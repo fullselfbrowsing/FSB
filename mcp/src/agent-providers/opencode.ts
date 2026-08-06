@@ -5,11 +5,13 @@ import {
   type AgentProviderAdapter,
   type AgentTask,
   type SpawnContext,
+  type SpawnPurpose,
   type SpawnSpec,
   type SupervisedChild,
 } from './adapter.js';
 import { createOpenCodeDetector } from './opencode-detect.js';
 import {
+  buildOpenCodeConnectionTestSpawnSpec,
   buildOpenCodeProfile,
   buildOpenCodeSpawnSpec,
   type OpenCodeProfileRuntime,
@@ -25,6 +27,7 @@ export type OpenCodeProfileRuntimeDependency = (
 ) => OpenCodeProfileRuntime;
 export type OpenCodeParserDependency = (
   stream: NodeJS.ReadableStream,
+  options?: Readonly<{ purpose: SpawnPurpose }>,
 ) => AsyncIterable<AgentEvent>;
 export type OpenCodeTreeKillDependency = (
   child: SupervisedChild,
@@ -83,6 +86,9 @@ export function createOpenCodeAdapter(
     },
 
     async buildSpawn(task: AgentTask, ctx: SpawnContext): Promise<SpawnSpec> {
+      if (ctx.purpose === 'connection_test') {
+        return buildOpenCodeConnectionTestSpawnSpec(task, ctx);
+      }
       const scopes = ctx.runtimeScopes;
       if (!scopes) {
         return buildOpenCodeSpawnSpec(task, ctx, resolveProfileRuntime(ctx));
@@ -107,8 +113,11 @@ export function createOpenCodeAdapter(
       ).spawnSpec;
     },
 
-    parseEvents(stream: NodeJS.ReadableStream): AsyncIterable<AgentEvent> {
-      return parseEvents(stream);
+    parseEvents(
+      stream: NodeJS.ReadableStream,
+      options?: Readonly<{ purpose: SpawnPurpose }>,
+    ): AsyncIterable<AgentEvent> {
+      return parseEvents(stream, options);
     },
 
     kill(child: SupervisedChild, options: { grace: number }): Promise<void> {

@@ -2206,6 +2206,19 @@ async function runAgentIteration(sessionId, options) {
         } catch (_e) { /* swallow - fire-and-forget */ }
       }
 
+      // Toolbar icon: the autopilot's own dispatches classify exactly like a
+      // direct MCP call, so one rule covers both surfaces. call.name is the
+      // canonical tool name here, not the wire verb.
+      try {
+        if (session.animatedActionHighlights !== false
+            && globalThis.fsbActionIcon
+            && typeof globalThis.fsbActionIcon.noteActivity === 'function'
+            && typeof resolveIconActivity === 'function') {
+          var iconActivity = resolveIconActivity(call.name);
+          if (iconActivity) globalThis.fsbActionIcon.noteActivity(session.tabId, iconActivity);
+        }
+      } catch (_e) { /* the icon is presentation-only */ }
+
       // --- Local tool interception (Phase 138 on-demand context) ---
       if (call.name === 'get_page_snapshot') {
         // CTX-01: Fetch markdown snapshot from content script
@@ -2474,6 +2487,7 @@ async function runAgentIteration(sessionId, options) {
       } else {
         // Standard tool: dispatch through unified executor
         result = await _executeTool(call.name, call.args, session.tabId, {
+          animateActionIcon: session.animatedActionHighlights,
           cdpHandler: executeCDPToolDirect
             ? function(verb, params, tabId) { return executeCDPToolDirect({ tool: verb, params: params }, tabId); }
             : null,

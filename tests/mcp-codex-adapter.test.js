@@ -952,6 +952,7 @@ async function collectEvents(parser, input) {
 function codexContext(reference, authState = 'chatgpt', version = '0.142.5') {
   const privateMcpConfigPath = '/fixture/runtime/codex-run/mcp.json';
   return {
+    purpose: 'delegation',
     adapterId: 'codex',
     detection: {
       installed: true,

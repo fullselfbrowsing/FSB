@@ -657,6 +657,9 @@ function _delegationValidPreflightResponse(value) {
     'agent_unpaired',
     'auth_unauthenticated',
     'auth_unknown',
+    'bridge_session_unavailable',
+    'extension_origin_mismatch',
+    'native_host_missing',
     'provider_status_refresh',
     'runtime_unavailable',
     'unsupported_provider'
@@ -1506,7 +1509,7 @@ function _renderDelegationConsent(options) {
     'p',
     'delegation-state-note',
     'This turns off confirmation for future ' + providerLabel
-      + ' runs on this browser. You can restore confirmation in Providers.'
+      + ' runs on this browser.'
   ));
 
   if (_delegationUiState.errorCode) {
@@ -1540,7 +1543,7 @@ function _renderDelegationConsent(options) {
 }
 
 function _openDelegationProviderSetup() {
-  openControlPanelSection('providers');
+  openControlPanelSection('api-config');
 }
 
 async function _copyDelegationDoctorCommand() {
@@ -1554,6 +1557,44 @@ async function _copyDelegationDoctorCommand() {
       if (mount.announcer) mount.announcer.textContent = 'Doctor command copied';
     }
   } catch (_error) { /* clipboard failure leaves the visible literal available */ }
+}
+
+async function _copyDelegationPairResetCommand() {
+  var command = 'npx -y fsb-mcp-server pair --reset';
+  try {
+    if (typeof navigator !== 'undefined'
+        && navigator.clipboard
+        && typeof navigator.clipboard.writeText === 'function') {
+      await navigator.clipboard.writeText(command);
+      var mount = _ensureDelegationMount();
+      if (mount.announcer) mount.announcer.textContent = 'Pairing reset command copied';
+    }
+  } catch (_error) { /* clipboard failure leaves the visible literal available */ }
+}
+
+async function _copyDelegationNativeHostInstallCommand() {
+  var helper = globalThis.FsbNativeHostInstallCommand;
+  var runtimeId = typeof chrome !== 'undefined'
+    && chrome.runtime
+    && typeof chrome.runtime.id === 'string'
+    ? chrome.runtime.id
+    : '';
+  var command = helper && typeof helper.buildInstallCommand === 'function'
+    ? helper.buildInstallCommand(
+        runtimeId,
+        typeof navigator !== 'undefined' ? navigator : null
+      )
+    : null;
+  if (!command) return;
+  try {
+    if (typeof navigator !== 'undefined'
+        && navigator.clipboard
+        && typeof navigator.clipboard.writeText === 'function') {
+      await navigator.clipboard.writeText(command);
+      var mount = _ensureDelegationMount();
+      if (mount.announcer) mount.announcer.textContent = 'Native helper install command copied';
+    }
+  } catch (_error) { /* the visible recovery copy remains actionable */ }
 }
 
 function _renderDelegationNativeWakeChecking(intentId, attemptId) {
@@ -1628,11 +1669,25 @@ function _renderDelegationPreflightFailure(result) {
   var secondaryLabel = 'Open provider setup';
   var secondaryAction = _openDelegationProviderSetup;
 
-  if (code === 'agent_unpaired') {
-    headingText = 'Pair this browser before starting ' + providerLabel;
-    bodyText = 'FSB can reach the local agent service, but this browser has not been paired with it. Open provider setup, pair this browser, then try this message again.';
-    primaryLabel = 'Open provider setup';
-    primaryAction = _openDelegationProviderSetup;
+  if (code === 'agent_unpaired' || code === 'native_host_missing') {
+    headingText = 'Automatic connection needs the native helper';
+    bodyText = 'Install or update the FSB native helper, then try this message again. FSB will connect this browser automatically.';
+    primaryLabel = 'Copy install command';
+    primaryAction = _copyDelegationNativeHostInstallCommand;
+    secondaryLabel = null;
+    secondaryAction = null;
+  } else if (code === 'extension_origin_mismatch') {
+    headingText = 'Native helper is paired with another extension';
+    bodyText = 'Reset the native helper pairing, then try this message again. FSB will pair this extension automatically.';
+    primaryLabel = 'Copy reset command';
+    primaryAction = _copyDelegationPairResetCommand;
+    secondaryLabel = null;
+    secondaryAction = null;
+  } else if (code === 'bridge_session_unavailable') {
+    headingText = 'Local agent session is unavailable';
+    bodyText = 'Run the doctor command, restart the local FSB service if prompted, then try this message again.';
+    primaryLabel = 'Copy doctor command';
+    primaryAction = _copyDelegationDoctorCommand;
     secondaryLabel = null;
     secondaryAction = null;
   } else if (code === 'unsupported_provider') {
@@ -1645,7 +1700,7 @@ function _renderDelegationPreflightFailure(result) {
   } else if (code === 'auth_unauthenticated') {
     headingText = providerLabel + ' cannot start this task';
     bodyText = 'Sign in to ' + providerLabel
-      + ' first. Open provider setup, refresh status, then try this message again.';
+      + ' locally, then try this message again.';
     primaryLabel = 'Open provider setup';
     primaryAction = _openDelegationProviderSetup;
     secondaryLabel = 'Back to message';
@@ -1653,7 +1708,7 @@ function _renderDelegationPreflightFailure(result) {
   } else if (code === 'auth_unknown') {
     headingText = providerLabel + ' cannot start this task';
     bodyText = providerLabel
-      + ' sign-in status could not be verified. Open provider setup, refresh status, then try this message again.';
+      + ' sign-in status could not be verified. Use Test Connection in API Configuration, then try again.';
     primaryLabel = 'Open provider setup';
     primaryAction = _openDelegationProviderSetup;
     secondaryLabel = 'Back to message';
@@ -1661,7 +1716,7 @@ function _renderDelegationPreflightFailure(result) {
   } else if (code === 'start_rejected') {
     headingText = providerLabel + ' cannot start this task';
     bodyText = providerLabel
-      + ' sign-in changed before this run. Refresh provider status and review the billing method before trying again.';
+      + ' sign-in changed before this run. Sign in locally again, then retry the message.';
     primaryLabel = 'Open provider setup';
     primaryAction = _openDelegationProviderSetup;
     secondaryLabel = 'Back to message';
@@ -1684,12 +1739,16 @@ function _renderDelegationPreflightFailure(result) {
   _delegationRunStopControls = [];
   _restoreLegacyStopControl();
   mount.state.removeAttribute('aria-live');
-  if (code === 'agent_offline' || code === 'runtime_unavailable') {
+  if (code === 'agent_offline'
+      || code === 'runtime_unavailable'
+      || code === 'bridge_session_unavailable') {
     mount.state.setAttribute('role', 'alert');
   } else {
     mount.state.removeAttribute('role');
   }
-  var offlinePresentation = code === 'agent_offline' || code === 'runtime_unavailable';
+  var offlinePresentation = code === 'agent_offline'
+    || code === 'runtime_unavailable'
+    || code === 'bridge_session_unavailable';
   var heading = offlinePresentation
     ? _delegationSemanticHeading(
       'h2', 'delegation-state-heading delegation-semantic-heading', headingText, 'danger'
@@ -1700,9 +1759,13 @@ function _renderDelegationPreflightFailure(result) {
   heading.tabIndex = -1;
   mount.state.appendChild(heading);
   mount.state.appendChild(_delegationElement('p', 'delegation-state-body', bodyText));
-  if (code === 'agent_offline' || code === 'runtime_unavailable') {
+  if (offlinePresentation || code === 'extension_origin_mismatch') {
     mount.state.appendChild(_delegationElement(
-      'code', 'delegation-doctor-command', 'fsb-mcp-server doctor'
+      'code',
+      'delegation-doctor-command',
+      code === 'extension_origin_mismatch'
+        ? 'npx -y fsb-mcp-server pair --reset'
+        : 'fsb-mcp-server doctor'
     ));
   }
   var actions = _delegationElement('div', 'delegation-state-actions');
@@ -2058,7 +2121,7 @@ function _renderDelegationRunHeader(container, snapshot) {
   else if (stopped) headingText = _delegationStoppedHeading(snapshot);
   else if (offline) headingText = 'Agent offline';
   else if (disconnected) headingText = 'Agent connection lost';
-  else if (unpaired) headingText = 'Pair this browser before starting ' + providerLabel;
+  else if (unpaired) headingText = 'Automatic connection needs the native helper';
   else if (unsupported) {
     headingText = (snapshot.provider ? snapshot.provider.label : 'Selected provider')
       + ' cannot run browser tasks';
@@ -2112,11 +2175,11 @@ function _renderDelegationRunHeader(container, snapshot) {
     container.appendChild(_delegationElement(
       'p',
       'delegation-state-body',
-      'FSB can reach the local agent service, but this browser has not been paired with it. Open provider setup, pair this browser, then try this message again.'
+      'Install or update the FSB native helper, then try again. FSB will connect this browser automatically.'
     ));
     _appendDelegationActionRow(container, [{
-      label: 'Open provider setup',
-      handler: _openDelegationProviderSetup
+      label: 'Copy install command',
+      handler: _copyDelegationNativeHostInstallCommand
     }]);
   } else if (unsupported) {
     container.appendChild(_delegationElement(
@@ -3683,18 +3746,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       const replayBtn = e.target.closest('.history-replay-btn');
       if (replayBtn) {
         e.stopPropagation();
-        // Phase 11 FINT-20 WR-03 fix -- gate history replay on the
-        // foreign-owned check. The history-replay-btn is dynamically
-        // rendered into the history list AFTER applyInputLockout's
-        // snapshot, so it cannot be dimmed via the lockout class.
-        // Without this guard, clicking replay while another agent owns
-        // the active tab would silently fail downstream (startReplay
-        // dispatches a replaySession message that targets the active
-        // tab). Early-return + console.warn surfaces the edge case.
-        if (await _isActiveTabForeignOwned()) {
-          console.warn('[sidepanel] history replay blocked -- active tab is foreign-owned');
-          return;
-        }
         const sessionId = replayBtn.dataset.sessionId;
         if (sessionId) {
           startReplay(sessionId);
@@ -5367,6 +5418,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       break;
     }
 
+    case 'replayDecisionRequired': {
+      if (request.sessionId !== currentSessionId) return;
+      renderReplayDecisionPrompt(request);
+      break;
+    }
+
     case 'statusUpdate':
       if (request.sessionId === currentSessionId) {
         // Auto-switch to chat view if user is on history while automation runs
@@ -5969,6 +6026,11 @@ async function loadHistoryList() {
       var costDisplay = session.totalCost > 0
         ? '<span class="history-cost">$' + session.totalCost.toFixed(4) + '</span>'
         : '';
+      var idleClosed = session.status === 'expired' ||
+        (session.status === 'stopped' && session.outcomeDetails?.reason === 'idle_timeout');
+      var statusLabel = idleClosed ? 'Idle-closed' : (session.status || 'unknown');
+      var statusClass = idleClosed ? 'idle-closed' : (session.status || '');
+      var hasReplayDetails = (session.actionCount > 0) || !!session.replayIntegrity;
       return '<div class="history-item" data-session-id="' + escapeHtml(session.id) + '">' +
         '<div class="history-item-info">' +
           '<div class="history-item-task">' + escapeHtml(session.task || 'Unknown task') + '</div>' +
@@ -5979,10 +6041,10 @@ async function loadHistoryList() {
             (session.mode === 'mcp-agent'
               ? '<span class="history-source-badge mcp">MCP · ' + escapeHtml(session.mcpClient || 'Agent') + '</span>'
               : '<span class="history-source-badge">Autopilot</span>') +
-            '<span class="history-status ' + (session.status || '') + '">' + escapeHtml(session.status || 'unknown') + '</span>' +
+            '<span class="history-status ' + escapeHtml(statusClass) + '">' + escapeHtml(statusLabel) + '</span>' +
           '</div>' +
         '</div>' +
-        (session.actionCount > 0 ?
+        (hasReplayDetails ?
           '<button class="history-replay-btn" data-session-id="' + escapeHtml(session.id) + '" title="Replay session">' +
             '<i class="fa fa-play"></i>' +
           '</button>' : '') +
@@ -6000,37 +6062,179 @@ async function loadHistoryList() {
   }
 }
 
-async function startReplay(sessionId) {
-  if (isRunning) {
-    addMessage('Cannot replay while another automation is running. Stop the current task first.', 'system');
-    return;
-  }
+function sendReplayRuntimeMessage(message) {
+  return new Promise((resolve, reject) => {
+    chrome.runtime.sendMessage(message, (response) => {
+      if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+      else resolve(response);
+    });
+  });
+}
 
-  // Switch to chat view to show replay progress
-  if (isHistoryViewActive) {
-    showChatView();
-  }
-
-  addMessage('Starting replay...', 'system');
-  addStatusMessage('Preparing replay...');
-
-  try {
-    const response = await new Promise((resolve, reject) => {
-      chrome.runtime.sendMessage({
-        action: 'replaySession',
-        sessionId: sessionId
-      }, (resp) => {
-        if (chrome.runtime.lastError) {
-          reject(new Error(chrome.runtime.lastError.message));
-        } else {
-          resolve(resp);
+function renderReplayDecisionPrompt(request) {
+  if (!request?.sessionId) return null;
+  const existing = chatMessages.querySelector(
+    '.replay-decision-card[data-replay-session-id="' + CSS.escape(request.sessionId) + '"]'
+  );
+  if (existing) return existing;
+  updateStatusMessage('Replay paused before a potentially duplicated write.');
+  const prompt = document.createElement('div');
+  prompt.className = 'message system new replay-decision-card';
+  prompt.dataset.replaySessionId = request.sessionId;
+  const text = document.createElement('div');
+  text.className = 'replay-decision-text';
+  text.textContent = `Step ${request.stepNumber}: ${request.tool}. ${request.error}`;
+  prompt.appendChild(text);
+  const actions = document.createElement('div');
+  actions.className = 'replay-decision-actions';
+  ['retry', 'skip', 'stop'].forEach((decision) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'replay-decision-btn ' + decision;
+    button.textContent = decision.charAt(0).toUpperCase() + decision.slice(1);
+    button.addEventListener('click', async () => {
+      Array.from(actions.querySelectorAll('button')).forEach((item) => { item.disabled = true; });
+      try {
+        const response = await sendReplayRuntimeMessage({
+          action: 'replayStepDecision',
+          sessionId: request.sessionId,
+          decision
+        });
+        if (!response?.success) throw new Error(response?.error || 'Replay decision failed');
+        prompt.remove();
+        if (decision !== 'stop') {
+          updateStatusMessage(decision === 'retry' ? 'Retrying replay step...' : 'Skipping replay step...');
         }
-      });
+      } catch (error) {
+        Array.from(actions.querySelectorAll('button')).forEach((item) => { item.disabled = false; });
+        addMessage('Could not apply replay decision: ' + error.message, 'error');
+      }
+    });
+    actions.appendChild(button);
+  });
+  prompt.appendChild(actions);
+  chatMessages.appendChild(prompt);
+  scrollToBottom();
+  return prompt;
+}
+
+function replayRiskLabel(step) {
+  if (step.replay?.availability === 'needs-input') return 'Blocked · redacted input';
+  if (step.replay?.availability === 'unsupported') return 'Inspect only';
+  if (step.replay?.availability === 'approval-per-step') return 'Per-step approval';
+  if (step.replay?.availability === 'approval-once') return 'Confirmation required';
+  return step.replay?.risk === 'navigation' ? 'Navigation' : 'Read only';
+}
+
+function renderReplayPreview(preview) {
+  const card = document.createElement('div');
+  card.className = 'message system new replay-preview-card';
+
+  const heading = document.createElement('div');
+  heading.className = 'replay-preview-heading';
+  heading.textContent = 'Verified replay preview';
+  card.appendChild(heading);
+
+  const meta = document.createElement('div');
+  meta.className = 'replay-preview-meta';
+  const provenance = preview.provenance === 'legacy-import' ? 'Imported legacy' : 'Capture attested';
+  meta.textContent = provenance + ' · ' + preview.counts.total + ' recorded · ' +
+    preview.counts.executable + ' executable · ' + preview.counts.blocked + ' inspect only';
+  card.appendChild(meta);
+
+  const origin = document.createElement('div');
+  origin.className = 'replay-preview-origin';
+  try { origin.textContent = 'Fresh tab: ' + new URL(preview.startUrl).origin; }
+  catch (_error) { origin.textContent = 'Fresh recorded-site tab'; }
+  card.appendChild(origin);
+
+  const timeline = document.createElement('div');
+  timeline.className = 'replay-preview-timeline';
+  preview.steps.forEach((step, index) => {
+    const row = document.createElement('div');
+    row.className = 'replay-preview-step ' + (step.replay?.availability || 'unsupported');
+    const title = document.createElement('span');
+    title.className = 'replay-preview-step-title';
+    title.textContent = (index + 1) + '. ' + (step.capability?.slug || step.tool || 'Unknown call');
+    const risk = document.createElement('span');
+    risk.className = 'replay-preview-step-risk';
+    risk.textContent = replayRiskLabel(step);
+    row.appendChild(title);
+    row.appendChild(risk);
+    if (step.replay?.reason) {
+      const reason = document.createElement('div');
+      reason.className = 'replay-preview-step-reason';
+      reason.textContent = step.replay.reason;
+      row.appendChild(reason);
+    }
+    timeline.appendChild(row);
+  });
+  card.appendChild(timeline);
+  chatMessages.appendChild(card);
+  scrollToBottom();
+  return card;
+}
+
+async function startReplay(sessionId) {
+  try {
+    const preview = await sendReplayRuntimeMessage({
+      action: 'prepareSessionReplay',
+      sessionId
+    });
+    if (!preview?.success) throw new Error(preview?.error || 'Replay verification failed');
+
+    if (preview.pendingDecision) {
+      if (isHistoryViewActive) showChatView();
+      currentSessionId = preview.pendingDecision.sessionId;
+      setRunningState(preview.pendingDecision.tabId, preview.pendingDecision.sessionId);
+      renderReplayDecisionPrompt(preview.pendingDecision);
+      return;
+    }
+    if (isRunning) {
+      addMessage('Cannot replay while another automation is running. Stop the current task first.', 'system');
+      return;
+    }
+
+    if (isHistoryViewActive) showChatView();
+    renderReplayPreview(preview);
+
+    if (preview.counts.executable === 0) {
+      addMessage('This recording is verified for inspection, but it has no executable steps.', 'system');
+      return;
+    }
+
+    const approvedScopes = [];
+    const onceSteps = preview.steps.filter((step) => step.replay?.availability === 'approval-once');
+    const summary = onceSteps.length > 0
+      ? `Open a fresh tab and replay this timeline? This also approves ${onceSteps.length} DOM/CDP or capability write step${onceSteps.length === 1 ? '' : 's'} once for this run.`
+      : 'Open a fresh tab at the recorded site and replay the verified read/navigation timeline?';
+    if (!confirm(summary)) {
+      addMessage('Replay cancelled. The original recording was not changed.', 'system');
+      return;
+    }
+    if (onceSteps.length > 0) approvedScopes.push('write');
+
+    const perStep = preview.steps.filter((step) => step.replay?.availability === 'approval-per-step');
+    for (const step of perStep) {
+      const label = step.capability?.slug || step.tool;
+      if (!confirm(`Approve high-impact replay step ${step.index + 1}: ${label}?`)) {
+        addMessage('Replay cancelled because a high-impact step was not approved.', 'system');
+        return;
+      }
+      approvedScopes.push('step:' + step.id);
+    }
+
+    addStatusMessage('Opening a fresh replay tab...');
+    const response = await sendReplayRuntimeMessage({
+      action: 'replaySession',
+      sessionId,
+      manifestHash: preview.manifestHash,
+      approvedScopes
     });
 
     if (response && response.success) {
       currentSessionId = response.sessionId;
-      setRunningState(_activeTabIdSnapshot, response.sessionId);
+      setRunningState(response.tabId, response.sessionId);
       updateStatusMessage('Replaying...');
     } else {
       completeStatusMessage(response?.error || 'Failed to start replay', 'error');
@@ -6073,25 +6277,40 @@ async function loadSessionView(sessionId) {
     // Show the original task as a user message
     addMessage(session.task || 'Unknown task', 'user');
 
-    // Show action history entries
-    var actions = session.actionHistory || [];
+    // Prefer the persisted replay manifest. Legacy actionHistory remains the
+    // compatibility source for sessions that have not been imported yet.
+    var replaySteps = session.replay?.manifest?.steps || [];
+    var actions = replaySteps.length > 0 ? replaySteps : (session.actionHistory || []);
     if (actions.length > 0) {
-      addMessage('Session had ' + actions.length + ' action(s):', 'system');
+      var integrity = session.replay?.integrity || 'legacy';
+      var provenance = session.replay?.provenance === 'legacy-import'
+        ? 'Imported legacy'
+        : (integrity === 'verified'
+          ? 'Capture attested'
+          : (integrity === 'failed' ? 'Capture verification failed' : 'Capture awaiting verification'));
+      addMessage(provenance + ' · integrity ' + integrity + ' · ' + actions.length + ' recorded call(s):', 'system');
       for (var i = 0; i < actions.length; i++) {
         var action = actions[i];
-        var tool = action.tool || 'unknown';
-        var success = action.result?.success !== false;
+        var tool = action.capability?.slug || action.tool || 'unknown';
+        var success = action.success !== false && action.result?.success !== false;
         var params = '';
-        if (action.params) {
+        var actionParams = action.arguments || action.params;
+        if (actionParams) {
           try {
-            params = '(' + Object.entries(action.params)
+            params = '(' + Object.entries(actionParams)
               .map(function(entry) { return entry[0] + ': "' + String(entry[1]).substring(0, 60) + '"'; })
               .join(', ') + ')';
           } catch (e) {
             params = '';
           }
         }
-        var label = (success ? '[OK] ' : '[FAIL] ') + tool + params;
+        var replayLabel = action.replay ? ' · ' + replayRiskLabel(action) : '';
+        var failureDetail = !success && action.resultSummary
+          ? (action.resultSummary.error || action.resultSummary.message ||
+            action.resultSummary.errorCode || action.resultSummary.code || '')
+          : '';
+        var label = (success ? '[OK] ' : '[FAIL] ') + tool + params + replayLabel +
+          (failureDetail ? ' · ' + String(failureDetail).substring(0, 180) : '');
         addMessage(label, 'action');
       }
     } else {
@@ -6099,7 +6318,10 @@ async function loadSessionView(sessionId) {
     }
 
     // Show session status footer
-    var status = session.status || 'unknown';
+    var status = session.status === 'expired' ||
+      (session.status === 'stopped' && session.outcomeDetails?.reason === 'idle_timeout')
+      ? 'Idle-closed'
+      : (session.status || 'unknown');
     var endTime = session.endTime ? new Date(session.endTime).toLocaleString() : 'N/A';
     addMessage('Session ' + status + ' at ' + endTime, 'system');
 

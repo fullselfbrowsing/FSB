@@ -91,6 +91,7 @@ globalThis.document = {
 
 const Feed = require('../extension/ui/delegation-feed.js');
 const DelegationProviders = require('../extension/utils/delegation-providers.js');
+const NativeHostInstallCommand = require('../extension/utils/native-host-install-command.js');
 
 const DELEGATION_ID = 'delegation_fixture';
 const CLAUDE_ACCEPTED_IDENTITY = DelegationProviders.createAcceptedAgentIdentity(
@@ -609,18 +610,29 @@ const htmlSource = fs.readFileSync(path.join(root, 'extension/ui/sidepanel.html'
 const cssSource = fs.readFileSync(path.join(root, 'extension/ui/sidepanel.css'), 'utf8');
 
 const delegationProviderScript = '  <script src="../utils/delegation-providers.js"></script>\n';
+const nativeHostInstallScript = '  <script src="../utils/native-host-install-command.js"></script>\n';
 const sha256 = (value) => crypto.createHash('sha256').update(value).digest('hex');
 assert.equal((htmlSource.match(/src="\.\.\/utils\/delegation-providers\.js"/g) || []).length, 1,
   'side panel loads the canonical delegation provider helper exactly once');
+assert.equal((htmlSource.match(/src="\.\.\/utils\/native-host-install-command\.js"/g) || []).length, 1,
+  'side panel loads the native-host install command helper exactly once');
 assert(htmlSource.indexOf('../utils/delegation-providers.js') < htmlSource.indexOf('delegation-feed.js')
+    && htmlSource.indexOf('../utils/native-host-install-command.js') < htmlSource.indexOf('sidepanel.js')
     && htmlSource.indexOf('delegation-feed.js') < htmlSource.indexOf('sidepanel.js'),
-  'canonical provider identity loads before both side-panel consumers');
-assert.equal(sha256(htmlSource.replace(delegationProviderScript, '')),
+  'nonvisual helpers load before their side-panel consumers');
+assert.equal(sha256(htmlSource
+  .replace(delegationProviderScript, '')
+  .replace(nativeHostInstallScript, '')),
   '6185330e1d4d978f049684e469f8e8cd842f55086d338685358f9b4e5a7f19ba',
-  'the nonvisual helper dependency is the only side-panel HTML delta');
-assert.equal(sha256(cssSource),
+  'the two nonvisual helper dependencies are the only side-panel HTML deltas');
+const replayCssStart = cssSource.indexOf('.history-status.idle-closed {');
+const replayCssEnd = cssSource.indexOf('/* Phase 11 FINT-20', replayCssStart);
+assert(replayCssStart !== -1 && replayCssEnd > replayCssStart,
+  'the session-replay CSS block has stable boundaries');
+const delegationCssSource = cssSource.slice(0, replayCssStart) + cssSource.slice(replayCssEnd);
+assert.equal(sha256(delegationCssSource),
   'e5ce10787a66e525123937fa6bef0d151c84c4c29b53333baeb8309d48d2c3ca',
-  'the intentional delegated target-size CSS delta is exact');
+  'the intentional delegated target-size CSS delta remains exact outside replay UI');
 
 {
   const context = { FsbDelegationProviders: DelegationProviders };
@@ -727,10 +739,7 @@ assert(!/\.delegation-entry-tool-call\s*\{[^}]*var\(--fsb-primary\)/s.test(cssSo
 assert(cssSource.includes('color: var(--fsb-text-inverse);'),
   'primary delegation actions use the theme-aware inverse text token');
 const delegationCssStart = cssSource.indexOf('.delegation-run {');
-const delegationCssEnd = cssSource.indexOf(
-  '/* Phase 11 FINT-20 -- visually-hidden screen-reader-only utility.',
-  delegationCssStart
-);
+const delegationCssEnd = replayCssStart;
 const delegationCss = cssSource.slice(delegationCssStart, delegationCssEnd);
 assert(/\.delegation-action\s*\{[^}]*min-height:\s*44px[^}]*padding:\s*var\(--fsb-space-2\) var\(--fsb-space-4\)/s.test(
   delegationCss
@@ -788,7 +797,14 @@ console.log('\n--- Phase 61 consent and human-control contract ---');
   'Agent run ended after daemon restart',
   'The previous agent process was stopped and was not reattached. Start a new task when the local service is ready.',
   'Start a new task',
-  'FSB can reach the local agent service, but this browser has not been paired with it. Open provider setup, pair this browser, then try this message again.',
+  'Automatic connection needs the native helper',
+  'Install or update the FSB native helper, then try this message again. FSB will connect this browser automatically.',
+  'Copy install command',
+  'Native helper is paired with another extension',
+  'Reset the native helper pairing, then try this message again. FSB will pair this extension automatically.',
+  'Copy reset command',
+  'Local agent session is unavailable',
+  'Run the doctor command, restart the local FSB service if prompted, then try this message again.',
   'The selected provider does not support agents that control browser tabs. Choose a supported agent provider, then try this message again.',
   'Choose another provider',
   'Agent could not resume control',
@@ -895,7 +911,7 @@ assert(/e\.key === 'Escape'[\s\S]{0,120}_backToDelegationMessage\(\)/.test(panel
     'OpenCode may drive FSB browser tools for this task.'));
   assert(openCodeConsent.stateCard.textContent.includes('Trust OpenCode for future runs'));
   assert(openCodeConsent.stateCard.textContent.includes(
-    'This turns off confirmation for future OpenCode runs on this browser. You can restore confirmation in Providers.'));
+    'This turns off confirmation for future OpenCode runs on this browser.'));
   assert.deepEqual(findAll(openCodeConsent.stateCard, 'button').map((button) => button.textContent),
     ['Allow & start OpenCode', 'Back to message']);
   assert.equal(findAll(openCodeConsent.stateCard, 'h2')[0].focusCount, 1,
@@ -964,12 +980,26 @@ assert(panelSource.includes("stopBtn.addEventListener('click', _handleFixedStop)
     && panelSource.includes('return stopAutomation();'),
   'fixed Stop multiplexes to delegated authority only for the selected active snapshot');
 const doctorSource = extractNamedFunction(panelSource, '_copyDelegationDoctorCommand');
+const pairResetSource = extractNamedFunction(
+  panelSource,
+  '_copyDelegationPairResetCommand'
+);
+const nativeInstallSource = extractNamedFunction(
+  panelSource,
+  '_copyDelegationNativeHostInstallCommand'
+);
 const setupSource = extractNamedFunction(panelSource, '_openDelegationProviderSetup');
 assert(doctorSource.includes("var command = 'fsb-mcp-server doctor'")
     && doctorSource.includes('navigator.clipboard.writeText(command)')
-    && setupSource.includes("openControlPanelSection('providers')"),
-  'doctor recovery copies only the literal and opens only the local Providers section');
-assert(!/sendMessage|nativeMessaging|exec\s*\(|restart/i.test(doctorSource + '\n' + setupSource),
+    && pairResetSource.includes("var command = 'npx -y fsb-mcp-server pair --reset'")
+    && pairResetSource.includes('navigator.clipboard.writeText(command)')
+    && nativeInstallSource.includes('FsbNativeHostInstallCommand')
+    && nativeInstallSource.includes('chrome.runtime.id')
+    && setupSource.includes("openControlPanelSection('api-config')"),
+  'recovery copies bounded doctor, pairing-reset, and browser-bound install commands');
+assert(!/sendMessage|nativeMessaging|exec\s*\(|restart/i.test(
+  doctorSource + '\n' + pairResetSource + '\n' + nativeInstallSource + '\n' + setupSource
+),
   'doctor/setup actions cannot execute or restart a daemon, native host, or shell');
 
 console.log('\n--- Phase 63 native wake checking contract ---');
@@ -1376,6 +1406,8 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
       _clearDelegationElapsedTimer() {},
       _restoreLegacyStopControl() {},
       _copyDelegationDoctorCommand() {},
+      _copyDelegationPairResetCommand() {},
+      _copyDelegationNativeHostInstallCommand() {},
       _openDelegationProviderSetup() {},
       _backToDelegationMessage() {},
       _setDelegationHeaderStatus(label, tone) { headers.push({ label, tone }); },
@@ -1425,12 +1457,12 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
     assert.equal(findAll(stateCard, 'h2')[0].focusCount, 1,
       'unpaired convergence preserves the existing focused heading');
     assert.equal(findAll(stateCard, 'h2')[0].textContent,
-      'Pair this browser before starting Claude Code');
+      'Automatic connection needs the native helper');
     assert(stateCard.textContent.includes(
-      'FSB can reach the local agent service, but this browser has not been paired with it. Open provider setup, pair this browser, then try this message again.'
+      'Install or update the FSB native helper, then try this message again. FSB will connect this browser automatically.'
     ));
     assert.deepEqual(findAll(stateCard, 'button').map((button) => button.textContent), [
-      'Open provider setup'
+      'Copy install command'
     ]);
     assert.equal(findAll(stateCard, 'code').length, 0);
     assert.deepEqual(headers[1], { label: 'Ready', tone: '' });
@@ -1444,7 +1476,7 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
     });
     assert.equal(findAll(stateCard, 'h2')[0].textContent, 'OpenCode cannot start this task');
     assert(stateCard.textContent.includes(
-      'OpenCode sign-in changed before this run. Refresh provider status and review the billing method before trying again.'
+      'OpenCode sign-in changed before this run. Sign in locally again, then retry the message.'
     ));
     assert.deepEqual(findAll(stateCard, 'button').map((button) => button.textContent), [
       'Open provider setup', 'Back to message'
@@ -1457,11 +1489,11 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
     for (const [code, body] of [
       [
         'auth_unauthenticated',
-        'Sign in to Codex first. Open provider setup, refresh status, then try this message again.'
+        'Sign in to Codex locally, then try this message again.'
       ],
       [
         'auth_unknown',
-        'Codex sign-in status could not be verified. Open provider setup, refresh status, then try this message again.'
+        'Codex sign-in status could not be verified. Use Test Connection in API Configuration, then try again.'
       ]
     ]) {
       context._renderDelegationPreflightFailure({
@@ -1494,6 +1526,57 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
     ]);
     assert.equal(findAll(stateCard, 'h2')[0].focusCount, 1,
       'generic status failure retains the existing focused fallback');
+
+    context._renderDelegationPreflightFailure({
+      ok: false,
+      code: 'native_host_missing',
+      providerId: 'claude-code',
+      providerLabel: 'Claude Code'
+    });
+    assert.equal(findAll(stateCard, 'h2')[0].textContent,
+      'Automatic connection needs the native helper');
+    assert.deepEqual(findAll(stateCard, 'button').map((button) => button.textContent), [
+      'Copy install command'
+    ]);
+    assert.equal(findAll(stateCard, 'code').length, 0);
+    assert.equal(stateCard.getAttribute('role'), null);
+
+    context._renderDelegationPreflightFailure({
+      ok: false,
+      code: 'extension_origin_mismatch',
+      providerId: 'claude-code',
+      providerLabel: 'Claude Code'
+    });
+    assert.equal(findAll(stateCard, 'h2')[0].textContent,
+      'Native helper is paired with another extension');
+    assert.equal(findAll(stateCard, 'p')[0].textContent,
+      'Reset the native helper pairing, then try this message again. FSB will pair this extension automatically.');
+    assert.deepEqual(findAll(stateCard, 'button').map((button) => button.textContent), [
+      'Copy reset command'
+    ]);
+    assert.equal(findAll(stateCard, 'code')[0].textContent,
+      'npx -y fsb-mcp-server pair --reset');
+    assert.equal(stateCard.getAttribute('role'), null);
+    assert.deepEqual(headers[headers.length - 1], { label: 'Ready', tone: '' });
+    assert.equal(composerLocks[composerLocks.length - 1], false);
+
+    context._renderDelegationPreflightFailure({
+      ok: false,
+      code: 'bridge_session_unavailable',
+      providerId: 'claude-code',
+      providerLabel: 'Claude Code'
+    });
+    assert.equal(findAll(stateCard, 'h2')[0].textContent,
+      'Local agent session is unavailable');
+    assert.equal(findAll(stateCard, 'p')[0].textContent,
+      'Run the doctor command, restart the local FSB service if prompted, then try this message again.');
+    assert.deepEqual(findAll(stateCard, 'button').map((button) => button.textContent), [
+      'Copy doctor command'
+    ]);
+    assert.equal(findAll(stateCard, 'code')[0].textContent, 'fsb-mcp-server doctor');
+    assert.equal(stateCard.getAttribute('role'), 'alert');
+    assert.deepEqual(headers[headers.length - 1], { label: 'Agent offline', tone: 'error' });
+    assert.equal(composerLocks[composerLocks.length - 1], false);
   }
 
   {
@@ -1716,6 +1799,25 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
           providerLabel: 'Claude Code'
         }
       },
+      ...[
+        ['missing native helper', 'native_host_missing'],
+        ['native helper origin mismatch', 'extension_origin_mismatch'],
+        ['missing bridge session', 'bridge_session_unavailable']
+      ].map(([name, code]) => ({
+        name,
+        response: {
+          ok: false,
+          code,
+          providerId: 'claude-code',
+          providerLabel: 'Claude Code'
+        },
+        expected: {
+          ok: false,
+          code,
+          providerId: 'claude-code',
+          providerLabel: 'Claude Code'
+        }
+      })),
       ...[
         ['unauthenticated Codex', 'auth_unauthenticated'],
         ['unknown-auth Codex', 'auth_unknown']
@@ -3228,18 +3330,36 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
     const opened = [];
     const announcer = new TestNode('div');
     const context = {
-      navigator: { clipboard: { async writeText(value) { copied.push(value); } } },
+      navigator: {
+        brave: {},
+        clipboard: { async writeText(value) { copied.push(value); } }
+      },
+      chrome: {
+        runtime: { id: 'abcdefghijklmnopabcdefghijklmnop' }
+      },
+      FsbNativeHostInstallCommand: NativeHostInstallCommand,
       _ensureDelegationMount: () => ({ announcer }),
       openControlPanelSection(section) { opened.push(section); }
     };
     vm.createContext(context);
     vm.runInContext(extractNamedFunction(panelSource, '_copyDelegationDoctorCommand'), context);
+    vm.runInContext(
+      extractNamedFunction(panelSource, '_copyDelegationNativeHostInstallCommand'),
+      context
+    );
     vm.runInContext(extractNamedFunction(panelSource, '_openDelegationProviderSetup'), context);
     await context._copyDelegationDoctorCommand();
     assert.deepEqual(copied, ['fsb-mcp-server doctor']);
     assert.equal(announcer.textContent, 'Doctor command copied');
+    await context._copyDelegationNativeHostInstallCommand();
+    assert.deepEqual(copied, [
+      'fsb-mcp-server doctor',
+      'npx -y fsb-mcp-server install --native-host --browser brave'
+        + ' --extension-id abcdefghijklmnopabcdefghijklmnop'
+    ]);
+    assert.equal(announcer.textContent, 'Native helper install command copied');
     context._openDelegationProviderSetup();
-    assert.deepEqual(opened, ['providers']);
+    assert.deepEqual(opened, ['api-config']);
   }
 
   {

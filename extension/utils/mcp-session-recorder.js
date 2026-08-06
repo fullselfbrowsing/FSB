@@ -25,10 +25,11 @@
  * AI provider. createSession(overrides) remains the runtime schema factory,
  * with a manual same-keys object under bare Node.
  *
- * Persisted actionHistory entries are {tool, params, result, timestamp} so
- * the existing replay engine (background.js loadReplayableSession /
- * executeReplaySequence) consumes MCP sessions unmodified. Params and
- * results are cloned and recursively redacted under secret-bearing keys;
+ * Persisted actionHistory remains as a compatibility view. A parallel
+ * replayEntries timeline retains the sanitized wire invocation, route,
+ * target, capability identity, result, and failure state used to build the
+ * signed fsb-lattice-replay/v1 manifest. Params and results are cloned and
+ * recursively redacted under secret-bearing keys;
  * text/value are additionally redacted when field metadata identifies a
  * sensitive target. Ordinary replay-critical url/selector/text values remain
  * exact. Users can disable future MCP recording and configure MCP-only
@@ -45,7 +46,8 @@
  *     run -- recording here would double sessions).
  *   - Read-only bursts (agentId but never a visualSession sidecar) never
  *     birth sessions; sidecar-less calls only JOIN an already-open session
- *     for the same agentId.
+ *     for the same agentId. Capability invocations are the deliberate
+ *     exception and can birth a capability-only session.
  *
  * recordDispatch NEVER throws and never returns a meaningful value
  * (fire-and-forget contract, threat T-q7id-02) -- the dispatcher further
@@ -69,7 +71,7 @@
   var FSB_MCP_MEMORY_CANDIDATES_KEY = 'fsbMcpMemoryCandidates';
   var FSB_MCP_MEMORY_CANDIDATES_VERSION = 1;
   var FSB_MCP_REDACTION_VERSION_KEY = 'fsbMcpRedactionVersion';
-  var FSB_MCP_REDACTION_VERSION = 3;
+  var FSB_MCP_REDACTION_VERSION = 4;
   var FSB_MCP_SESSION_ALARM_PREFIX = 'fsbMcpSession:';
   var FSB_MCP_SESSION_IDLE_ALARM_PREFIX = FSB_MCP_SESSION_ALARM_PREFIX + 'idle:';
   var FSB_MCP_SESSION_RETENTION_ALARM = FSB_MCP_SESSION_ALARM_PREFIX + 'retention';
@@ -92,6 +94,7 @@
   // (automation-logger.js slice(-100)) so memory cannot grow unbounded on a
   // long-lived agent session.
   var MCP_SESSION_ACTION_HISTORY_CAP = 100;
+  var MCP_SESSION_REPLAY_ENTRY_CAP = 100;
 
   // Values under these keys are never useful for replay and must not enter
   // the buffer, history, raw logs, or long-term memory.
@@ -143,15 +146,8 @@
     /^u![A-Za-z0-9_-]+/
   ];
 
-  // Wire-verb -> legacy replay-name map. The replay engine's whitelist
-  // (background.js loadReplayableSession replayableTools) speaks the content
-  // script's camelCase verb namespace, and almost every action tool's wire
-  // verb already matches it (type_text ships as 'type', press_enter as
-  // 'pressEnter', ...). The only replay-worthy mismatches are the
-  // background-routed history tools, whose wire verb is their snake_case
-  // tool name. Non-replayable verbs (cdp*, dragdrop, siteSearch, tab ops)
-  // store verbatim -- the replay filter drops them naturally, exactly as it
-  // does for autopilot sessions.
+  // Wire-verb -> actionHistory compatibility names. The signed manifest uses
+  // replayEntries and therefore keeps the original wire verb unchanged.
   var MCP_REPLAY_TOOL_NAME_MAP = Object.freeze({
     go_back: 'goBack',
     go_forward: 'goForward'
@@ -429,7 +425,25 @@
 
   function cloneResultForReplay(result, params) {
     var sensitiveTarget = _targetLooksSensitive(params, 0) || _targetLooksSensitive(result, 0);
-    return _sanitizeReplayValue(result, {}, sensitiveTarget);
+    var clone = _sanitizeReplayValue(result, {}, sensitiveTarget);
+    _sanitizeReplaySummaryFieldsInPlace(clone, 0);
+    return clone;
+  }
+
+  function _sanitizeReplaySummaryFieldsInPlace(node, depth) {
+    if (!node || typeof node !== 'object' || depth > 8) return;
+    if (Array.isArray(node)) {
+      node.forEach(function (item) { _sanitizeReplaySummaryFieldsInPlace(item, depth + 1); });
+      return;
+    }
+    Object.keys(node).forEach(function (key) {
+      if (typeof node[key] === 'string' &&
+          /^(?:error|message|summary|reason|blocker|nextStep|description|detail)$/i.test(key)) {
+        node[key] = _sanitizeSummaryText(node[key], 5000);
+      } else if (node[key] && typeof node[key] === 'object') {
+        _sanitizeReplaySummaryFieldsInPlace(node[key], depth + 1);
+      }
+    });
   }
 
   function _sanitizeActionHistory(history) {
@@ -445,12 +459,177 @@
     });
   }
 
+  function _sanitizeReplayContext(context) {
+    if (!context || typeof context !== 'object') return {};
+    var clone = _sanitizeReplayValue(context, {}, false);
+    if (!clone || typeof clone !== 'object' || Array.isArray(clone)) clone = {};
+    if (typeof clone.targetUrl === 'string') {
+      clone.targetUrl = _sanitizeUrlForPersistence(clone.targetUrl);
+    }
+    if (typeof clone.targetOrigin === 'string') {
+      try {
+        var originUrl = new URL(clone.targetOrigin);
+        clone.targetOrigin = (originUrl.protocol === 'http:' || originUrl.protocol === 'https:')
+          ? originUrl.origin
+          : null;
+      } catch (_e) {
+        clone.targetOrigin = null;
+      }
+    }
+    return clone;
+  }
+
+  function _sanitizeReplayEntries(entries) {
+    if (!Array.isArray(entries)) return [];
+    return entries.slice(-MCP_SESSION_REPLAY_ENTRY_CAP).map(function (entry) {
+      var item = entry && typeof entry === 'object' ? entry : {};
+      var payload = _sanitizeRequestPayload(item.requestPayload || {}, item.response);
+      var safeContext = _sanitizeReplayContext(item.replayContext);
+      var rawTargetUrl = item.replayContext && typeof item.replayContext.targetUrl === 'string'
+        ? item.replayContext.targetUrl
+        : null;
+      return {
+        tool: typeof item.tool === 'string' ? item.tool : '',
+        requestPayload: payload,
+        response: cloneResultForReplay(item.response, payload.params),
+        success: item.success !== false,
+        dispatcher_route: typeof item.dispatcher_route === 'string' ? item.dispatcher_route : 'unknown',
+        timestamp: typeof item.timestamp === 'number' ? item.timestamp : null,
+        replayContext: safeContext,
+        redactedInputs: item.redactedInputs === true ||
+          _replayInputWasRedacted(item.tool, item.requestPayload || {}, payload),
+        targetRedacted: item.targetRedacted === true ||
+          (rawTargetUrl !== null && safeContext.targetUrl !== rawTargetUrl)
+      };
+    });
+  }
+
+  function _sanitizePersistedReplayRecord(replay) {
+    if (!replay || typeof replay !== 'object') return replay;
+    var sanitized = cloneReplayValue(replay, null);
+    if (!sanitized || !sanitized.manifest || !Array.isArray(sanitized.manifest.steps)) return sanitized;
+    var originalManifest = JSON.stringify(sanitized.manifest);
+    sanitized.manifest.provenance = sanitized.provenance === 'legacy-import' ? 'legacy-import' : 'capture';
+    var originalStartUrl = sanitized.manifest.startUrl;
+    var safeStartUrl = _sanitizeUrlForPersistence(originalStartUrl);
+    if (typeof originalStartUrl === 'string') sanitized.manifest.startUrl = safeStartUrl;
+    var startRedacted = typeof originalStartUrl === 'string' && originalStartUrl !== safeStartUrl;
+    var startMissing = typeof safeStartUrl !== 'string' || !/^https?:\/\//i.test(safeStartUrl);
+
+    sanitized.manifest.steps = sanitized.manifest.steps.map(function (step) {
+      if (!step || typeof step !== 'object') return step;
+      var originalArguments = step.arguments && typeof step.arguments === 'object' ? step.arguments : {};
+      var safeArguments = cloneParamsForReplay(originalArguments, step.result);
+      var argumentsRedacted = _containsRedactedReplayValue(safeArguments) ||
+        _differsAtSourcePaths(originalArguments, safeArguments);
+      step.arguments = safeArguments;
+      if (Object.prototype.hasOwnProperty.call(step, 'result')) {
+        step.result = cloneResultForReplay(step.result, originalArguments);
+      }
+      if (step.target && typeof step.target === 'object' && typeof step.target.url === 'string') {
+        var originalTargetUrl = step.target.url;
+        step.target.url = _sanitizeUrlForPersistence(originalTargetUrl);
+        if (step.target.url !== originalTargetUrl) step.target.redacted = true;
+      }
+      if (argumentsRedacted || step.target?.redacted === true || startRedacted || startMissing) {
+        var availability = step.replay && step.replay.availability;
+        if (availability === 'ready' || availability === 'approval-once' || availability === 'approval-per-step') {
+          step.inputState = 'redacted';
+          step.replay = {
+            risk: 'inspect-only',
+            availability: 'needs-input',
+            reason: startRedacted
+              ? 'The recorded starting URL contained sensitive input that was redacted'
+              : (startMissing
+                ? 'The recording does not contain a safe HTTP(S) starting URL'
+                : 'Sensitive input was redacted')
+          };
+        }
+      }
+      return step;
+    });
+    sanitized.manifest.startOrigin = safeStartUrl ? (function () {
+      try { return new URL(safeStartUrl).origin; } catch (_error) { return null; }
+    })() : null;
+    sanitized.manifest.startUrlState = startRedacted ? 'redacted' :
+      (startMissing ? 'missing' : 'ready');
+
+    if (JSON.stringify(sanitized.manifest) !== originalManifest) {
+      sanitized.integrity = 'pending';
+      sanitized.manifestHash = null;
+      sanitized.receipt = null;
+      sanitized.receiptCid = null;
+      sanitized.signerKid = null;
+      sanitized.lastRun = null;
+      sanitized.error = null;
+      if (globalThis.FsbLatticeReplay && typeof globalThis.FsbLatticeReplay.replayCounts === 'function') {
+        sanitized.counts = globalThis.FsbLatticeReplay.replayCounts(sanitized.manifest.steps);
+      }
+    }
+    return sanitized;
+  }
+
   function _sanitizeRequestPayload(payload, result) {
     var clone = _sanitizeReplayValue(payload, {}, false);
     if (!clone || typeof clone !== 'object' || Array.isArray(clone)) clone = {};
     var sourceParams = payload && typeof payload.params === 'object' ? payload.params : {};
     clone.params = cloneParamsForReplay(sourceParams, result);
     return clone;
+  }
+
+  function _containsRedactedReplayValue(value) {
+    if (value === REDACTED_VALUE) return true;
+    if (Array.isArray(value)) return value.some(_containsRedactedReplayValue);
+    if (!value || typeof value !== 'object') return false;
+    return Object.keys(value).some(function (key) {
+      return _containsRedactedReplayValue(value[key]);
+    });
+  }
+
+  function _replayInvocationPayload(tool, payload) {
+    var source = cloneReplayValue(payload, {});
+    if (!source || typeof source !== 'object' || Array.isArray(source)) return {};
+    if (tool === 'mcp:capabilities-invoke' || tool === 'invoke_capability') {
+      var capability = {
+        slug: typeof source.slug === 'string' ? source.slug : null,
+        params: source.params && typeof source.params === 'object' ? source.params : {}
+      };
+      if (typeof source.origin === 'string') capability.origin = source.origin;
+      return capability;
+    }
+    if (typeof tool === 'string' && tool.indexOf('mcp:') === 0) {
+      [
+        'agentId', 'agent_id', 'ownershipToken', 'ownership_token',
+        'connectionId', 'connection_id', 'visualSession', 'client'
+      ].forEach(function (key) { delete source[key]; });
+      return source;
+    }
+    return source.params && typeof source.params === 'object' ? source.params : {};
+  }
+
+  function _differsAtSourcePaths(source, sanitized) {
+    if (source === sanitized) return false;
+    if (source === null || sanitized === null || typeof source !== typeof sanitized) return true;
+    if (Array.isArray(source)) {
+      if (!Array.isArray(sanitized) || source.length !== sanitized.length) return true;
+      return source.some(function (item, index) {
+        return _differsAtSourcePaths(item, sanitized[index]);
+      });
+    }
+    if (source && typeof source === 'object') {
+      if (!sanitized || typeof sanitized !== 'object' || Array.isArray(sanitized)) return true;
+      return Object.keys(source).some(function (key) {
+        return !Object.prototype.hasOwnProperty.call(sanitized, key) ||
+          _differsAtSourcePaths(source[key], sanitized[key]);
+      });
+    }
+    return source !== sanitized;
+  }
+
+  function _replayInputWasRedacted(tool, rawPayload, sanitizedPayload) {
+    var source = _replayInvocationPayload(tool, rawPayload);
+    var sanitized = _replayInvocationPayload(tool, sanitizedPayload);
+    return _containsRedactedReplayValue(sanitized) || _differsAtSourcePaths(source, sanitized);
   }
 
   function _countCharacter(value, character) {
@@ -498,9 +677,10 @@
   function _sanitizeSummaryText(value, maxLength) {
     if (typeof value !== 'string') return '';
     var limit = maxLength || 2000;
-    // Bound attacker-controlled work before parsing, then enforce the public
-    // field cap again after URL normalization and redaction.
-    var text = value.trim().slice(0, limit);
+    // Bound attacker-controlled work before parsing while retaining enough
+    // lookahead to recognize a credential that crosses the public field cap.
+    // The public cap is enforced only after URL normalization and redaction.
+    var text = value.trim().slice(0, limit + 4096);
     text = text.replace(/\b(password|passwd|secret|access[_ -]?token|refresh[_ -]?token|api[_ -]?key|authorization|credential|private[_ -]?key)\s*[:=]\s*(?:"[^"]*"|'[^']*'|[^\s,;]+)/gi, function (_match, label) {
       return label + ': ' + REDACTED_VALUE;
     });
@@ -591,14 +771,24 @@
     var sourceParams = (sourcePayload.params && typeof sourcePayload.params === 'object')
       ? sourcePayload.params
       : {};
+    var sanitizedPayload = _sanitizeRequestPayload(sourcePayload, entry.response);
+    var safeContext = _sanitizeReplayContext(entry.replayContext);
+    var rawTargetUrl = entry.replayContext && typeof entry.replayContext.targetUrl === 'string'
+      ? entry.replayContext.targetUrl
+      : null;
     return {
       client: entry.client,
       tool: entry.tool,
-      requestPayload: _sanitizeRequestPayload(sourcePayload, entry.response),
+      requestPayload: sanitizedPayload,
       response: cloneResultForReplay(entry.response, sourceParams),
       success: entry.success,
       dispatcher_route: entry.dispatcher_route,
-      tabId: entry.tabId
+      tabId: entry.tabId,
+      replayContext: safeContext,
+      redactedInputs: entry.redactedInputs === true ||
+        _replayInputWasRedacted(entry.tool, sourcePayload, sanitizedPayload),
+      targetRedacted: entry.targetRedacted === true ||
+        (rawTargetUrl !== null && safeContext.targetUrl !== rawTargetUrl)
     };
   }
 
@@ -633,6 +823,10 @@
     }
     _scheduleRetentionAlarm();
     await _requestRetentionPrune();
+    if (typeof globalThis !== 'undefined' && globalThis.FsbLatticeReplay &&
+        typeof globalThis.FsbLatticeReplay.resumePendingSeals === 'function') {
+      globalThis.FsbLatticeReplay.resumePendingSeals().catch(function () { /* retry next wake */ });
+    }
   }
 
   // ---- Open-session buffer persistence (eviction survival) ----------------
@@ -829,6 +1023,7 @@
         record.visualReasons = _sanitizeSummaryTextList(record.visualReasons, 2000);
         record.lastUrl = _sanitizeUrlForPersistence(record.lastUrl);
         record.actionHistory = _sanitizeActionHistory(record.actionHistory);
+        record.replayEntries = _sanitizeReplayEntries(record.replayEntries);
       }
     });
     var bufferScrubbed = await _writeBufferEnvelope(bufferRecords);
@@ -855,6 +1050,7 @@
             _sanitizePersistedMcpSessionText(session);
             session.lastUrl = _sanitizeUrlForPersistence(session.lastUrl);
             session.actionHistory = _sanitizeActionHistory(session.actionHistory);
+            session.replay = _sanitizePersistedReplayRecord(session.replay);
             if (Array.isArray(session.logs)) {
               session.logs = session.logs.map(_sanitizeAutomationLogEntry);
             }
@@ -868,6 +1064,13 @@
           if (entry && entry.mode === 'mcp-agent' && typeof entry.id === 'string' && entry.id) {
             mcpSessionIds.add(entry.id);
             _sanitizePersistedMcpSessionText(entry);
+            var fullSession = sessionLogs[entry.id];
+            if (fullSession && fullSession.replay) {
+              entry.replayIntegrity = fullSession.replay.integrity || null;
+              entry.replayProvenance = fullSession.replay.provenance || null;
+              entry.replayableCount = fullSession.replay.counts?.executable || 0;
+              entry.replayBlockedCount = fullSession.replay.counts?.blocked || 0;
+            }
           }
         });
 
@@ -910,6 +1113,10 @@
       lastUrl: _sanitizeUrlForPersistence(session.lastUrl),
       visualReasons: _sanitizeSummaryTextList(session.visualReasons, 2000),
       actionHistory: session.actionHistory.slice(),
+      replayEntries: _sanitizeReplayEntries(session.replayEntries),
+      startUrl: _sanitizeUrlForPersistence(session.startUrl),
+      startUrlRedacted: session.startUrlRedacted === true,
+      startOrigin: typeof session.startOrigin === 'string' ? session.startOrigin : null,
       sawActionTool: session.sawActionTool === true
     };
   }
@@ -1137,9 +1344,9 @@
   function _closeReasonSessionFields(reason) {
     if (reason === 'expired') {
       return _lifecycleSessionFields({
-        status: 'expired',
+        status: 'stopped',
         outcome: 'stopped',
-        reason: 'expired',
+        reason: 'idle_timeout',
         text: null
       });
     }
@@ -1395,8 +1602,8 @@
       _disarmIdleAlarm(session);
       _persistOpenSessions();
 
-      // >=1-action persistence gate (defence in depth -- the JOIN rule
-      // already prevents sidecar-less births).
+      // >=1-invocation persistence gate. Read-only bursts still cannot birth;
+      // capability invocation is the explicit sidecar-less birth case.
       if (session.sawActionTool !== true || session.actionHistory.length < 1) return null;
 
       var endTime = _now();
@@ -1421,6 +1628,26 @@
         mcpClient: session.client
       };
       Object.assign(overrides, closeFields);
+
+      if (typeof globalThis !== 'undefined' && globalThis.FsbLatticeReplay &&
+          typeof globalThis.FsbLatticeReplay.createReplayRecord === 'function') {
+        try {
+          overrides.replay = globalThis.FsbLatticeReplay.createReplayRecord({
+            sessionId: session.sessionId,
+            task: safeTask,
+            status: closeFields.status,
+            outcome: closeFields.outcome,
+            outcomeDetails: closeFields.outcomeDetails,
+            startTime: session.startTime,
+            endTime: endTime,
+            startUrl: session.startUrl,
+            startUrlRedacted: session.startUrlRedacted === true,
+            lastUrl: session.lastUrl,
+            mode: 'mcp-agent',
+            client: session.client
+          }, session.replayEntries, 'capture');
+        } catch (_e) { /* actionHistory remains the compatibility source */ }
+      }
 
       var memoryCandidate = _registerMemoryCandidate(session, endTime);
 
@@ -1455,6 +1682,13 @@
             var saveResult = logger.saveSession(session.sessionId, sessionObject);
             if (saveResult && typeof saveResult.catch === 'function') {
               saveResult.catch(function () { /* best-effort */ });
+            }
+            if (overrides.replay && saveResult && typeof saveResult.then === 'function' &&
+                typeof globalThis !== 'undefined' && globalThis.FsbLatticeReplay &&
+                typeof globalThis.FsbLatticeReplay.sealPersistedSession === 'function') {
+              saveResult.then(function () {
+                return globalThis.FsbLatticeReplay.sealPersistedSession(session.sessionId);
+              }).catch(function () { /* retry a pending seal on a later wake */ });
             }
           }
         } catch (_e) { /* never let history persistence break close */ }
@@ -1508,23 +1742,32 @@
       var sidecar = (payload.visualSession && typeof payload.visualSession === 'object')
         ? payload.visualSession
         : null;
+      var replayContext = entry.replayContext && typeof entry.replayContext === 'object'
+        ? entry.replayContext
+        : {};
+      var capabilityBirth = entry.tool === 'mcp:capabilities-invoke' && Number.isFinite(numericTabId);
 
       var session = null;
       var key = null;
 
-      if (sidecar) {
+      if (sidecar || capabilityBirth) {
         // Action tool call -- the sidecar exists ONLY on mutating action
         // tools. Look up (or birth) the session keyed agentId+tabId.
         key = agentId + '::' + _tabKeyPart(numericTabId);
         session = _openSessions.get(key) || null;
         if (!session) {
           var sessionId = _generateSessionId();
-          var task = (typeof sidecar.visualReason === 'string' && sidecar.visualReason.length > 0)
+          var task = (sidecar && typeof sidecar.visualReason === 'string' && sidecar.visualReason.length > 0)
             ? _sanitizeSummaryText(sidecar.visualReason, 2000)
-            : String(entry.tool);
-          var client = (typeof sidecar.client === 'string' && sidecar.client.length > 0)
+            : (capabilityBirth && typeof payload.slug === 'string' && payload.slug
+              ? 'Capability: ' + _sanitizeSummaryText(payload.slug, 500)
+              : String(entry.tool));
+          var client = (sidecar && typeof sidecar.client === 'string' && sidecar.client.length > 0)
             ? sidecar.client
             : ((typeof entry.client === 'string' && entry.client.length > 0) ? entry.client : 'unknown');
+          var targetUrl = typeof replayContext.targetUrl === 'string'
+            ? _sanitizeUrlForPersistence(replayContext.targetUrl)
+            : null;
           session = {
             key: key,
             sessionId: sessionId,
@@ -1536,8 +1779,12 @@
             lastActivityAt: now,
             deadlineAt: now + MCP_SESSION_IDLE_DEATH_MS,
             lastUrl: null,
+            startUrl: targetUrl,
+            startUrlRedacted: entry.targetRedacted === true,
+            startOrigin: typeof replayContext.targetOrigin === 'string' ? replayContext.targetOrigin : null,
             visualReasons: [],
             actionHistory: [],
+            replayEntries: [],
             sawActionTool: false
           };
           _openSessions.set(key, session);
@@ -1552,8 +1799,7 @@
         // Read-only tool route or message route -- JOIN the exact agent/tab
         // session when the route supplied a tab identity. Only tab-less routes
         // fall back to the most recently active session for this agent. No open session -> ignore
-        // (this structurally enforces the >=1-action persistence gate:
-        // read-only calls never birth sessions).
+        // (this structurally enforces that ordinary reads never birth).
         session = _findSessionForAgentTab(agentId, numericTabId)
           || (numericTabId === null ? _findMostRecentSessionForAgent(agentId) : null);
         if (!session) return;
@@ -1574,6 +1820,29 @@
       });
       if (session.actionHistory.length > MCP_SESSION_ACTION_HISTORY_CAP) {
         session.actionHistory.splice(0, session.actionHistory.length - MCP_SESSION_ACTION_HISTORY_CAP);
+      }
+
+      session.replayEntries = Array.isArray(session.replayEntries) ? session.replayEntries : [];
+      session.replayEntries.push({
+        tool: entry.tool,
+        requestPayload: _sanitizeRequestPayload(payload, entry.response),
+        response: replayResult,
+        success: entry.success !== false,
+        dispatcher_route: entry.dispatcher_route,
+        timestamp: now,
+        replayContext: _sanitizeReplayContext(replayContext),
+        redactedInputs: entry.redactedInputs === true,
+        targetRedacted: entry.targetRedacted === true
+      });
+      if (session.replayEntries.length > MCP_SESSION_REPLAY_ENTRY_CAP) {
+        session.replayEntries.splice(0, session.replayEntries.length - MCP_SESSION_REPLAY_ENTRY_CAP);
+      }
+      if (!session.startUrl && typeof replayContext.targetUrl === 'string') {
+        session.startUrl = _sanitizeUrlForPersistence(replayContext.targetUrl);
+        session.startUrlRedacted = entry.targetRedacted === true;
+      }
+      if (!session.startOrigin && typeof replayContext.targetOrigin === 'string') {
+        session.startOrigin = replayContext.targetOrigin;
       }
 
       // lastUrl supplies safe domain/final-URL metadata to client-authored
@@ -1650,7 +1919,8 @@
         response: input.response,
         success: input.success !== false,
         dispatcher_route: 'bridge-action',
-        tabId: input.tabId
+        tabId: input.tabId,
+        replayContext: input.replayContext
       });
     } catch (_e) { /* fire-and-forget */ }
   }
@@ -1690,6 +1960,10 @@
             lastUrl: _sanitizeUrlForPersistence(record.lastUrl),
             visualReasons: _sanitizeSummaryTextList(record.visualReasons, 2000),
             actionHistory: _sanitizeActionHistory(record.actionHistory),
+            replayEntries: _sanitizeReplayEntries(record.replayEntries),
+            startUrl: _sanitizeUrlForPersistence(record.startUrl),
+            startUrlRedacted: record.startUrlRedacted === true,
+            startOrigin: typeof record.startOrigin === 'string' ? record.startOrigin : null,
             sawActionTool: record.sawActionTool === true
           };
           _openSessions.set(key, session);
@@ -1715,6 +1989,10 @@
     }
     _scheduleRetentionAlarm();
     await _requestRetentionPrune();
+    if (typeof globalThis !== 'undefined' && globalThis.FsbLatticeReplay &&
+        typeof globalThis.FsbLatticeReplay.resumePendingSeals === 'function') {
+      await globalThis.FsbLatticeReplay.resumePendingSeals().catch(function () { /* retry on the next wake */ });
+    }
   }
 
   function _registerStorageListener() {
@@ -1805,6 +2083,7 @@
     handleAlarm: handleAlarm,
     cloneParamsForReplay: cloneParamsForReplay,
     cloneResultForReplay: cloneResultForReplay,
+    sanitizeSummaryTextForPersistence: _sanitizeSummaryText,
     // Compatibility alias retained for existing tests/callers.
     redactParams: cloneParamsForReplay,
     FSB_MCP_SESSION_BUFFER_KEY: FSB_MCP_SESSION_BUFFER_KEY,

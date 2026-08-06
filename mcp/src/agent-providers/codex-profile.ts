@@ -129,10 +129,11 @@ export const CODEX_FSB_DEVELOPER_INSTRUCTIONS = [
 type OwnDataRecord = Readonly<Record<string, unknown>>;
 
 interface ValidatedCodexContext {
+  readonly purpose: 'delegation' | 'connection_test';
   readonly command: string;
   readonly argvPrefix: readonly string[];
   readonly scratchDirectory: string;
-  readonly directRuntime: DirectRuntimeReference;
+  readonly directRuntime: DirectRuntimeReference | null;
   readonly authState: 'chatgpt' | 'api_key';
 }
 
@@ -192,7 +193,17 @@ function absolutePath(value: unknown, label: string): string {
 }
 
 function validateContext(contextValue: SpawnContext): ValidatedCodexContext {
-  const context = ownRecord(contextValue, [
+  const purposeDescriptor = contextValue && typeof contextValue === 'object'
+    ? Object.getOwnPropertyDescriptor(contextValue, 'purpose')
+    : null;
+  const purpose = purposeDescriptor && Object.hasOwn(purposeDescriptor, 'value')
+    ? purposeDescriptor.value
+    : null;
+  if (purpose !== 'delegation' && purpose !== 'connection_test') {
+    invalid('spawn purpose');
+  }
+  const context = ownRecord(contextValue, purpose === 'delegation' ? [
+    'purpose',
     'adapterId',
     'detection',
     'delegationId',
@@ -202,6 +213,15 @@ function validateContext(contextValue: SpawnContext): ValidatedCodexContext {
     'runtimeFiles',
     'runtimeScopes',
     'directRuntimeReference',
+  ] : [
+    'purpose',
+    'adapterId',
+    'detection',
+    'delegationId',
+    'runtimeFingerprint',
+    'cwd',
+    'privateMcpConfigPath',
+    'runtimeFiles',
   ], 'spawn context');
   if (ownValue(context, 'adapterId') !== CODEX_ADAPTER_ID) invalid('adapter identity');
   const detection = ownRecord(ownValue(context, 'detection'), [
@@ -248,10 +268,14 @@ function validateContext(contextValue: SpawnContext): ValidatedCodexContext {
   if (runtimeFiles.length !== 1 || runtimeFiles[0] !== privateMcpConfigPath) {
     invalid('runtime files');
   }
-  const runtimeScopes = denseArray(ownValue(context, 'runtimeScopes'), 3, 'runtime scopes');
-  if (runtimeScopes.length !== 3) invalid('runtime scopes');
-  const directRuntime = validateDirectRuntimeReference(ownValue(context, 'directRuntimeReference'));
+  let directRuntime: DirectRuntimeReference | null = null;
+  if (purpose === 'delegation') {
+    const runtimeScopes = denseArray(ownValue(context, 'runtimeScopes'), 3, 'runtime scopes');
+    if (runtimeScopes.length !== 3) invalid('runtime scopes');
+    directRuntime = validateDirectRuntimeReference(ownValue(context, 'directRuntimeReference'));
+  }
   return Object.freeze({
+    purpose,
     command,
     argvPrefix: Object.freeze(argvPrefix),
     scratchDirectory: dirname(privateMcpConfigPath),
@@ -318,6 +342,20 @@ export function buildCodexConfigOverrides(endpoint: string): readonly string[] {
     'mcp_servers.fsb.enabled=true',
     `mcp_servers.fsb.enabled_tools=${JSON.stringify(CODEX_ALLOWED_MCP_TOOLS)}`,
     'mcp_servers.fsb.default_tools_approval_mode="approve"',
+  ];
+  return Object.freeze(overrides.flatMap((value) => ['-c', value]));
+}
+
+export function buildCodexConnectionTestOverrides(): readonly string[] {
+  const overrides = [
+    'project_doc_max_bytes=0',
+    'web_search="disabled"',
+    `developer_instructions=${tomlString(
+      'This is a connection validation. Do not use any tool. Reply with a short plain-text acknowledgement.',
+    )}`,
+    'shell_environment_policy.inherit="none"',
+    ...CODEX_DISABLED_TOOL_FEATURES.map((feature) => `features.${feature}=false`),
+    'mcp_servers={}',
   ];
   return Object.freeze(overrides.flatMap((value) => ['-c', value]));
 }
@@ -429,6 +467,33 @@ function authorityAttestation(
 export function buildCodexSpawnSpec(task: AgentTask, context: SpawnContext): SpawnSpec {
   validateTask(task);
   const validated = validateContext(context);
+  if (validated.purpose === 'connection_test') {
+    const configArguments = buildCodexConnectionTestOverrides();
+    return freezeSpawnSpec({
+      adapterId: CODEX_ADAPTER_ID,
+      profileVersion: CODEX_PROFILE_VERSION,
+      topology: Object.freeze({
+        kind: 'direct' as const,
+        task: Object.freeze({
+          role: 'direct_task' as const,
+          command: validated.command,
+          argv: Object.freeze([
+            ...validated.argvPrefix,
+            ...CODEX_BASE_ARGV,
+            ...configArguments,
+          ]),
+          cwd: validated.scratchDirectory,
+          privateFiles: Object.freeze([]),
+          fixedEnv: Object.freeze({ FSB_AGENT_PURPOSE: 'connection_test' }),
+          spawnSecretEnvBindings: Object.freeze([]),
+          stdin: 'task' as const,
+          stdout: 'agent_jsonl' as const,
+        }),
+      }),
+      attestations: Object.freeze([]),
+    });
+  }
+  if (!validated.directRuntime) invalid('direct runtime');
   const configArguments = buildCodexConfigOverrides(validated.directRuntime.endpoint);
   return freezeSpawnSpec({
     adapterId: CODEX_ADAPTER_ID,

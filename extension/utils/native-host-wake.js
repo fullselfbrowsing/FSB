@@ -3,11 +3,16 @@
 
   var NATIVE_HOST_NAME = 'io.github.fullselfbrowsing.fsb_native_host';
   var NATIVE_PROTOCOL_VERSION = 1;
+  var NATIVE_BOOTSTRAP_PROTOCOL_VERSION = 2;
   var PROBE_TIMEOUT_MS = 250;
   var WAKE_TIMEOUT_MS = 12000;
   var FAILURE_COOLDOWN_MS = 5000;
   var SAFE_ID_PATTERN = /^[A-Za-z0-9_-]{16,64}$/;
   var RESPONSE_KEYS = Object.freeze(['v', 'correlationId', 'outcome', 'reason']);
+  var BOOTSTRAP_SUCCESS_KEYS = Object.freeze([
+    'v', 'correlationId', 'outcome', 'reason', 'pairingCode'
+  ]);
+  var PAIRING_CODE_PATTERN = /^fsb-auth\.[A-Za-z0-9_-]{43}$/;
   var OUTCOME_REASONS = Object.freeze({
     already_running: Object.freeze(['daemon_already_ready']),
     started: Object.freeze(['daemon_started_ready']),
@@ -24,11 +29,23 @@
     ])
   });
   var CLOSED_FAILURE = Object.freeze({ ok: false });
+  var BOOTSTRAP_FAILURE_REASONS = Object.freeze([
+    'daemon_identity_mismatch',
+    'daemon_protocol_mismatch',
+    'runtime_invalid',
+    'wake_lock_timeout',
+    'serve_spawn_failed',
+    'serve_readiness_timeout',
+    'internal_failure',
+    'bridge_session_unavailable',
+    'extension_origin_mismatch'
+  ]);
 
   var presence = 'unknown';
   var presenceSettled = false;
   var presencePromise = null;
   var wakeInFlight = null;
+  var bootstrapInFlight = null;
   var cooldownUntil = 0;
 
   function runtimeApi() {
@@ -74,15 +91,16 @@
     return promise;
   }
 
-  function exactResponseFields(value) {
+  function exactResponseFields(value, expectedKeys) {
+    expectedKeys = expectedKeys || RESPONSE_KEYS;
     try {
       if (value === null || typeof value !== 'object' || Array.isArray(value)) return null;
       if (Object.getPrototypeOf(value) !== Object.prototype) return null;
       var keys = Reflect.ownKeys(value);
-      if (keys.length !== RESPONSE_KEYS.length) return null;
+      if (keys.length !== expectedKeys.length) return null;
       var fields = Object.create(null);
-      for (var index = 0; index < RESPONSE_KEYS.length; index += 1) {
-        var key = RESPONSE_KEYS[index];
+      for (var index = 0; index < expectedKeys.length; index += 1) {
+        var key = expectedKeys[index];
         if (keys[index] !== key) return null;
         var descriptor = Object.getOwnPropertyDescriptor(value, key);
         if (!descriptor
@@ -116,6 +134,53 @@
       outcome: fields.outcome,
       reason: fields.reason
     });
+  }
+
+  function validateBootstrapResponse(value, correlationId) {
+    var outcome;
+    try {
+      var descriptor = value && typeof value === 'object'
+        ? Object.getOwnPropertyDescriptor(value, 'outcome')
+        : null;
+      outcome = descriptor && Object.prototype.hasOwnProperty.call(descriptor, 'value')
+        ? descriptor.value
+        : undefined;
+    } catch (_error) {
+      return CLOSED_FAILURE;
+    }
+    var successful = outcome === 'already_running' || outcome === 'started';
+    var fields = exactResponseFields(
+      value,
+      successful ? BOOTSTRAP_SUCCESS_KEYS : RESPONSE_KEYS
+    );
+    if (!fields
+        || fields.v !== NATIVE_BOOTSTRAP_PROTOCOL_VERSION
+        || fields.correlationId !== correlationId
+        || !SAFE_ID_PATTERN.test(fields.correlationId)
+        || typeof fields.reason !== 'string') {
+      return CLOSED_FAILURE;
+    }
+    if (successful) {
+      var expectedReason = outcome === 'already_running'
+        ? 'daemon_already_ready'
+        : 'daemon_started_ready';
+      if (fields.reason !== expectedReason
+          || typeof fields.pairingCode !== 'string'
+          || !PAIRING_CODE_PATTERN.test(fields.pairingCode)) {
+        return CLOSED_FAILURE;
+      }
+      return Object.freeze({
+        ok: true,
+        outcome: outcome,
+        reason: fields.reason,
+        pairingCode: fields.pairingCode
+      });
+    }
+    if ((outcome !== 'unavailable' && outcome !== 'failed')
+        || BOOTSTRAP_FAILURE_REASONS.indexOf(fields.reason) === -1) {
+      return CLOSED_FAILURE;
+    }
+    return Object.freeze({ ok: false, reason: fields.reason });
   }
 
   function getPresence() {
@@ -282,9 +347,99 @@
     return tracked;
   }
 
+  function ensureBootstrap() {
+    if (bootstrapInFlight) return bootstrapInFlight.promise;
+
+    var attemptId;
+    try {
+      attemptId = mintSafeId();
+    } catch (_error) {
+      throw new Error('native_bootstrap_unavailable');
+    }
+    if (clockNow() < cooldownUntil) {
+      return tagWorkPromise(Promise.resolve(CLOSED_FAILURE), attemptId);
+    }
+
+    var correlationId;
+    try {
+      correlationId = mintSafeId();
+    } catch (_error) {
+      return tagWorkPromise(Promise.resolve(CLOSED_FAILURE), attemptId);
+    }
+
+    var token = Object.freeze({ attemptId: attemptId, correlationId: correlationId });
+    var work = new Promise(function(resolve) {
+      var runtime = runtimeApi();
+      var timer = null;
+      var settled = false;
+
+      function finish(result) {
+        if (settled) return;
+        settled = true;
+        if (timer !== null) {
+          global.clearTimeout(timer);
+          timer = null;
+        }
+        if (!result || result.ok !== true) {
+          cooldownUntil = Math.max(cooldownUntil, clockNow() + FAILURE_COOLDOWN_MS);
+        }
+        resolve(result || CLOSED_FAILURE);
+      }
+
+      timer = global.setTimeout(function() {
+        finish(CLOSED_FAILURE);
+      }, WAKE_TIMEOUT_MS);
+
+      if (!runtime || typeof runtime.sendNativeMessage !== 'function') {
+        finish(CLOSED_FAILURE);
+        return;
+      }
+      try {
+        runtime.sendNativeMessage(
+          NATIVE_HOST_NAME,
+          Object.freeze({
+            v: NATIVE_BOOTSTRAP_PROTOCOL_VERSION,
+            action: 'bootstrap',
+            correlationId: correlationId
+          }),
+          function(response) {
+            if (settled) return;
+            try {
+              if (runtime.lastError) {
+                presence = 'absent';
+                presenceSettled = true;
+                finish(CLOSED_FAILURE);
+                return;
+              }
+            } catch (_error) {
+              finish(CLOSED_FAILURE);
+              return;
+            }
+            presence = 'present';
+            presenceSettled = true;
+            finish(validateBootstrapResponse(response, correlationId));
+          }
+        );
+      } catch (_error) {
+        finish(CLOSED_FAILURE);
+      }
+    });
+
+    var tracked;
+    tracked = work.finally(function() {
+      if (bootstrapInFlight && bootstrapInFlight.token === token) {
+        bootstrapInFlight = null;
+      }
+    });
+    tagWorkPromise(tracked, attemptId);
+    bootstrapInFlight = Object.freeze({ token: token, promise: tracked });
+    return tracked;
+  }
+
   global.FsbNativeHostWake = Object.freeze({
     probePresence: probePresence,
     getPresence: getPresence,
-    ensureWake: ensureWake
+    ensureWake: ensureWake,
+    ensureBootstrap: ensureBootstrap
   });
 })(typeof globalThis !== 'undefined' ? globalThis : this);

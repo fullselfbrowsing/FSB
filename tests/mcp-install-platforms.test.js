@@ -311,12 +311,12 @@ function run() {
     assertEqual(helpResult.status, 0, 'help with native syntax exits cleanly');
     assertIncludes(
       helpOutput,
-      'fsb-mcp-server install --native-host [--extension-id <id>] Install the Chrome native messaging host',
+      'fsb-mcp-server install --native-host [--browser <chrome|edge|brave|chromium>] [--extension-id <id>] Install the selected browser native messaging host',
       'help names the exact optional native install syntax',
     );
     assertIncludes(
       helpOutput,
-      'fsb-mcp-server uninstall --native-host Remove the Chrome native messaging host',
+      'fsb-mcp-server uninstall --native-host [--browser <chrome|edge|brave|chromium>] Remove the selected browser native messaging host',
       'help names the exact native uninstall syntax',
     );
     assertIncludes(
@@ -501,6 +501,74 @@ function run() {
       );
     }
   });
+
+  if (process.platform !== 'win32') {
+    console.log('\n--- native cross-browser split state ---');
+    withTempHome('mcp-native-cross-browser-split', (fixture) => {
+      const manifestName = 'io.github.fullselfbrowsing.fsb_native_host.json';
+      const edgeManifestPath = process.platform === 'darwin'
+        ? path.join(
+          fixture.home,
+          'Library',
+          'Application Support',
+          'Microsoft Edge',
+          'NativeMessagingHosts',
+          manifestName,
+        )
+        : path.join(
+          fixture.home,
+          '.config',
+          'microsoft-edge',
+          'NativeMessagingHosts',
+          manifestName,
+        );
+      const chromeManifestPath = process.platform === 'darwin'
+        ? path.join(
+          fixture.home,
+          'Library',
+          'Application Support',
+          'Google',
+          'Chrome',
+          'NativeMessagingHosts',
+          manifestName,
+        )
+        : path.join(
+          fixture.home,
+          '.config',
+          'google-chrome',
+          'NativeMessagingHosts',
+          manifestName,
+        );
+      const orphanRegistration = '{"foreign":"edge-registration"}\n';
+      writeText(edgeManifestPath, orphanRegistration);
+
+      const installResult = runCli(['install', '--native-host'], fixture);
+      assertEqual(installResult.status, 1, 'Chrome install refuses an existing Edge registration');
+      assertIncludes(
+        `${installResult.stdout}${installResult.stderr}`,
+        'not changed: split-state',
+        'cross-browser install reports a stable split-state refusal',
+      );
+      assertEqual(
+        readText(edgeManifestPath),
+        orphanRegistration,
+        'cross-browser install preserves the existing Edge registration byte-for-byte',
+      );
+      assert(!fs.existsSync(chromeManifestPath), 'cross-browser install publishes no Chrome registration');
+      assert(
+        !fs.existsSync(path.join(fixture.home, '.fsb', 'native-host')),
+        'cross-browser install materializes no shared runtime',
+      );
+
+      const uninstallResult = runCli(['uninstall', '--native-host'], fixture);
+      assertEqual(uninstallResult.status, 1, 'Chrome uninstall refuses an existing Edge registration');
+      assertEqual(
+        readText(edgeManifestPath),
+        orphanRegistration,
+        'cross-browser uninstall preserves the existing Edge registration byte-for-byte',
+      );
+    });
+  }
 
   console.log('\n--- native npm CLI provenance ---');
   withTempHome('mcp-native-hostile-npm-cli', (fixture) => {

@@ -171,6 +171,12 @@ function createChromeStorageSessionMock() {
   passAssertEqual(snap.kind, 'survivability-snapshot', 'serialize produces SerializedSnapshot envelope');
   passAssertEqual(snap.version, 'lattice-survivability/v1', 'serialize version literal matches Lattice contract');
   passAssertEqual(JSON.stringify(adapter.deserialize(snap)), JSON.stringify(stateA), 'deserialize round-trips state byte-equal');
+  const secretSnap = adapter.serialize({ ownershipToken: 'must-not-persist', manifestHash: 'safe-hash' });
+  const secretRestored = adapter.deserialize(secretSnap);
+  passAssertEqual(secretRestored.ownershipToken, '[REDACTED_BY_LATTICE_ADAPTER]',
+    'ownership tokens are redacted from survivability snapshots');
+  passAssertEqual(secretRestored.manifestHash, 'safe-hash',
+    'stable replay identifiers remain available after snapshot redaction');
 
   // ---- Part 2b: ResumePolicy dispatch over the FSB-attempt-1 marker vocabulary ----
   console.log('\n--- Part 2b: ResumePolicy dispatch ---');

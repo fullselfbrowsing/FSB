@@ -506,12 +506,12 @@ function readDispatch(o) {
     passAssertEqual(logger.calls.saveSession.length, 1, 'idle expiry closed and persisted the session');
     passAssertEqual(logger.calls.saveSession[0].sessionData.actionHistory.length, 2,
       'expired session kept both recorded actions');
-    passAssertEqual(logger.calls.saveSession[0].sessionData.status, 'expired',
-      'idle expiry persists an expired status');
+    passAssertEqual(logger.calls.saveSession[0].sessionData.status, 'stopped',
+      'idle closure persists a stopped status');
     passAssertEqual(logger.calls.saveSession[0].sessionData.outcome, 'stopped',
       'idle expiry does not claim task success');
-    passAssertEqual(logger.calls.saveSession[0].sessionData.outcomeDetails.reason, 'expired',
-      'idle expiry preserves its non-terminal close reason');
+    passAssertEqual(logger.calls.saveSession[0].sessionData.outcomeDetails.reason, 'idle_timeout',
+      'idle closure records the explicit idle_timeout reason');
     passAssertEqual(Object.keys(recorder._peekOpenSessions()).length, 0, 'expired session removed from the map');
 
     recorder.recordTaskOutcome({
@@ -943,8 +943,10 @@ function readDispatch(o) {
     passAssertEqual(logger.calls.saveSession[0].sessionId, 'session_100', 'the EXPIRED session is the one persisted');
     passAssertEqual(logger.calls.saveSession[0].sessionData.mode, 'mcp-agent', 'restored close keeps mcp-agent mode');
     passAssertEqual(logger.calls.saveSession[0].sessionData.mcpClient, 'Codex', 'restored close keeps the client label');
-    passAssertEqual(logger.calls.saveSession[0].sessionData.status, 'expired',
-      'restored expired session keeps the expired status');
+    passAssertEqual(logger.calls.saveSession[0].sessionData.status, 'stopped',
+      'restored idle-closed session persists as stopped');
+    passAssertEqual(logger.calls.saveSession[0].sessionData.outcomeDetails.reason, 'idle_timeout',
+      'restored idle-closed session preserves idle_timeout');
     passAssertEqual(logger.calls.saveSession[0].sessionData.outcome, 'stopped',
       'restored expired session is not reported as successful');
     passAssertEqual(logger.calls.logSessionStart.length, 1,
@@ -960,8 +962,10 @@ function readDispatch(o) {
     await alarms.fireDue();
     passAssertEqual(logger.calls.saveSession.length, 2, 'live session closes when its restored deadline passes');
     passAssertEqual(logger.calls.saveSession[1].sessionId, 'session_200', 'live session persisted on expiry');
-    passAssertEqual(logger.calls.saveSession[1].sessionData.status, 'expired',
-      'rehydrated live session later persists as expired');
+    passAssertEqual(logger.calls.saveSession[1].sessionData.status, 'stopped',
+      'rehydrated live session later persists as stopped');
+    passAssertEqual(logger.calls.saveSession[1].sessionData.outcomeDetails.reason, 'idle_timeout',
+      'rehydrated live session records idle_timeout');
     passAssertEqual(logger.calls.saveSession[1].sessionData.outcome, 'stopped',
       'rehydrated expiry maps to stopped');
     await drainMicrotasks();
@@ -1092,8 +1096,8 @@ function readDispatch(o) {
       'non-replayable wire verb stored verbatim (replay filter drops it downstream)');
   }
 
-  // -- Test 15: replay-name map (review finding #2) ---------------------------------
-  console.log('\n--- Test 15: go_back/go_forward stored as replay whitelist names ---');
+  // -- Test 15: legacy names remain compatible without an execution whitelist -------
+  console.log('\n--- Test 15: legacy name compatibility under Lattice replay ---');
   {
     const { logger } = await freshSection();
     recorder.recordAction(bridgeAction({
@@ -1122,16 +1126,17 @@ function readDispatch(o) {
     passAssertEqual(logger.calls.logAction[0].action.tool, 'goBack',
       'logAction agrees with actionHistory on the mapped name');
 
-    // Pin the whitelist side of the contract: the mapped names exist in
-    // background.js loadReplayableSession's set literal, the wire names do
-    // not (which is exactly why the map is required).
+    // The compatibility actionHistory keeps its old names, while execution
+    // now loads the verified manifest and resolves routes dynamically.
     const bgSource = fs.readFileSync(BACKGROUND_PATH, 'utf8');
-    const wlMatch = bgSource.match(/replayableTools = new Set\(\[[\s\S]*?\]\)/);
-    passAssert(!!wlMatch, 'replayableTools set literal found in background.js');
-    passAssert(!!wlMatch && wlMatch[0].indexOf("'goBack'") !== -1 && wlMatch[0].indexOf("'goForward'") !== -1,
-      'replay whitelist contains the mapped names goBack/goForward');
-    passAssert(!!wlMatch && wlMatch[0].indexOf("'go_back'") === -1,
-      'replay whitelist does NOT contain wire name go_back (mapping is required)');
+    passAssert(bgSource.indexOf('replayableTools = new Set') === -1,
+      'legacy hard-coded replay whitelist is removed');
+    passAssert(bgSource.indexOf('prepareSessionReplay') !== -1 &&
+      bgSource.indexOf('FsbLatticeReplay.prepareReplay') !== -1,
+      'replay execution loads a verified Lattice materialization');
+    passAssert(bgSource.indexOf('fsbReplayDispatchStep') !== -1 &&
+      bgSource.indexOf('hasMcpMessageRoute(step.tool)') !== -1,
+      'replay dispatch resolves shared handlers instead of filtering wire verbs');
   }
 
   // -- Test 16: failure semantics + sidecar-less action calls -----------------------
@@ -1479,6 +1484,27 @@ function readDispatch(o) {
       !JSON.stringify(section.logger.calls.updateSessionOutcome[0].sessionData).includes(failedTaskSecret),
     'failure summaries remove standalone recognized credentials from memory and history');
 
+    section = await freshSection(1750000725000);
+    const boundarySecret = 'ghp_1234567890abcdefghijklmnop';
+    recorder.recordAction(bridgeAction({
+      agentId: 'agent-boundary', tool: 'click', params: { tab_id: 5 }, tabId: 5,
+      visualReason: 'Finish bounded summary', client: 'Codex', isFinal: true
+    }));
+    await recorder._drainForTests();
+    recorder.recordTaskOutcome({
+      tool: 'complete_task',
+      params: {
+        summary: 'x'.repeat(1994) + ' ' + boundarySecret,
+        tab_id: 5
+      },
+      payload: { agentId: 'agent-boundary' }
+    });
+    await recorder._drainForTests();
+    passAssert(!section.taskMemories.calls[0].text.includes(boundarySecret.slice(0, 5)) &&
+      !JSON.stringify(section.logger.calls.updateSessionOutcome[0].sessionData)
+        .includes(boundarySecret.slice(0, 5)),
+    'recognized credentials crossing the final summary cap leave no truncated secret prefix');
+
     section = await freshSection(1750000750000);
     recorder.recordAction(bridgeAction({
       agentId: 'agent-closed-partial', tool: 'click', params: { tab_id: 8 }, tabId: 8,
@@ -1811,6 +1837,87 @@ function readDispatch(o) {
       'Task Memory failure cannot permit a second history outcome');
     passAssertEqual(section.taskMemories.calls.length, 1,
       'Task Memory failure cannot make the terminal candidate reusable');
+  }
+
+  // -- Test 27: capability-only session births a full replay manifest --------------
+  console.log('\n--- Test 27: capability-only Lattice replay capture ---');
+  {
+    const replayHelpers = require('../extension/utils/lattice-replay.js');
+    const priorReplayGlobal = globalThis.FsbLatticeReplay;
+    globalThis.FsbLatticeReplay = Object.assign({}, replayHelpers, {
+      sealPersistedSession() { return Promise.resolve(true); }
+    });
+    const section = await freshSection(1750001400000);
+    recorder.recordDispatch({
+      client: 'Codex',
+      tool: 'mcp:capabilities-invoke',
+      requestPayload: {
+        agentId: 'agent-cap-only',
+        slug: 'github.get_repository',
+        params: { owner: 'fullselfbrowsing', repo: 'FSB' },
+        origin: 'https://github.com'
+      },
+      response: { success: true, name: 'FSB' },
+      success: true,
+      dispatcher_route: 'message',
+      tabId: 77,
+      replayContext: {
+        tabId: 77,
+        targetUrl: 'https://github.com/fullselfbrowsing/FSB',
+        targetOrigin: 'https://github.com',
+        routeFamily: 'capabilities',
+        slug: 'github.get_repository',
+        sideEffectClass: 'read',
+        service: 'GitHub',
+        tier: 'T1a'
+      }
+    });
+    recorder.recordDispatch({
+      client: 'Codex',
+      tool: 'mcp:future-unsupported',
+      requestPayload: { agentId: 'agent-cap-only', query: 'keep for inspection', tab_id: 77 },
+      response: { success: false, errorCode: 'mcp_route_unavailable' },
+      success: false,
+      dispatcher_route: 'unsupported-message',
+      tabId: 77,
+      replayContext: {
+        tabId: 77,
+        targetUrl: 'https://github.com/fullselfbrowsing/FSB',
+        targetOrigin: 'https://github.com',
+        routeFamily: 'unsupported'
+      }
+    });
+    await recorder._drainForTests();
+    const open = recorder._peekOpenSessions()['agent-cap-only::77'];
+    passAssert(!!open, 'capability invocation births a session without a prior DOM action');
+    passAssertEqual(open.task, 'Capability: github.get_repository',
+      'capability-only session gets an inspectable capability task label');
+    passAssertEqual(open.replayEntries.length, 2,
+      'failed unsupported traffic remains in the replay capture timeline');
+
+    section.time.advance(60001);
+    await section.alarms.fireDue();
+    await recorder._drainForTests();
+    const saved = section.logger.calls.saveSession[0].sessionData;
+    passAssertEqual(saved.replay.version, 'fsb-lattice-replay/v1',
+      'closed capability session persists the versioned replay contract');
+    passAssertEqual(saved.replay.provenance, 'capture',
+      'new capability session is capture provenance');
+    passAssertEqual(saved.replay.manifest.startUrl, 'https://github.com/fullselfbrowsing/FSB',
+      'manifest preserves the recorded HTTP(S) starting URL');
+    passAssertEqual(saved.replay.manifest.steps[0].capability.slug, 'github.get_repository',
+      'manifest preserves the exact capability slug');
+    passAssertDeepEqual(saved.replay.manifest.steps[0].arguments.params,
+      { owner: 'fullselfbrowsing', repo: 'FSB' },
+      'manifest preserves exact capability params');
+    passAssertEqual(saved.replay.manifest.steps[0].capability.sideEffectClass, 'read',
+      'manifest preserves the catalog side-effect class');
+    passAssertEqual(saved.replay.manifest.steps[1].replay.availability, 'unsupported',
+      'failed unsupported call is inspectable but non-executable');
+    passAssertEqual(saved.status, 'stopped', 'capability session idle-close status is stopped');
+    passAssertEqual(saved.outcomeDetails.reason, 'idle_timeout',
+      'capability session idle-close reason is idle_timeout');
+    globalThis.FsbLatticeReplay = priorReplayGlobal;
   }
 
   // -- Wrap up ---------------------------------------------------------------------

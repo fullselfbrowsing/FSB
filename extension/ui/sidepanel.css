@@ -2205,6 +2205,110 @@ body[data-sidepanel-view="history"] .author-footer {
   }
 }
 
+.history-status.idle-closed {
+  background: rgba(100, 116, 139, 0.12);
+  color: var(--text-secondary);
+  border-color: rgba(100, 116, 139, 0.24);
+}
+
+.replay-preview-card,
+.replay-decision-card {
+  width: min(100%, 440px);
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 14px;
+  border-left: 3px solid var(--primary-color);
+}
+
+.replay-preview-heading {
+  color: var(--text-primary);
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.replay-preview-meta,
+.replay-preview-origin,
+.replay-preview-step-reason,
+.replay-decision-text {
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.replay-preview-origin {
+  margin-top: 5px;
+  overflow-wrap: anywhere;
+}
+
+.replay-preview-timeline {
+  display: grid;
+  gap: 7px;
+  margin-top: 12px;
+}
+
+.replay-preview-step {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 10px;
+  padding: 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 9px;
+  background: var(--bg-primary);
+}
+
+.replay-preview-step.needs-input,
+.replay-preview-step.unsupported {
+  opacity: 0.72;
+}
+
+.replay-preview-step-title {
+  color: var(--text-primary);
+  font-weight: 600;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.replay-preview-step-risk {
+  color: var(--text-muted);
+  font-size: 10px;
+  text-align: right;
+}
+
+.replay-preview-step-reason {
+  grid-column: 1 / -1;
+  color: var(--text-muted);
+}
+
+.replay-decision-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.replay-decision-btn {
+  min-height: 34px;
+  padding: 7px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  cursor: pointer;
+}
+
+.replay-decision-btn.retry {
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+}
+
+.replay-decision-btn.stop {
+  color: var(--error-text);
+  border-color: var(--error-border);
+}
+
+.replay-decision-btn:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
 /* Phase 11 FINT-20 -- visually-hidden screen-reader-only utility.
    Used by the aria-describedby description span near the owner chip
    (sidepanel.html line ~27 post-Plan-11-02). Pattern from standard

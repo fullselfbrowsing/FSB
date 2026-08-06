@@ -78,6 +78,7 @@ const RUNTIME_CONTEXT_KEYS = Object.freeze([
 ]);
 
 const CONTEXT_KEYS = Object.freeze([
+  'purpose',
   'adapterId',
   'detection',
   'delegationId',
@@ -283,6 +284,7 @@ function validateTask(task: AgentTask): string {
 }
 
 interface ValidatedContext {
+  readonly purpose: 'delegation' | 'connection_test';
   readonly command: string;
   readonly argvPrefix: readonly string[];
   readonly cwd: string;
@@ -296,6 +298,10 @@ function validateContext(ctx: SpawnContext): ValidatedContext {
     hasRuntimeScopes ? CONTEXT_KEYS_WITH_SCOPES : CONTEXT_KEYS,
     'spawn context',
   );
+  const purpose = ownValue(context, 'purpose');
+  if (purpose !== 'delegation' && purpose !== 'connection_test') {
+    throw new Error('OpenCode profile requires a closed spawn purpose');
+  }
   if (ownValue(context, 'adapterId') !== OPENCODE_ADAPTER_ID) {
     throw new Error('OpenCode profile requires the canonical adapter id');
   }
@@ -371,6 +377,7 @@ function validateContext(ctx: SpawnContext): ValidatedContext {
     }));
   }
   return Object.freeze({
+    purpose,
     command,
     argvPrefix: Object.freeze(argvPrefix),
     cwd: absolutePath(ownValue(context, 'cwd'), 'working directory'),
@@ -800,6 +807,9 @@ export function buildOpenCodeProfile(
 ): OpenCodeProfile {
   const taskText = validateTask(task);
   const context = validateContext(ctx);
+  if (context.purpose !== 'delegation') {
+    throw new Error('OpenCode full profile is delegation-only');
+  }
   let delegationRuntime: OpenCodeProfileRuntime;
   let providerServerRuntime: OpenCodeProfileRuntime;
   let policyPreflightRuntime: OpenCodeProfileRuntime;
@@ -940,4 +950,73 @@ export function buildOpenCodeSpawnSpec(
   runtime: OpenCodeProfileRuntime,
 ): SpawnSpec {
   return buildOpenCodeProfile(task, ctx, runtime).spawnSpec;
+}
+
+export function buildOpenCodeConnectionTestSpawnSpec(
+  task: AgentTask,
+  ctx: SpawnContext,
+): SpawnSpec {
+  const taskText = validateTask(task);
+  const context = validateContext(ctx);
+  if (context.purpose !== 'connection_test' || context.runtimeScopes !== null) {
+    throw new Error('OpenCode connection-test context is invalid');
+  }
+  const config = {
+    share: 'disabled',
+    autoupdate: false,
+    default_agent: 'connection',
+    plugin: [],
+    command: {},
+    instructions: [],
+    agent: {
+      connection: {
+        mode: 'primary',
+        description: 'FSB local connection validation',
+        prompt: 'Do not use tools. Reply with a short plain-text acknowledgement.',
+        steps: 1,
+        permission: { '*': 'deny' },
+      },
+    },
+    mcp: {},
+  };
+  const fixedEnv = Object.freeze({
+    OPENCODE_CONFIG_CONTENT: JSON.stringify(config),
+    OPENCODE_DB: ':memory:',
+    OPENCODE_DISABLE_AUTOUPDATE: '1',
+    OPENCODE_DISABLE_CLAUDE_CODE_PROMPT: '1',
+    OPENCODE_DISABLE_EXTERNAL_SKILLS: '1',
+    OPENCODE_DISABLE_LSP_DOWNLOAD: '1',
+    OPENCODE_DISABLE_PROJECT_CONFIG: '1',
+    FSB_AGENT_PURPOSE: 'connection_test',
+  });
+  const spawnSpec = freezeSpawnSpec({
+    adapterId: OPENCODE_ADAPTER_ID,
+    profileVersion: OPENCODE_PROFILE_VERSION,
+    topology: Object.freeze({
+      kind: 'direct' as const,
+      task: Object.freeze({
+        role: 'direct_task' as const,
+        command: context.command,
+        argv: Object.freeze([
+          ...context.argvPrefix,
+          '--pure',
+          '--log-level', 'ERROR',
+          'run',
+          '--format', 'json',
+          '--agent', 'connection',
+        ]),
+        cwd: context.cwd,
+        privateFiles: Object.freeze([]),
+        fixedEnv,
+        spawnSecretEnvBindings: Object.freeze([]),
+        stdin: 'task' as const,
+        stdout: 'agent_jsonl' as const,
+      }),
+    }),
+    attestations: Object.freeze([]),
+  });
+  if (!taskAbsent(taskText, spawnSpec)) {
+    throw new Error('Agent task crossed the OpenCode stdin-only boundary');
+  }
+  return spawnSpec;
 }

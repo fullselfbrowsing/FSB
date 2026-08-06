@@ -1,5 +1,6 @@
 import { endianness } from 'node:os';
 import {
+  NATIVE_HOST_BOOTSTRAP_PROTOCOL_VERSION,
   NATIVE_HOST_MAX_FRAME_BYTES,
   NATIVE_HOST_PROTOCOL_VERSION,
 } from './constants.js';
@@ -9,6 +10,7 @@ const DEFAULT_TRAILING_SETTLE_MS = 10;
 const CORRELATION_PATTERN = /^[A-Za-z0-9_-]{16,64}$/u;
 const ORIGIN_PATTERN = /^chrome-extension:\/\/[a-p]{32}\/$/u;
 const PARENT_WINDOW_PATTERN = /^--parent-window=([0-9]{1,20})$/u;
+const PAIRING_CODE_PATTERN = /^fsb-auth\.[A-Za-z0-9_-]{43}$/u;
 
 const OUTCOME_REASONS = Object.freeze({
   already_running: Object.freeze(['daemon_already_ready']),
@@ -43,12 +45,40 @@ export type NativeWakeRequest = Readonly<{
   correlationId: string;
 }>;
 
+export type NativeBootstrapRequest = Readonly<{
+  v: 2;
+  action: 'bootstrap';
+  correlationId: string;
+}>;
+
+export type NativeHostRequest = NativeWakeRequest | NativeBootstrapRequest;
+
 export type NativeWakeResponse = Readonly<{
   v: 1;
   correlationId: string;
   outcome: 'already_running' | 'started' | 'unavailable' | 'failed';
   reason: NativeWakeReason;
 }>;
+
+export type NativeBootstrapFailureReason =
+  | NativeWakeReason
+  | 'bridge_session_unavailable'
+  | 'extension_origin_mismatch';
+
+export type NativeBootstrapResponse =
+  | Readonly<{
+    v: 2;
+    correlationId: string;
+    outcome: 'already_running' | 'started';
+    reason: 'daemon_already_ready' | 'daemon_started_ready';
+    pairingCode: string;
+  }>
+  | Readonly<{
+    v: 2;
+    correlationId: string;
+    outcome: 'unavailable' | 'failed';
+    reason: NativeBootstrapFailureReason;
+  }>;
 
 export type NativeInvocation = Readonly<{
   origin: string;
@@ -121,6 +151,38 @@ export function validateNativeWakeRequest(value: unknown): NativeWakeRequest {
   });
 }
 
+export function validateNativeHostRequest(value: unknown): NativeHostRequest {
+  const fields = exactDataValues(
+    value,
+    ['v', 'action', 'correlationId'],
+    'native_invalid_request',
+  );
+  if (!isCorrelationId(fields.correlationId)) {
+    return fail('native_invalid_request');
+  }
+  if (
+    fields.v === NATIVE_HOST_PROTOCOL_VERSION
+    && fields.action === 'wake'
+  ) {
+    return Object.freeze({
+      v: 1,
+      action: 'wake',
+      correlationId: fields.correlationId,
+    });
+  }
+  if (
+    fields.v === NATIVE_HOST_BOOTSTRAP_PROTOCOL_VERSION
+    && fields.action === 'bootstrap'
+  ) {
+    return Object.freeze({
+      v: 2,
+      action: 'bootstrap',
+      correlationId: fields.correlationId,
+    });
+  }
+  return fail('native_invalid_request');
+}
+
 function exactInvocationArgs(argv: unknown): readonly string[] {
   try {
     if (!Array.isArray(argv) || Object.getPrototypeOf(argv) !== Array.prototype) {
@@ -173,7 +235,7 @@ export function validateNativeInvocation(
   return Object.freeze({ origin: expectedOrigin, parentWindow });
 }
 
-function decodeRequest(body: Buffer): NativeWakeRequest {
+function decodeRequest(body: Buffer): NativeHostRequest {
   let text: string;
   try {
     text = new TextDecoder('utf-8', { fatal: true }).decode(body);
@@ -186,7 +248,7 @@ function decodeRequest(body: Buffer): NativeWakeRequest {
   } catch (_error) {
     return fail('native_invalid_json');
   }
-  return validateNativeWakeRequest(value);
+  return validateNativeHostRequest(value);
 }
 
 function readNativeLength(header: Buffer): number {
@@ -208,7 +270,7 @@ type NativeReadOptions = Readonly<{
 export function readNativeWakeRequest(
   input: NativeReadable,
   options: NativeReadOptions = {},
-): Promise<NativeWakeRequest | null> {
+): Promise<NativeHostRequest | null> {
   const settleMs = options.settleMs ?? DEFAULT_TRAILING_SETTLE_MS;
   if (!Number.isSafeInteger(settleMs) || settleMs < 0 || settleMs > 1000) {
     return Promise.reject(new NativeHostProtocolError('native_invalid_settle'));
@@ -221,7 +283,7 @@ export function readNativeWakeRequest(
     let headerOffset = 0;
     let body: Buffer | null = null;
     let bodyOffset = 0;
-    let request: NativeWakeRequest | null = null;
+    let request: NativeHostRequest | null = null;
     let timer: ReturnType<typeof setTimeout> | null = null;
     let settled = false;
 
@@ -234,7 +296,7 @@ export function readNativeWakeRequest(
         timer = null;
       }
     };
-    const finish = (value: NativeWakeRequest | null) => {
+    const finish = (value: NativeHostRequest | null) => {
       if (settled) return;
       settled = true;
       cleanup();
@@ -337,6 +399,94 @@ export function encodeNativeWakeResponse(
   expectedCorrelationId: string,
 ): Buffer {
   const response = validateNativeWakeResponse(value);
+  if (response.correlationId !== expectedCorrelationId) {
+    return fail('native_correlation_mismatch');
+  }
+  const body = Buffer.from(JSON.stringify(response), 'utf8');
+  if (body.length === 0 || body.length > NATIVE_HOST_MAX_FRAME_BYTES) {
+    return fail('native_response_oversize');
+  }
+  const header = Buffer.alloc(NATIVE_HEADER_BYTES);
+  if (endianness() === 'LE') header.writeUInt32LE(body.length, 0);
+  else header.writeUInt32BE(body.length, 0);
+  return Buffer.concat([header, body], header.length + body.length);
+}
+
+function validateNativeBootstrapResponse(value: unknown): NativeBootstrapResponse {
+  let outcome: unknown;
+  try {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      return fail('native_invalid_response');
+    }
+    const descriptor = Object.getOwnPropertyDescriptor(value, 'outcome');
+    outcome = descriptor && Object.hasOwn(descriptor, 'value')
+      ? descriptor.value
+      : undefined;
+  } catch (_error) {
+    return fail('native_invalid_response');
+  }
+
+  const successful = outcome === 'already_running' || outcome === 'started';
+  const fields = exactDataValues(
+    value,
+    successful
+      ? ['v', 'correlationId', 'outcome', 'reason', 'pairingCode']
+      : ['v', 'correlationId', 'outcome', 'reason'],
+    'native_invalid_response',
+  );
+  if (
+    fields.v !== NATIVE_HOST_BOOTSTRAP_PROTOCOL_VERSION
+    || !isCorrelationId(fields.correlationId)
+    || typeof fields.reason !== 'string'
+  ) {
+    return fail('native_invalid_response');
+  }
+  if (successful) {
+    const expectedReason = outcome === 'already_running'
+      ? 'daemon_already_ready'
+      : 'daemon_started_ready';
+    if (
+      fields.reason !== expectedReason
+      || typeof fields.pairingCode !== 'string'
+      || !PAIRING_CODE_PATTERN.test(fields.pairingCode)
+    ) {
+      return fail('native_invalid_response');
+    }
+    return Object.freeze({
+      v: 2,
+      correlationId: fields.correlationId,
+      outcome,
+      reason: fields.reason,
+      pairingCode: fields.pairingCode,
+    }) as NativeBootstrapResponse;
+  }
+
+  const wakeReasons = outcome === 'unavailable'
+    ? OUTCOME_REASONS.unavailable
+    : (outcome === 'failed' ? OUTCOME_REASONS.failed : []);
+  const additionalReasons = ['bridge_session_unavailable', 'extension_origin_mismatch'];
+  if (
+    (outcome !== 'unavailable' && outcome !== 'failed')
+    || (
+      !(wakeReasons as readonly string[]).includes(fields.reason)
+      && !additionalReasons.includes(fields.reason)
+    )
+  ) {
+    return fail('native_invalid_response');
+  }
+  return Object.freeze({
+    v: 2,
+    correlationId: fields.correlationId,
+    outcome,
+    reason: fields.reason as NativeBootstrapFailureReason,
+  }) as NativeBootstrapResponse;
+}
+
+export function encodeNativeBootstrapResponse(
+  value: unknown,
+  expectedCorrelationId: string,
+): Buffer {
+  const response = validateNativeBootstrapResponse(value);
   if (response.correlationId !== expectedCorrelationId) {
     return fail('native_correlation_mismatch');
   }

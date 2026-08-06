@@ -7,7 +7,10 @@
 #include <wchar.h>
 
 #define FSB_PROTOCOL L"fsb-native-host-registry-v1"
-#define FSB_KEY L"Software\\Google\\Chrome\\NativeMessagingHosts\\io.github.fullselfbrowsing.fsb_native_host"
+#define FSB_CHROME_KEY L"Software\\Google\\Chrome\\NativeMessagingHosts\\io.github.fullselfbrowsing.fsb_native_host"
+#define FSB_EDGE_KEY L"Software\\Microsoft\\Edge\\NativeMessagingHosts\\io.github.fullselfbrowsing.fsb_native_host"
+#define FSB_BRAVE_KEY L"Software\\BraveSoftware\\Brave-Browser\\NativeMessagingHosts\\io.github.fullselfbrowsing.fsb_native_host"
+#define FSB_CHROMIUM_KEY L"Software\\Chromium\\NativeMessagingHosts\\io.github.fullselfbrowsing.fsb_native_host"
 #define FSB_ROLE_MARKER L"fsb-native-host-registry-helper-v1"
 #define FSB_MAX_VALUE_BYTES 4096U
 #define FSB_MAX_INPUT_BYTES (16U + FSB_MAX_VALUE_BYTES)
@@ -92,7 +95,7 @@ static int write_response(
   return 0;
 }
 
-static int query_default(DWORD operation, REGSAM view) {
+static int query_default(DWORD operation, REGSAM view, const wchar_t *host_key) {
   HKEY key = NULL;
   LONG result;
   DWORD type = 0U;
@@ -103,7 +106,7 @@ static int query_default(DWORD operation, REGSAM view) {
   BYTE *utf8_value = NULL;
   int exit_code;
 
-  result = RegOpenKeyExW(HKEY_CURRENT_USER, FSB_KEY, 0U, KEY_QUERY_VALUE | view, &key);
+  result = RegOpenKeyExW(HKEY_CURRENT_USER, host_key, 0U, KEY_QUERY_VALUE | view, &key);
   if (result == ERROR_FILE_NOT_FOUND || result == ERROR_PATH_NOT_FOUND) {
     return write_response(operation, FSB_STATUS_ABSENT, 0U, NULL, 0U);
   }
@@ -208,7 +211,7 @@ static int query_default(DWORD operation, REGSAM view) {
   return exit_code;
 }
 
-static int inspect_key(DWORD operation) {
+static int inspect_key(DWORD operation, const wchar_t *host_key) {
   HKEY key = NULL;
   LONG result;
   DWORD subkeys = 0U;
@@ -219,7 +222,7 @@ static int inspect_key(DWORD operation) {
 
   result = RegOpenKeyExW(
     HKEY_CURRENT_USER,
-    FSB_KEY,
+    host_key,
     0U,
     KEY_QUERY_VALUE | KEY_ENUMERATE_SUB_KEYS | KEY_WOW64_32KEY,
     &key
@@ -347,7 +350,7 @@ static int read_write_value(wchar_t **value_out, DWORD *characters_out) {
   return 1;
 }
 
-static int write_default(DWORD operation) {
+static int write_default(DWORD operation, const wchar_t *host_key) {
   wchar_t *value = NULL;
   DWORD characters = 0U;
   HKEY key = NULL;
@@ -357,7 +360,7 @@ static int write_default(DWORD operation) {
   if (!read_write_value(&value, &characters)) return fail("FSBRG_E_INPUT");
   result = RegCreateKeyExW(
     HKEY_CURRENT_USER,
-    FSB_KEY,
+    host_key,
     0U,
     NULL,
     REG_OPTION_NON_VOLATILE,
@@ -383,11 +386,11 @@ static int write_default(DWORD operation) {
   return write_response(operation, FSB_STATUS_OK, 0U, NULL, 0U);
 }
 
-static int delete_default(DWORD operation) {
+static int delete_default(DWORD operation, const wchar_t *host_key) {
   HKEY key = NULL;
   LONG result = RegOpenKeyExW(
     HKEY_CURRENT_USER,
-    FSB_KEY,
+    host_key,
     0U,
     KEY_SET_VALUE | KEY_WOW64_32KEY,
     &key
@@ -400,13 +403,13 @@ static int delete_default(DWORD operation) {
   return write_response(operation, FSB_STATUS_OK, 0U, NULL, 0U);
 }
 
-static int delete_empty_key(DWORD operation) {
+static int delete_empty_key(DWORD operation, const wchar_t *host_key) {
   HKEY key = NULL;
   DWORD subkeys = 0U;
   DWORD values = 0U;
   LONG result = RegOpenKeyExW(
     HKEY_CURRENT_USER,
-    FSB_KEY,
+    host_key,
     0U,
     KEY_QUERY_VALUE | KEY_ENUMERATE_SUB_KEYS | KEY_WOW64_32KEY,
     &key
@@ -421,7 +424,7 @@ static int delete_empty_key(DWORD operation) {
   if (result != ERROR_SUCCESS || subkeys != 0U || values != 0U) {
     return fail("FSBRG_E_DELETE_KEY");
   }
-  result = RegDeleteKeyExW(HKEY_CURRENT_USER, FSB_KEY, KEY_WOW64_32KEY, 0U);
+  result = RegDeleteKeyExW(HKEY_CURRENT_USER, host_key, KEY_WOW64_32KEY, 0U);
   if (result != ERROR_SUCCESS) return fail("FSBRG_E_DELETE_KEY");
   return write_response(operation, FSB_STATUS_OK, 0U, NULL, 0U);
 }
@@ -434,12 +437,30 @@ int wmain(int argc, wchar_t **argv) {
   operation = wcstoul(argv[2], &end, 10);
   if (end == argv[2] || *end != L'\0') return fail("FSBRG_E_ARGS");
   switch (operation) {
-    case 1UL: return query_default(1U, KEY_WOW64_32KEY);
-    case 2UL: return query_default(2U, KEY_WOW64_64KEY);
-    case 3UL: return inspect_key(3U);
-    case 4UL: return write_default(4U);
-    case 5UL: return delete_default(5U);
-    case 6UL: return delete_empty_key(6U);
+    case 1UL: return query_default(1U, KEY_WOW64_32KEY, FSB_CHROME_KEY);
+    case 2UL: return query_default(2U, KEY_WOW64_64KEY, FSB_CHROME_KEY);
+    case 3UL: return inspect_key(3U, FSB_CHROME_KEY);
+    case 4UL: return write_default(4U, FSB_CHROME_KEY);
+    case 5UL: return delete_default(5U, FSB_CHROME_KEY);
+    case 6UL: return delete_empty_key(6U, FSB_CHROME_KEY);
+    case 11UL: return query_default(11U, KEY_WOW64_32KEY, FSB_EDGE_KEY);
+    case 12UL: return query_default(12U, KEY_WOW64_64KEY, FSB_EDGE_KEY);
+    case 13UL: return inspect_key(13U, FSB_EDGE_KEY);
+    case 14UL: return write_default(14U, FSB_EDGE_KEY);
+    case 15UL: return delete_default(15U, FSB_EDGE_KEY);
+    case 16UL: return delete_empty_key(16U, FSB_EDGE_KEY);
+    case 21UL: return query_default(21U, KEY_WOW64_32KEY, FSB_BRAVE_KEY);
+    case 22UL: return query_default(22U, KEY_WOW64_64KEY, FSB_BRAVE_KEY);
+    case 23UL: return inspect_key(23U, FSB_BRAVE_KEY);
+    case 24UL: return write_default(24U, FSB_BRAVE_KEY);
+    case 25UL: return delete_default(25U, FSB_BRAVE_KEY);
+    case 26UL: return delete_empty_key(26U, FSB_BRAVE_KEY);
+    case 31UL: return query_default(31U, KEY_WOW64_32KEY, FSB_CHROMIUM_KEY);
+    case 32UL: return query_default(32U, KEY_WOW64_64KEY, FSB_CHROMIUM_KEY);
+    case 33UL: return inspect_key(33U, FSB_CHROMIUM_KEY);
+    case 34UL: return write_default(34U, FSB_CHROMIUM_KEY);
+    case 35UL: return delete_default(35U, FSB_CHROMIUM_KEY);
+    case 36UL: return delete_empty_key(36U, FSB_CHROMIUM_KEY);
     default: return fail("FSBRG_E_ARGS");
   }
 }

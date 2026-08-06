@@ -3162,7 +3162,54 @@ function runSharedEnvironmentTests(spawnEnvironmentModule) {
     PATH: '/fixture/bin',
     FSB_SAFE_VALUE: 'retained',
     FSB_FIXED_VALUE: 'fixed',
+    CODEX_EXEC_SERVER_URL: 'none',
   });
+
+  const processEnvironmentCanary = 'FSB_PROCESS_ENV_CONTRACT_TEST';
+  const windowsEnvironmentCanary = 'ProgramFiles(x86)';
+  const previousProcessEnvironmentCanary = process.env[processEnvironmentCanary];
+  const previousWindowsEnvironmentCanary = process.env[windowsEnvironmentCanary];
+  try {
+    process.env[processEnvironmentCanary] = 'retained';
+    process.env[windowsEnvironmentCanary] = 'C:\\Program Files (x86)';
+    const productionEnvironment = buildSanitizedAgentEnvironment(
+      process.env,
+      {},
+      DELEGATION_AGENT_ENVIRONMENT_POLICY,
+    );
+    assert.equal(
+      productionEnvironment[processEnvironmentCanary],
+      'retained',
+      'the exact Node process.env platform object is accepted for production startup',
+    );
+    assert.equal(
+      productionEnvironment[windowsEnvironmentCanary],
+      'C:\\Program Files (x86)',
+      'platform-owned Windows environment names survive production sanitization',
+    );
+    assert.equal(isSanitizedAgentEnvironment(productionEnvironment), true);
+  } finally {
+    if (previousProcessEnvironmentCanary === undefined) {
+      delete process.env[processEnvironmentCanary];
+    } else {
+      process.env[processEnvironmentCanary] = previousProcessEnvironmentCanary;
+    }
+    if (previousWindowsEnvironmentCanary === undefined) {
+      delete process.env[windowsEnvironmentCanary];
+    } else {
+      process.env[windowsEnvironmentCanary] = previousWindowsEnvironmentCanary;
+    }
+  }
+
+  assert.throws(
+    () => buildSanitizedAgentEnvironment(
+      { 'ProgramFiles(x86)': 'C:\\Program Files (x86)' },
+      {},
+      DELEGATION_AGENT_ENVIRONMENT_POLICY,
+    ),
+    /Invalid agent environment contract/,
+    'the process.env exception does not relax arbitrary source records',
+  );
 
   assert.throws(
     () => buildSanitizedAgentEnvironment(

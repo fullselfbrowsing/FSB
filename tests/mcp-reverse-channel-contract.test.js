@@ -26,6 +26,12 @@ async function run() {
     { id: 'delegate-resume-1', type: 'ext:request', method: 'delegate.resume', payload: { delegationId: 'delegation_server_0001' } },
     { id: 'delegate-status-1', type: 'ext:request', method: 'delegate.status', payload: {} },
     { id: 'adapter-compatibility-1', type: 'ext:request', method: 'adapter.compatibility', payload: {} },
+    {
+      id: 'provider-test-1',
+      type: 'ext:request',
+      method: 'provider.test-connection',
+      payload: { providerId: 'claude-code' },
+    },
     { id: 'response-1', type: 'ext:response', payload: { authorized: true } },
     {
       id: 'delegate-start-1',
@@ -138,6 +144,18 @@ async function run() {
     'compatibility uses one separately named additive request',
   );
   assert(
+    serveDelegationSource.includes("request.method === 'provider.test-connection'"),
+    'connection validation uses one separately named additive request',
+  );
+  assert(
+    serveDelegationSource.includes('exactConnectionTestProviderId(request.payload)'),
+    'connection validation accepts only the exact closed provider payload',
+  );
+  assert(
+    serveDelegationSource.includes('context?.signal ? { signal: context.signal } : {}'),
+    'connection validation receives reverse-request cancellation',
+  );
+  assert(
     serveDelegationSource.includes('createSafeCompatibilitySnapshot'),
     'the serve request returns only the canonical browser-safe snapshot projection',
   );
@@ -145,6 +163,11 @@ async function run() {
     serveDelegationSource.indexOf("request.method === 'adapter.compatibility'")
       < serveDelegationSource.indexOf('return supervisor.handleExtRequest(request, emit, context);'),
     'the read-only compatibility branch stays separate from supervisor lifecycle authority',
+  );
+  assert(
+    serveDelegationSource.indexOf("request.method === 'provider.test-connection'")
+      < serveDelegationSource.indexOf('return supervisor.handleExtRequest(request, emit, context);'),
+    'connection validation stays separate from supervisor lifecycle authority',
   );
   for (const forbiddenCompatibilityField of [
     'sessionSecret',

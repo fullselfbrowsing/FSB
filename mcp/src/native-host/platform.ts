@@ -14,7 +14,7 @@ import { request as requestHttp } from 'node:http';
 import { createServer } from 'node:net';
 import { isAbsolute, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { NATIVE_HOST_START_LEASE_PORT } from './constants.js';
+import { NATIVE_HOST_SERVICE_PORT } from './constants.js';
 
 export type NativeHostReadable = NodeJS.ReadableStream & {
   removeListener(event: string, listener: (...args: never[]) => void): unknown;
@@ -111,6 +111,10 @@ export interface NativeHostProductionEnvironment {
   daemonDependencies: NativeHostDaemonDependencies;
   settleExitCode(status: 0 | 1): void;
 }
+
+type NativeHostDaemonDependencyOptions = Readonly<{
+  startLeasePort?: number;
+}>;
 
 function isMissing(error: unknown): boolean {
   return Boolean(error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT');
@@ -355,7 +359,7 @@ async function claimLockDirectoryIdentity(
   }
 }
 
-function acquireExclusiveStartLease(): Promise<NativeHostStartLease | null> {
+function acquireExclusiveStartLease(port: number): Promise<NativeHostStartLease | null> {
   return new Promise((resolveLease) => {
     const server = createServer((socket) => socket.destroy());
     let settled = false;
@@ -368,7 +372,7 @@ function acquireExclusiveStartLease(): Promise<NativeHostStartLease | null> {
     try {
       server.listen({
         host: '127.0.0.1',
-        port: NATIVE_HOST_START_LEASE_PORT,
+        port,
         exclusive: true,
       }, () => {
         if (settled) {
@@ -414,7 +418,12 @@ function exactTokenedLockPath(
 
 export function createNativeHostDaemonDependencies(
   environment: Readonly<Record<string, string | undefined>> = process.env,
+  options: NativeHostDaemonDependencyOptions = {},
 ): NativeHostDaemonDependencies {
+  const startLeasePort = options.startLeasePort ?? NATIVE_HOST_SERVICE_PORT;
+  if (!Number.isInteger(startLeasePort) || startLeasePort < 1 || startLeasePort > 65_535) {
+    throw new TypeError('Invalid native-host start lease port');
+  }
   return Object.freeze({
     environment: Object.freeze({ ...environment }),
     now: () => Date.now(),
@@ -438,7 +447,7 @@ export function createNativeHostDaemonDependencies(
     readPrivateFile: readBoundedPrivateFile,
     inspectLockDirectory: inspectLockDirectoryIdentity,
     claimLockDirectory: claimLockDirectoryIdentity,
-    acquireStartLease: acquireExclusiveStartLease,
+    acquireStartLease: () => acquireExclusiveStartLease(startLeasePort),
     renameDirectory: async (source: string, destination: string) => {
       if (await pathExists(destination)) return false;
       try {

@@ -35,6 +35,17 @@ const DELEGATION_HEARTBEAT_NONCE_MAX_LENGTH = 64;
 const DELEGATION_HEARTBEAT_NONCE_PATTERN = /^[A-Za-z0-9_-]+$/;
 const MCP_DELEGATION_ID_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
 const MCP_DISPATCHER_SYNTHETIC_CHANGE_REPORT_TOOLS = new Set(['open_tab', 'close_tab']);
+// Toolbar icon classes keyed by message type. Read-only tools never reach
+// mcp:execute-action -- they have their own routes and carry no tool name, so
+// the route itself is what identifies them as reading.
+const MCP_ICON_READ_MESSAGE_TYPES = new Set([
+  'mcp:get-tabs', 'mcp:get-dom', 'mcp:read-page', 'mcp:get-page-snapshot',
+  'mcp:stop-trigger', 'mcp:get-trigger-status', 'mcp:list-triggers', 'mcp:task-status',
+  'mcp:get-task-snapshot', 'mcp:get-status', 'mcp:get-config', 'mcp:get-site-guides',
+  'mcp:get-memory', 'mcp:search-memory', 'mcp:list-sessions', 'mcp:get-session',
+  'mcp:get-logs', 'mcp:get-diagnostics', 'mcp:capabilities-search', 'mcp:list-agents',
+  'mcp:list-credentials', 'mcp:list-payments'
+]);
 const TRIGGER_HEARTBEAT_INTERVAL_MS = 30000;
 const TRIGGER_BLOCKING_TIMEOUT_DEFAULT_MS = 120000;
 const TRIGGER_BLOCKING_SAFETY_CEILING_MS = 240000;
@@ -1162,6 +1173,9 @@ class MCPBridgeClient {
         && this._isDelegationScopedInbound(type, payload)) {
       throw new Error('delegation_authority_not_ready');
     }
+    // Toolbar icon: report what KIND of work is starting. Presentation-only and
+    // fully guarded -- it must never gate, delay or fail a tool.
+    this._noteIconActivity(type, payload);
     switch (type) {
       case 'system:client-inventory': {
         if (!isPlainMcpClientInventory(payload && payload.platforms)) {
@@ -1323,6 +1337,7 @@ class MCPBridgeClient {
         return this._handleUsePaymentMethod(payload);
 
       default:
+        await this._recordUnsupportedMcpMessage(type, payload);
         throw new Error('Unknown MCP message type: ' + type);
     }
   }
@@ -1442,6 +1457,47 @@ class MCPBridgeClient {
    * re-arm) + TIMEOUT-05 (ownership-gating wins, by virtue of being called
    * AFTER resolved.success === true).
    */
+  /**
+   * Best-effort tab id for an icon claim. Falls back to null, which the icon
+   * keys as 'global' -- still ranks correctly, just not tab-scoped.
+   */
+  _iconTabIdFrom(payload) {
+    const bag = payload || {};
+    const params = bag.params || {};
+    const candidates = [bag.tabId, bag.tab_id, params.tabId, params.tab_id];
+    for (let i = 0; i < candidates.length; i++) {
+      const n = Number(candidates[i]);
+      if (Number.isFinite(n) && n > 0) return n;
+    }
+    return null;
+  }
+
+  /**
+   * Classify the inbound message for the toolbar icon. Action tools carry a tool
+   * name (as an FSB verb) which resolveIconActivity understands; every other
+   * route is identified by its message type alone.
+   */
+  _noteIconActivity(type, payload) {
+    try {
+      const icon = globalThis.fsbActionIcon;
+      if (!icon || typeof icon.noteActivity !== 'function') return;
+      if (typeof type !== 'string' || type.indexOf('mcp:') !== 0) return;
+      // Capability invokes own a balanced Ring claim around their full request.
+      // Skipping the generic claim prevents a 60-second Sweep tail afterwards.
+      if (type === 'mcp:capabilities-invoke') return;
+      let activity;
+      if (type === 'mcp:execute-action') {
+        activity = typeof resolveIconActivity === 'function'
+          ? resolveIconActivity(payload && payload.tool)
+          : 'sweep';
+      } else {
+        activity = MCP_ICON_READ_MESSAGE_TYPES.has(type) ? 'orbit' : 'sweep';
+      }
+      if (!activity) return;
+      icon.noteActivity(this._iconTabIdFrom(payload), activity);
+    } catch (_e) { /* the icon is presentation-only */ }
+  }
+
   async _recordVisualSessionTickIfPresent(tabId, agentId, payload) {
     if (typeof MCPVisualSessionLifecycleUtils === 'undefined') return;
     if (typeof MCPVisualSessionLifecycleUtils.recordVisualSessionTick !== 'function') return;
@@ -1516,7 +1572,12 @@ class MCPBridgeClient {
    * tests/ownership-error-codes.test.js keep resolveAgentTabOrError in view.
    */
   async _resolveMcpSessionRecordTarget(resolvedTabId, knownUrl) {
-    const unresolved = { targetOriginResolved: false, spreadsheetTarget: false };
+    const unresolved = {
+      targetOriginResolved: false,
+      spreadsheetTarget: false,
+      targetUrl: null,
+      targetOrigin: null
+    };
     try {
       if (!Number.isFinite(resolvedTabId)) return unresolved;
       let targetUrl = typeof knownUrl === 'string' && knownUrl.length > 0 ? knownUrl : '';
@@ -1525,13 +1586,53 @@ class MCPBridgeClient {
         targetUrl = (tab && (tab.url || tab.pendingUrl)) || '';
       }
       if (!targetUrl) return unresolved;
+      let targetOrigin = null;
+      try {
+        const parsed = new URL(targetUrl);
+        if (parsed.protocol === 'http:' || parsed.protocol === 'https:') targetOrigin = parsed.origin;
+      } catch (_e) { /* unresolved origin remains fail-closed */ }
       return {
         targetOriginResolved: true,
-        spreadsheetTarget: isMcpGoogleSheetsDocumentUrl(targetUrl)
+        spreadsheetTarget: isMcpGoogleSheetsDocumentUrl(targetUrl),
+        targetUrl,
+        targetOrigin
       };
     } catch (_e) {
       return unresolved;
     }
+  }
+
+  async _recordUnsupportedMcpMessage(type, payload) {
+    try {
+      const agentId = payload && payload.agentId;
+      const params = (payload && payload.params) || payload || {};
+      let tabId = Number.isFinite(payload && payload.tab_id)
+        ? payload.tab_id
+        : (Number.isFinite(params && params.tab_id) ? params.tab_id : null);
+      if (!Number.isFinite(tabId) && typeof globalThis.resolveAgentTabOrError === 'function') {
+        const resolved = await globalThis.resolveAgentTabOrError(agentId, params, this);
+        if (resolved && resolved.success !== false && Number.isFinite(resolved.tabId)) tabId = resolved.tabId;
+      }
+      const target = await this._resolveMcpSessionRecordTarget(tabId);
+      if (!globalThis.fsbMcpSessionRecorder ||
+          typeof globalThis.fsbMcpSessionRecorder.recordDispatch !== 'function') return;
+      globalThis.fsbMcpSessionRecorder.recordDispatch({
+        client: typeof globalThis.resolveMcpClientLabel === 'function'
+          ? globalThis.resolveMcpClientLabel(payload)
+          : null,
+        tool: type,
+        requestPayload: payload || {},
+        response: { success: false, errorCode: 'mcp_route_unavailable', error: 'Unknown MCP message type: ' + type },
+        success: false,
+        dispatcher_route: 'unsupported-message',
+        tabId: Number.isFinite(tabId) ? tabId : null,
+        replayContext: {
+          targetUrl: target.targetUrl || null,
+          targetOrigin: target.targetOrigin || null,
+          routeFamily: 'unsupported'
+        }
+      });
+    } catch (_error) { /* unsupported-route inspection never changes the wire error */ }
   }
 
   _recordMcpSessionAction(payload, response, resolvedTabId, targetContext) {
@@ -1553,7 +1654,21 @@ class MCPBridgeClient {
         tabId: Number.isFinite(resolvedTabId) ? resolvedTabId : null,
         requireTargetOrigin: true,
         targetOriginResolved: targetContext && targetContext.targetOriginResolved === true,
-        spreadsheetTarget: targetContext && targetContext.spreadsheetTarget === true
+        spreadsheetTarget: targetContext && targetContext.spreadsheetTarget === true,
+        replayContext: targetContext ? {
+          targetUrl: targetContext.targetUrl || null,
+          targetOrigin: targetContext.targetOrigin || null,
+          routeFamily: (() => {
+            try {
+              const definition = typeof getToolByName === 'function'
+                ? getToolByName(payload && payload.tool)
+                : null;
+              return definition && definition._route ? definition._route : 'content';
+            } catch (_e) {
+              return 'content';
+            }
+          })()
+        } : null
       };
       const spreadsheetRedactor = globalThis.FsbSpreadsheetRecordRedaction;
       const spreadsheetTool = sessionRecordEntry.spreadsheetTarget === true ||
@@ -1699,6 +1814,18 @@ class MCPBridgeClient {
     const executeFn = async () => {
       if (toolDef && toolDef._route === 'background') {
         return this._handleExecuteBackground(tab, payload, toolDef, routeParams);
+      }
+      if (toolDef && toolDef._route === 'cdp') {
+        if (typeof executeCDPToolDirect !== 'function' || !toolDef._cdpVerb) {
+          return {
+            success: false,
+            errorCode: 'mcp_route_unavailable',
+            tool: payload.tool,
+            routeFamily: 'cdp',
+            error: `CDP replay handler unavailable for ${payload.tool}`
+          };
+        }
+        return executeCDPToolDirect({ tool: toolDef._cdpVerb, params }, tabId);
       }
       // Default: send to content script (content-routed or unknown tools)
       return this._sendToContentScript(tabId, {
@@ -2583,12 +2710,29 @@ class MCPBridgeClient {
   // Phase 28 SURF-02: routerless capability invoke. Thin pass-through -- the
   // slug -> interpretRecipe -> executeBoundSpec path runs in the dispatcher handler.
   async _handleCapabilitiesInvoke(payload) {
-    const response = await dispatchMcpMessageRoute({
-      type: 'mcp:capabilities-invoke',
-      payload,
-      client: this
-    });
-    return response || {};
+    const tabId = this._iconTabIdFrom(payload);
+    let capabilityIcon = null;
+    try {
+      const candidate = globalThis.fsbActionIcon;
+      if (candidate
+          && typeof candidate.beginCapability === 'function'
+          && typeof candidate.endCapability === 'function') {
+        candidate.beginCapability(tabId);
+        capabilityIcon = candidate;
+      }
+    } catch (_e) { /* icon is presentation-only */ }
+    try {
+      const response = await dispatchMcpMessageRoute({
+        type: 'mcp:capabilities-invoke',
+        payload,
+        client: this
+      });
+      return response || {};
+    } finally {
+      try {
+        if (capabilityIcon) capabilityIcon.endCapability(tabId);
+      } catch (_e) { /* icon is presentation-only */ }
+    }
   }
 
   // Phase 31 DISC-01: user-initiated discovery trigger. Thin pass-through -- the

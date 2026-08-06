@@ -3134,10 +3134,10 @@ function runSourceContractCase() {
     'silent native presence probe starts only after background dependencies exist');
   assertEqual((backgroundSource.match(/FsbNativeHostWake\.probePresence\(\)/g) || []).length, 1,
     'service-worker boot starts exactly one advisory presence probe');
-  assertEqual((backgroundSource.match(/FsbNativeHostWake\.ensureWake\(\)/g) || []).length, 1,
-    'offline preflight owns the sole actual wake join');
+  assertEqual((backgroundSource.match(/wakeController\.ensureBootstrap\(\)/g) || []).length, 1,
+    'agent readiness owns one coalesced native bootstrap join');
   assert(backgroundSource.includes("type: 'FSB_NATIVE_WAKE_CHECKING'")
-      && backgroundSource.includes('attemptId: wakePromise.attemptId')
+      && backgroundSource.includes('attemptId: attemptId')
       && backgroundSource.includes('intentId: intentId'),
     'checking fanout carries only the exact attempt and current intent ids');
   assertEqual((backgroundSource.match(/mcpBridgeClient\.addEventObserver\(/g) || []).length, 1,
@@ -3172,13 +3172,15 @@ function runSourceContractCase() {
     delegationComposition.indexOf('async function fsbDelegationPreflightCommand(request) {'),
     delegationComposition.indexOf('async function fsbDelegationConsentCommand(request) {')
   );
-  assert(nativePreflight.includes("authority.result.code !== 'agent_offline'")
+  assert(nativePreflight.includes("authority.config.providerKind !== 'agent'")
+      && nativePreflight.includes('await fsbEnsureAgentBridgeReady(')
       && nativePreflight.includes('await fsbDelegationPreflightResult()'),
-    'only exact offline authority may wake and successful reachability reruns pure preflight directly');
-  assert(nativePreflight.includes("armMcpBridge('native-host-wake')")
-      && nativePreflight.includes('FSB_NATIVE_WAKE_BRIDGE_TIMEOUT_MS')
-      && nativePreflight.includes('FSB_NATIVE_WAKE_BRIDGE_POLL_MS'),
-    'native continuation uses one bounded ordinary bridge readiness wait');
+    'only agent preflight bootstraps and successful readiness reruns pure preflight directly');
+  assert(delegationComposition.includes("'native-host-bootstrap'")
+      && delegationComposition.includes("'native-host-bootstrap-retry'")
+      && delegationComposition.includes('FSB_NATIVE_WAKE_BRIDGE_TIMEOUT_MS')
+      && delegationComposition.includes('FSB_NATIVE_WAKE_BRIDGE_POLL_MS'),
+    'native continuation uses one bounded ordinary bridge readiness loop with one retry');
   assert(!/(?:delegate\.start|FSB_DELEGATION_START|consumeChallenge|issueChallenge|activeSessions|chrome\.tabs)/.test(nativePreflight),
     'native preflight continuation cannot replay, consent, create sessions, or touch tabs');
 
@@ -3375,8 +3377,12 @@ function runSourceContractCase() {
   );
   assertEqual((nativeWakeSource.match(/\.connectNative\(/g) || []).length, 1,
     'background helper owns one silent native presence API edge');
-  assertEqual((nativeWakeSource.match(/\.sendNativeMessage\(/g) || []).length, 1,
-    'background helper owns one actual native wake API edge');
+  assertEqual((nativeWakeSource.match(/\.sendNativeMessage\(/g) || []).length, 2,
+    'background helper owns one v1 wake edge and one additive v2 bootstrap edge');
+  assertEqual((nativeWakeSource.match(/action: 'wake'/g) || []).length, 1,
+    'background helper preserves exactly one v1 wake request');
+  assertEqual((nativeWakeSource.match(/action: 'bootstrap'/g) || []).length, 1,
+    'background helper adds exactly one v2 bootstrap request');
   assert(!/(?:connectNative|sendNativeMessage|io\.github\.fullselfbrowsing\.fsb_native_host)/.test(bridgeSource),
     'bridge client remains native-free');
   assert(!/(?:connectNative|sendNativeMessage|io\.github\.fullselfbrowsing\.fsb_native_host)/.test(preflightSource),

@@ -222,6 +222,15 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
     };
   }
 
+  function cloneReplayRecordForPersistence(replay) {
+    if (!replay || typeof replay !== 'object') return null;
+    try {
+      return JSON.parse(JSON.stringify(replay));
+    } catch (_e) {
+      return null;
+    }
+  }
+
   class AutomationLogger {
     constructor() {
       this.logs = [];
@@ -606,33 +615,67 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
     async getReplayData(sessionId) {
       const session = await this.loadSession(sessionId);
       if (!session) return null;
-      const actionRecords = this.getSessionActionRecords(sessionId);
+      let prepared = null;
+      if (globalThis.FsbLatticeReplay && typeof globalThis.FsbLatticeReplay.prepareReplay === 'function') {
+        try {
+          prepared = await globalThis.FsbLatticeReplay.prepareReplay(sessionId);
+        } catch (_e) {
+          // A temporarily unavailable offscreen host must not make persisted
+          // history disappear. Fall back to the stored manifest/history below.
+        }
+      }
+      let replayRecord = prepared?.replay || session.replay || null;
+      if (!replayRecord && globalThis.FsbLatticeReplay &&
+          typeof globalThis.FsbLatticeReplay.createLegacyReplayRecord === 'function') {
+        replayRecord = globalThis.FsbLatticeReplay.createLegacyReplayRecord(session);
+      }
+      const manifestSteps = replayRecord?.manifest?.steps;
+      const steps = Array.isArray(manifestSteps)
+        ? manifestSteps
+        : (session.actionHistory || []).map((record, index) => ({
+          id: 'legacy-step-' + String(index + 1),
+          index,
+          timestamp: record.timestamp,
+          tool: record.tool,
+          arguments: record.params || {},
+          result: record.result || {},
+          success: record.result?.success !== false,
+          replay: { risk: 'write', availability: 'approval-once', reason: 'Imported legacy action' }
+        }));
       return {
-        version: '1.0', id: sessionId,
+        version: replayRecord?.version || '1.0', id: sessionId,
         metadata: {
           task: session.task, startTime: session.startTime,
           endTime: session.endTime, status: session.status,
-          actionCount: actionRecords.length
+          actionCount: steps.length,
+          integrity: replayRecord?.integrity || 'legacy',
+          provenance: replayRecord?.provenance || 'legacy-import',
+          manifestHash: replayRecord?.manifestHash || null
         },
-        steps: actionRecords.map((record, index) => ({
+        steps: steps.map((record, index) => ({
           stepNumber: index + 1, timestamp: record.timestamp,
-          action: { tool: record.tool, params: record.params || {} },
+          action: { tool: record.tool, params: record.arguments || {} },
           targeting: {
-            selectorTried: record.selectorTried,
-            selectorUsed: record.selectorUsed,
-            elementFound: record.elementFound,
-            coordinatesUsed: record.coordinatesUsed
+            url: record.target?.url || null,
+            origin: record.target?.origin || null,
+            logicalTab: record.target?.logicalTab || 'primary'
           },
           result: {
-            success: record.success, error: record.error,
-            hadEffect: record.hadEffect, diagnostic: record.diagnostic
+            success: record.success !== false,
+            error: record.result?.error || null,
+            recorded: record.result || {}
           },
-          duration: record.duration
+          route: record.route || 'legacy',
+          capability: record.capability || null,
+          replay: record.replay || null
         })),
         summary: {
-          totalSteps: actionRecords.length,
-          successfulSteps: actionRecords.filter(r => r.success).length,
-          failedSteps: actionRecords.filter(r => !r.success).length
+          totalSteps: steps.length,
+          successfulSteps: steps.filter(r => r.success !== false).length,
+          failedSteps: steps.filter(r => r.success === false).length,
+          executableSteps: replayRecord?.counts?.executable ?? steps.length,
+          approvalRequiredSteps: replayRecord?.counts?.approvalRequired ?? 0,
+          blockedSteps: replayRecord?.counts?.blocked ?? 0
         }
       };
     }
@@ -845,6 +888,9 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
               .slice(-100)
               .map(a => ({ tool: a.tool, params: a.params, result: a.result, timestamp: a.timestamp }));
           }
+          if (sessionData.replay) {
+            existing.replay = cloneReplayRecordForPersistence(sessionData.replay) || existing.replay || null;
+          }
           sessionStorage[sessionId] = existing;
         } else {
           // NEW MODE: Create session entry
@@ -882,6 +928,7 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
             blocker: normalizedOutcome.blocker,
             nextStep: normalizedOutcome.nextStep,
             logs: filterPersistedSessionLogs(sessionLogs),
+            replay: cloneReplayRecordForPersistence(sessionData.replay),
             // Persist actionHistory for session replay (successful actions only, capped at 100)
             actionHistory: (sessionData.actionHistory || [])
               .filter(a => a.result?.success)
@@ -917,7 +964,11 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
           commandCount: savedSession.commandCount || 1,
           commands: savedSession.commands || [],
           lastTask: savedSession.lastTask || savedSession.task || null,
-          lastCommandAt: savedSession.lastCommandAt || savedSession.endTime || savedSession.startTime
+          lastCommandAt: savedSession.lastCommandAt || savedSession.endTime || savedSession.startTime,
+          replayIntegrity: savedSession.replay?.integrity || null,
+          replayProvenance: savedSession.replay?.provenance || null,
+          replayableCount: savedSession.replay?.counts?.executable || 0,
+          replayBlockedCount: savedSession.replay?.counts?.blocked || 0
         };
         const existingIndex = sessionIndex.findIndex(s => s.id === sessionId);
         if (existingIndex !== -1) sessionIndex[existingIndex] = indexEntry;

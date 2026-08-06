@@ -22,6 +22,11 @@ import {
 } from './spawn-supervisor.js';
 import type { AdapterAuthState, DirectRuntimeReference } from './adapter.js';
 import { createDirectRuntimeReference } from './effective-authority.js';
+import {
+  testAgentProviderConnection,
+  type AgentConnectionTestResult,
+} from './connection-test.js';
+import type { AgentProviderId } from './adapter.js';
 
 export interface ServeDelegationBridge {
   connect(): Promise<void>;
@@ -66,6 +71,11 @@ export interface ServeDelegationDependencies {
     directRuntimeReference: DirectRuntimeReference,
   ) => SpawnSupervisor;
   readonly createCompatibilityRegistry?: () => AgentProviderRegistry;
+  readonly runConnectionTest?: (input: Readonly<{
+    providerId: AgentProviderId;
+    registry: AgentProviderRegistry;
+    signal?: AbortSignal;
+  }>) => Promise<AgentConnectionTestResult>;
   readonly now?: () => number;
   readonly mintGeneration?: () => string;
   readonly prepareBridgeAuth?: () => void | Promise<void>;
@@ -128,6 +138,7 @@ function defaultDependencies(): Required<ServeDelegationDependencies> {
         throw new Error('Compatibility registry has no process-termination authority');
       },
     }),
+    runConnectionTest: testAgentProviderConnection,
     now: () => Date.now(),
     mintGeneration: () => randomUUID(),
     prepareBridgeAuth: () => undefined,
@@ -143,6 +154,32 @@ function isExactEmptyPayload(value: unknown): value is Record<string, never> {
     && !Array.isArray(value)
     && Object.getPrototypeOf(value) === Object.prototype
     && Reflect.ownKeys(value).length === 0;
+}
+
+function exactConnectionTestProviderId(value: unknown): AgentProviderId | null {
+  if (
+    value === null
+    || typeof value !== 'object'
+    || Array.isArray(value)
+    || Object.getPrototypeOf(value) !== Object.prototype
+    || Reflect.ownKeys(value).length !== 1
+  ) {
+    return null;
+  }
+  const descriptor = Object.getOwnPropertyDescriptor(value, 'providerId');
+  if (
+    !descriptor
+    || descriptor.enumerable !== true
+    || !Object.hasOwn(descriptor, 'value')
+    || (
+      descriptor.value !== 'claude-code'
+      && descriptor.value !== 'opencode'
+      && descriptor.value !== 'codex'
+    )
+  ) {
+    return null;
+  }
+  return descriptor.value;
 }
 
 function ownDataValue(record: object, key: string): unknown | undefined {
@@ -361,6 +398,17 @@ export async function startServeDelegation(
         dependencies.now(),
       );
       return snapshot as unknown as Record<string, unknown>;
+    }
+    if (request.method === 'provider.test-connection') {
+      const providerId = exactConnectionTestProviderId(request.payload);
+      if (!providerId) throw new TypeError('Invalid provider connection test request');
+      compatibilityRegistry ??= dependencies.createCompatibilityRegistry();
+      const result = await dependencies.runConnectionTest({
+        providerId,
+        registry: compatibilityRegistry,
+        ...(context?.signal ? { signal: context.signal } : {}),
+      });
+      return result as unknown as Record<string, unknown>;
     }
     return supervisor.handleExtRequest(request, emit, context);
   };

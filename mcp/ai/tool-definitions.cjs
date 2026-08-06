@@ -1440,6 +1440,53 @@ function getToolsByRoute(route) {
 }
 
 // =========================================================================
+// TOOLBAR ICON ACTIVITY CLASSES
+// =========================================================================
+// The toolbar icon animates by what KIND of work is running, not by session
+// phase -- every implicit visual session reports the same phase, so phase cannot
+// tell a read from a click. Read-only is tested FIRST, so list_tabs (a tab tool
+// that only reads) classifies as reading rather than driving.
+
+/**
+ * Non-mutating tools that live on the MCP surface but never reach TOOL_REGISTRY,
+ * so they carry no _readOnly flag of their own.
+ */
+const ICON_READ_ONLY_EXTRAS = new Set([
+  'search_capabilities', 'get_task_status', 'list_sessions', 'get_session_detail',
+  'get_logs', 'get_memory_stats', 'list_credentials', 'list_payment_methods'
+]);
+
+// The wire carries FSB verbs rather than MCP tool names -- type_text arrives as
+// 'type', check_box as 'toggleCheckbox', click_at as 'cdpClickAt'. Built once so
+// either spelling resolves to the same class.
+let _iconVerbToTool = null;
+
+function _iconVerbMap() {
+  if (_iconVerbToTool) return _iconVerbToTool;
+  _iconVerbToTool = new Map();
+  for (const tool of TOOL_REGISTRY) {
+    if (tool._contentVerb) _iconVerbToTool.set(tool._contentVerb, tool.name);
+    if (tool._cdpVerb) _iconVerbToTool.set(tool._cdpVerb, tool.name);
+  }
+  return _iconVerbToTool;
+}
+
+/**
+ * Classify a tool for the toolbar icon animation.
+ * @param {string} nameOrVerb - MCP tool name, or the FSB verb sent on the wire
+ * @returns {'orbit'|'sweep'|null} orbit = reading, sweep = other work; capability invokes use a dedicated lifecycle
+ */
+function resolveIconActivity(nameOrVerb) {
+  const raw = typeof nameOrVerb === 'string' ? nameOrVerb.trim() : '';
+  if (!raw) return 'sweep';
+  const name = _iconVerbMap().get(raw) || raw;
+  if (name === 'invoke_capability') return null;
+  const def = getToolByName(name);
+  if ((def && def._readOnly === true) || ICON_READ_ONLY_EXTRAS.has(name)) return 'orbit';
+  return 'sweep';
+}
+
+// =========================================================================
 // EXPORTS
 // =========================================================================
 
@@ -1447,6 +1494,7 @@ function getToolsByRoute(route) {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     TOOL_REGISTRY,
+    resolveIconActivity,
     getToolByName,
     getReadOnlyTools,
     getToolsByRoute,

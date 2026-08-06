@@ -15,18 +15,25 @@ const requestedSection = (() => {
   if (index + 1 >= process.argv.length) throw new Error('--section requires a value');
   return process.argv[index + 1];
 })();
-const knownSections = new Set(['framing-and-schema', 'entry-lifetime', 'production-entry']);
+const knownSections = new Set([
+  'framing-and-schema',
+  'entry-lifetime',
+  'bootstrap-credential',
+  'production-entry',
+]);
 if (requestedSection && !knownSections.has(requestedSection)) {
   throw new Error(`unknown section: ${requestedSection}`);
 }
 
 const ORIGIN = 'chrome-extension://badgafnfchcihdfnjneklogedcdkmjfk/';
 const CORRELATION_ID = 'NativeWake_123456';
+const PAIRING_CODE = `fsb-auth.${'A'.repeat(43)}`;
 const MAX_FRAME_BYTES = 4096;
 const STABLE_ROOT = '/Users/fsb/.fsb/native-host';
 const STABLE_ENTRY = `${STABLE_ROOT}/runtime/package/build/native-host/index.js`;
 const STABLE_BUILD_INDEX = `${STABLE_ROOT}/runtime/package/build/index.js`;
 const OWNER_MARKER_PATH = `${STABLE_ROOT}/owner.json`;
+const AUTH_STATE_PATH = '/Users/fsb/.fsb/bridge-auth.json';
 
 function nativeHeader(length) {
   const header = Buffer.alloc(4);
@@ -63,6 +70,37 @@ function validResponse(overrides = {}) {
   };
 }
 
+function validBootstrapRequest(overrides = {}) {
+  return {
+    v: 2,
+    action: 'bootstrap',
+    correlationId: CORRELATION_ID,
+    ...overrides,
+  };
+}
+
+function validBootstrapResponse(overrides = {}) {
+  return {
+    v: 2,
+    correlationId: CORRELATION_ID,
+    outcome: 'started',
+    reason: 'daemon_started_ready',
+    pairingCode: PAIRING_CODE,
+    ...overrides,
+  };
+}
+
+function validAuthState(overrides = {}) {
+  return {
+    version: 1,
+    allowedExtensionOrigin: ORIGIN.slice(0, -1),
+    sessionSecret: 'A'.repeat(43),
+    sessionId: 'B'.repeat(22),
+    rotatedAt: 1234,
+    ...overrides,
+  };
+}
+
 function validOwnerMarker(overrides = {}) {
   return {
     schema: 1,
@@ -80,9 +118,12 @@ function validOwnerMarker(overrides = {}) {
 
 function productionDependencies(options = {}) {
   const marker = options.marker ?? validOwnerMarker();
-  const calls = { health: 0, marker: 0, spawn: 0 };
+  const authState = Object.prototype.hasOwnProperty.call(options, 'authState')
+    ? options.authState
+    : validAuthState();
+  const calls = { auth: 0, health: 0, marker: 0, spawn: 0 };
   const daemonDependencies = {
-    environment: Object.freeze({ PATH: '/usr/bin:/bin' }),
+    environment: Object.freeze({ HOME: '/Users/fsb', PATH: '/usr/bin:/bin' }),
     now: () => 0,
     wait: async () => {},
     randomToken: () => '11111111111111111111111111111111',
@@ -102,9 +143,16 @@ function productionDependencies(options = {}) {
     createDirectory: async () => { throw new Error('unexpected lock'); },
     writePrivateFile: async () => { throw new Error('unexpected lock write'); },
     readPrivateFile: async (pathname) => {
-      if (pathname !== OWNER_MARKER_PATH) throw new Error('unexpected private read');
-      calls.marker += 1;
-      return typeof marker === 'string' ? marker : JSON.stringify(marker);
+      if (pathname === OWNER_MARKER_PATH) {
+        calls.marker += 1;
+        return typeof marker === 'string' ? marker : JSON.stringify(marker);
+      }
+      if (pathname === AUTH_STATE_PATH) {
+        calls.auth += 1;
+        if (authState === null) return null;
+        return typeof authState === 'string' ? authState : JSON.stringify(authState);
+      }
+      throw new Error('unexpected private read');
     },
     renameDirectory: async () => { throw new Error('unexpected lock rename'); },
     removeAttemptDirectory: async () => { throw new Error('unexpected attempt lock remove'); },
@@ -159,6 +207,14 @@ async function importEntry() {
   return await import(`${href}?phase63=${Date.now()}`);
 }
 
+async function importBootstrap() {
+  const href = pathToFileURL(path.join(
+    repositoryRoot,
+    'mcp/build/native-host/bootstrap.js',
+  )).href;
+  return await import(`${href}?bootstrap=${Date.now()}`);
+}
+
 function captureWritable(options = {}) {
   const chunks = [];
   const callbacks = [];
@@ -199,16 +255,20 @@ function decodeResponseFrame(encoded) {
 async function testFramingAndSchema() {
   const protocol = await importProtocol();
   const {
+    encodeNativeBootstrapResponse,
     encodeNativeWakeResponse,
     readNativeWakeRequest,
     validateNativeInvocation,
+    validateNativeHostRequest,
     validateNativeWakeRequest,
   } = protocol;
 
   for (const exported of [
+    encodeNativeBootstrapResponse,
     encodeNativeWakeResponse,
     readNativeWakeRequest,
     validateNativeInvocation,
+    validateNativeHostRequest,
     validateNativeWakeRequest,
   ]) {
     assert.equal(typeof exported, 'function');
@@ -219,6 +279,22 @@ async function testFramingAndSchema() {
   const parsed = await readNativeWakeRequest(Readable.from(oneByteChunks), { settleMs: 2 });
   assert.deepEqual(parsed, validRequest());
   assert.equal(Object.isFrozen(parsed), true);
+
+  const bootstrapParsed = await readNativeWakeRequest(
+    Readable.from([frameObject(validBootstrapRequest())]),
+    { settleMs: 2 },
+  );
+  assert.deepEqual(bootstrapParsed, validBootstrapRequest());
+  assert.equal(Object.isFrozen(bootstrapParsed), true);
+  assert.deepEqual(validateNativeHostRequest(validRequest()), validRequest());
+  assert.deepEqual(
+    validateNativeHostRequest(validBootstrapRequest()),
+    validBootstrapRequest(),
+  );
+  expectSyncCode(
+    () => validateNativeWakeRequest(validBootstrapRequest()),
+    'native_invalid_request',
+  );
 
   const openInput = new PassThrough();
   const openRead = readNativeWakeRequest(openInput, { settleMs: 4 });
@@ -419,6 +495,65 @@ async function testFramingAndSchema() {
     () => encodeNativeWakeResponse(responseAccessor, CORRELATION_ID),
     'native_invalid_response',
   );
+
+  for (const response of [
+    validBootstrapResponse(),
+    validBootstrapResponse({
+      outcome: 'already_running',
+      reason: 'daemon_already_ready',
+    }),
+    {
+      v: 2,
+      correlationId: CORRELATION_ID,
+      outcome: 'unavailable',
+      reason: 'bridge_session_unavailable',
+    },
+    {
+      v: 2,
+      correlationId: CORRELATION_ID,
+      outcome: 'unavailable',
+      reason: 'extension_origin_mismatch',
+    },
+    {
+      v: 2,
+      correlationId: CORRELATION_ID,
+      outcome: 'failed',
+      reason: 'internal_failure',
+    },
+  ]) {
+    const decoded = decodeResponseFrame(
+      encodeNativeBootstrapResponse(response, CORRELATION_ID),
+    );
+    assert.deepEqual(decoded, response);
+    if (decoded.outcome === 'unavailable' || decoded.outcome === 'failed') {
+      assert.equal(Object.prototype.hasOwnProperty.call(decoded, 'pairingCode'), false);
+    }
+  }
+
+  for (const response of [
+    { ...validBootstrapResponse(), extra: true },
+    { ...validBootstrapResponse(), v: 1 },
+    { ...validBootstrapResponse(), pairingCode: 'too-short' },
+    {
+      v: 2,
+      correlationId: CORRELATION_ID,
+      outcome: 'unavailable',
+      reason: 'bridge_session_unavailable',
+      pairingCode: PAIRING_CODE,
+    },
+    {
+      v: 2,
+      correlationId: CORRELATION_ID,
+      outcome: 'started',
+      reason: 'internal_failure',
+      pairingCode: PAIRING_CODE,
+    },
+  ]) {
+    expectSyncCode(
+      () => encodeNativeBootstrapResponse(response, CORRELATION_ID),
+      'native_invalid_response',
+    );
+  }
 }
 
 async function testEntryLifetime() {
@@ -475,6 +610,102 @@ async function testEntryLifetime() {
     assert.equal(settled, true);
     assert.equal(stderr.bytes().length, 0);
     assert.deepEqual(decodeResponseFrame(stdout.bytes()), validResponse());
+  }
+
+  {
+    const stdout = captureWritable();
+    const stderr = captureWritable();
+    let wakeCalls = 0;
+    let bootstrapCalls = 0;
+    const status = await runNativeHostEntry({
+      stdin: Readable.from([frameObject(validBootstrapRequest())]),
+      stdout: stdout.stream,
+      stderr: stderr.stream,
+      argv: [ORIGIN],
+      expectedOrigin: ORIGIN,
+      settleMs: 2,
+      handleWake: async (request) => {
+        wakeCalls += 1;
+        assert.deepEqual(request, validRequest());
+        return { outcome: 'started', reason: 'daemon_started_ready' };
+      },
+      handleBootstrap: async (request, invocation) => {
+        bootstrapCalls += 1;
+        assert.deepEqual(request, validBootstrapRequest());
+        assert.deepEqual(invocation, { origin: ORIGIN, parentWindow: null });
+        return { ok: true, pairingCode: PAIRING_CODE };
+      },
+    });
+    assert.equal(status, 0);
+    assert.equal(wakeCalls, 1, 'v2 reuses the v1 wake authority once');
+    assert.equal(bootstrapCalls, 1, 'v2 reads the credential only after wake readiness');
+    assert.deepEqual(
+      decodeResponseFrame(stdout.bytes()),
+      validBootstrapResponse(),
+    );
+    assert.equal(stderr.bytes().length, 0);
+  }
+
+  {
+    const stdout = captureWritable();
+    const stderr = captureWritable();
+    let bootstrapCalls = 0;
+    const status = await runNativeHostEntry({
+      stdin: Readable.from([frameObject(validBootstrapRequest())]),
+      stdout: stdout.stream,
+      stderr: stderr.stream,
+      argv: [ORIGIN],
+      expectedOrigin: ORIGIN,
+      settleMs: 2,
+      handleWake: async () => ({
+        outcome: 'failed',
+        reason: 'serve_readiness_timeout',
+      }),
+      handleBootstrap: async () => {
+        bootstrapCalls += 1;
+        return { ok: true, pairingCode: PAIRING_CODE };
+      },
+    });
+    assert.equal(status, 0);
+    assert.equal(bootstrapCalls, 0, 'failed daemon readiness cannot read a credential');
+    const response = decodeResponseFrame(stdout.bytes());
+    assert.deepEqual(response, {
+      v: 2,
+      correlationId: CORRELATION_ID,
+      outcome: 'failed',
+      reason: 'serve_readiness_timeout',
+    });
+    assert.equal(JSON.stringify(response).includes(PAIRING_CODE), false);
+  }
+
+  {
+    const stdout = captureWritable();
+    const stderr = captureWritable();
+    const status = await runNativeHostEntry({
+      stdin: Readable.from([frameObject(validBootstrapRequest())]),
+      stdout: stdout.stream,
+      stderr: stderr.stream,
+      argv: [ORIGIN],
+      expectedOrigin: ORIGIN,
+      settleMs: 2,
+      handleWake: async () => ({
+        outcome: 'already_running',
+        reason: 'daemon_already_ready',
+      }),
+      handleBootstrap: async () => ({
+        ok: false,
+        reason: 'extension_origin_mismatch',
+      }),
+    });
+    assert.equal(status, 0);
+    const response = decodeResponseFrame(stdout.bytes());
+    assert.deepEqual(response, {
+      v: 2,
+      correlationId: CORRELATION_ID,
+      outcome: 'unavailable',
+      reason: 'extension_origin_mismatch',
+    });
+    assert.equal(Object.prototype.hasOwnProperty.call(response, 'pairingCode'), false);
   }
 
   for (const invalid of [
@@ -596,6 +827,74 @@ async function testEntryLifetime() {
   }
 }
 
+async function testBootstrapCredential() {
+  const { readNativeBootstrapCredential } = await importBootstrap();
+  assert.equal(typeof readNativeBootstrapCredential, 'function');
+
+  let state = validAuthState();
+  const reads = [];
+  const dependencies = {
+    environment: Object.freeze({ HOME: '/Users/fsb' }),
+    readPrivateFile: async (pathname, maximum) => {
+      reads.push({ pathname, maximum });
+      return state === null
+        ? null
+        : (typeof state === 'string' ? state : JSON.stringify(state));
+    },
+  };
+
+  assert.deepEqual(
+    await readNativeBootstrapCredential({ origin: ORIGIN, dependencies }),
+    { ok: true, pairingCode: PAIRING_CODE },
+  );
+  assert.deepEqual(reads, [{ pathname: AUTH_STATE_PATH, maximum: 2048 }]);
+
+  state = validAuthState({
+    allowedExtensionOrigin: null,
+    sessionSecret: 'C'.repeat(43),
+  });
+  assert.deepEqual(
+    await readNativeBootstrapCredential({ origin: ORIGIN, dependencies }),
+    { ok: true, pairingCode: `fsb-auth.${'C'.repeat(43)}` },
+    'an unbound current daemon session can bootstrap only the validated invocation origin',
+  );
+
+  state = validAuthState({
+    allowedExtensionOrigin: 'chrome-extension://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  });
+  const mismatch = await readNativeBootstrapCredential({ origin: ORIGIN, dependencies });
+  assert.deepEqual(mismatch, { ok: false, reason: 'extension_origin_mismatch' });
+  assert.equal(JSON.stringify(mismatch).includes('A'.repeat(43)), false);
+
+  for (const invalidState of [
+    null,
+    '{malformed',
+    { ...validAuthState(), extra: true },
+    validAuthState({ sessionSecret: 'too-short' }),
+    validAuthState({ sessionId: 'too-short' }),
+    validAuthState({ rotatedAt: -1 }),
+  ]) {
+    state = invalidState;
+    const result = await readNativeBootstrapCredential({ origin: ORIGIN, dependencies });
+    assert.deepEqual(result, { ok: false, reason: 'bridge_session_unavailable' });
+    assert.equal(Object.prototype.hasOwnProperty.call(result, 'pairingCode'), false);
+  }
+
+  state = validAuthState();
+  assert.deepEqual(
+    await readNativeBootstrapCredential({
+      origin: 'chrome-extension://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/',
+      dependencies,
+    }),
+    { ok: false, reason: 'extension_origin_mismatch' },
+  );
+
+  state = validAuthState({ sessionSecret: 'D'.repeat(43), sessionId: 'E'.repeat(22) });
+  const rotated = await readNativeBootstrapCredential({ origin: ORIGIN, dependencies });
+  assert.deepEqual(rotated, { ok: true, pairingCode: `fsb-auth.${'D'.repeat(43)}` });
+  assert.notEqual(rotated.pairingCode, PAIRING_CODE);
+}
+
 async function testProductionEntry() {
   const { runProductionNativeHostEntry } = await importEntry();
   assert.equal(typeof runProductionNativeHostEntry, 'function');
@@ -638,6 +937,73 @@ async function testProductionEntry() {
       JSON.stringify(response),
       /paired|provider|task|agent|browser|session|secret|marker|path|child/iu,
     );
+  }
+
+  {
+    const stdout = captureWritable();
+    const stderr = captureWritable();
+    const harness = productionDependencies({
+      stdin: Readable.from([frameObject(validBootstrapRequest())]),
+      stdout: stdout.stream,
+      stderr: stderr.stream,
+    });
+    const status = await runProductionNativeHostEntry(harness.value);
+    assert.equal(status, 0);
+    assert.equal(harness.calls.marker, 1);
+    assert.equal(harness.calls.health, 1);
+    assert.equal(harness.calls.auth, 1);
+    assert.deepEqual(
+      decodeResponseFrame(stdout.bytes()),
+      validBootstrapResponse({
+        outcome: 'already_running',
+        reason: 'daemon_already_ready',
+      }),
+    );
+    assert.equal(stderr.bytes().length, 0);
+  }
+
+  {
+    const stdout = captureWritable();
+    const stderr = captureWritable();
+    const harness = productionDependencies({
+      stdin: Readable.from([frameObject(validBootstrapRequest())]),
+      stdout: stdout.stream,
+      stderr: stderr.stream,
+      authState: validAuthState({
+        allowedExtensionOrigin: 'chrome-extension://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      }),
+    });
+    const status = await runProductionNativeHostEntry(harness.value);
+    assert.equal(status, 0);
+    const response = decodeResponseFrame(stdout.bytes());
+    assert.deepEqual(response, {
+      v: 2,
+      correlationId: CORRELATION_ID,
+      outcome: 'unavailable',
+      reason: 'extension_origin_mismatch',
+    });
+    assert.equal(Object.prototype.hasOwnProperty.call(response, 'pairingCode'), false);
+  }
+
+  {
+    const stdout = captureWritable();
+    const stderr = captureWritable();
+    const harness = productionDependencies({
+      stdin: Readable.from([frameObject(validBootstrapRequest())]),
+      stdout: stdout.stream,
+      stderr: stderr.stream,
+      authState: null,
+    });
+    const status = await runProductionNativeHostEntry(harness.value);
+    assert.equal(status, 0);
+    const response = decodeResponseFrame(stdout.bytes());
+    assert.deepEqual(response, {
+      v: 2,
+      correlationId: CORRELATION_ID,
+      outcome: 'unavailable',
+      reason: 'bridge_session_unavailable',
+    });
+    assert.equal(JSON.stringify(response).includes('fsb-auth.'), false);
   }
 
   {
@@ -690,6 +1056,10 @@ async function main() {
     }
     if (section === 'entry-lifetime') {
       await testEntryLifetime();
+      continue;
+    }
+    if (section === 'bootstrap-credential') {
+      await testBootstrapCredential();
       continue;
     }
     if (section === 'production-entry') {

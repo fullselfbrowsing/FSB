@@ -19,9 +19,18 @@ to Orbit-only for parity with ViewportGlow.
 </domain>
 
 <decisions>
+## SUPERSEDED 2026-07-29 - the collapse to Orbit-only was reversed
+
+An audit against the design export confirmed the collapse left 3 of 4 concepts
+unimplemented. All four forms have since been built. The three decisions below marked
+**[REVERSED]** no longer describe the code; see "Four forms, one per state" in
+`260728-k2v-SUMMARY.md`. Everything not marked [REVERSED] still holds - in particular the
+no-text and transparent-background decisions, which the audit independently confirmed
+(the design's own 32px toolbar checks omit every text element).
+
 ## Implementation Decisions (LOCKED - do not revisit)
 
-### Canonical source of truth
+### Canonical source of truth  **[REVERSED]**
 `extension/content/visual-feedback.js` ViewportGlow is canonical. The icon mirrors it.
 The design file's own timings (1.2s sweep / 2.4s breathe / 1.6s ring) are SUPERSEDED.
 
@@ -35,16 +44,25 @@ The design file's own timings (1.2s sweep / 2.4s breathe / 1.6s ring) are SUPERS
 Periods: `visual-feedback.js:1216-1221` (`_getDuration`).
 Palettes: shadow-root CSS at `visual-feedback.js:1372-1403`.
 
-### One animation form, not four
+> Reversed: only `acting` still tracks ViewportGlow. `thinking` follows `fsbProgressSweep`,
+> `watching` follows the `.badge-dot` cadence, and `calling` has no upstream source at all.
+
+### One animation form, not four  **[REVERSED]**
 ViewportGlow uses a SINGLE bead (12% of perimeter, 2% end fades) varying only in period
 and palette. The icon does the same. Sweep / Breathe / Capability-ring from the design file
 are NOT implemented as separate forms - they survive only as palette values.
 
-### Watching is STATIC, not animated
+> Reversed: all four forms are implemented as distinct renderers.
+
+### Watching is STATIC, not animated  **[REVERSED]**
 This is the one deliberate deviation from ViewportGlow. Trigger-watch is an always-armed
 ambient state; a perpetual `setIcon` loop is the keepalive pattern Chrome restricts to
 enterprise/education devices. Watching gets a static frame in the watching palette, set once
 on arm and once on disarm. No loop.
+
+> Reversed in form, upheld in substance: watching now breathes, but for a bounded 6s hold on
+> arm and on disarm, then settles to a static frame. The keepalive concern was the right
+> call and still governs - there is still no perpetual loop.
 
 ### Connection state moves into the static icon
 The removed green dot's information goes into the idle frame: full-strength when

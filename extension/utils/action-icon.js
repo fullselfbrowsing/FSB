@@ -2,20 +2,33 @@
  * FSB toolbar action icon - state-driven static / animated frames.
  *
  * Quick 260728-k2v. Replaces the old chrome.action badge connection dot with a
- * frame-swapped toolbar icon that mirrors the on-page ViewportGlow overlay
- * (extension/content/visual-feedback.js): same periods, same palettes, same
- * phase vocabulary, same retime-on-state-change behaviour.
+ * frame-swapped toolbar icon carrying one distinct motion per state, as drawn in
+ * the design export (Orbit / Sweep / Breathe / Capability ring).
  *
- * States:
- *   idle      - base glyph only. Full strength when the dashboard relay is
- *               connected, dimmed + desaturated when it is not.
- *   watching  - STATIC single frame in the watching palette. Deliberately not
- *               animated: trigger-watch is an always-armed ambient state and a
- *               perpetual repaint loop is a keepalive pattern Chrome restricts.
- *   thinking / acting / calling - animated orbit bead, one setInterval loop.
+ * Each form quotes an existing on-page signal where one exists, so the icon and
+ * the page read as one system. Three of the four do:
+ *
+ *   idle      - base glyph only. Full strength until a dashboard relay has
+ *               connected at least once and then dropped.
+ *   thinking  - SWEEP. The indeterminate progress bar, quoting
+ *               .fsb-progress-bar.indeterminate .fsb-progress-fill and its
+ *               fsbProgressSweep keyframe (1.2s ease-in-out, 38% fill,
+ *               translateX -120% -> 320%). No orbit bead.
+ *   acting    - ORBIT. The ViewportGlow perimeter bead, 4s, _getDuration().
+ *   calling   - CAPABILITY RING. An inset violet border repeating while an
+ *               invocation is in flight, plus a ping travelling INWARD -- an
+ *               icon cannot paint outside its own box, so the design's outward
+ *               spread is unrenderable.
+ *               This form has NO upstream source: there is no ring pulse and no
+ *               1.6s cadence anywhere in the extension. It is design-only, and
+ *               it deliberately diverges from ViewportGlow's 4s calling glow.
+ *   watching  - BREATHE. Quotes the trigger badge dot's 2.4s ease-in-out
+ *               cadence and loops for as long as a watch remains armed. The
+ *               mark fades over a fixed black plate while a deliberately
+ *               amplified orange bloom keeps the motion legible at 16px.
  *
  * Everything canvas, timer and persistence related lives in this file. The
- * service worker only calls the five public methods.
+ * service worker drives it through the small public API at the bottom.
  *
  * Classic script. Loaded into the MV3 service worker global scope.
  */
@@ -25,22 +38,87 @@
 
   // ---- Locked geometry + cadence -----------------------------------------
   var FRAME_INTERVAL_MS = 66;        // ~15fps. chrome.alarms floors at 30s.
-  var BEAD_FRACTION = 0.12;          // bead spans 12% of the ring circumference
-  var FADE_FRACTION = 0.02;          // 2% of the circumference fades at each end
+  var BEAD_FRACTION = 0.12;          // bead spans 12% of the square perimeter
+  var FADE_FRACTION = 0.02;          // 2% of the perimeter fades at each end
   var SIZES = [16, 32];              // toolbar renders 16/24/32 DIPs
-  var RING_INSET_RATIO = 0.09;
-  var RING_WIDTH_RATIO = 0.10;
+  var ORBIT_WIDTH_RATIO = 0.10;
   // Full bleed, so the toolbar mark is the same size as the static manifest icon.
-  // The bead therefore rides over the artwork's empty black border instead of
-  // orbiting outside it, which is deliberate. Do not re-derive this from the ring
-  // constants: the old 1 - 2*inset - width made the tile narrower than the ring,
-  // so the bead left the artwork on the axes and cut across its corners.
+  // Orbit's centreline sits half its own width inside that tile: its outside edge
+  // is flush with the square artwork without being clipped by the canvas.
   var GLYPH_SCALE = 1.0;
   var BEAD_SEGMENTS = 24;
+  var SEAM_OVERLAP = 0.5;            // fraction of a segment
   var DIM_ALPHA = 0.5;
   var DIM_FILTER = 'grayscale(0.8)';
 
+  // ---- Sweep (thinking) ---------------------------------------------------
+  // Canonical: visual-feedback.js .fsb-progress-bar / .fsb-progress-fill and the
+  // fsbProgressSweep keyframe. The track is scaled for legibility rather than
+  // proportionally -- the canonical 4/128 height lands at half a pixel at 16px.
+  var SWEEP_TRACK_W_RATIO = 0.594;   // 76/128, the design's own 32px check
+  var SWEEP_TRACK_H_RATIO = 0.0625;  // 8/128 -> 1px at 16, 2px at 32
+  var SWEEP_TRACK_H_MIN = 1;
+  // The artwork's baked-in tag ends at y 0.656, so 0.75 keeps the track in the
+  // clear band beneath it.
+  var SWEEP_CENTER_Y_RATIO = 0.75;
+  var SWEEP_FILL_FRACTION = 0.38;
+  var SWEEP_FROM_PCT = -1.20;        // translateX(-120%), of the fill's own width
+  var SWEEP_TO_PCT = 3.20;           // translateX(320%)
+  var SWEEP_TRACK_COLOR = 'rgba(255, 255, 255, 0.1)';
+
+  // ---- Breathe (watching) -------------------------------------------------
+  // Canonical cadence: the .badge-dot fsb-trigger-badge-dot keyframe, 2.4s
+  // ease-in-out. The dot also scales 1 -> 1.15; the icon does not, because
+  // rescaling the mark at 16px aliases it. The glow colour is the dot's own
+  // static box-shadow colour.
+  var GLOW_RGB = '255, 140, 0';
+  // The plate the lockup sits on. Repainting it is not the "opaque background"
+  // the notes warn against -- the artwork already carries this exact tile; this
+  // just keeps it solid while the mark above it fades.
+  var PLATE_COLOR = '#000000';
+  var BREATHE_MIN_ALPHA = 0.45;
+  var BREATHE_GLOW_RATIO = 0.15625;  // 20/128 -> 2.5px at 16, 5px at 32
+  var BREATHE_GLOW_ALPHA = 0.95;
+  // Null means the breathe runs for as long as a watch is armed. This is the one
+  // line that decides whether an armed trigger keeps the service worker awake:
+  // set it to a number (6000 was the previous value) to restore a bounded hold.
+  var BREATHE_HOLD_MS = null;
+  // The settle frame is not invented: it is the badge dot's reduced-motion state
+  // (animation: none; opacity: 0.85) plus its static 8px glow.
+  var SETTLE_ALPHA = 0.85;
+  var SETTLE_GLOW_RATIO = 0.0625;    // 8/128
+  var SETTLE_GLOW_ALPHA = 0.75;
+
+  // ---- Capability ring (calling) ------------------------------------------
+  // Design-only. 3/128 is sub-pixel at both output sizes, so the stroke has a
+  // 1px floor and the ring reads as a hairline border rather than a 3px band.
+  // Scaled for legibility rather than proportionally, exactly as the sweep track
+  // is: the design's 3/128 lands at 0.75px on a 32px tile, and the 1px hairline
+  // it floored to did not read as a per-call pulse at toolbar size.
+  var CAP_COLOR = '#8b5cf6';
+  var CAP_RING_W_RATIO = 0.0625;     // 2px at 32, 1px at 16
+  var CAP_RING_W_MIN = 1;
+  var CAP_PING_INSET_RATIO = 0.15;   // ~4.8px of inward travel at 32
+  var CAP_ALPHA_HIGH = 0.9;
+  var CAP_ALPHA_LOW = 0.35;
+  var CAP_PING_ALPHA = 0.55;
+  var CAP_PING_STOP = 0.7;           // the keyframe's 70% stop
+
   var INTENT_KEY = 'fsbActionIconIntent';
+  // Install-scoped, so it outlives the session record above. Dimming means "the
+  // relay you use is down", not "you have never opened the dashboard": the relay
+  // has no enable switch and connect() runs unconditionally at startup, so a
+  // plain extension/MCP user would otherwise sit at the dimmed frame forever.
+  var RELAY_SEEN_KEY = 'fsbActionIconRelaySeen';
+  // Armed only while a loop is owed. A frozen static frame needs no repair --
+  // action state lives in the browser process and survives eviction intact --
+  // so a permanent beat here would wake the worker every 30s forever for
+  // nothing, which is the same keepalive shape that kept watching static.
+  var WATCHDOG_ALARM = 'fsb-action-icon-watchdog';
+  var WATCHDOG_PERIOD_MINUTES = 0.5;   // Chrome's periodic floor.
+  // How long the latest tool call on a tab keeps its activity claim alive.
+  // The form's own duration still controls each animation cycle.
+  var ACTIVITY_TTL_MS = 60000;
   // One source per output size. icon16 is not a downscale of icon128 -- its mark
   // was redrawn about a fifth chunkier to stay legible, so 16 has to come from
   // its own asset or the mark renders thin. 128 into 32 is an exact 4:1 reduction.
@@ -49,15 +127,26 @@
   // Normalized fade width expressed within the bead's own 0..1 span.
   var FADE_SPAN = FADE_FRACTION / BEAD_FRACTION;
 
-  // ---- Locked palettes + periods -----------------------------------------
-  // Canonical source: visual-feedback.js _getDuration() and the shadow-root
-  // custom properties --glow-color-1 / --glow-color-2.
+  // ---- Locked forms, palettes + periods -----------------------------------
+  // Each state names its own canonical source; only acting still tracks
+  // ViewportGlow. `bounded` means the loop runs for that long and then settles.
+  // Keyed by the form itself. The old phase names (acting / thinking / calling)
+  // would actively mislead here: orbit now means READING, so a key called
+  // "acting" naming the read animation is a trap for the next reader.
   var STATES = {
-    thinking: { duration: 6000, from: '#ff8c00', to: '#f59e0b', animated: true },
-    acting: { duration: 4000, from: '#ff6600', to: '#ff8c00', animated: true },
-    calling: { duration: 4000, from: '#8b5cf6', to: '#a78bfa', animated: true },
-    watching: { duration: 5000, from: '#ff8c00', to: '#ffa500', animated: false }
+    // Driving the browser. fsbProgressSweep, visual-feedback.js -- 1.2s ease-in-out.
+    sweep: { duration: 1200, form: 'sweep', from: '#ff8c00', to: '#ff6600', animated: true },
+    // Reading. ViewportGlow _getDuration() + .state-acting custom properties.
+    orbit: { duration: 4000, form: 'orbit', from: '#ff6600', to: '#ff8c00', animated: true },
+    // An in-flight capability invocation. Design-only: no ring pulse or 1.6s cadence exists upstream.
+    ring: { duration: 1600, form: 'ring', from: '#8b5cf6', to: '#8b5cf6', animated: true },
+    // A trigger watch. fsb-trigger-badge-dot cadence.
+    breathe: { duration: 2400, form: 'breathe', from: '#ff8c00', to: '#ffa500', animated: true, bounded: BREATHE_HOLD_MS }
   };
+
+  // Highest claim wins. A watch outranks everything on every tab: it is the one
+  // state the user armed deliberately and is waiting on.
+  var RANK = { breathe: 4, ring: 3, orbit: 2, sweep: 1 };
 
   // ---- Module state -------------------------------------------------------
   var unavailable = false;
@@ -66,20 +155,31 @@
   var liveSessionProbe = null;
 
   var contexts = Object.create(null);       // size -> CanvasRenderingContext2D
+  var scratches = Object.create(null);      // size -> scratch ctx, for the glow
   var animatedFrames = Object.create(null); // state -> array of frame records
   var animatedBuilds = Object.create(null); // state -> in-flight build promise
   var staticFrames = Object.create(null);   // key -> frame record
+  var glyphCache = null;                    // decoded bitmaps, shared by builds
+  var glyphBuild = null;                    // in-flight decode
   var emitFailureLogged = false;
 
-  var currentState = null;   // a STATES key with animated:true while animating
+  // The toolbar icon is global but the things it reports are not: several tabs
+  // and several agents can be doing different things at once. Each source keeps
+  // its own claim and the icon renders the highest-ranked one, so nothing is
+  // decided by whoever wrote last.
+  var claims = Object.create(null);   // 'session:' | 'capability:' | 'watch:' keyed by tab -> state
+  var preReadyClaimKeys = Object.create(null); // keys explicitly touched before restore
+  var activityTimers = Object.create(null);  // claim key -> expiry timeout id
+  var capabilityCounts = Object.create(null); // 'capability:<tabId>' -> in-flight invoke count
+  var resolved = null;                // the state currently on screen
   var animating = false;
-  var watching = false;
   var connected = false;
-  var watchingExplicit = false;
+  var relaySeen = false;
   var connectedExplicit = false;
   var startTime = 0;
   var timerId = null;
   var lastEmitted = null;
+  var watchdogArmed = false;
 
   // ---- Colour helpers -----------------------------------------------------
 
@@ -106,6 +206,39 @@
     return 1;
   }
 
+  function lerp(a, b, t) {
+    return a + (b - a) * t;
+  }
+
+  function alphaColor(rgb, alpha) {
+    return 'rgba(' + rgb + ', ' + alpha + ')';
+  }
+
+  // ---- CSS timing functions ------------------------------------------------
+  // Frames are built once per state and never inside the tick, so solving the
+  // bezier by bisection is more than fast enough and reads clearer than Newton.
+
+  function bezierAxis(p1, p2, t) {
+    var mt = 1 - t;
+    return 3 * mt * mt * t * p1 + 3 * mt * t * t * p2 + t * t * t;
+  }
+
+  function cubicBezier(p1x, p1y, p2x, p2y, x) {
+    if (x <= 0) return 0;
+    if (x >= 1) return 1;
+    var lo = 0;
+    var hi = 1;
+    var mid = 0;
+    for (var i = 0; i < 24; i++) {
+      mid = (lo + hi) / 2;
+      if (bezierAxis(p1x, p2x, mid) < x) lo = mid; else hi = mid;
+    }
+    return bezierAxis(p1y, p2y, (lo + hi) / 2);
+  }
+
+  function easeInOut(x) { return cubicBezier(0.42, 0, 0.58, 1, x); }
+  function easeOut(x) { return cubicBezier(0, 0, 0.58, 1, x); }
+
   // ---- Canvas -------------------------------------------------------------
 
   function contextFor(size) {
@@ -118,55 +251,327 @@
     return ctx;
   }
 
-  function drawGlyph(ctx, size, bitmap, dimmed) {
-    var drawn = size * GLYPH_SCALE;
-    var offset = (size - drawn) / 2;
-    if (dimmed) {
-      ctx.globalAlpha = DIM_ALPHA;
-      ctx.filter = DIM_FILTER;
+  // Probed rather than assumed. Assigning an unsupported filter is silently
+  // ignored instead of throwing, so the only way to tell is to read it back.
+  var dropShadows = null;
+
+  function supportsDropShadow(ctx) {
+    if (dropShadows !== null) return dropShadows;
+    try {
+      ctx.filter = 'blur(1px)';
+      dropShadows = typeof ctx.filter === 'string' && ctx.filter.indexOf('blur') !== -1;
+      ctx.filter = 'none';
+    } catch (_e) {
+      dropShadows = false;
     }
-    ctx.drawImage(bitmap, offset, offset, drawn, drawn);
-    ctx.globalAlpha = 1;
-    ctx.filter = 'none';
+    return dropShadows;
   }
 
-  function strokeBead(ctx, size, palette, progress) {
-    var center = size / 2;
-    var radius = size / 2 - RING_INSET_RATIO * size;
+  // One scratch surface per size, reused. Needed because the artwork is a FLAT
+  // opaque tile: the mark is distinguished from the plate by luminance, not by
+  // alpha, so it cannot be isolated with a composite op on the main canvas.
+  function scratchFor(size) {
+    var ctx = scratches[size];
+    if (!ctx) {
+      ctx = new OffscreenCanvas(size, size).getContext('2d', { willReadFrequently: true });
+      scratches[size] = ctx;
+    }
+    return ctx;
+  }
+
+  // An orange halo around the MARK, not around the tile.
+  //
+  // 'multiply' on the scratch turns the white mark orange and leaves the black
+  // plate black (x * 0 = 0). Compositing that back with 'lighter' then adds only
+  // where the scratch is non-black, so the halo hugs the lettering and the plate
+  // contributes nothing. A filter on the tile itself would halo the SQUARE.
+  function drawMarkGlow(ctx, size, bitmap, spec, offset, drawn) {
+    var scratch = scratchFor(size);
+    scratch.globalCompositeOperation = 'source-over';
+    scratch.globalAlpha = 1;
+    scratch.filter = 'none';
+    scratch.clearRect(0, 0, size, size);
+    scratch.drawImage(bitmap, offset, offset, drawn, drawn);
+    scratch.globalCompositeOperation = 'multiply';
+    scratch.fillStyle = alphaColor(GLOW_RGB, 1);
+    scratch.fillRect(0, 0, size, size);
+    scratch.globalCompositeOperation = 'source-over';
+
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = spec.glowAlpha;
+    ctx.filter = 'blur(' + (spec.glowRatio * size).toFixed(2) + 'px)';
+    ctx.drawImage(scratch.canvas, 0, 0);
+    ctx.filter = 'none';
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  // The design's breathe animates the LOCKUP inside a static black plate -- the
+  // plate itself never moves. Fading the artwork instead fades the whole icon,
+  // because the artwork IS the plate. So the plate is painted solid first and the
+  // mark composited over it: black-on-black is a no-op, so only the lettering
+  // varies. Dim is deliberately different -- a dropped relay recedes the whole
+  // icon, and it outranks the glow because grayscale would fight an orange halo.
+  function drawGlyph(ctx, size, bitmap, spec) {
+    var drawn = size * GLYPH_SCALE;
+    var offset = (size - drawn) / 2;
+
+    if (spec.dimmed === true) {
+      ctx.globalAlpha = DIM_ALPHA;
+      ctx.filter = DIM_FILTER;
+      ctx.drawImage(bitmap, offset, offset, drawn, drawn);
+      ctx.globalAlpha = 1;
+      ctx.filter = 'none';
+      return;
+    }
+
+    var markAlpha = typeof spec.glyphAlpha === 'number' ? spec.glyphAlpha : 1;
+    var wantsGlow = typeof spec.glowRatio === 'number' && spec.glowRatio > 0
+      && spec.glowAlpha > 0 && supportsDropShadow(ctx);
+    if (markAlpha >= 1 && !wantsGlow) {
+      ctx.drawImage(bitmap, offset, offset, drawn, drawn);
+      return;
+    }
+
+    ctx.fillStyle = PLATE_COLOR;
+    ctx.fillRect(0, 0, size, size);
+    if (wantsGlow) drawMarkGlow(ctx, size, bitmap, spec, offset, drawn);
+    ctx.globalAlpha = markAlpha;
+    ctx.drawImage(bitmap, offset, offset, drawn, drawn);
+    ctx.globalAlpha = 1;
+  }
+
+  function squareOrbitGeometry(size) {
+    var width = ORBIT_WIDTH_RATIO * size;
+    var half = width / 2;
+    var side = size - width;
+    return {
+      width: width,
+      half: half,
+      left: half,
+      top: half,
+      right: size - half,
+      bottom: size - half,
+      side: side,
+      perimeter: side * 4
+    };
+  }
+
+  // Distance zero is the top-left corner. Increasing distance walks clockwise:
+  // top -> right -> bottom -> left. Callers use side / 2 as their phase offset,
+  // preserving Orbit's old 12-o'clock (top-centre) starting position.
+  function squareOrbitPointAt(geometry, distance) {
+    var perimeter = geometry.perimeter;
+    var d = distance % perimeter;
+    if (d < 0) d += perimeter;
+    if (d < geometry.side) {
+      return { x: geometry.left + d, y: geometry.top };
+    }
+    d -= geometry.side;
+    if (d < geometry.side) {
+      return { x: geometry.right, y: geometry.top + d };
+    }
+    d -= geometry.side;
+    if (d < geometry.side) {
+      return { x: geometry.right - d, y: geometry.bottom };
+    }
+    d -= geometry.side;
+    return { x: geometry.left, y: geometry.bottom - d };
+  }
+
+  // Append one unwrapped distance interval. Corner distances are inserted as
+  // explicit vertices, so a segment that turns a corner follows the square and
+  // never shortcuts diagonally across the artwork.
+  function appendSquareOrbitInterval(ctx, geometry, start, end) {
+    var point = squareOrbitPointAt(geometry, start);
+    ctx.moveTo(point.x, point.y);
+    var corner = (Math.floor(start / geometry.side) + 1) * geometry.side;
+    while (corner < end) {
+      point = squareOrbitPointAt(geometry, corner);
+      ctx.lineTo(point.x, point.y);
+      corner += geometry.side;
+    }
+    point = squareOrbitPointAt(geometry, end);
+    ctx.lineTo(point.x, point.y);
+  }
+
+  // Canvas has no gradient primitive that follows an arbitrary path. The bead
+  // is therefore a short sequence of colour/alpha segments, pre-rendered with
+  // the rest of the animation. Each segment carries a mitered polyline when it
+  // crosses a corner, keeping the outside edge sharp and fully inside the tile.
+  function strokeSquareOrbit(ctx, size, palette, progress) {
+    var geometry = squareOrbitGeometry(size);
     var head = parseHex(palette.from);
     var tail = parseHex(palette.to);
-    var full = Math.PI * 2;
-    ctx.lineWidth = RING_WIDTH_RATIO * size;
-    ctx.lineCap = 'round';
+    var start = progress * geometry.perimeter + geometry.side / 2;
+    ctx.lineWidth = geometry.width;
+    ctx.lineCap = 'butt';
+    ctx.lineJoin = 'miter';
+    ctx.miterLimit = 2;
     for (var i = 0; i < BEAD_SEGMENTS; i++) {
       var t0 = i / BEAD_SEGMENTS;
       var t1 = (i + 1) / BEAD_SEGMENTS;
       var mid = (t0 + t1) / 2;
       var alpha = beadAlpha(mid);
       if (alpha <= 0) continue;
+      // Butt caps meet exactly, which can leave an antialiasing hairline.
+      // Everything but the last segment runs slightly long to cover it; the last
+      // one still ends at exactly BEAD_FRACTION.
+      var tEnd = i === BEAD_SEGMENTS - 1 ? t1 : t1 + SEAM_OVERLAP / BEAD_SEGMENTS;
       ctx.strokeStyle = mixColor(head, tail, mid, alpha);
-      var a0 = (progress + t0 * BEAD_FRACTION) * full - Math.PI / 2;
-      var a1 = (progress + t1 * BEAD_FRACTION) * full - Math.PI / 2;
+      var d0 = start + t0 * BEAD_FRACTION * geometry.perimeter;
+      var d1 = start + tEnd * BEAD_FRACTION * geometry.perimeter;
       ctx.beginPath();
-      ctx.arc(center, center, radius, a0, a1);
+      appendSquareOrbitInterval(ctx, geometry, d0, d1);
       ctx.stroke();
     }
+  }
+
+  // ---- Sweep --------------------------------------------------------------
+
+  // arcTo rather than the native roundRect, matching the shape already used at
+  // extension/lib/visualization/knowledge-graph.js.
+  function roundRectPath(ctx, x, y, w, h, r) {
+    if (r > h / 2) r = h / 2;
+    if (r > w / 2) r = w / 2;
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function barPath(ctx, x, y, w, h, r) {
+    if (r > 0) { roundRectPath(ctx, x, y, w, h, r); return; }
+    // A 1px track has no room for a radius, and arcTo with r=0 is just a rect.
+    ctx.beginPath();
+    ctx.rect(x, y, w, h);
+  }
+
+  function drawSweep(ctx, size, palette, progress) {
+    var trackW = SWEEP_TRACK_W_RATIO * size;
+    var trackH = Math.max(SWEEP_TRACK_H_MIN, Math.round(SWEEP_TRACK_H_RATIO * size));
+    var x = (size - trackW) / 2;
+    var y = Math.round(SWEEP_CENTER_Y_RATIO * size - trackH / 2);
+    var radius = trackH <= 2 ? 0 : trackH / 2;
+
+    ctx.fillStyle = SWEEP_TRACK_COLOR;
+    barPath(ctx, x, y, trackW, trackH, radius);
+    ctx.fill();
+
+    // The fill is translated by a multiple of its OWN width, exactly as the
+    // canonical translateX percentages do, and the track clips it the way
+    // .fsb-progress-bar's overflow:hidden does.
+    var fillW = SWEEP_FILL_FRACTION * trackW;
+    var fillX = x + lerp(SWEEP_FROM_PCT, SWEEP_TO_PCT, easeInOut(progress)) * fillW;
+    ctx.save();
+    barPath(ctx, x, y, trackW, trackH, radius);
+    ctx.clip();
+    var grad = ctx.createLinearGradient(fillX, y, fillX + fillW, y);
+    grad.addColorStop(0, palette.from);
+    grad.addColorStop(1, palette.to);
+    ctx.fillStyle = grad;
+    barPath(ctx, fillX, y, fillW, trackH, radius);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // ---- Capability ring ----------------------------------------------------
+
+  // Two strokes: the inset border, whose alpha dips and recovers, and a ping.
+  // The design's ping spreads outward, which an icon cannot do -- there is no
+  // canvas outside the tile -- so it travels inward from the border instead.
+  function drawCapabilityRing(ctx, size, progress) {
+    var rgb = parseHex(CAP_COLOR);
+    var width = Math.max(CAP_RING_W_MIN, Math.round(CAP_RING_W_RATIO * size));
+    var half = width / 2;
+    var ringAlpha;
+    var pingAlpha = 0;
+    var pingTravel = 0;
+    if (progress < CAP_PING_STOP) {
+      var out = easeOut(progress / CAP_PING_STOP);
+      ringAlpha = lerp(CAP_ALPHA_HIGH, CAP_ALPHA_LOW, out);
+      pingAlpha = lerp(CAP_PING_ALPHA, 0, out);
+      pingTravel = out;
+    } else {
+      ringAlpha = lerp(CAP_ALPHA_LOW, CAP_ALPHA_HIGH,
+        easeOut((progress - CAP_PING_STOP) / (1 - CAP_PING_STOP)));
+    }
+
+    ctx.lineWidth = width;
+    ctx.lineCap = 'butt';
+    ctx.strokeStyle = mixColor(rgb, rgb, 0, ringAlpha);
+    ctx.beginPath();
+    ctx.rect(half, half, size - width, size - width);
+    ctx.stroke();
+
+    if (pingAlpha <= 0) return;
+    var inset = half + CAP_PING_INSET_RATIO * size * pingTravel;
+    var span = size - inset * 2;
+    if (span <= 0) return;
+    ctx.strokeStyle = mixColor(rgb, rgb, 0, pingAlpha);
+    ctx.beginPath();
+    ctx.rect(inset, inset, span, span);
+    ctx.stroke();
   }
 
   // Renders one frame at every shipped size, each from its own source bitmap.
   // Nothing paints a background of its own -- the artwork already carries an
   // opaque tile, and a service worker cannot read the toolbar theme to pick one.
+  //
+  // Exactly one clearRect and one drawImage per frame, glyph first: the test
+  // harness splits its recorded op log on clearRect to reconstruct frames.
   function renderFrame(bitmaps, spec) {
     var frame = {};
     for (var i = 0; i < SIZES.length; i++) {
       var size = SIZES[i];
       var ctx = contextFor(size);
+      var progress = spec.progress || 0;
       ctx.clearRect(0, 0, size, size);
-      drawGlyph(ctx, size, bitmaps[size], spec.dimmed === true);
-      if (spec.bead === true) strokeBead(ctx, size, spec.palette, spec.progress || 0);
+      drawGlyph(ctx, size, bitmaps[size], spec);
+      if (spec.form === 'orbit') strokeSquareOrbit(ctx, size, spec.palette, progress);
+      else if (spec.form === 'sweep') drawSweep(ctx, size, spec.palette, progress);
+      else if (spec.form === 'ring') drawCapabilityRing(ctx, size, progress);
       frame[size] = ctx.getImageData(0, 0, size, size);
     }
     return frame;
+  }
+
+  // Per-frame parameters for one state at one point in its cycle. CSS applies a
+  // timing function BETWEEN adjacent keyframes, so a form with an intermediate
+  // stop eases each segment separately rather than easing the whole cycle once.
+  function frameSpec(state, progress) {
+    var def = STATES[state];
+    var spec = { form: def.form, palette: def, progress: progress, dimmed: false };
+    if (def.form === 'breathe') {
+      // 0%,100% -> min, 50% -> peak.
+      var toPeak = progress < 0.5
+        ? easeInOut(progress / 0.5)
+        : 1 - easeInOut((progress - 0.5) / 0.5);
+      spec.glyphAlpha = lerp(BREATHE_MIN_ALPHA, 1, toPeak);
+      // Blur AND alpha both ramp, per drop-shadow(0 0 0 ..0) -> (0 0 10px ..85).
+      // Animating only the alpha would fade a fixed-size halo in and out; the
+      // design blooms the halo outward from nothing.
+      spec.glowRatio = lerp(0, BREATHE_GLOW_RATIO, toPeak);
+      spec.glowAlpha = lerp(0, BREATHE_GLOW_ALPHA, toPeak);
+    }
+    return spec;
+  }
+
+  // What an armed watch shows before its frames exist -- during init, and on the
+  // repair path after a worker restart. The breathe itself no longer settles.
+  function settledSpec(dimmed) {
+    return {
+      form: 'breathe',
+      palette: STATES.breathe,
+      progress: 0,
+      dimmed: dimmed,
+      glyphAlpha: SETTLE_ALPHA,
+      glowRatio: SETTLE_GLOW_RATIO,
+      glowAlpha: SETTLE_GLOW_ALPHA
+    };
   }
 
   function closeGlyphs(bitmaps) {
@@ -195,22 +600,36 @@
     return bitmaps;
   }
 
-  // Only the four resting frames are rendered up front. A worker wake that never
-  // animates should not pay for a couple hundred frames it will never show.
+  // Decoded once per worker and kept. Every state's build used to re-fetch and
+  // re-decode both PNGs, so a session that touched all four states paid the I/O
+  // and the decode four times over. The bitmaps are small; the decode is not.
+  function ensureGlyphs() {
+    if (glyphCache) return Promise.resolve(glyphCache);
+    if (glyphBuild) return glyphBuild;
+    glyphBuild = loadGlyphs().then(function (bitmaps) {
+      glyphCache = bitmaps;
+      glyphBuild = null;
+      return bitmaps;
+    }, function (e) {
+      glyphBuild = null;
+      throw e;
+    });
+    return glyphBuild;
+  }
+
+  // Only the four resting frames and one Ring kickoff are rendered up front. A
+  // worker wake that never animates should not pay for full animation cycles.
   async function buildStaticCache() {
-    var bitmaps = await loadGlyphs();
-    try {
-      staticFrames['idle:on'] = renderFrame(bitmaps, { bead: false, dimmed: false });
-      staticFrames['idle:off'] = renderFrame(bitmaps, { bead: false, dimmed: true });
-      staticFrames['watching:on'] = renderFrame(bitmaps, {
-        palette: STATES.watching, progress: 0, bead: true, dimmed: false
-      });
-      staticFrames['watching:off'] = renderFrame(bitmaps, {
-        palette: STATES.watching, progress: 0, bead: true, dimmed: true
-      });
-    } finally {
-      closeGlyphs(bitmaps);
-    }
+    var bitmaps = await ensureGlyphs();
+    staticFrames['idle:on'] = renderFrame(bitmaps, { dimmed: false });
+    staticFrames['idle:off'] = renderFrame(bitmaps, { dimmed: true });
+    // Keep the reduced-motion watching frames cached alongside idle so a cold
+    // restore can render watch state without rebuilding the glyphs.
+    staticFrames['watching:on'] = renderFrame(bitmaps, settledSpec(false));
+    staticFrames['watching:off'] = renderFrame(bitmaps, settledSpec(true));
+    // Keep one Ring frame ready so a short capability invoke can paint
+    // immediately without delaying business logic for the full frame build.
+    staticFrames['ring:kickoff'] = renderFrame(bitmaps, frameSpec('ring', 0));
   }
 
   // One state's worth of frames, rendered on first use and kept for the life of
@@ -220,24 +639,14 @@
     if (animatedFrames[state]) return Promise.resolve(animatedFrames[state]);
     if (animatedBuilds[state]) return animatedBuilds[state];
     var build = (async function () {
-      var bitmaps = await loadGlyphs();
-      try {
-        var spec = STATES[state];
-        var count = Math.round(spec.duration / FRAME_INTERVAL_MS);
-        var frames = new Array(count);
-        for (var f = 0; f < count; f++) {
-          frames[f] = renderFrame(bitmaps, {
-            palette: spec,
-            progress: f / count,
-            bead: true,
-            dimmed: false
-          });
-        }
-        animatedFrames[state] = frames;
-        return frames;
-      } finally {
-        closeGlyphs(bitmaps);
+      var bitmaps = await ensureGlyphs();
+      var count = Math.round(STATES[state].duration / FRAME_INTERVAL_MS);
+      var frames = new Array(count);
+      for (var f = 0; f < count; f++) {
+        frames[f] = renderFrame(bitmaps, frameSpec(state, f / count));
       }
+      animatedFrames[state] = frames;
+      return frames;
     })();
     animatedBuilds[state] = build;
     build.catch(function (e) {
@@ -268,14 +677,21 @@
     } catch (e) { noteEmitFailure(e); }
   }
 
+  // Dim is a "your relay dropped" signal, so it needs a relay to have been there
+  // in the first place. Until one has connected once, every resting frame is
+  // full strength -- that is the only appearance the design has.
   function staticFrame() {
-    return staticFrames[(watching ? 'watching' : 'idle') + (connected ? ':on' : ':off')];
+    var dim = relaySeen && !connected;
+    // A settled breathe keeps its claim, so the resting frame it lands on is the
+    // watching one; only an empty claim set falls back to idle.
+    var base = resolved === 'breathe' ? 'watching' : 'idle';
+    return staticFrames[base + (dim ? ':off' : ':on')];
   }
 
   function frameAt(now) {
-    var frames = animatedFrames[currentState];
+    var frames = animatedFrames[resolved];
     if (!frames || !frames.length) return null;
-    var duration = STATES[currentState].duration;
+    var duration = STATES[resolved].duration;
     var elapsed = (now - startTime) % duration;
     var progress = elapsed / duration;
     var index = Math.min(frames.length - 1, Math.floor(progress * frames.length));
@@ -285,11 +701,19 @@
   // ---- Loop ---------------------------------------------------------------
 
   function tick() {
-    if (!animating || !currentState) {
+    if (!animating || !resolved) {
       stopLoop();
       return;
     }
-    emit(frameAt(Date.now()));
+    var now = Date.now();
+    // A bounded form says its piece and stops. Holding the loop open for an
+    // always-armed state is exactly the keepalive shape being avoided.
+    var hold = STATES[resolved].bounded;
+    if (typeof hold === 'number' && now - startTime >= hold) {
+      settleAnimation();
+      return;
+    }
+    emit(frameAt(now));
   }
 
   function stopLoop() {
@@ -305,23 +729,102 @@
     tick();
   }
 
+  // ---- Watchdog -----------------------------------------------------------
+
+  // Guarded on watchdogArmed because create() on an existing name RESTARTS the
+  // period. A session that changes phase every few seconds would otherwise push
+  // the fire time out on every transition and the watchdog would never run.
+  function armWatchdog() {
+    if (watchdogArmed) return;
+    try {
+      var alarms = chrome.alarms;
+      if (!alarms || typeof alarms.create !== 'function') return;
+      alarms.create(WATCHDOG_ALARM, { periodInMinutes: WATCHDOG_PERIOD_MINUTES });
+      watchdogArmed = true;
+    } catch (_e) { /* the watchdog is best-effort */ }
+  }
+
+  // Unconditional, unlike arm: module state is gone after an eviction, so this
+  // is also what clears an alarm a previous worker generation left behind.
+  function disarmWatchdog() {
+    watchdogArmed = false;
+    try {
+      var alarms = chrome.alarms;
+      if (!alarms || typeof alarms.clear !== 'function') return;
+      var result = alarms.clear(WATCHDOG_ALARM);
+      if (result && typeof result.catch === 'function') result.catch(function () {});
+    } catch (_e) { /* the watchdog is best-effort */ }
+  }
+
   // ---- Persistence --------------------------------------------------------
 
   function persistIntent() {
     try {
       var area = chrome.storage && chrome.storage.session;
       if (!area || typeof area.set !== 'function') return;
+      // Only watch claims persist. Activity timers and in-flight capability
+      // promises do not survive worker eviction, so restoring either would leave
+      // a claim that nothing can finish or expire.
+      var claimCopy = {};
+      var claimKeys = Object.keys(claims);
+      for (var c = 0; c < claimKeys.length; c++) {
+        if (claimKeys[c].indexOf('watch:') !== 0) continue;
+        claimCopy[claimKeys[c]] = claims[claimKeys[c]];
+      }
       var record = {};
       record[INTENT_KEY] = {
         animating: animating,
-        state: currentState,
-        watching: watching,
+        claims: claimCopy,
+        resolved: resolved,
         connected: connected,
         updatedAt: Date.now()
       };
       var result = area.set(record);
       if (result && typeof result.catch === 'function') result.catch(function () {});
     } catch (_e) { /* persistence is best-effort */ }
+  }
+
+  function persistRelaySeen() {
+    try {
+      var area = chrome.storage && chrome.storage.local;
+      if (!area || typeof area.set !== 'function') return;
+      var record = {};
+      record[RELAY_SEEN_KEY] = true;
+      var result = area.set(record);
+      if (result && typeof result.catch === 'function') result.catch(function () {});
+    } catch (_e) { /* persistence is best-effort */ }
+  }
+
+  async function readRelaySeen() {
+    try {
+      var area = chrome.storage && chrome.storage.local;
+      if (!area || typeof area.get !== 'function') return false;
+      var stored = await area.get(RELAY_SEEN_KEY);
+      return !!(stored && stored[RELAY_SEEN_KEY] === true);
+    } catch (_e) {
+      return false;
+    }
+  }
+
+  // Tab ids are stable within a browser session, which is exactly the scope of
+  // the session store the claims came from -- but a tab can close while the
+  // worker is evicted, so its claim has to be swept on the way back up.
+  async function pruneClosedTabClaims() {
+    try {
+      if (!chrome.tabs || typeof chrome.tabs.query !== 'function') return;
+      var open = await chrome.tabs.query({});
+      var alive = Object.create(null);
+      for (var i = 0; i < open.length; i++) alive[String(open[i].id)] = true;
+      var keys = Object.keys(claims);
+      for (var j = 0; j < keys.length; j++) {
+        var id = keys[j].slice(keys[j].indexOf(':') + 1);
+        if (id !== 'global' && !alive[id]) {
+          clearActivityTimer(keys[j]);
+          delete capabilityCounts[keys[j]];
+          delete claims[keys[j]];
+        }
+      }
+    } catch (_e) { /* pruning is best-effort */ }
   }
 
   async function readIntent() {
@@ -338,42 +841,95 @@
 
   // ---- Transitions --------------------------------------------------------
 
-  function startAnimation(next, fresh) {
+  // Every state owns a distinct visual form, so a transition is always a form
+  // change and there is no visual position worth carrying across it -- each one
+  // starts at frame 0.
+  function startAnimation(next) {
     if (!STATES[next] || !STATES[next].animated) return;
-    if (fresh !== true && animating && currentState === next && timerId !== null) return;
-    var running = animating && timerId !== null && currentState && STATES[currentState];
-    var now = Date.now();
-    if (fresh !== true && running) {
-      // Preserve the visual position across a period change so the bead does
-      // not jump mid-cycle (ported from the overlay's setState).
-      var oldDuration = STATES[currentState].duration;
-      var elapsed = (now - startTime) % oldDuration;
-      var progress = elapsed / oldDuration;
-      startTime = now - progress * STATES[next].duration;
-    } else {
-      startTime = now;
-    }
-    currentState = next;
+    resolved = next;
     animating = true;
+    armWatchdog();
     persistIntent();
+    if (next === 'ring' && !animatedFrames[next]) {
+      emit(staticFrames['ring:kickoff']);
+    }
     if (animatedFrames[next]) {
+      // The clock starts WITH the loop, never before it. Setting it earlier let
+      // the frame build eat into the cycle: the first showing of a state began
+      // mid-animation, and a bounded hold was short by the build's duration.
+      startTime = Date.now();
       startLoop();
       return;
     }
-    // First time this state is shown: render its frames, then pick the loop up
-    // only if the state still applies once they are ready.
     ensureAnimatedFrames(next).then(function () {
-      if (animating && currentState === next) startLoop();
+      if (!animating || resolved !== next) return;
+      startTime = Date.now();
+      startLoop();
     }).catch(function () { /* reported by ensureAnimatedFrames */ });
   }
 
-  function stopAnimation() {
-    var changed = animating;
+  // A bounded form has said its piece. The claim survives -- the icon simply
+  // stops repainting and rests on the frame that claim settles to.
+  function settleAnimation() {
     stopLoop();
+    disarmWatchdog();
     animating = false;
-    currentState = null;
+    persistIntent();
+    emit(staticFrame());
+  }
+
+  function stopAnimation() {
+    var changed = animating || resolved !== null;
+    stopLoop();
+    disarmWatchdog();
+    animating = false;
+    resolved = null;
     if (changed) persistIntent();
     emit(staticFrame());
+  }
+
+  // ---- Claims -------------------------------------------------------------
+
+  function tabKey(tabId) {
+    return (tabId === undefined || tabId === null || !Number.isFinite(Number(tabId)))
+      ? 'global'
+      : String(Number(tabId));
+  }
+
+  function topClaim() {
+    var best = null;
+    var bestRank = 0;
+    var keys = Object.keys(claims);
+    for (var i = 0; i < keys.length; i++) {
+      var rank = RANK[claims[keys[i]]] || 0;
+      if (rank > bestRank) {
+        bestRank = rank;
+        best = claims[keys[i]];
+      }
+    }
+    return best;
+  }
+
+  // Only a change in the WINNER repaints. Several tabs claiming the same state
+  // resolve to one animation, so the per-trigger rearm loop cannot restart it.
+  function applyResolved() {
+    var next = topClaim();
+    if (next === resolved) return;
+    if (next === null) stopAnimation();
+    else startAnimation(next);
+  }
+
+  function setClaim(key, state) {
+    var had = Object.prototype.hasOwnProperty.call(claims, key) ? claims[key] : null;
+    var want = state || null;
+    // A removal can be a no-op in memory while still overriding a persisted
+    // claim that init() has not restored yet.
+    if (!ready) preReadyClaimKeys[key] = true;
+    if (had === want) return;
+    if (want) claims[key] = want; else delete claims[key];
+    if (!ready) return;
+    persistIntent();
+    applyResolved();
   }
 
   // ---- Public API ---------------------------------------------------------
@@ -387,6 +943,7 @@
           || !chrome.action
           || typeof chrome.action.setIcon !== 'function') {
         unavailable = true;
+        disarmWatchdog();
         console.error('[FSB] action icon: canvas or chrome.action missing, staying on the manifest icon');
         return;
       }
@@ -397,67 +954,154 @@
         await buildStaticCache();
       } catch (e) {
         unavailable = true;
+        // repair() no-ops once unavailable, so a beat left armed by an earlier
+        // generation would wake the worker forever with nothing to do.
+        disarmWatchdog();
         console.error('[FSB] action icon: base frames failed to render, icon disabled:', e && e.message);
         return;
       }
       var intent = await readIntent();
       if (intent) {
-        if (!watchingExplicit) watching = intent.watching === true;
         if (!connectedExplicit) connected = intent.connected === true;
+        if (intent.claims && typeof intent.claims === 'object') {
+          var storedKeys = Object.keys(intent.claims);
+          for (var s = 0; s < storedKeys.length; s++) {
+            var sk = storedKeys[s];
+            // Capability claims never survive their owning promise or worker.
+            // Ignore any stale record written by an older worker generation.
+            if (sk.indexOf('capability:') === 0) continue;
+            // A call that raced this init already holds the truth for its key.
+            if (Object.prototype.hasOwnProperty.call(preReadyClaimKeys, sk)) continue;
+            if (STATES[intent.claims[sk]]) claims[sk] = intent.claims[sk];
+          }
+        }
       }
-      ready = true;
+      // OR, never assign: a setConnected(true) that raced this init already
+      // learned the relay, and the stored write may not have landed yet.
+      if (!relaySeen) relaySeen = await readRelaySeen();
+      await pruneClosedTabClaims();
       var live = true;
       if (liveSessionProbe) {
         try { live = liveSessionProbe() === true; } catch (_e) { live = false; }
       }
-      if (intent && intent.animating === true
-          && STATES[intent.state] && STATES[intent.state].animated && live) {
-        // Restart the cycle from frame 0 rather than resuming mid-phase; this
-        // matches the overlay being destroyed and recreated on a page reload.
-        startAnimation(intent.state, true);
-      } else {
-        stopAnimation();
-        persistIntent();
+      // A session claim cannot outlive the session that made it. Watch claims
+      // can: the trigger runtime owns them and restores them independently.
+      if (!live) {
+        var liveKeys = Object.keys(claims);
+        for (var l = 0; l < liveKeys.length; l++) {
+          if (liveKeys[l].indexOf('session:') === 0) delete claims[liveKeys[l]];
+        }
       }
+      ready = true;
+      preReadyClaimKeys = null;
+      // Restart from frame 0 rather than resuming mid-cycle; this matches the
+      // overlay being destroyed and recreated on a page reload.
+      resolved = null;
+      var initial = topClaim();
+      if (initial) startAnimation(initial);
+      else stopAnimation();
+      persistIntent();
     })();
     return initPromise;
   }
 
-  // Single drive point. Gate and phase map are identical to the content-script
-  // overlay: highlight.animated decides animated vs static, then the phase
-  // selects the palette and period.
-  function applyOverlayState(overlayState) {
-    if (unavailable || !ready) return;
-    var highlight = overlayState && overlayState.highlight;
-    if (!highlight || highlight.animated !== true) {
-      stopAnimation();
-      return;
-    }
-    var phase = overlayState.phase;
-    var next = phase === 'calling'
-      ? 'calling'
-      : (phase === 'acting' || phase === 'writing' || phase === 'switching_tab')
-        ? 'acting'
-        : 'thinking';
-    startAnimation(next, false);
+  // Single drive point. Callers classify the tool with resolveIconActivity()
+  // (extension/ai/tool-definitions.js) and report what kind of work is running.
+  //
+  // A tool call is instantaneous, so the claim DECAYS rather than being cleared
+  // by anything: each call on a tab refreshes its own expiry. That is why the
+  // icon no longer depends on visual-session lifecycle -- read-only tools never
+  // open a session at all, and making them do so would put the on-page overlay
+  // up on every read_page.
+  function noteActivity(tabId, activity) {
+    if (unavailable) return;
+    // Ring is deliberately unavailable through generic activity reporting.
+    // Only a balanced capability lifecycle may create a Ring claim.
+    if (activity !== 'orbit' && activity !== 'sweep') return;
+    var key = 'session:' + tabKey(tabId);
+    clearActivityTimer(key);
+    activityTimers[key] = setTimeout(function () {
+      delete activityTimers[key];
+      setClaim(key, null);
+    }, ACTIVITY_TTL_MS);
+    setClaim(key, activity);
   }
 
-  function setWatching(isWatching) {
+  function clearActivityTimer(key) {
+    if (!activityTimers[key]) return;
+    clearTimeout(activityTimers[key]);
+    delete activityTimers[key];
+  }
+
+  // Capability invokes are durations, not activity pulses. Reference counts
+  // balance overlapping invokes on one tab, while per-tab claims ensure one
+  // completion cannot clear an invoke that is still running elsewhere.
+  function beginCapability(tabId) {
     if (unavailable) return;
-    var next = isWatching === true;
-    watchingExplicit = true;
-    if (watching === next) return;
-    watching = next;
-    if (!ready) return;
+    var key = 'capability:' + tabKey(tabId);
+    var count = capabilityCounts[key] || 0;
+    capabilityCounts[key] = count + 1;
+    if (count === 0) setClaim(key, 'ring');
+  }
+
+  function endCapability(tabId) {
+    var key = 'capability:' + tabKey(tabId);
+    var count = capabilityCounts[key] || 0;
+    if (count <= 0) return;
+    if (count > 1) {
+      capabilityCounts[key] = count - 1;
+      return;
+    }
+    delete capabilityCounts[key];
+    if (unavailable) {
+      delete claims[key];
+      return;
+    }
+    setClaim(key, null);
+  }
+
+  // Keyed per tab, because the count that feeds this is per tab. A single global
+  // flag turned "tab B stopped watching" into "nothing is watching" while tab A
+  // still was, and each flip cost a full breathe.
+  // A watch claim is a STATE, not an activity pulse, so it carries no expiry --
+  // only disarming it or closing its tab takes it away.
+  function setWatching(isWatching, tabId) {
+    if (unavailable) return;
+    setClaim('watch:' + tabKey(tabId), isWatching === true ? 'breathe' : null);
+  }
+
+  // A closed tab cannot still be acting, invoking a capability, or watching.
+  function dropTab(tabId) {
+    var suffix = ':' + tabKey(tabId);
+    var keys = Object.keys(claims);
+    var changed = false;
+    for (var i = 0; i < keys.length; i++) {
+      if (keys[i].length >= suffix.length
+          && keys[i].slice(keys[i].length - suffix.length) === suffix) {
+        clearActivityTimer(keys[i]);
+        delete capabilityCounts[keys[i]];
+        delete claims[keys[i]];
+        changed = true;
+      }
+    }
+    if (!changed || !ready || unavailable) return;
     persistIntent();
-    if (!animating) emit(staticFrame());
+    applyResolved();
   }
 
   function setConnected(isConnected) {
     if (unavailable) return;
     var next = isConnected === true;
     connectedExplicit = true;
-    if (connected === next) return;
+    // Recorded before the no-op bail so the very first connect still arms the
+    // dim, even when it lands on an already-true value restored from intent.
+    var learned = false;
+    if (next && !relaySeen) {
+      relaySeen = true;
+      learned = true;
+      persistRelaySeen();
+    }
+    if (connected === next && !learned) return;
     connected = next;
     if (!ready) return;
     persistIntent();
@@ -472,18 +1116,23 @@
     return initPromise.then(function () {
       if (unavailable || !ready) return;
       lastEmitted = null;
-      if (animating && currentState && STATES[currentState]) {
-        if (timerId === null) startTime = Date.now();
-        var revived = currentState;
+      if (animating && resolved && STATES[resolved]) {
+        var revived = resolved;
         if (animatedFrames[revived]) {
+          startTime = Date.now();
           startLoop();
         } else {
           ensureAnimatedFrames(revived).then(function () {
-            if (animating && currentState === revived) startLoop();
+            if (!animating || resolved !== revived) return;
+            startTime = Date.now();
+            startLoop();
           }).catch(function () { /* reported by ensureAnimatedFrames */ });
         }
       } else {
+        // Nothing is owed, so the beat that woke us retires itself here. This is
+        // also the self-heal for an alarm stranded by an earlier generation.
         stopLoop();
+        disarmWatchdog();
         emit(staticFrame());
       }
     }).catch(function () { /* the icon is presentation-only */ });
@@ -491,9 +1140,12 @@
 
   globalThis.fsbActionIcon = Object.freeze({
     init: init,
-    applyOverlayState: applyOverlayState,
+    noteActivity: noteActivity,
+    beginCapability: beginCapability,
+    endCapability: endCapability,
     setWatching: setWatching,
     setConnected: setConnected,
+    dropTab: dropTab,
     repair: repair
   });
 })();

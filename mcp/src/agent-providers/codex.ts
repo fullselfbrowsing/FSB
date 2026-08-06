@@ -6,6 +6,7 @@ import {
   type AgentProviderAdapter,
   type AgentTask,
   type SpawnContext,
+  type SpawnPurpose,
   type SpawnSpec,
   type SupervisedChild,
 } from './adapter.js';
@@ -16,6 +17,7 @@ import { parseCodexStream } from './codex-stream.js';
 export type CodexDetectionDependency = () => Promise<AdapterDetection>;
 export type CodexParserDependency = (
   stream: NodeJS.ReadableStream,
+  options?: Readonly<{ purpose: SpawnPurpose }>,
 ) => AsyncIterable<AgentEvent>;
 export type CodexTreeKillDependency = (
   child: SupervisedChild,
@@ -55,8 +57,11 @@ export function createCodexAdapter(
       return buildCodexSpawnSpec(task, context);
     },
 
-    parseEvents(stream: NodeJS.ReadableStream): AsyncIterable<AgentEvent> {
-      return parseEvents(stream);
+    parseEvents(
+      stream: NodeJS.ReadableStream,
+      options?: Readonly<{ purpose: SpawnPurpose }>,
+    ): AsyncIterable<AgentEvent> {
+      return parseEvents(stream, options);
     },
 
     kill(child: SupervisedChild, options: { grace: number }): Promise<void> {

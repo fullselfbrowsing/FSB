@@ -5,8 +5,8 @@ import {
   NATIVE_HOST_PACKAGE_NAME,
   NATIVE_HOST_WINDOWS_BOOTSTRAP_ROLE_MARKER,
   NATIVE_HOST_WINDOWS_REGISTRY_HELPER_ROLE_MARKER,
-  NATIVE_HOST_WINDOWS_REGISTRY_KEY,
 } from './native-host/constants.js';
+import { NATIVE_HOST_WINDOWS_REGISTRY_KEYS } from './native-host-install/browser.js';
 import type {
   NativeHostInstallRegistryAdapter,
   NativeHostProcessInvocation,
@@ -36,7 +36,14 @@ const OPERATION = Object.freeze({
   deleteEmptyKey32: 6,
 });
 
-type RegistryOperation = typeof OPERATION[keyof typeof OPERATION];
+type RegistryOperationName = keyof typeof OPERATION;
+type RegistryOperation = number;
+const OPERATION_OFFSET_BY_KEY: Readonly<Record<string, number>> = Object.freeze({
+  [NATIVE_HOST_WINDOWS_REGISTRY_KEYS.chrome]: 0,
+  [NATIVE_HOST_WINDOWS_REGISTRY_KEYS.edge]: 10,
+  [NATIVE_HOST_WINDOWS_REGISTRY_KEYS.brave]: 20,
+  [NATIVE_HOST_WINDOWS_REGISTRY_KEYS.chromium]: 30,
+});
 type ArtifactRole = 'bootstrap' | 'registry-helper';
 
 type HelperOptions = Readonly<{
@@ -278,12 +285,18 @@ function writeInput(value: string): Uint8Array {
   return Buffer.concat([header, bytes]);
 }
 
+function registryOperation(key: string, name: RegistryOperationName): RegistryOperation | null {
+  if (!Object.hasOwn(OPERATION_OFFSET_BY_KEY, key)) return null;
+  return OPERATION[name] + OPERATION_OFFSET_BY_KEY[key];
+}
+
 function safeReadKey(view: string, key: string): boolean {
-  return (view === 'user/32' || view === 'user/64') && key === NATIVE_HOST_WINDOWS_REGISTRY_KEY;
+  return (view === 'user/32' || view === 'user/64')
+    && Object.hasOwn(OPERATION_OFFSET_BY_KEY, key);
 }
 
 function safeMutation(view: string, key: string): boolean {
-  return view === 'user/32' && key === NATIVE_HOST_WINDOWS_REGISTRY_KEY;
+  return view === 'user/32' && Object.hasOwn(OPERATION_OFFSET_BY_KEY, key);
 }
 
 export function createNativeHostRegistryHelperAdapter(
@@ -314,7 +327,11 @@ export function createNativeHostRegistryHelperAdapter(
     ): Promise<NativeHostRegistryValueFact> => {
       if (!safeReadKey(view, key)) return Object.freeze({ status: 'unavailable' });
       try {
-        const operation = view === 'user/32' ? OPERATION.query32 : OPERATION.query64;
+        const operation = registryOperation(
+          key,
+          view === 'user/32' ? 'query32' : 'query64',
+        );
+        if (operation === null) return Object.freeze({ status: 'unavailable' });
         const response = await invoke(operation);
         if (!response) return Object.freeze({ status: 'unavailable' });
         if (response.status === 1 && response.registryType === 0 && response.valueUtf8Hex === '') {
@@ -343,7 +360,9 @@ export function createNativeHostRegistryHelperAdapter(
         throw new Error('registry-helper-refused');
       }
       try {
-        const response = await invoke(OPERATION.write32, writeInput(value.value));
+        const operation = registryOperation(key, 'write32');
+        if (operation === null) throw new Error('registry-helper-refused');
+        const response = await invoke(operation, writeInput(value.value));
         if (!response || response.status !== 6
           || response.registryType !== 0 || response.valueUtf8Hex !== '') {
           throw new Error('registry-helper-failed');
@@ -355,7 +374,9 @@ export function createNativeHostRegistryHelperAdapter(
     deleteDefault: async (view: NativeHostRegistryView, key: string): Promise<void> => {
       if (!safeMutation(view, key)) throw new Error('registry-helper-refused');
       try {
-        const response = await invoke(OPERATION.deleteValue32);
+        const operation = registryOperation(key, 'deleteValue32');
+        if (operation === null) throw new Error('registry-helper-refused');
+        const response = await invoke(operation);
         if (!response || response.status !== 6
           || response.registryType !== 0 || response.valueUtf8Hex !== '') {
           throw new Error('registry-helper-failed');
@@ -370,7 +391,9 @@ export function createNativeHostRegistryHelperAdapter(
     ): Promise<NativeHostRegistryKeyFact> => {
       if (!safeMutation(view, key)) return Object.freeze({ status: 'unavailable' });
       try {
-        const response = await invoke(OPERATION.inspect32);
+        const operation = registryOperation(key, 'inspect32');
+        if (operation === null) return Object.freeze({ status: 'unavailable' });
+        const response = await invoke(operation);
         if (!response || response.registryType !== 0 || response.valueUtf8Hex !== '') {
           return Object.freeze({ status: 'unavailable' });
         }
@@ -387,7 +410,9 @@ export function createNativeHostRegistryHelperAdapter(
     deleteEmptyKey: async (view: NativeHostRegistryView, key: string): Promise<void> => {
       if (!safeMutation(view, key)) throw new Error('registry-helper-refused');
       try {
-        const response = await invoke(OPERATION.deleteEmptyKey32);
+        const operation = registryOperation(key, 'deleteEmptyKey32');
+        if (operation === null) throw new Error('registry-helper-refused');
+        const response = await invoke(operation);
         if (!response || response.status !== 6
           || response.registryType !== 0 || response.valueUtf8Hex !== '') {
           throw new Error('registry-helper-failed');

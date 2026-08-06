@@ -1,5 +1,10 @@
 import { z } from 'zod';
-import { CLAUDE_CODE_ADAPTER_ID, type AgentEvent, type AgentEventType } from './adapter.js';
+import {
+  CLAUDE_CODE_ADAPTER_ID,
+  type AgentEvent,
+  type AgentEventType,
+  type SpawnPurpose,
+} from './adapter.js';
 import {
   AGENT_STREAM_LINE_LIMIT_BYTES,
   AgentProtocolDriftError,
@@ -111,7 +116,22 @@ function serverName(server: z.infer<typeof McpServerSchema>): string {
   return typeof server === 'string' ? server : server.name;
 }
 
-function attestInit(init: z.infer<typeof InitSchema>, eventIndex: number): void {
+function attestInit(
+  init: z.infer<typeof InitSchema>,
+  eventIndex: number,
+  purpose: SpawnPurpose,
+): void {
+  if (purpose === 'connection_test') {
+    if (
+      init.tools.length !== 0
+      || init.mcp_servers.length !== 0
+      || (init.plugins?.length ?? 0) !== 0
+      || (init.hooks?.length ?? 0) !== 0
+    ) {
+      throw new AgentProtocolDriftError('configuration_surface', eventIndex);
+    }
+    return;
+  }
   const toolSurfaceOk = init.tools.every(
     (tool) => tool === 'mcp__fsb' || tool.startsWith('mcp__fsb__'),
   );
@@ -137,6 +157,8 @@ function attestInit(init: z.infer<typeof InitSchema>, eventIndex: number): void 
 class ClaudeEventNormalizer {
   private sessionId: string | null = null;
   private terminalEvent: AgentEvent | null = null;
+
+  constructor(private readonly purpose: SpawnPurpose) {}
 
   normalize(value: unknown, eventIndex: number): readonly AgentEvent[] {
     const envelope = record(value);
@@ -190,7 +212,7 @@ class ClaudeEventNormalizer {
     if (envelope.subtype === 'init') {
       if (this.sessionId) throw new AgentProtocolDriftError('duplicate_init', eventIndex);
       const init = parseShape(InitSchema, envelope, eventIndex);
-      attestInit(init, eventIndex);
+      attestInit(init, eventIndex, this.purpose);
       this.sessionId = init.session_id;
       return [freezeEvent('init', init.session_id, init)];
     }
@@ -267,13 +289,19 @@ function appendBounded(pending: Buffer, addition: Buffer, eventIndex: number): B
   );
 }
 
-export async function* parseClaudeEvents(stream: NodeJS.ReadableStream): AsyncIterable<AgentEvent> {
+export async function* parseClaudeEvents(
+  stream: NodeJS.ReadableStream,
+  options: Readonly<{ purpose: SpawnPurpose }> = { purpose: 'delegation' },
+): AsyncIterable<AgentEvent> {
   const iterable = stream as NodeJS.ReadableStream & AsyncIterable<Buffer | string>;
   if (typeof iterable[Symbol.asyncIterator] !== 'function') {
     throw new TypeError('Claude event stream must be async iterable');
   }
 
-  const normalizer = new ClaudeEventNormalizer();
+  if (options.purpose !== 'delegation' && options.purpose !== 'connection_test') {
+    throw new TypeError('Claude event purpose is invalid');
+  }
+  const normalizer = new ClaudeEventNormalizer(options.purpose);
   let pending: Buffer = Buffer.alloc(0);
   let eventIndex = 1;
 

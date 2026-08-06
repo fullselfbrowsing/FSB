@@ -18,8 +18,13 @@ const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 
 const repositoryRoot = path.resolve(__dirname, '..');
-const HOST_KEY =
-  'Software\\Google\\Chrome\\NativeMessagingHosts\\io.github.fullselfbrowsing.fsb_native_host';
+const HOST_KEYS = Object.freeze({
+  chrome: 'Software\\Google\\Chrome\\NativeMessagingHosts\\io.github.fullselfbrowsing.fsb_native_host',
+  edge: 'Software\\Microsoft\\Edge\\NativeMessagingHosts\\io.github.fullselfbrowsing.fsb_native_host',
+  brave: 'Software\\BraveSoftware\\Brave-Browser\\NativeMessagingHosts\\io.github.fullselfbrowsing.fsb_native_host',
+  chromium: 'Software\\Chromium\\NativeMessagingHosts\\io.github.fullselfbrowsing.fsb_native_host',
+});
+const HOST_KEY = HOST_KEYS.chrome;
 const PACKAGE_VERSION = require('../mcp/package.json').version;
 const ROLE_MARKERS = Object.freeze({
   bootstrap: 'fsb-native-host-bootstrap-v1',
@@ -246,6 +251,52 @@ async function testExactOperations(helper) {
   });
 }
 
+async function testBrowserOperationMatrix(helper) {
+  await withFixture(async ({ packageRoot }) => {
+    const operations = [];
+    const adapter = helper.createNativeHostRegistryHelperAdapter({
+      packageRoot,
+      packageVersion: PACKAGE_VERSION,
+      architecture: 'x64',
+      process: {
+        run: async (invocation) => {
+          const operation = Number(invocation.argv[1]);
+          operations.push(operation);
+          return {
+            status: 0,
+            stdout: response(
+              operation,
+              operation % 10 === 3 ? 4 : operation % 10 >= 4 ? 6 : 1,
+            ),
+            stderr: '',
+            networkRequests: 0,
+          };
+        },
+      },
+    });
+
+    for (const [index, [browser, key]] of Object.entries(HOST_KEYS).entries()) {
+      const offset = index * 10;
+      assert.deepEqual(await adapter.readDefault('user/32', key), { status: 'absent' });
+      assert.deepEqual(await adapter.readDefault('user/64', key), { status: 'absent' });
+      assert.deepEqual(await adapter.inspectKey('user/32', key), {
+        status: 'exact-default-only',
+      });
+      await adapter.writeDefault('user/32', key, {
+        type: 'REG_SZ',
+        value: 'C:\\FSB\\manifest.json',
+      });
+      await adapter.deleteDefault('user/32', key);
+      await adapter.deleteEmptyKey('user/32', key);
+      assert.deepEqual(
+        operations.slice(index * 6, (index + 1) * 6),
+        [1, 2, 3, 4, 5, 6].map((operation) => operation + offset),
+      );
+      pass(`${browser} uses only its fixed six-operation registry family`);
+    }
+  });
+}
+
 async function testMalformedShadowBlocksMutation(helper, platform) {
   for (const malformed of [
     '    (Par defaut)    REG_SZ    C:\\host.json\r\n',
@@ -370,6 +421,7 @@ async function main() {
   await testStructuredFacts(helper);
   await testClosedMutationSurface(helper);
   await testExactOperations(helper);
+  await testBrowserOperationMatrix(helper);
   await testMalformedShadowBlocksMutation(helper, platform);
   await testProcessFailuresAreContentFree(helper);
   await testTamperAndHostileEnvironment(helper);

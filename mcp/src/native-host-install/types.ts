@@ -16,6 +16,8 @@ export type NativeHostRegistryView = 'user/32' | 'user/64';
 
 export type NativeHostRegistrationKind = 'file' | 'registry';
 
+export type NativeHostBrowser = 'chrome' | 'edge' | 'brave' | 'chromium';
+
 export type NativeHostFileFact =
   | Readonly<{ status: 'absent' }>
   | Readonly<{ status: 'unavailable' }>
@@ -90,6 +92,7 @@ export type NativeHostRegistryRegistration = Readonly<{
 
 export interface NativeHostInstallPlatformLayout {
   platform: NativeHostPlatform;
+  browser: NativeHostBrowser;
   stableRoot: string;
   manifestPath: string;
   markerPath: string;
@@ -375,6 +378,11 @@ export interface NativeHostUninstallTransactionDependencies {
 
 export interface NativeHostInstallRequest {
   extensionId?: string;
+  browser?: NativeHostBrowser;
+}
+
+export interface NativeHostUninstallRequest {
+  browser?: NativeHostBrowser;
 }
 
 export type NativeHostInstallResult = Readonly<{

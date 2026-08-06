@@ -10,6 +10,7 @@ import {
   inspectNativeHostRegistration,
   validateNativeHostMarker,
 } from '../native-host-registration.js';
+import { isNativeHostBrowser } from './browser.js';
 import type {
   NativeHostInstallRequest,
   NativeHostInstallResult,
@@ -36,13 +37,26 @@ function ordinaryRequest(value: unknown): NativeHostInstallRequest | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   if (Object.getPrototypeOf(value) !== Object.prototype) return null;
   const keys = Reflect.ownKeys(value);
-  if (keys.some((key) => typeof key !== 'string' || key !== 'extensionId')) return null;
-  if (keys.length > 1) return null;
+  const allowedKeys = ['browser', 'extensionId'];
+  if (keys.some((key) => typeof key !== 'string' || !allowedKeys.includes(key))) return null;
+  if (keys.length > allowedKeys.length) return null;
   if (keys.length === 0) return Object.freeze({});
-  const descriptor = Object.getOwnPropertyDescriptor(value, 'extensionId');
-  if (!descriptor || !descriptor.enumerable || !Object.hasOwn(descriptor, 'value')) return null;
-  if (descriptor.value !== undefined && typeof descriptor.value !== 'string') return null;
-  return Object.freeze({ extensionId: descriptor.value as string | undefined });
+  const request: NativeHostInstallRequest = {};
+  for (const key of keys) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!descriptor || !descriptor.enumerable || !Object.hasOwn(descriptor, 'value')) return null;
+    if (key === 'extensionId') {
+      if (descriptor.value !== undefined && typeof descriptor.value !== 'string') return null;
+      request.extensionId = descriptor.value as string | undefined;
+    } else {
+      if (
+        descriptor.value !== undefined
+        && !isNativeHostBrowser(descriptor.value)
+      ) return null;
+      request.browser = descriptor.value as NativeHostInstallRequest['browser'];
+    }
+  }
+  return Object.freeze(request);
 }
 
 function dependencyLayoutsMatch(
@@ -319,9 +333,11 @@ export async function installNativeHost(
 ): Promise<NativeHostInstallResult> {
   const request = ordinaryRequest(requestValue);
   const extensionId = request?.extensionId ?? NATIVE_HOST_DEFAULT_EXTENSION_ID;
+  const browser = request?.browser ?? 'chrome';
   if (
     !request
     || !isNativeHostExtensionId(extensionId)
+    || browser !== dependencies.platform.layout.browser
     || !dependencyLayoutsMatch(dependencies)
     || dependencies.runtime.layout.extensionId !== extensionId
   ) {

@@ -7,6 +7,7 @@ import {
   NATIVE_HOST_PRIVATE_FILE_MODE,
   NATIVE_HOST_PROTOCOL_VERSION,
   NATIVE_HOST_RUNTIME_DIRECTORY_MODE,
+  NATIVE_HOST_SERVICE_PORT,
   NATIVE_HOST_START_LOCK_STALE_MS,
   NATIVE_HOST_START_POLL_INTERVAL_MS,
 } from './constants.js';
@@ -52,7 +53,7 @@ type NativeHostLockPaths = Readonly<{
 }>;
 
 type NativeHostLockState =
-  | Readonly<{ kind: 'owner'; token: string; lease: NativeHostStartLease }>
+  | Readonly<{ kind: 'owner'; token: string }>
   | Readonly<{ kind: 'contender' }>
   | Readonly<{ kind: 'health'; health: NativeHostHealthClassification }>
   | Readonly<{ kind: 'failure' }>;
@@ -62,7 +63,7 @@ type NativeHostLockPublicationState =
   | Readonly<{ kind: 'contender' }>
   | Readonly<{ kind: 'failure' }>;
 
-const HEALTH_URL = 'http://127.0.0.1:7226/health';
+const HEALTH_URL = `http://127.0.0.1:${NATIVE_HOST_SERVICE_PORT}/health`;
 const LOCK_DIRECTORY_NAME = 'wake.lock';
 const LOCK_METADATA_NAME = 'owner.json';
 const LOCK_METADATA_MAX_BYTES = 256;
@@ -236,6 +237,29 @@ async function releaseStartLease(lease: NativeHostStartLease): Promise<void> {
   }
 }
 
+// A canonical lock younger than the stale window belongs to a live wake attempt.
+// An unreadable or backwards clock counts as fresh, so recovery never runs off a
+// reading this process cannot trust.
+function lockMetadataIsFresh(
+  dependencies: NativeHostDaemonDependencies,
+  metadata: NativeHostLockMetadata,
+): boolean {
+  const now = dependencies.now();
+  return !Number.isSafeInteger(now)
+    || now < metadata.createdAt
+    || now - metadata.createdAt < NATIVE_HOST_START_LOCK_STALE_MS;
+}
+
+// Unparseable owner metadata is deliberately NOT fresh: that is the corrupt-lock
+// case stale recovery exists to clear.
+function honorsFreshOwner(
+  dependencies: NativeHostDaemonDependencies,
+  identity: NativeHostLockDirectoryIdentity,
+): boolean {
+  const metadata = parseLockMetadata(identity.ownerContents);
+  return metadata !== null && lockMetadataIsFresh(dependencies, metadata);
+}
+
 async function probeHealth(
   dependencies: NativeHostDaemonDependencies,
 ): Promise<NativeHostHealthClassification> {
@@ -406,6 +430,14 @@ async function acquireLock(
   const ownerToken = nextToken(dependencies);
   if (!ownerToken) return Object.freeze({ kind: 'failure' });
   const observed = await inspectLockIdentity(dependencies, paths.directory);
+  // The start lease reserves the very port the spawned serve process must bind,
+  // so it is only taken when this process could still publish. A live wake
+  // attempt holding a fresh canonical lock makes this one a contender whatever
+  // happens below, and reserving the port on the way to that verdict can outlast
+  // the winner's release and collide with its own child's bind.
+  if (observed && honorsFreshOwner(dependencies, observed)) {
+    return Object.freeze({ kind: 'contender' });
+  }
   let lease: NativeHostStartLease | null = null;
   try {
     lease = await dependencies.acquireStartLease();
@@ -414,12 +446,17 @@ async function acquireLock(
   }
   if (!lease) return Object.freeze({ kind: 'contender' });
 
-  let retainLease = false;
   try {
+    // Re-read under the reservation: a winner can publish and release between the
+    // snapshot above and this point, and honoring it here keeps the port held for
+    // one directory read rather than a full publication attempt.
+    const reserved = await inspectLockIdentity(dependencies, paths.directory);
+    if (reserved && honorsFreshOwner(dependencies, reserved)) {
+      return Object.freeze({ kind: 'contender' });
+    }
     const attempted = await publishOwnedLock(dependencies, paths, ownerToken);
     if (attempted.kind === 'owner') {
-      retainLease = true;
-      return Object.freeze({ kind: 'owner', token: attempted.token, lease });
+      return Object.freeze({ kind: 'owner', token: attempted.token });
     }
     if (attempted.kind === 'failure') return Object.freeze({ kind: 'failure' });
     if (!observed) return Object.freeze({ kind: 'contender' });
@@ -429,15 +466,8 @@ async function acquireLock(
       return Object.freeze({ kind: 'contender' });
     }
     const existing = parseLockMetadata(current.ownerContents);
-    if (existing) {
-      const now = dependencies.now();
-      if (
-        !Number.isSafeInteger(now)
-        || now < existing.createdAt
-        || now - existing.createdAt < NATIVE_HOST_START_LOCK_STALE_MS
-      ) {
-        return Object.freeze({ kind: 'contender' });
-      }
+    if (existing && lockMetadataIsFresh(dependencies, existing)) {
+      return Object.freeze({ kind: 'contender' });
     }
 
     const health = await probeHealth(dependencies);
@@ -470,12 +500,11 @@ async function acquireLock(
     }
     const replacement = await publishOwnedLock(dependencies, paths, ownerToken);
     if (replacement.kind === 'owner') {
-      retainLease = true;
-      return Object.freeze({ kind: 'owner', token: replacement.token, lease });
+      return Object.freeze({ kind: 'owner', token: replacement.token });
     }
     return replacement;
   } finally {
-    if (!retainLease) await releaseStartLease(lease);
+    await releaseStartLease(lease);
   }
 }
 
@@ -556,7 +585,7 @@ async function spawnServe(
     '--host',
     '127.0.0.1',
     '--port',
-    '7226',
+    String(NATIVE_HOST_SERVICE_PORT),
   ]);
   const options: NativeHostSpawnOptions = Object.freeze({
     cwd: runtime.stableRuntimeRoot,
@@ -654,7 +683,6 @@ export async function wakeServeDaemon(options: Readonly<{
         : failed('serve_readiness_timeout');
     } finally {
       await releaseLock(dependencies, paths, lock.token);
-      await releaseStartLease(lock.lease);
     }
   } catch (_error) {
     return failed('internal_failure');

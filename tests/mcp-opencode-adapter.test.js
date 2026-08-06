@@ -659,6 +659,7 @@ function openCodeProfileFixture() {
     opencodeDataRoot: '/fixture/native-data/opencode',
   };
   const context = {
+    purpose: 'delegation',
     adapterId: 'opencode',
     detection: retainedOpenCodeDetection(),
     delegationId: 'delegation_fixture_0001',
@@ -1264,6 +1265,7 @@ async function runAttestation() {
     'OPENCODE_TASK_LIMIT_BYTES',
     'SHIPPED_FSB_DESCRIPTION_SHA256',
     'SHIPPED_FSB_PROMPT_SHA256',
+    'buildOpenCodeConnectionTestSpawnSpec',
     'buildOpenCodeProfile',
     'buildOpenCodeSpawnSpec',
   ]);

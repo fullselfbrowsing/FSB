@@ -130,6 +130,9 @@ function validateTask(task: AgentTask): void {
 }
 
 function validateContext(ctx: SpawnContext): void {
+  if (ctx.purpose !== 'delegation' && ctx.purpose !== 'connection_test') {
+    throw new Error('Claude profile requires a closed spawn purpose');
+  }
   if (ctx.adapterId !== CLAUDE_CODE_ADAPTER_ID) {
     throw new Error('Claude profile requires the canonical adapter id');
   }
@@ -171,7 +174,22 @@ export function buildClaudeSpawnSpec(task: AgentTask, ctx: SpawnContext): SpawnS
   const binary = ctx.detection.binary;
   if (!binary) throw new Error('Claude profile has no retained binary');
 
-  const argv = [
+  const argv = ctx.purpose === 'connection_test' ? [
+    ...binary.argvPrefix,
+    '-p',
+    '--verbose',
+    '--output-format', 'stream-json',
+    '--setting-sources', '',
+    '--disable-slash-commands',
+    '--no-chrome',
+    '--strict-mcp-config',
+    '--mcp-config', ctx.privateMcpConfigPath,
+    '--permission-mode', 'dontAsk',
+    '--tools', '',
+    '--disallowedTools', DENIED_TOOLS.join(','),
+    '--max-turns', '1',
+    '--no-session-persistence',
+  ] : [
     ...binary.argvPrefix,
     '-p',
     '--verbose',
@@ -191,12 +209,16 @@ export function buildClaudeSpawnSpec(task: AgentTask, ctx: SpawnContext): SpawnS
     '--max-turns', '40',
     '--no-session-persistence',
   ];
-  const fixedEnv = {
-    FSB_AGENT_ADAPTER: CLAUDE_CODE_ADAPTER_ID,
-    FSB_AGENT_PROFILE: CLAUDE_COMPATIBILITY.profileVersion,
-    FSB_DELEGATION_ID: ctx.delegationId,
-    FSB_AGENT_FINGERPRINT: ctx.runtimeFingerprint,
-  };
+  const fixedEnv: Readonly<Record<string, string>> = ctx.purpose === 'connection_test'
+    ? {
+        FSB_AGENT_PURPOSE: 'connection_test',
+      }
+    : {
+        FSB_AGENT_ADAPTER: CLAUDE_CODE_ADAPTER_ID,
+        FSB_AGENT_PROFILE: CLAUDE_COMPATIBILITY.profileVersion,
+        FSB_DELEGATION_ID: ctx.delegationId,
+        FSB_AGENT_FINGERPRINT: ctx.runtimeFingerprint,
+      };
   const privateFiles = [...new Set(ctx.runtimeFiles)];
   const diagnostic = ctx.detection.diagnostic?.message ?? '';
 

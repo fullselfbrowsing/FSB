@@ -129,6 +129,7 @@ const PHASE65_NEW_ROOT_COMMANDS = Object.freeze([
 ]);
 
 const REFINEMENT_ROOT_TEST_COMMANDS = Object.freeze([
+  'node tests/mcp-agent-connection-test.test.js',
   'node tests/mcp-session-recorder.test.js',
   'node tests/automation-logger-mcp-retention.test.js',
   'node tests/mcp-session-settings-ui.test.js',
@@ -143,6 +144,9 @@ const REFINEMENT_ROOT_TEST_COMMANDS = Object.freeze([
   'node tests/server-legacy-html-redirects.test.js',
   'node tests/settings-card-select-clipping.test.js',
   'node tests/control-panel-scroll-containment.test.js',
+  'node tests/action-icon-behavior.test.js',
+  'node tests/lattice-session-replay.test.js',
+  'node tests/lattice-replay-background-contract.test.js',
   'node --test tests/google-sheets-session.test.js tests/google-sheets-content-actions.test.js tests/gsheets-handler.test.js tests/google-sheets-wiring.test.js tests/spreadsheet-record-redaction.test.js',
 ]);
 
@@ -1025,10 +1029,10 @@ function runPhase64FinalContract() {
   'public metadata stays three-field while internal billing mappings remain exact');
   const controlPanel64 = read('extension/ui/control_panel.html');
   const providerCss64 = read('extension/ui/options.css') + read('extension/ui/sidepanel.css');
-  check(exactOccurrences(controlPanel64, 'class="provider-row"') === 10
-      && exactOccurrences(controlPanel64, 'data-provider-id="opencode"') === 2
+  check(exactOccurrences(controlPanel64, 'id="modelProvider"') === 1
+      && exactOccurrences(controlPanel64, '<option value="opencode">OpenCode</option>') === 1
       && !/opencode/i.test(providerCss64),
-  'OpenCode reuses the existing Providers row structure with no provider-specific CSS branch');
+  'OpenCode uses the compact shared provider selector with no provider-specific CSS branch');
 }
 
 function runPhase63UatLedgerContract() {
@@ -1278,7 +1282,7 @@ function runPhase63FinalContract() {
     ['D63-03', 'scripts/verify-native-host-boundary.mjs', /agent-provider authority/],
     ['D63-04', 'mcp/src/native-host/daemon.ts', /shell:\s*false/],
     ['D63-05', 'tests/mcp-native-host-daemon.test.js', /concurrent native hosts create at most one child/],
-    ['D63-06', 'tests/native-host-background-wake.test.js', /positive wake never replays delegate\.start/],
+    ['D63-06', 'tests/native-host-background-wake.test.js', /concurrent bootstrap callers share one native request/],
     ['D63-07', 'tests/mcp-native-host-install.test.js', /--native-host/],
     ['D63-08', 'mcp/src/native-host-install/platform.ts', /NativeMessagingHosts/],
     ['D63-09', 'mcp/src/native-host-registration.ts', /allowed_origins/],
@@ -1286,11 +1290,11 @@ function runPhase63FinalContract() {
     ['D63-11', 'tests/mcp-native-host-install.test.js', /uninstall preserves adjacent user\/host files/],
     ['D63-12', 'mcp/src/native-host-install/platform.ts', /registry32[\s\S]*registry64/],
     ['D63-13', 'extension/manifest.json', /nativeMessaging/],
-    ['D63-14', 'tests/native-host-background-wake.test.js', /native APIs and the host name exist only in the approved background helper/],
-    ['D63-15', 'tests/native-host-background-wake.test.js', /probe never calls sendNativeMessage/],
-    ['D63-16', 'tests/native-host-background-wake.test.js', /reruns preflight exactly once/],
+    ['D63-14', 'tests/native-host-background-wake.test.js', /normal agent paths use bootstrap while the additive v1 helper remains available/],
+    ['D63-15', 'tests/native-host-background-wake.test.js', /testHelperV1Compatibility/],
+    ['D63-16', 'tests/native-host-background-wake.test.js', /native-host-bootstrap-retry/],
     ['D63-17', 'tests/delegation-sidepanel-ui.test.js', /Agent offline/],
-    ['D63-18', 'tests/delegation-sidepanel-ui.test.js', /Pair this browser/],
+    ['D63-18', 'tests/delegation-sidepanel-ui.test.js', /Automatic connection needs the native helper/],
     ['D63-19', 'tests/delegation-sidepanel-ui.test.js', /forced-colors[\s\S]*reduced-motion/],
     ['D63-20', 'tests/mcp-diagnostics-status.test.js', /nativeHost/],
     ['D63-21', 'tests/mcp-diagnostics-status.test.js', /doctor never calls any injected mutation/],
@@ -1328,7 +1332,7 @@ function runPhase63FinalContract() {
     ['T63-07', '.github/workflows/ci.yml', /win32-x64[\s\S]*win32-arm64/],
     ['T63-08', 'tests/mcp-native-host-install.test.js', /symlink[\s\S]*adjacent/],
     ['T63-09', 'tests/mcp-diagnostics-status.test.js', /sentinel|browser-safe/i],
-    ['T63-10', 'tests/native-host-background-wake.test.js', /boot composition never calls actual wake/],
+    ['T63-10', 'tests/native-host-background-wake.test.js', /sessionWrites/],
     ['T63-11', 'tests/native-host-background-wake.test.js', /late|never replays delegate\.start/],
     ['T63-12', 'tests/delegation-sidepanel-ui.test.js', /no native success toast|optimistic/],
   ]);
@@ -1347,9 +1351,9 @@ function runPhase63FinalContract() {
     .filter((name) => name.endsWith('.ts'))
     .sort((left, right) => left.localeCompare(right));
   equal(nativeSourceRoster, [
-    'constants.ts', 'daemon.ts', 'entry.ts', 'index.ts',
+    'bootstrap.ts', 'constants.ts', 'daemon.ts', 'entry.ts', 'index.ts',
     'platform.ts', 'protocol.ts', 'runtime-layout.ts',
-  ], 'native source authority remains the exact seven-file leaf graph');
+  ], 'native source authority remains the exact eight-file leaf graph');
   const mcpTsconfig63 = JSON.parse(read('mcp/tsconfig.json'));
   const mcpBuildScript63 = JSON.parse(read('mcp/package.json')).scripts?.build || '';
   check(mcpTsconfig63.compilerOptions?.rootDir === 'src'
@@ -1436,10 +1440,10 @@ function runPhase63FinalContract() {
   check(manifest63.permissions.filter((permission) => permission === 'nativeMessaging').length === 1,
     'extension manifest contains exactly one nativeMessaging permission');
   const nativeWakeTest63 = read('tests/native-host-background-wake.test.js');
-  check(nativeWakeTest63.includes('boot composition never calls actual wake')
-      && nativeWakeTest63.includes('positive wake never replays delegate.start')
-      && nativeWakeTest63.includes('reruns preflight exactly once'),
-  'background contract pins boot silence, offline-only wake, one rerun, and no replay');
+  check(nativeWakeTest63.includes('testHelperV1Compatibility')
+      && nativeWakeTest63.includes('testHelperV2Bootstrap')
+      && nativeWakeTest63.includes('testBackgroundBootstrapCoalescing'),
+  'background contract pins v1 wake, v2 bootstrap, and coalesced readiness');
   const browserProjector63 = extractFunction(read('mcp/src/diagnostics.ts'),
     'projectNativeHostBrowserStatus');
   check(browserProjector63.includes(
@@ -1462,12 +1466,12 @@ function runPhase63FinalContract() {
     'Copy doctor command',
     'Open provider setup',
     'Doctor command copied',
-    'Pair this browser before starting ',
-    'FSB can reach the local agent service, but this browser has not been paired with it. Open provider setup, pair this browser, then try this message again.',
+    'Automatic connection needs the native helper',
+    'Install or update the FSB native helper, then try this message again. FSB will connect this browser automatically.',
+    'Copy install command',
     'fsb-mcp-server doctor',
   ]) {
-    check(uiSpec63.includes(copy) && sidepanel63.includes(copy),
-      `UI spec and source retain exact copy: ${copy}`);
+    check(sidepanel63.includes(copy), `UI source retains exact copy: ${copy}`);
   }
   check(!/connectNative|sendNativeMessage|nativeMessaging|child_process|process\.platform|message\.(?:reason|path|secret|registry|manifest|task)/i
     .test(`${checkingRender63}\n${checkingHandler63}`),
@@ -2528,7 +2532,7 @@ const architectureLinks = Object.freeze({
   'controller to exact registry cleanup': [['extension/utils/delegation-controller.js', /releaseDelegation/], ['extension/utils/agent-registry.js', /releaseDelegation/]],
   'serve routes to one supervisor': [['mcp/src/agent-providers/serve-delegation.ts', /supervisor\.handle/], ['mcp/src/agent-providers/spawn-supervisor.ts', /delegate\.status/]],
   'recovery journal to generation status': [['mcp/src/agent-providers/runtime-files.ts', /restartLosses/], ['mcp/src/agent-providers/spawn-supervisor.ts', /restartLosses/]],
-  'Providers clear to background authority': [['extension/ui/options.js', /FSB_DELEGATION_CLEAR_TRUST/], ['extension/background.js', /FSB_DELEGATION_CLEAR_TRUST/]],
+  'background retains authority-reducing trust clear': [['extension/background.js', /FSB_DELEGATION_CLEAR_TRUST/]],
   'side panel to controller snapshots': [['extension/ui/sidepanel.js', /FSB_DELEGATION_SNAPSHOT/]],
   'canonical ledger to text-only feed': [['extension/utils/delegation-event-store.js', /ENTRY_KEYS/], ['extension/ui/delegation-feed.js', /textContent/]],
 });
@@ -2665,7 +2669,6 @@ const optionsSource = read('extension/ui/options.js');
 const setTrustFunction = extractFunction(backgroundSource, 'fsbDelegationSetTrustCommand');
 const clearTrustFunction = extractFunction(backgroundSource, 'fsbDelegationClearTrustCommand');
 const sidepanelTrustFunction = extractFunction(sidepanelSource, '_allowDelegationFromConsent');
-const optionsClearTrustFunction = extractFunction(optionsSource, 'clearDelegationTrust');
 check(setTrustFunction.includes("fsbDelegationHasExactKeys(request, ['challengeId', 'providerId', 'trusted', 'type'])")
   && setTrustFunction.indexOf('fsbDelegationPreflightResult')
     < setTrustFunction.indexOf('writeTrustFromChallenge')
@@ -2685,11 +2688,9 @@ check(clearTrustFunction.includes("fsbDelegationHasExactKeys(request, ['provider
   && clearTrustFunction.includes('FsbDelegationConsent.clearTrusted')
   && !/(?:issueChallenge|consumeChallenge|writeTrustFromChallenge|controller|delegate\.start)/.test(clearTrustFunction),
 'background clear is the canonical Providers-only authority-reducing path');
-check(optionsClearTrustFunction.includes("type: 'FSB_DELEGATION_CLEAR_TRUST'")
-  && optionsClearTrustFunction.includes('providerId: provider.id')
-  && optionsClearTrustFunction.includes('getCanonicalDelegationProvider(providerPanelState.agentProviderId)')
-  && !/chrome\.storage|localStorage|saveSettings|markUnsavedChanges/.test(optionsClearTrustFunction),
-'Providers clears trust through one runtime command with no direct storage mutation');
+check(!optionsSource.includes('FSB_DELEGATION_CLEAR_TRUST')
+  && !/chrome\.storage|localStorage|saveSettings|markUnsavedChanges/.test(clearTrustFunction),
+'compact provider settings expose no trust-mutation or direct trust-storage control');
 check(/clear does not consume the fresh challenge required after trust is removed/.test(read('tests/delegation-consent.test.js'))
   && /untrusted consent mints a background challenge/.test(read('tests/mcp-bridge-background-dispatch.test.js')),
 'cleared trust deterministically restores fresh consent on the next run');
@@ -2883,7 +2884,7 @@ const phase62ThreatEvidence = Object.freeze({
   'T62-03': [['tests/mcp-diagnostics-status.test.js', /sharedSecretPresent/]],
   'T62-04': [['tests/mcp-version-parity.test.js', /doctor text and JSON modes consume the same collected snapshot/]],
   'T62-05': [['mcp/src/agent-providers/serve-delegation.ts', /adapter\.compatibility/]],
-  'T62-06': [['tests/providers-panel-ui.test.js', /compatibility.*observational|observational.*compatibility/i]],
+  'T62-06': [['tests/providers-panel-ui.test.js', /compatibility-badge/]],
   'T62-07': [['extension/utils/agent-protocol-drift-diagnostics.js', /REQUIRED_KEYS\s*=\s*Object\.freeze\(\[\s*'adapterId',\s*'profileVersion',\s*'reason',\s*'expected',\s*'eventIndex',\s*'issuePaths',?\s*\]\)/]],
   'T62-08': [['extension/background.js', /FSB_AGENT_PROTOCOL_DRIFT_SEEN_LIMIT = 512/]],
 });
@@ -3181,7 +3182,7 @@ for (const boundaryToken of [
   "'runtime-layout.ts'",
   'agent-provider authority',
   'task or prompt authority',
-  'bridge authentication authority',
+  'session credential authority',
   'historical native IPC authority',
   'exact serve argv tuple is not uniquely pinned',
 ]) {
@@ -3192,7 +3193,7 @@ check(exactOccurrences(nativePlatformSource, "from 'node:child_process'") === 1
   && exactOccurrences(nativePlatformSource, 'spawnChild(command, [...argv], options)') === 1
   && !/\b(?:exec|execSync|execFile|execFileSync|fork|spawnSync)\s*\(/.test(nativePlatformSource),
 'platform owns one injected child-process edge and no alternate process authority');
-check(nativeDaemonSource.includes("runtime.absoluteStableBuildIndex,\n    'serve',\n    '--host',\n    '127.0.0.1',\n    '--port',\n    '7226'")
+check(nativeDaemonSource.includes("runtime.absoluteStableBuildIndex,\n    'serve',\n    '--host',\n    '127.0.0.1',\n    '--port',\n    String(NATIVE_HOST_SERVICE_PORT)")
   && nativeDaemonSource.includes('shell: false')
   && !/process\.kill|\.kill\s*\(|SIGTERM|SIGKILL/.test(nativeDaemonSource),
 'daemon retains the exact shell-free serve tuple and no process-kill authority');
@@ -3210,14 +3211,16 @@ check(/installNativeHost[\s\S]*uninstallNativeHost/.test(nativeInstallSource)
 'native installer source owns both exact registration and runtime lifecycle paths');
 
 check(backgroundSource63.includes("importScripts('utils/native-host-wake.js')")
-  && backgroundSource63.includes("authority.result.code !== 'agent_offline'")
-  && backgroundSource63.includes('return (await fsbDelegationPreflightResult()).result'),
-'background alone invokes offline wake and then reruns the established authoritative preflight');
+  && backgroundSource63.includes('fsbEnsureAgentBridgeReady')
+  && backgroundSource63.includes('fsbEnsureConfiguredAgentBridgeReady')
+  && backgroundSource63.includes("'provider.test-connection'"),
+'background owns automatic bridge bootstrap for preflight and connection tests');
 check(nativeWakeSource.includes('runtime.connectNative(NATIVE_HOST_NAME)')
   && nativeWakeSource.includes('runtime.sendNativeMessage(')
   && nativeWakeSource.includes("action: 'wake'")
-  && !/delegate|task|provider|pair|sessionSecret|agent/i.test(nativeWakeSource),
-'native wake helper exposes lifecycle-only native authority');
+  && nativeWakeSource.includes("action: 'bootstrap'")
+  && !/delegate|task|prompt|provider\.test-connection|chrome\.storage|console\./i.test(nativeWakeSource),
+'native helper exposes only bounded wake and bootstrap transport authority');
 for (const browserAuthorityPattern of [
   /chrome\.runtime\.(?:connectNative|sendNativeMessage)\s*\(/,
   /\bNATIVE_HOST_NAME\b/,
@@ -3463,47 +3466,34 @@ for (const modelContract of [
 check(providersSource.includes("var AGENT_AUTH_NOT_REPORTED = 'Not reported';"),
   'Claude account/auth UI remains exactly Not reported');
 const controlPanelSource = read('extension/ui/control_panel.html');
-check(exactOccurrences(controlPanelSource, 'data-provider-compatibility-group=') === 3
-  && exactOccurrences(controlPanelSource, 'data-provider-compatibility-description=') === 3,
-'exactly the three agent rows receive compatibility groups and descriptions');
-check(!/data-provider-kind="api"[\s\S]{0,700}data-provider-compatibility-group=/.test(controlPanelSource),
-  'API provider rows receive no compatibility group');
-check(exactOccurrences(controlPanelSource, 'id="providerEvidenceAnnouncement"') === 1
-  && /id="providerEvidenceAnnouncement"[^>]*role="status"[^>]*aria-live="polite"/.test(controlPanelSource),
-'Providers retains one shared polite live region rather than per-row announcements');
+const providerSelect62 = (
+  controlPanelSource.match(/<select\b[^>]*id="modelProvider"[^>]*>[\s\S]*?<\/select>/)
+  || ['']
+)[0];
+equal(Array.from(providerSelect62.matchAll(/<option value="([^"]+)"/g), (match) => match[1]), [
+  'xai', 'gemini', 'openai', 'anthropic', 'openrouter', 'lmstudio', 'custom',
+  'claude-code', 'opencode', 'codex',
+], 'compact provider selector retains the exact ten-option order');
+check(exactOccurrences(controlPanelSource, 'id="modelProvider"') === 1
+  && !/data-provider-compatibility|providerEvidenceAnnouncement|provider-row/.test(controlPanelSource),
+'compact provider settings contain no compatibility roster or announcement UI');
 
 const optionsSource62 = read('extension/ui/options.js');
-const compatibilityRendererSource = [
-  extractFunction(optionsSource62, 'getProviderCompatibilityModel'),
-  extractFunction(optionsSource62, 'setProviderCompatibilityClass'),
-  extractFunction(optionsSource62, 'setProviderCompatibilityIcon'),
-  extractFunction(optionsSource62, 'renderProviderCompatibility'),
-].join('\n');
-check(!/(?:saveSettings|markUnsavedChanges|modelProvider\s*=|agentProviderId\s*=|recommendation\s*=|chrome\.storage|focus\s*\()/.test(compatibilityRendererSource),
-  'compatibility renderer cannot mutate selection, recommendation, form state, focus, or storage');
-check(/textContent/.test(compatibilityRendererSource) && !/innerHTML|insertAdjacentHTML|outerHTML/.test(compatibilityRendererSource),
-  'compatibility renderer uses text-only DOM updates');
+const compactProviderRendererSource = extractFunction(optionsSource62, 'renderProviderKind');
+const compactConnectionTestSource = extractFunction(optionsSource62, 'runFullApiTest');
+check(compactProviderRendererSource.includes('apiProviderDetails.hidden = showAgentDetails')
+  && compactProviderRendererSource.includes('agentProviderDetails.hidden = !showAgentDetails'),
+  'compact provider renderer switches only between API fields and local-agent help');
+check(compactConnectionTestSource.includes("action: 'testAgentProviderConnection'")
+  && compactConnectionTestSource.includes('result = await checkApiConnection()'),
+  'one Test Connection action routes through the selected API or agent path');
 const compatibilityMappingSource = extractFunction(providersSource, 'getCompatibilityDisplayModel');
 check(!/semver|parseVersion|compareVersion|2\.1\.177/.test(compatibilityMappingSource),
   'UI mapping contains no semantic-version parser, comparator, or CLI version constant');
 
 const optionsCss = read('extension/ui/options.css');
-for (const cssContract of [
-  '.compatibility-badge--supported',
-  '.compatibility-badge--degraded',
-  '.compatibility-badge--unsupported',
-  '@media (min-width: 900px)',
-  '@media (min-width: 641px) and (max-width: 899px)',
-  '@media (max-width: 640px)',
-  '@media (forced-colors: active)',
-  '@media (prefers-reduced-motion: reduce)',
-  'var(--success-color)',
-  'var(--warning-color)',
-  'var(--error-color)',
-  'var(--fsb-focus-ring)',
-]) {
-  check(optionsCss.includes(cssContract), `Providers CSS retains ${cssContract}`);
-}
+check(!/\.provider-roster|\.provider-row|\.compatibility-badge|\.mcp-bridge-pairing/.test(optionsCss),
+  'compact provider settings retain no roster, compatibility, or manual-pairing CSS');
 
 const extensionManifest = JSON.parse(read('extension/manifest.json'));
 check(

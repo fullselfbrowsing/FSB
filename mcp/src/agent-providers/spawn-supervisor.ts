@@ -1237,6 +1237,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       }
       run.runtimeOwned = true;
       const declaredSpec = await run.adapter.buildSpawn({ text: run.task }, {
+        purpose: 'delegation',
         adapterId: run.adapterId,
         detection,
         delegationId: run.delegationId,

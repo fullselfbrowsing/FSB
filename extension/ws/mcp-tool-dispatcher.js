@@ -149,6 +149,11 @@ const MCP_PHASE199_MESSAGE_ROUTES = {
   'agent:status':   { routeFamily: 'agent', handler: handleAgentStatusRoute }
 };
 
+// Non-enumerable, in-process-only recorder context. A Symbol prevents an MCP
+// caller from spoofing the resolved tab/origin metadata and keeps it out of
+// the bridge response JSON.
+const MCP_REPLAY_RECORD_CONTEXT = Symbol('fsb-mcp-replay-record-context');
+
 const MCP_VISUAL_SESSION_TASK_STATUS_TOOLS = new Set([
   'report_progress',
   'complete_task',
@@ -807,16 +812,19 @@ async function dispatchMcpMessageRoute({ type, payload = {}, client = null, mcpM
             response,
             success,
             dispatcher_route: 'message',
-            tabId: readRouteInspection.recordContext
-              ? readRouteInspection.recordContext.tabId
-              : null,
+            tabId: payload && payload[MCP_REPLAY_RECORD_CONTEXT]
+              ? payload[MCP_REPLAY_RECORD_CONTEXT].tabId
+              : (readRouteInspection.recordContext ? readRouteInspection.recordContext.tabId : null),
             requireTargetOrigin: readRouteInspection.applies === true,
             targetOriginResolved: readRouteInspection.recordContext
               ? readRouteInspection.recordContext.targetOriginResolved
               : true,
             spreadsheetTarget: readRouteInspection.recordContext
               ? readRouteInspection.recordContext.spreadsheetTarget
-              : false
+              : false,
+            replayContext: payload && payload[MCP_REPLAY_RECORD_CONTEXT]
+              ? Object.assign({}, payload[MCP_REPLAY_RECORD_CONTEXT], { routeFamily: route.routeFamily })
+              : Object.assign({}, readRouteInspection.recordContext || {}, { routeFamily: route.routeFamily })
           };
           var spreadsheetRedactor = globalThis.FsbSpreadsheetRecordRedaction;
           var spreadsheetInvoke = type === 'mcp:capabilities-invoke'
@@ -926,10 +934,17 @@ async function buildRestrictedResponseForResolvedTab({ tool, client, payload }) 
 
 function buildReadRouteRecordContext(tab) {
   const currentUrl = (tab && (tab.url || tab.pendingUrl)) || '';
+  let targetOrigin = null;
+  try {
+    const parsed = new URL(currentUrl);
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') targetOrigin = parsed.origin;
+  } catch (_e) { /* unresolved target remains fail-closed */ }
   return {
     tabId: tab && Number.isFinite(tab.id) ? tab.id : null,
     targetOriginResolved: currentUrl.length > 0,
-    spreadsheetTarget: isGoogleSheetsDocumentUrlForRecord(currentUrl)
+    spreadsheetTarget: isGoogleSheetsDocumentUrlForRecord(currentUrl),
+    targetUrl: currentUrl || null,
+    targetOrigin
   };
 }
 
@@ -2758,6 +2773,24 @@ async function handleCapabilitiesInvokeMessageRoute({ payload, client }) {
   } catch (_e) {
     origin = null;
   }
+  var replayCatalogEntry = (typeof FsbCapabilityCatalog !== 'undefined' && FsbCapabilityCatalog &&
+    typeof FsbCapabilityCatalog.resolve === 'function')
+    ? FsbCapabilityCatalog.resolve(payload.slug, origin)
+    : null;
+  Object.defineProperty(payload, MCP_REPLAY_RECORD_CONTEXT, {
+    value: {
+      tabId,
+      targetUrl: tab && typeof tab.url === 'string' ? tab.url : null,
+      targetOrigin: origin,
+      slug: typeof payload.slug === 'string' ? payload.slug : null,
+      sideEffectClass: replayCatalogEntry?.descriptor?.sideEffectClass || 'write',
+      service: replayCatalogEntry?.descriptor?.service || null,
+      tier: replayCatalogEntry?.tier || null,
+      routeFamily: 'capabilities'
+    },
+    enumerable: false,
+    configurable: true
+  });
   if (payload.origin && origin && payload.origin !== origin) {
     return createMcpRouteError('invoke_capability', 'capabilities', MCP_ROUTE_RECOVERY_HINT, {
       errorCode: 'RECIPE_CONSENT_REQUIRED',

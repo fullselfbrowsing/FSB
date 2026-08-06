@@ -292,6 +292,7 @@ async function main() {
 
   const taskCanary = 'TASK_CANARY_71b831c9_$(touch pwned); --flag\nnext';
   const context = Object.freeze({
+    purpose: 'delegation',
     adapterId: 'claude-code',
     detection,
     delegationId: 'delegation_71b831c9',

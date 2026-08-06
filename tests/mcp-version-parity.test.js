@@ -67,6 +67,7 @@ const phase63BundleDependencies = Object.freeze([
   'zod',
 ]);
 const phase63NativeSourceFiles = Object.freeze([
+  'bootstrap.ts',
   'constants.ts',
   'daemon.ts',
   'entry.ts',
@@ -79,6 +80,7 @@ const phase63NativeCompiledFiles = Object.freeze(
   phase63NativeSourceFiles.map((entry) => entry.replace(/\.ts$/u, '.js')),
 );
 const phase63InstallSourceFiles = Object.freeze([
+  'browser.ts',
   'index.ts',
   'platform.ts',
   'runtime.ts',
@@ -482,7 +484,7 @@ async function run() {
     'Install state',
     'Expected location',
     'Manifest/registry',
-    'Chrome allowlist',
+    'Extension allowlist',
     'Launcher',
     'Daemon',
     'Reason',
@@ -544,6 +546,19 @@ async function run() {
   assertEqual(manifest.minimum_chrome_version, '116', 'extension minimum Chrome version is exactly string 116');
   assertEqual(rootPackageJson.engines.chrome, '>=116.0.0', 'root engine metadata requires Chrome 116');
   assertEqual(rootPackageJson.config.min_chrome_version, '116.0.0', 'root setup metadata requires Chrome 116');
+  assert(rootReadme.includes('Chromium 116+'), 'root prerequisites document the Chromium 116 browser floor');
+  assert(packageReadme.includes('Chromium 116+'), 'MCP prerequisites document the Chromium 116 browser floor');
+  assert(!rootReadme.includes('Chrome 88+'), 'root prerequisites do not advertise the obsolete Chrome 88 floor');
+  for (const browser of ['chrome', 'edge', 'brave', 'chromium']) {
+    assert(
+      packageReadme.includes(`--browser ${browser}`),
+      `MCP native-host help documents the ${browser} browser selector`,
+    );
+  }
+  assert(
+    packageReadme.includes('Extension IDs are browser-installation-specific'),
+    'MCP native-host help documents browser-specific extension IDs',
+  );
   assertEqual(
     String(Number.parseInt(rootPackageJson.engines.chrome.replace(/^>=/, ''), 10)),
     manifest.minimum_chrome_version,
@@ -616,6 +631,7 @@ async function run() {
     'NATIVE_HOST_MAX_FRAME_BYTES = 4096',
     "NATIVE_HOST_HEALTH_PRODUCT = 'fsb-mcp-server'",
     "NATIVE_HOST_HEALTH_PROTOCOL = 'fsb-native-host-health-v1'",
+    'NATIVE_HOST_SERVICE_PORT = 7226',
     'NATIVE_HOST_OWNER_MARKER_SCHEMA = 1',
   ];
   for (const token of nativeConstantTokens) {
@@ -623,7 +639,7 @@ async function run() {
     assert(builtNativeConstantsSource.includes(token), `compiled native-host constants retain ${token}`);
   }
   assert(
-    nativeDaemonSource.includes("const HEALTH_URL = 'http://127.0.0.1:7226/health';")
+    nativeDaemonSource.includes('const HEALTH_URL = `http://127.0.0.1:${NATIVE_HOST_SERVICE_PORT}/health`;')
       && nativeDaemonSource.includes('value.service !== NATIVE_HOST_HEALTH_PRODUCT')
       && nativeDaemonSource.includes('value.nativeHostProtocol !== NATIVE_HOST_PROTOCOL_VERSION')
       && nativeDaemonSource.includes("return value.serveReady ? 'ready' : 'not_ready';"),
@@ -721,11 +737,11 @@ async function run() {
     .filter((relativePath) => relativePath.endsWith('.js'));
   assert(
     JSON.stringify(actualNativeSourceFiles) === JSON.stringify(phase63NativeSourceFiles),
-    'source native-host graph is the exact ordered seven-file leaf roster',
+    'source native-host graph is the exact ordered eight-file leaf roster',
   );
   assert(
     JSON.stringify(actualNativeCompiledFiles) === JSON.stringify(phase63NativeCompiledFiles),
-    'fresh compiled native-host graph mirrors the exact ordered seven-file leaf roster',
+    'fresh compiled native-host graph mirrors the exact ordered eight-file leaf roster',
   );
   const actualInstallSourceFiles = recursivelyListFiles('mcp/src/native-host-install')
     .filter((relativePath) => relativePath.endsWith('.ts'));
@@ -733,11 +749,11 @@ async function run() {
     .filter((relativePath) => relativePath.endsWith('.js'));
   assert(
     JSON.stringify(actualInstallSourceFiles) === JSON.stringify(phase63InstallSourceFiles),
-    'source installer graph is the exact ordered four-file roster',
+    'source installer graph is the exact ordered five-file roster',
   );
   assert(
     JSON.stringify(actualInstallCompiledFiles) === JSON.stringify(phase63InstallCompiledFiles),
-    'fresh compiled installer graph mirrors the exact ordered four-file roster',
+    'fresh compiled installer graph mirrors the exact ordered five-file roster',
   );
   for (const compiledPath of [
     'mcp/build/native-host-registration.js',
@@ -758,6 +774,7 @@ async function run() {
     'compiled native graph contains no historical shim, relay, or echo-mode authority',
   );
   for (const graphToken of [
+    "'bootstrap.ts'",
     "'constants.ts'",
     "'daemon.ts'",
     "'entry.ts'",

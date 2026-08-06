@@ -147,6 +147,10 @@ async function run() {
     assertEqual(plain.status, 0, 'plain pair exits cleanly');
     assertEqual(plainTokens.length, 1, 'plain pair emits exactly one full pairing code');
     assert(/local daemon session/i.test(plain.stdout), 'plain pair explains the local session authority');
+    assert(/diagnostic pairing code/i.test(plain.stdout),
+      'plain pair is labeled diagnostic rather than normal extension setup');
+    assert(!/paste this code|pairing control/i.test(plain.stdout),
+      'plain pair does not instruct current users to pair manually');
     assertEqual(plain.stderr, '', 'plain pair keeps its warning and code on stdout only');
 
     const json = runCli(['pair', '--json'], home);

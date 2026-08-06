@@ -20,6 +20,7 @@ const knownSections = new Set([
   'install-transaction',
   'cli-routing',
   'cli-output',
+  'doctor-browser-selection',
 ]);
 if (requestedSection && !knownSections.has(requestedSection)) {
   throw new Error(`unknown section: ${requestedSection}`);
@@ -731,11 +732,66 @@ async function runPlatformAndRegistration() {
   for (const table of layouts) {
     const value = platform.resolveNativeHostPlatformLayout(table.input);
     equal(value.platform, table.platform, `${table.platform} layout retains the exact platform`);
+    equal(value.browser, 'chrome', `${table.platform} defaults omitted browser selection to Chrome`);
     equal(value.stableRoot, table.stableRoot, `${table.platform} uses the one stable FSB runtime root`);
     equal(value.manifestPath, table.manifestPath, `${table.platform} resolves the exact Chrome user-scope manifest`);
     equal(value.launcherPath, table.launcherPath, `${table.platform} registers the stable owned launcher`);
     equal(value.registration.kind, table.kind, `${table.platform} uses the required registration kind`);
     check(Object.isFrozen(value), `${table.platform} layout is immutable`);
+  }
+
+  const browserLayouts = [
+    {
+      browser: 'chrome',
+      darwin: 'Google/Chrome/NativeMessagingHosts',
+      linux: 'google-chrome/NativeMessagingHosts',
+      windows: 'Software\\Google\\Chrome\\NativeMessagingHosts\\io.github.fullselfbrowsing.fsb_native_host',
+    },
+    {
+      browser: 'edge',
+      darwin: 'Microsoft Edge/NativeMessagingHosts',
+      linux: 'microsoft-edge/NativeMessagingHosts',
+      windows: 'Software\\Microsoft\\Edge\\NativeMessagingHosts\\io.github.fullselfbrowsing.fsb_native_host',
+    },
+    {
+      browser: 'brave',
+      darwin: 'BraveSoftware/Brave-Browser/NativeMessagingHosts',
+      linux: 'BraveSoftware/Brave-Browser/NativeMessagingHosts',
+      windows: 'Software\\BraveSoftware\\Brave-Browser\\NativeMessagingHosts\\io.github.fullselfbrowsing.fsb_native_host',
+    },
+    {
+      browser: 'chromium',
+      darwin: 'Chromium/NativeMessagingHosts',
+      linux: 'chromium/NativeMessagingHosts',
+      windows: 'Software\\Chromium\\NativeMessagingHosts\\io.github.fullselfbrowsing.fsb_native_host',
+    },
+  ];
+  for (const browserLayout of browserLayouts) {
+    for (const table of layouts) {
+      const value = platform.resolveNativeHostPlatformLayout({
+        ...table.input,
+        browser: browserLayout.browser,
+      });
+      equal(value.browser, browserLayout.browser, `${table.platform} retains ${browserLayout.browser} selection`);
+      if (table.platform === 'darwin') {
+        check(
+          value.manifestPath.includes(`/Library/Application Support/${browserLayout.darwin}/`),
+          `macOS resolves the exact ${browserLayout.browser} user manifest root`,
+        );
+      } else if (table.platform === 'linux') {
+        check(
+          value.manifestPath.includes(`/.config/${browserLayout.linux}/`),
+          `Linux resolves the exact ${browserLayout.browser} user manifest root`,
+        );
+      } else {
+        equal(
+          value.registration.key,
+          browserLayout.windows,
+          `Windows resolves the exact ${browserLayout.browser} HKCU registration root`,
+        );
+      }
+      check(Object.isFrozen(value), `${table.platform} ${browserLayout.browser} layout is immutable`);
+    }
   }
 
   const windows = platform.resolveNativeHostPlatformLayout(layouts[2].input);
@@ -752,6 +808,7 @@ async function runPlatformAndRegistration() {
     { platform: 'darwin', homeDirectory: '/Users/fsb/../other' },
     { platform: 'win32', homeDirectory: 'C:\\Users\\fsb' },
     { platform: 'freebsd', homeDirectory: '/home/fsb' },
+    { platform: 'linux', browser: 'firefox', homeDirectory: '/home/fsb' },
   ]) {
     assert.throws(
       () => platform.resolveNativeHostPlatformLayout(invalid),
@@ -1043,14 +1100,12 @@ async function runPlatformAndRegistration() {
   const source = [
     readFileSync(path.join(repositoryRoot, 'mcp/src/native-host-registration.ts'), 'utf8'),
     readFileSync(path.join(repositoryRoot, 'mcp/src/native-host-install/types.ts'), 'utf8'),
+    readFileSync(path.join(repositoryRoot, 'mcp/src/native-host-install/browser.ts'), 'utf8'),
     readFileSync(path.join(repositoryRoot, 'mcp/src/native-host-install/platform.ts'), 'utf8'),
   ].join('\n').toLowerCase();
   for (const forbidden of [
     'hkey_local_machine',
     'hklm',
-    'microsoft\\edge',
-    'bravesoftware',
-    'chromium/native',
     'user data/default',
     'profile 1',
     'execsync',
@@ -1386,14 +1441,16 @@ function transactionMutations(trace) {
 
 async function runInstallTransaction() {
   const installer = await importBuild('native-host-install/index.js');
+  const cli = await importBuild('install.js');
   const platform = await importBuild('native-host-install/platform.js');
   const runtimeLayout = await importBuild('native-host/runtime-layout.js');
 
-  function layouts(platformName) {
+  function layouts(platformName, browser = 'chrome') {
     const input = runtimeLayoutInput(platformName);
     return {
       platformLayout: platform.resolveNativeHostPlatformLayout({
         platform: platformName,
+        browser,
         homeDirectory: input.homeDirectory,
         localAppData: input.localAppData,
       }),
@@ -1580,6 +1637,58 @@ async function runInstallTransaction() {
     equal(result.status, 'refused', 'malformed install extension id is refused');
     equal(result.reason, 'invalid-request', 'malformed extension id has one stable refusal');
     equal(harness.trace.length, 0, 'malformed extension id causes zero inspection or mutation');
+  }
+
+  for (const invalidBrowser of ['firefox', true, ['chrome'], { toString: () => 'chrome' }]) {
+    const resolved = layouts('darwin');
+    const harness = fakeInstallTransaction(platform, resolved.platformLayout, resolved.runtimeLayout);
+    const result = await installer.installNativeHost(
+      { browser: invalidBrowser, extensionId: EXTENSION_ID },
+      harness.dependencies,
+    );
+    equal(result.status, 'refused', 'malformed install browser selector is refused');
+    equal(result.reason, 'invalid-request', 'malformed browser selector has one stable refusal');
+    equal(harness.trace.length, 0, 'malformed browser selector causes zero inspection or mutation');
+  }
+
+  for (const selectedBrowser of ['edge', 'brave', 'chromium']) {
+    const resolved = layouts('linux');
+    const harness = fakeInstallTransaction(platform, resolved.platformLayout, resolved.runtimeLayout);
+    const result = await installer.installNativeHost(
+      { browser: selectedBrowser, extensionId: EXTENSION_ID },
+      harness.dependencies,
+    );
+    equal(result.status, 'refused', `${selectedBrowser} install refuses a Chrome-targeted runtime composition`);
+    equal(result.reason, 'invalid-request', `${selectedBrowser} cross-target refusal is stable`);
+    equal(transactionMutations(harness.trace).length, 0, `${selectedBrowser} cross-target install performs zero mutation`);
+  }
+
+  {
+    const resolved = layouts('linux');
+    const harness = fakeInstallTransaction(platform, resolved.platformLayout, resolved.runtimeLayout, {
+      runtimeState: 'exact',
+      registrationState: 'exact',
+    });
+    const operations = cli.createNativeHostCliOperations(harness.dependencies);
+    const result = await operations.uninstall({ browser: 'edge' });
+    equal(result.status, 'refused', 'cross-target uninstall refuses a Chrome-targeted runtime composition');
+    equal(result.reason, 'invalid-request', 'cross-target uninstall refusal is stable');
+    equal(transactionMutations(harness.trace).length, 0, 'cross-target uninstall performs zero mutation');
+  }
+
+  for (const selectedBrowser of ['edge', 'brave', 'chromium']) {
+    const resolved = layouts('linux', selectedBrowser);
+    const harness = fakeInstallTransaction(platform, resolved.platformLayout, resolved.runtimeLayout);
+    const result = await installer.installNativeHost(
+      { browser: selectedBrowser, extensionId: EXTENSION_ID },
+      harness.dependencies,
+    );
+    equal(result.status, 'installed', `${selectedBrowser} targeted transaction installs successfully`);
+    equal(result.location, resolved.platformLayout.manifestPath, `${selectedBrowser} result identifies its selected registration`);
+    const removed = await installer.uninstallNativeHost(harness.dependencies);
+    equal(removed.status, 'removed', `${selectedBrowser} targeted transaction uninstalls successfully`);
+    const absent = await installer.uninstallNativeHost(harness.dependencies);
+    equal(absent.status, 'not-installed', `${selectedBrowser} targeted uninstall is idempotent`);
   }
 
   {
@@ -2031,8 +2140,8 @@ async function runCliRouting() {
         packageVersion: PACKAGE_VERSION,
       });
     },
-    uninstall: async () => {
-      calls.push(Object.freeze({ operation: 'uninstall' }));
+    uninstall: async (request = {}) => {
+      calls.push(Object.freeze({ operation: 'uninstall', request: { ...request } }));
       return Object.freeze({
         status: 'removed',
         reason: 'removed',
@@ -2060,7 +2169,41 @@ async function runCliRouting() {
 
   await captureCliAction(() => cli.runUninstall({ 'native-host': true }, operations));
   equal(calls.length, 3, 'exact native uninstall calls the injected uninstall operation once');
-  deepEqual(calls[2], { operation: 'uninstall' }, 'native uninstall passes no extra authority');
+  deepEqual(calls[2], { operation: 'uninstall', request: {} }, 'default native uninstall passes no browser override');
+
+  for (const browser of ['chrome', 'edge', 'brave', 'chromium']) {
+    const installIndex = calls.length;
+    await captureCliAction(() => cli.runInstall({ 'native-host': true, browser }, operations));
+    deepEqual(
+      calls[installIndex],
+      { operation: 'install', request: { browser } },
+      `${browser} install forwards the exact browser selector`,
+    );
+    const uninstallIndex = calls.length;
+    await captureCliAction(() => cli.runUninstall({ 'native-host': true, browser }, operations));
+    deepEqual(
+      calls[uninstallIndex],
+      { operation: 'uninstall', request: { browser } },
+      `${browser} uninstall forwards the exact browser selector`,
+    );
+  }
+
+  {
+    const index = calls.length;
+    await captureCliAction(() => cli.runInstall({
+      'native-host': true,
+      browser: 'edge',
+      'extension-id': DEVELOPMENT_EXTENSION_ID,
+    }, operations));
+    deepEqual(
+      calls[index],
+      {
+        operation: 'install',
+        request: { browser: 'edge', extensionId: DEVELOPMENT_EXTENSION_ID },
+      },
+      'browser-targeted install forwards its exact browser-specific extension id',
+    );
+  }
 
   const invalidInstallFlags = [
     { 'native-host': false },
@@ -2071,6 +2214,9 @@ async function runCliRouting() {
     { 'native-host': true, 'extension-id': 'abcdefghijklmnop' },
     { 'native-host': true, 'extension-id': `${DEVELOPMENT_EXTENSION_ID}a` },
     { 'native-host': true, 'extension-id': DEVELOPMENT_EXTENSION_ID.toUpperCase() },
+    { 'native-host': true, browser: 'firefox' },
+    { 'native-host': true, browser: true },
+    { 'native-host': true, browser: ['chrome'] },
     { 'native-host': true, all: true },
     { 'native-host': true, list: true },
     { 'native-host': true, 'dry-run': true },
@@ -2092,6 +2238,9 @@ async function runCliRouting() {
     { 'native-host': 'true' },
     { 'native-host': [] },
     { 'native-host': true, 'extension-id': DEVELOPMENT_EXTENSION_ID },
+    { 'native-host': true, browser: 'firefox' },
+    { 'native-host': true, browser: true },
+    { 'native-host': true, browser: ['chrome'] },
     { 'native-host': true, all: true },
     { 'native-host': true, list: true },
     { 'native-host': true, 'dry-run': true },
@@ -2305,6 +2454,49 @@ async function runCliOutput() {
   check(/let command = 'stdio'/u.test(indexSource), 'no-argument startup remains the stdio server route');
 }
 
+async function runDoctorBrowserSelection() {
+  const production = await importBuild('native-host-production.js');
+  const absent = () => ({ exactOwned: false, absent: true });
+  const states = (overrides = {}) => ({
+    chrome: absent(),
+    edge: absent(),
+    brave: absent(),
+    chromium: absent(),
+    ...overrides,
+  });
+
+  equal(
+    production.selectNativeHostDoctorBrowser(states()),
+    'chrome',
+    'doctor falls back to Chrome only when every registration is absent',
+  );
+  equal(
+    production.selectNativeHostDoctorBrowser(states({
+      edge: { exactOwned: false, absent: false },
+      brave: { exactOwned: true, absent: false },
+    })),
+    'brave',
+    'doctor prefers a later exact owned registration over an earlier non-absent registration',
+  );
+  equal(
+    production.selectNativeHostDoctorBrowser(states({
+      edge: { exactOwned: false, absent: false },
+      brave: { exactOwned: false, absent: false },
+      chromium: { exactOwned: false, absent: false },
+    })),
+    'edge',
+    'doctor reports the first non-absent registration in browser priority order',
+  );
+  equal(
+    production.selectNativeHostDoctorBrowser(states({
+      chrome: { exactOwned: true, absent: false },
+      edge: { exactOwned: true, absent: false },
+    })),
+    'chrome',
+    'doctor reports the first exact registration in Chrome-to-Chromium priority order',
+  );
+}
+
 async function main() {
   if (!requestedSection || requestedSection === 'platform-and-registration') {
     console.log('\n=== Platform and registration ===');
@@ -2325,6 +2517,10 @@ async function main() {
   if (!requestedSection || requestedSection === 'cli-output') {
     console.log('\n=== Native CLI output ===');
     await runCliOutput();
+  }
+  if (!requestedSection || requestedSection === 'doctor-browser-selection') {
+    console.log('\n=== Native doctor browser selection ===');
+    await runDoctorBrowserSelection();
   }
   console.log(`\nNative host install tests: ${passed} passed, 0 failed`);
 }

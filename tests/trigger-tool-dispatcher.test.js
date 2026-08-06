@@ -66,14 +66,19 @@ function assertOrdered(src, earlier, later, msg) {
 
 function loadToolHandlers(extraGlobals) {
   const src = readSource(BACKGROUND_PATH);
+  const countsStart = src.indexOf('async function fsbTriggerCountsForTab');
+  const countsEnd = src.indexOf('async function fsbTriggerStartObserveForSnapshot', countsStart);
   const start = src.indexOf('function fsbTriggerFirstString');
+  assert.ok(countsStart >= 0 && countsEnd > countsStart, 'trigger icon count helpers exist in background.js');
   assert.ok(start >= 0, 'trigger helper block exists in background.js');
   assert.ok(src.includes('async function fsbTriggerOwnerContext'), 'fsbTriggerOwnerContext exists in background.js');
   const marker = 'globalThis.fsbTriggerToolHandlersForTest';
   const markerIndex = src.indexOf(marker, start);
   assert.ok(markerIndex > start, 'test-only trigger tool handler bundle exists');
   const assignmentEnd = src.indexOf('\n', markerIndex);
-  const slice = src.slice(start, assignmentEnd > 0 ? assignmentEnd : src.length);
+  const slice = src.slice(countsStart, countsEnd)
+    + '\n'
+    + src.slice(start, assignmentEnd > 0 ? assignmentEnd : src.length);
   const context = Object.assign({
     console,
     Date,
@@ -551,6 +556,53 @@ async function caseArmAllowsSameModeAndTerminalRecords() {
   assert.strictEqual(receivedSpec.watch, 'live-observe', 'same-mode arm persists requested watch');
 }
 
+async function caseRefreshPollArmSetsIconWatching() {
+  const iconCalls = [];
+  const records = {};
+  let receivedSpec = null;
+  const handlers = loadToolHandlers({
+    FsbTriggerStore: {
+      async hydrate() {
+        return { v: 1, records };
+      },
+      async readSnapshot(triggerId) {
+        return records[triggerId] || null;
+      }
+    },
+    async fsbTriggerSendRefreshPollRead() {
+      return { success: true, value: { text: '10' } };
+    },
+    FsbTriggerManager: {
+      async armTrigger(spec) {
+        receivedSpec = spec;
+        records[spec.trigger_id] = makeSnapshot(Object.assign({}, spec, { status: 'armed' }));
+        return { ok: true, trigger_id: spec.trigger_id };
+      }
+    },
+    fsbActionIcon: {
+      setWatching(isWatching, tabId) {
+        iconCalls.push({ isWatching, tabId });
+      }
+    },
+    async fsbTriggerSendTabMessage() {
+      return { ok: true };
+    }
+  });
+
+  const result = await handlers.fsbTriggerHandleToolArm({
+    selector: '#price',
+    target_tab_id: 12,
+    condition: { kind: 'changed' },
+    watch: 'refresh-poll'
+  }, {});
+
+  assert.strictEqual(result.success, true, 'refresh-poll arm succeeds');
+  assert.strictEqual(receivedSpec.watch, 'refresh-poll', 'refresh-poll mode is persisted');
+  assert.strictEqual(iconCalls.length, 1, 'refresh-poll arm updates the toolbar watch claim once');
+  assert.strictEqual(iconCalls[0].isWatching, true, 'refresh-poll arm enables the watch claim');
+  assert.strictEqual(iconCalls[0].tabId, 12, 'refresh-poll arm keys the watch claim by tab');
+}
+
 async function caseStatusProjectionMath() {
   const handlers = loadToolHandlers();
   const status = handlers.fsbTriggerProjectTriggerStatus(makeSnapshot(), 2500);
@@ -799,6 +851,97 @@ async function caseStopTerminalCleanupIdempotent() {
       : ['watchdog', 'lifecycle'];
     assert.deepStrictEqual(calls, expectedCalls, terminalStatus + ' stop runs expected cleanup before lifecycle');
   }
+}
+
+async function caseStopAndTimeoutResyncIconFromPersistedCounts() {
+  const stopIconCalls = [];
+  const stopRecords = {
+    first: makeSnapshot({ trigger_id: 'first', target_tab_id: 42, status: 'armed', agent_id: null, ownership_token: null }),
+    second: makeSnapshot({ trigger_id: 'second', target_tab_id: 42, status: 'blocked', agent_id: null, ownership_token: null })
+  };
+  const stopHandlers = loadToolHandlers({
+    FsbTriggerStore: {
+      async readSnapshot(triggerId) {
+        return stopRecords[triggerId] || null;
+      },
+      async hydrate() {
+        return { v: 1, records: stopRecords };
+      }
+    },
+    async fsbTriggerStopObserveForSnapshot() {
+      return { ok: true };
+    },
+    async fsbTriggerClearObserveWatchdog() {
+      return { ok: true };
+    },
+    FsbTriggerLifecycle: {
+      async clearTrigger(triggerId) {
+        delete stopRecords[triggerId];
+        return { ok: true };
+      }
+    },
+    fsbActionIcon: {
+      setWatching(isWatching, tabId) {
+        stopIconCalls.push({ isWatching, tabId });
+      }
+    }
+  });
+
+  await stopHandlers.fsbTriggerHandleToolStop({ trigger_id: 'first' }, {});
+  await stopHandlers.fsbTriggerHandleToolStop({ trigger_id: 'second' }, {});
+
+  assert.strictEqual(stopIconCalls.length, 2, 'each completed stop resynchronizes the watch claim');
+  assert.strictEqual(stopIconCalls[0].isWatching, true, 'stopping one trigger preserves another active watch');
+  assert.strictEqual(stopIconCalls[1].isWatching, false, 'stopping the final trigger clears the watch claim');
+  assert.strictEqual(stopIconCalls[0].tabId, 42, 'stop resynchronization remains tab-scoped');
+  assert.strictEqual(stopIconCalls[1].tabId, 42, 'final stop clears the same tab-scoped claim');
+
+  const timeoutIconCalls = [];
+  const timeoutRecords = {
+    timeout: makeSnapshot({
+      trigger_id: 'timeout',
+      target_tab_id: 43,
+      status: 'armed',
+      agent_id: null,
+      ownership_token: null
+    })
+  };
+  const timeoutHandlers = loadToolHandlers({
+    FsbTriggerStore: {
+      async readSnapshot(triggerId) {
+        return timeoutRecords[triggerId] || null;
+      },
+      async hydrate() {
+        return { v: 1, records: timeoutRecords };
+      }
+    },
+    async fsbTriggerStopObserveForSnapshot() {
+      return { ok: true };
+    },
+    async fsbTriggerClearObserveWatchdog() {
+      return { ok: true };
+    },
+    FsbTriggerLifecycle: {
+      async markTriggerTimedOut(triggerId) {
+        timeoutRecords[triggerId] = Object.assign({}, timeoutRecords[triggerId], {
+          status: 'timed_out',
+          timed_out_at: Date.now()
+        });
+        return { ok: true, snapshot: timeoutRecords[triggerId] };
+      }
+    },
+    fsbActionIcon: {
+      setWatching(isWatching, tabId) {
+        timeoutIconCalls.push({ isWatching, tabId });
+      }
+    }
+  });
+
+  const timeoutResult = await timeoutHandlers.fsbTriggerMarkTimedOutForMcp('timeout', {});
+  assert.strictEqual(timeoutResult.success, true, 'timeout transition succeeds');
+  assert.strictEqual(timeoutIconCalls.length, 1, 'timeout transition resynchronizes the watch claim once');
+  assert.strictEqual(timeoutIconCalls[0].isWatching, false, 'timing out the final trigger clears the watch claim');
+  assert.strictEqual(timeoutIconCalls[0].tabId, 43, 'timeout clearing remains tab-scoped');
 }
 
 async function caseInvalidConditionRejectedBeforeArm() {
@@ -1208,6 +1351,7 @@ async function caseAutopilotRejectsForeignOwner() {
   await runCase('arm rejects live-to-refresh cross-watch conflict before side effects', caseArmRejectsCrossModeConflictBeforeSideEffects);
   await runCase('arm rejects refresh-to-live cross-watch conflict before side effects', caseArmRejectsReverseCrossModeConflictBeforeSideEffects);
   await runCase('arm allows same-mode and terminal records', caseArmAllowsSameModeAndTerminalRecords);
+  await runCase('refresh-poll arm enables a tab-scoped toolbar watch claim', caseRefreshPollArmSetsIconWatching);
   await runCase('status projection derives elapsed and remaining time', caseStatusProjectionMath);
   await runCase('fired status/list projection includes event outcome', caseFiredProjectionIncludesEventOutcome);
   await runCase('list defaults to armed and attention states', caseListDefaultsToActiveAttentionStates);
@@ -1217,6 +1361,7 @@ async function caseAutopilotRejectsForeignOwner() {
   await runCase('cross-agent stop is rejected before cleanup', caseStopRejectsCrossAgentBeforeCleanup);
   await runCase('active stop clears observe then watchdog then lifecycle', caseStopActiveCleanupOrder);
   await runCase('terminal stop clears watchdog and lifecycle idempotently', caseStopTerminalCleanupIdempotent);
+  await runCase('stop and timeout resync toolbar claims from persisted counts', caseStopAndTimeoutResyncIconFromPersistedCounts);
   await runCase('invalid arm condition rejects before read or arm', caseInvalidConditionRejectedBeforeArm);
   await runCase('arm normalizes delta_percent alias before manager persistence', caseArmNormalizesDeltaPercentAlias);
   await runCase('arm reads baseline before manager and starts live observe', caseArmReadsBaselineBeforeManagerAndStartsLiveObserve);

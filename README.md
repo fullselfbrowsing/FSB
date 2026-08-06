@@ -199,7 +199,7 @@ Top level deploy and validation files:
 
 ### Prerequisites
 
-- Chrome 88+ or another Chromium based browser such as Edge or Brave.
+- Chromium 116+ in a supported stable desktop browser: Chrome, Edge, Brave, or Chromium.
 - One AI provider setup:
   - xAI API key: https://x.ai/api
   - Gemini API key: https://aistudio.google.com/app/apikey

@@ -6,6 +6,7 @@ import {
   type AgentTask,
   type AdapterCapabilities,
   type SpawnContext,
+  type SpawnPurpose,
   type SpawnSpec,
   type SupervisedChild,
 } from './adapter.js';
@@ -16,6 +17,7 @@ import { parseClaudeEvents } from './claude-stream.js';
 export type ClaudeDetectionDependency = () => Promise<AdapterDetection>;
 export type ClaudeParserDependency = (
   stream: NodeJS.ReadableStream,
+  options?: Readonly<{ purpose: SpawnPurpose }>,
 ) => AsyncIterable<AgentEvent>;
 export type ClaudeTreeKillDependency = (
   child: SupervisedChild,
@@ -59,8 +61,11 @@ export function createClaudeCodeAdapter(
       return buildClaudeSpawnSpec(task, ctx);
     },
 
-    parseEvents(stream: NodeJS.ReadableStream): AsyncIterable<AgentEvent> {
-      return parseEvents(stream);
+    parseEvents(
+      stream: NodeJS.ReadableStream,
+      options?: Readonly<{ purpose: SpawnPurpose }>,
+    ): AsyncIterable<AgentEvent> {
+      return parseEvents(stream, options);
     },
 
     kill(child: SupervisedChild, options: { grace: number }): Promise<void> {

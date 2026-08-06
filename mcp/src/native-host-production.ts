@@ -38,6 +38,7 @@ import {
 } from './native-host/constants.js';
 import { resolveNativeHostRuntimeLayout } from './native-host/runtime-layout.js';
 import {
+  inspectNativeHostRegistration,
   validateNativeHostManifest,
   validateNativeHostMarker,
 } from './native-host-registration.js';
@@ -55,6 +56,7 @@ import {
 import { publishNativeHostRuntime } from './native-host-install/runtime.js';
 import type {
   NativeHostFileFact,
+  NativeHostBrowser,
   NativeHostInstallFileAdapter,
   NativeHostInstallRequest,
   NativeHostInstallRuntimeAdapter,
@@ -65,8 +67,10 @@ import type {
   NativeHostRuntimeInspectionLayout,
   NativeHostRuntimeOwnedInspection,
   NativeHostRuntimeReceipt,
+  NativeHostRegistrationReadFacts,
   NativeHostSecurePathFact,
   NativeHostUninstallRuntimeAdapter,
+  NativeHostUninstallRequest,
   NativeHostUninstallTransactionDependencies,
 } from './native-host-install/types.js';
 import type { NativeHostCliOperations } from './install.js';
@@ -759,7 +763,9 @@ type ProductionPlatformComposition = Readonly<{
   adapter: ReturnType<typeof createNativeHostPlatformAdapter>;
 }>;
 
-async function productionPlatformComposition(): Promise<ProductionPlatformComposition> {
+async function productionPlatformComposition(
+  browser: NativeHostBrowser = 'chrome',
+): Promise<ProductionPlatformComposition> {
   if (!['darwin', 'linux', 'win32'].includes(process.platform)) {
     throw new Error('unsupported-platform');
   }
@@ -767,6 +773,7 @@ async function productionPlatformComposition(): Promise<ProductionPlatformCompos
   const homeDirectory = await realpath(homedir());
   const input = {
     platform,
+    browser,
     homeDirectory,
     ...(platform === 'win32' ? { localAppData: process.env.LOCALAPPDATA } : {}),
   };
@@ -813,8 +820,9 @@ function runtimeInspectionLayout(
 
 async function productionInstallDependencies(
   extensionId = NATIVE_HOST_DEFAULT_EXTENSION_ID,
+  browser: NativeHostBrowser = 'chrome',
 ): Promise<NativeHostInstallTransactionDependencies> {
-  const composition = await productionPlatformComposition();
+  const composition = await productionPlatformComposition(browser);
   const invokingPackageRoot = await realpath(dirname(dirname(fileURLToPath(import.meta.url))));
   const manifest = ordinaryRecord(await readJson(join(invokingPackageRoot, 'package.json')));
   if (
@@ -846,8 +854,9 @@ async function productionInstallDependencies(
 }
 
 async function productionUninstallDependencies(
+  browser: NativeHostBrowser = 'chrome',
 ): Promise<NativeHostUninstallTransactionDependencies> {
-  const composition = await productionPlatformComposition();
+  const composition = await productionPlatformComposition(browser);
   return Object.freeze({
     platform: composition.adapter,
     runtime: createUninstallRuntimeAdapter(runtimeInspectionLayout(composition.layout)),
@@ -859,6 +868,26 @@ type RegistrationDoctorFacts = Readonly<{
   registrationShadow: 'clear' | 'shadowed' | 'not_reported' | 'unavailable';
   allowlist: 'matches' | 'mismatch' | 'not_reported';
 }>;
+
+const NATIVE_HOST_BROWSER_PRIORITY = Object.freeze<readonly NativeHostBrowser[]>([
+  'chrome',
+  'edge',
+  'brave',
+  'chromium',
+]);
+
+type NativeHostDoctorBrowserState = Readonly<{
+  exactOwned: boolean;
+  absent: boolean;
+}>;
+
+export function selectNativeHostDoctorBrowser(
+  states: Readonly<Record<NativeHostBrowser, NativeHostDoctorBrowserState>>,
+): NativeHostBrowser {
+  return NATIVE_HOST_BROWSER_PRIORITY.find((browser) => states[browser].exactOwned)
+    ?? NATIVE_HOST_BROWSER_PRIORITY.find((browser) => !states[browser].absent)
+    ?? 'chrome';
+}
 
 function extensionIdFromOrigin(value: unknown): string | null {
   if (typeof value !== 'string' || !value.startsWith('chrome-extension://') || !value.endsWith('/')) {
@@ -943,6 +972,59 @@ function inspectRegistrationForDoctor(
   });
 }
 
+function registrationSurfaceAbsent(
+  layout: ReturnType<typeof resolveNativeHostPlatformLayout>,
+  facts: NativeHostRegistrationReadFacts,
+): boolean {
+  if (layout.registration.kind === 'file') return facts.manifest.status === 'absent';
+  return facts.registry32?.status === 'absent' && facts.registry64?.status === 'absent';
+}
+
+function registrationSurfaceUnavailable(
+  layout: ReturnType<typeof resolveNativeHostPlatformLayout>,
+  facts: NativeHostRegistrationReadFacts,
+): boolean {
+  if (facts.manifest.status === 'unavailable') return true;
+  if (layout.registration.kind === 'file') return false;
+  return !facts.registry32
+    || !facts.registry64
+    || facts.registry32.status === 'unavailable'
+    || facts.registry64.status === 'unavailable';
+}
+
+async function preflightProductionBrowserTarget(
+  selectedBrowser: NativeHostBrowser,
+): Promise<'available' | 'cross-target' | 'unavailable'> {
+  if (!['darwin', 'linux', 'win32'].includes(process.platform)) return 'unavailable';
+  const platform = process.platform as 'darwin' | 'linux' | 'win32';
+  const homeDirectory = await realpath(homedir());
+  const input = {
+    platform,
+    homeDirectory,
+    ...(platform === 'win32' ? { localAppData: process.env.LOCALAPPDATA } : {}),
+  };
+  const registry = platform === 'win32' ? await productionRegistryAdapter() : undefined;
+  const files = createInstallFileAdapter();
+  const surfaces = [];
+  for (const browser of NATIVE_HOST_BROWSER_PRIORITY) {
+    const layout = resolveNativeHostPlatformLayout({ ...input, browser });
+    const adapter = createNativeHostPlatformAdapter(layout, Object.freeze({
+      files,
+      ...(registry ? { registry } : {}),
+    }));
+    const facts = await adapter.readRegistrationFacts();
+    surfaces.push(Object.freeze({ layout, facts }));
+  }
+  if (surfaces.some(({ layout, facts }) => registrationSurfaceUnavailable(layout, facts))) {
+    return 'unavailable';
+  }
+  return surfaces.some(({ layout, facts }) => (
+    layout.browser !== selectedBrowser && !registrationSurfaceAbsent(layout, facts)
+  ))
+    ? 'cross-target'
+    : 'available';
+}
+
 function unavailableDoctorInspection(expectedLocation: string): Readonly<Record<string, unknown>> {
   return Object.freeze({
     platform: 'supported',
@@ -963,27 +1045,57 @@ export async function inspectProductionNativeHost(): Promise<unknown> {
   const platform = process.platform as 'darwin' | 'linux' | 'win32';
   let expectedLocation = 'Not reported';
   try {
-    const platformLayout = resolveNativeHostPlatformLayout({
+    const homeDirectory = await realpath(homedir());
+    const platformInput = {
       platform,
-      homeDirectory: await realpath(homedir()),
+      homeDirectory,
       ...(platform === 'win32' ? { localAppData: process.env.LOCALAPPDATA } : {}),
-    });
-    expectedLocation = platformLayout.manifestPath;
-    const runtimeLayout = runtimeInspectionLayout(platformLayout);
+    };
+    const platformLayouts = NATIVE_HOST_BROWSER_PRIORITY.map((browser) => (
+      resolveNativeHostPlatformLayout({ ...platformInput, browser })
+    ));
+    expectedLocation = platformLayouts[0].manifestPath;
+    const runtimeLayout = runtimeInspectionLayout(platformLayouts[0]);
     const registry = platform === 'win32' ? await productionRegistryAdapter() : undefined;
-    const platformAdapter = createNativeHostPlatformAdapter(platformLayout, Object.freeze({
-      files: createInstallFileAdapter(),
-      ...(registry ? { registry } : {}),
-    }));
+    const files = createInstallFileAdapter();
     const runtimeInspection = await inspectOwnedRuntime(runtimeLayout);
     const expectedExtensionId = extensionIdFromOrigin(runtimeInspection.marker?.origin)
       ?? NATIVE_HOST_DEFAULT_EXTENSION_ID;
-    const registration = inspectRegistrationForDoctor(
-      await platformAdapter.readRegistrationFacts(),
-      platformLayout,
-      expectedExtensionId,
-    );
-    const launcherFact = await inspectSecurePath(platformLayout.launcherPath, 'file');
+    const candidates = [];
+    for (const layout of platformLayouts) {
+      const adapter = createNativeHostPlatformAdapter(layout, Object.freeze({
+        files,
+        ...(registry ? { registry } : {}),
+      }));
+      const facts = await adapter.readRegistrationFacts();
+      candidates.push(Object.freeze({
+        layout,
+        facts,
+        ownership: inspectNativeHostRegistration({
+          layout,
+          extensionId: expectedExtensionId,
+          manifest: facts.manifest,
+          marker: runtimeInspection.markerFact,
+          registry32: facts.registry32,
+          registry64: facts.registry64,
+        }),
+        doctor: inspectRegistrationForDoctor(facts, layout, expectedExtensionId),
+      }));
+    }
+    const selectedBrowser = selectNativeHostDoctorBrowser(Object.fromEntries(
+      candidates.map(({ layout, facts, ownership }) => [
+        layout.browser,
+        Object.freeze({
+          exactOwned: ownership.state === 'exact',
+          absent: registrationSurfaceAbsent(layout, facts),
+        }),
+      ]),
+    ) as Record<NativeHostBrowser, NativeHostDoctorBrowserState>);
+    const selected = candidates.find(({ layout }) => layout.browser === selectedBrowser)
+      ?? candidates[0];
+    expectedLocation = selected.layout.manifestPath;
+    const registration = selected.doctor;
+    const launcherFact = await inspectSecurePath(selected.layout.launcherPath, 'file');
     const launcher = launcherFact.status === 'absent'
       ? 'missing'
       : launcherFact.status === 'unavailable'
@@ -1019,11 +1131,12 @@ export async function inspectProductionNativeHost(): Promise<unknown> {
   }
 }
 
-function unavailableLocation(): string {
+function unavailableLocation(browser: NativeHostBrowser = 'chrome'): string {
   try {
     if (!['darwin', 'linux', 'win32'].includes(process.platform)) return 'Unavailable';
     return resolveNativeHostPlatformLayout({
       platform: process.platform as 'darwin' | 'linux' | 'win32',
+      browser,
       homeDirectory: homedir(),
       ...(process.platform === 'win32' ? { localAppData: process.env.LOCALAPPDATA } : {}),
     }).manifestPath;
@@ -1035,26 +1148,49 @@ function unavailableLocation(): string {
 export function createProductionNativeHostCliOperations(): NativeHostCliOperations {
   return Object.freeze({
     install: async (request: NativeHostInstallRequest) => {
+      const browser = request.browser ?? 'chrome';
       try {
+        const preflight = await preflightProductionBrowserTarget(browser);
+        if (preflight !== 'available') {
+          return Object.freeze({
+            status: 'refused',
+            reason: preflight === 'cross-target' ? 'split-state' : 'unavailable',
+            location: unavailableLocation(browser),
+            origin: null,
+            packageVersion: null,
+          });
+        }
         return await installNativeHost(
           request,
           await productionInstallDependencies(
             request.extensionId ?? NATIVE_HOST_DEFAULT_EXTENSION_ID,
+            browser,
           ),
         );
       } catch {
         return Object.freeze({
-          status: 'refused', reason: 'unavailable', location: unavailableLocation(),
+          status: 'refused', reason: 'unavailable', location: unavailableLocation(browser),
           origin: null, packageVersion: null,
         });
       }
     },
-    uninstall: async () => {
+    uninstall: async (request: NativeHostUninstallRequest = {}) => {
+      const browser = request.browser ?? 'chrome';
       try {
-        return await uninstallNativeHost(await productionUninstallDependencies());
+        const preflight = await preflightProductionBrowserTarget(browser);
+        if (preflight !== 'available') {
+          return Object.freeze({
+            status: 'refused',
+            reason: preflight === 'cross-target' ? 'split-state' : 'unavailable',
+            location: unavailableLocation(browser),
+            origin: null,
+            packageVersion: null,
+          });
+        }
+        return await uninstallNativeHost(await productionUninstallDependencies(browser));
       } catch {
         return Object.freeze({
-          status: 'refused', reason: 'unavailable', location: unavailableLocation(),
+          status: 'refused', reason: 'unavailable', location: unavailableLocation(browser),
           origin: null, packageVersion: null,
         });
       }

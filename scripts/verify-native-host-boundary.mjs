@@ -14,6 +14,7 @@ const __filename = fileURLToPath(import.meta.url);
 const REPOSITORY_ROOT = resolve(dirname(__filename), '..');
 const MAX_SOURCE_BYTES = 256 * 1024;
 const EXPECTED_SOURCE_GRAPH = Object.freeze([
+  'bootstrap.ts',
   'constants.ts',
   'daemon.ts',
   'entry.ts',
@@ -26,6 +27,8 @@ const EXPECTED_COMPILED_GRAPH = Object.freeze(
   EXPECTED_SOURCE_GRAPH.map((entry) => entry.replace(/\.ts$/u, '.js')),
 );
 const ALLOWED_CORE_IMPORTS = Object.freeze({
+  'bootstrap.ts': new Set(['node:os', 'node:path']),
+  'bootstrap.js': new Set(['node:os', 'node:path']),
   'daemon.ts': new Set(['node:path']),
   'daemon.js': new Set(['node:path']),
   'platform.ts': new Set([
@@ -69,7 +72,6 @@ const FORBIDDEN_TOKENS = Object.freeze([
   ['agent-provider authority', /agent-providers|spawn-supervisor/iu],
   ['task or prompt authority', /(?:^|[^A-Za-z])(?:task|prompt|delegation)(?:[^A-Za-z]|$)/iu],
   ['browser or tab authority', /(?:^|[^A-Za-z])(?:browser|tabs?|tab-state)(?:[^A-Za-z]|$)/iu],
-  ['bridge authentication authority', /bridge-auth|session-secret|session_secret/iu],
   ['installer authority', /native-host-install|(?:^|[/\\])install\.(?:ts|js)\b/iu],
   ['doctor or diagnostics authority', /(?:^|[/_.-])(?:doctor|diagnostics?)(?:[/_.-]|$)/iu],
   ['CLI router authority', /mcp[/\\](?:src|build)[/\\]index\.(?:ts|js)/iu],
@@ -82,11 +84,12 @@ function countMatches(source, pattern) {
 
 function verifyProductionAuthority(sources, diagnostics) {
   const daemon = sources.get('daemon.ts') ?? sources.get('daemon.js') ?? '';
+  const bootstrap = sources.get('bootstrap.ts') ?? sources.get('bootstrap.js') ?? '';
   const platform = sources.get('platform.ts') ?? sources.get('platform.js') ?? '';
   const entry = sources.get('entry.ts') ?? sources.get('entry.js') ?? '';
   const executable = sources.get('index.ts') ?? sources.get('index.js') ?? '';
 
-  const exactTuple = /\[\s*runtime\.absoluteStableBuildIndex,\s*['"]serve['"],\s*['"]--host['"],\s*['"]127\.0\.0\.1['"],\s*['"]--port['"],\s*['"]7226['"],?\s*\]/gu;
+  const exactTuple = /\[\s*runtime\.absoluteStableBuildIndex,\s*['"]serve['"],\s*['"]--host['"],\s*['"]127\.0\.0\.1['"],\s*['"]--port['"],\s*String\(NATIVE_HOST_SERVICE_PORT\),?\s*\]/gu;
   if (countMatches(daemon, exactTuple) !== 1) {
     diagnostics.push('daemon: exact serve argv tuple is not uniquely pinned');
   }
@@ -128,6 +131,12 @@ function verifyProductionAuthority(sources, diagnostics) {
   }
   if (countMatches(entry, /wakeServeDaemon\s*\(/gu) !== 1) {
     diagnostics.push('entry: wakeServeDaemon must be invoked exactly once');
+  }
+  if (
+    countMatches(bootstrap, /dependencies\.readPrivateFile\s*\(/gu) !== 1
+    || /\b(?:writePrivateFile|spawn|requestHealth|createDirectory|renameDirectory)\s*\(/u.test(bootstrap)
+  ) {
+    diagnostics.push('bootstrap: session credential authority must remain one bounded read-only edge');
   }
   if (
     countMatches(executable, /runProductionNativeHostEntry\s*\(\s*productionEnvironment\s*\)/gu) !== 1
@@ -313,11 +322,14 @@ function verifyRegistryHelperBoundary(mode) {
     /RegDeleteKeyExW/u,
     /KEY_WOW64_32KEY/u,
     /Software\\\\Google\\\\Chrome\\\\NativeMessagingHosts/u,
+    /Software\\\\Microsoft\\\\Edge\\\\NativeMessagingHosts/u,
+    /Software\\\\BraveSoftware\\\\Brave-Browser\\\\NativeMessagingHosts/u,
+    /Software\\\\Chromium\\\\NativeMessagingHosts/u,
   ]) {
     if (!pattern.test(cSource)) diagnostics.push(`${mode}: registry helper Win32 boundary is incomplete`);
   }
-  if (countMatches(cSource, /KEY_WOW64_64KEY/gu) !== 1) {
-    diagnostics.push(`${mode}: 64-bit registry view must have exactly one read-only dispatch edge`);
+  if (countMatches(cSource, /KEY_WOW64_64KEY/gu) !== 4) {
+    diagnostics.push(`${mode}: 64-bit registry view must have one read-only dispatch edge per browser`);
   }
   if (/\b(?:system|_popen|ShellExecuteW?)\s*\(/u.test(cSource)) {
     diagnostics.push(`${mode}: registry helper shell authority is forbidden`);

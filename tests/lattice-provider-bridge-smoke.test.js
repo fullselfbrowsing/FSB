@@ -624,9 +624,10 @@ async function loadOffscreenHandlerSource(chromeMock) {
   // provider helper -> 318. PR #105 adds the MCP session recorder plus three
   // Google Sheets support loads -> 322. The native-host install-command
   // projector adds one pure shared helper -> 323.
-  // Quick 260728-k2v loads the animated action-icon module -> 324.
+  // Quick 260728-k2v loads the animated action-icon module -> 324. The
+  // replay manifest helper adds one classic-SW load -> 325.
   const importScriptsCount = (bgSource.match(/importScripts/g) || []).length;
-  passAssertEqual(importScriptsCount, 324, 'background.js importScripts count = 324 (including animated action-icon module)');
+  passAssertEqual(importScriptsCount, 325, 'background.js importScripts count includes the Lattice replay manifest helper');
   // Companion call-site-only count (regex requires open paren): Phase 5 baseline
   // was 150 actual importScripts() calls; Phase 6 adds 1 -> 151; Phase 8 adds 1 -> 152;
   // Phase 14 adds 2 (trigger-store + trigger-lifecycle) -> 154; Phase 15 adds 2
@@ -667,9 +668,10 @@ async function loadOffscreenHandlerSource(chromeMock) {
   // Phase 64 Plan 09 adds the canonical delegation provider helper -> 314.
   // PR #105 adds four call sites -> 318. The native-host install-command
   // projector adds one pure shared helper call site -> 319.
-  // Quick 260728-k2v adds the animated action-icon module call site -> 320.
+  // Quick 260728-k2v adds the animated action-icon module call site -> 320;
+  // the replay manifest helper is call site 321.
   const importScriptsCallSites = (bgSource.match(/importScripts\(/g) || []).length;
-  passAssertEqual(importScriptsCallSites, 320, 'background.js importScripts() call sites = 320 (including animated action-icon module)');
+  passAssertEqual(importScriptsCallSites, 321, 'background.js importScripts() call sites include the Lattice replay helper');
 
   const lineCli = bgLines.findIndex(l => /importScripts\(['"]ai\/cli-parser\.js['"]\)/.test(l));
   const lineBridge = bgLines.findIndex(l => /importScripts\(['"]ai\/lattice-provider-bridge\.js['"]\)/.test(l));

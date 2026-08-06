@@ -1075,7 +1075,13 @@ function writeBoundaryGraph(fixtureRoot, mode) {
   );
   writeFileSync(
     path.join(graphRoot, `entry.${extension}`),
-    "import { wakeServeDaemon } from './daemon.js';\nimport { protocolValue } from './protocol.js';\nimport { runtimeValue } from './runtime-layout.js';\nexport function runProductionNativeHostEntry(value) { return wakeServeDaemon(value, protocolValue, runtimeValue); }\n",
+    "import { wakeServeDaemon } from './daemon.js';\nimport { readOwnedCredential } from './bootstrap.js';\nimport { protocolValue } from './protocol.js';\nimport { runtimeValue } from './runtime-layout.js';\nexport function runProductionNativeHostEntry(value) { return wakeServeDaemon(value, protocolValue, runtimeValue, readOwnedCredential); }\n",
+  );
+  // Reachable from entry so the leaf roster matches, and shaped to satisfy the
+  // verifier's one-bounded-read-only-edge rule for the session credential.
+  writeFileSync(
+    path.join(graphRoot, `bootstrap.${extension}`),
+    "import { homedir } from 'node:os';\nimport { join } from 'node:path';\nimport { constantValue } from './constants.js';\nconst dependencies = { readPrivateFile: async () => null };\nexport async function readOwnedCredential() { return dependencies.readPrivateFile(join(homedir(), constantValue)); }\n",
   );
   writeFileSync(
     path.join(graphRoot, `protocol.${extension}`),
@@ -1083,11 +1089,11 @@ function writeBoundaryGraph(fixtureRoot, mode) {
   );
   writeFileSync(
     path.join(graphRoot, `constants.${extension}`),
-    "export const constantValue = 'leaf';\n",
+    "export const constantValue = 'leaf';\nexport const NATIVE_HOST_SERVICE_PORT = 7226;\n",
   );
   writeFileSync(
     path.join(graphRoot, `daemon.${extension}`),
-    "import { join } from 'node:path';\nimport { constantValue } from './constants.js';\nconst runtime = { absoluteStableBuildIndex: join('/', constantValue), absoluteNode: '/node' };\nconst dependencies = { spawn() {} };\nconst argv = [runtime.absoluteStableBuildIndex, 'serve', '--host', '127.0.0.1', '--port', '7226'];\nconst options = { shell: false, detached: true, stdio: 'ignore', windowsHide: true };\nexport function wakeServeDaemon() { return dependencies.spawn(runtime.absoluteNode, argv, options); }\n",
+    "import { join } from 'node:path';\nimport { NATIVE_HOST_SERVICE_PORT, constantValue } from './constants.js';\nconst runtime = { absoluteStableBuildIndex: join('/', constantValue), absoluteNode: '/node' };\nconst dependencies = { spawn() {} };\nconst argv = [runtime.absoluteStableBuildIndex, 'serve', '--host', '127.0.0.1', '--port', String(NATIVE_HOST_SERVICE_PORT)];\nconst options = { shell: false, detached: true, stdio: 'ignore', windowsHide: true };\nexport function wakeServeDaemon() { return dependencies.spawn(runtime.absoluteNode, argv, options); }\n",
   );
   writeFileSync(
     path.join(graphRoot, `platform.${extension}`),
@@ -1419,10 +1425,18 @@ function testWindowsBootstrapSources() {
   assert.match(registrySource, /fsb-native-host-registry-v1/);
   assert.match(registrySource, /Software\\\\Google\\\\Chrome\\\\NativeMessagingHosts/);
   assert.doesNotMatch(registrySource, /reg\.exe|SystemRoot|SYSTEMROOT|\b(?:system|_popen|ShellExecuteW?)\s*\(/i);
+  // The 64-bit view is read-only authority. Pin that invariant rather than an
+  // occurrence count: the helper carries one query dispatch per supported
+  // browser, so a count would have to be bumped every time a browser is added.
   assert.equal(
+    (registrySource.match(/query_default\([^)]*KEY_WOW64_64KEY[^)]*\)/g) || []).length,
     (registrySource.match(/KEY_WOW64_64KEY/g) || []).length,
-    1,
     '64-bit registry view appears only in the read-only query dispatch',
+  );
+  assert.doesNotMatch(
+    registrySource,
+    /(?:inspect_key|write_default|delete_default|delete_empty_key)\([^)]*KEY_WOW64_64KEY/,
+    'registry mutation and enumeration dispatches never receive the 64-bit view',
   );
   assert.match(registryResource, /fsb-native-host-registry-helper-v1/);
   assert.match(buildSource, /\bcl\.exe\b/);

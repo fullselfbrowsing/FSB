@@ -5,11 +5,12 @@ import { execSync } from 'node:child_process';
 import { homedir } from 'node:os';
 import { isNativeHostExtensionId, } from './native-host/constants.js';
 import { installNativeHost, uninstallNativeHost, } from './native-host-install/index.js';
+import { isNativeHostBrowser } from './native-host-install/browser.js';
 import { resolveNativeHostPlatformLayout } from './native-host-install/platform.js';
 const STDIO_COMMAND = 'npx -y fsb-mcp-server';
 const WINDOWS_STDIO_COMMAND = 'cmd /c npx -y fsb-mcp-server';
-const NATIVE_HOST_INSTALL_USAGE = 'Usage: fsb-mcp-server install --native-host [--extension-id <32 lowercase a-p chars>]';
-const NATIVE_HOST_UNINSTALL_USAGE = 'Usage: fsb-mcp-server uninstall --native-host';
+const NATIVE_HOST_INSTALL_USAGE = 'Usage: fsb-mcp-server install --native-host [--browser <chrome|edge|brave|chromium>] [--extension-id <32 lowercase a-p chars>]';
+const NATIVE_HOST_UNINSTALL_USAGE = 'Usage: fsb-mcp-server uninstall --native-host [--browser <chrome|edge|brave|chromium>]';
 const NATIVE_HOST_REFUSAL_REASONS = new Set([
     'boundary-changed',
     'foreign-state',
@@ -73,7 +74,19 @@ const unavailableNativeHostCliOperations = Object.freeze({
 export function createNativeHostCliOperations(dependencies) {
     return Object.freeze({
         install: (request) => installNativeHost(request, dependencies),
-        uninstall: () => uninstallNativeHost(dependencies),
+        uninstall: (request = {}) => {
+            const browser = request.browser ?? 'chrome';
+            if (browser !== dependencies.platform.layout.browser) {
+                return Promise.resolve(Object.freeze({
+                    status: 'refused',
+                    reason: 'invalid-request',
+                    location: dependencies.platform.layout.manifestPath,
+                    origin: null,
+                    packageVersion: null,
+                }));
+            }
+            return uninstallNativeHost(dependencies);
+        },
     });
 }
 function nativeHostTargetRequested(flags) {
@@ -108,21 +121,32 @@ function exactNativeFlags(flags, allowedKeys) {
     }
 }
 function nativeInstallRequest(flags) {
-    const values = exactNativeFlags(flags, ['native-host', 'extension-id']);
+    const values = exactNativeFlags(flags, ['native-host', 'browser', 'extension-id']);
     if (!values || values['native-host'] !== true)
         return null;
-    if (!Object.hasOwn(values, 'extension-id'))
-        return Object.freeze({});
-    const extensionId = values['extension-id'];
-    if (typeof extensionId !== 'string' || !isNativeHostExtensionId(extensionId))
+    const browser = Object.hasOwn(values, 'browser') ? values.browser : undefined;
+    const extensionId = Object.hasOwn(values, 'extension-id') ? values['extension-id'] : undefined;
+    if (browser !== undefined
+        && !isNativeHostBrowser(browser))
         return null;
-    return Object.freeze({ extensionId });
+    if (extensionId !== undefined
+        && (typeof extensionId !== 'string' || !isNativeHostExtensionId(extensionId)))
+        return null;
+    return Object.freeze({
+        ...(browser !== undefined ? { browser: browser } : {}),
+        ...(extensionId !== undefined ? { extensionId } : {}),
+    });
 }
-function validNativeUninstallFlags(flags) {
-    const values = exactNativeFlags(flags, ['native-host']);
-    return Boolean(values
-        && Reflect.ownKeys(values).length === 1
-        && values['native-host'] === true);
+function nativeUninstallRequest(flags) {
+    const values = exactNativeFlags(flags, ['native-host', 'browser']);
+    if (!values || values['native-host'] !== true)
+        return null;
+    if (!Object.hasOwn(values, 'browser'))
+        return Object.freeze({});
+    const browser = values.browser;
+    if (!isNativeHostBrowser(browser))
+        return null;
+    return Object.freeze({ browser: browser });
 }
 function rejectNativeUsage(usage) {
     console.error(usage);
@@ -959,12 +983,13 @@ export async function runInstall(flags, nativeHostOperations = unavailableNative
  */
 export async function runUninstall(flags, nativeHostOperations = unavailableNativeHostCliOperations) {
     if (nativeHostTargetRequested(flags)) {
-        if (!validNativeUninstallFlags(flags)) {
+        const request = nativeUninstallRequest(flags);
+        if (!request) {
             rejectNativeUsage(NATIVE_HOST_UNINSTALL_USAGE);
             return;
         }
         try {
-            printNativeUninstallResult(await nativeHostOperations.uninstall());
+            printNativeUninstallResult(await nativeHostOperations.uninstall(request));
         }
         catch {
             printNativeHostRefusal('unavailable', expectedNativeHostLocation());

@@ -222,6 +222,9 @@ function buildClientHarness(options = {}) {
     globalThis: {}
   };
   context.globalThis = context;
+  if (options.fsbActionIcon) {
+    context.fsbActionIcon = options.fsbActionIcon;
+  }
   // Phase 225-01: optionally seed the in-process lifecycle bus before mcp-bridge-client.js
   // captures it. background.js installs this on globalThis in real Chrome.
   if (options.installLifecycleBus) {
@@ -657,6 +660,149 @@ async function runTriggerMessageRouteCase() {
     cases.map(([type, payload], i) => ({ type, payload, mcpMsgId: `mcp-msg-trigger-${i}` })),
     'trigger MCP messages route through dispatchMcpMessageRoute',
   );
+}
+
+function runIconActivityRouteClassificationCase() {
+  console.log('\n--- toolbar icon route classification ---');
+
+  const activities = [];
+  const harness = buildClientHarness({
+    fsbActionIcon: {
+      noteActivity(_tabId, activity) {
+        activities.push(activity);
+      }
+    }
+  });
+  const client = harness.exports.mcpBridgeClient;
+
+  for (const type of ['mcp:list-credentials', 'mcp:list-payments', 'mcp:stop-trigger']) {
+    const callIndex = activities.length;
+    client._noteIconActivity(type, {});
+    assertEqual(activities.length, callIndex + 1, `${type} reports one toolbar activity`);
+    assertEqual(activities[callIndex], 'orbit', `${type} reports read-only Orbit activity`);
+  }
+
+  client._noteIconActivity('mcp:trigger', {});
+  assertEqual(activities[activities.length - 1], 'sweep', 'a mutating route uses default Sweep activity');
+
+  const beforeCapability = activities.length;
+  client._noteIconActivity('mcp:capabilities-invoke', { tab_id: 7 });
+  assertEqual(activities.length, beforeCapability,
+    'capability invoke skips generic activity so it cannot leave a Sweep tail');
+}
+
+async function runCapabilityIconLifecycleCase() {
+  console.log('\n--- capability Ring request lifecycle ---');
+
+  {
+    const events = [];
+    const completion = deferred();
+    const harness = buildClientHarness({
+      fsbActionIcon: {
+        noteActivity(tabId, activity) { events.push(['note', tabId, activity]); },
+        beginCapability(tabId) { events.push(['begin', tabId]); },
+        endCapability(tabId) { events.push(['end', tabId]); }
+      },
+      dispatchMcpMessageRoute: async ({ type }) => {
+        events.push(['dispatch', type]);
+        return completion.promise;
+      }
+    });
+    const pending = harness.exports.mcpBridgeClient._routeMessage(
+      'mcp:capabilities-invoke',
+      { slug: 'github.notifications', tab_id: 7 },
+      'capability-success'
+    );
+    await flushMicrotasks();
+    assertDeepEqual(events, [
+      ['begin', 7],
+      ['dispatch', 'mcp:capabilities-invoke']
+    ], 'accepted MCP invoke begins Ring before dispatch and holds it while unsettled');
+    completion.resolve({ success: true, data: { ok: true } });
+    const result = await pending;
+    assertDeepEqual(toPlainObject(result), { success: true, data: { ok: true } },
+      'successful MCP invoke preserves its dispatcher result');
+    assertDeepEqual(events, [
+      ['begin', 7],
+      ['dispatch', 'mcp:capabilities-invoke'],
+      ['end', 7]
+    ], 'successful MCP invoke balances Ring in finally with no generic note');
+  }
+
+  for (const scenario of [
+    { label: 'guarded result', response: { success: false, code: 'RECIPE_CONSENT_REQUIRED' } },
+    { label: 'unavailable router', response: { success: false, error: 'FsbCapabilityRouter unavailable' } }
+  ]) {
+    const events = [];
+    const harness = buildClientHarness({
+      fsbActionIcon: {
+        noteActivity(tabId, activity) { events.push(['note', tabId, activity]); },
+        beginCapability(tabId) { events.push(['begin', tabId]); },
+        endCapability(tabId) { events.push(['end', tabId]); }
+      },
+      dispatchMcpMessageRoute: async () => scenario.response
+    });
+    const result = await harness.exports.mcpBridgeClient._routeMessage(
+      'mcp:capabilities-invoke',
+      { slug: 'github.notifications', tab_id: 8 },
+      'capability-' + scenario.label.replace(/\s+/g, '-')
+    );
+    assertDeepEqual(toPlainObject(result), scenario.response,
+      scenario.label + ' response is preserved');
+    assertDeepEqual(events, [['begin', 8], ['end', 8]],
+      scenario.label + ' still balances the capability Ring');
+  }
+
+  {
+    const events = [];
+    const harness = buildClientHarness({
+      fsbActionIcon: {
+        noteActivity(tabId, activity) { events.push(['note', tabId, activity]); },
+        beginCapability(tabId) { events.push(['begin', tabId]); },
+        endCapability(tabId) { events.push(['end', tabId]); }
+      },
+      dispatchMcpMessageRoute: async () => { throw new Error('invalid capability payload'); }
+    });
+    let thrown = null;
+    try {
+      await harness.exports.mcpBridgeClient._routeMessage(
+        'mcp:capabilities-invoke',
+        { slug: '', tab_id: 9 },
+        'capability-validation-error'
+      );
+    } catch (error) {
+      thrown = error;
+    }
+    assertEqual(thrown && thrown.message, 'invalid capability payload',
+      'capability validation/dispatch errors still propagate');
+    assertDeepEqual(events, [['begin', 9], ['end', 9]],
+      'thrown capability errors balance Ring in finally');
+  }
+
+  {
+    const events = [];
+    const harness = buildClientHarness({
+      inboundAuthorityReady: false,
+      fsbActionIcon: {
+        noteActivity(tabId, activity) { events.push(['note', tabId, activity]); },
+        beginCapability(tabId) { events.push(['begin', tabId]); },
+        endCapability(tabId) { events.push(['end', tabId]); }
+      }
+    });
+    let thrown = null;
+    try {
+      await harness.exports.mcpBridgeClient._routeMessage(
+        'mcp:capabilities-invoke',
+        { slug: 'github.notifications', tab_id: 10 },
+        'capability-before-authority'
+      );
+    } catch (error) {
+      thrown = error;
+    }
+    assertEqual(thrown && thrown.message, 'mcp_authority_not_ready',
+      'bridge authority still rejects an invoke before routing');
+    assertDeepEqual(events, [], 'Ring begins only after bridge authority checks pass');
+  }
 }
 
 function runBackgroundArmingSourceCase() {
@@ -1432,6 +1578,8 @@ async function run() {
   await runBackgroundLifecycleBroadcasterSourceCase();
   await runVisualSessionRouteCase();
   await runTriggerMessageRouteCase();
+  runIconActivityRouteClassificationCase();
+  await runCapabilityIconLifecycleCase();
   runBackgroundArmingSourceCase();
   await runPairingConstructionCases();
   await runPairingProbeAndReloadCases();

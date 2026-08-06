@@ -1,13 +1,21 @@
 import { wakeServeDaemon } from './daemon.js';
+import {
+  readNativeBootstrapCredential,
+  type NativeBootstrapCredentialResult,
+} from './bootstrap.js';
 import type {
   NativeHostDaemonDependencies,
   NativeHostReadable,
   NativeHostWritable,
 } from './platform.js';
 import {
+  encodeNativeBootstrapResponse,
   encodeNativeWakeResponse,
   readNativeWakeRequest,
   validateNativeInvocation,
+  type NativeBootstrapRequest,
+  type NativeHostRequest,
+  type NativeInvocation,
   type NativeWakeReason,
   type NativeWakeRequest,
   type NativeWakeResponse,
@@ -26,6 +34,11 @@ type NativeWakeHandler = (
   request: NativeWakeRequest,
 ) => Promise<NativeWakeHandlerResult> | NativeWakeHandlerResult;
 
+type NativeBootstrapHandler = (
+  request: NativeBootstrapRequest,
+  invocation: NativeInvocation,
+) => Promise<NativeBootstrapCredentialResult> | NativeBootstrapCredentialResult;
+
 export type NativeHostEntryDependencies = Readonly<{
   stdin: NativeHostReadable;
   stdout: NativeHostWritable;
@@ -33,6 +46,7 @@ export type NativeHostEntryDependencies = Readonly<{
   argv: unknown;
   expectedOrigin: unknown;
   handleWake: NativeWakeHandler;
+  handleBootstrap?: NativeBootstrapHandler;
   settleMs?: number;
   setTimer?: typeof setTimeout;
   clearTimer?: typeof clearTimeout;
@@ -65,6 +79,7 @@ type NativeHostOneShotDependencies = Readonly<{
 type NativeWakeAuthority = Readonly<{
   expectedOrigin: unknown;
   handleWake: NativeWakeHandler;
+  handleBootstrap?: NativeBootstrapHandler;
 }>;
 
 type NativeWakeAuthorityLoader = () => Promise<NativeWakeAuthority> | NativeWakeAuthority;
@@ -148,9 +163,34 @@ async function writeStableDiagnostic(
 }
 
 function encodeHandlerResult(
-  request: NativeWakeRequest,
+  request: NativeHostRequest,
   result: NativeWakeHandlerResult,
+  credential: NativeBootstrapCredentialResult | null = null,
 ): Buffer {
+  if (request.v === 2) {
+    if (
+      (result.outcome === 'already_running' || result.outcome === 'started')
+      && credential
+      && credential.ok === true
+    ) {
+      return encodeNativeBootstrapResponse({
+        v: 2,
+        correlationId: request.correlationId,
+        outcome: result.outcome,
+        reason: result.reason,
+        pairingCode: credential.pairingCode,
+      }, request.correlationId);
+    }
+    const failedCredential = credential && credential.ok === false
+      ? credential.reason
+      : null;
+    return encodeNativeBootstrapResponse({
+      v: 2,
+      correlationId: request.correlationId,
+      outcome: failedCredential ? 'unavailable' : result.outcome,
+      reason: failedCredential ?? result.reason,
+    }, request.correlationId);
+  }
   return encodeNativeWakeResponse({
     v: 1,
     correlationId: request.correlationId,
@@ -167,6 +207,7 @@ export async function runNativeHostEntry(
     () => Object.freeze({
       expectedOrigin: dependencies.expectedOrigin,
       handleWake: dependencies.handleWake,
+      handleBootstrap: dependencies.handleBootstrap,
     }),
     'FSBNH_INVALID_INVOCATION',
   );
@@ -177,7 +218,7 @@ async function runNativeHostEntryWithAuthority(
   loadAuthority: NativeWakeAuthorityLoader,
   authorityFailureCode: Extract<NativeStableDiagnostic, 'FSBNH_INVALID_INVOCATION' | 'FSBNH_RUNTIME_CONFIG'>,
 ): Promise<0 | 1> {
-  let request: NativeWakeRequest | null;
+  let request: NativeHostRequest | null;
   try {
     request = await readNativeWakeRequest(dependencies.stdin, {
       settleMs: dependencies.settleMs,
@@ -199,8 +240,9 @@ async function runNativeHostEntryWithAuthority(
     return 1;
   }
 
+  let invocation: NativeInvocation;
   try {
-    validateNativeInvocation(dependencies.argv, authority.expectedOrigin);
+    invocation = validateNativeInvocation(dependencies.argv, authority.expectedOrigin);
   } catch (_error) {
     await writeStableDiagnostic(dependencies.stderr, 'FSBNH_INVALID_INVOCATION');
     return 1;
@@ -208,8 +250,22 @@ async function runNativeHostEntryWithAuthority(
 
   let encoded: Buffer;
   try {
-    const handled = safeHandlerResult(await authority.handleWake(request));
-    encoded = encodeHandlerResult(request, handled ?? INTERNAL_FAILURE);
+    const handled = safeHandlerResult(await authority.handleWake({
+      v: 1,
+      action: 'wake',
+      correlationId: request.correlationId,
+    }));
+    let credential: NativeBootstrapCredentialResult | null = null;
+    if (
+      request.v === 2
+      && handled
+      && (handled.outcome === 'already_running' || handled.outcome === 'started')
+    ) {
+      credential = authority.handleBootstrap
+        ? await authority.handleBootstrap(request, invocation)
+        : Object.freeze({ ok: false, reason: 'bridge_session_unavailable' });
+    }
+    encoded = encodeHandlerResult(request, handled ?? INTERNAL_FAILURE, credential);
   } catch (_error) {
     encoded = encodeHandlerResult(request, INTERNAL_FAILURE);
   }
@@ -258,6 +314,13 @@ export async function runProductionNativeHostEntry(
         expectedOrigin: marker.origin,
         handleWake: async () => wakeServeDaemon({
           runtime,
+          dependencies: dependencies.daemonDependencies,
+        }),
+        handleBootstrap: async (
+          _request: NativeBootstrapRequest,
+          invocation: NativeInvocation,
+        ) => readNativeBootstrapCredential({
+          origin: invocation.origin,
           dependencies: dependencies.daemonDependencies,
         }),
       });

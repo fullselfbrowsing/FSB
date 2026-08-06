@@ -53,8 +53,11 @@ export interface AgentTask {
   readonly text: string;
 }
 
+export type SpawnPurpose = 'delegation' | 'connection_test';
+
 /** Values here are minted or selected by the daemon, never by a wire caller. */
 export interface SpawnContext {
+  readonly purpose: SpawnPurpose;
   readonly adapterId: AgentProviderId;
   readonly detection: AdapterDetection;
   readonly delegationId: string;
@@ -981,7 +984,10 @@ export function freezeSpawnSpec(spec: unknown): SpawnSpec {
 export interface AgentProviderAdapter {
   detect(): Promise<AdapterDetection>;
   buildSpawn(task: AgentTask, ctx: SpawnContext): Promise<SpawnSpec>;
-  parseEvents(stream: NodeJS.ReadableStream): AsyncIterable<AgentEvent>;
+  parseEvents(
+    stream: NodeJS.ReadableStream,
+    options?: Readonly<{ purpose: SpawnPurpose }>,
+  ): AsyncIterable<AgentEvent>;
   kill(child: SupervisedChild, options: { grace: number }): Promise<void>;
   caps(): AdapterCapabilities;
 }

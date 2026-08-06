@@ -118,7 +118,7 @@ Usage:
   fsb-mcp-server                     Start the stdio MCP server
   fsb-mcp-server stdio              Start the stdio MCP server
   fsb-mcp-server serve              Start a local Streamable HTTP MCP server
-  fsb-mcp-server pair [--reset]     Show or reset the current bridge pairing code
+  fsb-mcp-server pair [--reset]     Diagnostic/backward-compatible bridge credential command
   fsb-mcp-server status             Show bridge and extension status
   fsb-mcp-server doctor             Diagnose the primary MCP failure layer
   fsb-mcp-server setup              Print install snippets for common MCP clients
@@ -126,8 +126,8 @@ Usage:
   fsb-mcp-server install             Install FSB to an MCP client config (21 platforms)
   fsb-mcp-server install --list      Show all platforms with detection status
   fsb-mcp-server uninstall           Remove FSB from an MCP client config
-  fsb-mcp-server install --native-host [--extension-id <id>] Install the Chrome native messaging host
-  fsb-mcp-server uninstall --native-host Remove the Chrome native messaging host
+  fsb-mcp-server install --native-host [--browser <chrome|edge|brave|chromium>] [--extension-id <id>] Install the selected browser native messaging host
+  fsb-mcp-server uninstall --native-host [--browser <chrome|edge|brave|chromium>] Remove the selected browser native messaging host
 
 Options:
   --host <host>       HTTP listen host for \`serve\` (default: ${DEFAULT_HTTP_HOST})
@@ -335,7 +335,7 @@ export function formatDoctor(diagnostics: DiagnosticsSnapshot): string {
   lines.push(`  Install state: ${DOCTOR_NATIVE_INSTALL_LABELS[nativeHost.installState]}`);
   lines.push(`  Expected location: ${nativeHost.expectedLocation}`);
   lines.push(`  Manifest/registry: ${DOCTOR_NATIVE_REGISTRATION_LABELS[nativeHost.registration]}`);
-  lines.push(`  Chrome allowlist: ${DOCTOR_NATIVE_ALLOWLIST_LABELS[nativeHost.allowlist]}`);
+  lines.push(`  Extension allowlist: ${DOCTOR_NATIVE_ALLOWLIST_LABELS[nativeHost.allowlist]}`);
   lines.push(`  Launcher: ${DOCTOR_NATIVE_LAUNCHER_LABELS[nativeHost.launcher]}`);
   lines.push(`  Daemon: ${DOCTOR_NATIVE_DAEMON_LABELS[nativeHost.daemon]}`);
   lines.push(`  Reason: ${nativeHost.reason}`);
@@ -445,7 +445,7 @@ export function runPair(flags: Record<string, FlagValue>): void {
       ? ['WARNING: Previous extension binding and bridge session revoked; the next authenticated extension Origin will be bound.']
       : []),
     'Pairing grants extension reverse-request authority for this local daemon session.',
-    'Paste this code only into the FSB extension pairing control:',
+    'Diagnostic pairing code (current extension builds connect automatically):',
     formatPairingCode(state),
   ];
   process.stdout.write(`${lines.join('\n')}\n`);

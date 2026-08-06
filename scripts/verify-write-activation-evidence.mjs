@@ -12,7 +12,7 @@
 
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { readFileSync, statSync } from 'node:fs';
+import { lstatSync, readFileSync, realpathSync } from 'node:fs';
 import { createRequire } from 'node:module';
 
 import { reportReadiness } from './report-t1-readiness.mjs';
@@ -20,6 +20,7 @@ import { reportReadiness } from './report-t1-readiness.mjs';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const ROOT = resolve(__dirname, '..');
+const REAL_ROOT = realpathSync(ROOT);
 const require = createRequire(import.meta.url);
 
 export const EVIDENCE_PATH = join(ROOT, 'catalog', 'write-activation-evidence.json');
@@ -132,8 +133,16 @@ function validateRepositoryFileReferences(records, field, failures) {
     }
 
     try {
-      if (!statSync(resolvedReference).isFile()) {
+      if (!lstatSync(resolvedReference).isFile()) {
         failures.push(field + ' must reference a regular file: ' + normalized);
+        continue;
+      }
+      const realReference = realpathSync(resolvedReference);
+      const realRepositoryRelative = relative(REAL_ROOT, realReference);
+      if (realRepositoryRelative === '..' ||
+          realRepositoryRelative.startsWith('..' + sep) ||
+          isAbsolute(realRepositoryRelative)) {
+        failures.push(field + ' must stay inside the repository: ' + normalized);
       }
     } catch (_error) {
       failures.push(field + ' references a missing repository file: ' + normalized);

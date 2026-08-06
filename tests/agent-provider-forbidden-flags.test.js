@@ -325,7 +325,13 @@ try {
     'rawNativeCanary',
   ]) assert(eventStoreTestSource.includes(browserProof), `browser projection rejects ${browserProof}`);
   assert(providersUiTestSource.includes(
-    'provider rendering contains no native version, path, topology, secret, model, or continuation field',
+    'there is exactly one visible provider selector',
+  ));
+  assert(providersUiTestSource.includes(
+    'mcpBridgePairingCode',
+  ));
+  assert(providersUiTestSource.includes(
+    'the seven API providers are followed by the three local agents',
   ));
 
   const controlPanelSource = fs.readFileSync(path.join(

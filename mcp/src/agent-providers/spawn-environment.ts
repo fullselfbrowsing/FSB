@@ -113,11 +113,26 @@ function copyEnvironment(
   value: unknown,
   allowUndefined: boolean,
 ): Readonly<Record<string, string>> {
-  const record = ownDataRecord(value);
-  const result: Record<string, string> = {};
-  for (const key of Reflect.ownKeys(record) as string[]) {
-    const item = ownValue(record, key);
-    if (!ENVIRONMENT_KEY_PATTERN.test(key)) invalidEnvironmentContract();
+  // Node exposes process.env as a platform-owned object with a special
+  // prototype and platform-owned names such as ProgramFiles(x86). Accept those
+  // names only on that exact object while retaining the own, enumerable
+  // data-descriptor checks below. Arbitrary prototype-bearing objects,
+  // accessors, and non-identifier policy/fixed keys remain rejected.
+  const isProcessEnvironment = value === process.env;
+  const record = isProcessEnvironment
+    ? value as OwnDataRecord
+    : ownDataRecord(value);
+  const result = Object.create(null) as Record<string, string>;
+  for (const key of Reflect.ownKeys(record)) {
+    if (typeof key !== 'string') invalidEnvironmentContract();
+    const descriptor = Object.getOwnPropertyDescriptor(record, key);
+    if (!descriptor || !descriptor.enumerable || !Object.hasOwn(descriptor, 'value')) {
+      invalidEnvironmentContract();
+    }
+    const item = descriptor.value;
+    if (!isProcessEnvironment && !ENVIRONMENT_KEY_PATTERN.test(key)) {
+      invalidEnvironmentContract();
+    }
     if (item === undefined && allowUndefined) continue;
     if (typeof item !== 'string' || item.includes('\0')) invalidEnvironmentContract();
     result[key] = item;
@@ -316,6 +331,17 @@ export const DELEGATION_PROVIDER_KEY_NAMES = Object.freeze([
 export const DELEGATION_AGENT_ENVIRONMENT_POLICY = freezeAgentEnvironmentPolicy({
   inheritedAllowRules: ['allow_unlisted'],
   strippedKeys: [...DELEGATION_PROVIDER_KEY_NAMES, 'OPENCODE_SERVER_PASSWORD'],
+  forcedValues: {
+    CODEX_EXEC_SERVER_URL: 'none',
+  },
+});
+
+export const CONNECTION_TEST_AGENT_ENVIRONMENT_POLICY = freezeAgentEnvironmentPolicy({
+  inheritedAllowRules: ['allow_unlisted'],
+  strippedKeys: [
+    ...DELEGATION_PROVIDER_KEY_NAMES.filter((key) => key !== 'OPENCODE_CONFIG_CONTENT'),
+    'OPENCODE_SERVER_PASSWORD',
+  ],
   forcedValues: {
     CODEX_EXEC_SERVER_URL: 'none',
   },

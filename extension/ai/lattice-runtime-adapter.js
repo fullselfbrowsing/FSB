@@ -87,6 +87,7 @@
     'openrouterapikey', 'xaiapikey', 'customapikey',
     'authorization', 'cookie', 'cookies', 'setcookie',
     'token', 'accesstoken', 'refreshtoken', 'bearer', 'bearertoken',
+    'ownershiptoken',
     'secret', 'clientsecret', 'apisecret',
     'password', 'passphrase',
     'providerinstance'
@@ -174,6 +175,13 @@
 
     const lruCap = Number.isFinite(options.lruCap) ? options.lruCap : DEFAULT_LRU_CAP;
     const hooks = new Set();
+    let snapshotSequence = 0;
+
+    function snapshotStorageKey(snapshot) {
+      snapshotSequence += 1;
+      return STORAGE_KEY_PREFIX + sessionId + '_' + snapshot.capturedAt + '_' +
+        String(snapshotSequence).padStart(8, '0');
+    }
 
     /**
      * Phase 9 FINT-15 -- keep-latest-N LRU enforcement per JSDoc line 76
@@ -232,7 +240,7 @@
         return; // flag default-off; production paths byte-identical to baseline
       }
       if (!storage) return;
-      const key = STORAGE_KEY_PREFIX + sessionId + '_' + snapshot.capturedAt;
+      const key = snapshotStorageKey(snapshot);
       try {
         storage.set({ [key]: snapshot }, () => {
           // chrome.storage.session.set MAY emit a runtime.lastError; the
@@ -276,6 +284,25 @@
           capturedAt: new Date().toISOString()
         };
         persistInternal(snapshot);
+        return snapshot;
+      },
+
+      /** FSB extension: await durable chrome.storage.session persistence. */
+      serializeAndPersist: async function serializeAndPersist(state) {
+        const snapshot = {
+          kind: 'survivability-snapshot',
+          version: 'lattice-survivability/v1',
+          payload: JSON.stringify(_redactSecrets(state === undefined ? null : state)),
+          capturedAt: new Date().toISOString()
+        };
+        if (typeof globalScope.FSB_LATTICE_RUNTIME_ADAPTER_ENABLED === 'undefined'
+            || !globalScope.FSB_LATTICE_RUNTIME_ADAPTER_ENABLED
+            || !storage) {
+          return snapshot;
+        }
+        const key = snapshotStorageKey(snapshot);
+        await Promise.resolve(storage.set({ [key]: snapshot }));
+        enforceLruCap(sessionId, storage, lruCap);
         return snapshot;
       },
 
@@ -323,6 +350,30 @@
           } catch (err) {
             console.warn(ADAPTER_TAG, 'eviction hook threw:', err && err.message);
           }
+        }
+      },
+
+      /** Remove this run's persisted snapshots after a terminal replay state. */
+      clearSnapshots: async function clearSnapshots() {
+        if (!storage) return;
+        const prefix = STORAGE_KEY_PREFIX + sessionId + '_';
+        try {
+          const all = await new Promise(function(resolve, reject) {
+            const maybe = storage.get(null, function(value) {
+              if (globalScope.chrome?.runtime?.lastError) {
+                reject(new Error(globalScope.chrome.runtime.lastError.message));
+                return;
+              }
+              resolve(value || {});
+            });
+            if (maybe && typeof maybe.then === 'function') maybe.then(resolve, reject);
+          });
+          const keys = Object.keys(all || {}).filter(function(key) {
+            return key.indexOf(prefix) === 0;
+          });
+          if (keys.length > 0) await Promise.resolve(storage.remove(keys));
+        } catch (err) {
+          console.warn(ADAPTER_TAG, 'clearSnapshots threw:', err && err.message);
         }
       },
 

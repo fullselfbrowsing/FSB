@@ -277,6 +277,7 @@ function makeLifecycleFakes(overrides = {}) {
     handlerCalls: 0,
     compatibilityRegistryCalls: 0,
     compatibilityDetectCalls: 0,
+    connectionTestCalls: [],
     prepareCalls: 0,
     readyCalls: 0,
     serveReady: false,
@@ -435,6 +436,10 @@ function makeLifecycleFakes(overrides = {}) {
     now() {
       return 123_456_789;
     },
+    async runConnectionTest(input) {
+      state.connectionTestCalls.push(input);
+      return Object.freeze({ ok: true, providerId: input.providerId });
+    },
     async prepareBridgeAuth() {
       state.prepareCalls++;
       order.push('bridge.auth.prepare');
@@ -547,6 +552,61 @@ async function runServeDelegationLifecycle(lifecycleModule) {
   }
   assertEqual(success.state.handlerCalls, 1, 'invalid compatibility payloads never reach the supervisor');
   assertEqual(success.state.compatibilityDetectCalls, 3, 'invalid compatibility payloads never run detection');
+
+  const connectionAbort = new AbortController();
+  const connectionTest = await success.state.bridgeOptions.handleExtRequest({
+    id: 'connection-test-route',
+    type: 'ext:request',
+    method: 'provider.test-connection',
+    payload: { providerId: 'codex' },
+  }, () => {}, { signal: connectionAbort.signal });
+  assertEqual(
+    JSON.stringify(connectionTest),
+    '{"ok":true,"providerId":"codex"}',
+    'authenticated provider.test-connection returns only the bounded selected-provider result',
+  );
+  assertEqual(success.state.connectionTestCalls.length, 1,
+    'provider.test-connection invokes one connection probe');
+  assertEqual(success.state.connectionTestCalls[0].providerId, 'codex',
+    'provider.test-connection routes only to the exact selected provider');
+  assert(success.state.connectionTestCalls[0].signal === connectionAbort.signal,
+    'provider.test-connection forwards socket cancellation');
+  assertEqual(success.state.compatibilityRegistryCalls, 1,
+    'connection tests reuse the one lazily-created production registry');
+  assertEqual(success.state.handlerCalls, 1,
+    'connection tests never enter delegation supervisor authority');
+
+  const invalidConnectionPayloads = [
+    null,
+    [],
+    {},
+    { providerId: 'cursor' },
+    { providerId: 'codex', extra: true },
+    Object.create(null),
+    Object.assign(Object.create({ inherited: true }), { providerId: 'codex' }),
+  ];
+  const accessorConnectionPayload = {};
+  Object.defineProperty(accessorConnectionPayload, 'providerId', {
+    enumerable: true,
+    get() { return 'codex'; },
+  });
+  invalidConnectionPayloads.push(accessorConnectionPayload);
+  for (const payload of invalidConnectionPayloads) {
+    let error = null;
+    try {
+      await success.state.bridgeOptions.handleExtRequest({
+        id: 'connection-test-invalid',
+        type: 'ext:request',
+        method: 'provider.test-connection',
+        payload,
+      }, () => {});
+    } catch (caught) {
+      error = caught;
+    }
+    assert(error, 'provider.test-connection rejects every non-exact payload');
+  }
+  assertEqual(success.state.connectionTestCalls.length, 1,
+    'invalid provider.test-connection payloads invoke no probe');
 
   const failedDetection = makeLifecycleFakes({
     compatibilityDetectionError: new Error('PRIVATE_DETECTOR_FAILURE'),
@@ -855,26 +915,28 @@ async function runRelayWaitsForExtensionReachability(WebSocketBridge) {
 }
 
 async function runExtensionStateBroadcastsToRelays(WebSocketBridge) {
-  const resources = await createBridgePair(WebSocketBridge);
-  try {
-    const { port, hub, relay, sockets } = resources;
-    const extensionSocket = await createExtensionSocket(port);
-    sockets.push(extensionSocket);
+  return withTempHome('bridge-extension-state', async () => {
+    const resources = await createBridgePair(WebSocketBridge);
+    try {
+      const { port, hub, relay, sockets } = resources;
+      const extensionSocket = await createExtensionSocket(port);
+      sockets.push(extensionSocket);
 
-    await sleep(30);
-    await waitFor(
-      () => hub.topology?.extensionConnected === true && relay.topology?.extensionConnected === true,
-      'extensionConnected topology broadcast',
-      1000,
-      10
-    );
+      await sleep(30);
+      await waitFor(
+        () => hub.topology?.extensionConnected === true && relay.topology?.extensionConnected === true,
+        'extensionConnected topology broadcast',
+        1000,
+        10
+      );
 
-    assert(hub.topology?.extensionConnected === true, 'hub topology reports extensionConnected true after extension socket attach');
-    assert(relay.topology?.extensionConnected === true, 'relay topology reports extensionConnected true after hub broadcast');
-    assert(relay.isConnected === true, 'relay.isConnected becomes true after extension reachability is broadcast');
-  } finally {
-    await cleanup(resources);
-  }
+      assert(hub.topology?.extensionConnected === true, 'hub topology reports extensionConnected true after extension socket attach');
+      assert(relay.topology?.extensionConnected === true, 'relay topology reports extensionConnected true after hub broadcast');
+      assert(relay.isConnected === true, 'relay.isConnected becomes true after extension reachability is broadcast');
+    } finally {
+      await cleanup(resources);
+    }
+  });
 }
 
 async function runRejectsUntrustedBrowserOrigin(WebSocketBridge) {
@@ -1091,6 +1153,12 @@ async function runPairingAuthorityMatrix(WebSocketBridge, auth) {
         { origin: 'chrome-extension://first-extension' },
         'missing auth token compatibility request',
         'adapter.compatibility',
+      ));
+      resources.sockets.push(await assertUnprivilegedSocket(
+        port,
+        { origin: 'chrome-extension://first-extension' },
+        'missing auth token provider connection test',
+        'provider.test-connection',
       ));
       resources.sockets.push(await assertUnprivilegedSocket(
         port,

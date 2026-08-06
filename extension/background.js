@@ -34,6 +34,7 @@ try { importScripts('utils/delegation-providers.js'); } catch (e) { console.erro
 try { importScripts('utils/mcp-client-aliases.js'); } catch (e) { console.error('[FSB] Failed to load mcp-client-aliases.js:', e.message); }
 try { importScripts('utils/mcp-agent-providers.js'); } catch (e) { console.error('[FSB] Failed to load mcp-agent-providers.js:', e.message); }
 try { importScripts('utils/delegation-preflight.js'); } catch (e) { console.error('[FSB] Failed to load delegation-preflight.js:', e.message); }
+try { importScripts('utils/native-host-install-command.js'); } catch (e) { console.error('[FSB] Failed to load native-host-install-command.js:', e.message); }
 try { importScripts('utils/native-host-wake.js'); } catch (e) { console.error('[FSB] Failed to load native-host-wake.js:', e.message); }
 try { importScripts('utils/delegation-consent.js'); } catch (e) { console.error('[FSB] Failed to load delegation-consent.js:', e.message); }
 try { importScripts('utils/delegation-event-store.js'); } catch (e) { console.error('[FSB] Failed to load delegation-event-store.js:', e.message); }
@@ -85,6 +86,7 @@ try { importScripts('utils/mcp-metrics-recorder.js'); } catch (e) { console.erro
 // the MCP recorder so startup redaction can serialize with every history/log
 // writer instead of racing a stale read-modify-write snapshot.
 importScripts('utils/automation-logger.js');
+try { importScripts('utils/lattice-replay.js'); } catch (e) { console.error('[FSB] Failed to load lattice-replay.js:', e.message); }
 // Quick 260707-7id -- MCP session recorder. Loaded AFTER the dispatcher,
 // metrics recorder, and automation logger: the dispatcher's finally-block
 // sibling hooks resolve the recorder lazily, while recorder startup can use the
@@ -1126,8 +1128,9 @@ async function sendSessionStatus(tabId, statusData) {
   const overlayState = (typeof FSBOverlayStateUtils !== 'undefined' && FSBOverlayStateUtils.buildOverlayState)
     ? FSBOverlayStateUtils.buildOverlayState(statusData, session)
     : statusData; // fallback: send raw data if overlay-state.js failed to load
-  // Toolbar icon reads the same normalized state as the in-page overlay.
-  try { if (globalThis.fsbActionIcon) globalThis.fsbActionIcon.applyOverlayState(overlayState); } catch (_e) { /* icon is presentation-only */ }
+  // The toolbar icon no longer rides this pipe: every implicit visual session
+  // reports the same phase, so phase cannot tell a read from a click. It is
+  // driven by tool class instead -- see fsbActionIcon.noteActivity.
   const payload = { action: 'sessionStatus', overlayState };
   try {
     await chrome.tabs.sendMessage(tabId, payload, { frameId: 0 });
@@ -1794,13 +1797,15 @@ async function fsbDelegationPreflightResult() {
 const FSB_NATIVE_WAKE_ID_PATTERN = /^[A-Za-z0-9_-]{16,64}$/;
 const FSB_NATIVE_WAKE_BRIDGE_TIMEOUT_MS = 5000;
 const FSB_NATIVE_WAKE_BRIDGE_POLL_MS = 50;
-let fsbNativeWakeBridgeAttempt = null;
+const FSB_MCP_BRIDGE_PAIRING_KEY = 'fsbMcpBridgePairing';
+let fsbAgentBridgeReadyAttempt = null;
 
 function fsbNativeWakeBridgeReady() {
   const state = fsbDelegationBridgeState();
   return !!state
     && state.connected === true
     && state.status === 'connected'
+    && state.pairingStatus === 'paired'
     && !!state.delegationConnection
     && state.delegationConnection.state === 'connected';
 }
@@ -1819,6 +1824,195 @@ function fsbBroadcastNativeWakeChecking(attemptId, intentId) {
   } catch (_error) {
     return false;
   }
+}
+
+function fsbAgentBridgeFailure(code) {
+  return Object.freeze({ ok: false, code: code });
+}
+
+function fsbCurrentNativeHostInstallCommand() {
+  const helper = globalThis.FsbNativeHostInstallCommand;
+  const runtimeId = typeof chrome !== 'undefined'
+    && chrome.runtime
+    && typeof chrome.runtime.id === 'string'
+    ? chrome.runtime.id
+    : '';
+  if (!helper || typeof helper.buildInstallCommand !== 'function') return null;
+  try {
+    return helper.buildInstallCommand(runtimeId, globalThis.navigator);
+  } catch (_error) {
+    return null;
+  }
+}
+
+function fsbAgentBridgeFailureMessage(code) {
+  if (code === 'native_host_missing') {
+    const command = fsbCurrentNativeHostInstallCommand();
+    return command
+      ? `Install the FSB native helper, then try again: ${command}`
+      : 'Install the FSB native helper for this browser and extension, then try again.';
+  }
+  if (code === 'extension_origin_mismatch') {
+    return 'The FSB native helper is paired with a different extension. Reset pairing with: npx -y fsb-mcp-server pair --reset. Then try again so FSB can pair this extension automatically.';
+  }
+  if (code === 'bridge_session_unavailable') {
+    return 'The local FSB service did not publish a usable session. Restart it and try again.';
+  }
+  return 'The local FSB agent service could not be reached. Try again.';
+}
+
+const FSB_AGENT_CONNECTION_FAILURE_CODES = Object.freeze({
+  binary_not_found: true,
+  unsupported_version: true,
+  auth_unauthenticated: true,
+  connection_test_timeout: true,
+  connection_test_cancelled: true,
+  connection_test_malformed: true,
+  connection_test_tools_used: true,
+  connection_test_failed: true,
+  connection_test_cleanup_failed: true
+});
+const FSB_AGENT_CONNECTION_TEST_REQUEST_TIMEOUT_MS = 120000;
+
+function fsbSafeAgentConnectionFailureCode(code) {
+  return typeof code === 'string'
+    && Object.prototype.hasOwnProperty.call(FSB_AGENT_CONNECTION_FAILURE_CODES, code)
+    ? code
+    : 'connection_test_failed';
+}
+
+function fsbAgentConnectionFailureMessage(code, providerId) {
+  const provider = globalThis.FsbDelegationProviders
+    && typeof globalThis.FsbDelegationProviders.get === 'function'
+    ? globalThis.FsbDelegationProviders.get(providerId)
+    : null;
+  const label = provider && provider.label ? provider.label : 'The selected agent';
+  if (code === 'binary_not_found') return `${label} is not installed or is not on PATH.`;
+  if (code === 'unsupported_version') return `${label} must be updated to a supported version.`;
+  if (code === 'auth_unauthenticated') return `Sign in to ${label} locally, then try again.`;
+  if (code === 'connection_test_timeout') return `${label} did not respond within 60 seconds.`;
+  if (code === 'connection_test_cancelled') return `${label} connection test was cancelled.`;
+  if (code === 'connection_test_malformed') return `${label} returned an invalid response.`;
+  if (code === 'connection_test_tools_used') return `${label} attempted to use tools during validation.`;
+  if (code === 'connection_test_cleanup_failed') return `${label} validation cleanup did not settle safely.`;
+  if (code === 'connection_test_failed') return `${label} could not complete the validation request.`;
+  return fsbAgentBridgeFailureMessage(code);
+}
+
+async function fsbWaitForAgentBridgeReady() {
+  for (let elapsed = 0;
+    elapsed < FSB_NATIVE_WAKE_BRIDGE_TIMEOUT_MS;
+    elapsed += FSB_NATIVE_WAKE_BRIDGE_POLL_MS) {
+    if (fsbNativeWakeBridgeReady()) return true;
+    await new Promise((resolve) => setTimeout(resolve, FSB_NATIVE_WAKE_BRIDGE_POLL_MS));
+  }
+  return fsbNativeWakeBridgeReady();
+}
+
+function fsbEnsureAgentBridgeReady(intentId = null) {
+  if (fsbNativeWakeBridgeReady()) {
+    return Promise.resolve(Object.freeze({ ok: true }));
+  }
+  if (fsbAgentBridgeReadyAttempt) {
+    if (intentId && fsbAgentBridgeReadyAttempt.attemptId) {
+      fsbBroadcastNativeWakeChecking(fsbAgentBridgeReadyAttempt.attemptId, intentId);
+    }
+    return fsbAgentBridgeReadyAttempt.promise;
+  }
+
+  const wakeController = globalThis.FsbNativeHostWake;
+  if (!wakeController || typeof wakeController.ensureBootstrap !== 'function') {
+    return Promise.resolve(fsbAgentBridgeFailure('native_host_missing'));
+  }
+
+  let bootstrapPromise;
+  try {
+    bootstrapPromise = wakeController.ensureBootstrap();
+  } catch (_error) {
+    return Promise.resolve(fsbAgentBridgeFailure('native_host_unavailable'));
+  }
+  const attemptId = bootstrapPromise
+    && typeof bootstrapPromise.attemptId === 'string'
+    && FSB_NATIVE_WAKE_ID_PATTERN.test(bootstrapPromise.attemptId)
+    ? bootstrapPromise.attemptId
+    : null;
+  if (intentId && attemptId) fsbBroadcastNativeWakeChecking(attemptId, intentId);
+
+  const work = (async () => {
+    let bootstrapResult;
+    let pairingCode = '';
+    try {
+      bootstrapResult = await bootstrapPromise;
+      if (
+        !bootstrapResult
+        || bootstrapResult.ok !== true
+        || typeof bootstrapResult.pairingCode !== 'string'
+      ) {
+        const nativeMissing = typeof wakeController.getPresence === 'function'
+          && wakeController.getPresence() === 'absent';
+        const reason = bootstrapResult && typeof bootstrapResult.reason === 'string'
+          ? bootstrapResult.reason
+          : (nativeMissing ? 'native_host_missing' : 'native_host_unavailable');
+        return fsbAgentBridgeFailure(reason);
+      }
+      pairingCode = bootstrapResult.pairingCode;
+      bootstrapResult = null;
+      await chrome.storage.session.set({
+        [FSB_MCP_BRIDGE_PAIRING_KEY]: {
+          pairingCode: pairingCode,
+          storedAt: Date.now()
+        }
+      });
+      pairingCode = '';
+    } catch (_error) {
+      pairingCode = '';
+      return fsbAgentBridgeFailure('bridge_bootstrap_failed');
+    }
+
+    if (
+      typeof mcpBridgeClient === 'undefined'
+      || !mcpBridgeClient
+      || typeof mcpBridgeClient.reloadPairingAndReconnect !== 'function'
+    ) {
+      return fsbAgentBridgeFailure('bridge_unavailable');
+    }
+
+    for (let readinessAttempt = 0; readinessAttempt < 2; readinessAttempt += 1) {
+      try {
+        await mcpBridgeClient.reloadPairingAndReconnect();
+      } catch (_error) {
+        // The bounded readiness check below decides whether one retry is needed.
+      }
+      armMcpBridge(readinessAttempt === 0 ? 'native-host-bootstrap' : 'native-host-bootstrap-retry');
+      if (await fsbWaitForAgentBridgeReady()) {
+        try {
+          await fsbRefreshMcpCompatibility();
+        } catch (_error) {
+          // Preflight or the connection-test request returns the bounded provider failure.
+        }
+        return Object.freeze({ ok: true });
+      }
+    }
+    return fsbAgentBridgeFailure('bridge_not_ready');
+  })();
+
+  let tracked;
+  tracked = work.finally(() => {
+    if (fsbAgentBridgeReadyAttempt && fsbAgentBridgeReadyAttempt.promise === tracked) {
+      fsbAgentBridgeReadyAttempt = null;
+    }
+  });
+  fsbAgentBridgeReadyAttempt = Object.freeze({
+    attemptId: attemptId,
+    promise: tracked
+  });
+  return tracked;
+}
+
+async function fsbEnsureConfiguredAgentBridgeReady() {
+  const config = await fsbReadAuthoritativeProviderConfig();
+  if (config.providerKind !== 'agent') return Object.freeze({ ok: true });
+  return fsbEnsureAgentBridgeReady();
 }
 
 async function fsbDelegationTaskDigest(task) {
@@ -1844,6 +2038,29 @@ function fsbDelegationTrustFailure(code) {
   return { ok: false, code: 'trust_challenge_invalid' };
 }
 
+function fsbDelegationBridgePreflightFailure(originalResult, bridgeReady) {
+  if (!originalResult
+      || originalResult.ok !== false
+      || (originalResult.code !== 'agent_offline'
+        && originalResult.code !== 'agent_unpaired')) {
+    return originalResult;
+  }
+  const readinessCode = bridgeReady && typeof bridgeReady.code === 'string'
+    ? bridgeReady.code
+    : '';
+  const code = readinessCode === 'native_host_missing'
+    || readinessCode === 'extension_origin_mismatch'
+    || readinessCode === 'bridge_session_unavailable'
+    ? readinessCode
+    : 'agent_offline';
+  return {
+    ok: false,
+    code,
+    providerId: originalResult.providerId,
+    providerLabel: originalResult.providerLabel
+  };
+}
+
 async function fsbDelegationPreflightCommand(request) {
   const hasIntentId = !!request
     && typeof request === 'object'
@@ -1863,68 +2080,17 @@ async function fsbDelegationPreflightCommand(request) {
     return { ok: false, code: 'agent_offline', providerId: '', providerLabel: 'Selected provider' };
   }
   const originalResult = authority.result;
-  if (!originalResult
-      || originalResult.ok !== false
-      || authority.result.code !== 'agent_offline') return originalResult;
-
-  const wakeController = globalThis.FsbNativeHostWake;
-  if (!wakeController || typeof wakeController.ensureWake !== 'function') return originalResult;
-  let wakePromise;
-  try {
-    wakePromise = globalThis.FsbNativeHostWake.ensureWake();
-  } catch (_error) {
-    return originalResult;
-  }
-  if (!wakePromise
-      || typeof wakePromise.then !== 'function'
-      || typeof wakePromise.attemptId !== 'string'
-      || !FSB_NATIVE_WAKE_ID_PATTERN.test(wakePromise.attemptId)) return originalResult;
-
-  const intentId = hasIntentId ? request.intentId : null;
-  if (intentId) {
-    fsbBroadcastNativeWakeChecking(wakePromise.attemptId, intentId);
-  }
-
-  let wakeResult;
-  try {
-    wakeResult = await wakePromise;
-  } catch (_error) {
-    return originalResult;
-  }
-  if (!wakeResult
-      || wakeResult.ok !== true
-      || (wakeResult.outcome !== 'already_running' && wakeResult.outcome !== 'started')) {
-    return originalResult;
-  }
-
-  let bridgePromise;
-  if (fsbNativeWakeBridgeAttempt
-      && fsbNativeWakeBridgeAttempt.attemptId === wakePromise.attemptId) {
-    bridgePromise = fsbNativeWakeBridgeAttempt.promise;
-  } else {
-    bridgePromise = (async () => {
-      armMcpBridge('native-host-wake');
-      for (let elapsed = 0;
-        elapsed < FSB_NATIVE_WAKE_BRIDGE_TIMEOUT_MS;
-        elapsed += FSB_NATIVE_WAKE_BRIDGE_POLL_MS) {
-        if (fsbNativeWakeBridgeReady()) return true;
-        await new Promise((resolve) => setTimeout(resolve, FSB_NATIVE_WAKE_BRIDGE_POLL_MS));
-      }
-      return fsbNativeWakeBridgeReady();
-    })();
-    fsbNativeWakeBridgeAttempt = Object.freeze({
-      attemptId: wakePromise.attemptId,
-      promise: bridgePromise
-    });
-  }
-
+  if (originalResult && originalResult.ok === true) return originalResult;
+  if (!authority.config || authority.config.providerKind !== 'agent') return originalResult;
   let bridgeReady;
   try {
-    bridgeReady = await bridgePromise;
+    bridgeReady = await fsbEnsureAgentBridgeReady(hasIntentId ? request.intentId : null);
   } catch (_error) {
-    return originalResult;
+    return fsbDelegationBridgePreflightFailure(originalResult, null);
   }
-  if (bridgeReady !== true) return originalResult;
+  if (!bridgeReady || bridgeReady.ok !== true) {
+    return fsbDelegationBridgePreflightFailure(originalResult, bridgeReady);
+  }
   try {
     return (await fsbDelegationPreflightResult()).result;
   } catch (_error) {
@@ -1937,6 +2103,14 @@ async function fsbDelegationConsentCommand(request) {
       || typeof request.task !== 'string'
       || request.task.trim().length === 0) {
     return { ok: false, code: 'invalid_request' };
+  }
+  try {
+    const readiness = await fsbEnsureConfiguredAgentBridgeReady();
+    if (!readiness || readiness.ok !== true) {
+      return { ok: false, code: 'agent_offline', providerId: '', providerLabel: 'Selected provider' };
+    }
+  } catch (_error) {
+    return { ok: false, code: 'agent_offline', providerId: '', providerLabel: 'Selected provider' };
   }
   let authority;
   try {
@@ -2222,6 +2396,15 @@ async function fsbDelegationStartCommand(request) {
       || typeof request.task !== 'string'
       || request.task.trim().length === 0) {
     return fsbDelegationFailure('invalid_request', null);
+  }
+
+  try {
+    const readiness = await fsbEnsureConfiguredAgentBridgeReady();
+    if (!readiness || readiness.ok !== true) {
+      return fsbDelegationFailure('preflight_failed', null);
+    }
+  } catch (_error) {
+    return fsbDelegationFailure('preflight_failed', null);
   }
 
   let authority;
@@ -4436,7 +4619,14 @@ function restoreServiceWorkerStateOnWake() {
     .catch((error) => {
       console.warn('[FSB] Delegation controller bootstrap failed:', error && error.message);
     });
-  return Promise.all([sessions, globalThis.fsbAgentRegistryReady, delegation]);
+  const replayRecovery = typeof fsbRestoreLatticeReplayCheckpoints === 'function'
+    ? Promise.all([registry, sessions])
+      .then(() => fsbRestoreLatticeReplayCheckpoints())
+      .catch((error) => {
+        console.warn('[FSB] Lattice replay recovery failed:', error && error.message);
+      })
+    : Promise.resolve();
+  return Promise.all([sessions, globalThis.fsbAgentRegistryReady, delegation, replayRecovery]);
 }
 
 // Immediately restore service-worker state on both worker restarts and browser
@@ -4639,6 +4829,9 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   contentScriptPorts.delete(tabId);
   contentScriptReadyStatus.delete(tabId);
   contentScriptHealth.delete(tabId);
+  // A closed tab cannot still be acting or watching; drop its icon claims so
+  // they cannot outrank a live one.
+  try { if (globalThis.fsbActionIcon) globalThis.fsbActionIcon.dropTab(tabId); } catch (_e) { /* icon is presentation-only */ }
 
   // Clean up any active sessions for this tab
   for (const [sessionId, session] of activeSessions) {
@@ -5491,10 +5684,10 @@ function fsbTriggerBuildCaption(snap) {
   return caption.length > 120 ? caption.slice(0, 117) + '...' : caption;
 }
 
-// Count active vs terminal triggers on a given tab. Used to drive the
-// in-page TriggerBadge tally. Reads from FsbTriggerStore.hydrate() which is
-// the same source of truth list_triggers exposes, so badge stays consistent
-// with the MCP-visible state.
+// Count active vs terminal triggers on a given tab. Used to drive both the
+// toolbar watch claim and the in-page TriggerBadge tally. Reads from
+// FsbTriggerStore.hydrate() which is the same source of truth list_triggers
+// exposes, so both presentations stay consistent with MCP-visible state.
 async function fsbTriggerCountsForTab(tabId) {
   const numericTabId = Number(tabId);
   if (!Number.isFinite(numericTabId)
@@ -5528,6 +5721,16 @@ async function fsbTriggerCountsForTab(tabId) {
   return { watching, fired };
 }
 
+async function fsbTriggerSyncActionIconWatchingForTab(tabId) {
+  const counts = await fsbTriggerCountsForTab(tabId);
+  try {
+    if (globalThis.fsbActionIcon) {
+      globalThis.fsbActionIcon.setWatching(counts.watching > 0, Number(tabId));
+    }
+  } catch (_e) { /* icon is presentation-only */ }
+  return counts;
+}
+
 async function fsbTriggerStartObserveForSnapshot(snap, reason) {
   const triggerId = fsbTriggerSnapshotId(snap);
   const tabId = Number(snap && snap.target_tab_id);
@@ -5537,8 +5740,7 @@ async function fsbTriggerStartObserveForSnapshot(snap, reason) {
   await ensureContentScriptInjected(tabId);
   const observeResult = await fsbTriggerSendTabMessage(tabId, fsbTriggerObserveMessage(snap));
   const caption = fsbTriggerBuildCaption(snap);
-  const counts = await fsbTriggerCountsForTab(tabId);
-  try { if (globalThis.fsbActionIcon) globalThis.fsbActionIcon.setWatching(counts.watching > 0); } catch (_e) { /* icon is presentation-only */ }
+  const counts = await fsbTriggerSyncActionIconWatchingForTab(tabId);
   const pulseResult = await fsbTriggerSendTabMessage(tabId, {
     action: 'triggerPulseStart',
     selector: snap.selector,
@@ -5557,8 +5759,7 @@ async function fsbTriggerStopObserveForSnapshot(snap) {
   const tabId = Number(snap && snap.target_tab_id);
   if (!triggerId || !Number.isFinite(tabId)) return;
   await fsbTriggerSendTabMessage(tabId, { action: 'triggerObserveStop', trigger_id: triggerId });
-  const counts = await fsbTriggerCountsForTab(tabId);
-  try { if (globalThis.fsbActionIcon) globalThis.fsbActionIcon.setWatching(counts.watching > 0); } catch (_e) { /* icon is presentation-only */ }
+  const counts = await fsbTriggerSyncActionIconWatchingForTab(tabId);
   await fsbTriggerSendTabMessage(tabId, {
     action: 'triggerPulseStop',
     trigger_id: triggerId,
@@ -5807,6 +6008,7 @@ async function fsbTriggerEvaluateRefreshPollAfterReload(triggerId, snap, tabId, 
       name: FsbTriggerLifecycle.TRIGGER_ALARM_PREFIX + triggerId
     });
   }
+  await fsbTriggerSyncActionIconWatchingForTab(tabId);
 
   if (seamResult && seamResult.action !== 'fired'
       && typeof FsbTriggerLifecycle !== 'undefined'
@@ -6079,6 +6281,7 @@ async function fsbTriggerRunRefreshPollTick(triggerId, snap) {
       name: FsbTriggerLifecycle.TRIGGER_ALARM_PREFIX + triggerId
     });
   }
+  await fsbTriggerSyncActionIconWatchingForTab(tabId);
 
   if (seamResult && seamResult.action !== 'fired'
       && typeof FsbTriggerLifecycle !== 'undefined'
@@ -6671,6 +6874,7 @@ async function fsbTriggerHandleToolStop(params, context) {
   } catch (err) {
     cleanup.lifecycle = { ok: false, error: fsbTriggerCleanupError(err) };
   }
+  await fsbTriggerSyncActionIconWatchingForTab(snap.target_tab_id);
 
   if (terminal) {
     return {
@@ -6756,6 +6960,7 @@ async function fsbTriggerMarkTimedOutForMcp(triggerId, context) {
   } catch (err) {
     cleanup.lifecycle = { ok: false, error: fsbTriggerCleanupError(err) };
   }
+  await fsbTriggerSyncActionIconWatchingForTab(snap.target_tab_id);
 
   const latestSnap = (lifecycleResult && lifecycleResult.snapshot)
     || (await FsbTriggerStore.readSnapshot(safeTriggerId))
@@ -7050,6 +7255,7 @@ async function fsbTriggerHandleToolArm(params, context) {
   if (fsbTriggerIsLiveObserveSnapshot(snapshot)) {
     await fsbTriggerStartObserveForSnapshot(snapshot, 'trigger-arm');
   } else if (fsbTriggerIsRefreshPollSnapshot(snapshot)) {
+    await fsbTriggerSyncActionIconWatchingForTab(tabId);
     await fsbTriggerSendTabMessage(Number(tabId), {
       action: 'triggerPulseStart',
       selector: snapshot.selector,
@@ -7207,287 +7413,792 @@ function slimActionResult(result) {
 // SESSION REPLAY ENGINE
 // ==========================================
 
-/**
- * Get appropriate inter-action delay for replay based on tool type.
- * Navigation actions get longer delays; typing/key actions are faster.
- * @param {string} tool - The action tool name
- * @returns {number} Delay in milliseconds
- */
+const FSB_REPLAY_CHECKPOINT_KIND = 'fsb-lattice-replay-checkpoint/v1';
+const FSB_REPLAY_TAB_LOAD_TIMEOUT_MS = 30000;
+const FSB_REPLAY_LEGACY_TOOL_MAP = Object.freeze({
+  rightClick: 'right_click',
+  doubleClick: 'double_click',
+  type: 'type_text',
+  clearInput: 'clear_input',
+  pressEnter: 'press_enter',
+  keyPress: 'press_key',
+  selectOption: 'select_option',
+  toggleCheckbox: 'check_box',
+  searchGoogle: 'search',
+  siteSearch: 'search',
+  goBack: 'go_back',
+  goForward: 'go_forward',
+  waitForElement: 'wait_for_element',
+  dragdrop: 'drag_drop',
+  dropfile: 'drop_file'
+});
+
 function getReplayDelay(tool) {
-  if (['navigate', 'searchGoogle', 'goBack', 'goForward'].includes(tool)) return 1500;
-  if (['click', 'doubleClick', 'rightClick'].includes(tool)) return 500;
-  if (['type', 'keyPress', 'pressEnter'].includes(tool)) return 300;
+  const normalized = FSB_REPLAY_LEGACY_TOOL_MAP[tool] || tool;
+  if (['navigate', 'search', 'go_back', 'go_forward', 'mcp:go-back'].includes(normalized)) return 1500;
+  if (['click', 'double_click', 'right_click', 'click_at', 'double_click_at'].includes(normalized)) return 500;
+  if (['type_text', 'press_key', 'press_enter', 'insert_text'].includes(normalized)) return 300;
   return 200;
 }
 
-/**
- * Load a stored session's actionHistory and filter to replayable actions.
- * @param {string} sessionId - The session ID to load from fsbSessionLogs
- * @returns {Object|null} { session, replayableActions, originalTask, originalUrl } or null
- */
-async function loadReplayableSession(sessionId) {
+function fsbReplayOrigin(url) {
   try {
-    const stored = await chrome.storage.local.get(['fsbSessionLogs']);
-    const sessionStorage = stored.fsbSessionLogs || {};
-    const session = sessionStorage[sessionId];
-
-    if (!session || !session.actionHistory || session.actionHistory.length === 0) {
-      return null;
-    }
-
-    const replayableTools = new Set([
-      'click', 'rightClick', 'doubleClick', 'type', 'clearInput', 'pressEnter',
-      'keyPress', 'selectOption', 'toggleCheckbox', 'navigate', 'searchGoogle',
-      'scroll', 'goBack', 'goForward', 'refresh', 'hover', 'focus', 'moveMouse',
-      'waitForElement'
-    ]);
-
-    const replayableActions = session.actionHistory
-      .filter(a => a.result?.success === true && replayableTools.has(a.tool));
-
-    if (replayableActions.length === 0) {
-      return null;
-    }
-
-    // Extract the original URL from the first navigation-like action or session logs
-    let originalUrl = null;
-    for (const action of session.actionHistory) {
-      if (action.params?.url) {
-        originalUrl = action.params.url;
-        break;
-      }
-    }
-    if (!originalUrl && session.logs && session.logs.length > 0) {
-      originalUrl = session.logs[0]?.data?.url || null;
-    }
-
-    return {
-      session,
-      replayableActions,
-      originalTask: session.task,
-      originalUrl
-    };
-  } catch (error) {
-    automationLogger.error('Failed to load replayable session', { sessionId, error: error.message });
+    const parsed = new URL(String(url || ''));
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? parsed.origin : null;
+  } catch (_error) {
     return null;
   }
 }
 
-/**
- * Execute a replay sequence step-by-step through the existing sendMessageWithRetry path.
- * Sends statusUpdate messages to UI during each step with progress percentage.
- * Critical step failures (navigate, searchGoogle) abort replay; non-critical failures are skipped.
- * @param {string} replaySessionId - The replay session ID in activeSessions
- */
+function fsbReplayClone(value, fallback) {
+  try {
+    return JSON.parse(JSON.stringify(value === undefined ? fallback : value));
+  } catch (_error) {
+    return fallback;
+  }
+}
+
+function fsbReplayIsExecutable(step) {
+  const availability = step?.replay?.availability;
+  return availability === 'ready' || availability === 'approval-once' || availability === 'approval-per-step';
+}
+
+function fsbReplayIsWriteRisk(step) {
+  return !['read', 'navigation'].includes(step?.replay?.risk);
+}
+
+function fsbReplayPublicPreparation(prepared) {
+  const lastRun = prepared?.replay?.lastRun;
+  const pausedSession = lastRun?.id ? activeSessions.get(lastRun.id) : null;
+  const pausedStep = pausedSession?.status === 'replay_paused'
+    ? pausedSession.replaySteps[pausedSession.currentStep]
+    : null;
+  return {
+    success: true,
+    verified: prepared.verified === true,
+    sessionId: prepared.sessionId,
+    manifestHash: prepared.replay.manifestHash,
+    integrity: prepared.replay.integrity,
+    provenance: prepared.replay.provenance,
+    startUrl: prepared.startUrl,
+    counts: prepared.counts,
+    pendingDecision: pausedStep ? {
+      sessionId: pausedSession.replaySessionId,
+      tabId: pausedSession.tabId,
+      stepId: pausedStep.id,
+      stepNumber: pausedStep.index + 1,
+      tool: pausedStep.tool,
+      error: pausedSession.replayRun?.error || 'The previous write could not be proven complete.'
+    } : null,
+    steps: (prepared.steps || []).map((step) => ({
+      id: step.id,
+      index: step.index,
+      tool: step.tool,
+      route: step.route,
+      arguments: fsbReplayClone(step.arguments, {}),
+      success: step.success !== false,
+      target: fsbReplayClone(step.target, {}),
+      capability: fsbReplayClone(step.capability, null),
+      replay: fsbReplayClone(step.replay, null)
+    }))
+  };
+}
+
+function fsbReplayIsTrustedUiSender(sender) {
+  const extensionPrefix = `chrome-extension://${chrome.runtime.id}/`;
+  return !!(sender && sender.id === chrome.runtime.id &&
+    typeof sender.url === 'string' && sender.url.startsWith(extensionPrefix));
+}
+
+async function prepareSessionReplay(sessionId) {
+  if (!globalThis.FsbLatticeReplay || typeof globalThis.FsbLatticeReplay.prepareReplay !== 'function') {
+    throw new Error('Lattice replay support is unavailable');
+  }
+  const prepared = await globalThis.FsbLatticeReplay.prepareReplay(sessionId);
+  if (!prepared || prepared.verified !== true) throw new Error('Replay integrity verification failed');
+  return prepared;
+}
+
+async function handlePrepareSessionReplay(request, sender, sendResponse) {
+  try {
+    if (!fsbReplayIsTrustedUiSender(sender)) {
+      throw new Error('Replay preview requires the extension UI');
+    }
+    const prepared = await prepareSessionReplay(request && request.sessionId);
+    sendResponse(fsbReplayPublicPreparation(prepared));
+  } catch (error) {
+    automationLogger.warn('Replay preparation failed', {
+      sessionId: request && request.sessionId,
+      error: error && error.message
+    });
+    sendResponse({ success: false, error: error && error.message ? error.message : String(error) });
+  }
+}
+
+async function fsbReplayWaitForTab(tabId) {
+  if (typeof pageLoadWatcher !== 'undefined' && pageLoadWatcher &&
+      typeof pageLoadWatcher.waitForPageReady === 'function') {
+    const ready = await pageLoadWatcher.waitForPageReady(tabId, {
+      maxWait: FSB_REPLAY_TAB_LOAD_TIMEOUT_MS,
+      requireDOMStable: false
+    });
+    if (!ready || ready.success === false) throw new Error(ready?.error || 'Replay tab did not become ready');
+  } else {
+    const deadline = Date.now() + FSB_REPLAY_TAB_LOAD_TIMEOUT_MS;
+    let ready = false;
+    while (Date.now() < deadline) {
+      const tab = await chrome.tabs.get(tabId);
+      if (tab && tab.status === 'complete') {
+        ready = true;
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+    if (!ready) throw new Error('Replay tab did not finish loading');
+  }
+  await ensureContentScriptInjected(tabId);
+}
+
+async function fsbReplayCreateOwnedTab(startUrl) {
+  await Promise.resolve(globalThis.fsbAgentRegistryReady).catch(() => {});
+  const registry = globalThis.fsbAgentRegistryInstance;
+  if (!registry || typeof registry.registerAgent !== 'function' || typeof registry.bindTab !== 'function') {
+    throw new Error('Replay tab ownership registry is unavailable');
+  }
+  const registration = await registry.registerAgent();
+  if (!registration || registration.error || !registration.agentId) {
+    throw new Error(registration?.error || 'Could not reserve a replay agent');
+  }
+  let tab = null;
+  try {
+    tab = await chrome.tabs.create({ url: startUrl, active: true });
+    if (!tab || !Number.isFinite(tab.id)) throw new Error('Could not create a replay tab');
+    const binding = await registry.bindTab(registration.agentId, tab.id);
+    if (!binding || binding.success === false) throw new Error(binding?.error || 'Could not own the replay tab');
+    await fsbReplayWaitForTab(tab.id);
+    tab = await chrome.tabs.get(tab.id);
+    return {
+      tab,
+      agentId: registration.agentId,
+      ownershipToken: binding.ownershipToken || null
+    };
+  } catch (error) {
+    if (tab && Number.isFinite(tab.id)) {
+      try { await chrome.tabs.remove(tab.id); } catch (_tabError) { /* newly-created tab may already be gone */ }
+    }
+    try { await registry.releaseAgent(registration.agentId, 'replay_start_failed'); } catch (_agentError) { /* best-effort */ }
+    throw error;
+  }
+}
+
+async function fsbReplayReleaseAgent(session) {
+  const registry = globalThis.fsbAgentRegistryInstance;
+  if (!registry || !session?.replayAgentId || typeof registry.releaseAgent !== 'function') return;
+  try { await registry.releaseAgent(session.replayAgentId, 'replay_terminal'); } catch (_error) { /* tab stays open for inspection */ }
+}
+
+function fsbReplayExecutionParams(step, tabId) {
+  const args = fsbReplayClone(step?.arguments, {});
+  const params = args && typeof args === 'object' && !Array.isArray(args) ? args : {};
+  ['agentId', 'agent_id', 'ownershipToken', 'ownership_token', 'tabId', 'tab_id',
+    'targetTabId', 'target_tab_id'].forEach((key) => delete params[key]);
+  const normalizedTool = FSB_REPLAY_LEGACY_TOOL_MAP[step?.tool] || step?.tool;
+  if (normalizedTool === 'switch_tab' || normalizedTool === 'close_tab') params.tabId = tabId;
+  return params;
+}
+
+async function fsbReplayAssertTarget(session, step) {
+  const tab = await chrome.tabs.get(session.tabId);
+  const currentUrl = (tab && (tab.url || tab.pendingUrl)) || '';
+  const currentOrigin = fsbReplayOrigin(currentUrl);
+  if (!currentOrigin) throw new Error('Replay target became restricted or unavailable');
+  const expectedOrigin = step?.target?.origin || session.expectedOrigin || null;
+  if (expectedOrigin && currentOrigin !== expectedOrigin) {
+    const error = new Error(`Replay paused because the target origin changed from ${expectedOrigin} to ${currentOrigin}`);
+    error.code = 'replay_origin_mismatch';
+    throw error;
+  }
+  return { tab, currentUrl, currentOrigin };
+}
+
+async function fsbReplayDispatchMessage(session, step, args, currentOrigin) {
+  if (typeof dispatchMcpMessageRoute !== 'function' || typeof mcpBridgeClient === 'undefined') {
+    throw new Error(`No shared MCP message route is available for ${step.tool}`);
+  }
+  const replayClient = Object.create(mcpBridgeClient);
+  replayClient._getActiveTab = () => chrome.tabs.get(session.tabId);
+  const payload = Object.assign({}, args, {
+    agentId: session.replayAgentId,
+    ownershipToken: session.ownershipToken,
+    tab_id: session.tabId
+  });
+  if (step.tool === 'mcp:capabilities-invoke') {
+    payload.slug = args.slug;
+    payload.params = args.params || {};
+    payload.origin = currentOrigin;
+  }
+  return dispatchMcpMessageRoute({ type: step.tool, payload, client: replayClient });
+}
+
+async function fsbReplayDispatchStep(session, step, currentOrigin) {
+  const args = fsbReplayExecutionParams(step, session.tabId);
+  if (typeof step.tool === 'string' && step.tool.startsWith('mcp:') &&
+      typeof hasMcpMessageRoute === 'function' && hasMcpMessageRoute(step.tool)) {
+    return fsbReplayDispatchMessage(session, step, args, currentOrigin);
+  }
+  let tool = FSB_REPLAY_LEGACY_TOOL_MAP[step.tool] || step.tool;
+  if (tool === 'invoke_capability') {
+    return fsbReplayDispatchMessage(session, Object.assign({}, step, { tool: 'mcp:capabilities-invoke' }), args, currentOrigin);
+  }
+  if (tool === 'moveMouse') {
+    return sendMessageWithRetry(session.tabId, { action: 'executeAction', tool: 'moveMouse', params: args });
+  }
+  const definition = typeof getToolByName === 'function' ? getToolByName(tool) : null;
+  if (!definition || typeof mcpBridgeClient === 'undefined' ||
+      typeof mcpBridgeClient._handleExecuteAction !== 'function') {
+    throw new Error(`No shared browser replay handler is available for ${step.tool}`);
+  }
+  return mcpBridgeClient._handleExecuteAction({
+    tool,
+    params: Object.assign({}, args, { tab_id: session.tabId }),
+    agentId: session.replayAgentId,
+    ownershipToken: session.ownershipToken
+  });
+}
+
+function fsbReplayCheckpointState(session, marker, step) {
+  return {
+    kind: FSB_REPLAY_CHECKPOINT_KIND,
+    replaySessionId: session.replaySessionId,
+    originalSessionId: session.originalSessionId,
+    manifestHash: session.manifestHash,
+    targetTabId: session.tabId,
+    replayAgentId: session.replayAgentId,
+    nextStep: session.currentStep,
+    approvedScopes: session.approvedScopes.slice(),
+    previousReceiptCid: session.previousReceiptCid || null,
+    startedAt: session.startTime,
+    expectedOrigin: session.expectedOrigin || null,
+    decisionRequired: session.status === 'replay_paused',
+    currentStepId: step?.id || null,
+    currentStepRisk: step?.replay?.risk || null,
+    writeInFlight: step ? fsbReplayIsWriteRisk(step) : false,
+    _currentStepName: marker
+  };
+}
+
+async function fsbReplayPersistCheckpoint(session, marker, step) {
+  if (!session._latticeAdapter) return null;
+  const state = fsbReplayCheckpointState(session, marker, step);
+  if (typeof session._latticeAdapter.serializeAndPersist === 'function') {
+    return session._latticeAdapter.serializeAndPersist(state);
+  }
+  return session._latticeAdapter.serialize(state);
+}
+
+async function fsbReplayPersistRun(session) {
+  if (!globalThis.FsbLatticeReplay || typeof globalThis.FsbLatticeReplay.persistReplayRun !== 'function') return;
+  await globalThis.FsbLatticeReplay.persistReplayRun(session.originalSessionId, session.replayRun);
+}
+
+async function fsbReplayRecordCheckpoint(session, step, result, success, status) {
+  const attemptNumber = session.replayRun.steps.filter((row) => row.stepId === step.id).length + 1;
+  const checkpoint = await globalThis.FsbLatticeReplay.checkpointReplayStep({
+    replaySessionId: session.replaySessionId,
+    manifestHash: session.manifestHash,
+    sourceReceiptCid: session.sourceReceiptCid,
+    previousReceiptCid: session.previousReceiptCid,
+    attemptNumber,
+    step,
+    result: result || {},
+    success: success !== false
+  });
+  session.previousReceiptCid = checkpoint.receiptCid;
+  const recordedResultHash = step.resultHash || null;
+  const row = {
+    stepId: step.id,
+    index: step.index,
+    tool: step.tool,
+    attemptNumber,
+    status,
+    success: success !== false,
+    recordedResultHash,
+    resultHash: checkpoint.resultHash,
+    match: recordedResultHash ? recordedResultHash === checkpoint.resultHash : null,
+    receipt: checkpoint.receipt,
+    receiptCid: checkpoint.receiptCid,
+    completedAt: Date.now()
+  };
+  session.replayRun.steps.push(row);
+  session.replayRun.nextStep = session.currentStep;
+  session.replayRun.previousReceiptCid = checkpoint.receiptCid;
+  await fsbReplayPersistRun(session);
+  return row;
+}
+
+function fsbReplayBroadcastProgress(session, step, index, label) {
+  const progressPercent = Math.round(((index + 1) / session.totalSteps) * 100);
+  try {
+    chrome.runtime.sendMessage({
+      action: 'statusUpdate',
+      sessionId: session.replaySessionId,
+      tabId: session.tabId,
+      message: label || `Replaying ${step.tool}`,
+      iteration: index + 1,
+      maxIterations: session.totalSteps,
+      progressPercent,
+      replayStep: index + 1,
+      isReplay: true
+    }).catch(() => {});
+  } catch (_error) { /* UI may not be listening */ }
+}
+
+async function fsbReplayPauseForDecision(session, step, error) {
+  session.status = 'replay_paused';
+  session.replayRun.status = 'paused';
+  session.replayRun.error = error?.message || String(error || 'Replay step outcome is ambiguous');
+  await fsbReplayPersistCheckpoint(session, 'BEFORE_TOOL_EXECUTION', step);
+  await fsbReplayPersistRun(session);
+  try {
+    await fsbBroadcastAutomationLifecycle({
+      action: 'replayDecisionRequired',
+      sessionId: session.replaySessionId,
+      tabId: session.tabId,
+      stepId: step.id,
+      stepNumber: step.index + 1,
+      tool: step.tool,
+      error: session.replayRun.error,
+      choices: ['retry', 'skip', 'stop']
+    });
+  } catch (_broadcastError) { /* recovery UI may attach later */ }
+}
+
+async function fsbReplayFinalize(session, status, error) {
+  if (session._replayFinalizing === true) return;
+  session._replayFinalizing = true;
+  session.status = status;
+  session.replayRun.status = status;
+  session.replayRun.finishedAt = Date.now();
+  session.replayRun.error = error ? (error.message || String(error)) : null;
+  session.replayRun.nextStep = session.currentStep;
+  await fsbReplayPersistRun(session).catch(() => {});
+  if (session._latticeAdapter && typeof session._latticeAdapter.clearSnapshots === 'function') {
+    await session._latticeAdapter.clearSnapshots();
+  }
+  await fsbReplayReleaseAgent(session);
+  const successful = session.replayRun.steps.filter((row) => row.status === 'executed' && row.success).length;
+  const blocked = session.replayRun.steps.filter((row) => row.status === 'blocked' || row.status === 'skipped').length;
+  if (status === 'replay_completed') {
+    try {
+      await fsbBroadcastAutomationLifecycle({
+        action: 'automationComplete',
+        sessionId: session.replaySessionId,
+        tabId: session.tabId,
+        conversationId: null,
+        historySessionId: session.originalSessionId,
+        result: `Verified replay complete: ${successful} step${successful === 1 ? '' : 's'} executed.${blocked ? ` ${blocked} inspect-only or skipped.` : ''}`
+      });
+    } catch (_error) { /* UI may not be listening */ }
+  } else {
+    try {
+      await fsbBroadcastAutomationLifecycle({
+        action: 'automationError',
+        sessionId: session.replaySessionId,
+        tabId: session.tabId,
+        error: error?.message || (status === 'replay_stopped' ? 'Replay stopped.' : 'Replay failed.')
+      });
+    } catch (_error) { /* UI may not be listening */ }
+  }
+  automationLogger.logSessionEnd(
+    session.replaySessionId,
+    status,
+    session.actionHistory.length,
+    Date.now() - session.startTime
+  );
+  await cleanupSession(session.replaySessionId);
+}
+
 async function executeReplaySequence(replaySessionId) {
   const session = activeSessions.get(replaySessionId);
   if (!session || session.status !== 'replaying') return;
-
-  const criticalTools = new Set(['navigate', 'searchGoogle']);
-
   for (let i = session.currentStep; i < session.replaySteps.length; i++) {
-    // Check for termination (user stopped the replay)
-    const currentSession = activeSessions.get(replaySessionId);
-    if (!currentSession || currentSession.isTerminating || currentSession.status !== 'replaying') {
+    if (!activeSessions.has(replaySessionId) || session.isTerminating || session.status !== 'replaying') return;
+    session.currentStep = i;
+    session.replayRun.nextStep = i;
+    const step = session.replaySteps[i];
+    fsbReplayBroadcastProgress(session, step, i);
+
+    let verdict;
+    try {
+      verdict = await globalThis.FsbLatticeReplay.authorizeReplayStep(step, session.approvedScopes);
+    } catch (error) {
+      await fsbReplayFinalize(session, 'replay_failed', error);
+      return;
+    }
+    if (!fsbReplayIsExecutable(step)) {
+      try {
+        await fsbReplayRecordCheckpoint(session, step, {
+          blocked: true,
+          reason: step.replay?.reason || verdict?.reason || 'Inspect-only replay step'
+        }, false, 'blocked');
+        session.currentStep = i + 1;
+        await fsbReplayPersistCheckpoint(session, 'BEFORE_NEXT_ITERATION_SCHEDULE', step);
+      } catch (error) {
+        await fsbReplayFinalize(session, 'replay_failed', error);
+        return;
+      }
+      continue;
+    }
+    if (!verdict || verdict.allow !== true) {
+      await fsbReplayFinalize(session, 'replay_failed', new Error(verdict?.reason || 'Replay step was not approved'));
       return;
     }
 
-    session.currentStep = i;
-    const step = session.replaySteps[i];
-
-    // Prepend clearInput before type actions to prevent text accumulation
-    if (step.tool === 'type' && step.params?.selector) {
-      try {
-        await sendMessageWithRetry(session.tabId, {
-          action: 'executeAction',
-          tool: 'clearInput',
-          params: { selector: step.params.selector }
-        });
-        await new Promise(resolve => setTimeout(resolve, 200));
-      } catch (e) {
-        automationLogger.debug('clearInput before type failed (non-critical)', {
-          sessionId: replaySessionId, step: i, error: e?.message || String(e)
-        });
-      }
-    }
-
-    // Send progress update to UI
-    const progressPercent = Math.round(((i + 1) / session.totalSteps) * 100);
+    let target;
     try {
-      chrome.runtime.sendMessage({
-        action: 'statusUpdate',
-        sessionId: replaySessionId,
-        message: getActionStatus(step.tool, step.params),
-        iteration: i + 1,
-        maxIterations: session.totalSteps,
-        progressPercent,
-        replayStep: i + 1,
-        isReplay: true
-      });
-    } catch (e) {
-      // Non-blocking: UI may not be listening
+      target = await fsbReplayAssertTarget(session, step);
+      await fsbReplayPersistCheckpoint(session, 'BEFORE_TOOL_EXECUTION', step);
+    } catch (error) {
+      await fsbReplayFinalize(session, 'replay_failed', error);
+      return;
     }
+    if (session.isTerminating || !activeSessions.has(replaySessionId)) return;
 
-    // Execute the action via the existing content script path
-    let actionResult = null;
+    let result;
     try {
-      actionResult = await sendMessageWithRetry(session.tabId, {
-        action: 'executeAction',
-        tool: step.tool,
-        params: step.params,
-        visualContext: {
-          taskName: session.task,
-          stepNumber: i + 1,
-          totalSteps: session.totalSteps,
-          iterationCount: 1,
-          isReplay: true
-        }
-      });
-    } catch (e) {
-      actionResult = { success: false, error: e?.message || String(e) };
+      result = await fsbReplayDispatchStep(session, step, target.currentOrigin);
+    } catch (error) {
+      result = { success: false, error: error?.message || String(error), ambiguous: true };
     }
-
-    // Record result in session actionHistory
+    const success = !(result && result.success === false);
     session.actionHistory.push({
       timestamp: Date.now(),
       tool: step.tool,
-      params: step.params,
-      result: slimActionResult(actionResult),
+      params: fsbReplayClone(step.arguments, {}),
+      result: slimActionResult(result),
       replayStep: i + 1
     });
+    try {
+      await fsbReplayRecordCheckpoint(session, step, result || {}, success, 'executed');
+    } catch (error) {
+      await fsbReplayPauseForDecision(session, step, error);
+      return;
+    }
+    if (session.isTerminating || !activeSessions.has(replaySessionId)) return;
 
-    // Handle failures
-    if (!actionResult?.success) {
-      if (criticalTools.has(step.tool)) {
-        session.status = 'replay_failed';
-        automationLogger.warn('Replay aborted: critical action failed', {
-          sessionId: replaySessionId, step: i + 1, tool: step.tool, error: actionResult?.error
-        });
-        break;
+    if (!success) {
+      const failure = new Error(result?.error || `Replay step ${i + 1} failed`);
+      if (fsbReplayIsWriteRisk(step)) {
+        await fsbReplayPauseForDecision(session, step, failure);
       } else {
-        automationLogger.warn('Replay step failed (non-critical, skipping)', {
-          sessionId: replaySessionId, step: i + 1, tool: step.tool, error: actionResult?.error
-        });
-        // Continue to next step
+        await fsbReplayFinalize(session, 'replay_failed', failure);
       }
+      return;
     }
 
-    // Inter-action delay (skip if last step)
+    session.currentStep = i + 1;
+    try {
+      const currentTab = await chrome.tabs.get(session.tabId);
+      session.expectedOrigin = fsbReplayOrigin(currentTab?.url) || session.expectedOrigin;
+    } catch (_error) { /* a later origin check reports the missing tab */ }
+    await fsbReplayPersistCheckpoint(session, 'BEFORE_NEXT_ITERATION_SCHEDULE', step);
+    session.replayRun.nextStep = session.currentStep;
+    await fsbReplayPersistRun(session);
     if (i < session.replaySteps.length - 1) {
-      await new Promise(resolve => setTimeout(resolve, getReplayDelay(step.tool)));
+      await new Promise((resolve) => setTimeout(resolve, getReplayDelay(step.tool)));
     }
   }
-
-  // Tally results
-  const successCount = session.actionHistory.filter(a => a.result?.success).length;
-  const failedCount = session.actionHistory.filter(a => !a.result?.success).length;
-
-  if (session.status === 'replaying') {
-    session.status = 'replay_completed';
-
-    // Send completion message to UI
-    try {
-      fsbBroadcastAutomationLifecycle({
-        action: 'automationComplete',
-        sessionId: replaySessionId,
-        // QT-uof-2 (BROADCAST-tabId-THREAD)
-        tabId: (session && typeof session.tabId === 'number') ? session.tabId : null,
-        // Thread the originating conversation (null for a conversation-less
-        // replay) so the sidepanel never mispersists this completion into
-        // whatever conversation happens to be visible.
-        conversationId: (session && session.conversationId) || null,
-        historySessionId: (session && session.historySessionId) || replaySessionId,
-        result: `Replay complete: ${successCount}/${session.totalSteps} steps executed successfully.${failedCount > 0 ? ` ${failedCount} steps skipped.` : ''}`
-      });
-    } catch (e) { /* UI may not be listening */ }
-  } else if (session.status === 'replay_failed') {
-    // Send error message to UI
-    try {
-      fsbBroadcastAutomationLifecycle({
-        action: 'automationError',
-        sessionId: replaySessionId,
-        error: `Replay failed at step ${session.currentStep + 1}/${session.totalSteps}. ${successCount} steps succeeded before failure.`
-      });
-    } catch (e) { /* UI may not be listening */ }
-  }
-
-  // Send session-ended status to content script (covers previousTabId if set)
-  await endSessionOverlays(session, session.status === 'replay_completed' ? 'completed' : 'error');
-
-  // Log session end and cleanup
-  const duration = Date.now() - session.startTime;
-  automationLogger.logSessionEnd(replaySessionId, session.status, session.actionHistory.length, duration);
-  automationLogger.saveSession(replaySessionId, session);
-  cleanupSession(replaySessionId);
+  await fsbReplayFinalize(session, 'replay_completed');
 }
 
-/**
- * Handle a replaySession message: load session data, create replay session, and kick off execution.
- * @param {Object} request - { sessionId: string }
- * @param {Object} sender - Chrome message sender
- * @param {Function} sendResponse - Response callback
- */
-async function handleReplaySession(request, sender, sendResponse) {
-  try {
-    const { sessionId } = request;
+function fsbReplayBuildSession(prepared, replaySessionId, owned, approvedScopes, priorRun) {
+  const adapter = globalThis.FsbLatticeRuntimeAdapter?.createFsbLatticeRuntimeAdapter({
+    sessionId: replaySessionId
+  });
+  const startTime = priorRun?.startedAt || Date.now();
+  return {
+    replaySessionId,
+    task: `Replay: ${prepared.replay.manifest.task || 'MCP agent session'}`,
+    tabId: owned.tab.id,
+    replayAgentId: owned.agentId,
+    ownershipToken: owned.ownershipToken || null,
+    status: 'replaying',
+    startTime,
+    actionHistory: [],
+    isReplay: true,
+    originalSessionId: prepared.sessionId,
+    manifestHash: prepared.replay.manifestHash,
+    sourceReceiptCid: prepared.receiptCid,
+    previousReceiptCid: priorRun?.previousReceiptCid || prepared.receiptCid,
+    replaySteps: prepared.steps,
+    currentStep: priorRun?.nextStep || 0,
+    totalSteps: prepared.steps.length,
+    approvedScopes: Array.isArray(approvedScopes) ? approvedScopes.slice() : [],
+    expectedOrigin: fsbReplayOrigin(owned.tab.url) || fsbReplayOrigin(prepared.startUrl),
+    replayRun: priorRun || {
+      id: replaySessionId,
+      manifestHash: prepared.replay.manifestHash,
+      sourceReceiptCid: prepared.receiptCid,
+      targetTabId: owned.tab.id,
+      startedAt: startTime,
+      status: 'running',
+      nextStep: 0,
+      previousReceiptCid: prepared.receiptCid,
+      steps: []
+    },
+    _latticeAdapter: adapter || null
+  };
+}
 
-    // Check if automation is already running
-    for (const [id, sess] of activeSessions) {
-      if (sess.status !== 'idle') {
+async function fsbReplayAbortFailedStart(owned, session, error) {
+  if (session) {
+    session.status = 'replay_failed';
+    session.replayRun.status = 'replay_failed';
+    session.replayRun.error = error?.message || String(error || 'Replay start failed');
+    session.replayRun.finishedAt = Date.now();
+    await fsbReplayPersistRun(session).catch(() => {});
+    if (session._latticeAdapter && typeof session._latticeAdapter.clearSnapshots === 'function') {
+      await session._latticeAdapter.clearSnapshots().catch(() => {});
+    }
+    await fsbReplayReleaseAgent(session);
+    await cleanupSession(session.replaySessionId).catch(() => {});
+  } else if (owned?.agentId) {
+    try {
+      await globalThis.fsbAgentRegistryInstance?.releaseAgent(owned.agentId, 'replay_start_failed');
+    } catch (_releaseError) { /* best-effort */ }
+  }
+  if (Number.isFinite(owned?.tab?.id)) {
+    try { await chrome.tabs.remove(owned.tab.id); } catch (_tabError) { /* the fresh tab may already be gone */ }
+  }
+}
+
+function fsbReplayStartExecution(session) {
+  const execution = executeReplaySequence(session.replaySessionId);
+  session._replayExecutionPromise = execution;
+  execution.catch((error) => {
+    const current = activeSessions.get(session.replaySessionId);
+    if (current) fsbReplayFinalize(current, 'replay_failed', error).catch(() => {});
+  }).finally(() => {
+    if (session._replayExecutionPromise === execution) session._replayExecutionPromise = null;
+  });
+}
+
+async function handleReplaySession(request, sender, sendResponse) {
+  let owned = null;
+  let session = null;
+  try {
+    if (!fsbReplayIsTrustedUiSender(sender)) {
+      throw new Error('Replay execution requires an extension UI confirmation');
+    }
+    for (const sess of activeSessions.values()) {
+      if (['running', 'replaying', 'replay_paused'].includes(sess.status)) {
         sendResponse({ success: false, error: 'Another automation is already running' });
         return;
       }
     }
-
-    // Get current active tab
-    const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!activeTab) {
-      sendResponse({ success: false, error: 'No active tab found' });
-      return;
+    const prepared = await prepareSessionReplay(request && request.sessionId);
+    if (request?.manifestHash && request.manifestHash !== prepared.replay.manifestHash) {
+      throw new Error('The replay changed after preview; review it again before starting');
     }
-
-    // Load replayable session data
-    const replayData = await loadReplayableSession(sessionId);
-    if (!replayData || replayData.replayableActions.length === 0) {
-      sendResponse({ success: false, error: 'No replayable actions found in this session' });
-      return;
+    if (!prepared.steps.some(fsbReplayIsExecutable)) {
+      throw new Error('This verified recording has no executable steps');
     }
-
-    // Create replay session ID
-    const replaySessionId = `replay_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
-
-    // Create replay session in activeSessions (no AI instance, no conversation session)
-    activeSessions.set(replaySessionId, {
-      task: `Replay: ${replayData.originalTask}`,
-      tabId: activeTab.id,
-      status: 'replaying',
-      startTime: Date.now(),
-      actionHistory: [],
-      isReplay: true,
-      originalSessionId: sessionId,
-      replaySteps: replayData.replayableActions,
-      currentStep: 0,
-      totalSteps: replayData.replayableActions.length
-    });
-
-    // Start keep-alive to prevent service worker from sleeping
+    if (!globalThis.FsbLatticeReplay.isReplayableUrl(prepared.startUrl)) {
+      throw new Error('The recording does not contain a safe HTTP(S) starting URL');
+    }
+    owned = await fsbReplayCreateOwnedTab(prepared.startUrl);
+    const replaySessionId = `replay_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    session = fsbReplayBuildSession(
+      prepared,
+      replaySessionId,
+      owned,
+      Array.isArray(request?.approvedScopes) ? request.approvedScopes : []
+    );
+    activeSessions.set(replaySessionId, session);
     startKeepAlive();
-
-    // Log session start
-    automationLogger.logSessionStart(replaySessionId, `Replay: ${replayData.originalTask}`, activeTab.id);
-
-    // Respond immediately with session info
+    automationLogger.logSessionStart(replaySessionId, session.task, owned.tab.id);
+    await fsbReplayPersistCheckpoint(session, 'BEFORE_NEXT_ITERATION_SCHEDULE', null);
+    await fsbReplayPersistRun(session);
     sendResponse({
       success: true,
       sessionId: replaySessionId,
-      totalSteps: replayData.replayableActions.length
+      tabId: owned.tab.id,
+      totalSteps: prepared.steps.length,
+      manifestHash: prepared.replay.manifestHash
     });
-
-    // Kick off replay execution asynchronously (do NOT await)
-    executeReplaySequence(replaySessionId);
+    setTimeout(() => {
+      if (activeSessions.get(replaySessionId) === session && session.status === 'replaying') {
+        fsbReplayStartExecution(session);
+      }
+    }, 0);
   } catch (error) {
-    automationLogger.error('Failed to start replay session', { error: error.message });
-    sendResponse({ success: false, error: error.message });
+    await fsbReplayAbortFailedStart(owned, session, error);
+    automationLogger.error('Failed to start replay session', { error: error && error.message });
+    sendResponse({ success: false, error: error && error.message ? error.message : String(error) });
+  }
+}
+
+async function handleReplayStepDecision(request, sender, sendResponse) {
+  if (!fsbReplayIsTrustedUiSender(sender)) {
+    sendResponse({ success: false, error: 'Replay decisions require the extension UI' });
+    return;
+  }
+  const session = activeSessions.get(request && request.sessionId);
+  if (!session || session.status !== 'replay_paused') {
+    sendResponse({ success: false, error: 'No paused replay is awaiting a decision' });
+    return;
+  }
+  const decision = request && request.decision;
+  if (!['retry', 'skip', 'stop'].includes(decision)) {
+    sendResponse({ success: false, error: 'Replay decision must be Retry, Skip, or Stop' });
+    return;
+  }
+  try {
+    const step = session.replaySteps[session.currentStep];
+    if (decision === 'stop') {
+      sendResponse({ success: true, decision });
+      await fsbReplayFinalize(session, 'replay_stopped', new Error('Replay stopped after an ambiguous write'));
+      return;
+    }
+    if (decision === 'skip') {
+      await fsbReplayRecordCheckpoint(session, step, { decision: 'skip', skipped: true }, false, 'skipped');
+      session.currentStep += 1;
+    }
+    session.status = 'replaying';
+    session.replayRun.status = 'running';
+    session.replayRun.error = null;
+    await fsbReplayPersistCheckpoint(
+      session,
+      decision === 'skip' ? 'BEFORE_NEXT_ITERATION_SCHEDULE' : 'BEFORE_TOOL_EXECUTION',
+      step
+    );
+    await fsbReplayPersistRun(session);
+    sendResponse({ success: true, decision, nextStep: session.currentStep });
+    fsbReplayStartExecution(session);
+  } catch (error) {
+    sendResponse({ success: false, error: error && error.message ? error.message : String(error) });
+  }
+}
+
+async function fsbReplayReclaimOwnedTab(state, tab) {
+  const registry = globalThis.fsbAgentRegistryInstance;
+  if (!registry || typeof registry.bindTab !== 'function') {
+    throw new Error('Replay recovery cannot access tab ownership');
+  }
+  let agentId = state.replayAgentId;
+  const currentOwner = typeof registry.getOwner === 'function' ? registry.getOwner(tab.id) : null;
+  if (currentOwner && currentOwner !== agentId) {
+    throw new Error('Replay recovery refused a tab now owned by another agent');
+  }
+  if (!agentId || typeof registry.hasAgent !== 'function' || !registry.hasAgent(agentId)) {
+    const registration = await registry.registerAgent();
+    if (!registration || registration.error || !registration.agentId) {
+      throw new Error(registration?.error || 'Replay recovery could not reserve an agent');
+    }
+    agentId = registration.agentId;
+  }
+  const binding = await registry.bindTab(agentId, tab.id);
+  if (!binding || binding.success === false) {
+    throw new Error(binding?.error || 'Replay recovery could not reclaim its tab');
+  }
+  return { tab, agentId, ownershipToken: binding.ownershipToken || null };
+}
+
+async function fsbRestoreLatticeReplayCheckpoints() {
+  if (!chrome.storage?.session || !globalThis.FsbLatticeReplay) return;
+  let stored;
+  try {
+    stored = await chrome.storage.session.get(null);
+  } catch (_error) {
+    return;
+  }
+  const latestByRun = new Map();
+  Object.entries(stored || {}).forEach(([storageKey, snapshot]) => {
+    if (!snapshot || snapshot.kind !== 'survivability-snapshot' || typeof snapshot.payload !== 'string') return;
+    let state;
+    try { state = JSON.parse(snapshot.payload); } catch (_error) { return; }
+    if (!state || state.kind !== FSB_REPLAY_CHECKPOINT_KIND || !state.replaySessionId) return;
+    const prior = latestByRun.get(state.replaySessionId);
+    const sortKey = String(snapshot.capturedAt || '') + '|' + storageKey;
+    if (!prior || sortKey > prior.sortKey) {
+      latestByRun.set(state.replaySessionId, { snapshot, state, sortKey });
+    }
+  });
+
+  for (const { snapshot, state } of latestByRun.values()) {
+    if (activeSessions.has(state.replaySessionId)) continue;
+    try {
+      const prepared = await prepareSessionReplay(state.originalSessionId);
+      if (prepared.replay.manifestHash !== state.manifestHash) {
+        throw new Error('Replay recovery manifest hash mismatch');
+      }
+      const tab = await chrome.tabs.get(state.targetTabId);
+      if (!tab || !fsbReplayOrigin(tab.url || tab.pendingUrl)) {
+        throw new Error('Replay recovery target is missing or restricted');
+      }
+      const owned = await fsbReplayReclaimOwnedTab(state, tab);
+      const priorRun = prepared.replay.lastRun && prepared.replay.lastRun.id === state.replaySessionId
+        ? prepared.replay.lastRun
+        : {
+            id: state.replaySessionId,
+            manifestHash: state.manifestHash,
+            sourceReceiptCid: prepared.receiptCid,
+            targetTabId: tab.id,
+            startedAt: state.startedAt || Date.now(),
+            status: 'running',
+            nextStep: state.nextStep || 0,
+            previousReceiptCid: state.previousReceiptCid || prepared.receiptCid,
+            steps: []
+          };
+      if (!Array.isArray(priorRun.steps)) priorRun.steps = [];
+      const session = fsbReplayBuildSession(
+        prepared,
+        state.replaySessionId,
+        owned,
+        Array.isArray(state.approvedScopes) ? state.approvedScopes : [],
+        priorRun
+      );
+      session.currentStep = Number.isFinite(state.nextStep) ? state.nextStep : 0;
+      session.previousReceiptCid = state.previousReceiptCid || prepared.receiptCid;
+      session.expectedOrigin = state.expectedOrigin || fsbReplayOrigin(tab.url);
+      activeSessions.set(state.replaySessionId, session);
+      startKeepAlive();
+
+      const currentStep = session.replaySteps[session.currentStep] || null;
+      const resumePolicy = session._latticeAdapter && typeof session._latticeAdapter.resume === 'function'
+        ? await session._latticeAdapter.resume(snapshot)
+        : 'RECOVERY_AMBIGUOUS';
+      const ambiguousWrite = state.decisionRequired === true ||
+        (resumePolicy === 'ON_ERROR_SW_EVICTION_MID_TOOL_DISPATCH' && state.writeInFlight === true);
+      if (ambiguousWrite && currentStep) {
+        await fsbReplayPauseForDecision(
+          session,
+          currentStep,
+          new Error('The service worker restarted during a write, so completion cannot be proven.')
+        );
+        continue;
+      }
+      if (resumePolicy === 'RECOVERY_AMBIGUOUS') {
+        await fsbReplayFinalize(session, 'replay_failed', new Error('Replay recovery checkpoint is ambiguous'));
+        continue;
+      }
+      fsbReplayStartExecution(session);
+    } catch (error) {
+      automationLogger.warn('Lattice replay recovery failed closed', {
+        replaySessionId: state.replaySessionId,
+        error: error && error.message
+      });
+      try {
+        const prior = await chrome.storage.local.get('fsbSessionLogs');
+        const source = (prior.fsbSessionLogs || {})[state.originalSessionId];
+        if (source?.replay?.lastRun?.id === state.replaySessionId) {
+          source.replay.lastRun.status = 'replay_failed';
+          source.replay.lastRun.error = error && error.message ? error.message : String(error);
+          source.replay.lastRun.finishedAt = Date.now();
+          await chrome.storage.local.set({ fsbSessionLogs: prior.fsbSessionLogs || {} });
+        }
+      } catch (_persistError) { /* the checkpoint remains for inspection */ }
+    }
   }
 }
 
@@ -9263,6 +9974,104 @@ const fsbHandleRuntimeMessage = (request, sender, sendResponse) => {
       return true; // async response
     }
 
+    case 'testAgentProviderConnection': {
+      const exactRequest = fsbDelegationHasExactKeys(request, ['action', 'providerId']);
+      const providerId = exactRequest && typeof request.providerId === 'string'
+        ? request.providerId
+        : '';
+      const providers = globalThis.FsbDelegationProviders;
+      if (
+        !exactRequest
+        || !providers
+        || typeof providers.isShippedId !== 'function'
+        || !providers.isShippedId(providerId)
+      ) {
+        sendResponse({
+          success: false,
+          ok: false,
+          errorCode: 'invalid_request',
+          message: 'Select a supported agent provider.'
+        });
+        return false;
+      }
+      (async () => {
+        const readiness = await fsbEnsureAgentBridgeReady();
+        if (!readiness || readiness.ok !== true) {
+          const code = readiness && typeof readiness.code === 'string'
+            ? readiness.code
+            : 'bridge_not_ready';
+          sendResponse({
+            success: true,
+            ok: false,
+            providerId: providerId,
+            errorCode: code,
+            message: fsbAgentConnectionFailureMessage(code, providerId)
+          });
+          return;
+        }
+        try {
+          const result = await mcpBridgeClient.sendExtRequest(
+            'provider.test-connection',
+            { providerId: providerId },
+            { timeout: FSB_AGENT_CONNECTION_TEST_REQUEST_TIMEOUT_MS }
+          );
+          const success = result
+            && typeof result === 'object'
+            && !Array.isArray(result)
+            && Object.keys(result).length === 2
+            && result.ok === true
+            && result.providerId === providerId;
+          const failed = result
+            && typeof result === 'object'
+            && !Array.isArray(result)
+            && Object.keys(result).length === 3
+            && result.ok === false
+            && result.providerId === providerId
+            && typeof result.code === 'string'
+            && fsbSafeAgentConnectionFailureCode(result.code) === result.code;
+          if (success) {
+            sendResponse({
+              success: true,
+              ok: true,
+              providerId: providerId
+            });
+          } else if (failed) {
+            sendResponse({
+              success: true,
+              ok: false,
+              providerId: providerId,
+              errorCode: result.code,
+              message: fsbAgentConnectionFailureMessage(result.code, providerId)
+            });
+          } else {
+            throw Object.assign(new Error('invalid connection response'), {
+              code: 'connection_test_malformed'
+            });
+          }
+        } catch (error) {
+          const code = fsbSafeAgentConnectionFailureCode(
+            error && typeof error.code === 'string' ? error.code : ''
+          );
+          sendResponse({
+            success: true,
+            ok: false,
+            providerId: providerId,
+            errorCode: code,
+            message: fsbAgentConnectionFailureMessage(code, providerId)
+          });
+        }
+      })().catch(() => {
+        sendResponse({
+          success: true,
+          ok: false,
+          providerId: providerId,
+          errorCode: 'connection_test_failed',
+          message: fsbAgentConnectionFailureMessage('connection_test_failed', providerId)
+        });
+      });
+      return true;
+    }
+
     case 'getMcpClients': {
       (async () => {
         try {
@@ -9399,7 +10208,7 @@ const fsbHandleRuntimeMessage = (request, sender, sendResponse) => {
     case 'checkSessionAlive': {
       const sessionId = request.sessionId;
       const session = activeSessions.get(sessionId);
-      const alive = !!(session && session.status === 'running');
+      const alive = !!(session && ['running', 'replaying', 'replay_paused'].includes(session.status));
       sendResponse({ alive: alive, status: session?.status || null });
       break;
     }
@@ -10173,9 +10982,17 @@ const fsbHandleRuntimeMessage = (request, sender, sendResponse) => {
 //       })();
 //       return true;
 
+    case 'prepareSessionReplay':
+      handlePrepareSessionReplay(request, sender, sendResponse);
+      return true;
+
     case 'replaySession':
       handleReplaySession(request, sender, sendResponse);
       return true; // Will respond asynchronously
+
+    case 'replayStepDecision':
+      handleReplayStepDecision(request, sender, sendResponse);
+      return true;
 
     case 'cdpMouseClick':
       handleCDPMouseClick(request, sender, sendResponse);
@@ -11296,6 +12113,24 @@ async function handleStopAutomation(request, sender, sendResponse) {
 
   if (session) {
     automationLogger.debug('Found session to stop', { sessionId, status: session.status });
+
+    if (session.isReplay === true) {
+      session.isTerminating = true;
+      session.status = 'replay_stopping';
+      if (session._replayExecutionPromise) {
+        await Promise.race([
+          session._replayExecutionPromise.catch(() => {}),
+          new Promise((resolve) => setTimeout(resolve, 5000))
+        ]);
+      }
+      if (!activeSessions.has(sessionId)) {
+        sendResponse({ success: true, message: 'Replay already ended' });
+        return;
+      }
+      await fsbReplayFinalize(session, 'replay_stopped', new Error('Replay stopped by the user'));
+      sendResponse({ success: true, message: 'Replay stopped' });
+      return;
+    }
 
     session.status = 'stopped';
 
@@ -17644,8 +18479,10 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
   }
 
   // Quick 260728-k2v: toolbar icon watchdog. A worker killed mid-cycle leaves
-  // the icon frozen on its last frame, so this 30s beat re-derives the intended
-  // frame and revives the loop when one is owed. 0.5 is Chrome's periodic floor.
+  // the icon frozen on its last frame, so this beat re-derives the intended
+  // frame and revives the loop when one is owed. The icon module owns the
+  // alarm's lifecycle -- it arms on animation start and clears on stop, so this
+  // only fires while a loop is actually outstanding. Nothing registers it here.
   if (alarm && alarm.name === 'fsb-action-icon-watchdog') {
     try {
       if (globalThis.fsbActionIcon) {
@@ -17828,14 +18665,6 @@ chrome.runtime.onInstalled.addListener(async () => {
     console.error('[FSB Telemetry] alarm create failed:', e && e.message);
   }
 
-  // Quick 260728-k2v: 30s toolbar icon watchdog. Same idempotent create-by-name
-  // contract as the telemetry beat above; the alarms permission already exists.
-  try {
-    chrome.alarms.create('fsb-action-icon-watchdog', { periodInMinutes: 0.5 });
-  } catch (e) {
-    console.error('[FSB] action icon watchdog alarm create failed:', e && e.message);
-  }
-
   // Phase 272 / BEAT-06: install_announce. 30s setTimeout (NOT a chrome.alarm
   // -- the minimum alarm period is 30s but the 30s grace before announce is
   // a one-shot per install, not a recurring beat). Enqueue + flush invokes
@@ -17906,12 +18735,6 @@ chrome.runtime.onStartup.addListener(async () => {
     chrome.alarms.create('fsb-telemetry-beat', { periodInMinutes: 5 });
   } catch (e) {
     console.error('[FSB Telemetry] alarm create failed:', e && e.message);
-  }
-  // Quick 260728-k2v: re-arm the toolbar icon watchdog on every worker wake.
-  try {
-    chrome.alarms.create('fsb-action-icon-watchdog', { periodInMinutes: 0.5 });
-  } catch (e) {
-    console.error('[FSB] action icon watchdog alarm create failed:', e && e.message);
   }
   // Load debug mode setting
   await loadDebugMode();

@@ -6,6 +6,7 @@ import {
   type AgentEvent,
   type AgentProviderAdapter,
   type AgentProviderId,
+  type SpawnPurpose,
   type SupervisedChild,
 } from './adapter.js';
 import { createClaudeCodeAdapter } from './claude-code.js';
@@ -49,7 +50,10 @@ export interface AgentProviderRegistry {
 
 export interface ProductionAdapterRegistryDependencies {
   readonly detect?: () => Promise<AdapterDetection>;
-  readonly parseEvents?: (stream: NodeJS.ReadableStream) => AsyncIterable<AgentEvent>;
+  readonly parseEvents?: (
+    stream: NodeJS.ReadableStream,
+    options?: Readonly<{ purpose: SpawnPurpose }>,
+  ) => AsyncIterable<AgentEvent>;
   readonly openCodeDetect?: OpenCodeDetectionDependency;
   readonly openCodeParseEvents?: OpenCodeParserDependency;
   readonly resolveOpenCodeProfileRuntime?: OpenCodeProfileRuntimeDependency;

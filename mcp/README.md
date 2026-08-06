@@ -144,8 +144,9 @@ Use `--dry-run` before `--all` when you want to see planned writes without chang
 ## Prerequisites
 
 - Node.js 18+
-- FSB Chrome extension installed and active
-- A normal webpage open in Chrome for page-reading and interaction tools
+- Chromium 116+ in a supported stable desktop browser: Chrome, Edge, Brave, or Chromium
+- FSB extension installed and active in that browser
+- A normal webpage open in the selected browser for page-reading and interaction tools
 
 Chrome internal pages such as `chrome://extensions` cannot be controlled by content scripts. Use `list_tabs`, `navigate`, or `open_tab` to move back to a normal page.
 
@@ -183,6 +184,29 @@ npx -y fsb-mcp-server uninstall --cursor
 ```
 
 `install --list` shows all supported platform flags and whether the target config was detected.
+
+### Native Messaging Host
+
+The native messaging host targets one browser per owned runtime. Chrome is the default, so existing commands and Chrome registrations continue to work:
+
+```bash
+npx -y fsb-mcp-server install --native-host
+npx -y fsb-mcp-server uninstall --native-host
+```
+
+Select another supported browser with `--browser`:
+
+```bash
+npx -y fsb-mcp-server install --native-host --browser chrome
+npx -y fsb-mcp-server install --native-host --browser edge --extension-id <extension-id>
+npx -y fsb-mcp-server install --native-host --browser brave --extension-id <extension-id>
+npx -y fsb-mcp-server install --native-host --browser chromium --extension-id <extension-id>
+npx -y fsb-mcp-server uninstall --native-host --browser edge
+```
+
+Extension IDs are browser-installation-specific. Omitted `--extension-id` uses the published Chrome Web Store ID, `badgafnfchcihdfnjneklogedcdkmjfk`. For Edge, Brave, Chromium, or an unpacked build, copy the 32-character lowercase ID shown on that browser's extensions page and pass it with `--extension-id`.
+
+The browser selector controls the user-scoped native-messaging registration location. To switch browsers, uninstall the browser target reported by `doctor` first; cross-target install and uninstall requests refuse without changing either registration.
 
 ### Manual Setup
 

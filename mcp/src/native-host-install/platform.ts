@@ -4,13 +4,17 @@ import {
   NATIVE_HOST_POSIX_LAUNCHER_RELATIVE_PATH,
   NATIVE_HOST_PRIVATE_FILE_MODE,
   NATIVE_HOST_WINDOWS_LAUNCHER_RELATIVE_PATH,
-  NATIVE_HOST_WINDOWS_REGISTRY_KEY,
 } from '../native-host/constants.js';
 import type { NativeHostPlatform } from '../native-host/runtime-layout.js';
+import {
+  NATIVE_HOST_WINDOWS_REGISTRY_KEYS,
+  isNativeHostBrowser,
+} from './browser.js';
 import type {
   NativeHostInstallPlatformAdapter,
   NativeHostInstallPlatformDependencies,
   NativeHostInstallPlatformLayout,
+  NativeHostBrowser,
   NativeHostRegistrationReadFacts,
   NativeHostRegistryKeyFact,
   NativeHostRegistryRegistration,
@@ -20,9 +24,26 @@ import type {
 const MAX_MANIFEST_BYTES = 16 * 1024;
 export interface NativeHostPlatformLayoutInput {
   platform: NativeHostPlatform;
+  browser?: NativeHostBrowser;
   homeDirectory: string;
   localAppData?: string;
 }
+
+const DARWIN_MANIFEST_ROOTS: Readonly<Record<NativeHostBrowser, readonly string[]>> =
+  Object.freeze({
+    chrome: Object.freeze(['Google', 'Chrome']),
+    edge: Object.freeze(['Microsoft Edge']),
+    brave: Object.freeze(['BraveSoftware', 'Brave-Browser']),
+    chromium: Object.freeze(['Chromium']),
+  });
+
+const LINUX_MANIFEST_ROOTS: Readonly<Record<NativeHostBrowser, readonly string[]>> =
+  Object.freeze({
+    chrome: Object.freeze(['google-chrome']),
+    edge: Object.freeze(['microsoft-edge']),
+    brave: Object.freeze(['BraveSoftware', 'Brave-Browser']),
+    chromium: Object.freeze(['chromium']),
+  });
 
 function refuse(): never {
   throw new Error('FSBNH_INSTALL_PLATFORM');
@@ -50,12 +71,19 @@ function assertSupportedPlatform(value: unknown): asserts value is NativeHostPla
   if (!['darwin', 'linux', 'win32'].includes(String(value))) refuse();
 }
 
+function nativeHostBrowser(value: unknown): NativeHostBrowser {
+  if (value === undefined) return 'chrome';
+  if (!isNativeHostBrowser(value)) refuse();
+  return value;
+}
+
 export function resolveNativeHostPlatformLayout(
   input: NativeHostPlatformLayoutInput,
 ): NativeHostInstallPlatformLayout {
   if (!input || typeof input !== 'object') refuse();
   assertSupportedPlatform(input.platform);
   const platform = input.platform;
+  const browser = nativeHostBrowser(input.browser);
   const api = platform === 'win32' ? win32 : posix;
   const homeDirectory = normalizedAbsolute(input.homeDirectory, platform);
   const stableRoot = platform === 'win32'
@@ -70,8 +98,7 @@ export function resolveNativeHostPlatformLayout(
       homeDirectory,
       'Library',
       'Application Support',
-      'Google',
-      'Chrome',
+      ...DARWIN_MANIFEST_ROOTS[browser],
       'NativeMessagingHosts',
       `${NATIVE_HOST_NAME}.json`,
     )
@@ -79,7 +106,7 @@ export function resolveNativeHostPlatformLayout(
       ? api.join(
         homeDirectory,
         '.config',
-        'google-chrome',
+        ...LINUX_MANIFEST_ROOTS[browser],
         'NativeMessagingHosts',
         `${NATIVE_HOST_NAME}.json`,
       )
@@ -90,7 +117,7 @@ export function resolveNativeHostPlatformLayout(
   const registration = platform === 'win32'
     ? Object.freeze<NativeHostRegistryRegistration>({
       kind: 'registry',
-      key: NATIVE_HOST_WINDOWS_REGISTRY_KEY,
+      key: NATIVE_HOST_WINDOWS_REGISTRY_KEYS[browser],
       canonicalView: 'user/32',
       shadowView: 'user/64',
     })
@@ -98,6 +125,7 @@ export function resolveNativeHostPlatformLayout(
 
   return Object.freeze({
     platform,
+    browser,
     stableRoot,
     manifestPath,
     markerPath: api.join(stableRoot, 'owner.json'),

@@ -293,7 +293,7 @@ function createWakeHarness(options = {}) {
         : 'unavailable';
     },
     acquireStartLease: async () => {
-      calls.acquireStartLease.push({ host: '127.0.0.1', port: 7227 });
+      calls.acquireStartLease.push({ host: '127.0.0.1', port: 7226 });
       trace.push('lease:acquire');
       if (startLeaseHeld) return null;
       startLeaseHeld = true;
@@ -740,6 +740,16 @@ async function runWakeDaemonSection() {
         < harness.state.trace.indexOf(`rename:${publish?.source}->${publish?.destination}`),
       'the OS lease is held before canonical owner publication',
     );
+    assert(
+      harness.state.trace.indexOf(`rename:${publish?.source}->${publish?.destination}`)
+        < harness.state.trace.indexOf('lease:release'),
+      'canonical owner publication precedes service-port reservation release',
+    );
+    assert(
+      harness.state.trace.indexOf('lease:release')
+        < harness.state.trace.indexOf('spawn'),
+      'the service-port reservation is released before daemon spawn',
+    );
     assertEqual(harness.state.calls.releaseStartLease, 1, 'winner releases one exact start lease');
   }
 
@@ -848,10 +858,8 @@ async function runWakeDaemonSection() {
       },
       acquireStartLease: async () => {
         const lease = await harness.dependencies.acquireStartLease();
-        if (!lease) {
-          bMayObserveReady = true;
-          resolveBTakeover('lease-contender');
-        }
+        bMayObserveReady = true;
+        resolveBTakeover(lease ? 'lease-reacquired' : 'lease-contender');
         return lease;
       },
       claimLockDirectory: async (source, destination, expected) => {
@@ -906,11 +914,12 @@ async function runWakeDaemonSection() {
     const freshAToken = JSON.parse(freshA.ownerContents).token;
     assert(freshAToken !== staleToken, 'contender A replaces S and publishes fresh owner A');
     const cLease = await harness.dependencies.acquireStartLease();
-    assertEqual(cLease, null, 'contender C also cannot publish while A holds the one-flight lease');
+    assert(Boolean(cLease), 'the service-port reservation is available after A publishes its canonical wake lock');
+    await cLease?.release();
     resumeB();
     const bTakeoverResult = await bTakeover;
     const afterB = harness.state.inspectDirectory(harness.state.lockPath);
-    assertEqual(bTakeoverResult, 'lease-contender', 'B cannot enter takeover while A holds the OS lease');
+    assertEqual(bTakeoverResult, 'lease-reacquired', 'B reacquires the service port but still honors fresh owner A');
     assertEqual(afterB?.directoryId, freshA?.directoryId, 'B leaves fresh canonical owner A in place');
     assertEqual(
       JSON.parse(afterB?.ownerContents || '{}').token,
@@ -928,12 +937,13 @@ async function runWakeDaemonSection() {
       false,
       'B leaves no quarantine containing fresh owner A',
     );
-    assertEqual(harness.state.startLeaseHeld, true, 'A holds the crash-released lease through readiness');
+    const bResult = await bResultPromise;
+    assertEqual(harness.state.startLeaseHeld, false, 'B releases its temporary reservation after honoring fresh owner A');
     allowAReady();
-    const [aResult, bResult] = await Promise.all([aResultPromise, bResultPromise]);
+    const aResult = await aResultPromise;
     assertEqual(aResult.outcome, 'started', 'A settles as the sole start owner');
     assertEqual(bResult.outcome, 'already_running', 'B settles from shared readiness without spawning');
-    assertEqual(harness.state.startLeaseHeld, false, 'A releases the OS lease after canonical cleanup');
+    assertEqual(harness.state.startLeaseHeld, false, 'all service-port reservations remain released after canonical cleanup');
   }
 
   {
@@ -1019,6 +1029,11 @@ async function runWakeDaemonSection() {
     });
     assertEqual(result.outcome, 'started', 'expired lock is recovered and one daemon is started');
     assertEqual(harness.state.calls.spawn.length, 1, 'stale recovery still spawns only once');
+    assertEqual(
+      harness.state.calls.acquireStartLease.length,
+      1,
+      'an expired owner does not suppress the service-port reservation recovery needs',
+    );
     const rename = harness.state.calls.claimLockDirectory.find(
       ({ destination }) => destination.includes('.quarantine-'),
     );
@@ -1107,13 +1122,25 @@ async function runWakeDaemonSection() {
     assertEqual(result.outcome, 'failed', 'lock contender timeout returns failed');
     assertEqual(result.reason, 'wake_lock_timeout', 'contender timeout has the exact lock reason');
     assertEqual(harness.state.calls.spawn.length, 0, 'lock contender never spawns');
+    // The lease reserves the port the winner's child must bind, so a contender
+    // that a fresh canonical owner already settles must never take it.
+    assertEqual(
+      harness.state.calls.acquireStartLease.length,
+      0,
+      'a fresh canonical owner is honored without reserving the service port',
+    );
+    assertEqual(
+      harness.state.startLeaseHeld,
+      false,
+      'no service-port reservation outlives a fresh-owner contender',
+    );
   }
 
   assertEqual(nativeConstants.NATIVE_HOST_HEALTH_TIMEOUT_MS, 500, 'the frozen health request timeout is 500 ms');
   assertEqual(nativeConstants.NATIVE_HOST_DAEMON_START_TIMEOUT_MS, 10_000, 'the readiness window stays 10 seconds');
   assertEqual(nativeConstants.NATIVE_HOST_START_POLL_INTERVAL_MS, 100, 'the readiness poll stays 100 ms');
   assertEqual(nativeConstants.NATIVE_HOST_START_LOCK_STALE_MS, 30_000, 'the stale-lock TTL stays 30 seconds');
-  assertEqual(nativeConstants.NATIVE_HOST_START_LEASE_PORT, 7227, 'the one-flight lease pins one loopback-only port');
+  assertEqual(nativeConstants.NATIVE_HOST_SERVICE_PORT, 7226, 'health, leasing, and spawn share the service port');
 
   const platformSource = readFileSync(path.join(repoRoot, 'mcp/src/native-host/platform.ts'), 'utf8');
   const daemonSource = readFileSync(path.join(repoRoot, 'mcp/src/native-host/daemon.ts'), 'utf8');
@@ -1124,21 +1151,44 @@ async function runWakeDaemonSection() {
 
   const cleanupRoot = await mkdtemp(path.join(os.tmpdir(), 'fsb-wake-cleanup-'));
   try {
-    const dependencies = platform.createNativeHostDaemonDependencies({});
+    const unrelatedListener = net.createServer();
+    await new Promise((resolve, reject) => {
+      unrelatedListener.once('error', reject);
+      unrelatedListener.listen(0, '127.0.0.1', resolve);
+    });
+    const unrelatedAddress = unrelatedListener.address();
+    const startLeasePort = await getFreePort();
+    const dependencies = platform.createNativeHostDaemonDependencies({}, { startLeasePort });
     assertEqual(
       typeof dependencies.acquireStartLease,
       'function',
       'production daemon dependencies expose the OS-backed one-flight lease',
     );
-    if (typeof dependencies.acquireStartLease === 'function') {
-      const firstLease = await dependencies.acquireStartLease();
-      const blockedLease = await dependencies.acquireStartLease();
-      assert(Boolean(firstLease), 'production acquires one exclusive loopback lease');
-      assertEqual(blockedLease, null, 'a concurrent production contender cannot share the lease');
+    let firstLease = null;
+    let blockedLease = null;
+    let reacquiredLease = null;
+    try {
+      firstLease = await dependencies.acquireStartLease();
+      blockedLease = await dependencies.acquireStartLease();
+      assert(
+        unrelatedAddress
+          && typeof unrelatedAddress === 'object'
+          && unrelatedAddress.port !== startLeasePort
+          && Boolean(firstLease),
+        'an unrelated loopback listener does not block the configured start-lease port',
+      );
+      assertEqual(blockedLease, null, 'a concurrent contender cannot share the configured start-lease port');
       await firstLease?.release();
-      const reacquiredLease = await dependencies.acquireStartLease();
-      assert(Boolean(reacquiredLease), 'released production lease is immediately reacquirable');
+      firstLease = null;
+      reacquiredLease = await dependencies.acquireStartLease();
+      assert(Boolean(reacquiredLease), 'released start-lease port is immediately reacquirable');
       await reacquiredLease?.release();
+      reacquiredLease = null;
+    } finally {
+      await firstLease?.release();
+      await blockedLease?.release();
+      await reacquiredLease?.release();
+      await new Promise((resolve) => unrelatedListener.close(resolve));
     }
     const ownerToken = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
     const publishToken = 'dddddddddddddddddddddddddddddddd';
