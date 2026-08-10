@@ -17,7 +17,7 @@
 
 *Manual browser tools, capabilities, trigger watchers, visual sessions, autopilot, vault, and observability for the FSB Chrome Extension.*
 
-[Quick Start](#quick-start) · [Trigger Watchers](#trigger-watchers) · [Tools](#tools-66-total) · [Diagnostics](#diagnostics) · [Architecture](#architecture)
+[Quick Start](#quick-start) · [Trigger Watchers](#trigger-watchers) · [Tools](#tools-68-total) · [Diagnostics](#diagnostics) · [Architecture](#architecture)
 
 </div>
 
@@ -455,7 +455,7 @@ Most tools execute on background tabs without stealing focus. Tools that genuine
 
 ---
 
-## Tools (66 Total)
+## Tools (68 Total)
 
 ### Visual Sessions (2)
 
@@ -524,15 +524,19 @@ Notes:
 
 `search_capabilities` is broader than direct API execution. Results can be `t1-ready`, `t1-guarded-fail-closed`, `learn-pending`, or `discovery-pending`. Non-denied origins are allowed under Auto for ordinary invoke; sensitive origins are flagged and audited; network-capture discovery on sensitive origins still requires extra confirmation; denylisted origins remain blocked.
 
-### Observability (5)
+### Observability and Replay (7)
 
 | Tool | Purpose |
 |------|---------|
 | `list_sessions` | List past automation sessions. |
 | `get_session_detail` | Inspect a specific session. |
+| `get_session_replay` | Inspect the verified, receipt-free replay manifest, logical tabs, and step risks. |
+| `replay_session` | Request one exact-manifest approval in the FSB side panel; FSB opens the recorded tabs automatically after approval. |
 | `get_logs` | Read recent or session-scoped logs. |
 | `search_memory` | Search FSB memory for relevant past experience. |
 | `get_memory_stats` | Inspect memory counts and storage usage. |
+
+One MCP task is recorded as one history session even when it uses several tabs. `complete_task`, `partial_task`, or `fail_task` closes that logical recording; `is_final` only clears the visual overlay, and idle expiry is the fallback when a client omits a terminal task tool.
 
 ### Vault (4)
 

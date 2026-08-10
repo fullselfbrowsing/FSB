@@ -45,6 +45,7 @@ export class TaskQueue {
     'get_extension_config',
     'list_sessions',
     'get_session_detail',
+    'get_session_replay',
     'get_logs',
     'search_memory',
     'search_capabilities',

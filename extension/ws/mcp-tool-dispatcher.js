@@ -86,6 +86,8 @@ const MCP_PHASE199_TOOL_ROUTES = {
   get_page_snapshot: { routeFamily: 'read-only', messageType: 'mcp:get-page-snapshot', handler: handleToolAliasRoute },
   list_sessions: { routeFamily: 'observability', messageType: 'mcp:list-sessions', handler: handleToolAliasRoute },
   get_session_detail: { routeFamily: 'observability', messageType: 'mcp:get-session', handler: handleToolAliasRoute },
+  get_session_replay: { routeFamily: 'observability', messageType: 'mcp:get-session-replay', handler: handleToolAliasRoute },
+  replay_session: { routeFamily: 'replay', messageType: 'mcp:replay-session', handler: handleToolAliasRoute },
   get_logs: { routeFamily: 'observability', messageType: 'mcp:get-logs', handler: handleToolAliasRoute },
   search_memory: { routeFamily: 'observability', messageType: 'mcp:search-memory', handler: handleToolAliasRoute },
   get_memory_stats: { routeFamily: 'observability', messageType: 'mcp:get-memory', handler: handleToolAliasRoute },
@@ -115,6 +117,8 @@ const MCP_PHASE199_MESSAGE_ROUTES = {
   'mcp:list-triggers': { routeFamily: 'trigger', handler: handleTriggerToolMessageRoute },
   'mcp:list-sessions': { routeFamily: 'observability', handler: handleListSessionsMessageRoute },
   'mcp:get-session': { routeFamily: 'observability', handler: handleGetSessionMessageRoute },
+  'mcp:get-session-replay': { routeFamily: 'observability', handler: handleGetSessionReplayMessageRoute },
+  'mcp:replay-session': { routeFamily: 'replay', handler: handleReplaySessionRequestMessageRoute },
   'mcp:get-logs': { routeFamily: 'observability', handler: handleGetLogsMessageRoute },
   'mcp:search-memory': { routeFamily: 'observability', handler: handleSearchMemoryMessageRoute },
   'mcp:get-memory': { routeFamily: 'observability', handler: handleGetMemoryMessageRoute },
@@ -1926,6 +1930,18 @@ function sanitizeSessionDetail(session) {
   }
 
   const sanitized = sanitizeSessionMetadata(session);
+  // The raw replay record carries a signing receipt and is too deeply nested
+  // for the generic metadata sanitizer. Expose it only through the verified,
+  // receipt-free get_session_replay route below.
+  delete sanitized.replay;
+  if (session.replay && typeof session.replay === 'object') {
+    sanitized.replaySummary = {
+      integrity: session.replay.integrity || null,
+      provenance: session.replay.provenance || null,
+      manifestHash: session.replay.manifestHash || null,
+      counts: sanitizeValue(session.replay.counts || {}, { maxString: 200, maxArray: 10, maxDepth: 3 })
+    };
+  }
   sanitized.logs = filterAndCapLogs(session.logs || [], 200);
   if (Array.isArray(session.actionHistory)) {
     sanitized.actionHistory = session.actionHistory.slice(-100).map(sanitizeActionHistoryEntry);
@@ -2574,6 +2590,14 @@ async function handleGetSessionMessageRoute({ payload }) {
 
   const session = await automationLogger.loadSession(payload.sessionId);
   if (session) {
+    if (payload.format === 'text') {
+      if (typeof automationLogger.exportHumanReadable !== 'function') {
+        return createMcpRouteError('get_session_detail', 'observability', MCP_ROUTE_RECOVERY_HINT, {
+          error: 'Human-readable session exporter unavailable'
+        });
+      }
+      return { success: true, format: 'text', text: await automationLogger.exportHumanReadable(payload.sessionId) };
+    }
     return {
       success: true,
       session: sanitizeSessionDetail(session)
@@ -2609,6 +2633,65 @@ async function handleGetSessionMessageRoute({ payload }) {
     error: `Session ${payload.sessionId} not found in active or historical sessions`,
     recoveryHint: 'Use list_sessions to see historical sessions, or get_task_status to check for an active session.'
   };
+}
+
+async function handleGetSessionReplayMessageRoute({ payload }) {
+  if (!payload.sessionId) {
+    return createMcpInvalidParamsError('get_session_replay', 'get_session_replay requires sessionId', {
+      routeFamily: 'observability'
+    });
+  }
+  if (typeof globalThis === 'undefined' || !globalThis.FsbLatticeReplay ||
+      typeof globalThis.FsbLatticeReplay.prepareReplay !== 'function') {
+    return createMcpRouteError('get_session_replay', 'observability', MCP_ROUTE_RECOVERY_HINT, {
+      error: 'Verified replay support unavailable'
+    });
+  }
+  try {
+    const prepared = await globalThis.FsbLatticeReplay.prepareReplay(payload.sessionId);
+    if (!prepared || prepared.verified !== true) throw new Error('Replay integrity verification failed');
+    const preview = typeof fsbReplayPublicPreparation === 'function'
+      ? fsbReplayPublicPreparation(prepared)
+      : {
+          success: true,
+          verified: true,
+          sessionId: prepared.sessionId,
+          manifestHash: prepared.replay?.manifestHash || null,
+          startUrl: prepared.startUrl,
+          tabs: prepared.tabs || [],
+          counts: prepared.counts,
+          steps: prepared.steps || []
+        };
+    // Keep step objects structural; omit receipt/signature material entirely.
+    return {
+      success: true,
+      replay: sanitizeValue(preview, { maxString: 10000, maxArray: 100, maxDepth: 10 })
+    };
+  } catch (error) {
+    return createMcpRouteError('get_session_replay', 'observability', MCP_ROUTE_RECOVERY_HINT, {
+      error: error?.message || String(error)
+    });
+  }
+}
+
+async function handleReplaySessionRequestMessageRoute({ payload }) {
+  if (!payload.sessionId) {
+    return createMcpInvalidParamsError('replay_session', 'replay_session requires sessionId', {
+      routeFamily: 'replay'
+    });
+  }
+  if (typeof requestMcpSessionReplay !== 'function') {
+    return createMcpRouteError('replay_session', 'replay', MCP_ROUTE_RECOVERY_HINT, {
+      error: 'Consent-gated replay support unavailable'
+    });
+  }
+  try {
+    return await requestMcpSessionReplay(payload.sessionId);
+  } catch (error) {
+    return createMcpRouteError('replay_session', 'replay', MCP_ROUTE_RECOVERY_HINT, {
+      error: error?.message || String(error)
+    });
+  }
 }
 
 async function handleGetLogsMessageRoute({ payload }) {

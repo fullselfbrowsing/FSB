@@ -3804,6 +3804,16 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   await _hydrateDelegationForSelectedConversation();
 
+  // MCP replay requests survive side-panel closure in storage.session. Hydrate
+  // them after the conversation surface exists so approval never depends on
+  // the panel having been open when the tool was called.
+  try {
+    const pendingReplays = await sendReplayRuntimeMessage({ action: 'getPendingMcpReplayApprovals' });
+    if (pendingReplays?.success) {
+      (pendingReplays.approvals || []).forEach(renderMcpReplayApproval);
+    }
+  } catch (_error) { /* a later runtime broadcast can still surface approval */ }
+
   // Focus the input
   if (!_delegationUiState.composerLocked) chatInput.focus();
 });
@@ -5424,6 +5434,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       break;
     }
 
+    case 'mcpReplayApprovalRequested':
+      renderMcpReplayApproval(request.approval);
+      break;
+
     case 'statusUpdate':
       if (request.sessionId === currentSessionId) {
         // Auto-switch to chat view if user is on history while automation runs
@@ -6175,6 +6189,92 @@ function renderReplayPreview(preview) {
   return card;
 }
 
+function renderMcpReplayApproval(approval) {
+  if (!approval?.requestId || !approval.preview) return null;
+  const selector = '.mcp-replay-approval-card[data-request-id="' + CSS.escape(approval.requestId) + '"]';
+  if (chatMessages.querySelector(selector)) return null;
+  if (isHistoryViewActive) showChatView();
+
+  const previewCard = renderReplayPreview(approval.preview);
+  previewCard.dataset.mcpReplayRequestId = approval.requestId;
+
+  const card = document.createElement('div');
+  card.className = 'message system new mcp-replay-approval-card';
+  card.dataset.requestId = approval.requestId;
+
+  const copy = document.createElement('div');
+  copy.className = 'replay-decision-text';
+  const tabCount = Math.max(1, approval.preview.tabs?.length || 0);
+  const highImpact = (approval.preview.steps || [])
+    .filter((step) => step.replay?.availability === 'approval-per-step').length;
+  copy.textContent = `An MCP client requested this replay in ${tabCount} fresh tab${tabCount === 1 ? '' : 's'}. ` +
+    `One approval covers only the exact verified manifest${highImpact ? `, including ${highImpact} high-impact step${highImpact === 1 ? '' : 's'}` : ''}.`;
+  card.appendChild(copy);
+
+  const actions = document.createElement('div');
+  actions.className = 'replay-decision-actions';
+  const approve = document.createElement('button');
+  approve.type = 'button';
+  approve.className = 'replay-decision-btn retry';
+  approve.textContent = 'Approve replay';
+  const cancel = document.createElement('button');
+  cancel.type = 'button';
+  cancel.className = 'replay-decision-btn stop';
+  cancel.textContent = 'Cancel';
+  actions.appendChild(approve);
+  actions.appendChild(cancel);
+  card.appendChild(actions);
+
+  const setDisabled = (disabled) => {
+    approve.disabled = disabled;
+    cancel.disabled = disabled;
+  };
+  approve.addEventListener('click', async () => {
+    if (isRunning) {
+      addMessage('Cannot replay while another automation is running. Stop the current task first.', 'system');
+      return;
+    }
+    setDisabled(true);
+    try {
+      addStatusMessage('Opening recorded replay tabs...');
+      const response = await sendReplayRuntimeMessage({
+        action: 'approveMcpReplay',
+        requestId: approval.requestId,
+        manifestHash: approval.manifestHash
+      });
+      if (!response?.success) throw new Error(response?.error || 'Failed to start replay');
+      card.remove();
+      currentSessionId = response.sessionId;
+      setRunningState(response.tabId, response.sessionId);
+      updateStatusMessage('Replaying...');
+    } catch (error) {
+      setDisabled(false);
+      completeStatusMessage('Replay error', 'error');
+      addMessage('Failed to start requested replay: ' + error.message, 'error');
+    }
+  });
+  cancel.addEventListener('click', async () => {
+    setDisabled(true);
+    try {
+      const response = await sendReplayRuntimeMessage({
+        action: 'cancelMcpReplay',
+        requestId: approval.requestId
+      });
+      if (!response?.success) throw new Error(response?.error || 'Replay cancellation failed');
+      card.remove();
+      previewCard.remove();
+      addMessage('Replay request cancelled. No target tabs were opened.', 'system');
+    } catch (error) {
+      setDisabled(false);
+      addMessage('Could not cancel replay request: ' + error.message, 'error');
+    }
+  });
+
+  chatMessages.appendChild(card);
+  scrollToBottom();
+  return card;
+}
+
 async function startReplay(sessionId) {
   try {
     const preview = await sendReplayRuntimeMessage({
@@ -6205,24 +6305,21 @@ async function startReplay(sessionId) {
 
     const approvedScopes = [];
     const onceSteps = preview.steps.filter((step) => step.replay?.availability === 'approval-once');
-    const summary = onceSteps.length > 0
-      ? `Open a fresh tab and replay this timeline? This also approves ${onceSteps.length} DOM/CDP or capability write step${onceSteps.length === 1 ? '' : 's'} once for this run.`
-      : 'Open a fresh tab at the recorded site and replay the verified read/navigation timeline?';
+    const perStep = preview.steps.filter((step) => step.replay?.availability === 'approval-per-step');
+    const tabCount = Math.max(1, preview.tabs?.length || 0);
+    const approvals = [];
+    if (onceSteps.length > 0) approvals.push(`${onceSteps.length} write step${onceSteps.length === 1 ? '' : 's'}`);
+    if (perStep.length > 0) approvals.push(`${perStep.length} high-impact step${perStep.length === 1 ? '' : 's'}`);
+    const summary = `Replay this verified timeline in ${tabCount} fresh tab${tabCount === 1 ? '' : 's'}?` +
+      (approvals.length > 0
+        ? ` This one approval covers the exact signed manifest: ${approvals.join(' and ')}.`
+        : ' The timeline contains only read and navigation steps.');
     if (!confirm(summary)) {
       addMessage('Replay cancelled. The original recording was not changed.', 'system');
       return;
     }
     if (onceSteps.length > 0) approvedScopes.push('write');
-
-    const perStep = preview.steps.filter((step) => step.replay?.availability === 'approval-per-step');
-    for (const step of perStep) {
-      const label = step.capability?.slug || step.tool;
-      if (!confirm(`Approve high-impact replay step ${step.index + 1}: ${label}?`)) {
-        addMessage('Replay cancelled because a high-impact step was not approved.', 'system');
-        return;
-      }
-      approvedScopes.push('step:' + step.id);
-    }
+    perStep.forEach((step) => approvedScopes.push('step:' + step.id));
 
     addStatusMessage('Opening a fresh replay tab...');
     const response = await sendReplayRuntimeMessage({

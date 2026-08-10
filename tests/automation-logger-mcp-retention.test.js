@@ -111,11 +111,14 @@ function actionRecord(sessionId, marker) {
     const logger = loadLogger(storage);
     logger.logSessionStart('session-a', 'First MCP session', 1);
     logger.logSessionStart('session-b', 'Second MCP session', 2);
+    const secondTabAction = action('click');
+    secondTabAction.logicalTab = 'tab-2';
 
     const [savedA, savedB] = await Promise.all([
       logger.saveSession('session-a', {
         task: 'First MCP session', mode: 'mcp-agent', startTime: Date.now(),
-        status: 'completed', actionHistory: [action('click')]
+        status: 'completed', tabId: 1, tabIds: [1, 7], tabCount: 2,
+        taskRunId: 'session-a', actionHistory: [secondTabAction]
       }),
       logger.saveSession('session-b', {
         task: 'Second MCP session', mode: 'mcp-agent', startTime: Date.now(),
@@ -129,6 +132,12 @@ function actionRecord(sessionId, marker) {
     check(storage.store.fsbSessionIndex.length === 2, 'both simultaneous saves remain in fsbSessionIndex');
     check(new Set(storage.store.fsbSessionIndex.map((entry) => entry.id)).size === 2,
       'serialized index contains two distinct session ids');
+    check(storage.store.fsbSessionLogs['session-a'].tabCount === 2 &&
+          storage.store.fsbSessionLogs['session-a'].actionHistory[0].logicalTab === 'tab-2',
+      'full history preserves logical task tab metadata');
+    const indexedA = storage.store.fsbSessionIndex.find((entry) => entry.id === 'session-a');
+    check(indexedA.taskRunId === 'session-a' && indexedA.tabCount === 2 && indexedA.tabIds.length === 2,
+      'history index preserves one task-run identity and its tab count');
   }
 
   console.log('\n--- AutomationLogger expired status normalization ---');

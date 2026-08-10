@@ -26,7 +26,7 @@
     'get_site_guide', 'mcp:get-site-guides', 'search_memory', 'mcp:search-memory',
     'read_sheet', 'readsheet', 'search_capabilities', 'mcp:capabilities-search',
     'get_trigger_status', 'mcp:get-trigger-status', 'list_triggers', 'mcp:list-triggers',
-    'mcp:list-sessions', 'mcp:get-session', 'mcp:get-logs', 'mcp:get-memory',
+    'mcp:list-sessions', 'mcp:get-session', 'mcp:get-session-replay', 'mcp:get-logs', 'mcp:get-memory',
     'mcp:get-diagnostics'
   ]);
   var NAVIGATION_TOOLS = new Set([
@@ -37,7 +37,7 @@
     'report_progress', 'complete_task', 'partial_task', 'fail_task',
     'start_visual_session', 'mcp:start-visual-session', 'end_visual_session',
     'mcp:end-visual-session', 'run_task', 'mcp:start-automation',
-    'mcp:stop-automation', 'mcp:task-status'
+    'mcp:stop-automation', 'mcp:task-status', 'mcp:replay-session'
   ]);
   var PER_STEP_TOOLS = new Set([
     'execute_js', 'upload_file', 'drop_file', 'dropfile', 'trigger',
@@ -216,6 +216,13 @@
     return String((entry && entry.tool) || '');
   }
 
+  function normalizedLogicalTab(context) {
+    var value = context && typeof context.logicalTab === 'string'
+      ? context.logicalTab.trim()
+      : '';
+    return /^[A-Za-z0-9_-]{1,64}$/.test(value) ? value : 'primary';
+  }
+
   function capabilityMetadata(entry) {
     if (entry && entry.capability && typeof entry.capability === 'object' &&
         typeof entry.capability.slug === 'string' && entry.capability.slug) {
@@ -357,7 +364,7 @@
         ? entry.success !== false
         : !(entry && entry.result && entry.result.success === false),
       target: {
-        logicalTab: 'primary',
+        logicalTab: normalizedLogicalTab(context),
         url: safeTarget.url,
         origin: typeof context.targetOrigin === 'string'
           ? safeOrigin(context.targetOrigin)
@@ -400,7 +407,8 @@
     if (session && typeof session.startUrl === 'string') candidates.push(session.startUrl);
     for (var i = 0; i < steps.length; i++) {
       var step = steps[i];
-      if (step && step.tool === 'navigate' && step.arguments && typeof step.arguments.url === 'string') {
+      if (step && (step.tool === 'navigate' || step.tool === 'open_tab') &&
+          step.arguments && typeof step.arguments.url === 'string') {
         candidates.push(step.arguments.url);
       }
       if (step && step.target && typeof step.target.url === 'string') candidates.push(step.target.url);
@@ -409,31 +417,86 @@
     return candidates.find(isReplayableUrl) || null;
   }
 
+  function deriveReplayTabs(session, steps, fallbackStartUrl) {
+    var order = [];
+    (steps || []).forEach(function (step) {
+      var logicalTab = step?.target?.logicalTab || 'primary';
+      if (order.indexOf(logicalTab) === -1) order.push(logicalTab);
+    });
+    if (order.length === 0) order.push('primary');
+    if (order.indexOf('primary') !== -1 && order[0] !== 'primary') {
+      order.splice(order.indexOf('primary'), 1);
+      order.unshift('primary');
+    }
+    return order.map(function (logicalTab, index) {
+      var candidates = [];
+      if (logicalTab === 'primary' && session && typeof session.startUrl === 'string') {
+        candidates.push(session.startUrl);
+      }
+      (steps || []).forEach(function (step) {
+        if ((step?.target?.logicalTab || 'primary') !== logicalTab) return;
+        if ((step.tool === 'navigate' || step.tool === 'open_tab') &&
+            step.arguments && typeof step.arguments.url === 'string') {
+          candidates.push(step.arguments.url);
+        }
+        if (typeof step?.target?.url === 'string') candidates.push(step.target.url);
+      });
+      // A global fallback may have been derived from another logical tab. Only
+      // use it for a single-tab legacy capture; cross-tab borrowing would map
+      // the first owned replay tab to the wrong recorded page.
+      if (logicalTab === 'primary' && order.length === 1 && typeof fallbackStartUrl === 'string') {
+        candidates.push(fallbackStartUrl);
+      }
+      var rawStartUrl = candidates.find(isReplayableUrl) || null;
+      var safeStart = sanitizeManifestUrl(rawStartUrl);
+      var redacted = safeStart.redacted || (steps || []).some(function (step) {
+        return (step?.target?.logicalTab || 'primary') === logicalTab &&
+          step?.target?.url === safeStart.url && step?.target?.redacted === true;
+      });
+      return {
+        id: logicalTab,
+        order: index,
+        startUrl: safeStart.url,
+        startOrigin: safeOrigin(safeStart.url),
+        startUrlState: redacted ? 'redacted' : (isReplayableUrl(safeStart.url) ? 'ready' : 'missing')
+      };
+    });
+  }
+
   function createReplayRecord(session, entries, provenance) {
     var replayProvenance = provenance === 'legacy-import' ? 'legacy-import' : 'capture';
     var sourceEntries = Array.isArray(entries) ? entries.slice(-100) : [];
     var steps = sourceEntries.map(normalizeReplayEntry);
     var derivedStartUrl = deriveStartUrl(session || {}, steps);
     var safeStart = sanitizeManifestUrl(derivedStartUrl);
-    var startUrl = safeStart.url;
-    var startUrlRedacted = session?.startUrlRedacted === true || safeStart.redacted ||
+    var tabs = deriveReplayTabs(session || {}, steps, safeStart.url);
+    var primaryTab = tabs.find(function (tab) { return tab.id === 'primary'; }) || tabs[0];
+    // If a primary track exists, its missing/redacted URL must remain missing.
+    // A later track may still be replayable, but background bootstrap selection
+    // is responsible for opening that track under its own logical tab id.
+    var startUrl = primaryTab ? primaryTab.startUrl : (tabs[0]?.startUrl || safeStart.url);
+    var startUrlRedacted = session?.startUrlRedacted === true || primaryTab?.startUrlState === 'redacted' ||
       steps.some(function (step) { return step?.target?.url === startUrl && step?.target?.redacted === true; });
     var startUrlMissing = !isReplayableUrl(startUrl);
-    if (startUrlRedacted || startUrlMissing) {
-      steps.forEach(function (step) {
+    steps.forEach(function (step) {
+      var logicalTab = step?.target?.logicalTab || 'primary';
+      var tab = tabs.find(function (candidate) { return candidate.id === logicalTab; });
+      var tabRedacted = tab?.startUrlState === 'redacted';
+      var tabMissing = !tab || tab.startUrlState === 'missing';
+      if (tabRedacted || tabMissing) {
         var availability = step?.replay?.availability;
         if (availability === 'ready' || availability === 'approval-once' || availability === 'approval-per-step') {
           step.inputState = 'redacted';
           step.replay = {
             risk: 'inspect-only',
             availability: 'needs-input',
-            reason: startUrlRedacted
-              ? 'The recorded starting URL contained sensitive input that was redacted'
-              : 'The recording does not contain a safe HTTP(S) starting URL'
+            reason: tabRedacted
+              ? 'This tab\'s recorded starting URL contained sensitive input that was redacted'
+              : 'This tab does not contain a safe HTTP(S) starting URL'
           };
         }
-      });
-    }
+      }
+    });
     var manifest = {
       kind: REPLAY_MANIFEST_KIND,
       version: 1,
@@ -450,6 +513,7 @@
       startUrl: startUrl,
       startOrigin: safeOrigin(startUrl),
       startUrlState: startUrlRedacted ? 'redacted' : (startUrlMissing ? 'missing' : 'ready'),
+      tabs: tabs,
       outcome: {
         status: (session && session.status) || 'unknown',
         outcome: (session && session.outcome) || null,
@@ -631,6 +695,7 @@
       offline: materialized.offline,
       receiptCid: replayRecord.receiptCid || materialized.receiptCid || null,
       startUrl: replayRecord.manifest.startUrl,
+      tabs: Array.isArray(replayRecord.manifest.tabs) ? replayRecord.manifest.tabs : [],
       steps: replayRecord.manifest.steps,
       counts: replayRecord.counts
     };

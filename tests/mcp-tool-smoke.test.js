@@ -45,6 +45,8 @@ const requiredSmokeTools = [
   'get_trigger_status',
   'list_triggers',
   'get_logs',
+  'get_session_replay',
+  'replay_session',
   'back',
 ];
 
@@ -103,6 +105,15 @@ async function run() {
       'mcp:get-dom': { success: true, elements: [{ ref: 'e5' }] },
       'mcp:get-page-snapshot': { success: true, snapshot: '# Example\n- e1: button "Submit"', elementCount: 1 },
       'mcp:get-site-guides': { success: true, guide: { site: 'example.com', selectors: {} } },
+      'mcp:get-session-replay': {
+        success: true,
+        replay: { verified: true, manifestHash: 'smoke-manifest-hash', steps: [] }
+      },
+      'mcp:replay-session': {
+        success: true,
+        status: 'approval_required',
+        requestId: 'smoke-replay-approval'
+      },
       'mcp:start-visual-session': ({ payload }) => ({
         success: true,
         sessionToken: 'visual_token_123',
@@ -359,6 +370,20 @@ async function run() {
     getLogsCall && getLogsCall.message,
     { type: 'mcp:get-logs', payload: { sessionId: 'smoke-session', count: 10 } },
     'get_logs routes through mcp:get-logs with observability payload',
+  );
+
+  const getReplayCall = await invokeTool(harness, 'get_session_replay', { sessionId: 'smoke-session' });
+  assertDeepEqual(
+    getReplayCall && getReplayCall.message,
+    { type: 'mcp:get-session-replay', payload: { sessionId: 'smoke-session' } },
+    'get_session_replay requests the verified structured manifest',
+  );
+
+  const replaySessionCall = await invokeTool(harness, 'replay_session', { sessionId: 'smoke-session' });
+  assertDeepEqual(
+    replaySessionCall && replaySessionCall.message,
+    { type: 'mcp:replay-session', payload: { sessionId: 'smoke-session' } },
+    'replay_session requests side-panel consent without target-page input',
   );
 
   // Phase 242 plan 02: 'back' routes through mcp:go-back. Bridge response

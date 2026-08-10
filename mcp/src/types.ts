@@ -28,6 +28,8 @@ export type MCPMessageType =
   | 'mcp:read-page'           // Read page text content
   | 'mcp:list-sessions'       // List all past session summaries
   | 'mcp:get-session'         // Get full session detail by ID
+  | 'mcp:get-session-replay'  // Get the verified structured replay preview by ID
+  | 'mcp:replay-session'      // Request UI consent for a verified replay
   | 'mcp:get-logs'            // Get recent logs or session-specific logs
   | 'mcp:search-memory'       // Search memories with query and filters
   | 'mcp:create-agent'        // Create a new background agent

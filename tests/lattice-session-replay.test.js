@@ -234,6 +234,90 @@ async function main() {
     assert.equal(captured.manifest.steps[4].replay.availability, 'unsupported');
     assert.deepEqual(captured.counts, { total: 5, executable: 3, approvalRequired: 2, blocked: 2 });
   });
+  const multiTabCapture = replayHelpers.createReplayRecord({
+    sessionId: 'session_multitab_manifest',
+    task: 'Research across several tabs',
+    endTime: 1785500000000,
+    status: 'completed'
+  }, [{
+    tool: 'navigate',
+    requestPayload: { params: { url: 'https://example.com/primary' } },
+    response: { success: true },
+    success: true,
+    replayContext: {
+      logicalTab: 'primary',
+      targetUrl: 'https://example.com/primary',
+      targetOrigin: 'https://example.com',
+      routeFamily: 'background'
+    }
+  }, {
+    tool: 'open_tab',
+    requestPayload: { params: { url: 'https://docs.example.net/reference' } },
+    response: { success: true },
+    success: true,
+    replayContext: {
+      logicalTab: 'tab-2',
+      targetUrl: 'https://docs.example.net/reference',
+      targetOrigin: 'https://docs.example.net',
+      routeFamily: 'background'
+    }
+  }, {
+    tool: 'click',
+    requestPayload: { params: { selector: '#missing-start' } },
+    response: { success: true },
+    success: true,
+    replayContext: { logicalTab: 'tab-3', routeFamily: 'content' }
+  }], 'capture');
+  check('one manifest preserves ordered logical tabs and blocks only a tab missing its start URL', () => {
+    assert.deepEqual(multiTabCapture.manifest.tabs.map((tab) => tab.id), ['primary', 'tab-2', 'tab-3']);
+    assert.deepEqual(
+      multiTabCapture.manifest.tabs.map((tab) => tab.startUrlState),
+      ['ready', 'ready', 'missing']
+    );
+    assert.equal(multiTabCapture.manifest.steps[0].target.logicalTab, 'primary');
+    assert.equal(multiTabCapture.manifest.steps[1].target.logicalTab, 'tab-2');
+    assert.equal(multiTabCapture.manifest.steps[1].replay.availability, 'ready');
+    assert.equal(multiTabCapture.manifest.steps[2].replay.availability, 'needs-input');
+    assert.deepEqual(multiTabCapture.counts, {
+      total: 3,
+      executable: 2,
+      approvalRequired: 0,
+      blocked: 1
+    });
+  });
+  const secondaryBootstrapCapture = replayHelpers.createReplayRecord({
+    sessionId: 'session_secondary_bootstrap',
+    task: 'Continue from a later tab',
+    endTime: 1785500000000,
+    status: 'completed'
+  }, [{
+    tool: 'click',
+    requestPayload: { params: { selector: '#unknown-primary' } },
+    response: { success: true },
+    success: true,
+    replayContext: { logicalTab: 'primary', routeFamily: 'content' }
+  }, {
+    tool: 'navigate',
+    requestPayload: { params: { url: 'https://docs.example.net/continue' } },
+    response: { success: true },
+    success: true,
+    replayContext: {
+      logicalTab: 'tab-2',
+      targetUrl: 'https://docs.example.net/continue',
+      targetOrigin: 'https://docs.example.net',
+      routeFamily: 'background'
+    }
+  }], 'capture');
+  check('a later tab URL is never borrowed as the primary tab start URL', () => {
+    assert.equal(secondaryBootstrapCapture.manifest.startUrl, null);
+    assert.equal(secondaryBootstrapCapture.manifest.startUrlState, 'missing');
+    assert.deepEqual(
+      secondaryBootstrapCapture.manifest.tabs.map((tab) => [tab.id, tab.startUrlState]),
+      [['primary', 'missing'], ['tab-2', 'ready']]
+    );
+    assert.equal(secondaryBootstrapCapture.manifest.steps[0].replay.availability, 'needs-input');
+    assert.equal(secondaryBootstrapCapture.manifest.steps[1].replay.availability, 'ready');
+  });
   check('classification validation rejects a signed step that understates its risk', () => {
     const tamperedStep = JSON.parse(JSON.stringify(captured.manifest.steps[1]));
     tamperedStep.replay = { risk: 'read', availability: 'ready', reason: null };

@@ -43,6 +43,7 @@ const MCP_ICON_READ_MESSAGE_TYPES = new Set([
   'mcp:stop-trigger', 'mcp:get-trigger-status', 'mcp:list-triggers', 'mcp:task-status',
   'mcp:get-task-snapshot', 'mcp:get-status', 'mcp:get-config', 'mcp:get-site-guides',
   'mcp:get-memory', 'mcp:search-memory', 'mcp:list-sessions', 'mcp:get-session',
+  'mcp:get-session-replay',
   'mcp:get-logs', 'mcp:get-diagnostics', 'mcp:capabilities-search', 'mcp:list-agents',
   'mcp:list-credentials', 'mcp:list-payments'
 ]);
@@ -1278,6 +1279,12 @@ class MCPBridgeClient {
       case 'mcp:get-session':
         return this._handleGetSession(payload);
 
+      case 'mcp:get-session-replay':
+        return this._handleGetSessionReplay(payload);
+
+      case 'mcp:replay-session':
+        return this._handleReplaySessionRequest(payload);
+
       case 'mcp:get-logs':
         return this._handleGetLogs(payload);
 
@@ -1571,13 +1578,14 @@ class MCPBridgeClient {
    * in tests/action-tool-agent-scoped.test.js and
    * tests/ownership-error-codes.test.js keep resolveAgentTabOrError in view.
    */
+  /**
+   * Resolve safe replay bootstrap context for ordinary HTTP(S) pages. Google
+   * Sheets targets deliberately stay boolean-only because the document path is
+   * private content that the generic URL sanitizer cannot recognize. Unresolved
+   * tabs also remain boolean-only and fail closed.
+   */
   async _resolveMcpSessionRecordTarget(resolvedTabId, knownUrl) {
-    const unresolved = {
-      targetOriginResolved: false,
-      spreadsheetTarget: false,
-      targetUrl: null,
-      targetOrigin: null
-    };
+    const unresolved = { targetOriginResolved: false, spreadsheetTarget: false };
     try {
       if (!Number.isFinite(resolvedTabId)) return unresolved;
       let targetUrl = typeof knownUrl === 'string' && knownUrl.length > 0 ? knownUrl : '';
@@ -1586,14 +1594,17 @@ class MCPBridgeClient {
         targetUrl = (tab && (tab.url || tab.pendingUrl)) || '';
       }
       if (!targetUrl) return unresolved;
+      if (isMcpGoogleSheetsDocumentUrl(targetUrl)) {
+        return { targetOriginResolved: true, spreadsheetTarget: true };
+      }
       let targetOrigin = null;
       try {
         const parsed = new URL(targetUrl);
         if (parsed.protocol === 'http:' || parsed.protocol === 'https:') targetOrigin = parsed.origin;
-      } catch (_e) { /* unresolved origin remains fail-closed */ }
+      } catch (_e) { /* recorder keeps the URL inspectable but replay origin unresolved */ }
       return {
         targetOriginResolved: true,
-        spreadsheetTarget: isMcpGoogleSheetsDocumentUrl(targetUrl),
+        spreadsheetTarget: false,
         targetUrl,
         targetOrigin
       };
@@ -1616,6 +1627,11 @@ class MCPBridgeClient {
       const target = await this._resolveMcpSessionRecordTarget(tabId);
       if (!globalThis.fsbMcpSessionRecorder ||
           typeof globalThis.fsbMcpSessionRecorder.recordDispatch !== 'function') return;
+      const replayContext = { routeFamily: 'unsupported' };
+      if (target.spreadsheetTarget !== true) {
+        if (typeof target.targetUrl === 'string') replayContext.targetUrl = target.targetUrl;
+        if (typeof target.targetOrigin === 'string') replayContext.targetOrigin = target.targetOrigin;
+      }
       globalThis.fsbMcpSessionRecorder.recordDispatch({
         client: typeof globalThis.resolveMcpClientLabel === 'function'
           ? globalThis.resolveMcpClientLabel(payload)
@@ -1626,11 +1642,7 @@ class MCPBridgeClient {
         success: false,
         dispatcher_route: 'unsupported-message',
         tabId: Number.isFinite(tabId) ? tabId : null,
-        replayContext: {
-          targetUrl: target.targetUrl || null,
-          targetOrigin: target.targetOrigin || null,
-          routeFamily: 'unsupported'
-        }
+        replayContext
       });
     } catch (_error) { /* unsupported-route inspection never changes the wire error */ }
   }
@@ -1641,6 +1653,22 @@ class MCPBridgeClient {
           !globalThis.fsbMcpSessionRecorder ||
           typeof globalThis.fsbMcpSessionRecorder.recordAction !== 'function') {
         return;
+      }
+      const replayContext = targetContext ? {
+        routeFamily: (() => {
+          try {
+            const definition = typeof getToolByName === 'function'
+              ? getToolByName(payload && payload.tool)
+              : null;
+            return definition && definition._route ? definition._route : 'content';
+          } catch (_e) {
+            return 'content';
+          }
+        })()
+      } : null;
+      if (replayContext && targetContext.spreadsheetTarget !== true) {
+        if (typeof targetContext.targetUrl === 'string') replayContext.targetUrl = targetContext.targetUrl;
+        if (typeof targetContext.targetOrigin === 'string') replayContext.targetOrigin = targetContext.targetOrigin;
       }
       let sessionRecordEntry = {
         client: (typeof globalThis.resolveMcpClientLabel === 'function')
@@ -1655,20 +1683,7 @@ class MCPBridgeClient {
         requireTargetOrigin: true,
         targetOriginResolved: targetContext && targetContext.targetOriginResolved === true,
         spreadsheetTarget: targetContext && targetContext.spreadsheetTarget === true,
-        replayContext: targetContext ? {
-          targetUrl: targetContext.targetUrl || null,
-          targetOrigin: targetContext.targetOrigin || null,
-          routeFamily: (() => {
-            try {
-              const definition = typeof getToolByName === 'function'
-                ? getToolByName(payload && payload.tool)
-                : null;
-              return definition && definition._route ? definition._route : 'content';
-            } catch (_e) {
-              return 'content';
-            }
-          })()
-        } : null
+        replayContext
       };
       const spreadsheetRedactor = globalThis.FsbSpreadsheetRecordRedaction;
       const spreadsheetTool = sessionRecordEntry.spreadsheetTarget === true ||
@@ -2672,6 +2687,24 @@ class MCPBridgeClient {
   async _handleGetSession(payload) {
     const response = await dispatchMcpMessageRoute({
       type: 'mcp:get-session',
+      payload,
+      client: this
+    });
+    return response || {};
+  }
+
+  async _handleGetSessionReplay(payload) {
+    const response = await dispatchMcpMessageRoute({
+      type: 'mcp:get-session-replay',
+      payload,
+      client: this
+    });
+    return response || {};
+  }
+
+  async _handleReplaySessionRequest(payload) {
+    const response = await dispatchMcpMessageRoute({
+      type: 'mcp:replay-session',
       payload,
       client: this
     });

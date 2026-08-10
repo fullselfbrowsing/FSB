@@ -2,7 +2,7 @@
 
 ## 1. Project Description
 
-FSB (Full Self-Browsing) is an open-source Chrome extension that automates the browser through natural language. You describe a task in plain English; FSB plans the clicks, types, and navigation to complete it. The extension runs in your browser with your own API keys, encrypted local storage, and opt-out anonymous usage telemetry for aggregate public stats only. Multi-model AI (xAI Grok, OpenAI, Anthropic Claude, Google Gemini, OpenRouter, LM Studio, custom OpenAI-compatible endpoints), 56 canonical browser tools, a 66-tool MCP surface, 142+ site-specific guides, reactive trigger watchers, real file uploads, and a 128-app native capability catalog for verified first-party API execution. Current release: FSB v0.9.91 (Chrome extension) with fsb-mcp-server 0.11.0 (npm MCP package). BSL 1.1 licensed.
+FSB (Full Self-Browsing) is an open-source Chrome extension that automates the browser through natural language. You describe a task in plain English; FSB plans the clicks, types, and navigation to complete it. The extension runs in your browser with your own API keys, encrypted local storage, and opt-out anonymous usage telemetry for aggregate public stats only. Multi-model AI (xAI Grok, OpenAI, Anthropic Claude, Google Gemini, OpenRouter, LM Studio, custom OpenAI-compatible endpoints), 56 canonical browser tools, a 68-tool MCP surface, 142+ site-specific guides, reactive trigger watchers, real file uploads, and a 128-app native capability catalog for verified first-party API execution. Current release: FSB v0.9.91 (Chrome extension) with fsb-mcp-server 0.11.0 (npm MCP package). BSL 1.1 licensed.
 
 FSB also works especially well as an MCP browser layer for AI agents. Claude Code, Codex, Cursor, VS Code, Windsurf, OpenClaw, Hermes, and other MCP clients can use FSB to operate a real Chrome browser, inspect page state, verify outcomes, and feed observations back into their own coding or autonomy loop.
 
@@ -33,7 +33,7 @@ The bring-your-own-key model is deliberate. The user picks the model -- frontier
 - Operator loop: every workflow can act on the page, observe what changed, verify the outcome, report errors, and recover when the web app shifts.
 - Reactive monitoring: arm a trigger watcher on one page element and get notified on value changes, thresholds, deltas, or regex matches instead of polling manually.
 
-### MCP tool surface (66 tools)
+### MCP tool surface (68 tools)
 - Navigation and tabs: navigate, search, refresh, go_back, go_forward, back, open_tab, close_tab, switch_tab, list_tabs
 - Clicking and pointer: click, double_click, right_click, hover, click_at, double_click_at, click_and_hold, drag, drag_drop, drag_variable_speed
 - Text and keyboard: type_text, insert_text, clear_input, press_key, press_enter, select_text_range, focus

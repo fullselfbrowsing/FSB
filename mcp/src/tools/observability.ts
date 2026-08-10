@@ -6,11 +6,12 @@ import { AgentScope } from '../agent-scope.js';
 import { mapFSBError } from '../errors.js';
 
 /**
- * Register observability tools: list_sessions, get_session_detail,
+ * Register observability tools: list_sessions, get_session_detail, get_session_replay,
  * get_logs, search_memory, get_memory_stats.
  *
- * All tools are read-only and bypass the TaskQueue mutation
- * serialization (their names are in the readOnlyTools set).
+ * Inspection tools are read-only and bypass TaskQueue mutation serialization.
+ * replay_session is intentionally serialized because it creates a pending
+ * user-consent request and can start browser execution after approval.
  */
 export function registerObservabilityTools(
   server: McpServer,
@@ -54,6 +55,42 @@ export function registerObservabilityTools(
         const result = await bridge.sendAndWait(
           { type: 'mcp:get-session', payload: { sessionId, format } },
           { timeout: 10_000 },
+        );
+        return mapFSBError(result);
+      });
+    },
+  );
+
+  server.tool(
+    'get_session_replay',
+    'Get the verified, structurally redacted replay manifest for a recorded session. Returns exact executable step structure, logical tab targets, risk classifications, and the manifest hash without returning signing receipts. Use this instead of reconstructing a replay from logs. Related: list_sessions (find a session), replay_session (request a consent-gated replay).',
+    { sessionId: z.string().min(1).describe('Session ID from list_sessions') },
+    async ({ sessionId }) => {
+      if (!bridge.isConnected) {
+        return mapFSBError({ success: false, error: 'extension_not_connected' });
+      }
+      return queue.enqueue('get_session_replay', async () => {
+        const result = await bridge.sendAndWait(
+          { type: 'mcp:get-session-replay', payload: { sessionId } },
+          { timeout: 20_000 },
+        );
+        return mapFSBError(result);
+      });
+    },
+  );
+
+  server.tool(
+    'replay_session',
+    'Request replay of a recorded session. FSB verifies the signed manifest and shows one approval card in the extension side panel; browser execution starts automatically only after the user approves that exact manifest hash. FSB creates the recorded tabs itself, so never ask the user to open target pages manually. Related: get_session_replay (inspect first), list_sessions (find a session).',
+    { sessionId: z.string().min(1).describe('Session ID from list_sessions') },
+    async ({ sessionId }) => {
+      if (!bridge.isConnected) {
+        return mapFSBError({ success: false, error: 'extension_not_connected' });
+      }
+      return queue.enqueue('replay_session', async () => {
+        const result = await bridge.sendAndWait(
+          { type: 'mcp:replay-session', payload: { sessionId } },
+          { timeout: 20_000 },
         );
         return mapFSBError(result);
       });

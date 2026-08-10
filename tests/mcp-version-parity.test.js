@@ -261,6 +261,23 @@ async function run() {
   const llmsFullSource = readText('showcase/angular/scripts/llms-full.source.md');
   const llmsPublic = readText('showcase/angular/public/llms.txt');
   const llmsFullPublic = readText('showcase/angular/public/llms-full.txt');
+  const promptSource = readText('mcp/src/prompts/index.ts');
+  const liveToolCountSources = [
+    ['root README', rootReadme],
+    ['MCP README', packageReadme],
+    ['extension onboarding', readText('extension/ui/onboarding.js')],
+    ['showcase about page', readText('showcase/angular/src/app/pages/about/about-page.component.html')],
+    ['showcase agents page', readText('showcase/angular/src/app/pages/agents/agents-page.component.html')],
+    ['showcase agents metadata', readText('showcase/angular/src/app/pages/agents/agents-page.component.ts')],
+    ['showcase support page', readText('showcase/angular/src/app/pages/support/support-page.component.html')],
+    ['showcase support metadata', readText('showcase/angular/src/app/pages/support/support-page.component.ts')],
+    ['LLM summary source', llmsSource],
+    ['LLM full source', llmsFullSource],
+    ['generated LLM summary', llmsPublic],
+    ['generated LLM full text', llmsFullPublic],
+    ...['messages.xlf', 'messages.de.xlf', 'messages.es.xlf', 'messages.ja.xlf', 'messages.zh-CN.xlf', 'messages.zh-TW.xlf']
+      .map((file) => [`showcase locale ${file}`, readText(`showcase/angular/src/locale/${file}`)]),
+  ];
 
   console.log('\n--- metadata parity ---');
   assertEqual(canonicalVersion, expectedReleaseVersion, 'mcp/package.json advances to the intended release version');
@@ -293,6 +310,23 @@ async function run() {
   ]) {
     assert(content.includes(`fsb-mcp-server ${canonicalVersion}`), `${name} advertises the canonical MCP release`);
   }
+  for (const [name, content] of liveToolCountSources) {
+    assert(!/\b66(?:-tool| MCP| granular| registered)|\(66 tools\)|Tools \(66 Total\)/u.test(content),
+      `${name} contains no stale 66-tool surface claim`);
+  }
+  assert(rootReadme.includes('68 registered MCP tools') && packageReadme.includes('## Tools (68 Total)'),
+    'primary README authorities advertise the 68-tool registered surface');
+  const rootSurfaceTable = rootReadme.match(/\| Visual sessions \|[\s\S]*?\n\nRead-only tools bypass/u);
+  const rootSurfaceCounts = rootSurfaceTable
+    ? Array.from(rootSurfaceTable[0].matchAll(/^\|[^|]+\|\s*(\d+)\s*\|/gmu), (match) => Number(match[1]))
+    : [];
+  assert(rootSurfaceCounts.length === 8 && rootSurfaceCounts.reduce((sum, count) => sum + count, 0) === 68,
+    'root README category table contains eight surfaces totaling 68 tools');
+  assert(promptSource.includes('FSB Tool Reference (48 tools)') &&
+    promptSource.includes('## Observability (7 tools)') &&
+    promptSource.includes('| get_session_replay |') &&
+    promptSource.includes('| replay_session |'),
+  'shipped tool-reference prompt advertises its 48 listed tools and both replay observability tools');
 
   console.log('\n--- cli output parity ---');
   const helpOutput = runCommand('node mcp/build/index.js help');
@@ -316,7 +350,12 @@ async function run() {
 
   console.log('\n--- Phase 57 additive wire freeze ---');
   const messageTypes = extractMcpMessageTypes(typesSource);
-  const mergedAdditiveMessageTypes = ['mcp:task-status', 'system:client-inventory'];
+  const mergedAdditiveMessageTypes = [
+    'mcp:task-status',
+    'mcp:get-session-replay',
+    'mcp:replay-session',
+    'system:client-inventory',
+  ];
   const historicalMessageTypes = messageTypes.filter(
     (type) => !mergedAdditiveMessageTypes.includes(type),
   );
@@ -327,7 +366,7 @@ async function run() {
   assert(
     JSON.stringify(messageTypes.filter((type) => mergedAdditiveMessageTypes.includes(type)))
       === JSON.stringify(mergedAdditiveMessageTypes),
-    'the merged branch retains only task-status and client-inventory as additive MCPMessageType values',
+    'the merged branch retains the reviewed task-status, replay, and client-inventory additive MCPMessageType values',
   );
   assert(
     /type: 'mcp:result' \| 'mcp:progress' \| 'mcp:error';/.test(typesSource),

@@ -192,7 +192,7 @@
         <div class="ob-feat-row">
           <div class="ob-feat"><i class="fa-solid fa-bolt"></i><b>Direct API</b><span>Talks to apps, not just clicks</span></div>
           <div class="ob-feat"><i class="fa-solid fa-compass"></i><b>130+ guides</b><span>Across 17 categories</span></div>
-          <div class="ob-feat"><i class="fa-solid fa-plug"></i><b>66 MCP tools</b><span>From your coding agent</span></div>
+          <div class="ob-feat"><i class="fa-solid fa-plug"></i><b>68 MCP tools</b><span>From your coding agent</span></div>
         </div>
         <div class="ob-nav ob-nav-center"><button class="ob-btn ob-btn-primary ob-btn-wide" id="obGetStarted" type="button">Get started <i class="fa-solid fa-arrow-right"></i></button></div>
         <button class="ob-skip ob-skip-center" id="obWelcomeSkip" type="button">Skip setup for now</button>
@@ -214,7 +214,7 @@
             <div class="ob-path-ic"><i class="fa-solid fa-plug"></i></div>
             <div class="ob-path-body">
               <div class="ob-path-head"><span class="ob-path-name">Agent</span><span class="ob-badge">Recommended</span></div>
-              <div class="ob-path-desc">Use FSB as an MCP server in Claude Code, Cursor, VS Code, OpenClaw and more. 66 tools, no API key, nothing to configure in the browser.</div>
+              <div class="ob-path-desc">Use FSB as an MCP server in Claude Code, Cursor, VS Code, OpenClaw and more. 68 tools, no API key, nothing to configure in the browser.</div>
             </div>
             <div class="ob-path-check"><i class="fa-solid fa-check"></i></div>
           </button>
@@ -262,7 +262,7 @@
         </div>
         <div class="ob-mcp-steps">
           <div class="ob-mcp-step"><span class="n">1</span><span>Run the command in your terminal. <b>Hover copy</b> to pick a specific client.</span></div>
-          <div class="ob-mcp-step"><span class="n">2</span><span>FSB writes itself into your agent's MCP config. <b>66 tools</b>, zero manual JSON.</span></div>
+          <div class="ob-mcp-step"><span class="n">2</span><span>FSB writes itself into your agent's MCP config. <b>68 tools</b>, zero manual JSON.</span></div>
           <div class="ob-mcp-step"><span class="n">3</span><span>Ask your agent to browse. It drives FSB's DOM engine for you.</span></div>
         </div>
         <a class="ob-claw" href="#" id="obOpenClaw">
@@ -730,7 +730,7 @@
       return [
         { k: 'Setup', v: 'MCP server' },
         { k: 'Command', v: 'fsb-mcp-server', mono: true },
-        { k: 'Tools', v: '66 available' },
+        { k: 'Tools', v: '68 available' },
         { k: 'Access', v: 'Granted on install', ok: true },
         { k: 'Version', v: `v${VERSION}`, mono: true }
       ];

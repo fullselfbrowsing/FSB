@@ -23,10 +23,9 @@
  *       timestamp}, in dispatch order, wire verbs stored replay-compatibly.
  *   3.  Read-only JOIN by agentId (sidecar-less dispatch appends to the open
  *       session; unknown agentId creates nothing).
- *   4.  isFinal close -> saveSession exactly once with mode 'mcp-agent',
- *       task = first visualReason, final action included, mcpClient set;
- *       no provider-backed memory extraction; a safe candidate is retained.
- *       Snake_case is_final tolerated.
+ *   4.  isFinal remains an overlay-only signal; terminal task-status closes
+ *       exactly once with mode 'mcp-agent', task = first visualReason, final
+ *       action included, and mcpClient set.
  *   5.  60s idle expiry with sliding chrome.alarms re-arm (fake clock/alarm
  *       store -- no real waiting; no premature close).
  *   6.  run_task skipped entirely (automation engine already records it).
@@ -51,10 +50,9 @@
  *   11. Eviction restore: a v:1 fsbMcpSessionBuffer envelope with one
  *       expired + one live session restores correctly (_restoreFromBuffer).
  *   12. Malformed / wrong-version envelope treated as canonical empty.
- *   13. Tab identity (review finding #1): params.tab_id (wire snake_case)
- *       keys sessions -- no agentId::none collapse; explicit resolved tabId
- *       wins over params; camelCase back-compat; same agent on two tabs
- *       yields two distinct sessions.
+ *   13. Tab identity: params.tab_id (wire snake_case) establishes the first
+ *       track; explicit resolved tabId wins over params; camelCase remains
+ *       compatible; later tabs join one logical task with stable tab tracks.
  *   14. Bootstrap birth (open_tab/switch_tab): empty params + post-dispatch
  *       resolved tabId key the session; non-replayable wire verb stored
  *       verbatim.
@@ -323,7 +321,8 @@ function bridgeAction(o) {
     payload,
     response: o.response === undefined ? { success: true } : o.response,
     success: o.success === undefined ? true : o.success,
-    tabId: o.tabId === undefined ? null : o.tabId
+    tabId: o.tabId === undefined ? null : o.tabId,
+    replayContext: o.replayContext
   };
 }
 
@@ -429,8 +428,8 @@ function readDispatch(o) {
     passAssertEqual(logger.calls.saveSession.length, 0, 'no close happened during joins');
   }
 
-  // -- Test 4: isFinal close -> history + safe memory candidate ---------------
-  console.log('\n--- Test 4: isFinal close saves history without provider extraction ---');
+  // -- Test 4: terminal task status closes; isFinal is overlay-only -----------
+  console.log('\n--- Test 4: task status closes while isFinal remains overlay-only ---');
   {
     const { logger, memories, taskMemories } = await freshSection();
     recorder.recordAction(bridgeAction({
@@ -446,7 +445,15 @@ function readDispatch(o) {
       visualReason: 'Send the report', client: 'Claude', isFinal: true
     }));
     await recorder._drainForTests();
-    passAssertEqual(logger.calls.saveSession.length, 1, 'saveSession invoked exactly once on isFinal');
+    passAssertEqual(logger.calls.saveSession.length, 0, 'isFinal does not split or close the logical recording');
+    passAssertEqual(Object.keys(recorder._peekOpenSessions()).length, 1,
+      'the logical recording remains open after the overlay clears');
+    recorder.recordTaskOutcome({
+      tool: 'complete_task', params: { summary: 'Weekly report sent', tab_id: 7 },
+      payload: { agentId: 'agent-1' }
+    });
+    await recorder._drainForTests();
+    passAssertEqual(logger.calls.saveSession.length, 1, 'complete_task saves the logical recording exactly once');
     const saved = logger.calls.saveSession[0];
     passAssert(/^session_\d+$/.test(saved.sessionId), 'saveSession got the session id');
     passAssertEqual(saved.sessionData.mode, 'mcp-agent', "session.mode === 'mcp-agent' (locked schema value)");
@@ -459,22 +466,24 @@ function readDispatch(o) {
     passAssertEqual(saved.sessionData.iterationCount, 3, 'iterationCount = actionHistory length');
     passAssertEqual(saved.sessionData.lastUrl, 'https://example.com/report', 'lastUrl carried onto the session');
     passAssertEqual(memories.calls.length, 0, 'session close never calls provider-backed extractAndStoreMemories');
-    passAssertEqual(taskMemories.calls.length, 0, 'session close creates no long-term memory without a lifecycle summary');
-    const candidates = recorder._peekMemoryCandidates();
-    passAssertEqual(Object.keys(candidates).length, 1, 'close retains one short-lived safe memory candidate');
-    passAssertEqual(candidates[saved.sessionId].sessionId, saved.sessionId, 'candidate is keyed by the source session id');
-    passAssertEqual(Object.prototype.hasOwnProperty.call(candidates[saved.sessionId], 'actionHistory'), false,
-      'candidate contains no raw action history');
+    passAssertEqual(taskMemories.calls.length, 1, 'terminal summary creates one provider-free Task Memory');
+    passAssertEqual(Object.keys(recorder._peekMemoryCandidates()).length, 0,
+      'the terminal outcome consumes its short-lived correlation candidate');
     passAssertEqual(Object.keys(recorder._peekOpenSessions()).length, 0, 'session removed from the open map');
 
-    // Snake_case tolerance: is_final on the very first action closes a
-    // 1-action session.
+    // Snake_case tolerance: is_final also remains overlay-only.
     recorder.recordAction(bridgeAction({
       agentId: 'agent-2', tool: 'click', params: { tab_id: 9 }, tabId: 9,
       visualReason: 'One-shot action', client: 'Codex', is_final: true
     }));
     await recorder._drainForTests();
-    passAssertEqual(logger.calls.saveSession.length, 2, 'snake_case is_final also closes (wire-spec tolerance)');
+    passAssertEqual(logger.calls.saveSession.length, 1, 'snake_case is_final does not close recording state');
+    recorder.recordTaskOutcome({
+      tool: 'complete_task', params: { summary: 'One-shot action finished', tab_id: 9 },
+      payload: { agentId: 'agent-2' }
+    });
+    await recorder._drainForTests();
+    passAssertEqual(logger.calls.saveSession.length, 2, 'terminal task status closes the one-shot recording');
     passAssertEqual(logger.calls.saveSession[1].sessionData.actionHistory.length, 1,
       'one-shot session persisted with its single action');
     passAssertEqual(logger.calls.saveSession[1].sessionData.mcpClient, 'Codex',
@@ -525,6 +534,39 @@ function readDispatch(o) {
       'late completion replaces the provisional stopped outcome');
     passAssertEqual(taskMemories.calls.length, 1,
       'late completion still creates the provider-free Task Memory');
+  }
+
+  // -- Test 5b: late outcome on a secondary tab after idle expiry -------------
+  console.log('\n--- Test 5b: secondary-tab outcome resolves an idle-closed logical task ---');
+  {
+    const { time, alarms, logger, taskMemories } = await freshSection(1750000050000);
+    recorder.recordAction(bridgeAction({
+      agentId: 'agent-3-multi', tool: 'click', params: { tab_id: 51 }, tabId: 51,
+      visualReason: 'Coordinate two tabs', client: 'Claude'
+    }));
+    recorder.recordAction(bridgeAction({
+      agentId: 'agent-3-multi', tool: 'type', params: { tab_id: 52, selector: '#note', text: 'done' }, tabId: 52,
+      visualReason: 'Coordinate two tabs', client: 'Claude'
+    }));
+    await recorder._drainForTests();
+    time.advance(recorder.MCP_SESSION_IDLE_DEATH_MS + 1);
+    await alarms.fireDue();
+    await recorder._drainForTests();
+    const candidate = Object.values(recorder._peekMemoryCandidates())[0];
+    passAssertDeepEqual(candidate.tabIds, [51, 52],
+      'idle-closed candidate retains every physical tab in the logical task');
+
+    recorder.recordTaskOutcome({
+      tool: 'complete_task', params: { summary: 'Both tabs finished', tab_id: 52 },
+      payload: { agentId: 'agent-3-multi' }
+    });
+    await recorder._drainForTests();
+    passAssertEqual(logger.calls.updateSessionOutcome.length, 1,
+      'secondary-tab completion patches the idle-closed history row');
+    passAssertEqual(logger.calls.updateSessionOutcome[0].sessionData.outcome, 'success',
+      'secondary-tab completion replaces the provisional stopped outcome');
+    passAssertEqual(taskMemories.calls.length, 1,
+      'secondary-tab completion creates one provider-free Task Memory');
   }
 
   // -- Test 6: run_task skipped ------------------------------------------------
@@ -590,6 +632,11 @@ function readDispatch(o) {
       response: { success: true, text: 'ordinary result text' },
       visualReason: 'Search', client: 'Claude', isFinal: true
     }));
+    await recorder._drainForTests();
+    recorder.recordTaskOutcome({
+      tool: 'complete_task', params: { summary: 'Search finished', tab_id: 11 },
+      payload: { agentId: 'agent-5' }
+    });
     await recorder._drainForTests();
     passAssertEqual(logger.calls.saveSession.length, 1, 'sanitized session closed and saved');
     const savedHistory = logger.calls.saveSession[0].sessionData.actionHistory;
@@ -767,6 +814,11 @@ function readDispatch(o) {
       agentId: 'agent-url-redaction', tool: 'click', params: { tab_id: 12, selector: '#done' }, tabId: 12,
       visualReason: 'Sign in safely', client: 'Codex', isFinal: true
     }));
+    await recorder._drainForTests();
+    recorder.recordTaskOutcome({
+      tool: 'complete_task', params: { summary: 'Safe sign-in flow finished', tab_id: 12 },
+      payload: { agentId: 'agent-url-redaction' }
+    });
     await recorder._drainForTests();
     passAssertEqual(urlSection.logger.calls.saveSession[0].sessionData.lastUrl, sanitizedSecretUrl,
       'closed session history receives only the sanitized lastUrl');
@@ -1002,7 +1054,7 @@ function readDispatch(o) {
   }
 
   // -- Test 13: tab identity precedence (review finding #1) ------------------------
-  console.log('\n--- Test 13: tab identity -- snake_case tab_id, explicit precedence, no collapse ---');
+  console.log('\n--- Test 13: tab identity -- precedence plus one logical task across tabs ---');
   {
     await freshSection();
     // Wire snake_case tab_id keys the session even with NO explicit tabId
@@ -1036,7 +1088,7 @@ function readDispatch(o) {
     keys = Object.keys(recorder._peekOpenSessions());
     passAssertEqual(keys[0], 'agent-8::13', 'camelCase params.tabId still keys the session (back-compat)');
 
-    // The review's headline scenario: one agent, two tabs -> two sessions.
+    // The headline scenario: one agent, two tabs -> one logical task.
     const { logger } = await freshSection();
     recorder.recordAction(bridgeAction({
       agentId: 'agent-m', tool: 'click', params: { tab_id: 1 }, tabId: 1,
@@ -1048,9 +1100,12 @@ function readDispatch(o) {
     }));
     await recorder._drainForTests();
     const open = recorder._peekOpenSessions();
-    passAssertEqual(Object.keys(open).length, 2,
-      'same agent driving two tabs holds two DISTINCT open sessions (no merge)');
-    passAssert(open['agent-m::1'] && open['agent-m::2'], 'sessions keyed agent-m::1 and agent-m::2');
+    passAssertEqual(Object.keys(open).length, 1,
+      'same agent driving two tabs holds one logical recording');
+    passAssert(open['agent-m::1'], 'the task retains its first-tab compatibility key');
+    passAssertDeepEqual(open['agent-m::1'].tabIds, [1, 2], 'both physical tabs are registered as child tracks');
+    passAssertEqual(open['agent-m::1'].logicalTabs['1'], 'primary', 'first tab receives the primary logical identity');
+    passAssertEqual(open['agent-m::1'].logicalTabs['2'], 'tab-2', 'second tab receives a stable logical identity');
 
     recorder.recordDispatch(readDispatch({ agentId: 'agent-m', tool: 'mcp:read-page', tab_id: 1 }));
     recorder.recordDispatch(readDispatch({ agentId: 'agent-m', tool: 'mcp:get-dom', payloadTabId: 2 }));
@@ -1063,17 +1118,15 @@ function readDispatch(o) {
     recorder.recordDispatch(readDispatch({ agentId: 'agent-m', tool: 'mcp:read-page', tab_id: 999 }));
     await recorder._drainForTests();
     const attributed = recorder._peekOpenSessions();
-    passAssertEqual(attributed['agent-m::1'].actionHistory.length, 3,
-      'top-level payload tab_id and entry.tabId reads join tab 1 exactly');
-    passAssertEqual(attributed['agent-m::2'].actionHistory.length, 3,
-      'top-level payload tabId and nested params.tabId reads join tab 2 exactly');
-    passAssertEqual(attributed['agent-m::2'].actionHistory[2].tool, 'mcp:read-page',
+    const multiTabHistory = attributed['agent-m::1'].actionHistory;
+    passAssertEqual(multiTabHistory.length, 7, 'every cross-tab action and read stays in one ordered timeline');
+    passAssertEqual(multiTabHistory[4].logicalTab, 'tab-2',
       'nested tab identity takes precedence over a conflicting top-level payload id');
-    passAssertEqual(attributed['agent-m::1'].actionHistory[2].tool, 'mcp:get-dom',
+    passAssertEqual(multiTabHistory[5].logicalTab, 'primary',
       'entry.tabId takes precedence over a conflicting nested tab identity');
-    passAssertEqual(attributed['agent-m::1'].actionHistory.length + attributed['agent-m::2'].actionHistory.length, 6,
-      'unknown explicit tab identity is ignored instead of falling back to another tab');
-    passAssertEqual(logger.calls.saveSession.length, 0, 'no spurious close while both tabs are active');
+    passAssertEqual(multiTabHistory[6].logicalTab, 'tab-3',
+      'a newly encountered explicit tab becomes another task track');
+    passAssertEqual(logger.calls.saveSession.length, 0, 'no spurious close while the multi-tab task is active');
   }
 
   // -- Test 14: bootstrap birth (open_tab/switch_tab post-dispatch tabId) ----------
@@ -1116,6 +1169,11 @@ function readDispatch(o) {
       agentId: 'agent-h', tool: 'navigate', params: { tab_id: 4, url: 'https://example.com/done' }, tabId: 4,
       visualReason: 'Wrap up', client: 'Claude', isFinal: true
     }));
+    await recorder._drainForTests();
+    recorder.recordTaskOutcome({
+      tool: 'complete_task', params: { summary: 'Navigation mapping complete', tab_id: 4 },
+      payload: { agentId: 'agent-h' }
+    });
     await recorder._drainForTests();
     passAssertEqual(logger.calls.saveSession.length, 1, 'mapping session closed and saved');
     const tools = logger.calls.saveSession[0].sessionData.actionHistory.map(function (a) { return a.tool; });
@@ -1365,7 +1423,7 @@ function readDispatch(o) {
       visualReason: 'Submit the report', client: 'Codex', isFinal: true
     }));
     await recorder._drainForTests();
-    const sourceSessionId = logger.calls.saveSession[0].sessionId;
+    const sourceSessionId = Object.values(recorder._peekOpenSessions())[0].sessionId;
 
     recorder.recordTaskOutcome({
       tool: 'complete_task',
@@ -1396,13 +1454,13 @@ function readDispatch(o) {
     passAssert(!JSON.stringify(memory).includes('do-not-copy'), 'memory contains no raw action params or results');
     passAssertEqual(Object.keys(recorder._peekMemoryCandidates()).length, 0,
       'successful terminal outcome consumes the pending candidate');
-    passAssertEqual(logger.calls.updateSessionOutcome.length, 1,
-      'completion arriving after is_final patches the closed history row');
-    passAssertEqual(logger.calls.updateSessionOutcome[0].sessionId, sourceSessionId,
-      'closed completion patches the history row for the matched replay session');
-    passAssertEqual(logger.calls.updateSessionOutcome[0].sessionData.outcome, 'success',
-      'closed completion persists a success outcome');
-    const persistedOutcome = JSON.stringify(logger.calls.updateSessionOutcome[0].sessionData);
+    passAssertEqual(logger.calls.saveSession.length, 1,
+      'completion closes and saves the still-open logical recording');
+    passAssertEqual(logger.calls.saveSession[0].sessionId, sourceSessionId,
+      'completion saves the matched replay session');
+    passAssertEqual(logger.calls.saveSession[0].sessionData.outcome, 'success',
+      'completion persists a success outcome');
+    const persistedOutcome = JSON.stringify(logger.calls.saveSession[0].sessionData);
     passAssert(!persistedOutcome.includes(signedUrlSecret) &&
       !persistedOutcome.includes(standaloneSecret) &&
       persistedOutcome.includes(sanitizedSignedUrl) &&
@@ -1416,8 +1474,8 @@ function readDispatch(o) {
     });
     await recorder._drainForTests();
     passAssertEqual(taskMemories.calls.length, 1, 'duplicate terminal outcome cannot create a second memory');
-    passAssertEqual(logger.calls.updateSessionOutcome.length, 1,
-      'duplicate terminal outcome cannot patch history a second time');
+    passAssertEqual(logger.calls.saveSession.length, 1,
+      'duplicate terminal outcome cannot save history a second time');
   }
 
   // -- Test 22: partial/failure outcomes + open-session close ---------------------
@@ -1474,14 +1532,14 @@ function readDispatch(o) {
     passAssertEqual(section.taskMemories.calls.length, 1, 'failure creates one local Task Memory');
     passAssertEqual(section.taskMemories.calls[0].typeData.session.outcome, 'failure',
       'fail_task maps to failure outcome');
-    passAssertEqual(section.logger.calls.updateSessionOutcome.length, 1,
-      'failure arriving after is_final patches the closed history row');
-    passAssertEqual(section.logger.calls.updateSessionOutcome[0].sessionData.status, 'failed',
-      'closed failure persists failed history status');
-    passAssertEqual(section.logger.calls.updateSessionOutcome[0].sessionData.outcome, 'failure',
-      'closed failure persists failure history outcome');
+    passAssertEqual(section.logger.calls.saveSession.length, 1,
+      'failure closes the still-open logical recording');
+    passAssertEqual(section.logger.calls.saveSession[0].sessionData.status, 'failed',
+      'failure persists failed history status');
+    passAssertEqual(section.logger.calls.saveSession[0].sessionData.outcome, 'failure',
+      'failure persists failure history outcome');
     passAssert(!section.taskMemories.calls[0].text.includes(failedTaskSecret) &&
-      !JSON.stringify(section.logger.calls.updateSessionOutcome[0].sessionData).includes(failedTaskSecret),
+      !JSON.stringify(section.logger.calls.saveSession[0].sessionData).includes(failedTaskSecret),
     'failure summaries remove standalone recognized credentials from memory and history');
 
     section = await freshSection(1750000725000);
@@ -1501,7 +1559,7 @@ function readDispatch(o) {
     });
     await recorder._drainForTests();
     passAssert(!section.taskMemories.calls[0].text.includes(boundarySecret.slice(0, 5)) &&
-      !JSON.stringify(section.logger.calls.updateSessionOutcome[0].sessionData)
+      !JSON.stringify(section.logger.calls.saveSession[0].sessionData)
         .includes(boundarySecret.slice(0, 5)),
     'recognized credentials crossing the final summary cap leave no truncated secret prefix');
 
@@ -1520,18 +1578,18 @@ function readDispatch(o) {
       payload: { agentId: 'agent-closed-partial' }
     });
     await recorder._drainForTests();
-    passAssertEqual(section.logger.calls.updateSessionOutcome.length, 1,
-      'partial outcome arriving after is_final patches the closed history row');
-    passAssertEqual(section.logger.calls.updateSessionOutcome[0].sessionData.status, 'partial',
-      'closed partial outcome persists partial history status');
-    passAssertEqual(section.logger.calls.updateSessionOutcome[0].sessionData.blocker,
-      'Manual approval required', 'closed partial history preserves its blocker');
+    passAssertEqual(section.logger.calls.saveSession.length, 1,
+      'partial outcome closes the still-open logical recording');
+    passAssertEqual(section.logger.calls.saveSession[0].sessionData.status, 'partial',
+      'partial outcome persists partial history status');
+    passAssertEqual(section.logger.calls.saveSession[0].sessionData.blocker,
+      'Manual approval required', 'partial history preserves its blocker');
   }
 
-  // -- Test 23: ambiguity falls back to history only ------------------------------
-  console.log('\n--- Test 23: multi-tab ambiguity requires explicit tab_id ---');
+  // -- Test 23: tab-less terminal status owns the logical multi-tab task -----------
+  console.log('\n--- Test 23: tab-less outcome closes one logical multi-tab task ---');
   {
-    const { taskMemories } = await freshSection(1750000800000);
+    const { taskMemories, logger } = await freshSection(1750000800000);
     recorder.recordAction(bridgeAction({
       agentId: 'agent-ambiguous', tool: 'click', params: { tab_id: 1 }, tabId: 1,
       visualReason: 'Tab one', client: 'Claude'
@@ -1542,28 +1600,20 @@ function readDispatch(o) {
     }));
     await recorder._drainForTests();
     recorder.recordTaskOutcome({
-      tool: 'complete_task', params: { summary: 'Ambiguous completion' },
+      tool: 'complete_task', params: { summary: 'Multi-tab completion' },
       payload: { agentId: 'agent-ambiguous' }
     });
     await recorder._drainForTests();
-    passAssertEqual(taskMemories.calls.length, 0, 'tab-less ambiguous summary creates no memory');
-    passAssertEqual(Object.keys(recorder._peekOpenSessions()).length, 2,
-      'ambiguous summary does not close or misattribute either session');
-
-    recorder.recordTaskOutcome({
-      tool: 'complete_task', params: { summary: 'Tab two complete', tab_id: 2 },
-      payload: { agentId: 'agent-ambiguous' }
-    });
-    await recorder._drainForTests();
-    passAssertEqual(taskMemories.calls.length, 1, 'explicit tab_id resolves exactly one session');
-    passAssertEqual(Object.keys(recorder._peekOpenSessions()).length, 1,
-      'explicit outcome closes only its matching tab session');
-
-    recorder.recordTaskOutcome({
-      tool: 'complete_task', params: { tab_id: 1 }, payload: { agentId: 'agent-ambiguous' }
-    });
-    await recorder._drainForTests();
-    passAssertEqual(taskMemories.calls.length, 1, 'missing required summary remains history-only');
+    passAssertEqual(taskMemories.calls.length, 1, 'tab-less logical-task summary creates one memory');
+    passAssertEqual(Object.keys(recorder._peekOpenSessions()).length, 0,
+      'tab-less summary closes the one logical recording');
+    passAssertEqual(logger.calls.saveSession.length, 1, 'multi-tab task produces one history row');
+    passAssertEqual(logger.calls.saveSession[0].sessionData.tabCount, 2,
+      'history row reports both tab tracks');
+    passAssertEqual(logger.calls.saveSession[0].sessionData.actionHistory.length, 2,
+      'history row preserves both tab actions in order');
+    passAssertEqual(logger.calls.saveSession[0].sessionData.actionHistory[1].logicalTab, 'tab-2',
+      'history records the second action against its logical tab');
   }
 
   // -- Test 24: candidate survives SW restart and expires after five minutes ------
@@ -1574,9 +1624,21 @@ function readDispatch(o) {
       agentId: 'agent-restore-memory', tool: 'click', params: { tab_id: 5 }, tabId: 5,
       visualReason: 'Restore candidate', client: 'Codex', isFinal: true
     }));
+    recorder.recordAction(bridgeAction({
+      agentId: 'agent-restore-memory', tool: 'type', params: { tab_id: 15, selector: '#secondary', text: 'ready' }, tabId: 15,
+      visualReason: 'Restore candidate', client: 'Codex'
+    }));
+    await recorder._drainForTests();
+    section.time.advance(recorder.MCP_SESSION_IDLE_DEATH_MS + 1);
+    await section.alarms.fireDue();
     await recorder._drainForTests();
     passAssert(!!section.storage.store[recorder.FSB_MCP_MEMORY_CANDIDATES_KEY],
       'closed-session candidate is persisted in chrome.storage.session');
+    const persistedCandidate = Object.values(
+      section.storage.store[recorder.FSB_MCP_MEMORY_CANDIDATES_KEY].records
+    )[0];
+    passAssertDeepEqual(persistedCandidate.tabIds, [5, 15],
+      'persisted candidate retains all logical-task tab ids');
 
     recorder._resetForTests();
     recorder._setStorageShim(section.storage);
@@ -1586,18 +1648,53 @@ function readDispatch(o) {
     await recorder._restoreMemoryCandidates();
     passAssertEqual(Object.keys(recorder._peekMemoryCandidates()).length, 1,
       'candidate rehydrates after simulated service-worker eviction');
+    passAssertDeepEqual(Object.values(recorder._peekMemoryCandidates())[0].tabIds, [5, 15],
+      'rehydrated candidate restores every logical-task tab id');
     recorder.recordTaskOutcome({
-      tool: 'complete_task', params: { summary: 'Restored completion', tab_id: 5 },
+      tool: 'complete_task', params: { summary: 'Restored completion', tab_id: 15 },
       payload: { agentId: 'agent-restore-memory' }
     });
     await recorder._drainForTests();
-    passAssertEqual(section.taskMemories.calls.length, 1, 'restored candidate can create local memory');
+    passAssertEqual(section.taskMemories.calls.length, 1,
+      'restored candidate can create local memory from its secondary tab');
+    passAssertEqual(section.logger.calls.updateSessionOutcome.length, 1,
+      'restored secondary-tab completion patches the stopped history row');
+
+    section = await freshSection(1750000950000);
+    recorder.recordAction(bridgeAction({
+      agentId: 'agent-legacy-memory', tool: 'click', params: { tab_id: 16 }, tabId: 16,
+      visualReason: 'Restore legacy candidate', client: 'Codex'
+    }));
+    await recorder._drainForTests();
+    section.time.advance(recorder.MCP_SESSION_IDLE_DEATH_MS + 1);
+    await section.alarms.fireDue();
+    await recorder._drainForTests();
+    const legacyEnvelope = section.storage.store[recorder.FSB_MCP_MEMORY_CANDIDATES_KEY];
+    delete Object.values(legacyEnvelope.records)[0].tabIds;
+    recorder._resetForTests();
+    recorder._setStorageShim(section.storage);
+    recorder._setLocalStorageShim(section.localStorage);
+    recorder._setAlarmShim(section.alarms);
+    recorder._setTimeShim(section.time.shim);
+    await recorder._restoreMemoryCandidates();
+    passAssertDeepEqual(Object.values(recorder._peekMemoryCandidates())[0].tabIds, [16],
+      'legacy candidate without tabIds derives its tab list from primary tabId');
+    recorder.recordTaskOutcome({
+      tool: 'complete_task', params: { summary: 'Legacy completion', tab_id: 16 },
+      payload: { agentId: 'agent-legacy-memory' }
+    });
+    await recorder._drainForTests();
+    passAssertEqual(section.taskMemories.calls.length, 1,
+      'legacy single-tab candidate remains outcome-compatible');
 
     section = await freshSection(1750001000000);
     recorder.recordAction(bridgeAction({
       agentId: 'agent-expire-memory', tool: 'click', params: { tab_id: 6 }, tabId: 6,
       visualReason: 'Expire candidate', client: 'Claude', isFinal: true
     }));
+    await recorder._drainForTests();
+    section.time.advance(recorder.MCP_SESSION_IDLE_DEATH_MS + 1);
+    await section.alarms.fireDue();
     await recorder._drainForTests();
     section.time.advance(recorder.MCP_MEMORY_CANDIDATE_TTL_MS + 1);
     recorder._resetForTests();
@@ -1656,7 +1753,29 @@ function readDispatch(o) {
         result: 'Saved api_key=old-key', completionMessage: rawCompletion,
         outcomeDetails: { summary: rawTask, result: rawCompletion },
         lastUrl: rawSecretUrl, actionHistory: [rawAction, rawNavigate],
-        logs: [{ data: { sessionId: 'session-old', task: rawTask } }]
+        logs: [{ data: { sessionId: 'session-old', task: rawTask } }],
+        replay: {
+          provenance: 'capture', integrity: 'verified', manifestHash: 'old-hash', receipt: { secret: 'old-receipt' },
+          manifest: {
+            startUrl: 'https://example.com/primary',
+            tabs: [
+              { id: 'primary', startUrl: 'https://example.com/primary' },
+              { id: 'tab-2', startUrl: rawSecretUrl }
+            ],
+            steps: [
+              {
+                id: 'step-1', arguments: {},
+                target: { logicalTab: 'primary', url: 'https://example.com/primary' },
+                replay: { risk: 'read', availability: 'ready' }
+              },
+              {
+                id: 'step-2', arguments: {},
+                target: { logicalTab: 'tab-2', url: rawSecretUrl },
+                replay: { risk: 'read', availability: 'ready' }
+              }
+            ]
+          }
+        }
       }
     };
     localStorage.store.fsbSessionIndex = [
@@ -1730,6 +1849,16 @@ function readDispatch(o) {
       'startup scrub sanitizes closed MCP lifecycle text');
     passAssertEqual(historicSession.logs[0].data.task, sanitizedTask,
       'startup scrub sanitizes session-start task text embedded in session logs');
+    passAssertEqual(historicSession.replay.manifest.tabs[1].startUrl, sanitizedSecretUrl,
+      'startup scrub sanitizes every logical tab start URL');
+    passAssertEqual(historicSession.replay.manifest.tabs[1].startUrlState, 'redacted',
+      'startup scrub marks the affected logical tab as redacted');
+    passAssertEqual(historicSession.replay.manifest.steps[0].replay.availability, 'ready',
+      'a redacted secondary tab does not block safe primary-tab replay steps');
+    passAssertEqual(historicSession.replay.manifest.steps[1].replay.availability, 'needs-input',
+      'startup scrub blocks replay only on the affected logical tab');
+    passAssertEqual(historicSession.replay.receipt, null,
+      'changing a stored tab manifest invalidates its old signing receipt');
     passAssertEqual(localStorage.store.fsbSessionIndex[0].task, sanitizedTask,
       'startup scrub sanitizes the MCP session-index task copy');
     passAssertEqual(localStorage.store.fsbSessionIndex[0].completionMessage, sanitizedCompletion,
@@ -1786,6 +1915,9 @@ function readDispatch(o) {
       visualReason: 'Finish despite history failure', client: 'Codex', isFinal: true
     }));
     await recorder._drainForTests();
+    section.time.advance(recorder.MCP_SESSION_IDLE_DEATH_MS + 1);
+    await section.alarms.fireDue();
+    await recorder._drainForTests();
     section.logger.updateSessionOutcome = function (sessionId, sessionData) {
       section.logger.calls.updateSessionOutcome.push({ sessionId, sessionData });
       return Promise.reject(new Error('history unavailable'));
@@ -1814,6 +1946,9 @@ function readDispatch(o) {
       agentId: 'agent-memory-failure', tool: 'click', params: { tab_id: 10 }, tabId: 10,
       visualReason: 'Finish despite memory failure', client: 'Claude', isFinal: true
     }));
+    await recorder._drainForTests();
+    section.time.advance(recorder.MCP_SESSION_IDLE_DEATH_MS + 1);
+    await section.alarms.fireDue();
     await recorder._drainForTests();
     section.taskMemories.storage.add = async function (memory) {
       section.taskMemories.calls.push(memory);
@@ -1917,6 +2052,46 @@ function readDispatch(o) {
     passAssertEqual(saved.status, 'stopped', 'capability session idle-close status is stopped');
     passAssertEqual(saved.outcomeDetails.reason, 'idle_timeout',
       'capability session idle-close reason is idle_timeout');
+    globalThis.FsbLatticeReplay = priorReplayGlobal;
+  }
+
+  // -- Test 28: action-only session receives an executable replay bootstrap -------
+  console.log('\n--- Test 28: action-only replay uses resolved non-Sheets target context ---');
+  {
+    const replayHelpers = require('../extension/utils/lattice-replay.js');
+    const priorReplayGlobal = globalThis.FsbLatticeReplay;
+    globalThis.FsbLatticeReplay = Object.assign({}, replayHelpers, {
+      sealPersistedSession() { return Promise.resolve(true); }
+    });
+    const section = await freshSection(1750001500000);
+    recorder.recordAction(bridgeAction({
+      agentId: 'agent-action-only',
+      tool: 'click',
+      params: { tab_id: 88, selector: '#continue' },
+      tabId: 88,
+      visualReason: 'Continue from the current page',
+      client: 'Codex',
+      replayContext: {
+        targetUrl: 'https://example.com/current-page',
+        targetOrigin: 'https://example.com',
+        routeFamily: 'content'
+      }
+    }));
+    await recorder._drainForTests();
+    recorder.recordTaskOutcome({
+      tool: 'complete_task', params: { summary: 'Continued successfully', tab_id: 88 },
+      payload: { agentId: 'agent-action-only' }
+    });
+    await recorder._drainForTests();
+    const saved = section.logger.calls.saveSession[0].sessionData;
+    passAssertEqual(saved.replay.manifest.startUrl, 'https://example.com/current-page',
+      'action-only replay preserves the resolved ordinary-page start URL');
+    passAssertEqual(saved.replay.manifest.tabs[0].startOrigin, 'https://example.com',
+      'action-only replay preserves the resolved HTTP(S) origin');
+    passAssertEqual(saved.replay.manifest.steps[0].replay.availability, 'approval-once',
+      'action-only click remains executable instead of needing a start URL');
+    passAssertEqual(saved.replay.counts.executable, 1,
+      'action-only replay reports one executable step');
     globalThis.FsbLatticeReplay = priorReplayGlobal;
   }
 

@@ -592,7 +592,7 @@ test('generic actions and page reads on Google Sheets targets are shape-only', (
   }
 });
 
-test('real bridge reduces resolved tab URLs to private target booleans', async () => {
+test('real bridge preserves ordinary replay targets while Sheets stay boolean-only', async () => {
   const sheetsUrl = `https://docs.google.com/spreadsheets/d/${ID}/edit#gid=0`;
   const harness = bridgeHarness(redaction, {
     tabs: {
@@ -608,9 +608,16 @@ test('real bridge reduces resolved tab URLs to private target booleans', async (
   const lookalikeTarget = await harness.client._resolveMcpSessionRecordTarget(2);
   const unresolvedTarget = await harness.client._resolveMcpSessionRecordTarget(3);
   assert.deepEqual({ ...sheetsTarget }, { targetOriginResolved: true, spreadsheetTarget: true });
-  assert.deepEqual({ ...lookalikeTarget }, { targetOriginResolved: true, spreadsheetTarget: false });
+  assert.deepEqual({ ...lookalikeTarget }, {
+    targetOriginResolved: true,
+    spreadsheetTarget: false,
+    targetUrl: `https://docs.google.com.evil.test/spreadsheets/d/${ID}/edit`,
+    targetOrigin: 'https://docs.google.com.evil.test'
+  });
   assert.deepEqual({ ...unresolvedTarget }, { targetOriginResolved: false, spreadsheetTarget: false });
   assert.equal(JSON.stringify(sheetsTarget).includes(ID), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(sheetsTarget, 'targetUrl'), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(sheetsTarget, 'targetOrigin'), false);
 
   harness.client._recordMcpSessionAction({
     tool: 'click',
@@ -619,6 +626,19 @@ test('real bridge reduces resolved tab URLs to private target booleans', async (
   }, { success: true, text: SENTINEL }, 1, sheetsTarget);
   assert.equal(harness.entries.length, 1);
   assertNoContent(harness.entries[0]);
+  assert.equal(harness.entries[0].replayContext, undefined);
+
+  harness.client._recordMcpSessionAction({
+    tool: 'click',
+    params: { selector: '#ordinary-page' },
+    agentId: 'agent:resolved-bridge'
+  }, { success: true }, 2, lookalikeTarget);
+  assert.equal(harness.entries.length, 2);
+  assert.deepEqual({ ...harness.entries[1].replayContext }, {
+    routeFamily: 'content',
+    targetUrl: `https://docs.google.com.evil.test/spreadsheets/d/${ID}/edit`,
+    targetOrigin: 'https://docs.google.com.evil.test'
+  });
 });
 
 test('content-bearing records fail closed when target origin resolution is unavailable', () => {

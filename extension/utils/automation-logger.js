@@ -874,6 +874,13 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
           // Quick 260707-7id: session source discriminator + MCP client label
           existing.mode = sessionData.mode || existing.mode || 'autopilot';
           existing.mcpClient = sessionData.mcpClient || existing.mcpClient || null;
+          existing.taskRunId = sessionData.taskRunId || existing.taskRunId || sessionId;
+          existing.tabIds = Array.isArray(sessionData.tabIds)
+            ? sessionData.tabIds.slice()
+            : (Array.isArray(existing.tabIds) ? existing.tabIds : []);
+          existing.tabCount = Number.isFinite(sessionData.tabCount)
+            ? sessionData.tabCount
+            : (Number.isFinite(existing.tabCount) ? existing.tabCount : existing.tabIds.length);
           applyPersistedOutcomeFields(existing, sessionData.status || existing.status, normalizedOutcome);
           // Update task to show the latest command
           if (metadata.commands.length > 1) {
@@ -886,7 +893,13 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
             existing.actionHistory = (sessionData.actionHistory || [])
               .filter(a => a.result?.success)
               .slice(-100)
-              .map(a => ({ tool: a.tool, params: a.params, result: a.result, timestamp: a.timestamp }));
+              .map(a => ({
+                tool: a.tool,
+                params: a.params,
+                result: a.result,
+                timestamp: a.timestamp,
+                logicalTab: a.logicalTab || 'primary'
+              }));
           }
           if (sessionData.replay) {
             existing.replay = cloneReplayRecordForPersistence(sessionData.replay) || existing.replay || null;
@@ -905,6 +918,11 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
             endTime: Date.now(),
             status: sessionData.status || 'completed',
             tabId: sessionData.tabId || null,
+            tabIds: Array.isArray(sessionData.tabIds) ? sessionData.tabIds.slice() : [],
+            tabCount: Number.isFinite(sessionData.tabCount)
+              ? sessionData.tabCount
+              : (Array.isArray(sessionData.tabIds) ? sessionData.tabIds.length : (sessionData.tabId == null ? 0 : 1)),
+            taskRunId: sessionData.taskRunId || sessionId,
             // Quick 260707-7id: session source discriminator + MCP client label
             mode: sessionData.mode || 'autopilot',
             mcpClient: sessionData.mcpClient || null,
@@ -933,7 +951,13 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
             actionHistory: (sessionData.actionHistory || [])
               .filter(a => a.result?.success)
               .slice(-100)
-              .map(a => ({ tool: a.tool, params: a.params, result: a.result, timestamp: a.timestamp }))
+              .map(a => ({
+                tool: a.tool,
+                params: a.params,
+                result: a.result,
+                timestamp: a.timestamp,
+                logicalTab: a.logicalTab || 'primary'
+              }))
           };
           sessionStorage[sessionId] = session;
         }
@@ -950,6 +974,9 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
           // change lack them and default to Autopilot in the UI)
           mode: savedSession.mode || 'autopilot',
           mcpClient: savedSession.mcpClient || null,
+          taskRunId: savedSession.taskRunId || sessionId,
+          tabIds: Array.isArray(savedSession.tabIds) ? savedSession.tabIds : [],
+          tabCount: Number.isFinite(savedSession.tabCount) ? savedSession.tabCount : 0,
           totalCost: savedSession.totalCost || 0,
           outcome: savedSession.outcome || null,
           outcomeDetails: savedSession.outcomeDetails || null,

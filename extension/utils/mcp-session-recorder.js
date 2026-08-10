@@ -14,8 +14,9 @@
  *     read-only/message traffic JOINs an exact agentId+tabId session when a
  *     tab identity is supplied, with agent-only recency fallback otherwise.
  * Each recorded call folds one resolved MCP dispatch into an in-memory
- * open-session record keyed agentId+tabId; the visualSession sidecar drives
- * the lifecycle (birth on first action tool, close on isFinal or 60s idle).
+ * open-session record keyed by the agent's current task. Tabs are child tracks
+ * inside that record; the visualSession sidecar drives overlay presentation,
+ * while complete_task / partial_task / fail_task close the logical recording.
  *
  * On close the assembled session flows through the DIRECT service-worker
  * automationLogger global -- NEVER chrome.runtime.sendMessage, which does
@@ -71,7 +72,7 @@
   var FSB_MCP_MEMORY_CANDIDATES_KEY = 'fsbMcpMemoryCandidates';
   var FSB_MCP_MEMORY_CANDIDATES_VERSION = 1;
   var FSB_MCP_REDACTION_VERSION_KEY = 'fsbMcpRedactionVersion';
-  var FSB_MCP_REDACTION_VERSION = 4;
+  var FSB_MCP_REDACTION_VERSION = 5;
   var FSB_MCP_SESSION_ALARM_PREFIX = 'fsbMcpSession:';
   var FSB_MCP_SESSION_IDLE_ALARM_PREFIX = FSB_MCP_SESSION_ALARM_PREFIX + 'idle:';
   var FSB_MCP_SESSION_RETENTION_ALARM = FSB_MCP_SESSION_ALARM_PREFIX + 'retention';
@@ -155,7 +156,8 @@
 
   // ---- In-memory state ----------------------------------------------------
 
-  // key = agentId + '::' + tabKey; value = open-session record.
+  // key = the first agentId::tabKey observed for a task. Later tabs join the
+  // same value and are represented by stable logical tab names on replay steps.
   var _openSessions = new Map();
   // key = source session id; value = safe, short-lived correlation metadata.
   var _memoryCandidates = new Map();
@@ -454,7 +456,8 @@
         tool: typeof item.tool === 'string' ? item.tool : '',
         params: cloneParamsForReplay(item.params, item.result),
         result: cloneResultForReplay(item.result, item.params),
-        timestamp: typeof item.timestamp === 'number' ? item.timestamp : null
+        timestamp: typeof item.timestamp === 'number' ? item.timestamp : null,
+        logicalTab: typeof item.logicalTab === 'string' ? item.logicalTab : 'primary'
       };
     });
   }
@@ -513,8 +516,33 @@
     var originalStartUrl = sanitized.manifest.startUrl;
     var safeStartUrl = _sanitizeUrlForPersistence(originalStartUrl);
     if (typeof originalStartUrl === 'string') sanitized.manifest.startUrl = safeStartUrl;
-    var startRedacted = typeof originalStartUrl === 'string' && originalStartUrl !== safeStartUrl;
+    var startRedacted = sanitized.manifest.startUrlState === 'redacted' ||
+      (typeof originalStartUrl === 'string' && originalStartUrl !== safeStartUrl);
     var startMissing = typeof safeStartUrl !== 'string' || !/^https?:\/\//i.test(safeStartUrl);
+    var tabStartStates = Object.create(null);
+
+    if (Array.isArray(sanitized.manifest.tabs)) {
+      sanitized.manifest.tabs = sanitized.manifest.tabs.map(function (tab, index) {
+        if (!tab || typeof tab !== 'object') return tab;
+        var logicalTab = typeof tab.id === 'string' && tab.id ? tab.id : (index === 0 ? 'primary' : 'tab-' + String(index + 1));
+        var originalTabStartUrl = tab.startUrl;
+        var safeTabStartUrl = _sanitizeUrlForPersistence(originalTabStartUrl);
+        var tabStartRedacted = tab.startUrlState === 'redacted' ||
+          (typeof originalTabStartUrl === 'string' && originalTabStartUrl !== safeTabStartUrl);
+        var tabStartMissing = typeof safeTabStartUrl !== 'string' || !/^https?:\/\//i.test(safeTabStartUrl);
+        tab.id = logicalTab;
+        if (typeof originalTabStartUrl === 'string') tab.startUrl = safeTabStartUrl;
+        tab.startOrigin = safeTabStartUrl ? (function () {
+          try { return new URL(safeTabStartUrl).origin; } catch (_error) { return null; }
+        })() : null;
+        tab.startUrlState = tabStartRedacted ? 'redacted' : (tabStartMissing ? 'missing' : 'ready');
+        tabStartStates[logicalTab] = tab.startUrlState;
+        return tab;
+      });
+    }
+    if (!tabStartStates.primary) {
+      tabStartStates.primary = startRedacted ? 'redacted' : (startMissing ? 'missing' : 'ready');
+    }
 
     sanitized.manifest.steps = sanitized.manifest.steps.map(function (step) {
       if (!step || typeof step !== 'object') return step;
@@ -531,17 +559,21 @@
         step.target.url = _sanitizeUrlForPersistence(originalTargetUrl);
         if (step.target.url !== originalTargetUrl) step.target.redacted = true;
       }
-      if (argumentsRedacted || step.target?.redacted === true || startRedacted || startMissing) {
+      var logicalTab = typeof step.target?.logicalTab === 'string' ? step.target.logicalTab : 'primary';
+      var tabStartState = tabStartStates[logicalTab] || 'missing';
+      var tabStartRedacted = tabStartState === 'redacted';
+      var tabStartMissing = tabStartState === 'missing';
+      if (argumentsRedacted || step.target?.redacted === true || tabStartRedacted || tabStartMissing) {
         var availability = step.replay && step.replay.availability;
         if (availability === 'ready' || availability === 'approval-once' || availability === 'approval-per-step') {
           step.inputState = 'redacted';
           step.replay = {
             risk: 'inspect-only',
             availability: 'needs-input',
-            reason: startRedacted
-              ? 'The recorded starting URL contained sensitive input that was redacted'
-              : (startMissing
-                ? 'The recording does not contain a safe HTTP(S) starting URL'
+            reason: tabStartRedacted
+              ? 'This tab\'s recorded starting URL contained sensitive input that was redacted'
+              : (tabStartMissing
+                ? 'This tab does not contain a safe HTTP(S) starting URL'
                 : 'Sensitive input was redacted')
           };
         }
@@ -943,6 +975,7 @@
       sessionId: candidate.sessionId,
       agentId: candidate.agentId,
       tabId: candidate.tabId,
+      tabIds: Array.isArray(candidate.tabIds) ? candidate.tabIds.slice() : [],
       task: candidate.task,
       client: candidate.client,
       startTime: candidate.startTime,
@@ -1105,6 +1138,8 @@
       sessionId: session.sessionId,
       agentId: session.agentId,
       tabId: session.tabId,
+      tabIds: Array.isArray(session.tabIds) ? session.tabIds.slice() : [],
+      logicalTabs: cloneReplayValue(session.logicalTabs || {}, {}),
       task: _sanitizeSummaryText(session.task, 2000),
       client: session.client,
       startTime: session.startTime,
@@ -1174,9 +1209,21 @@
     return _numericTabId(payload && payload.tabId);
   }
 
+  function _sessionHasTab(session, numericTabId) {
+    if (!session || numericTabId === null) return false;
+    if (session.tabId === numericTabId) return true;
+    return Array.isArray(session.tabIds) && session.tabIds.indexOf(numericTabId) !== -1;
+  }
+
   function _findSessionForAgentTab(agentId, numericTabId) {
     if (numericTabId === null) return null;
-    return _openSessions.get(agentId + '::' + _tabKeyPart(numericTabId)) || null;
+    var direct = _openSessions.get(agentId + '::' + _tabKeyPart(numericTabId)) || null;
+    if (direct) return direct;
+    var found = null;
+    _openSessions.forEach(function (session) {
+      if (!found && session.agentId === agentId && _sessionHasTab(session, numericTabId)) found = session;
+    });
+    return found;
   }
 
   // JOIN attribution fallback: the open session with matching agentId that
@@ -1191,13 +1238,46 @@
     return best;
   }
 
+  function _registerSessionTab(session, numericTabId) {
+    if (!session) return 'primary';
+    session.tabIds = Array.isArray(session.tabIds) ? session.tabIds : [];
+    session.logicalTabs = session.logicalTabs && typeof session.logicalTabs === 'object'
+      ? session.logicalTabs
+      : {};
+    if (numericTabId === null) {
+      return session.tabId !== null && session.logicalTabs[String(session.tabId)]
+        ? session.logicalTabs[String(session.tabId)]
+        : 'primary';
+    }
+    var tabKey = String(numericTabId);
+    if (typeof session.logicalTabs[tabKey] === 'string') return session.logicalTabs[tabKey];
+    var tabIndex = session.tabIds.indexOf(numericTabId);
+    if (tabIndex === -1) {
+      session.tabIds.push(numericTabId);
+      tabIndex = session.tabIds.length - 1;
+    }
+    var logicalTab = tabIndex === 0 ? 'primary' : 'tab-' + String(tabIndex + 1);
+    session.logicalTabs[tabKey] = logicalTab;
+    if (session.tabId === null) session.tabId = numericTabId;
+    return logicalTab;
+  }
+
   // ---- Client-authored memory correlation ---------------------------------
 
   function _buildMemoryCandidate(session, endTime) {
+    var tabIds = [];
+    var candidateTabIds = Array.isArray(session.tabIds) ? session.tabIds : [];
+    for (var i = 0; i < candidateTabIds.length; i++) {
+      var candidateTabId = _numericTabId(candidateTabIds[i]);
+      if (candidateTabId !== null && tabIds.indexOf(candidateTabId) === -1) tabIds.push(candidateTabId);
+    }
+    var primaryTabId = _numericTabId(session.tabId);
+    if (primaryTabId !== null && tabIds.indexOf(primaryTabId) === -1) tabIds.unshift(primaryTabId);
     return {
       sessionId: session.sessionId,
       agentId: session.agentId,
-      tabId: session.tabId,
+      tabId: primaryTabId,
+      tabIds: tabIds,
       task: _sanitizeSummaryText(session.task, 2000),
       client: session.client,
       startTime: session.startTime,
@@ -1229,10 +1309,21 @@
           typeof record.sessionId !== 'string' || !Number.isFinite(record.expiresAt) || record.expiresAt <= now) {
         return;
       }
+      var restoredTabId = _numericTabId(record.tabId);
+      var restoredTabIds = [];
+      var recordTabIds = Array.isArray(record.tabIds) ? record.tabIds : [];
+      for (var i = 0; i < recordTabIds.length; i++) {
+        var recordTabId = _numericTabId(recordTabIds[i]);
+        if (recordTabId !== null && restoredTabIds.indexOf(recordTabId) === -1) restoredTabIds.push(recordTabId);
+      }
+      if (restoredTabId !== null && restoredTabIds.indexOf(restoredTabId) === -1) {
+        restoredTabIds.unshift(restoredTabId);
+      }
       _memoryCandidates.set(record.sessionId, {
         sessionId: record.sessionId,
         agentId: record.agentId,
-        tabId: _numericTabId(record.tabId),
+        tabId: restoredTabId,
+        tabIds: restoredTabIds,
         task: typeof record.task === 'string' ? record.task : 'MCP agent session',
         client: typeof record.client === 'string' ? record.client : 'unknown',
         startTime: Number.isFinite(record.startTime) ? record.startTime : now,
@@ -1258,19 +1349,24 @@
       var exactOpen = _findSessionForAgentTab(agentId, tabId);
       if (exactOpen) return { kind: 'open', value: exactOpen };
       var exactClosed = Array.from(_memoryCandidates.values())
-        .filter(function (candidate) { return candidate.agentId === agentId && candidate.tabId === tabId; })
+        .filter(function (candidate) { return candidate.agentId === agentId && _sessionHasTab(candidate, tabId); })
         .sort(function (a, b) { return b.closedAt - a.closedAt; });
       return exactClosed.length > 0 ? { kind: 'closed', value: exactClosed[0] } : null;
     }
 
-    var all = [];
+    var open = [];
     _openSessions.forEach(function (session) {
-      if (session.agentId === agentId) all.push({ kind: 'open', value: session });
+      if (session.agentId === agentId) open.push({ kind: 'open', value: session });
     });
+    // A live logical run is authoritative even when older closed candidates
+    // from this process remain inside their short memory-correlation window.
+    if (open.length === 1) return open[0];
+    if (open.length > 1) return null;
+    var closed = [];
     _memoryCandidates.forEach(function (candidate) {
-      if (candidate.agentId === agentId) all.push({ kind: 'closed', value: candidate });
+      if (candidate.agentId === agentId) closed.push({ kind: 'closed', value: candidate });
     });
-    return all.length === 1 ? all[0] : null;
+    return closed.length === 1 ? closed[0] : null;
   }
 
   function _snapshotTaskOutcome(input) {
@@ -1591,7 +1687,7 @@
    * short-lived candidate is retained for a later MCP-authored task summary.
    * Never throws.
    *
-   * @param {string} key - agentId::tabKey map key.
+   * @param {string} key - logical task map key (the task's first agentId::tabKey).
    * @param {string} reason - 'final' | 'expired' | 'recording_disabled' | 'task_status'.
    */
   function closeSession(key, reason, lifecycleOutcome) {
@@ -1621,6 +1717,9 @@
         startTime: session.startTime,
         endTime: endTime,
         tabId: session.tabId,
+        tabIds: Array.isArray(session.tabIds) ? session.tabIds.slice() : [],
+        tabCount: Array.isArray(session.tabIds) ? session.tabIds.length : (session.tabId === null ? 0 : 1),
+        taskRunId: session.sessionId,
         actionHistory: session.actionHistory,
         iterationCount: session.actionHistory.length,
         lastUrl: _sanitizeUrlForPersistence(session.lastUrl),
@@ -1751,10 +1850,11 @@
       var key = null;
 
       if (sidecar || capabilityBirth) {
-        // Action tool call -- the sidecar exists ONLY on mutating action
-        // tools. Look up (or birth) the session keyed agentId+tabId.
-        key = agentId + '::' + _tabKeyPart(numericTabId);
-        session = _openSessions.get(key) || null;
+        // Action calls across every tab join the agent's one live logical task.
+        // Prefer an exact restored legacy track, then the agent's current run.
+        session = _findSessionForAgentTab(agentId, numericTabId)
+          || _findMostRecentSessionForAgent(agentId);
+        key = session ? session.key : agentId + '::' + _tabKeyPart(numericTabId);
         if (!session) {
           var sessionId = _generateSessionId();
           var task = (sidecar && typeof sidecar.visualReason === 'string' && sidecar.visualReason.length > 0)
@@ -1773,6 +1873,8 @@
             sessionId: sessionId,
             agentId: agentId,
             tabId: numericTabId,
+            tabIds: [],
+            logicalTabs: {},
             task: task,
             client: client,
             startTime: now,
@@ -1788,6 +1890,7 @@
             sawActionTool: false
           };
           _openSessions.set(key, session);
+          _registerSessionTab(session, numericTabId);
           // Seed session-bound logs so saveSession's empty-logs gate passes.
           var birthLogger = _getAutomationLogger();
           if (birthLogger && typeof birthLogger.logSessionStart === 'function') {
@@ -1796,12 +1899,12 @@
         }
         session.sawActionTool = true;
       } else {
-        // Read-only tool route or message route -- JOIN the exact agent/tab
-        // session when the route supplied a tab identity. Only tab-less routes
-        // fall back to the most recently active session for this agent. No open session -> ignore
+        // Read-only routes join the current logical task. Exact tab attribution
+        // is preferred, while a newly encountered tab becomes another track.
+        // No open session -> ignore
         // (this structurally enforces that ordinary reads never birth).
         session = _findSessionForAgentTab(agentId, numericTabId)
-          || (numericTabId === null ? _findMostRecentSessionForAgent(agentId) : null);
+          || _findMostRecentSessionForAgent(agentId);
         if (!session) return;
         key = session.key;
       }
@@ -1812,17 +1915,21 @@
       var storedTool = MCP_REPLAY_TOOL_NAME_MAP[entry.tool] || entry.tool;
       var replayParams = cloneParamsForReplay(params, entry.response);
       var replayResult = cloneResultForReplay(entry.response, params);
+      var logicalTab = _registerSessionTab(session, numericTabId);
       session.actionHistory.push({
         tool: storedTool,
         params: replayParams,
         result: replayResult,
-        timestamp: now
+        timestamp: now,
+        logicalTab: logicalTab
       });
       if (session.actionHistory.length > MCP_SESSION_ACTION_HISTORY_CAP) {
         session.actionHistory.splice(0, session.actionHistory.length - MCP_SESSION_ACTION_HISTORY_CAP);
       }
 
       session.replayEntries = Array.isArray(session.replayEntries) ? session.replayEntries : [];
+      var entryReplayContext = _sanitizeReplayContext(replayContext);
+      entryReplayContext.logicalTab = logicalTab;
       session.replayEntries.push({
         tool: entry.tool,
         requestPayload: _sanitizeRequestPayload(payload, entry.response),
@@ -1830,7 +1937,7 @@
         success: entry.success !== false,
         dispatcher_route: entry.dispatcher_route,
         timestamp: now,
-        replayContext: _sanitizeReplayContext(replayContext),
+        replayContext: entryReplayContext,
         redactedInputs: entry.redactedInputs === true,
         targetRedacted: entry.targetRedacted === true
       });
@@ -1868,16 +1975,12 @@
       session.lastActivityAt = now;
       session.deadlineAt = now + MCP_SESSION_IDLE_DEATH_MS;
 
-      // Tolerate both isFinal (wire spec) and snake_case is_final.
-      var isFinal = sidecar !== null && (sidecar.isFinal === true || sidecar.is_final === true);
-      if (isFinal) {
-        // Close AFTER the append so the final action is part of the history.
-        // closeSession persists the buffer update itself.
-        closeSession(key, 'final');
-      } else {
-        _armIdleAlarm(session);
-        _persistOpenSessions();
-      }
+      // is_final belongs to the visual overlay lifecycle. Closing recording
+      // here split one multi-tab task into one session per overlay. Terminal
+      // task-status tools now own the recording boundary; idle expiry remains
+      // the fail-safe when a client omits one.
+      _armIdleAlarm(session);
+      _persistOpenSessions();
     } catch (_outerErr) {
       // Whole-body safety net -- never throw out of the recorder.
       try {
@@ -1952,6 +2055,12 @@
             sessionId: record.sessionId,
             agentId: (typeof record.agentId === 'string') ? record.agentId : '',
             tabId: (typeof record.tabId === 'number' && isFinite(record.tabId)) ? record.tabId : null,
+            tabIds: Array.isArray(record.tabIds)
+              ? record.tabIds.map(_numericTabId).filter(function (tabId) { return tabId !== null; })
+              : [],
+            logicalTabs: record.logicalTabs && typeof record.logicalTabs === 'object'
+              ? cloneReplayValue(record.logicalTabs, {})
+              : {},
             task: _sanitizeSummaryText(record.task, 2000) || 'MCP agent session',
             client: (typeof record.client === 'string' && record.client.length > 0) ? record.client : 'unknown',
             startTime: (typeof record.startTime === 'number') ? record.startTime : now,
@@ -1966,6 +2075,7 @@
             startOrigin: typeof record.startOrigin === 'string' ? record.startOrigin : null,
             sawActionTool: record.sawActionTool === true
           };
+          _registerSessionTab(session, session.tabId);
           _openSessions.set(key, session);
           if (session.deadlineAt <= now) {
             closeSession(key, 'expired');

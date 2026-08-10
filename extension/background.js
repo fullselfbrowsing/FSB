@@ -7415,6 +7415,8 @@ function slimActionResult(result) {
 
 const FSB_REPLAY_CHECKPOINT_KIND = 'fsb-lattice-replay-checkpoint/v1';
 const FSB_REPLAY_TAB_LOAD_TIMEOUT_MS = 30000;
+const FSB_PENDING_MCP_REPLAY_KEY = 'fsbPendingMcpReplayApprovals';
+const FSB_MCP_REPLAY_APPROVAL_TTL_MS = 10 * 60 * 1000;
 const FSB_REPLAY_LEGACY_TOOL_MAP = Object.freeze({
   rightClick: 'right_click',
   doubleClick: 'double_click',
@@ -7473,6 +7475,7 @@ function fsbReplayPublicPreparation(prepared) {
   const pausedStep = pausedSession?.status === 'replay_paused'
     ? pausedSession.replaySteps[pausedSession.currentStep]
     : null;
+  const bootstrapTab = fsbReplayBootstrapTab(prepared);
   return {
     success: true,
     verified: prepared.verified === true,
@@ -7480,7 +7483,9 @@ function fsbReplayPublicPreparation(prepared) {
     manifestHash: prepared.replay.manifestHash,
     integrity: prepared.replay.integrity,
     provenance: prepared.replay.provenance,
-    startUrl: prepared.startUrl,
+    startUrl: bootstrapTab?.startUrl || prepared.startUrl,
+    bootstrapTab: bootstrapTab?.id || null,
+    tabs: fsbReplayClone(prepared.tabs, []),
     counts: prepared.counts,
     pendingDecision: pausedStep ? {
       sessionId: pausedSession.replaySessionId,
@@ -7508,6 +7513,92 @@ function fsbReplayIsTrustedUiSender(sender) {
   const extensionPrefix = `chrome-extension://${chrome.runtime.id}/`;
   return !!(sender && sender.id === chrome.runtime.id &&
     typeof sender.url === 'string' && sender.url.startsWith(extensionPrefix));
+}
+
+async function fsbReadPendingMcpReplayApprovals() {
+  if (!chrome.storage?.session) return [];
+  const stored = await chrome.storage.session.get(FSB_PENDING_MCP_REPLAY_KEY);
+  const now = Date.now();
+  const approvals = Array.isArray(stored?.[FSB_PENDING_MCP_REPLAY_KEY])
+    ? stored[FSB_PENDING_MCP_REPLAY_KEY].filter((item) => item && item.expiresAt > now)
+    : [];
+  if (approvals.length !== (stored?.[FSB_PENDING_MCP_REPLAY_KEY] || []).length) {
+    if (approvals.length > 0) await chrome.storage.session.set({ [FSB_PENDING_MCP_REPLAY_KEY]: approvals });
+    else await chrome.storage.session.remove(FSB_PENDING_MCP_REPLAY_KEY);
+  }
+  return approvals;
+}
+
+async function fsbWritePendingMcpReplayApprovals(approvals) {
+  if (!chrome.storage?.session) throw new Error('Replay approval storage is unavailable');
+  if (approvals.length > 0) {
+    await chrome.storage.session.set({ [FSB_PENDING_MCP_REPLAY_KEY]: approvals.slice(-10) });
+  } else {
+    await chrome.storage.session.remove(FSB_PENDING_MCP_REPLAY_KEY);
+  }
+}
+
+async function requestMcpSessionReplay(sessionId) {
+  const prepared = await prepareSessionReplay(sessionId);
+  if (!prepared.steps.some(fsbReplayIsExecutable)) {
+    throw new Error('This verified recording has no executable steps');
+  }
+  const preview = fsbReplayPublicPreparation(prepared);
+  const pending = await fsbReadPendingMcpReplayApprovals();
+  const existing = pending.find((item) =>
+    item.sessionId === sessionId && item.manifestHash === prepared.replay.manifestHash
+  );
+  if (existing) {
+    try {
+      await chrome.runtime.sendMessage({ action: 'mcpReplayApprovalRequested', approval: existing });
+    } catch (_error) { /* side panel can hydrate the existing request when opened */ }
+    return {
+      success: true,
+      status: 'approval_required',
+      requestId: existing.requestId,
+      sessionId,
+      manifestHash: existing.manifestHash,
+      counts: existing.preview.counts,
+      tabCount: Math.max(1, existing.preview.tabs?.length || 0),
+      message: 'Verified replay is waiting for one approval in the FSB side panel. Target pages will open automatically after approval.'
+    };
+  }
+  const requestId = globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function'
+    ? globalThis.crypto.randomUUID()
+    : `mcp-replay-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+  const approval = {
+    requestId,
+    sessionId,
+    manifestHash: prepared.replay.manifestHash,
+    createdAt: Date.now(),
+    expiresAt: Date.now() + FSB_MCP_REPLAY_APPROVAL_TTL_MS,
+    preview
+  };
+  pending.push(approval);
+  await fsbWritePendingMcpReplayApprovals(pending);
+  try {
+    await chrome.runtime.sendMessage({ action: 'mcpReplayApprovalRequested', approval });
+  } catch (_error) { /* side panel can hydrate the pending request when opened */ }
+  return {
+    success: true,
+    status: 'approval_required',
+    requestId,
+    sessionId,
+    manifestHash: approval.manifestHash,
+    counts: preview.counts,
+    tabCount: Math.max(1, preview.tabs?.length || 0),
+    message: 'Verified replay is waiting for one approval in the FSB side panel. Target pages will open automatically after approval.'
+  };
+}
+
+async function fsbGetMcpReplayApproval(requestId, manifestHash) {
+  const pending = await fsbReadPendingMcpReplayApprovals();
+  const approval = pending.find((item) => item.requestId === requestId) || null;
+  if (!approval) throw new Error('Replay approval request is missing or expired');
+  if (!manifestHash || manifestHash !== approval.manifestHash) {
+    throw new Error('Replay approval hash mismatch');
+  }
+  return { approval, pending };
 }
 
 async function prepareSessionReplay(sessionId) {
@@ -7591,10 +7682,83 @@ async function fsbReplayCreateOwnedTab(startUrl) {
   }
 }
 
+async function fsbReplayCreateAdditionalOwnedTab(session, logicalTab, startUrl, active) {
+  const registry = globalThis.fsbAgentRegistryInstance;
+  if (!registry || typeof registry.bindTab !== 'function' || !session?.replayAgentId) {
+    throw new Error('Replay tab ownership registry is unavailable');
+  }
+  let tab = null;
+  try {
+    tab = await chrome.tabs.create({ url: startUrl, active: active === true });
+    if (!tab || !Number.isFinite(tab.id)) throw new Error(`Could not create replay tab ${logicalTab}`);
+    const binding = await registry.bindTab(session.replayAgentId, tab.id);
+    if (!binding || binding.success === false) {
+      throw new Error(binding?.error || `Could not own replay tab ${logicalTab}`);
+    }
+    await fsbReplayWaitForTab(tab.id);
+    tab = await chrome.tabs.get(tab.id);
+    return {
+      logicalTab,
+      tabId: tab.id,
+      ownershipToken: binding.ownershipToken || null,
+      expectedOrigin: fsbReplayOrigin(tab.url || tab.pendingUrl) || fsbReplayOrigin(startUrl)
+    };
+  } catch (error) {
+    if (Number.isFinite(tab?.id)) {
+      try { await chrome.tabs.remove(tab.id); } catch (_tabError) { /* failed replay tab may already be gone */ }
+    }
+    throw error;
+  }
+}
+
 async function fsbReplayReleaseAgent(session) {
   const registry = globalThis.fsbAgentRegistryInstance;
   if (!registry || !session?.replayAgentId || typeof registry.releaseAgent !== 'function') return;
   try { await registry.releaseAgent(session.replayAgentId, 'replay_terminal'); } catch (_error) { /* tab stays open for inspection */ }
+}
+
+function fsbReplayLogicalTab(step) {
+  const logicalTab = typeof step?.target?.logicalTab === 'string' ? step.target.logicalTab : 'primary';
+  return /^[A-Za-z0-9_-]{1,64}$/.test(logicalTab) ? logicalTab : 'primary';
+}
+
+function fsbReplayTabPlan(session, logicalTab) {
+  return session?.replayTabPlan?.[logicalTab] || null;
+}
+
+function fsbReplayBootstrapTab(prepared) {
+  const plans = Array.isArray(prepared?.tabs)
+    ? prepared.tabs.filter((tab) => tab && typeof tab.id === 'string')
+    : [];
+  if (plans.length === 0 && globalThis.FsbLatticeReplay?.isReplayableUrl(prepared?.startUrl)) {
+    plans.push({
+      id: 'primary',
+      order: 0,
+      startUrl: prepared.startUrl,
+      startOrigin: fsbReplayOrigin(prepared.startUrl),
+      startUrlState: 'ready'
+    });
+  }
+  const plansById = new Map(plans.map((plan) => [plan.id, plan]));
+  for (const step of prepared?.steps || []) {
+    if (!fsbReplayIsExecutable(step)) continue;
+    const plan = plansById.get(fsbReplayLogicalTab(step));
+    if (plan && globalThis.FsbLatticeReplay?.isReplayableUrl(plan.startUrl)) return plan;
+  }
+  return null;
+}
+
+async function fsbReplayEnsureTargetTab(session, step) {
+  const logicalTab = fsbReplayLogicalTab(step);
+  if (session.replayTabs?.[logicalTab]) return session.replayTabs[logicalTab];
+  const plan = fsbReplayTabPlan(session, logicalTab);
+  if (!plan || !globalThis.FsbLatticeReplay?.isReplayableUrl(plan.startUrl)) {
+    throw new Error(`Replay tab ${logicalTab} does not contain a safe HTTP(S) starting URL`);
+  }
+  const shouldActivate = step?.tool === 'switch_tab' || step?.arguments?.active === true;
+  const state = await fsbReplayCreateAdditionalOwnedTab(session, logicalTab, plan.startUrl, shouldActivate);
+  session.replayTabs[logicalTab] = state;
+  return state;
 }
 
 function fsbReplayExecutionParams(step, tabId) {
@@ -7607,30 +7771,44 @@ function fsbReplayExecutionParams(step, tabId) {
   return params;
 }
 
+function fsbReplayTabResult(tool, tab, extra) {
+  let domain = '';
+  try { domain = new URL(tab?.url || '').hostname; } catch (_error) { /* keep empty */ }
+  return Object.assign({
+    success: true,
+    tool,
+    tabId: tab?.id ?? null,
+    url: tab?.url || '',
+    domain,
+    title: tab?.title || ''
+  }, extra || {});
+}
+
 async function fsbReplayAssertTarget(session, step) {
-  const tab = await chrome.tabs.get(session.tabId);
+  const tabState = await fsbReplayEnsureTargetTab(session, step);
+  const tab = await chrome.tabs.get(tabState.tabId);
   const currentUrl = (tab && (tab.url || tab.pendingUrl)) || '';
   const currentOrigin = fsbReplayOrigin(currentUrl);
   if (!currentOrigin) throw new Error('Replay target became restricted or unavailable');
-  const expectedOrigin = step?.target?.origin || session.expectedOrigin || null;
+  const expectedOrigin = step?.target?.origin || tabState.expectedOrigin || null;
   if (expectedOrigin && currentOrigin !== expectedOrigin) {
     const error = new Error(`Replay paused because the target origin changed from ${expectedOrigin} to ${currentOrigin}`);
     error.code = 'replay_origin_mismatch';
     throw error;
   }
-  return { tab, currentUrl, currentOrigin };
+  return { tab, tabState, currentUrl, currentOrigin };
 }
 
-async function fsbReplayDispatchMessage(session, step, args, currentOrigin) {
+async function fsbReplayDispatchMessage(session, step, args, targetState, currentOrigin) {
   if (typeof dispatchMcpMessageRoute !== 'function' || typeof mcpBridgeClient === 'undefined') {
     throw new Error(`No shared MCP message route is available for ${step.tool}`);
   }
   const replayClient = Object.create(mcpBridgeClient);
-  replayClient._getActiveTab = () => chrome.tabs.get(session.tabId);
+  replayClient._getActiveTab = () => chrome.tabs.get(targetState.tabId);
   const payload = Object.assign({}, args, {
     agentId: session.replayAgentId,
-    ownershipToken: session.ownershipToken,
-    tab_id: session.tabId
+    ownershipToken: targetState.ownershipToken,
+    tab_id: targetState.tabId
   });
   if (step.tool === 'mcp:capabilities-invoke') {
     payload.slug = args.slug;
@@ -7640,18 +7818,35 @@ async function fsbReplayDispatchMessage(session, step, args, currentOrigin) {
   return dispatchMcpMessageRoute({ type: step.tool, payload, client: replayClient });
 }
 
-async function fsbReplayDispatchStep(session, step, currentOrigin) {
-  const args = fsbReplayExecutionParams(step, session.tabId);
+async function fsbReplayDispatchStep(session, step, targetState, currentOrigin) {
+  const args = fsbReplayExecutionParams(step, targetState.tabId);
+  const normalizedTool = FSB_REPLAY_LEGACY_TOOL_MAP[step.tool] || step.tool;
+  // Tab creation already happened in fsbReplayEnsureTargetTab. Re-dispatching
+  // the recorded open_tab would create a duplicate and lose logical mapping.
+  if (normalizedTool === 'open_tab') {
+    const tab = await chrome.tabs.get(targetState.tabId);
+    return fsbReplayTabResult('open_tab', tab);
+  }
+  if (normalizedTool === 'switch_tab') {
+    const tab = await chrome.tabs.update(targetState.tabId, { active: true });
+    return fsbReplayTabResult('switch_tab', tab);
+  }
   if (typeof step.tool === 'string' && step.tool.startsWith('mcp:') &&
       typeof hasMcpMessageRoute === 'function' && hasMcpMessageRoute(step.tool)) {
-    return fsbReplayDispatchMessage(session, step, args, currentOrigin);
+    return fsbReplayDispatchMessage(session, step, args, targetState, currentOrigin);
   }
-  let tool = FSB_REPLAY_LEGACY_TOOL_MAP[step.tool] || step.tool;
+  let tool = normalizedTool;
   if (tool === 'invoke_capability') {
-    return fsbReplayDispatchMessage(session, Object.assign({}, step, { tool: 'mcp:capabilities-invoke' }), args, currentOrigin);
+    return fsbReplayDispatchMessage(
+      session,
+      Object.assign({}, step, { tool: 'mcp:capabilities-invoke' }),
+      args,
+      targetState,
+      currentOrigin
+    );
   }
   if (tool === 'moveMouse') {
-    return sendMessageWithRetry(session.tabId, { action: 'executeAction', tool: 'moveMouse', params: args });
+    return sendMessageWithRetry(targetState.tabId, { action: 'executeAction', tool: 'moveMouse', params: args });
   }
   const definition = typeof getToolByName === 'function' ? getToolByName(tool) : null;
   if (!definition || typeof mcpBridgeClient === 'undefined' ||
@@ -7660,9 +7855,9 @@ async function fsbReplayDispatchStep(session, step, currentOrigin) {
   }
   return mcpBridgeClient._handleExecuteAction({
     tool,
-    params: Object.assign({}, args, { tab_id: session.tabId }),
+    params: Object.assign({}, args, { tab_id: targetState.tabId }),
     agentId: session.replayAgentId,
-    ownershipToken: session.ownershipToken
+    ownershipToken: targetState.ownershipToken
   });
 }
 
@@ -7673,6 +7868,11 @@ function fsbReplayCheckpointState(session, marker, step) {
     originalSessionId: session.originalSessionId,
     manifestHash: session.manifestHash,
     targetTabId: session.tabId,
+    logicalTabs: Object.values(session.replayTabs || {}).map((tab) => ({
+      logicalTab: tab.logicalTab,
+      tabId: tab.tabId,
+      expectedOrigin: tab.expectedOrigin || null
+    })),
     replayAgentId: session.replayAgentId,
     nextStep: session.currentStep,
     approvedScopes: session.approvedScopes.slice(),
@@ -7866,7 +8066,7 @@ async function executeReplaySequence(replaySessionId) {
 
     let result;
     try {
-      result = await fsbReplayDispatchStep(session, step, target.currentOrigin);
+      result = await fsbReplayDispatchStep(session, step, target.tabState, target.currentOrigin);
     } catch (error) {
       result = { success: false, error: error?.message || String(error), ambiguous: true };
     }
@@ -7896,11 +8096,19 @@ async function executeReplaySequence(replaySessionId) {
       return;
     }
 
+    const normalizedTool = FSB_REPLAY_LEGACY_TOOL_MAP[step.tool] || step.tool;
+    const logicalTab = fsbReplayLogicalTab(step);
+    if (normalizedTool === 'close_tab') {
+      delete session.replayTabs[logicalTab];
+    } else {
+      try {
+        const currentTab = await chrome.tabs.get(target.tabState.tabId);
+        target.tabState.expectedOrigin = fsbReplayOrigin(currentTab?.url || currentTab?.pendingUrl) ||
+          target.tabState.expectedOrigin;
+      } catch (_error) { /* a later per-tab origin check reports the missing tab */ }
+    }
+
     session.currentStep = i + 1;
-    try {
-      const currentTab = await chrome.tabs.get(session.tabId);
-      session.expectedOrigin = fsbReplayOrigin(currentTab?.url) || session.expectedOrigin;
-    } catch (_error) { /* a later origin check reports the missing tab */ }
     await fsbReplayPersistCheckpoint(session, 'BEFORE_NEXT_ITERATION_SCHEDULE', step);
     session.replayRun.nextStep = session.currentStep;
     await fsbReplayPersistRun(session);
@@ -7911,17 +8119,39 @@ async function executeReplaySequence(replaySessionId) {
   await fsbReplayFinalize(session, 'replay_completed');
 }
 
-function fsbReplayBuildSession(prepared, replaySessionId, owned, approvedScopes, priorRun) {
+function fsbReplayBuildSession(prepared, replaySessionId, owned, approvedScopes, priorRun, bootstrapTab) {
   const adapter = globalThis.FsbLatticeRuntimeAdapter?.createFsbLatticeRuntimeAdapter({
     sessionId: replaySessionId
   });
   const startTime = priorRun?.startedAt || Date.now();
+  const tabPlan = {};
+  (prepared.tabs || []).forEach((tab) => {
+    if (tab?.id) tabPlan[tab.id] = fsbReplayClone(tab, null);
+  });
+  if (Object.keys(tabPlan).length === 0) {
+    tabPlan.primary = {
+      id: 'primary',
+      startUrl: prepared.startUrl,
+      startOrigin: fsbReplayOrigin(prepared.startUrl),
+      startUrlState: 'ready'
+    };
+  }
+  const bootstrapLogicalTab = bootstrapTab?.id || 'primary';
+  const bootstrapStartUrl = bootstrapTab?.startUrl || prepared.startUrl;
+  const bootstrapState = {
+    logicalTab: bootstrapLogicalTab,
+    tabId: owned.tab.id,
+    ownershipToken: owned.ownershipToken || null,
+    expectedOrigin: fsbReplayOrigin(owned.tab.url) || fsbReplayOrigin(bootstrapStartUrl)
+  };
   return {
     replaySessionId,
     task: `Replay: ${prepared.replay.manifest.task || 'MCP agent session'}`,
     tabId: owned.tab.id,
     replayAgentId: owned.agentId,
     ownershipToken: owned.ownershipToken || null,
+    replayTabs: { [bootstrapLogicalTab]: bootstrapState },
+    replayTabPlan: tabPlan,
     status: 'replaying',
     startTime,
     actionHistory: [],
@@ -7934,7 +8164,7 @@ function fsbReplayBuildSession(prepared, replaySessionId, owned, approvedScopes,
     currentStep: priorRun?.nextStep || 0,
     totalSteps: prepared.steps.length,
     approvedScopes: Array.isArray(approvedScopes) ? approvedScopes.slice() : [],
-    expectedOrigin: fsbReplayOrigin(owned.tab.url) || fsbReplayOrigin(prepared.startUrl),
+    expectedOrigin: fsbReplayOrigin(owned.tab.url) || fsbReplayOrigin(bootstrapStartUrl),
     replayRun: priorRun || {
       id: replaySessionId,
       manifestHash: prepared.replay.manifestHash,
@@ -8003,16 +8233,19 @@ async function handleReplaySession(request, sender, sendResponse) {
     if (!prepared.steps.some(fsbReplayIsExecutable)) {
       throw new Error('This verified recording has no executable steps');
     }
-    if (!globalThis.FsbLatticeReplay.isReplayableUrl(prepared.startUrl)) {
+    const bootstrapTab = fsbReplayBootstrapTab(prepared);
+    if (!bootstrapTab) {
       throw new Error('The recording does not contain a safe HTTP(S) starting URL');
     }
-    owned = await fsbReplayCreateOwnedTab(prepared.startUrl);
+    owned = await fsbReplayCreateOwnedTab(bootstrapTab.startUrl);
     const replaySessionId = `replay_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     session = fsbReplayBuildSession(
       prepared,
       replaySessionId,
       owned,
-      Array.isArray(request?.approvedScopes) ? request.approvedScopes : []
+      Array.isArray(request?.approvedScopes) ? request.approvedScopes : [],
+      undefined,
+      bootstrapTab
     );
     activeSessions.set(replaySessionId, session);
     startKeepAlive();
@@ -8090,18 +8323,85 @@ async function fsbReplayReclaimOwnedTab(state, tab) {
   if (currentOwner && currentOwner !== agentId) {
     throw new Error('Replay recovery refused a tab now owned by another agent');
   }
-  if (!agentId || typeof registry.hasAgent !== 'function' || !registry.hasAgent(agentId)) {
-    const registration = await registry.registerAgent();
-    if (!registration || registration.error || !registration.agentId) {
-      throw new Error(registration?.error || 'Replay recovery could not reserve an agent');
-    }
-    agentId = registration.agentId;
+  if (!agentId) {
+    throw new Error('Replay recovery could not reserve an agent');
   }
   const binding = await registry.bindTab(agentId, tab.id);
   if (!binding || binding.success === false) {
     throw new Error(binding?.error || 'Replay recovery could not reclaim its tab');
   }
   return { tab, agentId, ownershipToken: binding.ownershipToken || null };
+}
+
+async function fsbReplayReclaimOwnedTabs(state) {
+  const recorded = Array.isArray(state.logicalTabs) && state.logicalTabs.length > 0
+    ? state.logicalTabs
+    : [{ logicalTab: 'primary', tabId: state.targetTabId, expectedOrigin: state.expectedOrigin || null }];
+  const replayTabs = {};
+  let agentId = state.replayAgentId;
+  let bootstrapOwned = null;
+  let bootstrapLogicalTab = null;
+  let firstOwned = null;
+  let firstLogicalTab = null;
+  const eligibleTabs = [];
+  const registry = globalThis.fsbAgentRegistryInstance;
+  try {
+    for (const item of recorded) {
+      const tab = await chrome.tabs.get(item.tabId);
+      if (!tab || !fsbReplayOrigin(tab.url || tab.pendingUrl)) {
+        throw new Error(`Replay recovery target ${item.logicalTab || 'primary'} is missing or restricted`);
+      }
+      eligibleTabs.push({ item, tab });
+    }
+
+    if (!registry || typeof registry.bindTab !== 'function') {
+      throw new Error('Replay recovery cannot access tab ownership');
+    }
+    if (!agentId || typeof registry.hasAgent !== 'function' || !registry.hasAgent(agentId)) {
+      if (typeof registry.registerAgent !== 'function') {
+        throw new Error('Replay recovery cannot reserve an agent');
+      }
+      const registration = await registry.registerAgent();
+      if (!registration || registration.error || !registration.agentId) {
+        throw new Error(registration?.error || 'Replay recovery could not reserve an agent');
+      }
+      agentId = registration.agentId;
+    }
+
+    for (const { item, tab } of eligibleTabs) {
+      const reclaimed = await fsbReplayReclaimOwnedTab(
+        Object.assign({}, state, { replayAgentId: agentId }),
+        tab
+      );
+      agentId = reclaimed.agentId;
+      const logicalTab = item.logicalTab || 'primary';
+      replayTabs[logicalTab] = {
+        logicalTab,
+        tabId: tab.id,
+        ownershipToken: reclaimed.ownershipToken || null,
+        expectedOrigin: item.expectedOrigin || fsbReplayOrigin(tab.url || tab.pendingUrl)
+      };
+      if (!firstOwned) {
+        firstOwned = reclaimed;
+        firstLogicalTab = logicalTab;
+      }
+      if (tab.id === state.targetTabId) {
+        bootstrapOwned = reclaimed;
+        bootstrapLogicalTab = logicalTab;
+      }
+    }
+  } catch (error) {
+    const failedAgentId = agentId;
+    if (failedAgentId && registry && typeof registry.releaseAgent === 'function') {
+      try { await registry.releaseAgent(failedAgentId, 'replay_recovery_failed'); } catch (_releaseError) { /* preserve original recovery failure */ }
+    }
+    throw error;
+  }
+  return {
+    owned: bootstrapOwned || firstOwned,
+    replayTabs,
+    bootstrapLogicalTab: bootstrapLogicalTab || firstLogicalTab || 'primary'
+  };
 }
 
 async function fsbRestoreLatticeReplayCheckpoints() {
@@ -8132,11 +8432,17 @@ async function fsbRestoreLatticeReplayCheckpoints() {
       if (prepared.replay.manifestHash !== state.manifestHash) {
         throw new Error('Replay recovery manifest hash mismatch');
       }
-      const tab = await chrome.tabs.get(state.targetTabId);
-      if (!tab || !fsbReplayOrigin(tab.url || tab.pendingUrl)) {
-        throw new Error('Replay recovery target is missing or restricted');
-      }
-      const owned = await fsbReplayReclaimOwnedTab(state, tab);
+      const reclaimed = await fsbReplayReclaimOwnedTabs(state);
+      const owned = reclaimed.owned;
+      const tab = owned.tab;
+      const bootstrapTab = (prepared.tabs || []).find((item) =>
+        item?.id === reclaimed.bootstrapLogicalTab
+      ) || {
+        id: reclaimed.bootstrapLogicalTab,
+        startUrl: tab.url || tab.pendingUrl,
+        startOrigin: fsbReplayOrigin(tab.url || tab.pendingUrl),
+        startUrlState: 'ready'
+      };
       const priorRun = prepared.replay.lastRun && prepared.replay.lastRun.id === state.replaySessionId
         ? prepared.replay.lastRun
         : {
@@ -8156,8 +8462,10 @@ async function fsbRestoreLatticeReplayCheckpoints() {
         state.replaySessionId,
         owned,
         Array.isArray(state.approvedScopes) ? state.approvedScopes : [],
-        priorRun
+        priorRun,
+        bootstrapTab
       );
+      session.replayTabs = reclaimed.replayTabs;
       session.currentStep = Number.isFinite(state.nextStep) ? state.nextStep : 0;
       session.previousReceiptCid = state.previousReceiptCid || prepared.receiptCid;
       session.expectedOrigin = state.expectedOrigin || fsbReplayOrigin(tab.url);
@@ -10984,6 +11292,70 @@ const fsbHandleRuntimeMessage = (request, sender, sendResponse) => {
 
     case 'prepareSessionReplay':
       handlePrepareSessionReplay(request, sender, sendResponse);
+      return true;
+
+    case 'getPendingMcpReplayApprovals':
+      if (!fsbReplayIsTrustedUiSender(sender)) {
+        sendResponse({ success: false, error: 'Replay approvals require the extension UI' });
+        break;
+      }
+      (async () => {
+        try {
+          sendResponse({ success: true, approvals: await fsbReadPendingMcpReplayApprovals() });
+        } catch (error) {
+          sendResponse({ success: false, error: error?.message || String(error) });
+        }
+      })();
+      return true;
+
+    case 'approveMcpReplay':
+      if (!fsbReplayIsTrustedUiSender(sender)) {
+        sendResponse({ success: false, error: 'Replay approval requires the extension UI' });
+        break;
+      }
+      (async () => {
+        try {
+          const lookup = await fsbGetMcpReplayApproval(request.requestId, request.manifestHash);
+          const approval = lookup.approval;
+          const approvedScopes = ['write'];
+          (approval.preview.steps || [])
+            .filter((step) => step.replay?.availability === 'approval-per-step')
+            .forEach((step) => approvedScopes.push('step:' + step.id));
+          let replayResponse = null;
+          await handleReplaySession({
+            sessionId: approval.sessionId,
+            manifestHash: approval.manifestHash,
+            approvedScopes
+          }, sender, (response) => { replayResponse = response; });
+          if (!replayResponse) throw new Error('Replay startup did not return a result');
+          if (replayResponse.success === true) {
+            await fsbWritePendingMcpReplayApprovals(
+              lookup.pending.filter((item) => item.requestId !== approval.requestId)
+            );
+          }
+          sendResponse(replayResponse);
+        } catch (error) {
+          sendResponse({ success: false, error: error?.message || String(error) });
+        }
+      })();
+      return true;
+
+    case 'cancelMcpReplay':
+      if (!fsbReplayIsTrustedUiSender(sender)) {
+        sendResponse({ success: false, error: 'Replay cancellation requires the extension UI' });
+        break;
+      }
+      (async () => {
+        try {
+          const pending = await fsbReadPendingMcpReplayApprovals();
+          await fsbWritePendingMcpReplayApprovals(
+            pending.filter((item) => item.requestId !== request.requestId)
+          );
+          sendResponse({ success: true });
+        } catch (error) {
+          sendResponse({ success: false, error: error?.message || String(error) });
+        }
+      })();
       return true;
 
     case 'replaySession':

@@ -46,6 +46,8 @@ const requiredPublicRoutes = [
   'get_site_guide',
   'list_sessions',
   'get_session_detail',
+  'get_session_replay',
+  'replay_session',
   'get_logs',
   'search_memory',
   'get_memory_stats',
@@ -71,6 +73,8 @@ const requiredMessageRoutes = [
   'mcp:get-page-snapshot',
   'mcp:list-sessions',
   'mcp:get-session',
+  'mcp:get-session-replay',
+  'mcp:replay-session',
   'mcp:get-logs',
   'mcp:search-memory',
   'mcp:get-memory',
@@ -137,6 +141,8 @@ const groupDefinitions = {
     tools: [
       'list_sessions',
       'get_session_detail',
+      'get_session_replay',
+      'replay_session',
       'get_logs',
       'search_memory',
       'get_memory_stats'
@@ -144,6 +150,8 @@ const groupDefinitions = {
     messages: [
       'mcp:list-sessions',
       'mcp:get-session',
+      'mcp:get-session-replay',
+      'mcp:replay-session',
       'mcp:get-logs',
       'mcp:search-memory',
       'mcp:get-memory'
@@ -224,7 +232,7 @@ function runRegistryChecks() {
 
   for (const toolName of requiredPublicRoutes) {
     const inRegistry = TOOL_REGISTRY.some(tool => tool.name === toolName);
-    const serverOnly = ['start_visual_session', 'end_visual_session', 'run_task', 'stop_task', 'get_task_status', 'list_sessions', 'get_session_detail', 'get_logs', 'search_memory', 'get_memory_stats'].includes(toolName);
+    const serverOnly = ['start_visual_session', 'end_visual_session', 'run_task', 'stop_task', 'get_task_status', 'list_sessions', 'get_session_detail', 'get_session_replay', 'replay_session', 'get_logs', 'search_memory', 'get_memory_stats'].includes(toolName);
     assert(inRegistry || serverOnly, `${toolName} is known through TOOL_REGISTRY or MCP server tool registration`);
   }
 
@@ -365,6 +373,9 @@ async function runObservabilityRedactionCase(dispatcher, groups) {
           }
         ]
       };
+    },
+    async exportHumanReadable(sessionId) {
+      return `Human-readable ${sessionId}`;
     }
   };
 
@@ -403,12 +414,104 @@ async function runObservabilityRedactionCase(dispatcher, groups) {
     ]) {
       assert(!serialized.includes(secret), `mcp:get-session omits raw secret value ${secret}`);
     }
+
+    const textResponse = await dispatcher.dispatchMcpMessageRoute({
+      type: 'mcp:get-session',
+      payload: { sessionId: 'session-redaction', format: 'text' }
+    });
+    assert(textResponse?.success === true && textResponse?.format === 'text',
+      'mcp:get-session implements its advertised text format');
+    assert(textResponse?.text === 'Human-readable session-redaction',
+      'text format returns the human-readable exporter result');
   } finally {
     if (previousAutomationLogger === undefined) {
       delete global.automationLogger;
     } else {
       global.automationLogger = previousAutomationLogger;
     }
+  }
+}
+
+async function runReplayRouteCase(dispatcher, groups) {
+  if (!dispatcher || !groups.includes('observability')) return;
+
+  console.log('\n--- verified replay inspection and consent routing ---');
+
+  const previousReplay = global.FsbLatticeReplay;
+  const previousRequest = global.requestMcpSessionReplay;
+  let requestedSessionId = null;
+  global.FsbLatticeReplay = {
+    async prepareReplay(sessionId) {
+      return {
+        verified: true,
+        sessionId,
+        startUrl: 'https://example.com/start',
+        tabs: [{
+          id: 'primary',
+          order: 0,
+          startUrl: 'https://example.com/start',
+          startOrigin: 'https://example.com',
+          startUrlState: 'ready'
+        }],
+        counts: { total: 1, executable: 1, approvalRequired: 1, blocked: 0 },
+        steps: [{
+          id: 'step-1',
+          index: 0,
+          tool: 'click',
+          arguments: { selector: '#continue', nested: { exact: { value: 'preserved' } } },
+          target: { logicalTab: 'primary', origin: 'https://example.com' },
+          replay: { risk: 'write', availability: 'approval-once' }
+        }],
+        replay: {
+          integrity: 'verified',
+          provenance: 'capture',
+          manifestHash: 'verified-manifest-hash',
+          receipt: 'signing-receipt-must-not-leak'
+        }
+      };
+    }
+  };
+  global.requestMcpSessionReplay = async (sessionId) => {
+    requestedSessionId = sessionId;
+    return {
+      success: true,
+      status: 'approval_required',
+      requestId: 'approval-1',
+      sessionId,
+      manifestHash: 'verified-manifest-hash',
+      message: 'Target pages will open automatically after approval.'
+    };
+  };
+
+  try {
+    const inspection = await dispatcher.dispatchMcpMessageRoute({
+      type: 'mcp:get-session-replay',
+      payload: { sessionId: 'session-replay' }
+    });
+    assert(inspection?.success === true && inspection?.replay?.verified === true,
+      'mcp:get-session-replay returns a verified structural preview');
+    assert(inspection?.replay?.steps?.[0]?.arguments?.nested?.exact?.value === 'preserved',
+      'replay inspection keeps nested step structure instead of flattening objects');
+    assert(inspection?.replay?.manifestHash === 'verified-manifest-hash',
+      'replay inspection binds the preview to its manifest hash');
+    assert(!JSON.stringify(inspection).includes('signing-receipt-must-not-leak'),
+      'replay inspection omits signing receipts');
+
+    const request = await dispatcher.dispatchMcpMessageRoute({
+      type: 'mcp:replay-session',
+      payload: { sessionId: 'session-replay' }
+    });
+    assert(request?.success === true && request?.status === 'approval_required',
+      'mcp:replay-session creates a consent request instead of executing immediately');
+    assert(requestedSessionId === 'session-replay',
+      'replay consent request preserves the selected recorded session');
+    assert(request?.message?.includes('open automatically'),
+      'replay consent response tells the MCP client not to ask for manual page opening');
+  } finally {
+    if (previousReplay === undefined) delete global.FsbLatticeReplay;
+    else global.FsbLatticeReplay = previousReplay;
+    if (previousRequest === undefined) delete global.requestMcpSessionReplay;
+    else global.requestMcpSessionReplay = previousRequest;
   }
 }
 
@@ -715,6 +818,7 @@ async function run() {
   const dispatcher = loadDispatcher();
   runDispatcherChecks(dispatcher, groups);
   await runObservabilityRedactionCase(dispatcher, groups);
+  await runReplayRouteCase(dispatcher, groups);
   await runTriggerOwnershipGateCase(dispatcher, groups);
   await runTaskOutcomeRecorderCase(dispatcher, groups);
   await runVisualSessionTokenOwnershipCase(dispatcher, groups);
