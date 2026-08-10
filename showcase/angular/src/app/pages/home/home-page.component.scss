@@ -49,6 +49,8 @@
 
 .hero-content {
   text-align: center;
+  width: 100%;
+  min-width: 0;
   max-width: 800px;
   padding: 48px 24px;
   position: relative;
@@ -1211,9 +1213,8 @@
 }
 
 /* Mobile-native hero: first phone viewport holds only the FSB title, the two
-   CTAs, and the scroll cue. Append-only region: these rules override the
-   @media (max-width: 768px) block above purely by source order — do not move
-   or merge them upward, and never edit the rules above. */
+   CTAs, and the scroll cue. These rules override the broader mobile block
+   above by source order. */
 @media (max-width: 768px) {
   .hero {
     min-height: 100vh;
@@ -1227,12 +1228,15 @@
   }
 
   .hero h1 {
-    /* Single line at every phone width: available width is 100vw - 48px, so
-       the size must track vw with a negative constant (title is ~8.5x its
-       font-size wide). */
+    /* Keep the English wordmark on one line when it fits, while allowing
+       longer translations and unbroken locale text to wrap before clipping. */
     font-size: clamp(1.75rem, 11.2vw - 0.4rem, 3.2rem);
+    line-height: 1.1;
+    max-width: 100%;
     margin-bottom: 36px;
-    white-space: nowrap;
+    overflow-wrap: anywhere;
+    text-wrap: balance;
+    white-space: normal;
   }
 
   .hero-subtitle {
