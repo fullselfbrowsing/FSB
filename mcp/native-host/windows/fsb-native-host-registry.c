@@ -74,12 +74,12 @@ static int write_response(
     output[cursor + 1U] = hex[value[index] & 0x0fU];
     cursor += 2U;
   }
-  if (cursor + 4U > output_capacity) {
+  if (cursor + 3U > output_capacity) {
     HeapFree(GetProcessHeap(), 0U, output);
     return fail("FSBRG_E_OUTPUT");
   }
-  memcpy(output + cursor, "\"}\n", 4U);
-  cursor += 4U;
+  memcpy(output + cursor, "\"}\n", 3U);
+  cursor += 3U;
   output_handle = GetStdHandle(STD_OUTPUT_HANDLE);
   if (
     output_handle == INVALID_HANDLE_VALUE

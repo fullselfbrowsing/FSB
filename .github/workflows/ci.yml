@@ -23,7 +23,7 @@ jobs:
       - name: Install root deps
         run: npm install --no-audit --no-fund
       - name: Install mcp deps (needed by root test script)
-        run: npm --prefix mcp install --no-audit --no-fund
+        run: npm --prefix mcp ci --no-audit --no-fund
       - name: Install showcase/server deps (needed by server-telemetry tests in npm test chain)
         run: npm --prefix showcase/server install --no-audit --no-fund
       - name: Install showcase/angular deps (needed by fsb-telemetry-service + build-smoke + privacy-page tests)
@@ -44,7 +44,7 @@ jobs:
       - name: Install root deps
         run: npm install --no-audit --no-fund
       - name: Install mcp deps
-        run: npm --prefix mcp install --no-audit --no-fund
+        run: npm --prefix mcp ci --no-audit --no-fund
       - name: Build MCP server (TypeScript)
         run: npm --prefix mcp run build
       - name: Phase 62 adapter drift smoke

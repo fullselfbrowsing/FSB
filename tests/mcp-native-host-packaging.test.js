@@ -1043,6 +1043,7 @@ function testWorkflowContracts() {
     assert.match(ciSource, pattern);
   }
   assert.doesNotMatch(ciSource, /Microsoft Visual Studio\\2022\\Enterprise/);
+  assert.doesNotMatch(ciSource, /npm --prefix mcp install --no-audit --no-fund/);
 
   for (const pattern of [
     /windows-bootstrap:/,
