@@ -416,11 +416,43 @@ export class HomePageComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 }
 
-function detectBrowserIconClass(nav: Navigator): string {
+/* Declared in the module tail rather than beside the interfaces at the top of the
+   file on purpose: messages.xlf pins a linenumber for every $localize call in this
+   module (the last one sits at line 317) and CI diffs `ng extract-i18n`
+   byte-for-byte, so nothing at or above that line may move. Same reason there is no
+   separate browser-icon.ts -- importing it would shift every one of those numbers.
+
+   Narrower than Navigator so the detector stays a pure function over plain objects
+   in tests; the real `navigator` satisfies it structurally, so the call site needs
+   no cast. `brave` exists only in Brave, and only synchronously. Its isBrave()
+   promise is deliberately never awaited: it resolves to `true` unconditionally --
+   the namespace's existence is the entire signal -- and awaiting it would land the
+   icon a tick after every other browser, adding a second visible flip. */
+export interface BrowserSignals {
+  readonly userAgent: string;
+  readonly brave?: { readonly isBrave: () => Promise<boolean> };
+}
+
+/* Branch order is load-bearing. Every Chromium fork inherits `Chrome/` and every
+   iOS browser is WebKit and inherits `Safari/`, so all brand tokens must be tested
+   before the two engine fallbacks at the bottom. */
+export function detectBrowserIconClass(nav: BrowserSignals): string {
   const ua = nav.userAgent;
-  if (/Edg\//.test(ua)) return 'fa-edge';
-  if (/OPR\/|Opera/.test(ua)) return 'fa-opera';
-  if (/Firefox\//.test(ua)) return 'fa-firefox-browser';
+  // Brave's desktop/Android UA is byte-identical to Chrome's, so the namespace is
+  // the only signal there. iOS Brave is WebKit and carries a UA token instead.
+  if (typeof nav.brave === 'object' && nav.brave !== null) return 'fa-brave';
+  if (/\bBrave\b/.test(ua)) return 'fa-brave';
+  // Edg/ desktop, EdgA/ Android, EdgiOS/ iOS, Edge/ legacy EdgeHTML.
+  if (/\bEdg(?:e|A|iOS)?\//.test(ua)) return 'fa-edge';
+  // OPR/ desktop+Android, OPT/ and OPiOS/ on iOS, bare Opera for Mini/Presto.
+  if (/\bOP(?:R|T|iOS)\//.test(ua) || /\bOpera\b/.test(ua)) return 'fa-opera';
+  if (/\bYaBrowser\//.test(ua)) return 'fa-yandex';
+  if (/\bFirefox\/|\bFxiOS\//.test(ua)) return 'fa-firefox-browser';
+  // Chrome on iOS carries Safari/ but no Chrome/, so it must be claimed here before
+  // the fallback below, even though it returns the same value as the default.
+  if (/\bCriOS\//.test(ua)) return 'fa-chrome';
+  // Engine fallbacks. The negative test is intentionally unanchored: `HeadlessChrome/`
+  // must still read as Chromium, not Safari.
   if (/Safari\//.test(ua) && !/Chrome\/|Chromium\//.test(ua)) return 'fa-safari';
   return 'fa-chrome';
 }
