@@ -1026,8 +1026,10 @@ function testWorkflowContracts() {
   for (const pattern of [
     /native-host-windows:/,
     /runs-on: windows-latest/,
-    /VsDevCmd\.bat.*-arch=x64/,
-    /VsDevCmd\.bat.*-arch=arm64/,
+    /vswhere\.exe/,
+    /Microsoft\.VisualStudio\.Component\.VC\.Tools\.x86\.x64/,
+    /call "%VSDEVCMD%" -arch=x64/,
+    /call "%VSDEVCMD%" -arch=arm64/,
     /build-native-host-windows\.mjs --arch x64/,
     /build-native-host-windows\.mjs --arch arm64/,
     /mcp-native-host-packaging\.test\.js --section windows-bootstrap/,
@@ -1040,6 +1042,7 @@ function testWorkflowContracts() {
   ]) {
     assert.match(ciSource, pattern);
   }
+  assert.doesNotMatch(ciSource, /Microsoft Visual Studio\\2022\\Enterprise/);
 
   for (const pattern of [
     /windows-bootstrap:/,

@@ -62,22 +62,38 @@ jobs:
           node-version: '20'
       - name: Install MCP dependencies
         run: npm --prefix mcp ci --no-audit --no-fund
+      - name: Locate MSVC developer command prompt
+        shell: pwsh
+        run: |
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+          if (-not (Test-Path $vswhere)) {
+            throw "vswhere.exe was not found at $vswhere"
+          }
+          $installationPath = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath | Select-Object -First 1
+          if (-not $installationPath) {
+            throw 'No Visual Studio installation with the MSVC C++ toolchain was found'
+          }
+          $devCmd = Join-Path $installationPath 'Common7\Tools\VsDevCmd.bat'
+          if (-not (Test-Path $devCmd)) {
+            throw "VsDevCmd.bat was not found at $devCmd"
+          }
+          "VSDEVCMD=$devCmd" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       - name: Build x64 native-host bootstrap
         shell: cmd
         run: |
-          call "%ProgramFiles%\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64
+          call "%VSDEVCMD%" -arch=x64 -host_arch=x64
           if errorlevel 1 exit /b %errorlevel%
           node scripts/build-native-host-windows.mjs --arch x64
       - name: Build arm64 native-host bootstrap
         shell: cmd
         run: |
-          call "%ProgramFiles%\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat" -arch=arm64 -host_arch=x64
+          call "%VSDEVCMD%" -arch=arm64 -host_arch=x64
           if errorlevel 1 exit /b %errorlevel%
           node scripts/build-native-host-windows.mjs --arch arm64
       - name: Verify both PE artifacts and write package metadata
         shell: cmd
         run: |
-          call "%ProgramFiles%\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64
+          call "%VSDEVCMD%" -arch=x64 -host_arch=x64
           if errorlevel 1 exit /b %errorlevel%
           node scripts/build-native-host-windows.mjs --arch all --verify-only --metadata-out mcp/native-host/windows-artifacts.json
       - name: Execute the x64 bootstrap and safe registry-helper harnesses
