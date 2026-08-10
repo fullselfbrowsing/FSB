@@ -44,6 +44,8 @@ console.log('--- showcase-build-smoke (STATS-05 + STATS-06) ---');
 
 const SOURCE_XLF_PATH = path.join(ROOT, 'showcase/angular/src/locale/messages.xlf');
 const sourceXlf = fs.readFileSync(SOURCE_XLF_PATH, 'utf8');
+const homeStylePath = path.join(ROOT, 'showcase/angular/src/app/pages/home/home-page.component.scss');
+const homeStyle = fs.readFileSync(homeStylePath, 'utf8');
 const RETIRED_STATS_ISSUES_IDS = [
   'stats.view.issues',
   'stats.metric.open',
@@ -82,6 +84,21 @@ check('source: messages.xlf contains every current FSB Stats message',
 check('source: retired Issues/Sankey Stats messages are absent',
   RETIRED_STATS_ISSUES_IDS.every((id) => !sourceXlf.includes(`<trans-unit id="${id}"`)),
   'one or more retired Issues/Sankey translation units remain');
+
+const heroContentRule = homeStyle.match(/\.hero-content\s*\{([^}]*)\}/);
+const heroTitleRules = [...homeStyle.matchAll(/\.hero h1\s*\{([^}]*)\}/g)].map((match) => match[1]);
+const localizedHeroTitleRule = heroTitleRules.find((rule) => /overflow-wrap:\s*anywhere/.test(rule));
+check('source: hero content is constrained to the viewport width',
+  heroContentRule !== null && /width:\s*100%/.test(heroContentRule[1]) && /min-width:\s*0/.test(heroContentRule[1]),
+  '.hero-content must have width: 100% and min-width: 0');
+check('source: localized mobile hero titles can wrap safely',
+  localizedHeroTitleRule !== undefined
+    && /white-space:\s*normal/.test(localizedHeroTitleRule)
+    && /max-width:\s*100%/.test(localizedHeroTitleRule),
+  'mobile .hero h1 must allow wrapping within its content box');
+check('source: no hero title rule forces translated text onto one line',
+  heroTitleRules.every((rule) => !/white-space:\s*nowrap/.test(rule)),
+  'remove white-space: nowrap from .hero h1');
 
 // Each non-en locale must have a <target state="translated"> block for every
 // SHOWCASE_STATS_FSB_* id in the source.
