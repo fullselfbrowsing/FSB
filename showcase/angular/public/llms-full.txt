@@ -1,4 +1,4 @@
-<!-- generated 2026-08-10 by build-crawler-files.mjs; edit llms-full.source.md -->
+<!-- generated 2026-08-11 by build-crawler-files.mjs; edit llms-full.source.md -->
 # FSB (Full Self-Browsing)
 
 ## 1. Project Description
@@ -99,15 +99,15 @@ From source:
 ### MCP install for AI agents (one command per client)
 No FSB API key is needed on this path -- the MCP client's model does the reasoning:
 
-- Claude Code: `npx -y fsb-mcp-server install --claude-code`
-- Claude Desktop: `npx -y fsb-mcp-server install --claude-desktop`
-- Cursor: `npx -y fsb-mcp-server install --cursor`
-- VS Code: `npx -y fsb-mcp-server install --vscode`
-- Windsurf: `npx -y fsb-mcp-server install --windsurf`
-- Codex: `npx -y fsb-mcp-server install --codex`
-- All detected hosts: `npx -y fsb-mcp-server install --all`
+- Claude Code: `npx -y fsb-mcp-server@latest install --claude-code`
+- Claude Desktop: `npx -y fsb-mcp-server@latest install --claude-desktop`
+- Cursor: `npx -y fsb-mcp-server@latest install --cursor`
+- VS Code: `npx -y fsb-mcp-server@latest install --vscode`
+- Windsurf: `npx -y fsb-mcp-server@latest install --windsurf`
+- Codex: `npx -y fsb-mcp-server@latest install --codex`
+- All detected hosts: `npx -y fsb-mcp-server@latest install --all`
 
-Append `--dry-run` to preview without writing, sanity-check with `npx -y fsb-mcp-server doctor`, and restart the client so the new MCP server appears. The extension pairs with the local bridge on `ws://localhost:7225`; optional Streamable HTTP mode exposes `http://127.0.0.1:7226/mcp`.
+Append `--dry-run` to preview without writing, sanity-check with `npx -y fsb-mcp-server@latest doctor`, and restart the client so the new MCP server appears. The extension pairs with the local bridge on `ws://localhost:7225`; optional Streamable HTTP mode exposes `http://127.0.0.1:7226/mcp`.
 
 No build step is required for end users -- the extension ships as plain JavaScript per Manifest V3 conventions. Developers contributing to FSB do not need npm to install or run the extension itself; npm is only used by the showcase site under `showcase/angular/`.
 
@@ -125,7 +125,7 @@ When FSB acts on an element, the page briefly outlines that element in orange. T
 After every action, FSB checks the DOM for expected post-conditions (URL change, element disappearance, text appearance). If verification fails, FSB does not silently continue -- it surfaces the failure and lets the planner choose between retry, alternate selector, or stop. This is the second load-bearing reliability mechanism: even when a click "succeeded" mechanically, FSB only counts the action as complete when the page state reflects the intended outcome.
 
 ### MCP server surface
-FSB exposes its tooling through a Model Context Protocol (MCP) server. External AI clients (Claude Desktop, Claude Code, Codex, Cursor, Windsurf, OpenClaw, and custom MCP clients) can drive FSB by speaking MCP, which lets agents orchestrate browser tasks without writing extension code. The MCP server is published to npm as `fsb-mcp-server` and runs as `npx -y fsb-mcp-server`; it pairs with the running extension over a local WebSocket bridge.
+FSB exposes its tooling through a Model Context Protocol (MCP) server. External AI clients (Claude Desktop, Claude Code, Codex, Cursor, Windsurf, OpenClaw, and custom MCP clients) can drive FSB by speaking MCP, which lets agents orchestrate browser tasks without writing extension code. The MCP server is published to npm as `fsb-mcp-server` and runs as `npx -y fsb-mcp-server@latest`; it pairs with the running extension over a local WebSocket bridge.
 
 The MCP surface is the best way to use FSB with coding agents and external autonomy layers. FSB handles precise single-attempt browser execution, visual feedback, observability, and verification. Long-running scheduling and personality/identity decisions belong in the calling agent layer, such as OpenClaw or Claude Routines.
 

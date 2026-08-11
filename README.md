@@ -51,15 +51,15 @@ Project Mariner, Claude Computer Use, and OpenAI Operator rely heavily on visual
 
 | Client | One-command install |
 |--------|---------------------|
-| Claude Code | `npx -y fsb-mcp-server install --claude-code` |
-| Claude Desktop | `npx -y fsb-mcp-server install --claude-desktop` |
-| Cursor | `npx -y fsb-mcp-server install --cursor` |
-| VS Code | `npx -y fsb-mcp-server install --vscode` |
-| Windsurf | `npx -y fsb-mcp-server install --windsurf` |
-| Codex | `npx -y fsb-mcp-server install --codex` |
-| All at once | `npx -y fsb-mcp-server install --all` |
+| Claude Code | `npx -y fsb-mcp-server@latest install --claude-code` |
+| Claude Desktop | `npx -y fsb-mcp-server@latest install --claude-desktop` |
+| Cursor | `npx -y fsb-mcp-server@latest install --cursor` |
+| VS Code | `npx -y fsb-mcp-server@latest install --vscode` |
+| Windsurf | `npx -y fsb-mcp-server@latest install --windsurf` |
+| Codex | `npx -y fsb-mcp-server@latest install --codex` |
+| All at once | `npx -y fsb-mcp-server@latest install --all` |
 
-Preview before writing: append `--dry-run`. Sanity check with `npx -y fsb-mcp-server doctor`. Restart the client so the new MCP server appears.
+Preview before writing: append `--dry-run`. Sanity check with `npx -y fsb-mcp-server@latest doctor`. Restart the client so the new MCP server appears.
 
 **Then install the browser side** (the MCP bridge talks to the extension):
 
@@ -128,7 +128,7 @@ The core design goal is to keep the browser as the source of truth. The model re
 
 **PhantomStream 0.2.1 media mirroring.** Dashboard DOM live preview now consumes the published PhantomStream media side channel in reference mode, so progressive `<video>` and `<audio>` nodes can mirror alongside DOM snapshots. Adaptive HLS/DASH discovery remains deferred because it would require a new `webRequest` permission; MCP tool schemas, pairing, auth, and dashboard ownership behavior are unchanged.
 
-**v0.11.0 — Trigger Tool (reactive DOM monitoring).** MCP callers can arm a watch on one page element with `trigger` and manage it with `stop_trigger`, `get_trigger_status`, and `list_triggers`. Watches support `live-observe` and `refresh-poll` modes, threshold/delta/regex/compound conditions, blocking or detached reporting, and a configurable concurrency cap. See [Trigger Watchers](mcp/README.md#trigger-watchers) for the full contract.
+**Engineering milestone 0.11.0 — Trigger Tool (reactive DOM monitoring).** MCP callers can arm a watch on one page element with `trigger` and manage it with `stop_trigger`, `get_trigger_status`, and `list_triggers`. Watches support `live-observe` and `refresh-poll` modes, threshold/delta/regex/compound conditions, blocking or detached reporting, and a configurable concurrency cap. See [Trigger Watchers](mcp/README.md#trigger-watchers) for the full contract.
 
 **Showcase and ecosystem pages.** [full-selfbrowsing.com](https://full-selfbrowsing.com) added pages for [Lattice](https://full-selfbrowsing.com/lattice) (capability runtime SDK), [PhantomStream](https://full-selfbrowsing.com/phantom-stream) (DOM-native browser mirroring), [Prometheus](https://full-selfbrowsing.com/prometheus) (the autonomous browser build behind FSB), and a community [Site Maps](https://full-selfbrowsing.com/sitemaps) hub, plus a live [stats](https://full-selfbrowsing.com/stats) page with an anonymized active-regions globe, a [legal](https://full-selfbrowsing.com/legal) posture page, and an interactive knowledge-graph viewer on [About](https://full-selfbrowsing.com/about).
 
@@ -252,7 +252,7 @@ If a site uses heavy client rendering, custom canvas controls, or unusual shadow
 | Page reads fail | Move away from browser-internal pages such as `chrome://` or extension pages. |
 | Clicks miss targets | Refresh the DOM snapshot, scroll the target into view, or use coordinate tools. |
 | Typed text does not stick | Prefer `type_text` over JavaScript value assignment on controlled inputs. |
-| MCP tools are missing | Restart the host client and run `fsb-mcp-server doctor`. |
+| MCP tools are missing | Restart the host client and run `npx -y fsb-mcp-server@latest doctor`. |
 | MCP tools time out | Check `status --watch`, active tab readiness, and whether another task is queued. |
 
 Most failures are recoverable by inspecting the current page, refreshing selectors, or restarting the local MCP bridge. Reinstalling the MCP config should be the last step, not the first.
@@ -290,20 +290,20 @@ http://127.0.0.1:7226/mcp
 ### One Command Install
 
 ```bash
-npx -y fsb-mcp-server install --claude-desktop
-npx -y fsb-mcp-server install --claude-code
-npx -y fsb-mcp-server install --cursor
-npx -y fsb-mcp-server install --vscode
-npx -y fsb-mcp-server install --windsurf
-npx -y fsb-mcp-server install --codex
-npx -y fsb-mcp-server install --all
+npx -y fsb-mcp-server@latest install --claude-desktop
+npx -y fsb-mcp-server@latest install --claude-code
+npx -y fsb-mcp-server@latest install --cursor
+npx -y fsb-mcp-server@latest install --vscode
+npx -y fsb-mcp-server@latest install --windsurf
+npx -y fsb-mcp-server@latest install --codex
+npx -y fsb-mcp-server@latest install --all
 ```
 
 Preview without writing:
 
 ```bash
-npx -y fsb-mcp-server install --all --dry-run
-npx -y fsb-mcp-server install --list
+npx -y fsb-mcp-server@latest install --all --dry-run
+npx -y fsb-mcp-server@latest install --list
 ```
 
 ### Manual Examples
@@ -311,7 +311,7 @@ npx -y fsb-mcp-server install --list
 Claude Code:
 
 ```bash
-claude mcp add --scope user fsb -- npx -y fsb-mcp-server
+claude mcp add --scope user fsb -- npx -y fsb-mcp-server@latest
 ```
 
 Codex (`~/.codex/config.toml`):
@@ -319,7 +319,7 @@ Codex (`~/.codex/config.toml`):
 ```toml
 [mcp_servers.fsb]
 command = "npx"
-args = ["-y", "fsb-mcp-server"]
+args = ["-y", "fsb-mcp-server@latest"]
 ```
 
 VS Code (`mcp.json`):
@@ -330,7 +330,7 @@ VS Code (`mcp.json`):
     "fsb": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "fsb-mcp-server"]
+      "args": ["-y", "fsb-mcp-server@latest"]
     }
   }
 }
@@ -339,9 +339,9 @@ VS Code (`mcp.json`):
 Diagnostics:
 
 ```bash
-npx -y fsb-mcp-server doctor
-npx -y fsb-mcp-server status --watch
-npx -y fsb-mcp-server wait-for-extension
+npx -y fsb-mcp-server@latest doctor
+npx -y fsb-mcp-server@latest status --watch
+npx -y fsb-mcp-server@latest wait-for-extension
 ```
 
 See [mcp/README.md](mcp/README.md) for the full tool reference and client-specific setup notes.
@@ -587,7 +587,7 @@ Debugging:
 - Inspect the service worker from `chrome://extensions/`.
 - Check the browser console on the active tab for content script logs.
 - Use the options page log viewer for session and action history.
-- For MCP issues, run `npm run test:mcp-smoke`, then `fsb-mcp-server doctor`, then `fsb-mcp-server status --watch`.
+- For MCP issues, run `npm run test:mcp-smoke`, then `npx -y fsb-mcp-server@latest doctor`, then `npx -y fsb-mcp-server@latest status --watch`.
 
 ### Change Guidelines
 
@@ -600,10 +600,10 @@ Debugging:
 
 ### Release Sanity Checks
 
-Before cutting a release, verify:
+Before changing a release version, author its release entry in the owning changelog, then run `npm run version:set:extension -- X.Y.Z` or `npm run version:set:mcp -- X.Y.Z`. Release notes remain human-authored and the setters do not rewrite changelog history. Before cutting either release, run `npm run version:check` and verify:
 
-- root `package.json` version matches `extension/manifest.json`
-- `mcp/package.json` matches `mcp/src/version.ts`
+- extension-owned metadata matches `extension/manifest.json`, while MCP-owned metadata matches `mcp/package.json`
+- `extension-vX.Y.Z` and `mcp-vX.Y.Z` tags match their independently versioned artifacts
 - README version badges and "what's new" sections match package metadata
 - screenshots and logos resolve from tracked paths
 - MCP README tool counts match the registered runtime surface

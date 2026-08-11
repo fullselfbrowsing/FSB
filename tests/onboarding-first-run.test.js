@@ -8,6 +8,7 @@ const initConfigPath = path.join(ROOT, 'extension', 'config', 'init-config.js');
 const onboardingHtmlPath = path.join(ROOT, 'extension', 'ui', 'onboarding.html');
 const onboardingCssPath = path.join(ROOT, 'extension', 'ui', 'onboarding.css');
 const onboardingJsPath = path.join(ROOT, 'extension', 'ui', 'onboarding.js');
+const PRODUCT_VERSION = require('../extension/manifest.json').version;
 
 function read(relPath) {
   return fs.readFileSync(path.join(ROOT, relPath), 'utf8');
@@ -23,7 +24,7 @@ async function loadInitConfigHarness() {
     console,
     chrome: {
       runtime: {
-        getManifest: () => ({ version: '0.9.91' }),
+        getManifest: () => ({ version: PRODUCT_VERSION }),
         getURL: (rel) => `chrome-extension://fsb/${rel}`,
         openOptionsPage: () => openedOptions.push(true),
         onInstalled: {
@@ -97,7 +98,7 @@ async function loadInitConfigHarness() {
   console.log('--- onboarding provider storage mapping ---');
   {
     const context = {
-      chrome: { runtime: { getManifest: () => ({ version: '0.9.91' }) } },
+      chrome: { runtime: { getManifest: () => ({ version: PRODUCT_VERSION }) } },
       document: { addEventListener: () => {} },
       window: { addEventListener: () => {} },
       console,

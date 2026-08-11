@@ -1046,14 +1046,27 @@ function testWorkflowContracts() {
   assert.doesNotMatch(ciSource, /npm --prefix mcp install --no-audit --no-fund/);
 
   for (const pattern of [
+    /version-contract:/,
     /windows-bootstrap:/,
     /runs-on: windows-latest/,
+    /vswhere\.exe/,
+    /Microsoft\.VisualStudio\.Component\.VC\.Tools\.x86\.x64/,
+    /call "%VSDEVCMD%" -arch=x64/,
+    /call "%VSDEVCMD%" -arch=arm64/,
+    /build-native-host-windows\.mjs --arch x64/,
+    /build-native-host-windows\.mjs --arch arm64/,
+    /mcp-native-host-packaging\.test\.js --section windows-bootstrap/,
     /actions\/upload-artifact@v4/,
-    /publish:\s+needs: windows-bootstrap/s,
+    /publish-mcp:/,
+    /needs: \[version-contract, windows-bootstrap\]/,
     /actions\/download-artifact@v4/,
     /FSB_REQUIRE_REAL_WINDOWS_ARTIFACTS: '1'/,
     /mcp-native-host-packaging\.test\.js --section workflow-and-pack/,
-    /npm publish "\$\{\{ steps\.pack\.outputs\.tarball \}\}" --access public/,
+    /npm publish "\$\{\{ steps\.pack\.outputs\.tarball \}\}" --access public --tag latest/,
+    /test "\$GITHUB_REF_NAME" = "mcp-v\$\{\{ steps\.package-version\.outputs\.version \}\}"/,
+    /git merge-base --is-ancestor "\$release_commit" origin\/main/,
+    /softprops\/action-gh-release@v2/,
+    /name: fsb-mcp-server v\$\{\{ needs\.version-contract\.outputs\.version \}\}/,
     /lockSha256/,
     /integrityReceiptSha256/,
     /tarballSha512/,
@@ -1061,7 +1074,16 @@ function testWorkflowContracts() {
   ]) {
     assert.match(publishSource, pattern);
   }
+  assert.equal((publishSource.match(/softprops\/action-gh-release@v2/g) || []).length, 1);
+  assert.match(publishSource, /- 'mcp-v\*'/);
+  assert.doesNotMatch(publishSource, /- 'extension-v\*'/);
+  assert.doesNotMatch(publishSource, /^\s+- 'v\*'$/mu);
+  assert.doesNotMatch(publishSource, /extension-package:|publish-cws:|github-release:/);
   assert.doesNotMatch(publishSource, /npm publish --access public/);
+  assert.doesNotMatch(
+    publishSource,
+    /Chrome Web Store installations update through Chrome's normal extension update channel\./,
+  );
 }
 
 function writeBoundaryGraph(fixtureRoot, mode) {

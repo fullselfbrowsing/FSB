@@ -59,7 +59,7 @@
     if (typeof extensionId !== 'string' || !EXTENSION_ID_PATTERN.test(extensionId)) {
       return null;
     }
-    return 'npx -y fsb-mcp-server install --native-host --browser '
+    return 'npx -y fsb-mcp-server@latest install --native-host --browser '
       + detectBrowser(navigatorLike)
       + ' --extension-id '
       + extensionId;

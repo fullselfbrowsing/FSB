@@ -39,6 +39,19 @@ function loadOverlayStateModule() {
   return sandbox.module.exports;
 }
 
+function declarationSource(source, name) {
+  let start = source.indexOf('function ' + name + '(');
+  if (start === -1) start = source.indexOf('async function ' + name + '(');
+  if (start === -1) throw new Error('missing function ' + name);
+  const open = source.indexOf('{', start);
+  let depth = 0;
+  for (let index = open; index < source.length; index++) {
+    if (source[index] === '{') depth++;
+    if (source[index] === '}' && --depth === 0) return source.slice(start, index + 1);
+  }
+  throw new Error('unterminated function ' + name);
+}
+
 // ---------------------------------------------------------------------------
 // DOM/window shim (mirrors overlay-stability-cadence.test.js)
 // ---------------------------------------------------------------------------
@@ -80,6 +93,9 @@ function makeElement(tag, opts) {
     style: {},
     attributes: {},
     dataset: {},
+    disabled: false,
+    value: '',
+    _listeners: {},
     _textContent: '',
     _innerHTML: '',
     _isConnected: true,
@@ -95,10 +111,16 @@ function makeElement(tag, opts) {
         'fsb-note','fsb-note-icon','fsb-note-text',
         'fsb-step','fsb-step-number','fsb-step-text',
         'fsb-log','fsb-log-line','fsb-log-line',
-        'fsb-meta','fsb-phase','fsb-eta','fsb-progress-bar','fsb-progress-fill'
+        'fsb-meta','fsb-phase','fsb-eta','fsb-progress-bar','fsb-progress-fill',
+        'fsb-replay-player','fsb-replay-toggle','fsb-replay-track',
+        'fsb-replay-time','fsb-replay-scrubber','fsb-replay-speed'
       ];
       this.children = childClasses.map(c => {
-        const ch = makeElement(c === 'fsb-logo' ? 'img' : 'span');
+        const tagName = c === 'fsb-logo' ? 'img'
+          : (c === 'fsb-replay-toggle' ? 'button'
+            : (c === 'fsb-replay-scrubber' ? 'input'
+              : (c === 'fsb-replay-speed' ? 'select' : 'span')));
+        const ch = makeElement(tagName);
         ch.classList.add(c);
         ch.parentNode = this;
         return ch;
@@ -119,6 +141,13 @@ function makeElement(tag, opts) {
     getAttribute(k) { return this.attributes[k]; },
     hasAttribute(k) { return Object.prototype.hasOwnProperty.call(this.attributes, k); },
     removeAttribute(k) { delete this.attributes[k]; },
+    addEventListener(type, listener) {
+      if (!this._listeners[type]) this._listeners[type] = [];
+      this._listeners[type].push(listener);
+    },
+    dispatchEvent(event) {
+      (this._listeners[event.type] || []).forEach(listener => listener(event));
+    },
     querySelector(sel) {
       if (sel.startsWith('.')) {
         const cls = sel.slice(1);
@@ -230,7 +259,7 @@ const sandbox = {
   cancelAnimationFrame: cancelAnimationFrameStub,
   setTimeout, clearTimeout, setInterval, clearInterval,
   console,
-  chrome: { runtime: { getURL: (p) => 'chrome-extension://test/' + p } },
+  chrome: { runtime: { getURL: (p) => 'chrome-extension://test/' + p, sendMessage: () => Promise.resolve({ success: true }) } },
   module: { exports: {} },
   Set, Map, WeakMap, WeakSet, Promise, Date, Math, JSON, String, Number, Boolean, Array, Object, Error, RegExp,
   Symbol, Reflect
@@ -249,6 +278,10 @@ const { ProgressOverlay, ActionGlowOverlay } = sandbox.module.exports;
 // Capture the raw shadow-style source by re-reading the file (simpler than
 // trying to execute the create() Popover path inside the stub).
 const visualFeedbackSrc = src;
+const messagingSrc = fs.readFileSync(
+  path.resolve(__dirname, '..', 'extension', 'content', 'messaging.js'),
+  'utf8'
+);
 
 // ---------------------------------------------------------------------------
 // Test harness
@@ -294,7 +327,8 @@ function makeState(opts) {
     result: opts.result,
     guarded: opts.guarded,
     capability: opts.capability,
-    stoppable: opts.stoppable
+    stoppable: opts.stoppable,
+    replay: opts.replay
   };
 }
 
@@ -319,6 +353,71 @@ assertEq(overlayStateExports.isThinkingPhase(null), false, 'isThinkingPhase(null
 assertEq(overlayStateExports.isThinkingPhase(undefined), false, 'isThinkingPhase(undefined) === false');
 assertEq(overlayStateExports.isThinkingPhase(''), false, "isThinkingPhase('') === false");
 assertEq(overlayStateExports.isThinkingPhase('PLANNING'), true, "isThinkingPhase('PLANNING') case-insensitive");
+const replacementPolicyContext = { Boolean };
+vm.createContext(replacementPolicyContext);
+vm.runInContext(
+  declarationSource(messagingSrc, 'fsbShouldReplaceFinalOverlay') + '\n' +
+    'this.shouldReplaceFinalOverlay = fsbShouldReplaceFinalOverlay;',
+  replacementPolicyContext,
+  { filename: 'extension/content/messaging.js' }
+);
+const shouldReplaceFinalOverlay = replacementPolicyContext.shouldReplaceFinalOverlay;
+assert(
+  messagingSrc.includes('fsbShouldReplaceFinalOverlay(previousOverlayState, overlayState)') &&
+    messagingSrc.indexOf('FSB.progressOverlay.destroy();') < messagingSrc.indexOf('FSB.overlayState = overlayState;'),
+  'an accepted replacement destroys the finalized overlay before rendering'
+);
+assertEq(shouldReplaceFinalOverlay(
+  { lifecycle: 'final', sessionToken: 'replay-token' },
+  { lifecycle: 'running' }
+), true, 'a tokenless automation replaces a finalized replay overlay');
+assertEq(shouldReplaceFinalOverlay(
+  { lifecycle: 'final' },
+  { lifecycle: 'running' }
+), true, 'tokenless running lifecycles replace tokenless finalized overlays');
+assertEq(shouldReplaceFinalOverlay(
+  { lifecycle: 'final', sessionToken: 'old-token' },
+  { lifecycle: 'final', sessionToken: 'new-token' }
+), true, 'a different finalized session replaces the prior final overlay');
+assertEq(shouldReplaceFinalOverlay(
+  { lifecycle: 'final', sessionToken: 'same-token' },
+  { lifecycle: 'final', sessionToken: 'same-token' }
+), false, 'same-session final updates preserve the frozen overlay');
+assertEq(shouldReplaceFinalOverlay(
+  { lifecycle: 'final', sessionToken: 'old-token' },
+  { lifecycle: 'cleared', sessionToken: 'new-token' }
+), false, 'explicit clears continue through the existing clear path');
+
+console.log('\n--- Test: final overlay fades after three seconds and then destroys its state ---');
+{
+  const scheduled = [];
+  const realSetTimeout = sandbox.setTimeout;
+  const realClearTimeout = sandbox.clearTimeout;
+  sandbox.setTimeout = function(fn, delay) {
+    const timer = { fn, delay, cleared: false };
+    scheduled.push(timer);
+    return timer;
+  };
+  sandbox.clearTimeout = function(timer) {
+    if (timer) timer.cleared = true;
+  };
+
+  const o = buildOverlay();
+  o.update(makeState({ lifecycle: 'final', result: 'success', detail: 'Replay complete' }));
+  const hideTimer = scheduled.find((timer) => timer.delay === 3000);
+  assert(!!hideTimer, 'final overlay schedules its three-second display window');
+  hideTimer.fn();
+  assert(o.container.classList.contains('hidden'), 'final overlay starts its fade after three seconds');
+  const destroyTimer = scheduled.find((timer) => timer.delay === 200);
+  assert(!!destroyTimer, 'final overlay schedules destruction after the fade');
+  destroyTimer.fn();
+  assertEq(o.host, null, 'final overlay host is destroyed after the fade');
+  assertEq(o.container, null, 'final overlay DOM references are cleared after the fade');
+  assertEq(o._frozen, false, 'final overlay frozen state resets after destruction');
+
+  sandbox.setTimeout = realSetTimeout;
+  sandbox.clearTimeout = realClearTimeout;
+}
 
 // ===========================================================================
 // describe('thinking suppression in ProgressOverlay.update()')
@@ -570,6 +669,37 @@ console.log('\n--- Test: ordinary non-capability update leaves every new element
   assert(o.container.querySelector('.fsb-stop').classList.contains('hidden'), 'ordinary update: .fsb-stop stays hidden');
   assert(!o.container.querySelector('.fsb-step-number').classList.contains('calling'), 'ordinary update: pill has no .calling class');
   assert(!o.container.querySelector('.fsb-progress-fill').classList.contains('guarded'), 'ordinary update: fill has no .guarded class');
+  o.destroy();
+}
+
+console.log('\n--- Test: replay metadata renders the minimal player without affecting ordinary overlays ---');
+{
+  setNow(105000);
+  const o = buildOverlay();
+  o.update(makeState({
+    phase: 'acting',
+    detail: 'Clicking submit',
+    replay: {
+      sessionId: 'replay-overlay-test',
+      status: 'paused',
+      speed: 2,
+      positionMs: 4200,
+      durationMs: 10000,
+      currentStep: 2,
+      totalSteps: 5,
+      forwardSeekOnly: true
+    }
+  }));
+  assert(o.container.classList.contains('replay'), 'replay update enables the player class');
+  assertEq(o.container.querySelector('.fsb-replay-toggle').textContent, '\u25B6', 'paused replay shows play control');
+  assertEq(o.container.querySelector('.fsb-replay-toggle').getAttribute('aria-label'), 'Play replay', 'play control is labeled');
+  assertEq(o.container.querySelector('.fsb-replay-scrubber').value, '4200', 'scrubber reflects replay position');
+  assertEq(o.container.querySelector('.fsb-replay-scrubber').max, '10000', 'scrubber reflects replay duration');
+  assertEq(o.container.querySelector('.fsb-replay-speed').value, '2', 'speed control reflects replay speed');
+  assertEq(o.container.querySelector('.fsb-replay-time').textContent, '0:04 / 0:10', 'player renders elapsed and total time');
+
+  o.update(makeState({ phase: 'acting', detail: 'Ordinary task' }));
+  assert(!o.container.classList.contains('replay'), 'ordinary update removes the replay player class');
   o.destroy();
 }
 

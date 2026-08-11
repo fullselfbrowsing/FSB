@@ -244,6 +244,7 @@
       this._timerRAF = null;
       this._frozen = false;
       this._autoHideTimer = null;
+      this._autoDestroyTimer = null;
       // Phase 229-01 cadence/stability fields:
       this._pendingDisplay = null;       // latest queued text payload
       this._textDebounceTimer = null;    // setTimeout handle
@@ -251,6 +252,8 @@
       this._lastVisiblePercent = 0;      // monotonic clamp floor
       this._lastActionCount = null;      // last written actionCount (batching gate)
       this._logBuffer = [];              // rolling scrollback of previously-flushed detail strings, capped at 3
+      this._replayState = null;
+      this._replayScrubbing = false;
     }
 
     /**
@@ -496,6 +499,79 @@
 
       .fsb-stop.hidden {
         display: none;
+      }
+
+      .fsb-replay-player {
+        display: none;
+        grid-template-columns: 28px minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 8px;
+        margin-top: 10px;
+        padding-top: 10px;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        pointer-events: auto;
+      }
+
+      .fsb-overlay.replay .fsb-replay-player {
+        display: grid;
+      }
+
+      .fsb-replay-toggle {
+        width: 28px;
+        height: 28px;
+        border: 1px solid rgba(255, 140, 0, 0.42);
+        border-radius: 50%;
+        background: rgba(255, 140, 0, 0.14);
+        color: #FF9F2E;
+        cursor: pointer;
+        font-size: 12px;
+        line-height: 1;
+      }
+
+      .fsb-replay-toggle:hover:not(:disabled) {
+        background: rgba(255, 140, 0, 0.24);
+      }
+
+      .fsb-replay-toggle:disabled,
+      .fsb-replay-speed:disabled {
+        cursor: default;
+        opacity: 0.45;
+      }
+
+      .fsb-replay-track {
+        min-width: 0;
+      }
+
+      .fsb-replay-time {
+        display: block;
+        margin-bottom: 4px;
+        color: rgba(255, 255, 255, 0.58);
+        font-size: 10px;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .fsb-replay-scrubber {
+        display: block;
+        width: 100%;
+        height: 14px;
+        accent-color: #FF8C00;
+        cursor: ew-resize;
+      }
+
+      .fsb-replay-scrubber:disabled {
+        cursor: default;
+        opacity: 0.45;
+      }
+
+      .fsb-replay-speed {
+        height: 28px;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: 7px;
+        background: rgba(255, 255, 255, 0.07);
+        color: rgba(255, 255, 255, 0.9);
+        padding: 0 6px;
+        cursor: pointer;
+        font-size: 10px;
       }
 
       .fsb-task {
@@ -786,6 +862,19 @@
       <div class="fsb-progress-bar">
         <div class="fsb-progress-fill"></div>
       </div>
+      <div class="fsb-replay-player">
+        <button type="button" class="fsb-replay-toggle" aria-label="Pause replay">&#10074;&#10074;</button>
+        <div class="fsb-replay-track">
+          <span class="fsb-replay-time">0:00 / 0:00</span>
+          <input class="fsb-replay-scrubber" type="range" min="0" max="1" value="0" step="100" aria-label="Replay position, forward seek only" title="Seek forward through the replay">
+        </div>
+        <select class="fsb-replay-speed" aria-label="Replay speed">
+          <option value="0.5">0.5x</option>
+          <option value="1" selected>1x</option>
+          <option value="2">2x</option>
+          <option value="4">4x</option>
+        </select>
+      </div>
     `;
 
       // Set logo image src using chrome.runtime.getURL for web_accessible_resources
@@ -808,6 +897,72 @@
         });
       }
 
+      const replayToggle = this.container.querySelector('.fsb-replay-toggle');
+      if (replayToggle) {
+        replayToggle.addEventListener('click', (e) => {
+          e.stopPropagation();
+          var replay = this._replayState;
+          if (!replay || replay.status === 'decision') return;
+          var command = replay.status === 'paused' ? 'play' : 'pause';
+          Promise.resolve(chrome.runtime.sendMessage({
+            action: 'controlReplay',
+            sessionId: replay.sessionId,
+            command: command
+          })).catch((err) => {
+            logger.error('Replay play/pause failed', { error: err && err.message });
+          });
+        });
+      }
+
+      const replayScrubber = this.container.querySelector('.fsb-replay-scrubber');
+      if (replayScrubber) {
+        replayScrubber.addEventListener('input', (e) => {
+          e.stopPropagation();
+          this._replayScrubbing = true;
+          var timeEl = this.container && this.container.querySelector('.fsb-replay-time');
+          if (timeEl && this._replayState) {
+            timeEl.textContent = this._formatElapsed(Number(replayScrubber.value) || 0) +
+              ' / ' + this._formatElapsed(this._replayState.durationMs || 0);
+          }
+        });
+        replayScrubber.addEventListener('change', (e) => {
+          e.stopPropagation();
+          var replay = this._replayState;
+          var positionMs = Number(replayScrubber.value) || 0;
+          this._replayScrubbing = false;
+          if (!replay) return;
+          if (positionMs < replay.positionMs) {
+            replayScrubber.value = String(replay.positionMs);
+            return;
+          }
+          Promise.resolve(chrome.runtime.sendMessage({
+            action: 'controlReplay',
+            sessionId: replay.sessionId,
+            command: 'seek',
+            positionMs: positionMs
+          })).catch((err) => {
+            logger.error('Replay seek failed', { error: err && err.message });
+          });
+        });
+      }
+
+      const replaySpeed = this.container.querySelector('.fsb-replay-speed');
+      if (replaySpeed) {
+        replaySpeed.addEventListener('change', (e) => {
+          e.stopPropagation();
+          var replay = this._replayState;
+          if (!replay) return;
+          Promise.resolve(chrome.runtime.sendMessage({
+            action: 'controlReplay',
+            sessionId: replay.sessionId,
+            command: 'setSpeed',
+            speed: Number(replaySpeed.value)
+          })).catch((err) => {
+            logger.error('Replay speed change failed', { error: err && err.message });
+          });
+        });
+      }
+
       this.shadow.appendChild(this.container);
 
       // Promote to top layer via Popover API for guaranteed rendering above all page content.
@@ -817,6 +972,42 @@
       if (!this._inTopLayer) {
         // Fallback: append to documentElement with z-index
         document.documentElement.appendChild(this.host);
+      }
+    }
+
+    _renderReplayControls(replay) {
+      this._replayState = replay || null;
+      this.container.classList.toggle('replay', !!replay);
+      if (!replay) return;
+
+      var terminal = replay.status === 'completed' || replay.status === 'stopped' || replay.status === 'failed';
+      var awaitingDecision = replay.status === 'decision';
+      var toggle = this.container.querySelector('.fsb-replay-toggle');
+      if (toggle) {
+        var showPlay = replay.status === 'paused' || awaitingDecision;
+        toggle.textContent = showPlay ? '\u25B6' : '\u2161';
+        toggle.setAttribute('aria-label', showPlay ? 'Play replay' : 'Pause replay');
+        toggle.disabled = terminal || awaitingDecision;
+      }
+
+      var scrubber = this.container.querySelector('.fsb-replay-scrubber');
+      if (scrubber) {
+        scrubber.max = String(Math.max(1, replay.durationMs || 0));
+        scrubber.step = String(Math.max(1, Math.min(250, Math.round((replay.durationMs || 1) / 100))));
+        scrubber.disabled = terminal || awaitingDecision;
+        if (!this._replayScrubbing) scrubber.value = String(replay.positionMs || 0);
+      }
+
+      var timeEl = this.container.querySelector('.fsb-replay-time');
+      if (timeEl && !this._replayScrubbing) {
+        timeEl.textContent = this._formatElapsed(replay.positionMs || 0) +
+          ' / ' + this._formatElapsed(replay.durationMs || 0);
+      }
+
+      var speed = this.container.querySelector('.fsb-replay-speed');
+      if (speed) {
+        speed.value = String(replay.speed || 1);
+        speed.disabled = terminal || awaitingDecision;
       }
     }
 
@@ -891,6 +1082,7 @@
         : (overlayState.phase || 'Working');
       var display = overlayState.display || {};
       var progress = overlayState.progress || { mode: 'indeterminate', label: phaseLabel };
+      this._renderReplayControls(overlayState.replay || null);
       // Phase 243 plan 03 (UI-01): badge displays "<clientLabel> / <agentIdShort>"
       // when both are present (just clientLabel if only that; just agentIdShort if
       // only that; hidden if neither). agentIdShort is produced upstream in
@@ -1070,9 +1262,12 @@
         if (this._autoHideTimer !== null) clearTimeout(this._autoHideTimer);
         this._autoHideTimer = setTimeout(function() {
           self._autoHideTimer = null;
-          if (self.container) {
-            self.container.classList.add('hidden');
-          }
+          self.hide();
+          if (self._autoDestroyTimer !== null) clearTimeout(self._autoDestroyTimer);
+          self._autoDestroyTimer = setTimeout(function() {
+            self._autoDestroyTimer = null;
+            self.destroy();
+          }, 200);
         }, 3000);
       }
 
@@ -1119,6 +1314,10 @@
         clearTimeout(this._autoHideTimer);
         this._autoHideTimer = null;
       }
+      if (this._autoDestroyTimer !== null) {
+        clearTimeout(this._autoDestroyTimer);
+        this._autoDestroyTimer = null;
+      }
       // Phase 229-01: clear cadence/stability state so a re-created overlay starts clean.
       if (this._textDebounceTimer !== null) {
         clearTimeout(this._textDebounceTimer);
@@ -1129,6 +1328,8 @@
       this._lastVisiblePercent = 0;
       this._lastActionCount = null;
       this._logBuffer = [];
+      this._replayState = null;
+      this._replayScrubbing = false;
       this._startTime = null;
       this._frozen = false;
       if (this.host) {

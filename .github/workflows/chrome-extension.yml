@@ -6,12 +6,14 @@ on:
     paths:
       - 'extension/**'
       - 'scripts/package-extension.mjs'
+      - 'scripts/sync-product-version.mjs'
       - 'scripts/validate-extension.mjs'
       - 'tests/**'
       - 'package.json'
       - 'package-lock.json'
       - 'mcp/**'
       - '.github/workflows/chrome-extension.yml'
+      - '.github/workflows/npm-publish.yml'
     tags:
       - 'extension-v*'
   workflow_dispatch:
@@ -22,28 +24,30 @@ concurrency:
 
 jobs:
   package:
-    name: validate, test, package
+    name: validate, test, and package extension
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    outputs:
+      version: ${{ steps.extension-version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      - name: Install root deps
-        run: npm install --no-audit --no-fund
+      - name: Verify independent product versions
+        run: npm run version:check
 
-      - name: Install mcp deps
-        run: npm --prefix mcp install --no-audit --no-fund
-
-      - name: Install showcase/server deps (needed by server-telemetry tests in npm test chain)
-        run: npm --prefix showcase/server install --no-audit --no-fund
-
-      - name: Install showcase/angular deps (needed by fsb-telemetry-service + build-smoke + privacy-page tests in npm test chain)
-        run: npm --prefix showcase/angular install --no-audit --no-fund
+      - name: Install exact dependency trees
+        run: |
+          npm ci --no-audit --no-fund
+          npm --prefix mcp ci --no-audit --no-fund
+          npm --prefix showcase/server ci --no-audit --no-fund
+          npm --prefix showcase/angular ci --no-audit --no-fund
 
       - name: Validate extension
         run: npm run validate:extension
@@ -54,59 +58,61 @@ jobs:
       - name: Package Chrome extension
         run: npm run package:extension
 
-      - name: Read extension version
-        id: extension_version
+      - name: Read canonical extension version
+        id: extension-version
         run: |
-          node -e "const { version } = require('./extension/manifest.json'); console.log('version=' + version)" >> "$GITHUB_OUTPUT"
+          node -e "require('fs').appendFileSync(process.env.GITHUB_OUTPUT, 'version=' + require('./extension/manifest.json').version + String.fromCharCode(10))"
 
-      - name: Upload Chrome extension artifact
+      - name: Bind tag to canonical extension version
+        if: startsWith(github.ref, 'refs/tags/extension-v')
+        run: test "$GITHUB_REF_NAME" = "extension-v${{ steps.extension-version.outputs.version }}"
+
+      - name: Require the tagged commit to be on main
+        if: startsWith(github.ref, 'refs/tags/extension-v')
+        run: |
+          git fetch origin main --no-tags
+          release_commit="$(git rev-list -n 1 "$GITHUB_REF_NAME")"
+          git merge-base --is-ancestor "$release_commit" origin/main
+
+      - name: Verify version-bound extension archive
+        run: test -f "dist/fsb-extension-v${{ steps.extension-version.outputs.version }}.zip"
+
+      - name: Upload version-bound extension artifact
         uses: actions/upload-artifact@v4
         with:
-          name: fsb-extension-v${{ steps.extension_version.outputs.version }}
-          path: dist/fsb-extension-v*.zip
+          name: fsb-extension-v${{ steps.extension-version.outputs.version }}
+          path: dist/fsb-extension-v${{ steps.extension-version.outputs.version }}.zip
           if-no-files-found: error
 
-      # On extension-v* tag pushes, also attach the zip to the matching
-      # GitHub Release. Mirrors the pattern in .github/workflows/npm-publish.yml.
-      # The if-guard keeps main-branch pushes artifact-only (no Release touch).
-      - name: Attach zip to GitHub Release
+      - name: Create extension GitHub release
         if: startsWith(github.ref, 'refs/tags/extension-v')
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/fsb-extension-v*.zip
+          name: FSB extension v${{ steps.extension-version.outputs.version }}
+          body: |
+            FSB Chrome extension v${{ steps.extension-version.outputs.version }}.
+
+            Install from the Chrome Web Store when available, or use the attached package for a supervised manual installation.
+          files: dist/fsb-extension-v${{ steps.extension-version.outputs.version }}.zip
           fail_on_unmatched_files: true
+          generate_release_notes: true
 
   publish-cws:
-    name: publish to Chrome Web Store
+    name: publish extension to Chrome Web Store
     needs: package
     if: startsWith(github.ref, 'refs/tags/extension-v') && vars.CWS_PUBLISH_ENABLED == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
+      - name: Download version-bound extension artifact
+        uses: actions/download-artifact@v4
         with:
-          node-version: '20'
-
-      - name: Install root deps
-        run: npm install --no-audit --no-fund
-
-      - name: Install mcp deps
-        run: npm --prefix mcp install --no-audit --no-fund
-
-      - name: Rebuild Chrome extension zip
-        run: npm run package:extension
-
-      - name: Resolve zip path
-        id: zip
-        run: |
-          ZIP=$(ls dist/fsb-extension-v*.zip | head -n1)
-          echo "path=$ZIP" >> "$GITHUB_OUTPUT"
+          name: fsb-extension-v${{ needs.package.outputs.version }}
+          path: dist
 
       - name: Upload to Chrome Web Store
         uses: mnao305/chrome-extension-upload@v5.0.0
         with:
-          file-path: ${{ steps.zip.outputs.path }}
+          file-path: dist/fsb-extension-v${{ needs.package.outputs.version }}.zip
           extension-id: ${{ secrets.CWS_EXTENSION_ID }}
           client-id: ${{ secrets.CWS_CLIENT_ID }}
           client-secret: ${{ secrets.CWS_CLIENT_SECRET }}

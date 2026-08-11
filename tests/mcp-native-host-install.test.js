@@ -31,7 +31,7 @@ const HOST_DESCRIPTION = 'FSB local agent service wake host';
 const EXTENSION_ID = 'badgafnfchcihdfnjneklogedcdkmjfk';
 const DEVELOPMENT_EXTENSION_ID = 'abcdefghijklmnopabcdefghijklmnop';
 const ORIGIN = `chrome-extension://${EXTENSION_ID}/`;
-const PACKAGE_VERSION = '0.11.0';
+const PACKAGE_VERSION = require('../mcp/package.json').version;
 const INSTALL_TOKEN = '0123456789abcdef0123456789abcdef';
 const ARTIFACT_SHA256 = 'a'.repeat(64);
 const REGISTRY_HELPER_SHA256 = 'e'.repeat(64);
@@ -2388,7 +2388,7 @@ async function runCliOutput() {
     equal(refused.stdout, '', `${reason} native refusal emits no optimistic stdout`);
     equal(
       refused.stderr,
-      `Native messaging host was not changed: ${reason}\nExpected location: ${location}\nRun fsb-mcp-server doctor for repair details.\n`,
+      `Native messaging host was not changed: ${reason}\nExpected location: ${location}\nRun npx -y fsb-mcp-server@latest doctor for repair details.\n`,
       `${reason} native refusal prints only stable reason, location, and doctor guidance`,
     );
   }
@@ -2438,7 +2438,7 @@ async function runCliOutput() {
   equal(thrown.exitCode, 1, 'native adapter exception becomes a refusal without throwing');
   check(!`${thrown.stdout}${thrown.stderr}`.includes(sensitive), 'native adapter exception text is never serialized');
   check(thrown.stderr.includes('not changed: unavailable'), 'native adapter exception collapses to unavailable');
-  check(thrown.stderr.includes('Run fsb-mcp-server doctor for repair details.'), 'native adapter exception retains exact doctor guidance');
+  check(thrown.stderr.includes('Run npx -y fsb-mcp-server@latest doctor for repair details.'), 'native adapter exception retains exact doctor guidance');
 
   for (const result of [installed, alreadyInstalled, removed, notInstalled]) {
     const output = `${result.stdout}${result.stderr}`.toLowerCase();

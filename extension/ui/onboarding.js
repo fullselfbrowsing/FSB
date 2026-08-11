@@ -3,7 +3,7 @@
 
   const ASSET_ROOT = '../assets/onboarding';
   const VERSION = chrome.runtime.getManifest().version;
-  const BASE_INSTALL_COMMAND = 'npx -y fsb-mcp-server install';
+  const BASE_INSTALL_COMMAND = 'npx -y fsb-mcp-server@latest install';
   const ROTATE_MS = 1800;
 
   const PROVIDER_KEY_FIELDS = {
@@ -33,15 +33,15 @@
   ];
 
   const INSTALL_CLIENTS = [
-    { id: 'claude-code', name: 'Claude Code', logo: 'claude.svg', flag: '--claude-code', cmd: 'npx -y fsb-mcp-server install --claude-code' },
-    { id: 'claude-desktop', name: 'Claude Desktop', logo: 'claude.svg', flag: '--claude-desktop', cmd: 'npx -y fsb-mcp-server install --claude-desktop' },
-    { id: 'cursor', name: 'Cursor', logo: 'cursor.svg', flag: '--cursor', cmd: 'npx -y fsb-mcp-server install --cursor' },
-    { id: 'vscode', name: 'VS Code', logo: 'vscode.svg', flag: '--vscode', cmd: 'npx -y fsb-mcp-server install --vscode' },
-    { id: 'windsurf', name: 'Windsurf', logo: 'windsurf.svg', flag: '--windsurf', cmd: 'npx -y fsb-mcp-server install --windsurf' },
-    { id: 'codex', name: 'Codex', logo: 'openai.svg', flag: '--codex', cmd: 'npx -y fsb-mcp-server install --codex' },
-    { id: 'opencode', name: 'OpenCode', logo: 'opencode.svg', flag: '--opencode', cmd: 'npx -y fsb-mcp-server install --opencode' },
-    { id: 'openclaw', name: 'OpenClaw', logo: 'openclaw.svg', flag: '', cmd: 'npx -y fsb-mcp-server' },
-    { id: 'all', name: 'All Clients', logo: 'all.svg', flag: '--all', cmd: 'npx -y fsb-mcp-server install --all' }
+    { id: 'claude-code', name: 'Claude Code', logo: 'claude.svg', flag: '--claude-code', cmd: 'npx -y fsb-mcp-server@latest install --claude-code' },
+    { id: 'claude-desktop', name: 'Claude Desktop', logo: 'claude.svg', flag: '--claude-desktop', cmd: 'npx -y fsb-mcp-server@latest install --claude-desktop' },
+    { id: 'cursor', name: 'Cursor', logo: 'cursor.svg', flag: '--cursor', cmd: 'npx -y fsb-mcp-server@latest install --cursor' },
+    { id: 'vscode', name: 'VS Code', logo: 'vscode.svg', flag: '--vscode', cmd: 'npx -y fsb-mcp-server@latest install --vscode' },
+    { id: 'windsurf', name: 'Windsurf', logo: 'windsurf.svg', flag: '--windsurf', cmd: 'npx -y fsb-mcp-server@latest install --windsurf' },
+    { id: 'codex', name: 'Codex', logo: 'openai.svg', flag: '--codex', cmd: 'npx -y fsb-mcp-server@latest install --codex' },
+    { id: 'opencode', name: 'OpenCode', logo: 'opencode.svg', flag: '--opencode', cmd: 'npx -y fsb-mcp-server@latest install --opencode' },
+    { id: 'openclaw', name: 'OpenClaw', logo: 'openclaw.svg', flag: '', cmd: 'npx -y fsb-mcp-server@latest' },
+    { id: 'all', name: 'All Clients', logo: 'all.svg', flag: '--all', cmd: 'npx -y fsb-mcp-server@latest install --all' }
   ];
 
   const ROLL_CLIENTS = INSTALL_CLIENTS.slice(0, 7);

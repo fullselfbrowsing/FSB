@@ -148,6 +148,12 @@ body {
   animation: pulse 2s infinite;
 }
 
+.status-dot.owned {
+  color: #f59e0b;
+  text-shadow: 0 0 4px rgba(245, 158, 11, 0.3);
+  animation: none;
+}
+
 .status-dot.error {
   color: #ef4444;
   text-shadow: 0 0 4px rgba(239, 68, 68, 0.3);
@@ -1677,25 +1683,6 @@ body[data-sidepanel-view="history"] .author-footer {
   border: 1px solid var(--border-color, #333);
 }
 
-/* Phase 11 FINT-19 -- owner-chip baseline styling.
-   RESEARCH Section 6 discovered the `.fsb-owner-chip` class is referenced
-   in sidepanel.html line 26 but has zero CSS definition project-wide
-   pre-Phase-11. This rule establishes the baseline; the inline
-   `style="display:none"` on the span keeps the chip hidden at boot until
-   refreshOwnerChip toggles `chipEl.style.display = 'inline-flex'`. */
-.fsb-owner-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
-  font-size: 11px;
-  border-radius: 999px;
-  background: var(--bg-tertiary);
-  color: var(--text-secondary);
-  border: 1px solid var(--border-color);
-  white-space: nowrap;
-}
-
 /* Phase 11 FINT-20 -- foreign-owned input lockout visual treatment.
    Applied by applyInputLockout(true) on chatInput/sendBtn/stopBtn/micBtn
    when the active tab is foreign-owned per shouldShowOwnerChip(ownerAgentId,
@@ -2310,7 +2297,7 @@ body[data-sidepanel-view="history"] .author-footer {
 }
 
 /* Phase 11 FINT-20 -- visually-hidden screen-reader-only utility.
-   Used by the aria-describedby description span near the owner chip
+   Used by the aria-describedby description span near the ownership status
    (sidepanel.html line ~27 post-Plan-11-02). Pattern from standard
    WAI-ARIA convention. */
 .sr-only {

@@ -7,6 +7,7 @@ const path = require('path');
 const repoRoot = path.resolve(__dirname, '..');
 const css = fs.readFileSync(path.join(repoRoot, 'extension', 'ui', 'options.css'), 'utf8');
 const html = fs.readFileSync(path.join(repoRoot, 'extension', 'ui', 'control_panel.html'), 'utf8');
+const options = fs.readFileSync(path.join(repoRoot, 'extension', 'ui', 'options.js'), 'utf8');
 
 function getCssRule(selector, source = css) {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -69,7 +70,9 @@ const printContentRule = getCssRule('.dashboard-content', printCss);
 assert(/display\s*:\s*block\s*;/.test(printContentRule) && /overflow\s*:\s*visible\s*;/.test(printContentRule),
   'print lets settings content flow beyond one viewport');
 
-assert(/<section[^>]*id=["']branding["'][\s\S]*?▽\d+\.\d+\.\d+[\s\S]*?<\/section>/.test(html),
-  'version footer remains present at the end of the control panel content');
+assert(/<section[^>]*id=["']branding["'][\s\S]*?<span[^>]*class=["'][^"']*fsb-foot-ver[^"']*["'][^>]*>▽<\/span>[\s\S]*?<\/section>/.test(html),
+  'version footer placeholder remains present at the end of the control panel content');
+assert(/versionLabel\.textContent\s*=\s*`▽\$\{chrome\.runtime\.getManifest\(\)\.version\}`/.test(options),
+  'version footer reads the canonical extension manifest version at runtime');
 
 console.log('PASS control panel scroll containment guard');

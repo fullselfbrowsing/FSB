@@ -1,4 +1,4 @@
-// FSB v0.9.91 - Modern Dashboard Control Panel Script
+// FSB Modern Dashboard Control Panel Script
 
 // Default settings
 const defaultSettings = {
@@ -157,6 +157,11 @@ document.addEventListener('DOMContentLoaded', initializeDashboard);
 
 function initializeDashboard() {
   console.log('FSB Control Panel initializing...');
+
+  const versionLabel = document.querySelector('.fsb-foot-ver');
+  if (versionLabel) {
+    versionLabel.textContent = `▽${chrome.runtime.getManifest().version}`;
+  }
   
   // Cache DOM elements
   cacheElements();

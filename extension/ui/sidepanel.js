@@ -1,8 +1,8 @@
-// Side Panel Script for FSB v0.9.91 - Persistent UI
+// FSB Persistent Side Panel Script
 
 // Phase 243 plan 03 (UI-02): the sidepanel's surface id (matches the
 // legacy:sidepanel agent synthesized by ensureLegacySidepanelAgent below).
-// When the active tab is owned by THIS surface, the "owned by ..." chip
+// When the active tab is owned by THIS surface, the ownership status
 // stays hidden -- per CONTEXT D-05, a surface does not announce ownership
 // of its own tab.
 const MY_SURFACE = 'legacy:sidepanel';
@@ -119,8 +119,8 @@ let lastRenderedTerminalSessionId = null;
 // keeps renderAutomationCompletionPayload callable without ReferenceError.
 function persistSidepanelThreadState() { /* no-op stub -- thread state is derived */ }
 
-// Quick task 260524-7n9 -- chip-owned lock: true while the active tab is owned
-// by a non-self agent and the read-only "owned by <ClientName>" chip is showing.
+// True while the active tab is owned by a non-self agent and the ownership
+// status is showing.
 // Composes with updateSendButtonState's existing hasContent / isRunning gating;
 // it is an ADDITIONAL gate, never a replacement. Set/cleared exclusively by
 // refreshOwnerChip below (no automation-lifecycle setter writes this flag --
@@ -529,6 +529,39 @@ const statusText = document.querySelector('.status-text');
 const automationRunner = document.getElementById('automationRunner');
 const automationTimer = document.getElementById('automationTimer');
 const automationRunnerLabel = document.getElementById('automationRunnerLabel');
+
+let _headerBaseStatusLabel = 'Ready';
+let _headerBaseStatusTone = '';
+let _headerOwnerLabel = null;
+let _ownerStatusRefreshGeneration = 0;
+
+function _renderHeaderStatus() {
+  if (!statusText || !statusDot || !statusDot.classList) return;
+  statusDot.classList.remove('running', 'error', 'owned');
+  if (_headerOwnerLabel) {
+    statusText.textContent = (typeof FSBOwnerChip !== 'undefined'
+        && typeof FSBOwnerChip.buildChipText === 'function')
+      ? FSBOwnerChip.buildChipText(_headerOwnerLabel)
+      : 'Owned by ' + _headerOwnerLabel;
+    statusDot.classList.add('owned');
+    return;
+  }
+  statusText.textContent = _headerBaseStatusLabel;
+  if (_headerBaseStatusTone === 'running') statusDot.classList.add('running');
+  if (_headerBaseStatusTone === 'error') statusDot.classList.add('error');
+}
+
+function _setHeaderStatus(label, tone) {
+  _headerBaseStatusLabel = typeof label === 'string' && label.length > 0 ? label : 'Ready';
+  _headerBaseStatusTone = tone === 'running' || tone === 'error' ? tone : '';
+  _renderHeaderStatus();
+}
+
+function _setHeaderOwner(label) {
+  var normalized = typeof label === 'string' ? label.trim() : '';
+  _headerOwnerLabel = normalized || null;
+  _renderHeaderStatus();
+}
 
 var DELEGATION_CONVERSATION_STORAGE_KEY = 'fsbSidepanelDelegationConversations';
 var DELEGATION_CONVERSATION_CAP = 50;
@@ -1235,11 +1268,7 @@ function _delegationIsSelectedConversation() {
 }
 
 function _setDelegationHeaderStatus(label, tone) {
-  if (statusText) statusText.textContent = label;
-  if (!statusDot || !statusDot.classList) return;
-  statusDot.classList.remove('running', 'error');
-  if (tone === 'running') statusDot.classList.add('running');
-  if (tone === 'error') statusDot.classList.add('error');
+  _setHeaderStatus(label, tone);
 }
 
 function _applyDelegationComposerLock() {
@@ -1297,7 +1326,7 @@ function _renderDelegationReadyState() {
   if (!mount.run || !mount.state || !mount.feed) return;
   _delegationUiState.mode = 'ready';
   _delegationUiState.errorCode = null;
-  mount.run.classList.remove('hidden');
+  mount.run.classList.add('hidden');
   mount.run.setAttribute('aria-busy', 'false');
   _clearDelegationNode(mount.state);
   _clearDelegationNode(mount.feed);
@@ -1306,16 +1335,6 @@ function _renderDelegationReadyState() {
   _delegationUiState.lastAlertKey = null;
   _delegationRunStopControls = [];
   _restoreLegacyStopControl();
-  var heading = _delegationElement(
-    'h2', 'delegation-state-heading', 'Delegate a browser task'
-  );
-  heading.id = 'delegationRunHeading';
-  mount.state.appendChild(heading);
-  mount.state.appendChild(_delegationElement(
-    'p',
-    'delegation-state-body',
-    'Choose an agent provider, describe the outcome, and FSB will run it in a background tab.'
-  ));
   if (mount.control) {
     _clearDelegationNode(mount.control);
     mount.control.classList.add('hidden');
@@ -1438,7 +1457,9 @@ async function _hydrateDelegationForSelectedConversation() {
 
 function _renderDelegationInlineError(container, textValue) {
   if (!container || !textValue) return;
+  var standalone = !container.firstChild;
   var error = _delegationElement('p', 'delegation-inline-error', textValue);
+  if (standalone) error.id = 'delegationRunHeading';
   // The state card owns assertive semantics for lifecycle alerts. Avoid a
   // nested alert that would re-announce unchanged cleanup copy when the
   // parent is deliberately aria-live="off" on a repeated render.
@@ -1447,6 +1468,10 @@ function _renderDelegationInlineError(container, textValue) {
     error.setAttribute('role', 'alert');
   }
   container.appendChild(error);
+  var mount = _ensureDelegationMount();
+  if (mount.run && mount.state === container) {
+    mount.run.classList.remove('hidden');
+  }
 }
 
 function _backToDelegationMessage() {
@@ -1547,7 +1572,7 @@ function _openDelegationProviderSetup() {
 }
 
 async function _copyDelegationDoctorCommand() {
-  var command = 'fsb-mcp-server doctor';
+  var command = 'npx -y fsb-mcp-server@latest doctor';
   try {
     if (typeof navigator !== 'undefined'
         && navigator.clipboard
@@ -1560,7 +1585,7 @@ async function _copyDelegationDoctorCommand() {
 }
 
 async function _copyDelegationPairResetCommand() {
-  var command = 'npx -y fsb-mcp-server pair --reset';
+  var command = 'npx -y fsb-mcp-server@latest pair --reset';
   try {
     if (typeof navigator !== 'undefined'
         && navigator.clipboard
@@ -1764,8 +1789,8 @@ function _renderDelegationPreflightFailure(result) {
       'code',
       'delegation-doctor-command',
       code === 'extension_origin_mismatch'
-        ? 'npx -y fsb-mcp-server pair --reset'
-        : 'fsb-mcp-server doctor'
+        ? 'npx -y fsb-mcp-server@latest pair --reset'
+        : 'npx -y fsb-mcp-server@latest doctor'
     ));
   }
   var actions = _delegationElement('div', 'delegation-state-actions');
@@ -2032,7 +2057,7 @@ function _appendDelegationActionRow(container, actions) {
 
 function _appendDelegationDoctorRecovery(container) {
   container.appendChild(_delegationElement(
-    'code', 'delegation-doctor-command', 'fsb-mcp-server doctor'
+    'code', 'delegation-doctor-command', 'npx -y fsb-mcp-server@latest doctor'
   ));
   _appendDelegationActionRow(container, [
     { label: 'Copy doctor command', handler: _copyDelegationDoctorCommand },
@@ -3221,7 +3246,7 @@ function handleReconComplete(data) {
       // The handleSendMessage entry already fail-closes on foreign-owned
       // (defense-in-depth), but without this guard the click silently
       // drops the user's intent. Early-return + console.warn surfaces the
-      // edge case while honoring D-11 (chip is the visible explanation).
+      // edge case while honoring D-11 (the header status is the visible explanation).
       if (await _isActiveTabForeignOwned()) {
         console.warn('[sidepanel] retry blocked -- active tab is foreign-owned');
         return;
@@ -3262,15 +3287,15 @@ chrome.storage.onChanged.addListener((changes, area) => {
       ? _delegationCloneConversationEnvelope(nextDelegationEnvelope)
       : _delegationEmptyConversationEnvelope();
   }
-  // Phase 243 plan 03 (UI-02) follow-up: refresh chip when registry mutates
+  // Refresh ownership status when the registry mutates
   // for the active tab (ownership claimed/released/transferred). The
-  // sidepanel persists across tab switches, so without this branch the chip
+  // sidepanel persists across tab switches, so without this branch the status
   // would show stale ownership data when an agent claims or releases the
   // active tab while the user stays on it.
   //
   // Quick task 260524-7n9: also refresh when fsbAgentClientLabels mutates so
   // a freshly-arriving canonical MCP client label (Claude / Codex / ...)
-  // re-renders the chip immediately, without waiting for a tab switch or
+  // re-renders the ownership status immediately, without waiting for a tab switch or
   // a registry write that happens to follow.
   if (area === 'session' && changes && (changes.fsbAgentRegistry || changes.fsbAgentClientLabels)) {
     refreshOwnerChip();
@@ -3278,16 +3303,16 @@ chrome.storage.onChanged.addListener((changes, area) => {
       _refreshSelectedDelegationSnapshot();
     }
   }
-  // debug-sidepanel-agent-name fix: also refresh the chip when any
+  // Also refresh the ownership status when any
   // mcpVisualSession:<tabId> key mutates. The MCP visual-session lifecycle
   // entry is written by recordVisualSessionTick (extension/utils/
   // mcp-visual-session-lifecycle.js) AFTER ownership has been claimed in
   // fsbAgentRegistry, i.e. AFTER the first storage-change branch above has
   // already fired and resolved Tier 2 (friendly client label) as null. By
   // the time entry.client lands in storage, no listener observes the write
-  // and the chip stays stuck on the Tier 3 formatAgentIdForDisplay
+  // and the status stays stuck on the Tier 3 formatAgentIdForDisplay
   // short-prefix (e.g., 'agent_95ef8b'). Re-firing refreshOwnerChip on the
-  // visual-session key family causes the chip to re-resolve through Tier 2
+  // visual-session key family causes the status to re-resolve through Tier 2
   // and pick up the friendly label (e.g., 'Claude', 'OpenClaw'). Best-effort
   // key scan (Object.keys + indexOf) -- bounded by at most one entry per
   // owned tab so this is O(1) on typical input.
@@ -3311,7 +3336,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
 // the 4-control set covers all user-input affordances.
 //
 // D-11: visual treatment is dimmed/disabled CSS + aria-disabled='true'; NO
-// separate banner -- the existing owner chip is the explanation cue and
+// separate banner -- the existing ownership status is the explanation cue and
 // the aria-describedby span at sidepanel.html line ~27 supplies
 // screen-reader semantics.
 //
@@ -3403,7 +3428,7 @@ async function _isActiveTabForeignOwned() {
   }
 }
 
-// Phase 243 plan 03 (UI-02): refresh the read-only "owned by Agent X" chip.
+// Refresh the read-only "Owned by Agent X" header status.
 // Reads the persisted registry envelope from chrome.storage.session (Phase 237
 // D-03 write-through) and the active tab; uses FSBOwnerChip pure helpers to
 // decide visibility and label format. Bypasses background.js entirely so this
@@ -3412,13 +3437,12 @@ async function _isActiveTabForeignOwned() {
 // Sidepanel-specific: subscribed to chrome.tabs.onActivated below, since the
 // sidepanel persists across tab switches (popup is short-lived and skips this).
 async function refreshOwnerChip() {
+  const refreshGeneration = ++_ownerStatusRefreshGeneration;
   try {
-    const chipEl = document.getElementById('fsb-owner-chip');
-    if (!chipEl) return;
     if (typeof FSBOwnerChip === 'undefined') {
-      chipEl.style.display = 'none';
+      _setHeaderOwner(null);
       // Phase 11 FIX (debug-phase-11-tab-swap-stale) + Quick task 260524-7n9:
-      // honor the unlock contract on every chip-hidden path. applyInputLockout
+      // honor the unlock contract whenever ownership is hidden. applyInputLockout
       // restores chatInput + stopBtn + micBtn + aria; clearing the
       // _chatLockedByOwnerChip flag keeps updateSendButtonState in sync so the
       // user is not stranded with a disabled input after the helper went away.
@@ -3428,9 +3452,10 @@ async function refreshOwnerChip() {
     }
 
     const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (refreshGeneration !== _ownerStatusRefreshGeneration) return;
     const tab = tabs && tabs[0];
     if (!tab || typeof tab.id !== 'number') {
-      chipEl.style.display = 'none';
+      _setHeaderOwner(null);
       // Phase 11 FIX (debug-phase-11-tab-swap-stale) + Quick task 260524-7n9:
       // the no-active-tab branch must also unlock so controls re-enable when the
       // active-tab race resolves. Clear the _chatLockedByOwnerChip flag so
@@ -3443,16 +3468,16 @@ async function refreshOwnerChip() {
     // Quick task 260524-7n9: read both the registry envelope AND the per-agent
     // canonical client-label map in a single round-trip. The label map is
     // written by mcp-tool-dispatcher.js _persistAgentClientLabel and lets the
-    // chip show "owned by Claude" instead of "owned by agent_<hex>".
+    // status show "Owned by Claude" instead of "Owned by agent_<hex>".
     const stored = await chrome.storage.session.get(['fsbAgentRegistry', 'fsbAgentClientLabels']);
+    if (refreshGeneration !== _ownerStatusRefreshGeneration) return;
     const envelope = stored && stored.fsbAgentRegistry;
     const labelsMap = stored && stored.fsbAgentClientLabels;
     const ownerAgentId = FSBOwnerChip.findOwnerInEnvelope(envelope, tab.id);
 
     if (!FSBOwnerChip.shouldShowOwnerChip(ownerAgentId, MY_SURFACE)) {
-      chipEl.textContent = '';
-      chipEl.style.display = 'none';
-      // Phase 11 FINT-20 + Quick task 260524-7n9 -- unlock controls when the chip
+      _setHeaderOwner(null);
+      // Phase 11 FINT-20 + Quick task 260524-7n9 -- unlock controls when ownership
       // is hidden (either no owner or this surface owns the tab). applyInputLockout
       // restores chatInput + buttons + aria; clearing the _chatLockedByOwnerChip
       // flag keeps updateSendButtonState in sync.
@@ -3484,6 +3509,7 @@ async function refreshOwnerChip() {
           tab.id,
           (key) => chrome.storage.session.get(key)
         );
+        if (refreshGeneration !== _ownerStatusRefreshGeneration) return;
         if (friendly) {
           label = friendly;
         } else {
@@ -3495,9 +3521,8 @@ async function refreshOwnerChip() {
         }
       }
     }
-    chipEl.textContent = FSBOwnerChip.buildChipText(label);
-    chipEl.style.display = 'inline-flex';
-    // Phase 11 FINT-20 + Quick task 260524-7n9 -- lock controls when the chip
+    _setHeaderOwner(label);
+    // Phase 11 FINT-20 + Quick task 260524-7n9 -- lock controls when ownership
     // renders (tab is foreign-owned). applyInputLockout does the rich lock
     // (chatInput contenteditable + buttons + aria); the _chatLockedByOwnerChip
     // flag composes into updateSendButtonState's OR chain, and the title surfaces
@@ -3513,14 +3538,14 @@ async function refreshOwnerChip() {
 
 // Phase 243 plan 03 (UI-02): refresh on tab switch. The sidepanel is
 // persistent, so the active tab can change while the surface is open --
-// without this listener the chip would show stale ownership data (Threat
+// without this listener the status would show stale ownership data (Threat
 // T-243-03-02). Best-effort registration; if chrome.tabs.onActivated is
-// unavailable for any reason the chip simply does not auto-refresh.
+// unavailable for any reason the status simply does not auto-refresh.
 try {
   if (typeof chrome !== 'undefined' && chrome.tabs && chrome.tabs.onActivated
       && typeof chrome.tabs.onActivated.addListener === 'function') {
     // Phase 11 FINT-21 -- extended: also swap conversation history on tab
-    // switch (D-14 / D-17 lazy mint). The chip refresh + history swap run
+    // switch (D-14 / D-17 lazy mint). The ownership refresh + history swap run
     // sequentially; both are best-effort, so a failure in one does not
     // poison the other.
     chrome.tabs.onActivated.addListener(async (activeInfo) => {
@@ -3561,7 +3586,7 @@ try {
     });
   }
 } catch (_e) {
-  // swallow: chip auto-refresh is non-critical
+  // swallow: ownership auto-refresh is non-critical
 }
 
 // Phase 11 FINT-21 -- chrome.tabs.onRemoved listener: drop the tab's
@@ -3623,7 +3648,7 @@ try {
 // in rare cases miss an onActivated fire when a brand-new tab is created
 // and immediately becomes active as part of the create (Ctrl+T, opener-
 // linked target=_blank). Adding chrome.windows.onFocusChanged ensures the
-// chip + chat surface re-resolve against the user's real active tab
+// ownership status + chat surface re-resolve against the user's real active tab
 // whenever window focus changes. Best-effort: any throw inside swallows.
 //
 // Implementation note: onFocusChanged fires with windowId = -1 (WINDOW_ID_NONE)
@@ -3734,8 +3759,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Set UI mode preference
   await chrome.storage.local.set({ uiMode: 'sidepanel' });
 
-  // Phase 243 plan 03 (UI-02): render the read-only owner chip on load. The
-  // chrome.tabs.onActivated subscription registered above keeps the chip in
+  // Render the read-only ownership status on load. The
+  // chrome.tabs.onActivated subscription registered above keeps the status in
   // sync as the user switches tabs in the persistent sidepanel.
   refreshOwnerChip();
 
@@ -3886,11 +3911,11 @@ chatInput.addEventListener('paste', (e) => {
 });
 
 // Update send button state based on input content
-// Quick task 260524-7n9: composes the chip-owned chat lock into the existing
+// Compose the foreign-owner chat lock into the existing
 // gating chain via OR -- hasContent governs the empty-input case, isRunning
 // governs in-flight automation, _chatLockedByOwnerChip is the external-agent
 // ownership gate. NO normal lifecycle transition leaves the input enabled
-// while the chip is showing; refreshOwnerChip is the sole writer of the flag.
+// while ownership is showing; refreshOwnerChip is the sole writer of the flag.
 function updateSendButtonState() {
   const hasContent = chatInput.textContent.trim().length > 0;
   sendBtn.disabled = !hasContent
@@ -4289,8 +4314,7 @@ function setRunningState(tabId, sessionId) {
     if (resolvedSessionId) currentSessionId = resolvedSessionId;
     sendBtn.disabled = true;
     stopBtn.classList.remove('hidden');
-    statusDot.classList.add('running');
-    statusText.textContent = 'Working';
+    _setHeaderStatus('Working', 'running');
     if (typeof showAutomationRunner === 'function') showAutomationRunner(activeEntry.startedAt, 'Working');
     updateSendButtonState();
     _syncDelegationStopControls(_delegationUiState.snapshot);
@@ -4322,8 +4346,7 @@ function setIdleState(tabId) {
     currentSessionId = null;
     sendBtn.disabled = false;
     stopBtn.classList.add('hidden');
-    statusDot.classList.remove('running', 'error');
-    statusText.textContent = 'Ready';
+    _setHeaderStatus('Ready', '');
     if (typeof hideAutomationRunner === 'function') hideAutomationRunner();
 
     // Clean up any remaining status message with loader (active-tab only).
@@ -4367,8 +4390,7 @@ function setErrorState(tabId) {
     isRunning = false;
     sendBtn.disabled = false;
     stopBtn.classList.add('hidden');
-    statusDot.classList.add('error');
-    statusText.textContent = 'Error';
+    _setHeaderStatus('Error', 'error');
     if (typeof hideAutomationRunner === 'function') hideAutomationRunner();
     updateSendButtonState();
     _syncDelegationStopControls(_delegationUiState.snapshot);

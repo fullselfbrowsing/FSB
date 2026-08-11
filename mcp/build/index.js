@@ -261,7 +261,7 @@ export function formatDoctor(diagnostics) {
     lines.push(`  Reason: ${nativeHost.reason}`);
     lines.push('');
     lines.push('Install paths:');
-    lines.push('- Stdio: npx -y fsb-mcp-server');
+    lines.push('- Stdio: npx -y fsb-mcp-server@latest');
     lines.push(`- Streamable HTTP: ${getLocalHttpEndpoint()}`);
     return `${lines.join('\n')}\n`;
 }
@@ -269,7 +269,7 @@ function buildCursorDeeplink() {
     const config = {
         fsb: {
             command: 'npx',
-            args: ['-y', 'fsb-mcp-server'],
+            args: ['-y', 'fsb-mcp-server@latest'],
         },
     };
     return `cursor://anysphere.cursor-deeplink/mcp/install?name=fsb&config=${encodeURIComponent(JSON.stringify(config))}`;

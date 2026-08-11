@@ -7,8 +7,8 @@ import { isNativeHostExtensionId, } from './native-host/constants.js';
 import { installNativeHost, uninstallNativeHost, } from './native-host-install/index.js';
 import { isNativeHostBrowser } from './native-host-install/browser.js';
 import { resolveNativeHostPlatformLayout } from './native-host-install/platform.js';
-const STDIO_COMMAND = 'npx -y fsb-mcp-server';
-const WINDOWS_STDIO_COMMAND = 'cmd /c npx -y fsb-mcp-server';
+const STDIO_COMMAND = 'npx -y fsb-mcp-server@latest';
+const WINDOWS_STDIO_COMMAND = 'cmd /c npx -y fsb-mcp-server@latest';
 const NATIVE_HOST_INSTALL_USAGE = 'Usage: fsb-mcp-server install --native-host [--browser <chrome|edge|brave|chromium>] [--extension-id <32 lowercase a-p chars>]';
 const NATIVE_HOST_UNINSTALL_USAGE = 'Usage: fsb-mcp-server uninstall --native-host [--browser <chrome|edge|brave|chromium>]';
 const NATIVE_HOST_REFUSAL_REASONS = new Set([
@@ -177,7 +177,7 @@ function stableNativeRefusalReason(value) {
 function printNativeHostRefusal(reasonValue, locationValue) {
     console.error(`Native messaging host was not changed: ${stableNativeRefusalReason(reasonValue)}`);
     console.error(`Expected location: ${boundedNativeLocation(locationValue)}`);
-    console.error('Run fsb-mcp-server doctor for repair details.');
+    console.error('Run npx -y fsb-mcp-server@latest doctor for repair details.');
     process.exitCode = 1;
 }
 function exactNativeReceipt(value) {
@@ -325,7 +325,7 @@ function printPlatformInstructions(platformKey) {
             console.log('  1. Open Settings > Tools > AI Assistant > MCP Servers');
             console.log('  2. Click "+" to add a new server');
             console.log('  3. Set the command to: npx');
-            console.log('  4. Set the arguments to: -y fsb-mcp-server');
+            console.log('  4. Set the arguments to: -y fsb-mcp-server@latest');
             console.log('  5. Name it: fsb');
             console.log('  Supported IDEs: IntelliJ, WebStorm, PyCharm, GoLand, Android Studio, etc.');
             break;
@@ -333,7 +333,7 @@ function printPlatformInstructions(platformKey) {
             console.log('');
             console.log('ChatGPT (Streamable HTTP -- remote only):');
             console.log('  1. Start the FSB HTTP server:');
-            console.log('     npx -y fsb-mcp-server serve');
+            console.log('     npx -y fsb-mcp-server@latest serve');
             console.log('  2. In ChatGPT, go to Settings > Connections > MCP');
             console.log('  3. Add a new MCP server with URL:');
             console.log('     http://127.0.0.1:7226/mcp');
@@ -343,7 +343,7 @@ function printPlatformInstructions(platformKey) {
             console.log('');
             console.log('Claude.ai (Streamable HTTP -- remote only):');
             console.log('  1. Start the FSB HTTP server:');
-            console.log('     npx -y fsb-mcp-server serve');
+            console.log('     npx -y fsb-mcp-server@latest serve');
             console.log('  2. In Claude.ai, open the integrations UI');
             console.log('  3. Add a new MCP server with URL:');
             console.log('     http://127.0.0.1:7226/mcp');
@@ -354,7 +354,7 @@ function printPlatformInstructions(platformKey) {
             console.log('Warp Terminal:');
             console.log('  1. Open Warp and go to the MCP management UI');
             console.log('  2. Add a new MCP server');
-            console.log('  3. Set the command to: npx -y fsb-mcp-server');
+            console.log('  3. Set the command to: npx -y fsb-mcp-server@latest');
             console.log('  4. Name it: fsb');
             break;
         default:
@@ -376,7 +376,7 @@ export function getSetupSections(httpEndpoint, cursorDeeplink) {
             title: 'Local HTTP endpoint',
             lines: [
                 '1. Start the server:',
-                '  npx -y fsb-mcp-server serve',
+                '  npx -y fsb-mcp-server@latest serve',
                 '2. Use this endpoint in any Streamable HTTP-capable client:',
                 '  ' + httpEndpoint,
             ],
@@ -399,7 +399,7 @@ export function getSetupSections(httpEndpoint, cursorDeeplink) {
                 '    "mcpServers": {',
                 '      "fsb": {',
                 '        "command": "npx",',
-                '        "args": ["-y", "fsb-mcp-server"]',
+                '        "args": ["-y", "fsb-mcp-server@latest"]',
                 '      }',
                 '    }',
                 '  }',
@@ -414,7 +414,7 @@ export function getSetupSections(httpEndpoint, cursorDeeplink) {
                 'Add:',
                 '  [mcp_servers.fsb]',
                 '  command = "npx"',
-                '  args = ["-y", "fsb-mcp-server"]',
+                '  args = ["-y", "fsb-mcp-server@latest"]',
                 'Next step:',
                 '  ' + getInstallNextStep('codex'),
             ],
@@ -429,7 +429,7 @@ export function getSetupSections(httpEndpoint, cursorDeeplink) {
                 '      "fsb": {',
                 '        "type": "stdio",',
                 '        "command": "npx",',
-                '        "args": ["-y", "fsb-mcp-server"]',
+                '        "args": ["-y", "fsb-mcp-server@latest"]',
                 '      }',
                 '    }',
                 '  }',
@@ -446,7 +446,7 @@ export function getSetupSections(httpEndpoint, cursorDeeplink) {
                 '    "mcpServers": {',
                 '      "fsb": {',
                 '        "command": "npx",',
-                '        "args": ["-y", "fsb-mcp-server"]',
+                '        "args": ["-y", "fsb-mcp-server@latest"]',
                 '      }',
                 '    }',
                 '  }',
@@ -467,7 +467,7 @@ export function getSetupSections(httpEndpoint, cursorDeeplink) {
                 '    "mcpServers": {',
                 '      "fsb": {',
                 '        "command": "npx",',
-                '        "args": ["-y", "fsb-mcp-server"]',
+                '        "args": ["-y", "fsb-mcp-server@latest"]',
                 '      }',
                 '    }',
                 '  }',
@@ -485,7 +485,7 @@ export function getSetupSections(httpEndpoint, cursorDeeplink) {
                 '    "mcpServers": {',
                 '      "fsb": {',
                 '        "command": "npx",',
-                '        "args": ["-y", "fsb-mcp-server"]',
+                '        "args": ["-y", "fsb-mcp-server@latest"]',
                 '      }',
                 '    }',
                 '  }',
@@ -502,7 +502,7 @@ export function getSetupSections(httpEndpoint, cursorDeeplink) {
                 '    "mcpServers": {',
                 '      "fsb": {',
                 '        "command": "npx",',
-                '        "args": ["-y", "fsb-mcp-server"]',
+                '        "args": ["-y", "fsb-mcp-server@latest"]',
                 '      }',
                 '    }',
                 '  }',
@@ -521,7 +521,7 @@ export function getSetupSections(httpEndpoint, cursorDeeplink) {
                 '      cmd: npx',
                 '      args:',
                 '        - "-y"',
-                '        - fsb-mcp-server',
+                '        - fsb-mcp-server@latest',
                 'Next step:',
                 '  ' + getInstallNextStep('goose'),
             ],
@@ -535,7 +535,7 @@ export function getSetupSections(httpEndpoint, cursorDeeplink) {
                 '    "mcpServers": {',
                 '      "fsb": {',
                 '        "command": "npx",',
-                '        "args": ["-y", "fsb-mcp-server"]',
+                '        "args": ["-y", "fsb-mcp-server@latest"]',
                 '      }',
                 '    }',
                 '  }',
@@ -552,7 +552,7 @@ export function getSetupSections(httpEndpoint, cursorDeeplink) {
                 '    "mcpServers": {',
                 '      "fsb": {',
                 '        "command": "npx",',
-                '        "args": ["-y", "fsb-mcp-server"]',
+                '        "args": ["-y", "fsb-mcp-server@latest"]',
                 '      }',
                 '    }',
                 '  }',
@@ -569,7 +569,7 @@ export function getSetupSections(httpEndpoint, cursorDeeplink) {
                 '    "mcpServers": {',
                 '      "fsb": {',
                 '        "command": "npx",',
-                '        "args": ["-y", "fsb-mcp-server"]',
+                '        "args": ["-y", "fsb-mcp-server@latest"]',
                 '      }',
                 '    }',
                 '  }',
@@ -586,7 +586,7 @@ export function getSetupSections(httpEndpoint, cursorDeeplink) {
                 '    "mcp": {',
                 '      "fsb": {',
                 '        "type": "local",',
-                '        "command": ["npx", "-y", "fsb-mcp-server"]',
+                '        "command": ["npx", "-y", "fsb-mcp-server@latest"]',
                 '      }',
                 '    }',
                 '  }',
@@ -600,7 +600,7 @@ export function getSetupSections(httpEndpoint, cursorDeeplink) {
                 'Open Settings > Tools > AI Assistant > MCP Servers',
                 'Add a new server with:',
                 '  Command: npx',
-                '  Arguments: -y fsb-mcp-server',
+                '  Arguments: -y fsb-mcp-server@latest',
                 '  Name: fsb',
                 'Supported IDEs: IntelliJ, WebStorm, PyCharm, GoLand, Android Studio, etc.',
                 'Next step:',
@@ -610,7 +610,7 @@ export function getSetupSections(httpEndpoint, cursorDeeplink) {
         {
             title: 'ChatGPT (Streamable HTTP)',
             lines: [
-                '1. Start the server: npx -y fsb-mcp-server serve',
+                '1. Start the server: npx -y fsb-mcp-server@latest serve',
                 '2. In ChatGPT Settings > Connections > MCP, add:',
                 '   ' + httpEndpoint,
                 'Next step:',
@@ -620,7 +620,7 @@ export function getSetupSections(httpEndpoint, cursorDeeplink) {
         {
             title: 'Claude.ai (Streamable HTTP)',
             lines: [
-                '1. Start the server: npx -y fsb-mcp-server serve',
+                '1. Start the server: npx -y fsb-mcp-server@latest serve',
                 '2. In Claude.ai integrations UI, add:',
                 '   ' + httpEndpoint,
                 'Next step:',
@@ -631,7 +631,7 @@ export function getSetupSections(httpEndpoint, cursorDeeplink) {
             title: 'Warp Terminal',
             lines: [
                 'Open the MCP management UI in Warp',
-                'Add server with command: npx -y fsb-mcp-server',
+                'Add server with command: npx -y fsb-mcp-server@latest',
                 'Name: fsb',
                 'Next step:',
                 '  ' + getInstallNextStep('warp'),
@@ -654,8 +654,8 @@ export function getSetupSections(httpEndpoint, cursorDeeplink) {
         {
             title: 'Troubleshooting first',
             lines: [
-                '1. npx -y fsb-mcp-server doctor',
-                '2. npx -y fsb-mcp-server status --watch',
+                '1. npx -y fsb-mcp-server@latest doctor',
+                '2. npx -y fsb-mcp-server@latest status --watch',
                 'Use these before restarting or reinstalling any client.',
             ],
         },

@@ -36,7 +36,7 @@ It also supports trigger watchers, visible client-owned visual sessions, capabil
 
 Use this package when you want your AI client to drive the browser directly while still using FSB's DOM analysis, selector handling, visual overlay, action verification, session logging, memory, and vault boundaries.
 
-> **PhantomStream (FSB v0.12.0):** the dashboard live-preview and remote-control relay are now powered by the published `@full-self-browsing/phantom-stream` package on the extension and showcase side. This is an internal capture/renderer/transport change — the MCP tool schemas, routes, and bridge contracts in this server are unchanged.
+> **PhantomStream (engineering milestone 0.12.0):** the dashboard live-preview and remote-control relay are now powered by the published `@full-self-browsing/phantom-stream` package on the extension and showcase side. This is an internal capture/renderer/transport change — the MCP tool schemas, routes, and bridge contracts in this server are unchanged.
 
 ### What's New In v0.11.0
 
@@ -132,7 +132,7 @@ The installer writes the smallest config entry needed for the selected platform:
 
 ```text
 command: npx
-args: -y fsb-mcp-server
+args: -y fsb-mcp-server@latest
 ```
 
 For file-based targets, existing config files are parsed, updated, and serialized back in the platform's expected format: JSON, JSONC, TOML, or YAML. For Claude Code, the installer delegates to the `claude mcp add --scope user` CLI command. For instruction-only targets, it prints steps instead of guessing at a private config path.
@@ -166,21 +166,21 @@ The extension pairing contract did not change in `0.7.4`. Streamable HTTP is an 
 ### One Command Install
 
 ```bash
-npx -y fsb-mcp-server install --claude-desktop
-npx -y fsb-mcp-server install --claude-code
-npx -y fsb-mcp-server install --cursor
-npx -y fsb-mcp-server install --vscode
-npx -y fsb-mcp-server install --windsurf
-npx -y fsb-mcp-server install --codex
-npx -y fsb-mcp-server install --all
+npx -y fsb-mcp-server@latest install --claude-desktop
+npx -y fsb-mcp-server@latest install --claude-code
+npx -y fsb-mcp-server@latest install --cursor
+npx -y fsb-mcp-server@latest install --vscode
+npx -y fsb-mcp-server@latest install --windsurf
+npx -y fsb-mcp-server@latest install --codex
+npx -y fsb-mcp-server@latest install --all
 ```
 
 Useful installer commands:
 
 ```bash
-npx -y fsb-mcp-server install --list
-npx -y fsb-mcp-server install --all --dry-run
-npx -y fsb-mcp-server uninstall --cursor
+npx -y fsb-mcp-server@latest install --list
+npx -y fsb-mcp-server@latest install --all --dry-run
+npx -y fsb-mcp-server@latest uninstall --cursor
 ```
 
 `install --list` shows all supported platform flags and whether the target config was detected.
@@ -190,18 +190,18 @@ npx -y fsb-mcp-server uninstall --cursor
 The native messaging host targets one browser per owned runtime. Chrome is the default, so existing commands and Chrome registrations continue to work:
 
 ```bash
-npx -y fsb-mcp-server install --native-host
-npx -y fsb-mcp-server uninstall --native-host
+npx -y fsb-mcp-server@latest install --native-host
+npx -y fsb-mcp-server@latest uninstall --native-host
 ```
 
 Select another supported browser with `--browser`:
 
 ```bash
-npx -y fsb-mcp-server install --native-host --browser chrome
-npx -y fsb-mcp-server install --native-host --browser edge --extension-id <extension-id>
-npx -y fsb-mcp-server install --native-host --browser brave --extension-id <extension-id>
-npx -y fsb-mcp-server install --native-host --browser chromium --extension-id <extension-id>
-npx -y fsb-mcp-server uninstall --native-host --browser edge
+npx -y fsb-mcp-server@latest install --native-host --browser chrome
+npx -y fsb-mcp-server@latest install --native-host --browser edge --extension-id <extension-id>
+npx -y fsb-mcp-server@latest install --native-host --browser brave --extension-id <extension-id>
+npx -y fsb-mcp-server@latest install --native-host --browser chromium --extension-id <extension-id>
+npx -y fsb-mcp-server@latest uninstall --native-host --browser edge
 ```
 
 Extension IDs are browser-installation-specific. Omitted `--extension-id` uses the published Chrome Web Store ID, `badgafnfchcihdfnjneklogedcdkmjfk`. For Edge, Brave, Chromium, or an unpacked build, copy the 32-character lowercase ID shown on that browser's extensions page and pass it with `--extension-id`.
@@ -213,7 +213,7 @@ The browser selector controls the user-scoped native-messaging registration loca
 Claude Code:
 
 ```bash
-claude mcp add --scope user fsb -- npx -y fsb-mcp-server
+claude mcp add --scope user fsb -- npx -y fsb-mcp-server@latest
 ```
 
 Codex CLI / Codex IDE (`~/.codex/config.toml`):
@@ -221,7 +221,7 @@ Codex CLI / Codex IDE (`~/.codex/config.toml`):
 ```toml
 [mcp_servers.fsb]
 command = "npx"
-args = ["-y", "fsb-mcp-server"]
+args = ["-y", "fsb-mcp-server@latest"]
 ```
 
 Claude Desktop, Cursor (`~/.cursor/mcp.json`), and most JSON-based clients:
@@ -231,7 +231,7 @@ Claude Desktop, Cursor (`~/.cursor/mcp.json`), and most JSON-based clients:
   "mcpServers": {
     "fsb": {
       "command": "npx",
-      "args": ["-y", "fsb-mcp-server"]
+      "args": ["-y", "fsb-mcp-server@latest"]
     }
   }
 }
@@ -245,7 +245,7 @@ VS Code uses the `servers` root key and requires `type: "stdio"`:
     "fsb": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "fsb-mcp-server"]
+      "args": ["-y", "fsb-mcp-server@latest"]
     }
   }
 }
@@ -256,7 +256,7 @@ After editing config files, restart or reload the host client if tools do not ap
 ### Local Streamable HTTP
 
 ```bash
-npx -y fsb-mcp-server serve
+npx -y fsb-mcp-server@latest serve
 ```
 
 Default endpoint:
@@ -278,18 +278,18 @@ http://127.0.0.1:7226/health
 Start with diagnostics before reinstalling:
 
 ```bash
-npx -y fsb-mcp-server doctor
-npx -y fsb-mcp-server status
-npx -y fsb-mcp-server status --watch
-npx -y fsb-mcp-server wait-for-extension
+npx -y fsb-mcp-server@latest doctor
+npx -y fsb-mcp-server@latest status
+npx -y fsb-mcp-server@latest status --watch
+npx -y fsb-mcp-server@latest wait-for-extension
 ```
 
 Recommended release or host smoke flow:
 
 ```bash
 npm run test:mcp-smoke
-npx -y fsb-mcp-server doctor
-npx -y fsb-mcp-server status --watch
+npx -y fsb-mcp-server@latest doctor
+npx -y fsb-mcp-server@latest status --watch
 ```
 
 `doctor` reports the primary failing layer: package, bridge, extension, active tab, content script, or configuration. Only restart or reinstall the client when the reported layer points there.
@@ -614,7 +614,7 @@ npm --prefix mcp run serve
 
 Release checks should verify:
 
-- `mcp/package.json`, `mcp/package-lock.json`, `mcp/server.json`, and `mcp/src/version.ts` agree.
+- `mcp/package.json`, `mcp/package-lock.json`, `mcp/server.json`, `mcp/src/version.ts`, and the tracked `mcp/build/version.*` artifacts agree.
 - `mcp/CHANGELOG.md` and the current release instructions describe that same package version.
 - `mcp/README.md` tool counts match the registered runtime surface.
 - `mcp/src/tools/schema-bridge.ts` still loads the generated `ai/tool-definitions.cjs`.
@@ -629,9 +629,9 @@ The build command copies `extension/ai/tool-definitions.js` into `mcp/ai/tool-de
 
 ### Versioning
 
-The MCP package has its own version (`0.11.0`) because it is published independently from the extension release (`0.9.91`). When extension bridge contracts change, update all MCP version metadata plus the changelog and compatibility notes in this README. When only website or extension UI text changes, the MCP version usually does not need to move.
+The MCP package has its own version (`0.11.0`) because it is published independently from the extension release (`0.9.91`). Use `npm run version:set:mcp -- X.Y.Z` for MCP releases and `npm run version:set:extension -- X.Y.Z` for extension releases; `npm run version:check` verifies both domains without requiring them to match.
 
-Compatibility for this release: MCP 0.11.0 requires extension 0.9.91 or newer for the `mcp:task-status` route used by `complete_task`, `partial_task`, and `fail_task`. An older extension does not recognize those terminal lifecycle messages; update the extension before using these tools. Other 0.10.0 tool routes remain additive and unchanged.
+Compatibility for this release: MCP 0.11.0 requires extension 0.9.91 or newer for the `mcp:task-status` route used by `complete_task`, `partial_task`, and `fail_task`. Existing `0.10.0` tool routes remain additive and unchanged.
 
 Contract-sensitive changes should be covered by tests before publishing:
 
@@ -647,12 +647,12 @@ Contract-sensitive changes should be covered by tests before publishing:
 
 ### Releasing 0.11.0
 
-This 0.11.0 build is release-prep ready. The actual `npm publish` is a USER action via the existing tag-driven release workflow; autonomous mode does not run it.
+This 0.11.0 build is release-prep ready. The actual `npm publish` remains user-gated through the MCP-only tag workflow.
 
 To publish:
 
-- Preferred: run the MCP-only tag workflow (`git tag mcp-v0.11.0 && git push origin mcp-v0.11.0`); the workflow handles `npm publish` from a clean working tree. Repository milestone tags such as `v0.11.0` do not publish the MCP package.
-- Manual fallback: from the release branch, `cd mcp && npm publish` after confirming `npm whoami`, `npm --prefix mcp run build` exit 0, and the MCP smoke/parity/schema gates exit 0.
+- Preferred: after merging to `main`, run the MCP-only tag workflow (`git tag mcp-v0.11.0 && git push origin mcp-v0.11.0`). It publishes the verified npm artifact and creates the MCP GitHub release.
+- Manual MCP fallback: from the release commit, run `cd mcp && npm publish --tag latest` only after confirming `npm whoami`, `npm --prefix mcp run build`, and the MCP smoke/parity/schema gates all pass.
 
 Do not run `npm publish` from autonomous mode.
 

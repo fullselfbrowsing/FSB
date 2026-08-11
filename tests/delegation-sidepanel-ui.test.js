@@ -623,16 +623,16 @@ assert(htmlSource.indexOf('../utils/delegation-providers.js') < htmlSource.index
 assert.equal(sha256(htmlSource
   .replace(delegationProviderScript, '')
   .replace(nativeHostInstallScript, '')),
-  '6185330e1d4d978f049684e469f8e8cd842f55086d338685358f9b4e5a7f19ba',
-  'the two nonvisual helper dependencies are the only side-panel HTML deltas');
+  'bee35ef3c8fe04cd12be0185cd2cbcd734a01d3378c534871d13a4016d05d3fd',
+  'the side-panel HTML includes only the intended helpers and single-status ownership treatment');
 const replayCssStart = cssSource.indexOf('.history-status.idle-closed {');
 const replayCssEnd = cssSource.indexOf('/* Phase 11 FINT-20', replayCssStart);
 assert(replayCssStart !== -1 && replayCssEnd > replayCssStart,
   'the session-replay CSS block has stable boundaries');
 const delegationCssSource = cssSource.slice(0, replayCssStart) + cssSource.slice(replayCssEnd);
 assert.equal(sha256(delegationCssSource),
-  'e5ce10787a66e525123937fa6bef0d151c84c4c29b53333baeb8309d48d2c3ca',
-  'the intentional delegated target-size CSS delta remains exact outside replay UI');
+  '68459e3b6c75417f97e932e008d7d6b6eead96fe4c1c1bf239d93ca5c3736e33',
+  'the intentional delegated and ownership-status CSS deltas remain exact outside replay UI');
 
 {
   const context = { FsbDelegationProviders: DelegationProviders };
@@ -781,8 +781,6 @@ console.log('\n--- Phase 61 consent and human-control contract ---');
 [
   'It cannot edit files, run shell commands, or fetch arbitrary URLs.',
   'Back to message',
-  'Delegate a browser task',
-  'Choose an agent provider, describe the outcome, and FSB will run it in a background tab.',
   'Take control',
   'You have control of this tab',
   'Resume with agent',
@@ -814,6 +812,9 @@ console.log('\n--- Phase 61 consent and human-control contract ---');
   'Finish the pending agent cleanup in its original tab and conversation before starting another task. Your message was kept.',
   'FSB could not save this agent run. Stop was confirmed for that exact run, and your message was kept. Try again.'
 ].forEach((copy) => assert(panelSource.includes(copy), 'exact delegated copy is pinned: ' + copy));
+assert(!panelSource.includes('Delegate a browser task')
+    && !panelSource.includes('Choose an agent provider, describe the outcome, and FSB will run it in a background tab.'),
+  'the idle delegation promotion is absent from the side panel');
 assert(panelSource.includes("+ ' cannot run browser tasks'"),
   'unsupported-provider heading retains the exact dynamic provider-label suffix');
 
@@ -849,6 +850,58 @@ assert(consentRenderSource.includes('heading.tabIndex = -1')
   'consent focus lands programmatically on its heading');
 assert(/e\.key === 'Escape'[\s\S]{0,120}_backToDelegationMessage\(\)/.test(panelSource),
   'Escape follows the same non-starting consent back path');
+
+{
+  const run = new TestNode('section');
+  const stateCard = new TestNode('div');
+  const feed = new TestNode('div');
+  const control = new TestNode('div');
+  run.appendChild(stateCard);
+  run.appendChild(feed);
+  stateCard.appendChild(new TestNode('p', 'stale state'));
+  feed.appendChild(new TestNode('p', 'stale feed'));
+  let headerStatus = null;
+  let composerLocked = null;
+  let restoredStops = 0;
+  const context = {
+    _delegationUiState: { mode: 'snapshot', errorCode: 'old', lastAlertKey: 'old' },
+    _delegationRunStopControls: [{}],
+    _clearDelegationElapsedTimer() {},
+    _ensureDelegationMount: () => ({ run, state: stateCard, feed, control }),
+    _clearDelegationNode(node) { while (node.firstChild) node.removeChild(node.firstChild); },
+    _restoreLegacyStopControl() { restoredStops += 1; },
+    _setDelegationHeaderStatus(label) { headerStatus = label; },
+    _setDelegationComposerLocked(locked) { composerLocked = locked; },
+    _delegationElement(tag, className, textValue) {
+      const node = new TestNode(tag);
+      node.className = className || '';
+      if (textValue !== undefined) node.textContent = textValue;
+      return node;
+    }
+  };
+  vm.createContext(context);
+  vm.runInContext(extractNamedFunction(panelSource, '_renderDelegationReadyState'), context);
+  vm.runInContext(extractNamedFunction(panelSource, '_renderDelegationInlineError'), context);
+
+  context._renderDelegationReadyState();
+  assert.equal(run.classList.contains('hidden'), true,
+    'the idle delegation presentation stays hidden');
+  assert.equal(stateCard.children.length, 0, 'the idle state card is empty');
+  assert.equal(feed.children.length, 0, 'the idle delegation feed is empty');
+  assert.equal(context._delegationUiState.mode, 'ready');
+  assert.equal(context._delegationUiState.errorCode, null);
+  assert.equal(headerStatus, 'Ready');
+  assert.equal(composerLocked, false);
+  assert.equal(control.classList.contains('hidden'), true);
+  assert.equal(restoredStops, 1);
+
+  context._renderDelegationInlineError(stateCard, 'Delegation failed safely.');
+  assert.equal(run.classList.contains('hidden'), false,
+    'a standalone delegation error reveals the presentation');
+  assert.equal(stateCard.firstChild.id, 'delegationRunHeading',
+    'a standalone delegation error labels the revealed presentation');
+  assert.equal(stateCard.firstChild.getAttribute('role'), 'alert');
+}
 
 {
   function renderConsent(provider) {
@@ -989,9 +1042,9 @@ const nativeInstallSource = extractNamedFunction(
   '_copyDelegationNativeHostInstallCommand'
 );
 const setupSource = extractNamedFunction(panelSource, '_openDelegationProviderSetup');
-assert(doctorSource.includes("var command = 'fsb-mcp-server doctor'")
+assert(doctorSource.includes("var command = 'npx -y fsb-mcp-server@latest doctor'")
     && doctorSource.includes('navigator.clipboard.writeText(command)')
-    && pairResetSource.includes("var command = 'npx -y fsb-mcp-server pair --reset'")
+    && pairResetSource.includes("var command = 'npx -y fsb-mcp-server@latest pair --reset'")
     && pairResetSource.includes('navigator.clipboard.writeText(command)')
     && nativeInstallSource.includes('FsbNativeHostInstallCommand')
     && nativeInstallSource.includes('chrome.runtime.id')
@@ -1442,7 +1495,7 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
     assert.deepEqual(findAll(stateCard, 'button').map((button) => button.textContent), [
       'Copy doctor command', 'Open provider setup'
     ]);
-    assert.equal(findAll(stateCard, 'code')[0].textContent, 'fsb-mcp-server doctor');
+    assert.equal(findAll(stateCard, 'code')[0].textContent, 'npx -y fsb-mcp-server@latest doctor');
     assert.deepEqual(headers[0], { label: 'Agent offline', tone: 'error' });
     assert.equal(composerLocks[0], false);
 
@@ -1555,7 +1608,7 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
       'Copy reset command'
     ]);
     assert.equal(findAll(stateCard, 'code')[0].textContent,
-      'npx -y fsb-mcp-server pair --reset');
+      'npx -y fsb-mcp-server@latest pair --reset');
     assert.equal(stateCard.getAttribute('role'), null);
     assert.deepEqual(headers[headers.length - 1], { label: 'Ready', tone: '' });
     assert.equal(composerLocks[composerLocks.length - 1], false);
@@ -1573,7 +1626,7 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
     assert.deepEqual(findAll(stateCard, 'button').map((button) => button.textContent), [
       'Copy doctor command'
     ]);
-    assert.equal(findAll(stateCard, 'code')[0].textContent, 'fsb-mcp-server doctor');
+    assert.equal(findAll(stateCard, 'code')[0].textContent, 'npx -y fsb-mcp-server@latest doctor');
     assert.equal(stateCard.getAttribute('role'), 'alert');
     assert.deepEqual(headers[headers.length - 1], { label: 'Agent offline', tone: 'error' });
     assert.equal(composerLocks[composerLocks.length - 1], false);
@@ -3249,7 +3302,7 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
     assert.equal(findAll(card, 'i')[0].getAttribute('aria-hidden'), 'true');
     assert(card.textContent.includes('Agent connection lost'));
     assert(card.textContent.includes('FSB missed three replies from the local agent service. The run cannot continue safely.'));
-    assert(card.textContent.includes('fsb-mcp-server doctor'));
+    assert(card.textContent.includes('npx -y fsb-mcp-server@latest doctor'));
     assert(card.textContent.includes('Copy doctor command'));
     assert(card.textContent.includes('Open provider setup'));
     assert(card.textContent.includes('ProviderClaude Code')
@@ -3349,12 +3402,12 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
     );
     vm.runInContext(extractNamedFunction(panelSource, '_openDelegationProviderSetup'), context);
     await context._copyDelegationDoctorCommand();
-    assert.deepEqual(copied, ['fsb-mcp-server doctor']);
+    assert.deepEqual(copied, ['npx -y fsb-mcp-server@latest doctor']);
     assert.equal(announcer.textContent, 'Doctor command copied');
     await context._copyDelegationNativeHostInstallCommand();
     assert.deepEqual(copied, [
-      'fsb-mcp-server doctor',
-      'npx -y fsb-mcp-server install --native-host --browser brave'
+      'npx -y fsb-mcp-server@latest doctor',
+      'npx -y fsb-mcp-server@latest install --native-host --browser brave'
         + ' --extension-id abcdefghijklmnopabcdefghijklmnop'
     ]);
     assert.equal(announcer.textContent, 'Native helper install command copied');

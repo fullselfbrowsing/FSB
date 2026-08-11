@@ -7,7 +7,7 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
   globalThis.__FSB_AUTOMATION_LOGGER_LOADED__ = true;
   console.log('[FSB] automation-logger.js loading');
 
-  // Automation Logger for FSB v0.9.91
+  // Automation Logger for FSB
   // Provides structured logging for debugging automation loops
 
   function filterPersistedSessionLogs(sessionLogs) {

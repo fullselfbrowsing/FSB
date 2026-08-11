@@ -174,3 +174,723 @@ test('a newly registered agent is released when its first recovery bind fails', 
     { agentId: 'agent-new', reason: 'replay_recovery_failed' }
   ]);
 });
+
+test('a missing in-flight close target becomes an idempotent tombstone', async () => {
+  const harness = makeHarness({
+    agentId: 'agent-recovery',
+    tabs: [{ id: 101, url: 'https://one.example/start' }]
+  });
+
+  const result = JSON.parse(JSON.stringify(await harness.reclaimOwnedTabs(state, {
+    allowMissingCloseLogicalTab: 'tab-2'
+  })));
+  assert.deepEqual(harness.calls.gets, [101, 202]);
+  assert.deepEqual(harness.calls.binds, [
+    { agentId: 'agent-recovery', tabId: 101 }
+  ]);
+  assert.deepEqual(harness.calls.releases, []);
+  assert.equal(result.owned.tab.id, 101);
+  assert.equal(result.replayTabs['tab-2'].tabId, 202);
+  assert.equal(result.replayTabs['tab-2'].closed, true);
+  assert.equal(result.replayTabs['tab-2'].ownershipToken, null);
+});
+
+test('the close exception does not admit a restricted tab', async () => {
+  const harness = makeHarness({
+    agentId: 'agent-recovery',
+    tabs: [
+      { id: 101, url: 'https://one.example/start' },
+      { id: 202, url: 'chrome://settings/' }
+    ]
+  });
+
+  await assert.rejects(harness.reclaimOwnedTabs(state, {
+    allowMissingCloseLogicalTab: 'tab-2'
+  }), /tab-2 is missing or restricted/);
+  assert.deepEqual(harness.calls.binds, []);
+  assert.deepEqual(harness.calls.releases, [
+    { agentId: 'agent-recovery', reason: 'replay_recovery_failed' }
+  ]);
+});
+
+test('an explicit empty logical-tab set reserves an unbound recovery agent', async () => {
+  const harness = makeHarness({ hasAgent: false, tabs: [] });
+  const result = JSON.parse(JSON.stringify(await harness.reclaimOwnedTabs({
+    replayAgentId: null,
+    targetTabId: 101,
+    logicalTabs: []
+  })));
+
+  assert.deepEqual(harness.calls.gets, [], 'an explicit empty set must not use the legacy target fallback');
+  assert.deepEqual(harness.calls.binds, []);
+  assert.equal(harness.calls.registrations, 1);
+  assert.equal(result.owned.agentId, 'agent-new');
+  assert.equal(result.owned.tab, null);
+  assert.deepEqual(result.replayTabs, {});
+  assert.equal(result.bootstrapLogicalTab, null);
+});
+
+test('a filtered close tombstone is re-inferred after another worker eviction', async () => {
+  const harness = makeHarness({ agentId: 'agent-recovery', tabs: [] });
+  const result = JSON.parse(JSON.stringify(await harness.reclaimOwnedTabs({
+    replayAgentId: 'agent-recovery',
+    targetTabId: null,
+    logicalTabs: []
+  }, {
+    allowMissingCloseLogicalTab: 'tab-closed'
+  })));
+
+  assert.deepEqual(harness.calls.gets, []);
+  assert.deepEqual(harness.calls.binds, []);
+  assert.equal(result.replayTabs['tab-closed'].closed, true);
+  assert.equal(result.replayTabs['tab-closed'].tabId, null);
+  assert.equal(result.owned.tab, null);
+});
+
+test('concurrent replay starts create only one owned tab and session', async () => {
+  let resolvePreparation;
+  let createdTabs = 0;
+  const responses = { first: [], second: [] };
+  const context = {
+    activeSessions: new Map(),
+    fsbReplayIsTrustedUiSender() { return true; },
+    prepareSessionReplay() {
+      return new Promise((resolve) => { resolvePreparation = resolve; });
+    },
+    fsbReplayIsExecutable() { return true; },
+    fsbReplayBootstrapTab() {
+      return { id: 'primary', startUrl: 'https://example.com/start' };
+    },
+    async fsbReplayCreateOwnedTab() {
+      createdTabs++;
+      return { tab: { id: 501, url: 'https://example.com/start' }, agentId: 'agent-replay', ownershipToken: 'token' };
+    },
+    fsbReplayBuildSession(_prepared, replaySessionId, owned) {
+      return {
+        replaySessionId,
+        status: 'replaying',
+        task: 'Replay test',
+        tabId: owned.tab.id
+      };
+    },
+    startKeepAlive() {},
+    automationLogger: { logSessionStart() {}, error() {} },
+    async fsbReplayPersistCheckpoint() {},
+    async fsbReplayPersistRun() {},
+    async fsbReplayAbortFailedStart() {},
+    setTimeout() {}
+  };
+  vm.createContext(context);
+  vm.runInContext(
+    'let fsbReplayStartPending = false;\n' +
+      declarationSource(background, 'handleReplaySession') + '\n' +
+      'this.handleReplaySession = handleReplaySession;',
+    context,
+    { filename: 'extension/background.js' }
+  );
+
+  const first = context.handleReplaySession(
+    { sessionId: 'source-session', manifestHash: 'manifest-hash', approvedScopes: [] },
+    {},
+    (response) => responses.first.push(response)
+  );
+  const second = context.handleReplaySession(
+    { sessionId: 'source-session', manifestHash: 'manifest-hash', approvedScopes: [] },
+    {},
+    (response) => responses.second.push(response)
+  );
+
+  await second;
+  assert.equal(responses.second[0].success, false);
+  assert.match(responses.second[0].error, /Another automation is already running/);
+  resolvePreparation({
+    replay: { manifestHash: 'manifest-hash' },
+    steps: [{ id: 'step-1', tool: 'click' }]
+  });
+  await first;
+
+  assert.equal(createdTabs, 1);
+  assert.equal(responses.first[0].success, true);
+  assert.equal(context.activeSessions.size, 1);
+});
+
+function makeMcpReplayApprovalHarness() {
+  let storedApprovals = [];
+  let nextRequestId = 1;
+  let failNextStorageWrite = false;
+  let startupHandler = async (_request, _sender, respond) => {
+    respond({ success: true });
+  };
+  const calls = { storageSets: 0, storageRemoves: 0 };
+  const clone = (value) => JSON.parse(JSON.stringify(value));
+  const context = {
+    chrome: {
+      storage: {
+        session: {
+          async get(key) {
+            return storedApprovals.length > 0 ? { [key]: clone(storedApprovals) } : {};
+          },
+          async set(value) {
+            calls.storageSets++;
+            if (failNextStorageWrite) {
+              failNextStorageWrite = false;
+              throw new Error('approval storage write failed');
+            }
+            storedApprovals = clone(value.fsbPendingMcpReplayApprovals || []);
+          },
+          async remove() {
+            calls.storageRemoves++;
+            storedApprovals = [];
+          }
+        }
+      },
+      runtime: { async sendMessage() {} }
+    },
+    crypto: { randomUUID() { return 'approval-' + nextRequestId++; } },
+    async prepareSessionReplay(sessionId) {
+      return {
+        sessionId,
+        replay: { manifestHash: 'manifest-' + sessionId },
+        steps: [{ id: 'step-' + sessionId, replay: { availability: 'ready' } }],
+        tabs: [],
+        counts: { ready: 1 }
+      };
+    },
+    fsbReplayIsExecutable() { return true; },
+    fsbReplayPublicPreparation(prepared) {
+      return {
+        counts: prepared.counts,
+        tabs: prepared.tabs,
+        steps: prepared.steps
+      };
+    },
+    async handleReplaySession(request, sender, respond) {
+      return startupHandler(request, sender, respond);
+    }
+  };
+  vm.createContext(context);
+  vm.runInContext(
+    "const FSB_PENDING_MCP_REPLAY_KEY = 'fsbPendingMcpReplayApprovals';\n" +
+      'const FSB_MCP_REPLAY_APPROVAL_TTL_MS = 10 * 60 * 1000;\n' +
+      'let fsbPendingMcpReplayApprovalTail = Promise.resolve();\n' +
+      declarationSource(background, 'fsbReadPendingMcpReplayApprovals') + '\n' +
+      declarationSource(background, 'fsbWritePendingMcpReplayApprovals') + '\n' +
+      declarationSource(background, 'fsbMutatePendingMcpReplayApprovals') + '\n' +
+      declarationSource(background, 'fsbRemovePendingMcpReplayApproval') + '\n' +
+      declarationSource(background, 'requestMcpSessionReplay') + '\n' +
+      declarationSource(background, 'fsbGetMcpReplayApproval') + '\n' +
+      declarationSource(background, 'fsbApprovePendingMcpReplay') + '\n' +
+      'this.approvalApi = {' +
+        'request: requestMcpSessionReplay,' +
+        'read: fsbReadPendingMcpReplayApprovals,' +
+        'remove: fsbRemovePendingMcpReplayApproval,' +
+        'approve: fsbApprovePendingMcpReplay' +
+      '};',
+    context,
+    { filename: 'extension/background.js' }
+  );
+  return {
+    calls,
+    request: context.approvalApi.request,
+    read: context.approvalApi.read,
+    remove: context.approvalApi.remove,
+    approve: context.approvalApi.approve,
+    failNextStorageWrite() { failNextStorageWrite = true; },
+    setStartupHandler(handler) { startupHandler = handler; },
+    stored() { return clone(storedApprovals); }
+  };
+}
+
+test('concurrent MCP approval requests retain distinct manifests and coalesce duplicates', async () => {
+  const distinct = makeMcpReplayApprovalHarness();
+  await Promise.all([
+    distinct.request('source-a'),
+    distinct.request('source-b')
+  ]);
+  assert.deepEqual(distinct.stored().map((approval) => approval.sessionId).sort(), [
+    'source-a',
+    'source-b'
+  ]);
+
+  const duplicate = makeMcpReplayApprovalHarness();
+  const results = await Promise.all([
+    duplicate.request('source-a'),
+    duplicate.request('source-a')
+  ]);
+  assert.equal(results[0].requestId, results[1].requestId);
+  assert.equal(duplicate.stored().length, 1);
+});
+
+test('a failed MCP approval mutation does not poison later storage updates', async () => {
+  const harness = makeMcpReplayApprovalHarness();
+  harness.failNextStorageWrite();
+  await assert.rejects(harness.request('source-failed'), /approval storage write failed/);
+
+  const retried = await harness.request('source-retried');
+  assert.equal(harness.stored().length, 1);
+  assert.equal(harness.stored()[0].requestId, retried.requestId);
+});
+
+test('approval removal after replay startup preserves a newer pending request', async () => {
+  const harness = makeMcpReplayApprovalHarness();
+  const older = await harness.request('source-old');
+  let signalStarted;
+  const started = new Promise((resolve) => { signalStarted = resolve; });
+  let finishStartup;
+  harness.setStartupHandler((_request, _sender, respond) => {
+    signalStarted();
+    return new Promise((resolve) => {
+      finishStartup = (response) => {
+        respond(response);
+        resolve();
+      };
+    });
+  });
+
+  const approving = harness.approve({
+    requestId: older.requestId,
+    manifestHash: older.manifestHash
+  }, {});
+  await started;
+  const newer = await harness.request('source-new');
+  finishStartup({ success: true, sessionId: 'replay-old' });
+  assert.equal((await approving).success, true);
+
+  const remaining = harness.stored();
+  assert.equal(remaining.length, 1);
+  assert.equal(remaining[0].requestId, newer.requestId);
+  assert.equal(remaining[0].sessionId, 'source-new');
+});
+
+test('failed replay startup leaves its MCP approval available for retry', async () => {
+  const harness = makeMcpReplayApprovalHarness();
+  const approval = await harness.request('source-retry');
+  harness.setStartupHandler(async (_request, _sender, respond) => {
+    respond({ success: false, error: 'startup failed' });
+  });
+
+  const response = await harness.approve({
+    requestId: approval.requestId,
+    manifestHash: approval.manifestHash
+  }, {});
+  assert.equal(response.success, false);
+  assert.equal(harness.stored().length, 1);
+  assert.equal(harness.stored()[0].requestId, approval.requestId);
+});
+
+function makeTerminalRecoveryHarness(options = {}) {
+  const replaySessionId = 'replay-terminal-test';
+  const sourceSessionId = 'source-terminal-test';
+  let releaseFailuresRemaining = options.failReleaseCount || 0;
+  let checkpointStored = true;
+  let agentPresent = options.agentAlreadyReleased !== true;
+  let storedLogs = {
+    [sourceSessionId]: {
+      replay: { lastRun: { id: replaySessionId, status: options.initialStatus || 'running', steps: [] } }
+    }
+  };
+  const snapshot = {
+    kind: 'survivability-snapshot',
+    capturedAt: '2026-08-10T00:00:00.000Z',
+    payload: JSON.stringify({
+      kind: 'fsb-lattice-replay-checkpoint/v1',
+      replaySessionId,
+      originalSessionId: sourceSessionId,
+      manifestHash: 'stale-manifest-hash',
+      replayAgentId: 'agent-terminal-test',
+      logicalTabs: []
+    })
+  };
+  const calls = {
+    clears: 0,
+    events: [],
+    localSets: 0,
+    reclaims: 0,
+    releaseAttempts: [],
+    warnings: 0
+  };
+  const context = {
+    chrome: {
+      storage: {
+        session: { async get() { return checkpointStored ? { snapshot } : {}; } },
+        local: {
+          async get() {
+            return { fsbSessionLogs: JSON.parse(JSON.stringify(storedLogs)) };
+          },
+          async set(value) {
+            calls.localSets++;
+            if (options.failLocalSet === true) throw new Error('local storage write failed');
+            storedLogs = JSON.parse(JSON.stringify(value.fsbSessionLogs));
+          }
+        }
+      }
+    },
+    FsbLatticeReplay: {},
+    activeSessions: new Map(),
+    fsbAgentRegistryInstance: options.registryUnavailable === true ? null : {
+      hasAgent(agentId) {
+        return agentId === 'agent-terminal-test' && agentPresent;
+      },
+      async releaseAgent(agentId, reason) {
+        calls.releaseAttempts.push({ agentId, reason });
+        if (releaseFailuresRemaining > 0) {
+          releaseFailuresRemaining--;
+          calls.events.push('release-failed');
+          throw new Error('registry release failed');
+        }
+        calls.events.push('release');
+        if (options.releaseRefused === true) return false;
+        if (!agentPresent) return false;
+        agentPresent = false;
+        return true;
+      }
+    },
+    async prepareSessionReplay() {
+      return {
+        replay: {
+          manifestHash: 'current-manifest-hash',
+          lastRun: JSON.parse(JSON.stringify(storedLogs[sourceSessionId].replay.lastRun))
+        },
+        steps: []
+      };
+    },
+    async fsbReplayClearRecoverySnapshots(id) {
+      assert.equal(id, replaySessionId);
+      calls.clears++;
+      calls.events.push('clear');
+      checkpointStored = false;
+    },
+    async fsbReplayReclaimOwnedTabs() {
+      calls.reclaims++;
+      throw new Error('reclaim must not run');
+    },
+    automationLogger: { warn() { calls.warnings++; } }
+  };
+  vm.createContext(context);
+  vm.runInContext(
+    "const FSB_REPLAY_CHECKPOINT_KIND = 'fsb-lattice-replay-checkpoint/v1';\n" +
+      "const FSB_REPLAY_TERMINAL_STATUSES = new Set(['replay_completed', 'replay_failed', 'replay_stopped']);\n" +
+      declarationSource(background, 'fsbReplayReleaseAgentId') + '\n' +
+      declarationSource(background, 'fsbReplayReleaseRecoveredTerminalAgent') + '\n' +
+      declarationSource(background, 'fsbReplayCleanupFailedRecovery') + '\n' +
+      declarationSource(background, 'fsbRestoreLatticeReplayCheckpoints') + '\n' +
+      'this.restoreReplayCheckpoints = fsbRestoreLatticeReplayCheckpoints;',
+    context,
+    { filename: 'extension/background.js' }
+  );
+
+  return {
+    calls,
+    restoreReplayCheckpoints: context.restoreReplayCheckpoints,
+    storedRun() {
+      return JSON.parse(JSON.stringify(storedLogs[sourceSessionId].replay.lastRun));
+    }
+  };
+}
+
+test('a terminalized recovery failure never reclaims again on the next wake', async () => {
+  const harness = makeTerminalRecoveryHarness();
+
+  await harness.restoreReplayCheckpoints();
+  assert.equal(harness.storedRun().status, 'replay_failed');
+  assert.equal(harness.calls.localSets, 1);
+  assert.equal(harness.calls.warnings, 1);
+  assert.equal(harness.calls.clears, 1);
+  assert.equal(harness.calls.reclaims, 0);
+  assert.deepEqual(harness.calls.releaseAttempts, [
+    { agentId: 'agent-terminal-test', reason: 'replay_recovery_failed' }
+  ]);
+  assert.deepEqual(harness.calls.events, ['release', 'clear']);
+
+  await harness.restoreReplayCheckpoints();
+  assert.equal(harness.calls.localSets, 1, 'terminal retry must not rewrite the failure');
+  assert.equal(harness.calls.warnings, 1, 'terminal retry must not log another recovery failure');
+  assert.equal(harness.calls.clears, 1, 'the cleared checkpoint is absent on the next wake');
+  assert.equal(harness.calls.releaseAttempts.length, 1, 'ownership was released before the first clear');
+  assert.equal(harness.calls.reclaims, 0);
+});
+
+test('terminal replay recovery releases persisted ownership before deleting its snapshot', async () => {
+  const harness = makeTerminalRecoveryHarness({
+    initialStatus: 'replay_completed',
+    agentAlreadyReleased: true
+  });
+
+  await harness.restoreReplayCheckpoints();
+
+  assert.deepEqual(harness.calls.releaseAttempts, [
+    { agentId: 'agent-terminal-test', reason: 'replay_terminal' }
+  ]);
+  assert.deepEqual(harness.calls.events, ['release', 'clear']);
+  assert.equal(harness.calls.clears, 1);
+  assert.equal(harness.calls.reclaims, 0);
+  assert.equal(harness.calls.localSets, 0);
+});
+
+test('terminal replay recovery retains its snapshot until ownership release succeeds', async () => {
+  const harness = makeTerminalRecoveryHarness({
+    initialStatus: 'replay_failed',
+    failReleaseCount: 1
+  });
+
+  await harness.restoreReplayCheckpoints();
+  assert.equal(harness.calls.clears, 0);
+  assert.equal(harness.calls.reclaims, 0);
+  assert.deepEqual(harness.calls.events, ['release-failed']);
+
+  await harness.restoreReplayCheckpoints();
+  assert.equal(harness.calls.clears, 1);
+  assert.equal(harness.calls.reclaims, 0);
+  assert.equal(harness.calls.releaseAttempts.length, 2);
+  assert.deepEqual(harness.calls.events, ['release-failed', 'release', 'clear']);
+});
+
+test('terminal replay recovery retains its snapshot while the ownership registry is unavailable', async () => {
+  const harness = makeTerminalRecoveryHarness({
+    initialStatus: 'replay_stopped',
+    registryUnavailable: true
+  });
+
+  await harness.restoreReplayCheckpoints();
+
+  assert.equal(harness.calls.clears, 0);
+  assert.equal(harness.calls.reclaims, 0);
+  assert.deepEqual(harness.calls.releaseAttempts, []);
+  assert.deepEqual(harness.calls.events, []);
+});
+
+test('terminal replay recovery retains its snapshot when the registry refuses a live agent release', async () => {
+  const harness = makeTerminalRecoveryHarness({
+    initialStatus: 'replay_completed',
+    releaseRefused: true
+  });
+
+  await harness.restoreReplayCheckpoints();
+
+  assert.equal(harness.calls.clears, 0);
+  assert.equal(harness.calls.reclaims, 0);
+  assert.deepEqual(harness.calls.releaseAttempts, [
+    { agentId: 'agent-terminal-test', reason: 'replay_terminal' }
+  ]);
+  assert.deepEqual(harness.calls.events, ['release']);
+});
+
+test('a failed terminal persistence retains the recovery checkpoint for the next wake', async () => {
+  const harness = makeTerminalRecoveryHarness({ failLocalSet: true });
+
+  await harness.restoreReplayCheckpoints();
+  assert.equal(harness.storedRun().status, 'running');
+  assert.equal(harness.calls.localSets, 1);
+  assert.equal(harness.calls.warnings, 1);
+  assert.equal(harness.calls.clears, 0);
+  assert.equal(harness.calls.reclaims, 0);
+
+  await harness.restoreReplayCheckpoints();
+  assert.equal(harness.storedRun().status, 'running');
+  assert.equal(harness.calls.localSets, 2, 'the next wake retries terminal persistence');
+  assert.equal(harness.calls.warnings, 2, 'the retained checkpoint is retried on the next wake');
+  assert.equal(harness.calls.clears, 0, 'the checkpoint remains until terminal state is durable');
+  assert.equal(harness.calls.reclaims, 0, 'manifest failure occurs before tab reclaim');
+});
+
+function makeRegisteredRecoveryFailureHarness(options = {}) {
+  const replaySessionId = 'replay-registered-test';
+  const sourceSessionId = 'source-registered-test';
+  const clone = (value) => JSON.parse(JSON.stringify(value));
+  let storedLogs = {
+    [sourceSessionId]: {
+      replay: { lastRun: { id: replaySessionId, status: 'running', steps: [] } }
+    }
+  };
+  let builtSession = null;
+  let keepAliveRunning = false;
+  let agentPresent = true;
+  const activeSessions = new Map();
+  const calls = {
+    clears: 0,
+    cleanups: 0,
+    localSets: 0,
+    reclaims: 0,
+    releases: [],
+    starts: 0,
+    stops: 0,
+    warnings: 0
+  };
+  const snapshot = {
+    kind: 'survivability-snapshot',
+    capturedAt: '2026-08-10T00:00:00.000Z',
+    payload: JSON.stringify({
+      kind: 'fsb-lattice-replay-checkpoint/v1',
+      replaySessionId,
+      originalSessionId: sourceSessionId,
+      manifestHash: 'current-manifest-hash',
+      targetTabId: 101,
+      logicalTabs: [{ logicalTab: 'primary', tabId: 101, expectedOrigin: 'https://example.com' }],
+      approvedScopes: [],
+      nextStep: 0
+    })
+  };
+  const context = {
+    chrome: {
+      storage: {
+        session: { async get() { return { snapshot }; } },
+        local: {
+          async get() { return { fsbSessionLogs: clone(storedLogs) }; },
+          async set(value) {
+            calls.localSets++;
+            if (options.failLocalSet === true) throw new Error('local storage write failed');
+            storedLogs = clone(value.fsbSessionLogs);
+          }
+        }
+      }
+    },
+    FsbLatticeReplay: {},
+    activeSessions,
+    fsbAgentRegistryInstance: {
+      hasAgent(agentId) {
+        return agentId === 'agent-recovered' && agentPresent;
+      },
+      async releaseAgent(agentId, reason) {
+        calls.releases.push({ agentId, reason });
+        if (options.releaseThrows === true) throw new Error('registry persistence failed');
+        if (!agentPresent) return false;
+        agentPresent = false;
+        return true;
+      }
+    },
+    async prepareSessionReplay() {
+      return {
+        receiptCid: 'source-receipt',
+        replay: {
+          manifestHash: 'current-manifest-hash',
+          lastRun: clone(storedLogs[sourceSessionId].replay.lastRun)
+        },
+        steps: [{ id: 'step-1', index: 0, tool: 'click', replay: { risk: 'write' } }],
+        tabs: [{ id: 'primary', startUrl: 'https://example.com/start' }]
+      };
+    },
+    async fsbReplayReclaimOwnedTabs() {
+      calls.reclaims++;
+      return {
+        owned: {
+          tab: { id: 101, url: 'https://example.com/start' },
+          agentId: 'agent-recovered',
+          ownershipToken: 'ownership-token'
+        },
+        replayTabs: {
+          primary: {
+            logicalTab: 'primary',
+            tabId: 101,
+            expectedOrigin: 'https://example.com'
+          }
+        },
+        bootstrapLogicalTab: 'primary'
+      };
+    },
+    fsbReplayBuildSession(prepared, id, owned, _scopes, priorRun) {
+      builtSession = {
+        replaySessionId: id,
+        replayAgentId: owned.agentId,
+        status: 'replaying',
+        replayRun: priorRun,
+        replaySteps: prepared.steps,
+        currentStep: 0,
+        _latticeAdapter: {
+          async resume() { throw new Error('resume failed after registration'); }
+        }
+      };
+      return builtSession;
+    },
+    fsbReplayLogicalTab() { return 'primary'; },
+    fsbReplayOrigin() { return 'https://example.com'; },
+    async fsbReplayClearRecoverySnapshots(id) {
+      assert.equal(id, replaySessionId);
+      calls.clears++;
+    },
+    startKeepAlive() {
+      calls.starts++;
+      keepAliveRunning = true;
+    },
+    stopKeepAlive() {
+      calls.stops++;
+      keepAliveRunning = false;
+    },
+    async cleanupSession(id) {
+      calls.cleanups++;
+      if (options.cleanupThrows === true) throw new Error('cleanup failed');
+      activeSessions.delete(id);
+    },
+    async fsbReplayPauseForDecision() {},
+    async fsbReplayFinalize() {},
+    fsbReplayStartExecution() {},
+    automationLogger: { warn() { calls.warnings++; } }
+  };
+  vm.createContext(context);
+  vm.runInContext(
+    "const FSB_REPLAY_CHECKPOINT_KIND = 'fsb-lattice-replay-checkpoint/v1';\n" +
+      "const FSB_REPLAY_TERMINAL_STATUSES = new Set(['replay_completed', 'replay_failed', 'replay_stopped']);\n" +
+      'const FSB_REPLAY_LEGACY_TOOL_MAP = Object.freeze({});\n' +
+      declarationSource(background, 'fsbReplayReleaseAgentId') + '\n' +
+      declarationSource(background, 'fsbReplayReleaseAgent') + '\n' +
+      declarationSource(background, 'fsbReplayCleanupFailedRecovery') + '\n' +
+      declarationSource(background, 'fsbRestoreLatticeReplayCheckpoints') + '\n' +
+      'this.restoreReplayCheckpoints = fsbRestoreLatticeReplayCheckpoints;',
+    context,
+    { filename: 'extension/background.js' }
+  );
+
+  return {
+    activeSessions,
+    calls,
+    restoreReplayCheckpoints: context.restoreReplayCheckpoints,
+    builtSession() { return builtSession; },
+    isKeepAliveRunning() { return keepAliveRunning; },
+    storedRun() { return clone(storedLogs[sourceSessionId].replay.lastRun); }
+  };
+}
+
+test('post-registration recovery failure releases ownership despite cleanup errors', async () => {
+  const harness = makeRegisteredRecoveryFailureHarness({ cleanupThrows: true });
+
+  await harness.restoreReplayCheckpoints();
+  assert.equal(harness.builtSession().status, 'replay_failed');
+  assert.equal(harness.builtSession().replayRun.status, 'replay_failed');
+  assert.deepEqual(harness.calls.releases, [
+    { agentId: 'agent-recovered', reason: 'replay_terminal' }
+  ]);
+  assert.equal(harness.calls.cleanups, 1);
+  assert.equal(harness.activeSessions.size, 0, 'fallback removal must prevent a zombie session');
+  assert.equal(harness.isKeepAliveRunning(), false);
+  assert.equal(harness.calls.stops, 1);
+  assert.equal(harness.storedRun().status, 'replay_failed');
+  assert.equal(harness.calls.clears, 1);
+});
+
+test('post-registration persistence failure cleans runtime ownership but retains snapshot', async () => {
+  const harness = makeRegisteredRecoveryFailureHarness({ failLocalSet: true });
+
+  await harness.restoreReplayCheckpoints();
+  assert.equal(harness.builtSession().status, 'replay_failed');
+  assert.equal(harness.activeSessions.size, 0);
+  assert.equal(harness.isKeepAliveRunning(), false);
+  assert.deepEqual(harness.calls.releases, [
+    { agentId: 'agent-recovered', reason: 'replay_terminal' }
+  ]);
+  assert.equal(harness.storedRun().status, 'running');
+  assert.equal(harness.calls.localSets, 1);
+  assert.equal(harness.calls.clears, 0, 'non-durable terminal state must retain recovery data');
+});
+
+test('post-registration release persistence failure cleans runtime state but retains snapshot', async () => {
+  const harness = makeRegisteredRecoveryFailureHarness({ releaseThrows: true });
+
+  await harness.restoreReplayCheckpoints();
+  assert.equal(harness.builtSession().status, 'replay_failed');
+  assert.equal(harness.activeSessions.size, 0);
+  assert.equal(harness.isKeepAliveRunning(), false);
+  assert.deepEqual(harness.calls.releases, [
+    { agentId: 'agent-recovered', reason: 'replay_terminal' }
+  ]);
+  assert.equal(harness.storedRun().status, 'replay_failed');
+  assert.equal(harness.calls.clears, 0, 'ownership persistence failure must retain recovery data');
+});

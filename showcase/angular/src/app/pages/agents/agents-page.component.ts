@@ -236,12 +236,12 @@ export class AgentsPageComponent implements OnInit, OnDestroy {
             {
               '@type': 'HowToStep',
               name: $localize`:@@agents.schema.howTo.server.name:Configure the MCP server`,
-              text: $localize`:@@agents.schema.howTo.server.text:Use the FSB skill, ClawHub, or npx -y fsb-mcp-server install for a supported MCP host.`,
+              text: $localize`:@@agents.schema.howTo.server.text:Use the FSB skill, ClawHub, or npx -y fsb-mcp-server@latest install for a supported MCP host.`,
             },
             {
               '@type': 'HowToStep',
               name: $localize`:@@agents.schema.howTo.doctor.name:Run doctor verification`,
-              text: $localize`:@@agents.schema.howTo.doctor.text:Run npx -y fsb-mcp-server doctor and fix any failing package, bridge, extension, active-tab, content-script, or config layer.`,
+              text: $localize`:@@agents.schema.howTo.doctor.text:Run npx -y fsb-mcp-server@latest doctor and fix any failing package, bridge, extension, active-tab, content-script, or config layer.`,
             },
           ],
           isPartOf: { '@id': `${HOST}/agents#fsb-skill` },

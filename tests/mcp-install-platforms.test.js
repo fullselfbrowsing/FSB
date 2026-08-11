@@ -4,6 +4,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawn, spawnSync } = require('child_process');
+const { classifyDoctorLayer } = require('../mcp/build/diagnostics.js');
 
 let passed = 0;
 let failed = 0;
@@ -24,6 +25,7 @@ function assertEqual(actual, expected, msg) {
 
 const repoRoot = path.resolve(__dirname, '..');
 const cliPath = path.join(repoRoot, 'mcp', 'build', 'index.js');
+const PRODUCT_VERSION = require('../extension/manifest.json').version;
 const EXTENSION_ID = 'badgafnfchcihdfnjneklogedcdkmjfk';
 const DEVELOPMENT_EXTENSION_ID = 'abcdefghijklmnopabcdefghijklmnop';
 
@@ -90,8 +92,9 @@ function runProductionDoctor(fixture) {
     // The assertions below retain bounded stdout/stderr evidence on failure.
   }
   assertEqual(result.status, 1, 'production doctor preserves historical bridge-health exit semantics');
-  if (fixture.doctorLayer === undefined && snapshot) fixture.doctorLayer = snapshot.diagnosticLayer;
-  assert(snapshot && snapshot.diagnosticLayer === fixture.doctorLayer,
+  const bridgeSnapshot = snapshot ? { ...snapshot } : null;
+  if (bridgeSnapshot) delete bridgeSnapshot.nativeHost;
+  assert(snapshot && snapshot.diagnosticLayer === classifyDoctorLayer(bridgeSnapshot),
     'native-host facts do not change the historical doctor health layer');
   return snapshot;
 }
@@ -102,7 +105,7 @@ function startReadyHealthFixture(fixture) {
     "const fs = require('node:fs');",
     "const http = require('node:http');",
     'const readyPath = process.argv[1];',
-    'const body = JSON.stringify({ ok: true, service: \'fsb-mcp-server\', version: \'0.10.0\', nativeHostProtocol: 1, serveReady: true });',
+    `const body = JSON.stringify({ ok: true, service: 'fsb-mcp-server', version: '${PRODUCT_VERSION}', nativeHostProtocol: 1, serveReady: true });`,
     'const server = http.createServer((_request, response) => {',
     "  response.writeHead(200, { 'content-type': 'application/json' });",
     '  response.end(body);',
@@ -154,7 +157,7 @@ function run() {
 
     assertIncludes(
       output,
-      'claude mcp add --scope user fsb -- npx -y fsb-mcp-server',
+      'claude mcp add --scope user fsb -- npx -y fsb-mcp-server@latest',
       'dry-run locks Claude Code user-scope delegation',
     );
     assertIncludes(output, '"servers": {', 'dry-run shows VS Code top-level servers object');
@@ -231,7 +234,7 @@ function run() {
     assertIncludes(config, 'theme: dark', 'continue install preserves unrelated YAML keys');
     assertIncludes(config, 'name: existing', 'continue install preserves existing YAML server entries');
     assertIncludes(config, 'name: fsb', 'continue install appends the fsb YAML array entry');
-    assertIncludes(config, '- fsb-mcp-server', 'continue install writes the fsb command args');
+    assertIncludes(config, '- fsb-mcp-server@latest', 'continue install writes the latest-channel fsb command args');
   });
 
   console.log('\n--- windsurf app config path ---');

@@ -14,7 +14,7 @@ metadata:
     mcp_servers:
       fsb:
         command: "npx"
-        args: ["-y", "fsb-mcp-server"]
+        args: ["-y", "fsb-mcp-server@latest"]
 ---
 
 # FSB
@@ -36,7 +36,7 @@ FSB drives the user's real Chrome, so every action runs inside whatever sessions
 
 ## Doctor-first protocol
 
-If anything looks off (no page response, unexpected errors, stale state, missing tab) run `node scripts/doctor.mjs` (which wraps `npx -y fsb-mcp-server doctor`) BEFORE retrying the same call. Read the layered output, fix the failing layer, then resume. Do not loop on the same failing call hoping it self-heals.
+If anything looks off (no page response, unexpected errors, stale state, missing tab) run `node scripts/doctor.mjs` (which wraps `npx -y fsb-mcp-server@latest doctor`) BEFORE retrying the same call. Read the layered output, fix the failing layer, then resume. Do not loop on the same failing call hoping it self-heals.
 
 ## v0.9.62 visual-session contract
 

@@ -7,6 +7,7 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const background = fs.readFileSync(path.join(root, 'extension', 'background.js'), 'utf8');
 const sidepanel = fs.readFileSync(path.join(root, 'extension', 'ui', 'sidepanel.js'), 'utf8');
+const visualFeedback = fs.readFileSync(path.join(root, 'extension', 'content', 'visual-feedback.js'), 'utf8');
 const logger = fs.readFileSync(path.join(root, 'extension', 'utils', 'automation-logger.js'), 'utf8');
 const recorder = fs.readFileSync(path.join(root, 'extension', 'utils', 'mcp-session-recorder.js'), 'utf8');
 const replay = fs.readFileSync(path.join(root, 'extension', 'utils', 'lattice-replay.js'), 'utf8');
@@ -56,16 +57,33 @@ const ensureTargetTab = functionBody(background, 'fsbReplayEnsureTargetTab');
 const target = functionBody(background, 'fsbReplayAssertTarget');
 const dispatch = functionBody(background, 'fsbReplayDispatchStep');
 const execute = functionBody(background, 'executeReplaySequence');
+const buildTimeline = functionBody(background, 'fsbReplayBuildTimeline');
+const waitForPlayback = functionBody(background, 'fsbReplayWaitForPlayback');
+const broadcastReplayOverlay = functionBody(background, 'fsbReplayBroadcastOverlay');
+const finalizeReplay = functionBody(background, 'fsbReplayFinalize');
+const replayControl = functionBody(background, 'handleReplayControl');
+const renderReplayControls = functionBody(visualFeedback, '_renderReplayControls');
 const recovery = functionBody(background, 'fsbRestoreLatticeReplayCheckpoints');
+const failedRecoveryCleanup = functionBody(background, 'fsbReplayCleanupFailedRecovery');
 const reclaimTabs = functionBody(background, 'fsbReplayReclaimOwnedTabs');
+const clearRecoverySnapshots = functionBody(background, 'fsbReplayClearRecoverySnapshots');
+const releaseAgentId = functionBody(background, 'fsbReplayReleaseAgentId');
+const releaseRecoveredTerminalAgent = functionBody(background, 'fsbReplayReleaseRecoveredTerminalAgent');
 const checkpointState = functionBody(background, 'fsbReplayCheckpointState');
 const failedStart = functionBody(background, 'fsbReplayAbortFailedStart');
 const requestMcpReplay = functionBody(background, 'requestMcpSessionReplay');
+const mutateMcpApprovals = functionBody(background, 'fsbMutatePendingMcpReplayApprovals');
+const removeMcpApproval = functionBody(background, 'fsbRemovePendingMcpReplayApproval');
+const approveMcpReplay = functionBody(background, 'fsbApprovePendingMcpReplay');
 const startReplayUi = functionBody(sidepanel, 'startReplay');
 const renderMcpApproval = functionBody(sidepanel, 'renderMcpReplayApproval');
 const approveReplayCase = background.slice(
   background.indexOf("case 'approveMcpReplay':"),
   background.indexOf("case 'cancelMcpReplay':")
+);
+const cancelReplayCase = background.slice(
+  background.indexOf("case 'cancelMcpReplay':"),
+  background.indexOf("case 'replaySession':")
 );
 const replayData = logger.slice(
   logger.indexOf('async getReplayData('),
@@ -83,12 +101,16 @@ check('execution and recovery decisions require an extension-page sender',
 check('start verifies the preview hash before creating anything',
   start.indexOf('prepareSessionReplay') < start.indexOf('fsbReplayCreateOwnedTab') &&
   start.includes('request.manifestHash !== prepared.replay.manifestHash'));
+check('replay startup is synchronously single-flight across concurrent UI approvals',
+  start.includes('if (fsbReplayStartPending)') &&
+  start.indexOf('fsbReplayStartPending = true') < start.indexOf('prepareSessionReplay') &&
+  start.includes('finally') && start.includes('fsbReplayStartPending = false'));
 check('bootstrap opens the first executable logical tab under its own mapping',
   start.includes('fsbReplayBootstrapTab(prepared)') &&
   start.includes('fsbReplayCreateOwnedTab(bootstrapTab.startUrl)') &&
   bootstrapTab.includes('fsbReplayIsExecutable(step)') &&
   bootstrapTab.includes('fsbReplayLogicalTab(step)') &&
-  background.includes('replayTabs: { [bootstrapLogicalTab]: bootstrapState }'));
+  background.includes('replayTabs: bootstrapState ? { [bootstrapLogicalTab]: bootstrapState } : {}'));
 check('replay never selects or targets the previously active tab',
   !start.includes('chrome.tabs.query') && !start.includes('activeTab'));
 check('replay creates a fresh active recorded-site tab and binds ownership',
@@ -120,6 +142,39 @@ check('Lattice permission verdict runs before every replay classification branch
   execute.indexOf('authorizeReplayStep') < execute.indexOf('fsbReplayDispatchStep'));
 check('blocked and redacted calls remain inspectable instead of executing',
   execute.includes("'blocked'") && execute.includes('!fsbReplayIsExecutable(step)'));
+check('replay timing follows recorded timestamps with bounded gaps and an overlay lead-in',
+  buildTimeline.includes('current.timestamp - previous.timestamp') &&
+  buildTimeline.includes('FSB_REPLAY_MAX_RECORDED_GAP_MS') &&
+  buildTimeline.includes('FSB_REPLAY_LEAD_IN_MS') &&
+  execute.includes('fsbReplayWaitForPlayback(session, step, i)'));
+check('playback waits are interruptible for pause, speed changes, and safe forward seeking',
+  waitForPlayback.includes('playback.paused === true') &&
+  waitForPlayback.includes('fsbReplayWaitForWake') &&
+  waitForPlayback.includes('fsbReplayNormalizeSpeed(playback.speed)') &&
+  replayControl.includes("command === 'pause'") &&
+  replayControl.includes("command === 'play'") &&
+  replayControl.includes("command === 'setSpeed'") &&
+  replayControl.includes("command === 'seek'") &&
+  replayControl.includes('can only seek forward'));
+check('replay uses the regular FSB page overlay on every owned replay tab',
+  broadcastReplayOverlay.includes('sendSessionStatus(tabId, statusData)') &&
+  broadcastReplayOverlay.includes("clientLabel: 'Replay'") &&
+  broadcastReplayOverlay.includes('stoppable: !terminal') &&
+  background.includes("case 'controlReplay':"));
+check('terminal replay overlay delivery completes before resource cleanup preserves its final display',
+  finalizeReplay.includes('await fsbReplayBroadcastOverlay(') &&
+  finalizeReplay.includes("cleanupSession(session.replaySessionId, { preserveFinalOverlay: true })") &&
+  background.includes('if (!options.preserveFinalOverlay)') &&
+  !failedStart.includes('preserveFinalOverlay') &&
+  !failedRecoveryCleanup.includes('preserveFinalOverlay'));
+check('the in-page replay player exposes play pause forward scrub and four speeds',
+  visualFeedback.includes('class="fsb-replay-player"') &&
+  visualFeedback.includes('class="fsb-replay-scrubber"') &&
+  visualFeedback.includes('<option value="0.5">0.5x</option>') &&
+  visualFeedback.includes('<option value="4">4x</option>') &&
+  renderReplayControls.includes("replay.status === 'paused'") &&
+  visualFeedback.includes("command: 'seek'") &&
+  visualFeedback.includes("command: 'setSpeed'"));
 check('survivability persists before dispatch and after each step',
   execute.includes("fsbReplayPersistCheckpoint(session, 'BEFORE_TOOL_EXECUTION', step)") &&
   execute.includes("fsbReplayPersistCheckpoint(session, 'BEFORE_NEXT_ITERATION_SCHEDULE', step)"));
@@ -127,13 +182,20 @@ check('survivability snapshots contain stable recovery data but no ownership sec
   checkpointState.includes('manifestHash: session.manifestHash') &&
   checkpointState.includes('approvedScopes: session.approvedScopes.slice()') &&
   checkpointState.includes('logicalTabs: Object.values(session.replayTabs || {})') &&
+  checkpointState.includes('tab.closed !== true') &&
+  checkpointState.includes('playback: fsbReplayPlaybackSnapshot(session)') &&
   checkpointState.includes('_currentStepName: marker') &&
   !checkpointState.includes('ownershipToken'));
 check('recovery reclaims every surviving logical tab under one replay agent',
-  recovery.includes('fsbReplayReclaimOwnedTabs(state)') &&
+  recovery.includes('fsbReplayReclaimOwnedTabs(state,') &&
   reclaimTabs.includes('for (const item of recorded)') &&
+  reclaimTabs.includes('Array.isArray(state.logicalTabs)') &&
+  !reclaimTabs.includes('state.logicalTabs.length > 0') &&
   reclaimTabs.indexOf('eligibleTabs.push') < reclaimTabs.indexOf('fsbReplayReclaimOwnedTab') &&
   reclaimTabs.includes('replayTabs[logicalTab]') &&
+  reclaimTabs.includes('allowMissingCloseLogicalTab') &&
+  reclaimTabs.includes('closed: true') &&
+  reclaimTabs.includes('tab: null') &&
   reclaimTabs.includes('tab.id === state.targetTabId') &&
   reclaimTabs.includes('bootstrapLogicalTab') &&
   reclaimTabs.includes("releaseAgent(failedAgentId, 'replay_recovery_failed')") &&
@@ -142,6 +204,39 @@ check('mid-write recovery pauses for explicit Retry Skip Stop',
   recovery.includes("resumePolicy === 'ON_ERROR_SW_EVICTION_MID_TOOL_DISPATCH'") &&
   recovery.includes('fsbReplayPauseForDecision') &&
   sidepanel.includes("['retry', 'skip', 'stop']"));
+check('a recovered missing close target retries as an idempotent no-op',
+  target.includes("normalizedTool === 'close_tab'") && target.includes('tabState.closed === true') &&
+  dispatch.includes("normalizedTool === 'close_tab'") && dispatch.includes('alreadyClosed: true'));
+check('terminal replay checkpoints release ownership and clear before any reclaim retry',
+  recovery.includes('FSB_REPLAY_TERMINAL_STATUSES.has(persistedRun.status)') &&
+  recovery.indexOf('FSB_REPLAY_TERMINAL_STATUSES.has') < recovery.indexOf('fsbReplayReclaimOwnedTabs') &&
+  recovery.indexOf('fsbReplayReleaseRecoveredTerminalAgent(state.replayAgentId)') <
+    recovery.indexOf('fsbReplayClearRecoverySnapshots(state.replaySessionId)') &&
+  releaseRecoveredTerminalAgent.includes("fsbReplayReleaseAgentId(agentId, 'replay_terminal')") &&
+  releaseAgentId.includes('registry.releaseAgent(agentId, reason)') &&
+  releaseAgentId.includes('registry.hasAgent(agentId)') &&
+  releaseAgentId.includes('return false') &&
+  recovery.includes('fsbReplayClearRecoverySnapshots(state.replaySessionId)') &&
+  clearRecoverySnapshots.includes('createFsbLatticeRuntimeAdapter') &&
+  clearRecoverySnapshots.includes('clearSnapshots'));
+check('failed recovery always releases runtime ownership and removes its registered session',
+  recovery.includes('let reclaimedOwned = null') &&
+  recovery.includes('let recoveredSession = null') &&
+  recovery.includes('fsbReplayCleanupFailedRecovery(') &&
+  failedRecoveryCleanup.includes("session.status = 'replay_failed'") &&
+  failedRecoveryCleanup.includes('checkpointAgentId') &&
+  failedRecoveryCleanup.includes('fsbReplayReleaseAgentId(') &&
+  failedRecoveryCleanup.includes('return ownershipReleased') &&
+  failedRecoveryCleanup.includes('cleanupSession(replaySessionId)') &&
+  failedRecoveryCleanup.includes('activeSessions.delete(replaySessionId)') &&
+  failedRecoveryCleanup.includes('stopKeepAlive()') &&
+  recovery.indexOf('fsbReplayCleanupFailedRecovery(') <
+    recovery.lastIndexOf('fsbReplayClearRecoverySnapshots(state.replaySessionId)'));
+check('terminal cleanup only clears durable snapshots after ownership release',
+  finalizeReplay.includes('terminalPersisted && ownershipReleased') &&
+  finalizeReplay.indexOf('fsbReplayReleaseAgent(session)') < finalizeReplay.indexOf('clearSnapshots()') &&
+  failedStart.includes('terminalPersisted && ownershipReleased') &&
+  failedStart.indexOf("fsbReplayReleaseAgent(session, 'replay_start_failed')") < failedStart.indexOf('clearSnapshots()'));
 check('live receipts chain and persist drift comparison',
   background.includes('sourceReceiptCid: session.sourceReceiptCid') &&
   background.includes('previousReceiptCid: session.previousReceiptCid') &&
@@ -168,7 +263,15 @@ check('history replay uses one exact-manifest confirmation for all approved scop
 check('MCP replay requests never ask the user to open pages and coalesce duplicate approvals',
   observability.includes('never ask the user to open target pages manually') &&
   requestMcpReplay.includes('Target pages will open automatically after approval') &&
-  requestMcpReplay.includes('const existing = pending.find'));
+  requestMcpReplay.includes('fsbMutatePendingMcpReplayApprovals') &&
+  requestMcpReplay.includes('const existing = approvals.find'));
+check('MCP replay approval mutations serialize fresh storage read-modify-write cycles',
+  mutateMcpApprovals.includes('fsbPendingMcpReplayApprovalTail.then(run, run)') &&
+  mutateMcpApprovals.includes('chrome.storage.session.get(FSB_PENDING_MCP_REPLAY_KEY)') &&
+  mutateMcpApprovals.includes('item.expiresAt > now') &&
+  mutateMcpApprovals.includes('fsbWritePendingMcpReplayApprovals(approvals)') &&
+  removeMcpApproval.includes('fsbMutatePendingMcpReplayApprovals') &&
+  cancelReplayCase.includes('fsbRemovePendingMcpReplayApproval(request.requestId)'));
 check('MCP replay is gated by a persistent side-panel approval card',
   background.includes("case 'getPendingMcpReplayApprovals':") &&
   background.includes("case 'approveMcpReplay':") &&
@@ -178,14 +281,16 @@ check('MCP replay is gated by a persistent side-panel approval card',
   dispatcher.includes("'mcp:replay-session'") &&
   dispatcher.includes('requestMcpSessionReplay(payload.sessionId)'));
 check('a failed replay start keeps its exact approval request retryable',
-  approveReplayCase.indexOf('handleReplaySession') < approveReplayCase.indexOf('replayResponse.success === true') &&
-  approveReplayCase.indexOf('replayResponse.success === true') < approveReplayCase.indexOf('fsbWritePendingMcpReplayApprovals'));
+  approveReplayCase.includes('fsbApprovePendingMcpReplay(request, sender)') &&
+  approveMcpReplay.indexOf('handleReplaySession') < approveMcpReplay.indexOf('replayResponse.success === true') &&
+  approveMcpReplay.indexOf('replayResponse.success === true') < approveMcpReplay.indexOf('fsbRemovePendingMcpReplayApproval') &&
+  !approveMcpReplay.includes('fsbWritePendingMcpReplayApprovals'));
 check('paused recovery remains actionable after the side panel is reopened',
   background.includes('pendingDecision: pausedStep ?') &&
   sidepanel.includes('if (preview.pendingDecision)') &&
   sidepanel.includes('renderReplayDecisionPrompt(preview.pendingDecision)'));
 check('failed replay startup releases ownership and removes only its fresh tab',
-  failedStart.includes("releaseAgent(owned.agentId, 'replay_start_failed')") &&
+  failedStart.includes("fsbReplayReleaseAgentId(owned.agentId, 'replay_start_failed')") &&
   failedStart.includes('chrome.tabs.remove(owned.tab.id)'));
 check('replaying and paused sessions remain live to the side-panel liveness probe',
   background.includes("['running', 'replaying', 'replay_paused'].includes(session.status)"));

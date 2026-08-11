@@ -269,7 +269,7 @@ function runPart3() {
       'tabId', 'sessionId',
       '_tabRunningMap', '_activeTabIdSnapshot', 'currentSessionId', 'isRunning', 'livenessFailCount', 'livenessInterval',
       'sendBtn', 'stopBtn', 'statusDot', 'statusText', 'chatInput',
-      'updateSendButtonState', '_syncDelegationStopControls', '_delegationUiState',
+      'updateSendButtonState', '_setHeaderStatus', '_syncDelegationStopControls', '_delegationUiState',
       'checkSessionLiveness', 'clearInterval', 'setInterval',
       '_getTabRunningEntry',
       // Return a tuple of mutated locals so the test can inspect them.
@@ -288,7 +288,10 @@ function runPart3() {
       sandboxState.livenessFailCount, sandboxState.livenessInterval,
       sandboxState.sendBtn, sandboxState.stopBtn, sandboxState.statusDot,
       sandboxState.statusText, sandboxState.chatInput,
-      sandboxState.updateSendButtonState, sandboxState._syncDelegationStopControls,
+      sandboxState.updateSendButtonState, function (label, tone) {
+        sandboxState.statusText.textContent = label;
+        sandboxState.statusDot.tone = tone;
+      }, sandboxState._syncDelegationStopControls,
       sandboxState._delegationUiState, sandboxState.checkSessionLiveness,
       sandboxState.clearInterval, sandboxState.setInterval,
       _getTabRunningEntry
@@ -329,7 +332,7 @@ function runPart3() {
       'tabId',
       '_tabRunningMap', '_activeTabIdSnapshot', 'currentSessionId', 'isRunning',
       'livenessFailCount', 'livenessInterval', 'currentStatusMessage', 'currentActionGroup',
-      'sendBtn', 'stopBtn', 'statusDot', 'statusText', 'updateSendButtonState', 'clearInterval',
+      'sendBtn', 'stopBtn', 'statusDot', 'statusText', 'updateSendButtonState', '_setHeaderStatus', 'clearInterval',
       '_getTabRunningEntry',
       // QT-uof-5 (B-FIX) -- setIdleState now calls _clearTabStatusIntent to
       // drop the per-tab (currentStatusMessage, currentActionGroup) mirror
@@ -352,7 +355,10 @@ function runPart3() {
       sandboxState.livenessFailCount, sandboxState.livenessInterval,
       null, null,
       sandboxState.sendBtn, sandboxState.stopBtn, sandboxState.statusDot,
-      sandboxState.statusText, sandboxState.updateSendButtonState, sandboxState.clearInterval,
+      sandboxState.statusText, sandboxState.updateSendButtonState, function (label, tone) {
+        sandboxState.statusText.textContent = label;
+        sandboxState.statusDot.tone = tone;
+      }, sandboxState.clearInterval,
       _getTabRunningEntry,
       _clearTabStatusIntent
     );

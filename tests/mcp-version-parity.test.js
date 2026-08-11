@@ -23,8 +23,6 @@ function assertEqual(actual, expected, msg) {
 }
 
 const repoRoot = path.resolve(__dirname, '..');
-const expectedReleaseVersion = '0.11.0';
-const canonicalVersion = expectedReleaseVersion;
 const prePhase57MessageTypes = [
   'mcp:start-automation', 'mcp:stop-automation', 'mcp:get-status',
   'mcp:get-task-snapshot', 'mcp:trigger', 'mcp:stop-trigger',
@@ -233,10 +231,13 @@ async function run() {
   const packageReadme = readText('mcp/README.md');
   const packageChangelog = readText('mcp/CHANGELOG.md');
   const publishWorkflow = readText('.github/workflows/npm-publish.yml');
+  const extensionWorkflow = readText('.github/workflows/chrome-extension.yml');
   const rootReadme = readText('README.md');
   const typesSource = readText('mcp/src/types.ts');
   const dispatcherSource = readText('extension/ws/mcp-tool-dispatcher.js');
   const manifest = readJson('extension/manifest.json');
+  const extensionVersion = manifest.version;
+  const canonicalVersion = packageJson.version;
   const backgroundSource = readText('extension/background.js');
   const bridgeSource = readText('extension/ws/mcp-bridge-client.js');
   const delegationUiSpec = readText('.planning/phases/61-delegation-ux-sw-eviction-persistence/61-UI-SPEC.md');
@@ -280,7 +281,7 @@ async function run() {
   ];
 
   console.log('\n--- metadata parity ---');
-  assertEqual(canonicalVersion, expectedReleaseVersion, 'mcp/package.json advances to the intended release version');
+  assertEqual(rootPackageJson.version, extensionVersion, 'root package version matches the canonical extension manifest');
   assertEqual(packageLock.version, canonicalVersion, 'mcp/package-lock.json top-level version matches canonical package version');
   assertEqual(packageLock.packages[''].version, canonicalVersion, 'mcp/package-lock.json root package version matches canonical package version');
   assertEqual(extractRuntimeVersion(versionSource), canonicalVersion, 'FSB_MCP_VERSION matches canonical package version');
@@ -294,14 +295,22 @@ async function run() {
   assert(packageReadme.includes(`### What's New In v${canonicalVersion}`), 'MCP README has a current release summary');
   assert(packageReadme.includes(`### Releasing ${canonicalVersion}`), 'MCP README release instructions match canonical package version');
   assert(packageReadme.includes(`git tag mcp-v${canonicalVersion} && git push origin mcp-v${canonicalVersion}`), 'MCP README uses the MCP-only release tag');
-  assert(!packageReadme.includes(`git tag v${canonicalVersion}`), 'MCP README does not use a repository milestone tag for npm publishing');
-  assert(packageReadme.includes('requires FSB extension 0.9.91 or newer'), 'MCP README documents extension compatibility for task-status');
-  assert(publishWorkflow.includes("- 'mcp-v*'"), 'npm publish workflow is restricted to MCP release tags');
+  assert(packageReadme.includes(`MCP ${canonicalVersion} requires extension ${extensionVersion} or newer`), 'MCP README documents independent compatibility requirements');
+  assert(publishWorkflow.includes("- 'mcp-v*'"), 'MCP release workflow is restricted to MCP tags');
+  assert(publishWorkflow.includes('test "$GITHUB_REF_NAME" = "mcp-v${{ steps.package-version.outputs.version }}"'), 'MCP workflow binds the tag to mcp/package.json');
+  assert(publishWorkflow.includes('git merge-base --is-ancestor "$release_commit" origin/main'), 'release workflow requires the tagged commit to be on main');
+  assert(publishWorkflow.includes('--access public --tag latest'), 'MCP release workflow moves npm latest to the MCP version');
+  assert(!publishWorkflow.includes("- 'extension-v*'") && !/^\s+- 'v\*'$/mu.test(publishWorkflow), 'MCP workflow has no extension or shared tag trigger');
+  assert(extensionWorkflow.includes("- 'extension-v*'"), 'extension workflow owns the extension release tag');
+  assert(extensionWorkflow.includes('test "$GITHUB_REF_NAME" = "extension-v${{ steps.extension-version.outputs.version }}"'), 'extension workflow binds its tag to extension/manifest.json');
+  assert(!extensionWorkflow.includes("- 'mcp-v*'") && !/^\s+- 'v\*'$/mu.test(extensionWorkflow), 'extension workflow has no MCP or shared tag trigger');
   const currentProductRelease = rootChangelog
     .split(/^## /m)
-    .find(section => section.startsWith('v0.9.91 '));
-  assert(currentProductRelease && currentProductRelease.includes(`fsb-mcp-server\` advances to \`${canonicalVersion}`),
-    'current product changelog names the independently versioned MCP release');
+    .find(section => section.startsWith(`v${extensionVersion} `));
+  assert(currentProductRelease
+      && currentProductRelease.includes(`align at \`${extensionVersion}\``)
+      && currentProductRelease.includes(`advances to \`${canonicalVersion}\``),
+    'current product changelog documents the independent extension and MCP releases');
   for (const [name, content] of [
     ['LLM summary source', llmsSource],
     ['LLM full source', llmsFullSource],

@@ -178,7 +178,7 @@ When a `<code>` element wraps a CLI command, mark `translate="no"` directly on
 the `<code>` element:
 
 ```html
-<pre><code translate="no">npx -y fsb-mcp-server install --claude-code</code></pre>
+<pre><code translate="no">npx -y fsb-mcp-server@latest install --claude-code</code></pre>
 ```
 
 ## How this file is used

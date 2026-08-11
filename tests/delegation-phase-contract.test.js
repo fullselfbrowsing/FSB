@@ -1469,7 +1469,7 @@ function runPhase63FinalContract() {
     'Automatic connection needs the native helper',
     'Install or update the FSB native helper, then try this message again. FSB will connect this browser automatically.',
     'Copy install command',
-    'fsb-mcp-server doctor',
+    'npx -y fsb-mcp-server@latest doctor',
   ]) {
     check(sidepanel63.includes(copy), `UI source retains exact copy: ${copy}`);
   }

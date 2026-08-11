@@ -84,7 +84,7 @@ function testInstallCommandHelper() {
     installCommandHelper.buildInstallCommand(extensionId, {
       userAgentData: { brands: [{ brand: 'Microsoft Edge' }] },
     }),
-    'npx -y fsb-mcp-server install --native-host --browser edge'
+    'npx -y fsb-mcp-server@latest install --native-host --browser edge'
       + ' --extension-id abcdefghijklmnopabcdefghijklmnop',
   );
   for (const invalidId of [
@@ -788,12 +788,12 @@ function testBackgroundAndUiContracts() {
     {},
     'abcdefghijklmnopabcdefghijklmnop',
   );
-  assert.match(mismatchMessage, /npx -y fsb-mcp-server pair --reset/);
+  assert.match(mismatchMessage, /npx -y fsb-mcp-server@latest pair --reset/);
   assert.match(mismatchMessage, /Then try again so FSB can pair this extension automatically\./);
   assert.doesNotMatch(mismatchMessage, /install --native-host|reinstall/i);
   assert.doesNotMatch(
     backgroundFailureMessage('native_host_missing', {}, 'invalid'),
-    /npx -y fsb-mcp-server/,
+    /npx -y fsb-mcp-server@latest/,
     'an invalid runtime id never reaches a shell command',
   );
 

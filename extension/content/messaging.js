@@ -9,6 +9,16 @@
   // Local aliases for cross-module dependencies
   const getClassName = FSB.getClassName;
 
+  function fsbShouldReplaceFinalOverlay(previousOverlayState, overlayState) {
+    if (previousOverlayState?.lifecycle !== 'final' ||
+        !overlayState || overlayState.lifecycle === 'cleared') return false;
+    if (overlayState.lifecycle === 'running') return true;
+    const previousSessionToken = previousOverlayState.sessionToken || null;
+    const nextSessionToken = overlayState.sessionToken || null;
+    return Boolean(previousSessionToken || nextSessionToken) &&
+      previousSessionToken !== nextSessionToken;
+  }
+
   // ============================================================================
   // IFRAME SUPPORT - Detect if running in iframe and manage cross-frame comms
   // ============================================================================
@@ -1146,6 +1156,12 @@
           if (!overlayState || !shouldApply) {
             sendResponse({ success: true, ignored: true });
             break;
+          }
+
+          const previousOverlayState = FSB.overlayState;
+          const replacesFinalSession = fsbShouldReplaceFinalOverlay(previousOverlayState, overlayState);
+          if (replacesFinalSession) {
+            FSB.progressOverlay.destroy();
           }
 
           FSB.overlayState = overlayState;
