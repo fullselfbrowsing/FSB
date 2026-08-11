@@ -3736,31 +3736,32 @@ class PageLoadWatcher {
    */
   waitForTabComplete(tabId, timeout) {
     return new Promise((resolve, reject) => {
-      const timeoutId = setTimeout(() => {
+      let settled = false;
+      let timeoutId = null;
+
+      const finish = (error) => {
+        if (settled) return;
+        settled = true;
+        if (timeoutId !== null) clearTimeout(timeoutId);
         chrome.tabs.onUpdated.removeListener(listener);
-        reject(new Error('Tab load timeout'));
-      }, timeout);
+        if (error) reject(error);
+        else resolve();
+      };
 
       const listener = (updatedTabId, changeInfo) => {
         if (updatedTabId === tabId && changeInfo.status === 'complete') {
-          clearTimeout(timeoutId);
-          chrome.tabs.onUpdated.removeListener(listener);
-          resolve();
+          finish();
         }
       };
 
-      // Check if already complete
+      // Arm the listener before reading status so a completion transition cannot
+      // occur between the initial read and listener registration.
+      chrome.tabs.onUpdated.addListener(listener);
+      timeoutId = setTimeout(() => finish(new Error('Tab load timeout')), timeout);
+
       chrome.tabs.get(tabId).then(tab => {
-        if (tab.status === 'complete') {
-          clearTimeout(timeoutId);
-          resolve();
-        } else {
-          chrome.tabs.onUpdated.addListener(listener);
-        }
-      }).catch(err => {
-        clearTimeout(timeoutId);
-        reject(err);
-      });
+        if (tab.status === 'complete') finish();
+      }).catch(finish);
     });
   }
 
@@ -4680,6 +4681,15 @@ setInterval(async () => {
           automationLogger.warn('Stale cleanup: tab gone but session still running, skipping', { sessionId, tabId: session.tabId });
           continue;
         }
+        const closedTabId = session.tabId;
+        if (fsbReplayHandleClosedTab(session, closedTabId)) {
+          automationLogger.warn('Stale cleanup: replay tab gone, keeping replay session active', {
+            sessionId,
+            tabId: closedTabId,
+            replacementTabId: session.tabId
+          });
+          continue;
+        }
         automationLogger.info('Removing session for closed tab', { sessionId, tabId: session.tabId });
         activeSessions.delete(sessionId);
         sessionAIInstances.delete(sessionId);
@@ -4840,6 +4850,7 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 
   // Clean up any active sessions for this tab
   for (const [sessionId, session] of activeSessions) {
+    if (fsbReplayHandleClosedTab(session, tabId)) continue;
     if (session.tabId === tabId) {
       // LIFE-02 (D-02): Notify sidepanel BEFORE removing the session
       try {
@@ -7737,12 +7748,8 @@ async function handlePrepareSessionReplay(request, sender, sendResponse) {
 
 async function fsbReplayWaitForTab(tabId) {
   if (typeof pageLoadWatcher !== 'undefined' && pageLoadWatcher &&
-      typeof pageLoadWatcher.waitForPageReady === 'function') {
-    const ready = await pageLoadWatcher.waitForPageReady(tabId, {
-      maxWait: FSB_REPLAY_TAB_LOAD_TIMEOUT_MS,
-      requireDOMStable: false
-    });
-    if (!ready || ready.success === false) throw new Error(ready?.error || 'Replay tab did not become ready');
+      typeof pageLoadWatcher.waitForTabComplete === 'function') {
+    await pageLoadWatcher.waitForTabComplete(tabId, FSB_REPLAY_TAB_LOAD_TIMEOUT_MS);
   } else {
     const deadline = Date.now() + FSB_REPLAY_TAB_LOAD_TIMEOUT_MS;
     let ready = false;
@@ -7756,7 +7763,10 @@ async function fsbReplayWaitForTab(tabId) {
     }
     if (!ready) throw new Error('Replay tab did not finish loading');
   }
-  await ensureContentScriptInjected(tabId);
+  const injected = await ensureContentScriptInjected(tabId);
+  if (injected !== true) {
+    throw new Error('Replay tab content script did not become ready');
+  }
 }
 
 async function fsbReplayCreateOwnedTab(startUrl) {
@@ -8083,6 +8093,30 @@ function fsbReplayOverlayTabIds(session) {
   return Array.from(ids);
 }
 
+function fsbReplayHandleClosedTab(session, tabId) {
+  if (session?.isReplay !== true || !Number.isFinite(tabId)) return false;
+  const replayTabs = Object.values(session.replayTabs || {});
+  let matched = session.tabId === tabId;
+  replayTabs.forEach((tab) => {
+    if (!tab || tab.tabId !== tabId) return;
+    tab.closed = true;
+    tab.ownershipToken = null;
+    matched = true;
+  });
+  if (!matched) return false;
+
+  const currentPrimary = session.tabId !== tabId
+    ? replayTabs.find((tab) => tab && tab.closed !== true && tab.tabId === session.tabId)
+    : null;
+  const replacement = currentPrimary || replayTabs.find((tab) => (
+    tab && tab.closed !== true && Number.isFinite(tab.tabId) && tab.tabId !== tabId
+  )) || null;
+  session.tabId = replacement?.tabId ?? null;
+  session.expectedOrigin = replacement?.expectedOrigin ?? null;
+  session.ownershipToken = replacement?.ownershipToken ?? null;
+  return true;
+}
+
 function fsbReplayPlaybackStatus(session) {
   if (session?.status === 'replay_paused') return 'decision';
   return session?.playback?.paused === true ? 'paused' : 'playing';
@@ -8115,12 +8149,11 @@ async function fsbReplayBroadcastOverlay(session, step, index, label, finalState
       percent: terminal?.result === 'success' ? 100 : progressPercent,
       label: terminal
         ? (terminal.result === 'success' ? 'Done' : (terminal.status === 'stopped' ? 'Stopped' : 'Error'))
-        : `Step ${currentStep}/${session.totalSteps}`
+        : ''
     },
     animatedHighlights: !terminal && playbackStatus === 'playing',
-    stoppable: !terminal,
+    stoppable: false,
     clientLabel: 'Replay',
-    agentId: session.replayAgentId,
     replay: {
       sessionId: session.replaySessionId,
       status: playbackStatus,
@@ -8398,6 +8431,7 @@ async function executeReplaySequence(replaySessionId) {
     const normalizedTool = FSB_REPLAY_LEGACY_TOOL_MAP[step.tool] || step.tool;
     const logicalTab = fsbReplayLogicalTab(step);
     if (normalizedTool === 'close_tab') {
+      fsbReplayHandleClosedTab(session, target.tabState.tabId);
       delete session.replayTabs[logicalTab];
     } else {
       try {

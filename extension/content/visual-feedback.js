@@ -252,8 +252,6 @@
       this._lastVisiblePercent = 0;      // monotonic clamp floor
       this._lastActionCount = null;      // last written actionCount (batching gate)
       this._logBuffer = [];              // rolling scrollback of previously-flushed detail strings, capped at 3
-      this._replayState = null;
-      this._replayScrubbing = false;
     }
 
     /**
@@ -499,79 +497,6 @@
 
       .fsb-stop.hidden {
         display: none;
-      }
-
-      .fsb-replay-player {
-        display: none;
-        grid-template-columns: 28px minmax(0, 1fr) auto;
-        align-items: center;
-        gap: 8px;
-        margin-top: 10px;
-        padding-top: 10px;
-        border-top: 1px solid rgba(255, 255, 255, 0.1);
-        pointer-events: auto;
-      }
-
-      .fsb-overlay.replay .fsb-replay-player {
-        display: grid;
-      }
-
-      .fsb-replay-toggle {
-        width: 28px;
-        height: 28px;
-        border: 1px solid rgba(255, 140, 0, 0.42);
-        border-radius: 50%;
-        background: rgba(255, 140, 0, 0.14);
-        color: #FF9F2E;
-        cursor: pointer;
-        font-size: 12px;
-        line-height: 1;
-      }
-
-      .fsb-replay-toggle:hover:not(:disabled) {
-        background: rgba(255, 140, 0, 0.24);
-      }
-
-      .fsb-replay-toggle:disabled,
-      .fsb-replay-speed:disabled {
-        cursor: default;
-        opacity: 0.45;
-      }
-
-      .fsb-replay-track {
-        min-width: 0;
-      }
-
-      .fsb-replay-time {
-        display: block;
-        margin-bottom: 4px;
-        color: rgba(255, 255, 255, 0.58);
-        font-size: 10px;
-        font-variant-numeric: tabular-nums;
-      }
-
-      .fsb-replay-scrubber {
-        display: block;
-        width: 100%;
-        height: 14px;
-        accent-color: #FF8C00;
-        cursor: ew-resize;
-      }
-
-      .fsb-replay-scrubber:disabled {
-        cursor: default;
-        opacity: 0.45;
-      }
-
-      .fsb-replay-speed {
-        height: 28px;
-        border: 1px solid rgba(255, 255, 255, 0.16);
-        border-radius: 7px;
-        background: rgba(255, 255, 255, 0.07);
-        color: rgba(255, 255, 255, 0.9);
-        padding: 0 6px;
-        cursor: pointer;
-        font-size: 10px;
       }
 
       .fsb-task {
@@ -862,19 +787,6 @@
       <div class="fsb-progress-bar">
         <div class="fsb-progress-fill"></div>
       </div>
-      <div class="fsb-replay-player">
-        <button type="button" class="fsb-replay-toggle" aria-label="Pause replay">&#10074;&#10074;</button>
-        <div class="fsb-replay-track">
-          <span class="fsb-replay-time">0:00 / 0:00</span>
-          <input class="fsb-replay-scrubber" type="range" min="0" max="1" value="0" step="100" aria-label="Replay position, forward seek only" title="Seek forward through the replay">
-        </div>
-        <select class="fsb-replay-speed" aria-label="Replay speed">
-          <option value="0.5">0.5x</option>
-          <option value="1" selected>1x</option>
-          <option value="2">2x</option>
-          <option value="4">4x</option>
-        </select>
-      </div>
     `;
 
       // Set logo image src using chrome.runtime.getURL for web_accessible_resources
@@ -897,72 +809,6 @@
         });
       }
 
-      const replayToggle = this.container.querySelector('.fsb-replay-toggle');
-      if (replayToggle) {
-        replayToggle.addEventListener('click', (e) => {
-          e.stopPropagation();
-          var replay = this._replayState;
-          if (!replay || replay.status === 'decision') return;
-          var command = replay.status === 'paused' ? 'play' : 'pause';
-          Promise.resolve(chrome.runtime.sendMessage({
-            action: 'controlReplay',
-            sessionId: replay.sessionId,
-            command: command
-          })).catch((err) => {
-            logger.error('Replay play/pause failed', { error: err && err.message });
-          });
-        });
-      }
-
-      const replayScrubber = this.container.querySelector('.fsb-replay-scrubber');
-      if (replayScrubber) {
-        replayScrubber.addEventListener('input', (e) => {
-          e.stopPropagation();
-          this._replayScrubbing = true;
-          var timeEl = this.container && this.container.querySelector('.fsb-replay-time');
-          if (timeEl && this._replayState) {
-            timeEl.textContent = this._formatElapsed(Number(replayScrubber.value) || 0) +
-              ' / ' + this._formatElapsed(this._replayState.durationMs || 0);
-          }
-        });
-        replayScrubber.addEventListener('change', (e) => {
-          e.stopPropagation();
-          var replay = this._replayState;
-          var positionMs = Number(replayScrubber.value) || 0;
-          this._replayScrubbing = false;
-          if (!replay) return;
-          if (positionMs < replay.positionMs) {
-            replayScrubber.value = String(replay.positionMs);
-            return;
-          }
-          Promise.resolve(chrome.runtime.sendMessage({
-            action: 'controlReplay',
-            sessionId: replay.sessionId,
-            command: 'seek',
-            positionMs: positionMs
-          })).catch((err) => {
-            logger.error('Replay seek failed', { error: err && err.message });
-          });
-        });
-      }
-
-      const replaySpeed = this.container.querySelector('.fsb-replay-speed');
-      if (replaySpeed) {
-        replaySpeed.addEventListener('change', (e) => {
-          e.stopPropagation();
-          var replay = this._replayState;
-          if (!replay) return;
-          Promise.resolve(chrome.runtime.sendMessage({
-            action: 'controlReplay',
-            sessionId: replay.sessionId,
-            command: 'setSpeed',
-            speed: Number(replaySpeed.value)
-          })).catch((err) => {
-            logger.error('Replay speed change failed', { error: err && err.message });
-          });
-        });
-      }
-
       this.shadow.appendChild(this.container);
 
       // Promote to top layer via Popover API for guaranteed rendering above all page content.
@@ -972,42 +818,6 @@
       if (!this._inTopLayer) {
         // Fallback: append to documentElement with z-index
         document.documentElement.appendChild(this.host);
-      }
-    }
-
-    _renderReplayControls(replay) {
-      this._replayState = replay || null;
-      this.container.classList.toggle('replay', !!replay);
-      if (!replay) return;
-
-      var terminal = replay.status === 'completed' || replay.status === 'stopped' || replay.status === 'failed';
-      var awaitingDecision = replay.status === 'decision';
-      var toggle = this.container.querySelector('.fsb-replay-toggle');
-      if (toggle) {
-        var showPlay = replay.status === 'paused' || awaitingDecision;
-        toggle.textContent = showPlay ? '\u25B6' : '\u2161';
-        toggle.setAttribute('aria-label', showPlay ? 'Play replay' : 'Pause replay');
-        toggle.disabled = terminal || awaitingDecision;
-      }
-
-      var scrubber = this.container.querySelector('.fsb-replay-scrubber');
-      if (scrubber) {
-        scrubber.max = String(Math.max(1, replay.durationMs || 0));
-        scrubber.step = String(Math.max(1, Math.min(250, Math.round((replay.durationMs || 1) / 100))));
-        scrubber.disabled = terminal || awaitingDecision;
-        if (!this._replayScrubbing) scrubber.value = String(replay.positionMs || 0);
-      }
-
-      var timeEl = this.container.querySelector('.fsb-replay-time');
-      if (timeEl && !this._replayScrubbing) {
-        timeEl.textContent = this._formatElapsed(replay.positionMs || 0) +
-          ' / ' + this._formatElapsed(replay.durationMs || 0);
-      }
-
-      var speed = this.container.querySelector('.fsb-replay-speed');
-      if (speed) {
-        speed.value = String(replay.speed || 1);
-        speed.disabled = terminal || awaitingDecision;
       }
     }
 
@@ -1082,7 +892,6 @@
         : (overlayState.phase || 'Working');
       var display = overlayState.display || {};
       var progress = overlayState.progress || { mode: 'indeterminate', label: phaseLabel };
-      this._renderReplayControls(overlayState.replay || null);
       // Phase 243 plan 03 (UI-01): badge displays "<clientLabel> / <agentIdShort>"
       // when both are present (just clientLabel if only that; just agentIdShort if
       // only that; hidden if neither). agentIdShort is produced upstream in
@@ -1328,8 +1137,6 @@
       this._lastVisiblePercent = 0;
       this._lastActionCount = null;
       this._logBuffer = [];
-      this._replayState = null;
-      this._replayScrubbing = false;
       this._startTime = null;
       this._frozen = false;
       if (this.host) {
@@ -1343,8 +1150,604 @@
     }
   }
 
+  const REPLAY_PLAYER_HIDE_DELAY_MS = 3000;
+  const REPLAY_PLAYER_FADE_MS = 200;
+
+  /**
+   * ReplayPlayerOverlay - Bottom-center, video-style replay controls.
+   *
+   * This deliberately owns a separate top-layer host from ProgressOverlay so
+   * replay controls never expand or interfere with the ordinary task-status
+   * card. During playback the controls collapse after three seconds of pointer
+   * inactivity, leaving only a non-interactive progress rail visible.
+   */
+  class ReplayPlayerOverlay {
+    constructor() {
+      this.host = null;
+      this.shadow = null;
+      this.container = null;
+      this._inTopLayer = false;
+      this._replayState = null;
+      this._lifecycle = 'running';
+      this._scrubbing = false;
+      this._hovered = false;
+      this._focusWithin = false;
+      this._controlsVisible = true;
+      this._autoHideTimer = null;
+      this._terminalHideTimer = null;
+      this._terminalDestroyTimer = null;
+      this._listenersAttached = false;
+      this._handleDocumentPointerMove = this._handleDocumentPointerMove.bind(this);
+      this._handleDocumentPointerDown = this._handleDocumentPointerDown.bind(this);
+    }
+
+    _formatElapsed(ms) {
+      var totalSeconds = Math.max(0, Math.floor((Number(ms) || 0) / 1000));
+      var minutes = Math.floor(totalSeconds / 60);
+      var seconds = totalSeconds % 60;
+      return minutes + ':' + (seconds < 10 ? '0' : '') + seconds;
+    }
+
+    _isTerminal(replay, lifecycle) {
+      if (lifecycle === 'final') return true;
+      return !!replay && (replay.status === 'completed' || replay.status === 'stopped' || replay.status === 'failed');
+    }
+
+    _shouldAutoHide() {
+      return !!this._replayState &&
+        this._lifecycle !== 'final' &&
+        this._replayState.status === 'playing' &&
+        !this._scrubbing &&
+        !this._hovered &&
+        !this._focusWithin;
+    }
+
+    _clearAutoHideTimer() {
+      if (this._autoHideTimer !== null) {
+        clearTimeout(this._autoHideTimer);
+        this._autoHideTimer = null;
+      }
+    }
+
+    _setControlsVisible(visible) {
+      this._controlsVisible = visible !== false;
+      if (this.container) {
+        this.container.classList.toggle('controls-hidden', !this._controlsVisible);
+      }
+    }
+
+    _scheduleAutoHide(reset) {
+      if (!this._shouldAutoHide()) {
+        this._clearAutoHideTimer();
+        this._setControlsVisible(true);
+        return;
+      }
+      if (this._autoHideTimer !== null) {
+        if (!reset) return;
+        this._clearAutoHideTimer();
+      }
+      if (!this._controlsVisible) return;
+      var self = this;
+      this._autoHideTimer = setTimeout(function() {
+        self._autoHideTimer = null;
+        if (self._shouldAutoHide()) self._setControlsVisible(false);
+      }, REPLAY_PLAYER_HIDE_DELAY_MS);
+    }
+
+    _cancelTerminalRemoval() {
+      if (this._terminalHideTimer !== null) {
+        clearTimeout(this._terminalHideTimer);
+        this._terminalHideTimer = null;
+      }
+      if (this._terminalDestroyTimer !== null) {
+        clearTimeout(this._terminalDestroyTimer);
+        this._terminalDestroyTimer = null;
+      }
+      if (this.container) this.container.classList.remove('terminal-hidden');
+    }
+
+    _scheduleTerminalRemoval() {
+      this._clearAutoHideTimer();
+      this._setControlsVisible(true);
+      if (this._terminalHideTimer !== null) return;
+      var self = this;
+      this._terminalHideTimer = setTimeout(function() {
+        self._terminalHideTimer = null;
+        if (self.container) self.container.classList.add('terminal-hidden');
+        var reducedMotion = false;
+        try {
+          reducedMotion = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+        } catch (_error) { /* default to the short fade */ }
+        self._terminalDestroyTimer = setTimeout(function() {
+          self._terminalDestroyTimer = null;
+          self.destroy();
+        }, reducedMotion ? 0 : REPLAY_PLAYER_FADE_MS);
+      }, REPLAY_PLAYER_HIDE_DELAY_MS);
+    }
+
+    _handleDocumentPointerMove() {
+      if (!this.container || !this._replayState || this._isTerminal(this._replayState, this._lifecycle)) return;
+      this._setControlsVisible(true);
+      this._scheduleAutoHide(true);
+    }
+
+    _handleDocumentPointerDown() {
+      if (!this.container || !this._replayState || this._isTerminal(this._replayState, this._lifecycle)) return;
+      this._setControlsVisible(true);
+      this._scheduleAutoHide(true);
+    }
+
+    _sendControl(message, errorLabel) {
+      try {
+        Promise.resolve(chrome.runtime.sendMessage(message)).catch((err) => {
+          logger.error(errorLabel, { error: err && err.message });
+        });
+      } catch (err) {
+        logger.error(errorLabel, { error: err && err.message });
+      }
+    }
+
+    _renderPosition(positionMs, durationMs, updateScrubber) {
+      if (!this.container) return;
+      var duration = Math.max(0, Number(durationMs) || 0);
+      var position = Math.max(0, Math.min(duration, Number(positionMs) || 0));
+      var ratio = duration > 0 ? position / duration : 0;
+      var fill = this.container.querySelector('.fsb-replay-progress-fill');
+      var minimalFill = this.container.querySelector('.fsb-replay-minimal-fill');
+      if (fill) fill.style.transform = 'scaleX(' + ratio + ')';
+      if (minimalFill) minimalFill.style.transform = 'scaleX(' + ratio + ')';
+      var time = this.container.querySelector('.fsb-replay-time');
+      if (time) time.textContent = this._formatElapsed(position) + ' / ' + this._formatElapsed(duration);
+      if (updateScrubber !== false) {
+        var scrubber = this.container.querySelector('.fsb-replay-scrubber');
+        if (scrubber) scrubber.value = String(position);
+      }
+    }
+
+    create() {
+      if (this.host) return;
+
+      this.host = document.createElement('div');
+      this.host.id = 'fsb-replay-player-host';
+      this.host.setAttribute('data-fsb-overlay', 'true');
+      this.host.setAttribute('data-fsb-overlay-role', 'replay-player-host');
+      this.host.style.cssText = `
+      all: initial !important;
+      display: block !important;
+      position: fixed !important;
+      inset: auto !important;
+      left: 50% !important;
+      bottom: max(16px, env(safe-area-inset-bottom)) !important;
+      width: min(560px, calc(100vw - 32px)) !important;
+      transform: translateX(-50%) !important;
+      z-index: 2147483647 !important;
+      pointer-events: none !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      border: none !important;
+      background: none !important;
+    `;
+
+      this.shadow = this.host.attachShadow({ mode: 'open' });
+      const style = document.createElement('style');
+      style.textContent = `
+      :host {
+        display: block !important;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        font: inherit;
+        color: inherit;
+      }
+
+      .fsb-replay-shell {
+        position: relative;
+        width: 100%;
+        color: #ffffff;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        opacity: 1;
+        pointer-events: auto;
+        transition: opacity 0.2s ease-out;
+      }
+
+      .fsb-replay-controls {
+        display: grid;
+        grid-template-columns: 32px auto minmax(80px, 1fr) 54px;
+        align-items: center;
+        gap: 9px;
+        min-height: 44px;
+        padding: 7px 9px;
+        border: 1px solid rgba(255, 140, 0, 0.32);
+        border-radius: 12px;
+        background: rgba(8, 8, 8, 0.94);
+        box-shadow: 0 8px 28px rgba(0, 0, 0, 0.42);
+        opacity: 1;
+        transform: translateY(0);
+        pointer-events: auto;
+        transition: opacity 0.18s ease-out, transform 0.18s ease-out;
+        backdrop-filter: blur(10px);
+      }
+
+      .fsb-replay-toggle {
+        width: 30px;
+        height: 30px;
+        border: 1px solid rgba(255, 140, 0, 0.48);
+        border-radius: 50%;
+        background: rgba(255, 140, 0, 0.14);
+        color: #FF9F2E;
+        cursor: pointer;
+        font-size: 12px;
+        line-height: 1;
+        transition: background 0.15s ease-out, border-color 0.15s ease-out;
+      }
+
+      .fsb-replay-toggle:hover:not(:disabled),
+      .fsb-replay-toggle:focus-visible {
+        border-color: rgba(255, 159, 46, 0.78);
+        background: rgba(255, 140, 0, 0.25);
+        outline: none;
+      }
+
+      .fsb-replay-time {
+        min-width: 64px;
+        color: rgba(255, 255, 255, 0.7);
+        font-size: 10px;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+      }
+
+      .fsb-replay-timeline {
+        position: relative;
+        min-width: 0;
+        height: 18px;
+      }
+
+      .fsb-replay-progress-track,
+      .fsb-replay-minimal-track {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 50%;
+        height: 3px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.2);
+        transform: translateY(-50%);
+      }
+
+      .fsb-replay-progress-fill,
+      .fsb-replay-minimal-fill {
+        width: 100%;
+        height: 100%;
+        border-radius: inherit;
+        background: #FF8C00;
+        transform: scaleX(0);
+        transform-origin: left center;
+      }
+
+      .fsb-replay-scrubber {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 18px;
+        appearance: none;
+        -webkit-appearance: none;
+        border: 0;
+        outline: 0;
+        background: transparent;
+        cursor: ew-resize;
+      }
+
+      .fsb-replay-scrubber::-webkit-slider-runnable-track {
+        height: 3px;
+        background: transparent;
+      }
+
+      .fsb-replay-scrubber::-webkit-slider-thumb {
+        width: 10px;
+        height: 10px;
+        margin-top: -3.5px;
+        appearance: none;
+        -webkit-appearance: none;
+        border: 1px solid rgba(255, 255, 255, 0.72);
+        border-radius: 50%;
+        background: #FF9F2E;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+        opacity: 0;
+        transition: opacity 0.12s ease-out;
+      }
+
+      .fsb-replay-timeline:hover .fsb-replay-scrubber::-webkit-slider-thumb,
+      .fsb-replay-scrubber:focus-visible::-webkit-slider-thumb {
+        opacity: 1;
+      }
+
+      .fsb-replay-speed {
+        width: 54px;
+        height: 28px;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: 7px;
+        outline: 0;
+        background: rgba(255, 255, 255, 0.07);
+        color: rgba(255, 255, 255, 0.9);
+        padding: 0 5px;
+        cursor: pointer;
+        font-size: 10px;
+      }
+
+      .fsb-replay-speed:focus-visible {
+        border-color: rgba(255, 159, 46, 0.78);
+      }
+
+      .fsb-replay-toggle:disabled,
+      .fsb-replay-scrubber:disabled,
+      .fsb-replay-speed:disabled {
+        cursor: default;
+        opacity: 0.45;
+      }
+
+      .fsb-replay-minimal-track {
+        left: 8px;
+        right: 8px;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.18s ease-out;
+      }
+
+      .fsb-replay-shell.controls-hidden {
+        pointer-events: none;
+      }
+
+      .fsb-replay-shell.controls-hidden .fsb-replay-controls {
+        opacity: 0;
+        transform: translateY(6px);
+        pointer-events: none;
+      }
+
+      .fsb-replay-shell.controls-hidden .fsb-replay-minimal-track {
+        opacity: 1;
+      }
+
+      .fsb-replay-shell.terminal-hidden {
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      @media (max-width: 430px) {
+        .fsb-replay-controls {
+          grid-template-columns: 32px minmax(80px, 1fr) 54px;
+        }
+
+        .fsb-replay-time {
+          display: none;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .fsb-replay-shell,
+        .fsb-replay-controls,
+        .fsb-replay-minimal-track,
+        .fsb-replay-toggle,
+        .fsb-replay-scrubber::-webkit-slider-thumb {
+          transition: none !important;
+        }
+      }
+    `;
+      this.shadow.appendChild(style);
+
+      this.container = document.createElement('div');
+      this.container.className = 'fsb-replay-shell';
+      this.container.setAttribute('role', 'group');
+      this.container.setAttribute('aria-label', 'Replay controls');
+      this.container.innerHTML = `
+      <div class="fsb-replay-controls">
+        <button type="button" class="fsb-replay-toggle" aria-label="Pause replay">&#10074;&#10074;</button>
+        <span class="fsb-replay-time">0:00 / 0:00</span>
+        <div class="fsb-replay-timeline">
+          <div class="fsb-replay-progress-track" aria-hidden="true">
+            <div class="fsb-replay-progress-fill"></div>
+          </div>
+          <input class="fsb-replay-scrubber" type="range" min="0" max="1" value="0" step="100" aria-label="Replay position, forward seek only" title="Seek forward through the replay">
+        </div>
+        <select class="fsb-replay-speed" aria-label="Replay speed">
+          <option value="0.5">0.5x</option>
+          <option value="1" selected>1x</option>
+          <option value="2">2x</option>
+          <option value="4">4x</option>
+        </select>
+      </div>
+      <div class="fsb-replay-minimal-track" aria-hidden="true">
+        <div class="fsb-replay-minimal-fill"></div>
+      </div>
+    `;
+
+      const replayToggle = this.container.querySelector('.fsb-replay-toggle');
+      replayToggle.addEventListener('click', (event) => {
+        event.stopPropagation();
+        var replay = this._replayState;
+        if (!replay || replay.status === 'decision' || this._isTerminal(replay, this._lifecycle)) return;
+        this._setControlsVisible(true);
+        this._scheduleAutoHide(true);
+        this._sendControl({
+          action: 'controlReplay',
+          sessionId: replay.sessionId,
+          command: replay.status === 'paused' ? 'play' : 'pause'
+        }, 'Replay play/pause failed');
+      });
+
+      const replayScrubber = this.container.querySelector('.fsb-replay-scrubber');
+      replayScrubber.addEventListener('pointerdown', (event) => {
+        event.stopPropagation();
+        this._scrubbing = true;
+        this._setControlsVisible(true);
+        this._clearAutoHideTimer();
+      });
+      replayScrubber.addEventListener('input', (event) => {
+        event.stopPropagation();
+        this._scrubbing = true;
+        if (this._replayState) {
+          this._renderPosition(Number(replayScrubber.value) || 0, this._replayState.durationMs || 0, false);
+        }
+      });
+      replayScrubber.addEventListener('change', (event) => {
+        event.stopPropagation();
+        var replay = this._replayState;
+        var positionMs = Number(replayScrubber.value) || 0;
+        this._scrubbing = false;
+        if (!replay) return;
+        if (positionMs < replay.positionMs) {
+          this._renderPosition(replay.positionMs, replay.durationMs, true);
+          this._scheduleAutoHide(true);
+          return;
+        }
+        this._sendControl({
+          action: 'controlReplay',
+          sessionId: replay.sessionId,
+          command: 'seek',
+          positionMs: positionMs
+        }, 'Replay seek failed');
+        this._scheduleAutoHide(true);
+      });
+      replayScrubber.addEventListener('blur', () => {
+        this._scrubbing = false;
+        if (this._replayState) {
+          this._renderPosition(this._replayState.positionMs, this._replayState.durationMs, true);
+        }
+        this._scheduleAutoHide(true);
+      });
+
+      const replaySpeed = this.container.querySelector('.fsb-replay-speed');
+      replaySpeed.addEventListener('change', (event) => {
+        event.stopPropagation();
+        var replay = this._replayState;
+        if (!replay || this._isTerminal(replay, this._lifecycle)) return;
+        this._sendControl({
+          action: 'controlReplay',
+          sessionId: replay.sessionId,
+          command: 'setSpeed',
+          speed: Number(replaySpeed.value)
+        }, 'Replay speed change failed');
+        this._scheduleAutoHide(true);
+      });
+
+      this.container.addEventListener('pointerenter', () => {
+        this._hovered = true;
+        this._setControlsVisible(true);
+        this._clearAutoHideTimer();
+      });
+      this.container.addEventListener('pointerleave', () => {
+        this._hovered = false;
+        this._scheduleAutoHide(true);
+      });
+      this.container.addEventListener('focusin', () => {
+        this._focusWithin = true;
+        this._setControlsVisible(true);
+        this._clearAutoHideTimer();
+      });
+      this.container.addEventListener('focusout', (event) => {
+        this._focusWithin = !!(event.relatedTarget && this.container && this.container.contains(event.relatedTarget));
+        this._scheduleAutoHide(true);
+      });
+      this.container.addEventListener('keydown', () => {
+        this._setControlsVisible(true);
+        this._scheduleAutoHide(true);
+      });
+
+      this.shadow.appendChild(this.container);
+      document.addEventListener('pointermove', this._handleDocumentPointerMove, { passive: true });
+      document.addEventListener('pointerdown', this._handleDocumentPointerDown, { passive: true });
+      this._listenersAttached = true;
+
+      this._inTopLayer = promoteToTopLayer(this.host);
+      if (!this._inTopLayer) document.documentElement.appendChild(this.host);
+    }
+
+    update(replay, lifecycle) {
+      if (!replay) {
+        this.destroy();
+        return;
+      }
+      this.create();
+
+      var previous = this._replayState;
+      var isNewSession = !previous || previous.sessionId !== replay.sessionId;
+      var statusChanged = !previous || previous.status !== replay.status;
+      this._replayState = replay;
+      this._lifecycle = lifecycle || 'running';
+      var terminal = this._isTerminal(replay, this._lifecycle);
+      var awaitingDecision = replay.status === 'decision';
+
+      if (isNewSession || !terminal) this._cancelTerminalRemoval();
+      this.container.classList.toggle('terminal', terminal);
+
+      var toggle = this.container.querySelector('.fsb-replay-toggle');
+      var showPlay = replay.status === 'paused' || awaitingDecision;
+      toggle.textContent = showPlay ? '\u25B6' : '\u2161';
+      toggle.setAttribute('aria-label', showPlay ? 'Play replay' : 'Pause replay');
+      toggle.disabled = terminal || awaitingDecision;
+
+      var scrubber = this.container.querySelector('.fsb-replay-scrubber');
+      scrubber.max = String(Math.max(1, replay.durationMs || 0));
+      scrubber.step = String(Math.max(1, Math.min(250, Math.round((replay.durationMs || 1) / 100))));
+      scrubber.disabled = terminal || awaitingDecision;
+      if (!this._scrubbing) this._renderPosition(replay.positionMs, replay.durationMs, true);
+
+      var speed = this.container.querySelector('.fsb-replay-speed');
+      speed.value = String(replay.speed || 1);
+      speed.disabled = terminal || awaitingDecision;
+
+      if (terminal) {
+        this._scheduleTerminalRemoval();
+      } else if (replay.status !== 'playing') {
+        this._clearAutoHideTimer();
+        this._setControlsVisible(true);
+      } else {
+        if (isNewSession || statusChanged) this._setControlsVisible(true);
+        this._scheduleAutoHide(false);
+      }
+    }
+
+    show() {
+      if (!this.host || !this.host.parentNode) return;
+      if (this._inTopLayer) {
+        try { this.host.hidePopover(); } catch (_hideError) { /* ignore */ }
+        try { this.host.showPopover(); } catch (_showError) { /* ignore */ }
+      } else {
+        document.documentElement.appendChild(this.host);
+      }
+    }
+
+    destroy() {
+      this._clearAutoHideTimer();
+      this._cancelTerminalRemoval();
+      if (this._listenersAttached) {
+        document.removeEventListener('pointermove', this._handleDocumentPointerMove);
+        document.removeEventListener('pointerdown', this._handleDocumentPointerDown);
+        this._listenersAttached = false;
+      }
+      if (this.host) {
+        demoteFromTopLayer(this.host);
+        this.host.remove();
+      }
+      this.host = null;
+      this.shadow = null;
+      this.container = null;
+      this._inTopLayer = false;
+      this._replayState = null;
+      this._lifecycle = 'running';
+      this._scrubbing = false;
+      this._hovered = false;
+      this._focusWithin = false;
+      this._controlsVisible = true;
+    }
+  }
+
   // Singleton instance for progress overlay
   const progressOverlay = new ProgressOverlay();
+  const replayPlayerOverlay = new ReplayPlayerOverlay();
 
   // Persist the last action-specific status text so thinking phases can reuse it
   // (shared state -- attached to FSB namespace below)
@@ -2970,6 +3373,7 @@
       actionGlowOverlay.destroy();
       highlightManager.cleanup();
       progressOverlay.destroy();
+      replayPlayerOverlay.destroy();
       crawlProgressOverlay.destroy();
       elementInspector.disable();
       FSB.overlayState = null;
@@ -2987,6 +3391,7 @@
     if (e.persisted) return;
     try {
       actionGlowOverlay.destroy();
+      replayPlayerOverlay.destroy();
     } catch (_err) { /* ignore cleanup errors on pagehide */ }
   });
 
@@ -2997,6 +3402,7 @@
   // Classes (for potential subclassing or testing)
   FSB.HighlightManager = HighlightManager;
   FSB.ProgressOverlay = ProgressOverlay;
+  FSB.ReplayPlayerOverlay = ReplayPlayerOverlay;
   FSB.ViewportGlow = ViewportGlow;
   FSB.ActionGlowOverlay = ActionGlowOverlay;
   FSB.TriggerBadge = TriggerBadge;
@@ -3006,6 +3412,7 @@
   // Singleton instances
   FSB.highlightManager = highlightManager;
   FSB.progressOverlay = progressOverlay;
+  FSB.replayPlayerOverlay = replayPlayerOverlay;
   FSB.viewportGlow = viewportGlow;
   FSB.actionGlowOverlay = actionGlowOverlay;
   FSB.triggerBadge = triggerBadge;
@@ -3027,8 +3434,11 @@
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
       ProgressOverlay: ProgressOverlay,
+      ReplayPlayerOverlay: ReplayPlayerOverlay,
       ActionGlowOverlay: ActionGlowOverlay,
-      PROGRESS_TEXT_DEBOUNCE_MS: PROGRESS_TEXT_DEBOUNCE_MS
+      PROGRESS_TEXT_DEBOUNCE_MS: PROGRESS_TEXT_DEBOUNCE_MS,
+      REPLAY_PLAYER_HIDE_DELAY_MS: REPLAY_PLAYER_HIDE_DELAY_MS,
+      REPLAY_PLAYER_FADE_MS: REPLAY_PLAYER_FADE_MS
     };
   }
 })();

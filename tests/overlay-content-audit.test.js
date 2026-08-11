@@ -111,15 +111,10 @@ function makeElement(tag, opts) {
         'fsb-note','fsb-note-icon','fsb-note-text',
         'fsb-step','fsb-step-number','fsb-step-text',
         'fsb-log','fsb-log-line','fsb-log-line',
-        'fsb-meta','fsb-phase','fsb-eta','fsb-progress-bar','fsb-progress-fill',
-        'fsb-replay-player','fsb-replay-toggle','fsb-replay-track',
-        'fsb-replay-time','fsb-replay-scrubber','fsb-replay-speed'
+        'fsb-meta','fsb-phase','fsb-eta','fsb-progress-bar','fsb-progress-fill'
       ];
       this.children = childClasses.map(c => {
-        const tagName = c === 'fsb-logo' ? 'img'
-          : (c === 'fsb-replay-toggle' ? 'button'
-            : (c === 'fsb-replay-scrubber' ? 'input'
-              : (c === 'fsb-replay-speed' ? 'select' : 'span')));
+        const tagName = c === 'fsb-logo' ? 'img' : 'span';
         const ch = makeElement(tagName);
         ch.classList.add(c);
         ch.parentNode = this;
@@ -323,7 +318,8 @@ function makeState(opts) {
       mode: 'indeterminate', percent: null, label: 'Working', eta: ''
     },
     actionCount: opts.actionCount,
-    clientLabel: '',
+    clientLabel: opts.clientLabel || '',
+    agentIdShort: opts.agentIdShort,
     result: opts.result,
     guarded: opts.guarded,
     capability: opts.capability,
@@ -364,8 +360,9 @@ vm.runInContext(
 const shouldReplaceFinalOverlay = replacementPolicyContext.shouldReplaceFinalOverlay;
 assert(
   messagingSrc.includes('fsbShouldReplaceFinalOverlay(previousOverlayState, overlayState)') &&
-    messagingSrc.indexOf('FSB.progressOverlay.destroy();') < messagingSrc.indexOf('FSB.overlayState = overlayState;'),
-  'an accepted replacement destroys the finalized overlay before rendering'
+    messagingSrc.indexOf('FSB.progressOverlay.destroy();') < messagingSrc.indexOf('FSB.overlayState = overlayState;') &&
+    messagingSrc.indexOf('FSB.replayPlayerOverlay.destroy();') < messagingSrc.indexOf('FSB.overlayState = overlayState;'),
+  'an accepted replacement destroys both finalized overlay surfaces before rendering'
 );
 assertEq(shouldReplaceFinalOverlay(
   { lifecycle: 'final', sessionToken: 'replay-token' },
@@ -672,7 +669,7 @@ console.log('\n--- Test: ordinary non-capability update leaves every new element
   o.destroy();
 }
 
-console.log('\n--- Test: replay metadata renders the minimal player without affecting ordinary overlays ---');
+console.log('\n--- Test: replay metadata does not add controls to the ordinary overlay ---');
 {
   setNow(105000);
   const o = buildOverlay();
@@ -690,16 +687,74 @@ console.log('\n--- Test: replay metadata renders the minimal player without affe
       forwardSeekOnly: true
     }
   }));
-  assert(o.container.classList.contains('replay'), 'replay update enables the player class');
-  assertEq(o.container.querySelector('.fsb-replay-toggle').textContent, '\u25B6', 'paused replay shows play control');
-  assertEq(o.container.querySelector('.fsb-replay-toggle').getAttribute('aria-label'), 'Play replay', 'play control is labeled');
-  assertEq(o.container.querySelector('.fsb-replay-scrubber').value, '4200', 'scrubber reflects replay position');
-  assertEq(o.container.querySelector('.fsb-replay-scrubber').max, '10000', 'scrubber reflects replay duration');
-  assertEq(o.container.querySelector('.fsb-replay-speed').value, '2', 'speed control reflects replay speed');
-  assertEq(o.container.querySelector('.fsb-replay-time').textContent, '0:04 / 0:10', 'player renders elapsed and total time');
+  assertEq(o.container.querySelector('.fsb-replay-toggle'), null, 'ordinary overlay contains no replay button');
+  assertEq(o.container.querySelector('.fsb-replay-scrubber'), null, 'ordinary overlay contains no replay timeline');
+  assert(!o.container.classList.contains('replay'), 'ordinary overlay receives no replay presentation class');
+  o.destroy();
+}
 
-  o.update(makeState({ phase: 'acting', detail: 'Ordinary task' }));
-  assert(!o.container.classList.contains('replay'), 'ordinary update removes the replay player class');
+console.log('\n--- Test: replay status card uses normal presentation with Replay-only identity ---');
+{
+  setNow(106000);
+  const replayState = overlayStateExports.buildOverlayState({
+    sessionId: 'replay-overlay-test',
+    sessionToken: 'replay-overlay-test',
+    phase: 'acting',
+    taskName: 'Replay: Safe demo',
+    statusText: 'Scrolling page',
+    progress: { mode: 'determinate', percent: 40, label: '' },
+    clientLabel: 'Replay',
+    stoppable: false,
+    replay: {
+      sessionId: 'replay-overlay-test',
+      status: 'playing',
+      speed: 1,
+      positionMs: 4000,
+      durationMs: 10000,
+      currentStep: 2,
+      totalSteps: 5,
+      forwardSeekOnly: true
+    }
+  }, null);
+  const o = buildOverlay();
+  o.update(replayState);
+  await sleep(500);
+
+  assertEq(o.container.querySelector('.fsb-client-badge').textContent, 'Replay',
+    'replay badge contains only the Replay label');
+  assert(o.container.querySelector('.fsb-stop').classList.contains('hidden'),
+    'replay card keeps the shared stop control hidden');
+  assertEq(o.container.querySelector('.fsb-step-number').textContent, 'Acting…',
+    'replay card uses the normal acting phase label instead of a step count');
+  assertEq(o.container.querySelector('.fsb-task').textContent, 'Replay: Safe demo',
+    'replay card retains the task title');
+  assertEq(o.container.querySelector('.fsb-step-text').textContent, 'Scrolling page',
+    'replay card retains the current action text');
+  assertEq(o.container.querySelector('.fsb-phase').textContent, '0:00',
+    'replay card retains the normal elapsed timer');
+  assertEq(o.container.querySelector('.fsb-progress-fill').style.transform, 'scaleX(0.4)',
+    'replay card retains determinate progress');
+  o.destroy();
+}
+
+console.log('\n--- Test: ordinary sessions retain agent identity and stop controls ---');
+{
+  setNow(107000);
+  const o = buildOverlay();
+  o.update(makeState({
+    phase: 'acting',
+    detail: 'Clicking submit',
+    clientLabel: 'Codex',
+    agentIdShort: 'agent_abc123',
+    stoppable: true,
+    progress: { mode: 'determinate', percent: 25, label: 'Acting…', eta: null }
+  }));
+  await sleep(500);
+
+  assertEq(o.container.querySelector('.fsb-client-badge').textContent, 'Codex / agent_abc123',
+    'ordinary session badge retains client and agent identity');
+  assert(!o.container.querySelector('.fsb-stop').classList.contains('hidden'),
+    'ordinary stoppable session retains the stop control');
   o.destroy();
 }
 

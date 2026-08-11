@@ -8,6 +8,7 @@ const root = path.resolve(__dirname, '..');
 const background = fs.readFileSync(path.join(root, 'extension', 'background.js'), 'utf8');
 const sidepanel = fs.readFileSync(path.join(root, 'extension', 'ui', 'sidepanel.js'), 'utf8');
 const visualFeedback = fs.readFileSync(path.join(root, 'extension', 'content', 'visual-feedback.js'), 'utf8');
+const contentMessaging = fs.readFileSync(path.join(root, 'extension', 'content', 'messaging.js'), 'utf8');
 const logger = fs.readFileSync(path.join(root, 'extension', 'utils', 'automation-logger.js'), 'utf8');
 const recorder = fs.readFileSync(path.join(root, 'extension', 'utils', 'mcp-session-recorder.js'), 'utf8');
 const replay = fs.readFileSync(path.join(root, 'extension', 'utils', 'lattice-replay.js'), 'utf8');
@@ -52,17 +53,28 @@ console.log('--- Lattice replay background/UI contract ---');
 const start = functionBody(background, 'handleReplaySession');
 const ownedTab = functionBody(background, 'fsbReplayCreateOwnedTab');
 const additionalOwnedTab = functionBody(background, 'fsbReplayCreateAdditionalOwnedTab');
+const waitForReplayTab = functionBody(background, 'fsbReplayWaitForTab');
 const bootstrapTab = functionBody(background, 'fsbReplayBootstrapTab');
 const ensureTargetTab = functionBody(background, 'fsbReplayEnsureTargetTab');
 const target = functionBody(background, 'fsbReplayAssertTarget');
 const dispatch = functionBody(background, 'fsbReplayDispatchStep');
 const execute = functionBody(background, 'executeReplaySequence');
+const handleClosedReplayTab = functionBody(background, 'fsbReplayHandleClosedTab');
 const buildTimeline = functionBody(background, 'fsbReplayBuildTimeline');
 const waitForPlayback = functionBody(background, 'fsbReplayWaitForPlayback');
 const broadcastReplayOverlay = functionBody(background, 'fsbReplayBroadcastOverlay');
 const finalizeReplay = functionBody(background, 'fsbReplayFinalize');
 const replayControl = functionBody(background, 'handleReplayControl');
-const renderReplayControls = functionBody(visualFeedback, '_renderReplayControls');
+const progressOverlaySource = visualFeedback.slice(
+  visualFeedback.indexOf('class ProgressOverlay'),
+  visualFeedback.indexOf('class ReplayPlayerOverlay')
+);
+const replayPlayerSource = visualFeedback.slice(
+  visualFeedback.indexOf('class ReplayPlayerOverlay'),
+  visualFeedback.indexOf('// Singleton instance for progress overlay')
+);
+const renderReplayControls = functionBody(replayPlayerSource, 'update');
+const scheduleReplayAutoHide = functionBody(replayPlayerSource, '_scheduleAutoHide');
 const recovery = functionBody(background, 'fsbRestoreLatticeReplayCheckpoints');
 const failedRecoveryCleanup = functionBody(background, 'fsbReplayCleanupFailedRecovery');
 const reclaimTabs = functionBody(background, 'fsbReplayReclaimOwnedTabs');
@@ -88,6 +100,14 @@ const cancelReplayCase = background.slice(
 const replayData = logger.slice(
   logger.indexOf('async getReplayData('),
   logger.indexOf('async exportHumanReadable(')
+);
+const staleSessionCleanup = background.slice(
+  background.indexOf('// Periodic cleanup of stale sessions'),
+  background.indexOf('// Track content script ready status per tab')
+);
+const closedTabCleanup = background.slice(
+  background.indexOf('// PERF: Clean up all state when a tab is closed'),
+  background.indexOf('// Phase 237 -- registry tab-release hook.')
 );
 
 check('replay prepare and start are separate internal messages',
@@ -116,6 +136,11 @@ check('replay never selects or targets the previously active tab',
 check('replay creates a fresh active recorded-site tab and binds ownership',
   ownedTab.includes('chrome.tabs.create({ url: startUrl, active: true })') &&
   ownedTab.includes('registry.registerAgent()') && ownedTab.includes('registry.bindTab'));
+check('fresh replay tabs finish loading before injection without a pre-injection health check',
+  waitForReplayTab.includes('pageLoadWatcher.waitForTabComplete') &&
+  !waitForReplayTab.includes('pageLoadWatcher.waitForPageReady') &&
+  waitForReplayTab.indexOf('waitForTabComplete') < waitForReplayTab.indexOf('ensureContentScriptInjected') &&
+  waitForReplayTab.includes('injected !== true'));
 check('each recorded logical tab is lazily created and owned by the replay agent',
   ensureTargetTab.includes('session.replayTabs?.[logicalTab]') &&
   ensureTargetTab.includes('fsbReplayCreateAdditionalOwnedTab') &&
@@ -129,6 +154,18 @@ check('recorded tab-management steps use their mapped fresh tab instead of dupli
   dispatch.includes("normalizedTool === 'open_tab'") &&
   dispatch.includes("normalizedTool === 'switch_tab'") &&
   dispatch.includes('chrome.tabs.update(targetState.tabId, { active: true })'));
+check('closed replay tabs are marked and the primary target moves to a surviving owned tab',
+  handleClosedReplayTab.includes('tab.closed = true') &&
+  handleClosedReplayTab.includes('tab.ownershipToken = null') &&
+  handleClosedReplayTab.includes('session.tabId = replacement?.tabId ?? null') &&
+  handleClosedReplayTab.includes('session.expectedOrigin = replacement?.expectedOrigin ?? null') &&
+  handleClosedReplayTab.includes('session.ownershipToken = replacement?.ownershipToken ?? null'));
+check('tab removal and stale cleanup preserve replay sessions while close steps update immediately',
+  closedTabCleanup.includes('if (fsbReplayHandleClosedTab(session, tabId)) continue;') &&
+  staleSessionCleanup.includes('if (fsbReplayHandleClosedTab(session, closedTabId))') &&
+  execute.includes('fsbReplayHandleClosedTab(session, target.tabState.tabId)') &&
+  execute.indexOf('fsbReplayHandleClosedTab(session, target.tabState.tabId)') <
+    execute.indexOf('delete session.replayTabs[logicalTab]'));
 check('message, action/content/background, and CDP routes reuse shared handlers',
   dispatch.includes('hasMcpMessageRoute(step.tool)') &&
   dispatch.includes('mcpBridgeClient._handleExecuteAction') &&
@@ -159,7 +196,9 @@ check('playback waits are interruptible for pause, speed changes, and safe forwa
 check('replay uses the regular FSB page overlay on every owned replay tab',
   broadcastReplayOverlay.includes('sendSessionStatus(tabId, statusData)') &&
   broadcastReplayOverlay.includes("clientLabel: 'Replay'") &&
-  broadcastReplayOverlay.includes('stoppable: !terminal') &&
+  broadcastReplayOverlay.includes('stoppable: false') &&
+  !broadcastReplayOverlay.includes('agentId:') &&
+  !broadcastReplayOverlay.includes('`Step ${') &&
   background.includes("case 'controlReplay':"));
 check('terminal replay overlay delivery completes before resource cleanup preserves its final display',
   finalizeReplay.includes('await fsbReplayBroadcastOverlay(') &&
@@ -168,13 +207,34 @@ check('terminal replay overlay delivery completes before resource cleanup preser
   !failedStart.includes('preserveFinalOverlay') &&
   !failedRecoveryCleanup.includes('preserveFinalOverlay'));
 check('the in-page replay player exposes play pause forward scrub and four speeds',
-  visualFeedback.includes('class="fsb-replay-player"') &&
+  visualFeedback.includes('class="fsb-replay-controls"') &&
   visualFeedback.includes('class="fsb-replay-scrubber"') &&
   visualFeedback.includes('<option value="0.5">0.5x</option>') &&
   visualFeedback.includes('<option value="4">4x</option>') &&
   renderReplayControls.includes("replay.status === 'paused'") &&
   visualFeedback.includes("command: 'seek'") &&
   visualFeedback.includes("command: 'setSpeed'"));
+check('replay controls render in their own bottom-center top-layer host',
+  replayPlayerSource.includes("this.host.id = 'fsb-replay-player-host'") &&
+  replayPlayerSource.includes("this.host.setAttribute('data-fsb-overlay-role', 'replay-player-host')") &&
+  replayPlayerSource.includes("left: 50% !important") &&
+  replayPlayerSource.includes("bottom: max(16px, env(safe-area-inset-bottom)) !important") &&
+  !progressOverlaySource.includes('fsb-replay-') &&
+  contentMessaging.includes('FSB.replayPlayerOverlay.update(overlayState.replay, overlayState.lifecycle)'));
+check('playing controls auto-hide after three seconds while a minimal rail remains',
+  visualFeedback.includes('const REPLAY_PLAYER_HIDE_DELAY_MS = 3000') &&
+  scheduleReplayAutoHide.includes('REPLAY_PLAYER_HIDE_DELAY_MS') &&
+  replayPlayerSource.includes("classList.toggle('controls-hidden'") &&
+  replayPlayerSource.includes('class="fsb-replay-minimal-track"') &&
+  replayPlayerSource.includes("document.addEventListener('pointermove'") &&
+  replayPlayerSource.includes('!this._scrubbing') &&
+  replayPlayerSource.includes('!this._hovered') &&
+  replayPlayerSource.includes('!this._focusWithin'));
+check('terminal and cleared replay lifecycles destroy the standalone player',
+  replayPlayerSource.includes('_scheduleTerminalRemoval()') &&
+  replayPlayerSource.includes('this.destroy()') &&
+  contentMessaging.includes("if (overlayState.lifecycle === 'cleared')") &&
+  contentMessaging.includes('FSB.replayPlayerOverlay.destroy()'));
 check('survivability persists before dispatch and after each step',
   execute.includes("fsbReplayPersistCheckpoint(session, 'BEFORE_TOOL_EXECUTION', step)") &&
   execute.includes("fsbReplayPersistCheckpoint(session, 'BEFORE_NEXT_ITERATION_SCHEDULE', step)"));

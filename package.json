@@ -13,7 +13,7 @@
   },
   "scripts": {
     "test:stats": "node tests/stats-view-state.test.js && node tests/fsb-telemetry-service.test.js && node tests/stats-chart-overhaul.test.js && node tests/cumulative-commits-aggregator.test.js",
-    "pretest": "node tests/version-sync.test.js && node --import tsx tests/dashboard-localization-fallback.test.mjs && node --test tests/lattice-replay-reclaim.test.js tests/lattice-replay-playback.test.js",
+    "pretest": "node tests/version-sync.test.js && node --import tsx tests/dashboard-localization-fallback.test.mjs && node --test tests/lattice-replay-reclaim.test.js tests/lattice-replay-playback.test.js && node tests/replay-player-overlay.test.js",
     "pretest:lattice": "node --test tests/lattice-replay-reclaim.test.js",
     "version:set:extension": "node scripts/sync-product-version.mjs extension",
     "version:set:mcp": "node scripts/sync-product-version.mjs mcp",

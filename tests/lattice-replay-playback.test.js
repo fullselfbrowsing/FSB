@@ -10,6 +10,13 @@ const background = fs.readFileSync(
   path.resolve(__dirname, '..', 'extension', 'background.js'),
   'utf8'
 );
+const overlayStateUtils = require(path.resolve(
+  __dirname,
+  '..',
+  'extension',
+  'utils',
+  'overlay-state.js'
+));
 
 function declarationSource(source, name) {
   let start = source.indexOf('async function ' + name + '(');
@@ -35,6 +42,31 @@ function declarationSource(source, name) {
     if (char === '}' && --depth === 0) return source.slice(start, index + 1);
   }
   throw new Error('unterminated function ' + name);
+}
+
+function classSource(source, name) {
+  const start = source.indexOf('class ' + name);
+  assert.notEqual(start, -1, 'missing class ' + name);
+  const open = source.indexOf('{', start);
+  let depth = 0;
+  let quote = null;
+  let escaped = false;
+  for (let index = open; index < source.length; index++) {
+    const char = source[index];
+    if (quote) {
+      if (escaped) escaped = false;
+      else if (char === '\\') escaped = true;
+      else if (char === quote) quote = null;
+      continue;
+    }
+    if (char === '"' || char === "'" || char === '`') {
+      quote = char;
+      continue;
+    }
+    if (char === '{') depth++;
+    if (char === '}' && --depth === 0) return source.slice(start, index + 1);
+  }
+  throw new Error('unterminated class ' + name);
 }
 
 function makeTimelineApi() {
@@ -84,6 +116,265 @@ test('only the four player speeds are accepted', () => {
   assert.equal(api.normalizeSpeed(4), 4);
   assert.equal(api.normalizeSpeed(3), 1);
   assert.equal(api.normalizeSpeed('fast'), 1);
+});
+
+function makePageLoadWatcherHarness(options = {}) {
+  const listeners = new Set();
+  let listenerArmedAtGet = false;
+  const context = {
+    chrome: {
+      tabs: {
+        onUpdated: {
+          addListener(listener) { listeners.add(listener); },
+          removeListener(listener) { listeners.delete(listener); }
+        },
+        async get(tabId) {
+          listenerArmedAtGet = listeners.size > 0;
+          if (options.emitCompleteDuringGet === true) {
+            listeners.forEach((listener) => listener(tabId, { status: 'complete' }));
+          }
+          if (options.getError) throw options.getError;
+          return { id: tabId, status: options.status || 'loading' };
+        }
+      }
+    },
+    clearTimeout,
+    setTimeout,
+    Date,
+    Error,
+    Map,
+    Promise
+  };
+  vm.createContext(context);
+  vm.runInContext(
+    classSource(background, 'PageLoadWatcher') + '\n' +
+      'this.watcher = new PageLoadWatcher();',
+    context,
+    { filename: 'extension/background.js' }
+  );
+  return {
+    watcher: context.watcher,
+    listenerCount: () => listeners.size,
+    listenerArmedAtGet: () => listenerArmedAtGet
+  };
+}
+
+test('tab completion cannot be missed between the status read and listener registration', async () => {
+  const harness = makePageLoadWatcherHarness({ emitCompleteDuringGet: true });
+
+  await harness.watcher.waitForTabComplete(91, 50);
+
+  assert.equal(harness.listenerArmedAtGet(), true);
+  assert.equal(harness.listenerCount(), 0);
+});
+
+test('an already-complete tab resolves and removes its completion listener', async () => {
+  const harness = makePageLoadWatcherHarness({ status: 'complete' });
+
+  await harness.watcher.waitForTabComplete(92, 50);
+
+  assert.equal(harness.listenerArmedAtGet(), true);
+  assert.equal(harness.listenerCount(), 0);
+});
+
+test('tab completion timeout and status-read errors both remove their listeners', async () => {
+  const timeoutHarness = makePageLoadWatcherHarness();
+  await assert.rejects(
+    () => timeoutHarness.watcher.waitForTabComplete(93, 10),
+    /Tab load timeout/
+  );
+  assert.equal(timeoutHarness.listenerCount(), 0);
+
+  const errorHarness = makePageLoadWatcherHarness({ getError: new Error('Tab is gone') });
+  await assert.rejects(
+    () => errorHarness.watcher.waitForTabComplete(94, 50),
+    /Tab is gone/
+  );
+  assert.equal(errorHarness.listenerCount(), 0);
+});
+
+function makeClosedReplayTabHandler() {
+  const context = { Number };
+  vm.createContext(context);
+  vm.runInContext(
+    declarationSource(background, 'fsbReplayHandleClosedTab') + '\n' +
+      'this.handleClosedTab = fsbReplayHandleClosedTab;',
+    context,
+    { filename: 'extension/background.js' }
+  );
+  return context.handleClosedTab;
+}
+
+test('closing the primary replay tab hands the session to a surviving owned tab', () => {
+  const handleClosedTab = makeClosedReplayTabHandler();
+  const session = {
+    isReplay: true,
+    status: 'replaying',
+    tabId: 71,
+    expectedOrigin: 'https://primary.example',
+    ownershipToken: 'primary-token',
+    replayTabs: {
+      primary: {
+        logicalTab: 'primary',
+        tabId: 71,
+        expectedOrigin: 'https://primary.example',
+        ownershipToken: 'primary-token'
+      },
+      secondary: {
+        logicalTab: 'secondary',
+        tabId: 72,
+        expectedOrigin: 'https://secondary.example',
+        ownershipToken: 'secondary-token'
+      }
+    }
+  };
+
+  assert.equal(handleClosedTab(session, 71), true);
+  assert.equal(session.replayTabs.primary.closed, true);
+  assert.equal(session.replayTabs.primary.ownershipToken, null);
+  assert.equal(session.tabId, 72);
+  assert.equal(session.expectedOrigin, 'https://secondary.example');
+  assert.equal(session.ownershipToken, 'secondary-token');
+  assert.equal(session.status, 'replaying');
+  assert.equal(handleClosedTab(session, 71), true, 'repeated tab-removal delivery remains idempotent');
+  assert.equal(session.tabId, 72);
+});
+
+test('closing the last replay tab leaves a paused session alive without a tab target', () => {
+  const handleClosedTab = makeClosedReplayTabHandler();
+  const session = {
+    isReplay: true,
+    status: 'replay_paused',
+    tabId: 81,
+    expectedOrigin: 'https://only.example',
+    ownershipToken: 'only-token',
+    replayTabs: {
+      primary: {
+        logicalTab: 'primary',
+        tabId: 81,
+        expectedOrigin: 'https://only.example',
+        ownershipToken: 'only-token'
+      }
+    }
+  };
+
+  assert.equal(handleClosedTab(session, 81), true);
+  assert.equal(session.replayTabs.primary.closed, true);
+  assert.equal(session.tabId, null);
+  assert.equal(session.expectedOrigin, null);
+  assert.equal(session.ownershipToken, null);
+  assert.equal(session.status, 'replay_paused');
+});
+
+function makeFreshReplayTabHarness(options = {}) {
+  const events = [];
+  const removedTabs = [];
+  const releasedAgents = [];
+  const injected = options.injected !== false;
+  const tabId = 91;
+  const context = {
+    FSB_REPLAY_TAB_LOAD_TIMEOUT_MS: 30000,
+    pageLoadWatcher: {
+      async waitForTabComplete(receivedTabId, timeout) {
+        events.push(`load:${receivedTabId}:${timeout}`);
+      },
+      async waitForPageReady() {
+        events.push('invalid-pre-injection-health-check');
+        throw new Error('waitForPageReady must not run before injection');
+      }
+    },
+    async ensureContentScriptInjected(receivedTabId) {
+      events.push(`inject:${receivedTabId}`);
+      return injected;
+    },
+    fsbAgentRegistryReady: Promise.resolve(),
+    fsbAgentRegistryInstance: {
+      async registerAgent() {
+        events.push('register');
+        return { agentId: 'agent-replay' };
+      },
+      async bindTab(agentId, receivedTabId) {
+        events.push(`bind:${agentId}:${receivedTabId}`);
+        return { success: true, ownershipToken: 'owned-token' };
+      },
+      async releaseAgent(agentId, reason) {
+        events.push(`release:${agentId}:${reason}`);
+        releasedAgents.push(agentId);
+      }
+    },
+    chrome: {
+      tabs: {
+        async create({ url, active }) {
+          events.push(`create:${url}:${active}`);
+          return { id: tabId, url, status: 'loading' };
+        },
+        async get(receivedTabId) {
+          events.push(`get:${receivedTabId}`);
+          return { id: receivedTabId, url: 'https://example.com/start', status: 'complete' };
+        },
+        async remove(receivedTabId) {
+          events.push(`remove:${receivedTabId}`);
+          removedTabs.push(receivedTabId);
+        }
+      }
+    },
+    Date,
+    Error,
+    Math,
+    Number,
+    Promise,
+    setTimeout
+  };
+  vm.createContext(context);
+  vm.runInContext(
+    declarationSource(background, 'fsbReplayWaitForTab') + '\n' +
+      declarationSource(background, 'fsbReplayCreateOwnedTab') + '\n' +
+      'this.createOwnedTab = fsbReplayCreateOwnedTab;',
+    context,
+    { filename: 'extension/background.js' }
+  );
+  return {
+    createOwnedTab: context.createOwnedTab,
+    events,
+    removedTabs,
+    releasedAgents,
+    tabId
+  };
+}
+
+test('fresh replay tabs finish loading before content injection and then proceed', async () => {
+  const harness = makeFreshReplayTabHarness();
+  const owned = await harness.createOwnedTab('https://example.com/start');
+
+  assert.equal(owned.tab.id, harness.tabId);
+  assert.equal(owned.agentId, 'agent-replay');
+  assert.equal(owned.ownershipToken, 'owned-token');
+  assert.deepEqual(harness.events, [
+    'register',
+    'create:https://example.com/start:true',
+    'bind:agent-replay:91',
+    'load:91:30000',
+    'inject:91',
+    'get:91'
+  ]);
+  assert.deepEqual(harness.removedTabs, []);
+  assert.deepEqual(harness.releasedAgents, []);
+});
+
+test('failed fresh-tab injection closes only that replay tab and releases its agent', async () => {
+  const harness = makeFreshReplayTabHarness({ injected: false });
+
+  await assert.rejects(
+    () => harness.createOwnedTab('https://example.com/start'),
+    /Replay tab content script did not become ready/
+  );
+  assert.equal(harness.events.includes('invalid-pre-injection-health-check'), false);
+  assert.deepEqual(harness.removedTabs, [harness.tabId]);
+  assert.deepEqual(harness.releasedAgents, ['agent-replay']);
+  assert.deepEqual(harness.events.slice(-2), [
+    'remove:91',
+    'release:agent-replay:replay_start_failed'
+  ]);
 });
 
 test('an in-flight wait never rolls back a newer forward seek position', async () => {
@@ -171,6 +462,56 @@ test('replay overlay broadcast waits for every owned tab delivery', async () => 
   resolvers[1]();
   await pending;
   assert.equal(settled, true);
+});
+
+test('replay overlay uses ordinary session presentation with a Replay-only badge', async () => {
+  const deliveries = [];
+  const context = {
+    fsbReplayOverlayTabIds() { return [71]; },
+    fsbReplayPlaybackStatus() { return 'playing'; },
+    fsbReplayNormalizeSpeed(value) { return Number(value) || 1; },
+    fsbReplayActionLabel() { return 'Clicking element'; },
+    async sendSessionStatus(tabId, statusData) {
+      deliveries.push({ tabId, statusData });
+    },
+    Promise,
+    Number,
+    Math
+  };
+  vm.createContext(context);
+  vm.runInContext(
+    declarationSource(background, 'fsbReplayBroadcastOverlay') + '\n' +
+      'this.broadcast = fsbReplayBroadcastOverlay;',
+    context,
+    { filename: 'extension/background.js' }
+  );
+
+  const session = {
+    replaySessionId: 'replay-overlay-presentation',
+    replayAgentId: 'agent_replay_internal_only',
+    task: 'Replay a task',
+    totalSteps: 2,
+    playback: { speed: 1, positionMs: 100, durationMs: 500 }
+  };
+  await context.broadcast(session, { tool: 'click' }, 0);
+
+  assert.equal(deliveries.length, 1);
+  const statusData = deliveries[0].statusData;
+  assert.equal(statusData.clientLabel, 'Replay');
+  assert.equal(Object.prototype.hasOwnProperty.call(statusData, 'agentId'), false);
+  assert.equal(statusData.stoppable, false);
+  assert.equal(statusData.progress.label, '');
+  assert.equal(statusData.progress.percent, 20);
+  assert.equal(statusData.replay.currentStep, 1);
+  assert.equal(statusData.replay.totalSteps, 2);
+
+  const overlayState = overlayStateUtils.buildOverlayState(statusData, null);
+  assert.equal(overlayState.clientLabel, 'Replay');
+  assert.equal(Object.prototype.hasOwnProperty.call(overlayState, 'agentIdShort'), false);
+  assert.equal(overlayState.stoppable, false);
+  assert.equal(overlayState.progress.label, 'Acting…');
+  assert.equal(overlayState.display.title, 'Replay a task');
+  assert.equal(overlayState.display.detail, 'Clicking element');
 });
 
 test('replay finalization waits for the terminal overlay and preserves it during cleanup', async () => {

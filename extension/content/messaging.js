@@ -1162,6 +1162,7 @@
           const replacesFinalSession = fsbShouldReplaceFinalOverlay(previousOverlayState, overlayState);
           if (replacesFinalSession) {
             FSB.progressOverlay.destroy();
+            FSB.replayPlayerOverlay.destroy();
           }
 
           FSB.overlayState = overlayState;
@@ -1178,6 +1179,7 @@
             }
             FSB.viewportGlow.destroy();
             FSB.progressOverlay.destroy();
+            FSB.replayPlayerOverlay.destroy();
             FSB.actionGlowOverlay.destroy();
             FSB.lastActionStatusText = null;
           } else {
@@ -1195,6 +1197,13 @@
             FSB.progressOverlay.create();
             FSB.progressOverlay.update(overlayState);
             FSB.progressOverlay.show();
+            if (overlayState.replay) {
+              FSB.replayPlayerOverlay.create();
+              FSB.replayPlayerOverlay.update(overlayState.replay, overlayState.lifecycle);
+              FSB.replayPlayerOverlay.show();
+            } else {
+              FSB.replayPlayerOverlay.destroy();
+            }
 
             if (overlayState.lifecycle === 'final') {
               if (FSB._overlayWatchdogTimer) {
@@ -1214,6 +1223,7 @@
                   if (!currentOverlayState || currentOverlayState.lifecycle !== 'running') {
                     FSB.viewportGlow.destroy();
                     FSB.progressOverlay.destroy();
+                    FSB.replayPlayerOverlay.destroy();
                     FSB.actionGlowOverlay.destroy();
                     FSB.overlayState = null;
                     FSB.lastActionStatusText = null;
@@ -1240,6 +1250,13 @@
                   FSB.progressOverlay.create();
                   FSB.progressOverlay.update(degradedState);
                   FSB.progressOverlay.show();
+                  if (degradedState.replay) {
+                    FSB.replayPlayerOverlay.create();
+                    FSB.replayPlayerOverlay.update(degradedState.replay, degradedState.lifecycle);
+                    FSB.replayPlayerOverlay.show();
+                  } else {
+                    FSB.replayPlayerOverlay.destroy();
+                  }
                   try { FSB.actionGlowOverlay.hide(); } catch (_hideErr) { /* non-blocking */ }
                   try { FSB.viewportGlow.show('thinking'); } catch (_glowErr) { /* non-blocking */ }
 
@@ -1249,6 +1266,7 @@
                     try {
                       FSB.viewportGlow.destroy();
                       FSB.progressOverlay.destroy();
+                      FSB.replayPlayerOverlay.destroy();
                       FSB.actionGlowOverlay.destroy();
                       FSB.overlayState = null;
                       FSB.lastActionStatusText = null;
