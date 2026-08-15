@@ -181,8 +181,8 @@
                         <i class="fas fa-chevron-down" aria-hidden="true"></i>
                       </button>
                     </div>
-                    <button id="refreshModelsBtn" type="button" class="btn-secondary btn-icon" title="Refresh model list">
-                      <i class="fas fa-sync-alt"></i> Refresh
+                    <button id="refreshModelsBtn" type="button" class="fsb-refresh-icon" title="Refresh model list" aria-label="Refresh model list">
+                      <i class="fas fa-sync-alt" aria-hidden="true"></i>
                     </button>
                   </div>
                   <ul class="model-combobox__listbox" id="modelListbox" role="listbox" aria-label="Models" tabindex="-1" hidden></ul>
@@ -709,6 +709,52 @@
             </div>
 
             <div class="adv-sub"><i class="fas fa-user-shield"></i><span>Privacy &amp; Developer</span><span class="adv-sub-rule"></span></div>
+            <div class="settings-card full-width" id="voiceInputSettings">
+              <div class="settings-card-header">
+                <div class="settings-card-icon">
+                  <i class="fas fa-microphone"></i>
+                </div>
+                <div class="settings-card-title">
+                  <h3>Voice Input</h3>
+                  <p>Control microphone input in the FSB side panel</p>
+                </div>
+              </div>
+              <div class="settings-card-content">
+                <div class="setting-item">
+                  <label class="modern-toggle">
+                    <input type="checkbox" id="voiceInputEnabled" checked>
+                    <span class="toggle-track">
+                      <span class="toggle-thumb"></span>
+                    </span>
+                    <div class="toggle-content">
+                      <span class="toggle-label">Enable microphone voice input</span>
+                      <span class="toggle-desc">Show the microphone in the side panel and allow browser speech recognition or OpenAI Whisper. Default on.</span>
+                    </div>
+                  </label>
+                </div>
+                <div class="voice-permission-panel">
+                  <div class="voice-permission-copy">
+                    <span class="voice-permission-status" id="voiceInputPermissionStatus"
+                          data-state="checking" role="status" aria-live="polite">Checking microphone permission…</span>
+                    <span class="setting-hint" id="voiceInputPermissionDetail">Chrome manages the extension-wide microphone grant.</span>
+                  </div>
+                  <div class="voice-permission-actions">
+                    <button type="button" class="form-secondary-btn" id="voiceInputPermissionAction" hidden>
+                      <i class="fas fa-microphone"></i>
+                      <span>Enable microphone</span>
+                    </button>
+                    <button type="button" class="form-secondary-btn" id="voiceInputChromeSettings" hidden>
+                      <i class="fas fa-gear"></i>
+                      <span>Open Chrome settings</span>
+                    </button>
+                  </div>
+                </div>
+                <div class="setting-hint voice-permission-note">
+                  Turning voice input off stops FSB from using your microphone, but does not revoke Chrome's saved permission.
+                </div>
+              </div>
+            </div>
+
             <!-- Developer Card -->
             <div class="settings-card full-width">
               <div class="settings-card-header">
@@ -1971,6 +2017,8 @@
   <script src="../utils/service-denylist.js"></script>
   <script src="../utils/delegation-providers.js"></script>
   <script src="providers-panel.js"></script>
+  <script src="voice-input-settings.js"></script>
+  <script src="../utils/mcp-session-export-port.js"></script>
   <script src="options.js"></script>
   <!--
     Phase 269 / CONS-01, CONS-02: kill-switch wiring.

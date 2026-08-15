@@ -210,6 +210,14 @@
     if (typeof source.agentId === 'string' && source.agentId.length > 0 && source.agentId.length <= 256) {
       out.agentId = source.agentId;
     }
+    // Internal correlation sidecars contain no sheet content and are needed
+    // to keep the already-redacted event on the caller's durable run.
+    if (typeof source.recordingRunId === 'string' && /^[A-Za-z0-9_-]{8,128}$/.test(source.recordingRunId)) {
+      out.recordingRunId = source.recordingRunId;
+    }
+    if (typeof source.recordingCallId === 'string' && /^[A-Za-z0-9_-]{8,128}$/.test(source.recordingCallId)) {
+      out.recordingCallId = source.recordingCallId;
+    }
     if (Number.isFinite(source.tab_id)) { out.tab_id = source.tab_id; }
     if (Number.isFinite(source.tabId)) { out.tabId = source.tabId; }
     if (source.visualSession && typeof source.visualSession === 'object') {

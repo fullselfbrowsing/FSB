@@ -24,6 +24,9 @@
  *   ICON-16: activity decays on a TTL; capability and watch claims do not
  *   ICON-17: disabled autopilot action highlights suppress toolbar activity
  *   ICON-18: Ring is exclusive to balanced capability invocation lifecycles
+ *   ICON-19: exact-pixel interning and deadline scheduling skip only invisible work
+ *   ICON-20: setIcon is serialized, phase-correct, and failure-backoff bounded
+ *   ICON-21: the animation preference is authoritative across every ingress
  *
  * ICON-01 reads the canonical sources directly, so a timing or palette change in
  * visual-feedback.js that the icon does not follow fails here. ICON-14/15 derive
@@ -60,6 +63,7 @@ const BEAD_FRACTION = 0.12;
 const FADE_FRACTION = 0.02;
 const BEAD_SEGMENTS = 24;
 const ORBIT_WIDTH_RATIO = 0.10;
+const FRAME_INTERVAL_MS = 66;
 const WATCHDOG = 'fsb-action-icon-watchdog';
 const ACTIVITY_TTL_MS = 60000;
 const BREATHE_MIN_ALPHA = 0.45;
@@ -67,6 +71,7 @@ const BREATHE_GLOW_RATIO = 0.15625;
 const BREATHE_GLOW_ALPHA = 0.95;
 const RELAY_SEEN_KEY = 'fsbActionIconRelaySeen';
 const INTENT_KEY = 'fsbActionIconIntent';
+const ANIMATIONS_KEY = 'animatedActionHighlights';
 
 let passed = 0;
 let failed = 0;
@@ -97,9 +102,11 @@ function makeWorker(opts) {
   let now = typeof opts.now === 'number' ? opts.now : 1000000;
 
   const emits = [];
+  const pendingIconCalls = [];
   const alarmLog = { created: [], cleared: [] };
   const sessionStore = Object.assign({}, opts.session || {});
   const localStore = Object.assign({}, opts.local || {});
+  const storageChangeListeners = [];
   const timers = new Map();
   const timeouts = new Map();
   const errors = [];
@@ -109,6 +116,9 @@ function makeWorker(opts) {
   let timerSeq = 0;
   let timeoutSeq = 0;
   let imageSeq = 0;
+  let iconInFlight = 0;
+  let maxIconInFlight = 0;
+  let animationTimerWakes = 0;
 
   // Records every op. Reads back as ordered groups, one per renderFrame call,
   // because renderFrame opens each frame with clearRect.
@@ -175,7 +185,12 @@ function makeWorker(opts) {
         ops.push({ op: 'linear', x0, y0, x1, y1, stops });
         return { __linear: true, addColorStop(off, color) { stops.push({ off, color }); } };
       },
-      getImageData() { imageSeq += 1; return { __img: true, size, seq: imageSeq }; }
+      getImageData() {
+        imageSeq += 1;
+        const image = { __img: true, size, seq: imageSeq };
+        if (opts.identicalPixels) image.data = new Uint8ClampedArray(size * size * 4);
+        return image;
+      }
     };
     if (opts.conicGradients !== false) {
       ctx.createConicGradient = function (startAngle, cx, cy) {
@@ -208,7 +223,20 @@ function makeWorker(opts) {
   const chrome = {
     runtime: { getURL: (p) => 'chrome-extension://test/' + p },
     action: {
-      setIcon(arg) { emits.push(arg); return Promise.resolve(); }
+      setIcon(arg) {
+        emits.push(arg);
+        iconInFlight++;
+        maxIconInFlight = Math.max(maxIconInFlight, iconInFlight);
+        if (opts.deferSetIcon) {
+          return new Promise((resolve, reject) => {
+            pendingIconCalls.push({
+              resolve() { iconInFlight--; resolve(); },
+              reject(err) { iconInFlight--; reject(err || new Error('setIcon rejected')); }
+            });
+          });
+        }
+        return Promise.resolve().then(() => { iconInFlight--; });
+      }
     },
     storage: {
       session: {
@@ -218,6 +246,9 @@ function makeWorker(opts) {
       local: {
         get: async (k) => (Object.prototype.hasOwnProperty.call(localStore, k) ? { [k]: localStore[k] } : {}),
         set: async (rec) => { Object.assign(localStore, rec); }
+      },
+      onChanged: {
+        addListener(fn) { storageChangeListeners.push(fn); }
       }
     },
     alarms: {
@@ -242,7 +273,11 @@ function makeWorker(opts) {
     clearInterval(id) { timers.delete(id); },
     // Activity claims expire on a timeout. Held against the fake clock so a test
     // can expire them deterministically via expireTimeouts().
-    setTimeout(fn, ms) { timeoutSeq += 1; timeouts.set(timeoutSeq, { fn, at: now + (ms || 0) }); return timeoutSeq; },
+    setTimeout(fn, ms) {
+      timeoutSeq += 1;
+      timeouts.set(timeoutSeq, { fn, at: now + (ms || 0), ms: ms || 0 });
+      return timeoutSeq;
+    },
     clearTimeout(id) { timeouts.delete(id); },
     Date: { now: () => now },
     console: {
@@ -263,13 +298,29 @@ function makeWorker(opts) {
     sessionStore,
     localStore,
     errors,
-    timerCount: () => timers.size,
-    timeoutCount: () => timeouts.size,
-    killIntervals: () => timers.clear(),
-    // startLoop() always clears and re-creates, so a changed id means the
-    // animation restarted rather than continuing.
-    timerIds: () => Array.from(timers.keys()).join(','),
-    tick: () => { for (const t of Array.from(timers.values())) t.fn(); },
+    timerCount: () => timers.size + Array.from(timeouts.values()).filter((t) => t.ms < 1000).length,
+    timeoutCount: () => Array.from(timeouts.values()).filter((t) => t.ms >= ACTIVITY_TTL_MS).length,
+    retryTimerCount: () => Array.from(timeouts.values()).filter((t) => t.ms >= 1000 && t.ms < ACTIVITY_TTL_MS).length,
+    killIntervals: () => {
+      timers.clear();
+      for (const [id, t] of Array.from(timeouts.entries())) {
+        if (t.ms < 1000) timeouts.delete(id);
+      }
+    },
+    // The deadline scheduler owns exactly one short timeout at a time.
+    timerIds: () => [
+      ...Array.from(timers.keys()).map((id) => 'i' + id),
+      ...Array.from(timeouts.entries()).filter(([, t]) => t.ms < 1000).map(([id]) => 't' + id)
+    ].join(','),
+    tick: () => {
+      for (const t of Array.from(timers.values())) t.fn();
+      for (const [id, t] of Array.from(timeouts.entries())) {
+        if (t.ms >= 1000) continue;
+        timeouts.delete(id);
+        animationTimerWakes++;
+        t.fn();
+      }
+    },
     // Fire every timeout whose deadline has passed on the fake clock.
     expireTimeouts: () => {
       for (const [id, t] of Array.from(timeouts.entries())) {
@@ -278,6 +329,31 @@ function makeWorker(opts) {
     },
     advance: (ms) => { now += ms; },
     nowValue: () => now,
+    animationTimerWakes: () => animationTimerWakes,
+    nextAnimationDelay: () => {
+      const next = Array.from(timeouts.values()).find((t) => t.ms < 1000);
+      return next ? next.ms : null;
+    },
+    nextRetryDelay: () => {
+      const next = Array.from(timeouts.values()).find((t) => t.ms >= 1000 && t.ms < ACTIVITY_TTL_MS);
+      return next ? next.ms : null;
+    },
+    pendingIconCount: () => pendingIconCalls.length,
+    maxIconInFlight: () => maxIconInFlight,
+    resolveNextIcon: () => {
+      const call = pendingIconCalls.shift();
+      if (call) call.resolve();
+    },
+    rejectNextIcon: (err) => {
+      const call = pendingIconCalls.shift();
+      if (call) call.reject(err);
+    },
+    setLocal: (key, value) => {
+      const oldValue = localStore[key];
+      localStore[key] = value;
+      const changes = { [key]: { oldValue, newValue: value } };
+      for (const listener of storageChangeListeners) listener(changes, 'local');
+    },
     // Ops for one canvas size, split into one group per rendered frame.
     groups: (size) => {
       const ops = (contexts[size] || { _ops: [] })._ops;
@@ -893,6 +969,7 @@ const opsOf = (group, op) => (group || []).filter((o) => o.op === op);
     // service worker stays awake for as long as the watch is armed.
     w.advance(61000);
     w.tick();
+    await flush();
     assertEq(w.timerCount(), 1, 'the breathe is still looping a minute later');
     assert(w.emits.length > midEmits, 'and still repainting');
 
@@ -1299,13 +1376,15 @@ const opsOf = (group, op) => (group || []).filter((o) => o.op === op);
     // the animation that is already on screen.
     w.api.noteActivity(1, 'sweep');
     await flush();
-    const sweepLoop = w.timerIds();
     w.advance(ACTIVITY_TTL_MS - 100);
     w.expireTimeouts();
+    await flush();
+    const beforeRefresh = w.emits.length;
     w.api.noteActivity(1, 'sweep');
     await flush();
-    assertEq(w.timerIds(), sweepLoop,
-      'a repeated animation extends its deadline without restarting its loop');
+    assertEq(w.timerCount(), 1, 'a repeated animation keeps exactly one scheduler live');
+    assertEq(w.emits.length, beforeRefresh,
+      'a repeated animation extends its deadline without restarting at frame zero');
     w.advance(200);
     w.expireTimeouts();
     await flush();
@@ -1638,6 +1717,168 @@ const opsOf = (group, op) => (group || []).filter((o) => o.op === op);
     w.api.endCapability(4);
     assertEq((w.sessionStore[INTENT_KEY] || {}).resolved, 'sweep',
       'ending Ring immediately reveals an existing generic Sweep claim');
+  }
+
+  // -------------------------------------------------------------------------
+  console.log('\nICON-19: exact-pixel dedupe preserves the original visible timeline');
+  // -------------------------------------------------------------------------
+
+  {
+    const w = makeWorker();
+    await w.api.init({ hasLiveSession: () => false });
+    const before = w.emits.length;
+    const startedAt = w.nowValue();
+    w.api.noteActivity(1, 'sweep');
+    await flush();
+
+    const firstRequest = w.emits[before];
+    assertEq(w.nextAnimationDelay(), FRAME_INTERVAL_MS * 2,
+      'Sweep skips the 66ms poll whose rounded frame is still frame zero');
+
+    const observedTimes = [0];
+    const observedRequests = [firstRequest];
+    while (w.nowValue() - startedAt <= 1320) {
+      const delay = w.nextAnimationDelay();
+      if (delay === null || w.nowValue() - startedAt + delay > 1320) break;
+      w.advance(delay);
+      const callsBefore = w.emits.length;
+      w.tick();
+      await flush();
+      if (w.emits.length > callsBefore) {
+        observedTimes.push(w.nowValue() - startedAt);
+        observedRequests.push(w.emits[w.emits.length - 1]);
+      }
+    }
+
+    const expectedTimes = [0];
+    let priorIndex = 0;
+    for (let elapsed = FRAME_INTERVAL_MS; elapsed <= 1320; elapsed += FRAME_INTERVAL_MS) {
+      const index = Math.min(17, Math.floor(((elapsed % 1200) / 1200) * 18));
+      if (index === priorIndex) continue;
+      priorIndex = index;
+      expectedTimes.push(elapsed);
+    }
+    assertEq(observedTimes.join(','), expectedTimes.join(','),
+      'deadline scheduling requests every distinct Sweep frame on the original 66ms grid');
+    const wrappedFrame = observedTimes.indexOf(1254);
+    assert(wrappedFrame > 0 && observedRequests[wrappedFrame] === firstRequest,
+      'a cached request object is reused when the cycle returns to frame zero');
+  }
+
+  {
+    // The stub makes every rendered ImageData byte-identical. Production data is
+    // interned only after comparing both 16px and 32px byte arrays, so this is a
+    // direct proof that skipped work cannot change the displayed result.
+    const w = makeWorker({ identicalPixels: true });
+    await w.api.init({ hasLiveSession: () => false });
+    const before = w.emits.length;
+    w.api.setWatching(true, 2);
+    await flush();
+    assertEq(w.emits.length, before,
+      'a state transition emits nothing when both output sizes are byte-identical');
+    assertEq(w.timerCount(), 0,
+      'an entirely byte-identical cycle schedules no empty frame timer');
+    assertEq((w.sessionStore[INTENT_KEY] || {}).resolved, 'breathe',
+      'pixel dedupe does not alter the continuous watching state');
+  }
+
+  // -------------------------------------------------------------------------
+  console.log('\nICON-20: setIcon backpressure and failure retry are bounded');
+  // -------------------------------------------------------------------------
+
+  {
+    const w = makeWorker({ deferSetIcon: true });
+    await w.api.init({ hasLiveSession: () => false });
+    assertEq(w.pendingIconCount(), 1, 'init starts one asynchronous icon update');
+    w.resolveNextIcon();
+    await flush();
+
+    const before = w.emits.length;
+    w.api.noteActivity(1, 'sweep');
+    await flush();
+    assertEq(w.pendingIconCount(), 1, 'Sweep starts with exactly one update in flight');
+
+    w.advance(132);
+    w.tick();
+    w.advance(132);
+    w.tick();
+    await flush();
+    assertEq(w.emits.length, before + 1,
+      'slow setIcon does not enqueue stale browser API calls for intermediate frames');
+    assertEq(w.maxIconInFlight(), 1, 'setIcon concurrency never exceeds one');
+
+    w.resolveNextIcon();
+    await flush();
+    assertEq(w.emits.length, before + 2, 'completion drains exactly one latest frame');
+    assertEq(w.emits[w.emits.length - 1].imageData[32].seq, 18,
+      'the drained frame matches the current wall-clock phase, not the oldest queued phase');
+    w.resolveNextIcon();
+    await flush();
+  }
+
+  {
+    const w = makeWorker({ deferSetIcon: true });
+    await w.api.init({ hasLiveSession: () => false });
+    w.resolveNextIcon();
+    await flush();
+    w.api.noteActivity(1, 'orbit');
+    await flush();
+    w.rejectNextIcon(new Error('browser busy'));
+    await flush();
+
+    assertEq(w.timerCount(), 0, 'a rejected update pauses the 15fps frame scheduler');
+    assertEq(w.retryTimerCount(), 1, 'a rejected update leaves one bounded retry');
+    assertEq(w.nextRetryDelay(), 1000, 'the first retry backs off for one second');
+    const failedCalls = w.emits.length;
+
+    w.advance(1000);
+    w.expireTimeouts();
+    await flush();
+    assertEq(w.emits.length, failedCalls + 1, 'the backoff retries only the current phase');
+    w.rejectNextIcon(new Error('still busy'));
+    await flush();
+    assertEq(w.nextRetryDelay(), 2000, 'a repeated failure doubles the retry delay');
+    assertEq(w.errors.filter((e) => /setIcon failed/.test(e)).length, 1,
+      'repeated update failures are logged once');
+    assertEq(w.maxIconInFlight(), 1, 'failure recovery also keeps one request in flight');
+
+    w.advance(2000);
+    w.expireTimeouts();
+    await flush();
+    w.resolveNextIcon();
+    await flush();
+    assertEq(w.retryTimerCount(), 0, 'a successful retry clears the backoff');
+    assertEq(w.timerCount(), 1, 'a successful retry resumes the same continuous animation');
+  }
+
+  // -------------------------------------------------------------------------
+  console.log('\nICON-21: one preference gates Autopilot, MCP, capability, and watch animation');
+  // -------------------------------------------------------------------------
+
+  {
+    const w = makeWorker({ local: { [ANIMATIONS_KEY]: false } });
+    await w.api.init({ hasLiveSession: () => false });
+    const idleCalls = w.emits.length;
+    w.api.noteActivity(1, 'orbit');
+    w.api.beginCapability(2);
+    w.api.setWatching(true, 3);
+    await flush();
+    assertEq(w.emits.length, idleCalls, 'disabled motion emits no frame from any public ingress');
+    assertEq(w.timerCount(), 0, 'disabled motion owns no animation scheduler');
+    assertEq((w.sessionStore[INTENT_KEY] || {}).claims['watch:3'], 'breathe',
+      'disabled motion preserves semantic claims for an immediate re-enable');
+
+    w.setLocal(ANIMATIONS_KEY, true);
+    await flush();
+    assertEq((w.sessionStore[INTENT_KEY] || {}).resolved, 'breathe',
+      're-enabling resolves the same highest-priority claim');
+    assertEq(w.timerCount(), 1, 're-enabling starts the unchanged continuous Breathe');
+
+    w.setLocal(ANIMATIONS_KEY, false);
+    await flush();
+    assertEq(w.timerCount(), 0, 'disabling live motion stops its scheduler immediately');
+    assertEq((w.sessionStore[INTENT_KEY] || {}).claims['watch:3'], 'breathe',
+      'disabling live motion does not mutate watch functionality');
   }
 
   // -------------------------------------------------------------------------

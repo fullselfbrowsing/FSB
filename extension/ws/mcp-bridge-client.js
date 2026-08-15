@@ -40,6 +40,7 @@ const MCP_DISPATCHER_SYNTHETIC_CHANGE_REPORT_TOOLS = new Set(['open_tab', 'close
 // the route itself is what identifies them as reading.
 const MCP_ICON_READ_MESSAGE_TYPES = new Set([
   'mcp:get-tabs', 'mcp:get-dom', 'mcp:read-page', 'mcp:get-page-snapshot',
+  'mcp:capture-screenshot',
   'mcp:stop-trigger', 'mcp:get-trigger-status', 'mcp:list-triggers', 'mcp:task-status',
   'mcp:get-task-snapshot', 'mcp:get-status', 'mcp:get-config', 'mcp:get-site-guides',
   'mcp:get-memory', 'mcp:search-memory', 'mcp:list-sessions', 'mcp:get-session',
@@ -1154,11 +1155,37 @@ class MCPBridgeClient {
     const { id, type, payload } = msg;
     if (!id || !type) return;
 
+    const recorder = (typeof globalThis !== 'undefined') ? globalThis.fsbMcpSessionRecorder : null;
+    const recordingIdentity = payload && typeof payload.agentId === 'string' &&
+      typeof payload.recordingRunId === 'string' && typeof payload.recordingCallId === 'string'
+      ? {
+          agentId: payload.agentId,
+          recordingRunId: payload.recordingRunId,
+          recordingCallId: payload.recordingCallId,
+          client: typeof globalThis.resolveMcpClientLabel === 'function'
+            ? globalThis.resolveMcpClientLabel(payload)
+            : 'unknown',
+          task: type,
+          taskSource: 'tool',
+          tool: typeof payload.tool === 'string' ? payload.tool : type
+        }
+      : null;
+    if (recordingIdentity && recorder && typeof recorder.beginCall === 'function') {
+      try {
+        Promise.resolve(recorder.beginCall(recordingIdentity, payload.recordingLeaseMs))
+          .catch(function () { /* recording never gates routing */ });
+      } catch (_error) { /* recording never gates routing */ }
+    }
+
     try {
       const result = await this._routeMessage(type, payload || {}, id);
       this._sendResult(id, { success: true, ...result });
     } catch (err) {
       this._sendError(id, err.message || 'Unknown error');
+    } finally {
+      if (recordingIdentity && recorder && typeof recorder.endCall === 'function') {
+        try { await recorder.endCall(recordingIdentity); } catch (_error) { /* recording never gates routing */ }
+      }
     }
   }
 
@@ -1208,6 +1235,9 @@ class MCPBridgeClient {
         return dispatchMcpMessageRoute({ type, payload, client: this, mcpMsgId: id });
 
       case 'mcp:read-page':
+        return dispatchMcpMessageRoute({ type, payload, client: this, mcpMsgId: id });
+
+      case 'mcp:capture-screenshot':
         return dispatchMcpMessageRoute({ type, payload, client: this, mcpMsgId: id });
 
       case 'mcp:stop-trigger':

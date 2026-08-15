@@ -276,7 +276,8 @@ test('concurrent replay starts create only one owned tab and session', async () 
     startKeepAlive() {},
     automationLogger: { logSessionStart() {}, error() {} },
     async fsbReplayPersistCheckpoint() {},
-    async fsbReplayPersistRun() {},
+    async fsbReplayPersistRun() { return {}; },
+    fsbReplayAssertExecutablePreparation() {},
     async fsbReplayAbortFailedStart() {},
     setTimeout() {}
   };
@@ -314,7 +315,116 @@ test('concurrent replay starts create only one owned tab and session', async () 
   assert.equal(context.activeSessions.size, 1);
 });
 
-function makeMcpReplayApprovalHarness() {
+test('direct replay startup rejects truncated recordings before creating a tab', async () => {
+  let createdTabs = 0;
+  let response;
+  const steps = Array.from({ length: 100 }, (_, index) => ({
+    id: 'step-' + index,
+    replay: { availability: 'ready' }
+  }));
+  const context = {
+    activeSessions: new Map(),
+    fsbReplayIsTrustedUiSender() { return true; },
+    async prepareSessionReplay() {
+      return {
+        replay: { manifestHash: 'manifest-truncated' },
+        steps,
+        totalSourceSteps: 101,
+        truncated: true
+      };
+    },
+    async fsbReplayCreateOwnedTab() { createdTabs++; },
+    async fsbReplayAbortFailedStart() {},
+    automationLogger: { error() {} },
+    Error,
+    Map,
+    Math,
+    Number
+  };
+  vm.createContext(context);
+  vm.runInContext(
+    'let fsbReplayStartPending = false;\n' +
+      declarationSource(background, 'fsbReplayIsExecutable') + '\n' +
+      declarationSource(background, 'fsbReplayIsTruncated') + '\n' +
+      declarationSource(background, 'fsbReplayTruncatedMessage') + '\n' +
+      declarationSource(background, 'fsbReplayAssertExecutablePreparation') + '\n' +
+      declarationSource(background, 'handleReplaySession') + '\n' +
+      'this.handleReplaySession = handleReplaySession;',
+    context,
+    { filename: 'extension/background.js' }
+  );
+
+  await context.handleReplaySession(
+    { sessionId: 'source-truncated', manifestHash: 'manifest-truncated' },
+    {},
+    (value) => { response = value; }
+  );
+
+  assert.equal(response.success, false);
+  assert.match(response.error, /Earlier browser state is missing.*inspect-only/s);
+  assert.equal(createdTabs, 0);
+  assert.equal(context.activeSessions.size, 0);
+});
+
+test('replay startup reports failure when its initial run head is not durable', async () => {
+  const events = [];
+  let response;
+  const context = {
+    activeSessions: new Map(),
+    fsbReplayIsTrustedUiSender() { return true; },
+    async prepareSessionReplay() {
+      return {
+        replay: { manifestHash: 'manifest-persistence' },
+        steps: [{ id: 'step-1', replay: { availability: 'ready' } }]
+      };
+    },
+    fsbReplayAssertExecutablePreparation() {},
+    fsbReplayBootstrapTab() { return { id: 'primary', startUrl: 'https://example.com/start' }; },
+    async fsbReplayCreateOwnedTab() {
+      events.push('create-tab');
+      return { tab: { id: 501, url: 'https://example.com/start' }, agentId: 'agent-replay' };
+    },
+    fsbReplayBuildSession(_prepared, replaySessionId, owned) {
+      return {
+        replaySessionId,
+        status: 'replaying',
+        task: 'Replay test',
+        tabId: owned.tab.id,
+        replayRun: { id: replaySessionId, status: 'running', steps: [] }
+      };
+    },
+    startKeepAlive() {},
+    automationLogger: { logSessionStart() {}, error() {} },
+    async fsbReplayPersistCheckpoint() { events.push('checkpoint'); },
+    async fsbReplayPersistRun() { events.push('persist-failed'); return false; },
+    async fsbReplayAbortFailedStart() { events.push('abort'); },
+    setTimeout() { events.push('scheduled'); },
+    Date,
+    Error,
+    Map,
+    Math
+  };
+  vm.createContext(context);
+  vm.runInContext(
+    'let fsbReplayStartPending = false;\n' +
+      declarationSource(background, 'handleReplaySession') + '\n' +
+      'this.handleReplaySession = handleReplaySession;',
+    context,
+    { filename: 'extension/background.js' }
+  );
+
+  await context.handleReplaySession(
+    { sessionId: 'source-persistence', manifestHash: 'manifest-persistence' },
+    {},
+    (value) => { response = value; }
+  );
+
+  assert.equal(response.success, false);
+  assert.match(response.error, /persistence is unavailable/);
+  assert.deepEqual(events, ['create-tab', 'checkpoint', 'persist-failed', 'abort']);
+});
+
+function makeMcpReplayApprovalHarness(options = {}) {
   let storedApprovals = [];
   let nextRequestId = 1;
   let failNextStorageWrite = false;
@@ -348,15 +458,20 @@ function makeMcpReplayApprovalHarness() {
     },
     crypto: { randomUUID() { return 'approval-' + nextRequestId++; } },
     async prepareSessionReplay(sessionId) {
+      const stepCount = options.truncated === true ? 100 : 1;
       return {
         sessionId,
         replay: { manifestHash: 'manifest-' + sessionId },
-        steps: [{ id: 'step-' + sessionId, replay: { availability: 'ready' } }],
+        steps: Array.from({ length: stepCount }, (_, index) => ({
+          id: 'step-' + sessionId + '-' + index,
+          replay: { availability: 'ready' }
+        })),
         tabs: [],
-        counts: { ready: 1 }
+        counts: { ready: stepCount },
+        totalSourceSteps: options.truncated === true ? stepCount + 1 : stepCount,
+        truncated: options.truncated === true
       };
     },
-    fsbReplayIsExecutable() { return true; },
     fsbReplayPublicPreparation(prepared) {
       return {
         counts: prepared.counts,
@@ -373,6 +488,10 @@ function makeMcpReplayApprovalHarness() {
     "const FSB_PENDING_MCP_REPLAY_KEY = 'fsbPendingMcpReplayApprovals';\n" +
       'const FSB_MCP_REPLAY_APPROVAL_TTL_MS = 10 * 60 * 1000;\n' +
       'let fsbPendingMcpReplayApprovalTail = Promise.resolve();\n' +
+      declarationSource(background, 'fsbReplayIsExecutable') + '\n' +
+      declarationSource(background, 'fsbReplayIsTruncated') + '\n' +
+      declarationSource(background, 'fsbReplayTruncatedMessage') + '\n' +
+      declarationSource(background, 'fsbReplayAssertExecutablePreparation') + '\n' +
       declarationSource(background, 'fsbReadPendingMcpReplayApprovals') + '\n' +
       declarationSource(background, 'fsbWritePendingMcpReplayApprovals') + '\n' +
       declarationSource(background, 'fsbMutatePendingMcpReplayApprovals') + '\n' +
@@ -419,6 +538,17 @@ test('concurrent MCP approval requests retain distinct manifests and coalesce du
   ]);
   assert.equal(results[0].requestId, results[1].requestId);
   assert.equal(duplicate.stored().length, 1);
+});
+
+test('truncated recordings never create MCP replay approvals', async () => {
+  const harness = makeMcpReplayApprovalHarness({ truncated: true });
+
+  await assert.rejects(
+    harness.request('source-truncated'),
+    /Earlier browser state is missing.*inspect-only/s
+  );
+  assert.equal(harness.stored().length, 0);
+  assert.equal(harness.calls.storageSets, 0);
 });
 
 test('a failed MCP approval mutation does not poison later storage updates', async () => {
@@ -512,7 +642,11 @@ function makeTerminalRecoveryHarness(options = {}) {
   const context = {
     chrome: {
       storage: {
-        session: { async get() { return checkpointStored ? { snapshot } : {}; } },
+        session: {
+          async get(key) {
+            return checkpointStored ? { [key]: [replaySessionId] } : {};
+          }
+        },
         local: {
           async get() {
             return { fsbSessionLogs: JSON.parse(JSON.stringify(storedLogs)) };
@@ -525,7 +659,25 @@ function makeTerminalRecoveryHarness(options = {}) {
         }
       }
     },
-    FsbLatticeReplay: {},
+    FsbLatticeRuntimeAdapter: {
+      createFsbLatticeRuntimeAdapter() {
+        return {
+          async loadLatestSnapshot() { return checkpointStored ? snapshot : null; }
+        };
+      }
+    },
+    FsbLatticeReplay: {
+      async persistReplayRun(sessionId, run) {
+        assert.equal(sessionId, sourceSessionId);
+        calls.localSets++;
+        if (options.failLocalSet === true) throw new Error('local storage write failed');
+        storedLogs[sourceSessionId].replay.lastRun = JSON.parse(JSON.stringify(run));
+        return true;
+      }
+    },
+    fsbReplayClone(value, fallback) {
+      return value == null ? fallback : JSON.parse(JSON.stringify(value));
+    },
     activeSessions: new Map(),
     fsbAgentRegistryInstance: options.registryUnavailable === true ? null : {
       hasAgent(agentId) {
@@ -554,6 +706,7 @@ function makeTerminalRecoveryHarness(options = {}) {
         steps: []
       };
     },
+    fsbReplayAssertExecutablePreparation() {},
     async fsbReplayClearRecoverySnapshots(id) {
       assert.equal(id, replaySessionId);
       calls.clears++;
@@ -569,6 +722,7 @@ function makeTerminalRecoveryHarness(options = {}) {
   vm.createContext(context);
   vm.runInContext(
     "const FSB_REPLAY_CHECKPOINT_KIND = 'fsb-lattice-replay-checkpoint/v1';\n" +
+      "const FSB_REPLAY_CHECKPOINT_CATALOG_KEY = 'fsbLatticeReplayCheckpointRunsV2';\n" +
       "const FSB_REPLAY_TERMINAL_STATUSES = new Set(['replay_completed', 'replay_failed', 'replay_stopped']);\n" +
       declarationSource(background, 'fsbReplayReleaseAgentId') + '\n' +
       declarationSource(background, 'fsbReplayReleaseRecoveredTerminalAgent') + '\n' +
@@ -697,9 +851,10 @@ function makeRegisteredRecoveryFailureHarness(options = {}) {
   const replaySessionId = 'replay-registered-test';
   const sourceSessionId = 'source-registered-test';
   const clone = (value) => JSON.parse(JSON.stringify(value));
+  const initialRun = options.journalRun || { id: replaySessionId, status: 'running', steps: [] };
   let storedLogs = {
     [sourceSessionId]: {
-      replay: { lastRun: { id: replaySessionId, status: 'running', steps: [] } }
+      replay: { lastRun: clone(initialRun) }
     }
   };
   let builtSession = null;
@@ -711,7 +866,9 @@ function makeRegisteredRecoveryFailureHarness(options = {}) {
     cleanups: 0,
     localSets: 0,
     reclaims: 0,
+    reclaimStates: [],
     releases: [],
+    executions: 0,
     starts: 0,
     stops: 0,
     warnings: 0
@@ -733,7 +890,7 @@ function makeRegisteredRecoveryFailureHarness(options = {}) {
   const context = {
     chrome: {
       storage: {
-        session: { async get() { return { snapshot }; } },
+        session: { async get(key) { return { [key]: [replaySessionId] }; } },
         local: {
           async get() { return { fsbSessionLogs: clone(storedLogs) }; },
           async set(value) {
@@ -744,7 +901,23 @@ function makeRegisteredRecoveryFailureHarness(options = {}) {
         }
       }
     },
-    FsbLatticeReplay: {},
+    FsbLatticeRuntimeAdapter: {
+      createFsbLatticeRuntimeAdapter() {
+        return { async loadLatestSnapshot() { return snapshot; } };
+      }
+    },
+    FsbLatticeReplay: {
+      async persistReplayRun(sessionId, run) {
+        assert.equal(sessionId, sourceSessionId);
+        calls.localSets++;
+        if (options.failLocalSet === true) throw new Error('local storage write failed');
+        storedLogs[sourceSessionId].replay.lastRun = clone(run);
+        return true;
+      }
+    },
+    fsbReplayClone(value, fallback) {
+      return value == null ? fallback : clone(value);
+    },
     activeSessions,
     fsbAgentRegistryInstance: {
       hasAgent(agentId) {
@@ -765,26 +938,29 @@ function makeRegisteredRecoveryFailureHarness(options = {}) {
           manifestHash: 'current-manifest-hash',
           lastRun: clone(storedLogs[sourceSessionId].replay.lastRun)
         },
-        steps: [{ id: 'step-1', index: 0, tool: 'click', replay: { risk: 'write' } }],
+        steps: [
+          { id: 'step-1', index: 0, tool: 'open_tab', replay: { risk: 'navigation' } },
+          { id: 'step-2', index: 1, tool: 'click', replay: { risk: 'write' } }
+        ],
         tabs: [{ id: 'primary', startUrl: 'https://example.com/start' }]
       };
     },
-    async fsbReplayReclaimOwnedTabs() {
+    fsbReplayAssertExecutablePreparation() {},
+    async fsbReplayReclaimOwnedTabs(state) {
       calls.reclaims++;
+      calls.reclaimStates.push(clone(state));
+      const targetTabId = Number.isFinite(state.targetTabId) ? state.targetTabId : 101;
+      const logicalTabs = Array.isArray(state.logicalTabs) ? state.logicalTabs : [];
+      const replayTabs = {};
+      logicalTabs.forEach((tab) => { replayTabs[tab.logicalTab || 'primary'] = clone(tab); });
       return {
         owned: {
-          tab: { id: 101, url: 'https://example.com/start' },
+          tab: { id: targetTabId, url: state.expectedOrigin || 'https://example.com/start' },
           agentId: 'agent-recovered',
           ownershipToken: 'ownership-token'
         },
-        replayTabs: {
-          primary: {
-            logicalTab: 'primary',
-            tabId: 101,
-            expectedOrigin: 'https://example.com'
-          }
-        },
-        bootstrapLogicalTab: 'primary'
+        replayTabs,
+        bootstrapLogicalTab: logicalTabs.find((tab) => tab.tabId === targetTabId)?.logicalTab || 'primary'
       };
     },
     fsbReplayBuildSession(prepared, id, owned, _scopes, priorRun) {
@@ -822,12 +998,13 @@ function makeRegisteredRecoveryFailureHarness(options = {}) {
     },
     async fsbReplayPauseForDecision() {},
     async fsbReplayFinalize() {},
-    fsbReplayStartExecution() {},
+    fsbReplayStartExecution() { calls.executions++; },
     automationLogger: { warn() { calls.warnings++; } }
   };
   vm.createContext(context);
   vm.runInContext(
     "const FSB_REPLAY_CHECKPOINT_KIND = 'fsb-lattice-replay-checkpoint/v1';\n" +
+      "const FSB_REPLAY_CHECKPOINT_CATALOG_KEY = 'fsbLatticeReplayCheckpointRunsV2';\n" +
       "const FSB_REPLAY_TERMINAL_STATUSES = new Set(['replay_completed', 'replay_failed', 'replay_stopped']);\n" +
       'const FSB_REPLAY_LEGACY_TOOL_MAP = Object.freeze({});\n' +
       declarationSource(background, 'fsbReplayReleaseAgentId') + '\n' +
@@ -848,6 +1025,38 @@ function makeRegisteredRecoveryFailureHarness(options = {}) {
     storedRun() { return clone(storedLogs[sourceSessionId].replay.lastRun); }
   };
 }
+
+test('journal-advanced recovery reclaims the topology committed with the cursor', async () => {
+  const harness = makeRegisteredRecoveryFailureHarness({
+    journalRun: {
+      id: 'replay-registered-test',
+      status: 'running',
+      nextStep: 1,
+      previousReceiptCid: 'receipt-after-open-tab',
+      targetTabId: 202,
+      expectedOrigin: 'https://two.example',
+      logicalTabs: [
+        { logicalTab: 'primary', tabId: 101, expectedOrigin: 'https://example.com' },
+        { logicalTab: 'tab-2', tabId: 202, expectedOrigin: 'https://two.example' }
+      ],
+      steps: [{ stepId: 'step-1', index: 0, tool: 'open_tab', success: true }]
+    }
+  });
+
+  await harness.restoreReplayCheckpoints();
+
+  assert.equal(harness.calls.reclaims, 1);
+  assert.equal(harness.calls.executions, 1);
+  assert.equal(harness.calls.warnings, 0);
+  assert.equal(harness.calls.reclaimStates[0].targetTabId, 202);
+  assert.deepEqual(harness.calls.reclaimStates[0].logicalTabs, [
+    { logicalTab: 'primary', tabId: 101, expectedOrigin: 'https://example.com' },
+    { logicalTab: 'tab-2', tabId: 202, expectedOrigin: 'https://two.example' }
+  ]);
+  assert.equal(harness.builtSession().currentStep, 1);
+  assert.equal(harness.builtSession().replayTabs['tab-2'].tabId, 202);
+  assert.equal(harness.activeSessions.size, 1);
+});
 
 test('post-registration recovery failure releases ownership despite cleanup errors', async () => {
   const harness = makeRegisteredRecoveryFailureHarness({ cleanupThrows: true });

@@ -17,6 +17,8 @@ const SERIALIZED_LIFECYCLE_TOOLS = new Set([
   'complete_task',
   'partial_task',
   'fail_task',
+  // Semantically read-only, but consumes the exclusive per-tab CDP resource.
+  'capture_screenshot',
 ]);
 
 // ---------------------------------------------------------------------------

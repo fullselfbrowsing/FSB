@@ -17,7 +17,7 @@
 
 *Manual browser tools, capabilities, trigger watchers, visual sessions, autopilot, vault, and observability for the FSB Chrome Extension.*
 
-[Quick Start](#quick-start) · [Trigger Watchers](#trigger-watchers) · [Tools](#tools-68-total) · [Diagnostics](#diagnostics) · [Architecture](#architecture)
+[Quick Start](#quick-start) · [Trigger Watchers](#trigger-watchers) · [Tools](#tools-69-total) · [Diagnostics](#diagnostics) · [Architecture](#architecture)
 
 </div>
 
@@ -455,7 +455,7 @@ Most tools execute on background tabs without stealing focus. Tools that genuine
 
 ---
 
-## Tools (68 Total)
+## Tools (69 Total)
 
 ### Visual Sessions (2)
 
@@ -515,6 +515,14 @@ Notes:
 | `list_tabs` | List open tabs. |
 | `read_sheet` | Read spreadsheet ranges. |
 
+### Developer / UAT (1)
+
+| Tool | Purpose |
+|------|---------|
+| `capture_screenshot` | Capture Chromium's live composited viewport, full page, exact region, or selected element as a lossless PNG. |
+
+The screenshot excludes browser chrome and the desktop. FSB overlays are hidden by default and restored after capture. The MCP result contains both a native image block and a uniquely named private file under `~/.fsb/screenshots` (directory `0700`, file `0600`); matching files older than seven days are removed automatically. The path can be passed directly to `upload_file`. Screenshot pixels can contain sensitive visible page data, so upload or share the file only with a trusted destination. Autopilot uses the same capture engine but keeps image bytes in memory only and creates no filesystem artifact.
+
 ### Capabilities (2)
 
 | Tool | Purpose |
@@ -572,6 +580,7 @@ graph TD
       C["Capabilities"]
       T["Autopilot"]
       W["Trigger watchers"]
+      U["Developer / UAT"]
     end
 
     B --- Surface

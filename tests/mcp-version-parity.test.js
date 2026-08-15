@@ -323,19 +323,20 @@ async function run() {
     assert(!/\b66(?:-tool| MCP| granular| registered)|\(66 tools\)|Tools \(66 Total\)/u.test(content),
       `${name} contains no stale 66-tool surface claim`);
   }
-  assert(rootReadme.includes('68 registered MCP tools') && packageReadme.includes('## Tools (68 Total)'),
-    'primary README authorities advertise the 68-tool registered surface');
+  assert(rootReadme.includes('69 registered MCP tools') && packageReadme.includes('## Tools (69 Total)'),
+    'primary README authorities advertise the 69-tool registered surface');
   const rootSurfaceTable = rootReadme.match(/\| Visual sessions \|[\s\S]*?\n\nRead-only tools bypass/u);
   const rootSurfaceCounts = rootSurfaceTable
     ? Array.from(rootSurfaceTable[0].matchAll(/^\|[^|]+\|\s*(\d+)\s*\|/gmu), (match) => Number(match[1]))
     : [];
-  assert(rootSurfaceCounts.length === 8 && rootSurfaceCounts.reduce((sum, count) => sum + count, 0) === 68,
-    'root README category table contains eight surfaces totaling 68 tools');
-  assert(promptSource.includes('FSB Tool Reference (48 tools)') &&
+  assert(rootSurfaceCounts.length === 9 && rootSurfaceCounts.reduce((sum, count) => sum + count, 0) === 69,
+    'root README category table contains nine surfaces totaling 69 tools');
+  assert(promptSource.includes('FSB Tool Reference (49 tools)') &&
+    promptSource.includes('## Developer / UAT (1 tool)') &&
     promptSource.includes('## Observability (7 tools)') &&
     promptSource.includes('| get_session_replay |') &&
     promptSource.includes('| replay_session |'),
-  'shipped tool-reference prompt advertises its 48 listed tools and both replay observability tools');
+  'shipped tool-reference prompt advertises its 49 listed tools, screenshot capture, and both replay observability tools');
 
   console.log('\n--- cli output parity ---');
   const helpOutput = runCommand('node mcp/build/index.js help');
@@ -361,6 +362,7 @@ async function run() {
   const messageTypes = extractMcpMessageTypes(typesSource);
   const mergedAdditiveMessageTypes = [
     'mcp:task-status',
+    'mcp:capture-screenshot',
     'mcp:get-session-replay',
     'mcp:replay-session',
     'system:client-inventory',

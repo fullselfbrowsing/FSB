@@ -759,6 +759,8 @@ textarea.form-input {
 
 /* Refresh: icon-only, no background */
 .fsb-refresh-icon {
+  appearance: none;
+  -webkit-appearance: none;
   background: transparent;
   border: none;
   box-shadow: none;
@@ -775,9 +777,21 @@ textarea.form-input {
   transition: color var(--transition-fast);
 }
 
-.fsb-refresh-icon:hover {
+.fsb-refresh-icon:hover:not(:disabled) {
   background: transparent;
   color: var(--primary-color);
+}
+
+.fsb-refresh-icon:focus-visible {
+  outline: none;
+  color: var(--primary-color);
+  box-shadow: var(--fsb-focus-ring);
+}
+
+.fsb-refresh-icon:disabled {
+  color: var(--text-muted);
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 .fsb-refresh-icon i {
@@ -1062,6 +1076,87 @@ textarea.form-input {
   font-size: 0.75rem;
   color: var(--text-muted);
   margin-top: var(--space-sm);
+}
+
+.voice-permission-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-lg);
+  padding: var(--space-md);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  background: var(--bg-secondary);
+}
+
+.voice-permission-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.voice-permission-copy .setting-hint {
+  margin-top: 0;
+}
+
+.voice-permission-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.voice-permission-status::before {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 8px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  content: '';
+}
+
+.voice-permission-status[data-state="granted"]::before {
+  background: var(--success-color);
+}
+
+.voice-permission-status[data-state="prompt"]::before,
+.voice-permission-status[data-state="checking"]::before {
+  background: var(--warning-color);
+}
+
+.voice-permission-status[data-state="denied"]::before,
+.voice-permission-status[data-state="unavailable"]::before {
+  background: var(--danger);
+}
+
+.voice-permission-actions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+}
+
+.voice-permission-actions [hidden] {
+  display: none;
+}
+
+.voice-permission-note {
+  margin-top: var(--space-md);
+}
+
+@media (max-width: 720px) {
+  .voice-permission-panel {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .voice-permission-actions {
+    justify-content: flex-start;
+  }
 }
 
 /* Modern Slider */
@@ -3294,19 +3389,32 @@ textarea.form-input {
 }
 
 .explorer-option {
-  display: flex;
+  display: grid;
+  grid-template-columns: max-content 7.5rem;
   align-items: center;
   gap: 0.5rem;
+  flex: 0 0 auto;
+  min-width: 0;
   font-size: 0.8125rem;
   color: var(--text-secondary);
 }
 
+.explorer-option > span {
+  white-space: nowrap;
+}
+
 .explorer-option select {
-  padding: 0.25rem 0.5rem;
   border-radius: 6px;
   border: 1px solid var(--border-color);
   background: var(--bg-secondary);
   color: var(--text-primary);
+}
+
+.explorer-option .form-select.small {
+  width: 7.5rem;
+  min-width: 7.5rem;
+  padding: 0.5rem 2rem 0.5rem 0.75rem;
+  background-position: right 0.625rem center;
   font-size: 0.8125rem;
 }
 
@@ -3573,7 +3681,12 @@ textarea.form-input {
 
   .explorer-options-row {
     flex-direction: column;
-    align-items: flex-start;
+    align-items: stretch;
+  }
+
+  .explorer-option {
+    grid-template-columns: minmax(0, 1fr) 7.5rem;
+    width: 100%;
   }
 
   .research-detail-grid {
@@ -4538,6 +4651,59 @@ textarea.form-input {
 
 
 /* Detail toggle icon for all expandable items */
+.memory-item {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.memory-item-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.memory-item-icon {
+  color: var(--primary);
+  font-size: 1.1em;
+  flex-shrink: 0;
+}
+
+.memory-item-copy {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.memory-item-title,
+.memory-item-meta {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.memory-item-title {
+  font-weight: 500;
+}
+
+.memory-item-meta {
+  margin-top: 2px;
+  color: var(--text-secondary);
+  font-size: 0.82em;
+}
+
+.memory-item-header > .refine-btn-prominent,
+.memory-item-header > .memory-delete-btn {
+  flex-shrink: 0;
+}
+
+.memory-item-header > .memory-delete-btn {
+  color: var(--danger, #ef4444);
+}
+
 .memory-item .detail-toggle-icon {
   margin-left: auto;
   font-size: 0.8em;

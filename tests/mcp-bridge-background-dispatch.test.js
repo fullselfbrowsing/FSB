@@ -390,6 +390,96 @@ async function runSendMessageFallbackCase() {
   assertDeepEqual(empty, {}, 'undefined fallback response coerces to {}');
 }
 
+async function runRecordingLeaseLifecycleCase() {
+  console.log('\n--- MCP recording call lease lifecycle ---');
+  const harness = buildClientHarness();
+  const client = harness.exports.mcpBridgeClient;
+  const lifecycle = [];
+  harness.context.fsbMcpSessionRecorder = {
+    async beginCall(identity, leaseMs) {
+      lifecycle.push({ phase: 'begin', identity: toPlainObject(identity), leaseMs });
+    },
+    async endCall(identity) {
+      lifecycle.push({ phase: 'end', identity: toPlainObject(identity) });
+    }
+  };
+  client._sendResult = () => lifecycle.push({ phase: 'result' });
+  client._sendError = () => lifecycle.push({ phase: 'error' });
+  client._routeMessage = async () => {
+    lifecycle.push({ phase: 'route' });
+    throw new Error('simulated routing failure');
+  };
+  const payload = {
+    agentId: 'agent-lease-lifecycle',
+    recordingRunId: 'recording-run-lease-lifecycle',
+    recordingCallId: 'recording-call-lease-lifecycle',
+    recordingLeaseMs: 125_000,
+    tool: 'trigger',
+    params: { secret: 'not part of the lease identity' }
+  };
+  await client._handleMessage(JSON.stringify({ id: 'lease-message', type: 'mcp:trigger', payload }));
+  assertDeepEqual(lifecycle.map((item) => item.phase), ['begin', 'route', 'error', 'end'],
+    'routing failures always settle the durable call lease');
+  assertEqual(lifecycle[0].leaseMs, 125_000, 'bridge forwards the timeout-derived lease duration');
+  assertDeepEqual(lifecycle[0].identity, lifecycle[3].identity,
+    'begin and end use the same compact call identity');
+  assert(!JSON.stringify(lifecycle[0].identity).includes('secret'),
+    'lease lifecycle never forwards public request parameters');
+}
+
+async function runRecordingLeaseDoesNotGateRoutingCase() {
+  console.log('\n--- MCP recording call lease never gates routing ---');
+  const harness = buildClientHarness();
+  const client = harness.exports.mcpBridgeClient;
+  const lifecycle = [];
+  let settleBegin;
+  const beginPending = new Promise((resolve) => {
+    settleBegin = () => {
+      lifecycle.push({ phase: 'begin-settled' });
+      resolve();
+    };
+  });
+  harness.context.fsbMcpSessionRecorder = {
+    beginCall() {
+      lifecycle.push({ phase: 'begin' });
+      return beginPending;
+    },
+    async endCall() {
+      lifecycle.push({ phase: 'end' });
+      await beginPending;
+      lifecycle.push({ phase: 'end-settled' });
+    }
+  };
+  client._sendResult = () => lifecycle.push({ phase: 'result' });
+  client._sendError = () => lifecycle.push({ phase: 'error' });
+  client._routeMessage = async () => {
+    lifecycle.push({ phase: 'route' });
+    return { routed: true };
+  };
+  const payload = {
+    agentId: 'agent-lease-nonblocking',
+    recordingRunId: 'recording-run-lease-nonblocking',
+    recordingCallId: 'recording-call-lease-nonblocking',
+    recordingLeaseMs: 125_000,
+    tool: 'trigger'
+  };
+
+  const handling = client._handleMessage(JSON.stringify({
+    id: 'lease-nonblocking-message',
+    type: 'mcp:trigger',
+    payload
+  }));
+  await new Promise((resolve) => setImmediate(resolve));
+  assertDeepEqual(lifecycle.map((item) => item.phase), ['begin', 'route', 'result', 'end'],
+    'routing and response delivery proceed while recorder begin remains pending');
+
+  settleBegin();
+  await handling;
+  assertDeepEqual(lifecycle.map((item) => item.phase),
+    ['begin', 'route', 'result', 'end', 'begin-settled', 'end-settled'],
+    'lease settlement retains FIFO ordering after non-blocking routing');
+}
+
 async function runListCredentialsSecretStripCase() {
   console.log('\n--- A5: mcp:list-credentials end-to-end strips secrets (MCP-01) ---');
 
@@ -3194,6 +3284,11 @@ function runSourceContractCase() {
   assert(bootHydrate >= 0 && bootHydrate < bootSubscribe
       && bootSubscribe < bootObserver && bootObserver < bootReconcile,
     'boot hydrates silently before subscription, observer install, and status reconcile');
+  assert(bootSource.includes('runtimeEvent.view.terminal')
+      && bootSource.includes('runtimeEvent.view.delegationId')
+      && !bootSource.includes('runtimeEvent.snapshot')
+      && bootSource.includes('chrome.runtime.sendMessage(runtimeEvent)'),
+    'background bookkeeping and fanout consume only the bounded runtime view');
   const reconcileSource = delegationComposition.slice(
     delegationComposition.indexOf('async function fsbReconcileDelegationSnapshots(controller, snapshots) {'),
     delegationComposition.indexOf('async function fsbReadAuthoritativeProviderConfig()')
@@ -3404,6 +3499,8 @@ async function run() {
   }
   await runPrefersInternalDispatchCase();
   await runSendMessageFallbackCase();
+  await runRecordingLeaseLifecycleCase();
+  await runRecordingLeaseDoesNotGateRoutingCase();
   await runListCredentialsSecretStripCase();
   await runAgentActionDeprecationCase();
   await runDriftSettlementCases();

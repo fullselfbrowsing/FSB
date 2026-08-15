@@ -56,7 +56,7 @@ const REPO_ROOT = path.resolve(__dirname, '..');
 // The INV-01 lock value -- reused verbatim from tests/tool-definitions-parity.test.js:52.
 // The two out-of-registry capability tools must NOT have moved this.
 const EXPECTED_NON_TRIGGER_REGISTRY_HASH =
-  '0a525835adc6961463c5a954f3e80205f066e23bef6089283ef598c78f1d8623';
+  'b9c30a5a61fbcdae60b851aebfea90d0961cb95d95c3c2adbf8357014bbbd7b9';
 
 // The four trigger tools sit IN TOOL_REGISTRY but are excluded from the frozen
 // non-trigger baseline (mirrors tool-definitions-parity.test.js:35).

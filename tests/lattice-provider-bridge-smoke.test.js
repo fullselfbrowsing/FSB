@@ -625,9 +625,12 @@ async function loadOffscreenHandlerSource(chromeMock) {
   // Google Sheets support loads -> 322. The native-host install-command
   // projector adds one pure shared helper -> 323.
   // Quick 260728-k2v loads the animated action-icon module -> 324. The
-  // replay manifest helper adds one classic-SW load -> 325.
+  // replay manifest helper adds one classic-SW load -> 325, and the durable
+  // MCP Lattice journal adds one classic-SW load -> 326. The export helper is
+  // mention 327, and screenshot capture adds the CDP lease, capture engine,
+  // and attachment helper -> 330.
   const importScriptsCount = (bgSource.match(/importScripts/g) || []).length;
-  passAssertEqual(importScriptsCount, 325, 'background.js importScripts count includes the Lattice replay manifest helper');
+  passAssertEqual(importScriptsCount, 330, 'background.js importScripts count includes the Lattice replay, MCP journal, export, and screenshot helpers');
   // Companion call-site-only count (regex requires open paren): Phase 5 baseline
   // was 150 actual importScripts() calls; Phase 6 adds 1 -> 151; Phase 8 adds 1 -> 152;
   // Phase 14 adds 2 (trigger-store + trigger-lifecycle) -> 154; Phase 15 adds 2
@@ -669,9 +672,11 @@ async function loadOffscreenHandlerSource(chromeMock) {
   // PR #105 adds four call sites -> 318. The native-host install-command
   // projector adds one pure shared helper call site -> 319.
   // Quick 260728-k2v adds the animated action-icon module call site -> 320;
-  // the replay manifest helper is call site 321.
+  // the replay manifest helper is call site 321, and the durable MCP Lattice
+  // journal is call site 322. The export helper is call site 323, and screenshot
+  // capture adds three call sites -> 326.
   const importScriptsCallSites = (bgSource.match(/importScripts\(/g) || []).length;
-  passAssertEqual(importScriptsCallSites, 321, 'background.js importScripts() call sites include the Lattice replay helper');
+  passAssertEqual(importScriptsCallSites, 326, 'background.js importScripts() call sites include the Lattice replay, MCP journal, export, and screenshot helpers');
 
   const lineCli = bgLines.findIndex(l => /importScripts\(['"]ai\/cli-parser\.js['"]\)/.test(l));
   const lineBridge = bgLines.findIndex(l => /importScripts\(['"]ai\/lattice-provider-bridge\.js['"]\)/.test(l));

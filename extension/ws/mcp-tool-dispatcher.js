@@ -101,6 +101,7 @@ const MCP_PHASE199_TOOL_ROUTES = {
 
 const MCP_PHASE199_MESSAGE_ROUTES = {
   'mcp:get-tabs': { routeFamily: 'read-only', helperName: '_handleGetTabs' },
+  'mcp:capture-screenshot': { routeFamily: 'developer-uat', handler: handleCaptureScreenshotMessageRoute },
   'mcp:get-diagnostics': { routeFamily: 'diagnostics', handler: handleGetDiagnosticsMessageRoute },
   'mcp:get-site-guides': { routeFamily: 'read-only', handler: handleGetSiteGuidesRoute },
   'mcp:get-page-snapshot': { routeFamily: 'read-only', handler: handleGetPageSnapshotRoute },
@@ -684,8 +685,9 @@ async function dispatchMcpToolRoute({ tool, params = {}, client = null, tab = nu
         globalThis.fsbMcpMetricsRecorder.recordDispatch({
           client: resolveMcpClientLabel(payload),
           tool,
-          requestPayload: payload,
-          response,
+          requestMetadata: {
+            textLength: payload && typeof payload.text === 'string' ? payload.text.length : 0
+          },
           success,
           dispatcher_route: 'tool'
         });
@@ -788,8 +790,9 @@ async function dispatchMcpMessageRoute({ type, payload = {}, client = null, mcpM
           globalThis.fsbMcpMetricsRecorder.recordDispatch({
             client: resolveMcpClientLabel(payload),
             tool: type,
-            requestPayload: payload,
-            response,
+            requestMetadata: {
+              textLength: payload && typeof payload.text === 'string' ? payload.text.length : 0
+            },
             success,
             dispatcher_route: 'message'
           });
@@ -813,7 +816,9 @@ async function dispatchMcpMessageRoute({ type, payload = {}, client = null, mcpM
             client: resolveMcpClientLabel(payload),
             tool: type,
             requestPayload: payload,
-            response,
+            // Screenshot pixels are transport-only. The session journal keeps
+            // sanitized metadata and never receives base64.
+            response: sanitizeMcpMessageResponseForRecording(type, response),
             success,
             dispatcher_route: 'message',
             tabId: payload && payload[MCP_REPLAY_RECORD_CONTEXT]
@@ -854,6 +859,37 @@ async function dispatchMcpMessageRoute({ type, payload = {}, client = null, mcpM
   }
 }
 
+function sanitizeMcpMessageResponseForRecording(type, response) {
+  if (type !== 'mcp:capture-screenshot' || !response || typeof response !== 'object') {
+    return response;
+  }
+  const metadata = response.metadata && typeof response.metadata === 'object'
+    ? response.metadata
+    : {};
+  const recordedMetadata = {};
+  for (const key of [
+    'capture_id',
+    'output_width',
+    'output_height',
+    'byte_length',
+    'duration_ms',
+    'delivery_status'
+  ]) {
+    if (metadata[key] !== undefined) recordedMetadata[key] = metadata[key];
+  }
+
+  const sanitized = {
+    success: response.success !== false,
+    metadata: recordedMetadata
+  };
+  if (response.success === false) {
+    const code = response.code || response.errorCode;
+    if (code) sanitized.code = code;
+    sanitized.retryable = response.retryable === true;
+  }
+  return sanitized;
+}
+
 function buildRestrictedMcpResponse({ currentUrl, pageType, tool, error }) {
   return {
     success: false,
@@ -867,10 +903,12 @@ function buildRestrictedMcpResponse({ currentUrl, pageType, tool, error }) {
 }
 
 async function buildRestrictedResponseIfReadRoute({ type, client, payload }) {
-  if (type !== 'mcp:read-page' && type !== 'mcp:get-dom') {
+  if (type !== 'mcp:read-page' && type !== 'mcp:get-dom' && type !== 'mcp:capture-screenshot') {
     return { applies: false, recordContext: null, restrictedResponse: null };
   }
-  const tool = type === 'mcp:read-page' ? 'read_page' : 'get_dom_snapshot';
+  const tool = type === 'mcp:read-page'
+    ? 'read_page'
+    : (type === 'mcp:get-dom' ? 'get_dom_snapshot' : 'capture_screenshot');
 
   if (typeof globalThis !== 'undefined' && typeof globalThis.resolveAgentTabOrError === 'function') {
     return buildRestrictedResponseForResolvedTab({ tool, client, payload });
@@ -892,6 +930,70 @@ async function buildRestrictedResponseIfReadRoute({ type, client, payload }) {
         })
       : null
   };
+}
+
+async function handleCaptureScreenshotMessageRoute({ payload = {}, client = null }) {
+  const engine = (typeof globalThis !== 'undefined') ? globalThis.FsbScreenshotCapture : null;
+  if (!engine || typeof engine.capture !== 'function') {
+    return {
+      success: false,
+      code: 'SCREENSHOT_CAPTURE_FAILED',
+      errorCode: 'SCREENSHOT_CAPTURE_FAILED',
+      error: 'Screenshot capture engine unavailable'
+    };
+  }
+
+  const agentId = payload && payload.agentId ? payload.agentId : null;
+  let resolved;
+  if (typeof globalThis !== 'undefined' && typeof globalThis.resolveAgentTabOrError === 'function') {
+    resolved = await globalThis.resolveAgentTabOrError(agentId, payload, client);
+  } else {
+    const activeTab = await getActiveTabFromClient(client).catch(() => null);
+    resolved = activeTab && Number.isFinite(activeTab.id)
+      ? { tabId: activeTab.id, ownershipToken: null, skipGate: true }
+      : { success: false, code: 'NO_ACTIVE_TAB', errorCode: 'NO_ACTIVE_TAB', error: 'NO_ACTIVE_TAB' };
+  }
+  if (!resolved || resolved.success === false || !Number.isFinite(resolved.tabId)) {
+    const code = resolved && resolved.code ? resolved.code : 'NO_OWNED_TAB';
+    return {
+      success: false,
+      error: code,
+      errorCode: code,
+      ...(resolved || {})
+    };
+  }
+
+  if (resolved.skipGate !== true) {
+    const gateResult = checkOwnershipGate({
+      tool: 'capture_screenshot',
+      params: { tabId: resolved.tabId },
+      payload: { ...payload, tabId: resolved.tabId }
+    });
+    if (gateResult) return gateResult;
+  }
+
+  let tab;
+  try {
+    tab = await getChromeTabsApi().get(resolved.tabId);
+  } catch (error) {
+    return {
+      success: false,
+      code: 'SCREENSHOT_CAPTURE_FAILED',
+      errorCode: 'SCREENSHOT_CAPTURE_FAILED',
+      error: error && error.message ? error.message : String(error)
+    };
+  }
+  const currentUrl = (tab && (tab.url || tab.pendingUrl)) || '';
+  if (isRestrictedMcpUrl(currentUrl)) {
+    return buildRestrictedMcpResponse({
+      currentUrl,
+      pageType: getPageTypeDescriptionForMcp(currentUrl),
+      tool: 'capture_screenshot',
+      error: 'Screenshot capture is unavailable on restricted pages'
+    });
+  }
+
+  return engine.capture(payload, resolved.tabId);
 }
 
 // Checks restriction on the CALLER'S ACTUAL TARGET tab (via the same
@@ -1684,7 +1786,7 @@ async function handleOpenTabRoute({ params }) {
 // Phase 34: MCP front door for upload_file. Tab ownership is already enforced
 // by resolveAgentTabOrError + checkOwnershipGate before this runs; the shared
 // background helper (executeUploadFile) owns the denylist + audit chokepoint.
-async function handleUploadFileRoute({ params, tab }) {
+async function handleUploadFileRoute({ params, tab, payload }) {
   const p = params || {};
   const targetTabId = Number.isFinite(p.tabId)
     ? p.tabId
@@ -1705,7 +1807,9 @@ async function handleUploadFileRoute({ params, tab }) {
     return createMcpRouteError('upload_file', 'browser', MCP_ROUTE_RECOVERY_HINT, { error: 'upload handler unavailable' });
   }
   try {
-    const result = await uploadFn(targetTabId, p.selector, p.file_path);
+    const result = await uploadFn(targetTabId, p.selector, p.file_path, {
+      allowManagedScreenshot: payload && payload.managedScreenshotAttested === true
+    });
     if (result && result.success) {
       return { success: true, tool: 'upload_file', method: result.method, selector: result.selector, file: result.file };
     }

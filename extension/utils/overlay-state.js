@@ -252,6 +252,10 @@
     var allowedSpeeds = { '0.5': true, '1': true, '2': true, '4': true };
     var durationMs = Math.max(0, Math.round(Number(raw.durationMs) || 0));
     var positionMs = Math.max(0, Math.min(durationMs, Math.round(Number(raw.positionMs) || 0)));
+    var interpolationTargetMs = Math.max(
+      positionMs,
+      Math.min(durationMs, Math.round(Number(raw.interpolationTargetMs) || positionMs))
+    );
     var totalSteps = Math.max(0, Math.round(Number(raw.totalSteps) || 0));
     var currentStep = Math.max(0, Math.min(totalSteps, Math.round(Number(raw.currentStep) || 0)));
     var speed = Number(raw.speed);
@@ -260,6 +264,7 @@
       status: allowedStatuses[raw.status] ? raw.status : 'playing',
       speed: allowedSpeeds[String(speed)] ? speed : 1,
       positionMs: positionMs,
+      interpolationTargetMs: interpolationTargetMs,
       durationMs: durationMs,
       currentStep: currentStep,
       totalSteps: totalSteps,

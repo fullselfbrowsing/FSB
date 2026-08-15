@@ -97,6 +97,51 @@ const MAX_REASONING_TIMEOUT = 90000;
  * @param {number} attempt - Retry attempt number (0-based), increases timeout progressively
  * @returns {number} Timeout in milliseconds
  */
+function estimateRequestTextCharacters(value, key = '', seen = new WeakSet()) {
+  if (value == null) return 0;
+  if (typeof value === 'string') {
+    if (/^data:image\/[a-z0-9.+-]+;base64,/i.test(value)) return 0;
+    if (key === 'data' && value.length > 256 && /^[A-Za-z0-9+/]+=*$/.test(value)) return 0;
+    return value.length;
+  }
+  if (typeof value !== 'object') return String(value).length;
+  if (seen.has(value)) return 0;
+  seen.add(value);
+  if (Array.isArray(value)) {
+    return value.reduce((sum, item) => sum + estimateRequestTextCharacters(item, '', seen), 0);
+  }
+  const imageMime = typeof value.mimeType === 'string'
+    ? value.mimeType
+    : (typeof value.media_type === 'string' ? value.media_type : '');
+  let chars = 0;
+  for (const [childKey, child] of Object.entries(value)) {
+    // Image bytes are network payload, not prompt text. Metadata (mime type,
+    // labels, dimensions) remains countable through the surrounding fields.
+    if (childKey === 'data' && typeof child === 'string'
+        && (/^image\//i.test(imageMime)
+          || (child.length > 256 && /^[A-Za-z0-9+/]+=*$/.test(child)))) continue;
+    chars += estimateRequestTextCharacters(child, childKey, seen);
+  }
+  return chars;
+}
+
+function requestContainsImageData(value, key = '', parent = null, seen = new WeakSet()) {
+  if (value == null) return false;
+  if (typeof value === 'string') {
+    if (/^data:image\/[a-z0-9.+-]+;base64,/i.test(value)) return true;
+    const parentMime = parent && typeof parent === 'object'
+      ? (parent.mimeType || parent.media_type || '')
+      : '';
+    return key === 'data' && /^image\//i.test(String(parentMime));
+  }
+  if (typeof value !== 'object' || seen.has(value)) return false;
+  seen.add(value);
+  if (value.type === 'image' || value.inlineData || value.inline_data) return true;
+  return Object.entries(value).some(([childKey, child]) => (
+    requestContainsImageData(child, childKey, value, seen)
+  ));
+}
+
 function calculateAdaptiveTimeout(requestBody, modelName = '', attempt = 0) {
   const isReasoning = /reasoning|grok-4(?!.*(?:fast|mini))/.test(modelName);
   const baseTimeout = isReasoning ? REASONING_MODEL_TIMEOUT : DEFAULT_REQUEST_TIMEOUT;
@@ -106,16 +151,7 @@ function calculateAdaptiveTimeout(requestBody, modelName = '', attempt = 0) {
   const retryMultiplier = 1 + (Math.min(attempt, 2) * 0.5);
 
   try {
-    // PERF: Estimate size from messages array length instead of serializing entire body
-    let estimatedChars = 0;
-    if (requestBody.messages && Array.isArray(requestBody.messages)) {
-      for (const msg of requestBody.messages) {
-        estimatedChars += (msg.content || '').length;
-      }
-    } else {
-      // Fallback: rough estimate from stringify (only if no messages array)
-      estimatedChars = JSON.stringify(requestBody).length;
-    }
+    const estimatedChars = estimateRequestTextCharacters(requestBody);
     const estimatedTokens = estimatedChars / 4;
     const extra = Math.floor(estimatedTokens / 5000) * 5000;
     return Math.min(Math.round((baseTimeout + extra) * retryMultiplier), maxTimeout);
@@ -478,7 +514,7 @@ class UniversalProvider {
 
     } catch (error) {
       // Check if error is due to unsupported parameters
-      if (error.status === 400 && error.responseText) {
+      if (error.status === 400 && error.responseText && !requestContainsImageData(requestBody)) {
         const unsupportedParam = this.extractUnsupportedParameter(error.responseText);
         if (unsupportedParam && !retry) {
           console.log(`Parameter '${unsupportedParam}' not supported, retrying without it`);
@@ -726,6 +762,8 @@ if (typeof module !== 'undefined' && module.exports) {
     UniversalProvider,
     PROVIDER_CONFIGS,
     calculateAdaptiveTimeout,
+    estimateRequestTextCharacters,
+    requestContainsImageData,
     normalizeProviderBaseUrl,
     buildProviderModelsEndpoint,
     parseOpenAICompatibleModelList

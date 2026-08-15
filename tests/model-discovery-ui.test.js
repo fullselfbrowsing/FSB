@@ -73,6 +73,21 @@ assert(
   '[Task 1] control_panel.html has #refreshModelsBtn button'
 );
 
+const refreshButtonMatch = HTML.match(
+  /<button\b[^>]*id="refreshModelsBtn"[^>]*>([\s\S]*?)<\/button>/
+);
+const refreshButtonMarkup = refreshButtonMatch ? refreshButtonMatch[0] : '';
+const refreshButtonText = refreshButtonMatch
+  ? refreshButtonMatch[1].replace(/<[^>]+>/g, '').trim()
+  : '';
+assert(
+  /class="fsb-refresh-icon"/.test(refreshButtonMarkup)
+    && /aria-label="Refresh model list"/.test(refreshButtonMarkup)
+    && /class="fas fa-sync-alt"[^>]*aria-hidden="true"/.test(refreshButtonMarkup)
+    && refreshButtonText === '',
+  '[Task 1] model refresh is an accessible icon-only FSB control'
+);
+
 assert(
   /id="modelDiscoveryStatus"/.test(HTML),
   '[Task 1] control_panel.html has #modelDiscoveryStatus indicator element'
@@ -100,6 +115,12 @@ assert(/\.discovery-status\.loading\b/.test(CSS), '[Task 1] options.css defines 
 assert(/\.model-combobox\b/.test(CSS), '[Task 1] options.css defines .model-combobox');
 assert(/\.model-combobox__listbox\b/.test(CSS), '[Task 1] options.css defines .model-combobox__listbox');
 assert(/\.model-combobox__hl\b/.test(CSS), '[Task 1] options.css defines .model-combobox__hl (search-term highlight)');
+assert(/\.fsb-refresh-icon\s*\{[^}]*appearance:\s*none/s.test(CSS),
+  '[Task 1] refresh icon opts out of native button appearance');
+assert(/\.fsb-refresh-icon:focus-visible\s*\{[^}]*var\(--fsb-focus-ring\)/s.test(CSS),
+  '[Task 1] refresh icon has a visible keyboard-focus treatment');
+assert(/\.fsb-refresh-icon:disabled\s*\{[^}]*cursor:\s*not-allowed[^}]*opacity:/s.test(CSS),
+  '[Task 1] refresh icon has an explicit disabled treatment');
 
 console.log('\n--- Plan 228-02 / Task 2: options.js wiring call sites ---');
 

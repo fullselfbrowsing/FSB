@@ -617,6 +617,7 @@ var _delegationUiState = {
   lastAlertKey: null,
   announced: Object.create(null),
   announcedTransitions: Object.create(null),
+  resyncPromise: null,
   subscribed: false
 };
 
@@ -1373,6 +1374,7 @@ function _resetDelegationSelection(selectedConversationId) {
   _delegationUiState.lastAlertKey = null;
   _delegationUiState.announced = Object.create(null);
   _delegationUiState.announcedTransitions = Object.create(null);
+  _delegationUiState.resyncPromise = null;
   _delegationUiState.subscribed = false;
   _clearDelegationElapsedTimer();
 }
@@ -2505,21 +2507,143 @@ function _handleDelegationNativeWakeChecking(message) {
   return _renderDelegationNativeWakeChecking(message.intentId, message.attemptId);
 }
 
+function _requestDelegationRuntimeResync() {
+  if (_delegationUiState.resyncPromise) return true;
+  var requestedId = _delegationUiState.delegationId;
+  var pending = Promise.resolve().then(function() {
+    if (requestedId !== _delegationUiState.delegationId
+        || !_delegationIsSelectedConversation()) return false;
+    return _refreshSelectedDelegationSnapshot({ hydrated: true });
+  }).catch(function() {
+    return false;
+  });
+  _delegationUiState.resyncPromise = pending;
+  pending.then(function() {
+    if (_delegationUiState.resyncPromise === pending) {
+      _delegationUiState.resyncPromise = null;
+    }
+  }, function() {
+    if (_delegationUiState.resyncPromise === pending) {
+      _delegationUiState.resyncPromise = null;
+    }
+  });
+  return true;
+}
+
+function _delegationPreviousRuntimeSnapshot(snapshot) {
+  return snapshot ? {
+    delegationId: snapshot.delegationId,
+    state: snapshot.state,
+    provider: snapshot.provider,
+    activeTab: snapshot.activeTab
+  } : null;
+}
+
+function _renderDelegationRuntimeMetadata(
+  mount,
+  snapshot,
+  previousSnapshot,
+  previousLastSequence,
+  message
+) {
+  _delegationUiState.mode = 'snapshot';
+  mount.run.classList.remove('hidden');
+  mount.run.setAttribute(
+    'aria-busy',
+    snapshot.state === 'holding'
+      || snapshot.state === 'resuming'
+      || snapshot.state === 'stopping'
+      || _delegationUiState.pendingTake
+      || _delegationUiState.pendingResume
+      || _delegationUiState.pendingStop
+      ? 'true'
+      : 'false'
+  );
+  var alertKey = _delegationSnapshotAlertKey(snapshot);
+  if (alertKey) {
+    mount.state.setAttribute('role', 'alert');
+    if (alertKey === _delegationUiState.lastAlertKey) {
+      mount.state.setAttribute('aria-live', 'off');
+    } else {
+      mount.state.removeAttribute('aria-live');
+    }
+  } else {
+    mount.state.removeAttribute('role');
+    mount.state.removeAttribute('aria-live');
+  }
+  _delegationUiState.lastAlertKey = alertKey;
+  _renderDelegationRunHeader(mount.state, snapshot);
+
+  var announcementParts = [];
+  var lifecycleAnnouncement = _delegationLifecycleAnnouncement(
+    snapshot,
+    previousSnapshot,
+    false
+  );
+  if (lifecycleAnnouncement) announcementParts.push(lifecycleAnnouncement);
+  if (Number.isSafeInteger(message.announceSequence)
+      && message.announceSequence > previousLastSequence
+      && message.entry
+      && message.entry.sequence === message.announceSequence
+      && mount.announcer) {
+    var deliveryKey = snapshot.delegationId + ':' + message.announceSequence;
+    if (!_delegationUiState.announced[deliveryKey]) {
+      _delegationUiState.announced[deliveryKey] = true;
+      announcementParts.push(_delegationAnnouncement(message.entry));
+    }
+  }
+  if (announcementParts.length && mount.announcer) {
+    mount.announcer.textContent = announcementParts.join('. ');
+  }
+  _renderDelegationControlBar(snapshot, {});
+  _setDelegationHeaderStatus(
+    _delegationStateLabel(snapshot),
+    snapshot.state === 'running' || snapshot.state === 'holding' ? 'running'
+      : (snapshot.state === 'failed'
+        || snapshot.state === 'restart_lost'
+        || snapshot.connection === 'offline'
+        || snapshot.connection === 'disconnected'
+        ? 'error'
+        : '')
+  );
+  _setDelegationComposerLocked(_delegationSnapshotLocksComposer(snapshot));
+  return true;
+}
+
 function _handleDelegationRuntimeUpdate(message) {
   if (!_delegationUiState.subscribed
-      || !_delegationHasExactKeys(message, ['announceSequence', 'snapshot', 'type'])
+      || !message
       || message.type !== 'FSB_DELEGATION_UPDATED'
-      || (message.announceSequence !== null
-        && (!Number.isSafeInteger(message.announceSequence) || message.announceSequence < 1))
-      || typeof FsbDelegationFeed === 'undefined'
-      || !FsbDelegationFeed.validateSnapshot(message.snapshot)
-      || message.snapshot.delegationId !== _delegationUiState.delegationId
       || !_delegationIsSelectedConversation()) return false;
+  if (message.view
+      && typeof message.view.delegationId === 'string'
+      && message.view.delegationId !== _delegationUiState.delegationId) return false;
+  if (typeof FsbDelegationFeed === 'undefined'
+      || typeof FsbDelegationFeed.validateRuntimeUpdate !== 'function'
+      || typeof FsbDelegationFeed.applyRuntimeUpdate !== 'function'
+      || !FsbDelegationFeed.validateRuntimeUpdate(message)) {
+    return _requestDelegationRuntimeResync();
+  }
+  if (message.view.delegationId !== _delegationUiState.delegationId) return false;
+  var snapshot = _delegationUiState.snapshot;
+  if (!snapshot || snapshot.delegationId !== message.view.delegationId) {
+    return _requestDelegationRuntimeResync();
+  }
+  var mount = _ensureDelegationMount();
+  if (!mount.run || !mount.state || !mount.feed) return false;
+  var previousSnapshot = _delegationPreviousRuntimeSnapshot(snapshot);
+  var previousLastSequence = Number.isSafeInteger(_delegationUiState.lastRenderedSequence)
+    ? _delegationUiState.lastRenderedSequence
+    : snapshot.entries.length;
+  var applied = FsbDelegationFeed.applyRuntimeUpdate(mount.feed, snapshot, message);
+  if (!applied || applied.ok !== true) return _requestDelegationRuntimeResync();
+  _delegationUiState.snapshot = applied.snapshot;
+  _delegationUiState.lastRenderedSequence = applied.lastSequence;
   if (_delegationUiState.bindingCleanupPending === true) {
     _delegationUpdateUnboundCleanup(
       _delegationUiState.bindingCleanupOriginKey,
-      message.snapshot.delegationId,
-      message.snapshot,
+      message.view.delegationId,
+      applied.snapshot,
       _delegationUiState.task,
       _delegationUiState.pendingStop
     );
@@ -2528,14 +2652,17 @@ function _handleDelegationRuntimeUpdate(message) {
   // snapshots while the command is still pending. Keep the prior truthful
   // control in place (disabled and focused) until the authoritative command
   // result or terminal snapshot arrives; never render held/running early.
-  if ((_delegationUiState.pendingTake && message.snapshot.state === 'holding')
-      || (_delegationUiState.pendingResume && message.snapshot.state === 'resuming')) {
+  if ((_delegationUiState.pendingTake && message.view.state === 'holding')
+      || (_delegationUiState.pendingResume && message.view.state === 'resuming')) {
     return true;
   }
-  return _renderDelegationSnapshot(message.snapshot, {
-    hydrated: false,
-    announceSequence: message.announceSequence
-  });
+  return _renderDelegationRuntimeMetadata(
+    mount,
+    applied.snapshot,
+    previousSnapshot,
+    previousLastSequence,
+    message
+  );
 }
 
 async function _beginDelegationStart(challengeId) {
@@ -6174,7 +6301,10 @@ function renderReplayPreview(preview) {
   const meta = document.createElement('div');
   meta.className = 'replay-preview-meta';
   const provenance = preview.provenance === 'legacy-import' ? 'Imported legacy' : 'Capture attested';
-  meta.textContent = provenance + ' · ' + preview.counts.total + ' recorded · ' +
+  const range = preview.truncated
+    ? 'latest ' + preview.steps.length + ' of ' + preview.totalSourceSteps
+    : preview.counts.total + ' recorded';
+  meta.textContent = provenance + ' · ' + range + ' · ' +
     preview.counts.executable + ' executable · ' + preview.counts.blocked + ' inspect only';
   card.appendChild(meta);
 
@@ -6320,6 +6450,15 @@ async function startReplay(sessionId) {
     if (isHistoryViewActive) showChatView();
     renderReplayPreview(preview);
 
+    if (preview.truncated) {
+      addMessage(
+        `This recording is inspect-only because only the latest ${preview.steps.length} of ` +
+          `${preview.totalSourceSteps} recorded calls are available. Earlier browser state cannot be reconstructed safely.`,
+        'system'
+      );
+      return;
+    }
+
     if (preview.counts.executable === 0) {
       addMessage('This recording is verified for inspection, but it has no executable steps.', 'system');
       return;
@@ -6380,9 +6519,13 @@ async function deleteHistorySession(sessionId) {
 
 async function loadSessionView(sessionId) {
   try {
-    const stored = await chrome.storage.local.get(['fsbSessionLogs']);
-    const sessionStorage = stored.fsbSessionLogs || {};
-    const session = sessionStorage[sessionId];
+    const detailResponse = await chrome.runtime.sendMessage({
+      action: 'getSessionDetail',
+      sessionId,
+      afterSequence: -1,
+      limit: 500
+    });
+    const session = detailResponse?.success ? detailResponse.session : null;
 
     if (!session) {
       addMessage('Session data not found.', 'error');
@@ -6399,15 +6542,53 @@ async function loadSessionView(sessionId) {
     // Prefer the persisted replay manifest. Legacy actionHistory remains the
     // compatibility source for sessions that have not been imported yet.
     var replaySteps = session.replay?.manifest?.steps || [];
+    var replayEnvelope = null;
+    if (session.storageBackend === 'journal-v2') {
+      var replayResponse = await chrome.runtime.sendMessage({
+        action: 'getSessionReplayData',
+        sessionId
+      });
+      replayEnvelope = replayResponse?.replay || null;
+      replaySteps = (replayEnvelope?.steps || []).map(function(step) {
+        return {
+          tool: step.action?.tool,
+          arguments: step.action?.params || {},
+          success: step.result?.success !== false,
+          resultSummary: step.result?.recorded || null,
+          replay: step.replay || null,
+          capability: step.capability || null
+        };
+      });
+      if (replaySteps.length === 0) {
+        replaySteps = (detailResponse.events || []).filter(function(event) {
+          return event?.kind === 'tool.call';
+        }).map(function(event) {
+          var request = event.metadata?.request;
+          var result = event.metadata?.result;
+          return {
+            tool: event.metadata?.tool || 'unknown',
+            arguments: request?.storage === 'inline' ? request.inline : { preview: request?.preview || null },
+            success: event.metadata?.success !== false,
+            resultSummary: result?.storage === 'inline' ? result.inline : { preview: result?.preview || null },
+            replay: null,
+            capability: null
+          };
+        });
+      }
+    }
     var actions = replaySteps.length > 0 ? replaySteps : (session.actionHistory || []);
     if (actions.length > 0) {
-      var integrity = session.replay?.integrity || 'legacy';
-      var provenance = session.replay?.provenance === 'legacy-import'
+      var integrity = replayEnvelope?.metadata?.integrity || session.replay?.integrity || 'legacy';
+      var provenance = (replayEnvelope?.metadata?.provenance || session.replay?.provenance) === 'legacy-import'
         ? 'Imported legacy'
         : (integrity === 'verified'
           ? 'Capture attested'
           : (integrity === 'failed' ? 'Capture verification failed' : 'Capture awaiting verification'));
-      addMessage(provenance + ' · integrity ' + integrity + ' · ' + actions.length + ' recorded call(s):', 'system');
+      var totalSourceSteps = replayEnvelope?.metadata?.totalSourceSteps || actions.length;
+      var rangeLabel = replayEnvelope?.metadata?.truncated
+        ? 'latest ' + actions.length + ' of ' + totalSourceSteps + ' recorded call(s)'
+        : actions.length + ' recorded call(s)';
+      addMessage(provenance + ' · integrity ' + integrity + ' · ' + rangeLabel + ':', 'system');
       for (var i = 0; i < actions.length; i++) {
         var action = actions[i];
         var tool = action.capability?.slug || action.tool || 'unknown';

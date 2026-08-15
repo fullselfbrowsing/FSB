@@ -77,7 +77,7 @@ Want to run FSB standalone from the extension popup/side panel? Open settings, p
 - Runs natural language browser tasks from the popup or side panel.
 - Supports xAI, Gemini, OpenAI, Anthropic, OpenRouter, LM Studio, and custom OpenAI-compatible endpoints.
 - Discovers live provider model lists and falls back to bundled defaults.
-- Uses 56 canonical extension tool definitions and 68 registered MCP tools for external clients.
+- Uses 57 shared definitions (53 browser tools plus 4 trigger tools) and 69 registered MCP tools for external clients.
 - Provides DOM snapshots, action verification, smart waiting, stuck detection, visual feedback, and session logs.
 - Searches a 128-app capability catalog and invokes verified signed, audited, denylist-gated first-party API capabilities through the MCP capability surface.
 - Uploads real local files to file inputs through the supervised `upload_file` tool with sensitive-path safeguards.
@@ -273,7 +273,7 @@ The extension reads bundled scripts directly from `extension/`. The MCP package 
 
 ## MCP Server
 
-FSB ships [`fsb-mcp-server`](https://www.npmjs.com/package/fsb-mcp-server), a local MCP server that lets external AI clients control the same browser extension. It exposes 68 registered tools across visual sessions, trigger watchers, manual browser control, capability search/invoke, read-only page inspection, autopilot, vault, and observability.
+FSB ships [`fsb-mcp-server`](https://www.npmjs.com/package/fsb-mcp-server), a local MCP server that lets external AI clients control the same browser extension. It exposes 69 registered tools across visual sessions, trigger watchers, manual browser control, Developer/UAT capture, capability search/invoke, read-only page inspection, autopilot, vault, and observability.
 
 The extension connects to the MCP bridge on:
 
@@ -425,11 +425,14 @@ The MCP server exposes a curated public surface around that registry plus direct
 | Trigger watchers | 4 | `trigger`, `stop_trigger`, `get_trigger_status`, `list_triggers` |
 | Manual control | 37 | `execute_js`, `navigate`, `click`, `type_text`, `drag`, `upload_file` |
 | Read-only inspection | 8 | `read_page`, `get_dom_snapshot`, `get_site_guide`, `read_sheet` |
+| Developer / UAT | 1 | `capture_screenshot` |
 | Capabilities | 2 | `search_capabilities`, `invoke_capability` |
 | Observability and replay | 7 | `list_sessions`, `get_session_replay`, `replay_session` |
 | Vault | 4 | `list_credentials`, `fill_credential`, `use_payment_method` |
 
-Read-only tools bypass the mutation queue where safe. Mutation tools are serialized so two clients do not click, type, upload, invoke, or navigate at the same time. Capability tools remain outside the canonical extension registry by design; `search_capabilities` bypasses the queue, while `invoke_capability` serializes like other side-effecting tools. Search results include readiness labels so callers can distinguish `t1-ready` direct execution from `t1-guarded-fail-closed`, `learn-pending`, and `discovery-pending` catalog-tail hits.
+Read-only tools bypass the mutation queue where safe. `capture_screenshot` is semantically read-only but remains serialized because it consumes Chromium's exclusive debugger resource. Mutation tools are serialized so two clients do not click, type, upload, invoke, or navigate at the same time. Capability tools remain outside the canonical extension registry by design; `search_capabilities` bypasses the queue, while `invoke_capability` serializes like other side-effecting tools. Search results include readiness labels so callers can distinguish `t1-ready` direct execution from `t1-guarded-fail-closed`, `learn-pending`, and `discovery-pending` catalog-tail hits.
+
+`capture_screenshot` captures Chromium's actual composited page, not reconstructed HTML. MCP returns a native PNG image plus a private managed file in `~/.fsb/screenshots`; matching files expire after seven days. Autopilot does not create a file: screenshot bytes live only in service-worker memory until the next model request and are excluded from transcripts, history, logs, metrics, and persistence. A screenshot can contain sensitive visible page data, so share or upload the returned path only when the destination is trusted.
 
 Recorded MCP tasks can span multiple tabs while remaining one logical history session. The task lifecycle (`complete_task`, `partial_task`, or `fail_task`) closes that history record; `is_final` only clears the visual overlay, with idle expiry as a recording fallback. `get_session_replay` exposes the verified, receipt-free replay structure; `replay_session` requests one exact-manifest approval in the FSB side panel, after which FSB opens and maps the recorded tabs automatically.
 

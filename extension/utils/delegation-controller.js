@@ -484,6 +484,22 @@
     });
   }
 
+  function _runtimeView(record) {
+    return {
+      v: SNAPSHOT_VERSION,
+      delegationId: record.delegationId,
+      acceptedIdentity: record.acceptedIdentity ? _clone(record.acceptedIdentity) : null,
+      provider: record.provider ? _clone(record.provider) : null,
+      state: record.state,
+      connection: record.connection,
+      lastSequence: record.entries.length,
+      summary: record.summary ? _clone(record.summary) : null,
+      activeTab: record.activeTab ? _clone(record.activeTab) : null,
+      hold: record.hold ? _clone(record.hold) : null,
+      terminal: record.terminal ? _clone(record.terminal) : null
+    };
+  }
+
   function create(options) {
     options = options || {};
     var eventStore = options.eventStore;
@@ -560,10 +576,15 @@
     }
 
     function _emit(record, announceSequence) {
+      var sequence = Number.isSafeInteger(announceSequence) ? announceSequence : null;
+      var entry = sequence !== null && sequence > 0 && sequence <= record.entries.length
+        ? _clone(record.entries[sequence - 1])
+        : null;
       var runtimeEvent = _deepFreeze({
         type: RUNTIME_EVENT_TYPE,
-        snapshot: _snapshot(record),
-        announceSequence: Number.isSafeInteger(announceSequence) ? announceSequence : null
+        view: _runtimeView(record),
+        entry: entry,
+        announceSequence: sequence
       });
       listeners.forEach(function(listener) {
         try { listener(runtimeEvent); } catch (_errorIgnored) { /* listener isolation */ }

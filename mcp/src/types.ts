@@ -26,6 +26,7 @@ export type MCPMessageType =
   | 'mcp:get-memory'          // Read memory system
   | 'mcp:get-config'          // Read extension config (keys redacted)
   | 'mcp:read-page'           // Read page text content
+  | 'mcp:capture-screenshot'  // Developer/UAT: native composited page PNG
   | 'mcp:list-sessions'       // List all past session summaries
   | 'mcp:get-session'         // Get full session detail by ID
   | 'mcp:get-session-replay'  // Get the verified structured replay preview by ID

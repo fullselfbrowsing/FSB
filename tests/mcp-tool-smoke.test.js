@@ -76,6 +76,7 @@ async function invokeTool(harness, toolName, params = {}, extra = null) {
 async function run() {
   const runtimeModule = await loadBuildModule('runtime.js');
   const readOnlyModule = await loadBuildModule(pathJoin('tools', 'read-only.js'));
+  const screenshotsModule = await loadBuildModule(pathJoin('tools', 'screenshots.js'));
   const manualModule = await loadBuildModule(pathJoin('tools', 'manual.js'));
   const visualSessionModule = await loadBuildModule(pathJoin('tools', 'visual-session.js'));
   const autopilotModule = await loadBuildModule(pathJoin('tools', 'autopilot.js'));
@@ -90,6 +91,7 @@ async function run() {
   console.log('\n--- packaged runtime surface ---');
   assert(typeof runtimeModule.createRuntime === 'function', 'build/runtime.js exports createRuntime');
   assert(typeof readOnlyModule.registerReadOnlyTools === 'function', 'build/tools/read-only.js exports registerReadOnlyTools');
+  assert(typeof screenshotsModule.registerScreenshotTools === 'function', 'build/tools/screenshots.js exports registerScreenshotTools');
   assert(typeof manualModule.registerManualTools === 'function', 'build/tools/manual.js exports registerManualTools');
   assert(typeof visualSessionModule.registerVisualSessionTools === 'function', 'build/tools/visual-session.js exports registerVisualSessionTools');
   assert(typeof autopilotModule.registerAutopilotTools === 'function', 'build/tools/autopilot.js exports registerAutopilotTools');
@@ -156,6 +158,7 @@ async function run() {
   // with a deterministic { agentId: 'agent_test_smoke', ... } payload.
   const agentScope = await loadAgentScope();
   readOnlyModule.registerReadOnlyTools(harness.server, harness.bridge, harness.queue, agentScope);
+  screenshotsModule.registerScreenshotTools(harness.server, harness.bridge, harness.queue, agentScope);
   manualModule.registerManualTools(harness.server, harness.bridge, harness.queue, agentScope);
   visualSessionModule.registerVisualSessionTools(harness.server, harness.bridge, harness.queue, agentScope);
   triggersModule.registerTriggerTools(harness.server, harness.bridge, harness.queue, agentScope);
@@ -169,6 +172,7 @@ async function run() {
   for (const toolName of requiredSmokeTools) {
     assert(harness.handlers.has(toolName), `registered handlers include ${toolName}`);
   }
+  assert(harness.handlers.has('capture_screenshot'), 'registered handlers include capture_screenshot');
 
   console.log('\n--- bridge message families ---');
   const listTabsCall = await invokeTool(harness, 'list_tabs');

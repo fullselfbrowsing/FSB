@@ -91,7 +91,7 @@ If page is blank: call \`wait_for_stable\` then \`read_page\` again.`,
     'tool-reference',
     {
       title: 'FSB Tool Reference',
-      description: 'Complete reference of all 48 FSB browser automation tools organized by category with usage examples.',
+      description: 'Complete reference of all 49 FSB browser automation tools organized by category with usage examples.',
     },
     () => ({
       messages: [
@@ -99,7 +99,7 @@ If page is blank: call \`wait_for_stable\` then \`read_page\` again.`,
           role: 'user' as const,
           content: {
             type: 'text' as const,
-            text: `# FSB Tool Reference (48 tools)
+            text: `# FSB Tool Reference (49 tools)
 
 > **Default to manual tools for all browser tasks.** Only use run_task (autopilot) if the user explicitly requests it.
 
@@ -172,6 +172,11 @@ If page is blank: call \`wait_for_stable\` then \`read_page\` again.`,
 | Tool | Use For | Example |
 |------|---------|---------|
 | wait_for_stable | Wait for DOM to settle | wait_for_stable() |
+
+## Developer / UAT (1 tool)
+| Tool | Use For | Example |
+|------|---------|---------|
+| capture_screenshot | Capture the live viewport, full page, region, or element as PNG | capture_screenshot(mode="element", selector="e5") |
 
 ## Observability (7 tools)
 | Tool | Use For | Example |

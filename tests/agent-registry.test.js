@@ -2592,15 +2592,28 @@ const UUID_PATTERN = /^agent_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-
         false,
         'nonterminal cleanup evidence cannot acknowledge a receipt',
       );
+      const canonicalTerminalEnvelope = {
+        v: 1,
+        delegationId,
+        acceptedIdentity,
+        terminal: true,
+        terminalCode: 'stopped',
+        cleanupPending: null,
+        entries: [],
+      };
       await mock.session.set({
         [ledgerKey]: {
-          v: 1,
+          v: 2,
           delegationId,
           acceptedIdentity,
           terminal: true,
           terminalCode: 'stopped',
           cleanupPending: null,
-          entries: [],
+          entryCount: 0,
+          sealedChunkCount: 0,
+          entriesBytes: Buffer.byteLength(JSON.stringify([]), 'utf8'),
+          envelopeBytes: Buffer.byteLength(JSON.stringify(canonicalTerminalEnvelope), 'utf8'),
+          activeEntries: [],
         },
       });
       assert.strictEqual(

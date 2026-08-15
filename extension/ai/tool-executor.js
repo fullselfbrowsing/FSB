@@ -1,16 +1,16 @@
 /**
  * Unified Tool Executor for FSB Browser Automation
  *
- * Single dispatch function that routes all 42 browser tools to their correct
+ * Single dispatch function that routes shared browser tools to their correct
  * handler based on _route metadata from tool-definitions.js.
  *
  * Replaces duplicated routing logic in background.js (autopilot lines 10892-10955,
  * MCP lines 13647-13740) with one shared function.
  *
  * Routes:
- *   - 'content' (28 tools): chrome.tabs.sendMessage to content script
- *   - 'cdp' (7 tools): options.cdpHandler callback (delegates to executeCDPToolDirect)
- *   - 'background' (7 tools): chrome.tabs APIs or options.dataHandler callback
+ *   - 'content': chrome.tabs.sendMessage to content script
+ *   - 'cdp': options.cdpHandler callback (delegates to executeCDPToolDirect)
+ *   - 'background': chrome.tabs APIs or options.dataHandler callback
  *
  * @module tool-executor
  */
@@ -821,7 +821,7 @@ async function executeCapabilityToolForAutopilot(name, params, tabId, options = 
 // ---------------------------------------------------------------------------
 
 /**
- * Execute any of the 42 browser tools by name.
+ * Execute a shared browser tool by name.
  *
  * Routes to the correct handler based on _route metadata from tool-definitions.js:
  *   - 'content' -> chrome.tabs.sendMessage (content script)

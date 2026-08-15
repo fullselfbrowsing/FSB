@@ -31,6 +31,9 @@ const defaultSettings = {
   captchaApiKey: '',
   // Speech-to-Text provider ('browser' | 'whisper'); read by ui/speech-to-text.js
   sttProvider: 'browser',
+  // Extension-wide side-panel microphone feature switch. Chrome stores the
+  // actual origin permission separately.
+  voiceInputEnabled: true,
   autoRefineSiteMaps: true,
   // Phase 241 D-05 / POOL-05: max simultaneous agents (range 1-64, fallback 8).
   fsbAgentCap: 8,
@@ -140,6 +143,8 @@ const providerPanelState = {
 
 let providerSettingsModelLoadTimer = null;
 let providerSettingsLoadGeneration = 0;
+let voiceInputSettingsController = null;
+let persistedVoiceInputEnabled = defaultSettings.voiceInputEnabled;
 
 // Initialize analytics
 let analytics = null;
@@ -165,6 +170,10 @@ function initializeDashboard() {
   
   // Cache DOM elements
   cacheElements();
+
+  // Track the extension-origin microphone grant independently from the saved
+  // FSB feature preference.
+  initializeVoiceInputSettings();
   
   // Initialize analytics
   analytics = new FSBAnalytics();
@@ -293,6 +302,11 @@ function cacheElements() {
 
   // Speech-to-Text
   elements.sttProvider = document.getElementById('sttProvider');
+  elements.voiceInputEnabled = document.getElementById('voiceInputEnabled');
+  elements.voiceInputPermissionStatus = document.getElementById('voiceInputPermissionStatus');
+  elements.voiceInputPermissionDetail = document.getElementById('voiceInputPermissionDetail');
+  elements.voiceInputPermissionAction = document.getElementById('voiceInputPermissionAction');
+  elements.voiceInputChromeSettings = document.getElementById('voiceInputChromeSettings');
 
   // Button elements
   elements.toggleApiKey = document.getElementById('toggleApiKey');
@@ -344,6 +358,22 @@ function cacheElements() {
   elements.auditLogEmptyRow = document.getElementById('auditLogEmptyRow');
   elements.auditExportBtn = document.getElementById('auditExportBtn');
   elements.auditClearBtn = document.getElementById('auditClearBtn');
+}
+
+function initializeVoiceInputSettings() {
+  const module = (typeof globalThis !== 'undefined')
+    ? globalThis.FSBVoiceInputSettings
+    : null;
+  if (!module || typeof module.VoiceInputSettingsController !== 'function') return;
+
+  voiceInputSettingsController = new module.VoiceInputSettingsController({
+    statusElement: elements.voiceInputPermissionStatus,
+    detailElement: elements.voiceInputPermissionDetail,
+    permissionButton: elements.voiceInputPermissionAction,
+    settingsButton: elements.voiceInputChromeSettings,
+    onError: (message) => showToast(message, 'error')
+  });
+  void voiceInputSettingsController.init();
 }
 
 function getProviderPanelHelper() {
@@ -495,6 +525,7 @@ function setupEventListeners() {
     elements.captchaSolverEnabled,
     elements.captchaApiKey,
     elements.sttProvider,
+    elements.voiceInputEnabled,
     elements.fsbMcpSessionRecordingEnabled,
     elements.fsbMcpSessionRetentionDays
   ];
@@ -1700,6 +1731,11 @@ function loadSettings() {
     if (elements.sttProvider) {
       elements.sttProvider.checked = settings.sttProvider === 'whisper';
     }
+    const voiceInputEnabled = settings.voiceInputEnabled !== false;
+    persistedVoiceInputEnabled = voiceInputEnabled;
+    if (elements.voiceInputEnabled) {
+      elements.voiceInputEnabled.checked = voiceInputEnabled;
+    }
 
     // Bring the custom-select widgets' visible labels back into sync with the
     // now-populated native <select> values. initFsbSelects() runs synchronously
@@ -1838,6 +1874,7 @@ function normalizeProviderFormSelection() {
 
 function saveSettings() {
   const normalizedProviderSettings = normalizeProviderFormSelection();
+  const previousVoiceInputEnabled = persistedVoiceInputEnabled;
   const settings = {
     providerKind: normalizedProviderSettings.providerKind,
     agentProviderId: normalizedProviderSettings.agentProviderId,
@@ -1864,6 +1901,7 @@ function saveSettings() {
     captchaSolverEnabled: elements.captchaSolverEnabled?.checked ?? false,
     captchaApiKey: (elements.captchaApiKey?.value || '').trim(),
     sttProvider: elements.sttProvider?.checked ? 'whisper' : 'browser',
+    voiceInputEnabled: elements.voiceInputEnabled?.checked ?? true,
     autoRefineSiteMaps: elements.autoRefineSiteMaps?.checked ?? true,
     // Phase 241 D-05 / POOL-05: Agent Concurrency cap. Defense-in-depth
     // layer 2 (input clamp = layer 1; SW setCap on storage.onChanged = layer 3).
@@ -1889,6 +1927,7 @@ function saveSettings() {
   };
   
   chrome.storage.local.set(settings, () => {
+    persistedVoiceInputEnabled = settings.voiceInputEnabled;
     dashboardState.hasUnsavedChanges = false;
     hideSaveBar();
     showToast('Settings saved successfully', 'success');
@@ -1897,6 +1936,13 @@ function saveSettings() {
     // Update connection status if API key changed
     if (settings.providerKind === 'api' && settings.apiKey) {
       checkApiConnection();
+    }
+
+    if (voiceInputSettingsController) {
+      void voiceInputSettingsController.handleSavedChange(
+        previousVoiceInputEnabled,
+        settings.voiceInputEnabled
+      );
     }
   });
 }
@@ -2899,6 +2945,123 @@ let currentViewingSession = null;
 let currentReplayData = null;
 let currentStepIndex = 0;
 
+function journalDescriptorPreview(descriptor) {
+  if (!descriptor || typeof descriptor !== 'object') return null;
+  if (descriptor.storage === 'inline') return descriptor.inline;
+  if (typeof descriptor.preview === 'string') {
+    try { return JSON.parse(descriptor.preview); } catch (_error) { return descriptor.preview; }
+  }
+  return descriptor.storage === 'omitted'
+    ? { omitted: true, reason: descriptor.reason || 'unavailable', sha256: descriptor.sha256 || null }
+    : null;
+}
+
+function hydrateJournalSessionDetail(detail) {
+  const session = { ...(detail?.session || {}) };
+  const events = Array.isArray(detail?.events) ? detail.events : [];
+  session.iterationCount = session.actionCount || 0;
+  session._journalEvents = events;
+  session.logs = events.map((event) => {
+    const metadata = event.metadata || {};
+    const tool = metadata.tool || event.kind;
+    return {
+      timestamp: event.timestamp,
+      level: metadata.success === false ? 'warn' : 'info',
+      message: event.kind === 'tool.call' ? `MCP ${tool}` : event.kind,
+      data: event.kind === 'tool.call' ? {
+        logType: 'actionExec',
+        tool,
+        phase: metadata.route || 'recorded',
+        action: { tool, params: journalDescriptorPreview(metadata.request) },
+        result: journalDescriptorPreview(metadata.result),
+        logicalTab: metadata.logicalTab || 'primary'
+      } : { logType: 'serviceWorker', event: event.kind }
+    };
+  });
+  session.actionHistory = events.filter(event => event.kind === 'tool.call').map((event) => ({
+    tool: event.metadata?.tool || '',
+    params: journalDescriptorPreview(event.metadata?.request),
+    result: journalDescriptorPreview(event.metadata?.result),
+    timestamp: Date.parse(event.timestamp),
+    logicalTab: event.metadata?.logicalTab || 'primary'
+  }));
+  session._journalHasMore = detail?.hasMore === true;
+  session._journalNextSequence = Number.isFinite(detail?.nextSequence) ? detail.nextSequence : null;
+  return session;
+}
+
+async function loadSessionDetail(sessionId, afterSequence = -1) {
+  const response = await chrome.runtime.sendMessage({
+    action: 'getSessionDetail',
+    sessionId,
+    afterSequence,
+    limit: 500
+  });
+  if (!response?.success || !response.session) return null;
+  return response.legacy ? response.session : hydrateJournalSessionDetail(response);
+}
+
+function sessionExportFilename(sessionId, format) {
+  const uniqueId = String(sessionId || '')
+    .replace(/^session_/, '')
+    .replace(/[^A-Za-z0-9._-]+/g, '_')
+    .replace(/^_+|_+$/g, '') || 'unknown';
+  return `fsb-session-${uniqueId}.${format === 'text' ? 'txt' : 'json'}`;
+}
+
+function journalExportPickerOptions(sessionId, format) {
+  const text = format === 'text';
+  return {
+    suggestedName: sessionExportFilename(sessionId, format),
+    types: [{
+      description: text ? 'Text report' : 'JSON session data',
+      accept: { [text ? 'text/plain' : 'application/json']: [text ? '.txt' : '.json'] }
+    }]
+  };
+}
+
+async function saveJournalSessionExport(sessionId, format) {
+  if (typeof window.showSaveFilePicker !== 'function') {
+    const error = new Error('Streaming session export requires a browser with Save As support');
+    error.code = 'session_export_picker_unsupported';
+    throw error;
+  }
+  const transport = globalThis.FsbMcpSessionExportPort;
+  if (!transport || typeof transport.streamExportToWritable !== 'function') {
+    const error = new Error('Session export transport is unavailable');
+    error.code = 'session_export_unavailable';
+    throw error;
+  }
+
+  let fileHandle;
+  try {
+    // Invoke the picker before any other asynchronous work so Chrome retains
+    // the click's transient user activation.
+    fileHandle = await window.showSaveFilePicker(journalExportPickerOptions(sessionId, format));
+  } catch (error) {
+    if (error?.name === 'AbortError') return { cancelled: true };
+    throw error;
+  }
+
+  let writable = null;
+  try {
+    writable = await fileHandle.createWritable();
+    const result = await transport.streamExportToWritable({
+      connect: () => chrome.runtime.connect({ name: 'fsb-session-export-v2' }),
+      sessionId,
+      format,
+      writable
+    });
+    await writable.close();
+    return { cancelled: false, chunks: result.chunks };
+  } catch (error) {
+    if (writable && typeof writable.abort === 'function') {
+      try { await writable.abort(); } catch (_abortError) { /* preserve the export failure */ }
+    }
+    throw error;
+  }
+}
+
 /**
  * Initialize session history UI and event listeners
  */
@@ -2928,7 +3091,7 @@ function initializeSessionHistory() {
         e.stopPropagation();
         const action = actionBtn.dataset.action;
         if (action === 'view') viewSession(sessionId);
-        else if (action === 'download') downloadSessionLogs(sessionId);
+        else if (action === 'download') downloadSessionLogs(sessionId, sessionItem.dataset.storageBackend);
         else if (action === 'delete') deleteSession(sessionId);
       } else {
         viewSession(sessionId);
@@ -2964,7 +3127,7 @@ async function loadSessionList() {
 
     // Render session items (using data-action attributes, no inline onclick)
     sessionList.innerHTML = sessions.map(session => `
-      <div class="session-item" data-session-id="${session.id}">
+      <div class="session-item" data-session-id="${session.id}" data-storage-backend="${session.storageBackend === 'journal-v2' ? 'journal-v2' : 'legacy-v1'}">
         <div class="session-item-info">
           <div class="session-item-task">${escapeHtml(session.task || 'Unknown task')}</div>
           <div class="session-item-meta">
@@ -3027,10 +3190,9 @@ async function viewSession(sessionId) {
   collapseSessionDetail();
 
   try {
-    // Load full session data
-    const stored = await chrome.storage.local.get(['fsbSessionLogs']);
-    const sessionStorage = stored.fsbSessionLogs || {};
-    const session = sessionStorage[sessionId];
+    // V2 details are projected from IndexedDB; legacy and Autopilot rows are
+    // returned through the same background API.
+    const session = await loadSessionDetail(sessionId);
 
     if (!session) {
       showToast('Session not found', 'error');
@@ -3176,6 +3338,7 @@ function createInlineDetailHTML(session) {
         </button>
         <div class="session-logs-container" id="rawLogsContainer" style="display: none;">
           <pre class="session-logs-content" id="sessionLogsContent">Loading...</pre>
+          ${session._journalHasMore ? '<button class="control-btn" id="loadMoreSessionEvents">Load next 500 events</button>' : ''}
         </div>
       </div>
     </div>
@@ -3194,16 +3357,17 @@ function attachInlinePanelListeners(wrapper, session) {
   const prevStepBtn = wrapper.querySelector('#prevStep');
   const nextStepBtn = wrapper.querySelector('#nextStep');
   const toggleRawLogsBtn = wrapper.querySelector('#toggleRawLogs');
+  const loadMoreEventsBtn = wrapper.querySelector('#loadMoreSessionEvents');
 
   if (exportTextBtn) {
     exportTextBtn.addEventListener('click', () => {
-      exportSessionText(session.id);
+      exportSessionText(session.id, session.storageBackend);
     });
   }
 
   if (downloadBtn) {
     downloadBtn.addEventListener('click', () => {
-      downloadSessionLogs(session.id);
+      downloadSessionLogs(session.id, session.storageBackend);
     });
   }
 
@@ -3240,6 +3404,36 @@ function attachInlinePanelListeners(wrapper, session) {
       }
     });
   }
+
+  if (loadMoreEventsBtn) {
+    loadMoreEventsBtn.addEventListener('click', async () => {
+      if (!session._journalHasMore || !Number.isFinite(session._journalNextSequence)) return;
+      loadMoreEventsBtn.disabled = true;
+      loadMoreEventsBtn.textContent = 'Loading...';
+      try {
+        const page = await loadSessionDetail(session.id, session._journalNextSequence);
+        if (!page) throw new Error('Session events could not be loaded');
+        if (currentViewingSession?.id !== session.id) return;
+        session._journalEvents.push(...(page._journalEvents || []));
+        session.logs.push(...(page.logs || []));
+        session.actionHistory.push(...(page.actionHistory || []));
+        session._journalHasMore = page._journalHasMore === true;
+        session._journalNextSequence = page._journalNextSequence;
+        const logsEl = wrapper.querySelector('#sessionLogsContent');
+        if (logsEl) logsEl.textContent = formatSessionLogsForDisplay(session);
+        if (session._journalHasMore) {
+          loadMoreEventsBtn.disabled = false;
+          loadMoreEventsBtn.textContent = 'Load next 500 events';
+        } else {
+          loadMoreEventsBtn.remove();
+        }
+      } catch (error) {
+        loadMoreEventsBtn.disabled = false;
+        loadMoreEventsBtn.textContent = 'Retry loading events';
+        showToast('Failed to load more session events: ' + error.message, 'error');
+      }
+    });
+  }
 }
 
 /**
@@ -3250,15 +3444,28 @@ function downloadCurrentSessionLogs() {
     showToast('No session selected', 'warning');
     return;
   }
-  downloadSessionLogs(currentViewingSession.id);
+  downloadSessionLogs(currentViewingSession.id, currentViewingSession.storageBackend);
 }
 
 /**
  * Download raw JSON data for a specific session
  * @param {string} sessionId - The session ID to download
  */
-async function downloadSessionLogs(sessionId) {
+async function downloadSessionLogs(sessionId, storageBackend) {
   try {
+    if (storageBackend === 'journal-v2') {
+      const result = await saveJournalSessionExport(sessionId, 'json');
+      if (result.cancelled) return;
+      showToast('Session JSON downloaded', 'success');
+      addLog('info', `Downloaded session ${sessionId}`);
+      return;
+    }
+    const detailResponse = await chrome.runtime.sendMessage({
+      action: 'getSessionDetail', sessionId, afterSequence: -1, limit: 1
+    });
+    if (detailResponse?.success && detailResponse.session?.storageBackend === 'journal-v2') {
+      throw new Error('Retry the journal export from its session-history download button');
+    }
     const stored = await chrome.storage.local.get(['fsbSessionLogs']);
     const sessionStorage = stored.fsbSessionLogs || {};
     const session = sessionStorage[sessionId];
@@ -4065,9 +4272,13 @@ function renderReplaySummary() {
   }
 
   const summary = currentReplayData.summary;
+  const retainedRange = summary.truncated
+    ? ` | latest ${summary.totalSteps} of ${summary.totalSourceSteps}`
+    : '';
   let summaryHtml = `
     <strong>Summary:</strong> ${summary.successfulSteps}/${summary.totalSteps} steps successful
     ${summary.failedSteps > 0 ? ` | <span style="color: var(--error-color);">${summary.failedSteps} failed</span>` : ''}
+    ${retainedRange}
   `;
 
   document.getElementById('replaySummary').innerHTML = summaryHtml;
@@ -4078,19 +4289,35 @@ function renderReplaySummary() {
  * Export session as human-readable text
  * @param {string} sessionId - The session ID to export
  */
-async function exportSessionText(sessionId) {
+async function exportSessionText(sessionId, storageBackend) {
   try {
-    const response = await chrome.runtime.sendMessage({
-      action: 'exportSessionHumanReadable',
-      sessionId
+    if (storageBackend === 'journal-v2') {
+      const result = await saveJournalSessionExport(sessionId, 'text');
+      if (result.cancelled) return;
+      showToast('Session report exported', 'success');
+      addLog('info', `Exported session ${sessionId} as text`);
+      return;
+    }
+    const detailResponse = await chrome.runtime.sendMessage({
+      action: 'getSessionDetail', sessionId, afterSequence: -1, limit: 1
     });
+    let parts;
+    if (detailResponse?.success && detailResponse.session?.storageBackend === 'journal-v2') {
+      throw new Error('Retry the journal export from its session-history Export Text button');
+    } else {
+      const response = await chrome.runtime.sendMessage({
+        action: 'exportSessionHumanReadable',
+        sessionId
+      });
+      parts = response?.text ? [response.text] : null;
+    }
 
-    if (response?.text) {
-      const blob = new Blob([response.text], { type: 'text/plain' });
+    if (parts) {
+      const blob = new Blob(parts, { type: 'text/plain' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `fsb-session-${sessionId.substring(0, 8)}.txt`;
+      a.download = sessionExportFilename(sessionId, 'text');
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -6816,19 +7043,19 @@ function renderMemoryList(memories) {
 
     return `
       <div class="session-item memory-item" data-memory-id="${memory.id}" data-expandable="true"${graphAttr} style="cursor: pointer;">
-        <div class="session-item-header" style="display: flex; align-items: center; gap: 10px;">
-          <i class="fas ${typeIcon}" style="color: var(--primary); font-size: 1.1em;" title="${typeLabel}"></i>
-          <div style="flex: 1; min-width: 0;">
-            <div style="font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+        <div class="session-item-header memory-item-header">
+          <i class="fas ${typeIcon} memory-item-icon" title="${typeLabel}"></i>
+          <div class="memory-item-copy">
+            <div class="memory-item-title">
               ${escapeHtml(memory.text)} ${badgeHtml}
             </div>
-            <div style="font-size: 0.82em; color: var(--text-secondary); margin-top: 2px;">
+            <div class="memory-item-meta">
               ${typeLabel} | ${escapeHtml(domain)} | ${age} | ${accesses} accesses | ${confidence}% conf${tags ? ' | ' + escapeHtml(tags) : ''}
             </div>
           </div>
           ${refineBtn}
           ${chevronHtml}
-          <button class="control-btn small memory-delete-btn" data-id="${memory.id}" title="Delete memory" style="color: var(--danger, #ef4444); flex-shrink: 0;">
+          <button class="control-btn small memory-delete-btn" data-id="${memory.id}" title="Delete memory">
             <i class="fas fa-trash"></i>
           </button>
         </div>

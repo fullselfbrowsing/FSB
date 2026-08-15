@@ -12,8 +12,13 @@
     "url": "https://github.com/fullselfbrowsing/FSB/issues"
   },
   "scripts": {
+    "test:screenshot": "npm --prefix mcp run build && node --test tests/screenshot-capture.test.js tests/autopilot-screenshot-delivery.test.js tests/mcp-screenshot-route.test.js && node --import tsx --test tests/mcp-screenshot-store.test.ts tests/mcp-screenshot-native-result.test.ts && node tests/mcp-managed-screenshot-attestation.test.js",
+    "test:screenshot:uat": "node --test tests/screenshot-uat.test.js",
     "test:stats": "node tests/stats-view-state.test.js && node tests/fsb-telemetry-service.test.js && node tests/stats-chart-overhaul.test.js && node tests/cumulative-commits-aggregator.test.js",
-    "pretest": "node tests/version-sync.test.js && node --import tsx tests/dashboard-localization-fallback.test.mjs && node --test tests/lattice-replay-reclaim.test.js tests/lattice-replay-playback.test.js && node tests/replay-player-overlay.test.js",
+    "test:speech-to-text": "node tests/speech-to-text.test.js && node tests/voice-input-settings-ui.test.js",
+    "pretest": "node tests/version-sync.test.js && node --import tsx tests/dashboard-localization-fallback.test.mjs && node --test tests/lattice-replay-reclaim.test.js tests/lattice-replay-playback.test.js && node tests/replay-player-overlay.test.js && node tests/delegation-streaming-performance.test.js && node tests/mcp-session-recorder-journal.test.js && node --test tests/mcp-lattice-journal.test.js tests/mcp-session-export-port.test.js && npm run test:speech-to-text && npm run test:screenshot",
+    "test:mcp-journal": "node tests/mcp-session-recorder-journal.test.js && node --test tests/mcp-lattice-journal.test.js",
+    "test:delegation-streaming": "node tests/delegation-streaming-performance.test.js",
     "pretest:lattice": "node --test tests/lattice-replay-reclaim.test.js",
     "version:set:extension": "node scripts/sync-product-version.mjs extension",
     "version:set:mcp": "node scripts/sync-product-version.mjs mcp",

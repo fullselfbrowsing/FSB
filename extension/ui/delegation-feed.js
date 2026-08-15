@@ -373,6 +373,98 @@
     return true;
   }
 
+  function _sameAcceptedIdentity(left, right) {
+    var leftIdentity = _acceptedIdentity(left);
+    var rightIdentity = _acceptedIdentity(right);
+    return !!leftIdentity && !!rightIdentity
+      && leftIdentity.providerId === rightIdentity.providerId
+      && leftIdentity.label === rightIdentity.label
+      && leftIdentity.profileVersion === rightIdentity.profileVersion
+      && leftIdentity.authState === rightIdentity.authState
+      && leftIdentity.billingKind === rightIdentity.billingKind;
+  }
+
+  function _sameProvider(left, right) {
+    var leftProvider = _canonicalIdentity(left);
+    var rightProvider = _canonicalIdentity(right);
+    return !!leftProvider && !!rightProvider
+      && leftProvider.id === rightProvider.id
+      && leftProvider.label === rightProvider.label;
+  }
+
+  function _entryMatchesAcceptedIdentity(entry, acceptedIdentity) {
+    if (entry.init
+      && (!entry.init.client
+        || _ownDataValue(entry.init.client, 'id') !== acceptedIdentity.providerId
+        || _ownDataValue(entry.init.client, 'label') !== acceptedIdentity.label
+        || entry.init.profileVersion !== acceptedIdentity.profileVersion)) return false;
+    return !entry.metrics
+      || (entry.metrics.billingKind === acceptedIdentity.billingKind
+        && entry.metrics.usd === null);
+  }
+
+  function validateView(view) {
+    if (!_hasExactKeys(view, [
+      'acceptedIdentity', 'activeTab', 'connection', 'delegationId', 'hold',
+      'lastSequence', 'provider', 'state', 'summary', 'terminal', 'v'
+    ])
+        || view.v !== SNAPSHOT_VERSION
+        || typeof view.delegationId !== 'string'
+        || !SERVER_ID_PATTERN.test(view.delegationId)
+        || VALID_STATES[view.state] !== true
+        || VALID_CONNECTIONS[view.connection] !== true
+        || !Number.isSafeInteger(view.lastSequence)
+        || view.lastSequence < 0
+        || view.lastSequence > 2000
+        || !_validClient(view.provider)
+        || !_validSummary(view.summary)
+        || !_validActiveTab(view.activeTab)
+        || !_validHold(view.hold)
+        || !_validTerminal(view.terminal)) return false;
+    var acceptedIdentity = _acceptedIdentity(view.acceptedIdentity);
+    var provider = _canonicalIdentity(view.provider);
+    return !!acceptedIdentity
+      && !!provider
+      && provider.id === acceptedIdentity.providerId
+      && provider.label === acceptedIdentity.label
+      && (view.summary === null
+        || (view.summary.billingKind === acceptedIdentity.billingKind
+          && view.summary.usd === null));
+  }
+
+  function validateRuntimeUpdate(update) {
+    if (!_hasExactKeys(update, ['announceSequence', 'entry', 'type', 'view'])
+      || update.type !== 'FSB_DELEGATION_UPDATED'
+      || !validateView(update.view)
+      || (update.announceSequence !== null
+        && (!Number.isSafeInteger(update.announceSequence)
+          || update.announceSequence < 1
+          || update.announceSequence > 2000))) return false;
+    if (update.entry === null) return update.announceSequence === null;
+    var acceptedIdentity = _acceptedIdentity(update.view.acceptedIdentity);
+    return update.announceSequence === update.entry.sequence
+      && update.view.lastSequence === update.entry.sequence
+      && validateEntry(update.entry, update.view.delegationId, update.entry.sequence)
+      && _entryMatchesAcceptedIdentity(update.entry, acceptedIdentity);
+  }
+
+  function _validLocalSnapshotMetadata(snapshot) {
+    return _hasExactKeys(snapshot, [
+      'acceptedIdentity', 'activeTab', 'connection', 'delegationId', 'entries',
+      'hold', 'hydrated', 'provider', 'state', 'summary', 'terminal', 'v'
+    ])
+      && snapshot.v === SNAPSHOT_VERSION
+      && typeof snapshot.delegationId === 'string'
+      && SERVER_ID_PATTERN.test(snapshot.delegationId)
+      && Array.isArray(snapshot.entries)
+      && snapshot.entries.length <= 2000
+      && typeof snapshot.hydrated === 'boolean'
+      && VALID_STATES[snapshot.state] === true
+      && VALID_CONNECTIONS[snapshot.connection] === true
+      && _acceptedIdentity(snapshot.acceptedIdentity) !== null
+      && _canonicalIdentity(snapshot.provider) !== null;
+  }
+
   function _document() {
     if (!global.document || typeof global.document.createElement !== 'function') {
       throw new Error('delegation feed requires a document');
@@ -615,10 +707,113 @@
     };
   }
 
+  function _applyView(snapshot, view) {
+    snapshot.acceptedIdentity = view.acceptedIdentity;
+    snapshot.provider = view.provider;
+    snapshot.state = view.state;
+    snapshot.connection = view.connection;
+    snapshot.summary = view.summary;
+    snapshot.activeTab = view.activeTab;
+    snapshot.hold = view.hold;
+    snapshot.terminal = view.terminal;
+    snapshot.hydrated = false;
+  }
+
+  function _runtimeResult(ok, status, snapshot, rendered, completedRender) {
+    return {
+      ok: ok,
+      resync: !ok,
+      status: status,
+      snapshot: snapshot,
+      rendered: rendered === true,
+      completedRender: completedRender === true,
+      lastSequence: snapshot && snapshot.entries && snapshot.entries.length
+        ? snapshot.entries.length
+        : null
+    };
+  }
+
+  function applyRuntimeUpdate(container, snapshot, update) {
+    if (!container
+      || typeof container.appendChild !== 'function'
+      || !_validLocalSnapshotMetadata(snapshot)
+      || !validateRuntimeUpdate(update)
+      || snapshot.delegationId !== update.view.delegationId
+      || !_sameAcceptedIdentity(snapshot.acceptedIdentity, update.view.acceptedIdentity)
+      || !_sameProvider(snapshot.provider, update.view.provider)) {
+      return _runtimeResult(false, 'resync', snapshot, false, false);
+    }
+
+    var currentLength = snapshot.entries.length;
+    var entry = update.entry;
+    if (entry === null) {
+      if (update.view.lastSequence > currentLength) {
+        return _runtimeResult(false, 'gap', snapshot, false, false);
+      }
+      if (update.view.lastSequence < currentLength) {
+        return _runtimeResult(true, 'stale', snapshot, false, false);
+      }
+      var metadataWasCompleted = _hasAuthoritativeCompletedTerminal(snapshot);
+      _applyView(snapshot, update.view);
+      var metadataIsCompleted = _hasAuthoritativeCompletedTerminal(snapshot);
+      if (!metadataWasCompleted && metadataIsCompleted) {
+        var metadataRender = render(container, snapshot, { hydrated: false });
+        return metadataRender.ok
+          ? _runtimeResult(true, 'metadata', snapshot, true, true)
+          : _runtimeResult(false, 'resync', snapshot, false, false);
+      }
+      return _runtimeResult(true, 'metadata', snapshot, false, false);
+    }
+
+    if (entry.sequence <= currentLength) {
+      var existing = snapshot.entries[entry.sequence - 1];
+      if (!existing || JSON.stringify(existing) !== JSON.stringify(entry)) {
+        return _runtimeResult(false, 'conflict', snapshot, false, false);
+      }
+      if (entry.sequence < currentLength) {
+        return _runtimeResult(true, 'stale', snapshot, false, false);
+      }
+      var duplicateWasCompleted = _hasAuthoritativeCompletedTerminal(snapshot);
+      _applyView(snapshot, update.view);
+      var duplicateIsCompleted = _hasAuthoritativeCompletedTerminal(snapshot);
+      if (!duplicateWasCompleted && duplicateIsCompleted) {
+        var duplicateRender = render(container, snapshot, { hydrated: false });
+        return duplicateRender.ok
+          ? _runtimeResult(true, 'duplicate', snapshot, true, true)
+          : _runtimeResult(false, 'resync', snapshot, false, false);
+      }
+      return _runtimeResult(true, 'duplicate', snapshot, false, false);
+    }
+
+    if (entry.sequence !== currentLength + 1) {
+      return _runtimeResult(false, 'gap', snapshot, false, false);
+    }
+    var wasCompleted = _hasAuthoritativeCompletedTerminal(snapshot);
+    snapshot.entries.push(entry);
+    _applyView(snapshot, update.view);
+    var isCompleted = _hasAuthoritativeCompletedTerminal(snapshot);
+    if (!wasCompleted && isCompleted) {
+      var completed = render(container, snapshot, { hydrated: false });
+      return completed.ok
+        ? _runtimeResult(true, 'appended', snapshot, true, true)
+        : _runtimeResult(false, 'resync', snapshot, false, false);
+    }
+    if (entry.kind === 'result') {
+      return _runtimeResult(true, 'appended', snapshot, false, false);
+    }
+    var row = renderEntry(entry, { authoritativeCompleted: false });
+    if (!row) return _runtimeResult(false, 'resync', snapshot, false, false);
+    container.appendChild(row);
+    return _runtimeResult(true, 'appended', snapshot, true, false);
+  }
+
   var api = Object.freeze({
     NOT_REPORTED: NOT_REPORTED,
+    applyRuntimeUpdate: applyRuntimeUpdate,
     validateEntry: validateEntry,
+    validateRuntimeUpdate: validateRuntimeUpdate,
     validateSnapshot: validateSnapshot,
+    validateView: validateView,
     render: render,
     renderEntry: renderEntry,
     renderSummary: renderSummary

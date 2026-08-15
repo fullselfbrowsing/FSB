@@ -26,6 +26,10 @@ importScripts('ai/lattice-runtime-adapter.js');
 globalThis.FSB_LATTICE_RUNTIME_ADAPTER_ENABLED = true;
 importScripts('ai/ai-integration.js');
 importScripts('ai/tool-definitions.js');
+// All FSB-owned chrome.debugger consumers share a per-tab FIFO lease. The
+// capture engine is loaded before both MCP dispatch and autopilot execution.
+importScripts('utils/cdp-lease.js');
+importScripts('utils/screenshot-capture.js');
 importScripts('utils/mcp-visual-session.js');
 importScripts('utils/mcp-visual-session-lifecycle.js');
 try { importScripts('utils/agent-cap-recommendation.js'); } catch (e) { console.error('[FSB] Failed to load agent-cap-recommendation.js:', e.message); }
@@ -86,6 +90,10 @@ try { importScripts('utils/mcp-metrics-recorder.js'); } catch (e) { console.erro
 // the MCP recorder so startup redaction can serialize with every history/log
 // writer instead of racing a stale read-modify-write snapshot.
 importScripts('utils/automation-logger.js');
+// Durable Lattice-shaped MCP event journal. Loaded before replay and the
+// recorder facade so both can discover its API lazily without a module cycle.
+try { importScripts('utils/mcp-lattice-journal.js'); } catch (e) { console.error('[FSB] Failed to load mcp-lattice-journal.js:', e.message); }
+try { importScripts('utils/mcp-session-export-port.js'); } catch (e) { console.error('[FSB] Failed to load mcp-session-export-port.js:', e.message); }
 try { importScripts('utils/lattice-replay.js'); } catch (e) { console.error('[FSB] Failed to load lattice-replay.js:', e.message); }
 // Quick 260707-7id -- MCP session recorder. Loaded AFTER the dispatcher,
 // metrics recorder, and automation logger: the dispatcher's finally-block
@@ -801,6 +809,7 @@ importScripts('ai/hooks/safety-hooks.js');
 importScripts('ai/hooks/permission-hook.js');
 importScripts('ai/hooks/progress-hook.js');
 importScripts('ai/tool-use-adapter.js');
+importScripts('ai/screenshot-attachments.js');
 importScripts('ai/tool-executor.js');
 importScripts('ai/agent-loop.js');
 
@@ -2852,11 +2861,11 @@ async function bootstrapDelegationController() {
       if (runContext) fsbDelegationRunContexts.set(snapshot.delegationId, runContext);
     });
     controller.subscribe((runtimeEvent) => {
-      if (runtimeEvent.snapshot.terminal) {
-        fsbDelegationActiveIds.delete(runtimeEvent.snapshot.delegationId);
-        fsbDelegationRunContexts.delete(runtimeEvent.snapshot.delegationId);
+      if (runtimeEvent.view.terminal) {
+        fsbDelegationActiveIds.delete(runtimeEvent.view.delegationId);
+        fsbDelegationRunContexts.delete(runtimeEvent.view.delegationId);
       } else {
-        fsbDelegationActiveIds.add(runtimeEvent.snapshot.delegationId);
+        fsbDelegationActiveIds.add(runtimeEvent.view.delegationId);
       }
       Promise.resolve(chrome.runtime.sendMessage(runtimeEvent)).catch(() => {});
     });
@@ -3970,6 +3979,14 @@ async function cleanupSession(sessionId, options = {}) {
     }
   }
 
+  // Screenshot pixels are session-scoped memory only. Explicit stops and
+  // cleanup paths must erase them even when the agent loop never reaches its
+  // normal terminal finalizer.
+  if (globalThis.FsbScreenshotAttachments
+      && typeof globalThis.FsbScreenshotAttachments.discard === 'function') {
+    globalThis.FsbScreenshotAttachments.discard(sessionId);
+  }
+
   // PERF: Flush any pending debounced log writes before session cleanup
   if (automationLogger && typeof automationLogger.flush === 'function') {
     automationLogger.flush();
@@ -4682,11 +4699,12 @@ setInterval(async () => {
           continue;
         }
         const closedTabId = session.tabId;
-        if (fsbReplayHandleClosedTab(session, closedTabId)) {
-          automationLogger.warn('Stale cleanup: replay tab gone, keeping replay session active', {
+        if (fsbReplayHandleRemovedTab(session, closedTabId)) {
+          automationLogger.warn('Stale cleanup: replay tab gone, updated replay session', {
             sessionId,
             tabId: closedTabId,
-            replacementTabId: session.tabId
+            replacementTabId: session.tabId,
+            finalizing: session._replayFinalizing === true
           });
           continue;
         }
@@ -4720,6 +4738,24 @@ const contentScriptPorts = new Map();
 chrome.runtime.onConnect.addListener((port) => {
   armMcpBridge('runtime.onConnect');
   debugLog('[FSB Background] onConnect received, port name:', port.name);
+  if (port.name === 'fsb-session-export-v2') {
+    const transport = globalThis.FsbMcpSessionExportPort;
+    if (!transport || typeof transport.serveExportPort !== 'function') {
+      try { port.postMessage({ type: 'error', code: 'session_export_unavailable', error: 'Session export transport is unavailable' }); } catch (_error) {}
+      return;
+    }
+    transport.serveExportPort(port, async ({ sessionId, format, emit }) => {
+      const journal = globalThis.FsbMcpLatticeJournal;
+      if (!journal || typeof journal.streamSessionExport !== 'function' ||
+          !(await journal.hasSession(sessionId))) {
+        const error = new Error('Journal-backed session not found');
+        error.code = 'session_export_not_found';
+        throw error;
+      }
+      return journal.streamSessionExport(sessionId, format, emit);
+    });
+    return;
+  }
   if (port.name === 'content-script') {
     const tabId = port.sender?.tab?.id;
     const frameId = port.sender?.frameId;
@@ -4850,7 +4886,7 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 
   // Clean up any active sessions for this tab
   for (const [sessionId, session] of activeSessions) {
-    if (fsbReplayHandleClosedTab(session, tabId)) continue;
+    if (fsbReplayHandleRemovedTab(session, tabId)) continue;
     if (session.tabId === tabId) {
       // LIFE-02 (D-02): Notify sidepanel BEFORE removing the session
       try {
@@ -7437,7 +7473,8 @@ const FSB_REPLAY_TERMINAL_STATUSES = new Set(['replay_completed', 'replay_failed
 const FSB_REPLAY_LEAD_IN_MS = 750;
 const FSB_REPLAY_TAIL_MS = 750;
 const FSB_REPLAY_MAX_RECORDED_GAP_MS = 30000;
-const FSB_REPLAY_CLOCK_TICK_MS = 250;
+const FSB_REPLAY_CHECKPOINT_CATALOG_KEY = 'fsbLatticeReplayCheckpointRunsV2';
+const FSB_REPLAY_SEEK_EPSILON_MS = 250;
 const FSB_REPLAY_SPEEDS = Object.freeze([0.5, 1, 2, 4]);
 let fsbReplayStartPending = false;
 let fsbPendingMcpReplayApprovalTail = Promise.resolve();
@@ -7529,10 +7566,16 @@ function fsbReplayBuildTimeline(steps) {
 function fsbReplayPlaybackSnapshot(session) {
   const playback = session?.playback;
   if (!playback) return null;
+  const durationMs = Math.max(0, Number(playback.durationMs) || 0);
+  const positionMs = Math.max(0, Math.min(durationMs, Math.round(playback.positionMs || 0)));
   return {
     speed: fsbReplayNormalizeSpeed(playback.speed),
     paused: playback.paused === true,
-    positionMs: Math.max(0, Math.min(playback.durationMs || 0, Math.round(playback.positionMs || 0)))
+    positionMs,
+    interpolationTargetMs: Math.max(
+      positionMs,
+      Math.min(durationMs, Math.round(playback.interpolationTargetMs || positionMs))
+    )
   };
 }
 
@@ -7558,6 +7601,29 @@ function fsbReplayIsExecutable(step) {
   return availability === 'ready' || availability === 'approval-once' || availability === 'approval-per-step';
 }
 
+function fsbReplayIsTruncated(prepared) {
+  const retainedSteps = Array.isArray(prepared?.steps) ? prepared.steps.length : 0;
+  return prepared?.truncated === true ||
+    (Number.isFinite(prepared?.totalSourceSteps) && prepared.totalSourceSteps > retainedSteps);
+}
+
+function fsbReplayTruncatedMessage(prepared) {
+  const retainedSteps = Array.isArray(prepared?.steps) ? prepared.steps.length : 0;
+  const totalSourceSteps = Number.isFinite(prepared?.totalSourceSteps)
+    ? Math.max(retainedSteps, prepared.totalSourceSteps)
+    : retainedSteps;
+  return `Only the latest ${retainedSteps} of ${totalSourceSteps} recorded calls are available. ` +
+    'Earlier browser state is missing, so this recording is inspect-only and cannot be replayed safely.';
+}
+
+function fsbReplayAssertExecutablePreparation(prepared) {
+  if (fsbReplayIsTruncated(prepared)) throw new Error(fsbReplayTruncatedMessage(prepared));
+  if (!(prepared?.steps || []).some(fsbReplayIsExecutable)) {
+    throw new Error('This verified recording has no executable steps');
+  }
+  return prepared;
+}
+
 function fsbReplayIsWriteRisk(step) {
   return !['read', 'navigation'].includes(step?.replay?.risk);
 }
@@ -7569,6 +7635,32 @@ function fsbReplayPublicPreparation(prepared) {
     ? pausedSession.replaySteps[pausedSession.currentStep]
     : null;
   const bootstrapTab = fsbReplayBootstrapTab(prepared);
+  const replaySteps = prepared.steps || [];
+  const totalSourceSteps = Number.isFinite(prepared.totalSourceSteps)
+    ? Math.max(replaySteps.length, prepared.totalSourceSteps)
+    : replaySteps.length;
+  const truncated = fsbReplayIsTruncated(prepared);
+  const publicSteps = replaySteps.map((step) => {
+    const publicStep = {
+      id: step.id,
+      index: step.index,
+      tool: step.tool,
+      route: step.route,
+      arguments: fsbReplayClone(step.arguments, {}),
+      success: step.success !== false,
+      target: fsbReplayClone(step.target, {}),
+      capability: fsbReplayClone(step.capability, null),
+      replay: fsbReplayClone(step.replay, null)
+    };
+    if (truncated) {
+      publicStep.replay = {
+        risk: 'inspect-only',
+        availability: 'unsupported',
+        reason: fsbReplayTruncatedMessage(prepared)
+      };
+    }
+    return publicStep;
+  });
   return {
     success: true,
     verified: prepared.verified === true,
@@ -7579,7 +7671,14 @@ function fsbReplayPublicPreparation(prepared) {
     startUrl: bootstrapTab?.startUrl || prepared.startUrl,
     bootstrapTab: bootstrapTab?.id || null,
     tabs: fsbReplayClone(prepared.tabs, []),
-    counts: prepared.counts,
+    counts: truncated ? {
+      total: replaySteps.length,
+      executable: 0,
+      approvalRequired: 0,
+      blocked: replaySteps.length
+    } : prepared.counts,
+    totalSourceSteps,
+    truncated,
     pendingDecision: pausedStep ? {
       sessionId: pausedSession.replaySessionId,
       tabId: pausedSession.tabId,
@@ -7588,17 +7687,7 @@ function fsbReplayPublicPreparation(prepared) {
       tool: pausedStep.tool,
       error: pausedSession.replayRun?.error || 'The previous write could not be proven complete.'
     } : null,
-    steps: (prepared.steps || []).map((step) => ({
-      id: step.id,
-      index: step.index,
-      tool: step.tool,
-      route: step.route,
-      arguments: fsbReplayClone(step.arguments, {}),
-      success: step.success !== false,
-      target: fsbReplayClone(step.target, {}),
-      capability: fsbReplayClone(step.capability, null),
-      replay: fsbReplayClone(step.replay, null)
-    }))
+    steps: publicSteps
   };
 }
 
@@ -7654,9 +7743,7 @@ async function fsbRemovePendingMcpReplayApproval(requestId) {
 
 async function requestMcpSessionReplay(sessionId) {
   const prepared = await prepareSessionReplay(sessionId);
-  if (!prepared.steps.some(fsbReplayIsExecutable)) {
-    throw new Error('This verified recording has no executable steps');
-  }
+  fsbReplayAssertExecutablePreparation(prepared);
   const preview = fsbReplayPublicPreparation(prepared);
   const requestId = globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function'
     ? globalThis.crypto.randomUUID()
@@ -8042,15 +8129,43 @@ async function fsbReplayPersistCheckpoint(session, marker, step) {
   return session._latticeAdapter.serialize(state);
 }
 
-async function fsbReplayPersistRun(session) {
-  if (!globalThis.FsbLatticeReplay || typeof globalThis.FsbLatticeReplay.persistReplayRun !== 'function') return false;
-  session.replayRun.playback = fsbReplayPlaybackSnapshot(session);
-  await globalThis.FsbLatticeReplay.persistReplayRun(session.originalSessionId, session.replayRun);
-  return true;
+function fsbReplayTopologySnapshot(session) {
+  return Object.values(session.replayTabs || {})
+    .filter((tab) => tab && tab.closed !== true && Number.isFinite(tab.tabId))
+    .map((tab) => ({
+      logicalTab: tab.logicalTab,
+      tabId: tab.tabId,
+      expectedOrigin: tab.expectedOrigin || null
+    }));
 }
 
-async function fsbReplayRecordCheckpoint(session, step, result, success, status) {
+async function fsbReplayPersistRun(session, replayRun, playbackSnapshot) {
+  if (!globalThis.FsbLatticeReplay || typeof globalThis.FsbLatticeReplay.persistReplayRun !== 'function') return false;
+  const persistedRun = fsbReplayClone(replayRun || session.replayRun, {});
+  persistedRun.playback = fsbReplayClone(playbackSnapshot || fsbReplayPlaybackSnapshot(session), null);
+  persistedRun.targetTabId = Number.isFinite(session.tabId) ? session.tabId : null;
+  persistedRun.expectedOrigin = session.expectedOrigin || null;
+  persistedRun.logicalTabs = fsbReplayTopologySnapshot(session);
+  const persistenceResult = await globalThis.FsbLatticeReplay.persistReplayRun(
+    session.originalSessionId,
+    persistedRun
+  );
+  if (!persistenceResult) return false;
+  return persistedRun;
+}
+
+async function fsbReplayRecordCheckpointNow(session, step, result, success, status, options) {
+  options = options && typeof options === 'object' ? options : {};
   const attemptNumber = session.replayRun.steps.filter((row) => row.stepId === step.id).length + 1;
+  const resultProjection = session.resultProjectionByStepId?.[step.id];
+  const checkpointResult = status === 'executed' && resultProjection &&
+      globalThis.fsbMcpSessionRecorder?.projectJournalResult
+    ? globalThis.fsbMcpSessionRecorder.projectJournalResult(
+      result || {},
+      step.arguments || {},
+      resultProjection
+    )
+    : (result || {});
   const checkpoint = await globalThis.FsbLatticeReplay.checkpointReplayStep({
     replaySessionId: session.replaySessionId,
     manifestHash: session.manifestHash,
@@ -8058,10 +8173,9 @@ async function fsbReplayRecordCheckpoint(session, step, result, success, status)
     previousReceiptCid: session.previousReceiptCid,
     attemptNumber,
     step,
-    result: result || {},
+    result: checkpointResult,
     success: success !== false
   });
-  session.previousReceiptCid = checkpoint.receiptCid;
   const recordedResultHash = step.resultHash || null;
   const row = {
     stepId: step.id,
@@ -8077,11 +8191,43 @@ async function fsbReplayRecordCheckpoint(session, step, result, success, status)
     receiptCid: checkpoint.receiptCid,
     completedAt: Date.now()
   };
-  session.replayRun.steps.push(row);
-  session.replayRun.nextStep = session.currentStep;
-  session.replayRun.previousReceiptCid = checkpoint.receiptCid;
-  await fsbReplayPersistRun(session);
+  const nextStep = Number.isFinite(options.nextStep) ? options.nextStep : session.currentStep;
+  const stagedRun = fsbReplayClone(session.replayRun, {});
+  stagedRun.steps = Array.isArray(stagedRun.steps) ? stagedRun.steps : [];
+  stagedRun.steps.push(row);
+  stagedRun.nextStep = nextStep;
+  stagedRun.previousReceiptCid = checkpoint.receiptCid;
+  if (typeof options.replayStatus === 'string') stagedRun.status = options.replayStatus;
+  if (Object.prototype.hasOwnProperty.call(options, 'replayError')) stagedRun.error = options.replayError;
+  const stagedPlayback = fsbReplayPlaybackSnapshot(session);
+  if (stagedPlayback && Number.isFinite(options.playbackPositionMs)) {
+    stagedPlayback.positionMs = Math.max(
+      0,
+      Math.min(session.playback?.durationMs || 0, Math.round(options.playbackPositionMs))
+    );
+    stagedPlayback.interpolationTargetMs = stagedPlayback.positionMs;
+  }
+  if (stagedPlayback && typeof options.playbackPaused === 'boolean') {
+    stagedPlayback.paused = options.playbackPaused;
+  }
+  const persistedRun = await fsbReplayPersistRun(session, stagedRun, stagedPlayback);
+  if (persistedRun === false) throw new Error('Replay run persistence is unavailable');
+  session.previousReceiptCid = checkpoint.receiptCid;
+  session.replayRun = persistedRun;
+  session.currentStep = nextStep;
+  if (session.playback && stagedPlayback) {
+    session.playback.positionMs = stagedPlayback.positionMs;
+    session.playback.interpolationTargetMs = stagedPlayback.interpolationTargetMs;
+    session.playback.paused = stagedPlayback.paused === true;
+  }
   return row;
+}
+
+async function fsbReplayRecordCheckpoint(session, step, result, success, status, options) {
+  return fsbReplayQueueMutation(
+    session,
+    () => fsbReplayRecordCheckpointNow(session, step, result, success, status, options)
+  );
 }
 
 function fsbReplayOverlayTabIds(session) {
@@ -8114,6 +8260,27 @@ function fsbReplayHandleClosedTab(session, tabId) {
   session.tabId = replacement?.tabId ?? null;
   session.expectedOrigin = replacement?.expectedOrigin ?? null;
   session.ownershipToken = replacement?.ownershipToken ?? null;
+  return true;
+}
+
+function fsbReplayHandleRemovedTab(session, tabId) {
+  if (!fsbReplayHandleClosedTab(session, tabId)) return false;
+  const shouldStopPausedPlayback = session.status === 'replaying' &&
+    session.playback?.paused === true &&
+    fsbReplayOverlayTabIds(session).length === 0 &&
+    session._replayFinalizing !== true;
+  if (shouldStopPausedPlayback) {
+    fsbReplayFinalize(
+      session,
+      'replay_stopped',
+      new Error('Replay stopped because its last browser tab was closed')
+    ).catch((error) => {
+      automationLogger.warn('Failed to finalize replay after its last tab closed', {
+        sessionId: session.replaySessionId,
+        error: error?.message || String(error)
+      });
+    });
+  }
   return true;
 }
 
@@ -8159,6 +8326,9 @@ async function fsbReplayBroadcastOverlay(session, step, index, label, finalState
       status: playbackStatus,
       speed: fsbReplayNormalizeSpeed(playback.speed),
       positionMs: terminal?.result === 'success' ? durationMs : positionMs,
+      interpolationTargetMs: terminal?.result === 'success'
+        ? durationMs
+        : Math.max(positionMs, Math.min(durationMs, Number(playback.interpolationTargetMs) || positionMs)),
       durationMs,
       currentStep,
       totalSteps: session.totalSteps,
@@ -8198,6 +8368,67 @@ function fsbReplayWakePlayback(session) {
   if (typeof wake === 'function') wake();
 }
 
+function fsbReplaySettlePlaybackWait(session, anchor = session?.playback?._waitAnchor, now = Date.now()) {
+  const playback = session?.playback;
+  if (!playback || !anchor || playback._waitAnchor !== anchor) return false;
+  const elapsedWallMs = Math.max(0, now - anchor.startedAt);
+  playback.positionMs = Math.max(
+    playback.positionMs,
+    Math.min(anchor.targetMs, anchor.positionBeforeWait + (elapsedWallMs * anchor.speed))
+  );
+  playback._waitAnchor = null;
+  return true;
+}
+
+function fsbReplayHasPendingControls(session) {
+  return Number(session?._replayControlPendingCount) > 0;
+}
+
+function fsbReplayQueueMutation(session, operation) {
+  const prior = session._replayMutationTail || Promise.resolve();
+  const operationPromise = prior.then(operation);
+  const settledTail = operationPromise.then(() => undefined, () => undefined);
+  session._replayMutationTail = settledTail;
+  settledTail.then(() => {
+    if (session._replayMutationTail === settledTail) session._replayMutationTail = null;
+  });
+  return operationPromise;
+}
+
+function fsbReplayQueueControl(session, operation) {
+  session._replayControlPendingCount = Math.max(0, Number(session._replayControlPendingCount) || 0) + 1;
+
+  const operationPromise = fsbReplayQueueMutation(session, operation);
+  let settledTail;
+  const release = () => {
+    session._replayControlPendingCount = Math.max(
+      0,
+      (Number(session._replayControlPendingCount) || 0) - 1
+    );
+    if (session._replayControlTail === settledTail && !fsbReplayHasPendingControls(session)) {
+      session._replayControlTail = null;
+    }
+    fsbReplayWakePlayback(session);
+  };
+  settledTail = operationPromise.then(release, release);
+  session._replayControlTail = settledTail;
+
+  // Freeze the authoritative clock at the instant the command is accepted.
+  // The queued operation snapshots this settled position, and waking the timer
+  // prevents the executor from crossing a timeline boundary behind the barrier.
+  fsbReplaySettlePlaybackWait(session);
+  fsbReplayWakePlayback(session);
+  return operationPromise;
+}
+
+async function fsbReplayAwaitControls(session) {
+  while (fsbReplayHasPendingControls(session)) {
+    const tail = session._replayControlTail;
+    if (!tail) break;
+    await tail;
+  }
+}
+
 function fsbReplayWaitForWake(session, timeoutMs) {
   return new Promise((resolve) => {
     const playback = session?.playback;
@@ -8227,33 +8458,80 @@ async function fsbReplayWaitForPlayback(session, step, index) {
   while (activeSessions.get(session.replaySessionId) === session &&
       !session.isTerminating && session.status === 'replaying') {
     if (playback.paused === true) {
+      playback.interpolationTargetMs = playback.positionMs;
       fsbReplayBroadcastProgress(session, step, index, 'Replay paused');
       await fsbReplayWaitForWake(session, null);
       continue;
     }
     const remaining = targetMs - playback.positionMs;
-    if (remaining <= 0) return true;
+    if (remaining <= 0) {
+      playback.interpolationTargetMs = playback.positionMs;
+      return true;
+    }
     const speed = fsbReplayNormalizeSpeed(playback.speed);
+    playback.interpolationTargetMs = targetMs;
     fsbReplayBroadcastProgress(session, step, index, `Next: ${fsbReplayActionLabel(step)}`);
-    const wallDelay = Math.min(FSB_REPLAY_CLOCK_TICK_MS, Math.max(1, Math.ceil(remaining / speed)));
-    const positionBeforeWait = playback.positionMs;
+    // Broadcast one timing anchor, then sleep directly to the target. The UI
+    // interpolates position locally and control actions wake this timer.
+    const wallDelay = Math.max(1, Math.ceil(remaining / speed));
+    const waitAnchor = {
+      startedAt: Date.now(),
+      positionBeforeWait: playback.positionMs,
+      speed,
+      targetMs
+    };
+    playback._waitAnchor = waitAnchor;
     const elapsedWallMs = await fsbReplayWaitForWake(session, wallDelay);
-    playback.positionMs = Math.max(
-      playback.positionMs,
-      Math.min(targetMs, positionBeforeWait + (elapsedWallMs * speed))
-    );
+    fsbReplaySettlePlaybackWait(session, waitAnchor, waitAnchor.startedAt + elapsedWallMs);
   }
   return false;
 }
 
-async function fsbReplayPauseForDecision(session, step, error) {
+async function fsbReplayWaitUntilRunnable(session, step, index) {
+  while (activeSessions.get(session?.replaySessionId) === session &&
+      !session.isTerminating && session.status === 'replaying') {
+    const canContinue = await fsbReplayWaitForPlayback(session, step, index);
+    if (!canContinue) return false;
+    await fsbReplayAwaitControls(session);
+    if (activeSessions.get(session.replaySessionId) !== session ||
+        session.isTerminating || session.status !== 'replaying') {
+      return false;
+    }
+    if (fsbReplayHasPendingControls(session) || session.playback?.paused === true) continue;
+    return true;
+  }
+  return false;
+}
+
+async function fsbReplayPauseForDecision(session, step, error, options = {}) {
   session.status = 'replay_paused';
-  if (session.playback) session.playback.paused = true;
   fsbReplayWakePlayback(session);
-  session.replayRun.status = 'paused';
-  session.replayRun.error = error?.message || String(error || 'Replay step outcome is ambiguous');
-  await fsbReplayPersistCheckpoint(session, 'BEFORE_TOOL_EXECUTION', step);
-  await fsbReplayPersistRun(session);
+  const replayError = error?.message || String(error || 'Replay step outcome is ambiguous');
+  if (options.checkpoint !== false) {
+    await fsbReplayPersistCheckpoint(session, 'BEFORE_TOOL_EXECUTION', step);
+  }
+  if (options.persist !== false) {
+    await fsbReplayQueueMutation(session, async () => {
+      const stagedRun = fsbReplayClone(session.replayRun, {});
+      stagedRun.status = 'paused';
+      stagedRun.error = replayError;
+      const stagedPlayback = fsbReplayPlaybackSnapshot(session);
+      if (stagedPlayback) {
+        stagedPlayback.paused = true;
+        stagedPlayback.interpolationTargetMs = stagedPlayback.positionMs;
+      }
+      const persistedRun = await fsbReplayPersistRun(session, stagedRun, stagedPlayback);
+      if (persistedRun === false) throw new Error('Replay run persistence is unavailable');
+      session.replayRun = persistedRun;
+      if (session.playback && stagedPlayback) {
+        session.playback.paused = true;
+        session.playback.interpolationTargetMs = stagedPlayback.interpolationTargetMs;
+      }
+    });
+  } else if (session.playback) {
+    session.playback.paused = true;
+    session.playback.interpolationTargetMs = session.playback.positionMs;
+  }
   fsbReplayBroadcastProgress(session, step, session.currentStep, 'Replay needs a decision');
   try {
     await fsbBroadcastAutomationLifecycle({
@@ -8272,19 +8550,33 @@ async function fsbReplayPauseForDecision(session, step, error) {
 async function fsbReplayFinalize(session, status, error) {
   if (session._replayFinalizing === true) return;
   session._replayFinalizing = true;
-  if (session.playback) {
-    session.playback.paused = false;
-    if (status === 'replay_completed') session.playback.positionMs = session.playback.durationMs;
-  }
-  fsbReplayWakePlayback(session);
   session.status = status;
-  session.replayRun.status = status;
-  session.replayRun.finishedAt = Date.now();
-  session.replayRun.error = error ? (error.message || String(error)) : null;
-  session.replayRun.nextStep = session.currentStep;
+  fsbReplayWakePlayback(session);
   let terminalPersisted = false;
   try {
-    terminalPersisted = await fsbReplayPersistRun(session) !== false;
+    const persistedRun = await fsbReplayQueueMutation(session, async () => {
+      const stagedRun = fsbReplayClone(session.replayRun, {});
+      stagedRun.status = status;
+      stagedRun.finishedAt = Date.now();
+      stagedRun.error = error ? (error.message || String(error)) : null;
+      stagedRun.nextStep = session.currentStep;
+      const stagedPlayback = fsbReplayPlaybackSnapshot(session);
+      if (stagedPlayback) {
+        stagedPlayback.paused = false;
+        if (status === 'replay_completed') stagedPlayback.positionMs = session.playback.durationMs;
+        stagedPlayback.interpolationTargetMs = stagedPlayback.positionMs;
+      }
+      const committedRun = await fsbReplayPersistRun(session, stagedRun, stagedPlayback);
+      if (committedRun === false) return false;
+      session.replayRun = committedRun;
+      if (session.playback && stagedPlayback) {
+        session.playback.paused = false;
+        session.playback.positionMs = stagedPlayback.positionMs;
+        session.playback.interpolationTargetMs = stagedPlayback.interpolationTargetMs;
+      }
+      return committedRun;
+    });
+    terminalPersisted = persistedRun !== false;
   } catch (_persistError) { /* retain recovery data until terminal state is durable */ }
   await fsbReplayBroadcastOverlay(
     session,
@@ -8346,9 +8638,10 @@ async function executeReplaySequence(replaySessionId) {
     session.currentStep = i;
     session.replayRun.nextStep = i;
     const step = session.replaySteps[i];
-    const canContinue = await fsbReplayWaitForPlayback(session, step, i);
+    const canContinue = await fsbReplayWaitUntilRunnable(session, step, i);
     if (!canContinue || !activeSessions.has(replaySessionId) ||
         session.isTerminating || session.status !== 'replaying') return;
+    if (session.playback) session.playback.interpolationTargetMs = session.playback.positionMs;
     fsbReplayBroadcastProgress(session, step, i);
 
     let verdict;
@@ -8358,22 +8651,20 @@ async function executeReplaySequence(replaySessionId) {
       await fsbReplayFinalize(session, 'replay_failed', error);
       return;
     }
+    const authorizedCanContinue = await fsbReplayWaitUntilRunnable(session, step, i);
+    if (!authorizedCanContinue) return;
     if (!fsbReplayIsExecutable(step)) {
       try {
+        const blockedPositionMs = session.playback
+          ? Math.max(session.playback.positionMs, Number(session.playback.timeline?.[i]) || 0)
+          : 0;
         await fsbReplayRecordCheckpoint(session, step, {
           blocked: true,
           reason: step.replay?.reason || verdict?.reason || 'Inspect-only replay step'
-        }, false, 'blocked');
-        session.currentStep = i + 1;
-        if (session.playback) {
-          session.playback.positionMs = Math.max(
-            session.playback.positionMs,
-            Number(session.playback.timeline?.[i]) || 0
-          );
-        }
-        await fsbReplayPersistCheckpoint(session, 'BEFORE_NEXT_ITERATION_SCHEDULE', step);
-        session.replayRun.nextStep = session.currentStep;
-        await fsbReplayPersistRun(session);
+        }, false, 'blocked', {
+          nextStep: i + 1,
+          playbackPositionMs: blockedPositionMs
+        });
       } catch (error) {
         await fsbReplayFinalize(session, 'replay_failed', error);
         return;
@@ -8386,10 +8677,21 @@ async function executeReplaySequence(replaySessionId) {
     }
 
     let target;
+    session._replayRiskCheckpointStepId = null;
     try {
-      target = await fsbReplayAssertTarget(session, step);
-      fsbReplayBroadcastProgress(session, step, i);
-      await fsbReplayPersistCheckpoint(session, 'BEFORE_TOOL_EXECUTION', step);
+      while (true) {
+        const targetCanContinue = await fsbReplayWaitUntilRunnable(session, step, i);
+        if (!targetCanContinue) return;
+        target = await fsbReplayAssertTarget(session, step);
+        if (fsbReplayHasPendingControls(session) || session.playback?.paused === true) continue;
+        fsbReplayBroadcastProgress(session, step, i);
+        if (fsbReplayIsWriteRisk(step) && session._replayRiskCheckpointStepId !== step.id) {
+          await fsbReplayPersistCheckpoint(session, 'BEFORE_TOOL_EXECUTION', step);
+          session._replayRiskCheckpointStepId = step.id;
+        }
+        if (fsbReplayHasPendingControls(session) || session.playback?.paused === true) continue;
+        break;
+      }
     } catch (error) {
       await fsbReplayFinalize(session, 'replay_failed', error);
       return;
@@ -8410,54 +8712,67 @@ async function executeReplaySequence(replaySessionId) {
       result: slimActionResult(result),
       replayStep: i + 1
     });
-    try {
-      await fsbReplayRecordCheckpoint(session, step, result || {}, success, 'executed');
-    } catch (error) {
-      await fsbReplayPauseForDecision(session, step, error);
-      return;
+    const riskyFailure = !success && fsbReplayIsWriteRisk(step);
+    if (!success && riskyFailure) {
+      session.status = 'replay_paused';
     }
-    if (session.isTerminating || !activeSessions.has(replaySessionId)) return;
-
-    if (!success) {
-      const failure = new Error(result?.error || `Replay step ${i + 1} failed`);
-      if (fsbReplayIsWriteRisk(step)) {
-        await fsbReplayPauseForDecision(session, step, failure);
-      } else {
-        await fsbReplayFinalize(session, 'replay_failed', failure);
-      }
-      return;
-    }
-
     const normalizedTool = FSB_REPLAY_LEGACY_TOOL_MAP[step.tool] || step.tool;
     const logicalTab = fsbReplayLogicalTab(step);
-    if (normalizedTool === 'close_tab') {
+    if (success && normalizedTool === 'close_tab') {
       fsbReplayHandleClosedTab(session, target.tabState.tabId);
-      delete session.replayTabs[logicalTab];
-    } else {
+    } else if (success) {
       try {
         const currentTab = await chrome.tabs.get(target.tabState.tabId);
         target.tabState.expectedOrigin = fsbReplayOrigin(currentTab?.url || currentTab?.pendingUrl) ||
           target.tabState.expectedOrigin;
       } catch (_error) { /* a later per-tab origin check reports the missing tab */ }
     }
-
-    session.currentStep = i + 1;
-    if (session.playback) {
-      session.playback.positionMs = Math.max(
-        session.playback.positionMs,
-        Number(session.playback.timeline?.[i]) || 0
-      );
+    const nextStep = success ? i + 1 : i;
+    const nextPositionMs = success && session.playback
+      ? Math.max(session.playback.positionMs, Number(session.playback.timeline?.[i]) || 0)
+      : session.playback?.positionMs;
+    try {
+      const checkpointOptions = {
+        nextStep,
+        playbackPositionMs: nextPositionMs
+      };
+      if (riskyFailure) {
+        checkpointOptions.replayStatus = 'paused';
+        checkpointOptions.replayError = result?.error || `Replay step ${i + 1} failed`;
+        checkpointOptions.playbackPaused = true;
+      }
+      await fsbReplayRecordCheckpoint(session, step, result || {}, success, 'executed', checkpointOptions);
+    } catch (error) {
+      await fsbReplayPauseForDecision(session, step, error, {
+        checkpoint: session._replayRiskCheckpointStepId !== step.id
+      });
+      return;
     }
-    await fsbReplayPersistCheckpoint(session, 'BEFORE_NEXT_ITERATION_SCHEDULE', step);
-    session.replayRun.nextStep = session.currentStep;
-    await fsbReplayPersistRun(session);
+    if (success && normalizedTool === 'close_tab') delete session.replayTabs[logicalTab];
+    if (session.isTerminating || !activeSessions.has(replaySessionId)) return;
+
+    if (!success) {
+      const failure = new Error(result?.error || `Replay step ${i + 1} failed`);
+      if (riskyFailure) {
+        await fsbReplayPauseForDecision(session, step, failure, {
+          checkpoint: false,
+          persist: false
+        });
+      } else {
+        await fsbReplayFinalize(session, 'replay_failed', failure);
+      }
+      return;
+    }
+
   }
   await fsbReplayFinalize(session, 'replay_completed');
 }
 
 function fsbReplayBuildSession(prepared, replaySessionId, owned, approvedScopes, priorRun, bootstrapTab) {
   const adapter = globalThis.FsbLatticeRuntimeAdapter?.createFsbLatticeRuntimeAdapter({
-    sessionId: replaySessionId
+    sessionId: replaySessionId,
+    fixedSlots: true,
+    catalogKey: FSB_REPLAY_CHECKPOINT_CATALOG_KEY
   });
   const startTime = priorRun?.startedAt || Date.now();
   const tabPlan = {};
@@ -8501,8 +8816,14 @@ function fsbReplayBuildSession(prepared, replaySessionId, owned, approvedScopes,
     ),
     durationMs: timeline.durationMs,
     timeline: timeline.offsets,
-    _wake: null
+    interpolationTargetMs: Math.max(
+      0,
+      Math.min(timeline.durationMs, Number(priorPlayback.interpolationTargetMs) || fallbackPosition)
+    ),
+    _wake: null,
+    _waitAnchor: null
   };
+  playback.interpolationTargetMs = Math.max(playback.positionMs, playback.interpolationTargetMs);
   return {
     replaySessionId,
     task: `Replay: ${prepared.replay.manifest.task || 'MCP agent session'}`,
@@ -8520,11 +8841,15 @@ function fsbReplayBuildSession(prepared, replaySessionId, owned, approvedScopes,
     sourceReceiptCid: prepared.receiptCid,
     previousReceiptCid: priorRun?.previousReceiptCid || prepared.receiptCid,
     replaySteps: prepared.steps,
+    resultProjectionByStepId: fsbReplayClone(prepared.resultProjectionByStepId, {}),
     currentStep: priorRun?.nextStep || 0,
     totalSteps: prepared.steps.length,
     approvedScopes: Array.isArray(approvedScopes) ? approvedScopes.slice() : [],
     expectedOrigin: fsbReplayOrigin(ownedTab?.url) || fsbReplayOrigin(bootstrapStartUrl),
     playback,
+    _replayMutationTail: null,
+    _replayControlPendingCount: 0,
+    _replayControlTail: null,
     replayRun: priorRun || {
       id: replaySessionId,
       manifestHash: prepared.replay.manifestHash,
@@ -8543,12 +8868,19 @@ function fsbReplayBuildSession(prepared, replaySessionId, owned, approvedScopes,
 async function fsbReplayAbortFailedStart(owned, session, error) {
   if (session) {
     session.status = 'replay_failed';
-    session.replayRun.status = 'replay_failed';
-    session.replayRun.error = error?.message || String(error || 'Replay start failed');
-    session.replayRun.finishedAt = Date.now();
     let terminalPersisted = false;
     try {
-      terminalPersisted = await fsbReplayPersistRun(session) !== false;
+      const persistedRun = await fsbReplayQueueMutation(session, async () => {
+        const stagedRun = fsbReplayClone(session.replayRun, {});
+        stagedRun.status = 'replay_failed';
+        stagedRun.error = error?.message || String(error || 'Replay start failed');
+        stagedRun.finishedAt = Date.now();
+        const committedRun = await fsbReplayPersistRun(session, stagedRun);
+        if (committedRun === false) return false;
+        session.replayRun = committedRun;
+        return committedRun;
+      });
+      terminalPersisted = persistedRun !== false;
     } catch (_persistError) { /* retain recovery data until terminal state is durable */ }
     const ownershipReleased = await fsbReplayReleaseAgent(session, 'replay_start_failed');
     if (terminalPersisted && ownershipReleased &&
@@ -8599,9 +8931,7 @@ async function handleReplaySession(request, sender, sendResponse) {
     if (request?.manifestHash && request.manifestHash !== prepared.replay.manifestHash) {
       throw new Error('The replay changed after preview; review it again before starting');
     }
-    if (!prepared.steps.some(fsbReplayIsExecutable)) {
-      throw new Error('This verified recording has no executable steps');
-    }
+    fsbReplayAssertExecutablePreparation(prepared);
     const bootstrapTab = fsbReplayBootstrapTab(prepared);
     if (!bootstrapTab) {
       throw new Error('The recording does not contain a safe HTTP(S) starting URL');
@@ -8620,7 +8950,9 @@ async function handleReplaySession(request, sender, sendResponse) {
     startKeepAlive();
     automationLogger.logSessionStart(replaySessionId, session.task, owned.tab.id);
     await fsbReplayPersistCheckpoint(session, 'BEFORE_NEXT_ITERATION_SCHEDULE', null);
-    await fsbReplayPersistRun(session);
+    const persistedRun = await fsbReplayPersistRun(session);
+    if (persistedRun === false) throw new Error('Replay run persistence is unavailable');
+    session.replayRun = persistedRun;
     sendResponse({
       success: true,
       sessionId: replaySessionId,
@@ -8665,24 +8997,41 @@ async function handleReplayStepDecision(request, sender, sendResponse) {
       return;
     }
     if (decision === 'skip') {
-      await fsbReplayRecordCheckpoint(session, step, { decision: 'skip', skipped: true }, false, 'skipped');
       const normalizedTool = FSB_REPLAY_LEGACY_TOOL_MAP[step?.tool] || step?.tool;
       const logicalTab = fsbReplayLogicalTab(step);
+      await fsbReplayRecordCheckpoint(session, step, { decision: 'skip', skipped: true }, false, 'skipped', {
+        nextStep: session.currentStep + 1,
+        replayStatus: 'running',
+        replayError: null,
+        playbackPaused: false
+      });
       if (normalizedTool === 'close_tab' && session.replayTabs?.[logicalTab]?.closed === true) {
         delete session.replayTabs[logicalTab];
       }
-      session.currentStep += 1;
+      session.status = 'replaying';
+      await fsbReplayPersistCheckpoint(session, 'BEFORE_NEXT_ITERATION_SCHEDULE', null);
+    } else {
+      await fsbReplayQueueMutation(session, async () => {
+        const stagedRun = fsbReplayClone(session.replayRun, {});
+        stagedRun.status = 'running';
+        stagedRun.error = null;
+        stagedRun.nextStep = session.currentStep;
+        const stagedPlayback = fsbReplayPlaybackSnapshot(session);
+        if (stagedPlayback) {
+          stagedPlayback.paused = false;
+          stagedPlayback.interpolationTargetMs = stagedPlayback.positionMs;
+        }
+        const persistedRun = await fsbReplayPersistRun(session, stagedRun, stagedPlayback);
+        if (persistedRun === false) throw new Error('Replay run persistence is unavailable');
+        session.replayRun = persistedRun;
+        if (session.playback && stagedPlayback) {
+          session.playback.paused = false;
+          session.playback.interpolationTargetMs = stagedPlayback.interpolationTargetMs;
+        }
+      });
+      session.status = 'replaying';
+      await fsbReplayPersistCheckpoint(session, 'BEFORE_NEXT_ITERATION_SCHEDULE', null);
     }
-    session.status = 'replaying';
-    if (session.playback) session.playback.paused = false;
-    session.replayRun.status = 'running';
-    session.replayRun.error = null;
-    await fsbReplayPersistCheckpoint(
-      session,
-      decision === 'skip' ? 'BEFORE_NEXT_ITERATION_SCHEDULE' : 'BEFORE_TOOL_EXECUTION',
-      step
-    );
-    await fsbReplayPersistRun(session);
     sendResponse({ success: true, decision, nextStep: session.currentStep });
     fsbReplayWakePlayback(session);
     fsbReplayStartExecution(session);
@@ -8711,46 +9060,78 @@ async function handleReplayControl(request, sender, sendResponse) {
     sendResponse({ success: false, error: 'Choose Retry, Skip, or Stop in the FSB side panel' });
     return;
   }
-  const playback = session.playback;
-  if (!playback) {
+  if (!session.playback) {
     sendResponse({ success: false, error: 'Replay playback state is unavailable' });
     return;
   }
   const command = request?.command;
   try {
-    if (command === 'pause') {
-      playback.paused = true;
-    } else if (command === 'play') {
-      playback.paused = false;
-    } else if (command === 'setSpeed') {
-      const requestedSpeed = Number(request?.speed);
-      if (!FSB_REPLAY_SPEEDS.includes(requestedSpeed)) {
-        throw new Error('Replay speed must be 0.5x, 1x, 2x, or 4x');
-      }
-      playback.speed = requestedSpeed;
-    } else if (command === 'seek') {
-      const requestedPosition = Number(request?.positionMs);
-      if (!Number.isFinite(requestedPosition)) throw new Error('Replay seek position is invalid');
-      if (requestedPosition < playback.positionMs - FSB_REPLAY_CLOCK_TICK_MS) {
-        throw new Error('Replay can only seek forward because completed browser actions cannot be undone');
-      }
-      playback.positionMs = Math.max(
-        playback.positionMs,
-        Math.min(playback.durationMs, requestedPosition)
-      );
-    } else {
+    if (!['pause', 'play', 'setSpeed', 'seek'].includes(command)) {
       throw new Error('Unknown replay control');
     }
-    fsbReplayWakePlayback(session);
-    const step = session.replaySteps[session.currentStep] || null;
-    await fsbReplayPersistRun(session);
-    fsbReplayBroadcastProgress(
-      session,
-      step,
-      Math.min(session.currentStep, Math.max(0, session.totalSteps - 1)),
-      playback.paused ? 'Replay paused' : `Replaying at ${fsbReplayNormalizeSpeed(playback.speed)}x`
-    );
-    sendResponse({ success: true, playback: fsbReplayPlaybackSnapshot(session) });
+    if (command === 'setSpeed' && !FSB_REPLAY_SPEEDS.includes(Number(request?.speed))) {
+      throw new Error('Replay speed must be 0.5x, 1x, 2x, or 4x');
+    }
+    if (command === 'seek' && !Number.isFinite(Number(request?.positionMs))) {
+      throw new Error('Replay seek position is invalid');
+    }
+
+    const committedPlayback = await fsbReplayQueueControl(session, async () => {
+      if (activeSessions.get(session.replaySessionId) !== session ||
+          session.isTerminating || session.status !== 'replaying') {
+        throw new Error('Replay is no longer active');
+      }
+      const currentPlayback = session.playback;
+      const stagedPlayback = fsbReplayPlaybackSnapshot(session);
+      if (!currentPlayback || !stagedPlayback) {
+        throw new Error('Replay playback state is unavailable');
+      }
+      if (command === 'pause') {
+        stagedPlayback.paused = true;
+        stagedPlayback.interpolationTargetMs = stagedPlayback.positionMs;
+      } else if (command === 'play') {
+        stagedPlayback.paused = false;
+        stagedPlayback.interpolationTargetMs = stagedPlayback.positionMs;
+      } else if (command === 'setSpeed') {
+        stagedPlayback.speed = Number(request.speed);
+      } else {
+        const requestedPosition = Number(request.positionMs);
+        if (requestedPosition < currentPlayback.positionMs - FSB_REPLAY_SEEK_EPSILON_MS) {
+          throw new Error('Replay can only seek forward because completed browser actions cannot be undone');
+        }
+        stagedPlayback.positionMs = Math.max(
+          stagedPlayback.positionMs,
+          Math.min(currentPlayback.durationMs, requestedPosition)
+        );
+        stagedPlayback.interpolationTargetMs = stagedPlayback.positionMs;
+      }
+
+      const persistedRun = await fsbReplayPersistRun(session, session.replayRun, stagedPlayback);
+      if (persistedRun === false) throw new Error('Replay run persistence is unavailable');
+      if (activeSessions.get(session.replaySessionId) !== session ||
+          session.isTerminating || session.status !== 'replaying') {
+        throw new Error('Replay is no longer active');
+      }
+      session.replayRun = persistedRun;
+      currentPlayback.speed = stagedPlayback.speed;
+      currentPlayback.paused = stagedPlayback.paused;
+      currentPlayback.positionMs = Math.max(currentPlayback.positionMs, stagedPlayback.positionMs);
+      currentPlayback.interpolationTargetMs = Math.max(
+        currentPlayback.positionMs,
+        stagedPlayback.interpolationTargetMs
+      );
+      const step = session.replaySteps[session.currentStep] || null;
+      fsbReplayBroadcastProgress(
+        session,
+        step,
+        Math.min(session.currentStep, Math.max(0, session.totalSteps - 1)),
+        currentPlayback.paused
+          ? 'Replay paused'
+          : `Replaying at ${fsbReplayNormalizeSpeed(currentPlayback.speed)}x`
+      );
+      return fsbReplayPlaybackSnapshot(session);
+    });
+    sendResponse({ success: true, playback: committedPlayback });
   } catch (error) {
     sendResponse({ success: false, error: error?.message || String(error) });
   }
@@ -8884,7 +9265,9 @@ async function fsbReplayClearRecoverySnapshots(replaySessionId) {
     return;
   }
   const adapter = globalThis.FsbLatticeRuntimeAdapter.createFsbLatticeRuntimeAdapter({
-    sessionId: replaySessionId
+    sessionId: replaySessionId,
+    fixedSlots: true,
+    catalogKey: FSB_REPLAY_CHECKPOINT_CATALOG_KEY
   });
   if (adapter && typeof adapter.clearSnapshots === 'function') {
     await adapter.clearSnapshots();
@@ -8923,26 +9306,32 @@ async function fsbReplayCleanupFailedRecovery(replaySessionId, session, owned, c
 
 async function fsbRestoreLatticeReplayCheckpoints() {
   if (!chrome.storage?.session || !globalThis.FsbLatticeReplay) return;
-  let stored;
+  let catalog;
   try {
-    stored = await chrome.storage.session.get(null);
+    const stored = await chrome.storage.session.get(FSB_REPLAY_CHECKPOINT_CATALOG_KEY);
+    catalog = Array.isArray(stored?.[FSB_REPLAY_CHECKPOINT_CATALOG_KEY])
+      ? [...new Set(stored[FSB_REPLAY_CHECKPOINT_CATALOG_KEY].filter((id) => typeof id === 'string' && id))]
+      : [];
   } catch (_error) {
     return;
   }
-  const latestByRun = new Map();
-  Object.entries(stored || {}).forEach(([storageKey, snapshot]) => {
-    if (!snapshot || snapshot.kind !== 'survivability-snapshot' || typeof snapshot.payload !== 'string') return;
+  const checkpoints = [];
+  for (const replaySessionId of catalog) {
+    const adapter = globalThis.FsbLatticeRuntimeAdapter?.createFsbLatticeRuntimeAdapter?.({
+      sessionId: replaySessionId,
+      fixedSlots: true,
+      catalogKey: FSB_REPLAY_CHECKPOINT_CATALOG_KEY
+    });
+    if (!adapter || typeof adapter.loadLatestSnapshot !== 'function') continue;
+    const snapshot = await adapter.loadLatestSnapshot().catch(() => null);
+    if (!snapshot || snapshot.kind !== 'survivability-snapshot' || typeof snapshot.payload !== 'string') continue;
     let state;
-    try { state = JSON.parse(snapshot.payload); } catch (_error) { return; }
-    if (!state || state.kind !== FSB_REPLAY_CHECKPOINT_KIND || !state.replaySessionId) return;
-    const prior = latestByRun.get(state.replaySessionId);
-    const sortKey = String(snapshot.capturedAt || '') + '|' + storageKey;
-    if (!prior || sortKey > prior.sortKey) {
-      latestByRun.set(state.replaySessionId, { snapshot, state, sortKey });
-    }
-  });
+    try { state = JSON.parse(snapshot.payload); } catch (_error) { continue; }
+    if (!state || state.kind !== FSB_REPLAY_CHECKPOINT_KIND || state.replaySessionId !== replaySessionId) continue;
+    checkpoints.push({ snapshot, state });
+  }
 
-  for (const { snapshot, state } of latestByRun.values()) {
+  for (const { snapshot, state } of checkpoints) {
     if (activeSessions.has(state.replaySessionId)) continue;
     let reclaimedOwned = null;
     let recoveredSession = null;
@@ -8958,16 +9347,30 @@ async function fsbRestoreLatticeReplayCheckpoints() {
         }
         continue;
       }
+      fsbReplayAssertExecutablePreparation(prepared);
       if (prepared.replay.manifestHash !== state.manifestHash) {
         throw new Error('Replay recovery manifest hash mismatch');
       }
-      const recoveryStep = prepared.steps[Number.isFinite(state.nextStep) ? state.nextStep : 0] || null;
+      const checkpointNextStep = Number.isFinite(state.nextStep) ? state.nextStep : 0;
+      const persistedNextStep = persistedRun?.id === state.replaySessionId && Number.isFinite(persistedRun.nextStep)
+        ? persistedRun.nextStep
+        : checkpointNextStep;
+      const journalAdvanced = persistedNextStep > checkpointNextStep;
+      const recoveredNextStep = Math.max(checkpointNextStep, persistedNextStep);
+      const recoveryStep = prepared.steps[checkpointNextStep] || null;
       const recoveryTool = FSB_REPLAY_LEGACY_TOOL_MAP[recoveryStep?.tool] || recoveryStep?.tool;
-      const allowMissingCloseLogicalTab = state._currentStepName === 'BEFORE_TOOL_EXECUTION' &&
+      const recoveryState = journalAdvanced && Array.isArray(persistedRun?.logicalTabs)
+        ? Object.assign({}, state, {
+            targetTabId: Number.isFinite(persistedRun.targetTabId) ? persistedRun.targetTabId : null,
+            expectedOrigin: persistedRun.expectedOrigin || null,
+            logicalTabs: persistedRun.logicalTabs
+          })
+        : state;
+      const allowMissingCloseLogicalTab = !journalAdvanced && state._currentStepName === 'BEFORE_TOOL_EXECUTION' &&
         state.writeInFlight === true && recoveryTool === 'close_tab'
         ? fsbReplayLogicalTab(recoveryStep)
         : null;
-      const reclaimed = await fsbReplayReclaimOwnedTabs(state, { allowMissingCloseLogicalTab });
+      const reclaimed = await fsbReplayReclaimOwnedTabs(recoveryState, { allowMissingCloseLogicalTab });
       const owned = reclaimed.owned;
       reclaimedOwned = owned;
       const tab = owned.tab || null;
@@ -9006,18 +9409,21 @@ async function fsbRestoreLatticeReplayCheckpoints() {
       );
       recoveredSession = session;
       session.replayTabs = reclaimed.replayTabs;
-      session.currentStep = Number.isFinite(state.nextStep) ? state.nextStep : 0;
-      session.previousReceiptCid = state.previousReceiptCid || prepared.receiptCid;
-      session.expectedOrigin = state.expectedOrigin || fsbReplayOrigin(tab?.url);
+      session.currentStep = recoveredNextStep;
+      session.replayRun.nextStep = recoveredNextStep;
+      session.previousReceiptCid = priorRun.previousReceiptCid || state.previousReceiptCid || prepared.receiptCid;
+      session.expectedOrigin = recoveryState.expectedOrigin || fsbReplayOrigin(tab?.url);
       activeSessions.set(state.replaySessionId, session);
       startKeepAlive();
 
       const currentStep = session.replaySteps[session.currentStep] || null;
-      const resumePolicy = session._latticeAdapter && typeof session._latticeAdapter.resume === 'function'
+      const resumePolicy = journalAdvanced
+        ? 'SAFE'
+        : session._latticeAdapter && typeof session._latticeAdapter.resume === 'function'
         ? await session._latticeAdapter.resume(snapshot)
         : 'RECOVERY_AMBIGUOUS';
-      const ambiguousWrite = state.decisionRequired === true ||
-        (resumePolicy === 'ON_ERROR_SW_EVICTION_MID_TOOL_DISPATCH' && state.writeInFlight === true);
+      const ambiguousWrite = !journalAdvanced && (state.decisionRequired === true ||
+        (resumePolicy === 'ON_ERROR_SW_EVICTION_MID_TOOL_DISPATCH' && state.writeInFlight === true));
       if (ambiguousWrite && currentStep) {
         await fsbReplayPauseForDecision(
           session,
@@ -9038,15 +9444,23 @@ async function fsbRestoreLatticeReplayCheckpoints() {
       });
       let terminalPersisted = false;
       try {
-        const prior = await chrome.storage.local.get('fsbSessionLogs');
-        const source = (prior.fsbSessionLogs || {})[state.originalSessionId];
-        if (source?.replay?.lastRun?.id === state.replaySessionId) {
-          source.replay.lastRun.status = 'replay_failed';
-          source.replay.lastRun.error = error && error.message ? error.message : String(error);
-          source.replay.lastRun.finishedAt = Date.now();
-          await chrome.storage.local.set({ fsbSessionLogs: prior.fsbSessionLogs || {} });
-          terminalPersisted = true;
-        }
+        const failureRun = fsbReplayClone(recoveredSession?.replayRun, null) || {
+          id: state.replaySessionId,
+          manifestHash: state.manifestHash,
+          sourceReceiptCid: null,
+          targetTabId: state.targetTabId ?? null,
+          startedAt: state.startedAt || Date.now(),
+          nextStep: Number.isFinite(state.nextStep) ? state.nextStep : 0,
+          previousReceiptCid: state.previousReceiptCid || null,
+          steps: []
+        };
+        failureRun.status = 'replay_failed';
+        failureRun.error = error && error.message ? error.message : String(error);
+        failureRun.finishedAt = Date.now();
+        terminalPersisted = !!(await globalThis.FsbLatticeReplay.persistReplayRun(
+          state.originalSessionId,
+          failureRun
+        ));
       } catch (_persistError) { /* retain the checkpoint until terminal state can be persisted */ }
       const ownershipReleased = await fsbReplayCleanupFailedRecovery(
         state.replaySessionId,
@@ -11261,7 +11675,12 @@ const fsbHandleRuntimeMessage = (request, sender, sendResponse) => {
       }
       (async () => {
         try {
-          const deleted = await automationLogger.deleteSession(sessionId);
+          const isJournalSession = globalThis.FsbMcpLatticeJournal &&
+            typeof globalThis.FsbMcpLatticeJournal.hasSession === 'function' &&
+            await globalThis.FsbMcpLatticeJournal.hasSession(sessionId);
+          const deleted = isJournalSession
+            ? await globalThis.FsbMcpLatticeJournal.deleteSession(sessionId)
+            : await automationLogger.deleteSession(sessionId);
           sendResponse(deleted
             ? { success: true }
             : { success: false, error: 'Failed to delete session history' });
@@ -11275,6 +11694,10 @@ const fsbHandleRuntimeMessage = (request, sender, sendResponse) => {
     case 'clearSessionHistory':
       (async () => {
         try {
+          if (globalThis.FsbMcpLatticeJournal &&
+              typeof globalThis.FsbMcpLatticeJournal.clearSessions === 'function') {
+            await globalThis.FsbMcpLatticeJournal.clearSessions();
+          }
           const cleared = await automationLogger.clearAllSessions();
           sendResponse(cleared
             ? { success: true }
@@ -11289,7 +11712,12 @@ const fsbHandleRuntimeMessage = (request, sender, sendResponse) => {
       // Get structured replay data for session visualization
       (async () => {
         try {
-          const replay = await automationLogger.getReplayData(request.sessionId);
+          const isJournalSession = globalThis.FsbMcpLatticeJournal &&
+            typeof globalThis.FsbMcpLatticeJournal.hasSession === 'function' &&
+            await globalThis.FsbMcpLatticeJournal.hasSession(request.sessionId);
+          const replay = isJournalSession && typeof globalThis.FsbMcpLatticeJournal.getReplayData === 'function'
+            ? await globalThis.FsbMcpLatticeJournal.getReplayData(request.sessionId)
+            : await automationLogger.getReplayData(request.sessionId);
           sendResponse({ replay });
         } catch (error) {
           sendResponse({ replay: null, error: error.message });
@@ -11301,13 +11729,64 @@ const fsbHandleRuntimeMessage = (request, sender, sendResponse) => {
       // Export session as human-readable text report
       (async () => {
         try {
-          const text = await automationLogger.exportHumanReadable(request.sessionId);
+          const isJournalSession = globalThis.FsbMcpLatticeJournal &&
+            typeof globalThis.FsbMcpLatticeJournal.hasSession === 'function' &&
+            await globalThis.FsbMcpLatticeJournal.hasSession(request.sessionId);
+          const text = isJournalSession && typeof globalThis.FsbMcpLatticeJournal.exportHumanReadable === 'function'
+            ? await globalThis.FsbMcpLatticeJournal.exportHumanReadable(request.sessionId)
+            : await automationLogger.exportHumanReadable(request.sessionId);
           sendResponse({ text });
         } catch (error) {
           sendResponse({ text: null, error: error.message });
         }
       })();
       return true; // Will respond asynchronously
+
+    case 'getSessionDetail':
+      (async () => {
+        try {
+          const journal = globalThis.FsbMcpLatticeJournal;
+          const detail = journal && typeof journal.getSessionDetail === 'function'
+            ? await journal.getSessionDetail({
+              sessionId: request.sessionId,
+              afterSequence: request.afterSequence,
+              limit: request.limit
+            })
+            : null;
+          if (detail) {
+            sendResponse({ success: true, ...detail });
+            return;
+          }
+          const session = await automationLogger.loadSession(request.sessionId);
+          sendResponse(session
+            ? { success: true, session, events: [], nextSequence: null, hasMore: false, legacy: true }
+            : { success: false, error: 'Session not found' });
+        } catch (error) {
+          sendResponse({ success: false, error: error?.message || 'Failed to load session detail' });
+        }
+      })();
+      return true;
+
+    case 'readSessionArtifact':
+      (async () => {
+        try {
+          const artifact = globalThis.FsbMcpLatticeJournal &&
+            typeof globalThis.FsbMcpLatticeJournal.readSessionArtifact === 'function'
+            ? await globalThis.FsbMcpLatticeJournal.readSessionArtifact({
+              sessionId: request.sessionId,
+              artifactId: request.artifactId,
+              offset: request.offset,
+              limit: request.limit
+            })
+            : null;
+          sendResponse(artifact
+            ? { success: true, artifact }
+            : { success: false, error: 'Session artifact not found' });
+        } catch (error) {
+          sendResponse({ success: false, error: error?.message || 'Failed to read session artifact' });
+        }
+      })();
+      return true;
 
     case 'getDOMSnapshots':
       // Get full DOM snapshots for a session
@@ -17709,7 +18188,67 @@ async function handleCloseTab(request, sender, sendResponse) {
  * @param {Object} sender - The message sender
  * @param {Function} sendResponse - Function to send response
  */
+function isCdpDebuggerContention(error) {
+  const message = error && error.message ? error.message : String(error || '');
+  return /another debugger|already attached|debugger is busy|target is being debugged/i.test(message);
+}
+
+function cdpDebuggerBusyError(tabId, cause) {
+  const leaseApi = globalThis.FsbCdpLease;
+  const error = leaseApi && typeof leaseApi.busyError === 'function'
+    ? leaseApi.busyError(tabId)
+    : new Error(`The debugger for tab ${tabId} is busy. Retry the operation.`);
+  error.code = 'SCREENSHOT_DEBUGGER_BUSY';
+  error.retryable = true;
+  if (cause) error.cause = cause;
+  return error;
+}
+
+function cdpFailureResult(error, extra) {
+  return Object.assign({
+    success: false,
+    error: error && error.message ? error.message : String(error),
+    code: error && error.code ? error.code : undefined,
+    retryable: Boolean(error && error.retryable)
+  }, extra || {});
+}
+
+async function attachFsbDebugger(tabId, operation) {
+  // The per-tab lease makes it safe to release FSB's own warm Input-domain
+  // attachment. A foreign owner is never detached.
+  if (keyboardEmulator && keyboardEmulator.isAttachedTo(tabId)) {
+    automationLogger.debug(`${operation}: detaching FSB KeyboardEmulator before attaching`, { tabId });
+    await keyboardEmulator.detachDebugger(tabId);
+  }
+  try {
+    await chrome.debugger.attach({ tabId }, '1.3');
+  } catch (error) {
+    if (isCdpDebuggerContention(error)) throw cdpDebuggerBusyError(tabId, error);
+    throw error;
+  }
+}
+
+async function runLegacyCdpMessageWithLease(handler, request, sender, sendResponse) {
+  const tabId = sender && sender.tab ? sender.tab.id : null;
+  if (!tabId || !globalThis.FsbCdpLease || typeof globalThis.FsbCdpLease.acquire !== 'function') {
+    return handler(request, sender, sendResponse);
+  }
+  let lease = null;
+  try {
+    lease = await globalThis.FsbCdpLease.acquire(tabId, { timeoutMs: 10000 });
+    return await handler(request, sender, sendResponse);
+  } catch (error) {
+    sendResponse(cdpFailureResult(error));
+  } finally {
+    if (lease) lease.release();
+  }
+}
+
 async function handleCDPInsertText(request, sender, sendResponse) {
+  return runLegacyCdpMessageWithLease(handleCDPInsertTextUnlocked, request, sender, sendResponse);
+}
+
+async function handleCDPInsertTextUnlocked(request, sender, sendResponse) {
   const tabId = sender.tab?.id;
   const { text, clearFirst } = request;
 
@@ -17728,28 +18267,7 @@ async function handleCDPInsertText(request, sender, sendResponse) {
   try {
     automationLogger.logActionExecution(null, 'cdpInsertText', 'start', { tabId, textLength: text.length });
 
-    // If KeyboardEmulator has the debugger attached to this tab, detach it first
-    if (keyboardEmulator && keyboardEmulator.isAttachedTo(tabId)) {
-      automationLogger.debug('cdpInsertText: detaching KeyboardEmulator debugger before attaching', { tabId });
-      await keyboardEmulator.detachDebugger(tabId);
-    }
-
-    // Try to attach debugger; if "already attached" error, force-detach and retry
-    try {
-      await chrome.debugger.attach({ tabId }, '1.3');
-    } catch (attachErr) {
-      if (attachErr.message && attachErr.message.includes('Another debugger is already attached')) {
-        automationLogger.debug('cdpInsertText: stale debugger detected, force-detaching and retrying', { tabId });
-        try {
-          await chrome.debugger.detach({ tabId });
-        } catch (forceDetachErr) {
-          // Ignore -- may fail if the "other debugger" is not ours
-        }
-        await chrome.debugger.attach({ tabId }, '1.3');
-      } else {
-        throw attachErr;
-      }
-    }
+    await attachFsbDebugger(tabId, 'cdpInsertText');
     debuggerAttached = true;
 
     // If clearFirst is requested, select all and delete
@@ -17838,11 +18356,7 @@ async function handleCDPInsertText(request, sender, sendResponse) {
       }
     }
 
-    sendResponse({
-      success: false,
-      error: error.message,
-      method: 'cdp'
-    });
+    sendResponse(cdpFailureResult(error, { method: 'cdp' }));
   }
 }
 
@@ -17854,6 +18368,10 @@ async function handleCDPInsertText(request, sender, sendResponse) {
  * @param {Function} sendResponse - Function to send response
  */
 async function handleCDPMouseClick(request, sender, sendResponse) {
+  return runLegacyCdpMessageWithLease(handleCDPMouseClickUnlocked, request, sender, sendResponse);
+}
+
+async function handleCDPMouseClickUnlocked(request, sender, sendResponse) {
   const tabId = sender.tab?.id;
   const { x, y, shiftKey, ctrlKey, altKey } = request;
 
@@ -17873,24 +18391,7 @@ async function handleCDPMouseClick(request, sender, sendResponse) {
   try {
     automationLogger.logActionExecution(null, 'cdpMouseClick', 'start', { tabId, x, y });
 
-    // If KeyboardEmulator has the debugger attached to this tab, detach it first
-    if (keyboardEmulator && keyboardEmulator.isAttachedTo(tabId)) {
-      automationLogger.debug('cdpMouseClick: detaching KeyboardEmulator debugger before attaching', { tabId });
-      await keyboardEmulator.detachDebugger(tabId);
-    }
-
-    // Try to attach debugger; if "already attached" error, force-detach and retry
-    try {
-      await chrome.debugger.attach({ tabId }, '1.3');
-    } catch (attachErr) {
-      if (attachErr.message && attachErr.message.includes('Another debugger is already attached')) {
-        automationLogger.debug('cdpMouseClick: stale debugger detected, force-detaching and retrying', { tabId });
-        try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* ignore */ }
-        await chrome.debugger.attach({ tabId }, '1.3');
-      } else {
-        throw attachErr;
-      }
-    }
+    await attachFsbDebugger(tabId, 'cdpMouseClick');
     debuggerAttached = true;
 
     const modifiers = (altKey ? 1 : 0) | (ctrlKey ? 2 : 0) | (shiftKey ? 8 : 0);
@@ -17916,7 +18417,7 @@ async function handleCDPMouseClick(request, sender, sendResponse) {
     if (debuggerAttached) {
       try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* ignore */ }
     }
-    sendResponse({ success: false, error: error.message });
+    sendResponse(cdpFailureResult(error));
   }
 }
 
@@ -17928,6 +18429,10 @@ async function handleCDPMouseClick(request, sender, sendResponse) {
  * @param {Function} sendResponse - Function to send response
  */
 async function handleCDPMouseClickAndHold(request, sender, sendResponse) {
+  return runLegacyCdpMessageWithLease(handleCDPMouseClickAndHoldUnlocked, request, sender, sendResponse);
+}
+
+async function handleCDPMouseClickAndHoldUnlocked(request, sender, sendResponse) {
   const tabId = sender.tab?.id;
   const { x, y } = request;
   const holdMs = request.holdMs || 5000;
@@ -17948,22 +18453,7 @@ async function handleCDPMouseClickAndHold(request, sender, sendResponse) {
   try {
     automationLogger.logActionExecution(null, 'cdpMouseClickAndHold', 'start', { tabId, x, y, holdMs });
 
-    if (keyboardEmulator && keyboardEmulator.isAttachedTo(tabId)) {
-      automationLogger.debug('cdpMouseClickAndHold: detaching KeyboardEmulator debugger before attaching', { tabId });
-      await keyboardEmulator.detachDebugger(tabId);
-    }
-
-    try {
-      await chrome.debugger.attach({ tabId }, '1.3');
-    } catch (attachErr) {
-      if (attachErr.message && attachErr.message.includes('Another debugger is already attached')) {
-        automationLogger.debug('cdpMouseClickAndHold: stale debugger detected, force-detaching and retrying', { tabId });
-        try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* ignore */ }
-        await chrome.debugger.attach({ tabId }, '1.3');
-      } else {
-        throw attachErr;
-      }
-    }
+    await attachFsbDebugger(tabId, 'cdpMouseClickAndHold');
     debuggerAttached = true;
 
     // Mouse pressed
@@ -17990,7 +18480,7 @@ async function handleCDPMouseClickAndHold(request, sender, sendResponse) {
     if (debuggerAttached) {
       try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* ignore */ }
     }
-    sendResponse({ success: false, error: error.message });
+    sendResponse(cdpFailureResult(error));
   }
 }
 
@@ -18002,6 +18492,10 @@ async function handleCDPMouseClickAndHold(request, sender, sendResponse) {
  * @param {Function} sendResponse - Function to send response
  */
 async function handleCDPMouseDrag(request, sender, sendResponse) {
+  return runLegacyCdpMessageWithLease(handleCDPMouseDragUnlocked, request, sender, sendResponse);
+}
+
+async function handleCDPMouseDragUnlocked(request, sender, sendResponse) {
   const tabId = sender.tab?.id;
   const { startX, startY, endX, endY, shiftKey, ctrlKey, altKey } = request;
   const steps = request.steps || 10;
@@ -18024,22 +18518,7 @@ async function handleCDPMouseDrag(request, sender, sendResponse) {
   try {
     automationLogger.logActionExecution(null, 'cdpMouseDrag', 'start', { tabId, startX, startY, endX, endY, steps });
 
-    if (keyboardEmulator && keyboardEmulator.isAttachedTo(tabId)) {
-      automationLogger.debug('cdpMouseDrag: detaching KeyboardEmulator debugger before attaching', { tabId });
-      await keyboardEmulator.detachDebugger(tabId);
-    }
-
-    try {
-      await chrome.debugger.attach({ tabId }, '1.3');
-    } catch (attachErr) {
-      if (attachErr.message && attachErr.message.includes('Another debugger is already attached')) {
-        automationLogger.debug('cdpMouseDrag: stale debugger detected, force-detaching and retrying', { tabId });
-        try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* ignore */ }
-        await chrome.debugger.attach({ tabId }, '1.3');
-      } else {
-        throw attachErr;
-      }
-    }
+    await attachFsbDebugger(tabId, 'cdpMouseDrag');
     debuggerAttached = true;
 
     const modifiers = (altKey ? 1 : 0) | (ctrlKey ? 2 : 0) | (shiftKey ? 8 : 0);
@@ -18078,7 +18557,7 @@ async function handleCDPMouseDrag(request, sender, sendResponse) {
     if (debuggerAttached) {
       try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* ignore */ }
     }
-    sendResponse({ success: false, error: error.message });
+    sendResponse(cdpFailureResult(error));
   }
 }
 
@@ -18090,6 +18569,10 @@ async function handleCDPMouseDrag(request, sender, sendResponse) {
  * @param {Function} sendResponse - Function to send response
  */
 async function handleCDPMouseDragVariableSpeed(request, sender, sendResponse) {
+  return runLegacyCdpMessageWithLease(handleCDPMouseDragVariableSpeedUnlocked, request, sender, sendResponse);
+}
+
+async function handleCDPMouseDragVariableSpeedUnlocked(request, sender, sendResponse) {
   const tabId = sender.tab?.id;
   const { startX, startY, endX, endY } = request;
   const steps = request.steps || 20;
@@ -18113,22 +18596,7 @@ async function handleCDPMouseDragVariableSpeed(request, sender, sendResponse) {
   try {
     automationLogger.logActionExecution(null, 'cdpMouseDragVariableSpeed', 'start', { tabId, startX, startY, endX, endY, steps });
 
-    if (keyboardEmulator && keyboardEmulator.isAttachedTo(tabId)) {
-      automationLogger.debug('cdpMouseDragVariableSpeed: detaching KeyboardEmulator debugger before attaching', { tabId });
-      await keyboardEmulator.detachDebugger(tabId);
-    }
-
-    try {
-      await chrome.debugger.attach({ tabId }, '1.3');
-    } catch (attachErr) {
-      if (attachErr.message && attachErr.message.includes('Another debugger is already attached')) {
-        automationLogger.debug('cdpMouseDragVariableSpeed: stale debugger detected, force-detaching and retrying', { tabId });
-        try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* ignore */ }
-        await chrome.debugger.attach({ tabId }, '1.3');
-      } else {
-        throw attachErr;
-      }
-    }
+    await attachFsbDebugger(tabId, 'cdpMouseDragVariableSpeed');
     debuggerAttached = true;
 
     // Mouse pressed at start position
@@ -18166,7 +18634,7 @@ async function handleCDPMouseDragVariableSpeed(request, sender, sendResponse) {
     if (debuggerAttached) {
       try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* ignore */ }
     }
-    sendResponse({ success: false, error: error.message });
+    sendResponse(cdpFailureResult(error));
   }
 }
 
@@ -18178,6 +18646,10 @@ async function handleCDPMouseDragVariableSpeed(request, sender, sendResponse) {
  * @param {Function} sendResponse - Function to send response
  */
 async function handleCDPMouseWheel(request, sender, sendResponse) {
+  return runLegacyCdpMessageWithLease(handleCDPMouseWheelUnlocked, request, sender, sendResponse);
+}
+
+async function handleCDPMouseWheelUnlocked(request, sender, sendResponse) {
   const tabId = sender.tab?.id;
   const { x, y } = request;
   const deltaX = request.deltaX || 0;
@@ -18199,22 +18671,7 @@ async function handleCDPMouseWheel(request, sender, sendResponse) {
   try {
     automationLogger.logActionExecution(null, 'cdpMouseWheel', 'start', { tabId, x, y, deltaX, deltaY });
 
-    if (keyboardEmulator && keyboardEmulator.isAttachedTo(tabId)) {
-      automationLogger.debug('cdpMouseWheel: detaching KeyboardEmulator debugger before attaching', { tabId });
-      await keyboardEmulator.detachDebugger(tabId);
-    }
-
-    try {
-      await chrome.debugger.attach({ tabId }, '1.3');
-    } catch (attachErr) {
-      if (attachErr.message && attachErr.message.includes('Another debugger is already attached')) {
-        automationLogger.debug('cdpMouseWheel: stale debugger detected, force-detaching and retrying', { tabId });
-        try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* ignore */ }
-        await chrome.debugger.attach({ tabId }, '1.3');
-      } else {
-        throw attachErr;
-      }
-    }
+    await attachFsbDebugger(tabId, 'cdpMouseWheel');
     debuggerAttached = true;
 
     // Dispatch mouseWheel event
@@ -18233,7 +18690,7 @@ async function handleCDPMouseWheel(request, sender, sendResponse) {
     if (debuggerAttached) {
       try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* ignore */ }
     }
-    sendResponse({ success: false, error: error.message });
+    sendResponse(cdpFailureResult(error));
   }
 }
 
@@ -18249,9 +18706,32 @@ async function handleCDPMouseWheel(request, sender, sendResponse) {
  * @param {number} tabId    target tab (gate-resolved / owned)
  * @param {string} selector CSS selector for the file input (or a container holding one)
  * @param {string} filePath ABSOLUTE disk path; relative / ~ paths are rejected
+ * @param {{allowManagedScreenshot?:boolean}} options private MCP screenshot authorization
  * @returns {Promise<{success:boolean, method?:string, selector?:string, file?:string, hadEffect?:boolean, error?:string, reason?:string}>}
  */
-async function executeUploadFile(tabId, selector, filePath) {
+async function executeUploadFile(tabId, selector, filePath, options = {}) {
+  if (!tabId) return { success: false, error: 'No tab ID available' };
+  const leaseApi = globalThis.FsbCdpLease;
+  if (!leaseApi || typeof leaseApi.run !== 'function') {
+    return executeUploadFileUnlocked(tabId, selector, filePath, options);
+  }
+  try {
+    return await leaseApi.run(
+      tabId,
+      () => executeUploadFileUnlocked(tabId, selector, filePath, options),
+      { timeoutMs: 10000 }
+    );
+  } catch (error) {
+    return {
+      success: false,
+      error: error && error.message ? error.message : String(error),
+      code: error && error.code ? error.code : undefined,
+      retryable: Boolean(error && error.retryable)
+    };
+  }
+}
+
+async function executeUploadFileUnlocked(tabId, selector, filePath, options = {}) {
   const denylist = (typeof globalThis !== 'undefined') ? globalThis.FsbUploadPathDenylist : null;
   const auditLog = (typeof globalThis !== 'undefined') ? globalThis.FsbAuditLog : null;
 
@@ -18308,7 +18788,9 @@ async function executeUploadFile(tabId, selector, filePath) {
   }
 
   try {
-    const verdict = denylist.classify(filePath);
+    const verdict = denylist.classify(filePath, {
+      allowManagedScreenshot: options.allowManagedScreenshot === true
+    });
     if (verdict && verdict.denied) {
       automationLogger.logActionExecution(null, 'cdpUploadFile', 'complete', { success: false, tabId, blocked: true, reason: verdict.reason });
       await audit('blocked', verdict.reason || 'sensitive-path', null);
@@ -18328,17 +18810,20 @@ async function executeUploadFile(tabId, selector, filePath) {
     automationLogger.logActionExecution(null, 'cdpUploadFile', 'start', { tabId, selector, file: fileName });
 
     if (keyboardEmulator && keyboardEmulator.isAttachedTo(tabId)) {
-      try { await keyboardEmulator.detachDebugger(tabId); } catch (_e) { /* ignore */ }
+      await keyboardEmulator.detachDebugger(tabId);
     }
     try {
       await chrome.debugger.attach({ tabId }, '1.3');
-    } catch (attachErr) {
-      if (attachErr.message && attachErr.message.includes('Another debugger is already attached')) {
-        try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* ignore */ }
-        await chrome.debugger.attach({ tabId }, '1.3');
-      } else {
-        throw attachErr;
+    } catch (attachError) {
+      const message = attachError && attachError.message ? attachError.message : String(attachError || '');
+      if (/another debugger|already attached|debugger is busy|target is being debugged/i.test(message)) {
+        const busyError = new Error(`The debugger for tab ${tabId} is busy. Retry the operation.`);
+        busyError.code = 'SCREENSHOT_DEBUGGER_BUSY';
+        busyError.retryable = true;
+        busyError.cause = attachError;
+        throw busyError;
       }
+      throw attachError;
     }
     debuggerAttached = true;
 
@@ -18388,6 +18873,14 @@ async function executeUploadFile(tabId, selector, filePath) {
     const redactedMsg = redactPathForUploadLog(msg);
     automationLogger.logActionExecution(null, 'cdpUploadFile', 'complete', { success: false, tabId, error: redactedMsg });
     await audit('error', 'allow', (error && error.name) ? error.name : 'Error');
+    if (error && error.code === 'SCREENSHOT_DEBUGGER_BUSY') {
+      return {
+        success: false,
+        error: error.message,
+        code: error.code,
+        retryable: true
+      };
+    }
     return { success: false, error: 'upload_file failed: ' + redactedMsg };
   } finally {
     if (debuggerAttached) {
@@ -18413,33 +18906,52 @@ async function executeUploadFile(tabId, selector, filePath) {
  * @returns {Promise<Object>} { success, method, error?, ... }
  */
 async function executeCDPToolDirect(request, tabId) {
+  if (!tabId) return { success: false, error: 'No tab ID available' };
+  const leaseApi = globalThis.FsbCdpLease;
+  if (!leaseApi || typeof leaseApi.run !== 'function') {
+    return executeCDPToolDirectUnlocked(request, tabId);
+  }
+  try {
+    return await leaseApi.run(
+      tabId,
+      () => executeCDPToolDirectUnlocked(request, tabId),
+      { timeoutMs: 10000 }
+    );
+  } catch (error) {
+    return cdpFailureResult(error);
+  }
+}
+
+async function executeCDPToolDirectUnlocked(request, tabId) {
   const { tool: verb, params } = request;
 
   if (!tabId) {
     return { success: false, error: 'No tab ID available' };
   }
 
-  // Helper: attach debugger with force-detach retry on conflict
+  // Attach only after the caller owns the per-tab lease. Internal warm
+  // attachments may be released, but external debugger owners are preserved.
   async function attachDebugger() {
-    // If KeyboardEmulator has the debugger attached to this tab, detach it first
-    if (keyboardEmulator && keyboardEmulator.isAttachedTo(tabId)) {
-      automationLogger.debug('executeCDPToolDirect: detaching KeyboardEmulator debugger before attaching', { tabId, verb });
-      await keyboardEmulator.detachDebugger(tabId);
-    }
-    try {
-      await chrome.debugger.attach({ tabId }, '1.3');
-    } catch (attachErr) {
-      if (attachErr.message && attachErr.message.includes('Another debugger is already attached')) {
-        automationLogger.debug('executeCDPToolDirect: stale debugger detected, force-detaching and retrying', { tabId, verb });
-        try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* ignore */ }
-        await chrome.debugger.attach({ tabId }, '1.3');
-      } else {
-        throw attachErr;
-      }
-    }
+    await attachFsbDebugger(tabId, `executeCDPToolDirect:${verb}`);
   }
 
   switch (verb) {
+
+    // -----------------------------------------------------------------
+    // cdpCaptureScreenshot: actual Chromium-composited page image
+    // -----------------------------------------------------------------
+    case 'cdpCaptureScreenshot': {
+      const engine = globalThis.FsbScreenshotCapture;
+      if (!engine || typeof engine.capture !== 'function') {
+        return {
+          success: false,
+          error: 'Screenshot capture engine unavailable',
+          code: 'SCREENSHOT_CAPTURE_FAILED',
+          retryable: false
+        };
+      }
+      return await engine.capture(params || {}, tabId, { skipLease: true });
+    }
 
     // -----------------------------------------------------------------
     // cdpClickAt: mousePressed + mouseReleased at (x, y) with modifiers
@@ -18472,7 +18984,7 @@ async function executeCDPToolDirect(request, tabId) {
         return { success: true, method: 'cdp_direct', x, y };
       } catch (error) {
         automationLogger.logActionExecution(null, 'cdpClickAt', 'complete', { success: false, tabId, error: error.message });
-        return { success: false, error: error.message };
+        return cdpFailureResult(error);
       } finally {
         if (debuggerAttached) {
           try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* ignore */ }
@@ -18511,7 +19023,7 @@ async function executeCDPToolDirect(request, tabId) {
         return { success: true, method: 'cdp_direct', x, y, holdMs };
       } catch (error) {
         automationLogger.logActionExecution(null, 'cdpClickAndHold', 'complete', { success: false, tabId, error: error.message });
-        return { success: false, error: error.message };
+        return cdpFailureResult(error);
       } finally {
         if (debuggerAttached) {
           try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* ignore */ }
@@ -18564,7 +19076,7 @@ async function executeCDPToolDirect(request, tabId) {
         return { success: true, method: 'cdp_direct', startX, startY, endX, endY, steps };
       } catch (error) {
         automationLogger.logActionExecution(null, 'cdpDrag', 'complete', { success: false, tabId, error: error.message });
-        return { success: false, error: error.message };
+        return cdpFailureResult(error);
       } finally {
         if (debuggerAttached) {
           try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* ignore */ }
@@ -18617,7 +19129,7 @@ async function executeCDPToolDirect(request, tabId) {
         return { success: true, method: 'cdp_direct', startX, startY, endX, endY, steps };
       } catch (error) {
         automationLogger.logActionExecution(null, 'cdpDragVariableSpeed', 'complete', { success: false, tabId, error: error.message });
-        return { success: false, error: error.message };
+        return cdpFailureResult(error);
       } finally {
         if (debuggerAttached) {
           try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* ignore */ }
@@ -18653,7 +19165,7 @@ async function executeCDPToolDirect(request, tabId) {
         return { success: true, method: 'cdp_direct', x, y, deltaX, deltaY };
       } catch (error) {
         automationLogger.logActionExecution(null, 'cdpScrollAt', 'complete', { success: false, tabId, error: error.message });
-        return { success: false, error: error.message };
+        return cdpFailureResult(error);
       } finally {
         if (debuggerAttached) {
           try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* ignore */ }
@@ -18708,7 +19220,7 @@ async function executeCDPToolDirect(request, tabId) {
         return { success: true, method: 'cdp_direct', text, length: text.length };
       } catch (error) {
         automationLogger.logActionExecution(null, 'cdpInsertText', 'complete', { success: false, tabId, error: error.message });
-        return { success: false, error: error.message };
+        return cdpFailureResult(error);
       } finally {
         if (debuggerAttached) {
           try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* ignore */ }
@@ -18754,7 +19266,7 @@ async function executeCDPToolDirect(request, tabId) {
         return { success: true, method: 'cdp_direct', x, y };
       } catch (error) {
         automationLogger.logActionExecution(null, 'cdpDoubleClickAt', 'complete', { success: false, tabId, error: error.message });
-        return { success: false, error: error.message };
+        return cdpFailureResult(error);
       } finally {
         if (debuggerAttached) {
           try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* ignore */ }
@@ -19023,6 +19535,15 @@ async function handleWaitForTabLoad(request, sender, sendResponse) {
 // Global keyboard emulator instance
 let keyboardEmulator = null;
 
+// Screenshot capture calls this only while holding the per-tab CDP lease. It
+// may release FSB's own warm keyboard attachment, but never detaches DevTools
+// or another extension's debugger owner.
+globalThis.FsbReleaseOwnedDebuggerForTab = async function(tabId) {
+  if (keyboardEmulator && keyboardEmulator.isAttachedTo(tabId)) {
+    await keyboardEmulator.detachDebugger(tabId);
+  }
+};
+
 /**
  * Initialize keyboard emulator if not already initialized
  */
@@ -19061,10 +19582,15 @@ if (chrome.debugger && chrome.debugger.onDetach && typeof chrome.debugger.onDeta
 async function handleKeyboardDebuggerAction(request, sender, sendResponse) {
   const emulator = initializeKeyboardEmulator();
   let tabId;
+  let cdpLease = null;
 
   try {
     const { method, key, keys, text, specialKey, modifiers = {}, delay = 50 } = request;
     tabId = sender.tab.id;
+
+    if (globalThis.FsbCdpLease && typeof globalThis.FsbCdpLease.acquire === 'function') {
+      cdpLease = await globalThis.FsbCdpLease.acquire(tabId, { timeoutMs: 10000 });
+    }
 
     automationLogger.logActionExecution(null, `keyboard_${method}`, 'start', { tabId, key, specialKey });
 
@@ -19112,7 +19638,9 @@ async function handleKeyboardDebuggerAction(request, sender, sendResponse) {
       success: result.success,
       result: result,
       method: method,
-      tabId: tabId
+      tabId: tabId,
+      code: result && result.code ? result.code : undefined,
+      retryable: Boolean(result && result.retryable)
     });
 
   } catch (error) {
@@ -19128,8 +19656,12 @@ async function handleKeyboardDebuggerAction(request, sender, sendResponse) {
     sendResponse({
       success: false,
       error: error.message || 'Keyboard emulator action failed',
-      method: request.method
+      method: request.method,
+      code: error && error.code ? error.code : undefined,
+      retryable: Boolean(error && error.retryable)
     });
+  } finally {
+    if (cdpLease) cdpLease.release();
   }
 }
 
@@ -19301,7 +19833,10 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (globalThis.fsbMcpSessionRecorder
       && alarm
       && typeof alarm.name === 'string'
-      && alarm.name.startsWith(globalThis.fsbMcpSessionRecorder.FSB_MCP_SESSION_ALARM_PREFIX)) {
+      && (alarm.name.startsWith(globalThis.fsbMcpSessionRecorder.FSB_MCP_SESSION_ALARM_PREFIX)
+        || (globalThis.FsbMcpLatticeJournal
+          && (alarm.name.startsWith(globalThis.FsbMcpLatticeJournal.IDLE_ALARM_PREFIX)
+            || alarm.name === globalThis.FsbMcpLatticeJournal.RETENTION_ALARM)))) {
     try {
       await globalThis.fsbMcpSessionRecorder.handleAlarm(alarm);
     } catch (err) {

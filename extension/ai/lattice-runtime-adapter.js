@@ -75,6 +75,13 @@
   const STORAGE_KEY_PREFIX = 'fsb_lattice_snapshot_';
   const DEFAULT_LRU_CAP = 50; // JSDoc-documented contract; enforced in Phase 9 (FINT-15)
   const REDACTED_SENTINEL = '[REDACTED_BY_LATTICE_ADAPTER]';
+  let fixedStorageQueue = Promise.resolve();
+
+  function withFixedStorageLock(fn) {
+    const next = fixedStorageQueue.then(fn, fn);
+    fixedStorageQueue = next.catch(function() {});
+    return next;
+  }
   // Keys whose values are auth material or session-bound secrets that must
   // never land in chrome.storage.session. Match is case-insensitive on the
   // full key name; conservative allowlist over broad regex to keep the walk
@@ -174,8 +181,63 @@
     }
 
     const lruCap = Number.isFinite(options.lruCap) ? options.lruCap : DEFAULT_LRU_CAP;
+    const fixedSlots = options.fixedSlots === true;
+    const catalogKey = typeof options.catalogKey === 'string' && options.catalogKey
+      ? options.catalogKey
+      : null;
+    const fixedPrefix = STORAGE_KEY_PREFIX + sessionId + '_fixed_';
+    const fixedHeadKey = fixedPrefix + 'head';
+    const fixedSlotKeys = [fixedPrefix + '0', fixedPrefix + '1'];
     const hooks = new Set();
     let snapshotSequence = 0;
+
+    function storageGet(keys) {
+      if (!storage || typeof storage.get !== 'function') return Promise.resolve({});
+      return new Promise(function(resolve, reject) {
+        let settled = false;
+        function done(value) {
+          if (settled) return;
+          settled = true;
+          resolve(value || {});
+        }
+        try {
+          const maybe = storage.get(keys, function(value) {
+            if (globalScope.chrome?.runtime?.lastError) {
+              if (!settled) { settled = true; reject(new Error(globalScope.chrome.runtime.lastError.message)); }
+              return;
+            }
+            done(value);
+          });
+          if (maybe && typeof maybe.then === 'function') maybe.then(done, reject);
+        } catch (error) {
+          reject(error);
+        }
+      });
+    }
+
+    function persistFixedSnapshot(snapshot) {
+      const run = async function() {
+        const keys = [fixedHeadKey].concat(catalogKey ? [catalogKey] : []);
+        const stored = await storageGet(keys);
+        const priorHead = stored[fixedHeadKey] || {};
+        const sequence = Math.max(snapshotSequence, Number(priorHead.sequence) || 0) + 1;
+        snapshotSequence = sequence;
+        const slot = sequence % 2;
+        const catalog = catalogKey && Array.isArray(stored[catalogKey])
+          ? stored[catalogKey].filter(function(value) { return typeof value === 'string'; })
+          : [];
+        const addToCatalog = catalogKey && catalog.indexOf(sessionId) === -1;
+        if (addToCatalog) catalog.push(sessionId);
+        const update = {
+          [fixedSlotKeys[slot]]: Object.assign({}, snapshot, { sequence }),
+          [fixedHeadKey]: { slot, sequence, capturedAt: snapshot.capturedAt }
+        };
+        if (addToCatalog) update[catalogKey] = catalog;
+        await Promise.resolve(storage.set(update));
+        return update[fixedSlotKeys[slot]];
+      };
+      return withFixedStorageLock(run);
+    }
 
     function snapshotStorageKey(snapshot) {
       snapshotSequence += 1;
@@ -240,6 +302,12 @@
         return; // flag default-off; production paths byte-identical to baseline
       }
       if (!storage) return;
+      if (fixedSlots) {
+        persistFixedSnapshot(snapshot).catch(function(err) {
+          console.warn(ADAPTER_TAG, 'fixed-slot persist threw:', err && err.message);
+        });
+        return;
+      }
       const key = snapshotStorageKey(snapshot);
       try {
         storage.set({ [key]: snapshot }, () => {
@@ -300,6 +368,7 @@
             || !storage) {
           return snapshot;
         }
+        if (fixedSlots) return persistFixedSnapshot(snapshot);
         const key = snapshotStorageKey(snapshot);
         await Promise.resolve(storage.set({ [key]: snapshot }));
         enforceLruCap(sessionId, storage, lruCap);
@@ -356,6 +425,23 @@
       /** Remove this run's persisted snapshots after a terminal replay state. */
       clearSnapshots: async function clearSnapshots() {
         if (!storage) return;
+        if (fixedSlots) {
+          try {
+            await withFixedStorageLock(async function() {
+              if (catalogKey) {
+                const stored = await storageGet([catalogKey]);
+                const catalog = Array.isArray(stored[catalogKey])
+                  ? stored[catalogKey].filter(function(value) { return value !== sessionId; })
+                  : [];
+                await Promise.resolve(storage.set({ [catalogKey]: catalog }));
+              }
+              await Promise.resolve(storage.remove([fixedHeadKey].concat(fixedSlotKeys)));
+            });
+          } catch (err) {
+            console.warn(ADAPTER_TAG, 'fixed-slot clearSnapshots threw:', err && err.message);
+          }
+          return;
+        }
         const prefix = STORAGE_KEY_PREFIX + sessionId + '_';
         try {
           const all = await new Promise(function(resolve, reject) {
@@ -375,6 +461,18 @@
         } catch (err) {
           console.warn(ADAPTER_TAG, 'clearSnapshots threw:', err && err.message);
         }
+      },
+
+      /** Load the newest of the two exact-key replay recovery slots. */
+      loadLatestSnapshot: async function loadLatestSnapshot() {
+        if (!storage || !fixedSlots) return null;
+        const stored = await storageGet([fixedHeadKey].concat(fixedSlotKeys));
+        const head = stored[fixedHeadKey] || {};
+        const preferred = Number.isFinite(head.slot) ? stored[fixedSlotKeys[head.slot]] : null;
+        if (preferred && typeof preferred.payload === 'string') return preferred;
+        return fixedSlotKeys.map(function(key) { return stored[key]; })
+          .filter(function(snapshot) { return snapshot && typeof snapshot.payload === 'string'; })
+          .sort(function(a, b) { return (Number(b.sequence) || 0) - (Number(a.sequence) || 0); })[0] || null;
       },
 
       /**

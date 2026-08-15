@@ -78,6 +78,9 @@
   var FSB_MCP_SESSION_RETENTION_ALARM = FSB_MCP_SESSION_ALARM_PREFIX + 'retention';
   var FSB_MCP_RECORDING_ENABLED_KEY = 'fsbMcpSessionRecordingEnabled';
   var FSB_MCP_RETENTION_DAYS_KEY = 'fsbMcpSessionRetentionDays';
+  var FSB_MCP_RECORDER_BACKEND_KEY = 'fsbMcpRecorderBackend';
+  var FSB_MCP_RECORDER_BACKEND_JOURNAL = 'journal-v2';
+  var FSB_MCP_RECORDER_BACKEND_LEGACY = 'legacy-v1';
   var FSB_MCP_RETENTION_DEFAULT_DAYS = 30;
   var FSB_MCP_RETENTION_MIN_DAYS = 1;
   var FSB_MCP_RETENTION_MAX_DAYS = 365;
@@ -96,6 +99,42 @@
   // long-lived agent session.
   var MCP_SESSION_ACTION_HISTORY_CAP = 100;
   var MCP_SESSION_REPLAY_ENTRY_CAP = 100;
+
+  // Results from read routes retain their full redacted value in the v2
+  // journal. Action routes retain a compact acknowledgement projection; this
+  // prevents a write response that happens to carry a page snapshot from
+  // becoming a second multi-megabyte recording payload.
+  var JOURNAL_FULL_RESULT_TOOLS = Object.freeze({
+    read_page: 1, 'mcp:read-page': 1, get_text: 1, getText: 1,
+    get_attribute: 1, getAttribute: 1, get_dom_snapshot: 1, 'mcp:get-dom': 1,
+    get_page_snapshot: 1, 'mcp:get-page-snapshot': 1,
+    wait_for_stable: 1, waitForDOMStable: 1,
+    wait_for_element: 1, waitForElement: 1,
+    list_tabs: 1, 'mcp:get-tabs': 1, read_sheet: 1, readsheet: 1,
+    get_site_guide: 1, 'mcp:get-site-guides': 1,
+    search_memory: 1, 'mcp:search-memory': 1,
+    search_capabilities: 1, 'mcp:capabilities-search': 1,
+    get_trigger_status: 1, 'mcp:get-trigger-status': 1,
+    list_triggers: 1, 'mcp:list-triggers': 1,
+    get_task_status: 1, 'mcp:get-status': 1,
+    list_sessions: 1, 'mcp:list-sessions': 1,
+    get_session_detail: 1, get_session_replay: 1,
+    get_logs: 1, get_memory_stats: 1,
+    'mcp:get-session': 1, 'mcp:get-session-replay': 1,
+    'mcp:get-logs': 1, 'mcp:get-memory': 1, 'mcp:get-diagnostics': 1
+  });
+  var JOURNAL_ACTION_RESULT_FIELDS = Object.freeze([
+    'success', 'status', 'error', 'errorCode', 'code', 'message',
+    'url', 'resultingUrl', 'tabId', 'title', 'domain', 'id',
+    'receipt', 'receiptCid', 'signerKid', 'manifestHash',
+    'clicked', 'changed', 'alreadyClosed', 'recovered', 'shape',
+    'updatedRows', 'updatedColumns', 'updatedCells', 'updatedSheets'
+  ]);
+  var JOURNAL_RESULT_PROJECTION_ACTION = 'journal-action-v1';
+  var JOURNAL_RESULT_PROJECTION_FULL = 'journal-full-v1';
+  var JOURNAL_TASK_SOURCE_TOOL = 'tool';
+  var JOURNAL_TASK_SOURCE_CAPABILITY = 'capability';
+  var JOURNAL_TASK_SOURCE_VISUAL = 'visual-session';
 
   // Values under these keys are never useful for replay and must not enter
   // the buffer, history, raw logs, or long-term memory.
@@ -167,6 +206,7 @@
   var _lastGeneratedSessionTs = 0;
   var _recordingEnabled = true;
   var _retentionDays = FSB_MCP_RETENTION_DEFAULT_DAYS;
+  var _recorderBackend = FSB_MCP_RECORDER_BACKEND_JOURNAL;
   var _initializationPromise = Promise.resolve();
   var _recordQueue = Promise.resolve();
 
@@ -228,6 +268,12 @@
 
   function _getAutomationLogger() {
     return (typeof globalThis !== 'undefined' && globalThis.automationLogger) ? globalThis.automationLogger : null;
+  }
+
+  function _getJournal() {
+    return (typeof globalThis !== 'undefined' && globalThis.FsbMcpLatticeJournal)
+      ? globalThis.FsbMcpLatticeJournal
+      : null;
   }
 
   // ---- Replay-value cloning + redaction ------------------------------------
@@ -784,15 +830,24 @@
     if (!storage || typeof storage.get !== 'function') {
       _recordingEnabled = true;
       _retentionDays = FSB_MCP_RETENTION_DEFAULT_DAYS;
+      _recorderBackend = FSB_MCP_RECORDER_BACKEND_JOURNAL;
       return;
     }
     try {
-      var stored = await storage.get([FSB_MCP_RECORDING_ENABLED_KEY, FSB_MCP_RETENTION_DAYS_KEY]);
+      var stored = await storage.get([
+        FSB_MCP_RECORDING_ENABLED_KEY,
+        FSB_MCP_RETENTION_DAYS_KEY,
+        FSB_MCP_RECORDER_BACKEND_KEY
+      ]);
       _recordingEnabled = !stored || stored[FSB_MCP_RECORDING_ENABLED_KEY] !== false;
       _retentionDays = clampRetentionDays(stored && stored[FSB_MCP_RETENTION_DAYS_KEY]);
+      _recorderBackend = stored && stored[FSB_MCP_RECORDER_BACKEND_KEY] === FSB_MCP_RECORDER_BACKEND_LEGACY
+        ? FSB_MCP_RECORDER_BACKEND_LEGACY
+        : FSB_MCP_RECORDER_BACKEND_JOURNAL;
     } catch (_e) {
       _recordingEnabled = true;
       _retentionDays = FSB_MCP_RETENTION_DEFAULT_DAYS;
+      _recorderBackend = FSB_MCP_RECORDER_BACKEND_JOURNAL;
     }
   }
 
@@ -824,6 +879,109 @@
     };
   }
 
+  function _journalUsesFullResult(entry) {
+    if (JOURNAL_FULL_RESULT_TOOLS[entry && entry.tool] === 1) return true;
+    var context = entry && entry.replayContext && typeof entry.replayContext === 'object'
+      ? entry.replayContext
+      : {};
+    var sideEffectClass = typeof context.sideEffectClass === 'string'
+      ? context.sideEffectClass.toLowerCase()
+      : '';
+    return sideEffectClass === 'read' || sideEffectClass === 'read-only' || sideEffectClass === 'readonly';
+  }
+
+  function _compactJournalActionResult(result) {
+    if (!result || typeof result !== 'object' || Array.isArray(result)) {
+      return { success: result !== false };
+    }
+    var compact = {};
+    for (var i = 0; i < JOURNAL_ACTION_RESULT_FIELDS.length; i++) {
+      var key = JOURNAL_ACTION_RESULT_FIELDS[i];
+      if (Object.prototype.hasOwnProperty.call(result, key)) compact[key] = result[key];
+    }
+    if (!Object.prototype.hasOwnProperty.call(compact, 'success')) {
+      compact.success = result.success !== false;
+    }
+    return compact;
+  }
+
+  function projectJournalResult(result, params, projection) {
+    var source = projection === JOURNAL_RESULT_PROJECTION_ACTION
+      ? _compactJournalActionResult(result)
+      : result;
+    return cloneResultForReplay(source, params && typeof params === 'object' ? params : {});
+  }
+
+  // V2 snapshotting happens only after cheap retention checks. Request data is
+  // cloned/redacted once; large read results remain complete while action
+  // acknowledgements are projected before cloning.
+  function _snapshotJournalEntry(entry) {
+    var sourcePayload = entry && entry.requestPayload && typeof entry.requestPayload === 'object'
+      ? entry.requestPayload
+      : {};
+    var sourceParams = sourcePayload.params && typeof sourcePayload.params === 'object'
+      ? sourcePayload.params
+      : {};
+    var safePayload = _sanitizeRequestPayload(sourcePayload, entry && entry.response);
+    var resultProjection = _journalUsesFullResult(entry)
+      ? JOURNAL_RESULT_PROJECTION_FULL
+      : JOURNAL_RESULT_PROJECTION_ACTION;
+    var safeContext = _sanitizeReplayContext(entry && entry.replayContext);
+    var rawTargetUrl = entry && entry.replayContext && typeof entry.replayContext.targetUrl === 'string'
+      ? entry.replayContext.targetUrl
+      : null;
+    var sidecar = sourcePayload.visualSession && typeof sourcePayload.visualSession === 'object'
+      ? sourcePayload.visualSession
+      : null;
+    var hasVisualTask = sidecar && typeof sidecar.visualReason === 'string' && sidecar.visualReason;
+    var hasCapabilityTask = entry.tool === 'mcp:capabilities-invoke' && typeof sourcePayload.slug === 'string' && sourcePayload.slug;
+    var task = hasVisualTask
+      ? _sanitizeSummaryText(sidecar.visualReason, 2000)
+      : (hasCapabilityTask
+        ? 'Capability: ' + _sanitizeSummaryText(sourcePayload.slug, 500)
+        : _sanitizeSummaryText(String(entry.tool || 'MCP agent session'), 2000));
+    var taskSource = hasVisualTask
+      ? JOURNAL_TASK_SOURCE_VISUAL
+      : (hasCapabilityTask ? JOURNAL_TASK_SOURCE_CAPABILITY : JOURNAL_TASK_SOURCE_TOOL);
+    return {
+      agentId: typeof sourcePayload.agentId === 'string' ? sourcePayload.agentId : '',
+      recordingRunId: typeof sourcePayload.recordingRunId === 'string' ? sourcePayload.recordingRunId : '',
+      recordingCallId: typeof sourcePayload.recordingCallId === 'string' ? sourcePayload.recordingCallId : null,
+      client: entry.client,
+      task: task,
+      taskSource: taskSource,
+      tool: entry.tool,
+      requestPayload: safePayload,
+      response: projectJournalResult(entry.response, sourceParams, resultProjection),
+      resultProjection: resultProjection,
+      success: entry.success,
+      dispatcher_route: entry.dispatcher_route,
+      tabId: entry.tabId,
+      replayContext: safeContext,
+      redactedInputs: entry.redactedInputs === true ||
+        _replayInputWasRedacted(entry.tool, sourcePayload, safePayload),
+      targetRedacted: entry.targetRedacted === true ||
+        (rawTargetUrl !== null && safeContext.targetUrl !== rawTargetUrl)
+    };
+  }
+
+  function _legacyCanRetainRawEntry(entry) {
+    if (!_recordingEnabled || !entry || typeof entry !== 'object' || entry.tool === 'run_task') return false;
+    var payload = entry.requestPayload && typeof entry.requestPayload === 'object'
+      ? entry.requestPayload
+      : {};
+    var agentId = payload.agentId;
+    if (typeof agentId !== 'string' || !agentId) return false;
+    var params = payload.params && typeof payload.params === 'object' ? payload.params : {};
+    var tabId = _resolveNumericTabId(entry, params, payload);
+    var sidecar = payload.visualSession && typeof payload.visualSession === 'object'
+      ? payload.visualSession
+      : null;
+    var capabilityBirth = entry.tool === 'mcp:capabilities-invoke' && Number.isFinite(tabId);
+    if (sidecar || capabilityBirth) return true;
+    return !!(_findSessionForAgentTab(agentId, tabId) || _findMostRecentSessionForAgent(agentId));
+  }
+
   function _enqueueRecorderMutation(fn) {
     var run = function () {
       return Promise.resolve(_initializationPromise).catch(function () { /* initialize fail-open */ }).then(fn);
@@ -840,18 +998,28 @@
 
   async function _requestRetentionPrune() {
     var logger = _getAutomationLogger();
-    if (!logger || typeof logger.pruneMcpSessions !== 'function') return;
-    try {
-      await logger.pruneMcpSessions(_retentionDays);
-    } catch (_e) { /* best-effort */ }
+    if (logger && typeof logger.pruneMcpSessions === 'function') {
+      try { await logger.pruneMcpSessions(_retentionDays); } catch (_e) { /* best-effort */ }
+    }
+    var journal = _getJournal();
+    if (journal && typeof journal.prune === 'function') {
+      try { await journal.prune(_retentionDays); } catch (_e2) { /* best-effort */ }
+    }
   }
 
-  async function _applyRecordingPolicy(enabled, retentionDays, flushOnDisable) {
+  async function _applyRecordingPolicy(enabled, retentionDays, flushOnDisable, recorderBackend) {
     var wasEnabled = _recordingEnabled;
     _recordingEnabled = enabled !== false;
     _retentionDays = clampRetentionDays(retentionDays);
+    if (recorderBackend === FSB_MCP_RECORDER_BACKEND_LEGACY || recorderBackend === FSB_MCP_RECORDER_BACKEND_JOURNAL) {
+      _recorderBackend = recorderBackend;
+    }
     if (flushOnDisable && wasEnabled && !_recordingEnabled) {
       _closeAllOpenSessions('recording_disabled');
+      var journal = _getJournal();
+      if (journal && typeof journal.degradeOpenRuns === 'function') {
+        await journal.degradeOpenRuns('recording_disabled');
+      }
     }
     _scheduleRetentionAlarm();
     await _requestRetentionPrune();
@@ -1137,6 +1305,7 @@
     return {
       sessionId: session.sessionId,
       agentId: session.agentId,
+      recordingRunId: typeof session.recordingRunId === 'string' ? session.recordingRunId : null,
       tabId: session.tabId,
       tabIds: Array.isArray(session.tabIds) ? session.tabIds.slice() : [],
       logicalTabs: cloneReplayValue(session.logicalTabs || {}, {}),
@@ -1236,6 +1405,15 @@
       if (!best || session.lastActivityAt > best.lastActivityAt) best = session;
     });
     return best;
+  }
+
+  function _findLegacySessionForCorrelation(agentId, recordingRunId) {
+    if (typeof agentId !== 'string' || !agentId || typeof recordingRunId !== 'string' || !recordingRunId) return null;
+    var found = null;
+    _openSessions.forEach(function (session) {
+      if (!found && session.agentId === agentId && session.recordingRunId === recordingRunId) found = session;
+    });
+    return found;
   }
 
   function _registerSessionTab(session, numericTabId) {
@@ -1375,6 +1553,8 @@
     return {
       tool: input && input.tool,
       agentId: typeof payload.agentId === 'string' ? payload.agentId : '',
+      recordingRunId: typeof payload.recordingRunId === 'string' ? payload.recordingRunId : '',
+      recordingCallId: typeof payload.recordingCallId === 'string' ? payload.recordingCallId : null,
       tabId: _numericTabId(params.tab_id) !== null ? _numericTabId(params.tab_id) : _numericTabId(params.tabId),
       summary: _sanitizeSummaryText(params.summary, 2000),
       blocker: _sanitizeSummaryText(params.blocker, 1000),
@@ -1571,8 +1751,48 @@
   function recordTaskOutcome(input) {
     try {
       if (!input || typeof input !== 'object') return;
+      if (!_recordingEnabled) return;
+      var inputPayload = input.payload && typeof input.payload === 'object' ? input.payload : {};
+      if (typeof inputPayload.agentId !== 'string' || !inputPayload.agentId) return;
       var snapshot = _snapshotTaskOutcome(input);
-      _enqueueRecorderMutation(function () { return _recordTaskOutcomeNow(snapshot); })
+      _enqueueRecorderMutation(async function () {
+        // Startup initialization may load a persisted opt-out after the
+        // fire-and-forget caller passes the fast-path check above.
+        if (!_recordingEnabled) return { stored: false, reason: 'recording_disabled' };
+        var outcome = _normalizeTaskOutcome(snapshot);
+        if (!outcome) return { stored: false, reason: 'invalid_outcome' };
+        var journal = _getJournal();
+        var hasJournalIdentity = !!(journal && typeof journal.validRunSidecar === 'function' &&
+          journal.validRunSidecar(snapshot.recordingRunId));
+        var legacyCorrelation = _findLegacySessionForCorrelation(snapshot.agentId, snapshot.recordingRunId);
+        var useJournal = false;
+        if (hasJournalIdentity && !legacyCorrelation) {
+          useJournal = _recorderBackend === FSB_MCP_RECORDER_BACKEND_JOURNAL;
+          if (!useJournal && typeof journal.hasCorrelation === 'function') {
+            useJournal = await journal.hasCorrelation(snapshot.agentId, snapshot.recordingRunId);
+          }
+        }
+        if (useJournal && typeof journal.recordTaskOutcome === 'function') {
+          var payload = input.payload && typeof input.payload === 'object' ? input.payload : {};
+          var journalEntry = _snapshotJournalEntry({
+            client: payload.visualSession && payload.visualSession.client,
+            tool: input.tool,
+            requestPayload: payload,
+            response: input.response,
+            success: !(input.response && input.response.success === false),
+            dispatcher_route: 'task-status',
+            tabId: snapshot.tabId,
+            replayContext: { routeFamily: 'lifecycle' }
+          });
+          var result = await journal.recordTaskOutcome(journalEntry, outcome);
+          if (result && result.candidate) {
+            var stored = await _storeClientTaskMemory(result.candidate, outcome);
+            return { stored: stored, sessionId: result.candidate.sessionId };
+          }
+          return result;
+        }
+        return _recordTaskOutcomeNow(snapshot);
+      })
         .catch(function () { /* lifecycle responses never depend on memory */ });
     } catch (_e) { /* fire-and-forget */ }
   }
@@ -1663,6 +1883,12 @@
   }
 
   function handleAlarm(alarm) {
+    var journal = _getJournal();
+    if (journal && alarm && typeof alarm.name === 'string' &&
+        ((journal.IDLE_ALARM_PREFIX && alarm.name.indexOf(journal.IDLE_ALARM_PREFIX) === 0) ||
+          alarm.name === journal.RETENTION_ALARM) && typeof journal.handleAlarm === 'function') {
+      return journal.handleAlarm(alarm, _retentionDays);
+    }
     return _enqueueRecorderMutation(function () { return _handleAlarmNow(alarm); });
   }
 
@@ -1872,6 +2098,7 @@
             key: key,
             sessionId: sessionId,
             agentId: agentId,
+            recordingRunId: typeof payload.recordingRunId === 'string' ? payload.recordingRunId : null,
             tabId: numericTabId,
             tabIds: [],
             logicalTabs: {},
@@ -1995,10 +2222,106 @@
   function recordDispatch(entry) {
     try {
       if (!entry || typeof entry !== 'object') return;
-      var snapshot = _snapshotEntry(entry);
-      _enqueueRecorderMutation(function () { _recordDispatchNow(snapshot); })
+      _enqueueRecorderMutation(async function () {
+        if (!_recordingEnabled || entry.tool === 'run_task') return;
+        var payload = entry.requestPayload && typeof entry.requestPayload === 'object'
+          ? entry.requestPayload
+          : {};
+        if (typeof payload.agentId !== 'string' || !payload.agentId) return;
+
+        var journal = _getJournal();
+        var hasJournalIdentity = !!(journal && typeof journal.validRunSidecar === 'function' &&
+          journal.validRunSidecar(payload.recordingRunId));
+        var legacyCorrelation = _findLegacySessionForCorrelation(payload.agentId, payload.recordingRunId);
+        var useJournal = false;
+        if (hasJournalIdentity && !legacyCorrelation) {
+          useJournal = _recorderBackend === FSB_MCP_RECORDER_BACKEND_JOURNAL;
+          if (!useJournal && typeof journal.hasCorrelation === 'function') {
+            useJournal = await journal.hasCorrelation(payload.agentId, payload.recordingRunId);
+          }
+        }
+        if (useJournal) {
+          if (typeof journal.recordDispatch === 'function') {
+            if (payload.recordingCallId && typeof journal.hasCall === 'function') {
+              var duplicate = false;
+              try {
+                duplicate = await journal.hasCall(
+                  payload.agentId,
+                  payload.recordingRunId,
+                  payload.recordingCallId
+                );
+              } catch (error) {
+                if (typeof journal.markRecordingGap === 'function') {
+                  await journal.markRecordingGap({
+                    agentId: payload.agentId,
+                    recordingRunId: payload.recordingRunId,
+                    client: entry.client,
+                    tool: entry.tool
+                  }, error);
+                }
+                return;
+              }
+              if (duplicate) return;
+            }
+            await journal.recordDispatch(_snapshotJournalEntry(entry));
+          }
+          return;
+        }
+
+        // Legacy-only sessions keep their original projection, but the
+        // expensive snapshot now happens after the open-session retention
+        // check instead of before the recorder queue.
+        _sweepExpired(_now());
+        if (!_legacyCanRetainRawEntry(entry)) return;
+        _recordDispatchNow(_snapshotEntry(entry));
+      })
         .catch(function () { /* fire-and-forget */ });
     } catch (_e) { /* fire-and-forget */ }
+  }
+
+  function _snapshotCallIdentity(identity) {
+    var source = identity && typeof identity === 'object' ? identity : {};
+    return {
+      agentId: typeof source.agentId === 'string' ? source.agentId : '',
+      recordingRunId: typeof source.recordingRunId === 'string' ? source.recordingRunId : '',
+      recordingCallId: typeof source.recordingCallId === 'string' ? source.recordingCallId : '',
+      client: typeof source.client === 'string' ? source.client : 'unknown',
+      task: typeof source.task === 'string' ? source.task : '',
+      taskSource: typeof source.taskSource === 'string' ? source.taskSource : 'tool',
+      tool: typeof source.tool === 'string' ? source.tool : ''
+    };
+  }
+
+  function beginCall(identity, leaseMs) {
+    var snapshot = _snapshotCallIdentity(identity);
+    return _enqueueRecorderMutation(async function () {
+      if (!_recordingEnabled) return { accepted: false, reason: 'recording_disabled' };
+      var journal = _getJournal();
+      if (!journal || typeof journal.beginCall !== 'function' ||
+          typeof journal.validRunSidecar !== 'function' ||
+          !journal.validRunSidecar(snapshot.recordingRunId) || !snapshot.agentId || !snapshot.recordingCallId) {
+        return { accepted: false, reason: 'journal_unavailable' };
+      }
+      var useJournal = _recorderBackend === FSB_MCP_RECORDER_BACKEND_JOURNAL;
+      if (!useJournal && typeof journal.hasCorrelation === 'function') {
+        useJournal = await journal.hasCorrelation(snapshot.agentId, snapshot.recordingRunId);
+      }
+      if (!useJournal) return { accepted: false, reason: 'legacy_backend' };
+      return journal.beginCall(snapshot, leaseMs);
+    });
+  }
+
+  function endCall(identity) {
+    var snapshot = _snapshotCallIdentity(identity);
+    return _enqueueRecorderMutation(async function () {
+      var journal = _getJournal();
+      if (!journal || typeof journal.endCall !== 'function' ||
+          typeof journal.validRunSidecar !== 'function' ||
+          !journal.validRunSidecar(snapshot.recordingRunId) || !snapshot.agentId || !snapshot.recordingCallId) {
+        return { ended: false, reason: 'journal_unavailable' };
+      }
+      return journal.endCall(snapshot);
+    });
   }
 
   /**
@@ -2054,6 +2377,7 @@
             key: key,
             sessionId: record.sessionId,
             agentId: (typeof record.agentId === 'string') ? record.agentId : '',
+            recordingRunId: typeof record.recordingRunId === 'string' ? record.recordingRunId : null,
             tabId: (typeof record.tabId === 'number' && isFinite(record.tabId)) ? record.tabId : null,
             tabIds: Array.isArray(record.tabIds)
               ? record.tabIds.map(_numericTabId).filter(function (tabId) { return tabId !== null; })
@@ -2091,6 +2415,10 @@
 
   async function _initializeRecorder() {
     await _loadRecordingPolicy();
+    var journal = _getJournal();
+    if (journal && typeof journal.initialize === 'function') {
+      await journal.initialize(_retentionDays).catch(function () { /* v2 failures surface per session */ });
+    }
     await _scrubPersistedMcpData();
     await _restoreMemoryCandidates();
     await _restoreFromBuffer();
@@ -2111,16 +2439,21 @@
         typeof c.storage.onChanged.addListener !== 'function') return;
     c.storage.onChanged.addListener(function (changes, areaName) {
       if (areaName !== 'local' || !changes) return;
-      if (!changes[FSB_MCP_RECORDING_ENABLED_KEY] && !changes[FSB_MCP_RETENTION_DAYS_KEY]) return;
+      if (!changes[FSB_MCP_RECORDING_ENABLED_KEY] && !changes[FSB_MCP_RETENTION_DAYS_KEY] &&
+          !changes[FSB_MCP_RECORDER_BACKEND_KEY]) return;
 
       var hasEnabledChange = !!changes[FSB_MCP_RECORDING_ENABLED_KEY];
       var hasRetentionChange = !!changes[FSB_MCP_RETENTION_DAYS_KEY];
+      var hasBackendChange = !!changes[FSB_MCP_RECORDER_BACKEND_KEY];
       var changedEnabled = hasEnabledChange
         ? changes[FSB_MCP_RECORDING_ENABLED_KEY].newValue !== false
         : null;
       var changedRetentionDays = hasRetentionChange
         ? changes[FSB_MCP_RETENTION_DAYS_KEY].newValue
         : null;
+      var changedBackend = hasBackendChange && changes[FSB_MCP_RECORDER_BACKEND_KEY].newValue === FSB_MCP_RECORDER_BACKEND_LEGACY
+        ? FSB_MCP_RECORDER_BACKEND_LEGACY
+        : FSB_MCP_RECORDER_BACKEND_JOURNAL;
 
       _enqueueRecorderMutation(function () {
         // Resolve unchanged fields when this queued mutation actually runs;
@@ -2128,7 +2461,8 @@
         // updates the in-memory policy.
         var nextEnabled = hasEnabledChange ? changedEnabled : _recordingEnabled;
         var nextRetentionDays = hasRetentionChange ? changedRetentionDays : _retentionDays;
-        return _applyRecordingPolicy(nextEnabled, nextRetentionDays, true);
+        var nextBackend = hasBackendChange ? changedBackend : _recorderBackend;
+        return _applyRecordingPolicy(nextEnabled, nextRetentionDays, true, nextBackend);
       }).catch(function () { /* best-effort */ });
     });
   }
@@ -2160,6 +2494,7 @@
     _lastGeneratedSessionTs = 0;
     _recordingEnabled = true;
     _retentionDays = FSB_MCP_RETENTION_DEFAULT_DAYS;
+    _recorderBackend = FSB_MCP_RECORDER_BACKEND_JOURNAL;
     _initializationPromise = Promise.resolve();
     _recordQueue = Promise.resolve();
     _persistLock = Promise.resolve();
@@ -2171,9 +2506,9 @@
     return _initializationPromise;
   }
 
-  function _applyPolicyForTests(enabled, retentionDays) {
+  function _applyPolicyForTests(enabled, retentionDays, recorderBackend) {
     return _enqueueRecorderMutation(function () {
-      return _applyRecordingPolicy(enabled, retentionDays, true);
+      return _applyRecordingPolicy(enabled, retentionDays, true, recorderBackend);
     });
   }
 
@@ -2190,9 +2525,12 @@
     recordDispatch: recordDispatch,
     recordAction: recordAction,
     recordTaskOutcome: recordTaskOutcome,
+    beginCall: beginCall,
+    endCall: endCall,
     handleAlarm: handleAlarm,
     cloneParamsForReplay: cloneParamsForReplay,
     cloneResultForReplay: cloneResultForReplay,
+    projectJournalResult: projectJournalResult,
     sanitizeSummaryTextForPersistence: _sanitizeSummaryText,
     // Compatibility alias retained for existing tests/callers.
     redactParams: cloneParamsForReplay,
@@ -2204,6 +2542,9 @@
     FSB_MCP_SESSION_RETENTION_ALARM: FSB_MCP_SESSION_RETENTION_ALARM,
     FSB_MCP_RECORDING_ENABLED_KEY: FSB_MCP_RECORDING_ENABLED_KEY,
     FSB_MCP_RETENTION_DAYS_KEY: FSB_MCP_RETENTION_DAYS_KEY,
+    FSB_MCP_RECORDER_BACKEND_KEY: FSB_MCP_RECORDER_BACKEND_KEY,
+    FSB_MCP_RECORDER_BACKEND_JOURNAL: FSB_MCP_RECORDER_BACKEND_JOURNAL,
+    FSB_MCP_RECORDER_BACKEND_LEGACY: FSB_MCP_RECORDER_BACKEND_LEGACY,
     FSB_MCP_RETENTION_DEFAULT_DAYS: FSB_MCP_RETENTION_DEFAULT_DAYS,
     MCP_SESSION_IDLE_DEATH_MS: MCP_SESSION_IDLE_DEATH_MS,
     MCP_MEMORY_CANDIDATE_TTL_MS: MCP_MEMORY_CANDIDATE_TTL_MS,
@@ -2221,7 +2562,7 @@
     _applyPolicyForTests: _applyPolicyForTests,
     _drainForTests: _drainForTests,
     _getPolicyForTests: function () {
-      return { recordingEnabled: _recordingEnabled, retentionDays: _retentionDays };
+      return { recordingEnabled: _recordingEnabled, retentionDays: _retentionDays, recorderBackend: _recorderBackend };
     }
   };
 

@@ -1,4 +1,4 @@
-<!-- generated 2026-08-11 by build-crawler-files.mjs; edit llms-full.source.md -->
+<!-- generated 2026-08-14 by build-crawler-files.mjs; edit llms-full.source.md -->
 # FSB (Full Self-Browsing)
 
 ## 1. Project Description

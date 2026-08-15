@@ -119,5 +119,69 @@ check(/case 'deleteSessionHistory':[\s\S]*automationLogger\.deleteSession\(sessi
 check(/case 'clearSessionHistory':[\s\S]*automationLogger\.clearAllSessions\(\)/.test(background),
   'background clear-all action uses the race-safe automation logger path');
 
+console.log('\n--- Journal detail pagination recovery contract ---');
+
+const loadMoreStart = options.indexOf('if (loadMoreEventsBtn)');
+const loadMoreEnd = options.indexOf('\n  }\n}', loadMoreStart);
+const loadMoreEvents = options.slice(loadMoreStart, loadMoreEnd);
+check(loadMoreStart !== -1,
+  'journal detail view wires the load-more control');
+check(loadMoreEvents.includes("if (!page) throw new Error('Session events could not be loaded')"),
+  'a null journal detail page enters the retry error path');
+check(loadMoreEvents.includes("loadMoreEventsBtn.textContent = 'Retry loading events'"),
+  'the pagination error path restores a retry label');
+check(loadMoreEvents.indexOf("if (!page) throw new Error('Session events could not be loaded')") <
+      loadMoreEvents.indexOf('session._journalEvents.push'),
+  'failed pagination never appends partial journal data');
+
+console.log('\n--- Bounded journal export contract ---');
+
+const exportFilenameMatch = options.match(/function sessionExportFilename\(sessionId, format\)\s*\{[\s\S]*?\n\}/);
+check(!!exportFilenameMatch, 'session exports share a filename helper');
+if (exportFilenameMatch) {
+  const sandbox = { result: null };
+  vm.createContext(sandbox);
+  vm.runInContext(exportFilenameMatch[0] + '\nresult = sessionExportFilename;', sandbox);
+  const filename = sandbox.result;
+  const firstId = 'session_1723650000000_alpha_one';
+  const secondId = 'session_1723650000001_beta_two';
+  check(filename(firstId, 'text') === 'fsb-session-1723650000000_alpha_one.txt',
+    'text export retains the full unique session suffix');
+  check(filename(firstId, 'json') === 'fsb-session-1723650000000_alpha_one.json',
+    'JSON export uses the same unique session suffix');
+  check(filename(firstId, 'text') !== filename(secondId, 'text'),
+    'distinct journal sessions receive distinct text filenames');
+  check(filename('session_bad/id', 'text') === 'fsb-session-bad_id.txt',
+    'unsafe filename characters are sanitized');
+}
+
+const saveExportStart = options.indexOf('async function saveJournalSessionExport(sessionId, format)');
+const saveExportEnd = options.indexOf('\n}\n\n/**', saveExportStart);
+const saveExport = options.slice(saveExportStart, saveExportEnd);
+check(saveExportStart !== -1, 'journal export owns a dedicated Save As streaming path');
+check(saveExport.indexOf('window.showSaveFilePicker') < saveExport.indexOf('fileHandle.createWritable'),
+  'Save As picker runs before writable creation and export work');
+check(saveExport.includes("error?.name === 'AbortError'") && saveExport.includes('return { cancelled: true }'),
+  'picker cancellation is a quiet non-error result');
+check(saveExport.includes('streamExportToWritable') && saveExport.includes('await writable.close()'),
+  'journal chunks stream into the selected file before it is committed');
+check(saveExport.includes('await writable.abort()'),
+  'failed file writes abort the partial destination');
+check(!saveExport.includes('new Blob') && !saveExport.includes('const parts = []'),
+  'journal Save As never buffers the full export in a Blob or parts array');
+check(options.includes('data-storage-backend=') &&
+      options.includes('downloadSessionLogs(sessionId, sessionItem.dataset.storageBackend)'),
+  'session rows route journal clicks synchronously using their storage-backend hint');
+check(html.indexOf('<script src="../utils/mcp-session-export-port.js"></script>') <
+    html.indexOf('<script src="options.js"></script>'),
+  'the acknowledged export transport loads before options.js');
+check(background.includes("importScripts('utils/mcp-session-export-port.js')") &&
+      background.includes('transport.serveExportPort(port'),
+  'the service worker loads and serves the acknowledged export protocol');
+check(options.includes("a.download = sessionExportFilename(sessionId, 'text')"),
+  'legacy text exports use the shared unique filename helper');
+check(!/"downloads"/.test(fs.readFileSync(path.resolve(__dirname, '..', 'extension', 'manifest.json'), 'utf8')),
+  'streaming export adds no downloads permission');
+
 console.log(`\n=== Results: ${passed} passed, ${failed} failed ===`);
 process.exit(failed > 0 ? 1 : 0);

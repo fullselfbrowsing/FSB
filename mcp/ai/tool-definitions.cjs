@@ -1,14 +1,14 @@
 /**
  * Canonical Tool Registry for FSB Browser Automation
  *
- * Single source of truth for all 52 browser automation tool definitions.
+ * Single source of truth for 53 browser tools plus 4 trigger tools.
  * Shared between autopilot (agent loop) and MCP server.
  *
  * Per D-11/D-12: Each tool is a plain object with JSON Schema inputSchema
  * and routing metadata (_route, _readOnly, _contentVerb, _cdpVerb).
  *
  * Per D-01: All tool names use snake_case matching MCP convention.
- * Per D-04: All 52 tools defined (49 original + 2 vault fill tools + close_tab).
+ * The Developer/UAT screenshot tool shares this registry with MCP and autopilot.
  *
  * @module tool-definitions
  */
@@ -87,8 +87,9 @@ function withVisualSessionFields(tool) {
  */
 
 /**
- * All 52 browser automation tool definitions.
- * Grouped by category: Navigation, Interaction, Scrolling, Waiting, Tabs, Data, CDP, Read-Only.
+ * All 57 shared definitions (53 browser tools and 4 trigger tools).
+ * Grouped by category: Navigation, Interaction, Scrolling, Waiting, Tabs, Data,
+ * CDP, Developer/UAT, Read-Only, Task Status, Triggers, and Upload.
  * @type {ToolDefinition[]}
  */
 const TOOL_REGISTRY = [
@@ -907,6 +908,42 @@ const TOOL_REGISTRY = [
     _forceForeground: false,
     _emitChangeReport: true
   }),
+
+  // =========================================================================
+  // DEVELOPER / UAT TOOLS (1 tool)
+  // =========================================================================
+
+  {
+    name: 'capture_screenshot',
+    description: 'Capture the live Chromium-composited web page as a lossless PNG for visual inspection and UAT. Supports the current viewport, the full rendered document, an exact page/viewport region, or an element selected by CSS or an FSB element ref. Includes CSS, web fonts, SVG, canvas, images, open shadow DOM, and runtime state; browser chrome and the desktop are not included. FSB overlays are hidden by default and restored after capture. MCP returns a native image and private managed file; autopilot attaches the image transiently to the model without creating a file. Responsive desktop/mobile emulation is temporary and never spoofs the user agent or reloads the page. Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED. Pass tab_id only to disambiguate an owned tab.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        mode: { type: 'string', enum: ['viewport', 'full_page', 'region', 'element'], description: 'Capture mode. Defaults to viewport.' },
+        coordinate_space: { type: 'string', enum: ['viewport', 'page'], description: 'Region coordinate space. Valid only for region mode; defaults to viewport.' },
+        x: { type: 'number', description: 'Region left edge in CSS pixels. Region mode only.' },
+        y: { type: 'number', description: 'Region top edge in CSS pixels. Region mode only.' },
+        width: { type: 'number', description: 'Region width in CSS pixels. Region mode only.' },
+        height: { type: 'number', description: 'Region height in CSS pixels. Region mode only.' },
+        selector: { type: 'string', description: 'CSS selector or FSB element ref. Element mode only.' },
+        device_mode: { type: 'string', enum: ['current', 'desktop', 'mobile'], description: 'Use current metrics or temporary responsive emulation. Viewport dimensions without this field imply desktop.' },
+        viewport_width: { type: 'number', description: 'Temporary viewport width in integer CSS pixels. Desktop/mobile require both dimensions.' },
+        viewport_height: { type: 'number', description: 'Temporary viewport height in integer CSS pixels. Desktop/mobile require both dimensions.' },
+        device_scale_factor: { type: 'number', description: 'Temporary emulated device scale factor from 1 through 4; defaults to 1 while emulating.' },
+        orientation: { type: 'string', enum: ['auto', 'portrait', 'landscape'], description: 'Mobile screen orientation. Mobile mode only; defaults to auto.' },
+        wait_ms: { type: 'number', description: 'Additional settle delay from 0 through 5000 ms after font readiness and two animation frames. Defaults to 250.' },
+        include_fsb_overlays: { type: 'boolean', description: 'Capture FSB overlays instead of temporarily hiding them. Defaults to false.' },
+        tab_id: { type: 'number', description: 'Optional owned tab id. Omit when the calling agent owns exactly one tab.' }
+      },
+      required: []
+    },
+    _route: 'cdp',
+    _readOnly: true,
+    _contentVerb: null,
+    _cdpVerb: 'cdpCaptureScreenshot',
+    _forceForeground: false,
+    _emitChangeReport: false
+  },
 
   // =========================================================================
   // READ-ONLY / INFORMATION TOOLS (6 tools)

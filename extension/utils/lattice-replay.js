@@ -329,7 +329,8 @@
       var messageArgs = cloneJson(payload, {});
       [
         'agentId', 'agent_id', 'ownershipToken', 'ownership_token',
-        'connectionId', 'connection_id', 'visualSession', 'client'
+        'connectionId', 'connection_id', 'recordingRunId', 'recordingCallId',
+        'visualSession', 'client'
       ].forEach(function (key) { delete messageArgs[key]; });
       return messageArgs;
     }
@@ -562,6 +563,120 @@
     ]).finally(function () { clearTimeout(timer); });
   }
 
+  function journalApi() {
+    return globalScope.FsbMcpLatticeJournal || null;
+  }
+
+  var JOURNAL_REPLAY_VOLATILE_RESULT_KEYS = new Set([
+    'timestamp', 'timestampms', 'createdat', 'updatedat', 'startedat', 'completedat',
+    'duration', 'durationms', 'elapsed', 'elapsedms', 'executiontime', 'executiontimems',
+    'tabid', 'targettabid', 'windowid', 'agentid', 'requestid', 'messageid', 'mcpmsgid',
+    'ownershiptoken'
+  ]);
+
+  function normalizeJournalReplayResult(value) {
+    if (Array.isArray(value)) return value.map(normalizeJournalReplayResult);
+    if (!value || typeof value !== 'object') return value;
+    return Object.keys(value).sort().reduce(function (out, key) {
+      var normalizedKey = key.replace(/[^A-Za-z0-9]/g, '').toLowerCase();
+      if (!JOURNAL_REPLAY_VOLATILE_RESULT_KEYS.has(normalizedKey) && value[key] !== undefined) {
+        out[key] = normalizeJournalReplayResult(value[key]);
+      }
+      return out;
+    }, {});
+  }
+
+  function canonicalReplayValue(value) {
+    if (Array.isArray(value)) return value.map(canonicalReplayValue);
+    if (!value || typeof value !== 'object') return value;
+    return Object.keys(value).sort().reduce(function (out, key) {
+      if (value[key] !== undefined) out[key] = canonicalReplayValue(value[key]);
+      return out;
+    }, {});
+  }
+
+  async function sha256Canonical(value) {
+    if (!globalScope.crypto || !globalScope.crypto.subtle) throw new Error('Replay hashing is unavailable');
+    var bytes = new TextEncoder().encode(JSON.stringify(canonicalReplayValue(value)));
+    var digest = await globalScope.crypto.subtle.digest('SHA-256', bytes);
+    return Array.from(new Uint8Array(digest)).map(function (byte) {
+      return byte.toString(16).padStart(2, '0');
+    }).join('');
+  }
+
+  function journalReplayResultSummary(result, succeeded) {
+    if (succeeded !== false || !result || typeof result !== 'object') return null;
+    var summary = {};
+    ['errorCode', 'code', 'status', 'error', 'message', 'reason'].forEach(function (key) {
+      var value = result[key];
+      if (typeof value === 'string' && value) summary[key] = value.slice(0, 1000);
+      else if (key === 'status' && Number.isFinite(value)) summary[key] = value;
+    });
+    return Object.keys(summary).length ? summary : { failed: true };
+  }
+
+  // Rebuild the exact compact manifest shape produced by the offscreen seal
+  // without persisting result bodies. Sending this already-normalized shape
+  // through the host is idempotent and therefore preserves the receipt hash.
+  async function normalizeJournalManifest(manifest) {
+    var normalized = canonicalReplayValue(cloneJson(manifest, {}));
+    normalized.steps = await Promise.all((normalized.steps || []).map(async function (step) {
+      var persisted = Object.assign({}, step);
+      var result = persisted.result;
+      delete persisted.result;
+      var resultSummary = Object.prototype.hasOwnProperty.call(step, 'result')
+        ? journalReplayResultSummary(result, step.success)
+        : (step.resultSummary || null);
+      persisted.argumentHash = await sha256Canonical(step.arguments || {});
+      persisted.resultHash = Object.prototype.hasOwnProperty.call(step, 'result')
+        ? await sha256Canonical(normalizeJournalReplayResult(result || {}))
+        : (/^[a-f0-9]{64}$/.test(String(step.resultHash || ''))
+          ? step.resultHash
+          : await sha256Canonical({}));
+      persisted.resultHashVersion = 'fsb-normalized-result/v1';
+      if (resultSummary) persisted.resultSummary = resultSummary;
+      return persisted;
+    }));
+    return normalized;
+  }
+
+  async function buildJournalReplayRecord(sessionId) {
+    var journal = journalApi();
+    if (!journal || typeof journal.getReplayProjection !== 'function') return null;
+    var projection = await journal.getReplayProjection(sessionId);
+    if (!projection) return null;
+    if (projection.replayTrusted === false) {
+      throw new Error('Trusted replay is unavailable because this recording is degraded');
+    }
+    var record = createReplayRecord(projection.session, projection.entries, 'capture');
+    record.manifest = await normalizeJournalManifest(record.manifest);
+    var resultProjectionByStepId = {};
+    (record.manifest.steps || []).forEach(function (step, index) {
+      var marker = projection.entries[index] && projection.entries[index].resultProjection;
+      if (marker === 'journal-action-v1' || marker === 'journal-full-v1') {
+        resultProjectionByStepId[step.id] = marker;
+      }
+    });
+    record.totalSourceSteps = projection.totalSourceSteps;
+    record.truncated = projection.truncated === true;
+    var metadata = typeof journal.getReplayMetadata === 'function'
+      ? await journal.getReplayMetadata(sessionId)
+      : null;
+    if (metadata) {
+      record = Object.assign({}, record, metadata, {
+        manifest: record.manifest,
+        totalSourceSteps: projection.totalSourceSteps,
+        truncated: projection.truncated === true,
+        counts: replayCounts(record.manifest.steps || [])
+      });
+    }
+    return {
+      projection: projection,
+      record: record,
+      resultProjectionByStepId: resultProjectionByStepId
+    };
+  }
+
   async function requestHost(type, payload) {
     if (globalScope.ensureLatticeOffscreen) {
       await Promise.resolve(globalScope.ensureLatticeOffscreen());
@@ -629,12 +744,39 @@
       error: null
     });
     if (sessionId) {
-      await mutateStoredSession(sessionId, function () { return sealed; });
+      var journal = journalApi();
+      if (journal && typeof journal.hasSession === 'function' && await journal.hasSession(sessionId)) {
+        if (typeof journal.updateReplayMetadata === 'function') {
+          await journal.updateReplayMetadata(sessionId, sealed);
+        }
+      } else {
+        await mutateStoredSession(sessionId, function () { return sealed; });
+      }
     }
     return sealed;
   }
 
   async function sealPersistedSession(sessionId) {
+    var journal = journalApi();
+    if (journal && typeof journal.hasSession === 'function' && await journal.hasSession(sessionId)) {
+      var built = await buildJournalReplayRecord(sessionId);
+      if (!built) return null;
+      var journalRecord = built.record;
+      if (journalRecord.integrity !== 'verified' || !journalRecord.receipt || !journalRecord.manifestHash) {
+        try {
+          journalRecord = await sealReplayRecord(sessionId, journalRecord);
+        } catch (journalError) {
+          journalRecord = Object.assign({}, journalRecord, {
+            integrity: 'failed',
+            error: journalError && journalError.message ? journalError.message : String(journalError)
+          });
+          if (typeof journal.updateReplayMetadata === 'function') {
+            await journal.updateReplayMetadata(sessionId, journalRecord);
+          }
+        }
+      }
+      return Object.assign({}, built.projection.session, { replay: journalRecord });
+    }
     var stored = await globalScope.chrome.storage.local.get(['fsbSessionLogs']);
     var session = (stored.fsbSessionLogs || {})[sessionId];
     if (!session) return null;
@@ -669,6 +811,39 @@
   }
 
   async function prepareReplay(sessionId) {
+    var journal = journalApi();
+    if (journal && typeof journal.hasSession === 'function' && await journal.hasSession(sessionId)) {
+      var built = await buildJournalReplayRecord(sessionId);
+      if (!built) throw new Error('Session not found');
+      var journalRecord = built.record;
+      if (journalRecord.integrity !== 'verified' || !journalRecord.receipt || !journalRecord.manifestHash) {
+        journalRecord = await sealReplayRecord(sessionId, journalRecord);
+      }
+      if (journalRecord.manifest?.provenance !== journalRecord.provenance) {
+        throw new Error('Replay provenance does not match the signed manifest');
+      }
+      var journalMaterialized = await requestHost('lattice-replay-materialize', {
+        manifest: journalRecord.manifest,
+        manifestHash: journalRecord.manifestHash,
+        receipt: journalRecord.receipt,
+        signerKid: journalRecord.signerKid
+      });
+      validateReplayClassifications(journalRecord.manifest.steps);
+      return {
+        sessionId: sessionId,
+        replay: journalRecord,
+        verified: journalMaterialized.verified === true,
+        offline: journalMaterialized.offline,
+        receiptCid: journalRecord.receiptCid || journalMaterialized.receiptCid || null,
+        startUrl: journalRecord.manifest.startUrl,
+        tabs: Array.isArray(journalRecord.manifest.tabs) ? journalRecord.manifest.tabs : [],
+        steps: journalRecord.manifest.steps,
+        resultProjectionByStepId: built.resultProjectionByStepId,
+        counts: journalRecord.counts,
+        totalSourceSteps: built.projection.totalSourceSteps,
+        truncated: built.projection.truncated === true
+      };
+    }
     var stored = await globalScope.chrome.storage.local.get(['fsbSessionLogs']);
     var session = (stored.fsbSessionLogs || {})[sessionId];
     if (!session) throw new Error('Session not found');
@@ -697,6 +872,7 @@
       startUrl: replayRecord.manifest.startUrl,
       tabs: Array.isArray(replayRecord.manifest.tabs) ? replayRecord.manifest.tabs : [],
       steps: replayRecord.manifest.steps,
+      resultProjectionByStepId: {},
       counts: replayRecord.counts
     };
   }
@@ -714,6 +890,11 @@
   }
 
   async function persistReplayRun(sessionId, run) {
+    var journal = journalApi();
+    if (journal && typeof journal.hasSession === 'function' && await journal.hasSession(sessionId) &&
+        typeof journal.persistReplayRun === 'function') {
+      return journal.persistReplayRun(sessionId, run);
+    }
     return mutateStoredSession(sessionId, function (existing, session) {
       var replayRecord = existing && existing.version === REPLAY_SCHEMA_VERSION
         ? existing
@@ -725,6 +906,13 @@
   }
 
   async function resumePendingSeals() {
+    var journal = journalApi();
+    if (journal && typeof journal.listPendingSealSessionIds === 'function') {
+      var journalIds = await journal.listPendingSealSessionIds().catch(function () { return []; });
+      for (var j = 0; j < journalIds.length; j++) {
+        await sealPersistedSession(journalIds[j]).catch(function () { /* retry next wake */ });
+      }
+    }
     if (!globalScope.chrome || !globalScope.chrome.storage || !globalScope.chrome.storage.local) return;
     var stored = await globalScope.chrome.storage.local.get(['fsbSessionLogs']);
     var sessions = stored.fsbSessionLogs || {};

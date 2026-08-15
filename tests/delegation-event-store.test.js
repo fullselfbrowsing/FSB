@@ -54,6 +54,9 @@ const SECTION_ARGUMENT_INDEX = process.argv.indexOf('--section');
 const SELECTED_SECTION = SECTION_ARGUMENT_INDEX === -1
   ? null
   : process.argv[SECTION_ARGUMENT_INDEX + 1];
+const STORAGE_CATALOG_KEY = 'fsbDelegationLedgerCatalog:v2';
+const STORAGE_CHUNK_KEY_PREFIX = 'fsbDelegationLedgerChunk:v2:';
+const STORAGE_CHUNK_ENTRIES = 32;
 
 if (SECTION_ARGUMENT_INDEX !== -1 && !SELECTED_SECTION) {
   throw new Error('--section requires a value');
@@ -90,6 +93,7 @@ function installSessionStorage(initial = {}) {
   let setGate = null;
   let setStarted = null;
   let setCalls = 0;
+  const rejectedWriteCalls = new Set();
 
   const area = {
     async get(keys) {
@@ -106,6 +110,7 @@ function installSessionStorage(initial = {}) {
       setCalls += 1;
       if (setStarted) setStarted();
       if (setGate) await setGate;
+      if (rejectedWriteCalls.delete(setCalls)) throw new Error(`write ${setCalls} rejected`);
       if (rejectWrite) throw rejectWrite;
       Object.assign(data, jsonClone(update));
     },
@@ -120,6 +125,7 @@ function installSessionStorage(initial = {}) {
     get setCalls() { return setCalls; },
     rejectNextRead(error = new Error('read rejected')) { rejectRead = error; },
     rejectNextWrite(error = new Error('write rejected')) { rejectWrite = error; },
+    rejectWriteAt(callNumber) { rejectedWriteCalls.add(callNumber); },
     deferWrites() {
       let resolve;
       let startedResolve;
@@ -185,6 +191,55 @@ function storageKey(store, delegationId = fixtures.baseContext.delegationId) {
   return `${store.STORAGE_KEY_PREFIX}${delegationId}`;
 }
 
+function chunkKey(delegationId, index) {
+  return `${STORAGE_CHUNK_KEY_PREFIX}${delegationId}:${index}`;
+}
+
+function persistedManifest(mock, store, delegationId = fixtures.baseContext.delegationId) {
+  const manifest = mock.data[storageKey(store, delegationId)];
+  assert(manifest, `missing manifest for ${delegationId}`);
+  return manifest;
+}
+
+function reconstructStoredEnvelope(
+  mock,
+  store,
+  delegationId = fixtures.baseContext.delegationId,
+) {
+  const manifest = persistedManifest(mock, store, delegationId);
+  if (manifest.v === 1 && Array.isArray(manifest.entries)) return jsonClone(manifest);
+  exactKeys(manifest, [
+    'v', 'delegationId', 'acceptedIdentity', 'terminal', 'terminalCode',
+    'cleanupPending', 'entryCount', 'sealedChunkCount', 'entriesBytes',
+    'envelopeBytes', 'activeEntries',
+  ]);
+  assert.strictEqual(manifest.v, 2);
+  const entries = [];
+  for (let index = 0; index < manifest.sealedChunkCount; index += 1) {
+    const chunk = mock.data[chunkKey(delegationId, index)];
+    assert(chunk, `missing chunk ${index} for ${delegationId}`);
+    exactKeys(chunk, ['v', 'delegationId', 'index', 'entries']);
+    assert.strictEqual(chunk.v, 2);
+    assert.strictEqual(chunk.index, index);
+    assert.strictEqual(chunk.entries.length, STORAGE_CHUNK_ENTRIES);
+    entries.push(...jsonClone(chunk.entries));
+  }
+  entries.push(...jsonClone(manifest.activeEntries));
+  assert.strictEqual(entries.length, manifest.entryCount);
+  const envelope = {
+    v: 1,
+    delegationId: manifest.delegationId,
+    acceptedIdentity: jsonClone(manifest.acceptedIdentity),
+    terminal: manifest.terminal,
+    terminalCode: manifest.terminalCode,
+    cleanupPending: jsonClone(manifest.cleanupPending),
+    entries,
+  };
+  assert.strictEqual(store.serializedBytes(entries), manifest.entriesBytes);
+  assert.strictEqual(store.serializedBytes(envelope), manifest.envelopeBytes);
+  return envelope;
+}
+
 function project(store, event, overrides = {}) {
   return store.project(event, context(overrides));
 }
@@ -247,7 +302,7 @@ async function runAcceptedIdentityFoundation() {
         }),
       );
 
-      const openCodeEnvelope = mock.data[storageKey(store, openCodeId)];
+      const openCodeEnvelope = reconstructStoredEnvelope(mock, store, openCodeId);
       exactKeys(openCodeEnvelope, [
         'v', 'delegationId', 'acceptedIdentity', 'terminal', 'terminalCode',
         'cleanupPending', 'entries',
@@ -324,10 +379,10 @@ async function runAcceptedIdentityFoundation() {
         )),
         'delegation_persistence_failed',
       );
-      assert.strictEqual(mock.data[storageKey(store, id)].entries.length, 1);
+      assert.strictEqual(reconstructStoredEnvelope(mock, store, id).entries.length, 1);
 
       const legacyId = 'delegation_store_legacy_6501';
-      const legacy = jsonClone(mock.data[storageKey(store, id)]);
+      const legacy = reconstructStoredEnvelope(mock, store, id);
       legacy.delegationId = legacyId;
       delete legacy.acceptedIdentity;
       for (const entry of legacy.entries) entry.delegationId = legacyId;
@@ -335,8 +390,8 @@ async function runAcceptedIdentityFoundation() {
       await expectCode(store.hydrateNonterminal(), 'delegation_ledger_corrupt');
       delete mock.data[storageKey(store, legacyId)];
 
-      const driftedProfile = mock.data[storageKey(store, id)];
-      driftedProfile.entries[0].init.profileVersion = 'forged-profile';
+      const manifest = persistedManifest(mock, store, id);
+      manifest.activeEntries[0].init.profileVersion = 'forged-profile';
       await expectCode(store.hydrateNonterminal(), 'delegation_ledger_corrupt');
     } finally {
       mock.restore();
@@ -426,7 +481,7 @@ async function runCodexAcceptedIdentity() {
         assert.strictEqual(result.metrics.billingKind, acceptedIdentity.billingKind);
         assert.strictEqual(result.metrics.usd, null);
         assert.deepStrictEqual(
-          mock.data[storageKey(store, delegationId)].acceptedIdentity,
+          persistedManifest(mock, store, delegationId).acceptedIdentity,
           acceptedIdentity,
         );
       }
@@ -499,8 +554,8 @@ async function runCodexAcceptedIdentity() {
         ),
         'delegation_persistence_failed',
       );
-      assert.strictEqual(mock.data[storageKey(store, id)].entries.length, 1);
-      assert.deepStrictEqual(mock.data[storageKey(store, id)].acceptedIdentity,
+      assert.strictEqual(reconstructStoredEnvelope(mock, store, id).entries.length, 1);
+      assert.deepStrictEqual(persistedManifest(mock, store, id).acceptedIdentity,
         CODEX_API_ACCEPTED_IDENTITY);
     } finally {
       mock.restore();
@@ -690,9 +745,10 @@ async function runCodexAcceptedIdentity() {
       assert.strictEqual(hydrated.length, 1);
       assert(!Object.hasOwn(hydrated[0].entries[0].tool, 'argsSummary'));
       assert(!JSON.stringify(hydrated).includes(argumentCanary));
-      assert(!Object.hasOwn(mock.data[key].entries[0].tool, 'argsSummary'),
+      const migrated = reconstructStoredEnvelope(mock, store);
+      assert(!Object.hasOwn(migrated.entries[0].tool, 'argsSummary'),
         'legacy storage is rewritten to the canonical no-arguments shape');
-      assert(!JSON.stringify(mock.data[key]).includes(argumentCanary));
+      assert(!JSON.stringify(mock.data).includes(argumentCanary));
       assert.strictEqual(mock.setCalls, 1);
     } finally {
       mock.restore();
@@ -1113,8 +1169,8 @@ async function runCodexAcceptedIdentity() {
       )));
       assert.deepStrictEqual(entries.map((entry) => entry.sequence),
         Array.from({ length: 24 }, (_, index) => index + 1));
-      assert.strictEqual(mock.setCalls, 24);
-      const persisted = mock.data[storageKey(store)];
+      assert.strictEqual(mock.setCalls, 25);
+      const persisted = reconstructStoredEnvelope(mock, store);
       exactKeys(persisted, [
         'v', 'delegationId', 'acceptedIdentity', 'terminal', 'terminalCode',
         'cleanupPending', 'entries',
@@ -1124,6 +1180,144 @@ async function runCodexAcceptedIdentity() {
         Array.from({ length: 24 }, (_, index) => index + 1));
       assert.deepStrictEqual(persisted.entries.map((entry) => entry.title),
         Array.from({ length: 24 }, (_, index) => `event-${index}`));
+    } finally {
+      mock.restore();
+    }
+  });
+
+  await test('v2 catalog rolls immutable 32-entry chunks while the manifest stays bounded', async () => {
+    const mock = installSessionStorage();
+    try {
+      let store = freshStore();
+      const delegationId = 'delegation_chunk_layout_01';
+      await store.hydrateNonterminal();
+      for (let index = 0; index < 65; index += 1) {
+        const persisted = await store.appendBeforeFanout(
+          delegationId,
+          fixtures.stateEvent,
+          acceptedContext(CLAUDE_ACCEPTED_IDENTITY, {
+            timestamp: 1720000000000 + index,
+            state: 'running',
+            title: `chunk-event-${index}`,
+          }),
+        );
+        assert.strictEqual(persisted.sequence, index + 1);
+      }
+      assert.deepStrictEqual(mock.data[STORAGE_CATALOG_KEY], {
+        v: 2,
+        delegationIds: [delegationId],
+      });
+      const manifest = persistedManifest(mock, store, delegationId);
+      assert.strictEqual(manifest.v, 2);
+      assert.strictEqual(manifest.entryCount, 65);
+      assert.strictEqual(manifest.sealedChunkCount, 2);
+      assert.strictEqual(manifest.activeEntries.length, 1);
+      assert.deepStrictEqual(
+        mock.data[chunkKey(delegationId, 0)].entries.map((row) => row.sequence),
+        Array.from({ length: 32 }, (_, index) => index + 1),
+      );
+      assert.deepStrictEqual(
+        mock.data[chunkKey(delegationId, 1)].entries.map((row) => row.sequence),
+        Array.from({ length: 32 }, (_, index) => index + 33),
+      );
+      const immutableChunks = [
+        jsonClone(mock.data[chunkKey(delegationId, 0)]),
+        jsonClone(mock.data[chunkKey(delegationId, 1)]),
+      ];
+      await store.appendBeforeFanout(
+        delegationId,
+        fixtures.stateEvent,
+        acceptedContext(CLAUDE_ACCEPTED_IDENTITY, { timestamp: 1720000000065 }),
+      );
+      assert.deepStrictEqual(mock.data[chunkKey(delegationId, 0)], immutableChunks[0]);
+      assert.deepStrictEqual(mock.data[chunkKey(delegationId, 1)], immutableChunks[1]);
+
+      store = freshStore();
+      const hydrated = await store.hydrateNonterminal();
+      assert.strictEqual(hydrated[0].entries.length, 66);
+      assert.deepStrictEqual(
+        hydrated[0].entries.map((row) => row.sequence),
+        Array.from({ length: 66 }, (_, index) => index + 1),
+      );
+    } finally {
+      mock.restore();
+    }
+  });
+
+  await test('rollover preparation and manifest interruption never expose an uncommitted entry', async () => {
+    for (const failureStage of ['prepare', 'commit']) {
+      const mock = installSessionStorage();
+      try {
+        let store = freshStore();
+        const delegationId = `delegation_rollover_${failureStage}`;
+        await store.hydrateNonterminal();
+        for (let index = 0; index < STORAGE_CHUNK_ENTRIES; index += 1) {
+          await store.appendBeforeFanout(
+            delegationId,
+            fixtures.stateEvent,
+            acceptedContext(CLAUDE_ACCEPTED_IDENTITY, {
+              timestamp: 1720000000000 + index,
+            }),
+          );
+        }
+        const preparationCall = mock.setCalls + 1;
+        mock.rejectWriteAt(failureStage === 'prepare' ? preparationCall : preparationCall + 1);
+        await expectCode(
+          store.appendBeforeFanout(
+            delegationId,
+            fixtures.stateEvent,
+            acceptedContext(CLAUDE_ACCEPTED_IDENTITY, { timestamp: 1720000000032 }),
+          ),
+          'delegation_persistence_failed',
+        );
+        assert.strictEqual(persistedManifest(mock, store, delegationId).entryCount, 32);
+        assert.strictEqual(reconstructStoredEnvelope(mock, store, delegationId).entries.length, 32);
+        assert.strictEqual(
+          Object.hasOwn(mock.data, chunkKey(delegationId, 0)),
+          failureStage === 'commit',
+          'only a failed manifest commit may leave the recoverable prepared chunk',
+        );
+
+        store = freshStore();
+        assert.strictEqual((await store.hydrateNonterminal())[0].entries.length, 32);
+        const recovered = await store.appendBeforeFanout(
+          delegationId,
+          fixtures.stateEvent,
+          acceptedContext(CLAUDE_ACCEPTED_IDENTITY, { timestamp: 1720000000032 }),
+        );
+        assert.strictEqual(recovered.sequence, 33);
+        assert.strictEqual(reconstructStoredEnvelope(mock, store, delegationId).entries.length, 33);
+      } finally {
+        mock.restore();
+      }
+    }
+  });
+
+  await test('wake rejects missing, malformed, or mis-accounted catalog chunks', async () => {
+    const mock = installSessionStorage();
+    try {
+      let store = freshStore();
+      const delegationId = 'delegation_chunk_corruption_01';
+      await store.hydrateNonterminal();
+      for (let index = 0; index < 33; index += 1) {
+        await store.appendBeforeFanout(
+          delegationId,
+          fixtures.stateEvent,
+          acceptedContext(CLAUDE_ACCEPTED_IDENTITY, { timestamp: 1720000000000 + index }),
+        );
+      }
+      const key = chunkKey(delegationId, 0);
+      const validChunk = jsonClone(mock.data[key]);
+      delete mock.data[key];
+      await expectCode(freshStore().hydrateNonterminal(), 'delegation_ledger_corrupt');
+
+      mock.data[key] = jsonClone(validChunk);
+      mock.data[key].entries[4].sequence = 99;
+      await expectCode(freshStore().hydrateNonterminal(), 'delegation_ledger_corrupt');
+
+      mock.data[key] = jsonClone(validChunk);
+      persistedManifest(mock, store, delegationId).entriesBytes += 1;
+      await expectCode(freshStore().hydrateNonterminal(), 'delegation_ledger_corrupt');
     } finally {
       mock.restore();
     }
@@ -1151,7 +1345,7 @@ async function runCodexAcceptedIdentity() {
       const entry = await append;
       assert.strictEqual(settled, true);
       assert.strictEqual(entry.sequence, 1);
-      assert.strictEqual(mock.data[storageKey(store)].entries.length, 1);
+      assert.strictEqual(reconstructStoredEnvelope(mock, store).entries.length, 1);
     } finally {
       mock.restore();
     }
@@ -1254,7 +1448,10 @@ async function runCodexAcceptedIdentity() {
         store.appendBeforeFanout(delegationId, fixtures.stateEvent, context({ title: 'overflow' })),
         'delegation_quota_exceeded',
       );
-      assert.strictEqual(mock.data[storageKey(store, delegationId)].entries.length, 2000);
+      assert.strictEqual(
+        reconstructStoredEnvelope(mock, store, delegationId).entries.length,
+        2000,
+      );
     } finally {
       mock.restore();
     }
@@ -1359,7 +1556,7 @@ async function runCodexAcceptedIdentity() {
         'delegation_quota_exceeded',
       );
       assert.strictEqual(mock.data[storageKey(store, newId)], undefined);
-      assert.deepStrictEqual(mock.data[storageKey(store, otherId)], envelope);
+      assert.deepStrictEqual(reconstructStoredEnvelope(mock, store, otherId), envelope);
     } finally {
       mock.restore();
     }
@@ -1483,7 +1680,7 @@ async function runCodexAcceptedIdentity() {
         [delegationId],
         'canonical full-ledger validation proves only the exact durable terminal id',
       );
-      assert.strictEqual(mock.data[storageKey(store)].entries.length, 1);
+      assert.strictEqual(reconstructStoredEnvelope(mock, store).entries.length, 1);
       const repeated = await store.markTerminal(delegationId, 'completed');
       assert.deepStrictEqual(repeated, terminal);
       await expectCode(
@@ -1580,7 +1777,7 @@ async function runCodexAcceptedIdentity() {
         cancellationConfirmed: true,
         agentId: 'agent-cleanup-atomic',
       });
-      const before = jsonClone(mock.data[storageKey(store)]);
+      const before = jsonClone(persistedManifest(mock, store));
       mock.rejectNextWrite();
       await expectCode(
         store.markTerminal(delegationId, {
@@ -1590,10 +1787,10 @@ async function runCodexAcceptedIdentity() {
         }),
         'delegation_persistence_failed',
       );
-      assert.deepStrictEqual(mock.data[storageKey(store)], before);
-      assert.strictEqual(mock.data[storageKey(store)].terminal, false);
-      assert.strictEqual(mock.data[storageKey(store)].entries.length, 1);
-      assert.strictEqual(mock.data[storageKey(store)].cleanupPending.code, 'completed');
+      assert.deepStrictEqual(persistedManifest(mock, store), before);
+      assert.strictEqual(persistedManifest(mock, store).terminal, false);
+      assert.strictEqual(reconstructStoredEnvelope(mock, store).entries.length, 1);
+      assert.strictEqual(persistedManifest(mock, store).cleanupPending.code, 'completed');
     } finally {
       mock.restore();
     }
@@ -1620,7 +1817,7 @@ async function runCodexAcceptedIdentity() {
       assert.strictEqual(terminal.entries[1].kind, 'state');
       assert.strictEqual(terminal.entries[1].state, 'completed');
       assert.strictEqual(terminal.entries[1].sequence, 2);
-      assert.deepStrictEqual(successMock.data[storageKey(store)], terminal);
+      assert.deepStrictEqual(reconstructStoredEnvelope(successMock, store), terminal);
     } finally {
       successMock.restore();
     }
@@ -1817,7 +2014,7 @@ async function runCodexAcceptedIdentity() {
           timestamp: fixtures.baseContext.timestamp + index,
         });
       }
-      const persisted = mock.data[storageKey(store)];
+      const persisted = reconstructStoredEnvelope(mock, store);
       assert.strictEqual(persisted.entries.length, events.length);
       assert.deepStrictEqual(persisted.entries.map((entry) => entry.sequence), [1, 2, 3, 4, 5, 6]);
       const serialized = JSON.stringify(persisted);
@@ -1838,7 +2035,8 @@ async function runCodexAcceptedIdentity() {
     try {
       const store = freshStore();
       assert.deepStrictEqual(await store.hydrateNonterminal(), []);
-      assert.strictEqual(mock.setCalls, 0);
+      assert.strictEqual(mock.setCalls, 1);
+      assert.deepStrictEqual(mock.data[STORAGE_CATALOG_KEY], { v: 2, delegationIds: [] });
     } finally {
       mock.restore();
     }

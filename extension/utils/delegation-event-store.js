@@ -13,6 +13,10 @@
 
   var PAYLOAD_VERSION = 1;
   var STORAGE_KEY_PREFIX = 'fsbDelegationLedger:v1:';
+  var STORAGE_LAYOUT_VERSION = 2;
+  var STORAGE_CATALOG_KEY = 'fsbDelegationLedgerCatalog:v2';
+  var STORAGE_CHUNK_KEY_PREFIX = 'fsbDelegationLedgerChunk:v2:';
+  var STORAGE_CHUNK_ENTRIES = 32;
   var MAX_ENTRIES_PER_DELEGATION = 2000;
   var MAX_ENTRY_BYTES = 4 * 1024;
   var MAX_AGGREGATE_BYTES = 6 * 1024 * 1024;
@@ -45,6 +49,13 @@
     'acceptedIdentity', 'cleanupPending', 'delegationId', 'entries',
     'terminal', 'terminalCode', 'v'
   ];
+  var CATALOG_KEYS = ['delegationIds', 'v'];
+  var MANIFEST_KEYS = [
+    'acceptedIdentity', 'activeEntries', 'cleanupPending', 'delegationId',
+    'entriesBytes', 'entryCount', 'envelopeBytes', 'sealedChunkCount',
+    'terminal', 'terminalCode', 'v'
+  ];
+  var CHUNK_KEYS = ['delegationId', 'entries', 'index', 'v'];
   var CLEANUP_PENDING_KEYS = ['agentId', 'cancellationConfirmed', 'code'];
   var INIT_KEYS = ['allowedTools', 'client', 'model', 'profileVersion', 'sessionId'];
   var CLIENT_KEYS = ['id', 'label'];
@@ -771,6 +782,21 @@
     };
   }
 
+  function _assertEntryAcceptedIdentity(entry, acceptedIdentity) {
+    if (entry.init !== null
+      && (!entry.init.client
+        || entry.init.client.id !== acceptedIdentity.providerId
+        || entry.init.client.label !== acceptedIdentity.label
+        || entry.init.profileVersion !== acceptedIdentity.profileVersion)) {
+      _corrupt('persisted init identity changed');
+    }
+    if (entry.metrics !== null
+      && (entry.metrics.billingKind !== acceptedIdentity.billingKind
+        || entry.metrics.usd !== null)) {
+      _corrupt('persisted billing identity changed');
+    }
+  }
+
   function _assertValidEnvelope(envelope, delegationId) {
     if (!_hasExactKeys(envelope, ENVELOPE_KEYS)) {
       _corrupt('ledger envelope shape is invalid');
@@ -810,18 +836,7 @@
       var entry = normalized.entry;
       migrated = migrated || normalized.migrated;
       _assertValidEntry(entry, delegationId, i + 1, true);
-      if (entry.init !== null
-        && (!entry.init.client
-          || entry.init.client.id !== acceptedIdentity.providerId
-          || entry.init.client.label !== acceptedIdentity.label
-          || entry.init.profileVersion !== acceptedIdentity.profileVersion)) {
-        _corrupt('persisted init identity changed');
-      }
-      if (entry.metrics !== null
-        && (entry.metrics.billingKind !== acceptedIdentity.billingKind
-          || entry.metrics.usd !== null)) {
-        _corrupt('persisted billing identity changed');
-      }
+      _assertEntryAcceptedIdentity(entry, acceptedIdentity);
       normalizedEntries.push(entry);
     }
     if (!migrated) return envelope;
@@ -868,6 +883,10 @@
     return STORAGE_KEY_PREFIX + delegationId;
   }
 
+  function _chunkKey(delegationId, index) {
+    return STORAGE_CHUNK_KEY_PREFIX + delegationId + ':' + index;
+  }
+
   function _emptyEnvelope(delegationId, acceptedIdentity) {
     return {
       v: PAYLOAD_VERSION,
@@ -880,37 +899,6 @@
     };
   }
 
-  function _validatedLedgerRows(all) {
-    var rows = [];
-    var aggregateBytes = 0;
-    Object.keys(all).sort().forEach(function(key) {
-      if (key.indexOf(STORAGE_KEY_PREFIX) !== 0) return;
-      var delegationId = key.slice(STORAGE_KEY_PREFIX.length);
-      if (!delegationId || _characterLength(delegationId) > MAX_ID_CHARS) {
-        _corrupt('ledger storage key is invalid');
-      }
-      var envelope = _assertValidEnvelope(all[key], delegationId);
-      aggregateBytes += _serializedBytes(envelope);
-      rows.push({
-        delegationId: delegationId,
-        envelope: envelope,
-        migrated: envelope !== all[key]
-      });
-    });
-    if (aggregateBytes > MAX_AGGREGATE_BYTES) {
-      _corrupt('persisted aggregate ledger exceeds quota');
-    }
-    return rows;
-  }
-
-  async function _persistNormalizedRows(rows) {
-    var update = {};
-    rows.forEach(function(row) {
-      if (row.migrated) update[_key(row.delegationId)] = row.envelope;
-    });
-    if (Object.keys(update).length > 0) await _write(update);
-  }
-
   var _storageTail = Promise.resolve();
   function _withStorageLock(operation) {
     var next = _storageTail.then(operation, operation);
@@ -918,17 +906,373 @@
     return next;
   }
 
-  function _ledgerBytesFromStorage(all, replacementKey, replacementEnvelope) {
-    var total = 0;
-    var replacementSeen = false;
-    Object.keys(all).forEach(function(key) {
-      if (key.indexOf(STORAGE_KEY_PREFIX) !== 0) return;
-      var value = key === replacementKey ? replacementEnvelope : all[key];
-      if (key === replacementKey) replacementSeen = true;
-      total += _serializedBytes(value);
+  var _namespaceReady = false;
+  var _catalogIds = [];
+  var _aggregateBytes = 0;
+  var _knownEnvelopeBytes = Object.create(null);
+
+  function _catalogForIds(ids) {
+    return { v: STORAGE_LAYOUT_VERSION, delegationIds: ids.slice() };
+  }
+
+  function _assertValidCatalog(catalog) {
+    if (!_hasExactKeys(catalog, CATALOG_KEYS)
+      || catalog.v !== STORAGE_LAYOUT_VERSION
+      || !_isDenseDataArray(catalog.delegationIds)) {
+      _corrupt('delegation ledger catalog is invalid');
+    }
+    var previous = null;
+    for (var index = 0; index < catalog.delegationIds.length; index += 1) {
+      var delegationId = catalog.delegationIds[index];
+      if (typeof delegationId !== 'string'
+        || !delegationId
+        || _characterLength(delegationId) > MAX_ID_CHARS
+        || (previous !== null && previous >= delegationId)) {
+        _corrupt('delegation ledger catalog ids are invalid');
+      }
+      previous = delegationId;
+    }
+    return catalog;
+  }
+
+  function _envelopeFromManifest(manifest, entries) {
+    return {
+      v: PAYLOAD_VERSION,
+      delegationId: manifest.delegationId,
+      acceptedIdentity: manifest.acceptedIdentity,
+      terminal: manifest.terminal,
+      terminalCode: manifest.terminalCode,
+      cleanupPending: manifest.cleanupPending,
+      entries: entries
+    };
+  }
+
+  function _canonicalEnvelopeBytes(manifest, entriesBytes) {
+    var emptyBytes = _serializedBytes(_envelopeFromManifest(manifest, []));
+    return emptyBytes - 2 + entriesBytes;
+  }
+
+  function _assertValidManifest(manifest, delegationId) {
+    if (!_hasExactKeys(manifest, MANIFEST_KEYS)
+      || manifest.v !== STORAGE_LAYOUT_VERSION
+      || manifest.delegationId !== delegationId) {
+      _corrupt('delegation ledger manifest shape is invalid');
+    }
+    _assertValidEnvelope(_envelopeFromManifest(manifest, []), delegationId);
+    if (_nonnegativeIntegerOrNull(manifest.entryCount) === null
+      || manifest.entryCount > MAX_ENTRIES_PER_DELEGATION
+      || _nonnegativeIntegerOrNull(manifest.sealedChunkCount) === null
+      || !_isDenseDataArray(manifest.activeEntries)
+      || manifest.activeEntries.length > STORAGE_CHUNK_ENTRIES
+      || manifest.entryCount !== (
+        manifest.sealedChunkCount * STORAGE_CHUNK_ENTRIES + manifest.activeEntries.length
+      )
+      || _nonnegativeIntegerOrNull(manifest.entriesBytes) === null
+      || manifest.entriesBytes < 2
+      || _nonnegativeIntegerOrNull(manifest.envelopeBytes) === null
+      || manifest.envelopeBytes !== _canonicalEnvelopeBytes(manifest, manifest.entriesBytes)
+      || manifest.envelopeBytes > MAX_AGGREGATE_BYTES) {
+      _corrupt('delegation ledger manifest accounting is invalid');
+    }
+    var firstSequence = manifest.sealedChunkCount * STORAGE_CHUNK_ENTRIES + 1;
+    for (var index = 0; index < manifest.activeEntries.length; index += 1) {
+      var normalized = _withoutLegacyToolPresentation(manifest.activeEntries[index]);
+      if (normalized.migrated) _corrupt('v2 manifest contains a legacy entry');
+      _assertValidEntry(normalized.entry, delegationId, firstSequence + index, true);
+      _assertEntryAcceptedIdentity(normalized.entry, manifest.acceptedIdentity);
+    }
+    return manifest;
+  }
+
+  function _assertValidChunk(chunk, delegationId, index) {
+    if (!_hasExactKeys(chunk, CHUNK_KEYS)
+      || chunk.v !== STORAGE_LAYOUT_VERSION
+      || chunk.delegationId !== delegationId
+      || chunk.index !== index
+      || !_isDenseDataArray(chunk.entries)
+      || chunk.entries.length !== STORAGE_CHUNK_ENTRIES) {
+      _corrupt('delegation ledger chunk shape is invalid');
+    }
+    var firstSequence = index * STORAGE_CHUNK_ENTRIES + 1;
+    for (var row = 0; row < chunk.entries.length; row += 1) {
+      var normalized = _withoutLegacyToolPresentation(chunk.entries[row]);
+      if (normalized.migrated) _corrupt('v2 chunk contains a legacy entry');
+      _assertValidEntry(normalized.entry, delegationId, firstSequence + row, true);
+    }
+    return chunk;
+  }
+
+  function _reconstructEnvelope(manifest, chunks) {
+    var entries = [];
+    for (var index = 0; index < manifest.sealedChunkCount; index += 1) {
+      var key = _chunkKey(manifest.delegationId, index);
+      if (!Object.prototype.hasOwnProperty.call(chunks, key)) {
+        _corrupt('delegation ledger chunk is missing');
+      }
+      var chunk = _assertValidChunk(chunks[key], manifest.delegationId, index);
+      entries = entries.concat(chunk.entries);
+    }
+    entries = entries.concat(manifest.activeEntries);
+    if (entries.length !== manifest.entryCount) {
+      _corrupt('delegation ledger entry count is invalid');
+    }
+    var envelope = _envelopeFromManifest(manifest, entries);
+    var normalized = _assertValidEnvelope(envelope, manifest.delegationId);
+    if (normalized !== envelope) _corrupt('v2 ledger contains a legacy entry');
+    if (_serializedBytes(entries) !== manifest.entriesBytes
+      || _serializedBytes(envelope) !== manifest.envelopeBytes) {
+      _corrupt('delegation ledger aggregate accounting changed');
+    }
+    return envelope;
+  }
+
+  async function _readEnvelopeForManifest(manifest) {
+    var keys = [];
+    for (var index = 0; index < manifest.sealedChunkCount; index += 1) {
+      keys.push(_chunkKey(manifest.delegationId, index));
+    }
+    var chunks = keys.length > 0 ? await _read(keys) : {};
+    return _reconstructEnvelope(manifest, chunks);
+  }
+
+  function _manifestFromEnvelope(envelope) {
+    var sealedChunkCount = envelope.entries.length === 0
+      ? 0
+      : Math.floor((envelope.entries.length - 1) / STORAGE_CHUNK_ENTRIES);
+    var activeStart = sealedChunkCount * STORAGE_CHUNK_ENTRIES;
+    return {
+      v: STORAGE_LAYOUT_VERSION,
+      delegationId: envelope.delegationId,
+      acceptedIdentity: envelope.acceptedIdentity,
+      terminal: envelope.terminal,
+      terminalCode: envelope.terminalCode,
+      cleanupPending: envelope.cleanupPending,
+      entryCount: envelope.entries.length,
+      sealedChunkCount: sealedChunkCount,
+      entriesBytes: _serializedBytes(envelope.entries),
+      envelopeBytes: _serializedBytes(envelope),
+      activeEntries: envelope.entries.slice(activeStart)
+    };
+  }
+
+  function _chunksFromEnvelope(envelope, manifest) {
+    var chunks = [];
+    for (var index = 0; index < manifest.sealedChunkCount; index += 1) {
+      chunks.push({
+        v: STORAGE_LAYOUT_VERSION,
+        delegationId: envelope.delegationId,
+        index: index,
+        entries: envelope.entries.slice(
+          index * STORAGE_CHUNK_ENTRIES,
+          (index + 1) * STORAGE_CHUNK_ENTRIES
+        )
+      });
+    }
+    return chunks;
+  }
+
+  function _setNamespaceState(rows) {
+    var ids = [];
+    var aggregateBytes = 0;
+    var known = Object.create(null);
+    rows.forEach(function(row) {
+      ids.push(row.delegationId);
+      aggregateBytes += row.manifest.envelopeBytes;
+      known[row.delegationId] = row.manifest.envelopeBytes;
     });
-    if (!replacementSeen && replacementEnvelope) total += _serializedBytes(replacementEnvelope);
-    return total;
+    if (aggregateBytes > MAX_AGGREGATE_BYTES) {
+      _corrupt('persisted aggregate ledger exceeds quota');
+    }
+    _catalogIds = ids;
+    _aggregateBytes = aggregateBytes;
+    _knownEnvelopeBytes = known;
+    _namespaceReady = true;
+  }
+
+  async function _loadV2Namespace(catalog) {
+    _assertValidCatalog(catalog);
+    var manifestKeys = catalog.delegationIds.map(_key);
+    var storedManifests = manifestKeys.length > 0 ? await _read(manifestKeys) : {};
+    var rows = [];
+    var chunkKeys = [];
+    catalog.delegationIds.forEach(function(delegationId) {
+      var key = _key(delegationId);
+      if (!Object.prototype.hasOwnProperty.call(storedManifests, key)) {
+        _corrupt('catalog-listed delegation manifest is missing');
+      }
+      var manifest = _assertValidManifest(storedManifests[key], delegationId);
+      for (var index = 0; index < manifest.sealedChunkCount; index += 1) {
+        chunkKeys.push(_chunkKey(delegationId, index));
+      }
+      rows.push({ delegationId: delegationId, manifest: manifest, envelope: null });
+    });
+    var chunks = chunkKeys.length > 0 ? await _read(chunkKeys) : {};
+    rows.forEach(function(row) {
+      row.envelope = _reconstructEnvelope(row.manifest, chunks);
+    });
+    _setNamespaceState(rows);
+    return rows;
+  }
+
+  async function _migrateLegacyNamespace(all) {
+    var rows = [];
+    Object.keys(all).sort().forEach(function(key) {
+      if (key.indexOf(STORAGE_KEY_PREFIX) !== 0) return;
+      var delegationId = key.slice(STORAGE_KEY_PREFIX.length);
+      if (!delegationId || _characterLength(delegationId) > MAX_ID_CHARS) {
+        _corrupt('ledger storage key is invalid');
+      }
+      var envelope = _assertValidEnvelope(all[key], delegationId);
+      var manifest = _manifestFromEnvelope(envelope);
+      _assertValidManifest(manifest, delegationId);
+      rows.push({ delegationId: delegationId, manifest: manifest, envelope: envelope });
+    });
+    var aggregateBytes = rows.reduce(function(total, row) {
+      return total + row.manifest.envelopeBytes;
+    }, 0);
+    if (aggregateBytes > MAX_AGGREGATE_BYTES) {
+      _corrupt('persisted aggregate ledger exceeds quota');
+    }
+    var ids = rows.map(function(row) { return row.delegationId; });
+    var update = {};
+    update[STORAGE_CATALOG_KEY] = _catalogForIds(ids);
+    rows.forEach(function(row) {
+      update[_key(row.delegationId)] = row.manifest;
+      _chunksFromEnvelope(row.envelope, row.manifest).forEach(function(chunk) {
+        update[_chunkKey(row.delegationId, chunk.index)] = chunk;
+      });
+    });
+    await _write(update);
+    _setNamespaceState(rows);
+    return rows;
+  }
+
+  async function _loadNamespace(force) {
+    if (_namespaceReady && !force) return null;
+    var catalogRow = await _read(STORAGE_CATALOG_KEY);
+    if (Object.prototype.hasOwnProperty.call(catalogRow, STORAGE_CATALOG_KEY)) {
+      return _loadV2Namespace(catalogRow[STORAGE_CATALOG_KEY]);
+    }
+    return _migrateLegacyNamespace(await _read(null));
+  }
+
+  async function _currentManifest(delegationId) {
+    await _loadNamespace(false);
+    var listed = _catalogIds.indexOf(delegationId) !== -1;
+    var key = _key(delegationId);
+    var stored = await _read(key);
+    var present = Object.prototype.hasOwnProperty.call(stored, key);
+    if (listed !== present) {
+      _corrupt(listed
+        ? 'catalog-listed delegation manifest is missing'
+        : 'delegation manifest is absent from the catalog');
+    }
+    if (!present) return null;
+    var manifest = _assertValidManifest(stored[key], delegationId);
+    if (_knownEnvelopeBytes[delegationId] !== manifest.envelopeBytes) {
+      _corrupt('delegation manifest changed outside the serialized store');
+    }
+    return manifest;
+  }
+
+  function _emptyManifest(delegationId, acceptedIdentity) {
+    return _manifestFromEnvelope(_emptyEnvelope(delegationId, acceptedIdentity));
+  }
+
+  function _metadataManifest(current, terminal, terminalCode, cleanupPending) {
+    var next = {
+      v: STORAGE_LAYOUT_VERSION,
+      delegationId: current.delegationId,
+      acceptedIdentity: current.acceptedIdentity,
+      terminal: terminal,
+      terminalCode: terminalCode,
+      cleanupPending: cleanupPending,
+      entryCount: current.entryCount,
+      sealedChunkCount: current.sealedChunkCount,
+      entriesBytes: current.entriesBytes,
+      envelopeBytes: 0,
+      activeEntries: current.activeEntries.slice()
+    };
+    next.envelopeBytes = _canonicalEnvelopeBytes(next, next.entriesBytes);
+    return _assertValidManifest(next, next.delegationId);
+  }
+
+  function _manifestWithEntry(current, entry, terminal, terminalCode, cleanupPending) {
+    var preparedChunk = null;
+    var activeEntries;
+    var sealedChunkCount = current.sealedChunkCount;
+    if (current.activeEntries.length === STORAGE_CHUNK_ENTRIES) {
+      preparedChunk = {
+        v: STORAGE_LAYOUT_VERSION,
+        delegationId: current.delegationId,
+        index: current.sealedChunkCount,
+        entries: current.activeEntries.slice()
+      };
+      activeEntries = [entry];
+      sealedChunkCount += 1;
+    } else {
+      activeEntries = current.activeEntries.concat([entry]);
+    }
+    var entryBytes = _serializedBytes(entry);
+    var entriesBytes = current.entryCount === 0
+      ? 2 + entryBytes
+      : current.entriesBytes + 1 + entryBytes;
+    var next = {
+      v: STORAGE_LAYOUT_VERSION,
+      delegationId: current.delegationId,
+      acceptedIdentity: current.acceptedIdentity,
+      terminal: terminal,
+      terminalCode: terminalCode,
+      cleanupPending: cleanupPending,
+      entryCount: current.entryCount + 1,
+      sealedChunkCount: sealedChunkCount,
+      entriesBytes: entriesBytes,
+      envelopeBytes: 0,
+      activeEntries: activeEntries
+    };
+    next.envelopeBytes = _canonicalEnvelopeBytes(next, entriesBytes);
+    _assertValidManifest(next, next.delegationId);
+    return { manifest: next, preparedChunk: preparedChunk };
+  }
+
+  function _nextAggregateBytes(current, next) {
+    return _aggregateBytes - (current ? current.envelopeBytes : 0) + next.envelopeBytes;
+  }
+
+  function _idsWith(delegationId) {
+    var ids = _catalogIds.concat([delegationId]);
+    ids.sort();
+    return ids;
+  }
+
+  async function _commitManifest(current, next, preparedChunk) {
+    if (preparedChunk) {
+      var preparedKey = _chunkKey(next.delegationId, preparedChunk.index);
+      var existing = await _read(preparedKey);
+      if (Object.prototype.hasOwnProperty.call(existing, preparedKey)) {
+        var existingChunk = _assertValidChunk(
+          existing[preparedKey],
+          next.delegationId,
+          preparedChunk.index
+        );
+        if (JSON.stringify(existingChunk.entries) !== JSON.stringify(preparedChunk.entries)) {
+          _corrupt('prepared delegation chunk conflicts with the active manifest');
+        }
+      } else {
+        var chunkUpdate = {};
+        chunkUpdate[preparedKey] = preparedChunk;
+        await _write(chunkUpdate);
+      }
+    }
+    var update = {};
+    update[_key(next.delegationId)] = next;
+    var isNew = !current;
+    var nextIds = isNew ? _idsWith(next.delegationId) : _catalogIds;
+    if (isNew) update[STORAGE_CATALOG_KEY] = _catalogForIds(nextIds);
+    await _write(update);
+    _aggregateBytes = _nextAggregateBytes(current, next);
+    _knownEnvelopeBytes[next.delegationId] = next.envelopeBytes;
+    if (isNew) _catalogIds = nextIds;
   }
 
   async function appendBeforeFanout(delegationId, event, context) {
@@ -939,55 +1283,38 @@
     var acceptedIdentity = context.acceptedIdentity;
     if (!acceptedIdentity) _persistence('append requires accepted identity authority');
     return _withStorageLock(async function() {
-      var key = _key(delegationId);
-      var stored = await _read(null);
-      var current = stored[key] === undefined
-        ? _emptyEnvelope(delegationId, acceptedIdentity)
-        : stored[key];
-      current = _assertValidEnvelope(current, delegationId);
+      var persisted = await _currentManifest(delegationId);
+      var current = persisted || _emptyManifest(delegationId, acceptedIdentity);
       if (!_sameAcceptedIdentity(current.acceptedIdentity, acceptedIdentity)) {
         _persistence('accepted identity changed after delegation acceptance');
       }
       if (current.terminal) _persistence('cannot append to a terminal ledger');
       if (current.cleanupPending) _persistence('cannot append while cleanup is pending');
-      if (current.entries.length >= MAX_ENTRIES_PER_DELEGATION) {
+      if (current.entryCount >= MAX_ENTRIES_PER_DELEGATION) {
         _quota('delegation entry count limit reached');
       }
       var projectionContext = {};
       Object.keys(context).forEach(function(key) { projectionContext[key] = context[key]; });
       projectionContext.delegationId = delegationId;
-      projectionContext.sequence = current.entries.length + 1;
+      projectionContext.sequence = current.entryCount + 1;
       projectionContext.timestamp = Number.isSafeInteger(context.timestamp) && context.timestamp >= 0
         ? context.timestamp
         : Date.now();
       var entry = project(event, projectionContext);
-      var next = {
-        v: PAYLOAD_VERSION,
-        delegationId: delegationId,
-        acceptedIdentity: current.acceptedIdentity,
-        terminal: false,
-        terminalCode: null,
-        cleanupPending: null,
-        entries: current.entries.concat([entry])
-      };
-      _assertValidEnvelope(next, delegationId);
-      if (_ledgerBytesFromStorage(stored, key, next)
+      var pending = _manifestWithEntry(current, entry, false, null, null);
+      if (_nextAggregateBytes(persisted, pending.manifest)
           > MAX_AGGREGATE_BYTES - TERMINAL_MARKER_HEADROOM_BYTES) {
         _quota('aggregate delegation ledger limit reached');
       }
-      var update = {};
-      update[key] = next;
-      await _write(update);
+      await _commitManifest(persisted, pending.manifest, pending.preparedChunk);
       return _deepFreeze(_clone(entry));
     });
   }
 
   async function hydrateNonterminal() {
     return _withStorageLock(async function() {
-      var all = await _read(null);
+      var rows = await _loadNamespace(true);
       var ledgers = [];
-      var rows = _validatedLedgerRows(all);
-      await _persistNormalizedRows(rows);
       rows.forEach(function(row) {
         if (!row.envelope.terminal) ledgers.push(_clone(row.envelope));
       });
@@ -1013,10 +1340,8 @@
       wanted.add(_boundedId(delegationId, 'delegationId', false));
     });
     return _withStorageLock(async function() {
-      var all = await _read(null);
       var terminal = [];
-      var rows = _validatedLedgerRows(all);
-      await _persistNormalizedRows(rows);
+      var rows = await _loadNamespace(true);
       rows.forEach(function(row) {
         if (wanted.has(row.delegationId)
           && row.envelope.terminal === true
@@ -1040,17 +1365,19 @@
       ? _normalizeAcceptedIdentity(cleanup.acceptedIdentity, false)
       : null;
     return _withStorageLock(async function() {
-      var key = _key(delegationId);
-      var all = await _read(null);
-      var current = all[key] === undefined
-        ? (cleanupIdentity ? _emptyEnvelope(delegationId, cleanupIdentity) : null)
-        : _assertValidEnvelope(all[key], delegationId);
+      var persisted = await _currentManifest(delegationId);
+      var current = persisted || (cleanupIdentity
+        ? _emptyManifest(delegationId, cleanupIdentity)
+        : null);
       if (!current) _persistence('cannot quarantine a delegation without accepted identity');
       if (cleanupIdentity
         && !_sameAcceptedIdentity(current.acceptedIdentity, cleanupIdentity)) {
         _persistence('cleanup accepted identity changed');
       }
       if (current.terminal) _persistence('cannot quarantine a terminal ledger');
+      var currentEnvelope = persisted
+        ? await _readEnvelopeForManifest(current)
+        : _emptyEnvelope(delegationId, current.acceptedIdentity);
       var marker = {
         code: _normalizeTerminalCode(cleanup && cleanup.code),
         cancellationConfirmed: !!(cleanup && cleanup.cancellationConfirmed === true),
@@ -1066,48 +1393,25 @@
           _corrupt('cleanup marker conflicts with persisted ledger');
         }
         if (current.cleanupPending.cancellationConfirmed === marker.cancellationConfirmed) {
-          if (current !== all[key]) {
-            var normalizedUpdate = {};
-            normalizedUpdate[key] = current;
-            await _write(normalizedUpdate);
-          }
-          return _deepFreeze(_clone(current));
+          return _deepFreeze(_clone(currentEnvelope));
         }
-        var promoted = {
-          v: PAYLOAD_VERSION,
-          delegationId: delegationId,
-          acceptedIdentity: current.acceptedIdentity,
-          terminal: false,
-          terminalCode: null,
-          cleanupPending: marker,
-          entries: current.entries.slice()
-        };
-        _assertValidEnvelope(promoted, delegationId);
-        if (_ledgerBytesFromStorage(all, key, promoted) > MAX_AGGREGATE_BYTES) {
+        var promoted = _metadataManifest(current, false, null, marker);
+        if (_nextAggregateBytes(persisted, promoted) > MAX_AGGREGATE_BYTES) {
           _quota('aggregate delegation ledger limit reached');
         }
-        var promotionUpdate = {};
-        promotionUpdate[key] = promoted;
-        await _write(promotionUpdate);
-        return _deepFreeze(_clone(promoted));
+        await _commitManifest(persisted, promoted, null);
+        var promotedEnvelope = _envelopeFromManifest(promoted, currentEnvelope.entries.slice());
+        _assertValidEnvelope(promotedEnvelope, delegationId);
+        return _deepFreeze(_clone(promotedEnvelope));
       }
-      var next = {
-        v: PAYLOAD_VERSION,
-        delegationId: delegationId,
-        acceptedIdentity: current.acceptedIdentity,
-        terminal: false,
-        terminalCode: null,
-        cleanupPending: marker,
-        entries: current.entries.slice()
-      };
-      _assertValidEnvelope(next, delegationId);
-      if (_ledgerBytesFromStorage(all, key, next) > MAX_AGGREGATE_BYTES) {
+      var next = _metadataManifest(current, false, null, marker);
+      if (_nextAggregateBytes(persisted, next) > MAX_AGGREGATE_BYTES) {
         _quota('aggregate delegation ledger limit reached');
       }
-      var update = {};
-      update[key] = next;
-      await _write(update);
-      return _deepFreeze(_clone(next));
+      await _commitManifest(persisted, next, null);
+      var nextEnvelope = _envelopeFromManifest(next, currentEnvelope.entries.slice());
+      _assertValidEnvelope(nextEnvelope, delegationId);
+      return _deepFreeze(_clone(nextEnvelope));
     });
   }
 
@@ -1117,11 +1421,7 @@
       ? _snapshotContext(terminal.context)
       : Object.freeze({});
     return _withStorageLock(async function() {
-      var key = _key(delegationId);
-      var all = await _read(null);
-      var current = all[key] === undefined
-        ? null
-        : _assertValidEnvelope(all[key], delegationId);
+      var current = await _currentManifest(delegationId);
       if (!current) _persistence('cannot terminate a delegation without accepted identity');
       if (terminalContext.acceptedIdentity
         && !_sameAcceptedIdentity(current.acceptedIdentity, terminalContext.acceptedIdentity)) {
@@ -1131,14 +1431,10 @@
         ? terminal
         : terminal && terminal.code;
       var code = _normalizeTerminalCode(candidate);
+      var currentEnvelope = await _readEnvelopeForManifest(current);
       if (current.terminal) {
         if (current.terminalCode !== code) _corrupt('terminal code conflicts with persisted ledger');
-        if (current !== all[key]) {
-          var normalizedUpdate = {};
-          normalizedUpdate[key] = current;
-          await _write(normalizedUpdate);
-        }
-        return _deepFreeze(_clone(current));
+        return _deepFreeze(_clone(currentEnvelope));
       }
       if (current.cleanupPending && current.cleanupPending.code !== code) {
         _corrupt('terminal code conflicts with cleanup marker');
@@ -1147,40 +1443,35 @@
         && current.cleanupPending.cancellationConfirmed !== true) {
         _persistence('cannot mark terminal before cancellation confirmation');
       }
-      var entries = current.entries.slice();
+      var terminalEntry = null;
       if (terminal && _isPlainRecord(terminal.event)
-        && entries.length < MAX_ENTRIES_PER_DELEGATION) {
+        && current.entryCount < MAX_ENTRIES_PER_DELEGATION) {
         var projectedTerminalContext = {};
         Object.keys(terminalContext).forEach(function(key) {
           projectedTerminalContext[key] = terminalContext[key];
         });
         projectedTerminalContext.delegationId = delegationId;
-        projectedTerminalContext.sequence = entries.length + 1;
+        projectedTerminalContext.sequence = current.entryCount + 1;
         projectedTerminalContext.terminalCode = code;
         projectedTerminalContext.acceptedIdentity = current.acceptedIdentity;
         projectedTerminalContext.timestamp = Number.isSafeInteger(terminalContext.timestamp)
           && terminalContext.timestamp >= 0
           ? terminalContext.timestamp
           : Date.now();
-        entries.push(project(terminal.event, projectedTerminalContext));
+        terminalEntry = project(terminal.event, projectedTerminalContext);
       }
-      var next = {
-        v: PAYLOAD_VERSION,
-        delegationId: delegationId,
-        acceptedIdentity: current.acceptedIdentity,
-        terminal: true,
-        terminalCode: code,
-        cleanupPending: null,
-        entries: entries
-      };
-      _assertValidEnvelope(next, delegationId);
-      if (_ledgerBytesFromStorage(all, key, next) > MAX_AGGREGATE_BYTES) {
+      var pending = terminalEntry
+        ? _manifestWithEntry(current, terminalEntry, true, code, null)
+        : { manifest: _metadataManifest(current, true, code, null), preparedChunk: null };
+      if (_nextAggregateBytes(current, pending.manifest) > MAX_AGGREGATE_BYTES) {
         _quota('aggregate delegation ledger limit reached');
       }
-      var update = {};
-      update[key] = next;
-      await _write(update);
-      return _deepFreeze(_clone(next));
+      await _commitManifest(current, pending.manifest, pending.preparedChunk);
+      var entries = currentEnvelope.entries.slice();
+      if (terminalEntry) entries.push(terminalEntry);
+      var nextEnvelope = _envelopeFromManifest(pending.manifest, entries);
+      _assertValidEnvelope(nextEnvelope, delegationId);
+      return _deepFreeze(_clone(nextEnvelope));
     });
   }
 

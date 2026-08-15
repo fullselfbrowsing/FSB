@@ -42,6 +42,7 @@ const SECTION_ARGUMENT_INDEX = process.argv.indexOf('--section');
 const SELECTED_SECTION = SECTION_ARGUMENT_INDEX === -1
   ? null
   : process.argv[SECTION_ARGUMENT_INDEX + 1];
+const STORAGE_CHUNK_KEY_PREFIX = 'fsbDelegationLedgerChunk:v2:';
 
 if (SECTION_ARGUMENT_INDEX !== -1 && !SELECTED_SECTION) {
   throw new Error('--section requires a value');
@@ -67,6 +68,28 @@ function clone(value) {
 
 function exactKeys(value, keys) {
   assert.deepStrictEqual(Object.keys(value).sort(), [...keys].sort());
+}
+
+function storedEnvelope(storage, store, delegationId) {
+  const manifest = storage.data[`${store.STORAGE_KEY_PREFIX}${delegationId}`];
+  assert(manifest, `missing manifest for ${delegationId}`);
+  if (manifest.v === 1 && Array.isArray(manifest.entries)) return clone(manifest);
+  const entries = [];
+  for (let index = 0; index < manifest.sealedChunkCount; index += 1) {
+    const key = `${STORAGE_CHUNK_KEY_PREFIX}${delegationId}:${index}`;
+    assert(storage.data[key], `missing chunk ${index} for ${delegationId}`);
+    entries.push(...clone(storage.data[key].entries));
+  }
+  entries.push(...clone(manifest.activeEntries));
+  return {
+    v: 1,
+    delegationId: manifest.delegationId,
+    acceptedIdentity: clone(manifest.acceptedIdentity),
+    terminal: manifest.terminal,
+    terminalCode: manifest.terminalCode,
+    cleanupPending: clone(manifest.cleanupPending),
+    entries,
+  };
 }
 
 function freshModules() {
@@ -896,20 +919,21 @@ async function runCodexAcceptedIdentity() {
       assert.strictEqual(entry.init.profileVersion, 'profile-v61-start');
       assert.strictEqual(delivered.length, 1);
       const runtimeEvent = delivered[0];
-      exactKeys(runtimeEvent, ['announceSequence', 'snapshot', 'type']);
+      exactKeys(runtimeEvent, ['announceSequence', 'entry', 'type', 'view']);
       assert.strictEqual(runtimeEvent.type, 'FSB_DELEGATION_UPDATED');
       assert.strictEqual(runtimeEvent.announceSequence, 1);
-      exactKeys(runtimeEvent.snapshot, [
+      exactKeys(runtimeEvent.view, [
         'v', 'delegationId', 'acceptedIdentity', 'provider', 'state',
-        'connection', 'entries', 'summary', 'activeTab', 'hold', 'terminal',
-        'hydrated',
+        'connection', 'lastSequence', 'summary', 'activeTab', 'hold', 'terminal',
       ]);
-      assert.strictEqual(runtimeEvent.snapshot.entries.length, 1);
-      assert.deepStrictEqual(runtimeEvent.snapshot.entries[0], entry);
-      assert.strictEqual(runtimeEvent.snapshot.state, 'starting');
-      assert.strictEqual(storage.setCalls, 1);
+      assert.strictEqual(runtimeEvent.view.lastSequence, 1);
+      assert.deepStrictEqual(runtimeEvent.entry, entry);
+      assert.strictEqual(runtimeEvent.view.state, 'starting');
+      assert.strictEqual(Object.hasOwn(runtimeEvent.view, 'entries'), false);
+      assert.strictEqual(storage.setCalls, 2);
       assert(Object.isFrozen(runtimeEvent));
-      assert(Object.isFrozen(runtimeEvent.snapshot.entries));
+      assert(Object.isFrozen(runtimeEvent.view));
+      assert(Object.isFrozen(runtimeEvent.entry));
     } finally {
       storage.restore();
     }
@@ -932,7 +956,7 @@ async function runCodexAcceptedIdentity() {
         connection: '__proto__',
         status: null,
       });
-      assert.strictEqual(reconciled.snapshot.connection, 'disconnected',
+      assert.strictEqual(reconciled.view.connection, 'disconnected',
         'prototype property names cannot bypass disconnected reconciliation');
     } finally {
       storage.restore();
@@ -1023,15 +1047,15 @@ async function runCodexAcceptedIdentity() {
         })),
         'delegation_persistence_failed',
       );
-      const key = `${modules.store.STORAGE_KEY_PREFIX}${id}`;
-      assert.strictEqual(storage.data[key].terminal, true);
-      assert.strictEqual(storage.data[key].terminalCode, 'delegation_persistence_failed');
-      assert.strictEqual(storage.data[key].entries.length, 3,
+      const envelope = storedEnvelope(storage, modules.store, id);
+      assert.strictEqual(envelope.terminal, true);
+      assert.strictEqual(envelope.terminalCode, 'delegation_persistence_failed');
+      assert.strictEqual(envelope.entries.length, 3,
         'failed provider event is absent and one canonical terminal row is committed');
-      assert.strictEqual(storage.data[key].entries[2].state, 'failed');
+      assert.strictEqual(envelope.entries[2].state, 'failed');
       assert.strictEqual(delivered.length, 1,
         'typed failure fans out only after the tombstone write succeeds');
-      assert.deepStrictEqual(delivered[0].snapshot.terminal, {
+      assert.deepStrictEqual(delivered[0].view.terminal, {
         code: 'delegation_persistence_failed',
         releasedTabCount: 0,
       });
@@ -1143,7 +1167,7 @@ async function runCodexAcceptedIdentity() {
       const ackObservations = [];
       let originalAcknowledge = registry.acknowledgeDelegationRelease.bind(registry);
       registry.acknowledgeDelegationRelease = async (input) => {
-        ackObservations.push(clone(storage.data[`${modules.store.STORAGE_KEY_PREFIX}${id}`]));
+        ackObservations.push(storedEnvelope(storage, modules.store, id));
         return originalAcknowledge(input);
       };
       let harness = makeDeps(modules.store, {
@@ -1198,7 +1222,7 @@ async function runCodexAcceptedIdentity() {
       );
       originalAcknowledge = registry.acknowledgeDelegationRelease.bind(registry);
       registry.acknowledgeDelegationRelease = async (input) => {
-        ackObservations.push(clone(storage.data[ledgerKey]));
+        ackObservations.push(storedEnvelope(storage, modules.store, id));
         return originalAcknowledge(input);
       };
       harness = makeDeps(modules.store, {
@@ -1275,11 +1299,15 @@ async function runCodexAcceptedIdentity() {
         code: 'completed',
         releasedTabCount: 0,
       });
-      assert.strictEqual(storage.data[key].terminal, true);
-      assert.strictEqual(storage.data[key].terminalCode, 'completed');
-      assert.strictEqual(storage.data[key].cleanupPending, null);
-      assert.strictEqual(storage.data[key].entries.length, store.MAX_ENTRIES_PER_DELEGATION);
-      assert.strictEqual(storage.data[key].entries.at(-1).sequence, store.MAX_ENTRIES_PER_DELEGATION);
+      const terminalEnvelope = storedEnvelope(storage, store, id);
+      assert.strictEqual(terminalEnvelope.terminal, true);
+      assert.strictEqual(terminalEnvelope.terminalCode, 'completed');
+      assert.strictEqual(terminalEnvelope.cleanupPending, null);
+      assert.strictEqual(terminalEnvelope.entries.length, store.MAX_ENTRIES_PER_DELEGATION);
+      assert.strictEqual(
+        terminalEnvelope.entries.at(-1).sequence,
+        store.MAX_ENTRIES_PER_DELEGATION,
+      );
 
       const reloaded = freshModules();
       controller = reloaded.controllerModule.create(makeDeps(reloaded.store).deps);
@@ -1554,7 +1582,7 @@ async function runCodexAcceptedIdentity() {
           code: item.code,
           releasedTabCount: 0,
         });
-        const envelope = storage.data[`${store.STORAGE_KEY_PREFIX}${id}`];
+        const envelope = storedEnvelope(storage, store, id);
         assert.strictEqual(envelope.terminal, true);
         assert.strictEqual(envelope.terminalCode, item.code);
         assert.strictEqual(envelope.entries.length, 2);
@@ -1592,7 +1620,7 @@ async function runCodexAcceptedIdentity() {
       const snapshot = controller.getSnapshot(id);
       assert.strictEqual(snapshot.state, 'stopped');
       assert.deepStrictEqual(snapshot.terminal, { code: 'stopped', releasedTabCount: 0 });
-      const envelope = storage.data[`${store.STORAGE_KEY_PREFIX}${id}`];
+      const envelope = storedEnvelope(storage, store, id);
       assert.strictEqual(envelope.terminal, true);
       assert.strictEqual(envelope.terminalCode, 'stopped');
       assert.strictEqual(envelope.entries.length, 2);
@@ -1672,7 +1700,7 @@ async function runCodexAcceptedIdentity() {
         harness.calls.cancel.filter((call) => call.delegationId === stopFirstId).length,
         1,
       );
-      const envelope = storage.data[`${store.STORAGE_KEY_PREFIX}${stopFirstId}`];
+      const envelope = storedEnvelope(storage, store, stopFirstId);
       assert.strictEqual(envelope.terminal, true);
       assert.strictEqual(envelope.entries.length, 3);
       assert.strictEqual(envelope.entries[0].kind, 'init');
@@ -2057,7 +2085,7 @@ async function runCodexAcceptedIdentity() {
 
       const held = await controller.takeControl({ delegationId: id });
       assert.strictEqual(held.code, 'held');
-      exactKeys(held.runtimeEvent, ['announceSequence', 'snapshot', 'type']);
+      exactKeys(held.runtimeEvent, ['announceSequence', 'entry', 'type', 'view']);
       exactKeys(held.snapshot.activeTab, ['canTakeControl', 'owned', 'tabId']);
       exactKeys(held.snapshot.hold, ['expiresAt', 'tabIds']);
       assert.deepStrictEqual(held.snapshot.hold.tabIds, [11, 17]);
@@ -2065,7 +2093,7 @@ async function runCodexAcceptedIdentity() {
         order.slice(0, 5),
         ['bind:agent-61-02', 'active-tab', 'owned-tabs', 'daemon-hold', 'seal-all-tabs'],
       );
-      let envelope = storage.data[`${store.STORAGE_KEY_PREFIX}${id}`];
+      let envelope = storedEnvelope(storage, store, id);
       assert.deepStrictEqual(envelope.entries.map((entry) => entry.state), ['starting', 'running', 'held']);
 
       const resumed = await controller.resume({ delegationId: id });
@@ -2079,7 +2107,7 @@ async function runCodexAcceptedIdentity() {
       });
       assert(order.indexOf('live-tabs') < order.indexOf('restore-all-tabs'));
       assert(order.indexOf('restore-all-tabs') < order.indexOf('daemon-resume'));
-      envelope = storage.data[`${store.STORAGE_KEY_PREFIX}${id}`];
+      envelope = storedEnvelope(storage, store, id);
       assert.deepStrictEqual(envelope.entries.map((entry) => entry.state), ['starting', 'running', 'held', 'running']);
 
       const stopped = await controller.stop({ delegationId: id });
@@ -2090,7 +2118,7 @@ async function runCodexAcceptedIdentity() {
       });
       assert.strictEqual(order.filter((item) => item === 'release-all-tabs').length, 1);
       assert.strictEqual(harness.calls.cancel.length, 1);
-      envelope = storage.data[`${store.STORAGE_KEY_PREFIX}${id}`];
+      envelope = storedEnvelope(storage, store, id);
       assert.deepStrictEqual(
         envelope.entries.map((entry) => entry.state),
         ['starting', 'running', 'held', 'running', 'stopped'],
@@ -2264,7 +2292,7 @@ async function runCodexAcceptedIdentity() {
       assert(order.indexOf(`cancel:${sealFailureId}`) < order.indexOf(`release:${sealFailureId}`));
 
       for (const id of [holdFailureId, sealFailureId]) {
-        const envelope = storage.data[`${store.STORAGE_KEY_PREFIX}${id}`];
+        const envelope = storedEnvelope(storage, store, id);
         assert.strictEqual(envelope.terminal, true);
         assert.strictEqual(envelope.entries.filter((entry) => entry.kind === 'state'
           && (entry.state === 'failed' || entry.state === 'stopped')).length, 1);
@@ -2425,7 +2453,7 @@ async function runCodexAcceptedIdentity() {
         cancellationConfirmed: false,
         agentId: 'agent-tree-unsettled',
       });
-      assert.strictEqual(storage.data[key].entries.length, 2);
+      assert.strictEqual(storedEnvelope(storage, store, id).entries.length, 2);
 
       ({ store, controllerModule } = freshModules());
       harness = makeDeps(store, {
@@ -2450,7 +2478,7 @@ async function runCodexAcceptedIdentity() {
       assert.strictEqual(storage.data[key].terminal, true);
       assert.strictEqual(storage.data[key].terminalCode, 'stopped');
       assert.strictEqual(storage.data[key].cleanupPending, null);
-      assert.strictEqual(storage.data[key].entries.length, 3);
+      assert.strictEqual(storedEnvelope(storage, store, id).entries.length, 3);
     } finally {
       storage.restore();
     }
@@ -2684,7 +2712,7 @@ async function runCodexAcceptedIdentity() {
           1,
         );
         assert.strictEqual(releases.filter((value) => value === id).length, 1);
-        const envelope = storage.data[`${store.STORAGE_KEY_PREFIX}${id}`];
+        const envelope = storedEnvelope(storage, store, id);
         assert.strictEqual(envelope.terminal, true);
         assert.strictEqual(envelope.entries.filter((entry) => entry.state === 'stopped'
           || entry.state === 'failed').length <= 1, true);
@@ -2732,12 +2760,13 @@ async function runCodexAcceptedIdentity() {
         delegationId: id,
         connection: 'connected',
       });
-      exactKeys(observed, ['announceSequence', 'snapshot', 'type']);
+      exactKeys(observed, ['announceSequence', 'entry', 'type', 'view']);
       assert.strictEqual(observed.announceSequence, null);
-      assert.strictEqual(observed.snapshot.connection, 'connected');
-      assert.strictEqual(observed.snapshot.state, 'running');
-      assert.strictEqual(observed.snapshot.terminal, null);
-      exactKeys(observed.snapshot.provider, ['id', 'label']);
+      assert.strictEqual(observed.entry, null);
+      assert.strictEqual(observed.view.connection, 'connected');
+      assert.strictEqual(observed.view.state, 'running');
+      assert.strictEqual(observed.view.terminal, null);
+      exactKeys(observed.view.provider, ['id', 'label']);
       assert.deepStrictEqual(statusReads, [{ delegationId: id }]);
       assert.deepStrictEqual(harness.recoveryCalls.saveGeneration, []);
 
@@ -2750,9 +2779,9 @@ async function runCodexAcceptedIdentity() {
         delegationId: id,
         connection: 'disconnected',
       });
-      assert.strictEqual(disconnected.snapshot.connection, 'disconnected');
-      assert.strictEqual(disconnected.snapshot.state, 'running');
-      assert.strictEqual(disconnected.snapshot.terminal, null);
+      assert.strictEqual(disconnected.view.connection, 'disconnected');
+      assert.strictEqual(disconnected.view.state, 'running');
+      assert.strictEqual(disconnected.view.terminal, null);
       assert.strictEqual(statusReads.length, 2, 'disconnected reconciliation sends no status request');
       assert.deepStrictEqual(harness.calls.cancel, []);
 
@@ -2773,7 +2802,7 @@ async function runCodexAcceptedIdentity() {
         'delegation_already_terminal',
       );
       assert.deepStrictEqual(harness.recoveryCalls.releaseHeartbeat, [id]);
-      const envelope = storage.data[`${modules.store.STORAGE_KEY_PREFIX}${id}`];
+      const envelope = storedEnvelope(storage, modules.store, id);
       assert.strictEqual(envelope.entries.filter((entry) => entry.state === 'completed').length, 1);
     } finally {
       storage.restore();
@@ -2814,9 +2843,9 @@ async function runCodexAcceptedIdentity() {
         connection: 'connected',
         status: supervisorStatus(newGeneration),
       });
-      assert.strictEqual(pending.snapshot.connection, 'disconnected');
-      assert.strictEqual(pending.snapshot.state, 'running');
-      assert.strictEqual(pending.snapshot.terminal, null);
+      assert.strictEqual(pending.view.connection, 'disconnected');
+      assert.strictEqual(pending.view.state, 'running');
+      assert.strictEqual(pending.view.terminal, null);
       assert.strictEqual(generations.get(ids.pending), oldGeneration);
 
       const restartLoss = {
@@ -2846,9 +2875,9 @@ async function runCodexAcceptedIdentity() {
           recoveredAt: 1720000000200,
         }]),
       });
-      assert.strictEqual(sameGeneration.snapshot.connection, 'disconnected');
-      assert.strictEqual(sameGeneration.snapshot.state, 'running');
-      assert.strictEqual(sameGeneration.snapshot.terminal, null);
+      assert.strictEqual(sameGeneration.view.connection, 'disconnected');
+      assert.strictEqual(sameGeneration.view.state, 'running');
+      assert.strictEqual(sameGeneration.view.terminal, null);
 
       const malformedWithExtra = {
         ...supervisorStatus(newGeneration, [{
@@ -2862,9 +2891,9 @@ async function runCodexAcceptedIdentity() {
         connection: 'connected',
         status: malformedWithExtra,
       });
-      assert.strictEqual(malformed.snapshot.connection, 'connected');
-      assert.strictEqual(malformed.snapshot.state, 'running');
-      assert.strictEqual(malformed.snapshot.terminal, null);
+      assert.strictEqual(malformed.view.connection, 'connected');
+      assert.strictEqual(malformed.view.state, 'running');
+      assert.strictEqual(malformed.view.terminal, null);
       assert.strictEqual(generations.get(ids.malformed), oldGeneration);
 
       const pendingLoss = await controller.reconcile({
@@ -2888,7 +2917,7 @@ async function runCodexAcceptedIdentity() {
           harness.recoveryCalls.releaseHeartbeat.filter((value) => value === id).length,
           1,
         );
-        const envelope = storage.data[`${modules.store.STORAGE_KEY_PREFIX}${id}`];
+        const envelope = storedEnvelope(storage, modules.store, id);
         assert.strictEqual(envelope.entries.filter((entry) => (
           entry.state === 'restart_lost' || entry.state === 'completed'
         )).length, 1);
@@ -2934,7 +2963,7 @@ async function runCodexAcceptedIdentity() {
         'daemon route-loss evidence already proves cancellation cleanup');
       assert.deepStrictEqual(harness.recoveryCalls.releaseHeartbeat, [id]);
       assert.deepStrictEqual(harness.recoveryCalls.clearGeneration, [id]);
-      const ledger = storage.data[`${modules.store.STORAGE_KEY_PREFIX}${id}`];
+      const ledger = storedEnvelope(storage, modules.store, id);
       assert.strictEqual(ledger.terminal, true);
       assert.strictEqual(ledger.terminalCode, 'route_lost');
       assert.strictEqual(ledger.entries.filter((entry) => entry.state === 'failed').length, 1);
@@ -3026,8 +3055,8 @@ async function runCodexAcceptedIdentity() {
           connection: 'connected',
           status,
         });
-        assert.strictEqual(observed.snapshot.terminal, null, `${id} remains nonterminal`);
-        assert.strictEqual(observed.snapshot.state, 'running', `${id} remains observational`);
+        assert.strictEqual(observed.view.terminal, null, `${id} remains nonterminal`);
+        assert.strictEqual(observed.view.state, 'running', `${id} remains observational`);
       }
       assert.deepStrictEqual(harness.calls.cancel, []);
 
@@ -3117,17 +3146,17 @@ async function runCodexAcceptedIdentity() {
         status,
       });
       assert.strictEqual(exact.announceSequence, null);
-      assert.strictEqual(exact.snapshot.state, 'held');
-      assert.deepStrictEqual(exact.snapshot.hold, {
+      assert.strictEqual(exact.view.state, 'held');
+      assert.deepStrictEqual(exact.view.hold, {
         tabIds: [71, 73],
         expiresAt: 1720000300000,
       });
-      assert.deepStrictEqual(exact.snapshot.activeTab, {
+      assert.deepStrictEqual(exact.view.activeTab, {
         tabId: 71,
         owned: false,
         canTakeControl: false,
       });
-      assert.strictEqual(exact.snapshot.entries.length, 2, 'status observation appends no replay row');
+      assert.strictEqual(exact.view.lastSequence, 2, 'status observation appends no replay row');
 
       const mismatch = await controller.reconcile({
         delegationId: mismatchId,

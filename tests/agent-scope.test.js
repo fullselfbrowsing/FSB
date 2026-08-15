@@ -311,6 +311,56 @@ async function main() {
     console.log('Test 6 (optional bounded delegation registration sidecar): PASS');
   }
 
+  // ===== Test 7: logical recording run stability and rotation =====
+  {
+    const scope = new AgentScope();
+    assertEqual(scope.currentRecordingRunId(), null, 'Test 7a: recording id is lazy');
+    const first = scope.ensureRecordingRun(1_000);
+    assert(/^[0-9a-f-]{36}$/i.test(first), 'Test 7a: recording id is an internal UUID');
+    assertEqual(scope.ensureRecordingRun(60_999), first, 'Test 7b: activity inside 60s retains the run');
+    const idleRotated = scope.ensureRecordingRun(120_999);
+    assert(idleRotated !== first, 'Test 7c: 60s without activity rotates the run');
+    scope.rotateRecordingRun();
+    assertEqual(scope.currentRecordingRunId(), null, 'Test 7d: terminal rotation clears the current run');
+    const terminalRotated = scope.ensureRecordingRun(121_000);
+    assert(terminalRotated !== idleRotated, 'Test 7d: the next call after a terminal state mints a new run');
+    scope.reset();
+    assertEqual(scope.currentRecordingRunId(), null, 'Test 7e: full scope reset clears recording correlation');
+    console.log('Test 7 (recording run lifecycle): PASS');
+  }
+
+  // ===== Test 8: in-flight calls define real recording activity =====
+  {
+    const scope = new AgentScope();
+    const longCall = scope.beginRecordingCall(1_000);
+    scope.completeRecordingCall(longCall, 61_000);
+    const afterLongCall = scope.beginRecordingCall(61_001);
+    assertEqual(afterLongCall, longCall,
+      'Test 8a: a 60s call completion keeps the next sequential call in the run');
+
+    const concurrentCall = scope.beginRecordingCall(121_001);
+    assertEqual(concurrentCall, longCall,
+      'Test 8b: an active call suppresses idle rotation for concurrent work');
+    scope.completeRecordingCall(afterLongCall, 121_002);
+    scope.completeRecordingCall(concurrentCall, 121_003);
+    const idleRotated = scope.ensureRecordingRun(181_003);
+    assert(idleRotated !== longCall,
+      'Test 8c: the run rotates at 60s from the latest completion');
+
+    const terminalCall = scope.beginRecordingCall(200_000);
+    scope.rotateRecordingRun();
+    const postTerminal = scope.beginRecordingCall(200_001);
+    scope.completeRecordingCall(terminalCall, 300_000);
+    assertEqual(scope.currentRecordingRunId(), postTerminal,
+      'Test 8d: a late pre-terminal completion cannot touch the new run');
+
+    scope.reset();
+    scope.completeRecordingCall(postTerminal, 400_000);
+    assertEqual(scope.currentRecordingRunId(), null,
+      'Test 8e: a late pre-reset completion cannot restore recording correlation');
+    console.log('Test 8 (in-flight recording activity): PASS');
+  }
+
   console.log('agent-scope.test.js: PASS');
 }
 

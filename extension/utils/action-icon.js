@@ -105,6 +105,7 @@
   var CAP_PING_STOP = 0.7;           // the keyframe's 70% stop
 
   var INTENT_KEY = 'fsbActionIconIntent';
+  var ANIMATIONS_KEY = 'animatedActionHighlights';
   // Install-scoped, so it outlives the session record above. Dimming means "the
   // relay you use is down", not "you have never opened the dashboard": the relay
   // has no enable switch and connect() runs unconditionally at startup, so a
@@ -119,6 +120,11 @@
   // How long the latest tool call on a tab keeps its activity claim alive.
   // The form's own duration still controls each animation cycle.
   var ACTIVITY_TTL_MS = 60000;
+  // A rejected action update must not turn into the same 15fps failure loop as
+  // a healthy animation. Retry the latest desired frame at a bounded cadence;
+  // a success resets the backoff immediately.
+  var EMIT_RETRY_BASE_MS = 1000;
+  var EMIT_RETRY_MAX_MS = 30000;
   // One source per output size. icon16 is not a downscale of icon128 -- its mark
   // was redrawn about a fifth chunkier to stay legible, so 16 has to come from
   // its own asset or the mark renders thin. 128 into 32 is an exact 4:1 reduction.
@@ -159,6 +165,7 @@
   var animatedFrames = Object.create(null); // state -> array of frame records
   var animatedBuilds = Object.create(null); // state -> in-flight build promise
   var staticFrames = Object.create(null);   // key -> frame record
+  var canonicalFrameBuckets = Object.create(null); // pixel hash -> frame records
   var glyphCache = null;                    // decoded bitmaps, shared by builds
   var glyphBuild = null;                    // in-flight decode
   var emitFailureLogged = false;
@@ -173,12 +180,23 @@
   var capabilityCounts = Object.create(null); // 'capability:<tabId>' -> in-flight invoke count
   var resolved = null;                // the state currently on screen
   var animating = false;
+  var animationsEnabled = true;
+  var preferenceListenerArmed = false;
   var connected = false;
   var relaySeen = false;
   var connectedExplicit = false;
   var startTime = 0;
   var timerId = null;
-  var lastEmitted = null;
+  // chrome.action.setIcon is asynchronous. Keep one browser-process update in
+  // flight and one latest-wins mailbox behind it; otherwise a slow browser can
+  // accumulate stale frames faster than it can display them.
+  var lastEmitted = null;             // last frame whose setIcon call succeeded
+  var activeEmitFrame = null;
+  var pendingEmitFrame = null;
+  var emitInFlight = false;
+  var emitBlocked = false;
+  var emitRetryTimerId = null;
+  var emitFailureCount = 0;
   var watchdogArmed = false;
 
   // ---- Colour helpers -----------------------------------------------------
@@ -536,6 +554,60 @@
       else if (spec.form === 'ring') drawCapabilityRing(ctx, size, progress);
       frame[size] = ctx.getImageData(0, 0, size, size);
     }
+    // Reuse this exact request object for every cycle. Rebuilding the two nested
+    // dictionaries at 15fps creates avoidable garbage even though the ImageData
+    // records themselves are cached.
+    frame.request = { imageData: { 16: frame[16], 32: frame[32] } };
+    return internFrame(frame);
+  }
+
+  function imageDataEqual(a, b) {
+    if (a === b) return true;
+    var left = a && a.data;
+    var right = b && b.data;
+    if (!left || !right || left.length !== right.length) return false;
+    for (var i = 0; i < left.length; i++) {
+      if (left[i] !== right[i]) return false;
+    }
+    return true;
+  }
+
+  function framePixelsEqual(a, b) {
+    return !!a && !!b
+      && imageDataEqual(a[16], b[16])
+      && imageDataEqual(a[32], b[32]);
+  }
+
+  function framePixelHash(frame) {
+    var hash = 2166136261;
+    for (var s = 0; s < SIZES.length; s++) {
+      var pixels = frame && frame[SIZES[s]] && frame[SIZES[s]].data;
+      if (!pixels) return null;
+      hash ^= pixels.length;
+      hash = Math.imul(hash, 16777619);
+      for (var i = 0; i < pixels.length; i++) {
+        hash ^= pixels[i];
+        hash = Math.imul(hash, 16777619);
+      }
+    }
+    return String(hash >>> 0);
+  }
+
+  // Intern across static frames and every animation cycle. Hashing narrows the
+  // search; the full byte comparison at both sizes is authoritative, so a hash
+  // collision can never suppress a visible frame.
+  function internFrame(frame) {
+    var hash = framePixelHash(frame);
+    if (hash === null) return frame;
+    var bucket = canonicalFrameBuckets[hash];
+    if (!bucket) {
+      canonicalFrameBuckets[hash] = [frame];
+      return frame;
+    }
+    for (var i = 0; i < bucket.length; i++) {
+      if (framePixelsEqual(bucket[i], frame)) return bucket[i];
+    }
+    bucket.push(frame);
     return frame;
   }
 
@@ -663,18 +735,94 @@
   function noteEmitFailure(err) {
     if (emitFailureLogged) return;
     emitFailureLogged = true;
-    console.error('[FSB] action icon: setIcon failed, the icon will stop updating:', err && err.message);
+    console.error('[FSB] action icon: setIcon failed; updates paused and will retry with backoff:', err && err.message);
+  }
+
+  function clearEmitRetry() {
+    if (emitRetryTimerId === null) return;
+    clearTimeout(emitRetryTimerId);
+    emitRetryTimerId = null;
+  }
+
+  function emitRetryDelay() {
+    var exponent = Math.max(0, Math.min(emitFailureCount - 1, 10));
+    return Math.min(EMIT_RETRY_MAX_MS, EMIT_RETRY_BASE_MS * Math.pow(2, exponent));
+  }
+
+  function scheduleEmitRetry() {
+    clearEmitRetry();
+    emitRetryTimerId = setTimeout(function () {
+      emitRetryTimerId = null;
+      emitBlocked = false;
+      // A failed frame is stale by definition after a backoff. Re-derive from
+      // wall clock so recovery resumes at the same phase the old loop intended.
+      pendingEmitFrame = null;
+      var desired = animating && resolved ? frameAt(Date.now()) : staticFrame();
+      emit(desired);
+      if (animating && resolved && !emitBlocked) startLoop();
+    }, emitRetryDelay());
+  }
+
+  function finishEmit(frame) {
+    emitInFlight = false;
+    activeEmitFrame = null;
+    lastEmitted = frame;
+    emitBlocked = false;
+    emitFailureCount = 0;
+    clearEmitRetry();
+    drainEmit();
+  }
+
+  function failEmit(frame, err) {
+    emitInFlight = false;
+    activeEmitFrame = null;
+    emitBlocked = true;
+    emitFailureCount++;
+    // Preserve only the latest desired frame; the retry recomputes its phase.
+    if (!pendingEmitFrame) pendingEmitFrame = frame;
+    stopLoop();
+    noteEmitFailure(err);
+    scheduleEmitRetry();
+  }
+
+  function drainEmit() {
+    if (emitInFlight || emitBlocked || !pendingEmitFrame) return;
+    var frame = pendingEmitFrame;
+    pendingEmitFrame = null;
+    if (frame === lastEmitted) {
+      drainEmit();
+      return;
+    }
+    emitInFlight = true;
+    activeEmitFrame = frame;
+    try {
+      var result = chrome.action.setIcon(frame.request || {
+        imageData: { 16: frame[16], 32: frame[32] }
+      });
+      if (result && typeof result.then === 'function') {
+        result.then(function () { finishEmit(frame); }, function (err) { failEmit(frame, err); });
+      } else {
+        finishEmit(frame);
+      }
+    } catch (e) {
+      failEmit(frame, e);
+    }
   }
 
   // Always global. A per-surface icon permanently shadows the global one, which
   // would silently strand the loop for that surface.
   function emit(frame) {
-    if (!frame || frame === lastEmitted) return;
-    lastEmitted = frame;
-    try {
-      var result = chrome.action.setIcon({ imageData: { 16: frame[16], 32: frame[32] } });
-      if (result && typeof result.catch === 'function') result.catch(noteEmitFailure);
-    } catch (e) { noteEmitFailure(e); }
+    if (!frame) return;
+    if (!emitInFlight && !emitBlocked && frame === lastEmitted) return;
+    if (frame === activeEmitFrame) {
+      // The in-flight frame became current again before it committed. Any queued
+      // frame is now stale, so discard it rather than displaying it out of phase.
+      pendingEmitFrame = null;
+      return;
+    }
+    if (frame === pendingEmitFrame) return;
+    pendingEmitFrame = frame;
+    drainEmit();
   }
 
   // Dim is a "your relay dropped" signal, so it needs a relay to have been there
@@ -700,7 +848,40 @@
 
   // ---- Loop ---------------------------------------------------------------
 
+  // Find the next point on the ORIGINAL 66ms poll grid whose canonical frame is
+  // different. Skipped poll points would have reached emit() and returned on the
+  // same object, so omitting their timer wake cannot alter a displayed pixel or
+  // the time at which a distinct frame is requested.
+  function nextVisibleTickDelay(now, currentFrame) {
+    var frames = animatedFrames[resolved];
+    if (!frames || !frames.length) return null;
+    var elapsed = Math.max(0, now - startTime);
+    var ordinal = Math.floor(elapsed / FRAME_INTERVAL_MS) + 1;
+    var checks = frames.length * 3 + 3;
+    var hold = STATES[resolved].bounded;
+    for (var i = 0; i < checks; i++, ordinal++) {
+      var candidateTime = startTime + ordinal * FRAME_INTERVAL_MS;
+      if (typeof hold === 'number' && candidateTime - startTime >= hold) {
+        return Math.max(0, candidateTime - now);
+      }
+      if (frameAt(candidateTime) !== currentFrame) {
+        return Math.max(0, candidateTime - now);
+      }
+    }
+    // An entire cycle (with ample rounding headroom) is byte-identical. There is
+    // no visible transition to schedule; state and watchdog intent remain intact.
+    return null;
+  }
+
+  function scheduleNextTick(now, currentFrame) {
+    if (!animating || !resolved || emitBlocked) return;
+    var delay = nextVisibleTickDelay(now, currentFrame);
+    if (delay === null) return;
+    timerId = setTimeout(tick, delay);
+  }
+
   function tick() {
+    timerId = null;
     if (!animating || !resolved) {
       stopLoop();
       return;
@@ -713,19 +894,21 @@
       settleAnimation();
       return;
     }
-    emit(frameAt(now));
+    var frame = frameAt(now);
+    emit(frame);
+    scheduleNextTick(now, frame);
   }
 
   function stopLoop() {
     if (timerId !== null) {
-      clearInterval(timerId);
+      clearTimeout(timerId);
       timerId = null;
     }
   }
 
   function startLoop() {
     stopLoop();
-    timerId = setInterval(tick, FRAME_INTERVAL_MS);
+    if (emitBlocked) return;
     tick();
   }
 
@@ -806,6 +989,30 @@
     }
   }
 
+  async function readAnimationsEnabled() {
+    try {
+      var area = chrome.storage && chrome.storage.local;
+      if (!area || typeof area.get !== 'function') return true;
+      var stored = await area.get(ANIMATIONS_KEY);
+      return !(stored && stored[ANIMATIONS_KEY] === false);
+    } catch (_e) {
+      return true;
+    }
+  }
+
+  function armPreferenceListener() {
+    if (preferenceListenerArmed) return;
+    try {
+      var changed = chrome.storage && chrome.storage.onChanged;
+      if (!changed || typeof changed.addListener !== 'function') return;
+      changed.addListener(function (changes, area) {
+        if (area !== 'local' || !changes || !changes[ANIMATIONS_KEY]) return;
+        setAnimationsEnabled(changes[ANIMATIONS_KEY].newValue !== false);
+      });
+      preferenceListenerArmed = true;
+    } catch (_e) { /* preference synchronization is best-effort */ }
+  }
+
   // Tab ids are stable within a browser session, which is exactly the scope of
   // the session store the claims came from -- but a tab can close while the
   // worker is evicted, so its claim has to be swept on the way back up.
@@ -845,7 +1052,7 @@
   // change and there is no visual position worth carrying across it -- each one
   // starts at frame 0.
   function startAnimation(next) {
-    if (!STATES[next] || !STATES[next].animated) return;
+    if (!animationsEnabled || !STATES[next] || !STATES[next].animated) return;
     resolved = next;
     animating = true;
     armWatchdog();
@@ -913,6 +1120,7 @@
   // Only a change in the WINNER repaints. Several tabs claiming the same state
   // resolve to one animation, so the per-trigger rearm loop cannot restart it.
   function applyResolved() {
+    if (!animationsEnabled) return;
     var next = topClaim();
     if (next === resolved) return;
     if (next === null) stopAnimation();
@@ -929,6 +1137,20 @@
     if (want) claims[key] = want; else delete claims[key];
     if (!ready) return;
     persistIntent();
+    if (animationsEnabled) applyResolved();
+  }
+
+  function setAnimationsEnabled(isEnabled) {
+    var next = isEnabled !== false;
+    if (animationsEnabled === next) return;
+    animationsEnabled = next;
+    if (!ready || unavailable) return;
+    if (!animationsEnabled) {
+      // Preserve claims so re-enabling immediately restores the correct winner,
+      // but match the existing disabled-Autopilot appearance: static idle.
+      stopAnimation();
+      return;
+    }
     applyResolved();
   }
 
@@ -950,6 +1172,8 @@
       if (options && typeof options.hasLiveSession === 'function') {
         liveSessionProbe = options.hasLiveSession;
       }
+      animationsEnabled = await readAnimationsEnabled();
+      armPreferenceListener();
       try {
         await buildStaticCache();
       } catch (e) {
@@ -998,7 +1222,7 @@
       // overlay being destroyed and recreated on a page reload.
       resolved = null;
       var initial = topClaim();
-      if (initial) startAnimation(initial);
+      if (initial && animationsEnabled) startAnimation(initial);
       else stopAnimation();
       persistIntent();
     })();
@@ -1116,6 +1340,10 @@
     return initPromise.then(function () {
       if (unavailable || !ready) return;
       lastEmitted = null;
+      if (!animationsEnabled) {
+        stopAnimation();
+        return;
+      }
       if (animating && resolved && STATES[resolved]) {
         var revived = resolved;
         if (animatedFrames[revived]) {
@@ -1144,6 +1372,7 @@
     beginCapability: beginCapability,
     endCapability: endCapability,
     setWatching: setWatching,
+    setAnimationsEnabled: setAnimationsEnabled,
     setConnected: setConnected,
     dropTab: dropTab,
     repair: repair

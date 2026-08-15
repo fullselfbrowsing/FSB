@@ -49,13 +49,14 @@ if (typeof importScripts !== 'undefined') {
 }
 
 // Node.js require for testing -- use var to avoid redeclaration with tool-executor.js in shared scope
-var _al_toolDefs, _al_adapter, _al_executor, _al_provider;
+var _al_toolDefs, _al_adapter, _al_executor, _al_provider, _al_screenshotAttachments;
 if (typeof require !== 'undefined') {
   try {
     _al_toolDefs = require('./tool-definitions.js');
     _al_adapter = require('./tool-use-adapter.js');
     _al_executor = require('./tool-executor.js');
     _al_provider = require('./universal-provider.js');
+    _al_screenshotAttachments = require('./screenshot-attachments.js');
   } catch (_e) {
     // Running in Chrome extension context -- globals already available
   }
@@ -98,6 +99,9 @@ var _formatToolResult = (typeof formatToolResult !== 'undefined') ? formatToolRe
 var _isToolCallResponse = (typeof isToolCallResponse !== 'undefined') ? isToolCallResponse : (_al_adapter?.isToolCallResponse || (() => false));
 var _formatAssistantMessage = (typeof formatAssistantMessage !== 'undefined') ? formatAssistantMessage : (_al_adapter?.formatAssistantMessage || (() => ({})));
 var _extractUsage = (typeof extractUsage !== 'undefined') ? extractUsage : (_al_adapter?.extractUsage || (() => ({ input: 0, output: 0 })));
+var _al_ScreenshotAttachments = (typeof globalThis !== 'undefined' && globalThis.FsbScreenshotAttachments)
+  ? globalThis.FsbScreenshotAttachments
+  : (_al_screenshotAttachments || null);
 var _executeTool = (typeof executeTool !== 'undefined') ? executeTool : (_al_executor?.executeTool || (async () => ({ success: false, error: 'executeTool not available' })));
 var _UniversalProvider = (typeof UniversalProvider !== 'undefined') ? UniversalProvider : (_al_provider?.UniversalProvider || null);
 var _PROVIDER_CONFIGS = (typeof PROVIDER_CONFIGS !== 'undefined') ? PROVIDER_CONFIGS : (_al_provider?.PROVIDER_CONFIGS || {});
@@ -1215,6 +1219,11 @@ async function runAgentLoop(sessionId, options) {
     const systemPrompt = buildSystemPrompt(session.task, tabUrl);
     hydrateAgentRunState(session, systemPrompt);
     hydrateCostTracker(session);
+    // A persisted pending marker without its memory-only attachment means the
+    // service worker restarted before delivery. Keep only a typed text status.
+    if (_al_ScreenshotAttachments && typeof _al_ScreenshotAttachments.expireOrphans === 'function') {
+      _al_ScreenshotAttachments.expireOrphans(sessionId, session.messages);
+    }
 
     // Get provider configuration from chrome.storage.local (where options page saves them)
     let settings = {};
@@ -1552,6 +1561,9 @@ async function runAgentIteration(sessionId, options) {
 
   // Helper: full session finalization (overlays + logger + sidepanel + cleanup)
   async function finalizeSession(sid, sess, terminal) {
+    if (_al_ScreenshotAttachments && typeof _al_ScreenshotAttachments.discard === 'function') {
+      _al_ScreenshotAttachments.discard(sid);
+    }
     saveToLogger(sid, sess, sess.status);
     // QT-wnz Codex-3 -- background-side authoritative terminal persist
     // BEFORE broadcast. Defends against sidepanel context fanout +
@@ -1819,7 +1831,24 @@ async function runAgentIteration(sessionId, options) {
       _ts.compact();
       session.messages = _ts.replay();
     }
+    if (_al_ScreenshotAttachments && typeof _al_ScreenshotAttachments.expireOrphans === 'function') {
+      _al_ScreenshotAttachments.expireOrphans(sessionId, session.messages);
+    }
     var turnMessages = buildTurnMessages(session);
+    var pendingScreenshotAttachments = _al_ScreenshotAttachments
+      && typeof _al_ScreenshotAttachments.pending === 'function'
+      ? _al_ScreenshotAttachments.pending(sessionId)
+      : [];
+    var outboundTurnMessages = pendingScreenshotAttachments.length > 0
+      && _al_ScreenshotAttachments
+      && typeof _al_ScreenshotAttachments.attachForProvider === 'function'
+      ? _al_ScreenshotAttachments.attachForProvider(
+          turnMessages,
+          pendingScreenshotAttachments,
+          providerKey,
+          model
+        )
+      : turnMessages;
 
     await refreshCanonicalOverlay(
       'thinking',
@@ -1847,9 +1876,39 @@ async function runAgentIteration(sessionId, options) {
       // at the end_turn + normal-iteration persist tails, not this property assignment
       // (which is cheap + always-on).
       session._currentStepName = 'BEFORE_API_REQUEST';
-      response = await callProviderWithTools(
-        providerInstance, model, null, turnMessages, session.tools, providerKey
-      );
+      try {
+        response = await callProviderWithTools(
+          providerInstance, model, null, outboundTurnMessages, session.tools, providerKey
+        );
+      } catch (imageRequestError) {
+        var imageFallbackCode = pendingScreenshotAttachments.length > 0
+          && _al_ScreenshotAttachments
+          && typeof _al_ScreenshotAttachments.classifyImageRejection === 'function'
+          ? _al_ScreenshotAttachments.classifyImageRejection(imageRequestError)
+          : null;
+        if (!imageFallbackCode) throw imageRequestError;
+
+        // Retry exactly once, text-only, only for a likely image/shape/size
+        // rejection. Authentication, rate limits, network, and server errors
+        // never enter this branch.
+        _al_ScreenshotAttachments.markRejected(
+          sessionId,
+          session.messages,
+          imageFallbackCode
+        );
+        await persist(sessionId, session);
+        var textOnlyRetryMessages = buildTurnMessages(session);
+        response = await callProviderWithTools(
+          providerInstance, model, null, textOnlyRetryMessages, session.tools, providerKey
+        );
+        pendingScreenshotAttachments = [];
+      }
+      if (pendingScreenshotAttachments.length > 0
+          && _al_ScreenshotAttachments
+          && typeof _al_ScreenshotAttachments.markDelivered === 'function') {
+        _al_ScreenshotAttachments.markDelivered(sessionId, session.messages);
+        await persist(sessionId, session);
+      }
       if (typeof automationLogger !== 'undefined') {
         automationLogger.debug('Agent iteration API call completed', {
           sessionId: sessionId, iteration: iterNum,
@@ -2484,6 +2543,22 @@ async function runAgentIteration(sessionId, options) {
           { indeterminate: true, progressLabel: 'Planning' }
         );
         result = { success: true, hadEffect: false, error: null, navigationTriggered: false, result: { displayed: true } };
+      } else if (call.name === 'capture_screenshot'
+          && _al_ScreenshotAttachments
+          && typeof _al_ScreenshotAttachments.canCapture === 'function'
+          && !_al_ScreenshotAttachments.canCapture(sessionId)) {
+        result = {
+          success: false,
+          hadEffect: false,
+          error: 'Autopilot allows at most 4 screenshots per turn.',
+          navigationTriggered: false,
+          result: {
+            success: false,
+            code: 'INVALID_SCREENSHOT_ARGUMENTS',
+            error: 'Autopilot allows at most 4 screenshots per turn.',
+            retryable: false
+          }
+        };
       } else {
         // Standard tool: dispatch through unified executor
         result = await _executeTool(call.name, call.args, session.tabId, {
@@ -2493,6 +2568,26 @@ async function runAgentIteration(sessionId, options) {
             : null,
           dataHandler: handleDataTool
         });
+      }
+
+      if (call.name === 'capture_screenshot') {
+        if (_al_ScreenshotAttachments && typeof _al_ScreenshotAttachments.storeToolResult === 'function') {
+          result = _al_ScreenshotAttachments.storeToolResult(
+            sessionId,
+            call.id,
+            call.name,
+            result
+          );
+        } else if (result && result.result && typeof result.result.image_data === 'string') {
+          // Fail closed if the attachment manager did not load: never let the
+          // pixel payload fall through into persisted conversation history.
+          delete result.result.image_data;
+          result.success = false;
+          result.error = 'Screenshot attachment manager unavailable';
+          result.result.success = false;
+          result.result.code = 'SCREENSHOT_CAPTURE_FAILED';
+          result.result.error = result.error;
+        }
       }
 
       // Tab-switching tools: update session.tabId so subsequent tools target the new tab
@@ -2539,7 +2634,9 @@ async function runAgentIteration(sessionId, options) {
           globalThis.fsbMcpMetricsRecorder.recordDispatch({
             client: 'FSB Autopilot',
             tool: call.name,
-            requestPayload: call.args,
+            requestMetadata: {
+              textLength: call.args && typeof call.args.text === 'string' ? call.args.text.length : 0
+            },
             success: result.success,
             dispatcher_route: 'autopilot',
             drivingModel: {

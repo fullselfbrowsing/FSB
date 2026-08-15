@@ -44,12 +44,12 @@ const EXPECTED_NON_TRIGGER_TOOL_NAMES = [
   'wait_for_element', 'wait_for_stable', 'open_tab', 'switch_tab',
   'close_tab', 'fill_sheet', 'read_sheet', 'click_at', 'click_and_hold',
   'drag', 'drag_variable_speed', 'scroll_at', 'insert_text',
-  'double_click_at', 'read_page', 'get_text', 'get_attribute',
+  'double_click_at', 'capture_screenshot', 'read_page', 'get_text', 'get_attribute',
   'set_attribute', 'get_dom_snapshot', 'list_tabs', 'get_page_snapshot',
   'get_site_guide', 'search_memory', 'report_progress', 'complete_task',
   'partial_task', 'fail_task', 'upload_file'
 ];
-const EXPECTED_NON_TRIGGER_REGISTRY_HASH = '0a525835adc6961463c5a954f3e80205f066e23bef6089283ef598c78f1d8623';
+const EXPECTED_NON_TRIGGER_REGISTRY_HASH = 'b9c30a5a61fbcdae60b851aebfea90d0961cb95d95c3c2adbf8357014bbbd7b9';
 
 function stable(value) {
   if (Array.isArray(value)) return value.map(stable);
@@ -226,6 +226,17 @@ if (closeTab) {
   check(closeTab.inputSchema.properties.allow_active.type === 'boolean', 'close_tab.allow_active type is boolean');
   check(closeTab.inputSchema.properties.allow_active.default === false, 'close_tab.allow_active default is false');
   check(!((closeTab.inputSchema.required || []).includes('allow_active')), 'close_tab.allow_active is OPTIONAL');
+}
+
+const captureScreenshot = td.getToolByName('capture_screenshot');
+check(!!captureScreenshot, 'capture_screenshot exists in TOOL_REGISTRY');
+if (captureScreenshot) {
+  check(captureScreenshot._route === 'cdp', 'capture_screenshot is CDP-routed');
+  check(captureScreenshot._readOnly === true, 'capture_screenshot is semantically read-only');
+  check(captureScreenshot._cdpVerb === 'cdpCaptureScreenshot', 'capture_screenshot uses the dedicated CDP verb');
+  check(captureScreenshot._emitChangeReport === false, 'capture_screenshot emits no change report');
+  check(!captureScreenshot.inputSchema.properties.visual_reason, 'capture_screenshot has no visual-session fields');
+  check(!captureScreenshot.inputSchema.properties.client, 'capture_screenshot has no visual client field');
 }
 
 // Action tools have tab_id (Plan 02 Task 4 -- 35 tools)

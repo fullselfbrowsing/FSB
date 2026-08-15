@@ -176,6 +176,35 @@ function snapshot(overrides) {
   }, overrides || {});
 }
 
+function runtimeView(value, overrides) {
+  return Object.assign({
+    v: value.v,
+    delegationId: value.delegationId,
+    acceptedIdentity: clone(value.acceptedIdentity),
+    provider: clone(value.provider),
+    state: value.state,
+    connection: value.connection,
+    lastSequence: value.entries.length,
+    summary: clone(value.summary),
+    activeTab: clone(value.activeTab),
+    hold: clone(value.hold),
+    terminal: clone(value.terminal)
+  }, overrides || {});
+}
+
+function runtimeUpdate(value, nextEntry, overrides) {
+  const view = runtimeView(value, {
+    lastSequence: nextEntry ? nextEntry.sequence : value.entries.length,
+    ...(overrides || {})
+  });
+  return {
+    type: 'FSB_DELEGATION_UPDATED',
+    view,
+    entry: nextEntry ? clone(nextEntry) : null,
+    announceSequence: nextEntry ? nextEntry.sequence : null
+  };
+}
+
 function findAll(root, tagName) {
   const wanted = String(tagName).toUpperCase();
   const found = [];
@@ -354,6 +383,99 @@ console.log('\n--- Phase 61 delegation feed contract ---');
   assert.equal(Feed.render(nativeContainer, nativeSnapshot, { hydrated: false }).ok, false);
   assert(!nativeContainer.textContent.includes(nativeCanary),
     'rejected native provider metadata never reaches feed text');
+}
+
+{
+  const full = snapshot();
+  const local = snapshot({
+    state: 'running',
+    connection: 'connected',
+    entries: clone(full.entries.slice(0, 2)),
+    summary: null,
+    terminal: null,
+    hydrated: false
+  });
+  const container = new TestNode('div');
+  let removals = 0;
+  const removeChild = container.removeChild.bind(container);
+  container.removeChild = (child) => {
+    removals += 1;
+    return removeChild(child);
+  };
+  assert.equal(Feed.render(container, local, { hydrated: true }).ok, true);
+  removals = 0;
+  const firstRow = container.children[0];
+  const toolDisclosure = findAll(container, 'details')[0];
+  toolDisclosure.open = true;
+
+  const stateEntry = entry(3, 'state', 'running');
+  stateEntry.title = 'Streaming response';
+  const append = runtimeUpdate(local, stateEntry);
+  assert.equal(Feed.validateView(append.view), true);
+  assert.equal(Feed.validateRuntimeUpdate(append), true);
+  const appended = Feed.applyRuntimeUpdate(container, local, append);
+  assert.equal(appended.ok, true);
+  assert.equal(appended.status, 'appended');
+  assert.equal(appended.completedRender, false);
+  assert.equal(local.entries.length, 3);
+  assert.equal(container.children.length, 3);
+  assert.strictEqual(container.children[0], firstRow,
+    'normal streaming preserves existing row identity');
+  assert.strictEqual(findAll(container, 'details')[0], toolDisclosure);
+  assert.equal(toolDisclosure.open, true,
+    'normal streaming preserves open disclosure state');
+  assert.equal(removals, 0, 'normal streaming never clears the feed');
+
+  const metadata = runtimeUpdate(local, null, { connection: 'disconnected' });
+  const metadataApplied = Feed.applyRuntimeUpdate(container, local, metadata);
+  assert.equal(metadataApplied.status, 'metadata');
+  assert.equal(local.connection, 'disconnected');
+  assert.equal(container.children.length, 3);
+  assert.equal(removals, 0, 'metadata-only updates do not mutate feed rows');
+
+  const duplicate = runtimeUpdate(local, stateEntry, { connection: 'connected' });
+  const duplicateApplied = Feed.applyRuntimeUpdate(container, local, duplicate);
+  assert.equal(duplicateApplied.status, 'duplicate');
+  assert.equal(local.entries.length, 3);
+  assert.equal(container.children.length, 3);
+  assert.equal(removals, 0, 'exact duplicate updates neither clear nor append');
+
+  const gapEntry = entry(5, 'state', 'running');
+  const gap = Feed.applyRuntimeUpdate(container, local, runtimeUpdate(local, gapEntry));
+  assert.equal(gap.ok, false);
+  assert.equal(gap.resync, true);
+  assert.equal(gap.status, 'gap');
+  assert.equal(local.entries.length, 3, 'gapped updates do not mutate local history');
+
+  const resultEntry = entry(4, 'result', metrics());
+  const resultApplied = Feed.applyRuntimeUpdate(container, local, runtimeUpdate(
+    local,
+    resultEntry,
+    { summary: summary({ state: 'running' }), connection: 'connected' }
+  ));
+  assert.equal(resultApplied.ok, true);
+  assert.equal(local.entries.length, 4);
+  assert.equal(container.children.length, 3,
+    'streamed result remains deferred before terminal proof');
+  assert.equal(removals, 0);
+
+  const terminalEntry = entry(5, 'state', 'completed');
+  terminalEntry.title = 'Delegation completed';
+  const completed = Feed.applyRuntimeUpdate(container, local, runtimeUpdate(
+    local,
+    terminalEntry,
+    {
+      state: 'completed',
+      summary: summary({ state: 'completed' }),
+      terminal: { code: 'completed', releasedTabCount: 0 }
+    }
+  ));
+  assert.equal(completed.ok, true);
+  assert.equal(completed.completedRender, true,
+    'authoritative completion performs the one canonical full render');
+  assert(removals > 0, 'completion may rebuild once to reveal deferred canonical rows');
+  assert.equal(findByClass(container, 'delegation-entry-result').length, 1);
+  assert.equal(findByClass(container, 'delegation-summary').length, 1);
 }
 
 {
@@ -707,11 +829,11 @@ assert(panelSource.includes("message.type !== 'FSB_DELEGATION_UPDATED'"),
   'side panel accepts only the canonical runtime update type');
 assert(!/opencode/i.test(panelSource),
   'side-panel presentation contains no OpenCode-specific renderer or state branch');
-assert(panelSource.includes("_delegationHasExactKeys(message, ['announceSequence', 'snapshot', 'type'])"),
+assert(feedSource.includes("_hasExactKeys(update, ['announceSequence', 'entry', 'type', 'view'])"),
   'runtime message shape is exact');
-assert(panelSource.includes('snapshot.delegationId !== _delegationUiState.delegationId'),
+assert(panelSource.includes('message.view.delegationId !== _delegationUiState.delegationId'),
   'updates for every non-selected delegation id are ignored');
-assert(panelSource.includes("var deliveryKey = snapshot.delegationId + ':' + announceSequence"),
+assert(panelSource.includes("var deliveryKey = snapshot.delegationId + ':' + message.announceSequence"),
   'UI duplicate suppression is exact delegation-id/sequence identity');
 assert.equal((htmlSource.match(/id="delegationAnnouncer"/g) || []).length, 1,
   'one delegated live announcer exists');
@@ -835,8 +957,8 @@ assert(panelSource.includes("type: 'FSB_DELEGATION_PREFLIGHT'")
   'side panel routes every delegated action through the closed background commands');
 assert(!/FSB_DELEGATION_START[\s\S]{0,180}(?:trusted|consentGranted|consent\s*:)/.test(panelSource),
   'START carries no caller trust or consent boolean');
-assert(panelSource.includes("if ((_delegationUiState.pendingTake && message.snapshot.state === 'holding')")
-    && panelSource.includes("(_delegationUiState.pendingResume && message.snapshot.state === 'resuming')"),
+assert(panelSource.includes("if ((_delegationUiState.pendingTake && message.view.state === 'holding')")
+    && panelSource.includes("(_delegationUiState.pendingResume && message.view.state === 'resuming')"),
   'intermediate hold/resume snapshots retain the prior truthful focused control');
 assert(panelSource.includes("if (changes.fsbAgentRegistry && typeof _refreshSelectedDelegationSnapshot === 'function')")
     && panelSource.includes('_refreshSelectedDelegationSnapshot();')
@@ -1013,7 +1135,7 @@ const preflightFailureSource = extractNamedFunction(panelSource, '_renderDelegat
 assert(preflightFailureSource.includes('_delegationSemanticHeading(')
     && preflightFailureSource.includes("heading.setAttribute('data-delegation-tone', 'danger')"),
   'offline preflight alert pairs its danger treatment with an explicit semantic heading icon');
-assert(panelSource.includes("announceSequence > previousLastSequence"),
+assert(panelSource.includes('message.announceSequence > previousLastSequence'),
   'only a strictly newer matching sequence reaches the polite announcer');
 assert(panelSource.includes('announcedTransitions: Object.create(null)')
     && panelSource.includes("snapshot.delegationId + ':lifecycle:' + suffix")
@@ -2772,23 +2894,33 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
 
   {
     const delivered = [];
+    let resyncs = 0;
+    const localSnapshot = { delegationId: 'delegation_selected', entries: [] };
     const state = {
       subscribed: true,
       delegationId: 'delegation_selected',
       conversationId: 'conv_selected',
+      snapshot: localSnapshot,
       pendingTake: false,
-      pendingResume: false
+      pendingResume: false,
+      bindingCleanupPending: false,
+      lastRenderedSequence: null
     };
     const context = {
       conversationId: 'conv_selected',
       _delegationUiState: state,
-      _delegationHasExactKeys(value, keys) {
-        return value && Object.keys(value).sort().join('|') === [...keys].sort().join('|');
+      FsbDelegationFeed: {
+        validateRuntimeUpdate: () => true,
+        applyRuntimeUpdate() {
+          return { ok: true, snapshot: localSnapshot, lastSequence: null };
+        }
       },
-      FsbDelegationFeed: { validateSnapshot: () => true },
       _delegationIsSelectedConversation: () => true,
-      _renderDelegationSnapshot(next, options) {
-        delivered.push({ next, options });
+      _ensureDelegationMount: () => ({ run: {}, state: {}, feed: {} }),
+      _delegationPreviousRuntimeSnapshot: () => null,
+      _requestDelegationRuntimeResync() { resyncs += 1; return true; },
+      _renderDelegationRuntimeMetadata(_mount, next, _previous, _last, message) {
+        delivered.push({ next, message });
         return true;
       }
     };
@@ -2796,16 +2928,26 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
     vm.runInContext(extractNamedFunction(panelSource, '_handleDelegationRuntimeUpdate'), context);
     assert.equal(context._handleDelegationRuntimeUpdate({
       type: 'FSB_DELEGATION_UPDATED',
-      snapshot: { delegationId: 'delegation_other', state: 'running' },
+      view: { delegationId: 'delegation_other', state: 'running' },
+      entry: { sequence: 1 },
       announceSequence: 1
     }), false, 'interleaved updates for another delegation stay hidden');
     assert.equal(delivered.length, 0);
     assert.equal(context._handleDelegationRuntimeUpdate({
       type: 'FSB_DELEGATION_UPDATED',
-      snapshot: { delegationId: 'delegation_selected', state: 'running' },
+      view: { delegationId: 'delegation_selected', state: 'running' },
+      entry: { sequence: 1 },
       announceSequence: 1
     }), true, 'matching selected delegation update renders');
     assert.equal(delivered.length, 1);
+    context.FsbDelegationFeed.applyRuntimeUpdate = () => ({ ok: false, resync: true });
+    assert.equal(context._handleDelegationRuntimeUpdate({
+      type: 'FSB_DELEGATION_UPDATED',
+      view: { delegationId: 'delegation_selected', state: 'running' },
+      entry: { sequence: 3 },
+      announceSequence: 3
+    }), true, 'a selected continuity failure requests silent snapshot recovery');
+    assert.equal(resyncs, 1);
   }
 
   {

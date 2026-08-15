@@ -1176,6 +1176,10 @@
       this._autoHideTimer = null;
       this._terminalHideTimer = null;
       this._terminalDestroyTimer = null;
+      this._clockRafId = null;
+      this._clockAnchorAt = 0;
+      this._clockAnchorPositionMs = 0;
+      this._clockPositionMs = 0;
       this._listenersAttached = false;
       this._handleDocumentPointerMove = this._handleDocumentPointerMove.bind(this);
       this._handleDocumentPointerDown = this._handleDocumentPointerDown.bind(this);
@@ -1302,6 +1306,59 @@
         var scrubber = this.container.querySelector('.fsb-replay-scrubber');
         if (scrubber) scrubber.value = String(position);
       }
+    }
+
+    _stopReplayClock() {
+      if (this._clockRafId !== null) {
+        cancelAnimationFrame(this._clockRafId);
+        this._clockRafId = null;
+      }
+    }
+
+    _interpolatedPosition(now) {
+      var replay = this._replayState;
+      if (!replay) return 0;
+      var duration = Math.max(0, Number(replay.durationMs) || 0);
+      var target = Math.max(
+        0,
+        Math.min(duration, Number(replay.interpolationTargetMs) || this._clockPositionMs)
+      );
+      if (replay.status !== 'playing' || this._clockAnchorAt <= 0) {
+        return Math.max(0, Math.min(target, this._clockPositionMs));
+      }
+      var at = Number.isFinite(now) ? now : performance.now();
+      var elapsed = Math.max(0, at - this._clockAnchorAt);
+      return Math.max(0, Math.min(
+        target,
+        this._clockAnchorPositionMs + (elapsed * (Number(replay.speed) || 1))
+      ));
+    }
+
+    _startReplayClock() {
+      this._stopReplayClock();
+      if (!this._replayState || this._replayState.status !== 'playing' ||
+          this._isTerminal(this._replayState, this._lifecycle)) return;
+      var self = this;
+      function tick(now) {
+        self._clockRafId = null;
+        if (!self._replayState || self._replayState.status !== 'playing' ||
+            self._isTerminal(self._replayState, self._lifecycle)) return;
+        self._clockPositionMs = self._interpolatedPosition(now);
+        if (!self._scrubbing) {
+          self._renderPosition(self._clockPositionMs, self._replayState.durationMs, true);
+        }
+        var interpolationTarget = Math.max(
+          self._clockPositionMs,
+          Math.min(
+            Number(self._replayState.durationMs) || 0,
+            Number(self._replayState.interpolationTargetMs) || self._clockPositionMs
+          )
+        );
+        if (self._clockPositionMs < interpolationTarget) {
+          self._clockRafId = requestAnimationFrame(tick);
+        }
+      }
+      this._clockRafId = requestAnimationFrame(tick);
     }
 
     create() {
@@ -1598,8 +1655,10 @@
         var positionMs = Number(replayScrubber.value) || 0;
         this._scrubbing = false;
         if (!replay) return;
-        if (positionMs < replay.positionMs) {
-          this._renderPosition(replay.positionMs, replay.durationMs, true);
+        var currentPosition = this._interpolatedPosition();
+        if (positionMs < currentPosition) {
+          this._clockPositionMs = currentPosition;
+          this._renderPosition(currentPosition, replay.durationMs, true);
           this._scheduleAutoHide(true);
           return;
         }
@@ -1614,7 +1673,8 @@
       replayScrubber.addEventListener('blur', () => {
         this._scrubbing = false;
         if (this._replayState) {
-          this._renderPosition(this._replayState.positionMs, this._replayState.durationMs, true);
+          this._clockPositionMs = this._interpolatedPosition();
+          this._renderPosition(this._clockPositionMs, this._replayState.durationMs, true);
         }
         this._scheduleAutoHide(true);
       });
@@ -1679,6 +1739,12 @@
       this._lifecycle = lifecycle || 'running';
       var terminal = this._isTerminal(replay, this._lifecycle);
       var awaitingDecision = replay.status === 'decision';
+      this._clockPositionMs = Math.max(
+        0,
+        Math.min(Number(replay.durationMs) || 0, Number(replay.positionMs) || 0)
+      );
+      this._clockAnchorPositionMs = this._clockPositionMs;
+      this._clockAnchorAt = performance.now();
 
       if (isNewSession || !terminal) this._cancelTerminalRemoval();
       this.container.classList.toggle('terminal', terminal);
@@ -1693,18 +1759,21 @@
       scrubber.max = String(Math.max(1, replay.durationMs || 0));
       scrubber.step = String(Math.max(1, Math.min(250, Math.round((replay.durationMs || 1) / 100))));
       scrubber.disabled = terminal || awaitingDecision;
-      if (!this._scrubbing) this._renderPosition(replay.positionMs, replay.durationMs, true);
+      if (!this._scrubbing) this._renderPosition(this._clockPositionMs, replay.durationMs, true);
 
       var speed = this.container.querySelector('.fsb-replay-speed');
       speed.value = String(replay.speed || 1);
       speed.disabled = terminal || awaitingDecision;
 
       if (terminal) {
+        this._stopReplayClock();
         this._scheduleTerminalRemoval();
       } else if (replay.status !== 'playing') {
+        this._stopReplayClock();
         this._clearAutoHideTimer();
         this._setControlsVisible(true);
       } else {
+        this._startReplayClock();
         if (isNewSession || statusChanged) this._setControlsVisible(true);
         this._scheduleAutoHide(false);
       }
@@ -1721,6 +1790,7 @@
     }
 
     destroy() {
+      this._stopReplayClock();
       this._clearAutoHideTimer();
       this._cancelTerminalRemoval();
       if (this._listenersAttached) {
@@ -1742,6 +1812,9 @@
       this._hovered = false;
       this._focusWithin = false;
       this._controlsVisible = true;
+      this._clockAnchorAt = 0;
+      this._clockAnchorPositionMs = 0;
+      this._clockPositionMs = 0;
     }
   }
 

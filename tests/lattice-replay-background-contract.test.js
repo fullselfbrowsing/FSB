@@ -60,10 +60,21 @@ const target = functionBody(background, 'fsbReplayAssertTarget');
 const dispatch = functionBody(background, 'fsbReplayDispatchStep');
 const execute = functionBody(background, 'executeReplaySequence');
 const handleClosedReplayTab = functionBody(background, 'fsbReplayHandleClosedTab');
+const handleRemovedReplayTab = functionBody(background, 'fsbReplayHandleRemovedTab');
 const buildTimeline = functionBody(background, 'fsbReplayBuildTimeline');
 const waitForPlayback = functionBody(background, 'fsbReplayWaitForPlayback');
+const waitUntilRunnable = functionBody(background, 'fsbReplayWaitUntilRunnable');
+const queueReplayMutation = functionBody(background, 'fsbReplayQueueMutation');
+const queueReplayControl = functionBody(background, 'fsbReplayQueueControl');
+const publicPreparation = functionBody(background, 'fsbReplayPublicPreparation');
+const assertExecutablePreparation = functionBody(background, 'fsbReplayAssertExecutablePreparation');
+const persistReplayRun = functionBody(background, 'fsbReplayPersistRun');
+const recordReplayCheckpoint = functionBody(background, 'fsbReplayRecordCheckpoint');
+const recordReplayCheckpointNow = functionBody(background, 'fsbReplayRecordCheckpointNow');
+const buildReplaySession = functionBody(background, 'fsbReplayBuildSession');
 const broadcastReplayOverlay = functionBody(background, 'fsbReplayBroadcastOverlay');
 const finalizeReplay = functionBody(background, 'fsbReplayFinalize');
+const handleReplayDecision = functionBody(background, 'handleReplayStepDecision');
 const replayControl = functionBody(background, 'handleReplayControl');
 const progressOverlaySource = visualFeedback.slice(
   visualFeedback.indexOf('class ProgressOverlay'),
@@ -125,6 +136,15 @@ check('replay startup is synchronously single-flight across concurrent UI approv
   start.includes('if (fsbReplayStartPending)') &&
   start.indexOf('fsbReplayStartPending = true') < start.indexOf('prepareSessionReplay') &&
   start.includes('finally') && start.includes('fsbReplayStartPending = false'));
+check('truncated replay timelines remain inspectable but fail closed before every execution path',
+  publicPreparation.includes('executable: 0') &&
+  publicPreparation.includes("availability: 'unsupported'") &&
+  assertExecutablePreparation.includes('fsbReplayIsTruncated(prepared)') &&
+  start.includes('fsbReplayAssertExecutablePreparation(prepared)') &&
+  requestMcpReplay.includes('fsbReplayAssertExecutablePreparation(prepared)') &&
+  recovery.includes('fsbReplayAssertExecutablePreparation(prepared)') &&
+  recovery.indexOf('fsbReplayAssertExecutablePreparation(prepared)') <
+    recovery.indexOf('fsbReplayReclaimOwnedTabs(recoveryState,'));
 check('bootstrap opens the first executable logical tab under its own mapping',
   start.includes('fsbReplayBootstrapTab(prepared)') &&
   start.includes('fsbReplayCreateOwnedTab(bootstrapTab.startUrl)') &&
@@ -160,10 +180,18 @@ check('closed replay tabs are marked and the primary target moves to a surviving
   handleClosedReplayTab.includes('session.tabId = replacement?.tabId ?? null') &&
   handleClosedReplayTab.includes('session.expectedOrigin = replacement?.expectedOrigin ?? null') &&
   handleClosedReplayTab.includes('session.ownershipToken = replacement?.ownershipToken ?? null'));
-check('tab removal and stale cleanup preserve replay sessions while close steps update immediately',
-  closedTabCleanup.includes('if (fsbReplayHandleClosedTab(session, tabId)) continue;') &&
-  staleSessionCleanup.includes('if (fsbReplayHandleClosedTab(session, closedTabId))') &&
+check('last-tab removal stops ordinary paused playback but preserves decision recovery',
+  handleRemovedReplayTab.includes("session.status === 'replaying'") &&
+  handleRemovedReplayTab.includes('session.playback?.paused === true') &&
+  handleRemovedReplayTab.includes('fsbReplayOverlayTabIds(session).length === 0') &&
+  handleRemovedReplayTab.includes('session._replayFinalizing !== true') &&
+  handleRemovedReplayTab.includes("fsbReplayFinalize(") &&
+  handleRemovedReplayTab.includes("'replay_stopped'"));
+check('tab removal and stale cleanup use terminal-aware handling while close steps update immediately',
+  closedTabCleanup.includes('if (fsbReplayHandleRemovedTab(session, tabId)) continue;') &&
+  staleSessionCleanup.includes('if (fsbReplayHandleRemovedTab(session, closedTabId))') &&
   execute.includes('fsbReplayHandleClosedTab(session, target.tabState.tabId)') &&
+  !execute.includes('fsbReplayHandleRemovedTab') &&
   execute.indexOf('fsbReplayHandleClosedTab(session, target.tabState.tabId)') <
     execute.indexOf('delete session.replayTabs[logicalTab]'));
 check('message, action/content/background, and CDP routes reuse shared handlers',
@@ -183,7 +211,8 @@ check('replay timing follows recorded timestamps with bounded gaps and an overla
   buildTimeline.includes('current.timestamp - previous.timestamp') &&
   buildTimeline.includes('FSB_REPLAY_MAX_RECORDED_GAP_MS') &&
   buildTimeline.includes('FSB_REPLAY_LEAD_IN_MS') &&
-  execute.includes('fsbReplayWaitForPlayback(session, step, i)'));
+  execute.includes('fsbReplayWaitUntilRunnable(session, step, i)') &&
+  waitUntilRunnable.includes('fsbReplayWaitForPlayback(session, step, index)'));
 check('playback waits are interruptible for pause, speed changes, and safe forward seeking',
   waitForPlayback.includes('playback.paused === true') &&
   waitForPlayback.includes('fsbReplayWaitForWake') &&
@@ -193,6 +222,33 @@ check('playback waits are interruptible for pause, speed changes, and safe forwa
   replayControl.includes("command === 'setSpeed'") &&
   replayControl.includes("command === 'seek'") &&
   replayControl.includes('can only seek forward'));
+check('playback controls serialize, settle the clock, and commit before mutating live state',
+  replayControl.includes('await fsbReplayQueueControl(session') &&
+  replayControl.includes('const stagedPlayback = fsbReplayPlaybackSnapshot(session)') &&
+  replayControl.includes('fsbReplayPersistRun(session, session.replayRun, stagedPlayback)') &&
+  replayControl.indexOf('fsbReplayPersistRun(session, session.replayRun, stagedPlayback)') <
+    replayControl.lastIndexOf("session.status !== 'replaying'") &&
+  replayControl.lastIndexOf("session.status !== 'replaying'") <
+    replayControl.indexOf('currentPlayback.speed = stagedPlayback.speed') &&
+  queueReplayControl.includes('_replayControlPendingCount') &&
+  queueReplayControl.includes('fsbReplayQueueMutation(session, operation)') &&
+  queueReplayControl.includes('fsbReplaySettlePlaybackWait(session)') &&
+  queueReplayControl.includes('fsbReplayWakePlayback(session)'));
+check('all durable replay mutations share one per-session ordering barrier',
+  queueReplayMutation.includes('_replayMutationTail') &&
+  recordReplayCheckpoint.includes('fsbReplayQueueMutation(') &&
+  background.includes('async function fsbReplayPauseForDecision(session, step, error, options = {})') &&
+  background.slice(
+    background.indexOf('async function fsbReplayPauseForDecision('),
+    background.indexOf('async function fsbReplayFinalize(')
+  ).includes('fsbReplayQueueMutation(session') &&
+  finalizeReplay.includes('fsbReplayQueueMutation(session') &&
+  handleReplayDecision.includes('fsbReplayQueueMutation(session') &&
+  buildReplaySession.includes('_replayMutationTail: null'));
+check('the replay executor honors the control barrier immediately before dispatch',
+  (execute.match(/fsbReplayWaitUntilRunnable\(session, step, i\)/g) || []).length >= 2 &&
+  execute.lastIndexOf('fsbReplayWaitUntilRunnable(session, step, i)') <
+    execute.indexOf('fsbReplayDispatchStep(session, step'));
 check('replay uses the regular FSB page overlay on every owned replay tab',
   broadcastReplayOverlay.includes('sendSessionStatus(tabId, statusData)') &&
   broadcastReplayOverlay.includes("clientLabel: 'Replay'") &&
@@ -235,9 +291,16 @@ check('terminal and cleared replay lifecycles destroy the standalone player',
   replayPlayerSource.includes('this.destroy()') &&
   contentMessaging.includes("if (overlayState.lifecycle === 'cleared')") &&
   contentMessaging.includes('FSB.replayPlayerOverlay.destroy()'));
-check('survivability persists before dispatch and after each step',
+check('survivability checkpoints only risky steps while journal attempts advance every step',
+  execute.includes('if (fsbReplayIsWriteRisk(step)') &&
   execute.includes("fsbReplayPersistCheckpoint(session, 'BEFORE_TOOL_EXECUTION', step)") &&
-  execute.includes("fsbReplayPersistCheckpoint(session, 'BEFORE_NEXT_ITERATION_SCHEDULE', step)"));
+  !execute.includes("fsbReplayPersistCheckpoint(session, 'BEFORE_NEXT_ITERATION_SCHEDULE', step)") &&
+  execute.includes('fsbReplayRecordCheckpoint(session, step'));
+check('successful replay cursor advancement is committed only by durable receipt persistence',
+  !execute.includes('session.currentStep = i + 1') &&
+  recordReplayCheckpointNow.includes('const persistedRun = await fsbReplayPersistRun(session, stagedRun, stagedPlayback)') &&
+  recordReplayCheckpointNow.indexOf('const persistedRun = await fsbReplayPersistRun(session, stagedRun, stagedPlayback)') <
+    recordReplayCheckpointNow.indexOf('session.currentStep = nextStep'));
 check('survivability snapshots contain stable recovery data but no ownership secret',
   checkpointState.includes('manifestHash: session.manifestHash') &&
   checkpointState.includes('approvedScopes: session.approvedScopes.slice()') &&
@@ -247,7 +310,8 @@ check('survivability snapshots contain stable recovery data but no ownership sec
   checkpointState.includes('_currentStepName: marker') &&
   !checkpointState.includes('ownershipToken'));
 check('recovery reclaims every surviving logical tab under one replay agent',
-  recovery.includes('fsbReplayReclaimOwnedTabs(state,') &&
+  recovery.includes('fsbReplayReclaimOwnedTabs(recoveryState,') &&
+  recovery.includes('Array.isArray(persistedRun?.logicalTabs)') &&
   reclaimTabs.includes('for (const item of recorded)') &&
   reclaimTabs.includes('Array.isArray(state.logicalTabs)') &&
   !reclaimTabs.includes('state.logicalTabs.length > 0') &&
@@ -260,6 +324,17 @@ check('recovery reclaims every surviving logical tab under one replay agent',
   reclaimTabs.includes('bootstrapLogicalTab') &&
   reclaimTabs.includes("releaseAgent(failedAgentId, 'replay_recovery_failed')") &&
   !reclaimTabs.includes('chrome.tabs.remove'));
+check('journal replay heads persist ownership-free topology with cursor progress',
+  background.includes('persistedRun.logicalTabs = fsbReplayTopologySnapshot(session)') &&
+  background.includes('persistedRun.targetTabId = Number.isFinite(session.tabId)') &&
+  functionBody(background, 'fsbReplayTopologySnapshot').includes('expectedOrigin: tab.expectedOrigin || null') &&
+  !functionBody(background, 'fsbReplayTopologySnapshot').includes('ownershipToken'));
+check('falsey replay persistence results never masquerade as durable state',
+  persistReplayRun.includes('const persistenceResult = await') &&
+  persistReplayRun.includes('if (!persistenceResult) return false') &&
+  start.includes("if (persistedRun === false) throw new Error('Replay run persistence is unavailable')") &&
+  finalizeReplay.includes('if (committedRun === false) return false') &&
+  finalizeReplay.includes('terminalPersisted = persistedRun !== false'));
 check('mid-write recovery pauses for explicit Retry Skip Stop',
   recovery.includes("resumePolicy === 'ON_ERROR_SW_EVICTION_MID_TOOL_DISPATCH'") &&
   recovery.includes('fsbReplayPauseForDecision') &&
@@ -301,6 +376,12 @@ check('live receipts chain and persist drift comparison',
   background.includes('sourceReceiptCid: session.sourceReceiptCid') &&
   background.includes('previousReceiptCid: session.previousReceiptCid') &&
   background.includes('recordedResultHash === checkpoint.resultHash'));
+check('journal result projections remain internal and survive replay recovery',
+  replay.includes('resultProjectionByStepId: built.resultProjectionByStepId') &&
+  buildReplaySession.includes('resultProjectionByStepId: fsbReplayClone(prepared.resultProjectionByStepId, {})') &&
+  recordReplayCheckpointNow.includes('projectJournalResult') &&
+  recordReplayCheckpointNow.includes("status === 'executed'") &&
+  !publicPreparation.includes('resultProjectionByStepId'));
 check('capture and live receipts hash normalized results without persisting result bodies',
   host.includes('normalizeReplayResult(result || {})') &&
   host.includes('resultSummary: priorResultSummary, ...persistedStep') &&
@@ -315,6 +396,10 @@ check('session details read persisted manifests and never transient actionRecord
 check('side panel renders verified preview before requesting start',
   sidepanel.indexOf('renderReplayPreview(preview)') <
   sidepanel.indexOf("action: 'replaySession'"));
+check('side panel returns before confirmation for truncated inspect-only previews',
+  startReplayUi.includes('if (preview.truncated)') &&
+  startReplayUi.indexOf('if (preview.truncated)') < startReplayUi.indexOf('confirm(summary)') &&
+  startReplayUi.includes('Earlier browser state cannot be reconstructed safely'));
 check('history replay uses one exact-manifest confirmation for all approved scopes',
   (startReplayUi.match(/\bconfirm\s*\(/g) || []).length === 1 &&
   startReplayUi.includes('exact signed manifest') &&

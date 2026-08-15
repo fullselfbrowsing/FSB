@@ -1012,7 +1012,11 @@ async function handleRemoteKey(payload) {
       // dispatch the CDP keyboard event directly. Follow the same
       // attach-with-stale-debugger-recovery pattern used by cdpClickAt.
       var debuggerAttached = false;
+      var cdpLease = null;
       try {
+        if (globalThis.FsbCdpLease && typeof globalThis.FsbCdpLease.acquire === 'function') {
+          cdpLease = await globalThis.FsbCdpLease.acquire(tabId, { timeoutMs: 10000 });
+        }
         if (typeof keyboardEmulator !== 'undefined' && keyboardEmulator && keyboardEmulator.isAttachedTo(tabId)) {
           await keyboardEmulator.detachDebugger(tabId);
         }
@@ -1056,6 +1060,7 @@ async function handleRemoteKey(payload) {
         if (debuggerAttached) {
           try { await chrome.debugger.detach({ tabId: tabId }); } catch (_e) { /* ignore */ }
         }
+        if (cdpLease) cdpLease.release();
       }
     } else {
       console.warn('[FSB RC] Key rejected: unknown type', payload.type);
