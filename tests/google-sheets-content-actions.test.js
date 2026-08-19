@@ -19,16 +19,47 @@ function sheetsDomHarness(options = {}) {
   let selectedAddress = options.initialAddress || 'A1';
   let pendingAddress = selectedAddress;
   let activeWorksheet = options.initialWorksheet || 'Sheet1';
+  let nameBoxFocused = false;
   let pasteCalls = 0;
   let deleteCalls = 0;
   let insertCalls = 0;
   const keyCalls = [];
   const typeCalls = [];
+  function columnToNumber(column) {
+    let number = 0;
+    for (const character of String(column || '').toUpperCase()) {
+      number = number * 26 + character.charCodeAt(0) - 64;
+    }
+    return number;
+  }
+  function numberToColumn(number) {
+    let value = Number(number);
+    let out = '';
+    while (value > 0) {
+      const remainder = (value - 1) % 26;
+      out = String.fromCharCode(65 + remainder) + out;
+      value = Math.floor((value - 1) / 26);
+    }
+    return out;
+  }
+  function applyClipboard(text, address) {
+    const match = String(address || '').toUpperCase().match(/([A-Z]+)(\d+)/);
+    if (!match || options.pasteHasEffect === false) return;
+    const startColumn = columnToNumber(match[1]);
+    const startRow = Number(match[2]);
+    const rows = String(text || '').split('\n').map((row) => row.split('\t'));
+    rows.forEach((row, rowOffset) => {
+      row.forEach((value, columnOffset) => {
+        cells.set(`${numberToColumn(startColumn + columnOffset)}${startRow + rowOffset}`, value);
+      });
+    });
+  }
   const nameBox = options.missingNameBox ? null : {
     value: selectedAddress,
     textContent: selectedAddress,
-    focus() {},
-    click() {}
+    focus() { nameBoxFocused = true; },
+    click() { nameBoxFocused = true; },
+    blur() { nameBoxFocused = false; }
   };
   const formulaBar = options.missingFormulaBar ? null : {
     querySelector() { return null; },
@@ -43,18 +74,25 @@ function sheetsDomHarness(options = {}) {
         if (override) return override;
       }
       if (params.key === 'Enter') {
-        if (options.confirmNavigation !== false) {
-          selectedAddress = pendingAddress.replace(/^.*!/, '').replace(/\$/g, '').toUpperCase();
+        if (nameBoxFocused) {
+          if (options.confirmNavigation !== false) {
+            selectedAddress = pendingAddress.replace(/^.*!/, '').replace(/\$/g, '').toUpperCase();
+          }
+          if (options.confirmWorksheetNavigation !== false && pendingAddress.includes('!')) {
+            const rawSheet = pendingAddress.slice(0, pendingAddress.lastIndexOf('!'));
+            activeWorksheet = rawSheet.startsWith("'") && rawSheet.endsWith("'")
+              ? rawSheet.slice(1, -1).replace(/''/g, "'")
+              : rawSheet;
+          }
+          if (nameBox) nameBox.value = selectedAddress;
+          nameBoxFocused = false;
         }
-        if (options.confirmWorksheetNavigation !== false && pendingAddress.includes('!')) {
-          const rawSheet = pendingAddress.slice(0, pendingAddress.lastIndexOf('!'));
-          activeWorksheet = rawSheet.startsWith("'") && rawSheet.endsWith("'")
-            ? rawSheet.slice(1, -1).replace(/''/g, "'")
-            : rawSheet;
-        }
-        if (nameBox) nameBox.value = selectedAddress;
       }
-      if (params.key === 'v' && (params.ctrlKey || params.metaKey)) pasteCalls++;
+      if (params.key === 'Escape') nameBoxFocused = false;
+      if (params.key === 'v' && (params.ctrlKey || params.metaKey)) {
+        pasteCalls++;
+        applyClipboard(context.__clipboard, selectedAddress);
+      }
       if (params.key === '=' && (params.ctrlKey || params.metaKey) && params.altKey) insertCalls++;
       if (params.key === 'Delete') {
         deleteCalls++;
@@ -65,8 +103,12 @@ function sheetsDomHarness(options = {}) {
     async typeWithKeys(params) {
       typeCalls.push({ ...params });
       if (options.typeResult) return options.typeResult;
-      pendingAddress = String(params.text);
-      if (nameBox) nameBox.value = pendingAddress;
+      if (nameBoxFocused) {
+        pendingAddress = String(params.text);
+        if (nameBox) nameBox.value = pendingAddress;
+      } else {
+        cells.set(selectedAddress, String(params.text));
+      }
       return { success: true, method: 'debuggerAPI' };
     }
   };
@@ -160,7 +202,9 @@ function fillsheetActionHarness(options = {}) {
       return {
         success: true,
         updatedCells: values.length * values[0].length,
-        chunks: 1
+        chunks: 1,
+        verified: true,
+        transport: 'ui'
       };
     },
     async sheetsBoldHeaderRow() {
@@ -359,6 +403,24 @@ test('DOM fallback uses Command on macOS and Control on other platforms', async 
   assert.equal(windowsSelect.metaKey, undefined);
   assert.equal(windowsPaste.ctrlKey, true);
   assert.equal(windowsPaste.metaKey, undefined);
+});
+
+test('DOM writes verify formula-bar readback after paste', async () => {
+  const harness = sheetsDomHarness();
+  const result = await harness.api.sheetsUpdateValues('A1', [['item', 'qty'], ['widgets', '3']], 'RAW');
+  assert.equal(result.success, true);
+  assert.equal(result.verified, true);
+  assert.equal(result.transport, 'ui');
+  assert.equal(harness.pasteCalls, 1);
+  assert.equal(harness.cells.get('A1'), "'item");
+  assert.equal(harness.cells.get('B2'), "'3");
+
+  const missed = sheetsDomHarness({ pasteHasEffect: false });
+  const typed = await missed.api.sheetsUpdateValues('A1', [['widgets']], 'RAW');
+  assert.equal(typed.success, true);
+  assert.equal(typed.transport, 'ui-type');
+  assert.equal(typed.verified, true);
+  assert.equal(missed.cells.get('A1'), "'widgets");
 });
 
 test('legacy fillsheet selects and bolds the exact bounded header range', async () => {

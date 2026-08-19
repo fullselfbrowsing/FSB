@@ -1688,7 +1688,7 @@ function sheetsFormulaBarState() {
     const candidate = editable || element;
     const value = candidate.value !== undefined ? candidate.value : (candidate.innerText ?? candidate.textContent ?? '');
     if (value !== undefined && value !== null) {
-      return { success: true, value: String(value).replace(/\u200B/g, '') };
+      return { success: true, value: String(value).replace(/\u200B/g, '').replace(/\r/g, '').replace(/\n+$/g, '') };
     }
   }
   return sheetsError('GOOGLE_SHEETS_SESSION_UNAVAILABLE', 'formula-bar-unavailable');
@@ -1697,6 +1697,82 @@ function sheetsFormulaBarState() {
 function sheetsActiveAddress() {
   const box = sheetsNameBox();
   return box ? String(box.value || box.textContent || '').trim() : '';
+}
+
+function sheetsFormulaMatchesExpected(expected, actual) {
+  const got = String(actual ?? '').replace(/\u200B/g, '').replace(/\r/g, '').replace(/\n+$/g, '');
+  if (expected === null || expected === undefined || expected === '') return got === '';
+  if (typeof expected === 'boolean') return got.toUpperCase() === (expected ? 'TRUE' : 'FALSE');
+  const want = String(expected).replace(/\r/g, '').replace(/\n+$/g, '');
+  return got === want || got === `'${want}` || (want.startsWith("'") && got === want.slice(1));
+}
+
+async function sheetsDismissBlockingUi() {
+  for (let index = 0; index < 2; index++) {
+    const escaped = await tools.keyPress({ key: 'Escape', useDebuggerAPI: true });
+    if (!escaped || escaped.success !== true || escaped.method !== 'debuggerAPI') {
+      return sheetsError('GOOGLE_SHEETS_SESSION_UNAVAILABLE', 'overlay-escape-not-trusted');
+    }
+    await sheetsDelay(60);
+  }
+  const labels = /^(got it|not now|no thanks|dismiss)$/i;
+  const nodes = Array.from(document.querySelectorAll('button, [role="button"]'));
+  for (const node of nodes) {
+    const text = String(node.textContent || '').replace(/\s+/g, ' ').trim();
+    const aria = String(node.getAttribute?.('aria-label') || '').trim();
+    if (!labels.test(text) && !labels.test(aria)) continue;
+    try { node.click(); } catch (_error) { /* ignore overlay click failures */ }
+    await sheetsDelay(120);
+  }
+  return { success: true };
+}
+
+async function sheetsArmGrid() {
+  const escaped = sheetsTrustedKey(
+    await tools.keyPress({ key: 'Escape', useDebuggerAPI: true }),
+    'grid-arm-escape-not-trusted'
+  );
+  if (!escaped.success) return escaped;
+  const grid = document.querySelector('#sheets-viewport') ||
+    document.querySelector('#waffle-grid-container') ||
+    document.querySelector('.grid-container');
+  try { sheetsNameBox()?.blur?.(); } catch (_error) { /* ignore */ }
+  try { grid?.click(); } catch (_error) { /* grid click is best-effort */ }
+  await sheetsDelay(40);
+  return { success: true };
+}
+
+function sheetsTsvToHtml(text) {
+  const rows = String(text || '').split('\n').map((row) => row.split('\t'));
+  const body = rows.map((row) => `<tr>${row.map((cell) => {
+    const safe = String(cell || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+    return `<td>${safe}</td>`;
+  }).join('')}</tr>`).join('');
+  return `<table><tbody>${body}</tbody></table>`;
+}
+
+async function sheetsVerifyMatrix(parsed, values, startRow) {
+  for (let rowOffset = 0; rowOffset < values.length; rowOffset++) {
+    const row = values[rowOffset];
+    for (let columnOffset = 0; columnOffset < row.length; columnOffset++) {
+      const reference = sheetsUi.cellReference(
+        parsed,
+        parsed.startColumn + columnOffset,
+        startRow + rowOffset
+      );
+      const navigation = await sheetsNavigate(reference, 50);
+      if (!navigation.success) return navigation;
+      const formula = sheetsFormulaBarState();
+      if (!formula.success) return formula;
+      if (!sheetsFormulaMatchesExpected(row[columnOffset], formula.value)) {
+        return sheetsError('RECIPE_DOM_FALLBACK_PENDING', 'ui-write-verification-mismatch');
+      }
+    }
+  }
+  return { success: true };
 }
 
 async function sheetsReadValues(range, majorDimension) {
@@ -1745,17 +1821,67 @@ async function sheetsReadValues(range, majorDimension) {
 
 async function sheetsWriteClipboard(text) {
   try {
+    if (typeof ClipboardItem === 'function' && navigator.clipboard && typeof navigator.clipboard.write === 'function') {
+      try {
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            'text/plain': new Blob([text], { type: 'text/plain' }),
+            'text/html': new Blob([sheetsTsvToHtml(text)], { type: 'text/html' })
+          })
+        ]);
+        return { success: true, format: 'html+plain' };
+      } catch (_htmlError) { /* fall through to text/plain */ }
+    }
     if (!navigator.clipboard || typeof navigator.clipboard.writeText !== 'function') {
       return sheetsError('RECIPE_DOM_FALLBACK_PENDING', 'clipboard-write-unavailable');
     }
     await navigator.clipboard.writeText(text);
-    return { success: true };
+    return { success: true, format: 'plain' };
   } catch (_error) {
     return sheetsError('RECIPE_DOM_FALLBACK_PENDING', 'clipboard-write-failed');
   }
 }
 
-async function sheetsPasteEncoded(parsed, encoded, startRow) {
+async function sheetsTypeEncoded(parsed, encoded, startRow) {
+  for (const chunk of encoded.chunks) {
+    const rows = String(chunk.text || '').split('\n').map((row) => row.split('\t'));
+    const typed = await sheetsTypeMatrix(parsed, rows, startRow + chunk.rowOffset);
+    if (!typed.success) return typed;
+  }
+  return { success: true };
+}
+
+async function sheetsTypeMatrix(parsed, values, startRow) {
+  for (let rowOffset = 0; rowOffset < values.length; rowOffset++) {
+    const row = values[rowOffset];
+    for (let columnOffset = 0; columnOffset < row.length; columnOffset++) {
+      const value = row[columnOffset];
+      if (value === '' || value === null || value === undefined) continue;
+      const reference = sheetsUi.cellReference(
+        parsed,
+        parsed.startColumn + columnOffset,
+        startRow + rowOffset
+      );
+      const navigation = await sheetsNavigate(reference, 50);
+      if (!navigation.success) return navigation;
+      const armed = await sheetsArmGrid();
+      if (!armed.success) return armed;
+      const typed = await tools.typeWithKeys({ text: String(value), clearFirst: false, delay: 5 });
+      if (!typed || typed.success !== true || typed.method !== 'debuggerAPI') {
+        return sheetsError('GOOGLE_SHEETS_SESSION_UNAVAILABLE', 'cell-type-not-trusted');
+      }
+      const entered = sheetsTrustedKey(
+        await tools.keyPress({ key: 'Enter', useDebuggerAPI: true }),
+        'cell-enter-not-trusted'
+      );
+      if (!entered.success) return entered;
+      await sheetsDelay(80);
+    }
+  }
+  return { success: true };
+}
+
+async function sheetsPasteEncoded(parsed, encoded, startRow, originalValues) {
   let completedChunks = 0;
   let mutationStarted = false;
   for (const chunk of encoded.chunks) {
@@ -1772,6 +1898,8 @@ async function sheetsPasteEncoded(parsed, encoded, startRow) {
         ? sheetsError('RECOVERY_AMBIGUOUS', 'ui-paste-target-lost', true)
         : navigation;
     }
+    const armed = await sheetsArmGrid();
+    if (!armed.success) return armed;
     mutationStarted = true;
     try {
       const pasted = await tools.keyPress(sheetsPrimaryShortcut('v', { useDebuggerAPI: true }));
@@ -1784,15 +1912,41 @@ async function sheetsPasteEncoded(parsed, encoded, startRow) {
       return sheetsError('RECOVERY_AMBIGUOUS', 'ui-paste-outcome-unknown', mutationStarted);
     }
   }
+  const chunkValues = Array.isArray(originalValues) ? originalValues : [];
+  const verified = await sheetsVerifyMatrix(parsed, chunkValues, startRow);
+  if (verified.success === true) {
+    return {
+      success: true,
+      status: 200,
+      transport: 'ui',
+      updatedRows: encoded.rows,
+      updatedColumns: encoded.columns,
+      updatedCells: encoded.cells,
+      chunks: completedChunks,
+      mutationStarted,
+      verified: true
+    };
+  }
+  const typed = await sheetsTypeEncoded(parsed, encoded, startRow);
+  if (!typed.success) {
+    return mutationStarted
+      ? sheetsError('RECOVERY_AMBIGUOUS', typed.reason || 'ui-type-fallback-failed', true)
+      : typed;
+  }
+  const typedVerified = await sheetsVerifyMatrix(parsed, chunkValues, startRow);
+  if (typedVerified.success !== true) {
+    return sheetsError('RECOVERY_AMBIGUOUS', 'ui-write-verification-mismatch', true);
+  }
   return {
     success: true,
     status: 200,
-    transport: 'ui',
+    transport: 'ui-type',
     updatedRows: encoded.rows,
     updatedColumns: encoded.columns,
     updatedCells: encoded.cells,
     chunks: completedChunks,
-    mutationStarted
+    mutationStarted,
+    verified: true
   };
 }
 
@@ -1806,7 +1960,9 @@ async function sheetsUpdateValues(range, values, valueInputOption) {
   }
   const encoded = sheetsUi.encodeValues(values, inputOption);
   if (!encoded.success) return sheetsError('RECIPE_DOM_FALLBACK_PENDING', encoded.reason);
-  return sheetsPasteEncoded(parsed, encoded, parsed.startRow);
+  const dismissed = await sheetsDismissBlockingUi();
+  if (!dismissed.success) return dismissed;
+  return sheetsPasteEncoded(parsed, encoded, parsed.startRow, values);
 }
 
 async function sheetsFindAppendRow(parsed, rowsNeeded, insertDataOption) {
@@ -1855,7 +2011,7 @@ async function sheetsAppendValues(range, values, valueInputOption, insertDataOpt
   }
   const boundary = await sheetsFindAppendRow(parsed, encoded.rows, dataOption);
   if (!boundary.success) return boundary;
-  const pasted = await sheetsPasteEncoded(parsed, encoded, boundary.row);
+  const pasted = await sheetsPasteEncoded(parsed, encoded, boundary.row, values);
   if (pasted.success) pasted.appendedRows = encoded.rows;
   return pasted;
 }
@@ -5213,8 +5369,8 @@ const tools = {
         cols: sharedRows[0].length,
         cellsFilled: sharedResult.updatedCells,
         chunks: sharedResult.chunks,
-        transport: 'ui',
-        hadEffect: true
+        transport: sharedResult.transport || 'ui',
+        hadEffect: sharedResult.verified === true
       };
     });
   },
