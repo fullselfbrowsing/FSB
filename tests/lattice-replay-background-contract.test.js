@@ -262,11 +262,13 @@ check('terminal replay overlay delivery completes before resource cleanup preser
   background.includes('if (!options.preserveFinalOverlay)') &&
   !failedStart.includes('preserveFinalOverlay') &&
   !failedRecoveryCleanup.includes('preserveFinalOverlay'));
-check('the in-page replay player exposes play pause forward scrub and four speeds',
+check('the in-page replay player exposes play pause forward scrub and a five-speed pill',
   visualFeedback.includes('class="fsb-replay-controls"') &&
   visualFeedback.includes('class="fsb-replay-scrubber"') &&
-  visualFeedback.includes('<option value="0.5">0.5x</option>') &&
-  visualFeedback.includes('<option value="4">4x</option>') &&
+  visualFeedback.includes('const REPLAY_PLAYER_SPEEDS = Object.freeze([0.5, 1, 2, 4, 8])') &&
+  visualFeedback.includes('<button type="button" class="fsb-replay-speed"') &&
+  visualFeedback.includes('border-radius: 999px') &&
+  !visualFeedback.includes('<select class="fsb-replay-speed"') &&
   renderReplayControls.includes("replay.status === 'paused'") &&
   visualFeedback.includes("command: 'seek'") &&
   visualFeedback.includes("command: 'setSpeed'"));

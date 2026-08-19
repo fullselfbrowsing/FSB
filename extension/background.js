@@ -7475,7 +7475,7 @@ const FSB_REPLAY_TAIL_MS = 750;
 const FSB_REPLAY_MAX_RECORDED_GAP_MS = 30000;
 const FSB_REPLAY_CHECKPOINT_CATALOG_KEY = 'fsbLatticeReplayCheckpointRunsV2';
 const FSB_REPLAY_SEEK_EPSILON_MS = 250;
-const FSB_REPLAY_SPEEDS = Object.freeze([0.5, 1, 2, 4]);
+const FSB_REPLAY_SPEEDS = Object.freeze([0.5, 1, 2, 4, 8]);
 let fsbReplayStartPending = false;
 let fsbPendingMcpReplayApprovalTail = Promise.resolve();
 const FSB_REPLAY_LEGACY_TOOL_MAP = Object.freeze({
@@ -7533,7 +7533,7 @@ function fsbReplayActionLabel(step) {
 
 function fsbReplayNormalizeSpeed(value) {
   const speed = Number(value);
-  return FSB_REPLAY_SPEEDS.includes(speed) ? speed : 1;
+  return FSB_REPLAY_SPEEDS.includes(speed) ? speed : 2;
 }
 
 function fsbReplayBuildTimeline(steps) {
@@ -9070,7 +9070,7 @@ async function handleReplayControl(request, sender, sendResponse) {
       throw new Error('Unknown replay control');
     }
     if (command === 'setSpeed' && !FSB_REPLAY_SPEEDS.includes(Number(request?.speed))) {
-      throw new Error('Replay speed must be 0.5x, 1x, 2x, or 4x');
+      throw new Error('Replay speed must be 0.5x, 1x, 2x, 4x, or 8x');
     }
     if (command === 'seek' && !Number.isFinite(Number(request?.positionMs))) {
       throw new Error('Replay seek position is invalid');

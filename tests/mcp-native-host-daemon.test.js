@@ -224,15 +224,17 @@ function createWakeHarness(options = {}) {
     },
   };
 
+  const defaultEnvironment = {
+    PATH: '/usr/bin:/bin:/usr/sbin:/sbin',
+    HOME: '/Users/fsb',
+    FSB_SENTINEL: 'preserved',
+    NODE_OPTIONS: '--inspect=127.0.0.1:9999',
+    NODE_PATH: '/tmp/hostile-node-path',
+    OMIT_UNDEFINED: undefined,
+  };
   const dependencies = {
-    environment: Object.freeze({
-      PATH: '/usr/bin:/bin',
-      HOME: '/Users/fsb',
-      FSB_SENTINEL: 'preserved',
-      NODE_OPTIONS: '--inspect=127.0.0.1:9999',
-      NODE_PATH: '/tmp/hostile-node-path',
-      OMIT_UNDEFINED: undefined,
-    }),
+    platform: options.platform ?? 'darwin',
+    environment: Object.freeze(options.environment ?? defaultEnvironment),
     now: () => now,
     wait: async (milliseconds) => {
       calls.wait.push(milliseconds);
@@ -705,6 +707,11 @@ async function runWakeDaemonSection() {
     assertEqual(invocation.options.stdio, 'ignore', 'spawn inherits no native protocol streams');
     assertEqual(invocation.options.windowsHide, true, 'spawn hides the Windows console');
     assertEqual(invocation.options.env.FSB_SENTINEL, 'preserved', 'spawn preserves ordinary inherited environment');
+    assertEqual(
+      invocation.options.env.PATH,
+      '/usr/bin:/bin:/usr/sbin:/sbin:/Users/fsb/.local/bin:/opt/homebrew/bin:/usr/local/bin',
+      'macOS native serve appends user-local and Homebrew provider locations to Chrome PATH',
+    );
     assertEqual(Object.hasOwn(invocation.options.env, 'NODE_OPTIONS'), false, 'spawn strips NODE_OPTIONS');
     assertEqual(Object.hasOwn(invocation.options.env, 'NODE_PATH'), false, 'spawn strips NODE_PATH');
     assertEqual(Object.hasOwn(invocation.options.env, 'OMIT_UNDEFINED'), false, 'spawn omits undefined environment values');
@@ -799,6 +806,92 @@ async function runWakeDaemonSection() {
       [first.reason, second.reason].sort().join(','),
       'daemon_already_ready,daemon_started_ready',
       'concurrent settlements remain closed lifecycle facts',
+    );
+  }
+
+  const pathCases = [
+    {
+      name: 'existing provider directories are deduplicated without changing inherited order',
+      options: {
+        environment: {
+          PATH: '/opt/homebrew/bin:relative:/usr/bin:/opt/homebrew/bin:/usr/local/bin',
+          HOME: '/Users/fsb',
+          NODE_OPTIONS: '--inspect',
+          NODE_PATH: '/tmp/node-path',
+        },
+      },
+      expected: '/opt/homebrew/bin:/usr/bin:/usr/local/bin:/Users/fsb/.local/bin',
+    },
+    {
+      name: 'control-bearing PATH and HOME are rejected before fixed fallbacks are appended',
+      options: {
+        environment: {
+          PATH: 'relative:/usr/bin:/bad\nentry:/usr/bin',
+          HOME: '/Users/fsb\tforged',
+        },
+      },
+      expected: '/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:/usr/local/bin',
+    },
+    {
+      name: 'overlong inherited PATH is rejected before bounded defaults are applied',
+      options: {
+        environment: { PATH: `/${'p'.repeat(4_096)}`, HOME: '/Users/fsb' },
+      },
+      expected: '/usr/bin:/bin:/usr/sbin:/sbin:/Users/fsb/.local/bin:/opt/homebrew/bin:/usr/local/bin',
+    },
+    {
+      name: 'trusted entries retain space when a valid inherited PATH approaches the byte bound',
+      options: {
+        environment: { PATH: `/usr/bin:/${'p'.repeat(4_050)}`, HOME: '/Users/fsb' },
+      },
+      expected: '/usr/bin:/Users/fsb/.local/bin:/opt/homebrew/bin:/usr/local/bin',
+    },
+    {
+      name: 'missing PATH and HOME receive only the bounded macOS system and provider defaults',
+      options: { environment: {} },
+      expected: '/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:/usr/local/bin',
+    },
+    {
+      name: 'non-macOS PATH behavior remains byte-for-byte unchanged',
+      options: {
+        platform: 'linux',
+        environment: { PATH: 'relative:/usr/bin:/usr/bin', HOME: '/home/fsb' },
+      },
+      expected: 'relative:/usr/bin:/usr/bin',
+    },
+  ];
+  for (const pathCase of pathCases) {
+    const harness = createWakeHarness({
+      ...pathCase.options,
+      health: async (state) => (
+        state.calls.spawn.length > 0 && state.calls.wait.length > 0
+          ? readyHealth()
+          : new Error('offline')
+      ),
+    });
+    const result = await daemon.wakeServeDaemon({
+      runtime: harness.runtime,
+      dependencies: harness.dependencies,
+    });
+    assertEqual(result.outcome, 'started', `${pathCase.name}: daemon starts`);
+    assertEqual(
+      harness.state.calls.spawn[0]?.options.env.PATH,
+      pathCase.expected,
+      pathCase.name,
+    );
+    assert(
+      Buffer.byteLength(harness.state.calls.spawn[0]?.options.env.PATH ?? '', 'utf8') <= 4_096,
+      `${pathCase.name}: normalized PATH remains byte-bounded`,
+    );
+    assertEqual(
+      Object.hasOwn(harness.state.calls.spawn[0]?.options.env ?? {}, 'NODE_OPTIONS'),
+      false,
+      `${pathCase.name}: NODE_OPTIONS remains stripped`,
+    );
+    assertEqual(
+      Object.hasOwn(harness.state.calls.spawn[0]?.options.env ?? {}, 'NODE_PATH'),
+      false,
+      `${pathCase.name}: NODE_PATH remains stripped`,
     );
   }
 

@@ -84,7 +84,7 @@ function makeTimelineApi() {
       'const FSB_REPLAY_LEAD_IN_MS = 750;\n' +
       'const FSB_REPLAY_TAIL_MS = 750;\n' +
       'const FSB_REPLAY_MAX_RECORDED_GAP_MS = 30000;\n' +
-      'const FSB_REPLAY_SPEEDS = Object.freeze([0.5, 1, 2, 4]);\n' +
+      'const FSB_REPLAY_SPEEDS = Object.freeze([0.5, 1, 2, 4, 8]);\n' +
       declarationSource(background, 'getReplayDelay') + '\n' +
       declarationSource(background, 'fsbReplayNormalizeSpeed') + '\n' +
       declarationSource(background, 'fsbReplayBuildTimeline') + '\n' +
@@ -116,13 +116,69 @@ test('missing or non-monotonic timestamps use the existing tool-aware replay del
   assert.deepEqual(timeline.offsets, [750, 1250, 1550]);
 });
 
-test('only the four player speeds are accepted', () => {
+test('the five player speeds are accepted and missing speeds default to 2x', () => {
   const api = makeTimelineApi();
   assert.equal(api.normalizeSpeed(0.5), 0.5);
+  assert.equal(api.normalizeSpeed(1), 1);
   assert.equal(api.normalizeSpeed('2'), 2);
   assert.equal(api.normalizeSpeed(4), 4);
-  assert.equal(api.normalizeSpeed(3), 1);
-  assert.equal(api.normalizeSpeed('fast'), 1);
+  assert.equal(api.normalizeSpeed(8), 8);
+  assert.equal(api.normalizeSpeed(3), 2);
+  assert.equal(api.normalizeSpeed('fast'), 2);
+  assert.equal(api.normalizeSpeed(undefined), 2);
+});
+
+test('fresh replay sessions start at 2x while resumed sessions preserve a valid saved speed', () => {
+  const context = {
+    fsbReplayClone(value, fallback) {
+      return JSON.parse(JSON.stringify(value === undefined ? fallback : value));
+    },
+    fsbReplayOrigin(value) {
+      return value ? new URL(value).origin : '';
+    },
+    Date,
+    URL
+  };
+  vm.createContext(context);
+  vm.runInContext(
+    'const FSB_REPLAY_CHECKPOINT_CATALOG_KEY = "replay-checkpoints";\n' +
+      'const FSB_REPLAY_LEGACY_TOOL_MAP = Object.freeze({});\n' +
+      'const FSB_REPLAY_LEAD_IN_MS = 750;\n' +
+      'const FSB_REPLAY_TAIL_MS = 750;\n' +
+      'const FSB_REPLAY_MAX_RECORDED_GAP_MS = 30000;\n' +
+      'const FSB_REPLAY_SPEEDS = Object.freeze([0.5, 1, 2, 4, 8]);\n' +
+      declarationSource(background, 'getReplayDelay') + '\n' +
+      declarationSource(background, 'fsbReplayNormalizeSpeed') + '\n' +
+      declarationSource(background, 'fsbReplayBuildTimeline') + '\n' +
+      declarationSource(background, 'fsbReplayBuildSession') + '\n' +
+      'this.buildSession = fsbReplayBuildSession;',
+    context,
+    { filename: 'extension/background.js' }
+  );
+
+  const prepared = {
+    sessionId: 'recorded-session',
+    startUrl: 'https://example.test/start',
+    tabs: [],
+    steps: [{ id: 'step-1', tool: 'click' }],
+    replay: { manifest: { task: 'Default speed' }, manifestHash: 'manifest-hash' },
+    receiptCid: 'source-receipt',
+    resultProjectionByStepId: {}
+  };
+  const owned = {
+    agentId: 'replay-agent',
+    ownershipToken: 'ownership-token',
+    tab: { id: 77, url: prepared.startUrl }
+  };
+
+  const fresh = context.buildSession(prepared, 'fresh-replay', owned, [], null, null);
+  assert.equal(fresh.playback.speed, 2);
+
+  const resumed = context.buildSession(prepared, 'resumed-replay', owned, [], {
+    nextStep: 0,
+    playback: { speed: 1, positionMs: 0 }
+  }, null);
+  assert.equal(resumed.playback.speed, 1);
 });
 
 test('truncated replay previews remain verifiable but are inspect-only', () => {
@@ -380,6 +436,7 @@ test('replay player interpolation stops at its anchor and accepts authoritative 
   };
   vm.createContext(context);
   vm.runInContext(
+    'const REPLAY_PLAYER_SPEEDS = Object.freeze([0.5, 1, 2, 4, 8]);\n' +
     classSource(fs.readFileSync(
       path.resolve(__dirname, '..', 'extension', 'content', 'visual-feedback.js'),
       'utf8'
@@ -1264,7 +1321,7 @@ function makeControlHarness(options = {}) {
     async fsbBroadcastAutomationLifecycle() {},
     automationLogger: { logSessionEnd() {} },
     async cleanupSession() {},
-    fsbReplayNormalizeSpeed(value) { return [0.5, 1, 2, 4].includes(Number(value)) ? Number(value) : 1; },
+    fsbReplayNormalizeSpeed(value) { return [0.5, 1, 2, 4, 8].includes(Number(value)) ? Number(value) : 2; },
     fsbReplayPlaybackSnapshot(value) {
       return {
         paused: value.playback.paused,
@@ -1287,7 +1344,7 @@ function makeControlHarness(options = {}) {
       declarationSource(background, 'fsbReplayRecordCheckpointNow') + '\n' +
       declarationSource(background, 'fsbReplayRecordCheckpoint') + '\n' +
       declarationSource(background, 'fsbReplayFinalize') + '\n' +
-      'const FSB_REPLAY_SPEEDS = Object.freeze([0.5, 1, 2, 4]);\n' +
+      'const FSB_REPLAY_SPEEDS = Object.freeze([0.5, 1, 2, 4, 8]);\n' +
       'const FSB_REPLAY_SEEK_EPSILON_MS = 250;\n' +
       declarationSource(background, 'fsbReplayCanControl') + '\n' +
       declarationSource(background, 'handleReplayControl') + '\n' +
@@ -1342,8 +1399,8 @@ test('owned replay tabs can pause, resume, change speed, and seek forward', asyn
   assert.equal((await harness.control({ command: 'play' })).success, true);
   assert.equal(harness.session.playback.paused, false);
 
-  assert.equal((await harness.control({ command: 'setSpeed', speed: 4 })).success, true);
-  assert.equal(harness.session.playback.speed, 4);
+  assert.equal((await harness.control({ command: 'setSpeed', speed: 8 })).success, true);
+  assert.equal(harness.session.playback.speed, 8);
 
   assert.equal((await harness.control({ command: 'seek', positionMs: 8000 })).success, true);
   assert.equal(harness.session.playback.positionMs, 8000);
@@ -1357,7 +1414,7 @@ test('replay controls reject backward seeks, unsupported speeds, and unrelated t
 
   const speed = await harness.control({ command: 'setSpeed', speed: 3 });
   assert.equal(speed.success, false);
-  assert.match(speed.error, /0\.5x, 1x, 2x, or 4x/);
+  assert.match(speed.error, /0\.5x, 1x, 2x, 4x, or 8x/);
 
   const unrelated = await harness.control({ command: 'pause' }, { tab: { id: 88 } });
   assert.equal(unrelated.success, false);

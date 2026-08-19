@@ -71,7 +71,7 @@ function makeElement(tagName) {
         ['div', 'fsb-replay-progress-track'],
         ['div', 'fsb-replay-progress-fill'],
         ['input', 'fsb-replay-scrubber'],
-        ['select', 'fsb-replay-speed'],
+        ['button', 'fsb-replay-speed'],
         ['div', 'fsb-replay-minimal-track'],
         ['div', 'fsb-replay-minimal-fill']
       ];
@@ -257,7 +257,7 @@ function replayState(overrides) {
   return Object.assign({
     sessionId: 'session-replay-player',
     status: 'playing',
-    speed: 1,
+    speed: 2,
     positionMs: 2500,
     durationMs: 10000,
     currentStep: 1,
@@ -292,10 +292,16 @@ console.log('--- Replay player overlay ---');
   assert.equal(player.host.hasAttribute('aria-hidden'), false, 'interactive player remains in the accessibility tree');
   assert.equal(player.container.classList.contains('fsb-replay-shell'), true);
   assert.equal(player.container.querySelector('.fsb-overlay'), null, 'player does not contain the normal progress overlay');
+  const speed = player.container.querySelector('.fsb-replay-speed');
+  assert.equal(speed.tagName, 'BUTTON', 'speed control is a native button');
+  assert.equal(speed.textContent, '2\u00D7', 'fresh replay renders the 2x default');
+  assert.equal(speed.getAttribute('aria-label'), 'Replay speed 2\u00D7. Activate to change to 4\u00D7');
   assert.equal(progressSegment.includes('fsb-replay-'), false, 'ProgressOverlay contains no replay-specific DOM or state');
   assert.match(player.host.style.cssText, /left:\s*50%/);
   assert.match(player.host.style.cssText, /bottom:\s*max\(16px/);
   assert.match(visualFeedbackSource, /\.fsb-replay-minimal-track\s*\{[\s\S]*?height:\s*3px/);
+  assert.match(visualFeedbackSource, /\.fsb-replay-speed\s*\{[\s\S]*?border-radius:\s*999px/);
+  assert.doesNotMatch(visualFeedbackSource, /<select class="fsb-replay-speed"/);
   player.destroy();
 }
 
@@ -339,6 +345,7 @@ console.log('--- Replay player overlay ---');
 
   player.update(replayState({ status: 'decision' }), 'running');
   assert.equal(shell.querySelector('.fsb-replay-toggle').disabled, true, 'decision state disables playback control');
+  assert.equal(shell.querySelector('.fsb-replay-speed').disabled, true, 'decision state disables speed control');
   assert.equal(shell.classList.contains('controls-hidden'), false, 'decision state stays visible');
 
   player.update(replayState({ status: 'playing' }), 'running');
@@ -386,13 +393,17 @@ console.log('--- Replay player overlay ---');
   player.container.querySelector('.fsb-replay-toggle').dispatchEvent({ type: 'click' });
   assert.equal(sentMessages.at(-1).command, 'pause');
   const speed = player.container.querySelector('.fsb-replay-speed');
-  speed.value = '4';
-  speed.dispatchEvent({ type: 'change' });
-  assertMessage(sentMessages.at(-1), {
-    action: 'controlReplay',
-    sessionId: 'session-replay-player',
-    command: 'setSpeed',
-    speed: 4
+  const expectedSpeeds = [4, 8, 0.5, 1, 2];
+  const expectedLabels = ['4\u00D7', '8\u00D7', '\u00BD\u00D7', '1\u00D7', '2\u00D7'];
+  expectedSpeeds.forEach((expectedSpeed, index) => {
+    speed.dispatchEvent({ type: 'click' });
+    assertMessage(sentMessages.at(-1), {
+      action: 'controlReplay',
+      sessionId: 'session-replay-player',
+      command: 'setSpeed',
+      speed: expectedSpeed
+    });
+    assert.equal(speed.textContent, expectedLabels[index]);
   });
   player.destroy();
 }
@@ -404,6 +415,7 @@ console.log('--- Replay player overlay ---');
   player.update(replayState({ status: 'completed', positionMs: 10000 }), 'final');
 
   assert.equal(player.container.querySelector('.fsb-replay-toggle').disabled, true);
+  assert.equal(player.container.querySelector('.fsb-replay-speed').disabled, true);
   assert.equal(player.container.classList.contains('controls-hidden'), false, 'terminal controls remain visible initially');
   fireTimer(3000);
   assert.equal(player.container.classList.contains('terminal-hidden'), true, 'terminal player begins fading after three seconds');

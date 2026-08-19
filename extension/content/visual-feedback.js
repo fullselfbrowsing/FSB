@@ -1152,6 +1152,7 @@
 
   const REPLAY_PLAYER_HIDE_DELAY_MS = 3000;
   const REPLAY_PLAYER_FADE_MS = 200;
+  const REPLAY_PLAYER_SPEEDS = Object.freeze([0.5, 1, 2, 4, 8]);
 
   /**
    * ReplayPlayerOverlay - Bottom-center, video-style replay controls.
@@ -1180,6 +1181,7 @@
       this._clockAnchorAt = 0;
       this._clockAnchorPositionMs = 0;
       this._clockPositionMs = 0;
+      this._pendingSpeed = null;
       this._listenersAttached = false;
       this._handleDocumentPointerMove = this._handleDocumentPointerMove.bind(this);
       this._handleDocumentPointerDown = this._handleDocumentPointerDown.bind(this);
@@ -1190,6 +1192,34 @@
       var minutes = Math.floor(totalSeconds / 60);
       var seconds = totalSeconds % 60;
       return minutes + ':' + (seconds < 10 ? '0' : '') + seconds;
+    }
+
+    _normalizeSpeed(value) {
+      var speed = Number(value);
+      return REPLAY_PLAYER_SPEEDS.includes(speed) ? speed : 2;
+    }
+
+    _speedLabel(value) {
+      var speed = this._normalizeSpeed(value);
+      return speed === 0.5 ? '\u00BD\u00D7' : speed + '\u00D7';
+    }
+
+    _nextSpeed(value) {
+      var speed = this._normalizeSpeed(value);
+      var index = REPLAY_PLAYER_SPEEDS.indexOf(speed);
+      return REPLAY_PLAYER_SPEEDS[(index + 1) % REPLAY_PLAYER_SPEEDS.length];
+    }
+
+    _renderSpeed(value) {
+      if (!this.container) return;
+      var speed = this._normalizeSpeed(value);
+      var label = this._speedLabel(speed);
+      var nextLabel = this._speedLabel(this._nextSpeed(speed));
+      var button = this.container.querySelector('.fsb-replay-speed');
+      if (!button) return;
+      button.textContent = label;
+      button.setAttribute('aria-label', 'Replay speed ' + label + '. Activate to change to ' + nextLabel);
+      button.setAttribute('title', 'Replay speed: ' + label + ' (click to change)');
     }
 
     _isTerminal(replay, lifecycle) {
@@ -1283,11 +1313,18 @@
 
     _sendControl(message, errorLabel) {
       try {
-        Promise.resolve(chrome.runtime.sendMessage(message)).catch((err) => {
+        return Promise.resolve(chrome.runtime.sendMessage(message)).then((response) => {
+          if (response && response.success === false) {
+            throw new Error(response.error || errorLabel);
+          }
+          return response;
+        }).catch((err) => {
           logger.error(errorLabel, { error: err && err.message });
+          return null;
         });
       } catch (err) {
         logger.error(errorLabel, { error: err && err.message });
+        return Promise.resolve(null);
       }
     }
 
@@ -1330,7 +1367,7 @@
       var elapsed = Math.max(0, at - this._clockAnchorAt);
       return Math.max(0, Math.min(
         target,
-        this._clockAnchorPositionMs + (elapsed * (Number(replay.speed) || 1))
+        this._clockAnchorPositionMs + (elapsed * this._normalizeSpeed(replay.speed))
       ));
     }
 
@@ -1526,17 +1563,26 @@
         width: 54px;
         height: 28px;
         border: 1px solid rgba(255, 255, 255, 0.16);
-        border-radius: 7px;
+        border-radius: 999px;
         outline: 0;
         background: rgba(255, 255, 255, 0.07);
         color: rgba(255, 255, 255, 0.9);
-        padding: 0 5px;
+        padding: 0 10px;
         cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
         font-size: 10px;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+        transition: background 0.15s ease-out, border-color 0.15s ease-out, color 0.15s ease-out;
       }
 
+      .fsb-replay-speed:hover:not(:disabled),
       .fsb-replay-speed:focus-visible {
         border-color: rgba(255, 159, 46, 0.78);
+        background: rgba(255, 140, 0, 0.16);
+        color: #FFB45C;
       }
 
       .fsb-replay-toggle:disabled,
@@ -1609,12 +1655,7 @@
           </div>
           <input class="fsb-replay-scrubber" type="range" min="0" max="1" value="0" step="100" aria-label="Replay position, forward seek only" title="Seek forward through the replay">
         </div>
-        <select class="fsb-replay-speed" aria-label="Replay speed">
-          <option value="0.5">0.5x</option>
-          <option value="1" selected>1x</option>
-          <option value="2">2x</option>
-          <option value="4">4x</option>
-        </select>
+        <button type="button" class="fsb-replay-speed" aria-label="Replay speed 2\u00D7. Activate to change to 4\u00D7" title="Replay speed: 2\u00D7 (click to change)">2\u00D7</button>
       </div>
       <div class="fsb-replay-minimal-track" aria-hidden="true">
         <div class="fsb-replay-minimal-fill"></div>
@@ -1680,16 +1721,34 @@
       });
 
       const replaySpeed = this.container.querySelector('.fsb-replay-speed');
-      replaySpeed.addEventListener('change', (event) => {
+      replaySpeed.addEventListener('click', (event) => {
         event.stopPropagation();
         var replay = this._replayState;
-        if (!replay || this._isTerminal(replay, this._lifecycle)) return;
+        if (!replay || replay.status === 'decision' || this._isTerminal(replay, this._lifecycle)) return;
+        var currentSpeed = this._pendingSpeed === null
+          ? this._normalizeSpeed(replay.speed)
+          : this._pendingSpeed;
+        var nextSpeed = this._nextSpeed(currentSpeed);
+        this._pendingSpeed = nextSpeed;
+        this._renderSpeed(nextSpeed);
+        var self = this;
         this._sendControl({
           action: 'controlReplay',
           sessionId: replay.sessionId,
           command: 'setSpeed',
-          speed: Number(replaySpeed.value)
-        }, 'Replay speed change failed');
+          speed: nextSpeed
+        }, 'Replay speed change failed').then(function(response) {
+          if (!self.container || !self._replayState ||
+              self._replayState.sessionId !== replay.sessionId || self._pendingSpeed !== nextSpeed) return;
+          if (response && response.playback) {
+            var committedSpeed = self._normalizeSpeed(response.playback.speed);
+            self._pendingSpeed = null;
+            self._renderSpeed(committedSpeed);
+          } else if (response === null) {
+            self._pendingSpeed = null;
+            self._renderSpeed(self._replayState && self._replayState.speed);
+          }
+        });
         this._scheduleAutoHide(true);
       });
 
@@ -1739,6 +1798,7 @@
       this._lifecycle = lifecycle || 'running';
       var terminal = this._isTerminal(replay, this._lifecycle);
       var awaitingDecision = replay.status === 'decision';
+      if (isNewSession || terminal || awaitingDecision) this._pendingSpeed = null;
       this._clockPositionMs = Math.max(
         0,
         Math.min(Number(replay.durationMs) || 0, Number(replay.positionMs) || 0)
@@ -1762,7 +1822,9 @@
       if (!this._scrubbing) this._renderPosition(this._clockPositionMs, replay.durationMs, true);
 
       var speed = this.container.querySelector('.fsb-replay-speed');
-      speed.value = String(replay.speed || 1);
+      var authoritativeSpeed = this._normalizeSpeed(replay.speed);
+      if (this._pendingSpeed === authoritativeSpeed) this._pendingSpeed = null;
+      this._renderSpeed(this._pendingSpeed === null ? authoritativeSpeed : this._pendingSpeed);
       speed.disabled = terminal || awaitingDecision;
 
       if (terminal) {
@@ -1815,6 +1877,7 @@
       this._clockAnchorAt = 0;
       this._clockAnchorPositionMs = 0;
       this._clockPositionMs = 0;
+      this._pendingSpeed = null;
     }
   }
 

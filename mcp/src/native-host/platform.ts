@@ -70,6 +70,7 @@ export interface NativeHostStartLease {
 }
 
 export interface NativeHostDaemonDependencies {
+  platform: NodeJS.Platform;
   environment: Readonly<Record<string, string | undefined>>;
   now(): number;
   wait(milliseconds: number): Promise<void>;
@@ -114,6 +115,7 @@ export interface NativeHostProductionEnvironment {
 
 type NativeHostDaemonDependencyOptions = Readonly<{
   startLeasePort?: number;
+  platform?: NodeJS.Platform;
 }>;
 
 function isMissing(error: unknown): boolean {
@@ -425,6 +427,7 @@ export function createNativeHostDaemonDependencies(
     throw new TypeError('Invalid native-host start lease port');
   }
   return Object.freeze({
+    platform: options.platform ?? process.platform,
     environment: Object.freeze({ ...environment }),
     now: () => Date.now(),
     wait: (milliseconds: number) => new Promise<void>((resolve) => {

@@ -1,4 +1,4 @@
-import { isAbsolute, join, normalize } from 'node:path';
+import { isAbsolute, join, normalize, posix } from 'node:path';
 import {
   NATIVE_HOST_DAEMON_START_TIMEOUT_MS,
   NATIVE_HOST_HEALTH_MAX_BYTES,
@@ -70,6 +70,8 @@ const LOCK_METADATA_MAX_BYTES = 256;
 const TOKEN_PATTERN = /^[a-f0-9]{32}$/u;
 const VERSION_PATTERN = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/u;
 const MAX_PATH_BYTES = 4096;
+const DARWIN_SYSTEM_PATH = Object.freeze(['/usr/bin', '/bin', '/usr/sbin', '/sbin']);
+const DARWIN_PROVIDER_PATH = Object.freeze(['/opt/homebrew/bin', '/usr/local/bin']);
 
 const ALREADY_RUNNING = Object.freeze({
   outcome: 'already_running',
@@ -530,7 +532,67 @@ async function releaseLock(
   }
 }
 
+function boundedControlFreeString(value: unknown): value is string {
+  return typeof value === 'string'
+    && value.length > 0
+    && Buffer.byteLength(value, 'utf8') <= MAX_PATH_BYTES
+    && !/[\u0000-\u001f\u007f]/u.test(value);
+}
+
+function safePosixPath(value: unknown): value is string {
+  return boundedControlFreeString(value)
+    && posix.isAbsolute(value)
+    && posix.normalize(value) === value;
+}
+
+function normalizedDarwinPath(
+  environment: Readonly<Record<string, string | undefined>>,
+): string {
+  const inherited = boundedControlFreeString(environment.PATH)
+    ? environment.PATH.split(posix.delimiter)
+    : [];
+  const entries: string[] = [];
+  const seen = new Set<string>();
+  const append = (value: unknown): void => {
+    if (!safePosixPath(value) || seen.has(value)) return;
+    seen.add(value);
+    entries.push(value);
+  };
+
+  for (const entry of inherited) append(entry);
+  if (entries.length === 0) {
+    for (const entry of DARWIN_SYSTEM_PATH) append(entry);
+  }
+
+  const home = environment.HOME;
+  const homeBin = safePosixPath(home) ? posix.join(home, '.local', 'bin') : null;
+  const trustedEntries = homeBin
+    && safePosixPath(homeBin)
+    && Buffer.byteLength(
+      [homeBin, ...DARWIN_PROVIDER_PATH].join(posix.delimiter),
+      'utf8',
+    ) <= MAX_PATH_BYTES
+    ? [homeBin, ...DARWIN_PROVIDER_PATH]
+    : [...DARWIN_PROVIDER_PATH];
+  const trusted = new Set(trustedEntries);
+  for (const entry of trustedEntries) append(entry);
+
+  while (Buffer.byteLength(entries.join(posix.delimiter), 'utf8') > MAX_PATH_BYTES) {
+    let removable = -1;
+    for (let index = entries.length - 1; index >= 0; index -= 1) {
+      if (trusted.has(entries[index])) continue;
+      removable = index;
+      break;
+    }
+    if (removable < 0) break;
+    seen.delete(entries[removable]);
+    entries.splice(removable, 1);
+  }
+  return entries.join(posix.delimiter);
+}
+
 function sanitizedEnvironment(
+  platform: NodeJS.Platform,
   environment: Readonly<Record<string, string | undefined>>,
 ): Readonly<Record<string, string>> {
   const result: Record<string, string> = Object.create(null);
@@ -538,6 +600,7 @@ function sanitizedEnvironment(
     if (key === 'NODE_OPTIONS' || key === 'NODE_PATH' || typeof value !== 'string') continue;
     result[key] = value;
   }
+  if (platform === 'darwin') result.PATH = normalizedDarwinPath(environment);
   return Object.freeze(result);
 }
 
@@ -589,7 +652,7 @@ async function spawnServe(
   ]);
   const options: NativeHostSpawnOptions = Object.freeze({
     cwd: runtime.stableRuntimeRoot,
-    env: sanitizedEnvironment(dependencies.environment),
+    env: sanitizedEnvironment(dependencies.platform, dependencies.environment),
     shell: false,
     detached: true,
     stdio: 'ignore',
