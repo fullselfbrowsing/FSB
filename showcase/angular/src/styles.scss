@@ -354,6 +354,75 @@ code,
   gap: 24px;
 }
 
+/* Standard footer layout. Page/shell styles own colors only. */
+.footer:not(.stats-footer) {
+  margin-bottom: 0;
+  padding: 48px 0 44px;
+}
+
+.footer-inner {
+  align-items: flex-start;
+  display: flex;
+  gap: 48px;
+  justify-content: space-between;
+  margin-bottom: 32px;
+}
+
+.footer-brand {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+}
+
+.footer-brand .fsb-mark {
+  font-size: 1.32rem;
+}
+
+.footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 48px;
+}
+
+.footer-column h4 {
+  font-size: 0.85rem;
+  font-weight: 700;
+  margin-bottom: 12px;
+  text-transform: uppercase;
+}
+
+.footer-column a {
+  display: block;
+  font-size: 0.9rem;
+  margin-bottom: 8px;
+}
+
+.footer-column a.footer-x-link {
+  align-items: center;
+  display: flex;
+  font-size: 0;
+  line-height: 1;
+  width: fit-content;
+}
+
+.footer-column a.footer-x-link::before {
+  content: '\e61b';
+  font-family: 'Font Awesome 6 Brands';
+  font-size: 0.95rem;
+  font-weight: 400;
+}
+
+.footer-bottom {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  padding-top: 24px;
+}
+
+.footer-bottom p {
+  font-size: 0.85rem;
+}
+
 @media (max-width: 768px) {
   :root {
     --nav-height: 56px;
@@ -362,6 +431,21 @@ code,
 
   .container {
     padding: 0 16px;
+  }
+
+  .footer-inner {
+    flex-direction: column;
+    gap: 28px;
+  }
+
+  .footer-links {
+    gap: 28px 36px;
+  }
+
+  .footer-bottom {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
   }
 }
 

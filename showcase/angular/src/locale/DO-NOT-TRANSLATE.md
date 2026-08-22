@@ -56,6 +56,7 @@ whole element only when all of its content is genuinely invariant.
 - Codex
 - Codex MCP
 - Computer Use
+- Concierge
 - CSSOM
 - CSRF
 - Cursor
@@ -108,10 +109,12 @@ whole element only when all of its content is genuinely invariant.
 - Project Mariner
 - Prometheus
 - pnpm
+- React
 - Remote Dashboard
 - Safari
 - SDK
 - Standard Schema
+- Svelte
 - TypeScript
 - Vivaldi
 - WeakMap
@@ -119,6 +122,7 @@ whole element only when all of its content is genuinely invariant.
 - WebSocket
 - Windsurf
 - X
+- XSS
 - xAI
 - YouTube
 - Zod
