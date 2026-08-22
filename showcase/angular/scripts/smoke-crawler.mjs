@@ -46,6 +46,7 @@ const MARKETING_ASSERTIONS = [
   { path: '/support',        titleSubstr: 'Support',            canonical: `${PROD_HOST}/support` },
   { path: '/privacy',        titleSubstr: 'Privacy',            canonical: `${PROD_HOST}/privacy` },
   { path: '/lattice',        titleSubstr: 'Lattice',            canonical: `${PROD_HOST}/lattice` },
+  { path: '/concierge',      titleSubstr: 'Concierge',          canonical: `${PROD_HOST}/concierge` },
   { path: '/phantom-stream', titleSubstr: 'PhantomStream',      canonical: `${PROD_HOST}/phantom-stream` },
   { path: '/prometheus',     titleSubstr: 'Prometheus',         canonical: `${PROD_HOST}/prometheus` },
   { path: '/sitemaps',       titleSubstr: 'Site Maps',          canonical: `${PROD_HOST}/sitemaps` },

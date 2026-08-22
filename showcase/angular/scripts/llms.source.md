@@ -29,6 +29,7 @@ Unlike cloud browser agents that run in a headless container without your cookie
 - [Support](https://full-selfbrowsing.com/support): Setup guides, MCP configuration, troubleshooting, GitHub issues, and direct contact.
 - [Privacy](https://full-selfbrowsing.com/privacy): How FSB handles your data -- API keys encrypted in Chrome local storage, opt-out anonymous usage telemetry for aggregate public stats only, automation runs locally in your browser.
 - [Lattice](https://full-selfbrowsing.com/lattice): Capability runtime SDK for multimodal AI applications -- typed outputs, inspectable plans, provider routing, artifacts, tools, audit receipts, and replay-friendly records.
+- [Concierge](https://full-selfbrowsing.com/concierge): Safe action layer for agent-ready web applications -- typed verbs, live catalogs, consent-bound dispatch, and signed replay-protected batches.
 - [PhantomStream](https://full-selfbrowsing.com/phantom-stream): DOM-native live browser mirroring -- one style-inlined snapshot, then MutationObserver diffs instead of pixels. Powers the FSB remote dashboard live preview.
 - [Prometheus](https://full-selfbrowsing.com/prometheus): The autonomous browser build behind FSB -- native control spine, stdio MCP bridge, multi-agent tab ownership, runtime sidebar, and DOM-native supervision.
 - [Site Maps](https://full-selfbrowsing.com/sitemaps): Community site maps hub (under development) -- contribute well-tested site schemas that can become built-in browser knowledge.

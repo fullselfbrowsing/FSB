@@ -21,6 +21,7 @@ export const serverRoutes: ServerRoute[] = [
   { path: 'support', renderMode: RenderMode.Prerender },
   { path: 'agents', renderMode: RenderMode.Prerender },
   { path: 'lattice', renderMode: RenderMode.Prerender },
+  { path: 'concierge', renderMode: RenderMode.Prerender },
   { path: 'phantom-stream', renderMode: RenderMode.Prerender },
   { path: 'prometheus', renderMode: RenderMode.Prerender },
   { path: 'sitemaps', renderMode: RenderMode.Prerender },

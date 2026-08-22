@@ -884,7 +884,7 @@
 .footer {
   background: var(--bg-card);
   border-top: 1px solid var(--border-color);
-  padding: 48px 0 24px;
+  padding: 48px 0 44px;
 }
 
 .footer-inner {
@@ -1046,6 +1046,10 @@
   .footer-inner {
     flex-direction: column;
     gap: 28px;
+  }
+
+  .footer-links {
+    gap: 28px 36px;
   }
 
   .footer-bottom {

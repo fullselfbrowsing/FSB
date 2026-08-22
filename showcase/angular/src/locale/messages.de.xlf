@@ -274,12 +274,20 @@
           <context context-type="linenumber">85,86</context>
         </context-group>
       </trans-unit>
+      <trans-unit id="shell.footer.research.concierge" datatype="html">
+        <source>Concierge</source>
+        <target state="translated">Concierge</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/layout/showcase-shell/showcase-shell.component.html</context>
+          <context context-type="linenumber">86,87</context>
+        </context-group>
+      </trans-unit>
       <trans-unit id="shell.footer.research.phantomStream" datatype="html">
         <source>PhantomStream</source>
         <target state="translated">PhantomStream</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/layout/showcase-shell/showcase-shell.component.html</context>
-          <context context-type="linenumber">86,87</context>
+          <context context-type="linenumber">87,88</context>
         </context-group>
       </trans-unit>
       <trans-unit id="shell.footer.research.prometheus" datatype="html">
@@ -287,20 +295,12 @@
         <target state="translated">Prometheus</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/layout/showcase-shell/showcase-shell.component.html</context>
-          <context context-type="linenumber">87,89</context>
+          <context context-type="linenumber">88,90</context>
         </context-group>
       </trans-unit>
       <trans-unit id="shell.footer.col.community.title" datatype="html">
         <source>Community</source>
         <target state="translated">Gemeinschaft</target>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/layout/showcase-shell/showcase-shell.component.html</context>
-          <context context-type="linenumber">90,91</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="shell.footer.community.sitemaps" datatype="html">
-        <source>Sitemaps</source>
-        <target state="translated">Seitenübersichten</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/layout/showcase-shell/showcase-shell.component.html</context>
           <context context-type="linenumber">91,92</context>
@@ -319,7 +319,15 @@
         <target state="translated">X</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/layout/showcase-shell/showcase-shell.component.html</context>
-          <context context-type="linenumber">94,96</context>
+          <context context-type="linenumber">94</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="shell.footer.community.sitemaps" datatype="html">
+        <source>Sitemaps</source>
+        <target state="translated">Seitenübersichten</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/layout/showcase-shell/showcase-shell.component.html</context>
+          <context context-type="linenumber">94,97</context>
         </context-group>
       </trans-unit>
       <trans-unit id="shell.footer.bottom.credit" datatype="html">
@@ -327,7 +335,7 @@
         <target state="translated">Erstellt von <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Lakshman Turlapati<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/></target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/layout/showcase-shell/showcase-shell.component.html</context>
-          <context context-type="linenumber">98,99</context>
+          <context context-type="linenumber">99,100</context>
         </context-group>
       </trans-unit>
       <trans-unit id="shell.footer.bottom.version" datatype="html">
@@ -335,7 +343,7 @@
         <target state="translated"><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span class=&quot;version-tag&quot; [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>▽<x id="INTERPOLATION" equiv-text="{{ appVersion }}"/><x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/></target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/layout/showcase-shell/showcase-shell.component.html</context>
-          <context context-type="linenumber">99,100</context>
+          <context context-type="linenumber">100,101</context>
         </context-group>
       </trans-unit>
       <trans-unit id="about.hero.title" datatype="html">
@@ -1228,6 +1236,10 @@
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/agents/agents-page.component.ts</context>
           <context context-type="linenumber">10</context>
+        </context-group>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.ts</context>
+          <context context-type="linenumber">34</context>
         </context-group>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.ts</context>
@@ -2372,6 +2384,1230 @@
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/agents/agents-page.component.ts</context>
           <context context-type="linenumber">244</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.screen.label" datatype="html">
+        <source>Concierge</source>
+        <target state="translated">Concierge</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">1</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.hero.eyebrow" datatype="html">
+        <source> Research <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>@full-self-browsing<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/></source>
+        <target state="translated"> Forschung <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>@full-self-browsing<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/></target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">8,9</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.hero.title" datatype="html">
+        <source>Concierge.</source>
+        <target state="translated">Concierge.</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">10,11</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.hero.tagline" datatype="html">
+        <source>The safe action layer for agent-ready web applications.</source>
+        <target state="translated">Die sichere Aktionsschicht für agentenbereite Webanwendungen.</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">11,12</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.hero.lead" datatype="html">
+        <source> Typed, consent-gated actions so an <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>AI<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> can operate your web app; without taking over the browser. </source>
+        <target state="translated"> Typisierte, einwilligungsgebundene Aktionen, damit eine <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>AI<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> deine Web-App bedienen kann; ohne den Browser zu übernehmen. </target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">13,15</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.hero.quickStart" datatype="html">
+        <source><x id="START_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;i class=&quot;fa-solid fa-bolt&quot; aria-hidden=&quot;true&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/> Quick start </source>
+        <target state="translated"><x id="START_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;i class=&quot;fa-solid fa-bolt&quot; aria-hidden=&quot;true&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/> Schnellstart </target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">17,19</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.hero.github" datatype="html">
+        <source><x id="START_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;i class=&quot;fa-brands fa-github&quot; aria-hidden=&quot;true&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/> View on <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>GitHub<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/></source>
+        <target state="translated"><x id="START_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;i class=&quot;fa-brands fa-github&quot; aria-hidden=&quot;true&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/> Ansehen auf <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>GitHub<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/></target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">20,22</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.chip.version" datatype="html">
+        <source><x id="START_BOLD_TEXT" ctype="x-b" equiv-text="&lt;b class=&quot;version-tag&quot;&gt;"/>▽0.2.1<x id="CLOSE_BOLD_TEXT" ctype="x-b" equiv-text="&lt;/b&gt;"/></source>
+        <target state="translated"><x id="START_BOLD_TEXT" ctype="x-b" equiv-text="&lt;b class=&quot;version-tag&quot;&gt;"/>▽0.2.1<x id="CLOSE_BOLD_TEXT" ctype="x-b" equiv-text="&lt;/b&gt;"/></target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">24,25</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.chip.typescript" datatype="html">
+        <source>TypeScript-first</source>
+        <target state="translated">TypeScript-first</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">25,26</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.chip.node" datatype="html">
+        <source>ESM only · Node &gt;=22.12</source>
+        <target state="translated">ESM only · Node &gt;=22.12</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">26,27</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.chip.license" datatype="html">
+        <source>MIT</source>
+        <target state="translated">MIT</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">27,29</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.mark.aria" datatype="html">
+        <source>Concierge</source>
+        <target state="translated">Concierge</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">31,32</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.subnav.install" datatype="html">
+        <source>Install</source>
+        <target state="translated">Installation</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">49,50</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.subnav.boundary" datatype="html">
+        <source>Boundary</source>
+        <target state="translated">Grenze</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">50,51</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.subnav.how" datatype="html">
+        <source>How it works</source>
+        <target state="translated">So funktioniert es</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">51,52</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.subnav.quickstart" datatype="html">
+        <source>Quick start</source>
+        <target state="translated">Schnellstart</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">52,53</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.subnav.packages" datatype="html">
+        <source>Packages</source>
+        <target state="translated">Pakete</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">53,54</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.subnav.integrations" datatype="html">
+        <source>Integrations</source>
+        <target state="translated">Integrationen</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">54,55</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.subnav.guarantees" datatype="html">
+        <source>Guarantees</source>
+        <target state="translated">Garantien</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">55,56</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.subnav.security" datatype="html">
+        <source>Security</source>
+        <target state="translated">Sicherheit</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">56,60</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.install.eyebrow" datatype="html">
+        <source><x id="START_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;i class=&quot;fa-solid fa-terminal&quot; aria-hidden=&quot;true&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/> Install </source>
+        <target state="translated"><x id="START_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;i class=&quot;fa-solid fa-terminal&quot; aria-hidden=&quot;true&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/> Installation </target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">64,66</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.install.title" datatype="html">
+        <source>Three packages, one release set</source>
+        <target state="translated">Drei Pakete, ein gemeinsamer Release-Satz</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">66,67</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.install.copy" datatype="html">
+        <source>Install the core runtime for a framework-neutral integration, then add the matching adapter. Install and upgrade them together so every adapter resolves the same physical core.</source>
+        <target state="translated">Installieren Sie die Kernlaufzeit für eine frameworkneutrale Integration und fügen Sie dann den passenden Adapter hinzu. Installieren und aktualisieren Sie sie gemeinsam, damit jeder Adapter denselben physischen Kern auflöst.</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">67,69</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.install.packageManager" datatype="html">
+        <source>Package manager</source>
+        <target state="translated">Paketmanager</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">70,71</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.install.tab.pnpm" datatype="html">
+        <source>pnpm</source>
+        <target state="translated">pnpm</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">71,72</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.install.tab.npm" datatype="html">
+        <source>npm</source>
+        <target state="translated">npm</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">72,74</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.install.core" datatype="html">
+        <source><x id="START_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;i class=&quot;fa-solid fa-cube&quot; aria-hidden=&quot;true&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/> Core runtime </source>
+        <target state="translated"><x id="START_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;i class=&quot;fa-solid fa-cube&quot; aria-hidden=&quot;true&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/> Kernlaufzeit </target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">78,80</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.install.adapter" datatype="html">
+        <source><x id="START_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;i class=&quot;fa-brands fa-react&quot; aria-hidden=&quot;true&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/> With an adapter </source>
+        <target state="translated"><x id="START_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;i class=&quot;fa-brands fa-react&quot; aria-hidden=&quot;true&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/> Mit einem Adapter </target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">84,86</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.install.note" datatype="html">
+        <source> Version <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>0.2.1<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> is a supported public preview on runtime contract v2. <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>React<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> and <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Svelte<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> package roots are server-safe; their runtime bindings live in <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>/client<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> and <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>/client.svelte<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>. Edge deployment is not part of the <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>0.2<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> support matrix. </source>
+        <target state="translated"> Version <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>0.2.1<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> ist eine unterstützte öffentliche Vorschau auf Laufzeitvertrag v2. Die Paketwurzeln von <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>React<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> und <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Svelte<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> sind serverseitig sicher; ihre Laufzeitbindungen liegen in <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>/client<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> und <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>/client.svelte<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>. Edge-Bereitstellung gehört nicht zur Unterstützungsmatrix von <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>0.2<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>. </target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">92,94</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.boundary.eyebrow" datatype="html">
+        <source><x id="START_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;i class=&quot;fa-solid fa-scale-balanced&quot; aria-hidden=&quot;true&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/> Why <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Concierge<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/></source>
+        <target state="translated"><x id="START_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;i class=&quot;fa-solid fa-scale-balanced&quot; aria-hidden=&quot;true&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/> Warum <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Concierge<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/></target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">102,103</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.boundary.title" datatype="html">
+        <source>Publish verbs, not a page surface</source>
+        <target state="translated">Verben veröffentlichen, keine Seitenoberfläche</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">104,105</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.boundary.copy" datatype="html">
+        <source>Generic browser automation reconstructs intent from page structure, selectors, or coordinates. <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Concierge<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> lets a cooperating application publish the exact verbs an <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>AI<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> may use at the current moment.</source>
+        <target state="translated">Generische Browserautomatisierung rekonstruiert Absicht aus Seitenstruktur, Selektoren oder Koordinaten. <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Concierge<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> lässt eine kooperierende Anwendung die genauen Verben veröffentlichen, die eine <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>AI<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> im aktuellen Moment nutzen darf.</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">105,106</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.boundary.head.generic" datatype="html">
+        <source>Generic browser automation</source>
+        <target state="translated">Generische Browserautomatisierung</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">109,110</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.boundary.head.concierge" datatype="html">
+        <source>Concierge</source>
+        <target state="translated">Concierge</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">110,112</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.boundary.row1.generic" datatype="html">
+        <source>Click selectors or coordinates</source>
+        <target state="translated">Selektoren oder Koordinaten anklicken</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">113,114</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.boundary.row1.concierge" datatype="html">
+        <source>Call <x id="START_BOLD_TEXT" ctype="x-b" equiv-text="&lt;b&gt;"/>application-defined verbs<x id="CLOSE_BOLD_TEXT" ctype="x-b" equiv-text="&lt;/b&gt;"/></source>
+        <target state="translated"><x id="START_BOLD_TEXT" ctype="x-b" equiv-text="&lt;b&gt;"/>Anwendungsdefinierte Verben<x id="CLOSE_BOLD_TEXT" ctype="x-b" equiv-text="&lt;/b&gt;"/> aufrufen</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">114,115</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.boundary.row2.generic" datatype="html">
+        <source>Reconstruct intent from the visible interface</source>
+        <target state="translated">Absicht aus der sichtbaren Oberfläche rekonstruieren</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">117,118</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.boundary.row2.concierge" datatype="html">
+        <source>Receive <x id="START_BOLD_TEXT" ctype="x-b" equiv-text="&lt;b&gt;"/>typed schemas<x id="CLOSE_BOLD_TEXT" ctype="x-b" equiv-text="&lt;/b&gt;"/> and live availability</source>
+        <target state="translated"><x id="START_BOLD_TEXT" ctype="x-b" equiv-text="&lt;b&gt;"/>Typisierte Schemas<x id="CLOSE_BOLD_TEXT" ctype="x-b" equiv-text="&lt;/b&gt;"/> und live Verfügbarkeit erhalten</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">118,119</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.boundary.row3.generic" datatype="html">
+        <source>Inherit broad page authority</source>
+        <target state="translated">Breite Seitenautorität erben</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">121,122</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.boundary.row3.concierge" datatype="html">
+        <source>See only the <x id="START_BOLD_TEXT" ctype="x-b" equiv-text="&lt;b&gt;"/>current action catalog<x id="CLOSE_BOLD_TEXT" ctype="x-b" equiv-text="&lt;/b&gt;"/></source>
+        <target state="translated">Nur den <x id="START_BOLD_TEXT" ctype="x-b" equiv-text="&lt;b&gt;"/>aktuellen Aktionskatalog<x id="CLOSE_BOLD_TEXT" ctype="x-b" equiv-text="&lt;/b&gt;"/> sehen</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">122,123</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.boundary.row4.generic" datatype="html">
+        <source>Treat confirmation as a boolean</source>
+        <target state="translated">Bestätigung als Wahrheitswert behandeln</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">125,126</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.boundary.row4.concierge" datatype="html">
+        <source>Bind <x id="START_BOLD_TEXT" ctype="x-b" equiv-text="&lt;b&gt;"/>consent<x id="CLOSE_BOLD_TEXT" ctype="x-b" equiv-text="&lt;/b&gt;"/> to the reviewed payload and state snapshot</source>
+        <target state="translated"><x id="START_BOLD_TEXT" ctype="x-b" equiv-text="&lt;b&gt;"/>Einwilligung<x id="CLOSE_BOLD_TEXT" ctype="x-b" equiv-text="&lt;/b&gt;"/> an die geprüfte Nutzlast und den Zustands-Schnappschuss binden</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">126,127</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.boundary.row5.generic" datatype="html">
+        <source>Trust a model callback to actuate the browser</source>
+        <target state="translated">Einem Modell-Callback die Browsersteuerung überlassen</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">129,130</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.boundary.row5.concierge" datatype="html">
+        <source>Verify a <x id="START_BOLD_TEXT" ctype="x-b" equiv-text="&lt;b&gt;"/>signed, replay-protected batch<x id="CLOSE_BOLD_TEXT" ctype="x-b" equiv-text="&lt;/b&gt;"/> before dispatch</source>
+        <target state="translated">Einen <x id="START_BOLD_TEXT" ctype="x-b" equiv-text="&lt;b&gt;"/>signierten, replay-geschützten Stapel<x id="CLOSE_BOLD_TEXT" ctype="x-b" equiv-text="&lt;/b&gt;"/> vor dem Dispatch prüfen</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">130,131</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.boundary.note" datatype="html">
+        <source><x id="START_LINK" ctype="x-a" equiv-text="&lt;a href=&quot;https://github.com/fullselfbrowsing/FSB&quot; target=&quot;_blank&quot; rel=&quot;noopener&quot; [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_LINK" ctype="x-a" equiv-text="&lt;/a&gt;"/> operates sites that do not cooperate. <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Concierge<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> is the action layer for applications that do cooperate. The projects address different parts of the agent browsing stack. </source>
+        <target state="translated"> <x id="START_LINK" ctype="x-a" equiv-text="&lt;a href=&quot;https://github.com/fullselfbrowsing/FSB&quot; target=&quot;_blank&quot; rel=&quot;noopener&quot; [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_LINK" ctype="x-a" equiv-text="&lt;/a&gt;"/> bedient Sites, die nicht kooperieren. <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Concierge<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> ist die Aktionsschicht für Anwendungen, die kooperieren. Die Projekte decken unterschiedliche Teile des Agent-Browsing-Stapels ab. </target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">136,138</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.how.eyebrow" datatype="html">
+        <source><x id="START_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;i class=&quot;fa-solid fa-diagram-project&quot; aria-hidden=&quot;true&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/> How it works </source>
+        <target state="translated"><x id="START_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;i class=&quot;fa-solid fa-diagram-project&quot; aria-hidden=&quot;true&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/> So funktioniert es </target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">146,148</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.how.title" datatype="html">
+        <source>From declaration to structured result</source>
+        <target state="translated">Von der Deklaration zum strukturierten Ergebnis</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">148,150</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.how.step1" datatype="html">
+        <source>The application defines named actions with descriptions, input schemas, availability rules, effect metadata, redaction policy, and handlers.</source>
+        <target state="translated">Die Anwendung definiert benannte Aktionen mit Beschreibungen, Eingabeschemas, Verfügbarkeitsregeln, Effektmetadaten, Redaktionsrichtlinie und Handlern.</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">153,155</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.how.step2" datatype="html">
+        <source><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Concierge<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> resolves the active stage and its available actions into one immutable catalog snapshot with an instance-local revision.</source>
+        <target state="translated"><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Concierge<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> löst die aktive Stufe und ihre verfügbaren Aktionen in einen unveränderlichen Katalog-Schnappschuss mit einer instanzlokalen Revision auf.</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">157,158</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.how.step3" datatype="html">
+        <source>The model receives only the tools admitted by that snapshot.</source>
+        <target state="translated">Das Modell erhält nur die von diesem Schnappschuss zugelassenen Werkzeuge.</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">161,163</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.how.step4" datatype="html">
+        <source><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Concierge<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> validates every requested action again before execution, applies consent and scheduling rules, and rejects stale or conflicting calls.</source>
+        <target state="translated"><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Concierge<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> prüft jede angeforderte Aktion vor der Ausführung erneut, wendet Einwilligungs- und Planungsregeln an und lehnt veraltete oder widersprüchliche Aufrufe ab.</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">165,166</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.how.step5" datatype="html">
+        <source>The application bridge performs the approved interface operation and returns a structured result.</source>
+        <target state="translated">Die Anwendungsbrücke führt die genehmigte Oberflächenoperation aus und gibt ein strukturiertes Ergebnis zurück.</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">169,171</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.how.owner.app.title" datatype="html">
+        <source><x id="START_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;i class=&quot;fa-solid fa-window-maximize&quot; aria-hidden=&quot;true&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/> Application </source>
+        <target state="translated"><x id="START_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;i class=&quot;fa-solid fa-window-maximize&quot; aria-hidden=&quot;true&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/> Anwendung </target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">175,177</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.how.owner.app.copy" datatype="html">
+        <source>Action definitions, live state, interface operations, authentication, and server authorization.</source>
+        <target state="translated">Aktionsdefinitionen, Live-Zustand, Oberflächenoperationen, Authentifizierung und Serverautorisierung.</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">177,179</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.how.owner.concierge.title" datatype="html">
+        <source><x id="START_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;i class=&quot;fa-solid fa-shield-halved&quot; aria-hidden=&quot;true&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Concierge<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/></source>
+        <target state="translated"><x id="START_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;i class=&quot;fa-solid fa-shield-halved&quot; aria-hidden=&quot;true&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Concierge<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/></target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">181,182</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.how.owner.concierge.copy" datatype="html">
+        <source>Catalog admission, validation, consent, scheduling, deduplication, dispatch, and workflows.</source>
+        <target state="translated">Katalogzulassung, Validierung, Einwilligung, Planung, Deduplizierung, Dispatch und Workflows.</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">183,185</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.how.owner.model.title" datatype="html">
+        <source><x id="START_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;i class=&quot;fa-solid fa-comments&quot; aria-hidden=&quot;true&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/> Model integration </source>
+        <target state="translated"><x id="START_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;i class=&quot;fa-solid fa-comments&quot; aria-hidden=&quot;true&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/> Modellintegration </target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">187,189</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.how.owner.model.copy" datatype="html">
+        <source>Tool presentation, model calls, tool correlation, and result delivery.</source>
+        <target state="translated">Werkzeugdarstellung, Modellaufrufe, Werkzeugkorrelation und Ergebniszustellung.</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">189,192</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.quickstart.eyebrow" datatype="html">
+        <source><x id="START_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;i class=&quot;fa-solid fa-bolt&quot; aria-hidden=&quot;true&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/> Quick start </source>
+        <target state="translated"><x id="START_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;i class=&quot;fa-solid fa-bolt&quot; aria-hidden=&quot;true&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/> Schnellstart </target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">200,202</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.quickstart.title" datatype="html">
+        <source>Declare an action. Resolve one catalog.</source>
+        <target state="translated">Eine Aktion deklarieren. Einen Katalog auflösen.</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">202,203</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.quickstart.copy" datatype="html">
+        <source>Define each action as a named constant, attach it to a stage, and resolve one atomic catalog snapshot for the current application state.</source>
+        <target state="translated">Definieren Sie jede Aktion als benannte Konstante, hängen Sie sie an eine Stufe und lösen Sie einen atomaren Katalog-Schnappschuss für den aktuellen Anwendungszustand auf.</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">203,205</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.quickstart.tick.snapshot" datatype="html">
+        <source><x id="START_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;i class=&quot;fa-solid fa-check&quot; aria-hidden=&quot;true&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/> Stage, availability, tools, and revision resolve together</source>
+        <target state="translated"><x id="START_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;i class=&quot;fa-solid fa-check&quot; aria-hidden=&quot;true&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/> Stufe, Verfügbarkeit, Werkzeuge und Revision werden gemeinsam aufgelöst</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">205,206</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.quickstart.tick.true" datatype="html">
+        <source><x id="START_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;i class=&quot;fa-solid fa-check&quot; aria-hidden=&quot;true&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/> Only the literal value <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>true<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> admits an action; anything else fails closed</source>
+        <target state="translated"><x id="START_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;i class=&quot;fa-solid fa-check&quot; aria-hidden=&quot;true&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/> Nur der Literalwert <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>true<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> lässt eine Aktion zu; alles andere scheitert geschlossen</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">206,207</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.quickstart.tick.frozen" datatype="html">
+        <source><x id="START_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;i class=&quot;fa-solid fa-check&quot; aria-hidden=&quot;true&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/> The resolved catalog is deeply frozen and never cross-runtime authority</source>
+        <target state="translated"><x id="START_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;i class=&quot;fa-solid fa-check&quot; aria-hidden=&quot;true&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/> Der aufgelöste Katalog ist tiefgefroren und niemals runtime-übergreifende Autorität</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">207,208</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.quickstart.filename" datatype="html">
+        <source>actions/open-project.ts</source>
+        <target state="translated">actions/open-project.ts</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">212,213</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.packages.eyebrow" datatype="html">
+        <source><x id="START_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;i class=&quot;fa-solid fa-boxes-stacked&quot; aria-hidden=&quot;true&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/> Packages </source>
+        <target state="translated"><x id="START_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;i class=&quot;fa-solid fa-boxes-stacked&quot; aria-hidden=&quot;true&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/> Pakete </target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">228,230</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.packages.title" datatype="html">
+        <source>Core runtime plus framework bindings</source>
+        <target state="translated">Kernlaufzeit plus Framework-Bindungen</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">230,231</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.packages.copy" datatype="html">
+        <source>The public packages form one fixed release set and share runtime contract v2.</source>
+        <target state="translated">Die öffentlichen Pakete bilden einen festen Release-Satz und teilen Laufzeitvertrag v2.</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">231,233</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.packages.core.tag" datatype="html">
+        <source>Core</source>
+        <target state="translated">Kern</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">235,236</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.packages.core.path" datatype="html">
+        <source>@full-self-browsing/concierge</source>
+        <target state="translated">@full-self-browsing/concierge</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">236,237</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.packages.core.copy" datatype="html">
+        <source>Framework-neutral catalog, dispatch, consent, workflow, telemetry, and transport runtime.</source>
+        <target state="translated">Frameworkneutrale Laufzeit für Katalog, Dispatch, Einwilligung, Workflow, Telemetrie und Transport.</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">237,239</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.packages.react.tag" datatype="html">
+        <source>React</source>
+        <target state="translated">React</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">240,241</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.packages.react.path" datatype="html">
+        <source>@full-self-browsing/concierge-react</source>
+        <target state="translated">@full-self-browsing/concierge-react</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">241,242</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.packages.react.copy" datatype="html">
+        <source><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>React<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> context, bridge lifecycle, and optional activity visuals including <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>ConciergeActivityOverlay<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>.</source>
+        <target state="translated"><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>React<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>-Kontext, Brückenlebenszyklus und optionale Aktivitätsvisuals einschließlich <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>ConciergeActivityOverlay<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>.</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">242,243</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.packages.svelte.tag" datatype="html">
+        <source>Svelte</source>
+        <target state="translated">Svelte</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">245,246</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.packages.svelte.path" datatype="html">
+        <source>@full-self-browsing/concierge-svelte</source>
+        <target state="translated">@full-self-browsing/concierge-svelte</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">246,247</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.packages.svelte.copy" datatype="html">
+        <source><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Svelte<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> context, bridge lifecycle, and reactive snapshot normalization.</source>
+        <target state="translated"><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Svelte<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>-Kontext, Brückenlebenszyklus und reaktive Schnappschuss-Normalisierung.</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">247,248</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.packages.matrix" datatype="html">
+        <source><x id="START_TAG_DIV" ctype="x-div" equiv-text="&lt;div class=&quot;con-mrow&quot;&gt;"/><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span class=&quot;k&quot;&gt;"/>Node.js<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/><x id="START_TAG_SPAN_1" ctype="x-span_1" equiv-text="&lt;span class=&quot;v&quot;&gt;"/>&gt;=22.12.0<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/><x id="CLOSE_TAG_DIV" ctype="x-div" equiv-text="&lt;/div&gt;"/><x id="START_TAG_DIV" ctype="x-div" equiv-text="&lt;div class=&quot;con-mrow&quot;&gt;"/><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span class=&quot;k&quot;&gt;"/>Module format<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/><x id="START_TAG_SPAN_1" ctype="x-span_1" equiv-text="&lt;span class=&quot;v&quot;&gt;"/>ESM only<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/><x id="CLOSE_TAG_DIV" ctype="x-div" equiv-text="&lt;/div&gt;"/><x id="START_TAG_DIV" ctype="x-div" equiv-text="&lt;div class=&quot;con-mrow&quot;&gt;"/><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span class=&quot;k&quot;&gt;"/>React · React DOM<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/><x id="START_TAG_SPAN_1" ctype="x-span_1" equiv-text="&lt;span class=&quot;v&quot;&gt;"/>^18.2.0 || ^19.0.0<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/><x id="CLOSE_TAG_DIV" ctype="x-div" equiv-text="&lt;/div&gt;"/><x id="START_TAG_DIV" ctype="x-div" equiv-text="&lt;div class=&quot;con-mrow&quot;&gt;"/><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span class=&quot;k&quot;&gt;"/>Svelte<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/><x id="START_TAG_SPAN_1" ctype="x-span_1" equiv-text="&lt;span class=&quot;v&quot;&gt;"/>^5.0.0<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/><x id="CLOSE_TAG_DIV" ctype="x-div" equiv-text="&lt;/div&gt;"/><x id="START_TAG_DIV" ctype="x-div" equiv-text="&lt;div class=&quot;con-mrow&quot;&gt;"/><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span class=&quot;k&quot;&gt;"/>AI SDK core<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/><x id="START_TAG_SPAN_1" ctype="x-span_1" equiv-text="&lt;span class=&quot;v&quot;&gt;"/>^6.0.0 || ^7.0.0<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/><x id="CLOSE_TAG_DIV" ctype="x-div" equiv-text="&lt;/div&gt;"/><x id="START_TAG_DIV" ctype="x-div" equiv-text="&lt;div class=&quot;con-mrow&quot;&gt;"/><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span class=&quot;k&quot;&gt;"/>Runtime contract<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/><x id="START_TAG_SPAN_1" ctype="x-span_1" equiv-text="&lt;span class=&quot;v&quot;&gt;"/>v2 throughout 0.2.x<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/><x id="CLOSE_TAG_DIV" ctype="x-div" equiv-text="&lt;/div&gt;"/></source>
+        <target state="translated"><x id="START_TAG_DIV" ctype="x-div" equiv-text="&lt;div class=&quot;con-mrow&quot;&gt;"/><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span class=&quot;k&quot;&gt;"/>Node.js<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/><x id="START_TAG_SPAN_1" ctype="x-span_1" equiv-text="&lt;span class=&quot;v&quot;&gt;"/>&gt;=22.12.0<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/><x id="CLOSE_TAG_DIV" ctype="x-div" equiv-text="&lt;/div&gt;"/><x id="START_TAG_DIV" ctype="x-div" equiv-text="&lt;div class=&quot;con-mrow&quot;&gt;"/><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span class=&quot;k&quot;&gt;"/>Module format<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/><x id="START_TAG_SPAN_1" ctype="x-span_1" equiv-text="&lt;span class=&quot;v&quot;&gt;"/>ESM only<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/><x id="CLOSE_TAG_DIV" ctype="x-div" equiv-text="&lt;/div&gt;"/><x id="START_TAG_DIV" ctype="x-div" equiv-text="&lt;div class=&quot;con-mrow&quot;&gt;"/><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span class=&quot;k&quot;&gt;"/>React · React DOM<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/><x id="START_TAG_SPAN_1" ctype="x-span_1" equiv-text="&lt;span class=&quot;v&quot;&gt;"/>^18.2.0 || ^19.0.0<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/><x id="CLOSE_TAG_DIV" ctype="x-div" equiv-text="&lt;/div&gt;"/><x id="START_TAG_DIV" ctype="x-div" equiv-text="&lt;div class=&quot;con-mrow&quot;&gt;"/><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span class=&quot;k&quot;&gt;"/>Svelte<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/><x id="START_TAG_SPAN_1" ctype="x-span_1" equiv-text="&lt;span class=&quot;v&quot;&gt;"/>^5.0.0<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/><x id="CLOSE_TAG_DIV" ctype="x-div" equiv-text="&lt;/div&gt;"/><x id="START_TAG_DIV" ctype="x-div" equiv-text="&lt;div class=&quot;con-mrow&quot;&gt;"/><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span class=&quot;k&quot;&gt;"/>AI SDK core<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/><x id="START_TAG_SPAN_1" ctype="x-span_1" equiv-text="&lt;span class=&quot;v&quot;&gt;"/>^6.0.0 || ^7.0.0<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/><x id="CLOSE_TAG_DIV" ctype="x-div" equiv-text="&lt;/div&gt;"/><x id="START_TAG_DIV" ctype="x-div" equiv-text="&lt;div class=&quot;con-mrow&quot;&gt;"/><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span class=&quot;k&quot;&gt;"/>Runtime contract<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/><x id="START_TAG_SPAN_1" ctype="x-span_1" equiv-text="&lt;span class=&quot;v&quot;&gt;"/>v2 throughout 0.2.x<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/><x id="CLOSE_TAG_DIV" ctype="x-div" equiv-text="&lt;/div&gt;"/></target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">251,258</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.integrations.eyebrow" datatype="html">
+        <source><x id="START_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;i class=&quot;fa-solid fa-plug&quot; aria-hidden=&quot;true&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/> Integrations </source>
+        <target state="translated"><x id="START_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;i class=&quot;fa-solid fa-plug&quot; aria-hidden=&quot;true&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/> Integrationen </target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">265,267</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.integrations.title" datatype="html">
+        <source>One instance, several entry points</source>
+        <target state="translated">Eine Instanz, mehrere Einstiegspunkte</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">267,268</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.integrations.copy" datatype="html">
+        <source>Mount the same <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Concierge<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> instance and bridge registry through the appropriate adapter. Getter-based state stays live until <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Concierge<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> captures a snapshot for validation or consent.</source>
+        <target state="translated">Hängen Sie dieselbe <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Concierge<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>-Instanz und die Brückenregistrierung über den passenden Adapter ein. Getterbasierter Zustand bleibt lebendig, bis <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Concierge<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> einen Schnappschuss für Validierung oder Einwilligung erfasst.</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">268,269</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.integrations.head.name" datatype="html">
+        <source>Integration</source>
+        <target state="translated">Anbindung</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">272,273</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.integrations.head.path" datatype="html">
+        <source>Runtime entry point</source>
+        <target state="translated">Laufzeit-Einstiegspunkt</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">273,274</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.integrations.head.use" datatype="html">
+        <source>Guidance</source>
+        <target state="translated">Leitfaden</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">274,276</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.integrations.neutral.name" datatype="html">
+        <source>Framework-neutral</source>
+        <target state="translated">Frameworkneutral</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">277,278</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.integrations.neutral.path" datatype="html">
+        <source>@full-self-browsing/concierge</source>
+        <target state="translated">@full-self-browsing/concierge</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">278,279</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.integrations.neutral.use" datatype="html">
+        <source>Use the core runtime and register the application bridge directly.</source>
+        <target state="translated">Nutzen Sie die Kernlaufzeit und registrieren Sie die Anwendungsbrücke direkt.</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">279,281</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.integrations.react.name" datatype="html">
+        <source>React</source>
+        <target state="translated">React</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">282,283</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.integrations.react.path" datatype="html">
+        <source>/concierge-react/client</source>
+        <target state="translated">/concierge-react/client</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">283,284</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.integrations.react.use" datatype="html">
+        <source>Provide the core instance, register bridges, and optionally render the activity overlay.</source>
+        <target state="translated">Stellen Sie die Kerninstanz bereit, registrieren Sie Brücken und rendern Sie optional die Aktivitätsüberlagerung.</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">284,286</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.integrations.svelte.name" datatype="html">
+        <source>Svelte</source>
+        <target state="translated">Svelte</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">287,288</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.integrations.svelte.path" datatype="html">
+        <source>/concierge-svelte/client.svelte</source>
+        <target state="translated">/concierge-svelte/client.svelte</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">288,289</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.integrations.svelte.use" datatype="html">
+        <source>Provide the core instance with the Svelte snapshot normalizer and register bridges during initialization.</source>
+        <target state="translated">Stellen Sie die Kerninstanz mit dem Svelte-Schnappschuss-Normalisierer bereit und registrieren Sie Brücken während der Initialisierung.</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">289,291</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.integrations.aisdk.name" datatype="html">
+        <source>AI SDK 6 &amp; 7</source>
+        <target state="translated">AI SDK 6 &amp; 7</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">292,293</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.integrations.aisdk.path" datatype="html">
+        <source>/concierge/ai-sdk</source>
+        <target state="translated">/concierge/ai-sdk</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">293,294</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.integrations.aisdk.use" datatype="html">
+        <source>Convert a resolved catalog into model tools and correlate completed calls.</source>
+        <target state="translated">Wandeln Sie einen aufgelösten Katalog in Modellwerkzeuge um und korrelieren Sie abgeschlossene Aufrufe.</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">294,296</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.integrations.signed.name" datatype="html">
+        <source>Signed server bridge</source>
+        <target state="translated">Signierte Serverbrücke</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">297,298</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.integrations.signed.path" datatype="html">
+        <source>/ai-sdk/server · /ai-sdk/browser</source>
+        <target state="translated">/ai-sdk/server · /ai-sdk/browser</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">298,299</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.integrations.signed.use" datatype="html">
+        <source>Issue, verify, and dispatch short-lived browser batches bound to the catalog digest.</source>
+        <target state="translated">Stellen Sie kurzlebige Browserstapel aus, prüfen Sie sie und versenden Sie sie, gebunden an den Katalogdigest.</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">299,302</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.integrations.note" datatype="html">
+        <source> Raw <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>onToolCall<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> values are display data only. They never actuate the application. The signed bridge verifies the envelope, consumes its replay key, compares it with the live browser catalog, and only then enters core dispatch. </source>
+        <target state="translated"> Rohe <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>onToolCall<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>-Werte sind nur Anzeigedaten. Sie betätigen die Anwendung nie. Die signierte Brücke prüft den Umschlag, verbraucht ihren Replay-Schlüssel, vergleicht ihn mit dem lebenden Browserkatalog und tritt erst dann in den Kerndispatch ein. </target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">305,307</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.guarantees.eyebrow" datatype="html">
+        <source><x id="START_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;i class=&quot;fa-solid fa-lock&quot; aria-hidden=&quot;true&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/> Runtime guarantees </source>
+        <target state="translated"><x id="START_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;i class=&quot;fa-solid fa-lock&quot; aria-hidden=&quot;true&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/> Laufzeitgarantien </target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">315,317</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.guarantees.title" datatype="html">
+        <source>What the runtime holds to</source>
+        <target state="translated">Woran die Laufzeit festgehalten wird</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">317,319</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.guarantees.dispatch" datatype="html">
+        <source><x id="START_TAG_DIV" ctype="x-div" equiv-text="&lt;div class=&quot;con-dtop&quot;&gt;"/><x id="START_HEADING_LEVEL4" ctype="x-h4" equiv-text="&lt;h4&gt;"/>Dispatch outcome<x id="CLOSE_HEADING_LEVEL4" ctype="x-h4" equiv-text="&lt;/h4&gt;"/><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span class=&quot;st&quot;&gt;"/><x id="START_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;i class=&quot;fa-solid fa-circle-check&quot; aria-hidden=&quot;true&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/> completed<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/><x id="CLOSE_TAG_DIV" ctype="x-div" equiv-text="&lt;/div&gt;"/><x id="START_TAG_DIV_1" ctype="x-div_1" equiv-text="&lt;div class=&quot;con-drow&quot;&gt;"/><x id="START_TAG_SPAN_1" ctype="x-span_1" equiv-text="&lt;span class=&quot;k&quot;&gt;"/><x id="START_ITALIC_TEXT_1" equiv-text="&lt;i class=&quot;fa-solid fa-tag&quot; aria-hidden=&quot;true&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/> name<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/><x id="START_TAG_SPAN_2" ctype="x-span_2" equiv-text="&lt;span class=&quot;v&quot;&gt;"/>openProject<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/><x id="CLOSE_TAG_DIV" ctype="x-div" equiv-text="&lt;/div&gt;"/><x id="START_TAG_DIV_1" ctype="x-div_1" equiv-text="&lt;div class=&quot;con-drow&quot;&gt;"/><x id="START_TAG_SPAN_1" ctype="x-span_1" equiv-text="&lt;span class=&quot;k&quot;&gt;"/><x id="START_ITALIC_TEXT_2" equiv-text="&lt;i class=&quot;fa-solid fa-hashtag&quot; aria-hidden=&quot;true&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/> callId<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/><x id="START_TAG_SPAN_2" ctype="x-span_2" equiv-text="&lt;span class=&quot;v&quot;&gt;"/>call_7f2c · index 0<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/><x id="CLOSE_TAG_DIV" ctype="x-div" equiv-text="&lt;/div&gt;"/><x id="START_TAG_DIV_1" ctype="x-div_1" equiv-text="&lt;div class=&quot;con-drow&quot;&gt;"/><x id="START_TAG_SPAN_1" ctype="x-span_1" equiv-text="&lt;span class=&quot;k&quot;&gt;"/><x id="START_ITALIC_TEXT_3" equiv-text="&lt;i class=&quot;fa-solid fa-layer-group&quot; aria-hidden=&quot;true&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/> catalogRevision<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/><x id="START_TAG_SPAN_2" ctype="x-span_2" equiv-text="&lt;span class=&quot;v&quot;&gt;"/>stage projects · fresh<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/><x id="CLOSE_TAG_DIV" ctype="x-div" equiv-text="&lt;/div&gt;"/><x id="START_TAG_DIV_1" ctype="x-div_1" equiv-text="&lt;div class=&quot;con-drow&quot;&gt;"/><x id="START_TAG_SPAN_1" ctype="x-span_1" equiv-text="&lt;span class=&quot;k&quot;&gt;"/><x id="START_ITALIC_TEXT_4" equiv-text="&lt;i class=&quot;fa-solid fa-hand&quot; aria-hidden=&quot;true&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/> consent<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/><x id="START_TAG_SPAN_2" ctype="x-span_2" equiv-text="&lt;span class=&quot;v&quot;&gt;"/>bound · consumed once<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/><x id="CLOSE_TAG_DIV" ctype="x-div" equiv-text="&lt;/div&gt;"/><x id="START_TAG_DIV_1" ctype="x-div_1" equiv-text="&lt;div class=&quot;con-drow&quot;&gt;"/><x id="START_TAG_SPAN_1" ctype="x-span_1" equiv-text="&lt;span class=&quot;k&quot;&gt;"/><x id="START_ITALIC_TEXT_5" equiv-text="&lt;i class=&quot;fa-solid fa-rotate&quot; aria-hidden=&quot;true&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/> dedupe<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/><x id="START_TAG_SPAN_2" ctype="x-span_2" equiv-text="&lt;span class=&quot;v&quot;&gt;"/>session · response · callId<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/><x id="CLOSE_TAG_DIV" ctype="x-div" equiv-text="&lt;/div&gt;"/><x id="START_TAG_DIV_1" ctype="x-div_1" equiv-text="&lt;div class=&quot;con-drow&quot;&gt;"/><x id="START_TAG_SPAN_1" ctype="x-span_1" equiv-text="&lt;span class=&quot;k&quot;&gt;"/><x id="START_ITALIC_TEXT_6" equiv-text="&lt;i class=&quot;fa-solid fa-eye&quot; aria-hidden=&quot;true&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/> onDispatch<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/><x id="START_TAG_SPAN_2" ctype="x-span_2" equiv-text="&lt;span class=&quot;v&quot;&gt;"/>redacted lifecycle<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/><x id="CLOSE_TAG_DIV" ctype="x-div" equiv-text="&lt;/div&gt;"/></source>
+        <target state="translated"><x id="START_TAG_DIV" ctype="x-div" equiv-text="&lt;div class=&quot;con-dtop&quot;&gt;"/><x id="START_HEADING_LEVEL4" ctype="x-h4" equiv-text="&lt;h4&gt;"/>Dispatch outcome<x id="CLOSE_HEADING_LEVEL4" ctype="x-h4" equiv-text="&lt;/h4&gt;"/><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span class=&quot;st&quot;&gt;"/><x id="START_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;i class=&quot;fa-solid fa-circle-check&quot; aria-hidden=&quot;true&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/> completed<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/><x id="CLOSE_TAG_DIV" ctype="x-div" equiv-text="&lt;/div&gt;"/><x id="START_TAG_DIV_1" ctype="x-div_1" equiv-text="&lt;div class=&quot;con-drow&quot;&gt;"/><x id="START_TAG_SPAN_1" ctype="x-span_1" equiv-text="&lt;span class=&quot;k&quot;&gt;"/><x id="START_ITALIC_TEXT_1" equiv-text="&lt;i class=&quot;fa-solid fa-tag&quot; aria-hidden=&quot;true&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/> name<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/><x id="START_TAG_SPAN_2" ctype="x-span_2" equiv-text="&lt;span class=&quot;v&quot;&gt;"/>openProject<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/><x id="CLOSE_TAG_DIV" ctype="x-div" equiv-text="&lt;/div&gt;"/><x id="START_TAG_DIV_1" ctype="x-div_1" equiv-text="&lt;div class=&quot;con-drow&quot;&gt;"/><x id="START_TAG_SPAN_1" ctype="x-span_1" equiv-text="&lt;span class=&quot;k&quot;&gt;"/><x id="START_ITALIC_TEXT_2" equiv-text="&lt;i class=&quot;fa-solid fa-hashtag&quot; aria-hidden=&quot;true&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/> callId<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/><x id="START_TAG_SPAN_2" ctype="x-span_2" equiv-text="&lt;span class=&quot;v&quot;&gt;"/>call_7f2c · index 0<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/><x id="CLOSE_TAG_DIV" ctype="x-div" equiv-text="&lt;/div&gt;"/><x id="START_TAG_DIV_1" ctype="x-div_1" equiv-text="&lt;div class=&quot;con-drow&quot;&gt;"/><x id="START_TAG_SPAN_1" ctype="x-span_1" equiv-text="&lt;span class=&quot;k&quot;&gt;"/><x id="START_ITALIC_TEXT_3" equiv-text="&lt;i class=&quot;fa-solid fa-layer-group&quot; aria-hidden=&quot;true&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/> catalogRevision<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/><x id="START_TAG_SPAN_2" ctype="x-span_2" equiv-text="&lt;span class=&quot;v&quot;&gt;"/>stage projects · fresh<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/><x id="CLOSE_TAG_DIV" ctype="x-div" equiv-text="&lt;/div&gt;"/><x id="START_TAG_DIV_1" ctype="x-div_1" equiv-text="&lt;div class=&quot;con-drow&quot;&gt;"/><x id="START_TAG_SPAN_1" ctype="x-span_1" equiv-text="&lt;span class=&quot;k&quot;&gt;"/><x id="START_ITALIC_TEXT_4" equiv-text="&lt;i class=&quot;fa-solid fa-hand&quot; aria-hidden=&quot;true&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/> consent<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/><x id="START_TAG_SPAN_2" ctype="x-span_2" equiv-text="&lt;span class=&quot;v&quot;&gt;"/>bound · consumed once<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/><x id="CLOSE_TAG_DIV" ctype="x-div" equiv-text="&lt;/div&gt;"/><x id="START_TAG_DIV_1" ctype="x-div_1" equiv-text="&lt;div class=&quot;con-drow&quot;&gt;"/><x id="START_TAG_SPAN_1" ctype="x-span_1" equiv-text="&lt;span class=&quot;k&quot;&gt;"/><x id="START_ITALIC_TEXT_5" equiv-text="&lt;i class=&quot;fa-solid fa-rotate&quot; aria-hidden=&quot;true&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/> dedupe<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/><x id="START_TAG_SPAN_2" ctype="x-span_2" equiv-text="&lt;span class=&quot;v&quot;&gt;"/>session · response · callId<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/><x id="CLOSE_TAG_DIV" ctype="x-div" equiv-text="&lt;/div&gt;"/><x id="START_TAG_DIV_1" ctype="x-div_1" equiv-text="&lt;div class=&quot;con-drow&quot;&gt;"/><x id="START_TAG_SPAN_1" ctype="x-span_1" equiv-text="&lt;span class=&quot;k&quot;&gt;"/><x id="START_ITALIC_TEXT_6" equiv-text="&lt;i class=&quot;fa-solid fa-eye&quot; aria-hidden=&quot;true&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/> onDispatch<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/><x id="START_TAG_SPAN_2" ctype="x-span_2" equiv-text="&lt;span class=&quot;v&quot;&gt;"/>redacted lifecycle<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/><x id="CLOSE_TAG_DIV" ctype="x-div" equiv-text="&lt;/div&gt;"/></target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">321,331</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.guarantees.g1" datatype="html">
+        <source>Action inputs are validated again immediately before execution, and actions with side effects pass through a cancellable commit window.</source>
+        <target state="translated">Aktionseingaben werden unmittelbar vor der Ausführung erneut geprüft, und Aktionen mit Nebenwirkungen durchlaufen ein abbrechbares Commit-Fenster.</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">335,337</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.guarantees.g2" datatype="html">
+        <source>Exact retries share one Promise and cannot execute twice inside the deduplication window; a changed action, input, turn, or revision returns <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>identity_conflict<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>.</source>
+        <target state="translated">Exakte Wiederholungen teilen eine Promise und können innerhalb des Deduplizierungsfensters nicht zweimal laufen; eine geänderte Aktion, Eingabe, Runde oder Revision gibt <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>identity_conflict<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> zurück.</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">339,340</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.guarantees.g3" datatype="html">
+        <source>Batches execute in <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>outputIndex<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> order and return explicit completed or terminal outcomes.</source>
+        <target state="translated">Stapel laufen in <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>outputIndex<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>-Reihenfolge und geben explizit abgeschlossene oder terminale Ergebnisse zurück.</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">343,344</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.guarantees.g4" datatype="html">
+        <source>Compound actions use core-owned child dispatch, cleanup, delay, and bounded lineage — 16 nested levels and 256 steps per root workflow.</source>
+        <target state="translated">Zusammengesetzte Aktionen nutzen kern-eigenen Kind-Dispatch, Bereinigung, Verzögerung und begrenzte Abstammung — 16 verschachtelte Ebenen und 256 Schritte pro Wurzel-Workflow.</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">347,349</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.guarantees.g5" datatype="html">
+        <source>Mixed <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>0.1<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> and <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>0.2<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> installations fail before bridge registration or dispatch.</source>
+        <target state="translated">Gemischte <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>0.1<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>- und <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>0.2<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>-Installationen scheitern vor der Brückenregistrierung oder dem Dispatch.</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">351,352</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.security.eyebrow" datatype="html">
+        <source><x id="START_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;i class=&quot;fa-solid fa-user-shield&quot; aria-hidden=&quot;true&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/> Security &amp; privacy </source>
+        <target state="translated"><x id="START_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;i class=&quot;fa-solid fa-user-shield&quot; aria-hidden=&quot;true&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/> Sicherheit und Datenschutz </target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">362,363</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.security.title" datatype="html">
+        <source>A least-authority boundary, not an authentication system</source>
+        <target state="translated">Eine Grenze geringster Autorität, kein Authentifizierungssystem</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">364,366</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.security.model.title" datatype="html">
+        <source><x id="START_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;i class=&quot;fa-solid fa-shield-halved&quot; aria-hidden=&quot;true&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/> Security model </source>
+        <target state="translated"><x id="START_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;i class=&quot;fa-solid fa-shield-halved&quot; aria-hidden=&quot;true&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/> Sicherheitsmodell </target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">369,371</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.security.model.p1" datatype="html">
+        <source><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Concierge<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> does not authenticate users, and a client consent record is not server authorization. A server that performs a protected effect must independently authenticate the current principal, authorize the exact action and payload under current policy, reject replay, and make the effect idempotent or transactional.</source>
+        <target state="translated"><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Concierge<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> authentifiziert keine Benutzer, und ein Client-Einwilligungsdatensatz ist keine Serverautorisierung. Ein Server, der einen geschützten Effekt ausführt, muss den aktuellen Principal unabhängig authentifizieren, die genaue Aktion und Nutzlast unter der geltenden Richtlinie autorisieren, Replay ablehnen und den Effekt idempotent oder transaktional machen.</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">371,372</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.security.model.p2" datatype="html">
+        <source>The signed <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>AI<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> bridge authenticates a short-lived server decision to admit one specific browser batch. It does not make model output trustworthy, repair an <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>XSS<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> vulnerability, or turn client state into server authority.</source>
+        <target state="translated">Die signierte <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>AI<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>-Brücke authentifiziert eine kurzlebige Serverentscheidung, genau einen Browserstapel zuzulassen. Sie macht Modellausgabe nicht vertrauenswürdig, behebt keine <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>XSS<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>-Lücke und macht Clientzustand nicht zur Serverautorität.</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">372,373</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.security.model.link" datatype="html">
+        <source><x id="START_LINK" ctype="x-a" equiv-text="&lt;a href=&quot;https://github.com/fullselfbrowsing/Concierge/blob/main/SECURITY.md&quot; target=&quot;_blank&quot; rel=&quot;noopener&quot;&gt;"/>Read <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>SECURITY.md<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/><x id="CLOSE_LINK" ctype="x-a" equiv-text="&lt;/a&gt;"/> before shipping a consequential integration. </source>
+        <target state="translated"> <x id="START_LINK" ctype="x-a" equiv-text="&lt;a href=&quot;https://github.com/fullselfbrowsing/Concierge/blob/main/SECURITY.md&quot; target=&quot;_blank&quot; rel=&quot;noopener&quot;&gt;"/>Lesen Sie <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>SECURITY.md<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/><x id="CLOSE_LINK" ctype="x-a" equiv-text="&lt;/a&gt;"/>, bevor Sie eine folgenreiche Integration ausliefern. </target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">374,375</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.security.telemetry.title" datatype="html">
+        <source><x id="START_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;i class=&quot;fa-solid fa-chart-simple&quot; aria-hidden=&quot;true&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/> Telemetry </source>
+        <target state="translated"><x id="START_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;i class=&quot;fa-solid fa-chart-simple&quot; aria-hidden=&quot;true&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/> Telemetrie </target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">379,381</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.security.telemetry.p1" datatype="html">
+        <source>Mounted <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>React<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> and <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Svelte<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> runtimes send default-on anonymous usage estimates to <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>&apos;s aggregate statistics pipeline. Vanilla integrations mount telemetry explicitly through the browser-only <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>/telemetry<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> entry, which also provides status and opt-out <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>APIs<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>.</source>
+        <target state="translated">Eingebundene <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>React<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>- und <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Svelte<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>-Laufzeiten senden standardmäßig anonyme Nutzungsschätzungen an die aggregierte Statistikpipeline von <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>. Vanilla-Integrationen hängen Telemetrie ausdrücklich über den browseronly-Einstieg <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>/telemetry<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> ein, der auch Status- und Opt-out-<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>APIs<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> bereitstellt.</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">381,382</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.security.telemetry.p2" datatype="html">
+        <source>Telemetry never sends action names, arguments, results, schemas, stages, page <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>URLs<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>DOM<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> content, application names, or account identifiers. If browser storage is unavailable, telemetry stops without affecting dispatch.</source>
+        <target state="translated">Telemetrie sendet niemals Aktionsnamen, Argumente, Ergebnisse, Schemas, Stufen, Seiten-<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>URLs<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>DOM<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>-Inhalt, Anwendungsnamen oder Kontobezeichner. Ist der Browserspeicher nicht verfügbar, stoppt die Telemetrie, ohne den Dispatch zu beeinflussen.</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">382,383</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.security.telemetry.link" datatype="html">
+        <source><x id="START_LINK" ctype="x-a" equiv-text="&lt;a href=&quot;https://github.com/fullselfbrowsing/Concierge/blob/main/docs/privacy.md&quot; target=&quot;_blank&quot; rel=&quot;noopener&quot;&gt;"/>Read the telemetry privacy contract<x id="CLOSE_LINK" ctype="x-a" equiv-text="&lt;/a&gt;"/> for payload, retention, and erasure. </source>
+        <target state="translated"> <x id="START_LINK" ctype="x-a" equiv-text="&lt;a href=&quot;https://github.com/fullselfbrowsing/Concierge/blob/main/docs/privacy.md&quot; target=&quot;_blank&quot; rel=&quot;noopener&quot;&gt;"/>Lesen Sie den Telemetrie-Datenschutzvertrag<x id="CLOSE_LINK" ctype="x-a" equiv-text="&lt;/a&gt;"/> zu Nutzlast, Aufbewahrung und Löschung. </target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">384,385</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.final.title" datatype="html">
+        <source>Let an <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>AI<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> act without handing over the browser</source>
+        <target state="translated">Lassen Sie eine <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>AI<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> handeln, ohne den Browser aus der Hand zu geben</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">394,395</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.final.copy" datatype="html">
+        <source><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>TypeScript<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>-first, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>ESM<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>-only, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MIT<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>-licensed. Published under the <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>@full-self-browsing<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>npm<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> scope.</source>
+        <target state="translated"><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>TypeScript<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>-first, nur <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>ESM<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MIT<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>-lizenziert. Veröffentlicht unter dem Scope <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>@full-self-browsing<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> auf <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>npm<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>.</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">395,396</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.final.docs" datatype="html">
+        <source><x id="START_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;i class=&quot;fa-brands fa-github&quot; aria-hidden=&quot;true&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/> Read the docs </source>
+        <target state="translated"><x id="START_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;i class=&quot;fa-brands fa-github&quot; aria-hidden=&quot;true&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/> Dokumentation lesen </target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">398,400</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.final.npm" datatype="html">
+        <source><x id="START_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;i class=&quot;fa-brands fa-npm&quot; aria-hidden=&quot;true&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/> View on <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>npm<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/></source>
+        <target state="translated"><x id="START_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;i class=&quot;fa-brands fa-npm&quot; aria-hidden=&quot;true&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/> Ansehen auf <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>npm<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/></target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">401,403</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.footer.brand.aria" datatype="html">
+        <source>FSB</source>
+        <target state="translated">FSB</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">412,413</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.footer.pages.title" datatype="html">
+        <source>Pages</source>
+        <target state="translated">Seiten</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">424,425</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.footer.pages.home" datatype="html">
+        <source>Home</source>
+        <target state="translated">Startseite</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">426</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.footer.pages.about" datatype="html">
+        <source>About</source>
+        <target state="translated">Über uns</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">426,427</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.footer.pages.dashboard" datatype="html">
+        <source>Dashboard</source>
+        <target state="translated">Konsole</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">427,428</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.footer.pages.agents" datatype="html">
+        <source>Agents</source>
+        <target state="translated">Agenten</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">428,429</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.footer.pages.privacy" datatype="html">
+        <source>Privacy</source>
+        <target state="translated">Datenschutz</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">429,430</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.footer.pages.support" datatype="html">
+        <source>Support</source>
+        <target state="translated">Hilfe</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">430,432</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.footer.project.title" datatype="html">
+        <source>Project</source>
+        <target state="translated">Projekt</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">433,434</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.footer.project.github" datatype="html">
+        <source>GitHub</source>
+        <target state="translated">GitHub</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">434,435</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.footer.project.issues" datatype="html">
+        <source>Issues</source>
+        <target state="translated">Issues</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">435,436</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.footer.project.changelog" datatype="html">
+        <source>Changelog</source>
+        <target state="translated">Änderungsprotokoll</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">436,437</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.footer.project.license" datatype="html">
+        <source>BSL 1.1 License</source>
+        <target state="translated">BSL-1.1-Lizenz</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">437,438</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.footer.project.stats" datatype="html">
+        <source>Stats</source>
+        <target state="translated">Statistiken</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">438,440</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.footer.research.title" datatype="html">
+        <source>Research</source>
+        <target state="translated">Forschung</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">441,442</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.footer.research.lattice" datatype="html">
+        <source>Lattice</source>
+        <target state="translated">Lattice</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">442,443</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.footer.research.concierge" datatype="html">
+        <source>Concierge</source>
+        <target state="translated">Concierge</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">443,444</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.footer.research.phantomStream" datatype="html">
+        <source>PhantomStream</source>
+        <target state="translated">PhantomStream</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">444,445</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.footer.research.prometheus" datatype="html">
+        <source>Prometheus</source>
+        <target state="translated">Prometheus</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">445,447</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.footer.community.title" datatype="html">
+        <source>Community</source>
+        <target state="translated">Gemeinschaft</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">448,449</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.footer.community.discord" datatype="html">
+        <source>Discord</source>
+        <target state="translated">Discord</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">449,450</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.footer.community.x" datatype="html">
+        <source>X</source>
+        <target state="translated">X</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">451</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.footer.community.sitemaps" datatype="html">
+        <source>Sitemaps</source>
+        <target state="translated">Seitenübersichten</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">451,455</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.footer.credit" datatype="html">
+        <source>Made by <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Lakshman Turlapati<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/></source>
+        <target state="translated">Erstellt von <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Lakshman Turlapati<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/></target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.html</context>
+          <context context-type="linenumber">456,457</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.og.imageAlt" datatype="html">
+        <source>FSB Full Self-Browsing logo</source>
+        <target state="translated">Logo von FSB Full Self-Browsing</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.ts</context>
+          <context context-type="linenumber">33</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.copy" datatype="html">
+        <source>Copy</source>
+        <target state="translated">Kopieren</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.ts</context>
+          <context context-type="linenumber">99</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.copied" datatype="html">
+        <source>Copied</source>
+        <target state="translated">Kopiert</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.ts</context>
+          <context context-type="linenumber">100</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.meta.title" datatype="html">
+        <source>Concierge - Safe Action Layer</source>
+        <target state="translated">Concierge - Sichere Aktionsschicht</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.ts</context>
+          <context context-type="linenumber">132</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.meta.description" datatype="html">
+        <source>Concierge is the safe action layer for agent-ready web applications: typed verbs, live catalogs, consent-bound dispatch, and signed replay-protected batches.</source>
+        <target state="translated">Concierge ist die sichere Aktionsschicht für agentenbereite Webanwendungen: typisierte Verben, Live-Kataloge, einwilligungsgebundener Dispatch und signierte, replay-geschützte Stapel.</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.ts</context>
+          <context context-type="linenumber">133</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.schema.subcategory" datatype="html">
+        <source>Safe action layer for agent-ready web applications</source>
+        <target state="translated">Sichere Aktionsschicht für agentenbereite Webanwendungen</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.ts</context>
+          <context context-type="linenumber">236</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="concierge.schema.description" datatype="html">
+        <source>Concierge lets a cooperating application publish typed verbs, resolve a live action catalog, and keep execution behind the application&apos;s own state, policy, and interface.</source>
+        <target state="translated">Concierge lässt eine kooperierende Anwendung typisierte Verben veröffentlichen, einen lebenden Aktionskatalog auflösen und die Ausführung hinter dem eigenen Zustand, der Richtlinie und der Oberfläche der Anwendung halten.</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.ts</context>
+          <context context-type="linenumber">239</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.template.001" datatype="html">
@@ -6118,12 +7354,20 @@
           <context context-type="linenumber">364,365</context>
         </context-group>
       </trans-unit>
+      <trans-unit id="lattice.footer.research.concierge" datatype="html">
+        <source>Concierge</source>
+        <target state="translated">Concierge</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/lattice/lattice-page.component.html</context>
+          <context context-type="linenumber">365,366</context>
+        </context-group>
+      </trans-unit>
       <trans-unit id="lattice.footer.research.phantomStream" datatype="html">
         <source>PhantomStream</source>
         <target state="translated">PhantomStream</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/lattice/lattice-page.component.html</context>
-          <context context-type="linenumber">365,366</context>
+          <context context-type="linenumber">366,367</context>
         </context-group>
       </trans-unit>
       <trans-unit id="lattice.footer.research.prometheus" datatype="html">
@@ -6131,7 +7375,7 @@
         <target state="translated">Prometheus</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/lattice/lattice-page.component.html</context>
-          <context context-type="linenumber">366,368</context>
+          <context context-type="linenumber">367,369</context>
         </context-group>
       </trans-unit>
       <trans-unit id="lattice.footer.community.title" datatype="html">
@@ -6139,7 +7383,7 @@
         <target state="translated">Gemeinschaft</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/lattice/lattice-page.component.html</context>
-          <context context-type="linenumber">369,370</context>
+          <context context-type="linenumber">370,371</context>
         </context-group>
       </trans-unit>
       <trans-unit id="lattice.footer.community.discord" datatype="html">
@@ -6147,7 +7391,7 @@
         <target state="translated">Discord</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/lattice/lattice-page.component.html</context>
-          <context context-type="linenumber">370,371</context>
+          <context context-type="linenumber">371,372</context>
         </context-group>
       </trans-unit>
       <trans-unit id="lattice.footer.community.x" datatype="html">
@@ -6155,7 +7399,7 @@
         <target state="translated">X</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/lattice/lattice-page.component.html</context>
-          <context context-type="linenumber">372</context>
+          <context context-type="linenumber">373</context>
         </context-group>
       </trans-unit>
       <trans-unit id="lattice.footer.community.sitemaps" datatype="html">
@@ -6163,7 +7407,7 @@
         <target state="translated">Seitenübersichten</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/lattice/lattice-page.component.html</context>
-          <context context-type="linenumber">372,375</context>
+          <context context-type="linenumber">373,376</context>
         </context-group>
       </trans-unit>
       <trans-unit id="lattice.footer.credit" datatype="html">
@@ -6171,7 +7415,7 @@
         <target state="translated">Erstellt von <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Lakshman Turlapati<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/></target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/lattice/lattice-page.component.html</context>
-          <context context-type="linenumber">377,378</context>
+          <context context-type="linenumber">378,379</context>
         </context-group>
       </trans-unit>
       <trans-unit id="lattice.og.imageAlt" datatype="html">
@@ -8102,12 +9346,20 @@
           <context context-type="linenumber">360,361</context>
         </context-group>
       </trans-unit>
+      <trans-unit id="phantomStream.footer.research.concierge" datatype="html">
+        <source>Concierge</source>
+        <target state="translated">Concierge</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/phantom-stream/phantom-stream-page.component.html</context>
+          <context context-type="linenumber">361,362</context>
+        </context-group>
+      </trans-unit>
       <trans-unit id="phantomStream.footer.research.phantom" datatype="html">
         <source>PhantomStream</source>
         <target state="translated">PhantomStream</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/phantom-stream/phantom-stream-page.component.html</context>
-          <context context-type="linenumber">361,362</context>
+          <context context-type="linenumber">362,363</context>
         </context-group>
       </trans-unit>
       <trans-unit id="phantomStream.footer.research.prometheus" datatype="html">
@@ -8115,20 +9367,12 @@
         <target state="translated">Prometheus</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/phantom-stream/phantom-stream-page.component.html</context>
-          <context context-type="linenumber">362,364</context>
+          <context context-type="linenumber">363,365</context>
         </context-group>
       </trans-unit>
       <trans-unit id="phantomStream.footer.community.title" datatype="html">
         <source>Community</source>
         <target state="translated">Gemeinschaft</target>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/phantom-stream/phantom-stream-page.component.html</context>
-          <context context-type="linenumber">365,366</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="phantomStream.footer.community.sitemaps" datatype="html">
-        <source>Sitemaps</source>
-        <target state="translated">Seitenübersichten</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/phantom-stream/phantom-stream-page.component.html</context>
           <context context-type="linenumber">366,367</context>
@@ -8147,7 +9391,15 @@
         <target state="translated">X</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/phantom-stream/phantom-stream-page.component.html</context>
-          <context context-type="linenumber">369,371</context>
+          <context context-type="linenumber">369</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="phantomStream.footer.community.sitemaps" datatype="html">
+        <source>Sitemaps</source>
+        <target state="translated">Seitenübersichten</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/phantom-stream/phantom-stream-page.component.html</context>
+          <context context-type="linenumber">369,373</context>
         </context-group>
       </trans-unit>
       <trans-unit id="phantomStream.footer.credit" datatype="html">
@@ -8155,7 +9407,7 @@
         <target state="translated">Erstellt von <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Lakshman Turlapati<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/></target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/phantom-stream/phantom-stream-page.component.html</context>
-          <context context-type="linenumber">373,374</context>
+          <context context-type="linenumber">374,375</context>
         </context-group>
       </trans-unit>
       <trans-unit id="phantomStream.og.imageAlt" datatype="html">
@@ -9739,7 +10991,7 @@
         <target state="translated"><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span class=&quot;version-tag&quot; [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>▽<x id="INTERPOLATION" equiv-text="{{ appVersion }}"/><x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/></target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
-          <context context-type="linenumber">156,158</context>
+          <context context-type="linenumber">155,156</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.error.default" datatype="html">
