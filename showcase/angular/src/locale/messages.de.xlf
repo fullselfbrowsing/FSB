@@ -4199,7 +4199,7 @@
         <target state="translated">Öffnen Sie eine normale Browserseite, um die Vorschau fortzusetzen</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">170</context>
+          <context context-type="linenumber">244</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.tabClosed" datatype="html">
@@ -4207,7 +4207,7 @@
         <target state="translated">Der übertragene Tab wurde geschlossen. Öffnen Sie eine andere Seite, um die Vorschau fortzusetzen</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">171</context>
+          <context context-type="linenumber">245</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.waitingForPage" datatype="html">
@@ -4215,7 +4215,7 @@
         <target state="translated">Warten, bis die Browserseite vollständig geladen ist</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">172</context>
+          <context context-type="linenumber">246</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.openStreamableTab" datatype="html">
@@ -4223,7 +4223,7 @@
         <target state="translated">Öffnen Sie einen Browser-Tab mit einer normalen Webseite, um die Vorschau zu starten</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">173</context>
+          <context context-type="linenumber">247</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.streamingLabel" datatype="html">
@@ -4231,7 +4231,7 @@
         <target state="translated">wird übertragen</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">174</context>
+          <context context-type="linenumber">248</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.liveDetail" datatype="html">
@@ -4239,7 +4239,7 @@
         <target state="translated">Live-Browservorschau</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">175</context>
+          <context context-type="linenumber">249</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.pausedLabel" datatype="html">
@@ -4247,7 +4247,7 @@
         <target state="translated">pausiert</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">176</context>
+          <context context-type="linenumber">250</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.pausedDetail" datatype="html">
@@ -4255,7 +4255,7 @@
         <target state="translated">Vorschau pausiert</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">177</context>
+          <context context-type="linenumber">251</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.notReadyLabel" datatype="html">
@@ -4263,7 +4263,7 @@
         <target state="translated">nicht bereit</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">178</context>
+          <context context-type="linenumber">252</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.recoveringLabel" datatype="html">
@@ -4271,7 +4271,7 @@
         <target state="translated">wird wiederhergestellt</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">179</context>
+          <context context-type="linenumber">253</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.recoveringDetail" datatype="html">
@@ -4279,7 +4279,7 @@
         <target state="translated">Browservorschau wird wiederhergestellt...</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">180</context>
+          <context context-type="linenumber">254</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.loadingLabel" datatype="html">
@@ -4287,7 +4287,7 @@
         <target state="translated">wird geladen</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">181</context>
+          <context context-type="linenumber">255</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.loadingDetail" datatype="html">
@@ -4295,7 +4295,7 @@
         <target state="translated">Warten auf die Live-Seitenvorschau...</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">182</context>
+          <context context-type="linenumber">256</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.readyLabel" datatype="html">
@@ -4303,7 +4303,7 @@
         <target state="translated">bereit</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">183</context>
+          <context context-type="linenumber">257</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.errorLabel" datatype="html">
@@ -4311,7 +4311,7 @@
         <target state="translated">Fehler</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">184</context>
+          <context context-type="linenumber">258</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.hiddenLabel" datatype="html">
@@ -4319,7 +4319,7 @@
         <target state="translated">ausgeblendet</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">185</context>
+          <context context-type="linenumber">259</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.disconnectedLabel" datatype="html">
@@ -4327,7 +4327,7 @@
         <target state="translated">getrennt</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">186</context>
+          <context context-type="linenumber">260</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.disconnectedLastFrame" datatype="html">
@@ -4335,7 +4335,7 @@
         <target state="translated">Übertragung getrennt – letztes Bild wird angezeigt</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">187</context>
+          <context context-type="linenumber">261</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.disconnectedFrozenLabel" datatype="html">
@@ -4343,7 +4343,7 @@
         <target state="translated">Getrennt</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">188</context>
+          <context context-type="linenumber">262</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.completeLabel" datatype="html">
@@ -4351,7 +4351,7 @@
         <target state="translated">abgeschlossen</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">189</context>
+          <context context-type="linenumber">263</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.completeDetail" datatype="html">
@@ -4359,7 +4359,7 @@
         <target state="translated">Aufgabe beendet – die letzte Seite wird angezeigt</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">190</context>
+          <context context-type="linenumber">264</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.completeFrozenLabel" datatype="html">
@@ -4367,7 +4367,7 @@
         <target state="translated">Aufgabe abgeschlossen</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">191</context>
+          <context context-type="linenumber">265</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.disconnectedDetail" datatype="html">
@@ -4375,7 +4375,7 @@
         <target state="translated">Übertragung getrennt</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">192</context>
+          <context context-type="linenumber">266</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.restrictedLabel" datatype="html">
@@ -4383,7 +4383,7 @@
         <target state="translated">eingeschränkte Seite</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">193</context>
+          <context context-type="linenumber">267</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.restrictedDetail" datatype="html">
@@ -4391,7 +4391,7 @@
         <target state="translated">Eingeschränkte Seite – navigieren Sie über die Adressleiste</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">194</context>
+          <context context-type="linenumber">268</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.errorDetail" datatype="html">
@@ -4399,7 +4399,7 @@
         <target state="translated">Seitenvorschau konnte nicht geladen werden</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">195</context>
+          <context context-type="linenumber">269</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.remote.offDetail" datatype="html">
@@ -4407,7 +4407,7 @@
         <target state="translated">Die Fernsteuerung ist ausgeschaltet</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">196</context>
+          <context context-type="linenumber">270</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.remote.offLabel" datatype="html">
@@ -4415,7 +4415,7 @@
         <target state="translated">Fernsteuerung aus</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">197</context>
+          <context context-type="linenumber">271</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.remote.requestingLabel" datatype="html">
@@ -4423,7 +4423,7 @@
         <target state="translated">wird angefordert</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">198</context>
+          <context context-type="linenumber">272</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.remote.requestingDetail" datatype="html">
@@ -4431,7 +4431,7 @@
         <target state="translated">Anforderung der Fernsteuerung an die Erweiterung gesendet</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">199</context>
+          <context context-type="linenumber">273</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.remote.readyLabel" datatype="html">
@@ -4439,7 +4439,7 @@
         <target state="translated">Fernsteuerung bereit</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">200</context>
+          <context context-type="linenumber">274</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.remote.readyDetail" datatype="html">
@@ -4447,7 +4447,7 @@
         <target state="translated">Die Fernsteuerung ist mit der Live-Vorschau verbunden</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">201</context>
+          <context context-type="linenumber">275</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.remote.rearmLabel" datatype="html">
@@ -4455,7 +4455,7 @@
         <target state="translated">Fernsteuerung erneut aktivieren</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">202</context>
+          <context context-type="linenumber">276</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.remote.rearmDetail" datatype="html">
@@ -4463,7 +4463,7 @@
         <target state="translated">Das Vorschauziel hat sich geändert. Aktivieren Sie die Fernsteuerung erneut, um fortzufahren.</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">203</context>
+          <context context-type="linenumber">277</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.remote.retryLabel" datatype="html">
@@ -4471,7 +4471,7 @@
         <target state="translated">Fernsteuerung wiederholen</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">204</context>
+          <context context-type="linenumber">278</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.remote.retryDetail" datatype="html">
@@ -4479,7 +4479,7 @@
         <target state="translated">Die Fernsteuerung hat ihre Debugger-Sitzung verloren. Aktivieren Sie sie erneut, um es noch einmal zu versuchen.</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">205</context>
+          <context context-type="linenumber">279</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.remote.blockedLabel" datatype="html">
@@ -4487,7 +4487,7 @@
         <target state="translated">Fernsteuerung blockiert</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">206</context>
+          <context context-type="linenumber">280</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.remote.externalDebuggerDetail" datatype="html">
@@ -4495,7 +4495,7 @@
         <target state="translated">Ein anderer Debugger kontrolliert den Browser-Tab.</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">207</context>
+          <context context-type="linenumber">281</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.remote.blockedDetail" datatype="html">
@@ -4503,7 +4503,7 @@
         <target state="translated">Die Fernsteuerung konnte nicht mit dem Browser-Tab verbunden werden.</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">208</context>
+          <context context-type="linenumber">282</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.remote.noTabLabel" datatype="html">
@@ -4511,7 +4511,7 @@
         <target state="translated">kein Tab</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">209</context>
+          <context context-type="linenumber">283</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.remote.noTabDetail" datatype="html">
@@ -4519,7 +4519,7 @@
         <target state="translated">Die Fernsteuerung benötigt einen normalen Browser-Tab.</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">210</context>
+          <context context-type="linenumber">284</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.remote.noResponseLabel" datatype="html">
@@ -4527,7 +4527,7 @@
         <target state="translated">keine Antwort</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">211</context>
+          <context context-type="linenumber">285</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.remote.noResponseDetail" datatype="html">
@@ -4535,7 +4535,7 @@
         <target state="translated">Die Erweiterung hat die Fernsteuerung nicht bestätigt.</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">212</context>
+          <context context-type="linenumber">286</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.remote.dashboardOfflineLabel" datatype="html">
@@ -4543,7 +4543,7 @@
         <target state="translated">Dashboard nicht verbunden</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">213</context>
+          <context context-type="linenumber">287</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.remote.dashboardOfflineDetail" datatype="html">
@@ -4551,7 +4551,7 @@
         <target state="translated">Stellen Sie die Verbindung zum Dashboard wieder her, bevor Sie die Fernsteuerung verwenden.</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">214</context>
+          <context context-type="linenumber">288</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.remote.unavailableDetail" datatype="html">
@@ -4559,7 +4559,7 @@
         <target state="translated">Die Fernsteuerung ist nicht verfügbar, bis die Vorschau wieder live ist.</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">215</context>
+          <context context-type="linenumber">289</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.timedOutLabel" datatype="html">
@@ -4567,7 +4567,7 @@
         <target state="translated">Zeitüberschreitung bei Aufgabe</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">216</context>
+          <context context-type="linenumber">290</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.timedOutAction" datatype="html">
@@ -4575,7 +4575,7 @@
         <target state="translated">Zeitüberschreitung bei der Aufgabenwiederherstellung</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">217</context>
+          <context context-type="linenumber">291</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.waitingLabel" datatype="html">
@@ -4583,7 +4583,7 @@
         <target state="translated">Warten auf Aufgabe</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">218</context>
+          <context context-type="linenumber">292</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.waitingAction" datatype="html">
@@ -4591,7 +4591,7 @@
         <target state="translated">Warten auf die Aufgabenwiederherstellung...</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">219</context>
+          <context context-type="linenumber">293</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.recoveringLabel" datatype="html">
@@ -4599,7 +4599,7 @@
         <target state="translated">Aufgabe wird wiederhergestellt</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">220</context>
+          <context context-type="linenumber">294</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.liveLabel" datatype="html">
@@ -4607,7 +4607,7 @@
         <target state="translated">Aufgabe aktiv</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">221</context>
+          <context context-type="linenumber">295</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.workingAction" datatype="html">
@@ -4615,7 +4615,7 @@
         <target state="translated">In Arbeit...</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">222</context>
+          <context context-type="linenumber">296</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.stopping" datatype="html">
@@ -4623,7 +4623,7 @@
         <target state="translated">Wird angehalten...</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">223</context>
+          <context context-type="linenumber">297</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.extension.waking" datatype="html">
@@ -4631,7 +4631,7 @@
         <target state="translated">Erweiterung wird aktiviert...</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">224</context>
+          <context context-type="linenumber">298</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.extension.wake" datatype="html">
@@ -4639,7 +4639,7 @@
         <target state="translated">Erweiterung aktivieren</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">225</context>
+          <context context-type="linenumber">299</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.pauseStream" datatype="html">
@@ -4647,7 +4647,7 @@
         <target state="translated">Übertragung pausieren</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">226</context>
+          <context context-type="linenumber">300</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.resumeStream" datatype="html">
@@ -4655,7 +4655,7 @@
         <target state="translated">Übertragung fortsetzen</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">227</context>
+          <context context-type="linenumber">301</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.refreshing" datatype="html">
@@ -4663,7 +4663,7 @@
         <target state="translated">Browservorschau wird aktualisiert...</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">228</context>
+          <context context-type="linenumber">302</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.reconnecting" datatype="html">
@@ -4671,7 +4671,7 @@
         <target state="translated">Verbindung zur Browservorschau wird wiederhergestellt...</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">229</context>
+          <context context-type="linenumber">303</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.connecting" datatype="html">
@@ -4679,7 +4679,7 @@
         <target state="translated">Verbindung zum Browser wird hergestellt...</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">230</context>
+          <context context-type="linenumber">304</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.connectingToBrowser" datatype="html">
@@ -4687,7 +4687,7 @@
         <target state="translated">Verbindung zum Browser wird hergestellt...</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">231</context>
+          <context context-type="linenumber">305</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.frozen" datatype="html">
@@ -4695,7 +4695,7 @@
         <target state="translated">Eingefroren</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">232</context>
+          <context context-type="linenumber">306</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.newTab" datatype="html">
@@ -4703,7 +4703,7 @@
         <target state="translated">Neuer Tab</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">233</context>
+          <context context-type="linenumber">307</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.chromeInternalPage" datatype="html">
@@ -4711,7 +4711,7 @@
         <target state="translated">Interne Chrome-Seite</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">234</context>
+          <context context-type="linenumber">308</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.chromeExtensionPage" datatype="html">
@@ -4719,7 +4719,7 @@
         <target state="translated">Chrome-Erweiterungsseite</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">235</context>
+          <context context-type="linenumber">309</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.edgeInternalPage" datatype="html">
@@ -4727,7 +4727,7 @@
         <target state="translated">Interne Edge-Seite</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">236</context>
+          <context context-type="linenumber">310</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.browserInternalPage" datatype="html">
@@ -4735,7 +4735,7 @@
         <target state="translated">Interne Browserseite</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">237</context>
+          <context context-type="linenumber">311</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.localFile" datatype="html">
@@ -4743,7 +4743,7 @@
         <target state="translated">Lokale Datei</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">238</context>
+          <context context-type="linenumber">312</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.restrictedPageType" datatype="html">
@@ -4751,7 +4751,7 @@
         <target state="translated">Eingeschränkte Seite</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">239</context>
+          <context context-type="linenumber">313</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.noActiveTab" datatype="html">
@@ -4759,7 +4759,7 @@
         <target state="translated">Kein aktiver Tab</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">240</context>
+          <context context-type="linenumber">314</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.metrics.remoteOn" datatype="html">
@@ -4767,7 +4767,7 @@
         <target state="translated">Fernsteuerung ein</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">241</context>
+          <context context-type="linenumber">315</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.status.connected" datatype="html">
@@ -4775,7 +4775,7 @@
         <target state="translated">Verbunden</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">242</context>
+          <context context-type="linenumber">316</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.status.offline" datatype="html">
@@ -4783,7 +4783,7 @@
         <target state="translated">Offline</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">243</context>
+          <context context-type="linenumber">317</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.notConnected" datatype="html">
@@ -4791,7 +4791,7 @@
         <target state="translated">Keine Verbindung zum Server.</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">244</context>
+          <context context-type="linenumber">318</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.extensionOffline" datatype="html">
@@ -4799,7 +4799,7 @@
         <target state="translated">Die Erweiterung ist offline.</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">245</context>
+          <context context-type="linenumber">319</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.timeoutTenMinutes" datatype="html">
@@ -4807,7 +4807,7 @@
         <target state="translated">Zeitüberschreitung bei Aufgabe (10 Minuten)</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">246</context>
+          <context context-type="linenumber">320</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.etaPending" datatype="html">
@@ -4815,7 +4815,7 @@
         <target state="translated">Verbleibende Zeit wird geschätzt</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">247</context>
+          <context context-type="linenumber">321</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.phaseNavigating" datatype="html">
@@ -4823,7 +4823,7 @@
         <target state="translated">Navigieren</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">248</context>
+          <context context-type="linenumber">322</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.phaseReading" datatype="html">
@@ -4831,7 +4831,7 @@
         <target state="translated">Seite wird gelesen</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">249</context>
+          <context context-type="linenumber">323</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.phaseFilling" datatype="html">
@@ -4839,7 +4839,7 @@
         <target state="translated">Formular wird ausgefüllt</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">250</context>
+          <context context-type="linenumber">324</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.phaseAnalyzing" datatype="html">
@@ -4847,7 +4847,7 @@
         <target state="translated">Wird analysiert</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">251</context>
+          <context context-type="linenumber">325</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.phasePlanning" datatype="html">
@@ -4855,7 +4855,7 @@
         <target state="translated">Wird geplant</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">252</context>
+          <context context-type="linenumber">326</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.phaseActing" datatype="html">
@@ -4863,7 +4863,7 @@
         <target state="translated">Aktion wird ausgeführt</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">253</context>
+          <context context-type="linenumber">327</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.phaseWriting" datatype="html">
@@ -4871,7 +4871,7 @@
         <target state="translated">Wird geschrieben</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">254</context>
+          <context context-type="linenumber">328</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.phaseSwitchingTabs" datatype="html">
@@ -4879,7 +4879,7 @@
         <target state="translated">Tab wird gewechselt</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">255</context>
+          <context context-type="linenumber">329</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.phaseCallingApi" datatype="html">
@@ -4887,7 +4887,7 @@
         <target state="translated">API wird aufgerufen</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">256</context>
+          <context context-type="linenumber">330</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.phaseWatchingTrigger" datatype="html">
@@ -4895,7 +4895,7 @@
         <target state="translated">Trigger wird überwacht</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">257</context>
+          <context context-type="linenumber">331</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.phaseWaiting" datatype="html">
@@ -4903,7 +4903,7 @@
         <target state="translated">Warten</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">258</context>
+          <context context-type="linenumber">332</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.phaseWorking" datatype="html">
@@ -4911,7 +4911,7 @@
         <target state="translated">In Arbeit</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">259</context>
+          <context context-type="linenumber">333</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.progressSearching" datatype="html">
@@ -4919,7 +4919,7 @@
         <target state="translated">Suche läuft</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">260</context>
+          <context context-type="linenumber">334</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.progressFormatting" datatype="html">
@@ -4927,7 +4927,7 @@
         <target state="translated">Wird formatiert</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">261</context>
+          <context context-type="linenumber">335</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.progressFormatted" datatype="html">
@@ -4935,7 +4935,7 @@
         <target state="translated">Formatiert</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">262</context>
+          <context context-type="linenumber">336</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.progressTaskCompleted" datatype="html">
@@ -4943,7 +4943,7 @@
         <target state="translated">Aufgabe abgeschlossen</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">263</context>
+          <context context-type="linenumber">337</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.progressTaskPartiallyCompleted" datatype="html">
@@ -4951,7 +4951,7 @@
         <target state="translated">Aufgabe teilweise abgeschlossen</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">264</context>
+          <context context-type="linenumber">338</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.progressTaskError" datatype="html">
@@ -4959,7 +4959,7 @@
         <target state="translated">Aufgabe mit einem Fehler beendet</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">265</context>
+          <context context-type="linenumber">339</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.progressReviewingPage" datatype="html">
@@ -4967,7 +4967,7 @@
         <target state="translated">Seitenstatus wird geprüft</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">266</context>
+          <context context-type="linenumber">340</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.progressPlanningNextStep" datatype="html">
@@ -4975,7 +4975,7 @@
         <target state="translated">Nächster Schritt wird geplant</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">267</context>
+          <context context-type="linenumber">341</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.progressPerformingAction" datatype="html">
@@ -4983,7 +4983,7 @@
         <target state="translated">Browseraktion wird ausgeführt</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">268</context>
+          <context context-type="linenumber">342</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.progressRecoveringInterruption" datatype="html">
@@ -4991,7 +4991,7 @@
         <target state="translated">Wiederherstellung nach Unterbrechung</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">269</context>
+          <context context-type="linenumber">343</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.progressUpdatingPage" datatype="html">
@@ -4999,7 +4999,7 @@
         <target state="translated">Seite wird aktualisiert</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">270</context>
+          <context context-type="linenumber">344</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.progressSwitchingTab" datatype="html">
@@ -5007,7 +5007,7 @@
         <target state="translated">Wechsel zu einem anderen Tab</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">271</context>
+          <context context-type="linenumber">345</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.progressWatchingDom" datatype="html">
@@ -5015,7 +5015,7 @@
         <target state="translated">DOM wird auf Änderungen überwacht</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">272</context>
+          <context context-type="linenumber">346</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.progressReconnectOrUpdate" datatype="html">
@@ -5023,7 +5023,7 @@
         <target state="translated">Verbindung wiederherstellen oder ein weiteres Fortschrittsupdate senden</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">273</context>
+          <context context-type="linenumber">347</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.couldNotStart" datatype="html">
@@ -5031,7 +5031,7 @@
         <target state="translated">Aufgabe konnte nicht gestartet werden</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">274</context>
+          <context context-type="linenumber">348</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.errorMissing" datatype="html">
@@ -5039,7 +5039,7 @@
         <target state="translated">Es wurde keine Aufgabe angegeben</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">275</context>
+          <context context-type="linenumber">349</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.errorAlreadyRunning" datatype="html">
@@ -5047,7 +5047,7 @@
         <target state="translated">Eine andere Aufgabe wird bereits ausgeführt</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">276</context>
+          <context context-type="linenumber">350</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.errorNoUsableTab" datatype="html">
@@ -5055,7 +5055,7 @@
         <target state="translated">Es wurde kein verwendbarer Browser-Tab gefunden</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">277</context>
+          <context context-type="linenumber">351</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.couldNotComplete" datatype="html">
@@ -5063,7 +5063,7 @@
         <target state="translated">Aufgabe konnte nicht abgeschlossen werden</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">278</context>
+          <context context-type="linenumber">352</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.stopped" datatype="html">
@@ -5071,7 +5071,7 @@
         <target state="translated">Vom Benutzer angehalten</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">279</context>
+          <context context-type="linenumber">353</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.reconnected" datatype="html">
@@ -5079,7 +5079,7 @@
         <target state="translated">Verbindung wiederhergestellt...</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">280</context>
+          <context context-type="linenumber">354</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.extensionOfflinePlaceholder" datatype="html">
@@ -5087,7 +5087,7 @@
         <target state="translated">Erweiterung offline...</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">281</context>
+          <context context-type="linenumber">355</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.placeholder" datatype="html">
@@ -5095,7 +5095,7 @@
         <target state="translated">Was soll FSB tun?</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">282</context>
+          <context context-type="linenumber">356</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.auth.connecting" datatype="html">
@@ -5103,7 +5103,7 @@
         <target state="translated">Verbindung wird hergestellt...</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">283</context>
+          <context context-type="linenumber">357</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.auth.connectWithKey" datatype="html">
@@ -5111,7 +5111,7 @@
         <target state="translated">Mit Schlüssel verbinden</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">284</context>
+          <context context-type="linenumber">358</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.auth.invalidKey" datatype="html">
@@ -5119,7 +5119,7 @@
         <target state="translated">Ungültiger Hash-Schlüssel. Prüfen Sie Ihren Schlüssel und versuchen Sie es erneut.</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">285</context>
+          <context context-type="linenumber">359</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.auth.cannotConnect" datatype="html">
@@ -5127,7 +5127,7 @@
         <target state="translated">Verbindung zum Server konnte nicht hergestellt werden. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">286</context>
+          <context context-type="linenumber">360</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.auth.sessionExpired" datatype="html">
@@ -5135,7 +5135,7 @@
         <target state="translated">Sitzung abgelaufen. Scannen Sie den QR-Code, um die Verbindung wiederherzustellen.</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">287</context>
+          <context context-type="linenumber">361</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.qr.unavailable" datatype="html">
@@ -5143,7 +5143,7 @@
         <target state="translated">QR-Scanner nicht verfügbar</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">288</context>
+          <context context-type="linenumber">362</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.qr.cameraUnavailable" datatype="html">
@@ -5151,7 +5151,7 @@
         <target state="translated">Kamera nicht verfügbar</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">289</context>
+          <context context-type="linenumber">363</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.qr.missingToken" datatype="html">
@@ -5159,7 +5159,7 @@
         <target state="translated">Der QR-Code enthält kein Kopplungstoken</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">290</context>
+          <context context-type="linenumber">364</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.qr.exchangeFailed" datatype="html">
@@ -5167,7 +5167,7 @@
         <target state="translated">Kopplungsaustausch fehlgeschlagen</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">291</context>
+          <context context-type="linenumber">365</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.qr.invalidOrExpired" datatype="html">
@@ -5175,7 +5175,7 @@
         <target state="translated">Der Kopplungscode ist ungültig oder abgelaufen</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">292</context>
+          <context context-type="linenumber">366</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.qr.tokenUsed" datatype="html">
@@ -5183,7 +5183,7 @@
         <target state="translated">Der Kopplungscode wurde bereits verwendet</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">293</context>
+          <context context-type="linenumber">367</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.qr.tokenExpired" datatype="html">
@@ -5191,7 +5191,7 @@
         <target state="translated">Der Kopplungscode ist abgelaufen</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">294</context>
+          <context context-type="linenumber">368</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.qr.scanFailed" datatype="html">
@@ -5199,7 +5199,7 @@
         <target state="translated">Scannen fehlgeschlagen – fügen Sie stattdessen Ihren Schlüssel ein</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">295</context>
+          <context context-type="linenumber">369</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.qr.pointCamera" datatype="html">
@@ -5207,7 +5207,7 @@
         <target state="translated">Richten Sie die Kamera auf den QR-Code in der FSB-Erweiterung</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">296</context>
+          <context context-type="linenumber">370</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.qr.viewfinder" datatype="html">
@@ -5215,7 +5215,7 @@
         <target state="translated">Kamerasucher für QR-Code</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">297</context>
+          <context context-type="linenumber">371</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.remote.aria" datatype="html">
@@ -5223,7 +5223,7 @@
         <target state="translated">Browser-Fernsteuerung</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">298</context>
+          <context context-type="linenumber">372</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.remote.disable" datatype="html">
@@ -5231,7 +5231,7 @@
         <target state="translated">Fernsteuerung deaktivieren</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">299</context>
+          <context context-type="linenumber">373</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.remote.control" datatype="html">
@@ -5239,7 +5239,7 @@
         <target state="translated">Fernsteuerung</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">300</context>
+          <context context-type="linenumber">374</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.minimize" datatype="html">
@@ -5247,7 +5247,7 @@
         <target state="translated">Minimieren</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">301</context>
+          <context context-type="linenumber">375</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.exitPip" datatype="html">
@@ -5255,7 +5255,7 @@
         <target state="translated">Bild-in-Bild beenden</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">302</context>
+          <context context-type="linenumber">376</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.exitFullscreen" datatype="html">
@@ -5263,7 +5263,7 @@
         <target state="translated">Vollbild beenden</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">303</context>
+          <context context-type="linenumber">377</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.maximize" datatype="html">
@@ -5271,7 +5271,7 @@
         <target state="translated">Maximieren</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">304</context>
+          <context context-type="linenumber">378</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.pip" datatype="html">
@@ -5279,7 +5279,7 @@
         <target state="translated">Bild-in-Bild</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">305</context>
+          <context context-type="linenumber">379</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.fullscreen" datatype="html">
@@ -5287,7 +5287,7 @@
         <target state="translated">Vollbild</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">306</context>
+          <context context-type="linenumber">380</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.dialog.alert" datatype="html">
@@ -5295,7 +5295,7 @@
         <target state="translated">Warnung</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">307</context>
+          <context context-type="linenumber">381</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.dialog.confirm" datatype="html">
@@ -5303,7 +5303,7 @@
         <target state="translated">Bestätigen</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">308</context>
+          <context context-type="linenumber">382</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.dialog.prompt" datatype="html">
@@ -5311,7 +5311,7 @@
         <target state="translated">Eingabeaufforderung</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">309</context>
+          <context context-type="linenumber">383</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.viewer.crossOriginFrame" datatype="html">
@@ -5319,7 +5319,7 @@
         <target state="translated">Ursprungsübergreifender Iframe</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">310</context>
+          <context context-type="linenumber">384</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.viewer.originLabel" datatype="html">
@@ -5327,7 +5327,7 @@
         <target state="translated">Ursprung</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">311</context>
+          <context context-type="linenumber">385</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.viewer.sourceLabel" datatype="html">
@@ -5335,7 +5335,7 @@
         <target state="translated">Quelle</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">312</context>
+          <context context-type="linenumber">386</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.viewer.playMedia" datatype="html">
@@ -5343,7 +5343,7 @@
         <target state="translated">Gespiegelte Medien wiedergeben</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">313</context>
+          <context context-type="linenumber">387</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.viewer.unmuteMedia" datatype="html">
@@ -5351,7 +5351,7 @@
         <target state="translated">Ton der gespiegelten Medien einschalten</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">314</context>
+          <context context-type="linenumber">388</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.viewer.unmute" datatype="html">
@@ -5359,7 +5359,7 @@
         <target state="translated">Ton einschalten</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">315</context>
+          <context context-type="linenumber">389</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.viewer.mediaPosterOnly" datatype="html">
@@ -5367,7 +5367,7 @@
         <target state="translated">Medien (nur Posterbild)</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">316</context>
+          <context context-type="linenumber">390</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.viewer.mediaUnavailable" datatype="html">
@@ -5375,7 +5375,7 @@
         <target state="translated">Medien nicht verfügbar</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">317</context>
+          <context context-type="linenumber">391</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.viewer.liveMirrorTitle" datatype="html">
@@ -5383,7 +5383,7 @@
         <target state="translated">PhantomStream-Live-Spiegelung</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">318</context>
+          <context context-type="linenumber">392</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.ws.connected" datatype="html">
@@ -5391,7 +5391,7 @@
         <target state="translated">verbunden</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">319</context>
+          <context context-type="linenumber">393</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.ws.disconnected" datatype="html">
@@ -5399,7 +5399,7 @@
         <target state="translated">getrennt</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">320</context>
+          <context context-type="linenumber">394</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.ws.reconnecting" datatype="html">
@@ -5407,7 +5407,7 @@
         <target state="translated">Verbindung wird wiederhergestellt...</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">321</context>
+          <context context-type="linenumber">395</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.result.success" datatype="html">
@@ -5415,7 +5415,7 @@
         <target state="translated">Erfolgreich</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">322</context>
+          <context context-type="linenumber">396</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.result.partial" datatype="html">
@@ -5423,7 +5423,7 @@
         <target state="translated">Teilweise</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">323</context>
+          <context context-type="linenumber">397</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.result.failed" datatype="html">
@@ -5431,7 +5431,7 @@
         <target state="translated">Fehlgeschlagen</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">324</context>
+          <context context-type="linenumber">398</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.result.stopped" datatype="html">
@@ -5439,7 +5439,7 @@
         <target state="translated">Angehalten</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">325</context>
+          <context context-type="linenumber">399</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.result.actions" datatype="html">
@@ -5447,7 +5447,7 @@
         <target state="translated">Aktionen</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">326</context>
+          <context context-type="linenumber">400</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.result.cost" datatype="html">
@@ -5455,7 +5455,7 @@
         <target state="translated">Kosten</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">327</context>
+          <context context-type="linenumber">401</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.result.finalUrl" datatype="html">
@@ -5463,7 +5463,7 @@
         <target state="translated">Endgültige URL</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">328</context>
+          <context context-type="linenumber">402</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.recoveryTimeoutWithAction" datatype="html">
@@ -5471,7 +5471,7 @@
         <target state="translated">Zeitüberschreitung bei der Aufgabenwiederherstellung – zuvor: <x id="action" equiv-text="this.lastProgressAction"/></target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">1621</context>
+          <context context-type="linenumber">1699</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.tooltip.lastSnapshot" datatype="html">
@@ -5479,7 +5479,7 @@
         <target state="translated">Letzter Snapshot: <x id="snapshotTime" equiv-text="snapshotTime"/></target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">3851</context>
+          <context context-type="linenumber">3979</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.tooltip.state" datatype="html">
@@ -5487,7 +5487,7 @@
         <target state="translated">Status: <x id="streamState" equiv-text="state"/></target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">3855</context>
+          <context context-type="linenumber">3983</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.tooltip.reason" datatype="html">
@@ -5495,7 +5495,7 @@
         <target state="translated">Grund: <x id="reason" equiv-text="reason"/></target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">3859</context>
+          <context context-type="linenumber">3987</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.tooltip.recoveringFor" datatype="html">
@@ -5503,7 +5503,7 @@
         <target state="translated">Wiederherstellung seit <x id="seconds" equiv-text="seconds"/> s</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">3863</context>
+          <context context-type="linenumber">3991</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.tooltip.lastFrame" datatype="html">
@@ -5511,7 +5511,7 @@
         <target state="translated">letztes Bild: vor <x id="seconds" equiv-text="frameSeconds"/> s</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">3869</context>
+          <context context-type="linenumber">3997</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.tooltip.mutations" datatype="html">
@@ -5519,7 +5519,7 @@
         <target state="translated">Änderungen: <x id="count" equiv-text="this.mutationsAppliedTotal"/></target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">3870</context>
+          <context context-type="linenumber">3998</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.tooltip.applyFailures" datatype="html">
@@ -5527,7 +5527,7 @@
         <target state="translated">Fehler beim Anwenden: <x id="count" equiv-text="this.mutationApplyFailures"/></target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">3871</context>
+          <context context-type="linenumber">3999</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.tooltip.stale" datatype="html">
@@ -5535,7 +5535,7 @@
         <target state="translated">veraltet: <x id="count" equiv-text="this.staleMutationCount"/></target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">3872</context>
+          <context context-type="linenumber">4000</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.tooltip.noData" datatype="html">
@@ -5543,7 +5543,7 @@
         <target state="translated">Keine Übertragungsdaten</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">3873</context>
+          <context context-type="linenumber">4001</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.api.requestFailed" datatype="html">
@@ -5551,7 +5551,7 @@
         <target state="translated">Anfrage mit Status <x id="status" equiv-text="status"/> fehlgeschlagen</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">4176</context>
+          <context context-type="linenumber">4304</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.etaMinutes" datatype="html">
@@ -5559,7 +5559,7 @@
         <target state="translated">~<x id="minutes" equiv-text="amount"/> Min. verbleibend</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">4331</context>
+          <context context-type="linenumber">4459</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.etaSeconds" datatype="html">
@@ -5567,7 +5567,7 @@
         <target state="translated">~<x id="seconds" equiv-text="amount"/> Sek. verbleibend</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">4332</context>
+          <context context-type="linenumber">4460</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.runningFor" datatype="html">
@@ -5575,7 +5575,7 @@
         <target state="translated">Läuft seit <x id="duration" equiv-text="duration"/></target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">4406</context>
+          <context context-type="linenumber">4534</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.stoppedWithAction" datatype="html">
@@ -5583,7 +5583,7 @@
         <target state="translated">Vom Benutzer angehalten – zuvor: <x id="action" equiv-text="action"/></target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">4411</context>
+          <context context-type="linenumber">4539</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.hero.title" datatype="html">
