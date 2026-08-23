@@ -40,14 +40,21 @@ async function fetchText(url, opts = {}) {
   return { status: res.status, contentType: res.headers.get('content-type') || '', body };
 }
 
+// licensedSoftware, where present, selects the SoftwareApplication node whose
+// `license` must be the canonical MIT URL. Routes without one skip the JSON-LD asserts.
 const MARKETING_ASSERTIONS = [
-  { path: '/',               titleSubstr: 'Full Self-Browsing', canonical: `${PROD_HOST}` },
+  { path: '/',               titleSubstr: 'Full Self-Browsing', canonical: `${PROD_HOST}`,
+    licensedSoftware: (node) => node['@type'] === 'SoftwareApplication' && node.name === 'FSB' },
   { path: '/about',          titleSubstr: 'About',              canonical: `${PROD_HOST}/about` },
-  { path: '/agents',         titleSubstr: 'Agents',             canonical: `${PROD_HOST}/agents` },
+  { path: '/agents',         titleSubstr: 'Agents',             canonical: `${PROD_HOST}/agents`,
+    licensedSoftware: (node) => node['@type'] === 'SoftwareApplication'
+      && node['@id'] === `${PROD_HOST}/agents#fsb-skill` },
   { path: '/support',        titleSubstr: 'Support',            canonical: `${PROD_HOST}/support` },
   { path: '/privacy',        titleSubstr: 'Privacy',            canonical: `${PROD_HOST}/privacy` },
   { path: '/lattice',        titleSubstr: 'Lattice',            canonical: `${PROD_HOST}/lattice` },
-  { path: '/concierge',      titleSubstr: 'Concierge',          canonical: `${PROD_HOST}/concierge` },
+  { path: '/concierge',      titleSubstr: 'Concierge',          canonical: `${PROD_HOST}/concierge`,
+    licensedSoftware: (node) => node['@type'] === 'SoftwareApplication'
+      && node['@id'] === `${PROD_HOST}/concierge#concierge-sdk` },
   { path: '/phantom-stream', titleSubstr: 'PhantomStream',      canonical: `${PROD_HOST}/phantom-stream` },
   { path: '/prometheus',     titleSubstr: 'Prometheus',         canonical: `${PROD_HOST}/prometheus` },
   { path: '/sitemaps',       titleSubstr: 'Site Maps',          canonical: `${PROD_HOST}/sitemaps` },
@@ -112,7 +119,7 @@ function extractJsonLdNodes(html) {
 }
 
 async function checkMarketingRoutes() {
-  for (const { path, titleSubstr, canonical } of MARKETING_ASSERTIONS) {
+  for (const { path, titleSubstr, canonical, licensedSoftware } of MARKETING_ASSERTIONS) {
     const url = `${BASE_URL}${path}`;
     let r;
     try {
@@ -126,7 +133,7 @@ async function checkMarketingRoutes() {
     record(r.body.includes(titleSubstr), `GET ${path} body contains title substring "${titleSubstr}"`, '');
     record(r.body.includes(`href="${canonical}"`), `GET ${path} canonical href="${canonical}"`, '');
     record(r.body.includes('<app-root'), `GET ${path} contains <app-root>`, '');
-    if (path === '/' || path === '/agents') {
+    if (licensedSoftware) {
       const { nodes, parseErrors } = extractJsonLdNodes(r.body);
       record(
         r.body.includes('type="application/ld+json"'),
@@ -138,10 +145,7 @@ async function checkMarketingRoutes() {
         `GET ${path} JSON-LD parses`,
         parseErrors.join('; ')
       );
-      const software = path === '/'
-        ? nodes.find((node) => node['@type'] === 'SoftwareApplication' && node.name === 'FSB')
-        : nodes.find((node) => node['@type'] === 'SoftwareApplication'
-          && node['@id'] === `${PROD_HOST}/agents#fsb-skill`);
+      const software = nodes.find(licensedSoftware);
       record(
         software?.license === LICENSE_URL,
         `GET ${path} SoftwareApplication license is canonical MIT URL`,

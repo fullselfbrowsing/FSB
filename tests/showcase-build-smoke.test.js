@@ -11,8 +11,8 @@
  *      MIT License line with the canonical repository license URL.
  *   3. BUILD: `npm --prefix showcase/angular run build --silent` exits 0
  *      and `npm --prefix showcase/angular run verify:hreflang` exits 0. The
- *      prerendered home and agents pages expose the canonical MIT license URL
- *      in SoftwareApplication JSON-LD for English and all 5 locales.
+ *      prerendered home, agents, and concierge pages expose the canonical MIT
+ *      license URL in SoftwareApplication JSON-LD for English and all 5 locales.
  *   4. CRAWLER INVARIANT (Easter-egg posture): /stats does NOT appear in
  *      prerender-routes.txt, public/sitemap.xml, public/llms.txt, or
  *      public/llms-full.txt. The angular dist/ folder MUST NOT contain a
@@ -86,6 +86,13 @@ function checkPrerenderedLicenseJsonLd(distRoot) {
       findSoftware: (nodes) => nodes.find((node) =>
         node['@type'] === 'SoftwareApplication'
           && node['@id'] === 'https://full-selfbrowsing.com/agents#fsb-skill'),
+    },
+    {
+      label: 'concierge',
+      directory: 'concierge',
+      findSoftware: (nodes) => nodes.find((node) =>
+        node['@type'] === 'SoftwareApplication'
+          && node['@id'] === 'https://full-selfbrowsing.com/concierge#concierge-sdk'),
     },
   ];
 

@@ -237,6 +237,7 @@ export class ConciergePageComponent implements OnInit, AfterViewInit, OnDestroy 
       operatingSystem: 'macOS, Linux, Windows (Node 22.12+)',
       url: `${HOST}/concierge`,
       description: $localize`:@@concierge.schema.description:Concierge lets a cooperating application publish typed verbs, resolve a live action catalog, and keep execution behind the application's own state, policy, and interface.`,
+      license: 'https://github.com/fullselfbrowsing/FSB/blob/main/LICENSE',
       offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
       publisher: { '@id': `${HOST}/#org` },
     };
