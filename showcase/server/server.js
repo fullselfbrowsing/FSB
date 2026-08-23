@@ -224,6 +224,7 @@ const marketingRoutes = new Set([
   '/privacy',
   '/support',
   '/lattice',
+  '/concierge',
   '/phantom-stream',
   '/prometheus',
   '/sitemaps'

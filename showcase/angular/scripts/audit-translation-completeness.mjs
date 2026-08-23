@@ -70,6 +70,7 @@ const ROUTE_TABLE = [
   { path: 'support', componentDir: 'pages/support', shellless: false, outOfScope: null },
   { path: 'stats', componentDir: 'pages/stats', shellless: true, outOfScope: null },
   { path: 'lattice', componentDir: 'pages/lattice', shellless: true, outOfScope: null },
+  { path: 'concierge', componentDir: 'pages/concierge', shellless: true, outOfScope: null },
   { path: 'phantom-stream', componentDir: 'pages/phantom-stream', shellless: true, outOfScope: null },
   { path: 'prometheus', componentDir: 'pages/prometheus', shellless: true, outOfScope: null },
   { path: 'sitemaps', componentDir: 'pages/sitemaps', shellless: false, outOfScope: null },
@@ -430,9 +431,9 @@ function buildReport(ctx) {
   const totalMarkedUnion = new Set();
   for (const ids of routeMarkedIds.values()) for (const id of ids) totalMarkedUnion.add(id);
   lines.push(
-    `- Union of marked ids across all 12 routes (incl. shared shell/picker ids, deduplicated): ` +
+    `- Union of marked ids across all ${ROUTE_TABLE.length} routes (incl. shared shell/picker ids, deduplicated): ` +
     `${totalMarkedUnion.size} (a subset of EN's ${enMap.size} total, since messages.xlf also covers ` +
-    'any i18n-marked strings outside these 12 routes\' own component dirs / shared shell / picker).'
+    `any i18n-marked strings outside these ${ROUTE_TABLE.length} routes' own component dirs / shared shell / picker).`
   );
   lines.push('');
 

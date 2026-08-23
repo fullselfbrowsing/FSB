@@ -54,6 +54,13 @@ Static prerender currently covers:
 - `/privacy`
 - `/support`
 
+Research product pages also prerender:
+
+- `/lattice`
+- `/concierge`
+- `/phantom-stream`
+- `/prometheus`
+
 The `/stats` route is a deliberately low key stats for nerds page. It shows live GitHub activity plus FSB telemetry charts for active users, tokens, running agents, average agents per user, and popular MCP clients.
 
 Crawler-facing files are generated from `angular/scripts/build-crawler-files.mjs` and source content in `angular/scripts/llms-full.source.md`.

@@ -151,6 +151,7 @@ FSB ships 142+ hand-curated site-specific guides (Notion, Google Sheets, Workday
 
 ### Ecosystem pages
 - Lattice (`https://full-selfbrowsing.com/lattice`): capability runtime SDK for multimodal AI applications -- typed outputs, inspectable plans, provider routing, artifacts, tools, audit receipts, and replay-friendly records.
+- Concierge (`https://full-selfbrowsing.com/concierge`): safe action layer for agent-ready web applications -- typed verbs, live catalogs, consent-bound dispatch, and signed replay-protected batches.
 - PhantomStream (`https://full-selfbrowsing.com/phantom-stream`): DOM-native live browser mirroring library -- one style-inlined snapshot, then MutationObserver diffs instead of pixels; powers FSB's remote dashboard live preview.
 - Prometheus (`https://full-selfbrowsing.com/prometheus`): the autonomous browser build behind FSB -- native control spine, stdio MCP bridge, multi-agent tab ownership, runtime sidebar, and DOM-native supervision.
 - Site Maps (`https://full-selfbrowsing.com/sitemaps`): community hub (under development) for contributing well-tested site schemas that can become built-in browser knowledge.
@@ -177,6 +178,7 @@ Operator is OpenAI's agentic browser product (2025). Overlap with FSB: end-user-
 - Support: https://full-selfbrowsing.com/support
 - Privacy: https://full-selfbrowsing.com/privacy
 - Lattice: https://full-selfbrowsing.com/lattice
+- Concierge: https://full-selfbrowsing.com/concierge
 - PhantomStream: https://full-selfbrowsing.com/phantom-stream
 - Prometheus: https://full-selfbrowsing.com/prometheus
 - Site Maps: https://full-selfbrowsing.com/sitemaps

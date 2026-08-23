@@ -1,0 +1,462 @@
+<div class="con-page" #pageRoot data-screen-label="Concierge" i18n-data-screen-label="@@concierge.screen.label">
+  <main>
+    <section class="con-hero">
+      <div class="con-hero-mesh"></div>
+      <div class="con-hero-inner">
+        <div>
+          <span class="con-eyebrow con-eyebrow-plain" i18n="@@concierge.hero.eyebrow">
+            Research <span [attr.translate]="'no'">@full-self-browsing</span>
+          </span>
+          <h1 i18n="@@concierge.hero.title" [attr.translate]="'no'">Concierge.</h1>
+          <p class="con-tagline" i18n="@@concierge.hero.tagline">The safe action layer for agent-ready web applications.</p>
+          <p class="con-lead" i18n="@@concierge.hero.lead">
+            Typed, consent-gated actions so an <span [attr.translate]="'no'">AI</span> can operate your web app; without taking over the browser.
+          </p>
+          <div class="con-cta-row">
+            <a href="concierge#install" (click)="onSectionLink($event, 'install')" class="btn con-btn-dark" i18n="@@concierge.hero.quickStart">
+              <i class="fa-solid fa-bolt" aria-hidden="true"></i> Quick start
+            </a>
+            <a href="https://github.com/fullselfbrowsing/Concierge" target="_blank" rel="noopener" class="btn con-btn-line" i18n="@@concierge.hero.github">
+              <i class="fa-brands fa-github" aria-hidden="true"></i> View on <span [attr.translate]="'no'">GitHub</span>
+            </a>
+          </div>
+          <div class="con-chips">
+            <span class="con-chip" i18n="@@concierge.chip.version" [attr.translate]="'no'"><b class="version-tag">▽0.2.1</b></span>
+            <span class="con-chip" i18n="@@concierge.chip.typescript" [attr.translate]="'no'">TypeScript-first</span>
+            <span class="con-chip" i18n="@@concierge.chip.node" [attr.translate]="'no'">ESM only · Node &gt;=22.12</span>
+            <span class="con-chip" i18n="@@concierge.chip.license" [attr.translate]="'no'">MIT</span>
+          </div>
+        </div>
+        <div class="con-markwrap">
+          <span class="con-mark" i18n-aria-label="@@concierge.mark.aria" aria-label="Concierge" [attr.translate]="'no'">
+            <span class="c"></span>
+            <svg viewBox="0 -2 100 100" aria-hidden="true">
+              <circle cx="50" cy="50" r="35" fill="none" stroke="currentColor" stroke-width="24" stroke-dasharray="182 38"></circle>
+              <rect x="60" y="38" width="37" height="24" fill="currentColor"></rect>
+            </svg>
+          </span>
+        </div>
+        <!-- Mobile-only scroll cue: hidden on desktop via component styles; text-free
+             and aria-hidden so it adds no i18n surface (messages.xlf must not change). -->
+        <a href="concierge#install" class="con-scroll-cue" aria-hidden="true" tabindex="-1" (click)="onSectionLink($event, 'install')">
+          <span class="con-cue-chevron"></span>
+        </a>
+      </div>
+    </section>
+
+    <div class="con-subnav">
+      <div class="con-subnav-inner">
+        <a href="concierge#install" (click)="onSectionLink($event, 'install')" [class.on]="activeSection === 'install'" i18n="@@concierge.subnav.install">Install</a>
+        <a href="concierge#boundary" (click)="onSectionLink($event, 'boundary')" [class.on]="activeSection === 'boundary'" i18n="@@concierge.subnav.boundary">Boundary</a>
+        <a href="concierge#how" (click)="onSectionLink($event, 'how')" [class.on]="activeSection === 'how'" i18n="@@concierge.subnav.how">How it works</a>
+        <a href="concierge#quickstart" (click)="onSectionLink($event, 'quickstart')" [class.on]="activeSection === 'quickstart'" i18n="@@concierge.subnav.quickstart">Quick start</a>
+        <a href="concierge#packages" (click)="onSectionLink($event, 'packages')" [class.on]="activeSection === 'packages'" i18n="@@concierge.subnav.packages">Packages</a>
+        <a href="concierge#integrations" (click)="onSectionLink($event, 'integrations')" [class.on]="activeSection === 'integrations'" i18n="@@concierge.subnav.integrations">Integrations</a>
+        <a href="concierge#guarantees" (click)="onSectionLink($event, 'guarantees')" [class.on]="activeSection === 'guarantees'" i18n="@@concierge.subnav.guarantees">Guarantees</a>
+        <a href="concierge#security" (click)="onSectionLink($event, 'security')" [class.on]="activeSection === 'security'" i18n="@@concierge.subnav.security">Security</a>
+      </div>
+    </div>
+
+    <section class="con-section" id="install">
+      <div class="container">
+        <div class="con-shead">
+          <span class="con-eyebrow" i18n="@@concierge.install.eyebrow">
+            <i class="fa-solid fa-terminal" aria-hidden="true"></i> Install
+          </span>
+          <h2 i18n="@@concierge.install.title">Three packages, one release set</h2>
+          <p i18n="@@concierge.install.copy">Install the core runtime for a framework-neutral integration, then add the matching adapter. Install and upgrade them together so every adapter resolves the same physical core.</p>
+        </div>
+        <div class="con-pkgtabs">
+          <div class="con-tabset" role="group" i18n-aria-label="@@concierge.install.packageManager" aria-label="Package manager">
+            <button type="button" class="con-tab" [class.on]="pkg === 'pnpm'" [attr.aria-pressed]="pkg === 'pnpm'" (click)="setPackage('pnpm')" i18n="@@concierge.install.tab.pnpm" [attr.translate]="'no'">pnpm</button>
+            <button type="button" class="con-tab" [class.on]="pkg === 'npm'" [attr.aria-pressed]="pkg === 'npm'" (click)="setPackage('npm')" i18n="@@concierge.install.tab.npm" [attr.translate]="'no'">npm</button>
+          </div>
+        </div>
+        <div class="con-install">
+          <div class="con-cmd">
+            <div class="con-cmd-label" i18n="@@concierge.install.core">
+              <i class="fa-solid fa-cube" aria-hidden="true"></i> Core runtime
+            </div>
+            <code [attr.translate]="'no'"><span class="pr">$ </span>{{ installCore }}</code>
+          </div>
+          <div class="con-cmd">
+            <div class="con-cmd-label" i18n="@@concierge.install.adapter">
+              <i class="fa-brands fa-react" aria-hidden="true"></i> With an adapter
+            </div>
+            <code [attr.translate]="'no'"><span class="pr">$ </span>{{ installAdapter }}</code>
+          </div>
+        </div>
+        <div class="con-note">
+          <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+          <p i18n="@@concierge.install.note">
+            Version <span [attr.translate]="'no'">0.2.1</span> is a supported public preview on runtime contract v2. <span [attr.translate]="'no'">React</span> and <span [attr.translate]="'no'">Svelte</span> package roots are server-safe; their runtime bindings live in <span [attr.translate]="'no'">/client</span> and <span [attr.translate]="'no'">/client.svelte</span>. Edge deployment is not part of the <span [attr.translate]="'no'">0.2</span> support matrix.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section class="con-section con-section-alt" id="boundary">
+      <div class="container">
+        <div class="con-shead">
+          <span class="con-eyebrow" i18n="@@concierge.boundary.eyebrow">
+            <i class="fa-solid fa-scale-balanced" aria-hidden="true"></i> Why <span [attr.translate]="'no'">Concierge</span>
+          </span>
+          <h2 i18n="@@concierge.boundary.title">Publish verbs, not a page surface</h2>
+          <p i18n="@@concierge.boundary.copy">Generic browser automation reconstructs intent from page structure, selectors, or coordinates. <span [attr.translate]="'no'">Concierge</span> lets a cooperating application publish the exact verbs an <span [attr.translate]="'no'">AI</span> may use at the current moment.</p>
+        </div>
+        <div class="con-vs">
+          <div class="con-vs-row con-vs-head">
+            <div i18n="@@concierge.boundary.head.generic">Generic browser automation</div>
+            <div i18n="@@concierge.boundary.head.concierge" [attr.translate]="'no'">Concierge</div>
+          </div>
+          <div class="con-vs-row">
+            <div i18n="@@concierge.boundary.row1.generic">Click selectors or coordinates</div>
+            <div i18n="@@concierge.boundary.row1.concierge">Call <b>application-defined verbs</b></div>
+          </div>
+          <div class="con-vs-row">
+            <div i18n="@@concierge.boundary.row2.generic">Reconstruct intent from the visible interface</div>
+            <div i18n="@@concierge.boundary.row2.concierge">Receive <b>typed schemas</b> and live availability</div>
+          </div>
+          <div class="con-vs-row">
+            <div i18n="@@concierge.boundary.row3.generic">Inherit broad page authority</div>
+            <div i18n="@@concierge.boundary.row3.concierge">See only the <b>current action catalog</b></div>
+          </div>
+          <div class="con-vs-row">
+            <div i18n="@@concierge.boundary.row4.generic">Treat confirmation as a boolean</div>
+            <div i18n="@@concierge.boundary.row4.concierge">Bind <b>consent</b> to the reviewed payload and state snapshot</div>
+          </div>
+          <div class="con-vs-row">
+            <div i18n="@@concierge.boundary.row5.generic">Trust a model callback to actuate the browser</div>
+            <div i18n="@@concierge.boundary.row5.concierge">Verify a <b>signed, replay-protected batch</b> before dispatch</div>
+          </div>
+        </div>
+        <div class="con-note">
+          <i class="fa-solid fa-code-branch" aria-hidden="true"></i>
+          <p i18n="@@concierge.boundary.note">
+            <a href="https://github.com/fullselfbrowsing/FSB" target="_blank" rel="noopener" [attr.translate]="'no'">FSB</a> operates sites that do not cooperate. <span [attr.translate]="'no'">Concierge</span> is the action layer for applications that do cooperate. The projects address different parts of the agent browsing stack.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section class="con-section" id="how">
+      <div class="container">
+        <div class="con-shead">
+          <span class="con-eyebrow" i18n="@@concierge.how.eyebrow">
+            <i class="fa-solid fa-diagram-project" aria-hidden="true"></i> How it works
+          </span>
+          <h2 i18n="@@concierge.how.title">From declaration to structured result</h2>
+        </div>
+        <div class="con-steps">
+          <div class="con-step">
+            <span class="n" [attr.translate]="'no'">01</span>
+            <p i18n="@@concierge.how.step1">The application defines named actions with descriptions, input schemas, availability rules, effect metadata, redaction policy, and handlers.</p>
+          </div>
+          <div class="con-step">
+            <span class="n" [attr.translate]="'no'">02</span>
+            <p i18n="@@concierge.how.step2"><span [attr.translate]="'no'">Concierge</span> resolves the active stage and its available actions into one immutable catalog snapshot with an instance-local revision.</p>
+          </div>
+          <div class="con-step">
+            <span class="n" [attr.translate]="'no'">03</span>
+            <p i18n="@@concierge.how.step3">The model receives only the tools admitted by that snapshot.</p>
+          </div>
+          <div class="con-step">
+            <span class="n" [attr.translate]="'no'">04</span>
+            <p i18n="@@concierge.how.step4"><span [attr.translate]="'no'">Concierge</span> validates every requested action again before execution, applies consent and scheduling rules, and rejects stale or conflicting calls.</p>
+          </div>
+          <div class="con-step">
+            <span class="n" [attr.translate]="'no'">05</span>
+            <p i18n="@@concierge.how.step5">The application bridge performs the approved interface operation and returns a structured result.</p>
+          </div>
+        </div>
+        <div class="con-owners">
+          <div class="con-owner">
+            <h4 i18n="@@concierge.how.owner.app.title">
+              <i class="fa-solid fa-window-maximize" aria-hidden="true"></i> Application
+            </h4>
+            <p i18n="@@concierge.how.owner.app.copy">Action definitions, live state, interface operations, authentication, and server authorization.</p>
+          </div>
+          <div class="con-owner">
+            <h4 i18n="@@concierge.how.owner.concierge.title">
+              <i class="fa-solid fa-shield-halved" aria-hidden="true"></i> <span [attr.translate]="'no'">Concierge</span>
+            </h4>
+            <p i18n="@@concierge.how.owner.concierge.copy">Catalog admission, validation, consent, scheduling, deduplication, dispatch, and workflows.</p>
+          </div>
+          <div class="con-owner">
+            <h4 i18n="@@concierge.how.owner.model.title">
+              <i class="fa-solid fa-comments" aria-hidden="true"></i> Model integration
+            </h4>
+            <p i18n="@@concierge.how.owner.model.copy">Tool presentation, model calls, tool correlation, and result delivery.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="con-section con-section-coal" id="quickstart">
+      <div class="container">
+        <div class="con-split">
+          <div class="con-split-copy">
+            <span class="con-eyebrow" i18n="@@concierge.quickstart.eyebrow">
+              <i class="fa-solid fa-bolt" aria-hidden="true"></i> Quick start
+            </span>
+            <h2 i18n="@@concierge.quickstart.title">Declare an action. Resolve one catalog.</h2>
+            <p i18n="@@concierge.quickstart.copy">Define each action as a named constant, attach it to a stage, and resolve one atomic catalog snapshot for the current application state.</p>
+            <ul class="con-ticks">
+              <li i18n="@@concierge.quickstart.tick.snapshot"><i class="fa-solid fa-check" aria-hidden="true"></i> Stage, availability, tools, and revision resolve together</li>
+              <li i18n="@@concierge.quickstart.tick.true"><i class="fa-solid fa-check" aria-hidden="true"></i> Only the literal value <span [attr.translate]="'no'">true</span> admits an action; anything else fails closed</li>
+              <li i18n="@@concierge.quickstart.tick.frozen"><i class="fa-solid fa-check" aria-hidden="true"></i> The resolved catalog is deeply frozen and never cross-runtime authority</li>
+            </ul>
+          </div>
+          <div class="con-codecard con-codeblock">
+            <div class="con-cbhead">
+              <span class="con-cbname" i18n="@@concierge.quickstart.filename" [attr.translate]="'no'">actions/open-project.ts</span>
+              <button type="button" class="con-cbcopy" [class.copied]="copied" (click)="copyCode(actionCode)">
+                <i [class]="copied ? 'fa-solid fa-check' : 'fa-regular fa-copy'" aria-hidden="true"></i>
+                {{ copied ? copiedLabel : copyLabel }}
+              </button>
+            </div>
+            <pre #actionCode [attr.translate]="'no'"><code [innerHTML]="actionCodeHtml"></code></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="con-section" id="packages">
+      <div class="container">
+        <div class="con-shead">
+          <span class="con-eyebrow" i18n="@@concierge.packages.eyebrow">
+            <i class="fa-solid fa-boxes-stacked" aria-hidden="true"></i> Packages
+          </span>
+          <h2 i18n="@@concierge.packages.title">Core runtime plus framework bindings</h2>
+          <p i18n="@@concierge.packages.copy">The public packages form one fixed release set and share runtime contract v2.</p>
+        </div>
+        <div class="con-pkgs">
+          <div class="con-pkg">
+            <span class="tag" i18n="@@concierge.packages.core.tag">Core</span>
+            <code i18n="@@concierge.packages.core.path" [attr.translate]="'no'">@full-self-browsing/concierge</code>
+            <p i18n="@@concierge.packages.core.copy">Framework-neutral catalog, dispatch, consent, workflow, telemetry, and transport runtime.</p>
+          </div>
+          <div class="con-pkg">
+            <span class="tag" i18n="@@concierge.packages.react.tag" [attr.translate]="'no'">React</span>
+            <code i18n="@@concierge.packages.react.path" [attr.translate]="'no'">@full-self-browsing/concierge-react</code>
+            <p i18n="@@concierge.packages.react.copy"><span [attr.translate]="'no'">React</span> context, bridge lifecycle, and optional activity visuals including <span [attr.translate]="'no'">ConciergeActivityOverlay</span>.</p>
+          </div>
+          <div class="con-pkg">
+            <span class="tag" i18n="@@concierge.packages.svelte.tag" [attr.translate]="'no'">Svelte</span>
+            <code i18n="@@concierge.packages.svelte.path" [attr.translate]="'no'">@full-self-browsing/concierge-svelte</code>
+            <p i18n="@@concierge.packages.svelte.copy"><span [attr.translate]="'no'">Svelte</span> context, bridge lifecycle, and reactive snapshot normalization.</p>
+          </div>
+        </div>
+        <div class="con-matrix" i18n="@@concierge.packages.matrix" [attr.translate]="'no'">
+          <div class="con-mrow"><span class="k">Node.js</span><span class="v">&gt;=22.12.0</span></div>
+          <div class="con-mrow"><span class="k">Module format</span><span class="v">ESM only</span></div>
+          <div class="con-mrow"><span class="k">React · React DOM</span><span class="v">^18.2.0 || ^19.0.0</span></div>
+          <div class="con-mrow"><span class="k">Svelte</span><span class="v">^5.0.0</span></div>
+          <div class="con-mrow"><span class="k">AI SDK core</span><span class="v">^6.0.0 || ^7.0.0</span></div>
+          <div class="con-mrow"><span class="k">Runtime contract</span><span class="v">v2 throughout 0.2.x</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="con-section con-section-alt" id="integrations">
+      <div class="container">
+        <div class="con-shead">
+          <span class="con-eyebrow" i18n="@@concierge.integrations.eyebrow">
+            <i class="fa-solid fa-plug" aria-hidden="true"></i> Integrations
+          </span>
+          <h2 i18n="@@concierge.integrations.title">One instance, several entry points</h2>
+          <p i18n="@@concierge.integrations.copy">Mount the same <span [attr.translate]="'no'">Concierge</span> instance and bridge registry through the appropriate adapter. Getter-based state stays live until <span [attr.translate]="'no'">Concierge</span> captures a snapshot for validation or consent.</p>
+        </div>
+        <div class="con-int">
+          <div class="con-irow con-irow-head">
+            <div i18n="@@concierge.integrations.head.name">Integration</div>
+            <div i18n="@@concierge.integrations.head.path">Runtime entry point</div>
+            <div i18n="@@concierge.integrations.head.use">Guidance</div>
+          </div>
+          <div class="con-irow">
+            <div class="con-iname" i18n="@@concierge.integrations.neutral.name">Framework-neutral</div>
+            <div class="con-ipath" i18n="@@concierge.integrations.neutral.path" [attr.translate]="'no'">@full-self-browsing/concierge</div>
+            <div class="con-iuse" i18n="@@concierge.integrations.neutral.use">Use the core runtime and register the application bridge directly.</div>
+          </div>
+          <div class="con-irow">
+            <div class="con-iname" i18n="@@concierge.integrations.react.name" [attr.translate]="'no'">React</div>
+            <div class="con-ipath" i18n="@@concierge.integrations.react.path" [attr.translate]="'no'">/concierge-react/client</div>
+            <div class="con-iuse" i18n="@@concierge.integrations.react.use">Provide the core instance, register bridges, and optionally render the activity overlay.</div>
+          </div>
+          <div class="con-irow">
+            <div class="con-iname" i18n="@@concierge.integrations.svelte.name" [attr.translate]="'no'">Svelte</div>
+            <div class="con-ipath" i18n="@@concierge.integrations.svelte.path" [attr.translate]="'no'">/concierge-svelte/client.svelte</div>
+            <div class="con-iuse" i18n="@@concierge.integrations.svelte.use">Provide the core instance with the Svelte snapshot normalizer and register bridges during initialization.</div>
+          </div>
+          <div class="con-irow">
+            <div class="con-iname" i18n="@@concierge.integrations.aisdk.name" [attr.translate]="'no'">AI SDK 6 &amp; 7</div>
+            <div class="con-ipath" i18n="@@concierge.integrations.aisdk.path" [attr.translate]="'no'">/concierge/ai-sdk</div>
+            <div class="con-iuse" i18n="@@concierge.integrations.aisdk.use">Convert a resolved catalog into model tools and correlate completed calls.</div>
+          </div>
+          <div class="con-irow">
+            <div class="con-iname" i18n="@@concierge.integrations.signed.name">Signed server bridge</div>
+            <div class="con-ipath" i18n="@@concierge.integrations.signed.path" [attr.translate]="'no'">/ai-sdk/server · /ai-sdk/browser</div>
+            <div class="con-iuse" i18n="@@concierge.integrations.signed.use">Issue, verify, and dispatch short-lived browser batches bound to the catalog digest.</div>
+          </div>
+        </div>
+        <div class="con-note">
+          <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+          <p i18n="@@concierge.integrations.note">
+            Raw <span [attr.translate]="'no'">onToolCall</span> values are display data only. They never actuate the application. The signed bridge verifies the envelope, consumes its replay key, compares it with the live browser catalog, and only then enters core dispatch.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section class="con-section con-section-coal" id="guarantees">
+      <div class="container">
+        <div class="con-shead">
+          <span class="con-eyebrow" i18n="@@concierge.guarantees.eyebrow">
+            <i class="fa-solid fa-lock" aria-hidden="true"></i> Runtime guarantees
+          </span>
+          <h2 i18n="@@concierge.guarantees.title">What the runtime holds to</h2>
+        </div>
+        <div class="con-split con-split-start">
+          <div class="con-dispatch" i18n="@@concierge.guarantees.dispatch" [attr.translate]="'no'">
+            <div class="con-dtop">
+              <h4>Dispatch outcome</h4>
+              <span class="st"><i class="fa-solid fa-circle-check" aria-hidden="true"></i> completed</span>
+            </div>
+            <div class="con-drow"><span class="k"><i class="fa-solid fa-tag" aria-hidden="true"></i> name</span><span class="v">openProject</span></div>
+            <div class="con-drow"><span class="k"><i class="fa-solid fa-hashtag" aria-hidden="true"></i> callId</span><span class="v">call_7f2c · index 0</span></div>
+            <div class="con-drow"><span class="k"><i class="fa-solid fa-layer-group" aria-hidden="true"></i> catalogRevision</span><span class="v">stage projects · fresh</span></div>
+            <div class="con-drow"><span class="k"><i class="fa-solid fa-hand" aria-hidden="true"></i> consent</span><span class="v">bound · consumed once</span></div>
+            <div class="con-drow"><span class="k"><i class="fa-solid fa-rotate" aria-hidden="true"></i> dedupe</span><span class="v">session · response · callId</span></div>
+            <div class="con-drow"><span class="k"><i class="fa-solid fa-eye" aria-hidden="true"></i> onDispatch</span><span class="v">redacted lifecycle</span></div>
+          </div>
+          <div class="con-guarantees con-guarantees-stack">
+            <div class="con-guarantee con-guarantee-dark">
+              <i class="fa-solid fa-check" aria-hidden="true"></i>
+              <span i18n="@@concierge.guarantees.g1">Action inputs are validated again immediately before execution, and actions with side effects pass through a cancellable commit window.</span>
+            </div>
+            <div class="con-guarantee con-guarantee-dark">
+              <i class="fa-solid fa-check" aria-hidden="true"></i>
+              <span i18n="@@concierge.guarantees.g2">Exact retries share one Promise and cannot execute twice inside the deduplication window; a changed action, input, turn, or revision returns <span [attr.translate]="'no'">identity_conflict</span>.</span>
+            </div>
+            <div class="con-guarantee con-guarantee-dark">
+              <i class="fa-solid fa-check" aria-hidden="true"></i>
+              <span i18n="@@concierge.guarantees.g3">Batches execute in <span [attr.translate]="'no'">outputIndex</span> order and return explicit completed or terminal outcomes.</span>
+            </div>
+            <div class="con-guarantee con-guarantee-dark">
+              <i class="fa-solid fa-check" aria-hidden="true"></i>
+              <span i18n="@@concierge.guarantees.g4">Compound actions use core-owned child dispatch, cleanup, delay, and bounded lineage — 16 nested levels and 256 steps per root workflow.</span>
+            </div>
+            <div class="con-guarantee con-guarantee-dark">
+              <i class="fa-solid fa-check" aria-hidden="true"></i>
+              <span i18n="@@concierge.guarantees.g5">Mixed <span [attr.translate]="'no'">0.1</span> and <span [attr.translate]="'no'">0.2</span> installations fail before bridge registration or dispatch.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="con-section" id="security">
+      <div class="container">
+        <div class="con-shead">
+          <span class="con-eyebrow" i18n="@@concierge.security.eyebrow">
+            <i class="fa-solid fa-user-shield" aria-hidden="true"></i> Security &amp; privacy
+          </span>
+          <h2 i18n="@@concierge.security.title">A least-authority boundary, not an authentication system</h2>
+        </div>
+        <div class="con-guards">
+          <div class="con-guard">
+            <h3 i18n="@@concierge.security.model.title">
+              <i class="fa-solid fa-shield-halved" aria-hidden="true"></i> Security model
+            </h3>
+            <p i18n="@@concierge.security.model.p1"><span [attr.translate]="'no'">Concierge</span> does not authenticate users, and a client consent record is not server authorization. A server that performs a protected effect must independently authenticate the current principal, authorize the exact action and payload under current policy, reject replay, and make the effect idempotent or transactional.</p>
+            <p i18n="@@concierge.security.model.p2">The signed <span [attr.translate]="'no'">AI</span> bridge authenticates a short-lived server decision to admit one specific browser batch. It does not make model output trustworthy, repair an <span [attr.translate]="'no'">XSS</span> vulnerability, or turn client state into server authority.</p>
+            <p i18n="@@concierge.security.model.link">
+              <a href="https://github.com/fullselfbrowsing/Concierge/blob/main/SECURITY.md" target="_blank" rel="noopener">Read <span [attr.translate]="'no'">SECURITY.md</span></a> before shipping a consequential integration.
+            </p>
+          </div>
+          <div class="con-guard">
+            <h3 i18n="@@concierge.security.telemetry.title">
+              <i class="fa-solid fa-chart-simple" aria-hidden="true"></i> Telemetry
+            </h3>
+            <p i18n="@@concierge.security.telemetry.p1">Mounted <span [attr.translate]="'no'">React</span> and <span [attr.translate]="'no'">Svelte</span> runtimes send default-on anonymous usage estimates to <span [attr.translate]="'no'">FSB</span>'s aggregate statistics pipeline. Vanilla integrations mount telemetry explicitly through the browser-only <span [attr.translate]="'no'">/telemetry</span> entry, which also provides status and opt-out <span [attr.translate]="'no'">APIs</span>.</p>
+            <p i18n="@@concierge.security.telemetry.p2">Telemetry never sends action names, arguments, results, schemas, stages, page <span [attr.translate]="'no'">URLs</span>, <span [attr.translate]="'no'">DOM</span> content, application names, or account identifiers. If browser storage is unavailable, telemetry stops without affecting dispatch.</p>
+            <p i18n="@@concierge.security.telemetry.link">
+              <a href="https://github.com/fullselfbrowsing/Concierge/blob/main/docs/privacy.md" target="_blank" rel="noopener">Read the telemetry privacy contract</a> for payload, retention, and erasure.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="con-final">
+      <div class="con-final-mesh"></div>
+      <div class="con-final-inner">
+        <h2 i18n="@@concierge.final.title">Let an <span [attr.translate]="'no'">AI</span> act without handing over the browser</h2>
+        <p i18n="@@concierge.final.copy"><span [attr.translate]="'no'">TypeScript</span>-first, <span [attr.translate]="'no'">ESM</span>-only, <span [attr.translate]="'no'">MIT</span>-licensed. Published under the <span [attr.translate]="'no'">@full-self-browsing</span> <span [attr.translate]="'no'">npm</span> scope.</p>
+        <div class="con-cta-row">
+          <a href="https://github.com/fullselfbrowsing/Concierge" target="_blank" rel="noopener" class="btn con-btn-orange" i18n="@@concierge.final.docs">
+            <i class="fa-brands fa-github" aria-hidden="true"></i> Read the docs
+          </a>
+          <a href="https://www.npmjs.com/package/@full-self-browsing/concierge" target="_blank" rel="noopener" class="btn con-btn-coal-line" i18n="@@concierge.final.npm">
+            <i class="fa-brands fa-npm" aria-hidden="true"></i> View on <span [attr.translate]="'no'">npm</span>
+          </a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-inner">
+        <div class="footer-brand">
+          <span class="fsb-mark" i18n-aria-label="@@concierge.footer.brand.aria" aria-label="FSB" [attr.translate]="'no'">
+            <span class="fsb-row" aria-hidden="true">
+              <span class="fsb-f"></span>
+              <span class="fsb-s"></span>
+              <svg class="fsb-b" viewBox="-3 -3 78 103" aria-hidden="true">
+                <path d="M0 0 L40 0 C58 0 70 10 70 26 C70 38 62 46 50 49 C64 51 72 60 72 74 C72 90 60 100 40 100 L0 100 Z"></path>
+              </svg>
+            </span>
+          </span>
+        </div>
+        <div class="footer-links">
+          <div class="footer-column">
+            <h4 i18n="@@concierge.footer.pages.title">Pages</h4>
+            <a routerLink="/" i18n="@@concierge.footer.pages.home">Home</a>
+            <a routerLink="/about" i18n="@@concierge.footer.pages.about">About</a>
+            <a routerLink="/dashboard" i18n="@@concierge.footer.pages.dashboard">Dashboard</a>
+            <a routerLink="/agents" i18n="@@concierge.footer.pages.agents">Agents</a>
+            <a routerLink="/privacy" i18n="@@concierge.footer.pages.privacy">Privacy</a>
+            <a routerLink="/support" i18n="@@concierge.footer.pages.support">Support</a>
+          </div>
+          <div class="footer-column">
+            <h4 i18n="@@concierge.footer.project.title">Project</h4>
+            <a href="https://github.com/fullselfbrowsing/FSB" target="_blank" rel="noopener" i18n="@@concierge.footer.project.github" [attr.translate]="'no'">GitHub</a>
+            <a href="https://github.com/fullselfbrowsing/FSB/issues" target="_blank" rel="noopener" i18n="@@concierge.footer.project.issues" [attr.translate]="'no'">Issues</a>
+            <a href="https://github.com/fullselfbrowsing/FSB/releases" target="_blank" rel="noopener" i18n="@@concierge.footer.project.changelog">Changelog</a>
+            <a href="https://github.com/fullselfbrowsing/FSB/blob/main/LICENSE" target="_blank" rel="noopener" i18n="@@concierge.footer.project.license">BSL 1.1 License</a>
+            <a routerLink="/stats" i18n="@@concierge.footer.project.stats">Stats</a>
+          </div>
+          <div class="footer-column">
+            <h4 i18n="@@concierge.footer.research.title">Research</h4>
+            <a routerLink="/lattice" i18n="@@concierge.footer.research.lattice" [attr.translate]="'no'">Lattice</a>
+            <a routerLink="/concierge" class="text-orange" i18n="@@concierge.footer.research.concierge" [attr.translate]="'no'">Concierge</a>
+            <a routerLink="/phantom-stream" i18n="@@concierge.footer.research.phantomStream" [attr.translate]="'no'">PhantomStream</a>
+            <a routerLink="/prometheus" i18n="@@concierge.footer.research.prometheus" [attr.translate]="'no'">Prometheus</a>
+          </div>
+          <div class="footer-column">
+            <h4 i18n="@@concierge.footer.community.title">Community</h4>
+            <a href="https://discord.gg/xRbj6JQpY" target="_blank" rel="noopener" i18n="@@concierge.footer.community.discord" [attr.translate]="'no'">Discord</a>
+            <a href="https://x.com/fsb0804" target="_blank" rel="noopener" class="footer-x-link" i18n="@@concierge.footer.community.x" [attr.translate]="'no'">X</a>
+            <a routerLink="/sitemaps" i18n="@@concierge.footer.community.sitemaps" [attr.translate]="'no'">Sitemaps</a>
+          </div>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p i18n="@@concierge.footer.credit">Made by <span [attr.translate]="'no'">Lakshman Turlapati</span></p>
+        <p><span class="version-tag" [attr.translate]="'no'">▽0.9.90</span></p>
+        <app-language-picker [mode]="'text'"></app-language-picker>
+      </div>
+    </div>
+  </footer>
+</div>
