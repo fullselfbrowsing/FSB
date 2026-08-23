@@ -80,7 +80,7 @@ A hidden `/stats` route on the FSB showcase that renders live GitHub signals for
 - `showcase/angular/package-lock.json` — refreshed by `npm install`.
 - `showcase/angular/src/app/app.routes.ts` — inserted `{ path: 'stats', loadComponent: () => import('./pages/stats/stats-page.component').then(m => m.StatsPageComponent) }` immediately before `{ path: '**', redirectTo: '' }`.
 - `showcase/angular/src/app/app.routes.server.ts` — inserted `{ path: 'stats', renderMode: RenderMode.Client }` between the `dashboard` entry and the `**` wildcard.
-- `showcase/angular/src/app/layout/showcase-shell/showcase-shell.component.html` — added one `<a routerLink="/stats" i18n="@@shell.footer.project.stats">Stats</a>` line at line 70, inside the existing Project footer column (`<h4 i18n="@@shell.footer.col.project.title">Project</h4>`), AFTER the BSL 1.1 License link. NOT added to `.nav-links`, NOT added to `.nav-mobile`, NOT added to the Pages footer column.
+- `showcase/angular/src/app/layout/showcase-shell/showcase-shell.component.html` — added one `<a routerLink="/stats" i18n="@@shell.footer.project.stats">Stats</a>` line at line 70, inside the existing Project footer column (`<h4 i18n="@@shell.footer.col.project.title">Project</h4>`), AFTER the MIT License link. NOT added to `.nav-links`, NOT added to `.nav-mobile`, NOT added to the Pages footer column.
 - 6 × XLIFFs — added the `shell.footer.project.stats` trans-unit (English source + translations).
 
 ### chart.js install
@@ -97,7 +97,7 @@ A hidden `/stats` route on the FSB showcase that renders live GitHub signals for
 ```html
 65          <a href="https://github.com/lakshmanturlapati/FSB" target="_blank" rel="noopener" i18n="@@shell.footer.project.github" [attr.translate]="'no'">GitHub</a>
 67          <a href="https://github.com/lakshmanturlapati/FSB/issues" target="_blank" rel="noopener" i18n="@@shell.footer.project.issues" [attr.translate]="'no'">Issues</a>
-69          <a href="https://github.com/lakshmanturlapati/FSB/blob/main/LICENSE" target="_blank" rel="noopener" i18n="@@shell.footer.project.license">BSL 1.1 License</a>
+69          <a href="https://github.com/lakshmanturlapati/FSB/blob/main/LICENSE" target="_blank" rel="noopener" i18n="@@shell.footer.project.license">MIT License</a>
 70          <a routerLink="/stats" i18n="@@shell.footer.project.stats">Stats</a>     <-- NEW
 ```
 
@@ -217,7 +217,7 @@ The orchestrator does not have a browser, so the following items are queued for 
    - Expect the "GitHub rate-limited — retrying at HH:MM" card with a converted local-time clock.
 
 5. **Footer link discoverability:**
-   - Scroll to the footer → Project column → "Stats" link sits below "BSL 1.1 License".
+   - Scroll to the footer → Project column → "Stats" link sits below "MIT License".
    - Click it → arrives on /stats via internal router (no full-page load).
    - Confirm "Stats" is NOT in the desktop nav (Home / About / Agents / Dashboard / Privacy / Support).
    - Open the mobile nav (resize to <768 px) → confirm "Stats" is NOT there either.

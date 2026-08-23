@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // Phase 216 SMOKE-01..03: production-or-local crawler smoke.
 // Curls marketing routes under GPTBot UA; curls crawler files; resolves every
-// sitemap <loc>. Asserts route-specific titles, canonicals, JSON-LD presence
-// (home), Content-Type headers, and llms-full.txt size budget.
+// sitemap <loc>. Asserts route-specific titles, canonicals, licensed JSON-LD
+// software metadata, Content-Type headers, and llms-full.txt size budget.
 //
 // Run:
 //   npm --prefix showcase/angular run smoke:crawler:local           (local static build)
@@ -15,6 +15,7 @@
 
 const BASE_URL = (process.env.BASE_URL || 'https://full-selfbrowsing.com').replace(/\/$/, '');
 const PROD_HOST = 'https://full-selfbrowsing.com';
+const LICENSE_URL = 'https://github.com/fullselfbrowsing/FSB/blob/main/LICENSE';
 const UA = 'GPTBot';
 
 const failures = [];
@@ -74,11 +75,40 @@ const AEO_MUST_CONTAIN = [
   'Flight Booking: Powered by Codex MCP',
   'OpenClaw Monitoring Doge Price',
   'An Aha Moment by Claude Opus 4.6',
+  'MIT License',
+  LICENSE_URL,
 ];
 const AEO_MUST_NOT_CONTAIN = [
   'Watch FSB drive Google, search Amazon, and book travel autonomously.',
   'Claude Opus 4.7',
 ];
+
+function extractJsonLdNodes(html) {
+  const nodes = [];
+  const parseErrors = [];
+  const scriptRe = /<script\b[^>]*\btype=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+  let match;
+
+  function visit(value) {
+    if (Array.isArray(value)) {
+      value.forEach(visit);
+      return;
+    }
+    if (!value || typeof value !== 'object') return;
+    nodes.push(value);
+    if (value['@graph']) visit(value['@graph']);
+  }
+
+  while ((match = scriptRe.exec(html)) !== null) {
+    try {
+      visit(JSON.parse(match[1]));
+    } catch (err) {
+      parseErrors.push(err.message);
+    }
+  }
+
+  return { nodes, parseErrors };
+}
 
 async function checkMarketingRoutes() {
   for (const { path, titleSubstr, canonical } of MARKETING_ASSERTIONS) {
@@ -95,11 +125,26 @@ async function checkMarketingRoutes() {
     record(r.body.includes(titleSubstr), `GET ${path} body contains title substring "${titleSubstr}"`, '');
     record(r.body.includes(`href="${canonical}"`), `GET ${path} canonical href="${canonical}"`, '');
     record(r.body.includes('<app-root'), `GET ${path} contains <app-root>`, '');
-    if (path === '/') {
+    if (path === '/' || path === '/agents') {
+      const { nodes, parseErrors } = extractJsonLdNodes(r.body);
       record(
         r.body.includes('type="application/ld+json"'),
-        'GET / contains JSON-LD <script type="application/ld+json">',
+        `GET ${path} contains JSON-LD <script type="application/ld+json">`,
         ''
+      );
+      record(
+        parseErrors.length === 0,
+        `GET ${path} JSON-LD parses`,
+        parseErrors.join('; ')
+      );
+      const software = path === '/'
+        ? nodes.find((node) => node['@type'] === 'SoftwareApplication' && node.name === 'FSB')
+        : nodes.find((node) => node['@type'] === 'SoftwareApplication'
+          && node['@id'] === `${PROD_HOST}/agents#fsb-skill`);
+      record(
+        software?.license === LICENSE_URL,
+        `GET ${path} SoftwareApplication license is canonical MIT URL`,
+        software ? `actual ${software.license || '(missing)'}` : 'SoftwareApplication node not found'
       );
     }
   }

@@ -35,7 +35,6 @@ whole element only when all of its content is genuinely invariant.
 - AI
 - Anthropic
 - Brave
-- BSL 1.1
 - CDP
 - Chrome
 - Chrome DevTools
@@ -91,6 +90,7 @@ whole element only when all of its content is genuinely invariant.
 - LZ-string
 - MCP
 - MCP server
+- MIT
 - MutationObserver
 - MV3
 - npm

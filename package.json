@@ -70,7 +70,7 @@
       "name": "OpenAI Codex"
     }
   ],
-  "license": "BUSL-1.1",
+  "license": "MIT",
   "engines": {
     "node": ">=24.0.0",
     "chrome": ">=88.0.0"

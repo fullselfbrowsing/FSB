@@ -3,6 +3,8 @@
 
 FSB (Full Self-Browsing) is an open-source Chrome extension that automates the browser through natural language. You describe a task; FSB plans the clicks, types, and navigation to complete it. Multi-model AI (xAI, OpenAI, Anthropic, Gemini, OpenRouter, LM Studio, local), 56 browser tools, a 66-tool MCP surface, 142+ site guides, local-first execution, and BYO API keys. Current release: FSB v0.9.90 (extension) with fsb-mcp-server 0.10.0 (npm).
 
+License: [MIT License](https://github.com/fullselfbrowsing/FSB/blob/main/LICENSE).
+
 FSB also works as an MCP browser layer for AI agents. Claude Code, Codex, Cursor, VS Code, Windsurf, OpenClaw, Hermes, and other MCP clients can use FSB to operate a real Chrome browser, inspect page state, verify outcomes, and keep the calling agent in the loop. The MCP surface includes trigger watchers (`trigger`, `stop_trigger`, `get_trigger_status`, `list_triggers`) for reactive DOM monitoring, real local file uploads (`upload_file`) and synthetic dropzone support (`drop_file`), and a 128-app native capability catalog where `search_capabilities` finds verified first-party API actions and `invoke_capability` runs them against the user's logged-in sessions with readiness labels such as `t1-ready`, `t1-guarded-fail-closed`, `learn-pending`, and `discovery-pending`, plus audit records.
 
 The vault boundary is explicit: credentials and payment methods resolve inside the encrypted Chrome extension store through tools such as `fill_credential` and `use_payment_method`; raw passwords, card numbers, and secrets do not cross the MCP bridge. One-command install: `npx -y fsb-mcp-server install --claude-code` (also `--claude-desktop`, `--cursor`, `--vscode`, `--windsurf`, `--codex`, `--all`).
@@ -35,7 +37,7 @@ Unlike cloud browser agents that run in a headless container without your cookie
 - [Site Maps](https://full-selfbrowsing.com/sitemaps): Community site maps hub (under development) -- contribute well-tested site schemas that can become built-in browser knowledge.
 - [Legal](https://full-selfbrowsing.com/legal): Public non-indexed legal reference for automation posture, consent model, audit-log retention, and service-denylist rationale. It is intentionally excluded from sitemap and indexed SEO surfaces.
 - [Chrome Web Store](https://chromewebstore.google.com/detail/badgafnfchcihdfnjneklogedcdkmjfk): One-click extension install.
-- [GitHub repository](https://github.com/fullselfbrowsing/FSB): BSL 1.1 source code, install instructions, issue tracker.
+- [GitHub repository](https://github.com/fullselfbrowsing/FSB): MIT source code, install instructions, issue tracker.
 - [llms-full.txt](https://full-selfbrowsing.com/llms-full.txt): Long-form project dump for LLM ingestion -- capabilities, install, comparison framing.
 
 ## Demo Videos

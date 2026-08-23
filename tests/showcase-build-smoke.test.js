@@ -1,15 +1,19 @@
 /**
  * Phase 274 / STATS-05 + STATS-06 -- showcase build + i18n + crawler invariants.
  *
- * Three layers of asserts:
+ * Four layers of asserts:
  *
  *   1. SOURCE: messages.xlf contains every FSB Stats message used by the
  *      current page. All 5 non-en messages.{lang}.xlf files have a
  *      <target state="translated"> block for EVERY extracted ID (no missing
  *      translations means the build can pass with i18nMissingTranslation: error).
- *   2. BUILD: `npm --prefix showcase/angular run build --silent` exits 0
- *      and `npm --prefix showcase/angular run verify:hreflang` exits 0.
- *   3. CRAWLER INVARIANT (Easter-egg posture): /stats does NOT appear in
+ *   2. AEO: generated llms files match their sources and carry an explicit
+ *      MIT License line with the canonical repository license URL.
+ *   3. BUILD: `npm --prefix showcase/angular run build --silent` exits 0
+ *      and `npm --prefix showcase/angular run verify:hreflang` exits 0. The
+ *      prerendered home and agents pages expose the canonical MIT license URL
+ *      in SoftwareApplication JSON-LD for English and all 5 locales.
+ *   4. CRAWLER INVARIANT (Easter-egg posture): /stats does NOT appear in
  *      prerender-routes.txt, public/sitemap.xml, public/llms.txt, or
  *      public/llms-full.txt. The angular dist/ folder MUST NOT contain a
  *      /stats prerendered page either.
@@ -28,12 +32,89 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 
 const ROOT = path.join(__dirname, '..');
+const DIST_ROOT = path.join(ROOT, 'showcase/dist/showcase-angular/browser');
+const LICENSE_URL = 'https://github.com/fullselfbrowsing/FSB/blob/main/LICENSE';
+const LICENSE_LINE = `License: [MIT License](${LICENSE_URL}).`;
 
 let passed = 0;
 let failed = 0;
 function check(label, cond, detail) {
   if (cond) { passed += 1; console.log(`  PASS: ${label}`); }
   else { failed += 1; console.log(`  FAIL: ${label} -- ${detail}`); }
+}
+
+function extractJsonLdNodes(html) {
+  const nodes = [];
+  const parseErrors = [];
+  const scriptRe = /<script\b[^>]*\btype=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+  let match;
+
+  function visit(value) {
+    if (Array.isArray(value)) {
+      value.forEach(visit);
+      return;
+    }
+    if (!value || typeof value !== 'object') return;
+    nodes.push(value);
+    if (value['@graph']) visit(value['@graph']);
+  }
+
+  while ((match = scriptRe.exec(html)) !== null) {
+    try {
+      visit(JSON.parse(match[1]));
+    } catch (err) {
+      parseErrors.push(err.message);
+    }
+  }
+
+  return { nodes, parseErrors };
+}
+
+function checkPrerenderedLicenseJsonLd(distRoot) {
+  const localeBuilds = [{ label: 'en', directory: '' }]
+    .concat(LOCALES.map((locale) => ({ label: locale, directory: locale })));
+  const pages = [
+    {
+      label: 'home',
+      directory: '',
+      findSoftware: (nodes) => nodes.find((node) =>
+        node['@type'] === 'SoftwareApplication' && node.name === 'FSB'),
+    },
+    {
+      label: 'agents',
+      directory: 'agents',
+      findSoftware: (nodes) => nodes.find((node) =>
+        node['@type'] === 'SoftwareApplication'
+          && node['@id'] === 'https://full-selfbrowsing.com/agents#fsb-skill'),
+    },
+  ];
+
+  for (const locale of localeBuilds) {
+    for (const page of pages) {
+      const parts = [distRoot];
+      if (locale.directory) parts.push(locale.directory);
+      if (page.directory) parts.push(page.directory);
+      parts.push('index.html');
+      const pagePath = path.join(...parts);
+      if (!fs.existsSync(pagePath)) {
+        check(`build: ${locale.label} ${page.label} prerender exists`, false, `missing ${pagePath}`);
+        continue;
+      }
+
+      const html = fs.readFileSync(pagePath, 'utf8');
+      const { nodes, parseErrors } = extractJsonLdNodes(html);
+      check(`build: ${locale.label} ${page.label} JSON-LD parses`,
+        parseErrors.length === 0,
+        parseErrors.join('; '));
+      const software = page.findSoftware(nodes);
+      check(`build: ${locale.label} ${page.label} SoftwareApplication exists`,
+        Boolean(software),
+        'expected SoftwareApplication node not found');
+      check(`build: ${locale.label} ${page.label} license URL is canonical`,
+        software?.license === LICENSE_URL,
+        software ? `actual ${software.license || '(missing)'}` : 'SoftwareApplication node not found');
+    }
+  }
 }
 
 console.log('--- showcase-build-smoke (STATS-05 + STATS-06) ---');
@@ -136,7 +217,46 @@ for (const lang of LOCALES) {
 }
 
 // =============================================================================
-// Layer 2: build + verify:hreflang.
+// Layer 2: AEO crawler-source parity and explicit license metadata.
+// =============================================================================
+
+const LLMS_FILE_PAIRS = [
+  {
+    source: 'showcase/angular/scripts/llms.source.md',
+    generated: 'showcase/angular/public/llms.txt',
+  },
+  {
+    source: 'showcase/angular/scripts/llms-full.source.md',
+    generated: 'showcase/angular/public/llms-full.txt',
+  },
+];
+
+for (const pair of LLMS_FILE_PAIRS) {
+  const source = fs.readFileSync(path.join(ROOT, pair.source), 'utf8');
+  const generated = fs.readFileSync(path.join(ROOT, pair.generated), 'utf8');
+  const newlineIndex = generated.indexOf('\n');
+  const header = newlineIndex >= 0 ? generated.slice(0, newlineIndex) : generated;
+  const generatedBody = newlineIndex >= 0 ? generated.slice(newlineIndex + 1) : '';
+  const sourceName = path.basename(pair.source);
+  const expectedHeaderEnd = ` by build-crawler-files.mjs; edit ${sourceName} -->`;
+  const licenseLineCount = source.split(LICENSE_LINE).length - 1;
+
+  check(`${pair.generated}: keeps its generated header`,
+    /^<!-- generated \d{4}-\d{2}-\d{2}/.test(header) && header.endsWith(expectedHeaderEnd),
+    `unexpected header: ${header}`);
+  check(`${pair.source}: contains one explicit MIT license line`,
+    licenseLineCount === 1,
+    `found ${licenseLineCount}`);
+  check(`${pair.generated}: contains MIT License and canonical URL`,
+    generated.includes('MIT License') && generated.includes(LICENSE_URL),
+    'explicit MIT license phrase or canonical URL missing');
+  check(`${pair.generated}: generated body matches ${pair.source}`,
+    generatedBody === source,
+    'generated content drifted from its source');
+}
+
+// =============================================================================
+// Layer 3: build + verify:hreflang + prerendered license JSON-LD.
 // =============================================================================
 
 const SKIP_BUILD = process.env.SKIP_BUILD === '1';
@@ -153,6 +273,9 @@ if (SKIP_BUILD) {
   check('npm run build exits 0 (i18nMissingTranslation: error invariant honoured)',
     buildResult.status === 0,
     buildErr.slice(-2000) || `exit ${buildResult.status}, no stderr`);
+  if (buildResult.status === 0) {
+    checkPrerenderedLicenseJsonLd(DIST_ROOT);
+  }
 
   // hreflang verification derives the route count from server prerender routes.
   console.log('  (running `npm --prefix showcase/angular run verify:hreflang` ...)');
@@ -169,7 +292,7 @@ if (SKIP_BUILD) {
 }
 
 // =============================================================================
-// Layer 3: crawler invariant (/stats Easter-egg posture).
+// Layer 4: crawler invariant (/stats Easter-egg posture).
 // =============================================================================
 
 const CRAWLER_FILES = [
@@ -254,12 +377,11 @@ if (Array.isArray(marketingRoutes) && Array.isArray(clientShellRoutes)) {
 }
 
 // dist/ must not contain a /stats prerendered page either. Only check if a
-// build was just run (Layer 2 ran).
+// build was just run (Layer 3 ran).
 if (!SKIP_BUILD) {
-  const distRoot = path.join(ROOT, 'showcase/dist/showcase-angular/browser');
-  const statsPath = path.join(distRoot, 'stats');
-  const statsIndexPath = path.join(distRoot, 'stats', 'index.html');
-  const csrShellPath = path.join(distRoot, 'index.csr.html');
+  const statsPath = path.join(DIST_ROOT, 'stats');
+  const statsIndexPath = path.join(DIST_ROOT, 'stats', 'index.html');
+  const csrShellPath = path.join(DIST_ROOT, 'index.csr.html');
   check('showcase dist/ has NO /stats prerendered directory',
     !fs.existsSync(statsPath),
     `found at ${statsPath}`);
