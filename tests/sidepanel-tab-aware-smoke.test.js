@@ -341,7 +341,7 @@ function installDomStub(idMap) {
   const sidepanelHtmlSrc = fs.readFileSync(path.resolve(__dirname, '../extension/ui/sidepanel.html'), 'utf8');
 
   // 4.1 sidepanel.js carries applyInputLockout(true) inside refreshOwnerChip
-  const refreshChipBodyMatch = sidepanelSrcForP4.match(/async function refreshOwnerChip\(\)\s*\{[\s\S]*?^\}/m);
+  const refreshChipBodyMatch = sidepanelSrcForP4.match(/async function refreshOwnerChip\([^)]*\)\s*\{[\s\S]*?^\}/m);
   ok(refreshChipBodyMatch && refreshChipBodyMatch[0].indexOf('applyInputLockout(true)') !== -1,
      'Part 4.1 -- refreshOwnerChip body contains applyInputLockout(true)');
 
@@ -388,7 +388,8 @@ function installDomStub(idMap) {
       && delegationEligibility[0].indexOf('snapshot.activeTab.canTakeControl === true') !== -1
       && delegationEligibility[0].indexOf('FSBOwnerChip') === -1,
      'Part 4.9 -- Take control uses only exact canonical snapshot eligibility for the active tab');
-  const activationDelegationRefresh = /chrome\.tabs\.onActivated\.addListener[\s\S]*?_activeTabIdSnapshot\s*=\s*activeInfo\.tabId[\s\S]*?await _hydrateDelegationForSelectedConversation\(\)/.test(sidepanelSrcForP4);
+  const activationDelegationRefresh = /chrome\.tabs\.onActivated\.addListener[\s\S]*?syncActiveTabSurface\(activeInfo\.tabId, activeInfo\.windowId\)/.test(sidepanelSrcForP4)
+    && /async function syncActiveTabSurface[\s\S]*?_activeTabIdSnapshot\s*=\s*incomingTabId[\s\S]*?await _hydrateDelegationForSelectedConversation\(\)/.test(sidepanelSrcForP4);
   ok(activationDelegationRefresh,
      'Part 4.10 -- active-tab swaps refresh delegated eligibility after updating the tab snapshot');
   ok(/changes\.fsbAgentRegistry[\s\S]{0,160}_refreshSelectedDelegationSnapshot\(\)/.test(sidepanelSrcForP4),

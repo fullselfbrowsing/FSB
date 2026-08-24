@@ -28,6 +28,7 @@ const CONNECTION_TEST_TIMEOUT_MS = 60_000;
 const CONNECTION_TEST_CHANNEL_LIMIT_BYTES = 1024 * 1024;
 const CONNECTION_TEST_PROMPT =
   'This is a connection validation. Do not use tools. Reply with a short acknowledgement.';
+const EMPTY_MCP_CONFIG = '{"mcpServers":{}}\n';
 const TEMP_PREFIX = 'fsb-agent-connection-';
 
 export type AgentConnectionTestFailureCode =
@@ -164,9 +165,13 @@ export async function testAgentProviderConnection(input: Readonly<{
     }
     const emptyMcpConfigPath = join(directory, 'empty-mcp.json');
     if (dependencies.writePrivateFile) {
-      await dependencies.writePrivateFile(emptyMcpConfigPath, '{}\n');
+      await dependencies.writePrivateFile(emptyMcpConfigPath, EMPTY_MCP_CONFIG);
     } else {
-      await writeFile(emptyMcpConfigPath, '{}\n', { encoding: 'utf8', mode: 0o600, flag: 'wx' });
+      await writeFile(emptyMcpConfigPath, EMPTY_MCP_CONFIG, {
+        encoding: 'utf8',
+        mode: 0o600,
+        flag: 'wx',
+      });
     }
 
     const context: SpawnContext = Object.freeze({

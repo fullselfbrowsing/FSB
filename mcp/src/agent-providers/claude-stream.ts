@@ -84,6 +84,34 @@ const RetrySchema = z.object({
   retry_delay_ms: z.number().nonnegative(),
 }).passthrough();
 
+const StatusSchema = z.object({
+  type: z.literal('system'),
+  subtype: z.literal('status'),
+  session_id: z.string().min(1).max(SESSION_ID_LIMIT),
+  status: z.string().min(1).max(64),
+}).passthrough();
+
+const ThinkingTokensSchema = z.object({
+  type: z.literal('system'),
+  subtype: z.literal('thinking_tokens'),
+  session_id: z.string().min(1).max(SESSION_ID_LIMIT),
+  estimated_tokens: z.number().int().nonnegative(),
+  estimated_tokens_delta: z.number().int().nonnegative(),
+}).passthrough();
+
+const SessionStateChangedSchema = z.object({
+  type: z.literal('system'),
+  subtype: z.literal('session_state_changed'),
+  session_id: z.string().min(1).max(SESSION_ID_LIMIT),
+  state: z.string().min(1).max(64),
+}).passthrough();
+
+const RateLimitSchema = z.object({
+  type: z.literal('rate_limit_event'),
+  session_id: z.string().min(1).max(SESSION_ID_LIMIT),
+  rate_limit_info: z.object({}).passthrough(),
+}).passthrough();
+
 const ResultSchema = z.object({
   type: z.literal('result'),
   subtype: z.string().min(1),
@@ -166,6 +194,11 @@ class ClaudeEventNormalizer {
       throw new AgentProtocolDriftError('invalid_shape', eventIndex);
     }
     if (this.terminalEvent) {
+      // The CLI brackets a run with session_state_changed, so the closing one
+      // trails the result. It carries no run state, so it is validated and dropped.
+      if (envelope.type === 'system' && envelope.subtype === 'session_state_changed') {
+        return this.normalizeSystem(envelope, eventIndex);
+      }
       throw new AgentProtocolDriftError(
         envelope.type === 'result' ? 'duplicate_result' : 'event_after_result',
         eventIndex,
@@ -181,6 +214,8 @@ class ClaudeEventNormalizer {
         return this.normalizeUser(envelope, eventIndex);
       case 'stream_event':
         return this.normalizeStreamEvent(envelope, eventIndex);
+      case 'rate_limit_event':
+        return this.normalizeRateLimitEvent(envelope, eventIndex);
       case 'result':
         return this.normalizeResult(envelope, eventIndex);
       default:
@@ -220,6 +255,23 @@ class ClaudeEventNormalizer {
       const retry = parseShape(RetrySchema, envelope, eventIndex);
       const sessionId = this.requireSession(retry.session_id, eventIndex);
       return [freezeEvent('retry', sessionId, retry)];
+    }
+    if (envelope.subtype === 'session_state_changed') {
+      const stateChanged = parseShape(SessionStateChangedSchema, envelope, eventIndex);
+      // The CLI emits the first state change ahead of init, so the session is only
+      // cross-checked once init has established it.
+      if (this.sessionId) this.requireSession(stateChanged.session_id, eventIndex);
+      return [];
+    }
+    if (envelope.subtype === 'status') {
+      const status = parseShape(StatusSchema, envelope, eventIndex);
+      this.requireSession(status.session_id, eventIndex);
+      return [];
+    }
+    if (envelope.subtype === 'thinking_tokens') {
+      const thinkingTokens = parseShape(ThinkingTokensSchema, envelope, eventIndex);
+      this.requireSession(thinkingTokens.session_id, eventIndex);
+      return [];
     }
     if (isCustomizationEventName(envelope.subtype)) {
       throw new AgentProtocolDriftError('configuration_surface', eventIndex);
@@ -264,6 +316,15 @@ class ClaudeEventNormalizer {
       throw new AgentProtocolDriftError('unknown_stream_event', eventIndex);
     }
     return [freezeEvent('assistant_delta', sessionId, streamEvent)];
+  }
+
+  private normalizeRateLimitEvent(
+    envelope: Record<string, unknown>,
+    eventIndex: number,
+  ): AgentEvent[] {
+    const rateLimit = parseShape(RateLimitSchema, envelope, eventIndex);
+    this.requireSession(rateLimit.session_id, eventIndex);
+    return [];
   }
 
   private normalizeResult(envelope: Record<string, unknown>, eventIndex: number): AgentEvent[] {

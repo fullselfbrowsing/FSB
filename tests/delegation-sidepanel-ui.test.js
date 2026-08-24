@@ -99,6 +99,13 @@ const CLAUDE_ACCEPTED_IDENTITY = DelegationProviders.createAcceptedAgentIdentity
   'unknown'
 );
 
+function acceptedIdentityFor(providerId) {
+  return DelegationProviders.createAcceptedAgentIdentity(
+    providerId,
+    providerId === 'codex' ? 'chatgpt' : 'unknown'
+  );
+}
+
 function entry(sequence, kind, payload) {
   const base = {
     v: 1,
@@ -171,7 +178,7 @@ function snapshot(overrides) {
     summary: summary(),
     activeTab: null,
     hold: null,
-    terminal: { code: 'completed', releasedTabCount: 0 },
+    terminal: { code: 'completed', releasedTabCount: 0, answer: null },
     hydrated: true
   }, overrides || {});
 }
@@ -467,7 +474,7 @@ console.log('\n--- Phase 61 delegation feed contract ---');
     {
       state: 'completed',
       summary: summary({ state: 'completed' }),
-      terminal: { code: 'completed', releasedTabCount: 0 }
+      terminal: { code: 'completed', releasedTabCount: 0, answer: null }
     }
   ));
   assert.equal(completed.ok, true);
@@ -636,7 +643,7 @@ console.log('\n--- Phase 61 delegation feed contract ---');
     value.summary.state = state === 'running' ? 'running' : 'failed';
     value.terminal = terminalCode === null
       ? null
-      : { code: terminalCode, releasedTabCount: 0 };
+      : { code: terminalCode, releasedTabCount: 0, answer: null };
     value.hydrated = false;
     return value;
   }
@@ -742,18 +749,20 @@ assert(htmlSource.indexOf('../utils/delegation-providers.js') < htmlSource.index
     && htmlSource.indexOf('../utils/native-host-install-command.js') < htmlSource.indexOf('sidepanel.js')
     && htmlSource.indexOf('delegation-feed.js') < htmlSource.indexOf('sidepanel.js'),
   'nonvisual helpers load before their side-panel consumers');
+assert.equal((htmlSource.match(/id="takeControlBtn"/g) || []).length, 1,
+  'the ownership status exposes exactly one tab-scoped Take control action');
 assert.equal(sha256(htmlSource
   .replace(delegationProviderScript, '')
   .replace(nativeHostInstallScript, '')),
-  'bee35ef3c8fe04cd12be0185cd2cbcd734a01d3378c534871d13a4016d05d3fd',
-  'the side-panel HTML includes only the intended helpers and single-status ownership treatment');
+  '0e51022efe1458e5b2a66334e55aa94c17aa9399750aa2bcd96defa61865166d',
+  'the side-panel HTML includes only the intended helpers and tab-scoped ownership treatment');
 const replayCssStart = cssSource.indexOf('.history-status.idle-closed {');
 const replayCssEnd = cssSource.indexOf('/* Phase 11 FINT-20', replayCssStart);
 assert(replayCssStart !== -1 && replayCssEnd > replayCssStart,
   'the session-replay CSS block has stable boundaries');
 const delegationCssSource = cssSource.slice(0, replayCssStart) + cssSource.slice(replayCssEnd);
 assert.equal(sha256(delegationCssSource),
-  '68459e3b6c75417f97e932e008d7d6b6eead96fe4c1c1bf239d93ca5c3736e33',
+  'fb61e7dfad7aa3a71edba906446f5390c3021217843c868e094d9f6998b77fbc',
   'the intentional delegated and ownership-status CSS deltas remain exact outside replay UI');
 
 {
@@ -770,7 +779,11 @@ assert.equal(sha256(delegationCssSource),
 
   for (const provider of DelegationProviders.list()) {
     assert.equal(context._delegationValidPreflightResponse({
-      ok: true, kind: 'agent', providerId: provider.id, providerLabel: provider.label
+      ok: true,
+      kind: 'agent',
+      providerId: provider.id,
+      providerLabel: provider.label,
+      acceptedIdentity: acceptedIdentityFor(provider.id)
     }), true, provider.label + ' preflight identity is accepted');
     assert.equal(context._delegationValidConsentResponse({
       ok: true,
@@ -785,8 +798,25 @@ assert.equal(sha256(delegationCssSource),
     }, provider.id), true, provider.label + ' trust identity is accepted');
   }
   assert.equal(context._delegationValidPreflightResponse({
-    ok: true, kind: 'agent', providerId: 'opencode', providerLabel: 'Claude Code'
+    ok: true,
+    kind: 'agent',
+    providerId: 'opencode',
+    providerLabel: 'Claude Code',
+    acceptedIdentity: acceptedIdentityFor('opencode')
   }), false, 'mismatched preflight identity fails closed');
+  assert.equal(context._delegationValidPreflightResponse({
+    ok: true,
+    kind: 'agent',
+    providerId: 'claude-code',
+    providerLabel: 'Claude Code'
+  }), false, 'the obsolete identity-free success contract fails closed');
+  assert.equal(context._delegationValidPreflightResponse({
+    ok: true,
+    kind: 'agent',
+    providerId: 'claude-code',
+    providerLabel: 'Claude Code',
+    acceptedIdentity: acceptedIdentityFor('opencode')
+  }), false, 'a preflight response cannot switch its accepted provider identity');
   assert.equal(context._delegationValidConsentResponse({
     ok: true,
     providerId: 'opencode',
@@ -800,7 +830,12 @@ assert.equal(sha256(delegationCssSource),
   }, 'opencode'), false, 'trust response cannot switch the consent provider');
 
   let accessorReads = 0;
-  const accessorResponse = { ok: true, kind: 'agent', providerId: 'opencode' };
+  const accessorResponse = {
+    ok: true,
+    kind: 'agent',
+    providerId: 'opencode',
+    acceptedIdentity: acceptedIdentityFor('opencode')
+  };
   Object.defineProperty(accessorResponse, 'providerLabel', {
     enumerable: true,
     get() {
@@ -1534,7 +1569,8 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
       ok: true,
       kind: 'agent',
       providerId: 'claude-code',
-      providerLabel: 'Claude Code'
+      providerLabel: 'Claude Code',
+      acceptedIdentity: CLAUDE_ACCEPTED_IDENTITY
     });
     await editedAttempt;
     assert.equal(consentCalls, 0, 'edited captured task never reaches consent');
@@ -1555,7 +1591,8 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
       ok: true,
       kind: 'agent',
       providerId: 'claude-code',
-      providerLabel: 'Claude Code'
+      providerLabel: 'Claude Code',
+      acceptedIdentity: CLAUDE_ACCEPTED_IDENTITY
     });
     await rawMismatchAttempt;
     assert.equal(consentCalls, 0, 'byte mismatch fences continuation even without a delivered input event');
@@ -1844,7 +1881,8 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
       ok: true,
       kind: 'agent',
       providerId: 'claude-code',
-      providerLabel: 'Claude Code'
+      providerLabel: 'Claude Code',
+      acceptedIdentity: CLAUDE_ACCEPTED_IDENTITY
     };
     const trusted = await runSettlementScenario(ready, {
       ok: true,
@@ -1890,7 +1928,8 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
       ok: true,
       kind: 'agent',
       providerId: 'opencode',
-      providerLabel: 'OpenCode'
+      providerLabel: 'OpenCode',
+      acceptedIdentity: acceptedIdentityFor('opencode')
     };
     const openCodeConsent = await runSettlementScenario(openCodeReady, {
       ok: true,
@@ -2073,7 +2112,8 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
             ok: true,
             kind: 'agent',
             providerId: 'claude-code',
-            providerLabel: 'Claude Code'
+            providerLabel: 'Claude Code',
+            acceptedIdentity: CLAUDE_ACCEPTED_IDENTITY
           });
         }
         return new Promise((resolve) => { resolveConsent = resolve; });
@@ -2408,13 +2448,13 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
     const stopped = snapshot({
       state: 'stopped',
       summary: summary({ state: 'stopped' }),
-      terminal: { code: 'stopped', releasedTabCount: 1 },
+      terminal: { code: 'stopped', releasedTabCount: 1, answer: null },
       hydrated: false
     });
     const treeUnsettled = snapshot({
       state: 'failed',
       summary: summary({ state: 'failed' }),
-      terminal: { code: 'tree_unsettled', releasedTabCount: 0 },
+      terminal: { code: 'tree_unsettled', releasedTabCount: 0, answer: null },
       hydrated: false
     });
     const mismatchedStopped = clone(stopped);
@@ -3303,7 +3343,7 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
     const stopped = {
       delegationId: DELEGATION_ID,
       state: 'stopped',
-      terminal: { code: 'stopped', releasedTabCount: 1 }
+      terminal: { code: 'stopped', releasedTabCount: 1, answer: null }
     };
     const state = {
       snapshot: running,
@@ -3427,15 +3467,27 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
       ...base,
       provider: { id: 'opencode', label: 'OpenCode' },
       state: 'failed',
-      terminal: { code: 'agent_failed', releasedTabCount: 0 }
+      terminal: { code: 'agent_failed', releasedTabCount: 0, answer: null }
     });
     assert(card.textContent.includes('Agent could not finish this task'));
     assert(card.textContent.includes(
-      'OpenCode stopped before the task was complete. Review the error details, then try the same message again.'
+      'OpenCode stopped before the task was complete. Try the same message again.'
     ));
+    assert(card.textContent.includes('agent_failed'));
     assert.deepEqual(findAll(card, 'button').map((button) => button.textContent), [
       'Try message again'
     ], 'OpenCode failure has one explicit new-intent retry and no automatic replay control');
+
+    context._renderDelegationRunHeader(card, {
+      ...base,
+      state: 'failed',
+      terminal: { code: 'provider_error', releasedTabCount: 0, answer: null }
+    });
+    assert(card.textContent.includes(
+      'Claude Code reported an error before completing this task. Raw provider output was not retained. Try the same message again.'
+    ));
+    assert(card.textContent.includes('provider_error'));
+    assert(!card.textContent.includes('provider secret'), 'provider failure UI contains no raw payload');
 
     context._renderDelegationRunHeader(card, { ...base, connection: 'disconnected' });
     assert.equal(card.getAttribute('data-delegation-state'), 'running');
@@ -3457,7 +3509,7 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
       ...base,
       state: 'restart_lost',
       connection: 'disconnected',
-      terminal: { code: 'daemon_restart_lost_run', releasedTabCount: 0 }
+      terminal: { code: 'daemon_restart_lost_run', releasedTabCount: 0, answer: null }
     });
     assert(card.textContent.includes('Agent run ended after daemon restart'));
     assert(card.textContent.includes('The previous agent process was stopped and was not reattached. Start a new task when the local service is ready.'));
@@ -3470,7 +3522,7 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
     context._renderDelegationRunHeader(card, {
       ...base,
       state: 'stopped',
-      terminal: { code: 'stopped', releasedTabCount: 2 }
+      terminal: { code: 'stopped', releasedTabCount: 2, answer: null }
     });
     assert(card.textContent.includes('Agent stopped, 2 tabs released'));
     assert(card.textContent.includes('Start a new task'));
@@ -3479,7 +3531,7 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
     context._renderDelegationRunHeader(card, {
       ...base,
       state: 'completed',
-      terminal: { code: 'completed', releasedTabCount: 0 }
+      terminal: { code: 'completed', releasedTabCount: 0, answer: null }
     });
     assert.equal(card.getAttribute('data-delegation-tone'), 'success');
 
@@ -3490,7 +3542,7 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
     context._renderDelegationRunHeader(card, {
       ...base,
       state: 'failed',
-      terminal: { code: 'tree_unsettled', releasedTabCount: 0 }
+      terminal: { code: 'tree_unsettled', releasedTabCount: 0, answer: null }
     });
     assert(card.textContent.includes('Agent cleanup needs attention'));
     assert(card.textContent.includes('FSB accepted this run but could not save it, and Stop is not confirmed.'));

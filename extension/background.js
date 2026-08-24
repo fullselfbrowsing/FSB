@@ -34,6 +34,7 @@ importScripts('utils/mcp-visual-session.js');
 importScripts('utils/mcp-visual-session-lifecycle.js');
 try { importScripts('utils/agent-cap-recommendation.js'); } catch (e) { console.error('[FSB] Failed to load agent-cap-recommendation.js:', e.message); }
 try { importScripts('utils/agent-registry.js'); } catch (e) { console.error('[FSB] Failed to load agent-registry.js:', e.message); }
+try { importScripts('utils/agent-tab-spawn-provenance.js'); } catch (e) { console.error('[FSB] Failed to load agent-tab-spawn-provenance.js:', e.message); }
 try { importScripts('utils/delegation-providers.js'); } catch (e) { console.error('[FSB] Failed to load delegation-providers.js:', e.message); }
 try { importScripts('utils/mcp-client-aliases.js'); } catch (e) { console.error('[FSB] Failed to load mcp-client-aliases.js:', e.message); }
 try { importScripts('utils/mcp-agent-providers.js'); } catch (e) { console.error('[FSB] Failed to load mcp-agent-providers.js:', e.message); }
@@ -43,6 +44,7 @@ try { importScripts('utils/native-host-wake.js'); } catch (e) { console.error('[
 try { importScripts('utils/delegation-consent.js'); } catch (e) { console.error('[FSB] Failed to load delegation-consent.js:', e.message); }
 try { importScripts('utils/delegation-event-store.js'); } catch (e) { console.error('[FSB] Failed to load delegation-event-store.js:', e.message); }
 try { importScripts('utils/delegation-controller.js'); } catch (e) { console.error('[FSB] Failed to load delegation-controller.js:', e.message); }
+try { importScripts('utils/delegation-tab-seed.js'); } catch (e) { console.error('[FSB] Failed to load delegation-tab-seed.js:', e.message); }
 // Phase 246 plan 01: agent-scoped tab resolver. Pure helper; consumes
 // globalThis.fsbAgentRegistryInstance via getAgentTabs(agentId). Loaded
 // AFTER the registry and BEFORE the dispatcher / bridge-client so those
@@ -812,6 +814,7 @@ importScripts('ai/tool-use-adapter.js');
 importScripts('ai/screenshot-attachments.js');
 importScripts('ai/tool-executor.js');
 importScripts('ai/agent-loop.js');
+importScripts('ai/model-discovery.js');
 
 // Memory layer modules
 importScripts('lib/memory/memory-schemas.js');
@@ -1708,13 +1711,62 @@ async function fsbReconcileDelegationSnapshots(controller, snapshots) {
 
 async function fsbReadAuthoritativeProviderConfig() {
   const stored = await chrome.storage.local.get([
-    'providerKind', 'agentProviderId', 'modelProvider'
+    'providerKind', 'agentProviderId', 'modelProvider', 'modelName', 'lmstudioBaseUrl'
   ]);
   return {
     providerKind: typeof stored.providerKind === 'string' ? stored.providerKind : 'api',
     agentProviderId: typeof stored.agentProviderId === 'string' ? stored.agentProviderId : '',
-    modelProvider: typeof stored.modelProvider === 'string' ? stored.modelProvider : 'xai'
+    modelProvider: typeof stored.modelProvider === 'string' ? stored.modelProvider : 'xai',
+    modelName: typeof stored.modelName === 'string' ? stored.modelName.trim() : '',
+    lmstudioBaseUrl: typeof stored.lmstudioBaseUrl === 'string'
+      ? stored.lmstudioBaseUrl
+      : 'http://localhost:1234'
   };
+}
+
+async function fsbResolveLmStudioModelForStart(providerConfig) {
+  if (!providerConfig
+      || providerConfig.providerKind !== 'api'
+      || providerConfig.modelProvider !== 'lmstudio'
+      || providerConfig.modelName) {
+    return providerConfig;
+  }
+
+  const discovery = globalThis.FSBModelDiscovery;
+  if (!discovery || typeof discovery.discoverModels !== 'function') {
+    throw new Error('LM Studio model discovery is unavailable. Open Settings and select a loaded chat model.');
+  }
+
+  const result = await discovery.discoverModels('lmstudio', '', {
+    baseUrl: providerConfig.lmstudioBaseUrl,
+    timeoutMs: 5000
+  });
+  const models = result && result.ok === true && Array.isArray(result.models)
+    ? result.models.filter(model => model && model.id)
+    : [];
+
+  if (models.length === 1) {
+    const modelName = String(models[0].id);
+    await chrome.storage.local.set({ modelName: modelName });
+    if (typeof automationLogger !== 'undefined') {
+      automationLogger.info('LM Studio model auto-migrated', {
+        phase: 'startup-preflight',
+        provider: 'lmstudio',
+        model: modelName,
+        modelCount: 1
+      });
+    }
+    return Object.assign({}, providerConfig, { modelName: modelName });
+  }
+
+  if (models.length > 1) {
+    throw new Error('Multiple LM Studio chat models are loaded. Open Settings and choose the model FSB should use.');
+  }
+
+  const detail = result && result.reason === 'empty-response'
+    ? 'No compatible chat model is loaded.'
+    : ((result && result.message) || 'Could not connect to the LM Studio server.');
+  throw new Error('LM Studio is not ready: ' + detail + ' Open Settings after loading a chat model.');
 }
 
 async function fsbReadAuthoritativeProviderEvidence(providerId) {
@@ -2348,24 +2400,45 @@ function fsbDelegationTerminalCode(value) {
   if (value === 'runtime_cleanup_failed') return 'tree_unsettled';
   const allowed = new Set([
     'cancelled', 'route_lost', 'agent_protocol_drift', 'tree_unsettled',
-    'hold_expired', 'daemon_restart_lost_run', 'agent_failed'
+    'hold_expired', 'daemon_restart_lost_run', 'provider_error', 'agent_failed'
   ]);
   return typeof value === 'string' && allowed.has(value) ? value : 'agent_failed';
+}
+
+// The delegated CLI's final answer rides on the normalized result payload. Read
+// only that one string, and only for a completed run, so a provider error's prose
+// is never forwarded. The descriptor read keeps a getter on the payload inert.
+function fsbDelegationAnswerFromFinal(code, finalResult) {
+  if (code !== 'completed') return null;
+  try {
+    const terminal = finalResult && finalResult.terminal;
+    if (!terminal || terminal.type !== 'result') return null;
+    const payload = terminal.payload;
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
+    const descriptor = Object.getOwnPropertyDescriptor(payload, 'result');
+    if (!descriptor || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) return null;
+    return typeof descriptor.value === 'string' ? descriptor.value : null;
+  } catch (_error) {
+    return null;
+  }
 }
 
 async function fsbSettleDelegationFromFinal(delegationId, finalResult, transportError) {
   const controller = globalThis.fsbDelegationControllerInstance;
   if (!controller) {
     fsbDelegationRunContexts.delete(delegationId);
+    if (globalThis.FsbDelegationTabSeed) globalThis.FsbDelegationTabSeed.forget(delegationId);
     return;
   }
   let snapshot;
   try { snapshot = controller.getSnapshot(delegationId); } catch (_error) {
     fsbDelegationRunContexts.delete(delegationId);
+    if (globalThis.FsbDelegationTabSeed) globalThis.FsbDelegationTabSeed.forget(delegationId);
     return;
   }
   if (!snapshot || snapshot.terminal) {
     fsbDelegationRunContexts.delete(delegationId);
+    if (globalThis.FsbDelegationTabSeed) globalThis.FsbDelegationTabSeed.forget(delegationId);
     return;
   }
   const runContext = fsbDelegationRunContexts.get(delegationId) || null;
@@ -2376,10 +2449,23 @@ async function fsbSettleDelegationFromFinal(delegationId, finalResult, transport
     : null;
   if (!code && finalResult && finalResult.status === 'succeeded') code = 'completed';
   if (!code && finalResult && finalResult.status === 'cancelled') code = 'cancelled';
+  // A normalized provider result with is_error=true is distinct from a
+  // transport/protocol failure. Persist only this closed classification;
+  // never copy the provider's raw result payload into browser state.
+  if (!code
+      && finalResult
+      && finalResult.status === 'failed'
+      && finalResult.terminal
+      && finalResult.terminal.type === 'result'
+      && finalResult.terminal.payload
+      && finalResult.terminal.payload.is_error === true) {
+    code = 'provider_error';
+  }
   if (!code && finalResult && finalResult.terminal && finalResult.terminal.type === 'diagnostic') {
     code = fsbDelegationTerminalCode(finalResult.terminal.code);
   }
   if (!code) code = 'agent_failed';
+  const answer = fsbDelegationAnswerFromFinal(code, finalResult);
 
   try {
     await controller.acceptEvent({
@@ -2389,7 +2475,8 @@ async function fsbSettleDelegationFromFinal(delegationId, finalResult, transport
         timestamp: Date.now(),
         terminalCode: code,
         treeSettled: !transportError && code !== 'tree_unsettled',
-        acceptedIdentity: runContext.acceptedIdentity
+        acceptedIdentity: runContext.acceptedIdentity,
+        ...(answer === null ? {} : { answer })
       }
     });
     if (code === 'agent_protocol_drift') {
@@ -2400,6 +2487,7 @@ async function fsbSettleDelegationFromFinal(delegationId, finalResult, transport
     // record. The controller remains the only terminal authority either way.
   } finally {
     fsbDelegationRunContexts.delete(delegationId);
+    if (globalThis.FsbDelegationTabSeed) globalThis.FsbDelegationTabSeed.forget(delegationId);
   }
 }
 
@@ -2409,6 +2497,18 @@ async function fsbDelegationStartCommand(request) {
       || typeof request.task !== 'string'
       || request.task.trim().length === 0) {
     return fsbDelegationFailure('invalid_request', null);
+  }
+
+  // Taken before any await so a slow preflight or spawn cannot move it. Resolved
+  // here rather than sent by the caller: this command never receives `sender`, so a
+  // caller-supplied tab id could not be trust-checked.
+  let originTabId = null;
+  try {
+    const originTabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+    const originTab = originTabs && originTabs[0];
+    if (originTab && Number.isSafeInteger(originTab.id)) originTabId = originTab.id;
+  } catch (_error) {
+    originTabId = null;
   }
 
   try {
@@ -2536,8 +2636,15 @@ async function fsbDelegationStartCommand(request) {
               throw new Error('delegation controller rejected start');
             }
             fsbDelegationRunContexts.set(started.delegationId, runContext);
+            if (originTabId !== null && globalThis.FsbDelegationTabSeed) {
+              globalThis.FsbDelegationTabSeed.reserve({
+                delegationId: started.delegationId,
+                tabId: originTabId
+              });
+            }
           } catch (error) {
             fsbDelegationRunContexts.delete(started.delegationId);
+            if (globalThis.FsbDelegationTabSeed) globalThis.FsbDelegationTabSeed.forget(started.delegationId);
             rejectAccepted(error);
             throw error;
           }
@@ -2572,6 +2679,7 @@ async function fsbDelegationStartCommand(request) {
   const snapshot = controller.getSnapshot(delegationId);
   if (!snapshot) {
     fsbDelegationRunContexts.delete(delegationId);
+    if (globalThis.FsbDelegationTabSeed) globalThis.FsbDelegationTabSeed.forget(delegationId);
     return fsbDelegationFailure('start_rejected', null);
   }
   return { ok: true, snapshot };
@@ -2733,6 +2841,7 @@ async function fsbObserveDelegationBridgeEvent(bridgeEvent) {
   } finally {
     if (payload.event.type === 'terminal') {
       fsbDelegationRunContexts.delete(payload.delegationId);
+      if (globalThis.FsbDelegationTabSeed) globalThis.FsbDelegationTabSeed.forget(payload.delegationId);
     }
   }
 }
@@ -2864,6 +2973,7 @@ async function bootstrapDelegationController() {
       if (runtimeEvent.view.terminal) {
         fsbDelegationActiveIds.delete(runtimeEvent.view.delegationId);
         fsbDelegationRunContexts.delete(runtimeEvent.view.delegationId);
+        if (globalThis.FsbDelegationTabSeed) globalThis.FsbDelegationTabSeed.forget(runtimeEvent.view.delegationId);
       } else {
         fsbDelegationActiveIds.add(runtimeEvent.view.delegationId);
       }
@@ -2927,6 +3037,31 @@ function findActiveAutomationSessionForTab(tabId) {
   return null;
 }
 
+// A tab owned by a delegated (side-panel-started) agent whose run is still live counts as
+// working, like an autopilot session tab. Delegated runs never populate activeSessions, so
+// without this the panel would close the moment FSB foregrounds the agent's tab.
+function fsbTabBelongsToLiveDelegation(tabId) {
+  if (!Number.isSafeInteger(tabId)) return false;
+  const registry = globalThis.fsbAgentRegistryInstance;
+  if (!registry
+      || typeof registry.getOwner !== 'function'
+      || typeof registry.listDelegationMappings !== 'function') return false;
+  try {
+    const owner = registry.getOwner(tabId);
+    if (typeof owner !== 'string' || owner.length === 0 || owner.indexOf('legacy:') === 0) return false;
+    const mapping = registry.listDelegationMappings().find((row) => row && row.agentId === owner);
+    if (!mapping) return false;
+    const controller = globalThis.fsbDelegationControllerInstance;
+    if (controller && typeof controller.getSnapshot === 'function') {
+      const snapshot = controller.getSnapshot(mapping.delegationId);
+      if (snapshot && snapshot.terminal) return false;
+    }
+    return true;
+  } catch (_error) {
+    return false;
+  }
+}
+
 // QT-uof-6 (A-FIX) -- Chrome 141+ sidePanel.close auto-collapse with
 // per-window has-any-working-tab gate. See .planning/debug/cluster1-routing.md
 // Cluster 2 leftover items + memory file project_chrome_sidepanel_no_close.md
@@ -2944,6 +3079,41 @@ function findActiveAutomationSessionForTab(tabId) {
 // automation session (e.g., user switches from working Tab A to non-working
 // Tab B in the SAME window), DO NOT close -- Tab A's panel must stay
 // visible. Only close when NO tab in the window has an active session.
+// An agent-opened tab is activated by Chrome at creation, before the dispatcher has bound
+// it to its agent, so a first look at ownership can miss a tab that is about to be owned.
+// Re-check after this grace before deciding a window is idle.
+const FSB_SIDE_PANEL_COLLAPSE_GRACE_MS = 400;
+
+// Per-window "has any working tab" read. A tab counts as working when it has an
+// autopilot session OR belongs to a live delegated run. Ownership lives in the
+// agent registry, so the wake hydration is awaited before reading it.
+async function fsbFindWorkingTabInWindow(windowId) {
+  var tabsInWindow = await chrome.tabs.query({ windowId: windowId });
+  try {
+    if (globalThis.fsbAgentRegistryReady) await globalThis.fsbAgentRegistryReady;
+  } catch (_registryErr) { /* fail-safe: fall through to the session-only check */ }
+  for (var i = 0; i < tabsInWindow.length; i++) {
+    var t = tabsInWindow[i];
+    if (t && typeof t.id === 'number'
+        && (findActiveAutomationSessionForTab(t.id) || fsbTabBelongsToLiveDelegation(t.id))) {
+      return t.id;
+    }
+  }
+  return null;
+}
+
+function fsbLogSidePanelCollapse(activatedTabId, windowId, outcome, workingTabId) {
+  if (typeof automationLogger === 'undefined' || !automationLogger
+      || typeof automationLogger.info !== 'function') return;
+  automationLogger.info('Side panel auto-collapse', {
+    phase: 'side-panel-collapse',
+    activatedTabId: activatedTabId,
+    windowId: windowId,
+    outcome: outcome,
+    workingTabId: Number.isFinite(workingTabId) ? workingTabId : null
+  });
+}
+
 chrome.tabs.onActivated.addListener(async function (activeInfo) {
   try {
     if (typeof chrome.sidePanel === 'undefined') return;
@@ -2954,21 +3124,27 @@ chrome.tabs.onActivated.addListener(async function (activeInfo) {
     if (typeof activatedTabId !== 'number' || typeof activatedWindowId !== 'number') return;
 
     // Per-window has-any-working-tab gate.
-    var tabsInWindow = await chrome.tabs.query({ windowId: activatedWindowId });
-    var anyWorking = false;
-    for (var i = 0; i < tabsInWindow.length; i++) {
-      var t = tabsInWindow[i];
-      if (t && typeof t.id === 'number' && findActiveAutomationSessionForTab(t.id)) {
-        anyWorking = true;
-        break;
-      }
+    var workingTabId = await fsbFindWorkingTabInWindow(activatedWindowId);
+    if (workingTabId !== null) {
+      // keep panel visible -- some tab in this window still working
+      fsbLogSidePanelCollapse(activatedTabId, activatedWindowId, 'kept_working_tab', workingTabId);
+      return;
     }
-    if (anyWorking) return; // keep panel visible -- some tab in this window still working
+
+    // Looks idle. Give an in-flight agent tab bind a moment, then look again.
+    await new Promise(function (resolve) { setTimeout(resolve, FSB_SIDE_PANEL_COLLAPSE_GRACE_MS); });
+    workingTabId = await fsbFindWorkingTabInWindow(activatedWindowId);
+    if (workingTabId !== null) {
+      fsbLogSidePanelCollapse(activatedTabId, activatedWindowId, 'kept_after_grace', workingTabId);
+      return;
+    }
 
     // No working tab in this window -- close the panel.
     try {
       await chrome.sidePanel.close({ windowId: activatedWindowId });
+      fsbLogSidePanelCollapse(activatedTabId, activatedWindowId, 'closed', null);
     } catch (closeErr) {
+      fsbLogSidePanelCollapse(activatedTabId, activatedWindowId, 'close_failed', null);
       console.warn('[FSB] chrome.sidePanel.close failed (non-fatal)', closeErr && closeErr.message);
     }
   } catch (outerErr) {
@@ -3639,6 +3815,16 @@ function _getDashboardTaskRecoverySnapshot() {
 async function summarizeTask(taskText, settings) {
   try {
     if (!taskText || taskText.length <= 40) return taskText;
+
+    // A local reasoning model can spend its entire tiny 50-token budget on
+    // reasoning_content and return an empty title. Avoid an extra inference
+    // entirely for LM Studio; this label is presentation-only.
+    if (settings && settings.modelProvider === 'lmstudio') {
+      const normalizedTask = String(taskText).replace(/\s+/g, ' ').trim();
+      return normalizedTask.length <= 60
+        ? normalizedTask
+        : normalizedTask.slice(0, 57).trimEnd() + '...';
+    }
 
     const provider = new UniversalProvider(settings);
     const requestBody = await provider.buildRequest({
@@ -4625,6 +4811,15 @@ async function restoreSessionsFromStorage() {
 // as telemetry, while delegation remains fail-closed behind successful registry
 // hydration.
 function restoreServiceWorkerStateOnWake() {
+  // Bring the previous worker's log tail back so get_logs can still explain a run
+  // that finished right before this restart. Merge-only; failures are non-fatal.
+  try {
+    if (typeof automationLogger !== 'undefined' && automationLogger
+        && typeof automationLogger.loadLogs === 'function') {
+      Promise.resolve(automationLogger.loadLogs()).catch(() => {});
+    }
+  } catch (_logRestoreErr) { /* best-effort */ }
+
   const registry = Promise.resolve()
     .then(() => bootstrapAgentRegistry());
   globalThis.fsbAgentRegistryReady = registry.catch((error) => {
@@ -4955,27 +5150,25 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   }
 });
 
-// Phase 241 D-01 / POOL-03 -- forced-pool routing for new tabs.
-// Standalone listener (does NOT modify the existing onCreated handlers nor the
-// onRemoved chain above). When Chrome opens a new tab whose openerTabId points
-// to an agent-owned tab, the new tab is automatically pooled under that same
-// agent via bindTab(forced:true). New tabs without an openerTabId (Ctrl+T,
-// address-bar) are intentionally left unowned -- they are not the spawn of an
-// agent action, so no agent should claim them.
-//
-// D-02: forced-pool routing reuses an existing agent record; it does NOT call
-// registerAgent and therefore does NOT consume cap budget.
+// Agent-action child-tab routing. openerTabId alone cannot distinguish an
+// agent-triggered popup from a human Cmd-click on the same owned page. Require
+// a live, in-memory action intent for that opener before pooling the child.
+// Explicit open_tab routes bind their created tab directly and do not rely on
+// this listener. Intents are never persisted, so a service-worker restart
+// fails safe by leaving an uncertain child unowned.
 chrome.tabs.onCreated.addListener((tab) => {
   try {
     if (!tab || typeof tab.id !== 'number') return;
-    if (typeof tab.openerTabId !== 'number') return; // Pitfall 2: Ctrl+T / address-bar tabs unowned.
+    if (typeof tab.openerTabId !== 'number') return;
+    var provenance = globalThis.FsbAgentTabSpawnProvenance;
+    if (!provenance || typeof provenance.match !== 'function') return;
+    var intent = provenance.match(tab.openerTabId);
+    if (!intent || typeof intent.agentId !== 'string') return;
     var reg = globalThis.fsbAgentRegistryInstance;
     if (!reg || typeof reg.findAgentByTabId !== 'function') return;
-    var ownerAgentId = reg.findAgentByTabId(tab.openerTabId);
-    if (!ownerAgentId) return;
+    if (reg.findAgentByTabId(tab.openerTabId) !== intent.agentId) return;
     if (typeof reg.bindTab === 'function') {
-      // Fire-and-forget: bindTab is internally promise-chain-locked.
-      reg.bindTab(ownerAgentId, tab.id, { forced: true });
+      reg.bindTab(intent.agentId, tab.id, { forced: true });
     }
   } catch (_err) {
     // Defensive: never let registry errors stop other onCreated listeners.
@@ -11168,6 +11361,117 @@ function detectRepeatedSuccess(session) {
   return null;
 }
 
+function fsbTakeTabControlHasExactRequest(request) {
+  if (!request || typeof request !== 'object' || Array.isArray(request)) return false;
+  const actual = Object.keys(request).sort();
+  const expected = ['action', 'expectedOwnerAgentId', 'tabId', 'windowId'].sort();
+  return actual.length === expected.length
+    && actual.every((key, index) => key === expected[index]);
+}
+
+function fsbTakeTabControlSenderTrusted(sender) {
+  if (!sender || sender.id !== chrome.runtime.id) return false;
+  const expectedUrl = chrome.runtime.getURL('ui/sidepanel.html');
+  return sender.url === expectedUrl;
+}
+
+async function fsbTakeTabControlContextMatches(request) {
+  try {
+    const tab = await chrome.tabs.get(request.tabId);
+    return !!(tab
+      && tab.id === request.tabId
+      && tab.windowId === request.windowId
+      && tab.active === true);
+  } catch (_error) {
+    return false;
+  }
+}
+
+function fsbTabHasLiveAutomationSession(tabId) {
+  let live = false;
+  activeSessions.forEach((session) => {
+    if (live || !session || session.isTerminating) return;
+    if (session.tabId === tabId
+      || session.originalTabId === tabId
+      || session.previousTabId === tabId) live = true;
+  });
+  return live;
+}
+
+async function fsbStopLocalAutomationForTakeControl(tabId, ownerAgentId) {
+  const matchingSessionIds = [];
+  activeSessions.forEach((session, sessionId) => {
+    if (!session || session.isTerminating) return;
+    if (session.agentId && session.agentId !== ownerAgentId) return;
+    const ownsTarget = session.tabId === tabId
+      || session.originalTabId === tabId
+      || session.previousTabId === tabId;
+    if (ownsTarget) matchingSessionIds.push(sessionId);
+  });
+  for (const sessionId of matchingSessionIds) {
+    const response = await new Promise((resolve) => {
+      handleStopAutomation(
+        { action: 'stopAutomation', sessionId: sessionId },
+        { id: chrome.runtime.id, url: chrome.runtime.getURL('ui/sidepanel.html') },
+        resolve
+      );
+    });
+    if (!response || (response.success !== true && response.alreadyEnded !== true)) return false;
+  }
+  return true;
+}
+
+async function handleTakeTabControl(request, sender) {
+  if (!fsbTakeTabControlHasExactRequest(request)
+      || !fsbTakeTabControlSenderTrusted(sender)
+      || !Number.isSafeInteger(request.tabId)
+      || !Number.isSafeInteger(request.windowId)
+      || typeof request.expectedOwnerAgentId !== 'string'
+      || request.expectedOwnerAgentId.length === 0) {
+    return { success: false, code: 'stale_context', released: false };
+  }
+  const registry = globalThis.fsbAgentRegistryInstance;
+  if (!registry
+      || typeof registry.getOwner !== 'function'
+      || typeof registry.releaseTab !== 'function') {
+    return { success: false, code: 'registry_unavailable', released: false };
+  }
+  if (!await fsbTakeTabControlContextMatches(request)
+      || registry.getOwner(request.tabId) !== request.expectedOwnerAgentId) {
+    return { success: false, code: 'stale_context', released: false };
+  }
+
+  try {
+    const mappings = typeof registry.listDelegationMappings === 'function'
+      ? registry.listDelegationMappings()
+      : [];
+    if (mappings.some((row) => row && row.agentId === request.expectedOwnerAgentId)) {
+      return { success: false, code: 'protected_delegation', released: false };
+    }
+  } catch (_error) {
+    return { success: false, code: 'registry_unavailable', released: false };
+  }
+
+  const stopped = await fsbStopLocalAutomationForTakeControl(
+    request.tabId,
+    request.expectedOwnerAgentId
+  );
+  if (!stopped || !await fsbTakeTabControlContextMatches(request)) {
+    return { success: false, code: 'stale_context', released: false };
+  }
+
+  const currentOwner = registry.getOwner(request.tabId);
+  if (!currentOwner) return { success: true, code: 'released', released: true };
+  if (currentOwner !== request.expectedOwnerAgentId) {
+    return { success: false, code: 'stale_context', released: false };
+  }
+  const released = await registry.releaseTab(request.tabId);
+  if (released === true || registry.getOwner(request.tabId) === null) {
+    return { success: true, code: 'released', released: true };
+  }
+  return { success: false, code: 'protected_delegation', released: false };
+}
+
 // Listen for messages from popup and content scripts. Named (rather than
 // inline) so fsbDispatchInternalMessage, defined right after the listener
 // body, can invoke it directly for same-service-worker callers.
@@ -11432,6 +11736,12 @@ const fsbHandleRuntimeMessage = (request, sender, sendResponse) => {
     case 'startAutomation':
       handleStartAutomation(request, sender, sendResponse);
       return true; // Will respond asynchronously
+
+    case 'takeTabControl':
+      handleTakeTabControl(request, sender).then(sendResponse, () => {
+        sendResponse({ success: false, code: 'registry_unavailable', released: false });
+      });
+      return true;
 
     case 'stopAutomation':
       handleStopAutomation(request, sender, sendResponse);
@@ -12591,10 +12901,56 @@ const fsbHandleRuntimeMessage = (request, sender, sendResponse) => {
         return true;
       }
       (async function () {
+        const provider = String(request.provider || '');
+        const model = String(request.config && request.config.model || '').trim();
+        const timeoutMs = provider === 'lmstudio' ? 180000 : 60000;
+        const startedAt = Date.now();
         try {
-          await executeViaBridge(request.provider, request.config, { __testConnection: true }, { mode: 'test-connection' });
+          if (provider === 'lmstudio' && !model) {
+            throw new Error('LM Studio model is required before testing the connection.');
+          }
+          if (typeof automationLogger !== 'undefined') {
+            automationLogger.debug('Provider connection test starting', {
+              phase: 'test-connection',
+              provider: provider,
+              model: model,
+              toolCount: 0,
+              timeoutMs: timeoutMs,
+              elapsedMs: 0
+            });
+          }
+          await executeViaBridge(
+            provider,
+            request.config,
+            { __testConnection: true },
+            { mode: 'test-connection', timeoutMs: timeoutMs }
+          );
+          if (typeof automationLogger !== 'undefined') {
+            automationLogger.debug('Provider connection test completed', {
+              phase: 'test-connection',
+              provider: provider,
+              model: model,
+              toolCount: 0,
+              timeoutMs: timeoutMs,
+              elapsedMs: Date.now() - startedAt
+            });
+          }
           sendResponse({ ok: true });
         } catch (err) {
+          if (typeof automationLogger !== 'undefined') {
+            automationLogger.error('Provider connection test failed', {
+              phase: 'test-connection',
+              provider: provider,
+              model: model,
+              toolCount: 0,
+              timeoutMs: timeoutMs,
+              elapsedMs: Date.now() - startedAt,
+              status: err && typeof err.status === 'number' ? err.status : null,
+              errorKind: err && typeof err.code === 'string'
+                ? err.code
+                : 'connection_test_failed'
+            });
+          }
           sendResponse({ ok: false, error: (err && err.message) ? err.message : 'Unknown bridge error' });
         }
       })();
@@ -12809,6 +13165,12 @@ async function handleSolveCaptcha(request, sender, sendResponse) {
 
 async function handleStartAutomation(request, sender, sendResponse) {
   const { task, tabId, conversationId, source } = request;
+  const requestAgentId = (request && typeof request.agentId === 'string')
+    ? request.agentId
+    : null;
+  const isScopedMcpRequest = source === 'mcp'
+    && requestAgentId
+    && !requestAgentId.startsWith('legacy:');
 
   try {
     // Delegated providers must leave this chokepoint before side-panel, tab,
@@ -12816,7 +13178,7 @@ async function handleStartAutomation(request, sender, sendResponse) {
     // FSB_DELEGATION_START command is the sole spawn authority; this legacy
     // action returns only the background-owned consent disposition so older
     // callers cannot accidentally enter the API loop with an agent provider.
-    const authoritativeProvider = await fsbReadAuthoritativeProviderConfig();
+    let authoritativeProvider = await fsbReadAuthoritativeProviderConfig();
     if (authoritativeProvider.providerKind === 'agent') {
       const consent = await fsbDelegationConsentCommand({
         type: 'FSB_DELEGATION_CONSENT',
@@ -12864,6 +13226,12 @@ async function handleStartAutomation(request, sender, sendResponse) {
         });
       }
     }
+
+    // Resolve legacy LM Studio configurations after the gesture-sensitive
+    // side-panel open but before conversation/session mutation. Exactly one
+    // compatible local model is safe to migrate automatically; all ambiguous
+    // or unavailable states fail before the caller sees "Automation started".
+    authoritativeProvider = await fsbResolveLmStudioModelForStart(authoritativeProvider);
 
     // Check for existing conversation session for follow-up reuse
     if (conversationId && conversationSessions.has(conversationId)) {
@@ -12947,7 +13315,12 @@ async function handleStartAutomation(request, sender, sendResponse) {
     if (isRestrictedURL(tabInfo.url)) {
       if (shouldUseSmartNavigation(tabInfo.url, task)) {
         const targetUrl = analyzeTaskAndGetTargetUrl(getFirstTaskSegment(task));
-        const decision = await decideTabAction(targetTabId, tabInfo.url, targetUrl, task);
+        // A scoped MCP agent may only navigate the tab selected by its
+        // registry. Reusing a matching tab from the surrounding browser
+        // would silently cross the agent boundary.
+        const decision = isScopedMcpRequest
+          ? { action: 'navigate', reason: 'agent_scoped_target' }
+          : await decideTabAction(targetTabId, tabInfo.url, targetUrl, task);
         automationLogger.logNavigation(null, 'smart', tabInfo.url, targetUrl, { task: task.substring(0, 100), decision: decision.action, reason: decision.reason });
 
         if (decision.action === 'switch') {
@@ -13020,12 +13393,28 @@ async function handleStartAutomation(request, sender, sendResponse) {
     );
     const userMaxIterations = parseInt(storedSettings.maxIterations) || 100;
 
-    // Pre-populate allowedTabs with all non-restricted tabs in the current window
-    // so the AI can switch to any tab the user already has open
-    const allWindowTabs = await chrome.tabs.query({ currentWindow: true });
-    const initialAllowedTabs = allWindowTabs
-      .filter(t => t.id && !isRestrictedURL(t.url))
-      .map(t => t.id);
+    // Browser-native sessions retain their current-window tab pool. A real
+    // MCP agent receives only its registry-owned tabs so the autopilot loop
+    // cannot switch into a user's or another agent's tab.
+    let initialAllowedTabs = [];
+    if (isScopedMcpRequest) {
+      const reg = globalThis.fsbAgentRegistryInstance;
+      const ownedTabIds = reg && typeof reg.getAgentTabs === 'function'
+        ? (reg.getAgentTabs(requestAgentId) || [])
+        : [];
+      const ownedTabs = await Promise.all(ownedTabIds.filter(Number.isFinite).map(async (ownedTabId) => {
+        try { return await chrome.tabs.get(ownedTabId); }
+        catch (_error) { return null; }
+      }));
+      initialAllowedTabs = ownedTabs
+        .filter(t => t && t.id && !isRestrictedURL(t.url))
+        .map(t => t.id);
+    } else {
+      const allWindowTabs = await chrome.tabs.query({ currentWindow: true });
+      initialAllowedTabs = allWindowTabs
+        .filter(t => t.id && !isRestrictedURL(t.url))
+        .map(t => t.id);
+    }
     if (!initialAllowedTabs.includes(targetTabId)) {
       initialAllowedTabs.push(targetTabId);
     }
@@ -13052,7 +13441,8 @@ async function handleStartAutomation(request, sender, sendResponse) {
       lastUrl: null,            // Last known URL
       actionSequences: [],      // Track sequences of actions to detect patterns
       sequenceRepeatCount: {},  // Count how many times each sequence repeats
-      allowedTabs: initialAllowedTabs, // All non-restricted tabs in the current window
+      allowedTabs: initialAllowedTabs,
+      ...(requestAgentId ? { agentId: requestAgentId } : {}),
       tabHistory: [],             // Track tab switches for debugging
       navigationMessage,        // Store navigation message for UI
       animatedActionHighlights: storedSettings.animatedActionHighlights ?? true,
@@ -13163,6 +13553,16 @@ async function handleStartAutomation(request, sender, sendResponse) {
         // legacy single-agent flows remain functional during the v0.9.60
         // multi-agent transition.
       }
+    }
+
+    // Keep the owning identity with the local session so subsequent page
+    // actions can prove child-tab provenance and open_tab can bind its result
+    // directly. Persist again because the first session snapshot is written
+    // before the registry bind above.
+    if (resolvedAgentId) {
+      sessionData.agentId = resolvedAgentId;
+      sessionData.ownershipToken = (bindResult && bindResult.ownershipToken) || null;
+      persistSession(sessionId, sessionData);
     }
 
     sendResponse({

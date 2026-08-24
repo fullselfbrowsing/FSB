@@ -88,13 +88,22 @@ const REASONING_MODEL_TIMEOUT = 45000;
 // Higher cap for reasoning models
 const MAX_REASONING_TIMEOUT = 90000;
 
+// Local inference can spend minutes loading and evaluating a large prompt.
+// LM Studio stays separately bounded so hosted-provider latency behavior does
+// not change.
+const LMSTUDIO_REQUEST_TIMEOUT = 180000;
+const LMSTUDIO_MAX_TIMEOUT = 300000;
+const LMSTUDIO_TIMEOUT_PER_5K_TOKENS = 30000;
+
 /**
  * Calculate adaptive timeout based on prompt/request size, model type, and retry attempt.
- * Base 30s + 5s per estimated 5K input tokens (45s base for reasoning models).
+ * Hosted providers use their existing 30s/45s bases. LM Studio uses a 180s
+ * base plus 30s per complete 5K estimated input tokens, capped at 300s.
  * Progressive increase on retries: attempt 0 = base, attempt 1 = base * 1.5, attempt 2 = base * 2
  * @param {Object} requestBody - The request body to estimate size from
  * @param {string} modelName - The model name to check for reasoning model patterns
  * @param {number} attempt - Retry attempt number (0-based), increases timeout progressively
+ * @param {string} providerKey - Optional provider key for provider-specific budgets
  * @returns {number} Timeout in milliseconds
  */
 function estimateRequestTextCharacters(value, key = '', seen = new WeakSet()) {
@@ -142,10 +151,15 @@ function requestContainsImageData(value, key = '', parent = null, seen = new Wea
   ));
 }
 
-function calculateAdaptiveTimeout(requestBody, modelName = '', attempt = 0) {
+function calculateAdaptiveTimeout(requestBody, modelName = '', attempt = 0, providerKey = '') {
+  const isLmStudio = providerKey === 'lmstudio';
   const isReasoning = /reasoning|grok-4(?!.*(?:fast|mini))/.test(modelName);
-  const baseTimeout = isReasoning ? REASONING_MODEL_TIMEOUT : DEFAULT_REQUEST_TIMEOUT;
-  const maxTimeout = isReasoning ? MAX_REASONING_TIMEOUT : MAX_REQUEST_TIMEOUT;
+  const baseTimeout = isLmStudio
+    ? LMSTUDIO_REQUEST_TIMEOUT
+    : (isReasoning ? REASONING_MODEL_TIMEOUT : DEFAULT_REQUEST_TIMEOUT);
+  const maxTimeout = isLmStudio
+    ? LMSTUDIO_MAX_TIMEOUT
+    : (isReasoning ? MAX_REASONING_TIMEOUT : MAX_REQUEST_TIMEOUT);
 
   // Progressive multiplier: 1x, 1.5x, 2x for attempts 0, 1, 2+
   const retryMultiplier = 1 + (Math.min(attempt, 2) * 0.5);
@@ -153,7 +167,8 @@ function calculateAdaptiveTimeout(requestBody, modelName = '', attempt = 0) {
   try {
     const estimatedChars = estimateRequestTextCharacters(requestBody);
     const estimatedTokens = estimatedChars / 4;
-    const extra = Math.floor(estimatedTokens / 5000) * 5000;
+    const extra = Math.floor(estimatedTokens / 5000)
+      * (isLmStudio ? LMSTUDIO_TIMEOUT_PER_5K_TOKENS : 5000);
     return Math.min(Math.round((baseTimeout + extra) * retryMultiplier), maxTimeout);
   } catch {
     return Math.min(Math.round(baseTimeout * retryMultiplier), maxTimeout);
@@ -454,7 +469,7 @@ class UniversalProvider {
   async sendRequest(requestBody, options = {}) {
     // Use adaptive timeout based on request size and retry attempt if no explicit timeout provided
     const attempt = options.attempt || 0;
-    const defaultTimeout = options.timeout || calculateAdaptiveTimeout(requestBody, this.model, attempt);
+    const defaultTimeout = options.timeout || calculateAdaptiveTimeout(requestBody, this.model, attempt, this.provider);
     const { retry = false, rateLimitAttempt = 0, timeout = defaultTimeout } = options;
 
     try {

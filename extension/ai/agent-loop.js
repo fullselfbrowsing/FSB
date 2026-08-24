@@ -103,14 +103,16 @@ var _al_ScreenshotAttachments = (typeof globalThis !== 'undefined' && globalThis
   ? globalThis.FsbScreenshotAttachments
   : (_al_screenshotAttachments || null);
 var _executeTool = (typeof executeTool !== 'undefined') ? executeTool : (_al_executor?.executeTool || (async () => ({ success: false, error: 'executeTool not available' })));
+var _isReadOnlyTool = (typeof isReadOnly !== 'undefined') ? isReadOnly : (_al_executor?.isReadOnly || function() { return false; });
 var _UniversalProvider = (typeof UniversalProvider !== 'undefined') ? UniversalProvider : (_al_provider?.UniversalProvider || null);
 var _PROVIDER_CONFIGS = (typeof PROVIDER_CONFIGS !== 'undefined') ? PROVIDER_CONFIGS : (_al_provider?.PROVIDER_CONFIGS || {});
 var _al_calculateAdaptiveTimeout = (typeof calculateAdaptiveTimeout !== 'undefined')
   ? calculateAdaptiveTimeout
-  : (_al_provider?.calculateAdaptiveTimeout || function(requestBody, modelName, attempt) {
+  : (_al_provider?.calculateAdaptiveTimeout || function(requestBody, modelName, attempt, providerKey) {
+      var isLmStudio = providerKey === 'lmstudio';
       var isReasoning = /reasoning|grok-4(?!.*(?:fast|mini))/.test(modelName || '');
-      var baseTimeout = isReasoning ? 45000 : 30000;
-      var maxTimeout = isReasoning ? 90000 : 60000;
+      var baseTimeout = isLmStudio ? 180000 : (isReasoning ? 45000 : 30000);
+      var maxTimeout = isLmStudio ? 300000 : (isReasoning ? 90000 : 60000);
       var retryMultiplier = 1 + (Math.min(attempt || 0, 2) * 0.5);
       try {
         var estimatedChars = 0;
@@ -121,7 +123,7 @@ var _al_calculateAdaptiveTimeout = (typeof calculateAdaptiveTimeout !== 'undefin
         } else {
           estimatedChars = JSON.stringify(requestBody || {}).length;
         }
-        var extra = Math.floor((estimatedChars / 4) / 5000) * 5000;
+        var extra = Math.floor((estimatedChars / 4) / 5000) * (isLmStudio ? 30000 : 5000);
         return Math.min(Math.round((baseTimeout + extra) * retryMultiplier), maxTimeout);
       } catch (_e) {
         return Math.min(Math.round(baseTimeout * retryMultiplier), maxTimeout);
@@ -1102,14 +1104,54 @@ async function callProviderWithTools(providerInstance, model, apiKey, messages, 
   // llm-proxy, etc.), it must be added to computeUrl in a follow-on phase.
   var _cfg = providerInstance.config || {};
   var _settings = providerInstance.settings || {};
-  var timeoutMs = _al_calculateAdaptiveTimeout(requestBody, providerInstance.model, 0);
-  return executeViaBridge(providerKey, {
-    apiKey: _settings[_cfg.keyField] || '',
-    model: providerInstance.model,
-    baseUrl: providerKey === 'custom' ? _settings.customEndpoint
-           : providerKey === 'lmstudio' ? (_al_normalizeProviderBaseUrl('lmstudio', _settings.lmstudioBaseUrl) + '/v1')
-           : undefined,
-  }, requestBody, { mode: 'autopilot', timeoutMs: timeoutMs });
+  var timeoutMs = _al_calculateAdaptiveTimeout(requestBody, providerInstance.model, 0, providerKey);
+  var requestStartedAt = Date.now();
+  if (typeof automationLogger !== 'undefined') {
+    automationLogger.debug('Provider bridge request dispatch', {
+      phase: 'agent-tools',
+      provider: providerKey,
+      model: providerInstance.model,
+      toolCount: formattedTools.length,
+      timeoutMs: timeoutMs,
+      elapsedMs: 0
+    });
+  }
+  try {
+    var bridgeResponse = await executeViaBridge(providerKey, {
+      apiKey: _settings[_cfg.keyField] || '',
+      model: providerInstance.model,
+      baseUrl: providerKey === 'custom' ? _settings.customEndpoint
+             : providerKey === 'lmstudio' ? (_al_normalizeProviderBaseUrl('lmstudio', _settings.lmstudioBaseUrl) + '/v1')
+             : undefined,
+    }, requestBody, { mode: 'autopilot', timeoutMs: timeoutMs });
+    if (typeof automationLogger !== 'undefined') {
+      automationLogger.debug('Provider bridge request completed', {
+        phase: 'agent-tools',
+        provider: providerKey,
+        model: providerInstance.model,
+        toolCount: formattedTools.length,
+        timeoutMs: timeoutMs,
+        elapsedMs: Date.now() - requestStartedAt
+      });
+    }
+    return bridgeResponse;
+  } catch (bridgeError) {
+    if (typeof automationLogger !== 'undefined') {
+      automationLogger.error('Provider bridge request failed', {
+        phase: 'agent-tools',
+        provider: providerKey,
+        model: providerInstance.model,
+        toolCount: formattedTools.length,
+        timeoutMs: timeoutMs,
+        elapsedMs: Date.now() - requestStartedAt,
+        status: bridgeError && bridgeError.status || null,
+        errorKind: bridgeError && typeof bridgeError.code === 'string'
+          ? bridgeError.code
+          : 'provider_request_failed'
+      });
+    }
+    throw bridgeError;
+  }
 }
 
 
@@ -2561,13 +2603,52 @@ async function runAgentIteration(sessionId, options) {
         };
       } else {
         // Standard tool: dispatch through unified executor
-        result = await _executeTool(call.name, call.args, session.tabId, {
-          animateActionIcon: session.animatedActionHighlights,
-          cdpHandler: executeCDPToolDirect
-            ? function(verb, params, tabId) { return executeCDPToolDirect({ tool: verb, params: params }, tabId); }
-            : null,
-          dataHandler: handleDataTool
+        var actionOpenerTabId = session.tabId;
+        var actionAgentId = session.agentId || null;
+        var actionRegistry = (typeof globalThis !== 'undefined')
+          ? globalThis.fsbAgentRegistryInstance
+          : null;
+        if (!actionAgentId && actionRegistry
+            && typeof actionRegistry.findAgentByTabId === 'function') {
+          actionAgentId = actionRegistry.findAgentByTabId(actionOpenerTabId);
+          if (actionAgentId) session.agentId = actionAgentId;
+        }
+        var spawnProvenance = (typeof globalThis !== 'undefined')
+          ? globalThis.FsbAgentTabSpawnProvenance
+          : null;
+        var spawnIntentToken = null;
+        var actionToolDef = _al_TOOL_REGISTRY.find(function(definition) {
+          return definition && definition.name === call.name;
         });
+        var actionCanSpawnChild = !!(actionToolDef && (
+          actionToolDef._route === 'content'
+          || actionToolDef._route === 'cdp'
+          || call.name === 'execute_js'
+        ));
+        if (actionCanSpawnChild
+            && actionAgentId
+            && !_isReadOnlyTool(call.name)
+            && spawnProvenance
+            && typeof spawnProvenance.begin === 'function') {
+          spawnIntentToken = spawnProvenance.begin({
+            agentId: actionAgentId,
+            openerTabId: actionOpenerTabId
+          });
+        }
+        try {
+          result = await _executeTool(call.name, call.args, actionOpenerTabId, {
+            animateActionIcon: session.animatedActionHighlights,
+            cdpHandler: executeCDPToolDirect
+              ? function(verb, params, tabId) { return executeCDPToolDirect({ tool: verb, params: params }, tabId); }
+              : null,
+            dataHandler: handleDataTool
+          });
+        } finally {
+          if (spawnIntentToken && spawnProvenance
+              && typeof spawnProvenance.end === 'function') {
+            spawnProvenance.end(spawnIntentToken);
+          }
+        }
       }
 
       if (call.name === 'capture_screenshot') {
@@ -2593,17 +2674,50 @@ async function runAgentIteration(sessionId, options) {
       // Tab-switching tools: update session.tabId so subsequent tools target the new tab
       if ((call.name === 'open_tab' || call.name === 'switch_tab') && result.success && result.result && result.result.tabId) {
         var newTabId = result.result.tabId;
-        console.log('[AgentLoop] Tab changed', { from: session.tabId, to: newTabId, tool: call.name });
-        session.tabId = newTabId;
+        if (call.name === 'open_tab') {
+          var openTabRegistry = (typeof globalThis !== 'undefined')
+            ? globalThis.fsbAgentRegistryInstance
+            : null;
+          var openTabAgentId = session.agentId || (openTabRegistry
+            && typeof openTabRegistry.findAgentByTabId === 'function'
+            ? openTabRegistry.findAgentByTabId(session.tabId)
+            : null);
+          if (openTabAgentId && openTabRegistry
+              && typeof openTabRegistry.bindTab === 'function') {
+            try {
+              var openTabBinding = await openTabRegistry.bindTab(openTabAgentId, newTabId);
+              if (!openTabBinding || openTabBinding.success === false) {
+                try { await chrome.tabs.remove(newTabId); } catch (_removeError) { /* best-effort cleanup */ }
+                result.success = false;
+                result.hadEffect = false;
+                result.error = (openTabBinding && openTabBinding.error) || 'Could not reserve the new tab for this agent';
+              } else {
+                session.agentId = openTabAgentId;
+                session.ownershipToken = openTabBinding.ownershipToken || session.ownershipToken || null;
+              }
+            } catch (bindError) {
+              try { await chrome.tabs.remove(newTabId); } catch (_removeError) { /* best-effort cleanup */ }
+              result.success = false;
+              result.hadEffect = false;
+              result.error = bindError && bindError.message
+                ? bindError.message
+                : 'Could not reserve the new tab for this agent';
+            }
+          }
+        }
+        if (result.success) {
+          console.log('[AgentLoop] Tab changed', { from: session.tabId, to: newTabId, tool: call.name });
+          session.tabId = newTabId;
 
-        // Ensure content script is injected on the new tab
-        try {
-          await chrome.scripting.executeScript({
-            target: { tabId: newTabId },
-            files: ['content/messaging.js']
-          });
-        } catch (_e) {
-          // Content script may already be injected or tab may be restricted
+          // Ensure content script is injected on the new tab
+          try {
+            await chrome.scripting.executeScript({
+              target: { tabId: newTabId },
+              files: ['content/messaging.js']
+            });
+          } catch (_e) {
+            // Content script may already be injected or tab may be restricted
+          }
         }
       }
 

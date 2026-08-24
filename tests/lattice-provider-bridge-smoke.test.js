@@ -628,9 +628,11 @@ async function loadOffscreenHandlerSource(chromeMock) {
   // replay manifest helper adds one classic-SW load -> 325, and the durable
   // MCP Lattice journal adds one classic-SW load -> 326. The export helper is
   // mention 327, and screenshot capture adds the CDP lease, capture engine,
-  // and attachment helper -> 330.
+  // and attachment helper -> 330. Agent tab-spawn provenance and shared model
+  // discovery add two more classic-SW loads -> 332. The delegation tab seed
+  // (side-panel active tab handed to the delegated agent) adds one -> 333.
   const importScriptsCount = (bgSource.match(/importScripts/g) || []).length;
-  passAssertEqual(importScriptsCount, 330, 'background.js importScripts count includes the Lattice replay, MCP journal, export, and screenshot helpers');
+  passAssertEqual(importScriptsCount, 333, 'background.js importScripts count includes provenance, LM Studio discovery, and delegation tab seed helpers');
   // Companion call-site-only count (regex requires open paren): Phase 5 baseline
   // was 150 actual importScripts() calls; Phase 6 adds 1 -> 151; Phase 8 adds 1 -> 152;
   // Phase 14 adds 2 (trigger-store + trigger-lifecycle) -> 154; Phase 15 adds 2
@@ -674,9 +676,11 @@ async function loadOffscreenHandlerSource(chromeMock) {
   // Quick 260728-k2v adds the animated action-icon module call site -> 320;
   // the replay manifest helper is call site 321, and the durable MCP Lattice
   // journal is call site 322. The export helper is call site 323, and screenshot
-  // capture adds three call sites -> 326.
+  // capture adds three call sites -> 326. Agent tab-spawn provenance and
+  // shared model discovery add two more call sites -> 328. The delegation tab
+  // seed is call site 329.
   const importScriptsCallSites = (bgSource.match(/importScripts\(/g) || []).length;
-  passAssertEqual(importScriptsCallSites, 326, 'background.js importScripts() call sites include the Lattice replay, MCP journal, export, and screenshot helpers');
+  passAssertEqual(importScriptsCallSites, 329, 'background.js importScripts() call sites include provenance, LM Studio discovery, and delegation tab seed helpers');
 
   const lineCli = bgLines.findIndex(l => /importScripts\(['"]ai\/cli-parser\.js['"]\)/.test(l));
   const lineBridge = bgLines.findIndex(l => /importScripts\(['"]ai\/lattice-provider-bridge\.js['"]\)/.test(l));
@@ -826,13 +830,15 @@ async function loadOffscreenHandlerSource(chromeMock) {
   // Load-order fix: checkApiConnection reads DOM inputs, but the premature page-init
   // call ran BEFORE loadSettings' async chrome.storage.local.get callback populated
   // them, so it read empty fields and falsely showed 'No API Key'. The call is removed
-  // from init and now runs as the last statement of loadSettings' model-name setTimeout
-  // (after apiKey + provider + modelName are all populated).
+  // from init and now runs after awaited model discovery (after provider inputs
+  // and modelName are populated). LM Studio intentionally skips automatic
+  // inference and leaves Test Connection as an explicit action.
   passAssertEqual((optionsSrc.match(/\/\/ Check API connection/g) || []).length, 0,
     "options.js dropped the premature page-init '// Check API connection' call (load-order fix)");
   passAssert(
-    /if\s*\(settings\.providerKind\s*===\s*['"]api['"]\)\s*\{[\s\S]*?checkApiConnection\(\);\s*\}\s*\}, 100\);/.test(optionsSrc),
-    'checkApiConnection() stays last in the loadSettings model-name timer and is guarded to API kind'
+    /const discoveryResult = await setProviderSelection\([\s\S]*?settings\.modelProvider === ['"]lmstudio['"][\s\S]*?else if \(savedModelName\)[\s\S]*?checkApiConnection\(\);/.test(optionsSrc)
+      && !/providerSettingsModelLoadTimer\s*=\s*setTimeout/.test(optionsSrc),
+    'loadSettings awaits model discovery and auto-tests only configured hosted providers'
   );
 
   // ---- Part 6: INV byte-freeze regression assertions (Plan 06-05 fill) ----

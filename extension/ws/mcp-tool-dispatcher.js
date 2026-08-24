@@ -475,6 +475,20 @@ async function _persistAgentClientLabel(agentId, label) {
   } catch (_e) { /* swallow -- diagnostic-only path */ }
 }
 
+// Canonical chip label from the MCP initialize clientInfo, so ownership UI can
+// say "Owned by Claude" from the first render after agent:register instead of
+// falling back to the raw agent id until an action-tool sidecar arrives.
+function canonicalLabelFromClientInfo(clientInfo) {
+  if (!clientInfo || typeof clientInfo.name !== 'string') return null;
+  const name = clientInfo.name.toLowerCase();
+  if (name.includes('claude')) return 'Claude';
+  if (name.includes('codex')) return 'Codex';
+  if (name.includes('opencode')) return 'OpenCode';
+  if (name.includes('cursor')) return 'Cursor';
+  if (name.includes('windsurf')) return 'Windsurf';
+  return null;
+}
+
 function resolveMcpClientLabel(payload) {
   const fromPayload = extractMcpClientLabel(payload);
   const agentId = _payloadAgentId(payload);
@@ -1252,6 +1266,9 @@ async function handleNavigateRoute({ params, client, tab }) {
       const extra = (bindResult && bindResult.ownershipToken)
         ? { ownershipToken: bindResult.ownershipToken }
         : {};
+      if (createdTab && Number.isFinite(createdTab.id)) {
+        await activateSidePanelAgentTab(agentId, createdTab.id);
+      }
       return sanitizeSingleTab('navigate', createdTab, extra);
     }
 
@@ -1275,6 +1292,7 @@ async function handleNavigateRoute({ params, client, tab }) {
       }
     } catch (_e) { /* best-effort */ }
     const updatedTab = await chrome.tabs.update(targetTabId, { url: params.url });
+    await activateSidePanelAgentTab(agentId, targetTabId);
 
     // Phase 240 D-08: bindTab on the navigated tab BEFORE returning success
     // so the originating agent owns the tab; the freshly minted ownershipToken
@@ -1774,6 +1792,7 @@ async function handleOpenTabRoute({ params }) {
         bindResult = null;
       }
     }
+    if (tab && Number.isFinite(tab.id)) await activateSidePanelAgentTab(agentId, tab.id);
     const extra = (bindResult && bindResult.ownershipToken)
       ? { ownershipToken: bindResult.ownershipToken }
       : {};
@@ -1861,6 +1880,9 @@ async function handleSwitchTabRoute({ params }) {
         await chrome.windows.update(tab.windowId, { focused: true });
       }
     }
+    // A side-panel-started agent's working tab always comes forward, even when the
+    // agent did not ask for it. No-op for ordinary MCP clients.
+    if (!forceForeground) await activateSidePanelAgentTab(agentId, params.tabId);
 
     const extra = (bindResult && bindResult.ownershipToken)
       ? { ownershipToken: bindResult.ownershipToken }
@@ -1914,23 +1936,58 @@ async function handleCloseTabRoute({ params }) {
 
 async function handleListTabsRoute({ params }) {
   const { agentId } = params || {};
-  // Phase 240 will validate agent_id; Phase 238 deliberately ignores it.
-  void agentId;
   try {
     getChromeTabsApi();
-    const queryOptions = {};
-    if (params?.currentWindowOnly === true) {
-      queryOptions.currentWindow = true;
+    const reg = (typeof globalThis !== 'undefined')
+      ? globalThis.fsbAgentRegistryInstance
+      : null;
+    if (!reg || typeof reg.getAgentTabs !== 'function') {
+      return createMcpOwnershipError('AGENT_REGISTRY_UNAVAILABLE', {
+        requestingAgentId: agentId || null
+      });
+    }
+    if (!agentId || (typeof reg.hasAgent === 'function' && !reg.hasAgent(agentId))) {
+      return createMcpOwnershipError('AGENT_NOT_REGISTERED', {
+        requestingAgentId: agentId || null
+      });
+    }
+    const ownedTabIds = reg.getAgentTabs(agentId);
+    if (ownedTabIds === null) {
+      return createMcpOwnershipError('AGENT_NOT_REGISTERED', {
+        requestingAgentId: agentId
+      });
+    }
+    if (!Array.isArray(ownedTabIds)) {
+      return createMcpOwnershipError('AGENT_REGISTRY_UNAVAILABLE', {
+        requestingAgentId: agentId
+      });
     }
 
-    const tabs = await chrome.tabs.query(queryOptions);
-    const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    const sanitizedTabs = tabs.map(sanitizeTab);
+    // Resolve only registry-owned ids. Per-tab failures are expected when a
+    // close races the registry's onRemoved cleanup; omit those stale ids.
+    const ownedTabs = (await Promise.all(ownedTabIds.filter(Number.isFinite).map(async (tabId) => {
+      try { return await chrome.tabs.get(tabId); }
+      catch (_error) { return null; }
+    }))).filter(Boolean);
+
+    // Preserve currentWindowOnly without enumerating the browser. The active
+    // tab lookup is used only to identify the current window and is never
+    // returned unless that exact tab also belongs to the caller.
+    let activeTab = null;
+    try {
+      const activeTabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      activeTab = activeTabs && activeTabs[0] ? activeTabs[0] : null;
+    } catch (_error) { /* activeTabId remains null; owned tabs still return */ }
+    const visibleTabs = params?.currentWindowOnly === true && activeTab
+      ? ownedTabs.filter((tab) => tab && tab.windowId === activeTab.windowId)
+      : (params?.currentWindowOnly === true ? [] : ownedTabs);
+    const sanitizedTabs = visibleTabs.map(sanitizeTab);
+    const visibleIds = new Set(sanitizedTabs.map((tab) => tab.id));
     return {
       success: true,
       tool: 'list_tabs',
       tabs: sanitizedTabs,
-      activeTabId: activeTab?.id ?? null,
+      activeTabId: activeTab && visibleIds.has(activeTab.id) ? activeTab.id : null,
       totalTabs: sanitizedTabs.length
     };
   } catch (error) {
@@ -2081,6 +2138,37 @@ function getMemoryListStorageUsageBytes(memories) {
 
 function getActiveSessionsMap() {
   return (typeof activeSessions !== 'undefined' && activeSessions instanceof Map) ? activeSessions : new Map();
+}
+
+function isLegacyOrMissingMcpAgent(agentId) {
+  return typeof agentId !== 'string' || agentId.length === 0 || agentId.startsWith('legacy:');
+}
+
+function getAgentScopedAutomationSessions(agentId) {
+  const sessions = getActiveSessionsMap();
+  if (isLegacyOrMissingMcpAgent(agentId)) return sessions;
+  return new Map(Array.from(sessions.entries()).filter((entry) => {
+    const session = entry[1];
+    return session && session.agentId === agentId;
+  }));
+}
+
+function validateRegisteredMcpAgent(agentId) {
+  if (isLegacyOrMissingMcpAgent(agentId)) return null;
+  const reg = (typeof globalThis !== 'undefined')
+    ? globalThis.fsbAgentRegistryInstance
+    : null;
+  if (!reg || typeof reg.hasAgent !== 'function') {
+    return createMcpOwnershipError('AGENT_REGISTRY_UNAVAILABLE', {
+      requestingAgentId: agentId
+    });
+  }
+  if (!reg.hasAgent(agentId)) {
+    return createMcpOwnershipError('AGENT_NOT_REGISTERED', {
+      requestingAgentId: agentId
+    });
+  }
+  return null;
 }
 
 function callCallbackHandler(handlerName, request, sender = {}, routeFamily = 'autopilot') {
@@ -2323,6 +2411,89 @@ function resolveDelegationRegistrationGate(explicitGate) {
   return null;
 }
 
+// Hands the side panel's originating tab to a freshly registered delegated agent,
+// so it continues in the user's tab instead of opening a new one. Every refusal
+// returns null, leaving the agent owning nothing -- i.e. today's open_tab flow.
+const fsbDelegatedAgentIds = new Set();
+const FSB_DELEGATED_AGENT_LIMIT = 64;
+
+// The user watches a delegated run in the side panel, so the tab it is working in
+// is brought to the front. Best-effort: a failure here never fails the tool call.
+// Did this run start in the side panel? Only those may take focus: an API-provider
+// autopilot run (a legacy:* surface agent) or a delegated CLI run. Ordinary MCP
+// clients keep the Phase 246 D-05 background default.
+//
+// The registry is consulted rather than trusting in-memory state, because the service
+// worker can be evicted between agent:register and the first tab action.
+function isSidePanelOriginatedAgent(agentId) {
+  if (typeof agentId !== 'string' || !agentId) return false;
+  if (agentId.indexOf('legacy:') === 0) return true;
+  if (fsbDelegatedAgentIds.has(agentId)) return true;
+  const reg = globalThis.fsbAgentRegistryInstance;
+  if (!reg || typeof reg.listDelegationMappings !== 'function') return false;
+  try {
+    return reg.listDelegationMappings().some((row) => row && row.agentId === agentId);
+  } catch (_e) {
+    return false;
+  }
+}
+
+// The user watches a side-panel run live, so the tab it is working in is brought to
+// the front. Best-effort: a failure here never fails the tool call.
+// Foreground-audit note: this is the one foreground path outside the per-tool
+// _forceForeground opt-in. It is scoped to side-panel-originated agents only (the
+// user started this run and is watching it in the panel); ordinary MCP clients
+// never reach chrome.tabs.update({ active: true }) here.
+async function activateSidePanelAgentTab(agentId, tabId) {
+  const fromSidePanel = isSidePanelOriginatedAgent(agentId);
+  let outcome = 'skipped_not_side_panel';
+  if (fromSidePanel && Number.isFinite(tabId)) {
+    try {
+      const updated = await chrome.tabs.update(tabId, { active: true });
+      outcome = 'activated';
+      if (updated && Number.isFinite(updated.windowId)
+          && chrome.windows && typeof chrome.windows.update === 'function') {
+        try { await chrome.windows.update(updated.windowId, { focused: true }); }
+        catch (_e) { outcome = 'activated_window_focus_failed'; }
+      }
+    } catch (error) {
+      outcome = 'update_failed:' + ((error && error.message) || String(error));
+    }
+  } else if (fromSidePanel) {
+    outcome = 'skipped_bad_tab_id';
+  }
+  if (typeof automationLogger !== 'undefined') {
+    automationLogger.info('Side panel tab activation', {
+      phase: 'side-panel-activation',
+      agentId: typeof agentId === 'string' ? agentId.slice(0, 12) : null,
+      tabId: Number.isFinite(tabId) ? tabId : null,
+      fromSidePanel: fromSidePanel,
+      trackedInMemory: fsbDelegatedAgentIds.size,
+      outcome: outcome
+    });
+  }
+  return outcome === 'activated' || outcome === 'activated_window_focus_failed';
+}
+
+async function adoptDelegationSeedTab(delegationId, agentId) {
+  const seed = globalThis.FsbDelegationTabSeed;
+  const reg = globalThis.fsbAgentRegistryInstance;
+  if (!seed || typeof seed.adopt !== 'function' || !reg) return null;
+  try {
+    return await seed.adopt({
+      registry: reg,
+      tabsApi: (typeof chrome !== 'undefined' && chrome.tabs) ? chrome.tabs : null,
+      hasLiveSession: typeof globalThis.fsbTabHasLiveAutomationSession === 'function'
+        ? globalThis.fsbTabHasLiveAutomationSession
+        : null,
+      delegationId,
+      agentId
+    });
+  } catch (_e) {
+    return null;
+  }
+}
+
 async function rollbackDelegatedAgentRegistration(registry, agentId) {
   if (!registry || typeof registry.releaseAgent !== 'function' || typeof agentId !== 'string') {
     return false;
@@ -2361,6 +2532,7 @@ async function handleAgentRegisterRoute({ payload, client, bindRegisteredAgent, 
       : (typeof agentId === 'string' ? agentId.slice(0, 12) : ''));
   const hasDelegationSidecar = !!payload
     && Object.prototype.hasOwnProperty.call(payload, 'delegationId');
+  let seededOwnershipTokens = {};
   if (hasDelegationSidecar) {
     const delegationId = payload.delegationId;
     const gate = resolveDelegationRegistrationGate(bindRegisteredAgent || authorizeDelegation);
@@ -2382,6 +2554,14 @@ async function handleAgentRegisterRoute({ payload, client, bindRegisteredAgent, 
         rolledBack
       };
     }
+    fsbDelegatedAgentIds.add(agentId);
+    console.log('[FSB MCP Dispatcher] delegated agent tracked ' + String(agentId).slice(0, 12));
+    while (fsbDelegatedAgentIds.size > FSB_DELEGATED_AGENT_LIMIT) {
+      fsbDelegatedAgentIds.delete(fsbDelegatedAgentIds.values().next().value);
+    }
+    const seeded = await adoptDelegationSeedTab(delegationId, agentId);
+    console.log('[FSB MCP Dispatcher] seed adopt -> ' + (seeded ? ('tab ' + seeded.tabId) : 'refused'));
+    if (seeded) seededOwnershipTokens[String(seeded.tabId)] = seeded.ownershipToken;
   }
   // Phase 241 D-08: capture per-bridge connection_id from the caller's payload
   // and stamp it on the agent record so a later bridge onclose can stage all
@@ -2400,6 +2580,11 @@ async function handleAgentRegisterRoute({ payload, client, bindRegisteredAgent, 
       try { reg.stampClientInfo(agentId, clientInfo); } catch (_e) { /* best-effort */ }
     }
     runMcpAgentProviderWrite('recordConnected', agentId, clientInfo);
+    const registerLabel = canonicalLabelFromClientInfo(clientInfo);
+    if (registerLabel) {
+      _agentClientLabelCache.set(agentId, registerLabel);
+      _persistAgentClientLabel(agentId, registerLabel);
+    }
   }
   if (isPlainMcpEvidenceMap(payload && payload.platforms)) {
     runMcpAgentProviderWrite('replaceInstalled', payload.platforms);
@@ -2412,7 +2597,7 @@ async function handleAgentRegisterRoute({ payload, client, bindRegisteredAgent, 
   // accumulates them per-tab.
   // Phase 241 D-08: reflect connectionId on the response so AgentScope can
   // capture it (server-side) -- additive field; older callers ignore it.
-  return { success: true, agentId, agentIdShort, ownershipTokens: {}, connectionId: connectionId };
+  return { success: true, agentId, agentIdShort, ownershipTokens: seededOwnershipTokens, connectionId: connectionId };
 }
 
 async function handleAgentReleaseRoute({ payload } = {}) {
@@ -2450,9 +2635,29 @@ async function handleAgentStatusRoute({ payload } = {}) {
 
 async function handleStartAutomationRoute({ payload, client }) {
   const { agentId } = payload || {};
-  // Phase 240 will validate agent_id; Phase 238 deliberately ignores it.
-  void agentId;
-  const tab = await getActiveTabFromClient(client);
+  const validationError = validateRegisteredMcpAgent(agentId);
+  if (validationError) return validationError;
+
+  let tab = null;
+  let resolved = null;
+  if (isLegacyOrMissingMcpAgent(agentId)) {
+    tab = await getActiveTabFromClient(client);
+  } else {
+    resolved = await (typeof globalThis !== 'undefined'
+        && typeof globalThis.resolveAgentTabOrError === 'function'
+      ? globalThis.resolveAgentTabOrError(agentId, payload || {}, client)
+      : { success: false, code: 'AGENT_REGISTRY_UNAVAILABLE', agentId });
+    if (resolved.success === false) return resolved;
+    try {
+      getChromeTabsApi();
+      tab = await chrome.tabs.get(resolved.tabId);
+    } catch (_error) {
+      return createMcpRouteError('run_task', 'autopilot', MCP_ROUTE_RECOVERY_HINT, {
+        errorCode: 'tab_not_found',
+        error: 'The agent-owned tab is no longer available'
+      });
+    }
+  }
   if (!tab?.id) {
     return createMcpRouteError('run_task', 'autopilot', 'Use navigate, open_tab, switch_tab, or list_tabs to move to a normal webpage first.', {
       errorCode: 'no_active_tab',
@@ -2466,7 +2671,9 @@ async function handleStartAutomationRoute({ payload, client }) {
       action: 'startAutomation',
       task: payload.task,
       tabId: tab.id,
-      source: 'mcp'
+      source: 'mcp',
+      ...(agentId ? { agentId } : {}),
+      ...(payload && payload.ownershipToken ? { ownershipToken: payload.ownershipToken } : {})
     },
     { tab: { id: tab.id } }
   );
@@ -2474,17 +2681,22 @@ async function handleStartAutomationRoute({ payload, client }) {
 
 async function handleStopAutomationRoute({ payload, client }) {
   const { agentId } = payload || {};
-  // Phase 240 will validate agent_id; Phase 238 deliberately ignores it.
-  void agentId;
-  const tab = await getActiveTabFromClient(client).catch(() => null);
+  const validationError = validateRegisteredMcpAgent(agentId);
+  if (validationError) return validationError;
+  const sessions = getAgentScopedAutomationSessions(agentId);
 
   // Phase 225-01 (Task 2): MCP stop_task tool ships no sessionId in its
   // schema, so payload.sessionId is undefined and handleStopAutomation cannot
   // find anything in storage. Resolve to the in-flight session via the active
   // sessions map (same source get_task_status uses for currentSessionId).
   let sessionId = payload && payload.sessionId;
+  if (sessionId && !sessions.has(sessionId)) {
+    return createMcpOwnershipError('TAB_NOT_OWNED', {
+      requestingAgentId: agentId || null,
+      sessionId
+    });
+  }
   if (!sessionId) {
-    const sessions = getActiveSessionsMap();
     const ids = Array.from(sessions.keys());
     if (ids.length > 0) {
       sessionId = ids[0];
@@ -2496,6 +2708,11 @@ async function handleStopAutomationRoute({ payload, client }) {
       } catch (_e) { /* logging never blocks dispatch */ }
     }
   }
+
+  const session = sessions.get(sessionId) || null;
+  const tab = session && Number.isFinite(session.tabId)
+    ? { id: session.tabId }
+    : await getActiveTabFromClient(client).catch(() => null);
 
   if (!sessionId) {
     return {
@@ -2520,9 +2737,9 @@ async function handleStopAutomationRoute({ payload, client }) {
 
 async function handleGetStatusRoute({ payload } = {}) {
   const { agentId } = payload || {};
-  // Phase 240 will validate agent_id; Phase 238 deliberately ignores it.
-  void agentId;
-  const sessions = getActiveSessionsMap();
+  const validationError = validateRegisteredMcpAgent(agentId);
+  if (validationError) return validationError;
+  const sessions = getAgentScopedAutomationSessions(agentId);
   const sessionIds = Array.from(sessions.keys());
   const firstSession = sessionIds.length > 0 ? sessions.get(sessionIds[0]) : null;
   return {

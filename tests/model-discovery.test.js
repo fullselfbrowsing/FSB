@@ -172,6 +172,40 @@ async function testOpenRouter() {
   restoreFetch();
 }
 
+async function testLmStudio() {
+  console.log('\n--- LM Studio discovery ---');
+  clearDiscoveryCache();
+  let calls = 0;
+  setFetch(() => {
+    calls++;
+    return jsonResponse(200, {
+      object: 'list',
+      data: [
+        { id: 'qwen/qwen3.6-27b', object: 'model' },
+        { id: 'text-embedding-nomic-embed-text-v1.5', object: 'model' },
+        { id: 'qwen/qwen3.6-27b', object: 'model' },
+        { id: 'whisper-local', object: 'model' }
+      ]
+    });
+  });
+
+  const first = await discoverModels('lmstudio', '', {
+    baseUrl: 'localhost:1234/v1/chat/completions'
+  });
+  const second = await discoverModels('lmstudio', '', {
+    baseUrl: 'localhost:1234/v1/chat/completions'
+  });
+
+  assertEqual(first.ok, true, 'lmstudio discovers without an API key');
+  assertEqual(first.source, 'live', 'lmstudio source is live');
+  assertDeepEqual(first.models.map(model => model.id), ['qwen/qwen3.6-27b'], 'lmstudio deduplicates and filters non-chat models');
+  assertEqual(fetchCalls[0][0], 'http://localhost:1234/v1/models', 'lmstudio normalizes the models endpoint');
+  assert(!('Authorization' in (fetchCalls[0][1].headers || {})), 'lmstudio discovery sends no authorization header');
+  assertEqual(second.source, 'live', 'lmstudio does not return a persistent-cache result');
+  assertEqual(calls, 2, 'lmstudio re-fetches its live loaded-model list');
+  restoreFetch();
+}
+
 // --- 2. Failure modes --------------------------------------------------------
 
 async function testAuthFail() {
@@ -354,7 +388,7 @@ function testFallbackModelsShape() {
 
 function testProviderConfigRegistry() {
   console.log('\n--- PROVIDER_DISCOVERY_CONFIG registry ---');
-  for (const p of ['xai','openai','anthropic','gemini','openrouter']) {
+  for (const p of ['xai','openai','anthropic','gemini','openrouter','lmstudio']) {
     const cfg = PROVIDER_DISCOVERY_CONFIG[p];
     assert(cfg && typeof cfg.endpoint === 'function', 'config for ' + p + ' has endpoint(apiKey)');
     assert(typeof cfg.headers === 'function', 'config for ' + p + ' has headers(apiKey)');
@@ -371,6 +405,7 @@ function testProviderConfigRegistry() {
   await testAnthropic();
   await testGemini();
   await testOpenRouter();
+  await testLmStudio();
   await testAuthFail();
   await testNetworkFail500();
   await testNetworkThrown();

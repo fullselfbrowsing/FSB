@@ -80,7 +80,9 @@ if (!listenerBody) {
 }
 
 // Build a stub world. The listener body references several module-scope
-// helpers: refreshOwnerChip (chip refresh -- what we instrument),
+// helpers: the ownership refresh (what we instrument -- the listener routes it
+// through the unified syncActiveTabSurface(_activeTabIdSnapshot), which calls
+// refreshOwnerChip internally, so both names count as one refresh here),
 // showSidepanelProgressEnabled (write target for the local-area branch).
 // We provide stubs that record calls and return safe defaults.
 
@@ -93,7 +95,8 @@ let showSidepanelProgressEnabled = false;
 // over the explicit args we pass in.
 const listenerFn = new Function(
   'changes', 'area',
-  'refreshOwnerChip', 'getShowProgress', 'setShowProgress',
+  'refreshOwnerChip', 'syncActiveTabSurface', '_activeTabIdSnapshot',
+  'getShowProgress', 'setShowProgress',
   // The original body references `showSidepanelProgressEnabled` as a free
   // identifier. Provide a getter/setter pair and string-replace the
   // reference so the test sandbox can observe writes.
@@ -116,6 +119,8 @@ function invoke(changes, area) {
     changes,
     area,
     function () { refreshOwnerChipCalls++; },
+    function () { refreshOwnerChipCalls++; },
+    42,
     function () { return showSidepanelProgressEnabled; },
     function (v) { showSidepanelProgressEnabled = v; }
   );

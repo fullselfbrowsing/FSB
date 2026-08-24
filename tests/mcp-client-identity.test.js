@@ -166,8 +166,16 @@ async function main() {
   );
   assert.match(
     httpSource,
-    /isInitializeRequest\(parsedBody\)[\s\S]*?const runtime = createRuntime\(\{ bridge: options\.bridge, queue: options\.queue \}\);/,
-    'streamable-HTTP transport constructs each session through createRuntime',
+    /isInitializeRequest\(parsedBody\)[\s\S]*?const runtime = createRuntime\(\{\n\s*bridge: options\.bridge,\n\s*queue: options\.queue,\n\s*agentScope: sessionAgentScope,\n\s*\}\);/,
+    'streamable-HTTP transport constructs each session through createRuntime with a session-scoped AgentScope',
+  );
+  // The shared daemon serves every delegated CLI over HTTP, so the per-run
+  // delegation id cannot arrive through process.env. It rides on the private
+  // mcp-config header and is validated before it becomes the session's scope.
+  assert.match(
+    httpSource,
+    /const delegationIdHeader = req\.headers\[DELEGATION_ID_HEADER\];[\s\S]*?DELEGATION_ID_PATTERN\.test\(rawDelegationId\)[\s\S]*?new AgentScope\(\{ environment: \{ FSB_DELEGATION_ID: rawDelegationId \} \}\)[\s\S]*?: undefined;/,
+    'streamable-HTTP transport derives the session AgentScope from a validated x-fsb-delegation-id header',
   );
 
   const runtimeSource = fs.readFileSync(path.join(repoRoot, 'mcp', 'src', 'runtime.ts'), 'utf8');

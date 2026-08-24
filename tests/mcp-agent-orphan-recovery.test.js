@@ -215,6 +215,7 @@ async function runRuntimeFilesTests(runtimeModule) {
         fsb: {
           type: 'http',
           url: 'http://127.0.0.1:7226/mcp',
+          headers: { 'x-fsb-delegation-id': 'delegation_fixture_0001' },
         },
       },
     });

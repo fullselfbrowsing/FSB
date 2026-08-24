@@ -208,6 +208,9 @@ const geminiKey        = reg.make('geminiApiKey', 'input');
 const openaiKey        = reg.make('openaiApiKey', 'input');
 const anthropicKey     = reg.make('anthropicApiKey', 'input');
 const openrouterKey    = reg.make('openrouterApiKey', 'input');
+const lmstudioBaseUrl  = reg.make('lmstudioBaseUrl', 'input');
+const saveBtn          = reg.make('saveBtn', 'button');
+const fullApiTest      = reg.make('fullApiTest', 'button');
 const modelDescription = reg.make('modelDescription', 'div');
 
 statusChip.hidden = true;
@@ -245,8 +248,8 @@ let pendingResolvers = [];
 let nextResult = null;
 let clearCalls = [];
 
-global.discoverModels = function (provider, apiKey) {
-  discoverCalls.push({ provider, apiKey });
+global.discoverModels = function (provider, apiKey, opts) {
+  discoverCalls.push({ provider, apiKey, opts });
   if (nextResult === '__pending__') {
     return new Promise((resolve) => {
       pendingResolvers.push(resolve);
@@ -280,6 +283,8 @@ console.log('\n--- Plan 228-02 / Task 2: FSBDiscoveryUI runtime contract ---');
 assert(typeof ui === 'object' && ui !== null, '[Task 2] FSBDiscoveryUI exposed on globalThis after load');
 assert(typeof ui.runDiscovery === 'function', '[Task 2] FSBDiscoveryUI.runDiscovery is a function');
 assert(typeof ui.setDiscoveryStatus === 'function', '[Task 2] FSBDiscoveryUI.setDiscoveryStatus is a function');
+assert(typeof ui.setControlsDisabled === 'function', '[Task 2] FSBDiscoveryUI exposes provider control state');
+assert(typeof ui.handleSelectionChange === 'function', '[Task 2] FSBDiscoveryUI exposes local selection gating');
 assert(typeof ui.renderModelDropdown === 'function', '[Task 2] FSBDiscoveryUI.renderModelDropdown is a function');
 assert(typeof ui.applyModelSearch === 'function', '[Task 2] FSBDiscoveryUI.applyModelSearch is a function');
 assert(typeof ui.filterModelsForSearch === 'function', '[Task 2] FSBDiscoveryUI.filterModelsForSearch is a function');
@@ -298,6 +303,8 @@ function reset() {
   statusChip.className = '';
   statusChip.textContent = '';
   refreshBtn.disabled = false;
+  saveBtn.disabled = false;
+  fullApiTest.disabled = false;
   modelSearch.value = '';
 }
 
@@ -416,16 +423,73 @@ async function test_missing_key_loud() {
 }
 await test_missing_key_loud();
 
-// 8. lmstudio / custom no-op ------------------------------------------------
+// 8. LM Studio uses live discovery; custom remains out-of-scope --------------
 async function test_out_of_scope_providers() {
   reset();
-  await ui.runDiscovery('lmstudio');
-  assert(discoverCalls.length === 0, '[T2/oos] discoverModels NOT called for lmstudio');
+  lmstudioBaseUrl.value = 'localhost:1234/v1';
+  nextResult = {
+    ok: true,
+    source: 'live',
+    models: [{ id: 'qwen/qwen3.6-27b', displayName: 'qwen/qwen3.6-27b' }],
+    provider: 'lmstudio'
+  };
+  await ui.runDiscovery('lmstudio', { previousSelection: 'text-embedding-old' });
+  assert(discoverCalls.length === 1, '[T2/lmstudio] discoverModels called for lmstudio');
+  assert(discoverCalls[0].apiKey === '', '[T2/lmstudio] discovery does not synthesize an API key');
+  assert(discoverCalls[0].opts && discoverCalls[0].opts.baseUrl === 'localhost:1234/v1', '[T2/lmstudio] live base URL is passed through opts');
+  assert(modelSelect.value === 'qwen/qwen3.6-27b', '[T2/lmstudio] unavailable saved model is not retained as a synthetic option');
+  assert(statusChip.classList.contains('warning'), '[T2/lmstudio] unavailable saved model shows an actionable warning');
   reset();
   await ui.runDiscovery('custom');
   assert(discoverCalls.length === 0, '[T2/oos] discoverModels NOT called for custom');
 }
 await test_out_of_scope_providers();
+
+async function test_lmstudio_failure_blocks_actions() {
+  reset();
+  lmstudioBaseUrl.value = 'http://localhost:1234';
+  nextResult = { ok: false, reason: 'empty-response', message: 'none', provider: 'lmstudio' };
+  await ui.runDiscovery('lmstudio');
+  assert(modelSelect.value === '', '[T2/lmstudio-fail] no model remains selected');
+  assert(modelSelect.disabled === true, '[T2/lmstudio-fail] model selection is disabled');
+  assert(saveBtn.disabled === true, '[T2/lmstudio-fail] Save is disabled');
+  assert(fullApiTest.disabled === true, '[T2/lmstudio-fail] Test Connection is disabled');
+  assert(statusChip.classList.contains('error'), '[T2/lmstudio-fail] failure is rendered as an error');
+}
+await test_lmstudio_failure_blocks_actions();
+
+async function test_lmstudio_multiple_requires_choice() {
+  reset();
+  lmstudioBaseUrl.value = 'http://localhost:1234';
+  nextResult = {
+    ok: true,
+    source: 'live',
+    models: [
+      { id: 'qwen/qwen3.6-27b', displayName: 'qwen/qwen3.6-27b' },
+      { id: 'mistral/chat', displayName: 'mistral/chat' }
+    ],
+    provider: 'lmstudio'
+  };
+  await ui.runDiscovery('lmstudio');
+  assert(modelSelect.value === '', '[T2/lmstudio-choice] ambiguous local discovery does not silently choose the first model');
+  assert(modelSelect.disabled === false, '[T2/lmstudio-choice] model selector remains available for an explicit choice');
+  assert(saveBtn.disabled === true, '[T2/lmstudio-choice] Save stays disabled until a model is selected');
+  assert(fullApiTest.disabled === true, '[T2/lmstudio-choice] Test Connection stays disabled until a model is selected');
+  assert(statusChip.classList.contains('warning'), '[T2/lmstudio-choice] ambiguous discovery shows an actionable warning');
+  modelSelect.value = 'qwen/qwen3.6-27b';
+  ui.handleSelectionChange('lmstudio', modelSelect.value);
+  assert(saveBtn.disabled === false, '[T2/lmstudio-choice] explicit selection enables Save');
+  assert(fullApiTest.disabled === false, '[T2/lmstudio-choice] explicit selection enables Test Connection');
+}
+await test_lmstudio_multiple_requires_choice();
+
+async function test_provider_exit_reenables_actions() {
+  ui.setControlsDisabled(false);
+  assert(modelSelect.disabled === false, '[T2/lmstudio-exit] model selection is re-enabled after leaving failed local discovery');
+  assert(saveBtn.disabled === false, '[T2/lmstudio-exit] Save is re-enabled after leaving failed local discovery');
+  assert(fullApiTest.disabled === false, '[T2/lmstudio-exit] Test Connection is re-enabled after leaving failed local discovery');
+}
+await test_provider_exit_reenables_actions();
 
 // 9. Refresh button calls clearDiscoveryCache then discoverModels -----------
 async function test_refresh_force() {
@@ -456,6 +520,34 @@ async function test_loading_state() {
   assert(refreshBtn.disabled === false, '[T2/loading] refresh button re-enabled after resolve');
 }
 await test_loading_state();
+
+async function test_stale_lmstudio_response_is_ignored() {
+  reset();
+  lmstudioBaseUrl.value = 'http://localhost:1234';
+  nextResult = '__pending__';
+  const stalePromise = ui.runDiscovery('lmstudio');
+  const staleResolver = pendingResolvers[0];
+
+  setProviderKey('xai', 'sk-current');
+  nextResult = {
+    ok: true,
+    source: 'live',
+    models: [{ id: 'grok-current', displayName: 'Grok Current' }],
+    provider: 'xai'
+  };
+  await ui.runDiscovery('xai');
+  staleResolver({
+    ok: true,
+    source: 'live',
+    models: [{ id: 'qwen/stale', displayName: 'Qwen Stale' }],
+    provider: 'lmstudio'
+  });
+  await stalePromise;
+
+  assert(modelSelect.value === 'grok-current', '[T2/stale-local] late LM Studio result does not overwrite current provider');
+  assert(modelSelect.children.every(option => option.value !== 'qwen/stale'), '[T2/stale-local] stale local option is not rendered');
+}
+await test_stale_lmstudio_response_is_ignored();
 
 // 11. Selection preservation ------------------------------------------------
 async function test_selection_preserved() {

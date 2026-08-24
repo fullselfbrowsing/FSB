@@ -172,6 +172,32 @@ body {
   text-transform: uppercase;
 }
 
+.take-control-btn {
+  border: 0;
+  border-left: 1px solid var(--border-color);
+  margin: -2px -2px -2px 0;
+  padding: 2px 2px 2px 8px;
+  background: transparent;
+  color: var(--primary-color);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.take-control-btn:hover,
+.take-control-btn:focus-visible {
+  color: var(--primary-hover);
+  text-decoration: underline;
+  outline: none;
+}
+
+.take-control-btn:disabled {
+  cursor: wait;
+  opacity: 0.6;
+  text-decoration: none;
+}
+
 .header-actions {
   display: flex;
   gap: 8px;

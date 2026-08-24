@@ -22,10 +22,15 @@
  *                                   {tabId, ownershipToken:null, skipGate:true}.
  *   Test 5 (D-04 legacy + none)  -- legacy:* with no active tab; returns
  *                                   {success:false, code:'NO_ACTIVE_TAB', ...}.
- *   Test 6 (snake_case tab_id)   -- explicit params.tab_id wins regardless
- *                                   of registry contents; returns the tab_id.
- *   Test 7 (camelCase tabId)     -- explicit params.tabId wins likewise (back
- *                                   compat with already-camelCase callers).
+ *   Test 6 (snake_case tab_id)   -- an explicitly selected owned tab resolves.
+ *   Test 7 (camelCase tabId)     -- a foreign explicit tab is rejected before
+ *                                   any direct read/action path can use it.
+ *   Test 7b (navigate recovery)  -- a caller may explicitly opt into claiming
+ *                                   a truly unowned tab.
+ *   Test 7c (foreign recovery)   -- that opt-in never permits another agent's
+ *                                   tab.
+ *   Test 7d (missing authority)  -- recovery cannot infer "unowned" when the
+ *                                   registry has no owner lookup.
  *   Test 8 (registry missing)    -- no globalThis.fsbAgentRegistryInstance;
  *                                   {success:false, code:'AGENT_REGISTRY_UNAVAILABLE'}.
  *
@@ -83,6 +88,9 @@ function buildRegistryMock(opts) {
         if (owner === agentId) tabs.push(tabId);
       });
       return tabs;
+    },
+    getOwner(tabId) {
+      return tabOwners.get(tabId) || null;
     },
     getSelectedTabId(agentId) {
       return selectedTabIds.get(agentId) || null;
@@ -229,16 +237,16 @@ async function test5_legacyNoActive() {
 // Test 6 (explicit tab_id snake_case)
 // =========================================================================
 async function test6_explicitSnakeCase() {
-  console.log('--- Test 6: explicit params.tab_id wins over registry ---');
+  console.log('--- Test 6: explicit owned params.tab_id resolves ---');
   installRegistry(buildRegistryMock({
     knownAgents: ['agent_a'],
     tabOwners: [[42, 'agent_a']]
   }));
   try {
-    const resolved = await resolveAgentTabOrError('agent_a', { tab_id: 7 }, null);
-    check(resolved && resolved.tabId === 7, 'tabId === 7 (from params.tab_id, NOT registry)');
+    const resolved = await resolveAgentTabOrError('agent_a', { tab_id: 42 }, null);
+    check(resolved && resolved.tabId === 42, 'tabId === 42 (owned explicit params.tab_id)');
     check(resolved && resolved.ownershipToken === null, 'ownershipToken === null');
-    check(resolved && resolved.skipGate === false, 'skipGate === false (gate enforces ownership)');
+    check(resolved && resolved.skipGate === false, 'skipGate === false');
   } finally {
     uninstallRegistry();
   }
@@ -248,15 +256,81 @@ async function test6_explicitSnakeCase() {
 // Test 7 (explicit tabId camelCase)
 // =========================================================================
 async function test7_explicitCamelCase() {
-  console.log('--- Test 7: explicit params.tabId wins over registry ---');
+  console.log('--- Test 7: explicit foreign params.tabId rejects centrally ---');
+  installRegistry(buildRegistryMock({
+    knownAgents: ['agent_a', 'agent_b'],
+    tabOwners: [[42, 'agent_a'], [7, 'agent_b']]
+  }));
+  try {
+    const resolved = await resolveAgentTabOrError('agent_a', { tabId: 7 }, null);
+    check(resolved && resolved.success === false, 'success === false');
+    check(resolved && resolved.code === 'TAB_NOT_OWNED', 'code === TAB_NOT_OWNED');
+    check(resolved && resolved.ownerAgentId === 'agent_b', 'ownerAgentId === agent_b');
+  } finally {
+    uninstallRegistry();
+  }
+}
+
+async function test7b_explicitUnownedClaim() {
+  console.log('--- Test 7b: explicit unowned tab resolves only for recovery opt-in ---');
   installRegistry(buildRegistryMock({
     knownAgents: ['agent_a'],
     tabOwners: [[42, 'agent_a']]
   }));
   try {
-    const resolved = await resolveAgentTabOrError('agent_a', { tabId: 7 }, null);
-    check(resolved && resolved.tabId === 7, 'tabId === 7 (from params.tabId)');
-    check(resolved && resolved.skipGate === false, 'skipGate === false');
+    const denied = await resolveAgentTabOrError('agent_a', { tab_id: 7 }, null);
+    check(denied && denied.code === 'TAB_NOT_OWNED', 'unowned explicit tab rejects by default');
+    const resolved = await resolveAgentTabOrError(
+      'agent_a',
+      { tab_id: 7 },
+      null,
+      { allowUnownedClaim: true }
+    );
+    check(resolved && resolved.tabId === 7, 'unowned explicit tab resolves with recovery opt-in');
+    check(resolved && resolved.skipGate === false, 'recovery target still passes through ownership gate');
+  } finally {
+    uninstallRegistry();
+  }
+}
+
+async function test7c_explicitForeignClaimRejects() {
+  console.log('--- Test 7c: recovery opt-in never resolves a foreign tab ---');
+  installRegistry(buildRegistryMock({
+    knownAgents: ['agent_a', 'agent_b'],
+    tabOwners: [[42, 'agent_a'], [7, 'agent_b']]
+  }));
+  try {
+    const resolved = await resolveAgentTabOrError(
+      'agent_a',
+      { tab_id: 7 },
+      null,
+      { allowUnownedClaim: true }
+    );
+    check(resolved && resolved.success === false, 'success === false');
+    check(resolved && resolved.code === 'TAB_NOT_OWNED', 'code === TAB_NOT_OWNED');
+    check(resolved && resolved.ownerAgentId === 'agent_b', 'foreign owner remains visible in typed error');
+  } finally {
+    uninstallRegistry();
+  }
+}
+
+async function test7d_claimRequiresOwnerAuthority() {
+  console.log('--- Test 7d: recovery claim fails closed without owner authority ---');
+  const registry = buildRegistryMock({
+    knownAgents: ['agent_a'],
+    tabOwners: [[42, 'agent_a']]
+  });
+  delete registry.getOwner;
+  installRegistry(registry);
+  try {
+    const resolved = await resolveAgentTabOrError(
+      'agent_a',
+      { tab_id: 7 },
+      null,
+      { allowUnownedClaim: true }
+    );
+    check(resolved && resolved.success === false, 'success === false');
+    check(resolved && resolved.code === 'TAB_NOT_OWNED', 'claim rejects without getOwner authority');
   } finally {
     uninstallRegistry();
   }
@@ -284,6 +358,9 @@ async function run() {
   await test5_legacyNoActive();
   await test6_explicitSnakeCase();
   await test7_explicitCamelCase();
+  await test7b_explicitUnownedClaim();
+  await test7c_explicitForeignClaimRejects();
+  await test7d_claimRequiresOwnerAuthority();
   await test8_registryUnavailable();
 
   console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===');

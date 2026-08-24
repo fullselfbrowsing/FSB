@@ -105,6 +105,14 @@ export const CODEX_DISABLED_TOOL_FEATURES = Object.freeze([
   'workspace_dependencies',
 ] as const);
 
+const CODEX_FEATURE_SCHEMA_0_147_0 = Object.freeze([0, 147, 0] as const);
+const CODEX_INCOMPATIBLE_TOOL_FEATURES_0_147_0 = new Set<string>([
+  'imagegenext',
+  'sleep_tool',
+  'web_search_cached',
+  'web_search_request',
+]);
+
 export const CODEX_BASE_ARGV = Object.freeze([
   'exec',
   '-',
@@ -135,6 +143,7 @@ interface ValidatedCodexContext {
   readonly scratchDirectory: string;
   readonly directRuntime: DirectRuntimeReference | null;
   readonly authState: 'chatgpt' | 'api_key';
+  readonly detectedVersion: string;
 }
 
 function invalid(label: string): never {
@@ -281,6 +290,7 @@ function validateContext(contextValue: SpawnContext): ValidatedCodexContext {
     scratchDirectory: dirname(privateMcpConfigPath),
     directRuntime,
     authState,
+    detectedVersion: version,
   });
 }
 
@@ -308,7 +318,33 @@ function tomlString(value: string): string {
   return encoded;
 }
 
-export function buildCodexConfigOverrides(endpoint: string): readonly string[] {
+function compareVersionToTuple(
+  version: string,
+  target: readonly [number, number, number],
+): number {
+  const match = /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/.exec(version);
+  if (!match) invalid('detected version');
+  const parts = match.slice(1).map(Number);
+  for (let index = 0; index < target.length; index += 1) {
+    const difference = (parts[index] ?? 0) - target[index];
+    if (difference !== 0) return difference;
+  }
+  return 0;
+}
+
+function disabledToolFeatures(version: string): readonly string[] {
+  if (compareVersionToTuple(version, CODEX_FEATURE_SCHEMA_0_147_0) < 0) {
+    return CODEX_DISABLED_TOOL_FEATURES;
+  }
+  return Object.freeze(CODEX_DISABLED_TOOL_FEATURES.filter(
+    (feature) => !CODEX_INCOMPATIBLE_TOOL_FEATURES_0_147_0.has(feature),
+  ));
+}
+
+export function buildCodexConfigOverrides(
+  endpoint: string,
+  detectedVersion: string = CODEX_PROFILE_VERSION,
+): readonly string[] {
   let parsed: URL;
   try {
     parsed = new URL(endpoint);
@@ -335,7 +371,7 @@ export function buildCodexConfigOverrides(endpoint: string): readonly string[] {
     'web_search="disabled"',
     `developer_instructions=${tomlString(CODEX_FSB_DEVELOPER_INSTRUCTIONS)}`,
     'shell_environment_policy.inherit="none"',
-    ...CODEX_DISABLED_TOOL_FEATURES.map((feature) => `features.${feature}=false`),
+    ...disabledToolFeatures(detectedVersion).map((feature) => `features.${feature}=false`),
     'mcp_servers={}',
     `mcp_servers.fsb.url=${tomlString(normalizedEndpoint)}`,
     'mcp_servers.fsb.required=true',
@@ -346,7 +382,9 @@ export function buildCodexConfigOverrides(endpoint: string): readonly string[] {
   return Object.freeze(overrides.flatMap((value) => ['-c', value]));
 }
 
-export function buildCodexConnectionTestOverrides(): readonly string[] {
+export function buildCodexConnectionTestOverrides(
+  detectedVersion: string = CODEX_PROFILE_VERSION,
+): readonly string[] {
   const overrides = [
     'project_doc_max_bytes=0',
     'web_search="disabled"',
@@ -354,7 +392,7 @@ export function buildCodexConnectionTestOverrides(): readonly string[] {
       'This is a connection validation. Do not use any tool. Reply with a short plain-text acknowledgement.',
     )}`,
     'shell_environment_policy.inherit="none"',
-    ...CODEX_DISABLED_TOOL_FEATURES.map((feature) => `features.${feature}=false`),
+    ...disabledToolFeatures(detectedVersion).map((feature) => `features.${feature}=false`),
     'mcp_servers={}',
   ];
   return Object.freeze(overrides.flatMap((value) => ['-c', value]));
@@ -468,7 +506,7 @@ export function buildCodexSpawnSpec(task: AgentTask, context: SpawnContext): Spa
   validateTask(task);
   const validated = validateContext(context);
   if (validated.purpose === 'connection_test') {
-    const configArguments = buildCodexConnectionTestOverrides();
+    const configArguments = buildCodexConnectionTestOverrides(validated.detectedVersion);
     return freezeSpawnSpec({
       adapterId: CODEX_ADAPTER_ID,
       profileVersion: CODEX_PROFILE_VERSION,
@@ -494,7 +532,10 @@ export function buildCodexSpawnSpec(task: AgentTask, context: SpawnContext): Spa
     });
   }
   if (!validated.directRuntime) invalid('direct runtime');
-  const configArguments = buildCodexConfigOverrides(validated.directRuntime.endpoint);
+  const configArguments = buildCodexConfigOverrides(
+    validated.directRuntime.endpoint,
+    validated.detectedVersion,
+  );
   return freezeSpawnSpec({
     adapterId: CODEX_ADAPTER_ID,
     profileVersion: CODEX_PROFILE_VERSION,

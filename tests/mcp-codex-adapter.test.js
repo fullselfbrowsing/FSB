@@ -975,6 +975,30 @@ function codexContext(reference, authState = 'chatgpt', version = '0.142.5') {
   };
 }
 
+function codexConnectionContext(version = '0.142.5') {
+  const privateMcpConfigPath = '/fixture/runtime/codex-connection/mcp.json';
+  return {
+    purpose: 'connection_test',
+    adapterId: 'codex',
+    detection: {
+      installed: true,
+      version,
+      authState: 'chatgpt',
+      binary: {
+        command: '/fixture/bin/codex',
+        realPath: '/fixture/bin/codex',
+        argvPrefix: [],
+      },
+      profileVersion: '0.142.5',
+    },
+    delegationId: 'connection_codex_0001',
+    runtimeFingerprint: 'runtime_fingerprint_codex_connection_0001',
+    cwd: '/fixture/runtime/codex-connection',
+    privateMcpConfigPath,
+    runtimeFiles: [privateMcpConfigPath],
+  };
+}
+
 function codexFsbEffectiveServer(endpoint, overrides = {}) {
   return {
     url: endpoint,
@@ -1152,6 +1176,59 @@ async function runCodexIsolationTests(
   for (const feature of codexProfileModule.CODEX_DISABLED_TOOL_FEATURES) {
     assert.equal(configValues.filter((value) => value === `features.${feature}=false`).length, 1);
   }
+
+  const newerSpec = codexProfileModule.buildCodexSpawnSpec(
+    { text: 'Newer compatible Codex task.' },
+    codexContext(reference, 'chatgpt', '0.147.0'),
+  );
+  const newerConfigValues = newerSpec.topology.task.argv
+    .map((value, index, values) => (value === '-c' ? values[index + 1] : null))
+    .filter(Boolean);
+  for (const removed of [
+    'imagegenext',
+    'sleep_tool',
+    'web_search_cached',
+    'web_search_request',
+  ]) {
+    assert.equal(newerConfigValues.includes(`features.${removed}=false`), false);
+  }
+  for (const retained of ['image_generation', 'shell_tool', 'standalone_web_search']) {
+    assert.equal(newerConfigValues.includes(`features.${retained}=false`), true);
+  }
+  assert.deepEqual(
+    newerSpec.effectiveAuthorityAttestation.argv.filter((value) => (
+      value === 'features.imagegenext=false'
+      || value === 'features.sleep_tool=false'
+      || value === 'features.web_search_cached=false'
+      || value === 'features.web_search_request=false'
+    )),
+    [],
+  );
+
+  const newerConnectionSpec = codexProfileModule.buildCodexSpawnSpec(
+    { text: 'Newer compatible Codex connection test.' },
+    codexConnectionContext('0.147.0'),
+  );
+  assert.equal(newerConnectionSpec.topology.kind, 'direct');
+  assert.deepEqual(newerConnectionSpec.attestations, []);
+  assert.deepEqual(newerConnectionSpec.topology.task.fixedEnv, {
+    FSB_AGENT_PURPOSE: 'connection_test',
+  });
+  for (const removed of [
+    'imagegenext',
+    'sleep_tool',
+    'web_search_cached',
+    'web_search_request',
+  ]) {
+    assert.equal(
+      newerConnectionSpec.topology.task.argv.includes(`features.${removed}=false`),
+      false,
+    );
+  }
+  assert.equal(
+    newerConnectionSpec.topology.task.argv.includes('features.image_generation=false'),
+    true,
+  );
 
   assert.equal(spec.preSpawnIdentityProbe.expectedAuthState, 'chatgpt');
   assert.deepEqual(spec.preSpawnIdentityProbe.argv, ['login', 'status']);
@@ -1581,6 +1658,31 @@ async function runCodexParserTests(codexStreamModule) {
     'synthetic capability',
     'synthetic tool output',
   ]) assert.equal(serializedEvents.includes(privateFragment), false);
+
+  const newerUsageStream = [
+    { type: 'thread.started', thread_id: 'codex-newer-usage' },
+    { type: 'turn.started' },
+    {
+      type: 'item.completed',
+      item: { id: 'codex-newer-message', type: 'agent_message', text: 'Connection validated.' },
+    },
+    {
+      type: 'turn.completed',
+      usage: {
+        input_tokens: 7,
+        cached_input_tokens: 2,
+        cache_write_input_tokens: 3,
+        output_tokens: 3,
+        reasoning_output_tokens: 1,
+      },
+    },
+  ].map(JSON.stringify).join('\n') + '\n';
+  const newerUsageEvents = await collectEvents(
+    codexStreamModule.parseCodexStream,
+    Buffer.from(newerUsageStream),
+  );
+  assert.deepEqual(newerUsageEvents.map((event) => event.type), ['init', 'assistant', 'result']);
+  assert.deepEqual(newerUsageEvents.at(-1).payload.tokens.cache, { read: 2, write: 3 });
 
   assert.equal(corpus.schemaVersion, 1);
   assert.equal(corpus.profileVersion, '0.142.5');

@@ -941,6 +941,7 @@ async function runCodexAcceptedIdentity() {
     const store = freshStore();
     assert.strictEqual(store.normalizeTerminalCode('completed'), 'completed');
     assert.strictEqual(store.normalizeTerminalCode('daemon_restart_lost_run'), 'daemon_restart_lost_run');
+    assert.strictEqual(store.normalizeTerminalCode('provider_error'), 'provider_error');
     assert.strictEqual(store.normalizeTerminalCode('provider_private_terminal_code'), 'unknown_failure');
     const entry = project(store, fixtures.terminalEvent, {
       sequence: 11,
@@ -992,10 +993,10 @@ async function runCodexAcceptedIdentity() {
       sessionId: boundary.id,
       profileVersion: boundary.id,
       model: null,
-      allowedTools: Array.from({ length: 16 }, (_, index) => (
-        `${String(index).padStart(2, '0')}${'t'.repeat(94)}`
+      allowedTools: Array.from({ length: 128 }, (_, index) => (
+        `t${String(index).padStart(3, '0')}`
       )),
-    }).init.allowedTools.length, 16);
+    }).init.allowedTools.length, 128);
     await expectCode(
       () => project(store, fixtures.initEvent, { delegationId: boundary.idPlusOne }),
       'delegation_quota_exceeded',
@@ -1006,7 +1007,7 @@ async function runCodexAcceptedIdentity() {
     );
     await expectCode(
       () => project(store, fixtures.initEvent, {
-        allowedTools: Array.from({ length: 17 }, (_, index) => `tool-${index}`),
+        allowedTools: Array.from({ length: 129 }, (_, index) => `tool-${index}`),
       }),
       'delegation_quota_exceeded',
     );

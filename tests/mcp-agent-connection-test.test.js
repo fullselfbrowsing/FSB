@@ -200,6 +200,7 @@ async function testSuccessfulProviderProbes(connection) {
     const requireCalls = [];
     const probe = ownedProbeResult(successfulOutput(providerId));
     let descriptor;
+    let writtenMcpConfig;
     let cleanupCalls = 0;
     const result = await connection.testAgentProviderConnection({
       providerId,
@@ -208,6 +209,14 @@ async function testSuccessfulProviderProbes(connection) {
         environment: {
           PATH: '/usr/bin:/bin',
           OPENCODE_CONFIG_CONTENT: 'INHERITED_PROJECT_INSTRUCTIONS_CANARY',
+        },
+        writePrivateFile: async (pathname, contents) => {
+          writtenMcpConfig = { pathname, contents };
+          await fs.writeFile(pathname, contents, {
+            encoding: 'utf8',
+            mode: 0o600,
+            flag: 'wx',
+          });
         },
         runProbe: async (value) => {
           descriptor = value;
@@ -227,6 +236,10 @@ async function testSuccessfulProviderProbes(connection) {
     assert.equal(descriptor.stdoutLimitBytes, 1024 * 1024);
     assert.equal(descriptor.stderrLimitBytes, 1024 * 1024);
     assert.equal(path.dirname(descriptor.cwd), os.tmpdir());
+    assert.deepEqual(writtenMcpConfig, {
+      pathname: path.join(descriptor.cwd, 'empty-mcp.json'),
+      contents: '{"mcpServers":{}}\n',
+    });
     assert.equal(
       Buffer.from(descriptor.stdinBytes).toString('utf8'),
       'This is a connection validation. Do not use tools. Reply with a short acknowledgement.\n',

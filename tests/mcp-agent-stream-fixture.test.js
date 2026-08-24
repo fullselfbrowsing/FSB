@@ -248,13 +248,187 @@ async function run() {
     assert.deepStrictEqual(Object.keys(event).sort(), ['payload', 'sessionId', 'type']);
   }
 
+  // Provider quota telemetry is validated for session continuity but does not
+  // enter the user-visible normalized event feed.
+  const withRateLimit = cloneFixtureLines();
+  withRateLimit.splice(1, 0, {
+    type: 'rate_limit_event',
+    session_id: sessionId,
+    rate_limit_info: {
+      status: 'allowed',
+      rateLimitType: 'synthetic',
+    },
+  });
+  assert.deepStrictEqual(
+    await collect(parseClaudeEvents, [encode(withRateLimit)]),
+    events,
+  );
+
+  const malformedRateLimit = cloneFixtureLines();
+  malformedRateLimit.splice(1, 0, {
+    type: 'rate_limit_event',
+    session_id: sessionId,
+  });
+  await expectDrift(parseClaudeEvents, [encode(malformedRateLimit)], 'invalid_shape', 2);
+
+  const mismatchedRateLimit = cloneFixtureLines();
+  mismatchedRateLimit.splice(1, 0, {
+    type: 'rate_limit_event',
+    session_id: 'synthetic-other-session',
+    rate_limit_info: { status: 'allowed' },
+  });
+  await expectDrift(parseClaudeEvents, [encode(mismatchedRateLimit)], 'session_mismatch', 2);
+
+  const withStatus = cloneFixtureLines();
+  withStatus.splice(1, 0, {
+    type: 'system',
+    subtype: 'status',
+    session_id: sessionId,
+    status: 'requesting',
+  });
+  assert.deepStrictEqual(
+    await collect(parseClaudeEvents, [encode(withStatus)]),
+    events,
+  );
+
+  const malformedStatus = cloneFixtureLines();
+  malformedStatus.splice(1, 0, {
+    type: 'system',
+    subtype: 'status',
+    session_id: sessionId,
+    status: '',
+  });
+  await expectDrift(parseClaudeEvents, [encode(malformedStatus)], 'invalid_shape', 2);
+
+  const mismatchedStatus = cloneFixtureLines();
+  mismatchedStatus.splice(1, 0, {
+    type: 'system',
+    subtype: 'status',
+    session_id: 'synthetic-other-session',
+    status: 'requesting',
+  });
+  await expectDrift(parseClaudeEvents, [encode(mismatchedStatus)], 'session_mismatch', 2);
+
+  const withThinkingTokens = cloneFixtureLines();
+  withThinkingTokens.splice(1, 0, {
+    type: 'system',
+    subtype: 'thinking_tokens',
+    session_id: sessionId,
+    estimated_tokens: 128,
+    estimated_tokens_delta: 16,
+  });
+  assert.deepStrictEqual(
+    await collect(parseClaudeEvents, [encode(withThinkingTokens)]),
+    events,
+  );
+
+  const malformedThinkingTokens = cloneFixtureLines();
+  malformedThinkingTokens.splice(1, 0, {
+    type: 'system',
+    subtype: 'thinking_tokens',
+    session_id: sessionId,
+    estimated_tokens: -1,
+    estimated_tokens_delta: 16,
+  });
+  await expectDrift(parseClaudeEvents, [encode(malformedThinkingTokens)], 'invalid_shape', 2);
+
+  const mismatchedThinkingTokens = cloneFixtureLines();
+  mismatchedThinkingTokens.splice(1, 0, {
+    type: 'system',
+    subtype: 'thinking_tokens',
+    session_id: 'synthetic-other-session',
+    estimated_tokens: 128,
+    estimated_tokens_delta: 16,
+  });
+  await expectDrift(parseClaudeEvents, [encode(mismatchedThinkingTokens)], 'session_mismatch', 2);
+
+  const withSessionStateChanged = cloneFixtureLines();
+  withSessionStateChanged.splice(1, 0, {
+    type: 'system',
+    subtype: 'session_state_changed',
+    session_id: sessionId,
+    state: 'running',
+  });
+  assert.deepStrictEqual(
+    await collect(parseClaudeEvents, [encode(withSessionStateChanged)]),
+    events,
+  );
+
+  // The CLI emits its first session_state_changed ahead of init.
+  const preInitSessionStateChanged = cloneFixtureLines();
+  preInitSessionStateChanged.splice(0, 0, {
+    type: 'system',
+    subtype: 'session_state_changed',
+    session_id: sessionId,
+    state: 'running',
+  });
+  assert.deepStrictEqual(
+    await collect(parseClaudeEvents, [encode(preInitSessionStateChanged)]),
+    events,
+  );
+
+  // The CLI closes a run with a session_state_changed that trails the result.
+  const postResultSessionStateChanged = cloneFixtureLines();
+  postResultSessionStateChanged.push({
+    type: 'system',
+    subtype: 'session_state_changed',
+    session_id: sessionId,
+    state: 'idle',
+  });
+  assert.deepStrictEqual(
+    await collect(parseClaudeEvents, [encode(postResultSessionStateChanged)]),
+    events,
+  );
+
+  const postResultOtherEvent = cloneFixtureLines();
+  postResultOtherEvent.push({
+    type: 'system',
+    subtype: 'status',
+    session_id: sessionId,
+    status: 'requesting',
+  });
+  await expectDrift(
+    parseClaudeEvents,
+    [encode(postResultOtherEvent)],
+    'event_after_result',
+    postResultOtherEvent.length,
+  );
+
+  const malformedSessionStateChanged = cloneFixtureLines();
+  malformedSessionStateChanged.splice(1, 0, {
+    type: 'system',
+    subtype: 'session_state_changed',
+    session_id: sessionId,
+    state: '',
+  });
+  await expectDrift(
+    parseClaudeEvents,
+    [encode(malformedSessionStateChanged)],
+    'invalid_shape',
+    2,
+  );
+
+  const mismatchedSessionStateChanged = cloneFixtureLines();
+  mismatchedSessionStateChanged.splice(1, 0, {
+    type: 'system',
+    subtype: 'session_state_changed',
+    session_id: 'synthetic-other-session',
+    state: 'idle',
+  });
+  await expectDrift(
+    parseClaudeEvents,
+    [encode(mismatchedSessionStateChanged)],
+    'session_mismatch',
+    2,
+  );
+
   // EV-05/06: unknown and customization events have exact fail-loud labels.
   const unknownTop = cloneFixtureLines();
   unknownTop[1] = { type: 'TOP_SECRET_SENTINEL' };
   await expectDrift(parseClaudeEvents, [encode(unknownTop)], 'unknown_event_type', 2);
 
   const unknownSystem = cloneFixtureLines();
-  unknownSystem[1] = { type: 'system', subtype: 'status', detail: 'TOP_SECRET_SENTINEL' };
+  unknownSystem[1] = { type: 'system', subtype: 'future_status', detail: 'TOP_SECRET_SENTINEL' };
   await expectDrift(parseClaudeEvents, [encode(unknownSystem)], 'unknown_system_subtype', 2);
 
   const preInitHook = cloneFixtureLines();

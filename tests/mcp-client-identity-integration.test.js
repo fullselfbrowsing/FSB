@@ -307,8 +307,8 @@ async function main() {
     const httpSource = fs.readFileSync(path.join(repoRoot, 'mcp', 'src', 'http.ts'), 'utf8');
     assert.match(indexSource, /async function runStdioServer[\s\S]*?const runtime = createRuntime\(\);/,
       'stdio uses the common identity-aware runtime');
-    assert.match(httpSource, /isInitializeRequest\(parsedBody\)[\s\S]*?const runtime = createRuntime\(\{ bridge: options\.bridge, queue: options\.queue \}\);/,
-      'HTTP initialize uses the common identity-aware runtime');
+    assert.match(httpSource, /isInitializeRequest\(parsedBody\)[\s\S]*?const runtime = createRuntime\(\{\n\s*bridge: options\.bridge,\n\s*queue: options\.queue,\n\s*agentScope: sessionAgentScope,\n\s*\}\);/,
+      'HTTP initialize uses the common identity-aware runtime with a session-scoped AgentScope');
 
     const legacyScope = new AgentScope();
     const legacyBridge = new CaptureBridge();

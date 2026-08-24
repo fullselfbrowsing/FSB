@@ -405,16 +405,17 @@ function runPart3() {
 function runPart4() {
   console.log('\nPart 4 -- chrome.tabs.onActivated re-sync + completion routing:');
 
-  // 4.1 -- the chrome.tabs.onActivated handler at line ~786 (sidepanel.js)
-  // re-syncs _activeTabIdSnapshot AFTER swapToTabConversation.
-  var snippet = spSrc.indexOf('_activeTabIdSnapshot = activeInfo.tabId');
-  ok(snippet > -1,
-     'Part 4.1 -- chrome.tabs.onActivated handler assigns _activeTabIdSnapshot = activeInfo.tabId');
+  // 4.1 -- activation passes Chrome's exact tab/window identity into the
+  // unified synchronizer, which commits the incoming tab snapshot.
+  var exactActivation = /chrome\.tabs\.onActivated\.addListener[\s\S]*?syncActiveTabSurface\(activeInfo\.tabId, activeInfo\.windowId\)/.test(spSrc);
+  var syncCommitsTab = /async function syncActiveTabSurface[\s\S]*?_activeTabIdSnapshot\s*=\s*incomingTabId/.test(spSrc);
+  ok(exactActivation && syncCommitsTab,
+     'Part 4.1 -- activation sends exact tab identity to the unified synchronizer');
 
   // 4.2 -- the same handler dispatches setRunningState OR setIdleState
   // based on the activated tab's per-tab entry.
-  var dispatchesSetRunning = /if \(snap\.isRunning\) {\s*setRunningState\(activeInfo\.tabId/.test(spSrc);
-  var dispatchesSetIdle = /} else \{\s*setIdleState\(activeInfo\.tabId\)/.test(spSrc);
+  var dispatchesSetRunning = /if \(snap\.isRunning\) setRunningState\(incomingTabId/.test(spSrc);
+  var dispatchesSetIdle = /else setIdleState\(incomingTabId\)/.test(spSrc);
   ok(dispatchesSetRunning && dispatchesSetIdle,
      'Part 4.2 -- handler dispatches setRunningState/setIdleState based on per-tab entry on activation');
 

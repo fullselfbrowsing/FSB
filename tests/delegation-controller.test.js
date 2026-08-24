@@ -870,10 +870,12 @@ async function runCodexAcceptedIdentity() {
       assert.deepStrictEqual(controller.getSnapshot(openCodeId).terminal, {
         code: 'agent_failed',
         releasedTabCount: 0,
+        answer: null
       });
       assert.deepStrictEqual(controller.getSnapshot(claudeId).terminal, {
         code: 'completed',
         releasedTabCount: 0,
+        answer: null
       });
       assert.strictEqual(
         JSON.stringify(storage.data).includes(fixtures.rawNativeCanary),
@@ -1058,6 +1060,7 @@ async function runCodexAcceptedIdentity() {
       assert.deepStrictEqual(delivered[0].view.terminal, {
         code: 'delegation_persistence_failed',
         releasedTabCount: 0,
+        answer: null
       });
 
       modules = freshModules();
@@ -1097,6 +1100,7 @@ async function runCodexAcceptedIdentity() {
               ok: false,
               code: 'delegation_release_persistence_failed',
               releasedTabCount: 0,
+              answer: null
             };
           }
           return { ok: true, code: 'delegation_released', releasedTabCount: 2 };
@@ -1143,6 +1147,7 @@ async function runCodexAcceptedIdentity() {
       assert.deepStrictEqual(retried.snapshot.terminal, {
         code: 'delegation_persistence_failed',
         releasedTabCount: 2,
+        answer: null
       });
       assert.strictEqual(releaseAttempts, 2);
       assert.strictEqual(cancelAttempts, 1);
@@ -1242,6 +1247,7 @@ async function runCodexAcceptedIdentity() {
       assert.deepStrictEqual(retried.snapshot.terminal, {
         code: 'completed',
         releasedTabCount: 1,
+        answer: null
       });
       assert.strictEqual(ackObservations.length, 1);
       assert.strictEqual(ackObservations[0].terminal, true);
@@ -1298,6 +1304,7 @@ async function runCodexAcceptedIdentity() {
       assert.deepStrictEqual(controller.getSnapshot(id).terminal, {
         code: 'completed',
         releasedTabCount: 0,
+        answer: null
       });
       const terminalEnvelope = storedEnvelope(storage, store, id);
       assert.strictEqual(terminalEnvelope.terminal, true);
@@ -1577,10 +1584,11 @@ async function runCodexAcceptedIdentity() {
         const snapshot = controller.getSnapshot(id);
         assert.strictEqual(entry.state, terminalState(item.code));
         assert.strictEqual(snapshot.state, terminalState(item.code));
-        exactKeys(snapshot.terminal, ['code', 'releasedTabCount']);
+        exactKeys(snapshot.terminal, ['answer', 'code', 'releasedTabCount']);
         assert.deepStrictEqual(snapshot.terminal, {
           code: item.code,
           releasedTabCount: 0,
+          answer: null
         });
         const envelope = storedEnvelope(storage, store, id);
         assert.strictEqual(envelope.terminal, true);
@@ -1619,7 +1627,7 @@ async function runCodexAcceptedIdentity() {
       assert.deepStrictEqual(harness.calls.cancel, [{ delegationId: id, code: 'stopped' }]);
       const snapshot = controller.getSnapshot(id);
       assert.strictEqual(snapshot.state, 'stopped');
-      assert.deepStrictEqual(snapshot.terminal, { code: 'stopped', releasedTabCount: 0 });
+      assert.deepStrictEqual(snapshot.terminal, { code: 'stopped', releasedTabCount: 0, answer: null });
       const envelope = storedEnvelope(storage, store, id);
       assert.strictEqual(envelope.terminal, true);
       assert.strictEqual(envelope.terminalCode, 'stopped');
@@ -1662,6 +1670,7 @@ async function runCodexAcceptedIdentity() {
       assert.deepStrictEqual(finalSnapshot.terminal, {
         code: 'completed',
         releasedTabCount: 0,
+        answer: null
       });
       exactKeys(finalSnapshot.summary, [
         'inputTokens', 'outputTokens', 'totalTokens', 'turns', 'durationMs',
@@ -1695,6 +1704,7 @@ async function runCodexAcceptedIdentity() {
       assert.deepStrictEqual(controller.getSnapshot(stopFirstId).terminal, {
         code: 'stopped',
         releasedTabCount: 0,
+        answer: null
       });
       assert.strictEqual(
         harness.calls.cancel.filter((call) => call.delegationId === stopFirstId).length,
@@ -1815,6 +1825,7 @@ async function runCodexAcceptedIdentity() {
       assert.deepStrictEqual(controller.getSnapshot(finalId).terminal, {
         code: 'completed',
         releasedTabCount: 0,
+        answer: null
       });
       assert.strictEqual(
         harness.calls.cancel.filter((call) => call.delegationId === finalId).length,
@@ -1828,6 +1839,7 @@ async function runCodexAcceptedIdentity() {
       assert.deepStrictEqual(controller.getSnapshot(silenceId).terminal, {
         code: 'event_silence_timeout',
         releasedTabCount: 0,
+        answer: null
       });
       assert.strictEqual(
         harness.calls.cancel.filter((call) => call.delegationId === silenceId).length,
@@ -1847,6 +1859,7 @@ async function runCodexAcceptedIdentity() {
       assert.deepStrictEqual(controller.getSnapshot(wallId).terminal, {
         code: 'wall_clock_timeout',
         releasedTabCount: 0,
+        answer: null
       });
       assert.strictEqual(
         harness.calls.cancel.filter((call) => call.delegationId === wallId).length,
@@ -1912,6 +1925,7 @@ async function runCodexAcceptedIdentity() {
       assert.deepStrictEqual(controller.getSnapshot(wallId).terminal, {
         code: 'wall_clock_timeout',
         releasedTabCount: 0,
+        answer: null
       });
 
       const silenceId = 'delegation_absolute_silence_deadline';
@@ -1943,6 +1957,7 @@ async function runCodexAcceptedIdentity() {
       assert.deepStrictEqual(controller.getSnapshot(silenceId).terminal, {
         code: 'event_silence_timeout',
         releasedTabCount: 0,
+        answer: null
       });
       assert.strictEqual(
         harness.calls.cancel.filter((call) => call.delegationId === silenceId).length,
@@ -1986,6 +2001,7 @@ async function runCodexAcceptedIdentity() {
       assert.deepStrictEqual(secondAfterTimeout.terminal, {
         code: 'event_silence_timeout',
         releasedTabCount: 0,
+        answer: null
       });
       assert.deepStrictEqual(secondAfterTimeout.entries.map((entry) => entry.sequence), [1, 2, 3]);
       assert.strictEqual(secondAfterTimeout.entries[2].state, 'failed');
@@ -1995,6 +2011,7 @@ async function runCodexAcceptedIdentity() {
       assert.deepStrictEqual(controller.getSnapshot(firstId).terminal, {
         code: 'stopped',
         releasedTabCount: 0,
+        answer: null
       });
       assert.deepStrictEqual(
         harness.calls.cancel.map((call) => call.delegationId).sort(),
@@ -2115,6 +2132,7 @@ async function runCodexAcceptedIdentity() {
       assert.deepStrictEqual(stopped.snapshot.terminal, {
         code: 'stopped',
         releasedTabCount: 2,
+        answer: null
       });
       assert.strictEqual(order.filter((item) => item === 'release-all-tabs').length, 1);
       assert.strictEqual(harness.calls.cancel.length, 1);
@@ -2472,6 +2490,7 @@ async function runCodexAcceptedIdentity() {
       assert.deepStrictEqual(retried.snapshot.terminal, {
         code: 'stopped',
         releasedTabCount: 1,
+        answer: null
       });
       assert.strictEqual(cancelCalls, 2);
       assert.strictEqual(releaseCalls, 1);
@@ -2605,6 +2624,7 @@ async function runCodexAcceptedIdentity() {
         assert.deepStrictEqual(retried.snapshot.terminal, {
           code: expectedCode,
           releasedTabCount: 2,
+          answer: null
         });
         assert.strictEqual(releaseAttempts, 2);
         assert.strictEqual(cancelAttempts, item.finalPath ? 0 : 1,
@@ -2682,6 +2702,7 @@ async function runCodexAcceptedIdentity() {
       assert.deepStrictEqual(controller.getSnapshot(overlapId).terminal, {
         code: 'stopped',
         releasedTabCount: 1,
+        answer: null
       });
 
       const expiryId = 'delegation_hold_expiry';
@@ -2694,6 +2715,7 @@ async function runCodexAcceptedIdentity() {
       assert.deepStrictEqual(controller.getSnapshot(expiryId).terminal, {
         code: 'hold_expired',
         releasedTabCount: 1,
+        answer: null
       });
 
       const lostId = 'delegation_resume_lost';
@@ -2704,6 +2726,7 @@ async function runCodexAcceptedIdentity() {
       assert.deepStrictEqual(controller.getSnapshot(lostId).terminal, {
         code: 'resume_ownership_lost',
         releasedTabCount: 1,
+        answer: null
       });
 
       for (const id of [overlapId, expiryId, lostId]) {
@@ -2863,6 +2886,7 @@ async function runCodexAcceptedIdentity() {
       assert.deepStrictEqual(lost.snapshot.terminal, {
         code: 'daemon_restart_lost_run',
         releasedTabCount: 0,
+        answer: null
       });
       assert.strictEqual(harness.heartbeatOwners.has(ids.lost), false);
 
@@ -2957,6 +2981,7 @@ async function runCodexAcceptedIdentity() {
       assert.deepStrictEqual(settled.snapshot.terminal, {
         code: 'route_lost',
         releasedTabCount: 0,
+        answer: null
       });
       assert.strictEqual(settled.snapshot.state, 'failed');
       assert.deepStrictEqual(harness.calls.cancel, [],
@@ -3167,6 +3192,7 @@ async function runCodexAcceptedIdentity() {
       assert.deepStrictEqual(mismatch.snapshot.terminal, {
         code: 'resume_ownership_lost',
         releasedTabCount: 2,
+        answer: null
       });
       assert.deepStrictEqual(harness.calls.cancel, [{
         delegationId: mismatchId,
@@ -3357,6 +3383,54 @@ async function runCodexAcceptedIdentity() {
     } finally {
       storage.restore();
     }
+  });
+
+  await test('delegated answer is bounded, sanitized, and success-only', async () => {
+    const vm = require('vm');
+    const fsModule = require('fs');
+    const controllerSource = fsModule.readFileSync(CONTROLLER_PATH, 'utf8');
+    const vmContext = {
+      MAX_TERMINAL_ANSWER_CHARS: 4000,
+      _hasOwn: (target, key) => Object.prototype.hasOwnProperty.call(target, key)
+    };
+    vm.createContext(vmContext);
+    const extract = (name) => {
+      const start = controllerSource.indexOf('function ' + name + '(');
+      assert(start >= 0, name + ' is present in the controller');
+      let depth = 0;
+      let end = controllerSource.indexOf('{', start);
+      for (let i = end; i < controllerSource.length; i += 1) {
+        if (controllerSource[i] === '{') depth += 1;
+        else if (controllerSource[i] === '}') {
+          depth -= 1;
+          if (depth === 0) { end = i; break; }
+        }
+      }
+      return controllerSource.slice(start, end + 1);
+    };
+    vm.runInContext(extract('_terminalAnswerText'), vmContext);
+    vm.runInContext(extract('_contextWithoutAnswer'), vmContext);
+
+    assert.strictEqual(vmContext._terminalAnswerText(42), null, 'non-strings are refused');
+    assert.strictEqual(vmContext._terminalAnswerText('   '), null, 'blank answers are refused');
+    assert.strictEqual(vmContext._terminalAnswerText('a\u202Eevil\u200Bb'), 'aevilb',
+      'bidi-override and zero-width characters are stripped');
+    assert.strictEqual(
+      vmContext._terminalAnswerText('ok\n\u0060\u0060\u0060mermaid\ngraph TD;A-->B;\n\u0060\u0060\u0060\ndone'),
+      'ok\n\ndone',
+      'fences the markdown pipeline would execute are removed');
+    assert.strictEqual(Array.from(vmContext._terminalAnswerText('\u{1F600}'.repeat(4100))).length, 4000,
+      'truncation counts code points, not UTF-16 units, and fits the validator bound with its ellipsis');
+    assert.ok(vmContext._terminalAnswerText('\u{1F600}'.repeat(4100)).endsWith('\u2026'),
+      'truncated answers end with one ellipsis');
+    assert.deepStrictEqual(
+      Object.assign({}, vmContext._contextWithoutAnswer({ timestamp: 1, answer: 'x' })),
+      { timestamp: 1 },
+      'a non-terminal append never carries the answer into the closed context keys');
+
+    const eventStoreSource = fsModule.readFileSync(STORE_PATH, 'utf8');
+    assert(!/answer/.test(eventStoreSource),
+      'the delegated answer is never persisted into the ledger');
   });
 
   console.log('\n--- delegation controller summary ---');

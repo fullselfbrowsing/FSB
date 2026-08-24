@@ -229,17 +229,18 @@ ok((sidepanelHtmlSrc.match(/delegation-feed\.js/g) || []).length === 1
 ok((popupHtmlSrc.match(/class="status-text"/g) || []).length === 1
     && (sidepanelHtmlSrc.match(/class="status-text"/g) || []).length === 1,
   'Test 9g: each surface retains exactly one header status text element');
-ok(/changes\.fsbAgentRegistry[\s\S]{0,220}refreshOwnerChip\(\)[\s\S]{0,180}_refreshSelectedDelegationSnapshot\(\)/.test(sidepanelJsSrc),
-  'Test 9h: one registry-change branch refreshes both the owner chip and canonical delegation snapshot');
-ok(/chrome\.tabs\.onActivated\.addListener[\s\S]*?refreshOwnerChip\(\)[\s\S]*?_activeTabIdSnapshot\s*=\s*activeInfo\.tabId[\s\S]*?_hydrateDelegationForSelectedConversation\(\)/.test(sidepanelJsSrc),
-  'Test 9i: tab activation preserves owner-chip refresh and then re-resolves delegated active-tab eligibility');
+ok(/changes\.fsbAgentRegistry[\s\S]{0,220}syncActiveTabSurface\(_activeTabIdSnapshot\)[\s\S]{0,180}_refreshSelectedDelegationSnapshot\(\)/.test(sidepanelJsSrc),
+  'Test 9h: one registry-change branch synchronizes the tab surface and canonical delegation snapshot');
+ok(/chrome\.tabs\.onActivated\.addListener[\s\S]*?syncActiveTabSurface\(activeInfo\.tabId, activeInfo\.windowId\)/.test(sidepanelJsSrc)
+    && /async function syncActiveTabSurface[\s\S]*?_activeTabIdSnapshot\s*=\s*incomingTabId[\s\S]*?_hydrateDelegationForSelectedConversation\(\)/.test(sidepanelJsSrc),
+  'Test 9i: tab activation uses the exact event tab and the unified sync refreshes delegation eligibility');
 
 ok(/\.status-dot\.owned\s*\{[^}]*color:\s*#f59e0b[^}]*animation:\s*none/s.test(popupCssSrc),
   'Test 10a: popup ownership dot is orange and non-pulsing');
 ok(/\.status-dot\.owned\s*\{[^}]*color:\s*#f59e0b[^}]*animation:\s*none/s.test(sidepanelCssSrc),
   'Test 10b: sidepanel ownership dot is orange and non-pulsing');
 ok(/_setHeaderOwner\(label\)/.test(popupJsSrc)
-    && /_setHeaderOwner\(label\)/.test(sidepanelJsSrc),
+    && /_setHeaderOwner\(label,\s*\{/.test(sidepanelJsSrc),
   'Test 10c: both ownership refresh paths replace the header status');
 
 function extractNamedFunction(source, name) {

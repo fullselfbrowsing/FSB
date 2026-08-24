@@ -22,6 +22,7 @@
   var WALL_CLOCK_TIMEOUT_MS = 45 * 60 * 1000;
   var EVENT_SILENCE_TIMEOUT_MS = 120 * 1000;
   var HOLD_LEASE_MS = 5 * 60 * 1000;
+  var MAX_TERMINAL_ANSWER_CHARS = 4000;
   var STATUS_ACTIVE_LIMIT = 64;
   var STATUS_RESTART_LOSS_LIMIT = 128;
   var STATUS_ROUTE_LOSS_LIMIT = 128;
@@ -83,6 +84,7 @@
     resume_ownership_lost: true,
     daemon_restart_lost_run: true,
     agent_protocol_drift: true,
+    provider_error: true,
     tree_unsettled: true,
     agent_failed: true,
     unknown_failure: true
@@ -239,6 +241,40 @@
     if (state === 'stopped') return 'stopped';
     if (state === 'restart_lost') return 'restart_lost';
     return 'failed';
+  }
+
+  // The delegated answer is third-party prose rendered through the markdown
+  // pipeline, so it is normalized here rather than at the caller: control, C1,
+  // bidi-override and zero-width characters are stripped, and the mermaid/chart
+  // fences that pipeline would execute are removed.
+  function _terminalAnswerText(value) {
+    if (typeof value !== 'string') return null;
+    var text = value.replace(/\r\n?/g, '\n');
+    text = text.replace(
+      /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/g,
+      ''
+    );
+    text = text.replace(/```(?:mermaid|chart)[\s\S]*?(?:```|$)/gi, '');
+    text = text.replace(/\n{3,}/g, '\n\n').trim();
+    if (!text) return null;
+    var points = Array.from(text);
+    if (points.length > MAX_TERMINAL_ANSWER_CHARS) {
+      // The ellipsis counts toward the bound: validators reject answers longer
+      // than MAX_TERMINAL_ANSWER_CHARS code points.
+      return points.slice(0, MAX_TERMINAL_ANSWER_CHARS - 1).join('') + '\u2026';
+    }
+    return text;
+  }
+
+  // The event store's context keys are closed, so a delegated answer must never
+  // reach a non-terminal append.
+  function _contextWithoutAnswer(context) {
+    if (!context || typeof context !== 'object' || !_hasOwn(context, 'answer')) return context;
+    var copy = {};
+    Object.keys(context).forEach(function(key) {
+      if (key !== 'answer') copy[key] = context[key];
+    });
+    return copy;
   }
 
   function _normalizeTerminalCode(value, eventStore) {
@@ -953,7 +989,8 @@
       if (record.summary) record.summary.state = _summaryState(record.state);
       record.terminal = {
         code: code,
-        releasedTabCount: release.releasedTabCount || 0
+        releasedTabCount: release.releasedTabCount || 0,
+        answer: code === 'completed' ? _terminalAnswerText(options.answer) : null
       };
       if (record.agentId
         && registry
@@ -1313,7 +1350,11 @@
           var terminalResult = await _settle(
             record,
             context.terminalCode || 'unknown_failure',
-            { cancel: context.treeSettled !== true, timestamp: context.timestamp }
+            {
+              cancel: context.treeSettled !== true,
+              timestamp: context.timestamp,
+              answer: context.answer
+            }
           );
           if (terminalResult.ok !== true) {
             throw _error(terminalResult.code, 'delegation cleanup remains incomplete');
@@ -1322,7 +1363,11 @@
         }
         var canonicalEntry;
         try {
-          canonicalEntry = await eventStore.appendBeforeFanout(delegationId, input.event, context);
+          canonicalEntry = await eventStore.appendBeforeFanout(
+            delegationId,
+            input.event,
+            _contextWithoutAnswer(context)
+          );
         } catch (error) {
           return _failPersistence(record, error);
         }

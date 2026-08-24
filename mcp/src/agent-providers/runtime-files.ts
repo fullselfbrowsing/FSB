@@ -129,6 +129,7 @@ const ACTIVATE_INPUT_KEYS = Object.freeze([
 ].sort());
 const REMOVE_INPUT_KEYS = Object.freeze(['delegationId', 'role']);
 const MCP_ARTIFACT_KEYS = Object.freeze(['endpoint', 'kind']);
+export const DELEGATION_ID_HEADER = 'x-fsb-delegation-id';
 const OPENCODE_CONFIG_ARTIFACT_KEYS = Object.freeze(['contents', 'kind']);
 const DIRECTORY_ARTIFACT_KEYS = Object.freeze(['kind']);
 
@@ -1030,7 +1031,7 @@ export class AgentRuntimeFiles {
       }
       this.ensureRoot();
       this.ensureRunDirectory(entry.delegationId);
-      this.writePrivateArtifacts(paths, privateArtifacts);
+      this.writePrivateArtifacts(paths, privateArtifacts, entry.delegationId);
       this.writeJournal([...journal.entries, entry]);
       return Object.freeze({ entry, ...paths });
     });
@@ -1279,6 +1280,7 @@ export class AgentRuntimeFiles {
   private writePrivateArtifacts(
     paths: RuntimeRunPaths,
     artifacts: readonly RuntimePrivateArtifact[],
+    delegationId: string,
   ): void {
     for (const artifact of artifacts) {
       if (artifact.kind === 'mcp_config') {
@@ -1287,6 +1289,7 @@ export class AgentRuntimeFiles {
             fsb: {
               type: 'http',
               url: artifact.endpoint,
+              headers: { [DELEGATION_ID_HEADER]: delegationId },
             },
           },
         };

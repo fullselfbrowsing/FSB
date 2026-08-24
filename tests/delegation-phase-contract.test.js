@@ -130,6 +130,11 @@ const PHASE65_NEW_ROOT_COMMANDS = Object.freeze([
 
 const REFINEMENT_ROOT_TEST_COMMANDS = Object.freeze([
   'node tests/mcp-agent-connection-test.test.js',
+  'node tests/lmstudio-agent-request.test.js',
+  'node tests/lmstudio-startup-preflight.test.js',
+  'node tests/lmstudio-settings-persistence.test.js',
+  'node tests/onboarding-lmstudio.test.js',
+  'node tests/delegation-sidepanel-tab-follow.test.js',
   'node tests/mcp-session-recorder.test.js',
   'node tests/automation-logger-mcp-retention.test.js',
   'node tests/mcp-session-settings-ui.test.js',
@@ -2478,7 +2483,7 @@ for (const constant of [
   'MAX_ID_CHARS = 128',
   'MAX_TOOL_NAME_CHARS = 128',
   'MAX_ALLOWED_TOOL_CHARS = 96',
-  'MAX_ALLOWED_TOOLS = 16',
+  'MAX_ALLOWED_TOOLS = 128',
   'MAX_TOOL_COUNT_ROWS = 128',
 ]) {
   check(auditedEventStoreSource.includes(constant), `delegation ledger retains exact bound ${constant}`);
@@ -2499,7 +2504,7 @@ const terminalCodes = [
   'event_silence_timeout', 'delegation_persistence_failed', 'delegation_quota_exceeded',
   'delegation_ledger_corrupt', 'route_lost', 'agent_offline', 'agent_unpaired',
   'unsupported_provider', 'hold_expired', 'resume_ownership_lost',
-  'daemon_restart_lost_run', 'agent_protocol_drift', 'tree_unsettled', 'agent_failed',
+  'daemon_restart_lost_run', 'agent_protocol_drift', 'provider_error', 'tree_unsettled', 'agent_failed',
   'unknown_failure',
 ];
 equal(extractFrozenTrueKeys(auditedEventStoreSource, 'VALID_TERMINAL_CODES'), terminalCodes,

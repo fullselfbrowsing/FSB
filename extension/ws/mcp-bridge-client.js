@@ -1289,7 +1289,7 @@ class MCPBridgeClient {
         return this._handleStopAutomation(payload);
 
       case 'mcp:get-status':
-        return this._handleGetStatus();
+        return this._handleGetStatus(payload);
 
       case 'mcp:get-config':
         return this._handleGetConfig();
@@ -1803,7 +1803,9 @@ class MCPBridgeClient {
     }
 
     const resolved = await (typeof globalThis !== 'undefined' && typeof globalThis.resolveAgentTabOrError === 'function'
-      ? globalThis.resolveAgentTabOrError(agentId, params, this)
+      ? globalThis.resolveAgentTabOrError(agentId, params, this, {
+          allowUnownedClaim: toolName === 'navigate'
+        })
       : { success: false, code: 'AGENT_REGISTRY_UNAVAILABLE', agentId });
     if (resolved.success === false) {
       if (toolName === 'navigate' && resolved.code === 'NO_OWNED_TAB') {
@@ -1856,7 +1858,7 @@ class MCPBridgeClient {
     // The wrapper short-circuits to executeFn() when either gate is off, so
     // adding this wrap is zero-overhead for read tools / opt-out tools / when
     // fsbChangeReportsEnabled is false.
-    const executeFn = async () => {
+    const rawExecuteFn = async () => {
       if (toolDef && toolDef._route === 'background') {
         return this._handleExecuteBackground(tab, payload, toolDef, routeParams);
       }
@@ -1879,6 +1881,24 @@ class MCPBridgeClient {
         params,
         source: 'mcp-manual',
       });
+    };
+    const executeFn = async () => {
+      const provenance = (typeof globalThis !== 'undefined')
+        ? globalThis.FsbAgentTabSpawnProvenance
+        : null;
+      const actionCanSpawnChild = !!(toolDef && (
+        toolDef._route === 'content'
+        || toolDef._route === 'cdp'
+        || toolName === 'execute_js'
+      ));
+      if (!agentId
+          || !actionCanSpawnChild
+          || (toolDef && toolDef._readOnly === true)
+          || !provenance
+          || typeof provenance.run !== 'function') {
+        return rawExecuteFn();
+      }
+      return provenance.run({ agentId, openerTabId: tabId }, rawExecuteFn);
     };
 
     // Inspect the resolver-approved target as close as possible to execution.
@@ -2661,10 +2681,10 @@ class MCPBridgeClient {
     } catch (_e) { /* best-effort reconciliation */ }
   }
 
-  async _handleGetStatus() {
+  async _handleGetStatus(payload = {}) {
     const response = await dispatchMcpMessageRoute({
       type: 'mcp:get-status',
-      payload: {},
+      payload,
       client: this
     });
     return response || {};

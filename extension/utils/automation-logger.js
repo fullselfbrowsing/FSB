@@ -231,6 +231,12 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
     }
   }
 
+  // Persisted tail of the in-memory log ring. Large enough that a short delegated run
+  // (register, open_tab, navigate, read, result: ~40-80 lines) survives a service-worker
+  // restart or an extension reload and is still readable through get_logs.
+  // var: this file guards against re-injection but must tolerate re-evaluation.
+  var AUTOMATION_LOGS_PERSISTED_TAIL = 400;
+
   class AutomationLogger {
     constructor() {
       this.logs = [];
@@ -783,7 +789,7 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
       // Guard against invalidated extension context (service worker killed mid-timer)
       if (!chrome.runtime?.id) return;
       try {
-        const recentLogs = this.logs.slice(-100);
+        const recentLogs = this.logs.slice(-AUTOMATION_LOGS_PERSISTED_TAIL);
         await chrome.storage.local.set({ automationLogs: recentLogs });
       } catch (error) {
         // Only log if context is still valid (avoid noisy errors during shutdown)
@@ -798,7 +804,14 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
       if (!chrome.runtime?.id) return;
       try {
         const stored = await chrome.storage.local.get('automationLogs');
-        if (stored.automationLogs) this.logs = stored.automationLogs;
+        const persisted = Array.isArray(stored.automationLogs) ? stored.automationLogs : [];
+        if (persisted.length === 0) return;
+        // Merge, never replace: a fresh service worker has already logged its own
+        // boot entries, and the previous worker's tail is what explains the run
+        // that happened just before a restart or reload.
+        const seen = new Set(this.logs.map((entry) => (entry && entry.timestamp) + '|' + (entry && entry.message)));
+        const older = persisted.filter((entry) => entry && !seen.has(entry.timestamp + '|' + entry.message));
+        this.logs = older.concat(this.logs).slice(-this.maxLogs);
       } catch (error) {
         // Only log if context is still valid (avoid noisy errors during shutdown)
         if (chrome.runtime?.id) {

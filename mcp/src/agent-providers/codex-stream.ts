@@ -44,10 +44,12 @@ const SafeTokenSchema = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEG
 const UsageSchema = z.object({
   input_tokens: SafeTokenSchema,
   cached_input_tokens: SafeTokenSchema,
+  cache_write_input_tokens: SafeTokenSchema.optional(),
   output_tokens: SafeTokenSchema,
   reasoning_output_tokens: SafeTokenSchema,
 }).strict().refine(
   (usage) => usage.cached_input_tokens <= usage.input_tokens
+    && (usage.cache_write_input_tokens ?? 0) <= usage.input_tokens
     && usage.reasoning_output_tokens <= usage.output_tokens,
   { path: ['input_tokens'] },
 );
@@ -369,7 +371,7 @@ class CodexEventNormalizer {
         reasoning: usage.reasoning_output_tokens,
         cache: {
           read: usage.cached_input_tokens,
-          write: 0,
+          write: usage.cache_write_input_tokens ?? 0,
         },
       },
     });

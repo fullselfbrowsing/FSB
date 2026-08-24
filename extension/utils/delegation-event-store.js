@@ -27,7 +27,7 @@
   var MAX_ID_CHARS = 128;
   var MAX_TOOL_NAME_CHARS = 128;
   var MAX_ALLOWED_TOOL_CHARS = 96;
-  var MAX_ALLOWED_TOOLS = 16;
+  var MAX_ALLOWED_TOOLS = 128;
   var MAX_TOOL_COUNT_ROWS = 128;
   var MAX_SAFE_INTEGER = Number.MAX_SAFE_INTEGER || 9007199254740991;
   var delegationProviders = global.FsbDelegationProviders;
@@ -154,6 +154,7 @@
     resume_ownership_lost: true,
     daemon_restart_lost_run: true,
     agent_protocol_drift: true,
+    provider_error: true,
     tree_unsettled: true,
     agent_failed: true,
     unknown_failure: true

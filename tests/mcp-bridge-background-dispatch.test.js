@@ -1354,6 +1354,26 @@ async function runDriftSettlementCases() {
       'non-drift final never invokes the drift reporter');
     assertEqual(harness.settlementCalls.at(-1).context.terminalCode, 'agent_failed',
       'non-drift final retains its existing controller code');
+
+    harness.activate('delegation_provider_error');
+    await harness.settle('delegation_provider_error', {
+      status: 'failed',
+      terminal: {
+        type: 'result',
+        sessionId: 'provider-session',
+        payload: {
+          type: 'result',
+          subtype: 'error_during_execution',
+          is_error: true,
+          result: 'provider secret must never persist'
+        }
+      }
+    }, null);
+    const providerErrorSettlement = harness.settlementCalls.at(-1);
+    assertEqual(providerErrorSettlement.context.terminalCode, 'provider_error',
+      'normalized provider is_error result receives the closed provider_error code');
+    assert(!JSON.stringify(providerErrorSettlement).includes('provider secret'),
+      'provider error settlement never forwards raw provider output');
   }
 
   {
@@ -3344,7 +3364,7 @@ function runSourceContractCase() {
     backgroundSource.indexOf('async function handleStartAutomation(request, sender, sendResponse) {'),
     backgroundSource.indexOf('async function handleStopAutomation', backgroundSource.indexOf('async function handleStartAutomation(request, sender, sendResponse) {'))
   );
-  const authorityBranch = legacyStart.indexOf('const authoritativeProvider = await fsbReadAuthoritativeProviderConfig()');
+  const authorityBranch = legacyStart.indexOf('authoritativeProvider = await fsbReadAuthoritativeProviderConfig()');
   assert(authorityBranch >= 0, 'legacy start reloads background-authoritative provider config');
   for (const mutation of [
     'chrome.sidePanel.setOptions', 'conversationSessions.has', 'chrome.tabs.get',

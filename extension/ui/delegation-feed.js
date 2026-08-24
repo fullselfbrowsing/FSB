@@ -84,6 +84,7 @@
     resume_ownership_lost: true,
     daemon_restart_lost_run: true,
     agent_protocol_drift: true,
+    provider_error: true,
     tree_unsettled: true,
     agent_failed: true,
     unknown_failure: true
@@ -170,6 +171,12 @@
     return value === null || _canonicalIdentity(value) !== null;
   }
 
+  // Must match MAX_ALLOWED_TOOLS in extension/utils/delegation-event-store.js.
+  // The ledger is the producer: a Claude run's own system/init carries the full
+  // FSB tool catalog, and an init entry the ledger accepted but this validator
+  // rejects poisons every snapshot and runtime update for the entire run.
+  var MAX_ALLOWED_TOOLS = 128;
+
   function _validInit(value) {
     if (!_hasExactKeys(value, ['allowedTools', 'client', 'model', 'profileVersion', 'sessionId'])
         || !_validClient(value.client)
@@ -177,7 +184,7 @@
         || !_isNullableString(value.profileVersion, 128)
         || !_isNullableString(value.sessionId, 128)
         || !Array.isArray(value.allowedTools)
-        || value.allowedTools.length > 16) return false;
+        || value.allowedTools.length > MAX_ALLOWED_TOOLS) return false;
     var seen = Object.create(null);
     for (var index = 0; index < value.allowedTools.length; index++) {
       var tool = value.allowedTools[index];
@@ -320,11 +327,18 @@
     return true;
   }
 
+  var MAX_TERMINAL_ANSWER_CHARS = 4000;
+  var ANSWER_FORBIDDEN_PATTERN =
+    /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/;
+
   function _validTerminal(value) {
-    return value === null || (_hasExactKeys(value, ['code', 'releasedTabCount'])
+    return value === null || (_hasExactKeys(value, ['answer', 'code', 'releasedTabCount'])
       && VALID_TERMINAL_CODES[value.code] === true
       && Number.isSafeInteger(value.releasedTabCount)
-      && value.releasedTabCount >= 0);
+      && value.releasedTabCount >= 0
+      && _isNullableString(value.answer, MAX_TERMINAL_ANSWER_CHARS)
+      && (value.answer === null || value.code === 'completed')
+      && (value.answer === null || !ANSWER_FORBIDDEN_PATTERN.test(value.answer)));
   }
 
   function validateSnapshot(snapshot) {

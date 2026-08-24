@@ -429,11 +429,17 @@ function runApiProviderSelectionPath(provider, previousSelection, silentIfNoKey)
   if (ui && ui.IN_SCOPE_PROVIDERS && ui.IN_SCOPE_PROVIDERS[provider]) {
     const discoveryOptions = { previousSelection: previousSelection };
     if (silentIfNoKey) discoveryOptions.silentIfNoKey = true;
-    ui.runDiscovery(provider, discoveryOptions);
+    const discoveryPromise = ui.runDiscovery(provider, discoveryOptions);
+    updateApiKeyVisibility(provider);
+    return discoveryPromise;
   } else {
     updateModelOptions(provider);
+    updateApiKeyVisibility(provider);
+    if (ui && typeof ui.setControlsDisabled === 'function') {
+      ui.setControlsDisabled(false);
+    }
+    return Promise.resolve({ ok: true, provider: provider, source: 'static' });
   }
-  updateApiKeyVisibility(provider);
 }
 
 function invalidateProviderDiscovery(restoreUi) {
@@ -469,21 +475,31 @@ function setProviderSelection(kind, id, { markDirty = true } = {}) {
   }
 
   if (kind === 'api') {
-    const previousSelection = elements.modelName?.value;
+    const previousSelection = previousKind === 'api' && previousId === id
+      ? elements.modelName?.value
+      : '';
     providerPanelState.providerKind = 'api';
     providerPanelState.modelProvider = id;
     if (elements.modelProvider) elements.modelProvider.value = id;
-    runApiProviderSelectionPath(id, previousSelection, !markDirty);
+    const discoveryPromise = runApiProviderSelectionPath(id, previousSelection, !markDirty);
+    renderProviderKind();
+    if (typeof syncFsbSelectLabels === 'function') syncFsbSelectLabels();
+    if (markDirty) markUnsavedChanges();
+    return discoveryPromise;
   } else {
     providerPanelState.providerKind = 'agent';
     providerPanelState.agentProviderId = id;
     if (elements.modelProvider) elements.modelProvider.value = id;
+    const ui = (typeof globalThis !== 'undefined') ? globalThis.FSBDiscoveryUI : null;
+    if (ui && typeof ui.setControlsDisabled === 'function') {
+      ui.setControlsDisabled(false);
+    }
   }
 
   renderProviderKind();
   if (typeof syncFsbSelectLabels === 'function') syncFsbSelectLabels();
   if (markDirty) markUnsavedChanges();
-  return true;
+  return Promise.resolve({ ok: true, provider: id, source: 'agent' });
 }
 
 function setupEventListeners() {
@@ -798,10 +814,9 @@ function setupEventListeners() {
     });
   }
 
-  // Phase 228 / Plan 02: API-key inputs trigger debounced discovery for the
-  // selected provider. We attach to all 5 in-scope key inputs once at wiring
-  // time; the handler is a no-op if the user is currently on a different
-  // provider (we still re-discover when they switch back via provider-change).
+  // API-key inputs and the LM Studio base URL trigger debounced discovery for
+  // the selected provider. The handler is a no-op while another provider is
+  // active; switching back runs discovery immediately.
   (function wireDiscoveryKeyInputs() {
     const ui = (typeof globalThis !== 'undefined') ? globalThis.FSBDiscoveryUI : null;
     if (!ui) return;
@@ -842,6 +857,10 @@ function setupEventListeners() {
   // Model name change
   if (elements.modelName) {
     elements.modelName.addEventListener('change', (e) => {
+      const ui = (typeof globalThis !== 'undefined') ? globalThis.FSBDiscoveryUI : null;
+      if (ui && typeof ui.handleSelectionChange === 'function') {
+        ui.handleSelectionChange(providerPanelState.modelProvider, e.target.value);
+      }
       markUnsavedChanges();
     });
   }
@@ -876,18 +895,12 @@ function setupEventListeners() {
     toggleOpenrouterApiKey.addEventListener('click', () => togglePasswordVisibility('openrouterApiKey'));
   }
 
-  // Re-fetch LM Studio models when base URL changes
+  // Discovery for this input is wired through FSBDiscoveryUI above. Keep the
+  // settings dirty-state behavior separate from that cancellable async path.
   const lmstudioBaseUrl = document.getElementById('lmstudioBaseUrl');
   if (lmstudioBaseUrl) {
-    let debounceTimer;
     lmstudioBaseUrl.addEventListener('input', () => {
       markUnsavedChanges();
-      clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(() => {
-        if (elements.modelProvider?.value === 'lmstudio') {
-          updateModelOptions('lmstudio');
-        }
-      }, 800);
     });
   }
 
@@ -1393,67 +1406,19 @@ function initializeSections() {
 function updateModelOptions(provider) {
   const modelSelect = elements.modelName;
   if (!modelSelect) return;
+  const previousSelection = modelSelect.value;
   
   // Clear existing options
   modelSelect.innerHTML = '';
   
-  // LM Studio: fetch models dynamically from local server
+  // LM Studio discovery is owned by FSBDiscoveryUI so selection preservation,
+  // cancellation, filtering, and loading state stay identical across every
+  // entry point.
   if (provider === 'lmstudio') {
-    const loadingOption = document.createElement('option');
-    loadingOption.value = '';
-    loadingOption.textContent = 'Discovering models...';
-    modelSelect.appendChild(loadingOption);
-    updateModelDescription('Connecting to LM Studio server...');
-
-    const baseUrlInput = document.getElementById('lmstudioBaseUrl');
-    const rawUrl = baseUrlInput?.value || 'http://localhost:1234';
-    // Normalize: strip /v1 suffixes, ensure http://
-    let baseUrl = rawUrl.trim();
-    baseUrl = baseUrl.replace(/\/v1\/chat\/completions\/?$/, '');
-    baseUrl = baseUrl.replace(/\/v1\/?$/, '');
-    baseUrl = baseUrl.replace(/\/+$/, '');
-    if (!/^https?:\/\//i.test(baseUrl)) baseUrl = 'http://' + baseUrl;
-    const modelsEndpoint = baseUrl + '/v1/models';
-
-    fetch(modelsEndpoint)
-      .then(res => res.json())
-      .then(data => {
-        modelSelect.innerHTML = '';
-        const seen = new Set();
-        const ids = [];
-        if (data && Array.isArray(data.data)) {
-          for (const entry of data.data) {
-            if (entry && entry.id && !seen.has(entry.id)) {
-              seen.add(entry.id);
-              ids.push(entry.id);
-            }
-          }
-        }
-        if (ids.length === 0) {
-          const noModel = document.createElement('option');
-          noModel.value = '';
-          noModel.textContent = 'No models loaded in LM Studio';
-          modelSelect.appendChild(noModel);
-          updateModelDescription('Start a model in LM Studio, then re-select the provider to refresh.');
-          return;
-        }
-        ids.forEach(id => {
-          const option = document.createElement('option');
-          option.value = id;
-          option.textContent = id;
-          modelSelect.appendChild(option);
-        });
-        updateModelDescription('Discovered ' + ids.length + ' model(s) from LM Studio');
-      })
-      .catch(() => {
-        modelSelect.innerHTML = '';
-        const errOption = document.createElement('option');
-        errOption.value = '';
-        errOption.textContent = 'Could not connect to LM Studio';
-        modelSelect.appendChild(errOption);
-        updateModelDescription('Ensure LM Studio is running with the local server enabled.');
-      });
-    return;
+    const ui = (typeof globalThis !== 'undefined') ? globalThis.FSBDiscoveryUI : null;
+    return ui && typeof ui.runDiscovery === 'function'
+      ? ui.runDiscovery('lmstudio', { previousSelection: previousSelection })
+      : Promise.resolve({ ok: false, reason: 'discovery-unavailable', provider: 'lmstudio' });
   }
 
   // Add options for selected provider
@@ -1551,68 +1516,90 @@ function loadSettings() {
       settings.modelProvider = 'xai';
       settings.modelName = 'grok-4-1-fast'; // All legacy modes map to new default
     }
-    
+
+    // Provider inputs must be populated before provider selection starts live
+    // discovery. The prior ordering started LM Studio discovery against the
+    // default URL and then tried to restore the saved model on a fixed timer.
+    if (elements.apiKey) elements.apiKey.value = settings.apiKey || '';
+    if (elements.geminiApiKey) elements.geminiApiKey.value = settings.geminiApiKey || '';
+    const openaiApiKey = document.getElementById('openaiApiKey');
+    if (openaiApiKey) openaiApiKey.value = settings.openaiApiKey || '';
+    const anthropicApiKey = document.getElementById('anthropicApiKey');
+    if (anthropicApiKey) anthropicApiKey.value = settings.anthropicApiKey || '';
+    const customApiKey = document.getElementById('customApiKey');
+    if (customApiKey) customApiKey.value = settings.customApiKey || '';
+    const customEndpoint = document.getElementById('customEndpoint');
+    if (customEndpoint) customEndpoint.value = settings.customEndpoint || '';
+    const openrouterApiKey = document.getElementById('openrouterApiKey');
+    if (openrouterApiKey) openrouterApiKey.value = settings.openrouterApiKey || '';
+    const lmstudioBaseUrl = document.getElementById('lmstudioBaseUrl');
+    if (lmstudioBaseUrl) lmstudioBaseUrl.value = settings.lmstudioBaseUrl || 'http://localhost:1234';
+
+    const storedModelName = typeof data.modelName === 'string' ? data.modelName.trim() : '';
+    const savedModelName = settings.modelProvider === 'lmstudio'
+      ? storedModelName
+      : settings.modelName;
+
     // Restore both latent provider choices before applying the saved kind.
     // Staging the model gives the existing discovery path its sticky previous
     // selection while allowing saved-agent loads to avoid API work entirely.
-    stageLatentApiModel(settings.modelName);
+    stageLatentApiModel(savedModelName);
     providerPanelState.modelProvider = settings.modelProvider;
     providerPanelState.agentProviderId = settings.agentProviderId;
     const activeProviderId = settings.providerKind === 'agent'
       ? settings.agentProviderId
       : settings.modelProvider;
-    setProviderSelection(settings.providerKind, activeProviderId, { markDirty: false });
-    
-    // Update model name
-    if (elements.modelName && settings.modelName) {
-      // Wait for options to be populated
-      providerSettingsModelLoadTimer = setTimeout(() => {
-        providerSettingsModelLoadTimer = null;
-        if (loadGeneration !== providerSettingsLoadGeneration
-            || providerPanelState.providerKind !== 'api'
-            || providerPanelState.modelProvider !== settings.modelProvider) return;
-        elements.modelName.value = settings.modelName;
-        if (typeof globalThis !== 'undefined' && globalThis.FSBModelCombobox) {
-          globalThis.FSBModelCombobox.refresh();
+    const discoveryResult = await setProviderSelection(
+      settings.providerKind,
+      activeProviderId,
+      { markDirty: false }
+    );
+    if (loadGeneration !== providerSettingsLoadGeneration) return;
+
+    if (settings.providerKind === 'api' && elements.modelName) {
+      if (settings.modelProvider === 'lmstudio') {
+        const models = discoveryResult && discoveryResult.ok && Array.isArray(discoveryResult.models)
+          ? discoveryResult.models
+          : [];
+        const savedStillAvailable = !!savedModelName
+          && models.some(model => String(model.id) === savedModelName);
+
+        if (savedStillAvailable) {
+          elements.modelName.value = savedModelName;
+        } else if (models.length === 1) {
+          // Safe legacy migration: there is no choice to make, so repair the
+          // blank/stale stored value immediately and keep startup usable.
+          const migratedModel = String(models[0].id || '');
+          elements.modelName.value = migratedModel;
+          await new Promise(resolve => {
+            chrome.storage.local.set({ modelName: migratedModel }, resolve);
+          });
+          if (loadGeneration !== providerSettingsLoadGeneration) return;
+          const ui = (typeof globalThis !== 'undefined') ? globalThis.FSBDiscoveryUI : null;
+          if (ui && typeof ui.setDiscoveryStatus === 'function') {
+            ui.setDiscoveryStatus({ kind: 'info', text: 'Using loaded model ' + migratedModel });
+          }
+        } else if (models.length > 1 && !savedStillAvailable) {
+          markUnsavedChanges();
         }
-        const models = availableModels[settings.modelProvider || 'xai'];
-        const selectedModel = models.find(m => m.id === settings.modelName);
-        if (selectedModel) {
-          updateModelDescription(selectedModel.description);
-        }
-        if (settings.providerKind === 'api') {
-          updateApiKeyVisibility(settings.modelProvider || 'xai');
-          // Load-order fix: run the API-connection check inside this model-name timer.
-          // By the time it fires, the callback's synchronous body has already populated
-          // the apiKey + provider inputs and modelName was just applied above, so
-          // checkApiConnection reads populated inputs -- not the empty fields the old
-          // page-init call (initializeDashboard) saw, which falsely reported 'No API Key'.
-          checkApiConnection();
-        }
-      }, 100);
+
+        // Local inference is intentionally not run just by opening Settings.
+        // Live discovery establishes reachability; Test Connection remains an
+        // explicit user action and uses the selected model exactly.
+        updateApiKeyVisibility('lmstudio');
+      } else if (savedModelName) {
+        elements.modelName.value = savedModelName;
+        const models = availableModels[settings.modelProvider || 'xai'] || [];
+        const selectedModel = models.find(m => m.id === savedModelName);
+        if (selectedModel) updateModelDescription(selectedModel.description);
+        updateApiKeyVisibility(settings.modelProvider || 'xai');
+        checkApiConnection();
+      }
+
+      if (typeof globalThis !== 'undefined' && globalThis.FSBModelCombobox) {
+        globalThis.FSBModelCombobox.refresh();
+      }
     }
-    
-    // Update form elements
-    if (elements.apiKey) elements.apiKey.value = settings.apiKey || '';
-    if (elements.geminiApiKey) elements.geminiApiKey.value = settings.geminiApiKey || '';
-    // Update new provider API keys
-    const openaiApiKey = document.getElementById('openaiApiKey');
-    if (openaiApiKey) openaiApiKey.value = settings.openaiApiKey || '';
-    
-    const anthropicApiKey = document.getElementById('anthropicApiKey');
-    if (anthropicApiKey) anthropicApiKey.value = settings.anthropicApiKey || '';
-    
-    const customApiKey = document.getElementById('customApiKey');
-    if (customApiKey) customApiKey.value = settings.customApiKey || '';
-    
-    const customEndpoint = document.getElementById('customEndpoint');
-    if (customEndpoint) customEndpoint.value = settings.customEndpoint || '';
-
-    const openrouterApiKey = document.getElementById('openrouterApiKey');
-    if (openrouterApiKey) openrouterApiKey.value = settings.openrouterApiKey || '';
-
-    const lmstudioBaseUrl = document.getElementById('lmstudioBaseUrl');
-    if (lmstudioBaseUrl) lmstudioBaseUrl.value = settings.lmstudioBaseUrl || 'http://localhost:1234';
 
     // Max iterations
     const maxIter = settings.maxIterations || 100;
@@ -1872,14 +1859,50 @@ function normalizeProviderFormSelection() {
   return normalizedProviderSettings;
 }
 
+function validateLmStudioSettingsSelection(providerSettings, selectedModelName) {
+  if (providerSettings.providerKind !== 'api'
+      || providerSettings.modelProvider !== 'lmstudio'
+      || selectedModelName) return true;
+  showToast('Load and select an LM Studio chat model before saving', 'error');
+  updateConnectionStatus('disconnected', 'LM Studio model required');
+  updateApiStatusCard(
+    'disconnected',
+    'Model Required',
+    'Start LM Studio, load a chat model, then refresh and select it.'
+  );
+  return false;
+}
+
+function normalizeLmStudioSettingsBaseUrl(rawBaseUrl) {
+  const discovery = (typeof globalThis !== 'undefined')
+    ? globalThis.FSBModelDiscovery
+    : null;
+  if (discovery && typeof discovery.normalizeLmStudioBaseUrl === 'function') {
+    return discovery.normalizeLmStudioBaseUrl(rawBaseUrl);
+  }
+  if (typeof normalizeProviderBaseUrl === 'function') {
+    return normalizeProviderBaseUrl('lmstudio', rawBaseUrl);
+  }
+  let url = String(rawBaseUrl || 'http://localhost:1234').trim()
+    .replace(/\/v1\/chat\/completions\/?$/i, '')
+    .replace(/\/v1\/?$/i, '')
+    .replace(/\/+$/, '');
+  if (!/^https?:\/\//i.test(url)) url = 'http://' + url;
+  return url || 'http://localhost:1234';
+}
+
 function saveSettings() {
   const normalizedProviderSettings = normalizeProviderFormSelection();
   const previousVoiceInputEnabled = persistedVoiceInputEnabled;
+  const selectedModelName = String(elements.modelName?.value || '').trim();
+  if (!validateLmStudioSettingsSelection(normalizedProviderSettings, selectedModelName)) return false;
+  const rawLmStudioBaseUrl = (document.getElementById('lmstudioBaseUrl')?.value || 'http://localhost:1234').trim();
+  const normalizedLmStudioBaseUrl = normalizeLmStudioSettingsBaseUrl(rawLmStudioBaseUrl);
   const settings = {
     providerKind: normalizedProviderSettings.providerKind,
     agentProviderId: normalizedProviderSettings.agentProviderId,
     modelProvider: normalizedProviderSettings.modelProvider,
-    modelName: elements.modelName?.value || 'grok-4-1-fast',
+    modelName: selectedModelName || 'grok-4-1-fast',
     apiKey: (elements.apiKey?.value || '').trim(),
     geminiApiKey: (elements.geminiApiKey?.value || '').trim(),
     openaiApiKey: (document.getElementById('openaiApiKey')?.value || '').trim(),
@@ -1887,7 +1910,7 @@ function saveSettings() {
     customApiKey: (document.getElementById('customApiKey')?.value || '').trim(),
     customEndpoint: (document.getElementById('customEndpoint')?.value || '').trim(),
     openrouterApiKey: (document.getElementById('openrouterApiKey')?.value || '').trim(),
-    lmstudioBaseUrl: (document.getElementById('lmstudioBaseUrl')?.value || 'http://localhost:1234').trim(),
+    lmstudioBaseUrl: normalizedLmStudioBaseUrl,
     maxIterations: parseInt(elements.maxIterations?.value) || 20,
     debugMode: elements.debugMode?.checked ?? false,
     // DOM Optimization settings
@@ -1945,6 +1968,7 @@ function saveSettings() {
       );
     }
   });
+  return true;
 }
 
 function discardChanges() {
@@ -1999,7 +2023,18 @@ async function checkApiConnection() {
 
   try {
     const provider = providerPanelState.modelProvider || 'xai';
-    const modelName = elements.modelName?.value || 'grok-4-1-fast';
+    const selectedModelName = String(elements.modelName?.value || '').trim();
+    if (provider === 'lmstudio' && !selectedModelName) {
+      const error = 'Load and select an LM Studio chat model before testing the connection.';
+      updateConnectionStatus('disconnected', 'LM Studio model required');
+      updateApiStatusCard('disconnected', 'Model Required', error);
+      addLog('error', error);
+      return { ok: false, provider: provider, model: '', error: error };
+    }
+    const modelName = selectedModelName || 'grok-4-1-fast';
+    const lmstudioConnectionBaseUrl = normalizeLmStudioSettingsBaseUrl(
+      document.getElementById('lmstudioBaseUrl')?.value || 'http://localhost:1234'
+    );
 
     const PROVIDER_KEY_GETTERS = {
       xai:        function () { return (elements.apiKey?.value || '').trim(); },
@@ -2036,13 +2071,7 @@ async function checkApiConnection() {
       apiKey: apiKey,
       model: modelName,
       baseUrl: provider === 'custom' ? (document.getElementById('customEndpoint')?.value || '').trim()
-             // Strip a pasted /v1 or /v1/chat/completions suffix (the model-discovery
-             // normalization idiom above) before re-appending /v1, so the documented
-             // http://localhost:1234/v1 setting never becomes /v1/v1.
-             : provider === 'lmstudio' ? ((document.getElementById('lmstudioBaseUrl')?.value || 'http://localhost:1234').trim()
-                 .replace(/\/v1\/chat\/completions\/?$/, '')
-                 .replace(/\/v1\/?$/, '')
-                 .replace(/\/+$/, '') + '/v1')
+             : provider === 'lmstudio' ? (lmstudioConnectionBaseUrl + '/v1')
              : provider === 'openai' ? 'https://api.openai.com/v1'
              : undefined
     };
@@ -7916,8 +7945,8 @@ function initializeSyncSection() {
 // event listeners below (provider change, API-key input debounce, refresh
 // button click) all delegate into runDiscovery() so behavior is centralized.
 //
-// Out-of-scope providers (lmstudio, custom) are explicitly NOT handled here;
-// updateModelOptions() retains its existing flow for those.
+// Custom endpoints remain on the legacy static/manual flow. LM Studio uses
+// this same cancellable discovery path with its base-URL input as the source.
 //
 // Persistence (chrome.storage.local writes for modelName) is NOT touched by
 // this module — Plan 228-03 owns the validation migration.
@@ -7930,7 +7959,8 @@ function initializeSyncSection() {
     gemini: 'geminiApiKey',
     openai: 'openaiApiKey',
     anthropic: 'anthropicApiKey',
-    openrouter: 'openrouterApiKey'
+    openrouter: 'openrouterApiKey',
+    lmstudio: 'lmstudioBaseUrl'
   });
 
   // Per-provider debounce timers for API-key input handling.
@@ -7950,6 +7980,10 @@ function initializeSyncSection() {
     if (!doc) return '';
     const el = doc.getElementById(inputId);
     return (el && typeof el.value === 'string') ? el.value.trim() : '';
+  }
+
+  function _isLocalProvider(provider) {
+    return provider === 'lmstudio';
   }
 
   function _captureDiscoveryUiState() {
@@ -8086,7 +8120,8 @@ function initializeSyncSection() {
     });
   }
 
-  function _renderModelDropdownOptions(models, selectedId) {
+  function _renderModelDropdownOptions(models, selectedId, opts) {
+    const options = opts || {};
     const doc = _doc();
     if (!doc) return null;
     const sel = doc.getElementById('modelName');
@@ -8106,12 +8141,22 @@ function initializeSyncSection() {
       return null;
     }
 
+    if (options.requireExplicit === true) {
+      const prompt = doc.createElement('option');
+      prompt.value = '';
+      prompt.textContent = 'Choose a loaded model...';
+      prompt.disabled = true;
+      sel.appendChild(prompt);
+    }
+
     // Phase 232: sticky selection. If the user previously saved a model that's
     // not in the freshly-discovered list (preview model expired, provider
     // pruned the list, etc.), preserve it as a synthetic "(saved)" entry at
     // the top of the dropdown rather than silently reassigning the selection.
     const presentIds = new Set(list.map(m => String(m.id)));
-    const savedMissing = selectedId && !presentIds.has(String(selectedId));
+    const savedMissing = options.preserveMissing !== false
+      && selectedId
+      && !presentIds.has(String(selectedId));
     if (savedMissing) {
       const opt = doc.createElement('option');
       opt.value = selectedId;
@@ -8126,7 +8171,7 @@ function initializeSyncSection() {
       opt.textContent = m.displayName || m.name || m.id;
       sel.appendChild(opt);
       if (selectedId && m.id === selectedId) chosen = m.id;
-      if (chosen == null && !savedMissing && idx === 0) chosen = m.id;
+      if (chosen == null && !savedMissing && options.requireExplicit !== true && idx === 0) chosen = m.id;
     });
     if (savedMissing) chosen = selectedId;
     sel.value = chosen || '';
@@ -8134,11 +8179,11 @@ function initializeSyncSection() {
     return chosen;
   }
 
-  function renderModelDropdown(models, selectedId) {
+  function renderModelDropdown(models, selectedId, opts) {
     _currentModels = (Array.isArray(models) ? models : []).map(m => ({ ...m }));
     // The unified combobox owns search/filtering as a view concern, so the
     // native select always holds the full discovered list here.
-    return _renderModelDropdownOptions(_currentModels.slice(), selectedId);
+    return _renderModelDropdownOptions(_currentModels.slice(), selectedId, opts);
   }
 
   function applyModelSearch(query, opts) {
@@ -8157,6 +8202,22 @@ function initializeSyncSection() {
     const btn = doc.getElementById('refreshModelsBtn');
     if (sel) sel.disabled = !!disabled;
     if (btn) btn.disabled = !!disabled;
+    _setActionControlsDisabled(disabled);
+  }
+
+  function _setActionControlsDisabled(disabled) {
+    const doc = _doc();
+    if (!doc) return;
+    const saveBtn = doc.getElementById('saveBtn');
+    const testBtn = doc.getElementById('fullApiTest');
+    if (saveBtn) saveBtn.disabled = !!disabled;
+    if (testBtn) testBtn.disabled = !!disabled;
+  }
+
+  function handleSelectionChange(provider, modelId) {
+    if (_isLocalProvider(provider)) {
+      _setActionControlsDisabled(!String(modelId || '').trim());
+    }
   }
 
   function _renderLoading() {
@@ -8187,6 +8248,31 @@ function initializeSyncSection() {
     }
     _setControlsDisabled(false);
     setDiscoveryStatus({ kind: 'error', text: 'API key invalid for this provider' + (message ? ' (' + message + ')' : '') });
+  }
+
+  function _renderLocalFailure(message) {
+    const doc = _doc();
+    if (!doc) return;
+    const sel = doc.getElementById('modelName');
+    if (sel) {
+      sel.innerHTML = '';
+      const opt = doc.createElement('option');
+      opt.value = '';
+      opt.textContent = 'No compatible LM Studio models available';
+      opt.disabled = true;
+      sel.appendChild(opt);
+      sel.value = '';
+    }
+    _setControlsDisabled(false);
+    if (sel) sel.disabled = true;
+    const saveBtn = doc.getElementById('saveBtn');
+    const testBtn = doc.getElementById('fullApiTest');
+    if (saveBtn) saveBtn.disabled = true;
+    if (testBtn) testBtn.disabled = true;
+    setDiscoveryStatus({
+      kind: 'error',
+      text: message || 'Start LM Studio, load a chat model, and refresh the model list'
+    });
   }
 
   function _renderFallback(provider, chipText) {
@@ -8224,8 +8310,11 @@ function initializeSyncSection() {
     };
 
     try {
-      const apiKey = _getInputValueForProvider(provider);
-      if (!apiKey) {
+      const localProvider = _isLocalProvider(provider);
+      const inputValue = _getInputValueForProvider(provider);
+      const apiKey = localProvider ? '' : inputValue;
+      const baseUrl = localProvider ? (inputValue || 'http://localhost:1234') : '';
+      if (!localProvider && !apiKey) {
         // No key yet. Phase 232: prefer the persistent discovery cache
         // (chrome.storage.local) so a list discovered in a prior session is
         // shown immediately on reopen. Fall back to FALLBACK_MODELS only when
@@ -8270,7 +8359,11 @@ function initializeSyncSection() {
 
       let result;
       try {
-        result = await global.discoverModels(provider, apiKey);
+        result = await global.discoverModels(
+          provider,
+          apiKey,
+          localProvider ? { baseUrl: baseUrl } : undefined
+        );
       } catch (err) {
         if (!_isDiscoveryCurrent(generation)) return _cancelledDiscoveryResult(provider);
         _renderFallback(provider, 'Using fallback models — discovery unavailable');
@@ -8287,21 +8380,57 @@ function initializeSyncSection() {
           description: m.description,
           provider
         }));
-        const chosen = renderModelDropdown(list, options.previousSelection);
+        const previousSelectionPresent = !!options.previousSelection
+          && list.some(model => String(model.id) === String(options.previousSelection));
+        const requiresExplicitSelection = localProvider
+          && list.length > 1
+          && !previousSelectionPresent;
+        const chosen = renderModelDropdown(
+          list,
+          options.previousSelection,
+          {
+            preserveMissing: !localProvider,
+            requireExplicit: requiresExplicitSelection
+          }
+        );
         _setControlsDisabled(false);
+        if (requiresExplicitSelection) _setActionControlsDisabled(true);
         const cached = result.source === 'cache';
         const text = cached
           ? list.length + ' models (cached)'
           : list.length + ' models discovered';
-        setDiscoveryStatus({ kind: 'info', text });
+        if (localProvider && options.previousSelection && !previousSelectionPresent) {
+          setDiscoveryStatus({
+            kind: 'warning',
+            text: 'The saved LM Studio model is unavailable. Choose a loaded model and save.'
+          });
+        } else if (localProvider && !options.previousSelection && list.length > 1) {
+          setDiscoveryStatus({
+            kind: 'warning',
+            text: list.length + ' models discovered — choose one and save'
+          });
+        } else {
+          setDiscoveryStatus({ kind: 'info', text });
+        }
         // Phase 232: when the user's saved model is not in the discovered list,
         // renderModelDropdown now keeps it selected as a synthetic "(saved)"
         // entry, so chosen === previousSelection and no reassignment happens.
-        return result;
+        return Object.assign({}, result, {
+          selectedModel: chosen || '',
+          previousSelectionPresent: previousSelectionPresent
+        });
       }
 
       // Failure path
       const reason = result && result.reason;
+      if (localProvider) {
+        _renderLocalFailure(
+          reason === 'empty-response'
+            ? 'No compatible chat models are loaded in LM Studio'
+            : (result && result.message) || 'Could not connect to LM Studio'
+        );
+        return result;
+      }
       if (reason === 'auth-failed') {
         _renderAuthFailed(result && result.message);
         return result;
@@ -8347,6 +8476,8 @@ function initializeSyncSection() {
     invalidateDiscovery,
     scheduleDiscoveryFromKeyChange,
     setDiscoveryStatus,
+    setControlsDisabled: _setControlsDisabled,
+    handleSelectionChange,
     renderModelDropdown,
     applyModelSearch,
     filterModelsForSearch

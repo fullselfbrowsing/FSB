@@ -5,6 +5,8 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { createRuntime } from './runtime.js';
+import { AgentScope } from './agent-scope.js';
+import { DELEGATION_ID_HEADER } from './agent-providers/runtime-files.js';
 import type { WebSocketBridge } from './bridge.js';
 import type { TaskQueue } from './queue.js';
 import {
@@ -12,6 +14,8 @@ import {
   NATIVE_HOST_PROTOCOL_VERSION,
 } from './native-host/constants.js';
 import { FSB_MCP_VERSION } from './version.js';
+
+const DELEGATION_ID_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
 
 type SessionContext = {
   server: McpServer;
@@ -34,7 +38,7 @@ type RunningHttpServer = {
 
 function setCorsHeaders(res: ServerResponse): void {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Mcp-Session-Id');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Mcp-Session-Id, X-Fsb-Delegation-Id');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
   res.setHeader('Access-Control-Expose-Headers', 'Mcp-Session-Id');
 }
@@ -134,7 +138,19 @@ export async function startHttpServer(options: HttpServerOptions): Promise<Runni
     if (!context) {
       if (req.method === 'POST' && !sessionId && isInitializeRequest(parsedBody)) {
         let transport!: StreamableHTTPServerTransport;
-        const runtime = createRuntime({ bridge: options.bridge, queue: options.queue });
+        const delegationIdHeader = req.headers[DELEGATION_ID_HEADER];
+        const rawDelegationId = Array.isArray(delegationIdHeader)
+          ? delegationIdHeader[0]
+          : delegationIdHeader;
+        const sessionAgentScope = typeof rawDelegationId === 'string'
+          && DELEGATION_ID_PATTERN.test(rawDelegationId)
+          ? new AgentScope({ environment: { FSB_DELEGATION_ID: rawDelegationId } })
+          : undefined;
+        const runtime = createRuntime({
+          bridge: options.bridge,
+          queue: options.queue,
+          agentScope: sessionAgentScope,
+        });
 
         transport = new StreamableHTTPServerTransport({
           enableJsonResponse: true,

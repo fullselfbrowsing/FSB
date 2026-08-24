@@ -389,7 +389,7 @@ async function run() {
     'extension and server MCP tool definitions remain byte-identical after the Sheets additions',
   );
   assert(
-    dispatcherSource.includes('return { success: true, agentId, agentIdShort, ownershipTokens: {}, connectionId: connectionId };'),
+    dispatcherSource.includes('return { success: true, agentId, agentIdShort, ownershipTokens: seededOwnershipTokens, connectionId: connectionId };'),
     'agent:register response remains the exact established envelope',
   );
 

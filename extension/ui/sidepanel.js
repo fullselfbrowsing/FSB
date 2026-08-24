@@ -275,10 +275,19 @@ async function initTabConversationStore() {
 async function swapToTabConversation(tabId) {
   try {
     await _envelopeReadyPromise;
-    if (typeof FSBSidepanelTabConvStore === 'undefined') return;
-    if (!FSBSidepanelTabConvStore.isValidEnvelope(tabConvEnvelope)) return;
+    if (typeof FSBSidepanelTabConvStore === 'undefined') return false;
+    if (!FSBSidepanelTabConvStore.isValidEnvelope(tabConvEnvelope)) return false;
     var nextConvId = FSBSidepanelTabConvStore.getTabConversation(tabConvEnvelope, tabId);
-    if (nextConvId === conversationId) return; // same conversation; no-op
+    if (nextConvId === conversationId) {
+      var surfaceIsEmpty = !chatMessages
+        || (typeof chatMessages.querySelector === 'function'
+          ? !chatMessages.querySelector('.message')
+          : (typeof chatMessages.innerHTML === 'undefined' || chatMessages.innerHTML.length === 0));
+      if (nextConvId && surfaceIsEmpty) {
+        try { await hydrateChatFromConversationId(nextConvId); } catch (_e) { /* best-effort */ }
+      }
+      return true;
+    }
     _delegationUiState.subscribed = false;
     conversationId = nextConvId; // may be null (D-17 lazy mint deferred)
     if (chatMessages && typeof chatMessages.innerHTML !== 'undefined') {
@@ -291,7 +300,10 @@ async function swapToTabConversation(tabId) {
     if (nextConvId) {
       try { await hydrateChatFromConversationId(nextConvId); } catch (_e) { /* swallow */ }
     }
-  } catch (_e) { /* swallow: swap is best-effort */ }
+    return true;
+  } catch (_e) {
+    return false;
+  }
 }
 
 // Phase 11 FINT-21 -- drop tab's entry on chrome.tabs.onRemoved (D-14).
@@ -356,6 +368,79 @@ async function ensureTabConversationForActiveTab(overwrite) {
   }
 }
 
+// Only claims tabs that have no conversation of their own -- a tab the user
+// already used keeps its own transcript and swaps normally.
+//
+// Two sources for "the running conversation", in order:
+//   1. this document's own state -- a start in flight or a live snapshot;
+//   2. the agent registry -- the tab is owned by a delegated agent whose run
+//      is bound to a conversation. This is what a freshly opened panel (or
+//      one Chrome re-created) relies on, since it has no in-memory run.
+async function _adoptTabIntoRunningDelegationConversation(tabId) {
+  try {
+    if (!Number.isSafeInteger(tabId)) return false;
+    await _envelopeReadyPromise;
+    if (typeof FSBSidepanelTabConvStore === 'undefined'
+        || !FSBSidepanelTabConvStore.isValidEnvelope(tabConvEnvelope)) return false;
+    var existing = FSBSidepanelTabConvStore.getTabConversation(tabConvEnvelope, tabId);
+    if (existing) return false;
+
+    var runConversationId = null;
+    if (conversationId && typeof conversationId === 'string'
+        && (_delegationUiState.pendingStart === true
+          || _delegationIsActiveSnapshot(_delegationUiState.snapshot))) {
+      runConversationId = conversationId;
+    }
+    if (!runConversationId) {
+      runConversationId = await _delegationConversationForOwnedTab(tabId);
+    }
+    if (!runConversationId) return false;
+
+    FSBSidepanelTabConvStore.ensureTabConversation(
+      tabConvEnvelope, tabId, function() { return runConversationId; }
+    );
+    await _persistEnvelope();
+    return true;
+  } catch (_error) {
+    return false;
+  }
+}
+
+// Resolve the conversation of the delegated run that owns a tab, from persisted
+// state only: the agent registry envelope maps tab -> owner agent -> delegation,
+// and the delegation/conversation envelope maps delegation -> conversation.
+// Returns null for unowned tabs, surface-owned tabs, ordinary MCP clients, and
+// runs with no bound conversation.
+async function _delegationConversationForOwnedTab(tabId) {
+  try {
+    if (!Number.isSafeInteger(tabId)) return null;
+    if (typeof FSBOwnerChip === 'undefined'
+        || typeof FSBOwnerChip.findOwnerInEnvelope !== 'function') return null;
+    var stored = await chrome.storage.session.get(['fsbAgentRegistry']);
+    var envelope = stored && stored.fsbAgentRegistry;
+    var ownerAgentId = FSBOwnerChip.findOwnerInEnvelope(envelope, tabId);
+    if (typeof ownerAgentId !== 'string' || ownerAgentId.length === 0
+        || ownerAgentId.indexOf('legacy:') === 0) return null;
+    var delegations = envelope && envelope.delegations;
+    if (!delegations || typeof delegations !== 'object' || Array.isArray(delegations)) return null;
+    var delegationId = null;
+    var delegationIds = Object.keys(delegations);
+    for (var i = 0; i < delegationIds.length; i += 1) {
+      if (delegations[delegationIds[i]] === ownerAgentId
+          && DELEGATION_ID_PATTERN.test(delegationIds[i])) {
+        delegationId = delegationIds[i];
+        break;
+      }
+    }
+    if (!delegationId) return null;
+    // Re-read: the binding was written by whichever document started the run.
+    await _loadDelegationConversationEnvelope();
+    return _delegationConversationForDelegationId(delegationId);
+  } catch (_error) {
+    return null;
+  }
+}
+
 async function ensureTabConversationForTab(tabId) {
   try {
     await _envelopeReadyPromise;
@@ -403,6 +488,13 @@ async function ensureTabConversationForTab(tabId) {
 async function hydrateChatFromConversationId(convId) {
   if (!convId || typeof convId !== 'string') return 0;
   if (!chatMessages) return 0;
+  var surfaceGeneration = typeof _activeTabSurfaceSyncGeneration === 'number'
+    ? _activeTabSurfaceSyncGeneration
+    : null;
+  var hydrationIsCurrent = function() {
+    return surfaceGeneration === null
+      || surfaceGeneration === _activeTabSurfaceSyncGeneration;
+  };
 
   // ============================================================
   // Tier 1 (Phase 12 FINT-23): new fsbConversationMessages store.
@@ -412,6 +504,7 @@ async function hydrateChatFromConversationId(convId) {
         && typeof FSBSidepanelMessageLog.getMessages === 'function'
         && typeof FSBSidepanelMessageLog.STORAGE_KEY === 'string') {
       const bag = await chrome.storage.local.get(FSBSidepanelMessageLog.STORAGE_KEY);
+      if (!hydrationIsCurrent()) return 0;
       const envelope = bag[FSBSidepanelMessageLog.STORAGE_KEY];
       const messages = FSBSidepanelMessageLog.getMessages(envelope, convId);
       if (Array.isArray(messages) && messages.length > 0) {
@@ -445,6 +538,7 @@ async function hydrateChatFromConversationId(convId) {
   // ============================================================
   try {
     const stored = await chrome.storage.local.get(['fsbSessionLogs', 'fsbSessionIndex']);
+    if (!hydrationIsCurrent()) return 0;
     const sessionStorage = stored.fsbSessionLogs || {};
     const sessionIndex = stored.fsbSessionIndex || [];
     if (!Array.isArray(sessionIndex) || sessionIndex.length === 0) return 0;
@@ -526,6 +620,7 @@ const historyBtn = document.getElementById('historyBtn');
 const micBtn = document.getElementById('micBtn');
 const statusDot = document.querySelector('.status-dot');
 const statusText = document.querySelector('.status-text');
+const takeControlBtn = document.getElementById('takeControlBtn');
 const automationRunner = document.getElementById('automationRunner');
 const automationTimer = document.getElementById('automationTimer');
 const automationRunnerLabel = document.getElementById('automationRunnerLabel');
@@ -533,18 +628,38 @@ const automationRunnerLabel = document.getElementById('automationRunnerLabel');
 let _headerBaseStatusLabel = 'Ready';
 let _headerBaseStatusTone = '';
 let _headerOwnerLabel = null;
+let _headerOwnerAgentId = null;
+let _headerOwnerTabId = null;
+let _headerOwnerWindowId = null;
 let _ownerStatusRefreshGeneration = 0;
+let _activeTabSurfaceSyncGeneration = 0;
+let _takeControlPending = false;
 
 function _renderHeaderStatus() {
   if (!statusText || !statusDot || !statusDot.classList) return;
   statusDot.classList.remove('running', 'error', 'owned');
   if (_headerOwnerLabel) {
-    statusText.textContent = (typeof FSBOwnerChip !== 'undefined'
-        && typeof FSBOwnerChip.buildChipText === 'function')
-      ? FSBOwnerChip.buildChipText(_headerOwnerLabel)
-      : 'Owned by ' + _headerOwnerLabel;
-    statusDot.classList.add('owned');
+    var ownerRunIsLive = _headerBaseStatusTone === 'running'
+      && typeof _delegationIsActiveSnapshot === 'function'
+      && typeof _delegationUiState !== 'undefined'
+      && _delegationIsActiveSnapshot(_delegationUiState.snapshot);
+    statusText.textContent = ownerRunIsLive
+      ? 'Working \u2014 ' + _headerOwnerLabel
+      : ((typeof FSBOwnerChip !== 'undefined'
+          && typeof FSBOwnerChip.buildChipText === 'function')
+        ? FSBOwnerChip.buildChipText(_headerOwnerLabel)
+        : 'Owned by ' + _headerOwnerLabel);
+    statusDot.classList.add(ownerRunIsLive ? 'running' : 'owned');
+    if (typeof takeControlBtn !== 'undefined' && takeControlBtn) {
+      takeControlBtn.classList.toggle('hidden', !_headerOwnerAgentId);
+      takeControlBtn.disabled = _takeControlPending;
+      if (!_takeControlPending) takeControlBtn.title = 'Take control of this tab';
+    }
     return;
+  }
+  if (typeof takeControlBtn !== 'undefined' && takeControlBtn) {
+    takeControlBtn.classList.add('hidden');
+    takeControlBtn.disabled = false;
   }
   statusText.textContent = _headerBaseStatusLabel;
   if (_headerBaseStatusTone === 'running') statusDot.classList.add('running');
@@ -557,9 +672,18 @@ function _setHeaderStatus(label, tone) {
   _renderHeaderStatus();
 }
 
-function _setHeaderOwner(label) {
+function _setHeaderOwner(label, ownerContext) {
   var normalized = typeof label === 'string' ? label.trim() : '';
   _headerOwnerLabel = normalized || null;
+  if (_headerOwnerLabel && ownerContext && typeof ownerContext === 'object') {
+    _headerOwnerAgentId = typeof ownerContext.agentId === 'string' ? ownerContext.agentId : null;
+    _headerOwnerTabId = Number.isSafeInteger(ownerContext.tabId) ? ownerContext.tabId : null;
+    _headerOwnerWindowId = Number.isSafeInteger(ownerContext.windowId) ? ownerContext.windowId : null;
+  } else {
+    _headerOwnerAgentId = null;
+    _headerOwnerTabId = null;
+    _headerOwnerWindowId = null;
+  }
   _renderHeaderStatus();
 }
 
@@ -671,11 +795,29 @@ function _delegationValidPreflightResponse(value) {
   var ok = _delegationOwnDataValue(value, 'ok');
   var kind = _delegationOwnDataValue(value, 'kind');
   if (ok === true && kind === 'agent') {
-    return _delegationHasExactKeys(value, ['kind', 'ok', 'providerId', 'providerLabel'])
-      && _delegationCanonicalProvider(
-        _delegationOwnDataValue(value, 'providerId'),
-        _delegationOwnDataValue(value, 'providerLabel')
-      ) !== null;
+    if (!_delegationHasExactKeys(
+      value,
+      ['acceptedIdentity', 'kind', 'ok', 'providerId', 'providerLabel']
+    )) return false;
+    var providerId = _delegationOwnDataValue(value, 'providerId');
+    var providerLabel = _delegationOwnDataValue(value, 'providerLabel');
+    var provider = _delegationCanonicalProvider(providerId, providerLabel);
+    var helper = typeof FsbDelegationProviders !== 'undefined'
+      ? FsbDelegationProviders
+      : null;
+    var validateIdentity = _delegationOwnDataValue(helper, 'validateAcceptedAgentIdentity');
+    if (!provider || typeof validateIdentity !== 'function') return false;
+    var acceptedIdentity = null;
+    try {
+      acceptedIdentity = validateIdentity.call(
+        helper,
+        _delegationOwnDataValue(value, 'acceptedIdentity')
+      );
+    } catch (_error) {
+      return false;
+    }
+    return _delegationOwnDataValue(acceptedIdentity, 'providerId') === provider.id
+      && _delegationOwnDataValue(acceptedIdentity, 'label') === provider.label;
   }
   if (ok === true && kind === 'api') {
     return _delegationHasExactKeys(value, ['agentProviderId', 'kind', 'ok', 'providerId'])
@@ -1319,6 +1461,7 @@ function _hideDelegationPresentation() {
   }
   _delegationRunStopControls = [];
   _restoreLegacyStopControl();
+  if (typeof _delegatedRunTeardown === 'function') _delegatedRunTeardown();
 }
 
 function _renderDelegationReadyState() {
@@ -1340,6 +1483,7 @@ function _renderDelegationReadyState() {
     _clearDelegationNode(mount.control);
     mount.control.classList.add('hidden');
   }
+  if (typeof _delegatedRunTeardown === 'function') _delegatedRunTeardown();
   _setDelegationHeaderStatus('Ready');
   _setDelegationComposerLocked(false);
 }
@@ -2231,12 +2375,17 @@ function _renderDelegationRunHeader(container, snapshot) {
     ));
     container.appendChild(resumeFailureActions);
   } else if (genericRunFailure) {
+    var providerReportedFailure = terminalCode === 'provider_error';
     container.appendChild(_delegationElement(
       'p',
       'delegation-state-body',
-      providerLabel
-        + ' stopped before the task was complete. Review the error details, then try the same message again.'
+      providerReportedFailure
+        ? providerLabel
+          + ' reported an error before completing this task. Raw provider output was not retained. Try the same message again.'
+        : providerLabel
+          + ' stopped before the task was complete. Try the same message again.'
     ));
+    _appendDelegationTechnicalCode(container, terminalCode || 'agent_failed');
     var retryActions = _delegationElement('div', 'delegation-state-actions');
     retryActions.appendChild(_delegationAction(
       'Try message again', '', function() { _prepareDelegationTask(true); }
@@ -2347,6 +2496,76 @@ function _delegationAnnouncement(entry) {
   if (entry.kind === 'retry') return 'Retrying: ' + entry.retry.class;
   if (entry.kind === 'result') return 'Result: ' + entry.state;
   return 'Agent state: ' + entry.state;
+}
+
+// Kept outside _delegationUiState, which is wiped on every conversation switch --
+// holding the claim there would re-emit the bubble each time the user came back.
+var _delegationAnsweredIds = new Set();
+var DELEGATION_ANSWERED_LIMIT = 64;
+// Answer delivery must happen exactly once per delegation across panel
+// documents, so the dedupe set is mirrored to session storage.
+var DELEGATION_ANSWERED_STORAGE_KEY = 'fsbDelegationAnsweredIds';
+
+function _markDelegationAnswered(delegationId) {
+  _delegationAnsweredIds.add(delegationId);
+  while (_delegationAnsweredIds.size > DELEGATION_ANSWERED_LIMIT) {
+    _delegationAnsweredIds.delete(_delegationAnsweredIds.values().next().value);
+  }
+  try {
+    if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.session
+        && typeof chrome.storage.session.set === 'function') {
+      var answeredPayload = {};
+      answeredPayload[DELEGATION_ANSWERED_STORAGE_KEY] = Array.from(_delegationAnsweredIds);
+      chrome.storage.session.set(answeredPayload);
+    }
+  } catch (_persistError) { /* dedupe degrades to this document only */ }
+}
+
+async function _loadDelegationAnsweredIds() {
+  try {
+    var stored = await chrome.storage.session.get(DELEGATION_ANSWERED_STORAGE_KEY);
+    var ids = stored && stored[DELEGATION_ANSWERED_STORAGE_KEY];
+    if (Array.isArray(ids)) {
+      for (var i = 0; i < ids.length; i += 1) {
+        if (typeof ids[i] === 'string') _delegationAnsweredIds.add(ids[i]);
+      }
+    }
+  } catch (_loadError) { /* start with the in-memory set */ }
+}
+
+function _delegationConversationForDelegationId(delegationId) {
+  if (!delegationId || !_delegationConversationEnvelope) return null;
+  var byConversation = _delegationConversationEnvelope.byConversation;
+  if (!byConversation || typeof byConversation !== 'object') return null;
+  var keys = Object.keys(byConversation);
+  for (var i = 0; i < keys.length; i += 1) {
+    if (byConversation[keys[i]] === delegationId) return keys[i];
+  }
+  return null;
+}
+
+// hydrated renders deliver too: a raced tab-surface sync can leave the panel
+// unsubscribed while the run finishes, and a reopened panel document must still
+// receive the answer. The persisted answered set is the only dedupe.
+function _renderDelegationAnswerBubble(snapshot, hydrated) {
+  if (!snapshot || !snapshot.terminal || snapshot.terminal.code !== 'completed') return false;
+  var answer = snapshot.terminal.answer;
+  if (typeof answer !== 'string' || !answer) return false;
+  if (_delegationAnsweredIds.has(snapshot.delegationId)) return false;
+  if (!_delegationIsSelectedConversation()) {
+    var runConversationId = _delegationConversationForDelegationId(snapshot.delegationId);
+    if (!runConversationId) return false;
+    _markDelegationAnswered(snapshot.delegationId);
+    _persistMessageToConversation('assistant', answer, 'text', runConversationId, null, null);
+    return true;
+  }
+  _markDelegationAnswered(snapshot.delegationId);
+  if (typeof currentStatusMessage !== 'undefined' && currentStatusMessage) {
+    completeStatusMessage(answer, 'ai');
+  } else {
+    addCompletionMessage(answer, 'ai');
+  }
+  return true;
 }
 
 function _delegationOneShotTransition(key, textValue, silent) {
@@ -2493,6 +2712,12 @@ function _renderDelegationSnapshot(snapshot, options) {
         : '')
   );
   _setDelegationComposerLocked(_delegationSnapshotLocksComposer(snapshot));
+  if (typeof _renderDelegationAnswerBubble === 'function') {
+    _renderDelegationAnswerBubble(snapshot, options && options.hydrated === true);
+  }
+  if (typeof _delegatedRunReconcile === 'function') {
+    _delegatedRunReconcile(snapshot, options || {});
+  }
   return true;
 }
 
@@ -2607,6 +2832,19 @@ function _renderDelegationRuntimeMetadata(
         : '')
   );
   _setDelegationComposerLocked(_delegationSnapshotLocksComposer(snapshot));
+  if (Number.isSafeInteger(message.announceSequence)
+      && message.announceSequence > previousLastSequence
+      && message.entry
+      && message.entry.sequence === message.announceSequence
+      && typeof _delegatedRunEmitEntry === 'function') {
+    _delegatedRunEmitEntry(message.entry);
+  }
+  if (typeof _renderDelegationAnswerBubble === 'function') {
+    _renderDelegationAnswerBubble(snapshot, false);
+  }
+  if (typeof _delegatedRunReconcile === 'function') {
+    _delegatedRunReconcile(snapshot, {});
+  }
   return true;
 }
 
@@ -2668,6 +2906,9 @@ function _handleDelegationRuntimeUpdate(message) {
 async function _beginDelegationStart(challengeId) {
   if (_delegationUiState.pendingStart || typeof _delegationUiState.task !== 'string') return;
   var originTabId = _activeTabIdSnapshot;
+  if (!_delegationValidConversationId(conversationId) && Number.isSafeInteger(originTabId)) {
+    try { await ensureTabConversationForTab(originTabId); } catch (_error) { /* fall through */ }
+  }
   var originConversationId = conversationId;
   var originTask = _delegationUiState.task;
   var cleanupOriginKey = _delegationReserveUnboundCleanup(
@@ -2823,11 +3064,17 @@ async function _beginDelegationStart(challengeId) {
   }
   _delegationReleaseCleanupReservation(cleanupOriginKey);
 
-  if (originTabId !== _activeTabIdSnapshot || acceptedConversationId !== conversationId) {
+  if (acceptedConversationId !== conversationId) {
     if (_delegationValidConversationId(acceptedConversationId)) {
       _persistMessageToConversation('user', originTask, 'text', acceptedConversationId);
     }
+    console.warn('[sidepanel] delegated run not rendered: conversation changed',
+      { accepted: acceptedConversationId, selected: conversationId });
     return;
+  }
+  if (originTabId !== _activeTabIdSnapshot) {
+    console.log('[sidepanel] delegated run rendered after active-tab drift',
+      { originTabId: originTabId, activeTabId: _activeTabIdSnapshot });
   }
 
   _resetDelegationSelection(acceptedConversationId);
@@ -2839,8 +3086,16 @@ async function _beginDelegationStart(challengeId) {
   _delegationUiState.errorCode = null;
   addMessage(originTask, 'user');
   chatInput.textContent = '';
+  // The accepted task must not resurrect on the next panel boot (the boot path
+  // restores lastTask into the composer). Guarded: this function also runs in
+  // harness sandboxes that provide no chrome global.
+  if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local
+      && typeof chrome.storage.local.set === 'function') {
+    chrome.storage.local.set({ lastTask: '' });
+  }
   updateSendButtonState();
   _renderDelegationSnapshot(response.snapshot, { hydrated: false, announceSequence: null });
+  _delegatedRunBeginPresentation(response.snapshot, originTask);
   await _refreshSelectedDelegationSnapshot({ hydrated: true, announceLifecycle: true });
   if (acceptedConversationId === _delegationUiState.conversationId
       && response.snapshot.delegationId === _delegationUiState.delegationId
@@ -3055,10 +3310,31 @@ async function _refreshSelectedDelegationSnapshot(options) {
   });
 }
 
+var _delegationRuntimeRecoveryPending = false;
+
 try {
   chrome.runtime.onMessage.addListener(function(message) {
     if (_handleDelegationNativeWakeChecking(message)) return;
-    _handleDelegationRuntimeUpdate(message);
+    var handled = _handleDelegationRuntimeUpdate(message);
+    // Recovery: an update for the SELECTED conversation's own run arrived while
+    // the panel was not subscribed -- a raced tab-surface sync leaves the
+    // selection reset. Rehydrate so the run presentation returns and the
+    // terminal answer is not dropped.
+    if (handled === false
+        && message
+        && message.type === 'FSB_DELEGATION_UPDATED'
+        && message.view
+        && typeof message.view.delegationId === 'string'
+        && _delegationUiState.subscribed !== true
+        && !_delegationRuntimeRecoveryPending
+        && _delegationForConversation(conversationId) === message.view.delegationId) {
+      _delegationRuntimeRecoveryPending = true;
+      Promise.resolve().then(function() {
+        return _hydrateDelegationForSelectedConversation();
+      }).catch(function() { /* best-effort */ }).then(function() {
+        _delegationRuntimeRecoveryPending = false;
+      });
+    }
   });
 } catch (_error) { /* delegated updates are best-effort until panel boot */ }
 
@@ -3226,6 +3502,195 @@ function hideAutomationRunner() {
   if (automationTimer) automationTimer.textContent = '0.000s';
   stopAutomationPixelReveal();
   setAutomationRunnerText('Ready');
+}
+
+// A delegated agent-CLI run is presented through the ordinary autopilot surface --
+// the pixel loader, the status line and the collapsible action group -- so it is
+// indistinguishable from an API-provider run. The delegation card renderers below
+// are deliberately retained (they are still exercised directly by tests) but are no
+// longer on the visible path.
+var _delegatedRunPresentation = {
+  delegationId: null,
+  statusText: null,
+  watermark: 0,
+  terminalApplied: null
+};
+
+var DELEGATED_SKIP_STATUS_TEXTS = [
+  'Starting automation...', 'Connecting to page...', 'Connected. Analyzing page...', 'Analyzing page...'
+];
+
+function _delegatedRunResetPresentation(delegationId, entryCount) {
+  _delegatedRunPresentation.delegationId = delegationId || null;
+  _delegatedRunPresentation.statusText = null;
+  _delegatedRunPresentation.watermark = Number.isSafeInteger(entryCount) ? entryCount : 0;
+  _delegatedRunPresentation.terminalApplied = null;
+}
+
+function _delegatedRunSetStatus(text) {
+  _delegatedRunPresentation.statusText = text;
+  updateStatusMessage(text);
+}
+
+function _delegatedRunBeginPresentation(snapshot, task) {
+  if (!snapshot) return false;
+  _delegatedRunResetPresentation(snapshot.delegationId, 0);
+  _delegatedRunPresentation.statusText = 'Starting automation...';
+  showAutomationRunner(Date.now(), 'Starting automation...');
+  addStatusMessage('Starting automation...');
+  _setHeaderStatus('Working', 'running');
+  return true;
+}
+
+function _delegatedRunTeardown() {
+  hideAutomationRunner();
+  _delegatedRunResetPresentation(null, 0);
+}
+
+function _renderAutomationRetryPrompt(taskText, onRetry) {
+  if (!taskText) return null;
+  const retryDiv = document.createElement('div');
+  retryDiv.className = 'message system new';
+  retryDiv.textContent = 'Would you like to try again? ';
+  const retryBtn = document.createElement('button');
+  retryBtn.className = 'retry-btn';
+  retryBtn.textContent = 'Retry';
+  retryBtn.addEventListener('click', async () => {
+    // WR-03: without this gate the click silently drops the user's intent,
+    // because handleSendMessage's runtime gate fail-closes without surfacing why.
+    if (await _isActiveTabForeignOwned()) {
+      console.warn('[sidepanel] retry blocked -- active tab is foreign-owned');
+      return;
+    }
+    retryDiv.remove();
+    await onRetry();
+  });
+  retryDiv.appendChild(retryBtn);
+  chatMessages.appendChild(retryDiv);
+  scrollToBottom();
+  return retryDiv;
+}
+
+function _delegatedRunErrorMessage(snapshot) {
+  var label = (snapshot && snapshot.provider && snapshot.provider.label) || 'The agent';
+  var code = snapshot && snapshot.terminal ? snapshot.terminal.code : null;
+  if (code === 'provider_error') {
+    return label + ' reported an error before completing this task. Raw provider output was not retained.';
+  }
+  if (code === 'daemon_restart_lost_run') {
+    return 'The previous agent process was stopped and was not reattached. Start a new task when the local service is ready.';
+  }
+  if (code === 'resume_ownership_lost' || code === 'hold_expired') {
+    return 'FSB could not return this tab to ' + label + ', so the run ended and the tab remains under your control.';
+  }
+  if (code === 'wall_clock_timeout') return label + ' ran past the time limit for this task.';
+  if (code === 'event_silence_timeout') return label + ' stopped sending updates, so FSB ended the run.';
+  // Setup failures carry their recovery in the text, because a plain retry cannot fix them.
+  if (code === 'agent_unpaired' || code === 'native_host_missing') {
+    return 'FSB\u2019s local helper is not installed. Run: npx -y fsb-mcp-server@latest install --native-host';
+  }
+  if (code === 'agent_offline') {
+    return label + ' is not reachable. Start the local FSB service, then try this message again.';
+  }
+  if (code === 'unsupported_provider') {
+    return label + ' cannot run browser tasks. Choose a supported agent provider in Settings.';
+  }
+  return label + ' stopped before the task was complete.';
+}
+
+function _delegatedRunEmitEntry(entry) {
+  if (!entry || typeof entry !== 'object') return false;
+  if (Number.isSafeInteger(entry.sequence)) {
+    if (entry.sequence <= _delegatedRunPresentation.watermark) return false;
+    _delegatedRunPresentation.watermark = entry.sequence;
+  }
+  if (entry.kind === 'init') {
+    _delegatedRunSetStatus('Connected. Analyzing page...');
+    return true;
+  }
+  if (entry.kind === 'tool-call') {
+    // tool_use and tool_result both project to 'tool-call'; mirroring both would
+    // double every row, so only the opening and failing transitions are shown.
+    var status = entry.tool && entry.tool.status;
+    if (status !== 'running' && status !== 'failed') return false;
+    var previous = _delegatedRunPresentation.statusText;
+    if (previous && DELEGATED_SKIP_STATUS_TEXTS.indexOf(previous) === -1) addActionMessage(previous);
+    _delegatedRunSetStatus(entry.title || 'Working...');
+    return true;
+  }
+  if (entry.kind === 'retry') {
+    var prior = _delegatedRunPresentation.statusText;
+    if (prior && DELEGATED_SKIP_STATUS_TEXTS.indexOf(prior) === -1) addActionMessage(prior);
+    _delegatedRunSetStatus('Retrying...');
+    return true;
+  }
+  return false;
+}
+
+function _delegatedRunApplyTerminal(snapshot) {
+  if (!snapshot || !snapshot.terminal) return false;
+  if (_delegatedRunPresentation.terminalApplied === snapshot.delegationId) return false;
+  _delegatedRunPresentation.terminalApplied = snapshot.delegationId;
+  var code = snapshot.terminal.code;
+  if (code === 'completed') {
+    // The answer bubble is emitted separately from the terminal payload; only
+    // retire the status line here when it did not already carry the answer.
+    if (currentStatusMessage) completeStatusMessage('Task complete', 'system');
+    setIdleState(_activeTabIdSnapshot);
+    return true;
+  }
+  if (code === 'stopped' || code === 'cancelled') {
+    if (currentStatusMessage) completeStatusMessage('Automation stopped', 'system');
+    setIdleState(_activeTabIdSnapshot);
+    return true;
+  }
+  setErrorState(_activeTabIdSnapshot);
+  completeStatusMessage('Error: ' + _delegatedRunErrorMessage(snapshot), 'error');
+  if (typeof _renderAutomationRetryPrompt === 'function') {
+    _renderAutomationRetryPrompt(_delegationUiState.task, async function() {
+      await _prepareDelegationTask(true);
+      if (chatInput && chatInput.textContent.trim()) handleSendMessage();
+    });
+  }
+  return true;
+}
+
+function _delegatedRunReconcile(snapshot, options) {
+  if (!snapshot) return false;
+  if (snapshot.delegationId !== _delegatedRunPresentation.delegationId) {
+    // Catching up on an existing run (hydration, resync, tab swap-back): adopt its
+    // position silently rather than replaying every row that already happened.
+    _delegatedRunResetPresentation(
+      snapshot.delegationId,
+      Array.isArray(snapshot.entries) ? snapshot.entries.length : 0
+    );
+  }
+  var active = _delegationIsActiveSnapshot(snapshot);
+  if (active && !currentStatusMessage) {
+    addStatusMessage(_delegatedRunPresentation.statusText || 'Working...');
+    _delegatedRunPresentation.watermark = Array.isArray(snapshot.entries)
+      ? snapshot.entries.length
+      : _delegatedRunPresentation.watermark;
+  }
+  if (active) {
+    var startedAt = _delegationPersistedStartAt(snapshot);
+    showAutomationRunner(
+      Number.isSafeInteger(startedAt) ? startedAt : Date.now(),
+      _delegatedRunPresentation.statusText || 'Working'
+    );
+  }
+  var mount = _ensureDelegationMount();
+  // The mount also hosts the consent gate, preflight failure, native-wake and
+  // cleanup cards, so it is only hidden when it carries none of them.
+  var carriesActionableCard = _delegationUiState.bindingCleanupPending === true
+    || _delegationUiState.errorCode !== null;
+  if (mount.feed) mount.feed.classList.add('hidden');
+  if (mount.run) {
+    if (carriesActionableCard) mount.run.classList.remove('hidden');
+    else mount.run.classList.add('hidden');
+  }
+  if (snapshot.terminal) _delegatedRunApplyTerminal(snapshot);
+  return true;
 }
 
 // Apply theme based on settings. Preference is 'system' | 'dark' | 'light'
@@ -3425,7 +3890,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
   // re-renders the ownership status immediately, without waiting for a tab switch or
   // a registry write that happens to follow.
   if (area === 'session' && changes && (changes.fsbAgentRegistry || changes.fsbAgentClientLabels)) {
-    refreshOwnerChip();
+    syncActiveTabSurface(_activeTabIdSnapshot);
     if (changes.fsbAgentRegistry && typeof _refreshSelectedDelegationSnapshot === 'function') {
       _refreshSelectedDelegationSnapshot();
     }
@@ -3447,7 +3912,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
     var keys = Object.keys(changes);
     for (var i = 0; i < keys.length; i++) {
       if (keys[i].indexOf('mcpVisualSession:') === 0) {
-        refreshOwnerChip();
+        syncActiveTabSurface(_activeTabIdSnapshot);
         break;
       }
     }
@@ -3563,33 +4028,37 @@ async function _isActiveTabForeignOwned() {
 //
 // Sidepanel-specific: subscribed to chrome.tabs.onActivated below, since the
 // sidepanel persists across tab switches (popup is short-lived and skips this).
-async function refreshOwnerChip() {
+async function refreshOwnerChip(tabId, surfaceGeneration) {
   const refreshGeneration = ++_ownerStatusRefreshGeneration;
+  const isCurrent = function() {
+    if (refreshGeneration !== _ownerStatusRefreshGeneration) return false;
+    if (Number.isSafeInteger(surfaceGeneration)
+        && typeof _activeTabSurfaceSyncGeneration !== 'undefined'
+        && surfaceGeneration !== _activeTabSurfaceSyncGeneration) return false;
+    return true;
+  };
   try {
     if (typeof FSBOwnerChip === 'undefined') {
-      _setHeaderOwner(null);
-      // Phase 11 FIX (debug-phase-11-tab-swap-stale) + Quick task 260524-7n9:
-      // honor the unlock contract whenever ownership is hidden. applyInputLockout
-      // restores chatInput + stopBtn + micBtn + aria; clearing the
-      // _chatLockedByOwnerChip flag keeps updateSendButtonState in sync so the
-      // user is not stranded with a disabled input after the helper went away.
-      _chatLockedByOwnerChip = false;
-      applyInputLockout(false);
-      return;
+      console.warn('[sidepanel] ownership helper unavailable');
+      return { verified: false, code: 'owner_helper_unavailable' };
     }
 
-    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (refreshGeneration !== _ownerStatusRefreshGeneration) return;
-    const tab = tabs && tabs[0];
+    let tab = null;
+    if (Number.isSafeInteger(tabId)) {
+      tab = await chrome.tabs.get(tabId);
+      if (!tab || tab.id !== tabId) {
+        return { verified: false, code: 'tab_lookup_mismatch' };
+      }
+    } else {
+      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      tab = tabs && tabs[0];
+    }
+    if (!isCurrent()) return { verified: false, stale: true };
     if (!tab || typeof tab.id !== 'number') {
       _setHeaderOwner(null);
-      // Phase 11 FIX (debug-phase-11-tab-swap-stale) + Quick task 260524-7n9:
-      // the no-active-tab branch must also unlock so controls re-enable when the
-      // active-tab race resolves. Clear the _chatLockedByOwnerChip flag so
-      // updateSendButtonState stays in sync.
       _chatLockedByOwnerChip = false;
       applyInputLockout(false);
-      return;
+      return { verified: true, tabId: null, ownerAgentId: null, foreignOwned: false };
     }
 
     // Quick task 260524-7n9: read both the registry envelope AND the per-agent
@@ -3597,7 +4066,7 @@ async function refreshOwnerChip() {
     // written by mcp-tool-dispatcher.js _persistAgentClientLabel and lets the
     // status show "Owned by Claude" instead of "Owned by agent_<hex>".
     const stored = await chrome.storage.session.get(['fsbAgentRegistry', 'fsbAgentClientLabels']);
-    if (refreshGeneration !== _ownerStatusRefreshGeneration) return;
+    if (!isCurrent()) return { verified: false, stale: true };
     const envelope = stored && stored.fsbAgentRegistry;
     const labelsMap = stored && stored.fsbAgentClientLabels;
     const ownerAgentId = FSBOwnerChip.findOwnerInEnvelope(envelope, tab.id);
@@ -3610,7 +4079,13 @@ async function refreshOwnerChip() {
       // flag keeps updateSendButtonState in sync.
       _chatLockedByOwnerChip = false;
       applyInputLockout(false);
-      return;
+      return {
+        verified: true,
+        tabId: tab.id,
+        windowId: Number.isSafeInteger(tab.windowId) ? tab.windowId : null,
+        ownerAgentId: ownerAgentId || null,
+        foreignOwned: false
+      };
     }
 
     // Merged client-label resolution (Phase 11 FINT-19 three-tier + Quick task
@@ -3636,7 +4111,7 @@ async function refreshOwnerChip() {
           tab.id,
           (key) => chrome.storage.session.get(key)
         );
-        if (refreshGeneration !== _ownerStatusRefreshGeneration) return;
+        if (!isCurrent()) return { verified: false, stale: true };
         if (friendly) {
           label = friendly;
         } else {
@@ -3648,7 +4123,12 @@ async function refreshOwnerChip() {
         }
       }
     }
-    _setHeaderOwner(label);
+    if (!isCurrent()) return { verified: false, stale: true };
+    _setHeaderOwner(label, {
+      agentId: ownerAgentId,
+      tabId: tab.id,
+      windowId: Number.isSafeInteger(tab.windowId) ? tab.windowId : null
+    });
     // Phase 11 FINT-20 + Quick task 260524-7n9 -- lock controls when ownership
     // renders (tab is foreign-owned). applyInputLockout does the rich lock
     // (chatInput contenteditable + buttons + aria); the _chatLockedByOwnerChip
@@ -3658,9 +4138,169 @@ async function refreshOwnerChip() {
     applyInputLockout(true);
     chatInput.title = 'Disabled while tab is owned by ' + label;
     updateSendButtonState();
-  } catch (_e) {
-    // Chip is best-effort -- never poison sidepanel boot.
+    return {
+      verified: true,
+      tabId: tab.id,
+      windowId: Number.isSafeInteger(tab.windowId) ? tab.windowId : null,
+      ownerAgentId: ownerAgentId,
+      foreignOwned: true
+    };
+  } catch (error) {
+    console.warn('[sidepanel] ownership refresh failed', error && error.message ? error.message : error);
+    return { verified: false, code: 'owner_refresh_failed' };
   }
+}
+
+async function syncActiveTabSurface(tabId, windowId) {
+  const syncGeneration = ++_activeTabSurfaceSyncGeneration;
+  // Invalidate delegation hydration as soon as a tab transition begins. The
+  // replacement hydration later in this function will mint its own generation.
+  _delegationHydrationGeneration += 1;
+  let incomingTabId = Number.isSafeInteger(tabId) ? tabId : null;
+  try {
+    if (incomingTabId === null) {
+      const query = Number.isSafeInteger(windowId)
+        ? { active: true, windowId: windowId }
+        : { active: true, currentWindow: true };
+      const tabs = await chrome.tabs.query(query);
+      if (syncGeneration !== _activeTabSurfaceSyncGeneration) return false;
+      incomingTabId = tabs && tabs[0] && Number.isSafeInteger(tabs[0].id)
+        ? tabs[0].id
+        : null;
+    }
+
+    if (incomingTabId === null) {
+      if (syncGeneration !== _activeTabSurfaceSyncGeneration) return false;
+      _setHeaderOwner(null);
+      _chatLockedByOwnerChip = false;
+      applyInputLockout(false);
+      _activeTabIdSnapshot = null;
+      conversationId = null;
+      if (chatMessages) chatMessages.innerHTML = '';
+      return true;
+    }
+
+    const outgoingTabId = _activeTabIdSnapshot;
+    if (outgoingTabId !== incomingTabId) {
+      try { _persistTabStatusIntent(outgoingTabId); } catch (_e) { /* best-effort */ }
+    }
+
+    const ownerState = await refreshOwnerChip(incomingTabId, syncGeneration);
+    if (syncGeneration !== _activeTabSurfaceSyncGeneration) return false;
+    if (!ownerState || ownerState.verified !== true) return false;
+
+    if (typeof _adoptTabIntoRunningDelegationConversation === 'function') {
+      await _adoptTabIntoRunningDelegationConversation(incomingTabId);
+      if (syncGeneration !== _activeTabSurfaceSyncGeneration) return false;
+    }
+    const conversationSynced = await swapToTabConversation(incomingTabId);
+    if (syncGeneration !== _activeTabSurfaceSyncGeneration) return false;
+    if (conversationSynced !== true) {
+      console.warn('[sidepanel] active-tab conversation sync failed', incomingTabId);
+      conversationId = null;
+      if (chatMessages) chatMessages.innerHTML = '';
+    }
+
+    // Resolve the target tab's live automation status inside the same guarded
+    // synchronization. A late response for a previous tab is discarded by
+    // the generation check below, so it cannot restore a stale running state.
+    try {
+      if (chrome.runtime && typeof chrome.runtime.sendMessage === 'function') {
+        const liveStatus = await chrome.runtime.sendMessage({
+          action: 'getStatus',
+          activeTabId: incomingTabId
+        });
+        if (syncGeneration !== _activeTabSurfaceSyncGeneration) return false;
+        if (liveStatus && typeof liveStatus.activeSessions === 'number') {
+          const liveEntry = _getTabRunningEntry(incomingTabId);
+          liveEntry.isRunning = liveStatus.activeSessions > 0;
+          liveEntry.sessionId = liveEntry.isRunning && typeof liveStatus.currentSessionId === 'string'
+            ? liveStatus.currentSessionId
+            : null;
+          if (liveEntry.isRunning && !Number.isFinite(liveEntry.startedAt)) {
+            liveEntry.startedAt = Number.isFinite(liveStatus.currentStartTime)
+              ? liveStatus.currentStartTime
+              : Date.now();
+          }
+          if (!liveEntry.isRunning) liveEntry.startedAt = null;
+        }
+      }
+    } catch (error) {
+      console.warn('[sidepanel] active-tab running-state sync failed', error && error.message ? error.message : error);
+    }
+    if (syncGeneration !== _activeTabSurfaceSyncGeneration) return false;
+
+    _activeTabIdSnapshot = incomingTabId;
+    try {
+      var snap = _getTabRunningEntry(incomingTabId);
+      if (snap.isRunning) setRunningState(incomingTabId, snap.sessionId || null);
+      else setIdleState(incomingTabId);
+    } catch (_e) { /* best-effort */ }
+    try { _restoreTabStatusIntent(incomingTabId); } catch (_e) { /* best-effort */ }
+    try { await _hydrateDelegationForSelectedConversation(); } catch (_e) { /* best-effort */ }
+    return syncGeneration === _activeTabSurfaceSyncGeneration;
+  } catch (error) {
+    console.warn('[sidepanel] active-tab sync failed', error && error.message ? error.message : error);
+    return false;
+  }
+}
+
+async function takeControlOfActiveTab(event) {
+  if (_takeControlPending) return;
+  if (typeof _delegationCanTakeControl === 'function'
+      && typeof _delegationUiState !== 'undefined'
+      && _delegationCanTakeControl(_delegationUiState.snapshot)) {
+    await _takeDelegationControl(event);
+    return;
+  }
+
+  const requestContext = {
+    agentId: _headerOwnerAgentId,
+    tabId: _headerOwnerTabId,
+    windowId: _headerOwnerWindowId
+  };
+  if (!requestContext.agentId
+      || !Number.isSafeInteger(requestContext.tabId)
+      || !Number.isSafeInteger(requestContext.windowId)) {
+    await syncActiveTabSurface();
+    return;
+  }
+  if (typeof window !== 'undefined' && typeof window.confirm === 'function'
+      && !window.confirm('Take control of this tab? The current agent will lose access to it.')) {
+    return;
+  }
+
+  _takeControlPending = true;
+  _renderHeaderStatus();
+  try {
+    const response = await chrome.runtime.sendMessage({
+      action: 'takeTabControl',
+      tabId: requestContext.tabId,
+      windowId: requestContext.windowId,
+      expectedOwnerAgentId: requestContext.agentId
+    });
+    if (!response || response.success !== true) {
+      const code = response && response.code ? response.code : 'registry_unavailable';
+      console.warn('[sidepanel] take control rejected', code);
+      if (takeControlBtn) {
+        takeControlBtn.title = code === 'protected_delegation'
+          ? 'Use the delegated run controls to take control'
+          : 'Ownership changed; refresh and try again';
+      }
+    } else {
+      _setHeaderStatus('Ready', '');
+    }
+  } catch (error) {
+    console.warn('[sidepanel] take control failed', error && error.message ? error.message : error);
+  } finally {
+    _takeControlPending = false;
+    await syncActiveTabSurface();
+    _renderHeaderStatus();
+  }
+}
+
+if (takeControlBtn) {
+  takeControlBtn.addEventListener('click', takeControlOfActiveTab);
 }
 
 // Phase 243 plan 03 (UI-02): refresh on tab switch. The sidepanel is
@@ -3671,45 +4311,9 @@ async function refreshOwnerChip() {
 try {
   if (typeof chrome !== 'undefined' && chrome.tabs && chrome.tabs.onActivated
       && typeof chrome.tabs.onActivated.addListener === 'function') {
-    // Phase 11 FINT-21 -- extended: also swap conversation history on tab
-    // switch (D-14 / D-17 lazy mint). The ownership refresh + history swap run
-    // sequentially; both are best-effort, so a failure in one does not
-    // poison the other.
     chrome.tabs.onActivated.addListener(async (activeInfo) => {
-      // QT-uof-5 (B-FIX) -- persist the OUTGOING tab's
-      // (currentStatusMessage, currentActionGroup) BEFORE the swap clobbers
-      // them. Read _activeTabIdSnapshot here (pre-reassignment) so the
-      // entry is keyed by the tab the user is leaving.
-      try { _persistTabStatusIntent(_activeTabIdSnapshot); } catch (_e) { /* swallow */ }
-
-      try { await refreshOwnerChip(); } catch (_e) { /* swallow */ }
-      try { await swapToTabConversation(activeInfo && activeInfo.tabId); } catch (_e) { /* swallow */ }
-
-      // QT-93i-02 -- after the conversation swap, re-sync the running-state
-      // UI to reflect the newly-active tab's per-tab state. Without this,
-      // the sendBtn / statusDot / statusText reflect whatever tab was
-      // previously active. Tab swaps must surface the active tab's
-      // running state immediately so the send button enable/disable is
-      // correct on every keystroke after the swap.
-      try {
-        if (activeInfo && typeof activeInfo.tabId === 'number') {
-          _activeTabIdSnapshot = activeInfo.tabId;
-          var snap = _getTabRunningEntry(activeInfo.tabId);
-          if (snap.isRunning) {
-            setRunningState(activeInfo.tabId, snap.sessionId || null);
-          } else {
-            setIdleState(activeInfo.tabId);
-          }
-        }
-      } catch (_e) { /* swallow: re-sync is best-effort */ }
-
-      // QT-uof-5 (B-FIX) -- restore the INCOMING tab's previously-persisted
-      // (currentStatusMessage, currentActionGroup). When the tab has no
-      // entry (never had a loader), this nulls the module-scope vars so
-      // subsequent code does not inherit the outgoing tab's references.
-      try { _restoreTabStatusIntent(_activeTabIdSnapshot); } catch (_e) { /* swallow */ }
-      try { await _hydrateDelegationForSelectedConversation(); }
-      catch (_e) { /* delegated tab resync is best-effort */ }
+      if (!activeInfo || !Number.isSafeInteger(activeInfo.tabId)) return;
+      await syncActiveTabSurface(activeInfo.tabId, activeInfo.windowId);
     });
   }
 } catch (_e) {
@@ -3789,13 +4393,7 @@ try {
     chrome.windows.onFocusChanged.addListener(async (windowId) => {
       try {
         if (typeof windowId !== 'number' || windowId < 0) return;
-        await refreshOwnerChip();
-        var tabs = await chrome.tabs.query({ active: true, windowId: windowId });
-        if (tabs && tabs[0] && typeof tabs[0].id === 'number') {
-          _activeTabIdSnapshot = tabs[0].id;  // QT-93i-02
-          await swapToTabConversation(tabs[0].id);
-          await _hydrateDelegationForSelectedConversation();
-        }
+        await syncActiveTabSurface(null, windowId);
       } catch (_e) { /* swallow */ }
     });
   }
@@ -3820,6 +4418,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // (replaces previous single-key conversation init flow).
   await initTabConversationStore();
   await _loadDelegationConversationEnvelope();
+  await _loadDelegationAnsweredIds();
 
   // Phase 12 FINT-23 -- init message-log debouncer + beforeunload force flush.
   if (typeof FSBSidepanelMessageLog !== 'undefined'
@@ -3863,33 +4462,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
   
-  // QT-wnz Codex-2 -- send activeTabId so background returns only sessions
-  // owned by THIS tab. Pre-wnz the call omitted activeTabId and background
-  // returned sessionIds[0] globally, which is wrong when another tab has
-  // an older active session.
-  chrome.runtime.sendMessage({ action: 'getStatus', activeTabId: _activeTabIdSnapshot }, (response) => {
-    if (chrome.runtime.lastError) {
-      console.log('Background script not ready yet');
-      return;
-    }
-    if (response && response.activeSessions > 0) {
-      // QT-93i-02 -- wire boot-restore running state to the cached active tab.
-      setRunningState(_activeTabIdSnapshot, response.currentSessionId || null);
-      // Recover sessionId from background if UI lost it (e.g., after service worker restart)
-      if (!currentSessionId && response.currentSessionId) {
-        currentSessionId = response.currentSessionId;
-        console.log('FSB: Recovered sessionId from background:', currentSessionId);
-      }
-    }
-  });
-  
   // Set UI mode preference
   await chrome.storage.local.set({ uiMode: 'sidepanel' });
 
   // Render the read-only ownership status on load. The
   // chrome.tabs.onActivated subscription registered above keeps the status in
   // sync as the user switches tabs in the persistent sidepanel.
-  refreshOwnerChip();
+  await syncActiveTabSurface();
 
   // History list event delegation for delete buttons
   const historyListEl = document.getElementById('historyList');
@@ -3936,25 +4515,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     new FSBSpeechToText(chatInput, micBtn, sendBtn);
   }
 
-  // Phase 11 debug-phase-11-sidepanel-reopen-empty -- hydrate the chat
-  // surface from the per-tab conversation's persisted session log BEFORE
-  // adding the welcome message. If conversationId is null (D-17 lazy
-  // mint: no entry minted yet on this tab) OR no matching session rows
-  // exist (fresh conversation), the welcome message renders into an
-  // empty chat as before. Otherwise prior user prompts + ai completions
-  // replay in chronological order and the welcome is suppressed -- the
-  // user sees their conversation continuation, not a redundant greeting.
-  var hydratedCount = 0;
-  try {
-    hydratedCount = await hydrateChatFromConversationId(conversationId);
-  } catch (_e) { /* swallow: hydrate is best-effort */ }
-
-  if (hydratedCount === 0) {
-    // No prior conversation to restore -- show the welcome greeting.
+  // The unified active-tab synchronization above owns conversation and
+  // delegation hydration. Add the boot greeting only when that synchronized
+  // surface has no persisted messages.
+  var hasHydratedChatMessage = chatMessages
+    && typeof chatMessages.querySelector === 'function'
+    && chatMessages.querySelector('.message');
+  if (!hasHydratedChatMessage) {
     addMessage('Welcome to FSB. How can I help?', 'system');
   }
-
-  await _hydrateDelegationForSelectedConversation();
 
   // MCP replay requests survive side-panel closure in storage.session. Hydrate
   // them after the conversation surface exists so approval never depends on
@@ -5645,29 +6214,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
         // Add retry button if task is available
         if (request.task) {
-          const retryDiv = document.createElement('div');
-          retryDiv.className = 'message system new';
-          retryDiv.textContent = 'Would you like to try again? ';
-          const retryBtn = document.createElement('button');
-          retryBtn.className = 'retry-btn';
-          retryBtn.textContent = 'Retry';
-          retryBtn.addEventListener('click', async () => {
-            // Phase 11 FINT-20 WR-03 fix -- gate the retry on the foreign-owned
-            // check. See WR-03 rationale at the handleReconComplete retry
-            // handler. Without this guard the click silently drops the user's
-            // intent because handleSendMessage's runtime gate fail-closes
-            // without surfacing the cause.
-            if (await _isActiveTabForeignOwned()) {
-              console.warn('[sidepanel] retry blocked -- active tab is foreign-owned');
-              return;
-            }
-            retryDiv.remove();
+          _renderAutomationRetryPrompt(request.task, async () => {
             chatInput.textContent = request.task;
             handleSendMessage();
           });
-          retryDiv.appendChild(retryBtn);
-          chatMessages.appendChild(retryDiv);
-          scrollToBottom();
         } else {
           addMessage('No worries! The side panel is still here. Try again or ask for help with something else.', 'system');
         }
@@ -6132,10 +6682,9 @@ document.addEventListener('dragover', (e) => e.preventDefault());
 document.addEventListener('drop', (e) => e.preventDefault());
 
 // Handle side panel specific events
-document.addEventListener('visibilitychange', () => {
+document.addEventListener('visibilitychange', async () => {
   if (!document.hidden) {
-    // Side panel became visible - refresh status if needed
-    console.log('Side panel became visible');
+    await syncActiveTabSurface();
   }
 });
 
