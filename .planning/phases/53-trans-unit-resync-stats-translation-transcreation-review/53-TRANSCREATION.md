@@ -12,7 +12,7 @@
 | `home.hero.subtitle` | Shorter, spoken marketing voice |
 | `home.hero.cta.getStarted` | CTA punch-up (e.g. “Empezar ahora” / “Jetzt starten”) |
 | `home.hero.cta.seeAction` | Natural “see it work” CTA |
-| `home.cta.openSource.title` | Open-source + BSL 1.1 line, brand span intact |
+| `home.cta.openSource.title` | Open-source + MIT line, brand span intact |
 | `home.cta.openSource.desc` | Fork/contribute framing |
 | `home.cta.openSource.github` | “View on GitHub” localized |
 | `about.hero.title` | “See FSB in Action” with orange span |

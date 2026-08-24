@@ -248,6 +248,10 @@ export class AgentsPageComponent implements OnInit, OnDestroy {
         },
       ],
     };
+    // Assigned after the literal instead of inside it: messages.xlf pins a linenumber
+    // for every $localize call above (the last sits at line 244) and CI diffs
+    // `ng extract-i18n` byte-for-byte, so nothing at or above that line may move.
+    Object.assign(payload['@graph'][0], { license: 'https://github.com/fullselfbrowsing/FSB/blob/main/LICENSE' });
     const json = JSON.stringify(payload).replace(/</g, '\\u003c');
     const script = this.renderer.createElement('script') as HTMLScriptElement;
     this.renderer.setAttribute(script, 'type', 'application/ld+json');

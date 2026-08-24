@@ -787,7 +787,7 @@ check(/fsbTriggerHandleRefreshPollForTest/.test(src), 'test-only refresh-poll al
     "": {
       "name": "fsb-mcp-server",
       "version": "0.8.0",
-      "license": "BUSL-1.1"
+      "license": "MIT"
     }
   }
 }
