@@ -20,7 +20,7 @@
  *
  * BUILD COST: the full Angular production build takes ~10-90 seconds. The
  * test invokes it as a single child process. If the CI runner is slow, set
- * env SKIP_BUILD=1 to skip layer 2 (the i18n + crawler asserts still run).
+ * env SKIP_BUILD=1 to skip layer 3 (the i18n + AEO + crawler asserts still run).
  *
  * Run: node tests/showcase-build-smoke.test.js
  */
