@@ -577,29 +577,34 @@
   // Global element cache singleton
   const elementCache = new ElementCache(DEFAULT_ELEMENT_CACHE_SIZE);
 
-  // Read elementCacheSize from storage at init and listen for live updates
-  if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-    chrome.storage.local.get(['elementCacheSize'], (result) => {
-      if (result.elementCacheSize && Number.isFinite(result.elementCacheSize)) {
-        const newSize = Math.max(10, Math.min(1000, result.elementCacheSize));
-        if (newSize !== elementCache.maxCacheSize) {
-          elementCache.maxCacheSize = newSize;
-          if (elementCache.cache.size > newSize) {
-            elementCache.invalidate();
-          }
-        }
-      }
-    });
+  function applyElementCacheSize(value) {
+    if (!Number.isFinite(Number(value))) return;
+    const newSize = Math.max(10, Math.min(1000, Number(value)));
+    if (newSize === elementCache.maxCacheSize) return;
+    elementCache.maxCacheSize = newSize;
+    if (elementCache.cache.size > newSize) elementCache.invalidate();
+  }
 
-    chrome.storage.onChanged.addListener((changes, area) => {
-      if (area === 'local' && changes.elementCacheSize) {
-        const newSize = Math.max(10, Math.min(1000, changes.elementCacheSize.newValue || DEFAULT_ELEMENT_CACHE_SIZE));
-        elementCache.maxCacheSize = newSize;
-        if (elementCache.cache.size > newSize) {
-          elementCache.invalidate();
-        }
-      }
-    });
+  // Configuration is projected by the background through one fixed bridge.
+  if (typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.sendMessage === 'function') {
+    try {
+      chrome.runtime.sendMessage({ action: 'fsb:element-cache-config-get' }, (response) => {
+        if (chrome.runtime.lastError) return;
+        if (response && response.ok === true) applyElementCacheSize(response.elementCacheSize);
+      });
+    } catch (_error) {
+      // Keep the bounded default when the extension context is unavailable.
+    }
+
+    if (chrome.runtime.onMessage && typeof chrome.runtime.onMessage.addListener === 'function') {
+      chrome.runtime.onMessage.addListener((message) => {
+        if (!message || typeof message !== 'object' || Array.isArray(message)) return;
+        const keys = Object.keys(message).sort();
+        if (keys.length !== 2 || keys[0] !== 'action' || keys[1] !== 'elementCacheSize') return;
+        if (message.action !== 'fsb:element-cache-config-changed') return;
+        applyElementCacheSize(message.elementCacheSize);
+      });
+    }
   }
 
   // ============================================================================

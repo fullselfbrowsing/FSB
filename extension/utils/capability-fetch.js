@@ -2974,6 +2974,531 @@
         }
         return typedError('RECIPE_NOT_FOUND', { reason: 'unsupported-gcal-page-read-action' });
       }
+
+      // Private, fixed-function Drive corpus seam. This namespace is dispatched
+      // before the public page-read namespace catalog and is never registered in
+      // that catalog. Every request shape, provider path, field set, and MIME is
+      // constructed here from literals.
+      var SKOPEO_DRIVE_CORPUS_NAMESPACE = 'skopeo-drive-corpus';
+      var SKOPEO_DRIVE_CORPUS_MAX_EXACT_BYTES = 10485760;
+      var SKOPEO_DRIVE_CORPUS_FILE_FIELDS = [
+        'capabilities(canDownload,canListChildren)',
+        'driveId',
+        'headRevisionId',
+        'id',
+        'md5Checksum',
+        'mimeType',
+        'modifiedTime',
+        'name',
+        'parents',
+        'resourceKey',
+        'sha1Checksum',
+        'sha256Checksum',
+        'shortcutDetails(targetId,targetMimeType)',
+        'size',
+        'trashed',
+        'version'
+      ].join(',');
+      var SKOPEO_DRIVE_CORPUS_DOC_MIME = 'application/vnd.google-apps.document';
+      var SKOPEO_DRIVE_CORPUS_TEXT_MIME = 'text/plain';
+
+      function corpusFailure(kind, status) {
+        return {
+          kind: kind,
+          status: typeof status === 'number' && isFinite(status) ? status : null
+        };
+      }
+      function corpusSuccess(status, data) {
+        return { kind: 'ok', status: status, data: data };
+      }
+      function corpusRecord(value) {
+        return value && typeof value === 'object' && !Array.isArray(value) ? value : null;
+      }
+      function corpusExactKeys(value, required, optional) {
+        if (!corpusRecord(value)) { return false; }
+        if (typeof Object.getOwnPropertySymbols === 'function' && Object.getOwnPropertySymbols(value).length) {
+          return false;
+        }
+        var names = Object.getOwnPropertyNames(value).sort();
+        var allowed = required.concat(optional || []).sort();
+        if (names.length < required.length || names.length > allowed.length) { return false; }
+        for (var i = 0; i < required.length; i++) {
+          if (names.indexOf(required[i]) === -1) { return false; }
+        }
+        for (var j = 0; j < names.length; j++) {
+          if (allowed.indexOf(names[j]) === -1) { return false; }
+          var descriptor = Object.getOwnPropertyDescriptor(value, names[j]);
+          if (!descriptor || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) { return false; }
+        }
+        return true;
+      }
+      function corpusBoundedString(value, max) {
+        return typeof value === 'string' && value.length > 0 && value.length <= max && !/[\u0000-\u001f\u007f]/.test(value);
+      }
+      function corpusFileId(value) {
+        return corpusBoundedString(value, 512) && !/[\\'?#]/.test(value);
+      }
+      function corpusToken(value) {
+        return corpusBoundedString(value, 2048) && /^[A-Za-z0-9._~+/=-]+$/.test(value);
+      }
+      function corpusOptionalToken(value) {
+        return value === undefined || value === null || corpusToken(value);
+      }
+      function corpusOptionalString(value, max) {
+        return value === undefined || value === null || corpusBoundedString(value, max);
+      }
+      function corpusStatus(value) {
+        return typeof value === 'number' && isFinite(value) && Math.floor(value) === value
+          ? value
+          : null;
+      }
+      function corpusStatusFailure(status, contentRead) {
+        if (status === 401 || status === 408 || status === 429 || (status >= 500 && status <= 599)) {
+          return corpusFailure('transient', status);
+        }
+        if (status === 403) {
+          return corpusFailure(contentRead ? 'download-denied' : 'denied', status);
+        }
+        if (status === 404) { return corpusFailure('not-found', status); }
+        return corpusFailure('unsupported', status);
+      }
+      function corpusClient() {
+        try {
+          var root = globalThis.gapi;
+          var client = root && root.client;
+          return client && typeof client.request === 'function' ? client : null;
+        } catch (_clientErr) {
+          return null;
+        }
+      }
+      async function corpusGapi(options, contentRead) {
+        var client = corpusClient();
+        if (!client) { return corpusFailure('transient', null); }
+        var response;
+        try {
+          response = await client.request(options);
+        } catch (err) {
+          var rejectedStatus = corpusStatus(err && err.status);
+          return rejectedStatus === null
+            ? corpusFailure('transient', null)
+            : corpusStatusFailure(rejectedStatus, contentRead === true);
+        }
+        var status = corpusStatus(response && response.status);
+        if (status === null) { return corpusFailure('unsupported', null); }
+        if (status !== 200) { return corpusStatusFailure(status, contentRead === true); }
+        return { kind: 'ok', status: status, response: response };
+      }
+      function corpusHex(value, length) {
+        return value === undefined || value === null ||
+          (typeof value === 'string' && new RegExp('^[0-9a-fA-F]{' + length + '}$').test(value));
+      }
+      function corpusIsoTime(value) {
+        return value === undefined || value === null ||
+          (typeof value === 'string' && value.length <= 64 &&
+            /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$/.test(value));
+      }
+      function corpusParents(value) {
+        if (value === undefined || value === null) { return []; }
+        if (!Array.isArray(value) || value.length > 128) { return null; }
+        var out = [];
+        for (var i = 0; i < value.length; i++) {
+          if (!corpusFileId(value[i])) { return null; }
+          out.push(value[i]);
+        }
+        return out;
+      }
+      function corpusFile(value) {
+        var raw = corpusRecord(value);
+        if (!raw || !corpusFileId(raw.id) || !corpusBoundedString(raw.name, 4096) ||
+            !corpusBoundedString(raw.mimeType, 256) || typeof raw.trashed !== 'boolean') {
+          return null;
+        }
+        var parents = corpusParents(raw.parents);
+        var capabilities = corpusRecord(raw.capabilities);
+        if (!parents || !capabilities || typeof capabilities.canDownload !== 'boolean' ||
+            typeof capabilities.canListChildren !== 'boolean') {
+          return null;
+        }
+        if (!corpusOptionalToken(raw.driveId) || !corpusOptionalToken(raw.resourceKey) ||
+            !corpusOptionalToken(raw.headRevisionId) || !corpusOptionalToken(raw.version) ||
+            !corpusHex(raw.md5Checksum, 32) || !corpusHex(raw.sha1Checksum, 40) ||
+            !corpusHex(raw.sha256Checksum, 64) || !corpusIsoTime(raw.modifiedTime) ||
+            !(raw.size === undefined || raw.size === null ||
+              (typeof raw.size === 'string' && /^\d{1,32}$/.test(raw.size)))) {
+          return null;
+        }
+        var shortcut = null;
+        if (raw.shortcutDetails !== undefined && raw.shortcutDetails !== null) {
+          var shortcutRaw = corpusRecord(raw.shortcutDetails);
+          if (!shortcutRaw || !corpusFileId(shortcutRaw.targetId) ||
+              !corpusBoundedString(shortcutRaw.targetMimeType, 256)) {
+            return null;
+          }
+          shortcut = {
+            targetId: shortcutRaw.targetId,
+            targetMimeType: shortcutRaw.targetMimeType
+          };
+        }
+        return {
+          id: raw.id,
+          name: raw.name,
+          mimeType: raw.mimeType,
+          parents: parents,
+          trashed: raw.trashed,
+          driveId: raw.driveId || null,
+          resourceKey: raw.resourceKey || null,
+          capabilities: {
+            canDownload: raw.capabilities.canDownload,
+            canListChildren: raw.capabilities.canListChildren
+          },
+          version: raw.version || null,
+          headRevisionId: raw.headRevisionId || null,
+          md5Checksum: raw.md5Checksum || null,
+          sha1Checksum: raw.sha1Checksum || null,
+          sha256Checksum: raw.sha256Checksum || null,
+          size: raw.size || null,
+          modifiedTime: raw.modifiedTime || null,
+          shortcutDetails: shortcut
+        };
+      }
+      function corpusResultData(gapiResult) {
+        var response = gapiResult && gapiResult.response;
+        return response && Object.prototype.hasOwnProperty.call(response, 'result')
+          ? response.result
+          : null;
+      }
+      function corpusFileRequest(fileId, resourceKey) {
+        var params = {
+          fields: SKOPEO_DRIVE_CORPUS_FILE_FIELDS,
+          supportsAllDrives: true
+        };
+        var request = {
+          path: '/drive/v3/files/' + encodeURIComponent(fileId),
+          method: 'GET',
+          params: params
+        };
+        if (resourceKey) {
+          request.headers = {
+            'X-Goog-Drive-Resource-Keys': fileId + '/' + resourceKey
+          };
+        }
+        return request;
+      }
+      function corpusHeadersLength(headers) {
+        if (!headers) { return null; }
+        var value = null;
+        try {
+          if (typeof headers.get === 'function') {
+            value = headers.get('content-length');
+          } else if (corpusRecord(headers)) {
+            value = headers['content-length'];
+            if (value === undefined) { value = headers['Content-Length']; }
+          }
+        } catch (_headerErr) {
+          return -1;
+        }
+        if (value === undefined || value === null || value === '') { return null; }
+        if (typeof value !== 'string' && typeof value !== 'number') { return -1; }
+        var text = String(value);
+        if (!/^\d{1,16}$/.test(text)) { return -1; }
+        var number = Number(text);
+        return Number.isSafeInteger(number) ? number : -1;
+      }
+      function corpusBytes(value) {
+        if (value instanceof Uint8Array) {
+          return new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+        }
+        if (typeof ArrayBuffer !== 'undefined' && value instanceof ArrayBuffer) {
+          return new Uint8Array(value);
+        }
+        if (typeof ArrayBuffer !== 'undefined' && ArrayBuffer.isView && ArrayBuffer.isView(value)) {
+          return new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+        }
+        if (typeof value === 'string') {
+          try { return new TextEncoder().encode(value); } catch (_encodeErr) { return null; }
+        }
+        return null;
+      }
+      async function corpusReadBody(response) {
+        var declared = corpusHeadersLength(response && response.headers);
+        if (declared === -1) { return corpusFailure('malformed', 200); }
+        if (declared !== null && declared > SKOPEO_DRIVE_CORPUS_MAX_EXACT_BYTES) {
+          return corpusFailure('too-large', 200);
+        }
+        var source = response && response.body;
+        var direct = corpusBytes(source);
+        if (direct) {
+          if (direct.byteLength > SKOPEO_DRIVE_CORPUS_MAX_EXACT_BYTES) {
+            return corpusFailure('too-large', 200);
+          }
+          if (declared !== null && declared !== direct.byteLength) {
+            return corpusFailure('incomplete', 200);
+          }
+          return { kind: 'ok', status: 200, bytes: new Uint8Array(direct) };
+        }
+        var readerSource = source && typeof source.getReader === 'function'
+          ? source
+          : (response && response.body && typeof response.body.getReader === 'function' ? response.body : null);
+        if (!readerSource) { return corpusFailure('unsupported', 200); }
+        var reader;
+        try { reader = readerSource.getReader(); } catch (_readerErr) { return corpusFailure('incomplete', 200); }
+        if (!reader || typeof reader.read !== 'function') { return corpusFailure('unsupported', 200); }
+        var chunks = [];
+        var total = 0;
+        try {
+          while (true) {
+            var part = await reader.read();
+            if (!part || typeof part.done !== 'boolean') { return corpusFailure('incomplete', 200); }
+            if (part.done) { break; }
+            var chunk = corpusBytes(part.value);
+            if (!chunk) { return corpusFailure('malformed', 200); }
+            total += chunk.byteLength;
+            if (total > SKOPEO_DRIVE_CORPUS_MAX_EXACT_BYTES) {
+              if (typeof reader.cancel === 'function') {
+                try { await reader.cancel(); } catch (_cancelErr) { /* the read is already rejected */ }
+              }
+              return corpusFailure('too-large', 200);
+            }
+            chunks.push(new Uint8Array(chunk));
+          }
+        } catch (_streamErr) {
+          return corpusFailure('incomplete', 200);
+        }
+        if (declared !== null && declared !== total) { return corpusFailure('incomplete', 200); }
+        var bytes = new Uint8Array(total);
+        var offset = 0;
+        for (var i = 0; i < chunks.length; i++) {
+          bytes.set(chunks[i], offset);
+          offset += chunks[i].byteLength;
+        }
+        return { kind: 'ok', status: 200, bytes: bytes };
+      }
+      function corpusBase64(bytes) {
+        var parts = [];
+        for (var offset = 0; offset < bytes.byteLength; offset += 32768) {
+          var slice = bytes.subarray(offset, Math.min(offset + 32768, bytes.byteLength));
+          var chars = '';
+          for (var i = 0; i < slice.length; i++) { chars += String.fromCharCode(slice[i]); }
+          parts.push(chars);
+        }
+        return btoa(parts.join(''));
+      }
+      async function corpusHash(bytes) {
+        var digest = await globalThis.crypto.subtle.digest('SHA-256', bytes);
+        var view = new Uint8Array(digest);
+        var hex = '';
+        for (var i = 0; i < view.length; i++) { hex += view[i].toString(16).padStart(2, '0'); }
+        return 'sha256:' + hex;
+      }
+      async function corpusReadContent(args) {
+        var metadataResult = await corpusGapi(corpusFileRequest(args.fileId, args.resourceKey), false);
+        if (!metadataResult || metadataResult.kind !== 'ok') { return metadataResult; }
+        var file = corpusFile(corpusResultData(metadataResult));
+        if (!file || file.id !== args.fileId || file.mimeType !== args.mimeType) {
+          return corpusFailure('malformed', 200);
+        }
+        if (args.resourceKey && file.resourceKey && args.resourceKey !== file.resourceKey) {
+          return corpusFailure('malformed', 200);
+        }
+        if (file.capabilities.canDownload !== true) {
+          return corpusFailure('download-denied', 200);
+        }
+        var bodyOptions = args.mimeType === SKOPEO_DRIVE_CORPUS_DOC_MIME
+          ? {
+              path: '/drive/v3/files/' + encodeURIComponent(args.fileId) + '/export',
+              method: 'GET',
+              params: { mimeType: SKOPEO_DRIVE_CORPUS_TEXT_MIME }
+            }
+          : {
+              path: '/drive/v3/files/' + encodeURIComponent(args.fileId),
+              method: 'GET',
+              params: { alt: 'media', supportsAllDrives: true }
+            };
+        if (args.resourceKey) {
+          bodyOptions.headers = {
+            'X-Goog-Drive-Resource-Keys': args.fileId + '/' + args.resourceKey
+          };
+        }
+        var bodyResult = await corpusGapi(bodyOptions, true);
+        if (!bodyResult || bodyResult.kind !== 'ok') { return bodyResult; }
+        var complete = await corpusReadBody(bodyResult.response);
+        if (!complete || complete.kind !== 'ok') { return complete; }
+        var exactBytes = complete.bytes;
+        try {
+          var byteHash = await corpusHash(exactBytes);
+          return corpusSuccess(200, {
+            bytesBase64: corpusBase64(exactBytes),
+            exactByteLength: exactBytes.byteLength,
+            byteHash: byteHash
+          });
+        } catch (_contentErr) {
+          return corpusFailure('malformed', 200);
+        }
+      }
+      async function corpusDriveRead(privateRequest) {
+        if (!corpusExactKeys(privateRequest, ['origin', 'namespace', 'action', 'args'], []) ||
+            privateRequest.namespace !== SKOPEO_DRIVE_CORPUS_NAMESPACE ||
+            (privateRequest.origin !== 'https://drive.google.com' &&
+              privateRequest.origin !== 'https://docs.google.com') ||
+            !globalThis.location || globalThis.location.origin !== privateRequest.origin) {
+          return corpusFailure('unsupported', null);
+        }
+        var action = privateRequest.action;
+        var args = privateRequest.args;
+        if (typeof action !== 'string') { return corpusFailure('unsupported', null); }
+        if (action === 'about') {
+          if (!corpusExactKeys(args, [], [])) { return corpusFailure('unsupported', null); }
+          var aboutResult = await corpusGapi({
+            path: '/drive/v3/about',
+            method: 'GET',
+            params: { fields: 'user(permissionId)' }
+          }, false);
+          if (!aboutResult || aboutResult.kind !== 'ok') { return aboutResult; }
+          var aboutData = corpusRecord(corpusResultData(aboutResult));
+          var user = aboutData && corpusRecord(aboutData.user);
+          return user && corpusToken(user.permissionId)
+            ? corpusSuccess(200, { permissionId: user.permissionId })
+            : corpusFailure('malformed', 200);
+        }
+        if (action === 'getFile') {
+          if (!corpusExactKeys(args, ['fileId'], ['resourceKey']) || !corpusFileId(args.fileId) ||
+              !corpusOptionalToken(args.resourceKey)) {
+            return corpusFailure('unsupported', null);
+          }
+          var fileResult = await corpusGapi(corpusFileRequest(args.fileId, args.resourceKey), false);
+          if (!fileResult || fileResult.kind !== 'ok') { return fileResult; }
+          var file = corpusFile(corpusResultData(fileResult));
+          return file && file.id === args.fileId
+            ? corpusSuccess(200, file)
+            : corpusFailure('malformed', 200);
+        }
+        if (action === 'listChildren') {
+          if (!corpusExactKeys(args, ['parentFileId'], ['pageToken', 'driveId', 'resourceKey']) ||
+              !corpusFileId(args.parentFileId) || !corpusOptionalToken(args.pageToken) ||
+              !corpusOptionalToken(args.driveId) || !corpusOptionalToken(args.resourceKey)) {
+            return corpusFailure('unsupported', null);
+          }
+          var listParams = {
+            q: "'" + args.parentFileId + "' in parents and trashed = false",
+            spaces: 'drive',
+            corpora: args.driveId ? 'drive' : 'user',
+            supportsAllDrives: true,
+            includeItemsFromAllDrives: true,
+            pageSize: 1000
+          };
+          if (args.driveId) { listParams.driveId = args.driveId; }
+          if (args.pageToken) { listParams.pageToken = args.pageToken; }
+          listParams.fields = 'nextPageToken,incompleteSearch,files(' + SKOPEO_DRIVE_CORPUS_FILE_FIELDS + ')';
+          var listRequest = { path: '/drive/v3/files', method: 'GET', params: listParams };
+          if (args.resourceKey) {
+            listRequest.headers = {
+              'X-Goog-Drive-Resource-Keys': args.parentFileId + '/' + args.resourceKey
+            };
+          }
+          var listResult = await corpusGapi(listRequest, false);
+          if (!listResult || listResult.kind !== 'ok') { return listResult; }
+          var listData = corpusRecord(corpusResultData(listResult));
+          if (!listData || typeof listData.incompleteSearch !== 'boolean') {
+            return corpusFailure('malformed', 200);
+          }
+          if (listData.incompleteSearch) { return corpusFailure('incomplete', 200); }
+          if (!Array.isArray(listData.files) || listData.files.length > 1000 ||
+              !corpusOptionalToken(listData.nextPageToken)) {
+            return corpusFailure(listData.files && listData.files.length > 1000 ? 'incomplete' : 'malformed', 200);
+          }
+          var files = [];
+          for (var fi = 0; fi < listData.files.length; fi++) {
+            var listedFile = corpusFile(listData.files[fi]);
+            if (!listedFile) { return corpusFailure('malformed', 200); }
+            files.push(listedFile);
+          }
+          return corpusSuccess(200, {
+            files: files,
+            nextPageToken: listData.nextPageToken || null,
+            incompleteSearch: false
+          });
+        }
+        if (action === 'getStartPageToken') {
+          if (!corpusExactKeys(args, [], ['driveId']) || !corpusOptionalToken(args.driveId)) {
+            return corpusFailure('unsupported', null);
+          }
+          var startParams = { supportsAllDrives: true };
+          if (args.driveId) { startParams.driveId = args.driveId; }
+          var startResult = await corpusGapi({
+            path: '/drive/v3/changes/startPageToken', method: 'GET', params: startParams
+          }, false);
+          if (!startResult || startResult.kind !== 'ok') { return startResult; }
+          var startData = corpusRecord(corpusResultData(startResult));
+          return startData && corpusToken(startData.startPageToken)
+            ? corpusSuccess(200, { startPageToken: startData.startPageToken })
+            : corpusFailure('malformed', 200);
+        }
+        if (action === 'listChanges') {
+          if (!corpusExactKeys(args, ['pageToken'], ['driveId']) || !corpusToken(args.pageToken) ||
+              !corpusOptionalToken(args.driveId)) {
+            return corpusFailure('unsupported', null);
+          }
+          var changeParams = {
+            pageToken: args.pageToken,
+            spaces: 'drive',
+            includeRemoved: true,
+            supportsAllDrives: true,
+            includeItemsFromAllDrives: true,
+            pageSize: 1000,
+            fields: 'nextPageToken,newStartPageToken,changes(fileId,removed,time,file(' +
+              SKOPEO_DRIVE_CORPUS_FILE_FIELDS + '))'
+          };
+          if (args.driveId) { changeParams.driveId = args.driveId; }
+          var changesResult = await corpusGapi({
+            path: '/drive/v3/changes', method: 'GET', params: changeParams
+          }, false);
+          if (!changesResult || changesResult.kind !== 'ok') { return changesResult; }
+          var changesData = corpusRecord(corpusResultData(changesResult));
+          if (!changesData || !Array.isArray(changesData.changes) || changesData.changes.length > 1000 ||
+              !corpusOptionalToken(changesData.nextPageToken) ||
+              !corpusOptionalToken(changesData.newStartPageToken)) {
+            return corpusFailure(changesData && changesData.changes && changesData.changes.length > 1000
+              ? 'incomplete'
+              : 'malformed', 200);
+          }
+          var changes = [];
+          for (var ci = 0; ci < changesData.changes.length; ci++) {
+            var rawChange = corpusRecord(changesData.changes[ci]);
+            if (!rawChange || !corpusFileId(rawChange.fileId) || typeof rawChange.removed !== 'boolean' ||
+                !corpusIsoTime(rawChange.time)) {
+              return corpusFailure('malformed', 200);
+            }
+            var changedFile = rawChange.file === undefined || rawChange.file === null
+              ? null
+              : corpusFile(rawChange.file);
+            if ((!rawChange.removed && (!changedFile || changedFile.id !== rawChange.fileId)) ||
+                (rawChange.file !== undefined && rawChange.file !== null && !changedFile)) {
+              return corpusFailure('malformed', 200);
+            }
+            changes.push({
+              fileId: rawChange.fileId,
+              removed: rawChange.removed,
+              time: rawChange.time || null,
+              file: changedFile
+            });
+          }
+          return corpusSuccess(200, {
+            changes: changes,
+            nextPageToken: changesData.nextPageToken || null,
+            newStartPageToken: changesData.newStartPageToken || null
+          });
+        }
+        if (action === 'readContent') {
+          if (!corpusExactKeys(args, ['fileId', 'mimeType'], ['resourceKey']) ||
+              !corpusFileId(args.fileId) || !corpusOptionalToken(args.resourceKey) ||
+              (args.mimeType !== SKOPEO_DRIVE_CORPUS_DOC_MIME &&
+                args.mimeType !== SKOPEO_DRIVE_CORPUS_TEXT_MIME)) {
+            return corpusFailure('unsupported', null);
+          }
+          return corpusReadContent(args);
+        }
+        return corpusFailure('unsupported', null);
+      }
       var GDRIVE_API_KEY = 'AIzaSyD_InbmSFufIEps5UAt2NmB_3LvBH3Sz_8';
       var GDRIVE_FILE_FIELDS = 'id,name,mimeType,modifiedTime,createdTime,size,parents,trashed,starred,shared,webViewLink,iconLink,description,owners(displayName,emailAddress),lastModifyingUser(displayName,emailAddress)';
       var GDRIVE_FILE_LIST_FIELDS = 'nextPageToken,files(' + GDRIVE_FILE_FIELDS + ')';
@@ -5351,6 +5876,18 @@
         return typedError('RECIPE_NOT_FOUND', { reason: 'unsupported-steam-page-read-action' });
       }
 
+      var privateNamespace = request && typeof request === 'object'
+        ? Object.getOwnPropertyDescriptor(request, 'namespace')
+        : null;
+      if (privateNamespace && Object.prototype.hasOwnProperty.call(privateNamespace, 'value') &&
+          privateNamespace.value === SKOPEO_DRIVE_CORPUS_NAMESPACE) {
+        try {
+          return await corpusDriveRead(request);
+        } catch (_corpusErr) {
+          return corpusFailure('unsupported', null);
+        }
+      }
+
       try {
         if (!request || (request.namespace !== 'whatsapp'
             && request.namespace !== 'cockroachdb'
@@ -5729,21 +6266,77 @@
     };
   }
 
-  async function executeBoundPageRead(request, tabId) {
+  function _awaitPageReadOperation(thunk, operationSignal) {
+    var promise = Promise.resolve().then(thunk);
+    if (!operationSignal) {
+      return promise.then(function(value) {
+        return { ok: true, value: value };
+      }, function() {
+        return { ok: false, aborted: false };
+      });
+    }
+    return new Promise(function(resolve) {
+      var settled = false;
+      function finish(value) {
+        if (settled) return;
+        settled = true;
+        operationSignal.removeEventListener('abort', onAbort);
+        resolve(value);
+      }
+      function onAbort() {
+        finish({ ok: false, aborted: true });
+      }
+      operationSignal.addEventListener('abort', onAbort, { once: true });
+      if (operationSignal.aborted) onAbort();
+      promise.then(function(value) {
+        finish({ ok: true, value: value });
+      }, function() {
+        finish({ ok: false, aborted: false });
+      });
+    });
+  }
+
+  async function executeBoundPageRead(request, tabId, operationSignal) {
+    if (operationSignal !== undefined && (!operationSignal ||
+        typeof operationSignal.aborted !== 'boolean' ||
+        typeof operationSignal.addEventListener !== 'function' ||
+        typeof operationSignal.removeEventListener !== 'function')) {
+      return _typedError('RECIPE_DOM_FALLBACK_PENDING', {
+        reason: 'page-read-invalid-operation-signal',
+        fellBackToDom: true
+      });
+    }
+    if (operationSignal && operationSignal.aborted) {
+      return _typedError('RECIPE_DOM_FALLBACK_PENDING', {
+        reason: 'page-read-operation-aborted',
+        fellBackToDom: true
+      });
+    }
     var c = _getChrome();
     var tab = null;
     if (c && c.tabs && typeof c.tabs.get === 'function') {
-      try {
-        tab = await c.tabs.get(tabId);
-      } catch (tabErr) {
-        tab = null;
+      var tabRead = await _awaitPageReadOperation(function() {
+        return c.tabs.get(tabId);
+      }, operationSignal);
+      if (tabRead.aborted) {
+        return _typedError('RECIPE_DOM_FALLBACK_PENDING', {
+          reason: 'page-read-operation-aborted',
+          fellBackToDom: true
+        });
       }
+      tab = tabRead.ok ? tabRead.value : null;
     }
     var tabOrigin = null;
     try {
       tabOrigin = (tab && tab.url) ? new URL(tab.url).origin : null;
     } catch (originErr) {
       tabOrigin = null;
+    }
+    if (operationSignal && operationSignal.aborted) {
+      return _typedError('RECIPE_DOM_FALLBACK_PENDING', {
+        reason: 'page-read-operation-aborted',
+        fellBackToDom: true
+      });
     }
     if (!tabOrigin || tabOrigin !== (request && request.origin)) {
       return _typedError('RECIPE_ORIGIN_MISMATCH', {
@@ -5758,17 +6351,30 @@
       });
     }
 
-    var results;
-    try {
-      results = await c.scripting.executeScript({
+    var execution = await _awaitPageReadOperation(function() {
+      return c.scripting.executeScript({
         target: { tabId: tabId },
         world: 'MAIN',
         func: capabilityPageReadInPage,
         args: [request]
       });
-    } catch (execErr) {
+    }, operationSignal);
+    if (execution.aborted) {
+      return _typedError('RECIPE_DOM_FALLBACK_PENDING', {
+        reason: 'page-read-operation-aborted',
+        fellBackToDom: true
+      });
+    }
+    if (!execution.ok) {
       return _typedError('RECIPE_DOM_FALLBACK_PENDING', {
         reason: 'page-read-execute-script-failed',
+        fellBackToDom: true
+      });
+    }
+    var results = execution.value;
+    if (operationSignal && operationSignal.aborted) {
+      return _typedError('RECIPE_DOM_FALLBACK_PENDING', {
+        reason: 'page-read-operation-aborted',
         fellBackToDom: true
       });
     }

@@ -91,7 +91,7 @@
     return false;
   }
 
-  function _handlerParamsSchema(entry) {
+  function getResolvedParamsSchema(entry) {
     if (!entry) { return null; }
     if (entry.params && typeof entry.params === 'object') { return entry.params; }
     if (entry.handler && entry.handler.params && typeof entry.handler.params === 'object') { return entry.handler.params; }
@@ -99,32 +99,36 @@
     return null;
   }
 
-  function _validateHandlerParams(entry, args) {
-    var schema = _handlerParamsSchema(entry);
-    if (!schema) { return null; }
+  function validateResolvedArgs(entry, args, internalErrorMode) {
+    var schema = getResolvedParamsSchema(entry);
+    if (!schema) { return internalErrorMode ? null : true; }
     if (_paramsHasRemoteRef(schema)) {
-      return _err('RECIPE_SCHEMA_INVALID', { reason: 'handler-params-ref' });
+      var refError = _err('RECIPE_SCHEMA_INVALID', { reason: 'handler-params-ref' });
+      return internalErrorMode ? refError : false;
     }
     var safeArgs = (args && typeof args === 'object') ? args : {};
     try {
       var validator = _getValidator(schema, '2020-12');
       if (!validator) {
-        return _err('RECIPE_SCHEMA_INVALID', { error: 'validator unavailable' });
+        var unavailableError = _err('RECIPE_SCHEMA_INVALID', { error: 'validator unavailable' });
+        return internalErrorMode ? unavailableError : false;
       }
       var result = validator.validate(safeArgs);
       if (!result || result.valid !== true) {
-        return _err('RECIPE_SCHEMA_INVALID', {
+        var invalidError = _err('RECIPE_SCHEMA_INVALID', {
           reason: 'handler-params',
           errors: (result && result.errors) ? result.errors : []
         });
+        return internalErrorMode ? invalidError : false;
       }
     } catch (e) {
-      return _err('RECIPE_SCHEMA_INVALID', {
+      var schemaError = _err('RECIPE_SCHEMA_INVALID', {
         reason: 'handler-params-schema',
         error: (e && e.message) ? e.message : String(e)
       });
+      return internalErrorMode ? schemaError : false;
     }
-    return null;
+    return internalErrorMode ? null : true;
   }
 
   // ---- typeof-guarded collaborator accessors (mirror capability-search.js:57-69) -
@@ -695,7 +699,7 @@
     if (!handler || typeof handler.handle !== 'function') {
       return _err('RECIPE_NOT_FOUND', { slug: slug, reason: 'handler-unavailable' });
     }
-    var paramError = _validateHandlerParams(entry, args);
+    var paramError = validateResolvedArgs(entry, args, true);
     if (paramError) { return paramError; }
     var primitive = _fetchPrimitive();
     var interp = _interp();
@@ -868,6 +872,8 @@
   // ---- Export shape (dual-export IIFE; mirror capability-interpreter.js:372-385) -
   var exportsObj = {
     invoke: invoke,
+    getResolvedParamsSchema: getResolvedParamsSchema,
+    validateResolvedArgs: validateResolvedArgs,
     FsbConsentGate: _ownGate   // exported so callers can reference the gate directly
   };
 

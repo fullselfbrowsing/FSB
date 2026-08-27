@@ -10,11 +10,151 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
   // Automation Logger for FSB v0.9.90
   // Provides structured logging for debugging automation loops
 
+  const TRUSTED_MESSAGE = Object.freeze({
+    LOG_REPLACE: 'fsb:automation-log-replace',
+    LOG_LOAD: 'fsb:automation-log-load',
+    SESSION_SAVE: 'fsb:automation-session-save',
+    SESSION_LOAD: 'fsb:automation-session-load',
+    SESSION_LIST: 'fsb:automation-session-list',
+    SESSION_DELETE: 'fsb:automation-session-delete',
+    SESSION_CLEAR: 'fsb:automation-session-clear',
+    SNAPSHOT_LOAD: 'fsb:automation-dom-snapshot-load'
+  });
+
+  function getTrustedFeatureStore() {
+    const store = globalThis.fsbTrustedLocalFeatureStore;
+    return store && typeof store === 'object' ? store : null;
+  }
+
+  function sendTrustedFeatureMessage(message) {
+    if (typeof chrome === 'undefined' || !chrome.runtime || typeof chrome.runtime.sendMessage !== 'function') {
+      return Promise.resolve(null);
+    }
+    return new Promise((resolve) => {
+      try {
+        chrome.runtime.sendMessage(message, (response) => {
+          if (chrome.runtime.lastError) {
+            resolve(null);
+            return;
+          }
+          resolve(response || null);
+        });
+      } catch (_error) {
+        resolve(null);
+      }
+    });
+  }
+
+  function trustedReplaceAutomationLogs(logs) {
+    const store = getTrustedFeatureStore();
+    if (store && typeof store.replaceAutomationLogs === 'function') {
+      return Promise.resolve(store.replaceAutomationLogs(logs));
+    }
+    return sendTrustedFeatureMessage({ action: TRUSTED_MESSAGE.LOG_REPLACE, logs });
+  }
+
+  function trustedLoadAutomationLogs() {
+    const store = getTrustedFeatureStore();
+    if (store && typeof store.loadAutomationLogs === 'function') {
+      return Promise.resolve(store.loadAutomationLogs());
+    }
+    return sendTrustedFeatureMessage({ action: TRUSTED_MESSAGE.LOG_LOAD });
+  }
+
+  function trustedSaveAutomationSession(sessionId, session, snapshots) {
+    const store = getTrustedFeatureStore();
+    if (store && typeof store.saveAutomationSession === 'function') {
+      return Promise.resolve(store.saveAutomationSession(sessionId, session, snapshots));
+    }
+    return sendTrustedFeatureMessage({
+      action: TRUSTED_MESSAGE.SESSION_SAVE,
+      sessionId,
+      session,
+      snapshots
+    });
+  }
+
+  function trustedLoadAutomationSession(sessionId) {
+    const store = getTrustedFeatureStore();
+    if (store && typeof store.loadAutomationSession === 'function') {
+      return Promise.resolve(store.loadAutomationSession(sessionId));
+    }
+    return sendTrustedFeatureMessage({ action: TRUSTED_MESSAGE.SESSION_LOAD, sessionId });
+  }
+
+  function trustedListAutomationSessions() {
+    const store = getTrustedFeatureStore();
+    if (store && typeof store.listAutomationSessions === 'function') {
+      return Promise.resolve(store.listAutomationSessions());
+    }
+    return sendTrustedFeatureMessage({ action: TRUSTED_MESSAGE.SESSION_LIST });
+  }
+
+  function trustedDeleteAutomationSession(sessionId) {
+    const store = getTrustedFeatureStore();
+    if (store && typeof store.deleteAutomationSession === 'function') {
+      return Promise.resolve(store.deleteAutomationSession(sessionId));
+    }
+    return sendTrustedFeatureMessage({ action: TRUSTED_MESSAGE.SESSION_DELETE, sessionId });
+  }
+
+  function trustedClearAutomationSessions() {
+    const store = getTrustedFeatureStore();
+    if (store && typeof store.clearAutomationSessions === 'function') {
+      return Promise.resolve(store.clearAutomationSessions());
+    }
+    return sendTrustedFeatureMessage({ action: TRUSTED_MESSAGE.SESSION_CLEAR });
+  }
+
+  function trustedLoadAutomationDOMSnapshots(sessionId) {
+    const store = getTrustedFeatureStore();
+    if (store && typeof store.loadAutomationDOMSnapshots === 'function') {
+      return Promise.resolve(store.loadAutomationDOMSnapshots(sessionId));
+    }
+    return sendTrustedFeatureMessage({ action: TRUSTED_MESSAGE.SNAPSHOT_LOAD, sessionId });
+  }
+
+  function getSafeSnapshotOrigin(value) {
+    if (typeof value !== 'string' || value.length > 2048) return '';
+    try {
+      const parsed = new URL(value);
+      return parsed.protocol === 'https:' || parsed.protocol === 'http:' ? parsed.origin : '';
+    } catch (_error) {
+      return '';
+    }
+  }
+
+  function getSafePersistedText(value, maxChars) {
+    return String(value === undefined || value === null ? '' : value)
+      .slice(0, maxChars)
+      .replace(/\bBearer\s+[A-Za-z0-9._~+\/-]+/gi, '[redacted]')
+      .replace(/\b(?:sk|pk)_(?:live|test)_[A-Za-z0-9_-]+/gi, '[redacted]')
+      .replace(/\b(?:api[_ -]?key|access[_ -]?token|authorization)\s*[:=]\s*[^\s,;]+/gi, '[redacted]');
+  }
+
+  function getSafePersistedLogData(data) {
+    if (!data || typeof data !== 'object' || Array.isArray(data)) return {};
+    const safe = {};
+    ['logType', 'provider', 'category', 'action', 'reason', 'sessionId'].forEach((key) => {
+      if (typeof data[key] === 'string') safe[key] = getSafePersistedText(data[key], 96);
+    });
+    ['statusCode', 'durationMs', 'iterationCount', 'actionCount', 'tabId'].forEach((key) => {
+      if (Number.isFinite(Number(data[key]))) safe[key] = Number(data[key]);
+    });
+    if (typeof data.success === 'boolean') safe.success = data.success;
+    return safe;
+  }
+
   function filterPersistedSessionLogs(sessionLogs) {
     return (sessionLogs || []).filter(log => {
       const logType = log?.data?.logType || log?.logType || null;
       return logType !== 'prompt' && logType !== 'rawResponse';
-    });
+    }).slice(-500).map(log => ({
+      timestamp: Number.isFinite(Date.parse(log?.timestamp)) ? new Date(log.timestamp).toISOString() : new Date().toISOString(),
+      level: getSafePersistedText(log?.level || 'info', 16),
+      message: getSafePersistedText(log?.message || '', 512),
+      data: getSafePersistedLogData(log?.data)
+    }));
   }
 
   function getPersistedCommandList(sessionData = {}, fallbackTask = '') {
@@ -408,12 +548,11 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
         return this._domSnapshots[sessionId];
       }
       // Guard against invalidated extension context
-      if (!chrome.runtime?.id) return [];
-      // Then check persisted storage
+      if (typeof chrome === 'undefined' || !chrome.runtime?.id) return [];
+      // Then ask the fixed trusted feature bridge.
       try {
-        const stored = await chrome.storage.local.get('fsbDOMSnapshots');
-        const allSnapshots = stored.fsbDOMSnapshots || {};
-        return allSnapshots[sessionId] || [];
+        const result = await trustedLoadAutomationDOMSnapshots(sessionId);
+        return result && Array.isArray(result.snapshots) ? result.snapshots : [];
       } catch (error) {
         if (chrome.runtime?.id) {
           console.error('[FSB Logger] Failed to load DOM snapshots:', error);
@@ -657,10 +796,10 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
 
     async persistLogs() {
       // Guard against invalidated extension context (service worker killed mid-timer)
-      if (!chrome.runtime?.id) return;
+      if (typeof chrome === 'undefined' || !chrome.runtime?.id) return;
       try {
-        const recentLogs = this.logs.slice(-100);
-        await chrome.storage.local.set({ automationLogs: recentLogs });
+        const recentLogs = filterPersistedSessionLogs(this.logs).slice(-100);
+        await trustedReplaceAutomationLogs(recentLogs);
       } catch (error) {
         // Only log if context is still valid (avoid noisy errors during shutdown)
         if (chrome.runtime?.id) {
@@ -671,10 +810,10 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
 
     async loadLogs() {
       // Guard against invalidated extension context (service worker killed or extension reloaded)
-      if (!chrome.runtime?.id) return;
+      if (typeof chrome === 'undefined' || !chrome.runtime?.id) return;
       try {
-        const stored = await chrome.storage.local.get('automationLogs');
-        if (stored.automationLogs) this.logs = stored.automationLogs;
+        const result = await trustedLoadAutomationLogs();
+        if (result && Array.isArray(result.logs)) this.logs = result.logs;
       } catch (error) {
         // Only log if context is still valid (avoid noisy errors during shutdown)
         if (chrome.runtime?.id) {
@@ -702,19 +841,20 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
 
     async saveSession(sessionId, sessionData = {}) {
       // Guard against invalidated extension context
-      if (!chrome.runtime?.id) return false;
+      if (typeof chrome === 'undefined' || !chrome.runtime?.id) return false;
       try {
         const sessionLogs = this.getSessionLogs(sessionId);
         const persistedLogs = filterPersistedSessionLogs(sessionLogs);
         if (sessionLogs.length === 0 && persistedLogs.length === 0) return false;
 
-        const stored = await chrome.storage.local.get(['fsbSessionLogs', 'fsbSessionIndex']);
-        const sessionStorage = stored.fsbSessionLogs || {};
-        const sessionIndex = stored.fsbSessionIndex || [];
+        const loaded = await trustedLoadAutomationSession(sessionId);
+        let savedSession = loaded && loaded.session
+          ? hydratePersistedSessionRecord(sessionId, loaded.session)
+          : null;
 
-        if (sessionStorage[sessionId]) {
+        if (savedSession) {
           // APPEND MODE: Update existing session entry
-          const existing = sessionStorage[sessionId];
+          const existing = savedSession;
           const metadata = buildPersistedSessionMetadata(sessionId, sessionData, existing);
           const normalizedOutcome = normalizePersistedOutcomeFields(sessionData, existing);
           // Merge logs: add only new logs (those with timestamps after existing endTime)
@@ -755,14 +895,14 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
             existing.actionHistory = (sessionData.actionHistory || [])
               .filter(a => a.result?.success)
               .slice(-100)
-              .map(a => ({ tool: a.tool, params: a.params, result: a.result, timestamp: a.timestamp }));
+              .map(a => ({ tool: a.tool, result: { success: true }, timestamp: a.timestamp }));
           }
-          sessionStorage[sessionId] = existing;
+          savedSession = existing;
         } else {
           // NEW MODE: Create session entry
           const metadata = buildPersistedSessionMetadata(sessionId, sessionData);
           const normalizedOutcome = normalizePersistedOutcomeFields(sessionData);
-          const session = {
+          savedSession = {
             id: sessionId,
             task: metadata.commands.length > 1
               ? metadata.commands.map((cmd, i) => `[${i + 1}] ${cmd}`).join(' | ')
@@ -795,47 +935,23 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
             actionHistory: (sessionData.actionHistory || [])
               .filter(a => a.result?.success)
               .slice(-100)
-              .map(a => ({ tool: a.tool, params: a.params, result: a.result, timestamp: a.timestamp }))
+              .map(a => ({ tool: a.tool, result: { success: true }, timestamp: a.timestamp }))
           };
-          sessionStorage[sessionId] = session;
         }
 
-        // Update index
-        const savedSession = sessionStorage[sessionId];
-        const snapshotCount = (this._domSnapshots && this._domSnapshots[sessionId])
-          ? this._domSnapshots[sessionId].length : 0;
-        const indexEntry = {
-          id: sessionId, task: savedSession.task, startTime: savedSession.startTime,
-          endTime: savedSession.endTime, status: savedSession.status, actionCount: savedSession.actionCount,
-          domSnapshotCount: snapshotCount,
-          totalCost: savedSession.totalCost || 0,
-          outcome: savedSession.outcome || null,
-          outcomeDetails: savedSession.outcomeDetails || null,
-          result: savedSession.result || null,
-          completionMessage: savedSession.completionMessage || null,
-          error: savedSession.error || null,
-          blocker: savedSession.blocker || null,
-          nextStep: savedSession.nextStep || null,
-          conversationId: savedSession.conversationId || null,
-          uiSurface: savedSession.uiSurface || 'unknown',
-          historySessionId: savedSession.historySessionId || sessionId,
-          commandCount: savedSession.commandCount || 1,
-          commands: savedSession.commands || [],
-          lastTask: savedSession.lastTask || savedSession.task || null,
-          lastCommandAt: savedSession.lastCommandAt || savedSession.endTime || savedSession.startTime
-        };
-        const existingIndex = sessionIndex.findIndex(s => s.id === sessionId);
-        if (existingIndex !== -1) sessionIndex[existingIndex] = indexEntry;
-        else sessionIndex.unshift(indexEntry);
-        if (sessionIndex.length > 50) {
-          const toRemove = sessionIndex.slice(50);
-          toRemove.forEach(entry => delete sessionStorage[entry.id]);
-          sessionIndex.length = 50;
-        }
-        await chrome.storage.local.set({ fsbSessionLogs: sessionStorage, fsbSessionIndex: sessionIndex });
-
-        // Persist DOM snapshots to dedicated storage key
-        await this._persistDOMSnapshots(sessionId, sessionIndex);
+        const snapshots = (this._domSnapshots && this._domSnapshots[sessionId])
+          ? this._domSnapshots[sessionId].slice(-30).map(snapshot => ({
+            url: getSafeSnapshotOrigin(snapshot?.url),
+            timestamp: Number.isFinite(Number(snapshot?.timestamp)) ? Number(snapshot.timestamp) : Date.now(),
+            iteration: Number.isFinite(Number(snapshot?.iteration)) ? Number(snapshot.iteration) : 0,
+            elementCount: Number.isFinite(Number(snapshot?.elementCount)) ? Number(snapshot.elementCount) : 0
+          }))
+          : [];
+        const snapshotCount = snapshots.length;
+        savedSession.domSnapshotCount = snapshotCount;
+        const result = await trustedSaveAutomationSession(sessionId, savedSession, snapshots);
+        if (!result || result.ok !== true) return false;
+        if (this._domSnapshots) delete this._domSnapshots[sessionId];
 
         console.log(`[FSB Logger] Session ${sessionId} saved with ${savedSession.logs?.length || 0} total logs, ${snapshotCount} DOM snapshots`);
         return true;
@@ -847,54 +963,12 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
       }
     }
 
-    async _persistDOMSnapshots(sessionId, sessionIndex) {
-      // Guard against invalidated extension context
-      if (!chrome.runtime?.id) return;
-      try {
-        const snapshots = (this._domSnapshots && this._domSnapshots[sessionId])
-          ? this._domSnapshots[sessionId] : [];
-        if (snapshots.length === 0) return;
-
-        const stored = await chrome.storage.local.get('fsbDOMSnapshots');
-        const allSnapshots = stored.fsbDOMSnapshots || {};
-
-        // Store snapshots for this session
-        allSnapshots[sessionId] = snapshots;
-
-        // Cleanup: cap at 20 sessions of snapshots (FIFO -- oldest deleted first)
-        const snapshotSessionIds = Object.keys(allSnapshots);
-        if (snapshotSessionIds.length > 20) {
-          // Use session index order to determine age; sessions not in index are oldest
-          const indexIds = new Set((sessionIndex || []).map(s => s.id));
-          // Sort: sessions in index come last (newest), sessions not in index first (oldest)
-          const sorted = snapshotSessionIds.sort((a, b) => {
-            const aInIndex = indexIds.has(a);
-            const bInIndex = indexIds.has(b);
-            if (aInIndex && !bInIndex) return 1;
-            if (!aInIndex && bInIndex) return -1;
-            return 0;
-          });
-          const toRemove = sorted.slice(0, snapshotSessionIds.length - 20);
-          toRemove.forEach(id => delete allSnapshots[id]);
-        }
-
-        await chrome.storage.local.set({ fsbDOMSnapshots: allSnapshots });
-
-        // Clear in-memory snapshots for this session after persisting
-        delete this._domSnapshots[sessionId];
-      } catch (error) {
-        if (chrome.runtime?.id) {
-          console.error('[FSB Logger] Failed to persist DOM snapshots:', error);
-        }
-      }
-    }
-
     async loadSession(sessionId) {
       // Guard against invalidated extension context
-      if (!chrome.runtime?.id) return null;
+      if (typeof chrome === 'undefined' || !chrome.runtime?.id) return null;
       try {
-        const stored = await chrome.storage.local.get(['fsbSessionLogs']);
-        const session = (stored.fsbSessionLogs || {})[sessionId] || null;
+        const result = await trustedLoadAutomationSession(sessionId);
+        const session = result && result.session ? result.session : null;
         return hydratePersistedSessionRecord(sessionId, session);
       } catch (error) {
         if (chrome.runtime?.id) {
@@ -906,10 +980,10 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
 
     async listSessions() {
       // Guard against invalidated extension context
-      if (!chrome.runtime?.id) return [];
+      if (typeof chrome === 'undefined' || !chrome.runtime?.id) return [];
       try {
-        const stored = await chrome.storage.local.get(['fsbSessionIndex']);
-        return (stored.fsbSessionIndex || [])
+        const result = await trustedListAutomationSessions();
+        return (result && Array.isArray(result.sessions) ? result.sessions : [])
           .map(entry => hydratePersistedSessionRecord(entry?.id, entry))
           .filter(Boolean);
       } catch (error) {
@@ -919,21 +993,10 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
 
     async deleteSession(sessionId) {
       // Guard against invalidated extension context
-      if (!chrome.runtime?.id) return false;
+      if (typeof chrome === 'undefined' || !chrome.runtime?.id) return false;
       try {
-        const stored = await chrome.storage.local.get(['fsbSessionLogs', 'fsbSessionIndex', 'fsbDOMSnapshots']);
-        const sessionStorage = stored.fsbSessionLogs || {};
-        const sessionIndex = stored.fsbSessionIndex || [];
-        const allSnapshots = stored.fsbDOMSnapshots || {};
-        delete sessionStorage[sessionId];
-        delete allSnapshots[sessionId];
-        const updatedIndex = sessionIndex.filter(s => s.id !== sessionId);
-        await chrome.storage.local.set({
-          fsbSessionLogs: sessionStorage,
-          fsbSessionIndex: updatedIndex,
-          fsbDOMSnapshots: allSnapshots
-        });
-        return true;
+        const result = await trustedDeleteAutomationSession(sessionId);
+        return !!result && result.ok === true;
       } catch (error) {
         return false;
       }
@@ -973,9 +1036,10 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
 
     async clearAllSessions() {
       // Guard against invalidated extension context
-      if (!chrome.runtime?.id) return false;
+      if (typeof chrome === 'undefined' || !chrome.runtime?.id) return false;
       try {
-        await chrome.storage.local.remove(['fsbSessionLogs', 'fsbSessionIndex', 'fsbDOMSnapshots']);
+        const result = await trustedClearAutomationSessions();
+        if (!result || result.ok !== true) return false;
         this._domSnapshots = {};
         return true;
       } catch (error) {

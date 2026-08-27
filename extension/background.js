@@ -1,5 +1,119 @@
 // Background service worker for FSB v0.9.90
 
+/* FSB_TRUSTED_LOCAL_BOUNDARY_START */
+var fsbTrustedLocalBootPromise = null;
+
+function initializeFsbTrustedLocalBoundary() {
+  if (fsbTrustedLocalBootPromise) return fsbTrustedLocalBootPromise;
+
+  fsbTrustedLocalBootPromise = (async function() {
+    try {
+      if (!chrome.storage || !chrome.storage.local ||
+          typeof chrome.storage.local.setAccessLevel !== 'function') {
+        throw new Error('TRUSTED_CONTEXTS_UNAVAILABLE');
+      }
+
+      var accessAttempt = chrome.storage.local.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' });
+      if (!accessAttempt || typeof accessAttempt.then !== 'function') {
+        throw new Error('TRUSTED_CONTEXTS_NOT_CONFIRMABLE');
+      }
+      await accessAttempt;
+
+      if (!globalThis.FsbTrustedLocalFeatureStore ||
+          typeof globalThis.FsbTrustedLocalFeatureStore.create !== 'function') {
+        throw new Error('TRUSTED_FEATURE_STORE_UNAVAILABLE');
+      }
+
+      var store = globalThis.FsbTrustedLocalFeatureStore.create({ chrome: chrome });
+      await store.ready();
+      globalThis.fsbTrustedLocalFeatureStore = store;
+      globalThis.fsbTrustedLocalBoundaryClosed = false;
+
+      var hasCorpusBoundaryInitializer =
+        typeof globalThis.initializeFsbSkopeoCorpusBoundary === 'function';
+      var hasTestCorpusBoot = typeof globalThis.__FSB_TEST_CORPUS_BOOT__ === 'function';
+      if (!hasCorpusBoundaryInitializer && !hasTestCorpusBoot) {
+        throw new Error('SKOPEO_CORPUS_BOUNDARY_UNAVAILABLE');
+      }
+      if (hasCorpusBoundaryInitializer) {
+        await globalThis.initializeFsbSkopeoCorpusBoundary();
+      }
+
+      if (hasTestCorpusBoot) {
+        await globalThis.__FSB_TEST_CORPUS_BOOT__();
+      }
+
+      return store;
+    } catch (_error) {
+      globalThis.fsbTrustedLocalFeatureStore = null;
+      globalThis.fsbTrustedLocalBoundaryClosed = true;
+      console.error('[FSB] Trusted local boundary is closed');
+      return null;
+    }
+  })();
+
+  globalThis.fsbTrustedLocalBootPromise = fsbTrustedLocalBootPromise;
+  return fsbTrustedLocalBootPromise;
+}
+
+globalThis.initializeFsbTrustedLocalBoundary = initializeFsbTrustedLocalBoundary;
+fsbTrustedLocalBootPromise = initializeFsbTrustedLocalBoundary();
+/* FSB_TRUSTED_LOCAL_BOUNDARY_END */
+
+try { importScripts('utils/trusted-local-feature-store.js'); } catch (_error) { console.error('[FSB] Trusted local feature store failed to load'); }
+
+var fsbTrustedFeatureMessageHandler = null;
+
+function fsbHandlesTrustedFeatureAction(action) {
+  var vocabulary = globalThis.FsbTrustedLocalFeatureStore && globalThis.FsbTrustedLocalFeatureStore.MESSAGE;
+  if (!vocabulary || typeof action !== 'string') return false;
+  return action === vocabulary.DIAGNOSTIC_APPEND ||
+    action === vocabulary.DIAGNOSTIC_GET ||
+    action === vocabulary.AUTOMATION_LOG_REPLACE ||
+    action === vocabulary.AUTOMATION_LOG_LOAD ||
+    action === vocabulary.AUTOMATION_SESSION_SAVE ||
+    action === vocabulary.AUTOMATION_SESSION_LOAD ||
+    action === vocabulary.AUTOMATION_SESSION_LIST ||
+    action === vocabulary.AUTOMATION_SESSION_DELETE ||
+    action === vocabulary.AUTOMATION_SESSION_CLEAR ||
+    action === vocabulary.AUTOMATION_DOM_SNAPSHOT_LOAD ||
+    action === vocabulary.ELEMENT_CACHE_GET;
+}
+
+function fsbDispatchTrustedFeatureMessage(request, sender, sendResponse) {
+  Promise.resolve(fsbTrustedLocalBootPromise).then(function(store) {
+    if (!store) {
+      sendResponse({ ok: false, code: 'TRUSTED_STORAGE_CLOSED' });
+      return;
+    }
+    if (!fsbTrustedFeatureMessageHandler) {
+      fsbTrustedFeatureMessageHandler = store.createMessageHandler();
+    }
+    fsbTrustedFeatureMessageHandler(request, sender, sendResponse);
+  }, function() {
+    sendResponse({ ok: false, code: 'TRUSTED_STORAGE_CLOSED' });
+  });
+  return true;
+}
+
+Promise.resolve(fsbTrustedLocalBootPromise).then(function(store) {
+  if (!store || typeof store.subscribeElementCacheConfig !== 'function') return;
+  store.subscribeElementCacheConfig(function(elementCacheSize) {
+    if (!chrome.tabs || typeof chrome.tabs.query !== 'function' || typeof chrome.tabs.sendMessage !== 'function') return;
+    chrome.tabs.query({}, function(tabs) {
+      (Array.isArray(tabs) ? tabs : []).forEach(function(tab) {
+        if (!tab || !Number.isInteger(tab.id) || tab.id <= 0) return;
+        chrome.tabs.sendMessage(tab.id, {
+          action: globalThis.FsbTrustedLocalFeatureStore.MESSAGE.ELEMENT_CACHE_CHANGED,
+          elementCacheSize: elementCacheSize
+        }, function() {
+          void chrome.runtime.lastError;
+        });
+      });
+    });
+  });
+});
+
 // Import configuration and AI integration modules
 // Phase 269 / v0.9.69: install-identity.js MUST load FIRST so that any
 // downstream module (analytics.js, telemetry collectors, MCP recorder)
@@ -28,6 +142,7 @@ importScripts('ai/ai-integration.js');
 importScripts('ai/tool-definitions.js');
 importScripts('utils/mcp-visual-session.js');
 importScripts('utils/mcp-visual-session-lifecycle.js');
+try { importScripts('utils/skopeo-session-state.js'); } catch (e) { console.error('[FSB] Failed to load skopeo-session-state.js:', e.message); }
 try { importScripts('utils/agent-cap-recommendation.js'); } catch (e) { console.error('[FSB] Failed to load agent-cap-recommendation.js:', e.message); }
 try { importScripts('utils/agent-registry.js'); } catch (e) { console.error('[FSB] Failed to load agent-registry.js:', e.message); }
 // Phase 246 plan 01: agent-scoped tab resolver. Pure helper; consumes
@@ -149,6 +264,986 @@ try { importScripts('utils/capability-interpreter.js'); } catch (e) { console.er
 // resume-sidecar write. Additive only (D-05; background.js is byte-frozen as an
 // esbuild input; no manifest/permission change).
 try { importScripts('utils/capability-fetch.js'); } catch (e) { console.error('[FSB] Failed to load capability-fetch.js:', e.message); }
+try { importScripts('utils/skopeo-corpus-schema.js'); } catch (e) { console.error('[FSB] Failed to load skopeo-corpus-schema.js:', e.message); }
+try { importScripts('utils/skopeo-corpus-store.js'); } catch (e) { console.error('[FSB] Failed to load skopeo-corpus-store.js:', e.message); }
+try { importScripts('utils/skopeo-drive-corpus-transport.js'); } catch (e) { console.error('[FSB] Failed to load skopeo-drive-corpus-transport.js:', e.message); }
+try { importScripts('utils/skopeo-drive-authority.js'); } catch (e) { console.error('[FSB] Failed to load skopeo-drive-authority.js:', e.message); }
+try { importScripts('utils/skopeo-corpus-controller.js'); } catch (e) { console.error('[FSB] Failed to load skopeo-corpus-controller.js:', e.message); }
+try { importScripts('utils/skopeo-drive-reconciler.js'); } catch (e) { console.error('[FSB] Failed to load skopeo-drive-reconciler.js:', e.message); }
+try { importScripts('utils/skopeo-graph-schema.js'); } catch (e) { console.error('[FSB] Failed to load skopeo-graph-schema.js:', e.message); }
+try { importScripts('utils/skopeo-graph-store.js'); } catch (e) { console.error('[FSB] Failed to load skopeo-graph-store.js:', e.message); }
+try { importScripts('utils/skopeo-graph-extractor.js'); } catch (e) { console.error('[FSB] Failed to load skopeo-graph-extractor.js:', e.message); }
+try { importScripts('utils/skopeo-graph-query.js'); } catch (e) { console.error('[FSB] Failed to load skopeo-graph-query.js:', e.message); }
+try { importScripts('utils/skopeo-graph-engine.js'); } catch (e) { console.error('[FSB] Failed to load skopeo-graph-engine.js:', e.message); }
+try { importScripts('utils/skopeo-truth-schema.js'); } catch (e) { console.error('[FSB] Failed to load skopeo-truth-schema.js:', e.message); }
+try { importScripts('utils/skopeo-truth-extractor.js'); } catch (e) { console.error('[FSB] Failed to load skopeo-truth-extractor.js:', e.message); }
+try { importScripts('utils/skopeo-lineage-adjudicator.js'); } catch (e) { console.error('[FSB] Failed to load skopeo-lineage-adjudicator.js:', e.message); }
+try { importScripts('utils/skopeo-deadline-engine.js'); } catch (e) { console.error('[FSB] Failed to load skopeo-deadline-engine.js:', e.message); }
+try { importScripts('utils/skopeo-truth-store.js'); } catch (e) { console.error('[FSB] Failed to load skopeo-truth-store.js:', e.message); }
+try { importScripts('utils/skopeo-truth-engine.js'); } catch (e) { console.error('[FSB] Failed to load skopeo-truth-engine.js:', e.message); }
+try { importScripts('utils/skopeo-ask-schema.js'); } catch (e) { console.error('[FSB] Failed to load skopeo-ask-schema.js:', e.message); }
+try { importScripts('utils/skopeo-ask-engine.js'); } catch (e) { console.error('[FSB] Failed to load skopeo-ask-engine.js:', e.message); }
+try { importScripts('utils/skopeo-decision-policy-store.js'); } catch (e) { console.error('[FSB] Failed to load skopeo-decision-policy-store.js:', e.message); }
+try { importScripts('utils/skopeo-decision-policy.js'); } catch (e) { console.error('[FSB] Failed to load skopeo-decision-policy.js:', e.message); }
+try { importScripts('utils/skopeo-alert-schema.js'); } catch (e) { console.error('[FSB] Failed to load skopeo-alert-schema.js:', e.message); }
+try { importScripts('utils/skopeo-alert-store.js'); } catch (e) { console.error('[FSB] Failed to load skopeo-alert-store.js:', e.message); }
+try { importScripts('utils/skopeo-alert-engine.js'); } catch (e) { console.error('[FSB] Failed to load skopeo-alert-engine.js:', e.message); }
+try { importScripts('utils/skopeo-alert-runtime.js'); } catch (e) { console.error('[FSB] Failed to load skopeo-alert-runtime.js:', e.message); }
+try { importScripts('utils/skopeo-hud-schema.js'); } catch (e) { console.error('[FSB] Failed to load skopeo-hud-schema.js:', e.message); }
+try { importScripts('utils/skopeo-hud-projector.js'); } catch (e) { console.error('[FSB] Failed to load skopeo-hud-projector.js:', e.message); }
+
+/* FSB_SKOPEO_CORPUS_BOUNDARY_START */
+var fsbSkopeoCorpusBootPromise = null;
+var fsbSkopeoCorpusBoundaryState = null;
+var fsbSkopeoGraphEngineFacade = null;
+let fsbSkopeoTruthEngineFacade = null;
+let fsbSkopeoAskEngineFacade = null;
+let fsbSkopeoDecisionPolicyStoreFacade = null;
+let fsbSkopeoDecisionPolicyFacade = null;
+let fsbSkopeoAlertStoreFacade = null;
+let fsbSkopeoAlertEngineFacade = null;
+let fsbSkopeoAlertRuntimeFacade = null;
+const fsbSkopeoCurrentAlertContexts = new Map();
+
+function fsbClosedSkopeoAlertCandidate() {
+  return Object.freeze({ status: 'closed', candidate: null });
+}
+
+function fsbRegisterCurrentSkopeoAlertContext(alertKey, context) {
+  if (typeof alertKey !== 'string' || !/^sa1:[0-9a-f]{64}$/.test(alertKey) ||
+      !context || typeof context.revalidate !== 'function' ||
+      typeof context.openEvidence !== 'function') return false;
+  while (fsbSkopeoCurrentAlertContexts.size >= 512) {
+    const oldest = fsbSkopeoCurrentAlertContexts.keys().next();
+    if (oldest.done) break;
+    fsbSkopeoCurrentAlertContexts.delete(oldest.value);
+  }
+  fsbSkopeoCurrentAlertContexts.set(alertKey, context);
+  return true;
+}
+
+function fsbClearCurrentSkopeoAlertContexts(controllerKey) {
+  let removed = false;
+  for (const [alertKey, context] of fsbSkopeoCurrentAlertContexts.entries()) {
+    if (!controllerKey || context.controllerKey === controllerKey) {
+      fsbSkopeoCurrentAlertContexts.delete(alertKey);
+      removed = true;
+    }
+  }
+  return removed;
+}
+
+async function fsbRevalidateCurrentSkopeoAlertCandidate(candidate) {
+  const parsed = globalThis.FsbSkopeoAlertSchema &&
+    globalThis.FsbSkopeoAlertSchema.parseCandidate(candidate);
+  const context = parsed && fsbSkopeoCurrentAlertContexts.get(parsed.alertKey);
+  if (!context) return fsbClosedSkopeoAlertCandidate();
+  try {
+    const current = await context.revalidate(parsed);
+    if (!current || (current.status !== 'current' && current.status !== 'superseded') ||
+        (current.status === 'current' && !globalThis.FsbSkopeoAlertSchema.parseCandidate(
+          current.candidate))) return fsbClosedSkopeoAlertCandidate();
+    return current.status === 'current'
+      ? Object.freeze({ status: 'current', candidate: current.candidate })
+      : Object.freeze({ status: 'superseded', candidate: null });
+  } catch (_error) {
+    return fsbClosedSkopeoAlertCandidate();
+  }
+}
+
+async function fsbOpenCurrentSkopeoAlertEvidence(candidate) {
+  const parsed = globalThis.FsbSkopeoAlertSchema &&
+    globalThis.FsbSkopeoAlertSchema.parseCandidate(candidate);
+  const context = parsed && fsbSkopeoCurrentAlertContexts.get(parsed.alertKey);
+  if (!context) return false;
+  try { return await context.openEvidence(parsed) === true; }
+  catch (_error) { return false; }
+}
+
+async function fsbReconcileSkopeoAlerts() {
+  try {
+    await initializeFsbSkopeoCorpusBoundary();
+    return fsbSkopeoAlertRuntimeFacade
+      ? await fsbSkopeoAlertRuntimeFacade.reconcile()
+      : Object.freeze({ status: 'closed' });
+  } catch (_error) {
+    return Object.freeze({ status: 'closed' });
+  }
+}
+
+/* FSB_SKOPEO_TRUTH_CONTEXT_BUILDER_START */
+const createFsbSkopeoTruthEvaluationContextBuilder = function(dependencies) {
+  'use strict';
+
+  function own(value, key) {
+    return Object.prototype.hasOwnProperty.call(value, key);
+  }
+
+  function plainRecord(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+    var prototype;
+    try { prototype = Object.getPrototypeOf(value); } catch (_error) { return false; }
+    return prototype === Object.prototype || prototype === null;
+  }
+
+  function exactRecord(value, keys) {
+    if (!plainRecord(value)) return null;
+    var actual;
+    try { actual = Reflect.ownKeys(value); } catch (_error) { return null; }
+    if (actual.length !== keys.length || actual.some(function(key) {
+      return typeof key !== 'string' || keys.indexOf(key) < 0;
+    })) return null;
+    var output = Object.create(null);
+    for (var index = 0; index < keys.length; index += 1) {
+      var descriptor;
+      try {
+        descriptor = Object.getOwnPropertyDescriptor(value, keys[index] );
+      }
+      catch (_error) { return null; }
+      if (!descriptor || !own(descriptor, 'value') || descriptor.enumerable !== true) {
+        return null;
+      }
+      output[keys[index]] = descriptor.value;
+    }
+    return output;
+  }
+
+  function closed(code) {
+    return Object.freeze({
+      status: 'review-required',
+      blockerCodes: Object.freeze([code])
+    });
+  }
+
+  function configuredBinding(value) {
+    var fields = exactRecord(value, [
+      'kind', 'timezone', 'configurationId', 'configurationVersion'
+    ] );
+    return fields && fields.kind === 'configured' &&
+      typeof fields.timezone === 'string' && fields.timezone.length > 0 &&
+      fields.timezone.length <= 128 &&
+      typeof fields.configurationId === 'string' && fields.configurationId.length > 0 &&
+      fields.configurationId.length <= 256 &&
+      typeof fields.configurationVersion === 'string' &&
+      fields.configurationVersion.length > 0 &&
+      fields.configurationVersion.length <= 256
+      ? Object.freeze({
+        kind: fields.kind,
+        timezone: fields.timezone,
+        configurationId: fields.configurationId,
+        configurationVersion: fields.configurationVersion
+      })
+      : null;
+  }
+
+  function parseCalendars(values, truthSchema) {
+    if (!Array.isArray(values) || Reflect.ownKeys(values).length !== values.length + 1) {
+      return null;
+    }
+    var calendars = [];
+    for (var index = 0; index < values.length; index += 1) {
+      var descriptor = Object.getOwnPropertyDescriptor(values, String(index));
+      var calendar = descriptor && own(descriptor, 'value')
+        ? truthSchema.parseBusinessCalendar(descriptor.value)
+        : null;
+      if (!calendar) return null;
+      calendars.push(calendar);
+    }
+    calendars.sort(function(left, right) {
+      var a = left.calendarId + '\u0000' + left.calendarVersionId;
+      var b = right.calendarId + '\u0000' + right.calendarVersionId;
+      return a < b ? -1 : a > b ? 1 : 0;
+    });
+    return calendars;
+  }
+
+  function civilDate(formatter, instant) {
+    var parts;
+    try { parts = formatter.formatToParts(instant); } catch (_error) { return null; }
+    if (!Array.isArray(parts)) return null;
+    var values = Object.create(null);
+    for (var index = 0; index < parts.length; index += 1) {
+      var part = parts[index];
+      if (!part || typeof part.type !== 'string' || typeof part.value !== 'string') {
+        return null;
+      }
+      if (part.type === 'year' || part.type === 'month' || part.type === 'day') {
+        if (own(values, part.type)) return null;
+        values[part.type] = part.value;
+      }
+    }
+    var value = values.year + '-' + values.month + '-' + values.day;
+    return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
+  }
+
+  var fields = exactRecord(dependencies, [
+    'now', 'readSettings', 'truthSchema', 'IntlDateTimeFormat'
+  ] );
+  if (!fields || typeof fields.now !== 'function' ||
+      typeof fields.readSettings !== 'function' || !fields.truthSchema ||
+      typeof fields.truthSchema.parseBusinessCalendar !== 'function' ||
+      typeof fields.truthSchema.parseEvaluationContext !== 'function' ||
+      typeof fields.truthSchema.canonicalize !== 'function' ||
+      typeof fields.IntlDateTimeFormat !== 'function') return null;
+
+  return async function buildFsbSkopeoTruthEvaluationContext() {
+    var initial;
+    try { initial = await fields.readSettings(); } catch (_error) { initial = null; }
+    var initialFields = exactRecord(initial, [
+      'skopeoTruthTimezoneBinding', 'skopeoTruthCalendars'
+    ] );
+    var binding = initialFields && configuredBinding(
+      initialFields.skopeoTruthTimezoneBinding);
+    if (!binding) return closed('timezone-missing');
+    var calendars = parseCalendars(
+      initialFields.skopeoTruthCalendars, fields.truthSchema);
+    if (!calendars) return closed('business-calendar-missing');
+
+    var formatter;
+    try {
+      formatter = new fields.IntlDateTimeFormat('en-CA', {
+        timeZone: binding.timezone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      });
+    } catch (_error) {
+      return closed('timezone-missing');
+    }
+    var instant;
+    try { instant = fields.now(); } catch (_error) {
+      return closed('evaluation-context-mismatch');
+    }
+    var asOfCivilDate = civilDate(formatter, instant);
+    if (!asOfCivilDate) return closed('evaluation-context-mismatch');
+    var parsed;
+    try {
+      parsed = fields.truthSchema.parseEvaluationContext({
+        asOfCivilDate: asOfCivilDate,
+        governingTimezoneBinding: binding,
+        calendars: calendars
+      });
+    } catch (_error) {
+      parsed = null;
+    }
+    if (!parsed) return closed('evaluation-context-mismatch');
+
+    var current;
+    try { current = await fields.readSettings(); } catch (_error) { current = null; }
+    var currentFields = exactRecord(current, [
+      'skopeoTruthTimezoneBinding', 'skopeoTruthCalendars'
+    ] );
+    var currentBinding = currentFields && configuredBinding(
+      currentFields.skopeoTruthTimezoneBinding);
+    if (!currentBinding) return closed('evaluation-context-stale');
+    var currentCalendars = parseCalendars(
+      currentFields.skopeoTruthCalendars, fields.truthSchema);
+    if (!currentCalendars ||
+        fields.truthSchema.canonicalize(currentBinding) !==
+          fields.truthSchema.canonicalize(binding) ||
+        fields.truthSchema.canonicalize(currentCalendars) !==
+          fields.truthSchema.canonicalize(calendars)) {
+      return closed('evaluation-context-stale');
+    }
+    return parsed;
+  };
+};
+/* FSB_SKOPEO_TRUTH_CONTEXT_BUILDER_END */
+
+const fsbReadTruthEvaluationSettings = async function() {
+  if (typeof config === 'undefined' || !config ||
+      typeof config.getTruthEvaluationSettingsFresh !== 'function') {
+    throw new Error('SKOPEO_TRUTH_SETTINGS_UNAVAILABLE');
+  }
+  return config.getTruthEvaluationSettingsFresh();
+};
+
+const fsbBuildSkopeoTruthEvaluationContext =
+  createFsbSkopeoTruthEvaluationContextBuilder({
+    now: Date.now,
+    readSettings: fsbReadTruthEvaluationSettings,
+    truthSchema: globalThis.FsbSkopeoTruthSchema,
+    IntlDateTimeFormat: Intl.DateTimeFormat
+  });
+
+const fsbTruthClosedResult = function(code) {
+  return Object.freeze({
+    version: 'skopeo-truth-engine/1',
+    status: 'review-required',
+    blockerCodes: Object.freeze([code])
+  });
+};
+
+const fsbRunPrivateHudTruthOperation = async function(operation, exactTuple, request) {
+  var facade = fsbSkopeoTruthEngineFacade;
+  var method = operation === 'inspect-display'
+    ? 'inspectDisplaySnapshot'
+    : operation === 'recompute' ? 'recompute' : null;
+  if (!method || !facade || !Object.isFrozen(facade) ||
+      typeof facade[method] !== 'function') {
+    return fsbTruthClosedResult('snapshot-stale');
+  }
+  try {
+    return await facade[method](exactTuple, request);
+  } catch (_error) {
+    return fsbTruthClosedResult('snapshot-stale');
+  }
+};
+
+const fsbRunPrivateHudGraphSnapshot = async function(exactTuple, sourceFileIds) {
+  var facade = fsbSkopeoGraphEngineFacade;
+  if (!facade || !Object.isFrozen(facade) ||
+      typeof facade.snapshotExactSet !== 'function' ||
+      !Array.isArray(sourceFileIds)) return null;
+  try {
+    return await facade.snapshotExactSet(exactTuple, {
+      sourceFileIds: Object.freeze(sourceFileIds.slice())
+    });
+  } catch (_error) {
+    return null;
+  }
+};
+
+function fsbAuthorizedEmptyPurgeParticipant() {
+  return function bindEmptyParticipant(verifyParticipantAuthorization) {
+    if (typeof verifyParticipantAuthorization !== 'function') return null;
+    return Object.freeze({
+      purgeSource: async function(request, capability) {
+        return Object.freeze({
+          ok: !!verifyParticipantAuthorization(capability, 'purge-source', request)
+        });
+      },
+      purgePartition: async function(request, capability) {
+        return Object.freeze({
+          ok: !!verifyParticipantAuthorization(capability, 'purge-partition', request)
+        });
+      },
+      hasOwnedInfluence: async function(request, capability) {
+        var mode = request && request.sourceFileId === null
+          ? 'verify-partition'
+          : 'verify-source';
+        return Object.freeze({
+          owned: !verifyParticipantAuthorization(capability, mode, request)
+        });
+      }
+    });
+  };
+}
+
+function fsbGraphCorpusTransport() {
+  return Object.freeze({
+    readContent: async function(exactTuple, input, operationSink, operationSignal) {
+      var current = await currentCorpusFacadeEntry(exactTuple);
+      var kernel = current
+        ? await createSkopeoCorpusKernel(exactTuple.tabId, current.entry)
+        : null;
+      if (!kernel || !kernel.transport ||
+          typeof kernel.transport.readContent !== 'function') {
+        return Object.freeze({ kind: 'unsupported' });
+      }
+      return kernel.transport.readContent(input, operationSink, operationSignal);
+    }
+  });
+}
+
+function fsbSkopeoByteLength(value) {
+  return new TextEncoder().encode(value).length;
+}
+
+function fsbRunSkopeoCorpusOperation() {
+  var controller = globalThis.FSBSkopeoController;
+  if (!controller || typeof controller.runCorpusOperation !== 'function') {
+    return Promise.resolve(Object.freeze({ decision: 'closed' }));
+  }
+  return controller.runCorpusOperation.apply(null, arguments);
+}
+
+async function fsbReadVisibleSourceSet(exactTuple) {
+  var boundary = fsbSkopeoCorpusBoundaryState;
+  var claim = boundary && boundary.closed === false ? boundary.currentClaim : null;
+  var manifest = claim && boundary.store &&
+    typeof boundary.store.getVisibleManifest === 'function'
+    ? await boundary.store.getVisibleManifest(claim)
+    : null;
+  if (!manifest || !Array.isArray(manifest.sources) ||
+      manifest.sources.length === 0) {
+    return Object.freeze({
+      status: 'blocked',
+      blockerCodes: Object.freeze(['exact-set-incomplete'])
+    });
+  }
+  if (manifest.sources.length > 32) {
+    return Object.freeze({
+      status: 'blocked',
+      blockerCodes: Object.freeze(['exact-set-over-cap'])
+    });
+  }
+  var sourceBindings = [];
+  for (var sourceIndex = 0; sourceIndex < manifest.sources.length; sourceIndex += 1) {
+    var source = manifest.sources[sourceIndex];
+    var fingerprintRecord = source && source.contentFingerprint;
+    var contentFingerprint = fingerprintRecord &&
+      typeof fingerprintRecord === 'object'
+      ? fingerprintRecord.value
+      : null;
+    if (!source || typeof source.sourceFileId !== 'string' ||
+        !['ready', 'pending', 'unreadable', 'download-blocked',
+          'inaccessible', 'missing'].includes(source.state) ||
+        (source.state === 'ready'
+          ? typeof contentFingerprint !== 'string'
+          : contentFingerprint !== null)) {
+      return Object.freeze({
+        status: 'blocked',
+        blockerCodes: Object.freeze(['exact-set-incomplete'])
+      });
+    }
+    sourceBindings.push(Object.freeze({
+      sourceFileId: source.sourceFileId,
+      sourceState: source.state,
+      contentFingerprint: contentFingerprint
+    }));
+  }
+  sourceBindings.sort(function(left, right) {
+    return left.sourceFileId < right.sourceFileId
+      ? -1
+      : left.sourceFileId > right.sourceFileId ? 1 : 0;
+  });
+  if (new Set(sourceBindings.map(function(source) {
+    return source.sourceFileId;
+  })).size !== sourceBindings.length) {
+    return Object.freeze({
+      status: 'blocked',
+      blockerCodes: Object.freeze(['exact-set-incomplete'])
+    });
+  }
+  var sourceFileIds = sourceBindings.map(function(source) {
+    return source.sourceFileId;
+  });
+  var result = await fsbRunSkopeoCorpusOperation(
+    'query',
+    exactTuple,
+    Object.freeze({ sourceFileIds: Object.freeze(sourceFileIds.slice()) }),
+    async function(certificates, proof) {
+      if (!Array.isArray(certificates) ||
+          certificates.length !== sourceBindings.length ||
+          !proof || proof.complete !== true) return null;
+      return Object.freeze({
+        status: 'ready',
+        partitionKey: manifest.partitionKey,
+        sourceBindings: Object.freeze(sourceBindings.slice())
+      });
+    }
+  );
+  return result && result.decision === 'admitted' && result.value
+    ? result.value
+    : Object.freeze({
+      status: 'blocked',
+      blockerCodes: Object.freeze(['exact-set-incomplete'])
+    });
+}
+
+async function fsbTruthCitationIds(graphSnapshot) {
+  var ids = new Set();
+  if (!graphSnapshot || !Array.isArray(graphSnapshot.records) ||
+      !Array.isArray(graphSnapshot.relations)) return ids;
+  for (var recordIndex = 0; recordIndex < graphSnapshot.records.length;
+    recordIndex += 1) {
+    var record = graphSnapshot.records[recordIndex];
+    if (!record || !Array.isArray(record.evidence)) continue;
+    for (var evidenceIndex = 0; evidenceIndex < record.evidence.length;
+      evidenceIndex += 1) {
+      var evidence = record.evidence[evidenceIndex];
+      var citationId = await globalThis.FsbSkopeoTruthSchema.deriveCitationId({
+        schemaVersion: globalThis.FsbSkopeoTruthSchema.VERSION,
+        partitionKey: graphSnapshot.partitionKey,
+        sourceFileId: record.sourceFileId,
+        contentFingerprint: record.contentFingerprint,
+        fragmentGenerationId: record.fragmentGenerationId,
+        recordVersionId: record.recordVersionId,
+        relationVersionId: null,
+        locatorId: evidence.locatorId,
+        sourceByteStart: evidence.sourceByteStart,
+        sourceByteEnd: evidence.sourceByteEnd
+      });
+      if (citationId) ids.add(citationId);
+    }
+  }
+  for (var relationIndex = 0; relationIndex < graphSnapshot.relations.length;
+    relationIndex += 1) {
+    var relation = graphSnapshot.relations[relationIndex];
+    if (!relation || !Array.isArray(relation.evidence)) continue;
+    for (var relationEvidenceIndex = 0;
+      relationEvidenceIndex < relation.evidence.length;
+      relationEvidenceIndex += 1) {
+      var relationEvidence = relation.evidence[relationEvidenceIndex];
+      var relationCitationId =
+        await globalThis.FsbSkopeoTruthSchema.deriveCitationId({
+          schemaVersion: globalThis.FsbSkopeoTruthSchema.VERSION,
+          partitionKey: graphSnapshot.partitionKey,
+          sourceFileId: relation.sourceFileId,
+          contentFingerprint: relation.contentFingerprint,
+          fragmentGenerationId: relation.fragmentGenerationId,
+          recordVersionId: relation.fromRecordVersionId,
+          relationVersionId: relation.relationVersionId,
+          locatorId: relationEvidence.locatorId,
+          sourceByteStart: relationEvidence.sourceByteStart,
+          sourceByteEnd: relationEvidence.sourceByteEnd
+        });
+      if (relationCitationId) ids.add(relationCitationId);
+    }
+  }
+  return ids;
+}
+
+async function fsbValidateEvaluationContext(input) {
+  var signal = input && input.signal;
+  var parsed = input && globalThis.FsbSkopeoTruthSchema.parseEvaluationContext(
+    input.evaluationContext
+  );
+  var graphSnapshot = input && input.graphSnapshot;
+  if (!parsed || !signal || signal.aborted ||
+      !graphSnapshot ||
+      graphSnapshot.snapshotVersion !== 'skopeo-graph-exact-set/1') {
+    return Object.freeze({
+      ok: false,
+      blockerCodes: Object.freeze(['evaluation-context-mismatch'])
+    });
+  }
+  var settings;
+  try {
+    settings = await fsbReadTruthEvaluationSettings();
+  } catch (_error) {
+    settings = null;
+  }
+  if (!settings || signal.aborted) {
+    return Object.freeze({
+      ok: false,
+      blockerCodes: Object.freeze(['evaluation-context-stale'])
+    });
+  }
+  var timezoneBinding = parsed.governingTimezoneBinding;
+  if (timezoneBinding.kind === 'cited') {
+    var currentCitationIds = await fsbTruthCitationIds(graphSnapshot);
+    if (signal.aborted || timezoneBinding.citationIds.some(function(citationId) {
+      return !currentCitationIds.has(citationId);
+    })) {
+      return Object.freeze({
+        ok: false,
+        blockerCodes: Object.freeze(['evaluation-context-stale'])
+      });
+    }
+  } else {
+    var configuredBinding =
+      globalThis.FsbSkopeoTruthSchema.parseEvaluationContext({
+        asOfCivilDate: parsed.asOfCivilDate,
+        governingTimezoneBinding: settings.skopeoTruthTimezoneBinding,
+        calendars: parsed.calendars
+      });
+    if (!configuredBinding ||
+        globalThis.FsbSkopeoTruthSchema.canonicalize(
+          configuredBinding.governingTimezoneBinding
+        ) !== globalThis.FsbSkopeoTruthSchema.canonicalize(timezoneBinding)) {
+      return Object.freeze({
+        ok: false,
+        blockerCodes: Object.freeze(['evaluation-context-stale'])
+      });
+    }
+  }
+  var configuredCalendars = Array.isArray(settings.skopeoTruthCalendars)
+    ? settings.skopeoTruthCalendars
+    : [];
+  var currentCalendars = [];
+  for (var calendarIndex = 0; calendarIndex < configuredCalendars.length;
+    calendarIndex += 1) {
+    var calendar =
+      globalThis.FsbSkopeoTruthSchema.parseBusinessCalendar(
+        configuredCalendars[calendarIndex]
+      );
+    if (!calendar) {
+      return Object.freeze({
+        ok: false,
+        blockerCodes: Object.freeze(['evaluation-context-stale'])
+      });
+    }
+    currentCalendars.push(calendar);
+  }
+  currentCalendars.sort(function(left, right) {
+    var leftKey = left.calendarId + '\u0000' + left.calendarVersionId;
+    var rightKey = right.calendarId + '\u0000' + right.calendarVersionId;
+    return leftKey < rightKey ? -1 : leftKey > rightKey ? 1 : 0;
+  });
+  if (globalThis.FsbSkopeoTruthSchema.canonicalize(currentCalendars) !==
+      globalThis.FsbSkopeoTruthSchema.canonicalize(parsed.calendars)) {
+    return Object.freeze({
+      ok: false,
+      blockerCodes: Object.freeze(['evaluation-context-stale'])
+    });
+  }
+  var digest = await globalThis.FsbSkopeoTruthSchema.sha256Hex(parsed);
+  if (signal.aborted || typeof digest !== 'string' ||
+      !/^sha256:[0-9a-f]{64}$/.test(digest)) {
+    return Object.freeze({
+      ok: false,
+      blockerCodes: Object.freeze(['evaluation-context-mismatch'])
+    });
+  }
+  return Object.freeze({
+    ok: true,
+    contextDigest: digest.slice('sha256:'.length)
+  });
+}
+
+function initializeFsbSkopeoCorpusBoundary() {
+  if (fsbSkopeoCorpusBootPromise) return fsbSkopeoCorpusBootPromise;
+  fsbSkopeoCorpusBootPromise = (async function() {
+    if (globalThis.fsbTrustedLocalBoundaryClosed === true ||
+        !globalThis.fsbTrustedLocalFeatureStore ||
+        !chrome.storage || !chrome.storage.local ||
+        !globalThis.FsbSkopeoCorpusSchema ||
+        !globalThis.FsbSkopeoCorpusStore ||
+        !globalThis.FsbSkopeoDriveCorpusTransport ||
+        !globalThis.FsbSkopeoDriveAuthority ||
+        !globalThis.FsbSkopeoCorpusController ||
+        !globalThis.FsbSkopeoDriveReconciler ||
+        !globalThis.FsbSkopeoGraphSchema ||
+        !globalThis.FsbSkopeoGraphStore ||
+        !globalThis.FsbSkopeoGraphExtractor ||
+        !globalThis.FsbSkopeoGraphQuery ||
+        !globalThis.FsbSkopeoGraphEngine ||
+        !globalThis.FsbSkopeoTruthSchema ||
+        !globalThis.FsbSkopeoTruthExtractor ||
+        !globalThis.FsbSkopeoLineageAdjudicator ||
+        !globalThis.FsbSkopeoDeadlineEngine ||
+        !globalThis.FsbSkopeoTruthStore ||
+        !globalThis.FsbSkopeoTruthEngine ||
+        !globalThis.FsbSkopeoAskSchema ||
+        !globalThis.FsbSkopeoAskEngine ||
+        !globalThis.FsbSkopeoDecisionPolicyStore ||
+        !globalThis.FsbSkopeoDecisionPolicy ||
+        !globalThis.FsbSkopeoAlertSchema ||
+        !globalThis.FsbSkopeoAlertStore ||
+        !globalThis.FsbSkopeoAlertEngine ||
+        !globalThis.FsbSkopeoAlertRuntime ||
+        !globalThis.FsbSkopeoHudSchema ||
+        !globalThis.FsbSkopeoHudProjector ||
+        typeof globalThis.MiniSearch !== 'function' ||
+        !globalThis.FsbCapabilityFetch ||
+        typeof globalThis.FsbCapabilityFetch.executeBoundPageRead !== 'function') {
+      throw new Error('SKOPEO_CORPUS_DEPENDENCY_UNAVAILABLE');
+    }
+
+    var store = globalThis.FsbSkopeoCorpusStore.create({
+      storageArea: chrome.storage.local,
+      schema: globalThis.FsbSkopeoCorpusSchema,
+      now: Date.now
+    });
+    var graphStore = globalThis.FsbSkopeoGraphStore.create({
+      storageArea: chrome.storage.local,
+      graphSchema: globalThis.FsbSkopeoGraphSchema,
+      corpusSchema: globalThis.FsbSkopeoCorpusSchema,
+      now: Date.now
+    });
+    var graphQuery = graphStore && globalThis.FsbSkopeoGraphQuery.create({
+      graphSchema: globalThis.FsbSkopeoGraphSchema,
+      graphStore: graphStore,
+      MiniSearch: globalThis.MiniSearch,
+      byteLength: function(value) {
+        return new TextEncoder().encode(value).length;
+      }
+    });
+    if (!store || !graphStore || !graphQuery) {
+      throw new Error('SKOPEO_GRAPH_DEPENDENCY_UNAVAILABLE');
+    }
+    var cacheRegistration = graphStore.registerCacheOwner(graphQuery.cacheOwner);
+    if (!cacheRegistration || cacheRegistration.ok !== true) {
+      throw new Error('SKOPEO_GRAPH_CACHE_OWNER_UNAVAILABLE');
+    }
+    var readGraphSettings = async function() {
+      if (typeof config === 'undefined' || !config || typeof config.getAll !== 'function') {
+        throw new Error('SKOPEO_GRAPH_SETTINGS_UNAVAILABLE');
+      }
+      return config.getAll();
+    };
+    var makeGraphProvider = function(settings) {
+      if (typeof UniversalProvider !== 'function') {
+        throw new Error('SKOPEO_GRAPH_PROVIDER_UNAVAILABLE');
+      }
+      return new UniversalProvider(settings);
+    };
+    var graphExtractor = globalThis.FsbSkopeoGraphExtractor.create({
+      graphSchema: globalThis.FsbSkopeoGraphSchema,
+      providerFactory: makeGraphProvider,
+      readSettings: readGraphSettings,
+      nonceFactory: function() {
+        if (!globalThis.crypto || typeof globalThis.crypto.randomUUID !== 'function') {
+          throw new Error('SKOPEO_GRAPH_NONCE_UNAVAILABLE');
+        }
+        return 'skopeo_batch_' + globalThis.crypto.randomUUID();
+      },
+      now: Date.now
+    });
+    if (!graphExtractor) throw new Error('SKOPEO_GRAPH_EXTRACTOR_UNAVAILABLE');
+    var truthStore = globalThis.FsbSkopeoTruthStore.create({
+      storageArea: chrome.storage.local,
+      truthSchema: globalThis.FsbSkopeoTruthSchema,
+      corpusSchema: globalThis.FsbSkopeoCorpusSchema,
+      now: Date.now,
+      byteLength: fsbSkopeoByteLength
+    });
+    var truthExtractor = globalThis.FsbSkopeoTruthExtractor.create({
+      truthSchema: globalThis.FsbSkopeoTruthSchema,
+      providerFactory: makeGraphProvider,
+      readSettings: readGraphSettings,
+      nonceFactory: function() {
+        if (!globalThis.crypto ||
+            typeof globalThis.crypto.randomUUID !== 'function') {
+          throw new Error('SKOPEO_TRUTH_NONCE_UNAVAILABLE');
+        }
+        return 'skopeo_truth_' + globalThis.crypto.randomUUID();
+      },
+      now: Date.now
+    });
+    var lineageAdjudicator = globalThis.FsbSkopeoLineageAdjudicator.create({
+      truthSchema: globalThis.FsbSkopeoTruthSchema,
+      deadlineEngine: globalThis.FsbSkopeoDeadlineEngine,
+      byteLength: fsbSkopeoByteLength
+    });
+    if (!truthStore || !truthExtractor || !lineageAdjudicator) {
+      throw new Error('SKOPEO_TRUTH_DEPENDENCY_UNAVAILABLE');
+    }
+    var alertStore = globalThis.FsbSkopeoAlertStore.create({
+      storageArea: chrome.storage.local,
+      alertSchema: globalThis.FsbSkopeoAlertSchema,
+      now: Date.now,
+      byteLength: fsbSkopeoByteLength
+    });
+    var alertEngine = globalThis.FsbSkopeoAlertEngine.create({
+      alertSchema: globalThis.FsbSkopeoAlertSchema,
+      deadlineEngine: globalThis.FsbSkopeoDeadlineEngine,
+      digest: async function(value) {
+        var result = await globalThis.FsbSkopeoTruthSchema.sha256Hex(value);
+        return typeof result === 'string' && result.slice(0, 7) === 'sha256:'
+          ? result.slice(7)
+          : result;
+      }
+    });
+    var alertRuntime = globalThis.FsbSkopeoAlertRuntime.create({
+      alertSchema: globalThis.FsbSkopeoAlertSchema,
+      store: alertStore,
+      alarms: chrome.alarms,
+      notifications: chrome.notifications,
+      now: Date.now,
+      IntlDateTimeFormat: Intl.DateTimeFormat,
+      iconUrl: chrome.runtime.getURL('assets/icon128.png'),
+      revalidate: fsbRevalidateCurrentSkopeoAlertCandidate,
+      openEvidence: fsbOpenCurrentSkopeoAlertEvidence
+    });
+    if (!alertStore || !alertEngine || !alertRuntime || !Object.isFrozen(alertStore) ||
+        !Object.isFrozen(alertEngine) || !Object.isFrozen(alertRuntime)) {
+      throw new Error('SKOPEO_ALERT_DEPENDENCY_UNAVAILABLE');
+    }
+    var invalidatorRegistration =
+      graphStore.registerTruthInvalidator(truthStore.graphInvalidator);
+    if (!invalidatorRegistration || invalidatorRegistration.ok !== true) {
+      throw new Error('SKOPEO_TRUTH_INVALIDATOR_UNAVAILABLE');
+    }
+    var participantNames = [
+      'fragments', 'indexes', 'citations', 'counts', 'relationships', 'result-cache', 'alerts'
+    ];
+    for (var index = 0; index < participantNames.length; index += 1) {
+      var participantName = participantNames[index];
+      var graphOwned = participantName === 'fragments' || participantName === 'indexes' ||
+        participantName === 'relationships' || participantName === 'result-cache';
+      var emptyReserved = participantName === 'counts';
+      var binder = graphOwned
+        ? graphStore.getPurgeParticipant(participantName)
+        : participantName === 'citations'
+          ? truthStore.getPurgeParticipant(participantName)
+          : participantName === 'alerts'
+            ? alertStore.getPurgeParticipant(participantName)
+          : emptyReserved
+            ? fsbAuthorizedEmptyPurgeParticipant()
+            : null;
+      var registered = store.registerAuthorizedPurgeParticipant(participantName, binder);
+      if (!registered || registered.ok !== true) {
+        throw new Error('SKOPEO_CORPUS_PURGE_PARTICIPANT_UNAVAILABLE');
+      }
+    }
+
+    var alertRecovery = await alertStore.recover();
+    if (!alertRecovery || alertRecovery.ok !== true) {
+      throw new Error('SKOPEO_ALERT_RECOVERY_UNAVAILABLE');
+    }
+
+    var recoveryController = new AbortController();
+    var recoveryGuard = store.issueMutation(recoveryController.signal);
+    if (!recoveryGuard) throw new Error('SKOPEO_CORPUS_RECOVERY_UNAVAILABLE');
+    var recovery;
+    try {
+      recovery = await store.recover({}, recoveryGuard);
+    } finally {
+      var recoveryTerminal = store.finishMutation(recoveryGuard);
+      if (!recoveryTerminal || recoveryTerminal.ok !== true) {
+        throw new Error('SKOPEO_CORPUS_RECOVERY_UNAVAILABLE');
+      }
+    }
+    if (!recovery || recovery.ok !== true) {
+      throw new Error('SKOPEO_CORPUS_RECOVERY_UNAVAILABLE');
+    }
+
+    var graphRecoveryController = new AbortController();
+    var graphRecoveryGuard = graphStore.issueMutation(graphRecoveryController.signal);
+    if (!graphRecoveryGuard) throw new Error('SKOPEO_GRAPH_RECOVERY_UNAVAILABLE');
+    var graphRecovery;
+    try {
+      graphRecovery = await graphStore.recover(graphRecoveryGuard);
+    } finally {
+      var graphRecoveryTerminal = graphStore.finishMutation(graphRecoveryGuard);
+      if (!graphRecoveryTerminal || graphRecoveryTerminal.ok !== true) {
+        throw new Error('SKOPEO_GRAPH_RECOVERY_UNAVAILABLE');
+      }
+    }
+    if (!graphRecovery || graphRecovery.ok !== true) {
+      throw new Error('SKOPEO_GRAPH_RECOVERY_UNAVAILABLE');
+    }
+
+    fsbSkopeoGraphEngineFacade = globalThis.FsbSkopeoGraphEngine.create({
+      graphSchema: globalThis.FsbSkopeoGraphSchema,
+      graphStore: graphStore,
+      graphExtractor: graphExtractor,
+      graphQuery: graphQuery,
+      corpusTransport: fsbGraphCorpusTransport(),
+      runCorpusOperation: fsbRunSkopeoCorpusOperation,
+      readSettings: readGraphSettings,
+      providerFactory: makeGraphProvider,
+      now: Date.now
+    });
+    if (!fsbSkopeoGraphEngineFacade || !Object.isFrozen(fsbSkopeoGraphEngineFacade)) {
+      throw new Error('SKOPEO_GRAPH_ENGINE_UNAVAILABLE');
+    }
+    var truthRecoveryController = new AbortController();
+    var truthRecoveryGuard = truthStore.issueMutation(
+      truthRecoveryController.signal
+    );
+    if (!truthRecoveryGuard) {
+      throw new Error('SKOPEO_TRUTH_RECOVERY_UNAVAILABLE');
+    }
+    var truthRecovery;
+    try {
+      truthRecovery = await truthStore.recover(truthRecoveryGuard);
+    } finally {
+      var truthRecoveryTerminal = truthStore.finishMutation(
+        truthRecoveryGuard
+      );
+      if (!truthRecoveryTerminal || truthRecoveryTerminal.ok !== true) {
+        throw new Error('SKOPEO_TRUTH_RECOVERY_UNAVAILABLE');
+      }
+    }
+    if (!truthRecovery || truthRecovery.ok !== true) {
+      throw new Error('SKOPEO_TRUTH_RECOVERY_UNAVAILABLE');
+    }
+    fsbSkopeoTruthEngineFacade = globalThis.FsbSkopeoTruthEngine.create({
+      truthSchema: globalThis.FsbSkopeoTruthSchema,
+      truthStore: truthStore,
+      truthExtractor: truthExtractor,
+      lineageAdjudicator: lineageAdjudicator,
+      deadlineEngine: globalThis.FsbSkopeoDeadlineEngine,
+      graphFacade: fsbSkopeoGraphEngineFacade,
+      corpusTransport: fsbGraphCorpusTransport(),
+      runCorpusOperation: fsbRunSkopeoCorpusOperation,
+      readVisibleSourceSet: fsbReadVisibleSourceSet,
+      validateEvaluationContext: fsbValidateEvaluationContext,
+      readSettings: readGraphSettings,
+      providerFactory: makeGraphProvider,
+      byteLength: fsbSkopeoByteLength
+    });
+    if (!fsbSkopeoTruthEngineFacade ||
+        !Object.isFrozen(fsbSkopeoTruthEngineFacade)) {
+      throw new Error('SKOPEO_TRUTH_ENGINE_UNAVAILABLE');
+    }
+    fsbSkopeoAskEngineFacade = globalThis.FsbSkopeoAskEngine.create({
+      askSchema: globalThis.FsbSkopeoAskSchema,
+      providerFactory: makeGraphProvider,
+      readSettings: readGraphSettings,
+      nonceFactory: function() {
+        if (!globalThis.crypto || typeof globalThis.crypto.randomUUID !== 'function') {
+          throw new Error('SKOPEO_ASK_NONCE_UNAVAILABLE');
+        }
+        return 'skopeo_ask_' + globalThis.crypto.randomUUID();
+      },
+      byteLength: fsbSkopeoByteLength,
+      now: Date.now
+    });
+    fsbSkopeoDecisionPolicyStoreFacade = globalThis.FsbSkopeoDecisionPolicyStore;
+    fsbSkopeoDecisionPolicyFacade = globalThis.FsbSkopeoDecisionPolicy;
+    fsbSkopeoAlertStoreFacade = alertStore;
+    fsbSkopeoAlertEngineFacade = alertEngine;
+    fsbSkopeoAlertRuntimeFacade = alertRuntime;
+    if (!fsbSkopeoAskEngineFacade || !Object.isFrozen(fsbSkopeoAskEngineFacade) ||
+        !fsbSkopeoDecisionPolicyStoreFacade ||
+        !Object.isFrozen(fsbSkopeoDecisionPolicyStoreFacade) ||
+        !fsbSkopeoDecisionPolicyFacade || !Object.isFrozen(fsbSkopeoDecisionPolicyFacade) ||
+        !fsbSkopeoAlertStoreFacade || !Object.isFrozen(fsbSkopeoAlertStoreFacade) ||
+        !fsbSkopeoAlertEngineFacade || !Object.isFrozen(fsbSkopeoAlertEngineFacade) ||
+        !fsbSkopeoAlertRuntimeFacade || !Object.isFrozen(fsbSkopeoAlertRuntimeFacade)) {
+      throw new Error('SKOPEO_ASK_ENGINE_UNAVAILABLE');
+    }
+    var alertReconciliation = await fsbSkopeoAlertRuntimeFacade.reconcile();
+    if (!alertReconciliation || alertReconciliation.status !== 'reconciled') {
+      throw new Error('SKOPEO_ALERT_RECONCILIATION_UNAVAILABLE');
+    }
+    fsbSkopeoCorpusBoundaryState = {
+      accessLevel: 'TRUSTED_CONTEXTS',
+      store: store,
+      currentClaim: null,
+      closed: false
+    };
+    Object.seal(fsbSkopeoCorpusBoundaryState);
+    globalThis.fsbSkopeoCorpusBoundaryState = fsbSkopeoCorpusBoundaryState;
+    globalThis.fsbSkopeoGraphEngineFacade = fsbSkopeoGraphEngineFacade;
+    globalThis.fsbSkopeoGraphBoundaryClosed = false;
+    return fsbSkopeoCorpusBoundaryState;
+  })().catch(function(error) {
+    fsbSkopeoCorpusBoundaryState = null;
+    fsbSkopeoGraphEngineFacade = null;
+    fsbSkopeoTruthEngineFacade = null;
+    fsbSkopeoAskEngineFacade = null;
+    fsbSkopeoDecisionPolicyStoreFacade = null;
+    fsbSkopeoDecisionPolicyFacade = null;
+    fsbSkopeoAlertStoreFacade = null;
+    fsbSkopeoAlertEngineFacade = null;
+    fsbSkopeoAlertRuntimeFacade = null;
+    fsbClearCurrentSkopeoAlertContexts();
+    globalThis.fsbSkopeoCorpusBoundaryState = null;
+    globalThis.fsbSkopeoGraphEngineFacade = null;
+    globalThis.fsbSkopeoCorpusBoundaryClosed = true;
+    globalThis.fsbSkopeoGraphBoundaryClosed = true;
+    throw error;
+  });
+  globalThis.fsbSkopeoCorpusBootPromise = fsbSkopeoCorpusBootPromise;
+  return fsbSkopeoCorpusBootPromise;
+}
+
+globalThis.initializeFsbSkopeoCorpusBoundary = initializeFsbSkopeoCorpusBoundary;
+
+if (chrome.notifications && chrome.notifications.onClicked &&
+    chrome.notifications.onButtonClicked) {
+  chrome.notifications.onClicked.addListener(function(notificationId) {
+    const runtime = fsbSkopeoAlertRuntimeFacade;
+    if (!runtime || typeof notificationId !== 'string' ||
+        notificationId.slice(0, globalThis.FsbSkopeoAlertRuntime.NOTIFICATION_PREFIX.length) !==
+          globalThis.FsbSkopeoAlertRuntime.NOTIFICATION_PREFIX) return;
+    Promise.resolve(runtime.handleNotificationClick(notificationId)).catch(function() {});
+  });
+  chrome.notifications.onButtonClicked.addListener(function(notificationId, buttonIndex) {
+    const runtime = fsbSkopeoAlertRuntimeFacade;
+    if (buttonIndex !== 0 || !runtime || typeof notificationId !== 'string' ||
+        notificationId.slice(0, globalThis.FsbSkopeoAlertRuntime.NOTIFICATION_PREFIX.length) !==
+          globalThis.FsbSkopeoAlertRuntime.NOTIFICATION_PREFIX) return;
+    Promise.resolve(runtime.handleNotificationClick(notificationId)).catch(function() {});
+  });
+}
+/* FSB_SKOPEO_CORPUS_BOUNDARY_END */
 
 // Phase 28 Plan 01 (v0.9.99 SURF-04/SURF-01/D-16): the capability-search index +
 // its build-time catalog. Loaded LAST of the capability family. Order is
@@ -321,6 +1416,16 @@ try { importScripts('catalog/handlers/twitch.js'); } catch (e) { console.error('
 try { importScripts('catalog/handlers/steam.js'); } catch (e) { console.error('[FSB] Failed to load handlers/steam.js:', e.message); }
 try { importScripts('catalog/handlers/fiverr.js'); } catch (e) { console.error('[FSB] Failed to load handlers/fiverr.js:', e.message); }
 try { importScripts('catalog/handlers/glama.js'); } catch (e) { console.error('[FSB] Failed to load handlers/glama.js:', e.message); }
+
+// Skopeo's catalog projection and consequence policy stay background-owned.
+// Load them after the authoritative catalog/router dependencies and before the
+// explicit current-tab controller below. None of this data is a content script.
+try { importScripts('catalog/skopeo-profile-index.generated.js'); } catch (e) { console.error('[FSB] Failed to load skopeo-profile-index.generated.js:', e.message); }
+try { importScripts('utils/skopeo-profile-schema.js'); } catch (e) { console.error('[FSB] Failed to load skopeo-profile-schema.js:', e.message); }
+try { importScripts('catalog/skopeo-consequence-targets.js'); } catch (e) { console.error('[FSB] Failed to load skopeo-consequence-targets.js:', e.message); }
+try { importScripts('utils/skopeo-action-authority.js'); } catch (e) { console.error('[FSB] Failed to load skopeo-action-authority.js:', e.message); }
+try { importScripts('utils/skopeo-capability-projector.js'); } catch (e) { console.error('[FSB] Failed to load skopeo-capability-projector.js:', e.message); }
+try { importScripts('utils/skopeo-consequence-gate.js'); } catch (e) { console.error('[FSB] Failed to load skopeo-consequence-gate.js:', e.message); }
 try {
   if (typeof FsbCapabilityCatalog !== 'undefined' && FsbCapabilityCatalog
       && typeof FsbCapabilityCatalog.seedHeadHandlers === 'function') {
@@ -587,6 +1692,6178 @@ const CONTENT_SCRIPT_FILES = [
   'content/messaging.js',
   'content/lifecycle.js'
 ];
+
+/* FSB_SKOPEO_CONTROLLER_START */
+const SKOPEO_INJECTION_FILES = Object.freeze([
+  'utils/skopeo-profile-schema.js',
+  'utils/skopeo-action-authority.js',
+  'utils/skopeo-capability-projector.js',
+  'content/skopeo-context-router.js',
+  'content/skopeo-app-context-resolver.js',
+  'content/skopeo-anchor-registry.js',
+  'content/skopeo-adapter-registry.js',
+  'utils/skopeo-hud-schema.js',
+  'content/skopeo-adaptive-composer.js',
+  'content/skopeo-renderer-registry.js',
+  'content/skopeo-shell.js',
+  'content/skopeo-runtime.js'
+]);
+
+(function initializeFSBSkopeoController(global) {
+  'use strict';
+
+  const COMMAND = 'toggle-skopeo-current-tab';
+  const STORAGE_PREFIX = 'skopeoSession:';
+  const PREPARED_REASON = 'prepared-awaiting-commit';
+  const CONTENT_ACTIONS = new Set([
+    'skopeo:prepared',
+    'skopeo:ready',
+    'skopeo:kill-request',
+    'skopeo:teardown-complete',
+    'skopeo:corpus-enroll',
+    'skopeo:corpus-root-status',
+    'skopeo:corpus-status',
+    'skopeo:hud-projection',
+    'skopeo:hud-citation-open',
+    'skopeo:hud-ask',
+    'skopeo:hud-ask-cancel',
+    'skopeo:hud-answer-action',
+    'skopeo:hud-answer-action-confirm',
+    'skopeo:hud-alert-action',
+    'skopeo:hud-alert-action-confirm',
+    'skopeo:hud-revoke',
+    'skopeo:read-invoke',
+    'skopeo:consequence-open',
+    'skopeo:consequence-confirm',
+    'skopeo:consequence-cancel'
+  ]);
+  const PUBLIC_ACTIONS = new Set([
+    'skopeo:toggle-tab',
+    'skopeo:get-status'
+  ]);
+  const ALL_ACTIONS = new Set(Array.from(PUBLIC_ACTIONS).concat(Array.from(CONTENT_ACTIONS)));
+  const ALLOWED_KILL_REASONS = new Set(['close', 'escape', 'unsafe-layout', 'navigation']);
+  const RESOURCE_KEYS = Object.freeze([
+    'roots',
+    'listeners',
+    'observers',
+    'timeouts',
+    'intervals',
+    'animationFrames',
+    'animations',
+    'focusHooks',
+    'pointerSurfaces',
+    'pendingRenders',
+    'popoverTopLayer'
+  ]);
+  const controllers = new Map();
+  const hudTruthDisplayInflight = new Map();
+  let corpusRowSequence = 0;
+  const lifecycle = global.FSBSkopeoSessionState;
+  const ACTIVE_ATTENTION = new Set(['ambient', 'anchored', 'focused', 'interstitial']);
+  const READY_ATTENTION = new Set(['ambient', 'anchored']);
+  const CORPUS_OPERATION_KINDS = new Set([
+    'ingestion', 'query', 'display', 'citation-open', 'alert-delivery'
+  ]);
+  const CORPUS_EFFECT_OPERATION_KINDS = new Set([
+    'ingestion', 'citation-open', 'alert-delivery'
+  ]);
+  const MAX_CORPUS_OPERATION_SOURCES = 32;
+  const CORPUS_ENROLL_KEYS = Object.freeze([
+    'action', 'generation', 'exactOrigin', 'profileVersion', 'contextEpoch',
+    'semanticEntityToken', 'corpusRootFileId', 'actionToken'
+  ]);
+  const CORPUS_STATUS_KEYS = Object.freeze([
+    'action', 'generation', 'exactOrigin', 'profileVersion', 'contextEpoch',
+    'semanticEntityToken', 'currentSourceFileId', 'actionToken'
+  ]);
+  const CORPUS_ROOT_STATUS_KEYS = Object.freeze([
+    'action', 'generation', 'exactOrigin', 'profileVersion', 'contextEpoch',
+    'semanticEntityToken', 'corpusRootFileId', 'actionToken'
+  ]);
+  const HUD_PROJECTION_KEYS = Object.freeze([
+    'action', 'generation', 'exactOrigin', 'profileVersion', 'contextEpoch',
+    'semanticEntityToken', 'actionToken'
+  ]);
+  const HUD_CITATION_KEYS = Object.freeze([
+    'action', 'generation', 'exactOrigin', 'profileVersion', 'contextEpoch',
+    'semanticEntityToken', 'projectionToken', 'actionId'
+  ]);
+  const HUD_REVOKE_KEYS = Object.freeze([
+    'action', 'generation', 'exactOrigin', 'profileVersion', 'contextEpoch',
+    'semanticEntityToken', 'projectionToken'
+  ]);
+  const CORPUS_FACADE_TUPLE_KEYS = Object.freeze([
+    'tabId', 'generation', 'exactOrigin', 'profileId', 'profileVersion',
+    'contextEpoch', 'semanticEntity'
+  ]);
+  const CORPUS_CERTIFIED_ROW_STATES = new Set(['ready', 'unreadable', 'download-blocked']);
+  const READ_REQUEST_KEYS = Object.freeze([
+    'action', 'generation', 'exactOrigin', 'profileId', 'profileVersion', 'catalogVersion',
+    'contextEpoch', 'semanticEntity', 'slug', 'args', 'actionToken', 'schemaDigest'
+  ]);
+  const CONSEQUENCE_OPEN_KEYS = Object.freeze([
+    'action', 'generation', 'exactOrigin', 'profileVersion', 'contextEpoch',
+    'semanticEntity', 'slug', 'args'
+  ]);
+  const CONSEQUENCE_CONFIRM_KEYS = Object.freeze(CONSEQUENCE_OPEN_KEYS.concat(['actionToken']));
+  const READ_RESULT_LIMITS = Object.freeze({
+    depth: 4,
+    nodes: 512,
+    entries: 50,
+    columns: 8,
+    text: 512,
+    key: 80,
+    characters: 8192
+  });
+  const READ_RESULT_CONTRACTS = Object.freeze({
+    'generic-default-v1': Object.freeze({
+      mode: 'completion-only', single: null, record: null, primitiveList: null, recordList: null
+    }),
+    'reader-knowledge-v1': Object.freeze({
+      mode: 'structured', single: 'facts', record: 'facts', primitiveList: 'items', recordList: 'items'
+    }),
+    'communication-v1': Object.freeze({
+      mode: 'structured', single: 'items', record: 'items', primitiveList: 'items', recordList: 'items'
+    }),
+    'document-editor-v1': Object.freeze({
+      mode: 'structured', single: 'facts', record: 'facts', primitiveList: 'facts', recordList: 'facts'
+    }),
+    'worklist-record-v1': Object.freeze({
+      mode: 'structured', single: 'facts', record: 'facts', primitiveList: 'items', recordList: 'items'
+    }),
+    'dashboard-admin-v1': Object.freeze({
+      mode: 'structured', single: 'facts', record: 'facts', primitiveList: 'facts', recordList: 'table'
+    }),
+    'transactional-v1': Object.freeze({
+      mode: 'structured', single: 'facts', record: 'facts', primitiveList: 'facts', recordList: 'table'
+    }),
+    'media-feed-v1': Object.freeze({
+      mode: 'structured', single: 'facts', record: 'facts', primitiveList: 'items', recordList: 'items'
+    }),
+    'drive-docs-deep-pack-v1': Object.freeze({
+      mode: 'structured', single: 'facts', record: 'facts', primitiveList: 'items', recordList: 'table'
+    })
+  });
+  const READ_SECRET_KEY_PARTS = Object.freeze([
+    'password', 'passwd', 'passphrase', 'secret', 'token', 'apikey', 'authorization',
+    'authentication', 'authkey', 'authtoken', 'authsecret', 'authcredential', 'oauth',
+    'cookie', 'credential', 'privatekey', 'accesskey', 'session', 'csrftoken'
+  ]);
+  const READ_SECRET_VALUE = /(?:\b(?:bearer|basic)\s+[A-Za-z0-9+/=_-]{8,})|(?:\b(?:api[_ -]?key|access[_ -]?token|refresh[_ -]?token|password|passwd|secret|authorization|authentication|auth(?:[_ -]?(?:key|token|secret|credential))?|oauth(?:2)?[_ -]?token|session(?:[_ -]?(?:id|key|token))?|cookie|credential)\s*[:=]\s*\S+)|(?:\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b)|(?:\b(?:sk|ghp|xox[baprs])[-_][A-Za-z0-9_-]{12,}\b)|(?:-----BEGIN [A-Z ]*PRIVATE KEY-----)/i;
+  const READ_REMOVED_FORMATTING = /[\u0000-\u001f\u007f\u200b-\u200d\u202a-\u202e\u2060\u2066-\u2069\ufeff]+/g;
+
+  function positiveInteger(value) {
+    return typeof value === 'number' && Number.isSafeInteger(value) && value > 0;
+  }
+
+  function positiveGeneration(value) {
+    return positiveInteger(value);
+  }
+
+  function own(object, key) {
+    return !!object && Object.prototype.hasOwnProperty.call(object, key);
+  }
+
+  function exactKeys(object, expected) {
+    if (!object || typeof object !== 'object' || Array.isArray(object)) return false;
+    const actual = Object.keys(object).sort();
+    const wanted = expected.slice().sort();
+    return actual.length === wanted.length && actual.every((key, index) => key === wanted[index]);
+  }
+
+  function plainObject(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+    const prototype = Object.getPrototypeOf(value);
+    return prototype === Object.prototype || prototype === null;
+  }
+
+  function deepFreezeSkopeo(value) {
+    if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
+    for (const key of Reflect.ownKeys(value)) deepFreezeSkopeo(value[key]);
+    return Object.freeze(value);
+  }
+
+  /* FSB_SKOPEO_HUD_CONTROLLER_START */
+  function createFsbSkopeoHudProjectionController(dependencies) {
+    'use strict';
+
+    const projectionStates = new Map();
+    const closedAcknowledgement = Object.freeze({ success: false, status: 'closed' });
+    const openedAcknowledgement = Object.freeze({ success: true, status: 'opened' });
+    const projectionKeys = Object.freeze([
+      'action', 'generation', 'exactOrigin', 'profileVersion', 'contextEpoch',
+      'semanticEntityToken', 'actionToken'
+    ]);
+    const citationKeys = Object.freeze([
+      'action', 'generation', 'exactOrigin', 'profileVersion', 'contextEpoch',
+      'semanticEntityToken', 'projectionToken', 'actionId'
+    ]);
+    const revokeKeys = Object.freeze([
+      'action', 'generation', 'exactOrigin', 'profileVersion', 'contextEpoch',
+      'semanticEntityToken', 'projectionToken'
+    ]);
+    const askKeys = Object.freeze([
+      'action', 'generation', 'exactOrigin', 'profileVersion', 'contextEpoch',
+      'semanticEntityToken', 'projectionToken', 'scopeToken', 'question'
+    ]);
+    const cancelAskKeys = Object.freeze([
+      'action', 'generation', 'exactOrigin', 'profileVersion', 'contextEpoch',
+      'semanticEntityToken', 'projectionToken'
+    ]);
+    const answerActionKeys = Object.freeze([
+      'action', 'generation', 'exactOrigin', 'profileVersion', 'contextEpoch',
+      'semanticEntityToken', 'projectionToken', 'actionId'
+    ]);
+    const confirmAnswerActionKeys = Object.freeze([
+      'action', 'generation', 'exactOrigin', 'profileVersion', 'contextEpoch',
+      'semanticEntityToken', 'projectionToken', 'actionId', 'confirmationToken'
+    ]);
+    const alertActionKeys = answerActionKeys;
+    const confirmAlertActionKeys = confirmAnswerActionKeys;
+    const citationActionBindingKeys = Object.freeze([
+      'actionId', 'familyId', 'citationId', 'sourceFileId', 'sourceRevision',
+      'contentFingerprint', 'truthGenerationId', 'evaluationContextDigest'
+    ]);
+    const policyActionBindingKeys = Object.freeze([
+      'actionId', 'label', 'requiresConfirmation', 'policyInput', 'source'
+    ]);
+    const sourceActionBindingKeys = Object.freeze([
+      'familyId', 'citationId', 'sourceFileId', 'sourceRevision',
+      'contentFingerprint', 'truthGenerationId', 'evaluationContextDigest'
+    ]);
+    const alertActionBindingKeys = Object.freeze([
+      'actionId', 'kind', 'familyId', 'partition', 'owner', 'agreementStableId',
+      'sourceFileIds', 'sourceSetDigest', 'revisionDigest', 'accessDigest',
+      'truthGenerationId', 'evaluationContextDigest'
+    ]);
+    const scopeBindingKeys = Object.freeze([
+      'scopeToken', 'kind', 'label', 'scopeDigest', 'sourceFileIds'
+    ]);
+
+    function own(value, key) {
+      return Object.prototype.hasOwnProperty.call(value, key);
+    }
+
+    function plainRecord(value) {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+      let prototype;
+      try { prototype = Object.getPrototypeOf(value); } catch (_error) { return false; }
+      return prototype === Object.prototype || prototype === null;
+    }
+
+    function exactRecord(value, expectedKeys) {
+      if (!plainRecord(value)) return null;
+      let keys;
+      try { keys = Reflect.ownKeys(value); } catch (_error) { return null; }
+      if (keys.length !== expectedKeys.length || keys.some(function(key) {
+        return typeof key !== 'string';
+      })) return null;
+      const expected = expectedKeys.slice().sort();
+      const actual = keys.slice().sort();
+      for (let index = 0; index < actual.length; index += 1) {
+        if (actual[index] !== expected[index]) return null;
+      }
+      const output = Object.create(null);
+      for (let keyIndex = 0; keyIndex < keys.length; keyIndex += 1) {
+        const key = keys[keyIndex];
+        let descriptor;
+        try { descriptor = Object.getOwnPropertyDescriptor(value, key); } catch (_error) { return null; }
+        if (!descriptor || !own(descriptor, 'value') || descriptor.enumerable !== true) return null;
+        output[key] = descriptor.value;
+      }
+      return output;
+    }
+
+    function validToken(value, maximum) {
+      return typeof value === 'string' && value.length > 0 && value.length <= maximum &&
+        /^[A-Za-z0-9][A-Za-z0-9._:-]*$/.test(value) &&
+        value !== '__proto__' && value !== 'prototype' && value !== 'constructor';
+    }
+
+    function validOrigin(value) {
+      return value === 'https://drive.google.com' || value === 'https://docs.google.com';
+    }
+
+    function validLabel(value, maximum) {
+      return typeof value === 'string' && value.length > 0 && value.length <= maximum &&
+        value === value.trim() &&
+        !/[\u0000-\u001f\u007f\u202a-\u202e\u2066-\u2069<>]/.test(value) &&
+        !/(?:https?|file|chrome):\/\//i.test(value);
+    }
+
+    function validMessageFields(fields) {
+      return fields && Number.isSafeInteger(fields.generation) && fields.generation > 0 &&
+        validOrigin(fields.exactOrigin) && validToken(fields.profileVersion, 128) &&
+        Number.isSafeInteger(fields.contextEpoch) && fields.contextEpoch > 0 &&
+        validToken(fields.semanticEntityToken, 192);
+    }
+
+    function sourceIds(value) {
+      if (!Array.isArray(value) || value.length > 32) return null;
+      const output = [];
+      for (let index = 0; index < value.length; index += 1) {
+        if (!validToken(value[index], 256)) return null;
+        output.push(value[index]);
+      }
+      output.sort();
+      return new Set(output).size === output.length ? output : null;
+    }
+
+    function bindingSnapshot(binding) {
+      const ids = binding && sourceIds(binding.sourceFileIds);
+      if (!binding || !binding.controllerKey || !ids ||
+          !Number.isSafeInteger(binding.tabId) || binding.tabId <= 0 ||
+          !Number.isSafeInteger(binding.generation) || binding.generation <= 0 ||
+          !validOrigin(binding.exactOrigin) || !validToken(binding.profileVersion, 128) ||
+          !Number.isSafeInteger(binding.contextEpoch) || binding.contextEpoch <= 0 ||
+          !validToken(binding.semanticEntityToken, 192) ||
+          !validToken(binding.actionToken, 192) ||
+          (binding.mode !== 'folder' && binding.mode !== 'reading') ||
+          !binding.exactTuple || !validToken(binding.sourceSetDigest, 1024) ||
+          !validToken(binding.revisionDigest, 1024) || !validToken(binding.accessDigest, 1024)) {
+        return null;
+      }
+      return Object.freeze({
+        controllerKey: binding.controllerKey,
+        tabId: binding.tabId,
+        generation: binding.generation,
+        exactOrigin: binding.exactOrigin,
+        profileVersion: binding.profileVersion,
+        contextEpoch: binding.contextEpoch,
+        semanticEntityToken: binding.semanticEntityToken,
+        actionToken: binding.actionToken,
+        mode: binding.mode,
+        exactTuple: binding.exactTuple,
+        sourceFileIds: Object.freeze(ids),
+        sourceSetDigest: binding.sourceSetDigest,
+        revisionDigest: binding.revisionDigest,
+        accessDigest: binding.accessDigest
+      });
+    }
+
+    function sameBinding(left, right) {
+      return !!left && !!right && left.controllerKey === right.controllerKey &&
+        left.tabId === right.tabId && left.generation === right.generation &&
+        left.exactOrigin === right.exactOrigin && left.profileVersion === right.profileVersion &&
+        left.contextEpoch === right.contextEpoch &&
+        left.semanticEntityToken === right.semanticEntityToken &&
+        left.actionToken === right.actionToken && left.mode === right.mode &&
+        left.sourceSetDigest === right.sourceSetDigest &&
+        left.revisionDigest === right.revisionDigest && left.accessDigest === right.accessDigest &&
+        left.sourceFileIds.length === right.sourceFileIds.length &&
+        left.sourceFileIds.every(function(value, index) {
+          return value === right.sourceFileIds[index];
+        });
+    }
+
+    function messageMatchesBinding(fields, binding, requireActionToken) {
+      return validMessageFields(fields) && binding &&
+        fields.generation === binding.generation && fields.exactOrigin === binding.exactOrigin &&
+        fields.profileVersion === binding.profileVersion && fields.contextEpoch === binding.contextEpoch &&
+        fields.semanticEntityToken === binding.semanticEntityToken &&
+        (!requireActionToken ||
+          (validToken(fields.actionToken, 192) && fields.actionToken === binding.actionToken));
+    }
+
+    async function currentSnapshot(message, sender) {
+      if (!dependencies || typeof dependencies.resolveCurrentBinding !== 'function') return null;
+      let binding;
+      try { binding = await dependencies.resolveCurrentBinding(message, sender); } catch (_error) {
+        binding = null;
+      }
+      return bindingSnapshot(binding);
+    }
+
+    function revokeController(controllerKey, _reason) {
+      const state = controllerKey ? projectionStates.get(controllerKey) : null;
+      if (!state) return false;
+      if (state.askController && !state.askController.signal.aborted) {
+        state.askController.abort('skopeo-ask-revoked');
+      }
+      for (const action of state.actions.values()) action.status = 'revoked';
+      projectionStates.delete(controllerKey);
+      return true;
+    }
+
+    function mintToken(kind) {
+      if (!dependencies || typeof dependencies.randomToken !== 'function') return null;
+      let token;
+      try { token = dependencies.randomToken(kind); } catch (_error) { token = null; }
+      return validToken(token, 192) ? token : null;
+    }
+
+    function citationActionTokens(projection) {
+      const output = new Set();
+      const body = projection && projection.body;
+      if (!body) return output;
+      if (projection.mode === 'reading' && body.governingAction &&
+          body.governingAction.actionToken) {
+        output.add(body.governingAction.actionToken);
+      }
+      if (projection.mode === 'reading' && Array.isArray(body.facts)) {
+        body.facts.forEach(function(fact) {
+          if (fact && fact.actionToken) output.add(fact.actionToken);
+        });
+      }
+      if (projection.mode === 'answer' && body.answer) {
+        ['governingEvidence', 'historyEvidence'].forEach(function(section) {
+          (Array.isArray(body.answer[section]) ? body.answer[section] : []).forEach(function(item) {
+            if (item && item.actionToken) output.add(item.actionToken);
+          });
+        });
+      }
+      return output;
+    }
+
+    function publicPolicyActions(projection) {
+      const output = new Map();
+      const body = projection && projection.mode === 'answer' && projection.body;
+      (body && Array.isArray(body.policyActions) ? body.policyActions : []).forEach(function(item) {
+        if (item && item.actionId) output.set(item.actionId, item);
+      });
+      return output;
+    }
+
+    function publicAlertActions(projection) {
+      const output = new Map();
+      const body = projection && projection.body;
+      if (projection && projection.mode === 'folder' && body && Array.isArray(body.vendors)) {
+        body.vendors.forEach(function(vendor) {
+          const action = vendor && vendor.notificationDelivery &&
+            vendor.notificationDelivery !== 'not-available'
+            ? vendor.notificationDelivery.action
+            : null;
+          if (action && action.actionId) output.set(action.actionId, action);
+        });
+      } else if (projection && projection.mode === 'reading' && body) {
+        const action = body.notificationDelivery &&
+          body.notificationDelivery !== 'not-available'
+          ? body.notificationDelivery.action
+          : null;
+        if (action && action.actionId) output.set(action.actionId, action);
+      }
+      return output;
+    }
+
+    function projectionActionTokens(projection) {
+      const output = citationActionTokens(projection);
+      for (const actionId of publicPolicyActions(projection).keys()) output.add(actionId);
+      for (const actionId of publicAlertActions(projection).keys()) output.add(actionId);
+      return output;
+    }
+
+    function publicAskScopes(projection) {
+      if (!projection || !projection.body) return [];
+      if ((projection.mode === 'folder' || projection.mode === 'reading') &&
+          Array.isArray(projection.body.askScopes)) return projection.body.askScopes;
+      if ((projection.mode === 'ask' || projection.mode === 'answer') && projection.body.scope) {
+        return [projection.body.scope];
+      }
+      return [];
+    }
+
+    function parseScopeBindings(values, projection) {
+      if (!Array.isArray(values)) return null;
+      const publicScopes = publicAskScopes(projection);
+      if (values.length !== publicScopes.length) return null;
+      const publicByToken = new Map(publicScopes.map(function(scope) {
+        return [scope.scopeToken, scope];
+      }));
+      if (publicByToken.size !== publicScopes.length) return null;
+      const output = new Map();
+      for (let index = 0; index < values.length; index += 1) {
+        const fields = exactRecord(values[index], scopeBindingKeys);
+        const ids = fields && sourceIds(fields.sourceFileIds);
+        const publicScope = fields && publicByToken.get(fields.scopeToken);
+        if (!fields || !ids || !publicScope || output.has(fields.scopeToken) ||
+            ['agreement', 'vendor', 'corpus'].indexOf(fields.kind) === -1 ||
+            publicScope.kind !== fields.kind || publicScope.label !== fields.label ||
+            !validLabel(fields.label, 160) || !validToken(fields.scopeDigest, 1024)) return null;
+        output.set(fields.scopeToken, {
+          scopeToken: fields.scopeToken,
+          kind: fields.kind,
+          label: fields.label,
+          scopeDigest: fields.scopeDigest,
+          sourceFileIds: Object.freeze(ids)
+        });
+      }
+      return output;
+    }
+
+    function parseCitationActions(rawValues, publicActionTokens) {
+      const values = Array.isArray(rawValues) ? rawValues.filter(function(action) {
+        return action && publicActionTokens.has(action.actionId);
+      }) : [];
+      if (values.length !== publicActionTokens.size) return null;
+      const actions = new Map();
+      for (let index = 0; index < values.length; index += 1) {
+        const action = exactRecord(values[index], citationActionBindingKeys);
+        if (!action || !publicActionTokens.has(action.actionId) ||
+            !validToken(action.actionId, 192) || actions.has(action.actionId) ||
+            !validToken(action.familyId, 256) || !validToken(action.citationId, 256) ||
+            !validToken(action.sourceFileId, 256) || !validToken(action.sourceRevision, 1024) ||
+            !validToken(action.contentFingerprint, 1024) ||
+            !validToken(action.truthGenerationId, 256) ||
+            !validToken(action.evaluationContextDigest, 256)) return null;
+        actions.set(action.actionId, {
+          type: 'citation',
+          actionId: action.actionId,
+          familyId: action.familyId,
+          citationId: action.citationId,
+          sourceFileId: action.sourceFileId,
+          sourceRevision: action.sourceRevision,
+          contentFingerprint: action.contentFingerprint,
+          truthGenerationId: action.truthGenerationId,
+          evaluationContextDigest: action.evaluationContextDigest,
+          status: 'ready',
+          issuedEpoch: Date.now()
+        });
+      }
+      return actions;
+    }
+
+    function parseSourceAction(value) {
+      if (value === null) return null;
+      const source = exactRecord(value, sourceActionBindingKeys);
+      if (!source || !validToken(source.familyId, 256) ||
+          !validToken(source.citationId, 256) || !validToken(source.sourceFileId, 256) ||
+          !validToken(source.sourceRevision, 1024) ||
+          !validToken(source.contentFingerprint, 1024) ||
+          !validToken(source.truthGenerationId, 256) ||
+          !validToken(source.evaluationContextDigest, 256)) return false;
+      return Object.freeze({
+        familyId: source.familyId,
+        citationId: source.citationId,
+        sourceFileId: source.sourceFileId,
+        sourceRevision: source.sourceRevision,
+        contentFingerprint: source.contentFingerprint,
+        truthGenerationId: source.truthGenerationId,
+        evaluationContextDigest: source.evaluationContextDigest
+      });
+    }
+
+    function parsePolicyActions(rawValues, projection) {
+      const publicActions = publicPolicyActions(projection);
+      const values = Array.isArray(rawValues) ? rawValues : [];
+      if (values.length !== publicActions.size) return null;
+      const output = new Map();
+      const askSchema = dependencies && dependencies.askSchema;
+      for (let index = 0; index < values.length; index += 1) {
+        const fields = exactRecord(values[index], policyActionBindingKeys);
+        const publicAction = fields && publicActions.get(fields.actionId);
+        const policyInput = fields && askSchema && typeof askSchema.parsePolicyInput === 'function'
+          ? askSchema.parsePolicyInput(fields.policyInput)
+          : null;
+        const source = fields ? parseSourceAction(fields.source) : false;
+        const sourceRequired = fields &&
+          (fields.label === 'review-document-10' || fields.label === 'open-existing-memo');
+        const confirmationRequired = fields && [
+          'configure-document-10', 'replace-document-10', 'clear-document-10',
+          'classify-complex', 'classify-routine'
+        ].indexOf(fields.label) !== -1;
+        if (!fields || !publicAction || !policyInput || source === false ||
+            !validToken(fields.actionId, 192) || output.has(fields.actionId) ||
+            publicAction.label !== fields.label ||
+            publicAction.requiresConfirmation !== fields.requiresConfirmation ||
+            typeof fields.requiresConfirmation !== 'boolean' ||
+            fields.requiresConfirmation !== confirmationRequired ||
+            (sourceRequired && !source) || (!sourceRequired && source !== null)) return null;
+        output.set(fields.actionId, {
+          type: 'policy',
+          actionId: fields.actionId,
+          label: fields.label,
+          requiresConfirmation: fields.requiresConfirmation,
+          policyInput: policyInput,
+          source: source,
+          status: 'ready',
+          confirmationToken: null,
+          issuedEpoch: Date.now()
+        });
+      }
+      return output;
+    }
+
+    function parseAlertActions(rawValues, projection) {
+      const publicActions = publicAlertActions(projection);
+      const values = Array.isArray(rawValues) ? rawValues : [];
+      if (values.length !== publicActions.size) return null;
+      const output = new Map();
+      const alertSchema = dependencies && dependencies.alertSchema;
+      for (let index = 0; index < values.length; index += 1) {
+        const fields = exactRecord(values[index], alertActionBindingKeys);
+        const publicAction = fields && publicActions.get(fields.actionId);
+        const partition = fields && alertSchema &&
+          typeof alertSchema.parsePartition === 'function'
+          ? alertSchema.parsePartition(fields.partition)
+          : null;
+        const owner = fields && exactRecord(fields.owner, [
+          'stableRecordId', 'stableRelationId', 'sourceFileId', 'sourceRevision', 'label'
+        ]);
+        const ids = fields && sourceIds(fields.sourceFileIds);
+        if (!fields || !publicAction || !partition || !owner || !ids ||
+            !validToken(fields.actionId, 192) || output.has(fields.actionId) ||
+            (fields.kind !== 'map-current-owner' &&
+              fields.kind !== 'remove-current-owner-mapping') ||
+            publicAction.kind !== fields.kind || publicAction.label !==
+              (fields.kind === 'map-current-owner'
+                ? 'Map current owner to this Chrome user'
+                : 'Remove current owner mapping') ||
+            publicAction.requiresConfirmation !== true ||
+            !validToken(fields.familyId, 256) ||
+            !validToken(fields.agreementStableId, 256) ||
+            !validToken(owner.stableRecordId, 256) ||
+            !validToken(owner.stableRelationId, 256) ||
+            !validToken(owner.sourceFileId, 256) ||
+            !validToken(owner.sourceRevision, 1024) ||
+            !validLabel(owner.label, 512) || ids.indexOf(owner.sourceFileId) === -1 ||
+            !validToken(fields.sourceSetDigest, 1024) ||
+            !validToken(fields.revisionDigest, 1024) ||
+            !validToken(fields.accessDigest, 1024) ||
+            !validToken(fields.truthGenerationId, 256) ||
+            !validToken(fields.evaluationContextDigest, 256)) return null;
+        output.set(fields.actionId, {
+          type: 'alert',
+          actionId: fields.actionId,
+          kind: fields.kind,
+          familyId: fields.familyId,
+          partition: partition,
+          owner: Object.freeze({
+            stableRecordId: owner.stableRecordId,
+            stableRelationId: owner.stableRelationId,
+            sourceFileId: owner.sourceFileId,
+            sourceRevision: owner.sourceRevision,
+            label: owner.label
+          }),
+          agreementStableId: fields.agreementStableId,
+          sourceFileIds: Object.freeze(ids),
+          sourceSetDigest: fields.sourceSetDigest,
+          revisionDigest: fields.revisionDigest,
+          accessDigest: fields.accessDigest,
+          truthGenerationId: fields.truthGenerationId,
+          evaluationContextDigest: fields.evaluationContextDigest,
+          requiresConfirmation: true,
+          status: 'ready',
+          confirmationToken: null,
+          issuedEpoch: Date.now()
+        });
+      }
+      return output;
+    }
+
+    function mergeActions(citations, policies, alerts) {
+      if (!citations || !policies || !alerts) return null;
+      const output = new Map(citations);
+      for (const values of [policies, alerts]) {
+        for (const [actionId, action] of values) {
+          if (output.has(actionId)) return null;
+          output.set(actionId, action);
+        }
+      }
+      return output;
+    }
+
+    function admittedBlockerCodes(value) {
+      return value && value.status === 'review-required' && Array.isArray(value.blockerCodes) &&
+        value.blockerCodes.length > 0
+        ? value.blockerCodes
+        : null;
+    }
+
+    function hudClosedReason(codes) {
+      const set = Object.create(null);
+      (Array.isArray(codes) ? codes : []).forEach(function(code) {
+        if (typeof code === 'string') set[code] = true;
+      });
+      if (set['timezone-missing'] || set['business-calendar-missing'] ||
+          set['evaluation-context-missing'] || set['evaluation-context-stale'] ||
+          set['evaluation-context-mismatch']) {
+        return 'evaluation-context-missing';
+      }
+      if (set['source-unavailable'] || set['source-unreadable']) return 'access-unavailable';
+      if (set['exact-set-over-cap']) return 'exact-set-over-cap';
+      if (set['snapshot-stale']) return 'stale-input';
+      if (set['exact-set-incomplete'] || set['fact-missing']) return 'partial-authority';
+      return 'partial-authority';
+    }
+
+    function closedHudProjection(binding, projectionToken, reason) {
+      return {
+        version: 'skopeo-hud-projection/1',
+        generation: binding.generation,
+        exactOrigin: binding.exactOrigin,
+        profileVersion: binding.profileVersion,
+        contextEpoch: binding.contextEpoch,
+        semanticEntityToken: binding.semanticEntityToken,
+        requestActionToken: binding.actionToken,
+        projectionToken: projectionToken,
+        mode: 'contract-closed',
+        currentness: 'closed',
+        result: 'closed',
+        body: { reason: reason }
+      };
+    }
+
+    function admittedAggregate(result) {
+      if (!result || result.decision !== 'admitted') return null;
+      if (own(result, 'aggregate')) return result.aggregate;
+      return own(result, 'value') ? result.value : null;
+    }
+
+    async function requestProjection(message, sender) {
+      const fields = exactRecord(message, projectionKeys);
+      if (!fields || fields.action !== 'skopeo:hud-projection' ||
+          !validMessageFields(fields) || !validToken(fields.actionToken, 192)) return null;
+      const initial = await currentSnapshot(message, sender);
+      if (!messageMatchesBinding(fields, initial, true)) return null;
+
+      revokeController(initial.controllerKey, 'replacement');
+      const projectionToken = mintToken('projection');
+      if (!projectionToken || typeof dependencies.runCorpusOperation !== 'function' ||
+          typeof dependencies.ensureTruth !== 'function' ||
+          typeof dependencies.buildProjection !== 'function' ||
+          typeof dependencies.buildEvaluationContext !== 'function') return null;
+      let evaluationContext;
+      try { evaluationContext = await dependencies.buildEvaluationContext(initial); } catch (_error) {
+        evaluationContext = null;
+      }
+      const beforeOperation = await currentSnapshot(message, sender);
+      if (!sameBinding(initial, beforeOperation) ||
+          !messageMatchesBinding(fields, beforeOperation, true)) return null;
+
+      const contextBlockers = admittedBlockerCodes(evaluationContext);
+      let built = null;
+      if (!evaluationContext || contextBlockers) {
+        built = {
+          projection: closedHudProjection(
+            initial,
+            projectionToken,
+            hudClosedReason(contextBlockers || ['evaluation-context-missing'])
+          ),
+          actions: []
+        };
+      } else if (initial.mode === 'folder' && initial.sourceFileIds.length === 0) {
+        try {
+          built = await dependencies.buildProjection({
+            binding: initial,
+            certificates: [],
+            proof: { complete: true },
+            operationSignal: { aborted: false },
+            truth: {
+              status: 'current',
+              families: [],
+              blockerCodes: [],
+              authorizedSetDigest: initial.sourceSetDigest,
+              evaluationContextDigest: evaluationContext.digest || evaluationContext.evaluationContextDigest
+            },
+            evaluationContext: evaluationContext,
+            projectionToken: projectionToken,
+            mintActionId: function() { return mintToken('action'); },
+            mintScopeToken: function() { return mintToken('scope'); }
+          });
+        } catch (_error) {
+          built = null;
+        }
+      } else {
+        let operation;
+        try {
+          operation = await dependencies.runCorpusOperation(
+            'display',
+            initial.exactTuple,
+            { sourceFileIds: initial.sourceFileIds.slice() },
+            async function(certificates, proof, operationSignal) {
+              const truth = await dependencies.ensureTruth(initial.exactTuple, {
+                evaluationContext: evaluationContext
+              });
+              const afterTruth = await currentSnapshot(message, sender);
+              if (!sameBinding(initial, afterTruth)) {
+                throw new Error('stale-hud-truth');
+              }
+              const truthBlockers = admittedBlockerCodes(truth);
+              if (!truth || truth.status !== 'current' || truthBlockers) {
+                return {
+                  rows: [],
+                  aggregate: {
+                    projection: closedHudProjection(
+                      initial,
+                      projectionToken,
+                      hudClosedReason(truthBlockers || (truth && truth.blockerCodes) ||
+                        ['snapshot-stale'])
+                    ),
+                    actions: []
+                  }
+                };
+              }
+              const constructed = await dependencies.buildProjection({
+                binding: initial,
+                certificates: certificates,
+                proof: proof,
+                operationSignal: operationSignal,
+                truth: truth,
+                evaluationContext: evaluationContext,
+                projectionToken: projectionToken,
+                mintActionId: function() { return mintToken('action'); },
+                mintScopeToken: function() { return mintToken('scope'); }
+              });
+              return { rows: [], aggregate: constructed };
+            }
+          );
+        } catch (_error) {
+          operation = null;
+        }
+        built = admittedAggregate(operation);
+      }
+      const finalBinding = await currentSnapshot(message, sender);
+      if (!built || !plainRecord(built) || !sameBinding(initial, finalBinding) ||
+          !messageMatchesBinding(fields, finalBinding, true)) {
+        revokeController(initial.controllerKey, 'stale-input');
+        return null;
+      }
+
+      const hudSchema = dependencies.hudSchema;
+      const parsed = hudSchema && typeof hudSchema.parseProjection === 'function'
+        ? hudSchema.parseProjection(built.projection)
+        : null;
+      if (!parsed || parsed.generation !== initial.generation ||
+          parsed.exactOrigin !== initial.exactOrigin ||
+          parsed.profileVersion !== initial.profileVersion ||
+          parsed.contextEpoch !== initial.contextEpoch ||
+          parsed.semanticEntityToken !== initial.semanticEntityToken ||
+          parsed.requestActionToken !== initial.actionToken ||
+          parsed.projectionToken !== projectionToken ||
+          (parsed.mode !== initial.mode && parsed.mode !== 'contract-closed')) {
+        revokeController(initial.controllerKey, 'invalid-projection');
+        return null;
+      }
+
+      const scopes = parseScopeBindings(
+        Array.isArray(built.scopes) ? built.scopes : [],
+        parsed
+      );
+      if (!scopes) {
+        revokeController(initial.controllerKey, 'invalid-scopes');
+        return null;
+      }
+
+      const publicActionTokens = citationActionTokens(parsed);
+      const citations = parseCitationActions(built.actions, publicActionTokens);
+      const alerts = parseAlertActions(built.alertActions, parsed);
+      const actions = mergeActions(citations, new Map(), alerts);
+      if (!actions) return null;
+      const state = {
+        binding: initial,
+        projectionToken: projectionToken,
+        projection: parsed,
+        actions: actions,
+        scopes: scopes,
+        askController: null,
+        askEpoch: 0,
+        question: null,
+        answer: null,
+        acknowledgement: null,
+        reviewOpen: null
+      };
+      projectionStates.set(initial.controllerKey, state);
+      if (typeof dependencies.onProjectionPublished === 'function') {
+        try { dependencies.onProjectionPublished(initial, parsed); } catch (_error) {
+          revokeController(initial.controllerKey, 'publish-failed');
+          return null;
+        }
+      }
+      return parsed;
+    }
+
+    async function ask(message, sender) {
+      const fields = exactRecord(message, askKeys);
+      const askSchema = dependencies && dependencies.askSchema;
+      const question = fields && askSchema && typeof askSchema.parseQuestion === 'function'
+        ? askSchema.parseQuestion(fields.question)
+        : null;
+      if (!fields || fields.action !== 'skopeo:hud-ask' ||
+          !validMessageFields(fields) || !validToken(fields.projectionToken, 192) ||
+          !validToken(fields.scopeToken, 192) || !question) return null;
+      const initial = await currentSnapshot(message, sender);
+      if (!messageMatchesBinding(fields, initial, false)) return null;
+      const state = projectionStates.get(initial.controllerKey);
+      const scope = state && state.projectionToken === fields.projectionToken
+        ? state.scopes.get(fields.scopeToken)
+        : null;
+      if (!state || !scope || !sameBinding(state.binding, initial) ||
+          typeof dependencies.runCorpusOperation !== 'function' ||
+          typeof dependencies.runAsk !== 'function' ||
+          typeof dependencies.buildAskProjection !== 'function') return null;
+
+      if (state.askController && !state.askController.signal.aborted) {
+        state.askController.abort('skopeo-ask-replaced');
+      }
+      state.askEpoch += 1;
+      const askEpoch = state.askEpoch;
+      const askController = new AbortController();
+      state.askController = askController;
+      const requestToken = mintToken('request');
+      if (!requestToken) {
+        askController.abort('skopeo-ask-token-failed');
+        return null;
+      }
+
+      let operation;
+      try {
+        operation = await dependencies.runCorpusOperation(
+          'query',
+          state.binding.exactTuple,
+          { sourceFileIds: scope.sourceFileIds.slice() },
+          async function(certificates, proof, operationSignal) {
+            const beforeAsk = await currentSnapshot(message, sender);
+            if (askController.signal.aborted || !sameBinding(state.binding, beforeAsk) ||
+                projectionStates.get(initial.controllerKey) !== state ||
+                state.askEpoch !== askEpoch) throw new Error('stale-hud-ask');
+            const result = await dependencies.runAsk({
+              binding: state.binding,
+              scope: scope,
+              question: question,
+              requestToken: requestToken,
+              certificates: certificates,
+              proof: proof,
+              operationSignal: operationSignal,
+              askSignal: askController.signal
+            });
+            const afterAsk = await currentSnapshot(message, sender);
+            if (!result || askController.signal.aborted ||
+                !sameBinding(state.binding, afterAsk) ||
+                projectionStates.get(initial.controllerKey) !== state ||
+                state.askEpoch !== askEpoch) throw new Error('stale-hud-ask-result');
+            return { rows: [], aggregate: result };
+          }
+        );
+      } catch (_error) {
+        operation = null;
+      }
+      const result = admittedAggregate(operation);
+      const finalBinding = await currentSnapshot(message, sender);
+      if (!result || !plainRecord(result) || askController.signal.aborted ||
+          !sameBinding(state.binding, finalBinding) || state.askEpoch !== askEpoch ||
+          projectionStates.get(initial.controllerKey) !== state) return null;
+
+      const projectionToken = mintToken('projection');
+      const nextScopeToken = mintToken('scope');
+      if (!projectionToken || !nextScopeToken) return null;
+      const publicScope = Object.freeze({
+        kind: scope.kind,
+        label: scope.label,
+        scopeToken: nextScopeToken
+      });
+      let candidate;
+      try {
+        candidate = await dependencies.buildAskProjection({
+          question: question,
+          scope: publicScope,
+          answer: result.answer,
+          policy: result.policy,
+          policyActions: Array.isArray(result.policyActions) ? result.policyActions : [],
+          authority: {
+            generation: state.binding.generation,
+            exactOrigin: state.binding.exactOrigin,
+            profileVersion: state.binding.profileVersion,
+            contextEpoch: state.binding.contextEpoch,
+            semanticEntityToken: state.binding.semanticEntityToken,
+            requestActionToken: state.binding.actionToken,
+            projectionToken: projectionToken
+          }
+        });
+      } catch (_error) {
+        candidate = null;
+      }
+      const parsed = dependencies.hudSchema &&
+        typeof dependencies.hudSchema.parseProjection === 'function'
+        ? dependencies.hudSchema.parseProjection(candidate)
+        : null;
+      const beforePublish = await currentSnapshot(message, sender);
+      if (!parsed || parsed.mode !== 'answer' || parsed.projectionToken !== projectionToken ||
+          parsed.body.scope.scopeToken !== nextScopeToken ||
+          !sameBinding(state.binding, beforePublish) || askController.signal.aborted ||
+          state.askEpoch !== askEpoch || projectionStates.get(initial.controllerKey) !== state) {
+        return null;
+      }
+      const citationTokens = citationActionTokens(parsed);
+      const citationActions = parseCitationActions(result.actions, citationTokens);
+      const policyActions = parsePolicyActions(result.policyActionBindings, parsed);
+      const actions = mergeActions(citationActions, policyActions, new Map());
+      if (!actions) return null;
+      for (const action of state.actions.values()) action.status = 'revoked';
+      state.actions = actions;
+      state.projectionToken = projectionToken;
+      state.projection = parsed;
+      state.scopes = new Map([[nextScopeToken, {
+        scopeToken: nextScopeToken,
+        kind: scope.kind,
+        label: scope.label,
+        scopeDigest: scope.scopeDigest,
+        sourceFileIds: scope.sourceFileIds
+      }]]);
+      state.askController = null;
+      state.question = question;
+      state.answer = result.answer;
+      state.acknowledgement = null;
+      state.reviewOpen = null;
+      if (typeof dependencies.onProjectionPublished === 'function') {
+        try { dependencies.onProjectionPublished(state.binding, parsed); } catch (_error) {
+          revokeController(initial.controllerKey, 'ask-publish-failed');
+          return null;
+        }
+      }
+      return parsed;
+    }
+
+    async function cancelAsk(message, sender) {
+      const fields = exactRecord(message, cancelAskKeys);
+      if (!fields || fields.action !== 'skopeo:hud-ask-cancel' ||
+          !validMessageFields(fields) || !validToken(fields.projectionToken, 192)) {
+        return closedAcknowledgement;
+      }
+      const current = await currentSnapshot(message, sender);
+      if (!messageMatchesBinding(fields, current, false)) return closedAcknowledgement;
+      const state = projectionStates.get(current.controllerKey);
+      if (!state || state.projectionToken !== fields.projectionToken ||
+          !sameBinding(state.binding, current) || !state.askController ||
+          state.askController.signal.aborted) return closedAcknowledgement;
+      state.askEpoch += 1;
+      state.askController.abort('skopeo-ask-cancelled');
+      state.askController = null;
+      return Object.freeze({ success: true, status: 'cancelled' });
+    }
+
+    function rawCitationBinding(action) {
+      return {
+        actionId: action.actionId,
+        familyId: action.familyId,
+        citationId: action.citationId,
+        sourceFileId: action.sourceFileId,
+        sourceRevision: action.sourceRevision,
+        contentFingerprint: action.contentFingerprint,
+        truthGenerationId: action.truthGenerationId,
+        evaluationContextDigest: action.evaluationContextDigest
+      };
+    }
+
+    function consequenceForPolicyAction(action) {
+      const copy = {
+        'configure-document-10': Object.freeze([
+          'Configure Document 10',
+          'Stores this current document as Document 10 for the current account and corpus.'
+        ]),
+        'replace-document-10': Object.freeze([
+          'Replace Document 10',
+          'Replaces the local Document 10 identity and invalidates the current review acknowledgement.'
+        ]),
+        'clear-document-10': Object.freeze([
+          'Clear Document 10',
+          'Removes the local Document 10 identity and blocks applicable decisions until reconfigured.'
+        ]),
+        'classify-complex': Object.freeze([
+          'Classify as complex',
+          'Adds the human-authored memo safeguard for this current agreement.'
+        ]),
+        'classify-routine': Object.freeze([
+          'Remove complex classification',
+          'Removes the Skopeo memo safeguard for future decisions without changing any source.'
+        ])
+      };
+      const selected = copy[action && action.label];
+      return selected ? Object.freeze({
+        title: selected[0],
+        effect: 'local-policy-write',
+        detail: selected[1]
+      }) : null;
+    }
+
+    function consequenceForAlertAction(action) {
+      if (!action || action.type !== 'alert') return null;
+      if (action.kind === 'map-current-owner') return Object.freeze({
+        title: 'Map current owner',
+        effect: 'local-alert-owner-mapping',
+        detail: 'Stores this exact current agreement owner as the recipient for local alerts in this Chrome account and corpus.'
+      });
+      if (action.kind === 'remove-current-owner-mapping') return Object.freeze({
+        title: 'Remove current owner mapping',
+        effect: 'local-alert-owner-mapping',
+        detail: 'Removes the local recipient mapping and supersedes pending alerts for this exact current agreement owner.'
+      });
+      return null;
+    }
+
+    async function refreshAnswerPolicy(state, message, sender) {
+      if (!state || !state.answer || !state.question || state.scopes.size !== 1 ||
+          typeof dependencies.refreshPolicy !== 'function' ||
+          typeof dependencies.buildAskProjection !== 'function') return null;
+      const initial = await currentSnapshot(message, sender);
+      if (!sameBinding(state.binding, initial) ||
+          projectionStates.get(state.binding.controllerKey) !== state) return null;
+      const scope = Array.from(state.scopes.values())[0];
+      let refreshed;
+      try {
+        refreshed = await dependencies.refreshPolicy({
+          binding: state.binding,
+          scope: scope,
+          question: state.question,
+          answer: state.answer,
+          acknowledgement: state.acknowledgement,
+          reviewOpen: state.reviewOpen
+        });
+      } catch (_error) {
+        refreshed = null;
+      }
+      const afterRefresh = await currentSnapshot(message, sender);
+      if (!refreshed || !plainRecord(refreshed) || !sameBinding(state.binding, afterRefresh) ||
+          projectionStates.get(state.binding.controllerKey) !== state) return null;
+      const projectionToken = mintToken('projection');
+      const nextScopeToken = mintToken('scope');
+      if (!projectionToken || !nextScopeToken) return null;
+      const publicScope = Object.freeze({
+        kind: scope.kind,
+        label: scope.label,
+        scopeToken: nextScopeToken
+      });
+      let candidate;
+      try {
+        candidate = await dependencies.buildAskProjection({
+          question: state.question,
+          scope: publicScope,
+          answer: state.answer,
+          policy: refreshed.policy,
+          policyActions: Array.isArray(refreshed.policyActions) ? refreshed.policyActions : [],
+          authority: {
+            generation: state.binding.generation,
+            exactOrigin: state.binding.exactOrigin,
+            profileVersion: state.binding.profileVersion,
+            contextEpoch: state.binding.contextEpoch,
+            semanticEntityToken: state.binding.semanticEntityToken,
+            requestActionToken: state.binding.actionToken,
+            projectionToken: projectionToken
+          }
+        });
+      } catch (_error) {
+        candidate = null;
+      }
+      const parsed = dependencies.hudSchema &&
+        typeof dependencies.hudSchema.parseProjection === 'function'
+        ? dependencies.hudSchema.parseProjection(candidate)
+        : null;
+      const beforePublish = await currentSnapshot(message, sender);
+      if (!parsed || parsed.mode !== 'answer' || parsed.projectionToken !== projectionToken ||
+          parsed.body.scope.scopeToken !== nextScopeToken ||
+          !sameBinding(state.binding, beforePublish) ||
+          projectionStates.get(state.binding.controllerKey) !== state) return null;
+      const priorCitations = [];
+      for (const action of state.actions.values()) {
+        if (action.type === 'citation') priorCitations.push(rawCitationBinding(action));
+      }
+      const citations = parseCitationActions(priorCitations, citationActionTokens(parsed));
+      const policies = parsePolicyActions(refreshed.policyActionBindings, parsed);
+      const actions = mergeActions(citations, policies, new Map());
+      if (!actions) return null;
+      for (const action of state.actions.values()) action.status = 'revoked';
+      state.actions = actions;
+      state.projection = parsed;
+      state.projectionToken = projectionToken;
+      state.scopes = new Map([[nextScopeToken, {
+        scopeToken: nextScopeToken,
+        kind: scope.kind,
+        label: scope.label,
+        scopeDigest: scope.scopeDigest,
+        sourceFileIds: scope.sourceFileIds
+      }]]);
+      if (typeof dependencies.onProjectionPublished === 'function') {
+        try { dependencies.onProjectionPublished(state.binding, parsed); } catch (_error) {
+          revokeController(state.binding.controllerKey, 'policy-publish-failed');
+          return null;
+        }
+      }
+      return parsed;
+    }
+
+    async function answerAction(message, sender) {
+      const fields = exactRecord(message, answerActionKeys);
+      if (!fields || fields.action !== 'skopeo:hud-answer-action' ||
+          !validMessageFields(fields) || !validToken(fields.projectionToken, 192) ||
+          !validToken(fields.actionId, 192)) {
+        return closedAcknowledgement;
+      }
+      const current = await currentSnapshot(message, sender);
+      if (!messageMatchesBinding(fields, current, false)) return closedAcknowledgement;
+      const state = projectionStates.get(current.controllerKey);
+      const action = state && state.projectionToken === fields.projectionToken
+        ? state.actions.get(fields.actionId)
+        : null;
+      if (!state || !sameBinding(state.binding, current) || !action || action.status !== 'ready') {
+        return closedAcknowledgement;
+      }
+      if (action.type === 'citation') {
+        return openSourceAction(state, action, message, sender);
+      }
+      if (action.type !== 'policy') return closedAcknowledgement;
+      if (action.requiresConfirmation) {
+        const consequence = consequenceForPolicyAction(action);
+        const confirmationToken = consequence && mintToken('confirmation');
+        const beforeReturn = await currentSnapshot(message, sender);
+        if (!confirmationToken || !sameBinding(state.binding, beforeReturn) ||
+            projectionStates.get(current.controllerKey) !== state || action.status !== 'ready') {
+          action.status = 'revoked';
+          return closedAcknowledgement;
+        }
+        action.status = 'confirmation';
+        action.confirmationToken = confirmationToken;
+        return Object.freeze({
+          success: true,
+          status: 'confirmation-required',
+          confirmationToken: confirmationToken,
+          consequence: consequence
+        });
+      }
+      action.status = 'pending';
+      if (action.label === 'review-document-10' || action.label === 'open-existing-memo') {
+        const sourceAction = Object.assign({
+          type: 'citation', actionId: action.actionId, status: 'ready'
+        }, action.source);
+        const opened = await openSourceAction(state, sourceAction, message, sender);
+        if (!opened || opened.success !== true) {
+          action.status = 'revoked';
+          return closedAcknowledgement;
+        }
+        action.status = 'consumed';
+        if (action.label === 'open-existing-memo') return openedAcknowledgement;
+        let reviewOpen = null;
+        try {
+          reviewOpen = typeof dependencies.openPolicyReview === 'function'
+            ? dependencies.openPolicyReview(action.policyInput)
+            : null;
+        } catch (_error) {
+          reviewOpen = null;
+        }
+        const afterOpen = await currentSnapshot(message, sender);
+        if (!reviewOpen || !sameBinding(state.binding, afterOpen) ||
+            projectionStates.get(current.controllerKey) !== state) return closedAcknowledgement;
+        state.reviewOpen = reviewOpen;
+        state.acknowledgement = null;
+        return await refreshAnswerPolicy(state, message, sender) || closedAcknowledgement;
+      }
+      if (action.label === 'acknowledge-document-10') {
+        let acknowledgement = null;
+        try {
+          acknowledgement = state.reviewOpen &&
+            typeof dependencies.acknowledgePolicyReview === 'function'
+            ? dependencies.acknowledgePolicyReview(action.policyInput, state.reviewOpen)
+            : null;
+        } catch (_error) {
+          acknowledgement = null;
+        }
+        const afterAcknowledge = await currentSnapshot(message, sender);
+        if (!acknowledgement || !sameBinding(state.binding, afterAcknowledge) ||
+            projectionStates.get(current.controllerKey) !== state) {
+          action.status = 'revoked';
+          return closedAcknowledgement;
+        }
+        action.status = 'consumed';
+        state.acknowledgement = acknowledgement;
+        return await refreshAnswerPolicy(state, message, sender) || closedAcknowledgement;
+      }
+      action.status = 'revoked';
+      return closedAcknowledgement;
+    }
+
+    async function confirmAnswerAction(message, sender) {
+      const fields = exactRecord(message, confirmAnswerActionKeys);
+      if (!fields || fields.action !== 'skopeo:hud-answer-action-confirm' ||
+          !validMessageFields(fields) || !validToken(fields.projectionToken, 192) ||
+          !validToken(fields.actionId, 192) || !validToken(fields.confirmationToken, 192)) {
+        return closedAcknowledgement;
+      }
+      const current = await currentSnapshot(message, sender);
+      if (!messageMatchesBinding(fields, current, false)) return closedAcknowledgement;
+      const state = projectionStates.get(current.controllerKey);
+      const action = state && state.projectionToken === fields.projectionToken
+        ? state.actions.get(fields.actionId)
+        : null;
+      if (!state || !sameBinding(state.binding, current) || !action || action.type !== 'policy' ||
+          action.status !== 'confirmation' || !action.requiresConfirmation ||
+          fields.confirmationToken !== action.confirmationToken ||
+          typeof dependencies.commitPolicyAction !== 'function') return closedAcknowledgement;
+      action.status = 'pending';
+      action.confirmationToken = null;
+      let committed = false;
+      try {
+        committed = await dependencies.commitPolicyAction({
+          binding: state.binding,
+          scope: Array.from(state.scopes.values())[0],
+          action: action
+        });
+      } catch (_error) {
+        committed = false;
+      }
+      const afterCommit = await currentSnapshot(message, sender);
+      if (committed !== true || !sameBinding(state.binding, afterCommit) ||
+          projectionStates.get(current.controllerKey) !== state) {
+        action.status = 'revoked';
+        return closedAcknowledgement;
+      }
+      action.status = 'consumed';
+      state.reviewOpen = null;
+      state.acknowledgement = null;
+      return await refreshAnswerPolicy(state, message, sender) || closedAcknowledgement;
+    }
+
+    async function alertAction(message, sender) {
+      const fields = exactRecord(message, alertActionKeys);
+      if (!fields || fields.action !== 'skopeo:hud-alert-action' ||
+          !validMessageFields(fields) || !validToken(fields.projectionToken, 192) ||
+          !validToken(fields.actionId, 192)) return closedAcknowledgement;
+      const current = await currentSnapshot(message, sender);
+      if (!messageMatchesBinding(fields, current, false)) return closedAcknowledgement;
+      const state = projectionStates.get(current.controllerKey);
+      const action = state && state.projectionToken === fields.projectionToken
+        ? state.actions.get(fields.actionId)
+        : null;
+      if (!state || !sameBinding(state.binding, current) || !action ||
+          action.type !== 'alert' || action.status !== 'ready') return closedAcknowledgement;
+      const consequence = consequenceForAlertAction(action);
+      const confirmationToken = consequence && mintToken('confirmation');
+      const beforeReturn = await currentSnapshot(message, sender);
+      if (!confirmationToken || !sameBinding(state.binding, beforeReturn) ||
+          projectionStates.get(current.controllerKey) !== state || action.status !== 'ready') {
+        action.status = 'revoked';
+        return closedAcknowledgement;
+      }
+      action.status = 'confirmation';
+      action.confirmationToken = confirmationToken;
+      return Object.freeze({
+        success: true,
+        status: 'confirmation-required',
+        confirmationToken: confirmationToken,
+        consequence: consequence
+      });
+    }
+
+    async function confirmAlertAction(message, sender) {
+      const fields = exactRecord(message, confirmAlertActionKeys);
+      if (!fields || fields.action !== 'skopeo:hud-alert-action-confirm' ||
+          !validMessageFields(fields) || !validToken(fields.projectionToken, 192) ||
+          !validToken(fields.actionId, 192) || !validToken(fields.confirmationToken, 192)) {
+        return closedAcknowledgement;
+      }
+      const current = await currentSnapshot(message, sender);
+      if (!messageMatchesBinding(fields, current, false)) return closedAcknowledgement;
+      const state = projectionStates.get(current.controllerKey);
+      const action = state && state.projectionToken === fields.projectionToken
+        ? state.actions.get(fields.actionId)
+        : null;
+      if (!state || !sameBinding(state.binding, current) || !action ||
+          action.type !== 'alert' || action.status !== 'confirmation' ||
+          fields.confirmationToken !== action.confirmationToken ||
+          typeof dependencies.commitAlertAction !== 'function') return closedAcknowledgement;
+      action.status = 'pending';
+      action.confirmationToken = null;
+      let committed = false;
+      try {
+        committed = await dependencies.commitAlertAction({
+          binding: state.binding,
+          action: action
+        });
+      } catch (_error) {
+        committed = false;
+      }
+      const afterCommit = await currentSnapshot(message, sender);
+      if (committed !== true || !sameBinding(state.binding, afterCommit) ||
+          projectionStates.get(current.controllerKey) !== state) {
+        action.status = 'revoked';
+        return closedAcknowledgement;
+      }
+      action.status = 'consumed';
+      return Object.freeze({ success: true, status: 'committed' });
+    }
+
+    function canonicalGoogleUrl(value) {
+      if (typeof value !== 'string' || value.length > 2048 || typeof URL !== 'function') return null;
+      let parsed;
+      try { parsed = new URL(value); } catch (_error) { return null; }
+      if (parsed.protocol !== 'https:' || parsed.username || parsed.password || parsed.port ||
+          parsed.search || parsed.hash) return null;
+      if (parsed.origin === 'https://docs.google.com' &&
+          /^\/document\/d\/[A-Za-z0-9_-]+\/edit$/.test(parsed.pathname)) return parsed.href;
+      if (parsed.origin === 'https://drive.google.com' &&
+          /^\/file\/d\/[A-Za-z0-9_-]+\/view$/.test(parsed.pathname)) return parsed.href;
+      return null;
+    }
+
+    function freshCitationMatches(action, fresh) {
+      return fresh && fresh.familyId === action.familyId && fresh.citationId === action.citationId &&
+        fresh.sourceRevision === action.sourceRevision &&
+        fresh.contentFingerprint === action.contentFingerprint &&
+        fresh.truthGenerationId === action.truthGenerationId &&
+        fresh.evaluationContextDigest === action.evaluationContextDigest &&
+        canonicalGoogleUrl(fresh.canonicalUrl) !== null;
+    }
+
+    async function openSourceAction(state, action, message, sender) {
+      if (!state || !action || action.status !== 'ready') return closedAcknowledgement;
+      action.status = 'pending';
+      let operation;
+      try {
+        operation = await dependencies.runCorpusOperation(
+          'citation-open',
+          state.binding.exactTuple,
+          { sourceFileIds: state.binding.sourceFileIds.slice() },
+          async function(certificates, proof, operationSignal) {
+            const fresh = await dependencies.refreshCitation({
+              binding: state.binding,
+              action: action,
+              certificates: certificates,
+              proof: proof,
+              operationSignal: operationSignal
+            });
+            const afterRefresh = await currentSnapshot(message, sender);
+            if (!freshCitationMatches(action, fresh) || !sameBinding(state.binding, afterRefresh)) {
+              throw new Error('stale-hud-citation');
+            }
+            return fresh;
+          },
+          async function(prepared, commitContext) {
+            const beforeCommit = await currentSnapshot(message, sender);
+            if (!sameBinding(state.binding, beforeCommit) ||
+                !freshCitationMatches(action, prepared) || !commitContext ||
+                typeof commitContext.publish !== 'function') throw new Error('stale-hud-commit');
+            return commitContext.publish(async function() {
+              const atEffect = await currentSnapshot(message, sender);
+              const url = canonicalGoogleUrl(prepared.canonicalUrl);
+              if (!sameBinding(state.binding, atEffect) || !url ||
+                  !dependencies.chrome || !dependencies.chrome.tabs ||
+                  typeof dependencies.chrome.tabs.create !== 'function') {
+                throw new Error('stale-hud-effect');
+              }
+              const opened = await dependencies.chrome.tabs.create({ url: url, active: true });
+              if (opened === false || opened === null) throw new Error('hud-tab-open-failed');
+              return true;
+            });
+          }
+        );
+      } catch (_error) {
+        operation = null;
+      }
+      if (!operation || operation.decision !== 'admitted' || operation.value !== true) {
+        action.status = 'revoked';
+        return closedAcknowledgement;
+      }
+      action.status = 'consumed';
+      return openedAcknowledgement;
+    }
+
+    async function citationOpen(message, sender) {
+      const fields = exactRecord(message, citationKeys);
+      if (!fields || fields.action !== 'skopeo:hud-citation-open' ||
+          !validMessageFields(fields) || !validToken(fields.projectionToken, 192) ||
+          !validToken(fields.actionId, 192)) return closedAcknowledgement;
+      const current = await currentSnapshot(message, sender);
+      if (!messageMatchesBinding(fields, current, false)) return closedAcknowledgement;
+      const state = projectionStates.get(current.controllerKey);
+      const action = state && state.projectionToken === fields.projectionToken
+        ? state.actions.get(fields.actionId)
+        : null;
+      if (!state || !sameBinding(state.binding, current) || !action ||
+          action.type !== 'citation' || action.status !== 'ready') return closedAcknowledgement;
+      return openSourceAction(state, action, message, sender);
+    }
+
+    async function requestRevoke(message, sender) {
+      const fields = exactRecord(message, revokeKeys);
+      if (!fields || fields.action !== 'skopeo:hud-revoke' ||
+          !validMessageFields(fields) || !validToken(fields.projectionToken, 192)) {
+        return closedAcknowledgement;
+      }
+      const current = await currentSnapshot(message, sender);
+      if (!messageMatchesBinding(fields, current, false)) return closedAcknowledgement;
+      const state = projectionStates.get(current.controllerKey);
+      if (!state || state.projectionToken !== fields.projectionToken ||
+          !sameBinding(state.binding, current)) {
+        return closedAcknowledgement;
+      }
+      revokeController(current.controllerKey, 'hide');
+      return Object.freeze({ success: true, status: 'revoked' });
+    }
+
+    return Object.freeze({
+      requestProjection: requestProjection,
+      ask: ask,
+      cancelAsk: cancelAsk,
+      answerAction: answerAction,
+      confirmAnswerAction: confirmAnswerAction,
+      alertAction: alertAction,
+      confirmAlertAction: confirmAlertAction,
+      citationOpen: citationOpen,
+      requestRevoke: requestRevoke,
+      revokeController: revokeController
+    });
+  }
+  /* FSB_SKOPEO_HUD_CONTROLLER_END */
+
+  function boundedSkopeoText(value, maximum) {
+    return typeof value === 'string' && value.length > 0 && value.length <= maximum &&
+      !/[\u0000-\u001f\u007f\u202a-\u202e\u2066-\u2069<>]/.test(value);
+  }
+
+  function skopeoIdentifier(value) {
+    return boundedSkopeoText(value, 128) && /^[a-z0-9][A-Za-z0-9._-]*$/.test(value);
+  }
+
+  function ownEnumerableDataValue(object, key) {
+    let descriptor;
+    try {
+      descriptor = Object.getOwnPropertyDescriptor(object, key);
+    } catch (_error) {
+      return { valid: false, present: false, value: undefined };
+    }
+    if (!descriptor) return { valid: true, present: false, value: undefined };
+    if (!Object.prototype.hasOwnProperty.call(descriptor, 'value') || descriptor.enumerable !== true) {
+      return { valid: false, present: true, value: undefined };
+    }
+    return { valid: true, present: true, value: descriptor.value };
+  }
+
+  function secretReadKey(key) {
+    if (typeof key !== 'string') return true;
+    const compact = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+    return compact === 'auth' || READ_SECRET_KEY_PARTS.some((part) => compact.includes(part));
+  }
+
+  function safeReadBoundaryText(value, maximum) {
+    const limit = positiveInteger(maximum) ? maximum : READ_RESULT_LIMITS.text;
+    if (typeof value !== 'string' || value.length === 0 || value.length > limit) return null;
+    const normalized = value
+      .replace(READ_REMOVED_FORMATTING, ' ')
+      .replace(/(?:https?:\/\/|data:|javascript:)\S*/gi, '[external value omitted]')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (normalized.length === 0 || normalized.length > limit ||
+        READ_SECRET_VALUE.test(value) || READ_SECRET_VALUE.test(normalized)) return null;
+    return normalized;
+  }
+
+  function addReadCharacters(state, count) {
+    state.characters += count;
+    return state.characters <= READ_RESULT_LIMITS.characters;
+  }
+
+  function closedReadData(value, state, depth) {
+    state.nodes += 1;
+    if (state.nodes > READ_RESULT_LIMITS.nodes || depth > READ_RESULT_LIMITS.depth) return false;
+    if (value === null || typeof value === 'boolean') return true;
+    if (typeof value === 'number') return Number.isFinite(value);
+    if (typeof value === 'string') {
+      return value.length <= READ_RESULT_LIMITS.text && addReadCharacters(state, value.length) &&
+        safeReadBoundaryText(value, READ_RESULT_LIMITS.text) !== null;
+    }
+    if (!value || typeof value !== 'object' || state.seen.has(value)) return false;
+    state.seen.add(value);
+
+    let keys;
+    try {
+      keys = Reflect.ownKeys(value);
+    } catch (_error) {
+      return false;
+    }
+    if (Array.isArray(value)) {
+      if (value.length > READ_RESULT_LIMITS.entries || keys.length !== value.length + 1 ||
+          !keys.includes('length')) return false;
+      for (let index = 0; index < value.length; index += 1) {
+        const key = String(index);
+        if (!keys.includes(key)) return false;
+        const field = ownEnumerableDataValue(value, key);
+        if (!field.valid || !field.present || !closedReadData(field.value, state, depth + 1)) return false;
+      }
+      return keys.every((key) => key === 'length' || /^\d+$/.test(key));
+    }
+    try {
+      if (!plainObject(value)) return false;
+    } catch (_error) {
+      return false;
+    }
+    if (keys.length > READ_RESULT_LIMITS.entries) return false;
+    for (const key of keys) {
+      if (typeof key !== 'string' || key.length === 0 || key.length > READ_RESULT_LIMITS.key ||
+          /[\u0000-\u001f\u007f\u202a-\u202e\u2066-\u2069]/.test(key) ||
+          ['__proto__', 'prototype', 'constructor'].includes(key) || secretReadKey(key) ||
+          !addReadCharacters(state, key.length)) return false;
+      const field = ownEnumerableDataValue(value, key);
+      if (!field.valid || !field.present || !closedReadData(field.value, state, depth + 1)) return false;
+    }
+    return true;
+  }
+
+  function safeReadText(value, maximum) {
+    if (value === null) return 'Not available';
+    if (typeof value === 'number') {
+      if (!Number.isFinite(value)) return null;
+      value = String(value);
+    } else if (typeof value === 'boolean') {
+      value = value ? 'true' : 'false';
+    } else if (typeof value !== 'string') {
+      return null;
+    }
+    return safeReadBoundaryText(value, maximum);
+  }
+
+  function safeReadErrorCode(value) {
+    const code = safeReadBoundaryText(value, 128);
+    return code && /^[A-Za-z][A-Za-z0-9._-]{0,127}$/.test(code)
+      ? code
+      : null;
+  }
+
+  function humanizeReadKey(key) {
+    const normalized = key
+      .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+      .replace(/[_-]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (!normalized || normalized.length > READ_RESULT_LIMITS.key) return null;
+    return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+  }
+
+  function readRecordPairs(record, prefix, depth) {
+    if (!plainObject(record) || depth > 2) return null;
+    const pairs = [];
+    for (const key of Object.keys(record).sort()) {
+      const field = ownEnumerableDataValue(record, key);
+      const keyLabel = humanizeReadKey(key);
+      if (!field.valid || !field.present || !keyLabel) return null;
+      const label = prefix ? prefix + ' · ' + keyLabel : keyLabel;
+      if (label.length > READ_RESULT_LIMITS.key) return null;
+      if (field.value === null || ['string', 'number', 'boolean'].includes(typeof field.value)) {
+        const text = safeReadText(field.value);
+        if (!text) return null;
+        pairs.push({ label: label, value: text });
+      } else if (plainObject(field.value)) {
+        const nested = readRecordPairs(field.value, label, depth + 1);
+        if (!nested) return null;
+        pairs.push(...nested);
+      } else {
+        return null;
+      }
+    }
+    return pairs.length > 0 && pairs.length <= READ_RESULT_LIMITS.entries ? pairs : null;
+  }
+
+  function factsSection(pairs) {
+    return pairs && pairs.length > 0 && pairs.length <= READ_RESULT_LIMITS.entries
+      ? { kind: 'facts', heading: 'Result details', items: pairs }
+      : null;
+  }
+
+  function itemsSection(items) {
+    return items && items.length > 0 && items.length <= READ_RESULT_LIMITS.entries
+      ? { kind: 'items', heading: 'Results', items: items }
+      : null;
+  }
+
+  function recordSection(pairs, kind) {
+    if (kind === 'facts') return factsSection(pairs);
+    if (kind !== 'items' || !pairs) return null;
+    const items = pairs.map((pair) => {
+      const text = pair.label + ': ' + pair.value;
+      return text.length <= READ_RESULT_LIMITS.text ? { text: text, metadata: null } : null;
+    });
+    return items.every(Boolean) ? itemsSection(items) : null;
+  }
+
+  function primitiveListSection(list, kind) {
+    const values = list.map(safeReadText);
+    if (values.some((value) => !value)) return null;
+    if (kind === 'items') {
+      return itemsSection(values.map((text) => ({ text: text, metadata: null })));
+    }
+    if (kind === 'facts') {
+      return factsSection(values.map((value, index) => ({
+        label: 'Item ' + String(index + 1),
+        value: value
+      })));
+    }
+    return null;
+  }
+
+  function scalarRecordEntries(record) {
+    if (!plainObject(record)) return null;
+    const keys = Object.keys(record).sort();
+    if (!keys.length || keys.length > READ_RESULT_LIMITS.columns) return null;
+    const values = [];
+    for (const key of keys) {
+      const field = ownEnumerableDataValue(record, key);
+      if (!field.valid || !field.present ||
+          !(field.value === null || ['string', 'number', 'boolean'].includes(typeof field.value))) return null;
+      const text = safeReadText(field.value);
+      if (!text) return null;
+      values.push(text);
+    }
+    return { keys: keys, values: values };
+  }
+
+  function recordListItems(records) {
+    const items = [];
+    for (const record of records) {
+      const row = scalarRecordEntries(record);
+      if (!row) return null;
+      const preferred = row.keys.findIndex((key) =>
+        ['name', 'title', 'label', 'text', 'subject'].includes(key.toLowerCase()));
+      const textIndex = preferred >= 0 ? preferred : 0;
+      const metadataParts = [];
+      for (let index = 0; index < row.keys.length; index += 1) {
+        if (index === textIndex) continue;
+        const label = humanizeReadKey(row.keys[index]);
+        if (!label) return null;
+        metadataParts.push(label + ': ' + row.values[index]);
+      }
+      const metadata = metadataParts.length ? metadataParts.join(' · ') : null;
+      if (metadata && metadata.length > READ_RESULT_LIMITS.text) return null;
+      items.push({ text: row.values[textIndex], metadata: metadata });
+    }
+    return items;
+  }
+
+  function recordListSection(records, kind) {
+    if (!records.length) return null;
+    if (kind === 'items') return itemsSection(recordListItems(records));
+    if (kind === 'facts') {
+      const pairs = [];
+      for (let rowIndex = 0; rowIndex < records.length; rowIndex += 1) {
+        const row = scalarRecordEntries(records[rowIndex]);
+        if (!row) return null;
+        for (let columnIndex = 0; columnIndex < row.keys.length; columnIndex += 1) {
+          const keyLabel = humanizeReadKey(row.keys[columnIndex]);
+          const label = String(rowIndex + 1) + ' · ' + keyLabel;
+          if (!keyLabel || label.length > READ_RESULT_LIMITS.key) return null;
+          pairs.push({ label: label, value: row.values[columnIndex] });
+        }
+      }
+      return factsSection(pairs);
+    }
+    if (kind !== 'table') return null;
+    const first = scalarRecordEntries(records[0]);
+    if (!first) return null;
+    const rows = [first.values];
+    for (let index = 1; index < records.length; index += 1) {
+      const row = scalarRecordEntries(records[index]);
+      if (!row || JSON.stringify(row.keys) !== JSON.stringify(first.keys)) return null;
+      rows.push(row.values);
+    }
+    const columns = first.keys.map(humanizeReadKey);
+    return columns.every(Boolean)
+      ? { kind: 'table', heading: 'Results', columns: columns, rows: rows }
+      : null;
+  }
+
+  function adaptClosedReadData(data, capabilitySlug, rendererId) {
+    const policy = skopeoIdentifier(capabilitySlug) && skopeoIdentifier(rendererId)
+      ? READ_RESULT_CONTRACTS[rendererId]
+      : null;
+    if (!policy || policy.mode !== 'structured') return null;
+    const state = { nodes: 0, characters: 0, seen: new Set() };
+    try {
+      if (!closedReadData(data, state, 0)) return null;
+      if (data === null || ['string', 'number', 'boolean'].includes(typeof data)) {
+        const value = safeReadText(data);
+        return value ? recordSection([{ label: 'Result', value: value }], policy.single) : null;
+      }
+      if (Array.isArray(data)) {
+        if (!data.length) return null;
+        const primitives = data.every((value) =>
+          value === null || ['string', 'number', 'boolean'].includes(typeof value));
+        return primitives
+          ? primitiveListSection(data, policy.primitiveList)
+          : recordListSection(data, policy.recordList);
+      }
+      const keys = Object.keys(data);
+      const collectionKeys = keys.filter((key) => Array.isArray(data[key]));
+      if (collectionKeys.length > 0) {
+        if (collectionKeys.length !== 1 || keys.some((key) =>
+          key !== collectionKeys[0] && !(data[key] === null ||
+            ['string', 'number', 'boolean'].includes(typeof data[key])))) return null;
+        const collection = data[collectionKeys[0]];
+        if (!collection.length) return null;
+        const primitives = collection.every((value) =>
+          value === null || ['string', 'number', 'boolean'].includes(typeof value));
+        return primitives
+          ? primitiveListSection(collection, policy.primitiveList)
+          : recordListSection(collection, policy.recordList);
+      }
+      return recordSection(readRecordPairs(data, '', 0), policy.record);
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  function exactHttpsOrigin(value) {
+    if (typeof value !== 'string' || value.length === 0 || value.length > 2048) return false;
+    try {
+      const parsed = new URL(value);
+      return parsed.protocol === 'https:' && parsed.username === '' && parsed.password === '' &&
+        parsed.port === '' && parsed.origin === value && parsed.pathname === '/' &&
+        parsed.search === '' && parsed.hash === '';
+    } catch (_error) {
+      return false;
+    }
+  }
+
+  function normalizeSkopeoEntity(value) {
+    if (value === null) return null;
+    if (!exactKeys(value, ['kind', 'id', 'label']) || !skopeoIdentifier(value.kind) ||
+        !boundedSkopeoText(value.id, 512) || !boundedSkopeoText(value.label, 80)) return undefined;
+    return deepFreezeSkopeo({ kind: value.kind, id: value.id, label: value.label });
+  }
+
+  function sameSkopeoEntity(left, right) {
+    if (left === null || right === null) return left === right;
+    return !!left && !!right && left.kind === right.kind && left.id === right.id && left.label === right.label;
+  }
+
+  /* FSB_SKOPEO_HUD_TRUTH_HELPER_START */
+  function hudTruthBlocked(code) {
+    return deepFreezeSkopeo({
+      version: 'skopeo-truth-engine/1',
+      status: 'review-required',
+      blockerCodes: [code]
+    });
+  }
+
+  function currentHudTruthEntry(exactTuple) {
+    const entry = controllerEntryFor(exactTuple && exactTuple.tabId,
+      exactTuple && exactTuple.generation);
+    if (!entry || !entry.projection || !entry.authority ||
+        entry.projection.exactOrigin !== exactTuple.exactOrigin ||
+        entry.projection.profileId !== exactTuple.profileId ||
+        entry.projection.profileVersion !== exactTuple.profileVersion ||
+        entry.authority.contextEpoch !== exactTuple.contextEpoch ||
+        !sameSkopeoEntity(entry.authority.semanticEntity, exactTuple.semanticEntity)) {
+      return null;
+    }
+    return entry;
+  }
+
+  function hudTruthKey(exactTuple, contextDigest) {
+    const entity = exactTuple.semanticEntity;
+    return JSON.stringify([
+      exactTuple.tabId,
+      exactTuple.generation,
+      exactTuple.exactOrigin,
+      exactTuple.profileId,
+      exactTuple.profileVersion,
+      exactTuple.contextEpoch,
+      entity === null ? null : entity.kind,
+      entity === null ? null : entity.id,
+      entity === null ? null : entity.label,
+      contextDigest
+    ]);
+  }
+
+  function clearHudTruthDisplayInflight(entry) {
+    if (!entry) return false;
+    let removed = false;
+    for (const [key, value] of hudTruthDisplayInflight.entries()) {
+      if (value && value.entry === entry) {
+        hudTruthDisplayInflight.delete(key);
+        removed = true;
+      }
+    }
+    return removed;
+  }
+
+  async function ensureCurrentHudTruthDisplaySnapshot(
+    exactTuple, { evaluationContext }
+  ) {
+    const schema = global.FsbSkopeoTruthSchema;
+    const parsed = schema && typeof schema.parseEvaluationContext === 'function'
+      ? schema.parseEvaluationContext(evaluationContext)
+      : null;
+    if (!parsed || !exactKeys(exactTuple, CORPUS_FACADE_TUPLE_KEYS)) {
+      return hudTruthBlocked('evaluation-context-mismatch');
+    }
+    const entry = currentHudTruthEntry(exactTuple);
+    if (!entry) return hudTruthBlocked('snapshot-stale');
+    let digest;
+    try { digest = await schema.sha256Hex(parsed); } catch (_error) { digest = null; }
+    if (typeof digest !== 'string' || !/^sha256:[0-9a-f]{64}$/.test(digest)) {
+      return hudTruthBlocked('evaluation-context-mismatch');
+    }
+    if (currentHudTruthEntry(exactTuple) !== entry) {
+      return hudTruthBlocked('snapshot-stale');
+    }
+    const contextDigest = digest.slice('sha256:'.length);
+    const key = hudTruthKey(exactTuple, contextDigest);
+    const existing = hudTruthDisplayInflight.get(key);
+    if (existing && existing.entry === entry && !entry.controller.signal.aborted) {
+      return existing.promise;
+    }
+
+    const request = Object.freeze({ evaluationContext: evaluationContext });
+    const operation = (async function() {
+      if (currentHudTruthEntry(exactTuple) !== entry || entry.controller.signal.aborted) {
+        return hudTruthBlocked('snapshot-stale');
+      }
+      let result = await fsbRunPrivateHudTruthOperation(
+        'inspect-display', exactTuple, request);
+      if (currentHudTruthEntry(exactTuple) !== entry || entry.controller.signal.aborted) {
+        return hudTruthBlocked('snapshot-stale');
+      }
+      const blockers = result && result.status === 'review-required' &&
+        Array.isArray(result.blockerCodes) ? result.blockerCodes : [];
+      const recomputable = blockers.length === 1 &&
+        (blockers[0] === 'fact-missing' || blockers[0] === 'snapshot-stale');
+      if (!recomputable) return result || hudTruthBlocked('snapshot-stale');
+
+      const currentContext = schema.parseEvaluationContext(request.evaluationContext);
+      let currentDigest;
+      try { currentDigest = currentContext && await schema.sha256Hex(currentContext); }
+      catch (_error) { currentDigest = null; }
+      if (currentHudTruthEntry(exactTuple) !== entry || entry.controller.signal.aborted ||
+          currentDigest !== digest) return hudTruthBlocked('snapshot-stale');
+      const recomputed = await fsbRunPrivateHudTruthOperation(
+        'recompute', exactTuple, request);
+      if (currentHudTruthEntry(exactTuple) !== entry || entry.controller.signal.aborted ||
+          !recomputed || (recomputed.status !== 'published' &&
+            recomputed.status !== 'current')) {
+        return recomputed && recomputed.status === 'review-required'
+          ? recomputed
+          : hudTruthBlocked('snapshot-stale');
+      }
+      result = await fsbRunPrivateHudTruthOperation(
+        'inspect-display', exactTuple, request);
+      if (currentHudTruthEntry(exactTuple) !== entry || entry.controller.signal.aborted) {
+        return hudTruthBlocked('snapshot-stale');
+      }
+      const finalContext = schema.parseEvaluationContext(request.evaluationContext);
+      let finalDigest;
+      try { finalDigest = finalContext && await schema.sha256Hex(finalContext); }
+      catch (_error) { finalDigest = null; }
+      return finalDigest === digest
+        ? result || hudTruthBlocked('snapshot-stale')
+        : hudTruthBlocked('snapshot-stale');
+    })();
+    hudTruthDisplayInflight.set(key, { entry: entry, promise: operation });
+    try {
+      return await operation;
+    } finally {
+      const owned = hudTruthDisplayInflight.get(key);
+      if (owned && owned.entry === entry && owned.promise === operation) {
+        hudTruthDisplayInflight.delete(key);
+      }
+    }
+  }
+  /* FSB_SKOPEO_HUD_TRUTH_HELPER_END */
+
+  function mintHudOpaqueToken(kind) {
+    if (!global.crypto || typeof global.crypto.getRandomValues !== 'function') return null;
+    const bytes = new Uint8Array(32);
+    global.crypto.getRandomValues(bytes);
+    return 'shud_' + kind + '_' + Array.from(bytes, function(value) {
+      return value.toString(16).padStart(2, '0');
+    }).join('');
+  }
+
+  function safeHudText(value, maximum) {
+    return typeof value === 'string' && value.length > 0 && value.length <= maximum &&
+      !/[\u0000-\u001f\u007f\u202a-\u202e\u2066-\u2069<>]/.test(value) &&
+      !/(?:https?|file|chrome):\/\//i.test(value)
+      ? value
+      : null;
+  }
+
+  async function hudDigest(value) {
+    try {
+      const digest = await global.FsbSkopeoCorpusSchema.sha256Hex(value);
+      return typeof digest === 'string' && /^sha256:[0-9a-f]{64}$/.test(digest)
+        ? digest
+        : null;
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  async function visibleHudManifest() {
+    const boundary = await awaitCorpusBoundary();
+    const claim = boundary && boundary.currentClaim;
+    const manifest = claim && boundary.store &&
+      typeof boundary.store.getVisibleManifest === 'function'
+      ? await boundary.store.getVisibleManifest(claim)
+      : null;
+    return manifest && Array.isArray(manifest.sources) &&
+      manifest.sources.length <= MAX_CORPUS_OPERATION_SOURCES &&
+      (manifest.sources.length > 0 ||
+        (manifest.state === 'complete' && manifest.totalSources === 0 &&
+          manifest.sourceOverflow === 0))
+      ? { boundary: boundary, claim: claim, manifest: manifest }
+      : null;
+  }
+
+  async function resolveCurrentHudBinding(message, sender) {
+    const current = await currentActionEntry(message, sender);
+    const entry = current && current.entry;
+    const entity = entry && entry.authority && entry.authority.semanticEntity;
+    const mode = entity && entity.kind === 'drive-folder'
+      ? 'folder'
+      : entity && ['drive-file', 'docs-document'].includes(entity.kind)
+        ? 'reading'
+        : null;
+    const actionToken = message && message.action === 'skopeo:hud-projection'
+      ? message.actionToken
+      : entry && entry.hudProjectionActionToken;
+    const semanticEntityToken = message && message.action === 'skopeo:hud-projection'
+      ? message.semanticEntityToken
+      : entry && entry.hudProjectionSemanticEntityToken;
+    if (!current || !mode || !boundedSkopeoText(actionToken, 192) ||
+        !boundedSkopeoText(semanticEntityToken, 192) ||
+        entry.projection.profile.adapterId !== 'drive-docs-deep-pack-v1') return null;
+    const visible = await visibleHudManifest();
+    if (!visible) return null;
+    const sources = visible.manifest.sources.slice().sort(function(left, right) {
+      return left.sourceFileId < right.sourceFileId ? -1 : left.sourceFileId > right.sourceFileId ? 1 : 0;
+    });
+    const sourceFileIds = sources.map(function(source) { return source.sourceFileId; });
+    if (sourceFileIds.some(function(sourceFileId) { return !corpusValidId(sourceFileId); }) ||
+        new Set(sourceFileIds).size !== sourceFileIds.length ||
+        (mode === 'reading' && sourceFileIds.indexOf(entity.id) < 0)) return null;
+    const sourceSetDigest = await hudDigest(sourceFileIds);
+    const revisionDigest = await hudDigest(sources.map(function(source) {
+      return {
+        sourceFileId: source.sourceFileId,
+        contentFingerprint: source.contentFingerprint && source.contentFingerprint.value
+      };
+    }));
+    const accessDigest = await hudDigest(sources.map(function(source) {
+      return {
+        sourceFileId: source.sourceFileId,
+        visibility: source.visibility,
+        state: source.state,
+        membershipFingerprint: source.membershipFingerprint
+      };
+    }));
+    if (!sourceSetDigest || !revisionDigest || !accessDigest) return null;
+    return {
+      controllerKey: entry,
+      tabId: current.tabId,
+      generation: entry.generation,
+      exactOrigin: entry.projection.exactOrigin,
+      profileVersion: entry.projection.profileVersion,
+      contextEpoch: entry.authority.contextEpoch,
+      semanticEntityToken: semanticEntityToken,
+      actionToken: actionToken,
+      mode: mode,
+      exactTuple: corpusFacadeTuple(current.tabId, entry),
+      sourceFileIds: sourceFileIds,
+      sourceSetDigest: sourceSetDigest,
+      revisionDigest: revisionDigest,
+      accessDigest: accessDigest
+    };
+  }
+
+  function hudSourceId(value) {
+    return typeof value === 'string'
+      ? value
+      : value && typeof value.sourceFileId === 'string' ? value.sourceFileId : null;
+  }
+
+  function hudAxisValue(axis) {
+    return axis && typeof axis.value === 'string'
+      ? axis.value
+      : axis && typeof axis.conclusion === 'string' ? axis.conclusion : null;
+  }
+
+  function hudFactType(assertionType) {
+    const mappings = {
+      'signed-date': 'signed',
+      'effective-date': 'effective',
+      'expiration-date': 'expiration',
+      'termination-date': 'termination',
+      'renewal': 'renewal',
+      'notice-window': 'notice-window',
+      'notice-deadline': 'notice-deadline',
+      'delivery-method': 'delivery-method',
+      'written-address': 'written-notice-address'
+    };
+    return mappings[assertionType] || null;
+  }
+
+  function hudTypedValue(value) {
+    if (!value || typeof value !== 'object') return null;
+    if (value.kind === 'civil-date') return safeHudText(value.value, 1024);
+    if (value.kind === 'renewal') {
+      const renewal = value.mode === 'none-stated'
+        ? 'No automatic renewal stated'
+        : [value.mode, value.amount, value.unit, value.anchorAssertionType]
+          .filter(function(part) { return part !== null && part !== undefined; }).join(' ');
+      return safeHudText(renewal, 1024);
+    }
+    if (value.kind === 'notice-window') {
+      return safeHudText([
+        value.amount, value.unit, value.relation, value.anchorAssertionType, value.boundary
+      ].join(' '), 1024);
+    }
+    if (value.kind === 'delivery-method') {
+      return safeHudText([value.method, value.qualifier].filter(Boolean).join(' · '), 1024);
+    }
+    if (value.kind === 'written-address' && Array.isArray(value.lines)) {
+      return safeHudText(value.lines.concat([
+        value.recipient, value.city, value.region, value.postalCode, value.country
+      ].filter(Boolean)).join(', '), 1024);
+    }
+    return null;
+  }
+
+  function hudCitationLabel(assertionType) {
+    const text = typeof assertionType === 'string'
+      ? assertionType.replace(/-/g, ' ') + ' citation'
+      : null;
+    return safeHudText(text, 256);
+  }
+
+  function hudGraphProjection(graphSnapshot, sourceTokens) {
+    if (!graphSnapshot || !Array.isArray(graphSnapshot.records) ||
+        !Array.isArray(graphSnapshot.relations)) return null;
+    const records = [];
+    const recordTokens = new Map();
+    let complete = true;
+    graphSnapshot.records.forEach(function(record) {
+      const sourceBinding = sourceTokens.get(record && record.sourceFileId);
+      const label = safeHudText(record && record.label, 1024);
+      const token = mintHudOpaqueToken('record');
+      if (!sourceBinding || !label || !token || !record ||
+          !['agreement', 'amendment', 'clause', 'fact', 'event',
+            'owner', 'policy-document', 'memo'].includes(record.kind)) {
+        complete = false;
+        return;
+      }
+      recordTokens.set(record.stableRecordId, token);
+      records.push({
+        recordToken: token,
+        kind: record.kind,
+        sourceBinding: sourceBinding,
+        label: label
+      });
+    });
+    const relations = [];
+    graphSnapshot.relations.forEach(function(relation) {
+      if (!relation || !['assigned-owner', 'references-policy', 'references-memo']
+        .includes(relation.predicate)) return;
+      const fromRecordToken = recordTokens.get(relation.fromStableRecordId);
+      const toRecordToken = recordTokens.get(relation.toStableRecordId);
+      const sourceBinding = sourceTokens.get(relation.sourceFileId);
+      if (!fromRecordToken || !toRecordToken || !sourceBinding) {
+        complete = false;
+        return;
+      }
+      relations.push({
+        type: relation.predicate,
+        fromRecordToken: fromRecordToken,
+        toRecordToken: toRecordToken,
+        sourceBinding: sourceBinding,
+        current: relation.candidateOnly !== true
+      });
+    });
+    return {
+      value: {
+        state: complete ? 'complete' : 'partial',
+        authorizedSetDigest: graphSnapshot.authorizedSetDigest,
+        records: records,
+        relations: relations
+      },
+      recordTokens: recordTokens
+    };
+  }
+
+  async function readHudFileMetadata(kernel, sourceFileId, operationSignal) {
+    const result = kernel && kernel.transport &&
+      typeof kernel.transport.getFile === 'function'
+      ? await kernel.transport.getFile({ fileId: sourceFileId }, operationSignal)
+      : null;
+    const value = result && result.kind === 'ok' ? result.value : null;
+    return value && value.id === sourceFileId && value.trashed === false ? value : null;
+  }
+
+  function hudMetadataRevision(metadata, fallbackFingerprint) {
+    const value = metadata && (metadata.headRevisionId || metadata.version) || fallbackFingerprint;
+    return typeof value === 'string' && value.length > 0 && value.length <= 1024 &&
+      /^[A-Za-z0-9][A-Za-z0-9._:-]*$/.test(value)
+      ? value
+      : null;
+  }
+
+  function hudMaterialDateType(assertionType) {
+    if (assertionType === 'notice-deadline') return 'notice-deadline';
+    if (assertionType === 'termination-date') return 'termination';
+    if (assertionType === 'expiration-date') return 'expiration';
+    if (assertionType === 'renewal') return 'renewal';
+    return null;
+  }
+
+  function hudDeadlineBoundToContext(result, evaluationContext) {
+    if (!result || !evaluationContext) return false;
+    const binding = evaluationContext.governingTimezoneBinding;
+    const timezone = binding && typeof binding.timezone === 'string'
+      ? binding.timezone
+      : null;
+    return !timezone || result.timezone === timezone;
+  }
+
+  function hudAcceptDeadlineResult(result, evaluationContext) {
+    return !!(result && result.eligibility === 'eligible' &&
+      result.inputsCurrent === true && result.inputsExact === true &&
+      typeof result.deadlineCivilDate === 'string' &&
+      result.consequence &&
+      (!Array.isArray(result.blockerCodes) || result.blockerCodes.length === 0) &&
+      hudDeadlineBoundToContext(result, evaluationContext));
+  }
+
+  function hudAlertSameCandidate(left, right) {
+    try { return JSON.stringify(left) === JSON.stringify(right); }
+    catch (_error) { return false; }
+  }
+
+  function hudAlertCertificateFingerprint(certificate) {
+    const raw = certificate && certificate.contentFingerprint;
+    const value = raw && typeof raw === 'object' ? raw.value : raw;
+    return typeof value === 'string' && /^sha256:[0-9a-f]{64}$/.test(value)
+      ? value
+      : null;
+  }
+
+  async function deriveCurrentHudAlertCandidates(args) {
+    if (!fsbSkopeoAlertStoreFacade || !fsbSkopeoAlertEngineFacade ||
+        !args || !args.binding || !args.visible || !args.kernel ||
+        !args.proof || args.proof.complete !== true || !Array.isArray(args.certificates) ||
+        !args.truth || args.truth.status !== 'current' ||
+        !Array.isArray(args.truth.families) || !args.graphSnapshot ||
+        !Array.isArray(args.graphSnapshot.records) ||
+        !Array.isArray(args.graphSnapshot.relations) ||
+        !args.operationSignal || args.operationSignal.aborted) return [];
+    const partition = global.FsbSkopeoAlertSchema.parsePartition({
+      partitionKey: args.visible.manifest.partitionKey,
+      accountPermissionId: args.visible.claim.accountPermissionId,
+      corpusRootFileId: args.visible.claim.corpusRootFileId
+    });
+    if (!partition || args.graphSnapshot.partitionKey !== partition.partitionKey ||
+        args.truth.authorizedSetDigest !== args.graphSnapshot.authorizedSetDigest ||
+        args.binding.sourceFileIds.length !== args.certificates.length) return [];
+    const certificateBySource = new Map(args.certificates.map(function(certificate) {
+      return [certificate && certificate.sourceFileId, certificate];
+    }));
+    if (certificateBySource.size !== args.binding.sourceFileIds.length) return [];
+    const recordByStableId = new Map(args.graphSnapshot.records.map(function(record) {
+      return [record && record.stableRecordId, record];
+    }));
+    const assessments = [];
+    for (const family of args.truth.families) {
+      if (!family || !Array.isArray(family.sourceBindings) || !Array.isArray(family.citations) ||
+          !Array.isArray(family.assertions) || !Array.isArray(family.deadlineResults)) continue;
+      const sourceFileIds = family.sourceBindings.map(hudSourceId).filter(Boolean).sort();
+      const sourceSet = new Set(sourceFileIds);
+      if (sourceFileIds.length === 0 || sourceSet.size !== sourceFileIds.length ||
+          sourceFileIds.some(function(sourceFileId) {
+            const certificate = certificateBySource.get(sourceFileId);
+            return !certificate || certificate.sourceState !== 'ready' ||
+              !hudAlertCertificateFingerprint(certificate);
+          })) continue;
+      const acceptedPath = new Set(
+        family.lineageProof && Array.isArray(family.lineageProof.acceptedPath)
+          ? family.lineageProof.acceptedPath
+          : []
+      );
+      const ownerRelations = args.graphSnapshot.relations.filter(function(relation) {
+        if (!relation || relation.predicate !== 'assigned-owner' ||
+            relation.candidateOnly === true || !sourceSet.has(relation.sourceFileId) ||
+            !acceptedPath.has(relation.fromRecordVersionId)) return false;
+        const agreement = recordByStableId.get(relation.fromStableRecordId);
+        const owner = recordByStableId.get(relation.toStableRecordId);
+        return !!agreement && agreement.kind === 'agreement' && !!owner && owner.kind === 'owner' &&
+          agreement.recordVersionId === relation.fromRecordVersionId &&
+          owner.recordVersionId === relation.toRecordVersionId &&
+          agreement.sourceFileId === relation.sourceFileId &&
+          owner.sourceFileId === relation.sourceFileId;
+      });
+      const deadlines = family.deadlineResults.filter(function(result) {
+        return result && result.partitionKey === partition.partitionKey &&
+          result.familyId === family.familyId &&
+          hudAcceptDeadlineResult(result, args.evaluationContext);
+      });
+      if (deadlines.length !== 1) continue;
+      if (ownerRelations.length !== 1) {
+        const ownerReason = ownerRelations.length === 0 ? 'owner-absent' : 'owner-ambiguous';
+        const publicStatus = global.FsbSkopeoAlertSchema.parsePublicStatus({
+          version: global.FsbSkopeoAlertSchema.PUBLIC_STATUS_VERSION,
+          state: 'not-locally-deliverable',
+          summary: 'Not locally deliverable',
+          detail: ownerReason === 'owner-absent'
+            ? 'No single current agreement owner is proven from the accessible governing evidence.'
+            : 'The current agreement owner is ambiguous in the accessible governing evidence.',
+          deadlineCivilDate: null,
+          alertCivilDate: null,
+          action: null
+        });
+        if (publicStatus) assessments.push({
+          familyId: family.familyId,
+          result: Object.freeze({
+            disposition: 'not-locally-deliverable',
+            candidate: null,
+            publicStatus: publicStatus
+          }),
+          action: null,
+          owner: null,
+          partition: partition,
+          mapping: null,
+          agreementStableId: null,
+          sourceSetDigest: args.binding.sourceSetDigest,
+          revisionDigest: args.binding.revisionDigest,
+          accessDigest: args.binding.accessDigest,
+          truthGenerationId: args.truth.outputGenerationId,
+          evaluationContextDigest: 'sha256:' + args.truth.evaluationContextDigest,
+          publicStatus: publicStatus,
+          alertAction: null
+        });
+        continue;
+      }
+      const ownerRelation = ownerRelations[0];
+      const ownerRecord = recordByStableId.get(ownerRelation.toStableRecordId);
+      const deadline = deadlines[0];
+      const assertionsByVersion = new Map(family.assertions.map(function(assertion) {
+        return [assertion && assertion.assertionVersionId, assertion];
+      }));
+      const consequenceAssertion = assertionsByVersion.get(
+        deadline.consequence && deadline.consequence.assertionVersionId);
+      const consequence = consequenceAssertion && hudTypedValue(consequenceAssertion.typedValue);
+      const deadlineCitationSet = new Set(deadline.inputCitationIds || []);
+      const noticeCitationIds = [];
+      (deadline.inputAssertionVersionIds || []).forEach(function(assertionVersionId) {
+        const assertion = assertionsByVersion.get(assertionVersionId);
+        if (!assertion || (assertion.assertionType !== 'notice-window' &&
+            assertion.assertionType !== 'notice-deadline')) return;
+        (assertion.citationIds || []).forEach(function(citationId) {
+          if (deadlineCitationSet.has(citationId)) noticeCitationIds.push(citationId);
+        });
+      });
+      const preferredCitationIds = Array.from(new Set(noticeCitationIds)).sort();
+      const fallbackCitationIds = Array.from(deadlineCitationSet).sort();
+      const citationsById = new Map(family.citations.map(function(citation) {
+        return [citation && citation.citationId, citation];
+      }));
+      const evidenceCitation = preferredCitationIds.concat(fallbackCitationIds)
+        .map(function(citationId) { return citationsById.get(citationId); })
+        .find(function(citation) {
+          return citation && citation.sourceFileId === ownerRecord.sourceFileId &&
+            acceptedPath.has(citation.recordVersionId) &&
+            citation.contentFingerprint === ownerRecord.contentFingerprint;
+        });
+      if (!consequence || !evidenceCitation) continue;
+      const metadata = await readHudFileMetadata(
+        args.kernel, evidenceCitation.sourceFileId, args.operationSignal);
+      const revision = hudMetadataRevision(metadata, evidenceCitation.contentFingerprint);
+      const documentLabel = metadata && safeHudText(metadata.name, 160);
+      const ownerLabel = safeHudText(ownerRecord.label, 512);
+      const certificate = certificateBySource.get(ownerRecord.sourceFileId);
+      const vendorScopeFileId = certificate && certificate.vendorScopeFileId;
+      let vendorLabel = args.vendorLabelByRawScope &&
+        args.vendorLabelByRawScope.get(vendorScopeFileId);
+      if (!vendorLabel && vendorScopeFileId) {
+        const vendorMetadata = await readHudFileMetadata(
+          args.kernel, vendorScopeFileId, args.operationSignal);
+        vendorLabel = vendorMetadata &&
+          vendorMetadata.mimeType === 'application/vnd.google-apps.folder'
+          ? safeHudText(vendorMetadata.name, 160)
+          : null;
+      }
+      if (!revision || !documentLabel || !ownerLabel || !vendorLabel ||
+          args.operationSignal.aborted) continue;
+      const owner = {
+        stableRecordId: ownerRecord.stableRecordId,
+        stableRelationId: ownerRelation.stableRelationId,
+        sourceFileId: ownerRecord.sourceFileId,
+        sourceRevision: revision,
+        label: ownerLabel
+      };
+      const mapping = await fsbSkopeoAlertStoreFacade.readOwnerBinding(
+        partition, owner.stableRecordId);
+      const result = await fsbSkopeoAlertEngineFacade.derive({
+        partition: partition,
+        complete: true,
+        agreementStableId: ownerRelation.fromStableRecordId,
+        familyId: family.familyId,
+        vendorLabel: vendorLabel,
+        owner: owner,
+        mapping: mapping,
+        deadlineResult: {
+          type: 'notice-deadline',
+          derivationId: deadline.deadlineDerivationId,
+          deadlineCivilDate: deadline.deadlineCivilDate,
+          timezone: deadline.timezone,
+          consequence: consequence,
+          eligibility: deadline.eligibility,
+          inputsCurrent: deadline.inputsCurrent,
+          inputsExact: deadline.inputsExact,
+          blockerCodes: (deadline.blockerCodes || []).slice(),
+          citationIds: (deadline.inputCitationIds || []).slice()
+        },
+        evidence: {
+          citationId: evidenceCitation.citationId,
+          sourceFileId: evidenceCitation.sourceFileId,
+          sourceRevision: revision,
+          contentFingerprint: evidenceCitation.contentFingerprint,
+          label: documentLabel + ' · Notice evidence'
+        },
+        sourceFileIds: sourceFileIds,
+        sourceSetDigest: args.binding.sourceSetDigest,
+        revisionDigest: args.binding.revisionDigest,
+        accessDigest: args.binding.accessDigest,
+        truthGenerationId: args.truth.outputGenerationId,
+        evaluationContextDigest: 'sha256:' + args.truth.evaluationContextDigest
+      });
+      assessments.push({
+        familyId: family.familyId,
+        result: result,
+        owner: owner,
+        partition: partition,
+        mapping: mapping,
+        agreementStableId: ownerRelation.fromStableRecordId,
+        sourceSetDigest: args.binding.sourceSetDigest,
+        revisionDigest: args.binding.revisionDigest,
+        accessDigest: args.binding.accessDigest,
+        truthGenerationId: args.truth.outputGenerationId,
+        evaluationContextDigest: 'sha256:' + args.truth.evaluationContextDigest,
+        publicStatus: result && result.publicStatus,
+        alertAction: null,
+        action: result && result.candidate ? Object.freeze({
+          familyId: family.familyId,
+          citationId: evidenceCitation.citationId,
+          sourceFileId: evidenceCitation.sourceFileId,
+          sourceRevision: revision,
+          contentFingerprint: evidenceCitation.contentFingerprint,
+          truthGenerationId: args.truth.outputGenerationId,
+          evaluationContextDigest: 'sha256:' + args.truth.evaluationContextDigest
+        }) : null
+      });
+    }
+    return assessments;
+  }
+
+  async function hudCurrentAlertDerivations(binding, certificates, proof, operationSignal) {
+    const visible = await visibleHudManifest();
+    const current = visible ? await currentCorpusFacadeEntry(binding.exactTuple) : null;
+    const kernel = current ? await createSkopeoCorpusKernel(binding.tabId, current.entry) : null;
+    const evaluationContext = kernel ? await fsbBuildSkopeoTruthEvaluationContext() : null;
+    const truth = evaluationContext
+      ? await ensureCurrentHudTruthDisplaySnapshot(
+        binding.exactTuple, { evaluationContext: evaluationContext })
+      : null;
+    const graphResult = truth && truth.status === 'current'
+      ? await fsbRunPrivateHudGraphSnapshot(binding.exactTuple, binding.sourceFileIds)
+      : null;
+    const graphSnapshot = graphResult && graphResult.decision === 'admitted'
+      ? graphResult.value
+      : null;
+    if (!visible || !kernel || !truth || !graphSnapshot || operationSignal.aborted) return null;
+    const sources = visible.manifest.sources.slice().sort(function(left, right) {
+      return left.sourceFileId < right.sourceFileId ? -1 : left.sourceFileId > right.sourceFileId ? 1 : 0;
+    });
+    const sourceFileIds = sources.map(function(source) { return source.sourceFileId; });
+    if (sourceFileIds.join('\u0000') !== binding.sourceFileIds.join('\u0000')) return [];
+    const liveBinding = Object.assign({}, binding, {
+      sourceSetDigest: await hudDigest(sourceFileIds),
+      revisionDigest: await hudDigest(sources.map(function(source) {
+        return {
+          sourceFileId: source.sourceFileId,
+          contentFingerprint: source.contentFingerprint && source.contentFingerprint.value
+        };
+      })),
+      accessDigest: await hudDigest(sources.map(function(source) {
+        return {
+          sourceFileId: source.sourceFileId,
+          visibility: source.visibility,
+          state: source.state,
+          membershipFingerprint: source.membershipFingerprint
+        };
+      }))
+    });
+    if (!liveBinding.sourceSetDigest || !liveBinding.revisionDigest || !liveBinding.accessDigest) {
+      return null;
+    }
+    return deriveCurrentHudAlertCandidates({
+      binding: liveBinding,
+      visible: visible,
+      kernel: kernel,
+      certificates: certificates,
+      proof: proof,
+      truth: truth,
+      graphSnapshot: graphSnapshot,
+      vendorLabelByRawScope: null,
+      evaluationContext: evaluationContext,
+      operationSignal: operationSignal
+    });
+  }
+
+  async function revalidateCurrentHudAlertCandidate(binding, expected) {
+    let operation;
+    try {
+      operation = await runSkopeoCorpusOperation(
+        'display', binding.exactTuple,
+        { sourceFileIds: binding.sourceFileIds.slice() },
+        async function(certificates, proof, operationSignal) {
+          return hudCurrentAlertDerivations(
+            binding, certificates, proof, operationSignal);
+        }
+      );
+    } catch (_error) {
+      operation = null;
+    }
+    const assessments = operation && operation.decision === 'admitted'
+      ? (Array.isArray(operation.aggregate) ? operation.aggregate : operation.value)
+      : null;
+    if (!Array.isArray(assessments)) return fsbClosedSkopeoAlertCandidate();
+    const matches = assessments.filter(function(assessment) {
+      const candidate = assessment && assessment.result && assessment.result.candidate;
+      return candidate && candidate.familyId === expected.familyId &&
+        candidate.agreementStableId === expected.agreementStableId;
+    });
+    return matches.length === 1 && hudAlertSameCandidate(matches[0].result.candidate, expected)
+      ? Object.freeze({ status: 'current', candidate: matches[0].result.candidate })
+      : Object.freeze({ status: 'superseded', candidate: null });
+  }
+
+  function hudAlertCanonicalUrl(value) {
+    if (typeof value !== 'string' || value.length > 2048) return null;
+    let parsed;
+    try { parsed = new URL(value); } catch (_error) { return null; }
+    if (parsed.protocol !== 'https:' || parsed.username || parsed.password || parsed.port ||
+        parsed.search || parsed.hash) return null;
+    if (parsed.origin === 'https://docs.google.com' &&
+        /^\/document\/d\/[A-Za-z0-9_-]+\/edit$/.test(parsed.pathname)) return parsed.href;
+    if (parsed.origin === 'https://drive.google.com' &&
+        /^\/file\/d\/[A-Za-z0-9_-]+\/view$/.test(parsed.pathname)) return parsed.href;
+    return null;
+  }
+
+  async function openCurrentHudAlertEvidence(binding, action, expected) {
+    let operation;
+    try {
+      operation = await runSkopeoCorpusOperation(
+        'citation-open', binding.exactTuple,
+        { sourceFileIds: binding.sourceFileIds.slice() },
+        async function(certificates, proof, operationSignal) {
+          const assessments = await hudCurrentAlertDerivations(
+            binding, certificates, proof, operationSignal);
+          const exact = Array.isArray(assessments) && assessments.find(function(assessment) {
+            return assessment && assessment.result &&
+              hudAlertSameCandidate(assessment.result.candidate, expected);
+          });
+          if (!exact) throw new Error('stale-alert-evidence');
+          const fresh = await refreshCurrentHudCitation({
+            binding: binding,
+            action: action,
+            certificates: certificates,
+            proof: proof,
+            operationSignal: operationSignal
+          });
+          const url = fresh && fresh.familyId === action.familyId &&
+            fresh.citationId === action.citationId &&
+            fresh.sourceRevision === action.sourceRevision &&
+            fresh.contentFingerprint === action.contentFingerprint &&
+            fresh.truthGenerationId === action.truthGenerationId &&
+            fresh.evaluationContextDigest === action.evaluationContextDigest
+            ? hudAlertCanonicalUrl(fresh.canonicalUrl)
+            : null;
+          if (!url) throw new Error('stale-alert-evidence');
+          return Object.freeze({ candidate: exact.result.candidate, canonicalUrl: url });
+        },
+        async function(prepared, commitContext) {
+          const current = await currentCorpusFacadeEntry(binding.exactTuple);
+          if (!current || !prepared || !hudAlertSameCandidate(prepared.candidate, expected) ||
+              !commitContext || typeof commitContext.publish !== 'function') {
+            throw new Error('stale-alert-effect');
+          }
+          return commitContext.publish(async function() {
+            const atEffect = await currentCorpusFacadeEntry(binding.exactTuple);
+            const mapping = await fsbSkopeoAlertStoreFacade.readOwnerBinding(
+              expected.partition, expected.owner.stableRecordId);
+            if (!atEffect || !mapping ||
+                mapping.ownerStableRecordId !== expected.owner.stableRecordId ||
+                mapping.ownerRelationStableId !== expected.owner.stableRelationId ||
+                mapping.ownerSourceFileId !== expected.owner.sourceFileId ||
+                mapping.ownerSourceRevision !== expected.owner.sourceRevision) {
+              throw new Error('stale-alert-effect');
+            }
+            const opened = await chrome.tabs.create({
+              url: prepared.canonicalUrl,
+              active: true
+            });
+            return opened !== false && opened !== null;
+          });
+        }
+      );
+    } catch (_error) {
+      operation = null;
+    }
+    return !!operation && operation.decision === 'admitted' && operation.value === true;
+  }
+
+  async function reconcileCurrentHudAlerts(args) {
+    if (!fsbSkopeoAlertRuntimeFacade) return [];
+    const assessments = await deriveCurrentHudAlertCandidates(args);
+    for (const assessment of assessments) {
+      const candidate = assessment && assessment.result && assessment.result.candidate;
+      if (!candidate || !assessment.action) continue;
+      const binding = args.binding;
+      const action = assessment.action;
+      fsbRegisterCurrentSkopeoAlertContext(candidate.alertKey, Object.freeze({
+        controllerKey: binding.controllerKey,
+        revalidate: function(expected) {
+          return revalidateCurrentHudAlertCandidate(binding, expected);
+        },
+        openEvidence: function(expected) {
+          return openCurrentHudAlertEvidence(binding, action, expected);
+        }
+      }));
+      await fsbSkopeoAlertRuntimeFacade.consider(candidate);
+    }
+    await fsbSkopeoAlertRuntimeFacade.reconcile();
+    for (const assessment of assessments) {
+      const candidate = assessment && assessment.result && assessment.result.candidate;
+      if (candidate) {
+        const entry = await fsbSkopeoAlertStoreFacade.get(
+          candidate.partition, candidate.alertKey);
+        assessment.publicStatus = entry
+          ? fsbSkopeoAlertEngineFacade.publicStatus(entry)
+          : null;
+      }
+      const canMap = !candidate && assessment.owner && assessment.publicStatus &&
+        assessment.publicStatus.state === 'not-locally-deliverable';
+      const canRemove = !!candidate && !!assessment.publicStatus;
+      const actionId = (canMap || canRemove) && typeof args.mintActionId === 'function'
+        ? args.mintActionId()
+        : null;
+      if (!actionId) continue;
+      const kind = canMap ? 'map-current-owner' : 'remove-current-owner-mapping';
+      const label = canMap
+        ? 'Map current owner to this Chrome user'
+        : 'Remove current owner mapping';
+      const projected = global.FsbSkopeoAlertSchema.parsePublicStatus({
+        version: assessment.publicStatus.version,
+        state: assessment.publicStatus.state,
+        summary: assessment.publicStatus.summary,
+        detail: assessment.publicStatus.detail,
+        deadlineCivilDate: assessment.publicStatus.deadlineCivilDate,
+        alertCivilDate: assessment.publicStatus.alertCivilDate,
+        action: {
+          actionId: actionId,
+          kind: kind,
+          label: label,
+          requiresConfirmation: true
+        }
+      });
+      if (!projected) continue;
+      assessment.publicStatus = projected;
+      assessment.alertAction = Object.freeze({
+        actionId: actionId,
+        kind: kind,
+        familyId: assessment.familyId,
+        partition: assessment.partition,
+        owner: assessment.owner,
+        agreementStableId: assessment.agreementStableId,
+        sourceFileIds: Object.freeze(args.binding.sourceFileIds.slice()),
+        sourceSetDigest: args.binding.sourceSetDigest,
+        revisionDigest: args.binding.revisionDigest,
+        accessDigest: args.binding.accessDigest,
+        truthGenerationId: args.truth.outputGenerationId,
+        evaluationContextDigest: 'sha256:' + args.truth.evaluationContextDigest
+      });
+    }
+    return assessments;
+  }
+
+  /* FSB_SKOPEO_HUD_ABSENCE_JOIN_START */
+  function hudAxisIsConclusive(axis) {
+    return !!axis && typeof axis === 'object' &&
+      axis.trustState !== 'unreadable' &&
+      axis.trustState !== 'ambiguous' &&
+      axis.trustState !== 'review-required';
+  }
+
+  function hudFinalState(executionAxis) {
+    if (!hudAxisIsConclusive(executionAxis) || typeof executionAxis.value !== 'string') {
+      return 'not-evaluated';
+    }
+    if (executionAxis.value === 'executed' && executionAxis.reasonCode === 'executed-evidence') {
+      return 'present';
+    }
+    if (executionAxis.value === 'unsigned' &&
+        (executionAxis.reasonCode === 'unsigned-evidence' ||
+          executionAxis.reasonCode === 'execution-evidence-missing')) {
+      return 'proven-missing';
+    }
+    return 'not-evaluated';
+  }
+
+  function hudPolicyState(graphSnapshot, familySourceIds) {
+    if (!graphSnapshot || !Array.isArray(graphSnapshot.records) ||
+        !Array.isArray(graphSnapshot.relations) || !Array.isArray(familySourceIds)) {
+      return 'not-evaluated';
+    }
+    const familySet = new Set(familySourceIds);
+    let onFile = false;
+    let provenMissing = false;
+    graphSnapshot.records.forEach(function(record) {
+      if (!record || record.kind !== 'policy-document' || !familySet.has(record.sourceFileId)) {
+        return;
+      }
+      if (record.presence === 'absent' || record.absent === true) provenMissing = true;
+      else onFile = true;
+    });
+    graphSnapshot.relations.forEach(function(relation) {
+      if (!relation || relation.predicate !== 'references-policy' ||
+          relation.candidateOnly === true) return;
+      if (familySet.has(relation.sourceFileId) || familySet.has(relation.fromSourceFileId)) {
+        onFile = true;
+      }
+    });
+    if (onFile) return 'on-file';
+    if (provenMissing) return 'proven-missing';
+    return 'not-evaluated';
+  }
+
+  function hudPriorityGaps(finalState, policyState, governingState, conflicts) {
+    const gaps = [];
+    const seen = Object.create(null);
+    function push(type) {
+      if (!type || seen[type]) return;
+      seen[type] = true;
+      gaps.push(type);
+    }
+    if (finalState === 'proven-missing') push('missing-final');
+    if (policyState === 'proven-missing') push('policy-document-missing');
+    if (governingState === 'review-required' ||
+        (Array.isArray(conflicts) && conflicts.length > 0)) {
+      push('version-conflict');
+    }
+    return gaps;
+  }
+  /* FSB_SKOPEO_HUD_ABSENCE_JOIN_END */
+
+  function hudTruthProjection(input) {
+    const truth = input.truth;
+    const sourceTokens = input.sourceTokens;
+    const focusSourceId = input.focusSourceId;
+    const metadataBySource = input.metadataBySource;
+    const actionBindings = [];
+    const families = [];
+    const truthGenerationId = truth.outputGenerationId;
+    const contextDigest = 'sha256:' + truth.evaluationContextDigest;
+    for (let familyIndex = 0; familyIndex < truth.families.length; familyIndex += 1) {
+      const rawFamily = truth.families[familyIndex];
+      const rawSourceIds = Array.isArray(rawFamily.sourceBindings)
+        ? rawFamily.sourceBindings.map(hudSourceId).filter(Boolean)
+        : [];
+      const familySourceTokens = rawSourceIds.map(function(sourceFileId) {
+        return sourceTokens.get(sourceFileId);
+      }).filter(Boolean);
+      if (familySourceTokens.length === 0 || familySourceTokens.length !== rawSourceIds.length) continue;
+      const focusedFamily = input.mode === 'reading' && rawSourceIds.includes(focusSourceId);
+      const citations = new Map((rawFamily.citations || []).map(function(citation) {
+        return [citation.citationId, citation];
+      }));
+      const assertions = Array.isArray(rawFamily.assertions) ? rawFamily.assertions : [];
+      const assertionsByVersion = new Map(assertions.map(function(assertion) {
+        return [assertion.assertionVersionId, assertion];
+      }));
+      const governanceValue = hudAxisValue(rawFamily.lineageProof && rawFamily.lineageProof.governance);
+      const lineageValue = hudAxisValue(rawFamily.lineageProof && rawFamily.lineageProof.lineageRole);
+      const executionAxis = rawFamily.lineageProof && rawFamily.lineageProof.execution;
+      const finalState = hudFinalState(executionAxis);
+      const policyState = hudPolicyState(input.graphSnapshot, rawSourceIds);
+      const conflicts = (rawFamily.conflicts || []).length > 0 ? ['version-conflict'] : [];
+      const acceptedPathIds = new Set(
+        (rawFamily.lineageProof && Array.isArray(rawFamily.lineageProof.acceptedPath)
+          ? rawFamily.lineageProof.acceptedPath
+          : []).filter(function(id) {
+          return typeof id === 'string' && id.indexOf('srv1:') === 0;
+        })
+      );
+      const citationsOnAcceptedPath = (rawFamily.citations || []).filter(function(citation) {
+        return citation && acceptedPathIds.has(citation.recordVersionId);
+      });
+      const governingSourceIds = new Set(citationsOnAcceptedPath.map(function(citation) {
+        return citation.sourceFileId;
+      }).filter(Boolean));
+      const governanceCitations = rawFamily.lineageProof && rawFamily.lineageProof.governance &&
+        Array.isArray(rawFamily.lineageProof.governance.citationIds)
+        ? rawFamily.lineageProof.governance.citationIds
+        : [];
+      const governingCitation = governanceValue === 'review-required'
+        ? null
+        : governanceCitations.map(function(id) { return citations.get(id); }).find(function(citation) {
+          return citation && acceptedPathIds.has(citation.recordVersionId);
+        }) || citationsOnAcceptedPath[0] || null;
+      const governingSourceId = governingCitation &&
+        governingSourceIds.has(governingCitation.sourceFileId)
+        ? governingCitation.sourceFileId
+        : null;
+      const governingState = governanceValue === 'review-required'
+        ? 'review-required'
+        : governanceValue === 'partially-governing'
+          ? 'partially-governing'
+          : governanceValue === 'governing'
+            ? 'governing'
+            : 'not-evaluated';
+      const priorityGaps = hudPriorityGaps(finalState, policyState, governingState, conflicts);
+      const readingStates = rawSourceIds.map(function(sourceFileId) {
+        let state = 'not-evaluated';
+        if (governanceValue === 'review-required') state = 'review-required';
+        else if (governingSourceIds.has(sourceFileId)) {
+          if (governanceValue === 'superseded') state = 'superseded';
+          else if (lineageValue === 'historical') state = 'historical';
+          else if (governanceValue === 'governing') state = 'governing';
+          else if (governanceValue === 'partially-governing') state = 'partially-governing';
+        }
+        return { sourceBinding: sourceTokens.get(sourceFileId), state: state };
+      });
+      const facts = [];
+      const governingAction = { state: 'not-available', sourceBinding: null, actionToken: null };
+      if (focusedFamily && governingCitation && metadataBySource.has(governingSourceId) &&
+          (governanceValue === 'governing' || governanceValue === 'partially-governing')) {
+        const actionId = input.mintActionId();
+        const metadata = metadataBySource.get(governingSourceId);
+        const revision = hudMetadataRevision(metadata, governingCitation.contentFingerprint);
+        if (actionId && revision) {
+          governingAction.state = governingCitation.relationVersionId === null ? 'document' : 'clause';
+          governingAction.sourceBinding = sourceTokens.get(governingSourceId);
+          governingAction.actionToken = actionId;
+          actionBindings.push({
+            actionId: actionId,
+            familyId: rawFamily.familyId,
+            citationId: governingCitation.citationId,
+            sourceFileId: governingSourceId,
+            sourceRevision: revision,
+            contentFingerprint: governingCitation.contentFingerprint,
+            truthGenerationId: truthGenerationId,
+            evaluationContextDigest: contextDigest
+          });
+        }
+      }
+      if (focusedFamily) {
+        assertions.forEach(function(assertion) {
+          const type = hudFactType(assertion.assertionType);
+          const value = hudTypedValue(assertion.typedValue);
+          const label = hudCitationLabel(assertion.assertionType);
+          const citation = (assertion.citationIds || []).map(function(id) {
+            return citations.get(id);
+          }).find(function(candidate) {
+            return candidate && metadataBySource.has(candidate.sourceFileId);
+          });
+          if (!type || !value || !label || !citation ||
+              !sourceTokens.has(citation.sourceFileId)) return;
+          const actionId = input.mintActionId();
+          const revision = hudMetadataRevision(
+            metadataBySource.get(citation.sourceFileId), citation.contentFingerprint);
+          if (!actionId || !revision) return;
+          const onAcceptedPath = acceptedPathIds.has(citation.recordVersionId);
+          facts.push({
+            type: type,
+            value: value,
+            evidenceRole: onAcceptedPath ? 'governing' : 'history',
+            trustState: assertion.trustState,
+            citationLabel: label,
+            sourceBinding: sourceTokens.get(citation.sourceFileId),
+            actionToken: actionId
+          });
+          actionBindings.push({
+            actionId: actionId,
+            familyId: rawFamily.familyId,
+            citationId: citation.citationId,
+            sourceFileId: citation.sourceFileId,
+            sourceRevision: revision,
+            contentFingerprint: citation.contentFingerprint,
+            truthGenerationId: truthGenerationId,
+            evaluationContextDigest: contextDigest
+          });
+        });
+      }
+      const materialDates = [];
+      const seenMaterialDates = new Set();
+      function pushMaterialDate(entry) {
+        const key = [entry.type, entry.civilDate, entry.sourceBinding].join('\u0000');
+        if (seenMaterialDates.has(key)) return;
+        seenMaterialDates.add(key);
+        materialDates.push(entry);
+      }
+      (rawFamily.deadlineResults || []).forEach(function(result) {
+        if (!hudAcceptDeadlineResult(result, input.evaluationContext)) return;
+        const consequenceAssertion = assertionsByVersion.get(
+          result.consequence && result.consequence.assertionVersionId);
+        const consequence = consequenceAssertion && hudTypedValue(consequenceAssertion.typedValue);
+        const citation = (result.inputCitationIds || []).map(function(id) {
+          return citations.get(id);
+        }).find(function(candidate) {
+          return candidate && sourceTokens.has(candidate.sourceFileId);
+        });
+        if (!consequence || !citation) return;
+        pushMaterialDate({
+          type: 'notice-deadline',
+          civilDate: result.deadlineCivilDate,
+          displayDate: result.deadlineCivilDate,
+          trustState: 'accepted',
+          consequence: consequence,
+          sourceBinding: sourceTokens.get(citation.sourceFileId)
+        });
+      });
+      assertions.forEach(function(assertion) {
+        const type = hudMaterialDateType(assertion.assertionType);
+        if (!type || assertion.typedValue && assertion.typedValue.kind !== 'civil-date') return;
+        if (assertion.trustState !== 'accepted' &&
+            (assertion.trustState !== 'extracted' || governanceValue === 'review-required')) {
+          return;
+        }
+        const civilDate = hudTypedValue(assertion.typedValue);
+        const citation = (assertion.citationIds || []).map(function(id) {
+          return citations.get(id);
+        }).find(function(candidate) {
+          return candidate && sourceTokens.has(candidate.sourceFileId);
+        });
+        if (!civilDate || !citation) return;
+        const consequence = type === 'notice-deadline'
+          ? 'Notice must be given by this date'
+          : type === 'termination'
+            ? 'Agreement terminates on this date'
+            : type === 'expiration'
+              ? 'Agreement expires on this date'
+              : 'Renewal is measured from this date';
+        pushMaterialDate({
+          type: type,
+          civilDate: civilDate,
+          displayDate: civilDate,
+          trustState: 'accepted',
+          consequence: consequence,
+          sourceBinding: sourceTokens.get(citation.sourceFileId)
+        });
+      });
+      families.push({
+        familyToken: mintHudOpaqueToken('family'),
+        sourceBindings: familySourceTokens,
+        governingState: governingState,
+        readingStates: readingStates,
+        finalState: finalState,
+        materialDates: materialDates,
+        facts: facts,
+        conflicts: conflicts,
+        priorityGaps: priorityGaps,
+        policyState: policyState,
+        governingAction: governingAction,
+        notificationDelivery: input.alertStatusByFamily &&
+          input.alertStatusByFamily.get(rawFamily.familyId) || 'not-available'
+      });
+    }
+    return {
+      truth: {
+        state: 'complete',
+        authorizedSetDigest: truth.authorizedSetDigest,
+        evaluationContextDigest: contextDigest,
+        families: families,
+        blockerCodes: (truth.blockerCodes || []).slice(0, 32)
+      },
+      actions: actionBindings
+    };
+  }
+
+  async function buildCurrentHudProjection(args) {
+    const visible = await visibleHudManifest();
+    const exactCurrent = visible
+      ? await currentCorpusFacadeEntry(args.binding.exactTuple)
+      : null;
+    const kernel = exactCurrent
+      ? await createSkopeoCorpusKernel(args.binding.tabId, exactCurrent.entry)
+      : null;
+    if (!visible || !kernel || !args.proof || args.proof.complete !== true ||
+        !Array.isArray(args.certificates) ||
+        args.certificates.length !== args.binding.sourceFileIds.length) return null;
+    const sources = visible.manifest.sources.slice().sort(function(left, right) {
+      return left.sourceFileId < right.sourceFileId ? -1 : left.sourceFileId > right.sourceFileId ? 1 : 0;
+    });
+    if (sources.map(function(source) { return source.sourceFileId; }).join('\u0000') !==
+        args.binding.sourceFileIds.join('\u0000')) return null;
+    if (args.binding.mode === 'folder' && sources.length === 0 &&
+        visible.manifest.state === 'complete' &&
+        visible.manifest.totalSources === 0 &&
+        visible.manifest.sourceOverflow === 0) {
+      const digest = visible.manifest.authorizedSetDigest;
+      const civilDate = args.evaluationContext &&
+        (args.evaluationContext.asOfCivilDate || args.evaluationContext.civilDate);
+      const rawDigest = args.evaluationContext && args.evaluationContext.digest;
+      const contextDigest = typeof rawDigest === 'string'
+        ? (rawDigest.indexOf('sha256:') === 0 ? rawDigest : 'sha256:' + rawDigest)
+        : null;
+      if (!digest || !civilDate || !contextDigest) return null;
+      const projection = global.FsbSkopeoHudProjector.createProjection({
+        mode: 'folder',
+        focus: { sourceBinding: null, documentLabel: null },
+        manifest: {
+          state: 'complete',
+          authorizedSetDigest: digest,
+          totalSources: 0,
+          sourceOverflow: 0,
+          totalVendors: 0,
+          vendorOverflow: 0,
+          sources: []
+        },
+        graph: {
+          state: 'complete',
+          authorizedSetDigest: digest,
+          records: [],
+          relations: []
+        },
+        truth: {
+          state: 'complete',
+          authorizedSetDigest: digest,
+          evaluationContextDigest: contextDigest,
+          families: [],
+          blockerCodes: []
+        },
+        vendorLabels: { state: 'current', entries: [] },
+        evaluationContext: { civilDate: civilDate, digest: contextDigest },
+        authority: {
+          generation: args.binding.generation,
+          exactOrigin: args.binding.exactOrigin,
+          profileVersion: args.binding.profileVersion,
+          contextEpoch: args.binding.contextEpoch,
+          semanticEntityToken: args.binding.semanticEntityToken,
+          requestActionToken: args.binding.actionToken,
+          projectionToken: args.projectionToken
+        }
+      });
+      return projection ? { projection: projection, actions: [], scopes: [] } : null;
+    }
+    const certificateBySource = new Map(args.certificates.map(function(certificate) {
+      return [certificate.sourceFileId, certificate];
+    }));
+    if (certificateBySource.size !== sources.length) return null;
+
+    const graphResult = typeof fsbRunPrivateHudGraphSnapshot === 'function'
+      ? await fsbRunPrivateHudGraphSnapshot(
+        args.binding.exactTuple, args.binding.sourceFileIds)
+      : null;
+    const graphSnapshot = graphResult && graphResult.decision === 'admitted'
+      ? graphResult.value
+      : null;
+    if (!graphSnapshot || graphSnapshot.authorizedSetDigest !== args.truth.authorizedSetDigest) return null;
+
+    const sourceTokens = new Map();
+    const vendorScopeTokens = new Map();
+    sources.forEach(function(source) {
+      sourceTokens.set(source.sourceFileId, mintHudOpaqueToken('source'));
+      const certificate = certificateBySource.get(source.sourceFileId);
+      if (certificate && certificate.vendorScopeFileId &&
+          !vendorScopeTokens.has(certificate.vendorScopeFileId)) {
+        vendorScopeTokens.set(certificate.vendorScopeFileId, mintHudOpaqueToken('scope'));
+      }
+    });
+    if (Array.from(sourceTokens.values()).some(function(token) { return !token; }) ||
+        Array.from(vendorScopeTokens.values()).some(function(token) { return !token; })) return null;
+
+    let labelComplete = true;
+    const vendorEntries = [];
+    const vendorLabelByRawScope = new Map();
+    for (const [rawScopeId, scopeToken] of Array.from(vendorScopeTokens.entries()).sort()) {
+      const metadata = await readHudFileMetadata(kernel, rawScopeId, args.operationSignal);
+      const label = metadata && metadata.mimeType === 'application/vnd.google-apps.folder'
+        ? safeHudText(metadata.name, 160)
+        : null;
+      if (!label) labelComplete = false;
+      vendorLabelByRawScope.set(rawScopeId, label || 'Vendor folder');
+      vendorEntries.push({
+        vendorScopeFileId: scopeToken,
+        vendorToken: mintHudOpaqueToken('vendor'),
+        label: label || 'Vendor folder'
+      });
+    }
+
+    const metadataBySource = new Map();
+    let documentLabel = null;
+    let readingScopeSourceIds = null;
+    if (args.binding.mode === 'reading') {
+      const relevantFamily = args.truth.families.find(function(family) {
+        return (family.sourceBindings || []).some(function(binding) {
+          return hudSourceId(binding) === exactCurrent.live.entityId;
+        });
+      });
+      const relevantSourceIds = new Set([exactCurrent.live.entityId]);
+      if (relevantFamily) {
+        (relevantFamily.citations || []).forEach(function(citation) {
+          if (citation && citation.sourceFileId) relevantSourceIds.add(citation.sourceFileId);
+        });
+      }
+      readingScopeSourceIds = Array.from(relevantSourceIds).filter(function(sourceFileId) {
+        return args.binding.sourceFileIds.indexOf(sourceFileId) !== -1;
+      }).sort();
+      for (const sourceFileId of Array.from(relevantSourceIds).sort()) {
+        const metadata = await readHudFileMetadata(kernel, sourceFileId, args.operationSignal);
+        if (metadata) metadataBySource.set(sourceFileId, metadata);
+      }
+      const focusedMetadata = metadataBySource.get(exactCurrent.live.entityId);
+      documentLabel = focusedMetadata && safeHudText(focusedMetadata.name, 160);
+      if (!documentLabel) return null;
+    }
+
+    const askScopes = [];
+    const scopeBindings = [];
+    if (args.binding.mode === 'folder') {
+      const corpusScopeToken = args.mintScopeToken();
+      if (!corpusScopeToken) return null;
+      askScopes.push({
+        kind: 'corpus',
+        label: 'Enrolled accessible corpus',
+        scopeToken: corpusScopeToken
+      });
+      scopeBindings.push({
+        scopeToken: corpusScopeToken,
+        kind: 'corpus',
+        label: 'Enrolled accessible corpus',
+        scopeDigest: args.binding.sourceSetDigest,
+        sourceFileIds: args.binding.sourceFileIds.slice()
+      });
+      for (const [rawScopeId] of Array.from(vendorScopeTokens.entries()).sort()) {
+        const vendorScopeToken = args.mintScopeToken();
+        const vendorLabel = vendorLabelByRawScope.get(rawScopeId);
+        const vendorSourceIds = sources.filter(function(source) {
+          const certificate = certificateBySource.get(source.sourceFileId);
+          return certificate && certificate.vendorScopeFileId === rawScopeId;
+        }).map(function(source) { return source.sourceFileId; }).sort();
+        if (!vendorScopeToken || !vendorLabel || vendorSourceIds.length === 0) return null;
+        askScopes.push({ kind: 'vendor', label: vendorLabel, scopeToken: vendorScopeToken });
+        scopeBindings.push({
+          scopeToken: vendorScopeToken,
+          kind: 'vendor',
+          label: vendorLabel,
+          scopeDigest: await hudDigest(vendorSourceIds),
+          sourceFileIds: vendorSourceIds
+        });
+      }
+    } else {
+      const agreementScopeToken = args.mintScopeToken();
+      if (!agreementScopeToken || !readingScopeSourceIds || readingScopeSourceIds.length === 0) {
+        return null;
+      }
+      askScopes.push({
+        kind: 'agreement',
+        label: 'Current agreement',
+        scopeToken: agreementScopeToken
+      });
+      scopeBindings.push({
+        scopeToken: agreementScopeToken,
+        kind: 'agreement',
+        label: 'Current agreement',
+        scopeDigest: await hudDigest(readingScopeSourceIds),
+        sourceFileIds: readingScopeSourceIds
+      });
+    }
+    if (scopeBindings.some(function(scope) { return !scope.scopeDigest; })) return null;
+
+    const graph = hudGraphProjection(graphSnapshot, sourceTokens);
+    if (!graph) return null;
+    let alertAssessments = [];
+    try {
+      alertAssessments = await reconcileCurrentHudAlerts({
+        binding: args.binding,
+        visible: visible,
+        kernel: kernel,
+        certificates: args.certificates,
+        proof: args.proof,
+        truth: args.truth,
+        graphSnapshot: graphSnapshot,
+        vendorLabelByRawScope: vendorLabelByRawScope,
+        evaluationContext: args.evaluationContext,
+        operationSignal: args.operationSignal,
+        mintActionId: args.mintActionId
+      });
+    } catch (_error) {
+      alertAssessments = [];
+    }
+    const alertStatusByFamily = new Map(alertAssessments.map(function(assessment) {
+      return [assessment.familyId, assessment.publicStatus || 'not-available'];
+    }));
+    const truthProjection = hudTruthProjection({
+      truth: args.truth,
+      sourceTokens: sourceTokens,
+      graphSnapshot: graphSnapshot,
+      focusSourceId: args.binding.mode === 'reading' ? exactCurrent.live.entityId : null,
+      mode: args.binding.mode,
+      metadataBySource: metadataBySource,
+      mintActionId: args.mintActionId,
+      evaluationContext: args.evaluationContext,
+      alertStatusByFamily: alertStatusByFamily
+    });
+    if (!truthProjection || truthProjection.truth.families.some(function(family) {
+      return !family.familyToken;
+    })) return null;
+    const manifestState = labelComplete ? 'complete' : 'partial';
+    const manifest = {
+      state: manifestState,
+      authorizedSetDigest: graphSnapshot.authorizedSetDigest,
+      totalSources: sources.length,
+      sourceOverflow: 0,
+      totalVendors: vendorEntries.length,
+      vendorOverflow: 0,
+      sources: sources.map(function(source) {
+        const certificate = certificateBySource.get(source.sourceFileId);
+        const hasGraph = (graphSnapshot.sourceBindings || []).some(function(binding) {
+          return binding.sourceFileId === source.sourceFileId;
+        });
+        return {
+          sourceBinding: sourceTokens.get(source.sourceFileId),
+          vendorScopeFileId: certificate && certificate.vendorScopeFileId
+            ? vendorScopeTokens.get(certificate.vendorScopeFileId)
+            : null,
+          state: source.state,
+          indexState: source.state === 'ready' ? (hasGraph ? 'complete' : 'incomplete') :
+            source.state === 'pending' ? 'pending' : 'not-evaluated'
+        };
+      })
+    };
+    if (!labelComplete) {
+      graph.value.state = 'partial';
+      truthProjection.truth.state = 'partial';
+    }
+    const evaluationContext = {
+      civilDate: args.evaluationContext.asOfCivilDate,
+      digest: 'sha256:' + args.truth.evaluationContextDigest
+    };
+    const projection = global.FsbSkopeoHudProjector.createProjection({
+      mode: args.binding.mode,
+      askScopes: askScopes,
+      focus: args.binding.mode === 'folder'
+        ? { sourceBinding: null, documentLabel: null }
+        : {
+          sourceBinding: sourceTokens.get(exactCurrent.live.entityId),
+          documentLabel: documentLabel
+        },
+      manifest: manifest,
+      graph: graph.value,
+      truth: truthProjection.truth,
+      vendorLabels: { state: 'current', entries: vendorEntries },
+      evaluationContext: evaluationContext,
+      authority: {
+        generation: args.binding.generation,
+        exactOrigin: args.binding.exactOrigin,
+        profileVersion: args.binding.profileVersion,
+        contextEpoch: args.binding.contextEpoch,
+        semanticEntityToken: args.binding.semanticEntityToken,
+        requestActionToken: args.binding.actionToken,
+        projectionToken: args.projectionToken
+      }
+    });
+    if (!projection) return null;
+    const visibleActionIds = (function() {
+      const output = new Set();
+      const body = projection.mode === 'reading' ? projection.body : null;
+      if (!body) return output;
+      if (body.governingAction && body.governingAction.actionToken) {
+        output.add(body.governingAction.actionToken);
+      }
+      if (Array.isArray(body.facts)) {
+        body.facts.forEach(function(fact) {
+          if (fact && fact.actionToken) output.add(fact.actionToken);
+        });
+      }
+      return output;
+    })();
+    const actions = (truthProjection.actions || []).filter(function(action) {
+      return action && visibleActionIds.has(action.actionId);
+    });
+    if (actions.length !== visibleActionIds.size) return null;
+    const visibleAlertActionIds = new Set();
+    if (projection.mode === 'reading' && projection.body.notificationDelivery &&
+        projection.body.notificationDelivery.action) {
+      visibleAlertActionIds.add(projection.body.notificationDelivery.action.actionId);
+    }
+    if (projection.mode === 'folder' && Array.isArray(projection.body.vendors)) {
+      projection.body.vendors.forEach(function(vendor) {
+        if (vendor && vendor.notificationDelivery && vendor.notificationDelivery.action) {
+          visibleAlertActionIds.add(vendor.notificationDelivery.action.actionId);
+        }
+      });
+    }
+    const alertActions = alertAssessments.map(function(assessment) {
+      return assessment.alertAction;
+    }).filter(function(action) {
+      return action && visibleAlertActionIds.has(action.actionId);
+    });
+    if (alertActions.length !== visibleAlertActionIds.size) return null;
+    return {
+      projection: projection,
+      actions: actions,
+      alertActions: alertActions,
+      scopes: scopeBindings
+    };
+  }
+
+  async function refreshCurrentHudCitation(args) {
+    const binding = args && args.binding;
+    const action = args && args.action;
+    if (!binding || !action || !Array.isArray(args.certificates) ||
+        !args.proof || args.proof.complete !== true ||
+        !args.operationSignal || args.operationSignal.aborted) return null;
+    const sourceCertificate = args.certificates.find(function(certificate) {
+      return certificate && certificate.sourceFileId === action.sourceFileId;
+    });
+    const certificateFingerprint = sourceCertificate && sourceCertificate.contentFingerprint;
+    const certificateFingerprintValue = certificateFingerprint &&
+      typeof certificateFingerprint === 'object'
+      ? certificateFingerprint.value
+      : certificateFingerprint;
+    if (!sourceCertificate || sourceCertificate.sourceState !== 'ready' ||
+        certificateFingerprintValue !== action.contentFingerprint) return null;
+
+    const evaluationContext = await fsbBuildSkopeoTruthEvaluationContext();
+    if (!evaluationContext) return null;
+    const truth = await ensureCurrentHudTruthDisplaySnapshot(
+      binding.exactTuple, { evaluationContext: evaluationContext });
+    if (!truth || truth.status !== 'current' ||
+        truth.outputGenerationId !== action.truthGenerationId ||
+        'sha256:' + truth.evaluationContextDigest !== action.evaluationContextDigest ||
+        !Array.isArray(truth.families)) return null;
+    const familyMatches = truth.families.filter(function(family) {
+      return family && family.familyId === action.familyId;
+    });
+    if (familyMatches.length !== 1 || !Array.isArray(familyMatches[0].citations)) return null;
+    const citationMatches = familyMatches[0].citations.filter(function(citation) {
+      return citation && citation.citationId === action.citationId;
+    });
+    if (citationMatches.length !== 1) return null;
+    const citation = await global.FsbSkopeoTruthSchema.parseCitation(citationMatches[0]);
+    if (!citation || citation.sourceFileId !== action.sourceFileId ||
+        citation.contentFingerprint !== action.contentFingerprint) return null;
+
+    const current = await currentCorpusFacadeEntry(binding.exactTuple);
+    const kernel = current
+      ? await createSkopeoCorpusKernel(binding.tabId, current.entry)
+      : null;
+    const metadata = await readHudFileMetadata(
+      kernel, action.sourceFileId, args.operationSignal);
+    const revision = hudMetadataRevision(metadata, citation.contentFingerprint);
+    if (!metadata || !revision || revision !== action.sourceRevision ||
+        !safeHudText(metadata.name, 160)) return null;
+    const canonicalUrl = metadata.mimeType === 'application/vnd.google-apps.document'
+      ? 'https://docs.google.com/document/d/' + action.sourceFileId + '/edit'
+      : 'https://drive.google.com/file/d/' + action.sourceFileId + '/view';
+    return Object.freeze({
+      canonicalUrl: canonicalUrl,
+      familyId: familyMatches[0].familyId,
+      citationId: citation.citationId,
+      sourceRevision: revision,
+      contentFingerprint: citation.contentFingerprint,
+      truthGenerationId: truth.outputGenerationId,
+      evaluationContextDigest: 'sha256:' + truth.evaluationContextDigest
+    });
+  }
+
+  function hudAskCertificateFingerprint(certificate) {
+    const raw = certificate && certificate.contentFingerprint;
+    const value = raw && typeof raw === 'object' ? raw.value : raw;
+    return typeof value === 'string' && value.length > 0 ? value : null;
+  }
+
+  function hudAskCertificateMimeType(certificate) {
+    const metadata = certificate && certificate.metadataFingerprint;
+    const value = metadata && metadata.mimeType;
+    return typeof value === 'string' ? value : null;
+  }
+
+  function hudAskScalarPrefix(value, maximum) {
+    if (typeof value !== 'string') return null;
+    const normalized = value.trim();
+    if (!normalized) return null;
+    return Array.from(normalized).slice(0, maximum).join('');
+  }
+
+  function hudAskProviderAcknowledgement(step) {
+    return Object.freeze({
+      status: 'provider-no-storage',
+      durableEffect: false,
+      prepared: step
+    });
+  }
+
+  function hudAskCitationProof(truth, sourceFileId) {
+    const families = truth && Array.isArray(truth.families) ? truth.families : [];
+    for (let familyIndex = 0; familyIndex < families.length; familyIndex += 1) {
+      const family = families[familyIndex];
+      const citations = family && Array.isArray(family.citations) ? family.citations : [];
+      const citation = citations.find(function(candidate) {
+        return candidate && candidate.sourceFileId === sourceFileId;
+      });
+      if (!citation) continue;
+      const assertions = Array.isArray(family.assertions) ? family.assertions : [];
+      const assertion = assertions.find(function(candidate) {
+        return candidate && Array.isArray(candidate.citationIds) &&
+          candidate.citationIds.indexOf(citation.citationId) !== -1;
+      }) || null;
+      const acceptedPath = family.lineageProof && Array.isArray(family.lineageProof.acceptedPath)
+        ? family.lineageProof.acceptedPath
+        : [];
+      return {
+        family: family,
+        citation: citation,
+        assertion: assertion,
+        evidenceRole: acceptedPath.indexOf(citation.recordVersionId) !== -1
+          ? 'governing'
+          : 'history'
+      };
+    }
+    return null;
+  }
+
+  function hudAskTrustState(value) {
+    if (value === 'accepted') return 'accepted';
+    if (value === 'review-required') return 'review-required';
+    if (value === 'ambiguous' || value === 'unreadable') return 'ambiguous';
+    return 'extracted';
+  }
+
+  function hudPolicyPartitionClaim(visible) {
+    const claim = visible && visible.claim;
+    return claim && corpusValidId(claim.accountPermissionId) &&
+      corpusValidId(claim.corpusRootFileId)
+      ? Object.freeze({
+        accountKey: claim.accountPermissionId,
+        corpusKey: claim.corpusRootFileId
+      })
+      : null;
+  }
+
+  async function hudPolicySourceBinding(args, sourceFileId) {
+    const certificate = args.certificateBySource.get(sourceFileId);
+    const fingerprint = hudAskCertificateFingerprint(certificate);
+    const citationProof = fingerprint && hudAskCitationProof(args.truth, sourceFileId);
+    if (!certificate || certificate.sourceState !== 'ready' || !fingerprint || !citationProof) {
+      return null;
+    }
+    const metadata = await readHudFileMetadata(args.kernel, sourceFileId, args.operationSignal);
+    const revision = hudMetadataRevision(metadata, fingerprint);
+    if (!metadata || !revision || args.operationSignal.aborted) return null;
+    return Object.freeze({
+      familyId: citationProof.family.familyId,
+      citationId: citationProof.citation.citationId,
+      sourceFileId: sourceFileId,
+      sourceRevision: revision,
+      contentFingerprint: fingerprint,
+      truthGenerationId: args.truth.outputGenerationId,
+      evaluationContextDigest: 'sha256:' + args.truth.evaluationContextDigest
+    });
+  }
+
+  /* FSB_SKOPEO_POLICY_DOCUMENT_RESOLVER_START */
+  function createFsbSkopeoPolicyDocumentResolver(dependencies) {
+    if (!dependencies || typeof dependencies.runCorpusOperation !== 'function' ||
+        typeof dependencies.bindSource !== 'function') return null;
+    const ownValue = function(value, key) {
+      return Object.prototype.hasOwnProperty.call(value, key);
+    };
+    return async function resolvePolicyDocument(args, configuredFileKey) {
+      const sources = args && args.visible && args.visible.manifest &&
+        Array.isArray(args.visible.manifest.sources)
+        ? args.visible.manifest.sources
+        : [];
+      if (!configuredFileKey) {
+        return Object.freeze({ state: 'missing', revisionKey: null, source: null });
+      }
+      const matches = sources.filter(function(source) {
+        return source && source.sourceFileId === configuredFileKey;
+      });
+      if (matches.length !== 1) {
+        return Object.freeze({ state: 'missing', revisionKey: null, source: null });
+      }
+      if (matches[0].state !== 'ready') {
+        return Object.freeze({ state: 'inaccessible', revisionKey: null, source: null });
+      }
+      if (!args || !args.binding || !args.truth || !args.kernel ||
+          !args.operationSignal || args.operationSignal.aborted) {
+        return Object.freeze({ state: 'stale', revisionKey: null, source: null });
+      }
+
+      const bind = async function(certificates, proof, operationSignal) {
+        const selected = Array.isArray(certificates)
+          ? certificates.filter(function(certificate) {
+            return certificate && certificate.sourceFileId === configuredFileKey;
+          })
+          : [];
+        if (!proof || proof.complete !== true || selected.length !== 1 ||
+            selected[0].sourceState !== 'ready' || !operationSignal || operationSignal.aborted) {
+          return null;
+        }
+        return dependencies.bindSource({
+          certificateBySource: new Map([[configuredFileKey, selected[0]]]),
+          truth: args.truth,
+          kernel: args.kernel,
+          operationSignal: operationSignal
+        }, configuredFileKey);
+      };
+
+      let source = null;
+      const existing = args.certificateBySource &&
+        typeof args.certificateBySource.get === 'function'
+        ? args.certificateBySource.get(configuredFileKey)
+        : null;
+      if (existing) {
+        source = await bind(
+          [existing], { complete: true }, args.operationSignal
+        );
+      } else {
+        let operation = null;
+        try {
+          operation = await dependencies.runCorpusOperation(
+            'query',
+            args.binding.exactTuple,
+            { sourceFileIds: [configuredFileKey] },
+            async function(certificates, proof, operationSignal) {
+              return {
+                rows: [],
+                aggregate: await bind(certificates, proof, operationSignal)
+              };
+            }
+          );
+        } catch (_error) {
+          operation = null;
+        }
+        source = operation && operation.decision === 'admitted'
+          ? (ownValue(operation, 'aggregate') ? operation.aggregate : operation.value)
+          : null;
+      }
+      if (!source || args.operationSignal.aborted) {
+        return Object.freeze({ state: 'stale', revisionKey: null, source: null });
+      }
+      return Object.freeze({
+        state: 'current',
+        revisionKey: source.sourceRevision,
+        source: source
+      });
+    };
+  }
+  /* FSB_SKOPEO_POLICY_DOCUMENT_RESOLVER_END */
+
+  const fsbResolveCurrentHudPolicyDocument = createFsbSkopeoPolicyDocumentResolver({
+    runCorpusOperation: runSkopeoCorpusOperation,
+    bindSource: hudPolicySourceBinding
+  });
+
+  function hudPolicyPublicAction(label, requiresConfirmation, policyInput, source) {
+    const actionId = mintHudOpaqueToken('policy');
+    return actionId ? Object.freeze({
+      publicAction: Object.freeze({
+        actionId: actionId,
+        label: label,
+        requiresConfirmation: requiresConfirmation
+      }),
+      privateAction: Object.freeze({
+        actionId: actionId,
+        label: label,
+        requiresConfirmation: requiresConfirmation,
+        policyInput: policyInput,
+        source: source
+      })
+    }) : null;
+  }
+
+  /* FSB_SKOPEO_POLICY_MEMO_JOIN_START */
+  function hudQualifyingPolicyMemoRecords(graph, agreementFileKey, scopeSourceFileIds) {
+    if (!graph || !Array.isArray(graph.records) || !Array.isArray(graph.relations) ||
+        typeof agreementFileKey !== 'string' || !Array.isArray(scopeSourceFileIds)) return [];
+    const scope = new Set(scopeSourceFileIds);
+    const agreementVersions = new Set(graph.records.filter(function(record) {
+      return record && record.kind === 'agreement' &&
+        record.sourceFileId === agreementFileKey &&
+        typeof record.recordVersionId === 'string';
+    }).map(function(record) { return record.recordVersionId; }));
+    const memoByVersion = new Map(graph.records.filter(function(record) {
+      return record && record.kind === 'memo' && scope.has(record.sourceFileId) &&
+        typeof record.recordVersionId === 'string';
+    }).map(function(record) { return [record.recordVersionId, record]; }));
+    const related = new Map();
+    graph.relations.forEach(function(relation) {
+      const memo = relation && relation.predicate === 'references-memo' &&
+        agreementVersions.has(relation.fromRecordVersionId)
+        ? memoByVersion.get(relation.toRecordVersionId)
+        : null;
+      if (memo) related.set(memo.recordVersionId, memo);
+    });
+    return Array.from(related.values()).sort(function(left, right) {
+      return left.recordVersionId < right.recordVersionId ? -1 :
+        left.recordVersionId > right.recordVersionId ? 1 : 0;
+    });
+  }
+  /* FSB_SKOPEO_POLICY_MEMO_JOIN_END */
+
+  async function buildCurrentHudDecisionPolicy(args) {
+    if (!args || !args.binding || !args.scope || args.scope.kind !== 'agreement' ||
+        !args.question || !args.answer || !args.visible || !args.current || !args.kernel ||
+        !args.truth || !Array.isArray(args.certificates) || !args.proof ||
+        args.proof.complete !== true || !args.operationSignal || args.operationSignal.aborted ||
+        !fsbSkopeoDecisionPolicyStoreFacade || !fsbSkopeoDecisionPolicyFacade ||
+        !global.FsbSkopeoAskSchema) return null;
+    const partitionClaim = hudPolicyPartitionClaim(args.visible);
+    const agreementKey = args.current.live && args.current.live.entityId;
+    if (!partitionClaim || !corpusValidId(agreementKey) ||
+        args.scope.sourceFileIds.indexOf(agreementKey) === -1) return null;
+    const partition = await fsbSkopeoDecisionPolicyStoreFacade.readPartition(partitionClaim);
+    if (!partition || args.operationSignal.aborted) return null;
+    const certificateBySource = new Map(args.certificates.map(function(certificate) {
+      return [certificate && certificate.sourceFileId, certificate];
+    }));
+    if (certificateBySource.size !== args.scope.sourceFileIds.length) return null;
+
+    const configured = partition.document10FileKey;
+    const documentResolution = fsbResolveCurrentHudPolicyDocument
+      ? await fsbResolveCurrentHudPolicyDocument({
+        visible: args.visible,
+        binding: args.binding,
+        truth: args.truth,
+        kernel: args.kernel,
+        operationSignal: args.operationSignal,
+        certificateBySource: certificateBySource
+      }, configured)
+      : null;
+    if (!documentResolution || args.operationSignal.aborted) return null;
+    const documentState = documentResolution.state;
+    const documentRevisionKey = documentResolution.revisionKey;
+    const documentSource = documentResolution.source;
+
+    const graphResult = typeof fsbRunPrivateHudGraphSnapshot === 'function'
+      ? await fsbRunPrivateHudGraphSnapshot(
+        args.binding.exactTuple, args.scope.sourceFileIds.slice())
+      : null;
+    const graph = graphResult && graphResult.decision === 'admitted'
+      ? graphResult.value
+      : null;
+    const classification = partition.agreements[agreementKey] === 'complex'
+      ? 'complex'
+      : 'routine';
+    let memoProof = null;
+    let memoSource = null;
+    if (classification === 'complex') {
+      const memoRecords = hudQualifyingPolicyMemoRecords(
+        graph, agreementKey, args.scope.sourceFileIds);
+      if (memoRecords.length === 1) {
+        memoSource = await hudPolicySourceBinding({
+          certificateBySource: certificateBySource,
+          truth: args.truth,
+          kernel: args.kernel,
+          operationSignal: args.operationSignal
+        }, memoRecords[0].sourceFileId);
+        memoProof = memoSource
+          ? { state: 'on-file', complete: true }
+          : { state: 'inaccessible', complete: false };
+      } else if (memoRecords.length > 1) {
+        memoProof = { state: 'incomplete', complete: false };
+      } else if (graph && graph.authorizedSetDigest && args.proof.complete === true &&
+          args.certificates.every(function(certificate) {
+            return certificate && certificate.sourceState === 'ready';
+          })) {
+        memoProof = { state: 'proven-missing', complete: true };
+      } else {
+        memoProof = { state: 'incomplete', complete: false };
+      }
+    }
+    const decisionSourceDigest = await hudDigest([
+      args.scope.scopeDigest,
+      args.binding.sourceSetDigest,
+      args.binding.accessDigest
+    ]);
+    const decisionRevisionDigest = await hudDigest([
+      args.binding.revisionDigest,
+      args.question.text
+    ]);
+    if (!decisionSourceDigest || !decisionRevisionDigest || args.operationSignal.aborted) return null;
+    const policyInput = global.FsbSkopeoAskSchema.parsePolicyInput({
+      decisionKind: fsbSkopeoDecisionPolicyFacade.DECISION_KIND,
+      authority: {
+        accountKey: partitionClaim.accountKey,
+        corpusKey: partitionClaim.corpusKey,
+        agreementKey: agreementKey,
+        sourceSetDigest: decisionSourceDigest,
+        revisionDigest: decisionRevisionDigest
+      },
+      document10: {
+        configuredFileKey: configured || 'policy-document-10-unconfigured',
+        currentRevisionKey: documentRevisionKey,
+        state: documentState
+      },
+      classification: classification,
+      memoProof: memoProof,
+      governingConflict: Array.isArray(args.answer.conflicts) &&
+        args.answer.conflicts.some(function(conflict) {
+          return conflict && conflict.type === 'governing-conflict';
+        })
+    });
+    if (!policyInput) return null;
+    const policy = fsbSkopeoDecisionPolicyFacade.evaluate(
+      policyInput, args.acknowledgement || null);
+    if (!policy || policy.applicable !== true) return null;
+
+    const publicActions = [];
+    const privateActions = [];
+    function add(label, requiresConfirmation, source) {
+      const pair = hudPolicyPublicAction(label, requiresConfirmation, policyInput, source || null);
+      if (!pair) return false;
+      publicActions.push(pair.publicAction);
+      privateActions.push(pair.privateAction);
+      return true;
+    }
+    if (documentState === 'current' && documentSource) {
+      if (!add('review-document-10', false, documentSource)) return null;
+      const openedAcknowledgement = args.reviewOpen
+        ? fsbSkopeoDecisionPolicyFacade.acknowledgeDocument10Review(
+          policyInput, args.reviewOpen)
+        : null;
+      if (openedAcknowledgement && !add('acknowledge-document-10', false, null)) return null;
+      if (!add('replace-document-10', true, null) ||
+          !add('clear-document-10', true, null)) return null;
+    } else if (configured) {
+      if (!add('replace-document-10', true, null) ||
+          !add('clear-document-10', true, null)) return null;
+    } else if (!add('configure-document-10', true, null)) {
+      return null;
+    }
+    if (!add(classification === 'complex' ? 'classify-routine' : 'classify-complex', true, null)) {
+      return null;
+    }
+    if (classification === 'complex' && memoSource &&
+        !add('open-existing-memo', false, memoSource)) return null;
+    return Object.freeze({
+      policy: policy,
+      policyActions: Object.freeze(publicActions),
+      policyActionBindings: Object.freeze(privateActions)
+    });
+  }
+
+  async function runCurrentHudAsk(args) {
+    if (!args || !args.binding || !args.scope || !args.question ||
+        !Array.isArray(args.certificates) || !args.proof ||
+        !args.operationSignal || args.operationSignal.aborted ||
+        !args.askSignal || args.askSignal.aborted ||
+        !fsbSkopeoAskEngineFacade) return null;
+    const visible = await visibleHudManifest();
+    const current = visible ? await currentCorpusFacadeEntry(args.binding.exactTuple) : null;
+    const kernel = current
+      ? await createSkopeoCorpusKernel(args.binding.tabId, current.entry)
+      : null;
+    if (!visible || !current || !kernel ||
+        args.certificates.length !== args.scope.sourceFileIds.length) return null;
+    const certificateBySource = new Map(args.certificates.map(function(certificate) {
+      return [certificate && certificate.sourceFileId, certificate];
+    }));
+    if (certificateBySource.size !== args.scope.sourceFileIds.length) return null;
+
+    const evaluationContext = await fsbBuildSkopeoTruthEvaluationContext();
+    const truth = evaluationContext
+      ? await ensureCurrentHudTruthDisplaySnapshot(
+        args.binding.exactTuple,
+        { evaluationContext: evaluationContext }
+      )
+      : null;
+    if (!truth || truth.status !== 'current' || args.operationSignal.aborted ||
+        args.askSignal.aborted) return null;
+
+    const evidence = [];
+    const actions = [];
+    const gaps = [];
+    let complete = args.proof.complete === true;
+    const selectedSourceIds = args.scope.sourceFileIds.slice(0, 13);
+    for (let index = 0; index < selectedSourceIds.length; index += 1) {
+      const sourceFileId = selectedSourceIds[index];
+      const certificate = certificateBySource.get(sourceFileId);
+      const fingerprint = hudAskCertificateFingerprint(certificate);
+      const mimeType = hudAskCertificateMimeType(certificate);
+      const citationProof = hudAskCitationProof(truth, sourceFileId);
+      if (!certificate || certificate.sourceState !== 'ready' || !fingerprint ||
+          !mimeType || !citationProof) {
+        complete = false;
+        continue;
+      }
+      const metadata = await readHudFileMetadata(kernel, sourceFileId, args.operationSignal);
+      const revision = hudMetadataRevision(metadata, fingerprint);
+      let rawText = null;
+      const read = kernel.transport && typeof kernel.transport.readContent === 'function'
+        ? await kernel.transport.readContent({ fileId: sourceFileId, mimeType: mimeType },
+          async function(payload) {
+            rawText = payload && payload.text;
+          }, args.operationSignal)
+        : null;
+      const excerpt = hudAskScalarPrefix(rawText, 2000);
+      rawText = null;
+      if (!read || read.kind !== 'ok' || !metadata || !revision || !excerpt ||
+          args.operationSignal.aborted || args.askSignal.aborted) {
+        complete = false;
+        continue;
+      }
+      const actionToken = mintHudOpaqueToken('answer');
+      const assertion = citationProof.assertion;
+      const typedValue = assertion && hudTypedValue(assertion.typedValue);
+      const claim = safeHudText(
+        assertion && assertion.assertionType
+          ? String(assertion.assertionType).replace(/-/g, ' ')
+          : 'Current contract evidence',
+        512
+      );
+      const value = safeHudText(
+        typedValue || hudAskScalarPrefix(excerpt, 512),
+        512
+      );
+      const citationLabel = safeHudText(metadata.name, 256);
+      if (!actionToken || !claim || !value || !citationLabel) {
+        complete = false;
+        continue;
+      }
+      evidence.push({
+        evidenceKey: 'evidence:' + String(index).padStart(3, '0'),
+        scopeDigest: args.scope.scopeDigest,
+        revisionDigest: args.binding.revisionDigest,
+        evidenceRole: citationProof.evidenceRole,
+        claim: claim,
+        value: value,
+        trustState: hudAskTrustState(assertion && assertion.trustState),
+        citationLabel: citationLabel,
+        actionToken: actionToken,
+        excerpt: excerpt
+      });
+      actions.push({
+        actionId: actionToken,
+        familyId: citationProof.family.familyId,
+        citationId: citationProof.citation.citationId,
+        sourceFileId: sourceFileId,
+        sourceRevision: revision,
+        contentFingerprint: fingerprint,
+        truthGenerationId: truth.outputGenerationId,
+        evaluationContextDigest: 'sha256:' + truth.evaluationContextDigest
+      });
+    }
+    if (args.scope.sourceFileIds.length > 13 || evidence.length === 0) complete = false;
+    if (!complete) {
+      gaps.push({
+        type: 'source-inaccessible',
+        detail: 'One or more relevant current sources could not be certified for this answer.'
+      });
+    }
+    const conflicts = (truth.families || []).some(function(family) {
+      return family && Array.isArray(family.conflicts) && family.conflicts.length > 0;
+    }) ? [{
+      type: 'governing-conflict',
+      detail: 'Current governing evidence contains a conflict requiring review.'
+    }] : [];
+    const claim = visible.claim;
+    if (!claim || !claim.accountPermissionId || !claim.corpusRootFileId) return null;
+    const engineInput = {
+      question: { text: args.question.text },
+      scope: { kind: args.scope.kind, scopeDigest: args.scope.scopeDigest },
+      authority: {
+        accountKey: claim.accountPermissionId,
+        corpusKey: claim.corpusRootFileId,
+        sourceSetDigest: args.binding.sourceSetDigest,
+        revisionDigest: args.binding.revisionDigest
+      },
+      complete: complete,
+      evidence: evidence,
+      conflicts: conflicts,
+      gaps: gaps,
+      acknowledgeNoStorage: async function(step, signal) {
+        return signal === args.askSignal && !signal.aborted
+          ? hudAskProviderAcknowledgement(step)
+          : null;
+      }
+    };
+    const prepared = await fsbSkopeoAskEngineFacade.prepare(engineInput, args.askSignal);
+    if (!prepared || !prepared.session || args.askSignal.aborted ||
+        args.operationSignal.aborted) return null;
+    const answer = await fsbSkopeoAskEngineFacade.answer(prepared.session, args.askSignal);
+    if (!answer || !answer.outcome || args.askSignal.aborted ||
+        args.operationSignal.aborted) return null;
+    const policyResult = args.scope.kind === 'agreement'
+      ? await buildCurrentHudDecisionPolicy({
+        binding: args.binding,
+        scope: args.scope,
+        question: args.question,
+        answer: answer,
+        visible: visible,
+        current: current,
+        kernel: kernel,
+        truth: truth,
+        certificates: args.certificates,
+        proof: args.proof,
+        operationSignal: args.operationSignal,
+        acknowledgement: null,
+        reviewOpen: null
+      })
+      : null;
+    if (args.scope.kind === 'agreement' && !policyResult) return null;
+    return Object.freeze({
+      answer: answer,
+      policy: policyResult ? policyResult.policy : null,
+      actions: Object.freeze(actions.map(function(action) { return Object.freeze(action); })),
+      policyActions: policyResult ? policyResult.policyActions : Object.freeze([]),
+      policyActionBindings: policyResult
+        ? policyResult.policyActionBindings
+        : Object.freeze([])
+    });
+  }
+
+  async function refreshCurrentHudPolicy(args) {
+    if (!args || !args.binding || !args.scope || !args.question || !args.answer ||
+        args.scope.kind !== 'agreement') return null;
+    let operation;
+    try {
+      operation = await runSkopeoCorpusOperation(
+        'query',
+        args.binding.exactTuple,
+        { sourceFileIds: args.scope.sourceFileIds.slice() },
+        async function(certificates, proof, operationSignal) {
+          const visible = await visibleHudManifest();
+          const current = visible
+            ? await currentCorpusFacadeEntry(args.binding.exactTuple)
+            : null;
+          const kernel = current
+            ? await createSkopeoCorpusKernel(args.binding.tabId, current.entry)
+            : null;
+          const evaluationContext = kernel
+            ? await fsbBuildSkopeoTruthEvaluationContext()
+            : null;
+          const truth = evaluationContext
+            ? await ensureCurrentHudTruthDisplaySnapshot(
+              args.binding.exactTuple,
+              { evaluationContext: evaluationContext }
+            )
+            : null;
+          const result = truth && truth.status === 'current'
+            ? await buildCurrentHudDecisionPolicy({
+              binding: args.binding,
+              scope: args.scope,
+              question: args.question,
+              answer: args.answer,
+              visible: visible,
+              current: current,
+              kernel: kernel,
+              truth: truth,
+              certificates: certificates,
+              proof: proof,
+              operationSignal: operationSignal,
+              acknowledgement: args.acknowledgement,
+              reviewOpen: args.reviewOpen
+            })
+            : null;
+          if (!result) throw new Error('skopeo-policy-refresh-closed');
+          return { rows: [], aggregate: result };
+        }
+      );
+    } catch (_error) {
+      operation = null;
+    }
+    return operation && operation.decision === 'admitted'
+      ? (own(operation, 'aggregate') ? operation.aggregate : operation.value)
+      : null;
+  }
+
+  async function commitCurrentHudPolicyAction(args) {
+    const binding = args && args.binding;
+    const scope = args && args.scope;
+    const action = args && args.action;
+    const policyInput = action && action.policyInput;
+    if (!binding || !scope || scope.kind !== 'agreement' || !action || !policyInput ||
+        !fsbSkopeoDecisionPolicyStoreFacade) return false;
+    let operation;
+    try {
+      operation = await runSkopeoCorpusOperation(
+        'query',
+        binding.exactTuple,
+        { sourceFileIds: scope.sourceFileIds.slice() },
+        async function(certificates, proof, operationSignal) {
+          const visible = await visibleHudManifest();
+          const current = visible
+            ? await currentCorpusFacadeEntry(binding.exactTuple)
+            : null;
+          const claim = hudPolicyPartitionClaim(visible);
+          const agreementKey = current && current.live && current.live.entityId;
+          const currentSourceDigest = await hudDigest([
+            scope.scopeDigest,
+            binding.sourceSetDigest,
+            binding.accessDigest
+          ]);
+          if (!visible || !current || !claim || proof.complete !== true ||
+              operationSignal.aborted || certificates.length !== scope.sourceFileIds.length ||
+              agreementKey !== policyInput.authority.agreementKey ||
+              claim.accountKey !== policyInput.authority.accountKey ||
+              claim.corpusKey !== policyInput.authority.corpusKey ||
+              currentSourceDigest !== policyInput.authority.sourceSetDigest) {
+            throw new Error('skopeo-policy-effect-stale');
+          }
+          return {
+            rows: [],
+            aggregate: Object.freeze({
+              partitionClaim: claim,
+              agreementKey: agreementKey,
+              targetFileKey: agreementKey
+            })
+          };
+        }
+      );
+    } catch (_error) {
+      operation = null;
+    }
+    const prepared = operation && operation.decision === 'admitted'
+      ? (own(operation, 'aggregate') ? operation.aggregate : operation.value)
+      : null;
+    if (!prepared) return false;
+    const atCommit = await currentCorpusFacadeEntry(binding.exactTuple);
+    if (!atCommit || !atCommit.live || atCommit.live.entityId !== prepared.agreementKey) return false;
+    if (action.label === 'configure-document-10' ||
+        action.label === 'replace-document-10') {
+      return fsbSkopeoDecisionPolicyStoreFacade.configureDocument10(
+        prepared.partitionClaim, prepared.targetFileKey);
+    }
+    if (action.label === 'clear-document-10') {
+      return fsbSkopeoDecisionPolicyStoreFacade.clearDocument10(prepared.partitionClaim);
+    }
+    if (action.label === 'classify-complex' || action.label === 'classify-routine') {
+      return fsbSkopeoDecisionPolicyStoreFacade.classifyAgreement(
+        prepared.partitionClaim,
+        prepared.agreementKey,
+        action.label === 'classify-complex' ? 'complex' : 'routine'
+      );
+    }
+    return false;
+  }
+
+  function hudAlertAssessmentMatchesAction(assessment, action) {
+    const owner = assessment && assessment.owner;
+    return !!owner && assessment.familyId === action.familyId &&
+      assessment.agreementStableId === action.agreementStableId &&
+      assessment.partition.partitionKey === action.partition.partitionKey &&
+      assessment.partition.accountPermissionId === action.partition.accountPermissionId &&
+      assessment.partition.corpusRootFileId === action.partition.corpusRootFileId &&
+      owner.stableRecordId === action.owner.stableRecordId &&
+      owner.stableRelationId === action.owner.stableRelationId &&
+      owner.sourceFileId === action.owner.sourceFileId &&
+      owner.sourceRevision === action.owner.sourceRevision &&
+      assessment.sourceSetDigest === action.sourceSetDigest &&
+      assessment.revisionDigest === action.revisionDigest &&
+      assessment.accessDigest === action.accessDigest &&
+      assessment.truthGenerationId === action.truthGenerationId &&
+      assessment.evaluationContextDigest === action.evaluationContextDigest;
+  }
+
+  async function commitCurrentHudAlertAction(args) {
+    const binding = args && args.binding;
+    const action = args && args.action;
+    if (!binding || !action || !fsbSkopeoAlertStoreFacade ||
+        !fsbSkopeoAlertRuntimeFacade ||
+        (action.kind !== 'map-current-owner' &&
+          action.kind !== 'remove-current-owner-mapping')) return false;
+    let operation;
+    try {
+      operation = await runSkopeoCorpusOperation(
+        'alert-delivery', binding.exactTuple,
+        { sourceFileIds: action.sourceFileIds.slice() },
+        async function(certificates, proof, operationSignal) {
+          const assessments = await hudCurrentAlertDerivations(
+            binding, certificates, proof, operationSignal);
+          const matches = Array.isArray(assessments) ? assessments.filter(function(assessment) {
+            if (!hudAlertAssessmentMatchesAction(assessment, action)) return false;
+            const candidate = assessment.result && assessment.result.candidate;
+            return action.kind === 'map-current-owner'
+              ? !candidate && assessment.result.disposition === 'not-locally-deliverable'
+              : !!candidate && !!assessment.mapping;
+          }) : [];
+          if (matches.length !== 1) throw new Error('stale-alert-mapping');
+          return Object.freeze({
+            kind: action.kind,
+            partition: matches[0].partition,
+            owner: matches[0].owner
+          });
+        },
+        async function(prepared, publisher) {
+          const beforeCommit = await currentCorpusFacadeEntry(binding.exactTuple);
+          if (!beforeCommit || !prepared || !publisher ||
+              typeof publisher.publish !== 'function') {
+            throw new Error('stale-alert-mapping');
+          }
+          return publisher.publish(async function() {
+            const atEffect = await currentCorpusFacadeEntry(binding.exactTuple);
+            if (!atEffect) throw new Error('stale-alert-mapping');
+            const currentMapping = await fsbSkopeoAlertStoreFacade.readOwnerBinding(
+              prepared.partition, prepared.owner.stableRecordId);
+            let mutation;
+            if (prepared.kind === 'map-current-owner') {
+              mutation = await fsbSkopeoAlertStoreFacade.bindOwner({
+                version: global.FsbSkopeoAlertSchema.OWNER_BINDING_VERSION,
+                partition: prepared.partition,
+                ownerStableRecordId: prepared.owner.stableRecordId,
+                ownerRelationStableId: prepared.owner.stableRelationId,
+                ownerSourceFileId: prepared.owner.sourceFileId,
+                ownerSourceRevision: prepared.owner.sourceRevision,
+                ownerLabel: prepared.owner.label,
+                mappedAt: Date.now()
+              });
+            } else {
+              if (!currentMapping ||
+                  currentMapping.ownerRelationStableId !== prepared.owner.stableRelationId ||
+                  currentMapping.ownerSourceFileId !== prepared.owner.sourceFileId ||
+                  currentMapping.ownerSourceRevision !== prepared.owner.sourceRevision) {
+                throw new Error('stale-alert-mapping');
+              }
+              mutation = await fsbSkopeoAlertStoreFacade.unbindOwner(
+                prepared.partition, prepared.owner.stableRecordId);
+              if (mutation && mutation.ok === true) {
+                const entries = await fsbSkopeoAlertStoreFacade.list(prepared.partition);
+                for (const entry of entries) {
+                  if (!entry || entry.candidate.owner.stableRecordId !==
+                      prepared.owner.stableRecordId ||
+                      entry.state === 'missed' || entry.state === 'superseded') continue;
+                  await fsbSkopeoAlertStoreFacade.transition({
+                    partition: prepared.partition,
+                    alertKey: entry.candidate.alertKey,
+                    from: entry.state,
+                    to: 'superseded',
+                    reason: 'evidence-superseded'
+                  });
+                }
+              }
+            }
+            return !!mutation && mutation.ok === true;
+          });
+        }
+      );
+    } catch (_error) {
+      operation = null;
+    }
+    if (!operation || operation.decision !== 'admitted' || operation.value !== true) return false;
+    await fsbSkopeoAlertRuntimeFacade.reconcile();
+    return true;
+  }
+
+  const hudProjectionController = createFsbSkopeoHudProjectionController(Object.freeze({
+    hudSchema: global.FsbSkopeoHudSchema,
+    askSchema: global.FsbSkopeoAskSchema,
+    alertSchema: global.FsbSkopeoAlertSchema,
+    chrome: chrome,
+    randomToken: mintHudOpaqueToken,
+    resolveCurrentBinding: resolveCurrentHudBinding,
+    buildEvaluationContext: function() {
+      return typeof fsbBuildSkopeoTruthEvaluationContext === 'function'
+        ? fsbBuildSkopeoTruthEvaluationContext()
+        : null;
+    },
+    ensureTruth: function(exactTuple, { evaluationContext }) {
+      return ensureCurrentHudTruthDisplaySnapshot(exactTuple, { evaluationContext });
+    },
+    buildProjection: buildCurrentHudProjection,
+    runAsk: runCurrentHudAsk,
+    refreshPolicy: refreshCurrentHudPolicy,
+    openPolicyReview: function(policyInput) {
+      return fsbSkopeoDecisionPolicyFacade
+        ? fsbSkopeoDecisionPolicyFacade.openDocument10Review(policyInput)
+        : null;
+    },
+    acknowledgePolicyReview: function(policyInput, reviewOpen) {
+      return fsbSkopeoDecisionPolicyFacade
+        ? fsbSkopeoDecisionPolicyFacade.acknowledgeDocument10Review(
+          policyInput, reviewOpen)
+        : null;
+    },
+    commitPolicyAction: commitCurrentHudPolicyAction,
+    commitAlertAction: commitCurrentHudAlertAction,
+    buildAskProjection: function(args) {
+      return global.FsbSkopeoHudProjector.createProjection({
+        mode: 'answer',
+        question: args.question,
+        scope: args.scope,
+        answer: args.answer,
+        policy: args.policy,
+        policyActions: args.policyActions,
+        authority: args.authority
+      });
+    },
+    refreshCitation: refreshCurrentHudCitation,
+    runCorpusOperation: function(kind, exactTuple, sourceSelection, callback, commitCallback) {
+      if (kind === 'display') {
+        return runSkopeoCorpusOperation('display', exactTuple, sourceSelection, callback);
+      }
+      if (kind === 'query') {
+        return runSkopeoCorpusOperation('query', exactTuple, sourceSelection, callback);
+      }
+      if (kind === 'citation-open') {
+        return runSkopeoCorpusOperation('citation-open', exactTuple,
+          sourceSelection, callback, commitCallback);
+      }
+      return Promise.resolve(corpusDecision('closed'));
+    },
+    onProjectionPublished: function(binding) {
+      const entry = controllers.get(binding.tabId);
+      if (entry !== binding.controllerKey || entry.controller.signal.aborted) {
+        throw new Error('stale-hud-publication');
+      }
+      entry.hudProjectionActionToken = binding.actionToken;
+      entry.hudProjectionSemanticEntityToken = binding.semanticEntityToken;
+    }
+  }));
+
+  function revokeHudProjection(entry, reason) {
+    if (!entry) return false;
+    entry.hudProjectionActionToken = null;
+    entry.hudProjectionSemanticEntityToken = null;
+    if (typeof fsbClearCurrentSkopeoAlertContexts === 'function') {
+      fsbClearCurrentSkopeoAlertContexts(entry);
+    }
+    return hudProjectionController.revokeController(entry, reason);
+  }
+
+  function handleHudProjection(message, sender) {
+    return hudProjectionController.requestProjection(message, sender);
+  }
+
+  function handleHudCitationOpen(message, sender) {
+    return hudProjectionController.citationOpen(message, sender);
+  }
+
+  function handleHudAsk(message, sender) {
+    return hudProjectionController.ask(message, sender);
+  }
+
+  function handleHudAskCancel(message, sender) {
+    return hudProjectionController.cancelAsk(message, sender);
+  }
+
+  function handleHudAnswerAction(message, sender) {
+    return hudProjectionController.answerAction(message, sender);
+  }
+
+  function handleHudAnswerActionConfirm(message, sender) {
+    return hudProjectionController.confirmAnswerAction(message, sender);
+  }
+
+  function handleHudAlertAction(message, sender) {
+    return hudProjectionController.alertAction(message, sender);
+  }
+
+  function handleHudAlertActionConfirm(message, sender) {
+    return hudProjectionController.confirmAlertAction(message, sender);
+  }
+
+  async function handleHudRevoke(message, sender) {
+    if (!exactKeys(message, HUD_REVOKE_KEYS) || own(message, 'tabId')) {
+      return Object.freeze({ success: false, status: 'closed' });
+    }
+    const result = await hudProjectionController.requestRevoke(message, sender);
+    if (result && result.success === true) {
+      const current = await currentActionEntry(message, sender);
+      revokeHudProjection(current && current.entry, 'hide');
+    }
+    return result;
+  }
+
+  function corpusValidId(value) {
+    return typeof value === 'string' && value.length > 0 && value.length <= 256 &&
+      /^[A-Za-z0-9_-]+$/.test(value) && value !== '__proto__' &&
+      value !== 'prototype' && value !== 'constructor';
+  }
+
+  function corpusDecision(kind) {
+    return deepFreezeSkopeo({ decision: kind });
+  }
+
+  function corpusEntityToken(entity) {
+    return entity && entity !== null ? entity.kind + ':' + entity.id : null;
+  }
+
+  function corpusEntityFromUrl(rawUrl) {
+    let parsed;
+    try { parsed = new URL(rawUrl); } catch (_error) { return null; }
+    const path = parsed.pathname;
+    let match = null;
+    if (parsed.origin === 'https://drive.google.com') {
+      match = path.match(/(?:^|\/)folders\/([A-Za-z0-9_-]+)(?:\/|$)/);
+      if (match && corpusValidId(match[1])) return { kind: 'drive-folder', id: match[1] };
+      match = path.match(/(?:^|\/)file\/d\/([A-Za-z0-9_-]+)(?:\/|$)/);
+      if (match && corpusValidId(match[1])) return { kind: 'drive-file', id: match[1] };
+    }
+    if (parsed.origin === 'https://docs.google.com') {
+      match = path.match(/(?:^|\/)document\/(?:u\/\d+\/)?d\/([A-Za-z0-9_-]+)(?:\/|$)/);
+      if (match && corpusValidId(match[1])) return { kind: 'docs-document', id: match[1] };
+    }
+    return null;
+  }
+
+  function corpusContextKind(entityKind) {
+    if (entityKind === 'drive-folder') return 'vendor-folder';
+    if (entityKind === 'docs-document') return 'agreement-reading';
+    return entityKind === 'drive-file' ? 'focused-ask' : null;
+  }
+
+  async function awaitCorpusBoundary() {
+    try {
+      const boot = global.fsbSkopeoCorpusBootPromise ||
+        (typeof global.initializeFsbSkopeoCorpusBoundary === 'function'
+          ? global.initializeFsbSkopeoCorpusBoundary()
+          : null);
+      const boundary = boot ? await boot : null;
+      return boundary && boundary.closed === false && boundary.store ? boundary : null;
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  async function readLiveCorpusContext(tabId, entry) {
+    if (!positiveInteger(tabId) || !entry || controllers.get(tabId) !== entry ||
+        entry.controller.signal.aborted || !entry.projection || !entry.authority ||
+        !entry.projection.profile || entry.projection.profile.adapterId !== 'drive-docs-deep-pack-v1') {
+      return null;
+    }
+    const record = await readRecord(tabId);
+    if (!record || record.status !== 'active' || record.reason !== null ||
+        record.generation !== entry.generation || controllers.get(tabId) !== entry) return null;
+    let tab;
+    try { tab = await chrome.tabs.get(tabId); } catch (_error) { tab = null; }
+    if (!tab || tab.id !== tabId || typeof tab.url !== 'string') return null;
+    let origin;
+    try { origin = new URL(tab.url).origin; } catch (_error) { return null; }
+    const entity = corpusEntityFromUrl(tab.url);
+    const currentEntity = entry.authority.semanticEntity;
+    if (origin !== entry.projection.exactOrigin || !entity || !currentEntity ||
+        entity.kind !== currentEntity.kind || entity.id !== currentEntity.id ||
+        controllers.get(tabId) !== entry || entry.controller.signal.aborted) return null;
+    const contextKind = corpusContextKind(entity.kind);
+    if (!contextKind) return null;
+    return {
+      tabId: tabId,
+      origin: origin,
+      generation: entry.generation,
+      profileId: entry.projection.profileId,
+      profileVersion: 1,
+      contextEpoch: entry.authority.contextEpoch,
+      contextKind: contextKind,
+      entityKind: entity.kind,
+      entityId: entity.id
+    };
+  }
+
+  async function createSkopeoCorpusKernel(tabId, entry) {
+    if (!entry || controllers.get(tabId) !== entry || entry.controller.signal.aborted) return null;
+    if (entry.corpusKernel) return entry.corpusKernel;
+    const boundary = await awaitCorpusBoundary();
+    if (!boundary || controllers.get(tabId) !== entry || entry.controller.signal.aborted ||
+        !global.crypto || !global.crypto.subtle) return null;
+    const transportContext = { tabId: tabId, origin: entry.projection.exactOrigin };
+    const transport = global.FsbSkopeoDriveCorpusTransport.createTransport({
+      executeBoundPageRead: global.FsbCapabilityFetch.executeBoundPageRead,
+      crypto: global.crypto,
+      context: transportContext,
+      caps: {
+        maxItemsPerPage: 1000,
+        maxPagesPerChain: 64,
+        maxTokenLength: 4096,
+        maxStringLength: 4096
+      }
+    });
+    const readLiveContext = function() { return readLiveCorpusContext(tabId, entry); };
+    let kernelReference = null;
+    const authority = transport && global.FsbSkopeoDriveAuthority.create({
+      schema: global.FsbSkopeoCorpusSchema,
+      store: boundary.store,
+      transport: transport,
+      readLiveContext: readLiveContext,
+      now: Date.now,
+      signal: entry.controller.signal,
+      scheduleReconciliation: function(context, sourceFileId) {
+        if (!kernelReference || controllers.get(tabId) !== entry ||
+            entry.controller.signal.aborted) return false;
+        Promise.resolve().then(function() {
+          if (!kernelReference || controllers.get(tabId) !== entry ||
+              entry.controller.signal.aborted) return null;
+          return kernelReference.reconciler.reconcileSource(
+            context, sourceFileId, { removed: false }
+          );
+        }).catch(function() {});
+        return true;
+      },
+      limits: {
+        maxSourcesPerOperation: MAX_CORPUS_OPERATION_SOURCES,
+        maxAncestryDepth: 32,
+        maxAncestryRequests: 256,
+        maxParentPages: 16,
+        maxOperationMs: 30000
+      }
+    });
+    const corpusController = transport && global.FsbSkopeoCorpusController.create({
+      store: boundary.store,
+      transport: transport,
+      readLiveContext: readLiveContext,
+      now: Date.now,
+      signal: entry.controller.signal,
+      limits: { maxOperationMs: 30000 }
+    });
+    const reconciler = authority && global.FsbSkopeoDriveReconciler.create({
+      schema: global.FsbSkopeoCorpusSchema,
+      store: boundary.store,
+      transport: transport,
+      authority: authority,
+      limits: {
+        maxPagesPerScan: 64,
+        maxItemsPerScan: 4096,
+        maxDepth: 32,
+        maxRequestsPerRun: 8192,
+        maxChangesPerRun: 4096,
+        maxSources: 4096,
+        maxRescans: 2,
+        maxOperationMs: 30000
+      }
+    });
+    if (!transport || !authority || !corpusController || !reconciler ||
+        controllers.get(tabId) !== entry || entry.controller.signal.aborted) return null;
+    const kernel = Object.freeze({
+      transport: transport,
+      authority: authority,
+      controller: corpusController,
+      reconciler: reconciler
+    });
+    kernelReference = kernel;
+    entry.corpusKernel = kernel;
+    entry.controller.signal.addEventListener('abort', function() {
+      reconciler.abort('controller-aborted');
+    }, { once: true });
+    return kernel;
+  }
+
+  function corpusFacadeTuple(tabId, entry) {
+    return deepFreezeSkopeo({
+      tabId: tabId,
+      generation: entry.generation,
+      exactOrigin: entry.projection.exactOrigin,
+      profileId: entry.projection.profileId,
+      profileVersion: entry.projection.profileVersion,
+      contextEpoch: entry.authority.contextEpoch,
+      semanticEntity: entry.authority.semanticEntity
+    });
+  }
+
+  async function currentCorpusFacadeEntry(tuple) {
+    if (!exactKeys(tuple, CORPUS_FACADE_TUPLE_KEYS) || !positiveInteger(tuple.tabId) ||
+        !positiveGeneration(tuple.generation) || !positiveGeneration(tuple.contextEpoch) ||
+        !exactHttpsOrigin(tuple.exactOrigin) || !skopeoIdentifier(tuple.profileId) ||
+        !boundedSkopeoText(tuple.profileVersion, 128)) return null;
+    const entity = normalizeSkopeoEntity(tuple.semanticEntity);
+    const entry = controllers.get(tuple.tabId);
+    if (entity === undefined || !entry || entry.controller.signal.aborted ||
+        entry.generation !== tuple.generation || !entry.projection || !entry.authority ||
+        entry.projection.exactOrigin !== tuple.exactOrigin ||
+        entry.projection.profileId !== tuple.profileId ||
+        entry.projection.profileVersion !== tuple.profileVersion ||
+        entry.authority.contextEpoch !== tuple.contextEpoch ||
+        !sameSkopeoEntity(entry.authority.semanticEntity, entity)) return null;
+    const live = await readLiveCorpusContext(tuple.tabId, entry);
+    return live ? { entry: entry, live: live } : null;
+  }
+
+  function exactCorpusSourceSelection(selection) {
+    if (exactKeys(selection, ['sourceFileId'])) {
+      const field = ownEnumerableDataValue(selection, 'sourceFileId');
+      return field.valid && field.present && corpusValidId(field.value)
+        ? { single: field.value, sourceFileIds: null }
+        : null;
+    }
+    if (!exactKeys(selection, ['sourceFileIds'])) return null;
+    const field = ownEnumerableDataValue(selection, 'sourceFileIds');
+    if (!field.valid || !field.present || !Array.isArray(field.value) ||
+        field.value.length === 0 || field.value.length > MAX_CORPUS_OPERATION_SOURCES) return null;
+    let keys;
+    try { keys = Reflect.ownKeys(field.value); } catch (_error) { return null; }
+    if (keys.length !== field.value.length + 1 || keys.some(function(key) {
+      return typeof key !== 'string' || (key !== 'length' && !/^(?:0|[1-9][0-9]*)$/.test(key));
+    })) return null;
+    const sourceFileIds = [];
+    for (let index = 0; index < field.value.length; index += 1) {
+      const item = ownEnumerableDataValue(field.value, String(index));
+      if (!item.valid || !item.present || !corpusValidId(item.value)) return null;
+      sourceFileIds.push(item.value);
+    }
+    if (new Set(sourceFileIds).size !== sourceFileIds.length) return null;
+    return { single: null, sourceFileIds: sourceFileIds };
+  }
+
+  function corpusOperationContext(live, claim) {
+    if (!live || !claim || !corpusValidId(claim.accountPermissionId) ||
+        !corpusValidId(claim.corpusRootFileId)) return null;
+    return {
+      tabId: live.tabId,
+      origin: live.origin,
+      generation: live.generation,
+      profileId: live.profileId,
+      profileVersion: live.profileVersion,
+      contextEpoch: live.contextEpoch,
+      contextKind: live.contextKind,
+      entityKind: live.entityKind,
+      entityId: live.entityId,
+      accountPermissionId: claim.accountPermissionId,
+      corpusRootFileId: claim.corpusRootFileId
+    };
+  }
+
+  async function runSkopeoCorpusOperation(
+    kind, exactTuple, sourceSelection, callback, commitCallback
+  ) {
+    const effectful = CORPUS_EFFECT_OPERATION_KINDS.has(kind);
+    if (!CORPUS_OPERATION_KINDS.has(kind) || typeof callback !== 'function' ||
+        (effectful
+          ? arguments.length !== 5 || typeof commitCallback !== 'function'
+          : arguments.length !== 4 || commitCallback !== undefined)) {
+      return corpusDecision('closed');
+    }
+    const selection = exactCorpusSourceSelection(sourceSelection);
+    const current = selection ? await currentCorpusFacadeEntry(exactTuple) : null;
+    const boundary = current ? await awaitCorpusBoundary() : null;
+    const claim = boundary && boundary.currentClaim;
+    const kernel = current && claim
+      ? await createSkopeoCorpusKernel(exactTuple.tabId, current.entry)
+      : null;
+    const context = kernel ? corpusOperationContext(current.live, claim) : null;
+    if (!selection || !current || !boundary || !claim || !kernel || !context) {
+      return corpusDecision('closed');
+    }
+    const operation = await kernel.authority.beginOperation(kind, context);
+    if (!operation || operation.decision) return operation || corpusDecision('closed');
+    const guardedCallback = async function() {
+      const args = Array.prototype.slice.call(arguments);
+      if (!await currentCorpusFacadeEntry(exactTuple)) throw new Error('stale-corpus-tuple');
+      const value = await callback.apply(null, args);
+      if (!await currentCorpusFacadeEntry(exactTuple)) throw new Error('stale-corpus-tuple');
+      return value;
+    };
+    const guardedCommit = effectful ? async function() {
+      const args = Array.prototype.slice.call(arguments);
+      if (!await currentCorpusFacadeEntry(exactTuple)) throw new Error('stale-corpus-tuple');
+      const value = await commitCallback.apply(null, args);
+      if (!await currentCorpusFacadeEntry(exactTuple)) throw new Error('stale-corpus-tuple');
+      return value;
+    } : undefined;
+    let result;
+    if (selection.single) {
+      result = await kernel.authority.runWithCertifiedSource(
+        operation, selection.single, guardedCallback, guardedCommit
+      );
+    } else {
+      result = await kernel.authority.runWithCertifiedSources(
+        operation, selection.sourceFileIds, guardedCallback, guardedCommit
+      );
+    }
+    return await currentCorpusFacadeEntry(exactTuple) ? result : corpusDecision('closed');
+  }
+
+  function corpusClosedProjection(actionToken) {
+    return deepFreezeSkopeo({
+      mode: 'corpus-closed',
+      reasonCode: 'fail-quiet',
+      actionToken: actionToken
+    });
+  }
+
+  function corpusEnrollmentProjection(actionToken) {
+    return deepFreezeSkopeo({
+      mode: 'enrollment',
+      actionToken: actionToken
+    });
+  }
+
+  function currentSourceProjection(actionToken, state, displayLabel) {
+    const projection = {
+      mode: 'current-source',
+      state: state,
+      labelToken: 'current-source',
+      actionToken: actionToken
+    };
+    if (displayLabel) projection.displayLabel = displayLabel;
+    return deepFreezeSkopeo(projection);
+  }
+
+  function safeCorpusDisplayName(value) {
+    return boundedSkopeoText(value, 80) ? value : null;
+  }
+
+  function nextCorpusRowToken(entry) {
+    corpusRowSequence += 1;
+    return 'scrow_' + String(entry.generation) + '_' + String(entry.authority.contextEpoch) + '_' +
+      String(corpusRowSequence);
+  }
+
+  function corpusClaimsMatch(message, current, sourceField) {
+    const entry = current.entry;
+    const entity = entry.authority.semanticEntity;
+    return entity && boundedSkopeoText(message.actionToken, 160) &&
+      message.exactOrigin === entry.projection.exactOrigin &&
+      message.profileVersion === entry.projection.profileVersion &&
+      message.contextEpoch === entry.authority.contextEpoch &&
+      message.semanticEntityToken === corpusEntityToken(entity) &&
+      message[sourceField] === entity.id && corpusValidId(message[sourceField]);
+  }
+
+  async function projectActiveCorpus(current, actionToken) {
+    const boundary = await awaitCorpusBoundary();
+    if (!boundary || !boundary.currentClaim) return corpusClosedProjection(actionToken);
+    const manifest = await boundary.store.getVisibleManifest(boundary.currentClaim);
+    if (!manifest || !Array.isArray(manifest.sources) || manifest.sources.length === 0 ||
+        manifest.sources.length > MAX_CORPUS_OPERATION_SOURCES) {
+      return corpusClosedProjection(actionToken);
+    }
+    const sourceFileIds = manifest.sources.map(function(source) {
+      return source && source.sourceFileId;
+    });
+    if (sourceFileIds.some(function(sourceFileId) { return !corpusValidId(sourceFileId); }) ||
+        new Set(sourceFileIds).size !== sourceFileIds.length) {
+      return corpusClosedProjection(actionToken);
+    }
+    const tuple = corpusFacadeTuple(current.tabId, current.entry);
+    const result = await runSkopeoCorpusOperation(
+      'display', tuple, { sourceFileIds: sourceFileIds },
+      async function(certificates, proof) {
+        const freshManifest = await boundary.store.getVisibleManifest(boundary.currentClaim);
+        if (!freshManifest || !Array.isArray(freshManifest.sources)) {
+          return { rows: [], aggregate: null };
+        }
+        const sourceById = new Map(freshManifest.sources.map(function(source) {
+          return [source.sourceFileId, source];
+        }));
+        const rows = [];
+        for (let index = 0; index < certificates.length; index += 1) {
+          const sourceFileId = certificates[index].sourceFileId;
+          const source = sourceById.get(sourceFileId);
+          if (!source || !CORPUS_CERTIFIED_ROW_STATES.has(source.state)) continue;
+          const value = {
+            rowToken: nextCorpusRowToken(current.entry),
+            state: source.state
+          };
+          const displayLabel = safeCorpusDisplayName(source.displayName);
+          if (displayLabel) value.displayLabel = displayLabel;
+          rows.push({ sourceFileId: sourceFileId, value: deepFreezeSkopeo(value) });
+        }
+        const complete = proof && proof.complete === true && rows.length === sourceFileIds.length;
+        return {
+          rows: rows,
+          aggregate: complete
+            ? deepFreezeSkopeo({ rowTokens: rows.map(function(row) { return row.value.rowToken; }) })
+            : null
+        };
+      }
+    );
+    if (!result || (result.decision !== 'admitted' && result.decision !== 'partial') ||
+        !Array.isArray(result.rows) || result.rows.length === 0) {
+      return corpusClosedProjection(actionToken);
+    }
+    const rows = result.rows.map(function(row) { return row.value; });
+    return deepFreezeSkopeo({
+      mode: 'active-corpus',
+      rows: rows,
+      aggregate: result.decision === 'admitted' ? result.aggregate : null,
+      actionToken: actionToken
+    });
+  }
+
+  async function handleCorpusEnroll(message, sender) {
+    const tabId = contentTabId(sender);
+    if (!tabId || !exactKeys(message, CORPUS_ENROLL_KEYS) || own(message, 'tabId')) {
+      return corpusClosedProjection(message && message.actionToken);
+    }
+    const current = await currentActionEntry(message, sender);
+    if (!current || current.entry.authority.semanticEntity === null ||
+        current.entry.authority.semanticEntity.kind !== 'drive-folder' ||
+        !corpusClaimsMatch(message, current, 'corpusRootFileId')) {
+      return corpusClosedProjection(message.actionToken);
+    }
+    const boundary = await awaitCorpusBoundary();
+    const kernel = boundary ? await createSkopeoCorpusKernel(tabId, current.entry) : null;
+    if (!boundary || !kernel) return corpusClosedProjection(message.actionToken);
+    const enrollment = await kernel.controller.enroll({ folderFileId: message.corpusRootFileId });
+    let claim = enrollment && enrollment.ok === true ? kernel.controller.getCurrentClaim() : null;
+    let live = claim ? await readLiveCorpusContext(tabId, current.entry) : null;
+    let operationContext = live ? corpusOperationContext(live, claim) : null;
+    const inventory = operationContext
+      ? await kernel.reconciler.buildInitialInventory(operationContext)
+      : null;
+    const revalidated = inventory && inventory.ok === true
+      ? await kernel.controller.revalidate()
+      : null;
+    claim = revalidated && revalidated.ok === true && revalidated.status === 'active'
+      ? kernel.controller.getCurrentClaim()
+      : null;
+    if (!claim) {
+      boundary.currentClaim = null;
+      return corpusClosedProjection(message.actionToken);
+    }
+    boundary.currentClaim = deepFreezeSkopeo({
+      accountPermissionId: claim.accountPermissionId,
+      corpusRootFileId: claim.corpusRootFileId
+    });
+    const projection = await projectActiveCorpus(current, message.actionToken);
+    const after = await currentActionEntry(message, sender);
+    return after && after.entry === current.entry &&
+      corpusClaimsMatch(message, after, 'corpusRootFileId')
+      ? projection
+      : corpusClosedProjection(message.actionToken);
+  }
+
+  async function handleCorpusStatus(message, sender) {
+    const tabId = contentTabId(sender);
+    if (!tabId || !exactKeys(message, CORPUS_STATUS_KEYS) || own(message, 'tabId')) {
+      return corpusClosedProjection(message && message.actionToken);
+    }
+    const current = await currentActionEntry(message, sender);
+    if (!current || current.entry.authority.semanticEntity === null ||
+        !['drive-file', 'docs-document'].includes(current.entry.authority.semanticEntity.kind) ||
+        !corpusClaimsMatch(message, current, 'currentSourceFileId')) {
+      return corpusClosedProjection(message.actionToken);
+    }
+    const boundary = await awaitCorpusBoundary();
+    if (!boundary || !boundary.currentClaim) return corpusClosedProjection(message.actionToken);
+    const tuple = corpusFacadeTuple(tabId, current.entry);
+    const exactCurrent = await currentCorpusFacadeEntry(tuple);
+    const kernel = exactCurrent
+      ? await createSkopeoCorpusKernel(tabId, exactCurrent.entry)
+      : null;
+    const context = kernel
+      ? corpusOperationContext(exactCurrent.live, boundary.currentClaim)
+      : null;
+    const hiddenOperation = context
+      ? await kernel.authority.beginOperation('display', context)
+      : null;
+    const hidden = hiddenOperation && !hiddenOperation.decision &&
+      typeof kernel.authority.readHiddenSourceState === 'function'
+      ? await kernel.authority.readHiddenSourceState(hiddenOperation, message.currentSourceFileId)
+      : null;
+    const result = hidden && hidden.decision === 'admitted'
+      ? hidden
+      : await runSkopeoCorpusOperation(
+      'display', tuple, { sourceFileId: message.currentSourceFileId },
+      async function() {
+        const manifest = await boundary.store.getVisibleManifest(boundary.currentClaim);
+        const matches = manifest && Array.isArray(manifest.sources)
+          ? manifest.sources.filter(function(source) {
+              return source && source.sourceFileId === message.currentSourceFileId;
+            })
+          : [];
+        if (matches.length !== 1 || ![
+          'ready', 'pending', 'unreadable', 'download-blocked', 'inaccessible', 'missing'
+        ].includes(matches[0].state)) throw new Error('source-status-unavailable');
+        return {
+          state: matches[0].state,
+          displayLabel: CORPUS_CERTIFIED_ROW_STATES.has(matches[0].state)
+            ? safeCorpusDisplayName(matches[0].displayName)
+            : null
+        };
+      }
+    );
+    let projection = corpusClosedProjection(message.actionToken);
+    const admittedState = result && result.decision === 'admitted'
+      ? (result.value && typeof result.value.state === 'string'
+          ? result.value.state
+          : (['pending', 'inaccessible', 'missing'].includes(result.state) ? result.state : null))
+      : null;
+    if (admittedState) {
+      projection = currentSourceProjection(
+        message.actionToken,
+        admittedState,
+        result.value ? result.value.displayLabel : null
+      );
+    } else if (result && result.decision === 'pending') {
+      projection = currentSourceProjection(message.actionToken, 'pending', null);
+    } else if (result && result.decision === 'inaccessible') {
+      projection = currentSourceProjection(message.actionToken, 'inaccessible', null);
+    }
+    const after = await currentActionEntry(message, sender);
+    return after && after.entry === current.entry &&
+      corpusClaimsMatch(message, after, 'currentSourceFileId')
+      ? projection
+      : corpusClosedProjection(message.actionToken);
+  }
+
+  async function handleCorpusRootStatus(message, sender) {
+    const tabId = contentTabId(sender);
+    if (!tabId || !exactKeys(message, CORPUS_ROOT_STATUS_KEYS) || own(message, 'tabId')) {
+      return corpusClosedProjection(message && message.actionToken);
+    }
+    const current = await currentActionEntry(message, sender);
+    if (!current || current.entry.authority.semanticEntity === null ||
+        current.entry.authority.semanticEntity.kind !== 'drive-folder' ||
+        !corpusClaimsMatch(message, current, 'corpusRootFileId')) {
+      return corpusClosedProjection(message.actionToken);
+    }
+    const boundary = await awaitCorpusBoundary();
+    const kernel = boundary ? await createSkopeoCorpusKernel(tabId, current.entry) : null;
+    if (!boundary || !kernel || typeof kernel.controller.getRootStatus !== 'function') {
+      return corpusClosedProjection(message.actionToken);
+    }
+    const status = await kernel.controller.getRootStatus({
+      folderFileId: message.corpusRootFileId
+    });
+    const afterStatus = await currentActionEntry(message, sender);
+    if (!afterStatus || afterStatus.entry !== current.entry ||
+        !corpusClaimsMatch(message, afterStatus, 'corpusRootFileId')) {
+      return corpusClosedProjection(message.actionToken);
+    }
+    const claim = kernel.controller.getCurrentClaim();
+    if (status && status.ok === true &&
+        (status.status === 'active' || status.status === 'unconfigured')) {
+      boundary.currentClaim = claim ? deepFreezeSkopeo({
+        accountPermissionId: claim.accountPermissionId,
+        corpusRootFileId: claim.corpusRootFileId
+      }) : null;
+    } else if (!status || status.status !== 'validating') {
+      boundary.currentClaim = null;
+    }
+    if (status && status.ok === true && status.status === 'unconfigured') {
+      return corpusEnrollmentProjection(message.actionToken);
+    }
+    if (!status || status.ok !== true || status.status !== 'active' || !claim ||
+        claim.corpusRootFileId !== message.corpusRootFileId) {
+      return corpusClosedProjection(message.actionToken);
+    }
+    const projection = await projectActiveCorpus(current, message.actionToken);
+    const afterProjection = await currentActionEntry(message, sender);
+    return afterProjection && afterProjection.entry === current.entry &&
+      corpusClaimsMatch(message, afterProjection, 'corpusRootFileId')
+      ? projection
+      : corpusClosedProjection(message.actionToken);
+  }
+
+  async function recoverCorpusOnWake(tabId, entry) {
+    if (!entry || !entry.authority || !entry.authority.semanticEntity ||
+        !['drive-folder', 'drive-file', 'docs-document'].includes(
+          entry.authority.semanticEntity.kind
+        )) return false;
+    const boundary = await awaitCorpusBoundary();
+    const kernel = boundary ? await createSkopeoCorpusKernel(tabId, entry) : null;
+    if (!boundary || !kernel) return false;
+    const recovered = await kernel.controller.recover();
+    let claim = recovered && recovered.ok === true ? kernel.controller.getCurrentClaim() : null;
+    const live = claim ? await readLiveCorpusContext(tabId, entry) : null;
+    const context = live ? corpusOperationContext(live, claim) : null;
+    const inventory = context ? await kernel.reconciler.resume(context) : null;
+    const active = inventory && inventory.ok === true ? await kernel.controller.revalidate() : null;
+    claim = active && active.ok === true && active.status === 'active'
+      ? kernel.controller.getCurrentClaim()
+      : null;
+    boundary.currentClaim = claim ? deepFreezeSkopeo({
+      accountPermissionId: claim.accountPermissionId,
+      corpusRootFileId: claim.corpusRootFileId
+    }) : null;
+    return !!claim;
+  }
+
+  function projectionTupleMatches(left, right) {
+    return !!left && !!right && left.status === 'recognized' && right.status === 'recognized' &&
+      left.tabId === right.tabId && left.generation === right.generation &&
+      left.exactOrigin === right.exactOrigin && left.service === right.service &&
+      left.appStem === right.appStem && left.profileId === right.profileId &&
+      left.profileVersion === right.profileVersion && left.catalogVersion === right.catalogVersion;
+  }
+
+  function createCurrentProjection(tabId, generation, rawUrl) {
+    const api = global.FsbSkopeoCapabilityProjector;
+    if (!api || typeof api.createProjection !== 'function' ||
+        !global.FsbSkopeoProfileIndex) {
+      return deepFreezeSkopeo({ status: 'invalid', reason: 'projection-unavailable' });
+    }
+    let projection;
+    try {
+      projection = api.createProjection({ tabId: tabId, generation: generation, url: rawUrl },
+        global.FsbSkopeoProfileIndex);
+    } catch (_error) {
+      return deepFreezeSkopeo({ status: 'invalid', reason: 'projection-invalid' });
+    }
+    if (!projection || projection.status !== 'recognized' ||
+        typeof api.validateProjection !== 'function' || api.validateProjection(projection) !== true) {
+      return projection || deepFreezeSkopeo({ status: 'invalid', reason: 'projection-invalid' });
+    }
+    return projection;
+  }
+
+  function projectedCapability(projection, slug) {
+    if (!projection || !Array.isArray(projection.capabilityGroups) || !skopeoIdentifier(slug)) return null;
+    const matches = [];
+    for (const group of projection.capabilityGroups) {
+      if (!group || !Array.isArray(group.capabilities)) return null;
+      for (const row of group.capabilities) {
+        if (row && row.slug === slug) matches.push(row);
+      }
+    }
+    return matches.length === 1 ? matches[0] : null;
+  }
+
+  function indexedCapability(entry, slug) {
+    const index = global.FsbSkopeoProfileIndex;
+    if (!entry || !entry.projection || !index || !Array.isArray(index.capabilities)) return null;
+    const matches = index.capabilities.filter((row) => row && row.slug === slug &&
+      row.appStem === entry.projection.appStem &&
+      row.profileId === entry.projection.profileId && row.executionAuthority &&
+      row.executionAuthority.executionOrigin === entry.projection.exactOrigin);
+    return matches.length === 1 ? matches[0] : null;
+  }
+
+  async function validateInstalledReadAuthority(current, message, descriptor, row) {
+    const actionAuthority = global.FsbSkopeoActionAuthority;
+    if (!plainObject(message.args) || Object.keys(message.args).length > 12 || !descriptor || !row ||
+        !plainObject(descriptor.executionAuthority) || !plainObject(descriptor.paramSummary) ||
+        !plainObject(descriptor.argumentContract) || !plainObject(row.paramSummary) ||
+        !plainObject(row.argumentContract) || descriptor.actionabilityReason !== null ||
+        row.actionabilityReason !== null || descriptor.executionAuthority.tier !== 'T1a' ||
+        descriptor.executionAuthority.executionOrigin !== current.entry.projection.exactOrigin ||
+        descriptor.executionAuthority.executionOrigin !== row.executionOrigin ||
+        descriptor.executionAuthority.sideEffectClass !== 'read' ||
+        descriptor.executionAuthority.schemaDigest !== message.schemaDigest ||
+        row.schemaDigest !== message.schemaDigest || row.argumentContract.schemaDigest !== message.schemaDigest ||
+        JSON.stringify(descriptor.paramSummary) !== JSON.stringify(row.paramSummary) ||
+        JSON.stringify(descriptor.argumentContract) !== JSON.stringify(row.argumentContract) ||
+        !actionAuthority || typeof actionAuthority.normalizeResolvedAuthority !== 'function' ||
+        typeof actionAuthority.authorityMatches !== 'function' ||
+        typeof actionAuthority.analyzeArgumentSchema !== 'function' ||
+        typeof actionAuthority.validateCollectedArguments !== 'function' ||
+        !global.FsbCapabilityCatalog || typeof global.FsbCapabilityCatalog.resolve !== 'function' ||
+        !global.FsbCapabilityRouter ||
+        typeof global.FsbCapabilityRouter.validateResolvedArgs !== 'function') return null;
+
+    let resolved;
+    let installedAuthority;
+    try {
+      resolved = global.FsbCapabilityCatalog.resolve(message.slug, row.executionOrigin);
+      installedAuthority = await actionAuthority.normalizeResolvedAuthority(resolved);
+    } catch (_error) {
+      return null;
+    }
+    if (!installedAuthority || !actionAuthority.authorityMatches(
+      descriptor.executionAuthority, installedAuthority
+    )) return null;
+    const installedContract = actionAuthority.analyzeArgumentSchema(resolved, installedAuthority);
+    if (!installedContract || JSON.stringify(installedContract) !== JSON.stringify(row.argumentContract) ||
+        global.FsbSkopeoActionAuthority.validateCollectedArguments(
+          installedContract, message.args
+        ) !== true) return null;
+
+    let isolatedSchema;
+    try {
+      const canonical = actionAuthority.canonicalSchemaJson(installedAuthority.paramSchema);
+      if (canonical === null) return null;
+      isolatedSchema = JSON.parse(canonical);
+    } catch (_error) {
+      return null;
+    }
+    if (global.FsbCapabilityRouter.validateResolvedArgs({
+      tier: resolved.tier,
+      params: isolatedSchema
+    }, message.args) !== true) return null;
+    return { resolved: resolved, authority: installedAuthority, contract: installedContract };
+  }
+
+  function typedReadResult(routerResult, actionLabel, capabilitySlug, rendererId) {
+    let isPlain = false;
+    try {
+      isPlain = plainObject(routerResult);
+    } catch (_error) {
+      isPlain = false;
+    }
+    const successField = isPlain
+      ? ownEnumerableDataValue(routerResult, 'success')
+      : { valid: false, present: false, value: undefined };
+    if (!isPlain || !successField.valid || !successField.present ||
+        typeof successField.value !== 'boolean') {
+      return deepFreezeSkopeo({ status: 'error', actionLabel: actionLabel, errorCode: 'SKOPEO_ROUTER_RESULT_INVALID' });
+    }
+    if (successField.value !== true) {
+      const codeField = ownEnumerableDataValue(routerResult, 'code');
+      const safeErrorCode = codeField.valid && codeField.present
+        ? safeReadErrorCode(codeField.value)
+        : null;
+      const errorCode = safeErrorCode
+        ? safeErrorCode
+        : 'SKOPEO_ROUTER_ERROR';
+      return deepFreezeSkopeo({ status: 'error', actionLabel: actionLabel, errorCode: errorCode });
+    }
+    const messageField = ownEnumerableDataValue(routerResult, 'message');
+    const safeMessage = messageField.valid && messageField.present
+      ? safeReadText(messageField.value, 512)
+      : null;
+    const message = safeMessage
+      ? safeMessage
+      : 'The selected read completed through the capability router.';
+    const dataField = ownEnumerableDataValue(routerResult, 'data');
+    const structuredSection = dataField.valid && dataField.present
+      ? adaptClosedReadData(dataField.value, capabilitySlug, rendererId)
+      : null;
+    const sections = [];
+    if (structuredSection) sections.push(structuredSection);
+    sections.push({
+      kind: 'notice',
+      tone: 'info',
+      heading: 'Read complete',
+      message: message,
+      nextStep: 'Review the result and keep working in the current view.'
+    });
+    return deepFreezeSkopeo({
+      status: 'success',
+      actionLabel: actionLabel,
+      sections: sections
+    });
+  }
+
+  function validRecord(record, expectedTabId) {
+    if (!record || typeof record !== 'object' || Array.isArray(record)) return false;
+    if (!positiveInteger(record.tabId) || record.tabId !== expectedTabId) return false;
+    if (!Number.isSafeInteger(record.generation) || record.generation < 0) return false;
+    if (!Number.isSafeInteger(record.terminalGeneration) || record.terminalGeneration < 0) return false;
+    if (record.terminalGeneration > record.generation) return false;
+    if (!['off', 'starting', 'active', 'terminating'].includes(record.status)) return false;
+    const isTerminal = record.status === 'off' || record.status === 'terminating';
+    if (isTerminal && record.terminalGeneration !== record.generation) return false;
+    if (!isTerminal && record.terminalGeneration >= record.generation) return false;
+    if (typeof record.updatedAt !== 'number' || !Number.isFinite(record.updatedAt) || record.updatedAt < 0) {
+      return false;
+    }
+    if (record.status === 'starting') return record.reason === null;
+    if (record.status === 'active') {
+      return record.reason === null || record.reason === PREPARED_REASON;
+    }
+    if (record.status === 'terminating') {
+      return typeof record.reason === 'string' && record.reason.trim().length > 0;
+    }
+    return record.reason === null ||
+      (typeof record.reason === 'string' && record.reason.trim().length > 0);
+  }
+
+  function storageKey(tabId) {
+    if (!positiveInteger(tabId)) return null;
+    if (lifecycle && typeof lifecycle.storageKeyForTab === 'function') {
+      return lifecycle.storageKeyForTab(tabId);
+    }
+    return STORAGE_PREFIX + tabId;
+  }
+
+  async function readRecord(tabId) {
+    const key = storageKey(tabId);
+    if (!key) return null;
+    const bag = await chrome.storage.session.get(key);
+    const record = bag && bag[key];
+    return validRecord(record, tabId) ? record : null;
+  }
+
+  async function writeRecord(record) {
+    if (!validRecord(record, record && record.tabId)) throw new Error('Invalid Skopeo session record');
+    const key = storageKey(record.tabId);
+    const payload = {};
+    payload[key] = record;
+    await chrome.storage.session.set(payload);
+    return record;
+  }
+
+  async function removeRecord(tabId) {
+    const key = storageKey(tabId);
+    if (key) await chrome.storage.session.remove(key);
+  }
+
+  function unsupported(tabId, message) {
+    const response = {
+      success: false,
+      status: 'unsupported',
+      code: 'SKOPEO_UNSUPPORTED_TAB',
+      message: message || 'Skopeo is unavailable in this tab.'
+    };
+    if (positiveInteger(tabId)) response.tabId = tabId;
+    return response;
+  }
+
+  function errorResponse(tabId, generation, code, message) {
+    const response = {
+      success: false,
+      tabId: tabId,
+      status: 'error',
+      code: code,
+      message: message
+    };
+    if (positiveGeneration(generation)) response.generation = generation;
+    return response;
+  }
+
+  function staleResponse(tabId, generation, message) {
+    return errorResponse(
+      positiveInteger(tabId) ? tabId : 0,
+      generation,
+      'SKOPEO_STALE_GENERATION',
+      message || 'The Skopeo generation is no longer current.'
+    );
+  }
+
+  function publicResponse(record) {
+    if (!record) return { success: true, tabId: 0, generation: 0, status: 'off' };
+    if (record.status === 'active' && record.reason === null) {
+      const entry = controllerEntryFor(record.tabId, record.generation);
+      return {
+        success: true,
+        tabId: record.tabId,
+        generation: record.generation,
+        status: 'active',
+        attention: entry && ACTIVE_ATTENTION.has(entry.attention) ? entry.attention : 'ambient'
+      };
+    }
+    if (record.status === 'off') {
+      return {
+        success: true,
+        tabId: record.tabId,
+        generation: record.generation,
+        status: 'off'
+      };
+    }
+    return {
+      success: true,
+      tabId: record.tabId,
+      generation: record.generation,
+      status: 'starting'
+    };
+  }
+
+  async function broadcastStatus(response) {
+    if (!response || !positiveInteger(response.tabId)) return false;
+    const event = {
+      action: 'skopeo:status-changed',
+      tabId: response.tabId,
+      generation: positiveGeneration(response.generation) ? response.generation : 0,
+      status: response.status
+    };
+    if (response.attention === 'ambient') event.attention = 'ambient';
+    if (typeof response.code === 'string') event.code = response.code;
+    if (typeof response.message === 'string') event.message = response.message;
+    try {
+      await chrome.runtime.sendMessage(event);
+      return true;
+    } catch (_error) {
+      return false;
+    }
+  }
+
+  function controllerFor(tabId, generation) {
+    const current = controllers.get(tabId);
+    if (!current || current.generation !== generation || current.controller.signal.aborted) return null;
+    return current.controller;
+  }
+
+  function controllerEntryFor(tabId, generation) {
+    const current = controllers.get(tabId);
+    if (!current || current.generation !== generation || current.controller.signal.aborted) return null;
+    return current;
+  }
+
+  function invalidateRouteCommitLane(entry) {
+    if (!entry || entry.routeLaneOpen !== true) return false;
+    entry.routeLaneOpen = false;
+    entry.routeRequestSequence += 1;
+    entry.routeLaneVersion += 1;
+    return true;
+  }
+
+  function captureRouteRequest(tabId, rawUrl) {
+    const entry = controllers.get(tabId);
+    if (!entry || entry.routeLaneOpen !== true || entry.controller.signal.aborted ||
+        !entry.projection || !entry.authority || typeof entry.projection.exactOrigin !== 'string' ||
+        !Number.isSafeInteger(entry.routeRequestSequence) ||
+        entry.routeRequestSequence < 0 || entry.routeRequestSequence >= Number.MAX_SAFE_INTEGER) {
+      return null;
+    }
+    entry.routeRequestSequence += 1;
+    return Object.freeze({
+      tabId: tabId,
+      entry: entry,
+      controller: entry.controller,
+      generation: entry.generation,
+      admittedOrigin: entry.projection.exactOrigin,
+      sequence: entry.routeRequestSequence,
+      laneVersion: entry.routeLaneVersion,
+      rawUrl: rawUrl
+    });
+  }
+
+  function routeRequestOwnsController(request) {
+    if (!request || !positiveInteger(request.tabId) || !request.entry || !request.controller) return false;
+    const current = controllers.get(request.tabId);
+    return current === request.entry && current.controller === request.controller &&
+      current.generation === request.generation && !current.controller.signal.aborted;
+  }
+
+  function routeRequestIsCurrent(request) {
+    return routeRequestOwnsController(request) && request.entry.routeLaneOpen === true &&
+      request.entry.projection && request.entry.projection.exactOrigin === request.admittedOrigin &&
+      request.entry.routeLaneVersion === request.laneVersion &&
+      request.entry.routeRequestSequence === request.sequence;
+  }
+
+  function queueCurrentRouteCommit(request, commit) {
+    if (!routeRequestIsCurrent(request) || typeof commit !== 'function') return Promise.resolve(false);
+    const entry = request.entry;
+    const previous = entry.routeCommitLane || Promise.resolve();
+    const queued = previous.then(function () {
+      if (!routeRequestIsCurrent(request)) return false;
+      return commit();
+    }, function () {
+      return false;
+    });
+    entry.routeCommitLane = queued.then(function () {}, function () {});
+    return queued;
+  }
+
+  function installController(tabId, generation, projection) {
+    const previous = controllers.get(tabId);
+    invalidateRouteCommitLane(previous);
+    clearHudTruthDisplayInflight(previous);
+    revokeHudProjection(previous, 'replacement');
+    if (previous && previous.gateManager && typeof previous.gateManager.invalidate === 'function') {
+      previous.gateManager.invalidate('replacement');
+    }
+    if (previous && !previous.controller.signal.aborted) previous.controller.abort('replacement');
+    const controller = new AbortController();
+    controllers.set(tabId, {
+      generation: generation,
+      controller: controller,
+      projection: projection || null,
+      authority: null,
+      attention: 'ambient',
+      gateManager: null,
+      corpusKernel: null,
+      hudProjectionActionToken: null,
+      hudProjectionSemanticEntityToken: null,
+      readActionTokens: new Set(),
+      routeRequestSequence: 0,
+      routeLaneVersion: 0,
+      routeLaneOpen: true,
+      routeCommitLane: Promise.resolve()
+    });
+    return controller;
+  }
+
+  function authorityForEntry(tabId, entry) {
+    if (!entry || entry.controller.signal.aborted || !entry.projection || !entry.authority) return null;
+    return deepFreezeSkopeo({
+      tabId: tabId,
+      generation: entry.generation,
+      exactOrigin: entry.projection.exactOrigin,
+      profileVersion: entry.projection.profileVersion,
+      contextEpoch: entry.authority.contextEpoch,
+      semanticEntity: entry.authority.semanticEntity
+    });
+  }
+
+  function ensureGateManager(tabId, entry) {
+    if (!entry || entry.controller.signal.aborted) return null;
+    if (entry.gateManager) return entry.gateManager;
+    const gateApi = global.FsbSkopeoConsequenceGate;
+    const router = global.FsbCapabilityRouter;
+    if (!gateApi || typeof gateApi.createGateManager !== 'function' ||
+        !router || typeof router.invoke !== 'function') return null;
+    try {
+      entry.gateManager = gateApi.createGateManager({
+        getCurrentAuthority: function () {
+          return controllers.get(tabId) === entry ? authorityForEntry(tabId, entry) : null;
+        },
+        getCurrentProjection: function () {
+          return controllers.get(tabId) === entry && !entry.controller.signal.aborted
+            ? entry.projection
+            : null;
+        },
+        getCurrentCapabilityAuthority: function (slug) {
+          return controllers.get(tabId) === entry && !entry.controller.signal.aborted
+            ? indexedCapability(entry, slug)
+            : null;
+        },
+        resolveCapability: function (slug, origin) {
+          return global.FsbCapabilityCatalog &&
+            typeof global.FsbCapabilityCatalog.resolve === 'function'
+            ? global.FsbCapabilityCatalog.resolve(slug, origin)
+            : null;
+        },
+        router: router
+      });
+    } catch (_error) {
+      entry.gateManager = null;
+    }
+    return entry.gateManager;
+  }
+
+  function abortController(tabId, generation, reason) {
+    const current = controllers.get(tabId);
+    if (!current || current.generation !== generation) return false;
+    invalidateRouteCommitLane(current);
+    clearHudTruthDisplayInflight(current);
+    revokeHudProjection(current, reason || 'kill');
+    if (current.gateManager && typeof current.gateManager.invalidate === 'function') {
+      current.gateManager.invalidate(reason === 'replacement' ? 'replacement' : 'kill');
+    }
+    if (!current.controller.signal.aborted) current.controller.abort(reason);
+    controllers.delete(tabId);
+    return true;
+  }
+
+  function isRestrictedUrl(rawUrl) {
+    if (typeof rawUrl !== 'string' || rawUrl.trim().length === 0) return true;
+    const value = rawUrl.trim().toLowerCase();
+    if (/^(chrome|chrome-extension|edge|about|view-source|devtools|moz-extension|opera|vivaldi):/.test(value)) {
+      return true;
+    }
+    try {
+      const parsed = new URL(rawUrl);
+      const host = parsed.hostname.toLowerCase();
+      if (host === 'chrome.google.com' && parsed.pathname.toLowerCase().startsWith('/webstore')) return true;
+      if (host === 'chromewebstore.google.com') return true;
+    } catch (_error) {
+      return true;
+    }
+    return false;
+  }
+
+  async function normalizeTerminalOff(record, reason, options) {
+    if (!record) return null;
+    await terminateGeneration(record.tabId, record.generation, reason, options);
+    return readRecord(record.tabId);
+  }
+
+  async function sendToRuntime(tabId, message) {
+    return chrome.tabs.sendMessage(tabId, message, { frameId: 0 });
+  }
+
+  async function terminateGeneration(tabId, generation, reason, options) {
+    const settings = options || {};
+    invalidateRouteCommitLane(controllerEntryFor(tabId, generation));
+    let record = await readRecord(tabId);
+    if (!record || record.generation !== generation) return staleResponse(tabId, generation);
+    if (record.status === 'off') return publicResponse(record);
+
+    if (record.status !== 'terminating') {
+      record = lifecycle.beginTermination(record, generation, reason, Date.now());
+      if (!record || record.status !== 'terminating') return staleResponse(tabId, generation);
+      await writeRecord(record);
+    }
+
+    abortController(tabId, generation, reason);
+    try {
+      await sendToRuntime(tabId, { action: 'skopeo:terminate', generation: generation, reason: reason });
+    } catch (_error) {
+      // The page runtime tears itself down before unregistering its listener.
+      // Delivery failure therefore still completes the authoritative tombstone.
+    }
+
+    const latest = await readRecord(tabId);
+    if (latest && latest.generation === generation && latest.status === 'terminating') {
+      record = lifecycle.finishTermination(latest, generation, Date.now());
+      await writeRecord(record);
+    } else if (latest && latest.generation === generation) {
+      record = latest;
+    }
+    if (settings.broadcast !== false) await broadcastStatus(publicResponse(record));
+    return publicResponse(record);
+  }
+
+  async function failStart(tabId, generation, code, message, reason) {
+    let record = null;
+    try {
+      record = await readRecord(tabId);
+      if (!record || record.generation !== generation) {
+        abortController(tabId, generation, reason || 'failed-start');
+        return staleResponse(tabId, generation);
+      }
+      if (record.status === 'off') {
+        abortController(tabId, generation, reason || 'failed-start');
+        return publicResponse(record);
+      }
+      await terminateGeneration(tabId, generation, reason || 'failed-start', { broadcast: false });
+    } catch (_error) {
+      abortController(tabId, generation, reason || 'failed-start');
+    }
+    const response = errorResponse(tabId, generation, code, message);
+    await broadcastStatus(response);
+    return response;
+  }
+
+  async function preflightTab(tabId) {
+    if (!positiveInteger(tabId)) return { ok: false, response: unsupported(tabId, 'Choose a valid tab before toggling Skopeo.') };
+    let tab;
+    try {
+      tab = await chrome.tabs.get(tabId);
+    } catch (_error) {
+      return { ok: false, response: unsupported(tabId, 'The selected tab is no longer available.') };
+    }
+    if (!tab || tab.id !== tabId || isRestrictedUrl(tab.url)) {
+      return { ok: false, response: unsupported(tabId, 'Chrome does not allow Skopeo on this page.') };
+    }
+    return { ok: true, tab: tab };
+  }
+
+  async function startTab(tabId, priorRecord) {
+    const base = priorRecord || lifecycle.createOffState(tabId, 0, Date.now());
+    const starting = lifecycle.beginGeneration(base, tabId, Date.now());
+    if (!starting || starting.status !== 'starting') {
+      return errorResponse(tabId, base && base.generation, 'SKOPEO_START_FAILED', 'Skopeo could not allocate a new generation.');
+    }
+    const generation = starting.generation;
+    const controller = installController(tabId, generation);
+
+    try {
+      await writeRecord(starting);
+      await broadcastStatus(publicResponse(starting));
+
+      let current = await readRecord(tabId);
+      if (!current || current.generation !== generation || current.status !== 'starting' || controller.signal.aborted) {
+        return failStart(tabId, generation, 'SKOPEO_START_FAILED', 'Skopeo startup was cancelled.', 'cancelled');
+      }
+
+      // Re-read the exact current URL after generation allocation. The preflight
+      // tab snapshot is intentionally not projection authority across this await.
+      const currentTab = await chrome.tabs.get(tabId);
+      if (!currentTab || currentTab.id !== tabId || isRestrictedUrl(currentTab.url)) {
+        return failStart(tabId, generation, 'SKOPEO_UNSUPPORTED_TAB',
+          'Skopeo does not support the current app.', 'projection-unsupported');
+      }
+      const projection = createCurrentProjection(tabId, generation, currentTab.url);
+      if (!projection || projection.status !== 'recognized') {
+        return failStart(tabId, generation, 'SKOPEO_UNSUPPORTED_TAB',
+          'Skopeo does not support the current app.',
+          projection && projection.reason === 'profile-inconsistent' ? 'profile-inconsistent' : 'projection-unsupported');
+      }
+      const entry = controllerEntryFor(tabId, generation);
+      if (!entry || entry.controller !== controller) {
+        return failStart(tabId, generation, 'SKOPEO_START_FAILED', 'Skopeo startup was cancelled.', 'cancelled');
+      }
+      entry.projection = projection;
+
+      await chrome.scripting.executeScript({
+        target: { tabId: tabId, frameIds: [0] },
+        files: SKOPEO_INJECTION_FILES
+      });
+
+      current = await readRecord(tabId);
+      if (!current || current.generation !== generation || current.status !== 'starting' || controller.signal.aborted) {
+        return failStart(tabId, generation, 'SKOPEO_START_FAILED', 'Skopeo startup was cancelled.', 'cancelled');
+      }
+
+      const configured = await sendToRuntime(tabId, {
+        action: 'skopeo:configure',
+        generation: generation,
+        projection: projection
+      });
+      if (configured !== true) {
+        return failStart(tabId, generation, 'SKOPEO_START_FAILED',
+          'Skopeo could not configure the current app.', 'configure-failed');
+      }
+
+      current = await readRecord(tabId);
+      if (!current || current.generation !== generation || current.status !== 'starting' || controller.signal.aborted) {
+        return failStart(tabId, generation, 'SKOPEO_START_FAILED', 'Skopeo startup was cancelled.', 'cancelled');
+      }
+
+      const prepared = await sendToRuntime(tabId, { action: 'skopeo:prepare', generation: generation });
+      if (prepared !== true) {
+        return failStart(tabId, generation, 'SKOPEO_START_FAILED', 'Skopeo could not prepare the page runtime.', 'prepare-failed');
+      }
+
+      current = await readRecord(tabId);
+      if (!current || current.generation !== generation || controller.signal.aborted) {
+        return failStart(tabId, generation, 'SKOPEO_START_FAILED', 'Skopeo startup was cancelled.', 'cancelled');
+      }
+      if (current.status !== 'starting' && !(current.status === 'active' && current.reason === PREPARED_REASON)) {
+        return failStart(tabId, generation, 'SKOPEO_START_FAILED', 'Skopeo startup did not remain current.', 'stale-start');
+      }
+      return {
+        success: true,
+        tabId: tabId,
+        generation: generation,
+        status: 'starting'
+      };
+    } catch (error) {
+      return failStart(
+        tabId,
+        generation,
+        'SKOPEO_START_FAILED',
+        'Skopeo could not start in this tab.',
+        error && error.message ? 'start-failed' : 'failed-start'
+      );
+    }
+  }
+
+  async function toggleTab(tabId) {
+    const preflight = await preflightTab(tabId);
+    if (!preflight.ok) return preflight.response;
+
+    let record;
+    try {
+      record = await readRecord(tabId);
+    } catch (_error) {
+      return errorResponse(tabId, undefined, 'SKOPEO_START_FAILED', 'Skopeo session storage is unavailable.');
+    }
+    if (!record) record = lifecycle.createOffState(tabId, 0, Date.now());
+    if (record.status !== 'off') {
+      return terminateGeneration(tabId, record.generation, 'toggle-off');
+    }
+    return startTab(tabId, record);
+  }
+
+  function exactActiveProbe(response, generation, projection) {
+    if (!response || typeof response !== 'object' || Array.isArray(response)) return false;
+    const keys = Object.keys(response).sort();
+    const expected = [
+      'attention', 'catalogVersion', 'contextEpoch', 'exactOrigin', 'generation', 'mounted',
+      'profileId', 'profileVersion', 'semanticEntity', 'status', 'success'
+    ].sort();
+    const entity = normalizeSkopeoEntity(response.semanticEntity);
+    return keys.length === expected.length && keys.every((key, index) => key === expected[index]) &&
+      response.success === true && response.generation === generation && response.status === 'active' &&
+      ACTIVE_ATTENTION.has(response.attention) && response.mounted === true &&
+      projection && response.exactOrigin === projection.exactOrigin &&
+      response.profileId === projection.profileId && response.profileVersion === projection.profileVersion &&
+      response.catalogVersion === projection.catalogVersion && positiveGeneration(response.contextEpoch) &&
+      entity !== undefined;
+  }
+
+  function exactStaleProbe(response, generation) {
+    if (!response || typeof response !== 'object' || Array.isArray(response)) return false;
+    const keys = Object.keys(response).sort();
+    const expected = ['code', 'generation', 'status', 'success'];
+    return keys.length === expected.length && keys.every((key, index) => key === expected[index]) &&
+      response.success === false && response.generation === generation && response.status === 'stale' &&
+      response.code === 'SKOPEO_STALE_GENERATION';
+  }
+
+  async function probeRecord(record) {
+    const generation = record.generation;
+    let tab;
+    try {
+      tab = await chrome.tabs.get(record.tabId);
+    } catch (_error) {
+      tab = null;
+    }
+    const projection = tab && tab.id === record.tabId && !isRestrictedUrl(tab.url)
+      ? createCurrentProjection(record.tabId, generation, tab.url)
+      : null;
+    if (!projection || projection.status !== 'recognized') {
+      const off = await normalizeTerminalOff(record, 'projection-mismatch');
+      return publicResponse(off);
+    }
+    let response;
+    try {
+      response = await sendToRuntime(record.tabId, { action: 'skopeo:probe', generation: generation });
+    } catch (_error) {
+      response = {
+        success: false,
+        generation: generation,
+        status: 'missing',
+        code: 'SKOPEO_RUNTIME_MISSING'
+      };
+    }
+
+    const current = await readRecord(record.tabId);
+    if (!current || current.generation !== generation || current.status !== 'active') {
+      return staleResponse(record.tabId, generation);
+    }
+    if (exactActiveProbe(response, generation, projection)) {
+      let active = current;
+      if (active.reason === PREPARED_REASON) {
+        active = lifecycle.clearActiveReason(active, generation, Date.now());
+        await writeRecord(active);
+      }
+      installController(active.tabId, active.generation, projection);
+      const entry = controllerEntryFor(active.tabId, active.generation);
+      entry.authority = deepFreezeSkopeo({
+        contextEpoch: response.contextEpoch,
+        semanticEntity: normalizeSkopeoEntity(response.semanticEntity)
+      });
+      entry.attention = response.attention;
+      ensureGateManager(active.tabId, entry);
+      const projected = publicResponse(active);
+      await broadcastStatus(projected);
+      return projected;
+    }
+
+    const reason = exactStaleProbe(response, generation) ? 'stale-runtime' : 'missing-runtime';
+    const off = await normalizeTerminalOff(current, reason);
+    return publicResponse(off);
+  }
+
+  async function getStatus(tabId, options) {
+    if (!positiveInteger(tabId)) return unsupported(tabId, 'Choose a valid tab before reading Skopeo status.');
+    const preflight = await preflightTab(tabId);
+    if (!preflight.ok) return preflight.response;
+    let record;
+    try {
+      record = await readRecord(tabId);
+    } catch (_error) {
+      return errorResponse(tabId, undefined, 'SKOPEO_START_FAILED', 'Skopeo session storage is unavailable.');
+    }
+    if (!record) return { success: true, tabId: tabId, generation: 0, status: 'off' };
+    if (record.status === 'off') return publicResponse(record);
+
+    const live = controllerFor(tabId, record.generation);
+    if (live) return publicResponse(record);
+    if (options && options.rehydrate === false) return publicResponse(record);
+
+    if (record.status === 'starting' || record.status === 'terminating') {
+      const off = await normalizeTerminalOff(record, 'worker-interrupted');
+      return publicResponse(off);
+    }
+    if (record.status === 'active') return probeRecord(record);
+    return publicResponse(record);
+  }
+
+  function contentTabId(sender) {
+    return sender && sender.tab && positiveInteger(sender.tab.id) ? sender.tab.id : null;
+  }
+
+  async function handlePrepared(message, sender) {
+    const tabId = contentTabId(sender);
+    const generation = message && message.generation;
+    if (!tabId || !exactKeys(message, ['action', 'generation', 'placement']) ||
+        own(message, 'tabId') || !positiveGeneration(generation) ||
+        (message.placement !== 'full' && message.placement !== 'compact')) {
+      return staleResponse(tabId, generation, 'Prepared acknowledgment is not authoritative.');
+    }
+    let record = await readRecord(tabId);
+    if (!record || record.generation !== generation || !controllerFor(tabId, generation)) {
+      return staleResponse(tabId, generation);
+    }
+    if (record.status === 'active') return publicResponse(record);
+    if (record.status !== 'starting') return staleResponse(tabId, generation);
+
+    record = lifecycle.markActive(record, generation, Date.now(), PREPARED_REASON);
+    if (!record || record.status !== 'active' || record.reason !== PREPARED_REASON) {
+      return failStart(tabId, generation, 'SKOPEO_START_FAILED', 'Skopeo preparation was not accepted.', 'prepare-failed');
+    }
+    await writeRecord(record);
+
+    const beforeCommit = await readRecord(tabId);
+    if (!beforeCommit || beforeCommit.generation !== generation || beforeCommit.status !== 'active' ||
+        beforeCommit.reason !== PREPARED_REASON || !controllerFor(tabId, generation)) {
+      return failStart(tabId, generation, 'SKOPEO_START_FAILED', 'Skopeo startup was cancelled before commit.', 'cancelled');
+    }
+
+    try {
+      const committed = await sendToRuntime(tabId, { action: 'skopeo:commit', generation: generation });
+      if (committed !== true) {
+        return failStart(tabId, generation, 'SKOPEO_START_FAILED', 'Skopeo could not mount the page runtime.', 'commit-failed');
+      }
+    } catch (_error) {
+      return failStart(tabId, generation, 'SKOPEO_START_FAILED', 'Skopeo could not mount the page runtime.', 'commit-failed');
+    }
+    return { success: true, tabId: tabId, generation: generation, status: 'starting' };
+  }
+
+  async function handleReady(message, sender) {
+    const tabId = contentTabId(sender);
+    const generation = message && message.generation;
+    const entity = normalizeSkopeoEntity(message && message.semanticEntity);
+    if (!tabId || !exactKeys(message, [
+      'action', 'generation', 'attention', 'exactOrigin', 'profileId', 'profileVersion',
+      'catalogVersion', 'contextEpoch', 'semanticEntity'
+    ]) || own(message, 'tabId') || !positiveGeneration(generation) ||
+        !READY_ATTENTION.has(message.attention) || !positiveGeneration(message.contextEpoch) ||
+        entity === undefined) {
+      return staleResponse(tabId, generation, 'Ready acknowledgment is not authoritative.');
+    }
+    let record = await readRecord(tabId);
+    const entry = controllerEntryFor(tabId, generation);
+    if (!record || record.generation !== generation || !entry || !entry.projection ||
+        message.exactOrigin !== entry.projection.exactOrigin ||
+        message.profileId !== entry.projection.profileId ||
+        message.profileVersion !== entry.projection.profileVersion ||
+        message.catalogVersion !== entry.projection.catalogVersion) {
+      return staleResponse(tabId, generation);
+    }
+    if (record.status === 'active' && record.reason === null) return publicResponse(record);
+    if (record.status !== 'active' || record.reason !== PREPARED_REASON) return staleResponse(tabId, generation);
+
+    record = lifecycle.clearActiveReason(record, generation, Date.now());
+    if (!record || record.status !== 'active' || record.reason !== null) return staleResponse(tabId, generation);
+    entry.authority = deepFreezeSkopeo({
+      contextEpoch: message.contextEpoch,
+      semanticEntity: entity
+    });
+    entry.attention = message.attention;
+    ensureGateManager(tabId, entry);
+    await writeRecord(record);
+    const response = publicResponse(record);
+    await broadcastStatus(response);
+    return response;
+  }
+
+  async function handleKillRequest(message, sender) {
+    const tabId = contentTabId(sender);
+    const generation = message && message.generation;
+    const reason = message && message.reason;
+    if (!tabId || !exactKeys(message, ['action', 'generation', 'reason']) ||
+        own(message, 'tabId') || !positiveGeneration(generation) || !ALLOWED_KILL_REASONS.has(reason)) {
+      return staleResponse(tabId, generation, 'Kill request is not authoritative.');
+    }
+    const record = await readRecord(tabId);
+    if (!record || record.generation !== generation || record.status === 'off') return staleResponse(tabId, generation);
+    if (reason === 'unsafe-layout') {
+      return failStart(
+        tabId,
+        generation,
+        'SKOPEO_UNSAFE_LAYOUT',
+        'Skopeo cannot open without covering a page control.',
+        'unsafe-layout'
+      );
+    }
+    return terminateGeneration(tabId, generation, reason);
+  }
+
+  function resourcesAreZero(resources) {
+    return exactKeys(resources, RESOURCE_KEYS) && RESOURCE_KEYS.every((key) => (
+      typeof resources[key] === 'number' &&
+      Number.isFinite(resources[key]) &&
+      resources[key] === 0
+    ));
+  }
+
+  async function handleTeardownComplete(message, sender) {
+    const tabId = contentTabId(sender);
+    const generation = message && message.generation;
+    if (!tabId || !exactKeys(message, ['action', 'generation', 'reason', 'resources']) ||
+        own(message, 'tabId') || !positiveGeneration(generation) ||
+        typeof message.reason !== 'string' || !resourcesAreZero(message.resources)) {
+      return staleResponse(tabId, generation, 'Teardown acknowledgment is not authoritative.');
+    }
+    let record = await readRecord(tabId);
+    if (!record || record.generation !== generation) return staleResponse(tabId, generation);
+    if (record.status === 'off') return publicResponse(record);
+
+    const startFailure = record.status === 'starting' ||
+      (record.status === 'active' && record.reason === PREPARED_REASON);
+    if (record.status !== 'terminating') {
+      record = lifecycle.beginTermination(record, generation, message.reason, Date.now());
+      if (!record || record.status !== 'terminating') return staleResponse(tabId, generation);
+      await writeRecord(record);
+    }
+    record = lifecycle.finishTermination(record, generation, Date.now());
+    await writeRecord(record);
+    abortController(tabId, generation, message.reason);
+
+    if (startFailure) {
+      const response = errorResponse(
+        tabId,
+        generation,
+        message.reason === 'unsafe-layout' ? 'SKOPEO_UNSAFE_LAYOUT' : 'SKOPEO_START_FAILED',
+        message.reason === 'unsafe-layout'
+          ? 'Skopeo cannot open without covering a page control.'
+          : 'Skopeo could not finish mounting the page runtime.'
+      );
+      await broadcastStatus(response);
+      return response;
+    }
+    const response = publicResponse(record);
+    await broadcastStatus(response);
+    return response;
+  }
+
+  async function currentActionEntry(message, sender) {
+    const tabId = contentTabId(sender);
+    const generation = message && message.generation;
+    if (!tabId || !positiveGeneration(generation)) return null;
+    const record = await readRecord(tabId);
+    const entry = controllerEntryFor(tabId, generation);
+    if (!record || record.generation !== generation || record.status !== 'active' ||
+        record.reason !== null || !entry || !entry.projection || !entry.authority) return null;
+    return { tabId: tabId, record: record, entry: entry };
+  }
+
+  function readClaimsMatch(message, current) {
+    const entry = current.entry;
+    const entity = normalizeSkopeoEntity(message.semanticEntity);
+    return entity !== undefined && message.exactOrigin === entry.projection.exactOrigin &&
+      message.profileId === entry.projection.profileId &&
+      message.profileVersion === entry.projection.profileVersion &&
+      message.catalogVersion === entry.projection.catalogVersion &&
+      message.contextEpoch === entry.authority.contextEpoch &&
+      sameSkopeoEntity(entity, entry.authority.semanticEntity) &&
+      boundedSkopeoText(message.actionToken, 160) && skopeoIdentifier(message.slug) &&
+      typeof message.schemaDigest === 'string' && /^sha256:[0-9a-f]{64}$/.test(message.schemaDigest);
+  }
+
+  function readResponse(current, message, result) {
+    return deepFreezeSkopeo({
+      success: true,
+      generation: current.entry.generation,
+      exactOrigin: current.entry.projection.exactOrigin,
+      profileId: current.entry.projection.profileId,
+      profileVersion: current.entry.projection.profileVersion,
+      catalogVersion: current.entry.projection.catalogVersion,
+      contextEpoch: current.entry.authority.contextEpoch,
+      semanticEntity: current.entry.authority.semanticEntity,
+      slug: message.slug,
+      actionToken: message.actionToken,
+      result: result
+    });
+  }
+
+  async function handleReadInvoke(message, sender) {
+    if (!exactKeys(message, READ_REQUEST_KEYS) || own(message, 'tabId')) {
+      return { success: false, code: 'SKOPEO_READ_REQUEST_INVALID' };
+    }
+    const current = await currentActionEntry(message, sender);
+    if (!current || !readClaimsMatch(message, current)) {
+      return { success: false, code: 'SKOPEO_STALE_GENERATION' };
+    }
+    const row = projectedCapability(current.entry.projection, message.slug);
+    if (!row || row.presentationDisposition !== 't1-ready' || row.sourceReadiness !== 't1-ready' ||
+        row.sourceTerminalState !== 't1-ready' || row.surfaceStatus !== 't1-ready' ||
+        row.invocable !== true || row.executionEnabled !== true || row.sideEffectClass !== 'read') {
+      return { success: false, code: 'SKOPEO_CAPABILITY_NOT_READY' };
+    }
+    const descriptor = indexedCapability(current.entry, message.slug);
+    if (!descriptor || descriptor.presentationDisposition !== 't1-ready' ||
+        descriptor.invocable !== true || descriptor.sideEffectClass !== 'read' ||
+        descriptor.sourceReadiness !== 't1-ready' || descriptor.sourceTerminalState !== 't1-ready' ||
+        descriptor.surfaceStatus !== 't1-ready') {
+      return { success: false, code: 'SKOPEO_READ_ARGS_INVALID' };
+    }
+    const installed = await validateInstalledReadAuthority(current, message, descriptor, row);
+    if (!installed) return { success: false, code: 'SKOPEO_READ_ARGS_INVALID' };
+    const revalidated = await currentActionEntry(message, sender);
+    if (!revalidated || revalidated.entry !== current.entry ||
+        !readClaimsMatch(message, revalidated) || current.entry.controller.signal.aborted) {
+      return { success: false, code: 'SKOPEO_STALE_GENERATION' };
+    }
+    if (!global.FsbCapabilityRouter || typeof global.FsbCapabilityRouter.invoke !== 'function') {
+      return { success: false, code: 'SKOPEO_ROUTER_UNAVAILABLE' };
+    }
+    if (!(current.entry.readActionTokens instanceof Set) ||
+        current.entry.readActionTokens.has(message.actionToken)) {
+      return { success: false, code: 'SKOPEO_STALE_ACTION_TOKEN' };
+    }
+    if (current.entry.readActionTokens.size >= 512) {
+      return { success: false, code: 'SKOPEO_ACTION_LIMIT_REACHED' };
+    }
+    // Consume before the await. A retry cannot safely distinguish an invocation
+    // that failed before dispatch from one whose remote effect completed late.
+    current.entry.readActionTokens.add(message.actionToken);
+
+    let routerResult;
+    try {
+      routerResult = await global.FsbCapabilityRouter.invoke(message.slug, message.args, {
+        origin: installed.authority.executionOrigin,
+        tabId: current.tabId,
+        source: 'skopeo'
+      });
+    } catch (_error) {
+      routerResult = { success: false, code: 'SKOPEO_ROUTER_ERROR' };
+    }
+
+    const after = await currentActionEntry(message, sender);
+    if (!after || after.entry !== current.entry || !readClaimsMatch(message, after) ||
+        current.entry.controller.signal.aborted) {
+      return { success: false, code: 'SKOPEO_STALE_GENERATION' };
+    }
+    const rendererId = after.entry.projection.profile && after.entry.projection.profile.rendererId;
+    return readResponse(after, message,
+      typedReadResult(routerResult, row.actionLabel, message.slug, rendererId));
+  }
+
+  function consequenceRequest(message) {
+    const request = {
+      generation: message.generation,
+      exactOrigin: message.exactOrigin,
+      profileVersion: message.profileVersion,
+      contextEpoch: message.contextEpoch,
+      semanticEntity: message.semanticEntity,
+      slug: message.slug,
+      args: message.args
+    };
+    if (own(message, 'actionToken')) request.actionToken = message.actionToken;
+    return request;
+  }
+
+  async function handleConsequence(message, sender) {
+    const confirmLike = message.action === 'skopeo:consequence-confirm' ||
+      message.action === 'skopeo:consequence-cancel';
+    const expected = confirmLike ? CONSEQUENCE_CONFIRM_KEYS : CONSEQUENCE_OPEN_KEYS;
+    if (!exactKeys(message, expected) || own(message, 'tabId')) {
+      return { status: 'stale', reason: 'request-invalid' };
+    }
+    const current = await currentActionEntry(message, sender);
+    if (!current) return { status: 'stale', reason: 'authority-stale' };
+    const manager = ensureGateManager(current.tabId, current.entry);
+    if (!manager) return { status: 'stale', reason: 'manager-unavailable' };
+    const request = consequenceRequest(message);
+    const caller = { tabId: current.tabId };
+    if (message.action === 'skopeo:consequence-open') return manager.open(request, caller);
+    if (message.action === 'skopeo:consequence-cancel') return manager.cancel(request, caller);
+    const result = await manager.confirm(request, caller);
+    const after = await currentActionEntry(message, sender);
+    if (!after || after.entry !== current.entry || current.entry.controller.signal.aborted) {
+      return { status: 'stale', reason: 'late-result' };
+    }
+    return result;
+  }
+
+  async function handleContentMessage(message, sender) {
+    if (!message || !CONTENT_ACTIONS.has(message.action)) {
+      return errorResponse(0, undefined, 'SKOPEO_START_FAILED', 'Unknown Skopeo runtime action.');
+    }
+    if (message.action === 'skopeo:prepared') return handlePrepared(message, sender);
+    if (message.action === 'skopeo:ready') return handleReady(message, sender);
+    if (message.action === 'skopeo:kill-request') return handleKillRequest(message, sender);
+    if (message.action === 'skopeo:corpus-enroll') return handleCorpusEnroll(message, sender);
+    if (message.action === 'skopeo:corpus-root-status') return handleCorpusRootStatus(message, sender);
+    if (message.action === 'skopeo:corpus-status') return handleCorpusStatus(message, sender);
+    if (message.action === 'skopeo:hud-projection') return handleHudProjection(message, sender);
+    if (message.action === 'skopeo:hud-citation-open') return handleHudCitationOpen(message, sender);
+    if (message.action === 'skopeo:hud-ask') return handleHudAsk(message, sender);
+    if (message.action === 'skopeo:hud-ask-cancel') return handleHudAskCancel(message, sender);
+    if (message.action === 'skopeo:hud-answer-action') return handleHudAnswerAction(message, sender);
+    if (message.action === 'skopeo:hud-answer-action-confirm') {
+      return handleHudAnswerActionConfirm(message, sender);
+    }
+    if (message.action === 'skopeo:hud-alert-action') {
+      return handleHudAlertAction(message, sender);
+    }
+    if (message.action === 'skopeo:hud-alert-action-confirm') {
+      return handleHudAlertActionConfirm(message, sender);
+    }
+    if (message.action === 'skopeo:hud-revoke') return handleHudRevoke(message, sender);
+    if (message.action === 'skopeo:read-invoke') return handleReadInvoke(message, sender);
+    if (message.action === 'skopeo:consequence-open' ||
+        message.action === 'skopeo:consequence-confirm' ||
+        message.action === 'skopeo:consequence-cancel') return handleConsequence(message, sender);
+    return handleTeardownComplete(message, sender);
+  }
+
+  async function handleRuntimeRequest(request, sender) {
+    if (!request || !ALL_ACTIONS.has(request.action)) return undefined;
+    if (PUBLIC_ACTIONS.has(request.action)) {
+      if (!exactKeys(request, ['action', 'tabId'])) return unsupported(request.tabId, 'Skopeo request fields are invalid.');
+      if (!positiveInteger(request.tabId)) return unsupported(request.tabId, 'Choose a valid tab before using Skopeo.');
+      if (request.action === 'skopeo:toggle-tab') return toggleTab(request.tabId);
+      return getStatus(request.tabId);
+    }
+    return handleContentMessage(request, sender);
+  }
+
+  function onRuntimeMessage(request, sender, sendResponse) {
+    if (!request || !ALL_ACTIONS.has(request.action)) return false;
+    if (!sender || sender.id !== chrome.runtime.id) {
+      sendResponse({ success: false, status: 'error', code: 'SKOPEO_START_FAILED', message: 'Unauthorized Skopeo sender.' });
+      return false;
+    }
+    Promise.resolve(handleRuntimeRequest(request, sender)).then(sendResponse, function () {
+      const tabId = positiveInteger(request.tabId) ? request.tabId : contentTabId(sender);
+      sendResponse(errorResponse(tabId || 0, request.generation, 'SKOPEO_START_FAILED', 'Skopeo request failed.'));
+    });
+    return true;
+  }
+
+  async function handleCommand(command, tab) {
+    if (command !== COMMAND || !tab || !positiveInteger(tab.id)) return false;
+    await toggleTab(tab.id);
+    return true;
+  }
+
+  async function handleNavigation(tabId) {
+    if (!positiveInteger(tabId)) return false;
+    invalidateRouteCommitLane(controllers.get(tabId));
+    const record = await readRecord(tabId);
+    if (!record || record.status === 'off') return false;
+    await terminateGeneration(tabId, record.generation, 'navigation');
+    return true;
+  }
+
+  async function handleSameDocumentRoute(tabId, rawUrl) {
+    if (!positiveInteger(tabId) || typeof rawUrl !== 'string' ||
+        rawUrl.length === 0 || rawUrl.length > 4096) return false;
+    const request = captureRouteRequest(tabId, rawUrl);
+    let parsed;
+    try { parsed = new URL(rawUrl); } catch (_error) { parsed = null; }
+    if (isRestrictedUrl(rawUrl) || (request && parsed && parsed.origin !== request.admittedOrigin)) {
+      if (request) invalidateRouteCommitLane(request.entry);
+      const boundaryRecord = await readRecord(tabId);
+      if (!boundaryRecord || boundaryRecord.status === 'off') return false;
+      if (request && (!routeRequestOwnsController(request) || boundaryRecord.generation !== request.generation)) {
+        return false;
+      }
+      await terminateGeneration(tabId, boundaryRecord.generation, 'navigation');
+      return true;
+    }
+    if (!request || !parsed) return false;
+
+    const replacementProjection = createCurrentProjection(tabId, request.generation, rawUrl);
+    const tupleMatches = projectionTupleMatches(replacementProjection, request.entry.projection);
+    if (!routeRequestIsCurrent(request)) return false;
+    let record = null;
+    let delivered = false;
+    if (tupleMatches) {
+      try {
+        delivered = await sendToRuntime(tabId, {
+          action: 'skopeo:route-change',
+          generation: request.generation,
+          url: rawUrl
+        });
+      } catch (_error) {
+        delivered = false;
+      }
+      if (!routeRequestIsCurrent(request)) return false;
+    }
+
+    return queueCurrentRouteCommit(request, async function () {
+      record = await readRecord(tabId);
+      if (!routeRequestIsCurrent(request) || !record || record.status !== 'active' ||
+          record.reason !== null || record.generation !== request.generation) return false;
+
+      const entry = request.entry;
+      if (!tupleMatches) {
+        invalidateRouteCommitLane(entry);
+        await normalizeTerminalOff(record, 'navigation');
+        return false;
+      }
+
+      if (delivered && typeof delivered === 'object' && !Array.isArray(delivered) &&
+          exactKeys(delivered, [
+            'success', 'generation', 'exactOrigin', 'profileId', 'profileVersion', 'catalogVersion',
+            'contextEpoch', 'semanticEntity', 'attention'
+          ])) {
+        const entity = normalizeSkopeoEntity(delivered.semanticEntity);
+        if (delivered.success !== true || delivered.generation !== request.generation ||
+            delivered.exactOrigin !== replacementProjection.exactOrigin ||
+            delivered.profileId !== replacementProjection.profileId ||
+            delivered.profileVersion !== replacementProjection.profileVersion ||
+            delivered.catalogVersion !== replacementProjection.catalogVersion ||
+            !positiveGeneration(delivered.contextEpoch) ||
+            (entry.authority && delivered.contextEpoch <= entry.authority.contextEpoch) ||
+            entity === undefined || !READY_ATTENTION.has(delivered.attention)) {
+          invalidateRouteCommitLane(entry);
+          await normalizeTerminalOff(record, 'stale-runtime');
+          return false;
+        }
+        entry.projection = replacementProjection;
+        clearHudTruthDisplayInflight(entry);
+        revokeHudProjection(entry, 'authority-stale');
+        entry.readActionTokens.clear();
+        if (entry.gateManager && typeof entry.gateManager.invalidate === 'function') {
+          entry.gateManager.invalidate('authority-stale');
+        }
+        entry.authority = deepFreezeSkopeo({ contextEpoch: delivered.contextEpoch, semanticEntity: entity });
+        entry.attention = delivered.attention;
+        return true;
+      }
+      invalidateRouteCommitLane(entry);
+      if (!delivered) {
+        await normalizeTerminalOff(record, 'missing-runtime');
+        return false;
+      }
+      await normalizeTerminalOff(record, 'stale-runtime');
+      return false;
+    });
+  }
+
+  async function handleTabRemoved(tabId) {
+    if (!positiveInteger(tabId)) return false;
+    const current = controllers.get(tabId);
+    invalidateRouteCommitLane(current);
+    clearHudTruthDisplayInflight(current);
+    revokeHudProjection(current, 'tab-removed');
+    if (current && current.gateManager && typeof current.gateManager.invalidate === 'function') {
+      current.gateManager.invalidate('kill');
+    }
+    if (current && !current.controller.signal.aborted) current.controller.abort('tab-removed');
+    controllers.delete(tabId);
+    await removeRecord(tabId);
+    return true;
+  }
+
+  async function rehydrateStoredSessions() {
+    let bag;
+    try {
+      bag = await chrome.storage.session.get(null);
+    } catch (_error) {
+      return { success: false, restored: 0, normalized: 0 };
+    }
+    let restored = 0;
+    let normalized = 0;
+    const keys = Object.keys(bag || {}).filter((key) => key.startsWith(STORAGE_PREFIX));
+    for (const key of keys) {
+      const tabId = Number(key.slice(STORAGE_PREFIX.length));
+      const canonicalKey = storageKey(tabId);
+      if (canonicalKey && key !== canonicalKey) {
+        await chrome.storage.session.remove(key);
+        continue;
+      }
+      const record = bag[key];
+      if (!canonicalKey || !validRecord(record, tabId)) {
+        await chrome.storage.session.remove(key);
+        normalized += 1;
+        continue;
+      }
+      if (record.status === 'starting' || record.status === 'terminating') {
+        await normalizeTerminalOff(record, 'worker-interrupted');
+        normalized += 1;
+      } else if (record.status === 'active') {
+        const result = await probeRecord(record);
+        if (result.status === 'active') {
+          restored += 1;
+          const entry = controllerEntryFor(tabId, record.generation);
+          if (entry) await recoverCorpusOnWake(tabId, entry);
+        }
+        else normalized += 1;
+      }
+    }
+    return { success: true, restored: restored, normalized: normalized };
+  }
+
+  const controller = {
+    handlesAction: function (action) { return ALL_ACTIONS.has(action); },
+    onRuntimeMessage: onRuntimeMessage,
+    toggleTab: toggleTab,
+    getStatus: getStatus,
+    handleContentMessage: handleContentMessage,
+    handleCommand: handleCommand,
+    handleNavigation: handleNavigation,
+    handleSameDocumentRoute: handleSameDocumentRoute,
+    handleTabRemoved: handleTabRemoved,
+    rehydrateStoredSessions: rehydrateStoredSessions,
+    runCorpusOperation: runSkopeoCorpusOperation,
+    ready: null
+  };
+
+  global.FSBSkopeoController = controller;
+
+  if (chrome.commands && chrome.commands.onCommand) {
+    chrome.commands.onCommand.addListener(function (command, tab) {
+      if (command !== COMMAND) return;
+      Promise.resolve(handleCommand(command, tab)).catch(function () {});
+    });
+  }
+  if (chrome.tabs && chrome.tabs.onUpdated) {
+    chrome.tabs.onUpdated.addListener(function (tabId, changeInfo) {
+      if (!changeInfo || typeof changeInfo !== 'object' || Array.isArray(changeInfo)) return;
+      if (changeInfo.status === 'loading') {
+        Promise.resolve(handleNavigation(tabId)).catch(function () {});
+        return;
+      }
+      if (exactKeys(changeInfo, ['url']) && typeof changeInfo.url === 'string') {
+        Promise.resolve(handleSameDocumentRoute(tabId, changeInfo.url)).catch(function () {});
+      }
+    });
+  }
+  if (chrome.tabs && chrome.tabs.onRemoved) {
+    chrome.tabs.onRemoved.addListener(function (tabId) {
+      Promise.resolve(handleTabRemoved(tabId)).catch(function () {});
+    });
+  }
+
+  // The production worker routes these actions through fsbHandleRuntimeMessage.
+  // The isolated Node contract evaluates only this region, so it installs the
+  // same narrow listener when importScripts is absent.
+  if (typeof importScripts === 'undefined' && chrome.runtime && chrome.runtime.onMessage) {
+    chrome.runtime.onMessage.addListener(onRuntimeMessage);
+  }
+
+  controller.ready = rehydrateStoredSessions();
+})(globalThis);
+/* FSB_SKOPEO_CONTROLLER_END */
 
 const FSB_TRIGGER_OBSERVE_WATCHDOG_PREFIX = 'fsbTriggerObserveWatchdog:';
 const FSB_TRIGGER_OBSERVE_WATCHDOG_PERIOD_MINUTES = 1;
@@ -7615,6 +14892,17 @@ const fsbHandleRuntimeMessage = (request, sender, sendResponse) => {
     return;
   }
 
+  if (fsbHandlesTrustedFeatureAction(request && request.action)) {
+    return fsbDispatchTrustedFeatureMessage(request, sender, sendResponse);
+  }
+
+  // Skopeo has a narrow typed dispatcher so content acknowledgments can bind
+  // sender.tab.id before the unrelated automation switch handles its actions.
+  if (globalThis.FSBSkopeoController &&
+      globalThis.FSBSkopeoController.handlesAction(request && request.action)) {
+    return globalThis.FSBSkopeoController.onRuntimeMessage(request, sender, sendResponse);
+  }
+
   armMcpBridge('runtime.onMessage');
 
   automationLogger.logComm(null, 'receive', request.action || 'unknown', true, { tabId: sender.tab?.id });
@@ -8795,119 +16083,165 @@ const TWOCAPTCHA_ERRORS = {
   'ERROR_PROXY': 'Proxy error during CAPTCHA solving.'
 };
 
-/**
- * Handle CAPTCHA solving via 2Captcha API
- * Content scripts cannot make cross-origin requests, so this relays through the background
- */
+/* FSB_CAPTCHA_TRUSTED_HANDLER_START */
+function hasExactOwnKeys(value, expectedKeys) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const actualKeys = Object.keys(value).sort();
+  const sortedExpected = expectedKeys.slice().sort();
+  return actualKeys.length === sortedExpected.length &&
+    actualKeys.every((key, index) => key === sortedExpected[index]);
+}
+
+async function readBoundedTwoCaptchaResult(response) {
+  if (!response) throw new Error('CAPTCHA_PROVIDER_UNAVAILABLE');
+  let data;
+  if (typeof response.text === 'function') {
+    const text = await response.text();
+    if (typeof text !== 'string' || text.length > 4096) throw new Error('CAPTCHA_PROVIDER_RESPONSE_INVALID');
+    try {
+      data = JSON.parse(text);
+    } catch (_error) {
+      throw new Error('CAPTCHA_PROVIDER_RESPONSE_INVALID');
+    }
+  } else if (typeof response.json === 'function') {
+    data = await response.json();
+    if (JSON.stringify(data).length > 4096) throw new Error('CAPTCHA_PROVIDER_RESPONSE_INVALID');
+  } else {
+    throw new Error('CAPTCHA_PROVIDER_RESPONSE_INVALID');
+  }
+  if (!data || typeof data !== 'object' || Array.isArray(data) ||
+      !Number.isInteger(data.status) || typeof data.request !== 'string' || data.request.length > 16384) {
+    throw new Error('CAPTCHA_PROVIDER_RESPONSE_INVALID');
+  }
+  return { status: data.status, request: data.request };
+}
+
+function sendCaptchaFailure(sendResponse, code, message) {
+  sendResponse({ success: false, code: code, error: message.slice(0, 256) });
+}
+
 async function handleSolveCaptcha(request, sender, sendResponse) {
-  const { captchaType, sitekey, pageUrl, apiKey } = request;
+  if (!hasExactOwnKeys(request, ['action', 'captchaType', 'sitekey'])) {
+    sendCaptchaFailure(sendResponse, 'INVALID_REQUEST', 'Invalid CAPTCHA request.');
+    return;
+  }
+  if (!sender || sender.id !== chrome.runtime.id || !sender.tab ||
+      !Number.isInteger(sender.tab.id) || sender.tab.id <= 0 || typeof sender.tab.url !== 'string') {
+    sendCaptchaFailure(sendResponse, 'UNAUTHORIZED_SENDER', 'CAPTCHA request is not authorized.');
+    return;
+  }
+
+  const captchaType = request.captchaType;
+  const sitekey = request.sitekey;
+  const authoritativePageUrl = sender.tab.url;
+  if (typeof sitekey !== 'string' || sitekey.length < 1 || sitekey.length > 2048 || /[\u0000-\u001f\s]/.test(sitekey)) {
+    sendCaptchaFailure(sendResponse, 'INVALID_SITEKEY', 'Could not extract a valid CAPTCHA sitekey from the page.');
+    return;
+  }
+
+  let parsedPageUrl;
+  try {
+    parsedPageUrl = new URL(authoritativePageUrl);
+  } catch (_error) {
+    sendCaptchaFailure(sendResponse, 'INVALID_ORIGIN', 'CAPTCHA solving is unavailable for this page.');
+    return;
+  }
+  if ((parsedPageUrl.protocol !== 'https:' && parsedPageUrl.protocol !== 'http:') || authoritativePageUrl.length > 4096) {
+    sendCaptchaFailure(sendResponse, 'INVALID_ORIGIN', 'CAPTCHA solving is unavailable for this page.');
+    return;
+  }
+
+  let method;
+  if (captchaType === 'recaptcha') method = 'userrecaptcha';
+  else if (captchaType === 'hcaptcha') method = 'hcaptcha';
+  else if (captchaType === 'turnstile') method = 'turnstile';
+  else {
+    sendCaptchaFailure(sendResponse, 'UNSUPPORTED_TYPE', 'Unsupported CAPTCHA type.');
+    return;
+  }
 
   try {
-    // Validate inputs
-    if (!apiKey) {
-      sendResponse({ success: false, error: 'No 2Captcha API key configured. Add it in FSB settings.' });
+    const trustedStore = await fsbTrustedLocalBootPromise;
+    if (!trustedStore || typeof trustedStore.getCaptchaSettings !== 'function') {
+      sendCaptchaFailure(sendResponse, 'TRUSTED_STORAGE_CLOSED', 'CAPTCHA settings are unavailable.');
       return;
     }
-    if (!sitekey) {
-      sendResponse({ success: false, error: 'Could not extract sitekey from the page.' });
+    const settings = await trustedStore.getCaptchaSettings();
+    if (!settings || settings.enabled !== true) {
+      sendCaptchaFailure(sendResponse, 'CAPTCHA_DISABLED', 'CAPTCHA solving is disabled. Enable it in FSB settings.');
       return;
     }
-    if (!pageUrl) {
-      sendResponse({ success: false, error: 'Page URL is required for CAPTCHA solving.' });
+    if (typeof settings.apiKey !== 'string' || settings.apiKey.length < 1) {
+      sendCaptchaFailure(sendResponse, 'CAPTCHA_KEY_MISSING', 'No 2Captcha API key is configured.');
       return;
     }
 
-    // Determine method based on CAPTCHA type
-    let method;
-    switch (captchaType) {
-      case 'recaptcha':
-        method = 'userrecaptcha';
-        break;
-      case 'hcaptcha':
-        method = 'hcaptcha';
-        break;
-      case 'turnstile':
-        method = 'turnstile';
-        break;
-      default:
-        sendResponse({ success: false, error: `Unsupported CAPTCHA type: ${captchaType}` });
-        return;
-    }
-
-    console.log(`[FSB] Submitting ${captchaType} CAPTCHA to 2Captcha...`);
-
-    // Step 1: Submit CAPTCHA to 2Captcha (POST to keep API key out of URL/logs)
     const submitParams = new URLSearchParams({
-      key: apiKey,
+      key: settings.apiKey,
       method: method,
       googlekey: sitekey,
-      pageurl: pageUrl,
+      pageurl: authoritativePageUrl,
       json: '1'
     });
-
     const submitResponse = await fetch('https://2captcha.com/in.php', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: submitParams.toString()
     });
-    const submitData = await submitResponse.json();
-
+    const submitData = await readBoundedTwoCaptchaResult(submitResponse);
     if (submitData.status !== 1) {
-      const errorMsg = TWOCAPTCHA_ERRORS[submitData.request] || `2Captcha error: ${submitData.request}`;
-      console.error('[FSB] 2Captcha submit failed:', submitData.request);
-      sendResponse({ success: false, error: errorMsg });
+      sendCaptchaFailure(
+        sendResponse,
+        'CAPTCHA_PROVIDER_REJECTED',
+        TWOCAPTCHA_ERRORS[submitData.request] || 'CAPTCHA provider rejected the request.'
+      );
+      return;
+    }
+    const taskId = submitData.request;
+    if (!/^[A-Za-z0-9_-]{1,128}$/.test(taskId)) {
+      sendCaptchaFailure(sendResponse, 'CAPTCHA_PROVIDER_RESPONSE_INVALID', 'CAPTCHA provider returned an invalid task.');
       return;
     }
 
-    const taskId = submitData.request;
-    console.log(`[FSB] 2Captcha task submitted: ${taskId}. Polling for result...`);
-
-    // Step 2: Poll for result (every 5s, max 30 attempts = 150s)
     const maxAttempts = 30;
     const pollInterval = 5000;
-
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       await new Promise(resolve => setTimeout(resolve, pollInterval));
-
       const resultParams = new URLSearchParams({
-        key: apiKey,
+        key: settings.apiKey,
         action: 'get',
         id: taskId,
         json: '1'
       });
-
       const resultResponse = await fetch('https://2captcha.com/res.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: resultParams.toString()
       });
-      const resultData = await resultResponse.json();
-
+      const resultData = await readBoundedTwoCaptchaResult(resultResponse);
       if (resultData.status === 1) {
-        console.log(`[FSB] CAPTCHA solved successfully after ${(attempt + 1) * 5}s`);
+        if (resultData.request.length < 1 || resultData.request.length > 16384) {
+          sendCaptchaFailure(sendResponse, 'CAPTCHA_PROVIDER_RESPONSE_INVALID', 'CAPTCHA provider returned an invalid result.');
+          return;
+        }
         sendResponse({ success: true, token: resultData.request });
         return;
       }
-
       if (resultData.request !== 'CAPCHA_NOT_READY') {
-        const errorMsg = TWOCAPTCHA_ERRORS[resultData.request] || `2Captcha error: ${resultData.request}`;
-        console.error('[FSB] 2Captcha solve failed:', resultData.request);
-        sendResponse({ success: false, error: errorMsg });
+        sendCaptchaFailure(
+          sendResponse,
+          'CAPTCHA_PROVIDER_REJECTED',
+          TWOCAPTCHA_ERRORS[resultData.request] || 'CAPTCHA provider rejected the request.'
+        );
         return;
       }
-
-      // CAPCHA_NOT_READY - continue polling
-      debugLog(`2Captcha polling attempt ${attempt + 1}/${maxAttempts}...`);
     }
-
-    // Timeout
-    sendResponse({ success: false, error: 'CAPTCHA solve timed out after 150 seconds. The CAPTCHA may be too complex.' });
-
-  } catch (error) {
-    console.error('[FSB] CAPTCHA solve error:', error);
-    sendResponse({ success: false, error: `CAPTCHA solve failed: ${error.message}` });
+    sendCaptchaFailure(sendResponse, 'CAPTCHA_TIMEOUT', 'CAPTCHA solve timed out.');
+  } catch (_error) {
+    sendCaptchaFailure(sendResponse, 'CAPTCHA_SOLVE_FAILED', 'CAPTCHA solve failed.');
   }
 }
+/* FSB_CAPTCHA_TRUSTED_HANDLER_END */
 
 async function handleStartAutomation(request, sender, sendResponse) {
   const { task, tabId, conversationId, source } = request;
@@ -15831,6 +23165,13 @@ chrome.action.onClicked.addListener(async (tab) => {
 
 // --- chrome.alarms.onAlarm Listener (MCP reconnect + dom-stream watchdog; agent branch DEPRECATED) ---
 chrome.alarms.onAlarm.addListener(async (alarm) => {
+  if (fsbSkopeoAlertRuntimeFacade && alarm && typeof alarm.name === 'string' &&
+      alarm.name.startsWith(globalThis.FsbSkopeoAlertRuntime.ALARM_PREFIX)) {
+    try { await fsbSkopeoAlertRuntimeFacade.handleAlarm(alarm); }
+    catch (_error) {}
+    return;
+  }
+
   // Phase 256 Plan 03 -- visual-session sliding-window death-timer alarm.
   // Alarm names of the form 'mcpVisualDeath:<tabId>' route to the lifecycle
   // helper which deletes the storage entry and sends the v0.9.36 clear
@@ -16054,6 +23395,8 @@ chrome.runtime.onInstalled.addListener(async () => {
   // Initialize analytics
   initializeAnalytics();
 
+  await fsbReconcileSkopeoAlerts();
+
   // Phase 6 Plan 06-02 (FINT-07): open offscreen Lattice host idempotently.
   // Fire-and-forget; the helper's try/catch handles all errors.
   ensureLatticeOffscreen();
@@ -16131,6 +23474,7 @@ chrome.runtime.onInstalled.addListener(async () => {
 chrome.runtime.onStartup.addListener(async () => {
   automationLogger.logServiceWorker('startup', {});
   initializeAnalytics();
+  await fsbReconcileSkopeoAlerts();
   // Phase 6 Plan 06-02 (FINT-07): re-open offscreen Lattice host idempotently on SW wake.
   ensureLatticeOffscreen();
   // Phase 269 / IDENT-01, IDENT-02: idempotent get-or-create on every SW wake.

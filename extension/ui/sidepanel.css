@@ -202,6 +202,262 @@ body {
   transform: scale(1.1);
 }
 
+/* FSB_SKOPEO_ROW_START */
+.skopeo-control-row {
+  min-height: 64px;
+  padding: 8px 16px;
+  gap: 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  width: calc(100% - 32px);
+  max-width: calc(100% - 32px);
+  margin: 0 16px 8px;
+  background: color-mix(in srgb, var(--bg-secondary) 88%, var(--bg-primary) 12%);
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  min-width: 0;
+  overflow: visible;
+}
+
+.skopeo-control-copy {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.skopeo-control-heading {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.skopeo-control-title {
+  color: var(--text-primary);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 24px;
+}
+
+.skopeo-control-status,
+.skopeo-control-action {
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 20px;
+}
+
+.skopeo-control-action {
+  color: var(--text-primary);
+}
+
+.skopeo-control-body,
+.skopeo-control-hint {
+  color: var(--text-muted);
+  font-family: "Space Mono", "SF Mono", Monaco, Consolas, monospace;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 16px;
+}
+
+.skopeo-control-body[hidden] {
+  display: none;
+}
+
+.skopeo-control-hint {
+  width: fit-content;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.skopeo-control-hint:hover {
+  color: var(--text-secondary);
+}
+
+.skopeo-control-hint:disabled,
+.skopeo-control-hint:disabled:hover {
+  color: var(--text-muted);
+  cursor: default;
+}
+
+.skopeo-toggle {
+  width: 44px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: inherit;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 44px;
+  cursor: pointer;
+}
+
+.skopeo-switch-track {
+  position: relative;
+  width: 40px;
+  height: 24px;
+  border: 1px solid var(--border-hover);
+  border-radius: 999px;
+  background: var(--bg-tertiary);
+  transition: background-color 120ms ease-out, border-color 120ms ease-out;
+}
+
+.skopeo-switch-thumb {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  top: 4px;
+  left: 4px;
+  border-radius: 999px;
+  background: var(--text-secondary);
+  transition: transform 120ms ease-out, background-color 120ms ease-out;
+}
+
+.skopeo-toggle[aria-checked="true"] .skopeo-switch-track {
+  border-color: #ff6b35;
+  background: #ff6b35;
+}
+
+.skopeo-toggle[aria-checked="true"] .skopeo-switch-thumb {
+  background: #0d0a09;
+  transform: translateX(16px);
+}
+
+.skopeo-toggle:focus-visible {
+  outline: 2px solid #ff6b35;
+  outline-offset: 2px;
+}
+
+.skopeo-control-hint:focus-visible {
+  outline: 2px solid #ff6b35;
+  outline-offset: 2px;
+}
+
+.skopeo-control-row[data-state="starting"] .skopeo-control-status::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 4px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  background: transparent;
+}
+
+.skopeo-control-row[data-state="active"] {
+  border-color: color-mix(in srgb, #ff6b35 40%, var(--border-color) 60%);
+}
+
+.skopeo-control-row[data-state="active"] .skopeo-control-status {
+  color: var(--text-primary);
+}
+
+.skopeo-control-row[data-state="unsupported"] .skopeo-control-status,
+.skopeo-control-row[data-state="unsupported"] .skopeo-control-action {
+  color: var(--text-muted);
+}
+
+.skopeo-control-row[data-state="error"] {
+  border-color: var(--error-border);
+  background: color-mix(in srgb, var(--error-bg) 48%, var(--bg-secondary) 52%);
+}
+
+.skopeo-control-row[data-state="error"] .skopeo-control-status {
+  color: var(--error-text);
+}
+
+.skopeo-toggle:disabled {
+  cursor: not-allowed;
+  opacity: 0.56;
+}
+
+[data-theme="dark"] .skopeo-control-row {
+  background: color-mix(in srgb, #1a1513 72%, #050505 28%);
+  border-color: rgba(255, 241, 232, 0.18);
+}
+
+[data-theme="dark"] .skopeo-control-row[data-state="error"] {
+  border-color: #dc2626;
+}
+
+[data-theme="dark"] .skopeo-control-row[data-state="error"] .skopeo-control-status {
+  color: #fca5a5;
+}
+
+@media (max-width: 350px) {
+  .skopeo-control-row {
+    width: calc(100% - 32px);
+    max-width: calc(100% - 32px);
+    padding: 8px 16px;
+    align-items: flex-start;
+  }
+
+  .skopeo-control-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .skopeo-toggle {
+    flex-shrink: 0;
+  }
+}
+
+@media (forced-colors: active) {
+  .skopeo-control-row {
+    border-color: CanvasText;
+    background: Canvas;
+    color: CanvasText;
+  }
+
+  .skopeo-control-title,
+  .skopeo-control-status,
+  .skopeo-control-action,
+  .skopeo-control-body,
+  .skopeo-control-hint {
+    color: CanvasText;
+  }
+
+  .skopeo-switch-track {
+    border-color: ButtonText;
+    background: ButtonFace;
+  }
+
+  .skopeo-switch-thumb {
+    background: ButtonText;
+  }
+
+  .skopeo-toggle[aria-checked="true"] .skopeo-switch-track,
+  .skopeo-toggle:focus-visible,
+  .skopeo-control-hint:focus-visible {
+    border-color: Highlight;
+    outline-color: Highlight;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skopeo-switch-track,
+  .skopeo-switch-thumb {
+    transition-duration: 0ms;
+  }
+}
+/* FSB_SKOPEO_ROW_END */
+
 
 /* Chat Messages Area */
 .chat-messages-area {

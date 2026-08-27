@@ -780,7 +780,7 @@ export function loadCatalog() {
   return require(join(ROOT, 'extension', 'catalog', 'recipe-index.generated.js'));
 }
 
-function buildResolver(catalog) {
+export function buildInstalledResolver(catalog) {
   globalThis.FsbRecipeIndex = catalog;
 
   for (const mod of HANDLER_MODULES) {
@@ -996,7 +996,7 @@ export function reportReadiness(catalog, opts) {
     // write-activation-evidence, t1-port-contract, and pattern-d gates).
     throw new Error('report-t1-readiness: catalog.descriptors is empty or not an array -- refusing to emit an empty readiness matrix');
   }
-  const resolveFn = (opts && opts.resolveFn) || buildResolver(idx);
+  const resolveFn = (opts && opts.resolveFn) || buildInstalledResolver(idx);
   const classifyFn = (opts && opts.classifyOrigin) || buildOriginClassifier();
 
   const rows = [];

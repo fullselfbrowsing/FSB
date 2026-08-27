@@ -395,18 +395,35 @@ function runPart3() {
 function runPart4() {
   console.log('\nPart 4 -- chrome.tabs.onActivated re-sync + completion routing:');
 
-  // 4.1 -- the chrome.tabs.onActivated handler at line ~786 (sidepanel.js)
-  // re-syncs _activeTabIdSnapshot AFTER swapToTabConversation.
-  var snippet = spSrc.indexOf('_activeTabIdSnapshot = activeInfo.tabId');
-  ok(snippet > -1,
-     'Part 4.1 -- chrome.tabs.onActivated handler assigns _activeTabIdSnapshot = activeInfo.tabId');
+  // 4.1 -- the chrome.tabs.onActivated handler captures the incoming tab and
+  // commits it through the shared epoch gate BEFORE the authority-aware owner
+  // refresh. Passing both values keeps a late outgoing-tab completion from
+  // writing into the newly selected tab's chip, lock flag, or input controls.
+  var onActivatedBody = extractAfterAnchor(
+    spSrc,
+    'chrome.tabs.onActivated.addListener'
+  );
+  var capture = onActivatedBody
+    ? onActivatedBody.search(/var\s+incomingTabId\s*=\s*activeInfo\s*&&\s*activeInfo\.tabId/)
+    : -1;
+  var commit = onActivatedBody
+    ? onActivatedBody.search(/_commitAuthoritativeTab\s*\(\s*incomingTabId\s*,\s*authorityEpoch\s*\)/)
+    : -1;
+  var ownerRefresh = onActivatedBody
+    ? onActivatedBody.search(
+      /await\s+refreshOwnerChip\s*\(\s*incomingTabId\s*,\s*authorityEpoch\s*,\s*tabAuthorityChanged\s*\)/
+    )
+    : -1;
+  ok(capture > -1 && commit > capture && ownerRefresh > commit,
+     'Part 4.1 -- chrome.tabs.onActivated commits tab/epoch authority before owner refresh');
 
   // 4.2 -- the same handler dispatches setRunningState OR setIdleState
   // based on the activated tab's per-tab entry.
-  var dispatchesSetRunning = /if \(snap\.isRunning\) {\s*setRunningState\(activeInfo\.tabId/.test(spSrc);
-  var dispatchesSetIdle = /} else \{\s*setIdleState\(activeInfo\.tabId\)/.test(spSrc);
-  ok(dispatchesSetRunning && dispatchesSetIdle,
-     'Part 4.2 -- handler dispatches setRunningState/setIdleState based on per-tab entry on activation');
+  var readsIncomingEntry = /var snap = _getTabRunningEntry\(incomingTabId\)/.test(spSrc);
+  var dispatchesSetRunning = /if \(snap\.isRunning\) {\s*setRunningState\(incomingTabId/.test(spSrc);
+  var dispatchesSetIdle = /} else \{\s*setIdleState\(incomingTabId\)/.test(spSrc);
+  ok(readsIncomingEntry && dispatchesSetRunning && dispatchesSetIdle,
+     'Part 4.2 -- handler reads and dispatches running/idle state for captured incomingTabId');
 
   // 4.3 -- automationComplete routes setIdleState by originating tabId.
   var caseBody = extractAfterAnchor(spSrc, "case 'automationComplete': {");

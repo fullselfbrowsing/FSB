@@ -1,292 +1,236 @@
 # Feature Research
 
-**Domain:** Authenticated-API capability catalog (FSB v1.0.0 "Full App Catalog / OpenTabs Parity") — porting OpenTabs' 119-app / 2,523-op surface onto FSB's fixed closed-vocabulary recipe interpreter + bundled-head architecture.
-**Researched:** 2026-06-23
-**Confidence:** HIGH for the auth taxonomy and tier mapping (grounded in 20 OpenTabs `*-api.ts` files read directly from `github.com/opentabs-dev/opentabs@main`, plus the FSB slack handler + recipe-index as the FSB-side anchor). MEDIUM for the per-app value ranking (op-count is verified; "where FSB users live" is a product judgement). HIGH for the anti-feature/denylist (ToS + sensitivity are categorical, not speculative).
+**Domain:** On-demand, page-native assistance HUD; first capability pack is permission-scoped Google Drive vendor-contract lifecycle and compliance intelligence
+**Researched:** 2026-07-14
+**Confidence:** HIGH for the intended user experience (approved framing, supplied requirements, and supplied HUD board agree); MEDIUM for corpus-edge behavior until representative agreements, scans, amendments, permissions, and notification recipients are available for validation
 
-> Supersedes the prior v0.9.99 FEATURES.md (archived milestone). This file is the active v1.0.0 catalog research.
+## Product Thesis
 
----
+Skopeo is not a contract application placed beside Google Drive. It is an explicitly invoked instrument layer placed on the Drive content the user is already viewing. Its first proof must turn a vendor folder from a pile of files into three trustworthy user states:
 
-## TL;DR for the roadmapper
+1. **Folder intelligence:** what is active, what is due, who owns it, and what is missing.
+2. **Reading awareness:** whether the open document governs today, which document does, and which exact facts or clauses support the answer.
+3. **Cited ask:** a focused, permission-scoped answer that distinguishes governing evidence from superseded context and exposes uncertainty.
 
-1. **The whole catalog (119 apps) is "table stakes" only as DESCRIPTORS.** Breadth = codegen descriptors so every app returns from `search_capabilities`. That is cheap and uniform. It does NOT mean every app is invocable on day one.
-2. **Invocability splits by AUTH STRATEGY, and the discriminator is brutally simple for FSB:** *does the app call its OWN first-party origin, or a SEPARATE API origin?* FSB's Wall 2 is a MAIN-world `fetch()` with `credentials:'include'` — **identical** to OpenTabs' `fetchFromPage` (verified: `platform/plugin-sdk/src/fetch.ts` is a plain page-context fetch, NO background proxy). So FSB inherits OpenTabs' CORS reality exactly. Apps that hit a separate API origin only work if that origin returns permissive `access-control-allow-credentials: true` + a matching `allow-origin` — most do NOT.
-3. **Recommended depth shortlist = 22 apps** (detailed below), biased to dev/PM/cloud/observability, ranked by value × feasibility. The cheapest wins are same-origin-cookie apps with a CSRF/preloaded-token read from a meta tag or `window` global.
-4. **Denylist must land FIRST** (it already does in the milestone plan). ~18 apps are ToS-hostile or sensitivity-critical (banking, brokerage, health-adjacent, dating, DRM-streaming, anti-automation social). These get `deniedOrigins`; a wider sensitive set gets `sensitiveOrigins` (Ask-gated, never Auto).
-
----
-
-## Grounding: the 5 real auth patterns observed in OpenTabs source
-
-Every app I inspected collapses into one of these. The FSB tier follows mechanically from which one it is. Citations are the app's `src/<app>-api.ts` at `opentabs-dev/opentabs@main`.
-
-### Pattern A — Same-origin cookie, GET, no token (pure T1b recipe)
-The web app calls its OWN origin; HttpOnly session cookie rides automatically; reads need no CSRF. This is the *only* pattern expressible as a closed-vocabulary FSB **recipe** (data, no code).
-
-- **netlify** (`netlify-api.ts`): `API_BASE = '/access-control/bb-api/api/v1'` (same-origin), auth detected via non-HttpOnly `_nf-auth-hint` cookie; `fetchJSON` default `credentials:'include'`. *"no explicit token needed."*
-- **reddit** (already FSB T1b): `/message/unread.json` same-origin.
-- **github notifications** (already FSB recipe): `/notifications` with `Accept: application/json`.
-- **shortcut** (`shortcut-api.ts`): `/backend/api/v3${endpoint}` same-origin, *"documented public API, same-origin with session cookies."*
-
-> FSB mapping: **T1b same-origin-cookie recipe.** GET-only ops. Zero hand-code. These are the long-tail freebies — but note the *write* side of even these apps usually needs a CSRF token (Pattern B), so a given app is often "T1b for reads, T1a for writes."
-
-### Pattern B — Same-origin cookie + scraped CSRF/anti-forgery token (T1a handler)
-Reads ride the cookie; writes need a token the closed recipe schema can't express (it must be SCRAPED live from a meta tag, `window` global, or localStorage, then placed in a header or body). This is the github/notion precedent and the bulk of the high-value head.
-
-- **github** (`github-api.ts`): auth via `<meta name="user-login">`; CSRF from `input[name="authenticity_token"]`; `/_graphql` persisted queries + `{meta,payload}` page-JSON + Turbo-Frame Relay extraction. (This is exactly FSB's existing github head.)
-- **gitlab** (`gitlab-api.ts`): auth via `window.gon.current_username`; CSRF from `<meta name="csrf-token">`; same-origin `/api/v4`.
-- **jira** (`jira-api.ts`): auth via `<meta name="ajs-atlassian-account-id">` + `ajs-cloud-id`; same-origin `/rest/api/3`.
-- **confluence** (`confluence-api.ts`): same Atlassian meta-tag pattern (`ajs-*`), `credentials:'include'`.
-- **datadog** (`datadog-api.ts`): CSRF in **localStorage** `dd-csrf-token` (JSON `{token,timestamp}`), *rotates* — read fresh every call; sent as `x-csrf-token`/`x-dd-csrf-token` header AND `_authentication_token` body field. Same-origin.
-- **sentry** (`sentry-api.ts`): org slug from subdomain/path; `sentry-sc` non-HttpOnly CSRF cookie → `X-CSRFToken` header for writes; same-origin.
-- **cloudflare** (`cloudflare-api.ts`): same-origin `/api/v4`; `x-atok` header from `window.bootstrap.atok` (timestamp-prefixed, refreshes per page load — read live); *"Cross-origin requests to api.cloudflare.com are blocked by CORS."* (explicit confirmation of the FSB-forbidden pattern).
-- **airtable** (`airtable-api.ts`): `window.initData.csrfToken` + `sessionUserId`; same-origin `/v0.3/`; `_csrf` body field.
-- **linkedin** (`linkedin-api.ts`): CSRF = the `JSESSIONID` cookie value itself, sent as `csrf-token` header; same-origin voyager/graphql.
-- **x / twitter** (`x-api.ts`): `ct0` cookie → `x-csrf-token`; **static public bearer** embedded in the JS bundle (same for all users) → `authorization` header; same-origin `x.com/i/api/graphql`. (Mechanically portable, but see anti-features — ToS-hostile.)
-
-> FSB mapping: **T1a bundled handler** (the slack.js shape). The handler does a `from:'response'` scrape to get the token, then `executeBoundSpec` against the first-party origin. This is the proven github/notion/slack pattern.
-
-### Pattern C — Split-token / webpack-extracted / WebSocket-captured token (T1a handler, hard)
-The token is not in a cookie or a tidy global — it's split across cookie+body, or buried in the SPA's internal module registry, or only emitted on a WebSocket auth frame. Still same-origin for transport, but extraction is bespoke and brittle.
-
-- **slack** (FSB's existing head): `xoxc` token scraped from page state → request **body** (not header); `xoxd` HttpOnly cookie rides automatically. *Body placement is load-bearing.*
-- **discord** (`discord-api.ts`): token extracted from **Discord's webpack module registry** via a `getToken()` probe across the module cache. Extremely brittle (breaks on every bundler reshuffle).
-- **clickup** (`clickup-api.ts`): JWT captured from the **WebSocket auth frame** (`{method:'auth', token}`), stashed on `globalThis.__cu_captured_jwt`; `apiUrlBase` from `cuHandshake` localStorage. Requires observing a live WS — not a simple fetch.
-- **stripe** (`stripe-api.ts`): `window.PRELOADED.session_api_key` (Bearer) + `PRELOADED.csrf_token` + merchant id; same-origin `/v1` proxy; *"dashboard's Service Worker normally injects this token, but adapter code must add it explicitly."* Portable but multi-field.
-- **chatgpt** (`chatgpt-api.ts`): access token requires an **async fetch** to `/api/auth/session` first, then Bearer to `/backend-api`. Two-step, same-origin.
-
-> FSB mapping: **T1a handler if same-origin and the extraction is a stable scrape** (slack, stripe, chatgpt). **T2/T3-only if extraction needs webpack-internals or a live WebSocket** (discord, clickup) — those are too fragile to hand-port and should be left to learned discovery / DOM fallback.
-
-### Pattern D — SEPARATE API origin + bearer from localStorage (T1a *only if* CORS permits; else FSB-FORBIDDEN → T2/T3)
-The app reads a bearer/access token from localStorage and posts it to a DIFFERENT origin than the page. **This is the critical FSB feasibility cliff.** OpenTabs' `fetchFromPage` is a page-context fetch, so this only works when the API origin sends `access-control-allow-credentials: true` + a matching `allow-origin`. FSB inherits the same constraint — there is NO background-proxy escape hatch (the milestone context's "separate-origin public API is FORBIDDEN" rule = this CORS reality).
-
-- **linear** (`linear-api.ts`): GraphQL at `https://client-api.linear.app/graphql` (separate subdomain from `linear.app`). **OpenTabs documents the CORS allowance explicitly**: *"access-control-allow-origin: https://linear.app; access-control-allow-credentials: true … in-page fetch() with credentials:'include' sends the HttpOnly cookies automatically. No fetchViaBackground needed."* Bearer-less; needs `useraccount`/`user`/`organization` headers read from `localStorage.ApplicationStore`. **→ FEASIBLE for FSB** because the cross-origin CORS is permissive *and* FSB pins the page origin to `linear.app`.
-- **supabase** (`supabase-api.ts`): `https://api.supabase.com/v1`; Bearer from `localStorage['supabase.dashboard.auth.token']`. Separate origin. Works in OpenTabs only if api.supabase.com allows the dashboard origin with credentials. **→ VERIFY CORS before porting**; treat as conditional.
-- **robinhood** (`robinhood-api.ts`): FOUR separate origins (`api.`/`bonfire.`/`nummus.`/`dora.robinhood.com`); Bearer from `localStorage['web:auth_state']`. **→ DENYLIST anyway (brokerage), moot.**
-- **asana** (`asana-api.ts`): `https://app.asana.com/api/1.0` — same registrable origin as the app (app.asana.com), cookie-based, `credentials:'include'`. **→ effectively Pattern B, FEASIBLE.**
-- **figma** (`figma-api.ts`): `https://www.figma.com/api` — same-origin as the app; cookie-based (`__Host-figma.authn-state`). **→ Pattern B, FEASIBLE.**
-
-> FSB mapping: **Per-app CORS check is mandatory.** Same-registrable-origin (asana, figma, x) → T1a. Separate origin WITH documented permissive CORS (linear) → T1a. Separate origin without it (most "public API" subdomains) → **FSB-FORBIDDEN, demote to T2-learned/T3-DOM.** The roadmap MUST NOT assume an app is portable just because OpenTabs ships it — OpenTabs' own success depends on the same CORS gate. Linear is the proof that "separate origin" ≠ "impossible," but it's the exception that documents its own CORS, not the rule.
-
-### Pattern E — Host-SDK trampoline (`gapi.client.request`) (T1a handler, Google-specific)
-Google properties don't expose a clean REST surface to scrape; instead the page loads `gapi` and you call through `window.gapi.client.request`. Same-origin-ish but you're invoking the page's own SDK function, not issuing your own fetch.
-
-- **google-calendar / google-docs / google-drive** (`*-api.ts`): all gate on `window.gapi.client.request`; `API_BASE` like `/calendar/v3`, `/drive/v3`; auth presence via `SAPISID` cookie + gapi-ready. Calling requires invoking the page global, not a bare fetch.
-
-> FSB mapping: **T1a handler that bridges to the page's `gapi.client.request` via the MAIN-world.** FSB already runs MAIN-world JS (it has `execute_js` + `<all_urls>`), so this is feasible but is a distinct handler shape from the fetch-based ones — budget extra design. Google apps are high value (calendar/docs/drive) and worth the special case.
-
----
-
-## Auth-strategy → FSB-tier taxonomy (the deliverable)
-
-| Auth pattern (observed) | Transport origin | Token source | FSB tier | Codegen-able as DATA recipe? | Example apps |
-|---|---|---|---|---|---|
-| **A. Cookie-only GET** | first-party (same-origin) | none (cookie) | **T1b recipe** | **YES** (closed-vocab) | netlify (reads), reddit, github-notifications, shortcut (reads) |
-| **B. Cookie + scraped CSRF** | first-party (same-origin) | meta tag / `window` global / localStorage / cookie-as-CSRF | **T1a handler** | No (scrape = code) | github, gitlab, jira, confluence, datadog, sentry, cloudflare, airtable, linkedin, asana, figma |
-| **C. Split / webpack / WS token** | first-party (same-origin) | request-body split, webpack registry, WS frame | **T1a (if stable scrape) / T2-T3 (if webpack/WS)** | No | slack, stripe, chatgpt *(T1a)*; discord, clickup *(T2/T3)* |
-| **D. Separate API origin + bearer** | **cross-origin** | localStorage bearer | **T1a ONLY if CORS permits + origin-pinned; else FSB-FORBIDDEN → T2/T3** | No | linear *(feasible, documented CORS)*; supabase *(verify)*; robinhood *(denylist)* |
-| **E. Host-SDK trampoline** | first-party via `gapi` | page SDK | **T1a (gapi-bridge handler)** | No | google-calendar, google-docs, google-drive |
-
-**Rule of thumb for the generator:** default every imported descriptor to **T2/T3-discoverable** (learned/DOM). PROMOTE to T1b recipe only if the op is a same-origin GET with no token. PROMOTE to T1a only for the hand-ported shortlist below. This keeps Wall 1 intact (recipes stay pure data; anything needing a scrape is compiled code in the head, never shipped as recipe data).
-
----
+The feature test is not “can AI search the folder?” It is “can a user safely tell what governs today, what deadline is next, and why Skopeo believes that—without leaving Drive or trusting an uncited summary?”
 
 ## Feature Landscape
 
 ### Table Stakes (Users Expect These)
 
-For a "full app catalog" milestone, the table stakes are about *coverage + discoverability + safety*, not about every app being deeply wired.
+Missing any P1 item below makes the first capability pack unsafe or materially incomplete.
 
-| Feature | Why Expected | Complexity | Notes |
-|---------|--------------|------------|-------|
-| All 119 apps return from `search_capabilities` (descriptor import) | "OpenTabs parity" means the app is *findable*; a missing app reads as "FSB can't do X" | MEDIUM | Codegen descriptors (slug, service, intent synonyms, action verb, side-effect class, params JSON-Schema) from OpenTabs manifests. Scale `recipe-index.generated.js` from ~10 to ~2,523 descriptors with a stable `catalogVersion`. Search index (minisearch) must stay performant at thousands of docs (SURF-04 precedent). |
-| Per-op `sideEffectClass` (read/write) on every descriptor | The consent gate + Auto/Ask/Off policy keys off side-effect class; a write mislabeled as read is a safety hole | MEDIUM | Derive from OpenTabs tool metadata (each `src/tools/<op>.ts` declares its mutation intent). Cross-check descriptor side-effect vs recipe at scale ("descriptor-vs-recipe side-effect cross-check"). |
-| Denylist covering ToS-hostile + sensitive apps, landing BEFORE any sensitive app is reachable under Auto | Shipping a finance/health/dating app reachable under the opt-out Auto default is a legal + trust failure | LOW (data) / HIGH (judgement) | Grow `extension/config/service-denylist.json` `deniedOrigins` + `sensitiveOrigins`. Sequenced first in the milestone. See anti-features. |
-| First-party origin-pin on every invocation | The whole security model (Pitfall-3 credential replay) depends on specs targeting the app's OWN origin so the right cookie attaches and no token leaks cross-origin | LOW | Already enforced by `executeBoundSpec` re-pin; descriptors must carry the correct `service`/origin. |
-| Scraped tokens never logged | github/slack/datadog all scrape secrets; one `console.log` of a token is a credential leak | LOW | `redactForLog` discipline already in slack.js; enforce in every new handler + the Node CI path-guard. |
-| MIT attribution / provenance per imported descriptor | OpenTabs is MIT; derived descriptors need attribution | LOW | Already in README Acknowledgements; add per-app provenance field. |
-| Seeded discovery for the non-ported tail (119 origins + endpoint hints) | Apps not in the depth head must still be *reachable* via the network-capture learner, consent-gated | MEDIUM | Seed origins + known endpoint hints so the learner reliably promotes T2 recipes. |
+| Feature | User-visible expected behavior | Complexity | Dependencies / scope notes |
+|---------|--------------------------------|------------|----------------------------|
+| On-demand invocation and immediate dismissal | A user deliberately opens Skopeo from a discoverable control or shortcut, can dismiss the current surface immediately, and has a universal kill gesture. When off, no Skopeo chrome, marks, dimming, or layout changes remain. | MEDIUM | Platform lifecycle; all other HUD behavior depends on this. “On demand” governs visibility, not whether an authorized corpus may be maintained in the background. |
+| Host-page integrity | Drive and Docs remain the working surface. Skopeo annotations stay attached to relevant files, clauses, dates, or page edges without obscuring required host controls or shifting the host layout. | HIGH | Semantic anchoring, isolated rendering, collision handling, viewport/zoom/scroll resilience. |
+| Consistent HUD grammar and attention budget | Every capability pack composes the same six primitives—anchor mark, entity chip, halo, rail, ghost layer, and gate—and spends only the attention level appropriate to the current state. | HIGH | Shared rendering contracts and page-state router. A primitive being available does not mean all six appear at once. |
+| Accessible vendor-corpus recognition | When invoked in the designated `vendor agreements` area, Skopeo recognizes accessible vendor subfolders and reports which documents are ready, pending, unreadable, or missing without exposing inaccessible content. | HIGH | Drive identity/access checks, corpus enrollment rules, incremental indexing, OCR/readability status. |
+| Vendor overview in the folder | Each accessible vendor can show owner, document count/index state, active-version status, next material date, memo status when applicable, and urgent gaps. Quiet vendors stay visually quiet. | MEDIUM | Corpus state, owner mapping, lineage, date facts, gap detection. The mockup’s exact row density is illustrative, not mandatory. |
+| Governing-document lineage | Skopeo distinguishes executed agreements, amendments, historical/superseded documents, and the document or clause that governs today. Opening an old document produces an unambiguous superseded warning and a direct path to the governing source. | HIGH | Stable document identities, relationship/precedence model, effective dates, provenance, conflict handling. |
+| Exact, cited contract facts | The reading rail exposes exact signed, expiration/termination, renewal, notice-window/deadline, and written-notice destination facts with source locations and confidence/review state. Missing or conflicting evidence is shown as such; no date is silently guessed. | HIGH | Structured extraction, date-rule evaluation, citations, confidence states, OCR quality, governing lineage. |
+| Deadline and consequence view | Users can see upcoming notice deadlines and term/renewal events across accessible vendors, understand the consequence of silence (for example, auto-renewal), and distinguish a notice deadline from the later renewal or expiration date. | HIGH | Exact facts and date computation first; accessible corpus aggregation; timeline/rail presentation. |
+| Automatic 90-day owner notification | The mapped owner is notified 90 days before the **notice deadline**, with vendor, exact deadline, consequence, and a link back to the cited governing source. Missing owners or undeliverable alerts are surfaced as gaps rather than treated as complete. | HIGH | Trusted notice deadline, owner identity, scheduler/delivery channel, deduplication, delivery state. Notification is required; drafting or sending a termination notice is not. |
+| Permission-scoped cited questions | A user can ask a vendor-specific or accessible-corpus question. Each material conclusion resolves to source locations; governing and superseded evidence are labeled; confidence and conflicts are explicit. Querying and derived data never broaden current Drive access. | HIGH | Access check at query time, permission-partitioned retrieval/traversal/cache, lineage, citations, uncertainty behavior. |
+| Corpus-gap visibility | Skopeo calls out missing final agreements, unreadable/low-confidence scans, incomplete indexing, owner TBD, unresolved version conflicts, missing required policy documents, and other evidence gaps that could invalidate an answer or alert. | MEDIUM | Corpus completeness rules and quality state; must be visible in folder and answer contexts. |
+| “Document 10” decision protocol | When a question or proposed conclusion counts as a decision for the relevant corpus, Skopeo visibly requires review of Document 10 and links to it. If Document 10 is missing or inaccessible, Skopeo cannot present the decision as cleared. | MEDIUM | Configurable corpus policy and document identity; should not be hard-coded as “the tenth file in sort order.” |
+| Exceptional memo handling | Only agreements explicitly classified as complex (the supplied examples are Articulate, Priceline, and possibly Click Trust) show memo-required/on-file/missing status and a link to the authorized user-written memo. Routine agreements do not generate memo work. | MEDIUM | Complexity flag, memo identity/access, policy display. AI-authored memos for every vendor are out of scope. |
+| Failure and uncertainty states | If Skopeo cannot identify the page, anchor reliably, read a scan, resolve governing precedence, access a source, or complete an answer, it says what failed and offers a safe next step instead of rendering confident but stale guidance. | MEDIUM | Shared platform error states, source freshness, confidence thresholds. |
 
 ### Differentiators (Competitive Advantage)
 
-These are where FSB does something OpenTabs structurally *cannot*, and they should be foregrounded.
+These are the behaviors that make Skopeo more than a Drive search box or generic contract chat.
 
-| Feature | Value Proposition | Complexity | Notes |
+| Feature | Value proposition | Complexity | Notes |
 |---------|-------------------|------------|-------|
-| **Zero-install catalog** | OpenTabs is npm-per-plugin (119 installs). FSB ships the whole descriptor surface in one extension; depth head is bundled; tail is learned. No `npm i @opentabs-dev/plugin-*` ever. | (already the architecture) | This is the headline. The milestone's "port + learn, do NOT clone the npm-per-plugin model" IS the differentiator. |
-| **Self-healing DOM fallback (T3) on every app** | When a recipe/handler breaks (token moved, endpoint changed — and they DO: datadog rotates CSRF, cloudflare atok refreshes, discord webpack reshuffles), FSB drops to its DOM engine and still completes the task. OpenTabs just fails. | (existing) | Turns the brittle Pattern-C/D apps from "broken" into "slower but works." Huge reliability edge. |
-| **Learned discovery auto-grows the catalog (T2)** | The tail FSB doesn't hand-port gets learned from observed network traffic, consent-gated, and promoted to procedural memory. Catalog grows without code releases. | (existing discovery path) | Lets FSB credibly claim "all apps usable" without 2,523 hand-written handlers. |
-| **MV3-survivable closed-vocabulary recipes** | Recipes are DATA bound by a fixed interpreter — no remotely-hosted code, survives MV3 Wall 1. OpenTabs ships actual TS code per plugin (impossible to stream into an MV3 extension). | (existing CAP-01..05) | The reason FSB can have a streaming long tail at all. |
-| **Unified consent governance across the whole catalog** | One Off/Ask/Auto policy + audit log spanning all 119 apps, defaulting safe. OpenTabs has no equivalent cross-app supervision layer. | (existing v0.9.99 Phase 30) | Lets the denylist + sensitive-origin tiers be enforced uniformly. |
+| Meaning attached to the thing it describes | A status badge sits on the vendor folder, a supersession warning sits on the old document, and a cited fact resolves to the exact clause. Users do not have to reconcile a detached sidebar with the page. | HIGH | Semantic anchoring is the reusable platform advantage; selector-only placement would be too brittle. |
+| Cross-document truth, not cross-document find | Skopeo answers “what governs today?” by reasoning over agreement lineage and effective state, rather than returning the most semantically similar clause. | HIGH | Central differentiator for amendments, renewals, and conflicting historical language. |
+| Governing-versus-historical contrast | When a historical clause conflicts with today’s language, the answer can show both while marking which governs. This turns contradiction into useful context without presenting a false tie. | HIGH | Requires lineage and clause provenance; especially important for the Priceline airline-channel question. |
+| Verifiable confidence | Extracted facts, inferred relationships, ambiguous evidence, and low-OCR sources have visibly different trust states. A user can open the source behind any consequential claim. | MEDIUM-HIGH | Confidence is a user contract, not merely an internal score. Raw percentages alone are insufficient without a state/explanation. |
+| Sparse, state-shaped attention | The folder spends attention on deadlines and gaps; reading spends it on state and cited facts; ask temporarily ghosts the host page; a gate is reserved for genuinely consequential actions. The interface is quiet by design. | MEDIUM | Protects trust and prevents “movie HUD” noise. Orange halo is scarce, not decoration. |
+| Permission-preserving intelligence | Skopeo can answer across what the user may access while preventing the graph, cache, citations, snippets, counts, and error messages from becoming a side channel into restricted sources. | HIGH | Must hold at ingestion, query, traversal, caching, display, and access revocation. |
+| Reusable capability-pack contract | The Drive contract pack proves that page sensing, semantic anchors, attention states, and six primitives can support future genres without each pack inventing custom chrome. | HIGH | Platform value should be proven through this pack, not expanded into multiple packs in this milestone. |
+| Operational gaps as first-class answers | “The final agreement is missing,” “the owner is unknown,” or “this scan is too weak to compute the deadline” is treated as useful output, not a failed search. | MEDIUM | Particularly valuable where current operations rely on memory or incomplete accounting copies. |
 
 ### Anti-Features (Commonly Requested, Often Problematic)
 
-These are the apps/behaviors that "complete the catalog" superficially but must be DENYLISTED or skipped. Grouped by reason. (Apps named below are confirmed present in the 119-plugin list.)
+| Feature | Why it may sound attractive | Why it is problematic here | Approved alternative |
+|---------|-----------------------------|----------------------------|----------------------|
+| Always-on HUD | Assistance feels instantly available | Violates the approved invocation model, consumes attention, and makes every page feel surveilled or cluttered | Explicit invocation; immediate dismissal; universal kill gesture |
+| Separate contract dashboard or Drive replacement | Easier to design than anchoring into a changing host page | Splits the user’s workflow and evades the core product thesis | Keep Drive/Docs as the interaction surface; overlay only what is relevant |
+| Keyword search or generic RAG as the product | Fast route to a chat demo | Similarity does not establish which amendment governs, calculate the notice deadline, or resolve conflicting clauses | State-aware lineage + structured facts + cited retrieval |
+| A graph explorer for end users | Makes the knowledge graph visible and impressive | Adds a second complex UI without helping the routine deadline or decision task | Render graph-derived state as folder badges, lineage links, facts, and citations |
+| Autonomous legal/commercial action | “Draft and send notice” looks like end-to-end automation | A mistaken recipient, deadline, or governing clause has material consequences; requirements ask for intelligence and alerts, not unsupervised action | Notify and link to evidence; leave drafting/sending/approval to an explicit later workflow |
+| AI-generated memo for every agreement | Produces uniform-looking documentation | Conflicts with the stated 1% exception rule, creates review burden, and may falsely imply legal approval | Show memo required/on-file/missing only for flagged complex agreements; preserve human authorship |
+| One confident answer that hides conflict | Feels simpler | Conceals superseded language, missing documents, low OCR, and unresolved precedence | Label governing evidence, historical contrast, confidence, and gaps |
+| Cross-user or global derived cache | Improves apparent speed and recall | Can leak snippets, source existence, or graph relationships after permission changes | Permission-partitioned derived data with access revalidation |
+| Persistent ambient rail while Skopeo is off | Seems like a harmless reminder | “Off” would no longer mean off | Rail may persist only within the active Skopeo session/state |
+| Every primitive on every page | Demonstrates the design system | Creates noise and destroys the meaning of halos and gates | Apply the attention-budget matrix; most states use only a subset |
+| Per-pack custom chrome | Lets each domain optimize independently | Produces inconsistent behavior, accessibility drift, and an unmaintainable overlay ecosystem | Six shared primitives with constrained pack composition |
+| Treating every HUD mockup control as committed scope | Makes planning look concrete | Static sketches include illustrative controls such as “Draft notice” and “Add to memo” that were not approved as workflows | Use the board for grammar, states, and attention; validate each action separately |
+| GCP, NotebookLM, Sheets, LM Studio, or Graphify as required runtime surfaces | The source conversation mentioned them as possible architecture | Contradicts the native FSB framing and adds foreign permission/runtime contracts | Selectively adapt useful graph concepts inside FSB; no runtime dependency on those systems |
 
-| App / behavior | Why requested | Why problematic | FSB action |
-|---|---|---|---|
-| **netflix, spotify (playback), youtube-music, twitch, steam** | "automate my media" | DRM / ToS forbid automation; near-zero agentic value; playback isn't an API task | **deniedOrigins** (skip; descriptors may exist but never invocable). netflix already a known denylist target. |
-| **tinder** | "auto-swipe" | Dating ToS explicitly ban automation; reputational + harassment risk | **deniedOrigins.** |
-| **onlyfans** | catalog completeness | Adult/payment/ToS; sensitivity + reputational | **deniedOrigins.** |
-| **instagram, facebook, tiktok, pinterest, bluesky, tumblr, x** | "auto-post / scrape my feed" | Aggressive anti-automation; bot bans; x uses a static bundle bearer that's a ToS tripwire; engagement automation is abuse-adjacent | **deniedOrigins for write/engagement ops**; read-only `sensitiveOrigins` at most. x is mechanically portable (Pattern B) but **should be denied** to avoid account bans. |
-| **whatsapp, telegram, discord (DMs)** | "send messages for me" | Spam/abuse vector; webpack/WS token extraction (discord) is brittle; mass-DM is the #1 abuse pattern | **sensitiveOrigins** (Ask-only, never Auto) at minimum; deny write ops for messaging if abuse risk too high. |
-| **robinhood, fidelity, coinbase, carta, ynab** | "check my portfolio / trade" | Brokerage/financial trades = catastrophic on a misfire; multi-origin bearer auth (robinhood) compounds risk | **deniedOrigins** for any trade/transfer (write); reads at most **sensitiveOrigins** (Ask). Milestone already sequences finance behind denylist. |
-| **stripe (write), twilio (send)** | "issue a refund / send an SMS" | Money movement + outbound comms = real-world side effects with cost; stripe writes touch live charges | **sensitiveOrigins** (Ask-only); never Auto. Reads (list charges) can be T1a; writes gated hard. |
-| **Banking generally (not in the 119 but category)** | — | Regulatory + catastrophic | Pre-emptive **deniedOrigins** category in the denylist schema. |
-| **"Hand-port all 2,523 ops as code handlers"** | "real parity" | Violates the milestone strategy; unmaintainable; most ops low-value; brittle Pattern-C/D apps break constantly | **Descriptor import + tiered backing.** Depth = curated ~22-app head only. |
-| **"Use the public REST API (api.github.com, api.cloudflare.com)"** | "cleaner than scraping" | Session cookie does NOT cross to the separate API origin; CORS blocks it (cloudflare source says so explicitly) | **FORBIDDEN.** Always target the app's first-party origin. |
-| **e2e-test, prescript-test** | — | Test fixtures, not real apps | **Skip** (exclude from descriptor import). |
+## Attention Budget and Interaction-State Matrix
 
----
+| User state | Entry / exit | Attention level | Allowed primitives | Required content | Explicitly quiet or absent |
+|------------|--------------|-----------------|--------------------|------------------|----------------------------|
+| **Off** | Default; reached by dismiss or universal kill | None | None | None | No rail, anchors, chips, halos, ghosting, gates, or host layout residue |
+| **Invoked, context being identified** | User toggles Skopeo on | Ambient | Rail or compact invocation/lens chip | Current page/pack state, progress or a concise unsupported-context message | No speculative annotations; no modal interruption |
+| **Vendor folder intelligence** | Accessible `vendor agreements` folder or vendor subfolder recognized | Anchored | Folder anchors/chips, sparse halo for urgent anomalies, deadline rail/timeline | Owners, active state, next deadlines, gaps, index quality; corpus ask entry | No blanket dimming; quiet vendors receive little/no decoration |
+| **Document reading awareness** | Agreement document opened while Skopeo is active | Anchored | Supersession anchor/banner, fact/entity chips, clause marks, fact rail, rare halo | Governing status, route to current source, exact cited facts, Document 10/memo policy when relevant | No unrelated corpus dashboard; no gate merely for reading |
+| **Focused ask** | User invokes ask and chooses vendor or accessible corpus scope | Focused anchored layer | Temporary ghost layer, answer panel, citation anchors/chips | Query scope, conclusion, governing sources, historical contrast, confidence/gaps, permission boundary | Ghost layer disappears on exit; no inaccessible-source details |
+| **Consequential action (platform capability, not a baseline contract workflow)** | A future pack/action is about to cause an irreversible send, payment, disclosure, or commitment | Interstitial | Gate only, with minimal supporting evidence | Consequence, evidence, hold/proceed choices | No decorative marks competing with the gate; first contract-pack scope does not add autonomous notice sending |
 
-## Recommended DEPTH-TIER shortlist (~22 apps to hand-port as T1a/T1b head)
+### Attention Rules
 
-Ranked by **value × feasibility**, biased to dev / PM / cloud / observability where FSB's users live. Value = audience fit + op count + agentic usefulness. Feasibility = which auth pattern (A/B easy, C-stable medium, C-webpack/WS or D-no-CORS hard). All must use `executeBoundSpec`-only, first-party origin-pin, no token logging — the slack.js contract. Op counts verified via `gh api .../src/tools --jq length`.
+- **Halo scarcity:** use only for anomalies that merit immediate attention, such as a near notice deadline, unresolved governing conflict, or missing source that blocks a consequential conclusion.
+- **Ghosting is temporary:** it supports the focused ask state and must never become a permanent filter on Drive.
+- **A gate protects an action, not a fact:** uncertainty is shown through confidence/gap states; it does not warrant a modal on ordinary reading.
+- **One state, one main job:** folder = prioritize; document = orient and verify; ask = answer and cite.
 
-| # | App | Category | Ops | Auth pattern | Feasibility | Value rationale |
-|---|---|---|---|---|---|---|
-| 1 | **linear** | PM/dev | 60 | D (separate origin, **documented permissive CORS**) + localStorage headers | MEDIUM | Highest-value PM tool for FSB's dev audience; huge op surface; CORS is documented-safe + origin-pinnable. The flagship depth port. |
-| 2 | **jira** | PM | 21 | B (Atlassian meta tags, same-origin `/rest/api/3`) | EASY | Enterprise PM ubiquity; clean documented REST; trivial auth scrape. |
-| 3 | **github** | dev | 36 | B (persisted-query + CSRF) | DONE (exists) | Already FSB head; extend ops. Anchor of the dev audience. |
-| 4 | **gitlab** | dev | 23 | B (`gon` global + meta CSRF, `/api/v4`) | EASY | Mirrors github; same-origin; large self-host base. |
-| 5 | **datadog** | observability | 72 | B (rotating localStorage CSRF, same-origin) | MEDIUM | Biggest observability op surface; core to FSB's ops/dev users. Caveat: CSRF rotates — read live every call (source warns). |
-| 6 | **sentry** | observability | 22 | B (`sentry-sc` CSRF cookie, same-origin) | EASY | Error triage is a top agent task; clean same-origin CSRF. |
-| 7 | **vercel** | cloud/deploy | 9 | B-ish (HttpOnly `authorization` cookie, same-origin `/api`) | EASY | Deploy/inspect is high-frequency for dev users; smallest-effort win (cookie does the work, team slug from URL). |
-| 8 | **netlify** | cloud/deploy | 41 | A/B (cookie-only reads, same-origin `/access-control/bb-api`) | EASY | Reads are pure T1b recipes (no token); large op count; deploy audience. |
-| 9 | **cloudflare** | cloud/infra | 31 | B (`x-atok` from `window.bootstrap`, same-origin `/api/v4`) | MEDIUM | Infra-critical; same-origin proven; atok refreshes (read live). Source explicitly confirms cross-origin is CORS-blocked → first-party pin mandatory. |
-| 10 | **confluence** | docs/PM | 22 | B (Atlassian `ajs-*` meta, same-origin) | EASY | Pairs with jira; same auth scrape; docs/knowledge tasks. |
-| 11 | **notion** | docs | 19 | B (`token_v2` cookie + `/api/v3` RPC) | DONE (exists) | Already FSB head; extend. Top docs/PM surface. |
-| 12 | **slack** | comms | 23 | C (split-token, same-origin) | DONE (exists) | Already FSB head. Comms backbone for teams. |
-| 13 | **figma** | design/docs | 15 | B/D (same-origin `www.figma.com/api`, cookie) | EASY | Design handoff is a real agent task; same-origin cookie. |
-| 14 | **asana** | PM | 25 | D-as-B (`app.asana.com/api/1.0`, same registrable origin, cookie) | EASY | Major PM tool; cookie-only; effectively same-origin. |
-| 15 | **todoist** | PM/personal | 34 | B (localStorage `User.token` Bearer, same-origin `/api/v1`) | EASY | High op count; same-origin; popular task surface. |
-| 16 | **supabase** | db/backend | 27 | D (separate `api.supabase.com`, localStorage Bearer) | MEDIUM (**verify CORS**) | Core dev/db tool; HIGH value IF api.supabase.com permits the dashboard origin with credentials. Port only after CORS check. |
-| 17 | **shortcut** | PM/dev | 28 | A (documented public API, same-origin `/backend/api/v3`) | EASY | Clean documented API, same-origin cookie; good op count; dev-PM fit. |
-| 18 | **stripe** | finance/dev | 31 | C (`PRELOADED` bearer+csrf, same-origin `/v1`) | MEDIUM | High dev value for READS (list charges/customers); **writes → sensitiveOrigins Ask-only.** Port reads first. |
-| 19 | **mongodb-atlas** | db | 21 | (verify; expect B/D) | MEDIUM | Core db tool for dev audience; confirm auth pattern + CORS before committing. |
-| 20 | **circleci** | dev/CI | 34 | (verify; expect B same-origin) | MEDIUM | CI status/retrigger is a frequent agent task; large op count; dev fit. |
-| 21 | **google-calendar** | productivity | 19 | E (`gapi.client.request` bridge) | MEDIUM | Highest-value Google surface; scheduling is a top agent task. Needs the gapi-bridge handler shape (distinct from fetch handlers) — budget design. |
-| 22 | **linkedin** | comms/social | 7 | B (`JSESSIONID`-as-CSRF, same-origin) | EASY-but-CAUTION | Mechanically trivial (Pattern B). Include ONLY read ops; LinkedIn ToS is automation-hostile → keep writes denied. Borderline; could drop to keep the head clean. |
+## Contract Workflow Coverage Matrix
 
-**Shortlist composition:** dev/source 4 (github, gitlab, circleci) + stretch (npm, docker-hub); PM 6 (linear, jira, asana, todoist, shortcut, confluence); cloud/infra 4 (vercel, netlify, cloudflare); observability 2 (datadog, sentry); db 2 (supabase, mongodb-atlas); docs/design 3 (notion, figma, google-calendar); comms 2 (slack, linkedin-read); finance-read 1 (stripe-read). 4 of these (github, gitlab→easy, notion, slack) are already done/trivial, so **net new hand-port effort ≈ 18 apps.**
-
-**Stretch (port if cheap, defer otherwise):** `npm` (15, registry reads), `docker-hub` (13), `grafana` (30), `posthog` (39, analytics), `newrelic` (23), cloud consoles `azure`/`google-cloud`/`aws-console` (often Pattern-D/E, may be CORS-blocked; verify), `terraform-cloud` (39), `clickup` (Pattern-C WS token → DEFER, let T2 learn it).
-
-**Explicitly NOT in the head (leave to T2-learned / T3-DOM):**
-- **discord** (webpack-registry token — too brittle), **clickup** (WebSocket-captured JWT — needs live WS observation), and any Pattern-D app whose separate API origin does NOT send permissive CORS.
-- All anti-feature apps (media, dating, social-write, finance-write) — denylisted, never ported.
-
----
+| Workflow moment | User question / job | Skopeo behavior required in v1.2.0 | Evidence of success | Complexity |
+|-----------------|---------------------|------------------------------------|---------------------|------------|
+| Enter vendor corpus | “What do we actually have?” | Identify accessible vendor folders, ready/pending/unreadable files, missing final copies, and unassigned owners | Folder intelligence matches accessible Drive contents; restricted files do not appear in output | HIGH |
+| Triage portfolio | “What needs attention first?” | Order or visually emphasize upcoming notice deadlines, term/renewal events, auto-renew consequences, and blocking gaps | The earliest actionable notice deadline is distinct from expiration/renewal and links to its source | HIGH |
+| Open a historical document | “Can I rely on this?” | Mark it superseded, name/link the governing document or clause, and explain effective relationship | Opening Doc 4 clearly routes to Doc 11 if Doc 11 governs | HIGH |
+| Review key facts | “When was it signed; when and how can we terminate?” | Show exact dates, notice calculation, required delivery method/address, citations, and confidence/review state | Every fact can be opened at its supporting span; ambiguity is visible | HIGH |
+| Ask a business-constraint question | “Can we sell rental cars through airline channels under Priceline?” | Answer from the accessible corpus, identify governing language, contrast relevant superseded text, show confidence/gaps, and cite each material claim | User can open the governing clause directly and sees the Document 10 rule before treating it as a decision | HIGH |
+| Prepare for a decision | “Have we satisfied our internal review rule?” | Surface Document 10 as mandatory; show memo status only if this agreement is flagged complex | No “cleared” state when Document 10 is missing/inaccessible; routine vendors are not assigned memos | MEDIUM |
+| Approach notice deadline | “Will the owner know in time?” | Notify the mapped owner 90 days before the notice deadline; surface missing owner/delivery failure | Notification record links to deadline evidence; repeat indexing does not create duplicate alerts | HIGH |
+| Add a new agreement or amendment | “Does the new document change what governs?” | Incrementally update lineage, active status, affected facts, deadline timeline, alerts, and citations while retaining history | A newly executed amendment supersedes only what it actually changes; stale facts/alerts are replaced | HIGH |
+| Encounter incomplete evidence | “Can I trust this result?” | State the missing/unreadable/conflicting evidence and limit the conclusion accordingly | No confident governing/date claim is shown from an unresolved or inaccessible corpus | MEDIUM |
 
 ## Feature Dependencies
 
-```
-Denylist expansion (deniedOrigins + sensitiveOrigins)
-    └──MUST PRECEDE──> Any sensitive app reachable under Auto default
-                           └──gates──> Descriptor import making apps invocable
+```text
+On-demand lifecycle + kill switch
+    └──enables──> Context/genre recognition
+                      └──selects──> Contract capability pack
+                                        └──composes──> Shared six-primitive HUD grammar
+                                                           └──placed by──> Semantic anchors
 
-Descriptor import (all 119, with sideEffectClass)
-    └──requires──> Side-effect classification (read/write per op)
-    └──requires──> Scaled search index (minisearch perf at ~2.5k docs)
-    └──enables──> search_capabilities returns every app
+Drive identity + current permission checks
+    └──gates──> Accessible corpus discovery
+                   └──feeds──> Incremental source ingestion + quality state
+                                  └──feeds──> Stable document identity + provenance
+                                                 └──enables──> Governing lineage
+                                                                ├──enables──> Exact active facts
+                                                                ├──enables──> Governing-vs-historical answers
+                                                                └──enables──> Safe source replacement
 
-Depth head (T1a/T1b hand-ports)
-    └──requires──> Per-app CORS / first-party-origin verification (Pattern D gate)
-    └──requires──> Token-redaction discipline + CI path-guard (no eval, no log)
-    └──reuses────> slack.js handler contract (executeBoundSpec, origin-pin)
+Exact active facts + date-rule evaluation
+    └──enables──> Notice deadline / consequence timeline
+                      └──requires──> Owner mapping
+                                         └──enables──> 90-day notification + delivery state
 
-Seeded discovery (T2 learner)
-    └──depends on──> 119 origins + endpoint hints seeded
-    └──depends on──> Consent gate (Phase 30) already shipped
-    └──covers─────> The tail NOT in the depth head
+Permission-scoped retrieval/traversal
+    ├──requires──> Query-time access revalidation
+    ├──requires──> Provenance + citations + confidence/gap states
+    └──enables──> Vendor ask and accessible-corpus ask
 
-T3 DOM fallback (existing)
-    └──enhances──> Every app (catches Pattern-C/D breakage)
+Corpus policy (Document 10 rule + complex-agreement flag)
+    ├──enhances──> Reading and ask states
+    └──controls──> Human memo status (required / on file / missing)
 ```
 
 ### Dependency Notes
-- **Denylist MUST precede invocability:** the shipped Auto default (v0.9.99 Phase 30) means an imported finance/health/dating descriptor is reachable the moment it's invocable. The denylist data has to land first. (Milestone already sequences this.)
-- **Depth head requires the Pattern-D CORS gate:** porting linear/supabase/etc. without verifying the separate-origin CORS yields silent runtime failures. Linear documents its CORS in-source; supabase does not — verify each.
-- **Descriptor import requires side-effect classification:** the consent policy keys off read/write; importing descriptors without trustworthy side-effect class breaks the safety model.
-- **T3 DOM fallback enhances everything:** it's what makes the brittle Pattern-C/D apps acceptable to ship — they degrade instead of fail.
 
----
+- **Lineage must precede answers and alerts.** A precise extraction from a superseded agreement is still the wrong fact. Active-state resolution is therefore a hard gate for “governs today,” notice, renewal, and compliance outputs.
+- **Permissions must constrain every downstream feature.** Filtering only the final search results is insufficient; source ingestion, graph edges, cached summaries, citations, counts, notifications, and error text can all leak restricted information.
+- **Notifications are downstream of trusted date computation.** Scheduling from an unverified expiration date or from “90 days before renewal” instead of “90 days before the notice deadline” would reproduce the business risk the feature is meant to remove.
+- **Semantic anchoring and HUD grammar are separate foundations.** Grammar defines what can render; anchoring determines whether it stays attached to the right host content. Both are required before the first pack feels native.
+- **Document 10 is a policy identity, not a list position.** It needs an explicit configured source identity and access state so reordering or renaming Drive files does not bypass the rule.
+- **Memo support depends on an explicit exception flag.** No system inference should silently create memo obligations for the other 99% of agreements.
+- **Representative corpus fixtures are a validation dependency.** At minimum, later UAT needs an active agreement, superseded agreement, amendment, scan/low-OCR document, missing-final-copy case, conflicting-date case, inaccessible source, Document 10, complex vendor memo, and near notice deadline.
 
-## MVP Definition
+## MVP Definition: v1.2.0 Skopeo
 
-### Launch With (v1.0.0 core)
-- [ ] **Denylist expansion** — deniedOrigins (media/dating/adult/finance-write/social-write) + sensitiveOrigins (messaging, finance-read, stripe/twilio writes). Lands FIRST. *Essential: legal + trust gate.*
-- [ ] **Descriptor import for all ~117 real apps** (exclude e2e-test/prescript-test) with slug/service/synonyms/verb/sideEffectClass/params + MIT provenance. *Essential: this IS "OpenTabs parity / all apps discoverable."*
-- [ ] **Scaled search index** performant at ~2,523 descriptors with stable `catalogVersion` + descriptor-vs-recipe side-effect cross-check. *Essential: SURF-04 must not regress.*
-- [ ] **Depth head: the ~18 net-new T1a/T1b ports** from the shortlist (Pattern A/B + stable-C, CORS-verified). *Essential: "depth where users live."*
-- [ ] **T1b recipe promotion** for same-origin cookie GET ops across imported apps (netlify reads, shortcut reads, etc.). *Essential: cheap breadth-into-depth.*
-- [ ] **Seeded discovery** (119 origins + endpoint hints) for the tail. *Essential: "all apps usable" via the learner.*
+### Launch With
+
+- [ ] **Complete on-demand lifecycle** — explicit invocation, immediate dismissal, universal kill gesture, and zero HUD residue when off.
+- [ ] **Reusable HUD contract** — six shared primitives, accessible interaction states, attention budgets, and anchor behavior proven on the three Drive contract states.
+- [ ] **Permission-scoped Drive corpus state** — accessible vendor folders and document quality/gap status without permission leakage.
+- [ ] **Governing lineage** — active, amended, historical, and superseded states with direct routes to governing sources.
+- [ ] **Exact cited facts** — signed, expiration/termination, renewal, notice window/deadline, written-notice destination, owner, confidence, and evidence gaps.
+- [ ] **Folder prioritization** — upcoming events, auto-renew consequences, owner/memo status where relevant, and corpus gaps using sparse anchored/ambient presentation.
+- [ ] **90-day owner notification** — scheduled from the notice deadline with evidence link, deduplication, and missing/delivery-failure state.
+- [ ] **Permission-scoped cited ask** — vendor and accessible-corpus questions with governing/historical distinction, source navigation, confidence, and uncertainty.
+- [ ] **Decision safeguards** — Document 10 protocol plus human-authored memo status for explicitly complex agreements only.
+- [ ] **Incremental truth maintenance** — new or replaced documents update lineage, facts, queries, timeline, and alerts without leaving stale active claims.
 
 ### Add After Validation (v1.x)
-- [ ] **Stretch ports** (grafana, posthog, newrelic, npm, docker-hub, mongodb-atlas, circleci) once the head pattern is proven and CORS-verified. *Trigger: depth-head ships clean + telemetry shows demand.*
-- [ ] **gapi-bridge handler family** (google-calendar/docs/drive) as a distinct handler shape. *Trigger: validate one gapi bridge end-to-end first.*
-- [ ] **Cloud-console ports** (azure, google-cloud, aws-console, terraform-cloud) — only after confirming their API proxies are same-origin/CORS-permissive. *Trigger: per-app CORS verification passes.*
+
+- [ ] **Assisted notice drafting** — consider only after lineage/date/address accuracy and human review behavior are proven; sending remains separately authorized.
+- [ ] **Additional Drive contract policy rules** — add configurable review requirements only when real workflows demonstrate repeated need beyond Document 10.
+- [ ] **Additional contract sources** — expand beyond the designated Drive hierarchy only after permission and identity behavior is validated on Drive.
+- [ ] **Portfolio/team workflow features** — acknowledgements, escalation chains, assignment changes, and collaboration history after the single-owner notification loop is proven.
+- [ ] **More contract-specific views** — clause comparison or richer event maps only if users cannot answer the core jobs through the three approved states.
 
 ### Future Consideration (v2+)
-- [ ] **Pattern-C-hard ports** (discord webpack, clickup WS) — only if T2-learned proves insufficient. *Defer: brittleness not worth hand-maintenance.*
-- [ ] **Per-op depth beyond the head** (porting more of datadog's 72 / linear's 60 ops) driven by usage telemetry. *Defer: import gives discoverability; deep-wire on demand.*
-- [ ] **Carefully-gated finance/messaging WRITE ops** behind explicit per-call confirmation + vault. *Defer: high blast radius.*
 
----
+- [ ] **Additional capability packs/page genres** — the platform is designed for them, but this milestone should prove the contract pack before broadening scope.
+- [ ] **Autonomous contract actions** — draft/send termination notices or modify Drive documents only with a separate consequential-action design, permissions, and approval audit.
+- [ ] **End-user graph explorer** — defer unless users demonstrate a job that citations, lineage links, and folder intelligence cannot serve.
+- [ ] **Automated complex-agreement memos** — defer because the stated workflow requires rare, human-authored memos.
+- [ ] **Standalone CLM/dashboard surface** — conflicts with the overlay-first premise unless later evidence shows a workflow impossible to serve in Drive.
 
 ## Feature Prioritization Matrix
 
-| Feature | User Value | Implementation Cost | Priority |
+| Feature | User value | Implementation cost | Priority |
 |---------|------------|---------------------|----------|
-| Denylist expansion (lands first) | HIGH | LOW | **P1** |
-| Descriptor import (all 117 real apps) | HIGH | MEDIUM | **P1** |
-| Scaled search index + side-effect cross-check | HIGH | MEDIUM | **P1** |
-| Depth head — easy Pattern-A/B ports (jira, gitlab, sentry, vercel, netlify, confluence, todoist, shortcut, asana, figma) | HIGH | LOW-MEDIUM | **P1** |
-| Depth head — flagship linear (CORS-documented) | HIGH | MEDIUM | **P1** |
-| Depth head — datadog/cloudflare (live-rotating tokens) | HIGH | MEDIUM | **P1/P2** |
-| T1b recipe promotion (same-origin GET ops) | MEDIUM | LOW | **P1** |
-| Seeded discovery for the tail | HIGH | MEDIUM | **P1** |
-| stripe-read / mongodb-atlas / circleci ports | MEDIUM | MEDIUM | **P2** |
-| supabase port (CORS-conditional) | MEDIUM | MEDIUM (gated on CORS check) | **P2** |
-| gapi-bridge (google-calendar/docs/drive) | HIGH | HIGH (new handler shape) | **P2** |
-| Stretch observability/analytics ports (grafana, posthog, newrelic) | MEDIUM | MEDIUM | **P2** |
-| Cloud-console ports (azure/gcloud/aws/terraform) | MEDIUM | HIGH (CORS-uncertain) | **P3** |
-| discord/clickup hand-ports | LOW | HIGH (brittle) | **P3** (let T2 learn) |
-| Deep per-op wiring beyond head | MEDIUM | HIGH | **P3** |
+| On-demand lifecycle / kill switch / zero residue | HIGH | MEDIUM | P1 |
+| Shared primitives + attention-state contract | HIGH | HIGH | P1 |
+| Semantic anchoring on folder rows, document state, clauses, and page edge | HIGH | HIGH | P1 |
+| Permission-scoped corpus recognition and derived data | HIGH | HIGH | P1 |
+| Governing document lineage | HIGH | HIGH | P1 |
+| Exact facts, notice computation, citations, and confidence | HIGH | HIGH | P1 |
+| Folder deadline/gap/owner intelligence | HIGH | MEDIUM-HIGH | P1 |
+| 90-day owner notification with delivery state | HIGH | HIGH | P1 |
+| Cited vendor/corpus ask | HIGH | HIGH | P1 |
+| Document 10 protocol | HIGH | MEDIUM | P1 |
+| Complex-vendor memo status and link | MEDIUM | MEDIUM | P1 (narrow) |
+| Richer timeline visualization beyond prioritization needs | MEDIUM | MEDIUM | P2 |
+| Assisted notice draft | MEDIUM | HIGH | P2 |
+| Team acknowledgement/escalation workflow | MEDIUM | HIGH | P2 |
+| More page genres/capability packs | HIGH long-term | HIGH | P3 for this milestone |
+| Graph explorer | LOW for core jobs | HIGH | P3 |
+| Autonomous notice sending / source-document mutation | LOW until trust proven | VERY HIGH | P3 / separate authorization |
 
-**Priority key:** P1 = must have for v1.0.0; P2 = add when head pattern proven; P3 = defer / let the learner handle.
+**Priority key:** P1 = required to validate v1.2.0; P2 = add only after core validation or demonstrated need; P3 = explicitly deferred from this milestone.
 
----
+## Adjacent-Approach Comparison
 
-## Competitor Feature Analysis
+This is a product-shape comparison grounded in the supplied conversation, not a current market-capability review.
 
-| Feature | OpenTabs (the source) | "Public-API" approach (naive MCP-per-API) | FSB's approach |
-|---------|------------------------|-------------------------------------------|----------------|
-| App coverage | 119 plugins, 2,523 ops, **one npm install per plugin** | Per-API server, per-API auth/OAuth setup | One extension; all 119 as descriptors; ~22 bundled depth; tail learned. **Zero installs.** |
-| Auth | Page-context `fetchFromPage` (cookie/scraped token), CORS-bound | OAuth tokens you manage/store | Same page-context model (inherits the constraint) BUT origin-pinned + consent-gated + never-logged. |
-| Cross-origin API | Works only where CORS permits (linear documented; cloudflare blocked) | Designed for separate API origins | **Forbidden** unless CORS-permissive + origin-pinned; otherwise demote to learned/DOM. |
-| Breakage handling | Plugin fails (token moved / endpoint changed) | API version break → 4xx | **Self-healing T3 DOM fallback** still completes the task. |
-| Catalog growth | New plugin = new npm package + release | New API = new server | **T2 learner** auto-grows from observed traffic, consent-gated. |
-| Safety/supervision | Per-plugin, no unified gate | Per-server | **Unified Off/Ask/Auto + audit + denylist** across all apps. |
-| MV3 compliance | N/A (their host model differs) | N/A | **Closed-vocabulary recipes = data**, no remotely-hosted code (Wall 1). |
+| User need | Manual Drive folders | Proposed per-vendor notebook + sheet approach from source conversation | Generic folder chat/search | Skopeo approach |
+|-----------|----------------------|---------------------------------------------------------------|----------------------------|-----------------|
+| Know what governs today | Human remembers file order/history | Master summary must be manually kept authoritative | May retrieve conflicting versions without precedence | Maintained lineage; active/superseded state attached to files and citations |
+| Avoid missed renewal | Calendar/spreadsheet maintained separately | Sheet tracks dates and notifications | Chat answers only when asked | Exact notice deadline and consequence surfaced in Drive; owner alerted 90 days before notice deadline |
+| Verify a constraint | Manually open multiple documents | Ask the correct vendor notebook | Search similar passages | Permission-scoped answer labels governing and historical evidence and links to exact spans |
+| See incomplete records | Relies on team memory | Depends on notebook/sheet enrollment discipline | Missing sources may be invisible | Missing final copies, unreadable scans, index gaps, owner gaps, and conflicts are first-class state |
+| Work in existing tools | Native but little intelligence | User crosses Drive, notebook, and sheet | Often detached chat/sidebar | Drive stays Drive; intelligence appears only when invoked and anchors to host content |
 
----
+## Recommended Requirement Categories
+
+The later REQ-ID pass should group testable requirements under these categories, in dependency order:
+
+1. **Invocation & host integrity** — on/off lifecycle, kill behavior, no residue, accessibility, anchor resilience.
+2. **HUD grammar & routing** — six primitives, attention budget, context/pack selection, shared failure states.
+3. **Drive permissions & corpus state** — enrollment, accessible scope, revocation, index/quality/gap states.
+4. **Document identity & governing lineage** — agreement/amendment/supersession/effective relationships, source replacement.
+5. **Facts, provenance & confidence** — exact contract facts, source locations, notice computation, ambiguity and OCR state.
+6. **Folder intelligence & notification** — portfolio priorities, timeline, owners, 90-day notification, delivery/gap state.
+7. **Cited ask & decision protocol** — scoped questions, governing/history distinction, Document 10 rule, memo exception behavior.
+8. **Incremental correctness & UAT** — new amendment, revoked access, conflicting dates, low OCR, missing final copy, no duplicate alerts, and host redesign/anchor recovery.
 
 ## Sources
 
-- **OpenTabs source, read directly via authenticated `gh` at `opentabs-dev/opentabs@main`** (HIGH confidence — primary source):
-  - Plugin list: `gh api repos/opentabs-dev/opentabs/contents/plugins` (119 dirs incl. 2 test fixtures `e2e-test`, `prescript-test`).
-  - Auth/transport `src/<app>-api.ts` inspected in full or grepped for: **linear, github, gitlab, vercel, datadog, stripe, jira, notion, supabase, sentry, cloudflare, netlify, clickup, todoist, asana, shortcut, confluence, figma, coinbase, robinhood, discord, telegram, x, linkedin, chatgpt, claude, google-calendar, google-docs, google-drive, airtable** (20 read in detail, 10 more grepped).
-  - Transport SDK: `platform/plugin-sdk/src/fetch.ts` — confirmed `fetchFromPage`/`fetchJSON` are plain page-context `fetch()` with `credentials:'include'`, **no background proxy** (the load-bearing finding that maps OpenTabs' CORS reality onto FSB's MAIN-world Wall 2).
-  - Op counts per app via `gh api .../src/tools --jq length` (HIGH — verified counts; cited inline in the shortlist).
-  - Key in-source CORS quotes: linear-api.ts (`access-control-allow-origin: https://linear.app; access-control-allow-credentials: true … No fetchViaBackground needed`); cloudflare-api.ts (`Cross-origin requests to api.cloudflare.com are blocked by CORS`).
-- **FSB-side anchors** (HIGH — read directly):
-  - `extension/catalog/handlers/slack.js` — the T1a split-token handler contract (executeBoundSpec-only, origin-pin, no-log) the depth head must follow.
-  - `extension/catalog/recipe-index.generated.js` — existing descriptor/recipe shapes + the github/notion/slack/reddit head precedent.
-  - `.planning/PROJECT.md` — v1.0.0 framing, Wall 1/Wall 2, tier definitions, "port + learn not clone", denylist-first sequencing.
-- **Confidence caveats:** auth pattern + tier mapping = HIGH (grounded in source). Per-app value ranking = MEDIUM (op counts verified; audience-fit is product judgement). supabase/mongodb-atlas/circleci/cloud-console portability = MEDIUM-to-LOW pending the explicit per-app CORS verification flagged as a P1/P2 dependency. ToS/sensitivity classification = HIGH (categorical).
+- `.context/attachments/PPgV1d/AI-Driven Vendor Contract Lifecycle and Compliance Management System_summary.txt` — primary business requirements and workflow evidence.
+- `.context/hud-design-reference/export/canvas-4/Canvas-4.dc.html` — primary interaction/design evidence for the six primitives, attention ladder, and three Drive contract states.
+- `.planning/PROJECT.md` — approved v1.2.0 framing, constraints, and milestone boundaries.
 
 ---
-*Feature research for: FSB v1.0.0 Full App Catalog (OpenTabs Parity) — auth-strategy → tier taxonomy, depth shortlist, anti-feature/denylist.*
-*Researched: 2026-06-23*
+*Feature research for: FSB v1.2.0 Skopeo*
+*Researched: 2026-07-14*

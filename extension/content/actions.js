@@ -3440,17 +3440,6 @@ const tools = {
 
   // CAPTCHA solving via 2Captcha service
   solveCaptcha: async (params) => {
-    const settings = await new Promise(resolve => {
-      chrome.storage.local.get(['captchaSolverEnabled', 'captchaApiKey'], resolve);
-    });
-
-    if (!settings.captchaSolverEnabled) {
-      return { success: false, error: 'CAPTCHA solving is disabled. Enable it in FSB settings (Advanced > CAPTCHA Solver).' };
-    }
-    if (!settings.captchaApiKey) {
-      return { success: false, error: 'No 2Captcha API key configured. Add it in FSB settings (Advanced > CAPTCHA Solver).' };
-    }
-
     let captchaType = null;
     let sitekey = null;
 
@@ -3512,9 +3501,7 @@ const tools = {
         chrome.runtime.sendMessage({
           action: 'solveCaptcha',
           captchaType: captchaType,
-          sitekey: sitekey,
-          pageUrl: window.location.href,
-          apiKey: settings.captchaApiKey
+          sitekey: sitekey
         }, (result) => {
           if (chrome.runtime.lastError) {
             reject(new Error(chrome.runtime.lastError.message));

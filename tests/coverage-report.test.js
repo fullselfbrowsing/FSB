@@ -47,11 +47,22 @@ const REPORT_PATH = path.join(REPO_ROOT, 'scripts', 'coverage-report.mjs');
 const CROSSCHECK_PATH = path.join(REPO_ROOT, 'scripts', 'verify-catalog-crosscheck.mjs');
 const CATALOG_PATH = path.join(REPO_ROOT, 'extension', 'catalog', 'recipe-index.generated.js');
 const DENYLIST_MODULE = path.join(REPO_ROOT, 'extension', 'utils', 'service-denylist.js');
-const MANIFEST_PATH = path.join(
+const ACTIVE_MANIFEST_PATH = path.join(
   REPO_ROOT, '.planning', 'phases',
   '39-breadth-c-commerce-travel-misc-most-sensitive',
   '39-06-REMAINING-APPS.md'
 );
+const ARCHIVED_MANIFEST_PATH = path.join(
+  REPO_ROOT, '.planning', 'milestones', 'v1.0.0-phases',
+  '39-breadth-c-commerce-travel-misc-most-sensitive',
+  '39-06-REMAINING-APPS.md'
+);
+// Completed milestones move their phase artifacts under .planning/milestones.
+// Prefer the active path while a milestone is in progress, then read the same
+// committed completeness source from its archive after milestone cleanup.
+const MANIFEST_PATH = fs.existsSync(ACTIVE_MANIFEST_PATH)
+  ? ACTIVE_MANIFEST_PATH
+  : ARCHIVED_MANIFEST_PATH;
 
 let passed = 0;
 let failed = 0;

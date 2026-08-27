@@ -617,6 +617,7 @@ The root README should describe what a new user needs to understand before insta
 ## Acknowledgements
 
 - **OpenTabs** inspired FSB's Native Capability Catalog (first-party API execution: turning authenticated browser sessions into reusable, signed, audited API capabilities). Thanks for the direction on this approach.
+- **Graphify Labs / Graphify** informed the local graph design through a conceptual-only review of [Graphify](https://github.com/Graphify-Labs/graphify) at commit `abff1b1ca4052fcf9d955c5f6a034088723f4536`. The reviewed project is MIT licensed, with upstream copyright `Copyright 2026 Safi Shamsi`. Reviewed files: `LICENSE`, `docs/how-it-works.md`, `ARCHITECTURE.md`, `graphify/ids.py`, `graphify/validate.py`, and `graphify/cache.py`. Conceptual influences: bounded extraction, validate-before-build, evidence-bearing records/relations, fingerprints, and traversal. Integration status: no copied code; no runtime dependency. Copied-code inventory: empty (`[]`).
 
 ## License
 

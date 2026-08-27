@@ -61,6 +61,9 @@ const PARAM_CACHE_MAX = 50;
 const rateLimitState = new Map();
 const RATE_LIMIT_MAX = 50;
 const RATE_LIMIT_TTL = 10 * 60 * 1000; // 10 minutes
+const RETRYABLE_REQUEST_PARAMETERS = Object.freeze([
+  'temperature', 'top_p', 'frequency_penalty', 'presence_penalty'
+]);
 
 /**
  * PERF: Set a value in a size-limited Map, evicting oldest if over limit.
@@ -87,6 +90,105 @@ const REASONING_MODEL_TIMEOUT = 45000;
 
 // Higher cap for reasoning models
 const MAX_REASONING_TIMEOUT = 90000;
+
+// Private classification keeps timeout and caller cancellation distinct without
+// exposing the caller's AbortSignal reason or changing the legacy timeout error.
+const providerTimeoutErrors = new WeakSet();
+const fetchConsumptionResults = new WeakMap();
+
+function createProviderAbortError() {
+  const error = new Error('Provider request aborted');
+  error.name = 'AbortError';
+  error.code = 'FSB_PROVIDER_ABORTED';
+  return error;
+}
+
+function createProviderTimeoutError(timeout) {
+  const error = new Error(`API request timed out after ${timeout}ms`);
+  providerTimeoutErrors.add(error);
+  return error;
+}
+
+function createInvalidProviderSignalError() {
+  const error = new TypeError('options.signal must be AbortSignal-shaped');
+  error.code = 'FSB_PROVIDER_SIGNAL_INVALID';
+  return error;
+}
+
+function isAbortSignalShaped(signal) {
+  try {
+    return !!signal && typeof signal === 'object' && typeof signal.aborted === 'boolean' &&
+      typeof signal.addEventListener === 'function' &&
+      typeof signal.removeEventListener === 'function';
+  } catch {
+    return false;
+  }
+}
+
+function readCallerSignal(options) {
+  let signal;
+  try {
+    signal = options && options.signal;
+  } catch {
+    throw createInvalidProviderSignalError();
+  }
+  if (signal === undefined) return null;
+  if (!isAbortSignalShaped(signal)) throw createInvalidProviderSignalError();
+  return signal;
+}
+
+function callerIsAborted(signal) {
+  if (!signal) return false;
+  try {
+    return signal.aborted === true;
+  } catch {
+    return true;
+  }
+}
+
+function throwIfCallerAborted(signal) {
+  if (callerIsAborted(signal)) throw createProviderAbortError();
+}
+
+function waitWithCallerSignal(waitTime, callerSignal) {
+  throwIfCallerAborted(callerSignal);
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    let timerId = null;
+
+    const cleanup = () => {
+      if (timerId !== null) clearTimeout(timerId);
+      if (callerSignal) callerSignal.removeEventListener('abort', onAbort);
+    };
+    const settle = (operation) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      operation();
+    };
+    const onAbort = () => {
+      settle(() => reject(createProviderAbortError()));
+    };
+
+    if (callerSignal) {
+      callerSignal.addEventListener('abort', onAbort, { once: true });
+      if (callerIsAborted(callerSignal)) {
+        onAbort();
+        return;
+      }
+    }
+    timerId = setTimeout(() => {
+      settle(() => {
+        try {
+          throwIfCallerAborted(callerSignal);
+          resolve();
+        } catch (error) {
+          reject(error);
+        }
+      });
+    }, waitTime);
+  });
+}
 
 /**
  * Calculate adaptive timeout based on prompt/request size, model type, and retry attempt.
@@ -347,25 +449,81 @@ class UniversalProvider {
    * @param {string} endpoint - The API endpoint
    * @param {Object} fetchOptions - Fetch options
    * @param {number} timeout - Timeout in milliseconds
+   * @param {AbortSignal|null} callerSignal - Optional caller-owned cancellation signal
    * @returns {Promise<Response>}
    */
-  async fetchWithTimeout(endpoint, fetchOptions, timeout = DEFAULT_REQUEST_TIMEOUT) {
+  async fetchWithTimeout(
+    endpoint,
+    fetchOptions,
+    timeout = DEFAULT_REQUEST_TIMEOUT,
+    callerSignal = null,
+    consumeResponse = null
+  ) {
+    if (callerSignal !== null && !isAbortSignalShaped(callerSignal)) {
+      throw createInvalidProviderSignalError();
+    }
+    throwIfCallerAborted(callerSignal);
+
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeout);
+    let abortCause = null;
+    let rejectCancellation;
+    const cancellation = new Promise((_resolve, reject) => {
+      rejectCancellation = reject;
+    });
+    const abortOwnedOperation = (cause) => {
+      if (abortCause !== null) return;
+      abortCause = cause;
+      controller.abort();
+      rejectCancellation(cause === 'caller'
+        ? createProviderAbortError()
+        : createProviderTimeoutError(timeout));
+    };
+    const onCallerAbort = () => {
+      abortOwnedOperation('caller');
+    };
+
+    if (callerSignal) {
+      callerSignal.addEventListener('abort', onCallerAbort, { once: true });
+      if (callerIsAborted(callerSignal)) onCallerAbort();
+    }
+
+    const timeoutId = setTimeout(() => {
+      abortOwnedOperation('timeout');
+    }, timeout);
 
     try {
-      const response = await fetch(endpoint, {
-        ...fetchOptions,
-        signal: controller.signal
-      });
-      clearTimeout(timeoutId);
+      const response = await Promise.race([
+        fetch(endpoint, {
+          ...fetchOptions,
+          signal: controller.signal
+        }),
+        cancellation
+      ]);
+      if (abortCause === 'caller') throw createProviderAbortError();
+      if (abortCause === 'timeout') throw createProviderTimeoutError(timeout);
+      if (typeof consumeResponse === 'function') {
+        const body = await Promise.race([
+          Promise.resolve().then(() => consumeResponse(response)),
+          cancellation
+        ]);
+        if (abortCause === 'caller') throw createProviderAbortError();
+        if (abortCause === 'timeout') throw createProviderTimeoutError(timeout);
+        const completed = Object.freeze({});
+        fetchConsumptionResults.set(completed, { response, body });
+        return completed;
+      }
       return response;
     } catch (error) {
-      clearTimeout(timeoutId);
-      if (error.name === 'AbortError') {
-        throw new Error(`API request timed out after ${timeout}ms`);
+      if (error && error.code === 'FSB_PROVIDER_ABORTED') throw error;
+      if (providerTimeoutErrors.has(error)) throw error;
+      if (abortCause === 'caller') throw createProviderAbortError();
+      if (abortCause === 'timeout' || (error && error.name === 'AbortError')) {
+        throw createProviderTimeoutError(timeout);
       }
       throw error;
+    } finally {
+      clearTimeout(timeoutId);
+      if (callerSignal) callerSignal.removeEventListener('abort', onCallerAbort);
     }
   }
 
@@ -416,35 +574,63 @@ class UniversalProvider {
    * Enhanced with timeout and rate-limit handling
    */
   async sendRequest(requestBody, options = {}) {
+    const callerSignal = readCallerSignal(options);
+    throwIfCallerAborted(callerSignal);
+
     // Use adaptive timeout based on request size and retry attempt if no explicit timeout provided
     const attempt = options.attempt || 0;
     const defaultTimeout = options.timeout || calculateAdaptiveTimeout(requestBody, this.model, attempt);
     const { retry = false, rateLimitAttempt = 0, timeout = defaultTimeout } = options;
 
     try {
-      const response = await this.fetchWithTimeout(
+      throwIfCallerAborted(callerSignal);
+      let fetched = await this.fetchWithTimeout(
         this.getEndpoint(),
         {
           method: 'POST',
           headers: this.getHeaders(),
           body: JSON.stringify(requestBody)
         },
-        timeout
+        timeout,
+        callerSignal,
+        async (response) => {
+          if (response.status === 429 || response.status === 503) {
+            return {
+              kind: 'text',
+              value: await response.text().catch(() => 'Rate limit exceeded')
+            };
+          }
+          if (!response.ok) {
+            return { kind: 'text', value: await response.text() };
+          }
+          return { kind: 'json', value: await response.json() };
+        }
       );
+      const consumed = fetchConsumptionResults.get(fetched) || null;
+      const response = consumed ? consumed.response : fetched;
+      const consumedBody = consumed ? consumed.body : null;
+      fetched = null;
+      throwIfCallerAborted(callerSignal);
 
       // Handle rate limiting (429) and service unavailable (503)
       if (response.status === 429 || response.status === 503) {
         const { shouldRetry, waitTime } = await this.handleRateLimit(response, rateLimitAttempt + 1);
+        throwIfCallerAborted(callerSignal);
 
         if (shouldRetry) {
           // Wait and retry
-          await new Promise(resolve => setTimeout(resolve, waitTime));
+          await waitWithCallerSignal(waitTime, callerSignal);
+          throwIfCallerAborted(callerSignal);
           return this.sendRequest(requestBody, {
             ...options,
+            signal: callerSignal || undefined,
             rateLimitAttempt: rateLimitAttempt + 1
           });
         } else {
-          const errorText = await response.text().catch(() => 'Rate limit exceeded');
+          const errorText = consumedBody && consumedBody.kind === 'text'
+            ? consumedBody.value
+            : await response.text().catch(() => 'Rate limit exceeded');
+          throwIfCallerAborted(callerSignal);
           const error = new Error(`${this.provider} API rate limit exceeded after ${MAX_RATE_LIMIT_RETRIES} retries: ${errorText}`);
           error.isRateLimited = true;
           throw error;
@@ -452,14 +638,20 @@ class UniversalProvider {
       }
 
       if (!response.ok) {
-        const errorText = await response.text();
+        const errorText = consumedBody && consumedBody.kind === 'text'
+          ? consumedBody.value
+          : await response.text();
+        throwIfCallerAborted(callerSignal);
         const error = new Error(`${this.provider} API error: ${response.status} - ${errorText}`);
         error.status = response.status;
         error.responseText = errorText;
         throw error;
       }
 
-      const result = await response.json();
+      const result = consumedBody && consumedBody.kind === 'json'
+        ? consumedBody.value
+        : await response.json();
+      throwIfCallerAborted(callerSignal);
 
       // Reset rate limit backoff on success
       rateLimitState.delete(this.provider);
@@ -477,17 +669,26 @@ class UniversalProvider {
       return result;
 
     } catch (error) {
+      if (error && error.code === 'FSB_PROVIDER_ABORTED') throw error;
+      if (!providerTimeoutErrors.has(error)) throwIfCallerAborted(callerSignal);
+
       // Check if error is due to unsupported parameters
       if (error.status === 400 && error.responseText) {
         const unsupportedParam = this.extractUnsupportedParameter(error.responseText);
         if (unsupportedParam && !retry) {
-          console.log(`Parameter '${unsupportedParam}' not supported, retrying without it`);
+          throwIfCallerAborted(callerSignal);
+          console.log('[FSB API] Retrying without an unsupported optional request parameter');
 
           // Rebuild request without the problematic parameter
           const cleanedRequest = this.removeParameter(requestBody, unsupportedParam);
 
           // Retry with cleaned request
-          return this.sendRequest(cleanedRequest, { ...options, retry: true });
+          throwIfCallerAborted(callerSignal);
+          return this.sendRequest(cleanedRequest, {
+            ...options,
+            signal: callerSignal || undefined,
+            retry: true
+          });
         }
       }
 
@@ -514,7 +715,7 @@ class UniversalProvider {
         // Convert camelCase to snake_case if needed
         const param = match[1];
         const snakeCase = param.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
-        return snakeCase;
+        return RETRYABLE_REQUEST_PARAMETERS.includes(snakeCase) ? snakeCase : null;
       }
     }
     

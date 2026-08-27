@@ -502,7 +502,19 @@ const GITHUB_RECIPE = {
       type: 'object',
       properties: {
         channel: { type: 'string', minLength: 1 },
-        text: { type: 'string', minLength: 1 }
+        text: { type: 'string', minLength: 1 },
+        options: {
+          type: 'object',
+          properties: {
+            unfurl_links: { type: 'boolean' },
+            labels: {
+              type: 'array',
+              items: { type: 'string', minLength: 1 },
+              maxItems: 3
+            }
+          },
+          additionalProperties: false
+        }
       },
       required: ['channel', 'text'],
       additionalProperties: false
@@ -519,7 +531,54 @@ const GITHUB_RECIPE = {
   globalThis.FsbCapabilityFetch = {
     async executeBoundSpec() { validatingFetchCalled = true; return { success: true }; }
   };
-  installCatalog({ 'slack.chat.postMessage': { tier: 'T1a', handler: validatingHandler, params: validatingHandler.params } });
+  const validatingEntry = {
+    tier: 'T1a',
+    handler: validatingHandler,
+    params: validatingHandler.params
+  };
+  installCatalog({ 'slack.chat.postMessage': validatingEntry });
+
+  // Installed-handler authority helpers are pure public views over the exact
+  // schema used by invoke. In particular, no reduced display schema and no
+  // second validation vocabulary may authorize an argument object.
+  check(typeof ROUTER.getResolvedParamsSchema === 'function',
+    'installed authority: router exports getResolvedParamsSchema');
+  check(typeof ROUTER.validateResolvedArgs === 'function',
+    'installed authority: router exports validateResolvedArgs');
+  if (typeof ROUTER.getResolvedParamsSchema === 'function' &&
+      typeof ROUTER.validateResolvedArgs === 'function') {
+    check(ROUTER.getResolvedParamsSchema(validatingEntry) === validatingHandler.params,
+      'installed authority: getResolvedParamsSchema returns the exact schema invoke uses');
+    check(ROUTER.validateResolvedArgs(validatingEntry, {
+      channel: 'C123',
+      text: 'hello',
+      options: { unfurl_links: false, labels: ['release'] }
+    }) === true,
+    'installed authority: validateResolvedArgs accepts a full-schema-valid nested object');
+    check(ROUTER.validateResolvedArgs(validatingEntry, { channel: 'C123', text: 'hello', extra: true }) === false,
+      'installed authority: validateResolvedArgs rejects an extra property');
+    check(ROUTER.validateResolvedArgs(validatingEntry, { channel: 'C123' }) === false,
+      'installed authority: validateResolvedArgs rejects a missing required property');
+    check(ROUTER.validateResolvedArgs(validatingEntry, { channel: 'C123', text: 7 }) === false,
+      'installed authority: validateResolvedArgs rejects the wrong primitive type');
+    check(ROUTER.validateResolvedArgs(validatingEntry, {
+      channel: 'C123', text: 'hello', options: { labels: ['ok', 'also-ok', 'third', 'overflow'] }
+    }) === false,
+    'installed authority: validateResolvedArgs enforces nested constraints');
+    const refEntry = {
+      tier: 'T1a',
+      handler: validatingHandler,
+      params: { type: 'object', properties: { payload: { $ref: '#/$defs/payload' } } }
+    };
+    check(ROUTER.validateResolvedArgs(refEntry, { payload: {} }) === false,
+      'installed authority: validateResolvedArgs treats $ref schemas as fail-closed');
+    for (let validationIndex = 0; validationIndex < 3; validationIndex += 1) {
+      ROUTER.getResolvedParamsSchema(validatingEntry);
+      ROUTER.validateResolvedArgs(validatingEntry, { channel: 'C123', text: 'hello' });
+    }
+    check(validatingHandlerCalled === false && validatingFetchCalled === false,
+      'installed authority: pure router helpers make zero handler or fetch calls');
+  }
   const badParams = await ROUTER.invoke('slack.chat.postMessage', {}, { origin: 'https://app.slack.com', tabId: 44 });
   check(badParams && badParams.success === false && badParams.code === 'RECIPE_SCHEMA_INVALID',
     'T1a params gate: missing required handler args returns RECIPE_SCHEMA_INVALID');

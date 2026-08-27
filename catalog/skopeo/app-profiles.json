@@ -1,0 +1,319 @@
+{
+  "schemaVersion": 2,
+  "profileVersion": "skopeo-profiles-v2",
+  "defaults": {
+    "profileId": "generic-unanchored-v1",
+    "profile": {
+      "displayName": "Supported app",
+      "defaultGenre": "generic-app",
+      "pageNoun": "app",
+      "entityVocabulary": {
+        "singular": "item",
+        "plural": "items"
+      },
+      "capabilityGroups": [],
+      "attentionCeiling": "ambient",
+      "adapterId": "generic-unanchored-v1",
+      "rendererId": "generic-default-v1"
+    }
+  },
+  "profiles": [
+    {
+      "profileId": "wikipedia-reader-v1",
+      "appStem": "wikipedia",
+      "service": "wikipedia.org",
+      "exactOrigins": [
+        "https://wikipedia.org"
+      ],
+      "profile": {
+        "displayName": "Wikipedia",
+        "defaultGenre": "reader-knowledge",
+        "pageNoun": "article",
+        "entityVocabulary": {
+          "singular": "article",
+          "plural": "articles"
+        },
+        "capabilityGroups": [
+          {
+            "id": "articles",
+            "label": "Articles",
+            "slugPrefixes": [
+              "wikipedia."
+            ]
+          }
+        ],
+        "attentionCeiling": "anchored",
+        "adapterId": "reader-knowledge-v1",
+        "rendererId": "reader-knowledge-v1"
+      }
+    },
+    {
+      "profileId": "slack-communication-v1",
+      "appStem": "slack",
+      "service": "slack.com",
+      "exactOrigins": [
+        "https://slack.com"
+      ],
+      "profile": {
+        "displayName": "Slack",
+        "defaultGenre": "communication",
+        "pageNoun": "workspace",
+        "entityVocabulary": {
+          "singular": "conversation",
+          "plural": "conversations"
+        },
+        "capabilityGroups": [
+          {
+            "id": "conversations",
+            "label": "Conversations",
+            "slugPrefixes": [
+              "slack."
+            ]
+          }
+        ],
+        "attentionCeiling": "anchored",
+        "adapterId": "communication-v1",
+        "rendererId": "communication-v1"
+      }
+    },
+    {
+      "profileId": "word-document-editor-v1",
+      "appStem": "msword",
+      "service": "word.cloud.microsoft",
+      "exactOrigins": [
+        "https://word.cloud.microsoft"
+      ],
+      "profile": {
+        "displayName": "Word",
+        "defaultGenre": "document-editor",
+        "pageNoun": "document",
+        "entityVocabulary": {
+          "singular": "document",
+          "plural": "documents"
+        },
+        "capabilityGroups": [
+          {
+            "id": "documents",
+            "label": "Documents",
+            "slugPrefixes": [
+              "msword."
+            ]
+          }
+        ],
+        "attentionCeiling": "anchored",
+        "adapterId": "document-editor-v1",
+        "rendererId": "document-editor-v1"
+      }
+    },
+    {
+      "profileId": "github-worklist-v1",
+      "appStem": "github",
+      "service": "github.com",
+      "exactOrigins": [
+        "https://github.com"
+      ],
+      "profile": {
+        "displayName": "GitHub",
+        "defaultGenre": "worklist-record",
+        "pageNoun": "repository",
+        "entityVocabulary": {
+          "singular": "repository",
+          "plural": "repositories"
+        },
+        "capabilityGroups": [
+          {
+            "id": "issues",
+            "label": "Issues",
+            "slugPrefixes": [
+              "github.issues."
+            ]
+          },
+          {
+            "id": "notifications",
+            "label": "Notifications",
+            "slugPrefixes": [
+              "github.notifications."
+            ]
+          }
+        ],
+        "attentionCeiling": "anchored",
+        "adapterId": "worklist-record-v1",
+        "rendererId": "worklist-record-v1"
+      }
+    },
+    {
+      "profileId": "datadog-dashboard-v1",
+      "appStem": "datadog",
+      "service": "datadoghq.com",
+      "exactOrigins": [
+        "https://datadoghq.com"
+      ],
+      "profile": {
+        "displayName": "Datadog",
+        "defaultGenre": "dashboard-admin",
+        "pageNoun": "dashboard",
+        "entityVocabulary": {
+          "singular": "monitor",
+          "plural": "monitors"
+        },
+        "capabilityGroups": [
+          {
+            "id": "operations",
+            "label": "Operations",
+            "slugPrefixes": [
+              "datadog."
+            ]
+          }
+        ],
+        "attentionCeiling": "ambient",
+        "adapterId": "dashboard-admin-v1",
+        "rendererId": "dashboard-admin-v1"
+      }
+    },
+    {
+      "profileId": "amazon-transactional-v1",
+      "appStem": "amazon",
+      "service": "www.amazon.com",
+      "exactOrigins": [
+        "https://www.amazon.com"
+      ],
+      "profile": {
+        "displayName": "Amazon",
+        "defaultGenre": "transactional",
+        "pageNoun": "store",
+        "entityVocabulary": {
+          "singular": "order",
+          "plural": "orders"
+        },
+        "capabilityGroups": [
+          {
+            "id": "shopping",
+            "label": "Shopping",
+            "slugPrefixes": [
+              "amazon."
+            ]
+          }
+        ],
+        "attentionCeiling": "anchored",
+        "adapterId": "transactional-v1",
+        "rendererId": "transactional-v1"
+      }
+    },
+    {
+      "profileId": "tiktok-media-v1",
+      "appStem": "tiktok",
+      "service": "tiktok.com",
+      "exactOrigins": [
+        "https://tiktok.com"
+      ],
+      "profile": {
+        "displayName": "TikTok",
+        "defaultGenre": "media-feed",
+        "pageNoun": "feed",
+        "entityVocabulary": {
+          "singular": "video",
+          "plural": "videos"
+        },
+        "capabilityGroups": [
+          {
+            "id": "media",
+            "label": "Media",
+            "slugPrefixes": [
+              "tiktok."
+            ]
+          }
+        ],
+        "attentionCeiling": "anchored",
+        "adapterId": "media-feed-v1",
+        "rendererId": "media-feed-v1"
+      }
+    },
+    {
+      "profileId": "npm-generic-v1",
+      "appStem": "npm",
+      "service": "www.npmjs.com",
+      "exactOrigins": [
+        "https://www.npmjs.com"
+      ],
+      "profile": {
+        "displayName": "npm",
+        "defaultGenre": "generic-app",
+        "pageNoun": "registry",
+        "entityVocabulary": {
+          "singular": "package",
+          "plural": "packages"
+        },
+        "capabilityGroups": [
+          {
+            "id": "packages",
+            "label": "Packages",
+            "slugPrefixes": [
+              "npm."
+            ]
+          }
+        ],
+        "attentionCeiling": "ambient",
+        "adapterId": "generic-unanchored-v1",
+        "rendererId": "generic-default-v1"
+      }
+    },
+    {
+      "profileId": "drive-deep-pack-v1",
+      "appStem": "gdrive",
+      "service": "drive.google.com",
+      "exactOrigins": [
+        "https://drive.google.com"
+      ],
+      "profile": {
+        "displayName": "Google Drive",
+        "defaultGenre": "drive-docs-deep-pack",
+        "pageNoun": "drive",
+        "entityVocabulary": {
+          "singular": "file",
+          "plural": "files"
+        },
+        "capabilityGroups": [
+          {
+            "id": "drive-items",
+            "label": "Files and folders",
+            "slugPrefixes": [
+              "gdrive."
+            ]
+          }
+        ],
+        "attentionCeiling": "anchored",
+        "adapterId": "drive-docs-deep-pack-v1",
+        "rendererId": "drive-docs-deep-pack-v1"
+      }
+    },
+    {
+      "profileId": "docs-deep-pack-v1",
+      "appStem": "gdocs",
+      "service": "docs.google.com",
+      "exactOrigins": [
+        "https://docs.google.com"
+      ],
+      "profile": {
+        "displayName": "Google Docs",
+        "defaultGenre": "drive-docs-deep-pack",
+        "pageNoun": "document",
+        "entityVocabulary": {
+          "singular": "document",
+          "plural": "documents"
+        },
+        "capabilityGroups": [
+          {
+            "id": "documents",
+            "label": "Documents",
+            "slugPrefixes": [
+              "gdocs."
+            ]
+          }
+        ],
+        "attentionCeiling": "anchored",
+        "adapterId": "drive-docs-deep-pack-v1",
+        "rendererId": "drive-docs-deep-pack-v1"
+      }
+    }
+  ]
+}

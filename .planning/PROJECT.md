@@ -12,6 +12,8 @@ FSB is an AI-powered browser automation Chrome extension that executes tasks thr
 
 **Last completed:** v1.1.0 T1 App Execution Expansion -- milestone gate met and archived 2026-06-30, with artifacts refreshed 2026-07-01. FSB now has a verified T1 readiness surface across all 2,314 descriptors, 1,267 executable T1-ready rows, 556 guarded fail-closed rows, and explicit terminal-state accounting for the remaining bridge-needed, UAT-needed, blocked-policy, and degraded/discovery-pending catalog tail.
 
+**Current milestone progress:** Phase 53 is automated-complete as of 2026-07-15. Exact-origin Drive/Docs context routing, fail-quiet projection, immutable semantic anchors, withdraw-first rebinding, generation-owned SPA handoff, real local-Chrome mechanics, and exact teardown verify 15/15 automated must-haves for HUD-06/HUD-09. Current authenticated Drive/Docs and VoiceOver evidence remains tracked as human-needed in `53-HUMAN-UAT.md`; Phase 53 is not live-approved. On 2026-07-16 the product scope was clarified: Skopeo is a catalog-wide adaptive HUD platform, not a Drive/Docs-only feature. Phase 53.1 is now next and has not been planned.
+
 **Recent shipping cadence:**
 - v1.1.0 T1 App Execution Expansion -- archived 2026-06-30; remaining tail rows carry explicit proof requirements before direct execution
 - v1.0.0 Full App Catalog (OpenTabs Parity) -- archived 2026-06-29; T1 expansion debt carried into v1.1.0
@@ -33,9 +35,20 @@ FSB is an AI-powered browser automation Chrome extension that executes tasks thr
 
 **CI:** PRs to `main` gated by `ci / all-green` status check (extension + mcp + showcase jobs).
 
-## Current Milestone
+## Current Milestone: v1.2.0 Skopeo
 
-No active milestone is currently defined. Start the next cycle with `$gsd-new-milestone` after choosing the next product goal.
+**Goal:** Give FSB an explicitly invoked, page-native adaptive HUD platform across the full supported capability catalog, compose app- and context-appropriate assistance from one trustworthy interaction grammar, and prove deeper domain intelligence with a permission-scoped Google Drive vendor-contract capability pack.
+
+**Target features:**
+- An on-demand Skopeo lifecycle on every supported catalog app, with an obvious toggle, universal kill switch, and no persistent HUD when it is off.
+- A catalog-backed app/context interpreter and adaptive composer that chooses a custom HUD for the current app, page genre, semantic entity, requested task, available capabilities, and action risk instead of reusing one Drive-shaped screen everywhere.
+- A reusable semantic anchoring and genre-routing foundation with app profiles, attention budgets, and six shared primitives: anchor mark, entity chip, halo, rail, ghost layer, and consequence gate.
+- Honest capability-aware controls: only verified executable capabilities appear runnable, guarded or pending capabilities remain visibly unavailable, and consequential actions pass through the existing consent, denylist, and confirmation boundaries.
+- A Google Drive / Docs vendor-contract pack that overlays document state, governing-version lineage, exact renewal and notice facts, owner alerts, corpus gaps, timelines, and cited answers on the existing Drive surface.
+- A Chrome-local FSB knowledge layer that selectively adopts useful Graphify concepts -- stable graph identities, provenance, confidence, incremental replacement, and bounded traversal -- as bundled JavaScript without taking a Graphify runtime or server dependency.
+- Permission-preserving, source-grounded behavior: users can query only material they can access, answers identify what governs today, and consequential conclusions remain visibly verifiable.
+
+**Design reference:** `~/Downloads/HUD.zip`, unpacked only under gitignored `.context/hud-design-reference/`. It establishes the shared interaction and visual grammar, not one fixed layout. Skopeo interprets that grammar per app and context; the reference is not production code or a blanket commitment to every pictured control.
 
 ## Last Milestone: v1.1.0 T1 App Execution Expansion
 
@@ -286,6 +299,8 @@ Carry-forward backlog candidates:
 
 ### Validated
 
+- ✓ HUD-06: Closed exact-origin context recognition and concise fail-quiet projection reject missing, conflicting, spoofed, or hostile evidence without guessing page identity -- Phase 53 automated verification (live Drive/Docs UAT remains human-needed)
+- ✓ HUD-09: Immutable semantic identity and revocable bindings survive deterministic reuse, reorder, detach, ABA, SPA, scroll, zoom, and resize mechanics or withdraw synchronously, with exact resource teardown -- Phase 53 automated verification (live paint/VoiceOver UAT remains human-needed)
 - ✓ Chrome Extension MV3 architecture with service worker -- existing
 - ✓ Multi-provider AI integration (xAI, OpenAI, Anthropic, Gemini) -- existing
 - ✓ DOM analysis and element identification -- existing
@@ -415,7 +430,13 @@ Carry-forward backlog candidates:
 
 ### Active
 
-(Milestone v1.1.0 T1 App Execution Expansion -- requirements and roadmap defined on 2026-06-29; phases continue from v1.0.0's Phase 43 -> start at Phase 44. v1.0.0 Full App Catalog is archived with 2,314 searchable descriptors, 26 T1/T1b descriptors, and 2,288 DOM/discovery-tail descriptors carried forward as explicit T1 expansion work.)
+(Milestone v1.2.0 Skopeo -- started 2026-07-14. Atomic requirements are approved in `REQUIREMENTS.md`; the broader milestone hypotheses below remain active until their owning phases are verified.)
+
+- [ ] Users can invoke and dismiss Skopeo on demand without changing the host page when it is off.
+- [ ] Capability packs compose a small, consistent HUD grammar through semantic anchors and page-genre attention budgets.
+- [ ] Authorized Google Drive users can see vendor-agreement state, deadlines, ownership, gaps, and governing document lineage overlaid on Drive and Docs.
+- [ ] Users can ask contract questions and receive permission-scoped, confidence-marked answers with citations to the governing source spans.
+- [ ] FSB can maintain and query an incremental, provenance-rich document relationship graph locally inside Chrome using selectively adapted Graphify patterns, existing FSB model providers, and optional existing MCP surfaces rather than any new runtime or service.
 
 ### Validated (v0.9.99)
 
@@ -584,6 +605,10 @@ The following backlog items are formally retired in v0.9.45rc1. Better external 
 
 **Previous milestones:** v0.9 (Reliability), v9.0.2 (AI Situational Awareness), v9.3 (Tech Debt), v9.4 (Career Search), v10.0 (CLI Architecture), v0.9.2 (Productivity Sites), v0.9.3 (Memory Tab), v0.9.4 (AI Quality), v0.9.5 (Progress Overlay Intelligence), v0.9.6 (Agents & Remote Control), v0.9.7 (MCP Edge Case Validation), v0.9.9 (Excalidraw Mastery + Canvas Vision), v0.9.20 (Autopilot Agent Architecture Rewrite)
 
+**Skopeo v1.2.0 product context:** The initial operational problem is vendor-contract lifecycle and compliance management over a Drive folder named `vendor agreements`, with one subfolder per vendor. The source material calls for state-aware amendments and supersession, exact signed/expiration/termination/notice facts (including written-notice address), 90-day owner alerts, a mandatory Document 10 review rule, exceptional memos for roughly 1% of complex agreements, and permission-scoped natural-language questions such as whether Priceline terms permit airline-channel rental-car sales. The proposed GCP, NotebookLM, Sheets, and LM Studio implementation is context only; this milestone designs the capability natively inside FSB.
+
+**Skopeo design context:** The HUD reference keeps Drive as Drive and adds three on-demand states: folder intelligence, document-reading state awareness, and a cited ask overlay. It defines a shared six-primitive grammar and an ambient -> anchored -> interstitial intensity ladder. Dark FSB surfaces, Space Mono micro-labels, thin borders, and scarce orange glow are the visual language; the anchoring behavior and attention budget matter more than copying the static mockup pixel-for-pixel.
+
 **Tech stack:** Chrome Extension Manifest V3, vanilla JavaScript (ES2021+), xAI Grok / OpenAI / Anthropic / Gemini / OpenRouter APIs.
 **Codebase:** background.js (~11K lines), ai-integration.js (~5K lines), content/ modules (10 files), 50+ site guide files, CLI parser (cli-parser.js), Task Memory system.
 
@@ -601,11 +626,26 @@ The following backlog items are formally retired in v0.9.45rc1. Better external 
 - **No build system**: Direct JavaScript execution, no transpilation - keep it simple
 - **AI dependency**: Relies on external AI APIs - must handle latency, rate limits, failures gracefully
 - **Browser security**: Content scripts run in isolated world, limited access to page JavaScript context
+- **Invocation**: Skopeo is on-demand, never an always-on page layer; dismissal and a universal kill switch must be immediate and reliable.
+- **Host integrity**: Assistance overlays the user's existing page instead of replacing it with a standalone contract application; anchoring must not mutate or destabilize host layouts.
+- **Chrome-local intelligence**: Graph construction, storage, indexing, provenance, and traversal run as bundled JavaScript inside the extension using browser-native storage and existing MiniSearch; no Graphify runtime, Python process, graph database, vector database, daemon, or remote graph service.
+- **Existing AI/MCP only**: Model-assisted extraction and synthesis use the already-configured FSB provider layer with bounded permission-scoped excerpts. MCP is an optional existing interface, not a new server or runtime dependency. No new AI vendor, required LM Studio setup, MCP daemon, or tool-per-feature surface.
+- **Native integration**: Do not depend on GCP, NotebookLM, Google Sheets, or another external orchestration surface for the capability.
+- **Access control**: Retrieval, graph traversal, cached derived data, and answers must never broaden the user's underlying Google Drive permissions.
+- **Trust**: Governing-version claims, extracted dates, compliance answers, and action-driving facts require source citations, provenance, confidence state, and explicit uncertainty when evidence is incomplete or conflicting.
+- **Design system**: Reuse FSB tokens and HUD grammar from the supplied design reference; orange glow remains a scarce attention signal rather than decoration.
 
 ## Key Decisions
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
+| Build Skopeo as an on-demand overlay, not a separate app or always-on assistant | The value is contextual instrumentation on the user's existing workflow; persistent chrome would consume attention and violate the approved product framing | Pending -- v1.2.0 framing |
+| Treat semantic anchoring as the platform and the Drive contract experience as its first capability pack | Reliable placement and page-genre routing are the reusable moat; contract intelligence is the first concrete proof | Pending -- v1.2.0 framing |
+| Standardize six HUD primitives and a four-level attention ladder | A constrained visual grammar keeps future capability packs coherent and makes attention an explicit budget | Pending -- design reference approved |
+| Run the selectively adapted Graphify-style engine locally inside Chrome | Stable identities, provenance, incremental replacement, confidence, retrieval, and bounded traversal can be implemented in bundled JavaScript with browser-native storage; a foreign runtime, graph service, or database would violate the lightweight FSB-native goal | Approved -- v1.2.0 requirements |
+| Reuse only existing FSB AI providers and optional existing MCP surfaces | Model calls may process bounded accessible excerpts through the user's configured provider, while graph execution stays local; no new AI vendor, MCP daemon, or tool-per-feature surface is necessary | Approved -- v1.2.0 requirements |
+| Scope v1.2 notifications to the current FSB Chrome user | A browser-local implementation can reconcile and audit current-user notifications honestly; mapped teammates without a local recipient are surfaced as undeliverable until an authorized team delivery adapter is separately approved | Approved default -- v1.2.0 requirements |
+| Keep Drive as the system of interaction and enforce source permissions end to end | Users should work where the documents live, and derived intelligence must not become a permission bypass | Pending -- v1.2.0 research |
 | Focus on mechanics, not AI | User confirmed AI intent is correct, execution layer is the problem | Good -- v0.9 shipped with reliable execution |
 | Visual feedback with orange glow | User specifically requested seeing what's being targeted | Good -- Shadow DOM isolation prevents CSS conflicts |
 | Single-attempt reliability over retry sophistication | Core value is precision, not recovery from imprecision | Good -- verification + fallback selectors cover edge cases |
@@ -680,4 +720,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-29 -- v1.0.0 Full App Catalog archived; v1.1.0 T1 App Execution Expansion started. Phases continue at 44.*
+*Last updated: 2026-07-16 -- Phase 53 remains automated-complete with Drive/Docs/VoiceOver UAT human-needed; catalog-wide adaptive HUD scope was clarified and inserted as Phase 53.1 before Phase 54.*

@@ -340,7 +340,7 @@ function installDomStub(idMap) {
   const sidepanelHtmlSrc = fs.readFileSync(path.resolve(__dirname, '../extension/ui/sidepanel.html'), 'utf8');
 
   // 4.1 sidepanel.js carries applyInputLockout(true) inside refreshOwnerChip
-  const refreshChipBodyMatch = sidepanelSrcForP4.match(/async function refreshOwnerChip\(\)\s*\{[\s\S]*?^\}/m);
+  const refreshChipBodyMatch = sidepanelSrcForP4.match(/async function refreshOwnerChip\([^)]*\)\s*\{[\s\S]*?^\}/m);
   ok(refreshChipBodyMatch && refreshChipBodyMatch[0].indexOf('applyInputLockout(true)') !== -1,
      'Part 4.1 -- refreshOwnerChip body contains applyInputLockout(true)');
 

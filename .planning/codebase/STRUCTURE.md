@@ -94,6 +94,7 @@ FSB/
 - `content.js`: DOM analysis, action execution, tools (~5600 lines)
 - `ai-integration.js`: AI prompts, response parsing, caching (~2800 lines)
 - `universal-provider.js`: Multi-provider API adapter (~800 lines)
+- `extension/content/skopeo-context-router.js`: Closed, render-independent Drive/Docs context classification and context-epoch ownership
 
 **Testing:**
 - No dedicated test directory

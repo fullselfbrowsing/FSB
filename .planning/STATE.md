@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.1.0
-milestone_name: T1 App Execution Expansion
-status: completed
-stopped_at: "v1.1.0 T1 App Execution Expansion complete, audited, and archived. No active milestone is currently defined."
-last_updated: "2026-07-01T13:44:05-05:00"
-last_activity: 2026-07-01
+milestone: v1.2.0
+milestone_name: Skopeo
+status: complete
+stopped_at: "v1.2.0 automated complete; live/human evidence remains human_needed"
+last_updated: "2026-08-27T12:45:00.000Z"
+last_activity: 2026-08-27
 progress:
-  total_phases: 8
-  completed_phases: 8
-  total_plans: 29
-  completed_plans: 29
+  total_phases: 9
+  completed_phases: 9
+  total_plans: 62
+  completed_plans: 62
   percent: 100
 ---
 
@@ -18,39 +18,41 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (v1.1.0 T1 App Execution Expansion framing + v1.0.0 shipped baseline)
-See: .planning/ROADMAP.md (v1.1.0 shipped; no active milestone currently defined)
-See: .planning/REQUIREMENTS.md (placeholder; fresh requirements start with the next milestone)
+See: .planning/PROJECT.md (v1.2.0 Skopeo framing + shipped baseline)
+See: .planning/ROADMAP.md (v1.2.0 Skopeo roadmap, Phases 52-59 plus inserted Phase 53.1)
+See: .planning/REQUIREMENTS.md (63 approved v1.2.0 requirements with complete traceability)
 See: .planning/milestones/v1.0.0-ROADMAP.md and .planning/milestones/v1.0.0-REQUIREMENTS.md (archived Full App Catalog milestone)
 See: .planning/milestones/v1.0.0-MILESTONE-AUDIT.md (audit passed; non-blocking T1/live-UAT debt recorded)
 See: .planning/milestones/v1.1.0-ROADMAP.md, .planning/milestones/v1.1.0-REQUIREMENTS.md, and .planning/milestones/v1.1.0-MILESTONE-AUDIT.md (archived T1 App Execution Expansion milestone)
+See: .planning/milestones/v1.2.0-ROADMAP.md, .planning/milestones/v1.2.0-REQUIREMENTS.md, .planning/milestones/v1.2.0-MILESTONE-AUDIT.md, and .planning/milestones/v1.2.0-MILESTONE-SUMMARY.md (archived Skopeo milestone; automated complete, non-live-approved)
 
-**Core value:** Reliable single-attempt execution -- the AI decides correctly, the mechanics execute precisely. v1.1.0 focuses on turning the v1.0.0 catalog tail into verified direct T1 execution where safe and technically provable.
-**Current focus:** no active milestone; choose the next product goal and run `$gsd-new-milestone` when ready.
+**Core value:** Reliable single-attempt execution -- the AI decides correctly, the mechanics execute precisely. v1.2.0 extends that standard to trustworthy, page-native assistance whose placement and claims are both verifiable.
+**Current focus:** v1.2.0 automated milestone closeout complete; live/human evidence ledger retained
 
 ## Current Position
 
-Phase: none active
-Plan: none active
-Status: v1.1.0 milestone complete, audited, and archived
-Last activity: 2026-07-01 - Completed quick task 260701-iz0: Implement this Steam to be T1 ready
+Phase: 59 (Current-User Alerts & Release Hardening) — COMPLETE
+Plan: 5 of 5
+Status: Automated complete; `live_approved: false`; legal/domain, authorized live, native notification, and human accessibility evidence remain `human_needed`
+Last activity: 2026-08-27
 
-Progress: [##########] 100%
+Progress: [██████████] 100%
 
-## Roadmap At A Glance (v1.1.0, Phases 44-51)
+## Roadmap At A Glance (v1.2.0, Phases 52-59 plus 53.1)
 
 | Phase | Name | Requirements | Status |
 |-------|------|--------------|--------|
-| 44 | T1 Readiness Inventory + Status Surface | T1R-01..03 | Complete; 3/3 plans verified |
-| 45 | T1 Porting Scaffold + Handler Contract Hardening | T1R-04/05/09 | Complete; 3/3 plans verified |
-| 46 | Same-Origin Read Ports -- First High-Value Batch | T1R-06 | Complete; 3/3 plans verified |
-| 47 | Pattern-D + GAPI Bridge Architecture | T1R-07/08 | Complete; 3/3 plans verified |
-| 48 | High-Value Read Ports -- Second Batch | T1R-06/07/08 | Complete; 3/3 plans verified |
-| 49 | Guarded Writes Activation Pipeline | T1R-10/11 | Complete; 3/3 plans verified |
-| 50 | T1 Expansion Gate + Next-Batch Plan | T1R-12 | Complete; 3/3 plans verified |
-| 51 | Full T1 Tail Migration Across Remaining Catalog | T1ALL-01..05 | Complete; 8/8 plans verified |
+| 52 | On-Demand HUD Lifecycle & Primitive Shell | HUD-01..05/07/08 | Ready for review/verification (10/10); live UAT deferred |
+| 53 | Drive Context Router & Semantic Anchors | HUD-06/09 | Automated complete (5/5); live UAT human-needed |
+| 53.1 | Catalog-Wide Adaptive HUD Platform | ADAPT-01..10 | Automated verified (20/20); live UAT human-needed |
+| 54 | Permission-Scoped Drive Corpus Boundary | CORPUS-01..06 | Automated complete (8/8); live UAT human-needed |
+| 55 | Chrome-Local Graph & Incremental Truth Foundation | LOCAL-01..07, TRUTH-01/05/10 | Automated complete (5/5); domain fidelity human-needed |
+| 56 | Governing Lineage, Evidence & Deadline Engine | TRUTH-02..04/06..09/11 | Automated complete (5/5); domain/live UAT human-needed |
+| 57 | Folder & Reading HUD | VIEW-01..05 | Complete (5/5); authorized live UAT human-needed |
+| 58 | Cited Ask & Decision Policy | VIEW-06/07, POLICY-01..03 | Automated verified (5/5); legal/domain, authorized live UAT, and human UI evidence human-needed |
+| 59 | Current-User Alerts & Release Hardening | ALERT-01..05, VERIFY-01..05 | Automated verified (5/5); non-live-approved |
 
-Coverage: 17/17 v1.1.0 requirements mapped and complete, 0 orphaned.
+Coverage: 63/63 v1.2.0 requirements mapped exactly once and automated complete, 0 orphaned, 0 duplicates. VERIFY-04's named authorized-live observations remain `human_needed` and are not inferred from local fixtures.
 
 ## v1.0.0 Shipped Baseline
 
@@ -63,12 +65,18 @@ Coverage: 17/17 v1.1.0 requirements mapped and complete, 0 orphaned.
 
 ## Hard Invariants
 
-- Keep the two-tool capability surface: `search_capabilities` and `invoke_capability`.
-- Preserve MV3 Wall 1: descriptors/recipes are data; no OpenTabs runtime/plugin code ships.
-- Preserve Wall 2 or extend it only through a verified Pattern-D design with negative controls.
-- Writes/destructive actions stay fail-closed until live mutation-body UAT and consent/audit checks pass.
-- Denylist and sensitive-origin behavior remain security gates, not coverage metrics to game.
-- Search/status copy must distinguish T1-ready from DOM/discovery-pending.
+- Skopeo is explicitly invoked and leaves no visual, behavioral, or lifecycle residue when off.
+- Skopeo covers the full committed capability catalog, not only Drive/Docs. Every exact-origin catalog app resolves to an app- and context-appropriate profile or an explicit fail-quiet disposition.
+- Custom HUDs compose from one shared lifecycle, shell, primitive grammar, and versioned profile contract; app-specific semantics and renderers must not fork the runtime.
+- Capability readiness remains authoritative: only verified rows appear runnable, and write/destructive actions preserve origin classification, denylist, consent, consequence-gate, serialization, and audit boundaries.
+- Host apps remain the work surface; Skopeo is an overlay, not a replacement application. Drive and Docs remain the work surface for the vendor-contract proof pack.
+- The Graphify-style engine is bundled JavaScript running locally in Chrome with browser-native, account/corpus-partitioned state.
+- Use only existing FSB AI providers with bounded, permission-scoped excerpts; no wholesale corpus upload or new required AI setup.
+- Existing MCP is optional. No new Graphify runtime, Python process, graph/vector database, server, daemon, GCP, NotebookLM, Sheets, required LM Studio, or Skopeo-specific MCP service.
+- Source access and provenance gate every derived fact, query answer, citation, projection, and alert; revocation removes derived truth before later use.
+- Governing state, exact dates, notice terms, and deadline calculations fail visibly ambiguous rather than guessed.
+- v1.2 local notifications reach only the current FSB Chrome user when that user is the mapped owner; all other recipient states are explicitly undeliverable.
+- Side Phase 999.1 stays outside the milestone.
 
 ## Phase 44 Completion Snapshot
 
@@ -90,10 +98,21 @@ Coverage: 17/17 v1.1.0 requirements mapped and complete, 0 orphaned.
 
 ## Accumulated Context
 
+### Roadmap Evolution
+
+- Phase 53.1 inserted after Phase 53: Generalize Skopeo Adaptive HUDs Across the Capability Catalog (URGENT)
+- On 2026-07-16 the user clarified that Drive/Docs is only the first deep proof pack: Skopeo must interpret and compose custom HUDs for at least the full API-capability app catalog while remaining explicitly invoked and grounded in the shared reference-design grammar.
+
 ### Decisions
 
 Full decision log lives in PROJECT.md (v0.9.99 Phase 26-34 decisions + INV-01..04 + Walls 1/2). One v1.0.0 posture decision was surfaced by research as **DENY-04 (posture B)**, then superseded by the final consent patch: capability invoke is fully open for non-denied origins, sensitive origins are flagged/audited rather than forced to Ask, and the extra sensitive-origin confirmation is scoped to network-capture discovery. The denylist remains the hard block.
 
+- [Phase 53.1]: Plan 01 keeps app stem, service host, exact HTTPS origin, profile identity/version, and catalog hash as separate generated fields; the runtime join key is the exact `(appStem, service)` pair.
+- [Phase 53.1]: A service shared by multiple app stems receives `ambiguous-stem` with no guessed profile or executable capability, while canonical readiness is derived only from source readiness plus terminal evidence and enables invocation only for evidence-matched `t1-ready`.
+- [Phase 53.1]: Plan 02 binds each recognized current-service projection to the full tab, generation, exact-origin, service, stem, profile, profile-version, and catalog-version tuple; the pure projector never caches or exposes the complete index.
+- [Phase 53.1]: Projected actionability is derived locally from the validated canonical presentation disposition, with only exact `t1-ready` rows receiving `executionEnabled:true` and `invocable:true`; all other admitted states remain static.
+- [Phase 53.1]: Plan 03 keeps app, genre, requested lens, capability surface, risk, adapter evidence, and semantic identity separate; generic/path/text/CSS/DOM/list-position evidence can recognize an app but can never create an entity or anchor.
+- [Phase 53.1]: Stable adapter output must be exact-key, recursively frozen, tuple-current, and backed by matching exact-origin plus identity-kind evidence; Drive/Docs remains an unchanged deep-router delegation behind the injected Plan 05 seam.
 - [Phase ?]: Phase 35-01 (DENY-01/02): IG/FB/TikTok/X classified sensitive-not-denied (reads under Auto, writes mutating-gated by posture B Plan 35-03); fully-denied reserved for brokerage + ToS-hostile media. Exact-host forms (music.youtube.com NOT *.youtube.com; dashboard.stripe.com NOT api.stripe.com) avoid over-broadening.
 - [Phase 35]: Phase 35-04: catalog-side provenance scaffold placed under catalog/descriptors/_fixtures/ (not top-level descriptors/) because the non-recursive readJsonDir inlines every top-level descriptors/*.json into the shipped recipe-index.generated.js; _fixtures/ is excluded (proven via catalog regen showing 8 descriptors + SHA absent + validate-extension green).
 - [Phase 35]: Phase 35-04: OpenTabs pinned hermetically at SHA 4b17021637d2cac12b8d84d21c40e765aa7b85e9 + verbatim MIT (Copyright (c) 2026-present OpenTabs Contributors) in vendor/opentabs-snapshot/PIN.md mirroring LATTICE-PIN.md; Wall 1 enforced by tests/provenance-scaffold.test.js asserting the dir contains no runtime .js.
@@ -141,6 +160,147 @@ Full decision log lives in PROJECT.md (v0.9.99 Phase 26-34 decisions + INV-01..0
 - [Phase ?]: 43-03 (SCALE-02 self-heal impl, the net-new): turned 43-01's 3 RED tests GREEN. NEW extension/utils/relearn-scheduler.js (per-origin coalescing: N rot events on one origin -> ONE consent-gated re-learn, no thundering-herd; exponential back-off BASE 5s x2/attempt capped 5min via injectable now()/flush seam; bounded MAX_TRACKED_ORIGINS=64 LRU; consent-preserving+fail-safe -- invokes the supplied runDiscovery, captures nothing; dual-export IIFE, dynamic-code-free, NOT capability-* so off the recipe-path allowlist by construction -- Wall-1 holds). ADDITIVE on learned-recipe-store.js: recordRot/dispositionFor/recordOk per-(origin,slug) recurrence (>=3 systemic, reset-on-success, bounded RECURRENCE_CAP=24, T-32-PASS security passthrough never counted) + getOriginHealth(origin) degraded/needs-re-port accessor (all-quarantined -> degraded:true, reads the same _syncMirror as getLearnedSync) -- envelope/cap/LRU/quarantine/getLearnedSync/promote byte-unchanged. Additive importScripts in background.js after discovery-session.js. NO router-side adoption (the RED test pins only the scheduler's own behavior; _quarantineAndRelearn/consent gate/executeBoundSpec/tier dispatch/classifyRecipeBroken untouched). relearn-coalescing 16/0 + rot-recurrence-classify 19/0 + app-degraded-surfacing 14/0; recipe-path-guard + validate:extension + consent/router/store regression all green
 - [Phase ?]: 43-04 (THE MILESTONE GATE, v1.0.0 FINAL close): full npm test EXIT 0 over the whole catalog + all guards -- the authoritative v1.0.0 milestone signal. Sub-gates: INV-03 7-provider byte-equal (distinct=['RECIPE_DOM_FALLBACK_PENDING'] length 1, 31 passed); MIT provenance (127 apps MIT+SHA-pinned, PIN.md verbatim grant+disclaimer, Wall-1 no-runtime-js, 20 passed); SCALE-01 scale (1.372MB/11.7ms/621.7B/2314, 8 passed); SCALE-01 precision (eval wrong-invoke=0.000 HARD + recall@5=1.000, 16 passed; breadth curated=0.000 HARD, 52 passed); SCALE-02 self-heal (relearn-coalescing 16/0 + rot-recurrence-classify 19/0 + app-degraded-surfacing 14/0); INV-01 MCP surface + INV-02 autopilot parity; validate:extension EXIT 0 (INV-01..04 + Walls 1/2). Wrote 43-MILESTONE-GATE.md (gate table + npm-test-EXIT-0 + carried-forward NON-blocking UAT 41/42-HUMAN-UAT). 1 deviation [Rule 1/3]: lattice-provider-bridge-smoke background.js importScripts byte-freeze 187/183->188/184 for 43-03's additive relearn-scheduler importScripts (not reverting the legitimate module). v1.0.0 MILESTONE MET
 - [Phase 43]: Phase 43 CODE REVIEW + FIX + VERIFY (close): gsd-code-reviewer found 0 CRIT / 2 HIGH / 2 MED / 2 LOW -- two MATERIAL findings the executor's optimistic SUMMARY had glossed: HI-01 the self-heal scheduler was clean but DEAD/UNWIRED (capability-router._quarantineAndRelearn still fired runDiscovery fire-and-forget -> the per-origin coalescing/recurrence/degraded never ran in prod; SCALE-02 not genuinely delivered) and HI-02 the wrong-invoke=0 was PARTIALLY OVERFIT (the 190-fixture eval went to 0 but the breadth corpus-tier stayed ~0.537 unmoved; the SUMMARY overclaimed 'NOT fixture overfitting'). All 6 fixed: HI-01 WIRED the scheduler into the live rot path (_quarantineAndRelearn now routes the consent-gated re-learn THROUGH scheduleRelearn + calls recordRot; additive, degrades to legacy if absent; a NEW tests/relearn-router-wiring.test.js proves N->1 coalescing on the REAL router path, non-vacuous -- a sabotage to fire-and-forget reds it); HI-02 generalized the named brittle classes (bug->issue + file/log/report->create verb-class; bluesky publish/share/post app-alias) re-imported via the frozen machinery (eval stays 0 HARD, recall@5=1.000, curated HARD=0, corpus-tier IMPROVED 22->20 misses) AND corrected the overclaim to an HONEST framing (the 190-fixture wrong-invoke=0 is a HARD REGRESSION PIN; the corpus-tier ~0.526 is a RECORDED open adversarial frontier, future work -- the 39.5-style honest boundary); MED-01 made the coalescing N->1 test non-vacuous (sabotage reds it); MED-02 promoted 3 now-passing held-out paraphrases to curated HARD (39->42) so a re-tip fails CI; LO-01 dead-branch removal + LO-02 whole-word over-claim guard pinned (exported + sabotage-tested). gsd-verifier PASS (3/3 SC; 43-VERIFICATION.md) -- re-confirmed in the REAL working tree: full npm test EXIT 0 (142 suites all 0 failed, authoritative -- NOT a worktree); the scheduler is GENUINELY wired (proven non-vacuous via a /tmp sandbox sabotage -> RED); SCALE-01 scale+precision HARD; INV-03/provenance/INV-01..04/Walls 1/2 green. 1 WARNING (W-1, NON-blocking post-milestone follow-up): getOriginHealth (the degraded accessor) is live-data-backed but has no production CONSUMER yet (no UI/search-hit reads it -- the CONTEXT-permitted status-accessor form is satisfied; a user-visible reader is post-milestone). Commits 4a5723f9 (HI-01 wiring) / 608ad30a + 1ef07374 (HI-02 generalize+honesty) / 1407c4c6 (MED-01) / c1f45897 + e0bcf4fe (LO) + 34985e5f (REVIEW resolved). PHASE 43 COMPLETE + VERIFIED -- the v1.0.0 milestone gate is GENUINELY MET (not merely mechanically). NEXT: the milestone lifecycle (audit -> complete -> cleanup).
+- [Phase 52]: OFF retains the ended generation as a terminal tombstone; only BEGIN from OFF allocates a newer generation.
+- [Phase 52]: STARTING and ACTIVE admit only their exact generation; TERMINATING and OFF admit no render work.
+- [Phase 52]: prepared-awaiting-commit is the only retained ACTIVE reason and only matching COMMIT_READY clears it.
+- [Phase 52]: Ambient preparation is detached and one-use; only committed mount owns the Shadow root or top-layer handle. — This keeps startup cancel-safe and makes the root/top-layer transition observable.
+- [Phase 52]: One pointer-transparent Shadow owner enforces the exact six-primitive attention allowlists and text-only display sinks. — The shared owner prevents host mutation, pointer interception, primitive proliferation, and executable page data.
+- [Phase 52]: Focused and Interstitial preserve the preceding shell DOM and restore the exact trigger with preventScroll. — Identity-preserving restoration satisfies one-level back and avoids detached or body focus fallbacks.
+- [Phase 52]: The shell exposes only `full` or `compact` for its exact unconsumed placement token; runtime code never reads placement internals.
+- [Phase 52]: A newer prepared generation receives a fresh runtime API/listener identity only after the prior owner reaches terminal, abort, destroy, and complete listener/sentinel removal.
+- [Phase 52]: Active runtime Escape handling defers to the earlier shell listener when `defaultPrevented`, preventing one key from applying two back transitions.
+- [Phase 52]: Command invocation uses only its supplied tab id; side-panel requests require an explicit positive tab id and content acknowledgments derive tab authority from sender metadata. — This prevents active-tab drift and page-controlled cross-tab routing.
+- [Phase 52]: The Skopeo shell and runtime remain outside every static automation bundle and are injected only through one ordered dynamic pair. — Explicit invocation cannot become always-on content-script behavior.
+- [Phase 52]: Prepared generations persist ACTIVE with the prepared-awaiting-commit reason before commit but project Starting until exact ready admission. — Storage remains authoritative across MV3 suspension without presenting a partially mounted runtime as active.
+- [Phase 52]: Wake recovery probes ACTIVE records without injection and normalizes interrupted, stale, malformed, or missing runtime state to OFF. — Worker wake cannot resurrect or automatically start Skopeo.
+- [Phase 52]: Side-panel tab activation assigns the incoming explicit tab id and clears the outgoing row before any await; status, shortcut, toggle responses, and events must still match that captured id before writing. — This prevents late Tab A work from displaying or controlling Tab B.
+- [Phase 52]: Side-panel state copy is selected only from local enumerations and written through changed-value-only textContent sinks. — Background message text cannot become markup or spam equivalent atomic live announcements.
+- [Phase 52]: Active kill guidance is disabled and nonfocusable; shortcut-settings action semantics return only outside Active. — Visible, pointer, focus, and accessible meanings remain aligned.
+- [Phase 52]: Cascade-critical host geometry is asserted through production `getComputedStyle` in local Chrome for popover and fallback paths; inline styles are secondary defense only. — Browser cascade, not source intent, is authoritative for interception safety.
+- [Phase 52]: Focused and Interstitial surfaces stage invisibly, measure their production rectangle, and commit only when viewport inset and 8px required-host-control clearance pass. — Unsafe transitions preserve exact prior DOM, focus, primitives, and resources while announcing the approved failure copy.
+- [Phase 52]: Every attention render owns its listeners, pointer surfaces, nodes, and focus hook as one disposable scope; legitimate one-level back suspends that scope intact and permanent replacement/destroy releases it once in reverse order. — Repeated attention cycles plateau and terminal teardown returns all eleven categories to zero.
+- [Phase 52]: Boot hydration, explicit tab activation, and window-focus resolution share one monotonic authority epoch; only the newest captured identity may select, activate, or repaint Skopeo. — Older async tab work can finish best-effort data work without retargeting the current-tab control.
+- [Phase 52]: Runtime and shell resources form one exact eleven-key certificate, and the worker accepts it only after runtime listeners/timers/globals are removed with finite numeric zeroes from the authoritative sender/generation. — Partial, coerced, malformed, or premature cleanup can no longer finish a generation.
+- [Phase 52]: Ambient preparation is advisory rather than commit authority; an exact token is consumed once and fresh page geometry must still authorize mount before any host or resource acquisition. — Page controls moving during the prepare/commit gap cannot be covered by stale placement.
+- [Phase 52]: The single resize listener synchronously remeasures committed Focused/Gate geometry and the current required control, preserving safe scope identities or unwinding at most twice to the nearest measured-safe suspended level. — Revoked collision certificates cannot leave an unsafe rich surface committed.
+- [Phase 52]: Every side-panel activation claims a fresh controller token, including same-tab re-entry, while status, toggle, and shortcut retain independent latest-request lanes. — Numeric tab-ID reuse cannot reauthorize expired asynchronous work or make unrelated current requests cancel each other.
+- [Phase 52]: The side panel retains the highest accepted positive safe-integer lifecycle generation independently per tab; equal generations remain valid, but lower or unverifiable generations fail closed once a floor exists. — Delayed responses and live events cannot regress a newer accepted lifecycle state.
+- [Phase 53]: Only exact Drive/Docs origins plus closed stable-identity evidence can produce recognized context.
+- [Phase 53]: Every route admission receives a fresh context epoch, including unsupported and post-disposal attempts.
+- [Phase 53]: Router output excludes raw URLs and page copy, carrying only closed bounded stable metadata.
+- [Phase 53]: Semantic meaning stays recursively frozen while private DOM and Range candidates remain revocable binding state.
+- [Phase 53]: Every bind attempt and withdrawal advances bindingEpoch; async commits require generation, contextEpoch, semanticIdentity, bindingEpoch, and isCurrent authority.
+- [Phase 53]: Relevant signals withdraw invalid projections synchronously and share at most one owned validation frame.
+- [Phase 53]: Shell projection copy is selected only from frozen local maps after exact runtime model validation; caller strings never become visible or accessible copy.
+- [Phase 53]: The Phase 53 semantic mark is an independent pointer-transparent node scope beside the inherited Ambient surface, not a controlled-fixture attention render.
+- [Phase 53]: Target withdrawal invalidates and removes binding state while retaining recognized-context authority so a higher same-context binding epoch may rebind.
+- [Phase 53]: Keep router, trusted-adapter registry, shell, and teardown evidence under the existing Phase 52 installOwner lifecycle. — One generation owner preserves explicit invocation, abort-first cleanup, and exact zero-residue authority.
+- [Phase 53]: Allow URL-only same-document handoff only for the matching ACTIVE generation through the exact route-change envelope. — SPA navigation must reroute in place without reinjection, auto-start, or worker-side page interpretation.
+- [Phase 53]: Require the registry's exact current anchor snapshot at the final shell side effect. — Generation, context epoch, semantic identity, binding epoch, and bound state must all remain authoritative after asynchronous work.
+- [Phase 53]: The local-Chrome closure fixture exercises router, registry, shell, and runtime in exact production order while test-only row attributes remain mechanics evidence only. — This proves integrated authority and browser geometry without allowing a synthetic fixture to become Google adapter authority.
+- [Phase 53]: Automated Nyquist compliance is green while Phase 53 validation remains partial and live-approved remains false. — Current Drive/Docs host signals, live paint ordering, host-control coexistence, and VoiceOver were not observed and remain human-needed evidence debt.
+- [Phase 53]: Router and registry contracts run exactly once immediately before the existing Skopeo integration and browser segment in the default test chain. — Dependency ordering makes the security foundations mandatory without removing or reordering any prior repository command.
+- [Phase 53]: An explicit false projection callback synchronously withdraws registry binding authority and permits one fresh higher-epoch resolution. — Shell rejection must never leave the registry reporting a bound anchor without a mark.
+- [Phase 53.1]: Plan 04 makes the adaptive composer a pure exact-key, recursively frozen model-version-1 boundary. — Authority, attention, primitives, readiness groups, renderer request, and consequence data stay independently validated.
+- [Phase 53.1]: Generic or missing-copy contexts use complete Skopeo-owned fallback sentences and never inherit raw host, URL, slug, HTML, or profile-defined chrome. — Stable adapter evidence is required before entity, anchor, chip, or halo output.
+- [Phase 53.1]: Adaptive UI reuses the sole Shadow shell, transactional surface scopes, focus restoration, and eleven-category resource ledger. — The shell independently rechecks model policy and authority immediately before commit.
+- [Phase 53.1]: Only native Skopeo controls emit action intent; non-ready rows and result atoms remain static, and consequence confirmation emits at most one request. — Page content and asynchronous results cannot escalate attention or invoke work.
+- [Phase 53.1]: Plan 05 copies adapter and renderer IDs only from the frozen profile schema and resolves unknown IDs to null. — Profile data remains selection data and never supplies executable recognition or presentation behavior.
+- [Phase 53.1]: Ordinary genre adapters require matching exact-origin plus an app-owned stable identity key before emitting an entity or anchor. — Labels, paths, selectors, classes, DOM shape, and list position never establish identity; generic profiles stay app-level.
+- [Phase 53.1]: Drive/Docs routes once through the unchanged Phase 53 router and preserves its identity/evidence or failure without a guessed fallback. — The deep proof pack is delegated, not generalized or replaced.
+- [Phase 53.1]: Typed results normalize only to recursively frozen shell-approved atoms under 12/50/8/512 bounds. — Hostile text is inert and bounded, narrow tables become labelled facts, and malformed structure becomes one safe notice.
+- [Phase 53.1]: Plan 06 authorizes consequence targets only from the exact current verified semantic entity or validated non-secret fields in the closed target-role vocabulary. — Profile page nouns and caller-provided display claims never substitute for target authority.
+- [Phase 53.1]: Consequence tokens are manager-owned 256-bit values with a 30-second lifetime, bound to the complete tuple, slug, and validated args, and consumed synchronously before the sole router invocation. — Cancel, stale authority, kill, replacement, expiry, replay, and classification drift cannot create another attempt.
+- [Phase 53.1]: Projection readiness/effect/param summary and catalog descriptor service/class/schema must agree at open and confirm; typed router output returns only if that same canonical authority remains live after await. — Secrets are masked in bounded material copy and unsupported schemas fail closed.
+- [Phase 53.1]: Plan 07 re-reads the exact current tab URL and creates the current-service projection before dynamic injection, then sends exactly one configure message before prepare. — MV3 wake reprojects the same generation without auto-start, and Skopeo remains absent from static/all-pages content registration.
+- [Phase 53.1]: Sender tab metadata and the live background controller/projection are authoritative for ready reads and consequences; caller tuples and slugs are revalidated claims. — A valid ready read consumes one bounded action token before exactly one existing-router invocation and returns a typed result only while the same full tuple remains live after await.
+- [Phase 53.1]: Same-document replacement requires the exact enriched higher-context-epoch envelope, while hard or origin navigation is terminal and all controller gates invalidate on kill/replacement. — Legacy boolean route acceptance cannot prove replacement authority and is not retained.
+- [Phase 53.1]: Automated catalog coverage, deterministic fixtures, and local-Chrome mechanics approve automated closure only. — All nine authorized live genre rows remain `human_needed` and `live_approved:false` until user-controlled third-party-host evidence is recorded.
+- [Phase 53.1]: Plan 08 accepts execution authority only from successfully resolved installed T1a handlers; service strings and descriptor summaries never synthesize origin or schema authority. — This removes the verified cross-origin execution mismatch and fails closed when installed authority is absent.
+- [Phase 53.1]: Service identity, serviceOrigin, admittedPageOrigins, and per-capability executionOrigin remain distinct; only an exact execution-origin match makes a Ready row invocable. — A page may select a profile without gaining cross-origin execution authority.
+- [Phase 53.1]: Complete canonical parameter schemas stay background-only; content receives only executionOrigin, schemaDigest, and a bounded display-only paramSummary. — Display metadata cannot become validation authority or disclose the full schema surface to content.
+- [Phase 53.1]: Coverage independently resolves installed handlers and recomputes tier, origin, class, canonical schema, and digest instead of trusting generated authority as expected data. — Independent derivation makes stale or tampered generated authority observable.
+- [Phase 53.1]: Plan 11 allocates each route sequence synchronously from the current controller entry and binds it to tab, controller identity, generation, admitted origin, and lane version before runtime delivery. — Delayed replies remain scoped to the controller generation that admitted them.
+- [Phase 53.1]: Route-derived projection, authority, token, gate, and cleanup changes occur only in the controller-local commit lane after repeated currentness checks. — Only the latest admitted request may change current session state.
+- [Phase 53.1]: Replacement, termination, hard navigation, origin change, and tab removal synchronously close the controller route lane. — Terminal transitions retain precedence over delayed same-document work.
+- [Phase 53.1]: Argument collectability is decided by the complete installed schema: validate an empty object first, then compile at most 12 safe scalar fields, and otherwise keep the row static.
+- [Phase 53.1]: Schema defaults, examples, descriptions, patterns, secret-shaped fields, and representative verifier values never become projected form metadata or control values.
+- [Phase 53.1]: Only source-Ready reads with empty or form contracts are interactive in Plan 09; all five source-Ready writes retain contracts but remain static with consequence-contract-pending.
+- [Phase 53.1]: The shell emits raw own-key values, runtime parses once under a tuple-owned collection epoch, and background independently recomputes installed authority and validates typed args before invoking the existing router.
+- [Phase 53.1]: Consequence authority comes only from a frozen per-slug registry compiled against the complete installed schema and effective collector. — Parameter names, schema copy, page content, semantic entity, and action-label grammar are untrusted and cannot establish target, effect, or material authority.
+- [Phase 53.1]: A write is visually Ready only when trusted target and material roles exactly cover every accepted effective argument field and both authority digests are current. — Exact accepted-field coverage prevents a collected optional mutation from disappearing silently, while schema and consequence digests make hidden drift stale.
+- [Phase 53.1]: Catalog service identity and live page service identity remain distinct for Notion. — The installed descriptor must match the generated notion.so catalog service, while execution is separately pinned to the exact app.notion.com current origin.
+- [Phase 53.1]: Confirmation independently compares supplied and rendered field identities and consumes its tuple-bound token before awaiting the sole router dispatch. — This closes silent material omission and ensures cancel, replay, parallel confirmation, expiry, route replacement, kill, and late completion cannot create a second attempt.
+- [Phase 53.1]: Plan 12 derives its closure oracle from the production catalog generator and installed resolver, then exercises focused production harnesses for controller routing and preserved Drive/resolver behavior. — Release evidence stays tied to real catalog authority instead of duplicating expected data in fixtures.
+- [Phase 53.1]: The five substantive CR checks and their weakened controls execute before registration assertions. — A controlled RED can prove missing wiring only after the product and harness behavior has already passed.
+- [Phase 53.1]: Automated closure evidence remains separate from authorized live-host evidence. — The byte-identical HUMAN-UAT ledger stays `human_needed` and `live_approved:false` until user-controlled third-party-host observations exist.
+- [Phase 52]: Rich attention owns one session-ledger animation frame whose handle is released before synchronous geometry revalidation. — Release-before-revalidate makes Back, destroy, and unsafe termination exact and rearm is limited to a live nonterminal rich shell.
+- [Phase 52]: Current placement is applied to detached Ambient and Anchored scopes before restoration; Focused restoration remains identity-only. — No stale rail can become visible, and missing or unapplied placement fails closed through the generation's one-shot unsafe-layout request.
+- [Phase 52]: Status and toggle retain independent request lanes while lifecycle work shares one activation-scoped presentation token. — Accepted live events revoke older response paint authority without cancelling or repeating dispatched side effects; rejected events claim nothing.
+- [Phase 52]: Per-tab lifecycle presentation is ordered Starting 1, Active 2, terminal 3 within each positive worker generation. — Equal or forward stages remain admissible, and only a strictly newer generation can begin again at a lower stage.
+- [Phase 54]: Corpus identity is a strict versioned length-prefixed account/root/source tuple with no global fallback. — Structural tuple authority prevents delimiter collisions and cross-account or cross-corpus substitution.
+- [Phase 54]: Opaque not-found evidence remains inaccessible; only authoritative reconciliation may produce missing. — Transient or privacy-preserving Drive responses must not be promoted into deletion authority.
+- [Phase 54]: Metadata, physical membership, and content fingerprints remain separate canonical domains. — Rename and move evidence cannot impersonate a revision or exact-byte change.
+- [Phase 54]: Trusted local persistence boots only after one confirmable awaited TRUSTED_CONTEXTS call; any missing, rejected, or non-confirmable result leaves feature and corpus authority closed. — The storage access wall must be browser-enforced before any future corpus metadata can exist.
+- [Phase 54]: Dual-loaded feature clients use only fixed exact-key messages or explicit background methods; no bridge accepts arbitrary keys, values, namespaces, storage areas, URLs, tabs, or account identity. — A generic proxy would recreate the content-to-local authority that this plan removes.
+- [Phase 54]: CAPTCHA content sends only type and sitekey; background derives the authoritative sender URL, reads the secret trusted-only, and emits bounded local error codes. — Page-compromised content must never become a secret oracle or forge solver origin authority.
+- [Phase 54]: One schema-parsed control manifest is the only visibility authority; partition/source scans, current-user hints, and last-corpus state can never select a corpus. — Replacement stays closed until the exact candidate checkpoint, active partition, and committed operation are durable and the pointer is written last.
+- [Phase 54]: Source and partition removal are tombstone-first across the exact seven-name future-consumer registry; each adapter must return exact purge success and prove zero owned influence before terminal metadata. — Partial participant work remains a bounded durable journal and can never reopen stale influence.
+- [Phase 54]: MV3 wake recovery reparses the active partition, checkpoint, operation, source key/body pairs, and journals against a fresh optional account permission ID. — Missing identity is unproven, account mismatch withdraws before purge, and corrupt or stale durable state closes instead of being salvaged.
+- [Phase 54]: Drive corpus authority uses a private six-action namespace outside the public catalog. — Literal internal requests prevent arbitrary URL, method, field, query, and MIME expansion.
+- [Phase 54]: Resource keys and page tokens remain opaque transport-instance evidence scoped to one source or operation chain. — Raw, forged, stale, foreign, and repeated claims fail before authenticated execution.
+- [Phase 54]: Corpus content admits only Docs-to-text/plain export or exact text/plain blob download through a 10 MiB whole-read sink. — Complete bytes are rehashed before fatal decode and source text never enters normal results.
+- [Phase 54]: Corpus operations bind one exact trusted tab/origin/generation/profile/context/entity snapshot to a freshly proven Drive permission ID and enrolled root. — Email, authuser, names, profile position, alternate roots, and stale controller tuples make zero admitted output.
+- [Phase 54]: Physical source membership requires both current parent metadata and a bounded physical parent-child listing path to the exact root. — Root files remain corpus-wide, nested sources inherit one nearest direct-child vendor, cross-vendor ambiguity stays pending, and shortcut targets are never traversed.
+- [Phase 54]: Authority certificates are nonserializable operation-local identities held only in WeakMap/WeakSet registries. — Single/set proof coalesces only inside one operation and every certificate is destroyed on finish, timeout, abort, or callback completion.
+- [Phase 54]: Display admission repeats account/root/source/store/context currentness after assembly, removes any affected source row, and suppresses the aggregate unless the complete requested set remains current. — A failed source contributes no identifier, label, state, count, or stale callback value.
+- [Phase 54]: Plan 06 brackets complete physical inventory with a baseline change token and drains change hints before pointer-last publication. — This closes scan races without granting event payloads membership authority.
+- [Phase 54]: Plan 06 reserves missing for complete authoritative rescan absence; opaque removal, denial, and 404 evidence remain inaccessible. — This prevents false deletion claims while withdrawing unavailable source influence.
+- [Phase 54]: Enrollment and status messages are non-authoritative exact claims containing only the live generation/origin/profile-version/context/entity token, action token, and claimed root or current-source ID. — Background must re-derive tab, account, root, source, and Drive authority; content cannot claim account, permission, tab, or certificate authority.
+- [Phase 54]: Corpus presentation uses closed enrollment, current-source, active-corpus, and corpus-closed models; pending, inaccessible, and missing current sources admit only local generic identity, while active rows and aggregates require one complete bounded row-token set. — Structural omission prevents stale labels, rows, counts, details, or source identity from surviving proof loss or a fail-quiet transition.
+- [Phase 54]: Corpus UI is an auxiliary scope inside the existing Skopeo shell and runtime lifecycle, with synchronous withdrawal and tuple/entity/action-token rechecks before every paint. — Reusing the sole Shadow root, shell resource ledger, and generation abort boundary preserves host integrity and exact-zero teardown without a parallel lifecycle owner.
+- [Phase 54]: Trusted corpus boot and recovery complete before enrollment, reconciliation, projection, or consumer dispatch. — A failed storage restriction, dependency load, participant registration, or recovery leaves the entire corpus boundary closed across worker wakes.
+- [Phase 54]: The future-consumer seam is background-only and requires one exact source or a bounded exact set for one of five closed operation kinds. — There is no implicit current, all, global, content-message, storage, transport, or certificate fallback.
+- [Phase 54]: Rows and aggregates require fresh same-operation display proof through final assembly. — Any account, root, source, partition, access, or controller drift removes affected output and suppresses incomplete aggregate influence.
+- [Phase 54]: Deterministic local Chrome evidence never changes authorized live Drive approval. — The live ledger remains metadata-only, human-needed, and unapproved until an authorized run is recorded.
+- [Phase 55]: Plan 01 separates stable graph identity from generation currency: source byte ranges and closed kinds establish stable IDs, while fragment and endpoint generations establish record, relation, and overlay versions.
+- [Phase 55]: Cross-batch extraction references use only engine-derived @fsb: handles advertised from validated earlier batches in the same source generation; raw prior refs and current or future handles remain invalid.
+- [Phase 55]: UniversalProvider preserves the configured provider and timeout message while one exact caller signal cancels fetch, backoff, unsupported-parameter retry, recursive retry, and late completion with fixed FSB_PROVIDER_ABORTED output.
+- [Phase 55]: Corpus-owned one-call capabilities authenticate graph purge participants without sharing the corpus mutation guard. — Separate WeakMap domains prevent signal-shaped or foreign guards from crossing trust boundaries.
+- [Phase 55]: Staged graph batches persist only provider-bound hashes and locally derived version IDs. — Name-bearing labels become durable only in authoritative fragment records and matching lexical shards.
+- [Phase 55]: Source replacement closes and proves old influence absent before invisible staging; one validated source control pointer publishes last. — Quota, cancellation, corruption, or worker loss can expose only a complete generation or complete absence.
+- [Phase 55]: Candidate overlays are proposer-owned and exact-empty replacement removes only proposer-known keys without reading a target. — Target advance invalidates prior endpoint versions while empty clear reveals no former target or overlay existence.
+- [Phase 55]: Fresh-worker graph recovery is sorted, locally derivable, and capped at 128 work items. — Recovery never infers a current corpus fingerprint or hydrates a query cache, and corrupt authority remains withheld.
+- [Phase 55]: Extraction sessions expose only the eight invariant partition/account/source/content/schema/prompt/provider/model values; raw excerpts and mutable generation state remain private and are erased on terminal outcomes. — A frozen nonserializable capability can cross trusted engine steps without retaining a Phase 54 certificate, operation identity, signal, proof epoch, metadata fingerprint, membership fingerprint, or public source text.
+- [Phase 55]: Normal and repair extraction use only the currently configured provider/model through one UniversalProvider-compatible call, with a static system policy and inert one-source JSON envelope. — Rereading settings before every step and invalidating on drift prevents mixed-provider generations while avoiding automation history, caches, parsers, fallbacks, tools, and new model infrastructure.
+- [Phase 55]: Phase 54 ingestion certificates with null content fingerprints bind the trusted one-use transport hash at preparation, but cannot produce an exact reuse key. — The production authority intentionally omits an ingestion content fingerprint; transport hash binding enables extraction without weakening exact reuse, and any later non-null certificate fingerprint must still match the session.
+- [Phase 55]: Only stripped locally derived batches cross staging, and successful finalization returns the graph store's exact complete fragment, lexical, adjacency, and empty result-cache seal payload. — This keeps raw response and response-local refs outside durable state and lets the runtime seal one complete provider-bound generation without reshaping or partial publication.
+- [Phase 55]: Query authority lives only in nonserializable WeakMap scopes over a sorted exact partition and source-generation set. — Scope minting and cache-owner registration remain zero-read, while cloned, forged, released, evicted, or stale capabilities fail closed.
+- [Phase 55]: Only ensureScopeCache may hydrate a query cache from current exact source-owned fragments, shards, and candidate overlays. — Every generation is checked before and after reconstruction so disposable accelerators never become authority.
+- [Phase 55]: One exact-set cache is live per partition with a four-partition LRU, and invalidation closes attached scopes and clears all retained collections. — Different source sets cannot reuse subset or superset labels and edges, and purge absence is synchronous and exact.
+- [Phase 55]: Cross-document relations remain candidate-only and require both endpoint source generations and record versions in the exact scope. — Traversal can expose proposing-source evidence without fusing identity or inferring legal effect, precedence, or governing truth.
+- [Phase 55]: Every graph preparation, provider, repair, staging, publication, candidate-link, and read effect enters through its own fresh Phase 54 operation. — Graph sessions retain invariant binding values but never a reusable certificate or signal.
+- [Phase 55]: Provider work returns only through publisher.publish(effect) as provider-no-storage. — Raw provider output is discarded before a later certified staging effect can mutate durable graph state.
+- [Phase 55]: The background owns one frozen graph facade after trusted access, participant registration, corpus recovery, and durable graph recovery. — No content, MCP, server, process, or remote runtime receives graph authority.
+- [Phase 55]: Deterministic structural/security and provisional regression gates are independent from expert domain fidelity. — Pending fixtures remain human_needed and can never be represented as expert-approved gold labels.
+- [Phase 56]: Validate one canonical family citation registry once, then cross-check assertions and downstream records by immutable ID. — This preserves exact evidence admission while keeping the 2,048-item boundary linear.
+- [Phase 56]: Use zero-based proleptic-Gregorian ordinals and keep boundary/timezone as explicit proof data. — Host date, locale, timezone, clock, and hidden off-by-one defaults cannot influence derivation.
+- [Phase 56]: Require exact immutable calendar ID/version/data for business-day rules and abstain with sorted blockers otherwise. — No host weekend or holiday fallback can create an eligible deadline.
+- [Phase 56]: Fresh Drive source state is distinct from claim trust, and exact-set graph reads return one complete canonical set or no graph data. — Pending, unavailable, stale, over-cap, or endpoint-incomplete inputs cannot be silently omitted or replaced by search.
+- [Phase 56]: Exact-set identity hashes source state/fingerprint/generation, record/relation versions, and full evidence locator identities under the `sgx1:` namespace. — Labels, filenames, recency, similarity, source order, and relevance never influence complete-set authority.
+- [Phase 56]: Truth extraction uses one configured provider/model over one source and stages a normalized batch only after a frozen provider-no-storage acknowledgement. — Raw responses, another source, tools, fallback models, storage, graph query, and governing/deadline decisions stay outside the model boundary.
+- [Phase 56]: Each model batch may cite only evidence handles advertised to that current excerpt batch, and only JSON/closed-shape failure receives one fresh-authority category/path repair. — Guessed prior handles and semantic/evidence/provider/currentness/cancellation failures are terminal.
+- [Phase 56]: Governing-family identity binds only the exact-set digest, sorted source-owned document IDs, and accepted explicit lineage relation IDs. — Candidate confidence, labels, recency, similarity, majority, and input order cannot promote precedence.
+- [Phase 56]: Keep historical typed facts visible but let only the selected governing document and latest accepted exact-clause overlay clear conflicts or deadlines. — Superseded evidence remains inspectable without creating current certainty.
+- [Phase 56]: Preserve stated and derived notice deadlines as separate cited assertion versions and block eligibility when their applicable values conflict. — Derivation never overwrites contract text or hides disagreement.
+- [Phase 56]: Only the truth store may derive an `sts1:` identity from one reparsed semantic proof, bounded page set, hashes, manifest chunks, and symmetric dependencies. — Caller-supplied storage identities cannot publish truth.
+- [Phase 56]: Publish family truth pointer-last and withdraw it pointer-first across every sibling source dependency. — Staging, corruption, or uncertain absence remains invisible rather than falling back to prior or newest-looking bytes.
+- [Phase 56]: Once registered, the graph truth invalidator synchronously withdraws source and proposer-plus-old/new-target overlay dependencies before graph publication. — A failed, aborted, or malformed invalidation result blocks the graph mutation.
+- [Phase 56]: Chunk and independently hash large snapshot manifests under the 256-KiB value cap. — The exact 2,048-citation boundary remains publishable without weakening complete-manifest validation.
+- [Phase 56]: The truth engine derives the complete current source set internally and requires an explicit schema-parsed evaluation-context digest to be authoritatively revalidated before adjudication and again before publication or projection. — No caller graph, partial search result, host clock, locale, or default timezone can become governing authority.
+- [Phase 56]: Trusted boot registers the graph invalidator and real `citations` owner before corpus, graph, and truth recovery, then creates one background-private seven-method truth facade only after all recovery succeeds. — `counts` and `alerts` remain exact empty later-phase owners, and no content, MCP, UI, policy, or scheduling surface is introduced.
+- [Phase 56]: Truth inspection returns only recursively frozen typed projections capped at 64 KiB and repeats exact-set, source, context, and persisted-input currentness before every read. — Any stale or mismatched binding withdraws old truth before returning a closed result.
+- [Phase 56]: The 24-case network-free gate reports deterministic structural/security, provisional regression, and domain fidelity independently. — A passing synthetic/redacted exact comparison remains `not gold`, and domain fidelity stays `human_needed` until all required reviewer roles provide matching versioned approval evidence.
 
 ### Pending Todos
 
@@ -148,7 +308,12 @@ None yet.
 
 ### Blockers/Concerns
 
-None active.
+- Phase 56 deterministic structural/security and provisional regression gates pass, and the full repository suite including the automated Chrome browser contract is green. Commercial-contract domain adjudication, live citation navigation, and authorized Chrome MV3 lifecycle UAT remain `human_needed`; no automated result is live- or expert-approved.
+- Phase 53.1 independently re-verified all 20 automated must-haves and closed CR-01 through CR-05 with no automated gaps. Authorized live-host, accessibility, and reversible transactional evidence remains the sole pending work in `53.1-HUMAN-UAT.md`; `live_approved` remains false.
+
+Plans 52-09 and 52-10 close WR-07/WR-08 with fresh geometry certificates, same-tab ABA-safe controller authority, and retained per-tab lifecycle generation floors. Fresh review/goal verification remains required before Phase 52 can be marked complete, and Phase 52 is not live-approved: the user deferred `52-UAT.md` rows L01-L15, including blocking live proofs T-52-01/T-52-02/T-52-03, Chrome/Drive/Docs/VoiceOver evidence, and live eleven-category resource snapshots.
+
+Phase 53 automated evidence is green and all 5 plans are complete, but current Drive/Docs selector, paint, host-control, and VoiceOver rows P53-LIVE-01..12 remain human-needed; Phase 53 is not live-approved.
 
 ### Quick Tasks Completed
 
@@ -290,6 +455,7 @@ Items acknowledged and carried forward from previous milestone closes (Chrome MV
 | uat_gap | Phase 33 / 33-HUMAN-UAT.md (live media playback fidelity) | human_needed | v0.9.99 Phase 33 |
 | uat_gap | Phase 34 / 34-HUMAN-UAT.md (live upload fidelity) | partial: UAT-34-02 pass; UAT-34-01 MCP text-file smoke pass, binary/submit checks still human_needed; UAT-34-03/04 still human_needed | v0.9.99 Phase 34 |
 | uat_gap | Phases 01/16/20/25 (v0.10/v0.11/v0.12 live-browser) | human_needed/partial | prior closes |
+| uat_gap | Phase 52 / 52-UAT.md (L01-L15 live Chrome, Drive/Docs, VoiceOver, shortcut, MV3 wake, and eleven-category resource evidence) | partial; automated PASS, live UAT user-deferred, NOT LIVE-APPROVED | v1.2.0 Phase 52 |
 
 Carry-forward publish/tag gates (pre-existing, user-gated): `npm publish fsb-mcp-server@0.9.0`; `npm publish fsb-mcp-server@0.10.0`; branch + tag pushes for v0.9.62 / v0.9.63 / v0.9.69 / v0.10.0 / v0.11.0 / v0.12.0; `clawhub publish "skills/FSB Skill"`; public package publication.
 
@@ -297,15 +463,75 @@ Carry-forward publish/tag gates (pre-existing, user-gated): `npm publish fsb-mcp
 
 Runtime is `@full-self-browsing/lattice@1.4.0` via the `lattice` alias; pin/guardrails remain `.planning/LATTICE-PIN.md`, `package-lock.json` integrity, and `tests/lattice-public-package.test.js`. v0.9.99 reuses Lattice Ed25519/JCS receipts for recipe signature verification and the `run_task`/Lattice ResumePolicy survival machinery for in-flight fetch resume.
 
+## Performance Metrics
+
+| Phase-Plan | Duration | Tasks | Files | Completed |
+|------------|----------|-------|-------|-----------|
+| 52-01 | 9 min | 2 | 2 | 2026-07-14 |
+| 52-02 | 14 min | 3 | 4 | 2026-07-14 |
+| 52-03 | 20 min | 2 | 4 | 2026-07-14 |
+| Phase 52 P04 | 26min | 3 tasks | 4 files |
+| Phase 52 P05 | 20min | 3 tasks | 4 files |
+| 52-06 | 9h 17m elapsed across checkpoint | 2 dispositions | 4 evidence/test files | 2026-07-15 |
+| 52-07 | 24 min | 3 | 4 | 2026-07-15 |
+| 52-08 | 28 min | 3 | 7 | 2026-07-15 |
+| 52-09 | 15 min | 2 | 3 | 2026-07-15 |
+| 52-10 | 17 min | 2 | 5 | 2026-07-15 |
+| Phase 53 P01 | 8 min | 2 tasks | 2 files |
+| Phase 53 P02 | 20 min | 2 tasks | 4 files |
+| Phase 53 P03 | 15 min | 2 tasks | 3 files |
+| Phase 53 P04 | 16 min | 3 tasks | 5 files |
+| Phase 53 P05 | 45min | 3 tasks | 6 files |
+| 53.1-01 | 20 min | 3 | 7 | 2026-07-16 |
+| 53.1-02 | 19 min | 2 | 2 | 2026-07-16 |
+| 53.1-03 | 15 min | 2 | 2 | 2026-07-16 |
+| Phase 53.1 P04 | 24 min | 3 tasks | 3 files |
+| Phase 53.1 P05 | 27 min | 3 tasks | 4 files |
+| Phase 53.1 P06 | 25 min | 2 tasks | 2 files |
+| Phase 53.1 P07 | 1h 4m | 3 tasks | 10 files |
+| Phase 53.1 P08 | 35 min | 3 tasks | 16 files |
+| Phase 53.1 P11 | 23 min | 2 tasks | 2 files |
+| Phase 53.1 P09 | 1h 12m | 3 tasks | 18 files |
+| Phase 53.1 P10 | 42m | 3 tasks | 15 files |
+| Phase 53.1 P12 | 19 min | 3 tasks | 3 files |
+| Phase 52 P11 | 26min | 2 tasks | 3 files |
+| Phase 52 P12 | 14min | 2 tasks | 5 files |
+| Phase 54 P01 | 16 min | 2 tasks | 2 files |
+| Phase 54 P02 | 30 min | 3 tasks | 9 files |
+| Phase 54 P03 | 36 min | 3 tasks | 2 files |
+| Phase 54 P04 | 33 min | 3 tasks | 3 files |
+| Phase 54 P05 | 12 min | 2 tasks | 3 files |
+| Phase 54 P06 | 26 min | 2 tasks | 2 files |
+| Phase 54 P07 | 25 min | 2 tasks | 4 files |
+| Phase 54 P08 | 52 min | 2 tasks | 7 files |
+| Phase 55 P01 | 29 min | 2 tasks | 4 files |
+| Phase 55 P02 | 38 min | 3 tasks | 4 files |
+| Phase 55 P03 | 35 min | 3 tasks | 2 files |
+| Phase 55 P04 | 24 min | 2 tasks | 2 files |
+| Phase 55 P05 | 46 min | 3 tasks | 10 files |
+| Phase 56 P01 | 46 min | 4 tasks | 4 files |
+| Phase 56 P02 | 44 min | 4 tasks | 8 files |
+| Phase 56 P03 | 1h 5m | 3 tasks | 4 files |
+| Phase 56 P04 | 46 min | 3 tasks | 4 files |
+| Phase 56 P05 | 47 min | 3 tasks | 11 files |
+| Phase 57 P01 | 21min | 3 tasks | 4 files |
+| Phase 57 P02 | 31min | 3 tasks | 7 files |
+| Phase 57 P03 | 29min | 3 tasks | 3 files |
+| Phase 57 P04 | 44min | 3 tasks | 9 files |
+| Phase 57 P05 | 1h 2m | 3 tasks | 10 files |
+| Phase 58 P01 | 15min | 3 tasks | 5 files |
+| Phase 58 P02 | 13min | 3 tasks | 2 files |
+| Phase 58 P03 | 33min | 3 tasks | 5 files |
+
 ## Session Continuity
 
-Last session: 2026-06-29T15:38:28-05:00
-Stopped at: Phase 44 (T1 Readiness Inventory + Status Surface) complete and verified. v1.1.0 is active. The next executable step is to plan Phase 45: T1 Porting Scaffold + Handler Contract Hardening.
-Resume file: None
+Last session: 2026-08-27T12:45:00.000Z
+Stopped at: v1.2.0 automated complete; live/human evidence remains human_needed
+Resume file: .planning/phases/59-current-user-alerts-release-hardening/59-HUMAN-UAT.md
 
 ## Next Actions
 
-Plan Phase 45. Build the reusable handler/recipe porting scaffold and contract tests using the Phase 44 readiness matrix as the candidate source.
+When authorized, record actual legal/domain, Drive/Docs/PDF, native-notification, and human-accessibility observations in the Phase 59 human UAT ledger. Do not infer approval from automated evidence.
 
 ### (historical) Phase 37 planning context
 

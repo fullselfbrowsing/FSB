@@ -15,6 +15,7 @@
     "debugger",
     "webNavigation",
     "alarms",
+    "notifications",
     "clipboardWrite",
     "offscreen",
     "system.memory"
@@ -39,6 +40,15 @@
   },
   "side_panel": {
     "default_path": "ui/sidepanel.html"
+  },
+  "commands": {
+    "toggle-skopeo-current-tab": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+Space",
+        "mac": "Alt+Space"
+      },
+      "description": "Toggle Skopeo in current tab"
+    }
   },
   "options_page": "ui/control_panel.html",
   "web_accessible_resources": [

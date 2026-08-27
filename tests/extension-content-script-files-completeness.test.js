@@ -7,6 +7,7 @@ const assert = require('assert');
 const repoRoot = path.join(__dirname, '..');
 const backgroundSource = fs.readFileSync(path.join(repoRoot, 'extension', 'background.js'), 'utf8');
 const wsClientSource = fs.readFileSync(path.join(repoRoot, 'extension', 'ws', 'ws-client.js'), 'utf8');
+const manifest = JSON.parse(fs.readFileSync(path.join(repoRoot, 'extension', 'manifest.json'), 'utf8'));
 
 function parseStringArray(source, anchor) {
   const match = source.match(new RegExp(anchor + '\\s*=\\s*\\[([\\s\\S]*?)\\]'));
@@ -67,5 +68,21 @@ for (const entry of required) {
 }
 const helperDomStreamCount = (helperBody[0].match(/'content\/dom-stream\.js'/g) || []).length;
 assert(helperDomStreamCount === 1, 'fallback injection bundle lists dom-stream.js exactly once');
+
+const skopeoModules = [
+  'content/skopeo-context-router.js',
+  'content/skopeo-anchor-registry.js',
+  'content/skopeo-shell.js',
+  'content/skopeo-runtime.js'
+];
+const manifestContentScripts = (manifest.content_scripts || []).flatMap((entry) => entry.js || []);
+const webAccessibleResources = (manifest.web_accessible_resources || []).flatMap((entry) => entry.resources || []);
+for (const entry of skopeoModules) {
+  assertSafeEntry(entry);
+  assert(!contentScriptFiles.includes(entry), entry + ' is absent from CONTENT_SCRIPT_FILES');
+  assert(!helperBody[0].includes("'" + entry + "'"), entry + ' is absent from fallback injection files');
+  assert(!manifestContentScripts.includes(entry), entry + ' is absent from manifest content scripts');
+  assert(!webAccessibleResources.includes(entry), entry + ' is absent from web-accessible resources');
+}
 
 console.log('All content script injection bundle checks passed.');

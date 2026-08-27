@@ -615,8 +615,23 @@ async function loadOffscreenHandlerSource(chromeMock) {
   // landed handlers).
   // FINT-13 "actually load the adapter in SW" (commit a3c03e6a) adds 1 mention
   // (the ai/lattice-runtime-adapter.js importScripts() call) -> 309.
+  // Phase 52 Plan 52-04 adds 3 mentions: the guarded Skopeo reducer import,
+  // the isolated-controller importScripts comment, and its typeof guard -> 312.
+  // Phase 53.1 Plan 07 adds 4 background-owned Skopeo catalog/policy imports
+  // (profile index, profile schema, capability projector, consequence gate) -> 316.
+  // Phase 53.1 Plan 09 adds the shared Skopeo action-authority import -> 317.
+  // Phase 53.1 Plan 10 adds the trusted consequence-target authority -> 318.
+  // Phase 54 Plan 02 adds the background-only trusted local feature store -> 319.
+  // Phase 54 Plans 03-04 add the remaining six trusted corpus modules -> 325.
+  // Phase 55 Plan 05 adds the five trusted local graph modules -> 330.
+  // Phase 56 Plan 05 adds the six trusted local truth modules -> 336.
+  // Phase 57 Plan 03 adds the closed HUD schema and pure projector -> 338.
+  // Phase 58 Plans 01-03 add Ask schema, Ask engine, decision-policy store,
+  // and decision-policy engine between truth and the HUD boundary -> 342.
+  // Phase 59 Plans 01-03 add alert schema, store, engine, and runtime between
+  // the decision policy and the HUD projection boundary -> 346.
   const importScriptsCount = (bgSource.match(/importScripts/g) || []).length;
-  passAssertEqual(importScriptsCount, 309, 'background.js importScripts count = 309 (current head set including Google Cloud, parallel T1 handlers, and the FINT-13 lattice-runtime-adapter load)');
+  passAssertEqual(importScriptsCount, 346, 'background.js importScripts count = 346 (including the trusted Phase 59 alert chain)');
   // Companion call-site-only count (regex requires open paren): Phase 5 baseline
   // was 150 actual importScripts() calls; Phase 6 adds 1 -> 151; Phase 8 adds 1 -> 152;
   // Phase 14 adds 2 (trigger-store + trigger-lifecycle) -> 154; Phase 15 adds 2
@@ -649,8 +664,50 @@ async function loadOffscreenHandlerSource(chromeMock) {
   // (+14 handler importScripts() calls vs. the pre-review 290 pin).
   // FINT-13 "actually load the adapter in SW" (commit a3c03e6a) adds 1 call site
   // (ai/lattice-runtime-adapter.js) -> 305.
+  // Phase 52 Plan 52-04 adds the guarded Skopeo reducer import -> 306.
+  // Phase 53.1 Plan 07 adds the 4 background-owned Skopeo imports -> 310.
+  // Phase 53.1 Plan 09 adds the shared Skopeo action-authority import -> 311.
+  // Phase 53.1 Plan 10 adds the trusted consequence-target authority -> 312.
+  // Phase 54 Plan 02 adds the background-only trusted local feature store -> 313.
+  // Phase 54 Plans 03-04 add the remaining six trusted corpus call sites -> 319.
+  // Phase 55 Plan 05 adds the five trusted local graph call sites -> 324.
+  // Phase 56 Plan 05 adds the six trusted local truth call sites -> 330.
+  // Phase 57 Plan 03 adds the two trusted HUD call sites -> 332.
+  // Phase 58 Plans 01-03 add four trusted Ask/policy call sites -> 336.
+  // Phase 59 Plans 01-03 add four trusted alert call sites -> 340.
   const importScriptsCallSites = (bgSource.match(/importScripts\(/g) || []).length;
-  passAssertEqual(importScriptsCallSites, 305, 'background.js importScripts() call sites = 305 (current head set including Google Cloud, parallel T1 handlers, and the FINT-13 lattice-runtime-adapter load)');
+  passAssertEqual(importScriptsCallSites, 340, 'background.js importScripts() call sites = 340 (including the trusted Phase 59 alert chain)');
+
+  const corpusLoadOrder = [
+    'utils/capability-fetch.js',
+    'utils/skopeo-corpus-schema.js',
+    'utils/skopeo-corpus-store.js',
+    'utils/skopeo-drive-corpus-transport.js',
+    'utils/skopeo-drive-authority.js',
+    'utils/skopeo-corpus-controller.js',
+    'utils/skopeo-drive-reconciler.js'
+  ].map(file => bgLines.findIndex(line => line.includes("importScripts('" + file + "')")));
+  passAssert(
+    corpusLoadOrder.every((line, index) => line >= 0 && (index === 0 || line > corpusLoadOrder[index - 1])),
+    'order: capability-fetch -> corpus schema -> store -> transport -> authority -> controller -> reconciler'
+  );
+  const hudLoadOrder = [
+    'utils/skopeo-truth-engine.js',
+    'utils/skopeo-ask-schema.js',
+    'utils/skopeo-ask-engine.js',
+    'utils/skopeo-decision-policy-store.js',
+    'utils/skopeo-decision-policy.js',
+    'utils/skopeo-alert-schema.js',
+    'utils/skopeo-alert-store.js',
+    'utils/skopeo-alert-engine.js',
+    'utils/skopeo-alert-runtime.js',
+    'utils/skopeo-hud-schema.js',
+    'utils/skopeo-hud-projector.js'
+  ].map(file => bgLines.findIndex(line => line.includes("importScripts('" + file + "')")));
+  passAssert(
+    hudLoadOrder.every((line, index) => line >= 0 && (index === 0 || line === hudLoadOrder[index - 1] + 1)),
+    'order: truth engine -> Ask schema/engine -> policy store/engine -> alert schema/store/engine/runtime -> HUD schema/projector, exactly once and adjacent'
+  );
 
   const lineCli = bgLines.findIndex(l => /importScripts\(['"]ai\/cli-parser\.js['"]\)/.test(l));
   const lineBridge = bgLines.findIndex(l => /importScripts\(['"]ai\/lattice-provider-bridge\.js['"]\)/.test(l));

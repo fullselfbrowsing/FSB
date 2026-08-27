@@ -1,0 +1,43 @@
+{
+  "version": "skopeo-ask-evals/v1",
+  "fixture_policy": "synthetic-or-irreversibly-redacted",
+  "network_allowed": false,
+  "llm_judge_allowed": false,
+  "configured_provider_run_allowed": false,
+  "provisional_results_are_gold": false,
+  "domain_fidelity_policy": "human_needed_until_genuine_required_role_approval",
+  "authorized_live_drive_docs_policy": "human_needed_until_authorized_live_observation",
+  "requirements": ["VIEW-06", "VIEW-07", "POLICY-01", "POLICY-02", "POLICY-03"],
+  "threats": ["T58-01", "T58-02", "T58-03", "T58-04", "T58-05", "T58-06", "T58-07", "T58-08", "T58-09", "T58-10"],
+  "ordered_case_ids": [
+    "Q01", "Q02", "Q03", "Q04", "Q05", "Q06", "Q07", "Q08",
+    "Q09", "Q10", "Q11", "Q12", "Q13", "Q14", "Q15", "Q16",
+    "Q17", "Q18", "Q19", "Q20", "Q21", "Q22", "Q23", "Q24"
+  ],
+  "category_counts": {
+    "ask": 4,
+    "answer": 5,
+    "security": 5,
+    "policy": 7,
+    "accessibility-lifecycle": 3
+  },
+  "caps": {
+    "question_scalars": 2000,
+    "conclusion_scalars": 1200,
+    "governing_evidence": 8,
+    "history_evidence": 6,
+    "conflicts": 8,
+    "gaps": 8,
+    "sources": 12
+  },
+  "production_versions": {
+    "projection": "skopeo-hud-projection/1",
+    "ask_model": "skopeo-contract-ask/1"
+  },
+  "report_lines": [
+    "deterministic_structural_security",
+    "provisional_regression",
+    "domain_fidelity",
+    "authorized_live_drive_docs"
+  ]
+}

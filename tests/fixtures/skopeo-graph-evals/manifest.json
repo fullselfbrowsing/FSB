@@ -1,0 +1,32 @@
+{
+  "version": "skopeo-graph-evals/v1",
+  "fixture_policy": "synthetic-or-irreversibly-redacted",
+  "network_allowed": false,
+  "llm_judge_allowed": false,
+  "domain_fidelity_policy": "human_needed_until_genuine_required_role_approval",
+  "case_file": "cases.json",
+  "ordered_case_ids": [
+    "P01", "P02", "P03", "P04", "P05", "P06",
+    "Q01", "Q02", "Q03", "Q04", "Q05", "Q06",
+    "A01", "A02", "A03", "A04", "A05", "A06", "A07",
+    "I01", "I02", "I03", "I04", "I05",
+    "L01", "L02", "L03",
+    "R01", "R02", "R03", "R04", "R05", "R06", "R07",
+    "B01", "B02", "B03"
+  ],
+  "category_counts": {
+    "P": 6,
+    "Q": 6,
+    "A": 7,
+    "I": 5,
+    "L": 3,
+    "R": 7,
+    "B": 3
+  },
+  "required_reviewer_roles": [
+    "legal-counsel",
+    "legal-operations",
+    "privacy-security",
+    "evaluation"
+  ]
+}

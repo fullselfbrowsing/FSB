@@ -40,6 +40,23 @@
       </div>
     </header>
 
+    <section id="skopeoControl" class="skopeo-control-row" data-state="off" aria-live="off" aria-atomic="true" aria-busy="false" aria-labelledby="skopeoTitle">
+      <div class="skopeo-control-copy">
+        <div class="skopeo-control-heading">
+          <span id="skopeoTitle" class="skopeo-control-title">Skopeo</span>
+          <span id="skopeoStatus" class="skopeo-control-status">Off for this tab</span>
+        </div>
+        <p id="skopeoStatusBody" class="skopeo-control-body" hidden></p>
+        <span id="skopeoAction" class="skopeo-control-action">Turn on Skopeo</span>
+        <button id="skopeoHint" class="skopeo-control-hint" type="button" aria-label="Open Chrome shortcut settings">Shortcut not assigned &#183; Set in Chrome shortcuts</button>
+      </div>
+      <button id="skopeoToggle" class="skopeo-toggle" type="button" role="switch" aria-checked="false" aria-label="Skopeo for this tab" aria-describedby="skopeoStatus skopeoStatusBody skopeoHint">
+        <span class="skopeo-switch-track" aria-hidden="true">
+          <span class="skopeo-switch-thumb"></span>
+        </span>
+      </button>
+    </section>
+
     <div id="historyView" class="history-view hidden">
       <div class="history-header">
         <h3>Session History</h3>

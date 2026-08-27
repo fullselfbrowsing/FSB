@@ -80,7 +80,7 @@ if (!listenerBody) {
 }
 
 // Build a stub world. The listener body references several module-scope
-// helpers: refreshOwnerChip (chip refresh -- what we instrument),
+// helpers: refreshOwnerChipForCurrentAuthority (chip refresh -- what we instrument),
 // showSidepanelProgressEnabled (write target for the local-area branch).
 // We provide stubs that record calls and return safe defaults.
 
@@ -93,7 +93,7 @@ let showSidepanelProgressEnabled = false;
 // over the explicit args we pass in.
 const listenerFn = new Function(
   'changes', 'area',
-  'refreshOwnerChip', 'getShowProgress', 'setShowProgress',
+  'refreshOwnerChipForCurrentAuthority', 'getShowProgress', 'setShowProgress',
   // The original body references `showSidepanelProgressEnabled` as a free
   // identifier. Provide a getter/setter pair and string-replace the
   // reference so the test sandbox can observe writes.

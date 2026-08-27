@@ -42,6 +42,522 @@ let showSidepanelProgressEnabled = true;
 var _tabRunningMap = new Map();
 var _activeTabIdSnapshot = null;
 
+/* FSB_SKOPEO_TAB_AUTHORITY_START */
+var _tabAuthorityEpoch = 0;
+var _ownerRefreshSerial = 0;
+
+function _claimTabAuthority() {
+  _tabAuthorityEpoch += 1;
+  return _tabAuthorityEpoch;
+}
+
+function _tabAuthorityIsCurrent(epoch) {
+  return typeof epoch === 'number' && epoch === _tabAuthorityEpoch;
+}
+
+function _claimOwnerRefreshAuthority() {
+  _ownerRefreshSerial += 1;
+  return _ownerRefreshSerial;
+}
+
+function _ownerRefreshAuthorityIsCurrent(token) {
+  return typeof token === 'number' && token === _ownerRefreshSerial;
+}
+
+function _commitAuthoritativeTab(tabId, epoch) {
+  if (typeof tabId !== 'number' || !Number.isSafeInteger(tabId) || tabId <= 0) return false;
+  if (!_tabAuthorityIsCurrent(epoch)) return false;
+  _activeTabIdSnapshot = tabId;
+  try {
+    FSBSkopeoSidepanelController.activateTab(tabId);
+  } catch (_e) {
+    // Skopeo status is best-effort; the selected tab remains authoritative.
+  }
+  return true;
+}
+/* FSB_SKOPEO_TAB_AUTHORITY_END */
+
+/* FSB_SKOPEO_SIDEPANEL_CONTROLLER_START */
+(function initializeFSBSkopeoSidepanelController(global) {
+  'use strict';
+
+  var COMMAND = 'toggle-skopeo-current-tab';
+  var SHORTCUTS_URL = 'chrome://extensions/shortcuts';
+  var UNASSIGNED_SHORTCUT = 'Shortcut not assigned \u00b7 Set in Chrome shortcuts';
+  var ACTIVE_KILL_HINT = 'Esc Esc: turn off Skopeo in this tab';
+  var _nodes = null;
+  var _initialized = false;
+  var _shortcutHint = UNASSIGNED_SHORTCUT;
+  var _activationSerial = 0;
+  var _currentActivation = null;
+  var _requestSerial = 0;
+  var _latestRequestByLane = new Map();
+  var _presentationSerial = 0;
+  var _latestPresentation = null;
+  var _highestGenerationByTab = new Map();
+  var _lifecyclePresentationByTab = new Map();
+
+  function positiveTabId(value) {
+    return typeof value === 'number' && Number.isSafeInteger(value) && value > 0;
+  }
+
+  function activeTabMatches(tabId) {
+    return positiveTabId(tabId) && tabId === _activeTabIdSnapshot;
+  }
+
+  function claimActivation(tabId) {
+    if (!positiveTabId(tabId)) return null;
+    _activationSerial += 1;
+    _currentActivation = Object.freeze({ tabId: tabId, token: _activationSerial });
+    return _currentActivation;
+  }
+
+  function claimPresentation(capture) {
+    if (!capture || (capture.lane !== 'status' && capture.lane !== 'toggle') ||
+        !positiveTabId(capture.tabId) || !activeTabMatches(capture.tabId) ||
+        !_currentActivation || _currentActivation.tabId !== capture.tabId ||
+        _currentActivation.token !== capture.activationToken) {
+      return null;
+    }
+    _presentationSerial += 1;
+    _latestPresentation = Object.freeze({
+      tabId: capture.tabId,
+      activationToken: capture.activationToken,
+      token: _presentationSerial
+    });
+    return _latestPresentation;
+  }
+
+  function captureRequest(tabId, lane) {
+    if (!positiveTabId(tabId) || !activeTabMatches(tabId)) return null;
+    if (lane !== 'status' && lane !== 'toggle' && lane !== 'shortcut') return null;
+    var activation = _currentActivation;
+    if (!activation) activation = claimActivation(tabId);
+    if (!activation || activation.tabId !== tabId) return null;
+    _requestSerial += 1;
+    var capture = {
+      tabId: tabId,
+      activationToken: activation.token,
+      requestToken: _requestSerial,
+      lane: lane
+    };
+    if (lane === 'status' || lane === 'toggle') {
+      var presentation = claimPresentation(capture);
+      if (!presentation) return null;
+      capture.presentationToken = presentation.token;
+    }
+    capture = Object.freeze(capture);
+    _latestRequestByLane.set(lane, capture.requestToken);
+    return capture;
+  }
+
+  function requestIsCurrent(capture) {
+    return !!capture && positiveTabId(capture.tabId) && activeTabMatches(capture.tabId) &&
+      !!_currentActivation && _currentActivation.tabId === capture.tabId &&
+      _currentActivation.token === capture.activationToken &&
+      _latestRequestByLane.get(capture.lane) === capture.requestToken;
+  }
+
+  function presentationIsCurrent(capture) {
+    return !!capture && (capture.lane === 'status' || capture.lane === 'toggle') &&
+      positiveTabId(capture.tabId) && activeTabMatches(capture.tabId) &&
+      !!_currentActivation && _currentActivation.tabId === capture.tabId &&
+      _currentActivation.token === capture.activationToken &&
+      !!_latestPresentation && _latestPresentation.tabId === capture.tabId &&
+      _latestPresentation.activationToken === capture.activationToken &&
+      _latestPresentation.token === capture.presentationToken;
+  }
+
+  function lifecycleStage(response) {
+    var state = localStateCopy(response).state;
+    if (state === 'starting') return 1;
+    if (state === 'active') return 2;
+    return 3;
+  }
+
+  function acceptLifecyclePresentation(tabId, response, options) {
+    if (!positiveTabId(tabId) || !response || typeof response !== 'object' ||
+        Array.isArray(response)) return false;
+    var generation = response.generation;
+    var floor = _highestGenerationByTab.get(tabId);
+    var lifecycle = _lifecyclePresentationByTab.get(tabId);
+    var hasFloor = typeof floor === 'number' && Number.isSafeInteger(floor) && floor > 0;
+    var isPositiveGeneration = typeof generation === 'number' &&
+      Number.isSafeInteger(generation) && generation > 0;
+    if (!isPositiveGeneration) {
+      var resetLifecycleBaseline = options && options.allowLifecycleBaselineReset === true &&
+        options.advance !== false && response.success === true && response.tabId === tabId &&
+        response.status === 'off' && generation === 0;
+      if (resetLifecycleBaseline) {
+        _highestGenerationByTab.delete(tabId);
+        _lifecyclePresentationByTab.delete(tabId);
+        return true;
+      }
+      var allowUnversionedTerminal = options && options.allowUnversionedTerminal === true &&
+        lifecycleStage(response) === 3;
+      return !hasFloor || allowUnversionedTerminal;
+    }
+    if (hasFloor && generation < floor) return false;
+    var stage = lifecycleStage(response);
+    if (lifecycle && (generation < lifecycle.generation ||
+        (generation === lifecycle.generation && stage < lifecycle.stage))) {
+      return false;
+    }
+    if (!options || options.advance !== false) {
+      if (!hasFloor || generation > floor) _highestGenerationByTab.set(tabId, generation);
+      if (!lifecycle || generation > lifecycle.generation || stage > lifecycle.stage) {
+        _lifecyclePresentationByTab.set(tabId, Object.freeze({
+          generation: generation,
+          stage: stage
+        }));
+      }
+    }
+    return true;
+  }
+
+  function getSkopeoNodes() {
+    if (_nodes) return _nodes;
+    var nodes = {
+      row: document.getElementById('skopeoControl'),
+      title: document.getElementById('skopeoTitle'),
+      toggle: document.getElementById('skopeoToggle'),
+      status: document.getElementById('skopeoStatus'),
+      body: document.getElementById('skopeoStatusBody'),
+      action: document.getElementById('skopeoAction'),
+      hint: document.getElementById('skopeoHint')
+    };
+    if (!nodes.row || !nodes.title || !nodes.toggle || !nodes.status ||
+        !nodes.body || !nodes.action || !nodes.hint) {
+      return null;
+    }
+    _nodes = nodes;
+    return _nodes;
+  }
+
+  function setSkopeoText(node, value) {
+    if (!node) return;
+    var next = typeof value === 'string' ? value : '';
+    if (node.textContent !== next) node.textContent = next;
+  }
+
+  function setSkopeoAttribute(node, name, value) {
+    if (!node) return;
+    var next = String(value);
+    if (node.getAttribute(name) !== next) node.setAttribute(name, next);
+  }
+
+  function setSkopeoOptionalCopy(node, value) {
+    var present = typeof value === 'string' && value.length > 0;
+    setSkopeoText(node, present ? value : '');
+    node.hidden = !present;
+  }
+
+  function localStateCopy(response) {
+    var status = response && typeof response.status === 'string' ? response.status : 'error';
+    var code = response && typeof response.code === 'string' ? response.code : '';
+    if (code === 'SKOPEO_UNSAFE_LAYOUT') {
+      return {
+        state: 'error',
+        status: 'Skopeo can\u2019t open safely on this layout.',
+        body: 'Zoom out or resize the page, then try again.',
+        action: 'Try again',
+        checked: false,
+        busy: false,
+        disabled: false
+      };
+    }
+    if (status === 'off') {
+      return {
+        state: 'off',
+        status: 'Off for this tab',
+        body: '',
+        action: 'Turn on Skopeo',
+        checked: false,
+        busy: false,
+        disabled: false
+      };
+    }
+    if (status === 'starting') {
+      return {
+        state: 'starting',
+        status: 'Starting on this tab\u2026',
+        body: '',
+        action: 'Turn off Skopeo',
+        checked: true,
+        busy: true,
+        disabled: false
+      };
+    }
+    if (status === 'active') {
+      return {
+        state: 'active',
+        status: 'On \u00b7 Ambient',
+        body: '',
+        action: 'Turn off Skopeo',
+        checked: true,
+        busy: false,
+        disabled: false
+      };
+    }
+    if (status === 'unsupported' || code === 'SKOPEO_UNSUPPORTED_TAB') {
+      return {
+        state: 'unsupported',
+        status: 'Skopeo can\u2019t run on this page.',
+        body: 'Open a standard web page, then try again.',
+        action: '',
+        checked: false,
+        busy: false,
+        disabled: true
+      };
+    }
+    return {
+      state: 'error',
+      status: 'Skopeo didn\u2019t start.',
+      body: 'Nothing was added to the page. Try again.',
+      action: 'Try again',
+      checked: false,
+      busy: false,
+      disabled: false
+    };
+  }
+
+  function renderSkopeoState(tabId, response, requestCapture, generationOptions) {
+    if (requestCapture && (!requestIsCurrent(requestCapture) ||
+        !presentationIsCurrent(requestCapture))) return false;
+    if (!activeTabMatches(tabId)) return false;
+    if (response && positiveTabId(response.tabId) && response.tabId !== tabId) return false;
+    var nodes = getSkopeoNodes();
+    if (!nodes || !activeTabMatches(tabId) ||
+        (requestCapture && (!requestIsCurrent(requestCapture) ||
+          !presentationIsCurrent(requestCapture)))) return false;
+    var view = localStateCopy(response);
+    if (requestCapture && (!requestIsCurrent(requestCapture) ||
+        !presentationIsCurrent(requestCapture))) return false;
+    if (generationOptions &&
+        !acceptLifecyclePresentation(tabId, response, generationOptions)) return false;
+
+    if (nodes.row.dataset.state !== view.state) nodes.row.dataset.state = view.state;
+    setSkopeoAttribute(nodes.row, 'aria-live', view.state === 'off' ? 'off' : 'polite');
+    setSkopeoAttribute(nodes.row, 'aria-atomic', 'true');
+    setSkopeoAttribute(nodes.row, 'aria-busy', view.busy ? 'true' : 'false');
+    setSkopeoAttribute(nodes.toggle, 'aria-checked', view.checked ? 'true' : 'false');
+    nodes.toggle.disabled = view.disabled;
+    if (view.disabled) {
+      setSkopeoAttribute(nodes.toggle, 'aria-disabled', 'true');
+    } else {
+      nodes.toggle.removeAttribute('aria-disabled');
+    }
+
+    setSkopeoText(nodes.status, view.status);
+    setSkopeoOptionalCopy(nodes.body, view.body);
+    setSkopeoOptionalCopy(nodes.action, view.action);
+    setSkopeoText(nodes.hint, view.state === 'active' ? ACTIVE_KILL_HINT : _shortcutHint);
+    nodes.hint.disabled = view.state === 'active';
+    nodes.hint.tabIndex = view.state === 'active' ? -1 : 0;
+    setSkopeoAttribute(
+      nodes.hint,
+      'aria-label',
+      view.state === 'active' ? ACTIVE_KILL_HINT : 'Open Chrome shortcut settings'
+    );
+    if (view.state === 'active') {
+      setSkopeoAttribute(nodes.hint, 'aria-disabled', 'true');
+    } else {
+      nodes.hint.removeAttribute('aria-disabled');
+    }
+    return true;
+  }
+
+  function resetSkopeoControl(tabId) {
+    if (!activeTabMatches(tabId)) return false;
+    var nodes = getSkopeoNodes();
+    if (!nodes || !activeTabMatches(tabId)) return false;
+    nodes.row.dataset.state = 'loading';
+    setSkopeoAttribute(nodes.row, 'aria-live', 'off');
+    setSkopeoAttribute(nodes.row, 'aria-busy', 'true');
+    setSkopeoAttribute(nodes.toggle, 'aria-checked', 'false');
+    setSkopeoAttribute(nodes.toggle, 'aria-disabled', 'true');
+    nodes.toggle.disabled = true;
+    setSkopeoText(nodes.status, '');
+    setSkopeoOptionalCopy(nodes.body, '');
+    setSkopeoOptionalCopy(nodes.action, '');
+    setSkopeoText(nodes.hint, _shortcutHint);
+    return true;
+  }
+
+  async function refreshSkopeoControl(tabId) {
+    var capturedTabId = positiveTabId(tabId) ? tabId : _activeTabIdSnapshot;
+    var requestCapture = captureRequest(capturedTabId, 'status');
+    if (!requestIsCurrent(requestCapture) || !presentationIsCurrent(requestCapture)) return false;
+    try {
+      if (!requestIsCurrent(requestCapture) || !presentationIsCurrent(requestCapture)) return false;
+      var response = await chrome.runtime.sendMessage({
+        action: 'skopeo:get-status',
+        tabId: capturedTabId
+      });
+      if (!requestIsCurrent(requestCapture) || !presentationIsCurrent(requestCapture)) return false;
+      if (response && positiveTabId(response.tabId) && response.tabId !== capturedTabId) return false;
+      if (!requestIsCurrent(requestCapture) || !presentationIsCurrent(requestCapture)) return false;
+      return renderSkopeoState(capturedTabId, response, requestCapture, {
+        advance: true,
+        allowUnversionedTerminal: true,
+        allowLifecycleBaselineReset: true
+      });
+    } catch (_error) {
+      if (!requestIsCurrent(requestCapture) || !presentationIsCurrent(requestCapture)) return false;
+      return renderSkopeoState(capturedTabId, {
+        success: false,
+        tabId: capturedTabId,
+        status: 'error',
+        code: 'SKOPEO_START_FAILED'
+      }, requestCapture, { advance: true, allowUnversionedTerminal: true });
+    }
+  }
+
+  async function handleSkopeoToggle() {
+    var capturedTabId = _activeTabIdSnapshot;
+    var requestCapture = captureRequest(capturedTabId, 'toggle');
+    if (!requestIsCurrent(requestCapture) || !presentationIsCurrent(requestCapture)) return false;
+    var nodes = getSkopeoNodes();
+    if (!nodes || nodes.row.dataset.state === 'loading' || nodes.toggle.disabled) return false;
+
+    if (nodes.row.dataset.state !== 'starting' && nodes.row.dataset.state !== 'active') {
+      if (!requestIsCurrent(requestCapture) || !presentationIsCurrent(requestCapture)) return false;
+      renderSkopeoState(capturedTabId, { status: 'starting' }, requestCapture);
+    }
+    try {
+      if (!requestIsCurrent(requestCapture) || !presentationIsCurrent(requestCapture)) return false;
+      var response = await chrome.runtime.sendMessage({
+        action: 'skopeo:toggle-tab',
+        tabId: capturedTabId
+      });
+      if (!requestIsCurrent(requestCapture) || !presentationIsCurrent(requestCapture)) return false;
+      if (response && positiveTabId(response.tabId) && response.tabId !== capturedTabId) return false;
+      if (!requestIsCurrent(requestCapture) || !presentationIsCurrent(requestCapture)) return false;
+      return renderSkopeoState(capturedTabId, response, requestCapture, {
+        advance: true,
+        allowUnversionedTerminal: true
+      });
+    } catch (_error) {
+      if (!requestIsCurrent(requestCapture) || !presentationIsCurrent(requestCapture)) return false;
+      return renderSkopeoState(capturedTabId, {
+        success: false,
+        tabId: capturedTabId,
+        status: 'error',
+        code: 'SKOPEO_START_FAILED'
+      }, requestCapture, { advance: true, allowUnversionedTerminal: true });
+    }
+  }
+
+  function normalizeSkopeoShortcut(shortcut) {
+    if (typeof shortcut !== 'string' || shortcut.trim().length === 0) return null;
+    var raw = shortcut.trim();
+    if (raw === 'Alt+Space') return '\u2325 Space';
+    return raw.split('+').map(function (part) { return part.trim(); }).filter(Boolean).join(' ');
+  }
+
+  async function refreshSkopeoShortcut(tabId) {
+    var capturedTabId = positiveTabId(tabId) ? tabId : _activeTabIdSnapshot;
+    var requestCapture = captureRequest(capturedTabId, 'shortcut');
+    if (!requestIsCurrent(requestCapture)) return false;
+    try {
+      if (!requestIsCurrent(requestCapture)) return false;
+      var commands = await chrome.commands.getAll();
+      if (!requestIsCurrent(requestCapture)) return false;
+      var command = Array.isArray(commands)
+        ? commands.find(function (entry) { return entry && entry.name === COMMAND; })
+        : null;
+      var normalized = normalizeSkopeoShortcut(command && command.shortcut);
+      if (!requestIsCurrent(requestCapture)) return false;
+      _shortcutHint = normalized
+        ? 'Shortcut: ' + normalized + ' \u00b7 Change shortcut'
+        : UNASSIGNED_SHORTCUT;
+      var nodes = getSkopeoNodes();
+      if (!nodes || !requestIsCurrent(requestCapture)) return false;
+      if (nodes.row.dataset.state !== 'active') setSkopeoText(nodes.hint, _shortcutHint);
+      return _shortcutHint;
+    } catch (_error) {
+      if (!requestIsCurrent(requestCapture)) return false;
+      _shortcutHint = UNASSIGNED_SHORTCUT;
+      var nodes = getSkopeoNodes();
+      if (!nodes || !requestIsCurrent(requestCapture)) return false;
+      if (nodes.row.dataset.state !== 'active') setSkopeoText(nodes.hint, _shortcutHint);
+      return _shortcutHint;
+    }
+  }
+
+  function handleSkopeoStatusEvent(message) {
+    var capturedTabId = _activeTabIdSnapshot;
+    if (!message || message.action !== 'skopeo:status-changed' ||
+        !activeTabMatches(capturedTabId) || message.tabId !== capturedTabId) {
+      return false;
+    }
+    if (!acceptLifecyclePresentation(capturedTabId, message, { advance: false })) {
+      return false;
+    }
+    var requestCapture = captureRequest(capturedTabId, 'status');
+    if (!requestIsCurrent(requestCapture) || !presentationIsCurrent(requestCapture)) return false;
+    return renderSkopeoState(capturedTabId, message, requestCapture, { advance: true });
+  }
+
+  function onSkopeoStatusMessage(message) {
+    handleSkopeoStatusEvent(message);
+  }
+
+  function handleSkopeoShortcutClick() {
+    var capturedTabId = _activeTabIdSnapshot;
+    if (!activeTabMatches(capturedTabId)) return false;
+    var nodes = getSkopeoNodes();
+    if (!nodes || nodes.row.dataset.state === 'active' || nodes.hint.disabled) return false;
+    try {
+      var created = chrome.tabs.create({ url: SHORTCUTS_URL });
+      if (created && typeof created.catch === 'function') created.catch(function () {});
+      return true;
+    } catch (_error) {
+      return false;
+    }
+  }
+
+  function initialize() {
+    if (_initialized) return true;
+    var nodes = getSkopeoNodes();
+    if (!nodes) return false;
+    nodes.toggle.addEventListener('click', handleSkopeoToggle);
+    nodes.hint.addEventListener('click', handleSkopeoShortcutClick);
+    chrome.runtime.onMessage.addListener(onSkopeoStatusMessage);
+    _initialized = true;
+    return true;
+  }
+
+  function activateTab(tabId) {
+    if (!positiveTabId(tabId)) return Promise.resolve(false);
+    var activation = claimActivation(tabId);
+    if (!activation) return Promise.resolve(false);
+    _activeTabIdSnapshot = tabId;
+    resetSkopeoControl(tabId);
+    return Promise.allSettled([
+      refreshSkopeoControl(tabId),
+      refreshSkopeoShortcut(tabId)
+    ]);
+  }
+
+  global.FSBSkopeoSidepanelController = Object.freeze({
+    initialize: initialize,
+    activateTab: activateTab,
+    renderSkopeoState: renderSkopeoState,
+    refreshSkopeoControl: refreshSkopeoControl,
+    handleSkopeoToggle: handleSkopeoToggle,
+    refreshSkopeoShortcut: refreshSkopeoShortcut,
+    handleSkopeoStatusEvent: handleSkopeoStatusEvent
+  });
+})(globalThis);
+/* FSB_SKOPEO_SIDEPANEL_CONTROLLER_END */
+
+try {
+  FSBSkopeoSidepanelController.initialize();
+} catch (_e) {
+  // Skopeo is an optional side-panel surface; unrelated chat must still boot.
+}
+
 function _getTabRunningEntry(tabId) {
   if (typeof tabId !== 'number') return { isRunning: false, sessionId: null, startedAt: null };
   var entry = _tabRunningMap.get(tabId);
@@ -204,6 +720,7 @@ async function _persistEnvelope() {
 // Idempotent: subsequent boots find legacy key absent + envelope present
 // and short-circuit through the sidecar's migration helper.
 async function initTabConversationStore() {
+  var authorityEpoch = null;
   try {
     if (typeof FSBSidepanelTabConvStore === 'undefined'
         || typeof FSBSidepanelTabConvStore.migrateLegacyConversationKey !== 'function') {
@@ -212,18 +729,15 @@ async function initTabConversationStore() {
       if (typeof _envelopeReadyResolve === 'function') _envelopeReadyResolve();
       return;
     }
+    authorityEpoch = _claimTabAuthority();
     var activeTabId = null;
     try {
       var tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (tabs && tabs[0] && typeof tabs[0].id === 'number') activeTabId = tabs[0].id;
+      if (tabs && tabs[0] && typeof tabs[0].id === 'number'
+          && Number.isSafeInteger(tabs[0].id) && tabs[0].id > 0) {
+        activeTabId = tabs[0].id;
+      }
     } catch (_e) { /* swallow */ }
-
-    // QT-93i-02 -- cache active tab id at boot so the per-tab map and
-    // setRunningState/setIdleState/setErrorState can resolve "active tab"
-    // BEFORE chrome.tabs.onActivated fires for the first time.
-    if (activeTabId !== null) {
-      _activeTabIdSnapshot = activeTabId;
-    }
 
     tabConvEnvelope = await FSBSidepanelTabConvStore.migrateLegacyConversationKey(
       function (keys) { return chrome.storage.session.get(keys); },
@@ -232,7 +746,8 @@ async function initTabConversationStore() {
       activeTabId
     );
 
-    if (activeTabId !== null) {
+    if (!_tabAuthorityIsCurrent(authorityEpoch)) return;
+    if (activeTabId !== null && _commitAuthoritativeTab(activeTabId, authorityEpoch)) {
       var existing = FSBSidepanelTabConvStore.getTabConversation(tabConvEnvelope, activeTabId);
       if (existing) {
         conversationId = existing;
@@ -247,7 +762,9 @@ async function initTabConversationStore() {
   } catch (_e) {
     // Fallback: ensure module continues to boot even if migration fails.
     tabConvEnvelope = { v: 1, byTab: {}, lru: [] };
-    conversationId = _mintConversationId();
+    if (authorityEpoch === null || _tabAuthorityIsCurrent(authorityEpoch)) {
+      conversationId = _mintConversationId();
+    }
   } finally {
     if (typeof _envelopeReadyResolve === 'function') _envelopeReadyResolve();
   }
@@ -853,7 +1370,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
   // re-renders the chip immediately, without waiting for a tab switch or
   // a registry write that happens to follow.
   if (area === 'session' && changes && (changes.fsbAgentRegistry || changes.fsbAgentClientLabels)) {
-    refreshOwnerChip();
+    refreshOwnerChipForCurrentAuthority();
   }
   // debug-sidepanel-agent-name fix: also refresh the chip when any
   // mcpVisualSession:<tabId> key mutates. The MCP visual-session lifecycle
@@ -872,7 +1389,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
     var keys = Object.keys(changes);
     for (var i = 0; i < keys.length; i++) {
       if (keys[i].indexOf('mcpVisualSession:') === 0) {
-        refreshOwnerChip();
+        refreshOwnerChipForCurrentAuthority();
         break;
       }
     }
@@ -971,60 +1488,77 @@ async function _isActiveTabForeignOwned() {
 
 // Phase 243 plan 03 (UI-02): refresh the read-only "owned by Agent X" chip.
 // Reads the persisted registry envelope from chrome.storage.session (Phase 237
-// D-03 write-through) and the active tab; uses FSBOwnerChip pure helpers to
-// decide visibility and label format. Bypasses background.js entirely so this
-// plan stays Wave-1 zero-overlap with Plan 02's webNavigation listener.
+// D-03 write-through) for an explicitly-authorized tab; uses FSBOwnerChip pure
+// helpers to decide visibility and label format. Bypasses background.js
+// entirely so this plan stays Wave-1 zero-overlap with Plan 02's webNavigation
+// listener.
 //
 // Sidepanel-specific: subscribed to chrome.tabs.onActivated below, since the
 // sidepanel persists across tab switches (popup is short-lived and skips this).
-async function refreshOwnerChip() {
-  try {
-    const chipEl = document.getElementById('fsb-owner-chip');
-    if (!chipEl) return;
-    if (typeof FSBOwnerChip === 'undefined') {
-      chipEl.style.display = 'none';
-      // Phase 11 FIX (debug-phase-11-tab-swap-stale) + Quick task 260524-7n9:
-      // honor the unlock contract on every chip-hidden path. applyInputLockout
-      // restores chatInput + stopBtn + micBtn + aria; clearing the
-      // _chatLockedByOwnerChip flag keeps updateSendButtonState in sync so the
-      // user is not stranded with a disabled input after the helper went away.
-      _chatLockedByOwnerChip = false;
-      applyInputLockout(false);
-      return;
-    }
+async function refreshOwnerChip(tabId, authorityEpoch, neutralizeForTabTransition) {
+  // Same-tab storage mutations can overlap without advancing tab authority.
+  // Claim a separate take-latest token synchronously so an older registry or
+  // label read cannot commit after a newer owner refresh has started.
+  const ownerRefreshToken = _claimOwnerRefreshAuthority();
+  function authorityIsCurrent() {
+    return typeof tabId === 'number'
+      && Number.isSafeInteger(tabId)
+      && tabId > 0
+      && _tabAuthorityIsCurrent(authorityEpoch)
+      && _ownerRefreshAuthorityIsCurrent(ownerRefreshToken)
+      && _activeTabIdSnapshot === tabId;
+  }
 
-    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-    const tab = tabs && tabs[0];
-    if (!tab || typeof tab.id !== 'number') {
-      chipEl.style.display = 'none';
-      // Phase 11 FIX (debug-phase-11-tab-swap-stale) + Quick task 260524-7n9:
-      // the no-active-tab branch must also unlock so controls re-enable when the
-      // active-tab race resolves. Clear the _chatLockedByOwnerChip flag so
-      // updateSendButtonState stays in sync.
-      _chatLockedByOwnerChip = false;
-      applyInputLockout(false);
-      return;
-    }
+  const chipEl = document.getElementById('fsb-owner-chip');
+  if (!chipEl || !authorityIsCurrent()) return false;
+
+  // These commits are deliberately synchronous. Once the authority check
+  // passes, no tab activation can interleave between the chip DOM writes,
+  // the owner-lock flag write, and applyInputLockout's control mutations.
+  function commitHidden() {
+    if (!authorityIsCurrent()) return false;
+    chipEl.textContent = '';
+    chipEl.style.display = 'none';
+    _chatLockedByOwnerChip = false;
+    applyInputLockout(false);
+    return true;
+  }
+
+  function commitForeignOwner(label) {
+    if (!authorityIsCurrent()) return false;
+    chipEl.textContent = FSBOwnerChip.buildChipText(label);
+    chipEl.style.display = 'inline-flex';
+    _chatLockedByOwnerChip = true;
+    applyInputLockout(true);
+    chatInput.title = 'Disabled while tab is owned by ' + label;
+    updateSendButtonState();
+    return true;
+  }
+
+  // A newly selected tab cannot truthfully inherit the outgoing tab's named
+  // owner, so a real authority transition publishes a neutral presentation
+  // before the first storage await. Ordinary same-tab refreshes retain the last
+  // authoritative presentation until successful replacement evidence arrives.
+  try {
+    if (neutralizeForTabTransition === true && !commitHidden()) return false;
+    if (typeof FSBOwnerChip === 'undefined') return false;
 
     // Quick task 260524-7n9: read both the registry envelope AND the per-agent
     // canonical client-label map in a single round-trip. The label map is
     // written by mcp-tool-dispatcher.js _persistAgentClientLabel and lets the
     // chip show "owned by Claude" instead of "owned by agent_<hex>".
     const stored = await chrome.storage.session.get(['fsbAgentRegistry', 'fsbAgentClientLabels']);
+    if (!authorityIsCurrent()) return false;
     const envelope = stored && stored.fsbAgentRegistry;
     const labelsMap = stored && stored.fsbAgentClientLabels;
-    const ownerAgentId = FSBOwnerChip.findOwnerInEnvelope(envelope, tab.id);
+    const ownerAgentId = FSBOwnerChip.findOwnerInEnvelope(envelope, tabId);
 
     if (!FSBOwnerChip.shouldShowOwnerChip(ownerAgentId, MY_SURFACE)) {
-      chipEl.textContent = '';
-      chipEl.style.display = 'none';
       // Phase 11 FINT-20 + Quick task 260524-7n9 -- unlock controls when the chip
       // is hidden (either no owner or this surface owns the tab). applyInputLockout
       // restores chatInput + buttons + aria; clearing the _chatLockedByOwnerChip
       // flag keeps updateSendButtonState in sync.
-      _chatLockedByOwnerChip = false;
-      applyInputLockout(false);
-      return;
+      return commitHidden();
     }
 
     // Merged client-label resolution (Phase 11 FINT-19 three-tier + Quick task
@@ -1047,9 +1581,10 @@ async function refreshOwnerChip() {
         label = clientLabel;
       } else {
         const friendly = await FSBOwnerChip.lookupClientLabel(
-          tab.id,
+          tabId,
           (key) => chrome.storage.session.get(key)
         );
+        if (!authorityIsCurrent()) return false;
         if (friendly) {
           label = friendly;
         } else {
@@ -1061,20 +1596,24 @@ async function refreshOwnerChip() {
         }
       }
     }
-    chipEl.textContent = FSBOwnerChip.buildChipText(label);
-    chipEl.style.display = 'inline-flex';
     // Phase 11 FINT-20 + Quick task 260524-7n9 -- lock controls when the chip
     // renders (tab is foreign-owned). applyInputLockout does the rich lock
     // (chatInput contenteditable + buttons + aria); the _chatLockedByOwnerChip
     // flag composes into updateSendButtonState's OR chain, and the title surfaces
     // which client owns the tab.
-    _chatLockedByOwnerChip = true;
-    applyInputLockout(true);
-    chatInput.title = 'Disabled while tab is owned by ' + label;
-    updateSendButtonState();
+    return commitForeignOwner(label);
   } catch (_e) {
-    // Chip is best-effort -- never poison sidepanel boot.
+    // Registry/label reads are best-effort. A transition is already neutral,
+    // while a same-tab rejection must retain its last authoritative owner
+    // presentation. Stale rejections therefore have no mutation path either.
+    return false;
   }
+}
+
+function refreshOwnerChipForCurrentAuthority() {
+  var tabId = _activeTabIdSnapshot;
+  var authorityEpoch = _tabAuthorityEpoch;
+  return refreshOwnerChip(tabId, authorityEpoch, false);
 }
 
 // Phase 243 plan 03 (UI-02): refresh on tab switch. The sidepanel is
@@ -1090,14 +1629,33 @@ try {
     // sequentially; both are best-effort, so a failure in one does not
     // poison the other.
     chrome.tabs.onActivated.addListener(async (activeInfo) => {
+      var incomingTabId = activeInfo && activeInfo.tabId;
+      if (typeof incomingTabId !== 'number' || !Number.isSafeInteger(incomingTabId)
+          || incomingTabId <= 0) return;
+      var authorityEpoch = _claimTabAuthority();
+      var tabAuthorityChanged = _activeTabIdSnapshot !== incomingTabId;
       // QT-uof-5 (B-FIX) -- persist the OUTGOING tab's
       // (currentStatusMessage, currentActionGroup) BEFORE the swap clobbers
       // them. Read _activeTabIdSnapshot here (pre-reassignment) so the
       // entry is keyed by the tab the user is leaving.
       try { _persistTabStatusIntent(_activeTabIdSnapshot); } catch (_e) { /* swallow */ }
 
-      try { await refreshOwnerChip(); } catch (_e) { /* swallow */ }
-      try { await swapToTabConversation(activeInfo && activeInfo.tabId); } catch (_e) { /* swallow */ }
+      // Phase 52 D-03 -- make the selected tab authoritative before any
+      // asynchronous owner-chip/history work. The Skopeo controller clears
+      // the outgoing row synchronously, then guards both of its refreshes
+      // against this captured incoming ID.
+      // The former `_activeTabIdSnapshot = incomingTabId` write is centralized
+      // in _commitAuthoritativeTab so every outer path shares one authority gate.
+      if (!_commitAuthoritativeTab(incomingTabId, authorityEpoch)) return;
+
+      try {
+        await refreshOwnerChip(incomingTabId, authorityEpoch, tabAuthorityChanged);
+      } catch (_e) { /* swallow */ }
+      if (!_tabAuthorityIsCurrent(authorityEpoch)
+          || _activeTabIdSnapshot !== incomingTabId) return;
+      try { await swapToTabConversation(incomingTabId); } catch (_e) { /* swallow */ }
+      if (!_tabAuthorityIsCurrent(authorityEpoch)
+          || _activeTabIdSnapshot !== incomingTabId) return;
 
       // QT-93i-02 -- after the conversation swap, re-sync the running-state
       // UI to reflect the newly-active tab's per-tab state. Without this,
@@ -1106,13 +1664,13 @@ try {
       // running state immediately so the send button enable/disable is
       // correct on every keystroke after the swap.
       try {
-        if (activeInfo && typeof activeInfo.tabId === 'number') {
-          _activeTabIdSnapshot = activeInfo.tabId;
-          var snap = _getTabRunningEntry(activeInfo.tabId);
+        if (_tabAuthorityIsCurrent(authorityEpoch)
+            && _activeTabIdSnapshot === incomingTabId) {
+          var snap = _getTabRunningEntry(incomingTabId);
           if (snap.isRunning) {
-            setRunningState(activeInfo.tabId, snap.sessionId || null);
+            setRunningState(incomingTabId, snap.sessionId || null);
           } else {
-            setIdleState(activeInfo.tabId);
+            setIdleState(incomingTabId);
           }
         }
       } catch (_e) { /* swallow: re-sync is best-effort */ }
@@ -1121,7 +1679,10 @@ try {
       // (currentStatusMessage, currentActionGroup). When the tab has no
       // entry (never had a loader), this nulls the module-scope vars so
       // subsequent code does not inherit the outgoing tab's references.
-      try { _restoreTabStatusIntent(_activeTabIdSnapshot); } catch (_e) { /* swallow */ }
+      if (_tabAuthorityIsCurrent(authorityEpoch)
+          && _activeTabIdSnapshot === incomingTabId) {
+        try { _restoreTabStatusIntent(incomingTabId); } catch (_e) { /* swallow */ }
+      }
     });
   }
 } catch (_e) {
@@ -1200,13 +1761,24 @@ try {
       && typeof chrome.windows.onFocusChanged.addListener === 'function') {
     chrome.windows.onFocusChanged.addListener(async (windowId) => {
       try {
-        if (typeof windowId !== 'number' || windowId < 0) return;
-        await refreshOwnerChip();
-        var tabs = await chrome.tabs.query({ active: true, windowId: windowId });
-        if (tabs && tabs[0] && typeof tabs[0].id === 'number') {
-          _activeTabIdSnapshot = tabs[0].id;  // QT-93i-02
-          await swapToTabConversation(tabs[0].id);
-        }
+        if (typeof windowId !== 'number' || !Number.isSafeInteger(windowId)
+            || windowId < 0) return;
+        var authorityEpoch = _claimTabAuthority();
+        var tabs = await Promise.resolve(
+          chrome.tabs.query({ active: true, windowId: windowId })
+        ).catch(function () { return null; });
+        if (!_tabAuthorityIsCurrent(authorityEpoch)) return;
+        var focusedTabId = tabs && tabs[0] && tabs[0].id;
+        var tabAuthorityChanged = _activeTabIdSnapshot !== focusedTabId;
+        if (!_commitAuthoritativeTab(focusedTabId, authorityEpoch)) return;
+        try {
+          await refreshOwnerChip(focusedTabId, authorityEpoch, tabAuthorityChanged);
+        } catch (_e) { /* swallow */ }
+        if (!_tabAuthorityIsCurrent(authorityEpoch)
+            || _activeTabIdSnapshot !== focusedTabId) return;
+        try { await swapToTabConversation(focusedTabId); } catch (_e) { /* swallow */ }
+        if (!_tabAuthorityIsCurrent(authorityEpoch)
+            || _activeTabIdSnapshot !== focusedTabId) return;
       } catch (_e) { /* swallow */ }
     });
   }
@@ -1230,6 +1802,21 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Phase 11 FINT-21 -- per-tab envelope hydration + legacy migration
   // (replaces previous single-key conversation init flow).
   await initTabConversationStore();
+
+  // Phase 52 D-02/D-03 -- hydrate the dedicated row from the same explicit
+  // boot-time tab snapshot. The controller never performs its own tab query,
+  // so a late status or shortcut response cannot retarget this request.
+  try {
+    var hydrationEpoch = _tabAuthorityEpoch;
+    var hydrationTabId = _activeTabIdSnapshot;
+    if (typeof hydrationTabId === 'number'
+        && _tabAuthorityIsCurrent(hydrationEpoch)
+        && _activeTabIdSnapshot === hydrationTabId) {
+      FSBSkopeoSidepanelController.activateTab(hydrationTabId);
+    }
+  } catch (_e) {
+    // Skopeo status is best-effort and must not block the existing chat boot.
+  }
 
   // Phase 12 FINT-23 -- init message-log debouncer + beforeunload force flush.
   if (typeof FSBSidepanelMessageLog !== 'undefined'
@@ -1299,7 +1886,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Phase 243 plan 03 (UI-02): render the read-only owner chip on load. The
   // chrome.tabs.onActivated subscription registered above keeps the chip in
   // sync as the user switches tabs in the persistent sidepanel.
-  refreshOwnerChip();
+  refreshOwnerChipForCurrentAuthority();
 
   // History list event delegation for delete buttons
   const historyListEl = document.getElementById('historyList');

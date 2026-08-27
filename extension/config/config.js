@@ -54,7 +54,11 @@ class Config {
       // Background Agents Server
       serverUrl: 'https://fsb-server.fly.dev',
       serverHashKey: '',
-      serverSyncEnabled: false
+      serverSyncEnabled: false,
+
+      // Skopeo truth evaluation remains closed until explicitly configured.
+      skopeoTruthTimezoneBinding: null,
+      skopeoTruthCalendars: []
     };
 
     // PERF: In-memory config cache with TTL to avoid repeated chrome.storage reads
@@ -292,6 +296,19 @@ class Config {
    */
   async getAll() {
     return await this.loadFromStorage();
+  }
+
+  async getTruthEvaluationSettingsFresh() {
+    const keys = ['skopeoTruthTimezoneBinding', 'skopeoTruthCalendars'];
+    const stored = await chrome.storage.local.get(keys);
+    return {
+      skopeoTruthTimezoneBinding: Object.prototype.hasOwnProperty.call(
+        stored, 'skopeoTruthTimezoneBinding'
+      ) ? stored.skopeoTruthTimezoneBinding : this.defaults.skopeoTruthTimezoneBinding,
+      skopeoTruthCalendars: Object.prototype.hasOwnProperty.call(
+        stored, 'skopeoTruthCalendars'
+      ) ? stored.skopeoTruthCalendars : this.defaults.skopeoTruthCalendars
+    };
   }
   
   // Update specific configuration values
