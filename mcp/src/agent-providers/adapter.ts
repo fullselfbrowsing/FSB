@@ -4,15 +4,13 @@ import {
 } from './effective-authority.js';
 
 export const CLAUDE_CODE_ADAPTER_ID = 'claude-code' as const;
-export const OPENCODE_ADAPTER_ID = 'opencode' as const;
-export const CODEX_ADAPTER_ID = 'codex' as const;
+export const GROK_BUILD_ADAPTER_ID = 'grok-build' as const;
 
 export type AgentProviderId =
   | typeof CLAUDE_CODE_ADAPTER_ID
-  | typeof OPENCODE_ADAPTER_ID
-  | typeof CODEX_ADAPTER_ID;
+  | typeof GROK_BUILD_ADAPTER_ID;
 
-export type AdapterAuthState = 'chatgpt' | 'api_key' | 'unauthenticated' | 'unknown';
+export type AdapterAuthState = 'oauth' | 'unauthenticated' | 'unknown';
 
 export type AdapterDiagnosticCode =
   | 'adapter_unavailable'
@@ -117,14 +115,10 @@ export interface PreSpawnIdentityProbe {
 export interface EffectiveAuthorityAttestation {
   readonly source: 'retained_binary';
   readonly argv: readonly string[];
-  /** Optional fixed protocol request written to the retained binary's stdin. */
-  readonly stdinBytes?: readonly number[];
-  /** Keep stdin open until a complete stdout line begins with these exact bytes. */
-  readonly stdinCloseAfterStdoutLinePrefixBytes?: readonly number[];
   readonly timeoutMs: number;
   readonly stdoutLimitBytes: number;
   readonly stderrLimitBytes: number;
-  readonly classifier: 'effective_authority_json' | 'codex_effective_authority_json';
+  readonly classifier: 'effective_authority_json';
   readonly expectedServerName: 'fsb';
   readonly endpointRef: 'direct_runtime_endpoint';
   readonly required: true;
@@ -145,11 +139,7 @@ export interface SpawnRuntimeScope {
   readonly runtimeFiles: readonly string[];
 }
 
-export type SpawnPrivateArtifact =
-  | Readonly<{ kind: 'mcp_config'; endpoint: string }>
-  | Readonly<{ kind: 'opencode_config'; contents: string }>
-  | Readonly<{ kind: 'opencode_test_home' }>
-  | Readonly<{ kind: 'opencode_managed_config' }>;
+export type SpawnPrivateArtifact = Readonly<{ kind: 'mcp_config'; endpoint: string }>;
 
 export interface SpawnPrivateRuntime {
   readonly role: SpawnRuntimeRole;
@@ -158,7 +148,7 @@ export interface SpawnPrivateRuntime {
   readonly privateArtifacts: readonly SpawnPrivateArtifact[];
 }
 
-export const OPENCODE_SERVER_PASSWORD_ENV_KEY = 'OPENCODE_SERVER_PASSWORD' as const;
+export const OWNED_SERVER_PASSWORD_ENV_KEY = 'FSB_OWNED_SERVER_PASSWORD' as const;
 export const OWNED_SERVER_BASIC_PASSWORD_SECRET_REF = 'owned_server_basic_password' as const;
 
 export type ProcessRole =
@@ -168,8 +158,12 @@ export type ProcessRole =
   | 'attach_task'
   | 'policy_preflight';
 
-export type ProcessStdin = 'none' | 'task';
-export type ProcessStdout = 'agent_jsonl' | 'bounded_readiness' | 'bounded_json';
+export type ProcessStdin = 'none' | 'task' | 'acp_jsonrpc';
+export type ProcessStdout =
+  | 'agent_jsonl'
+  | 'acp_jsonrpc'
+  | 'bounded_readiness'
+  | 'bounded_json';
 
 /** A value supplied by the supervisor after it has verified an owned lease. */
 export interface SupervisorRuntimeArgument {
@@ -183,7 +177,7 @@ export type ProcessArgument = string | SupervisorRuntimeArgument;
  * by the adapter contract; only the serve-owned supervisor may materialize it.
  */
 export interface SpawnSecretEnvBinding {
-  readonly envKey: typeof OPENCODE_SERVER_PASSWORD_ENV_KEY;
+  readonly envKey: typeof OWNED_SERVER_PASSWORD_ENV_KEY;
   readonly secretRef: typeof OWNED_SERVER_BASIC_PASSWORD_SECRET_REF;
 }
 
@@ -496,7 +490,7 @@ function cloneFixedEnv(value: unknown): Readonly<Record<string, string>> {
   for (const key of keys) {
     if (
       !ENV_KEY_PATTERN.test(key)
-      || key === OPENCODE_SERVER_PASSWORD_ENV_KEY
+      || key === OWNED_SERVER_PASSWORD_ENV_KEY
       || SECRET_ENV_KEY_PATTERN.test(key)
     ) invalidContract('fixed environment');
     const item = boundedString(ownValue(record, key), 'fixed environment value', true);
@@ -522,11 +516,11 @@ function cloneSecretBindings(value: unknown): readonly SpawnSecretEnvBinding[] {
       'spawn secret environment binding',
     );
     if (
-      ownValue(binding, 'envKey') !== OPENCODE_SERVER_PASSWORD_ENV_KEY
+      ownValue(binding, 'envKey') !== OWNED_SERVER_PASSWORD_ENV_KEY
       || ownValue(binding, 'secretRef') !== OWNED_SERVER_BASIC_PASSWORD_SECRET_REF
     ) invalidContract('spawn secret environment binding');
     return Object.freeze({
-      envKey: OPENCODE_SERVER_PASSWORD_ENV_KEY,
+      envKey: OWNED_SERVER_PASSWORD_ENV_KEY,
       secretRef: OWNED_SERVER_BASIC_PASSWORD_SECRET_REF,
     });
   });
@@ -581,9 +575,15 @@ function cloneProcessSpec(value: unknown): ProcessSpec {
   ) invalidContract('spawn secret environment binding placement');
   const stdin = ownValue(record, 'stdin');
   const stdout = ownValue(record, 'stdout');
-  const isTask = typedRole === 'direct_task' || typedRole === 'cold_task' || typedRole === 'attach_task';
+  const directStream = typedRole === 'direct_task'
+    && (
+      (stdin === 'task' && stdout === 'agent_jsonl')
+      || (stdin === 'acp_jsonrpc' && stdout === 'acp_jsonrpc')
+    );
   if (
-    (isTask && (stdin !== 'task' || stdout !== 'agent_jsonl'))
+    ((typedRole === 'cold_task' || typedRole === 'attach_task')
+      && (stdin !== 'task' || stdout !== 'agent_jsonl'))
+    || (typedRole === 'direct_task' && !directStream)
     || (typedRole === 'owned_server' && (stdin !== 'none' || stdout !== 'bounded_readiness'))
     || (typedRole === 'policy_preflight' && (stdin !== 'none' || stdout !== 'bounded_json'))
   ) invalidContract('process stream contract');
@@ -780,18 +780,6 @@ function clonePrivateArtifact(value: unknown): SpawnPrivateArtifact {
       endpoint: boundedString(ownValue(record, 'endpoint'), 'MCP runtime endpoint'),
     });
   }
-  if (kind === 'opencode_config') {
-    const record = exactRecord(value, ['kind', 'contents'], 'OpenCode config artifact');
-    const contents = boundedString(ownValue(record, 'contents'), 'OpenCode config artifact');
-    if (Buffer.byteLength(contents, 'utf8') > 128 * 1024) {
-      invalidContract('OpenCode config artifact');
-    }
-    return Object.freeze({ kind, contents });
-  }
-  if (kind === 'opencode_test_home' || kind === 'opencode_managed_config') {
-    exactRecord(value, ['kind'], 'OpenCode directory artifact');
-    return Object.freeze({ kind });
-  }
   invalidContract('private runtime artifact kind');
 }
 
@@ -882,8 +870,7 @@ function cloneTopology(value: unknown): SpawnTopology {
 function cloneAdapterId(value: unknown): AgentProviderId {
   if (
     value !== CLAUDE_CODE_ADAPTER_ID
-    && value !== OPENCODE_ADAPTER_ID
-    && value !== CODEX_ADAPTER_ID
+    && value !== GROK_BUILD_ADAPTER_ID
   ) {
     invalidContract('adapter id');
   }

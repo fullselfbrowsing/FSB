@@ -170,12 +170,8 @@ export function isSanitizedAgentEnvironment(value: unknown): value is SanitizedA
   return !!value && typeof value === 'object' && sanitizedEnvironments.has(value);
 }
 
-// Source-pinned provider credential/discovery boundary for OpenCode v1.14.25,
-// tag commit 3c85719fea0ee83389c814d7abbf1f98c5c6f0f1. The base roster is the
-// provider `env` metadata in packages/opencode/test/tool/fixtures/models-api.json;
-// the additions are custom-provider reads in src/provider/provider.ts plus the
-// AWS/Google credential chains they invoke. HOME and XDG data/state/cache roots
-// stay available so the native OpenCode sign-in remains usable.
+// Reviewed provider credential and discovery variables. HOME and XDG roots stay
+// available so active CLIs can use their own native sign-in stores.
 export const DELEGATION_PROVIDER_KEY_NAMES = Object.freeze([
   '302AI_API_KEY',
   'ABACUS_API_KEY',
@@ -336,13 +332,76 @@ export const DELEGATION_AGENT_ENVIRONMENT_POLICY = freezeAgentEnvironmentPolicy(
   },
 });
 
-export const CONNECTION_TEST_AGENT_ENVIRONMENT_POLICY = freezeAgentEnvironmentPolicy({
-  inheritedAllowRules: ['allow_unlisted'],
-  strippedKeys: [
-    ...DELEGATION_PROVIDER_KEY_NAMES.filter((key) => key !== 'OPENCODE_CONFIG_CONTENT'),
-    'OPENCODE_SERVER_PASSWORD',
-  ],
-  forcedValues: {
-    CODEX_EXEC_SERVER_URL: 'none',
-  },
-});
+
+const GROK_INHERITED_ENVIRONMENT_PREFIXES = Object.freeze([
+  'GROK_',
+  'XAI_',
+  'OTEL_',
+  'CLAUDE_',
+  'CURSOR_',
+  'CODEX_',
+] as const);
+
+const GROK_INHERITED_ENVIRONMENT_KEYS = new Set([
+  'ALL_PROXY',
+  'HTTP_PROXY',
+  'HTTPS_PROXY',
+  'NO_PROXY',
+  'RUST_LOG',
+  'RUST_LOG_STYLE',
+  'XDG_CONFIG_HOME',
+  'XDG_DATA_HOME',
+  'XDG_STATE_HOME',
+  'XDG_CACHE_HOME',
+]);
+
+const GROK_INHERITED_PROVIDER_KEYS = new Set(
+  DELEGATION_PROVIDER_KEY_NAMES.map((key) => key.toUpperCase()),
+);
+
+function isGrokInheritedEnvironmentKeyDenied(key: string): boolean {
+  const canonical = key.toUpperCase();
+  return GROK_INHERITED_ENVIRONMENT_KEYS.has(canonical)
+    || GROK_INHERITED_PROVIDER_KEYS.has(canonical)
+    || GROK_INHERITED_ENVIRONMENT_PREFIXES.some((prefix) => (
+      canonical.startsWith(prefix)
+    ));
+}
+
+/**
+ * Grok gets a closed provider environment: no ambient xAI/Grok overrides,
+ * proxy or collector routing, provider credentials, or logging destinations.
+ * The caller may add only the reviewed fixed values after that removal.
+ *
+ * The removal pass below hands a plain object to the second sanitization, which
+ * no longer has the platform-owned-name exemption that copyEnvironment grants
+ * process.env itself. Names outside ENVIRONMENT_KEY_PATTERN -- ProgramFiles(x86)
+ * on Windows, an exported bash function, npm's own npm_package_bin_* -- are
+ * therefore dropped here rather than left to fail the whole environment build.
+ * A closed profile has no use for them.
+ */
+export function buildSanitizedGrokEnvironment(
+  sourceEnv: NodeJS.ProcessEnv,
+  fixedEnv: Readonly<Record<string, string>>,
+): SanitizedAgentEnvironment {
+  const providerSanitized = buildSanitizedAgentEnvironment(
+    sourceEnv,
+    Object.freeze({}),
+    DELEGATION_AGENT_ENVIRONMENT_POLICY,
+  );
+  const inherited: NodeJS.ProcessEnv = {};
+  for (const [key, value] of Object.entries(providerSanitized)) {
+    if (
+      ENVIRONMENT_KEY_PATTERN.test(key)
+      && !isGrokInheritedEnvironmentKeyDenied(key)
+      && value !== undefined
+    ) {
+      inherited[key] = value;
+    }
+  }
+  return buildSanitizedAgentEnvironment(
+    inherited,
+    fixedEnv,
+    DELEGATION_AGENT_ENVIRONMENT_POLICY,
+  );
+}

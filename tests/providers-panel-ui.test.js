@@ -91,11 +91,13 @@ assert.deepEqual(
     'lmstudio',
     'custom',
     'claude-code',
-    'opencode',
-    'codex'
+    'grok-build'
   ],
-  'the seven API providers are followed by the three local agents'
+  'the seven API providers are followed by the two active local agents'
 );
+assert.match(apiSection, /id="retiredAgentProviderNotice"[^>]*role="alert"[^>]*hidden/);
+assert.match(apiSection, /id="retiredAgentProviderNoticeText"/);
+assert.doesNotMatch(providerSelects[0], /opencode|OpenCode/);
 assert.equal((html.match(/data-section="api-config"/g) || []).length, 1);
 assert.equal((html.match(/id="api-config"/g) || []).length, 1);
 assert.doesNotMatch(html, /data-section="providers"|id="providers"/);
@@ -104,6 +106,10 @@ assert.match(apiSection, /id="apiProviderDetails"/);
 assert.match(apiSection, /id="agentProviderDetails"[^>]*hidden/);
 assert.match(apiSection, /id="agentProviderDetailsHeading"/);
 assert.match(apiSection, /existing local sign-in/);
+assert.match(apiSection, /id="grokBuildConnectionCard"[^>]*hidden/);
+assert.match(apiSection, /Connect SuperGrok/);
+assert.match(apiSection, /shared weekly allowance; extra usage may apply/);
+assert.match(apiSection, /task text and FSB MCP results are sent to Grok for inference/);
 assert.equal((apiSection.match(/id="fullApiTest"/g) || []).length, 1);
 assert.equal((apiSection.match(/>\s*Test Connection\s*</g) || []).length, 1);
 
@@ -122,18 +128,39 @@ for (const forbidden of [
 }
 assert.doesNotMatch(
   apiSection,
-  /Recommended|Compatibility|Refresh status|Pair this browser|Remove Pairing/i
+  /Recommended|Refresh status|Pair this browser|Remove Pairing/i
 );
 assert.doesNotMatch(
   css,
   /\.provider-roster|\.provider-row|\.compatibility-badge|\.mcp-bridge-pairing/
 );
+assert.match(
+  css,
+  /\.agent-card-actions\s+\[hidden\]\s*\{[^}]*display:\s*none\s*;/,
+  'OAuth controls with hidden are removed even though control buttons use flex'
+);
+assert.match(
+  css,
+  /\.test-btn\[hidden\]\s*\{[^}]*display:\s*none\s*;/,
+  'Test Connection hides during retired-provider reselection even though .test-btn is flex'
+);
 
 const normalizeSection = extractFunction(js, 'normalizeSectionId');
 assert.match(normalizeSection, /sectionId === 'providers' \? 'api-config'/);
 const renderKind = extractFunction(js, 'renderProviderKind');
-assert.match(renderKind, /apiProviderDetails\.hidden = showAgentDetails/);
+assert.match(renderKind, /apiProviderDetails\.hidden = showAgentDetails \|\| requiresProviderReselection/);
 assert.match(renderKind, /agentProviderDetails\.hidden = !showAgentDetails/);
+assert.match(renderKind, /retiredAgentProviderNotice\.hidden = !requiresProviderReselection/);
+assert.match(renderKind, /getAgentProviderLabel\(providerPanelState\.retiredAgentProviderId\)/);
+assert.match(renderKind, /is no longer available for Autopilot/);
+assert.match(renderKind, /fullApiTest\.hidden = requiresProviderReselection/);
+assert.match(renderKind, /if \(requiresProviderReselection\) elements\.fullApiTest\.disabled = true/);
+assert.doesNotMatch(
+  renderKind,
+  /fullApiTest\.disabled = requiresProviderReselection/,
+  'renderProviderKind must not re-enable Test Connection; runDiscovery blocks it synchronously first'
+);
+assert.match(js, /providerPanelState\.requiresProviderReselection === true\) return;/);
 
 const selection = extractFunction(js, 'setProviderSelection');
 assert.match(selection, /providerPanelState\.modelProvider = id/);
@@ -146,6 +173,77 @@ assert.match(
   /action:\s*'testAgentProviderConnection',\s*providerId:\s*providerId/
 );
 assert.match(connectionTest, /result = await checkApiConnection\(\)/);
+
+function testGrokBuildAuthRendering() {
+  const safeLoginUrl = extractFunction(js, 'safeGrokBuildLoginUrl');
+  const render = extractFunction(js, 'renderGrokBuildAuthState');
+  const applyProgress = extractFunction(js, 'applyGrokBuildAuthProgress');
+  const makeElement = () => ({
+    hidden: false,
+    disabled: false,
+    href: 'https://grok.com/stale',
+    textContent: '',
+    removeAttribute(name) {
+      if (name === 'href') delete this.href;
+    }
+  });
+  const elements = {
+    grokBuildAuthStatus: makeElement(),
+    connectGrokBuildBtn: makeElement(),
+    disconnectGrokBuildBtn: makeElement(),
+    grokBuildLoginLink: makeElement()
+  };
+  const context = { elements, URL, grokBuildAuthState: 'unauthenticated' };
+  vm.runInNewContext(
+    `${safeLoginUrl}\n${render}\n${applyProgress}\n`
+      + 'this.renderGrokBuildAuthState = renderGrokBuildAuthState;\n'
+      + 'this.applyGrokBuildAuthProgress = applyGrokBuildAuthProgress;',
+    context,
+    { filename: 'options.js#renderGrokBuildAuthState' }
+  );
+
+  context.renderGrokBuildAuthState('unauthenticated');
+  assert.equal(elements.connectGrokBuildBtn.hidden, false);
+  assert.equal(elements.disconnectGrokBuildBtn.hidden, true);
+  assert.equal(elements.grokBuildLoginLink.hidden, true);
+  assert.equal('href' in elements.grokBuildLoginLink, false);
+
+  context.renderGrokBuildAuthState('oauth');
+  assert.equal(elements.connectGrokBuildBtn.hidden, true);
+  assert.equal(elements.disconnectGrokBuildBtn.hidden, false);
+
+  elements.grokBuildLoginLink.href = 'https://grok.com/continue';
+  elements.grokBuildLoginLink.hidden = false;
+  context.renderGrokBuildAuthState('unauthenticated', 'waiting');
+  assert.equal(elements.connectGrokBuildBtn.disabled, true);
+  assert.equal(elements.disconnectGrokBuildBtn.disabled, true);
+  assert.equal(elements.grokBuildLoginLink.hidden, false);
+  assert.equal(elements.grokBuildLoginLink.href, 'https://grok.com/continue');
+
+  context.renderGrokBuildAuthState('unauthenticated', 'failed');
+  assert.equal(elements.connectGrokBuildBtn.disabled, false);
+  assert.equal(elements.disconnectGrokBuildBtn.disabled, false);
+  assert.equal(elements.grokBuildLoginLink.hidden, true);
+  assert.equal('href' in elements.grokBuildLoginLink, false);
+
+  context.applyGrokBuildAuthProgress({
+    type: 'FSB_GROK_BUILD_AUTH_PROGRESS',
+    providerId: 'grok-build',
+    state: 'waiting',
+    url: 'https://auth.x.ai/oauth2/authorize?state=SAFE'
+  });
+  assert.equal(elements.grokBuildLoginLink.hidden, false);
+  assert.equal(elements.grokBuildLoginLink.href,
+    'https://auth.x.ai/oauth2/authorize?state=SAFE');
+
+  context.applyGrokBuildAuthProgress({
+    type: 'FSB_GROK_BUILD_AUTH_PROGRESS',
+    providerId: 'grok-build',
+    state: 'authenticated'
+  });
+  assert.equal(elements.grokBuildLoginLink.hidden, true);
+  assert.equal('href' in elements.grokBuildLoginLink, false);
+}
 
 const keyboardShortcuts = extractFunction(js, 'handleKeyboardShortcuts');
 assert.match(keyboardShortcuts, /runFullApiTest\(\)/);
@@ -209,7 +307,7 @@ async function renderAgentConnectionResponse(response) {
         async sendMessage(message) {
           assert.deepEqual(JSON.parse(JSON.stringify(message)), {
             action: 'testAgentProviderConnection',
-            providerId: 'codex'
+            providerId: 'opencode'
           });
           return response;
         }
@@ -222,11 +320,11 @@ async function renderAgentConnectionResponse(response) {
     },
     providerPanelState: {
       providerKind: 'agent',
-      agentProviderId: 'codex',
+      agentProviderId: 'opencode',
       modelProvider: 'xai'
     },
     getAgentProviderLabel() {
-      return 'Codex';
+      return 'OpenCode';
     },
     async checkApiConnection() {
       throw new Error('API connection path must not run for an agent');
@@ -261,7 +359,7 @@ async function testAgentConnectionRendering() {
   const success = await renderAgentConnectionResponse({
     success: true,
     ok: true,
-    providerId: 'codex'
+    providerId: 'opencode'
   });
   assert.match(success.html, /<strong>Status:<\/strong>\s*Success/);
   assert.doesNotMatch(success.html, /<strong>Error:<\/strong>|Connection test failed/);
@@ -271,16 +369,16 @@ async function testAgentConnectionRendering() {
   const backendFailure = await renderAgentConnectionResponse({
     success: true,
     ok: false,
-    providerId: 'codex',
+    providerId: 'opencode',
     errorCode: 'auth_unauthenticated',
-    message: 'Sign in to Codex locally, then try again.'
+    message: 'Sign in to OpenCode locally, then try again.'
   });
   assert.match(backendFailure.html, /<strong>Status:<\/strong>\s*Failed/);
-  assert.match(backendFailure.html, /Sign in to Codex locally, then try again\./);
+  assert.match(backendFailure.html, /Sign in to OpenCode locally, then try again\./);
   assert.deepEqual(backendFailure.statusUpdates, [[
     'disconnected',
     'Connection Failed',
-    'Sign in to Codex locally, then try again.'
+    'Sign in to OpenCode locally, then try again.'
   ]]);
 
   const codeFailure = await renderAgentConnectionResponse({
@@ -309,6 +407,7 @@ for (const id of [
 }
 
 const save = extractFunction(js, 'saveSettings');
+assert.match(save, /validateProviderReselection\(normalizedProviderSettings\)/);
 assert.match(save, /providerKind:\s*normalizedProviderSettings\.providerKind/);
 assert.match(save, /agentProviderId:\s*normalizedProviderSettings\.agentProviderId/);
 assert.match(save, /modelProvider:\s*normalizedProviderSettings\.modelProvider/);
@@ -316,6 +415,7 @@ const discard = extractFunction(js, 'discardChanges');
 assert.match(discard, /loadSettings\(\)/);
 
 testKeyboardConnectionShortcuts();
+testGrokBuildAuthRendering();
 testAgentConnectionRendering()
   .then(() => console.log('providers-panel-ui.test.js: PASS'))
   .catch((error) => {

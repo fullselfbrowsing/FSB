@@ -10,6 +10,7 @@ const REGISTRY_PATH = path.join(__dirname, '..', 'extension', 'utils', 'agent-re
 
 const CLAUDE_PROVIDER = Object.freeze({ id: 'claude-code', label: 'Claude Code' });
 const OPENCODE_PROVIDER = Object.freeze({ id: 'opencode', label: 'OpenCode' });
+const GROK_BUILD_PROVIDER = Object.freeze({ id: 'grok-build', label: 'Grok Build' });
 const CLAUDE_ACCEPTED_IDENTITY = Object.freeze({
   providerId: 'claude-code',
   label: 'Claude Code',
@@ -23,6 +24,13 @@ const OPENCODE_ACCEPTED_IDENTITY = Object.freeze({
   profileVersion: '1.14.25',
   authState: 'unknown',
   billingKind: 'unknown',
+});
+const GROK_BUILD_ACCEPTED_IDENTITY = Object.freeze({
+  providerId: 'grok-build',
+  label: 'Grok Build',
+  profileVersion: '1.0.4',
+  authState: 'oauth',
+  billingKind: 'subscription',
 });
 const CODEX_CHATGPT_ACCEPTED_IDENTITY = Object.freeze({
   providerId: 'codex',
@@ -436,8 +444,8 @@ async function runAcceptedIdentityFoundation() {
       let controller = modules.controllerModule.create(makeDeps(modules.store).deps);
       await controller.hydrate();
       const claudeId = 'delegation_identity_claude_6501';
-      const openCodeId = 'delegation_identity_opencode_6501';
-      const mutableOpenCodeIdentity = clone(OPENCODE_ACCEPTED_IDENTITY);
+      const openCodeId = 'delegation_identity_grok_build_6501';
+      const mutableOpenCodeIdentity = clone(GROK_BUILD_ACCEPTED_IDENTITY);
       const write = storage.deferWrites();
       const openCodeStarting = controller.start(acceptedStartInput(
         openCodeId,
@@ -455,9 +463,9 @@ async function runAcceptedIdentityFoundation() {
         'v', 'delegationId', 'acceptedIdentity', 'provider', 'state', 'connection',
         'entries', 'summary', 'activeTab', 'hold', 'terminal', 'hydrated',
       ]);
-      assert.deepStrictEqual(openCodeStarted.snapshot.acceptedIdentity, OPENCODE_ACCEPTED_IDENTITY);
-      assert.deepStrictEqual(openCodeStarted.snapshot.provider, OPENCODE_PROVIDER);
-      assert.strictEqual(openCodeStarted.snapshot.entries[0].init.profileVersion, '1.14.25');
+      assert.deepStrictEqual(openCodeStarted.snapshot.acceptedIdentity, GROK_BUILD_ACCEPTED_IDENTITY);
+      assert.deepStrictEqual(openCodeStarted.snapshot.provider, GROK_BUILD_PROVIDER);
+      assert.strictEqual(openCodeStarted.snapshot.entries[0].init.profileVersion, '1.0.4');
       assert(Object.isFrozen(openCodeStarted.snapshot.acceptedIdentity));
 
       const result = await controller.acceptEvent(eventInput(
@@ -466,7 +474,7 @@ async function runAcceptedIdentityFoundation() {
         { timestamp: 1720000000001, state: 'completed' },
       ));
       assert.strictEqual(result.sequence, 2);
-      assert.strictEqual(result.metrics.billingKind, 'unknown');
+      assert.strictEqual(result.metrics.billingKind, 'subscription');
       assert.strictEqual(result.metrics.usd, null);
       const terminal = await controller.acceptEvent(eventInput(
         openCodeId,
@@ -475,12 +483,12 @@ async function runAcceptedIdentityFoundation() {
       ));
       assert.strictEqual(terminal.sequence, 3);
       assert.deepStrictEqual(controller.getSnapshot(openCodeId).acceptedIdentity,
-        OPENCODE_ACCEPTED_IDENTITY);
+        GROK_BUILD_ACCEPTED_IDENTITY);
 
       modules = freshModules();
       controller = modules.controllerModule.create(makeDeps(modules.store).deps);
       const restored = await controller.hydrate();
-      assert.strictEqual(restored.length, 1, 'terminal OpenCode run is not resurrected');
+      assert.strictEqual(restored.length, 1, 'terminal Grok Build run is not resurrected');
       assert.strictEqual(restored[0].delegationId, claudeId);
       assert.deepStrictEqual(restored[0].acceptedIdentity, CLAUDE_ACCEPTED_IDENTITY);
       assert.deepStrictEqual(restored[0].provider, CLAUDE_PROVIDER);
@@ -767,7 +775,7 @@ async function runCodexAcceptedIdentity() {
       );
       assert.strictEqual(getterCalls, 0, 'provider validation never invokes caller accessors');
 
-      const mutableIdentity = { ...OPENCODE_ACCEPTED_IDENTITY };
+      const mutableIdentity = { ...GROK_BUILD_ACCEPTED_IDENTITY };
       const starting = controller.start({
         delegationId: 'delegation_mutable_provider_6410',
         acceptedIdentity: mutableIdentity,
@@ -775,30 +783,30 @@ async function runCodexAcceptedIdentity() {
       mutableIdentity.providerId = 'claude-code';
       mutableIdentity.label = 'Claude Code';
       const started = await starting;
-      assert.deepStrictEqual(started.snapshot.provider, OPENCODE_PROVIDER);
+      assert.deepStrictEqual(started.snapshot.provider, GROK_BUILD_PROVIDER);
       assert(Object.isFrozen(started.snapshot.provider));
-      assert.deepStrictEqual(started.snapshot.entries[0].init.client, OPENCODE_PROVIDER);
-      assert.strictEqual(started.snapshot.entries[0].init.profileVersion, '1.14.25');
+      assert.deepStrictEqual(started.snapshot.entries[0].init.client, GROK_BUILD_PROVIDER);
+      assert.strictEqual(started.snapshot.entries[0].init.profileVersion, '1.0.4');
     } finally {
       storage.restore();
     }
   });
 
-  await test('concurrent Claude and OpenCode runs append durably and hydrate silently without relabeling', async () => {
+  await test('concurrent Claude and Grok Build runs append durably and hydrate silently without relabeling', async () => {
     const storage = installSessionStorage();
     try {
       let modules = freshModules();
       let controller = modules.controllerModule.create(makeDeps(modules.store).deps);
       await controller.hydrate();
       const claudeId = 'delegation_concurrent_claude_6410';
-      const openCodeId = 'delegation_concurrent_opencode_6410';
+      const openCodeId = 'delegation_concurrent_grok_build_6410';
       await Promise.all([
         controller.start(startInput(claudeId, { profileVersion: 'claude-profile-6410' })),
         controller.start({
           delegationId: openCodeId,
           acceptedIdentity: {
-            ...OPENCODE_ACCEPTED_IDENTITY,
-            profileVersion: 'opencode-profile-6410',
+            ...GROK_BUILD_ACCEPTED_IDENTITY,
+            profileVersion: 'grok-build-profile-6410',
           },
         }),
       ]);
@@ -810,7 +818,7 @@ async function runCodexAcceptedIdentity() {
       const appending = controller.acceptEvent(eventInput(openCodeId, fixtures.initEvent, {
         timestamp: 1720000000001,
         state: 'running',
-        profileVersion: 'opencode-profile-6410',
+        profileVersion: 'grok-build-profile-6410',
       })).then((entry) => {
         appendSettled = true;
         return entry;
@@ -819,7 +827,7 @@ async function runCodexAcceptedIdentity() {
       await Promise.resolve();
       assert.strictEqual(appendSettled, false);
       assert.strictEqual(controller.getSnapshot(openCodeId).entries.length, 1);
-      assert.strictEqual(delivered.length, 0, 'OpenCode fanout waits for the durable append');
+      assert.strictEqual(delivered.length, 0, 'Grok Build fanout waits for the durable append');
       write.resolve();
       assert.strictEqual((await appending).sequence, 2);
       assert.strictEqual(delivered.length, 1);
@@ -830,7 +838,7 @@ async function runCodexAcceptedIdentity() {
         profileVersion: 'claude-profile-6410',
       }));
       assert.deepStrictEqual(controller.getSnapshot(claudeId).provider, CLAUDE_PROVIDER);
-      assert.deepStrictEqual(controller.getSnapshot(openCodeId).provider, OPENCODE_PROVIDER);
+      assert.deepStrictEqual(controller.getSnapshot(openCodeId).provider, GROK_BUILD_PROVIDER);
       assert.deepStrictEqual(controller.getSnapshot(claudeId).entries.map((entry) => entry.sequence), [1, 2]);
       assert.deepStrictEqual(controller.getSnapshot(openCodeId).entries.map((entry) => entry.sequence), [1, 2]);
 
@@ -840,9 +848,9 @@ async function runCodexAcceptedIdentity() {
       assert.strictEqual(restored.length, 2);
       const restoredById = new Map(restored.map((snapshot) => [snapshot.delegationId, snapshot]));
       assert.deepStrictEqual(restoredById.get(claudeId).provider, CLAUDE_PROVIDER);
-      assert.deepStrictEqual(restoredById.get(openCodeId).provider, OPENCODE_PROVIDER);
+      assert.deepStrictEqual(restoredById.get(openCodeId).provider, GROK_BUILD_PROVIDER);
       assert.strictEqual(restoredById.get(claudeId).entries[0].init.profileVersion, 'claude-profile-6410');
-      assert.strictEqual(restoredById.get(openCodeId).entries[0].init.profileVersion, 'opencode-profile-6410');
+      assert.strictEqual(restoredById.get(openCodeId).entries[0].init.profileVersion, 'grok-build-profile-6410');
       let replayed = 0;
       controller.subscribe(() => { replayed += 1; });
       assert.strictEqual(replayed, 0, 'hydration never replays persisted announcements');
@@ -856,7 +864,7 @@ async function runCodexAcceptedIdentity() {
       assert.strictEqual(openCodeResult.metrics.inputTokens, 30);
       assert.strictEqual(openCodeResult.metrics.outputTokens, 40);
       assert.strictEqual(openCodeResult.metrics.totalTokens, 70);
-      assert.strictEqual(openCodeResult.metrics.billingKind, 'unknown');
+      assert.strictEqual(openCodeResult.metrics.billingKind, 'subscription');
       assert.strictEqual(openCodeResult.metrics.usd, null);
       assert.strictEqual(controller.getSnapshot(openCodeId).terminal, null);
       assert.strictEqual(controller.getSnapshot(claudeId).entries.length, 2);
@@ -1639,6 +1647,101 @@ async function runCodexAcceptedIdentity() {
     }
   });
 
+  await test('terminal commit fires releaseVisualSessions exactly once for the bound agent', async () => {
+    const storage = installSessionStorage();
+    try {
+      const { store, controllerModule } = freshModules();
+      const visualReleases = [];
+      const harness = makeDeps(store, {
+        releaseVisualSessions: (input) => {
+          visualReleases.push(clone(input));
+          return true;
+        },
+        registry: {
+          bindDelegation() { return { ok: true }; },
+          hydrate() {},
+          getAgentForDelegation() { return null; },
+          listDelegationMappings() { return []; },
+          getDelegationReleaseReceipt() { return null; },
+        },
+      });
+      const controller = controllerModule.create(harness.deps);
+      await controller.hydrate();
+      const id = 'delegation_visual_release';
+      await controller.start(startInput(id));
+      await controller.acceptEvent(eventInput(id, fixtures.initEvent, {}));
+      const bound = await controller.bindRegisteredAgent({ delegationId: id, agentId: 'agent-visual-release' });
+      assert.strictEqual(bound.ok, true);
+      assert.deepStrictEqual(visualReleases, [], 'no visual release before terminal');
+
+      await acceptSuccessfulFinal(controller, id, 1720000001000);
+      assert.deepStrictEqual(visualReleases, [
+        { delegationId: id, agentId: 'agent-visual-release' },
+      ]);
+      assert.strictEqual(controller.getSnapshot(id).terminal.code, 'completed');
+
+      await expectCode(
+        controller.acceptEvent(eventInput(id, fixtures.resultEvent, {
+          timestamp: 1720000001002,
+          state: 'completed',
+        })),
+        'delegation_already_terminal',
+      );
+      assert.strictEqual(visualReleases.length, 1, 'duplicate terminal input does not re-release');
+    } finally {
+      storage.restore();
+    }
+  });
+
+  await test('unbound terminal skips releaseVisualSessions and a throwing callback cannot block settlement', async () => {
+    const storage = installSessionStorage();
+    try {
+      {
+        const { store, controllerModule } = freshModules();
+        const visualReleases = [];
+        const harness = makeDeps(store, {
+          releaseVisualSessions: (input) => {
+            visualReleases.push(clone(input));
+            return true;
+          },
+        });
+        const controller = controllerModule.create(harness.deps);
+        await controller.hydrate();
+        const id = 'delegation_visual_unbound';
+        await controller.start(startInput(id));
+        const stopped = await controller.stop({ delegationId: id });
+        assert.strictEqual(stopped.code, 'stopped');
+        assert.deepStrictEqual(visualReleases, [], 'no bound agent means no visual release call');
+      }
+      {
+        const { store, controllerModule } = freshModules();
+        const harness = makeDeps(store, {
+          releaseVisualSessions: () => { throw new Error('overlay teardown exploded'); },
+          registry: {
+            bindDelegation() { return { ok: true }; },
+            hydrate() {},
+            getAgentForDelegation() { return null; },
+            listDelegationMappings() { return []; },
+            getDelegationReleaseReceipt() { return null; },
+          },
+        });
+        const controller = controllerModule.create(harness.deps);
+        await controller.hydrate();
+        const id = 'delegation_visual_throwing';
+        await controller.start(startInput(id));
+        await controller.acceptEvent(eventInput(id, fixtures.initEvent, {}));
+        const bound = await controller.bindRegisteredAgent({ delegationId: id, agentId: 'agent-visual-throwing' });
+        assert.strictEqual(bound.ok, true);
+        await acceptSuccessfulFinal(controller, id, 1720000002000);
+        const snapshot = controller.getSnapshot(id);
+        assert.strictEqual(snapshot.terminal.code, 'completed',
+          'terminal commits even when the visual release callback throws');
+      }
+    } finally {
+      storage.restore();
+    }
+  });
+
   await test('post-cleanup final-vs-stop ordering chooses exactly one winner in both directions', async () => {
     const storage = installSessionStorage();
     try {
@@ -1980,7 +2083,7 @@ async function runCodexAcceptedIdentity() {
       const secondId = 'delegation_parallel_second';
       await Promise.all([
         controller.start(startInput(firstId)),
-        controller.start(acceptedStartInput(secondId, OPENCODE_ACCEPTED_IDENTITY)),
+        controller.start(acceptedStartInput(secondId, GROK_BUILD_ACCEPTED_IDENTITY)),
       ]);
       await controller.acceptEvent(eventInput(firstId, fixtures.initEvent, {}));
       await controller.acceptEvent(eventInput(secondId, fixtures.initEvent, {}));
@@ -1994,7 +2097,7 @@ async function runCodexAcceptedIdentity() {
       const firstBeforeStop = controller.getSnapshot(firstId);
       const secondAfterTimeout = controller.getSnapshot(secondId);
       assert.deepStrictEqual(firstBeforeStop.provider, CLAUDE_PROVIDER);
-      assert.deepStrictEqual(secondAfterTimeout.provider, OPENCODE_PROVIDER);
+      assert.deepStrictEqual(secondAfterTimeout.provider, GROK_BUILD_PROVIDER);
       assert.strictEqual(firstBeforeStop.state, 'running');
       assert.strictEqual(firstBeforeStop.terminal, null);
       assert.deepStrictEqual(firstBeforeStop.entries.map((entry) => entry.sequence), [1, 2, 3]);

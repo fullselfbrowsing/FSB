@@ -34,6 +34,10 @@
  *      (COMPLETE-03 -- idempotent on confused / redundant final signals).
  *   L. clearVisualSession cancels the death timer (does NOT re-arm),
  *      reinforcing COMPLETE-02.
+ *   M. clearVisualSessionsForAgent clears every entry owned by one agent
+ *      (delegation-terminal immediate teardown) and leaves other agents'
+ *      entries untouched; unknown agent is a counted no-op; invalid
+ *      agentId rejects.
  *
  * Run: node tests/mcp-visual-tick-lifecycle.test.js
  */
@@ -377,6 +381,7 @@ function caseI() {
     'MCP_VISUAL_LIFECYCLE_DEATH_MS',
     'MCP_VISUAL_LIFECYCLE_STORAGE_KEY_PREFIX',
     'clearVisualSession',
+    'clearVisualSessionsForAgent',
     'handleVisualSessionLifecycleAlarm',
     'handleVisualSessionLifecycleTabRemoved',
     'recordVisualSessionTick',
@@ -481,6 +486,45 @@ async function caseL() {
   check(chromeMock.alarms._cleared().filter((name) => name === 'mcpVisualDeath:91').length >= 1, 'L.3 chrome.alarms.clear called for mcpVisualDeath:91 at least once during the clear path');
 }
 
+async function caseM() {
+  console.log('\n--- Case M: clearVisualSessionsForAgent clears one agent\'s entries (delegation terminal) ---');
+  const { chromeMock, lc, capturedStatusBroadcasts } = setupHarness();
+
+  await lc.recordVisualSessionTick(201, 'agent_term', { visualReason: 'step a', client: 'Claude' });
+  await lc.recordVisualSessionTick(202, 'agent_term', { visualReason: 'step b', client: 'Claude' });
+  await lc.recordVisualSessionTick(203, 'agent_other', { visualReason: 'other work', client: 'Codex' });
+  capturedStatusBroadcasts.length = 0;
+  const clearedBefore = chromeMock.alarms._cleared().length;
+
+  const r = await lc.clearVisualSessionsForAgent('agent_term', { reason: 'delegation_terminal' });
+
+  check(r && r.ok === true && r.cleared === 2, 'M.1 returned ok=true cleared=2 for the owning agent');
+  const dump = chromeMock.storage.session._dump();
+  check(dump['mcpVisualSession:201'] === undefined && dump['mcpVisualSession:202'] === undefined, 'M.2 both owned entries removed from storage');
+  check(dump['mcpVisualSession:203'] && dump['mcpVisualSession:203'].agentId === 'agent_other', 'M.3 other agent\'s entry untouched');
+
+  check(capturedStatusBroadcasts.length === 2, 'M.4 exactly two clear-broadcasts fired');
+  const broadcastTabs = capturedStatusBroadcasts.map((b) => b.tabId).sort();
+  check(broadcastTabs[0] === 201 && broadcastTabs[1] === 202, 'M.5 broadcasts targeted tabs 201 and 202');
+  check(capturedStatusBroadcasts.every((b) => b.statusData && b.statusData.phase === 'ended'), 'M.6 every broadcast carries phase=ended');
+  check(capturedStatusBroadcasts.every((b) => b.statusData && b.statusData.reason === 'delegation_terminal'), 'M.7 every broadcast carries reason=delegation_terminal');
+
+  const newlyCleared = chromeMock.alarms._cleared().slice(clearedBefore);
+  check(newlyCleared.includes('mcpVisualDeath:201') && newlyCleared.includes('mcpVisualDeath:202'), 'M.8 death timers cancelled for both owned tabs');
+  const remaining = await chromeMock.alarms.getAll();
+  check(!!remaining.find((a) => a.name === 'mcpVisualDeath:203'), 'M.9 other agent\'s death timer still armed');
+
+  capturedStatusBroadcasts.length = 0;
+  const rUnknown = await lc.clearVisualSessionsForAgent('agent_never_seen', { reason: 'delegation_terminal' });
+  check(rUnknown && rUnknown.ok === true && rUnknown.cleared === 0, 'M.10 unknown agent returns ok=true cleared=0');
+  check(capturedStatusBroadcasts.length === 0, 'M.11 unknown agent fires no broadcasts');
+
+  const rInvalid = await lc.clearVisualSessionsForAgent('   ', { reason: 'delegation_terminal' });
+  check(rInvalid && rInvalid.ok === false && rInvalid.reason === 'invalid_agent_id', 'M.12 blank agentId rejects with invalid_agent_id');
+  const rNonString = await lc.clearVisualSessionsForAgent(42, { reason: 'delegation_terminal' });
+  check(rNonString && rNonString.ok === false && rNonString.reason === 'invalid_agent_id', 'M.13 non-string agentId rejects with invalid_agent_id');
+}
+
 // ------------------------------------------------------------------
 // Driver
 // ------------------------------------------------------------------
@@ -498,6 +542,7 @@ async function caseL() {
   await caseJ();
   await caseK();
   await caseL();
+  await caseM();
 
   console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===');
   process.exit(failed > 0 ? 1 : 0);

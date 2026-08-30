@@ -248,16 +248,13 @@ function assertRunnerSourceContract() {
   assert.match(source, /shell:\s*false/);
   assert.doesNotMatch(source, /npm --prefix mcp run build/);
   assert.doesNotMatch(source, /git\s+(?:add|checkout|restore|reset|stash|clean)\b/);
-  assert.equal(source.split('name: Phase 65 Codex contract (sole Linux root invocation)').length - 1, 1,
+  assert.equal(source.split('name: Phase 65 agent provider contract (sole Linux root invocation)').length - 1, 1,
     'Phase 64 runner accepts exactly the coordinated Phase 65 CI root label');
   assert.doesNotMatch(source, /name: Phase 64 OpenCode contract \(sole Linux root invocation\)/);
 
   for (const token of [
-    "['node', 'tests/mcp-opencode-adapter.test.js', '--section', 'first-commit-drift-gate']",
     "['node', 'tests/mcp-agent-stream-fixture.test.js']",
     "['node', 'tests/mcp-agent-drift-smoke.test.js']",
-    "['node', 'tests/mcp-opencode-adapter.test.js', '--section', 'adapter']",
-    "['node', 'tests/mcp-opencode-server-topology.test.js']",
     "['node', 'tests/mcp-agent-provider-contract.test.js']",
     "['node', 'tests/mcp-adapter-compatibility.test.js']",
     "['node', 'tests/mcp-spawn-supervisor.test.js']",

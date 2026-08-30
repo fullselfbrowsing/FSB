@@ -46,8 +46,9 @@ const CLAUDE_REASONS = Object.freeze([
   'line_too_large', 'missing_result', 'session_mismatch', 'unknown_event_type',
   'unknown_stream_event', 'unknown_system_subtype',
 ]);
-const OPENCODE_REASONS = Object.freeze([
-  'counter_overflow', 'duplicate_id', 'duplicate_result', 'event_after_result',
+const GROK_BUILD_REASONS = Object.freeze([
+  'configuration_surface', 'counter_overflow', 'duplicate_id', 'duplicate_init',
+  'duplicate_result', 'event_after_result',
   'event_before_init', 'invalid_json', 'invalid_order', 'invalid_shape',
   'invalid_utf8', 'line_too_large', 'missing_result', 'provider_error',
   'session_mismatch', 'stream_too_large', 'unknown_event_type',
@@ -61,9 +62,9 @@ const VALID_CLAUDE = Object.freeze({
   eventIndex: 7,
   issuePaths: Object.freeze(['message.content.0.type']),
 });
-const VALID_OPENCODE = Object.freeze({
-  adapterId: 'opencode',
-  profileVersion: '1.14.25',
+const VALID_GROK_BUILD = Object.freeze({
+  adapterId: 'grok-build',
+  profileVersion: '1.0.4',
   reason: 'invalid_order',
   expected: 'known_event_shape',
   eventIndex: 4097,
@@ -91,12 +92,12 @@ assert.deepStrictEqual(EXPECTED_BY_REASON, EXPECTED,
   'validator exports the exhaustive MCP reason-to-expected mapping');
 assert.deepStrictEqual(REASONS_BY_ADAPTER, {
   'claude-code': CLAUDE_REASONS,
-  opencode: OPENCODE_REASONS,
+  'grok-build': GROK_BUILD_REASONS,
 }, 'validator exports the exact two MCP provider reason rosters');
 
 for (const [adapterId, profileVersion, reasons] of [
   ['claude-code', '2.1.177', CLAUDE_REASONS],
-  ['opencode', '1.14.25', OPENCODE_REASONS],
+  ['grok-build', '1.0.4', GROK_BUILD_REASONS],
 ]) {
   for (const reason of reasons) {
     const input = detailFor(adapterId, profileVersion, reason);
@@ -113,7 +114,7 @@ for (const [adapterId, profileVersion, reasons] of [
 }
 
 let accessorCalls = 0;
-const accessor = { ...VALID_OPENCODE };
+const accessor = { ...VALID_GROK_BUILD };
 Object.defineProperty(accessor, 'reason', {
   enumerable: true,
   get() { accessorCalls += 1; return 'invalid_order'; },
@@ -137,27 +138,27 @@ const malformed = [
   { ...VALID_CLAUDE, profileVersion: 'v'.repeat(129) },
   { ...VALID_CLAUDE, profileVersion: '/private/profile' },
   { ...VALID_CLAUDE, reason: 'counter_overflow', expected: 'bounded_jsonl' },
-  { ...VALID_OPENCODE, reason: 'duplicate_init', expected: 'single_init_session' },
-  { ...VALID_OPENCODE, reason: 'protocol_drift', expected: 'adapter_contract' },
-  { ...VALID_OPENCODE, reason: 'invalid_order', expected: 'adapter_contract' },
-  { ...VALID_OPENCODE, eventIndex: 0 },
-  { ...VALID_OPENCODE, eventIndex: 4098 },
-  { ...VALID_OPENCODE, eventIndex: 1.5 },
-  { ...VALID_OPENCODE, issuePaths: sparsePaths },
-  { ...VALID_OPENCODE, issuePaths: Array.from({ length: 17 }, () => 'shape') },
-  { ...VALID_OPENCODE, issuePaths: ['/private/path'] },
-  { ...VALID_OPENCODE, issuePaths: ['secret'] },
-  { ...VALID_OPENCODE, issuePaths: ['message.'.concat('x'.repeat(129))] },
-  { ...VALID_OPENCODE, issuePaths: [1] },
-  { ...VALID_OPENCODE, rawMessage: 'provider-output' },
-  { ...VALID_OPENCODE, event: 'provider-output' },
-  { ...VALID_OPENCODE, path: '/private/path' },
-  { ...VALID_OPENCODE, argv: ['--secret'] },
-  { ...VALID_OPENCODE, env: { TOKEN: 'secret' } },
-  { ...VALID_OPENCODE, task: 'private task' },
-  { ...VALID_OPENCODE, secret: 'secret' },
-  { ...VALID_OPENCODE, model: 'private-model' },
-  { ...VALID_OPENCODE, config: 'private-config' },
+  { ...VALID_GROK_BUILD, reason: 'unknown_system_subtype', expected: 'known_event_shape' },
+  { ...VALID_GROK_BUILD, reason: 'protocol_drift', expected: 'adapter_contract' },
+  { ...VALID_GROK_BUILD, reason: 'invalid_order', expected: 'adapter_contract' },
+  { ...VALID_GROK_BUILD, eventIndex: 0 },
+  { ...VALID_GROK_BUILD, eventIndex: 4098 },
+  { ...VALID_GROK_BUILD, eventIndex: 1.5 },
+  { ...VALID_GROK_BUILD, issuePaths: sparsePaths },
+  { ...VALID_GROK_BUILD, issuePaths: Array.from({ length: 17 }, () => 'shape') },
+  { ...VALID_GROK_BUILD, issuePaths: ['/private/path'] },
+  { ...VALID_GROK_BUILD, issuePaths: ['secret'] },
+  { ...VALID_GROK_BUILD, issuePaths: ['message.'.concat('x'.repeat(129))] },
+  { ...VALID_GROK_BUILD, issuePaths: [1] },
+  { ...VALID_GROK_BUILD, rawMessage: 'provider-output' },
+  { ...VALID_GROK_BUILD, event: 'provider-output' },
+  { ...VALID_GROK_BUILD, path: '/private/path' },
+  { ...VALID_GROK_BUILD, argv: ['--secret'] },
+  { ...VALID_GROK_BUILD, env: { TOKEN: 'secret' } },
+  { ...VALID_GROK_BUILD, task: 'private task' },
+  { ...VALID_GROK_BUILD, secret: 'secret' },
+  { ...VALID_GROK_BUILD, model: 'private-model' },
+  { ...VALID_GROK_BUILD, config: 'private-config' },
   accessor,
   symbolDetail,
   new Proxy({}, { getPrototypeOf() { throw new Error('provider-output'); } }),
@@ -189,14 +190,14 @@ assert.strictEqual(reportAgentProtocolDrift(VALID_CLAUDE, options), true,
   'first Claude detail is admitted at t=0');
 assert.strictEqual(reportAgentProtocolDrift(VALID_CLAUDE, options), false,
   'same-provider repeat is suppressed');
-assert.strictEqual(reportAgentProtocolDrift(VALID_OPENCODE, options), true,
-  'OpenCode is independently admitted at the same timestamp');
-assert.strictEqual(reportAgentProtocolDrift(VALID_OPENCODE, options), false,
-  'OpenCode repeat is independently suppressed');
+assert.strictEqual(reportAgentProtocolDrift(VALID_GROK_BUILD, options), true,
+  'Grok Build is independently admitted at the same timestamp');
+assert.strictEqual(reportAgentProtocolDrift(VALID_GROK_BUILD, options), false,
+  'Grok Build repeat is independently suppressed');
 assert.strictEqual(sinkCalls.length, 2, 'one report per provider reaches the sink');
 assert.strictEqual(_getTrackedAdapterCount(), 2, 'both and only shipped providers are tracked');
 
-for (const [index, detail] of [VALID_CLAUDE, VALID_OPENCODE].entries()) {
+for (const [index, detail] of [VALID_CLAUDE, VALID_GROK_BUILD].entries()) {
   assert.deepStrictEqual(sinkCalls[index].slice(0, 3), [
     'BG', 'agent-protocol-drift', 'Agent protocol drift detected',
   ], 'sink receives the fixed category and message');
@@ -210,24 +211,24 @@ for (const [index, detail] of [VALID_CLAUDE, VALID_OPENCODE].entries()) {
 now = 9999;
 assert.strictEqual(reportAgentProtocolDrift(VALID_CLAUDE, options), false,
   'Claude remains suppressed below its boundary');
-assert.strictEqual(reportAgentProtocolDrift(VALID_OPENCODE, options), false,
-  'OpenCode remains suppressed below its boundary');
+assert.strictEqual(reportAgentProtocolDrift(VALID_GROK_BUILD, options), false,
+  'Grok Build remains suppressed below its boundary');
 now = 10000;
 assert.strictEqual(reportAgentProtocolDrift(VALID_CLAUDE, options), true,
   'Claude exact boundary is admitted');
-assert.strictEqual(reportAgentProtocolDrift(VALID_OPENCODE, options), true,
-  'OpenCode exact boundary is admitted independently');
+assert.strictEqual(reportAgentProtocolDrift(VALID_GROK_BUILD, options), true,
+  'Grok Build exact boundary is admitted independently');
 now = 9000;
 assert.strictEqual(reportAgentProtocolDrift(VALID_CLAUDE, options), true,
-  'Claude clock rollback admits without changing OpenCode state');
+  'Claude clock rollback admits without changing Grok Build state');
 assert.strictEqual(_getTrackedAdapterCount(), 2, 'timestamp state remains at its closed cap');
-console.log('  PASS: Claude and OpenCode rate limits are deterministic and independent');
+console.log('  PASS: Claude and Grok Build rate limits are deterministic and independent');
 
 console.log('--- D64-11 fail-closed and best-effort boundaries ---');
 
 const canary = 'prompt=session-token-/private/path-provider-output';
 const rejectedSinkCalls = [];
-for (const value of malformed.concat([{ ...VALID_OPENCODE, rawMessage: canary }])) {
+for (const value of malformed.concat([{ ...VALID_GROK_BUILD, rawMessage: canary }])) {
   assert.doesNotThrow(() => reportAgentProtocolDrift(value, {
     now: () => 30000,
     rateLimitedWarn(...args) { rejectedSinkCalls.push(args); },
@@ -237,17 +238,17 @@ assert.strictEqual(rejectedSinkCalls.length, 0, 'rejected values never reach the
 assert(!JSON.stringify(rejectedSinkCalls).includes(canary), 'raw canary is absent from sink output');
 
 _resetForTests();
-assert.doesNotThrow(() => reportAgentProtocolDrift(VALID_OPENCODE, { now: () => 0 }),
+assert.doesNotThrow(() => reportAgentProtocolDrift(VALID_GROK_BUILD, { now: () => 0 }),
   'missing sink is best-effort');
-assert.strictEqual(reportAgentProtocolDrift(VALID_OPENCODE, { now: () => 1 }), false,
+assert.strictEqual(reportAgentProtocolDrift(VALID_GROK_BUILD, { now: () => 1 }), false,
   'missing-sink repeat remains throttled');
 
 _resetForTests();
-assert.doesNotThrow(() => reportAgentProtocolDrift(VALID_OPENCODE, {
+assert.doesNotThrow(() => reportAgentProtocolDrift(VALID_GROK_BUILD, {
   now: () => 0,
   rateLimitedWarn() { throw new Error(canary); },
 }), 'throwing sink is best-effort');
-assert.strictEqual(reportAgentProtocolDrift(VALID_OPENCODE, {
+assert.strictEqual(reportAgentProtocolDrift(VALID_GROK_BUILD, {
   now: () => 1,
   rateLimitedWarn() { throw new Error(canary); },
 }), false, 'throwing sink cannot bypass later throttling');

@@ -533,8 +533,10 @@ function backgroundPreflightHarness(options = {}) {
     providerLabel: 'Claude Code',
   };
   const rerunResult = options.rerunResult || originalResult;
+  const refreshedResult = options.refreshedResult || rerunResult;
   let preflightCalls = 0;
   let readinessCalls = 0;
+  let refreshCalls = 0;
   const context = {
     Promise,
     Object,
@@ -544,8 +546,15 @@ function backgroundPreflightHarness(options = {}) {
       preflightCalls += 1;
       return {
         config: { providerKind: options.providerKind || 'agent' },
-        result: preflightCalls === 1 ? originalResult : rerunResult,
+        result: preflightCalls === 1
+          ? originalResult
+          : (preflightCalls === 2 ? rerunResult : refreshedResult),
       };
+    },
+    async fsbRefreshMcpCompatibility() {
+      refreshCalls += 1;
+      if (options.refreshError) throw new Error('compatibility refresh failed');
+      return { refreshOutcome: 'refreshed' };
     },
     async fsbEnsureAgentBridgeReady() {
       readinessCalls += 1;
@@ -556,8 +565,10 @@ function backgroundPreflightHarness(options = {}) {
   context.globalThis = context;
   vm.runInNewContext([
     'const FSB_NATIVE_WAKE_ID_PATTERN = /^[A-Za-z0-9_-]{16,64}$/;',
+    "const FSB_GROK_BUILD_PROVIDER_ID = 'grok-build';",
     extractFunction(backgroundSource, 'fsbDelegationHasExactKeys'),
     extractFunction(backgroundSource, 'fsbDelegationBridgePreflightFailure'),
+    extractFunction(backgroundSource, 'fsbRefreshDelegationAuthorityIfNeeded'),
     extractFunction(backgroundSource, 'fsbDelegationPreflightCommand'),
     'this.preflight = fsbDelegationPreflightCommand;',
   ].join('\n'), context, {
@@ -575,6 +586,9 @@ function backgroundPreflightHarness(options = {}) {
     },
     get readinessCalls() {
       return readinessCalls;
+    },
+    get refreshCalls() {
+      return refreshCalls;
     },
   };
 }
@@ -705,6 +719,22 @@ async function testBackgroundPreflightFailureMapping() {
   });
   assert.deepEqual(plain(await ready.run()), readyResult);
   assert.equal(ready.preflightCalls, 2);
+
+  const refreshableResult = {
+    ok: false,
+    code: 'provider_status_refresh',
+    providerId: 'claude-code',
+    providerLabel: 'Claude Code',
+  };
+  const refreshable = backgroundPreflightHarness({
+    originalResult: providerFailure,
+    bridgeResult: { ok: true },
+    rerunResult: refreshableResult,
+    refreshedResult: readyResult,
+  });
+  assert.deepEqual(plain(await refreshable.run()), readyResult);
+  assert.equal(refreshable.preflightCalls, 3);
+  assert.equal(refreshable.refreshCalls, 1);
 }
 
 function backgroundFailureMessage(code, navigatorLike, extensionId) {

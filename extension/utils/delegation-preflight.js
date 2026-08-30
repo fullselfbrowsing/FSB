@@ -67,38 +67,37 @@
     return providerId || 'Selected provider';
   }
 
-  function canonicalCompatibility(value) {
-    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  function canonicalCompatibilityState(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return 'unsupported';
     var expected = ['status', 'reason', 'checkedAt'];
     var record = {};
     try {
       var keys = Reflect.ownKeys(value);
-      if (keys.length !== expected.length) return null;
+      if (keys.length !== expected.length) return 'unsupported';
       for (var index = 0; index < expected.length; index += 1) {
         var key = expected[index];
         var descriptor = Object.getOwnPropertyDescriptor(value, key);
         if (!descriptor
             || !descriptor.enumerable
-            || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) return null;
+            || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) return 'unsupported';
         record[key] = descriptor.value;
       }
       for (var keyIndex = 0; keyIndex < keys.length; keyIndex += 1) {
         if (typeof keys[keyIndex] !== 'string' || expected.indexOf(keys[keyIndex]) === -1) {
-          return null;
+          return 'unsupported';
         }
       }
     } catch (_error) {
-      return null;
+      return 'unsupported';
     }
+    if (!Number.isSafeInteger(record.checkedAt) || record.checkedAt < 0) return 'unsupported';
     var runnable = (record.status === 'supported'
         && record.reason === 'within_tested_range')
       || (record.status === 'degraded'
         && record.reason === 'newer_than_tested_range');
-    return runnable
-      && Number.isSafeInteger(record.checkedAt)
-      && record.checkedAt >= 0
-      ? record
-      : null;
+    if (runnable) return 'runnable';
+    if (record.status === 'degraded' && record.reason === 'evidence_stale') return 'refresh';
+    return 'unsupported';
   }
 
   function acceptedAgentIdentity(value, providerId) {
@@ -147,7 +146,11 @@
     if (getOwnValue(bridgeState, 'pairingStatus') !== 'paired') {
       return failure('agent_unpaired', agentProviderId);
     }
-    if (!canonicalCompatibility(getOwnValue(input, 'compatibility'))) {
+    var compatibilityState = canonicalCompatibilityState(getOwnValue(input, 'compatibility'));
+    if (compatibilityState === 'refresh') {
+      return failure('provider_status_refresh', agentProviderId);
+    }
+    if (compatibilityState !== 'runnable') {
       return failure('unsupported_provider', agentProviderId);
     }
 
@@ -156,17 +159,18 @@
       agentProviderId
     );
     var authState = getOwnValue(input, 'authState');
-    var safeAuthState = authState === 'chatgpt'
-      || authState === 'api_key'
+    var safeAuthState = authState === 'oauth'
       || authState === 'unauthenticated'
       || authState === 'unknown'
       ? authState
       : null;
     if (!acceptedIdentity) {
-      if (agentProviderId === 'codex' && safeAuthState === 'unauthenticated') {
+      if (agentProviderId === 'grok-build'
+          && safeAuthState === 'unauthenticated') {
         return failure('auth_unauthenticated', agentProviderId);
       }
-      if (agentProviderId === 'codex' && safeAuthState === 'unknown') {
+      if (agentProviderId === 'grok-build'
+          && safeAuthState === 'unknown') {
         return failure('auth_unknown', agentProviderId);
       }
       return failure('provider_status_refresh', agentProviderId);

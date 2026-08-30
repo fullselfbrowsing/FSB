@@ -27,6 +27,16 @@ function assertEqual(actual, expected, msg) {
   assert(actual === expected, `${msg} (expected: ${expected}, got: ${actual})`);
 }
 
+async function assertRejectsAsync(operation, msg) {
+  let error = null;
+  try {
+    await operation();
+  } catch (caught) {
+    error = caught;
+  }
+  assert(error, msg);
+}
+
 function getFreePort() {
   return new Promise((resolve, reject) => {
     const server = net.createServer();
@@ -278,10 +288,42 @@ function makeLifecycleFakes(overrides = {}) {
     compatibilityRegistryCalls: 0,
     compatibilityDetectCalls: 0,
     connectionTestCalls: [],
+    authStatusCalls: 0,
+    authBeginCalls: 0,
+    authLogoutCalls: 0,
+    authBeginSignal: null,
     prepareCalls: 0,
     readyCalls: 0,
     serveReady: false,
     onDegraded: null,
+  };
+  const grokBuildRuntime = Object.freeze({ kind: 'grok-runtime-fixture' });
+  const grokBuildAuthCoordinator = {
+    async recover() {},
+    async status() {
+      state.authStatusCalls++;
+      return Object.freeze({ state: 'unauthenticated' });
+    },
+    async begin(emit, signal) {
+      state.authBeginCalls++;
+      state.authBeginSignal = signal ?? null;
+      emit(Object.freeze({ state: 'opening_browser' }));
+      emit(Object.freeze({ state: 'waiting' }));
+      emit(Object.freeze({ state: 'waiting', url: 'https://auth.x.ai/device?code=SAFE' }));
+      emit(Object.freeze({ state: 'authenticated' }));
+      return Object.freeze({ state: 'oauth' });
+    },
+    async logout() {
+      state.authLogoutCalls++;
+      if (overrides.authLogoutError) throw overrides.authLogoutError;
+      if (overrides.authLogoutLocked) {
+        return Object.freeze({ state: 'unknown', locked: true });
+      }
+      return Object.freeze({ state: 'unauthenticated' });
+    },
+    async acquireTask() { return Object.freeze({ release() {} }); },
+    async recordSession() {},
+    async deleteSession() {},
   };
   const bridge = {
     currentMode: 'hub',
@@ -375,14 +417,21 @@ function makeLifecycleFakes(overrides = {}) {
       state.onDegraded = onDegraded;
       return supervisor;
     },
+    createGrokBuildRuntime() {
+      return grokBuildRuntime;
+    },
+    createGrokBuildAuthCoordinator(runtime) {
+      assert(runtime === grokBuildRuntime, 'serve shares one private Grok runtime with auth');
+      return grokBuildAuthCoordinator;
+    },
     createCompatibilityRegistry() {
       state.compatibilityRegistryCalls++;
       return {
         ids() {
-          return ['claude-code', 'opencode', 'codex'];
+          return ['claude-code', 'grok-build'];
         },
         require(id) {
-          if (!['claude-code', 'opencode', 'codex'].includes(id)) {
+          if (!['claude-code', 'grok-build'].includes(id)) {
             throw new Error('unknown adapter');
           }
           return {
@@ -404,29 +453,16 @@ function makeLifecycleFakes(overrides = {}) {
                   profileVersion: '2.1.177',
                 };
               }
-              if (id === 'codex') {
-                return {
-                  installed: true,
-                  version: '0.142.5',
-                  authState: 'chatgpt',
-                  binary: {
-                    command: 'codex',
-                    realPath: '/private/compatibility-path-canary/codex',
-                    argvPrefix: [],
-                  },
-                  profileVersion: '0.142.5',
-                };
-              }
               return {
                 installed: true,
-                version: '1.14.25',
-                authState: 'unknown',
+                version: '1.0.4',
+                authState: 'oauth',
                 binary: {
-                  command: 'opencode',
-                  realPath: '/private/compatibility-path-canary/opencode',
+                  command: 'grok',
+                  realPath: '/private/compatibility-path-canary/grok',
                   argvPrefix: [],
                 },
-                profileVersion: '1.14.25',
+                profileVersion: '1.0.4',
               };
             },
           };
@@ -503,17 +539,16 @@ async function runServeDelegationLifecycle(lifecycleModule) {
   }, () => {});
   assertEqual(success.state.handlerCalls, 1, 'compatibility never invokes supervisor process authority');
   assertEqual(success.state.compatibilityRegistryCalls, 1, 'compatibility creates one production-registry view lazily');
-  assertEqual(success.state.compatibilityDetectCalls, 3, 'compatibility invokes each registered production detector once');
+  assertEqual(success.state.compatibilityDetectCalls, 2, 'compatibility invokes each registered production detector once');
   assertEqual(
     JSON.stringify(compatibility),
-    '{"schemaVersion":2,"checkedAt":123456789,"adapters":[{"adapterId":"claude-code","displayLabel":"Claude Code","status":"supported","reason":"within_tested_range","authState":"unknown"},{"adapterId":"opencode","displayLabel":"OpenCode","status":"supported","reason":"within_tested_range","authState":"unknown"},{"adapterId":"codex","displayLabel":"Codex","status":"supported","reason":"within_tested_range","authState":"chatgpt"}]}',
+    '{"schemaVersion":2,"checkedAt":123456789,"adapters":[{"adapterId":"claude-code","displayLabel":"Claude Code","status":"supported","reason":"within_tested_range","authState":"unknown"},{"adapterId":"grok-build","displayLabel":"Grok Build","status":"supported","reason":"within_tested_range","authState":"oauth"}]}',
     'compatibility returns only the exact bounded browser-safe projection',
   );
   for (const forbidden of [
     'compatibility-path-canary',
     '2.1.177',
-    '1.14.25',
-    '0.142.5',
+    '1.0.4',
     'profileVersion',
     'sessionSecret',
     'sessionId',
@@ -551,23 +586,23 @@ async function runServeDelegationLifecycle(lifecycleModule) {
     );
   }
   assertEqual(success.state.handlerCalls, 1, 'invalid compatibility payloads never reach the supervisor');
-  assertEqual(success.state.compatibilityDetectCalls, 3, 'invalid compatibility payloads never run detection');
+  assertEqual(success.state.compatibilityDetectCalls, 2, 'invalid compatibility payloads never run detection');
 
   const connectionAbort = new AbortController();
   const connectionTest = await success.state.bridgeOptions.handleExtRequest({
     id: 'connection-test-route',
     type: 'ext:request',
     method: 'provider.test-connection',
-    payload: { providerId: 'codex' },
+    payload: { providerId: 'claude-code' },
   }, () => {}, { signal: connectionAbort.signal });
   assertEqual(
     JSON.stringify(connectionTest),
-    '{"ok":true,"providerId":"codex"}',
+    '{"ok":true,"providerId":"claude-code"}',
     'authenticated provider.test-connection returns only the bounded selected-provider result',
   );
   assertEqual(success.state.connectionTestCalls.length, 1,
     'provider.test-connection invokes one connection probe');
-  assertEqual(success.state.connectionTestCalls[0].providerId, 'codex',
+  assertEqual(success.state.connectionTestCalls[0].providerId, 'claude-code',
     'provider.test-connection routes only to the exact selected provider');
   assert(success.state.connectionTestCalls[0].signal === connectionAbort.signal,
     'provider.test-connection forwards socket cancellation');
@@ -581,6 +616,8 @@ async function runServeDelegationLifecycle(lifecycleModule) {
     [],
     {},
     { providerId: 'cursor' },
+    { providerId: 'codex' },
+    { providerId: 'opencode' },
     { providerId: 'codex', extra: true },
     Object.create(null),
     Object.assign(Object.create({ inherited: true }), { providerId: 'codex' }),
@@ -608,6 +645,83 @@ async function runServeDelegationLifecycle(lifecycleModule) {
   assertEqual(success.state.connectionTestCalls.length, 1,
     'invalid provider.test-connection payloads invoke no probe');
 
+  const authStatus = await success.state.bridgeOptions.handleExtRequest({
+    id: 'grok-auth-status',
+    type: 'ext:request',
+    method: 'provider.auth.status',
+    payload: { providerId: 'grok-build' },
+  }, () => {});
+  assertEqual(JSON.stringify(authStatus), '{"state":"unauthenticated"}',
+    'Grok auth status exposes only the safe state enum');
+
+  const authAbort = new AbortController();
+  const authEvents = [];
+  const authBegin = await success.state.bridgeOptions.handleExtRequest({
+    id: 'grok-auth-begin',
+    type: 'ext:request',
+    method: 'provider.auth.begin',
+    payload: { providerId: 'grok-build' },
+  }, (event) => authEvents.push(event), { signal: authAbort.signal });
+  assertEqual(JSON.stringify(authBegin), '{"state":"oauth"}',
+    'Grok auth begin returns only the final safe state');
+  assert(success.state.authBeginSignal === authAbort.signal,
+    'Grok auth begin forwards socket cancellation');
+  assertEqual(
+    JSON.stringify(authEvents),
+    '[{"id":"grok-auth-begin","type":"ext:event","event":"provider.auth.progress","payload":{"providerId":"grok-build","state":"opening_browser"}},{"id":"grok-auth-begin","type":"ext:event","event":"provider.auth.progress","payload":{"providerId":"grok-build","state":"waiting"}},{"id":"grok-auth-begin","type":"ext:event","event":"provider.auth.progress","payload":{"providerId":"grok-build","state":"waiting","url":"https://auth.x.ai/device?code=SAFE"}},{"id":"grok-auth-begin","type":"ext:event","event":"provider.auth.progress","payload":{"providerId":"grok-build","state":"authenticated"}}]',
+    'Grok auth begin emits the exact bounded progress event surface',
+  );
+
+  const authLogout = await success.state.bridgeOptions.handleExtRequest({
+    id: 'grok-auth-logout',
+    type: 'ext:request',
+    method: 'provider.auth.logout',
+    payload: { providerId: 'grok-build' },
+  }, () => {});
+  assertEqual(JSON.stringify(authLogout), '{"state":"unauthenticated"}',
+    'Grok auth logout returns only the final unauthenticated state');
+  assertEqual(success.state.authStatusCalls, 1, 'Grok auth status invokes its coordinator once');
+  assertEqual(success.state.authBeginCalls, 1, 'Grok auth begin invokes its coordinator once');
+  assertEqual(success.state.authLogoutCalls, 1, 'Grok auth logout invokes its coordinator once');
+  assertEqual(success.state.handlerCalls, 1, 'Grok auth RPCs never enter supervisor task authority');
+
+  for (const method of ['provider.auth.status', 'provider.auth.begin', 'provider.auth.logout']) {
+    for (const payload of [
+      {},
+      { providerId: 'codex' },
+      { providerId: 'grok-build', extra: true },
+      Object.assign(Object.create({ providerId: 'grok-build' }), {}),
+    ]) {
+      await assertRejectsAsync(
+        () => success.state.bridgeOptions.handleExtRequest({
+          id: 'grok-auth-invalid', type: 'ext:request', method, payload,
+        }, () => {}),
+        'invalid provider auth payload',
+      );
+    }
+  }
+  assertEqual(success.state.authStatusCalls, 1, 'invalid auth status payloads invoke no coordinator');
+  assertEqual(success.state.authBeginCalls, 1, 'invalid auth begin payloads invoke no coordinator');
+  assertEqual(success.state.authLogoutCalls, 1, 'invalid auth logout payloads invoke no coordinator');
+
+  const lockedLogout = makeLifecycleFakes({ authLogoutLocked: true });
+  const lockedLogoutRunning = await lifecycleModule.startServeDelegation({
+    host: '127.0.0.1',
+    port: 6015,
+    dependencies: lockedLogout.dependencies,
+  });
+  const refusedLogout = await lockedLogout.state.bridgeOptions.handleExtRequest({
+    id: 'grok-auth-logout-locked',
+    type: 'ext:request',
+    method: 'provider.auth.logout',
+    payload: { providerId: 'grok-build' },
+  }, () => {});
+  assertEqual(JSON.stringify(refusedLogout), '{"state":"unknown","locked":true}',
+    'a locked logout crosses the bridge as data, not as an erased handler throw');
+  assertEqual(lockedLogout.state.handlerCalls, 0,
+    'a locked logout still grants no supervisor authority');
+  await lockedLogoutRunning.shutdown();
+
   const failedDetection = makeLifecycleFakes({
     compatibilityDetectionError: new Error('PRIVATE_DETECTOR_FAILURE'),
   });
@@ -624,7 +738,7 @@ async function runServeDelegationLifecycle(lifecycleModule) {
   }, () => {});
   assertEqual(
     JSON.stringify(unavailableCompatibility),
-    '{"schemaVersion":2,"checkedAt":123456789,"adapters":[{"adapterId":"claude-code","displayLabel":"Claude Code","status":"unsupported","reason":"binary_not_found","authState":"unknown"},{"adapterId":"opencode","displayLabel":"OpenCode","status":"unsupported","reason":"binary_not_found","authState":"unknown"},{"adapterId":"codex","displayLabel":"Codex","status":"unsupported","reason":"binary_not_found","authState":"unknown"}]}',
+    '{"schemaVersion":2,"checkedAt":123456789,"adapters":[{"adapterId":"claude-code","displayLabel":"Claude Code","status":"unsupported","reason":"binary_not_found","authState":"unknown"},{"adapterId":"grok-build","displayLabel":"Grok Build","status":"unsupported","reason":"binary_not_found","authState":"unknown"}]}',
     'detector exceptions become deterministic canonical unsupported rows',
   );
   assert(!JSON.stringify(unavailableCompatibility).includes('PRIVATE_DETECTOR_FAILURE'), 'detector exceptions cannot leak through the safe response');

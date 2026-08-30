@@ -12,9 +12,9 @@
   ]);
   var AGENT_PROVIDER_IDS = Object.freeze([
     'claude-code',
-    'opencode',
-    'codex'
+    'grok-build'
   ]);
+  var RETIRED_AGENT_PROVIDER_IDS = Object.freeze(['codex', 'opencode']);
   var delegationProviders = global.FsbDelegationProviders;
   if (!delegationProviders
       && typeof module !== 'undefined'
@@ -65,33 +65,25 @@
   var AGENT_AUTH_NOT_REPORTED = 'Not reported';
   var CLAUDE_AUTH_HELP = 'Claude Code does not report an auth state that FSB can safely read.';
   var GENERIC_AGENT_AUTH_HELP = 'The CLI has not reported its account type.';
-  var CODEX_AUTH_DISPLAY_MODELS = Object.freeze({
-    chatgpt: Object.freeze({
-      label: 'ChatGPT',
-      help: 'Codex is signed in with ChatGPT.'
-    }),
-    api_key: Object.freeze({
-      label: 'API key',
-      help: 'Codex is signed in with an API key stored by Codex.'
+  var GROK_AUTH_DISPLAY_MODELS = Object.freeze({
+    oauth: Object.freeze({
+      label: 'Connected with Grok',
+      help: 'FSB\'s private Grok Build profile is signed in with browser OAuth.'
     }),
     unauthenticated: Object.freeze({
-      label: 'Not signed in',
-      help: 'Sign in to Codex first.'
+      label: 'Not connected',
+      help: 'Connect SuperGrok to the private FSB Grok Build profile.'
     }),
     unknown: Object.freeze({
       label: 'Status unavailable',
-      help: 'Codex sign-in status is unavailable. Refresh status before starting a task.'
+      help: 'Grok Build sign-in status is unavailable. Refresh status before starting a task.'
     })
   });
-  var CODEX_BILLING_LABELS = Object.freeze({
-    chatgpt: 'Included with your ChatGPT plan',
-    api_key: 'Billed to the API key stored by Codex; dollar amount not reported.',
-    unauthenticated: 'Sign in to Codex first.',
-    unknown: 'Billing not reported'
-  });
+  var GROK_BILLING_COPY = 'Uses your signed-in Grok account. SuperGrok usage draws from its shared weekly allowance; extra usage may apply.';
 
   var API_PROVIDER_SET = createProviderSet(API_PROVIDER_IDS);
   var AGENT_PROVIDER_SET = createProviderSet(AGENT_PROVIDER_IDS);
+  var RETIRED_AGENT_PROVIDER_SET = createProviderSet(RETIRED_AGENT_PROVIDER_IDS);
 
   var PROVIDER_DEFINITIONS = Object.freeze({
     xai: createProviderDefinition('xai', 'api', 'xAI'),
@@ -108,21 +100,12 @@
       'Review Claude plans and billing',
       'https://claude.com/pricing'
     ),
-    opencode: createAgentProviderDefinition(
-      'opencode',
-      'OpenCode',
-      'Uses the provider configured in OpenCode. FSB does not need that provider credential. Charges may come from OpenCode Zen or the configured provider.',
-      'Review OpenCode providers and billing',
-      'https://opencode.ai/docs/providers/',
-      'Review OpenCode Zen',
-      'https://opencode.ai/docs/zen/'
-    ),
-    codex: createAgentProviderDefinition(
-      'codex',
-      'Codex',
-      'Uses the account signed into Codex. FSB does not need your OpenAI credential. Usage, credits, and charges follow that account\'s current OpenAI plan or API configuration.',
-      'Review current Codex billing',
-      'https://help.openai.com/en/articles/20001106-codex-rate-card-2'
+    'grok-build': createAgentProviderDefinition(
+      'grok-build',
+      'Grok Build',
+      GROK_BILLING_COPY,
+      'Review SuperGrok usage',
+      'https://docs.x.ai/grok/faq'
     )
   });
 
@@ -203,6 +186,10 @@
     return hasOwn(AGENT_PROVIDER_SET, id);
   }
 
+  function isRetiredAgentProvider(id) {
+    return hasOwn(RETIRED_AGENT_PROVIDER_SET, id);
+  }
+
   function normalizeSettings(settings) {
     var source = isRecord(settings) ? settings : {};
     var savedModelProvider = getOwnValue(source, 'modelProvider');
@@ -210,11 +197,18 @@
     var providerKind = getOwnValue(source, 'providerKind');
     var modelProvider = isApiProvider(savedModelProvider) ? savedModelProvider : 'xai';
     var agentProviderId = isAgentProvider(savedAgentProvider) ? savedAgentProvider : '';
+    var requiresProviderReselection = providerKind === 'agent'
+      && isRetiredAgentProvider(savedAgentProvider);
 
     return {
-      providerKind: providerKind === 'agent' && agentProviderId ? 'agent' : 'api',
+      providerKind: requiresProviderReselection
+        || (providerKind === 'agent' && agentProviderId)
+        ? 'agent'
+        : 'api',
       modelProvider: modelProvider,
-      agentProviderId: agentProviderId
+      agentProviderId: agentProviderId,
+      requiresProviderReselection: requiresProviderReselection,
+      retiredAgentProviderId: requiresProviderReselection ? savedAgentProvider : ''
     };
   }
 
@@ -365,12 +359,12 @@
   }
 
   function getSafeAgentAuthState(providerId, row) {
-    if (providerId !== 'codex'
+    if (providerId !== 'grok-build'
         || !isPlainDataRecord(row)
         || getOwnValue(row, 'raw') === true) return 'unknown';
     var authState = getOwnValue(row, 'authState');
     return typeof authState === 'string'
-        && hasOwn(CODEX_AUTH_DISPLAY_MODELS, authState)
+        && hasOwn(GROK_AUTH_DISPLAY_MODELS, authState)
       ? authState
       : 'unknown';
   }
@@ -381,8 +375,8 @@
 
   function getAgentAuthDisplay(providerId, row) {
     if (!isAgentProvider(providerId)) return null;
-    if (providerId === 'codex') {
-      return copyDisplayModel(CODEX_AUTH_DISPLAY_MODELS[getSafeAgentAuthState(providerId, row)]);
+    if (providerId === 'grok-build') {
+      return copyDisplayModel(GROK_AUTH_DISPLAY_MODELS[getSafeAgentAuthState(providerId, row)]);
     }
     return {
       label: AGENT_AUTH_NOT_REPORTED,
@@ -392,11 +386,11 @@
 
   function getBillingLabel(providerId, row) {
     if (isAgentProvider(providerId)) {
-      if (providerId === 'codex') {
-        var authState = getSafeAgentAuthState(providerId, row);
+      if (providerId === 'grok-build') {
+        var grokAuthState = getSafeAgentAuthState(providerId, row);
         return {
-          label: CODEX_BILLING_LABELS[authState],
-          confirmed: authState === 'chatgpt' || authState === 'api_key'
+          label: grokAuthState === 'oauth' ? GROK_BILLING_COPY : 'Connect SuperGrok to view usage.',
+          confirmed: grokAuthState === 'oauth'
         };
       }
       return { label: 'Billing not reported', confirmed: false };
@@ -429,9 +423,11 @@
   var api = Object.freeze({
     API_PROVIDER_IDS: API_PROVIDER_IDS,
     AGENT_PROVIDER_IDS: AGENT_PROVIDER_IDS,
+    RETIRED_AGENT_PROVIDER_IDS: RETIRED_AGENT_PROVIDER_IDS,
     PROVIDER_DEFINITIONS: PROVIDER_DEFINITIONS,
     isApiProvider: isApiProvider,
     isAgentProvider: isAgentProvider,
+    isRetiredAgentProvider: isRetiredAgentProvider,
     normalizeSettings: normalizeSettings,
     getRecommendation: getRecommendation,
     getAgentStatus: getAgentStatus,

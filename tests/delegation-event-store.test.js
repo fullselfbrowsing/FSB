@@ -3,8 +3,6 @@
 const assert = require('assert');
 const fs = require('node:fs');
 const path = require('path');
-const { Readable } = require('node:stream');
-const { pathToFileURL } = require('node:url');
 const fixtures = require('./fixtures/delegation-events');
 
 const STORE_PATH = path.join(
@@ -13,14 +11,6 @@ const STORE_PATH = path.join(
   'extension',
   'utils',
   'delegation-event-store.js',
-);
-const MCP_BUILD_ROOT = process.env.FSB_MCP_BUILD_ROOT
-  ? path.resolve(process.env.FSB_MCP_BUILD_ROOT)
-  : path.join(__dirname, '..', 'mcp', 'build');
-const OPENCODE_STREAM_PATH = path.join(
-  MCP_BUILD_ROOT,
-  'agent-providers',
-  'opencode-stream.js',
 );
 const CLAUDE_ACCEPTED_IDENTITY = Object.freeze({
   providerId: 'claude-code',
@@ -880,41 +870,6 @@ async function runCodexAcceptedIdentity() {
         'delegation_persistence_failed',
       );
     }
-  });
-
-  await test('persists token totals emitted by the pinned OpenCode parser', async () => {
-    const store = freshStore();
-    const fixture = fs.readFileSync(path.join(
-      __dirname,
-      'fixtures',
-      'agent-streams',
-      'opencode-1.14.25',
-      'contract-stream.jsonl',
-    ));
-    const { parseOpenCodeEvents } = await import(pathToFileURL(OPENCODE_STREAM_PATH).href);
-    const normalized = [];
-    for await (const event of parseOpenCodeEvents(Readable.from([fixture]))) {
-      normalized.push(event);
-    }
-    const result = normalized.find((event) => event.type === 'result');
-    assert(result, 'pinned OpenCode stream emits one terminal result');
-    const entry = project(store, result, {
-      sequence: 11,
-      client: fixtures.canonicalClients.openCode,
-      profileVersion: '1.14.25',
-      sessionId: result.sessionId,
-      billingKind: 'unknown',
-    });
-    assert.deepStrictEqual(entry.metrics, {
-      inputTokens: 18,
-      outputTokens: 11,
-      totalTokens: 29,
-      turns: null,
-      durationMs: null,
-      billingKind: 'unknown',
-      usd: null,
-      toolCalls: [],
-    });
   });
 
   await test('state rows never parse presentation strings as machine data', () => {

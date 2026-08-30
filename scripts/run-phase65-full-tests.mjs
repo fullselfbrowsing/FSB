@@ -21,9 +21,6 @@ const wrapperPath = process.env.FSB_PHASE65_TEST_WRAPPER_PATH
   : productionWrapperPath;
 
 const PHASE65_COMMANDS = Object.freeze([
-  Object.freeze(['node', 'tests/mcp-codex-adapter.test.js', '--section', 'generic-probe']),
-  Object.freeze(['node', 'tests/mcp-codex-adapter.test.js', '--section', 'generic-authority']),
-  Object.freeze(['node', 'tests/mcp-codex-adapter.test.js']),
   Object.freeze(['node', 'tests/mcp-agent-orphan-recovery.test.js']),
   Object.freeze(['node', 'tests/mcp-spawn-supervisor.test.js']),
   Object.freeze(['node', 'tests/runtime-contracts.test.js']),
@@ -57,17 +54,14 @@ const PHASE65_COMMANDS = Object.freeze([
 
 const PHASE65_ROOT_COMMANDS = Object.freeze([
   'node tests/phase65-full-tests-harness.test.js',
-  'node tests/mcp-codex-adapter.test.js',
 ]);
 
 const RETAINED_ROOT_COMMANDS = Object.freeze([
   'node tests/phase60-full-tests-harness.test.js',
   'node tests/phase64-full-tests-harness.test.js',
   'node tests/delegation-routing.test.js',
-  'node tests/mcp-opencode-adapter.test.js --section adapter',
   'node tests/mcp-agent-drift-smoke.test.js',
   'node tests/mcp-spawn-supervisor.test.js',
-  'node tests/mcp-opencode-server-topology.test.js',
   'node tests/mcp-agent-orphan-recovery.test.js',
   'node tests/agent-provider-forbidden-flags.test.js',
   'node tests/delegation-phase-contract.test.js',
@@ -130,16 +124,13 @@ function assertStaticContracts() {
 
   const rootBuildCommand = ['npm', '--prefix', 'mcp', 'run', 'build'].join(' ');
   const buildIndex = rootCommands.indexOf(rootBuildCommand);
-  const openCodeIndex = rootCommands.indexOf('node tests/mcp-opencode-adapter.test.js --section adapter');
-  const codexIndex = rootCommands.indexOf('node tests/mcp-codex-adapter.test.js');
   const driftIndex = rootCommands.indexOf('node tests/mcp-agent-drift-smoke.test.js');
   const supervisorIndex = rootCommands.indexOf('node tests/mcp-spawn-supervisor.test.js');
-  const topologyIndex = rootCommands.indexOf('node tests/mcp-opencode-server-topology.test.js');
   const recoveryIndex = rootCommands.indexOf('node tests/mcp-agent-orphan-recovery.test.js');
   if (
     rootCommands.filter((command) => command === rootBuildCommand).length !== 1
-    || !(buildIndex < openCodeIndex && openCodeIndex < codexIndex && codexIndex < driftIndex)
-    || !(supervisorIndex < topologyIndex && topologyIndex < recoveryIndex)
+    || !(buildIndex < driftIndex)
+    || !(supervisorIndex < recoveryIndex)
   ) {
     throw new Error('root Phase 65 commands are outside their protected dependency order');
   }
@@ -155,7 +146,7 @@ function assertStaticContracts() {
 
   const ciSource = readFileSync(ciPath, 'utf8');
   if (
-    exactOccurrences(ciSource, 'name: Phase 65 Codex contract (sole Linux root invocation)') !== 1
+    exactOccurrences(ciSource, 'name: Phase 65 agent provider contract (sole Linux root invocation)') !== 1
     || exactOccurrences(ciSource, 'run: npm test') !== 1
     || ciSource.includes('run: node scripts/run-phase64-full-tests.mjs')
     || ciSource.includes('run: node scripts/run-phase65-full-tests.mjs')

@@ -26,6 +26,7 @@ const SIDE_PANEL_PATH = path.resolve(__dirname, '../extension/ui/sidepanel.js');
 const BACKGROUND_PATH = path.resolve(__dirname, '../extension/background.js');
 const OwnerChip = require('../extension/ui/owner-chip.js');
 const TabConvStore = require('../extension/ui/sidepanel-tab-conv-store.js');
+const DelegationTabSeed = require('../extension/utils/delegation-tab-seed.js');
 
 const sidepanelSource = fs.readFileSync(SIDE_PANEL_PATH, 'utf8');
 const backgroundSource = fs.readFileSync(BACKGROUND_PATH, 'utf8');
@@ -298,12 +299,45 @@ async function adopt(options) {
   result = await adopt({ tabId: 'nope' });
   check(result.adopted === false, 'non-integer tab ids are rejected');
 
+  // The side-panel seed may hand a legacy surface tab to the newly registered
+  // delegated agent, but it must never displace another real agent.
+  console.log('\n--- delegated seed: live owners are never displaced ---');
+  {
+    DelegationTabSeed.clear();
+    let releaseCalls = 0;
+    let bindCalls = 0;
+    const owner = 'agent_live_owner_0001';
+    const reserved = DelegationTabSeed.reserve({
+      delegationId: 'dlg_live_owner_0001',
+      tabId: 11
+    }, 1_000);
+    const seeded = await DelegationTabSeed.adopt({
+      delegationId: 'dlg_live_owner_0001',
+      agentId: 'agent_codex_delegate_0001',
+      registry: {
+        getOwner: function() { return owner; },
+        releaseTab: function() { releaseCalls += 1; },
+        bindTab: function() { bindCalls += 1; }
+      },
+      tabsApi: {
+        get: async function() {
+          return { id: 11, incognito: false, url: 'https://example.com/' };
+        }
+      }
+    }, 1_001);
+    check(reserved === true && seeded === null,
+      'a reserved side-panel tab already owned by a real agent is rejected');
+    check(releaseCalls === 0 && bindCalls === 0,
+      'live-owner rejection neither releases nor rebinds the tab');
+    DelegationTabSeed.clear();
+  }
+
   // The adoption call in syncActiveTabSurface stays guarded and single-arg:
   // that function runs in stub contexts that do not define the helper.
   const syncSource = extractNamedFunction(sidepanelSource, 'syncActiveTabSurface');
   check(syncSource.includes("if (typeof _adoptTabIntoRunningDelegationConversation === 'function') {\n      await _adoptTabIntoRunningDelegationConversation(incomingTabId);"),
     'syncActiveTabSurface keeps the guarded single-argument adoption call');
-  check(syncSource.indexOf('refreshOwnerChip(incomingTabId') < syncSource.indexOf('_adoptTabIntoRunningDelegationConversation(incomingTabId)')
+  check(syncSource.indexOf('refreshActiveTabOwnership(incomingTabId') < syncSource.indexOf('_adoptTabIntoRunningDelegationConversation(incomingTabId)')
     && syncSource.indexOf('_adoptTabIntoRunningDelegationConversation(incomingTabId)') < syncSource.indexOf('swapToTabConversation(incomingTabId)'),
     'adoption runs after the ownership read and before the conversation swap');
 
@@ -629,6 +663,31 @@ async function adopt(options) {
     check(registerBody.includes('canonicalLabelFromClientInfo(clientInfo)')
       && registerBody.includes('_persistAgentClientLabel(agentId, registerLabel)'),
       'agent:register persists the canonical label for the ownership chip');
+  }
+
+  // -------------------------------------------------------------------------
+  // 11. Terminal commit tears the on-page visual overlay down immediately:
+  //     the controller invokes the injected releaseVisualSessions callback
+  //     for the bound agent before the terminal emit, and background wires
+  //     that callback to the lifecycle store's guarded per-agent clear.
+  //     Without this, the overlay lingers until the 60s death alarm.
+  // -------------------------------------------------------------------------
+  console.log('\n--- terminal overlay teardown ---');
+  {
+    const controllerSource = fs.readFileSync(path.resolve(__dirname, '../extension/utils/delegation-controller.js'), 'utf8');
+    const commitBody = extractFunctionBody(controllerSource, '_commitTerminal');
+    const releaseIndex = commitBody.indexOf('releaseVisualSessions({ delegationId: record.delegationId, agentId: record.agentId })');
+    const emitIndex = commitBody.indexOf('_emit(record, terminalEntry');
+    check(releaseIndex > 0 && emitIndex > releaseIndex,
+      '_commitTerminal releases visual sessions for the bound agent before the terminal emit');
+
+    const wiringIndex = backgroundSource.indexOf('releaseVisualSessions: (');
+    const wiringSlice = wiringIndex >= 0 ? backgroundSource.slice(wiringIndex, wiringIndex + 900) : '';
+    check((backgroundSource.match(/releaseVisualSessions: \(/g) || []).length === 1
+      && wiringSlice.includes("typeof MCPVisualSessionLifecycleUtils === 'undefined'")
+      && wiringSlice.includes("MCPVisualSessionLifecycleUtils.clearVisualSessionsForAgent(agentId, { reason: 'delegation_terminal' })")
+      && wiringSlice.includes('.catch(() => {})'),
+      'background wires releaseVisualSessions to the guarded per-agent lifecycle clear');
   }
 
   console.log('\n' + passed + ' PASS / ' + failed + ' FAIL');

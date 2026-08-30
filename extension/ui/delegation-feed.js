@@ -16,6 +16,7 @@
   var ACCEPTED_BILLING_TEXT = Object.freeze({
     'chatgpt:subscription': 'Included with your ChatGPT plan',
     'api_key:api': 'Billed to the API key stored by Codex; dollar amount not reported.',
+    'oauth:subscription': 'Uses your signed-in Grok account; SuperGrok usage draws from its shared weekly allowance and extra usage may apply.',
     'unknown:subscription': 'Included in your subscription',
     'unknown:unknown': BILLING_NOT_REPORTED
   });

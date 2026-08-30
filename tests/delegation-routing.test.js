@@ -27,7 +27,7 @@ if (SECTION_ARGUMENT_INDEX !== -1 && !SELECTED_SECTION) {
 if (SELECTED_SECTION !== null
     && SELECTED_SECTION !== 'accepted-identity-preflight'
     && SELECTED_SECTION !== 'immediate-start-identity'
-    && SELECTED_SECTION !== 'codex-auth-preflight') {
+    && SELECTED_SECTION !== 'codex-retirement-preflight') {
   throw new Error(`unknown section: ${SELECTED_SECTION}`);
 }
 
@@ -44,6 +44,13 @@ const OPENCODE_ACCEPTED_IDENTITY = Object.freeze({
   profileVersion: '1.14.25',
   authState: 'unknown',
   billingKind: 'unknown'
+});
+const GROK_BUILD_ACCEPTED_IDENTITY = Object.freeze({
+  providerId: 'grok-build',
+  label: 'Grok Build',
+  profileVersion: '1.0.4',
+  authState: 'oauth',
+  billingKind: 'subscription'
 });
 const CODEX_CHATGPT_ACCEPTED_IDENTITY = Object.freeze({
   providerId: 'codex',
@@ -94,15 +101,23 @@ function loadPreflightContract() {
   };
 }
 
-function runCodexAuthPreflightContract() {
+function runCodexRetirementPreflightContract() {
   const { canonical, preflight } = loadPreflightContract();
-  assert.deepEqual(clone(canonical.ids()), ['claude-code', 'opencode', 'codex'],
-    'Codex is the exact third canonical agent provider');
+  assert.deepEqual(clone(canonical.ids()), ['claude-code', 'grok-build'],
+    'retired providers are absent from the active agent roster');
+  assert.equal(canonical.isShippedId('codex'), false);
+  assert.equal(canonical.isKnownId('codex'), true);
+  assert.equal(canonical.isShippedId('opencode'), false);
+  assert.equal(canonical.isKnownId('opencode'), true);
   for (const [identity, billingKind] of [
     [CODEX_CHATGPT_ACCEPTED_IDENTITY, 'subscription'],
     [CODEX_API_KEY_ACCEPTED_IDENTITY, 'api']
   ]) {
     assert.equal(canonical.resolveAgentBillingKind('codex', identity.authState), billingKind);
+    assert.deepEqual(clone(canonical.validateAcceptedAgentIdentity(identity)), identity,
+      'exact retired Codex identity remains readable for historical runs');
+    assert.equal(canonical.createAcceptedAgentIdentity('codex', identity.authState), null,
+      'retired Codex identity cannot be minted for a new run');
     for (const compatibility of [supportedCompatibility(), degradedCompatibility()]) {
       assert.deepEqual(clone(preflight.check({
         providerKind: 'agent',
@@ -112,19 +127,34 @@ function runCodexAuthPreflightContract() {
         compatibility,
         acceptedIdentity: clone(identity)
       })), {
-        ok: true,
-        kind: 'agent',
+        ok: false,
+        code: 'unsupported_provider',
         providerId: 'codex',
-        providerLabel: 'Codex',
-        acceptedIdentity: identity
-      }, `${identity.authState} Codex authority is runnable for fresh compatibility`);
+        providerLabel: 'Codex'
+      }, `${identity.authState} historical identity cannot reactivate Codex`);
     }
   }
 
-  for (const [authState, expectedCode] of [
-    ['unauthenticated', 'auth_unauthenticated'],
-    ['unknown', 'auth_unknown']
-  ]) {
+  assert.deepEqual(clone(canonical.validateAcceptedAgentIdentity(OPENCODE_ACCEPTED_IDENTITY)),
+    OPENCODE_ACCEPTED_IDENTITY,
+    'exact retired OpenCode identity remains readable for historical runs');
+  assert.equal(canonical.createAcceptedAgentIdentity('opencode', 'unknown'), null,
+    'retired OpenCode identity cannot be minted for a new run');
+  assert.deepEqual(clone(preflight.check({
+    providerKind: 'agent',
+    agentProviderId: 'opencode',
+    modelProvider: 'xai',
+    bridgeState: bridgeState(),
+    compatibility: supportedCompatibility(),
+    acceptedIdentity: clone(OPENCODE_ACCEPTED_IDENTITY)
+  })), {
+    ok: false,
+    code: 'unsupported_provider',
+    providerId: 'opencode',
+    providerLabel: 'OpenCode'
+  }, 'historical identity cannot reactivate OpenCode');
+
+  for (const authState of ['unauthenticated', 'unknown']) {
     assert.equal(canonical.createAcceptedAgentIdentity('codex', authState), null,
       `${authState} cannot mint Codex authority`);
     assert.deepEqual(clone(preflight.check({
@@ -137,7 +167,7 @@ function runCodexAuthPreflightContract() {
       acceptedIdentity: null
     })), {
       ok: false,
-      code: expectedCode,
+      code: 'unsupported_provider',
       providerId: 'codex',
       providerLabel: 'Codex'
     });
@@ -152,7 +182,7 @@ function runCodexAuthPreflightContract() {
     authState: 'unknown',
     acceptedIdentity: null
   }).code, 'provider_status_refresh',
-  'non-Codex identity failure retains the closed generic recovery code');
+  'active identity failure retains the closed generic recovery code');
 
   for (const acceptedIdentity of [
     { ...CODEX_CHATGPT_ACCEPTED_IDENTITY, billingKind: 'api' },
@@ -167,7 +197,7 @@ function runCodexAuthPreflightContract() {
       bridgeState: bridgeState(),
       compatibility: supportedCompatibility(),
       acceptedIdentity
-    }).code, 'provider_status_refresh', 'invalid Codex identity pairs fail closed');
+    }).code, 'unsupported_provider', 'invalid Codex identity pairs remain retired');
   }
   assert.equal(preflight.check({
     providerKind: 'agent',
@@ -176,7 +206,7 @@ function runCodexAuthPreflightContract() {
     bridgeState: bridgeState(),
     compatibility: { status: 'degraded', reason: 'evidence_stale', checkedAt: 100 },
     acceptedIdentity: clone(CODEX_CHATGPT_ACCEPTED_IDENTITY)
-  }).code, 'unsupported_provider', 'stale Codex evidence cannot start');
+  }).code, 'unsupported_provider', 'stale Codex evidence cannot reactivate the provider');
   runImmediateStartIdentityContract();
 }
 
@@ -278,8 +308,8 @@ function runImmediateStartIdentityContract() {
 }
 
 async function main() {
-  if (SELECTED_SECTION === 'codex-auth-preflight') {
-    runCodexAuthPreflightContract();
+  if (SELECTED_SECTION === 'codex-retirement-preflight') {
+    runCodexRetirementPreflightContract();
     console.log('delegation-routing.test.js: PASS');
     return;
   }
@@ -502,7 +532,7 @@ async function main() {
 
   const apiProviders = ['xai', 'gemini', 'openai', 'anthropic', 'openrouter', 'lmstudio', 'custom'];
   for (const modelProvider of apiProviders) {
-    for (const agentProviderId of ['', 'claude-code', 'codex']) {
+    for (const agentProviderId of ['', 'claude-code', 'codex', 'opencode']) {
       const input = {
         providerKind: 'api',
         agentProviderId,
@@ -565,32 +595,71 @@ async function main() {
 
   assert.deepEqual(clone(preflight.check({
     ...readyInput,
-    agentProviderId: 'opencode',
-    acceptedIdentity: clone(OPENCODE_ACCEPTED_IDENTITY)
+    agentProviderId: 'grok-build',
+    acceptedIdentity: clone(GROK_BUILD_ACCEPTED_IDENTITY)
   })), {
     ok: true,
     kind: 'agent',
-    providerId: 'opencode',
-    providerLabel: 'OpenCode',
-    acceptedIdentity: OPENCODE_ACCEPTED_IDENTITY
-  }, 'OpenCode enters delegated mode only with canonical compatibility evidence');
+    providerId: 'grok-build',
+    providerLabel: 'Grok Build',
+    acceptedIdentity: GROK_BUILD_ACCEPTED_IDENTITY
+  }, 'Grok Build enters delegated mode only with canonical compatibility evidence');
 
   for (const compatibility of [
     undefined,
-    { status: 'degraded', reason: 'evidence_stale', checkedAt: 100 },
     { status: 'unsupported', reason: 'wrong_major', checkedAt: 100 },
     { status: 'supported', reason: 'within_tested_range', checkedAt: 100, extra: true },
+    { status: 'degraded', reason: 'evidence_stale', checkedAt: 100, extra: true },
     Object.assign(Object.create({ status: 'supported' }), {
       reason: 'within_tested_range', checkedAt: 100
     })
   ]) {
     const result = clone(preflight.check({ ...readyInput, compatibility }));
-    assert.equal(result.ok, false, 'missing, stale, unsupported, or malformed evidence fails closed');
+    assert.equal(result.ok, false, 'missing, unsupported, or malformed evidence fails closed');
     assert.equal(result.code, 'unsupported_provider');
   }
 
+  for (const [agentProviderId, acceptedIdentity] of [
+    ['claude-code', CLAUDE_ACCEPTED_IDENTITY],
+    ['grok-build', GROK_BUILD_ACCEPTED_IDENTITY]
+  ]) {
+    assert.deepEqual(clone(preflight.check({
+      ...readyInput,
+      agentProviderId,
+      compatibility: { status: 'degraded', reason: 'evidence_stale', checkedAt: 100 },
+      acceptedIdentity: clone(acceptedIdentity)
+    })), {
+      ok: false,
+      code: 'provider_status_refresh',
+      providerId: agentProviderId,
+      providerLabel: acceptedIdentity.label
+    }, `${agentProviderId} stale evidence requests one authoritative refresh`);
+  }
+  assert.deepEqual(clone(preflight.check({
+    ...readyInput,
+    agentProviderId: 'codex',
+    compatibility: { status: 'degraded', reason: 'evidence_stale', checkedAt: 100 },
+    acceptedIdentity: clone(CODEX_CHATGPT_ACCEPTED_IDENTITY)
+  })), {
+    ok: false,
+    code: 'unsupported_provider',
+    providerId: 'codex',
+    providerLabel: 'Codex'
+  }, 'retired Codex is rejected before compatibility refresh');
+  assert.deepEqual(clone(preflight.check({
+    ...readyInput,
+    agentProviderId: 'opencode',
+    compatibility: { status: 'degraded', reason: 'evidence_stale', checkedAt: 100 },
+    acceptedIdentity: clone(OPENCODE_ACCEPTED_IDENTITY)
+  })), {
+    ok: false,
+    code: 'unsupported_provider',
+    providerId: 'opencode',
+    providerLabel: 'OpenCode'
+  }, 'retired OpenCode is rejected before compatibility refresh');
+
   for (const agentProviderId of [
-    '', 'Claude-Code', 'CLAUDE-CODE', 'OpenCode', 'OPENCode', 'anthropic', '__proto__', 'constructor'
+    '', 'codex', 'opencode', 'Claude-Code', 'CLAUDE-CODE', 'OpenCode', 'OPENCode', 'anthropic', '__proto__', 'constructor'
   ]) {
     const result = clone(preflight.check({
       providerKind: 'agent',
@@ -631,7 +700,7 @@ async function main() {
     bridgeState: bridgeState(), compatibility: supportedCompatibility()
   })).code);
   assert.deepEqual([...dispositionCodes].sort(), [
-    'agent_offline', 'agent_unpaired', 'provider_status_refresh'
+    'agent_offline', 'agent_unpaired', 'unsupported_provider'
   ]);
 
   for (const forbidden of [

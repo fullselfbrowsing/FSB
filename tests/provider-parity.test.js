@@ -37,7 +37,7 @@ const REPO_ROOT = path.resolve(__dirname, '..');
 // The 7 providers -- copied verbatim from tool-definitions-parity.test.js:37
 // (confirmed against universal-provider.js PROVIDER_CONFIGS).
 const PROVIDER_KEYS = ['xai', 'openai', 'anthropic', 'gemini', 'openrouter', 'lmstudio', 'custom'];
-const SHIPPED_AGENT_IDS = ['claude-code', 'opencode', 'codex'];
+const SHIPPED_AGENT_IDS = ['claude-code', 'grok-build'];
 const SECTION_ARGUMENT_INDEX = process.argv.indexOf('--section');
 const SELECTED_SECTION = SECTION_ARGUMENT_INDEX === -1
   ? null
@@ -108,9 +108,9 @@ async function run() {
     'delegation-providers.js',
   ));
   check(JSON.stringify(delegationProviders.AGENT_AUTH_STATES)
-      === JSON.stringify(['chatgpt', 'api_key', 'unauthenticated', 'unknown'])
+      === JSON.stringify(['chatgpt', 'api_key', 'oauth', 'unauthenticated', 'unknown'])
       && Object.isFrozen(delegationProviders.AGENT_AUTH_STATES),
-    'auth states are the exact frozen four-value provider-neutral vocabulary');
+    'auth states are the exact frozen five-value provider-neutral vocabulary');
   check(JSON.stringify(delegationProviders.AGENT_BILLING_KINDS)
       === JSON.stringify(['subscription', 'api', 'unknown'])
       && Object.isFrozen(delegationProviders.AGENT_BILLING_KINDS),
@@ -118,8 +118,7 @@ async function run() {
 
   const publicMetadataBefore = JSON.stringify([
     { id: 'claude-code', label: 'Claude Code', billingKind: 'subscription' },
-    { id: 'opencode', label: 'OpenCode', billingKind: 'unknown' },
-    { id: 'codex', label: 'Codex', billingKind: 'unknown' },
+    { id: 'grok-build', label: 'Grok Build', billingKind: 'subscription' },
   ]);
   check(JSON.stringify(delegationProviders.list()) === publicMetadataBefore
       && JSON.stringify(delegationProviders.get('claude-code'))
@@ -127,12 +126,15 @@ async function run() {
       && JSON.stringify(delegationProviders.get('opencode'))
         === JSON.stringify({ id: 'opencode', label: 'OpenCode', billingKind: 'unknown' })
       && JSON.stringify(delegationProviders.get('codex'))
-        === JSON.stringify({ id: 'codex', label: 'Codex', billingKind: 'unknown' }),
-    'all shipped public metadata uses the same exact three-field shape');
+        === JSON.stringify({ id: 'codex', label: 'Codex', billingKind: 'unknown' })
+      && JSON.stringify(delegationProviders.get('grok-build'))
+        === JSON.stringify({ id: 'grok-build', label: 'Grok Build', billingKind: 'subscription' }),
+    'active metadata uses one exact shape while retired providers remain known for history');
   check(delegationProviders.resolveAgentBillingKind('claude-code', 'unknown') === 'subscription'
       && delegationProviders.resolveAgentBillingKind('opencode', 'unknown') === 'unknown'
       && delegationProviders.resolveAgentBillingKind('codex', 'chatgpt') === 'subscription'
-      && delegationProviders.resolveAgentBillingKind('codex', 'api_key') === 'api',
+      && delegationProviders.resolveAgentBillingKind('codex', 'api_key') === 'api'
+      && delegationProviders.resolveAgentBillingKind('grok-build', 'oauth') === 'subscription',
     'each shipped provider retains its closed accepted auth-to-billing behavior');
   for (const [providerId, authState] of [
     ['claude-code', 'chatgpt'],
@@ -141,6 +143,7 @@ async function run() {
     ['opencode', '__proto__'],
     ['codex', 'unknown'],
     ['codex', 'unauthenticated'],
+    ['grok-build', 'api_key'],
     ['constructor', 'unknown'],
   ]) {
     check(delegationProviders.resolveAgentBillingKind(providerId, authState) === null,
@@ -224,8 +227,12 @@ async function run() {
   });
   check(accessorReads === 0, 'accepted-identity validation never invokes caller accessors');
   check(JSON.stringify(delegationProviders.ids())
-      === JSON.stringify(['claude-code', 'opencode', 'codex']),
-    'the production roster is exactly Claude Code, OpenCode, and Codex');
+      === JSON.stringify(['claude-code', 'grok-build'])
+      && delegationProviders.isShippedId('codex') === false
+      && delegationProviders.isKnownId('codex') === true
+      && delegationProviders.isShippedId('opencode') === false
+      && delegationProviders.isKnownId('opencode') === true,
+    'the active roster excludes retired providers while retaining historical metadata');
 
   if (SELECTED_SECTION === 'accepted-identity-foundation') {
     console.log('\nprovider-parity: ' + passed + ' passed, ' + failed + ' failed');
@@ -234,9 +241,7 @@ async function run() {
   if (SELECTED_SECTION === 'delegated-agent-parity') {
     const identityMatrix = [
       ['claude-code', 'unknown', '2.1.177', 'subscription'],
-      ['opencode', 'unknown', '1.14.25', 'unknown'],
-      ['codex', 'chatgpt', '0.142.5', 'subscription'],
-      ['codex', 'api_key', '0.142.5', 'api'],
+      ['grok-build', 'oauth', '1.0.4', 'subscription'],
     ];
     identityMatrix.forEach(([providerId, authState, profileVersion, billingKind]) => {
       const identity = delegationProviders.createAcceptedAgentIdentity(providerId, authState);
@@ -248,6 +253,26 @@ async function run() {
           && Object.isFrozen(identity),
       `${providerId}/${authState}: canonical accepted identity is exact and immutable`);
     });
+    const historicalCodexIdentity = delegationProviders.validateAcceptedAgentIdentity({
+      providerId: 'codex',
+      label: 'Codex',
+      profileVersion: '0.142.5',
+      authState: 'chatgpt',
+      billingKind: 'subscription',
+    });
+    check(historicalCodexIdentity !== null
+        && delegationProviders.createAcceptedAgentIdentity('codex', 'chatgpt') === null,
+      'retired Codex identities remain readable but cannot be created for a new run');
+    const historicalOpenCodeIdentity = delegationProviders.validateAcceptedAgentIdentity({
+      providerId: 'opencode',
+      label: 'OpenCode',
+      profileVersion: '1.14.25',
+      authState: 'unknown',
+      billingKind: 'unknown',
+    });
+    check(historicalOpenCodeIdentity !== null
+        && delegationProviders.createAcceptedAgentIdentity('opencode', 'unknown') === null,
+      'retired OpenCode identities remain readable but cannot be created for a new run');
     check(delegationProviders.list().every((metadata) => (
       JSON.stringify(Object.keys(metadata)) === JSON.stringify(['id', 'label', 'billingKind'])
     )), 'every agent exposes the same provider-neutral public metadata shape');
@@ -304,7 +329,7 @@ async function run() {
     'execution modes, API providers, and executable agent ids remain disjoint namespaces');
 
   for (const modelProvider of PROVIDER_KEYS) {
-    for (const storedAgentId of ['', ...SHIPPED_AGENT_IDS]) {
+    for (const storedAgentId of ['', ...SHIPPED_AGENT_IDS, 'codex', 'opencode']) {
       const apiInput = {
         providerKind: 'api',
         agentProviderId: storedAgentId,
@@ -325,12 +350,12 @@ async function run() {
   }
 
   for (const candidate of [
-    'claude-code', 'Claude-Code', 'CLAUDE-CODE', 'opencode', 'codex',
+    'claude-code', 'Claude-Code', 'CLAUDE-CODE', 'opencode', 'codex', 'grok-build',
     'xai', 'anthropic', '', '__proto__', 'constructor'
   ]) {
     const acceptedIdentity = delegationProviders.createAcceptedAgentIdentity(
       candidate,
-      candidate === 'codex' ? 'chatgpt' : 'unknown',
+      candidate === 'codex' ? 'chatgpt' : (candidate === 'grok-build' ? 'oauth' : 'unknown'),
     );
     const result = delegationPreflight.check({
       providerKind: 'agent',

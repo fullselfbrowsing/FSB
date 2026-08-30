@@ -27,9 +27,6 @@ const wrapperPath = path.join(repositoryRoot, 'scripts/run-mcp-build-preserving-
 const MAX_OUTPUT_BYTES = 32 * 1024 * 1024;
 
 const EXPECTED_COMMAND_TOKENS = Object.freeze([
-  "['node', 'tests/mcp-codex-adapter.test.js', '--section', 'generic-probe']",
-  "['node', 'tests/mcp-codex-adapter.test.js', '--section', 'generic-authority']",
-  "['node', 'tests/mcp-codex-adapter.test.js']",
   "['node', 'tests/mcp-agent-orphan-recovery.test.js']",
   "['node', 'tests/mcp-spawn-supervisor.test.js']",
   "['node', 'tests/runtime-contracts.test.js']",

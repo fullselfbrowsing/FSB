@@ -1,8 +1,7 @@
 import { z } from 'zod';
 import {
   CLAUDE_CODE_ADAPTER_ID,
-  CODEX_ADAPTER_ID,
-  OPENCODE_ADAPTER_ID,
+  GROK_BUILD_ADAPTER_ID,
   type AgentEvent,
   type AgentEventType,
   type AgentProviderId,
@@ -32,9 +31,11 @@ const CLAUDE_PROTOCOL_DRIFT_REASONS = Object.freeze([
   'unknown_system_subtype',
 ] as const);
 
-const OPENCODE_PROTOCOL_DRIFT_REASONS = Object.freeze([
+const GROK_BUILD_PROTOCOL_DRIFT_REASONS = Object.freeze([
+  'configuration_surface',
   'counter_overflow',
   'duplicate_id',
+  'duplicate_init',
   'duplicate_result',
   'event_after_result',
   'event_before_init',
@@ -50,37 +51,16 @@ const OPENCODE_PROTOCOL_DRIFT_REASONS = Object.freeze([
   'unknown_event_type',
 ] as const);
 
-const CODEX_PROTOCOL_DRIFT_REASONS = Object.freeze([
-  'counter_overflow',
-  'duplicate_id',
-  'duplicate_init',
-  'duplicate_result',
-  'event_after_result',
-  'event_before_init',
-  'invalid_json',
-  'invalid_order',
-  'invalid_shape',
-  'invalid_utf8',
-  'line_too_large',
-  'missing_result',
-  'provider_error',
-  'stream_too_large',
-  'unknown_event_type',
-] as const);
-
 export const AGENT_PROTOCOL_DRIFT_REASONS = Object.freeze({
   [CLAUDE_CODE_ADAPTER_ID]: CLAUDE_PROTOCOL_DRIFT_REASONS,
-  [OPENCODE_ADAPTER_ID]: OPENCODE_PROTOCOL_DRIFT_REASONS,
-  [CODEX_ADAPTER_ID]: CODEX_PROTOCOL_DRIFT_REASONS,
+  [GROK_BUILD_ADAPTER_ID]: GROK_BUILD_PROTOCOL_DRIFT_REASONS,
 });
 
 export type ClaudeProtocolDriftReason = typeof CLAUDE_PROTOCOL_DRIFT_REASONS[number];
-export type OpenCodeProtocolDriftReason = typeof OPENCODE_PROTOCOL_DRIFT_REASONS[number];
-export type CodexProtocolDriftReason = typeof CODEX_PROTOCOL_DRIFT_REASONS[number];
+export type GrokBuildProtocolDriftReason = typeof GROK_BUILD_PROTOCOL_DRIFT_REASONS[number];
 export type AgentProtocolDriftReason =
   | ClaudeProtocolDriftReason
-  | OpenCodeProtocolDriftReason
-  | CodexProtocolDriftReason;
+  | GrokBuildProtocolDriftReason;
 
 const SAFE_ISSUE_PATH_SEGMENTS = new Set([
   'attachments',
@@ -179,7 +159,7 @@ export class AgentProtocolDriftError extends Error {
       .map((value) => boundedIssuePath(String(value)));
     const providerLabel = providerId === CLAUDE_CODE_ADAPTER_ID
       ? 'Claude'
-      : providerId === OPENCODE_ADAPTER_ID ? 'OpenCode' : 'Codex';
+      : 'Grok Build';
     super(`${providerLabel} stream protocol drift at event ${safeIndex}: ${reason}`);
     this.name = 'AgentProtocolDriftError';
     this.providerId = providerId;

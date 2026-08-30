@@ -714,6 +714,27 @@ textarea.form-input {
   text-decoration: underline;
 }
 
+.provider-retirement-notice {
+  display: grid;
+  gap: var(--space-xs);
+  margin-top: var(--space-md);
+  padding: var(--space-md);
+  border: 1px solid var(--warning-color, #f59e0b);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--warning-color, #f59e0b) 12%, transparent);
+  color: var(--text-primary);
+  line-height: 1.45;
+}
+
+.provider-retirement-notice[hidden] {
+  display: none;
+}
+
+.provider-retirement-notice span {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+
 /* Input with Button: one bordered field; the icon button floats inside (no seam line) */
 .input-with-button {
   position: relative;
@@ -885,6 +906,10 @@ textarea.form-input {
 .test-btn:disabled {
   background: var(--gray-400);
   cursor: not-allowed;
+}
+
+.test-btn[hidden] {
+  display: none;
 }
 
 .test-results {
@@ -3950,6 +3975,10 @@ textarea.form-input {
   padding: 10px 16px;
   border-top: 1px solid var(--border-color);
   flex-wrap: wrap;
+}
+
+.agent-card-actions [hidden] {
+  display: none;
 }
 
 /* Run History */

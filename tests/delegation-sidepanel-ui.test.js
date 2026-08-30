@@ -102,8 +102,21 @@ const CLAUDE_ACCEPTED_IDENTITY = DelegationProviders.createAcceptedAgentIdentity
 function acceptedIdentityFor(providerId) {
   return DelegationProviders.createAcceptedAgentIdentity(
     providerId,
-    providerId === 'codex' ? 'chatgpt' : 'unknown'
+    providerId === 'grok-build' ? 'oauth' : 'unknown'
   );
+}
+
+function historicalAcceptedIdentityFor(providerId, authState) {
+  const metadata = DelegationProviders.get(providerId);
+  const resolvedAuthState = authState || 'unknown';
+  const profileVersions = { codex: '0.142.5', opencode: '1.14.25' };
+  return DelegationProviders.validateAcceptedAgentIdentity({
+    providerId,
+    label: metadata && metadata.label,
+    profileVersion: profileVersions[providerId],
+    authState: resolvedAuthState,
+    billingKind: DelegationProviders.resolveAgentBillingKind(providerId, resolvedAuthState)
+  });
 }
 
 function entry(sequence, kind, payload) {
@@ -268,10 +281,9 @@ function extractNamedFunction(source, name) {
 
 function canonicalProviderSnapshot(providerId, providerLabel, billingKind, authState) {
   const value = snapshot();
-  const acceptedIdentity = DelegationProviders.createAcceptedAgentIdentity(
-    providerId,
-    authState || 'unknown'
-  );
+  const acceptedIdentity = !DelegationProviders.isShippedId(providerId)
+    ? historicalAcceptedIdentityFor(providerId, authState)
+    : DelegationProviders.createAcceptedAgentIdentity(providerId, authState || 'unknown');
   assert(acceptedIdentity, providerId + ' has a canonical accepted identity');
   assert.equal(acceptedIdentity.billingKind, billingKind);
   value.acceptedIdentity = clone(acceptedIdentity);
@@ -749,12 +761,14 @@ assert(htmlSource.indexOf('../utils/delegation-providers.js') < htmlSource.index
     && htmlSource.indexOf('../utils/native-host-install-command.js') < htmlSource.indexOf('sidepanel.js')
     && htmlSource.indexOf('delegation-feed.js') < htmlSource.indexOf('sidepanel.js'),
   'nonvisual helpers load before their side-panel consumers');
-assert.equal((htmlSource.match(/id="takeControlBtn"/g) || []).length, 1,
-  'the ownership status exposes exactly one tab-scoped Take control action');
+assert.equal((htmlSource.match(/id="takeControlBtn"/g) || []).length, 0,
+  'the side panel exposes no header Take control action');
+assert.equal((htmlSource.match(/id="delegationControlBar"/g) || []).length, 0,
+  'the side panel exposes no delegated Take/Resume control bar');
 assert.equal(sha256(htmlSource
   .replace(delegationProviderScript, '')
   .replace(nativeHostInstallScript, '')),
-  '0e51022efe1458e5b2a66334e55aa94c17aa9399750aa2bcd96defa61865166d',
+  '2f2fd0bb74edc1e6a6bb5d20127d8e67943013818e9cafe3d42d51b0c460ae7a',
   'the side-panel HTML includes only the intended helpers and tab-scoped ownership treatment');
 const replayCssStart = cssSource.indexOf('.history-status.idle-closed {');
 const replayCssEnd = cssSource.indexOf('/* Phase 11 FINT-20', replayCssStart);
@@ -762,7 +776,7 @@ assert(replayCssStart !== -1 && replayCssEnd > replayCssStart,
   'the session-replay CSS block has stable boundaries');
 const delegationCssSource = cssSource.slice(0, replayCssStart) + cssSource.slice(replayCssEnd);
 assert.equal(sha256(delegationCssSource),
-  'fb61e7dfad7aa3a71edba906446f5390c3021217843c868e094d9f6998b77fbc',
+  '8350ef7f06ca9d39bf967df14c539acd40f74b2f4aea34e94c2fa6700d7a1872',
   'the intentional delegated and ownership-status CSS deltas remain exact outside replay UI');
 
 {
@@ -802,7 +816,7 @@ assert.equal(sha256(delegationCssSource),
     kind: 'agent',
     providerId: 'opencode',
     providerLabel: 'Claude Code',
-    acceptedIdentity: acceptedIdentityFor('opencode')
+    acceptedIdentity: historicalAcceptedIdentityFor('opencode')
   }), false, 'mismatched preflight identity fails closed');
   assert.equal(context._delegationValidPreflightResponse({
     ok: true,
@@ -815,7 +829,7 @@ assert.equal(sha256(delegationCssSource),
     kind: 'agent',
     providerId: 'claude-code',
     providerLabel: 'Claude Code',
-    acceptedIdentity: acceptedIdentityFor('opencode')
+    acceptedIdentity: historicalAcceptedIdentityFor('opencode')
   }), false, 'a preflight response cannot switch its accepted provider identity');
   assert.equal(context._delegationValidConsentResponse({
     ok: true,
@@ -834,7 +848,7 @@ assert.equal(sha256(delegationCssSource),
     ok: true,
     kind: 'agent',
     providerId: 'opencode',
-    acceptedIdentity: acceptedIdentityFor('opencode')
+    acceptedIdentity: historicalAcceptedIdentityFor('opencode')
   };
   Object.defineProperty(accessorResponse, 'providerLabel', {
     enumerable: true,
@@ -906,7 +920,7 @@ assert(/\.stop-btn\[data-delegation-action="stop"\]\s*\{[^}]*min-width:\s*44px[^
 ), 'the fixed delegated Stop is at least 44px square');
 assert(/\.send-btn, \.stop-btn\s*\{[^}]*width:\s*36px[^}]*height:\s*36px/s.test(cssSource),
   'the legacy non-delegated composer controls retain their established dimensions');
-assert(/@media \(max-width: 350px\)[\s\S]*?\.delegation-state-actions,[\s\S]*?flex-direction:\s*column[\s\S]*?\.delegation-action\s*\{[^}]*width:\s*100%[^}]*min-height:\s*44px/s.test(
+assert(/@media \(max-width: 350px\)[\s\S]*?\.delegation-state-actions\s*\{[^}]*flex-direction:\s*column[\s\S]*?\.delegation-action\s*\{[^}]*width:\s*100%[^}]*min-height:\s*44px/s.test(
   delegationCss
 ), 'narrow delegated actions stack full-width without shrinking their target height');
 const spacingDeclarations = Array.from(delegationCss.matchAll(
@@ -938,11 +952,8 @@ console.log('\n--- Phase 61 consent and human-control contract ---');
 [
   'It cannot edit files, run shell commands, or fetch arbitrary URLs.',
   'Back to message',
-  'Take control',
-  'You have control of this tab',
-  'Resume with agent',
-  'Stop agent',
-  'Stopping agent…',
+  'Stop Automation',
+  'Stopping Automation…',
   'Agent offline',
   'FSB cannot reach the local agent service. Run the doctor command, then try this message again.',
   'Copy doctor command',
@@ -985,19 +996,19 @@ assert(panelSource.includes("type: 'FSB_DELEGATION_PREFLIGHT'")
     && panelSource.includes("type: 'FSB_DELEGATION_CONSENT'")
     && panelSource.includes("type: 'FSB_DELEGATION_SET_TRUST'")
     && panelSource.includes("type: 'FSB_DELEGATION_START'")
-    && panelSource.includes("type: 'FSB_DELEGATION_TAKE_CONTROL'")
-    && panelSource.includes("type: 'FSB_DELEGATION_RESUME'")
     && panelSource.includes("type: 'FSB_DELEGATION_STOP'")
     && panelSource.includes("type: 'FSB_DELEGATION_SNAPSHOT'"),
-  'side panel routes every delegated action through the closed background commands');
+  'side panel routes consent, start, Stop, and hydration through closed background commands');
+assert(!panelSource.includes('FSB_DELEGATION_TAKE_CONTROL')
+    && !panelSource.includes('FSB_DELEGATION_RESUME')
+    && !panelSource.includes('Take control')
+    && !panelSource.includes('Resume with agent'),
+  'side panel emits no Take/Resume commands or presentation copy');
 assert(!/FSB_DELEGATION_START[\s\S]{0,180}(?:trusted|consentGranted|consent\s*:)/.test(panelSource),
   'START carries no caller trust or consent boolean');
-assert(panelSource.includes("if ((_delegationUiState.pendingTake && message.view.state === 'holding')")
-    && panelSource.includes("(_delegationUiState.pendingResume && message.view.state === 'resuming')"),
-  'intermediate hold/resume snapshots retain the prior truthful focused control');
-assert(panelSource.includes("if (changes.fsbAgentRegistry && typeof _refreshSelectedDelegationSnapshot === 'function')")
-    && panelSource.includes('_refreshSelectedDelegationSnapshot();')
-    && panelSource.includes('await _hydrateDelegationForSelectedConversation();'),
+assert(/changes\.fsbAgentRegistry[\s\S]{0,180}_refreshSelectedDelegationSnapshot\(\)/.test(panelSource)
+    && panelSource.includes('await _hydrateDelegationForSelectedConversation();')
+    && !panelSource.includes('fsbAgentClientLabels'),
   'registry and active-tab events refresh controller-owned eligibility without UI ownership reads');
 const consentRenderSource = extractNamedFunction(panelSource, '_renderDelegationConsent');
 assert(!/checkbox\.addEventListener|addEventListener\(['"]change/.test(consentRenderSource),
@@ -1012,7 +1023,6 @@ assert(/e\.key === 'Escape'[\s\S]{0,120}_backToDelegationMessage\(\)/.test(panel
   const run = new TestNode('section');
   const stateCard = new TestNode('div');
   const feed = new TestNode('div');
-  const control = new TestNode('div');
   run.appendChild(stateCard);
   run.appendChild(feed);
   stateCard.appendChild(new TestNode('p', 'stale state'));
@@ -1024,7 +1034,7 @@ assert(/e\.key === 'Escape'[\s\S]{0,120}_backToDelegationMessage\(\)/.test(panel
     _delegationUiState: { mode: 'snapshot', errorCode: 'old', lastAlertKey: 'old' },
     _delegationRunStopControls: [{}],
     _clearDelegationElapsedTimer() {},
-    _ensureDelegationMount: () => ({ run, state: stateCard, feed, control }),
+    _ensureDelegationMount: () => ({ run, state: stateCard, feed }),
     _clearDelegationNode(node) { while (node.firstChild) node.removeChild(node.firstChild); },
     _restoreLegacyStopControl() { restoredStops += 1; },
     _setDelegationHeaderStatus(label) { headerStatus = label; },
@@ -1049,7 +1059,6 @@ assert(/e\.key === 'Escape'[\s\S]{0,120}_backToDelegationMessage\(\)/.test(panel
   assert.equal(context._delegationUiState.errorCode, null);
   assert.equal(headerStatus, 'Ready');
   assert.equal(composerLocked, false);
-  assert.equal(control.classList.contains('hidden'), true);
   assert.equal(restoredStops, 1);
 
   context._renderDelegationInlineError(stateCard, 'Delegation failed safely.');
@@ -1065,7 +1074,6 @@ assert(/e\.key === 'Escape'[\s\S]{0,120}_backToDelegationMessage\(\)/.test(panel
     const run = new TestNode('section');
     const stateCard = new TestNode('div');
     const feed = new TestNode('div');
-    const control = new TestNode('div');
     const context = {
       document: globalThis.document,
       FsbDelegationProviders: DelegationProviders,
@@ -1080,7 +1088,7 @@ assert(/e\.key === 'Escape'[\s\S]{0,120}_backToDelegationMessage\(\)/.test(panel
       },
       _delegationRunStopControls: [],
       _clearDelegationElapsedTimer() {},
-      _ensureDelegationMount: () => ({ run, state: stateCard, feed, control }),
+      _ensureDelegationMount: () => ({ run, state: stateCard, feed }),
       _clearDelegationNode(node) { while (node.firstChild) node.removeChild(node.firstChild); },
       _restoreLegacyStopControl() {},
       _delegationElement(tag, className, textValue) {
@@ -1103,41 +1111,33 @@ assert(/e\.key === 'Escape'[\s\S]{0,120}_backToDelegationMessage\(\)/.test(panel
       _setDelegationComposerLocked() {}
     };
     vm.createContext(context);
+    // _beginDelegationStart paints the starting spinner; stub it for the harness.
+    vm.runInContext('var preparingPhases = []; var preparingCleared = 0;' + ' function _renderDelegationPreparing(phase) { preparingPhases.push(phase); return true; }' + ' function _clearDelegationPreparing() { preparingCleared += 1; }', context);
     [
       '_delegationOwnDataValue',
       '_delegationCanonicalProvider'
     ].forEach((name) => vm.runInContext(extractNamedFunction(panelSource, name), context));
     vm.runInContext(consentRenderSource, context);
     context._renderDelegationConsent({ focusHeading: true });
-    return { stateCard, control };
+    return { stateCard };
   }
 
   const claudeConsent = renderConsent(DelegationProviders.get('claude-code'));
-  const openCodeConsent = renderConsent(DelegationProviders.get('opencode'));
-  const codexConsent = renderConsent(DelegationProviders.get('codex'));
-  assert.equal(findAll(openCodeConsent.stateCard, 'h2')[0].textContent,
-    'Let OpenCode control this browser?');
-  assert(openCodeConsent.stateCard.textContent.includes(
-    'OpenCode may drive FSB browser tools for this task.'));
-  assert(openCodeConsent.stateCard.textContent.includes('Trust OpenCode for future runs'));
-  assert(openCodeConsent.stateCard.textContent.includes(
-    'This turns off confirmation for future OpenCode runs on this browser.'));
-  assert.deepEqual(findAll(openCodeConsent.stateCard, 'button').map((button) => button.textContent),
-    ['Allow & start OpenCode', 'Back to message']);
-  assert.equal(findAll(openCodeConsent.stateCard, 'h2')[0].focusCount, 1,
-    'OpenCode consent retains the existing focused heading');
+  const grokConsent = renderConsent(DelegationProviders.get('grok-build'));
   assert.deepEqual(
-    findAll(openCodeConsent.stateCard, 'button').map((button) => button.className),
+    findAll(grokConsent.stateCard, 'button').map((button) => button.className),
     findAll(claudeConsent.stateCard, 'button').map((button) => button.className),
-    'Claude and OpenCode consent reuse identical actions and classes'
+    'Claude Code and Grok Build consent reuse identical actions and classes'
   );
-  assert.deepEqual(findAll(codexConsent.stateCard, 'button').map((button) => button.textContent),
-    ['Allow & start Codex', 'Back to message']);
-  assert(findAll(codexConsent.stateCard, 'button').every((button) => (
+  assert.deepEqual(findAll(grokConsent.stateCard, 'button').map((button) => button.textContent),
+    ['Allow & start Grok Build', 'Back to message']);
+  assert(findAll(grokConsent.stateCard, 'button').every((button) => (
     String(button.className).split(/\s+/).includes('delegation-action')
-  )), 'Codex Allow and Back reuse the shared 44px delegated action class');
-  assert.equal(openCodeConsent.control.classList.contains('hidden'), true,
-    'consent retains the existing hidden control bar');
+  )), 'Grok Build Allow and Back reuse the shared 44px delegated action class');
+  assert.equal(DelegationProviders.isShippedId('codex'), false,
+    'retired Codex never enters the active consent renderer');
+  assert.equal(DelegationProviders.isShippedId('opencode'), false,
+    'retired OpenCode never enters the active consent renderer');
 }
 
 console.log('\n--- Phase 61 stop, recovery, and hydration contract ---');
@@ -1182,8 +1182,8 @@ assert(panelSource.includes("return 'Agent stopped, ' + count + ' '")
 assert(panelSource.includes('var stopping = _delegationStopControlPending(snapshot)')
     && panelSource.includes("snapshot.state === 'stopping'")
     && panelSource.includes('_delegationUiState.bindingCleanupPending !== true')
-    && panelSource.includes("stopping ? 'Stopping agent…' : 'Stop agent'"),
-  'pending Stop wording stays canonical while failed unbound cleanup becomes retryable');
+    && panelSource.includes("stopping ? 'Stopping Automation…' : 'Stop Automation'"),
+  'pending Stop wording is provider-neutral while failed unbound cleanup remains retryable');
 assert(panelSource.includes("stopBtn.addEventListener('click', _handleFixedStop)")
     && panelSource.includes('_delegationUsesFixedStop(_delegationUiState.snapshot)')
     && panelSource.includes('return _stopDelegation(event);')
@@ -1284,8 +1284,7 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
       const controllerPath = require.resolve('../extension/utils/delegation-controller.js');
       const matrix = [
         ['claude-code', 'unknown', '2.1.177'],
-        ['opencode', 'unknown', '1.14.25'],
-        ['codex', 'chatgpt', '0.142.5']
+        ['grok-build', 'oauth', '1.0.4']
       ];
       let canonicalShape = null;
       for (let index = 0; index < matrix.length; index += 1) {
@@ -1352,14 +1351,12 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
     const run = new TestNode('section');
     const stateCard = new TestNode('div');
     const feed = new TestNode('div');
-    const control = new TestNode('div');
     const announcer = new TestNode('div');
     const chatInput = new TestNode('div');
     run.appendChild(stateCard);
     run.appendChild(feed);
     run.classList.add('hidden');
     feed.appendChild(new TestNode('article', 'stale feed row'));
-    control.appendChild(new TestNode('button', 'stale action'));
     chatInput.textContent = rawText;
     const headers = [];
     let restoredStops = 0;
@@ -1380,7 +1377,7 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
         announcedTransitions: Object.create(null)
       },
       chatInput,
-      _ensureDelegationMount: () => ({ run, state: stateCard, feed, control, announcer }),
+      _ensureDelegationMount: () => ({ run, state: stateCard, feed, announcer }),
       _clearDelegationElapsedTimer() {},
       _restoreLegacyStopControl() { restoredStops += 1; },
       _setDelegationHeaderStatus(label, tone) { headers.push({ label, tone }); }
@@ -1434,8 +1431,6 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
     assert.equal(stateCard.getAttribute('role'), null, 'checking is not an alert');
     assert.equal(stateCard.getAttribute('aria-live'), null, 'the card is not a second live region');
     assert.equal(findAll(feed, 'article').length, 0, 'checking empties the existing feed');
-    assert.equal(control.children.length, 0, 'checking empties the existing control bar');
-    assert.equal(control.classList.contains('hidden'), true);
     assert.equal(chatInput.textContent, rawText, 'checking preserves exact composer bytes');
     assert.equal(chatInput.focusCount, 0, 'checking never moves composer focus');
     assert.deepEqual(headers, [{ label: 'Checking agent service', tone: '' }]);
@@ -1525,6 +1520,9 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
       debouncedSaveTask() { saveCalls += 1; }
     };
     vm.createContext(context);
+    // The preparing spinner has its own render contract; stub it here so these
+    // harnesses keep asserting the send sequence rather than the DOM.
+    vm.runInContext('var preparingPhases = []; var preparingCleared = 0;' + ' function _renderDelegationPreparing(phase) { preparingPhases.push(phase); return true; }' + ' function _clearDelegationPreparing() { preparingCleared += 1; }', context);
     [
       '_delegationHasExactKeys',
       '_delegationOwnDataValue',
@@ -1541,6 +1539,13 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
     ].forEach((name) => vm.runInContext(extractNamedFunction(panelSource, name), context));
 
     const editedAttempt = context.handleSendMessage();
+    // Verifying a provider spawns processes and takes seconds. The click must
+    // paint before the first await or the panel looks dead.
+    assert.deepEqual(
+      vm.runInContext('preparingPhases', context),
+      ['preflight'],
+      'the send paints a pending state synchronously, before any await',
+    );
     await new Promise((resolve) => setImmediate(resolve));
     assert.deepEqual(preflightCommands, [{
       type: 'FSB_DELEGATION_PREFLIGHT',
@@ -1604,7 +1609,6 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
     const run = new TestNode('section');
     const stateCard = new TestNode('div');
     const feed = new TestNode('div');
-    const control = new TestNode('div');
     run.appendChild(stateCard);
     run.appendChild(feed);
     const headers = [];
@@ -1614,7 +1618,7 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
       FsbDelegationProviders: DelegationProviders,
       _delegationUiState: { mode: 'ready', errorCode: null },
       _delegationRunStopControls: [],
-      _ensureDelegationMount: () => ({ run, state: stateCard, feed, control }),
+      _ensureDelegationMount: () => ({ run, state: stateCard, feed }),
       _clearDelegationElapsedTimer() {},
       _restoreLegacyStopControl() {},
       _copyDelegationDoctorCommand() {},
@@ -1622,6 +1626,7 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
       _copyDelegationNativeHostInstallCommand() {},
       _openDelegationProviderSetup() {},
       _backToDelegationMessage() {},
+      _announceDelegationLifecycleKey() {},
       _setDelegationHeaderStatus(label, tone) { headers.push({ label, tone }); },
       _setDelegationComposerLocked(value) { composerLocks.push(value); }
     };
@@ -1634,6 +1639,9 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
       '_delegationAction',
       '_delegationOwnDataValue',
       '_delegationCanonicalProvider',
+      '_delegationStartRejectionDetail',
+      '_renderDelegationPreparing',
+      '_clearDelegationPreparing',
       '_renderDelegationPreflightFailure'
     ].forEach((name) => vm.runInContext(extractNamedFunction(panelSource, name), context));
 
@@ -1683,38 +1691,68 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
     context._renderDelegationPreflightFailure({
       ok: false,
       code: 'start_rejected',
-      providerId: 'opencode',
-      providerLabel: 'OpenCode'
+      providerId: 'grok-build',
+      providerLabel: 'Grok Build'
     });
-    assert.equal(findAll(stateCard, 'h2')[0].textContent, 'OpenCode cannot start this task');
+    assert.equal(findAll(stateCard, 'h2')[0].textContent, 'Grok Build cannot start this task');
     assert(stateCard.textContent.includes(
-      'OpenCode sign-in changed before this run. Sign in locally again, then retry the message.'
+      'Grok Build could not pass FSB\'s final delegated-browser start checks. Test Connection may still succeed because it does not start a delegated run. Retry the message or review provider setup.'
     ));
     assert.deepEqual(findAll(stateCard, 'button').map((button) => button.textContent), [
       'Open provider setup', 'Back to message'
     ]);
     assert.equal(stateCard.getAttribute('role'), null,
-      'not-ready OpenCode reuses the existing non-alert preflight state');
+      'not-ready Grok Build reuses the existing non-alert preflight state');
     assert.deepEqual(headers[2], { label: 'Ready', tone: '' });
     assert.equal(composerLocks[2], false);
+
+    // The daemon knows which start gate refused the run. When it says so, the card
+    // names the gate instead of leaving the reader to guess between ~19 of them.
+    context._renderDelegationPreflightFailure({
+      ok: false,
+      code: 'start_rejected',
+      detail: 'activation_failed',
+      providerId: 'grok-build',
+      providerLabel: 'Grok Build'
+    });
+    assert.equal(findAll(stateCard, 'h2')[0].textContent, 'Grok Build cannot start this task');
+    assert.equal(
+      findAll(stateCard, 'p')[0].textContent,
+      'Grok Build could not start a delegated browser run because the agent process'
+        + ' could not be verified (activation_failed). Test Connection may still succeed'
+        + ' because it does not start a delegated run. Retry the message or review provider setup.'
+    );
+
+    // An unknown or forged detail is dropped rather than shown.
+    context._renderDelegationPreflightFailure({
+      ok: false,
+      code: 'start_rejected',
+      detail: 'not_a_supervisor_code',
+      providerId: 'grok-build',
+      providerLabel: 'Grok Build'
+    });
+    assert(findAll(stateCard, 'p')[0].textContent.includes(
+      'could not pass FSB\'s final delegated-browser start checks.'
+    ));
+    assert.equal(findAll(stateCard, 'p')[0].textContent.includes('not_a_supervisor_code'), false);
 
     for (const [code, body] of [
       [
         'auth_unauthenticated',
-        'Sign in to Codex locally, then try this message again.'
+        'Sign in to Grok Build locally, then try this message again.'
       ],
       [
         'auth_unknown',
-        'Codex sign-in status could not be verified. Use Test Connection in API Configuration, then try again.'
+        'Grok Build sign-in status could not be verified. Use Test Connection in API Configuration, then try again.'
       ]
     ]) {
       context._renderDelegationPreflightFailure({
         ok: false,
         code,
-        providerId: 'codex',
-        providerLabel: 'Codex'
+        providerId: 'grok-build',
+        providerLabel: 'Grok Build'
       });
-      assert.equal(findAll(stateCard, 'h2')[0].textContent, 'Codex cannot start this task');
+      assert.equal(findAll(stateCard, 'h2')[0].textContent, 'Grok Build cannot start this task');
       assert.equal(findAll(stateCard, 'p')[0].textContent, body);
       assert.deepEqual(findAll(stateCard, 'button').map((button) => button.textContent), [
         'Open provider setup', 'Back to message'
@@ -1724,11 +1762,39 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
       assert.equal(stateCard.getAttribute('role'), null);
     }
 
+    // Both waits the user actually sits through get a spinner and an
+    // explanation, and the composer stays locked while they run.
+    for (const [phase, heading, body] of [
+      [
+        'preflight',
+        'Checking provider',
+        'FSB is checking your AI provider before sending your message.'
+      ],
+      [
+        'starting',
+        'Starting agent',
+        'FSB is handing your message to the agent.'
+      ]
+    ]) {
+      assert.equal(context._renderDelegationPreparing(phase), true);
+      assert.equal(run.getAttribute('aria-busy'), 'true');
+      assert.equal(stateCard.getAttribute('data-delegation-state'), 'preparing');
+      assert.equal(stateCard.getAttribute('role'), null,
+        'a pending state is not an alert');
+      assert.equal(findAll(stateCard, 'h2')[0].textContent, heading);
+      assert.equal(findAll(stateCard, 'p')[0].textContent, body);
+      assert.equal(findAll(stateCard, 'i').length, 1, 'the pending state shows a spinner');
+      assert.deepEqual(findAll(stateCard, 'button'), [],
+        'nothing is actionable while FSB is still preparing');
+    }
+    assert.equal(context._renderDelegationPreparing('not_a_phase'), false,
+      'only the two known waits can paint a spinner');
+
     context._renderDelegationPreflightFailure({
       ok: false,
       code: 'provider_status_refresh',
-      providerId: 'codex',
-      providerLabel: 'Codex'
+      providerId: 'grok-build',
+      providerLabel: 'Grok Build'
     });
     assert.equal(findAll(stateCard, 'h2')[0].textContent, 'Agent could not start this task');
     assert.equal(findAll(stateCard, 'p')[0].textContent,
@@ -1849,6 +1915,9 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
         updateSendButtonState() {}
       };
       vm.createContext(context);
+      // The preparing spinner has its own render contract; stub it here so these
+      // harnesses keep asserting the send sequence rather than the DOM.
+      vm.runInContext('var preparingPhases = []; var preparingCleared = 0;' + ' function _renderDelegationPreparing(phase) { preparingPhases.push(phase); return true; }' + ' function _clearDelegationPreparing() { preparingCleared += 1; }', context);
       [
         '_delegationHasExactKeys',
         '_delegationOwnDataValue',
@@ -1924,36 +1993,36 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
     assert.equal(needsConsent.state.challengeExpiresAt, 12345);
     assert.equal(needsConsent.announcementCalls, 0);
 
-    const openCodeReady = {
+    const grokReady = {
       ok: true,
       kind: 'agent',
-      providerId: 'opencode',
-      providerLabel: 'OpenCode',
-      acceptedIdentity: acceptedIdentityFor('opencode')
+      providerId: 'grok-build',
+      providerLabel: 'Grok Build',
+      acceptedIdentity: acceptedIdentityFor('grok-build')
     };
-    const openCodeConsent = await runSettlementScenario(openCodeReady, {
+    const grokConsent = await runSettlementScenario(grokReady, {
       ok: true,
-      providerId: 'opencode',
-      providerLabel: 'OpenCode',
+      providerId: 'grok-build',
+      providerLabel: 'Grok Build',
       trusted: false,
-      challengeId: 'challenge_opencode_wake',
+      challengeId: 'challenge_grok_wake',
       expiresAt: 12345
     });
-    assert.deepEqual(openCodeConsent.starts, []);
-    assert.deepEqual(openCodeConsent.consentRenders, [{ focusHeading: true }]);
-    assert.equal(openCodeConsent.state.providerId, 'opencode');
-    assert.equal(openCodeConsent.state.providerLabel, 'OpenCode');
-    assert.equal(openCodeConsent.state.challengeId, 'challenge_opencode_wake');
-    assert.deepEqual(openCodeConsent.commands, [{
+    assert.deepEqual(grokConsent.starts, []);
+    assert.deepEqual(grokConsent.consentRenders, [{ focusHeading: true }]);
+    assert.equal(grokConsent.state.providerId, 'grok-build');
+    assert.equal(grokConsent.state.providerLabel, 'Grok Build');
+    assert.equal(grokConsent.state.challengeId, 'challenge_grok_wake');
+    assert.deepEqual(grokConsent.commands, [{
       type: 'FSB_DELEGATION_PREFLIGHT',
       task: 'Keep this task unsent',
       intentId: 'intent_native_wake_table'
     }, {
       type: 'FSB_DELEGATION_CONSENT',
       task: 'Keep this task unsent'
-    }], 'OpenCode reuses one provider-free preflight/consent path');
+    }], 'Grok Build reuses one provider-free preflight/consent path');
 
-    const mismatchedConsent = await runSettlementScenario(openCodeReady, {
+    const mismatchedConsent = await runSettlementScenario(grokReady, {
       ok: true,
       providerId: 'claude-code',
       providerLabel: 'Claude Code',
@@ -2033,20 +2102,20 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
         }
       })),
       ...[
-        ['unauthenticated Codex', 'auth_unauthenticated'],
-        ['unknown-auth Codex', 'auth_unknown']
+        ['unauthenticated Grok Build', 'auth_unauthenticated'],
+        ['unknown-auth Grok Build', 'auth_unknown']
       ].map(([name, code]) => ({
         name,
-        response: { ok: false, code, providerId: 'codex', providerLabel: 'Codex' },
-        expected: { ok: false, code, providerId: 'codex', providerLabel: 'Codex' }
+        response: { ok: false, code, providerId: 'grok-build', providerLabel: 'Grok Build' },
+        expected: { ok: false, code, providerId: 'grok-build', providerLabel: 'Grok Build' }
       })),
       {
         name: 'provider-native auth bytes are not a safe reason',
         response: {
           ok: false,
           code: 'Logged in using native-secret-bytes',
-          providerId: 'codex',
-          providerLabel: 'Codex'
+          providerId: 'grok-build',
+          providerLabel: 'Grok Build'
         },
         expected: {
           ok: false,
@@ -2127,6 +2196,9 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
       debouncedSaveTask() {}
     };
     vm.createContext(context);
+    // The preparing spinner has its own render contract; stub it here so these
+    // harnesses keep asserting the send sequence rather than the DOM.
+    vm.runInContext('var preparingPhases = []; var preparingCleared = 0;' + ' function _renderDelegationPreparing(phase) { preparingPhases.push(phase); return true; }' + ' function _clearDelegationPreparing() { preparingCleared += 1; }', context);
     [
       '_delegationHasExactKeys',
       '_delegationOwnDataValue',
@@ -2162,104 +2234,106 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
   }
 
   {
-    const context = { _activeTabIdSnapshot: 42 };
+    const context = {};
     vm.createContext(context);
-    vm.runInContext(extractNamedFunction(panelSource, '_delegationCanTakeControl'), context);
-    const exact = { state: 'running', activeTab: { tabId: 42, owned: true, canTakeControl: true } };
-    assert.equal(context._delegationCanTakeControl(exact), true,
-      'Take control appears for the exact canonical active owned tab');
-    assert.equal(context._delegationCanTakeControl({ ...exact, activeTab: { ...exact.activeTab, owned: false } }), false,
-      'Take control hides for an unowned tab');
-    assert.equal(context._delegationCanTakeControl({ ...exact, activeTab: { ...exact.activeTab, tabId: 43 } }), false,
-      'Take control hides for a different active tab');
-    assert.equal(context._delegationCanTakeControl({ ...exact, state: 'holding' }), false,
-      'Take control hides outside canonical running');
+    vm.runInContext(extractNamedFunction(panelSource, '_delegationIsActiveSnapshot'), context);
+    vm.runInContext(extractNamedFunction(panelSource, '_delegationHeaderPresentation'), context);
+    ['starting', 'running', 'holding', 'held', 'resuming', 'stopping'].forEach((state) => {
+      const presentation = context._delegationHeaderPresentation({
+        state,
+        connection: 'connected',
+        provider: { id: 'claude-code', label: 'Claude Code' }
+      });
+      assert.equal(presentation.label, 'Working', state + ' uses the generic Working label');
+      assert.equal(presentation.tone, 'running', state + ' uses the running tone');
+    });
+    [
+      { state: 'failed', connection: 'connected' },
+      { state: 'restart_lost', connection: 'connected' },
+      { state: 'running', connection: 'offline' },
+      { state: 'running', connection: 'disconnected' }
+    ].forEach((snapshot) => {
+      const presentation = context._delegationHeaderPresentation(snapshot);
+      assert.equal(presentation.label, 'Error');
+      assert.equal(presentation.tone, 'error');
+    });
+    ['completed', 'stopped'].forEach((state) => {
+      const presentation = context._delegationHeaderPresentation({ state, connection: 'connected' });
+      assert.equal(presentation.label, 'Ready');
+      assert.equal(presentation.tone, '');
+    });
   }
 
   {
-    let resolveCommand;
-    const commands = [];
-    const renders = [];
-    const running = { delegationId: DELEGATION_ID, state: 'running' };
-    const held = { delegationId: DELEGATION_ID, state: 'held' };
-    const state = {
-      snapshot: running,
-      delegationId: DELEGATION_ID,
-      conversationId: 'conv_fixture',
-      pendingTake: false,
-      errorCode: null
-    };
+    const run = new TestNode('section');
+    const feed = new TestNode('div');
+    const runnerCalls = [];
+    const terminalCalls = [];
+    const persistedStartedAt = 4321;
     const context = {
-      conversationId: 'conv_fixture',
-      _delegationUiState: state,
-      _delegationCanTakeControl: () => true,
-      _delegationIsSelectedConversation: () => true,
-      _sendDelegationCommand(message) {
-        commands.push(clone(message));
-        return new Promise((resolve) => { resolveCommand = resolve; });
+      _delegatedRunPresentation: {
+        delegationId: DELEGATION_ID,
+        statusText: null,
+        watermark: 0,
+        terminalApplied: null
       },
-      _delegationValidLifecycleResponse: () => true,
-      FsbDelegationFeed: { validateSnapshot: () => true },
-      _renderDelegationSnapshot(next, options) { renders.push({ next, options }); }
+      _delegationUiState: { bindingCleanupPending: false, errorCode: null },
+      currentStatusMessage: {},
+      _delegationPersistedStartAt: () => persistedStartedAt,
+      showAutomationRunner(startedAt, label) { runnerCalls.push({ startedAt, label }); },
+      _ensureDelegationMount: () => ({ run, feed }),
+      _delegatedRunApplyTerminal(snapshot) { terminalCalls.push(snapshot); }
     };
     vm.createContext(context);
-    vm.runInContext(extractNamedFunction(panelSource, '_takeDelegationControl'), context);
-    const button = { disabled: false, focusCount: 0, focus() { this.focusCount += 1; } };
-    const pending = context._takeDelegationControl({ currentTarget: button });
-    assert.deepEqual(commands, [{ type: 'FSB_DELEGATION_TAKE_CONTROL', delegationId: DELEGATION_ID }]);
-    assert.equal(state.pendingTake, true);
-    assert.equal(button.disabled, true);
-    assert.equal(button.focusCount, 1);
-    assert.equal(renders.length, 0, 'Take control renders no held state before authority replies');
-    resolveCommand({ ok: true, snapshot: held });
-    await pending;
-    assert.equal(state.pendingTake, false);
-    assert.equal(renders.length, 1);
-    assert.equal(renders[0].options.focusAction, 'resume',
-      'confirmed hold moves focus to Resume with agent');
-  }
+    vm.runInContext(extractNamedFunction(panelSource, '_delegationIsActiveSnapshot'), context);
+    vm.runInContext(
+      extractNamedFunction(panelSource, '_delegationSnapshotNeedsDiagnosticCard'),
+      context
+    );
+    vm.runInContext(extractNamedFunction(panelSource, '_delegatedRunReconcile'), context);
 
-  {
-    let resolveCommand;
-    const commands = [];
-    const renders = [];
-    const held = { delegationId: DELEGATION_ID, state: 'held' };
-    const running = { delegationId: DELEGATION_ID, state: 'running' };
-    const state = {
-      snapshot: held,
+    ['starting', 'running', 'holding', 'held', 'resuming', 'stopping'].forEach((state) => {
+      assert.equal(context._delegatedRunReconcile({
+        delegationId: DELEGATION_ID,
+        state,
+        connection: 'connected',
+        provider: { id: 'claude-code', label: 'Claude Code' },
+        terminal: null,
+        entries: [{ timestamp: persistedStartedAt }]
+      }, {}), true);
+    });
+    assert.equal(runnerCalls.length, 6);
+    assert(runnerCalls.every((call) => (
+      call.startedAt === persistedStartedAt && call.label === 'Working'
+    )), 'every delegated active state reuses the generic runner and original start time');
+    assert.equal(run.classList.contains('hidden'), true,
+      'healthy delegated cards remain off the visible API-style run surface');
+    assert.equal(feed.classList.contains('hidden'), true,
+      'healthy delegated feed remains off the visible API-style run surface');
+
+    const failed = {
       delegationId: DELEGATION_ID,
-      conversationId: 'conv_fixture',
-      pendingResume: false,
-      errorCode: null
+      state: 'failed',
+      connection: 'connected',
+      provider: { id: 'codex', label: 'Codex' },
+      terminal: { code: 'agent_failed', releasedTabCount: 0, answer: null },
+      entries: [{ timestamp: persistedStartedAt }]
     };
-    const context = {
-      conversationId: 'conv_fixture',
-      _delegationUiState: state,
-      _delegationCanResume: () => true,
-      _delegationIsSelectedConversation: () => true,
-      _sendDelegationCommand(message) {
-        commands.push(clone(message));
-        return new Promise((resolve) => { resolveCommand = resolve; });
-      },
-      _delegationValidLifecycleResponse: () => true,
-      FsbDelegationFeed: { validateSnapshot: () => true },
-      _renderDelegationSnapshot(next, options) { renders.push({ next, options }); }
+    assert.equal(context._delegatedRunReconcile(failed, {}), true);
+    assert.equal(run.classList.contains('hidden'), false,
+      'an Error header always retains the failed-run diagnostic card');
+    assert.equal(feed.classList.contains('hidden'), true,
+      'failed-run diagnostics do not expose the raw event feed');
+    assert.deepEqual(terminalCalls, [failed]);
+
+    const completed = {
+      ...failed,
+      state: 'completed',
+      terminal: { code: 'completed', releasedTabCount: 0, answer: 'done' }
     };
-    vm.createContext(context);
-    vm.runInContext(extractNamedFunction(panelSource, '_resumeDelegationControl'), context);
-    const button = { disabled: false, focusCount: 0, focus() { this.focusCount += 1; } };
-    const pending = context._resumeDelegationControl({ currentTarget: button });
-    assert.deepEqual(commands, [{ type: 'FSB_DELEGATION_RESUME', delegationId: DELEGATION_ID }]);
-    assert.equal(state.pendingResume, true);
-    assert.equal(button.disabled, true);
-    assert.equal(button.focusCount, 1);
-    assert.equal(renders.length, 0, 'Resume renders no running state before authority replies');
-    resolveCommand({ ok: true, snapshot: running });
-    await pending;
-    assert.equal(state.pendingResume, false);
-    assert.equal(renders.length, 1);
-    assert.equal(renders[0].options.focusAction, 'take',
-      'confirmed ownership restoration returns focus to the contextual control');
+    context._delegatedRunReconcile(completed, {});
+    assert.equal(run.classList.contains('hidden'), true,
+      'successful terminal runs keep the compact API-style completion surface');
   }
 
   {
@@ -2269,7 +2343,7 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
     const state = {
       mode: 'consent', pendingTrust: false, pendingStart: false,
       errorCode: null, challengeId: 'dch_fixture',
-      providerId: 'opencode', providerLabel: 'OpenCode'
+      providerId: 'grok-build', providerLabel: 'Grok Build'
     };
     const context = {
       FsbDelegationProviders: DelegationProviders,
@@ -2293,11 +2367,11 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
     assert.deepEqual(commands, [{
       type: 'FSB_DELEGATION_SET_TRUST',
       challengeId: 'dch_fixture',
-      providerId: 'opencode',
+      providerId: 'grok-build',
       trusted: true
     }]);
     assert.equal(starts.length, 0, 'checked trust does not start before trust authority succeeds');
-    resolveTrust({ ok: true, providerId: 'opencode', trusted: true });
+    resolveTrust({ ok: true, providerId: 'grok-build', trusted: true });
     await pending;
     assert.deepEqual(starts, [null], 'trusted flow starts separately with a null caller challenge');
 
@@ -2535,8 +2609,12 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
         _announceDelegationLifecycleKey() {}
       };
       vm.createContext(context);
+      // _beginDelegationStart paints the starting spinner; stub it for the harness.
+      vm.runInContext('var preparingPhases = []; var preparingCleared = 0;' + ' function _renderDelegationPreparing(phase) { preparingPhases.push(phase); return true; }' + ' function _clearDelegationPreparing() { preparingCleared += 1; }', context);
       [
         '_delegationHasExactKeys',
+        '_delegationOwnDataValue',
+        '_delegationStartRejectionDetail',
         '_delegationValidLifecycleResponse',
         '_delegationStopProvesTerminal',
         '_delegationExactStopSnapshot',
@@ -2941,8 +3019,6 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
       delegationId: 'delegation_selected',
       conversationId: 'conv_selected',
       snapshot: localSnapshot,
-      pendingTake: false,
-      pendingResume: false,
       bindingCleanupPending: false,
       lastRenderedSequence: null
     };
@@ -2999,8 +3075,6 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
     const uiState = {
       delegationId: DELEGATION_ID,
       snapshot: null,
-      pendingTake: false,
-      pendingResume: false,
       pendingStop: false,
       lastRenderedSequence: null,
       lastAlertKey: null,
@@ -3008,7 +3082,7 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
     };
     const context = {
       _delegationUiState: uiState,
-      _ensureDelegationMount: () => ({ run, state: stateNode, feed, announcer, control: null }),
+      _ensureDelegationMount: () => ({ run, state: stateNode, feed, announcer }),
       FsbDelegationFeed: {
         validateSnapshot: () => true,
         render(_feed, next, options) {
@@ -3016,7 +3090,7 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
         }
       },
       _renderDelegationRunHeader() {},
-      _renderDelegationControlBar() {},
+      _delegationHeaderPresentation: () => ({ label: 'Error', tone: 'error' }),
       _setDelegationHeaderStatus() {},
       _setDelegationComposerLocked() {},
       _delegationStateLabel: () => 'status',
@@ -3069,11 +3143,10 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
     const feed = new TestNode('div');
     const announcer = new TestNode('div');
     announcer.textContent = 'hydration sentinel';
+    const headerUpdates = [];
     const uiState = {
       delegationId: DELEGATION_ID,
       snapshot: null,
-      pendingTake: false,
-      pendingResume: false,
       pendingStop: false,
       lastRenderedSequence: null,
       lastAlertKey: null,
@@ -3081,9 +3154,8 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
       announcedTransitions: Object.create(null)
     };
     const context = {
-      _activeTabIdSnapshot: 42,
       _delegationUiState: uiState,
-      _ensureDelegationMount: () => ({ run, state: stateNode, feed, announcer, control: null }),
+      _ensureDelegationMount: () => ({ run, state: stateNode, feed, announcer }),
       FsbDelegationFeed: {
         validateSnapshot: () => true,
         render(_feed, next, options) {
@@ -3095,8 +3167,7 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
         }
       },
       _renderDelegationRunHeader() {},
-      _renderDelegationControlBar() {},
-      _setDelegationHeaderStatus() {},
+      _setDelegationHeaderStatus(label, tone) { headerUpdates.push({ label, tone }); },
       _setDelegationComposerLocked() {},
       _delegationStateLabel: () => 'status',
       _delegationSnapshotLocksComposer: () => true,
@@ -3104,7 +3175,8 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
     };
     vm.createContext(context);
     [
-      '_delegationCanTakeControl',
+      '_delegationIsActiveSnapshot',
+      '_delegationHeaderPresentation',
       '_delegationOneShotTransition',
       '_delegationLifecycleAnnouncement',
       '_delegationSnapshotAlertKey',
@@ -3121,7 +3193,8 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
     };
     const starting = { ...base, state: 'starting' };
     context._renderDelegationSnapshot(starting, { hydrated: false, announceSequence: null });
-    assert.equal(announcer.textContent, 'Starting agent');
+    assert.equal(announcer.textContent, 'Starting automation');
+    assert.deepEqual(headerUpdates.at(-1), { label: 'Working', tone: 'running' });
     announcer.textContent = 'starting dedupe sentinel';
     context._renderDelegationSnapshot(starting, { hydrated: false, announceSequence: null });
     assert.equal(announcer.textContent, 'starting dedupe sentinel',
@@ -3146,11 +3219,13 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
       activeTab: { tabId: 42, owned: true, canTakeControl: true }
     };
     context._renderDelegationSnapshot(running, { hydrated: false, announceSequence: null });
-    assert.equal(announcer.textContent, 'Take control available');
-    announcer.textContent = 'control dedupe sentinel';
+    assert.equal(announcer.textContent, 'unchanged sentinel',
+      'running ownership metadata produces no side-panel announcement');
+    assert.deepEqual(headerUpdates.at(-1), { label: 'Working', tone: 'running' });
+    announcer.textContent = 'running dedupe sentinel';
     context._renderDelegationSnapshot(running, { hydrated: false, announceSequence: null });
-    assert.equal(announcer.textContent, 'control dedupe sentinel',
-      'unchanged control eligibility announces only once');
+    assert.equal(announcer.textContent, 'running dedupe sentinel',
+      'unchanged running state remains silent');
 
     const held = {
       ...base,
@@ -3159,82 +3234,45 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
       hold: { expiresAt: 10000, tabIds: [42] }
     };
     context._renderDelegationSnapshot(held, { hydrated: false, announceSequence: null });
-    assert.equal(announcer.textContent,
-      'You have control of this tab. Resume with agent available');
+    assert.equal(announcer.textContent, 'Automation paused');
+    assert.deepEqual(headerUpdates.at(-1), { label: 'Working', tone: 'running' });
     context._renderDelegationSnapshot({ ...base, state: 'stopping' }, {
       hydrated: false,
       announceSequence: null
     });
-    assert.equal(announcer.textContent, 'Stopping agent');
+    assert.equal(announcer.textContent, 'Stopping automation');
+    assert.deepEqual(headerUpdates.at(-1), { label: 'Working', tone: 'running' });
     assert.notEqual(uiState.announced, uiState.announcedTransitions,
       'persisted sequence and lifecycle/control identities remain separate');
   }
 
   {
-    let now = 61000;
-    let nextIntervalId = 1;
-    const intervals = new Map();
-    const cleared = [];
-    const elapsedNode = new TestNode('dd');
-    const active = {
+    const context = {};
+    vm.createContext(context);
+    vm.runInContext(
+      extractNamedFunction(panelSource, '_delegationPersistedStartAt'),
+      context
+    );
+    assert.equal(context._delegationPersistedStartAt({
       delegationId: DELEGATION_ID,
       state: 'running',
       connection: 'connected',
       entries: [
-        { timestamp: 1000 },
-        { timestamp: 2500 }
+        { timestamp: 2500 },
+        { timestamp: 1000 }
       ]
-    };
-    const state = { snapshot: active };
-    const context = {
-      Date: { now: () => now },
-      _delegationElapsedInterval: null,
-      _delegationUiState: state,
-      setInterval(fn, delay) {
-        const id = nextIntervalId++;
-        intervals.set(id, { fn, delay });
-        return id;
-      },
-      clearInterval(id) {
-        cleared.push(id);
-        intervals.delete(id);
-      }
-    };
-    vm.createContext(context);
-    [
-      '_delegationIsActiveSnapshot',
-      '_clearDelegationElapsedTimer',
-      '_delegationPersistedStartAt',
-      '_formatDelegationElapsed',
-      '_updateDelegationElapsed',
-      '_syncDelegationElapsedTimer'
-    ].forEach((name) => vm.runInContext(extractNamedFunction(panelSource, name), context));
-    assert.equal(context._delegationPersistedStartAt(active), 1000,
-      'elapsed presentation uses only the earliest persisted ledger timestamp');
-    context._syncDelegationElapsedTimer(active, elapsedNode);
-    assert.equal(elapsedNode.textContent, '1m 00s');
-    assert.equal(intervals.size, 1);
-    assert.equal(Array.from(intervals.values())[0].delay, 1000);
-    now = 126000;
-    Array.from(intervals.values())[0].fn();
-    assert.equal(elapsedNode.textContent, '2m 05s',
-      'fake presentation clock advances elapsed text without mutating lifecycle state');
-    const terminal = { ...active, state: 'completed' };
-    state.snapshot = terminal;
-    context._syncDelegationElapsedTimer(terminal, elapsedNode);
-    assert.equal(intervals.size, 0, 'terminal render safely clears the elapsed interval');
-    assert.equal(cleared.length, 1);
-    assert.equal(context._formatDelegationElapsed(null, now), 'Not reported');
+    }), 1000,
+      'the automation runner start time is the earliest persisted ledger timestamp');
+    assert.equal(context._delegationPersistedStartAt({ entries: [] }), null);
+    assert.equal(context._delegationPersistedStartAt(null), null);
+    assert.equal(context._delegationPersistedStartAt({
+      entries: [{ timestamp: -1 }, { timestamp: 'nope' }]
+    }), null, 'malformed ledger timestamps never become a start time');
 
-    const elapsedSource = [
-      extractNamedFunction(panelSource, '_delegationPersistedStartAt'),
-      extractNamedFunction(panelSource, '_formatDelegationElapsed'),
-      extractNamedFunction(panelSource, '_updateDelegationElapsed'),
-      extractNamedFunction(panelSource, '_syncDelegationElapsedTimer')
-    ].join('\n');
-    assert(elapsedSource.includes('snapshot.entries') && elapsedSource.includes('Date.now()'));
-    assert(!/chrome\.|storage|sendMessage|FSB_DELEGATION/.test(elapsedSource),
-      'elapsed presentation has no persistence, command, or lifecycle-authority side effect');
+    const startAtSource = extractNamedFunction(panelSource, '_delegationPersistedStartAt');
+    assert(startAtSource.includes('snapshot.entries'));
+    assert(!/chrome\.|storage|sendMessage|FSB_DELEGATION/.test(startAtSource),
+      'run start-time derivation has no persistence, command, or lifecycle-authority side effect');
   }
 
   {
@@ -3243,7 +3281,6 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
     const chatInput = new TestNode('div');
     const sendButton = new TestNode('button');
     const micButton = new TestNode('button');
-    const runStop = new TestNode('button');
     const run = new TestNode('section');
     const state = {
       snapshot: { delegationId: DELEGATION_ID, state: 'running' },
@@ -3262,7 +3299,7 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
       stopBtn: fixedStop,
       isRunning: false,
       _chatLockedByOwnerChip: false,
-      _delegationRunStopControls: [runStop],
+      _delegationRunStopControls: [],
       _delegationUiState: state,
       _delegationIsSelectedConversation: () => true,
       _ensureDelegationMount: () => ({ run }),
@@ -3285,10 +3322,9 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
     assert.equal(context._syncDelegationStopControls(state.snapshot), true);
     assert.equal(fixedStop.classList.contains('hidden'), false,
       'fixed input-cluster Stop is visible for selected delegated activity');
-    assert.equal(fixedStop.getAttribute('title'), 'Stop agent');
-    assert.equal(fixedStop.getAttribute('aria-label'), 'Stop agent');
+    assert.equal(fixedStop.getAttribute('title'), 'Stop Automation');
+    assert.equal(fixedStop.getAttribute('aria-label'), 'Stop Automation');
     assert.equal(fixedStop.getAttribute('data-delegation-action'), 'stop');
-    assert.equal(runStop.textContent, 'Stop agent');
     assert.equal(context._handleFixedStop({ currentTarget: fixedStop }), 'delegated');
     assert.equal(delegatedCalls, 1);
     assert.equal(legacyCalls, 0);
@@ -3313,11 +3349,9 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
     state.pendingStop = true;
     context._syncDelegationStopControls(state.snapshot);
     assert.equal(fixedStop.disabled, true);
-    assert.equal(runStop.disabled, true);
-    assert.equal(fixedStop.getAttribute('aria-label'), 'Stopping agent…');
-    assert.equal(runStop.textContent, 'Stopping agent…');
+    assert.equal(fixedStop.getAttribute('aria-label'), 'Stopping Automation…');
     assert.equal(run.getAttribute('aria-busy'), 'true',
-      'both Stop locations share one delegated pending/busy state');
+      'the one delegated Stop exposes its pending/busy state');
 
     state.pendingStop = false;
     state.snapshot = { delegationId: DELEGATION_ID, state: 'completed' };
@@ -3380,7 +3414,7 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
     assert.equal(button.focusCount, 1, 'Stop retains focus on its disabled control while pending');
     assert.equal(stopSyncs.length, 1);
     assert.equal(stopSyncs[0].pending, true,
-      'deferred Stop response immediately synchronizes both redundant controls');
+      'deferred Stop response immediately synchronizes the fixed control');
     assert.equal(renders.length, 0, 'Stop renders no terminal result before authority replies');
     assert.equal(await duplicate, undefined, 'duplicate Stop click has no lifecycle effect');
     resolveStop({ ok: true, snapshot: stopped });
@@ -3402,9 +3436,6 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
       stopBtn: new TestNode('button'),
       isRunning: false,
       _chatLockedByOwnerChip: false,
-      _delegationRunStopControls: [],
-      _delegationElapsedInterval: null,
-      clearInterval() {},
       _delegationUiState: {
         errorCode: null,
         pendingStop: false
@@ -3431,20 +3462,12 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
       '_delegationIsActiveSnapshot',
       '_delegationStopIsActionable',
       '_delegationStopControlPending',
-      '_clearDelegationElapsedTimer',
-      '_delegationPersistedStartAt',
-      '_formatDelegationElapsed',
-      '_updateDelegationElapsed',
-      '_syncDelegationElapsedTimer',
       '_delegationUsesFixedStop',
       '_restoreLegacyStopControl',
       '_syncDelegationStopControls',
-      '_renderDelegationRunActions',
       '_appendDelegationActionRow',
       '_appendDelegationDoctorRecovery',
       '_appendDelegationTechnicalCode',
-      '_appendDelegationRunDefinition',
-      '_appendDelegationRunMetadata',
       '_renderDelegationRunHeader'
     ].forEach((name) => vm.runInContext(extractNamedFunction(panelSource, name), context));
     const base = {
@@ -3460,8 +3483,10 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
       ...base,
       provider: { id: 'opencode', label: 'OpenCode' }
     });
-    assert(card.textContent.includes('OpenCode running'));
-    assert(card.textContent.includes('OpenCode is working in the background'));
+    assert(card.textContent.includes('Working'));
+    assert(card.textContent.includes('Automation is working'));
+    assert(!card.textContent.includes('OpenCode'),
+      'a healthy active card contains no provider identity');
 
     context._renderDelegationRunHeader(card, {
       ...base,
@@ -3499,10 +3524,8 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
     assert(card.textContent.includes('npx -y fsb-mcp-server@latest doctor'));
     assert(card.textContent.includes('Copy doctor command'));
     assert(card.textContent.includes('Open provider setup'));
-    assert(card.textContent.includes('ProviderClaude Code')
-      && card.textContent.includes('StateAgent connection lost')
-      && card.textContent.includes('ElapsedNot reported'),
-      'active run metadata exposes canonical provider, state, and elapsed fallback');
+    assert(!card.textContent.includes('ProviderClaude Code'),
+      'diagnostic cards do not inherit the removed active-provider badge');
     assert(!card.textContent.includes('daemon restart'), 'ordinary disconnect never receives restart copy');
 
     context._renderDelegationRunHeader(card, {
@@ -3547,10 +3570,10 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
     assert(card.textContent.includes('Agent cleanup needs attention'));
     assert(card.textContent.includes('FSB accepted this run but could not save it, and Stop is not confirmed.'));
     assert(card.textContent.includes('Your original message is still here. Retry Stop to finish cleanup.'));
-    assert(card.textContent.includes('Stop agent'),
-      'tree-unsettled binding cleanup retains a delegated Stop control');
-    assert.equal(findByClass(card, 'delegation-action-danger')[0].disabled, false,
-      'canonical stopping/failed snapshots cannot disable the unbound cleanup retry');
+    assert.equal(findByClass(card, 'delegation-action-danger').length, 0,
+      'tree-unsettled cleanup does not add a second Stop surface');
+    assert.equal(context.stopBtn.getAttribute('aria-label'), 'Stop Automation',
+      'tree-unsettled cleanup remains stoppable through the fixed generic Stop');
     assert.equal(card.getAttribute('data-delegation-tone'), 'danger',
       'cleanup-required presentation overrides a stale active snapshot tone');
     assert(findAll(card, 'i')[0].className.includes('fa-circle-exclamation'),

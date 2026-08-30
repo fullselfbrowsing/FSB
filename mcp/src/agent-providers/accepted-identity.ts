@@ -1,8 +1,7 @@
 import type { AdapterDetection, AgentProviderId } from './adapter.js';
 import {
   CLAUDE_CODE_ADAPTER_ID,
-  CODEX_ADAPTER_ID,
-  OPENCODE_ADAPTER_ID,
+  GROK_BUILD_ADAPTER_ID,
 } from './adapter.js';
 
 export const ACCEPTED_AGENT_IDENTITY_KEYS = Object.freeze([
@@ -14,8 +13,7 @@ export const ACCEPTED_AGENT_IDENTITY_KEYS = Object.freeze([
 ] as const);
 
 export const ACCEPTED_AGENT_AUTH_STATES = Object.freeze([
-  'chatgpt',
-  'api_key',
+  'oauth',
   'unauthenticated',
   'unknown',
 ] as const);
@@ -53,17 +51,10 @@ const PROVIDER_DEFINITIONS: Readonly<
     label: 'Claude Code',
     authToBilling: Object.freeze({ unknown: 'subscription' }),
   }),
-  [OPENCODE_ADAPTER_ID]: Object.freeze({
-    label: 'OpenCode',
-    authToBilling: Object.freeze({ unknown: 'unknown' }),
-  }),
-  [CODEX_ADAPTER_ID]: Object.freeze({
-    label: 'Codex',
+  [GROK_BUILD_ADAPTER_ID]: Object.freeze({
+    label: 'Grok Build',
     authToBilling: Object.freeze({
-      chatgpt: 'subscription',
-      api_key: 'api',
-      unauthenticated: 'unknown',
-      unknown: 'unknown',
+      oauth: 'subscription',
     }),
   }),
 });

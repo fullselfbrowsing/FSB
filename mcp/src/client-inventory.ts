@@ -1,8 +1,5 @@
 import { execFile } from 'node:child_process';
-import { isAbsolute } from 'node:path';
 import type { WebSocketBridge } from './bridge.js';
-import { createCodexDetector } from './agent-providers/codex-detect.js';
-import { createOpenCodeDetector } from './agent-providers/opencode-detect.js';
 import { PLATFORMS, resolvePlatformTarget } from './platforms.js';
 import type { PlatformRegistry, PlatformTarget } from './platforms.js';
 
@@ -28,8 +25,6 @@ type ExecFileDependency = (
 
 type ClientInventoryDependencies = {
   execFile: ExecFileDependency;
-  detectOpenCode: () => Promise<unknown>;
-  detectCodex: () => Promise<unknown>;
   platform: NodeJS.Platform;
   platforms: PlatformRegistry;
   resolvePlatformTarget: (platformKey: string) => PlatformTarget;
@@ -37,17 +32,9 @@ type ClientInventoryDependencies = {
 };
 
 const INVENTORY_PROVIDER_ROSTER = Object.freeze(['claude-code', 'opencode', 'codex'] as const);
-const MAX_RETAINED_PATH_BYTES = 4_096;
-const MAX_RETAINED_PREFIX_ARGUMENTS = 8;
-const MAX_RETAINED_PREFIX_BYTES = 32 * 1_024;
-const MAX_RETAINED_VERSION_BYTES = 64;
-const openCodeDetector = createOpenCodeDetector();
-const codexDetector = createCodexDetector();
 
 const DEFAULT_DEPENDENCIES: ClientInventoryDependencies = {
   execFile: execFile as unknown as ExecFileDependency,
-  detectOpenCode: () => openCodeDetector.detect(),
-  detectCodex: () => codexDetector.detect(),
   platform: process.platform,
   platforms: PLATFORMS,
   resolvePlatformTarget,
@@ -60,10 +47,6 @@ let inventoryPromise: Promise<McpClientInventory> | null = null;
 const TEST_ONLY_EXEC_FILE: ExecFileDependency = () => {
   throw new TypeError('Client inventory test exec dependency is not configured');
 };
-const TEST_ONLY_PROVIDER_DETECT = async (): Promise<unknown> => {
-  throw new TypeError('Client inventory test provider detector is not configured');
-};
-
 /** Test-only dependency injection/reset hook. Pass null to restore production dependencies. */
 export function __configureClientInventoryForTests(
   overrides: Partial<ClientInventoryDependencies> | null,
@@ -73,40 +56,45 @@ export function __configureClientInventoryForTests(
     : {
         ...DEFAULT_DEPENDENCIES,
         execFile: TEST_ONLY_EXEC_FILE,
-        detectOpenCode: TEST_ONLY_PROVIDER_DETECT,
-        detectCodex: TEST_ONLY_PROVIDER_DETECT,
         ...overrides,
       };
   inventoryPromise = null;
 }
 
-function versionCandidates(platform: NodeJS.Platform): string[] {
+function claudeVersionCandidates(platform: NodeJS.Platform): string[] {
   return platform === 'win32'
     ? ['claude.cmd', 'claude.exe', 'claude']
     : ['claude'];
 }
 
-function runClaudeVersionProbe(candidate: string): Promise<string | null> {
+function codexVersionCandidates(platform: NodeJS.Platform): string[] {
+  return platform === 'win32'
+    ? ['codex.cmd', 'codex.exe', 'codex']
+    : ['codex'];
+}
+
+function openCodeVersionCandidates(platform: NodeJS.Platform): string[] {
+  return platform === 'win32'
+    ? ['opencode.cmd', 'opencode.exe', 'opencode']
+    : ['opencode'];
+}
+
+function runVersionProbe(candidate: string): Promise<boolean> {
   return new Promise((resolve) => {
     dependencies.execFile(
       candidate,
       ['--version'],
       { timeout: 3000, windowsHide: true, maxBuffer: 65536 },
-      (error, stdout, stderr) => {
-        if (error) {
-          resolve(null);
-          return;
-        }
-        resolve(`${String(stdout ?? '')}\n${String(stderr ?? '')}`.trim());
+      (error) => {
+        resolve(!error);
       },
     );
   });
 }
 
 async function detectClaudeCode(checkedAt: number): Promise<McpClientInventoryRecord> {
-  for (const candidate of versionCandidates(dependencies.platform)) {
-    const output = await runClaudeVersionProbe(candidate);
-    if (output === null) continue;
+  for (const candidate of claudeVersionCandidates(dependencies.platform)) {
+    if (!await runVersionProbe(candidate)) continue;
 
     return {
       detected: true,
@@ -117,88 +105,20 @@ async function detectClaudeCode(checkedAt: number): Promise<McpClientInventoryRe
   return { detected: false, checkedAt };
 }
 
-function ownDataRecord(value: unknown): Readonly<Record<string, unknown>> | null {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
-  if (Object.getPrototypeOf(value) !== Object.prototype) return null;
-
-  const record: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
-  for (const key of Reflect.ownKeys(value)) {
-    if (typeof key !== 'string') return null;
-    const descriptor = Object.getOwnPropertyDescriptor(value, key);
-    if (!descriptor || !descriptor.enumerable || !('value' in descriptor)) return null;
-    record[key] = descriptor.value;
-  }
-  return record;
-}
-
-function safeRetainedPath(value: unknown): value is string {
-  return typeof value === 'string'
-    && isAbsolute(value)
-    && value.length > 0
-    && !/[\u0000-\u001f\u007f]/u.test(value)
-    && Buffer.byteLength(value, 'utf8') <= MAX_RETAINED_PATH_BYTES;
-}
-
-function safeRetainedPrefix(value: unknown): boolean {
-  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) return false;
-  if (!Number.isSafeInteger(value.length) || value.length > MAX_RETAINED_PREFIX_ARGUMENTS) {
-    return false;
-  }
-
-  let bytes = 0;
-  for (let index = 0; index < value.length; index += 1) {
-    const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
-    if (!descriptor || !descriptor.enumerable || !('value' in descriptor)) return false;
-    const argument = descriptor.value;
-    if (typeof argument !== 'string' || argument.length === 0 || argument.includes('\0')) return false;
-    bytes += Buffer.byteLength(argument, 'utf8');
-    if (bytes > MAX_RETAINED_PREFIX_BYTES) return false;
-  }
-  return Reflect.ownKeys(value).length === value.length + 1;
-}
-
-function projectsRetainedProviderAvailability(value: unknown): boolean {
-  const detection = ownDataRecord(value);
-  if (!detection || typeof detection.installed !== 'boolean') return false;
-  const version = detection.version;
-  if (
-    typeof version !== 'string'
-    || version.length === 0
-    || /[\u0000-\u001f\u007f]/u.test(version)
-    || Buffer.byteLength(version, 'utf8') > MAX_RETAINED_VERSION_BYTES
-  ) return false;
-
-  const binary = ownDataRecord(detection.binary);
-  if (!binary) return false;
-  if (!safeRetainedPath(binary.command) || !safeRetainedPath(binary.realPath)) return false;
-  if (binary.command !== binary.realPath || !safeRetainedPrefix(binary.argvPrefix)) return false;
-  return true;
-}
-
 async function detectOpenCode(checkedAt: number): Promise<McpClientInventoryRecord> {
-  let evidence: unknown = null;
-  try {
-    evidence = await dependencies.detectOpenCode();
-  } catch {
-    evidence = null;
+  for (const candidate of openCodeVersionCandidates(dependencies.platform)) {
+    if (!await runVersionProbe(candidate)) continue;
+    return Object.freeze({ detected: true, checkedAt });
   }
-  return Object.freeze({
-    detected: projectsRetainedProviderAvailability(evidence),
-    checkedAt,
-  });
+  return Object.freeze({ detected: false, checkedAt });
 }
 
 async function detectCodex(checkedAt: number): Promise<McpClientInventoryRecord> {
-  let evidence: unknown = null;
-  try {
-    evidence = await dependencies.detectCodex();
-  } catch {
-    evidence = null;
+  for (const candidate of codexVersionCandidates(dependencies.platform)) {
+    if (!await runVersionProbe(candidate)) continue;
+    return Object.freeze({ detected: true, checkedAt });
   }
-  return Object.freeze({
-    detected: projectsRetainedProviderAvailability(evidence),
-    checkedAt,
-  });
+  return Object.freeze({ detected: false, checkedAt });
 }
 
 function hasExactInventoryProviderRoster(keys: readonly string[]): boolean {

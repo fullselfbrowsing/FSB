@@ -830,15 +830,15 @@ async function loadOffscreenHandlerSource(chromeMock) {
   // Load-order fix: checkApiConnection reads DOM inputs, but the premature page-init
   // call ran BEFORE loadSettings' async chrome.storage.local.get callback populated
   // them, so it read empty fields and falsely showed 'No API Key'. The call is removed
-  // from init and now runs after awaited model discovery (after provider inputs
-  // and modelName are populated). LM Studio intentionally skips automatic
-  // inference and leaves Test Connection as an explicit action.
+  // from init and now runs after awaited, successful hosted-model discovery
+  // (after provider inputs and modelName are populated). LM Studio intentionally
+  // skips automatic inference and leaves Test Connection as an explicit action.
   passAssertEqual((optionsSrc.match(/\/\/ Check API connection/g) || []).length, 0,
     "options.js dropped the premature page-init '// Check API connection' call (load-order fix)");
   passAssert(
-    /const discoveryResult = await setProviderSelection\([\s\S]*?settings\.modelProvider === ['"]lmstudio['"][\s\S]*?else if \(savedModelName\)[\s\S]*?checkApiConnection\(\);/.test(optionsSrc)
+    /discoveryResult = await setProviderSelection\([\s\S]*?settings\.modelProvider === ['"]lmstudio['"][\s\S]*?discoveryResult && discoveryResult\.ok && discoveryResult\.selectedModel[\s\S]*?checkApiConnection\(\);/.test(optionsSrc)
       && !/providerSettingsModelLoadTimer\s*=\s*setTimeout/.test(optionsSrc),
-    'loadSettings awaits model discovery and auto-tests only configured hosted providers'
+    'loadSettings awaits model discovery and auto-tests only successfully discovered hosted providers'
   );
 
   // ---- Part 6: INV byte-freeze regression assertions (Plan 06-05 fill) ----

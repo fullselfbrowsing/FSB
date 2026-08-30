@@ -443,17 +443,17 @@ async function run() {
     ? Array.from(productionRegistryBlock[0].matchAll(/^\s*id: ([A-Z_]+_ADAPTER_ID),$/gm), (match) => match[1])
     : [];
   assert(
-    /const CANONICAL_IDS = Object\.freeze\(\[\s*CLAUDE_CODE_ADAPTER_ID,\s*OPENCODE_ADAPTER_ID,\s*CODEX_ADAPTER_ID,\s*\] as const\);/m.test(adapterRegistrySource)
+    /const CANONICAL_IDS = Object\.freeze\(\[\s*CLAUDE_CODE_ADAPTER_ID,\s*GROK_BUILD_ADAPTER_ID,\s*\] as const\);/m.test(adapterRegistrySource)
       && JSON.stringify(productionRegistryIds) === JSON.stringify([
         'CLAUDE_CODE_ADAPTER_ID',
-        'OPENCODE_ADAPTER_ID',
-        'CODEX_ADAPTER_ID',
+        'GROK_BUILD_ADAPTER_ID',
       ])
       && /adapter: createClaudeCodeAdapter\(dependencies\)/m.test(productionRegistryBlock?.[0] || '')
-      && /adapter: createOpenCodeAdapter\(\{[\s\S]*?kill: dependencies\.kill,[\s\S]*?\}\)/m.test(productionRegistryBlock?.[0] || '')
-      && /adapter: createCodexAdapter\(\{[\s\S]*?kill: dependencies\.kill,[\s\S]*?\}\)/m.test(productionRegistryBlock?.[0] || '')
-      && /from '\.\/codex\.js'/.test(adapterRegistrySource),
-    'production registry is the exact closed Claude Code/OpenCode/Codex roster',
+      && /adapter: createGrokBuildAdapter\(\{[\s\S]*?kill: dependencies\.kill,[\s\S]*?\}\)/m.test(productionRegistryBlock?.[0] || '')
+      && !/CODEX_ADAPTER_ID|createCodexAdapter|from '\.\/codex\.js'/.test(adapterRegistrySource)
+      && !/OPENCODE_ADAPTER_ID|createOpenCodeAdapter|from '\.\/opencode\.js'/.test(adapterRegistrySource)
+      && /from '\.\/grok\.js'/.test(adapterRegistrySource),
+    'production registry is the exact closed Claude Code/Grok Build roster',
   );
   assert(
     !/(?:hold|resume|status)\s*\(/.test(adapterInterface ? adapterInterface[1] : ''),

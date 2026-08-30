@@ -42,8 +42,9 @@
   },
   "scripts": {
     "prebuild": "node ../scripts/verify-agent-provider-flags.mjs && node ../scripts/verify-native-host-boundary.mjs --source",
-    "clean": "node -e \"try{require('fs').unlinkSync('build/test-config-engine.js')}catch{}\"",
+    "clean": "node -e \"require('fs').rmSync('build',{recursive:true,force:true})\"",
     "build": "npm run clean && tsc && node ../scripts/verify-native-host-boundary.mjs --compiled && cp ../extension/ai/tool-definitions.js ai/tool-definitions.cjs",
+    "postbuild": "node -e \"try{require('fs').chmodSync('build/index.js',0o755)}catch{}\"",
     "dev": "tsx src/index.ts",
     "doctor": "node build/index.js doctor",
     "serve": "node build/index.js serve",

@@ -49,10 +49,10 @@ function assertRecursivelyFrozen(value, label, seen = new Set()) {
 function processSpec(role, overrides = {}) {
   const defaults = {
     role,
-    command: '/fixture/opencode',
+    command: '/fixture/owned-server',
     argv: ['--pure'],
     cwd: '/fixture/work',
-    privateFiles: ['/fixture/run/opencode.json'],
+    privateFiles: ['/fixture/run/owned-server.json'],
     fixedEnv: { XDG_CONFIG_HOME: '/fixture/run/config' },
     spawnSecretEnvBindings: [],
     stdin: role.endsWith('_task') ? 'task' : 'none',
@@ -81,7 +81,7 @@ function directSpawn(overrides = {}) {
 
 function ownedServerSpawn(overrides = {}) {
   const binding = {
-    envKey: 'OPENCODE_SERVER_PASSWORD',
+    envKey: 'FSB_OWNED_SERVER_PASSWORD',
     secretRef: 'owned_server_basic_password',
   };
   const processAttestation = {
@@ -117,8 +117,8 @@ function ownedServerSpawn(overrides = {}) {
     ],
   };
   return {
-    adapterId: 'opencode',
-    profileVersion: '1.14.25',
+    adapterId: 'claude-code',
+    profileVersion: '2.1.177',
     topology: {
       kind: 'owned_server',
       server: processSpec('owned_server', {
@@ -134,7 +134,7 @@ function ownedServerSpawn(overrides = {}) {
         spawnSecretEnvBindings: [binding],
       }),
       readiness: {
-        linePrefix: 'opencode server listening on http://127.0.0.1:',
+        linePrefix: 'owned server listening on http://127.0.0.1:',
         maxBytes: 4 * 1024,
         timeoutMs: 5_000,
       },
@@ -161,9 +161,8 @@ async function main() {
 
   const {
     CLAUDE_CODE_ADAPTER_ID,
-    CODEX_ADAPTER_ID,
-    OPENCODE_ADAPTER_ID,
-    OPENCODE_SERVER_PASSWORD_ENV_KEY,
+    GROK_BUILD_ADAPTER_ID,
+    OWNED_SERVER_PASSWORD_ENV_KEY,
     OWNED_SERVER_BASIC_PASSWORD_SECRET_REF,
     TASK_ONLY_CAPABILITIES,
     freezeSpawnSpec,
@@ -176,9 +175,8 @@ async function main() {
   } = registryModule;
 
   assert.equal(CLAUDE_CODE_ADAPTER_ID, 'claude-code');
-  assert.equal(OPENCODE_ADAPTER_ID, 'opencode');
-  assert.equal(CODEX_ADAPTER_ID, 'codex');
-  assert.equal(OPENCODE_SERVER_PASSWORD_ENV_KEY, 'OPENCODE_SERVER_PASSWORD');
+  assert.equal(GROK_BUILD_ADAPTER_ID, 'grok-build');
+  assert.equal(OWNED_SERVER_PASSWORD_ENV_KEY, 'FSB_OWNED_SERVER_PASSWORD');
   assert.equal(OWNED_SERVER_BASIC_PASSWORD_SECRET_REF, 'owned_server_basic_password');
   assert.equal(PLATFORMS['claude-code'].flag, 'claude-code', 'platform id remains canonical');
   assert.equal(PLATFORMS.codex.flag, 'codex', 'Codex platform id remains canonical');
@@ -221,20 +219,7 @@ async function main() {
     kill: async () => {},
     caps: () => TASK_ONLY_CAPABILITIES,
   });
-  const openCodeCapabilities = Object.freeze({
-    taskMode: true,
-    chatMode: false,
-    resume: false,
-    serverMode: true,
-  });
-  const fakeOpenCodeAdapter = Object.freeze({
-    detect: async () => detection,
-    buildSpawn: async (_task, _context) => immutableSpec,
-    parseEvents: async function* () {},
-    kill: async () => {},
-    caps: () => openCodeCapabilities,
-  });
-  const fakeCodexAdapter = Object.freeze({
+  const fakeGrokBuildAdapter = Object.freeze({
     detect: async () => detection,
     buildSpawn: async (_task, _context) => immutableSpec,
     parseEvents: async function* () {},
@@ -275,12 +260,12 @@ async function main() {
   const immutableOwned = freezeSpawnSpec(mutableOwned);
   assert.equal(immutableOwned.topology.kind, 'owned_server');
   assert.deepEqual(immutableOwned.topology.server.spawnSecretEnvBindings, [{
-    envKey: 'OPENCODE_SERVER_PASSWORD',
+    envKey: 'FSB_OWNED_SERVER_PASSWORD',
     secretRef: 'owned_server_basic_password',
   }]);
   assert.deepEqual(immutableOwned.topology.coldTask.spawnSecretEnvBindings, []);
   assert.deepEqual(immutableOwned.topology.attachTask.spawnSecretEnvBindings, [{
-    envKey: 'OPENCODE_SERVER_PASSWORD',
+    envKey: 'FSB_OWNED_SERVER_PASSWORD',
     secretRef: 'owned_server_basic_password',
   }]);
   assert.equal(immutableOwned.attestations[0].source, 'process_json');
@@ -290,7 +275,7 @@ async function main() {
   mutableOwned.topology.readiness.linePrefix = 'mutated';
   mutableOwned.attestations[0].assertions[0].keys.push('mutated');
   assert.deepEqual(immutableOwned.topology.server.argv, ['--pure', 'serve']);
-  assert.match(immutableOwned.topology.readiness.linePrefix, /^opencode server listening/);
+  assert.match(immutableOwned.topology.readiness.linePrefix, /^owned server listening/);
   assert.deepEqual(immutableOwned.attestations[0].assertions[0].keys, [
     'enabled', 'model', 'prompt', 'tools',
   ]);
@@ -306,7 +291,7 @@ async function main() {
         kind: 'direct',
         task: processSpec('direct_task', {
           spawnSecretEnvBindings: [{
-            envKey: 'OPENCODE_SERVER_PASSWORD',
+            envKey: 'FSB_OWNED_SERVER_PASSWORD',
             secretRef: 'owned_server_basic_password',
           }],
         }),
@@ -317,7 +302,7 @@ async function main() {
         ...ownedServerSpawn().topology,
         coldTask: processSpec('cold_task', {
           spawnSecretEnvBindings: [{
-            envKey: 'OPENCODE_SERVER_PASSWORD',
+            envKey: 'FSB_OWNED_SERVER_PASSWORD',
             secretRef: 'owned_server_basic_password',
           }],
         }),
@@ -327,9 +312,9 @@ async function main() {
       topology: {
         ...ownedServerSpawn().topology,
         server: processSpec('owned_server', {
-          fixedEnv: { OPENCODE_SERVER_PASSWORD: passwordCanary },
+          fixedEnv: { FSB_OWNED_SERVER_PASSWORD: passwordCanary },
           spawnSecretEnvBindings: [{
-            envKey: 'OPENCODE_SERVER_PASSWORD',
+            envKey: 'FSB_OWNED_SERVER_PASSWORD',
             secretRef: 'owned_server_basic_password',
           }],
           stdout: 'bounded_readiness',
@@ -342,7 +327,7 @@ async function main() {
         server: processSpec('owned_server', {
           fixedEnv: { SAFE_VALUE: `Basic ${passwordCanary}` },
           spawnSecretEnvBindings: [{
-            envKey: 'OPENCODE_SERVER_PASSWORD',
+            envKey: 'FSB_OWNED_SERVER_PASSWORD',
             secretRef: 'owned_server_basic_password',
           }],
           stdout: 'bounded_readiness',
@@ -364,7 +349,7 @@ async function main() {
         attachTask: processSpec('attach_task', {
           argv: ['--pure', 'run', { runtimeRef: 'owned_server_endpoint' }],
           spawnSecretEnvBindings: [{
-            envKey: 'OPENCODE_SERVER_PASSWORD',
+            envKey: 'FSB_OWNED_SERVER_PASSWORD',
             secretRef: 'owned_server_basic_password',
             secretValue: passwordCanary,
           }],
@@ -376,7 +361,7 @@ async function main() {
         ...ownedServerSpawn().attestations[0],
         process: processSpec('policy_preflight', {
           spawnSecretEnvBindings: [{
-            envKey: 'OPENCODE_SERVER_PASSWORD',
+            envKey: 'FSB_OWNED_SERVER_PASSWORD',
             secretRef: 'owned_server_basic_password',
           }],
         }),
@@ -484,13 +469,11 @@ async function main() {
 
   const registry = createAdapterRegistry([
     { id: 'claude-code', adapter: fakeAdapter },
-    { id: 'opencode', adapter: fakeOpenCodeAdapter },
-    { id: 'codex', adapter: fakeCodexAdapter },
+    { id: 'grok-build', adapter: fakeGrokBuildAdapter },
   ]);
   assert.strictEqual(registry.require('claude-code'), fakeAdapter, 'exact canonical lookup succeeds');
-  assert.strictEqual(registry.require('opencode'), fakeOpenCodeAdapter, 'second canonical lookup succeeds');
-  assert.strictEqual(registry.require('codex'), fakeCodexAdapter, 'third canonical lookup succeeds');
-  assert.deepEqual(registry.ids(), ['claude-code', 'opencode', 'codex']);
+  assert.strictEqual(registry.require('grok-build'), fakeGrokBuildAdapter, 'second canonical lookup succeeds');
+  assert.deepEqual(registry.ids(), ['claude-code', 'grok-build']);
   assert.ok(Object.isFrozen(registry));
   assert.ok(Object.isFrozen(registry.ids()));
   assert.throws(() => registry.ids().push('foreign'), TypeError);
@@ -512,6 +495,16 @@ async function main() {
     'unknown_adapter_id',
   );
   expectRegistryError(
+    () => registry.require('codex'),
+    AdapterRegistryError,
+    'unknown_adapter_id',
+  );
+  expectRegistryError(
+    () => registry.require('opencode'),
+    AdapterRegistryError,
+    'unknown_adapter_id',
+  );
+  expectRegistryError(
     () => createAdapterRegistry([]),
     AdapterRegistryError,
     'missing_adapter',
@@ -527,7 +520,7 @@ async function main() {
   expectRegistryError(
     () => createAdapterRegistry([
       { id: 'Claude-Code', adapter: fakeAdapter },
-      { id: 'opencode', adapter: fakeOpenCodeAdapter },
+      { id: 'grok-build', adapter: fakeGrokBuildAdapter },
     ]),
     AdapterRegistryError,
     'invalid_adapter_id',
@@ -535,7 +528,7 @@ async function main() {
   expectRegistryError(
     () => createAdapterRegistry([
       { id: 'claude-code', adapter: fakeAdapter },
-      { id: 'foreign', adapter: fakeOpenCodeAdapter },
+      { id: 'foreign', adapter: fakeGrokBuildAdapter },
     ]),
     AdapterRegistryError,
     'unknown_adapter_id',
@@ -546,23 +539,22 @@ async function main() {
     'missing_adapter',
   );
   expectRegistryError(
-    () => createAdapterRegistry([{ id: 'opencode', adapter: fakeOpenCodeAdapter }]),
+    () => createAdapterRegistry([{ id: 'opencode', adapter: fakeGrokBuildAdapter }]),
     AdapterRegistryError,
-    'missing_adapter',
+    'unknown_adapter_id',
   );
   expectRegistryError(
     () => createAdapterRegistry([
       { id: 'claude-code', adapter: fakeAdapter },
-      { id: 'OpenCode', adapter: fakeOpenCodeAdapter },
+      { id: 'OpenCode', adapter: fakeGrokBuildAdapter },
     ]),
     AdapterRegistryError,
     'invalid_adapter_id',
   );
   expectRegistryError(
     () => createAdapterRegistry([
-      { id: 'opencode', adapter: fakeOpenCodeAdapter },
+      { id: 'grok-build', adapter: fakeGrokBuildAdapter },
       { id: 'claude-code', adapter: fakeAdapter },
-      { id: 'codex', adapter: fakeCodexAdapter },
     ]),
     AdapterRegistryError,
     'invalid_adapter_id',
@@ -570,23 +562,13 @@ async function main() {
   assert.throws(
     () => createAdapterRegistry([
       { id: 'claude-code', adapter: { ...fakeAdapter } },
-      { id: 'opencode', adapter: fakeOpenCodeAdapter },
-      { id: 'codex', adapter: fakeCodexAdapter },
+      { id: 'grok-build', adapter: fakeGrokBuildAdapter },
     ]),
     /immutable/i,
   );
 
-  const productionRegistry = createProductionAdapterRegistry({
-    codexDetect: async () => ({
-      installed: false,
-      version: null,
-      authState: 'unknown',
-      binary: null,
-      profileVersion: null,
-    }),
-    kill: async () => {},
-  });
-  assert.deepEqual(productionRegistry.ids(), ['claude-code', 'opencode', 'codex']);
+  const productionRegistry = createProductionAdapterRegistry({ kill: async () => {} });
+  assert.deepEqual(productionRegistry.ids(), ['claude-code', 'grok-build']);
   for (const id of productionRegistry.ids()) {
     const productionAdapter = productionRegistry.require(id);
     assert.ok(Object.isFrozen(productionAdapter), `${id} production adapter is immutable`);
@@ -596,13 +578,16 @@ async function main() {
       `${id} production adapter has exactly five methods in contract order`,
     );
   }
-  assert.deepEqual(await productionRegistry.require('codex').detect(), {
-    installed: false,
-    version: null,
-    authState: 'unknown',
-    binary: null,
-    profileVersion: null,
-  }, 'production-registry contract uses only its injected synthetic Codex detector');
+  expectRegistryError(
+    () => productionRegistry.require('codex'),
+    AdapterRegistryError,
+    'unknown_adapter_id',
+  );
+  expectRegistryError(
+    () => productionRegistry.require('opencode'),
+    AdapterRegistryError,
+    'unknown_adapter_id',
+  );
 
   const adapterSource = fs.readFileSync(adapterSourcePath, 'utf8');
   const policySource = fs.readFileSync(policySourcePath, 'utf8');
@@ -628,6 +613,8 @@ async function main() {
   assert.doesNotMatch(supervisorSource, /from ['"][^'"]*codex[^'"]*['"]/, 'supervisor has no Codex import');
   assert.doesNotMatch(supervisorSource, /adapterId\s*===\s*['"]opencode['"]/, 'supervisor has no OpenCode id branch');
   assert.doesNotMatch(supervisorSource, /adapterId\s*===\s*['"]codex['"]/, 'supervisor has no Codex id branch');
+  assert.match(supervisorSource, /createGrokBuildAcpController/,
+    'supervisor directly owns the Grok Build ACP lifecycle');
   const prepareIndex = supervisorSource.indexOf('runtimeFiles.prepareRun({');
   const spawnIndex = supervisorSource.indexOf('this.spawnChild(', prepareIndex);
   const activateIndex = supervisorSource.indexOf('runtimeFiles.activateRun({', spawnIndex);
@@ -639,12 +626,7 @@ async function main() {
     'retained process identity is activated before authority and task delivery');
   assert.match(runtimeSource, /JOURNAL_VERSION\s*=\s*2\s+as const/);
   assert.match(runtimeSource, /['"]delegation['"]\s*,\s*['"]provider_server['"]/);
-  for (const artifactKind of [
-    'mcp_config',
-    'opencode_config',
-    'opencode_test_home',
-    'opencode_managed_config',
-  ]) {
+  for (const artifactKind of ['mcp_config']) {
     assert(runtimeSource.includes(`'${artifactKind}'`), `${artifactKind} is a closed runtime artifact kind`);
   }
   assert.doesNotMatch(runtimeSource, /rmSync\([^)]*recursive\s*:\s*true/,

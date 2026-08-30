@@ -108,34 +108,6 @@ try {
   }
   fs.chmodSync(unreadableFile, 0o600);
 
-  const profilePath = path.join(
-    repoRoot,
-    'mcp',
-    'src',
-    'agent-providers',
-    'opencode-profile.ts',
-  );
-  const detectorPath = path.join(
-    repoRoot,
-    'mcp',
-    'src',
-    'agent-providers',
-    'opencode-detect.ts',
-  );
-  const codexProfilePath = path.join(
-    repoRoot,
-    'mcp',
-    'src',
-    'agent-providers',
-    'codex-profile.ts',
-  );
-  const codexDetectorPath = path.join(
-    repoRoot,
-    'mcp',
-    'src',
-    'agent-providers',
-    'codex-detect.ts',
-  );
   const supervisorPath = path.join(
     repoRoot,
     'mcp',
@@ -143,10 +115,6 @@ try {
     'agent-providers',
     'spawn-supervisor.ts',
   );
-  const profileSource = fs.readFileSync(profilePath, 'utf8');
-  const detectorSource = fs.readFileSync(detectorPath, 'utf8');
-  const codexProfileSource = fs.readFileSync(codexProfilePath, 'utf8');
-  const codexDetectorSource = fs.readFileSync(codexDetectorPath, 'utf8');
   const supervisorSource = fs.readFileSync(supervisorPath, 'utf8');
   const adapterSource = fs.readFileSync(path.join(
     repoRoot,
@@ -181,11 +149,6 @@ try {
     'tests',
     'mcp-agent-provider-contract.test.js',
   ), 'utf8');
-  const topologyTestSource = fs.readFileSync(path.join(
-    repoRoot,
-    'tests',
-    'mcp-opencode-server-topology.test.js',
-  ), 'utf8');
   const eventStoreTestSource = fs.readFileSync(path.join(
     repoRoot,
     'tests',
@@ -214,43 +177,6 @@ try {
     'ui',
     'sidepanel.css',
   ), 'utf8');
-  const codexManifest = JSON.parse(fs.readFileSync(path.join(
-    repoRoot,
-    'tests',
-    'fixtures',
-    'agent-streams',
-    'codex-0.142.5',
-    'manifest.json',
-  ), 'utf8'));
-  for (const sourceFlag of [
-    'OPENCODE_DISABLE_PROJECT_CONFIG',
-    'OPENCODE_DISABLE_CLAUDE_CODE_PROMPT',
-    'OPENCODE_DISABLE_EXTERNAL_SKILLS',
-    'OPENCODE_DISABLE_AUTOUPDATE',
-    'OPENCODE_DISABLE_LSP_DOWNLOAD',
-    'OPENCODE_TEST_HOME',
-    'OPENCODE_TEST_MANAGED_CONFIG_DIR',
-    'XDG_CONFIG_HOME',
-  ]) assert(profileSource.includes(sourceFlag), `${sourceFlag} is source-pinned`);
-  assert(profileSource.includes("'--pure'"));
-  assert(profileSource.includes("'--log-level'"));
-  assert(profileSource.includes("'ERROR'"));
-  assert(profileSource.includes("'--hostname', '127.0.0.1'"));
-  assert(profileSource.includes("'--port', '0'"));
-  assert(profileSource.includes("'--mdns', 'false'"));
-  assert(profileSource.includes("'--attach'"));
-  assert(profileSource.includes("'owned_server_endpoint'"));
-  assert(profileSource.includes("path: '/config'"));
-  assert(profileSource.includes("path: '/agent'"));
-  assert(profileSource.includes("prefixRef: 'fsb_mcp_tool_prefix'"));
-  assert(profileSource.includes('SHIPPED_FSB_PROMPT_SHA256'));
-  assert(profileSource.includes("'*': 'deny'"));
-  assert(profileSource.includes("'fsb_*': 'allow'"));
-  assert(profileSource.indexOf("'*': 'deny'") < profileSource.indexOf("'fsb_*': 'allow'"));
-  assert(profileSource.includes('OPENCODE_SERVER_PASSWORD_ENV_KEY'));
-  assert(profileSource.includes('OWNED_SERVER_BASIC_PASSWORD_SECRET_REF'));
-  assert(detectorSource.includes("OPENCODE_PROFILE_VERSION = '1.14.25'"));
-  assert(detectorSource.includes('shell: false'));
   assert(supervisorSource.includes('verifyPolicyAttestation'));
   assert(supervisorSource.includes("descriptor.source === 'process_json'"));
   assert(supervisorSource.includes("descriptor.source === 'owned_server_json'"));
@@ -284,11 +210,9 @@ try {
   assert(!/OPENCODE_SERVER_PASSWORD/.test(runtimeSource),
     'runtime journal grammar cannot name or retain the OpenCode server password');
 
-  assert(adapterSource.includes('key === OPENCODE_SERVER_PASSWORD_ENV_KEY'));
-  assert(adapterSource.includes("ownValue(binding, 'envKey') !== OPENCODE_SERVER_PASSWORD_ENV_KEY"));
+  assert(adapterSource.includes('key === OWNED_SERVER_PASSWORD_ENV_KEY'));
+  assert(adapterSource.includes("ownValue(binding, 'envKey') !== OWNED_SERVER_PASSWORD_ENV_KEY"));
   assert(adapterSource.includes("ownValue(binding, 'secretRef') !== OWNED_SERVER_BASIC_PASSWORD_SECRET_REF"));
-  assert(profileSource.includes("input.role === 'owned_server' || input.role === 'attach_task'"));
-  assert(profileSource.includes('? SERVER_SECRET_BINDING'));
   assert(supervisorSource.includes('options.env[binding.envKey] = password'));
   assert(supervisorSource.includes("delete options.env[binding.envKey]"));
   assert(supervisorSource.includes("headers.Authorization = ''"));
@@ -297,7 +221,7 @@ try {
   assert(supervisorSource.includes('secret.fill(0)'));
 
   for (const secretProof of [
-    'fixedEnv: { OPENCODE_SERVER_PASSWORD: passwordCanary }',
+    'fixedEnv: { FSB_OWNED_SERVER_PASSWORD: passwordCanary }',
     "fixedEnv: { SAFE_VALUE: `Basic ${passwordCanary}` }",
     "spawnSecretEnvBindings: [{ envKey: 'ARBITRARY_PASSWORD', secretRef: 'arbitrary' }]",
     'JSON.stringify(immutableOwned).includes(passwordCanary)',
@@ -305,16 +229,6 @@ try {
     'JSON.stringify(failed).includes(passwordCanary)',
     'runtime cleanup does not gain arbitrary recursive deletion authority',
   ]) assert(providerContractSource.includes(secretProof), `provider contract retains ${secretProof}`);
-  for (const transientProof of [
-    'server spawn environment is scrubbed immediately after spawn returns',
-    'cold task receives no server password',
-    'inherited password is scrubbed from cold task environment',
-    'transient Basic header is scrubbed after the direct HTTP call',
-    'attach spawn environment is scrubbed immediately after spawn returns',
-    'raw credentials are not serialized',
-    'server stdin receives no task bytes',
-    'creates no fallback task child',
-  ]) assert(topologyTestSource.includes(transientProof), `topology contract retains ${transientProof}`);
   for (const browserProof of [
     'secretCanary',
     'taskCanary',
@@ -331,7 +245,7 @@ try {
     'mcpBridgePairingCode',
   ));
   assert(providersUiTestSource.includes(
-    'the seven API providers are followed by the three local agents',
+    'the seven API providers are followed by the two active local agents',
   ));
 
   const controlPanelSource = fs.readFileSync(path.join(
@@ -350,70 +264,22 @@ try {
   assert.equal(controlPanelSource.split(helperTag).length - 1, 1);
   assert.equal(sidepanelSource.split(helperTag).length - 1, 1);
 
-  for (const forbidden of [
-    '--model',
-    '--continue',
-    '--session',
-    '--fork',
-    '--share',
-    '--file',
-    '--command',
-    '--print-logs',
-    '--password',
-  ]) assert(!profileSource.includes(forbidden), `${forbidden} is absent from OpenCode profile`);
-  for (const forbiddenPattern of [
-    /\bHOME\s*:/,
-    /\bXDG_DATA_HOME\b/,
-    /\bXDG_STATE_HOME\b/,
-    /\bXDG_CACHE_HOME\b/,
-    /\bOPENCODE_SERVER_PASSWORD\s*:/,
-    /\b(?:ANTHROPIC|OPENAI|GOOGLE|GEMINI)_[A-Z_]*KEY\b/,
-    /\bAuthorization\b/,
-    /\bBasic\s+/,
-    /process\.env/,
-    /from ['"]node:(?:child_process|http|https|net|tls)['"]/,
-    /export function (?:check|verify|reduce)OpenCode/,
-    /adapterId\s*===\s*['"]opencode['"]/,
-  ]) assert(!forbiddenPattern.test(profileSource), `${forbiddenPattern} is absent from OpenCode profile`);
-
-  assert(codexDetectorSource.includes("CODEX_PROFILE_VERSION = '0.142.5'"));
-  assert(codexProfileSource.includes("'exec',"));
-  assert(codexProfileSource.includes("'-',"));
-  for (const required of [
-    "'--json'",
-    "'--ephemeral'",
-    "'--ignore-user-config'",
-    "'--ignore-rules'",
-    "'--strict-config'",
-    "'--color'",
-    "'never'",
-    "'--sandbox'",
-    "'read-only'",
-    "'--skip-git-repo-check'",
-    "'project_doc_max_bytes=0'",
-    "'web_search=\"disabled\"'",
-    "'shell_environment_policy.inherit=\"none\"'",
-    "'mcp_servers={}'",
-    "'mcp_servers.fsb.required=true'",
-    "'mcp_servers.fsb.enabled=true'",
-    "'mcp_servers.fsb.default_tools_approval_mode=\"approve\"'",
-  ]) assert(codexProfileSource.includes(required), `${required} is source-pinned in Codex profile`);
-  for (const forbidden of [
-    "'resume'",
-    "'review'",
-    "'--model'",
-    "'--profile'",
-    "'--image'",
-    "'--output-last-message'",
-    "'--output-schema'",
-    "'--add-dir'",
-    "'--search'",
-    "'--local-provider'",
-    "'--full-auto'",
-    "'--yolo'",
-    "'--dangerously-bypass-approvals-and-sandbox'",
-    "'--ask-for-approval'",
-  ]) assert(!codexProfileSource.includes(forbidden), `${forbidden} is absent from Codex profile`);
+  for (const retiredSource of [
+    'codex.ts',
+    'codex-detect.ts',
+    'codex-profile.ts',
+    'codex-stream.ts',
+    'opencode.ts',
+    'opencode-detect.ts',
+    'opencode-profile.ts',
+    'opencode-stream.ts',
+  ]) assert.equal(fs.existsSync(path.join(
+    repoRoot,
+    'mcp',
+    'src',
+    'agent-providers',
+    retiredSource,
+  )), false, `${retiredSource} is deleted from the active provider runtime`);
   for (const stripped of [
     'CODEX_API_KEY',
     'CODEX_ACCESS_TOKEN',
@@ -425,29 +291,12 @@ try {
     'CODEX_EXEC_SERVER_NOISE_REGISTRY_URL',
   ]) assert(environmentSource.includes(`'${stripped}'`), `${stripped} is in the strip roster`);
   assert(environmentSource.includes("CODEX_EXEC_SERVER_URL: 'none'"));
-  assert(codexProfileSource.includes("'search_capabilities'"));
-  assert(codexProfileSource.includes("'invoke_capability'"));
-  assert(codexProfileSource.includes("kind: 'masked_token' as const"));
-  assert(codexDetectorSource.includes('result.zeroize()'));
-  assert.deepEqual({
-    profileVersion: codexManifest.profileVersion,
-    provenance: codexManifest.provenance,
-    liveCapturePending: codexManifest.liveCapturePending,
-    recordedProvenanceStatus: codexManifest.recordedProvenanceStatus,
-    sanitized: codexManifest.sanitized,
-  }, {
-    profileVersion: '0.142.5',
-    provenance: 'schema-derived-contract',
-    liveCapturePending: true,
-    recordedProvenanceStatus: 'human_needed',
-    sanitized: true,
-  }, 'Codex fixture provenance remains schema-derived, sanitized, and live-capture pending');
   for (const exactBillingCopy of [
     'Included with your ChatGPT plan',
     'Billed to the API key stored by Codex; dollar amount not reported.',
   ]) {
-    assert.strictEqual(providersPanelSource.split(exactBillingCopy).length - 1, 1,
-      `Providers contains exact billing copy once: ${exactBillingCopy}`);
+    assert.strictEqual(providersPanelSource.split(exactBillingCopy).length - 1, 0,
+      `active Providers UI excludes retired Codex billing copy: ${exactBillingCopy}`);
     assert.strictEqual(delegationFeedSource.split(exactBillingCopy).length - 1, 1,
       `delegation feed contains exact billing copy once: ${exactBillingCopy}`);
   }

@@ -185,17 +185,15 @@ function makeOfflineBridge() {
 
 function makeAdapterRegistry(
   claudeDetect,
-  openCodeDetect = async () => makeOpenCodeDetection(),
-  codexDetect = async () => makeCodexDetection(),
+  grokDetect = async () => makeGrokDetection(),
 ) {
   const adapters = Object.freeze({
     'claude-code': Object.freeze({ detect: claudeDetect }),
-    opencode: Object.freeze({ detect: openCodeDetect }),
-    codex: Object.freeze({ detect: codexDetect }),
+    'grok-build': Object.freeze({ detect: grokDetect }),
   });
   return Object.freeze({
     ids() {
-      return Object.freeze(['claude-code', 'opencode', 'codex']);
+      return Object.freeze(['claude-code', 'grok-build']);
     },
     require(id) {
       if (!Object.hasOwn(adapters, id)) throw new Error('unknown adapter');
@@ -219,32 +217,17 @@ function makeDetection(overrides = {}) {
   };
 }
 
-function makeOpenCodeDetection(overrides = {}) {
+function makeGrokDetection(overrides = {}) {
   return {
     installed: true,
-    version: '1.14.25',
-    authState: 'unknown',
+    version: '1.0.4',
+    authState: 'oauth',
     binary: {
-      command: '/opt/opencode',
-      realPath: '/opt/opencode',
+      command: '/opt/grok',
+      realPath: '/opt/grok',
       argvPrefix: [],
     },
-    profileVersion: '1.14.25',
-    ...overrides,
-  };
-}
-
-function makeCodexDetection(overrides = {}) {
-  return {
-    installed: true,
-    version: '0.142.5',
-    authState: 'chatgpt',
-    binary: {
-      command: '/opt/codex',
-      realPath: '/opt/codex',
-      argvPrefix: [],
-    },
-    profileVersion: '0.142.5',
+    profileVersion: '1.0.4',
     ...overrides,
   };
 }
@@ -719,22 +702,11 @@ async function run() {
         bridgeFactory: makeOfflineBridge,
         adapterRegistry: makeAdapterRegistry(
           async () => makeDetection(),
-          async () => makeOpenCodeDetection({
-            authState: 'DOCTOR_OPENCODE_AUTH_SENTINEL',
-            billing: 'DOCTOR_OPENCODE_BILLING_SENTINEL',
-            model: 'DOCTOR_OPENCODE_MODEL_SENTINEL',
-            config: 'DOCTOR_OPENCODE_CONFIG_SENTINEL',
-            nativeBody: 'DOCTOR_OPENCODE_NATIVE_BODY_SENTINEL',
-            diagnostic: {
-              code: 'version_unsupported',
-              message: 'DOCTOR_OPENCODE_DIAGNOSTIC_SENTINEL',
-            },
-          }),
-          async () => makeCodexDetection({
-            billing: 'DOCTOR_CODEX_BILLING_SENTINEL',
-            model: 'DOCTOR_CODEX_MODEL_SENTINEL',
-            config: 'DOCTOR_CODEX_CONFIG_SENTINEL',
-            nativeBody: 'DOCTOR_CODEX_NATIVE_BODY_SENTINEL',
+          async () => makeGrokDetection({
+            billing: 'DOCTOR_GROK_BILLING_SENTINEL',
+            model: 'DOCTOR_GROK_MODEL_SENTINEL',
+            config: 'DOCTOR_GROK_CONFIG_SENTINEL',
+            nativeBody: 'DOCTOR_GROK_NATIVE_BODY_SENTINEL',
           }),
         ),
         readBridgeAuthState: () => ({
@@ -758,7 +730,7 @@ async function run() {
     offlineSnapshot.compatibilityMatrix === compatibility.ADAPTER_COMPATIBILITY_MATRIX,
     'doctor snapshot reuses the canonical compatibility matrix object',
   );
-  assertEqual(offlineSnapshot.adapterDiagnostics.length, 3, 'doctor emits the exact three-row registry/matrix roster');
+  assertEqual(offlineSnapshot.adapterDiagnostics.length, 2, 'doctor emits the exact two-row registry/matrix roster');
   const doctorRow = offlineSnapshot.adapterDiagnostics[0];
   assertDeepEqual(
     Object.keys(doctorRow).sort(),
@@ -791,30 +763,16 @@ async function run() {
   assertDeepEqual(
     offlineSnapshot.adapterDiagnostics[1],
     {
-      adapterId: 'opencode',
-      displayLabel: 'OpenCode',
-      binaryPath: '/opt/opencode',
-      detectedVersion: '1.14.25',
+      adapterId: 'grok-build',
+      displayLabel: 'Grok Build',
+      binaryPath: '/opt/grok',
+      detectedVersion: '1.0.4',
       compatibilityStatus: 'supported',
       compatibilityReason: 'within_tested_range',
-      authState: 'unknown',
-      profileVersion: '1.14.25',
+      authState: 'oauth',
+      profileVersion: '1.0.4',
     },
-    'OpenCode doctor row retains bounded local path/version facts but never infers auth',
-  );
-  assertDeepEqual(
-    offlineSnapshot.adapterDiagnostics[2],
-    {
-      adapterId: 'codex',
-      displayLabel: 'Codex',
-      binaryPath: '/opt/codex',
-      detectedVersion: '0.142.5',
-      compatibilityStatus: 'supported',
-      compatibilityReason: 'within_tested_range',
-      authState: 'chatgpt',
-      profileVersion: '0.142.5',
-    },
-    'Codex doctor row publishes only retained local facts and its safe auth enum',
+    'Grok Build doctor row publishes the exact reviewed profile and safe OAuth state',
   );
   assertDeepEqual(
     offlineSnapshot.bridgeAuthMetadata,
@@ -838,140 +796,44 @@ async function run() {
     sessionSentinel,
     envSentinel,
     'allowedExtensionOrigin',
-    'DOCTOR_OPENCODE_AUTH_SENTINEL',
-    'DOCTOR_OPENCODE_BILLING_SENTINEL',
-    'DOCTOR_OPENCODE_MODEL_SENTINEL',
-    'DOCTOR_OPENCODE_CONFIG_SENTINEL',
-    'DOCTOR_OPENCODE_NATIVE_BODY_SENTINEL',
-    'DOCTOR_OPENCODE_DIAGNOSTIC_SENTINEL',
-    'DOCTOR_CODEX_BILLING_SENTINEL',
-    'DOCTOR_CODEX_MODEL_SENTINEL',
-    'DOCTOR_CODEX_CONFIG_SENTINEL',
-    'DOCTOR_CODEX_NATIVE_BODY_SENTINEL',
+    'DOCTOR_GROK_BILLING_SENTINEL',
+    'DOCTOR_GROK_MODEL_SENTINEL',
+    'DOCTOR_GROK_CONFIG_SENTINEL',
+    'DOCTOR_GROK_NATIVE_BODY_SENTINEL',
   ]) {
     assert(!serializedOfflineSnapshot.includes(sentinel), `serialized offline doctor snapshot omits ${sentinel}`);
     assert(!formattedOfflineSnapshot.includes(sentinel), `formatted offline doctor snapshot omits ${sentinel}`);
   }
 
-  console.log('\n--- deterministic OpenCode doctor evidence ---');
-  const openCodeDoctorCases = [
-    ['exact profile', makeOpenCodeDetection(), {
-      binaryPath: '/opt/opencode',
-      detectedVersion: '1.14.25',
-      compatibilityStatus: 'supported',
-      compatibilityReason: 'within_tested_range',
-    }],
-    ['newer retained profile', makeOpenCodeDetection({
-      installed: false,
-      version: '1.14.26',
-      profileVersion: null,
-      diagnostic: { code: 'version_unsupported', message: 'NEWER_DIAGNOSTIC_SENTINEL' },
-    }), {
-      binaryPath: '/opt/opencode',
-      detectedVersion: '1.14.26',
-      compatibilityStatus: 'degraded',
-      compatibilityReason: 'newer_than_tested_range',
-    }],
-    ['missing binary', makeOpenCodeDetection({
-      installed: false,
-      version: null,
-      binary: null,
-      profileVersion: null,
-      diagnostic: { code: 'binary_missing', message: 'MISSING_DIAGNOSTIC_SENTINEL' },
-    }), {
-      binaryPath: null,
-      detectedVersion: null,
-      compatibilityStatus: 'unsupported',
-      compatibilityReason: 'binary_not_found',
-    }],
-    ['malformed version', makeOpenCodeDetection({
-      installed: false,
-      version: null,
-      profileVersion: null,
-      diagnostic: { code: 'version_unparseable', message: 'MALFORMED_DIAGNOSTIC_SENTINEL' },
-    }), {
-      binaryPath: '/opt/opencode',
-      detectedVersion: null,
-      compatibilityStatus: 'unsupported',
-      compatibilityReason: 'version_malformed',
-    }],
-    ['changed binary identity', makeOpenCodeDetection({
-      installed: false,
-      version: null,
-      binary: null,
-      profileVersion: null,
-      diagnostic: { code: 'binary_changed', message: 'CHANGED_DIAGNOSTIC_SENTINEL' },
-    }), {
-      binaryPath: null,
-      detectedVersion: null,
-      compatibilityStatus: 'unsupported',
-      compatibilityReason: 'binary_not_found',
-    }],
-  ];
-  for (const [label, detection, expected] of openCodeDoctorCases) {
-    const snapshot = await diagnostics.collectBridgeDiagnostics(
-      { waitForExtensionMs: 0 },
-      {
-        bridgeFactory: makeOfflineBridge,
-        adapterRegistry: makeAdapterRegistry(async () => makeDetection(), async () => detection),
-        readBridgeAuthState: () => null,
-        now: () => 10_000,
-      },
-    );
-    assertDeepEqual(
-      snapshot.adapterDiagnostics[1],
-      {
-        adapterId: 'opencode',
-        displayLabel: 'OpenCode',
-        ...expected,
-        authState: 'unknown',
-        profileVersion: '1.14.25',
-      },
-      `${label} maps to the canonical local-only OpenCode doctor row`,
-    );
-    const serialized = JSON.stringify(snapshot);
-    const formatted = indexModule.formatDoctor(snapshot);
-    for (const sentinel of [
-      'NEWER_DIAGNOSTIC_SENTINEL',
-      'MISSING_DIAGNOSTIC_SENTINEL',
-      'MALFORMED_DIAGNOSTIC_SENTINEL',
-      'CHANGED_DIAGNOSTIC_SENTINEL',
-    ]) {
-      assert(!serialized.includes(sentinel), `${label} JSON omits raw detector diagnostic text`);
-      assert(!formatted.includes(sentinel), `${label} text omits raw detector diagnostic text`);
-    }
-  }
-
-  console.log('\n--- deterministic Codex doctor evidence ---');
+  console.log('\n--- deterministic Grok Build doctor evidence ---');
   for (const [label, detection, expected] of [
-    ['supported ChatGPT', makeCodexDetection(), {
-      binaryPath: '/opt/codex',
-      detectedVersion: '0.142.5',
+    ['supported OAuth', makeGrokDetection(), {
+      binaryPath: '/opt/grok',
+      detectedVersion: '1.0.4',
       compatibilityStatus: 'supported',
       compatibilityReason: 'within_tested_range',
-      authState: 'chatgpt',
+      authState: 'oauth',
     }],
-    ['degraded stored API key', makeCodexDetection({
-      version: '0.144.6',
-      authState: 'api_key',
-      profileVersion: '0.142.5',
+    ['degraded OAuth', makeGrokDetection({
+      version: '1.0.5',
+      profileVersion: '1.0.4',
     }), {
-      binaryPath: '/opt/codex',
-      detectedVersion: '0.144.6',
+      binaryPath: '/opt/grok',
+      detectedVersion: '1.0.5',
       compatibilityStatus: 'degraded',
       compatibilityReason: 'newer_than_tested_range',
-      authState: 'api_key',
+      authState: 'oauth',
     }],
-    ['unauthenticated', makeCodexDetection({ authState: 'unauthenticated' }), {
-      binaryPath: '/opt/codex',
-      detectedVersion: '0.142.5',
+    ['unauthenticated', makeGrokDetection({ authState: 'unauthenticated' }), {
+      binaryPath: '/opt/grok',
+      detectedVersion: '1.0.4',
       compatibilityStatus: 'supported',
       compatibilityReason: 'within_tested_range',
       authState: 'unauthenticated',
     }],
-    ['unknown native state', makeCodexDetection({ authState: 'authenticated' }), {
-      binaryPath: '/opt/codex',
-      detectedVersion: '0.142.5',
+    ['unknown native state', makeGrokDetection({ authState: 'authenticated' }), {
+      binaryPath: '/opt/grok',
+      detectedVersion: '1.0.4',
       compatibilityStatus: 'supported',
       compatibilityReason: 'within_tested_range',
       authState: 'unknown',
@@ -983,19 +845,18 @@ async function run() {
         bridgeFactory: makeOfflineBridge,
         adapterRegistry: makeAdapterRegistry(
           async () => makeDetection(),
-          async () => makeOpenCodeDetection(),
           async () => detection,
         ),
         readBridgeAuthState: () => null,
         now: () => 10_000,
       },
     );
-    assertDeepEqual(snapshot.adapterDiagnostics[2], {
-      adapterId: 'codex',
-      displayLabel: 'Codex',
+    assertDeepEqual(snapshot.adapterDiagnostics[1], {
+      adapterId: 'grok-build',
+      displayLabel: 'Grok Build',
       ...expected,
-      profileVersion: '0.142.5',
-    }, `${label} maps to the canonical safe Codex doctor row`);
+      profileVersion: '1.0.4',
+    }, `${label} maps to the canonical safe Grok Build doctor row`);
   }
 
   console.log('\n--- malformed injected authorities fail closed ---');
@@ -1072,7 +933,7 @@ async function run() {
     enumerable: true,
     get() {
       rosterAccessorReads++;
-      return () => ['claude-code', 'opencode', 'codex'];
+      return () => ['claude-code', 'grok-build'];
     },
   });
   accessorRegistry.require = () => {
@@ -1080,15 +941,16 @@ async function run() {
     return Object.freeze({ detect: async () => makeDetection() });
   };
   const prototypeRegistry = Object.create({
-    ids: () => Object.freeze(['claude-code', 'opencode', 'codex']),
+    ids: () => Object.freeze(['claude-code', 'grok-build']),
     require: () => Object.freeze({ detect: async () => makeDetection() }),
   });
   const rosterCases = [
-    ['missing', ['claude-code', 'opencode']],
-    ['duplicate', ['claude-code', 'opencode', 'codex', 'codex']],
-    ['orphan', ['claude-code', 'opencode', 'codex', 'foreign']],
-    ['case variant', ['claude-code', 'OpenCode', 'codex']],
-    ['reordered', ['opencode', 'claude-code', 'codex']],
+    ['missing', ['claude-code']],
+    ['duplicate', ['claude-code', 'grok-build', 'grok-build']],
+    ['retired', ['claude-code', 'opencode', 'grok-build']],
+    ['orphan', ['claude-code', 'grok-build', 'foreign']],
+    ['case variant', ['claude-code', 'Grok-Build']],
+    ['reordered', ['grok-build', 'claude-code']],
   ].map(([label, ids]) => [label, Object.freeze({
     ids: () => Object.freeze([...ids]),
     require: () => {
@@ -1152,21 +1014,21 @@ async function run() {
     'prototype-bearing auth state fails closed without inherited reads',
   );
 
-  let openCodeAccessorReads = 0;
-  const openCodeAccessorDetection = {};
+  let grokAccessorReads = 0;
+  const grokAccessorDetection = {};
   for (const key of ['binary', 'version']) {
-    Object.defineProperty(openCodeAccessorDetection, key, {
+    Object.defineProperty(grokAccessorDetection, key, {
       enumerable: true,
       get() {
-        openCodeAccessorReads++;
-        return key === 'binary' ? makeOpenCodeDetection().binary : '1.14.25';
+        grokAccessorReads++;
+        return key === 'binary' ? makeGrokDetection().binary : '1.0.4';
       },
     });
   }
-  const openCodePrototypeDetection = Object.create(makeOpenCodeDetection());
+  const grokPrototypeDetection = Object.create(makeGrokDetection());
   for (const [label, unsafeDetection] of [
-    ['accessor', openCodeAccessorDetection],
-    ['prototype', openCodePrototypeDetection],
+    ['accessor', grokAccessorDetection],
+    ['prototype', grokPrototypeDetection],
   ]) {
     const snapshot = await diagnostics.collectBridgeDiagnostics(
       { waitForExtensionMs: 0 },
@@ -1184,9 +1046,9 @@ async function run() {
       ...closedRosterRows[1],
       compatibilityReason: 'binary_not_found',
     },
-      `${label} OpenCode detector evidence fails closed without inherited or computed reads`);
+      `${label} Grok Build detector evidence fails closed without inherited or computed reads`);
   }
-  assertEqual(openCodeAccessorReads, 0, 'doctor never invokes OpenCode detector accessors');
+  assertEqual(grokAccessorReads, 0, 'doctor never invokes Grok Build detector accessors');
 
   const futureAuthSnapshot = await diagnostics.collectBridgeDiagnostics(
     { waitForExtensionMs: 0 },

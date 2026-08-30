@@ -478,36 +478,6 @@ test('MAIN-world bridge re-pins location immediately before the page request', a
   }
 });
 
-test('MAIN-world bridge uses same-origin gviz after a page-session 401', async () => {
-  const previousGapi = globalThis.gapi;
-  const previousXhr = globalThis.XMLHttpRequest;
-  const restoreLocation = installPageLocation();
-  const urls = [];
-  globalThis.gapi = { client: { request: () => Promise.reject({ status: 401 }) } };
-  globalThis.XMLHttpRequest = function MockXhr() {
-    this.open = function (_method, url) { urls.push(url); };
-    this.send = function () {
-      this.status = 200;
-      this.responseText = '/*O_o*/\ngoogle.visualization.Query.setResponse({"status":"ok","table":{"cols":[{"id":"A","type":"string"}],"rows":[{"c":[{"v":"widgets"}]}]}})';
-      if (typeof this.onload === 'function') this.onload();
-    };
-  };
-  try {
-    const out = await sessionModule.pageClientOperation({
-      operation: 'getValues', spreadsheetId: ID, timeoutMs: 100, args: { range: 'A1' }
-    });
-    assert.equal(out.success, true);
-    assert.equal(out.transport, 'gviz');
-    assert.deepEqual(out.data.values, [['widgets']]);
-    assert.match(urls[0], /\/gviz\/tq/);
-    assert.equal(JSON.stringify(urls[0]).includes('attacker'), false);
-  } finally {
-    globalThis.gapi = previousGapi;
-    globalThis.XMLHttpRequest = previousXhr;
-    restoreLocation();
-  }
-});
-
 test('session source has no OAuth, Chrome Identity, credential storage, or arbitrary network primitive', () => {
   const source = fs.readFileSync(path.resolve(__dirname, '../extension/utils/google-sheets-session.js'), 'utf8');
   for (const forbidden of [
@@ -520,7 +490,12 @@ test('session source has no OAuth, Chrome Identity, credential storage, or arbit
     /sessionStorage/,
     /Authorization\s*:/,
     /\bBearer\b/,
-    /\bfetch\s*\(/
+    // Mirrors hasForbiddenSheetsNetworkPrimitive in
+    // scripts/verify-origin-classification.mjs: the session helper reaches the
+    // network only through the page's gapi client, never its own transport.
+    /\bfetch\s*\(/,
+    /\bXMLHttpRequest\b/,
+    /\bsendBeacon\b/
   ]) {
     assert.doesNotMatch(source, forbidden);
   }

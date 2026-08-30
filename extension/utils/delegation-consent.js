@@ -85,6 +85,19 @@
       && delegationProviders.isShippedId(providerId);
   }
 
+  function _isKnownRetiredProviderId(providerId) {
+    if (_isCanonicalProviderId(providerId) || !delegationProviders) return false;
+    try {
+      if (typeof delegationProviders.isKnownId === 'function') {
+        return delegationProviders.isKnownId(providerId);
+      }
+      return typeof delegationProviders.get === 'function'
+        && delegationProviders.get(providerId) !== null;
+    } catch (_error) {
+      return false;
+    }
+  }
+
   function _acceptedIdentity(value) {
     if (!delegationProviders
         || typeof delegationProviders.validateAcceptedAgentIdentity !== 'function') return null;
@@ -93,6 +106,11 @@
     } catch (_error) {
       return null;
     }
+  }
+
+  function _activeAcceptedIdentity(value) {
+    var identity = _acceptedIdentity(value);
+    return identity && _isCanonicalProviderId(identity.providerId) ? identity : null;
   }
 
   function _sameAcceptedIdentity(left, right) {
@@ -223,10 +241,14 @@
     }
     var providers = _emptyTrustProviders();
     Object.keys(raw.providers).forEach(function(providerId) {
-      if (!_isCanonicalProviderId(providerId) || raw.providers[providerId] !== true) {
+      if (raw.providers[providerId] !== true) {
         throw _storageError('trust_storage_corrupt');
       }
-      providers[providerId] = true;
+      if (_isCanonicalProviderId(providerId)) {
+        providers[providerId] = true;
+      } else if (!_isKnownRetiredProviderId(providerId)) {
+        throw _storageError('trust_storage_corrupt');
+      }
     });
     return { v: PAYLOAD_VERSION, providers: providers };
   }
@@ -295,7 +317,7 @@
     )) {
       return Promise.resolve(_resultError('invalid_challenge_request'));
     }
-    var acceptedIdentity = _acceptedIdentity(request.acceptedIdentity);
+    var acceptedIdentity = _activeAcceptedIdentity(request.acceptedIdentity);
     if (!acceptedIdentity
         || typeof request.taskDigest !== 'string'
         || !SHA256_DIGEST_PATTERN.test(request.taskDigest)) {
@@ -320,7 +342,12 @@
           if (!_validateChallengeRecord(record, key)) {
             throw _storageError('challenge_storage_corrupt');
           }
-          if (record.expiresAt <= now) delete envelope.challenges[key];
+          var storedIdentity = _acceptedIdentity(record.acceptedIdentity);
+          if (!storedIdentity
+              || !_isCanonicalProviderId(storedIdentity.providerId)
+              || record.expiresAt <= now) {
+            delete envelope.challenges[key];
+          }
         });
         envelope.challenges[challengeId] = {
           v: PAYLOAD_VERSION,
@@ -360,7 +387,7 @@
         || !SHA256_DIGEST_PATTERN.test(request.taskDigest)) {
       return Promise.resolve(_resultError('invalid_challenge_request'));
     }
-    var acceptedIdentity = _acceptedIdentity(request.acceptedIdentity);
+    var acceptedIdentity = _activeAcceptedIdentity(request.acceptedIdentity);
 
     return _withChallengeLock(async function() {
       try {
@@ -371,7 +398,13 @@
         var record = envelope.challenges[request.challengeId];
         var corruptSibling = Object.keys(envelope.challenges).some(function(key) {
           if (key === request.challengeId) return false;
-          return !_validateChallengeRecord(envelope.challenges[key], key);
+          var sibling = envelope.challenges[key];
+          if (!_validateChallengeRecord(sibling, key)) return true;
+          var siblingIdentity = _acceptedIdentity(sibling.acceptedIdentity);
+          if (!siblingIdentity || !_isCanonicalProviderId(siblingIdentity.providerId)) {
+            delete envelope.challenges[key];
+          }
+          return false;
         });
         if (corruptSibling) {
           envelope.challenges = _emptyChallenges();
@@ -389,6 +422,11 @@
           return _resultError('challenge_expired');
         }
         var storedIdentity = _acceptedIdentity(record.acceptedIdentity);
+        if (!storedIdentity || !_isCanonicalProviderId(storedIdentity.providerId)) {
+          delete envelope.challenges[request.challengeId];
+          await _writeEnvelope(envelope);
+          return _resultError('provider_status_refresh');
+        }
         if (!acceptedIdentity || !_sameAcceptedIdentity(storedIdentity, acceptedIdentity)) {
           delete envelope.challenges[request.challengeId];
           await _writeEnvelope(envelope);
@@ -434,7 +472,7 @@
         || request.trusted !== true) {
       return Promise.resolve(_resultError('invalid_trust_request'));
     }
-    var acceptedIdentity = _acceptedIdentity(request.acceptedIdentity);
+    var acceptedIdentity = _activeAcceptedIdentity(request.acceptedIdentity);
 
     return _withChallengeLock(async function() {
       try {
@@ -454,6 +492,11 @@
           return _resultError('challenge_expired');
         }
         var storedIdentity = _acceptedIdentity(record.acceptedIdentity);
+        if (!storedIdentity || !_isCanonicalProviderId(storedIdentity.providerId)) {
+          delete challengeEnvelope.challenges[request.challengeId];
+          await _writeEnvelope(challengeEnvelope);
+          return _resultError('provider_status_refresh');
+        }
         if (!acceptedIdentity || !_sameAcceptedIdentity(storedIdentity, acceptedIdentity)) {
           delete challengeEnvelope.challenges[request.challengeId];
           await _writeEnvelope(challengeEnvelope);

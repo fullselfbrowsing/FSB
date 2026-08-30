@@ -151,6 +151,44 @@ function requestContainsImageData(value, key = '', parent = null, seen = new Wea
   ));
 }
 
+/**
+ * Normalize an outbound chat-completions request for provider-specific API
+ * compatibility without mutating the caller's request object.
+ *
+ * OpenAI's current Chat Completions API uses max_completion_tokens. GPT-5 and
+ * o-series reasoning models also reject sampling parameters unless they are
+ * running in a compatible non-reasoning mode, which FSB does not force.
+ * Other providers keep their existing OpenAI-compatible request shape.
+ *
+ * @param {string} providerKey - Provider key such as openai, xai, or openrouter
+ * @param {string} modelName - Exact provider model ID
+ * @param {Object} requestBody - Provider-formatted request body
+ * @returns {Object} The normalized request body
+ */
+function normalizeProviderChatRequest(providerKey, modelName, requestBody) {
+  if (providerKey !== 'openai' || !requestBody || typeof requestBody !== 'object' || Array.isArray(requestBody)) {
+    return requestBody;
+  }
+
+  const normalized = { ...requestBody };
+  const hasModernLimit = Object.prototype.hasOwnProperty.call(normalized, 'max_completion_tokens');
+  if (!hasModernLimit && Object.prototype.hasOwnProperty.call(normalized, 'max_tokens')) {
+    normalized.max_completion_tokens = normalized.max_tokens;
+  }
+  delete normalized.max_tokens;
+
+  const model = String(modelName || '').trim().toLowerCase();
+  const isReasoningFamily = /^gpt-5(?:$|[.-])/.test(model) || /^o\d+(?:$|[.-])/.test(model);
+  if (isReasoningFamily) {
+    delete normalized.temperature;
+    delete normalized.top_p;
+    delete normalized.logprobs;
+    delete normalized.top_logprobs;
+  }
+
+  return normalized;
+}
+
 function calculateAdaptiveTimeout(requestBody, modelName = '', attempt = 0, providerKey = '') {
   const isLmStudio = providerKey === 'lmstudio';
   const isReasoning = /reasoning|grok-4(?!.*(?:fast|mini))/.test(modelName);
@@ -467,6 +505,8 @@ class UniversalProvider {
    * Enhanced with timeout and rate-limit handling
    */
   async sendRequest(requestBody, options = {}) {
+    requestBody = normalizeProviderChatRequest(this.provider, this.model, requestBody);
+
     // Use adaptive timeout based on request size and retry attempt if no explicit timeout provided
     const attempt = options.attempt || 0;
     const defaultTimeout = options.timeout || calculateAdaptiveTimeout(requestBody, this.model, attempt, this.provider);
@@ -779,6 +819,7 @@ if (typeof module !== 'undefined' && module.exports) {
     calculateAdaptiveTimeout,
     estimateRequestTextCharacters,
     requestContainsImageData,
+    normalizeProviderChatRequest,
     normalizeProviderBaseUrl,
     buildProviderModelsEndpoint,
     parseOpenAICompatibleModelList

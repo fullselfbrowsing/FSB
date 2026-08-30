@@ -41,36 +41,6 @@ function failingError(code) {
   return error;
 }
 
-function openCodeDetection(overrides = {}) {
-  return {
-    installed: true,
-    version: '1.14.25',
-    authState: 'unknown',
-    binary: {
-      command: '/private/OPENCODE_EXECUTABLE_SENTINEL',
-      realPath: '/private/OPENCODE_EXECUTABLE_SENTINEL',
-      argvPrefix: [],
-    },
-    profileVersion: '1.14.25',
-    ...overrides,
-  };
-}
-
-function codexDetection(overrides = {}) {
-  return {
-    installed: true,
-    version: '0.142.5',
-    authState: 'chatgpt',
-    binary: {
-      command: '/private/CODEX_EXECUTABLE_SENTINEL',
-      realPath: '/private/CODEX_EXECUTABLE_SENTINEL',
-      argvPrefix: [],
-    },
-    profileVersion: '0.142.5',
-    ...overrides,
-  };
-}
-
 function requiredInventoryPlatforms(extra = {}) {
   return {
     'claude-code': fakePlatform('Claude Code'),
@@ -114,20 +84,6 @@ async function main() {
         platform: 'linux',
         now: () => 1_783_858_833_000,
         execFile: successfulExec('Claude Code 2.1.177', execCalls),
-        detectOpenCode: async () => openCodeDetection({
-          authState: 'OPENCODE_AUTH_SENTINEL',
-          model: 'OPENCODE_MODEL_SENTINEL',
-          config: 'OPENCODE_CONFIG_SENTINEL',
-          nativeBody: 'OPENCODE_NATIVE_BODY_SENTINEL',
-          diagnostic: { code: 'ok', message: 'OPENCODE_DIAGNOSTIC_SENTINEL' },
-        }),
-        detectCodex: async () => codexDetection({
-          authState: 'CODEX_AUTH_SENTINEL',
-          model: 'CODEX_MODEL_SENTINEL',
-          config: 'CODEX_CONFIG_SENTINEL',
-          nativeBody: 'CODEX_NATIVE_BODY_SENTINEL',
-          diagnostic: { code: 'ok', message: 'CODEX_DIAGNOSTIC_SENTINEL' },
-        }),
         resolvePlatformTarget: (key) => {
           resolvedKeys.push(key);
           return {
@@ -165,29 +121,16 @@ async function main() {
       assert.deepEqual(inventory.opencode, {
         detected: true,
         checkedAt: 1_783_858_833_000,
-      }, 'OpenCode inventory reuses retained detector evidence but projects availability only');
+      }, 'OpenCode inventory uses its bounded version probe and projects availability only');
       assert.deepEqual(inventory.codex, {
         detected: true,
         checkedAt: 1_783_858_833_000,
-      }, 'Codex inventory reuses retained detector evidence but projects availability only');
+      }, 'Codex inventory uses its bounded version probe and projects availability only');
+      assert.deepEqual(execCalls.map((call) => call.file), ['claude', 'codex', 'opencode']);
       const serializedInventory = JSON.stringify(inventory);
       for (const forbidden of [
         '/fixture/cursor.json',
         '2.1.177',
-        '1.14.25',
-        'OPENCODE_EXECUTABLE_SENTINEL',
-        'OPENCODE_AUTH_SENTINEL',
-        'OPENCODE_MODEL_SENTINEL',
-        'OPENCODE_CONFIG_SENTINEL',
-        'OPENCODE_NATIVE_BODY_SENTINEL',
-        'OPENCODE_DIAGNOSTIC_SENTINEL',
-        '0.142.5',
-        'CODEX_EXECUTABLE_SENTINEL',
-        'CODEX_AUTH_SENTINEL',
-        'CODEX_MODEL_SENTINEL',
-        'CODEX_CONFIG_SENTINEL',
-        'CODEX_NATIVE_BODY_SENTINEL',
-        'CODEX_DIAGNOSTIC_SENTINEL',
       ]) {
         assert.equal(serializedInventory.includes(forbidden), false,
           `browser-bound inventory excludes ${forbidden}`);
@@ -205,8 +148,6 @@ async function main() {
         platform: 'win32',
         platforms: requiredInventoryPlatforms(),
         now: () => 200,
-        detectOpenCode: async () => openCodeDetection(),
-        detectCodex: async () => codexDetection(),
         execFile: (file, args, options, callback) => {
           calls.push({ file, args, options });
           const failure = failures.shift();
@@ -216,7 +157,9 @@ async function main() {
       });
 
       const inventory = await detectMcpClientInventory();
-      assert.deepEqual(calls.map((call) => call.file), ['claude.cmd', 'claude.exe', 'claude']);
+      assert.deepEqual(calls.map((call) => call.file), [
+        'claude.cmd', 'claude.exe', 'claude', 'opencode.cmd', 'codex.cmd',
+      ]);
       for (const call of calls) {
         assert.deepEqual(call.args, ['--version'], 'probe argv is fixed');
         assert.deepEqual(call.options, {
@@ -227,6 +170,8 @@ async function main() {
         assert.equal(Object.hasOwn(call.options, 'shell'), false, 'shell escalation is absent');
       }
       assert.deepEqual(inventory['claude-code'], { detected: true, checkedAt: 200 });
+      assert.deepEqual(inventory.codex, { detected: true, checkedAt: 200 });
+      assert.deepEqual(inventory.opencode, { detected: true, checkedAt: 200 });
     }
 
     {
@@ -234,12 +179,11 @@ async function main() {
       __configureClientInventoryForTests({
         platform: 'darwin',
         platforms: requiredInventoryPlatforms(),
-        detectOpenCode: async () => openCodeDetection(),
-        detectCodex: async () => codexDetection(),
         execFile: successfulExec('Claude development build', calls),
       });
       const inventory = await detectMcpClientInventory();
-      assert.deepEqual(calls.map((call) => call.file), ['claude'], 'POSIX probes only bare claude');
+      assert.deepEqual(calls.map((call) => call.file), ['claude', 'opencode', 'codex'],
+        'POSIX probes only the bare provider commands');
       assert.deepEqual(inventory['claude-code'], {
         detected: true,
         checkedAt: inventory['claude-code'].checkedAt,
@@ -251,8 +195,6 @@ async function main() {
         platform: 'linux',
         platforms: requiredInventoryPlatforms(),
         now: () => 400,
-        detectOpenCode: async () => openCodeDetection(),
-        detectCodex: async () => codexDetection(),
         execFile: (_file, _args, _options, callback) => {
           callback(failingError(code), '', '');
         },
@@ -269,8 +211,6 @@ async function main() {
       __configureClientInventoryForTests({
         platform: 'linux',
         platforms: requiredInventoryPlatforms(),
-        detectOpenCode: async () => openCodeDetection(),
-        detectCodex: async () => codexDetection(),
         execFile: (_file, _args, _options, callback) => {
           execCount += 1;
           callback(null, '1.2.3', '');
@@ -280,47 +220,32 @@ async function main() {
       const second = detectMcpClientInventory();
       assert.strictEqual(first, second, 'the process-lifetime inventory Promise is memoized');
       await Promise.all([first, second]);
-      assert.equal(execCount, 1, 'memoization performs one probe sweep');
+      assert.equal(execCount, 3, 'memoization performs one probe for each external CLI client');
     }
 
     {
-      let accessorRead = false;
-      const accessorDetection = {};
-      Object.defineProperty(accessorDetection, 'version', {
-        enumerable: true,
-        get() {
-          accessorRead = true;
-          return '1.14.25';
-        },
-      });
-      Object.defineProperty(accessorDetection, 'binary', {
-        enumerable: true,
-        get() {
-          accessorRead = true;
-          return openCodeDetection().binary;
-        },
-      });
-      const inheritedDetection = Object.create(openCodeDetection());
       const cases = [
-        ['exact profile', openCodeDetection(), true],
-        ['newer retained profile', openCodeDetection({ installed: false, version: '1.14.26' }), true],
-        ['missing binary', openCodeDetection({ installed: false, version: null, binary: null }), false],
-        ['malformed version', openCodeDetection({ installed: false, version: null }), false],
-        ['changed binary identity', openCodeDetection({ installed: false, binary: null }), false],
-        ['accessor evidence', accessorDetection, false],
-        ['prototype evidence', inheritedDetection, false],
+        ['version output', null, 'opencode 1.14.25', true],
+        ['unparseable output', null, 'development build', true],
+        ['empty successful output', null, '', true],
+        ['missing binary', failingError('ENOENT'), '', false],
+        ['non-zero exit', failingError('NON_ZERO_EXIT'), '', false],
       ];
 
-      for (const [label, detection, expectedDetected] of cases) {
+      for (const [label, openCodeError, openCodeOutput, expectedDetected] of cases) {
+        const probeCalls = [];
         __configureClientInventoryForTests({
           platform: 'linux',
           platforms: requiredInventoryPlatforms(),
           now: () => 450,
-          execFile: (_file, _args, _options, callback) => {
-            callback(failingError('ENOENT'), '', '');
+          execFile: (file, args, options, callback) => {
+            probeCalls.push({ file, args, options });
+            if (file === 'opencode') {
+              callback(openCodeError, openCodeOutput, 'IGNORED_STDERR_SENTINEL');
+            } else {
+              callback(failingError('ENOENT'), '', '');
+            }
           },
-          detectOpenCode: async () => detection,
-          detectCodex: async () => codexDetection(),
         });
         const inventory = await detectMcpClientInventory();
         assert.deepEqual(inventory.opencode, {
@@ -329,56 +254,59 @@ async function main() {
         }, `${label} projects deterministic OpenCode availability only`);
         assert.deepEqual(Object.keys(inventory.opencode), ['detected', 'checkedAt'],
           `${label} cannot expand the browser-bound inventory grammar`);
+        assert.deepEqual(probeCalls.map((call) => call.file), ['claude', 'opencode', 'codex']);
+        assert.deepEqual(probeCalls[1].args, ['--version']);
+        assert.deepEqual(probeCalls[1].options, {
+          timeout: 3000,
+          windowsHide: true,
+          maxBuffer: 65536,
+        });
+        assert.equal(JSON.stringify(inventory).includes('IGNORED_STDERR_SENTINEL'), false);
+        if (openCodeOutput.length > 0) {
+          assert.equal(JSON.stringify(inventory).includes(openCodeOutput), false);
+        }
       }
-      assert.equal(accessorRead, false, 'inventory rejects OpenCode accessors without invoking them');
     }
 
     {
-      let accessorRead = false;
-      const accessorDetection = {};
-      for (const key of ['version', 'binary']) {
-        Object.defineProperty(accessorDetection, key, {
-          enumerable: true,
-          get() {
-            accessorRead = true;
-            return key === 'version' ? '0.142.5' : codexDetection().binary;
-          },
-        });
-      }
       const cases = [
-        ['exact profile', codexDetection(), true],
-        ['newer retained profile', codexDetection({
-          installed: false,
-          version: '0.144.6',
-        }), true],
-        ['missing binary', codexDetection({
-          installed: false,
-          version: null,
-          binary: null,
-        }), false],
-        ['accessor evidence', accessorDetection, false],
-        ['prototype evidence', Object.create(codexDetection()), false],
+        ['version output', null, 'codex-cli 0.142.5', true],
+        ['unparseable output', null, 'development build', true],
+        ['empty successful output', null, '', true],
+        ['missing binary', failingError('ENOENT'), '', false],
+        ['non-zero exit', failingError('NON_ZERO_EXIT'), '', false],
       ];
-      for (const [label, detection, expectedDetected] of cases) {
+      for (const [label, codexError, codexOutput, expectedDetected] of cases) {
+        const probeCalls = [];
         __configureClientInventoryForTests({
           platform: 'linux',
           platforms: requiredInventoryPlatforms(),
           now: () => 475,
-          execFile: (_file, _args, _options, callback) => {
-            callback(failingError('ENOENT'), '', '');
+          execFile: (file, args, options, callback) => {
+            probeCalls.push({ file, args, options });
+            if (file === 'codex') callback(codexError, codexOutput, 'IGNORED_STDERR_SENTINEL');
+            else callback(failingError('ENOENT'), '', '');
           },
-          detectOpenCode: async () => openCodeDetection(),
-          detectCodex: async () => detection,
         });
         const inventory = await detectMcpClientInventory();
         assert.deepEqual(inventory.codex, {
           detected: expectedDetected,
           checkedAt: 475,
-        }, `${label} projects deterministic Codex availability only`);
+        }, `${label} projects version-agnostic Codex availability only`);
         assert.deepEqual(Object.keys(inventory.codex), ['detected', 'checkedAt'],
           `${label} cannot expand the browser-bound inventory grammar`);
+        assert.deepEqual(probeCalls.map((call) => call.file), ['claude', 'opencode', 'codex']);
+        assert.deepEqual(probeCalls[2].args, ['--version']);
+        assert.deepEqual(probeCalls[2].options, {
+          timeout: 3000,
+          windowsHide: true,
+          maxBuffer: 65536,
+        });
+        assert.equal(JSON.stringify(inventory).includes('IGNORED_STDERR_SENTINEL'), false);
+        if (codexOutput.length > 0) {
+          assert.equal(JSON.stringify(inventory).includes(codexOutput), false);
+        }
       }
-      assert.equal(accessorRead, false, 'inventory rejects Codex accessors without invoking them');
     }
 
     {
@@ -394,18 +322,6 @@ async function main() {
         execFile: (_file, _args, _options, callback) => {
           callback(failingError('ENOENT'), '', '');
         },
-        detectOpenCode: async () => openCodeDetection({
-          installed: false,
-          version: null,
-          binary: null,
-          profileVersion: null,
-        }),
-        detectCodex: async () => codexDetection({
-          installed: false,
-          version: null,
-          binary: null,
-          profileVersion: null,
-        }),
         resolvePlatformTarget: (key) => ({
           platformKey: key,
           platform: fakePlatform('Cursor'),
@@ -468,13 +384,11 @@ async function main() {
         },
         now: () => 700,
         execFile: successfulExec('Claude Code 2.1.177', []),
-        detectOpenCode: async () => openCodeDetection(),
-        detectCodex: async () => codexDetection(),
       });
       await assert.rejects(
         detectMcpClientInventory(),
         /inventory roster/i,
-        'missing OpenCode membership fails the browser-bound inventory closed',
+        'missing external-client roster membership fails the browser-bound inventory closed',
       );
     }
 
@@ -507,13 +421,15 @@ async function main() {
       'utf8',
     );
     assert.match(inventorySource, /execFile: TEST_ONLY_EXEC_FILE/);
-    assert.match(inventorySource, /detectOpenCode: TEST_ONLY_PROVIDER_DETECT/);
-    assert.match(inventorySource, /detectCodex: TEST_ONLY_PROVIDER_DETECT/);
-    assert.equal(
-      (fs.readFileSync(__filename, 'utf8').match(/detectCodex:\s*async/g) || []).length,
-      (fs.readFileSync(__filename, 'utf8').match(/__configureClientInventoryForTests\(\{/g) || []).length,
-      'every injected inventory case supplies a synthetic Codex detector',
-    );
+    assert.doesNotMatch(inventorySource, /opencode-detect|detectOpenCode:\s*TEST_ONLY_PROVIDER_DETECT/);
+    assert.match(inventorySource, /function codexVersionCandidates/);
+    assert.match(inventorySource, /function openCodeVersionCandidates/);
+    assert.match(inventorySource, /\['codex\.cmd', 'codex\.exe', 'codex'\]/);
+    assert.match(inventorySource, /\['opencode\.cmd', 'opencode\.exe', 'opencode'\]/);
+    assert.match(inventorySource, /\['--version'\]/);
+    assert.match(inventorySource, /timeout: 3000, windowsHide: true, maxBuffer: 65536/);
+    assert.doesNotMatch(inventorySource, /authState|credential|secret/i,
+      'external OpenCode availability never probes authentication or secrets');
 
     console.log('mcp-client-inventory.test.js: PASS');
   } finally {

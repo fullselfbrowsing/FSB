@@ -7,7 +7,7 @@ import {
 } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { request as nodeHttpRequest } from 'node:http';
-import { dirname, isAbsolute, join } from 'node:path';
+import { isAbsolute } from 'node:path';
 import { TextDecoder } from 'node:util';
 import { z } from 'zod';
 import type {
@@ -28,7 +28,8 @@ import type {
 } from './adapter.js';
 import {
   CLAUDE_CODE_ADAPTER_ID,
-  OPENCODE_SERVER_PASSWORD_ENV_KEY,
+  GROK_BUILD_ADAPTER_ID,
+  OWNED_SERVER_PASSWORD_ENV_KEY,
   OWNED_SERVER_BASIC_PASSWORD_SECRET_REF,
   freezeSpawnSpec,
 } from './adapter.js';
@@ -71,21 +72,36 @@ import type {
 } from './process-tree.js';
 import { createArgvSignature, TreeUnsettledError } from './process-tree.js';
 import { createProcessInspector, createProcessTreeTerminator } from './process-tree.js';
+import { logDelegationEvent, type DelegationLogRecord } from './delegation-log.js';
 import {
   verifyPolicyAttestation,
 } from './policy-attestation.js';
 import {
-  codexAuthorityUsesTaskConfig,
   classifyEffectiveAuthority,
   classifyPreSpawnIdentityProbe,
   validateDirectRuntimeReference,
 } from './effective-authority.js';
 import {
   buildSanitizedAgentEnvironment,
+  buildSanitizedGrokEnvironment,
   DELEGATION_AGENT_ENVIRONMENT_POLICY,
   DELEGATION_PROVIDER_KEY_NAMES as SOURCE_PINNED_PROVIDER_KEY_NAMES,
   type SanitizedAgentEnvironment,
 } from './spawn-environment.js';
+import {
+  createGrokBuildAcpController,
+  type GrokBuildAcpController,
+} from './grok-acp.js';
+import {
+  createGrokBuildAuthCoordinator,
+  type GrokBuildAuthCoordinator,
+  type GrokBuildTaskLease,
+} from './grok-auth.js';
+import {
+  createGrokBuildPrivateRuntime,
+  type GrokBuildPrivateRuntime,
+  type GrokBuildRunPaths,
+} from './grok-runtime.js';
 import type {
   ExtEvent,
   ExtRequest,
@@ -110,7 +126,7 @@ const PROCESS_STATUS_LIMIT_BYTES = 2 * 1024 * 1024;
 const OWNED_SERVER_SECRET_BYTES = 32;
 const OWNED_SERVER_HEALTH_LIMIT_BYTES = 16 * 1024;
 const OWNED_SERVER_HEALTH_PATH = '/global/health';
-const OWNED_SERVER_BASIC_USERNAME = 'opencode';
+const OWNED_SERVER_BASIC_USERNAME = 'fsb';
 const TASK_STDERR_FALLBACK_SENTINELS = Object.freeze([
   'agent "fsb" not found. Falling back to default agent',
   'agent "fsb" is a subagent, not a primary agent. Falling back to default agent',
@@ -309,6 +325,8 @@ export interface SpawnSupervisorDependencies {
   readonly startupRecovery: AgentStartupRecovery;
   readonly endpoint: string;
   readonly directRuntimeReference?: DirectRuntimeReference;
+  readonly grokBuildRuntime?: GrokBuildPrivateRuntime;
+  readonly grokBuildAuthCoordinator?: GrokBuildAuthCoordinator;
   readonly cwd?: string;
   readonly platform?: NodeJS.Platform;
   readonly environment?: NodeJS.ProcessEnv;
@@ -332,6 +350,7 @@ export interface SpawnSupervisorDependencies {
   readonly clearScheduled?: (timer: unknown) => void;
   readonly terminationGrace?: number;
   readonly activationAttempts?: number;
+  readonly logEvent?: (record: DelegationLogRecord) => void;
   readonly allowSpawnOnPlatform?: (platform: NodeJS.Platform) => boolean;
   readonly onDegraded?: (
     code: 'tree_unsettled' | 'runtime_cleanup_failed',
@@ -347,9 +366,10 @@ export interface ProductionSpawnSupervisorOptions {
   readonly terminationGrace?: number;
   readonly onDegraded?: SpawnSupervisorDependencies['onDegraded'];
   readonly runtimeRootPath?: string;
+  readonly grokBuildRuntime?: GrokBuildPrivateRuntime;
+  readonly grokBuildAuthCoordinator?: GrokBuildAuthCoordinator;
   readonly processSeams?: Readonly<{
-    openCodeDetect?: ProductionAdapterRegistryDependencies['openCodeDetect'];
-    codexDetect?: ProductionAdapterRegistryDependencies['codexDetect'];
+    grokBuildDetect?: ProductionAdapterRegistryDependencies['grokBuildDetect'];
     spawn?: AgentSpawnDependency;
     processProbe?: AgentProcessProbeDependency;
     inspector?: ProcessInspector;
@@ -411,6 +431,14 @@ interface DelegationRun {
   replayClosed: boolean;
   taskWriteStarted: boolean;
   ownedServerLease: OwnedServerLease | null;
+  grokRun: GrokBuildRunPaths | null;
+  grokTaskLease: GrokBuildTaskLease | null;
+  grokAcpController: GrokBuildAcpController | null;
+  grokSessionRecorded: boolean;
+  grokSessionCleaned: boolean;
+  detectionBinary: AdapterDetection['binary'];
+  settleMaskedCode: string | null;
+  settleReason: string | null;
 }
 
 type OwnedServerTopology = Extract<SpawnSpec['topology'], { readonly kind: 'owned_server' }>;
@@ -993,6 +1021,8 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
   private readonly mintRuntimeId: (role: Exclude<SpawnRuntimeRole, 'delegation'>) => string;
   private readonly generation: string;
   private readonly directRuntimeReference: DirectRuntimeReference | null;
+  private readonly grokBuildRuntime: GrokBuildPrivateRuntime | null;
+  private readonly grokBuildAuthCoordinator: GrokBuildAuthCoordinator | null;
   private readonly signalProcessGroup: NonNullable<SpawnSupervisorDependencies['signalProcessGroup']>;
   private readonly inspectProcessGroupStatus: ProcessGroupStatusInspector;
   private readonly schedule: NonNullable<SpawnSupervisorDependencies['schedule']>;
@@ -1005,6 +1035,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
   private readonly routeLosses = new Map<string, DelegationRouteLoss>();
   private readonly terminationGrace: number;
   private readonly activationAttempts: number;
+  private readonly logEvent: (record: DelegationLogRecord) => void;
   private readonly allowSpawnOnPlatform: (platform: NodeJS.Platform) => boolean;
   private accepting = true;
   private degraded = false;
@@ -1048,6 +1079,8 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       this.directRuntimeReference !== null
       && this.directRuntimeReference.endpoint !== dependencies.endpoint
     ) throw new TypeError('Direct runtime endpoint ownership is unavailable');
+    this.grokBuildRuntime = dependencies.grokBuildRuntime ?? null;
+    this.grokBuildAuthCoordinator = dependencies.grokBuildAuthCoordinator ?? null;
     this.signalProcessGroup = dependencies.signalProcessGroup
       ?? ((negativeProcessGroupId, signal) => process.kill(negativeProcessGroupId, signal));
     this.inspectProcessGroupStatus = dependencies.inspectProcessGroupStatus
@@ -1058,6 +1091,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       ?? ((timer) => clearTimeout(timer as ReturnType<typeof setTimeout>));
     this.terminationGrace = dependencies.terminationGrace ?? 2_000;
     this.activationAttempts = dependencies.activationAttempts ?? DEFAULT_ACTIVATION_ATTEMPTS;
+    this.logEvent = dependencies.logEvent ?? logDelegationEvent;
     this.allowSpawnOnPlatform = dependencies.allowSpawnOnPlatform
       ?? ((platform) => platform === 'linux' || platform === 'darwin');
     if (
@@ -1099,6 +1133,14 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
 
   async recover(): Promise<AgentStartupRecoveryResult> {
     const result = await this.dependencies.startupRecovery.recover();
+    if (result.spawnAvailable && this.grokBuildAuthCoordinator) {
+      // A stale Grok session journal must not take the whole delegation daemon
+      // down. The coordinator has already latched cleanupBlocked, which refuses
+      // later Grok runs at acquireTask() while every other adapter stays usable.
+      try {
+        await this.grokBuildAuthCoordinator.recover();
+      } catch { /* cleanupBlocked already gates Grok runs */ }
+    }
     this.restartLosses = sanitizeRestartLosses(result.restartLosses);
     if (this.allowSpawnOnPlatform(this.platform)) return result;
     return Object.freeze({
@@ -1194,6 +1236,14 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       replayClosed: false,
       taskWriteStarted: false,
       ownedServerLease: null,
+      grokRun: null,
+      grokTaskLease: null,
+      grokAcpController: null,
+      grokSessionRecorded: false,
+      grokSessionCleaned: false,
+      detectionBinary: null,
+      settleMaskedCode: null,
+      settleReason: null,
     };
     this.activeRuns.set(delegationId, run);
     run.executionPromise = this.executeRun(run);
@@ -1214,6 +1264,12 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       this.throwIfStopped(run);
       if (!this.allowSpawnOnPlatform(this.platform)) throw new Error('adapter_unavailable');
       run.state = 'spawning';
+      if (run.adapterId === GROK_BUILD_ADAPTER_ID) {
+        if (!this.grokBuildRuntime || !this.grokBuildAuthCoordinator) {
+          throw new Error('adapter_unavailable');
+        }
+        run.grokTaskLease = await this.grokBuildAuthCoordinator.acquireTask();
+      }
       const detection = await run.adapter.detect();
       validateDetection(detection);
       const detectedIdentity = acceptedIdentityFromDetection(run.adapterId, detection);
@@ -1223,29 +1279,27 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       run.acceptedIdentity = detectedIdentity;
       profileVersion = detection.profileVersion;
       run.profileVersion = profileVersion;
+      run.detectionBinary = detection.binary;
+      if (run.adapterId === GROK_BUILD_ADAPTER_ID) {
+        if (!this.grokBuildRuntime) throw new Error('adapter_unavailable');
+        run.grokRun = await this.grokBuildRuntime.prepareRun(run.delegationId);
+      }
       this.throwIfStopped(run);
 
       const runtimeFingerprint = this.uniqueFingerprint();
       const paths = this.dependencies.runtimeFiles.pathsFor(run.delegationId);
-      const runtimeScopes = Object.freeze([
-        this.runtimeScope('delegation', run.delegationId),
-        this.runtimeScope('provider_server', this.uniqueRuntimeId('provider_server')),
-        this.runtimeScope('policy_preflight', this.uniqueRuntimeId('policy_preflight')),
-      ]);
-      if (new Set(runtimeScopes.map((scope) => scope.runtimeId)).size !== runtimeScopes.length) {
-        throw new Error('Unable to mint private runtime identity');
-      }
+      const runtimeScopes: readonly SpawnRuntimeScope[] = Object.freeze([]);
       run.runtimeOwned = true;
+      const spawnCwd = run.grokRun?.cwd ?? this.cwd;
       const declaredSpec = await run.adapter.buildSpawn({ text: run.task }, {
         purpose: 'delegation',
         adapterId: run.adapterId,
         detection,
         delegationId: run.delegationId,
         runtimeFingerprint,
-        cwd: this.cwd,
+        cwd: spawnCwd,
         privateMcpConfigPath: paths.mcpConfigPath,
         runtimeFiles: [paths.mcpConfigPath],
-        runtimeScopes,
         ...(this.directRuntimeReference
           ? {
               directRuntimeReference: validateDirectRuntimeReference(
@@ -1262,10 +1316,28 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       let process: ProcessSpec;
       let argv: readonly string[];
       if (spec.topology.kind === 'direct') {
-        process = this.requireDirectProcess(spec);
+        process = this.requireDirectProcess(spec, run.adapterId);
         const directArgv = directProcessArguments(process);
         if (!directArgv) throw new Error('adapter_unavailable');
         argv = directArgv;
+        if (run.adapterId === GROK_BUILD_ADAPTER_ID) {
+          await this.executePolicyAttestations(
+            run,
+            spec.attestations,
+            'process_json',
+            null,
+            spec.privateRuntimes,
+          );
+          if (!this.grokBuildRuntime) throw new Error('adapter_unavailable');
+          await this.grokBuildRuntime.attestBase();
+          const reattestedRun = await this.grokBuildRuntime.prepareRun(run.delegationId);
+          if (
+            !run.grokRun
+            || reattestedRun.runDirectory !== run.grokRun.runDirectory
+            || reattestedRun.cwd !== run.grokRun.cwd
+          ) throw new Error('adapter_unavailable');
+          run.grokRun = reattestedRun;
+        }
       } else {
         await this.executePolicyAttestations(
           run,
@@ -1289,7 +1361,11 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       }
       this.throwIfStopped(run);
       const argvSignature = createArgvSignature(process.command, argv);
-      const environment = this.createEnvironment(process.fixedEnv, argvSignature);
+      const environment = this.createEnvironment(
+        process.fixedEnv,
+        argvSignature,
+        run.adapterId,
+      );
       const directAuthorityBound = await this.executePreSpawnAuthorityBarrier(
         run,
         spec,
@@ -1297,10 +1373,11 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
         environment,
       );
       this.throwIfStopped(run);
+      environment.FSB_AGENT_FINGERPRINT = runtimeFingerprint;
       const createdAt = this.wallNow();
       const delegationRuntime = this.privateRuntime(spec, 'delegation');
       const prepared = process.role === 'direct_task'
-        ? directAuthorityBound
+        ? directAuthorityBound || process.stdin === 'acp_jsonrpc'
           ? await this.dependencies.runtimeFiles.prepareRun({
               role: 'direct',
               delegationId: run.delegationId,
@@ -1367,11 +1444,17 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       });
       run.supervisedChild = supervisedChild;
       this.entriesByPid.set(supervisedChild.pid, prepared.entry);
-      run.streams = {
-        parser: this.consumeEvents(run, child.stdout),
-        stderr: this.drainStderr(child.stderr, true),
-        closed: observed.closed,
-      };
+      run.streams = process.stdin === 'acp_jsonrpc'
+        ? {
+            parser: Promise.resolve(),
+            stderr: this.consumeGrokStderr(run, child.stderr),
+            closed: observed.closed,
+          }
+        : {
+            parser: this.consumeEvents(run, child.stdout),
+            stderr: this.drainStderr(child.stderr, true),
+            closed: observed.closed,
+          };
       await observed.ready;
       this.throwIfStopped(run);
       const identity = await this.resolveActivation(prepared.entry, supervisedChild.pid);
@@ -1397,25 +1480,40 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       if (run.parserError) throw run.parserError;
       run.state = 'running';
       run.resolveSetup();
-      await this.writeTask(run, process, child);
-      await Promise.all([run.streams.parser, run.streams.stderr, run.streams.closed]);
-      if (run.stopRequested) {
-        run.resultEvent = null;
-        return;
-      }
-      if (run.parserError) throw run.parserError;
-      const resultEvent = this.takeResultEvent(run);
-      const exit = await run.streams.closed;
-      if (resultEvent.payload.is_error === true) {
+      let resultEvent: AgentEvent;
+      if (process.stdin === 'acp_jsonrpc') {
+        resultEvent = await this.runGrokAcp(run, child);
+        if (run.parserError) throw run.parserError;
+        if (run.stopRequested) return;
+        run.resultEvent = resultEvent;
+        this.validateGrokResult(run, resultEvent);
         await this.terminateAndCleanup(run);
         if (run.stopRequested) return;
+        await Promise.all([run.streams.stderr, run.streams.closed]);
+        if (run.parserError) throw run.parserError;
+        validateNormalizedEvent(resultEvent);
+      } else {
+        await this.writeTask(run, process, child);
+        await Promise.all([run.streams.parser, run.streams.stderr, run.streams.closed]);
+        if (run.stopRequested) {
+          run.resultEvent = null;
+          return;
+        }
+        if (run.parserError) throw run.parserError;
+        resultEvent = this.takeResultEvent(run);
+        const exit = await run.streams.closed;
+        if (resultEvent.payload.is_error !== true
+            && (exit.code !== 0 || exit.signal !== null)) {
+          throw new Error('process_exit');
+        }
+        await this.terminateAndCleanup(run);
+        if (run.stopRequested) return;
+        validateNormalizedEvent(resultEvent);
+      }
+      if (resultEvent.payload.is_error === true) {
         this.settleOnce(run, 'failed', eventTerminal(resultEvent));
         return;
       }
-      if (exit.code !== 0 || exit.signal !== null) throw new Error('process_exit');
-      await this.terminateAndCleanup(run);
-      if (run.stopRequested) return;
-      validateNormalizedEvent(resultEvent);
       this.emitNormalizedEvent(run, resultEvent);
       this.settleOnce(run, 'succeeded', eventTerminal(resultEvent));
     } catch (error) {
@@ -1424,17 +1522,34 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       if (run.stopRequested) return;
       const driftDetail = driftTerminalDetail(error, run.adapterId);
       let code = this.failureCode(error);
+      // A cleanup failure outranks the run's own failure because an unkillable
+      // process tree is the more serious fact, but it must not erase why the run
+      // failed in the first place.
+      let maskedCode: string | null = null;
+      let cleanupCode: 'tree_unsettled' | 'runtime_cleanup_failed' | null = null;
       try {
         await this.terminateAndCleanup(run);
         if (run.stopRequested) return;
       } catch (cleanupError) {
-        code = errorCode(cleanupError) === 'tree_unsettled'
+        cleanupCode = errorCode(cleanupError) === 'tree_unsettled'
           ? 'tree_unsettled'
           : 'runtime_cleanup_failed';
+        // A run that already knows why it failed keeps that answer; the cleanup
+        // failure is recorded beside it and still latches the daemon. Replacing
+        // the code here is what left the extension with an unexplained hang.
+        if (code === 'spawn_failed' || code === 'adapter_unavailable') {
+          maskedCode = code;
+          code = cleanupCode;
+        } else {
+          maskedCode = cleanupCode;
+        }
       }
-      if (code === 'tree_unsettled' || code === 'runtime_cleanup_failed') {
-        this.markDegraded(code);
-      }
+      if (cleanupCode) this.markDegraded(cleanupCode);
+      if (maskedCode && maskedCode !== code) run.settleMaskedCode = maskedCode;
+      if (
+        error instanceof AgentProtocolDriftError
+        && isBoundedDriftLabel((error as { reason?: unknown }).reason)
+      ) run.settleReason = String((error as { reason?: unknown }).reason);
       this.settleOnce(
         run,
         'failed',
@@ -1450,7 +1565,18 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       } catch {
         this.markDegraded('runtime_cleanup_failed');
       } finally {
-        run.resolveSetup();
+        try {
+          if (run.grokRun && this.grokBuildRuntime) {
+            await this.grokBuildRuntime.removeRun(run.delegationId);
+            run.grokRun = null;
+          }
+        } catch {
+          this.markDegraded('runtime_cleanup_failed');
+        } finally {
+          run.grokTaskLease?.release();
+          run.grokTaskLease = null;
+          run.resolveSetup();
+        }
       }
     }
   }
@@ -1493,20 +1619,6 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
     throw new Error('Unable to mint private runtime identity');
   }
 
-  private runtimeScope(role: SpawnRuntimeRole, runtimeId: string): SpawnRuntimeScope {
-    const paths = this.dependencies.runtimeFiles.pathsFor(runtimeId);
-    return Object.freeze({
-      role,
-      runtimeId,
-      privateMcpConfigPath: paths.mcpConfigPath,
-      runtimeFiles: Object.freeze([
-        paths.opencodeConfigPath,
-        paths.opencodeTestHomePath,
-        paths.opencodeManagedConfigPath,
-      ]),
-    });
-  }
-
   private privateRuntime(
     spec: SpawnSpec,
     role: SpawnRuntimeRole,
@@ -1514,16 +1626,22 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
     return spec.privateRuntimes?.find((runtime) => runtime.role === role) ?? null;
   }
 
-  private requireDirectProcess(spec: SpawnSpec): ProcessSpec {
+  private requireDirectProcess(spec: SpawnSpec, adapterId: AgentProviderId): ProcessSpec {
+    const task = spec.topology.kind === 'direct' ? spec.topology.task : null;
+    const legacyTransport = task?.stdin === 'task'
+      && task.stdout === 'agent_jsonl'
+      && spec.attestations.length === 0;
+    const grokTransport = adapterId === GROK_BUILD_ADAPTER_ID
+      && task?.stdin === 'acp_jsonrpc'
+      && task.stdout === 'acp_jsonrpc'
+      && spec.attestations.length === 3;
     if (
       !spec
       || typeof spec !== 'object'
       || spec.topology.kind !== 'direct'
       || spec.topology.task.role !== 'direct_task'
-      || spec.topology.task.stdin !== 'task'
-      || spec.topology.task.stdout !== 'agent_jsonl'
       || !hasNoSecretBindings(spec.topology.task.spawnSecretEnvBindings)
-      || spec.attestations.length !== 0
+      || (!legacyTransport && !grokTransport)
     ) throw new Error('adapter_unavailable');
     return spec.topology.task;
   }
@@ -1576,6 +1694,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
         })
       ) throw new Error('adapter_unavailable');
     }
+    const expectedCwd = run.grokRun?.cwd ?? this.cwd;
     if (
       spec.adapterId !== run.adapterId
       || spec.profileVersion !== detection.profileVersion
@@ -1584,7 +1703,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
         || process.cwd !== (
           descriptorBoundDirect && process === directTask
             ? directScratchDirectory
-            : this.cwd
+            : expectedCwd
         )
         || !isPlainRecord(process.fixedEnv)
         || Object.keys(process.fixedEnv).some((key) => PROVIDER_KEY_NAMES.includes(
@@ -1618,7 +1737,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       || topology.attachTask.stdin !== 'task'
       || topology.attachTask.stdout !== 'agent_jsonl'
       || serverBinding.length !== 1
-      || serverBinding[0].envKey !== OPENCODE_SERVER_PASSWORD_ENV_KEY
+      || serverBinding[0].envKey !== OWNED_SERVER_PASSWORD_ENV_KEY
       || serverBinding[0].secretRef !== OWNED_SERVER_BASIC_PASSWORD_SECRET_REF
       || attachBinding.length !== 1
       || attachBinding[0].envKey !== serverBinding[0].envKey
@@ -1859,7 +1978,11 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
 
     const argvSignature = createArgvSignature(process.command, argv);
     const runtimeFingerprint = this.uniqueFingerprint();
-    const environment = this.createEnvironment(process.fixedEnv, argvSignature);
+    const environment = this.createEnvironment(
+      process.fixedEnv,
+      argvSignature,
+      run.adapterId,
+    );
     environment.FSB_AGENT_FINGERPRINT = runtimeFingerprint;
     const options: SpawnInvocationOptions = Object.freeze({
       shell: false,
@@ -1899,7 +2022,16 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       if (!Number.isSafeInteger(child.pid) || (child.pid ?? 0) < 1) {
         throw new PolicyAttestationFailure();
       }
-      const observed = observeChild(child);
+      const probe = child;
+      const observed = observeChild(probe);
+      // Exit is observable twice: 'exit' lands as soon as the process is reaped,
+      // 'close' only once its stdio has drained. Either proves there is nothing
+      // left to bind.
+      let probeClosed = false;
+      void observed.closed.then(() => { probeClosed = true; });
+      const probeHasExited = (): boolean => probeClosed
+        || probe.exitCode !== null
+        || probe.signalCode !== null;
       supervisedChild = Object.freeze({
         pid: child.pid!,
         processGroupId: child.pid!,
@@ -1918,16 +2050,22 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
         child.stdin.off('error', ignoreStdinError);
         throw new PolicyAttestationFailure();
       }
-      const identity = await this.resolveActivation(entry as PreparedJournalEntry, supervisedChild.pid);
-      entry = await this.dependencies.runtimeFiles.activateRun({
-        role: 'policy_preflight',
-        delegationId: runtimeId,
-        pid: supervisedChild.pid,
-        processGroupId: identity.process.processGroupId,
-        startedAt: Math.max(createdAt, this.wallNow()),
-        processStartIdentity: identity.process.processStartIdentity,
-      });
-      this.entriesByPid.set(supervisedChild.pid, entry);
+      const identity = await this.resolveActivationOrExit(
+        entry as PreparedJournalEntry,
+        supervisedChild.pid,
+        probeHasExited,
+      );
+      if (identity) {
+        entry = await this.dependencies.runtimeFiles.activateRun({
+          role: 'policy_preflight',
+          delegationId: runtimeId,
+          pid: supervisedChild.pid,
+          processGroupId: identity.process.processGroupId,
+          startedAt: Math.max(createdAt, this.wallNow()),
+          processStartIdentity: identity.process.processStartIdentity,
+        });
+        this.entriesByPid.set(supervisedChild.pid, entry);
+      }
       const [boundedBody, discardedStderr, exit] = await this.withDeadline(
         Promise.all([stdout, stderr, observed.closed]),
         descriptor.timeoutMs,
@@ -2121,26 +2259,6 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
     }
   }
 
-  private parseJsonLines(bytes: Buffer): readonly unknown[] {
-    let text: string | null = null;
-    try {
-      text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
-      if (!text.endsWith('\n')) throw new PolicyAttestationFailure();
-      const lines = text.split('\n');
-      lines.pop();
-      if (lines.length < 2 || lines.length > 8 || lines.some((line) => line.length === 0)) {
-        throw new PolicyAttestationFailure();
-      }
-      return Object.freeze(lines.map((line) => JSON.parse(line) as unknown));
-    } catch (error) {
-      if (error instanceof PolicyAttestationFailure) throw error;
-      throw new PolicyAttestationFailure();
-    } finally {
-      bytes.fill(0);
-      text = null;
-    }
-  }
-
   private withDeadline<T>(operation: Promise<T>, timeoutMs: number): Promise<T> {
     let timer: unknown = null;
     const timeout = new Promise<never>((_resolve, reject) => {
@@ -2161,7 +2279,14 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
   private createEnvironment(
     fixedEnv: Readonly<Record<string, string>>,
     argvSignature: string,
+    adapterId?: AgentProviderId,
   ): SanitizedAgentEnvironment {
+    if (adapterId === GROK_BUILD_ADAPTER_ID) {
+      return buildSanitizedGrokEnvironment(this.environment, Object.freeze({
+        ...fixedEnv,
+        FSB_AGENT_ARGV_SIGNATURE: argvSignature,
+      }));
+    }
     return buildSanitizedAgentEnvironment(
       this.environment,
       fixedEnv,
@@ -2196,15 +2321,6 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       this.directRuntimeReference,
       this.generation,
     );
-    const codexAuthority = authorityDescriptor.classifier
-      === 'codex_effective_authority_json';
-    if (
-      codexAuthority && !codexAuthorityUsesTaskConfig(
-        authorityDescriptor.argv,
-        process.argv,
-      )
-    ) throw new PolicyAttestationFailure();
-
     let identityResult: BoundedProcessProbeResult | null = null;
     try {
       identityResult = await this.processProbe(Object.freeze({
@@ -2247,20 +2363,11 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       authorityResult = await this.processProbe(Object.freeze({
         command: process.command,
         argv: authorityDescriptor.argv,
-        cwd: codexAuthority ? process.cwd : this.cwd,
+        cwd: this.cwd,
         environment,
         timeoutMs: authorityDescriptor.timeoutMs,
         stdoutLimitBytes: authorityDescriptor.stdoutLimitBytes,
         stderrLimitBytes: authorityDescriptor.stderrLimitBytes,
-        ...(authorityDescriptor.stdinBytes
-          ? { stdinBytes: authorityDescriptor.stdinBytes }
-          : {}),
-        ...(authorityDescriptor.stdinCloseAfterStdoutLinePrefixBytes
-          ? {
-              stdinCloseAfterStdoutLinePrefixBytes:
-                authorityDescriptor.stdinCloseAfterStdoutLinePrefixBytes,
-            }
-          : {}),
         ...(run.routeSignal ? { signal: run.routeSignal } : {}),
       }));
       if (
@@ -2268,9 +2375,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
         || authorityResult.exit.signal !== null
         || authorityResult.stderr.length !== 0
       ) throw new PolicyAttestationFailure();
-      document = codexAuthority
-        ? this.parseJsonLines(authorityResult.stdout)
-        : this.parseJsonDocument(authorityResult.stdout);
+      document = this.parseJsonDocument(authorityResult.stdout);
       const classification = classifyEffectiveAuthority(
         document,
         authorityDescriptor,
@@ -2316,6 +2421,42 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
     throw new Error('activation_failed');
   }
 
+  /**
+   * Bounded JSON probes finish in a few milliseconds, often before the process
+   * inspector's first sample lands, so there is nothing left to bind. A process
+   * that has already exited cannot be orphaned, so that one case resolves to
+   * null and the caller leaves its journal entry prepared. A live process that
+   * never confirms, and any identity mismatch, still fail closed.
+   */
+  private async resolveActivationOrExit(
+    entry: PreparedJournalEntry,
+    expectedPid: number,
+    hasExited: () => boolean,
+  ): Promise<Extract<ProcessInspection, { classification: 'confirmed' }> | null> {
+    const started = this.monotonicNow();
+    for (let attempt = 0; attempt < this.activationAttempts; attempt += 1) {
+      const inspection = await this.dependencies.inspector.inspect(entry);
+      if (inspection.classification === 'confirmed') {
+        if (
+          inspection.process.pid !== expectedPid
+          || (this.platform !== 'win32' && inspection.process.processGroupId !== expectedPid)
+        ) throw new Error('activation_failed');
+        return inspection;
+      }
+      if (
+        inspection.classification === 'ambiguous'
+        && (inspection.reason === 'identity_mismatch' || inspection.reason === 'multiple_matches')
+      ) throw new Error('activation_failed');
+      if (hasExited()) return null;
+      if (attempt + 1 < this.activationAttempts) {
+        await this.wait(DEFAULT_ACTIVATION_POLL_MS);
+        if (this.monotonicNow() < started) throw new Error('activation_failed');
+      }
+    }
+    if (hasExited()) return null;
+    throw new Error('activation_failed');
+  }
+
   private consumeEvents(run: DelegationRun, stream: NodeJS.ReadableStream): Promise<void> {
     return (async () => {
       try {
@@ -2343,6 +2484,66 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
         }
       }
     })();
+  }
+
+  private acceptGrokEvent(run: DelegationRun, event: AgentEvent): void {
+    const serialized = validateNormalizedEvent(event);
+    const sensitive = [
+      run.task,
+      ...PROVIDER_KEY_NAMES.map((name) => this.environment[name] ?? ''),
+    ];
+    if (containsSensitiveValue(serialized, sensitive) || event.type === 'result') {
+      throw new Error('agent_protocol_drift');
+    }
+    this.publishOrBuffer(run, event, serialized);
+  }
+
+  private async runGrokAcp(
+    run: DelegationRun,
+    child: ChildProcessWithoutNullStreams,
+  ): Promise<AgentEvent> {
+    if (
+      run.adapterId !== GROK_BUILD_ADAPTER_ID
+      || !run.grokRun
+      || !run.detectionBinary
+      || !this.grokBuildAuthCoordinator
+    ) throw new Error('adapter_unavailable');
+    const binary = run.detectionBinary;
+    const controller = createGrokBuildAcpController({
+      stdin: child.stdin,
+      stdout: child.stdout,
+      task: run.task,
+      cwd: run.grokRun.cwd,
+      endpoint: this.dependencies.endpoint,
+      onEvent: (event) => this.acceptGrokEvent(run, event),
+      recordSession: async (sessionId) => {
+        await this.grokBuildAuthCoordinator!.recordSession(run.delegationId, sessionId);
+        run.grokSessionRecorded = true;
+      },
+      deleteSession: async (sessionId) => {
+        await this.grokBuildAuthCoordinator!.deleteSession({
+          binary,
+          delegationId: run.delegationId,
+          sessionId,
+          cwd: run.grokRun!.cwd,
+          journaled: true,
+        });
+        run.grokSessionCleaned = true;
+      },
+    });
+    run.grokAcpController = controller;
+    return controller.run();
+  }
+
+  private validateGrokResult(run: DelegationRun, event: AgentEvent): void {
+    const serialized = validateNormalizedEvent(event);
+    const sensitive = [
+      run.task,
+      ...PROVIDER_KEY_NAMES.map((name) => this.environment[name] ?? ''),
+    ];
+    if (event.type !== 'result' || containsSensitiveValue(serialized, sensitive)) {
+      throw new Error('agent_protocol_drift');
+    }
   }
 
   private async drainStderr(
@@ -2386,6 +2587,40 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
     }
   }
 
+  private consumeGrokStderr(
+    run: DelegationRun,
+    stream: NodeJS.ReadableStream,
+  ): Promise<void> {
+    return (async () => {
+      let totalBytes = 0;
+      try {
+        for await (const chunk of stream as AsyncIterable<Buffer | string>) {
+          const value = Buffer.isBuffer(chunk) ? Buffer.from(chunk) : Buffer.from(chunk, 'utf8');
+          try {
+            totalBytes += value.length;
+            if (totalBytes > STDERR_LIMIT_BYTES) {
+              throw new AgentProtocolDriftError(
+                'stream_too_large',
+                1,
+                Object.freeze([]),
+                GROK_BUILD_ADAPTER_ID,
+              );
+            }
+          } finally {
+            value.fill(0);
+          }
+        }
+      } catch (error) {
+        run.parserError = error instanceof AgentProtocolDriftError
+          ? error
+          : new Error('agent_protocol_drift');
+        if (run.authorityGranted && run.child && run.entry && !run.terminationPromise) {
+          void this.terminateAndCleanup(run).catch(() => undefined);
+        }
+      }
+    })();
+  }
+
   private publishOrBuffer(run: DelegationRun, event: AgentEvent, serialized: string): void {
     if (run.authorityGranted) {
       this.emitNormalizedEvent(run, event);
@@ -2406,6 +2641,12 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       || acceptedIdentity.providerId !== entry.adapterId
       || acceptedIdentity.profileVersion !== entry.profileVersion
     ) throw new Error('adapter_unavailable');
+    this.logEvent({
+      event: 'run_started',
+      delegationId: run.delegationId,
+      adapterId: run.adapterId,
+      profileVersion: run.profileVersion,
+    });
     try {
       run.emit({
         id: run.requestId,
@@ -2559,7 +2800,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
     if (
       process.spawnSecretEnvBindings.length !== 1
       || !binding
-      || binding.envKey !== OPENCODE_SERVER_PASSWORD_ENV_KEY
+      || binding.envKey !== OWNED_SERVER_PASSWORD_ENV_KEY
       || binding.secretRef !== OWNED_SERVER_BASIC_PASSWORD_SECRET_REF
     ) throw new Error('adapter_unavailable');
     const secret = this.ownedServerSecrets.get(binding.secretRef);
@@ -3061,6 +3302,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
           await this.dependencies.runtimeFiles.removeRun(run.delegationId);
           run.runtimeOwned = false;
         }
+        await this.cleanupGrokSession(run);
         return;
       }
       if (run.supervisedChild) {
@@ -3089,8 +3331,29 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       run.runtimeOwned = false;
       if (run.supervisedChild) this.entriesByPid.delete(run.supervisedChild.pid);
       run.entry = null;
+      await this.cleanupGrokSession(run);
     })();
     return run.terminationPromise;
+  }
+
+  private async cleanupGrokSession(run: DelegationRun): Promise<void> {
+    const sessionId = run.grokAcpController?.sessionId() ?? null;
+    if (
+      run.adapterId !== GROK_BUILD_ADAPTER_ID
+      || run.grokSessionCleaned
+      || !sessionId
+      || !run.detectionBinary
+      || !run.grokRun
+      || !this.grokBuildAuthCoordinator
+    ) return;
+    await this.grokBuildAuthCoordinator.deleteSession({
+      binary: run.detectionBinary,
+      delegationId: run.delegationId,
+      sessionId,
+      cwd: run.grokRun.cwd,
+      journaled: run.grokSessionRecorded,
+    });
+    run.grokSessionCleaned = true;
   }
 
   private async cancel(delegationId: string): Promise<Record<string, unknown>> {
@@ -3374,6 +3637,10 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
     if (run.settled) return run.terminalPromise;
     try {
       await run.setupPromise;
+      if (run.grokAcpController) {
+        await run.grokAcpController.cancel().catch(() => undefined);
+        await this.wait(Math.min(this.terminationGrace, PROCESS_TRANSITION_GRACE_MS));
+      }
       if (run.entry || run.runtimeOwned) await this.terminateAndCleanup(run);
       if (run.executionPromise) await run.executionPromise;
       if (run.streams) {
@@ -3405,6 +3672,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
     if (code === 'stdin_failed') return 'stdin_failed';
     if (code === 'process_exit') return 'process_exit';
     if (code === 'tree_unsettled') return 'tree_unsettled';
+    if (code === 'grok_session_cleanup_failed') return 'runtime_cleanup_failed';
     if (code === 'daemon_shutdown') return 'daemon_shutdown';
     if (code === 'route_lost') return 'route_lost';
     if (code === 'hold_failed') return 'hold_failed';
@@ -3417,6 +3685,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
     this.accepting = false;
     if (this.degraded) return;
     this.degraded = true;
+    this.logEvent({ event: 'degraded', code });
     try {
       this.dependencies.onDegraded?.(code);
     } catch {
@@ -3478,6 +3747,16 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       if (!first) break;
       this.completedRuns.delete(first);
     }
+    this.logEvent({
+      event: 'run_settled',
+      delegationId: run.delegationId,
+      adapterId: run.adapterId,
+      profileVersion: run.profileVersion,
+      status,
+      ...(typeof terminal.code === 'string' ? { code: terminal.code } : {}),
+      ...(run.settleMaskedCode ? { maskedCode: run.settleMaskedCode } : {}),
+      ...(run.settleReason ? { reason: run.settleReason } : {}),
+    });
     run.resolveTerminal(result);
     return true;
   }
@@ -3509,13 +3788,6 @@ export function createProductionSpawnSupervisor(
   }
   const generation = directRuntimeReference?.generation ?? randomUUID();
   const environment = options.environment ?? process.env;
-  const dataHome = environment.XDG_DATA_HOME;
-  const home = environment.HOME;
-  const opencodeDataRoot = typeof dataHome === 'string' && isAbsolute(dataHome)
-    ? join(dataHome, 'opencode')
-    : typeof home === 'string' && isAbsolute(home)
-      ? join(home, '.local', 'share', 'opencode')
-      : null;
   const startupRecovery = createAgentStartupRecovery({
     runtimeFiles,
     inspector,
@@ -3524,25 +3796,26 @@ export function createProductionSpawnSupervisor(
     generation,
     now: () => Date.now(),
   });
+  const grokBuildRuntime = options.grokBuildRuntime
+    ?? createGrokBuildPrivateRuntime({ platform });
+  const grokBuildAuthCoordinator = options.grokBuildAuthCoordinator
+    ?? createGrokBuildAuthCoordinator({
+      runtime: grokBuildRuntime,
+      environment,
+      platform,
+      ...(options.processSeams?.grokBuildDetect
+        ? { detect: options.processSeams.grokBuildDetect }
+        : {}),
+      ...(options.processSeams?.processProbe
+        ? { probe: options.processSeams.processProbe }
+        : {}),
+      ...(options.processSeams?.spawn ? { spawn: options.processSeams.spawn } : {}),
+    });
 
   let supervisor: SpawnSupervisor | null = null;
   const registry = createProductionAdapterRegistry({
-    openCodeDetect: options.processSeams?.openCodeDetect,
-    codexDetect: options.processSeams?.codexDetect,
-    resolveOpenCodeProfileRuntime: (_context, _role, scope) => {
-      if (!scope || scope.runtimeFiles.length !== 3 || !opencodeDataRoot) {
-        throw new TypeError('OpenCode production runtime graph is unavailable');
-      }
-      const [opencodeConfigPath, opencodeTestHomePath, opencodeManagedConfigPath] = scope.runtimeFiles;
-      return Object.freeze({
-        fsbMcpEndpoint: options.endpoint,
-        opencodeConfigRoot: dirname(dirname(opencodeConfigPath)),
-        opencodeConfigPath,
-        opencodeTestHomePath,
-        opencodeManagedConfigPath,
-        opencodeDataRoot,
-      });
-    },
+    grokBuildDetect: options.processSeams?.grokBuildDetect,
+    grokBuildRuntime,
     kill: async (child, killOptions) => {
       const entry = supervisor?.journalEntryForChild(child) ?? null;
       if (!entry) throw new TreeUnsettledError();
@@ -3558,6 +3831,8 @@ export function createProductionSpawnSupervisor(
     mintGeneration: () => generation,
     inspectProcessGroupStatus,
     endpoint: options.endpoint,
+    grokBuildRuntime,
+    grokBuildAuthCoordinator,
     ...(directRuntimeReference ? { directRuntimeReference } : {}),
     ...(options.cwd ? { cwd: options.cwd } : {}),
     platform,

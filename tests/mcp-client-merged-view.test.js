@@ -275,14 +275,8 @@ async function main() {
     clicked: null,
     installed: staleCodex,
     connected: null,
-    live: null,
-    compatibility: {
-      status: 'unsupported',
-      reason: 'matrix_invalid',
-      checkedAt: null
-    },
-    authState: 'unknown'
-  }, 'stale installed checkedAt is preserved without interpretation');
+    live: null
+  }, 'external Codex inventory is preserved without Autopilot compatibility authority');
   assertExactRow(merged['claude-code'], {
     id: 'claude-code',
     raw: false,

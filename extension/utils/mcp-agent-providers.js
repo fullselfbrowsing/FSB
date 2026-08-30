@@ -19,8 +19,7 @@
     opencode: 'OpenCode'
   });
   var FSB_COMPATIBILITY_AUTH_STATES = Object.freeze({
-    chatgpt: true,
-    api_key: true,
+    oauth: true,
     unauthenticated: true,
     unknown: true
   });
@@ -168,7 +167,8 @@
         || !Object.prototype.hasOwnProperty.call(
           FSB_COMPATIBILITY_AUTH_STATES,
           record.authState
-        )) return null;
+        )
+        || !validProviderAuthState(record.adapterId, record.authState)) return null;
     return {
       adapterId: record.adapterId,
       displayLabel: record.displayLabel,
@@ -176,6 +176,18 @@
       reason: record.reason,
       authState: record.authState
     };
+  }
+
+  function validProviderAuthState(providerId, authState) {
+    if (providerId === 'claude-code') {
+      return authState === 'unknown';
+    }
+    if (providerId === 'grok-build') {
+      return authState === 'oauth'
+        || authState === 'unauthenticated'
+        || authState === 'unknown';
+    }
+    return false;
   }
 
   function parseLegacyCompatibilityRow(value) {
@@ -223,17 +235,19 @@
       if (!row
           || row.adapterId !== expectedId
           || row.displayLabel !== FSB_LEGACY_COMPATIBILITY_LABELS[expectedId]) return null;
-      adapters.push({
-        adapterId: expectedId,
-        displayLabel: FSB_LEGACY_COMPATIBILITY_LABELS[expectedId],
-        status: row.status === 'unsupported' ? 'unsupported' : 'degraded',
-        reason: row.status === 'unsupported' ? row.reason : 'evidence_stale',
-        authState: 'unknown'
-      });
+      if (expectedId === 'claude-code') {
+        adapters.push({
+          adapterId: expectedId,
+          displayLabel: FSB_LEGACY_COMPATIBILITY_LABELS[expectedId],
+          status: row.status === 'unsupported' ? 'unsupported' : 'degraded',
+          reason: row.status === 'unsupported' ? row.reason : 'evidence_stale',
+          authState: 'unknown'
+        });
+      }
     }
     adapters.push({
-      adapterId: 'codex',
-      displayLabel: 'Codex',
+      adapterId: 'grok-build',
+      displayLabel: 'Grok Build',
       status: 'unsupported',
       reason: 'matrix_invalid',
       authState: 'unknown'

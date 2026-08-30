@@ -41,8 +41,7 @@ if (SECTION_ARGUMENT_INDEX >= 0 && !SELECTED_SECTION) {
   throw new Error('--section requires a value');
 }
 if (SELECTED_SECTION !== null
-    && SELECTED_SECTION !== 'accepted-identity'
-    && SELECTED_SECTION !== 'codex-start-authority') {
+    && SELECTED_SECTION !== 'accepted-identity') {
   throw new Error(`unknown section: ${SELECTED_SECTION}`);
 }
 
@@ -66,6 +65,13 @@ const ACCEPTED_IDENTITIES = Object.freeze({
     label: 'Codex',
     profileVersion: '0.142.5',
     authState: 'chatgpt',
+    billingKind: 'subscription'
+  }),
+  'grok-build': Object.freeze({
+    providerId: 'grok-build',
+    label: 'Grok Build',
+    profileVersion: '1.0.4',
+    authState: 'oauth',
     billingKind: 'subscription'
   })
 });
@@ -761,6 +767,17 @@ function buildDelegationCommandHarness(options = {}) {
     modelProvider: 'xai',
     ...(options.providerConfig || {})
   };
+  const compatibilityClients = options.compatibilityClients || {
+    'claude-code': {
+      compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 100 },
+      acceptedIdentity: acceptedIdentity('claude-code')
+    },
+    'grok-build': {
+      compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 100 },
+      authState: 'oauth',
+      acceptedIdentity: acceptedIdentity('grok-build')
+    }
+  };
   const consent = {
     async getTrusted(providerId) {
       calls.push(['getTrusted', providerId]);
@@ -801,17 +818,14 @@ function buildDelegationCommandHarness(options = {}) {
     FsbMcpAgentProviders: {
       async getMergedClients() {
         calls.push(['getMergedClients']);
-        return options.compatibilityClients || {
-          'claude-code': {
-            compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 100 },
-            acceptedIdentity: acceptedIdentity('claude-code')
-          },
-          opencode: {
-            compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 100 },
-            acceptedIdentity: acceptedIdentity('opencode')
-          }
-        };
+        return compatibilityClients;
       }
+    },
+    fsbRefreshMcpCompatibility() {
+      calls.push(['refreshMcpCompatibility']);
+      return typeof options.refreshCompatibility === 'function'
+        ? options.refreshCompatibility(compatibilityClients)
+        : Promise.resolve({ refreshOutcome: 'stale' });
     },
     FsbDelegationConsent: consent,
     FsbDelegationController: { create() { throw new Error('controller must not boot in authority-only cases'); } },
@@ -898,13 +912,10 @@ function buildDelegationProviderRoutingHarness(options = {}) {
       compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 100 },
       acceptedIdentity: acceptedIdentity('claude-code')
     },
-    opencode: {
+    'grok-build': {
       compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 100 },
-      acceptedIdentity: acceptedIdentity('opencode')
-    },
-    codex: {
-      compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 100 },
-      acceptedIdentity: acceptedIdentity('codex')
+      authState: 'oauth',
+      acceptedIdentity: acceptedIdentity('grok-build')
     }
   };
 
@@ -1056,6 +1067,12 @@ function buildDelegationProviderRoutingHarness(options = {}) {
     fsbAgentRegistryInstance: registry,
     bootstrapAgentRegistry: async () => {},
     armMcpBridge() {},
+    fsbRefreshMcpCompatibility() {
+      calls.push(['refreshMcpCompatibility']);
+      return typeof options.refreshCompatibility === 'function'
+        ? options.refreshCompatibility(compatibilityClients)
+        : Promise.resolve({ refreshOutcome: 'stale' });
+    },
     mcpBridgeClient,
     crypto: require('node:crypto').webcrypto,
     TextEncoder,
@@ -1151,6 +1168,7 @@ function buildDriftSettlementHarness(options = {}) {
   ));
   const reporterCalls = [];
   const settlementCalls = [];
+  const terminalLogs = [];
   const snapshots = new Map();
   const runContexts = new Map();
   const controller = {
@@ -1179,6 +1197,11 @@ function buildDriftSettlementHarness(options = {}) {
   };
   const sandbox = {
     FsbAgentProtocolDriftDiagnostics: diagnostics,
+    automationLogger: {
+      info(message, data) {
+        terminalLogs.push({ message, data: toPlainObject(data) });
+      }
+    },
     fsbDelegationControllerInstance: controller,
     fsbDelegationRunContexts: runContexts,
     Date: { now: () => 4242 },
@@ -1204,6 +1227,7 @@ function buildDriftSettlementHarness(options = {}) {
     seenLimit: sandbox.__seenLimit,
     reporterCalls,
     settlementCalls,
+    terminalLogs,
     profiles: runContexts,
     activate(delegationId, profileVersion = '2.1.177', providerId = 'claude-code') {
       const provider = delegationProviders.get(providerId);
@@ -1305,6 +1329,17 @@ async function runDriftSettlementCases() {
       'delegation id never enters diagnostic context');
     assertEqual(harness.settlementCalls.length, 1,
       'diagnostic reporting preserves one controller settlement');
+    assertDeepEqual(harness.terminalLogs, [{
+      message: 'Delegation run settled',
+      data: {
+        phase: 'delegation-terminal',
+        delegationId,
+        providerId: 'claude-code',
+        profileVersion: '2.1.177',
+        supervisorStatus: 'failed',
+        terminalCode: 'agent_protocol_drift'
+      }
+    }], 'authoritative settlement writes one sanitized terminal log');
     assertDeepEqual(harness.settlementCalls[0], {
       delegationId,
       event: { type: 'terminal', sessionId: null, payload: {} },
@@ -1374,52 +1409,56 @@ async function runDriftSettlementCases() {
       'normalized provider is_error result receives the closed provider_error code');
     assert(!JSON.stringify(providerErrorSettlement).includes('provider secret'),
       'provider error settlement never forwards raw provider output');
+    assert(!JSON.stringify(harness.terminalLogs).includes('provider secret'),
+      'terminal logs never retain raw provider output');
+    assertEqual(harness.terminalLogs.at(-1).data.terminalCode, 'provider_error',
+      'provider failure code is directly observable through get_logs');
   }
 
   {
     const harness = buildDriftSettlementHarness();
-    const openCodeId = 'delegation_drift_opencode';
-    harness.activate(openCodeId, '1.14.25', 'opencode');
-    await harness.settle(openCodeId, driftFinal({
-      adapterId: 'opencode',
-      profileVersion: '1.14.25',
+    const grokBuildId = 'delegation_drift_grok_build';
+    harness.activate(grokBuildId, '1.0.4', 'grok-build');
+    await harness.settle(grokBuildId, driftFinal({
+      adapterId: 'grok-build',
+      profileVersion: '1.0.4',
       reason: 'invalid_order',
       expected: 'known_event_shape',
       eventIndex: 4097,
       issuePaths: ['part.state', 'messageID']
     }), null);
     assertDeepEqual(harness.reporterCalls[0], {
-      adapterId: 'opencode',
-      profileVersion: '1.14.25',
+      adapterId: 'grok-build',
+      profileVersion: '1.0.4',
       reason: 'invalid_order',
       expected: 'known_event_shape',
       eventIndex: 4097,
       issuePaths: ['part.state', 'messageID']
-    }, 'matching accepted OpenCode context reports its exact safe detail');
-    assertEqual(harness.settlementCalls[0].context.acceptedIdentity.providerId, 'opencode',
-      'OpenCode drift terminal retains the accepted provider identity');
-    assertEqual(harness.settlementCalls[0].context.acceptedIdentity.billingKind, 'unknown',
-      'OpenCode drift terminal retains unknown billing');
+    }, 'matching accepted Grok Build context reports its exact safe detail');
+    assertEqual(harness.settlementCalls[0].context.acceptedIdentity.providerId, 'grok-build',
+      'Grok Build drift terminal retains the accepted provider identity');
+    assertEqual(harness.settlementCalls[0].context.acceptedIdentity.billingKind, 'subscription',
+      'Grok Build drift terminal retains subscription billing');
 
     for (const [delegationId, detail] of [
       ['delegation_drift_provider_mismatch', {
         adapterId: 'claude-code',
-        profileVersion: '1.14.25',
+        profileVersion: '1.0.4',
         reason: 'invalid_json',
         expected: 'bounded_jsonl',
         eventIndex: 1,
         issuePaths: []
       }],
       ['delegation_drift_profile_mismatch', {
-        adapterId: 'opencode',
-        profileVersion: '1.14.26',
+        adapterId: 'grok-build',
+        profileVersion: '1.0.5',
         reason: 'invalid_order',
         expected: 'known_event_shape',
         eventIndex: 1,
         issuePaths: []
       }]
     ]) {
-      harness.activate(delegationId, '1.14.25', 'opencode');
+      harness.activate(delegationId, '1.0.4', 'grok-build');
       await harness.settle(delegationId, driftFinal(detail), null);
     }
     assertEqual(harness.reporterCalls.length, 1,
@@ -1611,19 +1650,15 @@ async function runCompatibilityRefreshCases() {
           id: 'claude-code',
           compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 500 }
         },
-        opencode: {
-          id: 'opencode',
-          compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 100 }
-        },
-        codex: {
-          id: 'codex',
+        'grok-build': {
+          id: 'grok-build',
           compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 1 }
         }
       }
     });
     const result = await harness.readCached();
     assertEqual(result.compatibilityExpiresAt, 900_001,
-      'compatibility expiry uses the earliest exact shipped-provider row including Codex');
+      'compatibility expiry uses the earliest exact active-provider row including Grok Build');
     assertEqual(harness.calls.filter((call) => call[0] === 'replace:start').length, 0,
       'expiry projection cannot write compatibility or provider selection');
   }
@@ -2474,14 +2509,14 @@ async function runDelegationAuthorityCases() {
       type: 'FSB_DELEGATION_CONSENT',
       task: 'OpenCode-bound consent task'
     });
-    assertEqual(result.providerId, 'opencode',
-      'consent returns the exact authoritative OpenCode provider');
-    assertEqual(result.providerLabel, 'OpenCode',
-      'consent returns only the canonical OpenCode label');
-    assertDeepEqual(harness.calls.find((call) => call[0] === 'issueChallenge')[1], {
-      acceptedIdentity: ACCEPTED_IDENTITIES.opencode,
-      taskDigest: harness.calls.find((call) => call[0] === 'issueChallenge')[1].taskDigest
-    }, 'challenge issuance binds the authoritative OpenCode identity and task digest only');
+    assertDeepEqual(result, {
+      ok: false,
+      code: 'unsupported_provider',
+      providerId: 'opencode',
+      providerLabel: 'OpenCode'
+    }, 'retired OpenCode consent is rejected before challenge issuance');
+    assertEqual(harness.calls.some((call) => call[0] === 'issueChallenge'), false,
+      'retired OpenCode consent cannot mint a challenge');
   }
 
   {
@@ -2493,51 +2528,166 @@ async function runDelegationAuthorityCases() {
       task: 'Use OpenCode for this task'
     });
     assertDeepEqual(result, {
+      ok: false,
+      code: 'unsupported_provider',
+      providerId: 'opencode',
+      providerLabel: 'OpenCode'
+    }, 'background preflight rejects retired OpenCode even from saved settings');
+  }
+
+  for (const providerId of ['claude-code', 'grok-build']) {
+    const clients = {
+      [providerId]: {
+        compatibility: { status: 'degraded', reason: 'evidence_stale', checkedAt: 100 },
+        authState: 'unknown'
+      }
+    };
+    const harness = buildDelegationCommandHarness({
+      providerConfig: { agentProviderId: providerId },
+      compatibilityClients: clients,
+      async refreshCompatibility() {
+        clients[providerId] = {
+          compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 200 },
+          authState: ACCEPTED_IDENTITIES[providerId].authState,
+          acceptedIdentity: acceptedIdentity(providerId)
+        };
+        return { refreshOutcome: 'refreshed' };
+      }
+    });
+    const result = await harness.command({
+      type: 'FSB_DELEGATION_PREFLIGHT',
+      task: `Refresh stale ${providerId} compatibility`
+    });
+    assertDeepEqual(result, {
       ok: true,
       kind: 'agent',
-      providerId: 'opencode',
-      providerLabel: 'OpenCode',
-      acceptedIdentity: ACCEPTED_IDENTITIES.opencode
-    }, 'background preflight authorizes OpenCode from saved settings and compatibility');
+      providerId,
+      providerLabel: ACCEPTED_IDENTITIES[providerId].label,
+      acceptedIdentity: ACCEPTED_IDENTITIES[providerId]
+    }, `${providerId} stale preflight refreshes through the shared authority path`);
+    assertEqual(harness.calls.filter((call) => call[0] === 'refreshMcpCompatibility').length, 1,
+      `${providerId} stale preflight requests one live compatibility refresh`);
+  }
+
+  {
+    const clients = {
+      codex: {
+        compatibility: { status: 'degraded', reason: 'evidence_stale', checkedAt: 100 },
+        authState: 'unknown'
+      }
+    };
+    const harness = buildDelegationCommandHarness({
+      providerConfig: { agentProviderId: 'codex' },
+      compatibilityClients: clients,
+      async refreshCompatibility() { return { refreshOutcome: 'stale' }; }
+    });
+    const result = await harness.command({
+      type: 'FSB_DELEGATION_CONSENT',
+      task: 'Do not consent from stale Codex evidence'
+    });
+    assertDeepEqual(result, {
+      ok: false,
+      code: 'unsupported_provider',
+      providerId: 'codex',
+      providerLabel: 'Codex'
+    }, 'retired Codex consent is rejected before compatibility refresh');
+    assertEqual(harness.calls.filter((call) => call[0] === 'refreshMcpCompatibility').length, 0,
+      'retired Codex consent performs no compatibility refresh');
+    assertEqual(harness.calls.some((call) => call[0] === 'getTrusted'
+      || call[0] === 'issueChallenge'), false,
+    'stale Codex evidence cannot read trust or issue consent');
+  }
+
+  for (const compatibility of [
+    { status: 'unsupported', reason: 'wrong_major', checkedAt: 100 },
+    { status: 'supported', reason: 'within_tested_range', checkedAt: 100, extra: true }
+  ]) {
+    const harness = buildDelegationCommandHarness({
+      providerConfig: { agentProviderId: 'codex' },
+      compatibilityClients: { codex: { compatibility } }
+    });
+    const result = await harness.command({
+      type: 'FSB_DELEGATION_PREFLIGHT',
+      task: 'Reject non-refreshable Codex evidence'
+    });
+    assertDeepEqual(result, {
+      ok: false,
+      code: 'unsupported_provider',
+      providerId: 'codex',
+      providerLabel: 'Codex'
+    }, 'truly unsupported or malformed Codex evidence remains unsupported');
+    assertEqual(harness.calls.some((call) => call[0] === 'refreshMcpCompatibility'), false,
+      'non-refreshable Codex evidence never enters live compatibility refresh');
   }
 
   {
     const harness = buildDelegationCommandHarness({
-      providerConfig: { agentProviderId: 'opencode' }
+      providerConfig: { agentProviderId: 'grok-build' }
     });
     const first = await harness.command({
       type: 'FSB_DELEGATION_CLEAR_TRUST',
-      providerId: 'opencode'
+      providerId: 'grok-build'
     });
     const second = await harness.command({
       type: 'FSB_DELEGATION_CLEAR_TRUST',
-      providerId: 'opencode'
+      providerId: 'grok-build'
     });
-    assertDeepEqual(first, { ok: true, providerId: 'opencode', trusted: false },
-      'OpenCode clear returns the exact authority-reducing result');
-    assertDeepEqual(second, first, 'OpenCode clear remains idempotent');
+    assertDeepEqual(first, { ok: true, providerId: 'grok-build', trusted: false },
+      'Grok Build clear returns the exact authority-reducing result');
+    assertDeepEqual(second, first, 'Grok Build clear remains idempotent');
   }
 
   {
     const harness = buildDelegationCommandHarness({
-      providerConfig: { agentProviderId: 'opencode' }
+      providerConfig: { agentProviderId: 'grok-build' }
     });
     const result = await harness.command({
       type: 'FSB_DELEGATION_SET_TRUST',
       challengeId: 'dch_fixture',
-      providerId: 'opencode',
+      providerId: 'grok-build',
       trusted: true
     });
-    assertDeepEqual(result, { ok: true, providerId: 'opencode', trusted: true },
-      'OpenCode trust grant returns the exact authoritative provider');
+    assertDeepEqual(result, { ok: true, providerId: 'grok-build', trusted: true },
+      'Grok Build trust grant returns the exact authoritative provider');
     assertDeepEqual(harness.calls.map((call) => call[0]), [
       'getMergedClients', 'writeTrustFromChallenge'
     ], 'selection/preflight recheck precedes provider-local trust mutation');
   }
 
   {
+    const clients = {
+      'grok-build': {
+        compatibility: { status: 'degraded', reason: 'evidence_stale', checkedAt: 100 }
+      }
+    };
     const harness = buildDelegationCommandHarness({
-      providerConfig: { agentProviderId: 'opencode' }
+      providerConfig: { agentProviderId: 'grok-build' },
+      compatibilityClients: clients,
+      async refreshCompatibility() {
+        clients['grok-build'] = {
+          compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 200 },
+          acceptedIdentity: acceptedIdentity('grok-build')
+        };
+        return { refreshOutcome: 'refreshed' };
+      }
+    });
+    const result = await harness.command({
+      type: 'FSB_DELEGATION_SET_TRUST',
+      challengeId: 'dch_fixture',
+      providerId: 'grok-build',
+      trusted: true
+    });
+    assertDeepEqual(result, { ok: true, providerId: 'grok-build', trusted: true },
+      'direct trust grant refreshes stale authority before mutation');
+    assertDeepEqual(harness.calls.map((call) => call[0]), [
+      'getMergedClients', 'refreshMcpCompatibility', 'getMergedClients',
+      'writeTrustFromChallenge'
+    ], 'trust mutation follows one refreshed authoritative identity read');
+  }
+
+  {
+    const harness = buildDelegationCommandHarness({
+      providerConfig: { agentProviderId: 'grok-build' }
     });
     const issued = await harness.command({
       type: 'FSB_DELEGATION_CONSENT',
@@ -2548,7 +2698,7 @@ async function runDelegationAuthorityCases() {
     const result = await harness.command({
       type: 'FSB_DELEGATION_SET_TRUST',
       challengeId: issued.challengeId,
-      providerId: 'opencode',
+      providerId: 'grok-build',
       trusted: true
     });
     assertDeepEqual(result, { ok: false, code: 'trust_provider_changed' },
@@ -2609,6 +2759,7 @@ async function runDelegationAuthorityCases() {
 
   for (const request of [
     { type: 'FSB_DELEGATION_CLEAR_TRUST', providerId: 'Claude-Code' },
+    { type: 'FSB_DELEGATION_CLEAR_TRUST', providerId: 'opencode' },
     { type: 'FSB_DELEGATION_CLEAR_TRUST', providerId: 'future-agent' },
     { type: 'FSB_DELEGATION_CLEAR_TRUST', providerId: 'claude-code', trusted: false }
   ]) {
@@ -2651,7 +2802,7 @@ async function runDelegationAuthorityCases() {
 async function runAcceptedIdentityBoundaryCases() {
   console.log('\n--- B11: accepted identity is consent-bound before visible state ---');
 
-  for (const providerId of ['claude-code', 'opencode']) {
+  for (const providerId of ['claude-code', 'grok-build']) {
     const harness = buildDelegationProviderRoutingHarness({ providerId });
     const task = `${providerId} accepted identity`;
     const pending = harness.command({
@@ -2694,14 +2845,14 @@ async function runAcceptedIdentityBoundaryCases() {
       providerId,
       label: ACCEPTED_IDENTITIES[providerId].label,
       profileVersion: ACCEPTED_IDENTITIES[providerId].profileVersion,
-      authState: 'unknown',
+      authState: ACCEPTED_IDENTITIES[providerId].authState,
       billingKind: ACCEPTED_IDENTITIES[providerId].billingKind
     }, `${providerId} run context retains the immutable five-field echo`);
   }
 
   const echoMutations = [
-    ['providerId', 'opencode'],
-    ['label', 'OpenCode'],
+    ['providerId', 'grok-build'],
+    ['label', 'Grok Build'],
     ['profileVersion', '2.1.178'],
     ['authState', 'chatgpt'],
     ['billingKind', 'api']
@@ -2783,185 +2934,105 @@ async function runAcceptedIdentityBoundaryCases() {
   }
 }
 
-async function runCodexStartAuthorityCases() {
-  console.log('\n--- B11: Codex auth-bound start authority ---');
 
-  const identities = [
-    acceptedIdentity('codex'),
-    acceptedIdentity('codex', { authState: 'api_key', billingKind: 'api' })
-  ];
-  for (const identity of identities) {
+async function runDelegationProviderRoutingCases() {
+  console.log('\n--- B11: accepted delegation provider routing is immutable ---');
+
+  {
+    const clients = {
+      'grok-build': {
+        compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 100 },
+        authState: 'unauthenticated'
+      }
+    };
     const harness = buildDelegationProviderRoutingHarness({
-      providerId: 'codex',
-      identitySequence: [identity, identity]
+      providerId: 'grok-build',
+      compatibilityClients: clients,
+      async refreshCompatibility() {
+        clients['grok-build'] = {
+          compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 200 },
+          authState: 'oauth',
+          acceptedIdentity: acceptedIdentity('grok-build')
+        };
+        return { refreshOutcome: 'refreshed' };
+      }
     });
-    const task = `Codex ${identity.authState} provider-free task`;
     const pending = harness.command({
       type: 'FSB_DELEGATION_START',
-      task,
-      challengeId: `dch_codex_${identity.authState}`
+      task: 'Start Grok after browser OAuth refreshed cached evidence',
+      challengeId: 'dch_grok_oauth_refresh'
     });
     const request = await harness.waitForStartRequest();
-    assert(request, `${identity.authState} reaches one authenticated daemon start`);
-    if (!request) continue;
-    assertDeepEqual(request.payload, {
-      acceptedIdentity: identity,
-      task
-    }, `${identity.authState} transports only consumed identity and task`);
-    assertEqual(Object.prototype.hasOwnProperty.call(request.payload, 'providerId'), false,
-      `${identity.authState} payload has no standalone provider selector`);
-    const consumeCall = harness.calls.find((call) => call[0] === 'consumeChallenge');
-    assertDeepEqual(consumeCall[1].acceptedIdentity, identity,
-      `${identity.authState} challenge consumes the second authoritative projection`);
-    assertEqual(harness.controllerCreates, 0,
-      `${identity.authState} creates no controller before daemon echo`);
-
-    const delegationId = `delegation_codex_${identity.authState}`;
-    const error = await harness.emitStarted(request, {
-      delegationId,
-      acceptedIdentity: identity
-    });
-    assertEqual(error, null, `${identity.authState} exact daemon echo is accepted`);
-    const result = await pending;
-    assertEqual(result.ok, true, `${identity.authState} starts one accepted Codex run`);
-    assertDeepEqual(harness.controllerStarts, [{
-      delegationId,
-      acceptedIdentity: identity,
-      connection: 'connected'
-    }], `${identity.authState} controller persists the echoed identity`);
-    assertDeepEqual(harness.contexts.get(delegationId), {
-      acceptedIdentity: identity,
-      providerId: 'codex',
-      label: 'Codex',
-      profileVersion: '0.142.5',
-      authState: identity.authState,
-      billingKind: identity.billingKind
-    }, `${identity.authState} run context retains exact Codex billing authority`);
+    assert(request, 'fresh Grok OAuth refreshes previously unauthenticated evidence before transport');
+    assertEqual(harness.calls.filter((call) => call[0] === 'refreshMcpCompatibility').length, 1,
+      'Grok OAuth recovery performs one compatibility refresh');
+    if (request) {
+      assertDeepEqual(request.payload.acceptedIdentity, ACCEPTED_IDENTITIES['grok-build'],
+        'Grok start transports only the refreshed OAuth identity');
+      await harness.emitStarted(request, {
+        delegationId: 'delegation_grok_oauth_refresh',
+        acceptedIdentity: acceptedIdentity('grok-build')
+      });
+      assertEqual((await pending).ok, true,
+        'refreshed Grok OAuth authority reaches an accepted delegated run');
+      await harness.resolveFinal(request, { status: 'succeeded' });
+    } else {
+      await pending;
+    }
   }
 
   {
-    const chatgptIdentity = acceptedIdentity('codex');
-    const apiKeyIdentity = acceptedIdentity('codex', {
-      authState: 'api_key', billingKind: 'api'
-    });
+    const clients = {
+      codex: {
+        compatibility: { status: 'degraded', reason: 'evidence_stale', checkedAt: 100 },
+        authState: 'unknown'
+      }
+    };
     const harness = buildDelegationProviderRoutingHarness({
       providerId: 'codex',
-      identitySequence: [chatgptIdentity, chatgptIdentity]
+      compatibilityClients: clients,
+      async refreshCompatibility() {
+        throw new Error('retired Codex must not refresh');
+      }
     });
-    const pending = harness.command({
+    const result = await harness.command({
       type: 'FSB_DELEGATION_START',
-      task: 'Reject changed Codex auth echo',
-      challengeId: 'dch_codex_echo_mismatch'
+      task: 'Reject retired Codex before refreshing stale compatibility',
+      challengeId: 'dch_codex_stale_refresh'
     });
-    const request = await harness.waitForStartRequest();
-    const error = await harness.emitStarted(request, {
-      delegationId: 'delegation_codex_echo_mismatch',
-      acceptedIdentity: apiKeyIdentity
-    });
-    assert(error instanceof Error, 'changed Codex auth echo rejects acceptance');
-    assertDeepEqual(await pending, { ok: false, code: 'start_rejected', snapshot: null },
-      'changed Codex auth echo returns one bounded rejection');
-    assertEqual(harness.controllerCreates, 0, 'changed auth echo creates no controller');
-    assertEqual(harness.startRequests.length, 1, 'changed auth echo is never replayed');
+    assertDeepEqual(result, { ok: false, code: 'preflight_failed', snapshot: null },
+      'retired Codex start is rejected before stale compatibility can refresh');
+    assertEqual(harness.calls.filter((call) => call[0] === 'refreshMcpCompatibility').length, 0,
+      'retired Codex start performs no compatibility refresh');
+    assertEqual(harness.startRequests.length, 0,
+      'retired Codex start sends no delegate.start request');
+    assertEqual(harness.calls.some((call) => call[0] === 'consumeChallenge'), false,
+      'retired Codex start consumes no consent challenge');
   }
 
-  for (const authState of ['unauthenticated', 'unknown']) {
+  {
     const harness = buildDelegationProviderRoutingHarness({
       providerId: 'codex',
       compatibilityClients: {
         codex: {
-          compatibility: {
-            status: 'supported', reason: 'within_tested_range', checkedAt: 100
-          },
-          authState
+          compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 100 },
+          authState: 'chatgpt',
+          acceptedIdentity: acceptedIdentity('codex')
         }
       }
     });
     const result = await harness.command({
       type: 'FSB_DELEGATION_START',
-      task: `Reject ${authState} Codex`,
-      challengeId: `dch_codex_${authState}`
+      task: 'Reject retired Codex even with historical runnable evidence',
+      challengeId: 'dch_codex_stale_failure'
     });
     assertDeepEqual(result, { ok: false, code: 'preflight_failed', snapshot: null },
-      `${authState} Codex evidence cannot reach consent or transport`);
-    assertEqual(harness.startRequests.length, 0, `${authState} sends no daemon start`);
-
-    const preflightHarness = buildDelegationCommandHarness({
-      providerConfig: { agentProviderId: 'codex' },
-      compatibilityClients: {
-        codex: {
-          compatibility: {
-            status: 'supported', reason: 'within_tested_range', checkedAt: 100
-          },
-          authState
-        }
-      }
-    });
-    const preflight = await preflightHarness.command({
-      type: 'FSB_DELEGATION_PREFLIGHT',
-      task: `Explain ${authState} Codex recovery`
-    });
-    assertDeepEqual(preflight, {
-      ok: false,
-      code: authState === 'unauthenticated' ? 'auth_unauthenticated' : 'auth_unknown',
-      providerId: 'codex',
-      providerLabel: 'Codex'
-    }, `${authState} survives background reduction only as a closed safe recovery code`);
-    assertEqual(JSON.stringify(preflight).includes('Logged in'), false,
-      `${authState} response contains no provider-native status bytes`);
+      'historical Codex compatibility cannot restore start authority');
+    assertEqual(harness.startRequests.length, 0,
+      'historical Codex evidence never sends delegate.start');
+    assertEqual(harness.calls.some((call) => call[0] === 'consumeChallenge'), false,
+      'historical Codex evidence never consumes consent');
   }
-
-  {
-    const staleClients = {
-      codex: {
-        id: 'codex',
-        compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 100 },
-        authState: 'chatgpt',
-        acceptedIdentity: acceptedIdentity('codex')
-      }
-    };
-    const refreshHarness = buildCompatibilityRefreshHarness({
-      clients: staleClients,
-      rejectRequest: true,
-      cachedSnapshot: { schemaVersion: 2, checkedAt: 100, adapters: [] }
-    });
-    const result = await refreshHarness.refresh();
-    assertEqual(result.refreshOutcome, 'stale', 'failed refresh uses only durable cached evidence');
-    assertDeepEqual(result.clients.codex.compatibility, {
-      status: 'degraded', reason: 'evidence_stale', checkedAt: 100
-    }, 'failed refresh closes fresh Codex compatibility');
-    assertEqual(result.clients.codex.authState, 'unknown',
-      'failed refresh forces Codex auth unknown');
-    assertEqual(Object.prototype.hasOwnProperty.call(
-      result.clients.codex, 'acceptedIdentity'
-    ), false, 'failed refresh strips accepted Codex start authority');
-  }
-
-  {
-    const checkedAt = 400;
-    const refreshHarness = buildCompatibilityRefreshHarness({
-      clients: {
-        codex: {
-          id: 'codex',
-          compatibility: {
-            status: 'degraded', reason: 'newer_than_tested_range', checkedAt
-          },
-          authState: 'api_key',
-          acceptedIdentity: acceptedIdentity('codex', {
-            authState: 'api_key', billingKind: 'api'
-          })
-        }
-      },
-      cachedSnapshot: { schemaVersion: 2, checkedAt, adapters: [] }
-    });
-    const cached = await refreshHarness.readCached();
-    assertEqual(cached.compatibilityExpiresAt, checkedAt + 15 * 60 * 1000,
-      'fresh newer-than-tested Codex evidence schedules the same expiry boundary');
-  }
-}
-
-async function runDelegationProviderRoutingCases() {
-  console.log('\n--- B11: accepted delegation provider routing is immutable ---');
 
   {
     const harness = buildDelegationProviderRoutingHarness({ providerId: 'claude-code' });
@@ -3017,62 +3088,62 @@ async function runDelegationProviderRoutingCases() {
   }
 
   {
-    const harness = buildDelegationProviderRoutingHarness({ providerId: 'opencode' });
+    const harness = buildDelegationProviderRoutingHarness({ providerId: 'grok-build' });
     const pending = harness.command({
       type: 'FSB_DELEGATION_START',
-      task: 'OpenCode provider-free task',
-      challengeId: 'dch_opencode'
+      task: 'Grok Build provider-free task',
+      challengeId: 'dch_grok_build'
     });
     const request = await harness.waitForStartRequest();
-    assert(request, 'OpenCode authoritative start reaches one daemon request');
+    assert(request, 'Grok Build authoritative start reaches one daemon request');
     if (request) {
       assertDeepEqual(request.payload, {
-        acceptedIdentity: ACCEPTED_IDENTITIES.opencode, task: 'OpenCode provider-free task'
-      }, 'OpenCode delegate.start payload is exact and canonical');
+        acceptedIdentity: ACCEPTED_IDENTITIES['grok-build'], task: 'Grok Build provider-free task'
+      }, 'Grok Build delegate.start payload is exact and canonical');
       await harness.emitStarted(request, {
-        delegationId: 'delegation_opencode_route',
-        acceptedIdentity: acceptedIdentity('opencode')
+        delegationId: 'delegation_grok_build_route',
+        acceptedIdentity: acceptedIdentity('grok-build')
       });
       const result = await pending;
-      assertEqual(result.ok, true, 'matching OpenCode acceptance starts exactly one run');
-      assertDeepEqual(harness.contexts.get('delegation_opencode_route'), {
-        acceptedIdentity: ACCEPTED_IDENTITIES.opencode,
-        providerId: 'opencode',
-        label: 'OpenCode',
-        profileVersion: '1.14.25',
-        authState: 'unknown',
-        billingKind: 'unknown'
-      }, 'accepted OpenCode context never inherits Claude identity or billing');
+      assertEqual(result.ok, true, 'matching Grok Build acceptance starts exactly one run');
+      assertDeepEqual(harness.contexts.get('delegation_grok_build_route'), {
+        acceptedIdentity: ACCEPTED_IDENTITIES['grok-build'],
+        providerId: 'grok-build',
+        label: 'Grok Build',
+        profileVersion: '1.0.4',
+        authState: 'oauth',
+        billingKind: 'subscription'
+      }, 'accepted Grok Build context never inherits Claude identity or billing');
       harness.setProviderId('claude-code');
       await harness.emitDelegationEvent(request, {
-        delegationId: 'delegation_opencode_route',
+        delegationId: 'delegation_grok_build_route',
         event: { type: 'result', sessionId: null, payload: {} }
       });
-      assertEqual(harness.acceptedEvents.at(-1).context.acceptedIdentity.billingKind, 'unknown',
-        'OpenCode result billing remains unknown after a settings change');
+      assertEqual(harness.acceptedEvents.at(-1).context.acceptedIdentity.billingKind, 'subscription',
+        'Grok Build result billing remains subscription after a settings change');
       assertDeepEqual(harness.acceptedEvents.at(-1).context.acceptedIdentity,
-        ACCEPTED_IDENTITIES.opencode,
-        'OpenCode event identity remains canonical after a settings change');
+        ACCEPTED_IDENTITIES['grok-build'],
+        'Grok Build event identity remains canonical after a settings change');
       await harness.resolveFinal(request, { status: 'failed', terminal: { code: 'agent_failed' } });
-      assertEqual(harness.acceptedEvents.at(-1).context.acceptedIdentity.billingKind, 'unknown',
-        'OpenCode terminal billing remains unknown');
-      assertEqual(harness.contexts.has('delegation_opencode_route'), false,
-        'terminal settlement always clears accepted OpenCode context');
+      assertEqual(harness.acceptedEvents.at(-1).context.acceptedIdentity.billingKind, 'subscription',
+        'Grok Build terminal billing remains subscription');
+      assertEqual(harness.contexts.has('delegation_grok_build_route'), false,
+        'terminal settlement always clears accepted Grok Build context');
     } else {
       const result = await pending;
-      assertEqual(result.ok, true, 'OpenCode must not be rejected before daemon routing');
+      assertEqual(result.ok, true, 'Grok Build must not be rejected before daemon routing');
     }
   }
 
   {
-    const harness = buildDelegationProviderRoutingHarness({ providerId: 'opencode' });
+    const harness = buildDelegationProviderRoutingHarness({ providerId: 'grok-build' });
     const pending = harness.command({
       type: 'FSB_DELEGATION_START',
       task: 'Reject mismatched acceptance',
       challengeId: 'dch_mismatch'
     });
     const request = await harness.waitForStartRequest();
-    assert(request, 'mismatch case reaches one selected OpenCode request');
+    assert(request, 'mismatch case reaches one selected Grok Build request');
     if (request) {
       await harness.emitStarted(request, {
         delegationId: 'delegation_mismatch_route',
@@ -3209,6 +3280,24 @@ function runSourceContractCase() {
   assert(backgroundSource.includes('mcpBridgeClient.reloadPairingAndReconnect()'), 'background.js delegates pairing reload directly to the bridge client');
   assert(!/chrome\.runtime\.sendMessage\s*\(\s*\{\s*action\s*:\s*['"]reloadMcpBridgePairing['"]/.test(backgroundSource),
     'background.js never self-sends the pairing reload action');
+  const grokAuthBeginCase = backgroundSource.slice(
+    backgroundSource.indexOf("case 'beginGrokBuildAuth':"),
+    backgroundSource.indexOf("case 'logoutGrokBuildAuth':")
+  );
+  assert(grokAuthBeginCase.includes('fsbBroadcastGrokAuthProgress(progress)'),
+    'Grok OAuth still broadcasts the validated continuation URL to the provider panel');
+  assert(!grokAuthBeginCase.includes('chrome.tabs.create'),
+    'Grok OAuth leaves native browser opening to the CLI so one Connect click creates one tab');
+  const grokAuthLogoutCase = backgroundSource.slice(
+    backgroundSource.indexOf("case 'logoutGrokBuildAuth':"),
+    backgroundSource.indexOf("case 'testAgentProviderConnection':")
+  );
+  assert(grokAuthLogoutCase.includes('fsbSafeGrokLogoutResponse(value)'),
+    'disconnect reads the exact logout payload rather than the plain auth-state shape');
+  assert(grokAuthLogoutCase.includes("errorCode: 'provider_auth_locked'"),
+    'a locked disconnect names itself from the response payload');
+  assert(!backgroundSource.includes("error.code === 'provider_auth_locked'"),
+    'the bridge rewrites every daemon handler throw, so no branch may key off that code');
 
   const orderedImports = [
     "importScripts('utils/delegation-providers.js')",
@@ -3284,8 +3373,17 @@ function runSourceContractCase() {
   );
   assert(nativePreflight.includes("authority.config.providerKind !== 'agent'")
       && nativePreflight.includes('await fsbEnsureAgentBridgeReady(')
-      && nativePreflight.includes('await fsbDelegationPreflightResult()'),
-    'only agent preflight bootstraps and successful readiness reruns pure preflight directly');
+      && nativePreflight.includes('await fsbDelegationPreflightResult()')
+      && nativePreflight.includes('await fsbRefreshDelegationAuthorityIfNeeded(authority)'),
+    'only agent preflight bootstraps and stale readiness enters shared compatibility refresh');
+  assert(delegationComposition.includes('async function fsbRefreshDelegationAuthorityIfNeeded(authority) {')
+      && delegationComposition.includes("authority.result.code !== 'provider_status_refresh'")
+      && delegationComposition.includes("authority.result.code === 'auth_unauthenticated'")
+      && delegationComposition.includes("authority.result.code === 'auth_unknown'")
+      && delegationComposition.includes('await fsbRefreshMcpCompatibility()'),
+    'shared authority refresh is exact-code gated, including fresh Grok OAuth evidence');
+  assertEqual((delegationComposition.match(/await fsbRefreshDelegationAuthorityIfNeeded\(/g) || []).length, 5,
+    'preflight, consent, trust, and both start checks share one refresh helper');
   assert(delegationComposition.includes("'native-host-bootstrap'")
       && delegationComposition.includes("'native-host-bootstrap-retry'")
       && delegationComposition.includes('FSB_NATIVE_WAKE_BRIDGE_TIMEOUT_MS')
@@ -3507,11 +3605,6 @@ function runSourceContractCase() {
 // ---------------------------------------------------------------------------
 
 async function run() {
-  if (SELECTED_SECTION === 'codex-start-authority') {
-    await runCodexStartAuthorityCases();
-    console.log(`\n=== Results: ${passed} passed, ${failed} failed ===`);
-    process.exit(failed > 0 ? 1 : 0);
-  }
   if (SELECTED_SECTION === 'accepted-identity') {
     await runAcceptedIdentityBoundaryCases();
     console.log(`\n=== Results: ${passed} passed, ${failed} failed ===`);

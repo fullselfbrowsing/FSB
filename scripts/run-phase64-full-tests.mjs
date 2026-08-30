@@ -21,11 +21,8 @@ const wrapperPath = process.env.FSB_PHASE64_TEST_WRAPPER_PATH
   : productionWrapperPath;
 
 const PHASE64_COMMANDS = Object.freeze([
-  Object.freeze(['node', 'tests/mcp-opencode-adapter.test.js', '--section', 'first-commit-drift-gate']),
   Object.freeze(['node', 'tests/mcp-agent-stream-fixture.test.js']),
   Object.freeze(['node', 'tests/mcp-agent-drift-smoke.test.js']),
-  Object.freeze(['node', 'tests/mcp-opencode-adapter.test.js', '--section', 'adapter']),
-  Object.freeze(['node', 'tests/mcp-opencode-server-topology.test.js']),
   Object.freeze(['node', 'tests/mcp-agent-provider-contract.test.js']),
   Object.freeze(['node', 'tests/mcp-adapter-compatibility.test.js']),
   Object.freeze(['node', 'tests/mcp-spawn-supervisor.test.js']),
@@ -50,8 +47,6 @@ const PHASE64_COMMANDS = Object.freeze([
 
 const PHASE64_ROOT_COMMANDS = Object.freeze([
   'node tests/phase64-full-tests-harness.test.js',
-  'node tests/mcp-opencode-adapter.test.js --section adapter',
-  'node tests/mcp-opencode-server-topology.test.js',
 ]);
 
 const RETAINED_PHASE64_ROOT_COMMANDS = Object.freeze([
@@ -129,15 +124,13 @@ function assertStaticContracts() {
   }
   const rootBuildCommand = ['npm', '--prefix', 'mcp', 'run', 'build'].join(' ');
   const buildIndex = rootCommands.indexOf(rootBuildCommand);
-  const adapterIndex = rootCommands.indexOf('node tests/mcp-opencode-adapter.test.js --section adapter');
   const driftIndex = rootCommands.indexOf('node tests/mcp-agent-drift-smoke.test.js');
   const supervisorIndex = rootCommands.indexOf('node tests/mcp-spawn-supervisor.test.js');
-  const topologyIndex = rootCommands.indexOf('node tests/mcp-opencode-server-topology.test.js');
   const recoveryIndex = rootCommands.indexOf('node tests/mcp-agent-orphan-recovery.test.js');
   if (
     rootCommands.filter((command) => command === rootBuildCommand).length !== 1
-    || !(buildIndex < adapterIndex && adapterIndex < driftIndex)
-    || !(supervisorIndex < topologyIndex && topologyIndex < recoveryIndex)
+    || !(buildIndex < driftIndex)
+    || !(supervisorIndex < recoveryIndex)
   ) {
     throw new Error('root Phase 64 commands are outside their protected dependency order');
   }
@@ -150,7 +143,7 @@ function assertStaticContracts() {
 
   const ciSource = readFileSync(ciPath, 'utf8');
   if (
-    exactOccurrences(ciSource, 'name: Phase 65 Codex contract (sole Linux root invocation)') !== 1
+    exactOccurrences(ciSource, 'name: Phase 65 agent provider contract (sole Linux root invocation)') !== 1
     || exactOccurrences(ciSource, 'run: npm test') !== 1
     || ciSource.includes('run: node scripts/run-phase64-full-tests.mjs')
   ) {

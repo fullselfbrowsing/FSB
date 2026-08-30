@@ -155,6 +155,7 @@
               <div class="form-group">
                 <label for="modelProvider">AI Provider <span id="providerIcon" style="display: inline-block; vertical-align: middle; margin-left: 6px;"></span></label>
                 <select id="modelProvider" class="form-select">
+                  <option value="" disabled>Choose another provider</option>
                   <option value="xai">xAI (Grok)</option>
                   <option value="gemini">Google Gemini</option>
                   <option value="openai">OpenAI</option>
@@ -163,10 +164,13 @@
                   <option value="lmstudio">LM Studio</option>
                   <option value="custom">Custom (OpenAI Compatible)</option>
                   <option value="claude-code">Claude Code</option>
-                  <option value="opencode">OpenCode</option>
-                  <option value="codex">Codex</option>
+                  <option value="grok-build">Grok Build</option>
                 </select>
                 <div class="form-help">API providers use local keys. Agent CLIs use their existing local sign-in.</div>
+                <div id="retiredAgentProviderNotice" class="provider-retirement-notice" role="alert" hidden>
+                  <strong>Choose another AI provider</strong>
+                  <span id="retiredAgentProviderNoticeText">This provider is no longer available for Autopilot. Select and save another provider before starting a new task.</span>
+                </div>
               </div>
 
               <div id="apiProviderDetails">
@@ -176,18 +180,18 @@
                 <div class="model-combobox" id="modelCombobox">
                   <div class="model-combobox__control">
                     <div class="model-combobox__field">
-                      <input type="text" id="modelSearch" class="form-input model-combobox__input" placeholder="Search models" autocomplete="off" spellcheck="false" role="combobox" aria-expanded="false" aria-controls="modelListbox" aria-autocomplete="list" aria-haspopup="listbox" aria-label="Search and select model">
-                      <button type="button" id="modelComboboxToggle" class="model-combobox__chevron" tabindex="-1" aria-label="Toggle model list">
+                      <input type="text" id="modelSearch" class="form-input model-combobox__input" value="Provide API key to list models" placeholder="Search models" autocomplete="off" spellcheck="false" role="combobox" aria-expanded="false" aria-controls="modelListbox" aria-autocomplete="list" aria-haspopup="listbox" aria-label="Search and select model" disabled>
+                      <button type="button" id="modelComboboxToggle" class="model-combobox__chevron" tabindex="-1" aria-label="Toggle model list" disabled>
                         <i class="fas fa-chevron-down" aria-hidden="true"></i>
                       </button>
                     </div>
-                    <button id="refreshModelsBtn" type="button" class="fsb-refresh-icon" title="Refresh model list" aria-label="Refresh model list">
+                    <button id="refreshModelsBtn" type="button" class="fsb-refresh-icon" title="Refresh model list" aria-label="Refresh model list" disabled>
                       <i class="fas fa-sync-alt" aria-hidden="true"></i>
                     </button>
                   </div>
                   <ul class="model-combobox__listbox" id="modelListbox" role="listbox" aria-label="Models" tabindex="-1" hidden></ul>
-                  <select id="modelName" class="model-combobox__native" tabindex="-1" aria-hidden="true">
-                    <!-- Hidden source of truth; options populated dynamically based on provider -->
+                  <select id="modelName" class="model-combobox__native" tabindex="-1" aria-hidden="true" disabled>
+                    <option value="" disabled selected>Provide API key to list models</option>
                   </select>
                 </div>
                 <div id="modelDiscoveryStatus" class="discovery-status" hidden></div>
@@ -346,6 +350,21 @@
               <div id="agentProviderDetails" hidden>
                 <h3 id="agentProviderDetailsHeading">Agent CLI</h3>
                 <p id="agentProviderHelp" class="form-help">FSB uses this CLI's existing local sign-in. Test Connection sends one small no-tools validation request.</p>
+                <div id="grokBuildConnectionCard" class="provider-card" hidden>
+                  <div class="provider-card-header">
+                    <h3>Grok Build</h3>
+                    <span id="grokBuildAuthStatus">Checking sign-in...</span>
+                  </div>
+                  <p id="grokBuildCompatibility" class="form-help">Requires the reviewed Grok Build 1.0.4 profile. Test Connection verifies installation, version, isolation, ACP, and cached OAuth without sending a prompt.</p>
+                  <p class="form-help">Uses your signed-in Grok account. SuperGrok usage draws from its shared weekly allowance; extra usage may apply.</p>
+                  <p class="form-help">Browser task text and FSB MCP results are sent to Grok for inference. FSB disables secondary telemetry and trace uploads for this private profile.</p>
+                  <div class="agent-card-actions">
+                    <button type="button" class="control-btn primary" id="connectGrokBuildBtn">Connect SuperGrok</button>
+                    <button type="button" class="control-btn danger" id="disconnectGrokBuildBtn" hidden>Disconnect</button>
+                    <a class="control-btn" id="grokBuildLoginLink" href="#" target="_blank" rel="noopener noreferrer" hidden>Continue sign-in</a>
+                    <a class="control-btn" href="https://docs.x.ai/build/overview" target="_blank" rel="noopener noreferrer">Installation guide</a>
+                  </div>
+                </div>
               </div>
 
               <!-- Connection Status Card -->

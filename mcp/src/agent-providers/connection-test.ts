@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { Readable } from 'node:stream';
 import {
+  GROK_BUILD_ADAPTER_ID,
   freezeSpawnSpec,
   type AgentEvent,
   type AgentProviderId,
@@ -20,7 +21,6 @@ import {
 } from './process-probe.js';
 import {
   buildSanitizedAgentEnvironment,
-  CONNECTION_TEST_AGENT_ENVIRONMENT_POLICY,
   DELEGATION_AGENT_ENVIRONMENT_POLICY,
 } from './spawn-environment.js';
 
@@ -34,6 +34,7 @@ const TEMP_PREFIX = 'fsb-agent-connection-';
 export type AgentConnectionTestFailureCode =
   | 'binary_not_found'
   | 'unsupported_version'
+  | 'adapter_unavailable'
   | 'auth_unauthenticated'
   | 'connection_test_timeout'
   | 'connection_test_cancelled'
@@ -140,22 +141,39 @@ export async function testAgentProviderConnection(input: Readonly<{
     const adapter = registry.require(providerId);
     const detection = await adapter.detect();
     const compatibility = classifyAdapterCompatibility(providerId, {
-      binaryFound: detection.installed === true && detection.binary !== null,
-      version: detection.version,
+      binaryFound: detection.binary !== null,
+      // Mirrors compatibilityEvidence() in serve-delegation.ts. A retained
+      // binary whose version never parsed is a version failure, not an
+      // isolation one, but so is every version-less detection when read
+      // through the classifier alone -- only the diagnostic separates the two.
+      version: detection.version === null
+          && detection.diagnostic?.code === 'version_unparseable'
+        ? 'malformed'
+        : detection.version,
     });
     if (!detection.binary) {
       return failure(providerId, 'binary_not_found');
     }
-    if (compatibility.status === 'unsupported') {
+    if (
+      detection.diagnostic?.code === 'version_unsupported'
+      || compatibility.reason === 'below_minimum'
+      || compatibility.reason === 'wrong_major'
+      || compatibility.reason === 'version_malformed'
+    ) {
       return failure(providerId, 'unsupported_version');
     }
     if (!detection.installed) {
-      return failure(providerId, 'binary_not_found');
+      return failure(providerId, 'adapter_unavailable');
     }
     if (detection.authState === 'unauthenticated') {
       return failure(providerId, 'auth_unauthenticated');
     }
     if (signal?.aborted) return failure(providerId, 'connection_test_cancelled');
+    if (providerId === GROK_BUILD_ADAPTER_ID) {
+      return detection.authState === 'oauth'
+        ? Object.freeze({ ok: true, providerId })
+        : failure(providerId, 'connection_test_failed');
+    }
 
     directory = dependencies.createTempDirectory
       ? await dependencies.createTempDirectory()
@@ -212,9 +230,7 @@ export async function testAgentProviderConnection(input: Readonly<{
     const environment = buildSanitizedAgentEnvironment(
       dependencies.environment ?? process.env,
       processSpec.fixedEnv,
-      Object.hasOwn(processSpec.fixedEnv, 'OPENCODE_CONFIG_CONTENT')
-        ? CONNECTION_TEST_AGENT_ENVIRONMENT_POLICY
-        : DELEGATION_AGENT_ENVIRONMENT_POLICY,
+      DELEGATION_AGENT_ENVIRONMENT_POLICY,
     );
     const prompt = Buffer.from(`${CONNECTION_TEST_PROMPT}\n`, 'utf8');
     try {

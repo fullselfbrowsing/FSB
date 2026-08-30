@@ -333,6 +333,21 @@ async function testCacheHit() {
   restoreFetch();
 }
 
+async function testBypassCache() {
+  console.log('\n--- Cache: bypassCache forces a live response and refreshes metadata ---');
+  clearDiscoveryCache();
+  let calls = 0;
+  setFetch(() => { calls++; return jsonResponse(200, RESPONSE_FIXTURES.xai); });
+  const first = await discoverModels('xai', 'sk-test-xai');
+  const bypassed = await discoverModels('xai', 'sk-test-xai', { bypassCache: true });
+  const cachedAfterBypass = await discoverModels('xai', 'sk-test-xai');
+  assertEqual(first.source, 'live', 'initial response is live');
+  assertEqual(bypassed.source, 'live', 'bypassCache skips the existing cache entry');
+  assertEqual(cachedAfterBypass.source, 'cache', 'successful bypass response is still recorded for runtime validation');
+  assertEqual(calls, 2, 'bypassCache performs exactly one additional fetch');
+  restoreFetch();
+}
+
 async function testCacheKeyByApiKey() {
   console.log('\n--- Cache: distinct api keys -> distinct entries ---');
   clearDiscoveryCache();
@@ -414,6 +429,7 @@ function testProviderConfigRegistry() {
   await testMissingApiKey();
   await testUnsupportedProvider();
   await testCacheHit();
+  await testBypassCache();
   await testCacheKeyByApiKey();
   await testClearCache();
   testFallbackModelsShape();

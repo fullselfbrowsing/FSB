@@ -151,101 +151,8 @@
           requestSent: false
         });
       }
-      function parseGvizBody(body) {
-        var text = String(body || '');
-        var start = text.indexOf('{');
-        var end = text.lastIndexOf('}');
-        if (start < 0 || end <= start) { return null; }
-        var parsed;
-        try { parsed = JSON.parse(text.slice(start, end + 1)); } catch (_e) { return null; }
-        if (!parsed || parsed.status === 'error' || !parsed.table) { return null; }
-        var rows = Array.isArray(parsed.table.rows) ? parsed.table.rows : [];
-        var colCount = Array.isArray(parsed.table.cols) ? parsed.table.cols.length : 0;
-        var values = [];
-        for (var rowIndex = 0; rowIndex < rows.length; rowIndex++) {
-          var cells = rows[rowIndex] && Array.isArray(rows[rowIndex].c) ? rows[rowIndex].c : [];
-          var width = Math.max(colCount, cells.length);
-          var outputRow = [];
-          for (var columnIndex = 0; columnIndex < width; columnIndex++) {
-            var cell = cells[columnIndex];
-            if (!cell || cell.v === null || cell.v === undefined) {
-              outputRow.push('');
-            } else if (cell.f !== undefined && cell.f !== null && cell.f !== '') {
-              outputRow.push(String(cell.f));
-            } else {
-              outputRow.push(String(cell.v));
-            }
-          }
-          values.push(outputRow);
-        }
-        return {
-          range: args.range,
-          majorDimension: args.majorDimension === 'COLUMNS' ? 'COLUMNS' : 'ROWS',
-          values: args.majorDimension === 'COLUMNS' ? (function () {
-            var transposed = [];
-            var width = values.reduce(function (max, row) {
-              return Math.max(max, row.length);
-            }, 0);
-            for (var column = 0; column < width; column++) {
-              var next = [];
-              for (var row = 0; row < values.length; row++) {
-                next.push(values[row][column] !== undefined ? values[row][column] : '');
-              }
-              transposed.push(next);
-            }
-            return transposed;
-          }()) : values
-        };
-      }
-      function sameOriginGet(url) {
-        return new Promise(function (resolve) {
-          if (typeof XMLHttpRequest !== 'function') {
-            resolve({ status: 0, body: '' });
-            return;
-          }
-          try {
-            var xhr = new XMLHttpRequest();
-            xhr.open('GET', url, true);
-            xhr.withCredentials = true;
-            xhr.timeout = Math.min(Number(request.timeoutMs) || 15000, 8000);
-            xhr.onload = function () { resolve({ status: Number(xhr.status) || 0, body: String(xhr.responseText || '') }); };
-            xhr.onerror = function () { resolve({ status: 0, body: '' }); };
-            xhr.ontimeout = function () { resolve({ status: 0, body: '' }); };
-            xhr.send();
-          } catch (_xhrError) {
-            resolve({ status: 0, body: '' });
-          }
-        });
-      }
-      async function tryGvizGetValues() {
-        if (operation !== 'getValues') { return null; }
-        var rangeError = validateGetValuesRange(args.range);
-        if (rangeError) { return error(rangeError.code, rangeError); }
-        var gid = '';
-        try {
-          var href = String((pageLocation && (pageLocation.href || pageLocation.search)) || '') +
-            String((pageLocation && pageLocation.hash) || '');
-          var gidMatch = href.match(/[?&#]gid=(\d+)/);
-          if (gidMatch) { gid = gidMatch[1]; }
-        } catch (_gidError) { gid = ''; }
-        var url = '/spreadsheets/d/' + encode(spreadsheetId) + '/gviz/tq?tqx=out:json&range=' + encode(args.range);
-        if (gid) { url += '&gid=' + gid; }
-        var response = await sameOriginGet(url);
-        if (response.status !== 200 || !response.body) { return null; }
-        var data = parseGvizBody(response.body);
-        if (!data) { return null; }
-        var serialized;
-        try { serialized = JSON.stringify(data); } catch (_serializationError) { return null; }
-        if (byteLength(serialized) > 5 * 1024 * 1024) {
-          return error('GOOGLE_SHEETS_RESPONSE_TOO_LARGE', { reason: 'gviz-response-limit-exceeded', requestSent: true });
-        }
-        return { success: true, status: 200, data: data, transport: 'gviz' };
-      }
-
       var gapiClient = globalThis.gapi && globalThis.gapi.client;
       if (!gapiClient || typeof gapiClient.request !== 'function') {
-        var gvizWithoutGapi = await tryGvizGetValues();
-        if (gvizWithoutGapi) { return gvizWithoutGapi; }
         return error('GOOGLE_SHEETS_SESSION_UNAVAILABLE', {
           reason: 'page-gapi-client-unavailable',
           safeToFallback: true,
@@ -314,8 +221,6 @@
       if (settled.failure) {
         var status = statusFromFailure(settled.failure);
         if (status === 401 || status === 403) {
-          var gvizAfterReject = await tryGvizGetValues();
-          if (gvizAfterReject) { return gvizAfterReject; }
           return error('GOOGLE_SHEETS_SESSION_UNAVAILABLE', {
             reason: 'page-gapi-session-rejected',
             status: status,
@@ -345,8 +250,6 @@
       var responseStatus = Number(response.status) || 200;
       if (responseStatus >= 400) {
         if (responseStatus === 401 || responseStatus === 403) {
-          var gvizAfterStatus = await tryGvizGetValues();
-          if (gvizAfterStatus) { return gvizAfterStatus; }
           return error('GOOGLE_SHEETS_SESSION_UNAVAILABLE', {
             reason: 'page-gapi-session-rejected',
             status: responseStatus,

@@ -6,7 +6,7 @@
     'providerId', 'label', 'profileVersion', 'authState', 'billingKind'
   ];
   var AGENT_AUTH_STATES = Object.freeze([
-    'chatgpt', 'api_key', 'unauthenticated', 'unknown'
+    'chatgpt', 'api_key', 'oauth', 'unauthenticated', 'unknown'
   ]);
   var AGENT_BILLING_KINDS = Object.freeze([
     'subscription', 'api', 'unknown'
@@ -29,23 +29,38 @@
       authToBilling: { unknown: 'subscription' }
     },
     {
-      id: 'opencode',
-      label: 'OpenCode',
-      billingKind: 'unknown',
-      profileVersion: '1.14.25',
-      authToBilling: { unknown: 'unknown' }
-    },
+      id: 'grok-build',
+      label: 'Grok Build',
+      billingKind: 'subscription',
+      profileVersion: '1.0.4',
+      authToBilling: { oauth: 'subscription' }
+    }
+  ]);
+  var retiredDefinitions = deepFreeze([
     {
       id: 'codex',
       label: 'Codex',
       billingKind: 'unknown',
       profileVersion: '0.142.5',
       authToBilling: { chatgpt: 'subscription', api_key: 'api' }
+    },
+    {
+      id: 'opencode',
+      label: 'OpenCode',
+      billingKind: 'unknown',
+      profileVersion: '1.14.25',
+      authToBilling: { unknown: 'unknown' }
     }
   ]);
-  var byId = Object.create(null);
-  definitions.forEach(function(metadata) { byId[metadata.id] = metadata; });
-  Object.freeze(byId);
+  var activeById = Object.create(null);
+  var knownById = Object.create(null);
+  definitions.forEach(function(metadata) {
+    activeById[metadata.id] = metadata;
+    knownById[metadata.id] = metadata;
+  });
+  retiredDefinitions.forEach(function(metadata) { knownById[metadata.id] = metadata; });
+  Object.freeze(activeById);
+  Object.freeze(knownById);
 
   function copyMetadata(metadata) {
     if (!metadata) return null;
@@ -84,8 +99,8 @@
 
   function get(providerId) {
     if (typeof providerId !== 'string'
-        || !Object.prototype.hasOwnProperty.call(byId, providerId)) return null;
-    return copyMetadata(byId[providerId]);
+        || !Object.prototype.hasOwnProperty.call(knownById, providerId)) return null;
+    return copyMetadata(knownById[providerId]);
   }
 
   function validate(value) {
@@ -101,8 +116,8 @@
   function resolveAgentBillingKind(providerId, authState) {
     if (typeof providerId !== 'string'
         || typeof authState !== 'string'
-        || !Object.prototype.hasOwnProperty.call(byId, providerId)) return null;
-    var mapping = byId[providerId].authToBilling;
+        || !Object.prototype.hasOwnProperty.call(knownById, providerId)) return null;
+    var mapping = knownById[providerId].authToBilling;
     if (!mapping || !Object.prototype.hasOwnProperty.call(mapping, authState)) return null;
     var billingKind = mapping[authState];
     return AGENT_BILLING_KINDS.indexOf(billingKind) === -1 ? null : billingKind;
@@ -116,8 +131,8 @@
         || Array.from(record.profileVersion).length > MAX_PROFILE_VERSION_CHARS
         || AGENT_AUTH_STATES.indexOf(record.authState) === -1
         || AGENT_BILLING_KINDS.indexOf(record.billingKind) === -1) return null;
-    var metadata = Object.prototype.hasOwnProperty.call(byId, record.providerId)
-      ? byId[record.providerId]
+    var metadata = Object.prototype.hasOwnProperty.call(knownById, record.providerId)
+      ? knownById[record.providerId]
       : null;
     var billingKind = resolveAgentBillingKind(record.providerId, record.authState);
     if (!metadata
@@ -135,8 +150,8 @@
   function createAcceptedAgentIdentity(providerId, authState) {
     if (typeof providerId !== 'string'
         || typeof authState !== 'string'
-        || !Object.prototype.hasOwnProperty.call(byId, providerId)) return null;
-    var metadata = byId[providerId];
+        || !Object.prototype.hasOwnProperty.call(activeById, providerId)) return null;
+    var metadata = activeById[providerId];
     var billingKind = resolveAgentBillingKind(providerId, authState);
     if (!billingKind) return null;
     return validateAcceptedAgentIdentity({
@@ -157,7 +172,13 @@
   }
 
   function isShippedId(providerId) {
-    return get(providerId) !== null;
+    return typeof providerId === 'string'
+      && Object.prototype.hasOwnProperty.call(activeById, providerId);
+  }
+
+  function isKnownId(providerId) {
+    return typeof providerId === 'string'
+      && Object.prototype.hasOwnProperty.call(knownById, providerId);
   }
 
   var api = Object.freeze({
@@ -168,6 +189,7 @@
     ids: ids,
     list: list,
     isShippedId: isShippedId,
+    isKnownId: isKnownId,
     resolveAgentBillingKind: resolveAgentBillingKind,
     validateAcceptedAgentIdentity: validateAcceptedAgentIdentity,
     createAcceptedAgentIdentity: createAcceptedAgentIdentity

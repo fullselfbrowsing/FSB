@@ -4,8 +4,7 @@ import { homedir } from 'node:os';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import {
   CLAUDE_CODE_ADAPTER_ID,
-  CODEX_ADAPTER_ID,
-  OPENCODE_ADAPTER_ID,
+  GROK_BUILD_ADAPTER_ID,
   type AgentProviderId,
 } from './adapter.js';
 import type { ProcessInspector, ProcessTreeTerminator } from './process-tree.js';
@@ -27,6 +26,8 @@ const JOURNAL_LIMIT_BYTES = 256 * 1024;
 const RECOVERY_LIMIT_BYTES = 64 * 1024;
 const MAX_JOURNAL_ENTRIES = 256;
 const MAX_RECOVERY_DISPOSITIONS = 128;
+const RETIRED_CODEX_JOURNAL_ADAPTER_ID = 'codex' as const;
+const RETIRED_OPENCODE_JOURNAL_ADAPTER_ID = 'opencode' as const;
 
 const DELEGATION_ID_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
 const PROFILE_VERSION_PATTERN = /^[0-9A-Za-z.+-]{1,64}$/;
@@ -51,13 +52,13 @@ const RUNTIME_ROLES = Object.freeze([
 ] as const);
 const PRIVATE_ARTIFACT_KINDS = Object.freeze([
   'mcp_config',
-  'opencode_config',
-  'opencode_test_home',
-  'opencode_managed_config',
 ] as const);
 
 export type RuntimeRole = (typeof RUNTIME_ROLES)[number];
 export type RuntimePrivateArtifactKind = (typeof PRIVATE_ARTIFACT_KINDS)[number];
+export type JournalProviderId = AgentProviderId
+  | typeof RETIRED_CODEX_JOURNAL_ADAPTER_ID
+  | typeof RETIRED_OPENCODE_JOURNAL_ADAPTER_ID;
 
 const LEGACY_PREPARED_KEYS = Object.freeze([
   'adapterId',
@@ -130,8 +131,6 @@ const ACTIVATE_INPUT_KEYS = Object.freeze([
 const REMOVE_INPUT_KEYS = Object.freeze(['delegationId', 'role']);
 const MCP_ARTIFACT_KEYS = Object.freeze(['endpoint', 'kind']);
 export const DELEGATION_ID_HEADER = 'x-fsb-delegation-id';
-const OPENCODE_CONFIG_ARTIFACT_KEYS = Object.freeze(['contents', 'kind']);
-const DIRECTORY_ARTIFACT_KEYS = Object.freeze(['kind']);
 
 export type RuntimeFilesErrorCode =
   | 'invalid_runtime_input'
@@ -153,7 +152,7 @@ export interface PreparedJournalEntry {
   readonly state: 'prepared';
   readonly role: RuntimeRole;
   readonly delegationId: string;
-  readonly adapterId: AgentProviderId;
+  readonly adapterId: JournalProviderId;
   readonly profileVersion: string;
   readonly createdAt: number;
   readonly binaryRealPath: string;
@@ -167,7 +166,7 @@ export interface ActiveJournalEntry {
   readonly state: 'active';
   readonly role: RuntimeRole;
   readonly delegationId: string;
-  readonly adapterId: AgentProviderId;
+  readonly adapterId: JournalProviderId;
   readonly profileVersion: string;
   readonly createdAt: number;
   readonly binaryRealPath: string;
@@ -226,24 +225,7 @@ export interface McpConfigRuntimeArtifact {
   readonly endpoint: string;
 }
 
-export interface OpenCodeConfigRuntimeArtifact {
-  readonly kind: 'opencode_config';
-  readonly contents: string;
-}
-
-export interface OpenCodeTestHomeRuntimeArtifact {
-  readonly kind: 'opencode_test_home';
-}
-
-export interface OpenCodeManagedConfigRuntimeArtifact {
-  readonly kind: 'opencode_managed_config';
-}
-
-export type RuntimePrivateArtifact =
-  | McpConfigRuntimeArtifact
-  | OpenCodeConfigRuntimeArtifact
-  | OpenCodeTestHomeRuntimeArtifact
-  | OpenCodeManagedConfigRuntimeArtifact;
+export type RuntimePrivateArtifact = McpConfigRuntimeArtifact;
 
 export interface RoleAwarePrepareRunInput {
   readonly role: RuntimeRole;
@@ -296,7 +278,7 @@ export interface RuntimeRunPaths {
 
 export interface AgentRecoveryProfileSummary {
   readonly role: RuntimeRole;
-  readonly adapterId: AgentProviderId;
+  readonly adapterId: JournalProviderId;
   readonly profileVersion: string;
   readonly confirmedKilled: number;
   readonly staleCleared: number;
@@ -428,17 +410,24 @@ function isRuntimeRole(value: unknown): value is RuntimeRole {
     || value === 'policy_preflight';
 }
 
-function isAllowedRoleAdapter(role: RuntimeRole, adapterId: unknown): adapterId is AgentProviderId {
-  if (role === 'provider_server' || role === 'policy_preflight') {
-    return adapterId === OPENCODE_ADAPTER_ID;
+function isActiveRoleAdapter(role: RuntimeRole, adapterId: unknown): adapterId is AgentProviderId {
+  if (role === 'provider_server') return false;
+  if (role === 'policy_preflight') {
+    return adapterId === GROK_BUILD_ADAPTER_ID;
   }
   return adapterId === CLAUDE_CODE_ADAPTER_ID
-    || adapterId === OPENCODE_ADAPTER_ID
-    || adapterId === CODEX_ADAPTER_ID;
+    || adapterId === GROK_BUILD_ADAPTER_ID;
 }
 
-function normalizedFieldName(value: string): string {
-  return value.replace(/([a-z0-9])([A-Z])/g, '$1_$2').replace(/[- ]/g, '_').toUpperCase();
+function isRecoverableRoleAdapter(
+  role: RuntimeRole,
+  adapterId: unknown,
+): adapterId is JournalProviderId {
+  if (adapterId === RETIRED_CODEX_JOURNAL_ADAPTER_ID) {
+    return role === 'direct' || role === 'delegation';
+  }
+  if (adapterId === RETIRED_OPENCODE_JOURNAL_ADAPTER_ID) return true;
+  return isActiveRoleAdapter(role, adapterId);
 }
 
 function containsCredentialUrl(value: string): boolean {
@@ -478,39 +467,6 @@ function cloneFixedEnv(value: unknown): Readonly<Record<string, string>> | null 
   return Object.freeze(clone);
 }
 
-function isSafePublicDocument(
-  value: unknown,
-  state: { nodes: number },
-  depth = 0,
-): boolean {
-  state.nodes += 1;
-  if (state.nodes > 4096 || depth > 32) return false;
-  if (value === null || typeof value === 'boolean') return true;
-  if (typeof value === 'number') return Number.isFinite(value);
-  if (typeof value === 'string') {
-    return value.length <= 64 * 1024 && !isSecretBearingString(value);
-  }
-  if (Array.isArray(value)) {
-    return isDenseDataArray(value, 1024)
-      && value.every((entry) => isSafePublicDocument(entry, state, depth + 1));
-  }
-  if (!isOwnDataRecord(value) || Object.keys(value).length > 256) return false;
-  for (const [key, entry] of Object.entries(value)) {
-    const normalized = normalizedFieldName(key);
-    if (
-      SECRET_ENV_KEY_PATTERN.test(normalized)
-      || normalized === 'HEADERS'
-      || normalized === 'RESOLVED_ENV'
-      || normalized === 'SPAWN_SECRET_ENV_BINDINGS'
-      || normalized === 'RAW_SECRET'
-      || normalized === 'RAW_SECRET_BYTES'
-      || normalized === 'ENDPOINT_CREDENTIALS'
-    ) return false;
-    if (!isSafePublicDocument(entry, state, depth + 1)) return false;
-  }
-  return true;
-}
-
 function isPreparedEntry(value: unknown): value is PreparedJournalEntry {
   if (!isOwnDataRecord(value)) return false;
   const entry = value;
@@ -520,7 +476,7 @@ function isPreparedEntry(value: unknown): value is PreparedJournalEntry {
     && isRuntimeRole(entry.role)
     && typeof entry.delegationId === 'string'
     && DELEGATION_ID_PATTERN.test(entry.delegationId)
-    && isAllowedRoleAdapter(entry.role, entry.adapterId)
+    && isRecoverableRoleAdapter(entry.role, entry.adapterId)
     && typeof entry.profileVersion === 'string'
     && PROFILE_VERSION_PATTERN.test(entry.profileVersion)
     && isSafeInteger(entry.createdAt)
@@ -751,30 +707,6 @@ function validatePrivateArtifacts(
       artifacts.push(Object.freeze({ kind: 'mcp_config', endpoint }));
       continue;
     }
-    if (candidate.kind === 'opencode_config') {
-      if (
-        !exactKeys(candidate, OPENCODE_CONFIG_ARTIFACT_KEYS)
-        || typeof candidate.contents !== 'string'
-        || Buffer.byteLength(candidate.contents, 'utf8') > 128 * 1024
-      ) return null;
-      let document: unknown;
-      try {
-        document = JSON.parse(candidate.contents) as unknown;
-      } catch {
-        return null;
-      }
-      if (!isOwnDataRecord(document) || !isSafePublicDocument(document, { nodes: 0 })) return null;
-      artifacts.push(Object.freeze({ kind: 'opencode_config', contents: candidate.contents }));
-      continue;
-    }
-    if (
-      candidate.kind === 'opencode_test_home'
-      || candidate.kind === 'opencode_managed_config'
-    ) {
-      if (!exactKeys(candidate, DIRECTORY_ARTIFACT_KEYS)) return null;
-      artifacts.push(Object.freeze({ kind: candidate.kind }));
-      continue;
-    }
     return null;
   }
   const kinds = artifacts.map((artifact) => artifact.kind);
@@ -782,9 +714,7 @@ function validatePrivateArtifacts(
     ? []
     : adapterId === CLAUDE_CODE_ADAPTER_ID && role === 'delegation'
     ? ['mcp_config']
-    : adapterId === OPENCODE_ADAPTER_ID
-      ? ['opencode_config', 'opencode_test_home', 'opencode_managed_config']
-      : [];
+    : [];
   return kinds.length === expected.length
     && kinds.every((kind, index) => kind === expected[index])
     ? Object.freeze(artifacts)
@@ -814,7 +744,7 @@ function validatePrepareInput(input: PrepareRunInput): ValidatedPrepareRun {
     artifacts = Object.freeze([Object.freeze({ kind: 'mcp_config', endpoint })]);
   } else if (exactKeys(record, PREPARE_INPUT_KEYS) && isRuntimeRole(record.role)) {
     role = record.role;
-    if (!isAllowedRoleAdapter(role, record.adapterId)) {
+    if (!isActiveRoleAdapter(role, record.adapterId)) {
       throw new RuntimeFilesError('invalid_runtime_input', 'Prepared runtime state is invalid');
     }
     const clonedFixedEnv = cloneFixedEnv(record.fixedEnv);
@@ -1097,7 +1027,10 @@ export class AgentRuntimeFiles {
   ): Promise<readonly AgentRestartLossDisposition[]> {
     if (
       (!isPreparedEntry(entry) && !isActiveEntry(entry))
-      || entry.role !== 'delegation'
+      || (
+        entry.role !== 'delegation'
+        && entry.adapterId !== RETIRED_CODEX_JOURNAL_ADAPTER_ID
+      )
       || !isRecoveryDisposition(disposition)
       || disposition.delegationId !== entry.delegationId
     ) {
@@ -1208,7 +1141,9 @@ export class AgentRuntimeFiles {
 
   private hasValidRuntimePaths(entry: JournalEntry): boolean {
     if (entry.role === 'direct') return true;
-    if (entry.adapterId !== OPENCODE_ADAPTER_ID) return entry.role === 'delegation';
+    if (entry.adapterId !== RETIRED_OPENCODE_JOURNAL_ADAPTER_ID) {
+      return entry.role === 'delegation' || entry.role === 'policy_preflight';
+    }
     const paths = this.pathsFor(entry.delegationId);
     const fixedEnv = entry.fixedEnv;
     return fixedEnv.XDG_CONFIG_HOME === paths.opencodeConfigRoot
@@ -1296,17 +1231,6 @@ export class AgentRuntimeFiles {
         this.atomicWrite(paths.mcpConfigPath, `${JSON.stringify(config)}\n`, false);
         continue;
       }
-      if (artifact.kind === 'opencode_config') {
-        this.ensureDirectory(paths.opencodeConfigRoot);
-        this.ensureDirectory(paths.opencodeConfigDirectory);
-        this.atomicWrite(paths.opencodeConfigPath, artifact.contents, false);
-        continue;
-      }
-      if (artifact.kind === 'opencode_test_home') {
-        this.ensureDirectory(paths.opencodeTestHomePath);
-        continue;
-      }
-      this.ensureDirectory(paths.opencodeManagedConfigPath);
     }
   }
 
@@ -1455,7 +1379,7 @@ export class AgentRuntimeFiles {
         this.requireSecureDirectory(directory, [MCP_CONFIG_FILENAME]);
         this.requireSecureFile(paths.mcpConfigPath);
         this.fs.unlinkSync(paths.mcpConfigPath);
-      } else if (entry.adapterId === OPENCODE_ADAPTER_ID) {
+      } else if (entry.adapterId === RETIRED_OPENCODE_JOURNAL_ADAPTER_ID) {
         this.requireSecureDirectory(directory, [
           OPENCODE_CONFIG_ROOT_DIRECTORY,
           OPENCODE_TEST_HOME_DIRECTORY,
@@ -1494,7 +1418,7 @@ type RecoveryCategory = 'confirmedKilled' | 'staleCleared' | 'ambiguousFailClose
 
 interface MutableRecoveryProfileSummary {
   role: RuntimeRole;
-  adapterId: AgentProviderId;
+  adapterId: JournalProviderId;
   profileVersion: string;
   confirmedKilled: number;
   staleCleared: number;
@@ -1608,7 +1532,10 @@ class JournalStartupRecovery implements AgentStartupRecovery {
     entry: JournalEntry,
     restartLosses: readonly AgentRestartLossDisposition[],
   ): Promise<readonly AgentRestartLossDisposition[]> {
-    if (entry.role !== 'delegation') {
+    if (
+      entry.role !== 'delegation'
+      && entry.adapterId !== RETIRED_CODEX_JOURNAL_ADAPTER_ID
+    ) {
       return this.dependencies.runtimeFiles.removeRecoveredRun(entry).then(() => restartLosses);
     }
     const recoveredAt = this.dependencies.now();

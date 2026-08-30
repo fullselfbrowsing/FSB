@@ -1,5 +1,11 @@
 import { randomUUID } from 'node:crypto';
-import type { BridgeMode, BridgeOptions, BridgeTopologyState, ExtRequestHandler } from '../types.js';
+import type {
+  BridgeMode,
+  BridgeOptions,
+  BridgeTopologyState,
+  ExtEvent,
+  ExtRequestHandler,
+} from '../types.js';
 import { WebSocketBridge } from '../bridge.js';
 import { startHttpServer } from '../http.js';
 import { pushMcpClientInventory } from '../client-inventory.js';
@@ -21,12 +27,26 @@ import {
   type SpawnSupervisorCloseResult,
 } from './spawn-supervisor.js';
 import type { AdapterAuthState, DirectRuntimeReference } from './adapter.js';
+import { GROK_BUILD_ADAPTER_ID } from './adapter.js';
 import { createDirectRuntimeReference } from './effective-authority.js';
 import {
   testAgentProviderConnection,
   type AgentConnectionTestResult,
 } from './connection-test.js';
 import type { AgentProviderId } from './adapter.js';
+import {
+  createGrokBuildAuthCoordinator,
+  type GrokBuildAuthCoordinator,
+  type GrokBuildAuthProgress,
+} from './grok-auth.js';
+import {
+  createGrokBuildPrivateRuntime,
+  type GrokBuildPrivateRuntime,
+} from './grok-runtime.js';
+import { logDelegationEvent } from './delegation-log.js';
+
+const GROK_LOGIN_SENSITIVE_QUERY_KEY =
+  /(?:token|secret|password|credential|api[_-]?key|authorization)/i;
 
 export interface ServeDelegationBridge {
   connect(): Promise<void>;
@@ -69,8 +89,16 @@ export interface ServeDelegationDependencies {
     endpoint: string,
     onDegraded: (code: 'tree_unsettled' | 'runtime_cleanup_failed') => void,
     directRuntimeReference: DirectRuntimeReference,
+    grokBuildAuthCoordinator: GrokBuildAuthCoordinator,
+    grokBuildRuntime: GrokBuildPrivateRuntime,
   ) => SpawnSupervisor;
-  readonly createCompatibilityRegistry?: () => AgentProviderRegistry;
+  readonly createCompatibilityRegistry?: (
+    grokBuildRuntime: GrokBuildPrivateRuntime,
+  ) => AgentProviderRegistry;
+  readonly createGrokBuildRuntime?: () => GrokBuildPrivateRuntime;
+  readonly createGrokBuildAuthCoordinator?: (
+    runtime: GrokBuildPrivateRuntime,
+  ) => GrokBuildAuthCoordinator;
   readonly runConnectionTest?: (input: Readonly<{
     providerId: AgentProviderId;
     registry: AgentProviderRegistry;
@@ -80,6 +108,7 @@ export interface ServeDelegationDependencies {
   readonly mintGeneration?: () => string;
   readonly prepareBridgeAuth?: () => void | Promise<void>;
   readonly pushInventory?: (bridge: ServeDelegationBridge) => Promise<void>;
+  readonly scheduleDegradedShutdown?: (run: () => void) => void;
   readonly registerSignal?: (
     signal: 'SIGTERM' | 'SIGINT',
     handler: () => void,
@@ -117,6 +146,7 @@ const EMPTY_CLOSE_RESULT: SpawnSupervisorCloseResult = Object.freeze({
   alreadySettled: 0,
 });
 const MAX_COMPATIBILITY_ADAPTERS = 16;
+const DEGRADED_SHUTDOWN_FLUSH_MS = 250;
 
 function defaultDependencies(): Required<ServeDelegationDependencies> {
   return {
@@ -128,21 +158,36 @@ function defaultDependencies(): Required<ServeDelegationDependencies> {
       bridge: options.bridge as WebSocketBridge,
       queue: options.queue as TaskQueue,
     }),
-    createSupervisor: (endpoint, onDegraded, directRuntimeReference) => createProductionSpawnSupervisor({
+    createSupervisor: (
       endpoint,
       onDegraded,
       directRuntimeReference,
+      grokBuildAuthCoordinator,
+      grokBuildRuntime,
+    ) => createProductionSpawnSupervisor({
+      endpoint,
+      onDegraded,
+      directRuntimeReference,
+      grokBuildAuthCoordinator,
+      grokBuildRuntime,
     }),
-    createCompatibilityRegistry: () => createProductionAdapterRegistry({
+    createCompatibilityRegistry: (grokBuildRuntime) => createProductionAdapterRegistry({
+      grokBuildRuntime,
       kill: async () => {
         throw new Error('Compatibility registry has no process-termination authority');
       },
     }),
+    createGrokBuildRuntime: () => createGrokBuildPrivateRuntime(),
+    createGrokBuildAuthCoordinator: (runtime) => createGrokBuildAuthCoordinator({ runtime }),
     runConnectionTest: testAgentProviderConnection,
     now: () => Date.now(),
     mintGeneration: () => randomUUID(),
     prepareBridgeAuth: () => undefined,
     pushInventory: async (bridge) => pushMcpClientInventory(bridge as WebSocketBridge),
+    // A degraded latch fires while the failing run is still resolving its ext
+    // response. Exiting in the same tick strands the extension on a 47-minute
+    // timeout, so the shutdown yields long enough for that reply to flush.
+    scheduleDegradedShutdown: (run) => { setTimeout(run, DEGRADED_SHUTDOWN_FLUSH_MS).unref?.(); },
     registerSignal: (signal, handler) => process.on(signal, handler),
     exit: (code) => process.exit(code),
   };
@@ -173,8 +218,7 @@ function exactConnectionTestProviderId(value: unknown): AgentProviderId | null {
     || !Object.hasOwn(descriptor, 'value')
     || (
       descriptor.value !== 'claude-code'
-      && descriptor.value !== 'opencode'
-      && descriptor.value !== 'codex'
+      && descriptor.value !== GROK_BUILD_ADAPTER_ID
     )
   ) {
     return null;
@@ -290,8 +334,7 @@ function safeAuthState(detection: unknown): AdapterAuthState {
   if (!detection || typeof detection !== 'object' || Array.isArray(detection)) return 'unknown';
   if (Object.getPrototypeOf(detection) !== Object.prototype) return 'unknown';
   const authState = ownDataValue(detection, 'authState');
-  return authState === 'chatgpt'
-    || authState === 'api_key'
+  return authState === 'oauth'
     || authState === 'unauthenticated'
     || authState === 'unknown'
     ? authState
@@ -385,6 +428,122 @@ export async function startServeDelegation(
   let compatibilityRegistry: AgentProviderRegistry | null = null;
   let degraded = false;
   let requestDegradedShutdown: (() => void) | null = null;
+  const grokBuildRuntime = dependencies.createGrokBuildRuntime();
+  const grokBuildAuthCoordinator = dependencies.createGrokBuildAuthCoordinator(
+    grokBuildRuntime,
+  );
+
+  const exactGrokAuthProvider = (value: unknown): boolean => (
+    value !== null
+    && typeof value === 'object'
+    && !Array.isArray(value)
+    && Object.getPrototypeOf(value) === Object.prototype
+    && Reflect.ownKeys(value).length === 1
+    && ownDataValue(value, 'providerId') === GROK_BUILD_ADAPTER_ID
+  );
+
+  const grokAuthStateOnly = (value: unknown): Readonly<{ state: AdapterAuthState }> => {
+    if (
+      value === null
+      || typeof value !== 'object'
+      || Array.isArray(value)
+      || Object.getPrototypeOf(value) !== Object.prototype
+      || Reflect.ownKeys(value).length !== 1
+    ) throw new TypeError('Invalid provider auth result');
+    const state = ownDataValue(value, 'state');
+    if (state !== 'oauth' && state !== 'unauthenticated' && state !== 'unknown') {
+      throw new TypeError('Invalid provider auth result');
+    }
+    return Object.freeze({ state });
+  };
+
+  // Logout answers with one of exactly two shapes: the settled state, or the
+  // locked marker the panel turns into "a task is active". A handler throw
+  // cannot carry that distinction -- the bridge rewrites every one of them to a
+  // single opaque code -- so the refusal rides the payload instead.
+  const grokLogoutResult = (value: unknown): Readonly<Record<string, unknown>> => {
+    if (
+      value === null
+      || typeof value !== 'object'
+      || Array.isArray(value)
+      || Object.getPrototypeOf(value) !== Object.prototype
+    ) throw new TypeError('Invalid provider auth result');
+    const keys = Reflect.ownKeys(value);
+    const state = ownDataValue(value, 'state');
+    if (keys.length === 1 && state === 'unauthenticated') {
+      return Object.freeze({ state });
+    }
+    if (
+      keys.length === 2
+      && state === 'unknown'
+      && ownDataValue(value, 'locked') === true
+    ) {
+      return Object.freeze({ state, locked: true });
+    }
+    throw new TypeError('Invalid provider auth result');
+  };
+
+  const canonicalGrokLoginUrl = (value: unknown): string | null => {
+    if (typeof value !== 'string' || value.length === 0 || value.length > 2_048) return null;
+    try {
+      const parsed = new URL(value);
+      if (
+        parsed.hash !== ''
+        || [...parsed.searchParams.keys()].some((key) => (
+          GROK_LOGIN_SENSITIVE_QUERY_KEY.test(key)
+        ))
+      ) return null;
+      return parsed.protocol === 'https:'
+        && parsed.username === ''
+        && parsed.password === ''
+        && ['auth.x.ai', 'accounts.x.ai', 'grok.com', 'auth.grok.com']
+          .includes(parsed.hostname.toLowerCase())
+        ? parsed.toString()
+        : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const emitAuthProgress = (
+    requestId: string,
+    emit: (event: ExtEvent) => void,
+    progress: GrokBuildAuthProgress,
+  ): void => {
+    if (
+      progress === null
+      || typeof progress !== 'object'
+      || Array.isArray(progress)
+      || Object.getPrototypeOf(progress) !== Object.prototype
+    ) throw new TypeError('Invalid provider auth progress');
+    const keys = Reflect.ownKeys(progress);
+    const state = ownDataValue(progress, 'state');
+    if (
+      !['opening_browser', 'waiting', 'authenticated', 'failed', 'cancelled'].includes(
+        typeof state === 'string' ? state : '',
+      )
+    ) throw new TypeError('Invalid provider auth progress');
+    const rawUrl = keys.length === 2 && keys.includes('state') && keys.includes('url')
+      ? ownDataValue(progress, 'url')
+      : null;
+    if (keys.length !== (rawUrl === null ? 1 : 2) || !keys.includes('state')) {
+      throw new TypeError('Invalid provider auth progress');
+    }
+    const url = rawUrl === null ? null : canonicalGrokLoginUrl(rawUrl);
+    if (rawUrl !== null && (state !== 'waiting' || !url)) {
+      throw new TypeError('Invalid provider auth progress');
+    }
+    emit({
+      id: requestId,
+      type: 'ext:event',
+      event: 'provider.auth.progress',
+      payload: Object.freeze({
+        providerId: GROK_BUILD_ADAPTER_ID,
+        state,
+        ...(url ? { url } : {}),
+      }),
+    });
+  };
 
   const handleExtRequest: ExtRequestHandler = async (request, emit, context) => {
     if (!supervisor) throw new ServeDelegationStartupError();
@@ -392,7 +551,7 @@ export async function startServeDelegation(
       if (!isExactEmptyPayload(request.payload)) {
         throw new TypeError('Invalid adapter compatibility request');
       }
-      compatibilityRegistry ??= dependencies.createCompatibilityRegistry();
+      compatibilityRegistry ??= dependencies.createCompatibilityRegistry(grokBuildRuntime);
       const snapshot = await collectCompatibilitySnapshot(
         compatibilityRegistry,
         dependencies.now(),
@@ -402,13 +561,34 @@ export async function startServeDelegation(
     if (request.method === 'provider.test-connection') {
       const providerId = exactConnectionTestProviderId(request.payload);
       if (!providerId) throw new TypeError('Invalid provider connection test request');
-      compatibilityRegistry ??= dependencies.createCompatibilityRegistry();
+      compatibilityRegistry ??= dependencies.createCompatibilityRegistry(grokBuildRuntime);
       const result = await dependencies.runConnectionTest({
         providerId,
         registry: compatibilityRegistry,
         ...(context?.signal ? { signal: context.signal } : {}),
       });
       return result as unknown as Record<string, unknown>;
+    }
+    if (request.method === 'provider.auth.status') {
+      if (!exactGrokAuthProvider(request.payload)) {
+        throw new TypeError('Invalid provider auth status request');
+      }
+      return grokAuthStateOnly(await grokBuildAuthCoordinator.status());
+    }
+    if (request.method === 'provider.auth.begin') {
+      if (!exactGrokAuthProvider(request.payload)) {
+        throw new TypeError('Invalid provider auth begin request');
+      }
+      return grokAuthStateOnly(await grokBuildAuthCoordinator.begin(
+        (progress) => emitAuthProgress(request.id, emit, progress),
+        context?.signal,
+      ));
+    }
+    if (request.method === 'provider.auth.logout') {
+      if (!exactGrokAuthProvider(request.payload)) {
+        throw new TypeError('Invalid provider auth logout request');
+      }
+      return grokLogoutResult(await grokBuildAuthCoordinator.logout());
     }
     return supervisor.handleExtRequest(request, emit, context);
   };
@@ -432,7 +612,7 @@ export async function startServeDelegation(
     supervisor = dependencies.createSupervisor(httpServer.endpoint, () => {
       degraded = true;
       requestDegradedShutdown?.();
-    }, directRuntimeReference);
+    }, directRuntimeReference, grokBuildAuthCoordinator, grokBuildRuntime);
     const recovery = await supervisor.recover();
     if (!recovery.spawnAvailable) throw new ServeDelegationStartupError();
     await dependencies.prepareBridgeAuth();
@@ -469,6 +649,9 @@ export async function startServeDelegation(
         failed = true;
       }
       const exitCode = failed ? 1 : 0;
+      // Written before exit so a degraded shutdown leaves a reason behind; the
+      // daemon runs with stdio ignored, so this file is its only voice.
+      logDelegationEvent({ event: 'daemon_shutdown', exitCode, degraded });
       dependencies.exit(exitCode);
       if (failed) throw new ServeDelegationShutdownError();
       return Object.freeze({ supervisor: supervisorResult, exitCode });
@@ -477,7 +660,9 @@ export async function startServeDelegation(
   };
 
   requestDegradedShutdown = () => {
-    void shutdown().catch(() => undefined);
+    dependencies.scheduleDegradedShutdown(() => {
+      void shutdown().catch(() => undefined);
+    });
   };
   if (degraded) requestDegradedShutdown();
 

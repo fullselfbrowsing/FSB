@@ -63,16 +63,11 @@ async function testExactUnownedRefresh() {
   const context = {
     MY_SURFACE: 'legacy:sidepanel',
     FSBOwnerChip: OwnerChip,
-    FsbAgentRegistry: { formatAgentIdForDisplay: (id) => id },
-    statusText: { textContent: 'Owned by Claude' },
+    statusText: { textContent: 'Ready' },
     statusDot: { classList: makeClassList() },
     chatInput: { title: '', removeAttribute() {} },
     _headerBaseStatusLabel: 'Ready',
     _headerBaseStatusTone: '',
-    _headerOwnerLabel: 'Claude',
-    _headerOwnerAgentId: 'agent_a',
-    _headerOwnerTabId: 10,
-    _headerOwnerWindowId: 1,
     _ownerStatusRefreshGeneration: 0,
     _activeTabSurfaceSyncGeneration: 1,
     _chatLockedByOwnerChip: true,
@@ -85,8 +80,7 @@ async function testExactUnownedRefresh() {
         session: {
           async get() {
             return {
-              fsbAgentRegistry: { v: 1, records: { agent_a: { tabIds: [10] } } },
-              fsbAgentClientLabels: { agent_a: 'Claude' }
+              fsbAgentRegistry: { v: 1, records: { agent_a: { tabIds: [10] } } }
             };
           }
         }
@@ -97,16 +91,14 @@ async function testExactUnownedRefresh() {
     console: { warn() {} }
   };
   vm.createContext(context);
-  ['_renderHeaderStatus', '_setHeaderOwner', 'refreshOwnerChip'].forEach((name) => {
-    vm.runInContext(extractNamedFunction(sidepanelSource, name), context);
-  });
+  vm.runInContext(extractNamedFunction(sidepanelSource, 'refreshActiveTabOwnership'), context);
 
-  const result = await context.refreshOwnerChip(20, 1);
+  const result = await context.refreshActiveTabOwnership(20, 1);
   assert.strictEqual(result.verified, true);
   assert.strictEqual(result.tabId, 20);
   assert.strictEqual(result.foreignOwned, false);
   assert.strictEqual(queryCalls, 0, 'exact activation tab bypasses a stale active-tab query');
-  assert.strictEqual(context._headerOwnerLabel, null);
+  assert.strictEqual(context.statusText.textContent, 'Ready');
   assert.strictEqual(context._chatLockedByOwnerChip, false);
   assert.strictEqual(lockCalls.at(-1), false, 'verified unowned tab unlocks the composer');
 }
@@ -118,16 +110,11 @@ async function testOwnershipReadFailureIsFailSafe() {
   const context = {
     MY_SURFACE: 'legacy:sidepanel',
     FSBOwnerChip: OwnerChip,
-    FsbAgentRegistry: { formatAgentIdForDisplay: (id) => id },
-    statusText: { textContent: 'Owned by Claude' },
+    statusText: { textContent: 'Working' },
     statusDot: { classList: makeClassList() },
-    chatInput: { title: 'Disabled while tab is owned by Claude', removeAttribute() {} },
-    _headerBaseStatusLabel: 'Ready',
-    _headerBaseStatusTone: '',
-    _headerOwnerLabel: 'Claude',
-    _headerOwnerAgentId: 'agent_a',
-    _headerOwnerTabId: 10,
-    _headerOwnerWindowId: 1,
+    chatInput: { title: 'Disabled while automation is working on this tab', removeAttribute() {} },
+    _headerBaseStatusLabel: 'Working',
+    _headerBaseStatusTone: 'running',
     _ownerStatusRefreshGeneration: 0,
     _activeTabSurfaceSyncGeneration: 1,
     _chatLockedByOwnerChip: true,
@@ -140,13 +127,11 @@ async function testOwnershipReadFailureIsFailSafe() {
     console: { warn(...args) { warnings.push(args); } }
   };
   vm.createContext(context);
-  ['_renderHeaderStatus', '_setHeaderOwner', 'refreshOwnerChip'].forEach((name) => {
-    vm.runInContext(extractNamedFunction(sidepanelSource, name), context);
-  });
+  vm.runInContext(extractNamedFunction(sidepanelSource, 'refreshActiveTabOwnership'), context);
 
-  const result = await context.refreshOwnerChip(20, 1);
+  const result = await context.refreshActiveTabOwnership(20, 1);
   assert.strictEqual(result.verified, false);
-  assert.strictEqual(context._headerOwnerLabel, 'Claude');
+  assert.strictEqual(context.statusText.textContent, 'Working');
   assert.strictEqual(context._chatLockedByOwnerChip, true);
   assert.deepStrictEqual(lockCalls, [], 'failed storage read is not proof that the tab is unowned');
   assert.strictEqual(warnings.length, 1, 'ownership read failure emits a diagnostic');
@@ -171,7 +156,7 @@ async function testUnifiedSyncAndRace() {
       }
     },
     _persistTabStatusIntent() {},
-    async refreshOwnerChip(tabId) {
+    async refreshActiveTabOwnership(tabId) {
       calls.owner.push(tabId);
       return { verified: true, tabId, ownerAgentId: null, foreignOwned: false };
     },
@@ -181,7 +166,6 @@ async function testUnifiedSyncAndRace() {
     setIdleState(tabId) { calls.idle.push(tabId); },
     _restoreTabStatusIntent() {},
     async _hydrateDelegationForSelectedConversation() { calls.hydrate += 1; },
-    _setHeaderOwner() {},
     applyInputLockout() {},
     console: { warn() {} }
   };
@@ -199,7 +183,7 @@ async function testUnifiedSyncAndRace() {
 
   let resolveOld;
   calls.swap.length = 0;
-  context.refreshOwnerChip = async (tabId) => {
+  context.refreshActiveTabOwnership = async (tabId) => {
     if (tabId === 30) return new Promise((resolve) => { resolveOld = resolve; });
     return { verified: true, tabId, ownerAgentId: null, foreignOwned: false };
   };

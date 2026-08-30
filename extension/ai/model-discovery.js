@@ -351,6 +351,9 @@
   //
   // opts.timeoutMs (optional): overrides the 5000ms default. Tests use a small
   //   value to exercise the timeout branch deterministically.
+  // opts.bypassCache (optional): skips cache reads while still recording a
+  //   successful live response. The Control Panel uses this so its model list
+  //   always reflects the provider's current response.
   // ---------------------------------------------------------------------------
   async function discoverModels(provider, apiKey, opts) {
     const options = opts || {};
@@ -376,6 +379,7 @@
     }
 
     const cacheable = cfg.cacheable !== false;
+    const bypassCache = options.bypassCache === true;
     let key = null;
     if (cacheable) {
       // Phase 232: hydrate persistent cache before reading (no-op in tests).
@@ -383,9 +387,11 @@
 
       // Cache hit?
       key = _cacheKey(provider, apiKey);
-      const cached = _cache.get(key);
-      if (cached && cached.expiresAt > Date.now()) {
-        return Object.assign({}, cached.result, { source: 'cache' });
+      if (!bypassCache) {
+        const cached = _cache.get(key);
+        if (cached && cached.expiresAt > Date.now()) {
+          return Object.assign({}, cached.result, { source: 'cache' });
+        }
       }
     }
 

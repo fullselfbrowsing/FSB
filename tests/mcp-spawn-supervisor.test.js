@@ -2,6 +2,8 @@
 
 const assert = require('node:assert/strict');
 const { EventEmitter } = require('node:events');
+const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 const { PassThrough, Writable } = require('node:stream');
 const { pathToFileURL } = require('node:url');
@@ -60,13 +62,6 @@ const ACCEPTED_IDENTITIES = Object.freeze({
     profileVersion: '1.14.25',
     authState: 'unknown',
     billingKind: 'unknown',
-  }),
-  codex: Object.freeze({
-    providerId: 'codex',
-    label: 'Codex',
-    profileVersion: '0.142.5',
-    authState: 'chatgpt',
-    billingKind: 'subscription',
   }),
 });
 
@@ -148,74 +143,6 @@ function authorityDocument(endpoint = 'http://127.0.0.1:7226/mcp', overrides = {
       defaultToolsApprovalMode: 'approve',
       ...overrides,
     }],
-  };
-}
-
-function codexAuthorityConfig(endpoint = 'http://127.0.0.1:7226/mcp') {
-  return [
-    '-c', 'project_doc_max_bytes=0',
-    '-c', 'mcp_servers={}',
-    '-c', `mcp_servers.fsb.url=${JSON.stringify(endpoint)}`,
-    '-c', 'mcp_servers.fsb.required=true',
-    '-c', 'mcp_servers.fsb.enabled=true',
-    '-c', 'mcp_servers.fsb.enabled_tools=["search_capabilities","invoke_capability"]',
-    '-c', 'mcp_servers.fsb.default_tools_approval_mode="approve"',
-  ];
-}
-
-function codexAuthorityStdin(cwd) {
-  return Object.freeze(Array.from(Buffer.from(`${[
-    {
-      method: 'initialize',
-      id: 1,
-      params: {
-        clientInfo: {
-          name: 'fsb_codex_authority',
-          title: 'Full Self-Browsing Codex Authority',
-          version: '0.142.5',
-        },
-        capabilities: {
-          optOutNotificationMethods: ['remoteControl/status/changed'],
-        },
-      },
-    },
-    { method: 'initialized', params: {} },
-    { method: 'config/read', id: 2, params: { includeLayers: false, cwd } },
-  ].map((document) => JSON.stringify(document)).join('\n')}\n`)));
-}
-
-function codexAuthorityResponsePrefix() {
-  return Object.freeze(Array.from(Buffer.from('{"id":2,"result":', 'utf8')));
-}
-
-function codexAuthorityOutput(mcpServers) {
-  return `${[
-    {
-      id: 1,
-      result: {
-        userAgent: 'codex_cli_rs/0.142.5',
-        codexHome: '/fixture/codex-home',
-        platformFamily: 'unix',
-        platformOs: 'linux',
-      },
-    },
-    { method: 'remoteControl/status/changed', params: {} },
-    {
-      id: 2,
-      result: { config: { mcp_servers: mcpServers }, origins: {} },
-    },
-  ].map((document) => JSON.stringify(document)).join('\n')}\n`;
-}
-
-function codexEffectiveServer(endpoint = 'http://127.0.0.1:7226/mcp') {
-  return {
-    url: endpoint,
-    environment_id: 'local',
-    enabled: true,
-    required: true,
-    tool_timeout_sec: null,
-    default_tools_approval_mode: 'approve',
-    enabled_tools: ['search_capabilities', 'invoke_capability'],
   };
 }
 
@@ -388,15 +315,11 @@ function makeHarness(supervisorModule, options = {}) {
   const adapterId = options.adapterId ?? 'claude-code';
   const command = adapterId === 'opencode'
     ? '/fixture/bin/opencode'
-    : adapterId === 'codex'
-      ? '/fixture/bin/codex'
-      : '/fixture/bin/claude';
+    : '/fixture/bin/claude';
   const profileVersion = adapterId === 'opencode'
     ? '1.14.25'
-    : adapterId === 'codex'
-      ? '0.142.5'
-      : '2.1.177';
-  const authState = adapterId === 'codex' ? 'chatgpt' : 'unknown';
+    : '2.1.177';
+  const authState = 'unknown';
   const runtimeRoot = '/fixture/private/agent-runtime';
 
   const adapter = {
@@ -418,51 +341,8 @@ function makeHarness(supervisorModule, options = {}) {
       if (options.buildGate) await options.buildGate.promise;
       if (options.buildError) throw new Error('fixture build failure');
       runtimeRuns.set(context.delegationId, 'config');
-      const codexAuthority = options.preSpawnAuthority === 'codex';
-      const codexConfig = codexAuthorityConfig();
       const authorityDescriptors = options.preSpawnAuthority
-        ? codexAuthority
-          ? {
-              preSpawnIdentityProbe: Object.freeze({
-                source: 'retained_binary',
-                argv: Object.freeze(['identity-probe']),
-                timeoutMs: 250,
-                stdoutLimitBytes: 64,
-                stderrLimitBytes: 64,
-                expectedAuthState: 'chatgpt',
-                outcomes: Object.freeze([Object.freeze({
-                  authState: 'chatgpt',
-                  exitCode: 0,
-                  stdout: Object.freeze({ kind: 'exact', bytes: Object.freeze([73]) }),
-                  stderr: Object.freeze({ kind: 'empty' }),
-                })]),
-              }),
-              effectiveAuthorityAttestation: Object.freeze({
-                source: 'retained_binary',
-                argv: Object.freeze([
-                  ...codexConfig,
-                  'app-server',
-                  '--stdio',
-                  '--strict-config',
-                ]),
-                stdinBytes: codexAuthorityStdin(path.dirname(context.privateMcpConfigPath)),
-                stdinCloseAfterStdoutLinePrefixBytes: codexAuthorityResponsePrefix(),
-                timeoutMs: 250,
-                stdoutLimitBytes: 64 * 1024,
-                stderrLimitBytes: 64,
-                classifier: 'codex_effective_authority_json',
-                expectedServerName: 'fsb',
-                endpointRef: 'direct_runtime_endpoint',
-                required: true,
-                enabled: true,
-                enabledTools: Object.freeze(['search_capabilities', 'invoke_capability']),
-                defaultToolsApprovalMode: 'approve',
-                headers: 'absent',
-                env: 'absent',
-                bearerToken: 'absent',
-              }),
-            }
-          : {
+        ? {
             preSpawnIdentityProbe: Object.freeze({
               source: 'retained_binary',
               argv: Object.freeze(['identity-probe']),
@@ -504,20 +384,12 @@ function makeHarness(supervisorModule, options = {}) {
           task: Object.freeze({
             role: 'direct_task',
             command,
-            argv: Object.freeze(codexAuthority
-              ? [
-                  'exec',
-                  '-',
-                  ...(options.codexTaskConfigMutation
-                    ? [...codexConfig.slice(0, -1), 'mcp_servers.fsb.enabled=false']
-                    : codexConfig),
-                ]
-              : [
-                  '-p',
-                  '--strict-mcp-config',
-                  '--mcp-config', context.privateMcpConfigPath,
-                  '--output-format', 'stream-json',
-                ]),
+            argv: Object.freeze([
+              '-p',
+              '--strict-mcp-config',
+              '--mcp-config', context.privateMcpConfigPath,
+              '--output-format', 'stream-json',
+            ]),
             cwd: options.preSpawnAuthority
               ? path.dirname(context.privateMcpConfigPath)
               : '/fixture/workspace',
@@ -528,7 +400,12 @@ function makeHarness(supervisorModule, options = {}) {
               FSB_AGENT_ADAPTER: adapterId,
               FSB_AGENT_PROFILE: profileVersion,
               FSB_DELEGATION_ID: context.delegationId,
-              FSB_AGENT_FINGERPRINT: context.runtimeFingerprint,
+              ...(!options.omitTaskFingerprint
+                ? {
+                    FSB_AGENT_FINGERPRINT: options.taskFingerprint
+                      ?? context.runtimeFingerprint,
+                  }
+                : {}),
             }),
             spawnSecretEnvBindings: Object.freeze([]),
             stdin: 'task',
@@ -713,7 +590,9 @@ function makeHarness(supervisorModule, options = {}) {
   };
 
   let delegationCounter = 0;
+  const loggedEvents = [];
   const supervisor = supervisorModule.createSpawnSupervisor({
+    logEvent: (record) => loggedEvents.push(record),
     registry,
     runtimeFiles,
     inspector,
@@ -728,9 +607,18 @@ function makeHarness(supervisorModule, options = {}) {
       ANTHROPIC_API_KEY: 'anthropic_key_canary_0001',
       OPENAI_API_KEY: 'openai_key_canary_0001',
       GEMINI_API_KEY: 'gemini_key_canary_0001',
+      ...(options.inheritedFingerprint
+        ? { FSB_AGENT_FINGERPRINT: options.inheritedFingerprint }
+        : {}),
+      ...(options.inheritedDelegationId
+        ? { FSB_DELEGATION_ID: options.inheritedDelegationId }
+        : {}),
     },
     ...(options.directRuntimeReference
       ? { directRuntimeReference: options.directRuntimeReference }
+      : {}),
+    ...(options.grokBuildAuthCoordinator
+      ? { grokBuildAuthCoordinator: options.grokBuildAuthCoordinator }
       : {}),
     ...(options.processProbe
       ? {
@@ -846,6 +734,7 @@ function makeHarness(supervisorModule, options = {}) {
     scheduledTimers,
     advanceClock,
     degradations,
+    loggedEvents,
     runtimeFiles,
     inspector,
     terminator,
@@ -913,10 +802,6 @@ function runAcceptedIdentityFoundationTests(identityModule) {
     'opencode',
     openCodeDetection,
   );
-  const codex = identityModule.acceptedIdentityFromDetection(
-    'codex',
-    codexDetection,
-  );
   assert.deepEqual(claude, {
     providerId: 'claude-code',
     label: 'Claude Code',
@@ -931,16 +816,8 @@ function runAcceptedIdentityFoundationTests(identityModule) {
     authState: 'unknown',
     billingKind: 'unknown',
   });
-  assert.deepEqual(codex, {
-    providerId: 'codex',
-    label: 'Codex',
-    profileVersion: '0.142.5',
-    authState: 'chatgpt',
-    billingKind: 'subscription',
-  });
   assert(Object.isFrozen(claude));
   assert(Object.isFrozen(openCode));
-  assert(Object.isFrozen(codex));
   assert.deepEqual(Object.keys(claude), [
     'providerId', 'label', 'profileVersion', 'authState', 'billingKind',
   ]);
@@ -953,7 +830,13 @@ function runAcceptedIdentityFoundationTests(identityModule) {
   assert.equal(validatedNullPrototype.profileVersion, '2.1.177');
   assert.equal(identityModule.acceptedAgentIdentitiesEqual(claude, validatedNullPrototype), true);
   assert.equal(identityModule.acceptedAgentIdentitiesEqual(claude, openCode), false);
-  assert.equal(identityModule.acceptedAgentIdentitiesEqual(claude, codex), false);
+  assert.equal(identityModule.acceptedAgentIdentitiesEqual(claude, {
+    providerId: 'codex',
+    label: 'Codex',
+    profileVersion: '0.142.5',
+    authState: 'chatgpt',
+    billingKind: 'subscription',
+  }), false);
 
   const accessor = { ...claude };
   Object.defineProperty(accessor, 'label', {
@@ -997,10 +880,7 @@ function runAcceptedIdentityFoundationTests(identityModule) {
   }
 
   assert.throws(
-    () => identityModule.acceptedIdentityFromDetection('codex', {
-      ...codexDetection,
-      authState: 'authenticated',
-    }),
+    () => identityModule.acceptedIdentityFromDetection('codex', codexDetection),
     /adapter_unavailable/,
   );
   assert.throws(
@@ -2661,6 +2541,52 @@ async function runRecoveryAndRegistryTests(supervisorModule, registryModule) {
   });
   assert.equal(harness.order.at(-1), 'recover');
 
+  const grokRecoveryHarness = makeHarness(supervisorModule, {
+    grokBuildAuthCoordinator: {
+      async recover() { grokRecoveryHarness.order.push('grok-recover'); },
+    },
+  });
+  await grokRecoveryHarness.supervisor.recover();
+  assert.deepEqual(
+    grokRecoveryHarness.order.slice(-2),
+    ['recover', 'grok-recover'],
+    'detached process recovery settles before journal-proven Grok session cleanup',
+  );
+
+  const unavailableRecoveryHarness = makeHarness(supervisorModule, {
+    recoveryResult: Object.freeze({
+      confirmedKilled: 0,
+      staleCleared: 0,
+      ambiguousFailClosed: 1,
+      spawnAvailable: false,
+      profiles: Object.freeze([]),
+      restartLosses: Object.freeze([]),
+    }),
+    grokBuildAuthCoordinator: {
+      async recover() { unavailableRecoveryHarness.order.push('unexpected-grok-recover'); },
+    },
+  });
+  await unavailableRecoveryHarness.supervisor.recover();
+  assert.equal(
+    unavailableRecoveryHarness.order.includes('unexpected-grok-recover'),
+    false,
+    'ambiguous process recovery never races Grok session deletion',
+  );
+
+  const blockedGrokRecoveryHarness = makeHarness(supervisorModule, {
+    grokBuildAuthCoordinator: {
+      async recover() { throw new Error('grok_session_cleanup_failed'); },
+    },
+  });
+  assert.deepEqual(await blockedGrokRecoveryHarness.supervisor.recover(), {
+    confirmedKilled: 0,
+    staleCleared: 0,
+    ambiguousFailClosed: 0,
+    spawnAvailable: true,
+    profiles: [],
+    restartLosses: [],
+  }, 'an unsweepable Grok session journal never denies startup to the other adapters');
+
   const child = { pid: 99999, processGroupId: 99999, platform: 'linux', closed: Promise.resolve({ code: 0, signal: null }) };
   assert.equal(harness.supervisor.journalEntryForChild(child), null);
 
@@ -2913,158 +2839,6 @@ async function runPreSpawnAuthorityTests(supervisorModule, authorityModule) {
   }
 
   {
-    const results = [
-      trackedProbeResult(Buffer.from([73])),
-      trackedProbeResult(Buffer.from(codexAuthorityOutput({
-        fsb: codexEffectiveServer(),
-      }), 'utf8')),
-    ];
-    const harness = makeHarness(supervisorModule, {
-      adapterId: 'codex',
-      preSpawnAuthority: 'codex',
-      directRuntimeReference,
-      processProbe: (_descriptor, index) => results[index].result,
-    });
-    const terminal = await harness.supervisor.handleExtRequest(
-      startRequest({ adapterId: 'codex', task: 'Codex native effective authority success' }),
-      harness.emit,
-    );
-    assert.equal(terminal.status, 'succeeded');
-    const barrierOffsets = [
-      'build',
-      'probe:identity-probe',
-      'probe:-c',
-      'prepare',
-      'spawn',
-      'stdin',
-    ].map((entry) => harness.order.indexOf(entry));
-    assert(barrierOffsets.every((offset, index) => (
-      offset >= 0 && (index === 0 || barrierOffsets[index - 1] < offset)
-    )), 'Codex config/read completes before runtime preparation, spawn, and stdin');
-    assert.equal(harness.probeCalls.length, 2);
-    assert.strictEqual(
-      harness.probeCalls[0].environment,
-      harness.probeCalls[1].environment,
-      'identity and config/read use the exact same sanitized environment',
-    );
-    assert.equal(harness.probeCalls[1].command, '/fixture/bin/codex');
-    assert.equal(
-      harness.probeCalls[1].cwd,
-      `/fixture/private/agent-runtime/${terminal.delegationId}`,
-    );
-    assert(Array.isArray(harness.probeCalls[1].stdinBytes));
-    assert.deepEqual(
-      harness.probeCalls[1].stdinCloseAfterStdoutLinePrefixBytes,
-      codexAuthorityResponsePrefix(),
-    );
-    assert.equal(
-      Buffer.from(harness.probeCalls[1].stdinBytes).toString('utf8').includes('config/read'),
-      true,
-    );
-    assert(results.every((result) => result.zeroizeCalls === 1));
-  }
-
-  {
-    const results = [
-      trackedProbeResult(Buffer.from([73])),
-      trackedProbeResult(Buffer.from(codexAuthorityOutput({
-        fsb: codexEffectiveServer(),
-        foreign: codexEffectiveServer('http://127.0.0.1:7333/mcp'),
-      }), 'utf8')),
-    ];
-    const harness = makeHarness(supervisorModule, {
-      adapterId: 'codex',
-      preSpawnAuthority: 'codex',
-      directRuntimeReference,
-      processProbe: (_descriptor, index) => results[index].result,
-    });
-    const terminal = await harness.supervisor.handleExtRequest(
-      startRequest({ adapterId: 'codex', task: 'foreign native MCP must fail closed' }),
-      harness.emit,
-    );
-    assert.equal(terminal.status, 'failed');
-    assert.equal(terminal.terminal.code, 'adapter_unavailable');
-    assert.equal(harness.probeCalls.length, 2);
-    assert.deepEqual(harness.counters, {
-      detect: 1, build: 1, prepare: 0, activate: 0, remove: 0,
-    });
-    assert.equal(harness.spawnCalls.length, 0);
-    assert.equal(harness.emitted.length, 0);
-    assert(results.every((result) => result.zeroizeCalls === 1));
-    assert(results.every((result) => result.stdout.every((byte) => byte === 0)));
-  }
-
-  {
-    const validLines = codexAuthorityOutput({ fsb: codexEffectiveServer() })
-      .trimEnd()
-      .split('\n');
-    const closedNativeCases = [
-      {
-        label: 'missing config/read id 2',
-        stdout: Buffer.from(`${validLines.slice(0, 2).join('\n')}\n`, 'utf8'),
-        exit: { code: 0, signal: null },
-      },
-      {
-        label: 'malformed config/read JSON',
-        stdout: Buffer.from(`${validLines.slice(0, 2).join('\n')}\n{"id":2,"result":not-json}\n`, 'utf8'),
-        exit: { code: 0, signal: null },
-      },
-      {
-        label: 'early nonzero app-server exit',
-        stdout: Buffer.from(codexAuthorityOutput({ fsb: codexEffectiveServer() }), 'utf8'),
-        exit: { code: 17, signal: null },
-      },
-    ];
-    for (const testCase of closedNativeCases) {
-      const results = [
-        trackedProbeResult(Buffer.from([73])),
-        trackedProbeResult(testCase.stdout, Buffer.alloc(0), testCase.exit),
-      ];
-      const harness = makeHarness(supervisorModule, {
-        adapterId: 'codex',
-        preSpawnAuthority: 'codex',
-        directRuntimeReference,
-        processProbe: (_descriptor, index) => results[index].result,
-      });
-      const terminal = await harness.supervisor.handleExtRequest(
-        startRequest({ adapterId: 'codex', task: testCase.label }),
-        harness.emit,
-      );
-      assert.equal(terminal.status, 'failed', testCase.label);
-      assert.equal(terminal.terminal.code, 'adapter_unavailable', testCase.label);
-      assert.equal(harness.counters.prepare, 0, testCase.label);
-      assert.equal(harness.spawnCalls.length, 0, testCase.label);
-      assert.equal(harness.emitted.length, 0, testCase.label);
-      assert(results.every((result) => result.zeroizeCalls === 1), testCase.label);
-      assert(results.every((result) => (
-        result.stdout.every((byte) => byte === 0)
-        && result.stderr.every((byte) => byte === 0)
-      )), testCase.label);
-    }
-  }
-
-  {
-    const harness = makeHarness(supervisorModule, {
-      adapterId: 'codex',
-      preSpawnAuthority: 'codex',
-      directRuntimeReference,
-      codexTaskConfigMutation: true,
-      processProbe: () => {
-        throw new Error('mismatched overrides must block before probing');
-      },
-    });
-    const terminal = await harness.supervisor.handleExtRequest(
-      startRequest({ adapterId: 'codex', task: 'mismatched config overrides fail closed' }),
-      harness.emit,
-    );
-    assert.equal(terminal.status, 'failed');
-    assert.equal(terminal.terminal.code, 'adapter_unavailable');
-    assert.equal(harness.probeCalls.length, 0);
-    assert.equal(harness.counters.prepare, 0);
-    assert.equal(harness.spawnCalls.length, 0);
-  }
-
-  {
     const identity = trackedProbeResult(Buffer.from([73]));
     const authority = trackedProbeResult(Buffer.from(JSON.stringify(
       authorityDocument('http://127.0.0.1:7999/mcp'),
@@ -3259,6 +3033,355 @@ function runSharedEnvironmentTests(spawnEnvironmentModule) {
   assert.equal(getterCalls, 0);
 }
 
+// A policy preflight is a bounded JSON probe: it prints one document and exits in
+// milliseconds. The process inspector samples the OS process table, so by the time
+// its first sample lands the child is already gone and there is nothing left to
+// bind. Requiring a confirmed activation there refused every Grok delegated run
+// before the first attestation finished, while Test Connection -- which never runs
+// attestations -- stayed green.
+async function runGrokPreflightActivationTests(supervisorModule) {
+  const GROK_IDENTITY = Object.freeze({
+    providerId: 'grok-build',
+    label: 'Grok Build',
+    profileVersion: '1.0.4',
+    authState: 'oauth',
+    billingKind: 'subscription',
+  });
+  const command = '/fixture/bin/grok';
+  const runCwd = '/fixture/private/grok/runs/run/cwd';
+
+  function makeGrokHarness(overrides = {}) {
+    const order = [];
+    const spawnCalls = [];
+    const loggedEvents = [];
+    const prepared = new Map();
+    const counters = { attestActivate: 0, attestRemove: 0 };
+
+    const preflight = (argv) => Object.freeze({
+      role: 'policy_preflight',
+      command,
+      argv: Object.freeze(argv),
+      cwd: runCwd,
+      privateFiles: Object.freeze([]),
+      fixedEnv: Object.freeze({ GROK_HOME: '/fixture/private/grok/grok-home' }),
+      spawnSecretEnvBindings: Object.freeze([]),
+      stdin: 'none',
+      stdout: 'bounded_json',
+    });
+    const attestation = (argv) => Object.freeze({
+      source: 'process_json',
+      process: preflight(argv),
+      maxBytes: 4096,
+      timeoutMs: 2_000,
+      assertions: Object.freeze([
+        Object.freeze({ kind: 'exact_scalar', path: Object.freeze(['ok']), value: true }),
+      ]),
+    });
+
+    const adapter = {
+      async detect() {
+        return {
+          installed: true,
+          version: '1.0.4',
+          authState: 'oauth',
+          profileVersion: '1.0.4',
+          binary: { command, realPath: command, argvPrefix: [] },
+        };
+      },
+      async buildSpawn(task, context) {
+        return Object.freeze({
+          adapterId: 'grok-build',
+          profileVersion: '1.0.4',
+          topology: Object.freeze({
+            kind: 'direct',
+            task: Object.freeze({
+              role: 'direct_task',
+              command,
+              argv: Object.freeze(['agent', 'stdio']),
+              cwd: runCwd,
+              privateFiles: Object.freeze([]),
+              fixedEnv: Object.freeze({
+                FSB_AGENT_ADAPTER: 'grok-build',
+                FSB_AGENT_FINGERPRINT: context.runtimeFingerprint,
+              }),
+              spawnSecretEnvBindings: Object.freeze([]),
+              stdin: 'acp_jsonrpc',
+              stdout: 'acp_jsonrpc',
+            }),
+          }),
+          attestations: Object.freeze([
+            attestation(['inspect', '--json']),
+            attestation(['mcp', 'list', '--json']),
+            attestation(['plugin', 'list', '--json']),
+          ]),
+        });
+      },
+      parseEvents() { throw new Error('agent_protocol_drift'); },
+      async kill() {},
+      caps() {
+        return { taskMode: true, chatMode: false, resume: false, serverMode: false };
+      },
+    };
+
+    const runtimeFiles = {
+      pathsFor(delegationId) {
+        return {
+          runDirectory: `/fixture/private/agent-runtime/${delegationId}`,
+          mcpConfigPath: `/fixture/private/agent-runtime/${delegationId}/mcp-config.json`,
+        };
+      },
+      async prepareRun(input) {
+        const entry = Object.freeze({ ...input, state: 'prepared' });
+        prepared.set(input.delegationId, entry);
+        if (input.role === 'policy_preflight') order.push('attest:prepare');
+        return { entry, paths: this.pathsFor(input.delegationId) };
+      },
+      async activateRun(input) {
+        if (input.role === 'policy_preflight') counters.attestActivate += 1;
+        const base = prepared.get(input.delegationId) ?? {};
+        return Object.freeze({ ...base, ...input, state: 'active' });
+      },
+      async removeRun(input) {
+        if (input.role === 'policy_preflight') counters.attestRemove += 1;
+        prepared.delete(input.delegationId);
+      },
+    };
+
+    // Models the real race: a preflight is always gone by the time the process
+    // table is sampled, while the long-lived ACP task process is still there.
+    const inspector = {
+      async inspect(entry) {
+        if (entry.role === 'policy_preflight') return { classification: 'stale' };
+        const pid = spawnCalls.at(-1).pid;
+        return {
+          classification: 'confirmed',
+          process: {
+            pid,
+            parentPid: 1,
+            processGroupId: pid,
+            processStartIdentity: String(90000 + pid),
+            descendants: [],
+          },
+        };
+      },
+    };
+
+    const grokRun = Object.freeze({
+      runDirectory: '/fixture/private/grok/runs/run',
+      cwd: runCwd,
+    });
+    const grokBuildRuntime = {
+      paths: Object.freeze({}),
+      async ensureBase() { return {}; },
+      async attestBase() {},
+      async prepareRun() { return grokRun; },
+      async removeRun() {},
+      taskEnvironment() { return Object.freeze({}); },
+      authEnvironment() { return Object.freeze({}); },
+      async secureAuthFile() { return true; },
+      async pendingSessions() { return []; },
+      async recordSession() {},
+      async clearSession() {},
+    };
+
+    const supervisor = supervisorModule.createSpawnSupervisor({
+      registry: {
+        require(id) {
+          if (id !== 'grok-build') throw new Error('unexpected adapter');
+          return adapter;
+        },
+        ids() { return ['grok-build']; },
+      },
+      runtimeFiles,
+      inspector,
+      terminator: { async stop() {} },
+      startupRecovery: {
+        async recover() {
+          return {
+            confirmedKilled: 0,
+            staleCleared: 0,
+            ambiguousFailClosed: 0,
+            spawnAvailable: true,
+            profiles: [],
+            restartLosses: [],
+          };
+        },
+      },
+      endpoint: 'http://127.0.0.1:7226/mcp',
+      cwd: '/fixture/workspace',
+      platform: 'linux',
+      environment: { PATH: '/fixture/bin' },
+      logEvent: (record) => loggedEvents.push(record),
+      grokBuildRuntime,
+      grokBuildAuthCoordinator: {
+        async recover() {},
+        async acquireTask() { return { release() {} }; },
+      },
+      spawn(commandValue, argv) {
+        const pid = 52001 + spawnCalls.length;
+        order.push(`spawn:${argv.join(' ')}`);
+        const child = makeChild({ pid });
+        spawnCalls.push({ argv, pid, child });
+        // The probe answers and exits before anything can inspect it.
+        setImmediate(() => child.send(overrides.attestationLines ?? [{ ok: true }]));
+        return child;
+      },
+      ...overrides.dependencies,
+    });
+    return { supervisor, order, spawnCalls, counters, loggedEvents };
+  }
+
+  {
+    const harness = makeGrokHarness();
+    const result = await harness.supervisor.handleExtRequest(
+      {
+        id: 'ext-start-grok-1',
+        type: 'ext:request',
+        method: 'delegate.start',
+        payload: { acceptedIdentity: GROK_IDENTITY, task: 'preflight activation regression' },
+      },
+      () => {},
+    );
+    const attestationSpawns = harness.order.filter((entry) => entry.startsWith('spawn:'));
+    assert.deepEqual(
+      attestationSpawns.slice(0, 3),
+      ['spawn:inspect --json', 'spawn:mcp list --json', 'spawn:plugin list --json'],
+      'all three policy preflights run even though each child exits before activation',
+    );
+    assert.notEqual(
+      result.terminal.code,
+      'activation_failed',
+      'a preflight that exits before the inspector samples must not fail the run',
+    );
+    assert.equal(harness.counters.attestActivate, 0,
+      'an exited preflight is never activated, so its journal entry stays prepared');
+    assert.equal(harness.counters.attestRemove, 3,
+      'every preflight journal entry is removed regardless of activation');
+    const settled = harness.loggedEvents.filter((entry) => entry.event === 'run_settled');
+    assert.equal(settled.length, 1, 'a settled run records exactly one terminal reason');
+    assert.equal(settled[0].adapterId, 'grok-build');
+    assert(typeof settled[0].code === 'string' && settled[0].code.length > 0,
+      'the terminal diagnostic code is recorded, not just the status');
+    assert(typeof settled[0].reason === 'string' && settled[0].reason.length > 0,
+      'a protocol drift names the check that tripped, not just that one did');
+    assert(harness.loggedEvents.every((entry) => (
+      !JSON.stringify(entry).includes('preflight activation regression')
+    )), 'task text never reaches the delegation log');
+  }
+
+  {
+    // A preflight that keeps running still has to bind, and a mismatched identity
+    // still fails closed.
+    const harness = makeGrokHarness({
+      dependencies: {
+        inspector: {
+          async inspect() {
+            return { classification: 'ambiguous', reason: 'identity_mismatch' };
+          },
+        },
+      },
+    });
+    const result = await harness.supervisor.handleExtRequest(
+      {
+        id: 'ext-start-grok-2',
+        type: 'ext:request',
+        method: 'delegate.start',
+        payload: { acceptedIdentity: GROK_IDENTITY, task: 'identity mismatch stays closed' },
+      },
+      () => {},
+    );
+    assert.equal(result.status, 'failed');
+    assert.equal(
+      harness.order.filter((entry) => entry.startsWith('spawn:')).length,
+      1,
+      'a mismatched preflight identity stops the run at the first attestation',
+    );
+    assert.deepEqual(
+      harness.loggedEvents
+        .filter((entry) => entry.event === 'run_settled')
+        .map((entry) => `${entry.status}:${entry.code}`),
+      ['failed:adapter_unavailable'],
+      'the refusing gate is named in the log even though the card says start_rejected',
+    );
+  }
+}
+
+// The daemon runs with stdio ignored, so this file is the only place a failed
+// run or a degraded shutdown can explain itself. It must stay a closed set of
+// identifiers and codes.
+async function runDelegationLogTests() {
+  const logModule = await import(pathToFileURL(path.join(
+    mcpBuildRoot,
+    'agent-providers',
+    'delegation-log.js',
+  )).href);
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'fsb-delegation-log-'));
+  const logPath = path.join(root, 'delegation-events.jsonl');
+  const read = () => fs.readFileSync(logPath, 'utf8')
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => JSON.parse(line));
+
+  logModule.logDelegationEvent({
+    event: 'run_settled',
+    delegationId: 'delegation_log_fixture_0001',
+    adapterId: 'grok-build',
+    profileVersion: '1.0.4',
+    status: 'failed',
+    code: 'activation_failed',
+  }, { rootPath: root, now: () => 1720000000000 });
+  const [first] = read();
+  assert.deepEqual(first, {
+    ts: '2024-07-03T09:46:40.000Z',
+    event: 'run_settled',
+    delegationId: 'delegation_log_fixture_0001',
+    adapterId: 'grok-build',
+    profileVersion: '1.0.4',
+    status: 'failed',
+    code: 'activation_failed',
+  });
+  assert.equal(fs.statSync(logPath).mode & 0o777, 0o600,
+    'the delegation log is owner-only');
+
+  // Unknown events, free text, and unlisted fields are dropped rather than written.
+  logModule.logDelegationEvent({
+    event: 'not_a_known_event',
+    code: 'activation_failed',
+  }, { rootPath: root, now: () => 1720000000001 });
+  assert.equal(read().length, 1, 'an unknown event writes nothing');
+
+  logModule.logDelegationEvent({
+    event: 'degraded',
+    code: 'tree_unsettled',
+    delegationId: 'find out latest XAI news',
+    profileVersion: 'ANTHROPIC_API_KEY=secret',
+    task: 'find out latest XAI news',
+  }, { rootPath: root, now: () => 1720000000002 });
+  const second = read()[1];
+  assert.deepEqual(second, {
+    ts: '2024-07-03T09:46:40.002Z',
+    event: 'degraded',
+    code: 'tree_unsettled',
+  }, 'free text and unlisted keys never reach the log');
+
+  // A runaway daemon cannot fill the disk.
+  fs.writeFileSync(logPath, 'x'.repeat(logModule.DELEGATION_LOG_MAX_BYTES + 1));
+  logModule.logDelegationEvent({
+    event: 'daemon_shutdown',
+    exitCode: 1,
+    degraded: true,
+  }, { rootPath: root, now: () => 1720000000003 });
+  assert.equal(read().length, 1, 'an oversized log rotates before the next append');
+  assert(fs.existsSync(path.join(root, 'delegation-events.1.jsonl')),
+    'the rotated log is kept for one generation');
+
+  // Diagnostics must never be able to fail a run.
+  logModule.logDelegationEvent({ event: 'degraded', code: 'tree_unsettled' }, {
+    rootPath: 'not/an/absolute/path',
+  });
+  fs.rmSync(root, { recursive: true, force: true });
+}
+
 async function main() {
   const supervisorModule = await import(pathToFileURL(supervisorBuildPath).href);
   const registryModule = await import(pathToFileURL(registryBuildPath).href);
@@ -3310,6 +3433,8 @@ async function main() {
   await runRecoveryAndRegistryTests(supervisorModule, registryModule);
   await runRecoveryStatusTests(supervisorModule);
   await runRouteLossStatusTests(supervisorModule);
+  await runGrokPreflightActivationTests(supervisorModule);
+  await runDelegationLogTests();
   console.log('mcp-spawn-supervisor.test.js: PASS');
 }
 

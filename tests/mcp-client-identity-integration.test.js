@@ -260,21 +260,13 @@ async function main() {
     platform: 'linux',
     platforms: { 'claude-code': fakePlatform(), opencode: fakePlatform(), codex: fakePlatform() },
     now: () => 1_783_900_000_000,
-    execFile: (_file, _args, _options, callback) => callback(null, 'Claude Code 2.1.177', ''),
-    detectOpenCode: async () => ({
-      installed: false,
-      version: null,
-      authState: 'unknown',
-      binary: null,
-      profileVersion: null
-    }),
-    detectCodex: async () => ({
-      installed: false,
-      version: null,
-      authState: 'unknown',
-      binary: null,
-      profileVersion: null
-    })
+    execFile: (file, _args, _options, callback) => {
+      if (/^(?:codex|opencode)/.test(path.basename(file))) {
+        callback(Object.assign(new Error('not installed'), { code: 'ENOENT' }), '', '');
+        return;
+      }
+      callback(null, 'Claude Code 2.1.177', '');
+    }
   });
 
   let registerPayload;

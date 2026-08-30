@@ -54,6 +54,14 @@ const ALL_REASONS = Object.freeze([
   'adapter_unshipped',
   'matrix_invalid',
 ]);
+const CANONICAL_IDS = Object.freeze(['claude-code', 'grok-build']);
+
+function withGrokDetection(detections) {
+  return {
+    ...detections,
+    'grok-build': retainedDetection('1.0.4', '/opt/grok'),
+  };
+}
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -101,14 +109,18 @@ function safeCompatibilityRow(classification, authState = 'unknown') {
 }
 
 function compatibilityRegistry(ids, detections, tracker = { requireCalls: 0 }) {
+  const effectiveIds = ids;
+  const effectiveDetections = Object.hasOwn(detections, 'grok-build')
+    ? detections
+    : withGrokDetection(detections);
   return Object.freeze({
     ids() {
-      return Object.freeze([...ids]);
+      return Object.freeze([...effectiveIds]);
     },
     require(adapterId) {
       tracker.requireCalls += 1;
-      if (!Object.hasOwn(detections, adapterId)) throw new Error('unknown fixture adapter');
-      return Object.freeze({ detect: async () => detections[adapterId] });
+      if (!Object.hasOwn(effectiveDetections, adapterId)) throw new Error('unknown fixture adapter');
+      return Object.freeze({ detect: async () => effectiveDetections[adapterId] });
     },
   });
 }
@@ -193,10 +205,10 @@ async function main() {
 
   assert.deepEqual(Object.keys(ADAPTER_COMPATIBILITY_MATRIX).sort(), ['adapters', 'schemaVersion']);
   assert.equal(ADAPTER_COMPATIBILITY_MATRIX.schemaVersion, 1);
-  assert.equal(ADAPTER_COMPATIBILITY_MATRIX.adapters.length, 3);
+  assert.equal(ADAPTER_COMPATIBILITY_MATRIX.adapters.length, 2);
   assert.deepEqual(
     ADAPTER_COMPATIBILITY_MATRIX.adapters.map((candidate) => candidate.adapterId),
-    ['claude-code', 'opencode', 'codex'],
+    CANONICAL_IDS,
   );
   const row = ADAPTER_COMPATIBILITY_MATRIX.adapters[0];
   assert.deepEqual(Object.keys(row).sort(), ROW_KEYS);
@@ -227,91 +239,46 @@ async function main() {
       'result',
     ],
   });
-  const openCodeRow = ADAPTER_COMPATIBILITY_MATRIX.adapters[1];
-  assert.deepEqual(Object.keys(openCodeRow).sort(), ROW_KEYS);
-  assert.deepEqual(openCodeRow, {
-    adapterId: 'opencode',
-    capabilities: {
-      taskMode: true,
-      chatMode: false,
-      resume: false,
-      serverMode: true,
-    },
-    displayLabel: 'OpenCode',
-    profileVersion: '1.14.25',
-    minimumVersion: '1.14.25',
-    testedThroughVersion: '1.14.25',
-    supportedMajor: 1,
-    fixtureManifest: 'tests/fixtures/agent-streams/opencode-1.14.25/manifest.json',
-    requiredInitFields: [
-      'type',
-      'timestamp',
-      'sessionID',
-      'part.id',
-      'part.sessionID',
-      'part.messageID',
-      'part.type',
-    ],
-    requiredResultFields: [
-      'type',
-      'timestamp',
-      'sessionID',
-      'part.id',
-      'part.sessionID',
-      'part.messageID',
-      'part.type',
-      'part.reason',
-      'part.cost',
-      'part.tokens',
-    ],
-    expectedNormalizedSequence: [
-      'init',
-      'assistant_delta',
-      'assistant',
-      'tool_use',
-      'tool_result',
-      'tool_use',
-      'tool_result',
-      'assistant',
-      'result',
-    ],
-  });
-  const codexRow = ADAPTER_COMPATIBILITY_MATRIX.adapters[2];
-  assert.deepEqual(Object.keys(codexRow).sort(), ROW_KEYS);
-  assert.deepEqual(codexRow, {
-    adapterId: 'codex',
+  const grokRow = ADAPTER_COMPATIBILITY_MATRIX.adapters[1];
+  assert.deepEqual(Object.keys(grokRow).sort(), ROW_KEYS);
+  assert.deepEqual(grokRow, {
+    adapterId: 'grok-build',
     capabilities: {
       taskMode: true,
       chatMode: false,
       resume: false,
       serverMode: false,
     },
-    displayLabel: 'Codex',
-    profileVersion: '0.142.5',
-    minimumVersion: '0.142.5',
-    testedThroughVersion: '0.142.5',
-    supportedMajor: 0,
-    fixtureManifest: 'tests/fixtures/agent-streams/codex-0.142.5/manifest.json',
-    requiredInitFields: ['type', 'thread_id'],
-    requiredResultFields: [
-      'type',
-      'usage.input_tokens',
-      'usage.cached_input_tokens',
-      'usage.output_tokens',
-      'usage.reasoning_output_tokens',
+    displayLabel: 'Grok Build',
+    profileVersion: '1.0.4',
+    minimumVersion: '1.0.4',
+    testedThroughVersion: '1.0.4',
+    supportedMajor: 1,
+    fixtureManifest: 'tests/fixtures/agent-streams/grok-build-1.0.4/manifest.json',
+    requiredInitFields: [
+      'protocolVersion',
+      'agentCapabilities.mcpCapabilities.http',
+      'agentCapabilities.sessionCapabilities.close',
+      'authMethods',
+      '_meta.defaultAuthMethodId',
+      '_meta.agentVersion',
+      '_meta.mcpServers',
     ],
+    requiredResultFields: ['stopReason'],
     expectedNormalizedSequence: [
       'init',
-      'assistant',
+      'assistant_delta',
       'tool_use',
       'tool_result',
+      'assistant',
       'result',
     ],
   });
   assertDeepFrozen(ADAPTER_COMPATIBILITY_MATRIX);
   assert.strictEqual(getAdapterCompatibilityContract('claude-code'), row);
-  assert.strictEqual(getAdapterCompatibilityContract('opencode'), openCodeRow);
-  assert.strictEqual(getAdapterCompatibilityContract('codex'), codexRow);
+  assert.equal(getAdapterCompatibilityContract('opencode'), null);
+  assert.equal(getAdapterCompatibilityContract('codex'), null);
+  assert.strictEqual(getAdapterCompatibilityContract('grok-build'), grokRow);
   assert.equal(getAdapterCompatibilityContract('OpenCode'), null);
 
   assert.equal(extractAdapterVersion('Claude Code 2.1.177'), '2.1.177');
@@ -380,51 +347,27 @@ async function main() {
   );
   assertClassification(
     classifyAdapterCompatibility('opencode', '1.14.25'),
-    'supported',
-    'within_tested_range',
-    'opencode',
-  );
-  assertClassification(
-    classifyAdapterCompatibility('opencode', '1.14.26'),
-    'degraded',
-    'newer_than_tested_range',
-    'opencode',
-  );
-  assertClassification(
-    classifyAdapterCompatibility('opencode', '1.14.24'),
     'unsupported',
-    'below_minimum',
-    'opencode',
-  );
-  assertClassification(
-    classifyAdapterCompatibility('opencode', '2.0.0'),
-    'unsupported',
-    'wrong_major',
+    'adapter_unshipped',
     'opencode',
   );
   assertClassification(
     classifyAdapterCompatibility('codex', '0.142.5'),
+    'unsupported',
+    'adapter_unshipped',
+    'codex',
+  );
+  assertClassification(
+    classifyAdapterCompatibility('grok-build', '1.0.4'),
     'supported',
     'within_tested_range',
-    'codex',
+    'grok-build',
   );
   assertClassification(
-    classifyAdapterCompatibility('codex', '0.144.6'),
+    classifyAdapterCompatibility('grok-build', '1.0.5'),
     'degraded',
     'newer_than_tested_range',
-    'codex',
-  );
-  assertClassification(
-    classifyAdapterCompatibility('codex', '0.142.4'),
-    'unsupported',
-    'below_minimum',
-    'codex',
-  );
-  assertClassification(
-    classifyAdapterCompatibility('codex', '1.0.0'),
-    'unsupported',
-    'wrong_major',
-    'codex',
+    'grok-build',
   );
 
   const invalidMatrix = clone(ADAPTER_COMPATIBILITY_MATRIX);
@@ -437,11 +380,10 @@ async function main() {
   );
 
   const supported = classifyAdapterCompatibility('claude-code', '2.1.177');
-  const openCodeSupported = classifyAdapterCompatibility('opencode', '1.14.25');
-  const codexSupported = classifyAdapterCompatibility('codex', '0.142.5');
+  const grokSupported = classifyAdapterCompatibility('grok-build', '1.0.4');
   const snapshot = createSafeCompatibilitySnapshot(
     1_784_222_000_000,
-    [supported, openCodeSupported, codexSupported].map((candidate) => (
+    [supported, grokSupported].map((candidate) => (
       safeCompatibilityRow(candidate)
     )),
   );
@@ -455,14 +397,8 @@ async function main() {
       reason: 'within_tested_range',
       authState: 'unknown',
     }, {
-      adapterId: 'opencode',
-      displayLabel: 'OpenCode',
-      status: 'supported',
-      reason: 'within_tested_range',
-      authState: 'unknown',
-    }, {
-      adapterId: 'codex',
-      displayLabel: 'Codex',
+      adapterId: 'grok-build',
+      displayLabel: 'Grok Build',
       status: 'supported',
       reason: 'within_tested_range',
       authState: 'unknown',
@@ -498,8 +434,7 @@ async function main() {
   }));
   const daemonSentinels = [
     '/private/CLAUDE_EXECUTABLE_SENTINEL',
-    '/private/OPENCODE_EXECUTABLE_SENTINEL',
-    '/private/CODEX_EXECUTABLE_SENTINEL',
+    '/private/GROK_EXECUTABLE_SENTINEL',
     'DAEMON_RAW_VERSION_SENTINEL',
     'DAEMON_AUTH_SENTINEL',
     'DAEMON_BILLING_SENTINEL',
@@ -515,28 +450,27 @@ async function main() {
   const daemonSnapshot = await requestServeCompatibility(
     serveDelegation,
     compatibilityRegistry(
-      ['claude-code', 'opencode', 'codex'],
+      CANONICAL_IDS,
       {
-        'claude-code': retainedDetection('2.1.177', daemonSentinels[0]),
-        opencode: retainedDetection('1.14.25', daemonSentinels[1], {
-          rawVersion: daemonSentinels[3],
-          auth: daemonSentinels[4],
-          billing: daemonSentinels[5],
-          model: daemonSentinels[6],
-          config: daemonSentinels[7],
-          nativeBody: daemonSentinels[8],
-          diagnostic: { code: 'agent_protocol_drift', message: daemonSentinels[9] },
-          topology: daemonSentinels[10],
-          endpoint: daemonSentinels[11],
-          port: daemonSentinels[12],
-          secret: daemonSentinels[13],
+        'claude-code': retainedDetection('2.1.177', daemonSentinels[0], {
+          rawVersion: daemonSentinels[2],
+          auth: daemonSentinels[3],
+          billing: daemonSentinels[4],
+          model: daemonSentinels[5],
+          config: daemonSentinels[6],
+          nativeBody: daemonSentinels[7],
+          diagnostic: { code: 'agent_protocol_drift', message: daemonSentinels[8] },
+          topology: daemonSentinels[9],
+          endpoint: daemonSentinels[10],
+          port: daemonSentinels[11],
+          secret: daemonSentinels[12],
         }),
-        codex: retainedDetection('0.142.5', daemonSentinels[2]),
+        'grok-build': retainedDetection('1.0.4', daemonSentinels[1]),
       },
     ),
   );
   assert.deepEqual(daemonSnapshot, snapshot,
-    'serve compatibility returns the exact three-row browser-safe canonical snapshot');
+    'serve compatibility returns the exact two-row browser-safe canonical snapshot');
   assertDeepFrozen(daemonSnapshot);
   const serializedDaemonSnapshot = JSON.stringify(daemonSnapshot);
   for (const sentinel of daemonSentinels) {
@@ -544,21 +478,20 @@ async function main() {
       `daemon safe projection excludes ${sentinel}`);
   }
 
-  for (const authState of ['chatgpt', 'api_key', 'unauthenticated', 'unknown']) {
+  for (const authState of ['oauth', 'unauthenticated', 'unknown']) {
     const projected = await requestServeCompatibility(
       serveDelegation,
       compatibilityRegistry(
-        ['claude-code', 'opencode', 'codex'],
+        CANONICAL_IDS,
         {
           'claude-code': retainedDetection('2.1.177', '/opt/claude'),
-          opencode: retainedDetection('1.14.25', '/opt/opencode'),
-          codex: retainedDetection('0.142.5', '/opt/codex', { authState }),
+          'grok-build': retainedDetection('1.0.4', '/opt/grok', { authState }),
         },
       ),
     );
-    assert.equal(projected.adapters[2].authState, authState,
+    assert.equal(projected.adapters[1].authState, authState,
       `daemon preserves the bounded ${authState} auth state`);
-    assert.deepEqual(Object.keys(projected.adapters[2]).sort(), [
+    assert.deepEqual(Object.keys(projected.adapters[1]).sort(), [
       'adapterId',
       'authState',
       'displayLabel',
@@ -570,23 +503,22 @@ async function main() {
   const invalidAuthProjection = await requestServeCompatibility(
     serveDelegation,
     compatibilityRegistry(
-      ['claude-code', 'opencode', 'codex'],
+      CANONICAL_IDS,
       {
         'claude-code': retainedDetection('2.1.177', '/opt/claude'),
-        opencode: retainedDetection('1.14.25', '/opt/opencode'),
-        codex: retainedDetection('0.142.5', '/opt/codex', {
+        'grok-build': retainedDetection('1.0.4', '/opt/grok', {
           authState: 'PRIVATE_AUTH_SENTINEL',
         }),
       },
     ),
   );
-  assert.equal(invalidAuthProjection.adapters[2].authState, 'unknown',
+  assert.equal(invalidAuthProjection.adapters[1].authState, 'unknown',
     'invalid auth evidence fails closed without leaking its value');
   assert.equal(JSON.stringify(invalidAuthProjection).includes('PRIVATE_AUTH_SENTINEL'), false);
 
   const daemonEvidenceCases = [
-    ['exact profile', retainedDetection('1.14.25', '/opt/opencode'), 'supported', 'within_tested_range'],
-    ['newer retained profile', retainedDetection('1.14.26', '/opt/opencode', {
+    ['exact profile', retainedDetection('1.0.4', '/opt/grok'), 'supported', 'within_tested_range'],
+    ['newer retained profile', retainedDetection('1.0.5', '/opt/grok', {
       installed: false,
       profileVersion: null,
       diagnostic: { code: 'version_unsupported', message: 'NEWER_MESSAGE_SENTINEL' },
@@ -597,7 +529,7 @@ async function main() {
       authState: 'chatgpt',
       diagnostic: { code: 'binary_missing', message: 'MISSING_MESSAGE_SENTINEL' },
     }), 'unsupported', 'binary_not_found'],
-    ['malformed version', retainedDetection(null, '/opt/opencode', {
+    ['malformed version', retainedDetection(null, '/opt/grok', {
       installed: false,
       profileVersion: null,
       diagnostic: { code: 'version_unparseable', message: 'MALFORMED_MESSAGE_SENTINEL' },
@@ -608,27 +540,26 @@ async function main() {
       diagnostic: { code: 'binary_changed', message: 'CHANGED_MESSAGE_SENTINEL' },
     }), 'unsupported', 'binary_not_found'],
   ];
-  for (const [label, openCodeDetection, expectedStatus, expectedReason] of daemonEvidenceCases) {
+  for (const [label, grokDetection, expectedStatus, expectedReason] of daemonEvidenceCases) {
     const projected = await requestServeCompatibility(
       serveDelegation,
       compatibilityRegistry(
-        ['claude-code', 'opencode', 'codex'],
+        CANONICAL_IDS,
         {
           'claude-code': retainedDetection('2.1.177', '/opt/claude'),
-          opencode: openCodeDetection,
-          codex: retainedDetection('0.142.5', '/opt/codex'),
+          'grok-build': grokDetection,
         },
       ),
       1_784_222_000_001,
     );
     assert.deepEqual(projected.adapters[1], {
-      adapterId: 'opencode',
-      displayLabel: 'OpenCode',
+      adapterId: 'grok-build',
+      displayLabel: 'Grok Build',
       status: expectedStatus,
       reason: expectedReason,
       authState: 'unknown',
-    }, `${label} produces one deterministic OpenCode safe row without omission`);
-    assert.equal(projected.adapters.length, 3, `${label} preserves the exact three-provider roster`);
+    }, `${label} produces one deterministic Grok Build safe row without omission`);
+    assert.equal(projected.adapters.length, 2, `${label} preserves the exact two-provider roster`);
     for (const sentinel of [
       'NEWER_MESSAGE_SENTINEL',
       'MISSING_MESSAGE_SENTINEL',
@@ -647,14 +578,14 @@ async function main() {
       enumerable: true,
       get() {
         detectionAccessorReads += 1;
-        if (key === 'binary') return retainedDetection('1.14.25', '/opt/opencode').binary;
-        return key === 'version' ? '1.14.25' : 'chatgpt';
+        if (key === 'binary') return retainedDetection('1.0.4', '/opt/grok').binary;
+        return key === 'version' ? '1.0.4' : 'oauth';
       },
     });
   }
   for (const [label, unsafeDetection] of [
     ['accessor', accessorDetection],
-    ['prototype', Object.create(retainedDetection('1.14.25', '/opt/opencode'))],
+    ['prototype', Object.create(retainedDetection('1.0.4', '/opt/grok'))],
     ['throwing proxy', new Proxy({}, {
       getPrototypeOf() { throw new Error('PRIVATE_PROXY_TRAP_SENTINEL'); }
     })],
@@ -662,17 +593,16 @@ async function main() {
     const projected = await requestServeCompatibility(
       serveDelegation,
       compatibilityRegistry(
-        ['claude-code', 'opencode', 'codex'],
+        CANONICAL_IDS,
         {
           'claude-code': retainedDetection('2.1.177', '/opt/claude'),
-          opencode: unsafeDetection,
-          codex: retainedDetection('0.142.5', '/opt/codex'),
+          'grok-build': unsafeDetection,
         },
       ),
     );
     assert.deepEqual(projected.adapters[1], {
-      adapterId: 'opencode',
-      displayLabel: 'OpenCode',
+      adapterId: 'grok-build',
+      displayLabel: 'Grok Build',
       status: 'unsupported',
       reason: 'binary_not_found',
       authState: 'unknown',
@@ -687,7 +617,7 @@ async function main() {
     enumerable: true,
     get() {
       rosterAccessorReads += 1;
-      return () => ['claude-code', 'opencode', 'codex'];
+      return () => [...CANONICAL_IDS];
     },
   });
   accessorRegistry.require = () => {
@@ -695,15 +625,16 @@ async function main() {
     return Object.freeze({ detect: async () => retainedDetection('2.1.177', '/opt/claude') });
   };
   const prototypeRegistry = Object.create({
-    ids: () => Object.freeze(['claude-code', 'opencode', 'codex']),
+    ids: () => CANONICAL_IDS,
     require: () => Object.freeze({ detect: async () => retainedDetection('2.1.177', '/opt/claude') }),
   });
   const mismatchRegistries = [
-    ['missing', ['claude-code', 'opencode']],
-    ['duplicate', ['claude-code', 'opencode', 'codex', 'codex']],
-    ['orphan', ['claude-code', 'opencode', 'codex', 'foreign']],
-    ['case variant', ['claude-code', 'OpenCode', 'codex']],
-    ['reordered', ['opencode', 'claude-code', 'codex']],
+    ['missing', ['claude-code']],
+    ['duplicate', ['claude-code', 'grok-build', 'grok-build']],
+    ['retired', ['claude-code', 'opencode', 'grok-build']],
+    ['orphan', ['claude-code', 'grok-build', 'foreign']],
+    ['case variant', ['claude-code', 'Grok-Build']],
+    ['reordered', ['grok-build', 'claude-code']],
   ].map(([label, ids]) => [label, Object.freeze({
     ids: () => Object.freeze([...ids]),
     require: () => {
@@ -741,7 +672,7 @@ async function main() {
     { ...safeCompatibilityRow(supported), status: 'supported', reason: 'evidence_stale' },
     { ...safeCompatibilityRow(supported), status: 'degraded', reason: 'within_tested_range' },
     { ...safeCompatibilityRow(supported), status: 'unsupported', reason: 'newer_than_tested_range' },
-    { ...safeCompatibilityRow(supported), authState: 'oauth' },
+    { ...safeCompatibilityRow(supported), authState: 'private_auth' },
   ]) {
     assert.throws(
       () => createSafeCompatibilitySnapshot(1, [badRow]),
@@ -821,23 +752,23 @@ async function main() {
   duplicateAdapter.adapters.push(clone(row));
   invalidMatrices.push(duplicateAdapter);
   const sparseAdapters = clone(ADAPTER_COMPATIBILITY_MATRIX);
-  sparseAdapters.adapters.length = 4;
+  sparseAdapters.adapters.length = 5;
   invalidMatrices.push(sparseAdapters);
-  const missingOpenCode = clone(ADAPTER_COMPATIBILITY_MATRIX);
-  missingOpenCode.adapters.pop();
-  invalidMatrices.push(missingOpenCode);
+  const missingGrokBuild = clone(ADAPTER_COMPATIBILITY_MATRIX);
+  missingGrokBuild.adapters.pop();
+  invalidMatrices.push(missingGrokBuild);
   const reversedAdapters = clone(ADAPTER_COMPATIBILITY_MATRIX);
   reversedAdapters.adapters.reverse();
   invalidMatrices.push(reversedAdapters);
   const caseVariedAdapter = clone(ADAPTER_COMPATIBILITY_MATRIX);
-  caseVariedAdapter.adapters[1].adapterId = 'OpenCode';
+  caseVariedAdapter.adapters[1].adapterId = 'Grok-Build';
   invalidMatrices.push(caseVariedAdapter);
   const codexOrphan = clone(ADAPTER_COMPATIBILITY_MATRIX);
   codexOrphan.adapters[1].adapterId = 'codex';
   codexOrphan.adapters[1].fixtureManifest = 'tests/fixtures/agent-streams/codex-1.14.25/manifest.json';
   invalidMatrices.push(codexOrphan);
   const wrongCapabilities = clone(ADAPTER_COMPATIBILITY_MATRIX);
-  wrongCapabilities.adapters[1].capabilities.serverMode = false;
+  wrongCapabilities.adapters[1].capabilities.serverMode = true;
   invalidMatrices.push(wrongCapabilities);
   const extraCapability = clone(ADAPTER_COMPATIBILITY_MATRIX);
   extraCapability.adapters[1].capabilities.shellMode = true;

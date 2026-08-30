@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * Popup/sidepanel ownership-status tests.
+ * Popup ownership-status and side-panel ownership-lock tests.
  *
  * Validates:
  *   - shouldShowOwnerChip render conditions per CONTEXT D-05
@@ -9,8 +9,8 @@
  *   - buildChipText format ('Owned by <label>')
  *   - ownerLabelFor: legacy:* literal vs agent_<uuid> -> formatAgentIdForDisplay
  *   - findOwnerInEnvelope flat-scan over the Phase 237 D-03 storage envelope
- *   - Popup and sidepanel replace the one header status instead of appending
- *     a second owner chip.
+ *   - Popup renders ownership provenance while the side panel keeps ownership
+ *     internal and preserves its provider-neutral lifecycle status.
  *
  * Run: node tests/owner-chip.test.js
  */
@@ -215,9 +215,8 @@ ok(sidepanelJsSrc.indexOf('legacy:sidepanel') >= 0,
   'Test 9a: sidepanel.js references legacy:sidepanel surface id');
 ok(sidepanelJsSrc.indexOf('shouldShowOwnerChip') >= 0,
   'Test 9b: sidepanel.js calls shouldShowOwnerChip');
-ok(sidepanelJsSrc.indexOf('refreshOwnerChip') >= 0 || sidepanelJsSrc.indexOf('owner-chip') >= 0
-  || sidepanelJsSrc.indexOf('owned by') >= 0,
-  'Test 9c: sidepanel.js threads owner-chip refresh logic');
+ok(sidepanelJsSrc.indexOf('refreshActiveTabOwnership') >= 0,
+  'Test 9c: sidepanel.js refreshes ownership as an internal lock');
 ok(sidepanelHtmlSrc.indexOf('fsb-owner-chip') === -1,
   'Test 9d: sidepanel.html has no separate owner-chip element');
 ok(sidepanelHtmlSrc.indexOf('owner-chip.js') >= 0,
@@ -237,11 +236,11 @@ ok(/chrome\.tabs\.onActivated\.addListener[\s\S]*?syncActiveTabSurface\(activeIn
 
 ok(/\.status-dot\.owned\s*\{[^}]*color:\s*#f59e0b[^}]*animation:\s*none/s.test(popupCssSrc),
   'Test 10a: popup ownership dot is orange and non-pulsing');
-ok(/\.status-dot\.owned\s*\{[^}]*color:\s*#f59e0b[^}]*animation:\s*none/s.test(sidepanelCssSrc),
-  'Test 10b: sidepanel ownership dot is orange and non-pulsing');
+ok(!/\.status-dot\.owned\s*\{/.test(sidepanelCssSrc),
+  'Test 10b: sidepanel has no decorative ownership tone');
 ok(/_setHeaderOwner\(label\)/.test(popupJsSrc)
-    && /_setHeaderOwner\(label,\s*\{/.test(sidepanelJsSrc),
-  'Test 10c: both ownership refresh paths replace the header status');
+    && !/_setHeaderOwner\s*\(/.test(sidepanelJsSrc),
+  'Test 10c: only the popup replaces the header with ownership provenance');
 
 function extractNamedFunction(source, name) {
   const asyncStart = source.indexOf('async function ' + name + '(');
@@ -311,7 +310,41 @@ function runHeaderStatusContract(source, surfaceName) {
 
 console.log('\n--- exclusive ownership status rendering ---');
 runHeaderStatusContract(popupJsSrc, 'popup');
-runHeaderStatusContract(sidepanelJsSrc, 'sidepanel');
+
+function runSidepanelHeaderStatusContract(source) {
+  const classes = new Set();
+  const context = {
+    statusText: { textContent: 'Ready' },
+    statusDot: {
+      classList: {
+        add(...names) { names.forEach((name) => classes.add(name)); },
+        remove(...names) { names.forEach((name) => classes.delete(name)); }
+      }
+    },
+    _headerBaseStatusLabel: 'Ready',
+    _headerBaseStatusTone: ''
+  };
+  vm.createContext(context);
+  for (const name of ['_renderHeaderStatus', '_setHeaderStatus']) {
+    const definition = extractNamedFunction(source, name);
+    ok(!!definition, 'sidepanel: ' + name + ' is extractable');
+    if (definition) vm.runInContext(definition, context);
+  }
+
+  context._setHeaderStatus('Ready', '');
+  ok(context.statusText.textContent === 'Ready' && classes.size === 0,
+    'sidepanel: idle state remains Ready');
+  context._setHeaderStatus('Working', 'running');
+  ok(context.statusText.textContent === 'Working'
+      && classes.has('running') && !classes.has('owned'),
+    'sidepanel: active status is provider-neutral Working');
+  context._setHeaderStatus('Error', 'error');
+  ok(context.statusText.textContent === 'Error'
+      && classes.has('error') && !classes.has('owned'),
+    'sidepanel: failures use the generic Error status');
+}
+
+runSidepanelHeaderStatusContract(sidepanelJsSrc);
 
 async function runOwnershipRefreshContract(source, surfaceName, mySurface, richLockout) {
   const classes = new Set();
@@ -423,10 +456,109 @@ async function runOwnershipRefreshContract(source, surfaceName, mySurface, richL
     surfaceName + ': a stale ownership read cannot overwrite a newer release');
 }
 
+async function runSidepanelOwnershipLockContract(source) {
+  const classes = new Set();
+  const chatInput = { title: '' };
+  let storageBag = {
+    fsbAgentRegistry: { v: 1, records: { agent_aaa: { tabIds: [42] } } }
+  };
+  let delayNextStorageRead = false;
+  let resolveDelayedStorageRead = null;
+  const storageKeys = [];
+  const lockoutCalls = [];
+  const context = {
+    MY_SURFACE: 'legacy:sidepanel',
+    FSBOwnerChip: OwnerChip,
+    statusText: { textContent: 'Ready' },
+    statusDot: {
+      classList: {
+        add(...names) { names.forEach((name) => classes.add(name)); },
+        remove(...names) { names.forEach((name) => classes.delete(name)); }
+      }
+    },
+    chatInput,
+    _headerBaseStatusLabel: 'Ready',
+    _headerBaseStatusTone: '',
+    _ownerStatusRefreshGeneration: 0,
+    _activeTabSurfaceSyncGeneration: 0,
+    _chatLockedByOwnerChip: false,
+    chrome: {
+      tabs: { async query() { return [{ id: 42, windowId: 7 }]; } },
+      storage: {
+        session: {
+          get(key) {
+            storageKeys.push(key);
+            if (key === 'fsbAgentRegistry' && delayNextStorageRead) {
+              delayNextStorageRead = false;
+              return new Promise((resolve) => { resolveDelayedStorageRead = resolve; });
+            }
+            return Promise.resolve(storageBag);
+          }
+        }
+      }
+    },
+    updateSendButtonState() {},
+    applyInputLockout(value) { lockoutCalls.push(value); }
+  };
+  vm.createContext(context);
+  for (const name of ['_renderHeaderStatus', '_setHeaderStatus', 'refreshActiveTabOwnership']) {
+    const definition = extractNamedFunction(source, name);
+    ok(!!definition, 'sidepanel: ' + name + ' is extractable for ownership-lock behavior');
+    if (definition) vm.runInContext(definition, context);
+  }
+
+  await context.refreshActiveTabOwnership();
+  ok(context.statusText.textContent === 'Ready'
+      && !classes.has('owned') && context._chatLockedByOwnerChip === true,
+    'sidepanel: foreign ownership locks the composer without replacing Ready');
+  ok(lockoutCalls[lockoutCalls.length - 1] === true,
+    'sidepanel: foreign ownership preserves the rich input lockout path');
+  ok(chatInput.title === 'Disabled while automation is working on this tab',
+    'sidepanel: ownership tooltip is generic automation copy');
+  ok(storageKeys.every((key) => key === 'fsbAgentRegistry'),
+    'sidepanel: ownership refresh reads only the registry, not decorative labels');
+
+  context._setHeaderStatus('Working', 'running');
+  await context.refreshActiveTabOwnership();
+  ok(context.statusText.textContent === 'Working'
+      && classes.has('running') && !classes.has('owned'),
+    'sidepanel: a foreign-owned delegated run remains generic Working');
+
+  context._setHeaderStatus('Error', 'error');
+  storageBag = { fsbAgentRegistry: { v: 1, records: {} } };
+  await context.refreshActiveTabOwnership();
+  ok(context.statusText.textContent === 'Error'
+      && classes.has('error') && context._chatLockedByOwnerChip === false,
+    'sidepanel: ownership release unlocks without changing the lifecycle status');
+
+  context._setHeaderStatus('Ready', '');
+  storageBag = {
+    fsbAgentRegistry: { v: 1, records: { 'legacy:sidepanel': { tabIds: [42] } } }
+  };
+  await context.refreshActiveTabOwnership();
+  ok(context.statusText.textContent === 'Ready'
+      && !classes.has('owned') && context._chatLockedByOwnerChip === false,
+    'sidepanel: self-owned tabs remain unlocked and Ready');
+
+  const staleOwnedBag = {
+    fsbAgentRegistry: { v: 1, records: { agent_stale: { tabIds: [42] } } }
+  };
+  delayNextStorageRead = true;
+  const staleRefresh = context.refreshActiveTabOwnership();
+  await new Promise((resolve) => setImmediate(resolve));
+  storageBag = { fsbAgentRegistry: { v: 1, records: {} } };
+  await context.refreshActiveTabOwnership();
+  resolveDelayedStorageRead(staleOwnedBag);
+  await staleRefresh;
+  ok(context.statusText.textContent === 'Ready'
+      && !classes.has('owned') && context._chatLockedByOwnerChip === false,
+    'sidepanel: a stale ownership read cannot restore an old lock or badge');
+}
+
 (async function runAsyncContracts() {
   console.log('\n--- ownership refresh and race handling ---');
   await runOwnershipRefreshContract(popupJsSrc, 'popup', 'legacy:popup', false);
-  await runOwnershipRefreshContract(sidepanelJsSrc, 'sidepanel', 'legacy:sidepanel', true);
+  await runSidepanelOwnershipLockContract(sidepanelJsSrc);
   console.log('\n=== owner-chip results: ' + passed + ' passed, ' + failed + ' failed ===');
   if (failed > 0) process.exitCode = 1;
 })().catch((error) => {

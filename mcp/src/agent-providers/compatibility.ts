@@ -1,7 +1,6 @@
 import {
   CLAUDE_CODE_ADAPTER_ID,
-  CODEX_ADAPTER_ID,
-  OPENCODE_ADAPTER_ID,
+  GROK_BUILD_ADAPTER_ID,
   type AdapterCapabilities,
   type AdapterAuthState,
 } from './adapter.js';
@@ -109,8 +108,7 @@ const SAFE_ROW_KEYS = Object.freeze([
   'status',
 ]);
 const SAFE_AUTH_STATES = Object.freeze([
-  'chatgpt',
-  'api_key',
+  'oauth',
   'unauthenticated',
   'unknown',
 ] as const);
@@ -139,8 +137,7 @@ const KNOWN_NORMALIZED_EVENTS = new Set([
 ]);
 const CANONICAL_ADAPTER_IDS = Object.freeze([
   CLAUDE_CODE_ADAPTER_ID,
-  OPENCODE_ADAPTER_ID,
-  CODEX_ADAPTER_ID,
+  GROK_BUILD_ADAPTER_ID,
 ] as const);
 const EXPECTED_CAPABILITIES = Object.freeze({
   [CLAUDE_CODE_ADAPTER_ID]: Object.freeze({
@@ -149,13 +146,7 @@ const EXPECTED_CAPABILITIES = Object.freeze({
     resume: false,
     serverMode: false,
   }),
-  [OPENCODE_ADAPTER_ID]: Object.freeze({
-    taskMode: true,
-    chatMode: false,
-    resume: false,
-    serverMode: true,
-  }),
-  [CODEX_ADAPTER_ID]: Object.freeze({
+  [GROK_BUILD_ADAPTER_ID]: Object.freeze({
     taskMode: true,
     chatMode: false,
     resume: false,
@@ -277,8 +268,7 @@ function parseCapabilities(
   value: unknown,
   adapterId:
     | typeof CLAUDE_CODE_ADAPTER_ID
-    | typeof OPENCODE_ADAPTER_ID
-    | typeof CODEX_ADAPTER_ID,
+    | typeof GROK_BUILD_ADAPTER_ID,
 ): AdapterCapabilities | null {
   const record = ownDataRecord(value, CAPABILITY_KEYS);
   if (!record || CAPABILITY_KEYS.some((key) => typeof record[key] !== 'boolean')) return null;
@@ -298,8 +288,7 @@ function parseContract(value: unknown): AdapterCompatibilityContract | null {
   if (!boundedString(record.adapterId, MAX_ID_OR_LABEL_LENGTH, ADAPTER_ID_PATTERN)) return null;
   if (
     record.adapterId !== CLAUDE_CODE_ADAPTER_ID
-    && record.adapterId !== OPENCODE_ADAPTER_ID
-    && record.adapterId !== CODEX_ADAPTER_ID
+    && record.adapterId !== GROK_BUILD_ADAPTER_ID
   ) return null;
   if (!boundedString(record.displayLabel, MAX_ID_OR_LABEL_LENGTH)) return null;
   const capabilities = parseCapabilities(record.capabilities, record.adapterId);
@@ -421,78 +410,35 @@ const RAW_ADAPTER_COMPATIBILITY_MATRIX = {
       'result',
     ],
   }, {
-    adapterId: 'opencode',
-    capabilities: {
-      taskMode: true,
-      chatMode: false,
-      resume: false,
-      serverMode: true,
-    },
-    displayLabel: 'OpenCode',
-    profileVersion: '1.14.25',
-    minimumVersion: '1.14.25',
-    testedThroughVersion: '1.14.25',
-    supportedMajor: 1,
-    fixtureManifest: 'tests/fixtures/agent-streams/opencode-1.14.25/manifest.json',
-    requiredInitFields: [
-      'type',
-      'timestamp',
-      'sessionID',
-      'part.id',
-      'part.sessionID',
-      'part.messageID',
-      'part.type',
-    ],
-    requiredResultFields: [
-      'type',
-      'timestamp',
-      'sessionID',
-      'part.id',
-      'part.sessionID',
-      'part.messageID',
-      'part.type',
-      'part.reason',
-      'part.cost',
-      'part.tokens',
-    ],
-    expectedNormalizedSequence: [
-      'init',
-      'assistant_delta',
-      'assistant',
-      'tool_use',
-      'tool_result',
-      'tool_use',
-      'tool_result',
-      'assistant',
-      'result',
-    ],
-  }, {
-    adapterId: 'codex',
+    adapterId: 'grok-build',
     capabilities: {
       taskMode: true,
       chatMode: false,
       resume: false,
       serverMode: false,
     },
-    displayLabel: 'Codex',
-    profileVersion: '0.142.5',
-    minimumVersion: '0.142.5',
-    testedThroughVersion: '0.142.5',
-    supportedMajor: 0,
-    fixtureManifest: 'tests/fixtures/agent-streams/codex-0.142.5/manifest.json',
-    requiredInitFields: ['type', 'thread_id'],
-    requiredResultFields: [
-      'type',
-      'usage.input_tokens',
-      'usage.cached_input_tokens',
-      'usage.output_tokens',
-      'usage.reasoning_output_tokens',
+    displayLabel: 'Grok Build',
+    profileVersion: '1.0.4',
+    minimumVersion: '1.0.4',
+    testedThroughVersion: '1.0.4',
+    supportedMajor: 1,
+    fixtureManifest: 'tests/fixtures/agent-streams/grok-build-1.0.4/manifest.json',
+    requiredInitFields: [
+      'protocolVersion',
+      'agentCapabilities.mcpCapabilities.http',
+      'agentCapabilities.sessionCapabilities.close',
+      'authMethods',
+      '_meta.defaultAuthMethodId',
+      '_meta.agentVersion',
+      '_meta.mcpServers',
     ],
+    requiredResultFields: ['stopReason'],
     expectedNormalizedSequence: [
       'init',
-      'assistant',
+      'assistant_delta',
       'tool_use',
       'tool_result',
+      'assistant',
       'result',
     ],
   }],
@@ -640,6 +586,19 @@ function validStatusReason(status: unknown, reason: unknown): boolean {
     || reason === 'matrix_invalid';
 }
 
+function validProviderAuthState(adapterId: unknown, authState: unknown): boolean {
+  if (typeof adapterId !== 'string' || typeof authState !== 'string') return false;
+  if (adapterId === CLAUDE_CODE_ADAPTER_ID) {
+    return authState === 'unknown';
+  }
+  if (adapterId === GROK_BUILD_ADAPTER_ID) {
+    return authState === 'oauth'
+      || authState === 'unauthenticated'
+      || authState === 'unknown';
+  }
+  return false;
+}
+
 function parseSafeRow(value: unknown): SafeAdapterCompatibilityRow | null {
   const record = ownDataRecord(value, SAFE_ROW_KEYS);
   if (!record) return null;
@@ -649,6 +608,7 @@ function parseSafeRow(value: unknown): SafeAdapterCompatibilityRow | null {
   if (
     typeof record.authState !== 'string'
     || !(SAFE_AUTH_STATES as readonly string[]).includes(record.authState)
+    || !validProviderAuthState(record.adapterId, record.authState)
   ) return null;
   return Object.freeze({
     adapterId: record.adapterId,

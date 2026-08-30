@@ -20,7 +20,7 @@ if (SECTION_ARGUMENT_INDEX !== -1 && !SELECTED_SECTION) {
 }
 if (SELECTED_SECTION !== null
     && SELECTED_SECTION !== 'accepted-identity-binding'
-    && SELECTED_SECTION !== 'codex-auth-binding') {
+    && SELECTED_SECTION !== 'codex-retirement-binding') {
   throw new Error(`unknown section: ${SELECTED_SECTION}`);
 }
 
@@ -38,6 +38,13 @@ const ACCEPTED_IDENTITIES = Object.freeze({
     profileVersion: '1.14.25',
     authState: 'unknown',
     billingKind: 'unknown'
+  }),
+  'grok-build': Object.freeze({
+    providerId: 'grok-build',
+    label: 'Grok Build',
+    profileVersion: '1.0.4',
+    authState: 'oauth',
+    billingKind: 'subscription'
   }),
   'codex-chatgpt': Object.freeze({
     providerId: 'codex',
@@ -155,7 +162,22 @@ async function issue(
   });
 }
 
-async function runCodexAuthBindingContract() {
+function createStoredChallenge(acceptedIdentityValue, taskDigest) {
+  const nonce = crypto.randomUUID();
+  const now = Date.now();
+  return {
+    v: 1,
+    challengeId: `dch_${nonce}`,
+    nonce,
+    acceptedIdentity: clone(acceptedIdentityValue),
+    taskDigest,
+    issuedAt: now,
+    expiresAt: now + 60_000,
+    trustWriteUsed: false
+  };
+}
+
+async function runCodexRetirementBindingContract() {
   const harness = createStorageHarness();
   const localHarness = createStorageHarness();
   installChrome(harness, localHarness);
@@ -163,77 +185,78 @@ async function runCodexAuthBindingContract() {
   const chatgptIdentity = acceptedIdentity('codex-chatgpt');
   const apiKeyIdentity = acceptedIdentity('codex-api-key');
 
-  const consumeDigest = digest('Codex auth-bound consume');
-  const chatgptChallenge = await consent.issueChallenge({
-    acceptedIdentity: chatgptIdentity,
-    taskDigest: consumeDigest,
-    ttlMs: 60_000
-  });
-  assert.equal(chatgptChallenge.ok, true);
-  assert.deepEqual(await consent.consumeChallenge({
-    challengeId: chatgptChallenge.challengeId,
-    acceptedIdentity: apiKeyIdentity,
-    taskDigest: consumeDigest
-  }), { ok: false, code: 'provider_status_refresh' },
-  'changing only Codex auth and billing burns the challenge');
-  assert.deepEqual(await consent.consumeChallenge({
-    challengeId: chatgptChallenge.challengeId,
-    acceptedIdentity: chatgptIdentity,
-    taskDigest: consumeDigest
-  }), { ok: false, code: 'challenge_not_found' },
-  'burned ChatGPT authority cannot be replayed');
+  for (const retiredIdentity of [
+    chatgptIdentity,
+    apiKeyIdentity,
+    acceptedIdentity('opencode')
+  ]) {
+    assert.deepEqual(await consent.issueChallenge({
+      acceptedIdentity: retiredIdentity,
+      taskDigest: digest(`retired ${retiredIdentity.authState}`),
+      ttlMs: 60_000
+    }), { ok: false, code: 'invalid_challenge_request' },
+    'historical retired identities cannot mint new start authority');
+  }
 
-  const trustDigest = digest('Codex auth-bound trust');
-  const apiKeyChallenge = await consent.issueChallenge({
-    acceptedIdentity: apiKeyIdentity,
-    taskDigest: trustDigest,
-    ttlMs: 60_000
+  localHarness.values.set(consent.TRUST_STORAGE_KEY, {
+    v: 1,
+    providers: { codex: true, opencode: true, 'claude-code': true }
   });
-  assert.equal(apiKeyChallenge.ok, true);
+  assert.equal(await consent.getTrusted('codex'), false,
+    'retired Codex trust is never active');
+  assert.equal(await consent.getTrusted('claude-code'), true,
+    'retired trust does not corrupt an active sibling');
+  assert.equal(await consent.getTrusted('opencode'), false,
+    'retired OpenCode trust is never active');
+  const activeTrustChallenge = await issue(
+    consent,
+    digest('prune retired trust'),
+    60_000,
+    'grok-build'
+  );
   assert.deepEqual(await consent.writeTrustFromChallenge({
-    challengeId: apiKeyChallenge.challengeId,
-    acceptedIdentity: chatgptIdentity,
+    challengeId: activeTrustChallenge.challengeId,
+    acceptedIdentity: acceptedIdentity('grok-build'),
     trusted: true
-  }), { ok: false, code: 'provider_status_refresh' },
-  'changed Codex auth cannot grant trust');
-  assert.equal(await consent.getTrusted('codex'), false);
-  assert.deepEqual(await consent.writeTrustFromChallenge({
-    challengeId: apiKeyChallenge.challengeId,
-    acceptedIdentity: apiKeyIdentity,
-    trusted: true
-  }), { ok: false, code: 'challenge_not_found' },
-  'a mismatched trust attempt cannot be retried with older authority');
+  }), { ok: true, providerId: 'grok-build', trusted: true });
+  assert.deepEqual(localHarness.values.get(consent.TRUST_STORAGE_KEY), {
+    v: 1,
+    providers: { 'claude-code': true, 'grok-build': true }
+  }, 'the next trust write prunes both retired provider records');
 
-  const validChallenge = await consent.issueChallenge({
-    acceptedIdentity: chatgptIdentity,
-    taskDigest: trustDigest,
-    ttlMs: 60_000
+  const retiredDigest = digest('retired stored challenge');
+  const retiredChallenge = createStoredChallenge(chatgptIdentity, retiredDigest);
+  harness.values.set(storageKey, {
+    v: 1,
+    challenges: { [retiredChallenge.challengeId]: retiredChallenge }
   });
-  assert.deepEqual(await consent.writeTrustFromChallenge({
-    challengeId: validChallenge.challengeId,
-    acceptedIdentity: chatgptIdentity,
-    trusted: true
-  }), { ok: true, providerId: 'codex', trusted: true });
-  assert.equal(await consent.getTrusted('codex'), true);
-  assert.equal((await consent.consumeChallenge({
-    challengeId: validChallenge.challengeId,
-    acceptedIdentity: chatgptIdentity,
-    taskDigest: trustDigest
-  })).ok, true, 'exact auth-bound trust still leaves one exact start consumption');
   assert.deepEqual(await consent.consumeChallenge({
-    challengeId: validChallenge.challengeId,
-    acceptedIdentity: chatgptIdentity,
-    taskDigest: trustDigest
-  }), { ok: false, code: 'challenge_not_found' });
-  assert.deepEqual(await consent.clearTrusted({ providerId: 'codex' }), {
-    ok: true, providerId: 'codex', trusted: false
+    challengeId: retiredChallenge.challengeId,
+    acceptedIdentity: acceptedIdentity(),
+    taskDigest: retiredDigest
+  }), { ok: false, code: 'provider_status_refresh' },
+  'a retired stored challenge is burned as stale authority');
+  assert.equal(harness.values.has(storageKey), false,
+    'the retired challenge is removed without corrupting the store');
+
+  const retiredSibling = createStoredChallenge(apiKeyIdentity, digest('retired sibling'));
+  harness.values.set(storageKey, {
+    v: 1,
+    challenges: { [retiredSibling.challengeId]: retiredSibling }
   });
+  const replacementChallenge = await issue(consent, digest('active replacement challenge'));
+  assert.equal(replacementChallenge.ok, true);
+  assert.equal(Object.keys(getEnvelope(harness).challenges).length, 1);
+  assert.equal(Object.prototype.hasOwnProperty.call(
+    getEnvelope(harness).challenges,
+    retiredSibling.challengeId
+  ), false, 'active issuance prunes retired sibling challenges');
   delete globalThis.chrome;
 }
 
 async function main() {
-  if (SELECTED_SECTION === 'codex-auth-binding') {
-    await runCodexAuthBindingContract();
+  if (SELECTED_SECTION === 'codex-retirement-binding') {
+    await runCodexRetirementBindingContract();
     console.log('delegation-consent.test.js: PASS');
     return;
   }
@@ -328,7 +351,7 @@ async function main() {
     consent,
     digest('provider mismatch'),
     60_000,
-    'opencode'
+    'grok-build'
   );
   assert.deepEqual(await consent.consumeChallenge({
     challengeId: providerMismatch.challengeId,
@@ -339,7 +362,7 @@ async function main() {
     'any changed accepted identity burns stale authority');
   assert.deepEqual(await consent.consumeChallenge({
     challengeId: providerMismatch.challengeId,
-    acceptedIdentity: acceptedIdentity('opencode'),
+    acceptedIdentity: acceptedIdentity('grok-build'),
     taskDigest: digest('provider mismatch')
   }), { ok: false, code: 'challenge_not_found' },
   'a stale identity mismatch cannot be retried with older authority');
@@ -472,6 +495,8 @@ async function main() {
     { ...ACCEPTED_IDENTITIES['claude-code'], profileVersion: '' },
     { ...ACCEPTED_IDENTITIES['claude-code'], authState: 'chatgpt' },
     { ...ACCEPTED_IDENTITIES['claude-code'], billingKind: 'api' },
+    acceptedIdentity('codex-chatgpt'),
+    acceptedIdentity('codex-api-key'),
     hostileIssueIdentity
   ]) {
     assert.deepEqual(await consent.issueChallenge({
@@ -554,29 +579,29 @@ async function main() {
   }, 'legacy Claude-only trust remains a valid provider-local envelope');
   assert.equal(await consent.getTrusted('claude-code'), true);
 
-  const openCodeTrustChallenge = await issue(
+  const grokTrustChallenge = await issue(
     consent,
-    digest('enable independent OpenCode trust'),
+    digest('enable independent Grok Build trust'),
     60_000,
-    'opencode'
+    'grok-build'
   );
   assert.deepEqual(await consent.writeTrustFromChallenge({
-    challengeId: openCodeTrustChallenge.challengeId,
-    acceptedIdentity: acceptedIdentity('opencode'),
+    challengeId: grokTrustChallenge.challengeId,
+    acceptedIdentity: acceptedIdentity('grok-build'),
     trusted: true
-  }), { ok: true, providerId: 'opencode', trusted: true });
+  }), { ok: true, providerId: 'grok-build', trusted: true });
   assert.deepEqual(localHarness.values.get(consent.TRUST_STORAGE_KEY), {
     v: 1,
-    providers: { 'claude-code': true, opencode: true }
-  }, 'Claude and OpenCode trust entries coexist independently');
-  assert.equal(await consent.getTrusted('opencode'), true);
-  assert.deepEqual(await consent.clearTrusted({ providerId: 'opencode' }), {
-    ok: true, providerId: 'opencode', trusted: false
+    providers: { 'claude-code': true, 'grok-build': true }
+  }, 'Claude and Grok Build trust entries coexist independently');
+  assert.equal(await consent.getTrusted('grok-build'), true);
+  assert.deepEqual(await consent.clearTrusted({ providerId: 'grok-build' }), {
+    ok: true, providerId: 'grok-build', trusted: false
   });
-  assert.equal(await consent.getTrusted('opencode'), false,
-    'clearing OpenCode restores only OpenCode confirmation');
+  assert.equal(await consent.getTrusted('grok-build'), false,
+    'clearing Grok Build restores only Grok Build confirmation');
   assert.equal(await consent.getTrusted('claude-code'), true,
-    'clearing OpenCode cannot copy or clear Claude trust');
+    'clearing Grok Build cannot copy or clear Claude trust');
   assert.deepEqual(await consent.writeTrustFromChallenge({
     challengeId: trustChallenge.challengeId,
     acceptedIdentity: acceptedIdentity(),

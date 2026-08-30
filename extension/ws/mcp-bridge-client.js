@@ -17,6 +17,13 @@ const MCP_BRIDGE_PAIRING_PATTERN = /^fsb-auth\.[A-Za-z0-9_-]{43}$/;
 const DEFAULT_EXT_REQUEST_TIMEOUT_MS = 30000;
 const MIN_EXT_REQUEST_TIMEOUT_MS = 1000;
 const MAX_EXT_REQUEST_TIMEOUT_MS = 120000;
+// provider.auth.begin brackets the 5-minute browser login with a detection on
+// each side: one before the login child is spawned and one to verify the
+// result. Each detection is up to six bounded 5s probes, so the transport
+// ceiling has to outlast the whole window plus a margin -- otherwise the panel
+// reports provider_auth_timeout while the daemon is still finishing a login
+// that succeeds, and the user is told sign-in failed when it did not.
+const PROVIDER_AUTH_BEGIN_REQUEST_TIMEOUT_MS = (5 * 60 * 1000) + (2 * 30 * 1000) + (30 * 1000);
 // delegate.start is a run-lifecycle request, not a short RPC. The controller's
 // 45-minute watchdog is authoritative; this transport ceiling leaves a bounded
 // two-minute cleanup window for the exact-id cancellation/final response.
@@ -694,7 +701,9 @@ class MCPBridgeClient {
     const id = `ext_${connectionPart}_${++this._extRequestCounter}_${Date.now()}`;
     const timeoutMs = method === 'delegate.start'
       ? DELEGATION_START_REQUEST_TIMEOUT_MS
-      : this._boundedExtTimeout(options.timeout);
+      : (method === 'provider.auth.begin'
+          ? PROVIDER_AUTH_BEGIN_REQUEST_TIMEOUT_MS
+          : this._boundedExtTimeout(options.timeout));
 
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {

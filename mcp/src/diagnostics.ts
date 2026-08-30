@@ -562,8 +562,7 @@ function normalizeAdapterDetection(
   const version = boundedDoctorString(rawVersion, MAX_DOCTOR_FIELD_LENGTH)
     ? rawVersion
     : null;
-  const authState = detection.authState === 'chatgpt'
-    || detection.authState === 'api_key'
+  const authState = detection.authState === 'oauth'
     || detection.authState === 'unauthenticated'
     || detection.authState === 'unknown'
     ? detection.authState

@@ -148,12 +148,6 @@ body {
   animation: pulse 2s infinite;
 }
 
-.status-dot.owned {
-  color: #f59e0b;
-  text-shadow: 0 0 4px rgba(245, 158, 11, 0.3);
-  animation: none;
-}
-
 .status-dot.error {
   color: #ef4444;
   text-shadow: 0 0 4px rgba(239, 68, 68, 0.3);
@@ -170,32 +164,6 @@ body {
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-}
-
-.take-control-btn {
-  border: 0;
-  border-left: 1px solid var(--border-color);
-  margin: -2px -2px -2px 0;
-  padding: 2px 2px 2px 8px;
-  background: transparent;
-  color: var(--primary-color);
-  font: inherit;
-  font-size: 11px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.take-control-btn:hover,
-.take-control-btn:focus-visible {
-  color: var(--primary-hover);
-  text-decoration: underline;
-  outline: none;
-}
-
-.take-control-btn:disabled {
-  cursor: wait;
-  opacity: 0.6;
-  text-decoration: none;
 }
 
 .header-actions {
@@ -1733,15 +1701,13 @@ body[data-sidepanel-view="history"] .author-footer {
   max-width: 100%;
 }
 
-.delegation-run.hidden,
-.delegation-control-bar.hidden {
+.delegation-run.hidden {
   display: none;
 }
 
 .delegation-state-card,
 .delegation-entry,
-.delegation-summary,
-.delegation-control-bar {
+.delegation-summary {
   border: 1px solid var(--fsb-border-subtle);
   background: var(--fsb-surface-elevated);
   color: var(--fsb-text-primary);
@@ -1787,7 +1753,8 @@ body[data-sidepanel-view="history"] .author-footer {
   border-left: 4px solid var(--fsb-info);
 }
 
-.delegation-state-card[data-delegation-state="native-wake-checking"] {
+.delegation-state-card[data-delegation-state="native-wake-checking"],
+.delegation-state-card[data-delegation-state="preparing"] {
   border-left-color: var(--fsb-info);
 }
 
@@ -1935,14 +1902,6 @@ body[data-sidepanel-view="history"] .author-footer {
   margin: 0;
 }
 
-.delegation-run-metadata {
-  margin-bottom: var(--fsb-space-4);
-}
-
-.delegation-run-elapsed {
-  font-variant-numeric: tabular-nums;
-}
-
 .delegation-result-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--fsb-space-2) var(--fsb-space-4);
@@ -2088,28 +2047,6 @@ body[data-sidepanel-view="history"] .author-footer {
   box-shadow: var(--fsb-focus-ring);
 }
 
-.delegation-control-bar {
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--fsb-space-2);
-  margin: 0 var(--fsb-space-4);
-  padding: var(--fsb-space-2) var(--fsb-space-4);
-  border-left: 4px solid var(--fsb-warning);
-  border-radius: 12px;
-  flex-shrink: 0;
-}
-
-.delegation-control-bar:not(.hidden) {
-  display: flex;
-}
-
-.delegation-control-copy {
-  color: var(--fsb-text-secondary);
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1.4;
-}
-
 .delegation-entry-new {
   animation: delegation-entry-tint 200ms ease-out;
 }
@@ -2121,8 +2058,7 @@ body[data-sidepanel-view="history"] .author-footer {
 
 [data-theme="dark"] .delegation-state-card,
 [data-theme="dark"] .delegation-entry,
-[data-theme="dark"] .delegation-summary,
-[data-theme="dark"] .delegation-control-bar {
+[data-theme="dark"] .delegation-summary {
   background: var(--fsb-surface-elevated);
   color: var(--fsb-text-primary);
   border-color: var(--fsb-border-subtle);
@@ -2142,8 +2078,7 @@ body[data-sidepanel-view="history"] .author-footer {
     overflow-wrap: anywhere;
   }
 
-  .delegation-state-actions,
-  .delegation-control-bar {
+  .delegation-state-actions {
     align-items: stretch;
     flex-direction: column;
   }
@@ -2165,7 +2100,8 @@ body[data-sidepanel-view="history"] .author-footer {
 }
 
 @media (forced-colors: active) {
-  .delegation-state-card[data-delegation-state="native-wake-checking"] {
+  .delegation-state-card[data-delegation-state="native-wake-checking"],
+  .delegation-state-card[data-delegation-state="preparing"] {
     border-color: CanvasText;
     border-left-color: CanvasText;
   }
@@ -2209,8 +2145,7 @@ body[data-sidepanel-view="history"] .author-footer {
 
   .delegation-entry-new,
   .delegation-action,
-  .delegation-run,
-  .delegation-control-bar {
+  .delegation-run {
     animation: none !important;
     scroll-behavior: auto !important;
     transition: none !important;

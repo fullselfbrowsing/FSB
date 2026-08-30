@@ -1474,6 +1474,20 @@ let fsbDelegationConnectionEpoch = 0;
 const fsbDelegationActiveIds = new Set();
 const fsbDelegationRunContexts = new Map();
 const FSB_DELEGATION_GENERATION_PREFIX = 'fsbDelegationGeneration:v1:';
+// Mirrors failureCode() in mcp/src/agent-providers/spawn-supervisor.ts. Codes
+// outside this roster are dropped rather than shown.
+const FSB_DELEGATION_START_REJECTION_DETAILS = new Set([
+  'adapter_unavailable',
+  'spawn_failed',
+  'activation_failed',
+  'agent_protocol_drift',
+  'route_lost',
+  'daemon_shutdown',
+  'tree_unsettled',
+  'runtime_cleanup_failed',
+  'cancelled'
+]);
+
 const FSB_DELEGATION_GENERATION_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
 const FSB_DELEGATION_PROFILE_VERSION_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$/;
 const FSB_DELEGATION_STATUS_TIMEOUT_MS = 5000;
@@ -1815,8 +1829,7 @@ async function fsbReadAuthoritativeProviderEvidence(providerId) {
     && Object.prototype.hasOwnProperty.call(authStateDescriptor, 'value')
     ? authStateDescriptor.value
     : undefined;
-  let authState = projectedAuthState === 'chatgpt'
-    || projectedAuthState === 'api_key'
+  let authState = projectedAuthState === 'oauth'
     || projectedAuthState === 'unauthenticated'
     || projectedAuthState === 'unknown'
     ? projectedAuthState
@@ -1857,6 +1870,28 @@ async function fsbDelegationPreflightResult() {
     authState: evidence && evidence.authState
   });
   return { config, result };
+}
+
+async function fsbRefreshDelegationAuthorityIfNeeded(authority) {
+  const refreshableGrokAuthEvidence = authority
+    && authority.config
+    && authority.config.agentProviderId === FSB_GROK_BUILD_PROVIDER_ID
+    && authority.result
+    && (authority.result.code === 'auth_unauthenticated'
+      || authority.result.code === 'auth_unknown');
+  if (!authority
+      || !authority.config
+      || authority.config.providerKind !== 'agent'
+      || !authority.result
+      || authority.result.ok !== false
+      || (authority.result.code !== 'provider_status_refresh'
+        && !refreshableGrokAuthEvidence)) return authority;
+  try {
+    await fsbRefreshMcpCompatibility();
+    return await fsbDelegationPreflightResult();
+  } catch (_error) {
+    return authority;
+  }
 }
 
 const FSB_NATIVE_WAKE_ID_PATTERN = /^[A-Za-z0-9_-]{16,64}$/;
@@ -1929,6 +1964,7 @@ function fsbAgentBridgeFailureMessage(code) {
 const FSB_AGENT_CONNECTION_FAILURE_CODES = Object.freeze({
   binary_not_found: true,
   unsupported_version: true,
+  adapter_unavailable: true,
   auth_unauthenticated: true,
   connection_test_timeout: true,
   connection_test_cancelled: true,
@@ -1938,6 +1974,134 @@ const FSB_AGENT_CONNECTION_FAILURE_CODES = Object.freeze({
   connection_test_cleanup_failed: true
 });
 const FSB_AGENT_CONNECTION_TEST_REQUEST_TIMEOUT_MS = 120000;
+// Both Grok auth reads outrun the bridge's 30s default. provider.auth.status is one
+// detection -- six bounded 5s probes -- and provider.auth.logout runs two of them around
+// the logout probe, so a slow install can spend a minute answering. Both stay under
+// MAX_EXT_REQUEST_TIMEOUT_MS so the transport keeps them verbatim.
+const FSB_GROK_AUTH_STATUS_REQUEST_TIMEOUT_MS = 60000;
+const FSB_GROK_AUTH_LOGOUT_REQUEST_TIMEOUT_MS = 90000;
+const FSB_GROK_BUILD_PROVIDER_ID = 'grok-build';
+const FSB_GROK_AUTH_STATES = Object.freeze({
+  oauth: true,
+  unauthenticated: true,
+  unknown: true
+});
+const FSB_GROK_AUTH_PROGRESS_STATES = Object.freeze({
+  opening_browser: true,
+  waiting: true,
+  authenticated: true,
+  failed: true,
+  cancelled: true
+});
+const FSB_GROK_LOGIN_HOSTS = Object.freeze({
+  'auth.x.ai': true,
+  'accounts.x.ai': true,
+  'grok.com': true,
+  'auth.grok.com': true
+});
+const FSB_GROK_LOGIN_SENSITIVE_QUERY_KEY =
+  /(?:token|secret|password|credential|api[_-]?key|authorization)/i;
+
+function fsbSafeGrokAuthState(value) {
+  return typeof value === 'string'
+    && Object.prototype.hasOwnProperty.call(FSB_GROK_AUTH_STATES, value)
+    ? value
+    : null;
+}
+
+function fsbSafeGrokLoginUrl(value) {
+  if (typeof value !== 'string' || value.length === 0 || value.length > 2048) return null;
+  try {
+    const parsed = new URL(value);
+    if (parsed.hash !== ''
+        || Array.from(parsed.searchParams.keys()).some((key) => (
+          FSB_GROK_LOGIN_SENSITIVE_QUERY_KEY.test(key)
+        ))) return null;
+    return parsed.protocol === 'https:'
+      && parsed.username === ''
+      && parsed.password === ''
+      && Object.prototype.hasOwnProperty.call(
+        FSB_GROK_LOGIN_HOSTS,
+        parsed.hostname.toLowerCase()
+      )
+      ? parsed.toString()
+      : null;
+  } catch (_error) {
+    return null;
+  }
+}
+
+function fsbSafeGrokAuthResponse(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const keys = Object.keys(value);
+  const state = keys.length === 1 && keys[0] === 'state'
+    ? fsbSafeGrokAuthState(value.state)
+    : null;
+  return state ? Object.freeze({ state: state }) : null;
+}
+
+// Mirrors grokLogoutResult() in mcp/src/agent-providers/serve-delegation.ts.
+// Logout answers with the settled state, or with the locked marker when a Grok
+// run or a blocked session cleanup owns the profile. A daemon-side throw cannot
+// carry that distinction -- the bridge rewrites every handler error to one
+// opaque code -- so the refusal arrives in the payload.
+function fsbSafeGrokLogoutResponse(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const keys = Object.keys(value).sort();
+  if (keys.length === 1
+      && keys[0] === 'state'
+      && value.state === 'unauthenticated') {
+    return Object.freeze({ state: 'unauthenticated', locked: false });
+  }
+  if (keys.length === 2
+      && keys[0] === 'locked'
+      && keys[1] === 'state'
+      && value.locked === true
+      && value.state === 'unknown') {
+    return Object.freeze({ state: 'unknown', locked: true });
+  }
+  return null;
+}
+
+function fsbSafeGrokAuthProgress(eventName, value) {
+  if (eventName !== 'provider.auth.progress'
+      || !value
+      || typeof value !== 'object'
+      || Array.isArray(value)) return null;
+  const keys = Object.keys(value).sort();
+  const hasUrl = keys.length === 3
+    && keys[0] === 'providerId'
+    && keys[1] === 'state'
+    && keys[2] === 'url';
+  const noUrl = keys.length === 2
+    && keys[0] === 'providerId'
+    && keys[1] === 'state';
+  if ((!hasUrl && !noUrl)
+      || value.providerId !== FSB_GROK_BUILD_PROVIDER_ID
+      || typeof value.state !== 'string'
+      || !Object.prototype.hasOwnProperty.call(FSB_GROK_AUTH_PROGRESS_STATES, value.state)) {
+    return null;
+  }
+  const url = hasUrl ? fsbSafeGrokLoginUrl(value.url) : null;
+  if (hasUrl && (value.state !== 'waiting' || !url)) return null;
+  return Object.freeze({
+    providerId: FSB_GROK_BUILD_PROVIDER_ID,
+    state: value.state,
+    ...(url ? { url: url } : {})
+  });
+}
+
+function fsbBroadcastGrokAuthProgress(progress) {
+  try {
+    const pending = chrome.runtime.sendMessage({
+      type: 'FSB_GROK_BUILD_AUTH_PROGRESS',
+      providerId: progress.providerId,
+      state: progress.state,
+      ...(progress.url ? { url: progress.url } : {})
+    });
+    if (pending && typeof pending.catch === 'function') pending.catch(() => {});
+  } catch (_error) { /* no open extension page is listening */ }
+}
 
 function fsbSafeAgentConnectionFailureCode(code) {
   return typeof code === 'string'
@@ -1954,7 +2118,14 @@ function fsbAgentConnectionFailureMessage(code, providerId) {
   const label = provider && provider.label ? provider.label : 'The selected agent';
   if (code === 'binary_not_found') return `${label} is not installed or is not on PATH.`;
   if (code === 'unsupported_version') return `${label} must be updated to a supported version.`;
-  if (code === 'auth_unauthenticated') return `Sign in to ${label} locally, then try again.`;
+  if (code === 'adapter_unavailable') {
+    return `${label} was found at a supported version, but its isolation or protocol profile could not be verified.`;
+  }
+  if (code === 'auth_unauthenticated') {
+    return providerId === FSB_GROK_BUILD_PROVIDER_ID
+      ? 'Connect SuperGrok to the private FSB Grok Build profile, then try again.'
+      : `Sign in to ${label} locally, then try again.`;
+  }
   if (code === 'connection_test_timeout') return `${label} did not respond within 60 seconds.`;
   if (code === 'connection_test_cancelled') return `${label} connection test was cancelled.`;
   if (code === 'connection_test_malformed') return `${label} returned an invalid response.`;
@@ -2157,7 +2328,9 @@ async function fsbDelegationPreflightCommand(request) {
     return fsbDelegationBridgePreflightFailure(originalResult, bridgeReady);
   }
   try {
-    return (await fsbDelegationPreflightResult()).result;
+    authority = await fsbDelegationPreflightResult();
+    authority = await fsbRefreshDelegationAuthorityIfNeeded(authority);
+    return authority.result;
   } catch (_error) {
     return originalResult;
   }
@@ -2180,6 +2353,7 @@ async function fsbDelegationConsentCommand(request) {
   let authority;
   try {
     authority = await fsbDelegationPreflightResult();
+    authority = await fsbRefreshDelegationAuthorityIfNeeded(authority);
   } catch (_error) {
     return { ok: false, code: 'agent_offline', providerId: '', providerLabel: 'Selected provider' };
   }
@@ -2233,6 +2407,7 @@ async function fsbDelegationSetTrustCommand(request) {
   let authority;
   try {
     authority = await fsbDelegationPreflightResult();
+    authority = await fsbRefreshDelegationAuthorityIfNeeded(authority);
   } catch (_error) {
     return { ok: false, code: 'trust_provider_changed' };
   }
@@ -2423,6 +2598,96 @@ function fsbDelegationAnswerFromFinal(code, finalResult) {
   }
 }
 
+// The supervisor already knows exactly which start gate refused a run and puts
+// that code on the diagnostic terminal it settles delegate.start with. Read it
+// back through a closed roster so a rejected start can name its own cause
+// instead of collapsing every gate into one opaque card. Unknown codes stay out.
+function fsbDelegationStartRejectionDetail(finalResult) {
+  try {
+    if (!finalResult || typeof finalResult !== 'object' || Array.isArray(finalResult)) return null;
+    const terminal = fsbDelegationReadExactOwnDataRecord(
+      finalResult,
+      ['delegationId', 'status', 'terminal'],
+      false
+    );
+    if (!terminal || terminal.status !== 'failed') return null;
+    const diagnostic = terminal.terminal;
+    if (!diagnostic || typeof diagnostic !== 'object' || Array.isArray(diagnostic)) return null;
+    const descriptor = Object.getOwnPropertyDescriptor(diagnostic, 'code');
+    if (!descriptor
+        || descriptor.enumerable !== true
+        || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) return null;
+    return FSB_DELEGATION_START_REJECTION_DETAILS.has(descriptor.value)
+      ? descriptor.value
+      : null;
+  } catch (_error) {
+    return null;
+  }
+}
+
+function fsbDelegationStartRejected(detail) {
+  return typeof detail === 'string' && FSB_DELEGATION_START_REJECTION_DETAILS.has(detail)
+    ? { ok: false, code: 'start_rejected', snapshot: null, detail }
+    : fsbDelegationFailure('start_rejected', null);
+}
+
+function fsbLogDelegationStartRejected(providerId, stage, detail) {
+  try {
+    if (typeof automationLogger === 'undefined'
+        || !automationLogger
+        || typeof automationLogger.info !== 'function') return false;
+    automationLogger.info('Delegation start rejected', {
+      phase: 'delegation-start-rejected',
+      providerId: typeof providerId === 'string' ? providerId : null,
+      stage,
+      terminalCode: typeof detail === 'string' ? detail : null
+    });
+    return true;
+  } catch (_error) {
+    return false;
+  }
+}
+
+function fsbLogDelegationStartPreflight(code) {
+  try {
+    if (typeof automationLogger === 'undefined'
+        || !automationLogger
+        || typeof automationLogger.info !== 'function') return false;
+    automationLogger.info('Delegation start preflight refused', {
+      phase: 'delegation-start-preflight',
+      preflightCode: typeof code === 'string' ? code : null
+    });
+    return true;
+  } catch (_error) {
+    return false;
+  }
+}
+
+function fsbLogDelegationTerminalSettlement(delegationId, code, finalResult, runContext) {
+  try {
+    if (typeof automationLogger === 'undefined'
+        || !automationLogger
+        || typeof automationLogger.info !== 'function') return false;
+    const supervisorStatus = finalResult
+      && (finalResult.status === 'succeeded'
+        || finalResult.status === 'failed'
+        || finalResult.status === 'cancelled')
+      ? finalResult.status
+      : 'transport_error';
+    automationLogger.info('Delegation run settled', {
+      phase: 'delegation-terminal',
+      delegationId,
+      providerId: runContext.providerId,
+      profileVersion: runContext.profileVersion,
+      supervisorStatus,
+      terminalCode: code
+    });
+    return true;
+  } catch (_error) {
+    return false;
+  }
+}
+
 async function fsbSettleDelegationFromFinal(delegationId, finalResult, transportError) {
   const controller = globalThis.fsbDelegationControllerInstance;
   if (!controller) {
@@ -2479,6 +2744,7 @@ async function fsbSettleDelegationFromFinal(delegationId, finalResult, transport
         ...(answer === null ? {} : { answer })
       }
     });
+    fsbLogDelegationTerminalSettlement(delegationId, code, finalResult, runContext);
     if (code === 'agent_protocol_drift') {
       fsbReportAgentProtocolDriftOnce(delegationId, finalResult, runContext);
     }
@@ -2523,11 +2789,13 @@ async function fsbDelegationStartCommand(request) {
   let authority;
   try {
     authority = await fsbDelegationPreflightResult();
+    authority = await fsbRefreshDelegationAuthorityIfNeeded(authority);
   } catch (_error) {
     return fsbDelegationFailure('preflight_failed', null);
   }
   if (!authority.result.ok
       || authority.result.kind !== 'agent') {
+    fsbLogDelegationStartPreflight(authority.result.code);
     return fsbDelegationFailure('preflight_failed', null);
   }
   const selectedProvider = globalThis.FsbDelegationProviders.get(
@@ -2558,6 +2826,7 @@ async function fsbDelegationStartCommand(request) {
   let currentAuthority;
   try {
     currentAuthority = await fsbDelegationPreflightResult();
+    currentAuthority = await fsbRefreshDelegationAuthorityIfNeeded(currentAuthority);
   } catch (_error) {
     return fsbDelegationFailure('provider_changed', null);
   }
@@ -2653,25 +2922,35 @@ async function fsbDelegationStartCommand(request) {
       }
     );
   } catch (error) {
+    fsbLogDelegationStartRejected(authority.result.providerId, 'transport', null);
     return fsbDelegationFailure('start_rejected', null);
   }
 
+  let settledBeforeAcceptance = null;
   const rejectedBeforeAcceptance = finalPromise.then(
-    () => { throw new Error('delegate.start completed without acceptance'); },
+    (result) => {
+      settledBeforeAcceptance = result;
+      throw new Error('delegate.start completed without acceptance');
+    },
     (error) => { throw error; }
   );
   let delegationId;
   try {
     delegationId = await Promise.race([acceptedPromise, rejectedBeforeAcceptance]);
   } catch (_error) {
-    return fsbDelegationFailure('start_rejected', null);
+    const detail = fsbDelegationStartRejectionDetail(settledBeforeAcceptance);
+    fsbLogDelegationStartRejected(authority.result.providerId, 'supervisor', detail);
+    return fsbDelegationStartRejected(detail);
   }
 
   finalPromise.then(
     (result) => fsbSettleDelegationFromFinal(delegationId, result, null),
     (error) => fsbSettleDelegationFromFinal(delegationId, null, error)
   ).catch(() => {});
-  if (!controller) return fsbDelegationFailure('start_rejected', null);
+  if (!controller) {
+    fsbLogDelegationStartRejected(authority.result.providerId, 'controller', null);
+    return fsbDelegationFailure('start_rejected', null);
+  }
   const acceptedSnapshot = controller.getSnapshot(delegationId);
   if (acceptedSnapshot) {
     await fsbReconcileDelegationSnapshots(controller, [acceptedSnapshot]);
@@ -2680,6 +2959,7 @@ async function fsbDelegationStartCommand(request) {
   if (!snapshot) {
     fsbDelegationRunContexts.delete(delegationId);
     if (globalThis.FsbDelegationTabSeed) globalThis.FsbDelegationTabSeed.forget(delegationId);
+    fsbLogDelegationStartRejected(authority.result.providerId, 'snapshot', null);
     return fsbDelegationFailure('start_rejected', null);
   }
   return { ok: true, snapshot };
@@ -2941,6 +3221,24 @@ async function bootstrapDelegationController() {
         clearGeneration: fsbClearDelegationGeneration,
         retainHeartbeat: (delegationId) => mcpBridgeClient.retainDelegationHeartbeat(delegationId),
         releaseHeartbeat: (delegationId) => mcpBridgeClient.releaseDelegationHeartbeat(delegationId),
+        releaseVisualSessions: ({ delegationId, agentId }) => {
+          if (typeof MCPVisualSessionLifecycleUtils === 'undefined'
+              || typeof MCPVisualSessionLifecycleUtils.clearVisualSessionsForAgent !== 'function') {
+            return false;
+          }
+          Promise.resolve(
+            MCPVisualSessionLifecycleUtils.clearVisualSessionsForAgent(agentId, { reason: 'delegation_terminal' })
+          ).then((result) => {
+            if (typeof automationLogger === 'undefined' || !automationLogger) return;
+            automationLogger.info('Delegation visual overlay cleared', {
+              phase: 'delegation-visual-clear',
+              delegationId,
+              agentId,
+              cleared: result && Number.isFinite(result.cleared) ? result.cleared : 0
+            });
+          }).catch(() => {});
+          return true;
+        },
         getConnectionSnapshot: () => mcpBridgeClient.getDelegationConnectionSnapshot(),
         getActiveTab: async () => {
           const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -11551,6 +11849,133 @@ const fsbHandleRuntimeMessage = (request, sender, sendResponse) => {
           sendResponse({ success: false, error: (err && err.message) || String(err) });
         });
       return true; // async response
+    }
+
+    case 'getGrokBuildAuthStatus': {
+      if (!fsbDelegationHasExactKeys(request, ['action'])) {
+        sendResponse({ success: false, errorCode: 'invalid_request' });
+        return false;
+      }
+      (async () => {
+        const readiness = await fsbEnsureAgentBridgeReady();
+        if (!readiness || readiness.ok !== true) {
+          sendResponse({
+            success: false,
+            errorCode: readiness && typeof readiness.code === 'string'
+              ? readiness.code
+              : 'bridge_not_ready'
+          });
+          return;
+        }
+        try {
+          const value = await mcpBridgeClient.sendExtRequest(
+            'provider.auth.status',
+            { providerId: FSB_GROK_BUILD_PROVIDER_ID },
+            { timeout: FSB_GROK_AUTH_STATUS_REQUEST_TIMEOUT_MS }
+          );
+          const result = fsbSafeGrokAuthResponse(value);
+          if (!result) throw new Error('provider_auth_malformed');
+          if (result.state === 'oauth') {
+            try { await fsbRefreshMcpCompatibility(); }
+            catch (_error) { /* delegation preflight retries stale Grok auth evidence */ }
+          }
+          sendResponse({ success: true, state: result.state });
+        } catch (error) {
+          sendResponse({
+            success: false,
+            errorCode: error && error.code === 'ext_request_timeout'
+              ? 'provider_auth_timeout'
+              : 'provider_auth_failed'
+          });
+        }
+      })();
+      return true;
+    }
+
+    case 'beginGrokBuildAuth': {
+      if (!fsbDelegationHasExactKeys(request, ['action'])) {
+        sendResponse({ success: false, errorCode: 'invalid_request' });
+        return false;
+      }
+      (async () => {
+        const readiness = await fsbEnsureAgentBridgeReady();
+        if (!readiness || readiness.ok !== true) {
+          sendResponse({
+            success: false,
+            errorCode: readiness && typeof readiness.code === 'string'
+              ? readiness.code
+              : 'bridge_not_ready'
+          });
+          return;
+        }
+        try {
+          const value = await mcpBridgeClient.sendExtRequest(
+            'provider.auth.begin',
+            { providerId: FSB_GROK_BUILD_PROVIDER_ID },
+            {
+              onEvent: async (eventName, payload) => {
+                const progress = fsbSafeGrokAuthProgress(eventName, payload);
+                if (!progress) throw new Error('provider_auth_malformed');
+                fsbBroadcastGrokAuthProgress(progress);
+              }
+            }
+          );
+          const result = fsbSafeGrokAuthResponse(value);
+          if (!result) throw new Error('provider_auth_malformed');
+          sendResponse({ success: true, state: result.state });
+        } catch (error) {
+          sendResponse({
+            success: false,
+            errorCode: error && error.code === 'ext_request_timeout'
+              ? 'provider_auth_timeout'
+              : 'provider_auth_failed'
+          });
+        }
+      })();
+      return true;
+    }
+
+    case 'logoutGrokBuildAuth': {
+      if (!fsbDelegationHasExactKeys(request, ['action'])) {
+        sendResponse({ success: false, errorCode: 'invalid_request' });
+        return false;
+      }
+      (async () => {
+        const readiness = await fsbEnsureAgentBridgeReady();
+        if (!readiness || readiness.ok !== true) {
+          sendResponse({
+            success: false,
+            errorCode: readiness && typeof readiness.code === 'string'
+              ? readiness.code
+              : 'bridge_not_ready'
+          });
+          return;
+        }
+        try {
+          const value = await mcpBridgeClient.sendExtRequest(
+            'provider.auth.logout',
+            { providerId: FSB_GROK_BUILD_PROVIDER_ID },
+            { timeout: FSB_GROK_AUTH_LOGOUT_REQUEST_TIMEOUT_MS }
+          );
+          const result = fsbSafeGrokLogoutResponse(value);
+          if (!result) throw new Error('provider_auth_malformed');
+          if (result.locked === true) {
+            sendResponse({ success: false, errorCode: 'provider_auth_locked' });
+            return;
+          }
+          try { await fsbRefreshMcpCompatibility(); }
+          catch (_error) { /* status refresh remains available from the provider panel */ }
+          sendResponse({ success: true, state: result.state });
+        } catch (error) {
+          sendResponse({
+            success: false,
+            errorCode: error && error.code === 'ext_request_timeout'
+              ? 'provider_auth_timeout'
+              : 'provider_auth_failed'
+          });
+        }
+      })();
+      return true;
     }
 
     case 'testAgentProviderConnection': {

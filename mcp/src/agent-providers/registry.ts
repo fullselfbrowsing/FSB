@@ -1,7 +1,6 @@
 import {
   CLAUDE_CODE_ADAPTER_ID,
-  CODEX_ADAPTER_ID,
-  OPENCODE_ADAPTER_ID,
+  GROK_BUILD_ADAPTER_ID,
   type AdapterDetection,
   type AgentEvent,
   type AgentProviderAdapter,
@@ -11,16 +10,10 @@ import {
 } from './adapter.js';
 import { createClaudeCodeAdapter } from './claude-code.js';
 import {
-  createCodexAdapter,
-  type CodexDetectionDependency,
-  type CodexParserDependency,
-} from './codex.js';
-import {
-  createOpenCodeAdapter,
-  type OpenCodeDetectionDependency,
-  type OpenCodeParserDependency,
-  type OpenCodeProfileRuntimeDependency,
-} from './opencode.js';
+  createGrokBuildAdapter,
+  type GrokBuildDetectionDependency,
+} from './grok.js';
+import type { GrokBuildPrivateRuntime } from './grok-runtime.js';
 
 export type AdapterRegistryErrorCode =
   | 'invalid_adapter_id'
@@ -54,11 +47,8 @@ export interface ProductionAdapterRegistryDependencies {
     stream: NodeJS.ReadableStream,
     options?: Readonly<{ purpose: SpawnPurpose }>,
   ) => AsyncIterable<AgentEvent>;
-  readonly openCodeDetect?: OpenCodeDetectionDependency;
-  readonly openCodeParseEvents?: OpenCodeParserDependency;
-  readonly resolveOpenCodeProfileRuntime?: OpenCodeProfileRuntimeDependency;
-  readonly codexDetect?: CodexDetectionDependency;
-  readonly codexParseEvents?: CodexParserDependency;
+  readonly grokBuildDetect?: GrokBuildDetectionDependency;
+  readonly grokBuildRuntime?: GrokBuildPrivateRuntime;
   readonly kill: (
     child: SupervisedChild,
     options: { grace: number },
@@ -67,8 +57,7 @@ export interface ProductionAdapterRegistryDependencies {
 
 const CANONICAL_IDS = Object.freeze([
   CLAUDE_CODE_ADAPTER_ID,
-  OPENCODE_ADAPTER_ID,
-  CODEX_ADAPTER_ID,
+  GROK_BUILD_ADAPTER_ID,
 ] as const);
 const ADAPTER_METHODS = Object.freeze([
   'detect',
@@ -84,8 +73,7 @@ function parseRegistrationId(id: string): AgentProviderId {
   }
   if (
     id !== CLAUDE_CODE_ADAPTER_ID
-    && id !== OPENCODE_ADAPTER_ID
-    && id !== CODEX_ADAPTER_ID
+    && id !== GROK_BUILD_ADAPTER_ID
   ) {
     throw new AdapterRegistryError('unknown_adapter_id', 'Unknown adapter id');
   }
@@ -184,7 +172,7 @@ function validateAdapter(adapter: AgentProviderAdapter): void {
 
 /**
  * Construct the complete immutable production roster. Registration is closed
- * to the three shipped canonical ids and their reviewed order.
+ * to the shipped canonical ids and their reviewed order.
  */
 export function createAdapterRegistry(
   registrations: readonly AdapterRegistration[],
@@ -239,19 +227,10 @@ export function createProductionAdapterRegistry(
       adapter: createClaudeCodeAdapter(dependencies),
     },
     {
-      id: OPENCODE_ADAPTER_ID,
-      adapter: createOpenCodeAdapter({
-        detect: dependencies.openCodeDetect,
-        resolveProfileRuntime: dependencies.resolveOpenCodeProfileRuntime,
-        parseEvents: dependencies.openCodeParseEvents,
-        kill: dependencies.kill,
-      }),
-    },
-    {
-      id: CODEX_ADAPTER_ID,
-      adapter: createCodexAdapter({
-        detect: dependencies.codexDetect,
-        parseEvents: dependencies.codexParseEvents,
+      id: GROK_BUILD_ADAPTER_ID,
+      adapter: createGrokBuildAdapter({
+        detect: dependencies.grokBuildDetect,
+        runtime: dependencies.grokBuildRuntime,
         kill: dependencies.kill,
       }),
     },

@@ -129,6 +129,11 @@ var _al_calculateAdaptiveTimeout = (typeof calculateAdaptiveTimeout !== 'undefin
         return Math.min(Math.round(baseTimeout * retryMultiplier), maxTimeout);
       }
     });
+var _al_normalizeProviderChatRequest = (typeof normalizeProviderChatRequest !== 'undefined')
+  ? normalizeProviderChatRequest
+  : (_al_provider?.normalizeProviderChatRequest || function(providerKey, modelName, requestBody) {
+      return requestBody;
+    });
 
 // LM Studio base URLs are normalized through the SAME helper universal-provider.js
 // uses (strips a pasted /v1 or /v1/chat/completions suffix before the bridge
@@ -1069,8 +1074,11 @@ async function callProviderWithTools(providerInstance, model, apiKey, messages, 
 
     default: {
       // OpenAI/xAI/OpenRouter/Custom: standard messages + tools format.
-      // max_tokens: match Anthropic's 4096 budget so the model has room for
-      // multi-tool responses (report_progress + click + type_text in one turn).
+      // Start from the broadly compatible request shape. Direct OpenAI calls
+      // are normalized below to max_completion_tokens and, for reasoning
+      // model families, omit unsupported sampling parameters.
+      // The 4096 budget matches Anthropic so the model has room for multi-tool
+      // responses (report_progress + click + type_text in one turn).
       // Without this, xAI defaulted to a tight internal limit (~87 tokens/iter)
       // causing the model to truncate after report_progress and never emit click.
       // NOTE: tool_choice intentionally omitted -- xAI returns 400 for it,
@@ -1086,6 +1094,8 @@ async function callProviderWithTools(providerInstance, model, apiKey, messages, 
       break;
     }
   }
+
+  requestBody = _al_normalizeProviderChatRequest(providerKey, model, requestBody);
 
   // Phase 7 (FINT-09): Lattice provider bridge is the UNCONDITIONAL
   // provider call path. The Phase 6 feature flag has been removed; the

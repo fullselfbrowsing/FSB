@@ -81,8 +81,8 @@ assert(authoritySource.includes("endpointRef: 'direct_runtime_endpoint'"), 'auth
 assert(authoritySource.includes("parsed.hostname !== '127.0.0.1'"), 'direct runtime materialization pins numeric loopback');
 assert(serveDelegationSource.indexOf('await dependencies.startHttp') < serveDelegationSource.indexOf('createDirectRuntimeReference('), 'serve materializes the direct reference only after HTTP ownership');
 assert(serveDelegationSource.includes('dependencies.mintGeneration()'), 'serve owns the direct runtime generation');
-assert(registrySource.includes('CODEX_ADAPTER_ID') && registrySource.includes('createCodexAdapter'), 'production adapter roster retains the canonical Codex registration');
-assert(!authoritySource.includes('CODEX_ADAPTER_ID') && !authoritySource.includes('createCodexAdapter'), 'generic authority substrate remains provider-neutral after Codex registration');
+assert(!registrySource.includes('CODEX_ADAPTER_ID') && !registrySource.includes('createCodexAdapter'), 'production adapter roster excludes retired Codex registration');
+assert(!authoritySource.includes('CODEX_ADAPTER_ID') && !authoritySource.includes('createCodexAdapter'), 'generic authority substrate remains provider-neutral after Codex retirement');
 assert(spawnSupervisorSource.includes('executePreSpawnAuthorityBarrier'), 'supervisor owns the generic pre-spawn authority barrier');
 assert(spawnSupervisorSource.includes('runBoundedProcessProbe'), 'supervisor consumes the bounded byte-probe primitive');
 assert(spawnSupervisorSource.indexOf('executePreSpawnAuthorityBarrier(') < spawnSupervisorSource.indexOf("role: 'direct',"), 'pre-spawn authority completes before direct runtime preparation');

@@ -57,25 +57,6 @@ function activeInput(overrides = {}) {
   };
 }
 
-function opencodePrivateArtifacts(overrides = {}) {
-  const config = {
-    share: 'disabled',
-    mcp: {
-      fsb: {
-        type: 'remote',
-        url: 'http://127.0.0.1:7226/mcp',
-        enabled: true,
-        oauth: false,
-      },
-    },
-  };
-  return [
-    { kind: 'opencode_config', contents: `${JSON.stringify(config)}\n` },
-    { kind: 'opencode_test_home' },
-    { kind: 'opencode_managed_config' },
-  ].map((entry) => ({ ...entry, ...(overrides[entry.kind] ?? {}) }));
-}
-
 function rolePreparedInput(runtime, overrides = {}) {
   const delegationId = overrides.delegationId ?? 'provider_server_fixture_0001';
   const paths = runtime.pathsFor(delegationId);
@@ -95,7 +76,7 @@ function rolePreparedInput(runtime, overrides = {}) {
     },
     envFingerprint: 'env_fingerprint_opencode_0001',
     generation: 'generation_fixture_previous',
-    privateArtifacts: opencodePrivateArtifacts(),
+    privateArtifacts: [],
     ...overrides,
   };
 }
@@ -111,6 +92,23 @@ function directPreparedInput(overrides = {}) {
     argvSignature: 'argv_signature_direct_fixture_0001',
     fixedEnv: {},
     envFingerprint: 'env_fingerprint_direct_fixture_0001',
+    generation: 'generation_fixture_previous',
+    privateArtifacts: [],
+    ...overrides,
+  };
+}
+
+function grokPolicyPreflightPreparedInput(overrides = {}) {
+  return {
+    role: 'policy_preflight',
+    delegationId: 'policy_preflight_grok_fixture_0001',
+    adapterId: 'grok-build',
+    profileVersion: '1.0.4',
+    createdAt: 1000,
+    binaryRealPath: '/fixture/bin/grok',
+    argvSignature: 'argv_signature_grok_preflight_0001',
+    fixedEnv: {},
+    envFingerprint: 'env_fingerprint_grok_preflight_0001',
     generation: 'generation_fixture_previous',
     privateArtifacts: [],
     ...overrides,
@@ -171,9 +169,6 @@ async function runRuntimeFilesTests(runtimeModule) {
   ]);
   assert.deepEqual(AGENT_RUNTIME_PRIVATE_ARTIFACT_KINDS, [
     'mcp_config',
-    'opencode_config',
-    'opencode_test_home',
-    'opencode_managed_config',
   ]);
   assert(Object.isFrozen(AGENT_RUNTIME_ROLES));
   assert(Object.isFrozen(AGENT_RUNTIME_PRIVATE_ARTIFACT_KINDS));
@@ -254,7 +249,7 @@ async function runRuntimeFilesTests(runtimeModule) {
     state.cleanup();
   }
 
-  const roleState = tempRoot('runtime-role-state');
+  const roleState = tempRoot('runtime-retired-opencode-rejection');
   try {
     const runtime = createAgentRuntimeFiles({ rootPath: roleState.root, platform: 'linux' });
     const paths = runtime.pathsFor('provider_server_fixture_0001');
@@ -267,35 +262,121 @@ async function runRuntimeFilesTests(runtimeModule) {
       'opencodeTestHomePath',
       'runDirectory',
     ]);
-    const prepared = await runtime.prepareRun(rolePreparedInput(runtime));
-    assert.equal(prepared.entry.role, 'provider_server');
-    assert.equal(prepared.entry.adapterId, 'opencode');
-    assert.deepEqual(prepared.entry.fixedEnv, rolePreparedInput(runtime).fixedEnv);
-    assert(Object.isFrozen(prepared.entry.fixedEnv));
-    assert.equal('privateArtifacts' in prepared.entry, false);
-    assert.equal('endpoint' in prepared.entry, false);
-    assert.equal('resolvedEnv' in prepared.entry, false);
-    assert.equal('spawnSecretEnvBindings' in prepared.entry, false);
-    assert.equal(fs.statSync(paths.opencodeConfigRoot).mode & 0o777, 0o700);
-    assert.equal(fs.statSync(paths.opencodeConfigDirectory).mode & 0o777, 0o700);
-    assert.equal(fs.statSync(paths.opencodeTestHomePath).mode & 0o777, 0o700);
-    assert.equal(fs.statSync(paths.opencodeManagedConfigPath).mode & 0o777, 0o700);
-    assert.equal(fs.statSync(paths.opencodeConfigPath).mode & 0o777, 0o600);
-    assert.deepEqual(readJson(paths.opencodeConfigPath), JSON.parse(
-      opencodePrivateArtifacts()[0].contents,
-    ));
-    const active = await runtime.activateRun({
-      ...activeInput({ delegationId: prepared.entry.delegationId }),
-      role: 'provider_server',
-    });
-    assert.equal(active.role, 'provider_server');
-    assert.deepEqual(readJson(runtime.journalPath), { version: 2, entries: [active] });
-    await runtime.removeRecoveredRun(active);
-    assert.deepEqual(readJson(runtime.journalPath), { version: 2, entries: [] });
-    assert.equal(fs.existsSync(paths.runDirectory), false);
-    assert.equal(fs.existsSync(runtime.recoveryPath), false);
+    for (const role of ['direct', 'delegation', 'provider_server', 'policy_preflight']) {
+      await expectRuntimeError(
+        () => runtime.prepareRun(rolePreparedInput(runtime, {
+          role,
+          delegationId: `retired_opencode_new_${role}_0001`,
+          argvSignature: `argv_signature_retired_${role}_0001`,
+          envFingerprint: `env_fingerprint_retired_${role}_0001`,
+        })),
+        'invalid_runtime_input',
+      );
+    }
+    assert.equal(fs.existsSync(runtime.journalPath), false,
+      'retired OpenCode cannot create a new runtime journal');
   } finally {
     roleState.cleanup();
+  }
+
+  const grokPolicyState = tempRoot('runtime-grok-policy-preflight');
+  try {
+    const runtime = createAgentRuntimeFiles({ rootPath: grokPolicyState.root, platform: 'linux' });
+    await expectRuntimeError(
+      () => runtime.prepareRun(grokPolicyPreflightPreparedInput({
+        role: 'provider_server',
+        delegationId: 'provider_server_grok_rejected_0001',
+        envFingerprint: 'env_fingerprint_grok_server_rejected_0001',
+      })),
+      'invalid_runtime_input',
+    );
+    await expectRuntimeError(
+      () => runtime.prepareRun(grokPolicyPreflightPreparedInput({
+        delegationId: 'policy_preflight_grok_artifact_0001',
+        envFingerprint: 'env_fingerprint_grok_artifact_0001',
+        privateArtifacts: [{
+          kind: 'mcp_config',
+          endpoint: 'http://127.0.0.1:7226/mcp',
+        }],
+      })),
+      'invalid_runtime_input',
+    );
+
+    const prepared = await runtime.prepareRun(grokPolicyPreflightPreparedInput());
+    assert.equal(prepared.entry.role, 'policy_preflight');
+    assert.equal(prepared.entry.adapterId, 'grok-build');
+    assert.deepEqual(fs.readdirSync(prepared.runDirectory), [],
+      'Grok policy probes receive an empty owner-only journal directory');
+    assert.equal(fs.statSync(prepared.runDirectory).mode & 0o777, 0o700);
+    assert.equal(fs.existsSync(prepared.mcpConfigPath), false);
+
+    const active = await runtime.activateRun({
+      ...activeInput({ delegationId: prepared.entry.delegationId }),
+      role: 'policy_preflight',
+    });
+    assert.equal(active.role, 'policy_preflight');
+    assert.equal(active.adapterId, 'grok-build');
+    await runtime.removeRun({
+      delegationId: active.delegationId,
+      role: 'policy_preflight',
+    });
+    assert.deepEqual(readJson(runtime.journalPath), { version: 2, entries: [] });
+    assert.equal(fs.existsSync(prepared.runDirectory), false);
+  } finally {
+    grokPolicyState.cleanup();
+  }
+
+  const grokRecoveryState = tempRoot('runtime-grok-policy-recovery');
+  try {
+    const runtime = createAgentRuntimeFiles({ rootPath: grokRecoveryState.root, platform: 'linux' });
+    const preparedOnly = await runtime.prepareRun(grokPolicyPreflightPreparedInput({
+      delegationId: 'policy_preflight_grok_recovery_0001',
+      envFingerprint: 'env_fingerprint_grok_recovery_0001',
+    }));
+    const preparedActive = await runtime.prepareRun(grokPolicyPreflightPreparedInput({
+      delegationId: 'policy_preflight_grok_recovery_0002',
+      argvSignature: 'argv_signature_grok_preflight_0002',
+      envFingerprint: 'env_fingerprint_grok_recovery_0002',
+    }));
+    await runtime.activateRun({
+      ...activeInput({
+        delegationId: preparedActive.entry.delegationId,
+        pid: 41002,
+        processGroupId: 41002,
+        processStartIdentity: 'start-ticks-90002',
+      }),
+      role: 'policy_preflight',
+    });
+    const result = await runtimeModule.createAgentStartupRecovery({
+      runtimeFiles: runtime,
+      inspector: { async inspect() { return { classification: 'stale' }; } },
+      terminator: { async stop() { assert.fail('stale Grok policy probes are never signaled'); } },
+      terminationGrace: 25,
+      generation: 'generation_fixture_current',
+      now: () => 1700000000000,
+    }).recover();
+    assert.deepEqual(result, {
+      confirmedKilled: 0,
+      staleCleared: 2,
+      ambiguousFailClosed: 0,
+      spawnAvailable: true,
+      profiles: [{
+        role: 'policy_preflight',
+        adapterId: 'grok-build',
+        profileVersion: '1.0.4',
+        confirmedKilled: 0,
+        staleCleared: 2,
+        ambiguousFailClosed: 0,
+      }],
+      restartLosses: [],
+    });
+    assert.deepEqual(readJson(runtime.journalPath), { version: 2, entries: [] });
+    assert.equal(fs.existsSync(preparedOnly.runDirectory), false);
+    assert.equal(fs.existsSync(preparedActive.runDirectory), false);
+    assert.equal(fs.existsSync(runtime.recoveryPath), false,
+      'policy probes never create user-facing delegated-run restart losses');
+  } finally {
+    grokRecoveryState.cleanup();
   }
 
   const directState = tempRoot('runtime-direct-state');
@@ -572,94 +653,6 @@ async function runRuntimeFilesTests(runtimeModule) {
     }
   }
 
-  const secretCanaries = [
-    'PASSWORD_CANARY_runtime_64_03_0001',
-    'RAW_SECRET_CANARY_runtime_64_03_0001',
-    'AUTHORIZATION_CANARY_runtime_64_03_0001',
-  ];
-  const exactBoundary = tempRoot('runtime-role-exact-boundary');
-  try {
-    const runtime = createAgentRuntimeFiles({ rootPath: exactBoundary.root, platform: 'linux' });
-    const clean = rolePreparedInput(runtime);
-    const invalidInputs = [
-      { ...clean, role: 'user_process' },
-      { ...clean, adapterId: 'claude-code' },
-      { ...clean, endpoint: 'http://127.0.0.1:7226/mcp' },
-      { ...clean, resolvedEnv: { PATH: '/bin' } },
-      {
-        ...clean,
-        spawnSecretEnvBindings: [{
-          envKey: 'OPENCODE_SERVER_PASSWORD',
-          secretRef: 'owned_server_basic_password',
-        }],
-      },
-      { ...clean, rawSecretBytes: Buffer.from(secretCanaries[1]) },
-      { ...clean, rawSecret: secretCanaries[1] },
-      { ...clean, headers: { Authorization: `Basic ${secretCanaries[2]}` } },
-      { ...clean, endpointCredentials: { password: secretCanaries[0] } },
-      {
-        ...clean,
-        fixedEnv: { ...clean.fixedEnv, OPENCODE_SERVER_PASSWORD: secretCanaries[0] },
-      },
-      { ...clean, fixedEnv: { ...clean.fixedEnv, SAFE_VALUE: `Basic ${secretCanaries[0]}` } },
-      {
-        ...clean,
-        privateArtifacts: opencodePrivateArtifacts({
-          opencode_config: {
-            contents: `${JSON.stringify({ headers: { Authorization: `Bearer ${secretCanaries[2]}` } })}\n`,
-          },
-        }),
-      },
-      {
-        ...clean,
-        privateArtifacts: opencodePrivateArtifacts({
-          opencode_config: {
-            contents: `${JSON.stringify({ endpoint: `http://user:${secretCanaries[0]}@127.0.0.1:7226` })}\n`,
-          },
-        }),
-      },
-      {
-        ...clean,
-        privateArtifacts: [
-          ...opencodePrivateArtifacts(),
-          { kind: 'arbitrary_file', path: '../../outside' },
-        ],
-      },
-      {
-        ...clean,
-        privateArtifacts: opencodePrivateArtifacts().map((entry, index) => (
-          index === 0 ? { ...entry, path: '../../outside' } : entry
-        )),
-      },
-      { ...clean, privateArtifacts: opencodePrivateArtifacts().slice(0, 2) },
-    ];
-    for (const input of invalidInputs) {
-      await expectRuntimeError(() => runtime.prepareRun(input), 'invalid_runtime_input');
-    }
-
-    let getterTouched = false;
-    const accessorEnv = { ...clean.fixedEnv };
-    Object.defineProperty(accessorEnv, 'SAFE_ACCESSOR', {
-      enumerable: true,
-      get() {
-        getterTouched = true;
-        return secretCanaries[0];
-      },
-    });
-    await expectRuntimeError(
-      () => runtime.prepareRun({ ...clean, fixedEnv: accessorEnv }),
-      'invalid_runtime_input',
-    );
-    assert.equal(getterTouched, false, 'runtime input validation never invokes accessors');
-    assert.equal(fs.existsSync(runtime.journalPath), false);
-    const artifacts = collectArtifactText(exactBoundary.root);
-    for (const canary of secretCanaries) {
-      assert.equal(artifacts.includes(canary), false, `${canary} is absent from disk`);
-    }
-  } finally {
-    exactBoundary.cleanup();
-  }
-
   const unknownCanary = 'TASK_CANARY_DO_NOT_PERSIST_71b831c9';
   const canary = tempRoot('runtime-canary');
   try {
@@ -685,67 +678,6 @@ async function runRuntimeFilesTests(runtimeModule) {
     }
   } finally {
     canary.cleanup();
-  }
-
-  for (const [label, mutate] of [
-    ['foreign', (paths) => fs.writeFileSync(path.join(paths.runDirectory, 'foreign.txt'), 'foreign')],
-    ['symlink', (paths, parent) => {
-      const outside = path.join(parent, 'outside');
-      fs.mkdirSync(outside, { mode: 0o700 });
-      fs.rmdirSync(paths.opencodeTestHomePath);
-      fs.symlinkSync(outside, paths.opencodeTestHomePath);
-    }],
-    ['unsafe-mode', (paths) => fs.chmodSync(paths.opencodeManagedConfigPath, 0o755)],
-  ]) {
-    const guardedCleanup = tempRoot(`runtime-opencode-cleanup-${label}`);
-    try {
-      const runtime = createAgentRuntimeFiles({
-        rootPath: guardedCleanup.root,
-        platform: 'linux',
-      });
-      const input = rolePreparedInput(runtime, {
-        delegationId: `provider_server_cleanup_${label.replace('-', '_')}`,
-      });
-      const prepared = await runtime.prepareRun(input);
-      const paths = runtime.pathsFor(prepared.entry.delegationId);
-      mutate(paths, guardedCleanup.parent);
-      await expectRuntimeError(
-        () => runtime.removeRun({
-          delegationId: prepared.entry.delegationId,
-          role: 'provider_server',
-        }),
-        'runtime_target_unavailable',
-      );
-      assert.equal(
-        fs.existsSync(paths.opencodeConfigPath),
-        true,
-        'cleanup prevalidates the complete graph before removing any owned file',
-      );
-      assert.deepEqual(runtime.readJournal().journal.entries, [prepared.entry]);
-    } finally {
-      guardedCleanup.cleanup();
-    }
-  }
-
-  const unsafeCreation = tempRoot('runtime-opencode-unsafe-creation');
-  try {
-    const runtime = createAgentRuntimeFiles({
-      rootPath: unsafeCreation.root,
-      platform: 'linux',
-    });
-    const input = rolePreparedInput(runtime, {
-      delegationId: 'provider_server_unsafe_creation',
-    });
-    fs.mkdirSync(runtime.pathsFor(input.delegationId).runDirectory, {
-      recursive: true,
-      mode: 0o755,
-    });
-    fs.chmodSync(unsafeCreation.root, 0o700);
-    fs.chmodSync(runtime.pathsFor(input.delegationId).runDirectory, 0o755);
-    await expectRuntimeError(() => runtime.prepareRun(input), 'runtime_target_unavailable');
-    assert.equal(fs.existsSync(runtime.journalPath), false);
-  } finally {
-    unsafeCreation.cleanup();
   }
 
   const concurrent = tempRoot('runtime-concurrent');
@@ -2055,11 +1987,6 @@ async function runRecoveryTests(runtimeModule, processTreeModule) {
       profileVersion: '2.1.177',
       binaryRealPath: '/fixture/bin/claude',
     },
-    {
-      adapterId: 'codex',
-      profileVersion: '0.142.5',
-      binaryRealPath: '/fixture/bin/codex',
-    },
   ]) for (const crashState of ['prepared', 'active']) {
     const state = tempRoot(`direct-recovery-${crashState}`);
     try {
@@ -2132,31 +2059,165 @@ async function runRecoveryTests(runtimeModule, processTreeModule) {
   }
 
   for (const crashState of ['prepared', 'active']) {
-    const state = tempRoot(`policy-preflight-${crashState}`);
+    const state = tempRoot(`retired-codex-recovery-${crashState}`);
     try {
+      fs.mkdirSync(state.root, { recursive: true, mode: 0o700 });
+      fs.chmodSync(state.root, 0o700);
       const runtime = createAgentRuntimeFiles({ rootPath: state.root, platform: 'linux' });
-      const delegationId = `policy_preflight_crash_${crashState}_0001`;
-      const prepared = await runtime.prepareRun(rolePreparedInput(runtime, {
-        role: 'policy_preflight',
+      await expectRuntimeError(
+        () => runtime.prepareRun(directPreparedInput({
+          delegationId: `retired_codex_new_${crashState}_0001`,
+          adapterId: 'codex',
+          profileVersion: '0.142.5',
+          binaryRealPath: '/fixture/bin/codex',
+        })),
+        'invalid_runtime_input',
+      );
+
+      const delegationId = `retired_codex_crash_${crashState}_0001`;
+      const runDirectory = runtime.pathsFor(delegationId).runDirectory;
+      fs.mkdirSync(runDirectory, { recursive: true, mode: 0o700 });
+      fs.chmodSync(runDirectory, 0o700);
+      const baseEntry = {
+        state: crashState,
+        role: 'direct',
         delegationId,
-        argvSignature: `argv_signature_policy_${crashState}_0001`,
-        envFingerprint: `env_fingerprint_policy_${crashState}_0001`,
-      }));
+        adapterId: 'codex',
+        profileVersion: '0.142.5',
+        createdAt: 1000,
+        binaryRealPath: '/fixture/bin/codex',
+        argvSignature: `argv_signature_retired_codex_${crashState}_0001`,
+        fixedEnv: {},
+        envFingerprint: `env_fingerprint_retired_codex_${crashState}_0001`,
+        generation: 'generation_fixture_previous',
+      };
       const entry = crashState === 'active'
-        ? await runtime.activateRun({
-            role: 'policy_preflight',
-            delegationId,
-            pid: 45001,
-            processGroupId: 45001,
+        ? {
+            ...baseEntry,
+            pid: 44502,
+            processGroupId: 44502,
             startedAt: 1100,
-            processStartIdentity: 'policy-start-45001',
-          })
-        : prepared.entry;
-      assert.equal(entry.role, 'policy_preflight');
-      assert.equal(entry.state, crashState);
-      assert.deepEqual(runtime.readJournal().journal.entries, [entry]);
-      assert.equal(fs.existsSync(prepared.runDirectory), true);
-      assert.equal(fs.existsSync(prepared.opencodeConfigPath), true);
+            processStartIdentity: 'retired-codex-start-44502',
+          }
+        : baseEntry;
+      fs.writeFileSync(
+        runtime.journalPath,
+        `${JSON.stringify({ version: 2, entries: [entry] })}\n`,
+        { mode: 0o600 },
+      );
+      fs.chmodSync(runtime.journalPath, 0o600);
+      assert.deepEqual(runtime.readJournal().journal.entries, [entry],
+        'the recovery parser accepts the retired Codex journal entry');
+
+      let inspections = 0;
+      const terminationCalls = [];
+      const result = await createAgentStartupRecovery({
+        runtimeFiles: runtime,
+        inspector: {
+          async inspect(candidate) {
+            assert.deepEqual(candidate, entry);
+            inspections += 1;
+            if (crashState === 'prepared' || inspections > 1) return staleInspection;
+            return confirmedInspection({
+              pid: 44502,
+              processGroupId: 44502,
+              processStartIdentity: 'retired-codex-start-44502',
+            });
+          },
+        },
+        terminator: {
+          async stop(candidate, child, options) {
+            terminationCalls.push({ candidate, child, options });
+          },
+        },
+        terminationGrace: 25,
+        now: () => 1700000000000,
+      }).recover();
+      assert.deepEqual(result, {
+        confirmedKilled: crashState === 'active' ? 1 : 0,
+        staleCleared: crashState === 'prepared' ? 1 : 0,
+        ambiguousFailClosed: 0,
+        spawnAvailable: true,
+        profiles: [{
+          role: 'direct',
+          adapterId: 'codex',
+          profileVersion: '0.142.5',
+          confirmedKilled: crashState === 'active' ? 1 : 0,
+          staleCleared: crashState === 'prepared' ? 1 : 0,
+          ambiguousFailClosed: 0,
+        }],
+        restartLosses: [{
+          delegationId,
+          code: 'daemon_restart_lost_run',
+          recoveredAt: 1700000000000,
+        }],
+      });
+      assert.equal(terminationCalls.length, crashState === 'active' ? 1 : 0);
+      assert.deepEqual(runtime.readJournal().journal.entries, []);
+      assert.equal(fs.existsSync(runDirectory), false);
+    } finally {
+      state.cleanup();
+    }
+  }
+
+  for (const [role, roleIndex] of [
+    ['direct', 0],
+    ['delegation', 1],
+    ['provider_server', 2],
+    ['policy_preflight', 3],
+  ]) {
+    const state = tempRoot(`retired-opencode-${role}`);
+    try {
+      fs.mkdirSync(state.root, { recursive: true, mode: 0o700 });
+      fs.chmodSync(state.root, 0o700);
+      const runtime = createAgentRuntimeFiles({ rootPath: state.root, platform: 'linux' });
+      const delegationId = `retired_opencode_${role}_0001`;
+      const paths = runtime.pathsFor(delegationId);
+      fs.mkdirSync(paths.runDirectory, { recursive: true, mode: 0o700 });
+      fs.chmodSync(paths.runDirectory, 0o700);
+      if (role !== 'direct') {
+        fs.mkdirSync(paths.opencodeConfigDirectory, { recursive: true, mode: 0o700 });
+        fs.mkdirSync(paths.opencodeTestHomePath, { mode: 0o700 });
+        fs.mkdirSync(paths.opencodeManagedConfigPath, { mode: 0o700 });
+        for (const directory of [
+          paths.opencodeConfigRoot,
+          paths.opencodeConfigDirectory,
+          paths.opencodeTestHomePath,
+          paths.opencodeManagedConfigPath,
+        ]) fs.chmodSync(directory, 0o700);
+        fs.writeFileSync(paths.opencodeConfigPath, '{"share":"disabled"}\n', { mode: 0o600 });
+        fs.chmodSync(paths.opencodeConfigPath, 0o600);
+      }
+      const entry = {
+        state: 'active',
+        role,
+        delegationId,
+        adapterId: 'opencode',
+        profileVersion: '1.14.25',
+        createdAt: 1000,
+        binaryRealPath: '/fixture/bin/opencode',
+        argvSignature: `argv_signature_retired_${role}_0001`,
+        fixedEnv: role === 'direct' ? {} : {
+          XDG_CONFIG_HOME: paths.opencodeConfigRoot,
+          OPENCODE_TEST_HOME: paths.opencodeTestHomePath,
+          OPENCODE_TEST_MANAGED_CONFIG_DIR: paths.opencodeManagedConfigPath,
+          OPENCODE_DISABLE_PROJECT_CONFIG: '1',
+        },
+        envFingerprint: `env_fingerprint_retired_${role}_0001`,
+        generation: 'generation_fixture_previous',
+        pid: 45001 + roleIndex,
+        processGroupId: 45001 + roleIndex,
+        startedAt: 1100,
+        processStartIdentity: `retired-opencode-start-${45001 + roleIndex}`,
+      };
+      fs.writeFileSync(
+        runtime.journalPath,
+        `${JSON.stringify({ version: 2, entries: [entry] })}\n`,
+        { mode: 0o600 },
+      );
+      fs.chmodSync(runtime.journalPath, 0o600);
+      assert.deepEqual(runtime.readJournal().journal.entries, [entry],
+        `the recovery parser accepts the retired OpenCode ${role} journal`);
 
       let inspections = 0;
       const terminationCalls = [];
@@ -2168,9 +2229,9 @@ async function runRecoveryTests(runtimeModule, processTreeModule) {
             inspections += 1;
             return inspections === 1
               ? confirmedInspection({
-                  pid: 45001,
-                  processGroupId: 45001,
-                  processStartIdentity: 'policy-start-45001',
+                  pid: entry.pid,
+                  processGroupId: entry.processGroupId,
+                  processStartIdentity: entry.processStartIdentity,
                 })
               : staleInspection;
           },
@@ -2181,6 +2242,7 @@ async function runRecoveryTests(runtimeModule, processTreeModule) {
           },
         },
         terminationGrace: 25,
+        now: () => 1700000000000,
       }).recover();
 
       assert.deepEqual(result, {
@@ -2189,14 +2251,18 @@ async function runRecoveryTests(runtimeModule, processTreeModule) {
         ambiguousFailClosed: 0,
         spawnAvailable: true,
         profiles: [{
-          role: 'policy_preflight',
+          role,
           adapterId: 'opencode',
           profileVersion: '1.14.25',
           confirmedKilled: 1,
           staleCleared: 0,
           ambiguousFailClosed: 0,
         }],
-        restartLosses: [],
+        restartLosses: role === 'delegation' ? [{
+          delegationId,
+          code: 'daemon_restart_lost_run',
+          recoveredAt: 1700000000000,
+        }] : [],
       });
       assert.equal(terminationCalls.length, 1);
       assert.deepEqual(terminationCalls[0], {
@@ -2206,9 +2272,9 @@ async function runRecoveryTests(runtimeModule, processTreeModule) {
       });
       assert.equal(inspections, 2);
       assert.deepEqual(runtime.readJournal().journal.entries, []);
-      assert.equal(fs.existsSync(prepared.runDirectory), false);
-      assert.equal(fs.existsSync(runtime.recoveryPath), false,
-        'infrastructure preflight recovery does not record delegation restart loss');
+      assert.equal(fs.existsSync(paths.runDirectory), false,
+        `retired OpenCode ${role} artifacts are securely removed`);
+      assert.equal(fs.existsSync(runtime.recoveryPath), role === 'delegation');
     } finally {
       state.cleanup();
     }

@@ -119,8 +119,6 @@ const PHASE65_ATOMIC_EXPOSURE_FILES = Object.freeze([
 
 const PHASE64_NEW_ROOT_COMMANDS = Object.freeze([
   'node tests/phase64-full-tests-harness.test.js',
-  'node tests/mcp-opencode-adapter.test.js --section adapter',
-  'node tests/mcp-opencode-server-topology.test.js',
 ]);
 
 const PHASE65_NEW_ROOT_COMMANDS = Object.freeze([
@@ -658,10 +656,8 @@ function runPhase64WiringContract() {
         && !runner.includes('npm --prefix mcp run build'),
     'focused runner delegates one shell-free closed matrix to the existing build preserver');
     for (const suite of [
-      'tests/mcp-opencode-adapter.test.js',
       'tests/mcp-agent-stream-fixture.test.js',
       'tests/mcp-agent-drift-smoke.test.js',
-      'tests/mcp-opencode-server-topology.test.js',
       'tests/mcp-agent-provider-contract.test.js',
       'tests/mcp-adapter-compatibility.test.js',
       'tests/mcp-spawn-supervisor.test.js',
@@ -698,19 +694,15 @@ function runPhase64WiringContract() {
         < rootCommands64.indexOf('node tests/delegation-routing.test.js'),
   'Phase 64 preservation harness occupies the protected pre-delegation slot');
   check(rootCommands64.indexOf('npm --prefix mcp run build')
-      < rootCommands64.indexOf('node tests/mcp-opencode-adapter.test.js --section adapter')
-      && rootCommands64.indexOf('node tests/mcp-opencode-adapter.test.js --section adapter')
-        < rootCommands64.indexOf('node tests/mcp-agent-drift-smoke.test.js')
+      < rootCommands64.indexOf('node tests/mcp-agent-drift-smoke.test.js')
       && rootCommands64.indexOf('node tests/mcp-spawn-supervisor.test.js')
-        < rootCommands64.indexOf('node tests/mcp-opencode-server-topology.test.js')
-      && rootCommands64.indexOf('node tests/mcp-opencode-server-topology.test.js')
         < rootCommands64.indexOf('node tests/mcp-agent-orphan-recovery.test.js'),
-  'the two OpenCode suites retain their dependency-aware post-build root order');
+  'active-provider drift and recovery suites retain their dependency-aware post-build order');
   check(rootCommands64.filter((command) => command === 'npm --prefix mcp run build').length === 1,
     'root tests retain one MCP build boundary');
 
   const ci64 = read('.github/workflows/ci.yml');
-  check(exactOccurrences(ci64, 'name: Phase 65 Codex contract (sole Linux root invocation)') === 1
+  check(exactOccurrences(ci64, 'name: Phase 65 agent provider contract (sole Linux root invocation)') === 1
       && exactOccurrences(ci64, 'run: npm test') === 1
       && !ci64.includes('run: node scripts/run-phase64-full-tests.mjs'),
   'CI retains one source-pinned Linux root invocation without a duplicate focused run');
@@ -993,7 +985,7 @@ function runPhase64FinalContract() {
   'Phase 64 retains the exact five-method adapter surface');
   const supervisor64 = read('mcp/src/agent-providers/spawn-supervisor.ts');
   const successfulSettlement64 = between(supervisor64,
-    'const resultEvent = this.takeResultEvent(run);',
+    'resultEvent = this.takeResultEvent(run);',
     '} catch (error) {');
   check(supervisor64.includes('verifyPolicyAttestation')
       && !/from ['"].*opencode-(?:profile|detect|stream)/.test(supervisor64)
@@ -1005,17 +997,15 @@ function runPhase64FinalContract() {
       && successfulSettlement64.indexOf('this.emitNormalizedEvent(run, resultEvent)')
         < successfulSettlement64.indexOf("this.settleOnce(run, 'succeeded'"),
   'replay closes before spawn and the private candidate crosses only after cleanup');
-  check(adapter64.includes("key === OPENCODE_SERVER_PASSWORD_ENV_KEY")
+  check(adapter64.includes("key === OWNED_SERVER_PASSWORD_ENV_KEY")
       && adapter64.includes("ownValue(binding, 'secretRef') !== OWNED_SERVER_BASIC_PASSWORD_SECRET_REF")
       && !/OPENCODE_SERVER_PASSWORD/.test(read('mcp/src/agent-providers/runtime-files.ts')),
   'fixedEnv, opaque binding, and runtime-journal secret boundaries remain exact');
-  const detector64 = read('mcp/src/agent-providers/opencode-detect.ts');
-  const profile64 = read('mcp/src/agent-providers/opencode-profile.ts');
-  check(detector64.includes("OPENCODE_PROFILE_VERSION = '1.14.25'")
-      && profile64.includes("'*': 'deny'")
-      && profile64.includes("'fsb_*': 'allow'")
-      && profile64.indexOf("'*': 'deny'") < profile64.indexOf("'fsb_*': 'allow'"),
-  'private OpenCode 1.14.25 policy retains ordered deny then final fsb_* allow');
+  check(!exists('mcp/src/agent-providers/opencode.ts')
+      && !exists('mcp/src/agent-providers/opencode-detect.ts')
+      && !exists('mcp/src/agent-providers/opencode-profile.ts')
+      && !exists('mcp/src/agent-providers/opencode-stream.ts'),
+  'retired OpenCode implementation sources are absent from the active runtime');
 
   const canonicalProviders64 = read('extension/utils/delegation-providers.js');
   const providerDefinitions64 = between(
@@ -1025,19 +1015,29 @@ function runPhase64FinalContract() {
   );
   equal(Array.from(providerDefinitions64.matchAll(/^      id: '([^']+)',$/gm),
     (match) => match[1]),
-  ['claude-code', 'opencode', 'codex'],
-  'browser metadata retains the canonical three-provider order');
+  ['claude-code', 'grok-build'],
+  'browser metadata retains the canonical two-provider order');
+  const retiredProviderDefinitions64 = between(
+    canonicalProviders64,
+    'var retiredDefinitions = deepFreeze([',
+    '\n  ]);',
+  );
   check(canonicalProviders64.includes("var METADATA_KEYS = ['id', 'label', 'billingKind'];")
       && providerDefinitions64.includes("authToBilling: { unknown: 'subscription' }")
-      && providerDefinitions64.includes("authToBilling: { unknown: 'unknown' }")
-      && providerDefinitions64.includes("authToBilling: { chatgpt: 'subscription', api_key: 'api' }"),
-  'public metadata stays three-field while internal billing mappings remain exact');
+      && providerDefinitions64.includes("authToBilling: { oauth: 'subscription' }")
+      && retiredProviderDefinitions64.includes("id: 'codex'")
+      && retiredProviderDefinitions64.includes("id: 'opencode'")
+      && retiredProviderDefinitions64.includes("authToBilling: { unknown: 'unknown' }")
+      && retiredProviderDefinitions64.includes(
+        "authToBilling: { chatgpt: 'subscription', api_key: 'api' }"
+      ),
+  'public metadata stays three-field while retired provider billing remains history-only');
   const controlPanel64 = read('extension/ui/control_panel.html');
   const providerCss64 = read('extension/ui/options.css') + read('extension/ui/sidepanel.css');
   check(exactOccurrences(controlPanel64, 'id="modelProvider"') === 1
-      && exactOccurrences(controlPanel64, '<option value="opencode">OpenCode</option>') === 1
+      && exactOccurrences(controlPanel64, '<option value="opencode">OpenCode</option>') === 0
       && !/opencode/i.test(providerCss64),
-  'OpenCode uses the compact shared provider selector with no provider-specific CSS branch');
+  'OpenCode is absent from the selector and has no provider-specific CSS branch');
 }
 
 function runPhase63UatLedgerContract() {
@@ -1530,22 +1530,13 @@ function runPhase63FinalContract() {
   'final automated contract leaves genuine OS/browser/accessibility evidence human-needed');
 }
 
-function phase65AtomicExposureViolations(files) {
+function phase65RetirementViolations(files) {
   const violations = [];
-  for (const relativePath of PHASE65_ATOMIC_EXPOSURE_FILES) {
-    if (typeof files[relativePath] !== 'string') violations.push(`missing:${relativePath}`);
-  }
-  const production = Object.entries(files)
-    .filter(([relativePath]) => relativePath.startsWith('mcp/src/'))
+  const activeRuntime = Object.entries(files)
+    .filter(([relativePath]) => relativePath !== 'mcp/src/agent-providers/runtime-files.ts'
+      && relativePath !== 'mcp/src/client-inventory.ts')
     .map(([, source]) => source)
     .join('\n');
-  const exposed = [
-    'CODEX_ADAPTER_ID',
-    'createCodexAdapter',
-    "adapterId: 'codex'",
-    'codex-0.142.5',
-  ].some((token) => production.includes(token));
-  if (!exposed) violations.push('production:codex-not-exposed');
   for (const token of [
     'CODEX_ADAPTER_ID',
     'createCodexAdapter',
@@ -1554,21 +1545,28 @@ function phase65AtomicExposureViolations(files) {
     'parseCodexEvents',
     'codex-0.142.5',
   ]) {
-    if (!production.includes(token)) violations.push(`production:${token}`);
+    if (activeRuntime.includes(token)) violations.push(`active-runtime:${token}`);
   }
-  for (const relativePath of [
-    'tests/fixtures/agent-streams/codex-0.142.5/manifest.json',
-    'tests/fixtures/agent-streams/codex-0.142.5/contract-stream.jsonl',
-    'tests/fixtures/agent-streams/codex-0.142.5/expected-events.json',
-    'tests/fixtures/agent-streams/codex-0.142.5/native-negative-corpus.json',
-  ]) {
-    if (typeof files[relativePath] !== 'string') violations.push(`fixture:${relativePath}`);
+  const runtimeFiles = files['mcp/src/agent-providers/runtime-files.ts'] || '';
+  if (!runtimeFiles.includes("RETIRED_CODEX_JOURNAL_ADAPTER_ID = 'codex'")) {
+    violations.push('recovery:retired-journal-id');
+  }
+  if (!runtimeFiles.includes(
+    'export type JournalProviderId = AgentProviderId\n  | typeof RETIRED_CODEX_JOURNAL_ADAPTER_ID\n  | typeof RETIRED_OPENCODE_JOURNAL_ADAPTER_ID'
+  )) {
+    violations.push('recovery:journal-union');
+  }
+  const inventory = files['mcp/src/client-inventory.ts'] || '';
+  if (!inventory.includes("['claude-code', 'opencode', 'codex']")
+      || !inventory.includes("['--version']")
+      || /codex.*auth|auth.*codex/i.test(inventory)) {
+    violations.push('inventory:bounded-version-only-codex-probe');
   }
   return violations;
 }
 
 function runPhase65AtomicExposureContract() {
-  console.log('\n--- Phase 65 atomic Codex exposure ---');
+  console.log('\n--- Phase 65 historical exposure and current Codex retirement ---');
   const plan = read(PHASE65_PLAN05_PATH);
   const taskIds = Array.from(plan.matchAll(/<task id="([^"]+)"/g), (match) => match[1]);
   check(JSON.stringify(taskIds) === JSON.stringify(['65-05-01']),
@@ -1590,29 +1588,57 @@ function runPhase65AtomicExposureContract() {
       && /do not create an intermediate production commit/.test(plan),
   'Plan 05 pins one implementation commit with no intermediate exposure');
 
-  const files = Object.fromEntries(PHASE65_ATOMIC_EXPOSURE_FILES.map((relativePath) => [
-    relativePath,
-    exists(relativePath) ? read(relativePath) : null,
-  ]));
-  const violations = phase65AtomicExposureViolations(files);
-  check(violations.length === 0,
-    `complete Codex exposure has no partial-surface violations: ${violations.join(', ')}`);
-  const mutation = { ...files };
-  delete mutation['tests/fixtures/agent-streams/codex-0.142.5/native-negative-corpus.json'];
-  check(phase65AtomicExposureViolations(mutation).length > 0,
-    'the sentinel rejects a literal partial-exposure mutation');
+  const retiredPaths = [
+    'mcp/src/agent-providers/codex.ts',
+    'mcp/src/agent-providers/codex-detect.ts',
+    'mcp/src/agent-providers/codex-profile.ts',
+    'mcp/src/agent-providers/codex-stream.ts',
+    'tests/mcp-codex-adapter.test.js',
+    'tests/fixtures/agent-streams/codex-0.142.5/manifest.json',
+    'tests/fixtures/agent-streams/codex-0.142.5/contract-stream.jsonl',
+    'tests/fixtures/agent-streams/codex-0.142.5/expected-events.json',
+    'tests/fixtures/agent-streams/codex-0.142.5/native-negative-corpus.json',
+  ];
+  check(retiredPaths.every((relativePath) => !exists(relativePath)),
+    'retired Codex adapter sources, fixtures, and dedicated test are deleted');
 
-  const adapter = files['mcp/src/agent-providers/adapter.ts'] || '';
-  const registry = files['mcp/src/agent-providers/registry.ts'] || '';
-  const compatibility = files['mcp/src/agent-providers/compatibility.ts'] || '';
-  const drift = files['tests/mcp-agent-drift-smoke.test.js'] || '';
-  check(/CODEX_ADAPTER_ID\s*=\s*'codex'/.test(adapter)
-      && /'chatgpt'\s*\|\s*'api_key'\s*\|\s*'unauthenticated'\s*\|\s*'unknown'/.test(adapter),
-  'adapter ids and auth states expose the closed Codex contract together');
-  check(/createCodexAdapter/.test(registry)
-      && /codex-0\.142\.5/.test(compatibility)
-      && /codex-0\.142\.5/.test(drift),
-  'registry, matrix, fixture parser, and drift roster expose Codex together');
+  const activePaths = [
+    'mcp/src/agent-providers/adapter.ts',
+    'mcp/src/agent-providers/accepted-identity.ts',
+    'mcp/src/agent-providers/registry.ts',
+    'mcp/src/agent-providers/compatibility.ts',
+    'mcp/src/agent-providers/protocol-drift.ts',
+    'mcp/src/agent-providers/effective-authority.ts',
+    'mcp/src/agent-providers/spawn-supervisor.ts',
+    'mcp/src/agent-providers/serve-delegation.ts',
+    'mcp/src/diagnostics.ts',
+    'mcp/src/agent-providers/runtime-files.ts',
+    'mcp/src/client-inventory.ts',
+  ];
+  const files = Object.fromEntries(activePaths.map((relativePath) => [
+    relativePath,
+    read(relativePath),
+  ]));
+  const violations = phase65RetirementViolations(files);
+  check(violations.length === 0,
+    `Codex retirement preserves only journal recovery and external inventory: ${violations.join(', ')}`);
+  const mutation = {
+    ...files,
+    'mcp/src/agent-providers/adapter.ts': `${files['mcp/src/agent-providers/adapter.ts']}\nCODEX_ADAPTER_ID`,
+  };
+  check(phase65RetirementViolations(mutation).length > 0,
+    'the sentinel rejects a literal Codex runtime re-exposure');
+
+  const adapter = files['mcp/src/agent-providers/adapter.ts'];
+  const registry = files['mcp/src/agent-providers/registry.ts'];
+  const compatibility = files['mcp/src/agent-providers/compatibility.ts'];
+  check(!adapter.includes("'codex'")
+      && !adapter.includes("'chatgpt'")
+      && !adapter.includes("'api_key'"),
+  'active adapter ids and auth states exclude Codex authority');
+  check(!/createCodexAdapter|CODEX_ADAPTER_ID/.test(registry)
+      && !/codex-0\.142\.5|adapterId:\s*'codex'/.test(compatibility),
+  'registry and compatibility matrix expose only active providers');
 }
 
 const PHASE65_UAT_DISCLAIMER = 'No schema-derived fixture, fake process, injected account state, source inspection, DOM harness, screenshot, or automated result is live provenance; none may check or promote a scenario.';
@@ -2039,40 +2065,60 @@ function phase65ValidationViolations(source) {
 }
 
 function runPhase65SourceContract() {
-  console.log('\n--- Phase 65 source, security, provenance, and shared UI locks ---');
-  const manifest = JSON.parse(read('tests/fixtures/agent-streams/codex-0.142.5/manifest.json'));
-  check(manifest.profileVersion === '0.142.5'
-      && manifest.provenance === 'schema-derived-contract'
-      && manifest.liveCapturePending === true
-      && manifest.recordedProvenanceStatus === 'human_needed'
-      && manifest.sanitized === true,
-  'Codex fixture retains exact schema-derived, live-pending, sanitized provenance');
+  console.log('\n--- Phase 65 historical rendering and current Codex retirement locks ---');
   const providerPanel = read('extension/ui/providers-panel.js');
   const feed = read('extension/ui/delegation-feed.js');
   const css = read('extension/ui/sidepanel.css');
   const providerMetadata = read('extension/utils/delegation-providers.js');
+  const controlPanel = read('extension/ui/control_panel.html');
+  const inventory = read('mcp/src/client-inventory.ts');
   for (const copy of [
     'Included with your ChatGPT plan',
     'Billed to the API key stored by Codex; dollar amount not reported.',
   ]) {
-    check(exactOccurrences(providerPanel, copy) === 1 && exactOccurrences(feed, copy) === 1,
-      `Providers and feed share exact billing copy: ${copy}`);
+    check(exactOccurrences(providerPanel, copy) === 0 && exactOccurrences(feed, copy) === 1,
+      `active Providers hides and historical feed retains exact billing copy: ${copy}`);
   }
   check(!/_definition\([^\n]*['"]Profile['"]/.test(feed)
       && !/providerId\s*===\s*['"]codex['"]|case\s+['"]codex['"]/.test(feed),
   'shared feed has no visible Profile definition or Codex renderer branch');
   check(feed.includes("summary.billingKind !== acceptedIdentity.billingKind")
       && feed.includes('summary.usd !== null'),
-  'accepted Codex summaries fail closed unless billing is immutable and USD is null');
+  'historical Codex summaries fail closed unless billing is immutable and USD is null');
   check(/\.delegation-action\s*\{[\s\S]*?min-height:\s*44px/.test(css)
       && /\.stop-btn\[data-delegation-action="stop"\]\s*\{[\s\S]*?min-width:\s*44px[\s\S]*?min-height:\s*44px/.test(css)
       && /@media \(max-width: 350px\)[\s\S]*?\.delegation-action\s*\{[\s\S]*?min-height:\s*44px/.test(css),
   'shared delegated actions retain desktop, fixed-stop, and narrow 44px targets');
-  check(providerMetadata.indexOf("id: 'claude-code'")
-      < providerMetadata.indexOf("id: 'opencode'")
-      && providerMetadata.indexOf("id: 'opencode'")
-        < providerMetadata.indexOf("id: 'codex'"),
-  'canonical metadata retains Codex as the existing third agent-provider row');
+  const activeDefinitions = between(
+    providerMetadata,
+    'var definitions = deepFreeze([',
+    '\n  ]);',
+  );
+  const retiredDefinitions = between(
+    providerMetadata,
+    'var retiredDefinitions = deepFreeze([',
+    '\n  ]);',
+  );
+  equal(Array.from(activeDefinitions.matchAll(/^      id: '([^']+)',$/gm),
+    (match) => match[1]),
+  ['claude-code', 'grok-build'],
+  'active browser metadata exposes exactly the two-provider roster');
+  check(!activeDefinitions.includes("id: 'codex'")
+      && !activeDefinitions.includes("id: 'opencode'")
+      && retiredDefinitions.includes("id: 'codex'")
+      && retiredDefinitions.includes("id: 'opencode'")
+      && providerMetadata.includes('!Object.prototype.hasOwnProperty.call(activeById, providerId)'),
+  'retired provider metadata validates history but cannot create a new active identity');
+  check(!controlPanel.includes('<option value="codex">')
+      && !controlPanel.includes('<option value="opencode">')
+      && controlPanel.includes('id="retiredAgentProviderNotice"')
+      && controlPanel.includes('Choose another provider'),
+  'Autopilot selector removes retired providers and retains an explicit retirement prompt');
+  check(inventory.includes("['claude-code', 'opencode', 'codex']")
+      && inventory.includes("['--version']")
+      && inventory.includes('maxBuffer: 65536')
+      && inventory.includes('timeout: 3000'),
+  'external Codex MCP inventory uses only a bounded version availability probe');
 }
 
 function runPhase65ValidationContract() {
@@ -2442,7 +2488,7 @@ const threatEvidence = Object.freeze({
   'T61-08': [['tests/delegation-controller.test.js', /duplicate stop coalesce/]],
   'T61-09': [['tests/mcp-agent-orphan-recovery.test.js', /daemon_restart_lost_run/]],
   'T61-10': [['tests/mcp-bridge-client-lifecycle.test.js', /three consecutive/]],
-  'T61-11': [['tests/delegation-sidepanel-ui.test.js', /no held state before authority replies/]],
+  'T61-11': [['tests/delegation-sidepanel-ui.test.js', /Stop renders no terminal result before authority replies/]],
   'T61-12': [['tests/mcp-version-parity.test.js', /nativeMessaging permission appears exactly once/]],
   'T61-13': [['tests/delegation-controller.test.js', /forced module reload hydrates/]],
   'T61-14': [['tests/delegation-sidepanel-ui.test.js', /hostile metadata remains inert text/]],
@@ -2740,17 +2786,22 @@ check(/canonicalOwnedTabs\(input\.ownedTabs\)/.test(sealHoldLeaseFunction)
   && /supplied\.forEach/.test(sealHoldLeaseFunction),
 'registry atomically compares and leases every exact owned tab/token');
 
-for (const functionName of [
-  '_takeDelegationControl', '_resumeDelegationControl', '_stopDelegation',
-]) {
-  const lifecycleFunction = extractFunction(sidepanelSource, functionName);
-  check(lifecycleFunction.includes('_renderDelegationSnapshot(response.snapshot')
-    && !/(?:snapshot|_delegationUiState\.snapshot)\.state\s*=(?!=)|state:\s*['"](?:held|stopped)['"]/.test(lifecycleFunction),
-  `${functionName} renders only the authoritative response snapshot without optimistic held/stopped state`);
-}
+const stopDelegationFunction = extractFunction(sidepanelSource, '_stopDelegation');
+check(stopDelegationFunction.includes('_renderDelegationSnapshot(response.snapshot')
+  && !/(?:snapshot|_delegationUiState\.snapshot)\.state\s*=(?!=)|state:\s*['"]stopped['"]/.test(stopDelegationFunction),
+'_stopDelegation renders only the authoritative response snapshot without optimistic stopped state');
+check(extractFunction(sidepanelSource, '_takeDelegationControl') === ''
+  && extractFunction(sidepanelSource, '_resumeDelegationControl') === ''
+  && !/FSB_DELEGATION_(?:TAKE_CONTROL|RESUME)/.test(sidepanelSource),
+'sidepanel has no Take/Resume UI handler or command emission');
+check(extractFunction(auditedControllerSource, 'takeControl') !== ''
+  && extractFunction(auditedControllerSource, 'resumeDelegation') !== ''
+  && /FSB_DELEGATION_TAKE_CONTROL/.test(backgroundSource)
+  && /FSB_DELEGATION_RESUME/.test(backgroundSource),
+'controller and background retain internal hold/resume authority outside the sidepanel');
 const runtimeUpdateFunction = extractFunction(sidepanelSource, '_handleDelegationRuntimeUpdate');
-check(/pendingTake[\s\S]*state === 'holding'[\s\S]*pendingResume[\s\S]*state === 'resuming'/.test(runtimeUpdateFunction),
-  'pending Take Control/Resume suppress intermediate optimistic presentation');
+check(!/pendingTake|pendingResume/.test(runtimeUpdateFunction),
+  'runtime updates have no sidepanel Take/Resume pending presentation state');
 const wakeReconcileFunction = extractFunction(backgroundSource, 'fsbReconcileDelegationSnapshots');
 check(/controller\.reconcile/.test(wakeReconcileFunction)
   && !/delegate\.start|runAgentLoop|spawn|replay|adopt/i.test(wakeReconcileFunction),
@@ -2923,8 +2974,8 @@ const rawCompatibilityMatrix = between(
   'const parsedMatrix',
 );
 equal(Array.from(rawCompatibilityMatrix.matchAll(/adapterId:\s*'([^']+)'/g), (match) => match[1]),
-  ['claude-code', 'opencode', 'codex'],
-  'the canonical matrix has the exact Claude Code/OpenCode/Codex production order');
+  ['claude-code', 'grok-build'],
+  'the canonical matrix has the exact Claude Code/Grok Build production order');
 for (const exactMatrixToken of [
   'schemaVersion: 1',
   "profileVersion: '2.1.177'",
@@ -2938,34 +2989,23 @@ for (const exactMatrixToken of [
   check(rawCompatibilityMatrix.includes(exactMatrixToken),
     `canonical Claude row retains ${exactMatrixToken}`);
 }
-for (const exactOpenCodeMatrixToken of [
-  "displayLabel: 'OpenCode'",
-  "profileVersion: '1.14.25'",
-  "minimumVersion: '1.14.25'",
-  "testedThroughVersion: '1.14.25'",
-  'supportedMajor: 1',
-  "fixtureManifest: 'tests/fixtures/agent-streams/opencode-1.14.25/manifest.json'",
-  "'part.messageID'",
-  "'part.reason'",
-  "'part.tokens'",
+check(!rawCompatibilityMatrix.includes("adapterId: 'codex'")
+    && !rawCompatibilityMatrix.includes('codex-0.142.5')
+    && !rawCompatibilityMatrix.includes("adapterId: 'opencode'")
+    && !rawCompatibilityMatrix.includes('opencode-1.14.25'),
+  'the canonical matrix contains no retired provider row or fixture');
+for (const exactGrokMatrixToken of [
+  "displayLabel: 'Grok Build'",
+  "profileVersion: '1.0.4'",
+  "minimumVersion: '1.0.4'",
+  "testedThroughVersion: '1.0.4'",
+  "fixtureManifest: 'tests/fixtures/agent-streams/grok-build-1.0.4/manifest.json'",
+  "'agentCapabilities.mcpCapabilities.http'",
+  "'agentCapabilities.sessionCapabilities.close'",
+  "requiredResultFields: ['stopReason']",
 ]) {
-  check(rawCompatibilityMatrix.includes(exactOpenCodeMatrixToken),
-    `canonical OpenCode row retains ${exactOpenCodeMatrixToken}`);
-}
-check(/adapterId: 'opencode',[\s\S]*capabilities: \{[\s\S]*taskMode: true,[\s\S]*chatMode: false,[\s\S]*resume: false,[\s\S]*serverMode: true,[\s\S]*displayLabel: 'OpenCode'/.test(rawCompatibilityMatrix),
-  'canonical OpenCode row retains exact server/task-only capabilities');
-for (const exactCodexMatrixToken of [
-  "displayLabel: 'Codex'",
-  "profileVersion: '0.142.5'",
-  "minimumVersion: '0.142.5'",
-  "testedThroughVersion: '0.142.5'",
-  "fixtureManifest: 'tests/fixtures/agent-streams/codex-0.142.5/manifest.json'",
-  'taskMode: true',
-  'chatMode: false',
-  'serverMode: false',
-]) {
-  check(rawCompatibilityMatrix.includes(exactCodexMatrixToken),
-    `canonical Codex row retains ${exactCodexMatrixToken}`);
+  check(rawCompatibilityMatrix.includes(exactGrokMatrixToken),
+    `canonical Grok Build row retains ${exactGrokMatrixToken}`);
 }
 check(/compareVersions\(version, minimum\) < 0[\s\S]*'below_minimum'[\s\S]*compareVersions\(version, testedThrough\) > 0[\s\S]*'degraded'[\s\S]*'newer_than_tested_range'[\s\S]*'supported'[\s\S]*'within_tested_range'/.test(compatibilitySource),
   'canonical classifier keeps inclusive tested bounds and same-major newer degradation');
@@ -3004,8 +3044,8 @@ const driftFixtureContracts = between(
 equal(Array.from(
   driftFixtureContracts.matchAll(/^  (?:'([^']+)'|([a-z][a-z0-9-]*)):\s*\{$/gm),
   (match) => match[1] || match[2],
-), ['claude-code', 'opencode', 'codex'],
-  'drift smoke fixture table is the exact closed three-provider roster');
+), ['claude-code'],
+  'drift smoke JSONL parser-contract table remains the exact active JSONL roster');
 equal(Array.from(
   driftFixtureContracts.matchAll(
     /^    adapterId: '([^']+)',\n    directory: '([^']+)',\n    parserModule: '([^']+)',\n    parserExport: '([^']+)',/gm,
@@ -3013,12 +3053,10 @@ equal(Array.from(
   (match) => match.slice(1),
 ), [
   ['claude-code', 'claude-code-2.1.177', 'claude-stream.js', 'parseClaudeEvents'],
-  ['opencode', 'opencode-1.14.25', 'opencode-stream.js', 'parseOpenCodeEvents'],
-  ['codex', 'codex-0.142.5', 'codex-stream.js', 'parseCodexEvents'],
 ], 'each adapter-native fixture points at its exact compiled production parser export');
-check(exactOccurrences(driftFixtureContracts, 'requiredInitFields:') === 3
-  && exactOccurrences(driftFixtureContracts, 'requiredTerminalFields:') === 3,
-  'all three closed fixture contracts declare native init and terminal field requirements');
+check(exactOccurrences(driftFixtureContracts, 'requiredInitFields:') === 1
+  && exactOccurrences(driftFixtureContracts, 'requiredTerminalFields:') === 1,
+  'the closed JSONL fixture contract declares native init and terminal field requirements');
 check(/for \(const field of contract\.requiredInitFields\) \{\s*assert\.ok\(hasPath\(nativeInit\[0\], field\)/.test(driftSmokeSource)
   && /for \(const field of contract\.requiredTerminalFields\) \{\s*assert\.ok\(hasPath\(nativeTerminal\[0\], field\)/.test(driftSmokeSource),
   'drift smoke validates every declared dotted native init and terminal field');
@@ -3027,22 +3065,24 @@ const productionRosterSource = extractFunction(driftSmokeSource, 'assertProducti
 for (const productionRosterToken of [
   "assert.deepEqual(matrixIds, sortedRegistryIds, 'registry and matrix adapter rosters agree')",
   "assert.equal(new Set(matrixIds).size, matrixIds.length, 'matrix adapter ids are unique')",
-  'FIXTURE_CONTRACTS[adapterId].directory',
+  'Object.keys(FIXTURE_CONTRACTS)',
+  "'JSONL parser-contract roster excludes the supervisor-owned Grok ACP transport'",
   "assert.deepEqual(matrixFixtures, registeredFixtures, 'registered matrix fixtures agree')",
 ]) {
   check(productionRosterSource.includes(productionRosterToken),
     `production roster keeps its registry/matrix/fixture bijection: ${productionRosterToken}`);
 }
 for (const atomicProductionExposureToken of [
-  "const exactProductionIds = ['claude-code', 'opencode', 'codex'];",
+  "const exactProductionIds = ['claude-code', 'grok-build'];",
   'assertProductionRoster(registryIds, matrixRows, registry);',
   "assert.deepEqual(registryIds, exactProductionIds, 'production registry order is exact')",
   "assert.deepEqual(rows.map((row) => row.adapterId), exactProductionIds, 'matrix order is exact')",
   "assert.deepEqual(productionAdapterIds, exactProductionIds, 'production adapter roster is exact')",
-  "assert.ok(registry.require('opencode'));",
-  "assert.ok(registry.require('codex'));",
+  "assert.ok(registry.require('grok-build'));",
+  "assert.throws(() => registry.require('opencode'), /Unknown adapter id/);",
+  "assert.throws(() => registry.require('codex'), /Unknown adapter id/);",
   "assert.throws(() => registry.require('foreign'), /Unknown adapter id/);",
-  "'fixture roster is exactly Claude, OpenCode, and Codex',",
+  "'fixture roster covers both active delegated providers',",
 ]) {
   check(driftSmokeSource.includes(atomicProductionExposureToken),
     `production exposure retains its exact atomic roster boundary: ${atomicProductionExposureToken}`);
@@ -3061,7 +3101,7 @@ for (const productionParserToken of [
 check(!loadParserSource.includes("contract.adapterId === 'claude-code'")
   && exactOccurrences(loadParserSource, 'registry.require(contract.adapterId).parseEvents') === 1
   && /return registeredParser;/.test(loadParserSource),
-  'both production fixtures replay only through their exact registered adapter parser');
+  'the production fixture replays only through its exact registered adapter parser');
 check(/Offline adapter-native fixture drift gate\.[\s\S]*only compiled[\s\S]*production parsers over committed synthetic streams; it never invokes a[\s\S]*provider binary, account, browser, or network\./.test(driftSmokeSource),
   'drift smoke declares its committed-fixture-only offline authority boundary');
 check(!/child_process|execFile|spawnSync|fetch\s*\(|new WebSocket|claude\s+--/.test(driftSmokeSource),
@@ -3119,7 +3159,7 @@ check(phase63BuildIndex >= 0
   && phase63RootIndexes.every((index) => index > phase63BuildIndex && index < firstDependentMcpIndex)
   && phase63RootIndexes.every((index, position) => position === 0 || index > phase63RootIndexes[position - 1]),
 'all six Phase 63 root gates occupy one ordered slot after build and before dependent seams');
-check(exactOccurrences(ciSource, 'name: Phase 65 Codex contract (sole Linux root invocation)') === 1
+check(exactOccurrences(ciSource, 'name: Phase 65 agent provider contract (sole Linux root invocation)') === 1
   && exactOccurrences(ciSource, 'run: npm test') === 1
   && !ciSource.includes('run: node scripts/run-phase63-focused-tests.mjs'),
 'CI source-pins the sole Linux root invocation without a duplicate focused run');
@@ -3451,8 +3491,8 @@ equal(Array.from(apiProviderBlock.matchAll(/'([^']+)'/g), (match) => match[1]),
   ['xai', 'gemini', 'openai', 'anthropic', 'openrouter', 'lmstudio', 'custom'],
   'Providers retains the exact seven API-provider order');
 equal(Array.from(agentProviderBlock.matchAll(/'([^']+)'/g), (match) => match[1]),
-  ['claude-code', 'opencode', 'codex'],
-  'Providers retains the exact three agent-provider order');
+  ['claude-code', 'grok-build'],
+  'Providers retains the exact two active agent-provider order');
 const providerParitySource = read('tests/provider-parity.test.js');
 check(providerParitySource.includes("const PROVIDER_KEYS = ['xai', 'openai', 'anthropic', 'gemini', 'openrouter', 'lmstudio', 'custom'];")
   && providerParitySource.includes("!PROVIDER_KEYS.includes('claude-code')"),
@@ -3477,8 +3517,8 @@ const providerSelect62 = (
 )[0];
 equal(Array.from(providerSelect62.matchAll(/<option value="([^"]+)"/g), (match) => match[1]), [
   'xai', 'gemini', 'openai', 'anthropic', 'openrouter', 'lmstudio', 'custom',
-  'claude-code', 'opencode', 'codex',
-], 'compact provider selector retains the exact ten-option order');
+  'claude-code', 'grok-build',
+], 'compact provider selector retains the exact nine active options');
 check(exactOccurrences(controlPanelSource, 'id="modelProvider"') === 1
   && !/data-provider-compatibility|providerEvidenceAnnouncement|provider-row/.test(controlPanelSource),
 'compact provider settings contain no compatibility roster or announcement UI');
@@ -3518,27 +3558,14 @@ for (const forbiddenUiPattern of [
   check(!forbiddenUiPattern.test(compatibilityUiScope),
     `Providers UI has no direct compatibility/process/private authority matching ${forbiddenUiPattern}`);
 }
-check(exists('mcp/src/agent-providers/opencode.ts')
-  && exists('mcp/src/agent-providers/codex.ts')
-  && read('mcp/src/agent-providers/registry.ts').includes('createOpenCodeAdapter')
-  && read('mcp/src/agent-providers/registry.ts').includes('createCodexAdapter'),
-  'production exposure retains canonical OpenCode and Codex registrations');
-const openCodeAdapterSource = read('mcp/src/agent-providers/opencode.ts');
-const openCodeAdapterComposition = extractFunction(openCodeAdapterSource, 'createOpenCodeAdapter');
-equal(Array.from(
-  openCodeAdapterComposition.matchAll(/^    (?:async )?([a-zA-Z][a-zA-Z0-9]*)\([^)]*\)(?::[^\{]+)? \{/gm),
-  (match) => match[1],
-), ['detect', 'buildSpawn', 'parseEvents', 'kill', 'caps'],
-  'OpenCode production composition exposes exactly the five reviewed methods');
-for (const atomicAdapterToken of [
-  'createOpenCodeDetector().detect',
-  'buildOpenCodeSpawnSpec',
-  'parseOpenCodeEvents',
-  'OPENCODE_CAPABILITIES',
-]) {
-  check(openCodeAdapterSource.includes(atomicAdapterToken),
-    `OpenCode production composition retains ${atomicAdapterToken}`);
-}
+const registrySource62 = read('mcp/src/agent-providers/registry.ts');
+check(!exists('mcp/src/agent-providers/opencode.ts')
+  && !registrySource62.includes('createOpenCodeAdapter')
+  && !exists('mcp/src/agent-providers/codex.ts')
+  && !registrySource62.includes('createCodexAdapter')
+  && registrySource62.includes('createClaudeCodeAdapter')
+  && registrySource62.includes('createGrokBuildAdapter'),
+  'production exposure contains only Claude Code and Grok Build registrations');
 
 const compatibilityBrowserProjection = [
   projectedCompatibilitySource,

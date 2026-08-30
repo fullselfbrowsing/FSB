@@ -590,6 +590,9 @@
     var releaseHeartbeat = typeof options.releaseHeartbeat === 'function'
       ? options.releaseHeartbeat
       : function() { return false; };
+    var releaseVisualSessions = typeof options.releaseVisualSessions === 'function'
+      ? options.releaseVisualSessions
+      : function() { return false; };
     var getConnectionSnapshot = typeof options.getConnectionSnapshot === 'function'
       ? options.getConnectionSnapshot
       : function() { return null; };
@@ -1004,6 +1007,12 @@
       }
       await _releaseHeartbeatOnce(record);
       await _forgetGeneration(record);
+      if (record.agentId) {
+        // Fire-and-forget: overlay teardown must never delay the terminal emit.
+        try {
+          releaseVisualSessions({ delegationId: record.delegationId, agentId: record.agentId });
+        } catch (_visualCleanupError) { /* best-effort overlay teardown */ }
+      }
       var runtimeEvent = _emit(record, terminalEntry ? terminalEntry.sequence : null);
       return _deepFreeze({
         ok: true,
@@ -1252,7 +1261,10 @@
       input = input || {};
       var delegationId = _requireId(input.delegationId);
       var acceptedIdentity = _acceptedIdentity(input.acceptedIdentity);
-      if (!acceptedIdentity) {
+      if (!acceptedIdentity
+          || !delegationProviders
+          || typeof delegationProviders.isShippedId !== 'function'
+          || !delegationProviders.isShippedId(acceptedIdentity.providerId)) {
         throw _error('unsupported_provider', 'an exact accepted identity is required');
       }
       if (records.has(delegationId)) {

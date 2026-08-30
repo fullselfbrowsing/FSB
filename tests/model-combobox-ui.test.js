@@ -197,6 +197,7 @@ assert(input.disabled === false && !root.classList.contains('is-disabled'), 're-
 select.innerHTML = '';
 const empty = makeEl('option'); empty.value=''; empty.textContent='No models available'; empty.disabled=true; select.appendChild(empty);
 select.value=''; flush();
+assert(input.value === 'No models available', 'closed combobox mirrors status-placeholder text into the visible field');
 fire(input,'focus');
 assert(optionEls().length===0 && statusEls().length===1 && /no models available/i.test(statusEls()[0].textContent), 'empty state shows status row, no selectable options');
 fire(input,'keydown',{ key:'Enter' });
