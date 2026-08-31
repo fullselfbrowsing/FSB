@@ -1073,7 +1073,7 @@ async function callProviderWithTools(providerInstance, model, apiKey, messages, 
     }
 
     default: {
-      // OpenAI/xAI/OpenRouter/Custom: standard messages + tools format.
+      // OpenAI/xAI/OpenRouter/Custom/LM Studio: standard messages + tools format.
       // Start from the broadly compatible request shape. Direct OpenAI calls
       // are normalized below to max_completion_tokens and, for reasoning
       // model families, omit unsupported sampling parameters.
@@ -1084,9 +1084,31 @@ async function callProviderWithTools(providerInstance, model, apiKey, messages, 
       // NOTE: tool_choice intentionally omitted -- xAI returns 400 for it,
       // which crashes the iteration loop via unhandled throw in UniversalProvider.
       // The default behavior (auto) applies when tools are present.
+      //
+      // Local Jinja chat templates (LM Studio serving Qwen 3) reject any turn
+      // that carries no user message with a 400 "No user query found in
+      // messages." Iteration 1 is system-only -- the task lives in the system
+      // prompt -- and every later iteration is system + assistant/tool, so
+      // neither shape qualifies. Hosted OpenAI-compatible APIs accept both,
+      // which is why this only ever surfaced on LM Studio. Seed the same
+      // starter turn the anthropic and gemini branches already do, placed after
+      // the leading system messages so the assistant(tool_calls) -> tool
+      // adjacency OpenAI-compatible APIs require stays intact. Request shaping
+      // only: session.messages is never mutated.
+      var openAiMessages = messages;
+      if (Array.isArray(messages) && !messages.some(m => m && m.role === 'user')) {
+        var insertAt = 0;
+        while (insertAt < messages.length && messages[insertAt] && messages[insertAt].role === 'system') {
+          insertAt++;
+        }
+        openAiMessages = messages.slice(0, insertAt)
+          .concat([{ role: 'user', content: 'Begin.' }])
+          .concat(messages.slice(insertAt));
+      }
+
       requestBody = {
         model,
-        messages,
+        messages: openAiMessages,
         tools: formattedTools,
         temperature: 0,
         max_tokens: 4096
