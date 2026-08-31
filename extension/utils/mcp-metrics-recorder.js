@@ -13,10 +13,9 @@
  * so MCP rows merge into the same numbers automatically with NO new UI section
  * (per CONTEXT decision D-04, strict merge).
  *
- * Allowlist of fields this module reads from `requestPayload`:
- *   - requestPayload.text -- ONLY its `.length` is read, for the type_text /
- *     insert_text token estimator. The literal string value is NEVER stored,
- *     forwarded, logged, or otherwise inspected.
+ * The dispatcher supplies compact `requestMetadata` containing only scalar
+ * facts. For type_text / insert_text, `textLength` drives the token estimate;
+ * the literal request and response never cross this module boundary.
  *
  * NEVER reads / persists: any of bodies, page DOM, request URLs, hrefs,
  * innerHTML/outerHTML, clipboard, cookie headers, Authorization headers, OR
@@ -28,7 +27,7 @@
  *   - recordDispatch(input) -> Promise<void>
  *       Appends one row; NEVER throws; broadcasts ANALYTICS_UPDATE.
  *   - MCP_TOOL_TOKEN_HEURISTICS  -- frozen const tool->{in,out,token_source}.
- *   - _estimateTokensForTool(tool, requestPayload) -- pure helper; test-only.
+ *   - _estimateTokensForTool(tool, requestMetadata) -- pure helper; test-only.
  *   - FSB_USAGE_DATA_KEY = 'fsbUsageData'
  *
  * Node CommonJS surface for the test harness mirrors the above plus
@@ -126,18 +125,20 @@ var MCP_TOOL_TOKEN_HEURISTICS = Object.freeze({
  * stats can surface uncategorised tool counts.
  *
  * @param {string} tool - The MCP tool name.
- * @param {object|null|undefined} requestPayload - The original payload.
+ * @param {object|null|undefined} requestMetadata - Compact scalar metadata.
  * @returns {{tokens_in:number, tokens_out:number, token_source:string}}
  */
-function _estimateTokensForTool(tool, requestPayload) {
+function _estimateTokensForTool(tool, requestMetadata) {
   // Special-case the two payload-length-scaled tools BEFORE table lookup.
   // ONLY the .length is consulted -- never the string value. The variable
   // name `textLength` is intentional: the no-pii grep allows `text.length`
   // but not `text` alone in source code (it would conflict with body fields
   // a future contributor might be tempted to add).
   if (tool === 'type_text' || tool === 'insert_text') {
-    var raw = (requestPayload && typeof requestPayload.text === 'string') ? requestPayload.text : '';
-    var textLength = raw.length;
+    var suppliedLength = requestMetadata && requestMetadata.textLength;
+    var textLength = (typeof suppliedLength === 'number' && isFinite(suppliedLength))
+      ? Math.max(0, Math.floor(suppliedLength))
+      : 0;
     var estimated = Math.max(50, Math.ceil(textLength / 4));
     return { tokens_in: estimated, tokens_out: 30, token_source: 'estimate' };
   }
@@ -239,12 +240,7 @@ function _withRecordLock(fn) {
  * inner try/catch as defence in depth.
  *
  * Caller-supplied input shape (CONTEXT decision 3):
- *   {client, tool, requestPayload, response, success, dispatcher_route}
- *
- * `response` is intentionally NOT used by the row schema -- it is part of
- * the hook signature for forward-compat with future heuristics that might
- * consume metadata. The PII gate test asserts the recorder source contains
- * no references to response body / DOM / etc.
+ *   {client, tool, requestMetadata:{textLength}, success, dispatcher_route}
  *
  * Row schema written (CONTEXT decision 5 + reconciliation #2):
  *   - Canonical snake_case for Phase 272 TelemetryCollector consumption:
@@ -281,7 +277,7 @@ async function recordDispatch(input) {
       : null;
 
     // Token estimate -- pure synchronous lookup.
-    var tokenEstimate = _estimateTokensForTool(toolLabel, input.requestPayload);
+    var tokenEstimate = _estimateTokensForTool(toolLabel, input.requestMetadata);
 
     // Pricing resolution -- synchronous call to Phase 270 module. NEVER
     // throws. When globalThis.fsbMcpPricing is unavailable (e.g. Node test

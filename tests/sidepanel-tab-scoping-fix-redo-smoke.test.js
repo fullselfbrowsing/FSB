@@ -30,6 +30,12 @@
  *     4.3 automationComplete with request.tabId=X calls setIdleState(X) (per-tab routing)
  *     4.4 session_ended with request.tabId=X resolves the entry before flipping idle
  *
+ *   Part 5 (API automation presentation survives delegation hydration)
+ *     5.1 API running -> null delegation hydration keeps Working + runner + Stop
+ *     5.2 Idle delegation hydration keeps Ready with no runner or Stop
+ *     5.3 Switching away and back preserves the running tab's original timer
+ *     5.4 Hiding delegation presentation cannot hide an active API runner
+ *
  * Discipline: extract listener / handler / case bodies via brace-counting and
  * eval into sandboxed Functions (Rule 3 / CLAUDE.md MEMORY). NO static-text
  * grep for presence -- every assertion exercises real code paths against
@@ -251,12 +257,14 @@ function runPart3() {
     isRunning: false,
     livenessFailCount: 0,
     livenessInterval: null,
+    _delegationUiState: { snapshot: null },
     sendBtn: { disabled: false, classList: { add: function () {}, remove: function () {} } },
     stopBtn: { classList: { add: function () {}, remove: function () {} } },
     statusDot: { classList: { add: function () {}, remove: function () {} } },
     statusText: { textContent: '' },
     chatInput: { textContent: '' },
     updateSendButtonState: function () {},
+    _syncDelegationStopControls: function () {},
     checkSessionLiveness: function () {},
     clearInterval: function () {},
     setInterval: function () { return 1; }
@@ -267,7 +275,8 @@ function runPart3() {
       'tabId', 'sessionId',
       '_tabRunningMap', '_activeTabIdSnapshot', 'currentSessionId', 'isRunning', 'livenessFailCount', 'livenessInterval',
       'sendBtn', 'stopBtn', 'statusDot', 'statusText', 'chatInput',
-      'updateSendButtonState', 'checkSessionLiveness', 'clearInterval', 'setInterval',
+      'updateSendButtonState', '_setHeaderStatus', '_syncDelegationStopControls', '_delegationUiState',
+      'checkSessionLiveness', 'clearInterval', 'setInterval',
       '_getTabRunningEntry',
       // Return a tuple of mutated locals so the test can inspect them.
       setRunningBody + ' ; return { _tabRunningMap: _tabRunningMap, isRunning: isRunning, currentSessionId: currentSessionId };'
@@ -285,7 +294,11 @@ function runPart3() {
       sandboxState.livenessFailCount, sandboxState.livenessInterval,
       sandboxState.sendBtn, sandboxState.stopBtn, sandboxState.statusDot,
       sandboxState.statusText, sandboxState.chatInput,
-      sandboxState.updateSendButtonState, sandboxState.checkSessionLiveness,
+      sandboxState.updateSendButtonState, function (label, tone) {
+        sandboxState.statusText.textContent = label;
+        sandboxState.statusDot.tone = tone;
+      }, sandboxState._syncDelegationStopControls,
+      sandboxState._delegationUiState, sandboxState.checkSessionLiveness,
       sandboxState.clearInterval, sandboxState.setInterval,
       _getTabRunningEntry
     );
@@ -325,7 +338,7 @@ function runPart3() {
       'tabId',
       '_tabRunningMap', '_activeTabIdSnapshot', 'currentSessionId', 'isRunning',
       'livenessFailCount', 'livenessInterval', 'currentStatusMessage', 'currentActionGroup',
-      'sendBtn', 'stopBtn', 'statusDot', 'statusText', 'updateSendButtonState', 'clearInterval',
+      'sendBtn', 'stopBtn', 'statusDot', 'statusText', 'updateSendButtonState', '_setHeaderStatus', 'clearInterval',
       '_getTabRunningEntry',
       // QT-uof-5 (B-FIX) -- setIdleState now calls _clearTabStatusIntent to
       // drop the per-tab (currentStatusMessage, currentActionGroup) mirror
@@ -348,7 +361,10 @@ function runPart3() {
       sandboxState.livenessFailCount, sandboxState.livenessInterval,
       null, null,
       sandboxState.sendBtn, sandboxState.stopBtn, sandboxState.statusDot,
-      sandboxState.statusText, sandboxState.updateSendButtonState, sandboxState.clearInterval,
+      sandboxState.statusText, sandboxState.updateSendButtonState, function (label, tone) {
+        sandboxState.statusText.textContent = label;
+        sandboxState.statusDot.tone = tone;
+      }, sandboxState.clearInterval,
       _getTabRunningEntry,
       _clearTabStatusIntent
     );
@@ -395,16 +411,17 @@ function runPart3() {
 function runPart4() {
   console.log('\nPart 4 -- chrome.tabs.onActivated re-sync + completion routing:');
 
-  // 4.1 -- the chrome.tabs.onActivated handler at line ~786 (sidepanel.js)
-  // re-syncs _activeTabIdSnapshot AFTER swapToTabConversation.
-  var snippet = spSrc.indexOf('_activeTabIdSnapshot = activeInfo.tabId');
-  ok(snippet > -1,
-     'Part 4.1 -- chrome.tabs.onActivated handler assigns _activeTabIdSnapshot = activeInfo.tabId');
+  // 4.1 -- activation passes Chrome's exact tab/window identity into the
+  // unified synchronizer, which commits the incoming tab snapshot.
+  var exactActivation = /chrome\.tabs\.onActivated\.addListener[\s\S]*?syncActiveTabSurface\(activeInfo\.tabId, activeInfo\.windowId\)/.test(spSrc);
+  var syncCommitsTab = /async function syncActiveTabSurface[\s\S]*?_activeTabIdSnapshot\s*=\s*incomingTabId/.test(spSrc);
+  ok(exactActivation && syncCommitsTab,
+     'Part 4.1 -- activation sends exact tab identity to the unified synchronizer');
 
   // 4.2 -- the same handler dispatches setRunningState OR setIdleState
   // based on the activated tab's per-tab entry.
-  var dispatchesSetRunning = /if \(snap\.isRunning\) {\s*setRunningState\(activeInfo\.tabId/.test(spSrc);
-  var dispatchesSetIdle = /} else \{\s*setIdleState\(activeInfo\.tabId\)/.test(spSrc);
+  var dispatchesSetRunning = /if \(snap\.isRunning\) setRunningState\(incomingTabId/.test(spSrc);
+  var dispatchesSetIdle = /else setIdleState\(incomingTabId\)/.test(spSrc);
   ok(dispatchesSetRunning && dispatchesSetIdle,
      'Part 4.2 -- handler dispatches setRunningState/setIdleState based on per-tab entry on activation');
 
@@ -424,6 +441,174 @@ function runPart4() {
     && /setIdleState\(sessionEndedTabId\)/.test(spSrc);
   ok(hasSessionEndedRouted,
      'Part 4.4 -- session_ended branch derives sessionEndedTabId from request.tabId + calls setIdleState(sessionEndedTabId)');
+
+  runPart5();
+}
+
+// =====================================================================
+// PART 5 -- API automation presentation survives delegation hydration
+// =====================================================================
+
+function runPart5() {
+  console.log('\nPart 5 -- API automation presentation survives delegation hydration:');
+
+  var setRunningAnchor = 'function setRunningState(tabId, sessionId) {';
+  var restoreAnchor = 'function _restoreActiveTabAutomationPresentation() {';
+  var readyAnchor = 'function _renderDelegationReadyState() {';
+  var hideAnchor = 'function _hideDelegationPresentation() {';
+  var setRunningBody = extractAfterAnchor(spSrc, setRunningAnchor);
+  var restoreBody = extractAfterAnchor(spSrc, restoreAnchor);
+  var readyBody = extractAfterAnchor(spSrc, readyAnchor);
+  var hideBody = extractAfterAnchor(spSrc, hideAnchor);
+
+  ok(Boolean(setRunningBody && restoreBody && readyBody && hideBody),
+     'Part 5.1a -- running, reconciliation, ready, and hidden presentation functions are extractable');
+
+  if (!(setRunningBody && restoreBody && readyBody && hideBody)) {
+    console.log('\n' + passed + ' PASS / ' + failed + ' FAIL');
+    process.exit(failed === 0 ? 0 : 1);
+    return;
+  }
+
+  function classList(initial) {
+    var values = new Set(initial || []);
+    return {
+      add: function(name) { values.add(name); },
+      remove: function(name) { values.delete(name); },
+      contains: function(name) { return values.has(name); }
+    };
+  }
+
+  function node(initialClasses) {
+    var attributes = Object.create(null);
+    return {
+      classList: classList(initialClasses),
+      attributes: attributes,
+      setAttribute: function(name, value) { attributes[name] = String(value); },
+      removeAttribute: function(name) { delete attributes[name]; }
+    };
+  }
+
+  var ui = {
+    now: 250000,
+    headerLabel: 'Ready',
+    headerTone: '',
+    loaderVisible: false,
+    timerVisible: false,
+    runnerStartedAt: null,
+    runnerText: 'Ready',
+    stopVisible: false,
+    composerLocked: false
+  };
+  var mount = {
+    run: node(['hidden']),
+    state: node(),
+    feed: node(),
+    control: node(['hidden'])
+  };
+  var FakeDate = { now: function() { return ui.now; } };
+
+  var createRuntime = new Function('ui', 'mount', 'Date', [
+    'var _tabRunningMap = new Map();',
+    'var _activeTabIdSnapshot = null;',
+    'var currentSessionId = null;',
+    'var isRunning = false;',
+    'var livenessFailCount = 0;',
+    'var livenessInterval = null;',
+    'var sendBtn = { disabled: false };',
+    "var stopBtn = { classList: { add: function(name) { if (name === 'hidden') ui.stopVisible = false; }, remove: function(name) { if (name === 'hidden') ui.stopVisible = true; } } };",
+    'var _delegationUiState = { snapshot: null, mode: \'ready\', errorCode: null, lastAlertKey: null, composerLocked: false };',
+    'var _delegationRunStopControls = [];',
+    'function _getTabRunningEntry(tabId) {',
+    '  if (typeof tabId !== \'number\') return { isRunning: false, sessionId: null, startedAt: null };',
+    '  var entry = _tabRunningMap.get(tabId);',
+    '  if (!entry) { entry = { isRunning: false, sessionId: null, startedAt: null }; _tabRunningMap.set(tabId, entry); }',
+    '  return entry;',
+    '}',
+    'function getCurrentTabRunningState() {',
+    '  if (typeof _activeTabIdSnapshot !== \'number\') return { isRunning: false, sessionId: null, startedAt: null };',
+    '  return _getTabRunningEntry(_activeTabIdSnapshot);',
+    '}',
+    'function _setHeaderStatus(label, tone) { ui.headerLabel = label || \'Ready\'; ui.headerTone = tone || \'\'; }',
+    'function _setDelegationHeaderStatus(label, tone) { _setHeaderStatus(label, tone); }',
+    'function showAutomationRunner(startedAt, text) {',
+    '  ui.loaderVisible = true; ui.timerVisible = true; ui.runnerStartedAt = startedAt; ui.runnerText = text;',
+    '}',
+    'function hideAutomationRunner() {',
+    '  ui.loaderVisible = false; ui.timerVisible = false; ui.runnerStartedAt = null; ui.runnerText = \'Ready\';',
+    '}',
+    'function updateSendButtonState() {}',
+    'function _syncDelegationStopControls() {}',
+    'function checkSessionLiveness() {}',
+    'function clearInterval() {}',
+    'function setInterval() { return 1; }',
+    'function _clearDelegationElapsedTimer() {}',
+    'function _ensureDelegationMount() { return mount; }',
+    'function _clearDelegationNode() {}',
+    'function _restoreLegacyStopControl() {',
+    '  if (isRunning) stopBtn.classList.remove(\'hidden\'); else stopBtn.classList.add(\'hidden\');',
+    '}',
+    'function _delegatedRunTeardown() { hideAutomationRunner(); }',
+    'function _setDelegationComposerLocked(locked) { _delegationUiState.composerLocked = locked === true; ui.composerLocked = locked === true; }',
+    setRunningAnchor + setRunningBody + '}',
+    restoreAnchor + restoreBody + '}',
+    readyAnchor + readyBody + '}',
+    hideAnchor + hideBody + '}',
+    'return {',
+    '  start: function(tabId, sessionId) { _activeTabIdSnapshot = tabId; setRunningState(tabId, sessionId); },',
+    '  syncTab: function(tabId) {',
+    '    _activeTabIdSnapshot = tabId;',
+    '    var entry = _getTabRunningEntry(tabId);',
+    '    if (entry.isRunning) { setRunningState(tabId, entry.sessionId || null); return; }',
+    '    isRunning = false; currentSessionId = null; sendBtn.disabled = false;',
+    '    stopBtn.classList.add(\'hidden\'); _setHeaderStatus(\'Ready\'); hideAutomationRunner();',
+    '  },',
+    '  hydrateReady: function() { _renderDelegationReadyState(); },',
+    '  hideDelegation: function() { _hideDelegationPresentation(); },',
+    '  inspect: function() {',
+    '    var entry = getCurrentTabRunningState();',
+    '    return { entry: entry, isRunning: isRunning, currentSessionId: currentSessionId };',
+    '  }',
+    '};'
+  ].join('\n'));
+
+  var runtime = createRuntime(ui, mount, FakeDate);
+  var originalStartedAt = ui.now;
+  runtime.start(100, 'api-session-A');
+  ui.now += 8750;
+  runtime.hydrateReady();
+  var afterHydration = runtime.inspect();
+
+  ok(ui.headerLabel === 'Working' && ui.headerTone === 'running'
+      && ui.loaderVisible === true && ui.timerVisible === true
+      && ui.stopVisible === true,
+     'Part 5.1b -- API setRunningState followed by ready hydration keeps Working, running tone, loader, timer, and Stop');
+  ok(afterHydration.entry.startedAt === originalStartedAt
+      && ui.runnerStartedAt === originalStartedAt,
+     'Part 5.1c -- null-delegation hydration preserves the API session startedAt value');
+
+  runtime.syncTab(200);
+  runtime.hydrateReady();
+  ok(ui.headerLabel === 'Ready' && ui.headerTone === ''
+      && ui.loaderVisible === false && ui.timerVisible === false
+      && ui.stopVisible === false,
+     'Part 5.2 -- idle delegation hydration shows Ready with no loader, timer, or Stop');
+
+  ui.now += 12000;
+  runtime.syncTab(100);
+  runtime.hydrateReady();
+  var afterTabReturn = runtime.inspect();
+  ok(ui.headerLabel === 'Working' && ui.headerTone === 'running'
+      && afterTabReturn.entry.startedAt === originalStartedAt
+      && ui.runnerStartedAt === originalStartedAt
+      && ui.now - ui.runnerStartedAt === 20750,
+     'Part 5.3 -- switching back to the running tab restores Working and continues from its original timer');
+
+  runtime.hideDelegation();
+  ok(ui.headerLabel === 'Working' && ui.headerTone === 'running'
+      && ui.loaderVisible === true && ui.timerVisible === true
+      && ui.stopVisible === true && ui.runnerStartedAt === originalStartedAt,
+     'Part 5.4 -- hiding delegation presentation cannot tear down an active API runner');
 
   // Summary
   console.log('\n' + passed + ' PASS / ' + failed + ' FAIL');

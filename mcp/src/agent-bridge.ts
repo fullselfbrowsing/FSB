@@ -1,6 +1,7 @@
 import type { WebSocketBridge } from './bridge.js';
 import type { AgentScope } from './agent-scope.js';
 import type { MCPMessageType, MCPResponse } from './types.js';
+import { randomUUID } from 'node:crypto';
 
 type AgentScopedSendOptions = {
   timeout?: number;
@@ -47,16 +48,42 @@ function captureOwnershipToken(agentScope: AgentScope, result: Record<string, un
   );
 }
 
+function supportsRecordingCallLifecycle(agentScope: AgentScope): boolean {
+  return typeof agentScope.beginRecordingCall === 'function'
+    && typeof agentScope.completeRecordingCall === 'function';
+}
+
+const RECORDING_LEASE_DEFAULT_MS = 30_000;
+const RECORDING_LEASE_MIN_MS = 1_000;
+const RECORDING_LEASE_MAX_MS = 15 * 60_000;
+const RECORDING_LEASE_SETTLE_GRACE_MS = 5_000;
+
+function recordingLeaseMs(timeout: number | undefined): number {
+  const requested = typeof timeout === 'number' && Number.isFinite(timeout) && timeout > 0
+    ? timeout
+    : RECORDING_LEASE_DEFAULT_MS;
+  return Math.max(
+    RECORDING_LEASE_MIN_MS,
+    Math.min(RECORDING_LEASE_MAX_MS, Math.ceil(requested) + RECORDING_LEASE_SETTLE_GRACE_MS),
+  );
+}
+
 async function buildAgentPayload(
   bridge: WebSocketBridge,
   agentScope: AgentScope,
   basePayload: Record<string, unknown>,
   options: AgentScopedSendOptions,
+  recordingCallId: string,
 ): Promise<Record<string, unknown>> {
   const agentId = await agentScope.ensure(bridge);
   options.onAgentId?.(agentId);
 
-  const payload: Record<string, unknown> = { ...basePayload, agentId };
+  const payload: Record<string, unknown> = {
+    ...basePayload,
+    agentId,
+    recordingCallId,
+    recordingLeaseMs: recordingLeaseMs(options.timeout),
+  };
   if (options.includeOwnershipToken !== false) {
     const ownershipToken = currentOwnershipToken(agentScope, options.targetTabId ?? null);
     if (ownershipToken) payload.ownershipToken = ownershipToken;
@@ -64,7 +91,46 @@ async function buildAgentPayload(
 
   const connectionId = currentConnectionId(agentScope);
   if (connectionId) payload.connectionId = connectionId;
+
+  // Compatibility: pre-journal embedders omit correlation, while the first
+  // journal implementation exposes only ensureRecordingRun(). Newer scopes
+  // track physical attempts so long-running calls do not look idle.
+  if (supportsRecordingCallLifecycle(agentScope)) {
+    payload.recordingRunId = agentScope.beginRecordingCall();
+  } else if (typeof agentScope.ensureRecordingRun === 'function') {
+    payload.recordingRunId = agentScope.ensureRecordingRun();
+  }
   return payload;
+}
+
+async function sendBridgeAttempt(
+  bridge: WebSocketBridge,
+  agentScope: AgentScope,
+  type: MCPMessageType,
+  payload: Record<string, unknown>,
+  sendOptions: Pick<AgentScopedSendOptions, 'timeout' | 'onProgress'>,
+): Promise<Record<string, unknown>> {
+  try {
+    return await bridge.sendAndWait({ type, payload }, sendOptions);
+  } finally {
+    const runId = payload.recordingRunId;
+    if (typeof runId === 'string' && supportsRecordingCallLifecycle(agentScope)) {
+      agentScope.completeRecordingCall(runId);
+    }
+  }
+}
+
+function isConfirmedTerminalLifecycle(
+  type: MCPMessageType,
+  basePayload: Record<string, unknown>,
+  result: Record<string, unknown> | null | undefined,
+): boolean {
+  if (type !== 'mcp:task-status' || !result) return false;
+  const tool = basePayload.tool;
+  if (tool === 'complete_task') return result.status === 'completed';
+  if (tool === 'partial_task') return result.status === 'partial';
+  if (tool === 'fail_task') return result.status === 'failed';
+  return false;
 }
 
 export async function sendAgentScopedBridgeMessage(
@@ -78,16 +144,21 @@ export async function sendAgentScopedBridgeMessage(
     timeout: options.timeout,
     onProgress: options.onProgress,
   };
+  let recordingCallId = randomUUID();
 
-  let payload = await buildAgentPayload(bridge, agentScope, basePayload, options);
-  let result = await bridge.sendAndWait({ type, payload }, sendOptions);
+  let payload = await buildAgentPayload(bridge, agentScope, basePayload, options, recordingCallId);
+  let result = await sendBridgeAttempt(bridge, agentScope, type, payload, sendOptions);
 
   if (options.retryOnAgentNotRegistered !== false && isAgentNotRegistered(result)) {
     agentScope.reset();
-    payload = await buildAgentPayload(bridge, agentScope, basePayload, options);
-    result = await bridge.sendAndWait({ type, payload }, sendOptions);
+    recordingCallId = randomUUID();
+    payload = await buildAgentPayload(bridge, agentScope, basePayload, options, recordingCallId);
+    result = await sendBridgeAttempt(bridge, agentScope, type, payload, sendOptions);
   }
 
   captureOwnershipToken(agentScope, result);
+  if (isConfirmedTerminalLifecycle(type, basePayload, result)) {
+    if (typeof agentScope.rotateRecordingRun === 'function') agentScope.rotateRecordingRun();
+  }
   return result;
 }

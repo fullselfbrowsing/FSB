@@ -214,7 +214,8 @@ function createRefreshPollVmHarness(seedRecords, options) {
     pulses: [],
     stamps: [],
     ownership: [],
-    ensures: []
+    ensures: [],
+    iconWatching: []
   };
   const registeredAgents = new Set(opts.registeredAgents || ['agent_refresh', 'agent_a', 'agent_b', 'agent_c']);
   const ownerByTab = opts.ownerByTab || {};
@@ -321,7 +322,8 @@ function createRefreshPollVmHarness(seedRecords, options) {
         calls.events.push('handle:' + alarm.name);
         calls.handles.push(alarm.name);
         if (typeof opts.onHandleTriggerAlarm === 'function') {
-          await opts.onHandleTriggerAlarm(alarm, records, calls);
+          const result = await opts.onHandleTriggerAlarm(alarm, records, calls);
+          if (result) return result;
         }
         return { ok: true, action: 'evaluated_noop' };
       },
@@ -330,6 +332,12 @@ function createRefreshPollVmHarness(seedRecords, options) {
         calls.schedules.push({ triggerId: snap.trigger_id, now });
         snap.next_poll_at = now + Number(opts.nextPollOffsetMs || 60000);
         return { ok: true };
+      }
+    },
+    fsbActionIcon: {
+      setWatching(isWatching, tabId) {
+        calls.events.push('icon:' + isWatching + ':' + tabId);
+        calls.iconWatching.push({ isWatching, tabId });
       }
     }
   });
@@ -780,6 +788,81 @@ async function caseRefreshPollBatchPreservesAttentionAndPulseGuards() {
   });
 }
 
+async function caseRefreshPollIconTracksFireAndRearm() {
+  console.log('\n--- Case R: refresh-poll fire transitions resync the toolbar watch claim ---');
+  const now = 8500000;
+  await withFixedNow(now, async () => {
+    const terminal = createRefreshPollVmHarness({
+      trg_terminal_icon: makeRefreshPollSnapshot({
+        trigger_id: 'trg_terminal_icon',
+        selector: '#terminal-icon',
+        target_tab_id: 601,
+        next_poll_at: now - 1,
+        agent_id: 'agent_a'
+      })
+    }, {
+      onHandleTriggerAlarm(_alarm, records) {
+        records.trg_terminal_icon.status = 'fired';
+        return { ok: true, action: 'fired' };
+      }
+    });
+
+    await terminal.context.fsbTriggerHandleRefreshPollForTest(terminal.alarm('trg_terminal_icon'));
+    const terminalIcon = terminal.calls.iconWatching[terminal.calls.iconWatching.length - 1];
+    check(terminalIcon && terminalIcon.isWatching === false && terminalIcon.tabId === 601,
+      'R.1 a terminal refresh-poll fire clears the final tab-scoped watch claim');
+
+    const rearmed = createRefreshPollVmHarness({
+      trg_rearmed_icon: makeRefreshPollSnapshot({
+        trigger_id: 'trg_rearmed_icon',
+        selector: '#rearmed-icon',
+        target_tab_id: 602,
+        next_poll_at: now - 1,
+        agent_id: 'agent_a',
+        rearm_on_fire: true
+      })
+    }, {
+      onHandleTriggerAlarm(_alarm, records) {
+        records.trg_rearmed_icon.status = 'armed';
+        records.trg_rearmed_icon.fire_count = 1;
+        return { ok: true, action: 'fired_rearmed' };
+      }
+    });
+
+    await rearmed.context.fsbTriggerHandleRefreshPollForTest(rearmed.alarm('trg_rearmed_icon'));
+    const rearmedIcon = rearmed.calls.iconWatching[rearmed.calls.iconWatching.length - 1];
+    check(rearmedIcon && rearmedIcon.isWatching === true && rearmedIcon.tabId === 602,
+      'R.2 a rearmed refresh-poll fire preserves the tab-scoped watch claim');
+
+    const remaining = createRefreshPollVmHarness({
+      trg_fired_icon: makeRefreshPollSnapshot({
+        trigger_id: 'trg_fired_icon',
+        selector: '#fired-icon',
+        target_tab_id: 603,
+        next_poll_at: now - 1,
+        agent_id: 'agent_a'
+      }),
+      trg_remaining_icon: makeRefreshPollSnapshot({
+        trigger_id: 'trg_remaining_icon',
+        selector: '#remaining-icon',
+        target_tab_id: 603,
+        next_poll_at: now + 60000,
+        agent_id: 'agent_b'
+      })
+    }, {
+      onHandleTriggerAlarm(_alarm, records) {
+        records.trg_fired_icon.status = 'fired';
+        return { ok: true, action: 'fired' };
+      }
+    });
+
+    await remaining.context.fsbTriggerHandleRefreshPollForTest(remaining.alarm('trg_fired_icon'));
+    const remainingIcon = remaining.calls.iconWatching[remaining.calls.iconWatching.length - 1];
+    check(remainingIcon && remainingIcon.isWatching === true && remainingIcon.tabId === 603,
+      'R.3 a terminal fire keeps the claim while another trigger on the tab remains active');
+  });
+}
+
 async function caseRefreshPollCoalescingSourceGuards() {
   console.log('\n--- Case Q: refresh-poll coalescing source guards ---');
   const src = readSource(BACKGROUND_PATH);
@@ -957,6 +1040,7 @@ async function caseAlarmBranchSourceGuards() {
   await caseRefreshPollSameTabPendingAlarmRescans();
   await caseRefreshPollOtherTabsReloadIndependently();
   await caseRefreshPollBatchPreservesAttentionAndPulseGuards();
+  await caseRefreshPollIconTracksFireAndRearm();
   await caseRefreshPollCoalescingSourceGuards();
   await caseOwnershipSourceGuards();
   await caseRefreshPollRunSourceGuards();

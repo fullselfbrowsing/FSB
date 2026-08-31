@@ -1,0 +1,6 @@
+{"type":"system","subtype":"init","session_id":"synthetic-session-01","tools":["mcp__fsb__search_capabilities","mcp__fsb__invoke_capability"],"mcp_servers":[{"name":"fsb","status":"connected"}],"plugins":[],"hooks":[],"model":"synthetic-model"}
+{"type":"assistant","session_id":"synthetic-session-01","message":{"role":"assistant","content":[{"type":"text","text":"synthetic-output-µ"},{"type":"tool_use","id":"synthetic-tool-01","name":"mcp__fsb__search_capabilities","input":{"query":"synthetic-query"}}]}}
+{"type":"stream_event","session_id":"synthetic-session-01","event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"synthetic-delta"}}}
+{"type":"user","session_id":"synthetic-session-01","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"synthetic-tool-01","content":"synthetic-result"}]}}
+{"type":"system","subtype":"api_retry","session_id":"synthetic-session-01","attempt":1,"max_retries":3,"retry_delay_ms":250,"error":"synthetic-rate-limit"}
+{"type":"result","subtype":"success","session_id":"synthetic-session-01","is_error":false,"num_turns":2,"usage":{"input_tokens":10,"output_tokens":20}}

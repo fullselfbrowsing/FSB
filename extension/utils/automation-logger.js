@@ -7,13 +7,44 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
   globalThis.__FSB_AUTOMATION_LOGGER_LOADED__ = true;
   console.log('[FSB] automation-logger.js loading');
 
-  // Automation Logger for FSB v0.9.90
+  // Automation Logger for FSB
   // Provides structured logging for debugging automation loops
 
   function filterPersistedSessionLogs(sessionLogs) {
     return (sessionLogs || []).filter(log => {
       const logType = log?.data?.logType || log?.logType || null;
       return logType !== 'prompt' && logType !== 'rawResponse';
+    });
+  }
+
+  const SESSION_HISTORY_CAP_PER_MODE = 50;
+
+  function capPersistedSessionHistory(sessionIndex, sessionStorage) {
+    const counts = { autopilot: 0, mcp: 0 };
+    const removedIds = [];
+    const retainedIndex = (sessionIndex || []).filter(entry => {
+      const storedSession = entry?.id ? sessionStorage?.[entry.id] : null;
+      const mode = storedSession ? storedSession.mode : entry?.mode;
+      const bucket = mode === 'mcp-agent' ? 'mcp' : 'autopilot';
+      if (counts[bucket] < SESSION_HISTORY_CAP_PER_MODE) {
+        counts[bucket]++;
+        return true;
+      }
+      if (entry?.id) {
+        removedIds.push(entry.id);
+        delete sessionStorage[entry.id];
+      }
+      return false;
+    });
+    return { retainedIndex, removedIds };
+  }
+
+  function filterAutomationLogsBySession(logs, sessionIds, removeAllSessionLogs = false) {
+    const ids = sessionIds instanceof Set ? sessionIds : new Set(sessionIds || []);
+    return (Array.isArray(logs) ? logs : []).filter(log => {
+      const sessionId = log?.data?.sessionId;
+      if (typeof sessionId !== 'string' || !sessionId) return true;
+      return !(removeAllSessionLogs || ids.has(sessionId));
     });
   }
 
@@ -54,7 +85,7 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
     const normalizedStatus = typeof status === 'string' ? status.trim().toLowerCase() : '';
     if (!normalizedStatus) return 'success';
     if (normalizedStatus === 'partial') return 'partial';
-    if (normalizedStatus === 'stopped') return 'stopped';
+    if (normalizedStatus === 'stopped' || normalizedStatus === 'expired') return 'stopped';
     if (normalizedStatus === 'error' || normalizedStatus === 'failed' || normalizedStatus === 'stuck' || normalizedStatus === 'replay_failed') {
       return 'failure';
     }
@@ -140,6 +171,19 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
     };
   }
 
+  function applyPersistedOutcomeFields(target, status, normalized) {
+    if (!target || !normalized) return target;
+    target.status = status || target.status || 'completed';
+    target.outcome = normalized.outcome;
+    target.outcomeDetails = normalized.outcomeDetails;
+    target.result = normalized.result;
+    target.completionMessage = normalized.completionMessage;
+    target.error = normalized.error;
+    target.blocker = normalized.blocker;
+    target.nextStep = normalized.nextStep;
+    return target;
+  }
+
   function hydratePersistedSessionRecord(sessionId, sessionData = {}) {
     if (!sessionData || typeof sessionData !== 'object') return null;
     const normalized = normalizePersistedOutcomeFields(sessionData, sessionData);
@@ -178,6 +222,21 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
     };
   }
 
+  function cloneReplayRecordForPersistence(replay) {
+    if (!replay || typeof replay !== 'object') return null;
+    try {
+      return JSON.parse(JSON.stringify(replay));
+    } catch (_e) {
+      return null;
+    }
+  }
+
+  // Persisted tail of the in-memory log ring. Large enough that a short delegated run
+  // (register, open_tab, navigate, read, result: ~40-80 lines) survives a service-worker
+  // restart or an extension reload and is still readable through get_logs.
+  // var: this file guards against re-injection but must tolerate re-evaluation.
+  var AUTOMATION_LOGS_PERSISTED_TAIL = 400;
+
   class AutomationLogger {
     constructor() {
       this.logs = [];
@@ -187,6 +246,39 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
       this.storageMode = 'full';
       this.actionRecords = [];
       this._persistTimer = null;
+      // Session history and MCP-retention both mutate the same three storage
+      // keys. Keep every read-modify-write cycle on one chain so simultaneous
+      // MCP closes cannot replace each other's saves.
+      this._sessionMutationLock = Promise.resolve();
+    }
+
+    _withSessionMutationLock(fn) {
+      const next = this._sessionMutationLock.then(fn, fn);
+      this._sessionMutationLock = next.catch(() => {});
+      return next;
+    }
+
+    withSessionMutationLock(fn) {
+      if (typeof fn !== 'function') return Promise.resolve(undefined);
+      return this._withSessionMutationLock(fn);
+    }
+
+    _removeInMemorySessionArtifacts(sessionIds, removeAllSessionArtifacts = false) {
+      const ids = sessionIds instanceof Set ? sessionIds : new Set(sessionIds || []);
+      const shouldRemove = sessionId => (
+        typeof sessionId === 'string' &&
+        sessionId.length > 0 &&
+        (removeAllSessionArtifacts || ids.has(sessionId))
+      );
+
+      this.logs = (this.logs || []).filter(log => !shouldRemove(log?.data?.sessionId));
+      this.actionRecords = (this.actionRecords || []).filter(record => !shouldRemove(record?.sessionId));
+
+      if (removeAllSessionArtifacts) {
+        this._domSnapshots = {};
+      } else if (this._domSnapshots) {
+        ids.forEach(sessionId => delete this._domSnapshots[sessionId]);
+      }
     }
 
     log(level, message, data = null) {
@@ -529,33 +621,67 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
     async getReplayData(sessionId) {
       const session = await this.loadSession(sessionId);
       if (!session) return null;
-      const actionRecords = this.getSessionActionRecords(sessionId);
+      let prepared = null;
+      if (globalThis.FsbLatticeReplay && typeof globalThis.FsbLatticeReplay.prepareReplay === 'function') {
+        try {
+          prepared = await globalThis.FsbLatticeReplay.prepareReplay(sessionId);
+        } catch (_e) {
+          // A temporarily unavailable offscreen host must not make persisted
+          // history disappear. Fall back to the stored manifest/history below.
+        }
+      }
+      let replayRecord = prepared?.replay || session.replay || null;
+      if (!replayRecord && globalThis.FsbLatticeReplay &&
+          typeof globalThis.FsbLatticeReplay.createLegacyReplayRecord === 'function') {
+        replayRecord = globalThis.FsbLatticeReplay.createLegacyReplayRecord(session);
+      }
+      const manifestSteps = replayRecord?.manifest?.steps;
+      const steps = Array.isArray(manifestSteps)
+        ? manifestSteps
+        : (session.actionHistory || []).map((record, index) => ({
+          id: 'legacy-step-' + String(index + 1),
+          index,
+          timestamp: record.timestamp,
+          tool: record.tool,
+          arguments: record.params || {},
+          result: record.result || {},
+          success: record.result?.success !== false,
+          replay: { risk: 'write', availability: 'approval-once', reason: 'Imported legacy action' }
+        }));
       return {
-        version: '1.0', id: sessionId,
+        version: replayRecord?.version || '1.0', id: sessionId,
         metadata: {
           task: session.task, startTime: session.startTime,
           endTime: session.endTime, status: session.status,
-          actionCount: actionRecords.length
+          actionCount: steps.length,
+          integrity: replayRecord?.integrity || 'legacy',
+          provenance: replayRecord?.provenance || 'legacy-import',
+          manifestHash: replayRecord?.manifestHash || null
         },
-        steps: actionRecords.map((record, index) => ({
+        steps: steps.map((record, index) => ({
           stepNumber: index + 1, timestamp: record.timestamp,
-          action: { tool: record.tool, params: record.params || {} },
+          action: { tool: record.tool, params: record.arguments || {} },
           targeting: {
-            selectorTried: record.selectorTried,
-            selectorUsed: record.selectorUsed,
-            elementFound: record.elementFound,
-            coordinatesUsed: record.coordinatesUsed
+            url: record.target?.url || null,
+            origin: record.target?.origin || null,
+            logicalTab: record.target?.logicalTab || 'primary'
           },
           result: {
-            success: record.success, error: record.error,
-            hadEffect: record.hadEffect, diagnostic: record.diagnostic
+            success: record.success !== false,
+            error: record.result?.error || null,
+            recorded: record.result || {}
           },
-          duration: record.duration
+          route: record.route || 'legacy',
+          capability: record.capability || null,
+          replay: record.replay || null
         })),
         summary: {
-          totalSteps: actionRecords.length,
-          successfulSteps: actionRecords.filter(r => r.success).length,
-          failedSteps: actionRecords.filter(r => !r.success).length
+          totalSteps: steps.length,
+          successfulSteps: steps.filter(r => r.success !== false).length,
+          failedSteps: steps.filter(r => r.success === false).length,
+          executableSteps: replayRecord?.counts?.executable ?? steps.length,
+          approvalRequiredSteps: replayRecord?.counts?.approvalRequired ?? 0,
+          blockedSteps: replayRecord?.counts?.blocked ?? 0
         }
       };
     }
@@ -655,11 +781,15 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
       }
     }
 
-    async persistLogs() {
+    persistLogs() {
+      return this.withSessionMutationLock(() => this._persistLogsUnlocked());
+    }
+
+    async _persistLogsUnlocked() {
       // Guard against invalidated extension context (service worker killed mid-timer)
       if (!chrome.runtime?.id) return;
       try {
-        const recentLogs = this.logs.slice(-100);
+        const recentLogs = this.logs.slice(-AUTOMATION_LOGS_PERSISTED_TAIL);
         await chrome.storage.local.set({ automationLogs: recentLogs });
       } catch (error) {
         // Only log if context is still valid (avoid noisy errors during shutdown)
@@ -674,7 +804,14 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
       if (!chrome.runtime?.id) return;
       try {
         const stored = await chrome.storage.local.get('automationLogs');
-        if (stored.automationLogs) this.logs = stored.automationLogs;
+        const persisted = Array.isArray(stored.automationLogs) ? stored.automationLogs : [];
+        if (persisted.length === 0) return;
+        // Merge, never replace: a fresh service worker has already logged its own
+        // boot entries, and the previous worker's tail is what explains the run
+        // that happened just before a restart or reload.
+        const seen = new Set(this.logs.map((entry) => (entry && entry.timestamp) + '|' + (entry && entry.message)));
+        const older = persisted.filter((entry) => entry && !seen.has(entry.timestamp + '|' + entry.message));
+        this.logs = older.concat(this.logs).slice(-this.maxLogs);
       } catch (error) {
         // Only log if context is still valid (avoid noisy errors during shutdown)
         if (chrome.runtime?.id) {
@@ -700,7 +837,11 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
       };
     }
 
-    async saveSession(sessionId, sessionData = {}) {
+    saveSession(sessionId, sessionData = {}) {
+      return this.withSessionMutationLock(() => this._saveSessionUnlocked(sessionId, sessionData));
+    }
+
+    async _saveSessionUnlocked(sessionId, sessionData = {}) {
       // Guard against invalidated extension context
       if (!chrome.runtime?.id) return false;
       try {
@@ -708,9 +849,16 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
         const persistedLogs = filterPersistedSessionLogs(sessionLogs);
         if (sessionLogs.length === 0 && persistedLogs.length === 0) return false;
 
-        const stored = await chrome.storage.local.get(['fsbSessionLogs', 'fsbSessionIndex']);
+        const stored = await chrome.storage.local.get([
+          'fsbSessionLogs',
+          'fsbSessionIndex',
+          'fsbDOMSnapshots',
+          'automationLogs'
+        ]);
         const sessionStorage = stored.fsbSessionLogs || {};
         const sessionIndex = stored.fsbSessionIndex || [];
+        const allSnapshots = stored.fsbDOMSnapshots || {};
+        const persistedAutomationLogs = Array.isArray(stored.automationLogs) ? stored.automationLogs : [];
 
         if (sessionStorage[sessionId]) {
           // APPEND MODE: Update existing session entry
@@ -724,7 +872,6 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
             existing.logs = filterPersistedSessionLogs(existing.logs.concat(newLogs));
           }
           existing.endTime = Date.now();
-          existing.status = sessionData.status || existing.status;
           existing.actionCount = sessionData.actionHistory?.length || existing.actionCount;
           existing.iterationCount = sessionData.iterationCount || existing.iterationCount;
           existing.conversationId = metadata.conversationId;
@@ -737,13 +884,17 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
           existing.totalCost = sessionData.totalCost || existing.totalCost || 0;
           existing.totalInputTokens = sessionData.totalInputTokens || existing.totalInputTokens || 0;
           existing.totalOutputTokens = sessionData.totalOutputTokens || existing.totalOutputTokens || 0;
-          existing.outcome = normalizedOutcome.outcome;
-          existing.outcomeDetails = normalizedOutcome.outcomeDetails;
-          existing.result = normalizedOutcome.result;
-          existing.completionMessage = normalizedOutcome.completionMessage;
-          existing.error = normalizedOutcome.error;
-          existing.blocker = normalizedOutcome.blocker;
-          existing.nextStep = normalizedOutcome.nextStep;
+          // Quick 260707-7id: session source discriminator + MCP client label
+          existing.mode = sessionData.mode || existing.mode || 'autopilot';
+          existing.mcpClient = sessionData.mcpClient || existing.mcpClient || null;
+          existing.taskRunId = sessionData.taskRunId || existing.taskRunId || sessionId;
+          existing.tabIds = Array.isArray(sessionData.tabIds)
+            ? sessionData.tabIds.slice()
+            : (Array.isArray(existing.tabIds) ? existing.tabIds : []);
+          existing.tabCount = Number.isFinite(sessionData.tabCount)
+            ? sessionData.tabCount
+            : (Number.isFinite(existing.tabCount) ? existing.tabCount : existing.tabIds.length);
+          applyPersistedOutcomeFields(existing, sessionData.status || existing.status, normalizedOutcome);
           // Update task to show the latest command
           if (metadata.commands.length > 1) {
             existing.task = metadata.commands.map((cmd, i) => `[${i + 1}] ${cmd}`).join(' | ');
@@ -755,7 +906,16 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
             existing.actionHistory = (sessionData.actionHistory || [])
               .filter(a => a.result?.success)
               .slice(-100)
-              .map(a => ({ tool: a.tool, params: a.params, result: a.result, timestamp: a.timestamp }));
+              .map(a => ({
+                tool: a.tool,
+                params: a.params,
+                result: a.result,
+                timestamp: a.timestamp,
+                logicalTab: a.logicalTab || 'primary'
+              }));
+          }
+          if (sessionData.replay) {
+            existing.replay = cloneReplayRecordForPersistence(sessionData.replay) || existing.replay || null;
           }
           sessionStorage[sessionId] = existing;
         } else {
@@ -771,6 +931,14 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
             endTime: Date.now(),
             status: sessionData.status || 'completed',
             tabId: sessionData.tabId || null,
+            tabIds: Array.isArray(sessionData.tabIds) ? sessionData.tabIds.slice() : [],
+            tabCount: Number.isFinite(sessionData.tabCount)
+              ? sessionData.tabCount
+              : (Array.isArray(sessionData.tabIds) ? sessionData.tabIds.length : (sessionData.tabId == null ? 0 : 1)),
+            taskRunId: sessionData.taskRunId || sessionId,
+            // Quick 260707-7id: session source discriminator + MCP client label
+            mode: sessionData.mode || 'autopilot',
+            mcpClient: sessionData.mcpClient || null,
             actionCount: sessionData.actionHistory?.length || 0,
             iterationCount: sessionData.iterationCount || 0,
             conversationId: metadata.conversationId,
@@ -791,11 +959,18 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
             blocker: normalizedOutcome.blocker,
             nextStep: normalizedOutcome.nextStep,
             logs: filterPersistedSessionLogs(sessionLogs),
+            replay: cloneReplayRecordForPersistence(sessionData.replay),
             // Persist actionHistory for session replay (successful actions only, capped at 100)
             actionHistory: (sessionData.actionHistory || [])
               .filter(a => a.result?.success)
               .slice(-100)
-              .map(a => ({ tool: a.tool, params: a.params, result: a.result, timestamp: a.timestamp }))
+              .map(a => ({
+                tool: a.tool,
+                params: a.params,
+                result: a.result,
+                timestamp: a.timestamp,
+                logicalTab: a.logicalTab || 'primary'
+              }))
           };
           sessionStorage[sessionId] = session;
         }
@@ -808,6 +983,13 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
           id: sessionId, task: savedSession.task, startTime: savedSession.startTime,
           endTime: savedSession.endTime, status: savedSession.status, actionCount: savedSession.actionCount,
           domSnapshotCount: snapshotCount,
+          // Quick 260707-7id: source badge fields (entries predating this
+          // change lack them and default to Autopilot in the UI)
+          mode: savedSession.mode || 'autopilot',
+          mcpClient: savedSession.mcpClient || null,
+          taskRunId: savedSession.taskRunId || sessionId,
+          tabIds: Array.isArray(savedSession.tabIds) ? savedSession.tabIds : [],
+          tabCount: Number.isFinite(savedSession.tabCount) ? savedSession.tabCount : 0,
           totalCost: savedSession.totalCost || 0,
           outcome: savedSession.outcome || null,
           outcomeDetails: savedSession.outcomeDetails || null,
@@ -822,20 +1004,45 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
           commandCount: savedSession.commandCount || 1,
           commands: savedSession.commands || [],
           lastTask: savedSession.lastTask || savedSession.task || null,
-          lastCommandAt: savedSession.lastCommandAt || savedSession.endTime || savedSession.startTime
+          lastCommandAt: savedSession.lastCommandAt || savedSession.endTime || savedSession.startTime,
+          replayIntegrity: savedSession.replay?.integrity || null,
+          replayProvenance: savedSession.replay?.provenance || null,
+          replayableCount: savedSession.replay?.counts?.executable || 0,
+          replayBlockedCount: savedSession.replay?.counts?.blocked || 0
         };
         const existingIndex = sessionIndex.findIndex(s => s.id === sessionId);
         if (existingIndex !== -1) sessionIndex[existingIndex] = indexEntry;
         else sessionIndex.unshift(indexEntry);
-        if (sessionIndex.length > 50) {
-          const toRemove = sessionIndex.slice(50);
-          toRemove.forEach(entry => delete sessionStorage[entry.id]);
-          sessionIndex.length = 50;
+        const cappedHistory = capPersistedSessionHistory(sessionIndex, sessionStorage);
+        const retainedSessionIndex = cappedHistory.retainedIndex;
+        const evictedIds = new Set(cappedHistory.removedIds);
+        const nextStorage = {
+          fsbSessionLogs: sessionStorage,
+          fsbSessionIndex: retainedSessionIndex
+        };
+
+        if (evictedIds.size > 0) {
+          evictedIds.forEach(id => delete allSnapshots[id]);
+          nextStorage.fsbDOMSnapshots = allSnapshots;
+          nextStorage.automationLogs = filterAutomationLogsBySession(persistedAutomationLogs, evictedIds);
         }
-        await chrome.storage.local.set({ fsbSessionLogs: sessionStorage, fsbSessionIndex: sessionIndex });
+
+        await chrome.storage.local.set(nextStorage);
+        if (evictedIds.size > 0) this._removeInMemorySessionArtifacts(evictedIds);
 
         // Persist DOM snapshots to dedicated storage key
-        await this._persistDOMSnapshots(sessionId, sessionIndex);
+        if (!evictedIds.has(sessionId)) {
+          await this._persistDOMSnapshots(sessionId, retainedSessionIndex);
+        }
+
+        if (savedSession.mode === 'mcp-agent') {
+          let retentionDays = 30;
+          try {
+            const policy = await chrome.storage.local.get('fsbMcpSessionRetentionDays');
+            retentionDays = policy?.fsbMcpSessionRetentionDays;
+          } catch (_policyError) { /* save succeeded; prune with the default */ }
+          await this._pruneMcpSessionsUnlocked(retentionDays);
+        }
 
         console.log(`[FSB Logger] Session ${sessionId} saved with ${savedSession.logs?.length || 0} total logs, ${snapshotCount} DOM snapshots`);
         return true;
@@ -844,6 +1051,101 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
           console.error('[FSB Logger] Failed to save session:', error);
         }
         return false;
+      }
+    }
+
+    pruneMcpSessions(retentionDays = 30) {
+      return this.withSessionMutationLock(() => this._pruneMcpSessionsUnlocked(retentionDays));
+    }
+
+    updateSessionOutcome(sessionId, sessionData = {}) {
+      return this.withSessionMutationLock(() => this._updateSessionOutcomeUnlocked(sessionId, sessionData));
+    }
+
+    async _updateSessionOutcomeUnlocked(sessionId, sessionData = {}) {
+      if (!chrome.runtime?.id || typeof sessionId !== 'string' || !sessionId) return false;
+      try {
+        const stored = await chrome.storage.local.get(['fsbSessionLogs', 'fsbSessionIndex']);
+        const sessionStorage = stored.fsbSessionLogs || {};
+        const sessionIndex = Array.isArray(stored.fsbSessionIndex) ? stored.fsbSessionIndex : [];
+        const session = sessionStorage[sessionId];
+        if (!session || typeof session !== 'object') return false;
+
+        const status = getPersistedTextValue(sessionData.status, session.status) || 'completed';
+        const normalized = normalizePersistedOutcomeFields(sessionData, session);
+        applyPersistedOutcomeFields(session, status, normalized);
+
+        const indexEntry = sessionIndex.find(entry => entry?.id === sessionId);
+        if (indexEntry) applyPersistedOutcomeFields(indexEntry, status, normalized);
+
+        await chrome.storage.local.set({
+          fsbSessionLogs: sessionStorage,
+          fsbSessionIndex: sessionIndex
+        });
+        return true;
+      } catch (error) {
+        if (chrome.runtime?.id) {
+          console.error('[FSB Logger] Failed to update session outcome:', error);
+        }
+        return false;
+      }
+    }
+
+    async _pruneMcpSessionsUnlocked(retentionDays = 30) {
+      if (!chrome.runtime?.id) return { removed: 0, ids: [] };
+      try {
+        let days = typeof retentionDays === 'number' ? retentionDays : parseInt(retentionDays, 10);
+        if (!Number.isFinite(days)) days = 30;
+        days = Math.min(365, Math.max(1, Math.floor(days)));
+        const cutoff = Date.now() - (days * 24 * 60 * 60 * 1000);
+        const stored = await chrome.storage.local.get([
+          'fsbSessionLogs',
+          'fsbSessionIndex',
+          'fsbDOMSnapshots',
+          'automationLogs'
+        ]);
+        const sessionStorage = stored.fsbSessionLogs || {};
+        const sessionIndex = Array.isArray(stored.fsbSessionIndex) ? stored.fsbSessionIndex : [];
+        const allSnapshots = stored.fsbDOMSnapshots || {};
+        const persistedAutomationLogs = Array.isArray(stored.automationLogs) ? stored.automationLogs : [];
+        const indexById = new Map(sessionIndex.map(entry => [entry?.id, entry]));
+        const candidateIds = new Set([...Object.keys(sessionStorage), ...indexById.keys()]);
+        const expiredIds = [];
+
+        for (const id of candidateIds) {
+          if (!id) continue;
+          // The full log entry is authoritative when both stores exist. This
+          // guarantees a stale index badge can never delete Autopilot history.
+          const record = sessionStorage[id] || indexById.get(id);
+          if (!record || record.mode !== 'mcp-agent') continue;
+          const rawTimestamp = record.endTime ?? record.startTime;
+          const timestamp = typeof rawTimestamp === 'number' ? rawTimestamp : Date.parse(rawTimestamp);
+          if (Number.isFinite(timestamp) && timestamp <= cutoff) expiredIds.push(id);
+        }
+
+        if (expiredIds.length === 0) return { removed: 0, ids: [] };
+        const expiredSet = new Set(expiredIds);
+        for (const id of expiredIds) {
+          delete sessionStorage[id];
+          delete allSnapshots[id];
+        }
+        const retainedIndex = sessionIndex.filter(entry => !expiredSet.has(entry?.id));
+        const retainedAutomationLogs = filterAutomationLogsBySession(persistedAutomationLogs, expiredSet);
+        await chrome.storage.local.set({
+          fsbSessionLogs: sessionStorage,
+          fsbSessionIndex: retainedIndex,
+          fsbDOMSnapshots: allSnapshots,
+          automationLogs: retainedAutomationLogs
+        });
+        // Keep the in-memory source of future debounced persists in sync so a
+        // timer queued after this prune cannot resurrect expired raw rows.
+        this._removeInMemorySessionArtifacts(expiredSet);
+        return { removed: expiredIds.length, ids: expiredIds };
+      } catch (error) {
+        if (chrome.runtime?.id) {
+          console.error('[FSB Logger] Failed to prune MCP sessions:', error);
+        }
+        return { removed: 0, ids: [] };
       }
     }
 
@@ -917,22 +1219,35 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
       }
     }
 
-    async deleteSession(sessionId) {
+    deleteSession(sessionId) {
+      return this.withSessionMutationLock(() => this._deleteSessionUnlocked(sessionId));
+    }
+
+    async _deleteSessionUnlocked(sessionId) {
       // Guard against invalidated extension context
-      if (!chrome.runtime?.id) return false;
+      if (!chrome.runtime?.id || typeof sessionId !== 'string' || !sessionId) return false;
       try {
-        const stored = await chrome.storage.local.get(['fsbSessionLogs', 'fsbSessionIndex', 'fsbDOMSnapshots']);
+        const stored = await chrome.storage.local.get([
+          'fsbSessionLogs',
+          'fsbSessionIndex',
+          'fsbDOMSnapshots',
+          'automationLogs'
+        ]);
         const sessionStorage = stored.fsbSessionLogs || {};
-        const sessionIndex = stored.fsbSessionIndex || [];
+        const sessionIndex = Array.isArray(stored.fsbSessionIndex) ? stored.fsbSessionIndex : [];
         const allSnapshots = stored.fsbDOMSnapshots || {};
+        const removedIds = new Set([sessionId]);
         delete sessionStorage[sessionId];
         delete allSnapshots[sessionId];
         const updatedIndex = sessionIndex.filter(s => s.id !== sessionId);
+        const retainedAutomationLogs = filterAutomationLogsBySession(stored.automationLogs, removedIds);
         await chrome.storage.local.set({
           fsbSessionLogs: sessionStorage,
           fsbSessionIndex: updatedIndex,
-          fsbDOMSnapshots: allSnapshots
+          fsbDOMSnapshots: allSnapshots,
+          automationLogs: retainedAutomationLogs
         });
+        this._removeInMemorySessionArtifacts(removedIds);
         return true;
       } catch (error) {
         return false;
@@ -971,12 +1286,23 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
       return lines.join('\n');
     }
 
-    async clearAllSessions() {
+    clearAllSessions() {
+      return this.withSessionMutationLock(() => this._clearAllSessionsUnlocked());
+    }
+
+    async _clearAllSessionsUnlocked() {
       // Guard against invalidated extension context
       if (!chrome.runtime?.id) return false;
       try {
-        await chrome.storage.local.remove(['fsbSessionLogs', 'fsbSessionIndex', 'fsbDOMSnapshots']);
-        this._domSnapshots = {};
+        const stored = await chrome.storage.local.get('automationLogs');
+        const retainedAutomationLogs = filterAutomationLogsBySession(stored.automationLogs, [], true);
+        await chrome.storage.local.set({
+          fsbSessionLogs: {},
+          fsbSessionIndex: [],
+          fsbDOMSnapshots: {},
+          automationLogs: retainedAutomationLogs
+        });
+        this._removeInMemorySessionArtifacts([], true);
         return true;
       } catch (error) {
         return false;

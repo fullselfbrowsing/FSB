@@ -2,8 +2,263 @@ import { PLATFORMS, resolvePlatformTarget, getEntryForPlatform } from './platfor
 import { installToConfig, removeFromConfig, serializeByFormat } from './config-writer.js';
 import { FSB_MCP_VERSION, FSB_SERVER_NAME } from './version.js';
 import { execSync } from 'node:child_process';
-const STDIO_COMMAND = 'npx -y fsb-mcp-server';
-const WINDOWS_STDIO_COMMAND = 'cmd /c npx -y fsb-mcp-server';
+import { homedir } from 'node:os';
+import { isNativeHostExtensionId, } from './native-host/constants.js';
+import { installNativeHost, uninstallNativeHost, } from './native-host-install/index.js';
+import { isNativeHostBrowser } from './native-host-install/browser.js';
+import { resolveNativeHostPlatformLayout } from './native-host-install/platform.js';
+const STDIO_COMMAND = 'npx -y fsb-mcp-server@latest';
+const WINDOWS_STDIO_COMMAND = 'cmd /c npx -y fsb-mcp-server@latest';
+const NATIVE_HOST_INSTALL_USAGE = 'Usage: fsb-mcp-server install --native-host [--browser <chrome|edge|brave|chromium>] [--extension-id <32 lowercase a-p chars>]';
+const NATIVE_HOST_UNINSTALL_USAGE = 'Usage: fsb-mcp-server uninstall --native-host [--browser <chrome|edge|brave|chromium>]';
+const NATIVE_HOST_REFUSAL_REASONS = new Set([
+    'boundary-changed',
+    'foreign-state',
+    'install-failed',
+    'invalid-materialized-package',
+    'invalid-pack-receipt',
+    'invalid-request',
+    'invalid-source-package',
+    'invalid-state',
+    'network-attempted',
+    'ownership-mismatch',
+    'pack-failed',
+    'process-output-exceeded',
+    'publication-failed',
+    'registration-publish-failed',
+    'registration-remove-failed',
+    'registry-key-cleanup-failed',
+    'registry-key-not-exact',
+    'registry-shadow',
+    'runtime-remove-failed',
+    'split-state',
+    'stable-root-not-absent',
+    'stage-failed',
+    'tarball-integrity-mismatch',
+    'unavailable',
+    'unsupported-architecture',
+    'version-mismatch',
+]);
+function expectedNativeHostLocation() {
+    if (!['darwin', 'linux', 'win32'].includes(process.platform))
+        return 'Unavailable';
+    try {
+        return resolveNativeHostPlatformLayout({
+            platform: process.platform,
+            homeDirectory: homedir(),
+            ...(process.platform === 'win32'
+                ? { localAppData: process.env.LOCALAPPDATA }
+                : {}),
+        }).manifestPath;
+    }
+    catch {
+        return 'Unavailable';
+    }
+}
+const unavailableNativeHostCliOperations = Object.freeze({
+    install: async () => Object.freeze({
+        status: 'refused',
+        reason: 'unavailable',
+        location: expectedNativeHostLocation(),
+        origin: null,
+        packageVersion: null,
+    }),
+    uninstall: async () => Object.freeze({
+        status: 'refused',
+        reason: 'unavailable',
+        location: expectedNativeHostLocation(),
+        origin: null,
+        packageVersion: null,
+    }),
+});
+export function createNativeHostCliOperations(dependencies) {
+    return Object.freeze({
+        install: (request) => installNativeHost(request, dependencies),
+        uninstall: (request = {}) => {
+            const browser = request.browser ?? 'chrome';
+            if (browser !== dependencies.platform.layout.browser) {
+                return Promise.resolve(Object.freeze({
+                    status: 'refused',
+                    reason: 'invalid-request',
+                    location: dependencies.platform.layout.manifestPath,
+                    origin: null,
+                    packageVersion: null,
+                }));
+            }
+            return uninstallNativeHost(dependencies);
+        },
+    });
+}
+function nativeHostTargetRequested(flags) {
+    return Boolean(flags && typeof flags === 'object' && Object.hasOwn(flags, 'native-host'));
+}
+function exactNativeFlags(flags, allowedKeys) {
+    try {
+        if (!flags || typeof flags !== 'object' || Array.isArray(flags))
+            return null;
+        if (Object.getPrototypeOf(flags) !== Object.prototype)
+            return null;
+        const keys = Reflect.ownKeys(flags);
+        if (keys.length < 1
+            || keys.some((key) => typeof key !== 'string' || !allowedKeys.includes(key))) {
+            return null;
+        }
+        const values = Object.create(null);
+        for (const key of keys) {
+            const descriptor = Object.getOwnPropertyDescriptor(flags, key);
+            if (typeof key !== 'string'
+                || !descriptor
+                || !descriptor.enumerable
+                || !Object.hasOwn(descriptor, 'value')) {
+                return null;
+            }
+            values[key] = descriptor.value;
+        }
+        return values;
+    }
+    catch {
+        return null;
+    }
+}
+function nativeInstallRequest(flags) {
+    const values = exactNativeFlags(flags, ['native-host', 'browser', 'extension-id']);
+    if (!values || values['native-host'] !== true)
+        return null;
+    const browser = Object.hasOwn(values, 'browser') ? values.browser : undefined;
+    const extensionId = Object.hasOwn(values, 'extension-id') ? values['extension-id'] : undefined;
+    if (browser !== undefined
+        && !isNativeHostBrowser(browser))
+        return null;
+    if (extensionId !== undefined
+        && (typeof extensionId !== 'string' || !isNativeHostExtensionId(extensionId)))
+        return null;
+    return Object.freeze({
+        ...(browser !== undefined ? { browser: browser } : {}),
+        ...(extensionId !== undefined ? { extensionId } : {}),
+    });
+}
+function nativeUninstallRequest(flags) {
+    const values = exactNativeFlags(flags, ['native-host', 'browser']);
+    if (!values || values['native-host'] !== true)
+        return null;
+    if (!Object.hasOwn(values, 'browser'))
+        return Object.freeze({});
+    const browser = values.browser;
+    if (!isNativeHostBrowser(browser))
+        return null;
+    return Object.freeze({ browser: browser });
+}
+function rejectNativeUsage(usage) {
+    console.error(usage);
+    process.exitCode = 1;
+}
+function boundedNativeLocation(value) {
+    return typeof value === 'string'
+        && value.length > 0
+        && Buffer.byteLength(value, 'utf8') <= 4096
+        && !/[\u0000-\u001f\u007f-\u009f]/u.test(value)
+        ? value
+        : 'Unavailable';
+}
+function exactNativeOrigin(value) {
+    if (typeof value !== 'string'
+        || !value.startsWith('chrome-extension://')
+        || !value.endsWith('/')) {
+        return null;
+    }
+    const extensionId = value.slice('chrome-extension://'.length, -1);
+    return isNativeHostExtensionId(extensionId) ? value : null;
+}
+function stableNativeRefusalReason(value) {
+    return typeof value === 'string' && NATIVE_HOST_REFUSAL_REASONS.has(value)
+        ? value
+        : 'unavailable';
+}
+function printNativeHostRefusal(reasonValue, locationValue) {
+    console.error(`Native messaging host was not changed: ${stableNativeRefusalReason(reasonValue)}`);
+    console.error(`Expected location: ${boundedNativeLocation(locationValue)}`);
+    console.error('Run npx -y fsb-mcp-server@latest doctor for repair details.');
+    process.exitCode = 1;
+}
+function exactNativeReceipt(value) {
+    const expectedKeys = ['location', 'origin', 'packageVersion', 'reason', 'status'];
+    try {
+        if (!value || typeof value !== 'object' || Array.isArray(value))
+            return null;
+        if (Object.getPrototypeOf(value) !== Object.prototype)
+            return null;
+        const keys = Reflect.ownKeys(value);
+        if (keys.length !== expectedKeys.length
+            || keys.some((key) => typeof key !== 'string' || !expectedKeys.includes(key))) {
+            return null;
+        }
+        const fields = Object.create(null);
+        for (const key of keys) {
+            const descriptor = Object.getOwnPropertyDescriptor(value, key);
+            if (typeof key !== 'string'
+                || !descriptor
+                || !descriptor.enumerable
+                || !Object.hasOwn(descriptor, 'value')) {
+                return null;
+            }
+            fields[key] = descriptor.value;
+        }
+        return fields;
+    }
+    catch {
+        return null;
+    }
+}
+function printNativeInstallResult(result) {
+    const receipt = exactNativeReceipt(result);
+    if (!receipt) {
+        printNativeHostRefusal('unavailable', 'Unavailable');
+        return;
+    }
+    const location = boundedNativeLocation(receipt.location);
+    const origin = exactNativeOrigin(receipt.origin);
+    if (receipt.status === 'refused') {
+        printNativeHostRefusal(receipt.reason, receipt.location);
+        return;
+    }
+    if (location === 'Unavailable'
+        || !origin
+        || (receipt.status !== 'installed' && receipt.status !== 'already-installed')) {
+        printNativeHostRefusal('unavailable', location);
+        return;
+    }
+    console.log(receipt.status === 'installed'
+        ? 'Native messaging host installed.'
+        : 'Native messaging host is already installed.');
+    console.log(`Expected location: ${location}`);
+    console.log(`Allowed origin: ${origin}`);
+}
+function printNativeUninstallResult(result) {
+    const receipt = exactNativeReceipt(result);
+    if (!receipt) {
+        printNativeHostRefusal('unavailable', 'Unavailable');
+        return;
+    }
+    const location = boundedNativeLocation(receipt.location);
+    if (receipt.status === 'refused') {
+        printNativeHostRefusal(receipt.reason, receipt.location);
+        return;
+    }
+    if (location === 'Unavailable'
+        || (receipt.status !== 'removed' && receipt.status !== 'not-installed')) {
+        printNativeHostRefusal('unavailable', location);
+        return;
+    }
+    if (receipt.status === 'removed') {
+        console.log('Native messaging host removed.');
+        console.log('Removed: 1');
+    }
+    else {
+        console.log('Native messaging host is not installed.');
+        console.log('Removed: 0');
+    }
+    console.log(`Expected location: ${location}`);
+}
 export function getClaudeCodeInstallCommand() {
     return 'claude mcp add --scope user ' + FSB_SERVER_NAME + ' -- ' + STDIO_COMMAND;
 }
@@ -70,7 +325,7 @@ function printPlatformInstructions(platformKey) {
             console.log('  1. Open Settings > Tools > AI Assistant > MCP Servers');
             console.log('  2. Click "+" to add a new server');
             console.log('  3. Set the command to: npx');
-            console.log('  4. Set the arguments to: -y fsb-mcp-server');
+            console.log('  4. Set the arguments to: -y fsb-mcp-server@latest');
             console.log('  5. Name it: fsb');
             console.log('  Supported IDEs: IntelliJ, WebStorm, PyCharm, GoLand, Android Studio, etc.');
             break;
@@ -78,7 +333,7 @@ function printPlatformInstructions(platformKey) {
             console.log('');
             console.log('ChatGPT (Streamable HTTP -- remote only):');
             console.log('  1. Start the FSB HTTP server:');
-            console.log('     npx -y fsb-mcp-server serve');
+            console.log('     npx -y fsb-mcp-server@latest serve');
             console.log('  2. In ChatGPT, go to Settings > Connections > MCP');
             console.log('  3. Add a new MCP server with URL:');
             console.log('     http://127.0.0.1:7226/mcp');
@@ -88,7 +343,7 @@ function printPlatformInstructions(platformKey) {
             console.log('');
             console.log('Claude.ai (Streamable HTTP -- remote only):');
             console.log('  1. Start the FSB HTTP server:');
-            console.log('     npx -y fsb-mcp-server serve');
+            console.log('     npx -y fsb-mcp-server@latest serve');
             console.log('  2. In Claude.ai, open the integrations UI');
             console.log('  3. Add a new MCP server with URL:');
             console.log('     http://127.0.0.1:7226/mcp');
@@ -99,7 +354,7 @@ function printPlatformInstructions(platformKey) {
             console.log('Warp Terminal:');
             console.log('  1. Open Warp and go to the MCP management UI');
             console.log('  2. Add a new MCP server');
-            console.log('  3. Set the command to: npx -y fsb-mcp-server');
+            console.log('  3. Set the command to: npx -y fsb-mcp-server@latest');
             console.log('  4. Name it: fsb');
             break;
         default:
@@ -121,7 +376,7 @@ export function getSetupSections(httpEndpoint, cursorDeeplink) {
             title: 'Local HTTP endpoint',
             lines: [
                 '1. Start the server:',
-                '  npx -y fsb-mcp-server serve',
+                '  npx -y fsb-mcp-server@latest serve',
                 '2. Use this endpoint in any Streamable HTTP-capable client:',
                 '  ' + httpEndpoint,
             ],
@@ -144,7 +399,7 @@ export function getSetupSections(httpEndpoint, cursorDeeplink) {
                 '    "mcpServers": {',
                 '      "fsb": {',
                 '        "command": "npx",',
-                '        "args": ["-y", "fsb-mcp-server"]',
+                '        "args": ["-y", "fsb-mcp-server@latest"]',
                 '      }',
                 '    }',
                 '  }',
@@ -159,7 +414,7 @@ export function getSetupSections(httpEndpoint, cursorDeeplink) {
                 'Add:',
                 '  [mcp_servers.fsb]',
                 '  command = "npx"',
-                '  args = ["-y", "fsb-mcp-server"]',
+                '  args = ["-y", "fsb-mcp-server@latest"]',
                 'Next step:',
                 '  ' + getInstallNextStep('codex'),
             ],
@@ -174,7 +429,7 @@ export function getSetupSections(httpEndpoint, cursorDeeplink) {
                 '      "fsb": {',
                 '        "type": "stdio",',
                 '        "command": "npx",',
-                '        "args": ["-y", "fsb-mcp-server"]',
+                '        "args": ["-y", "fsb-mcp-server@latest"]',
                 '      }',
                 '    }',
                 '  }',
@@ -191,7 +446,7 @@ export function getSetupSections(httpEndpoint, cursorDeeplink) {
                 '    "mcpServers": {',
                 '      "fsb": {',
                 '        "command": "npx",',
-                '        "args": ["-y", "fsb-mcp-server"]',
+                '        "args": ["-y", "fsb-mcp-server@latest"]',
                 '      }',
                 '    }',
                 '  }',
@@ -212,7 +467,7 @@ export function getSetupSections(httpEndpoint, cursorDeeplink) {
                 '    "mcpServers": {',
                 '      "fsb": {',
                 '        "command": "npx",',
-                '        "args": ["-y", "fsb-mcp-server"]',
+                '        "args": ["-y", "fsb-mcp-server@latest"]',
                 '      }',
                 '    }',
                 '  }',
@@ -230,7 +485,7 @@ export function getSetupSections(httpEndpoint, cursorDeeplink) {
                 '    "mcpServers": {',
                 '      "fsb": {',
                 '        "command": "npx",',
-                '        "args": ["-y", "fsb-mcp-server"]',
+                '        "args": ["-y", "fsb-mcp-server@latest"]',
                 '      }',
                 '    }',
                 '  }',
@@ -247,7 +502,7 @@ export function getSetupSections(httpEndpoint, cursorDeeplink) {
                 '    "mcpServers": {',
                 '      "fsb": {',
                 '        "command": "npx",',
-                '        "args": ["-y", "fsb-mcp-server"]',
+                '        "args": ["-y", "fsb-mcp-server@latest"]',
                 '      }',
                 '    }',
                 '  }',
@@ -266,7 +521,7 @@ export function getSetupSections(httpEndpoint, cursorDeeplink) {
                 '      cmd: npx',
                 '      args:',
                 '        - "-y"',
-                '        - fsb-mcp-server',
+                '        - fsb-mcp-server@latest',
                 'Next step:',
                 '  ' + getInstallNextStep('goose'),
             ],
@@ -280,7 +535,7 @@ export function getSetupSections(httpEndpoint, cursorDeeplink) {
                 '    "mcpServers": {',
                 '      "fsb": {',
                 '        "command": "npx",',
-                '        "args": ["-y", "fsb-mcp-server"]',
+                '        "args": ["-y", "fsb-mcp-server@latest"]',
                 '      }',
                 '    }',
                 '  }',
@@ -297,7 +552,7 @@ export function getSetupSections(httpEndpoint, cursorDeeplink) {
                 '    "mcpServers": {',
                 '      "fsb": {',
                 '        "command": "npx",',
-                '        "args": ["-y", "fsb-mcp-server"]',
+                '        "args": ["-y", "fsb-mcp-server@latest"]',
                 '      }',
                 '    }',
                 '  }',
@@ -314,7 +569,7 @@ export function getSetupSections(httpEndpoint, cursorDeeplink) {
                 '    "mcpServers": {',
                 '      "fsb": {',
                 '        "command": "npx",',
-                '        "args": ["-y", "fsb-mcp-server"]',
+                '        "args": ["-y", "fsb-mcp-server@latest"]',
                 '      }',
                 '    }',
                 '  }',
@@ -331,7 +586,7 @@ export function getSetupSections(httpEndpoint, cursorDeeplink) {
                 '    "mcp": {',
                 '      "fsb": {',
                 '        "type": "local",',
-                '        "command": ["npx", "-y", "fsb-mcp-server"]',
+                '        "command": ["npx", "-y", "fsb-mcp-server@latest"]',
                 '      }',
                 '    }',
                 '  }',
@@ -345,7 +600,7 @@ export function getSetupSections(httpEndpoint, cursorDeeplink) {
                 'Open Settings > Tools > AI Assistant > MCP Servers',
                 'Add a new server with:',
                 '  Command: npx',
-                '  Arguments: -y fsb-mcp-server',
+                '  Arguments: -y fsb-mcp-server@latest',
                 '  Name: fsb',
                 'Supported IDEs: IntelliJ, WebStorm, PyCharm, GoLand, Android Studio, etc.',
                 'Next step:',
@@ -355,7 +610,7 @@ export function getSetupSections(httpEndpoint, cursorDeeplink) {
         {
             title: 'ChatGPT (Streamable HTTP)',
             lines: [
-                '1. Start the server: npx -y fsb-mcp-server serve',
+                '1. Start the server: npx -y fsb-mcp-server@latest serve',
                 '2. In ChatGPT Settings > Connections > MCP, add:',
                 '   ' + httpEndpoint,
                 'Next step:',
@@ -365,7 +620,7 @@ export function getSetupSections(httpEndpoint, cursorDeeplink) {
         {
             title: 'Claude.ai (Streamable HTTP)',
             lines: [
-                '1. Start the server: npx -y fsb-mcp-server serve',
+                '1. Start the server: npx -y fsb-mcp-server@latest serve',
                 '2. In Claude.ai integrations UI, add:',
                 '   ' + httpEndpoint,
                 'Next step:',
@@ -376,7 +631,7 @@ export function getSetupSections(httpEndpoint, cursorDeeplink) {
             title: 'Warp Terminal',
             lines: [
                 'Open the MCP management UI in Warp',
-                'Add server with command: npx -y fsb-mcp-server',
+                'Add server with command: npx -y fsb-mcp-server@latest',
                 'Name: fsb',
                 'Next step:',
                 '  ' + getInstallNextStep('warp'),
@@ -399,8 +654,8 @@ export function getSetupSections(httpEndpoint, cursorDeeplink) {
         {
             title: 'Troubleshooting first',
             lines: [
-                '1. npx -y fsb-mcp-server doctor',
-                '2. npx -y fsb-mcp-server status --watch',
+                '1. npx -y fsb-mcp-server@latest doctor',
+                '2. npx -y fsb-mcp-server@latest status --watch',
                 'Use these before restarting or reinstalling any client.',
             ],
         },
@@ -617,7 +872,21 @@ function getTargetPlatform(target) {
  *
  * @param flags - Parsed CLI flags (platform keys mapped to boolean)
  */
-export async function runInstall(flags) {
+export async function runInstall(flags, nativeHostOperations = unavailableNativeHostCliOperations) {
+    if (nativeHostTargetRequested(flags)) {
+        const request = nativeInstallRequest(flags);
+        if (!request) {
+            rejectNativeUsage(NATIVE_HOST_INSTALL_USAGE);
+            return;
+        }
+        try {
+            printNativeInstallResult(await nativeHostOperations.install(request));
+        }
+        catch {
+            printNativeHostRefusal('unavailable', expectedNativeHostLocation());
+        }
+        return;
+    }
     // Handle --list before anything else
     if (flags['list'] === true) {
         printPlatformListDetailed();
@@ -712,7 +981,21 @@ export async function runInstall(flags) {
  *
  * @param flags - Parsed CLI flags (platform keys mapped to boolean)
  */
-export async function runUninstall(flags) {
+export async function runUninstall(flags, nativeHostOperations = unavailableNativeHostCliOperations) {
+    if (nativeHostTargetRequested(flags)) {
+        const request = nativeUninstallRequest(flags);
+        if (!request) {
+            rejectNativeUsage(NATIVE_HOST_UNINSTALL_USAGE);
+            return;
+        }
+        try {
+            printNativeUninstallResult(await nativeHostOperations.uninstall(request));
+        }
+        catch {
+            printNativeHostRefusal('unavailable', expectedNativeHostLocation());
+        }
+        return;
+    }
     // Capture --all before expansion (Pitfall 4)
     const isAll = flags['all'] === true;
     // --all expansion: set all platform keys EXCEPT instructions-only platforms

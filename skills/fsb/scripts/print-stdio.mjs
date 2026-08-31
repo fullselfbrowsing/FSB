@@ -7,7 +7,7 @@ const BLOCK = `{
   "mcpServers": {
     "fsb": {
       "command": "npx",
-      "args": ["-y", "fsb-mcp-server"]
+      "args": ["-y", "fsb-mcp-server@latest"]
     }
   }
 }
@@ -25,7 +25,7 @@ try {
     Array.isArray(parsed.mcpServers.fsb.args) &&
     parsed.mcpServers.fsb.args.length === 2 &&
     parsed.mcpServers.fsb.args[0] === '-y' &&
-    parsed.mcpServers.fsb.args[1] === 'fsb-mcp-server';
+    parsed.mcpServers.fsb.args[1] === 'fsb-mcp-server@latest';
   if (!ok) {
     process.stderr.write('[FAIL] BLOCK constant is not valid JSON or has drifted\n');
     process.exit(1);

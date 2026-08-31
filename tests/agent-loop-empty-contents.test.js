@@ -60,9 +60,19 @@ function assert(cond, msg) {
 function makeProviderInstance(keyField) {
   return {
     config: { keyField: keyField || 'apiKey' },
-    settings: { apiKey: 'sk-test', geminiApiKey: 'sk-test', anthropicApiKey: 'sk-test' },
+    settings: {
+      apiKey: 'sk-test',
+      geminiApiKey: 'sk-test',
+      anthropicApiKey: 'sk-test',
+      lmstudioBaseUrl: 'http://localhost:1234'
+    },
     model: 'fake-model',
   };
+}
+
+function hasUserTurn(body) {
+  return !!body && Array.isArray(body.messages)
+    && body.messages.some(m => m && m.role === 'user');
 }
 
 async function run() {
@@ -95,7 +105,55 @@ async function run() {
   lastCapturedRequestBody = null;
   await callProviderWithTools(makeProviderInstance('apiKey'), 'grok-4-1-fast', null, systemMessages, tools, 'xai');
   assert(lastCapturedRequestBody && Array.isArray(lastCapturedRequestBody.messages), 'xai request has messages array (Phase 7 bridge envelope)');
-  assert(lastCapturedRequestBody && lastCapturedRequestBody.messages.length > 0, 'xai messages is non-empty');
+  // A system-only array already satisfies `length > 0`, so the count alone never
+  // proved anything. Assert the user turn itself.
+  assert(hasUserTurn(lastCapturedRequestBody), 'xai messages carry a real user turn');
+
+  // LM Studio serves Qwen 3 through a local Jinja chat template that returns
+  // 400 "No user query found in messages." for ANY turn without a user message.
+  // Both agent-loop shapes hit that: iteration 1 is system-only (the task lives
+  // in the system prompt) and iterations 2+ are system + assistant/tool.
+  console.log('\n--- LM Studio: system-only conversation seeds starter user turn ---');
+  lastCapturedRequestBody = null;
+  await callProviderWithTools(makeProviderInstance('apiKey'), 'qwen/qwen3.6-27b', null, systemMessages, tools, 'lmstudio');
+  assert(lastCapturedRequestBody && Array.isArray(lastCapturedRequestBody.messages), 'lmstudio request has messages array');
+  assert(hasUserTurn(lastCapturedRequestBody), 'lmstudio system-only turn is seeded with a user message');
+  assert(lastCapturedRequestBody.messages[0].role === 'system', 'lmstudio seed is inserted after the system message');
+
+  console.log('\n--- LM Studio: assistant/tool-only conversation seeds starter user turn ---');
+  const toolOnlyConversation = [
+    { role: 'system', content: 'TASK: play sunflower on youtube' },
+    {
+      role: 'assistant',
+      content: '',
+      tool_calls: [{ id: 'call_1', type: 'function', function: { name: 'read_page', arguments: '{}' } }]
+    },
+    { role: 'tool', tool_call_id: 'call_1', name: 'read_page', content: '{"success":true}' }
+  ];
+  lastCapturedRequestBody = null;
+  await callProviderWithTools(makeProviderInstance('apiKey'), 'qwen/qwen3.6-27b', null, toolOnlyConversation, tools, 'lmstudio');
+  assert(hasUserTurn(lastCapturedRequestBody), 'lmstudio assistant/tool turn is seeded with a user message');
+  const seeded = lastCapturedRequestBody.messages;
+  const userIdx = seeded.findIndex(m => m && m.role === 'user');
+  const assistantIdx = seeded.findIndex(m => m && m.role === 'assistant');
+  const toolIdx = seeded.findIndex(m => m && m.role === 'tool');
+  assert(userIdx < assistantIdx, 'seeded user turn precedes the assistant tool_calls turn');
+  assert(toolIdx === assistantIdx + 1, 'assistant tool_calls -> tool result stay adjacent after seeding');
+
+  console.log('\n--- LM Studio: existing user turn is left alone ---');
+  lastCapturedRequestBody = null;
+  await callProviderWithTools(
+    makeProviderInstance('apiKey'),
+    'qwen/qwen3.6-27b',
+    null,
+    [{ role: 'system', content: 'TASK: x' }, { role: 'user', content: 'real user message' }],
+    tools,
+    'lmstudio'
+  );
+  assert(
+    lastCapturedRequestBody.messages.filter(m => m && m.role === 'user').length === 1,
+    'lmstudio does not seed a duplicate user turn when one already exists'
+  );
 
   console.log('\n--- Summary ---');
   console.log('  Passed:', passed);

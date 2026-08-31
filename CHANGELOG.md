@@ -1,12 +1,16 @@
 # Changelog
 
-All notable changes to the FSB product (Chrome extension + showcase dashboard) are documented in this file. Entries are organized by FSB milestone. The extension version is `0.9.90`; milestone versions such as `v0.11.0` and `v0.12.0` are the meaningful release units.
+All notable changes to the FSB product (Chrome extension + showcase dashboard) are documented in this file. Entries are organized by FSB milestone. The extension version is `0.9.91`; milestone versions such as `v0.11.0` and `v0.12.0` are the meaningful release units.
 
-The `fsb-mcp-server` npm package keeps its own semver changelog in [`mcp/CHANGELOG.md`](./mcp/CHANGELOG.md).
+The independently published `fsb-mcp-server` npm package keeps its own semver changelog in [`mcp/CHANGELOG.md`](./mcp/CHANGELOG.md).
 
 ## [Unreleased]
 
 Nothing yet.
+
+## v0.9.91 — Version Metadata Alignment — 2026-07-14
+
+The extension, showcase, skill, documentation, and store metadata align at `0.9.91`. The independently versioned `fsb-mcp-server` advances to `0.11.0` for the `mcp:task-status` terminal task-outcome contract; see [`mcp/CHANGELOG.md`](./mcp/CHANGELOG.md) for its package-specific release notes and compatibility requirements.
 
 ## v0.9.90 — Native Capability Catalog, Trigger Watchers, Control Panel Redesign & Onboarding — 2026-07-06
 
@@ -119,7 +123,7 @@ A brand-new guided setup on first install:
 - **`list_triggers` status filter accepts the full persisted set.** The optional `status` enum now allows `armed`, `needs_attention`, `blocked`, `fired`, `timed_out`, and `stopped`; `needs_attention` and `timed_out` were previously rejected at the schema gate. Kept in parity between the extension and MCP tool definitions. (`1d23c56c`)
 - **Background-tab automation errors route to their owning tab only.** A session failing in a background tab now clears that tab's per-tab running state without disturbing the active tab's UI, matching the `automationComplete` routing contract. (`ace4528b`)
 
-## v0.12.0 — PhantomStream Package Migration — 2026-06-17
+## Engineering milestone 0.12.0 — PhantomStream Package Migration — 2026-06-17
 
 Migrates FSB's dashboard DOM live-preview from FSB-owned generic stream engines to the pinned, published `@full-self-browsing/phantom-stream@0.1.0` package.
 
@@ -134,7 +138,7 @@ Migrates FSB's dashboard DOM live-preview from FSB-owned generic stream engines 
 
 - Live-browser UAT for dashboard preview fidelity, navigation/reconnect recovery, restricted tabs, large pages, security masking, and remote-control usability remains `human_needed` (automated protocol and source-contract tests pass).
 
-## v0.11.0 — Trigger Tool (Reactive DOM Monitoring) — 2026-06-17
+## Engineering milestone 0.11.0 — Trigger Tool (Reactive DOM Monitoring) — 2026-06-17
 
 Adds reactive DOM monitoring: an agent arms a watch on one element and is notified when a condition is met, without server-side polling.
 
@@ -151,6 +155,6 @@ Adds reactive DOM monitoring: an agent arms a watch on one element and is notifi
 
 - Live-browser composed trigger UAT (multiple interacting watches on real pages) and publish/tag/release actions.
 
-## v0.10.0 — Autopilot via Lattice SDK — 2026-06-15
+## Engineering milestone 0.10.0 — Autopilot via Lattice SDK — 2026-06-15
 
 Shipped 2026-06-15: FSB's agent runtime, providers, and MV3 survivability moved onto the public Lattice SDK. See the `v0.10.0` git tag for detail; MCP-specific history is in [`mcp/CHANGELOG.md`](./mcp/CHANGELOG.md).

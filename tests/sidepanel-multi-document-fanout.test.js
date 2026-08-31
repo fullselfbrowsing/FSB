@@ -485,7 +485,9 @@ ok(terminalsB_inA.length === 0,
 
 console.log('\nScenario C -- boot getStatus carries activeTabId (C2 contract):');
 
-ok(spSrc.indexOf("action: 'getStatus', activeTabId") !== -1,
+// Boot now routes through the unified syncActiveTabSurface(), whose getStatus
+// payload is the multi-line object pinned by ownership-leakage-regression.
+ok(spSrc.indexOf("action: 'getStatus',\n          activeTabId: incomingTabId") !== -1,
    'C.1 -- boot getStatus call payload includes activeTabId');
 
 console.log('\n' + passed + ' PASS / ' + failed + ' FAIL');

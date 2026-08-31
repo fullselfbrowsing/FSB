@@ -113,6 +113,12 @@
     var c = (typeof globalThis !== 'undefined' && globalThis.chrome) ? globalThis.chrome : null;
     return (c && c.debugger) ? c.debugger : null;
   }
+  function _cdpLease() {
+    if (typeof globalThis !== 'undefined' && globalThis.FsbCdpLease) {
+      return globalThis.FsbCdpLease;
+    }
+    return _requireSibling('./cdp-lease.js');
+  }
   // The Input-op owner (KeyboardEmulator). Present in the SW; absent under Node.
   // Used ONLY on the release side to avoid detaching out from under an Input op.
   function _keyboardEmulator() {
@@ -291,12 +297,25 @@
       return { ok: false, reason: 'RECIPE_CAPTURE_UNAVAILABLE' };
     }
 
+    // Hold the same per-tab FIFO lease used by screenshots and Input/DOM CDP
+    // operations for the entire time-boxed discovery session.
+    var cdpLease = null;
+    var leaseApi = _cdpLease();
+    if (leaseApi && typeof leaseApi.acquire === 'function') {
+      try {
+        cdpLease = await leaseApi.acquire(tabId, { timeoutMs: 10000 });
+      } catch (_leaseErr) {
+        return { ok: false, reason: 'RECIPE_CAPTURE_BUSY' };
+      }
+    }
+
     // Collision-safe attach (MIRRORED from bg.js:13920-13935), REUSING the
     // existing Input-domain attachment -- NO manifest change (D-02).
     var attachResult;
     try {
       attachResult = await _collisionSafeAttach(dbg, tabId);
     } catch (attachErr) {
+      if (cdpLease) { cdpLease.release(); }
       return { ok: false, reason: 'RECIPE_CAPTURE_ATTACH_FAILED' };
     }
 
@@ -311,6 +330,7 @@
           await _detach(dbg, tabId);
         }
       }
+      if (cdpLease) { cdpLease.release(); }
       return { ok: false, reason: 'RECIPE_CAPTURE_ENABLE_FAILED' };
     }
 
@@ -323,6 +343,7 @@
       remaining: maxCount,
       maxCount: maxCount,
       weAttached: !!(attachResult && attachResult.weAttached),
+      cdpLease: cdpLease,
       calls: new Map(),
       detachListener: null,
       timer: null
@@ -412,10 +433,14 @@
     // detach below) sees no session and is a no-op.
     _session = null;
 
-    // Release the Network domain (KEEP the attachment) -- best-effort, fire and
-    // forget (we do not await in this synchronous teardown).
+    // Release the Network domain and any owned debugger attachment in order.
+    // endSession remains synchronous for its callers, but the per-tab lease is
+    // held until this best-effort cleanup chain actually settles.
+    var releaseChain = Promise.resolve();
     if (dbg && typeof dbg.sendCommand === 'function' && session.tabId != null) {
-      try { _send(dbg, session.tabId, 'Network.disable', {}); } catch (_e) { /* best-effort */ }
+      releaseChain = releaseChain.then(function() {
+        return _send(dbg, session.tabId, 'Network.disable', {});
+      }).catch(function() { /* best-effort */ });
     }
 
     // Detach the tab ONLY if capture was the attaching owner AND no Input op
@@ -425,8 +450,16 @@
       var ke = _keyboardEmulator();
       var inputHolds = !!(ke && typeof ke.isAttachedTo === 'function' && ke.isAttachedTo(session.tabId));
       if (!inputHolds) {
-        try { _detach(dbg, session.tabId); } catch (_e) { /* best-effort */ }
+        releaseChain = releaseChain.then(function() {
+          return _detach(dbg, session.tabId);
+        }).catch(function() { /* best-effort */ });
       }
+    }
+
+    if (session.cdpLease && typeof session.cdpLease.release === 'function') {
+      releaseChain.finally(function() {
+        try { session.cdpLease.release(); } catch (_e) { /* best-effort */ }
+      });
     }
 
     return collected;

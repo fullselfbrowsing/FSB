@@ -171,6 +171,12 @@ function createChromeStorageSessionMock() {
   passAssertEqual(snap.kind, 'survivability-snapshot', 'serialize produces SerializedSnapshot envelope');
   passAssertEqual(snap.version, 'lattice-survivability/v1', 'serialize version literal matches Lattice contract');
   passAssertEqual(JSON.stringify(adapter.deserialize(snap)), JSON.stringify(stateA), 'deserialize round-trips state byte-equal');
+  const secretSnap = adapter.serialize({ ownershipToken: 'must-not-persist', manifestHash: 'safe-hash' });
+  const secretRestored = adapter.deserialize(secretSnap);
+  passAssertEqual(secretRestored.ownershipToken, '[REDACTED_BY_LATTICE_ADAPTER]',
+    'ownership tokens are redacted from survivability snapshots');
+  passAssertEqual(secretRestored.manifestHash, 'safe-hash',
+    'stable replay identifiers remain available after snapshot redaction');
 
   // ---- Part 2b: ResumePolicy dispatch over the FSB-attempt-1 marker vocabulary ----
   console.log('\n--- Part 2b: ResumePolicy dispatch ---');
@@ -284,6 +290,49 @@ function createChromeStorageSessionMock() {
   unsub();
   await adapter.fireEvictionHooks({ smoke: 'state-2' });
   passAssertEqual(hookCalled, 1, 'unsubscribed hook does not fire again');
+
+  // Replay checkpoints use two exact A/B keys per run plus one compact
+  // catalog. Concurrent adapters share a mutation lock so catalog entries
+  // cannot overwrite each other, and this path never lists all storage.
+  const fixedStorage = createChromeStorageSessionMock();
+  let fixedNullReads = 0;
+  const fixedGet = fixedStorage.get.bind(fixedStorage);
+  fixedStorage.get = function(keys, callback) {
+    if (keys === null) fixedNullReads++;
+    return fixedGet(keys, callback);
+  };
+  const fixedCatalogKey = 'replay-checkpoint-catalog';
+  const fixedA = createFsbLatticeRuntimeAdapter({
+    sessionId: 'fixed-run-A', storage: fixedStorage, fixedSlots: true, catalogKey: fixedCatalogKey
+  });
+  const fixedB = createFsbLatticeRuntimeAdapter({
+    sessionId: 'fixed-run-B', storage: fixedStorage, fixedSlots: true, catalogKey: fixedCatalogKey
+  });
+  globalThis.FSB_LATTICE_RUNTIME_ADAPTER_ENABLED = true;
+  await Promise.all([
+    fixedA.serializeAndPersist({ marker: 'A-1' }),
+    fixedB.serializeAndPersist({ marker: 'B-1' })
+  ]);
+  for (let i = 2; i <= 5; i++) {
+    await fixedA.serializeAndPersist({ marker: 'A-' + i });
+  }
+  passAssertEqual(
+    JSON.stringify((fixedStorage._peek(fixedCatalogKey) || []).slice().sort()),
+    JSON.stringify(['fixed-run-A', 'fixed-run-B']),
+    'fixed-slot replay catalog retains concurrent run IDs without a lost update'
+  );
+  passAssertEqual(
+    fixedStorage._keys().filter((key) => key.indexOf('fsb_lattice_snapshot_fixed-run-A_fixed_') === 0).length,
+    3,
+    'fixed-slot replay persistence retains exactly head plus two A/B slots'
+  );
+  const latestFixed = await fixedA.loadLatestSnapshot();
+  passAssertEqual(fixedA.deserialize(latestFixed).marker, 'A-5', 'fixed-slot load resolves the latest committed checkpoint');
+  passAssertEqual(fixedNullReads, 0, 'fixed-slot replay persistence performs no storage.get(null) scans');
+  await fixedA.clearSnapshots();
+  passAssertEqual(JSON.stringify(fixedStorage._peek(fixedCatalogKey)), JSON.stringify(['fixed-run-B']),
+    'fixed-slot cleanup removes only the terminal run from the recovery catalog');
+  globalThis.FSB_LATTICE_RUNTIME_ADAPTER_ENABLED = false;
 
   // ---- Part 5: Phase 1-4 byte-frozen carryforward ----
   console.log('\n--- Part 5: Phase 1-4 carryforward (Lattice surface) ---');

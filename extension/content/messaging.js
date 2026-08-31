@@ -9,6 +9,16 @@
   // Local aliases for cross-module dependencies
   const getClassName = FSB.getClassName;
 
+  function fsbShouldReplaceFinalOverlay(previousOverlayState, overlayState) {
+    if (previousOverlayState?.lifecycle !== 'final' ||
+        !overlayState || overlayState.lifecycle === 'cleared') return false;
+    if (overlayState.lifecycle === 'running') return true;
+    const previousSessionToken = previousOverlayState.sessionToken || null;
+    const nextSessionToken = overlayState.sessionToken || null;
+    return Boolean(previousSessionToken || nextSessionToken) &&
+      previousSessionToken !== nextSessionToken;
+  }
+
   // ============================================================================
   // IFRAME SUPPORT - Detect if running in iframe and manage cross-frame comms
   // ============================================================================
@@ -886,7 +896,13 @@
         case 'executeAction':
           const { tool, params, visualContext, source } = request;
           const isManualMCP = source === 'mcp-manual';
-          const SENSITIVE_TOOLS = new Set(['fillCredentialFields', 'fillPaymentFields']);
+          const SENSITIVE_TOOLS = new Set([
+            'fillCredentialFields',
+            'fillPaymentFields',
+            'fillsheet',
+            'readsheet',
+            'sheetsSession'
+          ]);
           const safeParams = SENSITIVE_TOOLS.has(tool) ? '***' : params;
           logger.logActionExecution(FSB.sessionId, tool, 'start', safeParams);
 
@@ -988,7 +1004,7 @@
             }
 
             // Timeout wrapper
-            const longTimeoutTools = ['solveCaptcha', 'fillsheet', 'readsheet'];
+            const longTimeoutTools = ['solveCaptcha', 'fillsheet', 'readsheet', 'sheetsSession'];
             const actionTimeout = longTimeoutTools.includes(tool) ? 120000 : 10000;
             const timeoutPromise = new Promise((_, reject) => {
               setTimeout(() => reject(new Error(`Action ${tool} timed out after ${actionTimeout / 1000} seconds`)), actionTimeout);
@@ -1142,6 +1158,13 @@
             break;
           }
 
+          const previousOverlayState = FSB.overlayState;
+          const replacesFinalSession = fsbShouldReplaceFinalOverlay(previousOverlayState, overlayState);
+          if (replacesFinalSession) {
+            FSB.progressOverlay.destroy();
+            FSB.replayPlayerOverlay.destroy();
+          }
+
           FSB.overlayState = overlayState;
 
           if (FSB._overlayOrphanTimer) {
@@ -1156,6 +1179,7 @@
             }
             FSB.viewportGlow.destroy();
             FSB.progressOverlay.destroy();
+            FSB.replayPlayerOverlay.destroy();
             FSB.actionGlowOverlay.destroy();
             FSB.lastActionStatusText = null;
           } else {
@@ -1173,6 +1197,13 @@
             FSB.progressOverlay.create();
             FSB.progressOverlay.update(overlayState);
             FSB.progressOverlay.show();
+            if (overlayState.replay) {
+              FSB.replayPlayerOverlay.create();
+              FSB.replayPlayerOverlay.update(overlayState.replay, overlayState.lifecycle);
+              FSB.replayPlayerOverlay.show();
+            } else {
+              FSB.replayPlayerOverlay.destroy();
+            }
 
             if (overlayState.lifecycle === 'final') {
               if (FSB._overlayWatchdogTimer) {
@@ -1192,6 +1223,7 @@
                   if (!currentOverlayState || currentOverlayState.lifecycle !== 'running') {
                     FSB.viewportGlow.destroy();
                     FSB.progressOverlay.destroy();
+                    FSB.replayPlayerOverlay.destroy();
                     FSB.actionGlowOverlay.destroy();
                     FSB.overlayState = null;
                     FSB.lastActionStatusText = null;
@@ -1218,6 +1250,13 @@
                   FSB.progressOverlay.create();
                   FSB.progressOverlay.update(degradedState);
                   FSB.progressOverlay.show();
+                  if (degradedState.replay) {
+                    FSB.replayPlayerOverlay.create();
+                    FSB.replayPlayerOverlay.update(degradedState.replay, degradedState.lifecycle);
+                    FSB.replayPlayerOverlay.show();
+                  } else {
+                    FSB.replayPlayerOverlay.destroy();
+                  }
                   try { FSB.actionGlowOverlay.hide(); } catch (_hideErr) { /* non-blocking */ }
                   try { FSB.viewportGlow.show('thinking'); } catch (_glowErr) { /* non-blocking */ }
 
@@ -1227,6 +1266,7 @@
                     try {
                       FSB.viewportGlow.destroy();
                       FSB.progressOverlay.destroy();
+                      FSB.replayPlayerOverlay.destroy();
                       FSB.actionGlowOverlay.destroy();
                       FSB.overlayState = null;
                       FSB.lastActionStatusText = null;

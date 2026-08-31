@@ -57,7 +57,7 @@ export class AgentsPageComponent implements OnInit, OnDestroy {
     // tokens (FSB, OpenClaw, Claude, Codex, Cursor, MCP, Chrome) are preserved verbatim
     // by translators per showcase/angular/src/locale/DO-NOT-TRANSLATE.md.
     const t = $localize`:@@agents.meta.title:FSB - Agents (OpenClaw Skill + MCP)`;
-    const d = $localize`:@@agents.meta.description:Drive your real Chrome from OpenClaw, Hermes, Claude, Codex, Cursor, and more. FSB gives agents a skill plus 66 MCP tools to act, observe, verify.`;
+    const d = $localize`:@@agents.meta.description:Drive your real Chrome from OpenClaw, Hermes, Claude, Codex, Cursor, and more. FSB gives agents a skill plus 68 MCP tools to act, observe, verify.`;
     this.applyMeta(t, d, url);
     this.injectAgentsPageJsonLd();
 
@@ -210,9 +210,9 @@ export class AgentsPageComponent implements OnInit, OnDestroy {
           applicationCategory: 'DeveloperApplication',
           operatingSystem: 'macOS, Linux, Windows (Node.js 18+)',
           url: `${HOST}/agents`,
-          description: $localize`:@@agents.schema.software.description:Canonical OpenClaw and Hermes onboarding path for FSB. Doctor flow, stdio config printer, consent-gated multi-host installer, and 66 MCP browser tools for the FSB MCP server.`,
+          description: $localize`:@@agents.schema.software.description:Canonical OpenClaw and Hermes onboarding path for FSB. Doctor flow, stdio config printer, consent-gated multi-host installer, and 68 MCP browser tools for the FSB MCP server.`,
           featureList: [
-            $localize`:@@agents.schema.software.feature.tools:66 MCP tools for browser action, observation, verification, and recovery`,
+            $localize`:@@agents.schema.software.feature.tools:68 MCP tools for browser action, observation, verification, and recovery`,
             $localize`:@@agents.schema.software.feature.manual:Manual mode by default; run_task autopilot only on explicit delegation`,
             $localize`:@@agents.schema.software.feature.vault:Vault tools fill credentials and payment methods without exposing raw secrets`,
             $localize`:@@agents.schema.software.feature.triggers:Trigger watcher tools for reactive page monitoring`,
@@ -236,12 +236,12 @@ export class AgentsPageComponent implements OnInit, OnDestroy {
             {
               '@type': 'HowToStep',
               name: $localize`:@@agents.schema.howTo.server.name:Configure the MCP server`,
-              text: $localize`:@@agents.schema.howTo.server.text:Use the FSB skill, ClawHub, or npx -y fsb-mcp-server install for a supported MCP host.`,
+              text: $localize`:@@agents.schema.howTo.server.text:Use the FSB skill, ClawHub, or npx -y fsb-mcp-server@latest install for a supported MCP host.`,
             },
             {
               '@type': 'HowToStep',
               name: $localize`:@@agents.schema.howTo.doctor.name:Run doctor verification`,
-              text: $localize`:@@agents.schema.howTo.doctor.text:Run npx -y fsb-mcp-server doctor and fix any failing package, bridge, extension, active-tab, content-script, or config layer.`,
+              text: $localize`:@@agents.schema.howTo.doctor.text:Run npx -y fsb-mcp-server@latest doctor and fix any failing package, bridge, extension, active-tab, content-script, or config layer.`,
             },
           ],
           isPartOf: { '@id': `${HOST}/agents#fsb-skill` },

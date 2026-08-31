@@ -61,6 +61,18 @@ const MESSAGE_TYPE_MAP: Record<
       ...(p.domain ? { domain: p.domain, url: p.domain } : {}),
     },
   }),
+  complete_task: (p) => ({
+    type: 'mcp:task-status',
+    payload: { tool: 'complete_task', params: { ...p } },
+  }),
+  partial_task: (p) => ({
+    type: 'mcp:task-status',
+    payload: { tool: 'partial_task', params: { ...p } },
+  }),
+  fail_task: (p) => ({
+    type: 'mcp:task-status',
+    payload: { tool: 'fail_task', params: { ...p } },
+  }),
 };
 
 // ---------------------------------------------------------------------------
@@ -80,9 +92,10 @@ const TIMEOUT_OVERRIDES: Record<string, number> = {
 
 /**
  * Register read-only information tools from the shared TOOL_REGISTRY.
- * These bypass the TaskQueue mutation serialization (their names are in
- * the readOnlyTools set) so they can execute even while a mutation tool
- * is running.
+ * Most bypass TaskQueue mutation serialization so they can execute while a
+ * mutation is running. The terminal lifecycle tools remain registered here,
+ * but TaskQueue deliberately serializes them so their outcomes cannot overtake
+ * the final mutation.
  *
  * Each tool's JSON Schema inputSchema is converted to Zod on the fly.
  * Bridge message types are resolved via MESSAGE_TYPE_MAP.
@@ -127,6 +140,20 @@ export function registerReadOnlyTools(
             built.payload as Record<string, unknown>,
             { timeout, targetTabId },
           );
+          // fail_task reports the task's outcome with success:false even when
+          // the dispatcher successfully recorded it. Treat only that canonical
+          // lifecycle envelope as an acknowledgement; genuine tool failures
+          // must still flow through mapFSBError.
+          if (
+            tool.name === 'fail_task' &&
+            result.success === false &&
+            result.tool === 'fail_task' &&
+            result.status === 'failed'
+          ) {
+            return {
+              content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
+            };
+          }
           return mapFSBError(result);
         });
       },

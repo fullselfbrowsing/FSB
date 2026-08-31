@@ -41,18 +41,18 @@ The goal of this page: get a new user from a clean machine to a green doctor in 
    To discover other supported hosts on the machine (Claude Desktop, Cursor, etc.), run:
 
    ```
-   npx -y fsb-mcp-server install --list
+   npx -y fsb-mcp-server@latest install --list
    ```
 
    Then run the host-specific installer, for example:
 
    ```
-   npx -y fsb-mcp-server install --claude-desktop
+   npx -y fsb-mcp-server@latest install --claude-desktop
    ```
 
    Notes:
    - What these commands do: each invocation spawns the `fsb-mcp-server` Node package via npx. `install --list` only prints detected MCP hosts and exits. `install --<host>` writes the FSB stdio block into that host's MCP config file and nothing else. Run only the host installers you actually want configured; decline prompts otherwise.
-   - By default, `npx -y fsb-mcp-server` resolves to the latest published bridge so security fixes ship without re-running the installer. If you prefer review-before-upgrade, pin a release by replacing `fsb-mcp-server` with `fsb-mcp-server@x.y.z` (see releases at `https://www.npmjs.com/package/fsb-mcp-server`) in the stdio block printed by `node scripts/print-stdio.mjs` and in any host-specific install command. The bridge accepts the same arguments either way.
+   - By default, `npx -y fsb-mcp-server@latest` resolves to the latest published bridge so security fixes ship without re-running the installer. If you prefer review-before-upgrade, pin a release by replacing `fsb-mcp-server` with `fsb-mcp-server@x.y.z` (see releases at `https://www.npmjs.com/package/fsb-mcp-server`) in the stdio block printed by `node scripts/print-stdio.mjs` and in any host-specific install command. The bridge accepts the same arguments either way.
    - Zero environment variables are needed. Vault values (passwords, payment methods) resolve inside the FSB Chrome extension's encrypted storage and never cross into the MCP server process or the OpenClaw host process. See `references/vault-boundary.md` for the boundary rules.
 
 3. **Verify with the doctor.**
@@ -133,11 +133,11 @@ Each `[FAIL]` from `node scripts/doctor.mjs` maps to one of six layers. Find you
 
 | Layer | What it means | What to do |
 | --- | --- | --- |
-| package | npm cannot fetch `fsb-mcp-server`. | Run `npx -y fsb-mcp-server --version` to confirm npm can reach the package. If that fails, check Node 18+ is installed and on PATH. |
-| bridge | The extension is not running, or `ws://localhost:7225` is not reachable. | Start the FSB extension (open Chrome with the extension installed) and run `npx -y fsb-mcp-server status --watch` to confirm `ws://localhost:7225` is reachable. |
+| package | npm cannot fetch `fsb-mcp-server`. | Run `npx -y fsb-mcp-server@latest --version` to confirm npm can reach the package. If that fails, check Node 18+ is installed and on PATH. |
+| bridge | The extension is not running, or `ws://localhost:7225` is not reachable. | Start the FSB extension (open Chrome with the extension installed) and run `npx -y fsb-mcp-server@latest status --watch` to confirm `ws://localhost:7225` is reachable. |
 | extension | The FSB Chrome extension is not installed. | Install from `https://chromewebstore.google.com/detail/badgafnfchcihdfnjneklogedcdkmjfk` (fallback: GitHub Releases at `https://github.com/fullselfbrowsing/FSB/releases`), then reopen this session. |
-| active-tab | The active tab is restricted (`chrome://`, `edge://`, the Web Store) or no tab is owned by the agent. | Open a normal `http(s)` tab (not `chrome://`, `edge://`, or the Web Store) and run `npx -y fsb-mcp-server status --watch` to re-attach. See `references/restricted-tab-recovery.md` for the recovery toolset. |
+| active-tab | The active tab is restricted (`chrome://`, `edge://`, the Web Store) or no tab is owned by the agent. | Open a normal `http(s)` tab (not `chrome://`, `edge://`, or the Web Store) and run `npx -y fsb-mcp-server@latest status --watch` to re-attach. See `references/restricted-tab-recovery.md` for the recovery toolset. |
 | content-script | The content script did not attach (extension installed after the tab loaded). | Reload the active tab. The FSB content script attaches on page load; reloads after extension install are required. |
-| config | The MCP host config does not include the FSB stdio block. | Re-run `npx -y fsb-mcp-server install --<host>` for your MCP host (replace `<host>` with `claude-desktop`, `cursor`, etc.). Or paste the block printed by `node scripts/print-stdio.mjs` into your host config. |
+| config | The MCP host config does not include the FSB stdio block. | Re-run `npx -y fsb-mcp-server@latest install --<host>` for your MCP host (replace `<host>` with `claude-desktop`, `cursor`, etc.). Or paste the block printed by `node scripts/print-stdio.mjs` into your host config. |
 
 Re-run `node scripts/doctor.mjs` after each fix. If a layer keeps flipping or you see `[WARN]`, capture the raw output and file an issue at `https://github.com/fullselfbrowsing/FSB/issues`.

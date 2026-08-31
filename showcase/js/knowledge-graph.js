@@ -2,7 +2,7 @@
  * KnowledgeGraph -- Consolidated 3D mind map of FSB's built-in site knowledge
  *
  * Pure Canvas with 3D projection. No external dependencies.
- * Renders all 9 categories and 43+ sites as a single rotating 3D graph.
+ * Renders all built-in site-guide categories and sites as a single rotating 3D graph.
  *
  * Public API:
  *   KnowledgeGraph.render(container, options)   - Create canvas, build data, start animation
@@ -41,7 +41,15 @@ const KnowledgeGraph = (function () {
     'Coding Platforms',
     'Career & Job Search',
     'Gaming Platforms',
-    'Productivity Tools'
+    'Productivity Tools',
+    'Design & Whiteboard',
+    'Games',
+    'Media',
+    'Music',
+    'News',
+    'Reference',
+    'Sports',
+    'Utilities'
   ];
 
   // Task-discovered site color (teal/cyan -- distinct from built-in categories)

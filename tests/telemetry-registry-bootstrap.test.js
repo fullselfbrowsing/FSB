@@ -55,7 +55,8 @@ function makeArea(seed, getImpl) {
 (async function run() {
   const background = fs.readFileSync(BACKGROUND_PATH, 'utf8');
   const restoreStart = background.indexOf('async function restoreSessionsFromStorage()');
-  const restoreEnd = background.indexOf('// Immediately restore sessions when service worker wakes up', restoreStart);
+  const restoreEnd = background.indexOf('function restoreServiceWorkerStateOnWake()', restoreStart);
+  assert(restoreEnd > restoreStart, 'wake-up coordinator follows session restoration');
   const restoreSource = background.slice(restoreStart, restoreEnd);
   assert(!restoreSource.includes('bootstrapAgentRegistry('),
     'registry bootstrap is not nested behind session-restore awaits');
@@ -63,9 +64,13 @@ function makeArea(seed, getImpl) {
   const wakeStart = restoreEnd;
   const wakeEnd = background.indexOf('// Eagerly rehydrate vault session key', wakeStart);
   const wakeSource = background.slice(wakeStart, wakeEnd);
-  const registryKickoff = wakeSource.indexOf('globalThis.fsbAgentRegistryReady = bootstrapAgentRegistry()');
-  const sessionKickoff = wakeSource.indexOf('restoreSessionsFromStorage().catch');
-  assert(registryKickoff >= 0 && sessionKickoff > registryKickoff,
+  const registryKickoff = wakeSource.indexOf('.then(() => bootstrapAgentRegistry())');
+  const registryPublish = wakeSource.indexOf('globalThis.fsbAgentRegistryReady = registry.catch');
+  const sessionKickoff = wakeSource.indexOf('.then(() => restoreSessionsFromStorage())');
+  assert(
+    registryKickoff >= 0
+      && registryPublish > registryKickoff
+      && sessionKickoff > registryPublish,
     'wake-up starts and publishes registry readiness independently before session restore');
 
   let releaseRegistryRead;

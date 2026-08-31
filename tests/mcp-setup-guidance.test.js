@@ -33,7 +33,7 @@ const rootReadmePath = path.join(repoRoot, 'README.md');
 const requiredSetupLines = [
   {
     label: 'Claude Code uses the user-scoped MCP install command',
-    needles: ['claude mcp add --scope user fsb -- npx -y fsb-mcp-server'],
+    needles: ['claude mcp add --scope user fsb -- npx -y fsb-mcp-server@latest'],
   },
   {
     label: 'Codex documents ~/.codex/config.toml and the mcp_servers TOML block',
@@ -53,7 +53,15 @@ const requiredSetupLines = [
   },
   {
     label: 'OpenCode includes the manual mcp.local snippet',
-    needles: ['OpenCode', '"mcp"', '"type": "local"', '"command": ["npx", "-y", "fsb-mcp-server"]'],
+    needles: ['OpenCode', '"mcp"', '"type": "local"', '"command": ["npx", "-y", "fsb-mcp-server@latest"]'],
+  },
+  {
+    label: 'Goose pins its split YAML package argument to npm latest',
+    needles: ['Goose (Block)', '- fsb-mcp-server@latest'],
+  },
+  {
+    label: 'JetBrains pins its separate arguments field to npm latest',
+    needles: ['JetBrains (AI Assistant / Junie)', 'Arguments: -y fsb-mcp-server@latest'],
   },
   {
     label: 'OpenClaw is called out as a manual or unsupported fallback',
@@ -95,6 +103,12 @@ function run() {
       assertIncludes(output, needle, contract.label);
     }
   }
+  const unpinnedSetupCommands = output.match(/fsb-mcp-server(?!@latest|%40latest)/gu) || [];
+  assertEqual(
+    unpinnedSetupCommands.length,
+    0,
+    'setup output contains no unpinned MCP package invocation',
+  );
 
   console.log('\n--- readme parity ---');
   for (const needle of requiredReadmeMarkers) {

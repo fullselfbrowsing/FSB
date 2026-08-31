@@ -163,6 +163,50 @@ assertEqual(errorFinalState.lifecycle, 'final', 'explicit error lifecycle stays 
 assertEqual(errorFinalState.result, 'error', 'explicit error result passes through');
 assertEqual(errorFinalState.progress.label, 'Error', 'error final state gets dedicated progress label');
 
+console.log('\n--- replay player metadata pass-through ---');
+
+const replayState = overlayStateUtils.buildOverlayState({
+  phase: 'acting',
+  replay: {
+    sessionId: 'replay_123',
+    status: 'paused',
+    speed: 2,
+    positionMs: 4200,
+    durationMs: 10000,
+    currentStep: 3,
+    totalSteps: 8,
+    forwardSeekOnly: true
+  }
+}, null);
+
+assertEqual(replayState.replay.sessionId, 'replay_123', 'replay session ID passes through');
+assertEqual(replayState.replay.status, 'paused', 'replay paused state passes through');
+assertEqual(replayState.replay.speed, 2, 'replay speed passes through');
+assertEqual(replayState.replay.positionMs, 4200, 'replay position passes through');
+assertEqual(replayState.replay.durationMs, 10000, 'replay duration passes through');
+assertEqual(replayState.replay.currentStep, 3, 'replay current step passes through');
+assertEqual(replayState.replay.totalSteps, 8, 'replay total steps passes through');
+
+const clampedReplayState = overlayStateUtils.buildOverlayState({
+  replay: {
+    sessionId: 'replay_clamped',
+    status: 'unknown',
+    speed: 3,
+    positionMs: 50000,
+    durationMs: 1000,
+    currentStep: 99,
+    totalSteps: 4
+  }
+}, null);
+
+assertEqual(clampedReplayState.replay.status, 'playing', 'unknown replay status falls back safely');
+assertEqual(clampedReplayState.replay.speed, 1, 'unsupported replay speed falls back to 1x');
+assertEqual(clampedReplayState.replay.positionMs, 1000, 'replay position clamps to duration');
+assertEqual(clampedReplayState.replay.currentStep, 4, 'replay current step clamps to total');
+
+const noReplayState = overlayStateUtils.buildOverlayState({ phase: 'acting' }, null);
+assert(!Object.prototype.hasOwnProperty.call(noReplayState, 'replay'), 'ordinary overlay state has no replay metadata');
+
 console.log('\n--- degraded client-owned lifecycle state ---');
 
 const degradedWaitingState = overlayStateUtils.buildOverlayState({

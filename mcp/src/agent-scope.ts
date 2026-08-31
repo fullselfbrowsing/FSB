@@ -11,12 +11,32 @@
 // the FSB family ([FSB AGT], [FSB DLG], [FSB BG], ...).
 
 import type { WebSocketBridge } from './bridge.js';
+import type { McpClientInventory } from './client-inventory.js';
+import { randomUUID } from 'node:crypto';
 
 const SCOPE_LOG_PREFIX = '[FSB AgentScope]';
+const DELEGATION_ID_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
+export const RECORDING_RUN_IDLE_MS = 60_000;
+
+export type ClientInfo = {
+  name?: string;
+  version?: string;
+};
+
+export type ClientInfoSupplier = () => ClientInfo | null;
+export type ClientInventorySupplier = () => McpClientInventory | Promise<McpClientInventory>;
+
+export type AgentScopeEnvironment = Readonly<Record<string, string | undefined>>;
+
+export type AgentScopeOptions = {
+  environment?: AgentScopeEnvironment;
+};
 
 export class AgentScope {
   private agentId: string | null = null;
   private pending: Promise<string> | null = null;
+  private clientInfoSupplier: ClientInfoSupplier | null = null;
+  private clientInventorySupplier: ClientInventorySupplier | null = null;
   // Phase 240 Open Q1 resolution: ownership tokens are minted per-bindTab on
   // the extension side. Each bindTab-firing handler returns the freshly
   // minted token in its response under `ownershipToken`. AgentScope captures
@@ -41,6 +61,30 @@ export class AgentScope {
   // Single-slot model (one bridge per process for v0.9.60) -- mirrors the
   // lastOwnershipToken pattern.
   private connectionId: string | null = null;
+  // Internal recording correlation. This is deliberately independent from
+  // agent identity and ownership: one long-lived MCP process may execute many
+  // logical tasks, while every bridge call still needs an unambiguous run.
+  // Rotation is lazy after the same 60s idle boundary used by the extension
+  // recorder, so no timer is kept alive in the MCP process.
+  private recordingRunId: string | null = null;
+  private recordingRunTouchedAt = 0;
+  private recordingRunInFlight: Map<string, number> = new Map();
+  private readonly environment: AgentScopeEnvironment;
+
+  constructor(options: AgentScopeOptions = {}) {
+    // Capture the process environment once. A delegated child receives the
+    // daemon-minted id at spawn time; later ambient mutations must not change
+    // the identity carried by this process's one registration handshake.
+    this.environment = { ...(options.environment ?? process.env) };
+  }
+
+  setClientInfoSupplier(supplier: ClientInfoSupplier): void {
+    this.clientInfoSupplier = supplier;
+  }
+
+  setClientInventorySupplier(supplier: ClientInventorySupplier): void {
+    this.clientInventorySupplier = supplier;
+  }
 
   /**
    * Returns the per-process agent_id, lazy-minting on first call via the
@@ -56,8 +100,46 @@ export class AgentScope {
 
     this.pending = (async () => {
       try {
+        const payload: {
+          clientInfo?: ClientInfo;
+          platforms?: McpClientInventory;
+          delegationId?: string;
+        } = {};
+        const delegationId = this.environment.FSB_DELEGATION_ID;
+        if (delegationId !== undefined) {
+          if (!DELEGATION_ID_PATTERN.test(delegationId)) {
+            throw new Error('Invalid FSB_DELEGATION_ID');
+          }
+          // Registration-only correlation sidecar. It is intentionally not
+          // stored as agent identity and never participates in MCP tool args.
+          payload.delegationId = delegationId;
+        }
+        const suppliedClientInfo = this.clientInfoSupplier?.();
+        if (suppliedClientInfo) {
+          const clientInfo: ClientInfo = {};
+          if (typeof suppliedClientInfo.name === 'string') {
+            clientInfo.name = suppliedClientInfo.name;
+          }
+          if (typeof suppliedClientInfo.version === 'string') {
+            clientInfo.version = suppliedClientInfo.version;
+          }
+          if (Object.keys(clientInfo).length > 0) {
+            payload.clientInfo = clientInfo;
+          }
+        }
+
+        const suppliedPlatforms = await this.clientInventorySupplier?.();
+        if (
+          suppliedPlatforms &&
+          typeof suppliedPlatforms === 'object' &&
+          !Array.isArray(suppliedPlatforms) &&
+          Object.keys(suppliedPlatforms).length > 0
+        ) {
+          payload.platforms = { ...suppliedPlatforms };
+        }
+
         const result = await bridge.sendAndWait(
-          { type: 'agent:register', payload: {} },
+          { type: 'agent:register', payload },
           { timeout: 10_000 },
         );
         if (!result || result.success !== true || typeof result.agentId !== 'string') {
@@ -176,6 +258,65 @@ export class AgentScope {
   }
 
   /**
+   * Return the active logical recording run, minting or idle-rotating it as
+   * needed. The value is an internal bridge sidecar and never enters a tool's
+   * public input schema.
+   */
+  ensureRecordingRun(now = Date.now()): string {
+    const hasInFlightCall = this.recordingRunId !== null
+      && (this.recordingRunInFlight.get(this.recordingRunId) ?? 0) > 0;
+    if (
+      !this.recordingRunId ||
+      !Number.isFinite(this.recordingRunTouchedAt) ||
+      (!hasInFlightCall && now - this.recordingRunTouchedAt >= RECORDING_RUN_IDLE_MS)
+    ) {
+      this.recordingRunId = randomUUID();
+    }
+    this.recordingRunTouchedAt = now;
+    return this.recordingRunId;
+  }
+
+  /**
+   * Start one physical bridge attempt in the current logical recording run.
+   * In-flight attempts keep the run active even when their execution exceeds
+   * the ordinary idle boundary.
+   */
+  beginRecordingCall(now = Date.now()): string {
+    const runId = this.ensureRecordingRun(now);
+    this.recordingRunInFlight.set(runId, (this.recordingRunInFlight.get(runId) ?? 0) + 1);
+    return runId;
+  }
+
+  /**
+   * Finish one physical bridge attempt. Late completions from a rotated run
+   * retire their own count but never advance the current run's idle clock.
+   */
+  completeRecordingCall(runId: string, now = Date.now()): void {
+    const inFlight = this.recordingRunInFlight.get(runId) ?? 0;
+    if (inFlight <= 1) this.recordingRunInFlight.delete(runId);
+    else this.recordingRunInFlight.set(runId, inFlight - 1);
+
+    if (this.recordingRunId === runId) {
+      this.recordingRunTouchedAt = Math.max(this.recordingRunTouchedAt, now);
+    }
+  }
+
+  /** Sync read for diagnostics and tests; null before the first tool call. */
+  currentRecordingRunId(): string | null {
+    return this.recordingRunId;
+  }
+
+  /**
+   * End the current logical task without changing the process's agent or tab
+   * ownership identity. The next bridge call mints a fresh recording run.
+   */
+  rotateRecordingRun(): void {
+    this.recordingRunInFlight.clear();
+    this.recordingRunId = null;
+    this.recordingRunTouchedAt = 0;
+  }
+
+  /**
    * Test-only escape hatch; do NOT call from production code.
    * Clears both the cached id and any in-flight pending mint so a fresh
    * ensure() will round-trip a new agent:register.
@@ -188,5 +329,6 @@ export class AgentScope {
     // Phase 241 D-08: connection_id is per-bridge-connect; reset clears it
     // alongside the rest so a follow-up ensure() captures a fresh one.
     this.connectionId = null;
+    this.rotateRecordingRun();
   }
 }

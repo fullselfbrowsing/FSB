@@ -545,6 +545,11 @@ const HEAD_APP_MAP = {
     fallbackBaseUrl: 'https://docs.google.com',
     relativeRuntimeBaseUrl: '/drive/v3'
   },
+  FsbHandlerGsheets: {
+    app: 'google-sheets',
+    fallbackBaseUrl: 'https://docs.google.com',
+    pageGapiUiSheetsSessionBaseUrl: 'https://sheets.googleapis.com/v4'
+  },
   FsbHandlerWebflow: {
     app: 'webflow',
     fallbackBaseUrl: 'https://webflow.com',
@@ -723,6 +728,28 @@ export function classifyOriginPattern(handlerOrigin, apiBaseUrl, opts) {
       reason: 'CORS_UNRESOLVABLE_ORIGIN: handler="' + String(handlerOrigin) +
         '" apiBaseUrl="' + String(apiBaseUrl) + '" -- one origin did not parse; ' +
         'a head whose origin cannot be verified must be demoted to T3-DOM'
+    };
+  }
+  // ---- Signed-in page-gapi/UI Google Sheets session: exact endpoints, ASSERTED ----
+  if (options.pageGapiUiSheetsSession) {
+    const expectedBase = 'https://sheets.googleapis.com/v4';
+    const same = hOrigin === 'https://docs.google.com'
+      && aOrigin === 'https://sheets.googleapis.com'
+      && apiBaseUrl === expectedBase;
+    return {
+      sameOrigin: same,
+      separate: !same,
+      apiOrigin: aOrigin,
+      handlerOrigin: hOrigin,
+      reason: same
+        ? 'PAGE_GAPI_UI_SHEETS_SESSION: head origin https://docs.google.com uses only the ' +
+          'already signed-in, agent-owned Sheets tab through the reviewed fixed five-method ' +
+          'session. The MAIN-world path calls only gapi.client.request against ' + expectedBase +
+          ', the fallback is the fixed sheetsSession UI action, no auth or credential source ' +
+          'is available, and write/destructive slugs remain guarded fail-closed.'
+        : 'CORS_SEPARATE_ORIGIN: page-gapi/UI Sheets session accommodation is limited to ' +
+          'exactly docs.google.com -> ' + expectedBase + '; got head ' + hOrigin +
+          ', API base ' + String(apiBaseUrl)
     };
   }
   // ---- Dynamic-workspace accommodation (slack): same-registrable-domain, ASSERTED ----
@@ -4448,6 +4475,226 @@ function readGlamaPageStateRuntimeBase(app, runtimeBaseUrl) {
     : null;
 }
 
+function hasForbiddenSheetsNetworkPrimitive(source) {
+  const text = String(source || '');
+  return /\b(?:fetch|XMLHttpRequest|sendBeacon|WebSocket|EventSource|Worker|SharedWorker|importScripts|axios|superagent)\b/i.test(text);
+}
+
+// The Sheets content action is a reviewed UI-only boundary. Keep this stricter than
+// the session helper: the latter owns the one fixed page-gapi request, while content
+// code may only inspect the pinned Sheets DOM and issue trusted keyboard gestures.
+// Reject the primitive names themselves so aliases and bracket access cannot turn a
+// harmless-looking operation argument into a generic authenticated network proxy.
+function hasForbiddenSheetsContentNetworkSource(source) {
+  const text = String(source || '');
+  const dynamicOrProxyCall =
+    /\b(?:globalThis|window|self|document|navigator|tools|chrome(?:Api)?|browser)\s*\[/i.test(text)
+    || /\]\s*\(/.test(text)
+    || /\bimport\s*\(/i.test(text)
+    || /\beval\b|\bFunction\b/.test(text)
+    || /\.\s*request\s*\(/i.test(text)
+    || /\b(?:gapi|postMessage|MessageChannel|BroadcastChannel)\b/i.test(text)
+    || /\b(?:serviceWorker|sharedStorage|audioWorklet|paintWorklet|layoutWorklet)\b/i.test(text)
+    || /\.\s*addModule\s*\(/i.test(text)
+    || /\b(?:chrome(?:Api)?|browser)\s*\.\s*(?:runtime|tabs|scripting|webRequest|cookies|identity)\b/i.test(text)
+    || /\bReflect\s*\.\s*(?:get|set|apply|construct)\s*\(/i.test(text);
+
+  const urlLiteralOrBuilder =
+    /['"`]\s*(?:https?|wss?|ftp|data|blob)\s*:/i.test(text)
+    || /['"`]\s*\/\/(?![/*])/i.test(text)
+    || /\b(?:url|uri|endpoint|baseUrl)\b/i.test(text)
+    || /\b(?:encodeURI|decodeURI)(?:Component)?\s*\(/i.test(text)
+    || /\b(?:params|args|request|payload|input)\s*(?:\.\s*(?:url|uri|href|src|endpoint|origin|host|path)\b|\[\s*['"`](?:url|uri|href|src|endpoint|origin|host|path)['"`]\s*\])/i.test(text);
+
+  const domNetworkSink =
+    /\b(?:new\s+)?(?:Image|Audio)\s*\(/i.test(text)
+    || /\bdocument\s*\.\s*createElement(?:NS)?\s*\([\s\S]*?['"`](?:a|audio|embed|form|iframe|image|img|link|meta|object|script|source|track|video)\b/i.test(text)
+    || /(?:\.\s*(?:src|srcdoc|srcset|href|action|formAction|poster|data)\b|\[\s*['"`](?:src|srcdoc|srcset|href|action|formAction|poster|data)['"`]\s*\])\s*=/i.test(text)
+    || /\[[^\]\r\n]+\]\s*=/.test(text)
+    || /\.\s*setAttribute(?:NS)?\s*\(/i.test(text)
+    || /\bObject\s*\.\s*(?:assign|defineProperty|defineProperties)\s*\(/i.test(text)
+    || /\.\s*(?:innerHTML|outerHTML|cssText|background|backgroundImage|borderImage|content|cursor|listStyle|listStyleImage|mask|maskImage)\s*=/i.test(text)
+    || /\.\s*(?:createContextualFragment|insertAdjacentHTML|submit|requestSubmit|setProperty)\s*\(/i.test(text)
+    || /\bdocument\s*\.\s*(?:write|writeln)\s*\(/i.test(text)
+    || /\b(?:window|globalThis|self)\s*\.\s*open\s*\(/i.test(text)
+    || /\b(?:window\s*\.\s*)?(?:document\s*\.\s*)?location\s*(?:\.\s*href\s*)?=/i.test(text)
+    || /\blocation\s*\.\s*(?:assign|replace|reload)\s*\(/i.test(text);
+
+  return hasForbiddenSheetsNetworkPrimitive(text)
+    || dynamicOrProxyCall
+    || urlLiteralOrBuilder
+    || domNetworkSink;
+}
+
+export function verifyPageGapiUiSheetsSessionSources(sourceOverrides) {
+  const overrides = sourceOverrides || {};
+  const expectedBase = 'https://sheets.googleapis.com/v4';
+  const sessionPath = join(ROOT, 'extension', 'utils', 'google-sheets-session.js');
+  const handlerPath = join(ROOT, 'catalog', 'handlers', 'gsheets.js');
+  const contentActionsPath = join(ROOT, 'extension', 'content', 'actions.js');
+  const manifestPath = join(ROOT, 'extension', 'manifest.json');
+  const failures = [];
+
+  let manifest = overrides.manifest;
+  if (manifest === undefined) {
+    if (!existsSync(manifestPath)) {
+      manifest = null;
+    } else {
+      try { manifest = JSON.parse(readFileSync(manifestPath, 'utf8')); } catch (_e) { manifest = null; }
+    }
+  }
+  const permissions = manifest && Array.isArray(manifest.permissions) ? manifest.permissions : [];
+  const manifestOk = !!manifest
+    && !permissions.includes('identity')
+    && !Object.prototype.hasOwnProperty.call(manifest, 'oauth2');
+  if (!manifestOk) { failures.push('MANIFEST_IDENTITY_OR_OAUTH2_PRESENT'); }
+
+  const readSource = function(overrideKey, filePath) {
+    if (Object.prototype.hasOwnProperty.call(overrides, overrideKey)) {
+      return typeof overrides[overrideKey] === 'string' ? overrides[overrideKey] : '';
+    }
+    return existsSync(filePath) ? readFileSync(filePath, 'utf8') : '';
+  };
+  const sessionText = readSource('sessionText', sessionPath);
+  const handlerText = readSource('handlerText', handlerPath);
+  const contentActionsText = readSource('contentActionsText', contentActionsPath);
+  if (!sessionText) { failures.push('SHEETS_SESSION_HELPER_MISSING'); }
+  if (!handlerText) { failures.push('SHEETS_HANDLER_MISSING'); }
+  if (!contentActionsText) { failures.push('SHEETS_CONTENT_ACTIONS_MISSING'); }
+
+  const contentHelpersStart = contentActionsText.indexOf('// Google Sheets signed-in-tab UI transport');
+  const contentHelpersEnd = contentActionsText.indexOf('// Tool functions for browser automation', contentHelpersStart);
+  const contentActionStart = contentActionsText.search(/\bsheetsSession\s*:\s*async\b/);
+  const contentActionEnd = contentActionsText.indexOf('// GOOGLE SHEETS: fillsheet', contentActionStart);
+  const sheetsContentText = contentHelpersStart !== -1 && contentHelpersEnd > contentHelpersStart
+    && contentActionStart !== -1 && contentActionEnd > contentActionStart
+    ? contentActionsText.slice(contentHelpersStart, contentHelpersEnd)
+      + '\n' + contentActionsText.slice(contentActionStart, contentActionEnd)
+    : '';
+  if (!sheetsContentText) { failures.push('SHEETS_CONTENT_ACTION_NOT_FIXED'); }
+
+  const fixedMethods = ['getSpreadsheet', 'getValues', 'updateValues', 'appendValues', 'clearValues'];
+  const sessionReturn = sessionText.match(
+    /return\s*\{([\s\S]*?)\};\s*\}\s*var\s+session\s*=\s*createSession\s*\(\s*\)/
+  );
+  const exposedMethods = sessionReturn
+    ? Array.from(sessionReturn[1].matchAll(/^\s*([A-Za-z_$][\w$]*)\s*:\s*function\b/gm), function(match) { return match[1]; })
+    : [];
+  const fixedMethodSurfaceOk = exposedMethods.length === fixedMethods.length
+    && fixedMethods.every(function(method, index) { return exposedMethods[index] === method; });
+  if (!fixedMethodSurfaceOk) { failures.push('SHEETS_SESSION_METHOD_SURFACE_NOT_FIXED'); }
+
+  const exactActiveTabPinOk = /SHEETS_ORIGIN\s*=\s*['"]https:\/\/docs\.google\.com['"]/.test(sessionText)
+    && /SHEETS_URL_RE\s*=\s*\/\^\\\/spreadsheets\\\/d\\\//.test(sessionText)
+    && /var\s+tabId\s*=\s*Number\(context\.tabId\)/.test(sessionText)
+    && /chromeApi\.tabs\.get\(tabId\)/.test(sessionText)
+    && /spreadsheetIdFromUrl\(tab\s*&&\s*tab\.url\)/.test(sessionText)
+    && /explicit\s*!==\s*spreadsheetId/.test(sessionText)
+    && /pageLocation\.origin\s*===\s*['"]https:\/\/docs\.google\.com['"]/.test(sessionText)
+    && /pageMatch\[1\]\s*!==\s*spreadsheetId/.test(sessionText)
+    && /target:\s*\{\s*tabId:\s*target\.tabId\s*\}/.test(sessionText)
+    && /sendMessage\(target\.tabId,\s*\{/.test(sessionText)
+    && !/chromeApi\.tabs\.(?:query|create|update)\s*\(/.test(sessionText);
+  if (!exactActiveTabPinOk) { failures.push('SHEETS_ACTIVE_TAB_PIN_NOT_EXACT'); }
+
+  const requestCalls = sessionText.match(
+    /\b[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*\.request\s*\(/g
+  ) || [];
+  const sourceUrls = sessionText.match(/https:\/\/[A-Za-z0-9._~:/?#\[\]@!$&()*+,=%-]+/g) || [];
+  const allowedUrls = new Set([
+    'https://docs.google.com',
+    expectedBase,
+    expectedBase + '/spreadsheets/'
+  ]);
+  const fixedGapiRequestOk = /SHEETS_API_BASE\s*=\s*['"]https:\/\/sheets\.googleapis\.com\/v4['"]/.test(sessionText)
+    && /var\s+gapiClient\s*=\s*globalThis\.gapi\s*&&\s*globalThis\.gapi\.client/.test(sessionText)
+    && /gapiClient\.request\(\{\s*path:\s*path,\s*method:\s*method,\s*params:\s*params,\s*body:\s*body\s*\}\)/.test(sessionText)
+    && requestCalls.length === 1
+    && /^gapiClient\.request\s*\($/.test(requestCalls[0])
+    && sourceUrls.length > 0
+    && sourceUrls.every(function(url) { return allowedUrls.has(url); })
+    && !/(?:request|args|params)\.(?:url|path|method|headers|body)\b/.test(sessionText);
+  if (!fixedGapiRequestOk) { failures.push('SHEETS_GAPI_REQUEST_NOT_FIXED'); }
+
+  const forbiddenSheetsSource = sessionText + '\n' + handlerText + '\n' + sheetsContentText;
+  const hasForbiddenCredentialOrNetworkSource =
+    /chrome(?:Api)?\.identity\b|\bgetAuthToken\b/i.test(forbiddenSheetsSource)
+    || /\bgapi(?:Client)?\.(?:auth|load|init)\b|\bgoogle\.accounts\b|\binit(?:Token|Code)Client\b|\brequestAccessToken\b/i.test(forbiddenSheetsSource)
+    || /\b(?:accessToken|authToken|refreshToken|idToken|token)\b/i.test(forbiddenSheetsSource)
+    || /\bdocument\.cookie\b|chrome(?:Api)?\.cookies\b|\bcookies?\.(?:get|set|remove)\s*\(/i.test(forbiddenSheetsSource)
+    || /\b(?:localStorage|sessionStorage|chrome(?:Api)?\.storage)\b/i.test(forbiddenSheetsSource)
+    || /\bAuthorization\b|\bBearer\b/i.test(forbiddenSheetsSource)
+    || hasForbiddenSheetsNetworkPrimitive(forbiddenSheetsSource)
+    || hasForbiddenSheetsContentNetworkSource(sheetsContentText);
+  if (hasForbiddenCredentialOrNetworkSource) { failures.push('FORBIDDEN_SHEETS_CREDENTIAL_OR_NETWORK_SOURCE'); }
+
+  const contentActionOk = !!sheetsContentText
+    && /\bsheetsSession\s*:\s*async\b/.test(sheetsContentText)
+    && /isGoogleSheetsPage\(\)/.test(sheetsContentText)
+    && /params\.spreadsheetId\s*&&\s*params\.spreadsheetId\s*!==\s*activeId/.test(sheetsContentText)
+    && ['getSpreadsheet', 'getValues', 'updateValues', 'appendValues', 'clearValues'].every(function(operation) {
+      return sheetsContentText.indexOf("operation === '" + operation + "'") !== -1;
+    })
+    && !/(?:params|args)\.(?:url|path|method|headers|body)\b/.test(sheetsContentText);
+  if (!contentActionOk) { failures.push('SHEETS_SESSION_CONTENT_ACTION_MISSING'); }
+
+  const slugs = [
+    'gsheets.get_spreadsheet',
+    'gsheets.get_values',
+    'gsheets.update_values',
+    'gsheets.append_values',
+    'gsheets.clear_values'
+  ];
+  const handlerOk = /var\s+ORIGIN\s*=\s*['"]https:\/\/docs\.google\.com['"]/.test(handlerText)
+    && slugs.every(function(slug) { return handlerText.indexOf("'" + slug + "'") !== -1; })
+    && /ctx\s*&&\s*ctx\.googleSheets/.test(handlerText);
+  if (!handlerOk) { failures.push('SHEETS_HANDLER_SESSION_CONTRACT_MISMATCH'); }
+
+  const guardedWritesOk =
+    /['"]gsheets\.update_values['"]\s*:\s*guarded\(\s*['"]gsheets\.update_values['"]\s*,\s*['"]write['"]/.test(handlerText)
+    && /['"]gsheets\.append_values['"]\s*:\s*guarded\(\s*['"]gsheets\.append_values['"]\s*,\s*['"]write['"]/.test(handlerText)
+    && /['"]gsheets\.clear_values['"]\s*:\s*guarded\(\s*['"]gsheets\.clear_values['"]\s*,\s*['"]destructive['"]/.test(handlerText)
+    && /function\s+guarded\s*\([\s\S]*?code:\s*FALLBACK_CODE[\s\S]*?google-sheets-live-mutation-uat-required/.test(handlerText);
+  if (!guardedWritesOk) { failures.push('SHEETS_WRITE_SLUGS_NOT_GUARDED'); }
+
+  const expectedClasses = ['read', 'read', 'write', 'write', 'destructive'];
+  const descriptorsOk = slugs.every(function(slug, index) {
+    let descriptor;
+    if (overrides.descriptors && Object.prototype.hasOwnProperty.call(overrides.descriptors, slug)) {
+      descriptor = overrides.descriptors[slug];
+    } else {
+      const descriptorPath = join(ROOT, 'catalog', 'descriptors', slug.replace('.', '__') + '.json');
+      if (!existsSync(descriptorPath)) { return false; }
+      try { descriptor = JSON.parse(readFileSync(descriptorPath, 'utf8')); } catch (_e) { return false; }
+    }
+    try {
+      const idDescription = descriptor.params && descriptor.params.properties
+        && descriptor.params.properties.spreadsheetId
+        && descriptor.params.properties.spreadsheetId.description;
+      return descriptor.backing === 'handler'
+        && descriptor.sideEffectClass === expectedClasses[index]
+        && descriptor.provenance && descriptor.provenance.signals
+        && descriptor.provenance.signals.transportHelper === 'page-gapi-ui-sheets-session'
+        && idDescription === 'Spreadsheet ID. When provided, it must match the spreadsheet open in the agent-owned Google Sheets tab.';
+    } catch (_e) {
+      return false;
+    }
+  });
+  if (!descriptorsOk) { failures.push('SHEETS_DESCRIPTORS_CONTRACT_MISMATCH'); }
+
+  return { ok: failures.length === 0, failures: failures };
+}
+
+function readPageGapiUiSheetsSessionBase(mapping) {
+  const expectedBase = 'https://sheets.googleapis.com/v4';
+  if (!mapping || mapping.app !== 'google-sheets'
+      || mapping.pageGapiUiSheetsSessionBaseUrl !== expectedBase) {
+    return null;
+  }
+  const verified = verifyPageGapiUiSheetsSessionSources();
+  return verified.ok ? expectedBase : null;
+}
+
 /**
  * checkOriginClassification(headsOverride, opts) -> { results, failures }
  *
@@ -4509,7 +4756,23 @@ export function checkOriginClassification(headsOverride, opts) {
 
     let apiBaseUrl;
     let classifyOpts;
-    if (mapping.graphBearerRuntimeBaseUrl) {
+    if (mapping.pageGapiUiSheetsSessionBaseUrl) {
+      const sheetsBase = readPageGapiUiSheetsSessionBase(mapping);
+      if (!sheetsBase) {
+        const reason = 'CORS_PAGE_GAPI_UI_SHEETS_SESSION_MISMATCH: head ' + head.global +
+          ' requested Google Sheets API base "' + String(mapping.pageGapiUiSheetsSessionBaseUrl) +
+          '" but the no-Identity manifest, fixed five-method session, active-tab pin, fixed ' +
+          'gapi.client.request base, sheetsSession UI action, guarded writes, or descriptors ' +
+          'did not match the reviewed source contract -- refusing a broader cross-origin ' +
+          'accommodation';
+        results.push({ global: head.global, handlerOrigin: head.origin, apiBaseUrl: null,
+          classification: { sameOrigin: false, separate: true, reason: reason } });
+        failures.push(reason);
+        continue;
+      }
+      apiBaseUrl = sheetsBase;
+      classifyOpts = { pageGapiUiSheetsSession: true };
+    } else if (mapping.graphBearerRuntimeBaseUrl) {
       let graphBase = null;
       if (mapping.pageBearerGraphApp === 'excel') {
         graphBase = readExcelGraphBearerRuntimeBase(mapping.app, mapping.graphBearerRuntimeBaseUrl);
@@ -4890,6 +5153,8 @@ function runCli() {
       && reason.indexOf('PAGE_BEARER_GRAPH_READ') === 0;
     const isGapiPageBridge = typeof reason === 'string'
       && reason.indexOf('PAGE_GAPI_CLIENT_READ') === 0;
+    const isPageGapiUiSheetsSession = typeof reason === 'string'
+      && reason.indexOf('PAGE_GAPI_UI_SHEETS_SESSION') === 0;
     const isGlamaPageStateRuntime = typeof reason === 'string'
       && reason.indexOf('GLAMA_PAGE_STATE_RUNTIME_READ') === 0;
     const verdict = r.classification.sameOrigin
@@ -4909,7 +5174,9 @@ function runCli() {
                     ? 'PAGE-BEARER-GRAPH'
                     : (isGapiPageBridge
                       ? 'PAGE-GAPI-CLIENT'
-                      : (isGlamaPageStateRuntime ? 'PAGE-STATE-RUNTIME' : 'SAME-ORIGIN')))))))))
+                      : (isPageGapiUiSheetsSession
+                        ? 'PAGE-GAPI/UI-SHEETS-SESSION'
+                        : (isGlamaPageStateRuntime ? 'PAGE-STATE-RUNTIME' : 'SAME-ORIGIN'))))))))))
       : 'SEPARATE';
     console.log('  ' + verdict + '  ' + r.global + '  head=' + String(r.handlerOrigin) +
       '  api=' + String(r.apiBaseUrl));
@@ -4977,6 +5244,10 @@ function runCli() {
     const reason = r.classification && r.classification.reason;
     return typeof reason === 'string' && reason.indexOf('GLAMA_PAGE_STATE_RUNTIME_READ') === 0;
   }).length;
+  const pageGapiUiSheetsSessions = results.filter(function(r) {
+    const reason = r.classification && r.classification.reason;
+    return typeof reason === 'string' && reason.indexOf('PAGE_GAPI_UI_SHEETS_SESSION') === 0;
+  }).length;
   console.log(
     'verify-origin-classification: PASS (' + results.length + ' shipped head(s); ' +
     publicCorsReads + ' explicit public no-auth CORS read accommodation(s); ' +
@@ -4987,6 +5258,7 @@ function runCli() {
     guardedOnlyHeads + ' guarded-only no-execution head(s); ' +
     pageBearerGraphReads + ' page-bearer Graph read accommodation(s); ' +
     gapiPageBridgeReads + ' page GAPI client read accommodation(s); ' +
+    pageGapiUiSheetsSessions + ' signed-in page-gapi/UI Sheets session accommodation(s); ' +
     glamaPageStateRuntimeReads + ' Glama page-state runtime read accommodation(s); linear ' +
     'separate-origin negative-control classifies separate; 0 silent cross-origin ports)'
   );

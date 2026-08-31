@@ -2,9 +2,8 @@
  * Engine Configuration -- session defaults, execution modes, and config loader.
  *
  * Single source of truth for all session limits currently hardcoded across
- * agent-loop.js and background.js.  Formalizes FSB's four implicit execution
- * modes (autopilot, mcp-manual, mcp-agent, dashboard-remote) as named mode
- * objects with per-mode safety limits and UI feedback channels.
+ * agent-loop.js and background.js.  Formalizes FSB's execution modes as named
+ * mode objects with per-mode safety limits and UI feedback channels.
  *
  * Mirrors Claude Code's direct_modes.py pattern adapted for Chrome MV3.
  *
@@ -52,13 +51,14 @@ var SESSION_DEFAULTS = {
  * Each mode object describes a distinct entry point into the automation
  * engine with per-mode safety limits and UI feedback routing.
  *
- * Four modes based on current background.js implicit code paths:
+ * Five modes based on current background.js entry points:
  *   - autopilot:        User-initiated from popup/sidepanel
  *   - mcp-manual:       Single tool execution via MCP
  *   - mcp-agent:        Multi-step automation via MCP run_automation
  *   - dashboard-remote: Remote automation from dashboard UI
+ *   - delegated:        Local agent provider driving FSB browser tools
  *
- * @type {Object.<string, {name: string, description: string, safetyLimits: {maxIterations: number, costLimit: number, timeLimit: number}, uiFeedbackChannel: string, animatedHighlights: boolean}>}
+ * @type {Object.<string, {name: string, description: string, safetyLimits: {maxIterations?: number, costLimit?: number, timeLimit?: number, wallClockMs?: number, eventSilenceMs?: number}, uiFeedbackChannel: string, animatedHighlights: boolean}>}
  */
 var EXECUTION_MODES = {
   autopilot: {
@@ -103,6 +103,16 @@ var EXECUTION_MODES = {
       timeLimit: 600000
     },
     uiFeedbackChannel: 'dashboard-ws',
+    animatedHighlights: true
+  },
+  delegated: {
+    name: 'delegated',
+    description: 'Local agent provider driving FSB browser tools',
+    safetyLimits: {
+      wallClockMs: 2700000,
+      eventSilenceMs: 120000
+    },
+    uiFeedbackChannel: 'popup-sidepanel',
     animatedHighlights: true
   }
 };

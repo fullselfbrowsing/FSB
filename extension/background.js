@@ -1,4 +1,4 @@
-// Background service worker for FSB v0.9.90
+// Background service worker for FSB
 
 // Import configuration and AI integration modules
 // Phase 269 / v0.9.69: install-identity.js MUST load FIRST so that any
@@ -26,10 +26,25 @@ importScripts('ai/lattice-runtime-adapter.js');
 globalThis.FSB_LATTICE_RUNTIME_ADAPTER_ENABLED = true;
 importScripts('ai/ai-integration.js');
 importScripts('ai/tool-definitions.js');
+// All FSB-owned chrome.debugger consumers share a per-tab FIFO lease. The
+// capture engine is loaded before both MCP dispatch and autopilot execution.
+importScripts('utils/cdp-lease.js');
+importScripts('utils/screenshot-capture.js');
 importScripts('utils/mcp-visual-session.js');
 importScripts('utils/mcp-visual-session-lifecycle.js');
 try { importScripts('utils/agent-cap-recommendation.js'); } catch (e) { console.error('[FSB] Failed to load agent-cap-recommendation.js:', e.message); }
 try { importScripts('utils/agent-registry.js'); } catch (e) { console.error('[FSB] Failed to load agent-registry.js:', e.message); }
+try { importScripts('utils/agent-tab-spawn-provenance.js'); } catch (e) { console.error('[FSB] Failed to load agent-tab-spawn-provenance.js:', e.message); }
+try { importScripts('utils/delegation-providers.js'); } catch (e) { console.error('[FSB] Failed to load delegation-providers.js:', e.message); }
+try { importScripts('utils/mcp-client-aliases.js'); } catch (e) { console.error('[FSB] Failed to load mcp-client-aliases.js:', e.message); }
+try { importScripts('utils/mcp-agent-providers.js'); } catch (e) { console.error('[FSB] Failed to load mcp-agent-providers.js:', e.message); }
+try { importScripts('utils/delegation-preflight.js'); } catch (e) { console.error('[FSB] Failed to load delegation-preflight.js:', e.message); }
+try { importScripts('utils/native-host-install-command.js'); } catch (e) { console.error('[FSB] Failed to load native-host-install-command.js:', e.message); }
+try { importScripts('utils/native-host-wake.js'); } catch (e) { console.error('[FSB] Failed to load native-host-wake.js:', e.message); }
+try { importScripts('utils/delegation-consent.js'); } catch (e) { console.error('[FSB] Failed to load delegation-consent.js:', e.message); }
+try { importScripts('utils/delegation-event-store.js'); } catch (e) { console.error('[FSB] Failed to load delegation-event-store.js:', e.message); }
+try { importScripts('utils/delegation-controller.js'); } catch (e) { console.error('[FSB] Failed to load delegation-controller.js:', e.message); }
+try { importScripts('utils/delegation-tab-seed.js'); } catch (e) { console.error('[FSB] Failed to load delegation-tab-seed.js:', e.message); }
 // Phase 246 plan 01: agent-scoped tab resolver. Pure helper; consumes
 // globalThis.fsbAgentRegistryInstance via getAgentTabs(agentId). Loaded
 // AFTER the registry and BEFORE the dispatcher / bridge-client so those
@@ -62,6 +77,7 @@ try { importScripts('utils/trigger-lifecycle.js'); } catch (e) { console.error('
 // remain DOM-bound but are not invoked here -- SW reaches them via
 // chrome.scripting.executeScript injection inside wrapWithChangeReport.
 try { importScripts('utils/action-verification.js'); } catch (e) { console.error('[FSB] Failed to load action-verification.js:', e.message); }
+try { importScripts('utils/spreadsheet-record-redaction.js'); } catch (e) { console.error('[FSB] Failed to load spreadsheet-record-redaction.js:', e.message); }
 try { importScripts('ws/mcp-tool-dispatcher.js'); } catch (e) { console.error('[FSB] Failed to load mcp-tool-dispatcher.js:', e.message); }
 // Phase 270 / v0.9.69 -- price resolver. Must load BEFORE mcp-metrics-recorder
 // so the recorder's try/catch can call globalThis.fsbMcpPricing.estimateMcpCost.
@@ -72,12 +88,25 @@ try { importScripts('utils/mcp-pricing.js'); } catch (e) { console.error('[FSB] 
 // (it calls fsbMcpPricing) and AFTER mcp-tool-dispatcher.js (dispatcher hooks
 // call globalThis.fsbMcpMetricsRecorder).
 try { importScripts('utils/mcp-metrics-recorder.js'); } catch (e) { console.error('[FSB] Failed to load mcp-metrics-recorder.js:', e.message); }
+// Session history owns the shared local-storage mutation chain. Load it before
+// the MCP recorder so startup redaction can serialize with every history/log
+// writer instead of racing a stale read-modify-write snapshot.
+importScripts('utils/automation-logger.js');
+// Durable Lattice-shaped MCP event journal. Loaded before replay and the
+// recorder facade so both can discover its API lazily without a module cycle.
+try { importScripts('utils/mcp-lattice-journal.js'); } catch (e) { console.error('[FSB] Failed to load mcp-lattice-journal.js:', e.message); }
+try { importScripts('utils/mcp-session-export-port.js'); } catch (e) { console.error('[FSB] Failed to load mcp-session-export-port.js:', e.message); }
+try { importScripts('utils/lattice-replay.js'); } catch (e) { console.error('[FSB] Failed to load lattice-replay.js:', e.message); }
+// Quick 260707-7id -- MCP session recorder. Loaded AFTER the dispatcher,
+// metrics recorder, and automation logger: the dispatcher's finally-block
+// sibling hooks resolve the recorder lazily, while recorder startup can use the
+// logger's storage mutation chain before any WS dispatch fires.
+try { importScripts('utils/mcp-session-recorder.js'); } catch (e) { console.error('[FSB] Failed to load mcp-session-recorder.js:', e.message); }
 // Phase 272 / v0.9.69 -- TelemetryCollector. Loaded AFTER mcp-metrics-recorder
 // (collector reads the rows the recorder writes to fsbUsageData). The alarm
 // handler in chrome.alarms.onAlarm + the install_announce setTimeout in
 // chrome.runtime.onInstalled are wired below.
 try { importScripts('utils/telemetry-collector.js'); } catch (e) { console.error('[FSB] Failed to load telemetry-collector.js:', e.message); }
-importScripts('utils/automation-logger.js');
 importScripts('utils/analytics.js');
 importScripts('utils/keyboard-emulator.js');
 importScripts('utils/site-explorer.js');
@@ -86,8 +115,245 @@ importScripts('utils/crawler-manager.js');
 // Overlay state builder for sendSessionStatus -> content script overlay
 importScripts('utils/overlay-state.js');
 
+// Toolbar action icon frames driven by the same overlay state
+try { importScripts('utils/action-icon.js'); } catch (e) { console.error('[FSB] Failed to load action-icon.js:', e.message); }
+
 // MCP bridge client for local MCP server connection
 try { importScripts('ws/mcp-bridge-client.js'); } catch (e) { console.error('[FSB] Failed to load mcp-bridge-client.js:', e.message); }
+
+// Native registration detection is advisory only. The helper installs its
+// native-port listeners synchronously, sends no message, and closes on its own
+// short timer. This promise is deliberately independent from SW bootstrap.
+try {
+  if (globalThis.FsbNativeHostWake
+      && typeof globalThis.FsbNativeHostWake.probePresence === 'function') {
+    Promise.resolve(globalThis.FsbNativeHostWake.probePresence()).catch(() => {});
+  }
+} catch (_error) { /* optional native host remains silent at boot */ }
+
+let fsbMcpCompatibilityRefreshPromise = null;
+let fsbMcpCompatibilityPairingStatus = null;
+
+function fsbGetMcpCompatibilityProviders() {
+  const providers = globalThis.FsbMcpAgentProviders;
+  if (!providers
+      || typeof providers.read !== 'function'
+      || typeof providers.validateCompatibilitySnapshot !== 'function'
+      || typeof providers.replaceCompatibility !== 'function'
+      || typeof providers.getMergedClients !== 'function') {
+    throw new Error('MCP client inventory helper unavailable');
+  }
+  return providers;
+}
+
+async function fsbReadMergedMcpClients(providers) {
+  const registry = globalThis.fsbAgentRegistryInstance;
+  const liveRecords = registry && typeof registry.listAgents === 'function'
+    ? await Promise.resolve(registry.listAgents())
+    : [];
+  return await providers.getMergedClients(liveRecords);
+}
+
+async function fsbReadMcpCompatibilityFallbackOutcome(providers) {
+  try {
+    const envelope = await providers.read();
+    const cached = envelope && Object.prototype.hasOwnProperty.call(envelope, 'compatibility')
+      ? providers.validateCompatibilitySnapshot(envelope.compatibility)
+      : null;
+    return cached ? 'stale' : 'unavailable';
+  } catch (_error) {
+    return 'unavailable';
+  }
+}
+
+async function fsbReadCachedMcpClients(providers = fsbGetMcpCompatibilityProviders()) {
+  const refreshOutcome = await fsbReadMcpCompatibilityFallbackOutcome(providers);
+  const clients = await fsbReadMergedMcpClients(providers);
+  return {
+    clients,
+    refreshOutcome,
+    compatibilityExpiresAt: refreshOutcome === 'stale'
+      ? fsbReadMcpCompatibilityExpiryAt(providers, clients)
+      : null
+  };
+}
+
+function fsbCompatibilityOwnDataValue(value, key) {
+  if (!value || typeof value !== 'object') return undefined;
+  try {
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    return descriptor && Object.prototype.hasOwnProperty.call(descriptor, 'value')
+      ? descriptor.value
+      : undefined;
+  } catch (_error) {
+    return undefined;
+  }
+}
+
+function fsbCopyCompatibilityDataRecord(value) {
+  const copy = {};
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return copy;
+  try {
+    Object.keys(value).forEach((key) => {
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      if (!descriptor || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) return;
+      Object.defineProperty(copy, key, {
+        value: descriptor.value,
+        writable: true,
+        enumerable: true,
+        configurable: true
+      });
+    });
+  } catch (_error) { /* return only the safely copied fields */ }
+  return copy;
+}
+
+function fsbReadMcpCompatibilityExpiryAt(providers, clients) {
+  const maxAge = fsbCompatibilityOwnDataValue(providers, 'COMPATIBILITY_MAX_AGE_MS');
+  const canonical = globalThis.FsbDelegationProviders;
+  if (!canonical
+      || typeof canonical.ids !== 'function'
+      || !Number.isSafeInteger(maxAge)
+      || maxAge <= 0) return null;
+  const expirations = [];
+  for (const providerId of canonical.ids()) {
+    const row = fsbCompatibilityOwnDataValue(clients, providerId);
+    const compatibility = fsbCompatibilityOwnDataValue(row, 'compatibility');
+    const status = fsbCompatibilityOwnDataValue(compatibility, 'status');
+    const reason = fsbCompatibilityOwnDataValue(compatibility, 'reason');
+    const checkedAt = fsbCompatibilityOwnDataValue(compatibility, 'checkedAt');
+    const runnable = (status === 'supported' && reason === 'within_tested_range')
+      || (status === 'degraded' && reason === 'newer_than_tested_range');
+    if (runnable
+        && Number.isSafeInteger(checkedAt)
+        && checkedAt >= 0
+        && checkedAt <= Number.MAX_SAFE_INTEGER - maxAge) {
+      expirations.push(checkedAt + maxAge);
+    }
+  }
+  return expirations.length > 0 ? Math.min(...expirations) : null;
+}
+
+function fsbProjectStaleMcpClients(clients) {
+  const projected = {};
+  if (!clients || typeof clients !== 'object' || Array.isArray(clients)) return projected;
+  const canonical = globalThis.FsbDelegationProviders;
+  let canonicalIds = [];
+  try {
+    canonicalIds = canonical && typeof canonical.ids === 'function'
+      ? canonical.ids()
+      : [];
+  } catch (_error) { /* no canonical rows can be projected */ }
+  try {
+    Object.keys(clients).forEach((providerId) => {
+      const row = fsbCompatibilityOwnDataValue(clients, providerId);
+      let nextRow = row;
+      if (canonicalIds.indexOf(providerId) === -1) {
+        Object.defineProperty(projected, providerId, {
+          value: nextRow,
+          writable: true,
+          enumerable: true,
+          configurable: true
+        });
+        return;
+      }
+      const compatibility = fsbCompatibilityOwnDataValue(row, 'compatibility');
+      const status = fsbCompatibilityOwnDataValue(compatibility, 'status');
+      const reason = fsbCompatibilityOwnDataValue(compatibility, 'reason');
+      const checkedAt = fsbCompatibilityOwnDataValue(compatibility, 'checkedAt');
+      nextRow = fsbCopyCompatibilityDataRecord(row);
+      nextRow.authState = 'unknown';
+      delete nextRow.acceptedIdentity;
+      const runnable = (status === 'supported' && reason === 'within_tested_range')
+        || (status === 'degraded' && reason === 'newer_than_tested_range');
+      if (runnable
+          && Number.isSafeInteger(checkedAt)
+          && checkedAt >= 0) {
+        nextRow.compatibility = {
+          status: 'degraded',
+          reason: 'evidence_stale',
+          checkedAt
+        };
+      }
+      Object.defineProperty(projected, providerId, {
+        value: nextRow,
+        writable: true,
+        enumerable: true,
+        configurable: true
+      });
+    });
+  } catch (_error) { /* return only the safely projected rows */ }
+  return projected;
+}
+
+async function fsbReadStaleMcpClientFallback(providers) {
+  const fallback = await fsbReadCachedMcpClients(providers);
+  if (fallback.refreshOutcome !== 'stale') return fallback;
+  return {
+    clients: fsbProjectStaleMcpClients(fallback.clients),
+    refreshOutcome: 'stale',
+    compatibilityExpiresAt: null
+  };
+}
+
+function fsbMcpBridgeIsPaired() {
+  if (typeof mcpBridgeClient === 'undefined'
+      || !mcpBridgeClient
+      || typeof mcpBridgeClient.getState !== 'function'
+      || typeof mcpBridgeClient.requestAdapterCompatibility !== 'function') return false;
+  const state = mcpBridgeClient.getState();
+  return !!state && state.pairingStatus === 'paired';
+}
+
+function fsbRefreshMcpCompatibility() {
+  if (fsbMcpCompatibilityRefreshPromise) return fsbMcpCompatibilityRefreshPromise;
+
+  const run = async () => {
+    const providers = fsbGetMcpCompatibilityProviders();
+    if (fsbMcpBridgeIsPaired()) {
+      try {
+        const response = await mcpBridgeClient.requestAdapterCompatibility();
+        const validated = providers.validateCompatibilitySnapshot(response);
+        if (!validated) throw new Error('Invalid MCP adapter compatibility response');
+        await providers.replaceCompatibility(validated);
+        const clients = await fsbReadMergedMcpClients(providers);
+        return {
+          clients,
+          refreshOutcome: 'refreshed',
+          compatibilityExpiresAt: fsbReadMcpCompatibilityExpiryAt(providers, clients)
+        };
+      } catch (_error) {
+        // Preserve and project only the last durable cache below.
+      }
+    }
+
+    return await fsbReadStaleMcpClientFallback(providers);
+  };
+
+  let tracked;
+  tracked = run().finally(() => {
+    if (fsbMcpCompatibilityRefreshPromise === tracked) {
+      fsbMcpCompatibilityRefreshPromise = null;
+    }
+  });
+  fsbMcpCompatibilityRefreshPromise = tracked;
+  return tracked;
+}
+
+function fsbObserveMcpCompatibilityPairing(status) {
+  if (status === fsbMcpCompatibilityPairingStatus) return;
+  fsbMcpCompatibilityPairingStatus = status;
+  if (status !== 'paired') return;
+  fsbRefreshMcpCompatibility().catch(() => { /* silent best-effort cold refresh */ });
+}
+
+try {
+  if (typeof mcpBridgeClient !== 'undefined'
+      && mcpBridgeClient
+      && typeof mcpBridgeClient.addPairingStatusObserver === 'function') {
+    mcpBridgeClient.addPairingStatusObserver(fsbObserveMcpCompatibilityPairing);
+  }
+} catch (_error) { /* optional bridge dependency */ }
 
 function armMcpBridge(reason) {
   try {
@@ -105,10 +371,11 @@ armMcpBridge('service-worker-evaluated');
 try { importScripts('lib/lz-string.min.js'); } catch (e) { console.error('[FSB] Failed to load lz-string.min.js:', e.message); }
 try { importScripts('ws/phantom-stream-protocol.js'); } catch (e) { console.error('[FSB] Failed to load phantom-stream-protocol.js:', e.message); }
 // Phase 211-03 diagnostic logging: load the ring buffer BEFORE redactForLog so
-// that rateLimitedWarn sees globalThis.fsbDiagnostics on first call. Both load
-// BEFORE ws-client.js so the WebSocket layer can use the helpers.
+// that rateLimitedWarn sees globalThis.fsbDiagnostics on first call. The drift
+// pre-throttle then loads after both dependencies and before runtime consumers.
 try { importScripts('utils/diagnostics-ring-buffer.js'); } catch (e) { console.error('[FSB] Failed to load diagnostics-ring-buffer.js:', e.message); }
 try { importScripts('utils/redactForLog.js'); } catch (e) { console.error('[FSB] Failed to load redactForLog.js:', e.message); }
+try { importScripts('utils/agent-protocol-drift-diagnostics.js'); } catch (e) { console.error('[FSB] Failed to load agent-protocol-drift-diagnostics.js:', e.message); }
 try { importScripts('ws/ws-client.js'); } catch (e) { console.error('[FSB] Failed to load ws-client.js:', e.message); }
 
 // Phase 26 Plan 01 (v0.9.99 CAP-01/CAP-05): Native Capability Catalog Wall-1
@@ -185,6 +452,7 @@ try {
 // before the router's post-fetch classify hook runs.
 try { importScripts('utils/capability-rot-detector.js'); } catch (e) { console.error('[FSB] Failed to load capability-rot-detector.js:', e.message); }
 try { importScripts('utils/capability-catalog.js'); } catch (e) { console.error('[FSB] Failed to load capability-catalog.js:', e.message); }
+try { importScripts('utils/google-sheets-session.js'); } catch (e) { console.error('[FSB] Failed to load google-sheets-session.js:', e.message); }
 try { importScripts('utils/capability-router.js'); } catch (e) { console.error('[FSB] Failed to load capability-router.js:', e.message); }
 
 // Phase 29 Plan 03 (v0.9.99 CAT-02): the bundled-head T1a handler modules. These
@@ -293,6 +561,7 @@ try { importScripts('catalog/handlers/ganalytics.js'); } catch (e) { console.err
 try { importScripts('catalog/handlers/figma.js'); } catch (e) { console.error('[FSB] Failed to load handlers/figma.js:', e.message); }
 try { importScripts('catalog/handlers/gdrive.js'); } catch (e) { console.error('[FSB] Failed to load handlers/gdrive.js:', e.message); }
 try { importScripts('catalog/handlers/gdocs.js'); } catch (e) { console.error('[FSB] Failed to load handlers/gdocs.js:', e.message); }
+try { importScripts('catalog/handlers/gsheets.js'); } catch (e) { console.error('[FSB] Failed to load handlers/gsheets.js:', e.message); }
 try { importScripts('catalog/handlers/powerpoint.js'); } catch (e) { console.error('[FSB] Failed to load handlers/powerpoint.js:', e.message); }
 try { importScripts('catalog/handlers/outlook.js'); } catch (e) { console.error('[FSB] Failed to load handlers/outlook.js:', e.message); }
 try { importScripts('catalog/handlers/teams.js'); } catch (e) { console.error('[FSB] Failed to load handlers/teams.js:', e.message); }
@@ -542,8 +811,10 @@ importScripts('ai/hooks/safety-hooks.js');
 importScripts('ai/hooks/permission-hook.js');
 importScripts('ai/hooks/progress-hook.js');
 importScripts('ai/tool-use-adapter.js');
+importScripts('ai/screenshot-attachments.js');
 importScripts('ai/tool-executor.js');
 importScripts('ai/agent-loop.js');
+importScripts('ai/model-discovery.js');
 
 // Memory layer modules
 importScripts('lib/memory/memory-schemas.js');
@@ -582,6 +853,7 @@ const CONTENT_SCRIPT_FILES = [
   'content/dom-stream.js',
   'content/trigger-observe.js',
   'content/accessibility.js',
+  'utils/google-sheets-ui.js',
   'content/actions.js',
   'content/dom-analysis.js',
   'content/messaging.js',
@@ -868,7 +1140,14 @@ async function sendSessionStatus(tabId, statusData) {
   const overlayState = (typeof FSBOverlayStateUtils !== 'undefined' && FSBOverlayStateUtils.buildOverlayState)
     ? FSBOverlayStateUtils.buildOverlayState(statusData, session)
     : statusData; // fallback: send raw data if overlay-state.js failed to load
-  const payload = { action: 'sessionStatus', overlayState };
+  // The toolbar icon no longer rides this pipe: every implicit visual session
+  // reports the same phase, so phase cannot tell a read from a click. It is
+  // driven by tool class instead -- see fsbActionIcon.noteActivity.
+  const payload = {
+    action: 'sessionStatus',
+    overlayState,
+    ...(statusData?.sessionId ? { sessionId: statusData.sessionId } : {})
+  };
   try {
     await chrome.tabs.sendMessage(tabId, payload, { frameId: 0 });
   } catch (firstErr) {
@@ -889,6 +1168,15 @@ function getMcpVisualSessionManager() {
     throw new Error('MCP visual session manager unavailable');
   }
   return mcpVisualSessionManager;
+}
+
+function resolveMcpVisualSessionTabId(sessionToken) {
+  const token = String(sessionToken || '').trim();
+  if (!token) return null;
+  const session = getMcpVisualSessionManager().getSession(token);
+  return session && Number.isFinite(session.tabId) && session.tabId > 0
+    ? Number(session.tabId)
+    : null;
 }
 
 function getMcpVisualSessionFinalClearDelayMs() {
@@ -1146,11 +1434,18 @@ async function restorePersistedMcpVisualSessions() {
 // Phase 237 -- Agent Registry boot.
 // Hydrates registry from chrome.storage.session and reconciles against live tabs.
 // Idempotent: subsequent calls within the same SW lifetime are no-ops.
-// Failure mode: log via rateLimitedWarn and continue; never poison SW startup.
+// Failure mode: log via rateLimitedWarn and propagate so dependent lifecycle
+// authorities cannot start against an empty or quarantined registry.
 async function bootstrapAgentRegistry() {
-  if (!globalThis.FsbAgentRegistry || !globalThis.FsbAgentRegistry.AgentRegistry) return;
+  if (!globalThis.FsbAgentRegistry
+      || typeof globalThis.FsbAgentRegistry.AgentRegistry !== 'function') {
+    throw new Error('agent registry dependency is unavailable');
+  }
   if (!globalThis.fsbAgentRegistryInstance) {
     globalThis.fsbAgentRegistryInstance = new globalThis.FsbAgentRegistry.AgentRegistry();
+  }
+  if (typeof globalThis.fsbAgentRegistryInstance.hydrate !== 'function') {
+    throw new Error('agent registry hydration authority is unavailable');
   }
   try {
     await globalThis.fsbAgentRegistryInstance.hydrate();
@@ -1163,7 +1458,1897 @@ async function bootstrapAgentRegistry() {
         typeof globalThis.redactForLog === 'function' ? globalThis.redactForLog(err) : { kind: 'error' }
       );
     }
+    throw err;
   }
+}
+
+// Phase 61 -- one service-worker-owned delegation lifecycle authority.
+// Hydration intentionally completes before either the runtime subscriber or
+// bridge observer is installed, so persisted history is never replayed as a
+// polite live announcement after an MV3 worker wake.
+let fsbDelegationBootPromise = null;
+let fsbDelegationBridgeObserverInstalled = false;
+let fsbDelegationConnectionObserverInstalled = false;
+let fsbDelegationConnectionTail = Promise.resolve();
+let fsbDelegationConnectionEpoch = 0;
+const fsbDelegationActiveIds = new Set();
+const fsbDelegationRunContexts = new Map();
+const FSB_DELEGATION_GENERATION_PREFIX = 'fsbDelegationGeneration:v1:';
+// Mirrors failureCode() in mcp/src/agent-providers/spawn-supervisor.ts. Codes
+// outside this roster are dropped rather than shown.
+const FSB_DELEGATION_START_REJECTION_DETAILS = new Set([
+  'adapter_unavailable',
+  'spawn_failed',
+  'activation_failed',
+  'agent_protocol_drift',
+  'route_lost',
+  'daemon_shutdown',
+  'tree_unsettled',
+  'runtime_cleanup_failed',
+  'cancelled'
+]);
+
+const FSB_DELEGATION_GENERATION_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
+const FSB_DELEGATION_PROFILE_VERSION_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$/;
+const FSB_DELEGATION_STATUS_TIMEOUT_MS = 5000;
+const FSB_DELEGATION_STATUS_ACTIVE_LIMIT = 64;
+const FSB_DELEGATION_STATUS_LOSS_LIMIT = 128;
+const FSB_DELEGATION_ACCEPTED_IDENTITY_KEYS = Object.freeze([
+  'providerId', 'label', 'profileVersion', 'authState', 'billingKind'
+]);
+
+function fsbDelegationHasExactKeys(value, expected) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const actual = Object.keys(value).sort();
+  const sortedExpected = expected.slice().sort();
+  return actual.length === sortedExpected.length
+    && actual.every((key, index) => key === sortedExpected[index]);
+}
+
+function fsbDelegationReadExactOwnDataRecord(value, expected, allowNullPrototype) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  try {
+    const prototype = Object.getPrototypeOf(value);
+    if (prototype !== Object.prototype && !(allowNullPrototype && prototype === null)) return null;
+    const ownKeys = Reflect.ownKeys(value);
+    if (ownKeys.length !== expected.length) return null;
+    const record = {};
+    for (const key of expected) {
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      if (!descriptor
+          || descriptor.enumerable !== true
+          || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) return null;
+      record[key] = descriptor.value;
+    }
+    return ownKeys.every((key) => typeof key === 'string' && expected.includes(key))
+      ? record
+      : null;
+  } catch (_error) {
+    return null;
+  }
+}
+
+function fsbDelegationAcceptedIdentity(value) {
+  const canonical = globalThis.FsbDelegationProviders;
+  return canonical && typeof canonical.validateAcceptedAgentIdentity === 'function'
+    ? canonical.validateAcceptedAgentIdentity(value)
+    : null;
+}
+
+function fsbDelegationSameAcceptedIdentity(left, right) {
+  const acceptedLeft = fsbDelegationAcceptedIdentity(left);
+  const acceptedRight = fsbDelegationAcceptedIdentity(right);
+  return !!acceptedLeft
+    && !!acceptedRight
+    && FSB_DELEGATION_ACCEPTED_IDENTITY_KEYS.every(
+      (key) => acceptedLeft[key] === acceptedRight[key]
+    );
+}
+
+function fsbDelegationCreateRunContext(value) {
+  const acceptedIdentity = fsbDelegationAcceptedIdentity(value);
+  if (!acceptedIdentity
+      || !FSB_DELEGATION_PROFILE_VERSION_PATTERN.test(acceptedIdentity.profileVersion)) return null;
+  return Object.freeze({
+    acceptedIdentity,
+    providerId: acceptedIdentity.providerId,
+    label: acceptedIdentity.label,
+    profileVersion: acceptedIdentity.profileVersion,
+    authState: acceptedIdentity.authState,
+    billingKind: acceptedIdentity.billingKind
+  });
+}
+
+function fsbDelegationRunContextFromSnapshot(snapshot) {
+  if (!snapshot
+      || typeof snapshot !== 'object'
+      || !snapshot.provider
+      || typeof snapshot.provider !== 'object'
+      || !Array.isArray(snapshot.entries)) return null;
+  const initEntry = snapshot.entries.find((entry) => (
+    entry && entry.init && entry.init.client && typeof entry.init.profileVersion === 'string'
+  ));
+  if (!initEntry
+      || snapshot.provider.id !== initEntry.init.client.id
+      || snapshot.provider.label !== initEntry.init.client.label) return null;
+  const context = fsbDelegationCreateRunContext(snapshot.acceptedIdentity);
+  return context
+    && context.providerId === snapshot.provider.id
+    && context.label === snapshot.provider.label
+    && context.profileVersion === initEntry.init.profileVersion
+    ? context
+    : null;
+}
+
+function fsbDelegationStatusIsCanonical(value) {
+  if (!fsbDelegationHasExactKeys(value, ['active', 'generation', 'restartLosses', 'routeLosses'])
+      || typeof value.generation !== 'string'
+      || !FSB_DELEGATION_GENERATION_PATTERN.test(value.generation)
+      || !Array.isArray(value.active)
+      || value.active.length > FSB_DELEGATION_STATUS_ACTIVE_LIMIT
+      || !Array.isArray(value.restartLosses)
+      || value.restartLosses.length > FSB_DELEGATION_STATUS_LOSS_LIMIT
+      || !Array.isArray(value.routeLosses)
+      || value.routeLosses.length > FSB_DELEGATION_STATUS_LOSS_LIMIT) {
+    return false;
+  }
+  const activeIds = new Set();
+  for (const row of value.active) {
+    if (!fsbDelegationHasExactKeys(row, ['delegationId', 'state'])
+        || typeof row.delegationId !== 'string'
+        || !FSB_DELEGATION_GENERATION_PATTERN.test(row.delegationId)
+        || (row.state !== 'running' && row.state !== 'held' && row.state !== 'stopping')
+        || activeIds.has(row.delegationId)) {
+      return false;
+    }
+    activeIds.add(row.delegationId);
+  }
+  const dispositionIds = new Set();
+  for (const row of value.restartLosses) {
+    if (!fsbDelegationHasExactKeys(row, ['code', 'delegationId', 'recoveredAt'])
+        || row.code !== 'daemon_restart_lost_run'
+        || typeof row.delegationId !== 'string'
+        || !FSB_DELEGATION_GENERATION_PATTERN.test(row.delegationId)
+        || !Number.isSafeInteger(row.recoveredAt)
+        || row.recoveredAt < 0
+        || activeIds.has(row.delegationId)
+        || dispositionIds.has(row.delegationId)) {
+      return false;
+    }
+    dispositionIds.add(row.delegationId);
+  }
+  for (const row of value.routeLosses) {
+    if (!fsbDelegationHasExactKeys(row, ['code', 'delegationId', 'lostAt'])
+        || row.code !== 'route_lost'
+        || typeof row.delegationId !== 'string'
+        || !FSB_DELEGATION_GENERATION_PATTERN.test(row.delegationId)
+        || !Number.isSafeInteger(row.lostAt)
+        || row.lostAt < 0
+        || activeIds.has(row.delegationId)
+        || dispositionIds.has(row.delegationId)) {
+      return false;
+    }
+    dispositionIds.add(row.delegationId);
+  }
+  return true;
+}
+
+function fsbDelegationGenerationKey(delegationId) {
+  return FSB_DELEGATION_GENERATION_PREFIX + delegationId;
+}
+
+async function fsbLoadDelegationGeneration({ delegationId }) {
+  const key = fsbDelegationGenerationKey(delegationId);
+  const stored = await chrome.storage.session.get([key]);
+  const record = stored && stored[key];
+  if (!fsbDelegationHasExactKeys(record, ['delegationId', 'generation', 'v'])
+      || record.v !== 1
+      || record.delegationId !== delegationId
+      || typeof record.generation !== 'string'
+      || !FSB_DELEGATION_GENERATION_PATTERN.test(record.generation)) {
+    return null;
+  }
+  return record.generation;
+}
+
+async function fsbSaveDelegationGeneration({ delegationId, generation }) {
+  if (typeof generation !== 'string'
+      || !FSB_DELEGATION_GENERATION_PATTERN.test(generation)) {
+    throw new Error('delegation generation is invalid');
+  }
+  const key = fsbDelegationGenerationKey(delegationId);
+  await chrome.storage.session.set({
+    [key]: { v: 1, delegationId, generation }
+  });
+}
+
+async function fsbClearDelegationGeneration({ delegationId }) {
+  await chrome.storage.session.remove(fsbDelegationGenerationKey(delegationId));
+}
+
+async function fsbWaitForDelegationBridge() {
+  armMcpBridge('delegation-reconcile');
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    if (mcpBridgeClient.isConnected === true) return true;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  return mcpBridgeClient.isConnected === true;
+}
+
+async function fsbReadDelegationStatus() {
+  const status = await mcpBridgeClient.sendExtRequest(
+    'delegate.status',
+    {},
+    { timeout: FSB_DELEGATION_STATUS_TIMEOUT_MS }
+  );
+  if (!fsbDelegationStatusIsCanonical(status)) {
+    throw new Error('delegation status response is invalid');
+  }
+  return status;
+}
+
+async function fsbReconcileDelegationSnapshots(controller, snapshots) {
+  if (!Array.isArray(snapshots) || snapshots.length === 0) return true;
+  let connection = mcpBridgeClient.getDelegationConnectionSnapshot();
+  let status;
+  let statusVerified = false;
+  if ((connection && connection.state === 'connected')
+      || await fsbWaitForDelegationBridge()) {
+    try {
+      status = await fsbReadDelegationStatus();
+      statusVerified = true;
+      connection = { state: 'connected' };
+    } catch (_error) {
+      status = undefined;
+      connection = mcpBridgeClient.getDelegationConnectionSnapshot();
+    }
+  }
+  const connectionState = connection && connection.state === 'connected'
+    ? 'connected'
+    : 'disconnected';
+  let allReconciled = true;
+  for (const snapshot of snapshots) {
+    if (!snapshot || typeof snapshot.delegationId !== 'string') continue;
+    try {
+      await controller.reconcile({
+        delegationId: snapshot.delegationId,
+        connection: connectionState,
+        status
+      });
+    } catch (_error) {
+      // A corrupt or concurrently-terminal record cannot poison other ids.
+      allReconciled = false;
+    }
+  }
+  return statusVerified && allReconciled;
+}
+
+async function fsbReadAuthoritativeProviderConfig() {
+  const stored = await chrome.storage.local.get([
+    'providerKind', 'agentProviderId', 'modelProvider', 'modelName', 'lmstudioBaseUrl'
+  ]);
+  return {
+    providerKind: typeof stored.providerKind === 'string' ? stored.providerKind : 'api',
+    agentProviderId: typeof stored.agentProviderId === 'string' ? stored.agentProviderId : '',
+    modelProvider: typeof stored.modelProvider === 'string' ? stored.modelProvider : 'xai',
+    modelName: typeof stored.modelName === 'string' ? stored.modelName.trim() : '',
+    lmstudioBaseUrl: typeof stored.lmstudioBaseUrl === 'string'
+      ? stored.lmstudioBaseUrl
+      : 'http://localhost:1234'
+  };
+}
+
+async function fsbResolveLmStudioModelForStart(providerConfig) {
+  if (!providerConfig
+      || providerConfig.providerKind !== 'api'
+      || providerConfig.modelProvider !== 'lmstudio'
+      || providerConfig.modelName) {
+    return providerConfig;
+  }
+
+  const discovery = globalThis.FSBModelDiscovery;
+  if (!discovery || typeof discovery.discoverModels !== 'function') {
+    throw new Error('LM Studio model discovery is unavailable. Open Settings and select a loaded chat model.');
+  }
+
+  const result = await discovery.discoverModels('lmstudio', '', {
+    baseUrl: providerConfig.lmstudioBaseUrl,
+    timeoutMs: 5000
+  });
+  const models = result && result.ok === true && Array.isArray(result.models)
+    ? result.models.filter(model => model && model.id)
+    : [];
+
+  if (models.length === 1) {
+    const modelName = String(models[0].id);
+    await chrome.storage.local.set({ modelName: modelName });
+    if (typeof automationLogger !== 'undefined') {
+      automationLogger.info('LM Studio model auto-migrated', {
+        phase: 'startup-preflight',
+        provider: 'lmstudio',
+        model: modelName,
+        modelCount: 1
+      });
+    }
+    return Object.assign({}, providerConfig, { modelName: modelName });
+  }
+
+  if (models.length > 1) {
+    throw new Error('Multiple LM Studio chat models are loaded. Open Settings and choose the model FSB should use.');
+  }
+
+  const detail = result && result.reason === 'empty-response'
+    ? 'No compatible chat model is loaded.'
+    : ((result && result.message) || 'Could not connect to the LM Studio server.');
+  throw new Error('LM Studio is not ready: ' + detail + ' Open Settings after loading a chat model.');
+}
+
+async function fsbReadAuthoritativeProviderEvidence(providerId) {
+  const canonical = globalThis.FsbDelegationProviders;
+  const providers = globalThis.FsbMcpAgentProviders;
+  if (!canonical
+      || typeof canonical.isShippedId !== 'function'
+      || !canonical.isShippedId(providerId)
+      || !providers
+      || typeof providers.getMergedClients !== 'function') return null;
+  const registry = globalThis.fsbAgentRegistryInstance;
+  const liveRecords = registry && typeof registry.listAgents === 'function'
+    ? await Promise.resolve(registry.listAgents())
+    : [];
+  const clients = await providers.getMergedClients(liveRecords);
+  let rowDescriptor;
+  let compatibilityDescriptor;
+  let acceptedIdentityDescriptor;
+  let authStateDescriptor;
+  try {
+    rowDescriptor = Object.getOwnPropertyDescriptor(clients, providerId);
+    if (!rowDescriptor
+        || rowDescriptor.enumerable !== true
+        || !Object.prototype.hasOwnProperty.call(rowDescriptor, 'value')) return null;
+    compatibilityDescriptor = Object.getOwnPropertyDescriptor(rowDescriptor.value, 'compatibility');
+    acceptedIdentityDescriptor = Object.getOwnPropertyDescriptor(
+      rowDescriptor.value,
+      'acceptedIdentity'
+    );
+    authStateDescriptor = Object.getOwnPropertyDescriptor(rowDescriptor.value, 'authState');
+  } catch (_error) {
+    return null;
+  }
+  const compatibility = compatibilityDescriptor
+    && compatibilityDescriptor.enumerable === true
+    && Object.prototype.hasOwnProperty.call(compatibilityDescriptor, 'value')
+    ? compatibilityDescriptor.value
+    : null;
+  let acceptedIdentity = acceptedIdentityDescriptor
+    && acceptedIdentityDescriptor.enumerable === true
+    && Object.prototype.hasOwnProperty.call(acceptedIdentityDescriptor, 'value')
+    ? fsbDelegationAcceptedIdentity(acceptedIdentityDescriptor.value)
+    : null;
+  const projectedAuthState = authStateDescriptor
+    && authStateDescriptor.enumerable === true
+    && Object.prototype.hasOwnProperty.call(authStateDescriptor, 'value')
+    ? authStateDescriptor.value
+    : undefined;
+  let authState = projectedAuthState === 'oauth'
+    || projectedAuthState === 'unauthenticated'
+    || projectedAuthState === 'unknown'
+    ? projectedAuthState
+    : (acceptedIdentity ? acceptedIdentity.authState : 'unknown');
+  if (acceptedIdentity && acceptedIdentity.authState !== authState) {
+    acceptedIdentity = null;
+    authState = 'unknown';
+  }
+  return Object.freeze({ compatibility, acceptedIdentity, authState });
+}
+
+function fsbDelegationBridgeState() {
+  if (typeof mcpBridgeClient === 'undefined'
+      || !mcpBridgeClient
+      || typeof mcpBridgeClient.getState !== 'function') {
+    return {
+      connected: false,
+      status: 'disconnected',
+      pairingStatus: 'unknown',
+      delegationConnection: { state: 'disconnected' }
+    };
+  }
+  return mcpBridgeClient.getState();
+}
+
+async function fsbDelegationPreflightResult() {
+  const config = await fsbReadAuthoritativeProviderConfig();
+  const evidence = config.providerKind === 'agent'
+    ? await fsbReadAuthoritativeProviderEvidence(config.agentProviderId)
+    : null;
+  const result = globalThis.FsbDelegationPreflight.check({
+    providerKind: config.providerKind,
+    agentProviderId: config.agentProviderId,
+    modelProvider: config.modelProvider,
+    bridgeState: fsbDelegationBridgeState(),
+    compatibility: evidence && evidence.compatibility,
+    acceptedIdentity: evidence && evidence.acceptedIdentity,
+    authState: evidence && evidence.authState
+  });
+  return { config, result };
+}
+
+async function fsbRefreshDelegationAuthorityIfNeeded(authority) {
+  const refreshableGrokAuthEvidence = authority
+    && authority.config
+    && authority.config.agentProviderId === FSB_GROK_BUILD_PROVIDER_ID
+    && authority.result
+    && (authority.result.code === 'auth_unauthenticated'
+      || authority.result.code === 'auth_unknown');
+  if (!authority
+      || !authority.config
+      || authority.config.providerKind !== 'agent'
+      || !authority.result
+      || authority.result.ok !== false
+      || (authority.result.code !== 'provider_status_refresh'
+        && !refreshableGrokAuthEvidence)) return authority;
+  try {
+    await fsbRefreshMcpCompatibility();
+    return await fsbDelegationPreflightResult();
+  } catch (_error) {
+    return authority;
+  }
+}
+
+const FSB_NATIVE_WAKE_ID_PATTERN = /^[A-Za-z0-9_-]{16,64}$/;
+const FSB_NATIVE_WAKE_BRIDGE_TIMEOUT_MS = 5000;
+const FSB_NATIVE_WAKE_BRIDGE_POLL_MS = 50;
+const FSB_MCP_BRIDGE_PAIRING_KEY = 'fsbMcpBridgePairing';
+let fsbAgentBridgeReadyAttempt = null;
+
+function fsbNativeWakeBridgeReady() {
+  const state = fsbDelegationBridgeState();
+  return !!state
+    && state.connected === true
+    && state.status === 'connected'
+    && state.pairingStatus === 'paired'
+    && !!state.delegationConnection
+    && state.delegationConnection.state === 'connected';
+}
+
+function fsbBroadcastNativeWakeChecking(attemptId, intentId) {
+  if (!FSB_NATIVE_WAKE_ID_PATTERN.test(attemptId)
+      || !FSB_NATIVE_WAKE_ID_PATTERN.test(intentId)) return false;
+  try {
+    const pending = chrome.runtime.sendMessage({
+      type: 'FSB_NATIVE_WAKE_CHECKING',
+      attemptId: attemptId,
+      intentId: intentId
+    });
+    if (pending && typeof pending.catch === 'function') pending.catch(() => {});
+    return true;
+  } catch (_error) {
+    return false;
+  }
+}
+
+function fsbAgentBridgeFailure(code) {
+  return Object.freeze({ ok: false, code: code });
+}
+
+function fsbCurrentNativeHostInstallCommand() {
+  const helper = globalThis.FsbNativeHostInstallCommand;
+  const runtimeId = typeof chrome !== 'undefined'
+    && chrome.runtime
+    && typeof chrome.runtime.id === 'string'
+    ? chrome.runtime.id
+    : '';
+  if (!helper || typeof helper.buildInstallCommand !== 'function') return null;
+  try {
+    return helper.buildInstallCommand(runtimeId, globalThis.navigator);
+  } catch (_error) {
+    return null;
+  }
+}
+
+function fsbAgentBridgeFailureMessage(code) {
+  if (code === 'native_host_missing') {
+    const command = fsbCurrentNativeHostInstallCommand();
+    return command
+      ? `Install the FSB native helper, then try again: ${command}`
+      : 'Install the FSB native helper for this browser and extension, then try again.';
+  }
+  if (code === 'extension_origin_mismatch') {
+    return 'The FSB native helper is paired with a different extension. Reset pairing with: npx -y fsb-mcp-server@latest pair --reset. Then try again so FSB can pair this extension automatically.';
+  }
+  if (code === 'bridge_session_unavailable') {
+    return 'The local FSB service did not publish a usable session. Restart it and try again.';
+  }
+  return 'The local FSB agent service could not be reached. Try again.';
+}
+
+const FSB_AGENT_CONNECTION_FAILURE_CODES = Object.freeze({
+  binary_not_found: true,
+  unsupported_version: true,
+  adapter_unavailable: true,
+  auth_unauthenticated: true,
+  connection_test_timeout: true,
+  connection_test_cancelled: true,
+  connection_test_malformed: true,
+  connection_test_tools_used: true,
+  connection_test_failed: true,
+  connection_test_cleanup_failed: true
+});
+const FSB_AGENT_CONNECTION_TEST_REQUEST_TIMEOUT_MS = 120000;
+// Both Grok auth reads outrun the bridge's 30s default. provider.auth.status is one
+// detection -- six bounded 5s probes -- and provider.auth.logout runs two of them around
+// the logout probe, so a slow install can spend a minute answering. Both stay under
+// MAX_EXT_REQUEST_TIMEOUT_MS so the transport keeps them verbatim.
+const FSB_GROK_AUTH_STATUS_REQUEST_TIMEOUT_MS = 60000;
+const FSB_GROK_AUTH_LOGOUT_REQUEST_TIMEOUT_MS = 90000;
+const FSB_GROK_BUILD_PROVIDER_ID = 'grok-build';
+const FSB_GROK_AUTH_STATES = Object.freeze({
+  oauth: true,
+  unauthenticated: true,
+  unknown: true
+});
+const FSB_GROK_AUTH_PROGRESS_STATES = Object.freeze({
+  opening_browser: true,
+  waiting: true,
+  authenticated: true,
+  failed: true,
+  cancelled: true
+});
+// Mirrors GrokBuildAuthBeginReason in mcp/src/agent-providers/grok-auth.ts. The
+// daemon answers begin() with the settled state plus why, because the bridge
+// collapses every ext-handler throw into one opaque code and the panel has to
+// name the refusal.
+const FSB_GROK_AUTH_BEGIN_REASONS = Object.freeze({
+  none: true,
+  cancelled: true,
+  login_failed: true,
+  version_unsupported: true,
+  sandbox_unavailable: true,
+  adapter_unavailable: true,
+  provider_auth_locked: true,
+  session_cleanup_blocked: true
+});
+const FSB_GROK_LOGIN_HOSTS = Object.freeze({
+  'auth.x.ai': true,
+  'accounts.x.ai': true,
+  'grok.com': true,
+  'auth.grok.com': true
+});
+const FSB_GROK_LOGIN_SENSITIVE_QUERY_KEY =
+  /(?:token|secret|password|credential|api[_-]?key|authorization)/i;
+
+function fsbSafeGrokAuthState(value) {
+  return typeof value === 'string'
+    && Object.prototype.hasOwnProperty.call(FSB_GROK_AUTH_STATES, value)
+    ? value
+    : null;
+}
+
+function fsbSafeGrokLoginUrl(value) {
+  if (typeof value !== 'string' || value.length === 0 || value.length > 2048) return null;
+  try {
+    const parsed = new URL(value);
+    if (parsed.hash !== ''
+        || Array.from(parsed.searchParams.keys()).some((key) => (
+          FSB_GROK_LOGIN_SENSITIVE_QUERY_KEY.test(key)
+        ))) return null;
+    return parsed.protocol === 'https:'
+      && parsed.username === ''
+      && parsed.password === ''
+      && Object.prototype.hasOwnProperty.call(
+        FSB_GROK_LOGIN_HOSTS,
+        parsed.hostname.toLowerCase()
+      )
+      ? parsed.toString()
+      : null;
+  } catch (_error) {
+    return null;
+  }
+}
+
+function fsbSafeGrokAuthBeginResponse(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const keys = Object.keys(value).sort();
+  if (keys.length !== 2 || keys[0] !== 'reason' || keys[1] !== 'state') return null;
+  const state = fsbSafeGrokAuthState(value.state);
+  if (!state
+      || typeof value.reason !== 'string'
+      || !Object.prototype.hasOwnProperty.call(FSB_GROK_AUTH_BEGIN_REASONS, value.reason)) {
+    return null;
+  }
+  return Object.freeze({ state: state, reason: value.reason });
+}
+
+function fsbSafeGrokAuthResponse(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const keys = Object.keys(value);
+  const state = keys.length === 1 && keys[0] === 'state'
+    ? fsbSafeGrokAuthState(value.state)
+    : null;
+  return state ? Object.freeze({ state: state }) : null;
+}
+
+// Mirrors grokLogoutResult() in mcp/src/agent-providers/serve-delegation.ts.
+// Logout answers with the settled state, or with the locked marker when a Grok
+// run or a blocked session cleanup owns the profile. A daemon-side throw cannot
+// carry that distinction -- the bridge rewrites every handler error to one
+// opaque code -- so the refusal arrives in the payload.
+function fsbSafeGrokLogoutResponse(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const keys = Object.keys(value).sort();
+  if (keys.length === 1
+      && keys[0] === 'state'
+      && value.state === 'unauthenticated') {
+    return Object.freeze({ state: 'unauthenticated', locked: false });
+  }
+  if (keys.length === 2
+      && keys[0] === 'locked'
+      && keys[1] === 'state'
+      && value.locked === true
+      && value.state === 'unknown') {
+    return Object.freeze({ state: 'unknown', locked: true });
+  }
+  return null;
+}
+
+function fsbSafeGrokAuthProgress(eventName, value) {
+  if (eventName !== 'provider.auth.progress'
+      || !value
+      || typeof value !== 'object'
+      || Array.isArray(value)) return null;
+  const keys = Object.keys(value).sort();
+  const hasUrl = keys.length === 3
+    && keys[0] === 'providerId'
+    && keys[1] === 'state'
+    && keys[2] === 'url';
+  const noUrl = keys.length === 2
+    && keys[0] === 'providerId'
+    && keys[1] === 'state';
+  if ((!hasUrl && !noUrl)
+      || value.providerId !== FSB_GROK_BUILD_PROVIDER_ID
+      || typeof value.state !== 'string'
+      || !Object.prototype.hasOwnProperty.call(FSB_GROK_AUTH_PROGRESS_STATES, value.state)) {
+    return null;
+  }
+  const url = hasUrl ? fsbSafeGrokLoginUrl(value.url) : null;
+  if (hasUrl && (value.state !== 'waiting' || !url)) return null;
+  return Object.freeze({
+    providerId: FSB_GROK_BUILD_PROVIDER_ID,
+    state: value.state,
+    ...(url ? { url: url } : {})
+  });
+}
+
+function fsbBroadcastGrokAuthProgress(progress) {
+  try {
+    const pending = chrome.runtime.sendMessage({
+      type: 'FSB_GROK_BUILD_AUTH_PROGRESS',
+      providerId: progress.providerId,
+      state: progress.state,
+      ...(progress.url ? { url: progress.url } : {})
+    });
+    if (pending && typeof pending.catch === 'function') pending.catch(() => {});
+  } catch (_error) { /* no open extension page is listening */ }
+}
+
+function fsbSafeAgentConnectionFailureCode(code) {
+  return typeof code === 'string'
+    && Object.prototype.hasOwnProperty.call(FSB_AGENT_CONNECTION_FAILURE_CODES, code)
+    ? code
+    : 'connection_test_failed';
+}
+
+function fsbAgentConnectionFailureMessage(code, providerId) {
+  const provider = globalThis.FsbDelegationProviders
+    && typeof globalThis.FsbDelegationProviders.get === 'function'
+    ? globalThis.FsbDelegationProviders.get(providerId)
+    : null;
+  const label = provider && provider.label ? provider.label : 'The selected agent';
+  if (code === 'binary_not_found') return `${label} is not installed or is not on PATH.`;
+  if (code === 'unsupported_version') return `${label} must be updated to a supported version.`;
+  if (code === 'adapter_unavailable') {
+    return `${label} was found at a supported version, but its isolation or protocol profile could not be verified.`;
+  }
+  if (code === 'auth_unauthenticated') {
+    return providerId === FSB_GROK_BUILD_PROVIDER_ID
+      ? 'Connect SuperGrok to the private FSB Grok Build profile, then try again.'
+      : `Sign in to ${label} locally, then try again.`;
+  }
+  if (code === 'connection_test_timeout') return `${label} did not respond within 60 seconds.`;
+  if (code === 'connection_test_cancelled') return `${label} connection test was cancelled.`;
+  if (code === 'connection_test_malformed') return `${label} returned an invalid response.`;
+  if (code === 'connection_test_tools_used') return `${label} attempted to use tools during validation.`;
+  if (code === 'connection_test_cleanup_failed') return `${label} validation cleanup did not settle safely.`;
+  if (code === 'connection_test_failed') return `${label} could not complete the validation request.`;
+  return fsbAgentBridgeFailureMessage(code);
+}
+
+async function fsbWaitForAgentBridgeReady() {
+  for (let elapsed = 0;
+    elapsed < FSB_NATIVE_WAKE_BRIDGE_TIMEOUT_MS;
+    elapsed += FSB_NATIVE_WAKE_BRIDGE_POLL_MS) {
+    if (fsbNativeWakeBridgeReady()) return true;
+    await new Promise((resolve) => setTimeout(resolve, FSB_NATIVE_WAKE_BRIDGE_POLL_MS));
+  }
+  return fsbNativeWakeBridgeReady();
+}
+
+function fsbEnsureAgentBridgeReady(intentId = null) {
+  if (fsbNativeWakeBridgeReady()) {
+    return Promise.resolve(Object.freeze({ ok: true }));
+  }
+  if (fsbAgentBridgeReadyAttempt) {
+    if (intentId && fsbAgentBridgeReadyAttempt.attemptId) {
+      fsbBroadcastNativeWakeChecking(fsbAgentBridgeReadyAttempt.attemptId, intentId);
+    }
+    return fsbAgentBridgeReadyAttempt.promise;
+  }
+
+  const wakeController = globalThis.FsbNativeHostWake;
+  if (!wakeController || typeof wakeController.ensureBootstrap !== 'function') {
+    return Promise.resolve(fsbAgentBridgeFailure('native_host_missing'));
+  }
+
+  let bootstrapPromise;
+  try {
+    bootstrapPromise = wakeController.ensureBootstrap();
+  } catch (_error) {
+    return Promise.resolve(fsbAgentBridgeFailure('native_host_unavailable'));
+  }
+  const attemptId = bootstrapPromise
+    && typeof bootstrapPromise.attemptId === 'string'
+    && FSB_NATIVE_WAKE_ID_PATTERN.test(bootstrapPromise.attemptId)
+    ? bootstrapPromise.attemptId
+    : null;
+  if (intentId && attemptId) fsbBroadcastNativeWakeChecking(attemptId, intentId);
+
+  const work = (async () => {
+    let bootstrapResult;
+    let pairingCode = '';
+    try {
+      bootstrapResult = await bootstrapPromise;
+      if (
+        !bootstrapResult
+        || bootstrapResult.ok !== true
+        || typeof bootstrapResult.pairingCode !== 'string'
+      ) {
+        const nativeMissing = typeof wakeController.getPresence === 'function'
+          && wakeController.getPresence() === 'absent';
+        const reason = bootstrapResult && typeof bootstrapResult.reason === 'string'
+          ? bootstrapResult.reason
+          : (nativeMissing ? 'native_host_missing' : 'native_host_unavailable');
+        return fsbAgentBridgeFailure(reason);
+      }
+      pairingCode = bootstrapResult.pairingCode;
+      bootstrapResult = null;
+      await chrome.storage.session.set({
+        [FSB_MCP_BRIDGE_PAIRING_KEY]: {
+          pairingCode: pairingCode,
+          storedAt: Date.now()
+        }
+      });
+      pairingCode = '';
+    } catch (_error) {
+      pairingCode = '';
+      return fsbAgentBridgeFailure('bridge_bootstrap_failed');
+    }
+
+    if (
+      typeof mcpBridgeClient === 'undefined'
+      || !mcpBridgeClient
+      || typeof mcpBridgeClient.reloadPairingAndReconnect !== 'function'
+    ) {
+      return fsbAgentBridgeFailure('bridge_unavailable');
+    }
+
+    for (let readinessAttempt = 0; readinessAttempt < 2; readinessAttempt += 1) {
+      try {
+        await mcpBridgeClient.reloadPairingAndReconnect();
+      } catch (_error) {
+        // The bounded readiness check below decides whether one retry is needed.
+      }
+      armMcpBridge(readinessAttempt === 0 ? 'native-host-bootstrap' : 'native-host-bootstrap-retry');
+      if (await fsbWaitForAgentBridgeReady()) {
+        try {
+          await fsbRefreshMcpCompatibility();
+        } catch (_error) {
+          // Preflight or the connection-test request returns the bounded provider failure.
+        }
+        return Object.freeze({ ok: true });
+      }
+    }
+    return fsbAgentBridgeFailure('bridge_not_ready');
+  })();
+
+  let tracked;
+  tracked = work.finally(() => {
+    if (fsbAgentBridgeReadyAttempt && fsbAgentBridgeReadyAttempt.promise === tracked) {
+      fsbAgentBridgeReadyAttempt = null;
+    }
+  });
+  fsbAgentBridgeReadyAttempt = Object.freeze({
+    attemptId: attemptId,
+    promise: tracked
+  });
+  return tracked;
+}
+
+async function fsbEnsureConfiguredAgentBridgeReady() {
+  const config = await fsbReadAuthoritativeProviderConfig();
+  if (config.providerKind !== 'agent') return Object.freeze({ ok: true });
+  return fsbEnsureAgentBridgeReady();
+}
+
+async function fsbDelegationTaskDigest(task) {
+  if (typeof task !== 'string' || task.trim().length === 0 || task.length > 200000) {
+    throw new Error('invalid delegation task');
+  }
+  if (!globalThis.crypto || !globalThis.crypto.subtle || typeof TextEncoder !== 'function') {
+    throw new Error('delegation digest is unavailable');
+  }
+  const bytes = await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(task));
+  return Array.from(new Uint8Array(bytes), (value) => value.toString(16).padStart(2, '0')).join('');
+}
+
+function fsbDelegationFailure(code, snapshot) {
+  return { ok: false, code, snapshot: snapshot || null };
+}
+
+function fsbDelegationTrustFailure(code) {
+  if (code === 'unsupported_provider') return { ok: false, code: 'unsupported_provider' };
+  if (typeof code === 'string' && code.indexOf('storage') !== -1) {
+    return { ok: false, code: 'trust_storage_failed' };
+  }
+  return { ok: false, code: 'trust_challenge_invalid' };
+}
+
+function fsbDelegationBridgePreflightFailure(originalResult, bridgeReady) {
+  if (!originalResult
+      || originalResult.ok !== false
+      || (originalResult.code !== 'agent_offline'
+        && originalResult.code !== 'agent_unpaired')) {
+    return originalResult;
+  }
+  const readinessCode = bridgeReady && typeof bridgeReady.code === 'string'
+    ? bridgeReady.code
+    : '';
+  const code = readinessCode === 'native_host_missing'
+    || readinessCode === 'extension_origin_mismatch'
+    || readinessCode === 'bridge_session_unavailable'
+    ? readinessCode
+    : 'agent_offline';
+  return {
+    ok: false,
+    code,
+    providerId: originalResult.providerId,
+    providerLabel: originalResult.providerLabel
+  };
+}
+
+async function fsbDelegationPreflightCommand(request) {
+  const hasIntentId = !!request
+    && typeof request === 'object'
+    && Object.prototype.hasOwnProperty.call(request, 'intentId');
+  const expectedKeys = hasIntentId ? ['intentId', 'task', 'type'] : ['task', 'type'];
+  if (!fsbDelegationHasExactKeys(request, expectedKeys)
+      || typeof request.task !== 'string'
+      || request.task.trim().length === 0
+      || (hasIntentId && (typeof request.intentId !== 'string'
+        || !FSB_NATIVE_WAKE_ID_PATTERN.test(request.intentId)))) {
+    return { ok: false, code: 'invalid_request' };
+  }
+  let authority;
+  try {
+    authority = await fsbDelegationPreflightResult();
+  } catch (_error) {
+    return { ok: false, code: 'agent_offline', providerId: '', providerLabel: 'Selected provider' };
+  }
+  const originalResult = authority.result;
+  if (originalResult && originalResult.ok === true) return originalResult;
+  if (!authority.config || authority.config.providerKind !== 'agent') return originalResult;
+  let bridgeReady;
+  try {
+    bridgeReady = await fsbEnsureAgentBridgeReady(hasIntentId ? request.intentId : null);
+  } catch (_error) {
+    return fsbDelegationBridgePreflightFailure(originalResult, null);
+  }
+  if (!bridgeReady || bridgeReady.ok !== true) {
+    return fsbDelegationBridgePreflightFailure(originalResult, bridgeReady);
+  }
+  try {
+    authority = await fsbDelegationPreflightResult();
+    authority = await fsbRefreshDelegationAuthorityIfNeeded(authority);
+    return authority.result;
+  } catch (_error) {
+    return originalResult;
+  }
+}
+
+async function fsbDelegationConsentCommand(request) {
+  if (!fsbDelegationHasExactKeys(request, ['task', 'type'])
+      || typeof request.task !== 'string'
+      || request.task.trim().length === 0) {
+    return { ok: false, code: 'invalid_request' };
+  }
+  try {
+    const readiness = await fsbEnsureConfiguredAgentBridgeReady();
+    if (!readiness || readiness.ok !== true) {
+      return { ok: false, code: 'agent_offline', providerId: '', providerLabel: 'Selected provider' };
+    }
+  } catch (_error) {
+    return { ok: false, code: 'agent_offline', providerId: '', providerLabel: 'Selected provider' };
+  }
+  let authority;
+  try {
+    authority = await fsbDelegationPreflightResult();
+    authority = await fsbRefreshDelegationAuthorityIfNeeded(authority);
+  } catch (_error) {
+    return { ok: false, code: 'agent_offline', providerId: '', providerLabel: 'Selected provider' };
+  }
+  if (!authority.result.ok || authority.result.kind !== 'agent') return authority.result;
+  const trusted = await globalThis.FsbDelegationConsent.getTrusted(authority.result.providerId);
+  if (trusted) {
+    return {
+      ok: true,
+      providerId: authority.result.providerId,
+      providerLabel: authority.result.providerLabel,
+      trusted: true,
+      challengeId: null,
+      expiresAt: null
+    };
+  }
+  let taskDigest;
+  try {
+    taskDigest = await fsbDelegationTaskDigest(request.task);
+  } catch (_error) {
+    return { ok: false, code: 'invalid_request' };
+  }
+  const issued = await globalThis.FsbDelegationConsent.issueChallenge({
+    acceptedIdentity: authority.result.acceptedIdentity,
+    taskDigest
+  });
+  if (!issued || issued.ok !== true) {
+    return { ok: false, code: 'consent_required' };
+  }
+  return {
+    ok: true,
+    providerId: authority.result.providerId,
+    providerLabel: authority.result.providerLabel,
+    trusted: false,
+    challengeId: issued.challengeId,
+    expiresAt: issued.expiresAt
+  };
+}
+
+async function fsbDelegationSetTrustCommand(request) {
+  if (!fsbDelegationHasExactKeys(request, ['challengeId', 'providerId', 'trusted', 'type'])
+      || typeof request.challengeId !== 'string'
+      || request.trusted !== true) {
+    return { ok: false, code: 'trust_challenge_invalid' };
+  }
+  const canonical = globalThis.FsbDelegationProviders;
+  if (!canonical
+      || typeof canonical.isShippedId !== 'function'
+      || !canonical.isShippedId(request.providerId)) {
+    return { ok: false, code: 'unsupported_provider' };
+  }
+  let authority;
+  try {
+    authority = await fsbDelegationPreflightResult();
+    authority = await fsbRefreshDelegationAuthorityIfNeeded(authority);
+  } catch (_error) {
+    return { ok: false, code: 'trust_provider_changed' };
+  }
+  if (!authority.result.ok
+      || authority.result.kind !== 'agent'
+      || authority.result.providerId !== request.providerId) {
+    return {
+      ok: false,
+      code: authority.result && authority.result.code === 'unsupported_provider'
+        ? 'unsupported_provider'
+        : 'trust_provider_changed'
+    };
+  }
+  const result = await globalThis.FsbDelegationConsent.writeTrustFromChallenge({
+    challengeId: request.challengeId,
+    acceptedIdentity: authority.result.acceptedIdentity,
+    trusted: true
+  });
+  return result && result.ok === true
+    ? { ok: true, providerId: request.providerId, trusted: true }
+    : fsbDelegationTrustFailure(result && result.code);
+}
+
+async function fsbDelegationClearTrustCommand(request) {
+  const canonical = globalThis.FsbDelegationProviders;
+  if (!fsbDelegationHasExactKeys(request, ['providerId', 'type'])
+      || !canonical
+      || typeof canonical.isShippedId !== 'function'
+      || !canonical.isShippedId(request.providerId)) {
+    return { ok: false, code: 'unsupported_provider' };
+  }
+  const result = await globalThis.FsbDelegationConsent.clearTrusted({
+    providerId: request.providerId
+  });
+  return result && result.ok === true
+    ? { ok: true, providerId: request.providerId, trusted: false }
+    : fsbDelegationTrustFailure(result && result.code);
+}
+
+const FSB_AGENT_PROTOCOL_DRIFT_SEEN_LIMIT = 512;
+const fsbAgentProtocolDriftSeenDelegationIds = new Set();
+const FSB_AGENT_PROTOCOL_DRIFT_DETAIL_KEYS = Object.freeze([
+  'adapterId', 'eventIndex', 'expected', 'issuePaths', 'profileVersion', 'reason'
+]);
+const FSB_AGENT_PROTOCOL_DRIFT_LEGACY_KEYS = Object.freeze([
+  'adapterId', 'expected', 'observed'
+]);
+
+function fsbReadExactAgentProtocolDriftRecord(value, expectedKeys) {
+  try {
+    if (!value || typeof value !== 'object' || Array.isArray(value)
+        || Object.getPrototypeOf(value) !== Object.prototype) return null;
+    const keys = Reflect.ownKeys(value);
+    if (keys.length !== expectedKeys.length) return null;
+    const record = Object.create(Object.prototype);
+    for (const key of expectedKeys) {
+      if (!keys.includes(key)) return null;
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      if (!descriptor
+          || descriptor.enumerable !== true
+          || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) return null;
+      record[key] = descriptor.value;
+    }
+    return keys.every((key) => typeof key === 'string' && expectedKeys.includes(key))
+      ? record
+      : null;
+  } catch (_error) {
+    return null;
+  }
+}
+
+function fsbReadAgentProtocolDriftDataProperty(value, key) {
+  try {
+    if (!value || typeof value !== 'object' || Array.isArray(value)
+        || Object.getPrototypeOf(value) !== Object.prototype) return null;
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!descriptor
+        || descriptor.enumerable !== true
+        || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) return null;
+    return { value: descriptor.value };
+  } catch (_error) {
+    return null;
+  }
+}
+
+function fsbProjectAgentProtocolDriftDetail(finalResult) {
+  try {
+    const terminalProperty = fsbReadAgentProtocolDriftDataProperty(finalResult, 'terminal');
+    const terminal = terminalProperty && terminalProperty.value;
+    const codeProperty = fsbReadAgentProtocolDriftDataProperty(terminal, 'code');
+    const detailProperty = fsbReadAgentProtocolDriftDataProperty(terminal, 'detail');
+    if (!codeProperty
+        || codeProperty.value !== 'agent_protocol_drift'
+        || !detailProperty) return null;
+
+    const detail = detailProperty.value;
+    const current = fsbReadExactAgentProtocolDriftRecord(
+      detail,
+      FSB_AGENT_PROTOCOL_DRIFT_DETAIL_KEYS
+    );
+    if (current) return current;
+
+    const legacy = fsbReadExactAgentProtocolDriftRecord(
+      detail,
+      FSB_AGENT_PROTOCOL_DRIFT_LEGACY_KEYS
+    );
+    const profileProperty = fsbReadAgentProtocolDriftDataProperty(terminal, 'profileVersion');
+    if (!legacy
+        || !profileProperty) return null;
+    const projected = Object.create(Object.prototype);
+    projected.adapterId = legacy.adapterId;
+    projected.profileVersion = profileProperty.value;
+    projected.reason = legacy.observed;
+    projected.expected = legacy.expected;
+    projected.eventIndex = 1;
+    projected.issuePaths = Array.from([]);
+    return projected;
+  } catch (_error) {
+    return null;
+  }
+}
+
+function fsbReportAgentProtocolDriftOnce(delegationId, finalResult, runContext) {
+  try {
+    if (typeof delegationId !== 'string'
+        || delegationId.length === 0
+        || fsbAgentProtocolDriftSeenDelegationIds.has(delegationId)
+        || !runContext
+        || typeof runContext !== 'object') {
+      return false;
+    }
+
+    const diagnostics = globalThis.FsbAgentProtocolDriftDiagnostics;
+    const validate = diagnostics && diagnostics.validateAgentProtocolDriftDetail;
+    const report = diagnostics && diagnostics.reportAgentProtocolDrift;
+    if (typeof validate !== 'function' || typeof report !== 'function') return false;
+
+    const projected = fsbProjectAgentProtocolDriftDetail(finalResult);
+    const safeDetail = projected && validate.call(diagnostics, projected);
+    if (!safeDetail
+        || safeDetail.adapterId !== runContext.providerId
+        || safeDetail.profileVersion !== runContext.profileVersion) return false;
+
+    if (fsbAgentProtocolDriftSeenDelegationIds.size >= FSB_AGENT_PROTOCOL_DRIFT_SEEN_LIMIT) {
+      const oldest = fsbAgentProtocolDriftSeenDelegationIds.values().next();
+      if (!oldest.done) fsbAgentProtocolDriftSeenDelegationIds.delete(oldest.value);
+    }
+    fsbAgentProtocolDriftSeenDelegationIds.add(delegationId);
+
+    try {
+      report.call(diagnostics, safeDetail);
+    } catch (_error) {
+      // Diagnostics are observational and cannot affect terminal settlement.
+    }
+    return true;
+  } catch (_error) {
+    return false;
+  }
+}
+
+function fsbDelegationTerminalCode(value) {
+  if (value === 'ext_request_timeout' || value === 'bridge_topology_changed') {
+    return 'route_lost';
+  }
+  if (value === 'runtime_cleanup_failed') return 'tree_unsettled';
+  const allowed = new Set([
+    'cancelled', 'route_lost', 'agent_protocol_drift', 'tree_unsettled',
+    'hold_expired', 'daemon_restart_lost_run', 'provider_error', 'agent_failed'
+  ]);
+  return typeof value === 'string' && allowed.has(value) ? value : 'agent_failed';
+}
+
+// The delegated CLI's final answer rides on the normalized result payload. Read
+// only that one string, and only for a completed run, so a provider error's prose
+// is never forwarded. The descriptor read keeps a getter on the payload inert.
+function fsbDelegationAnswerFromFinal(code, finalResult) {
+  if (code !== 'completed') return null;
+  try {
+    const terminal = finalResult && finalResult.terminal;
+    if (!terminal || terminal.type !== 'result') return null;
+    const payload = terminal.payload;
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
+    const descriptor = Object.getOwnPropertyDescriptor(payload, 'result');
+    if (!descriptor || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) return null;
+    return typeof descriptor.value === 'string' ? descriptor.value : null;
+  } catch (_error) {
+    return null;
+  }
+}
+
+// The supervisor already knows exactly which start gate refused a run and puts
+// that code on the diagnostic terminal it settles delegate.start with. Read it
+// back through a closed roster so a rejected start can name its own cause
+// instead of collapsing every gate into one opaque card. Unknown codes stay out.
+function fsbDelegationStartRejectionDetail(finalResult) {
+  try {
+    if (!finalResult || typeof finalResult !== 'object' || Array.isArray(finalResult)) return null;
+    const terminal = fsbDelegationReadExactOwnDataRecord(
+      finalResult,
+      ['delegationId', 'status', 'terminal'],
+      false
+    );
+    if (!terminal || terminal.status !== 'failed') return null;
+    const diagnostic = terminal.terminal;
+    if (!diagnostic || typeof diagnostic !== 'object' || Array.isArray(diagnostic)) return null;
+    const descriptor = Object.getOwnPropertyDescriptor(diagnostic, 'code');
+    if (!descriptor
+        || descriptor.enumerable !== true
+        || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) return null;
+    return FSB_DELEGATION_START_REJECTION_DETAILS.has(descriptor.value)
+      ? descriptor.value
+      : null;
+  } catch (_error) {
+    return null;
+  }
+}
+
+function fsbDelegationStartRejected(detail) {
+  return typeof detail === 'string' && FSB_DELEGATION_START_REJECTION_DETAILS.has(detail)
+    ? { ok: false, code: 'start_rejected', snapshot: null, detail }
+    : fsbDelegationFailure('start_rejected', null);
+}
+
+function fsbLogDelegationStartRejected(providerId, stage, detail) {
+  try {
+    if (typeof automationLogger === 'undefined'
+        || !automationLogger
+        || typeof automationLogger.info !== 'function') return false;
+    automationLogger.info('Delegation start rejected', {
+      phase: 'delegation-start-rejected',
+      providerId: typeof providerId === 'string' ? providerId : null,
+      stage,
+      terminalCode: typeof detail === 'string' ? detail : null
+    });
+    return true;
+  } catch (_error) {
+    return false;
+  }
+}
+
+function fsbLogDelegationStartPreflight(code) {
+  try {
+    if (typeof automationLogger === 'undefined'
+        || !automationLogger
+        || typeof automationLogger.info !== 'function') return false;
+    automationLogger.info('Delegation start preflight refused', {
+      phase: 'delegation-start-preflight',
+      preflightCode: typeof code === 'string' ? code : null
+    });
+    return true;
+  } catch (_error) {
+    return false;
+  }
+}
+
+function fsbLogDelegationTerminalSettlement(delegationId, code, finalResult, runContext) {
+  try {
+    if (typeof automationLogger === 'undefined'
+        || !automationLogger
+        || typeof automationLogger.info !== 'function') return false;
+    const supervisorStatus = finalResult
+      && (finalResult.status === 'succeeded'
+        || finalResult.status === 'failed'
+        || finalResult.status === 'cancelled')
+      ? finalResult.status
+      : 'transport_error';
+    automationLogger.info('Delegation run settled', {
+      phase: 'delegation-terminal',
+      delegationId,
+      providerId: runContext.providerId,
+      profileVersion: runContext.profileVersion,
+      supervisorStatus,
+      terminalCode: code
+    });
+    return true;
+  } catch (_error) {
+    return false;
+  }
+}
+
+async function fsbSettleDelegationFromFinal(delegationId, finalResult, transportError) {
+  const controller = globalThis.fsbDelegationControllerInstance;
+  if (!controller) {
+    fsbDelegationRunContexts.delete(delegationId);
+    if (globalThis.FsbDelegationTabSeed) globalThis.FsbDelegationTabSeed.forget(delegationId);
+    return;
+  }
+  let snapshot;
+  try { snapshot = controller.getSnapshot(delegationId); } catch (_error) {
+    fsbDelegationRunContexts.delete(delegationId);
+    if (globalThis.FsbDelegationTabSeed) globalThis.FsbDelegationTabSeed.forget(delegationId);
+    return;
+  }
+  if (!snapshot || snapshot.terminal) {
+    fsbDelegationRunContexts.delete(delegationId);
+    if (globalThis.FsbDelegationTabSeed) globalThis.FsbDelegationTabSeed.forget(delegationId);
+    return;
+  }
+  const runContext = fsbDelegationRunContexts.get(delegationId) || null;
+  if (!runContext) return;
+
+  let code = transportError && transportError.code
+    ? fsbDelegationTerminalCode(transportError.code)
+    : null;
+  if (!code && finalResult && finalResult.status === 'succeeded') code = 'completed';
+  if (!code && finalResult && finalResult.status === 'cancelled') code = 'cancelled';
+  // A normalized provider result with is_error=true is distinct from a
+  // transport/protocol failure. Persist only this closed classification;
+  // never copy the provider's raw result payload into browser state.
+  if (!code
+      && finalResult
+      && finalResult.status === 'failed'
+      && finalResult.terminal
+      && finalResult.terminal.type === 'result'
+      && finalResult.terminal.payload
+      && finalResult.terminal.payload.is_error === true) {
+    code = 'provider_error';
+  }
+  if (!code && finalResult && finalResult.terminal && finalResult.terminal.type === 'diagnostic') {
+    code = fsbDelegationTerminalCode(finalResult.terminal.code);
+  }
+  if (!code) code = 'agent_failed';
+  const answer = fsbDelegationAnswerFromFinal(code, finalResult);
+
+  try {
+    await controller.acceptEvent({
+      delegationId,
+      event: { type: 'terminal', sessionId: null, payload: {} },
+      context: {
+        timestamp: Date.now(),
+        terminalCode: code,
+        treeSettled: !transportError && code !== 'tree_unsettled',
+        acceptedIdentity: runContext.acceptedIdentity,
+        ...(answer === null ? {} : { answer })
+      }
+    });
+    fsbLogDelegationTerminalSettlement(delegationId, code, finalResult, runContext);
+    if (code === 'agent_protocol_drift') {
+      fsbReportAgentProtocolDriftOnce(delegationId, finalResult, runContext);
+    }
+  } catch (_error) {
+    // A streamed result or concurrent Stop may already have settled the exact
+    // record. The controller remains the only terminal authority either way.
+  } finally {
+    fsbDelegationRunContexts.delete(delegationId);
+    if (globalThis.FsbDelegationTabSeed) globalThis.FsbDelegationTabSeed.forget(delegationId);
+  }
+}
+
+async function fsbDelegationStartCommand(request) {
+  if (!fsbDelegationHasExactKeys(request, ['challengeId', 'task', 'type'])
+      || (request.challengeId !== null && typeof request.challengeId !== 'string')
+      || typeof request.task !== 'string'
+      || request.task.trim().length === 0) {
+    return fsbDelegationFailure('invalid_request', null);
+  }
+
+  // Taken before any await so a slow preflight or spawn cannot move it. Resolved
+  // here rather than sent by the caller: this command never receives `sender`, so a
+  // caller-supplied tab id could not be trust-checked.
+  let originTabId = null;
+  try {
+    const originTabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+    const originTab = originTabs && originTabs[0];
+    if (originTab && Number.isSafeInteger(originTab.id)) originTabId = originTab.id;
+  } catch (_error) {
+    originTabId = null;
+  }
+
+  try {
+    const readiness = await fsbEnsureConfiguredAgentBridgeReady();
+    if (!readiness || readiness.ok !== true) {
+      return fsbDelegationFailure('preflight_failed', null);
+    }
+  } catch (_error) {
+    return fsbDelegationFailure('preflight_failed', null);
+  }
+
+  let authority;
+  try {
+    authority = await fsbDelegationPreflightResult();
+    authority = await fsbRefreshDelegationAuthorityIfNeeded(authority);
+  } catch (_error) {
+    return fsbDelegationFailure('preflight_failed', null);
+  }
+  if (!authority.result.ok
+      || authority.result.kind !== 'agent') {
+    fsbLogDelegationStartPreflight(authority.result.code);
+    return fsbDelegationFailure('preflight_failed', null);
+  }
+  const selectedProvider = globalThis.FsbDelegationProviders.get(
+    authority.result.providerId
+  );
+  if (!selectedProvider) return fsbDelegationFailure('preflight_failed', null);
+
+  let taskDigest;
+  try {
+    taskDigest = await fsbDelegationTaskDigest(request.task);
+  } catch (_error) {
+    return fsbDelegationFailure('invalid_request', null);
+  }
+  const trusted = await globalThis.FsbDelegationConsent.getTrusted(selectedProvider.id);
+  let challengeId = request.challengeId;
+  if (trusted) {
+    if (challengeId !== null) return fsbDelegationFailure('consent_invalid', null);
+    const issued = await globalThis.FsbDelegationConsent.issueChallenge({
+      acceptedIdentity: authority.result.acceptedIdentity,
+      taskDigest
+    });
+    if (!issued || issued.ok !== true) return fsbDelegationFailure('consent_required', null);
+    challengeId = issued.challengeId;
+  } else if (typeof challengeId !== 'string' || challengeId.length === 0) {
+    return fsbDelegationFailure('consent_required', null);
+  }
+
+  let currentAuthority;
+  try {
+    currentAuthority = await fsbDelegationPreflightResult();
+    currentAuthority = await fsbRefreshDelegationAuthorityIfNeeded(currentAuthority);
+  } catch (_error) {
+    return fsbDelegationFailure('provider_changed', null);
+  }
+  if (!currentAuthority.result.ok
+      || currentAuthority.result.kind !== 'agent'
+      || currentAuthority.result.providerId !== authority.result.providerId) {
+    return fsbDelegationFailure('provider_changed', null);
+  }
+
+  const consumed = await globalThis.FsbDelegationConsent.consumeChallenge({
+    challengeId,
+    acceptedIdentity: currentAuthority.result.acceptedIdentity,
+    taskDigest
+  });
+  if (!consumed || consumed.ok !== true) {
+    return fsbDelegationFailure(
+      consumed && consumed.code === 'challenge_not_found' ? 'consent_required' : 'consent_invalid',
+      null
+    );
+  }
+  const consumedIdentity = fsbDelegationAcceptedIdentity(consumed.acceptedIdentity);
+  if (!consumedIdentity
+      || !fsbDelegationSameAcceptedIdentity(
+        consumedIdentity,
+        currentAuthority.result.acceptedIdentity
+      )) {
+    return fsbDelegationFailure('provider_changed', null);
+  }
+
+  let controller = null;
+  let resolveAccepted;
+  let rejectAccepted;
+  const acceptedPromise = new Promise((resolve, reject) => {
+    resolveAccepted = resolve;
+    rejectAccepted = reject;
+  });
+  let finalPromise;
+  try {
+    finalPromise = mcpBridgeClient.sendExtRequest(
+      'delegate.start',
+      { acceptedIdentity: consumedIdentity, task: request.task },
+      {
+        async onEvent(eventName, payload) {
+          if (eventName !== 'delegation.started') return;
+          const started = fsbDelegationReadExactOwnDataRecord(
+            payload,
+            ['acceptedIdentity', 'delegationId'],
+            false
+          );
+          const echoedIdentity = started
+            ? fsbDelegationAcceptedIdentity(started.acceptedIdentity)
+            : null;
+          if (!started
+              || !echoedIdentity
+              || !fsbDelegationSameAcceptedIdentity(echoedIdentity, consumedIdentity)
+              || typeof started.delegationId !== 'string'
+              || !FSB_DELEGATION_GENERATION_PATTERN.test(started.delegationId)) {
+            const error = new Error('missing server delegation id');
+            rejectAccepted(error);
+            throw error;
+          }
+          const runContext = fsbDelegationCreateRunContext(echoedIdentity);
+          if (!runContext || fsbDelegationRunContexts.has(started.delegationId)) {
+            const error = new Error('delegation run context is invalid');
+            rejectAccepted(error);
+            throw error;
+          }
+          try {
+            controller = (await bootstrapDelegationController()).controller;
+            const startedRun = await controller.start({
+              delegationId: started.delegationId,
+              acceptedIdentity: echoedIdentity,
+              connection: 'connected'
+            });
+            if (!startedRun || startedRun.ok !== true) {
+              throw new Error('delegation controller rejected start');
+            }
+            fsbDelegationRunContexts.set(started.delegationId, runContext);
+            if (originTabId !== null && globalThis.FsbDelegationTabSeed) {
+              globalThis.FsbDelegationTabSeed.reserve({
+                delegationId: started.delegationId,
+                tabId: originTabId
+              });
+            }
+          } catch (error) {
+            fsbDelegationRunContexts.delete(started.delegationId);
+            if (globalThis.FsbDelegationTabSeed) globalThis.FsbDelegationTabSeed.forget(started.delegationId);
+            rejectAccepted(error);
+            throw error;
+          }
+          resolveAccepted(started.delegationId);
+        }
+      }
+    );
+  } catch (error) {
+    fsbLogDelegationStartRejected(authority.result.providerId, 'transport', null);
+    return fsbDelegationFailure('start_rejected', null);
+  }
+
+  let settledBeforeAcceptance = null;
+  const rejectedBeforeAcceptance = finalPromise.then(
+    (result) => {
+      settledBeforeAcceptance = result;
+      throw new Error('delegate.start completed without acceptance');
+    },
+    (error) => { throw error; }
+  );
+  let delegationId;
+  try {
+    delegationId = await Promise.race([acceptedPromise, rejectedBeforeAcceptance]);
+  } catch (_error) {
+    const detail = fsbDelegationStartRejectionDetail(settledBeforeAcceptance);
+    fsbLogDelegationStartRejected(authority.result.providerId, 'supervisor', detail);
+    return fsbDelegationStartRejected(detail);
+  }
+
+  finalPromise.then(
+    (result) => fsbSettleDelegationFromFinal(delegationId, result, null),
+    (error) => fsbSettleDelegationFromFinal(delegationId, null, error)
+  ).catch(() => {});
+  if (!controller) {
+    fsbLogDelegationStartRejected(authority.result.providerId, 'controller', null);
+    return fsbDelegationFailure('start_rejected', null);
+  }
+  const acceptedSnapshot = controller.getSnapshot(delegationId);
+  if (acceptedSnapshot) {
+    await fsbReconcileDelegationSnapshots(controller, [acceptedSnapshot]);
+  }
+  const snapshot = controller.getSnapshot(delegationId);
+  if (!snapshot) {
+    fsbDelegationRunContexts.delete(delegationId);
+    if (globalThis.FsbDelegationTabSeed) globalThis.FsbDelegationTabSeed.forget(delegationId);
+    fsbLogDelegationStartRejected(authority.result.providerId, 'snapshot', null);
+    return fsbDelegationFailure('start_rejected', null);
+  }
+  return { ok: true, snapshot };
+}
+
+function fsbDelegationMapLifecycleFailure(operation, result) {
+  const code = result && result.code;
+  if (code === 'invalid_transition' || code === 'already_terminal') return 'invalid_state';
+  if (code === 'unknown_delegation' || code === 'invalid_delegation_id') return 'delegation_mismatch';
+  if (code === 'delegation_binding_rejected' || code === 'active_tab_not_owned') return 'mapping_unavailable';
+  if (operation === 'take') {
+    return code && code.indexOf('lease') !== -1 ? 'hold_lease_failed' : 'hold_failed';
+  }
+  if (operation === 'resume') {
+    return code === 'resume_ownership_lost' || code === 'hold_expired'
+      ? 'resume_ownership_lost'
+      : 'resume_failed';
+  }
+  return code && code.indexOf('persistence') !== -1 ? 'persistence_failed' : 'stop_failed';
+}
+
+async function fsbDelegationLifecycleCommand(request, operation) {
+  if (!fsbDelegationHasExactKeys(request, ['delegationId', 'type'])
+      || typeof request.delegationId !== 'string'
+      || request.delegationId.length === 0) {
+    return fsbDelegationFailure('invalid_request', null);
+  }
+  let controller;
+  try { controller = (await bootstrapDelegationController()).controller; } catch (_error) {
+    return fsbDelegationFailure(operation === 'stop' ? 'stop_failed' : operation === 'resume' ? 'resume_failed' : 'hold_failed', null);
+  }
+  const before = controller.getSnapshot(request.delegationId);
+  if (!before) return fsbDelegationFailure('delegation_mismatch', null);
+  let result;
+  try {
+    if (operation === 'take') result = await controller.takeControl({ delegationId: request.delegationId });
+    else if (operation === 'resume') result = await controller.resume({ delegationId: request.delegationId });
+    else result = await controller.stop({ delegationId: request.delegationId });
+  } catch (error) {
+    return fsbDelegationFailure(
+      fsbDelegationMapLifecycleFailure(operation, { code: error && error.code }),
+      controller.getSnapshot(request.delegationId) || before
+    );
+  }
+  try {
+    await controller.refreshActiveTab({ delegationId: request.delegationId });
+  } catch (_error) {
+    // Active-tab eligibility is presentation authority, not lifecycle
+    // settlement. A failed refresh hides contextual controls by leaving the
+    // canonical snapshot fail-closed; it never changes the operation result.
+  }
+  const refreshed = controller.getSnapshot(request.delegationId);
+  if (!result || result.ok !== true) {
+    return fsbDelegationFailure(
+      fsbDelegationMapLifecycleFailure(operation, result),
+      refreshed || (result && result.snapshot) || before
+    );
+  }
+  return { ok: true, snapshot: refreshed || result.snapshot };
+}
+
+async function fsbDelegationSnapshotCommand(request) {
+  if (!fsbDelegationHasExactKeys(request, ['delegationId', 'type'])
+      || (request.delegationId !== null && typeof request.delegationId !== 'string')) {
+    return fsbDelegationFailure('invalid_request', null);
+  }
+  let boot;
+  try { boot = await bootstrapDelegationController(); } catch (_error) {
+    return fsbDelegationFailure('persistence_failed', null);
+  }
+  if (request.delegationId === null) return { ok: true, snapshot: null };
+  const before = boot.controller.getSnapshot(request.delegationId);
+  if (before) await fsbReconcileDelegationSnapshots(boot.controller, [before]);
+  if (before) {
+    try {
+      await boot.controller.refreshActiveTab({ delegationId: request.delegationId });
+    } catch (_error) {
+      // The controller owns the fail-closed activeTab field. Snapshot reads
+      // remain available even if the browser cannot resolve an active tab.
+    }
+  }
+  const snapshot = boot.controller.getSnapshot(request.delegationId);
+  return snapshot
+    ? { ok: true, snapshot }
+    : fsbDelegationFailure('delegation_mismatch', null);
+}
+
+function fsbHandleDelegationCommand(request) {
+  switch (request && request.type) {
+    case 'FSB_DELEGATION_PREFLIGHT': return fsbDelegationPreflightCommand(request);
+    case 'FSB_DELEGATION_CONSENT': return fsbDelegationConsentCommand(request);
+    case 'FSB_DELEGATION_SET_TRUST': return fsbDelegationSetTrustCommand(request);
+    case 'FSB_DELEGATION_CLEAR_TRUST': return fsbDelegationClearTrustCommand(request);
+    case 'FSB_DELEGATION_START': return fsbDelegationStartCommand(request);
+    case 'FSB_DELEGATION_TAKE_CONTROL': return fsbDelegationLifecycleCommand(request, 'take');
+    case 'FSB_DELEGATION_RESUME': return fsbDelegationLifecycleCommand(request, 'resume');
+    case 'FSB_DELEGATION_STOP': return fsbDelegationLifecycleCommand(request, 'stop');
+    case 'FSB_DELEGATION_SNAPSHOT': return fsbDelegationSnapshotCommand(request);
+    default: return null;
+  }
+}
+
+function fsbDelegationEventContext(delegationId, event) {
+  const runContext = fsbDelegationRunContexts.get(delegationId) || null;
+  if (!runContext) return null;
+  return {
+    timestamp: Date.now(),
+    acceptedIdentity: runContext.acceptedIdentity
+  };
+}
+
+async function fsbObserveDelegationBridgeEvent(bridgeEvent) {
+  const bridgeRecord = fsbDelegationReadExactOwnDataRecord(
+    bridgeEvent,
+    ['event', 'id', 'method', 'payload'],
+    false
+  );
+  if (!bridgeRecord || bridgeRecord.method !== 'delegate.start') {
+    return;
+  }
+
+  if (bridgeRecord.event === 'delegation.started') {
+    const payload = fsbDelegationReadExactOwnDataRecord(
+      bridgeRecord.payload,
+      ['acceptedIdentity', 'delegationId'],
+      false
+    );
+    const acceptedIdentity = payload
+      ? fsbDelegationAcceptedIdentity(payload.acceptedIdentity)
+      : null;
+    if (!payload
+        || !acceptedIdentity
+        || typeof payload.delegationId !== 'string'
+        || !FSB_DELEGATION_GENERATION_PATTERN.test(payload.delegationId)) {
+      throw new Error('delegation.started payload is invalid');
+    }
+    // Request-bound onEvent acceptance compares this identity with consumed
+    // consent before it boots or persists controller state.
+    return;
+  }
+
+  if (bridgeRecord.event !== 'delegation.event') return;
+  const controller = globalThis.fsbDelegationControllerInstance;
+  if (!controller) throw new Error('delegation controller is unavailable');
+  const payload = bridgeRecord.payload;
+  if (!fsbDelegationHasExactKeys(payload, ['delegationId', 'event'])
+      || typeof payload.delegationId !== 'string'
+      || !fsbDelegationHasExactKeys(payload.event, ['payload', 'sessionId', 'type'])) {
+    throw new Error('delegation.event payload is invalid');
+  }
+  const context = fsbDelegationEventContext(payload.delegationId, payload.event);
+  if (!context) throw new Error('delegation run context is unavailable');
+  try {
+    await controller.acceptEvent({
+      delegationId: payload.delegationId,
+      event: payload.event,
+      context
+    });
+  } finally {
+    if (payload.event.type === 'terminal') {
+      fsbDelegationRunContexts.delete(payload.delegationId);
+      if (globalThis.FsbDelegationTabSeed) globalThis.FsbDelegationTabSeed.forget(payload.delegationId);
+    }
+  }
+}
+
+function fsbObserveDelegationConnection(connection) {
+  if (!connection || (connection.state !== 'connected' && connection.state !== 'disconnected')) {
+    return Promise.resolve();
+  }
+  const connectionEpoch = ++fsbDelegationConnectionEpoch;
+  if (fsbDelegationActiveIds.size > 0) {
+    mcpBridgeClient.setDelegationAuthorityReady(false);
+  } else if (connection.state === 'connected') {
+    mcpBridgeClient.setDelegationAuthorityReady(true);
+  }
+  fsbDelegationConnectionTail = fsbDelegationConnectionTail.catch(() => {}).then(async () => {
+    const controller = globalThis.fsbDelegationControllerInstance;
+    if (!controller) return;
+    const snapshots = [];
+    for (const delegationId of Array.from(fsbDelegationActiveIds)) {
+      let snapshot = null;
+      try { snapshot = controller.getSnapshot(delegationId); } catch (_error) { /* stale id */ }
+      if (!snapshot || snapshot.terminal) {
+        fsbDelegationActiveIds.delete(delegationId);
+      } else {
+        snapshots.push(snapshot);
+      }
+    }
+    if (snapshots.length === 0) {
+      if (connectionEpoch === fsbDelegationConnectionEpoch) {
+        mcpBridgeClient.setDelegationAuthorityReady(true);
+      }
+      return;
+    }
+    if (connection.state === 'connected') {
+      const reconciled = await fsbReconcileDelegationSnapshots(controller, snapshots);
+      const latestConnection = mcpBridgeClient.getDelegationConnectionSnapshot();
+      if (connectionEpoch === fsbDelegationConnectionEpoch) {
+        const ready = reconciled === true
+          && latestConnection
+          && latestConnection.state === 'connected';
+        mcpBridgeClient.setDelegationAuthorityReady(ready);
+      }
+      return;
+    }
+    for (const snapshot of snapshots) {
+      try {
+        await controller.reconcile({
+          delegationId: snapshot.delegationId,
+          connection: 'disconnected'
+        });
+      } catch (_error) { /* one stale record cannot block the remaining fanout */ }
+    }
+    if (connectionEpoch === fsbDelegationConnectionEpoch
+        && fsbDelegationActiveIds.size === 0) {
+      mcpBridgeClient.setDelegationAuthorityReady(true);
+    }
+  });
+  return fsbDelegationConnectionTail;
+}
+
+async function bootstrapDelegationController() {
+  if (fsbDelegationBootPromise) return fsbDelegationBootPromise;
+  fsbDelegationBootPromise = (async () => {
+    await bootstrapAgentRegistry();
+    const registry = globalThis.fsbAgentRegistryInstance;
+    if (!globalThis.FsbDelegationController
+        || !globalThis.FsbDelegationEventStore
+        || typeof mcpBridgeClient === 'undefined'
+        || !mcpBridgeClient
+        || typeof mcpBridgeClient.setInboundAuthorityReady !== 'function'
+        || typeof mcpBridgeClient.isInboundAuthorityReady !== 'function'
+        || typeof mcpBridgeClient.setDelegationAuthorityReady !== 'function'
+        || typeof mcpBridgeClient.isDelegationAuthorityReady !== 'function') {
+      throw new Error('delegation dependencies are unavailable');
+    }
+    if (!registry
+        || typeof registry.getAgentForDelegation !== 'function'
+        || typeof registry.listDelegationMappings !== 'function'
+        || typeof registry.getDelegationReleaseReceipt !== 'function'
+        || typeof registry.quarantineAuthority !== 'function') {
+      const error = new Error('delegation registry authority is unavailable');
+      error.code = 'delegation_binding_rejected';
+      throw error;
+    }
+    mcpBridgeClient.setInboundAuthorityReady(false);
+    mcpBridgeClient.setDelegationAuthorityReady(false);
+    if (!globalThis.fsbDelegationControllerInstance) {
+      globalThis.fsbDelegationControllerInstance = globalThis.FsbDelegationController.create({
+        eventStore: globalThis.FsbDelegationEventStore,
+        registry,
+        cancel: ({ delegationId }) => mcpBridgeClient.sendExtRequest('delegate.cancel', { delegationId }),
+        hold: ({ delegationId }) => mcpBridgeClient.sendExtRequest('delegate.hold', { delegationId }),
+        resume: ({ delegationId }) => mcpBridgeClient.sendExtRequest('delegate.resume', { delegationId }),
+        status: fsbReadDelegationStatus,
+        loadGeneration: fsbLoadDelegationGeneration,
+        saveGeneration: fsbSaveDelegationGeneration,
+        clearGeneration: fsbClearDelegationGeneration,
+        retainHeartbeat: (delegationId) => mcpBridgeClient.retainDelegationHeartbeat(delegationId),
+        releaseHeartbeat: (delegationId) => mcpBridgeClient.releaseDelegationHeartbeat(delegationId),
+        releaseVisualSessions: ({ delegationId, agentId }) => {
+          if (typeof MCPVisualSessionLifecycleUtils === 'undefined'
+              || typeof MCPVisualSessionLifecycleUtils.clearVisualSessionsForAgent !== 'function') {
+            return false;
+          }
+          Promise.resolve(
+            MCPVisualSessionLifecycleUtils.clearVisualSessionsForAgent(agentId, { reason: 'delegation_terminal' })
+          ).then((result) => {
+            if (typeof automationLogger === 'undefined' || !automationLogger) return;
+            automationLogger.info('Delegation visual overlay cleared', {
+              phase: 'delegation-visual-clear',
+              delegationId,
+              agentId,
+              cleared: result && Number.isFinite(result.cleared) ? result.cleared : 0
+            });
+          }).catch(() => {});
+          return true;
+        },
+        getConnectionSnapshot: () => mcpBridgeClient.getDelegationConnectionSnapshot(),
+        getActiveTab: async () => {
+          const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+          const active = Array.isArray(tabs) && tabs.length === 1 ? tabs[0] : null;
+          return active && Number.isSafeInteger(active.id) ? { tabId: active.id } : null;
+        },
+        getLiveTabIds: async ({ tabIds }) => {
+          if (!Array.isArray(tabIds)) return [];
+          const identities = await Promise.all(tabIds.map(async (tabId) => {
+            if (!Number.isSafeInteger(tabId)) return null;
+            try {
+              const tab = await chrome.tabs.get(tabId);
+              return tab && tab.id === tabId ? tabId : null;
+            } catch (_error) {
+              return null;
+            }
+          }));
+          return identities.filter(Number.isSafeInteger);
+        }
+      });
+    }
+    const controller = globalThis.fsbDelegationControllerInstance;
+    const hydratedSnapshots = await controller.hydrate();
+    hydratedSnapshots.forEach((snapshot) => {
+      fsbDelegationActiveIds.add(snapshot.delegationId);
+      const runContext = fsbDelegationRunContextFromSnapshot(snapshot);
+      if (runContext) fsbDelegationRunContexts.set(snapshot.delegationId, runContext);
+    });
+    controller.subscribe((runtimeEvent) => {
+      if (runtimeEvent.view.terminal) {
+        fsbDelegationActiveIds.delete(runtimeEvent.view.delegationId);
+        fsbDelegationRunContexts.delete(runtimeEvent.view.delegationId);
+        if (globalThis.FsbDelegationTabSeed) globalThis.FsbDelegationTabSeed.forget(runtimeEvent.view.delegationId);
+      } else {
+        fsbDelegationActiveIds.add(runtimeEvent.view.delegationId);
+      }
+      Promise.resolve(chrome.runtime.sendMessage(runtimeEvent)).catch(() => {});
+    });
+    if (!fsbDelegationBridgeObserverInstalled) {
+      mcpBridgeClient.addEventObserver(fsbObserveDelegationBridgeEvent);
+      fsbDelegationBridgeObserverInstalled = true;
+    }
+    if (!fsbDelegationConnectionObserverInstalled) {
+      mcpBridgeClient.addDelegationConnectionObserver(fsbObserveDelegationConnection);
+      fsbDelegationConnectionObserverInstalled = true;
+    }
+    mcpBridgeClient.setInboundAuthorityReady(true);
+    const reconciliationEpoch = fsbDelegationConnectionEpoch;
+    const statusReconciled = await fsbReconcileDelegationSnapshots(controller, hydratedSnapshots);
+    const latestConnection = mcpBridgeClient.getDelegationConnectionSnapshot();
+    const authorityReady = fsbDelegationActiveIds.size === 0
+      || (statusReconciled === true
+        && reconciliationEpoch === fsbDelegationConnectionEpoch
+        && latestConnection
+        && latestConnection.state === 'connected');
+    if (authorityReady) {
+      mcpBridgeClient.setDelegationAuthorityReady(true);
+      armMcpBridge('delegation-authority-ready');
+    }
+    return {
+      controller,
+      hydratedSnapshots: hydratedSnapshots.map((snapshot) => (
+        controller.getSnapshot(snapshot.delegationId)
+      )).filter(Boolean)
+    };
+  })().catch((error) => {
+    if (typeof mcpBridgeClient !== 'undefined'
+        && mcpBridgeClient
+        && typeof mcpBridgeClient.setInboundAuthorityReady === 'function') {
+      mcpBridgeClient.setInboundAuthorityReady(false);
+      if (typeof mcpBridgeClient.setDelegationAuthorityReady === 'function') {
+        mcpBridgeClient.setDelegationAuthorityReady(false);
+      }
+    }
+    if (globalThis.fsbAgentRegistryInstance
+        && typeof globalThis.fsbAgentRegistryInstance.quarantineAuthority === 'function') {
+      globalThis.fsbAgentRegistryInstance.quarantineAuthority();
+    }
+    fsbDelegationRunContexts.clear();
+    fsbDelegationBootPromise = null;
+    throw error;
+  });
+  return fsbDelegationBootPromise;
 }
 
 function findActiveAutomationSessionForTab(tabId) {
@@ -1175,6 +3360,31 @@ function findActiveAutomationSessionForTab(tabId) {
     }
   }
   return null;
+}
+
+// A tab owned by a delegated (side-panel-started) agent whose run is still live counts as
+// working, like an autopilot session tab. Delegated runs never populate activeSessions, so
+// without this the panel would close the moment FSB foregrounds the agent's tab.
+function fsbTabBelongsToLiveDelegation(tabId) {
+  if (!Number.isSafeInteger(tabId)) return false;
+  const registry = globalThis.fsbAgentRegistryInstance;
+  if (!registry
+      || typeof registry.getOwner !== 'function'
+      || typeof registry.listDelegationMappings !== 'function') return false;
+  try {
+    const owner = registry.getOwner(tabId);
+    if (typeof owner !== 'string' || owner.length === 0 || owner.indexOf('legacy:') === 0) return false;
+    const mapping = registry.listDelegationMappings().find((row) => row && row.agentId === owner);
+    if (!mapping) return false;
+    const controller = globalThis.fsbDelegationControllerInstance;
+    if (controller && typeof controller.getSnapshot === 'function') {
+      const snapshot = controller.getSnapshot(mapping.delegationId);
+      if (snapshot && snapshot.terminal) return false;
+    }
+    return true;
+  } catch (_error) {
+    return false;
+  }
 }
 
 // QT-uof-6 (A-FIX) -- Chrome 141+ sidePanel.close auto-collapse with
@@ -1194,6 +3404,41 @@ function findActiveAutomationSessionForTab(tabId) {
 // automation session (e.g., user switches from working Tab A to non-working
 // Tab B in the SAME window), DO NOT close -- Tab A's panel must stay
 // visible. Only close when NO tab in the window has an active session.
+// An agent-opened tab is activated by Chrome at creation, before the dispatcher has bound
+// it to its agent, so a first look at ownership can miss a tab that is about to be owned.
+// Re-check after this grace before deciding a window is idle.
+const FSB_SIDE_PANEL_COLLAPSE_GRACE_MS = 400;
+
+// Per-window "has any working tab" read. A tab counts as working when it has an
+// autopilot session OR belongs to a live delegated run. Ownership lives in the
+// agent registry, so the wake hydration is awaited before reading it.
+async function fsbFindWorkingTabInWindow(windowId) {
+  var tabsInWindow = await chrome.tabs.query({ windowId: windowId });
+  try {
+    if (globalThis.fsbAgentRegistryReady) await globalThis.fsbAgentRegistryReady;
+  } catch (_registryErr) { /* fail-safe: fall through to the session-only check */ }
+  for (var i = 0; i < tabsInWindow.length; i++) {
+    var t = tabsInWindow[i];
+    if (t && typeof t.id === 'number'
+        && (findActiveAutomationSessionForTab(t.id) || fsbTabBelongsToLiveDelegation(t.id))) {
+      return t.id;
+    }
+  }
+  return null;
+}
+
+function fsbLogSidePanelCollapse(activatedTabId, windowId, outcome, workingTabId) {
+  if (typeof automationLogger === 'undefined' || !automationLogger
+      || typeof automationLogger.info !== 'function') return;
+  automationLogger.info('Side panel auto-collapse', {
+    phase: 'side-panel-collapse',
+    activatedTabId: activatedTabId,
+    windowId: windowId,
+    outcome: outcome,
+    workingTabId: Number.isFinite(workingTabId) ? workingTabId : null
+  });
+}
+
 chrome.tabs.onActivated.addListener(async function (activeInfo) {
   try {
     if (typeof chrome.sidePanel === 'undefined') return;
@@ -1204,21 +3449,27 @@ chrome.tabs.onActivated.addListener(async function (activeInfo) {
     if (typeof activatedTabId !== 'number' || typeof activatedWindowId !== 'number') return;
 
     // Per-window has-any-working-tab gate.
-    var tabsInWindow = await chrome.tabs.query({ windowId: activatedWindowId });
-    var anyWorking = false;
-    for (var i = 0; i < tabsInWindow.length; i++) {
-      var t = tabsInWindow[i];
-      if (t && typeof t.id === 'number' && findActiveAutomationSessionForTab(t.id)) {
-        anyWorking = true;
-        break;
-      }
+    var workingTabId = await fsbFindWorkingTabInWindow(activatedWindowId);
+    if (workingTabId !== null) {
+      // keep panel visible -- some tab in this window still working
+      fsbLogSidePanelCollapse(activatedTabId, activatedWindowId, 'kept_working_tab', workingTabId);
+      return;
     }
-    if (anyWorking) return; // keep panel visible -- some tab in this window still working
+
+    // Looks idle. Give an in-flight agent tab bind a moment, then look again.
+    await new Promise(function (resolve) { setTimeout(resolve, FSB_SIDE_PANEL_COLLAPSE_GRACE_MS); });
+    workingTabId = await fsbFindWorkingTabInWindow(activatedWindowId);
+    if (workingTabId !== null) {
+      fsbLogSidePanelCollapse(activatedTabId, activatedWindowId, 'kept_after_grace', workingTabId);
+      return;
+    }
 
     // No working tab in this window -- close the panel.
     try {
       await chrome.sidePanel.close({ windowId: activatedWindowId });
+      fsbLogSidePanelCollapse(activatedTabId, activatedWindowId, 'closed', null);
     } catch (closeErr) {
+      fsbLogSidePanelCollapse(activatedTabId, activatedWindowId, 'close_failed', null);
       console.warn('[FSB] chrome.sidePanel.close failed (non-fatal)', closeErr && closeErr.message);
     }
   } catch (outerErr) {
@@ -1695,6 +3946,7 @@ if (typeof globalThis !== 'undefined') {
   globalThis.handleStartMcpVisualSession = handleStartMcpVisualSession;
   globalThis.handleEndMcpVisualSession = handleEndMcpVisualSession;
   globalThis.handleMcpVisualSessionTaskStatus = handleMcpVisualSessionTaskStatus;
+  globalThis.resolveMcpVisualSessionTabId = resolveMcpVisualSessionTabId;
 }
 
 /**
@@ -1889,6 +4141,16 @@ async function summarizeTask(taskText, settings) {
   try {
     if (!taskText || taskText.length <= 40) return taskText;
 
+    // A local reasoning model can spend its entire tiny 50-token budget on
+    // reasoning_content and return an empty title. Avoid an extra inference
+    // entirely for LM Studio; this label is presentation-only.
+    if (settings && settings.modelProvider === 'lmstudio') {
+      const normalizedTask = String(taskText).replace(/\s+/g, ' ').trim();
+      return normalizedTask.length <= 60
+        ? normalizedTask
+        : normalizedTask.slice(0, 57).trimEnd() + '...';
+    }
+
     const provider = new UniversalProvider(settings);
     const requestBody = await provider.buildRequest({
       systemPrompt: 'Summarize this browser automation task in under 10 words. Return only the summary, nothing else.',
@@ -1994,31 +4256,32 @@ class PageLoadWatcher {
    */
   waitForTabComplete(tabId, timeout) {
     return new Promise((resolve, reject) => {
-      const timeoutId = setTimeout(() => {
+      let settled = false;
+      let timeoutId = null;
+
+      const finish = (error) => {
+        if (settled) return;
+        settled = true;
+        if (timeoutId !== null) clearTimeout(timeoutId);
         chrome.tabs.onUpdated.removeListener(listener);
-        reject(new Error('Tab load timeout'));
-      }, timeout);
+        if (error) reject(error);
+        else resolve();
+      };
 
       const listener = (updatedTabId, changeInfo) => {
         if (updatedTabId === tabId && changeInfo.status === 'complete') {
-          clearTimeout(timeoutId);
-          chrome.tabs.onUpdated.removeListener(listener);
-          resolve();
+          finish();
         }
       };
 
-      // Check if already complete
+      // Arm the listener before reading status so a completion transition cannot
+      // occur between the initial read and listener registration.
+      chrome.tabs.onUpdated.addListener(listener);
+      timeoutId = setTimeout(() => finish(new Error('Tab load timeout')), timeout);
+
       chrome.tabs.get(tabId).then(tab => {
-        if (tab.status === 'complete') {
-          clearTimeout(timeoutId);
-          resolve();
-        } else {
-          chrome.tabs.onUpdated.addListener(listener);
-        }
-      }).catch(err => {
-        clearTimeout(timeoutId);
-        reject(err);
-      });
+        if (tab.status === 'complete') finish();
+      }).catch(finish);
     });
   }
 
@@ -2176,7 +4439,7 @@ function stopKeepAlive() {
 
 // EASY WIN #10: Helper to clean up session and stop keep-alive if no active sessions
 // Enhanced with race condition protection
-async function cleanupSession(sessionId) {
+async function cleanupSession(sessionId, options = {}) {
   const session = activeSessions.get(sessionId);
 
   // If session exists, mark it as terminating and wait for loop to yield
@@ -2216,14 +4479,23 @@ async function cleanupSession(sessionId) {
       session._loginHandler = null;
     }
 
-    // Defense-in-depth: always send overlay cleanup to content script.
-    // Some code paths call cleanupSession without endSessionOverlays;
-    // sending 'ended' again is harmless if overlays were already destroyed.
-    try {
-      await endSessionOverlays(session, 'cleanup');
-    } catch (e) {
-      automationLogger.debug('endSessionOverlays during cleanup failed (non-blocking)', { sessionId, error: e?.message });
+    // Terminal replay overlays own their short final display and teardown in the
+    // content script. Every other cleanup path keeps the defense-in-depth clear.
+    if (!options.preserveFinalOverlay) {
+      try {
+        await endSessionOverlays(session, 'cleanup');
+      } catch (e) {
+        automationLogger.debug('endSessionOverlays during cleanup failed (non-blocking)', { sessionId, error: e?.message });
+      }
     }
+  }
+
+  // Screenshot pixels are session-scoped memory only. Explicit stops and
+  // cleanup paths must erase them even when the agent loop never reaches its
+  // normal terminal finalizer.
+  if (globalThis.FsbScreenshotAttachments
+      && typeof globalThis.FsbScreenshotAttachments.discard === 'function') {
+    globalThis.FsbScreenshotAttachments.discard(sessionId);
   }
 
   // PERF: Flush any pending debounced log writes before session cleanup
@@ -2859,20 +5131,50 @@ async function restoreSessionsFromStorage() {
   }
 }
 
-// Immediately restore sessions when service worker wakes up
-// This handles both service worker restarts and browser startups
-//
-// Start the registry first and publish its readiness promise. This invocation
-// is deliberately independent of restoreSessionsFromStorage(): a failure in
-// any earlier session-restore await must not prevent registry construction,
-// hydration, live-tab reconciliation, or the telemetry collector from waiting
-// for the resulting authoritative count.
-globalThis.fsbAgentRegistryReady = bootstrapAgentRegistry().catch(err => {
-  console.warn('FSB: Failed to bootstrap agent registry on wake:', err);
-});
-restoreSessionsFromStorage().catch(err => {
-  console.warn('FSB: Failed to restore sessions on wake:', err);
-});
+// Start unrelated session recovery and delegation authority recovery as
+// independent wake chains. Registry readiness is published for consumers such
+// as telemetry, while delegation remains fail-closed behind successful registry
+// hydration.
+function restoreServiceWorkerStateOnWake() {
+  // Bring the previous worker's log tail back so get_logs can still explain a run
+  // that finished right before this restart. Merge-only; failures are non-fatal.
+  try {
+    if (typeof automationLogger !== 'undefined' && automationLogger
+        && typeof automationLogger.loadLogs === 'function') {
+      Promise.resolve(automationLogger.loadLogs()).catch(() => {});
+    }
+  } catch (_logRestoreErr) { /* best-effort */ }
+
+  const registry = Promise.resolve()
+    .then(() => bootstrapAgentRegistry());
+  globalThis.fsbAgentRegistryReady = registry.catch((error) => {
+    console.warn('FSB: Failed to bootstrap agent registry on wake:', error);
+  });
+
+  const sessions = Promise.resolve()
+    .then(() => restoreSessionsFromStorage())
+    .catch((error) => {
+      console.warn('FSB: Failed to restore sessions on wake:', error);
+    });
+
+  const delegation = registry
+    .then(() => bootstrapDelegationController())
+    .catch((error) => {
+      console.warn('[FSB] Delegation controller bootstrap failed:', error && error.message);
+    });
+  const replayRecovery = typeof fsbRestoreLatticeReplayCheckpoints === 'function'
+    ? Promise.all([registry, sessions])
+      .then(() => fsbRestoreLatticeReplayCheckpoints())
+      .catch((error) => {
+        console.warn('[FSB] Lattice replay recovery failed:', error && error.message);
+      })
+    : Promise.resolve();
+  return Promise.all([sessions, globalThis.fsbAgentRegistryReady, delegation, replayRecovery]);
+}
+
+// Immediately restore service-worker state on both worker restarts and browser
+// startups. Each chain catches its own failure before the aggregate settles.
+restoreServiceWorkerStateOnWake();
 
 // Eagerly rehydrate vault session key on service worker startup (Phase 191 - VAULT-03)
 // chrome.storage.session survives SW restarts but the in-memory SecureConfig fields reset to null.
@@ -2916,6 +5218,16 @@ setInterval(async () => {
           automationLogger.warn('Stale cleanup: tab gone but session still running, skipping', { sessionId, tabId: session.tabId });
           continue;
         }
+        const closedTabId = session.tabId;
+        if (fsbReplayHandleRemovedTab(session, closedTabId)) {
+          automationLogger.warn('Stale cleanup: replay tab gone, updated replay session', {
+            sessionId,
+            tabId: closedTabId,
+            replacementTabId: session.tabId,
+            finalizing: session._replayFinalizing === true
+          });
+          continue;
+        }
         automationLogger.info('Removing session for closed tab', { sessionId, tabId: session.tabId });
         activeSessions.delete(sessionId);
         sessionAIInstances.delete(sessionId);
@@ -2946,6 +5258,24 @@ const contentScriptPorts = new Map();
 chrome.runtime.onConnect.addListener((port) => {
   armMcpBridge('runtime.onConnect');
   debugLog('[FSB Background] onConnect received, port name:', port.name);
+  if (port.name === 'fsb-session-export-v2') {
+    const transport = globalThis.FsbMcpSessionExportPort;
+    if (!transport || typeof transport.serveExportPort !== 'function') {
+      try { port.postMessage({ type: 'error', code: 'session_export_unavailable', error: 'Session export transport is unavailable' }); } catch (_error) {}
+      return;
+    }
+    transport.serveExportPort(port, async ({ sessionId, format, emit }) => {
+      const journal = globalThis.FsbMcpLatticeJournal;
+      if (!journal || typeof journal.streamSessionExport !== 'function' ||
+          !(await journal.hasSession(sessionId))) {
+        const error = new Error('Journal-backed session not found');
+        error.code = 'session_export_not_found';
+        throw error;
+      }
+      return journal.streamSessionExport(sessionId, format, emit);
+    });
+    return;
+  }
   if (port.name === 'content-script') {
     const tabId = port.sender?.tab?.id;
     const frameId = port.sender?.frameId;
@@ -3070,9 +5400,13 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   contentScriptPorts.delete(tabId);
   contentScriptReadyStatus.delete(tabId);
   contentScriptHealth.delete(tabId);
+  // A closed tab cannot still be acting or watching; drop its icon claims so
+  // they cannot outrank a live one.
+  try { if (globalThis.fsbActionIcon) globalThis.fsbActionIcon.dropTab(tabId); } catch (_e) { /* icon is presentation-only */ }
 
   // Clean up any active sessions for this tab
   for (const [sessionId, session] of activeSessions) {
+    if (fsbReplayHandleRemovedTab(session, tabId)) continue;
     if (session.tabId === tabId) {
       // LIFE-02 (D-02): Notify sidepanel BEFORE removing the session
       try {
@@ -3141,27 +5475,25 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   }
 });
 
-// Phase 241 D-01 / POOL-03 -- forced-pool routing for new tabs.
-// Standalone listener (does NOT modify the existing onCreated handlers nor the
-// onRemoved chain above). When Chrome opens a new tab whose openerTabId points
-// to an agent-owned tab, the new tab is automatically pooled under that same
-// agent via bindTab(forced:true). New tabs without an openerTabId (Ctrl+T,
-// address-bar) are intentionally left unowned -- they are not the spawn of an
-// agent action, so no agent should claim them.
-//
-// D-02: forced-pool routing reuses an existing agent record; it does NOT call
-// registerAgent and therefore does NOT consume cap budget.
+// Agent-action child-tab routing. openerTabId alone cannot distinguish an
+// agent-triggered popup from a human Cmd-click on the same owned page. Require
+// a live, in-memory action intent for that opener before pooling the child.
+// Explicit open_tab routes bind their created tab directly and do not rely on
+// this listener. Intents are never persisted, so a service-worker restart
+// fails safe by leaving an uncertain child unowned.
 chrome.tabs.onCreated.addListener((tab) => {
   try {
     if (!tab || typeof tab.id !== 'number') return;
-    if (typeof tab.openerTabId !== 'number') return; // Pitfall 2: Ctrl+T / address-bar tabs unowned.
+    if (typeof tab.openerTabId !== 'number') return;
+    var provenance = globalThis.FsbAgentTabSpawnProvenance;
+    if (!provenance || typeof provenance.match !== 'function') return;
+    var intent = provenance.match(tab.openerTabId);
+    if (!intent || typeof intent.agentId !== 'string') return;
     var reg = globalThis.fsbAgentRegistryInstance;
     if (!reg || typeof reg.findAgentByTabId !== 'function') return;
-    var ownerAgentId = reg.findAgentByTabId(tab.openerTabId);
-    if (!ownerAgentId) return;
+    if (reg.findAgentByTabId(tab.openerTabId) !== intent.agentId) return;
     if (typeof reg.bindTab === 'function') {
-      // Fire-and-forget: bindTab is internally promise-chain-locked.
-      reg.bindTab(ownerAgentId, tab.id, { forced: true });
+      reg.bindTab(intent.agentId, tab.id, { forced: true });
     }
   } catch (_err) {
     // Defensive: never let registry errors stop other onCreated listeners.
@@ -3922,10 +6254,10 @@ function fsbTriggerBuildCaption(snap) {
   return caption.length > 120 ? caption.slice(0, 117) + '...' : caption;
 }
 
-// Count active vs terminal triggers on a given tab. Used to drive the
-// in-page TriggerBadge tally. Reads from FsbTriggerStore.hydrate() which is
-// the same source of truth list_triggers exposes, so badge stays consistent
-// with the MCP-visible state.
+// Count active vs terminal triggers on a given tab. Used to drive both the
+// toolbar watch claim and the in-page TriggerBadge tally. Reads from
+// FsbTriggerStore.hydrate() which is the same source of truth list_triggers
+// exposes, so both presentations stay consistent with MCP-visible state.
 async function fsbTriggerCountsForTab(tabId) {
   const numericTabId = Number(tabId);
   if (!Number.isFinite(numericTabId)
@@ -3959,6 +6291,16 @@ async function fsbTriggerCountsForTab(tabId) {
   return { watching, fired };
 }
 
+async function fsbTriggerSyncActionIconWatchingForTab(tabId) {
+  const counts = await fsbTriggerCountsForTab(tabId);
+  try {
+    if (globalThis.fsbActionIcon) {
+      globalThis.fsbActionIcon.setWatching(counts.watching > 0, Number(tabId));
+    }
+  } catch (_e) { /* icon is presentation-only */ }
+  return counts;
+}
+
 async function fsbTriggerStartObserveForSnapshot(snap, reason) {
   const triggerId = fsbTriggerSnapshotId(snap);
   const tabId = Number(snap && snap.target_tab_id);
@@ -3968,7 +6310,7 @@ async function fsbTriggerStartObserveForSnapshot(snap, reason) {
   await ensureContentScriptInjected(tabId);
   const observeResult = await fsbTriggerSendTabMessage(tabId, fsbTriggerObserveMessage(snap));
   const caption = fsbTriggerBuildCaption(snap);
-  const counts = await fsbTriggerCountsForTab(tabId);
+  const counts = await fsbTriggerSyncActionIconWatchingForTab(tabId);
   const pulseResult = await fsbTriggerSendTabMessage(tabId, {
     action: 'triggerPulseStart',
     selector: snap.selector,
@@ -3987,7 +6329,7 @@ async function fsbTriggerStopObserveForSnapshot(snap) {
   const tabId = Number(snap && snap.target_tab_id);
   if (!triggerId || !Number.isFinite(tabId)) return;
   await fsbTriggerSendTabMessage(tabId, { action: 'triggerObserveStop', trigger_id: triggerId });
-  const counts = await fsbTriggerCountsForTab(tabId);
+  const counts = await fsbTriggerSyncActionIconWatchingForTab(tabId);
   await fsbTriggerSendTabMessage(tabId, {
     action: 'triggerPulseStop',
     trigger_id: triggerId,
@@ -4236,6 +6578,7 @@ async function fsbTriggerEvaluateRefreshPollAfterReload(triggerId, snap, tabId, 
       name: FsbTriggerLifecycle.TRIGGER_ALARM_PREFIX + triggerId
     });
   }
+  await fsbTriggerSyncActionIconWatchingForTab(tabId);
 
   if (seamResult && seamResult.action !== 'fired'
       && typeof FsbTriggerLifecycle !== 'undefined'
@@ -4508,6 +6851,7 @@ async function fsbTriggerRunRefreshPollTick(triggerId, snap) {
       name: FsbTriggerLifecycle.TRIGGER_ALARM_PREFIX + triggerId
     });
   }
+  await fsbTriggerSyncActionIconWatchingForTab(tabId);
 
   if (seamResult && seamResult.action !== 'fired'
       && typeof FsbTriggerLifecycle !== 'undefined'
@@ -5100,6 +7444,7 @@ async function fsbTriggerHandleToolStop(params, context) {
   } catch (err) {
     cleanup.lifecycle = { ok: false, error: fsbTriggerCleanupError(err) };
   }
+  await fsbTriggerSyncActionIconWatchingForTab(snap.target_tab_id);
 
   if (terminal) {
     return {
@@ -5185,6 +7530,7 @@ async function fsbTriggerMarkTimedOutForMcp(triggerId, context) {
   } catch (err) {
     cleanup.lifecycle = { ok: false, error: fsbTriggerCleanupError(err) };
   }
+  await fsbTriggerSyncActionIconWatchingForTab(snap.target_tab_id);
 
   const latestSnap = (lifecycleResult && lifecycleResult.snapshot)
     || (await FsbTriggerStore.readSnapshot(safeTriggerId))
@@ -5479,6 +7825,7 @@ async function fsbTriggerHandleToolArm(params, context) {
   if (fsbTriggerIsLiveObserveSnapshot(snapshot)) {
     await fsbTriggerStartObserveForSnapshot(snapshot, 'trigger-arm');
   } else if (fsbTriggerIsRefreshPollSnapshot(snapshot)) {
+    await fsbTriggerSyncActionIconWatchingForTab(tabId);
     await fsbTriggerSendTabMessage(Number(tabId), {
       action: 'triggerPulseStart',
       selector: snapshot.selector,
@@ -5636,287 +7983,2015 @@ function slimActionResult(result) {
 // SESSION REPLAY ENGINE
 // ==========================================
 
-/**
- * Get appropriate inter-action delay for replay based on tool type.
- * Navigation actions get longer delays; typing/key actions are faster.
- * @param {string} tool - The action tool name
- * @returns {number} Delay in milliseconds
- */
+const FSB_REPLAY_CHECKPOINT_KIND = 'fsb-lattice-replay-checkpoint/v1';
+const FSB_REPLAY_TAB_LOAD_TIMEOUT_MS = 30000;
+const FSB_PENDING_MCP_REPLAY_KEY = 'fsbPendingMcpReplayApprovals';
+const FSB_MCP_REPLAY_APPROVAL_TTL_MS = 10 * 60 * 1000;
+const FSB_REPLAY_TERMINAL_STATUSES = new Set(['replay_completed', 'replay_failed', 'replay_stopped']);
+const FSB_REPLAY_LEAD_IN_MS = 750;
+const FSB_REPLAY_TAIL_MS = 750;
+const FSB_REPLAY_MAX_RECORDED_GAP_MS = 30000;
+const FSB_REPLAY_CHECKPOINT_CATALOG_KEY = 'fsbLatticeReplayCheckpointRunsV2';
+const FSB_REPLAY_SEEK_EPSILON_MS = 250;
+const FSB_REPLAY_SPEEDS = Object.freeze([0.5, 1, 2, 4, 8]);
+let fsbReplayStartPending = false;
+let fsbPendingMcpReplayApprovalTail = Promise.resolve();
+const FSB_REPLAY_LEGACY_TOOL_MAP = Object.freeze({
+  rightClick: 'right_click',
+  doubleClick: 'double_click',
+  type: 'type_text',
+  clearInput: 'clear_input',
+  pressEnter: 'press_enter',
+  keyPress: 'press_key',
+  selectOption: 'select_option',
+  toggleCheckbox: 'check_box',
+  searchGoogle: 'search',
+  siteSearch: 'search',
+  goBack: 'go_back',
+  goForward: 'go_forward',
+  waitForElement: 'wait_for_element',
+  dragdrop: 'drag_drop',
+  dropfile: 'drop_file'
+});
+
 function getReplayDelay(tool) {
-  if (['navigate', 'searchGoogle', 'goBack', 'goForward'].includes(tool)) return 1500;
-  if (['click', 'doubleClick', 'rightClick'].includes(tool)) return 500;
-  if (['type', 'keyPress', 'pressEnter'].includes(tool)) return 300;
+  const normalized = FSB_REPLAY_LEGACY_TOOL_MAP[tool] || tool;
+  if (['navigate', 'search', 'go_back', 'go_forward', 'mcp:go-back'].includes(normalized)) return 1500;
+  if (['click', 'double_click', 'right_click', 'click_at', 'double_click_at'].includes(normalized)) return 500;
+  if (['type_text', 'press_key', 'press_enter', 'insert_text'].includes(normalized)) return 300;
   return 200;
 }
 
-/**
- * Load a stored session's actionHistory and filter to replayable actions.
- * @param {string} sessionId - The session ID to load from fsbSessionLogs
- * @returns {Object|null} { session, replayableActions, originalTask, originalUrl } or null
- */
-async function loadReplayableSession(sessionId) {
+function fsbReplayActionLabel(step) {
+  const normalized = FSB_REPLAY_LEGACY_TOOL_MAP[step?.tool] || step?.tool;
+  const statusTool = {
+    type_text: 'type',
+    press_enter: 'pressEnter',
+    press_key: 'keyPress',
+    select_option: 'selectOption',
+    check_box: 'toggleCheckbox',
+    clear_input: 'clearInput',
+    wait_for_element: 'waitForElement',
+    double_click: 'doubleClick',
+    right_click: 'rightClick',
+    go_back: 'goBack',
+    go_forward: 'goForward',
+    move_mouse: 'moveMouse',
+    open_tab: 'openNewTab',
+    switch_tab: 'switchToTab',
+    close_tab: 'closeTab',
+    get_text: 'getText',
+    get_attribute: 'getAttribute'
+  }[normalized] || normalized;
+  const status = getActionStatus(statusTool, step?.arguments || {});
+  if (status !== 'Working') return status;
+  const slug = step?.capability?.slug || step?.arguments?.slug;
+  return slug ? `Calling ${shorten(slug, 40)}` : 'Replaying recorded action';
+}
+
+function fsbReplayNormalizeSpeed(value) {
+  const speed = Number(value);
+  return FSB_REPLAY_SPEEDS.includes(speed) ? speed : 2;
+}
+
+function fsbReplayBuildTimeline(steps) {
+  const replaySteps = Array.isArray(steps) ? steps : [];
+  const offsets = [];
+  let elapsed = FSB_REPLAY_LEAD_IN_MS;
+  for (let index = 0; index < replaySteps.length; index++) {
+    if (index === 0) {
+      offsets.push(elapsed);
+      continue;
+    }
+    const previous = replaySteps[index - 1];
+    const current = replaySteps[index];
+    const recordedGap = Number.isFinite(previous?.timestamp) && Number.isFinite(current?.timestamp)
+      ? current.timestamp - previous.timestamp
+      : NaN;
+    const fallbackGap = getReplayDelay(previous?.tool);
+    const gap = Number.isFinite(recordedGap) && recordedGap > 0
+      ? Math.min(recordedGap, FSB_REPLAY_MAX_RECORDED_GAP_MS)
+      : fallbackGap;
+    elapsed += Math.max(1, gap);
+    offsets.push(elapsed);
+  }
+  return {
+    offsets,
+    durationMs: offsets.length > 0 ? offsets[offsets.length - 1] + FSB_REPLAY_TAIL_MS : 0
+  };
+}
+
+function fsbReplayPlaybackSnapshot(session) {
+  const playback = session?.playback;
+  if (!playback) return null;
+  const durationMs = Math.max(0, Number(playback.durationMs) || 0);
+  const positionMs = Math.max(0, Math.min(durationMs, Math.round(playback.positionMs || 0)));
+  return {
+    speed: fsbReplayNormalizeSpeed(playback.speed),
+    paused: playback.paused === true,
+    positionMs,
+    interpolationTargetMs: Math.max(
+      positionMs,
+      Math.min(durationMs, Math.round(playback.interpolationTargetMs || positionMs))
+    )
+  };
+}
+
+function fsbReplayOrigin(url) {
   try {
-    const stored = await chrome.storage.local.get(['fsbSessionLogs']);
-    const sessionStorage = stored.fsbSessionLogs || {};
-    const session = sessionStorage[sessionId];
-
-    if (!session || !session.actionHistory || session.actionHistory.length === 0) {
-      return null;
-    }
-
-    const replayableTools = new Set([
-      'click', 'rightClick', 'doubleClick', 'type', 'clearInput', 'pressEnter',
-      'keyPress', 'selectOption', 'toggleCheckbox', 'navigate', 'searchGoogle',
-      'scroll', 'goBack', 'goForward', 'refresh', 'hover', 'focus', 'moveMouse',
-      'waitForElement'
-    ]);
-
-    const replayableActions = session.actionHistory
-      .filter(a => a.result?.success === true && replayableTools.has(a.tool));
-
-    if (replayableActions.length === 0) {
-      return null;
-    }
-
-    // Extract the original URL from the first navigation-like action or session logs
-    let originalUrl = null;
-    for (const action of session.actionHistory) {
-      if (action.params?.url) {
-        originalUrl = action.params.url;
-        break;
-      }
-    }
-    if (!originalUrl && session.logs && session.logs.length > 0) {
-      originalUrl = session.logs[0]?.data?.url || null;
-    }
-
-    return {
-      session,
-      replayableActions,
-      originalTask: session.task,
-      originalUrl
-    };
-  } catch (error) {
-    automationLogger.error('Failed to load replayable session', { sessionId, error: error.message });
+    const parsed = new URL(String(url || ''));
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? parsed.origin : null;
+  } catch (_error) {
     return null;
   }
 }
 
-/**
- * Execute a replay sequence step-by-step through the existing sendMessageWithRetry path.
- * Sends statusUpdate messages to UI during each step with progress percentage.
- * Critical step failures (navigate, searchGoogle) abort replay; non-critical failures are skipped.
- * @param {string} replaySessionId - The replay session ID in activeSessions
- */
+function fsbReplayClone(value, fallback) {
+  try {
+    return JSON.parse(JSON.stringify(value === undefined ? fallback : value));
+  } catch (_error) {
+    return fallback;
+  }
+}
+
+function fsbReplayIsExecutable(step) {
+  const availability = step?.replay?.availability;
+  return availability === 'ready' || availability === 'approval-once' || availability === 'approval-per-step';
+}
+
+function fsbReplayIsTruncated(prepared) {
+  const retainedSteps = Array.isArray(prepared?.steps) ? prepared.steps.length : 0;
+  return prepared?.truncated === true ||
+    (Number.isFinite(prepared?.totalSourceSteps) && prepared.totalSourceSteps > retainedSteps);
+}
+
+function fsbReplayTruncatedMessage(prepared) {
+  const retainedSteps = Array.isArray(prepared?.steps) ? prepared.steps.length : 0;
+  const totalSourceSteps = Number.isFinite(prepared?.totalSourceSteps)
+    ? Math.max(retainedSteps, prepared.totalSourceSteps)
+    : retainedSteps;
+  return `Only the latest ${retainedSteps} of ${totalSourceSteps} recorded calls are available. ` +
+    'Earlier browser state is missing, so this recording is inspect-only and cannot be replayed safely.';
+}
+
+function fsbReplayAssertExecutablePreparation(prepared) {
+  if (fsbReplayIsTruncated(prepared)) throw new Error(fsbReplayTruncatedMessage(prepared));
+  if (!(prepared?.steps || []).some(fsbReplayIsExecutable)) {
+    throw new Error('This verified recording has no executable steps');
+  }
+  return prepared;
+}
+
+function fsbReplayIsWriteRisk(step) {
+  return !['read', 'navigation'].includes(step?.replay?.risk);
+}
+
+function fsbReplayPublicPreparation(prepared) {
+  const lastRun = prepared?.replay?.lastRun;
+  const pausedSession = lastRun?.id ? activeSessions.get(lastRun.id) : null;
+  const pausedStep = pausedSession?.status === 'replay_paused'
+    ? pausedSession.replaySteps[pausedSession.currentStep]
+    : null;
+  const bootstrapTab = fsbReplayBootstrapTab(prepared);
+  const replaySteps = prepared.steps || [];
+  const totalSourceSteps = Number.isFinite(prepared.totalSourceSteps)
+    ? Math.max(replaySteps.length, prepared.totalSourceSteps)
+    : replaySteps.length;
+  const truncated = fsbReplayIsTruncated(prepared);
+  const publicSteps = replaySteps.map((step) => {
+    const publicStep = {
+      id: step.id,
+      index: step.index,
+      tool: step.tool,
+      route: step.route,
+      arguments: fsbReplayClone(step.arguments, {}),
+      success: step.success !== false,
+      target: fsbReplayClone(step.target, {}),
+      capability: fsbReplayClone(step.capability, null),
+      replay: fsbReplayClone(step.replay, null)
+    };
+    if (truncated) {
+      publicStep.replay = {
+        risk: 'inspect-only',
+        availability: 'unsupported',
+        reason: fsbReplayTruncatedMessage(prepared)
+      };
+    }
+    return publicStep;
+  });
+  return {
+    success: true,
+    verified: prepared.verified === true,
+    sessionId: prepared.sessionId,
+    manifestHash: prepared.replay.manifestHash,
+    integrity: prepared.replay.integrity,
+    provenance: prepared.replay.provenance,
+    startUrl: bootstrapTab?.startUrl || prepared.startUrl,
+    bootstrapTab: bootstrapTab?.id || null,
+    tabs: fsbReplayClone(prepared.tabs, []),
+    counts: truncated ? {
+      total: replaySteps.length,
+      executable: 0,
+      approvalRequired: 0,
+      blocked: replaySteps.length
+    } : prepared.counts,
+    totalSourceSteps,
+    truncated,
+    pendingDecision: pausedStep ? {
+      sessionId: pausedSession.replaySessionId,
+      tabId: pausedSession.tabId,
+      stepId: pausedStep.id,
+      stepNumber: pausedStep.index + 1,
+      tool: pausedStep.tool,
+      error: pausedSession.replayRun?.error || 'The previous write could not be proven complete.'
+    } : null,
+    steps: publicSteps
+  };
+}
+
+function fsbReplayIsTrustedUiSender(sender) {
+  const extensionPrefix = `chrome-extension://${chrome.runtime.id}/`;
+  return !!(sender && sender.id === chrome.runtime.id &&
+    typeof sender.url === 'string' && sender.url.startsWith(extensionPrefix));
+}
+
+async function fsbReadPendingMcpReplayApprovals() {
+  if (!chrome.storage?.session) return [];
+  return fsbMutatePendingMcpReplayApprovals((approvals) => ({ approvals, value: approvals }));
+}
+
+async function fsbWritePendingMcpReplayApprovals(approvals) {
+  if (!chrome.storage?.session) throw new Error('Replay approval storage is unavailable');
+  if (approvals.length > 0) {
+    await chrome.storage.session.set({ [FSB_PENDING_MCP_REPLAY_KEY]: approvals.slice(-10) });
+  } else {
+    await chrome.storage.session.remove(FSB_PENDING_MCP_REPLAY_KEY);
+  }
+}
+
+function fsbMutatePendingMcpReplayApprovals(mutator) {
+  const run = async () => {
+    if (!chrome.storage?.session) throw new Error('Replay approval storage is unavailable');
+    const stored = await chrome.storage.session.get(FSB_PENDING_MCP_REPLAY_KEY);
+    const now = Date.now();
+    const current = Array.isArray(stored?.[FSB_PENDING_MCP_REPLAY_KEY])
+      ? stored[FSB_PENDING_MCP_REPLAY_KEY]
+          .filter((item) => item && item.expiresAt > now)
+          .slice(-10)
+      : [];
+    const mutation = await mutator(current.slice());
+    const approvals = Array.isArray(mutation?.approvals) ? mutation.approvals : current;
+    await fsbWritePendingMcpReplayApprovals(approvals);
+    return mutation?.value;
+  };
+  const next = fsbPendingMcpReplayApprovalTail.then(run, run);
+  fsbPendingMcpReplayApprovalTail = next.catch(() => {});
+  return next;
+}
+
+async function fsbRemovePendingMcpReplayApproval(requestId) {
+  return fsbMutatePendingMcpReplayApprovals((approvals) => {
+    const removed = approvals.find((item) => item.requestId === requestId) || null;
+    return {
+      approvals: approvals.filter((item) => item.requestId !== requestId),
+      value: removed
+    };
+  });
+}
+
+async function requestMcpSessionReplay(sessionId) {
+  const prepared = await prepareSessionReplay(sessionId);
+  fsbReplayAssertExecutablePreparation(prepared);
+  const preview = fsbReplayPublicPreparation(prepared);
+  const requestId = globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function'
+    ? globalThis.crypto.randomUUID()
+    : `mcp-replay-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+  const candidate = {
+    requestId,
+    sessionId,
+    manifestHash: prepared.replay.manifestHash,
+    createdAt: Date.now(),
+    expiresAt: Date.now() + FSB_MCP_REPLAY_APPROVAL_TTL_MS,
+    preview
+  };
+  const approval = await fsbMutatePendingMcpReplayApprovals((approvals) => {
+    const existing = approvals.find((item) =>
+      item.sessionId === sessionId && item.manifestHash === prepared.replay.manifestHash
+    );
+    return existing
+      ? { approvals, value: existing }
+      : { approvals: approvals.concat(candidate), value: candidate };
+  });
+  try {
+    await chrome.runtime.sendMessage({ action: 'mcpReplayApprovalRequested', approval });
+  } catch (_error) { /* side panel can hydrate the pending request when opened */ }
+  return {
+    success: true,
+    status: 'approval_required',
+    requestId: approval.requestId,
+    sessionId,
+    manifestHash: approval.manifestHash,
+    counts: approval.preview.counts,
+    tabCount: Math.max(1, approval.preview.tabs?.length || 0),
+    message: 'Verified replay is waiting for one approval in the FSB side panel. Target pages will open automatically after approval.'
+  };
+}
+
+async function fsbGetMcpReplayApproval(requestId, manifestHash) {
+  const pending = await fsbReadPendingMcpReplayApprovals();
+  const approval = pending.find((item) => item.requestId === requestId) || null;
+  if (!approval) throw new Error('Replay approval request is missing or expired');
+  if (!manifestHash || manifestHash !== approval.manifestHash) {
+    throw new Error('Replay approval hash mismatch');
+  }
+  return approval;
+}
+
+async function fsbApprovePendingMcpReplay(request, sender) {
+  const approval = await fsbGetMcpReplayApproval(request.requestId, request.manifestHash);
+  const approvedScopes = ['write'];
+  (approval.preview.steps || [])
+    .filter((step) => step.replay?.availability === 'approval-per-step')
+    .forEach((step) => approvedScopes.push('step:' + step.id));
+  let replayResponse = null;
+  await handleReplaySession({
+    sessionId: approval.sessionId,
+    manifestHash: approval.manifestHash,
+    approvedScopes
+  }, sender, (response) => { replayResponse = response; });
+  if (!replayResponse) throw new Error('Replay startup did not return a result');
+  if (replayResponse.success === true) {
+    await fsbRemovePendingMcpReplayApproval(approval.requestId);
+  }
+  return replayResponse;
+}
+
+async function prepareSessionReplay(sessionId) {
+  if (!globalThis.FsbLatticeReplay || typeof globalThis.FsbLatticeReplay.prepareReplay !== 'function') {
+    throw new Error('Lattice replay support is unavailable');
+  }
+  const prepared = await globalThis.FsbLatticeReplay.prepareReplay(sessionId);
+  if (!prepared || prepared.verified !== true) throw new Error('Replay integrity verification failed');
+  return prepared;
+}
+
+async function handlePrepareSessionReplay(request, sender, sendResponse) {
+  try {
+    if (!fsbReplayIsTrustedUiSender(sender)) {
+      throw new Error('Replay preview requires the extension UI');
+    }
+    const prepared = await prepareSessionReplay(request && request.sessionId);
+    sendResponse(fsbReplayPublicPreparation(prepared));
+  } catch (error) {
+    automationLogger.warn('Replay preparation failed', {
+      sessionId: request && request.sessionId,
+      error: error && error.message
+    });
+    sendResponse({ success: false, error: error && error.message ? error.message : String(error) });
+  }
+}
+
+async function fsbReplayWaitForTab(tabId) {
+  if (typeof pageLoadWatcher !== 'undefined' && pageLoadWatcher &&
+      typeof pageLoadWatcher.waitForTabComplete === 'function') {
+    await pageLoadWatcher.waitForTabComplete(tabId, FSB_REPLAY_TAB_LOAD_TIMEOUT_MS);
+  } else {
+    const deadline = Date.now() + FSB_REPLAY_TAB_LOAD_TIMEOUT_MS;
+    let ready = false;
+    while (Date.now() < deadline) {
+      const tab = await chrome.tabs.get(tabId);
+      if (tab && tab.status === 'complete') {
+        ready = true;
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+    if (!ready) throw new Error('Replay tab did not finish loading');
+  }
+  const injected = await ensureContentScriptInjected(tabId);
+  if (injected !== true) {
+    throw new Error('Replay tab content script did not become ready');
+  }
+}
+
+async function fsbReplayCreateOwnedTab(startUrl) {
+  await Promise.resolve(globalThis.fsbAgentRegistryReady).catch(() => {});
+  const registry = globalThis.fsbAgentRegistryInstance;
+  if (!registry || typeof registry.registerAgent !== 'function' || typeof registry.bindTab !== 'function') {
+    throw new Error('Replay tab ownership registry is unavailable');
+  }
+  const registration = await registry.registerAgent();
+  if (!registration || registration.error || !registration.agentId) {
+    throw new Error(registration?.error || 'Could not reserve a replay agent');
+  }
+  let tab = null;
+  try {
+    tab = await chrome.tabs.create({ url: startUrl, active: true });
+    if (!tab || !Number.isFinite(tab.id)) throw new Error('Could not create a replay tab');
+    const binding = await registry.bindTab(registration.agentId, tab.id);
+    if (!binding || binding.success === false) throw new Error(binding?.error || 'Could not own the replay tab');
+    await fsbReplayWaitForTab(tab.id);
+    tab = await chrome.tabs.get(tab.id);
+    return {
+      tab,
+      agentId: registration.agentId,
+      ownershipToken: binding.ownershipToken || null
+    };
+  } catch (error) {
+    if (tab && Number.isFinite(tab.id)) {
+      try { await chrome.tabs.remove(tab.id); } catch (_tabError) { /* newly-created tab may already be gone */ }
+    }
+    try { await registry.releaseAgent(registration.agentId, 'replay_start_failed'); } catch (_agentError) { /* best-effort */ }
+    throw error;
+  }
+}
+
+async function fsbReplayCreateAdditionalOwnedTab(session, logicalTab, startUrl, active) {
+  const registry = globalThis.fsbAgentRegistryInstance;
+  if (!registry || typeof registry.bindTab !== 'function' || !session?.replayAgentId) {
+    throw new Error('Replay tab ownership registry is unavailable');
+  }
+  let tab = null;
+  try {
+    tab = await chrome.tabs.create({ url: startUrl, active: active === true });
+    if (!tab || !Number.isFinite(tab.id)) throw new Error(`Could not create replay tab ${logicalTab}`);
+    const binding = await registry.bindTab(session.replayAgentId, tab.id);
+    if (!binding || binding.success === false) {
+      throw new Error(binding?.error || `Could not own replay tab ${logicalTab}`);
+    }
+    await fsbReplayWaitForTab(tab.id);
+    tab = await chrome.tabs.get(tab.id);
+    return {
+      logicalTab,
+      tabId: tab.id,
+      ownershipToken: binding.ownershipToken || null,
+      expectedOrigin: fsbReplayOrigin(tab.url || tab.pendingUrl) || fsbReplayOrigin(startUrl)
+    };
+  } catch (error) {
+    if (Number.isFinite(tab?.id)) {
+      try { await chrome.tabs.remove(tab.id); } catch (_tabError) { /* failed replay tab may already be gone */ }
+    }
+    throw error;
+  }
+}
+
+async function fsbReplayReleaseAgentId(agentId, reason = 'replay_terminal') {
+  if (!agentId) return true;
+  const registry = globalThis.fsbAgentRegistryInstance;
+  if (!registry || typeof registry.releaseAgent !== 'function') return false;
+  try {
+    const released = await registry.releaseAgent(agentId, reason);
+    if (released === true || released?.released === true) return true;
+    return typeof registry.hasAgent === 'function' && registry.hasAgent(agentId) !== true;
+  } catch (_error) {
+    return false;
+  }
+}
+
+async function fsbReplayReleaseAgent(session, reason = 'replay_terminal') {
+  return fsbReplayReleaseAgentId(session?.replayAgentId, reason);
+}
+
+function fsbReplayLogicalTab(step) {
+  const logicalTab = typeof step?.target?.logicalTab === 'string' ? step.target.logicalTab : 'primary';
+  return /^[A-Za-z0-9_-]{1,64}$/.test(logicalTab) ? logicalTab : 'primary';
+}
+
+function fsbReplayTabPlan(session, logicalTab) {
+  return session?.replayTabPlan?.[logicalTab] || null;
+}
+
+function fsbReplayBootstrapTab(prepared) {
+  const plans = Array.isArray(prepared?.tabs)
+    ? prepared.tabs.filter((tab) => tab && typeof tab.id === 'string')
+    : [];
+  if (plans.length === 0 && globalThis.FsbLatticeReplay?.isReplayableUrl(prepared?.startUrl)) {
+    plans.push({
+      id: 'primary',
+      order: 0,
+      startUrl: prepared.startUrl,
+      startOrigin: fsbReplayOrigin(prepared.startUrl),
+      startUrlState: 'ready'
+    });
+  }
+  const plansById = new Map(plans.map((plan) => [plan.id, plan]));
+  for (const step of prepared?.steps || []) {
+    if (!fsbReplayIsExecutable(step)) continue;
+    const plan = plansById.get(fsbReplayLogicalTab(step));
+    if (plan && globalThis.FsbLatticeReplay?.isReplayableUrl(plan.startUrl)) return plan;
+  }
+  return null;
+}
+
+async function fsbReplayEnsureTargetTab(session, step) {
+  const logicalTab = fsbReplayLogicalTab(step);
+  if (session.replayTabs?.[logicalTab]) return session.replayTabs[logicalTab];
+  const plan = fsbReplayTabPlan(session, logicalTab);
+  if (!plan || !globalThis.FsbLatticeReplay?.isReplayableUrl(plan.startUrl)) {
+    throw new Error(`Replay tab ${logicalTab} does not contain a safe HTTP(S) starting URL`);
+  }
+  const shouldActivate = step?.tool === 'switch_tab' || step?.arguments?.active === true;
+  const state = await fsbReplayCreateAdditionalOwnedTab(session, logicalTab, plan.startUrl, shouldActivate);
+  session.replayTabs[logicalTab] = state;
+  return state;
+}
+
+function fsbReplayExecutionParams(step, tabId) {
+  const args = fsbReplayClone(step?.arguments, {});
+  const params = args && typeof args === 'object' && !Array.isArray(args) ? args : {};
+  ['agentId', 'agent_id', 'ownershipToken', 'ownership_token', 'tabId', 'tab_id',
+    'targetTabId', 'target_tab_id'].forEach((key) => delete params[key]);
+  const normalizedTool = FSB_REPLAY_LEGACY_TOOL_MAP[step?.tool] || step?.tool;
+  if (normalizedTool === 'switch_tab' || normalizedTool === 'close_tab') params.tabId = tabId;
+  return params;
+}
+
+function fsbReplayTabResult(tool, tab, extra) {
+  let domain = '';
+  try { domain = new URL(tab?.url || '').hostname; } catch (_error) { /* keep empty */ }
+  return Object.assign({
+    success: true,
+    tool,
+    tabId: tab?.id ?? null,
+    url: tab?.url || '',
+    domain,
+    title: tab?.title || ''
+  }, extra || {});
+}
+
+async function fsbReplayAssertTarget(session, step) {
+  const tabState = await fsbReplayEnsureTargetTab(session, step);
+  const normalizedTool = FSB_REPLAY_LEGACY_TOOL_MAP[step?.tool] || step?.tool;
+  if (normalizedTool === 'close_tab' && tabState.closed === true) {
+    return {
+      tab: null,
+      tabState,
+      currentUrl: '',
+      currentOrigin: tabState.expectedOrigin || step?.target?.origin || null,
+      alreadyClosed: true
+    };
+  }
+  const tab = await chrome.tabs.get(tabState.tabId);
+  const currentUrl = (tab && (tab.url || tab.pendingUrl)) || '';
+  const currentOrigin = fsbReplayOrigin(currentUrl);
+  if (!currentOrigin) throw new Error('Replay target became restricted or unavailable');
+  const expectedOrigin = step?.target?.origin || tabState.expectedOrigin || null;
+  if (expectedOrigin && currentOrigin !== expectedOrigin) {
+    const error = new Error(`Replay paused because the target origin changed from ${expectedOrigin} to ${currentOrigin}`);
+    error.code = 'replay_origin_mismatch';
+    throw error;
+  }
+  return { tab, tabState, currentUrl, currentOrigin };
+}
+
+async function fsbReplayDispatchMessage(session, step, args, targetState, currentOrigin) {
+  if (typeof dispatchMcpMessageRoute !== 'function' || typeof mcpBridgeClient === 'undefined') {
+    throw new Error(`No shared MCP message route is available for ${step.tool}`);
+  }
+  const replayClient = Object.create(mcpBridgeClient);
+  replayClient._getActiveTab = () => chrome.tabs.get(targetState.tabId);
+  const payload = Object.assign({}, args, {
+    agentId: session.replayAgentId,
+    ownershipToken: targetState.ownershipToken,
+    tab_id: targetState.tabId
+  });
+  if (step.tool === 'mcp:capabilities-invoke') {
+    payload.slug = args.slug;
+    payload.params = args.params || {};
+    payload.origin = currentOrigin;
+  }
+  return dispatchMcpMessageRoute({ type: step.tool, payload, client: replayClient });
+}
+
+async function fsbReplayDispatchStep(session, step, targetState, currentOrigin) {
+  const args = fsbReplayExecutionParams(step, targetState.tabId);
+  const normalizedTool = FSB_REPLAY_LEGACY_TOOL_MAP[step.tool] || step.tool;
+  if (normalizedTool === 'close_tab' && targetState.closed === true) {
+    return fsbReplayTabResult('close_tab', null, { alreadyClosed: true, recovered: true });
+  }
+  // Tab creation already happened in fsbReplayEnsureTargetTab. Re-dispatching
+  // the recorded open_tab would create a duplicate and lose logical mapping.
+  if (normalizedTool === 'open_tab') {
+    const tab = await chrome.tabs.get(targetState.tabId);
+    return fsbReplayTabResult('open_tab', tab);
+  }
+  if (normalizedTool === 'switch_tab') {
+    const tab = await chrome.tabs.update(targetState.tabId, { active: true });
+    return fsbReplayTabResult('switch_tab', tab);
+  }
+  if (typeof step.tool === 'string' && step.tool.startsWith('mcp:') &&
+      typeof hasMcpMessageRoute === 'function' && hasMcpMessageRoute(step.tool)) {
+    return fsbReplayDispatchMessage(session, step, args, targetState, currentOrigin);
+  }
+  let tool = normalizedTool;
+  if (tool === 'invoke_capability') {
+    return fsbReplayDispatchMessage(
+      session,
+      Object.assign({}, step, { tool: 'mcp:capabilities-invoke' }),
+      args,
+      targetState,
+      currentOrigin
+    );
+  }
+  if (tool === 'moveMouse') {
+    return sendMessageWithRetry(targetState.tabId, { action: 'executeAction', tool: 'moveMouse', params: args });
+  }
+  const definition = typeof getToolByName === 'function' ? getToolByName(tool) : null;
+  if (!definition || typeof mcpBridgeClient === 'undefined' ||
+      typeof mcpBridgeClient._handleExecuteAction !== 'function') {
+    throw new Error(`No shared browser replay handler is available for ${step.tool}`);
+  }
+  return mcpBridgeClient._handleExecuteAction({
+    tool,
+    params: Object.assign({}, args, { tab_id: targetState.tabId }),
+    agentId: session.replayAgentId,
+    ownershipToken: targetState.ownershipToken
+  });
+}
+
+function fsbReplayCheckpointState(session, marker, step) {
+  return {
+    kind: FSB_REPLAY_CHECKPOINT_KIND,
+    replaySessionId: session.replaySessionId,
+    originalSessionId: session.originalSessionId,
+    manifestHash: session.manifestHash,
+    targetTabId: session.tabId,
+    logicalTabs: Object.values(session.replayTabs || {})
+      .filter((tab) => tab && tab.closed !== true)
+      .map((tab) => ({
+        logicalTab: tab.logicalTab,
+        tabId: tab.tabId,
+        expectedOrigin: tab.expectedOrigin || null
+      })),
+    replayAgentId: session.replayAgentId,
+    nextStep: session.currentStep,
+    approvedScopes: session.approvedScopes.slice(),
+    previousReceiptCid: session.previousReceiptCid || null,
+    startedAt: session.startTime,
+    expectedOrigin: session.expectedOrigin || null,
+    playback: fsbReplayPlaybackSnapshot(session),
+    decisionRequired: session.status === 'replay_paused',
+    currentStepId: step?.id || null,
+    currentStepRisk: step?.replay?.risk || null,
+    writeInFlight: step ? fsbReplayIsWriteRisk(step) : false,
+    _currentStepName: marker
+  };
+}
+
+async function fsbReplayPersistCheckpoint(session, marker, step) {
+  if (!session._latticeAdapter) return null;
+  const state = fsbReplayCheckpointState(session, marker, step);
+  if (typeof session._latticeAdapter.serializeAndPersist === 'function') {
+    return session._latticeAdapter.serializeAndPersist(state);
+  }
+  return session._latticeAdapter.serialize(state);
+}
+
+function fsbReplayTopologySnapshot(session) {
+  return Object.values(session.replayTabs || {})
+    .filter((tab) => tab && tab.closed !== true && Number.isFinite(tab.tabId))
+    .map((tab) => ({
+      logicalTab: tab.logicalTab,
+      tabId: tab.tabId,
+      expectedOrigin: tab.expectedOrigin || null
+    }));
+}
+
+async function fsbReplayPersistRun(session, replayRun, playbackSnapshot) {
+  if (!globalThis.FsbLatticeReplay || typeof globalThis.FsbLatticeReplay.persistReplayRun !== 'function') return false;
+  const persistedRun = fsbReplayClone(replayRun || session.replayRun, {});
+  persistedRun.playback = fsbReplayClone(playbackSnapshot || fsbReplayPlaybackSnapshot(session), null);
+  persistedRun.targetTabId = Number.isFinite(session.tabId) ? session.tabId : null;
+  persistedRun.expectedOrigin = session.expectedOrigin || null;
+  persistedRun.logicalTabs = fsbReplayTopologySnapshot(session);
+  const persistenceResult = await globalThis.FsbLatticeReplay.persistReplayRun(
+    session.originalSessionId,
+    persistedRun
+  );
+  if (!persistenceResult) return false;
+  return persistedRun;
+}
+
+async function fsbReplayRecordCheckpointNow(session, step, result, success, status, options) {
+  options = options && typeof options === 'object' ? options : {};
+  const attemptNumber = session.replayRun.steps.filter((row) => row.stepId === step.id).length + 1;
+  const resultProjection = session.resultProjectionByStepId?.[step.id];
+  const checkpointResult = status === 'executed' && resultProjection &&
+      globalThis.fsbMcpSessionRecorder?.projectJournalResult
+    ? globalThis.fsbMcpSessionRecorder.projectJournalResult(
+      result || {},
+      step.arguments || {},
+      resultProjection
+    )
+    : (result || {});
+  const checkpoint = await globalThis.FsbLatticeReplay.checkpointReplayStep({
+    replaySessionId: session.replaySessionId,
+    manifestHash: session.manifestHash,
+    sourceReceiptCid: session.sourceReceiptCid,
+    previousReceiptCid: session.previousReceiptCid,
+    attemptNumber,
+    step,
+    result: checkpointResult,
+    success: success !== false
+  });
+  const recordedResultHash = step.resultHash || null;
+  const row = {
+    stepId: step.id,
+    index: step.index,
+    tool: step.tool,
+    attemptNumber,
+    status,
+    success: success !== false,
+    recordedResultHash,
+    resultHash: checkpoint.resultHash,
+    match: recordedResultHash ? recordedResultHash === checkpoint.resultHash : null,
+    receipt: checkpoint.receipt,
+    receiptCid: checkpoint.receiptCid,
+    completedAt: Date.now()
+  };
+  const nextStep = Number.isFinite(options.nextStep) ? options.nextStep : session.currentStep;
+  const stagedRun = fsbReplayClone(session.replayRun, {});
+  stagedRun.steps = Array.isArray(stagedRun.steps) ? stagedRun.steps : [];
+  stagedRun.steps.push(row);
+  stagedRun.nextStep = nextStep;
+  stagedRun.previousReceiptCid = checkpoint.receiptCid;
+  if (typeof options.replayStatus === 'string') stagedRun.status = options.replayStatus;
+  if (Object.prototype.hasOwnProperty.call(options, 'replayError')) stagedRun.error = options.replayError;
+  const stagedPlayback = fsbReplayPlaybackSnapshot(session);
+  if (stagedPlayback && Number.isFinite(options.playbackPositionMs)) {
+    stagedPlayback.positionMs = Math.max(
+      0,
+      Math.min(session.playback?.durationMs || 0, Math.round(options.playbackPositionMs))
+    );
+    stagedPlayback.interpolationTargetMs = stagedPlayback.positionMs;
+  }
+  if (stagedPlayback && typeof options.playbackPaused === 'boolean') {
+    stagedPlayback.paused = options.playbackPaused;
+  }
+  const persistedRun = await fsbReplayPersistRun(session, stagedRun, stagedPlayback);
+  if (persistedRun === false) throw new Error('Replay run persistence is unavailable');
+  session.previousReceiptCid = checkpoint.receiptCid;
+  session.replayRun = persistedRun;
+  session.currentStep = nextStep;
+  if (session.playback && stagedPlayback) {
+    session.playback.positionMs = stagedPlayback.positionMs;
+    session.playback.interpolationTargetMs = stagedPlayback.interpolationTargetMs;
+    session.playback.paused = stagedPlayback.paused === true;
+  }
+  return row;
+}
+
+async function fsbReplayRecordCheckpoint(session, step, result, success, status, options) {
+  return fsbReplayQueueMutation(
+    session,
+    () => fsbReplayRecordCheckpointNow(session, step, result, success, status, options)
+  );
+}
+
+function fsbReplayOverlayTabIds(session) {
+  const ids = new Set();
+  if (Number.isFinite(session?.tabId)) ids.add(session.tabId);
+  Object.values(session?.replayTabs || {}).forEach((tab) => {
+    if (tab && tab.closed !== true && Number.isFinite(tab.tabId)) ids.add(tab.tabId);
+  });
+  return Array.from(ids);
+}
+
+function fsbReplayHandleClosedTab(session, tabId) {
+  if (session?.isReplay !== true || !Number.isFinite(tabId)) return false;
+  const replayTabs = Object.values(session.replayTabs || {});
+  let matched = session.tabId === tabId;
+  replayTabs.forEach((tab) => {
+    if (!tab || tab.tabId !== tabId) return;
+    tab.closed = true;
+    tab.ownershipToken = null;
+    matched = true;
+  });
+  if (!matched) return false;
+
+  const currentPrimary = session.tabId !== tabId
+    ? replayTabs.find((tab) => tab && tab.closed !== true && tab.tabId === session.tabId)
+    : null;
+  const replacement = currentPrimary || replayTabs.find((tab) => (
+    tab && tab.closed !== true && Number.isFinite(tab.tabId) && tab.tabId !== tabId
+  )) || null;
+  session.tabId = replacement?.tabId ?? null;
+  session.expectedOrigin = replacement?.expectedOrigin ?? null;
+  session.ownershipToken = replacement?.ownershipToken ?? null;
+  return true;
+}
+
+function fsbReplayHandleRemovedTab(session, tabId) {
+  if (!fsbReplayHandleClosedTab(session, tabId)) return false;
+  const shouldStopPausedPlayback = session.status === 'replaying' &&
+    session.playback?.paused === true &&
+    fsbReplayOverlayTabIds(session).length === 0 &&
+    session._replayFinalizing !== true;
+  if (shouldStopPausedPlayback) {
+    fsbReplayFinalize(
+      session,
+      'replay_stopped',
+      new Error('Replay stopped because its last browser tab was closed')
+    ).catch((error) => {
+      automationLogger.warn('Failed to finalize replay after its last tab closed', {
+        sessionId: session.replaySessionId,
+        error: error?.message || String(error)
+      });
+    });
+  }
+  return true;
+}
+
+function fsbReplayPlaybackStatus(session) {
+  if (session?.status === 'replay_paused') return 'decision';
+  return session?.playback?.paused === true ? 'paused' : 'playing';
+}
+
+async function fsbReplayBroadcastOverlay(session, step, index, label, finalState) {
+  if (!session) return [];
+  const playback = session.playback || {};
+  const durationMs = Math.max(0, Number(playback.durationMs) || 0);
+  const positionMs = Math.max(0, Math.min(durationMs, Number(playback.positionMs) || 0));
+  const progressPercent = durationMs > 0
+    ? Math.round((positionMs / durationMs) * 100)
+    : Math.round((((index || 0) + 1) / Math.max(1, session.totalSteps || 1)) * 100);
+  const version = (session._replayOverlayVersion || 0) + 1;
+  session._replayOverlayVersion = version;
+  const terminal = finalState && typeof finalState === 'object' ? finalState : null;
+  const playbackStatus = terminal?.status || fsbReplayPlaybackStatus(session);
+  const currentStep = Math.max(0, Math.min(session.totalSteps || 0, Number(index) + 1 || 0));
+  const statusData = {
+    sessionId: session.replaySessionId,
+    sessionToken: session.replaySessionId,
+    version,
+    phase: terminal?.phase || 'acting',
+    lifecycle: terminal ? 'final' : 'running',
+    result: terminal?.result || null,
+    taskName: session.task,
+    statusText: label || (playbackStatus === 'paused' ? 'Replay paused' : fsbReplayActionLabel(step)),
+    progress: {
+      mode: 'determinate',
+      percent: terminal?.result === 'success' ? 100 : progressPercent,
+      label: terminal
+        ? (terminal.result === 'success' ? 'Done' : (terminal.status === 'stopped' ? 'Stopped' : 'Error'))
+        : ''
+    },
+    animatedHighlights: !terminal && playbackStatus === 'playing',
+    stoppable: false,
+    clientLabel: 'Replay',
+    replay: {
+      sessionId: session.replaySessionId,
+      status: playbackStatus,
+      speed: fsbReplayNormalizeSpeed(playback.speed),
+      positionMs: terminal?.result === 'success' ? durationMs : positionMs,
+      interpolationTargetMs: terminal?.result === 'success'
+        ? durationMs
+        : Math.max(positionMs, Math.min(durationMs, Number(playback.interpolationTargetMs) || positionMs)),
+      durationMs,
+      currentStep,
+      totalSteps: session.totalSteps,
+      forwardSeekOnly: true
+    }
+  };
+  const tabIds = fsbReplayOverlayTabIds(session);
+  await Promise.allSettled(tabIds.map((tabId) => sendSessionStatus(tabId, statusData)));
+  return tabIds;
+}
+
+function fsbReplayBroadcastProgress(session, step, index, label) {
+  const playback = session?.playback || {};
+  const durationMs = Math.max(0, Number(playback.durationMs) || 0);
+  const positionMs = Math.max(0, Math.min(durationMs, Number(playback.positionMs) || 0));
+  const progressPercent = durationMs > 0
+    ? Math.round((positionMs / durationMs) * 100)
+    : Math.round(((index + 1) / session.totalSteps) * 100);
+  fsbReplayBroadcastOverlay(session, step, index, label).catch(() => {});
+  try {
+    chrome.runtime.sendMessage({
+      action: 'statusUpdate',
+      sessionId: session.replaySessionId,
+      tabId: session.tabId,
+      message: label || `Replaying ${step.tool}`,
+      iteration: index + 1,
+      maxIterations: session.totalSteps,
+      progressPercent,
+      replayStep: index + 1,
+      isReplay: true
+    }).catch(() => {});
+  } catch (_error) { /* UI may not be listening */ }
+}
+
+function fsbReplayWakePlayback(session) {
+  const wake = session?.playback?._wake;
+  if (typeof wake === 'function') wake();
+}
+
+function fsbReplaySettlePlaybackWait(session, anchor = session?.playback?._waitAnchor, now = Date.now()) {
+  const playback = session?.playback;
+  if (!playback || !anchor || playback._waitAnchor !== anchor) return false;
+  const elapsedWallMs = Math.max(0, now - anchor.startedAt);
+  playback.positionMs = Math.max(
+    playback.positionMs,
+    Math.min(anchor.targetMs, anchor.positionBeforeWait + (elapsedWallMs * anchor.speed))
+  );
+  playback._waitAnchor = null;
+  return true;
+}
+
+function fsbReplayHasPendingControls(session) {
+  return Number(session?._replayControlPendingCount) > 0;
+}
+
+function fsbReplayQueueMutation(session, operation) {
+  const prior = session._replayMutationTail || Promise.resolve();
+  const operationPromise = prior.then(operation);
+  const settledTail = operationPromise.then(() => undefined, () => undefined);
+  session._replayMutationTail = settledTail;
+  settledTail.then(() => {
+    if (session._replayMutationTail === settledTail) session._replayMutationTail = null;
+  });
+  return operationPromise;
+}
+
+function fsbReplayQueueControl(session, operation) {
+  session._replayControlPendingCount = Math.max(0, Number(session._replayControlPendingCount) || 0) + 1;
+
+  const operationPromise = fsbReplayQueueMutation(session, operation);
+  let settledTail;
+  const release = () => {
+    session._replayControlPendingCount = Math.max(
+      0,
+      (Number(session._replayControlPendingCount) || 0) - 1
+    );
+    if (session._replayControlTail === settledTail && !fsbReplayHasPendingControls(session)) {
+      session._replayControlTail = null;
+    }
+    fsbReplayWakePlayback(session);
+  };
+  settledTail = operationPromise.then(release, release);
+  session._replayControlTail = settledTail;
+
+  // Freeze the authoritative clock at the instant the command is accepted.
+  // The queued operation snapshots this settled position, and waking the timer
+  // prevents the executor from crossing a timeline boundary behind the barrier.
+  fsbReplaySettlePlaybackWait(session);
+  fsbReplayWakePlayback(session);
+  return operationPromise;
+}
+
+async function fsbReplayAwaitControls(session) {
+  while (fsbReplayHasPendingControls(session)) {
+    const tail = session._replayControlTail;
+    if (!tail) break;
+    await tail;
+  }
+}
+
+function fsbReplayWaitForWake(session, timeoutMs) {
+  return new Promise((resolve) => {
+    const playback = session?.playback;
+    if (!playback) {
+      resolve(0);
+      return;
+    }
+    const startedAt = Date.now();
+    let timer = null;
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      if (timer !== null) clearTimeout(timer);
+      if (playback._wake === finish) playback._wake = null;
+      resolve(Math.max(0, Date.now() - startedAt));
+    };
+    playback._wake = finish;
+    if (Number.isFinite(timeoutMs)) timer = setTimeout(finish, Math.max(0, timeoutMs));
+  });
+}
+
+async function fsbReplayWaitForPlayback(session, step, index) {
+  const playback = session?.playback;
+  if (!playback) return true;
+  const targetMs = Math.max(0, Number(playback.timeline?.[index]) || 0);
+  while (activeSessions.get(session.replaySessionId) === session &&
+      !session.isTerminating && session.status === 'replaying') {
+    if (playback.paused === true) {
+      playback.interpolationTargetMs = playback.positionMs;
+      fsbReplayBroadcastProgress(session, step, index, 'Replay paused');
+      await fsbReplayWaitForWake(session, null);
+      continue;
+    }
+    const remaining = targetMs - playback.positionMs;
+    if (remaining <= 0) {
+      playback.interpolationTargetMs = playback.positionMs;
+      return true;
+    }
+    const speed = fsbReplayNormalizeSpeed(playback.speed);
+    playback.interpolationTargetMs = targetMs;
+    fsbReplayBroadcastProgress(session, step, index, `Next: ${fsbReplayActionLabel(step)}`);
+    // Broadcast one timing anchor, then sleep directly to the target. The UI
+    // interpolates position locally and control actions wake this timer.
+    const wallDelay = Math.max(1, Math.ceil(remaining / speed));
+    const waitAnchor = {
+      startedAt: Date.now(),
+      positionBeforeWait: playback.positionMs,
+      speed,
+      targetMs
+    };
+    playback._waitAnchor = waitAnchor;
+    const elapsedWallMs = await fsbReplayWaitForWake(session, wallDelay);
+    fsbReplaySettlePlaybackWait(session, waitAnchor, waitAnchor.startedAt + elapsedWallMs);
+  }
+  return false;
+}
+
+async function fsbReplayWaitUntilRunnable(session, step, index) {
+  while (activeSessions.get(session?.replaySessionId) === session &&
+      !session.isTerminating && session.status === 'replaying') {
+    const canContinue = await fsbReplayWaitForPlayback(session, step, index);
+    if (!canContinue) return false;
+    await fsbReplayAwaitControls(session);
+    if (activeSessions.get(session.replaySessionId) !== session ||
+        session.isTerminating || session.status !== 'replaying') {
+      return false;
+    }
+    if (fsbReplayHasPendingControls(session) || session.playback?.paused === true) continue;
+    return true;
+  }
+  return false;
+}
+
+async function fsbReplayPauseForDecision(session, step, error, options = {}) {
+  session.status = 'replay_paused';
+  fsbReplayWakePlayback(session);
+  const replayError = error?.message || String(error || 'Replay step outcome is ambiguous');
+  if (options.checkpoint !== false) {
+    await fsbReplayPersistCheckpoint(session, 'BEFORE_TOOL_EXECUTION', step);
+  }
+  if (options.persist !== false) {
+    await fsbReplayQueueMutation(session, async () => {
+      const stagedRun = fsbReplayClone(session.replayRun, {});
+      stagedRun.status = 'paused';
+      stagedRun.error = replayError;
+      const stagedPlayback = fsbReplayPlaybackSnapshot(session);
+      if (stagedPlayback) {
+        stagedPlayback.paused = true;
+        stagedPlayback.interpolationTargetMs = stagedPlayback.positionMs;
+      }
+      const persistedRun = await fsbReplayPersistRun(session, stagedRun, stagedPlayback);
+      if (persistedRun === false) throw new Error('Replay run persistence is unavailable');
+      session.replayRun = persistedRun;
+      if (session.playback && stagedPlayback) {
+        session.playback.paused = true;
+        session.playback.interpolationTargetMs = stagedPlayback.interpolationTargetMs;
+      }
+    });
+  } else if (session.playback) {
+    session.playback.paused = true;
+    session.playback.interpolationTargetMs = session.playback.positionMs;
+  }
+  fsbReplayBroadcastProgress(session, step, session.currentStep, 'Replay needs a decision');
+  try {
+    await fsbBroadcastAutomationLifecycle({
+      action: 'replayDecisionRequired',
+      sessionId: session.replaySessionId,
+      tabId: session.tabId,
+      stepId: step.id,
+      stepNumber: step.index + 1,
+      tool: step.tool,
+      error: session.replayRun.error,
+      choices: ['retry', 'skip', 'stop']
+    });
+  } catch (_broadcastError) { /* recovery UI may attach later */ }
+}
+
+async function fsbReplayFinalize(session, status, error) {
+  if (session._replayFinalizing === true) return;
+  session._replayFinalizing = true;
+  session.status = status;
+  fsbReplayWakePlayback(session);
+  let terminalPersisted = false;
+  try {
+    const persistedRun = await fsbReplayQueueMutation(session, async () => {
+      const stagedRun = fsbReplayClone(session.replayRun, {});
+      stagedRun.status = status;
+      stagedRun.finishedAt = Date.now();
+      stagedRun.error = error ? (error.message || String(error)) : null;
+      stagedRun.nextStep = session.currentStep;
+      const stagedPlayback = fsbReplayPlaybackSnapshot(session);
+      if (stagedPlayback) {
+        stagedPlayback.paused = false;
+        if (status === 'replay_completed') stagedPlayback.positionMs = session.playback.durationMs;
+        stagedPlayback.interpolationTargetMs = stagedPlayback.positionMs;
+      }
+      const committedRun = await fsbReplayPersistRun(session, stagedRun, stagedPlayback);
+      if (committedRun === false) return false;
+      session.replayRun = committedRun;
+      if (session.playback && stagedPlayback) {
+        session.playback.paused = false;
+        session.playback.positionMs = stagedPlayback.positionMs;
+        session.playback.interpolationTargetMs = stagedPlayback.interpolationTargetMs;
+      }
+      return committedRun;
+    });
+    terminalPersisted = persistedRun !== false;
+  } catch (_persistError) { /* retain recovery data until terminal state is durable */ }
+  await fsbReplayBroadcastOverlay(
+    session,
+    session.replaySteps[Math.min(session.currentStep, Math.max(0, session.replaySteps.length - 1))] || null,
+    Math.max(0, Math.min(session.currentStep, Math.max(0, session.totalSteps - 1))),
+    status === 'replay_completed'
+      ? 'Replay complete'
+      : (error?.message || (status === 'replay_stopped' ? 'Replay stopped' : 'Replay failed')),
+    {
+      status: status === 'replay_completed' ? 'completed' : (status === 'replay_stopped' ? 'stopped' : 'failed'),
+      phase: status === 'replay_completed' ? 'complete' : 'error',
+      result: status === 'replay_completed' ? 'success' : 'error'
+    }
+  );
+  const ownershipReleased = await fsbReplayReleaseAgent(session);
+  if (terminalPersisted && ownershipReleased &&
+      session._latticeAdapter && typeof session._latticeAdapter.clearSnapshots === 'function') {
+    try {
+      await session._latticeAdapter.clearSnapshots();
+    } catch (_clearError) { /* retained snapshot will be retried after the next worker wake */ }
+  }
+  const successful = session.replayRun.steps.filter((row) => row.status === 'executed' && row.success).length;
+  const blocked = session.replayRun.steps.filter((row) => row.status === 'blocked' || row.status === 'skipped').length;
+  if (status === 'replay_completed') {
+    try {
+      await fsbBroadcastAutomationLifecycle({
+        action: 'automationComplete',
+        sessionId: session.replaySessionId,
+        tabId: session.tabId,
+        conversationId: null,
+        historySessionId: session.originalSessionId,
+        result: `Verified replay complete: ${successful} step${successful === 1 ? '' : 's'} executed.${blocked ? ` ${blocked} inspect-only or skipped.` : ''}`
+      });
+    } catch (_error) { /* UI may not be listening */ }
+  } else {
+    try {
+      await fsbBroadcastAutomationLifecycle({
+        action: 'automationError',
+        sessionId: session.replaySessionId,
+        tabId: session.tabId,
+        error: error?.message || (status === 'replay_stopped' ? 'Replay stopped.' : 'Replay failed.')
+      });
+    } catch (_error) { /* UI may not be listening */ }
+  }
+  automationLogger.logSessionEnd(
+    session.replaySessionId,
+    status,
+    session.actionHistory.length,
+    Date.now() - session.startTime
+  );
+  await cleanupSession(session.replaySessionId, { preserveFinalOverlay: true });
+}
+
 async function executeReplaySequence(replaySessionId) {
   const session = activeSessions.get(replaySessionId);
   if (!session || session.status !== 'replaying') return;
-
-  const criticalTools = new Set(['navigate', 'searchGoogle']);
-
   for (let i = session.currentStep; i < session.replaySteps.length; i++) {
-    // Check for termination (user stopped the replay)
-    const currentSession = activeSessions.get(replaySessionId);
-    if (!currentSession || currentSession.isTerminating || currentSession.status !== 'replaying') {
+    if (!activeSessions.has(replaySessionId) || session.isTerminating || session.status !== 'replaying') return;
+    session.currentStep = i;
+    session.replayRun.nextStep = i;
+    const step = session.replaySteps[i];
+    const canContinue = await fsbReplayWaitUntilRunnable(session, step, i);
+    if (!canContinue || !activeSessions.has(replaySessionId) ||
+        session.isTerminating || session.status !== 'replaying') return;
+    if (session.playback) session.playback.interpolationTargetMs = session.playback.positionMs;
+    fsbReplayBroadcastProgress(session, step, i);
+
+    let verdict;
+    try {
+      verdict = await globalThis.FsbLatticeReplay.authorizeReplayStep(step, session.approvedScopes);
+    } catch (error) {
+      await fsbReplayFinalize(session, 'replay_failed', error);
+      return;
+    }
+    const authorizedCanContinue = await fsbReplayWaitUntilRunnable(session, step, i);
+    if (!authorizedCanContinue) return;
+    if (!fsbReplayIsExecutable(step)) {
+      try {
+        const blockedPositionMs = session.playback
+          ? Math.max(session.playback.positionMs, Number(session.playback.timeline?.[i]) || 0)
+          : 0;
+        await fsbReplayRecordCheckpoint(session, step, {
+          blocked: true,
+          reason: step.replay?.reason || verdict?.reason || 'Inspect-only replay step'
+        }, false, 'blocked', {
+          nextStep: i + 1,
+          playbackPositionMs: blockedPositionMs
+        });
+      } catch (error) {
+        await fsbReplayFinalize(session, 'replay_failed', error);
+        return;
+      }
+      continue;
+    }
+    if (!verdict || verdict.allow !== true) {
+      await fsbReplayFinalize(session, 'replay_failed', new Error(verdict?.reason || 'Replay step was not approved'));
       return;
     }
 
-    session.currentStep = i;
-    const step = session.replaySteps[i];
-
-    // Prepend clearInput before type actions to prevent text accumulation
-    if (step.tool === 'type' && step.params?.selector) {
-      try {
-        await sendMessageWithRetry(session.tabId, {
-          action: 'executeAction',
-          tool: 'clearInput',
-          params: { selector: step.params.selector }
-        });
-        await new Promise(resolve => setTimeout(resolve, 200));
-      } catch (e) {
-        automationLogger.debug('clearInput before type failed (non-critical)', {
-          sessionId: replaySessionId, step: i, error: e?.message || String(e)
-        });
-      }
-    }
-
-    // Send progress update to UI
-    const progressPercent = Math.round(((i + 1) / session.totalSteps) * 100);
+    let target;
+    session._replayRiskCheckpointStepId = null;
     try {
-      chrome.runtime.sendMessage({
-        action: 'statusUpdate',
-        sessionId: replaySessionId,
-        message: getActionStatus(step.tool, step.params),
-        iteration: i + 1,
-        maxIterations: session.totalSteps,
-        progressPercent,
-        replayStep: i + 1,
-        isReplay: true
-      });
-    } catch (e) {
-      // Non-blocking: UI may not be listening
-    }
-
-    // Execute the action via the existing content script path
-    let actionResult = null;
-    try {
-      actionResult = await sendMessageWithRetry(session.tabId, {
-        action: 'executeAction',
-        tool: step.tool,
-        params: step.params,
-        visualContext: {
-          taskName: session.task,
-          stepNumber: i + 1,
-          totalSteps: session.totalSteps,
-          iterationCount: 1,
-          isReplay: true
+      while (true) {
+        const targetCanContinue = await fsbReplayWaitUntilRunnable(session, step, i);
+        if (!targetCanContinue) return;
+        target = await fsbReplayAssertTarget(session, step);
+        if (fsbReplayHasPendingControls(session) || session.playback?.paused === true) continue;
+        fsbReplayBroadcastProgress(session, step, i);
+        if (fsbReplayIsWriteRisk(step) && session._replayRiskCheckpointStepId !== step.id) {
+          await fsbReplayPersistCheckpoint(session, 'BEFORE_TOOL_EXECUTION', step);
+          session._replayRiskCheckpointStepId = step.id;
         }
-      });
-    } catch (e) {
-      actionResult = { success: false, error: e?.message || String(e) };
+        if (fsbReplayHasPendingControls(session) || session.playback?.paused === true) continue;
+        break;
+      }
+    } catch (error) {
+      await fsbReplayFinalize(session, 'replay_failed', error);
+      return;
     }
+    if (session.isTerminating || !activeSessions.has(replaySessionId)) return;
 
-    // Record result in session actionHistory
+    let result;
+    try {
+      result = await fsbReplayDispatchStep(session, step, target.tabState, target.currentOrigin);
+    } catch (error) {
+      result = { success: false, error: error?.message || String(error), ambiguous: true };
+    }
+    const success = !(result && result.success === false);
     session.actionHistory.push({
       timestamp: Date.now(),
       tool: step.tool,
-      params: step.params,
-      result: slimActionResult(actionResult),
+      params: fsbReplayClone(step.arguments, {}),
+      result: slimActionResult(result),
       replayStep: i + 1
     });
-
-    // Handle failures
-    if (!actionResult?.success) {
-      if (criticalTools.has(step.tool)) {
-        session.status = 'replay_failed';
-        automationLogger.warn('Replay aborted: critical action failed', {
-          sessionId: replaySessionId, step: i + 1, tool: step.tool, error: actionResult?.error
-        });
-        break;
-      } else {
-        automationLogger.warn('Replay step failed (non-critical, skipping)', {
-          sessionId: replaySessionId, step: i + 1, tool: step.tool, error: actionResult?.error
-        });
-        // Continue to next step
+    const riskyFailure = !success && fsbReplayIsWriteRisk(step);
+    if (!success && riskyFailure) {
+      session.status = 'replay_paused';
+    }
+    const normalizedTool = FSB_REPLAY_LEGACY_TOOL_MAP[step.tool] || step.tool;
+    const logicalTab = fsbReplayLogicalTab(step);
+    if (success && normalizedTool === 'close_tab') {
+      fsbReplayHandleClosedTab(session, target.tabState.tabId);
+    } else if (success) {
+      try {
+        const currentTab = await chrome.tabs.get(target.tabState.tabId);
+        target.tabState.expectedOrigin = fsbReplayOrigin(currentTab?.url || currentTab?.pendingUrl) ||
+          target.tabState.expectedOrigin;
+      } catch (_error) { /* a later per-tab origin check reports the missing tab */ }
+    }
+    const nextStep = success ? i + 1 : i;
+    const nextPositionMs = success && session.playback
+      ? Math.max(session.playback.positionMs, Number(session.playback.timeline?.[i]) || 0)
+      : session.playback?.positionMs;
+    try {
+      const checkpointOptions = {
+        nextStep,
+        playbackPositionMs: nextPositionMs
+      };
+      if (riskyFailure) {
+        checkpointOptions.replayStatus = 'paused';
+        checkpointOptions.replayError = result?.error || `Replay step ${i + 1} failed`;
+        checkpointOptions.playbackPaused = true;
       }
+      await fsbReplayRecordCheckpoint(session, step, result || {}, success, 'executed', checkpointOptions);
+    } catch (error) {
+      await fsbReplayPauseForDecision(session, step, error, {
+        checkpoint: session._replayRiskCheckpointStepId !== step.id
+      });
+      return;
+    }
+    if (success && normalizedTool === 'close_tab') delete session.replayTabs[logicalTab];
+    if (session.isTerminating || !activeSessions.has(replaySessionId)) return;
+
+    if (!success) {
+      const failure = new Error(result?.error || `Replay step ${i + 1} failed`);
+      if (riskyFailure) {
+        await fsbReplayPauseForDecision(session, step, failure, {
+          checkpoint: false,
+          persist: false
+        });
+      } else {
+        await fsbReplayFinalize(session, 'replay_failed', failure);
+      }
+      return;
     }
 
-    // Inter-action delay (skip if last step)
-    if (i < session.replaySteps.length - 1) {
-      await new Promise(resolve => setTimeout(resolve, getReplayDelay(step.tool)));
-    }
   }
-
-  // Tally results
-  const successCount = session.actionHistory.filter(a => a.result?.success).length;
-  const failedCount = session.actionHistory.filter(a => !a.result?.success).length;
-
-  if (session.status === 'replaying') {
-    session.status = 'replay_completed';
-
-    // Send completion message to UI
-    try {
-      fsbBroadcastAutomationLifecycle({
-        action: 'automationComplete',
-        sessionId: replaySessionId,
-        // QT-uof-2 (BROADCAST-tabId-THREAD)
-        tabId: (session && typeof session.tabId === 'number') ? session.tabId : null,
-        // Thread the originating conversation (null for a conversation-less
-        // replay) so the sidepanel never mispersists this completion into
-        // whatever conversation happens to be visible.
-        conversationId: (session && session.conversationId) || null,
-        historySessionId: (session && session.historySessionId) || replaySessionId,
-        result: `Replay complete: ${successCount}/${session.totalSteps} steps executed successfully.${failedCount > 0 ? ` ${failedCount} steps skipped.` : ''}`
-      });
-    } catch (e) { /* UI may not be listening */ }
-  } else if (session.status === 'replay_failed') {
-    // Send error message to UI
-    try {
-      fsbBroadcastAutomationLifecycle({
-        action: 'automationError',
-        sessionId: replaySessionId,
-        error: `Replay failed at step ${session.currentStep + 1}/${session.totalSteps}. ${successCount} steps succeeded before failure.`
-      });
-    } catch (e) { /* UI may not be listening */ }
-  }
-
-  // Send session-ended status to content script (covers previousTabId if set)
-  await endSessionOverlays(session, session.status === 'replay_completed' ? 'completed' : 'error');
-
-  // Log session end and cleanup
-  const duration = Date.now() - session.startTime;
-  automationLogger.logSessionEnd(replaySessionId, session.status, session.actionHistory.length, duration);
-  automationLogger.saveSession(replaySessionId, session);
-  cleanupSession(replaySessionId);
+  await fsbReplayFinalize(session, 'replay_completed');
 }
 
-/**
- * Handle a replaySession message: load session data, create replay session, and kick off execution.
- * @param {Object} request - { sessionId: string }
- * @param {Object} sender - Chrome message sender
- * @param {Function} sendResponse - Response callback
- */
-async function handleReplaySession(request, sender, sendResponse) {
-  try {
-    const { sessionId } = request;
+function fsbReplayBuildSession(prepared, replaySessionId, owned, approvedScopes, priorRun, bootstrapTab) {
+  const adapter = globalThis.FsbLatticeRuntimeAdapter?.createFsbLatticeRuntimeAdapter({
+    sessionId: replaySessionId,
+    fixedSlots: true,
+    catalogKey: FSB_REPLAY_CHECKPOINT_CATALOG_KEY
+  });
+  const startTime = priorRun?.startedAt || Date.now();
+  const tabPlan = {};
+  (prepared.tabs || []).forEach((tab) => {
+    if (tab?.id) tabPlan[tab.id] = fsbReplayClone(tab, null);
+  });
+  if (Object.keys(tabPlan).length === 0) {
+    tabPlan.primary = {
+      id: 'primary',
+      startUrl: prepared.startUrl,
+      startOrigin: fsbReplayOrigin(prepared.startUrl),
+      startUrlState: 'ready'
+    };
+  }
+  const bootstrapLogicalTab = bootstrapTab?.id || 'primary';
+  const bootstrapStartUrl = bootstrapTab?.startUrl || prepared.startUrl;
+  const ownedTab = owned?.tab || null;
+  const bootstrapState = ownedTab ? {
+    logicalTab: bootstrapLogicalTab,
+    tabId: ownedTab.id,
+    ownershipToken: owned.ownershipToken || null,
+    expectedOrigin: fsbReplayOrigin(ownedTab.url) || fsbReplayOrigin(bootstrapStartUrl)
+  } : null;
+  const timeline = fsbReplayBuildTimeline(prepared.steps);
+  const resumeStep = Number.isFinite(priorRun?.nextStep) ? priorRun.nextStep : 0;
+  const fallbackPosition = resumeStep > 0
+    ? Number(timeline.offsets[Math.min(resumeStep - 1, Math.max(0, timeline.offsets.length - 1))]) || 0
+    : 0;
+  const priorPlayback = priorRun?.playback && typeof priorRun.playback === 'object'
+    ? priorRun.playback
+    : {};
+  const playback = {
+    speed: fsbReplayNormalizeSpeed(priorPlayback.speed),
+    paused: priorPlayback.paused === true,
+    positionMs: Math.max(
+      0,
+      Math.min(
+        timeline.durationMs,
+        Number.isFinite(priorPlayback.positionMs) ? priorPlayback.positionMs : fallbackPosition
+      )
+    ),
+    durationMs: timeline.durationMs,
+    timeline: timeline.offsets,
+    interpolationTargetMs: Math.max(
+      0,
+      Math.min(timeline.durationMs, Number(priorPlayback.interpolationTargetMs) || fallbackPosition)
+    ),
+    _wake: null,
+    _waitAnchor: null
+  };
+  playback.interpolationTargetMs = Math.max(playback.positionMs, playback.interpolationTargetMs);
+  return {
+    replaySessionId,
+    task: `Replay: ${prepared.replay.manifest.task || 'MCP agent session'}`,
+    tabId: ownedTab?.id ?? null,
+    replayAgentId: owned.agentId,
+    ownershipToken: owned.ownershipToken || null,
+    replayTabs: bootstrapState ? { [bootstrapLogicalTab]: bootstrapState } : {},
+    replayTabPlan: tabPlan,
+    status: 'replaying',
+    startTime,
+    actionHistory: [],
+    isReplay: true,
+    originalSessionId: prepared.sessionId,
+    manifestHash: prepared.replay.manifestHash,
+    sourceReceiptCid: prepared.receiptCid,
+    previousReceiptCid: priorRun?.previousReceiptCid || prepared.receiptCid,
+    replaySteps: prepared.steps,
+    resultProjectionByStepId: fsbReplayClone(prepared.resultProjectionByStepId, {}),
+    currentStep: priorRun?.nextStep || 0,
+    totalSteps: prepared.steps.length,
+    approvedScopes: Array.isArray(approvedScopes) ? approvedScopes.slice() : [],
+    expectedOrigin: fsbReplayOrigin(ownedTab?.url) || fsbReplayOrigin(bootstrapStartUrl),
+    playback,
+    _replayMutationTail: null,
+    _replayControlPendingCount: 0,
+    _replayControlTail: null,
+    replayRun: priorRun || {
+      id: replaySessionId,
+      manifestHash: prepared.replay.manifestHash,
+      sourceReceiptCid: prepared.receiptCid,
+      targetTabId: ownedTab?.id ?? null,
+      startedAt: startTime,
+      status: 'running',
+      nextStep: 0,
+      previousReceiptCid: prepared.receiptCid,
+      steps: []
+    },
+    _latticeAdapter: adapter || null
+  };
+}
 
-    // Check if automation is already running
-    for (const [id, sess] of activeSessions) {
-      if (sess.status !== 'idle') {
+async function fsbReplayAbortFailedStart(owned, session, error) {
+  if (session) {
+    session.status = 'replay_failed';
+    let terminalPersisted = false;
+    try {
+      const persistedRun = await fsbReplayQueueMutation(session, async () => {
+        const stagedRun = fsbReplayClone(session.replayRun, {});
+        stagedRun.status = 'replay_failed';
+        stagedRun.error = error?.message || String(error || 'Replay start failed');
+        stagedRun.finishedAt = Date.now();
+        const committedRun = await fsbReplayPersistRun(session, stagedRun);
+        if (committedRun === false) return false;
+        session.replayRun = committedRun;
+        return committedRun;
+      });
+      terminalPersisted = persistedRun !== false;
+    } catch (_persistError) { /* retain recovery data until terminal state is durable */ }
+    const ownershipReleased = await fsbReplayReleaseAgent(session, 'replay_start_failed');
+    if (terminalPersisted && ownershipReleased &&
+        session._latticeAdapter && typeof session._latticeAdapter.clearSnapshots === 'function') {
+      await session._latticeAdapter.clearSnapshots().catch(() => {});
+    }
+    await cleanupSession(session.replaySessionId).catch(() => {});
+  } else if (owned?.agentId) {
+    await fsbReplayReleaseAgentId(owned.agentId, 'replay_start_failed');
+  }
+  if (Number.isFinite(owned?.tab?.id)) {
+    try { await chrome.tabs.remove(owned.tab.id); } catch (_tabError) { /* the fresh tab may already be gone */ }
+  }
+}
+
+function fsbReplayStartExecution(session) {
+  const execution = executeReplaySequence(session.replaySessionId);
+  session._replayExecutionPromise = execution;
+  execution.catch((error) => {
+    const current = activeSessions.get(session.replaySessionId);
+    if (current) fsbReplayFinalize(current, 'replay_failed', error).catch(() => {});
+  }).finally(() => {
+    if (session._replayExecutionPromise === execution) session._replayExecutionPromise = null;
+  });
+}
+
+async function handleReplaySession(request, sender, sendResponse) {
+  let owned = null;
+  let session = null;
+  let startClaimed = false;
+  try {
+    if (!fsbReplayIsTrustedUiSender(sender)) {
+      throw new Error('Replay execution requires an extension UI confirmation');
+    }
+    if (fsbReplayStartPending) {
+      sendResponse({ success: false, error: 'Another automation is already running' });
+      return;
+    }
+    for (const sess of activeSessions.values()) {
+      if (['running', 'replaying', 'replay_paused'].includes(sess.status)) {
         sendResponse({ success: false, error: 'Another automation is already running' });
         return;
       }
     }
-
-    // Get current active tab
-    const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!activeTab) {
-      sendResponse({ success: false, error: 'No active tab found' });
-      return;
+    fsbReplayStartPending = true;
+    startClaimed = true;
+    const prepared = await prepareSessionReplay(request && request.sessionId);
+    if (request?.manifestHash && request.manifestHash !== prepared.replay.manifestHash) {
+      throw new Error('The replay changed after preview; review it again before starting');
     }
-
-    // Load replayable session data
-    const replayData = await loadReplayableSession(sessionId);
-    if (!replayData || replayData.replayableActions.length === 0) {
-      sendResponse({ success: false, error: 'No replayable actions found in this session' });
-      return;
+    fsbReplayAssertExecutablePreparation(prepared);
+    const bootstrapTab = fsbReplayBootstrapTab(prepared);
+    if (!bootstrapTab) {
+      throw new Error('The recording does not contain a safe HTTP(S) starting URL');
     }
-
-    // Create replay session ID
-    const replaySessionId = `replay_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
-
-    // Create replay session in activeSessions (no AI instance, no conversation session)
-    activeSessions.set(replaySessionId, {
-      task: `Replay: ${replayData.originalTask}`,
-      tabId: activeTab.id,
-      status: 'replaying',
-      startTime: Date.now(),
-      actionHistory: [],
-      isReplay: true,
-      originalSessionId: sessionId,
-      replaySteps: replayData.replayableActions,
-      currentStep: 0,
-      totalSteps: replayData.replayableActions.length
-    });
-
-    // Start keep-alive to prevent service worker from sleeping
+    owned = await fsbReplayCreateOwnedTab(bootstrapTab.startUrl);
+    const replaySessionId = `replay_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    session = fsbReplayBuildSession(
+      prepared,
+      replaySessionId,
+      owned,
+      Array.isArray(request?.approvedScopes) ? request.approvedScopes : [],
+      undefined,
+      bootstrapTab
+    );
+    activeSessions.set(replaySessionId, session);
     startKeepAlive();
-
-    // Log session start
-    automationLogger.logSessionStart(replaySessionId, `Replay: ${replayData.originalTask}`, activeTab.id);
-
-    // Respond immediately with session info
+    automationLogger.logSessionStart(replaySessionId, session.task, owned.tab.id);
+    await fsbReplayPersistCheckpoint(session, 'BEFORE_NEXT_ITERATION_SCHEDULE', null);
+    const persistedRun = await fsbReplayPersistRun(session);
+    if (persistedRun === false) throw new Error('Replay run persistence is unavailable');
+    session.replayRun = persistedRun;
     sendResponse({
       success: true,
       sessionId: replaySessionId,
-      totalSteps: replayData.replayableActions.length
+      tabId: owned.tab.id,
+      totalSteps: prepared.steps.length,
+      manifestHash: prepared.replay.manifestHash
     });
-
-    // Kick off replay execution asynchronously (do NOT await)
-    executeReplaySequence(replaySessionId);
+    setTimeout(() => {
+      if (activeSessions.get(replaySessionId) === session && session.status === 'replaying') {
+        fsbReplayStartExecution(session);
+      }
+    }, 0);
   } catch (error) {
-    automationLogger.error('Failed to start replay session', { error: error.message });
-    sendResponse({ success: false, error: error.message });
+    await fsbReplayAbortFailedStart(owned, session, error);
+    automationLogger.error('Failed to start replay session', { error: error && error.message });
+    sendResponse({ success: false, error: error && error.message ? error.message : String(error) });
+  } finally {
+    if (startClaimed) fsbReplayStartPending = false;
+  }
+}
+
+async function handleReplayStepDecision(request, sender, sendResponse) {
+  if (!fsbReplayIsTrustedUiSender(sender)) {
+    sendResponse({ success: false, error: 'Replay decisions require the extension UI' });
+    return;
+  }
+  const session = activeSessions.get(request && request.sessionId);
+  if (!session || session.status !== 'replay_paused') {
+    sendResponse({ success: false, error: 'No paused replay is awaiting a decision' });
+    return;
+  }
+  const decision = request && request.decision;
+  if (!['retry', 'skip', 'stop'].includes(decision)) {
+    sendResponse({ success: false, error: 'Replay decision must be Retry, Skip, or Stop' });
+    return;
+  }
+  try {
+    const step = session.replaySteps[session.currentStep];
+    if (decision === 'stop') {
+      sendResponse({ success: true, decision });
+      await fsbReplayFinalize(session, 'replay_stopped', new Error('Replay stopped after an ambiguous write'));
+      return;
+    }
+    if (decision === 'skip') {
+      const normalizedTool = FSB_REPLAY_LEGACY_TOOL_MAP[step?.tool] || step?.tool;
+      const logicalTab = fsbReplayLogicalTab(step);
+      await fsbReplayRecordCheckpoint(session, step, { decision: 'skip', skipped: true }, false, 'skipped', {
+        nextStep: session.currentStep + 1,
+        replayStatus: 'running',
+        replayError: null,
+        playbackPaused: false
+      });
+      if (normalizedTool === 'close_tab' && session.replayTabs?.[logicalTab]?.closed === true) {
+        delete session.replayTabs[logicalTab];
+      }
+      session.status = 'replaying';
+      await fsbReplayPersistCheckpoint(session, 'BEFORE_NEXT_ITERATION_SCHEDULE', null);
+    } else {
+      await fsbReplayQueueMutation(session, async () => {
+        const stagedRun = fsbReplayClone(session.replayRun, {});
+        stagedRun.status = 'running';
+        stagedRun.error = null;
+        stagedRun.nextStep = session.currentStep;
+        const stagedPlayback = fsbReplayPlaybackSnapshot(session);
+        if (stagedPlayback) {
+          stagedPlayback.paused = false;
+          stagedPlayback.interpolationTargetMs = stagedPlayback.positionMs;
+        }
+        const persistedRun = await fsbReplayPersistRun(session, stagedRun, stagedPlayback);
+        if (persistedRun === false) throw new Error('Replay run persistence is unavailable');
+        session.replayRun = persistedRun;
+        if (session.playback && stagedPlayback) {
+          session.playback.paused = false;
+          session.playback.interpolationTargetMs = stagedPlayback.interpolationTargetMs;
+        }
+      });
+      session.status = 'replaying';
+      await fsbReplayPersistCheckpoint(session, 'BEFORE_NEXT_ITERATION_SCHEDULE', null);
+    }
+    sendResponse({ success: true, decision, nextStep: session.currentStep });
+    fsbReplayWakePlayback(session);
+    fsbReplayStartExecution(session);
+  } catch (error) {
+    sendResponse({ success: false, error: error && error.message ? error.message : String(error) });
+  }
+}
+
+function fsbReplayCanControl(session, sender) {
+  if (fsbReplayIsTrustedUiSender(sender)) return true;
+  const senderTabId = sender?.tab?.id;
+  return Number.isFinite(senderTabId) && fsbReplayOverlayTabIds(session).includes(senderTabId);
+}
+
+async function handleReplayControl(request, sender, sendResponse) {
+  const session = activeSessions.get(request?.sessionId);
+  if (!session || session.isReplay !== true || !['replaying', 'replay_paused'].includes(session.status)) {
+    sendResponse({ success: false, error: 'Replay is no longer active' });
+    return;
+  }
+  if (!fsbReplayCanControl(session, sender)) {
+    sendResponse({ success: false, error: 'Replay controls are only available on an owned replay tab' });
+    return;
+  }
+  if (session.status === 'replay_paused') {
+    sendResponse({ success: false, error: 'Choose Retry, Skip, or Stop in the FSB side panel' });
+    return;
+  }
+  if (!session.playback) {
+    sendResponse({ success: false, error: 'Replay playback state is unavailable' });
+    return;
+  }
+  const command = request?.command;
+  try {
+    if (!['pause', 'play', 'setSpeed', 'seek'].includes(command)) {
+      throw new Error('Unknown replay control');
+    }
+    if (command === 'setSpeed' && !FSB_REPLAY_SPEEDS.includes(Number(request?.speed))) {
+      throw new Error('Replay speed must be 0.5x, 1x, 2x, 4x, or 8x');
+    }
+    if (command === 'seek' && !Number.isFinite(Number(request?.positionMs))) {
+      throw new Error('Replay seek position is invalid');
+    }
+
+    const committedPlayback = await fsbReplayQueueControl(session, async () => {
+      if (activeSessions.get(session.replaySessionId) !== session ||
+          session.isTerminating || session.status !== 'replaying') {
+        throw new Error('Replay is no longer active');
+      }
+      const currentPlayback = session.playback;
+      const stagedPlayback = fsbReplayPlaybackSnapshot(session);
+      if (!currentPlayback || !stagedPlayback) {
+        throw new Error('Replay playback state is unavailable');
+      }
+      if (command === 'pause') {
+        stagedPlayback.paused = true;
+        stagedPlayback.interpolationTargetMs = stagedPlayback.positionMs;
+      } else if (command === 'play') {
+        stagedPlayback.paused = false;
+        stagedPlayback.interpolationTargetMs = stagedPlayback.positionMs;
+      } else if (command === 'setSpeed') {
+        stagedPlayback.speed = Number(request.speed);
+      } else {
+        const requestedPosition = Number(request.positionMs);
+        if (requestedPosition < currentPlayback.positionMs - FSB_REPLAY_SEEK_EPSILON_MS) {
+          throw new Error('Replay can only seek forward because completed browser actions cannot be undone');
+        }
+        stagedPlayback.positionMs = Math.max(
+          stagedPlayback.positionMs,
+          Math.min(currentPlayback.durationMs, requestedPosition)
+        );
+        stagedPlayback.interpolationTargetMs = stagedPlayback.positionMs;
+      }
+
+      const persistedRun = await fsbReplayPersistRun(session, session.replayRun, stagedPlayback);
+      if (persistedRun === false) throw new Error('Replay run persistence is unavailable');
+      if (activeSessions.get(session.replaySessionId) !== session ||
+          session.isTerminating || session.status !== 'replaying') {
+        throw new Error('Replay is no longer active');
+      }
+      session.replayRun = persistedRun;
+      currentPlayback.speed = stagedPlayback.speed;
+      currentPlayback.paused = stagedPlayback.paused;
+      currentPlayback.positionMs = Math.max(currentPlayback.positionMs, stagedPlayback.positionMs);
+      currentPlayback.interpolationTargetMs = Math.max(
+        currentPlayback.positionMs,
+        stagedPlayback.interpolationTargetMs
+      );
+      const step = session.replaySteps[session.currentStep] || null;
+      fsbReplayBroadcastProgress(
+        session,
+        step,
+        Math.min(session.currentStep, Math.max(0, session.totalSteps - 1)),
+        currentPlayback.paused
+          ? 'Replay paused'
+          : `Replaying at ${fsbReplayNormalizeSpeed(currentPlayback.speed)}x`
+      );
+      return fsbReplayPlaybackSnapshot(session);
+    });
+    sendResponse({ success: true, playback: committedPlayback });
+  } catch (error) {
+    sendResponse({ success: false, error: error?.message || String(error) });
+  }
+}
+
+async function fsbReplayReclaimOwnedTab(state, tab) {
+  const registry = globalThis.fsbAgentRegistryInstance;
+  if (!registry || typeof registry.bindTab !== 'function') {
+    throw new Error('Replay recovery cannot access tab ownership');
+  }
+  let agentId = state.replayAgentId;
+  const currentOwner = typeof registry.getOwner === 'function' ? registry.getOwner(tab.id) : null;
+  if (currentOwner && currentOwner !== agentId) {
+    throw new Error('Replay recovery refused a tab now owned by another agent');
+  }
+  if (!agentId) {
+    throw new Error('Replay recovery could not reserve an agent');
+  }
+  const binding = await registry.bindTab(agentId, tab.id);
+  if (!binding || binding.success === false) {
+    throw new Error(binding?.error || 'Replay recovery could not reclaim its tab');
+  }
+  return { tab, agentId, ownershipToken: binding.ownershipToken || null };
+}
+
+async function fsbReplayReclaimOwnedTabs(state, options) {
+  options = options && typeof options === 'object' ? options : {};
+  const recorded = Array.isArray(state.logicalTabs)
+    ? state.logicalTabs
+    : [{ logicalTab: 'primary', tabId: state.targetTabId, expectedOrigin: state.expectedOrigin || null }];
+  const allowMissingCloseLogicalTab = typeof options.allowMissingCloseLogicalTab === 'string'
+    ? options.allowMissingCloseLogicalTab
+    : null;
+  const replayTabs = {};
+  let agentId = state.replayAgentId;
+  let bootstrapOwned = null;
+  let bootstrapLogicalTab = null;
+  let firstOwned = null;
+  let firstLogicalTab = null;
+  const eligibleTabs = [];
+  const registry = globalThis.fsbAgentRegistryInstance;
+  try {
+    for (const item of recorded) {
+      const logicalTab = item.logicalTab || 'primary';
+      let tab;
+      try {
+        tab = await chrome.tabs.get(item.tabId);
+      } catch (error) {
+        if (logicalTab === allowMissingCloseLogicalTab) {
+          replayTabs[logicalTab] = {
+            logicalTab,
+            tabId: item.tabId,
+            ownershipToken: null,
+            expectedOrigin: item.expectedOrigin || null,
+            closed: true
+          };
+          continue;
+        }
+        throw new Error(`Replay recovery target ${logicalTab} is missing or restricted`);
+      }
+      if (!tab || !fsbReplayOrigin(tab.url || tab.pendingUrl)) {
+        throw new Error(`Replay recovery target ${logicalTab} is missing or restricted`);
+      }
+      eligibleTabs.push({ item, tab });
+    }
+
+    if (allowMissingCloseLogicalTab &&
+        !eligibleTabs.some(({ item }) => (item.logicalTab || 'primary') === allowMissingCloseLogicalTab) &&
+        !replayTabs[allowMissingCloseLogicalTab]) {
+      replayTabs[allowMissingCloseLogicalTab] = {
+        logicalTab: allowMissingCloseLogicalTab,
+        tabId: null,
+        ownershipToken: null,
+        expectedOrigin: null,
+        closed: true
+      };
+    }
+
+    if (!registry || typeof registry.bindTab !== 'function') {
+      throw new Error('Replay recovery cannot access tab ownership');
+    }
+    if (!agentId || typeof registry.hasAgent !== 'function' || !registry.hasAgent(agentId)) {
+      if (typeof registry.registerAgent !== 'function') {
+        throw new Error('Replay recovery cannot reserve an agent');
+      }
+      const registration = await registry.registerAgent();
+      if (!registration || registration.error || !registration.agentId) {
+        throw new Error(registration?.error || 'Replay recovery could not reserve an agent');
+      }
+      agentId = registration.agentId;
+    }
+
+    for (const { item, tab } of eligibleTabs) {
+      const reclaimed = await fsbReplayReclaimOwnedTab(
+        Object.assign({}, state, { replayAgentId: agentId }),
+        tab
+      );
+      agentId = reclaimed.agentId;
+      const logicalTab = item.logicalTab || 'primary';
+      replayTabs[logicalTab] = {
+        logicalTab,
+        tabId: tab.id,
+        ownershipToken: reclaimed.ownershipToken || null,
+        expectedOrigin: item.expectedOrigin || fsbReplayOrigin(tab.url || tab.pendingUrl)
+      };
+      if (!firstOwned) {
+        firstOwned = reclaimed;
+        firstLogicalTab = logicalTab;
+      }
+      if (tab.id === state.targetTabId) {
+        bootstrapOwned = reclaimed;
+        bootstrapLogicalTab = logicalTab;
+      }
+    }
+  } catch (error) {
+    const failedAgentId = agentId;
+    if (failedAgentId && registry && typeof registry.releaseAgent === 'function') {
+      try { await registry.releaseAgent(failedAgentId, 'replay_recovery_failed'); } catch (_releaseError) { /* preserve original recovery failure */ }
+    }
+    throw error;
+  }
+  return {
+    owned: bootstrapOwned || firstOwned || { tab: null, agentId, ownershipToken: null },
+    replayTabs,
+    bootstrapLogicalTab: bootstrapLogicalTab || firstLogicalTab || null
+  };
+}
+
+async function fsbReplayClearRecoverySnapshots(replaySessionId) {
+  if (!replaySessionId || typeof globalThis.FsbLatticeRuntimeAdapter?.createFsbLatticeRuntimeAdapter !== 'function') {
+    return;
+  }
+  const adapter = globalThis.FsbLatticeRuntimeAdapter.createFsbLatticeRuntimeAdapter({
+    sessionId: replaySessionId,
+    fixedSlots: true,
+    catalogKey: FSB_REPLAY_CHECKPOINT_CATALOG_KEY
+  });
+  if (adapter && typeof adapter.clearSnapshots === 'function') {
+    await adapter.clearSnapshots();
+  }
+}
+
+async function fsbReplayReleaseRecoveredTerminalAgent(agentId) {
+  return fsbReplayReleaseAgentId(agentId, 'replay_terminal');
+}
+
+async function fsbReplayCleanupFailedRecovery(replaySessionId, session, owned, checkpointAgentId) {
+  if (session) {
+    session.status = 'replay_failed';
+    if (session.replayRun) session.replayRun.status = 'replay_failed';
+  }
+  const recoveryAgentId = session?.replayAgentId || owned?.agentId || checkpointAgentId || null;
+  const ownershipReleased = await fsbReplayReleaseAgentId(
+    recoveryAgentId,
+    session ? 'replay_terminal' : 'replay_recovery_failed'
+  );
+  if (session && activeSessions.get(replaySessionId) === session) {
+    try {
+      await cleanupSession(replaySessionId);
+    } catch (_cleanupError) {
+      activeSessions.delete(replaySessionId);
+    } finally {
+      if (activeSessions.get(replaySessionId) === session) activeSessions.delete(replaySessionId);
+      const hasActiveSession = [...activeSessions.values()].some((candidate) =>
+        candidate.status === 'running' || candidate.status === 'replaying'
+      );
+      if (!hasActiveSession) stopKeepAlive();
+    }
+  }
+  return ownershipReleased;
+}
+
+async function fsbRestoreLatticeReplayCheckpoints() {
+  if (!chrome.storage?.session || !globalThis.FsbLatticeReplay) return;
+  let catalog;
+  try {
+    const stored = await chrome.storage.session.get(FSB_REPLAY_CHECKPOINT_CATALOG_KEY);
+    catalog = Array.isArray(stored?.[FSB_REPLAY_CHECKPOINT_CATALOG_KEY])
+      ? [...new Set(stored[FSB_REPLAY_CHECKPOINT_CATALOG_KEY].filter((id) => typeof id === 'string' && id))]
+      : [];
+  } catch (_error) {
+    return;
+  }
+  const checkpoints = [];
+  for (const replaySessionId of catalog) {
+    const adapter = globalThis.FsbLatticeRuntimeAdapter?.createFsbLatticeRuntimeAdapter?.({
+      sessionId: replaySessionId,
+      fixedSlots: true,
+      catalogKey: FSB_REPLAY_CHECKPOINT_CATALOG_KEY
+    });
+    if (!adapter || typeof adapter.loadLatestSnapshot !== 'function') continue;
+    const snapshot = await adapter.loadLatestSnapshot().catch(() => null);
+    if (!snapshot || snapshot.kind !== 'survivability-snapshot' || typeof snapshot.payload !== 'string') continue;
+    let state;
+    try { state = JSON.parse(snapshot.payload); } catch (_error) { continue; }
+    if (!state || state.kind !== FSB_REPLAY_CHECKPOINT_KIND || state.replaySessionId !== replaySessionId) continue;
+    checkpoints.push({ snapshot, state });
+  }
+
+  for (const { snapshot, state } of checkpoints) {
+    if (activeSessions.has(state.replaySessionId)) continue;
+    let reclaimedOwned = null;
+    let recoveredSession = null;
+    try {
+      const prepared = await prepareSessionReplay(state.originalSessionId);
+      const persistedRun = prepared.replay?.lastRun;
+      if (persistedRun?.id === state.replaySessionId && FSB_REPLAY_TERMINAL_STATUSES.has(persistedRun.status)) {
+        const ownershipReleased = await fsbReplayReleaseRecoveredTerminalAgent(state.replayAgentId);
+        if (ownershipReleased) {
+          try {
+            await fsbReplayClearRecoverySnapshots(state.replaySessionId);
+          } catch (_clearError) { /* terminal state still prevents replay recovery below */ }
+        }
+        continue;
+      }
+      fsbReplayAssertExecutablePreparation(prepared);
+      if (prepared.replay.manifestHash !== state.manifestHash) {
+        throw new Error('Replay recovery manifest hash mismatch');
+      }
+      const checkpointNextStep = Number.isFinite(state.nextStep) ? state.nextStep : 0;
+      const persistedNextStep = persistedRun?.id === state.replaySessionId && Number.isFinite(persistedRun.nextStep)
+        ? persistedRun.nextStep
+        : checkpointNextStep;
+      const journalAdvanced = persistedNextStep > checkpointNextStep;
+      const recoveredNextStep = Math.max(checkpointNextStep, persistedNextStep);
+      const recoveryStep = prepared.steps[checkpointNextStep] || null;
+      const recoveryTool = FSB_REPLAY_LEGACY_TOOL_MAP[recoveryStep?.tool] || recoveryStep?.tool;
+      const recoveryState = journalAdvanced && Array.isArray(persistedRun?.logicalTabs)
+        ? Object.assign({}, state, {
+            targetTabId: Number.isFinite(persistedRun.targetTabId) ? persistedRun.targetTabId : null,
+            expectedOrigin: persistedRun.expectedOrigin || null,
+            logicalTabs: persistedRun.logicalTabs
+          })
+        : state;
+      const allowMissingCloseLogicalTab = !journalAdvanced && state._currentStepName === 'BEFORE_TOOL_EXECUTION' &&
+        state.writeInFlight === true && recoveryTool === 'close_tab'
+        ? fsbReplayLogicalTab(recoveryStep)
+        : null;
+      const reclaimed = await fsbReplayReclaimOwnedTabs(recoveryState, { allowMissingCloseLogicalTab });
+      const owned = reclaimed.owned;
+      reclaimedOwned = owned;
+      const tab = owned.tab || null;
+      const bootstrapTab = tab ? ((prepared.tabs || []).find((item) =>
+        item?.id === reclaimed.bootstrapLogicalTab
+      ) || {
+        id: reclaimed.bootstrapLogicalTab || 'primary',
+        startUrl: tab.url || tab.pendingUrl,
+        startOrigin: fsbReplayOrigin(tab.url || tab.pendingUrl),
+        startUrlState: 'ready'
+      }) : null;
+      const priorRun = prepared.replay.lastRun && prepared.replay.lastRun.id === state.replaySessionId
+        ? prepared.replay.lastRun
+        : {
+            id: state.replaySessionId,
+            manifestHash: state.manifestHash,
+            sourceReceiptCid: prepared.receiptCid,
+            targetTabId: tab?.id ?? null,
+            startedAt: state.startedAt || Date.now(),
+            status: 'running',
+            nextStep: state.nextStep || 0,
+            previousReceiptCid: state.previousReceiptCid || prepared.receiptCid,
+            steps: []
+          };
+      if (!Array.isArray(priorRun.steps)) priorRun.steps = [];
+      if (!priorRun.playback && state.playback) {
+        priorRun.playback = fsbReplayClone(state.playback, null);
+      }
+      const session = fsbReplayBuildSession(
+        prepared,
+        state.replaySessionId,
+        owned,
+        Array.isArray(state.approvedScopes) ? state.approvedScopes : [],
+        priorRun,
+        bootstrapTab
+      );
+      recoveredSession = session;
+      session.replayTabs = reclaimed.replayTabs;
+      session.currentStep = recoveredNextStep;
+      session.replayRun.nextStep = recoveredNextStep;
+      session.previousReceiptCid = priorRun.previousReceiptCid || state.previousReceiptCid || prepared.receiptCid;
+      session.expectedOrigin = recoveryState.expectedOrigin || fsbReplayOrigin(tab?.url);
+      activeSessions.set(state.replaySessionId, session);
+      startKeepAlive();
+
+      const currentStep = session.replaySteps[session.currentStep] || null;
+      const resumePolicy = journalAdvanced
+        ? 'SAFE'
+        : session._latticeAdapter && typeof session._latticeAdapter.resume === 'function'
+        ? await session._latticeAdapter.resume(snapshot)
+        : 'RECOVERY_AMBIGUOUS';
+      const ambiguousWrite = !journalAdvanced && (state.decisionRequired === true ||
+        (resumePolicy === 'ON_ERROR_SW_EVICTION_MID_TOOL_DISPATCH' && state.writeInFlight === true));
+      if (ambiguousWrite && currentStep) {
+        await fsbReplayPauseForDecision(
+          session,
+          currentStep,
+          new Error('The service worker restarted during a write, so completion cannot be proven.')
+        );
+        continue;
+      }
+      if (resumePolicy === 'RECOVERY_AMBIGUOUS') {
+        await fsbReplayFinalize(session, 'replay_failed', new Error('Replay recovery checkpoint is ambiguous'));
+        continue;
+      }
+      fsbReplayStartExecution(session);
+    } catch (error) {
+      automationLogger.warn('Lattice replay recovery failed closed', {
+        replaySessionId: state.replaySessionId,
+        error: error && error.message
+      });
+      let terminalPersisted = false;
+      try {
+        const failureRun = fsbReplayClone(recoveredSession?.replayRun, null) || {
+          id: state.replaySessionId,
+          manifestHash: state.manifestHash,
+          sourceReceiptCid: null,
+          targetTabId: state.targetTabId ?? null,
+          startedAt: state.startedAt || Date.now(),
+          nextStep: Number.isFinite(state.nextStep) ? state.nextStep : 0,
+          previousReceiptCid: state.previousReceiptCid || null,
+          steps: []
+        };
+        failureRun.status = 'replay_failed';
+        failureRun.error = error && error.message ? error.message : String(error);
+        failureRun.finishedAt = Date.now();
+        terminalPersisted = !!(await globalThis.FsbLatticeReplay.persistReplayRun(
+          state.originalSessionId,
+          failureRun
+        ));
+      } catch (_persistError) { /* retain the checkpoint until terminal state can be persisted */ }
+      const ownershipReleased = await fsbReplayCleanupFailedRecovery(
+        state.replaySessionId,
+        recoveredSession,
+        reclaimedOwned,
+        state.replayAgentId
+      );
+      if (terminalPersisted && ownershipReleased) {
+        try {
+          await fsbReplayClearRecoverySnapshots(state.replaySessionId);
+        } catch (_clearError) { /* terminal or orphaned recovery state remains fail-closed */ }
+      }
+    }
   }
 }
 
@@ -7611,6 +11686,117 @@ function detectRepeatedSuccess(session) {
   return null;
 }
 
+function fsbTakeTabControlHasExactRequest(request) {
+  if (!request || typeof request !== 'object' || Array.isArray(request)) return false;
+  const actual = Object.keys(request).sort();
+  const expected = ['action', 'expectedOwnerAgentId', 'tabId', 'windowId'].sort();
+  return actual.length === expected.length
+    && actual.every((key, index) => key === expected[index]);
+}
+
+function fsbTakeTabControlSenderTrusted(sender) {
+  if (!sender || sender.id !== chrome.runtime.id) return false;
+  const expectedUrl = chrome.runtime.getURL('ui/sidepanel.html');
+  return sender.url === expectedUrl;
+}
+
+async function fsbTakeTabControlContextMatches(request) {
+  try {
+    const tab = await chrome.tabs.get(request.tabId);
+    return !!(tab
+      && tab.id === request.tabId
+      && tab.windowId === request.windowId
+      && tab.active === true);
+  } catch (_error) {
+    return false;
+  }
+}
+
+function fsbTabHasLiveAutomationSession(tabId) {
+  let live = false;
+  activeSessions.forEach((session) => {
+    if (live || !session || session.isTerminating) return;
+    if (session.tabId === tabId
+      || session.originalTabId === tabId
+      || session.previousTabId === tabId) live = true;
+  });
+  return live;
+}
+
+async function fsbStopLocalAutomationForTakeControl(tabId, ownerAgentId) {
+  const matchingSessionIds = [];
+  activeSessions.forEach((session, sessionId) => {
+    if (!session || session.isTerminating) return;
+    if (session.agentId && session.agentId !== ownerAgentId) return;
+    const ownsTarget = session.tabId === tabId
+      || session.originalTabId === tabId
+      || session.previousTabId === tabId;
+    if (ownsTarget) matchingSessionIds.push(sessionId);
+  });
+  for (const sessionId of matchingSessionIds) {
+    const response = await new Promise((resolve) => {
+      handleStopAutomation(
+        { action: 'stopAutomation', sessionId: sessionId },
+        { id: chrome.runtime.id, url: chrome.runtime.getURL('ui/sidepanel.html') },
+        resolve
+      );
+    });
+    if (!response || (response.success !== true && response.alreadyEnded !== true)) return false;
+  }
+  return true;
+}
+
+async function handleTakeTabControl(request, sender) {
+  if (!fsbTakeTabControlHasExactRequest(request)
+      || !fsbTakeTabControlSenderTrusted(sender)
+      || !Number.isSafeInteger(request.tabId)
+      || !Number.isSafeInteger(request.windowId)
+      || typeof request.expectedOwnerAgentId !== 'string'
+      || request.expectedOwnerAgentId.length === 0) {
+    return { success: false, code: 'stale_context', released: false };
+  }
+  const registry = globalThis.fsbAgentRegistryInstance;
+  if (!registry
+      || typeof registry.getOwner !== 'function'
+      || typeof registry.releaseTab !== 'function') {
+    return { success: false, code: 'registry_unavailable', released: false };
+  }
+  if (!await fsbTakeTabControlContextMatches(request)
+      || registry.getOwner(request.tabId) !== request.expectedOwnerAgentId) {
+    return { success: false, code: 'stale_context', released: false };
+  }
+
+  try {
+    const mappings = typeof registry.listDelegationMappings === 'function'
+      ? registry.listDelegationMappings()
+      : [];
+    if (mappings.some((row) => row && row.agentId === request.expectedOwnerAgentId)) {
+      return { success: false, code: 'protected_delegation', released: false };
+    }
+  } catch (_error) {
+    return { success: false, code: 'registry_unavailable', released: false };
+  }
+
+  const stopped = await fsbStopLocalAutomationForTakeControl(
+    request.tabId,
+    request.expectedOwnerAgentId
+  );
+  if (!stopped || !await fsbTakeTabControlContextMatches(request)) {
+    return { success: false, code: 'stale_context', released: false };
+  }
+
+  const currentOwner = registry.getOwner(request.tabId);
+  if (!currentOwner) return { success: true, code: 'released', released: true };
+  if (currentOwner !== request.expectedOwnerAgentId) {
+    return { success: false, code: 'stale_context', released: false };
+  }
+  const released = await registry.releaseTab(request.tabId);
+  if (released === true || registry.getOwner(request.tabId) === null) {
+    return { success: true, code: 'released', released: true };
+  }
+  return { success: false, code: 'protected_delegation', released: false };
+}
+
 // Listen for messages from popup and content scripts. Named (rather than
 // inline) so fsbDispatchInternalMessage, defined right after the listener
 // body, can invoke it directly for same-service-worker callers.
@@ -7624,7 +11810,16 @@ const fsbHandleRuntimeMessage = (request, sender, sendResponse) => {
 
   armMcpBridge('runtime.onMessage');
 
-  automationLogger.logComm(null, 'receive', request.action || 'unknown', true, { tabId: sender.tab?.id });
+  const delegationCommand = fsbHandleDelegationCommand(request);
+  if (delegationCommand) {
+    Promise.resolve(delegationCommand).then(
+      (result) => sendResponse(result),
+      () => sendResponse(fsbDelegationFailure('invalid_request', null))
+    );
+    return true;
+  }
+
+  automationLogger.logComm(null, 'receive', request.action || request.type || 'unknown', true, { tabId: sender.tab?.id });
 
   switch (request.action) {
     case 'fsbAuditLogClearAndExport': {
@@ -7683,9 +11878,328 @@ const fsbHandleRuntimeMessage = (request, sender, sendResponse) => {
       return true; // async response
     }
 
+    case 'getGrokBuildAuthStatus': {
+      if (!fsbDelegationHasExactKeys(request, ['action'])) {
+        sendResponse({ success: false, errorCode: 'invalid_request' });
+        return false;
+      }
+      (async () => {
+        const readiness = await fsbEnsureAgentBridgeReady();
+        if (!readiness || readiness.ok !== true) {
+          sendResponse({
+            success: false,
+            errorCode: readiness && typeof readiness.code === 'string'
+              ? readiness.code
+              : 'bridge_not_ready'
+          });
+          return;
+        }
+        try {
+          const value = await mcpBridgeClient.sendExtRequest(
+            'provider.auth.status',
+            { providerId: FSB_GROK_BUILD_PROVIDER_ID },
+            { timeout: FSB_GROK_AUTH_STATUS_REQUEST_TIMEOUT_MS }
+          );
+          const result = fsbSafeGrokAuthResponse(value);
+          if (!result) throw new Error('provider_auth_malformed');
+          if (result.state === 'oauth') {
+            try { await fsbRefreshMcpCompatibility(); }
+            catch (_error) { /* delegation preflight retries stale Grok auth evidence */ }
+          }
+          sendResponse({ success: true, state: result.state });
+        } catch (error) {
+          sendResponse({
+            success: false,
+            errorCode: error && error.code === 'ext_request_timeout'
+              ? 'provider_auth_timeout'
+              : 'provider_auth_failed'
+          });
+        }
+      })();
+      return true;
+    }
+
+    case 'beginGrokBuildAuth': {
+      if (!fsbDelegationHasExactKeys(request, ['action'])) {
+        sendResponse({ success: false, errorCode: 'invalid_request' });
+        return false;
+      }
+      (async () => {
+        const readiness = await fsbEnsureAgentBridgeReady();
+        if (!readiness || readiness.ok !== true) {
+          sendResponse({
+            success: false,
+            errorCode: readiness && typeof readiness.code === 'string'
+              ? readiness.code
+              : 'bridge_not_ready'
+          });
+          return;
+        }
+        try {
+          const value = await mcpBridgeClient.sendExtRequest(
+            'provider.auth.begin',
+            { providerId: FSB_GROK_BUILD_PROVIDER_ID },
+            {
+              onEvent: async (eventName, payload) => {
+                const progress = fsbSafeGrokAuthProgress(eventName, payload);
+                if (!progress) throw new Error('provider_auth_malformed');
+                fsbBroadcastGrokAuthProgress(progress);
+              }
+            }
+          );
+          const result = fsbSafeGrokAuthBeginResponse(value);
+          if (!result) throw new Error('provider_auth_malformed');
+          if (result.state === 'oauth') {
+            try { await fsbRefreshMcpCompatibility(); }
+            catch (_error) { /* delegation preflight retries stale Grok auth evidence */ }
+          }
+          // reason travels even on success so the panel can tell a completed
+          // sign-in apart from a refusal it must explain.
+          sendResponse({ success: true, state: result.state, reason: result.reason });
+        } catch (error) {
+          sendResponse({
+            success: false,
+            errorCode: error && error.code === 'ext_request_timeout'
+              ? 'provider_auth_timeout'
+              : 'provider_auth_failed'
+          });
+        }
+      })();
+      return true;
+    }
+
+    case 'logoutGrokBuildAuth': {
+      if (!fsbDelegationHasExactKeys(request, ['action'])) {
+        sendResponse({ success: false, errorCode: 'invalid_request' });
+        return false;
+      }
+      (async () => {
+        const readiness = await fsbEnsureAgentBridgeReady();
+        if (!readiness || readiness.ok !== true) {
+          sendResponse({
+            success: false,
+            errorCode: readiness && typeof readiness.code === 'string'
+              ? readiness.code
+              : 'bridge_not_ready'
+          });
+          return;
+        }
+        try {
+          const value = await mcpBridgeClient.sendExtRequest(
+            'provider.auth.logout',
+            { providerId: FSB_GROK_BUILD_PROVIDER_ID },
+            { timeout: FSB_GROK_AUTH_LOGOUT_REQUEST_TIMEOUT_MS }
+          );
+          const result = fsbSafeGrokLogoutResponse(value);
+          if (!result) throw new Error('provider_auth_malformed');
+          if (result.locked === true) {
+            sendResponse({ success: false, errorCode: 'provider_auth_locked' });
+            return;
+          }
+          try { await fsbRefreshMcpCompatibility(); }
+          catch (_error) { /* status refresh remains available from the provider panel */ }
+          sendResponse({ success: true, state: result.state });
+        } catch (error) {
+          sendResponse({
+            success: false,
+            errorCode: error && error.code === 'ext_request_timeout'
+              ? 'provider_auth_timeout'
+              : 'provider_auth_failed'
+          });
+        }
+      })();
+      return true;
+    }
+
+    case 'testAgentProviderConnection': {
+      const exactRequest = fsbDelegationHasExactKeys(request, ['action', 'providerId']);
+      const providerId = exactRequest && typeof request.providerId === 'string'
+        ? request.providerId
+        : '';
+      const providers = globalThis.FsbDelegationProviders;
+      if (
+        !exactRequest
+        || !providers
+        || typeof providers.isShippedId !== 'function'
+        || !providers.isShippedId(providerId)
+      ) {
+        sendResponse({
+          success: false,
+          ok: false,
+          errorCode: 'invalid_request',
+          message: 'Select a supported agent provider.'
+        });
+        return false;
+      }
+      (async () => {
+        const readiness = await fsbEnsureAgentBridgeReady();
+        if (!readiness || readiness.ok !== true) {
+          const code = readiness && typeof readiness.code === 'string'
+            ? readiness.code
+            : 'bridge_not_ready';
+          sendResponse({
+            success: true,
+            ok: false,
+            providerId: providerId,
+            errorCode: code,
+            message: fsbAgentConnectionFailureMessage(code, providerId)
+          });
+          return;
+        }
+        try {
+          const result = await mcpBridgeClient.sendExtRequest(
+            'provider.test-connection',
+            { providerId: providerId },
+            { timeout: FSB_AGENT_CONNECTION_TEST_REQUEST_TIMEOUT_MS }
+          );
+          const success = result
+            && typeof result === 'object'
+            && !Array.isArray(result)
+            && Object.keys(result).length === 2
+            && result.ok === true
+            && result.providerId === providerId;
+          const failed = result
+            && typeof result === 'object'
+            && !Array.isArray(result)
+            && Object.keys(result).length === 3
+            && result.ok === false
+            && result.providerId === providerId
+            && typeof result.code === 'string'
+            && fsbSafeAgentConnectionFailureCode(result.code) === result.code;
+          if (success) {
+            sendResponse({
+              success: true,
+              ok: true,
+              providerId: providerId
+            });
+          } else if (failed) {
+            sendResponse({
+              success: true,
+              ok: false,
+              providerId: providerId,
+              errorCode: result.code,
+              message: fsbAgentConnectionFailureMessage(result.code, providerId)
+            });
+          } else {
+            throw Object.assign(new Error('invalid connection response'), {
+              code: 'connection_test_malformed'
+            });
+          }
+        } catch (error) {
+          const code = fsbSafeAgentConnectionFailureCode(
+            error && typeof error.code === 'string' ? error.code : ''
+          );
+          sendResponse({
+            success: true,
+            ok: false,
+            providerId: providerId,
+            errorCode: code,
+            message: fsbAgentConnectionFailureMessage(code, providerId)
+          });
+        }
+      })().catch(() => {
+        sendResponse({
+          success: true,
+          ok: false,
+          providerId: providerId,
+          errorCode: 'connection_test_failed',
+          message: fsbAgentConnectionFailureMessage('connection_test_failed', providerId)
+        });
+      });
+      return true;
+    }
+
+    case 'getMcpClients': {
+      (async () => {
+        try {
+          const result = await fsbReadCachedMcpClients();
+          sendResponse({
+            success: true,
+            clients: result.clients,
+            refreshOutcome: result.refreshOutcome,
+            compatibilityExpiresAt: result.compatibilityExpiresAt
+          });
+        } catch (_error) {
+          sendResponse({ success: false, error: 'mcp_client_inventory_unavailable' });
+        }
+      })();
+      return true;
+    }
+
+    case 'refreshMcpCompatibility': {
+      let exactRequest = false;
+      try {
+        const keys = Reflect.ownKeys(request);
+        const action = Object.getOwnPropertyDescriptor(request, 'action');
+        exactRequest = keys.length === 1
+          && keys[0] === 'action'
+          && action
+          && action.enumerable
+          && Object.prototype.hasOwnProperty.call(action, 'value')
+          && action.value === 'refreshMcpCompatibility';
+      } catch (_error) { /* reject malformed runtime input below */ }
+      if (!exactRequest) {
+        sendResponse({ success: false, error: 'mcp_client_inventory_unavailable' });
+        return false;
+      }
+      (async () => {
+        try {
+          const result = await fsbRefreshMcpCompatibility();
+          sendResponse({
+            success: true,
+            clients: result.clients,
+            refreshOutcome: result.refreshOutcome,
+            compatibilityExpiresAt: result.compatibilityExpiresAt
+          });
+        } catch (_error) {
+          sendResponse({ success: false, error: 'mcp_client_inventory_unavailable' });
+        }
+      })();
+      return true;
+    }
+
+    case 'reloadMcpBridgePairing': {
+      // Pairing credentials cross only from the trusted options page directly
+      // into chrome.storage.session. Runtime messages carry no secret data.
+      const forbiddenPairingFields = ['pairingCode', 'secret', 'token'];
+      if (forbiddenPairingFields.some((field) => Object.prototype.hasOwnProperty.call(request, field))) {
+        sendResponse({ success: false, errorCode: 'pairing_secret_in_runtime_message' });
+        return false;
+      }
+      if (!mcpBridgeClient || typeof mcpBridgeClient.reloadPairingAndReconnect !== 'function') {
+        sendResponse({ success: false, errorCode: 'mcp_bridge_pairing_reload_unavailable' });
+        return false;
+      }
+      (async () => {
+        try {
+          const result = await mcpBridgeClient.reloadPairingAndReconnect();
+          sendResponse({
+            success: true,
+            pairingStatus: result && result.pairingStatus
+              ? result.pairingStatus
+              : mcpBridgeClient.getState().pairingStatus
+          });
+        } catch (error) {
+          sendResponse({
+            success: false,
+            errorCode: error && typeof error.code === 'string'
+              ? error.code
+              : 'mcp_bridge_pairing_reload_failed'
+          });
+        }
+      })();
+      return true;
+    }
+
     case 'startAutomation':
       handleStartAutomation(request, sender, sendResponse);
       return true; // Will respond asynchronously
+
+    case 'takeTabControl':
+      handleTakeTabControl(request, sender).then(sendResponse, () => {
+        sendResponse({ success: false, code: 'registry_unavailable', released: false });
+      });
+      return true;
 
     case 'stopAutomation':
       handleStopAutomation(request, sender, sendResponse);
@@ -7737,7 +12251,7 @@ const fsbHandleRuntimeMessage = (request, sender, sendResponse) => {
     case 'checkSessionAlive': {
       const sessionId = request.sessionId;
       const session = activeSessions.get(sessionId);
-      const alive = !!(session && session.status === 'running');
+      const alive = !!(session && ['running', 'replaying', 'replay_paused'].includes(session.status));
       sendResponse({ alive: alive, status: session?.status || null });
       break;
     }
@@ -7849,11 +12363,6 @@ const fsbHandleRuntimeMessage = (request, sender, sendResponse) => {
             url: request.url || sender.url,
             frameId: frameId
           });
-          // Only clear badge if the dashboard relay is not connected;
-          // otherwise the green indicator would vanish on every page navigation
-          if (typeof fsbWebSocket === 'undefined' || !fsbWebSocket.connected) {
-            chrome.action.setBadgeText({ text: '' });
-          }
           debugLog('[FSB Background] Tab marked as ready:', tabId);
           automationLogger.logInit('content_script', 'ready', { tabId, frameId, readyState: request.readyState, retry: request.retry || false });
           replayMcpVisualSessionForTab(tabId, { now: Date.now(), source: 'contentScriptReady' }).catch((error) => {
@@ -7923,16 +12432,60 @@ const fsbHandleRuntimeMessage = (request, sender, sendResponse) => {
         lineno: request.lineno,
         colno: request.colno
       });
-      chrome.action.setBadgeBackgroundColor({ color: '#FF0000' });
-      chrome.action.setBadgeText({ text: '!' });
       sendResponse({ success: true });
       break;
+
+    case 'deleteSessionHistory': {
+      const sessionId = typeof request.sessionId === 'string' ? request.sessionId.trim() : '';
+      if (!sessionId) {
+        sendResponse({ success: false, error: 'Session ID is required' });
+        break;
+      }
+      (async () => {
+        try {
+          const isJournalSession = globalThis.FsbMcpLatticeJournal &&
+            typeof globalThis.FsbMcpLatticeJournal.hasSession === 'function' &&
+            await globalThis.FsbMcpLatticeJournal.hasSession(sessionId);
+          const deleted = isJournalSession
+            ? await globalThis.FsbMcpLatticeJournal.deleteSession(sessionId)
+            : await automationLogger.deleteSession(sessionId);
+          sendResponse(deleted
+            ? { success: true }
+            : { success: false, error: 'Failed to delete session history' });
+        } catch (error) {
+          sendResponse({ success: false, error: error?.message || 'Failed to delete session history' });
+        }
+      })();
+      return true;
+    }
+
+    case 'clearSessionHistory':
+      (async () => {
+        try {
+          if (globalThis.FsbMcpLatticeJournal &&
+              typeof globalThis.FsbMcpLatticeJournal.clearSessions === 'function') {
+            await globalThis.FsbMcpLatticeJournal.clearSessions();
+          }
+          const cleared = await automationLogger.clearAllSessions();
+          sendResponse(cleared
+            ? { success: true }
+            : { success: false, error: 'Failed to clear session history' });
+        } catch (error) {
+          sendResponse({ success: false, error: error?.message || 'Failed to clear session history' });
+        }
+      })();
+      return true;
 
     case 'getSessionReplayData':
       // Get structured replay data for session visualization
       (async () => {
         try {
-          const replay = await automationLogger.getReplayData(request.sessionId);
+          const isJournalSession = globalThis.FsbMcpLatticeJournal &&
+            typeof globalThis.FsbMcpLatticeJournal.hasSession === 'function' &&
+            await globalThis.FsbMcpLatticeJournal.hasSession(request.sessionId);
+          const replay = isJournalSession && typeof globalThis.FsbMcpLatticeJournal.getReplayData === 'function'
+            ? await globalThis.FsbMcpLatticeJournal.getReplayData(request.sessionId)
+            : await automationLogger.getReplayData(request.sessionId);
           sendResponse({ replay });
         } catch (error) {
           sendResponse({ replay: null, error: error.message });
@@ -7944,13 +12497,64 @@ const fsbHandleRuntimeMessage = (request, sender, sendResponse) => {
       // Export session as human-readable text report
       (async () => {
         try {
-          const text = await automationLogger.exportHumanReadable(request.sessionId);
+          const isJournalSession = globalThis.FsbMcpLatticeJournal &&
+            typeof globalThis.FsbMcpLatticeJournal.hasSession === 'function' &&
+            await globalThis.FsbMcpLatticeJournal.hasSession(request.sessionId);
+          const text = isJournalSession && typeof globalThis.FsbMcpLatticeJournal.exportHumanReadable === 'function'
+            ? await globalThis.FsbMcpLatticeJournal.exportHumanReadable(request.sessionId)
+            : await automationLogger.exportHumanReadable(request.sessionId);
           sendResponse({ text });
         } catch (error) {
           sendResponse({ text: null, error: error.message });
         }
       })();
       return true; // Will respond asynchronously
+
+    case 'getSessionDetail':
+      (async () => {
+        try {
+          const journal = globalThis.FsbMcpLatticeJournal;
+          const detail = journal && typeof journal.getSessionDetail === 'function'
+            ? await journal.getSessionDetail({
+              sessionId: request.sessionId,
+              afterSequence: request.afterSequence,
+              limit: request.limit
+            })
+            : null;
+          if (detail) {
+            sendResponse({ success: true, ...detail });
+            return;
+          }
+          const session = await automationLogger.loadSession(request.sessionId);
+          sendResponse(session
+            ? { success: true, session, events: [], nextSequence: null, hasMore: false, legacy: true }
+            : { success: false, error: 'Session not found' });
+        } catch (error) {
+          sendResponse({ success: false, error: error?.message || 'Failed to load session detail' });
+        }
+      })();
+      return true;
+
+    case 'readSessionArtifact':
+      (async () => {
+        try {
+          const artifact = globalThis.FsbMcpLatticeJournal &&
+            typeof globalThis.FsbMcpLatticeJournal.readSessionArtifact === 'function'
+            ? await globalThis.FsbMcpLatticeJournal.readSessionArtifact({
+              sessionId: request.sessionId,
+              artifactId: request.artifactId,
+              offset: request.offset,
+              limit: request.limit
+            })
+            : null;
+          sendResponse(artifact
+            ? { success: true, artifact }
+            : { success: false, error: 'Session artifact not found' });
+        } catch (error) {
+          sendResponse({ success: false, error: error?.message || 'Failed to read session artifact' });
+        }
+      })();
+      return true;
 
     case 'getDOMSnapshots':
       // Get full DOM snapshots for a session
@@ -8486,9 +13090,64 @@ const fsbHandleRuntimeMessage = (request, sender, sendResponse) => {
 //       })();
 //       return true;
 
+    case 'prepareSessionReplay':
+      handlePrepareSessionReplay(request, sender, sendResponse);
+      return true;
+
+    case 'getPendingMcpReplayApprovals':
+      if (!fsbReplayIsTrustedUiSender(sender)) {
+        sendResponse({ success: false, error: 'Replay approvals require the extension UI' });
+        break;
+      }
+      (async () => {
+        try {
+          sendResponse({ success: true, approvals: await fsbReadPendingMcpReplayApprovals() });
+        } catch (error) {
+          sendResponse({ success: false, error: error?.message || String(error) });
+        }
+      })();
+      return true;
+
+    case 'approveMcpReplay':
+      if (!fsbReplayIsTrustedUiSender(sender)) {
+        sendResponse({ success: false, error: 'Replay approval requires the extension UI' });
+        break;
+      }
+      (async () => {
+        try {
+          sendResponse(await fsbApprovePendingMcpReplay(request, sender));
+        } catch (error) {
+          sendResponse({ success: false, error: error?.message || String(error) });
+        }
+      })();
+      return true;
+
+    case 'cancelMcpReplay':
+      if (!fsbReplayIsTrustedUiSender(sender)) {
+        sendResponse({ success: false, error: 'Replay cancellation requires the extension UI' });
+        break;
+      }
+      (async () => {
+        try {
+          await fsbRemovePendingMcpReplayApproval(request.requestId);
+          sendResponse({ success: true });
+        } catch (error) {
+          sendResponse({ success: false, error: error?.message || String(error) });
+        }
+      })();
+      return true;
+
     case 'replaySession':
       handleReplaySession(request, sender, sendResponse);
       return true; // Will respond asynchronously
+
+    case 'replayStepDecision':
+      handleReplayStepDecision(request, sender, sendResponse);
+      return true;
+
+    case 'controlReplay':
+      handleReplayControl(request, sender, sendResponse);
+      return true;
 
     case 'cdpMouseClick':
       handleCDPMouseClick(request, sender, sendResponse);
@@ -8700,10 +13359,56 @@ const fsbHandleRuntimeMessage = (request, sender, sendResponse) => {
         return true;
       }
       (async function () {
+        const provider = String(request.provider || '');
+        const model = String(request.config && request.config.model || '').trim();
+        const timeoutMs = provider === 'lmstudio' ? 180000 : 60000;
+        const startedAt = Date.now();
         try {
-          await executeViaBridge(request.provider, request.config, { __testConnection: true }, { mode: 'test-connection' });
+          if (provider === 'lmstudio' && !model) {
+            throw new Error('LM Studio model is required before testing the connection.');
+          }
+          if (typeof automationLogger !== 'undefined') {
+            automationLogger.debug('Provider connection test starting', {
+              phase: 'test-connection',
+              provider: provider,
+              model: model,
+              toolCount: 0,
+              timeoutMs: timeoutMs,
+              elapsedMs: 0
+            });
+          }
+          await executeViaBridge(
+            provider,
+            request.config,
+            { __testConnection: true },
+            { mode: 'test-connection', timeoutMs: timeoutMs }
+          );
+          if (typeof automationLogger !== 'undefined') {
+            automationLogger.debug('Provider connection test completed', {
+              phase: 'test-connection',
+              provider: provider,
+              model: model,
+              toolCount: 0,
+              timeoutMs: timeoutMs,
+              elapsedMs: Date.now() - startedAt
+            });
+          }
           sendResponse({ ok: true });
         } catch (err) {
+          if (typeof automationLogger !== 'undefined') {
+            automationLogger.error('Provider connection test failed', {
+              phase: 'test-connection',
+              provider: provider,
+              model: model,
+              toolCount: 0,
+              timeoutMs: timeoutMs,
+              elapsedMs: Date.now() - startedAt,
+              status: err && typeof err.status === 'number' ? err.status : null,
+              errorKind: err && typeof err.code === 'string'
+                ? err.code
+                : 'connection_test_failed'
+            });
+          }
           sendResponse({ ok: false, error: (err && err.message) ? err.message : 'Unknown bridge error' });
         }
       })();
@@ -8918,8 +13623,29 @@ async function handleSolveCaptcha(request, sender, sendResponse) {
 
 async function handleStartAutomation(request, sender, sendResponse) {
   const { task, tabId, conversationId, source } = request;
+  const requestAgentId = (request && typeof request.agentId === 'string')
+    ? request.agentId
+    : null;
+  const isScopedMcpRequest = source === 'mcp'
+    && requestAgentId
+    && !requestAgentId.startsWith('legacy:');
 
   try {
+    // Delegated providers must leave this chokepoint before side-panel, tab,
+    // conversation, chat, session, or agent-loop mutation. The typed
+    // FSB_DELEGATION_START command is the sole spawn authority; this legacy
+    // action returns only the background-owned consent disposition so older
+    // callers cannot accidentally enter the API loop with an agent provider.
+    let authoritativeProvider = await fsbReadAuthoritativeProviderConfig();
+    if (authoritativeProvider.providerKind === 'agent') {
+      const consent = await fsbDelegationConsentCommand({
+        type: 'FSB_DELEGATION_CONSENT',
+        task
+      });
+      sendResponse(consent);
+      return;
+    }
+
     // Get the target tab ID (may be updated by smart tab management below)
     let targetTabId = tabId || sender.tab?.id;
 
@@ -8958,6 +13684,12 @@ async function handleStartAutomation(request, sender, sendResponse) {
         });
       }
     }
+
+    // Resolve legacy LM Studio configurations after the gesture-sensitive
+    // side-panel open but before conversation/session mutation. Exactly one
+    // compatible local model is safe to migrate automatically; all ambiguous
+    // or unavailable states fail before the caller sees "Automation started".
+    authoritativeProvider = await fsbResolveLmStudioModelForStart(authoritativeProvider);
 
     // Check for existing conversation session for follow-up reuse
     if (conversationId && conversationSessions.has(conversationId)) {
@@ -9041,7 +13773,12 @@ async function handleStartAutomation(request, sender, sendResponse) {
     if (isRestrictedURL(tabInfo.url)) {
       if (shouldUseSmartNavigation(tabInfo.url, task)) {
         const targetUrl = analyzeTaskAndGetTargetUrl(getFirstTaskSegment(task));
-        const decision = await decideTabAction(targetTabId, tabInfo.url, targetUrl, task);
+        // A scoped MCP agent may only navigate the tab selected by its
+        // registry. Reusing a matching tab from the surrounding browser
+        // would silently cross the agent boundary.
+        const decision = isScopedMcpRequest
+          ? { action: 'navigate', reason: 'agent_scoped_target' }
+          : await decideTabAction(targetTabId, tabInfo.url, targetUrl, task);
         automationLogger.logNavigation(null, 'smart', tabInfo.url, targetUrl, { task: task.substring(0, 100), decision: decision.action, reason: decision.reason });
 
         if (decision.action === 'switch') {
@@ -9114,12 +13851,28 @@ async function handleStartAutomation(request, sender, sendResponse) {
     );
     const userMaxIterations = parseInt(storedSettings.maxIterations) || 100;
 
-    // Pre-populate allowedTabs with all non-restricted tabs in the current window
-    // so the AI can switch to any tab the user already has open
-    const allWindowTabs = await chrome.tabs.query({ currentWindow: true });
-    const initialAllowedTabs = allWindowTabs
-      .filter(t => t.id && !isRestrictedURL(t.url))
-      .map(t => t.id);
+    // Browser-native sessions retain their current-window tab pool. A real
+    // MCP agent receives only its registry-owned tabs so the autopilot loop
+    // cannot switch into a user's or another agent's tab.
+    let initialAllowedTabs = [];
+    if (isScopedMcpRequest) {
+      const reg = globalThis.fsbAgentRegistryInstance;
+      const ownedTabIds = reg && typeof reg.getAgentTabs === 'function'
+        ? (reg.getAgentTabs(requestAgentId) || [])
+        : [];
+      const ownedTabs = await Promise.all(ownedTabIds.filter(Number.isFinite).map(async (ownedTabId) => {
+        try { return await chrome.tabs.get(ownedTabId); }
+        catch (_error) { return null; }
+      }));
+      initialAllowedTabs = ownedTabs
+        .filter(t => t && t.id && !isRestrictedURL(t.url))
+        .map(t => t.id);
+    } else {
+      const allWindowTabs = await chrome.tabs.query({ currentWindow: true });
+      initialAllowedTabs = allWindowTabs
+        .filter(t => t.id && !isRestrictedURL(t.url))
+        .map(t => t.id);
+    }
     if (!initialAllowedTabs.includes(targetTabId)) {
       initialAllowedTabs.push(targetTabId);
     }
@@ -9146,7 +13899,8 @@ async function handleStartAutomation(request, sender, sendResponse) {
       lastUrl: null,            // Last known URL
       actionSequences: [],      // Track sequences of actions to detect patterns
       sequenceRepeatCount: {},  // Count how many times each sequence repeats
-      allowedTabs: initialAllowedTabs, // All non-restricted tabs in the current window
+      allowedTabs: initialAllowedTabs,
+      ...(requestAgentId ? { agentId: requestAgentId } : {}),
       tabHistory: [],             // Track tab switches for debugging
       navigationMessage,        // Store navigation message for UI
       animatedActionHighlights: storedSettings.animatedActionHighlights ?? true,
@@ -9257,6 +14011,16 @@ async function handleStartAutomation(request, sender, sendResponse) {
         // legacy single-agent flows remain functional during the v0.9.60
         // multi-agent transition.
       }
+    }
+
+    // Keep the owning identity with the local session so subsequent page
+    // actions can prove child-tab provenance and open_tab can bind its result
+    // directly. Persist again because the first session snapshot is written
+    // before the registry bind above.
+    if (resolvedAgentId) {
+      sessionData.agentId = resolvedAgentId;
+      sessionData.ownershipToken = (bindResult && bindResult.ownershipToken) || null;
+      persistSession(sessionId, sessionData);
     }
 
     sendResponse({
@@ -9594,6 +14358,25 @@ async function handleStopAutomation(request, sender, sendResponse) {
 
   if (session) {
     automationLogger.debug('Found session to stop', { sessionId, status: session.status });
+
+    if (session.isReplay === true) {
+      session.isTerminating = true;
+      session.status = 'replay_stopping';
+      fsbReplayWakePlayback(session);
+      if (session._replayExecutionPromise) {
+        await Promise.race([
+          session._replayExecutionPromise.catch(() => {}),
+          new Promise((resolve) => setTimeout(resolve, 5000))
+        ]);
+      }
+      if (!activeSessions.has(sessionId)) {
+        sendResponse({ success: true, message: 'Replay already ended' });
+        return;
+      }
+      await fsbReplayFinalize(session, 'replay_stopped', new Error('Replay stopped by the user'));
+      sendResponse({ success: true, message: 'Replay stopped' });
+      return;
+    }
 
     session.status = 'stopped';
 
@@ -14263,7 +19046,67 @@ async function handleCloseTab(request, sender, sendResponse) {
  * @param {Object} sender - The message sender
  * @param {Function} sendResponse - Function to send response
  */
+function isCdpDebuggerContention(error) {
+  const message = error && error.message ? error.message : String(error || '');
+  return /another debugger|already attached|debugger is busy|target is being debugged/i.test(message);
+}
+
+function cdpDebuggerBusyError(tabId, cause) {
+  const leaseApi = globalThis.FsbCdpLease;
+  const error = leaseApi && typeof leaseApi.busyError === 'function'
+    ? leaseApi.busyError(tabId)
+    : new Error(`The debugger for tab ${tabId} is busy. Retry the operation.`);
+  error.code = 'SCREENSHOT_DEBUGGER_BUSY';
+  error.retryable = true;
+  if (cause) error.cause = cause;
+  return error;
+}
+
+function cdpFailureResult(error, extra) {
+  return Object.assign({
+    success: false,
+    error: error && error.message ? error.message : String(error),
+    code: error && error.code ? error.code : undefined,
+    retryable: Boolean(error && error.retryable)
+  }, extra || {});
+}
+
+async function attachFsbDebugger(tabId, operation) {
+  // The per-tab lease makes it safe to release FSB's own warm Input-domain
+  // attachment. A foreign owner is never detached.
+  if (keyboardEmulator && keyboardEmulator.isAttachedTo(tabId)) {
+    automationLogger.debug(`${operation}: detaching FSB KeyboardEmulator before attaching`, { tabId });
+    await keyboardEmulator.detachDebugger(tabId);
+  }
+  try {
+    await chrome.debugger.attach({ tabId }, '1.3');
+  } catch (error) {
+    if (isCdpDebuggerContention(error)) throw cdpDebuggerBusyError(tabId, error);
+    throw error;
+  }
+}
+
+async function runLegacyCdpMessageWithLease(handler, request, sender, sendResponse) {
+  const tabId = sender && sender.tab ? sender.tab.id : null;
+  if (!tabId || !globalThis.FsbCdpLease || typeof globalThis.FsbCdpLease.acquire !== 'function') {
+    return handler(request, sender, sendResponse);
+  }
+  let lease = null;
+  try {
+    lease = await globalThis.FsbCdpLease.acquire(tabId, { timeoutMs: 10000 });
+    return await handler(request, sender, sendResponse);
+  } catch (error) {
+    sendResponse(cdpFailureResult(error));
+  } finally {
+    if (lease) lease.release();
+  }
+}
+
 async function handleCDPInsertText(request, sender, sendResponse) {
+  return runLegacyCdpMessageWithLease(handleCDPInsertTextUnlocked, request, sender, sendResponse);
+}
+
+async function handleCDPInsertTextUnlocked(request, sender, sendResponse) {
   const tabId = sender.tab?.id;
   const { text, clearFirst } = request;
 
@@ -14282,28 +19125,7 @@ async function handleCDPInsertText(request, sender, sendResponse) {
   try {
     automationLogger.logActionExecution(null, 'cdpInsertText', 'start', { tabId, textLength: text.length });
 
-    // If KeyboardEmulator has the debugger attached to this tab, detach it first
-    if (keyboardEmulator && keyboardEmulator.isAttachedTo(tabId)) {
-      automationLogger.debug('cdpInsertText: detaching KeyboardEmulator debugger before attaching', { tabId });
-      await keyboardEmulator.detachDebugger(tabId);
-    }
-
-    // Try to attach debugger; if "already attached" error, force-detach and retry
-    try {
-      await chrome.debugger.attach({ tabId }, '1.3');
-    } catch (attachErr) {
-      if (attachErr.message && attachErr.message.includes('Another debugger is already attached')) {
-        automationLogger.debug('cdpInsertText: stale debugger detected, force-detaching and retrying', { tabId });
-        try {
-          await chrome.debugger.detach({ tabId });
-        } catch (forceDetachErr) {
-          // Ignore -- may fail if the "other debugger" is not ours
-        }
-        await chrome.debugger.attach({ tabId }, '1.3');
-      } else {
-        throw attachErr;
-      }
-    }
+    await attachFsbDebugger(tabId, 'cdpInsertText');
     debuggerAttached = true;
 
     // If clearFirst is requested, select all and delete
@@ -14392,11 +19214,7 @@ async function handleCDPInsertText(request, sender, sendResponse) {
       }
     }
 
-    sendResponse({
-      success: false,
-      error: error.message,
-      method: 'cdp'
-    });
+    sendResponse(cdpFailureResult(error, { method: 'cdp' }));
   }
 }
 
@@ -14408,6 +19226,10 @@ async function handleCDPInsertText(request, sender, sendResponse) {
  * @param {Function} sendResponse - Function to send response
  */
 async function handleCDPMouseClick(request, sender, sendResponse) {
+  return runLegacyCdpMessageWithLease(handleCDPMouseClickUnlocked, request, sender, sendResponse);
+}
+
+async function handleCDPMouseClickUnlocked(request, sender, sendResponse) {
   const tabId = sender.tab?.id;
   const { x, y, shiftKey, ctrlKey, altKey } = request;
 
@@ -14427,24 +19249,7 @@ async function handleCDPMouseClick(request, sender, sendResponse) {
   try {
     automationLogger.logActionExecution(null, 'cdpMouseClick', 'start', { tabId, x, y });
 
-    // If KeyboardEmulator has the debugger attached to this tab, detach it first
-    if (keyboardEmulator && keyboardEmulator.isAttachedTo(tabId)) {
-      automationLogger.debug('cdpMouseClick: detaching KeyboardEmulator debugger before attaching', { tabId });
-      await keyboardEmulator.detachDebugger(tabId);
-    }
-
-    // Try to attach debugger; if "already attached" error, force-detach and retry
-    try {
-      await chrome.debugger.attach({ tabId }, '1.3');
-    } catch (attachErr) {
-      if (attachErr.message && attachErr.message.includes('Another debugger is already attached')) {
-        automationLogger.debug('cdpMouseClick: stale debugger detected, force-detaching and retrying', { tabId });
-        try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* ignore */ }
-        await chrome.debugger.attach({ tabId }, '1.3');
-      } else {
-        throw attachErr;
-      }
-    }
+    await attachFsbDebugger(tabId, 'cdpMouseClick');
     debuggerAttached = true;
 
     const modifiers = (altKey ? 1 : 0) | (ctrlKey ? 2 : 0) | (shiftKey ? 8 : 0);
@@ -14470,7 +19275,7 @@ async function handleCDPMouseClick(request, sender, sendResponse) {
     if (debuggerAttached) {
       try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* ignore */ }
     }
-    sendResponse({ success: false, error: error.message });
+    sendResponse(cdpFailureResult(error));
   }
 }
 
@@ -14482,6 +19287,10 @@ async function handleCDPMouseClick(request, sender, sendResponse) {
  * @param {Function} sendResponse - Function to send response
  */
 async function handleCDPMouseClickAndHold(request, sender, sendResponse) {
+  return runLegacyCdpMessageWithLease(handleCDPMouseClickAndHoldUnlocked, request, sender, sendResponse);
+}
+
+async function handleCDPMouseClickAndHoldUnlocked(request, sender, sendResponse) {
   const tabId = sender.tab?.id;
   const { x, y } = request;
   const holdMs = request.holdMs || 5000;
@@ -14502,22 +19311,7 @@ async function handleCDPMouseClickAndHold(request, sender, sendResponse) {
   try {
     automationLogger.logActionExecution(null, 'cdpMouseClickAndHold', 'start', { tabId, x, y, holdMs });
 
-    if (keyboardEmulator && keyboardEmulator.isAttachedTo(tabId)) {
-      automationLogger.debug('cdpMouseClickAndHold: detaching KeyboardEmulator debugger before attaching', { tabId });
-      await keyboardEmulator.detachDebugger(tabId);
-    }
-
-    try {
-      await chrome.debugger.attach({ tabId }, '1.3');
-    } catch (attachErr) {
-      if (attachErr.message && attachErr.message.includes('Another debugger is already attached')) {
-        automationLogger.debug('cdpMouseClickAndHold: stale debugger detected, force-detaching and retrying', { tabId });
-        try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* ignore */ }
-        await chrome.debugger.attach({ tabId }, '1.3');
-      } else {
-        throw attachErr;
-      }
-    }
+    await attachFsbDebugger(tabId, 'cdpMouseClickAndHold');
     debuggerAttached = true;
 
     // Mouse pressed
@@ -14544,7 +19338,7 @@ async function handleCDPMouseClickAndHold(request, sender, sendResponse) {
     if (debuggerAttached) {
       try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* ignore */ }
     }
-    sendResponse({ success: false, error: error.message });
+    sendResponse(cdpFailureResult(error));
   }
 }
 
@@ -14556,6 +19350,10 @@ async function handleCDPMouseClickAndHold(request, sender, sendResponse) {
  * @param {Function} sendResponse - Function to send response
  */
 async function handleCDPMouseDrag(request, sender, sendResponse) {
+  return runLegacyCdpMessageWithLease(handleCDPMouseDragUnlocked, request, sender, sendResponse);
+}
+
+async function handleCDPMouseDragUnlocked(request, sender, sendResponse) {
   const tabId = sender.tab?.id;
   const { startX, startY, endX, endY, shiftKey, ctrlKey, altKey } = request;
   const steps = request.steps || 10;
@@ -14578,22 +19376,7 @@ async function handleCDPMouseDrag(request, sender, sendResponse) {
   try {
     automationLogger.logActionExecution(null, 'cdpMouseDrag', 'start', { tabId, startX, startY, endX, endY, steps });
 
-    if (keyboardEmulator && keyboardEmulator.isAttachedTo(tabId)) {
-      automationLogger.debug('cdpMouseDrag: detaching KeyboardEmulator debugger before attaching', { tabId });
-      await keyboardEmulator.detachDebugger(tabId);
-    }
-
-    try {
-      await chrome.debugger.attach({ tabId }, '1.3');
-    } catch (attachErr) {
-      if (attachErr.message && attachErr.message.includes('Another debugger is already attached')) {
-        automationLogger.debug('cdpMouseDrag: stale debugger detected, force-detaching and retrying', { tabId });
-        try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* ignore */ }
-        await chrome.debugger.attach({ tabId }, '1.3');
-      } else {
-        throw attachErr;
-      }
-    }
+    await attachFsbDebugger(tabId, 'cdpMouseDrag');
     debuggerAttached = true;
 
     const modifiers = (altKey ? 1 : 0) | (ctrlKey ? 2 : 0) | (shiftKey ? 8 : 0);
@@ -14632,7 +19415,7 @@ async function handleCDPMouseDrag(request, sender, sendResponse) {
     if (debuggerAttached) {
       try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* ignore */ }
     }
-    sendResponse({ success: false, error: error.message });
+    sendResponse(cdpFailureResult(error));
   }
 }
 
@@ -14644,6 +19427,10 @@ async function handleCDPMouseDrag(request, sender, sendResponse) {
  * @param {Function} sendResponse - Function to send response
  */
 async function handleCDPMouseDragVariableSpeed(request, sender, sendResponse) {
+  return runLegacyCdpMessageWithLease(handleCDPMouseDragVariableSpeedUnlocked, request, sender, sendResponse);
+}
+
+async function handleCDPMouseDragVariableSpeedUnlocked(request, sender, sendResponse) {
   const tabId = sender.tab?.id;
   const { startX, startY, endX, endY } = request;
   const steps = request.steps || 20;
@@ -14667,22 +19454,7 @@ async function handleCDPMouseDragVariableSpeed(request, sender, sendResponse) {
   try {
     automationLogger.logActionExecution(null, 'cdpMouseDragVariableSpeed', 'start', { tabId, startX, startY, endX, endY, steps });
 
-    if (keyboardEmulator && keyboardEmulator.isAttachedTo(tabId)) {
-      automationLogger.debug('cdpMouseDragVariableSpeed: detaching KeyboardEmulator debugger before attaching', { tabId });
-      await keyboardEmulator.detachDebugger(tabId);
-    }
-
-    try {
-      await chrome.debugger.attach({ tabId }, '1.3');
-    } catch (attachErr) {
-      if (attachErr.message && attachErr.message.includes('Another debugger is already attached')) {
-        automationLogger.debug('cdpMouseDragVariableSpeed: stale debugger detected, force-detaching and retrying', { tabId });
-        try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* ignore */ }
-        await chrome.debugger.attach({ tabId }, '1.3');
-      } else {
-        throw attachErr;
-      }
-    }
+    await attachFsbDebugger(tabId, 'cdpMouseDragVariableSpeed');
     debuggerAttached = true;
 
     // Mouse pressed at start position
@@ -14720,7 +19492,7 @@ async function handleCDPMouseDragVariableSpeed(request, sender, sendResponse) {
     if (debuggerAttached) {
       try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* ignore */ }
     }
-    sendResponse({ success: false, error: error.message });
+    sendResponse(cdpFailureResult(error));
   }
 }
 
@@ -14732,6 +19504,10 @@ async function handleCDPMouseDragVariableSpeed(request, sender, sendResponse) {
  * @param {Function} sendResponse - Function to send response
  */
 async function handleCDPMouseWheel(request, sender, sendResponse) {
+  return runLegacyCdpMessageWithLease(handleCDPMouseWheelUnlocked, request, sender, sendResponse);
+}
+
+async function handleCDPMouseWheelUnlocked(request, sender, sendResponse) {
   const tabId = sender.tab?.id;
   const { x, y } = request;
   const deltaX = request.deltaX || 0;
@@ -14753,22 +19529,7 @@ async function handleCDPMouseWheel(request, sender, sendResponse) {
   try {
     automationLogger.logActionExecution(null, 'cdpMouseWheel', 'start', { tabId, x, y, deltaX, deltaY });
 
-    if (keyboardEmulator && keyboardEmulator.isAttachedTo(tabId)) {
-      automationLogger.debug('cdpMouseWheel: detaching KeyboardEmulator debugger before attaching', { tabId });
-      await keyboardEmulator.detachDebugger(tabId);
-    }
-
-    try {
-      await chrome.debugger.attach({ tabId }, '1.3');
-    } catch (attachErr) {
-      if (attachErr.message && attachErr.message.includes('Another debugger is already attached')) {
-        automationLogger.debug('cdpMouseWheel: stale debugger detected, force-detaching and retrying', { tabId });
-        try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* ignore */ }
-        await chrome.debugger.attach({ tabId }, '1.3');
-      } else {
-        throw attachErr;
-      }
-    }
+    await attachFsbDebugger(tabId, 'cdpMouseWheel');
     debuggerAttached = true;
 
     // Dispatch mouseWheel event
@@ -14787,7 +19548,7 @@ async function handleCDPMouseWheel(request, sender, sendResponse) {
     if (debuggerAttached) {
       try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* ignore */ }
     }
-    sendResponse({ success: false, error: error.message });
+    sendResponse(cdpFailureResult(error));
   }
 }
 
@@ -14803,9 +19564,32 @@ async function handleCDPMouseWheel(request, sender, sendResponse) {
  * @param {number} tabId    target tab (gate-resolved / owned)
  * @param {string} selector CSS selector for the file input (or a container holding one)
  * @param {string} filePath ABSOLUTE disk path; relative / ~ paths are rejected
+ * @param {{allowManagedScreenshot?:boolean}} options private MCP screenshot authorization
  * @returns {Promise<{success:boolean, method?:string, selector?:string, file?:string, hadEffect?:boolean, error?:string, reason?:string}>}
  */
-async function executeUploadFile(tabId, selector, filePath) {
+async function executeUploadFile(tabId, selector, filePath, options = {}) {
+  if (!tabId) return { success: false, error: 'No tab ID available' };
+  const leaseApi = globalThis.FsbCdpLease;
+  if (!leaseApi || typeof leaseApi.run !== 'function') {
+    return executeUploadFileUnlocked(tabId, selector, filePath, options);
+  }
+  try {
+    return await leaseApi.run(
+      tabId,
+      () => executeUploadFileUnlocked(tabId, selector, filePath, options),
+      { timeoutMs: 10000 }
+    );
+  } catch (error) {
+    return {
+      success: false,
+      error: error && error.message ? error.message : String(error),
+      code: error && error.code ? error.code : undefined,
+      retryable: Boolean(error && error.retryable)
+    };
+  }
+}
+
+async function executeUploadFileUnlocked(tabId, selector, filePath, options = {}) {
   const denylist = (typeof globalThis !== 'undefined') ? globalThis.FsbUploadPathDenylist : null;
   const auditLog = (typeof globalThis !== 'undefined') ? globalThis.FsbAuditLog : null;
 
@@ -14862,7 +19646,9 @@ async function executeUploadFile(tabId, selector, filePath) {
   }
 
   try {
-    const verdict = denylist.classify(filePath);
+    const verdict = denylist.classify(filePath, {
+      allowManagedScreenshot: options.allowManagedScreenshot === true
+    });
     if (verdict && verdict.denied) {
       automationLogger.logActionExecution(null, 'cdpUploadFile', 'complete', { success: false, tabId, blocked: true, reason: verdict.reason });
       await audit('blocked', verdict.reason || 'sensitive-path', null);
@@ -14882,17 +19668,20 @@ async function executeUploadFile(tabId, selector, filePath) {
     automationLogger.logActionExecution(null, 'cdpUploadFile', 'start', { tabId, selector, file: fileName });
 
     if (keyboardEmulator && keyboardEmulator.isAttachedTo(tabId)) {
-      try { await keyboardEmulator.detachDebugger(tabId); } catch (_e) { /* ignore */ }
+      await keyboardEmulator.detachDebugger(tabId);
     }
     try {
       await chrome.debugger.attach({ tabId }, '1.3');
-    } catch (attachErr) {
-      if (attachErr.message && attachErr.message.includes('Another debugger is already attached')) {
-        try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* ignore */ }
-        await chrome.debugger.attach({ tabId }, '1.3');
-      } else {
-        throw attachErr;
+    } catch (attachError) {
+      const message = attachError && attachError.message ? attachError.message : String(attachError || '');
+      if (/another debugger|already attached|debugger is busy|target is being debugged/i.test(message)) {
+        const busyError = new Error(`The debugger for tab ${tabId} is busy. Retry the operation.`);
+        busyError.code = 'SCREENSHOT_DEBUGGER_BUSY';
+        busyError.retryable = true;
+        busyError.cause = attachError;
+        throw busyError;
       }
+      throw attachError;
     }
     debuggerAttached = true;
 
@@ -14942,6 +19731,14 @@ async function executeUploadFile(tabId, selector, filePath) {
     const redactedMsg = redactPathForUploadLog(msg);
     automationLogger.logActionExecution(null, 'cdpUploadFile', 'complete', { success: false, tabId, error: redactedMsg });
     await audit('error', 'allow', (error && error.name) ? error.name : 'Error');
+    if (error && error.code === 'SCREENSHOT_DEBUGGER_BUSY') {
+      return {
+        success: false,
+        error: error.message,
+        code: error.code,
+        retryable: true
+      };
+    }
     return { success: false, error: 'upload_file failed: ' + redactedMsg };
   } finally {
     if (debuggerAttached) {
@@ -14967,33 +19764,52 @@ async function executeUploadFile(tabId, selector, filePath) {
  * @returns {Promise<Object>} { success, method, error?, ... }
  */
 async function executeCDPToolDirect(request, tabId) {
+  if (!tabId) return { success: false, error: 'No tab ID available' };
+  const leaseApi = globalThis.FsbCdpLease;
+  if (!leaseApi || typeof leaseApi.run !== 'function') {
+    return executeCDPToolDirectUnlocked(request, tabId);
+  }
+  try {
+    return await leaseApi.run(
+      tabId,
+      () => executeCDPToolDirectUnlocked(request, tabId),
+      { timeoutMs: 10000 }
+    );
+  } catch (error) {
+    return cdpFailureResult(error);
+  }
+}
+
+async function executeCDPToolDirectUnlocked(request, tabId) {
   const { tool: verb, params } = request;
 
   if (!tabId) {
     return { success: false, error: 'No tab ID available' };
   }
 
-  // Helper: attach debugger with force-detach retry on conflict
+  // Attach only after the caller owns the per-tab lease. Internal warm
+  // attachments may be released, but external debugger owners are preserved.
   async function attachDebugger() {
-    // If KeyboardEmulator has the debugger attached to this tab, detach it first
-    if (keyboardEmulator && keyboardEmulator.isAttachedTo(tabId)) {
-      automationLogger.debug('executeCDPToolDirect: detaching KeyboardEmulator debugger before attaching', { tabId, verb });
-      await keyboardEmulator.detachDebugger(tabId);
-    }
-    try {
-      await chrome.debugger.attach({ tabId }, '1.3');
-    } catch (attachErr) {
-      if (attachErr.message && attachErr.message.includes('Another debugger is already attached')) {
-        automationLogger.debug('executeCDPToolDirect: stale debugger detected, force-detaching and retrying', { tabId, verb });
-        try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* ignore */ }
-        await chrome.debugger.attach({ tabId }, '1.3');
-      } else {
-        throw attachErr;
-      }
-    }
+    await attachFsbDebugger(tabId, `executeCDPToolDirect:${verb}`);
   }
 
   switch (verb) {
+
+    // -----------------------------------------------------------------
+    // cdpCaptureScreenshot: actual Chromium-composited page image
+    // -----------------------------------------------------------------
+    case 'cdpCaptureScreenshot': {
+      const engine = globalThis.FsbScreenshotCapture;
+      if (!engine || typeof engine.capture !== 'function') {
+        return {
+          success: false,
+          error: 'Screenshot capture engine unavailable',
+          code: 'SCREENSHOT_CAPTURE_FAILED',
+          retryable: false
+        };
+      }
+      return await engine.capture(params || {}, tabId, { skipLease: true });
+    }
 
     // -----------------------------------------------------------------
     // cdpClickAt: mousePressed + mouseReleased at (x, y) with modifiers
@@ -15026,7 +19842,7 @@ async function executeCDPToolDirect(request, tabId) {
         return { success: true, method: 'cdp_direct', x, y };
       } catch (error) {
         automationLogger.logActionExecution(null, 'cdpClickAt', 'complete', { success: false, tabId, error: error.message });
-        return { success: false, error: error.message };
+        return cdpFailureResult(error);
       } finally {
         if (debuggerAttached) {
           try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* ignore */ }
@@ -15065,7 +19881,7 @@ async function executeCDPToolDirect(request, tabId) {
         return { success: true, method: 'cdp_direct', x, y, holdMs };
       } catch (error) {
         automationLogger.logActionExecution(null, 'cdpClickAndHold', 'complete', { success: false, tabId, error: error.message });
-        return { success: false, error: error.message };
+        return cdpFailureResult(error);
       } finally {
         if (debuggerAttached) {
           try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* ignore */ }
@@ -15118,7 +19934,7 @@ async function executeCDPToolDirect(request, tabId) {
         return { success: true, method: 'cdp_direct', startX, startY, endX, endY, steps };
       } catch (error) {
         automationLogger.logActionExecution(null, 'cdpDrag', 'complete', { success: false, tabId, error: error.message });
-        return { success: false, error: error.message };
+        return cdpFailureResult(error);
       } finally {
         if (debuggerAttached) {
           try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* ignore */ }
@@ -15171,7 +19987,7 @@ async function executeCDPToolDirect(request, tabId) {
         return { success: true, method: 'cdp_direct', startX, startY, endX, endY, steps };
       } catch (error) {
         automationLogger.logActionExecution(null, 'cdpDragVariableSpeed', 'complete', { success: false, tabId, error: error.message });
-        return { success: false, error: error.message };
+        return cdpFailureResult(error);
       } finally {
         if (debuggerAttached) {
           try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* ignore */ }
@@ -15207,7 +20023,7 @@ async function executeCDPToolDirect(request, tabId) {
         return { success: true, method: 'cdp_direct', x, y, deltaX, deltaY };
       } catch (error) {
         automationLogger.logActionExecution(null, 'cdpScrollAt', 'complete', { success: false, tabId, error: error.message });
-        return { success: false, error: error.message };
+        return cdpFailureResult(error);
       } finally {
         if (debuggerAttached) {
           try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* ignore */ }
@@ -15262,7 +20078,7 @@ async function executeCDPToolDirect(request, tabId) {
         return { success: true, method: 'cdp_direct', text, length: text.length };
       } catch (error) {
         automationLogger.logActionExecution(null, 'cdpInsertText', 'complete', { success: false, tabId, error: error.message });
-        return { success: false, error: error.message };
+        return cdpFailureResult(error);
       } finally {
         if (debuggerAttached) {
           try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* ignore */ }
@@ -15308,7 +20124,7 @@ async function executeCDPToolDirect(request, tabId) {
         return { success: true, method: 'cdp_direct', x, y };
       } catch (error) {
         automationLogger.logActionExecution(null, 'cdpDoubleClickAt', 'complete', { success: false, tabId, error: error.message });
-        return { success: false, error: error.message };
+        return cdpFailureResult(error);
       } finally {
         if (debuggerAttached) {
           try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* ignore */ }
@@ -15577,6 +20393,15 @@ async function handleWaitForTabLoad(request, sender, sendResponse) {
 // Global keyboard emulator instance
 let keyboardEmulator = null;
 
+// Screenshot capture calls this only while holding the per-tab CDP lease. It
+// may release FSB's own warm keyboard attachment, but never detaches DevTools
+// or another extension's debugger owner.
+globalThis.FsbReleaseOwnedDebuggerForTab = async function(tabId) {
+  if (keyboardEmulator && keyboardEmulator.isAttachedTo(tabId)) {
+    await keyboardEmulator.detachDebugger(tabId);
+  }
+};
+
 /**
  * Initialize keyboard emulator if not already initialized
  */
@@ -15615,10 +20440,15 @@ if (chrome.debugger && chrome.debugger.onDetach && typeof chrome.debugger.onDeta
 async function handleKeyboardDebuggerAction(request, sender, sendResponse) {
   const emulator = initializeKeyboardEmulator();
   let tabId;
+  let cdpLease = null;
 
   try {
     const { method, key, keys, text, specialKey, modifiers = {}, delay = 50 } = request;
     tabId = sender.tab.id;
+
+    if (globalThis.FsbCdpLease && typeof globalThis.FsbCdpLease.acquire === 'function') {
+      cdpLease = await globalThis.FsbCdpLease.acquire(tabId, { timeoutMs: 10000 });
+    }
 
     automationLogger.logActionExecution(null, `keyboard_${method}`, 'start', { tabId, key, specialKey });
 
@@ -15666,7 +20496,9 @@ async function handleKeyboardDebuggerAction(request, sender, sendResponse) {
       success: result.success,
       result: result,
       method: method,
-      tabId: tabId
+      tabId: tabId,
+      code: result && result.code ? result.code : undefined,
+      retryable: Boolean(result && result.retryable)
     });
 
   } catch (error) {
@@ -15682,8 +20514,12 @@ async function handleKeyboardDebuggerAction(request, sender, sendResponse) {
     sendResponse({
       success: false,
       error: error.message || 'Keyboard emulator action failed',
-      method: request.method
+      method: request.method,
+      code: error && error.code ? error.code : undefined,
+      retryable: Boolean(error && error.retryable)
     });
+  } finally {
+    if (cdpLease) cdpLease.release();
   }
 }
 
@@ -15836,8 +20672,37 @@ chrome.action.onClicked.addListener(async (tab) => {
   }
 });
 
+// Quick 260728-k2v: bring up the toolbar icon on every worker wake. The module
+// re-derives its own frame from persisted intent; the probe tells it whether a
+// session is still live so a stale animating record cannot resurrect a loop.
+try {
+  if (globalThis.fsbActionIcon) {
+    Promise.resolve(globalThis.fsbActionIcon.init({
+      hasLiveSession: () => activeSessions.size > 0
+    })).catch(() => {});
+  }
+} catch (_e) { /* icon is presentation-only */ }
+
 // --- chrome.alarms.onAlarm Listener (MCP reconnect + dom-stream watchdog; agent branch DEPRECATED) ---
 chrome.alarms.onAlarm.addListener(async (alarm) => {
+  // MCP replay recorder idle + retention alarms. The recorder owns the
+  // fsbMcpSession: namespace so open sessions survive service-worker
+  // eviction and daily MCP-only pruning has one durable wake-up path.
+  if (globalThis.fsbMcpSessionRecorder
+      && alarm
+      && typeof alarm.name === 'string'
+      && (alarm.name.startsWith(globalThis.fsbMcpSessionRecorder.FSB_MCP_SESSION_ALARM_PREFIX)
+        || (globalThis.FsbMcpLatticeJournal
+          && (alarm.name.startsWith(globalThis.FsbMcpLatticeJournal.IDLE_ALARM_PREFIX)
+            || alarm.name === globalThis.FsbMcpLatticeJournal.RETENTION_ALARM)))) {
+    try {
+      await globalThis.fsbMcpSessionRecorder.handleAlarm(alarm);
+    } catch (err) {
+      console.warn('[FSB MCP] session recorder alarm failed (non-blocking):', err && err.message);
+    }
+    return;
+  }
+
   // Phase 256 Plan 03 -- visual-session sliding-window death-timer alarm.
   // Alarm names of the form 'mcpVisualDeath:<tabId>' route to the lifecycle
   // helper which deletes the storage entry and sends the v0.9.36 clear
@@ -15912,6 +20777,20 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
         }
       } catch (_e) { /* swallow per defence in depth */ }
     }, Math.floor(Math.random() * 30000));
+    return;
+  }
+
+  // Quick 260728-k2v: toolbar icon watchdog. A worker killed mid-cycle leaves
+  // the icon frozen on its last frame, so this beat re-derives the intended
+  // frame and revives the loop when one is owed. The icon module owns the
+  // alarm's lifecycle -- it arms on animation start and clears on stop, so this
+  // only fires while a loop is actually outstanding. Nothing registers it here.
+  if (alarm && alarm.name === 'fsb-action-icon-watchdog') {
+    try {
+      if (globalThis.fsbActionIcon) {
+        await globalThis.fsbActionIcon.repair();
+      }
+    } catch (_e) { /* icon is presentation-only */ }
     return;
   }
 

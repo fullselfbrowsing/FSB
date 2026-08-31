@@ -127,6 +127,7 @@ export const HANDLER_BY_APP = Object.freeze({
   figma: 'figma.js',
   gdrive: 'gdrive.js',
   gdocs: 'gdocs.js',
+  gsheets: 'gsheets.js',
   powerpoint: 'powerpoint.js',
   outlook: 'outlook.js',
   teams: 'teams.js',

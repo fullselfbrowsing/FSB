@@ -65,7 +65,7 @@
       <div class="feature-card reveal delay-2">
         <div class="feature-icon"><i class="fa-solid fa-plug"></i></div>
         <h3 i18n="@@home.features.card.mcpIntegration.title"><span [attr.translate]="'no'">MCP</span> Integration</h3>
-        <p i18n="@@home.features.card.mcpIntegration.desc">Use <span [attr.translate]="'no'">FSB</span> as an <span [attr.translate]="'no'">MCP</span> server from <span [attr.translate]="'no'">Claude Code</span>, <span [attr.translate]="'no'">Codex</span>, <span [attr.translate]="'no'">Cursor</span>, <span [attr.translate]="'no'">OpenClaw</span>, or any <span [attr.translate]="'no'">MCP</span> client. 66 tools, with browser automation straight from your IDE.</p>
+        <p i18n="@@home.features.card.mcpIntegration.desc">Use <span [attr.translate]="'no'">FSB</span> as an <span [attr.translate]="'no'">MCP</span> server from <span [attr.translate]="'no'">Claude Code</span>, <span [attr.translate]="'no'">Codex</span>, <span [attr.translate]="'no'">Cursor</span>, <span [attr.translate]="'no'">OpenClaw</span>, or any <span [attr.translate]="'no'">MCP</span> client. 68 tools, with browser automation straight from your IDE.</p>
       </div>
       <div class="feature-card reveal delay-3">
         <div class="feature-icon"><i class="fa-solid fa-tower-broadcast"></i></div>
@@ -168,7 +168,7 @@
             <span class="install-glyph"></span>
           </span>
           <button class="install-cmd" type="button" (click)="copyCurrent()" title="Copy command" i18n-title="@@home.install.copyCurrent.title">
-            <span class="install-base" i18n="@@home.install.baseCommand" [attr.translate]="'no'">npx -y fsb-mcp-server install</span>
+            <span class="install-base" i18n="@@home.install.baseCommand" [attr.translate]="'no'">npx -y fsb-mcp-server@latest install</span>
             <span class="install-flag" [class.is-morphing]="morphing" [attr.translate]="'no'">{{ token }}</span>
           </button>
           <div class="install-copy-wrap" (mouseenter)="onCopyEnter()" (mouseleave)="onCopyLeave()">

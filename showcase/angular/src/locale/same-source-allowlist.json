@@ -432,7 +432,7 @@
     },
     {
       "id": "home.install.baseCommand",
-      "sourceSha256": "94452aa0f0141687ce5d8da494c30d2cef2ef711d7735c19fdbeb3973be3b8f0",
+      "sourceSha256": "86156113ad29f424021e6fb0f2f3dbce68bd3da232918310e725124bd89ba6b1",
       "reason": "literal install command"
     },
     {

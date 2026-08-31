@@ -866,6 +866,24 @@ a:hover {
   border-color: var(--primary);
 }
 
+.ob-model-label {
+  display: block;
+  margin: 13px 0 6px;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.ob-model-select {
+  padding-right: 34px;
+  appearance: auto;
+}
+
+.ob-model-select:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
 .ob-eye {
   position: absolute;
   right: 11px;

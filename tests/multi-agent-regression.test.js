@@ -496,12 +496,13 @@ test('test_case_7_phase246_two_agents_read_isolation', async () => {
     const bResolved = await globalThis.resolveAgentTabOrError(bReg.agentId, {}, null);
     assert.strictEqual(bResolved.tabId, 1101, 'agent B resolves to its own tab 1101');
 
-    // Agent A passing explicit tab_id=1101 (B's tab) -- resolver does NOT
-    // reject; the dispatch gate is the layer that rejects (D-16). Verified
-    // separately in tests/ownership-error-codes.test.js D-16 cases.
+    // Agent A passing explicit tab_id=1101 (B's tab) rejects at the resolver.
+    // Direct read/content paths do not all traverse the dispatcher gate, so
+    // the shared resolver must enforce ownership itself.
     const aWithBId = await globalThis.resolveAgentTabOrError(aReg.agentId, { tab_id: 1101 }, null);
-    assert.strictEqual(aWithBId.tabId, 1101, 'resolver returns explicit tab_id even cross-agent (gate enforces)');
-    assert.strictEqual(aWithBId.skipGate, false, 'skipGate false for explicit tab_id; gate enforces ownership');
+    assert.strictEqual(aWithBId.success, false, 'resolver rejects explicit cross-agent tab_id');
+    assert.strictEqual(aWithBId.code, 'TAB_NOT_OWNED', 'resolver returns TAB_NOT_OWNED');
+    assert.strictEqual(aWithBId.ownerAgentId, bReg.agentId, 'resolver reports the authoritative owner');
   } finally {
     delete globalThis.fsbAgentRegistryInstance;
     delete globalThis.resolveAgentTabOrError;

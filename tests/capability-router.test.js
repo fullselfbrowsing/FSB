@@ -489,6 +489,69 @@ const GITHUB_RECIPE = {
   delete globalThis.FsbCapabilityFetch;
 
   // -----------------------------------------------------------------------
+  // Session-backed T1a handlers opt out of recipe-rot classification. Operational
+  // Google Sheets tab/session errors must remain actionable and never quarantine the
+  // capability for the rest of the service-worker session.
+  // -----------------------------------------------------------------------
+  const sheetsCodes = [
+    'GOOGLE_SHEETS_ACTIVE_TAB_REQUIRED',
+    'GOOGLE_SHEETS_TARGET_MISMATCH',
+    'GOOGLE_SHEETS_SESSION_UNAVAILABLE'
+  ];
+  let sheetsAttempt = 0;
+  const sheetsQuarantineCalls = [];
+  const sheetsHandler = {
+    tier: 'T1a',
+    origin: 'https://docs.google.com',
+    sideEffectClass: 'read',
+    rotClassifiable: false,
+    async handle() {
+      if (sheetsAttempt < sheetsCodes.length) {
+        const code = sheetsCodes[sheetsAttempt++];
+        return { success: false, code, errorCode: code, error: code };
+      }
+      return { success: true, data: { values: [['recovered']] } };
+    }
+  };
+  installCatalog({ 'gsheets.get_values': { tier: 'T1a', handler: sheetsHandler } });
+  globalThis.FsbCapabilityCatalog.quarantineBundled = function (slug) {
+    sheetsQuarantineCalls.push(slug);
+  };
+  for (const code of sheetsCodes) {
+    const operational = await ROUTER.invoke('gsheets.get_values', {}, {
+      origin: 'https://docs.google.com', tabId: 18
+    });
+    check(operational && operational.code === code && operational.errorCode === code,
+      'session-backed T1a handler preserves operational error ' + code);
+  }
+  const sheetsRetry = await ROUTER.invoke('gsheets.get_values', {}, {
+    origin: 'https://docs.google.com', tabId: 18
+  });
+  check(sheetsQuarantineCalls.length === 0,
+    'session-backed T1a operational failures never quarantine the capability');
+  check(sheetsRetry && sheetsRetry.success === true && sheetsRetry.tier === 'T1a',
+    'session-backed T1a capability remains available for a successful retry');
+  clearCatalog();
+
+  const ordinaryQuarantineCalls = [];
+  const ordinaryHandler = {
+    tier: 'T1a', origin: 'https://example.com', sideEffectClass: 'read',
+    async handle() { return { success: false, error: 'page fetch failed' }; }
+  };
+  installCatalog({ 'example.page.read': { tier: 'T1a', handler: ordinaryHandler } });
+  globalThis.FsbCapabilityCatalog.quarantineBundled = function (slug) {
+    ordinaryQuarantineCalls.push(slug);
+  };
+  const ordinaryFailure = await ROUTER.invoke('example.page.read', {}, {
+    origin: 'https://example.com', tabId: 19
+  });
+  check(ordinaryFailure && ordinaryFailure.code === 'RECIPE_DOM_FALLBACK_PENDING',
+    'unmarked page-backed T1a failures still route through recipe-rot fallback');
+  check(ordinaryQuarantineCalls.length === 1 && ordinaryQuarantineCalls[0] === 'example.page.read',
+    'unmarked page-backed T1a failures still quarantine the broken capability');
+  clearCatalog();
+
+  // -----------------------------------------------------------------------
   // T1a params gate: handler-backed capabilities with descriptor/handler
   // schemas reject malformed args before handler.handle or executeBoundSpec.
   // -----------------------------------------------------------------------

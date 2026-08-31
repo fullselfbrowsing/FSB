@@ -1,4 +1,4 @@
-# FSB v0.9.90 Full Self Browsing
+# FSB v0.9.91 Full Self Browsing
 
 <div align="center">
 
@@ -9,7 +9,7 @@
 </picture>
 
 ![FSB](https://img.shields.io/badge/FSB-Full_Self_Browsing-000000?style=for-the-badge)
-![Version](https://img.shields.io/badge/version-0.9.90-0078D4?style=for-the-badge)
+![Version](https://img.shields.io/badge/version-0.9.91-0078D4?style=for-the-badge)
 ![Manifest V3](https://img.shields.io/badge/Manifest_V3-Chrome-34A853?style=for-the-badge&logo=googlechrome&logoColor=white)
 ![License](https://img.shields.io/badge/license-MIT-F5C518?style=for-the-badge)
 
@@ -32,7 +32,7 @@
 
 FSB (Full Self Browsing) is an open source Chrome extension for AI powered browser automation. Describe a task in plain English; FSB reads the live DOM, builds a plan, executes browser actions, verifies results, and reports progress through the popup, side panel, or MCP.
 
-> FSB v0.9.90 is functional and production ready for supervised automation. Browser automation can still behave unpredictably on complex or sensitive sites, so monitor actions and test on non critical pages first.
+> FSB v0.9.91 is functional and production ready for supervised automation. Browser automation can still behave unpredictably on complex or sensitive sites, so monitor actions and test on non critical pages first.
 
 ### Why DOM First
 
@@ -51,15 +51,15 @@ Project Mariner, Claude Computer Use, and OpenAI Operator rely heavily on visual
 
 | Client | One-command install |
 |--------|---------------------|
-| Claude Code | `npx -y fsb-mcp-server install --claude-code` |
-| Claude Desktop | `npx -y fsb-mcp-server install --claude-desktop` |
-| Cursor | `npx -y fsb-mcp-server install --cursor` |
-| VS Code | `npx -y fsb-mcp-server install --vscode` |
-| Windsurf | `npx -y fsb-mcp-server install --windsurf` |
-| Codex | `npx -y fsb-mcp-server install --codex` |
-| All at once | `npx -y fsb-mcp-server install --all` |
+| Claude Code | `npx -y fsb-mcp-server@latest install --claude-code` |
+| Claude Desktop | `npx -y fsb-mcp-server@latest install --claude-desktop` |
+| Cursor | `npx -y fsb-mcp-server@latest install --cursor` |
+| VS Code | `npx -y fsb-mcp-server@latest install --vscode` |
+| Windsurf | `npx -y fsb-mcp-server@latest install --windsurf` |
+| Codex | `npx -y fsb-mcp-server@latest install --codex` |
+| All at once | `npx -y fsb-mcp-server@latest install --all` |
 
-Preview before writing: append `--dry-run`. Sanity check with `npx -y fsb-mcp-server doctor`. Restart the client so the new MCP server appears.
+Preview before writing: append `--dry-run`. Sanity check with `npx -y fsb-mcp-server@latest doctor`. Restart the client so the new MCP server appears.
 
 **Then install the browser side** (the MCP bridge talks to the extension):
 
@@ -77,7 +77,7 @@ Want to run FSB standalone from the extension popup/side panel? Open settings, p
 - Runs natural language browser tasks from the popup or side panel.
 - Supports xAI, Gemini, OpenAI, Anthropic, OpenRouter, LM Studio, and custom OpenAI-compatible endpoints.
 - Discovers live provider model lists and falls back to bundled defaults.
-- Uses 56 canonical extension tool definitions and 66 registered MCP tools for external clients.
+- Uses 57 shared definitions (53 browser tools plus 4 trigger tools) and 69 registered MCP tools for external clients.
 - Provides DOM snapshots, action verification, smart waiting, stuck detection, visual feedback, and session logs.
 - Searches a 128-app capability catalog and invokes verified signed, audited, denylist-gated first-party API capabilities through the MCP capability surface.
 - Uploads real local files to file inputs through the supervised `upload_file` tool with sensitive-path safeguards.
@@ -128,7 +128,7 @@ The core design goal is to keep the browser as the source of truth. The model re
 
 **PhantomStream 0.2.1 media mirroring.** Dashboard DOM live preview now consumes the published PhantomStream media side channel in reference mode, so progressive `<video>` and `<audio>` nodes can mirror alongside DOM snapshots. Adaptive HLS/DASH discovery remains deferred because it would require a new `webRequest` permission; MCP tool schemas, pairing, auth, and dashboard ownership behavior are unchanged.
 
-**v0.11.0 — Trigger Tool (reactive DOM monitoring).** MCP callers can arm a watch on one page element with `trigger` and manage it with `stop_trigger`, `get_trigger_status`, and `list_triggers`. Watches support `live-observe` and `refresh-poll` modes, threshold/delta/regex/compound conditions, blocking or detached reporting, and a configurable concurrency cap. See [Trigger Watchers](mcp/README.md#trigger-watchers) for the full contract.
+**Engineering milestone 0.11.0 — Trigger Tool (reactive DOM monitoring).** MCP callers can arm a watch on one page element with `trigger` and manage it with `stop_trigger`, `get_trigger_status`, and `list_triggers`. Watches support `live-observe` and `refresh-poll` modes, threshold/delta/regex/compound conditions, blocking or detached reporting, and a configurable concurrency cap. See [Trigger Watchers](mcp/README.md#trigger-watchers) for the full contract.
 
 **Showcase and ecosystem pages.** [full-selfbrowsing.com](https://full-selfbrowsing.com) added pages for [Lattice](https://full-selfbrowsing.com/lattice) (capability runtime SDK), [PhantomStream](https://full-selfbrowsing.com/phantom-stream) (DOM-native browser mirroring), [Prometheus](https://full-selfbrowsing.com/prometheus) (the autonomous browser build behind FSB), and a community [Site Maps](https://full-selfbrowsing.com/sitemaps) hub, plus a live [stats](https://full-selfbrowsing.com/stats) page with an anonymized active-regions globe, a [legal](https://full-selfbrowsing.com/legal) posture page, and an interactive knowledge-graph viewer on [About](https://full-selfbrowsing.com/about).
 
@@ -199,7 +199,7 @@ Top level deploy and validation files:
 
 ### Prerequisites
 
-- Chrome 88+ or another Chromium based browser such as Edge or Brave.
+- Chromium 116+ in a supported stable desktop browser: Chrome, Edge, Brave, or Chromium.
 - One AI provider setup:
   - xAI API key: https://x.ai/api
   - Gemini API key: https://aistudio.google.com/app/apikey
@@ -252,7 +252,7 @@ If a site uses heavy client rendering, custom canvas controls, or unusual shadow
 | Page reads fail | Move away from browser-internal pages such as `chrome://` or extension pages. |
 | Clicks miss targets | Refresh the DOM snapshot, scroll the target into view, or use coordinate tools. |
 | Typed text does not stick | Prefer `type_text` over JavaScript value assignment on controlled inputs. |
-| MCP tools are missing | Restart the host client and run `fsb-mcp-server doctor`. |
+| MCP tools are missing | Restart the host client and run `npx -y fsb-mcp-server@latest doctor`. |
 | MCP tools time out | Check `status --watch`, active tab readiness, and whether another task is queued. |
 
 Most failures are recoverable by inspecting the current page, refreshing selectors, or restarting the local MCP bridge. Reinstalling the MCP config should be the last step, not the first.
@@ -273,7 +273,7 @@ The extension reads bundled scripts directly from `extension/`. The MCP package 
 
 ## MCP Server
 
-FSB ships [`fsb-mcp-server`](https://www.npmjs.com/package/fsb-mcp-server), a local MCP server that lets external AI clients control the same browser extension. It exposes 66 registered tools across visual sessions, trigger watchers, manual browser control, capability search/invoke, read-only page inspection, autopilot, vault, and observability.
+FSB ships [`fsb-mcp-server`](https://www.npmjs.com/package/fsb-mcp-server), a local MCP server that lets external AI clients control the same browser extension. It exposes 69 registered tools across visual sessions, trigger watchers, manual browser control, Developer/UAT capture, capability search/invoke, read-only page inspection, autopilot, vault, and observability.
 
 The extension connects to the MCP bridge on:
 
@@ -290,20 +290,20 @@ http://127.0.0.1:7226/mcp
 ### One Command Install
 
 ```bash
-npx -y fsb-mcp-server install --claude-desktop
-npx -y fsb-mcp-server install --claude-code
-npx -y fsb-mcp-server install --cursor
-npx -y fsb-mcp-server install --vscode
-npx -y fsb-mcp-server install --windsurf
-npx -y fsb-mcp-server install --codex
-npx -y fsb-mcp-server install --all
+npx -y fsb-mcp-server@latest install --claude-desktop
+npx -y fsb-mcp-server@latest install --claude-code
+npx -y fsb-mcp-server@latest install --cursor
+npx -y fsb-mcp-server@latest install --vscode
+npx -y fsb-mcp-server@latest install --windsurf
+npx -y fsb-mcp-server@latest install --codex
+npx -y fsb-mcp-server@latest install --all
 ```
 
 Preview without writing:
 
 ```bash
-npx -y fsb-mcp-server install --all --dry-run
-npx -y fsb-mcp-server install --list
+npx -y fsb-mcp-server@latest install --all --dry-run
+npx -y fsb-mcp-server@latest install --list
 ```
 
 ### Manual Examples
@@ -311,7 +311,7 @@ npx -y fsb-mcp-server install --list
 Claude Code:
 
 ```bash
-claude mcp add --scope user fsb -- npx -y fsb-mcp-server
+claude mcp add --scope user fsb -- npx -y fsb-mcp-server@latest
 ```
 
 Codex (`~/.codex/config.toml`):
@@ -319,7 +319,7 @@ Codex (`~/.codex/config.toml`):
 ```toml
 [mcp_servers.fsb]
 command = "npx"
-args = ["-y", "fsb-mcp-server"]
+args = ["-y", "fsb-mcp-server@latest"]
 ```
 
 VS Code (`mcp.json`):
@@ -330,7 +330,7 @@ VS Code (`mcp.json`):
     "fsb": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "fsb-mcp-server"]
+      "args": ["-y", "fsb-mcp-server@latest"]
     }
   }
 }
@@ -339,9 +339,9 @@ VS Code (`mcp.json`):
 Diagnostics:
 
 ```bash
-npx -y fsb-mcp-server doctor
-npx -y fsb-mcp-server status --watch
-npx -y fsb-mcp-server wait-for-extension
+npx -y fsb-mcp-server@latest doctor
+npx -y fsb-mcp-server@latest status --watch
+npx -y fsb-mcp-server@latest wait-for-extension
 ```
 
 See [mcp/README.md](mcp/README.md) for the full tool reference and client-specific setup notes.
@@ -425,11 +425,16 @@ The MCP server exposes a curated public surface around that registry plus direct
 | Trigger watchers | 4 | `trigger`, `stop_trigger`, `get_trigger_status`, `list_triggers` |
 | Manual control | 37 | `execute_js`, `navigate`, `click`, `type_text`, `drag`, `upload_file` |
 | Read-only inspection | 8 | `read_page`, `get_dom_snapshot`, `get_site_guide`, `read_sheet` |
+| Developer / UAT | 1 | `capture_screenshot` |
 | Capabilities | 2 | `search_capabilities`, `invoke_capability` |
-| Observability | 5 | `list_sessions`, `get_logs`, `search_memory` |
+| Observability and replay | 7 | `list_sessions`, `get_session_replay`, `replay_session` |
 | Vault | 4 | `list_credentials`, `fill_credential`, `use_payment_method` |
 
-Read-only tools bypass the mutation queue where safe. Mutation tools are serialized so two clients do not click, type, upload, invoke, or navigate at the same time. Capability tools remain outside the canonical extension registry by design; `search_capabilities` bypasses the queue, while `invoke_capability` serializes like other side-effecting tools. Search results include readiness labels so callers can distinguish `t1-ready` direct execution from `t1-guarded-fail-closed`, `learn-pending`, and `discovery-pending` catalog-tail hits.
+Read-only tools bypass the mutation queue where safe. `capture_screenshot` is semantically read-only but remains serialized because it consumes Chromium's exclusive debugger resource. Mutation tools are serialized so two clients do not click, type, upload, invoke, or navigate at the same time. Capability tools remain outside the canonical extension registry by design; `search_capabilities` bypasses the queue, while `invoke_capability` serializes like other side-effecting tools. Search results include readiness labels so callers can distinguish `t1-ready` direct execution from `t1-guarded-fail-closed`, `learn-pending`, and `discovery-pending` catalog-tail hits.
+
+`capture_screenshot` captures Chromium's actual composited page, not reconstructed HTML. MCP returns a native PNG image plus a private managed file in `~/.fsb/screenshots`; matching files expire after seven days. Autopilot does not create a file: screenshot bytes live only in service-worker memory until the next model request and are excluded from transcripts, history, logs, metrics, and persistence. A screenshot can contain sensitive visible page data, so share or upload the returned path only when the destination is trusted.
+
+Recorded MCP tasks can span multiple tabs while remaining one logical history session. The task lifecycle (`complete_task`, `partial_task`, or `fail_task`) closes that history record; `is_final` only clears the visual overlay, with idle expiry as a recording fallback. `get_session_replay` exposes the verified, receipt-free replay structure; `replay_session` requests one exact-manifest approval in the FSB side panel, after which FSB opens and maps the recorded tabs automatically.
 
 ---
 
@@ -585,7 +590,7 @@ Debugging:
 - Inspect the service worker from `chrome://extensions/`.
 - Check the browser console on the active tab for content script logs.
 - Use the options page log viewer for session and action history.
-- For MCP issues, run `npm run test:mcp-smoke`, then `fsb-mcp-server doctor`, then `fsb-mcp-server status --watch`.
+- For MCP issues, run `npm run test:mcp-smoke`, then `npx -y fsb-mcp-server@latest doctor`, then `npx -y fsb-mcp-server@latest status --watch`.
 
 ### Change Guidelines
 
@@ -598,10 +603,10 @@ Debugging:
 
 ### Release Sanity Checks
 
-Before cutting a release, verify:
+Before changing a release version, author its release entry in the owning changelog, then run `npm run version:set:extension -- X.Y.Z` or `npm run version:set:mcp -- X.Y.Z`. Release notes remain human-authored and the setters do not rewrite changelog history. Before cutting either release, run `npm run version:check` and verify:
 
-- root `package.json` version matches `extension/manifest.json`
-- `mcp/package.json` matches `mcp/src/version.ts`
+- extension-owned metadata matches `extension/manifest.json`, while MCP-owned metadata matches `mcp/package.json`
+- `extension-vX.Y.Z` and `mcp-vX.Y.Z` tags match their independently versioned artifacts
 - README version badges and "what's new" sections match package metadata
 - screenshots and logos resolve from tracked paths
 - MCP README tool counts match the registered runtime surface

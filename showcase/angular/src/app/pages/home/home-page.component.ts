@@ -45,7 +45,7 @@ const OG_IMAGE_ALT = $localize`:@@home.og.imageAlt:FSB Full Self-Browsing logo`;
 const SITE_NAME = $localize`:@@site.name:FSB - Full Self-Browsing`;
 const YOUTUBE_CHANNEL = 'https://www.youtube.com/@parzival5707';
 const GITHUB_REPO = 'https://github.com/fullselfbrowsing/FSB';
-const BASE_INSTALL_COMMAND = 'npx -y fsb-mcp-server install';
+const BASE_INSTALL_COMMAND = 'npx -y fsb-mcp-server@latest install';
 const ROTATE_MS = 1800;
 const SIMPLE_ICON_COLOR = '94a3b8';
 function capabilityIcon(name: string): string {
@@ -105,7 +105,7 @@ export class HomePageComponent implements OnInit, AfterViewInit, OnDestroy {
     { id: 'windsurf', name: 'Windsurf', logo: 'windsurf.svg', flag: '--windsurf', cmd: `${BASE_INSTALL_COMMAND} --windsurf` },
     { id: 'codex', name: 'Codex', logo: 'openai.svg', flag: '--codex', cmd: `${BASE_INSTALL_COMMAND} --codex` },
     { id: 'opencode', name: 'OpenCode', logo: 'opencode.svg', flag: '--opencode', cmd: `${BASE_INSTALL_COMMAND} --opencode` },
-    { id: 'openclaw', name: 'OpenClaw', logo: 'openclaw.svg', flag: '', cmd: 'npx -y fsb-mcp-server' },
+    { id: 'openclaw', name: 'OpenClaw', logo: 'openclaw.svg', flag: '', cmd: 'npx -y fsb-mcp-server@latest' },
     { id: 'all', name: $localize`:@@home.install.allClients:All Clients`, logo: 'all.svg', flag: '--all', cmd: `${BASE_INSTALL_COMMAND} --all` },
   ];
   readonly capRow1: readonly CapabilityApp[] = [

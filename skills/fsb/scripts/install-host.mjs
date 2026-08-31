@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // install-host.mjs -- confirmation-based multi-host installer (SKILL-05 / SKILL-06)
-// Detects other MCP hosts via `npx -y fsb-mcp-server install --list`,
-// prompts y/n per host, runs `npx -y fsb-mcp-server install --<host>` only on explicit yes.
+// Detects other MCP hosts via `npx -y fsb-mcp-server@latest install --list`,
+// prompts y/n per host, runs `npx -y fsb-mcp-server@latest install --<host>` only on explicit yes.
 // NEVER passes --all. NEVER auto-writes OpenClaw's MCP config (use print-stdio.mjs).
 
 import { spawn } from 'node:child_process';
@@ -12,7 +12,7 @@ import path from 'node:path';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 
 const NPX = 'npx';
-const PKG = 'fsb-mcp-server';
+const PKG = 'fsb-mcp-server@latest';
 const MARKERS = ['detected', 'found', 'available', 'configured'];
 const FILLER = new Set([
   'mcp', 'host', 'hosts', 'server', 'client', 'clients',
@@ -27,11 +27,11 @@ const HERMES_CONFIG_PATH = path.join(os.homedir(), '.hermes', 'config.yaml');
 const HERMES_BLOCK = `mcp_servers:
   fsb:
     command: "npx"
-    args: ["-y", "fsb-mcp-server"]
+    args: ["-y", "fsb-mcp-server@latest"]
 `;
 const HERMES_FSB_CHILD = `  fsb:
     command: "npx"
-    args: ["-y", "fsb-mcp-server"]
+    args: ["-y", "fsb-mcp-server@latest"]
 `;
 
 // Detect the indent width used by direct children of `mcp_servers:`.
@@ -100,7 +100,7 @@ function runDetect() {
       launched = false;
       if (err && err.code === 'ENOENT') {
         process.stdout.write(
-          '[FAIL] cannot launch `npx -y fsb-mcp-server install --list` -- is Node 18+ on PATH?\n'
+          '[FAIL] cannot launch `npx -y fsb-mcp-server@latest install --list` -- is Node 18+ on PATH?\n'
         );
         process.stdout.write(
           'next-step: Install Node 18+ (https://nodejs.org/en/download) and reopen the session.\n'
@@ -254,7 +254,7 @@ async function maybeInstallHermes(rl, stdinClosed) {
     const fsbChild =
       indentStr + 'fsb:\n' +
       indentStr + indentStr + 'command: "npx"\n' +
-      indentStr + indentStr + 'args: ["-y", "fsb-mcp-server"]\n';
+      indentStr + indentStr + 'args: ["-y", "fsb-mcp-server@latest"]\n';
     newContent = existing.replace(/^(mcp_servers:\s*(?:#.*)?)\n/m, '$1\n' + fsbChild);
   } else {
     // No existing mcp_servers heading -- append the full block, ensuring the

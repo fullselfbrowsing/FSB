@@ -10,6 +10,8 @@ FSB is an AI-powered browser automation Chrome extension that executes tasks thr
 
 ## Current State
 
+**Active milestone progress:** Phases 57-64 are complete (48/51 requirements). Phase 64 verified 4/4 roadmap success criteria, 66/66 plan truths, 36/36 key links, MULTI-01..03, and all ten registered HIGH/CRITICAL threats; its guarded 25-command matrix and repository test process are green after a clean code-review fix loop. Three genuine OpenCode account/process/browser/accessibility scenarios join the prior 42 in the user-directed milestone-end UAT sweep. Phase 65 (Codex Adapter) is the final implementation phase in v0.9.91; backlog Phase 999.1 remains outside this milestone.
+
 **Last completed:** v1.2.0 Showcase i18n Completeness — Phases 52-56 shipped 2026-07-09. Full-page translation audit, 5-id resync + stats-274 retirement + hero/CTA transcreation, stats lint gate flip, permanent `verify-translation-drift` CI gate, and WARNING-02 locale-cookie redirect fix. VISUAL-01 browser UAT remains human_needed (`53-VISUAL-QA.md`).
 
 > **Post-v1.2 supersession (2026-07-15):** The showcase localization follow-up
@@ -23,7 +25,34 @@ FSB is an AI-powered browser automation Chrome extension that executes tasks thr
 - v1.0.0 Full App Catalog (OpenTabs Parity) -- archived 2026-06-29; T1 expansion debt carried into v1.1.0
 
 
-## Current Milestone: v1.2.0 Showcase i18n Completeness
+## Current Milestone: v0.9.91 MCP Clients as Providers
+
+**Goal:** Make installed agent CLIs (Claude Code first) first-class side-panel providers -- FSB captures which MCP clients the user installs/connects, presents them as key-less providers in a renamed Providers panel, and delegates side-panel tasks to a spawned agent CLI that drives the browser back through FSB's own MCP tools.
+
+**Target features:**
+- **Agent identity capture (Phase 57 complete)** -- onboarding copy intent, MCP initialize `clientInfo`, and the 21-client installed inventory now converge into durable clicked/connected/installed evidence and one guarded `getMcpClients` view. The wire additions remain optional and legacy `agent:register` payloads stay byte-compatible.
+- **Providers panel (Phase 58 complete)** -- "API Configuration" is now "Providers"; explicit `api` vs `agent` kinds preserve BYOK settings; agent details report evidence and conditional billing truth; one advisory recommendation follows live > installed > copy-clicked > xAI. Live visual/interaction UAT is deferred to the milestone-end sweep.
+- **Reverse-request security foundation (Phase 59 complete)** -- additive `ext:*` frames now cross the existing loopback bridge behind exact Host/Origin/session authority, deterministic capable-relay routing, secret redaction, topology exact-once cleanup, and a permanent forbidden-flag prebuild gate. Four live pairing/lifecycle/accessibility checks remain pending for the milestone-end sweep.
+- **Adapter contract + Claude Code MVP (Phase 60 complete)** -- the serve daemon owns the five-method adapter contract and safe spawn supervisor; Claude Code runs through the pinned task-mode profile, stdin-only prompt, recorded stream fixture, exact process-tree cleanup, and restart recovery. Seven genuine CLI/OS/browser checks remain in the milestone-end sweep.
+- **Delegation UX + persistence (Phase 61 complete)** -- the side panel has consent, live streaming progress, background-tab ownership, Take Control, Stop/reclaim, honest usage, 20-second liveness, and service-worker-eviction recovery. Eight genuine consent/theme/handoff/stream/endurance/POSIX/restart checks remain pending.
+- **Drift gate + compatibility doctor (Phase 62 complete)** -- one daemon-owned compatibility matrix feeds offline production-parser CI, doctor text/JSON, authenticated durable browser projection, protocol-drift diagnostics, and non-mutating Providers compatibility states. Three genuine installed/rendered/accessibility checks remain pending.
+- **Native wake path (Phase 63 complete)** -- the optional native-messaging host wakes or attaches only to `serve` through exact one-shot framing, exact-owned cross-platform registration, read-only diagnostics, and a background-authoritative wake UI with doctor fallback; it never spawns agent CLIs, and the Phase 59 channel-gate files are byte-identical to the phase base. Eight genuine install/Chrome/accessibility checks remain pending.
+- **OpenCode adapter (Phase 64 complete)** -- the unchanged five-method `AgentProviderAdapter` now drives both cold `opencode run` tasks and verified attaches to an FSB-owned `opencode serve`; exact 1.14.25 private policy, schema-derived JSONL fixture, first-commit drift coverage, transient server authentication, role-aware crash recovery, provider-neutral browser persistence, and honest unknown billing are all verified. Three genuine live scenarios remain pending.
+- **Codex adapter (Phase 65 next)** -- complete the stable adapter roster with hermetic `codex exec --json`, source-pinned fixture/drift coverage, and honest ChatGPT OAuth versus API-key versus unauthenticated disclosure. Gemini remains explicitly deferred until a live help capture and fixture pin exist. Task-mode only for v0.9.91.
+
+**Key context:**
+- The spawn channel is security-critical (RCE-adjacent): extension-origin gating + shared secret + explicit consent tiers required. Bridge already rejects untrusted browser origins (`tests/mcp-bridge-topology.test.js`).
+- Daemon lifecycle constraint through Phase 62: the extension has NO nativeMessaging permission and cannot wake any process. Phase 63 adds one optional wake host that starts or attaches only to `serve`; all agent spawn authority stays behind the existing daemon channel gates.
+- INV-01 carries forward: MCP wire contracts stay byte-stable -- all bridge message types and tools are additive.
+- Test suite has source-pin tripwires on extension files (token counts/substrings); extension-side wiring must run the suite from the first commit.
+- Delegation becomes the fifth `EXECUTION_MODES` entry in `extension/ai/engine-config.js` (autopilot, mcp-manual, mcp-agent, dashboard-remote, + delegated).
+- This milestone completes the v0.9.45rc1 arc (background agents retired in favor of external agent runtimes) and the v0.9.36 deferred item "derive trusted MCP client identity from connection/handshake metadata".
+- Phases continue from 57.
+- Per user instruction, all live/human UAT checklists accumulate without fabricated passes and are executed as one milestone-end gate; each phase still requires green automated/source verification and clean review before advancing.
+
+## Last Milestone: v1.2.0 Showcase i18n Completeness
+
+**Status:** Archived 2026-07-09. Phases 52-56 shipped; audit passed. Archive files under `.planning/milestones/v1.2.0-*`. VISUAL-01 browser UAT remains human_needed (`53-VISUAL-QA.md`).
 
 **Goal:** Close the translation gap that reopened after v0.9.63 shipped -- full, drift-free coverage across all six supported locales (en, es, de, ja, zh-CN, zh-TW) for every showcase marketing page plus the stats page, the long-deferred locale-cookie redirect bug, and a CI gate that catches future drift automatically.
 
@@ -416,7 +445,33 @@ Carry-forward backlog candidates:
 
 ### Active
 
-(Milestone v1.2.0 Showcase i18n Completeness -- requirements and roadmap to be defined; phases continue from v1.1.0's Phase 51 -> start at Phase 52. v1.1.0 T1 App Execution Expansion is archived; this milestone returns to the showcase-site i18n surface last touched in v0.9.63.)
+(Milestone v0.9.91 MCP Clients as Providers -- Phases 57-63 are verified complete. NATIVE-01..04 validated in Phase 63: Native-Messaging Host. Remaining active requirements are MULTI-01..06; 45/51 requirements are complete.)
+
+### Validated (v0.9.91)
+
+- [x] IDENT-01: Onboarding copy actions persist durable, aggregated per-client intent without changing clipboard feedback -- Phase 57.
+- [x] IDENT-02: Stdio and streamable-HTTP MCP initialization identity crosses the existing bridge through optional additive registration evidence -- Phase 57.
+- [x] IDENT-03: Sanitized client identity persists on live AgentRecords and canonical durable connected rows, with reconnects updating in place -- Phase 57.
+- [x] IDENT-04: The daemon reports the full platform registry inventory with fixed, shell-free Claude Code version probing and dual tolerant delivery -- Phase 57.
+- [x] IDENT-05: A guarded fresh-on-read `getMcpClients` action returns the durable clicked/installed/connected plus live evidence union -- Phase 57.
+- [x] PROV-01: Providers is the canonical route and legacy `#api-config` normalizes without breaking source-pin contracts -- Phase 58.
+- [x] PROV-02: Seven API and three agent providers use explicit closed kind/id domains -- Phase 58.
+- [x] PROV-03: Agent mode removes API controls and presents truthful install, connection, account, setup, usage, and credential-boundary details -- Phase 58.
+- [x] PROV-04: Agent intent remains isolated from API-only `modelProvider`; latent BYOK state survives switching, refresh, delayed work, and cancellation races -- Phase 58.
+- [x] PROV-05: Exactly one non-selecting recommendation follows live > installed > clicked > xAI with raw identities excluded -- Phase 58.
+- [x] PROV-06: Usage and billing avoid fabricated currency or subscription claims; unknown auth reports Billing not reported and links fixed official destinations -- Phase 58.
+- [x] CHAN-01: A separate strict `ext:request` / `ext:event` / `ext:response` family crosses the existing bridge while historical MCP and default relay bytes remain frozen -- Phase 59.
+- [x] CHAN-02: Optional `agent-spawn` capabilities route reverse requests local-first, then to the first capable relay, with a typed offline fallback and no default production advertisement -- Phase 59.
+- [x] CHAN-03: Loopback bind, exact Host, exact extension Origin, pre-registration classification, and per-frame current-session checks enforce the browser-to-daemon trust boundary -- Phase 59.
+- [x] CHAN-04: Explicit session-only pairing uses a 32-byte daemon-session secret, durable exact Origin binding, reset/rebind, secret-free authorization probe, and rotation revocation -- Phase 59.
+- [x] CHAN-05: Caller and diagnostic-sink redaction remove bridge-secret tokens and raw/interior-token tests remain green -- Phase 59.
+- [x] CHAN-06: Hub/relay/stale-socket churn settles reverse work exactly once, clears ownership maps, and never replays automatically -- Phase 59.
+- [x] CHAN-07: Every MCP build recursively rejects forbidden agent auto-approval flags before TypeScript compilation -- Phase 59.
+- [x] ADAPT-01..05: The serve-owned five-method adapter contract, shell-free supervisor, stdin-only prompt path, exact process-tree cancellation, and orphan recovery are enforced -- Phase 60.
+- [x] CLAUDE-01..04: Claude Code uses the pinned hermetic task-mode profile, production stream parser/fixture, closed compatibility classifier, and no session persistence -- Phase 60.
+- [x] UX-01..06: Consent, delegated routing, live feed, background ownership, Take Control/Stop, and honest usage/offline recovery are implemented without weakening BYOK behavior -- Phase 61.
+- [x] LIFE-01..04: Session-backed event persistence, exact recovery, active-only heartbeat, hold/resume, and daemon-restart classification survive MV3 worker eviction -- Phase 61.
+- [x] DRIFT-01..04: Registry-driven offline drift CI, safe doctor text/JSON, sanitized rate-limited runtime diagnostics, and one canonical browser-consumed compatibility matrix are enforced -- Phase 62.
 
 ### Validated (v0.9.99)
 
@@ -681,4 +736,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-07-08 -- Phase 52 (Full-Page Translation Completeness Audit) complete. Next: Phase 53 (Trans-Unit Resync, Stats Translation & Transcreation Review).*
+*Last updated: 2026-07-21 -- Phase 64 OpenCode Adapter deterministically complete; 45 live scenarios remain deferred to the milestone-end sweep. Next: Phase 65 Codex Adapter.*
