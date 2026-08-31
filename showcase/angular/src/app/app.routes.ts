@@ -9,6 +9,7 @@ export const routes: Routes = [
   { path: 'support', loadComponent: () => import('./pages/support/support-page.component').then(m => m.SupportPageComponent) },
   { path: 'stats', loadComponent: () => import('./pages/stats/stats-page.component').then(m => m.StatsPageComponent), data: { shellless: true } },
   { path: 'lattice', loadComponent: () => import('./pages/lattice/lattice-page.component').then(m => m.LatticePageComponent), data: { shellless: true } },
+  { path: 'concierge', loadComponent: () => import('./pages/concierge/concierge-page.component').then(m => m.ConciergePageComponent), data: { shellless: true } },
   { path: 'phantom-stream', loadComponent: () => import('./pages/phantom-stream/phantom-stream-page.component').then(m => m.PhantomStreamPageComponent), data: { shellless: true } },
   { path: 'prometheus', loadComponent: () => import('./pages/prometheus/prometheus-page.component').then(m => m.PrometheusPageComponent), data: { shellless: true } },
   { path: 'sitemaps', loadComponent: () => import('./pages/sitemaps/sitemaps-page.component').then(m => m.SiteMapsPageComponent) },

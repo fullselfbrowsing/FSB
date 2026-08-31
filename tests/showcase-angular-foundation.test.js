@@ -165,20 +165,11 @@ assert(
 );
 
 assert(
-    /event instanceof NavigationEnd/.test(shellComponentSource) &&
-    /event instanceof Scroll/.test(shellComponentSource) &&
-    /this\.scrollToRouteTop\(/.test(shellComponentSource) &&
-    /!event\.anchor/.test(shellComponentSource) &&
-    /window\.location\.hash/.test(shellComponentSource) &&
-    /window\.history\.scrollRestoration = 'manual'/.test(shellComponentSource) &&
-    /ROUTE_SCROLL_RESET_DELAYS_MS/.test(shellComponentSource) &&
-    /PERSISTENT_ROUTE_SCROLL_RESET_DELAYS_MS/.test(shellComponentSource) &&
-    /ROUTE_SCROLL_RESET_STORAGE_KEY/.test(shellComponentSource) &&
-    /window\.setTimeout/.test(shellComponentSource) &&
-    /window\.requestAnimationFrame/.test(shellComponentSource) &&
-    /window\.scrollTo\(0,\s*0\)/.test(shellComponentSource) &&
-    /scroller\.scrollTop = 0/.test(shellComponentSource),
-  'showcase shell explicitly resets window scroll after late route navigation events'
+  /event instanceof NavigationEnd/.test(shellComponentSource) &&
+    !/event instanceof Scroll/.test(shellComponentSource) &&
+    !/(prepareRouteTopNavigation|scrollToRouteTop|resetWindowScroll|ROUTE_SCROLL_RESET|fsb-route-scroll-top)/.test(shellComponentSource) &&
+    !/(window\.setTimeout|window\.requestAnimationFrame|window\.scrollTo|sessionStorage|scrollRestoration)/.test(shellComponentSource),
+  'showcase shell delegates route scrolling exclusively to the Angular router'
 );
 
 assert(
@@ -203,14 +194,9 @@ assert(
 );
 
 assert(
-  /initRouteScrollRestoration/.test(indexSource) &&
-    /window\.history\.scrollRestoration = 'manual'/.test(indexSource) &&
-    /window\.location\.hash/.test(indexSource) &&
-    /fsb-route-scroll-top/.test(indexSource) &&
-    /document\.addEventListener\('click'/.test(indexSource) &&
-    /target\.closest\('footer a\[href\]'\)/.test(indexSource) &&
-    /window\.setTimeout\(reset,\s*delays\[i\]\)/.test(indexSource),
-  'index pre-bootstrap script disables browser scroll restoration and resets non-hash route loads to top'
+  !/(initRouteScrollRestoration|fsb-route-scroll-top|scheduleReset|target\.closest\('footer a\[href\]'\))/.test(indexSource) &&
+    !/(window\.scrollTo|window\.setTimeout|window\.history\.scrollRestoration)/.test(indexSource),
+  'index bootstrap does not install a competing route-scroll owner'
 );
 
 const themeBootstrapIndex = indexSource.indexOf("window.matchMedia('(prefers-color-scheme: dark)'");
@@ -240,9 +226,18 @@ assert(
 );
 
 assert(
-  /prepareRouteTopNavigation\(\): void/.test(shellComponentSource) &&
-    (shellTemplateSource.match(/\(click\)="prepareRouteTopNavigation\(\)"/g) || []).length >= 11,
-  'footer internal router links reset scroll before route navigation starts'
+  (shellTemplateSource.match(/<a routerLink=/g) || []).length >= 23 &&
+    !/\(click\)="prepareRouteTopNavigation\(\)"/.test(shellTemplateSource),
+  'footer internal links remain plain router links without imperative scroll handlers'
+);
+
+const reducedMotionMediaIndex = globalStylesSource.indexOf('@media (prefers-reduced-motion: no-preference)');
+const smoothScrollIndex = globalStylesSource.indexOf('scroll-behavior: smooth');
+assert(
+  reducedMotionMediaIndex !== -1 &&
+    smoothScrollIndex > reducedMotionMediaIndex &&
+    /@media\s*\(prefers-reduced-motion:\s*no-preference\)\s*\{[\s\S]*?html\s*\{[\s\S]*?scroll-behavior:\s*smooth;[\s\S]*?\}/.test(globalStylesSource),
+  'smooth scrolling is enabled only when reduced motion is not requested'
 );
 
 assert(

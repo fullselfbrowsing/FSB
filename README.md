@@ -11,7 +11,7 @@
 ![FSB](https://img.shields.io/badge/FSB-Full_Self_Browsing-000000?style=for-the-badge)
 ![Version](https://img.shields.io/badge/version-0.9.91-0078D4?style=for-the-badge)
 ![Manifest V3](https://img.shields.io/badge/Manifest_V3-Chrome-34A853?style=for-the-badge&logo=googlechrome&logoColor=white)
-![License](https://img.shields.io/badge/license-BSL_1.1-F5C518?style=for-the-badge)
+![License](https://img.shields.io/badge/license-MIT-F5C518?style=for-the-badge)
 
 ![Stars](https://img.shields.io/github/stars/fullselfbrowsing/FSB?style=flat-square&logo=github&label=Stars)
 ![Forks](https://img.shields.io/github/forks/fullselfbrowsing/FSB?style=flat-square&logo=github&label=Forks)
@@ -625,7 +625,7 @@ The root README should describe what a new user needs to understand before insta
 
 ## License
 
-This project is licensed under the Business Source License 1.1. See [LICENSE](LICENSE).
+This project is licensed under the MIT License. See [LICENSE](LICENSE).
 
 ## Support And Contributing
 

@@ -11,7 +11,7 @@
 ![FSB](https://img.shields.io/badge/FSB-Full_Self_Browsing-000000?style=for-the-badge)
 [![npm](https://img.shields.io/npm/v/fsb-mcp-server?style=for-the-badge&color=0078D4)](https://www.npmjs.com/package/fsb-mcp-server)
 ![MCP](https://img.shields.io/badge/MCP-Server-00B4D8?style=for-the-badge)
-![License](https://img.shields.io/badge/license-BSL_1.1-F5C518?style=for-the-badge)
+![License](https://img.shields.io/badge/license-MIT-F5C518?style=for-the-badge)
 
 **Control your browser from any MCP client.**
 

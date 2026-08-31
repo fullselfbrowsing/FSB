@@ -37,6 +37,12 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://full-selfbrowsing.com/concierge</loc>
+    <lastmod>2026-08-31</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://full-selfbrowsing.com/phantom-stream</loc>
     <lastmod>2026-08-31</lastmod>
     <changefreq>weekly</changefreq>

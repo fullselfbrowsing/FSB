@@ -2,7 +2,9 @@
 
 ## 1. Project Description
 
-FSB (Full Self-Browsing) is an open-source Chrome extension that automates the browser through natural language. You describe a task in plain English; FSB plans the clicks, types, and navigation to complete it. The extension runs in your browser with your own API keys, encrypted local storage, and opt-out anonymous usage telemetry for aggregate public stats only. Multi-model AI (xAI Grok, OpenAI, Anthropic Claude, Google Gemini, OpenRouter, LM Studio, custom OpenAI-compatible endpoints), 56 canonical browser tools, a 68-tool MCP surface, 142+ site-specific guides, reactive trigger watchers, real file uploads, and a 128-app native capability catalog for verified first-party API execution. Current release: FSB v0.9.91 (Chrome extension) with fsb-mcp-server 0.11.0 (npm MCP package). BSL 1.1 licensed.
+FSB (Full Self-Browsing) is an open-source Chrome extension that automates the browser through natural language. You describe a task in plain English; FSB plans the clicks, types, and navigation to complete it. The extension runs in your browser with your own API keys, encrypted local storage, and opt-out anonymous usage telemetry for aggregate public stats only. Multi-model AI (xAI Grok, OpenAI, Anthropic Claude, Google Gemini, OpenRouter, LM Studio, custom OpenAI-compatible endpoints), 56 canonical browser tools, a 68-tool MCP surface, 142+ site-specific guides, reactive trigger watchers, real file uploads, and a 128-app native capability catalog for verified first-party API execution. Current release: FSB v0.9.91 (Chrome extension) with fsb-mcp-server 0.11.0 (npm MCP package).
+
+License: [MIT License](https://github.com/fullselfbrowsing/FSB/blob/main/LICENSE).
 
 FSB also works especially well as an MCP browser layer for AI agents. Claude Code, Codex, Cursor, VS Code, Windsurf, OpenClaw, Hermes, and other MCP clients can use FSB to operate a real Chrome browser, inspect page state, verify outcomes, and feed observations back into their own coding or autonomy loop.
 
@@ -149,6 +151,7 @@ FSB ships 142+ hand-curated site-specific guides (Notion, Google Sheets, Workday
 
 ### Ecosystem pages
 - Lattice (`https://full-selfbrowsing.com/lattice`): capability runtime SDK for multimodal AI applications -- typed outputs, inspectable plans, provider routing, artifacts, tools, audit receipts, and replay-friendly records.
+- Concierge (`https://full-selfbrowsing.com/concierge`): safe action layer for agent-ready web applications -- typed verbs, live catalogs, consent-bound dispatch, and signed replay-protected batches.
 - PhantomStream (`https://full-selfbrowsing.com/phantom-stream`): DOM-native live browser mirroring library -- one style-inlined snapshot, then MutationObserver diffs instead of pixels; powers FSB's remote dashboard live preview.
 - Prometheus (`https://full-selfbrowsing.com/prometheus`): the autonomous browser build behind FSB -- native control spine, stdio MCP bridge, multi-agent tab ownership, runtime sidebar, and DOM-native supervision.
 - Site Maps (`https://full-selfbrowsing.com/sitemaps`): community hub (under development) for contributing well-tested site schemas that can become built-in browser knowledge.
@@ -175,6 +178,7 @@ Operator is OpenAI's agentic browser product (2025). Overlap with FSB: end-user-
 - Support: https://full-selfbrowsing.com/support
 - Privacy: https://full-selfbrowsing.com/privacy
 - Lattice: https://full-selfbrowsing.com/lattice
+- Concierge: https://full-selfbrowsing.com/concierge
 - PhantomStream: https://full-selfbrowsing.com/phantom-stream
 - Prometheus: https://full-selfbrowsing.com/prometheus
 - Site Maps: https://full-selfbrowsing.com/sitemaps

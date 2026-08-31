@@ -141,18 +141,92 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
   }
 
   private loadDashboardCdnScripts(): void {
-    const libs: ReadonlyArray<readonly [string, string]> = [
-      ['dash-html5-qrcode', 'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js'],
-      ['dash-lz-string',    'https://unpkg.com/lz-string@1.5.0/libs/lz-string.min.js'],
-    ];
-    for (const [id, src] of libs) {
-      if (this.doc.head.querySelector(`script[data-cdn="${id}"]`)) continue;
-      const s = this.renderer.createElement('script') as HTMLScriptElement;
-      this.renderer.setAttribute(s, 'src', src);
-      this.renderer.setAttribute(s, 'data-cdn', id);
-      this.renderer.setAttribute(s, 'defer', '');
-      this.renderer.appendChild(this.doc.body, s);
+    // Start both downloads together, but keep their failure domains separate:
+    // QR startup must not depend on the unrelated preview decompressor.
+    void this.ensureQRScannerLibrary().catch(() => {});
+    void this.ensureLZStringLibrary().catch(() => {});
+  }
+
+  private ensureQRScannerLibrary(): Promise<void> {
+    if (typeof Html5Qrcode !== 'undefined') return Promise.resolve();
+    if (!this.qrLibraryPromise) {
+      this.qrLibraryPromise = this.loadDashboardCdnScript(
+        'dash-html5-qrcode',
+        'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js',
+        () => typeof Html5Qrcode !== 'undefined',
+      ).catch((error) => {
+        this.qrLibraryPromise = null;
+        throw error;
+      });
     }
+    return this.qrLibraryPromise;
+  }
+
+  private ensureLZStringLibrary(): Promise<void> {
+    if (typeof LZString !== 'undefined') return Promise.resolve();
+    if (!this.lzLibraryPromise) {
+      this.lzLibraryPromise = this.loadDashboardCdnScript(
+        'dash-lz-string',
+        'https://unpkg.com/lz-string@1.5.0/libs/lz-string.min.js',
+        () => typeof LZString !== 'undefined',
+      ).catch((error) => {
+        this.lzLibraryPromise = null;
+        throw error;
+      });
+    }
+    return this.lzLibraryPromise;
+  }
+
+  private loadDashboardCdnScript(
+    id: string,
+    src: string,
+    isReady: () => boolean,
+  ): Promise<void> {
+    if (isReady()) return Promise.resolve();
+
+    const selector = `script[data-cdn="${id}"]`;
+    const existing = this.doc.querySelector<HTMLScriptElement>(selector);
+    const script = existing || this.renderer.createElement('script') as HTMLScriptElement;
+
+    return new Promise<void>((resolve, reject) => {
+      const removeListeners = () => {
+        script.removeEventListener('load', handleLoad);
+        script.removeEventListener('error', handleError);
+      };
+      const rejectAndRemove = () => {
+        removeListeners();
+        script.parentNode?.removeChild(script);
+        reject(new Error(`Unable to load ${src}`));
+      };
+      const handleLoad = () => {
+        removeListeners();
+        if (isReady()) {
+          script.dataset['cdnState'] = 'loaded';
+          resolve();
+        } else {
+          rejectAndRemove();
+        }
+      };
+      const handleError = () => {
+        script.dataset['cdnState'] = 'failed';
+        rejectAndRemove();
+      };
+
+      script.addEventListener('load', handleLoad);
+      script.addEventListener('error', handleError);
+
+      if (existing) {
+        if (script.dataset['cdnState'] === 'loaded') handleLoad();
+        if (script.dataset['cdnState'] === 'failed') handleError();
+        return;
+      }
+
+      script.dataset['cdnState'] = 'loading';
+      this.renderer.setAttribute(script, 'src', src);
+      this.renderer.setAttribute(script, 'data-cdn', id);
+      this.renderer.setAttribute(script, 'async', '');
+      this.renderer.appendChild(this.doc.body, script);
+    });
   }
 
   // ---- Constants ----
@@ -335,6 +409,10 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
 
   // ---- Runtime state ----
   private qrScanner: any = null;
+  private qrLibraryPromise: Promise<void> | null = null;
+  private lzLibraryPromise: Promise<void> | null = null;
+  private qrStartAttempt = 0;
+  private qrStartPending = false;
   // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
   // private agents: any[] = [];
   // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
@@ -2377,6 +2455,9 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
   // ==================== TAB SWITCHING ====================
 
   private switchTab(tab: 'scan' | 'paste'): void {
+    const scanError = this.host.nativeElement.querySelector('#dash-scan-error') as HTMLElement | null;
+    if (scanError) scanError.style.display = 'none';
+
     if (tab === 'scan') {
       this.tabScan?.classList.add('active');
       this.tabPaste?.classList.remove('active');
@@ -2390,42 +2471,89 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
       if (this.tabScanContent) this.tabScanContent.style.display = 'none';
       this.stopQRScanner();
     }
-    if (this.scanError) this.scanError.style.display = 'none';
     this.clearLoginError();
   }
 
   // ==================== QR SCANNER ====================
 
-  private startQRScanner(): void {
-    if (this.qrScanner) return;
-    if (typeof Html5Qrcode === 'undefined') {
-      this.showScanError(this.dashboardCopy.qrScannerUnavailable);
-      this.switchTab('paste');
+  private async startQRScanner(): Promise<void> {
+    if (this.qrScanner || this.qrStartPending) return;
+
+    const attempt = ++this.qrStartAttempt;
+    this.qrStartPending = true;
+
+    try {
+      await this.ensureQRScannerLibrary();
+    } catch (_) {
+      if (this.canStartQRScanner(attempt)) {
+        this.showScanError(this.dashboardCopy.qrScannerUnavailable);
+      }
+      if (attempt === this.qrStartAttempt) this.qrStartPending = false;
       return;
     }
 
-    this.qrScanner = new Html5Qrcode('qr-reader');
-    this.qrScanner.start(
-      { facingMode: 'environment' },
-      { fps: 10, qrbox: { width: 250, height: 250 } },
-      (decodedText: string) => {
-        this.qrScanner.stop().then(() => {
-          this.qrScanner = null;
-          this.handleScannedQR(decodedText);
-        }).catch(() => {
-          this.qrScanner = null;
-          this.handleScannedQR(decodedText);
-        });
-      },
-      () => { /* Ignore per-frame decode failures */ }
-    ).catch((err: any) => {
-      this.qrScanner = null;
-      this.showScanError(this.dashboardCopy.cameraUnavailable);
-      this.switchTab('paste');
-    });
+    if (!this.canStartQRScanner(attempt)) {
+      if (attempt === this.qrStartAttempt) this.qrStartPending = false;
+      return;
+    }
+
+    let scanner: any;
+    try {
+      scanner = new Html5Qrcode('qr-reader');
+    } catch (_) {
+      this.showScanError(this.dashboardCopy.qrScannerUnavailable);
+      if (attempt === this.qrStartAttempt) this.qrStartPending = false;
+      return;
+    }
+    let decoded = false;
+    this.qrScanner = scanner;
+
+    try {
+      await scanner.start(
+        { facingMode: 'environment' },
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        (decodedText: string) => {
+          if (decoded || this.qrScanner !== scanner) return;
+          decoded = true;
+          void scanner.stop().catch(() => {}).then(() => {
+            if (this.qrScanner === scanner) this.qrScanner = null;
+            if (!this.destroyed && attempt === this.qrStartAttempt) {
+              this.handleScannedQR(decodedText);
+            }
+          });
+        },
+        () => { /* Ignore per-frame decode failures */ },
+      );
+
+      // Camera permission can keep start() pending after the user has switched
+      // tabs or left the route. Stop a stream that became ready after cancellation.
+      if (!this.canStartQRScanner(attempt)) {
+        if (this.qrScanner === scanner) this.qrScanner = null;
+        await scanner.stop().catch(() => {});
+      }
+    } catch (_) {
+      if (this.qrScanner === scanner) this.qrScanner = null;
+      if (this.canStartQRScanner(attempt)) {
+        this.showScanError(this.dashboardCopy.cameraUnavailable);
+      }
+    } finally {
+      if (attempt === this.qrStartAttempt) this.qrStartPending = false;
+    }
+  }
+
+  private canStartQRScanner(attempt: number): boolean {
+    const reader = this.host.nativeElement.querySelector('#qr-reader') as HTMLElement | null;
+    return !this.destroyed &&
+      attempt === this.qrStartAttempt &&
+      !!this.loginSection &&
+      this.loginSection.style.display !== 'none' &&
+      !!this.tabScan?.classList.contains('active') &&
+      !!reader?.isConnected;
   }
 
   private stopQRScanner(): void {
+    this.qrStartAttempt++;
+    this.qrStartPending = false;
     if (this.qrScanner) {
       const scanner = this.qrScanner;
       this.qrScanner = null;

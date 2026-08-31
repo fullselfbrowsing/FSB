@@ -679,6 +679,191 @@
       "id": "PRIVACY_TELEMETRY_ERASE_CURL|GDPR Article 17 erasure curl command. Copy this command literally; do not translate.",
       "sourceSha256": "37dde52ba4a6ce2e738f280f4ca93c3b91308a44bd28c042ab3215e48008f324",
       "reason": "literal GDPR curl command"
+    },
+    {
+      "id": "shell.footer.research.concierge",
+      "sourceSha256": "6fd6628dffd218e9e6629a6147624ab9736c8d005278ba2d11c025312158b0b1",
+      "reason": "brand, package, version, or machine-owned runtime chrome"
+    },
+    {
+      "id": "concierge.screen.label",
+      "sourceSha256": "6fd6628dffd218e9e6629a6147624ab9736c8d005278ba2d11c025312158b0b1",
+      "reason": "brand, package, version, or machine-owned runtime chrome"
+    },
+    {
+      "id": "concierge.hero.title",
+      "sourceSha256": "a9780862da8714312e0ac271ee8650faec6386199e2eec5ea5f6084ca885f5ca",
+      "reason": "brand, package, version, or machine-owned runtime chrome"
+    },
+    {
+      "id": "concierge.chip.typescript",
+      "sourceSha256": "42364e866bd6e19d4710d610fb116bfe573107d39aaea84e11e741a405c984dc",
+      "reason": "brand, package, version, or machine-owned runtime chrome"
+    },
+    {
+      "id": "concierge.chip.node",
+      "sourceSha256": "b8ef4f4390414dccfd3eb286a12f9a65ec0fac1f336fe48c4b84128eb43852f0",
+      "reason": "brand, package, version, or machine-owned runtime chrome"
+    },
+    {
+      "id": "concierge.chip.license",
+      "sourceSha256": "e5dcffe836b6ec8a58e492419b550e65fb8cbdc308503979e5dacb33ac7ea3b7",
+      "reason": "brand, package, version, or machine-owned runtime chrome"
+    },
+    {
+      "id": "concierge.mark.aria",
+      "sourceSha256": "6fd6628dffd218e9e6629a6147624ab9736c8d005278ba2d11c025312158b0b1",
+      "reason": "brand, package, version, or machine-owned runtime chrome"
+    },
+    {
+      "id": "concierge.install.tab.pnpm",
+      "sourceSha256": "2e5aa0361aaffd9121d965204bff293f4a12be1e71208fea0cb44739a4356999",
+      "reason": "brand, package, version, or machine-owned runtime chrome"
+    },
+    {
+      "id": "concierge.install.tab.npm",
+      "sourceSha256": "d79677188687e7b32b43de9d2365a1ff8ae6f1a9e3d494719be542394d99f7dd",
+      "reason": "brand, package, version, or machine-owned runtime chrome"
+    },
+    {
+      "id": "concierge.boundary.head.concierge",
+      "sourceSha256": "6fd6628dffd218e9e6629a6147624ab9736c8d005278ba2d11c025312158b0b1",
+      "reason": "brand, package, version, or machine-owned runtime chrome"
+    },
+    {
+      "id": "concierge.how.owner.concierge.title",
+      "sourceSha256": "603fed2ba219cfa108f70336edb0c1fb15a0b16fabe91a4c070369a9d052b8f2",
+      "reason": "brand, package, version, or machine-owned runtime chrome"
+    },
+    {
+      "id": "concierge.quickstart.filename",
+      "sourceSha256": "b3de4e8748b1b4c7a26a5d574a701a5cad2c6a65fd80cc1402e969584e240499",
+      "reason": "brand, package, version, or machine-owned runtime chrome"
+    },
+    {
+      "id": "concierge.packages.react.tag",
+      "sourceSha256": "01fad993ff61aca9a1f2f07100c95eb1559d8b6440a00cb974a92810a6b5a2dc",
+      "reason": "brand, package, version, or machine-owned runtime chrome"
+    },
+    {
+      "id": "concierge.packages.svelte.tag",
+      "sourceSha256": "0073bfcaa87713eefbee59df1c1f07d30f680a9bd411f8d00b0b4874b66b1daa",
+      "reason": "brand, package, version, or machine-owned runtime chrome"
+    },
+    {
+      "id": "concierge.packages.matrix",
+      "sourceSha256": "e107e8d6b5a7656b582adf5d8e8a1ea6c61f95c3010e35ed9e1404ce4d4a45ca",
+      "reason": "brand, package, version, or machine-owned runtime chrome"
+    },
+    {
+      "id": "concierge.integrations.react.name",
+      "sourceSha256": "01fad993ff61aca9a1f2f07100c95eb1559d8b6440a00cb974a92810a6b5a2dc",
+      "reason": "brand, package, version, or machine-owned runtime chrome"
+    },
+    {
+      "id": "concierge.integrations.svelte.name",
+      "sourceSha256": "0073bfcaa87713eefbee59df1c1f07d30f680a9bd411f8d00b0b4874b66b1daa",
+      "reason": "brand, package, version, or machine-owned runtime chrome"
+    },
+    {
+      "id": "concierge.integrations.aisdk.name",
+      "sourceSha256": "6f30a3238886f02ab0aca1e90e6fd57e1d1647e9a78a53a078ce40448ec76dbd",
+      "reason": "brand, package, version, or machine-owned runtime chrome"
+    },
+    {
+      "id": "concierge.guarantees.dispatch",
+      "sourceSha256": "f66b1ff0b0f00efd1c07511a655832b8053c267f71076864d66260cbd441590f",
+      "reason": "brand, package, version, or machine-owned runtime chrome"
+    },
+    {
+      "id": "concierge.footer.brand.aria",
+      "sourceSha256": "83139e1a42a4c7033286d67f1c732d7067ea620fd6dbf5c5fb0df845d8b33e4a",
+      "reason": "brand, package, version, or machine-owned runtime chrome"
+    },
+    {
+      "id": "concierge.footer.project.github",
+      "sourceSha256": "f911e414cf6bdfc595532ab166b5ba0f63d73c021452fcdacbda363dda6ad8fb",
+      "reason": "brand, package, version, or machine-owned runtime chrome"
+    },
+    {
+      "id": "concierge.footer.project.issues",
+      "sourceSha256": "666067dd376e5d4553b8fd554f855855819ad213ae825022d2a32dfa28431115",
+      "reason": "brand, package, version, or machine-owned runtime chrome"
+    },
+    {
+      "id": "concierge.footer.research.lattice",
+      "sourceSha256": "4864e5af58e7bc8a61c79ea22e20bf6b9bbab4f7f3e92baf158c8674265a05de",
+      "reason": "brand, package, version, or machine-owned runtime chrome"
+    },
+    {
+      "id": "concierge.footer.research.concierge",
+      "sourceSha256": "6fd6628dffd218e9e6629a6147624ab9736c8d005278ba2d11c025312158b0b1",
+      "reason": "brand, package, version, or machine-owned runtime chrome"
+    },
+    {
+      "id": "concierge.footer.research.phantomStream",
+      "sourceSha256": "766575aab91a68ee42174ed84cca4ccca21632578d7becf95149ce9d1a06dae5",
+      "reason": "brand, package, version, or machine-owned runtime chrome"
+    },
+    {
+      "id": "concierge.footer.research.prometheus",
+      "sourceSha256": "bfa97cfb590b2093ee41d9e44a906fbe19c3f809130727a37895afe9bad12756",
+      "reason": "brand, package, version, or machine-owned runtime chrome"
+    },
+    {
+      "id": "concierge.footer.community.discord",
+      "sourceSha256": "053bc65874ad6098e58c41c57b378a2f36b0220e5e0b46722245e6c2f796818c",
+      "reason": "brand, package, version, or machine-owned runtime chrome"
+    },
+    {
+      "id": "lattice.footer.research.concierge",
+      "sourceSha256": "6fd6628dffd218e9e6629a6147624ab9736c8d005278ba2d11c025312158b0b1",
+      "reason": "brand, package, version, or machine-owned runtime chrome"
+    },
+    {
+      "id": "phantomStream.footer.research.concierge",
+      "sourceSha256": "6fd6628dffd218e9e6629a6147624ab9736c8d005278ba2d11c025312158b0b1",
+      "reason": "brand, package, version, or machine-owned runtime chrome"
+    },
+    {
+      "id": "concierge.packages.core.path",
+      "sourceSha256": "06a3072729cbbda1442550f153c21a4ebdbea8348f3ecc9d032628eb6f3d4547",
+      "reason": "brand, package, version, or machine-owned runtime chrome"
+    },
+    {
+      "id": "concierge.packages.react.path",
+      "sourceSha256": "5795bbfc67e57ca247a573191ac13e13247b6d645cf4d2438328de2da4832ecc",
+      "reason": "brand, package, version, or machine-owned runtime chrome"
+    },
+    {
+      "id": "concierge.packages.svelte.path",
+      "sourceSha256": "09325f46cd3a0bf81d858923f0146ec865e6968dd4f4cc256577ada8cb133c76",
+      "reason": "brand, package, version, or machine-owned runtime chrome"
+    },
+    {
+      "id": "concierge.integrations.neutral.path",
+      "sourceSha256": "06a3072729cbbda1442550f153c21a4ebdbea8348f3ecc9d032628eb6f3d4547",
+      "reason": "brand, package, version, or machine-owned runtime chrome"
+    },
+    {
+      "id": "concierge.integrations.react.path",
+      "sourceSha256": "8afb8e277117a28267782aba423ea4b4eb194862af3bcad607cd7d7ac643f25a",
+      "reason": "brand, package, version, or machine-owned runtime chrome"
+    },
+    {
+      "id": "concierge.integrations.svelte.path",
+      "sourceSha256": "98b16b932e6c2137b828569ae4f06b3c7ebe947b802cdc103acac4c6e0cfa28e",
+      "reason": "brand, package, version, or machine-owned runtime chrome"
+    },
+    {
+      "id": "concierge.integrations.aisdk.path",
+      "sourceSha256": "76d07d2e73e6b435ea0cd3194dcd498c021679cd4b1410a6cec0721bb8428e21",
+      "reason": "brand, package, version, or machine-owned runtime chrome"
+    },
+    {
+      "id": "concierge.integrations.signed.path",
+      "sourceSha256": "02b1fb7b18b80bc8c7a595ca9f4d0903a07d1bfc8d5e41954588bcbc83ad2908",
+      "reason": "brand, package, version, or machine-owned runtime chrome"
     }
   ],
   "byLocale": {

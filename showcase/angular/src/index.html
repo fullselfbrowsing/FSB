@@ -19,78 +19,7 @@
       }
     })();
   </script>
-  <script>
-    (function initRouteScrollRestoration() {
-      var storageKey = 'fsb-route-scroll-top';
-      if (typeof window === 'undefined') return;
-      if (window.history && 'scrollRestoration' in window.history) {
-        window.history.scrollRestoration = 'manual';
-      }
 
-      var hasPendingReset = function() {
-        try {
-          return window.sessionStorage && window.sessionStorage.getItem(storageKey) === '1';
-        } catch (err) {
-          return false;
-        }
-      };
-      var markPendingReset = function() {
-        try {
-          if (window.sessionStorage) window.sessionStorage.setItem(storageKey, '1');
-        } catch (err) {
-          // Ignore private-mode storage failures; the in-page reset still runs.
-        }
-      };
-      var clearPendingReset = function() {
-        try {
-          if (window.sessionStorage) window.sessionStorage.removeItem(storageKey);
-        } catch (err) {
-          // Ignore private-mode storage failures.
-        }
-      };
-
-      var reset = function() {
-        window.scrollTo(0, 0);
-      };
-      var scheduleReset = function(persistent) {
-        var delays = persistent ? [0, 100, 500, 1500, 3000] : [0, 100, 500];
-        reset();
-        if (typeof window.requestAnimationFrame === 'function') {
-          window.requestAnimationFrame(reset);
-        }
-        for (var i = 0; i < delays.length; i += 1) {
-          window.setTimeout(reset, delays[i]);
-        }
-      };
-      var isInternalFooterRouteLink = function(link) {
-        if (!link || !link.href) return false;
-        var url;
-        try {
-          url = new URL(link.href, window.location.href);
-        } catch (err) {
-          return false;
-        }
-        return url.origin === window.location.origin && !url.hash;
-      };
-
-      document.addEventListener('click', function(event) {
-        var target = event.target;
-        var link = target && target.closest ? target.closest('footer a[href]') : null;
-        if (!isInternalFooterRouteLink(link)) return;
-        markPendingReset();
-        scheduleReset(true);
-      }, true);
-
-      var pendingReset = hasPendingReset();
-      if (pendingReset) clearPendingReset();
-      if (!window.location.hash || pendingReset) {
-        scheduleReset(pendingReset);
-        window.addEventListener('pageshow', function() { scheduleReset(pendingReset); }, { once: true });
-        window.addEventListener('load', function() { scheduleReset(pendingReset); }, { once: true });
-      }
-    })();
-  </script>
-   
   <link rel="icon" type="image/png" href="/assets/icon48.png">
   <!-- Organization JSON-LD (LD-01, D-10..D-12). Inherited by every prerendered route via index.html template. Payload is hand-authored single-line strict JSON; no field contains '<' so no \u003c escape pass is needed. Pattern: PITFALLS.md P4. Threat: T-LD-01 (XSS via JSON-LD injection). -->
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","@id":"https://full-selfbrowsing.com/#org","name":"FSB","alternateName":"Full Self-Browsing","url":"https://full-selfbrowsing.com","logo":"https://full-selfbrowsing.com/assets/fsb_logo_dark.png","sameAs":["https://github.com/fullselfbrowsing/FSB","https://www.youtube.com/@parzival5707"]}</script>
