@@ -561,6 +561,35 @@ function grokBuildDisconnectFailureMessage(errorCode) {
   return 'Grok Build could not disconnect: the local agent service is unavailable';
 }
 
+// Mirrors GrokBuildAuthBeginReason in mcp/src/agent-providers/grok-auth.ts. A
+// stale version pin used to surface here as a bare "Sign-in failed", which reads
+// as an account problem and sends people round the sign-in loop forever.
+function grokBuildSignInFailureMessage(reason, errorCode) {
+  if (errorCode === 'provider_auth_timeout') {
+    return 'Grok Build did not answer the sign-in in time. Refresh status before trying again.';
+  }
+  if (errorCode && errorCode !== 'provider_auth_failed') {
+    return 'Grok Build could not sign in: the local agent service is unavailable';
+  }
+  if (reason === 'version_unsupported') {
+    return 'Grok Build sign-in is blocked because the installed Grok CLI is not the version FSB supports. Your account is fine. Check the compatibility badge, then install a supported CLI.';
+  }
+  if (reason === 'provider_auth_locked') {
+    return 'Grok Build cannot sign in while a task is running. Wait for the run to finish, then try again.';
+  }
+  if (reason === 'session_cleanup_blocked') {
+    return 'Grok Build could not clean up a previous session, so sign-in is blocked. Refresh status to retry cleanup.';
+  }
+  if (reason === 'sandbox_unavailable') {
+    return 'The Grok CLI refused to start under the strict sandbox FSB requires, so sign-in is blocked. The CLI is installed and your account is fine.';
+  }
+  if (reason === 'adapter_unavailable') {
+    return 'FSB could not run the Grok CLI. Check that it is installed, then refresh status.';
+  }
+  if (reason === 'cancelled') return 'Grok Build sign-in was cancelled';
+  return 'Grok Build sign-in did not complete';
+}
+
 function applyGrokBuildAuthProgress(message) {
   if (!message
       || message.type !== 'FSB_GROK_BUILD_AUTH_PROGRESS'
@@ -618,21 +647,27 @@ async function beginGrokBuildAuth() {
     try {
       const response = await chrome.runtime.sendMessage({ action: 'beginGrokBuildAuth' });
       // The daemon answers 'unknown' when the sign-in could not be attempted at
-      // all -- a delegated run holds the profile, or session cleanup is blocked
-      // -- which is not the same as being signed out. Keep the three states
-      // distinct here exactly as refreshGrokBuildAuthStatus does, so a refusal
-      // never relabels a still-connected profile as "Not connected".
+      // all -- a delegated run holds the profile, session cleanup is blocked, or
+      // the CLI is outside the supported version -- which is not the same as
+      // being signed out. Keep the three states distinct here exactly as
+      // refreshGrokBuildAuthStatus does, so a refusal never relabels a
+      // still-connected profile as "Not connected".
       grokBuildAuthState = response
         && response.success === true
         && (response.state === 'oauth' || response.state === 'unauthenticated')
         ? response.state
         : 'unknown';
-      renderGrokBuildAuthState(grokBuildAuthState,
-        grokBuildAuthState === 'oauth' ? 'authenticated' : 'failed');
-      if (response && response.success === true && response.state === 'oauth') {
+      const reason = response && typeof response.reason === 'string' ? response.reason : '';
+      const errorCode = response && typeof response.errorCode === 'string'
+        ? response.errorCode
+        : '';
+      if (grokBuildAuthState === 'oauth') {
+        renderGrokBuildAuthState(grokBuildAuthState, 'authenticated');
         showToast('Grok Build connected to the private FSB profile', 'success');
       } else {
-        showToast('Grok Build sign-in did not complete', 'error');
+        renderGrokBuildAuthState(grokBuildAuthState,
+          reason === 'cancelled' ? 'cancelled' : 'failed');
+        showToast(grokBuildSignInFailureMessage(reason, errorCode), 'error');
       }
       return grokBuildAuthState;
     } catch (_error) {

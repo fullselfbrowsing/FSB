@@ -19,6 +19,10 @@ export type AdapterDiagnosticCode =
   | 'binary_unsafe'
   | 'version_unparseable'
   | 'version_unsupported'
+  // The CLI started but refused to apply the strict sandbox FSB requires, so it
+  // is installed and the right version yet still unusable. Distinct from
+  // adapter_unavailable so the panel can say so instead of "check it is installed".
+  | 'sandbox_unavailable'
   | 'agent_protocol_drift'
   | 'tree_unsettled';
 

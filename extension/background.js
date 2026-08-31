@@ -1993,6 +1993,20 @@ const FSB_GROK_AUTH_PROGRESS_STATES = Object.freeze({
   failed: true,
   cancelled: true
 });
+// Mirrors GrokBuildAuthBeginReason in mcp/src/agent-providers/grok-auth.ts. The
+// daemon answers begin() with the settled state plus why, because the bridge
+// collapses every ext-handler throw into one opaque code and the panel has to
+// name the refusal.
+const FSB_GROK_AUTH_BEGIN_REASONS = Object.freeze({
+  none: true,
+  cancelled: true,
+  login_failed: true,
+  version_unsupported: true,
+  sandbox_unavailable: true,
+  adapter_unavailable: true,
+  provider_auth_locked: true,
+  session_cleanup_blocked: true
+});
 const FSB_GROK_LOGIN_HOSTS = Object.freeze({
   'auth.x.ai': true,
   'accounts.x.ai': true,
@@ -2029,6 +2043,19 @@ function fsbSafeGrokLoginUrl(value) {
   } catch (_error) {
     return null;
   }
+}
+
+function fsbSafeGrokAuthBeginResponse(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const keys = Object.keys(value).sort();
+  if (keys.length !== 2 || keys[0] !== 'reason' || keys[1] !== 'state') return null;
+  const state = fsbSafeGrokAuthState(value.state);
+  if (!state
+      || typeof value.reason !== 'string'
+      || !Object.prototype.hasOwnProperty.call(FSB_GROK_AUTH_BEGIN_REASONS, value.reason)) {
+    return null;
+  }
+  return Object.freeze({ state: state, reason: value.reason });
 }
 
 function fsbSafeGrokAuthResponse(value) {
@@ -11920,9 +11947,15 @@ const fsbHandleRuntimeMessage = (request, sender, sendResponse) => {
               }
             }
           );
-          const result = fsbSafeGrokAuthResponse(value);
+          const result = fsbSafeGrokAuthBeginResponse(value);
           if (!result) throw new Error('provider_auth_malformed');
-          sendResponse({ success: true, state: result.state });
+          if (result.state === 'oauth') {
+            try { await fsbRefreshMcpCompatibility(); }
+            catch (_error) { /* delegation preflight retries stale Grok auth evidence */ }
+          }
+          // reason travels even on success so the panel can tell a completed
+          // sign-in apart from a refusal it must explain.
+          sendResponse({ success: true, state: result.state, reason: result.reason });
         } catch (error) {
           sendResponse({
             success: false,

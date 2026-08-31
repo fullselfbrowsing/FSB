@@ -31,6 +31,11 @@ const EVENTS = Object.freeze([
   'run_settled',
   'degraded',
   'daemon_shutdown',
+  // provider.auth.begin used to write nothing at all, so a sign-in that refused
+  // before spawning the login child left no trace anywhere -- the panel showed
+  // only "Sign-in failed" and this file stayed silent. The settled record
+  // carries the same reason code the panel renders.
+  'auth_settled',
 ] as const);
 
 export type DelegationLogEvent = typeof EVENTS[number];

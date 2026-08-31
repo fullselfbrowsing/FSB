@@ -311,7 +311,7 @@ function makeLifecycleFakes(overrides = {}) {
       emit(Object.freeze({ state: 'waiting' }));
       emit(Object.freeze({ state: 'waiting', url: 'https://auth.x.ai/device?code=SAFE' }));
       emit(Object.freeze({ state: 'authenticated' }));
-      return Object.freeze({ state: 'oauth' });
+      return Object.freeze({ state: 'oauth', reason: 'none' });
     },
     async logout() {
       state.authLogoutCalls++;
@@ -662,8 +662,29 @@ async function runServeDelegationLifecycle(lifecycleModule) {
     method: 'provider.auth.begin',
     payload: { providerId: 'grok-build' },
   }, (event) => authEvents.push(event), { signal: authAbort.signal });
-  assertEqual(JSON.stringify(authBegin), '{"state":"oauth"}',
-    'Grok auth begin returns only the final safe state');
+  // begin() carries the settled state plus why it settled, because the bridge
+  // collapses every ext-handler throw into one opaque code and the panel has to
+  // name the refusal -- the same reason logout carries its `locked` marker.
+  // The surface stays minimal: two keys, both from closed enums that
+  // serve-delegation validates before anything can leave.
+  assertEqual(JSON.stringify(authBegin), '{"state":"oauth","reason":"none"}',
+    'Grok auth begin returns only the final safe state and its reason');
+  assertEqual(Object.keys(authBegin).sort().join(','), 'reason,state',
+    'Grok auth begin exposes no field beyond state and reason');
+  assertEqual(
+    [
+      'none',
+      'cancelled',
+      'login_failed',
+      'version_unsupported',
+      'sandbox_unavailable',
+      'adapter_unavailable',
+      'provider_auth_locked',
+      'session_cleanup_blocked',
+    ].includes(authBegin.reason),
+    true,
+    'Grok auth begin reason stays inside the closed enum',
+  );
   assert(success.state.authBeginSignal === authAbort.signal,
     'Grok auth begin forwards socket cancellation');
   assertEqual(

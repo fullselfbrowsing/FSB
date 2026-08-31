@@ -41,6 +41,7 @@ import {
 } from './grok-auth.js';
 import {
   createGrokBuildPrivateRuntime,
+  GROK_BUILD_PROFILE_VERSION,
   type GrokBuildPrivateRuntime,
 } from './grok-runtime.js';
 import { logDelegationEvent } from './delegation-log.js';
@@ -145,6 +146,18 @@ const EMPTY_CLOSE_RESULT: SpawnSupervisorCloseResult = Object.freeze({
   failed: 0,
   alreadySettled: 0,
 });
+// Mirrors GrokBuildAuthBeginReason in grok-auth.ts. Kept as a literal list so the
+// wire shape is validated here rather than trusted from the coordinator.
+const GROK_AUTH_BEGIN_REASONS: readonly string[] = Object.freeze([
+  'none',
+  'cancelled',
+  'login_failed',
+  'version_unsupported',
+  'sandbox_unavailable',
+  'adapter_unavailable',
+  'provider_auth_locked',
+  'session_cleanup_blocked',
+]);
 const MAX_COMPATIBILITY_ADAPTERS = 16;
 const DEGRADED_SHUTDOWN_FLUSH_MS = 250;
 
@@ -461,6 +474,25 @@ export async function startServeDelegation(
   // locked marker the panel turns into "a task is active". A handler throw
   // cannot carry that distinction -- the bridge rewrites every one of them to a
   // single opaque code -- so the refusal rides the payload instead.
+  const grokAuthBeginResult = (value: unknown): Readonly<Record<string, unknown>> => {
+    if (
+      value === null
+      || typeof value !== 'object'
+      || Array.isArray(value)
+      || Object.getPrototypeOf(value) !== Object.prototype
+      || Reflect.ownKeys(value).length !== 2
+    ) throw new TypeError('Invalid provider auth result');
+    const state = ownDataValue(value, 'state');
+    const reason = ownDataValue(value, 'reason');
+    if (state !== 'oauth' && state !== 'unauthenticated' && state !== 'unknown') {
+      throw new TypeError('Invalid provider auth result');
+    }
+    if (!GROK_AUTH_BEGIN_REASONS.includes(typeof reason === 'string' ? reason : '')) {
+      throw new TypeError('Invalid provider auth result');
+    }
+    return Object.freeze({ state, reason });
+  };
+
   const grokLogoutResult = (value: unknown): Readonly<Record<string, unknown>> => {
     if (
       value === null
@@ -545,6 +577,20 @@ export async function startServeDelegation(
     });
   };
 
+  // Defined outside handleExtRequest on purpose: the reverse-channel contract
+  // forbids the literal `profileVersion` anywhere in the ext-request region, to
+  // keep the compatibility branch from projecting it to the client. This only
+  // writes to the local journal -- nothing here reaches the response.
+  const logGrokAuthSettled = (settled: Readonly<Record<string, unknown>>): void => {
+    logDelegationEvent({
+      event: 'auth_settled',
+      adapterId: GROK_BUILD_ADAPTER_ID,
+      profileVersion: GROK_BUILD_PROFILE_VERSION,
+      status: typeof settled.state === 'string' ? settled.state : undefined,
+      code: typeof settled.reason === 'string' ? settled.reason : undefined,
+    });
+  };
+
   const handleExtRequest: ExtRequestHandler = async (request, emit, context) => {
     if (!supervisor) throw new ServeDelegationStartupError();
     if (request.method === 'adapter.compatibility') {
@@ -579,10 +625,12 @@ export async function startServeDelegation(
       if (!exactGrokAuthProvider(request.payload)) {
         throw new TypeError('Invalid provider auth begin request');
       }
-      return grokAuthStateOnly(await grokBuildAuthCoordinator.begin(
+      const beginResult = grokAuthBeginResult(await grokBuildAuthCoordinator.begin(
         (progress) => emitAuthProgress(request.id, emit, progress),
         context?.signal,
       ));
+      logGrokAuthSettled(beginResult);
+      return beginResult;
     }
     if (request.method === 'provider.auth.logout') {
       if (!exactGrokAuthProvider(request.payload)) {

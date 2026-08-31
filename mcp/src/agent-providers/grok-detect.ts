@@ -413,27 +413,52 @@ async function verifyIsolation(
   return true;
 }
 
+// grok refuses to start under `--sandbox strict` when it cannot resolve one of
+// the runtime-socket deny paths -- a symlinked /var/run/docker.sock is enough.
+// It prints this on stderr and exits non-zero, which otherwise reads to us as an
+// indistinguishable "ACP could not be verified".
+const SANDBOX_REFUSAL_MARKER = "could not apply the 'strict' sandbox profile";
+
+function refusedSandbox(result: BoundedProcessProbeResult): boolean {
+  try {
+    return result.exit.code !== 0
+      && result.stderr.length > 0
+      && new TextDecoder('utf-8', { fatal: false })
+        .decode(result.stderr)
+        .includes(SANDBOX_REFUSAL_MARKER);
+  } catch {
+    return false;
+  }
+}
+
 async function probeAcpAuthState(
   dependencies: GrokBuildDetectDependencies,
   binary: RetainedBinary,
   run: GrokBuildRunPaths,
-): Promise<Readonly<{ initialized: boolean; authState: AdapterAuthState }>> {
+): Promise<Readonly<{
+  initialized: boolean;
+  authState: AdapterAuthState;
+  sandboxRefused?: boolean;
+}>> {
   const argv = [
     ...GROK_BUILD_TASK_ARGV,
     '--agent-profile',
     dependencies.runtime.paths.agentProfilePath,
     'stdio',
   ];
-  const initialized = parseJsonLines(await dependencies.probe(descriptor(
+  const initializeProbe = await dependencies.probe(descriptor(
     dependencies,
     binary,
     run,
     argv,
     JSON_OUTPUT_LIMIT_BYTES,
     jsonLine(GROK_BUILD_INITIALIZE_REQUEST),
-  )));
+  ));
+  // Read stderr before parseJsonLines zeroizes both channels.
+  const sandboxRefused = refusedSandbox(initializeProbe);
+  const initialized = parseJsonLines(initializeProbe);
   if (!initialized) {
-    return Object.freeze({ initialized: false, authState: 'unknown' });
+    return Object.freeze({ initialized: false, authState: 'unknown', sandboxRefused });
   }
   const negotiation = parseGrokBuildProbeTranscript(initialized, false);
   if (!negotiation) {
@@ -531,10 +556,16 @@ export function createGrokBuildDetector(
         }
         const acp = await probeAcpAuthState(dependencies, binary, run);
         if (!acp.initialized) {
-          return unavailable('adapter_unavailable', 'Grok Build ACP could not be verified', {
-            binary,
-            version,
-          });
+          return acp.sandboxRefused === true
+            ? unavailable(
+              'sandbox_unavailable',
+              'Grok Build refused to start under the required strict sandbox',
+              { binary, version },
+            )
+            : unavailable('adapter_unavailable', 'Grok Build ACP could not be verified', {
+              binary,
+              version,
+            });
         }
         const authState = acp.authState;
         if (authState === 'oauth' && !await dependencies.runtime.secureAuthFile()) {

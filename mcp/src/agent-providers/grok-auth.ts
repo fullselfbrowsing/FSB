@@ -38,6 +38,27 @@ const FORBIDDEN_LOGIN_QUERY_KEY_PATTERN =
 const ignoreStreamError = (): void => {};
 
 export type GrokBuildAuthState = 'oauth' | 'unauthenticated' | 'unknown';
+/**
+ * begin() answers with the settled state plus why it settled there. The bridge
+ * collapses every ext-handler throw into one opaque code, so a refusal the panel
+ * needs to name has to travel as data -- the same reason logout carries its
+ * locked marker. 'none' is the success case.
+ */
+export type GrokBuildAuthBeginReason =
+  | 'none'
+  | 'cancelled'
+  | 'login_failed'
+  | 'version_unsupported'
+  | 'sandbox_unavailable'
+  | 'adapter_unavailable'
+  | 'provider_auth_locked'
+  | 'session_cleanup_blocked';
+
+export type GrokBuildAuthBeginResult = Readonly<{
+  state: GrokBuildAuthState;
+  reason: GrokBuildAuthBeginReason;
+}>;
+
 export type GrokBuildAuthProgressState =
   | 'opening_browser'
   | 'waiting'
@@ -83,7 +104,7 @@ export interface GrokBuildAuthCoordinator {
   begin(
     emit: (progress: GrokBuildAuthProgress) => void,
     signal?: AbortSignal,
-  ): Promise<Readonly<{ state: GrokBuildAuthState }>>;
+  ): Promise<GrokBuildAuthBeginResult>;
   logout(): Promise<GrokBuildLogoutResult>;
   acquireTask(): Promise<GrokBuildTaskLease>;
   recordSession(delegationId: string, sessionId: string): Promise<void>;
@@ -105,6 +126,21 @@ export interface GrokBuildAuthCoordinatorDependencies {
   readonly probe?: (
     descriptor: BoundedProcessProbeDescriptor,
   ) => Promise<BoundedProcessProbeResult>;
+}
+
+const BEGIN_FAILURE_REASONS: ReadonlySet<string> = new Set([
+  'version_unsupported',
+  'sandbox_unavailable',
+  'adapter_unavailable',
+  'provider_auth_locked',
+  'session_cleanup_blocked',
+]);
+
+function beginFailureReason(error: unknown): GrokBuildAuthBeginReason {
+  const code = error instanceof Error ? error.message : '';
+  return BEGIN_FAILURE_REASONS.has(code)
+    ? code as GrokBuildAuthBeginReason
+    : 'adapter_unavailable';
 }
 
 function safeState(value: unknown): GrokBuildAuthState {
@@ -196,7 +232,17 @@ class DefaultGrokBuildAuthCoordinator implements GrokBuildAuthCoordinator {
       || detection.version !== GROK_BUILD_PROFILE_VERSION
       || detection.profileVersion !== GROK_BUILD_PROFILE_VERSION
       || !detection.binary
-    ) throw new Error('adapter_unavailable');
+    ) {
+      // The detector already classified why it refused. Carry that through so
+      // begin() can tell a stale version pin apart from a missing binary --
+      // otherwise both surface to the panel as a bare "Sign-in failed".
+      const code = detection.diagnostic?.code;
+      throw new Error(
+        code === 'version_unsupported' || code === 'version_unparseable'
+          ? 'version_unsupported'
+          : (code === 'sandbox_unavailable' ? 'sandbox_unavailable' : 'adapter_unavailable'),
+      );
+    }
     return detection.binary;
   }
 
@@ -286,7 +332,7 @@ class DefaultGrokBuildAuthCoordinator implements GrokBuildAuthCoordinator {
   async begin(
     emit: (progress: GrokBuildAuthProgress) => void,
     signal?: AbortSignal,
-  ): Promise<Readonly<{ state: GrokBuildAuthState }>> {
+  ): Promise<GrokBuildAuthBeginResult> {
     const release = await this.mutex.lock();
     let child: ChildProcessWithoutNullStreams | null = null;
     let timer: NodeJS.Timeout | null = null;
@@ -296,17 +342,18 @@ class DefaultGrokBuildAuthCoordinator implements GrokBuildAuthCoordinator {
     let stdoutTail = Buffer.alloc(0);
     let stderrTail = Buffer.alloc(0);
     try {
-      if (this.activeTasks > 0 || this.cleanupBlocked) throw new Error('provider_auth_locked');
+      if (this.cleanupBlocked) throw new Error('session_cleanup_blocked');
+      if (this.activeTasks > 0) throw new Error('provider_auth_locked');
       if (signal?.aborted) {
         emit(Object.freeze({ state: 'cancelled' }));
-        return Object.freeze({ state: 'unauthenticated' });
+        return Object.freeze({ state: 'unauthenticated', reason: 'cancelled' });
       }
       await this.runtime.ensureBase();
       const detection = await this.detection();
       const binary = this.supportedBinary(detection);
       if (detection.authState === 'oauth') {
         emit(Object.freeze({ state: 'authenticated' }));
-        return Object.freeze({ state: 'oauth' });
+        return Object.freeze({ state: 'oauth', reason: 'none' });
       }
       emit(Object.freeze({ state: 'opening_browser' }));
       const environment = buildSanitizedGrokEnvironment(
@@ -419,7 +466,7 @@ class DefaultGrokBuildAuthCoordinator implements GrokBuildAuthCoordinator {
       if (abortListener) signal?.removeEventListener('abort', abortListener);
       if (stopReason === 'cancelled' || signal?.aborted) {
         emit(Object.freeze({ state: 'cancelled' }));
-        return Object.freeze({ state: 'unauthenticated' });
+        return Object.freeze({ state: 'unauthenticated', reason: 'cancelled' });
       }
       if (
         stopReason === 'timeout'
@@ -429,18 +476,24 @@ class DefaultGrokBuildAuthCoordinator implements GrokBuildAuthCoordinator {
         || bytes > OUTPUT_LIMIT_BYTES
       ) {
         emit(Object.freeze({ state: 'failed' }));
-        return Object.freeze({ state: 'unauthenticated' });
+        return Object.freeze({ state: 'unauthenticated', reason: 'login_failed' });
       }
       const verified = await this.detection();
       if (verified.authState !== 'oauth') {
         emit(Object.freeze({ state: 'failed' }));
-        return Object.freeze({ state: safeState(verified.authState) });
+        return Object.freeze({
+          state: safeState(verified.authState),
+          reason: 'login_failed',
+        });
       }
       emit(Object.freeze({ state: 'authenticated' }));
-      return Object.freeze({ state: 'oauth' });
-    } catch {
+      return Object.freeze({ state: 'oauth', reason: 'none' });
+    } catch (error) {
       emit(Object.freeze({ state: stopReason === 'cancelled' ? 'cancelled' : 'failed' }));
-      return Object.freeze({ state: 'unknown' });
+      return Object.freeze({
+        state: 'unknown',
+        reason: stopReason === 'cancelled' ? 'cancelled' : beginFailureReason(error),
+      });
     } finally {
       if (timer) clearTimeout(timer);
       if (escalationTimer) clearTimeout(escalationTimer);

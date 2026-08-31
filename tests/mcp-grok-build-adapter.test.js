@@ -1079,7 +1079,7 @@ async function testAuthCoordinator(authModule) {
     },
   });
   const result = await coordinator.begin((event) => progress.push(event));
-  assert.deepEqual(result, { state: 'oauth' });
+  assert.deepEqual(result, { state: 'oauth', reason: 'none' });
   assert.deepEqual(progress.map((event) => event.state), [
     'opening_browser',
     'waiting',
@@ -1118,7 +1118,7 @@ async function testAuthCoordinator(authModule) {
   });
   assert.deepEqual(
     await cancelledCoordinator.begin((event) => cancelledProgress.push(event), preAborted.signal),
-    { state: 'unauthenticated' },
+    { state: 'unauthenticated', reason: 'cancelled' },
   );
   assert.deepEqual(cancelledProgress, [{ state: 'cancelled' }]);
   assert.equal(preAbortedSpawnCalls, 0, 'pre-cancelled OAuth never spawns Grok');
@@ -1139,9 +1139,45 @@ async function testAuthCoordinator(authModule) {
       throw new Error('unsupported binary must never spawn');
     },
   });
-  assert.deepEqual(await unsupportedAuthCoordinator.begin(() => {}), { state: 'unknown' });
+  assert.deepEqual(
+    await unsupportedAuthCoordinator.begin(() => {}),
+    { state: 'unknown', reason: 'version_unsupported' },
+    'a stale version pin names itself rather than collapsing into a bare sign-in failure',
+  );
   assert.equal(unsupportedAuthSpawnCalls, 0,
     'OAuth login refuses a retained binary outside the reviewed compatibility profile');
+
+  // grok refuses to start under `--sandbox strict` when a runtime-socket deny
+  // path cannot be resolved -- a symlinked /var/run/docker.sock is enough. The
+  // CLI is installed and the right version, so "check that it is installed"
+  // would be wrong; the refusal has to keep its own name all the way to the panel.
+  let sandboxAuthSpawnCalls = 0;
+  const sandboxAuthCoordinator = authModule.createGrokBuildAuthCoordinator({
+    runtime,
+    detect: async () => ({
+      installed: false,
+      version: '1.0.4',
+      authState: 'unknown',
+      binary,
+      profileVersion: null,
+      diagnostic: {
+        code: 'sandbox_unavailable',
+        message: 'Grok Build refused to start under the required strict sandbox',
+      },
+    }),
+    spawn: () => {
+      sandboxAuthSpawnCalls += 1;
+      throw new Error('a sandbox refusal must never spawn a login');
+    },
+  });
+  const sandboxProgress = [];
+  assert.deepEqual(
+    await sandboxAuthCoordinator.begin((event) => sandboxProgress.push(event)),
+    { state: 'unknown', reason: 'sandbox_unavailable' },
+    'a sandbox refusal is distinguishable from a missing adapter',
+  );
+  assert.equal(sandboxAuthSpawnCalls, 0, 'a sandbox refusal never opens a browser');
+  assert.deepEqual(sandboxProgress, [{ state: 'failed' }]);
 
   const activeAbort = new AbortController();
   const activeAbortProgress = [];
@@ -1174,7 +1210,7 @@ async function testAuthCoordinator(authModule) {
     await new Promise((resolve) => setImmediate(resolve));
   }
   activeAbort.abort();
-  assert.deepEqual(await activeAbortResult, { state: 'unauthenticated' });
+  assert.deepEqual(await activeAbortResult, { state: 'unauthenticated', reason: 'cancelled' });
   assert.equal(activeAbortProgress.at(-1).state, 'cancelled',
     'an in-flight browser OAuth operation terminates as cancelled');
 
@@ -1198,7 +1234,7 @@ async function testAuthCoordinator(authModule) {
   });
   assert.deepEqual(
     await oversizedCoordinator.begin((event) => oversizedProgress.push(event)),
-    { state: 'unauthenticated' },
+    { state: 'unauthenticated', reason: 'login_failed' },
   );
   assert.equal(oversizedProgress.at(-1).state, 'failed');
   assert.equal(JSON.stringify(oversizedProgress).includes('x'.repeat(64)), false,

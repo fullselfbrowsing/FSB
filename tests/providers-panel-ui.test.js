@@ -414,7 +414,55 @@ assert.match(save, /modelProvider:\s*normalizedProviderSettings\.modelProvider/)
 const discard = extractFunction(js, 'discardChanges');
 assert.match(discard, /loadSettings\(\)/);
 
+// A stale version pin, a locked profile and a sandbox refusal all used to reach
+// the panel as one indistinguishable "Sign-in failed", which reads as an account
+// problem and sends people round the sign-in loop forever. Each refusal has to
+// keep its own copy.
+function testGrokBuildSignInFailureCopy() {
+  const context = {};
+  vm.runInNewContext(
+    `${extractFunction(js, 'grokBuildSignInFailureMessage')}\n`
+      + 'this.message = grokBuildSignInFailureMessage;',
+    context,
+    { filename: 'options.js#grokBuildSignInFailureMessage' }
+  );
+
+  const seen = new Map();
+  for (const reason of [
+    'version_unsupported',
+    'sandbox_unavailable',
+    'provider_auth_locked',
+    'session_cleanup_blocked',
+    'adapter_unavailable',
+    'cancelled'
+  ]) {
+    const copy = context.message(reason, '');
+    assert.equal(typeof copy, 'string');
+    assert.ok(copy.length > 0, `${reason} has copy`);
+    assert.ok(!seen.has(copy), `${reason} copy is distinct from ${seen.get(copy)}`);
+    seen.set(copy, reason);
+  }
+
+  // The two that are most often mistaken for a broken account must say so.
+  assert.match(context.message('version_unsupported', ''), /version/i);
+  assert.match(context.message('version_unsupported', ''), /account is fine/i);
+  assert.match(context.message('sandbox_unavailable', ''), /sandbox/i);
+  assert.match(context.message('sandbox_unavailable', ''), /account is fine/i);
+
+  // Transport failures outrank the reason: a timeout is not a version problem.
+  assert.match(
+    context.message('version_unsupported', 'provider_auth_timeout'),
+    /in time/i
+  );
+  assert.match(
+    context.message('version_unsupported', 'bridge_not_ready'),
+    /unavailable/i
+  );
+  console.log('  PASS: each Grok sign-in refusal keeps distinct, actionable copy');
+}
+
 testKeyboardConnectionShortcuts();
+testGrokBuildSignInFailureCopy();
 testGrokBuildAuthRendering();
 testAgentConnectionRendering()
   .then(() => console.log('providers-panel-ui.test.js: PASS'))
