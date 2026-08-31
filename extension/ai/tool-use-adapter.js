@@ -193,6 +193,7 @@ function formatToolResult(id, result, provider, options) {
         role: 'user',
         parts: [{
           functionResponse: {
+            id: id,
             name: options?.name || '',
             response: typeof result === 'object' && result !== null ? result : { result }
           }

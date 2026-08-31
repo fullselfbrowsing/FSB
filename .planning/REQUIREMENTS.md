@@ -1,219 +1,203 @@
-# Requirements: FSB (Full Self-Browsing) -- v1.2.0 Skopeo
+# Requirements: FSB (Full Self-Browsing)
 
-**Defined:** 2026-07-14
-**Core Value:** Reliable single-attempt execution -- the AI decides correctly; the mechanics execute precisely.
-**Milestone Goal:** Give FSB an explicitly invoked, page-native adaptive HUD across the full supported capability catalog, then prove deeper domain intelligence with permission-scoped Google Drive vendor-contract intelligence backed by a Chrome-local Graphify-style truth engine.
+**Defined:** 2026-07-11
+**Core Value:** Reliable single-attempt execution -- the AI decides correctly, the mechanics execute precisely.
+**Milestone:** v0.9.91 MCP Clients as Providers
 
 ## v1 Requirements
 
-Requirements committed to the v1.2.0 milestone. Each requirement will map to exactly one roadmap phase.
+Requirements for this milestone. Each maps to roadmap phases.
 
-### Invocation, HUD, and Semantic Anchoring
+### IDENT -- Agent Identity Capture
 
-- [x] **HUD-01**: User can explicitly invoke Skopeo from a stable FSB control or keyboard shortcut; arbitrary pages never activate the HUD automatically.
-- [x] **HUD-02**: User can dismiss the current Skopeo surface or use a universal kill action that cancels in-flight work and prevents delayed output from restoring the HUD.
-- [x] **HUD-03**: When Skopeo is off, the host page retains no Skopeo marks, rails, ghosting, gates, styles, layout changes, listeners, observers, or focus hooks.
-- [x] **HUD-04**: User can use supported Drive and Docs controls without Skopeo shifting the host layout, obscuring required controls, or intercepting unrelated interaction.
-- [x] **HUD-05**: User can operate every supported Skopeo state with keyboard and screen-reader access, visible focus, supported zoom, sufficient contrast, and reduced-motion behavior.
-- [x] **HUD-06**: User receives a concise fail-quiet state when Skopeo cannot confidently recognize the configured corpus, vendor folder, agreement document, focused ask, or anchor target.
-- [x] **HUD-07**: Every Skopeo capability pack composes the shared anchor mark, entity chip, halo, rail, ghost layer, and gate primitives under one FSB visual and interaction contract.
-- [x] **HUD-08**: Skopeo uses ambient, anchored, focused, and interstitial attention levels so halos remain scarce, ghosting remains temporary, and gates appear only for consequential actions.
-- [x] **HUD-09**: An annotation remains attached to its validated file, document, or clause identity across Drive virtualization, row reuse, reorder, SPA navigation, scrolling, zoom, and resize, or withdraws when identity cannot be proven.
+- [x] **IDENT-01**: When the user clicks a copy-to-clipboard button on the onboarding MCP-install screen for a specific client (`claude-code`, `cursor`, `vscode`, `windsurf`, `codex`, `opencode`, `openclaw`, `claude-desktop`, `all`), FSB records that client id (with timestamp, deduplicated, all-clients aggregated for multi-select cases) into a durable `fsbAgentProviders.clicked` list in `chrome.storage.local`.
+- [x] **IDENT-02**: When an MCP client completes its `initialize` handshake with `fsb-mcp-server` (over any transport: stdio, streamable-HTTP, or the ws://7225 bridge), FSB captures the caller's `clientInfo.name` and `clientInfo.version` and threads them to the extension via an additive field on the existing `agent:register` bridge payload without breaking any existing consumer of that payload (INV-01).
+- [x] **IDENT-03**: The extension's agent registry stamps captured `clientInfo` onto each live `AgentRecord` and rolls the identity up into a durable `fsbAgentProviders.connected` entry that survives service-worker eviction and Chrome restart, keyed so re-connections update rather than duplicate.
+- [x] **IDENT-04**: `fsb-mcp-server` can enumerate installed MCP-capable clients on the current machine by inspecting the paths already known to `platforms.ts` (per-OS `configPath` for file-mode clients; `<bin> --version` probe for cli-mode `claude-code`) and report each as `installed` / `not-installed` with any parseable version.
+- [x] **IDENT-05**: A `getMcpClients` extension runtime message returns a merged view (`clicked` ∪ `installed` ∪ `connected`) with per-client status, so UI surfaces read one consistent structure instead of assembling it themselves.
 
-### Catalog-Wide Adaptive HUDs
+### PROV -- Providers Panel
 
-- [x] **ADAPT-01**: User can explicitly invoke Skopeo on every exact-origin app represented by the committed FSB capability catalog; catalog membership never makes the HUD always-on.
-- [x] **ADAPT-02**: Skopeo resolves the active app, page genre, current semantic entity, requested task, verified capability surface, and action risk before choosing a HUD composition, and fails quietly when required context cannot be proven.
-- [x] **ADAPT-03**: Every catalog app receives an app-appropriate composition of the shared primitives and attention levels, showing useful controls and state for the current context while omitting irrelevant UI instead of inheriting one Drive-shaped layout.
-- [x] **ADAPT-04**: App profiles can define app-native entity names, semantic anchor strategies, context recognizers, capability groupings, labels, result renderers, and focused overrides without forking the shared Skopeo lifecycle or shell.
-- [x] **ADAPT-05**: A versioned pack/profile contract supports catalog-derived defaults plus audited app-specific adapters, so newly cataloged apps inherit a safe baseline and deeper customization remains incremental.
-- [x] **ADAPT-06**: A HUD presents only `t1-ready` capabilities as directly executable and represents guarded, UAT-needed, blocked, degraded, learn-pending, or discovery-pending capabilities honestly without implying success or availability.
-- [x] **ADAPT-07**: Write and destructive capabilities use the consequence gate to identify the target, effect, material parameters, and confirmation boundary while preserving the existing origin classification, denylist, consent, and audit contracts.
-- [x] **ADAPT-08**: Automated coverage maps every committed catalog app/service to exactly one resolvable profile or explicit fail-quiet disposition and fails CI on missing, stale, duplicate, or origin-ambiguous mappings as the catalog changes.
-- [x] **ADAPT-09**: Catalog-wide HUD compositions preserve host layout, controls, focus, accessibility, reduced-motion behavior, lifecycle authority, and zero-residue teardown across a representative matrix of app genres and rendering models.
-- [x] **ADAPT-10**: App, page, capability, and host content remain untrusted inputs; no profile may invent an entity, action, readiness state, result, or semantic anchor that is not supported by validated catalog or page evidence.
+- [x] **PROV-01**: The control panel section formerly labeled "API Configuration" is labeled "Providers" (heading, nav label, and any anchor `#api-config` continues to work as a redirect to the new `#providers` anchor for existing bookmarks).
+- [x] **PROV-02**: Each provider has an explicit `providerKind` value of either `api` (the existing 7 BYOK LLM providers) or `agent` (a locally installed agent CLI); the kind determines which fields render.
+- [x] **PROV-03**: When an `agent`-kind provider is selected, the API-key input, key-URL hint, and per-model key-format hint are hidden; the panel shows instead the provider's install status, auth status (from the CLI's own login state where surfaceable), connection status, and a short "uses your subscription -- no API key needed" caption.
+- [x] **PROV-04**: When the user has both an active `agent` provider selection and a valid BYOK key for an `api` provider, `universal-provider.js` continues to see only `api`-kind provider values; the two selections do not collide, and switching between them preserves the other's configuration (INV-03 provider parity for the BYOK side).
+- [x] **PROV-05**: The panel visually marks exactly one provider as "Recommended" per session, chosen by a ground-truth cascade: highest-priority = a provider whose CLI is currently connected via MCP `initialize`, next = a provider whose CLI is installed on disk, next = a provider whose copy button the user clicked during onboarding, fallback = the current xAI-default recommendation. The panel never auto-switches the user's selection; the badge is advisory only.
+- [x] **PROV-06**: Cost/usage rows for `agent`-kind providers never display fabricated dollar amounts; they display token count, turn count, and duration and label the run as "included in your subscription", with a link to the vendor's current billing page (copy must not promise "free" or "unlimited").
 
-### Chrome-Local Graphify-Style Intelligence
+### CHAN -- Delegation Channel & Security Foundation
 
-- [x] **LOCAL-01**: User can build, update, query, and inspect Skopeo contract intelligence without installing or starting a Graphify runtime, Python process, graph server, database, daemon, or separate application.
-- [x] **LOCAL-02**: Skopeo runs graph construction, provenance tracking, indexing, lineage traversal, and bounded query execution as bundled JavaScript inside the Chrome extension.
-- [x] **LOCAL-03**: Skopeo stores compact graph records, source fingerprints, indexes, review state, and alert state in browser-native storage partitioned by Drive account and enrolled corpus.
-- [x] **LOCAL-04**: Model-assisted extraction and synthesis use only the user's already-configured FSB provider path; Skopeo introduces no required AI vendor, model host, or LM Studio setup.
-- [x] **LOCAL-05**: Only bounded, permission-scoped source excerpts needed for a specific extraction or answer may be sent to the configured model provider; the corpus is not uploaded wholesale by default.
-- [x] **LOCAL-06**: Existing FSB MCP surfaces may optionally invoke or inspect Skopeo, but the local graph engine does not require a new MCP server, daemon, or tool-per-feature surface.
-- [x] **LOCAL-07**: Any upstream Graphify code selectively reused in Skopeo is locally bundled, pinned, and attributed under its license; upstream Graphify remains a design/code source rather than a runtime dependency.
+- [x] **CHAN-01**: A new bridge message-type family (`ext:request` / `ext:response` / `ext:event`) transports extension→daemon reverse requests over the existing ws://localhost:7225 bridge without changing the byte-shape of any existing `MCPMessageType` value (INV-01 additive proof).
+- [x] **CHAN-02**: A relay process signals its ability to fulfill spawn requests by advertising `capabilities: ['agent-spawn']` in its `relay:hello`; the hub routes each `ext:request` locally (if itself the daemon) or to the first relay advertising the required capability.
+- [x] **CHAN-03**: The bridge rejects every incoming `ext:*` frame whose WebSocket upgrade did not carry an `Origin` header matching a durable per-install FSB-extension-id allowlist and whose `Host` header is not exactly `127.0.0.1` (or `localhost`) at the loopback port.
+- [x] **CHAN-04**: A per-install >=32-byte shared secret is provisioned once between the extension and the daemon, transported only in the `Sec-WebSocket-Protocol` upgrade header (never in URL, never in payloads, never in logs), rotated on daemon restart, and required on every `ext:*` frame.
+- [x] **CHAN-05**: `redactForLog` and diagnostic ring-buffer writes strip any string matching the shared-secret token pattern; the drift gate fails the build if a raw secret substring appears in any tracked log fixture.
+- [x] **CHAN-06**: The bridge topology test suite covers hub-exit-mid-delegation and relay-mid-`ext:*`-frame scenarios; existing hub-exit-promotion tests still pass byte-for-byte.
+- [x] **CHAN-07**: A permanent CI grep gate fails the build if the strings `--dangerously-skip-permissions`, `--yolo`, or `--auto` appear anywhere in `mcp/src/agent-providers/**`, so those flags can never enter the spawn path in any future patch.
 
-### Drive Corpus and Permissions
+### ADAPT -- Adapter Contract & Spawn Supervisor
 
-- [x] **CORPUS-01**: User can enroll the designated `vendor agreements` root by stable Drive folder identity, with only accessible vendor descendants included in the corpus.
-- [x] **CORPUS-02**: User sees source and derived intelligence only for the active Drive account and enrolled corpus; no global or cross-account graph/index can influence results.
-- [x] **CORPUS-03**: User sees an honest ready, pending, unreadable, download-blocked, inaccessible, or missing state for each expected source instead of inferred content from an unreadable file.
-- [x] **CORPUS-04**: Skopeo revalidates current source access during ingestion, query, display, citation opening, and alert delivery.
-- [x] **CORPUS-05**: Removing a file, revoking access, or switching accounts removes its derived snippets, counts, relationships, search entries, citations, and alert evidence before later results are shown.
-- [x] **CORPUS-06**: New, changed, moved, renamed, deleted, or revoked sources update idempotently from stable file identity plus revision/content fingerprint without retaining unnecessary full-document copies.
+- [x] **ADAPT-01**: An `AgentProviderAdapter` TypeScript interface in `mcp/src/agent-providers/` defines exactly five methods: `detect() -> {installed, version, authState, binary}`, `buildSpawn(task, ctx) -> SpawnSpec`, `parseEvents(stream) -> AsyncIterable<AgentEvent>`, `kill(child, {grace}) -> Promise<void>`, and `caps() -> AdapterCapabilities`.
+- [x] **ADAPT-02**: A `SpawnSupervisor` module living in the `fsb-mcp-server serve` daemon accepts a validated spawn request, looks up the requested adapter, constructs argv from adapter output plus a daemon-controlled flag allowlist (unknown payload keys rejected), and spawns the child with `{ detached: true, windowsHide: true, stdio: ['pipe','pipe','pipe'] }` and an environment with `ANTHROPIC_API_KEY`/`OPENAI_API_KEY`/`GEMINI_API_KEY` scrubbed.
+- [x] **ADAPT-03**: The supervisor never invokes a shell; the user's prompt travels only via `child.stdin` (never argv, never `sh -c`) so shell metacharacters and Windows `.cmd`-shim EINVAL (Node CVE-2024-27980) cannot execute.
+- [x] **ADAPT-04**: A `stop`/cancel request triggers SIGTERM at the process-group level (POSIX `process.kill(-child.pid, 'SIGTERM')` after `spawn({detached:true})`, Windows `taskkill /pid <pid> /T /F`), escalates to SIGKILL after a grace window, and blocks resolving the delegation until either an exit-signal is observed or the daemon confirms no descendant matches remain.
+- [x] **ADAPT-05**: On daemon startup, the supervisor scans for orphaned children matching prior adapter fingerprints and kills them before accepting new spawn requests (recovery from crash).
 
-### Governing Lineage, Facts, and Evidence
+### CLAUDE -- Claude Code MVP
 
-- [x] **TRUTH-01**: Skopeo represents agreements, amendments, clauses, facts, events, owners, policy documents, and memos with stable source-owned identities and provenance.
-- [x] **TRUTH-02**: User can distinguish executed agreements, unsigned drafts, amendments, historical documents, supersession, effective relationships, and governing relationships.
-- [x] **TRUTH-03**: User can see which document and clause govern today, including partial amendments, without Skopeo deciding precedence from filename, list order, or similarity alone.
-- [x] **TRUTH-04**: User sees an ambiguous or review-required state when precedence is conflicting, unsigned, missing, unreadable, or inaccessible instead of receiving a guessed governing answer.
-- [x] **TRUTH-05**: Reprocessing a source atomically removes its previous facts, relationships, search entries, and alert consequences before installing the validated replacement and recomputing affected truth.
-- [x] **TRUTH-06**: User can inspect distinct exact signed, effective, expiration, termination, and renewal facts with citations to the governing source location.
-- [x] **TRUTH-07**: User can inspect the exact notice window, notice deadline, required delivery method, and written-notice destination/address with governing citations.
-- [x] **TRUTH-08**: User can inspect a deterministic deadline derivation that identifies its input facts, rule, boundary behavior, and timezone assumptions.
-- [x] **TRUTH-09**: Every consequential claim identifies an accessible file revision and source location and carries an explained extracted, inferred, ambiguous, unreadable, or review-required trust state.
-- [x] **TRUTH-10**: Contract text, filenames, comments, and host-page content are handled as untrusted data through closed extraction schemas and a trusted citation registry rather than as model or tool instructions.
-- [x] **TRUTH-11**: Ambiguous, low-quality, inaccessible, or unresolved evidence cannot generate a cleared decision state or an eligible deadline alert.
+- [x] **CLAUDE-01**: The Claude Code adapter spawns `claude -p --verbose --output-format stream-json --include-partial-messages --strict-mcp-config --mcp-config <daemon-generated-file-pointing-at-loopback-mcp-http-endpoint> --agents <shipped-fsb-agent-json> --agent fsb --permission-mode dontAsk --allowedTools "mcp__fsb" --disallowedTools "Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch" --max-turns 40 --no-session-persistence`, or the version-appropriate equivalent selected by `detect()` output.
+- [x] **CLAUDE-02**: The user's task prompt is sent to the spawned CLI via stdin only; the adapter constructs no argv fragment containing user-supplied text.
+- [x] **CLAUDE-03**: The adapter's `parseEvents` translates the CLI's stream-json events (`system/init`, `assistant`, `user`, tool-use events, `system/api_retry`, `result`) into a normalized `AgentEvent` schema (`type`, `sessionId`, `payload`), fails loud on unknown event types (surfaced as `agent_protocol_drift` diagnostic), and is covered by a recorded JSONL fixture under `tests/fixtures/agent-streams/claude-code-2.1.177/` so CI runs without a live CLI.
+- [x] **CLAUDE-04**: The Claude Code adapter's `detect()` fingerprints the binary via `claude --version`, compares against a minimum supported version, and reports `installed=false` with a doctor-diagnostic message rather than spawning if the version predates the verified stream-json contract.
 
-### Folder, Reading, and Cited Ask Experience
+### UX -- Delegation UX
 
-- [x] **VIEW-01**: User can see each accessible vendor's owner, document/index state, governing status, next material date, relevant memo status, and urgent gaps from the Drive folder surface.
-- [x] **VIEW-02**: User can distinguish a notice deadline from renewal, termination, or expiration and see the consequence of inaction, including auto-renewal where supported by evidence.
-- [x] **VIEW-03**: User can see missing final copies, unreadable scans, incomplete indexing, owner gaps, version conflicts, missing policy documents, missing required memos, and notification failures as first-class results.
-- [x] **VIEW-04**: Opening a historical or superseded agreement produces an unmistakable state indicator and a direct route to the governing document or clause.
-- [x] **VIEW-05**: The document-reading state shows governing-versus-historical context and exact cited facts without replacing Drive or Docs with a detached contract application.
-- [x] **VIEW-06**: User can ask vendor-specific or accessible-corpus questions and receive answers based only on currently accessible evidence.
-- [x] **VIEW-07**: Every material answer conclusion distinguishes governing evidence from relevant history and exposes citations, confidence, conflicts, gaps, abstention, and direct source navigation.
+- [x] **UX-01**: A fifth entry `delegated` in `EXECUTION_MODES` (`extension/ai/engine-config.js`) defines: `uiFeedbackChannel: 'popup-sidepanel'`, `animatedHighlights: true`, `safetyLimits: { wallClockMs, eventSilenceMs }` (no iteration cap -- the loop runs in the spawned CLI, not `runAgentLoop`), and is selected when the active provider is `agent`-kind.
+- [x] **UX-02**: The side panel renders a live per-run streaming feed with distinct card types for init (client, model, session id, allowed tools), tool-call (name, args summary, tab id), retry (typed error class), and result (usage summary), driven by the normalized `AgentEvent` stream.
+- [x] **UX-03**: Before FSB spawns any agent CLI for the first time, the user sees an explicit consent card that names the CLI, what it will be permitted to do (drive the FSB MCP tools on the user's live browser), and what it will not be permitted to do (edit files, run shell, fetch arbitrary URLs). A per-run confirm-to-continue toggle is on by default and can be disabled per provider only via an explicit "trust this agent" setting.
+- [x] **UX-04**: A prominent Stop button in the side panel triggers `stopDelegatedTask`, which routes to the supervisor's kill and, on confirmed exit, releases every tab that was owned by the spawned agent (per v0.9.60 ownership) and reports "Agent stopped, N tab(s) released" in the feed.
+- [x] **UX-05**: A delegated run opens by default in a new background tab; when the user activates the tab that the agent is driving, a persistent "Take control" affordance appears; clicking it pauses the agent (v0.9.60 ownership release + supervisor grace hold), lets the user interact, and offers "Resume with agent" to give ownership back.
+- [x] **UX-06**: A post-run summary card displays tokens (in/out/total), turn count, wall-clock duration, cost bucket (`included in your subscription` for agent kind; real USD for api kind), and a per-tool-call breakdown, expandable to the full tool-call log for the run.
 
-### Decision Policies
+### LIFE -- Lifecycle & Persistence
 
-- [x] **POLICY-01**: User sees Document 10 as a configured stable document identity, never as the tenth item in a folder, and is visibly required to review it for applicable decisions.
-- [x] **POLICY-02**: Missing or inaccessible Document 10 prevents Skopeo from presenting an applicable decision as cleared and appears as an explicit blocking gap.
-- [x] **POLICY-03**: User sees human-authored memo required, on-file, or missing status only for agreements explicitly flagged as complex; routine agreements receive no automatic memo obligation or AI-authored memo.
+- [x] **LIFE-01**: Every progress event received from the supervisor is written to `chrome.storage.session` under a per-delegation key before it fans out to UI subscribers, so a MV3 service worker eviction mid-run reloads exactly the delivered feed on re-open.
+- [x] **LIFE-02**: While a delegation is active, the extension pings the bridge every 20 s over the existing WS heartbeat channel to keep the Chrome 116+ SW-lifetime extension applied; if 3 heartbeats are missed the extension shows a `daemon:disconnected` fallback that offers a doctor-relaunch button but does not attempt an in-extension restart.
+- [x] **LIFE-03**: If `fsb-mcp-server serve` is not running when a delegated send is attempted, the side panel shows an "Agent offline" state with a deep-link to `fsb-mcp-server doctor` output and does not enqueue or optimistically show the message.
+- [x] **LIFE-04**: On daemon restart while a delegation was mid-flight, the supervisor does not re-adopt any surviving spawned CLI; it kills it (LIFE-04 restart-is-clean) and reports `daemon_restart_lost_run` in the side panel so the user knows the run ended.
 
-### Current-User Deadline Notifications
+### DRIFT -- CI Drift-Smoke Gate & Doctor Extensions
 
-- [x] **ALERT-01**: When the current FSB Chrome user is the mapped owner, that user receives a local notification exactly 90 days before the governing notice deadline rather than before renewal or expiration.
-- [x] **ALERT-02**: When the mapped owner is absent or is not the current FSB Chrome user, Skopeo presents the event as not locally deliverable and never claims that the owner was notified.
-- [x] **ALERT-03**: A notification identifies the vendor, exact deadline, consequence, mapped owner, and governing evidence link.
-- [x] **ALERT-04**: Skopeo revalidates access, governing facts, deadline, and recipient before delivery and supersedes an old notification when its evidence revision changes.
-- [x] **ALERT-05**: User can distinguish scheduled, attempted, delivered, failed, and missed notifications through a persistent deduplicated ledger reconciled after browser start, wake, or delayed alarms.
+- [x] **DRIFT-01**: A CI job runs each shipped adapter against a canned prompt fixture, asserts a known event-type sequence and the presence of required fields on `system/init` and `result`, and fails the build on unknown event types, missing fields, or a `--version` outside the compatibility matrix.
+- [x] **DRIFT-02**: `fsb-mcp-server doctor` gains a per-adapter section reporting: binary path, version, auth state (parseable where the CLI exposes it), shared-secret presence, and the current spawn-secret rotation age.
+- [x] **DRIFT-03**: The diagnostics ring buffer classifies drift events as `agent_protocol_drift` (with adapter id, expected vs observed) and rate-limits duplicate entries at the existing 1-per-10s bucket.
+- [x] **DRIFT-04**: The `doctor` output includes a machine-readable adapter compatibility matrix that both CI and the extension can read to render "supported / degraded / unsupported" states without hardcoding versions in extension code.
 
-### Milestone Verification
+### NATIVE -- Native-Messaging Host
 
-- [x] **VERIFY-01**: Release evidence includes a golden corpus covering an active agreement, partial amendment, full replacement, unsigned draft, conflicting facts, unreadable scan, inaccessible source, Document 10, complex memo, and near notice deadline.
-- [x] **VERIFY-02**: Exact dates, addresses, governing paths, and calculations match the golden corpus; ambiguous cases abstain and permission-negative cases expose no source existence or derived information.
-- [x] **VERIFY-03**: Repeated on/off cycles plus Drive row reuse, reorder, SPA navigation, scroll, zoom, and resize produce no wrong-target annotation and no teardown residue.
-- [x] **VERIFY-04**: Live Drive UAT covers representative Google Docs, text-bearing PDFs, blocked downloads, shared access, revocation, and account switching; unsupported coverage is recorded rather than inferred.
-- [x] **VERIFY-05**: Prompt-injection, malicious filename, fake citation, cross-vendor exfiltration, source replacement, deletion, revocation, and duplicate-notification negative tests pass before release.
+- [x] **NATIVE-01**: `fsb-mcp-server install --native-host` writes the platform-appropriate native-messaging host manifest (macOS `~/Library/Application Support/Google/Chrome/NativeMessagingHosts/`, Linux `~/.config/google-chrome/NativeMessagingHosts/`, Windows registry `HKCU\Software\Google\Chrome\NativeMessagingHosts\`), allowing the FSB extension id as the sole caller, and installs a host binary that wakes the daemon on demand.
+- [x] **NATIVE-02**: The extension's manifest gains a `nativeMessaging` permission entry (additive, no other permission changes), and the extension detects native-host presence at boot; when present, an "Agent offline" state auto-attempts a wake before showing the doctor deep-link.
+- [x] **NATIVE-03**: The native host itself does not spawn agents; it only starts `fsb-mcp-server serve` (or attaches to a running one) and exits after handoff. All spawn authority remains inside the `serve` daemon behind the CHAN gates.
+- [x] **NATIVE-04**: `fsb-mcp-server uninstall --native-host` removes the manifest, and `doctor` reports native-host install state including manifest path and any Chrome allowlist mismatch.
 
-## Future Requirements
+### MULTI -- Additional Adapters
 
-Acknowledged but deferred beyond v1.2.0 unless explicitly promoted through a roadmap update.
+- [x] **MULTI-01**: An OpenCode adapter (`mcp/src/agent-providers/opencode.ts`) implements the `AgentProviderAdapter` contract with `caps.serverMode=true`; the supervisor either spawns `opencode run` cold or attaches to a running `opencode serve` per the adapter's `buildSpawn` output (contract-stresser: the ADAPT contract must accommodate both spawn and attach without hardcoding).
+- [x] **MULTI-02**: The OpenCode adapter ships a pinned agent definition (equivalent to Claude Code's `--agents fsb`) using OpenCode's `agent create` / `agents` config surface, keyed to a version pinned during phase spike.
+- [x] **MULTI-03**: A recorded OpenCode JSONL fixture under `tests/fixtures/agent-streams/opencode-1.14.25/` (or the latest pinned version) proves the adapter's event schema in CI without a live CLI.
+- [x] **MULTI-04**: A Codex adapter (`mcp/src/agent-providers/codex.ts`) implements the `AgentProviderAdapter` contract, invoking `codex exec --json` with the current-verified flag set (v0.142.5 as baseline: use `--ephemeral` + `--ignore-user-config` for hermeticity; do not use the deprecated `--full-auto`).
+- [x] **MULTI-05**: The Codex adapter's `detect()` correctly identifies auth via ChatGPT OAuth vs API key vs unauthenticated and surfaces the state in the provider panel so the user knows which billing bucket a run will hit.
+- [x] **MULTI-06**: A schema-derived Codex JSONL contract fixture pins the event schema in CI with `liveCapturePending: true` until genuine UAT capture, and the adapter's `caps()` correctly reports `chatMode: false` for v0.9.91 (task-mode only across all adapters).
 
-### Team Delivery and Workflow
+## v2 Requirements
 
-- **TEAM-01**: Deliver a deadline notification to whichever teammate is mapped as owner through an explicitly authorized email, chat, calendar, or backend adapter.
-- **TEAM-02**: Track owner acknowledgement, escalation, reassignment, and team delivery history.
-- **TEAM-03**: Maintain browser-independent Drive change subscriptions and notification delivery with tenant isolation and audit.
+Deferred to future release. Tracked but not in current roadmap.
 
-### Document Coverage and Actions
+### Chat-Mode Continuity
 
-- **DOC-01**: Add a locally bundled OCR path if representative scan volume, privacy, performance, and accuracy justify it.
-- **DOC-02**: Add a dedicated local PDF parser if bounded Drive export/download and rendered text cannot cover representative signed PDFs.
-- **ACTION-01**: Assist with drafting a termination notice under explicit human review; sending remains separately authorized.
-- **SOURCE-01**: Enroll contract sources beyond the designated Drive hierarchy after Drive identity and permission behavior is validated.
+- **CHAT-FUTURE-01**: Adapters expose `caps.chatMode: true` and the side panel maps a chat thread to `--resume <session-id>` (Claude Code) / `codex resume` / `gemini --resume` / `opencode --continue` per adapter.
+- **CHAT-FUTURE-02**: The daemon pins per-thread working directory so `claude --resume` finds its history.
 
-### Platform Expansion
+### Gemini CLI Adapter
 
-- **DEEP-PACK-01**: Add specialized domain-intelligence packs beyond the catalog-wide adaptive HUDs and Drive vendor-contract pack after their data, policy, and evaluation requirements are separately approved.
-- **QUERY-01**: Add embeddings or another retrieval layer only if evaluation proves lexical retrieval plus structured relations cannot recover governing evidence.
+- **GEMINI-FUTURE-01**: Gemini CLI adapter after a live `--help` capture and JSONL schema pinning (v0.9.91 lacked a local binary to verify against).
+
+### Broader Agent Ecosystem
+
+- **ACP-FUTURE-01**: ACP-based adapter unification (`@zed-industries/agent-client-protocol`) once ≥2 non-Claude adapters have shipped and proven the contract shape.
+- **REMOTE-FUTURE-01**: Remote/mobile delegation surfaces (Happy-style approval flows) -- explicitly localhost-only in v0.9.91.
 
 ## Out of Scope
 
+Explicitly excluded. Documented to prevent scope creep.
+
 | Feature | Reason |
 |---------|--------|
-| Always-on Skopeo or a persistent rail while off | Violates explicit invocation and the user's attention boundary. |
-| Standalone contract-management application or Drive replacement | Drive and Docs remain the system of interaction; the overlay is the product proof. |
-| Upstream Graphify runtime, Python, NetworkX, Neo4j, FalkorDB, vector database, or remote graph API | The approved engine runs locally as lightweight bundled JavaScript in Chrome. |
-| New AI vendor, required model host, required LM Studio setup, or wholesale corpus upload | Skopeo reuses the existing FSB provider path with bounded permission-scoped excerpts. |
-| New Skopeo-specific MCP server, daemon, or tool per capability | Existing MCP is optional; the local engine must work without new infrastructure. |
-| GCP, NotebookLM, Google Sheets, or another external orchestration layer | Contradicts the approved native FSB architecture. |
-| Cross-person owner delivery in v1.2 | Current-user Chrome notifications are the approved lightweight baseline; mismatched owners fail visibly until TEAM-01 is promoted. |
-| Autonomous notice sending or source-document mutation | Material legal/commercial action requires a separately approved consequence and authorization workflow. |
-| AI-generated memo for every agreement | Conflicts with the rare, explicitly flagged, human-authored memo policy. |
-| Silent OCR fallback | Weak scans can yield plausible but wrong exact facts; unreadable evidence fails visibly. |
-| End-user graph explorer | Graph state should appear as useful lineage, facts, gaps, and citations rather than a second complex UI. |
-| A forked HUD runtime or hand-built screen for every capability descriptor | Catalog-wide custom surfaces are in scope, but they must compose from shared lifecycle, profile, primitive, readiness, and safety contracts rather than diverging into 2,314 independent implementations. |
-| Additional deep domain-intelligence packs | General adaptive HUD coverage is in scope for the full catalog; specialized knowledge engines beyond the Drive contract pack remain future work. |
-| Every illustrative control in the HUD design reference | The reference approves grammar and states, not unreviewed workflows such as drafting or sending notices. |
+| Embedding `@anthropic-ai/claude-agent-sdk` in FSB | Anthropic policy prohibits third-party products from using consumer subscription auth via the SDK (enforcement Apr 4 2026); shelling to the user's installed `claude` binary is the only compliant "no API key" path. |
+| Proxying / spoofing subscription OAuth tokens | Banned outright by Anthropic Apr 4 2026; would be product-killing regardless of technical feasibility. |
+| Bundling / silent-installing agent CLIs | Wrong shape for a Chrome extension + npm daemon; would violate Chrome Web Store distribution rules and add attack surface. |
+| PTY / TUI screen-scraping of agent CLIs | Structured headless interfaces exist for all four target CLIs; scraping is a maintenance sinkhole. |
+| Any `--dangerously-skip-permissions` / `--yolo` / `--auto` flag in the spawn path | 1-click RCE for any prompt-injection incident; CHAN-07 grep gate makes this a permanent invariant. |
+| Fabricated dollar costs on subscription-backed runs | Cline established the $0.00 convention; PROV-06 codifies it. |
+| Auto-switching the user's provider when a "better" agent appears | Advisory badge only (PROV-05); user consent is the load-bearing property. |
+| Forcing users away from BYOK when an agent is available | INV-03 provider parity carries forward; BYOK stays first-class. |
+| `Firefox` support | Deferred at project level; MV3 nativeMessaging in NATIVE requirements is Chrome-specific for v0.9.91. |
+| Native host that itself spawns agent CLIs | NATIVE-03 explicitly forbids this; all spawn authority lives inside the serve daemon behind CHAN gates. |
 
 ## Traceability
 
+Which phases cover which requirements. Populated during roadmap creation.
+
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| HUD-01 | Phase 52 | Complete |
-| HUD-02 | Phase 52 | Complete |
-| HUD-03 | Phase 52 | Complete |
-| HUD-04 | Phase 52 | Complete |
-| HUD-05 | Phase 52 | Complete |
-| HUD-06 | Phase 53 | Complete |
-| HUD-07 | Phase 52 | Complete |
-| HUD-08 | Phase 52 | Complete |
-| HUD-09 | Phase 53 | Complete |
-| ADAPT-01 | Phase 53.1 | Automated verified — live UAT pending |
-| ADAPT-02 | Phase 53.1 | Automated verified — live UAT pending |
-| ADAPT-03 | Phase 53.1 | Automated verified — live UAT pending |
-| ADAPT-04 | Phase 53.1 | Automated verified — live UAT pending |
-| ADAPT-05 | Phase 53.1 | Automated verified — live UAT pending |
-| ADAPT-06 | Phase 53.1 | Automated verified — live UAT pending |
-| ADAPT-07 | Phase 53.1 | Automated verified — live UAT pending |
-| ADAPT-08 | Phase 53.1 | Automated verified — live UAT pending |
-| ADAPT-09 | Phase 53.1 | Automated verified — live UAT pending |
-| ADAPT-10 | Phase 53.1 | Automated verified — live UAT pending |
-| LOCAL-01 | Phase 55 | Complete |
-| LOCAL-02 | Phase 55 | Complete |
-| LOCAL-03 | Phase 55 | Complete |
-| LOCAL-04 | Phase 55 | Complete |
-| LOCAL-05 | Phase 55 | Complete |
-| LOCAL-06 | Phase 55 | Complete |
-| LOCAL-07 | Phase 55 | Complete |
-| CORPUS-01 | Phase 54 | Complete |
-| CORPUS-02 | Phase 54 | Complete |
-| CORPUS-03 | Phase 54 | Complete |
-| CORPUS-04 | Phase 54 | Complete |
-| CORPUS-05 | Phase 54 | Complete |
-| CORPUS-06 | Phase 54 | Complete |
-| TRUTH-01 | Phase 55 | Complete |
-| TRUTH-02 | Phase 56 | Complete |
-| TRUTH-03 | Phase 56 | Complete |
-| TRUTH-04 | Phase 56 | Complete |
-| TRUTH-05 | Phase 55 | Complete |
-| TRUTH-06 | Phase 56 | Complete |
-| TRUTH-07 | Phase 56 | Complete |
-| TRUTH-08 | Phase 56 | Complete |
-| TRUTH-09 | Phase 56 | Complete |
-| TRUTH-10 | Phase 55 | Complete |
-| TRUTH-11 | Phase 56 | Complete |
-| VIEW-01 | Phase 57 | Complete |
-| VIEW-02 | Phase 57 | Complete |
-| VIEW-03 | Phase 57 | Complete |
-| VIEW-04 | Phase 57 | Complete |
-| VIEW-05 | Phase 57 | Complete |
-| VIEW-06 | Phase 58 | Complete |
-| VIEW-07 | Phase 58 | Complete |
-| POLICY-01 | Phase 58 | Complete |
-| POLICY-02 | Phase 58 | Complete |
-| POLICY-03 | Phase 58 | Complete |
-| ALERT-01 | Phase 59 | Complete |
-| ALERT-02 | Phase 59 | Complete |
-| ALERT-03 | Phase 59 | Complete |
-| ALERT-04 | Phase 59 | Complete |
-| ALERT-05 | Phase 59 | Complete |
-| VERIFY-01 | Phase 59 | Complete |
-| VERIFY-02 | Phase 59 | Complete |
-| VERIFY-03 | Phase 59 | Complete |
-| VERIFY-04 | Phase 59 | Complete (automated reporting contract; live rows human-needed) |
-| VERIFY-05 | Phase 59 | Complete |
+| IDENT-01 | Phase 57 | Complete |
+| IDENT-02 | Phase 57 | Complete |
+| IDENT-03 | Phase 57 | Complete |
+| IDENT-04 | Phase 57 | Complete |
+| IDENT-05 | Phase 57 | Complete |
+| PROV-01 | Phase 58 | Complete |
+| PROV-02 | Phase 58 | Complete |
+| PROV-03 | Phase 58 | Complete |
+| PROV-04 | Phase 58 | Complete |
+| PROV-05 | Phase 58 | Complete |
+| PROV-06 | Phase 58 | Complete |
+| CHAN-01 | Phase 59 | Complete |
+| CHAN-02 | Phase 59 | Complete |
+| CHAN-03 | Phase 59 | Complete |
+| CHAN-04 | Phase 59 | Complete |
+| CHAN-05 | Phase 59 | Complete |
+| CHAN-06 | Phase 59 | Complete |
+| CHAN-07 | Phase 59 | Complete |
+| ADAPT-01 | Phase 60 | Complete |
+| ADAPT-02 | Phase 60 | Complete |
+| ADAPT-03 | Phase 60 | Complete |
+| ADAPT-04 | Phase 60 | Complete |
+| ADAPT-05 | Phase 60 | Complete |
+| CLAUDE-01 | Phase 60 | Complete |
+| CLAUDE-02 | Phase 60 | Complete |
+| CLAUDE-03 | Phase 60 | Complete |
+| CLAUDE-04 | Phase 60 | Complete |
+| UX-01 | Phase 61 | Complete |
+| UX-02 | Phase 61 | Complete |
+| UX-03 | Phase 61 | Complete |
+| UX-04 | Phase 61 | Complete |
+| UX-05 | Phase 61 | Complete |
+| UX-06 | Phase 61 | Complete |
+| LIFE-01 | Phase 61 | Complete |
+| LIFE-02 | Phase 61 | Complete |
+| LIFE-03 | Phase 61 | Complete |
+| LIFE-04 | Phase 61 | Complete |
+| DRIFT-01 | Phase 62 | Complete |
+| DRIFT-02 | Phase 62 | Complete |
+| DRIFT-03 | Phase 62 | Complete |
+| DRIFT-04 | Phase 62 | Complete |
+| NATIVE-01 | Phase 63 | Complete |
+| NATIVE-02 | Phase 63 | Complete |
+| NATIVE-03 | Phase 63 | Complete |
+| NATIVE-04 | Phase 63 | Complete |
+| MULTI-01 | Phase 64 | Complete |
+| MULTI-02 | Phase 64 | Complete |
+| MULTI-03 | Phase 64 | Complete |
+| MULTI-04 | Phase 65 | Complete |
+| MULTI-05 | Phase 65 | Complete |
+| MULTI-06 | Phase 65 | Complete |
 
 **Coverage:**
-
-- v1 requirements: 63 total
-- Mapped to phases: 63
+- v1 requirements: 51 total
+- Mapped to phases: 51 / 51 (100%)
 - Unmapped: 0
-- Duplicate mappings: 0
+
+**Phase distribution:**
+- Phase 57 (IDENT): 5 requirements
+- Phase 58 (PROV): 6 requirements
+- Phase 59 (CHAN): 7 requirements
+- Phase 60 (ADAPT + CLAUDE): 9 requirements
+- Phase 61 (UX + LIFE): 10 requirements
+- Phase 62 (DRIFT): 4 requirements
+- Phase 63 (NATIVE): 4 requirements
+- Phase 64 (MULTI-OpenCode): 3 requirements
+- Phase 65 (MULTI-Codex): 3 requirements
 
 ---
-*Requirements defined: 2026-07-14*
-*Last updated: 2026-07-16 after catalog-wide adaptive HUD scope clarification*
+*Requirements defined: 2026-07-11*
+*Last updated: 2026-07-16 after Phase 62 completion (41/51 requirements complete; all live checks deferred to milestone end)*

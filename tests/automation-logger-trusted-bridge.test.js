@@ -68,6 +68,18 @@ async function exerciseFailure(label, options) {
   assert.equal(await logger.clearAllSessions(), false,
     `${label}: clear requires an explicit trusted acknowledgement`);
   assertMemoryRetained(logger, sessionId, label);
+
+  assert.equal(await logger.updateSessionOutcome(sessionId, {
+    status: 'failed', outcome: 'failure', error: 'not persisted'
+  }), false, `${label}: outcome update requires an explicit trusted acknowledgement`);
+  assertMemoryRetained(logger, sessionId, label);
+
+  const pruneResult = await logger.pruneMcpSessions(30);
+  assert.equal(pruneResult.removed, 0,
+    `${label}: prune reports no removal without a trusted acknowledgement`);
+  assert.deepEqual(Array.from(pruneResult.ids), [],
+    `${label}: prune returns no IDs without a trusted acknowledgement`);
+  assertMemoryRetained(logger, sessionId, label);
 }
 
 async function run() {
@@ -98,14 +110,20 @@ async function run() {
       loadAutomationSession: async () => ({ session: null }),
       saveAutomationSession: async () => { throw new Error('storage rejected'); },
       deleteAutomationSession: async () => { throw new Error('storage rejected'); },
-      clearAutomationSessions: async () => { throw new Error('storage rejected'); }
+      clearAutomationSessions: async () => { throw new Error('storage rejected'); },
+      updateAutomationSessionOutcome: async () => { throw new Error('storage rejected'); },
+      pruneMcpAutomationSessions: async () => { throw new Error('storage rejected'); }
     }
   });
 
+  const messages = [];
   const acknowledged = loadLogger({
     sendMessage(_runtime, message, callback) {
+      messages.push(structuredClone(message));
       if (message.action === 'fsb:automation-session-load') {
         callback({ ok: true, session: null });
+      } else if (message.action === 'fsb:automation-session-prune-mcp') {
+        callback({ ok: true, removed: 1, ids: ['session-ok'] });
       } else {
         callback({ ok: true });
       }
@@ -116,6 +134,37 @@ async function run() {
     'explicit ok acknowledgement completes session persistence');
   assert.equal(Object.hasOwn(acknowledged._domSnapshots, 'session-ok'), false,
     'acknowledged persistence releases the snapshot accumulator');
+  assert.equal(await acknowledged.updateSessionOutcome('session-ok', {
+    status: 'failed',
+    outcome: 'failure',
+    outcomeDetails: { reason: 'missing-data', error: 'Requested data does not exist' },
+    error: 'Requested data does not exist'
+  }), true, 'explicit ok acknowledgement completes outcome persistence');
+  const pruneResult = await acknowledged.pruneMcpSessions(999);
+  assert.equal(pruneResult.removed, 1,
+    'explicit prune acknowledgement returns the trusted removal count');
+  assert.deepEqual(Array.from(pruneResult.ids), ['session-ok'],
+    'explicit prune acknowledgement returns the trusted removal IDs');
+  assert.equal(acknowledged.logs.length, 0,
+    'acknowledged prune removes the reported session from in-memory logs');
+
+  assert.deepEqual(messages.map((message) => message.action), [
+    'fsb:automation-session-load',
+    'fsb:automation-session-save',
+    'fsb:automation-session-update-outcome',
+    'fsb:automation-session-prune-mcp'
+  ], 'logger uses only the fixed trusted session message vocabulary');
+  const outcomeMessage = messages[2];
+  assert.deepEqual(Object.keys(outcomeMessage).sort(), ['action', 'outcome', 'sessionId'],
+    'outcome bridge message has the exact fixed envelope');
+  assert.deepEqual(Object.keys(outcomeMessage.outcome).sort(), [
+    'blocker', 'completionMessage', 'error', 'nextStep', 'outcome',
+    'reason', 'result', 'status', 'summary'
+  ], 'outcome bridge payload has the exact trusted schema');
+  assert.deepEqual(messages[3], {
+    action: 'fsb:automation-session-prune-mcp',
+    retentionDays: 365
+  }, 'prune bridge clamps retention and sends no generic storage authority');
 }
 
 run().then(() => {

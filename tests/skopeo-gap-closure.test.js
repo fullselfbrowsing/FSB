@@ -19,7 +19,7 @@ const ROOT = path.resolve(__dirname, '..');
 const BACKGROUND_PATH = path.join(ROOT, 'extension', 'background.js');
 const VALIDATION_PATH = path.join(
   ROOT,
-  '.planning/phases/53.1-generalize-skopeo-adaptive-huds-across-the-capability-catalo/53.1-VALIDATION.md'
+  '.planning/milestones/v1.2.0-SKOPEO-phases/53.1-generalize-skopeo-adaptive-huds-across-the-capability-catalo/53.1-VALIDATION.md'
 );
 const CLOSURE_COMMAND = 'node tests/skopeo-gap-closure.test.js';
 const CONTROLLER_START = '/* FSB_SKOPEO_CONTROLLER_START */';
@@ -204,7 +204,7 @@ async function loadRealIndexAndResolver() {
 
 async function assertCatalogReachabilityAndAuthority(index, resolveInstalled) {
   assert.deepEqual(index.counts, {
-    descriptors: 2314, stems: 128, services: 129, pairs: 130
+    descriptors: 2319, stems: 129, services: 129, pairs: 131
   }, 'CR-01 real generated catalog retains all descriptor/stem/service/pair counts');
 
   const sourceReady = sourceReadyCapabilities(index);

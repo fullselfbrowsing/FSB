@@ -30,6 +30,7 @@ function check(cond, msg) {
 
 const repoRoot = path.resolve(__dirname, '..');
 const skillRoot = path.join(repoRoot, 'skills', 'fsb');
+const productVersion = require('../extension/manifest.json').version;
 
 const skillMd = path.join(skillRoot, 'SKILL.md');
 const usageMd = path.join(skillRoot, 'USAGE.md');
@@ -60,7 +61,7 @@ const nameMatch = fm.match(/^name:\s*(\S.*?)\s*$/m);
 check(nameMatch && nameMatch[1] === 'fsb', 'frontmatter name === fsb');
 
 const versionMatch = fm.match(/^version:\s*(\S+)\s*$/m);
-check(versionMatch && versionMatch[1] === '0.9.62', 'frontmatter version === 0.9.62');
+check(versionMatch && versionMatch[1] === productVersion, `frontmatter version === ${productVersion}`);
 
 // requires.bins must include node and npx
 const binsMatch = fm.match(/bins:\s*\[([^\]]*)\]/);
@@ -113,10 +114,10 @@ const installSrc = fs.readFileSync(installTs, 'utf8');
 
 // Both must reference the canonical command shape
 check(/"command":\s*"npx"/.test(printSrc), 'print-stdio.mjs has "command": "npx"');
-check(/"args":\s*\[\s*"-y"\s*,\s*"fsb-mcp-server"\s*\]/.test(printSrc), 'print-stdio.mjs has args ["-y", "fsb-mcp-server"]');
-check(/STDIO_COMMAND\s*=\s*'npx -y fsb-mcp-server'/.test(installSrc), 'install.ts STDIO_COMMAND === "npx -y fsb-mcp-server"');
+check(/"args":\s*\[\s*"-y"\s*,\s*"fsb-mcp-server@latest"\s*\]/.test(printSrc), 'print-stdio.mjs has args ["-y", "fsb-mcp-server@latest"]');
+check(/STDIO_COMMAND\s*=\s*'npx -y fsb-mcp-server@latest'/.test(installSrc), 'install.ts STDIO_COMMAND === "npx -y fsb-mcp-server@latest"');
 check(/"command":\s*"npx"/.test(installSrc), 'install.ts has "command": "npx" sample');
-check(/"args":\s*\[\s*"-y"\s*,\s*"fsb-mcp-server"\s*\]/.test(installSrc), 'install.ts has args ["-y", "fsb-mcp-server"] sample');
+check(/"args":\s*\[\s*"-y"\s*,\s*"fsb-mcp-server@latest"\s*\]/.test(installSrc), 'install.ts has args ["-y", "fsb-mcp-server@latest"] sample');
 
 console.log('\n=== TEST-04: references completeness ===');
 

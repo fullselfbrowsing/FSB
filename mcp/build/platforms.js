@@ -277,9 +277,9 @@ export const PLATFORMS = {
  */
 export function getServerEntry() {
     if (process.platform === 'win32') {
-        return { command: 'cmd', args: ['/c', 'npx', '-y', 'fsb-mcp-server'] };
+        return { command: 'cmd', args: ['/c', 'npx', '-y', 'fsb-mcp-server@latest'] };
     }
-    return { command: 'npx', args: ['-y', 'fsb-mcp-server'] };
+    return { command: 'npx', args: ['-y', 'fsb-mcp-server@latest'] };
 }
 /**
  * Returns the platform-specific entry shape for a given platform.

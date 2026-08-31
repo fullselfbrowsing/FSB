@@ -184,11 +184,28 @@ function isPrintableKey(key) {
 /**
  * Chrome DevTools Protocol Keyboard Emulator
  */
+function _keIsDebuggerContention(error) {
+  const message = error && error.message ? error.message : String(error || '');
+  return /another debugger|already attached|debugger is busy|target is being debugged/i.test(message);
+}
+
+function _keDebuggerBusyError(tabId, cause) {
+  const leaseApi = typeof globalThis !== 'undefined' ? globalThis.FsbCdpLease : null;
+  const error = leaseApi && typeof leaseApi.busyError === 'function'
+    ? leaseApi.busyError(tabId)
+    : new Error(`The debugger for tab ${tabId} is busy. Retry the operation.`);
+  error.code = 'SCREENSHOT_DEBUGGER_BUSY';
+  error.retryable = true;
+  if (cause) error.cause = cause;
+  return error;
+}
+
 class KeyboardEmulator {
   constructor() {
     this.debuggerAttached = false;
     this.attachedTabId = null;
     this.attachPromise = null;
+    this.lastAttachError = null;
   }
 
   /**
@@ -214,39 +231,24 @@ class KeyboardEmulator {
     }
 
     this.attachPromise = new Promise(async (resolve) => {
-      // Bounded retry for transient navigation races. The force-detach-and-retry
-      // on "Another debugger is already attached" counts as its own recovery; this
-      // backoff is only for transient attach failures during navigation. Never an
-      // unbounded loop, and we never hold the debugger persistently.
+      // Bounded retry for transient navigation races. Debugger-owner contention
+      // is not transient and fails immediately without detaching that owner.
       const MAX_ATTEMPTS = 3;
       let lastError = null;
       for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
         try {
-          // Mirror background.js cdpInsertText/cdpMouseClick: if a stale debugger is
-          // already attached, force-detach (swallowing errors -- the other debugger
-          // may not be ours) then retry the attach once.
-          try {
-            await chrome.debugger.attach({ tabId }, '1.3');
-          } catch (attachErr) {
-            if (attachErr.message && attachErr.message.includes('Another debugger is already attached')) {
-              console.log(`[FSB KeyboardEmulator] Stale debugger detected on tab ${tabId}, force-detaching and retrying`);
-              try {
-                await chrome.debugger.detach({ tabId });
-              } catch (forceDetachErr) {
-                // Ignore -- the "other debugger" may not be ours
-              }
-              await chrome.debugger.attach({ tabId }, '1.3');
-            } else {
-              throw attachErr;
-            }
-          }
+          await chrome.debugger.attach({ tabId }, '1.3');
           this.debuggerAttached = true;
           this.attachedTabId = tabId;
+          this.lastAttachError = null;
           console.log(`[FSB KeyboardEmulator] Debugger attached to tab ${tabId}`);
           resolve(true);
           return;
         } catch (error) {
-          lastError = error;
+          lastError = _keIsDebuggerContention(error)
+            ? _keDebuggerBusyError(tabId, error)
+            : error;
+          if (lastError && lastError.code === 'SCREENSHOT_DEBUGGER_BUSY') break;
           if (attempt < MAX_ATTEMPTS) {
             // Short backoff between transient attempts.
             await new Promise((r) => setTimeout(r, 150));
@@ -259,6 +261,7 @@ class KeyboardEmulator {
       console.error('[FSB KeyboardEmulator] Failed to attach debugger:', lastError);
       this.debuggerAttached = false;
       this.attachedTabId = null;
+      this.lastAttachError = lastError;
       this.attachPromise = null;
       resolve(false);
     });
@@ -284,6 +287,7 @@ class KeyboardEmulator {
     this.debuggerAttached = false;
     this.attachedTabId = null;
     this.attachPromise = null;
+    this.lastAttachError = null;
   }
 
   /**
@@ -312,6 +316,7 @@ class KeyboardEmulator {
     this.debuggerAttached = false;
     this.attachedTabId = null;
     this.attachPromise = null;
+    this.lastAttachError = null;
     return true;
   }
 
@@ -341,7 +346,14 @@ class KeyboardEmulator {
     try {
       const attached = await this.attachDebugger(tabId);
       if (!attached) {
-        return { success: false, error: 'Failed to attach debugger' };
+        return {
+          success: false,
+          error: this.lastAttachError && this.lastAttachError.message
+            ? this.lastAttachError.message
+            : 'Failed to attach debugger',
+          code: this.lastAttachError && this.lastAttachError.code,
+          retryable: Boolean(this.lastAttachError && this.lastAttachError.retryable)
+        };
       }
 
       const keyData = KEY_MAPPINGS[key] || KEY_MAPPINGS[key.toLowerCase()];
@@ -402,6 +414,8 @@ class KeyboardEmulator {
       return { 
         success: false, 
         error: error.message || 'Key event dispatch failed',
+        code: error && error.code,
+        retryable: Boolean(error && error.retryable),
         key,
         type
       };
@@ -553,7 +567,11 @@ class KeyboardEmulator {
             } else {
               return {
                 success: false,
-                error: `Failed at character: ${char}`,
+                error: this.lastAttachError && this.lastAttachError.message
+                  ? this.lastAttachError.message
+                  : `Failed at character: ${char}`,
+                code: this.lastAttachError && this.lastAttachError.code,
+                retryable: Boolean(this.lastAttachError && this.lastAttachError.retryable),
                 completedChars: results.length - 1,
                 results
               };

@@ -198,10 +198,14 @@ async function main() {
   const serviceSet = new Set(descriptors.map(function(row) { return row.service; }));
   const pairSet = new Set(descriptors.map(pairKey));
 
-  assert.equal(descriptorSet.size, 2314, 'descriptor baseline is pinned');
-  assert.equal(stemSet.size, 128, 'app-stem baseline is pinned');
+  assert.equal(descriptorSet.size, 2319, 'descriptor baseline is pinned');
+  assert.equal(stemSet.size, 129, 'app-stem baseline is pinned');
   assert.equal(serviceSet.size, 129, 'service baseline is pinned');
-  assert.notEqual(stemSet.size, serviceSet.size, 'stems are not treated as services');
+  assert.equal(pairSet.size, 131, 'stem/service pairs remain independently derived');
+  assert.deepEqual(Array.from(new Set(descriptors.filter(function(row) {
+    return row.service === 'docs.google.com';
+  }).map(stemFor))).sort(), ['gdocs', 'gsheets'],
+  'one service may retain distinct app stems even when aggregate counts coincide');
 
   const terminalReport = terminalModule.buildTerminalStateReport();
   const index = generator.buildSkopeoProfileIndex({
@@ -224,8 +228,8 @@ async function main() {
     'tierMismatches', 'executionOriginMismatches', 'sideEffectClassMismatches',
     'schemaDigestMismatches', 'originCollisions',
   ].map(function(key) { return [key, verification.stats[key]]; })), {
-    descriptors: 2314,
-    stems: 128,
+    descriptors: 2319,
+    stems: 129,
     services: 129,
     pairs: pairSet.size,
     admittedOrigins: 166,
@@ -268,15 +272,28 @@ async function main() {
   );
   assert.equal(index.serviceProfiles.length, 129, 'one profile/disposition row per service');
   assert.equal(index.profiles.length, pairSet.size, 'one runtime profile row per stem/service pair');
-  assert.equal(index.capabilities.length, 2314, 'one runtime capability row per descriptor');
-  assert.equal(new Set(index.capabilities.map(function(row) { return row.slug; })).size, 2314,
+  assert.equal(index.capabilities.length, 2319, 'one runtime capability row per descriptor');
+  assert.equal(new Set(index.capabilities.map(function(row) { return row.slug; })).size, 2319,
     'every descriptor occurs exactly once');
   assert.equal(new Set(index.serviceProfiles.map(function(row) { return row.service; })).size, 129,
     'every service occurs exactly once');
-  assert.equal(new Set(index.profiles.map(function(row) { return row.appStem; })).size, 128,
-    'the exact 128-profile app-stem corpus is retained');
+  assert.equal(new Set(index.profiles.map(function(row) { return row.appStem; })).size, 129,
+    'the exact 129-profile app-stem corpus is retained');
   assert.equal(index.admittedOriginIndex.length, 166,
     'post-generation admitted-origin total is exactly 166');
+
+  const docsAdmission = index.admittedOriginIndex.find(function(row) {
+    return row.admittedOrigin === 'https://docs.google.com';
+  });
+  assert.deepEqual(docsAdmission.profileKeys, ['gdocs@docs.google.com'],
+    'the sole authored Docs profile wins a shared-origin collision deterministically');
+  assert.equal(index.profiles.find(function(row) {
+    return row.profileKey === 'gdocs@docs.google.com';
+  }).profileDisposition, 'authored', 'the existing authored Docs surface remains available');
+  assert.equal(index.profiles.find(function(row) {
+    return row.profileKey === 'gsheets@docs.google.com';
+  }).profileDisposition, 'ambiguous-stem',
+  'the colliding un-authored Sheets surface remains fail-quiet');
 
   const sourceReady = sourceReadyCapabilities(index);
   assert.equal(sourceReady.length, 1285, 'source Ready corpus is pinned to 1285 rows');

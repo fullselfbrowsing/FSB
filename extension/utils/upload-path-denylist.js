@@ -37,6 +37,11 @@
   // Absolute system secret stores.
   var DENY_ABS_PREFIXES = ['/etc/ssl/private/', '/etc/shadow', '/etc/sudoers', '/proc/'];
 
+  // MCP capture_screenshot returns a managed file that can be passed to
+  // upload_file after the MCP server attests it. The filename shape narrows
+  // that private exception; every other /.fsb/ path remains denied.
+  var MANAGED_SCREENSHOT_PATH = /\/\.fsb\/screenshots\/fsb-screenshot-[0-9]+-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.png$/i;
+
   function normalize(p) {
     return String(p == null ? '' : p).replace(/\\+/g, '/');
   }
@@ -60,15 +65,19 @@
    * @param {string} filePath
    * @returns {{denied: boolean, reason: string}} reason is a content-free token.
    */
-  function classify(filePath) {
+  function classify(filePath, options) {
     var lower = normalize(filePath).toLowerCase();
     var baseLower = basenameOf(filePath).toLowerCase();
+    var managedScreenshot = options && options.allowManagedScreenshot === true &&
+      MANAGED_SCREENSHOT_PATH.test(lower);
 
     for (var a = 0; a < DENY_ABS_PREFIXES.length; a++) {
       if (lower.indexOf(DENY_ABS_PREFIXES[a]) === 0) return { denied: true, reason: 'system-secret-store' };
     }
     for (var d = 0; d < DENY_DIR_SEGMENTS.length; d++) {
-      if (lower.indexOf(DENY_DIR_SEGMENTS[d]) !== -1) return { denied: true, reason: 'sensitive-directory' };
+      if (lower.indexOf(DENY_DIR_SEGMENTS[d]) === -1) continue;
+      if (managedScreenshot && DENY_DIR_SEGMENTS[d] === '/.fsb/') continue;
+      return { denied: true, reason: 'sensitive-directory' };
     }
     for (var b = 0; b < DENY_BASENAMES.length; b++) {
       if (baseLower === DENY_BASENAMES[b]) return { denied: true, reason: 'sensitive-filename' };
@@ -82,8 +91,8 @@
     return { denied: false, reason: '' };
   }
 
-  function isDenied(filePath) {
-    return classify(filePath).denied;
+  function isDenied(filePath, options) {
+    return classify(filePath, options).denied;
   }
 
   // Is this a usable absolute path? (CDP setFileInputFiles needs absolute paths;

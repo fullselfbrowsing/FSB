@@ -88,7 +88,7 @@
             <h2>Dashboard</h2>
             <p>Monitor your AI usage, costs, and automation performance</p>
           </div>
-          
+
           <!-- Analytics Hero Section -->
           <div class="analytics-hero">
             <div class="hero-metrics">
@@ -146,15 +146,16 @@
             <h2>API Configuration</h2>
             <p>Configure your AI model provider and API settings</p>
           </div>
-          
+
           <div class="form-card">
             <div class="form-section">
               <h3>AI Model Configuration</h3>
-              
+
               <!-- Model Provider Selection -->
               <div class="form-group">
                 <label for="modelProvider">AI Provider <span id="providerIcon" style="display: inline-block; vertical-align: middle; margin-left: 6px;"></span></label>
                 <select id="modelProvider" class="form-select">
+                  <option value="" disabled>Choose another provider</option>
                   <option value="xai">xAI (Grok)</option>
                   <option value="gemini">Google Gemini</option>
                   <option value="openai">OpenAI</option>
@@ -162,28 +163,37 @@
                   <option value="openrouter">OpenRouter</option>
                   <option value="lmstudio">LM Studio</option>
                   <option value="custom">Custom (OpenAI Compatible)</option>
+                  <optgroup label="Harness Adapters">
+                    <option value="claude-code">Claude Code</option>
+                    <option value="grok-build">Grok Build</option>
+                  </optgroup>
                 </select>
-                <div class="form-help">Select your preferred AI provider</div>
+                <div class="form-help">API providers use local keys. Agent CLIs use their existing local sign-in.</div>
+                <div id="retiredAgentProviderNotice" class="provider-retirement-notice" role="alert" hidden>
+                  <strong>Choose another AI provider</strong>
+                  <span id="retiredAgentProviderNoticeText">This provider is no longer available for Autopilot. Select and save another provider before starting a new task.</span>
+                </div>
               </div>
-              
+
+              <div id="apiProviderDetails">
               <!-- Model Selection -->
               <div class="form-group">
                 <label for="modelSearch">Model</label>
                 <div class="model-combobox" id="modelCombobox">
                   <div class="model-combobox__control">
                     <div class="model-combobox__field">
-                      <input type="text" id="modelSearch" class="form-input model-combobox__input" placeholder="Search models" autocomplete="off" spellcheck="false" role="combobox" aria-expanded="false" aria-controls="modelListbox" aria-autocomplete="list" aria-haspopup="listbox" aria-label="Search and select model">
-                      <button type="button" id="modelComboboxToggle" class="model-combobox__chevron" tabindex="-1" aria-label="Toggle model list">
+                      <input type="text" id="modelSearch" class="form-input model-combobox__input" value="Provide API key to list models" placeholder="Search models" autocomplete="off" spellcheck="false" role="combobox" aria-expanded="false" aria-controls="modelListbox" aria-autocomplete="list" aria-haspopup="listbox" aria-label="Search and select model" disabled>
+                      <button type="button" id="modelComboboxToggle" class="model-combobox__chevron" tabindex="-1" aria-label="Toggle model list" disabled>
                         <i class="fas fa-chevron-down" aria-hidden="true"></i>
                       </button>
                     </div>
-                    <button id="refreshModelsBtn" type="button" class="btn-secondary btn-icon" title="Refresh model list">
-                      <i class="fas fa-sync-alt"></i> Refresh
+                    <button id="refreshModelsBtn" type="button" class="fsb-refresh-icon" title="Refresh model list" aria-label="Refresh model list" disabled>
+                      <i class="fas fa-sync-alt" aria-hidden="true"></i>
                     </button>
                   </div>
                   <ul class="model-combobox__listbox" id="modelListbox" role="listbox" aria-label="Models" tabindex="-1" hidden></ul>
-                  <select id="modelName" class="model-combobox__native" tabindex="-1" aria-hidden="true">
-                    <!-- Hidden source of truth; options populated dynamically based on provider -->
+                  <select id="modelName" class="model-combobox__native" tabindex="-1" aria-hidden="true" disabled>
+                    <option value="" disabled selected>Provide API key to list models</option>
                   </select>
                 </div>
                 <div id="modelDiscoveryStatus" class="discovery-status" hidden></div>
@@ -337,7 +347,56 @@
                 </div>
               </div>
 
-              <!-- API Status Card -->
+              </div>
+
+              <div id="agentProviderDetails" hidden>
+                <h3 id="agentProviderDetailsHeading" class="agent-conn-title">Agent CLI</h3>
+                <p id="agentProviderHelp" class="agent-conn-sub">FSB uses this CLI's existing local sign-in. Test Connection sends one small no-tools validation request.</p>
+
+                <div id="grokBuildConnectionCard" class="agent-conn" hidden>
+                  <div class="agent-conn-top">
+                    <span class="agent-conn-mark"><img src="../assets/onboarding/providers/xai.png" alt="" data-invert="1"></span>
+                    <span class="agent-conn-name">
+                      <h4>Grok Build</h4>
+                      <span class="agent-conn-meta">xAI &middot; local harness</span>
+                    </span>
+                    <span class="agent-conn-status" id="grokBuildAuthStatus" data-state="off">Checking sign-in...</span>
+                  </div>
+                  <dl class="agent-conn-rows">
+                    <div class="agent-conn-row"><dt>Profile</dt><dd id="grokBuildCompatibility">Requires the reviewed Grok Build 1.0.4 profile. Test Connection verifies installation, version, isolation, ACP, and cached OAuth without sending a prompt.</dd></div>
+                    <div class="agent-conn-row"><dt>Billing</dt><dd>Uses your signed-in Grok account. SuperGrok usage draws from its shared weekly allowance; extra usage may apply.</dd></div>
+                    <div class="agent-conn-row"><dt>Data</dt><dd>Browser task text and FSB MCP results are sent to Grok for inference. FSB disables secondary telemetry and trace uploads for this private profile.</dd></div>
+                  </dl>
+                  <div class="agent-conn-actions">
+                    <button type="button" class="control-btn primary" id="connectGrokBuildBtn">Connect SuperGrok</button>
+                    <button type="button" class="control-btn danger" id="disconnectGrokBuildBtn" hidden>Disconnect</button>
+                    <a class="control-btn" id="grokBuildLoginLink" href="#" target="_blank" rel="noopener noreferrer" hidden>Continue sign-in</a>
+                    <a class="agent-conn-link" href="https://docs.x.ai/grok/faq" target="_blank" rel="noopener noreferrer">Review SuperGrok usage <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i></a>
+                    <a class="agent-conn-link" href="https://docs.x.ai/build/overview" target="_blank" rel="noopener noreferrer">Installation guide <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i></a>
+                  </div>
+                </div>
+
+                <div id="claudeCodeConnectionCard" class="agent-conn" hidden>
+                  <div class="agent-conn-top">
+                    <span class="agent-conn-mark"><span class="agent-conn-claude" role="img" aria-label="Claude"></span></span>
+                    <span class="agent-conn-name">
+                      <h4>Claude Code</h4>
+                      <span class="agent-conn-meta">Anthropic &middot; local harness</span>
+                    </span>
+                    <span class="agent-conn-status" id="claudeCodeAuthStatus" data-state="off">Not reported</span>
+                  </div>
+                  <dl class="agent-conn-rows">
+                    <div class="agent-conn-row"><dt>Sign-in</dt><dd>Uses the account signed into Claude Code. FSB does not need your Anthropic credential.</dd></div>
+                    <div class="agent-conn-row"><dt>Billing</dt><dd>Usage and charges follow that account's Claude plan or API configuration.</dd></div>
+                    <div class="agent-conn-row"><dt>Auth state</dt><dd>Claude Code does not report an auth state that FSB can safely read.</dd></div>
+                  </dl>
+                  <div class="agent-conn-actions">
+                    <a class="agent-conn-link" href="https://claude.com/pricing" target="_blank" rel="noopener noreferrer">Review Claude plans and billing <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i></a>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Connection Status Card -->
               <div class="api-status-card" id="apiStatusCard" style="display: none;">
                 <div class="status-display">
                   <div class="status-icon">
@@ -352,8 +411,8 @@
 
               <div class="api-test-section">
                 <button class="test-btn" id="fullApiTest">
-                  <i class="fas fa-flask"></i>
-                  Run Full API Test
+                  <i class="fas fa-plug"></i>
+                  Test Connection
                 </button>
                 <div class="test-results" id="testResults"></div>
               </div>
@@ -573,6 +632,43 @@
               </div>
             </div>
 
+            <div class="settings-card full-width" id="mcpSessionReplaySettings">
+              <div class="settings-card-header">
+                <div class="settings-card-icon">
+                  <i class="fas fa-clock-rotate-left"></i>
+                </div>
+                <div class="settings-card-title">
+                  <h3>MCP Session Replay</h3>
+                  <p>Local, exact-fidelity history for MCP agent actions</p>
+                </div>
+              </div>
+              <div class="settings-card-content">
+                <div class="setting-item">
+                  <label class="modern-toggle">
+                    <input type="checkbox" id="fsbMcpSessionRecordingEnabled" checked>
+                    <span class="toggle-track">
+                      <span class="toggle-thumb"></span>
+                    </span>
+                    <div class="toggle-content">
+                      <span class="toggle-label">Record MCP sessions for replay</span>
+                      <span class="toggle-desc">Stores replay data locally while redacting secret-bearing fields and sensitive inputs. Ordinary typed text and action results remain available for replay. MCP clients can save a local task memory by providing a secret-free completion, partial, or failure summary; no separate AI-provider call is made. Turning this off stops future MCP recording and saves any open recording. Existing MCP replay history stores up to the 50 most recent sessions, and no session is kept longer than the configured retention period. Autopilot history is unaffected.</span>
+                    </div>
+                  </label>
+                </div>
+                <div class="setting-item">
+                  <div class="setting-label">
+                    <span>MCP replay retention (days)</span>
+                    <div class="fsb-stepper" data-min="1" data-max="365" data-step="1">
+                      <button type="button" class="fsb-stepper__btn fsb-stepper__btn--dec" aria-label="Decrease MCP replay retention"><i class="fas fa-minus"></i></button>
+                      <input type="text" inputmode="numeric" class="fsb-stepper__input" id="fsbMcpSessionRetentionDays" value="30" aria-label="MCP replay retention days">
+                      <button type="button" class="fsb-stepper__btn fsb-stepper__btn--inc" aria-label="Increase MCP replay retention"><i class="fas fa-plus"></i></button>
+                    </div>
+                  </div>
+                  <div class="setting-hint">Default 30. Range 1 to 365 days. This automatically deletes expired MCP replay sessions only; Autopilot history is never pruned by this setting.</div>
+                </div>
+              </div>
+            </div>
+
             <!-- Performance Card -->
             <div class="settings-card full-width">
               <div class="settings-card-header">
@@ -661,6 +757,52 @@
             </div>
 
             <div class="adv-sub"><i class="fas fa-user-shield"></i><span>Privacy &amp; Developer</span><span class="adv-sub-rule"></span></div>
+            <div class="settings-card full-width" id="voiceInputSettings">
+              <div class="settings-card-header">
+                <div class="settings-card-icon">
+                  <i class="fas fa-microphone"></i>
+                </div>
+                <div class="settings-card-title">
+                  <h3>Voice Input</h3>
+                  <p>Control microphone input in the FSB side panel</p>
+                </div>
+              </div>
+              <div class="settings-card-content">
+                <div class="setting-item">
+                  <label class="modern-toggle">
+                    <input type="checkbox" id="voiceInputEnabled" checked>
+                    <span class="toggle-track">
+                      <span class="toggle-thumb"></span>
+                    </span>
+                    <div class="toggle-content">
+                      <span class="toggle-label">Enable microphone voice input</span>
+                      <span class="toggle-desc">Show the microphone in the side panel and allow browser speech recognition or OpenAI Whisper. Default on.</span>
+                    </div>
+                  </label>
+                </div>
+                <div class="voice-permission-panel">
+                  <div class="voice-permission-copy">
+                    <span class="voice-permission-status" id="voiceInputPermissionStatus"
+                          data-state="checking" role="status" aria-live="polite">Checking microphone permission…</span>
+                    <span class="setting-hint" id="voiceInputPermissionDetail">Chrome manages the extension-wide microphone grant.</span>
+                  </div>
+                  <div class="voice-permission-actions">
+                    <button type="button" class="form-secondary-btn" id="voiceInputPermissionAction" hidden>
+                      <i class="fas fa-microphone"></i>
+                      <span>Enable microphone</span>
+                    </button>
+                    <button type="button" class="form-secondary-btn" id="voiceInputChromeSettings" hidden>
+                      <i class="fas fa-gear"></i>
+                      <span>Open Chrome settings</span>
+                    </button>
+                  </div>
+                </div>
+                <div class="setting-hint voice-permission-note">
+                  Turning voice input off stops FSB from using your microphone, but does not revoke Chrome's saved permission.
+                </div>
+              </div>
+            </div>
+
             <!-- Developer Card -->
             <div class="settings-card full-width">
               <div class="settings-card-header">
@@ -1023,7 +1165,7 @@
               </div>
               <div class="site-graph-detail-toggle" id="knowledgeDetailToggle">
                 <button class="detail-btn active" data-level="simple">Overview</button>
-                <button class="detail-btn" data-level="full">Full Detail</button>
+                <button class="detail-btn" data-level="full">Expanded</button>
               </div>
             </div>
 
@@ -1773,7 +1915,7 @@
                 <i class="fas fa-gavel"></i>
               </div>
               <h3>License</h3>
-              <p>FSB is open source under the BSL 1.1 license</p>
+              <p>FSB is open source under the MIT license</p>
               <a href="https://github.com/LakshmanTurlapati/FSB/blob/main/LICENSE" target="_blank" rel="noopener" class="help-link">View License</a>
             </div>
 
@@ -1796,7 +1938,7 @@
           <div class="branding-section">
             <div class="branding-content">
               <div class="fsb-foot-brand">
-                <span class="version-tag fsb-foot-ver" translate="no">▽0.9.90</span>
+                <span class="version-tag fsb-foot-ver" translate="no">▽</span>
               </div>
             </div>
           </div>
@@ -1921,6 +2063,10 @@
   <script src="../utils/consent-policy-store.js"></script>
   <script src="../utils/audit-log.js"></script>
   <script src="../utils/service-denylist.js"></script>
+  <script src="../utils/delegation-providers.js"></script>
+  <script src="providers-panel.js"></script>
+  <script src="voice-input-settings.js"></script>
+  <script src="../utils/mcp-session-export-port.js"></script>
   <script src="options.js"></script>
   <!--
     Phase 269 / CONS-01, CONS-02: kill-switch wiring.

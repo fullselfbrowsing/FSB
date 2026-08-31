@@ -1,5 +1,5 @@
 /**
- * Universal AI Provider for FSB v0.9.90
+ * Universal AI Provider for FSB
  * A model-agnostic provider that works with any OpenAI-compatible API
  */
 
@@ -190,36 +190,125 @@ function waitWithCallerSignal(waitTime, callerSignal) {
   });
 }
 
+// Local inference can spend minutes loading and evaluating a large prompt.
+// LM Studio stays separately bounded so hosted-provider latency behavior does
+// not change.
+const LMSTUDIO_REQUEST_TIMEOUT = 180000;
+const LMSTUDIO_MAX_TIMEOUT = 300000;
+const LMSTUDIO_TIMEOUT_PER_5K_TOKENS = 30000;
+
 /**
  * Calculate adaptive timeout based on prompt/request size, model type, and retry attempt.
- * Base 30s + 5s per estimated 5K input tokens (45s base for reasoning models).
+ * Hosted providers use their existing 30s/45s bases. LM Studio uses a 180s
+ * base plus 30s per complete 5K estimated input tokens, capped at 300s.
  * Progressive increase on retries: attempt 0 = base, attempt 1 = base * 1.5, attempt 2 = base * 2
  * @param {Object} requestBody - The request body to estimate size from
  * @param {string} modelName - The model name to check for reasoning model patterns
  * @param {number} attempt - Retry attempt number (0-based), increases timeout progressively
+ * @param {string} providerKey - Optional provider key for provider-specific budgets
  * @returns {number} Timeout in milliseconds
  */
-function calculateAdaptiveTimeout(requestBody, modelName = '', attempt = 0) {
+function estimateRequestTextCharacters(value, key = '', seen = new WeakSet()) {
+  if (value == null) return 0;
+  if (typeof value === 'string') {
+    if (/^data:image\/[a-z0-9.+-]+;base64,/i.test(value)) return 0;
+    if (key === 'data' && value.length > 256 && /^[A-Za-z0-9+/]+=*$/.test(value)) return 0;
+    return value.length;
+  }
+  if (typeof value !== 'object') return String(value).length;
+  if (seen.has(value)) return 0;
+  seen.add(value);
+  if (Array.isArray(value)) {
+    return value.reduce((sum, item) => sum + estimateRequestTextCharacters(item, '', seen), 0);
+  }
+  const imageMime = typeof value.mimeType === 'string'
+    ? value.mimeType
+    : (typeof value.media_type === 'string' ? value.media_type : '');
+  let chars = 0;
+  for (const [childKey, child] of Object.entries(value)) {
+    // Image bytes are network payload, not prompt text. Metadata (mime type,
+    // labels, dimensions) remains countable through the surrounding fields.
+    if (childKey === 'data' && typeof child === 'string'
+        && (/^image\//i.test(imageMime)
+          || (child.length > 256 && /^[A-Za-z0-9+/]+=*$/.test(child)))) continue;
+    chars += estimateRequestTextCharacters(child, childKey, seen);
+  }
+  return chars;
+}
+
+function requestContainsImageData(value, key = '', parent = null, seen = new WeakSet()) {
+  if (value == null) return false;
+  if (typeof value === 'string') {
+    if (/^data:image\/[a-z0-9.+-]+;base64,/i.test(value)) return true;
+    const parentMime = parent && typeof parent === 'object'
+      ? (parent.mimeType || parent.media_type || '')
+      : '';
+    return key === 'data' && /^image\//i.test(String(parentMime));
+  }
+  if (typeof value !== 'object' || seen.has(value)) return false;
+  seen.add(value);
+  if (value.type === 'image' || value.inlineData || value.inline_data) return true;
+  return Object.entries(value).some(([childKey, child]) => (
+    requestContainsImageData(child, childKey, value, seen)
+  ));
+}
+
+/**
+ * Normalize an outbound chat-completions request for provider-specific API
+ * compatibility without mutating the caller's request object.
+ *
+ * OpenAI's current Chat Completions API uses max_completion_tokens. GPT-5 and
+ * o-series reasoning models also reject sampling parameters unless they are
+ * running in a compatible non-reasoning mode, which FSB does not force.
+ * Other providers keep their existing OpenAI-compatible request shape.
+ *
+ * @param {string} providerKey - Provider key such as openai, xai, or openrouter
+ * @param {string} modelName - Exact provider model ID
+ * @param {Object} requestBody - Provider-formatted request body
+ * @returns {Object} The normalized request body
+ */
+function normalizeProviderChatRequest(providerKey, modelName, requestBody) {
+  if (providerKey !== 'openai' || !requestBody || typeof requestBody !== 'object' || Array.isArray(requestBody)) {
+    return requestBody;
+  }
+
+  const normalized = { ...requestBody };
+  const hasModernLimit = Object.prototype.hasOwnProperty.call(normalized, 'max_completion_tokens');
+  if (!hasModernLimit && Object.prototype.hasOwnProperty.call(normalized, 'max_tokens')) {
+    normalized.max_completion_tokens = normalized.max_tokens;
+  }
+  delete normalized.max_tokens;
+
+  const model = String(modelName || '').trim().toLowerCase();
+  const isReasoningFamily = /^gpt-5(?:$|[.-])/.test(model) || /^o\d+(?:$|[.-])/.test(model);
+  if (isReasoningFamily) {
+    delete normalized.temperature;
+    delete normalized.top_p;
+    delete normalized.logprobs;
+    delete normalized.top_logprobs;
+  }
+
+  return normalized;
+}
+
+function calculateAdaptiveTimeout(requestBody, modelName = '', attempt = 0, providerKey = '') {
+  const isLmStudio = providerKey === 'lmstudio';
   const isReasoning = /reasoning|grok-4(?!.*(?:fast|mini))/.test(modelName);
-  const baseTimeout = isReasoning ? REASONING_MODEL_TIMEOUT : DEFAULT_REQUEST_TIMEOUT;
-  const maxTimeout = isReasoning ? MAX_REASONING_TIMEOUT : MAX_REQUEST_TIMEOUT;
+  const baseTimeout = isLmStudio
+    ? LMSTUDIO_REQUEST_TIMEOUT
+    : (isReasoning ? REASONING_MODEL_TIMEOUT : DEFAULT_REQUEST_TIMEOUT);
+  const maxTimeout = isLmStudio
+    ? LMSTUDIO_MAX_TIMEOUT
+    : (isReasoning ? MAX_REASONING_TIMEOUT : MAX_REQUEST_TIMEOUT);
 
   // Progressive multiplier: 1x, 1.5x, 2x for attempts 0, 1, 2+
   const retryMultiplier = 1 + (Math.min(attempt, 2) * 0.5);
 
   try {
-    // PERF: Estimate size from messages array length instead of serializing entire body
-    let estimatedChars = 0;
-    if (requestBody.messages && Array.isArray(requestBody.messages)) {
-      for (const msg of requestBody.messages) {
-        estimatedChars += (msg.content || '').length;
-      }
-    } else {
-      // Fallback: rough estimate from stringify (only if no messages array)
-      estimatedChars = JSON.stringify(requestBody).length;
-    }
+    const estimatedChars = estimateRequestTextCharacters(requestBody);
     const estimatedTokens = estimatedChars / 4;
-    const extra = Math.floor(estimatedTokens / 5000) * 5000;
+    const extra = Math.floor(estimatedTokens / 5000)
+      * (isLmStudio ? LMSTUDIO_TIMEOUT_PER_5K_TOKENS : 5000);
     return Math.min(Math.round((baseTimeout + extra) * retryMultiplier), maxTimeout);
   } catch {
     return Math.min(Math.round(baseTimeout * retryMultiplier), maxTimeout);
@@ -576,10 +665,11 @@ class UniversalProvider {
   async sendRequest(requestBody, options = {}) {
     const callerSignal = readCallerSignal(options);
     throwIfCallerAborted(callerSignal);
+    requestBody = normalizeProviderChatRequest(this.provider, this.model, requestBody);
 
     // Use adaptive timeout based on request size and retry attempt if no explicit timeout provided
     const attempt = options.attempt || 0;
-    const defaultTimeout = options.timeout || calculateAdaptiveTimeout(requestBody, this.model, attempt);
+    const defaultTimeout = options.timeout || calculateAdaptiveTimeout(requestBody, this.model, attempt, this.provider);
     const { retry = false, rateLimitAttempt = 0, timeout = defaultTimeout } = options;
 
     try {
@@ -673,7 +763,7 @@ class UniversalProvider {
       if (!providerTimeoutErrors.has(error)) throwIfCallerAborted(callerSignal);
 
       // Check if error is due to unsupported parameters
-      if (error.status === 400 && error.responseText) {
+      if (error.status === 400 && error.responseText && !requestContainsImageData(requestBody)) {
         const unsupportedParam = this.extractUnsupportedParameter(error.responseText);
         if (unsupportedParam && !retry) {
           throwIfCallerAborted(callerSignal);
@@ -927,6 +1017,9 @@ if (typeof module !== 'undefined' && module.exports) {
     UniversalProvider,
     PROVIDER_CONFIGS,
     calculateAdaptiveTimeout,
+    estimateRequestTextCharacters,
+    requestContainsImageData,
+    normalizeProviderChatRequest,
     normalizeProviderBaseUrl,
     buildProviderModelsEndpoint,
     parseOpenAICompatibleModelList

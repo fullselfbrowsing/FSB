@@ -2765,6 +2765,157 @@ async function assertForwardOnlyLifecyclePresentation(sidepanelSource) {
   assert.equal(readLifecyclePresentations(booted).length, 2, 'lifecycle map stays bounded to encountered tabs');
 }
 
+async function assertUnifiedTabSurfaceAuthority(sidepanelSource) {
+  const syncSource = extractBracedSource(
+    sidepanelSource,
+    'async function syncActiveTabSurface(tabId, windowId)',
+    true
+  );
+  const activatedBody = extractBracedSource(
+    sidepanelSource,
+    'chrome.tabs.onActivated.addListener(async (activeInfo) =>',
+    false
+  );
+  const focusedBody = extractBracedSource(
+    sidepanelSource,
+    'chrome.windows.onFocusChanged.addListener(async (windowId) =>',
+    false
+  );
+
+  assert.match(
+    activatedBody,
+    /await syncActiveTabSurface\(activeInfo\.tabId, activeInfo\.windowId\);/,
+    'tab activation delegates its exact identity to the unified surface synchronizer'
+  );
+  assert.match(
+    focusedBody,
+    /await syncActiveTabSurface\(null, windowId\);/,
+    'window focus delegates tab discovery to the same surface synchronizer'
+  );
+  assert.equal(
+    (syncSource.match(/FSBSkopeoSidepanelController\.activateTab\(incomingTabId\)/g) || []).length,
+    1,
+    'the unified synchronizer contains one Skopeo activation site'
+  );
+  assert.match(
+    syncSource,
+    /const tabChanged = outgoingTabId !== incomingTabId;[\s\S]*?_activeTabIdSnapshot = incomingTabId;[\s\S]*?if \(tabChanged\) \{[\s\S]*?FSBSkopeoSidepanelController[\s\S]*?\.activateTab\(incomingTabId\)/,
+    'Skopeo activates only after a changed tab is committed as authoritative'
+  );
+  assert.ok(
+    (syncSource.match(/syncGeneration !== _activeTabSurfaceSyncGeneration/g) || []).length >= 6,
+    'the unified synchronizer fences every asynchronous phase with its generation'
+  );
+
+  const lateOwner = createDeferred();
+  const lateQuery = createDeferred();
+  const activations = [];
+  const ownerRefreshes = [];
+  const adoptions = [];
+  const swaps = [];
+  const statusReads = [];
+  const stateDispatches = [];
+  const hydrations = [];
+  const persistedTabs = [];
+  const restoredTabs = [];
+  const runningByTab = new Map();
+  let queryPromise = Promise.resolve([{ id: 11 }]);
+
+  const sandbox = {
+    console: { warn() {} },
+    Promise,
+    Number,
+    Date,
+    Map,
+    _activeTabSurfaceSyncGeneration: 0,
+    _delegationHydrationGeneration: 0,
+    _activeTabIdSnapshot: 11,
+    _chatLockedByOwnerChip: false,
+    conversationId: 'conversation-11',
+    chatMessages: { innerHTML: '' },
+    applyInputLockout() {},
+    _persistTabStatusIntent(tabId) { persistedTabs.push(tabId); },
+    _restoreTabStatusIntent(tabId) { restoredTabs.push(tabId); },
+    refreshActiveTabOwnership(tabId, generation) {
+      ownerRefreshes.push({ tabId, generation });
+      if (tabId === 22) return lateOwner.promise;
+      return Promise.resolve({ verified: true, tabId });
+    },
+    async _adoptTabIntoRunningDelegationConversation(tabId) {
+      adoptions.push(tabId);
+      return true;
+    },
+    async swapToTabConversation(tabId) {
+      swaps.push(tabId);
+      sandbox.conversationId = 'conversation-' + tabId;
+      return true;
+    },
+    _getTabRunningEntry(tabId) {
+      if (!runningByTab.has(tabId)) {
+        runningByTab.set(tabId, { isRunning: false, sessionId: null, startedAt: null });
+      }
+      return runningByTab.get(tabId);
+    },
+    setRunningState(tabId) { stateDispatches.push({ tabId, state: 'running' }); },
+    setIdleState(tabId) { stateDispatches.push({ tabId, state: 'idle' }); },
+    async _hydrateDelegationForSelectedConversation() {
+      hydrations.push(sandbox._activeTabIdSnapshot);
+    },
+    chrome: {
+      tabs: {
+        query() { return queryPromise; }
+      },
+      runtime: {
+        async sendMessage(message) {
+          statusReads.push(message.activeTabId);
+          return { activeSessions: 0 };
+        }
+      }
+    }
+  };
+  sandbox.globalThis = sandbox;
+  sandbox.FSBSkopeoSidepanelController = {
+    activateTab(tabId) { activations.push(tabId); }
+  };
+  const context = vm.createContext(sandbox);
+  vm.runInContext(syncSource, context, { filename: 'sidepanel-unified-tab-surface.js' });
+
+  const staleTabA = context.syncActiveTabSurface(22, 1);
+  const winningTabB = context.syncActiveTabSurface(33, 1);
+  assert.equal(await winningTabB, true, 'the newest explicit tab sync completes');
+  lateOwner.resolve({ verified: true, tabId: 22 });
+  assert.equal(await staleTabA, false, 'a late ownership result cannot finish an older tab sync');
+  assert.deepEqual(activations, [22, 33], 'each committed changed tab activates Skopeo exactly once');
+  assert.equal(sandbox._activeTabIdSnapshot, 33, 'the winning explicit tab remains authoritative');
+  assert.deepEqual(adoptions, [33], 'the stale generation cannot adopt a delegation tab');
+  assert.deepEqual(swaps, [33], 'the stale generation cannot swap the conversation');
+  assert.deepEqual(statusReads, [33], 'the stale generation cannot refresh running state');
+  assert.deepEqual(hydrations, [33], 'the stale generation cannot hydrate delegation UI');
+
+  assert.equal(await context.syncActiveTabSurface(33, 1), true, 'same-tab refresh still synchronizes the surface');
+  assert.deepEqual(activations, [22, 33], 'same-tab refresh does not activate Skopeo again');
+
+  queryPromise = lateQuery.promise;
+  const staleWindowQuery = context.syncActiveTabSurface(null, 101);
+  assert.equal(await context.syncActiveTabSurface(44, 202), true, 'explicit activation supersedes an older window query');
+  lateQuery.resolve([{ id: 55 }]);
+  assert.equal(await staleWindowQuery, false, 'late window-query resolution is generation fenced');
+  assert.deepEqual(activations, [22, 33, 44], 'a stale queried tab is never committed or activated');
+  assert.equal(sandbox._activeTabIdSnapshot, 44, 'the explicit activation wins over the stale query');
+  assert.deepEqual(persistedTabs, [11, 22, 33], 'only committed tab transitions persist outgoing intent');
+  assert.deepEqual(restoredTabs, [33, 33, 44], 'only current generations restore incoming intent');
+  assert.deepEqual(
+    ownerRefreshes.map((entry) => entry.tabId),
+    [22, 33, 33, 44],
+    'ownership refreshes are scoped to committed tabs only'
+  );
+  assert.deepEqual(
+    stateDispatches.map((entry) => entry.tabId),
+    [33, 33, 44],
+    'only current generations dispatch tab-scoped running state'
+  );
+}
+
 async function assertOuterTabAuthorityRaces(sidepanelSource) {
   async function settleWinningTab(harness, tabId, label) {
     await harness.flush();
@@ -4409,8 +4560,7 @@ async function runProductionContract() {
   await assertPerTabGenerationFloors(sidepanelSource);
   await assertCurrentUnversionedTerminalAuthority(sidepanelSource);
   await assertForwardOnlyLifecyclePresentation(sidepanelSource);
-  await assertOuterTabAuthorityRaces(sidepanelSource);
-  await assertOwnerChipTabAuthorityRaces(sidepanelSource);
+  await assertUnifiedTabSurfaceAuthority(sidepanelSource);
   await assertPrimaryInvocationContract(backgroundSource);
   await assertFailureAndCancellationContracts(backgroundSource);
   await assertTeardownCertificateValidation(backgroundSource);

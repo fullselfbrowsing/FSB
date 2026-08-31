@@ -254,12 +254,13 @@ function executionAuthorityFor(resolved) {
   };
 }
 
-function buildAdmissionPlan(pairRows, stemsByService, authorityBySlug) {
+function buildAdmissionPlan(pairRows, stemsByService, authorityBySlug, authoredByPair) {
   const pairOrigins = new Map(pairRows.map(function(pair) {
     return [pairKey(pair.appStem, pair.service), new Set()];
   }));
   const candidates = new Map();
   const ambiguousOrigins = [];
+  const preferredPairKeys = new Set();
 
   function addCandidate(origin, pair) {
     if (!candidates.has(origin)) candidates.set(origin, []);
@@ -301,6 +302,17 @@ function buildAdmissionPlan(pairRows, stemsByService, authorityBySlug) {
 
   for (const [service, appStemSet] of stemsByService.entries()) {
     if (appStemSet.size <= 1) continue;
+    const preferred = Array.from(appStemSet).map(function(appStem) {
+      return pairKey(appStem, service);
+    }).filter(function(key) {
+      return authoredByPair.has(key);
+    });
+    if (preferred.length === 1) {
+      const preferredKey = preferred[0];
+      pairOrigins.get(preferredKey).add(exactOriginFor(service));
+      preferredPairKeys.add(preferredKey);
+      continue;
+    }
     const related = Array.from(appStemSet).sort().map(function(appStem) {
       return publicProfileKey(appStem, service);
     });
@@ -327,7 +339,7 @@ function buildAdmissionPlan(pairRows, stemsByService, authorityBySlug) {
   admittedOriginIndex.sort(function(left, right) {
     return compareText(left.admittedOrigin, right.admittedOrigin);
   });
-  return { pairOrigins, admittedOriginIndex };
+  return { pairOrigins, admittedOriginIndex, preferredPairKeys };
 }
 
 function profileRecordFor(
@@ -471,11 +483,18 @@ export function buildSkopeoProfileIndex({ catalog, descriptors, terminalReport, 
       ? compareText(left.service, right.service)
       : compareText(left.appStem, right.appStem);
   });
-  const admissionPlan = buildAdmissionPlan(pairRows, stemsByService, authorityBySlug);
+  const admissionPlan = buildAdmissionPlan(
+    pairRows,
+    stemsByService,
+    authorityBySlug,
+    authoredByPair
+  );
   const profiles = pairRows.map(function (pair) {
-    const ambiguous = stemsByService.get(pair.service).size > 1;
+    const key = pairKey(pair.appStem, pair.service);
+    const ambiguous = stemsByService.get(pair.service).size > 1 &&
+      !admissionPlan.preferredPairKeys.has(key);
     const admittedPageOrigins = Array.from(
-      admissionPlan.pairOrigins.get(pairKey(pair.appStem, pair.service))
+      admissionPlan.pairOrigins.get(key)
     ).sort();
     const capabilitySlugs = descriptorsByStem.get(pair.appStem)
       .map(function(row) { return row.slug; })
@@ -507,7 +526,9 @@ export function buildSkopeoProfileIndex({ catalog, descriptors, terminalReport, 
     }).filter(function(origin, index, all) {
       return all.indexOf(origin) === index;
     }).sort();
-    if (ambiguous) admittedPageOrigins.push(exactOriginFor(service));
+    if (ambiguous && !admittedPageOrigins.includes(exactOriginFor(service))) {
+      admittedPageOrigins.push(exactOriginFor(service));
+    }
     return {
       service,
       serviceOrigin: exactOriginFor(service),

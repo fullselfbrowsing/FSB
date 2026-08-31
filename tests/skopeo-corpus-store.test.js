@@ -1992,9 +1992,28 @@ async function run() {
       'trusted store exposes only limits, fixed message vocabulary, and create');
     check(Object.isFrozen(api) && Object.isFrozen(api.MESSAGE) && Object.isFrozen(api.LIMITS),
       'trusted feature-store public contract is frozen');
+    check(api.LIMITS.SESSION_COUNT === 100 && api.LIMITS.SESSION_COUNT_PER_MODE === 50 &&
+          api.LIMITS.AUTOMATION_LOG_ENTRIES === 400,
+    'trusted store exposes the merged 50-per-mode session and 400-log bounds');
+    check(api.MESSAGE.AUTOMATION_SESSION_UPDATE_OUTCOME === 'fsb:automation-session-update-outcome' &&
+          api.MESSAGE.AUTOMATION_SESSION_PRUNE_MCP === 'fsb:automation-session-prune-mcp',
+    'trusted store exposes fixed outcome-update and MCP-prune actions');
+    const trustedRouterStart = backgroundSource.indexOf('function fsbHandlesTrustedFeatureAction(action) {');
+    const trustedRouterEnd = backgroundSource.indexOf(
+      '\n}\n\nfunction fsbDispatchTrustedFeatureMessage',
+      trustedRouterStart
+    );
+    const trustedRouter = trustedRouterStart >= 0 && trustedRouterEnd > trustedRouterStart
+      ? backgroundSource.slice(trustedRouterStart, trustedRouterEnd)
+      : '';
+    check(trustedRouter.includes('vocabulary.AUTOMATION_SESSION_UPDATE_OUTCOME') &&
+          trustedRouter.includes('vocabulary.AUTOMATION_SESSION_PRUNE_MCP'),
+    'background routes fixed outcome-update and MCP-prune actions to the trusted store');
   }
 
   if (api) {
+    const bridgeSecret = 'fsb-auth.' + 'C'.repeat(43);
+    const bridgeSecretInterior = 'C'.repeat(16);
     const fake = createFakeStorage({
       elementCacheSize: 321,
       captchaSolverEnabled: true,
@@ -2006,10 +2025,14 @@ async function run() {
     await store.appendDiagnosticEntry({
       ts: 1,
       level: 'warn',
-      prefix: 'DOM',
+      prefix: `DOM ${bridgeSecret}`,
       category: 'host-error',
-      message: 'token sk_' + 'live_abcdefghijklmnopqrstuvwxyz raw remote error',
-      redactedContext: { origin: 'https://example.test', statusCode: 500 },
+      message: 'token sk_' + `live_abcdefghijklmnopqrstuvwxyz ${bridgeSecret} raw remote error`,
+      redactedContext: {
+        origin: 'https://example.test',
+        statusCode: 500,
+        kind: `bridge-${bridgeSecret}`
+      },
       rawError: 'must-not-persist',
       fullText: 'must-not-persist',
       accountPermissionId: 'permission-id-must-not-persist'
@@ -2019,15 +2042,19 @@ async function run() {
     check(diagnostics.entries.length === 1, 'diagnostic append persists one bounded record');
     check(!/sk_live_|must-not-persist|permission-id/i.test(diagnosticJson),
       'diagnostic persistence redacts secrets, raw errors, permission IDs, and source text');
+    check(!diagnosticJson.includes(bridgeSecret) && !diagnosticJson.includes(bridgeSecretInterior) &&
+          diagnosticJson.includes('[REDACTED_FSB_BRIDGE_SECRET]'),
+    'diagnostic persistence privately scrubs bridge credentials without load-order dependence');
     check(Buffer.byteLength(diagnosticJson) <= api.LIMITS.DIAGNOSTIC_RESPONSE_BYTES,
       'diagnostic response is byte-bounded');
 
     await store.appendAutomationLogs([{
       timestamp: new Date(0).toISOString(),
       level: 'warn',
-      message: 'provider failed with Bearer abcdefghijklmnopqrstuvwxyz',
+      message: `provider failed with Bearer abcdefghijklmnopqrstuvwxyz ${bridgeSecret}`,
       data: {
         logType: 'comm',
+        provider: `bridge-${bridgeSecret}`,
         statusCode: 403,
         rawResponse: 'full provider response',
         systemPrompt: 'full source text',
@@ -2037,8 +2064,11 @@ async function run() {
     const automation = await store.loadAutomationLogs();
     const automationJson = JSON.stringify(automation);
     check(automation.logs.length === 1, 'automation log append/load round-trips one fixed record');
-    check(!/Bearer|full provider response|full source text|secret/i.test(automationJson),
+    check(!/Bearer|full provider response|full source text|"apiKey"|:"secret"/i.test(automationJson),
       'automation persistence is redacted and metadata-only');
+    check(!automationJson.includes(bridgeSecret) && !automationJson.includes(bridgeSecretInterior) &&
+          automationJson.includes('[REDACTED_FSB_BRIDGE_SECRET]'),
+    'automation persistence privately scrubs bridge credentials');
 
     fake.values.fsbSessionIndex = [{
       id: '__proto__',
@@ -2103,10 +2133,80 @@ async function run() {
     check(validConfig && validConfig.ok === true && validConfig.elementCacheSize === 321,
       'valid content sender receives only bounded element-cache configuration');
 
+    const NOW = 1700000000000;
+    const DAY = 24 * 60 * 60 * 1000;
+    fake.values.fsbSessionLogs = {
+      'bridge-session': {
+        id: 'bridge-session', task: 'Bridge session', mode: 'mcp-agent',
+        startTime: NOW - DAY, endTime: NOW, status: 'completed', outcome: 'success'
+      },
+      'expired-mcp': {
+        id: 'expired-mcp', task: 'Expired MCP', mode: 'mcp-agent',
+        startTime: NOW - 32 * DAY, endTime: NOW - 31 * DAY, status: 'completed'
+      },
+      'ancient-autopilot': {
+        id: 'ancient-autopilot', task: 'Ancient Autopilot', mode: 'autopilot',
+        startTime: NOW - 401 * DAY, endTime: NOW - 400 * DAY, status: 'completed'
+      }
+    };
+    fake.values.fsbSessionIndex = Object.values(fake.values.fsbSessionLogs).map((entry) => ({ ...entry }));
+    fake.values.fsbDOMSnapshots = {
+      'expired-mcp': [{ url: 'https://example.test/private', timestamp: 1 }],
+      'ancient-autopilot': [{ url: 'https://example.test/keep', timestamp: 2 }]
+    };
+    fake.values.automationLogs = [{
+      timestamp: new Date(0).toISOString(), level: 'info', message: 'expired',
+      data: { sessionId: 'expired-mcp' }
+    }, {
+      timestamp: new Date(0).toISOString(), level: 'info', message: 'keep',
+      data: { sessionId: 'ancient-autopilot' }
+    }];
+
+    const outcomePayload = {
+      status: 'failed',
+      outcome: 'failure',
+      reason: 'missing-data',
+      summary: '',
+      result: '',
+      completionMessage: '',
+      error: `failure-${bridgeSecret}`,
+      blocker: '',
+      nextStep: ''
+    };
+    const updatedOutcome = await invokeMessage(messageHandler, {
+      action: api.MESSAGE.AUTOMATION_SESSION_UPDATE_OUTCOME,
+      sessionId: 'bridge-session',
+      outcome: outcomePayload
+    }, validSender);
+    check(updatedOutcome && updatedOutcome.ok === true &&
+          fake.values.fsbSessionLogs['bridge-session'].status === 'failed' &&
+          !JSON.stringify(fake.values.fsbSessionLogs['bridge-session']).includes(bridgeSecret),
+    'fixed outcome bridge updates through the trusted store and scrubs its error');
+
+    const prunedMcp = await invokeMessage(messageHandler, {
+      action: api.MESSAGE.AUTOMATION_SESSION_PRUNE_MCP,
+      retentionDays: 30
+    }, validSender);
+    check(prunedMcp && prunedMcp.ok === true && prunedMcp.ids.includes('expired-mcp') &&
+          !fake.values.fsbSessionLogs['expired-mcp'] &&
+          !!fake.values.fsbSessionLogs['ancient-autopilot'],
+    'fixed prune bridge removes only expired MCP artifacts and preserves Autopilot history');
+
     const hostileMessages = [
       { action: api.MESSAGE.ELEMENT_CACHE_GET, tabId: 99 },
       { action: api.MESSAGE.ELEMENT_CACHE_GET, pageUrl: 'https://forged.test/' },
       { action: api.MESSAGE.DIAGNOSTIC_APPEND, key: 'skopeo:corpus', value: 'leak' },
+      {
+        action: api.MESSAGE.AUTOMATION_SESSION_UPDATE_OUTCOME,
+        sessionId: 'bridge-session',
+        outcome: outcomePayload,
+        key: 'skopeo:corpus'
+      },
+      {
+        action: api.MESSAGE.AUTOMATION_SESSION_PRUNE_MCP,
+        retentionDays: 30,
+        operation: 'remove'
+      },
       { action: 'storageGet', key: 'skopeo:corpus' },
       { action: 'storageSet', key: 'skopeo:corpus', value: {} },
       { action: 'unknownOperation', operation: 'get', keys: ['skopeo:corpus'] }

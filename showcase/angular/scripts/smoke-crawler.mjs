@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // Phase 216 SMOKE-01..03: production-or-local crawler smoke.
 // Curls marketing routes under GPTBot UA; curls crawler files; resolves every
-// sitemap <loc>. Asserts route-specific titles, canonicals, JSON-LD presence
-// (home), Content-Type headers, and llms-full.txt size budget.
+// sitemap <loc>. Asserts route-specific titles, canonicals, licensed JSON-LD
+// software metadata, Content-Type headers, and llms-full.txt size budget.
 //
 // Run:
 //   npm --prefix showcase/angular run smoke:crawler:local           (local static build)
@@ -15,6 +15,7 @@
 
 const BASE_URL = (process.env.BASE_URL || 'https://full-selfbrowsing.com').replace(/\/$/, '');
 const PROD_HOST = 'https://full-selfbrowsing.com';
+const LICENSE_URL = 'https://github.com/fullselfbrowsing/FSB/blob/main/LICENSE';
 const UA = 'GPTBot';
 
 const failures = [];
@@ -39,22 +40,86 @@ async function fetchText(url, opts = {}) {
   return { status: res.status, contentType: res.headers.get('content-type') || '', body };
 }
 
+// licensedSoftware, where present, selects the SoftwareApplication node whose
+// `license` must be the canonical MIT URL. Routes without one skip the JSON-LD asserts.
 const MARKETING_ASSERTIONS = [
-  { path: '/',               titleSubstr: 'Full Self-Browsing', canonical: `${PROD_HOST}` },
+  { path: '/',               titleSubstr: 'Full Self-Browsing', canonical: `${PROD_HOST}`,
+    licensedSoftware: (node) => node['@type'] === 'SoftwareApplication' && node.name === 'FSB' },
   { path: '/about',          titleSubstr: 'About',              canonical: `${PROD_HOST}/about` },
-  { path: '/agents',         titleSubstr: 'Agents',             canonical: `${PROD_HOST}/agents` },
+  { path: '/agents',         titleSubstr: 'Agents',             canonical: `${PROD_HOST}/agents`,
+    licensedSoftware: (node) => node['@type'] === 'SoftwareApplication'
+      && node['@id'] === `${PROD_HOST}/agents#fsb-skill` },
   { path: '/support',        titleSubstr: 'Support',            canonical: `${PROD_HOST}/support` },
   { path: '/privacy',        titleSubstr: 'Privacy',            canonical: `${PROD_HOST}/privacy` },
   { path: '/lattice',        titleSubstr: 'Lattice',            canonical: `${PROD_HOST}/lattice` },
+  { path: '/concierge',      titleSubstr: 'Concierge',          canonical: `${PROD_HOST}/concierge`,
+    licensedSoftware: (node) => node['@type'] === 'SoftwareApplication'
+      && node['@id'] === `${PROD_HOST}/concierge#concierge-sdk` },
   { path: '/phantom-stream', titleSubstr: 'PhantomStream',      canonical: `${PROD_HOST}/phantom-stream` },
   { path: '/prometheus',     titleSubstr: 'Prometheus',         canonical: `${PROD_HOST}/prometheus` },
   { path: '/sitemaps',       titleSubstr: 'Site Maps',          canonical: `${PROD_HOST}/sitemaps` },
 ];
 
 const EXPECTED_SITEMAP_LOCS = MARKETING_ASSERTIONS.map(({ canonical }) => canonical);
+const EXCLUDED_SITEMAP_LOCS = ['/legal', '/dashboard', '/stats'].map((path) => `${PROD_HOST}${path}`);
+const AEO_MUST_CONTAIN = [
+  'trigger',
+  'stop_trigger',
+  'get_trigger_status',
+  'list_triggers',
+  'search_capabilities',
+  'invoke_capability',
+  'upload_file',
+  'drop_file',
+  '128-app',
+  't1-ready',
+  't1-guarded-fail-closed',
+  'fill_credential',
+  'use_payment_method',
+  'secrets do not cross the MCP bridge',
+  'OpenClaw',
+  'Hermes',
+  'FSB: E-Commerce Autopilot by Grok 4.1',
+  'Flight Booking: Powered by Codex MCP',
+  'OpenClaw Monitoring Doge Price',
+  'An Aha Moment by Claude Opus 4.6',
+  'MIT License',
+  LICENSE_URL,
+];
+const AEO_MUST_NOT_CONTAIN = [
+  'Watch FSB drive Google, search Amazon, and book travel autonomously.',
+  'Claude Opus 4.7',
+];
+
+function extractJsonLdNodes(html) {
+  const nodes = [];
+  const parseErrors = [];
+  const scriptRe = /<script\b[^>]*\btype=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+  let match;
+
+  function visit(value) {
+    if (Array.isArray(value)) {
+      value.forEach(visit);
+      return;
+    }
+    if (!value || typeof value !== 'object') return;
+    nodes.push(value);
+    if (value['@graph']) visit(value['@graph']);
+  }
+
+  while ((match = scriptRe.exec(html)) !== null) {
+    try {
+      visit(JSON.parse(match[1]));
+    } catch (err) {
+      parseErrors.push(err.message);
+    }
+  }
+
+  return { nodes, parseErrors };
+}
 
 async function checkMarketingRoutes() {
-  for (const { path, titleSubstr, canonical } of MARKETING_ASSERTIONS) {
+  for (const { path, titleSubstr, canonical, licensedSoftware } of MARKETING_ASSERTIONS) {
     const url = `${BASE_URL}${path}`;
     let r;
     try {
@@ -68,25 +133,37 @@ async function checkMarketingRoutes() {
     record(r.body.includes(titleSubstr), `GET ${path} body contains title substring "${titleSubstr}"`, '');
     record(r.body.includes(`href="${canonical}"`), `GET ${path} canonical href="${canonical}"`, '');
     record(r.body.includes('<app-root'), `GET ${path} contains <app-root>`, '');
-    if (path === '/') {
+    if (licensedSoftware) {
+      const { nodes, parseErrors } = extractJsonLdNodes(r.body);
       record(
         r.body.includes('type="application/ld+json"'),
-        'GET / contains JSON-LD <script type="application/ld+json">',
+        `GET ${path} contains JSON-LD <script type="application/ld+json">`,
         ''
+      );
+      record(
+        parseErrors.length === 0,
+        `GET ${path} JSON-LD parses`,
+        parseErrors.join('; ')
+      );
+      const software = nodes.find(licensedSoftware);
+      record(
+        software?.license === LICENSE_URL,
+        `GET ${path} SoftwareApplication license is canonical MIT URL`,
+        software ? `actual ${software.license || '(missing)'}` : 'SoftwareApplication node not found'
       );
     }
   }
 }
 
 const CRAWLER_FILES = [
-  { path: '/robots.txt',    ctMatch: /text\/plain/i,        bodyMustContain: 'User-agent: GPTBot' },
-  { path: '/sitemap.xml',   ctMatch: /(application|text)\/xml/i, bodyMustContain: '<urlset' },
-  { path: '/llms.txt',      ctMatch: /text\/plain/i,        bodyMustContain: '# FSB (Full Self-Browsing)' },
-  { path: '/llms-full.txt', ctMatch: /text\/plain/i,        bodyMustContain: '' },
+  { path: '/robots.txt',    ctMatch: /text\/plain/i,        bodyMustContain: ['User-agent: GPTBot'] },
+  { path: '/sitemap.xml',   ctMatch: /(application|text)\/xml/i, bodyMustContain: ['<urlset'] },
+  { path: '/llms.txt',      ctMatch: /text\/plain/i,        bodyMustContain: ['# FSB (Full Self-Browsing)', ...AEO_MUST_CONTAIN], bodyMustNotContain: AEO_MUST_NOT_CONTAIN },
+  { path: '/llms-full.txt', ctMatch: /text\/plain/i,        bodyMustContain: AEO_MUST_CONTAIN, bodyMustNotContain: AEO_MUST_NOT_CONTAIN },
 ];
 
 async function checkCrawlerFiles() {
-  for (const { path, ctMatch, bodyMustContain } of CRAWLER_FILES) {
+  for (const { path, ctMatch, bodyMustContain, bodyMustNotContain } of CRAWLER_FILES) {
     const url = `${BASE_URL}${path}`;
     let r;
     try {
@@ -98,8 +175,11 @@ async function checkCrawlerFiles() {
     record(r.status === 200, `GET ${path} -> 200`, `actual ${r.status}`);
     record(ctMatch.test(r.contentType), `GET ${path} content-type matches ${ctMatch}`, r.contentType);
     record(r.body.length > 0, `GET ${path} body non-empty`, `${r.body.length} chars`);
-    if (bodyMustContain) {
-      record(r.body.includes(bodyMustContain), `GET ${path} body contains "${bodyMustContain}"`, '');
+    for (const expected of bodyMustContain || []) {
+      record(r.body.includes(expected), `GET ${path} body contains "${expected}"`, '');
+    }
+    for (const forbidden of bodyMustNotContain || []) {
+      record(!r.body.includes(forbidden), `GET ${path} body does not contain stale text "${forbidden}"`, '');
     }
     if (path === '/llms-full.txt') {
       const bytes = Buffer.byteLength(r.body, 'utf8');
@@ -124,10 +204,16 @@ async function checkSitemapLocs() {
   const locs = [...r.body.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1].trim());
   const missing = EXPECTED_SITEMAP_LOCS.filter((loc) => !locs.includes(loc));
   const unexpected = locs.filter((loc) => !EXPECTED_SITEMAP_LOCS.includes(loc));
+  const excludedPresent = EXCLUDED_SITEMAP_LOCS.filter((loc) => locs.includes(loc));
   record(
     locs.length === EXPECTED_SITEMAP_LOCS.length && missing.length === 0 && unexpected.length === 0,
     `sitemap has exact expected <loc> set (${EXPECTED_SITEMAP_LOCS.length} entries)`,
     `actual ${locs.length}; missing ${missing.join(', ') || 'none'}; unexpected ${unexpected.join(', ') || 'none'}`
+  );
+  record(
+    excludedPresent.length === 0,
+    'sitemap excludes noindex/client-only routes',
+    excludedPresent.length === 0 ? '/legal, /dashboard, /stats absent' : `present ${excludedPresent.join(', ')}`
   );
   for (const loc of locs) {
     // When running locally, rewrite the prod-host URLs in sitemap.xml to BASE_URL

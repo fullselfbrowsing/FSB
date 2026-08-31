@@ -22,6 +22,7 @@ const { initializeDatabase } = require(path.join(__dirname, '..', 'showcase', 's
 const Queries = require(path.join(__dirname, '..', 'showcase', 'server', 'src', 'db', 'queries'));
 const { hashIp } = require(path.join(__dirname, '..', 'showcase', 'server', 'src', 'utils', 'telemetry-hash'));
 const createTelemetryRouter = require(path.join(__dirname, '..', 'showcase', 'server', 'src', 'routes', 'telemetry'));
+const { createGlobalJsonParser } = require(path.join(__dirname, '..', 'showcase', 'server', 'src', 'middleware', 'global-json-parser'));
 const { resetPerUuidBudget } = require(path.join(__dirname, '..', 'showcase', 'server', 'src', 'middleware', 'telemetry-rate-limit'));
 
 resetPerUuidBudget();
@@ -30,7 +31,20 @@ initializeDatabase(db);
 const queries = new Queries(db);
 const app = express();
 app.set('trust proxy', 1);
+// Match production ordering: the global parser is mounted before the telemetry
+// router, but must skip this namespace so the router's 32 KB parser sees the
+// original request stream.
+app.use(createGlobalJsonParser());
 app.use('/api/telemetry', createTelemetryRouter(db, queries, hashIp));
+// Match the production error-handler ordering. Body-parser forwards an
+// entity.too.large error, which must remain a 413 instead of becoming the
+// server's generic 500 response.
+app.use((err, _req, res, _next) => {
+  if (err && (err.status === 413 || err.type === 'entity.too.large')) {
+    return res.status(413).json({ error: 'payload_too_large' });
+  }
+  return res.status(500).json({ error: 'Internal server error' });
+});
 const server = http.createServer(app).listen(0);
 const port = server.address().port;
 

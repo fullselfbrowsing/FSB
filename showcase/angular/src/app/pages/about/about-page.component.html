@@ -114,7 +114,7 @@
             @for (category of categories; track category.name) {
               <span class="cat-legend-item">
                 <span class="cat-dot" [style.background]="category.color" aria-hidden="true"></span>
-                <span [attr.translate]="'no'">{{ category.name }}</span>
+                <span>{{ category.name }}</span>
                 <span class="cat-count" [attr.translate]="'no'">{{ category.count }}</span>
               </span>
             }
@@ -129,7 +129,7 @@
     <div class="container">
       <div class="section-header reveal">
         <h2 i18n="@@about.actions.title">Action Library</h2>
-        <p i18n="@@about.actions.subtitle">60 browser actions organized by category, all executable through natural language, and surfaced to agents as part of the 66-tool <span [attr.translate]="'no'">MCP</span> catalog.</p>
+        <p i18n="@@about.actions.subtitle">60 browser actions organized by category, all executable through natural language, and surfaced to agents as part of the 68-tool <span [attr.translate]="'no'">MCP</span> catalog.</p>
       </div>
       <div class="action-categories">
         <div class="action-category reveal delay-1">

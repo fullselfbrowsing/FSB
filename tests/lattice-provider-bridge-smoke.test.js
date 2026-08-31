@@ -615,23 +615,26 @@ async function loadOffscreenHandlerSource(chromeMock) {
   // landed handlers).
   // FINT-13 "actually load the adapter in SW" (commit a3c03e6a) adds 1 mention
   // (the ai/lattice-runtime-adapter.js importScripts() call) -> 309.
-  // Phase 52 Plan 52-04 adds 3 mentions: the guarded Skopeo reducer import,
-  // the isolated-controller importScripts comment, and its typeof guard -> 312.
-  // Phase 53.1 Plan 07 adds 4 background-owned Skopeo catalog/policy imports
-  // (profile index, profile schema, capability projector, consequence gate) -> 316.
-  // Phase 53.1 Plan 09 adds the shared Skopeo action-authority import -> 317.
-  // Phase 53.1 Plan 10 adds the trusted consequence-target authority -> 318.
-  // Phase 54 Plan 02 adds the background-only trusted local feature store -> 319.
-  // Phase 54 Plans 03-04 add the remaining six trusted corpus modules -> 325.
-  // Phase 55 Plan 05 adds the five trusted local graph modules -> 330.
-  // Phase 56 Plan 05 adds the six trusted local truth modules -> 336.
-  // Phase 57 Plan 03 adds the closed HUD schema and pure projector -> 338.
-  // Phase 58 Plans 01-03 add Ask schema, Ask engine, decision-policy store,
-  // and decision-policy engine between truth and the HUD boundary -> 342.
-  // Phase 59 Plans 01-03 add alert schema, store, engine, and runtime between
-  // the decision policy and the HUD projection boundary -> 346.
+  // Phase 57 Plan 02 adds the durable MCP-agent provider helper -> 310.
+  // Phase 57 Plan 03 adds the exact MCP client alias helper -> 311.
+  // Phase 61 Plan 06 composes preflight, consent, event-store, and controller
+  // modules in the service worker -> 315. Phase 62 Plan 04 loads the protocol
+  // drift diagnostics pre-throttle -> 316. Phase 63 Plan 08 loads the native
+  // wake controller -> 317. Phase 64 Plan 09 loads the canonical delegation
+  // provider helper -> 318. PR #105 adds the MCP session recorder plus three
+  // Google Sheets support loads -> 322. The native-host install-command
+  // projector adds one pure shared helper -> 323.
+  // Quick 260728-k2v loads the animated action-icon module -> 324. The
+  // replay manifest helper adds one classic-SW load -> 325, and the durable
+  // MCP Lattice journal adds one classic-SW load -> 326. The export helper is
+  // mention 327, and screenshot capture adds the CDP lease, capture engine,
+  // and attachment helper -> 330. Agent tab-spawn provenance and shared model
+  // discovery add two more classic-SW loads -> 332. The delegation tab seed
+  // (side-panel active tab handed to the delegated agent) adds one -> 333.
+  // Merging the Skopeo runtime adds 37 mentions while main's provider,
+  // delegation, replay, native-host, and screenshot work adds 24.
   const importScriptsCount = (bgSource.match(/importScripts/g) || []).length;
-  passAssertEqual(importScriptsCount, 346, 'background.js importScripts count = 346 (including the trusted Phase 59 alert chain)');
+  passAssertEqual(importScriptsCount, 370, 'background.js importScripts count includes both Skopeo and main runtime families');
   // Companion call-site-only count (regex requires open paren): Phase 5 baseline
   // was 150 actual importScripts() calls; Phase 6 adds 1 -> 151; Phase 8 adds 1 -> 152;
   // Phase 14 adds 2 (trigger-store + trigger-lifecycle) -> 154; Phase 15 adds 2
@@ -664,19 +667,24 @@ async function loadOffscreenHandlerSource(chromeMock) {
   // (+14 handler importScripts() calls vs. the pre-review 290 pin).
   // FINT-13 "actually load the adapter in SW" (commit a3c03e6a) adds 1 call site
   // (ai/lattice-runtime-adapter.js) -> 305.
-  // Phase 52 Plan 52-04 adds the guarded Skopeo reducer import -> 306.
-  // Phase 53.1 Plan 07 adds the 4 background-owned Skopeo imports -> 310.
-  // Phase 53.1 Plan 09 adds the shared Skopeo action-authority import -> 311.
-  // Phase 53.1 Plan 10 adds the trusted consequence-target authority -> 312.
-  // Phase 54 Plan 02 adds the background-only trusted local feature store -> 313.
-  // Phase 54 Plans 03-04 add the remaining six trusted corpus call sites -> 319.
-  // Phase 55 Plan 05 adds the five trusted local graph call sites -> 324.
-  // Phase 56 Plan 05 adds the six trusted local truth call sites -> 330.
-  // Phase 57 Plan 03 adds the two trusted HUD call sites -> 332.
-  // Phase 58 Plans 01-03 add four trusted Ask/policy call sites -> 336.
-  // Phase 59 Plans 01-03 add four trusted alert call sites -> 340.
+  // Phase 57 Plan 02 adds one helper call site -> 306.
+  // Phase 57 Plan 03 adds the alias helper call site -> 307.
+  // Phase 61 Plan 06 adds four delegation composition call sites -> 311.
+  // Phase 62 Plan 04 adds the protocol drift diagnostics call site -> 312.
+  // Phase 63 Plan 08 adds the native wake controller call site -> 313.
+  // Phase 64 Plan 09 adds the canonical delegation provider helper -> 314.
+  // PR #105 adds four call sites -> 318. The native-host install-command
+  // projector adds one pure shared helper call site -> 319.
+  // Quick 260728-k2v adds the animated action-icon module call site -> 320;
+  // the replay manifest helper is call site 321, and the durable MCP Lattice
+  // journal is call site 322. The export helper is call site 323, and screenshot
+  // capture adds three call sites -> 326. Agent tab-spawn provenance and
+  // shared model discovery add two more call sites -> 328. The delegation tab
+  // seed is call site 329.
+  // The same union contains 35 Skopeo and 24 main call sites beyond the
+  // shared 305-call baseline.
   const importScriptsCallSites = (bgSource.match(/importScripts\(/g) || []).length;
-  passAssertEqual(importScriptsCallSites, 340, 'background.js importScripts() call sites = 340 (including the trusted Phase 59 alert chain)');
+  passAssertEqual(importScriptsCallSites, 364, 'background.js importScripts() call sites include both Skopeo and main runtime families');
 
   const corpusLoadOrder = [
     'utils/capability-fetch.js',
@@ -706,7 +714,7 @@ async function loadOffscreenHandlerSource(chromeMock) {
   ].map(file => bgLines.findIndex(line => line.includes("importScripts('" + file + "')")));
   passAssert(
     hudLoadOrder.every((line, index) => line >= 0 && (index === 0 || line === hudLoadOrder[index - 1] + 1)),
-    'order: truth engine -> Ask schema/engine -> policy store/engine -> alert schema/store/engine/runtime -> HUD schema/projector, exactly once and adjacent'
+    'order: truth -> Ask -> policy -> alert -> HUD modules is exactly-once and adjacent'
   );
 
   const lineCli = bgLines.findIndex(l => /importScripts\(['"]ai\/cli-parser\.js['"]\)/.test(l));
@@ -857,12 +865,16 @@ async function loadOffscreenHandlerSource(chromeMock) {
   // Load-order fix: checkApiConnection reads DOM inputs, but the premature page-init
   // call ran BEFORE loadSettings' async chrome.storage.local.get callback populated
   // them, so it read empty fields and falsely showed 'No API Key'. The call is removed
-  // from init and now runs as the last statement of loadSettings' model-name setTimeout
-  // (after apiKey + provider + modelName are all populated).
+  // from init and now runs after awaited, successful hosted-model discovery
+  // (after provider inputs and modelName are populated). LM Studio intentionally
+  // skips automatic inference and leaves Test Connection as an explicit action.
   passAssertEqual((optionsSrc.match(/\/\/ Check API connection/g) || []).length, 0,
     "options.js dropped the premature page-init '// Check API connection' call (load-order fix)");
-  passAssert(/checkApiConnection\(\);\s*\}, 100\);/.test(optionsSrc),
-    'checkApiConnection() now runs as the last statement of the loadSettings model-name setTimeout (inputs populated first)');
+  passAssert(
+    /discoveryResult = await setProviderSelection\([\s\S]*?settings\.modelProvider === ['"]lmstudio['"][\s\S]*?discoveryResult && discoveryResult\.ok && discoveryResult\.selectedModel[\s\S]*?checkApiConnection\(\);/.test(optionsSrc)
+      && !/providerSettingsModelLoadTimer\s*=\s*setTimeout/.test(optionsSrc),
+    'loadSettings awaits model discovery and auto-tests only successfully discovered hosted providers'
+  );
 
   // ---- Part 6: INV byte-freeze regression assertions (Plan 06-05 fill) ----
   console.log('\n--- Part 6: INV-04 / INV-01 / INV-02 / INV-05 / INV-06 byte-freeze ---');

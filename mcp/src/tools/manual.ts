@@ -4,6 +4,7 @@ import type { TaskQueue } from '../queue.js';
 import { AgentScope } from '../agent-scope.js';
 import { sendAgentScopedBridgeMessage, targetTabIdFromParams } from '../agent-bridge.js';
 import { mapFSBError } from '../errors.js';
+import { screenshotStore, type ManagedScreenshotAttestor } from '../screenshot-store.js';
 import {
   TOOL_REGISTRY,
   jsonSchemaToZod,
@@ -90,7 +91,13 @@ function validateVisualSessionFields(
  * leaving them in the payload would noise up the bridge wire.
  */
 function stripVisualSessionFields(params: Record<string, unknown>): Record<string, unknown> {
-  const { visual_reason: _vr, client: _cl, is_final: _if, ...rest } = params;
+  const {
+    visual_reason: _vr,
+    client: _cl,
+    is_final: _if,
+    managedScreenshotAttested: _managedScreenshotAttested,
+    ...rest
+  } = params;
   return rest;
 }
 
@@ -129,6 +136,10 @@ type VisualSessionSidecar = {
   isFinal: boolean;
 };
 
+type ManualToolOptions = {
+  screenshotAttestor?: ManagedScreenshotAttestor;
+};
+
 function buildVisualSessionSidecar(params: Record<string, unknown>): VisualSessionSidecar {
   const reasonRaw = params.visual_reason;
   const clientRaw = params.client;
@@ -156,6 +167,7 @@ async function execAction(
   fsbVerb: string,
   params: Record<string, unknown>,
   visualSession: VisualSessionSidecar | null,
+  screenshotAttestor: ManagedScreenshotAttestor,
 ): Promise<ToolCallResult> {
   if (!bridge.isConnected) {
     console.error(`[FSB Manual] ${toolName}: bridge not connected`);
@@ -169,6 +181,21 @@ async function execAction(
 
   return queue.enqueue(toolName, async () => {
     try {
+      let outboundParams = params;
+      let managedScreenshotAttested = false;
+      if (toolName === 'upload_file' && typeof params.file_path === 'string') {
+        let canonicalPath: string | null = null;
+        try {
+          canonicalPath = await screenshotAttestor.attestManagedPath(params.file_path);
+        } catch (_error) {
+          // The extension's default /.fsb/ deny rule remains authoritative.
+        }
+        if (canonicalPath) {
+          outboundParams = { ...params, file_path: canonicalPath };
+          managedScreenshotAttested = true;
+        }
+      }
+
       // Phase 256 Plan 02: when the visual-session sidecar is present, attach
       // it as a TOP-LEVEL field on the bridge payload base object (not inside
       // `params`). sendAgentScopedBridgeMessage merges agentId, ownershipToken,
@@ -177,9 +204,12 @@ async function execAction(
       // lifecycle code (Phase 256 Plan 03) reads after the v0.9.60 ownership
       // gate fires. The action params shipped under `params` stay scrubbed
       // (Phase 255 strip preserved verbatim).
-      const basePayload: Record<string, unknown> = { tool: fsbVerb, params };
+      const basePayload: Record<string, unknown> = { tool: fsbVerb, params: outboundParams };
       if (visualSession) {
         basePayload.visualSession = visualSession;
+      }
+      if (managedScreenshotAttested) {
+        basePayload.managedScreenshotAttested = true;
       }
       const result = await sendAgentScopedBridgeMessage(
         bridge,
@@ -211,7 +241,9 @@ export function registerManualTools(
   bridge: WebSocketBridge,
   queue: TaskQueue,
   agentScope: AgentScope,
+  options?: ManualToolOptions,
 ): void {
+  const screenshotAttestor = options?.screenshotAttestor ?? screenshotStore;
   // Filter to non-read-only tools from canonical registry
   const manualTools = TOOL_REGISTRY.filter(isManualTool);
 
@@ -250,7 +282,16 @@ export function registerManualTools(
 
         const cleanedParams = stripVisualSessionFields(params);
         const finalParams = transform ? transform(cleanedParams) : cleanedParams;
-        return execAction(bridge, queue, agentScope, tool.name, fsbVerb, finalParams, visualSession);
+        return execAction(
+          bridge,
+          queue,
+          agentScope,
+          tool.name,
+          fsbVerb,
+          finalParams,
+          visualSession,
+          screenshotAttestor,
+        );
       },
     );
   }

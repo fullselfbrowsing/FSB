@@ -12,7 +12,8 @@ const FIXTURE_ROOT = path.join(__dirname, 'fixtures', 'skopeo-release-evals');
 const MANIFEST_PATH = path.join(FIXTURE_ROOT, 'manifest.json');
 const CASES_PATH = path.join(FIXTURE_ROOT, 'cases.json');
 const UAT_PATH = path.join(
-  ROOT, '.planning', 'phases', '59-current-user-alerts-release-hardening', '59-HUMAN-UAT.md'
+  ROOT, '.planning', 'milestones', 'v1.2.0-SKOPEO-phases',
+  '59-current-user-alerts-release-hardening', '59-HUMAN-UAT.md'
 );
 const PACKAGE_PATH = path.join(ROOT, 'package.json');
 const RED_MARKER = 'skopeo release aggregate: RED';

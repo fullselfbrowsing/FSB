@@ -1283,6 +1283,81 @@ var init_canonicalize = __esm({
 });
 
 // node_modules/lattice/dist/runtime-D25ehzCj.js
+function inferMediaType(value, options) {
+  if (options.mediaType !== void 0) return options.mediaType;
+  if (isBlobLike(value) && value.type !== "") return value.type;
+  if (typeof value === "string") return src_default.getType(value) ?? options.defaultMediaType;
+  return options.defaultMediaType;
+}
+function measureArtifactValue(value, kind) {
+  if (kind === "text" && typeof value === "string") return measureString(value);
+  if (kind === "json") {
+    const serialized = JSON.stringify(value);
+    return serialized === void 0 ? void 0 : measureString(serialized);
+  }
+  if (isBlobLike(value)) return { bytes: value.size };
+}
+function measureString(value) {
+  return {
+    characters: value.length,
+    bytes: textEncoder$1.encode(value).byteLength
+  };
+}
+function isBlobLike(value) {
+  return typeof Blob !== "undefined" && value instanceof Blob;
+}
+function toArtifactRef(input) {
+  return {
+    id: input.id,
+    kind: input.kind,
+    source: input.source,
+    privacy: input.privacy,
+    ...input.mediaType !== void 0 ? { mediaType: input.mediaType } : {},
+    ...input.label !== void 0 ? { label: input.label } : {},
+    ...input.metadata !== void 0 ? { metadata: input.metadata } : {},
+    ...input.size !== void 0 ? { size: input.size } : {},
+    ...input.fingerprint !== void 0 ? { fingerprint: input.fingerprint } : {},
+    ...input.storage !== void 0 ? { storage: input.storage } : {},
+    ...input.lineage !== void 0 ? { lineage: input.lineage } : {}
+  };
+}
+function createArtifact(kind, source, value, options, defaultMediaType) {
+  const mediaType = inferMediaType(value, {
+    kind,
+    ...options.mediaType !== void 0 ? { mediaType: options.mediaType } : {},
+    ...defaultMediaType !== void 0 ? { defaultMediaType } : {}
+  });
+  const size = options.size ?? measureArtifactValue(value, kind);
+  return {
+    id: options.id ?? createArtifactId(kind),
+    kind,
+    source,
+    value,
+    privacy: options.privacy ?? "standard",
+    ...mediaType !== void 0 ? { mediaType } : {},
+    ...options.label !== void 0 ? { label: options.label } : {},
+    ...options.metadata !== void 0 ? { metadata: options.metadata } : {},
+    ...size !== void 0 ? { size } : {},
+    ...options.fingerprint !== void 0 ? { fingerprint: options.fingerprint } : {},
+    ...options.storage !== void 0 ? { storage: options.storage } : {},
+    ...options.lineage !== void 0 ? { lineage: options.lineage } : {}
+  };
+}
+function defaultMediaTypeForKind(kind) {
+  switch (kind) {
+    case "text":
+      return "text/plain";
+    case "json":
+    case "tool-result":
+      return "application/json";
+    default:
+      return;
+  }
+}
+function createArtifactId(kind) {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return `artifact:${kind}:${crypto.randomUUID()}`;
+  return `artifact:${kind}:${Date.now()}:${Math.random().toString(16).slice(2)}`;
+}
 function freezeContext(ctx) {
   let cloned;
   try {
@@ -1413,6 +1488,9 @@ function canonicalizeReceiptBody(body) {
 function base64Encode(bytes) {
   return Buffer.from(bytes).toString("base64");
 }
+function base64Decode(value) {
+  return new Uint8Array(Buffer.from(value, "base64"));
+}
 function buildPae(payloadType, payloadBase64) {
   const ascii = "DSSEv1 " + payloadType.length.toString() + " " + payloadType + " " + payloadBase64.length.toString() + " " + payloadBase64;
   return textEncoder.encode(ascii);
@@ -1424,6 +1502,17 @@ function encodeEnvelope(input) {
     signatures: input.signatures.map((entry) => ({
       keyid: entry.keyid,
       sig: base64Encode(entry.sig)
+    }))
+  };
+}
+function decodeEnvelope(envelope) {
+  if (envelope.payloadType !== "application/vnd.lattice.receipt+json") throw new Error(`envelope payloadType mismatch: expected "${PAYLOAD_TYPE}" got "${envelope.payloadType}"`);
+  return {
+    payloadType: envelope.payloadType,
+    payloadBytes: base64Decode(envelope.payload),
+    signatures: envelope.signatures.map((entry) => ({
+      keyid: entry.keyid,
+      sig: base64Decode(entry.sig)
     }))
   };
 }
@@ -1655,12 +1744,55 @@ function createNoopSurvivabilityAdapter(options = {}) {
     }
   };
 }
-var textEncoder$1, BAND, BAND_ORDER, PIPELINE_FROZEN_ERROR_NAME, HOOK_TIMEOUT_EVENT_NAME, encoder, PAYLOAD_TYPE, textEncoder, DEFAULT_REDACTION_POLICY_ID, STEP_TRANSITION_EVENT_NAME, DEFAULT_CHECKPOINT_BAND, DEFAULT_MODEL, DEFAULT_ROUTE, DEFAULT_USAGE;
+var textEncoder$1, artifact, BAND, BAND_ORDER, PIPELINE_FROZEN_ERROR_NAME, HOOK_TIMEOUT_EVENT_NAME, encoder, PAYLOAD_TYPE, textEncoder, DEFAULT_REDACTION_POLICY_ID, STEP_TRANSITION_EVENT_NAME, DEFAULT_CHECKPOINT_BAND, DEFAULT_MODEL, DEFAULT_ROUTE, DEFAULT_USAGE;
 var init_runtime_D25ehzCj = __esm({
   "node_modules/lattice/dist/runtime-D25ehzCj.js"() {
     init_src();
     init_canonicalize();
     textEncoder$1 = new TextEncoder();
+    artifact = {
+      text(value, options = {}) {
+        return createArtifact("text", "inline", value, options, "text/plain");
+      },
+      json(value, options = {}) {
+        return createArtifact("json", "inline", value, options, "application/json");
+      },
+      file(value, options = {}) {
+        return createArtifact("file", "file", value, options);
+      },
+      image(value, options = {}) {
+        return createArtifact("image", "file", value, options);
+      },
+      audio(value, options = {}) {
+        return createArtifact("audio", "file", value, options);
+      },
+      document(value, options = {}) {
+        return createArtifact("document", "file", value, options);
+      },
+      url(value, options = {}) {
+        return createArtifact("url", "url", value.toString(), options);
+      },
+      toolResult(value, options) {
+        return createArtifact("tool-result", "tool", value, {
+          ...options,
+          metadata: {
+            ...options.metadata,
+            toolName: options.toolName,
+            ...options.callId !== void 0 ? { callId: options.callId } : {}
+          }
+        }, "application/json");
+      },
+      derive(input) {
+        const { kind, source = "generated", value, parents, transform, ...options } = input;
+        return createArtifact(kind, source, value, {
+          ...options,
+          lineage: {
+            parents: parents.map(toArtifactRef),
+            transform
+          }
+        }, defaultMediaTypeForKind(kind));
+      }
+    };
     BAND = {
       SAFETY: 0,
       OBSERVABILITY: 1,
@@ -1696,8 +1828,27 @@ var init_runtime_D25ehzCj = __esm({
   }
 });
 
+// node_modules/lattice/dist/run-crew-CKdBjh5P.js
+async function receiptCid(envelope) {
+  const bytes = Uint8Array.from(atob(envelope.payload), (c) => c.charCodeAt(0));
+  const copy = new Uint8Array(bytes.byteLength);
+  copy.set(bytes);
+  const digest = await crypto.subtle.digest("SHA-256", copy.buffer);
+  return `sha256:${Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("")}`;
+}
+var encoder2, LEAF_DOMAIN, NODE_DOMAIN;
+var init_run_crew_CKdBjh5P = __esm({
+  "node_modules/lattice/dist/run-crew-CKdBjh5P.js"() {
+    init_canonicalize();
+    encoder2 = new TextEncoder();
+    LEAF_DOMAIN = encoder2.encode("lattice-lineage-leaf-v1:");
+    NODE_DOMAIN = encoder2.encode("lattice-lineage-node-v1:");
+  }
+});
+
 // node_modules/lattice/dist/index.js
 init_runtime_D25ehzCj();
+init_run_crew_CKdBjh5P();
 init_canonicalize();
 function luhn(digits) {
   const cleaned = digits.replace(/\D/g, "");
@@ -1809,6 +1960,13 @@ function defaultCapabilityForProvider(providerId) {
     available: true
   };
 }
+function createMemoryKeySet(entries) {
+  const byKid = /* @__PURE__ */ new Map();
+  for (const entry of entries) byKid.set(entry.kid, entry);
+  return { lookup(kid) {
+    return byKid.get(kid);
+  } };
+}
 var ALG = "Ed25519";
 function toArrayBuffer$1(bytes) {
   const copy = new Uint8Array(bytes.byteLength);
@@ -1818,6 +1976,9 @@ function toArrayBuffer$1(bytes) {
 async function importEd25519PrivateKey(jwk) {
   return crypto.subtle.importKey("jwk", jwk, ALG, true, ["sign"]);
 }
+async function importEd25519PublicKey(jwk) {
+  return crypto.subtle.importKey("jwk", jwk, ALG, true, ["verify"]);
+}
 async function generateEd25519KeyPairJwk() {
   const pair = await crypto.subtle.generateKey(ALG, true, ["sign", "verify"]);
   const [privateKeyJwk, publicKeyJwk] = await Promise.all([crypto.subtle.exportKey("jwk", pair.privateKey), crypto.subtle.exportKey("jwk", pair.publicKey)]);
@@ -1825,6 +1986,19 @@ async function generateEd25519KeyPairJwk() {
     privateKeyJwk,
     publicKeyJwk
   };
+}
+async function verifyEd25519Signature(publicKeyJwk, message, signature) {
+  let key;
+  try {
+    key = await importEd25519PublicKey(publicKeyJwk);
+  } catch {
+    return false;
+  }
+  try {
+    return await crypto.subtle.verify(ALG, key, toArrayBuffer$1(signature), toArrayBuffer$1(message));
+  } catch {
+    return false;
+  }
 }
 function createInMemorySigner(privateKeyJwk, options) {
   let cachedKey;
@@ -1840,6 +2014,68 @@ function createInMemorySigner(privateKeyJwk, options) {
       const sig = await crypto.subtle.sign(ALG, key, toArrayBuffer$1(bytes));
       return new Uint8Array(sig);
     }
+  };
+}
+function fail$1(kind, message) {
+  return {
+    ok: false,
+    error: {
+      kind,
+      message
+    }
+  };
+}
+function bytesEqual(a, b) {
+  if (a.byteLength !== b.byteLength) return false;
+  for (let i = 0; i < a.byteLength; i += 1) if (a[i] !== b[i]) return false;
+  return true;
+}
+function asReceiptBody(value) {
+  if (typeof value !== "object" || value === null) return void 0;
+  const v = value;
+  if (v.version !== void 0 && v.version !== "lattice-receipt/v1" && v.version !== "lattice-receipt/v1.1" && v.version !== "lattice-receipt/v1.2" && v.version !== "lattice-receipt/v1.3") return;
+  if (typeof v.receiptId !== "string") return void 0;
+  if (typeof v.runId !== "string") return void 0;
+  if (typeof v.issuedAt !== "string") return void 0;
+  if (typeof v.kid !== "string") return void 0;
+  if (typeof v.model !== "object" || v.model === null) return void 0;
+  if (typeof v.route !== "object" || v.route === null) return void 0;
+  if (typeof v.usage !== "object" || v.usage === null) return void 0;
+  if (typeof v.contractVerdict !== "string") return void 0;
+  if (!Array.isArray(v.inputHashes)) return void 0;
+  if (typeof v.redactionPolicyId !== "string") return void 0;
+  if (!Array.isArray(v.redactions)) return void 0;
+  return v;
+}
+async function verifyReceipt(envelope, keySet) {
+  let decoded;
+  try {
+    decoded = decodeEnvelope(envelope);
+  } catch (error) {
+    return fail$1("envelope-malformed", error instanceof Error ? error.message : String(error));
+  }
+  if (decoded.signatures.length === 0) return fail$1("envelope-malformed", "envelope has no signatures");
+  let parsed;
+  try {
+    parsed = JSON.parse(new TextDecoder().decode(decoded.payloadBytes));
+  } catch (error) {
+    return fail$1("envelope-malformed", `payload is not valid JSON: ${error instanceof Error ? error.message : String(error)}`);
+  }
+  const body = asReceiptBody(parsed);
+  if (body === void 0) return fail$1("version-mismatch", "receipt body is not a lattice-receipt/v1.1, lattice-receipt/v1.2, or lattice-receipt/v1.3 shape");
+  if (body.version === void 0 || body.version === "lattice-receipt/v1") return fail$1("schema-version-too-low", "Receipt body.version must be 'lattice-receipt/v1.1', 'lattice-receipt/v1.2', or 'lattice-receipt/v1.3' \u2014 v1 receipts are not accepted (CRYPTO-01).");
+  const firstSig = decoded.signatures[0];
+  const entry = keySet.lookup(firstSig.keyid);
+  if (entry === void 0) return fail$1("key-not-found", `keySet has no entry for kid "${firstSig.keyid}"`);
+  if (entry.state === "revoked") return fail$1("key-revoked", `key "${entry.kid}" is revoked`);
+  if (!bytesEqual(canonicalizeReceiptBody(body), decoded.payloadBytes)) return fail$1("canonicalization-mismatch", "re-canonicalized body does not match signed payload bytes");
+  const pae = buildPae(PAYLOAD_TYPE, base64Encode(decoded.payloadBytes));
+  if (!await verifyEd25519Signature(entry.publicKeyJwk, pae, firstSig.sig)) return fail$1("signature-invalid", "Ed25519 signature does not verify");
+  if (body.kid !== entry.kid) return fail$1("signature-invalid", `body.kid "${body.kid}" does not match envelope keyid "${entry.kid}"`);
+  return {
+    ok: true,
+    body,
+    keyState: entry.state
   };
 }
 function packagedPlanForArtifact(request, artifactId) {
@@ -14683,6 +14919,243 @@ function reasoningTokensFromUsage(usage) {
 function isRecord(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
+function createExecutionPlan(input) {
+  const selected = input.route.selected;
+  const status = selected === void 0 ? "no-route" : "planned";
+  const contextWarnings = input.context?.warnings ?? [];
+  const packagingWarnings = input.providerPackaging?.warnings ?? [];
+  const warnings = [
+    ...input.warnings ?? [],
+    ...contextWarnings,
+    ...packagingWarnings,
+    ...input.route.noRouteReasons.map((reason) => reason.message)
+  ];
+  return {
+    id: createPlanId(),
+    kind: "execution-plan",
+    version: 1,
+    createdAt: (/* @__PURE__ */ new Date()).toISOString(),
+    status,
+    task: input.task,
+    outputNames: Object.keys(input.outputs),
+    artifactRefs: input.artifacts,
+    route: input.route,
+    stages: createDefaultStages(status, input.artifacts, warnings),
+    ...input.context !== void 0 ? { context: input.context } : {},
+    ...input.providerPackaging !== void 0 ? { providerPackaging: input.providerPackaging } : {},
+    attempts: selected === void 0 ? [] : [{
+      providerId: selected.providerId,
+      modelId: selected.modelId,
+      status: "pending"
+    }],
+    warnings,
+    ...input.metadata !== void 0 ? { metadata: input.metadata } : {}
+  };
+}
+function createDefaultStages(status, artifacts, warnings) {
+  const skipped = status === "no-route";
+  const artifactIds = artifacts.map((artifact2) => artifact2.id);
+  return [
+    {
+      id: "stage:analysis",
+      kind: "analysis",
+      status: "completed",
+      inputArtifacts: artifactIds,
+      warnings: []
+    },
+    {
+      id: "stage:transforms",
+      kind: "transforms",
+      status: "pending",
+      inputArtifacts: artifactIds,
+      warnings: []
+    },
+    {
+      id: "stage:context-packing",
+      kind: "context-packing",
+      status: "completed",
+      inputArtifacts: artifactIds,
+      warnings: []
+    },
+    {
+      id: "stage:provider-packaging",
+      kind: "provider-packaging",
+      status: skipped ? "skipped" : "completed",
+      inputArtifacts: artifactIds,
+      warnings
+    },
+    {
+      id: "stage:tool-execution",
+      kind: "tool-execution",
+      status: "pending",
+      warnings: []
+    },
+    {
+      id: "stage:execution",
+      kind: "execution",
+      status: skipped ? "skipped" : "pending",
+      warnings: skipped ? warnings : []
+    },
+    {
+      id: "stage:validation",
+      kind: "validation",
+      status: skipped ? "skipped" : "pending",
+      warnings: []
+    },
+    {
+      id: "stage:tripwire",
+      kind: "tripwire",
+      status: skipped ? "skipped" : "pending",
+      warnings: []
+    },
+    {
+      id: "stage:persistence",
+      kind: "persistence",
+      status: "pending",
+      warnings: []
+    }
+  ];
+}
+function createPlanId() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return `plan:${crypto.randomUUID()}`;
+  return `plan:${Date.now()}:${Math.random().toString(16).slice(2)}`;
+}
+var latticeVersion = "1.4.0";
+function asMaterializationError(value) {
+  return typeof value === "object" && value !== null && typeof value.kind === "string" && typeof value.message === "string";
+}
+function fail(kind, message) {
+  return {
+    kind,
+    message
+  };
+}
+async function materializeReplayEnvelope(receipt, options) {
+  const verifyResult = await verifyReceipt(receipt, options.keySet);
+  if (!verifyResult.ok) throw fail(verifyResult.error.kind === "envelope-malformed" ? "envelope-malformed" : "verify-failed", verifyResult.error.message);
+  const body = verifyResult.body;
+  const loadedInputs = [];
+  for (const hash of body.inputHashes) {
+    if (hash === "") continue;
+    try {
+      const input = await options.artifactLoader(hash);
+      loadedInputs.push(input);
+    } catch (error) {
+      throw fail("artifact-load-failed", error instanceof Error ? error.message : asMaterializationError(error) ? error.message : String(error));
+    }
+  }
+  const artifactRefs = loadedInputs.map(toArtifactRef);
+  const outputsMap = options.outputs !== void 0 ? Object.fromEntries(Object.keys(options.outputs).map((k) => [k, "text"])) : {};
+  const plan = createExecutionPlan({
+    task: options.task ?? "",
+    artifacts: artifactRefs,
+    outputs: outputsMap,
+    route: {
+      catalogVersion: "materialized",
+      selected: {
+        providerId: body.route.providerId,
+        modelId: body.route.capabilityId,
+        score: 0,
+        estimates: {
+          inputTokens: 0,
+          outputTokens: 0
+        },
+        inputModalities: [],
+        outputModalities: [],
+        fileTransport: []
+      },
+      candidates: [],
+      rejected: [],
+      fallbackChain: [],
+      noRouteReasons: []
+    },
+    warnings: [],
+    metadata: {
+      materialized: true,
+      receiptId: body.receiptId,
+      runId: body.runId,
+      contractVerdict: body.contractVerdict,
+      ...options.policy !== void 0 ? { policy: { ...options.policy } } : {}
+    }
+  });
+  const usage = {
+    inputTokens: body.usage.promptTokens,
+    outputTokens: body.usage.completionTokens,
+    ...body.usage.costUsd !== null ? { costUsd: Number(body.usage.costUsd) } : {}
+  };
+  return {
+    kind: "replay-envelope",
+    version: 1,
+    runtimeVersion: latticeVersion,
+    catalogVersion: "materialized",
+    createdAt: (/* @__PURE__ */ new Date()).toISOString(),
+    plan,
+    artifacts: artifactRefs,
+    ...options.outputs !== void 0 ? { outputs: options.outputs } : {},
+    warnings: [],
+    errors: [],
+    usage,
+    events: [],
+    receipt,
+    ...options.contract !== void 0 ? { contract: options.contract } : {}
+  };
+}
+async function replayOffline(envelope) {
+  const replayedUsage = envelopeUsage(envelope);
+  if (envelope.outputs === void 0) return {
+    ok: false,
+    error: {
+      kind: "execution_unavailable",
+      message: "Replay envelope does not contain successful outputs."
+    },
+    usage: replayedUsage,
+    plan: envelope.plan,
+    events: envelope.events
+  };
+  return {
+    ok: true,
+    outputs: envelope.outputs,
+    artifacts: envelope.artifacts,
+    usage: replayedUsage,
+    plan: envelope.plan,
+    events: envelope.events
+  };
+}
+function envelopeUsage(envelope) {
+  if (envelope.usage === void 0) return {
+    promptTokens: 0,
+    completionTokens: 0,
+    costUsd: null
+  };
+  return {
+    promptTokens: envelope.usage.inputTokens ?? 0,
+    completionTokens: envelope.usage.outputTokens ?? 0,
+    costUsd: envelope.usage.costUsd ?? null
+  };
+}
+function matches(matcher, value) {
+  if (matcher === void 0) return true;
+  if (value === void 0) return false;
+  if (typeof matcher === "string") return matcher === value;
+  return matcher.test(value);
+}
+function createPermissionContext(rules) {
+  return {
+    kind: "permission-context",
+    decide(input) {
+      for (const rule of rules) {
+        if (!matches(rule.toolName, input.toolName)) continue;
+        if (rule.resource !== void 0 && !matches(rule.resource, input.resource)) continue;
+        if (rule.verdict === "allow") return { allow: true };
+        return {
+          allow: false,
+          reason: rule.reason ?? `denied by permission rule for ${input.toolName}`
+        };
+      }
+      return { allow: true };
+    }
+  };
+}
 var MEDIA_INLINE_LIMIT_BYTES = 100 * 1024 * 1024;
 var PDF_INLINE_LIMIT_BYTES = 50 * 1024 * 1024;
 var textEncoder2 = new TextEncoder();
@@ -14759,14 +15232,105 @@ function computeHeaders(providerKey, config) {
 console.log(HOST_TAG, "boot: Plan 05-04 offscreen Lattice host loaded");
 var survivability = createNoopSurvivabilityAdapter({ id: "fsb-offscreen-noop" });
 console.log(HOST_TAG, "survivability adapter id:", survivability.id, "kind:", survivability.kind);
+var REPLAY_KEY_DB = "fsb-lattice-replay";
+var REPLAY_KEY_STORE = "signing-keys";
+var REPLAY_ACTIVE_KEY_ID = "active";
 var signer = null;
-(async () => {
-  const { privateKeyJwk, publicKeyJwk } = await generateEd25519KeyPairJwk();
-  signer = createInMemorySigner(privateKeyJwk, { kid: "fsb-offscreen-ephemeral", publicKeyJwk });
-  console.log(HOST_TAG, "ephemeral signer ready");
-})().catch((err) => {
-  console.error(HOST_TAG, "boot init failed:", err && err.message ? err.message : err);
+var signerRecord = null;
+var signerPersistent = false;
+function openReplayKeyDb() {
+  return new Promise((resolve, reject) => {
+    if (typeof indexedDB === "undefined") {
+      reject(new Error("IndexedDB unavailable"));
+      return;
+    }
+    const request = indexedDB.open(REPLAY_KEY_DB, 1);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(REPLAY_KEY_STORE)) {
+        db.createObjectStore(REPLAY_KEY_STORE, { keyPath: "id" });
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error || new Error("Could not open replay key database"));
+  });
+}
+async function readReplaySigningRecord() {
+  const db = await openReplayKeyDb();
+  try {
+    return await new Promise((resolve, reject) => {
+      const request = db.transaction(REPLAY_KEY_STORE, "readonly").objectStore(REPLAY_KEY_STORE).get(REPLAY_ACTIVE_KEY_ID);
+      request.onsuccess = () => resolve(request.result || null);
+      request.onerror = () => reject(request.error || new Error("Could not read replay signing key"));
+    });
+  } finally {
+    db.close();
+  }
+}
+async function writeReplaySigningRecord(record) {
+  const db = await openReplayKeyDb();
+  try {
+    await new Promise((resolve, reject) => {
+      const request = db.transaction(REPLAY_KEY_STORE, "readwrite").objectStore(REPLAY_KEY_STORE).put(record);
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error || new Error("Could not persist replay signing key"));
+    });
+  } finally {
+    db.close();
+  }
+}
+function replayKid() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return "fsb-replay-" + crypto.randomUUID();
+  }
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return "fsb-replay-" + Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+async function loadOrCreateReplaySigner() {
+  let record = await readReplaySigningRecord();
+  if (!record) {
+    const pair = await generateEd25519KeyPairJwk();
+    record = {
+      id: REPLAY_ACTIVE_KEY_ID,
+      kid: replayKid(),
+      privateKeyJwk: pair.privateKeyJwk,
+      publicKeyJwk: pair.publicKeyJwk,
+      createdAt: (/* @__PURE__ */ new Date()).toISOString()
+    };
+    await writeReplaySigningRecord(record);
+  }
+  signerRecord = record;
+  signer = createInMemorySigner(record.privateKeyJwk, {
+    kid: record.kid,
+    publicKeyJwk: record.publicKeyJwk
+  });
+  signerPersistent = true;
+  console.log(HOST_TAG, "persistent replay signer ready", record.kid);
+}
+var signerReadyPromise = loadOrCreateReplaySigner().catch(async (err) => {
+  const pair = await generateEd25519KeyPairJwk();
+  signerRecord = {
+    id: "ephemeral",
+    kid: "fsb-offscreen-ephemeral",
+    privateKeyJwk: pair.privateKeyJwk,
+    publicKeyJwk: pair.publicKeyJwk,
+    createdAt: (/* @__PURE__ */ new Date()).toISOString()
+  };
+  signer = createInMemorySigner(pair.privateKeyJwk, {
+    kid: signerRecord.kid,
+    publicKeyJwk: pair.publicKeyJwk
+  });
+  signerPersistent = false;
+  console.warn(HOST_TAG, "persistent signer unavailable; checkpoint-only fallback:", err && err.message);
 });
+async function requireReplaySigner() {
+  await signerReadyPromise;
+  if (!signer || !signerRecord || !signerPersistent) {
+    throw new Error("Persistent Lattice replay signer unavailable");
+  }
+  return signer;
+}
 if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.onMessage) {
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (!message || typeof message !== "object") return false;
@@ -14838,6 +15402,276 @@ if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.onMessage)
   console.log(HOST_TAG, "chrome.runtime.onMessage listener registered for 'lattice-step-transition'");
 } else {
   console.warn(HOST_TAG, "chrome.runtime.onMessage not available; SW <-> offscreen bus unavailable (Node test context?)");
+}
+function canonicalReplayValue(value) {
+  if (Array.isArray(value)) return value.map(canonicalReplayValue);
+  if (!value || typeof value !== "object") return value;
+  return Object.keys(value).sort().reduce((out, key) => {
+    if (value[key] !== void 0) out[key] = canonicalReplayValue(value[key]);
+    return out;
+  }, {});
+}
+function canonicalReplayJson(value) {
+  return JSON.stringify(canonicalReplayValue(value));
+}
+async function sha256Hex(value) {
+  const bytes = new TextEncoder().encode(value);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+var REPLAY_VOLATILE_RESULT_KEYS = /* @__PURE__ */ new Set([
+  "timestamp",
+  "timestampms",
+  "createdat",
+  "updatedat",
+  "startedat",
+  "completedat",
+  "duration",
+  "durationms",
+  "elapsed",
+  "elapsedms",
+  "executiontime",
+  "executiontimems",
+  "tabid",
+  "targettabid",
+  "windowid",
+  "agentid",
+  "requestid",
+  "messageid",
+  "mcpmsgid",
+  "ownershiptoken"
+]);
+function normalizeReplayResult(value) {
+  if (Array.isArray(value)) return value.map(normalizeReplayResult);
+  if (!value || typeof value !== "object") return value;
+  return Object.keys(value).sort().reduce((out, key) => {
+    const normalizedKey = key.replace(/[^A-Za-z0-9]/g, "").toLowerCase();
+    if (!REPLAY_VOLATILE_RESULT_KEYS.has(normalizedKey) && value[key] !== void 0) {
+      out[key] = normalizeReplayResult(value[key]);
+    }
+    return out;
+  }, {});
+}
+function replayResultSummary(result, succeeded) {
+  if (succeeded !== false || !result || typeof result !== "object") return null;
+  const summary = {};
+  ["errorCode", "code", "status", "error", "message", "reason"].forEach((key) => {
+    const value = result[key];
+    if (typeof value === "string" && value) summary[key] = value.slice(0, 1e3);
+    else if (key === "status" && Number.isFinite(value)) summary[key] = value;
+  });
+  return Object.keys(summary).length > 0 ? summary : { failed: true };
+}
+function replayKeySet() {
+  if (!signerRecord) throw new Error("Replay signer key unavailable");
+  return createMemoryKeySet([{
+    kid: signerRecord.kid,
+    publicKeyJwk: signerRecord.publicKeyJwk,
+    state: "active"
+  }]);
+}
+function replayArtifact(manifest, manifestHash) {
+  return artifact.json(manifest, {
+    id: "fsb-replay-" + manifestHash,
+    label: "FSB browser replay manifest",
+    mediaType: "application/vnd.fsb.browser-replay+json",
+    privacy: "sensitive",
+    fingerprint: { algorithm: "sha256", value: manifestHash },
+    storage: { storeId: "chrome.storage.local", key: manifestHash }
+  });
+}
+function validateReplayManifest(manifest) {
+  if (!manifest || typeof manifest !== "object") throw new Error("Replay manifest is required");
+  if (manifest.kind !== "fsb-browser-replay-manifest" || manifest.version !== 1) {
+    throw new Error("Unsupported replay manifest version");
+  }
+  if (manifest.provenance !== "capture" && manifest.provenance !== "legacy-import") {
+    throw new Error("Replay manifest provenance is required");
+  }
+  if (typeof manifest.sessionId !== "string" || !manifest.sessionId) {
+    throw new Error("Replay manifest sessionId is required");
+  }
+  if (!Array.isArray(manifest.steps)) throw new Error("Replay manifest steps are required");
+  if (manifest.steps.length > 100) throw new Error("Replay manifest exceeds the 100-step cap");
+}
+async function sealReplayManifest(payload) {
+  const replaySigner = await requireReplaySigner();
+  const suppliedManifest = payload && payload.manifest;
+  validateReplayManifest(suppliedManifest);
+  if (payload.provenance !== suppliedManifest.provenance) {
+    throw new Error("Replay provenance does not match the manifest");
+  }
+  const manifest = canonicalReplayValue(suppliedManifest);
+  manifest.steps = await Promise.all(manifest.steps.map(async (step) => {
+    const { result, resultSummary: priorResultSummary, ...persistedStep } = step;
+    const resultSummary = Object.prototype.hasOwnProperty.call(step, "result") ? replayResultSummary(result, step.success) : step.success === false && priorResultSummary && typeof priorResultSummary === "object" ? priorResultSummary : null;
+    const normalizedResultHash = Object.prototype.hasOwnProperty.call(step, "result") ? await sha256Hex(canonicalReplayJson(normalizeReplayResult(result || {}))) : /^[a-f0-9]{64}$/.test(String(step.resultHash || "")) ? step.resultHash : await sha256Hex(canonicalReplayJson({}));
+    return {
+      ...persistedStep,
+      argumentHash: await sha256Hex(canonicalReplayJson(step.arguments || {})),
+      resultHash: normalizedResultHash,
+      resultHashVersion: "fsb-normalized-result/v1",
+      ...resultSummary ? { resultSummary } : {}
+    };
+  }));
+  const canonical = canonicalReplayJson(manifest);
+  if (canonical.length > 2 * 1024 * 1024) throw new Error("Replay manifest exceeds the 2 MiB cap");
+  const manifestHash = await sha256Hex(canonical);
+  const receipt = await createReceipt({
+    runId: "replay-record:" + manifest.sessionId,
+    model: { requested: "fsb-browser-runtime", observed: null },
+    route: { providerId: "fsb-extension", capabilityId: "mcp-session-replay", attemptNumber: 1 },
+    usage: { promptTokens: 0, completionTokens: 0, costUsd: null },
+    contractVerdict: "success",
+    contractHash: null,
+    inputHashes: [manifestHash],
+    outputHash: manifestHash,
+    stepName: "REPLAY_CAPTURE",
+    stepIndex: 0,
+    sessionId: manifest.sessionId,
+    timestamp: (/* @__PURE__ */ new Date()).toISOString()
+  }, replaySigner);
+  return {
+    ok: true,
+    manifest,
+    manifestHash,
+    receipt,
+    receiptCid: await receiptCid(receipt),
+    signerKid: signerRecord.kid
+  };
+}
+async function materializeReplayManifest(payload) {
+  await requireReplaySigner();
+  const manifest = payload && payload.manifest;
+  const expectedHash = String(payload && payload.manifestHash || "");
+  const receipt = payload && payload.receipt;
+  validateReplayManifest(manifest);
+  if (!expectedHash || !receipt) throw new Error("Replay receipt and manifest hash are required");
+  if (payload.signerKid && payload.signerKid !== signerRecord.kid) {
+    throw new Error("Replay receipt signing key is not available");
+  }
+  const computedHash = await sha256Hex(canonicalReplayJson(manifest));
+  if (computedHash !== expectedHash) throw new Error("Replay manifest hash mismatch");
+  let artifactLoaderCalls = 0;
+  const envelope = await materializeReplayEnvelope(receipt, {
+    keySet: replayKeySet(),
+    artifactLoader: async (requestedHash) => {
+      artifactLoaderCalls++;
+      if (requestedHash !== computedHash) throw new Error("Replay artifact hash mismatch");
+      return replayArtifact(manifest, computedHash);
+    },
+    task: manifest.task || "MCP session replay",
+    outputs: { manifestHash: computedHash },
+    policy: { privacy: "sensitive", noUpload: true, noLogging: true }
+  });
+  const verified = await verifyReceipt(receipt, replayKeySet());
+  if (!verified.ok) throw new Error(verified.error.message);
+  if (artifactLoaderCalls !== 1 || verified.body.inputHashes.length !== 1 || verified.body.inputHashes[0] !== computedHash || verified.body.outputHash !== computedHash) {
+    throw new Error("Replay receipt does not commit to the supplied manifest");
+  }
+  const offline = await replayOffline(envelope);
+  if (!offline.ok || offline.outputs.manifestHash !== computedHash) {
+    throw new Error(offline.ok ? "Offline replay output mismatch" : offline.error.message);
+  }
+  return {
+    ok: true,
+    verified: true,
+    manifestHash: computedHash,
+    receiptCid: await receiptCid(receipt),
+    offline: {
+      ok: true,
+      planId: envelope.plan.id,
+      artifactCount: envelope.artifacts.length,
+      manifestHash: offline.outputs.manifestHash
+    }
+  };
+}
+function authorizeReplay(payload) {
+  const step = payload && payload.step;
+  if (!step || !step.replay) throw new Error("Replay step classification is required");
+  const availability = step.replay.availability;
+  if (availability !== "ready" && availability !== "approval-once" && availability !== "approval-per-step") {
+    return { ok: true, verdict: { allow: false, reason: step.replay.reason || "Replay step is not executable" } };
+  }
+  const approved = new Set(Array.isArray(payload.approvedScopes) ? payload.approvedScopes : []);
+  const rules = [
+    { resource: "read", verdict: "allow" },
+    { resource: "navigation", verdict: "allow" }
+  ];
+  if (approved.has("write")) rules.push({ resource: "write", verdict: "allow" });
+  if (approved.has("step:" + step.id)) {
+    rules.push({ toolName: String(step.tool || ""), resource: String(step.replay.risk || ""), verdict: "allow" });
+  }
+  rules.push({ verdict: "deny", reason: "Replay step has not been approved" });
+  const permission = createPermissionContext(rules);
+  return {
+    ok: true,
+    verdict: permission.decide({
+      toolName: String(step.tool || ""),
+      iterationIndex: Number.isFinite(step.index) ? step.index : 0,
+      resource: String(step.replay.risk || ""),
+      args: step.arguments || {}
+    })
+  };
+}
+async function checkpointReplayStep(payload) {
+  const replaySigner = await requireReplaySigner();
+  const step = payload && payload.step;
+  const manifestHash = String(payload && payload.manifestHash || "");
+  if (!step || !manifestHash) throw new Error("Replay checkpoint requires a step and manifest hash");
+  const argsHash = await sha256Hex(canonicalReplayJson(step.arguments || {}));
+  const resultHash = await sha256Hex(canonicalReplayJson(normalizeReplayResult(payload.result || {})));
+  const parentReceiptCid = payload.previousReceiptCid || payload.sourceReceiptCid || null;
+  const receipt = await createReceipt({
+    runId: String(payload.replaySessionId || "replay-run"),
+    model: { requested: "fsb-browser-runtime", observed: null },
+    route: {
+      providerId: "fsb-extension",
+      capabilityId: "replay:" + String(step.tool || "unknown").replace(/[^A-Za-z0-9:_-]/g, "_").slice(0, 100),
+      attemptNumber: Number.isFinite(payload.attemptNumber) && payload.attemptNumber > 0 ? Math.floor(payload.attemptNumber) : 1
+    },
+    usage: { promptTokens: 0, completionTokens: 0, costUsd: null },
+    contractVerdict: payload.success === false ? "execution-failed" : "success",
+    contractHash: null,
+    inputHashes: [manifestHash, argsHash],
+    outputHash: resultHash,
+    stepName: "REPLAY_STEP",
+    stepIndex: Number.isFinite(step.index) ? step.index : 0,
+    sessionId: String(payload.replaySessionId || "replay-run"),
+    timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+    ...parentReceiptCid ? { parentReceiptCid } : {}
+  }, replaySigner);
+  return {
+    ok: true,
+    receipt,
+    receiptCid: await receiptCid(receipt),
+    argsHash,
+    resultHash,
+    signerKid: signerRecord.kid
+  };
+}
+if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.onMessage) {
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (!message || typeof message !== "object") return false;
+    if (sender && sender.id && sender.id !== chrome.runtime.id) return false;
+    const handlers = {
+      "lattice-replay-seal": sealReplayManifest,
+      "lattice-replay-materialize": materializeReplayManifest,
+      "lattice-replay-authorize": async (payload) => authorizeReplay(payload),
+      "lattice-replay-checkpoint": checkpointReplayStep
+    };
+    const handler = handlers[message.type];
+    if (!handler) return false;
+    Promise.resolve(handler(message.payload || {})).then((response) => sendResponse(response)).catch((error) => sendResponse({
+      ok: false,
+      error: {
+        kind: error && error.kind ? String(error.kind) : "lattice-replay-error",
+        message: error && error.message ? error.message : String(error)
+      }
+    }));
+    return true;
+  });
+  console.log(HOST_TAG, "Lattice replay services registered");
 }
 if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.onMessage) {
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {

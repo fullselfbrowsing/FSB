@@ -10,9 +10,9 @@ type CountdownParts = Record<CountdownUnit, string>;
 
 const ROUTE_PATH = '/prometheus';
 const OG_IMAGE = `${HOST}/assets/fsb_logo_dark.png`;
-const OG_IMAGE_ALT = 'FSB Full Self-Browsing logo';
-const SITE_NAME = 'FSB - Full Self-Browsing';
-const TARGET_TIME = new Date('2026-07-31T23:59:59').getTime();
+const OG_IMAGE_ALT = $localize`:@@prometheus.og.imageAlt:FSB Full Self-Browsing logo`;
+const SITE_NAME = $localize`:@@site.name:FSB - Full Self-Browsing`;
+const TARGET_TIME = new Date('2026-09-30T23:59:59').getTime();
 const TOKEN_BASE = 257960;
 const TOKEN_ORIGIN = new Date('2026-06-24T12:00:00').getTime();
 const TOKENS_PER_MS = 1000000 / 3600000;
@@ -51,7 +51,7 @@ export class PrometheusPageComponent implements OnInit, OnDestroy {
   private glitchTimers: Partial<Record<CountdownUnit, number>> = {};
 
   get tokensFormatted(): string {
-    return this.tokens.toLocaleString('en-US');
+    return this.tokens.toLocaleString(this.localeId);
   }
 
   ngOnInit(): void {

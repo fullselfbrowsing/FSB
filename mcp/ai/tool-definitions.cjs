@@ -1,14 +1,14 @@
 /**
  * Canonical Tool Registry for FSB Browser Automation
  *
- * Single source of truth for all 52 browser automation tool definitions.
+ * Single source of truth for 53 browser tools plus 4 trigger tools.
  * Shared between autopilot (agent loop) and MCP server.
  *
  * Per D-11/D-12: Each tool is a plain object with JSON Schema inputSchema
  * and routing metadata (_route, _readOnly, _contentVerb, _cdpVerb).
  *
  * Per D-01: All tool names use snake_case matching MCP convention.
- * Per D-04: All 52 tools defined (49 original + 2 vault fill tools + close_tab).
+ * The Developer/UAT screenshot tool shares this registry with MCP and autopilot.
  *
  * @module tool-definitions
  */
@@ -87,8 +87,9 @@ function withVisualSessionFields(tool) {
  */
 
 /**
- * All 52 browser automation tool definitions.
- * Grouped by category: Navigation, Interaction, Scrolling, Waiting, Tabs, Data, CDP, Read-Only.
+ * All 57 shared definitions (53 browser tools and 4 trigger tools).
+ * Grouped by category: Navigation, Interaction, Scrolling, Waiting, Tabs, Data,
+ * CDP, Developer/UAT, Read-Only, Task Status, Triggers, and Upload.
  * @type {ToolDefinition[]}
  */
 const TOOL_REGISTRY = [
@@ -909,6 +910,42 @@ const TOOL_REGISTRY = [
   }),
 
   // =========================================================================
+  // DEVELOPER / UAT TOOLS (1 tool)
+  // =========================================================================
+
+  {
+    name: 'capture_screenshot',
+    description: 'Capture the live Chromium-composited web page as a lossless PNG for visual inspection and UAT. Supports the current viewport, the full rendered document, an exact page/viewport region, or an element selected by CSS or an FSB element ref. Includes CSS, web fonts, SVG, canvas, images, open shadow DOM, and runtime state; browser chrome and the desktop are not included. FSB overlays are hidden by default and restored after capture. MCP returns a native image and private managed file; autopilot attaches the image transiently to the model without creating a file. Responsive desktop/mobile emulation is temporary and never spoofs the user agent or reloads the page. Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED. Pass tab_id only to disambiguate an owned tab.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        mode: { type: 'string', enum: ['viewport', 'full_page', 'region', 'element'], description: 'Capture mode. Defaults to viewport.' },
+        coordinate_space: { type: 'string', enum: ['viewport', 'page'], description: 'Region coordinate space. Valid only for region mode; defaults to viewport.' },
+        x: { type: 'number', description: 'Region left edge in CSS pixels. Region mode only.' },
+        y: { type: 'number', description: 'Region top edge in CSS pixels. Region mode only.' },
+        width: { type: 'number', description: 'Region width in CSS pixels. Region mode only.' },
+        height: { type: 'number', description: 'Region height in CSS pixels. Region mode only.' },
+        selector: { type: 'string', description: 'CSS selector or FSB element ref. Element mode only.' },
+        device_mode: { type: 'string', enum: ['current', 'desktop', 'mobile'], description: 'Use current metrics or temporary responsive emulation. Viewport dimensions without this field imply desktop.' },
+        viewport_width: { type: 'number', description: 'Temporary viewport width in integer CSS pixels. Desktop/mobile require both dimensions.' },
+        viewport_height: { type: 'number', description: 'Temporary viewport height in integer CSS pixels. Desktop/mobile require both dimensions.' },
+        device_scale_factor: { type: 'number', description: 'Temporary emulated device scale factor from 1 through 4; defaults to 1 while emulating.' },
+        orientation: { type: 'string', enum: ['auto', 'portrait', 'landscape'], description: 'Mobile screen orientation. Mobile mode only; defaults to auto.' },
+        wait_ms: { type: 'number', description: 'Additional settle delay from 0 through 5000 ms after font readiness and two animation frames. Defaults to 250.' },
+        include_fsb_overlays: { type: 'boolean', description: 'Capture FSB overlays instead of temporarily hiding them. Defaults to false.' },
+        tab_id: { type: 'number', description: 'Optional owned tab id. Omit when the calling agent owns exactly one tab.' }
+      },
+      required: []
+    },
+    _route: 'cdp',
+    _readOnly: true,
+    _contentVerb: null,
+    _cdpVerb: 'cdpCaptureScreenshot',
+    _forceForeground: false,
+    _emitChangeReport: false
+  },
+
+  // =========================================================================
   // READ-ONLY / INFORMATION TOOLS (6 tools)
   // =========================================================================
 
@@ -1136,11 +1173,12 @@ const TOOL_REGISTRY = [
 
   {
     name: 'complete_task',
-    description: 'Signal that the task is fully complete. ONLY call this when the user\'s requested task has been fully achieved -- all data collected, all entries made, all actions performed. Include a summary of what was accomplished. Provide session_token only when completing a client-owned visual session created by start_visual_session; otherwise omit it and keep the normal task-lifecycle semantics. Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64).',
+    description: 'Signal that the task is fully complete. ONLY call this when the user\'s requested task has been fully achieved -- all data collected, all entries made, all actions performed. Include a summary of what was accomplished, but never include passwords, tokens, API keys, or sensitive form values. Provide tab_id when more than one tab/session could be active so the local task memory is associated exactly. Provide session_token only when completing a client-owned visual session created by start_visual_session; otherwise omit it and keep the normal task-lifecycle semantics. Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64).',
     inputSchema: {
       type: 'object',
       properties: {
         summary: { type: 'string', description: 'Summary of what was accomplished (e.g. "Found 50 Tesla internships and added them to Google Sheet with title, department, location columns")' },
+        tab_id: { type: 'integer', description: 'Optional target tab id used to associate this outcome with the correct local MCP replay session.' },
         session_token: {
           type: 'string',
           description: 'Optional token returned by start_visual_session. Provide this only when finalizing a client-owned visual session.'
@@ -1158,13 +1196,14 @@ const TOOL_REGISTRY = [
 
   {
     name: 'partial_task',
-    description: 'Signal that the task is partially complete because useful work was completed but an external blocker prevents the final step. Use this instead of fail_task when the user can still benefit from the completed work, especially for auth/manual handoff blockers after research, drafting, or data entry is already done. Auth/manual blockers include login required, no saved credentials, user skipped login, credentials failed, and manual approval, MFA, or external verification. Preserve three things clearly: what you completed, the exact blocker, and the manual next step the user should take. If the runtime offers one saved-credential or operator-prompt attempt, let that single attempt happen first; call partial_task only after that attempt is unavailable, skipped, exhausted, or fails. Provide session_token only when finalizing a client-owned visual session created by start_visual_session. Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64).',
+    description: 'Signal that the task is partially complete because useful work was completed but an external blocker prevents the final step. Use this instead of fail_task when the user can still benefit from the completed work, especially for auth/manual handoff blockers after research, drafting, or data entry is already done. Auth/manual blockers include login required, no saved credentials, user skipped login, credentials failed, and manual approval, MFA, or external verification. Preserve three things clearly: what you completed, the exact blocker, and the manual next step the user should take, but never include passwords, tokens, API keys, or sensitive form values. If the runtime offers one saved-credential or operator-prompt attempt, let that single attempt happen first; call partial_task only after that attempt is unavailable, skipped, exhausted, or fails. Provide tab_id when more than one tab/session could be active. Provide session_token only when finalizing a client-owned visual session created by start_visual_session. Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64).',
     inputSchema: {
       type: 'object',
       properties: {
         summary: { type: 'string', description: 'Summary of the useful work that was completed before the blocker was hit' },
         blocker: { type: 'string', description: 'What prevented the final step from being completed (e.g. "Messaging requires login", "Manual approval required")' },
         next_step: { type: 'string', description: 'Manual next step the user can take to finish manually or resume later. Include this for auth or approval blockers.' },
+        tab_id: { type: 'integer', description: 'Optional target tab id used to associate this outcome with the correct local MCP replay session.' },
         reason: {
           type: 'string',
           description: 'Optional machine-readable blocker category. Keep it narrow and stable for blocked/manual-handoff outcomes.',
@@ -1187,11 +1226,12 @@ const TOOL_REGISTRY = [
 
   {
     name: 'fail_task',
-    description: 'Signal that the task cannot be completed. Include the reason why. Call this instead of just stopping when you encounter an unrecoverable problem. Provide session_token only when ending a client-owned visual session created by start_visual_session; otherwise omit it and keep the normal task-failure semantics. Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64).',
+    description: 'Signal that the task cannot be completed. Include the reason why, but never include passwords, tokens, API keys, or sensitive form values. Call this instead of just stopping when you encounter an unrecoverable problem. Provide tab_id when more than one tab/session could be active. Provide session_token only when ending a client-owned visual session created by start_visual_session; otherwise omit it and keep the normal task-failure semantics. Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64).',
     inputSchema: {
       type: 'object',
       properties: {
         reason: { type: 'string', description: 'Why the task cannot be completed (e.g. "Page requires login", "Data not found on page")' },
+        tab_id: { type: 'integer', description: 'Optional target tab id used to associate this outcome with the correct local MCP replay session.' },
         session_token: {
           type: 'string',
           description: 'Optional token returned by start_visual_session. Provide this only when failing a client-owned visual session.'
@@ -1437,6 +1477,53 @@ function getToolsByRoute(route) {
 }
 
 // =========================================================================
+// TOOLBAR ICON ACTIVITY CLASSES
+// =========================================================================
+// The toolbar icon animates by what KIND of work is running, not by session
+// phase -- every implicit visual session reports the same phase, so phase cannot
+// tell a read from a click. Read-only is tested FIRST, so list_tabs (a tab tool
+// that only reads) classifies as reading rather than driving.
+
+/**
+ * Non-mutating tools that live on the MCP surface but never reach TOOL_REGISTRY,
+ * so they carry no _readOnly flag of their own.
+ */
+const ICON_READ_ONLY_EXTRAS = new Set([
+  'search_capabilities', 'get_task_status', 'list_sessions', 'get_session_detail',
+  'get_logs', 'get_memory_stats', 'list_credentials', 'list_payment_methods'
+]);
+
+// The wire carries FSB verbs rather than MCP tool names -- type_text arrives as
+// 'type', check_box as 'toggleCheckbox', click_at as 'cdpClickAt'. Built once so
+// either spelling resolves to the same class.
+let _iconVerbToTool = null;
+
+function _iconVerbMap() {
+  if (_iconVerbToTool) return _iconVerbToTool;
+  _iconVerbToTool = new Map();
+  for (const tool of TOOL_REGISTRY) {
+    if (tool._contentVerb) _iconVerbToTool.set(tool._contentVerb, tool.name);
+    if (tool._cdpVerb) _iconVerbToTool.set(tool._cdpVerb, tool.name);
+  }
+  return _iconVerbToTool;
+}
+
+/**
+ * Classify a tool for the toolbar icon animation.
+ * @param {string} nameOrVerb - MCP tool name, or the FSB verb sent on the wire
+ * @returns {'orbit'|'sweep'|null} orbit = reading, sweep = other work; capability invokes use a dedicated lifecycle
+ */
+function resolveIconActivity(nameOrVerb) {
+  const raw = typeof nameOrVerb === 'string' ? nameOrVerb.trim() : '';
+  if (!raw) return 'sweep';
+  const name = _iconVerbMap().get(raw) || raw;
+  if (name === 'invoke_capability') return null;
+  const def = getToolByName(name);
+  if ((def && def._readOnly === true) || ICON_READ_ONLY_EXTRAS.has(name)) return 'orbit';
+  return 'sweep';
+}
+
+// =========================================================================
 // EXPORTS
 // =========================================================================
 
@@ -1444,6 +1531,7 @@ function getToolsByRoute(route) {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     TOOL_REGISTRY,
+    resolveIconActivity,
     getToolByName,
     getReadOnlyTools,
     getToolsByRoute,

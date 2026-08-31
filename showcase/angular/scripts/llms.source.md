@@ -1,0 +1,49 @@
+# FSB (Full Self-Browsing)
+
+FSB (Full Self-Browsing) is an open-source Chrome extension that automates the browser through natural language. You describe a task; FSB plans the clicks, types, and navigation to complete it. Multi-model AI (xAI, OpenAI, Anthropic, Gemini, OpenRouter, LM Studio, local), 56 browser tools, a 68-tool MCP surface, 142+ site guides, local-first execution, and BYO API keys. Current release: FSB v0.9.91 (extension) with fsb-mcp-server 0.11.0 (npm).
+
+License: [MIT License](https://github.com/fullselfbrowsing/FSB/blob/main/LICENSE).
+
+FSB also works as an MCP browser layer for AI agents. Claude Code, Codex, Cursor, VS Code, Windsurf, OpenClaw, Hermes, and other MCP clients can use FSB to operate a real Chrome browser, inspect page state, verify outcomes, and keep the calling agent in the loop. The MCP surface includes trigger watchers (`trigger`, `stop_trigger`, `get_trigger_status`, `list_triggers`) for reactive DOM monitoring, real local file uploads (`upload_file`) and synthetic dropzone support (`drop_file`), and a 128-app native capability catalog where `search_capabilities` finds verified first-party API actions and `invoke_capability` runs them against the user's logged-in sessions with readiness labels such as `t1-ready`, `t1-guarded-fail-closed`, `learn-pending`, and `discovery-pending`, plus audit records.
+
+The vault boundary is explicit: credentials and payment methods resolve inside the encrypted Chrome extension store through tools such as `fill_credential` and `use_payment_method`; raw passwords, card numbers, and secrets do not cross the MCP bridge. One-command install: `npx -y fsb-mcp-server@latest install --claude-code` (also `--claude-desktop`, `--cursor`, `--vscode`, `--windsurf`, `--codex`, `--all`).
+
+OpenClaw and Hermes users get a dedicated FSB skill at `skills/fsb/` in the FSB repo. The skill is the canonical OpenClaw onboarding path: it runs the doctor flow against `fsb-mcp-server`, prints the OpenClaw stdio config block for the user to paste, and offers consent-gated install for any other detected MCP hosts. Hermes users can print the canonical config block with `node skills/fsb/scripts/print-hermes-yaml.mjs`.
+
+## How FSB compares
+
+Unlike cloud browser agents that run in a headless container without your cookies, FSB is local-first: it drives the user's real Chrome session, uses keys stored encrypted in Chrome local storage (BYO API key, never relayed through a vendor backend), and inherits any logged-in state, MFA, and saved extensions already on the machine.
+
+## Use cases
+
+- Inbox triage: open Gmail, label billing threads, draft replies in the user's tone, flag urgent items.
+- Support replies: in Zendesk, draft answers to open tickets about pricing, order status, and shipping using the help center as ground truth.
+- Logged-in dashboards: pull yesterday's revenue, signups, and refund count from analytics dashboards and post a one-paragraph summary.
+- Lead monitoring: score new LinkedIn connection requests against an ICP, draft outreach for the top three, skip the rest.
+- Small-business ops: categorize today's POS invoices as supplies vs. retail, extract shipping line items, and flag any vendor over last month's average.
+- Trigger watchers: arm a watch on one page element (price, availability, status) and get notified on threshold, delta, regex, or compound conditions without manual polling.
+- Native capability calls: search the 128-app catalog for `t1-ready` first-party API actions, invoke supported actions through the guarded router, and keep sensitive origins visible in the audit trail.
+
+## Docs
+
+- [About](https://full-selfbrowsing.com/about): Real demo videos for Grok 4.1 e-commerce autopilot, Codex MCP flight booking, OpenClaw monitoring, and Claude-powered browser iteration, plus an interactive knowledge graph of FSB's site intelligence.
+- [Agents](https://full-selfbrowsing.com/agents): OpenClaw skill onboarding, ClawHub one-click install (`https://clawhub.ai/lakshmanturlapati/full-selfbrowsing`), FSB MCP power story (68 MCP tools, multi-agent identity, vault boundary, real Chrome session), 3-step install, and grounded use cases. Autopilot (`run_task`) only fires on explicit user delegation; manual tool calls are default.
+- [Support](https://full-selfbrowsing.com/support): Setup guides, MCP configuration, troubleshooting, GitHub issues, and direct contact.
+- [Privacy](https://full-selfbrowsing.com/privacy): How FSB handles your data -- API keys encrypted in Chrome local storage, opt-out anonymous usage telemetry for aggregate public stats only, automation runs locally in your browser.
+- [Lattice](https://full-selfbrowsing.com/lattice): Capability runtime SDK for multimodal AI applications -- typed outputs, inspectable plans, provider routing, artifacts, tools, audit receipts, and replay-friendly records.
+- [Concierge](https://full-selfbrowsing.com/concierge): Safe action layer for agent-ready web applications -- typed verbs, live catalogs, consent-bound dispatch, and signed replay-protected batches.
+- [PhantomStream](https://full-selfbrowsing.com/phantom-stream): DOM-native live browser mirroring -- one style-inlined snapshot, then MutationObserver diffs instead of pixels. Powers the FSB remote dashboard live preview.
+- [Prometheus](https://full-selfbrowsing.com/prometheus): The autonomous browser build behind FSB -- native control spine, stdio MCP bridge, multi-agent tab ownership, runtime sidebar, and DOM-native supervision.
+- [Site Maps](https://full-selfbrowsing.com/sitemaps): Community site maps hub (under development) -- contribute well-tested site schemas that can become built-in browser knowledge.
+- [Legal](https://full-selfbrowsing.com/legal): Public non-indexed legal reference for automation posture, consent model, audit-log retention, and service-denylist rationale. It is intentionally excluded from sitemap and indexed SEO surfaces.
+- [Chrome Web Store](https://chromewebstore.google.com/detail/badgafnfchcihdfnjneklogedcdkmjfk): One-click extension install.
+- [GitHub repository](https://github.com/fullselfbrowsing/FSB): MIT source code, install instructions, issue tracker.
+- [llms-full.txt](https://full-selfbrowsing.com/llms-full.txt): Long-form project dump for LLM ingestion -- capabilities, install, comparison framing.
+
+## Demo Videos
+
+- [FSB: E-Commerce Autopilot by Grok 4.1](https://www.youtube.com/watch?v=_iQ4_LSXcTU)
+- [Flight Booking: Powered by Codex MCP](https://www.youtube.com/watch?v=WbpOrFwgGME)
+- [OpenClaw Monitoring Doge Price](https://www.youtube.com/watch?v=PNTGCWGopf8)
+- [An Aha Moment by Claude Opus 4.6](https://www.youtube.com/watch?v=mD9oGB2JqVM)
+- [YouTube channel](https://www.youtube.com/@parzival5707)

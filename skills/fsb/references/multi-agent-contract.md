@@ -1,4 +1,4 @@
-# FSB multi-agent contract (current as of v0.9.90)
+# FSB multi-agent contract (current as of v0.9.91)
 
 This file documents the rules that make FSB's per-agent tab ownership work. Anyone calling FSB tools through MCP MUST follow these rules; breaking them produces typed errors that recover cleanly only when the caller knows the contract. The contract is small (six error names + the `agent_id` rule + the `back` tool), but every rule matters: bypassing one corrupts the ownership graph and the only recovery is closing the affected tab.
 

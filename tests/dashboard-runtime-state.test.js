@@ -64,6 +64,16 @@ const pausedPreview = runtimeState.derivePreviewSurface({
 assertEqual(pausedPreview.chipLabel, 'paused', 'paused preview shows paused chip');
 assertEqual(pausedPreview.showIframe, true, 'paused preview keeps iframe visible');
 
+const localizedPreview = runtimeState.derivePreviewSurface({
+  previewState: 'loading',
+  lastRecoveredStreamState: 'recovering',
+  previewNotReadyReason: '',
+  previewResyncPending: true,
+  copy: { previewRecoveringLabel: 'wiederherstellen', previewRecoveringDetail: 'Vorschau wird wiederhergestellt...' }
+});
+assertEqual(localizedPreview.chipLabel, 'wiederherstellen', 'preview surface uses caller-provided localized chip copy');
+assertEqual(localizedPreview.detailText, 'Vorschau wird wiederhergestellt...', 'preview surface uses caller-provided localized detail copy');
+
 // frozen-disconnect state
 const frozenDisconnect = runtimeState.derivePreviewSurface({
   previewState: 'frozen-disconnect',
@@ -153,6 +163,16 @@ const timeoutRemote = runtimeState.deriveRemoteControlSurface({
 
 assertEqual(timeoutRemote.chipLabel, 'no response', 'remote-control timeout renders visible no response state');
 
+const localizedRemote = runtimeState.deriveRemoteControlSurface({
+  previewState: 'streaming',
+  attached: false,
+  reason: 'request-timeout',
+  ownership: 'none',
+  copy: { remoteNoResponseLabel: 'sin respuesta', remoteNoResponseDetail: 'La extensión no respondió.' }
+});
+assertEqual(localizedRemote.chipLabel, 'sin respuesta', 'remote-control surface uses caller-provided localized chip copy');
+assertEqual(localizedRemote.detailText, 'La extensión no respondió.', 'remote-control surface uses caller-provided localized detail copy');
+
 console.log('\n--- task recovery surface ---');
 
 const recoveringTask = runtimeState.deriveTaskRecoverySurface({
@@ -211,6 +231,223 @@ const timedOutTask = runtimeState.deriveTaskRecoverySurface({
 assertEqual(timedOutTask.chipLabel, 'task timed out', 'timed-out recovery shows task timed out');
 assertEqual(timedOutTask.shouldFail, true, 'timed-out recovery requests failure');
 
+const localizedTask = runtimeState.deriveTaskRecoverySurface({
+  taskState: 'running',
+  activeTaskRunId: 'run-1',
+  incomingTaskRunId: '',
+  extensionOnline: false,
+  wsConnected: false,
+  recoveryPending: true,
+  recoveryTimedOut: false,
+  lastActionText: '',
+  copy: { taskRecoveringLabel: 'タスクを復旧中', taskWaitingAction: 'タスクの復旧を待っています...' }
+});
+assertEqual(localizedTask.chipLabel, 'タスクを復旧中', 'task-recovery surface uses caller-provided localized chip copy');
+assertEqual(localizedTask.actionText, 'タスクの復旧を待っています...', 'task-recovery surface uses caller-provided localized action copy');
+
+console.log('\n--- progress localization ---');
+
+const progressCopy = {
+  phaseAnalyzing: 'ANALYZE',
+  phasePlanning: 'PLAN',
+  phaseActing: 'ACT',
+  previewRecoveringLabel: 'RECOVER',
+  phaseWriting: 'WRITE',
+  phaseSwitchingTabs: 'SWITCH',
+  phaseCallingApi: 'CALL',
+  phaseWatchingTrigger: 'WATCH',
+  phaseWaiting: 'WAIT',
+  previewCompleteLabel: 'COMPLETE',
+  previewErrorLabel: 'ERROR',
+  phaseWorking: 'WORK',
+  progressSearching: 'SEARCH',
+  progressFormatting: 'FORMAT',
+  progressFormatted: 'FORMATTED',
+  resultPartial: 'PARTIAL',
+  progressReviewingPage: 'REVIEW PAGE',
+  progressTaskCompleted: 'TASK COMPLETE',
+  progressReconnectOrUpdate: 'RECONNECT OR UPDATE',
+  progressPerformingAction: 'BROWSER ACTION'
+};
+
+const canonicalPhases = {
+  analyzing: 'ANALYZE',
+  thinking: 'ANALYZE',
+  planning: 'PLAN',
+  acting: 'ACT',
+  recovering: 'RECOVER',
+  writing: 'WRITE',
+  switching_tab: 'SWITCH',
+  calling: 'CALL',
+  'trigger-watch': 'WATCH',
+  waiting: 'WAIT',
+  complete: 'COMPLETE',
+  error: 'ERROR'
+};
+for (const [phase, expected] of Object.entries(canonicalPhases)) {
+  assertEqual(
+    runtimeState.translateProgressPhase(phase, progressCopy),
+    expected,
+    `canonical ${phase} phase uses localized semantic copy`
+  );
+}
+
+assertEqual(
+  runtimeState.formatProgressOverlay(
+    { mode: 'indeterminate', phase: 'planning', label: 'Planning…' },
+    progressCopy
+  ),
+  'PLAN… - PLAN',
+  'indeterminate progress localizes a real generated phase label'
+);
+assertEqual(
+  runtimeState.formatProgressOverlay(
+    { mode: 'determinate', percent: 42, phase: 'writing', label: 'Formatting' },
+    progressCopy
+  ),
+  '42% - WRITE',
+  'determinate progress preserves numeric renderer semantics and localizes the phase'
+);
+assertEqual(
+  runtimeState.formatProgressOverlay(
+    { mode: 'indeterminate', phase: 'writing', label: 'Formatting' },
+    progressCopy
+  ),
+  'FORMAT - WRITE',
+  'known generated progress label uses localized copy'
+);
+assertEqual(
+  runtimeState.formatProgressOverlay(
+    { mode: 'indeterminate', phase: 'vendor-phase', label: 'Vendor status' },
+    progressCopy
+  ),
+  'Vendor status - vendor-phase',
+  'arbitrary extension progress text remains unchanged'
+);
+assertEqual(
+  runtimeState.translateProgressPhase('constructor', progressCopy),
+  'constructor',
+  'hostile inherited-property phase is treated as arbitrary text'
+);
+assertEqual(
+  runtimeState.translateProgressLabel('__proto__', 'WORK', progressCopy),
+  '__proto__',
+  'hostile inherited-property label is treated as arbitrary text'
+);
+assertEqual(
+  runtimeState.translateProgressDetail('Reviewing page state', progressCopy),
+  'REVIEW PAGE',
+  'known extension detail copy is localized'
+);
+assertEqual(
+  runtimeState.translateProgressDetail('Task completed', progressCopy),
+  'TASK COMPLETE',
+  'known final detail copy is localized'
+);
+assertEqual(
+  runtimeState.formatProgressOverlay(
+    { mode: 'indeterminate', phase: 'waiting', label: 'Waiting' },
+    progressCopy
+  ),
+  'WAIT - WAIT',
+  'MCP waiting progress uses localized semantic copy'
+);
+assertEqual(
+  runtimeState.translateProgressDetail('Reconnect or send another progress update', progressCopy),
+  'RECONNECT OR UPDATE',
+  'MCP waiting detail uses localized semantic copy'
+);
+assertEqual(
+  runtimeState.translateProgressDetail('Clicking "Sign in"', progressCopy),
+  'Clicking "Sign in"',
+  'producer-owned action detail remains unchanged'
+);
+assertEqual(
+  runtimeState.translateProgressDetail('Step 2/10: Clicking "Sign in"', progressCopy),
+  '2/10: Clicking "Sign in"',
+  'generated step prefix becomes language-neutral while producer-owned detail remains unchanged'
+);
+assertEqual(
+  runtimeState.translateProgressDetail('Opening the billing portal', progressCopy),
+  'Opening the billing portal',
+  'producer-owned opening detail remains unchanged'
+);
+assertEqual(
+  runtimeState.translateProgressDetail('Waiting for the confirmation email', progressCopy),
+  'Waiting for the confirmation email',
+  'producer-owned waiting detail remains unchanged'
+);
+assertEqual(
+  runtimeState.translateProgressDetail('Clicking element', progressCopy),
+  'BROWSER ACTION',
+  'exact package-owned action fallback is localized'
+);
+assertEqual(
+  runtimeState.translateProgressDetail('Signing in...', progressCopy),
+  'BROWSER ACTION',
+  'hardcoded sign-in status is replaced with localized semantic copy'
+);
+assertEqual(
+  runtimeState.translateProgressDetail('Working...', progressCopy),
+  'WORK',
+  'code-owned working fallback uses localized semantic copy'
+);
+assertEqual(
+  runtimeState.translateProgressDetail('AI-generated detail', progressCopy),
+  'AI-generated detail',
+  'arbitrary extension detail text remains unchanged'
+);
+
+const protocolCopy = {
+  restrictedChromeInternalPage: 'CHROME INTERN',
+  restrictedChromeExtensionPage: 'CHROME ERWEITERUNG',
+  restrictedEdgeInternalPage: 'EDGE INTERN',
+  restrictedBrowserInternalPage: 'BROWSER INTERN',
+  restrictedLocalFile: 'LOKALE DATEI',
+  restrictedPageType: 'EINGESCHRÄNKTE SEITE',
+  restrictedNoActiveTab: 'KEIN AKTIVER TAB',
+  newTab: 'NEUER TAB',
+  taskErrorMissing: 'AUFGABE FEHLT',
+  taskErrorAlreadyRunning: 'AUFGABE LÄUFT',
+  taskErrorNoUsableTab: 'KEIN NUTZBARER TAB',
+  taskCouldNotStart: 'START FEHLGESCHLAGEN',
+};
+assertEqual(
+  runtimeState.translateRestrictedPageType('Chrome internal page', protocolCopy),
+  'CHROME INTERN',
+  'code-owned restricted page description is localized'
+);
+assertEqual(
+  runtimeState.translateRestrictedPageType('new-tab', protocolCopy),
+  'NEUER TAB',
+  'restricted placeholder protocol code is localized'
+);
+assertEqual(
+  runtimeState.translateRestrictedPageType('Vendor-controlled page', protocolCopy),
+  'Vendor-controlled page',
+  'unknown producer-owned page description remains unchanged'
+);
+assertEqual(
+  runtimeState.translateTaskError('dashboard_task_missing', 'No task provided', protocolCopy),
+  'AUFGABE FEHLT',
+  'task-start error code is localized'
+);
+assertEqual(
+  runtimeState.translateTaskError('', 'Another task is already running', protocolCopy),
+  'AUFGABE LÄUFT',
+  'legacy code-owned task error text is localized'
+);
+assertEqual(
+  runtimeState.translateTaskError('dashboard_task_start_exception', 'TypeError', protocolCopy),
+  'START FEHLGESCHLAGEN',
+  'task-start exception hides raw implementation text behind localized copy'
+);
+assertEqual(
+  runtimeState.translateTaskError('', 'AI-generated failure detail', protocolCopy),
+  'AI-generated failure detail',
+  'arbitrary task failure detail remains producer-owned'
+);
+
 console.log('\n--- source contracts ---');
 
 const dashboardSource = fs.readFileSync(path.join(__dirname, '../showcase/js/dashboard.js'), 'utf8');
@@ -220,6 +457,19 @@ const runtimeStateSource = fs.readFileSync(path.join(__dirname, '../showcase/js/
 const angularDashboardTsSource = fs.readFileSync(path.join(__dirname, '../showcase/angular/src/app/pages/dashboard/dashboard-page.component.ts'), 'utf8');
 const angularDashboardHtmlSource = fs.readFileSync(path.join(__dirname, '../showcase/angular/src/app/pages/dashboard/dashboard-page.component.html'), 'utf8');
 const angularDashboardScssSource = fs.readFileSync(path.join(__dirname, '../showcase/angular/src/app/pages/dashboard/dashboard-page.component.scss'), 'utf8');
+
+const runtimeCopyKeys = [...new Set(
+  [...runtimeStateSource.matchAll(/copyText\(copy,\s*'([^']+)'/g)].map((match) => match[1])
+)];
+const localizedDashboardCopyKeys = new Set(
+  [...angularDashboardTsSource.matchAll(/^\s*(\w+):\s*\$localize`/gm)].map((match) => match[1])
+);
+const missingLocalizedRuntimeCopy = runtimeCopyKeys.filter((key) => !localizedDashboardCopyKeys.has(key));
+assert(
+  missingLocalizedRuntimeCopy.length === 0,
+  'Angular dashboard supplies $localize copy for every shared runtime fallback'
+    + (missingLocalizedRuntimeCopy.length ? ': ' + missingLocalizedRuntimeCopy.join(', ') : '')
+);
 
 assert(dashboardSource.includes('handleRemoteControlState'), 'dashboard.js handles authoritative remote control state');
 assert(dashboardSource.includes('setTaskRecoveryPending'), 'dashboard.js tracks task recovery state');
@@ -268,6 +518,28 @@ assert(angularDashboardHtmlSource.includes('dash-preview-progress-badge'), 'Angu
 assert(angularDashboardHtmlSource.includes('dash-preview-frozen-badge'), 'Angular dashboard HTML exposes frozen preview badge markup');
 assert(angularDashboardScssSource.includes('.dash-preview-client-badge'), 'Angular dashboard SCSS styles the preview client badge');
 assert(backgroundSource.includes('ext:dom-overlay'), 'background.js forwards ext:dom-overlay payloads');
+assert(angularDashboardTsSource.includes('this.translateTaskPhase(payload.phase)'),
+  'Angular dashboard localizes task protocol phases before rendering');
+assert(angularDashboardTsSource.includes('this.formatTaskEta(payload.eta)')
+  && !angularDashboardTsSource.includes("'~' + payload.eta"),
+  'Angular dashboard localizes ETA copy without duplicating the approximation marker');
+assert(angularDashboardTsSource.includes('this.translateTaskAction(payload.action)'),
+  'Angular dashboard localizes code-owned task action fallbacks before rendering');
+assert(angularDashboardTsSource.includes('this.translateRestrictedPageType(payload && payload.pageType)'),
+  'Angular dashboard localizes restricted-page protocol labels before rendering');
+assert(angularDashboardTsSource.includes('this.translateTaskError(')
+  && wsClientSource.includes('errorCode: '),
+  'dashboard task-start failures use stable codes and localized presentation');
+assert(angularDashboardTsSource.includes('this.pairingErrorMessage(body?.code)')
+  && !angularDashboardTsSource.includes('body.error || this.dashboardCopy.qrExchangeFailed'),
+  'QR pairing failures use trusted codes instead of rendering server English');
+assert(angularDashboardTsSource.includes('inject(LOCALE_ID)')
+  && angularDashboardTsSource.includes('Math.round(safe).toLocaleString(this.localeId)')
+  && angularDashboardTsSource.includes('new Date(this.lastSnapshotTime).toLocaleTimeString(this.localeId)'),
+  'Angular dashboard formats visible numbers and snapshot times with the selected build locale');
+assert(angularDashboardTsSource.includes('this.showLoginError(this.dashboardCopy.invalidHashKey)')
+  && !angularDashboardTsSource.includes('this.showLoginError(result.error'),
+  'dashboard authentication failures use trusted localized copy instead of raw server errors');
 
 console.log('\n--- timeout alignment ---');
 // STRM-03: Dashboard TASK_TIMEOUT_MS must be 10 * 60 * 1000 = 600000

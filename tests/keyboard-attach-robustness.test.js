@@ -9,9 +9,9 @@
  *     false-resolving attachPromise forever. After a first sendKeyEvent whose attach
  *     fails (all bounded attempts exhausted), the NEXT keystroke must call
  *     chrome.debugger.attach AGAIN (real retry, not cached false) and can succeed.
- *   Test 2 (force-detach-and-retry / Tier 1a): on an 'Another debugger is already
- *     attached' error, attachDebugger force-detaches then retries the attach once and
- *     succeeds (parity with background.js cdpInsertText/cdpMouseClick).
+ *   Test 2 (external owner preservation / Tier 1a): on an 'Another debugger is
+ *     already attached' error, attachDebugger fails with a retryable busy result
+ *     without detaching DevTools or another extension.
  *   Test 3 (post-op detach preserved / regression guard): after a successful op,
  *     detachDebugger (as handleKeyboardDebuggerAction does after every op) resets state
  *     so isAttachedTo(tabId) is false and the next attach starts fresh -- confirming we
@@ -103,23 +103,22 @@ const { KeyboardEmulator } = require('../extension/utils/keyboard-emulator.js');
     check(emu.isAttachedTo(TAB_ID) === true, 'Test 1: emulator is attached to the tab after recovery');
   }
 
-  // === Test 2: force-detach-and-retry (Tier 1a) ============================
-  // First attach throws the "Another debugger is already attached" sentinel; the
-  // emulator must force-detach (once) then retry the attach (succeeds on the 2nd call).
+  // === Test 2: preserve an external debugger owner (Tier 1a) ===============
+  // An already-attached debugger is never force-detached or retried internally.
   {
     const { chromeMock, counts } = makeChromeMock([
-      { throw: 'Another debugger is already attached to the tab with id: 4242' },
-      { ok: true }
+      { throw: 'Another debugger is already attached to the tab with id: 4242' }
     ]);
     globalThis.chrome = chromeMock;
 
     const emu = new KeyboardEmulator();
     const res = await emu.sendKeyEvent(TAB_ID, 'keyDown', 'a', {});
 
-    check(counts.detach === 1, 'Test 2: force-detach called exactly once on "already attached"');
-    check(counts.attach === 2, 'Test 2: attach retried once after force-detach (2 attach calls)');
-    check(res && res.success === true, 'Test 2: sendKeyEvent succeeds via force-detach-and-retry');
-    check(emu.isAttachedTo(TAB_ID) === true, 'Test 2: emulator attached to tab after retry');
+    check(counts.detach === 0, 'Test 2: external debugger owner is never detached');
+    check(counts.attach === 1, 'Test 2: external contention is not retried internally');
+    check(res && res.success === false && res.code === 'SCREENSHOT_DEBUGGER_BUSY' && res.retryable === true,
+      'Test 2: sendKeyEvent returns the typed retryable busy result');
+    check(emu.isAttachedTo(TAB_ID) === false, 'Test 2: emulator does not claim the externally owned tab');
   }
 
   // === Test 3: post-op detach preserved (regression guard) =================

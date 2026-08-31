@@ -98,9 +98,10 @@ function post(events) {
   // Valid: now.
   const okTs = now;
 
-  const futureEvent = event(tooFar);
-  const oldEvent = event(tooOld);
-  const validEvent = event(okTs);
+  const batchInstallUuid = uuidv4();
+  const futureEvent = event(tooFar, batchInstallUuid);
+  const oldEvent = event(tooOld, batchInstallUuid);
+  const validEvent = event(okTs, batchInstallUuid);
 
   const r1 = await post([futureEvent, oldEvent, validEvent]);
   let p1 = null; try { p1 = JSON.parse(r1.body); } catch {}
@@ -130,7 +131,8 @@ function post(events) {
   check('6.99-day-old event accepted (inside -7d window)', r3.statusCode === 200, `got ${r3.statusCode}, body=${r3.body}`);
 
   // ALL events dropped (no surviving inserts) -> still 400 timestamp_out_of_window with accepted=0.
-  const r4 = await post([event(tooFar), event(tooOld)]);
+  const droppedBatchUuid = uuidv4();
+  const r4 = await post([event(tooFar, droppedBatchUuid), event(tooOld, droppedBatchUuid)]);
   let p4 = null; try { p4 = JSON.parse(r4.body); } catch {}
   check('all-events-dropped -> 400', r4.statusCode === 400, `got ${r4.statusCode}, body=${r4.body}`);
   check('all-events-dropped: accepted === 0', p4 && p4.accepted === 0, `body=${r4.body}`);

@@ -50,10 +50,10 @@ function uuidv4() {
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20, 32)}`;
 }
 
-function evt() {
+function evt(installUuid) {
   return {
     event_id: uuidv4(),
-    install_uuid: uuidv4(),
+    install_uuid: installUuid || uuidv4(),
     ts_minute: Date.now(),
     mcp_client: 'Claude',
     model: 'm',
@@ -87,7 +87,8 @@ function postEvents(events) {
 (async function main() {
   console.log('--- server-telemetry-batch-cap (INGEST-07b) ---');
 
-  const batch51 = Array.from({ length: 51 }, evt);
+  const installUuid = uuidv4();
+  const batch51 = Array.from({ length: 51 }, () => evt(installUuid));
   const r1 = await postEvents(batch51);
   check('51 events -> 400', r1.statusCode === 400, `got ${r1.statusCode}, body=${r1.body}`);
   let parsed1 = null;
@@ -96,7 +97,7 @@ function postEvents(events) {
   check('51 events -> response includes max:50', parsed1 && parsed1.max === 50, `body=${r1.body}`);
   check('51 events -> response includes got:51', parsed1 && parsed1.got === 51, `body=${r1.body}`);
 
-  const batch50 = Array.from({ length: 50 }, evt);
+  const batch50 = Array.from({ length: 50 }, () => evt(installUuid));
   const r2 = await postEvents(batch50);
   check('50 events -> 200 (sanity, cap boundary inclusive)', r2.statusCode === 200, `got ${r2.statusCode}, body=${r2.body}`);
 

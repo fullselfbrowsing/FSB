@@ -100,11 +100,15 @@
   border-radius: var(--radius-md);
   background: var(--bg-body);
   transition: all var(--transition-base);
+  /* Hover lift uses top, not transform: transforming a multicol child makes
+     Chromium re-composite the fragmented box and the card blinks out. */
+  position: relative;
+  top: 0;
 }
 
 .skill-feature-card:hover {
   border-color: var(--border-hover);
-  transform: translateY(-3px);
+  top: -3px;
   box-shadow: var(--shadow-sm);
 }
 
@@ -154,11 +158,15 @@
   border-radius: var(--radius-md);
   background: var(--bg-card);
   transition: all var(--transition-base);
+  /* Hover lift uses top, not transform (multicol fragment flicker — see
+     .skill-feature-card). */
+  position: relative;
+  top: 0;
 }
 
 .power-card:hover {
   border-color: var(--border-hover);
-  transform: translateY(-3px);
+  top: -3px;
   box-shadow: var(--shadow-sm);
 }
 
@@ -207,7 +215,10 @@
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   background: var(--bg-card);
-  transition: border-color var(--transition-base), transform var(--transition-base), box-shadow var(--transition-base);
+  /* Hover lift uses top, not transform (multicol fragment flicker — see
+     .skill-feature-card). */
+  top: 0;
+  transition: border-color var(--transition-base), top var(--transition-base), box-shadow var(--transition-base);
   overflow: hidden;
 }
 
@@ -223,7 +234,7 @@
 
 .prompt-card:hover {
   border-color: var(--border-hover);
-  transform: translateY(-2px);
+  top: -2px;
   box-shadow: var(--shadow-sm);
 }
 

@@ -23,14 +23,14 @@ jobs:
       - name: Install root deps
         run: npm install --no-audit --no-fund
       - name: Install mcp deps (needed by root test script)
-        run: npm --prefix mcp install --no-audit --no-fund
+        run: npm --prefix mcp ci --no-audit --no-fund
       - name: Install showcase/server deps (needed by server-telemetry tests in npm test chain)
         run: npm --prefix showcase/server install --no-audit --no-fund
       - name: Install showcase/angular deps (needed by fsb-telemetry-service + build-smoke + privacy-page tests)
         run: npm --prefix showcase/angular install --no-audit --no-fund
       - name: Validate extension (manifest + JS syntax)
         run: npm run validate:extension
-      - name: Run extension + bridge contract tests
+      - name: Phase 65 agent provider contract (sole Linux root invocation)
         run: npm test
 
   mcp-smoke:
@@ -44,11 +44,98 @@ jobs:
       - name: Install root deps
         run: npm install --no-audit --no-fund
       - name: Install mcp deps
-        run: npm --prefix mcp install --no-audit --no-fund
+        run: npm --prefix mcp ci --no-audit --no-fund
       - name: Build MCP server (TypeScript)
         run: npm --prefix mcp run build
+      - name: Phase 62 adapter drift smoke
+        run: node tests/mcp-agent-drift-smoke.test.js
       - name: MCP lifecycle + tools smoke
         run: npm run test:mcp-smoke
+
+  native-host-windows:
+    name: native host (Windows PE + pack)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install MCP dependencies
+        run: npm --prefix mcp ci --no-audit --no-fund
+      - name: Locate MSVC developer command prompt
+        shell: pwsh
+        run: |
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+          if (-not (Test-Path $vswhere)) {
+            throw "vswhere.exe was not found at $vswhere"
+          }
+          $installationPath = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath | Select-Object -First 1
+          if (-not $installationPath) {
+            throw 'No Visual Studio installation with the MSVC C++ toolchain was found'
+          }
+          $devCmd = Join-Path $installationPath 'Common7\Tools\VsDevCmd.bat'
+          if (-not (Test-Path $devCmd)) {
+            throw "VsDevCmd.bat was not found at $devCmd"
+          }
+          "VSDEVCMD=$devCmd" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Build x64 native-host bootstrap
+        shell: cmd
+        run: |
+          call "%VSDEVCMD%" -arch=x64 -host_arch=x64
+          if errorlevel 1 exit /b %errorlevel%
+          node scripts/build-native-host-windows.mjs --arch x64
+      - name: Build arm64 native-host bootstrap
+        shell: cmd
+        run: |
+          call "%VSDEVCMD%" -arch=arm64 -host_arch=x64
+          if errorlevel 1 exit /b %errorlevel%
+          node scripts/build-native-host-windows.mjs --arch arm64
+      - name: Verify both PE artifacts and write package metadata
+        shell: cmd
+        run: |
+          call "%VSDEVCMD%" -arch=x64 -host_arch=x64
+          if errorlevel 1 exit /b %errorlevel%
+          node scripts/build-native-host-windows.mjs --arch all --verify-only --metadata-out mcp/native-host/windows-artifacts.json
+      - name: Execute the x64 bootstrap and safe registry-helper harnesses
+        run: node tests/mcp-native-host-packaging.test.js --section windows-bootstrap
+      - name: Inspect the staged npm package
+        working-directory: mcp
+        run: npm pack --dry-run --ignore-scripts --json
+      - name: Read package version
+        id: package-version
+        shell: pwsh
+        run: |
+          node -e "require('fs').appendFileSync(process.env.GITHUB_OUTPUT, 'version=' + require('./mcp/package.json').version + String.fromCharCode(10))"
+      - name: Upload version-bound Windows bootstrap artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: fsb-native-host-${{ steps.package-version.outputs.version }}
+          if-no-files-found: error
+          path: |
+            mcp/native-host/bin/win32-x64/fsb-native-host.exe
+            mcp/native-host/bin/win32-x64/fsb-native-host-registry.exe
+            mcp/native-host/bin/win32-arm64/fsb-native-host.exe
+            mcp/native-host/bin/win32-arm64/fsb-native-host-registry.exe
+            mcp/native-host/windows-artifacts.json
+
+  runtime-payload:
+    name: native runtime payload (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install MCP dependencies from the committed lock
+        run: npm --prefix mcp ci --no-audit --no-fund
+      - name: Build the package payload
+        run: npm --prefix mcp run build
+      - name: Prove complete offline payload and negative cases
+        run: node tests/mcp-native-host-packaging.test.js --section workflow-and-pack
 
   website:
     name: showcase (build + crawler smoke)
@@ -64,6 +151,14 @@ jobs:
         run: node showcase/angular/scripts/verify-locale-sync.mjs
       - name: Lint i18n template marking (CI-03 promoted from Phase 261)
         run: npm --prefix showcase/angular run lint:i18n
+      - name: Verify translation source drift (Phase 55 / CI-02..CI-04)
+        run: npm --prefix showcase/angular run verify:translation-drift
+      - name: Exercise translation-tool adversarial fixtures
+        run: npm --prefix showcase/angular run test:translation-tools
+      - name: Reject English-copy and cross-locale-identical targets
+        run: npm --prefix showcase/angular run verify:translation-quality
+      - name: Run Angular component tests
+        run: npm --prefix showcase/angular run test:ci
       - name: Verify ng extract-i18n produces no diff (CI-02)
         run: |
           mkdir -p /tmp/extract-check
@@ -80,7 +175,7 @@ jobs:
 
   all-green:
     name: all-green
-    needs: [extension, mcp-smoke, website]
+    needs: [extension, mcp-smoke, website, native-host-windows, runtime-payload]
     runs-on: ubuntu-latest
     steps:
       - run: echo "All required CI checks passed."

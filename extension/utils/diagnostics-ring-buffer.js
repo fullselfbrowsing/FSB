@@ -7,14 +7,32 @@
   var MAX_ENTRIES = 100;
   var DIAGNOSTIC_APPEND = 'fsb:diagnostic-append';
   var DIAGNOSTIC_GET = 'fsb:diagnostic-get';
+  var FSB_BRIDGE_SECRET_PATTERN = /fsb-auth\.[A-Za-z0-9_-]{43}(?![A-Za-z0-9_-])/g;
+  var FSB_BRIDGE_SECRET_REPLACEMENT = '[REDACTED_FSB_BRIDGE_SECRET]';
   var _inMemoryRing = [];
 
+  function _redactBridgeSecrets(value) {
+    var text = String(value === undefined || value === null ? '' : value);
+    try {
+      var shared = typeof globalThis !== 'undefined'
+        ? globalThis.redactBridgeSecretsInString
+        : null;
+      if (typeof shared === 'function') {
+        var sharedResult = shared(text);
+        if (typeof sharedResult === 'string') return sharedResult;
+      }
+    } catch (_error) {
+      // Fall through to the private fail-closed scrubber.
+    }
+    return text.replace(FSB_BRIDGE_SECRET_PATTERN, FSB_BRIDGE_SECRET_REPLACEMENT);
+  }
+
   function _redactText(value, maxChars) {
-    return String(value === undefined || value === null ? '' : value)
-      .slice(0, maxChars)
+    return _redactBridgeSecrets(value)
       .replace(/\bBearer\s+[A-Za-z0-9._~+\/-]+/gi, '[redacted]')
       .replace(/\b(?:sk|pk)_(?:live|test)_[A-Za-z0-9_-]+/gi, '[redacted]')
-      .replace(/\b(?:api[_ -]?key|access[_ -]?token|authorization)\s*[:=]\s*[^\s,;]+/gi, '[redacted]');
+      .replace(/\b(?:api[_ -]?key|access[_ -]?token|authorization)\s*[:=]\s*[^\s,;]+/gi, '[redacted]')
+      .slice(0, maxChars);
   }
 
   function _safeContext(value) {

@@ -31,7 +31,7 @@ const path = require('path');
 const REPO_ROOT = path.resolve(__dirname, '..');
 const CATALOG_MODULE_PATH = path.join(REPO_ROOT, 'extension', 'utils', 'capability-catalog.js');
 
-const CAP = 123;
+const CAP = 124;
 // The head globals expected today. Locking the identities (not just the count)
 // catches a silent SWAP that keeps the count stable but changes which handlers ship.
 const EXPECTED_HEAD_GLOBALS = [
@@ -131,6 +131,7 @@ const EXPECTED_HEAD_GLOBALS = [
   'FsbHandlerFigma',
   'FsbHandlerGdrive',
   'FsbHandlerGdocs',
+  'FsbHandlerGsheets',
   'FsbHandlerPowerpoint',
   'FsbHandlerOutlook',
   'FsbHandlerTeams',
@@ -201,8 +202,8 @@ check(headEntryCount <= CAP,
   `HEAD_HANDLER_MODULES.length ${headEntryCount} <= CAP ${CAP} (the head stays descriptors-only; breadth never sprawls)`);
 
 // ---- Today's exact head -- breadth adds DATA, depth adds narrow same-origin heads --
-check(headEntryCount === 123,
-  `HEAD_HANDLER_MODULES has exactly 123 entries (current T1 head set); got ${headEntryCount}`);
+check(headEntryCount === 124,
+  `HEAD_HANDLER_MODULES has exactly 124 entries (current T1 head set); got ${headEntryCount}`);
 const missingGlobals = EXPECTED_HEAD_GLOBALS.filter((g) => !foundGlobals.includes(g));
 check(missingGlobals.length === 0,
   `the expected head globals are present (missing: [${missingGlobals.join(', ') || 'none'}])`);

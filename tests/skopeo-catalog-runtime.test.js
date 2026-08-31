@@ -230,10 +230,10 @@ function assertIsolatedDynamicProjectionCoherence(background) {
 
 function assertCatalogProjectionClosure() {
   assert.deepEqual(profileIndex.counts, {
-    descriptors: 2314,
-    stems: 128,
+    descriptors: 2319,
+    stems: 129,
     services: 129,
-    pairs: 130
+    pairs: 131
   }, 'the deterministic generated catalog retains its full closure counts');
   assert.equal(profileIndex.admittedOriginIndex.length, 166,
     'all exact admitted page origins are represented');
@@ -1035,7 +1035,7 @@ async function main() {
   await assertProductionArgumentDispatch(background);
   assert.equal(source(PROFILE_SCHEMA_PATH).includes('FsbSkopeoProfileSchema'), true,
     'profile schema is the shared closed vocabulary');
-  console.log('skopeo-catalog-runtime: PASS (2314 descriptors, 128 stems, 129 services, 130 pairs, 9 genres)');
+  console.log('skopeo-catalog-runtime: PASS (2319 descriptors, 129 stems, 129 services, 131 pairs, 9 genres)');
 }
 
 main().catch(function(error) {

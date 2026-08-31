@@ -20,6 +20,10 @@
  *           ownership tokens against arbitrary user-active tabs)
  *   D-12 -- shared error code surface (NO_OWNED_TAB / AMBIGUOUS_TAB /
  *           NO_ACTIVE_TAB / AGENT_REGISTRY_UNAVAILABLE)
+ *   OWN-READ -- explicit non-legacy tab ids are checked against the
+ *           authoritative owned-tab set before any direct read/action path
+ *           can touch Chrome. Only navigate may opt into claiming a truly
+ *           unowned tab; another agent's tab always rejects.
  *
  * Returns either a resolved tab descriptor:
  *   { tabId: number, ownershipToken: string|null, skipGate: boolean }
@@ -36,10 +40,14 @@
    *                           or tabId; both accepted for snake/camel split).
    * @param {object} client    Bridge client (provides _getActiveTab for the
    *                           legacy fall-through branch).
+   * @param {object} [options]
+   * @param {boolean} [options.allowUnownedClaim] Permit a recovery caller to
+   *                           continue with a tab that has no owner. This does
+   *                           not permit cross-agent access.
    * @returns {Promise<{tabId:number, ownershipToken:string|null, skipGate:boolean}
    *           | {success:false, code:string, agentId?:string, tabIds?:number[]}>}
    */
-  async function resolveAgentTabOrError(agentId, params, client) {
+  async function resolveAgentTabOrError(agentId, params, client, options) {
     // D-04 legacy:* branch -- first line, single rule.
     // skipGate:true signals the call site NOT to push tabId into routeParams
     // (preserves Phase 240's tab-arm-skip path for legacy popup/sidepanel/
@@ -55,22 +63,55 @@
       return { tabId: tab.id, ownershipToken: null, skipGate: true };
     }
 
-    // Explicit tab_id from caller -- gate enforces ownership downstream.
-    // Snake-case form is the MCP boundary convention; camelCase form is
-    // back-compat with already-camelCase callers (Pitfall 6 in RESEARCH.md).
-    if (params && Number.isFinite(params.tab_id)) {
-      return { tabId: params.tab_id, ownershipToken: null, skipGate: false };
-    }
-    if (params && Number.isFinite(params.tabId)) {
-      return { tabId: params.tabId, ownershipToken: null, skipGate: false };
-    }
-
-    // Registry path -- D-01 three branches.
+    // Registry authority is required before accepting any non-legacy target.
     const reg = (typeof globalThis !== 'undefined') ? globalThis.fsbAgentRegistryInstance : null;
     if (!reg || typeof reg.getAgentTabs !== 'function') {
       return { success: false, code: 'AGENT_REGISTRY_UNAVAILABLE', agentId };
     }
-    const tabIds = reg.getAgentTabs(agentId) || [];
+    if (typeof agentId !== 'string' || agentId.length === 0
+        || (typeof reg.hasAgent === 'function' && !reg.hasAgent(agentId))) {
+      return { success: false, code: 'AGENT_NOT_REGISTERED', agentId };
+    }
+    const owned = reg.getAgentTabs(agentId);
+    if (owned === null) {
+      return { success: false, code: 'AGENT_NOT_REGISTERED', agentId };
+    }
+    if (!Array.isArray(owned)) {
+      return { success: false, code: 'AGENT_REGISTRY_UNAVAILABLE', agentId };
+    }
+    const tabIds = owned.filter(Number.isFinite);
+
+    // Explicit tab_id from caller. Direct content/CDP/read/vault routes do
+    // not all pass through dispatchMcpToolRoute, so the resolver itself must
+    // reject foreign targets rather than relying on a later gate.
+    // Snake-case form is the MCP boundary convention; camelCase is retained
+    // for already-normalized extension callers.
+    const explicitTabId = params && Number.isFinite(params.tab_id)
+      ? params.tab_id
+      : (params && Number.isFinite(params.tabId) ? params.tabId : null);
+    if (explicitTabId !== null) {
+      if (tabIds.indexOf(explicitTabId) !== -1) {
+        return { tabId: explicitTabId, ownershipToken: null, skipGate: false };
+      }
+      const hasOwnerAuthority = typeof reg.getOwner === 'function';
+      const ownerAgentId = hasOwnerAuthority ? (reg.getOwner(explicitTabId) || null) : null;
+      if (options
+          && options.allowUnownedClaim === true
+          && hasOwnerAuthority
+          && ownerAgentId === null) {
+        return { tabId: explicitTabId, ownershipToken: null, skipGate: false };
+      }
+      return {
+        success: false,
+        code: 'TAB_NOT_OWNED',
+        agentId,
+        requestingAgentId: agentId,
+        requestedTabId: explicitTabId,
+        ownerAgentId
+      };
+    }
+
+    // Registry path -- D-01 three branches.
     if (tabIds.length === 0) {
       return { success: false, code: 'NO_OWNED_TAB', agentId };
     }

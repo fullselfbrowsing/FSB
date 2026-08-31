@@ -107,6 +107,7 @@ globalThis.chrome = {
 // --- Module loads (sidecar + owner-chip; Plan 11-01+ will require additional modules) ---
 const TabConvStore = require('../extension/ui/sidepanel-tab-conv-store.js');
 require('../extension/ui/owner-chip.js'); // registers globalThis.FSBOwnerChip
+const DelegationFeed = require('../extension/ui/delegation-feed.js');
 
 // --- DOM stub helpers (forward-compat for Plan 11-02 lockout assertions) ---
 function createButtonStub() {
@@ -207,20 +208,22 @@ function installDomStub(idMap) {
     ok(result === null, 'Part 1.8 -- thrown storage read returns null (best-effort)');
   }
 
-  console.log('\n--- Part 2: refreshOwnerChip three-tier resolution + sidepanel/popup wiring (FILLED in Plan 11-01) ---');
+  console.log('\n--- Part 2: popup labels + provider-neutral sidepanel ownership wiring ---');
 
   // Part 2.1-2.7: source-level three-tier wiring + export contracts
   const sidepanelSrc = fs.readFileSync(path.resolve(__dirname, '../extension/ui/sidepanel.js'), 'utf8');
   const popupSrc = fs.readFileSync(path.resolve(__dirname, '../extension/ui/popup.js'), 'utf8');
 
-  // 2.1 sidepanel.js wires lookupClientLabel
+  // 2.1 sidepanel.js no longer resolves decorative owner labels.
   const sidepanelLookupCount = (sidepanelSrc.match(/FSBOwnerChip\.lookupClientLabel/g) || []).length;
-  ok(sidepanelLookupCount === 1,
-     'Part 2.1 -- sidepanel.js references FSBOwnerChip.lookupClientLabel exactly once');
+  ok(sidepanelLookupCount === 0,
+     'Part 2.1 -- sidepanel.js does not resolve visual-session owner labels');
 
-  // 2.2 sidepanel.js carries Phase 11 FINT-19 marker
-  ok(/Phase 11 FINT-19/.test(sidepanelSrc),
-     'Part 2.2 -- sidepanel.js carries Phase 11 FINT-19 marker');
+  // 2.2 sidepanel reads the ownership registry directly for locking.
+  ok(/async function refreshActiveTabOwnership/.test(sidepanelSrc)
+      && /chrome\.storage\.session\.get\('fsbAgentRegistry'\)/.test(sidepanelSrc)
+      && !/fsbAgentClientLabels/.test(sidepanelSrc),
+     'Part 2.2 -- sidepanel ownership is registry-only and internal');
 
   // 2.3 popup.js wires lookupClientLabel
   const popupLookupCount = (popupSrc.match(/FSBOwnerChip\.lookupClientLabel/g) || []).length;
@@ -231,11 +234,11 @@ function installDomStub(idMap) {
   ok(/Phase 11 FINT-19/.test(popupSrc),
      'Part 2.4 -- popup.js carries Phase 11 FINT-19 marker');
 
-  // 2.5 Tier 1 short-circuit comes BEFORE Tier 2 (sidepanel.js)
-  const sidepanelTier1Idx = sidepanelSrc.search(/ownerAgentId\.indexOf\(['"]legacy:['"]\)\s*===\s*0/);
-  const sidepanelTier2Idx = sidepanelSrc.indexOf('FSBOwnerChip.lookupClientLabel');
-  ok(sidepanelTier1Idx > 0 && sidepanelTier2Idx > sidepanelTier1Idx,
-     'Part 2.5 -- sidepanel.js Tier 1 conditional appears before Tier 2 call');
+  // 2.5 Popup retains its provider/client provenance presentation.
+  const popupTier1Idx = popupSrc.search(/ownerAgentId\.indexOf\(['"]legacy:['"]\)\s*===\s*0/);
+  const popupTier2Idx = popupSrc.indexOf('FSBOwnerChip.lookupClientLabel');
+  ok(popupTier1Idx > 0 && popupTier2Idx > popupTier1Idx,
+     'Part 2.5 -- popup retains its ordered ownership-label resolution');
 
   // 2.6 module.exports.lookupClientLabel is a function
   ok(typeof ownerChipMod.lookupClientLabel === 'function',
@@ -298,10 +301,10 @@ function installDomStub(idMap) {
        'Part 3.3 -- applyInputLockout(true) sets aria-disabled + aria-describedby + .fsb-foreign-owned-disabled on all 4 controls');
 
     // 3.4 unlock state: aria-disabled + aria-describedby + class cleared.
-    // Seed the owner tooltip the way refreshOwnerChip's lock path does after
+    // Seed the generic ownership tooltip the way the internal lock path does after
     // applyInputLockout(true) -- title is a reflected attribute, so the
     // attribute-level stub mirrors `chatInput.title = ...` on a real DOM.
-    chatInputStub.setAttribute('title', 'Disabled while tab is owned by X');
+    chatInputStub.setAttribute('title', 'Disabled while automation is working on this tab');
     applyInputLockoutFn(false);
     const noneHaveAria = allFour.every(el => el._attrs()['aria-disabled'] === undefined);
     const noneHaveDesc = allFour.every(el => el._attrs()['aria-describedby'] === undefined);
@@ -339,19 +342,21 @@ function installDomStub(idMap) {
   const sidepanelCssSrc = fs.readFileSync(path.resolve(__dirname, '../extension/ui/sidepanel.css'), 'utf8');
   const sidepanelHtmlSrc = fs.readFileSync(path.resolve(__dirname, '../extension/ui/sidepanel.html'), 'utf8');
 
-  // 4.1 sidepanel.js carries applyInputLockout(true) inside refreshOwnerChip
-  const refreshChipBodyMatch = sidepanelSrcForP4.match(/async function refreshOwnerChip\([^)]*\)\s*\{[\s\S]*?^\}/m);
+  // 4.1 sidepanel.js carries applyInputLockout(true) inside its internal
+  // active-tab ownership refresh.
+  const refreshChipBodyMatch = sidepanelSrcForP4.match(/async function refreshActiveTabOwnership\([^)]*\)\s*\{[\s\S]*?^\}/m);
   ok(refreshChipBodyMatch && refreshChipBodyMatch[0].indexOf('applyInputLockout(true)') !== -1,
-     'Part 4.1 -- refreshOwnerChip body contains applyInputLockout(true)');
+     'Part 4.1 -- internal ownership refresh contains applyInputLockout(true)');
 
-  // 4.2 sidepanel.js carries applyInputLockout(false) inside refreshOwnerChip
+  // 4.2 sidepanel.js carries applyInputLockout(false) inside the same refresh.
   ok(refreshChipBodyMatch && refreshChipBodyMatch[0].indexOf('applyInputLockout(false)') !== -1,
-     'Part 4.2 -- refreshOwnerChip body contains applyInputLockout(false)');
+     'Part 4.2 -- internal ownership refresh contains applyInputLockout(false)');
 
   // 4.3 sidepanel.js carries the runtime gate inside handleSendMessage
   const handleSendBodyMatch = sidepanelSrcForP4.match(/async function handleSendMessage\(\)\s*\{[\s\S]*?^\}/m);
-  ok(handleSendBodyMatch && /if \(await _isActiveTabForeignOwned\(\)\) return;/.test(handleSendBodyMatch[0]),
-     'Part 4.3 -- handleSendMessage body contains _isActiveTabForeignOwned runtime gate');
+  ok(handleSendBodyMatch
+      && /if \(await _isActiveTabForeignOwned\(\)\)\s*\{[\s\S]*?_clearDelegationPreflightIntent\(intentId\);[\s\S]*?updateSendButtonState\(\);[\s\S]*?return;[\s\S]*?\}/.test(handleSendBodyMatch[0]),
+     'Part 4.3 -- handleSendMessage foreign-owner gate clears the reserved intent before returning');
 
   // 4.4 sidepanel.css carries .fsb-foreign-owned-disabled rule
   ok(/\.fsb-foreign-owned-disabled\s*\{[^}]*opacity:\s*0\.45[^}]*pointer-events:\s*none/s.test(sidepanelCssSrc),
@@ -360,6 +365,40 @@ function installDomStub(idMap) {
   // 4.5 sidepanel.html carries the aria-describedby description span
   ok(/<span\s+id=\"fsb-lockout-aria-description\"\s+class=\"sr-only\">/.test(sidepanelHtmlSrc),
      'Part 4.5 -- sidepanel.html carries fsb-lockout-aria-description sr-only span');
+
+  // Phase 61 Plan 07: the delegation renderer is loaded exactly once before
+  // sidepanel.js and every fixed delegation mount id is unique.
+  const feedScriptCount = (sidepanelHtmlSrc.match(/<script src="delegation-feed\.js"><\/script>/g) || []).length;
+  ok(feedScriptCount === 1
+      && sidepanelHtmlSrc.indexOf('delegation-feed.js') < sidepanelHtmlSrc.indexOf('sidepanel.js'),
+     'Part 4.6 -- delegation-feed.js loads exactly once before sidepanel.js');
+  const delegationIds = ['delegationRun', 'delegationStateCard', 'delegationFeed', 'delegationAnnouncer'];
+  const uniqueDelegationIds = delegationIds.every(function(id) {
+    return (sidepanelHtmlSrc.match(new RegExp('id="' + id + '"', 'g')) || []).length === 1;
+  });
+  ok(uniqueDelegationIds,
+     'Part 4.7 -- every fixed delegation DOM id appears exactly once');
+  ok(sidepanelHtmlSrc.indexOf('takeControlBtn') === -1
+      && sidepanelHtmlSrc.indexOf('delegationControlBar') === -1,
+     'Part 4.7b -- sidepanel markup has no Take/Resume ownership controls');
+  ok(DelegationFeed && typeof DelegationFeed.render === 'function'
+      && globalThis.FsbDelegationFeed === DelegationFeed,
+     'Part 4.8 -- delegation feed preserves classic-global/CommonJS dual export');
+  ok(sidepanelSrcForP4.indexOf('FSB_DELEGATION_TAKE_CONTROL') === -1
+      && sidepanelSrcForP4.indexOf('FSB_DELEGATION_RESUME') === -1
+      && sidepanelSrcForP4.indexOf('Take control') === -1
+      && sidepanelSrcForP4.indexOf('Resume with agent') === -1,
+     'Part 4.9 -- sidepanel exposes and emits no Take/Resume path');
+  const activationDelegationRefresh = /chrome\.tabs\.onActivated\.addListener[\s\S]*?syncActiveTabSurface\(activeInfo\.tabId, activeInfo\.windowId\)/.test(sidepanelSrcForP4)
+    && /async function syncActiveTabSurface[\s\S]*?_activeTabIdSnapshot\s*=\s*incomingTabId[\s\S]*?await _hydrateDelegationForSelectedConversation\(\)/.test(sidepanelSrcForP4);
+  ok(activationDelegationRefresh,
+     'Part 4.10 -- active-tab swaps refresh delegated eligibility after updating the tab snapshot');
+  ok(/changes\.fsbAgentRegistry[\s\S]{0,160}_refreshSelectedDelegationSnapshot\(\)/.test(sidepanelSrcForP4),
+     'Part 4.11 -- registry ownership changes refresh the controller-owned delegated snapshot');
+  ok(handleSendBodyMatch
+      && handleSendBodyMatch[0].indexOf("type: 'FSB_DELEGATION_PREFLIGHT'")
+        < handleSendBodyMatch[0].indexOf('_handleLegacySendMessage(message)'),
+     'Part 4.12 -- background preflight routes API tasks to the untouched legacy send path');
 
   console.log('\n--- Part 5: envelope CRUD + LRU eviction (FILLED in Plan 11-03) ---');
 

@@ -34,12 +34,16 @@ function readIfPresent(relativePath) {
 console.log('\n--- showcase angular foundation contracts ---');
 
 const rootPackageSource = readIfPresent('package.json');
+const dockerfileSource = readIfPresent('Dockerfile');
+const dockerignoreSource = readIfPresent('.dockerignore');
 const angularConfigSource = readIfPresent('showcase/angular/angular.json');
 const mainSource = readIfPresent('showcase/angular/src/main.ts');
+const appConfigSource = readIfPresent('showcase/angular/src/app/app.config.ts');
 const routeSource = readIfPresent('showcase/angular/src/app/app.routes.ts');
 const indexSource = readIfPresent('showcase/angular/src/index.html');
 const appComponentSource = readIfPresent('showcase/angular/src/app/app.component.ts');
 const appComponentTemplateSource = readIfPresent('showcase/angular/src/app/app.component.html');
+const shellComponentSource = readIfPresent('showcase/angular/src/app/layout/showcase-shell/showcase-shell.component.ts');
 const shellTemplateSource = readIfPresent('showcase/angular/src/app/layout/showcase-shell/showcase-shell.component.html');
 const shellStyleSource = readIfPresent('showcase/angular/src/app/layout/showcase-shell/showcase-shell.component.scss');
 const globalStylesSource = readIfPresent('showcase/angular/src/styles.scss');
@@ -110,6 +114,17 @@ assert(
   'root showcase scripts preserve deterministic npm --prefix workspace delegation'
 );
 
+assert(
+  /RUN npm run build -- --configuration production/.test(dockerfileSource),
+  'Docker showcase build runs npm build so prebuild regenerates crawler files before deploy'
+);
+
+assert(
+  /COPY extension\/manifest\.json \.\.\/extension\/manifest\.json/.test(dockerfileSource) &&
+    /^!extension\/manifest\.json$/m.test(dockerignoreSource),
+  'Docker showcase build includes extension manifest for crawler version generation'
+);
+
 // outputPath can be a string or an object { base, browser }
 const resolvedOutputPath = typeof angularOutputPath === 'string'
   ? angularOutputPath
@@ -143,6 +158,21 @@ assert(
 );
 
 assert(
+  /withInMemoryScrolling/.test(appConfigSource) &&
+    /scrollPositionRestoration:\s*'enabled'/.test(appConfigSource) &&
+    /provideRouter\(routes,\s*withInMemoryScrolling/.test(appConfigSource),
+  'router config restores scroll position to top on route navigation'
+);
+
+assert(
+  /event instanceof NavigationEnd/.test(shellComponentSource) &&
+    !/event instanceof Scroll/.test(shellComponentSource) &&
+    !/(prepareRouteTopNavigation|scrollToRouteTop|resetWindowScroll|ROUTE_SCROLL_RESET|fsb-route-scroll-top)/.test(shellComponentSource) &&
+    !/(window\.setTimeout|window\.requestAnimationFrame|window\.scrollTo|sessionStorage|scrollRestoration)/.test(shellComponentSource),
+  'showcase shell delegates route scrolling exclusively to the Angular router'
+);
+
+assert(
   /path:\s*''/.test(routeSource) &&
     /path:\s*'about'/.test(routeSource) &&
     /path:\s*'dashboard'/.test(routeSource) &&
@@ -153,24 +183,33 @@ assert(
 );
 
 assert(
-  /localStorage\.getItem\('fsb-showcase-theme'\)/.test(indexSource),
-  'index pre-bootstrap script reads fsb-showcase-theme from localStorage'
+  /typeof window\.matchMedia !== 'function'/.test(indexSource) &&
+    /window\.matchMedia\('\(prefers-color-scheme: dark\)'\)\.matches/.test(indexSource),
+  'index pre-bootstrap script reads system color scheme with a prerender-safe matchMedia guard'
 );
 
 assert(
-  /if\s*\(saved\s*===\s*'light'\)\s*\{[\s\S]*setAttribute\('data-theme',\s*'light'\)/.test(indexSource),
-  'index pre-bootstrap script applies data-theme=\"light\" only for stored light mode'
+  /if\s*\(\s*!window\.matchMedia\('\(prefers-color-scheme: dark\)'\)\.matches\s*\)\s*\{[\s\S]*setAttribute\('data-theme',\s*'light'\)/.test(indexSource),
+  'index pre-bootstrap script applies data-theme=\"light\" for non-dark system theme'
 );
 
 assert(
-  indexSource.indexOf('localStorage.getItem(\'fsb-showcase-theme\')') <
-    indexSource.indexOf('<app-root>'),
-  'theme pre-bootstrap read occurs before app root bootstrap'
+  !/(initRouteScrollRestoration|fsb-route-scroll-top|scheduleReset|target\.closest\('footer a\[href\]'\))/.test(indexSource) &&
+    !/(window\.scrollTo|window\.setTimeout|window\.history\.scrollRestoration)/.test(indexSource),
+  'index bootstrap does not install a competing route-scroll owner'
+);
+
+const themeBootstrapIndex = indexSource.indexOf("window.matchMedia('(prefers-color-scheme: dark)'");
+assert(
+  themeBootstrapIndex !== -1 && themeBootstrapIndex < indexSource.indexOf('<app-root>'),
+  'theme pre-bootstrap system preference read occurs before app root bootstrap'
 );
 
 assert(
-  /const STORAGE_KEY = 'fsb-showcase-theme'/.test(themeServiceSource),
-  'theme service uses fsb-showcase-theme storage key constant'
+  /function getSystemThemeMedia\(\): MediaQueryList \| null/.test(themeServiceSource) &&
+    /typeof window\.matchMedia !== 'function'/.test(themeServiceSource) &&
+    /window\.matchMedia\('\(prefers-color-scheme: dark\)'\)/.test(themeServiceSource),
+  'theme service uses prerender-safe system theme media query'
 );
 
 assert(
@@ -184,6 +223,21 @@ assert(
   /<div class="nav-links">[\s\S]*routerLink="\/"[\s\S]*routerLink="\/about"[\s\S]*routerLink="\/dashboard"[\s\S]*routerLink="\/privacy"[\s\S]*routerLink="\/support"/.test(shellTemplateSource) &&
     /<div class="nav-mobile"[\s\S]*routerLink="\/"[\s\S]*routerLink="\/about"[\s\S]*routerLink="\/dashboard"[\s\S]*routerLink="\/privacy"[\s\S]*routerLink="\/support"/.test(shellTemplateSource),
   'shell template preserves canonical desktop and mobile routerLink contracts'
+);
+
+assert(
+  (shellTemplateSource.match(/<a routerLink=/g) || []).length >= 23 &&
+    !/\(click\)="prepareRouteTopNavigation\(\)"/.test(shellTemplateSource),
+  'footer internal links remain plain router links without imperative scroll handlers'
+);
+
+const reducedMotionMediaIndex = globalStylesSource.indexOf('@media (prefers-reduced-motion: no-preference)');
+const smoothScrollIndex = globalStylesSource.indexOf('scroll-behavior: smooth');
+assert(
+  reducedMotionMediaIndex !== -1 &&
+    smoothScrollIndex > reducedMotionMediaIndex &&
+    /@media\s*\(prefers-reduced-motion:\s*no-preference\)\s*\{[\s\S]*?html\s*\{[\s\S]*?scroll-behavior:\s*smooth;[\s\S]*?\}/.test(globalStylesSource),
+  'smooth scrolling is enabled only when reduced motion is not requested'
 );
 
 assert(
@@ -218,15 +272,13 @@ assert(
 );
 
 assert(
-  /localStorage\.setItem\(STORAGE_KEY,\s*'light'\)/.test(themeServiceSource) &&
-    /localStorage\.removeItem\(STORAGE_KEY\)/.test(themeServiceSource),
-  'theme service writes light mode and removes key when toggling off'
+  /media\.addEventListener\('change',\s*\(e\)\s*=>\s*this\.applyDark\(e\.matches\)\)/.test(themeServiceSource),
+  'theme service updates theme on system preference changes'
 );
 
 assert(
-  /localStorage\.getItem\(STORAGE_KEY\)/.test(themeServiceSource) &&
-    /setAttribute\('data-theme',\s*'light'\)/.test(themeServiceSource),
-  'theme service reapplies persisted light mode from storage'
+  /if\s*\(isDark\)\s*\{[\s\S]*removeAttribute\('data-theme'\)[\s\S]*\}\s*else\s*\{[\s\S]*setAttribute\('data-theme',\s*'light'\)/.test(themeServiceSource),
+  'theme service maps dark mode to default theme and light mode to data-theme=\"light\"'
 );
 
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===');

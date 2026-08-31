@@ -27,6 +27,10 @@ check(denylist.isDenied('/Users/me/.aws/credentials'), '~/.aws/credentials is de
 check(denylist.isDenied('/home/u/.gnupg/secring.gpg'), '~/.gnupg/* is denied');
 check(denylist.isDenied('/Users/me/Library/Keychains/login.keychain-db'), 'macOS keychain is denied');
 check(denylist.isDenied('/home/u/.fsb-vault/keys.json'), 'FSB vault is denied');
+check(denylist.isDenied('/Users/me/.fsb/bridge-auth.json'), 'other FSB private state is denied');
+check(denylist.isDenied('/Users/me/.fsb/screenshots/unmanaged.png'), 'unmanaged files in the screenshot directory are denied');
+check(denylist.isDenied('/Users/me/.fsb/screenshots/fsb-screenshot-1723650000000-not-a-uuid.png'),
+  'lookalike managed screenshot names remain denied');
 
 // --- denied: sensitive filenames / prefixes ---
 check(denylist.isDenied('/home/u/project/.env'), '.env is denied');
@@ -63,6 +67,18 @@ check(!denylist.isDenied('/Users/me/Documents/resume.pdf'), 'resume.pdf is allow
 check(!denylist.isDenied('/Users/me/Pictures/photo.png'), 'photo.png is allowed');
 check(!denylist.isDenied('/tmp/report.docx'), 'report.docx is allowed');
 check(!denylist.isDenied('/Users/me/Downloads/invoice.xlsx'), 'invoice.xlsx is allowed');
+const managedScreenshot = '/Users/me/.fsb/screenshots/fsb-screenshot-1723650000000-550e8400-e29b-41d4-a716-446655440000.png';
+const managedOptions = { allowManagedScreenshot: true };
+check(denylist.isDenied(managedScreenshot),
+  'managed MCP screenshot path is denied without server attestation');
+check(!denylist.isDenied(managedScreenshot, managedOptions),
+  'attested managed MCP screenshot path is directly uploadable');
+check(!denylist.isDenied('C:\\Users\\me\\.fsb\\screenshots\\fsb-screenshot-1723650000000-550e8400-e29b-41d4-a716-446655440000.png', managedOptions),
+  'attested managed MCP screenshot path is directly uploadable on Windows');
+check(denylist.isDenied('/Users/me/.ssh/.fsb/screenshots/fsb-screenshot-1723650000000-550e8400-e29b-41d4-a716-446655440000.png', managedOptions),
+  'attestation does not bypass another sensitive parent directory');
+check(denylist.isDenied('/etc/ssl/private/.fsb/screenshots/fsb-screenshot-1723650000000-550e8400-e29b-41d4-a716-446655440000.png', managedOptions),
+  'attestation does not bypass a system secret store');
 
 // --- reasons are content-free tokens (safe to audit, no path echoed) ---
 check(denylist.classify('/Users/me/.ssh/id_rsa').reason === 'sensitive-directory', 'dir reason token');

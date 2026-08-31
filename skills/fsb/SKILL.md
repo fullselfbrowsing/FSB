@@ -1,7 +1,7 @@
 ---
 name: fsb
 description: FSB drives the user's Chrome via the FSB extension and an MCP bridge for live web tasks.
-version: 0.9.62
+version: 0.9.91
 user-invocable: true
 requires:
   bins: [node, npx]
@@ -14,7 +14,7 @@ metadata:
     mcp_servers:
       fsb:
         command: "npx"
-        args: ["-y", "fsb-mcp-server"]
+        args: ["-y", "fsb-mcp-server@latest"]
 ---
 
 # FSB
@@ -32,11 +32,11 @@ FSB lets you drive the user's real Chrome via the FSB extension and a local MCP 
 
 ## Sensitive actions and logged-in context
 
-FSB drives the user's real Chrome, so every action runs inside whatever sessions, cookies, and saved auth that browser already holds. Before the final click that submits a purchase, payment, account change (password update, data deletion, permission grant, settings write), or public post (tweet, comment, DM, issue, PR), pause and ask the user to confirm in chat -- state the action, the target site, and any amount or recipient, then wait for an explicit yes. Vault-backed fills (`fill_credential`, `use_payment_method`) are allowed during preparation; only the final submission is gated. Read-only inspection (`read_page`, `get_dom_snapshot`, `get_text`) does not require confirmation.
+FSB drives the user's real Chrome, so every action runs inside whatever sessions, cookies, and saved auth that browser already holds. Before the final click or `invoke_capability` call that submits a purchase, payment, account change (password update, data deletion, permission grant, settings write), or public post (tweet, comment, DM, issue, PR), pause and ask the user to confirm in chat -- state the action, the target site, and any amount or recipient, then wait for an explicit yes. Vault-backed fills (`fill_credential`, `use_payment_method`) are allowed during preparation; only the final submission is gated. Read-only inspection (`read_page`, `get_dom_snapshot`, `get_text`) does not require confirmation.
 
 ## Doctor-first protocol
 
-If anything looks off (no page response, unexpected errors, stale state, missing tab) run `node scripts/doctor.mjs` (which wraps `npx -y fsb-mcp-server doctor`) BEFORE retrying the same call. Read the layered output, fix the failing layer, then resume. Do not loop on the same failing call hoping it self-heals.
+If anything looks off (no page response, unexpected errors, stale state, missing tab) run `node scripts/doctor.mjs` (which wraps `npx -y fsb-mcp-server@latest doctor`) BEFORE retrying the same call. Read the layered output, fix the failing layer, then resume. Do not loop on the same failing call hoping it self-heals.
 
 ## v0.9.62 visual-session contract
 
@@ -76,5 +76,5 @@ Passwords and CVV resolve INSIDE the extension via `fill_credential` and `use_pa
 
 - `scripts/doctor.mjs` -- diagnose the failing layer; prints [OK], [FAIL], and [WARN] markers per layer.
 - `scripts/print-stdio.mjs` -- print the OpenClaw stdio config block to paste into your MCP config.
-- `scripts/install-host.mjs` -- detect other MCP hosts on the machine; consent-gated per-host install.
+- `scripts/install-host.mjs` -- detect other MCP hosts on the machine; confirmation-based per-host install.
 - `scripts/print-hermes-yaml.mjs` -- print the Hermes mcp_servers config block to paste into `~/.hermes/config.yaml`.

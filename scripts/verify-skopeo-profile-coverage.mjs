@@ -29,10 +29,10 @@ const CAPABILITY_ROUTER = require(join(ROOT, 'extension', 'utils', 'capability-r
 const CONSEQUENCE_TARGETS = require(join(ROOT, 'extension', 'catalog', 'skopeo-consequence-targets.js'));
 
 const BASELINES = Object.freeze({
-  descriptors: 2314,
-  stems: 128,
+  descriptors: 2319,
+  stems: 129,
   services: 129,
-  pairs: 130,
+  pairs: 131,
   admittedOrigins: 166,
   sourceReady: 1285,
   comparable: 1279,
@@ -297,11 +297,18 @@ function isOrdered(rows, keyFor) {
   return keys.every(function(key, index) { return key === sorted[index]; });
 }
 
-function buildExpectedAdmissions(sets, authorityBySlug, failures) {
+function buildExpectedAdmissions(sets, authorityBySlug, authoredRegistry, failures) {
   const pairOrigins = new Map(Array.from(sets.pairs.keys(), function(key) {
     return [key, new Set()];
   }));
   const candidates = new Map();
+  const preferredPairKeys = new Set();
+  const authoredProfiles = authoredRegistry && Array.isArray(authoredRegistry.profiles)
+    ? authoredRegistry.profiles
+    : [];
+  const authoredPairKeys = new Set(authoredProfiles.map(function(profile) {
+    return pairKey(profile.appStem, profile.service);
+  }));
 
   function addCandidate(origin, pair) {
     if (!candidates.has(origin)) candidates.set(origin, []);
@@ -337,6 +344,19 @@ function buildExpectedAdmissions(sets, authorityBySlug, failures) {
     }
   }
 
+  for (const [service, appStems] of sets.stemsByService.entries()) {
+    if (appStems.size <= 1) continue;
+    const preferred = Array.from(appStems).map(function(appStem) {
+      return pairKey(appStem, service);
+    }).filter(function(key) {
+      return authoredPairKeys.has(key);
+    });
+    if (preferred.length === 1) {
+      pairOrigins.get(preferred[0]).add(exactServiceOrigin(service));
+      preferredPairKeys.add(preferred[0]);
+    }
+  }
+
   const originRows = new Map();
   for (const pair of sets.pairs.values()) {
     const key = pairKey(pair.appStem, pair.service);
@@ -351,6 +371,12 @@ function buildExpectedAdmissions(sets, authorityBySlug, failures) {
   }
   for (const [service, appStems] of sets.stemsByService.entries()) {
     if (appStems.size <= 1) continue;
+    const preferred = Array.from(appStems).map(function(appStem) {
+      return pairKey(appStem, service);
+    }).filter(function(key) {
+      return preferredPairKeys.has(key);
+    });
+    if (preferred.length === 1) continue;
     const origin = exactServiceOrigin(service);
     originRows.set(origin, {
       admittedOrigin: origin,
@@ -361,7 +387,7 @@ function buildExpectedAdmissions(sets, authorityBySlug, failures) {
       profileDisposition: 'ambiguous-stem',
     });
   }
-  return { pairOrigins, originRows };
+  return { pairOrigins, originRows, preferredPairKeys };
 }
 
 function expectedCatalogVersion(descriptors, authorityBySlug, consequenceBySlug, profileVersion) {
@@ -520,7 +546,7 @@ export function verifySkopeoProfileCoverage(options = {}) {
     failures.push('generated catalog version is stale');
   }
 
-  const admissions = buildExpectedAdmissions(sets, authorityBySlug, failures);
+  const admissions = buildExpectedAdmissions(sets, authorityBySlug, authoredRegistry, failures);
   stats.admittedOrigins = admissions.originRows.size;
   if (stats.admittedOrigins !== BASELINES.admittedOrigins) {
     failures.push('admitted origin baseline drift: expected ' + BASELINES.admittedOrigins +
@@ -570,7 +596,8 @@ export function verifySkopeoProfileCoverage(options = {}) {
     }
     const key = pairKey(profile.appStem, profile.service);
     const expectedPair = sets.pairs.get(key);
-    const ambiguous = expectedPair && sets.stemsByService.get(profile.service).size > 1;
+    const ambiguous = expectedPair && sets.stemsByService.get(profile.service).size > 1 &&
+      !admissions.preferredPairKeys.has(key);
     if (!expectedPair || profile.profileKey !== profileKey(profile.appStem, profile.service) ||
         profile.serviceOrigin !== exactServiceOrigin(profile.service) ||
         profile.schemaVersion !== PROFILE_SCHEMA.SCHEMA_VERSION ||

@@ -3,7 +3,7 @@
 
   const ASSET_ROOT = '../assets/onboarding';
   const VERSION = chrome.runtime.getManifest().version;
-  const BASE_INSTALL_COMMAND = 'npx -y fsb-mcp-server install';
+  const BASE_INSTALL_COMMAND = 'npx -y fsb-mcp-server@latest install';
   const ROTATE_MS = 1800;
 
   const PROVIDER_KEY_FIELDS = {
@@ -33,18 +33,28 @@
   ];
 
   const INSTALL_CLIENTS = [
-    { id: 'claude-code', name: 'Claude Code', logo: 'claude.svg', flag: '--claude-code', cmd: 'npx -y fsb-mcp-server install --claude-code' },
-    { id: 'claude-desktop', name: 'Claude Desktop', logo: 'claude.svg', flag: '--claude-desktop', cmd: 'npx -y fsb-mcp-server install --claude-desktop' },
-    { id: 'cursor', name: 'Cursor', logo: 'cursor.svg', flag: '--cursor', cmd: 'npx -y fsb-mcp-server install --cursor' },
-    { id: 'vscode', name: 'VS Code', logo: 'vscode.svg', flag: '--vscode', cmd: 'npx -y fsb-mcp-server install --vscode' },
-    { id: 'windsurf', name: 'Windsurf', logo: 'windsurf.svg', flag: '--windsurf', cmd: 'npx -y fsb-mcp-server install --windsurf' },
-    { id: 'codex', name: 'Codex', logo: 'openai.svg', flag: '--codex', cmd: 'npx -y fsb-mcp-server install --codex' },
-    { id: 'opencode', name: 'OpenCode', logo: 'opencode.svg', flag: '--opencode', cmd: 'npx -y fsb-mcp-server install --opencode' },
-    { id: 'openclaw', name: 'OpenClaw', logo: 'openclaw.svg', flag: '', cmd: 'npx -y fsb-mcp-server' },
-    { id: 'all', name: 'All Clients', logo: 'all.svg', flag: '--all', cmd: 'npx -y fsb-mcp-server install --all' }
+    { id: 'claude-code', name: 'Claude Code', logo: 'claude.svg', flag: '--claude-code', cmd: 'npx -y fsb-mcp-server@latest install --claude-code' },
+    { id: 'claude-desktop', name: 'Claude Desktop', logo: 'claude.svg', flag: '--claude-desktop', cmd: 'npx -y fsb-mcp-server@latest install --claude-desktop' },
+    { id: 'cursor', name: 'Cursor', logo: 'cursor.svg', flag: '--cursor', cmd: 'npx -y fsb-mcp-server@latest install --cursor' },
+    { id: 'vscode', name: 'VS Code', logo: 'vscode.svg', flag: '--vscode', cmd: 'npx -y fsb-mcp-server@latest install --vscode' },
+    { id: 'windsurf', name: 'Windsurf', logo: 'windsurf.svg', flag: '--windsurf', cmd: 'npx -y fsb-mcp-server@latest install --windsurf' },
+    { id: 'codex', name: 'Codex', logo: 'openai.svg', flag: '--codex', cmd: 'npx -y fsb-mcp-server@latest install --codex' },
+    { id: 'opencode', name: 'OpenCode', logo: 'opencode.svg', flag: '--opencode', cmd: 'npx -y fsb-mcp-server@latest install --opencode' },
+    { id: 'openclaw', name: 'OpenClaw', logo: 'openclaw.svg', flag: '', cmd: 'npx -y fsb-mcp-server@latest' },
+    { id: 'all', name: 'All Clients', logo: 'all.svg', flag: '--all', cmd: 'npx -y fsb-mcp-server@latest install --all' }
   ];
 
   const ROLL_CLIENTS = INSTALL_CLIENTS.slice(0, 7);
+  const ALL_INSTALL_CLIENT_IDS = [
+    'claude-code',
+    'claude-desktop',
+    'cursor',
+    'vscode',
+    'windsurf',
+    'codex',
+    'opencode'
+  ];
+  const FSB_AGENT_PROVIDERS_STORAGE_KEY = 'fsbAgentProviders';
   const STEP_LABELS = { welcome: 'Welcome', path: 'Path', mcp: 'MCP', provider: 'Provider', apikey: 'API Key', setup: 'Setup', pin: 'Pin', done: 'Done' };
 
   const state = {
@@ -54,6 +64,11 @@
     provider: 'xai',
     apiKey: '',
     lmstudioBaseUrl: 'http://localhost:1234',
+    lmstudioModel: '',
+    lmstudioModels: [],
+    lmstudioDiscoveryStatus: 'idle',
+    lmstudioDiscoveryMessage: '',
+    lmstudioDiscoveredBaseUrl: '',
     revealed: false,
     keyStatus: 'idle',
     keyMessage: '',
@@ -78,6 +93,9 @@
   let fanCloseTimer = null;
   let hoverTimer = null;
   let currentWindowId = null;
+  let copyClickMutationTail = Promise.resolve();
+  let lmstudioDiscoveryGeneration = 0;
+  let lmstudioDiscoveryTimer = null;
 
   globalThis.FSB_ONBOARDING_PROVIDER_KEY_FIELDS = PROVIDER_KEY_FIELDS;
   globalThis.FSB_ONBOARDING_INSTALL_CLIENTS = INSTALL_CLIENTS;
@@ -121,12 +139,15 @@
 
   async function loadInitialState() {
     try {
-      const data = await storageGet(['modelProvider', 'lmstudioBaseUrl']);
+      const data = await storageGet(['modelProvider', 'modelName', 'lmstudioBaseUrl']);
       if (data.modelProvider && PROVIDER_MODELS[data.modelProvider] !== undefined) {
         state.provider = data.modelProvider;
       }
       if (data.lmstudioBaseUrl) {
         state.lmstudioBaseUrl = data.lmstudioBaseUrl;
+      }
+      if (data.modelProvider === 'lmstudio' && typeof data.modelName === 'string') {
+        state.lmstudioModel = data.modelName.trim();
       }
     } catch (_error) {
       // Onboarding should stay usable even if storage is temporarily unavailable.
@@ -181,7 +202,7 @@
         <div class="ob-feat-row">
           <div class="ob-feat"><i class="fa-solid fa-bolt"></i><b>Direct API</b><span>Talks to apps, not just clicks</span></div>
           <div class="ob-feat"><i class="fa-solid fa-compass"></i><b>130+ guides</b><span>Across 17 categories</span></div>
-          <div class="ob-feat"><i class="fa-solid fa-plug"></i><b>66 MCP tools</b><span>From your coding agent</span></div>
+          <div class="ob-feat"><i class="fa-solid fa-plug"></i><b>68 MCP tools</b><span>From your coding agent</span></div>
         </div>
         <div class="ob-nav ob-nav-center"><button class="ob-btn ob-btn-primary ob-btn-wide" id="obGetStarted" type="button">Get started <i class="fa-solid fa-arrow-right"></i></button></div>
         <button class="ob-skip ob-skip-center" id="obWelcomeSkip" type="button">Skip setup for now</button>
@@ -203,7 +224,7 @@
             <div class="ob-path-ic"><i class="fa-solid fa-plug"></i></div>
             <div class="ob-path-body">
               <div class="ob-path-head"><span class="ob-path-name">Agent</span><span class="ob-badge">Recommended</span></div>
-              <div class="ob-path-desc">Use FSB as an MCP server in Claude Code, Cursor, VS Code, OpenClaw and more. 66 tools, no API key, nothing to configure in the browser.</div>
+              <div class="ob-path-desc">Use FSB as an MCP server in Claude Code, Cursor, VS Code, OpenClaw and more. 68 tools, no API key, nothing to configure in the browser.</div>
             </div>
             <div class="ob-path-check"><i class="fa-solid fa-check"></i></div>
           </button>
@@ -251,7 +272,7 @@
         </div>
         <div class="ob-mcp-steps">
           <div class="ob-mcp-step"><span class="n">1</span><span>Run the command in your terminal. <b>Hover copy</b> to pick a specific client.</span></div>
-          <div class="ob-mcp-step"><span class="n">2</span><span>FSB writes itself into your agent's MCP config. <b>66 tools</b>, zero manual JSON.</span></div>
+          <div class="ob-mcp-step"><span class="n">2</span><span>FSB writes itself into your agent's MCP config. <b>68 tools</b>, zero manual JSON.</span></div>
           <div class="ob-mcp-step"><span class="n">3</span><span>Ask your agent to browse. It drives FSB's DOM engine for you.</span></div>
         </div>
         <a class="ob-claw" href="#" id="obOpenClaw">
@@ -295,13 +316,17 @@
   function renderApiKey() {
     const provider = currentProvider();
     const local = !!provider.local;
+    const localSelectionReady = !local || (
+      state.lmstudioDiscoveryStatus === 'ready'
+      && !!state.lmstudioModel
+    );
     els.screen.innerHTML = `
       <div class="ob-screen">
         <div class="ob-eyebrow">In-Browser / BYOK</div>
         <h2 class="ob-h">Add your <span translate="no">${escapeHtml(provider.name)}</span> key</h2>
         <div class="ob-optional-card"><i class="fa-solid fa-circle-info oc-ic"></i><div class="oc-body"><b>This step is optional.</b> FSB shines brightest through MCP, so you can skip the key entirely. <button class="ob-link" type="button" id="obUseMcpFromKey">Skip and use MCP</button></div></div>
         ${local ? localFieldHtml() : apiKeyFieldHtml(provider)}
-        ${navHtml({ nextLabel: state.validating ? 'Checking...' : 'Continue', nextDisabled: state.validating, skipLabel: 'Skip to MCP', skipId: 'obUseMcpFromKeySkip' })}
+        ${navHtml({ nextLabel: state.validating ? 'Checking...' : 'Continue', nextDisabled: state.validating || !localSelectionReady, skipLabel: 'Skip to MCP', skipId: 'obUseMcpFromKeySkip' })}
       </div>
     `;
     bind('#obUseMcpFromKey', 'click', useMcp);
@@ -312,11 +337,27 @@
     });
     bind('#obLocalUrlInput', 'input', (event) => {
       state.lmstudioBaseUrl = event.target.value;
+      state.lmstudioModel = '';
+      state.lmstudioModels = [];
+      state.lmstudioDiscoveryStatus = 'idle';
+      state.lmstudioDiscoveryMessage = 'Waiting for the server URL to settle...';
+      lmstudioDiscoveryGeneration += 1;
       resetKeyStatusIdle();
+      scheduleLmStudioDiscovery();
+    });
+    bind('#obLocalModelSelect', 'change', (event) => {
+      state.lmstudioModel = String(event.target.value || '');
+      state.keyStatus = 'idle';
+      state.keyMessage = '';
+      const nextButton = els.screen.querySelector('#obNext');
+      if (nextButton) nextButton.disabled = !state.lmstudioModel;
     });
     bind('#obRevealKey', 'click', () => { state.revealed = !state.revealed; render(); });
     bind('#obPasteKey', 'click', pasteFromClipboard);
     bindNav({ beforeNext: validateAndContinue });
+    if (local && state.lmstudioDiscoveryStatus === 'idle' && lmstudioDiscoveryTimer === null) {
+      void discoverLmStudioModels();
+    }
   }
 
   function renderPin() {
@@ -430,6 +471,88 @@
     `;
   }
 
+  function scheduleLmStudioDiscovery() {
+    if (lmstudioDiscoveryTimer !== null) clearTimeout(lmstudioDiscoveryTimer);
+    lmstudioDiscoveryTimer = setTimeout(() => {
+      lmstudioDiscoveryTimer = null;
+      void discoverLmStudioModels({ force: true });
+    }, 500);
+  }
+
+  async function discoverLmStudioModels(options = {}) {
+    const baseUrl = normalizeBaseUrl(state.lmstudioBaseUrl);
+    if (!options.force
+        && state.lmstudioDiscoveryStatus === 'ready'
+        && state.lmstudioDiscoveredBaseUrl === baseUrl) {
+      return true;
+    }
+
+    const generation = lmstudioDiscoveryGeneration + 1;
+    lmstudioDiscoveryGeneration = generation;
+    state.lmstudioDiscoveryStatus = 'loading';
+    state.lmstudioDiscoveryMessage = 'Discovering loaded chat models...';
+    state.keyStatus = 'idle';
+    state.keyMessage = '';
+    render();
+
+    const discovery = globalThis.FSBModelDiscovery;
+    if (!discovery || typeof discovery.discoverModels !== 'function') {
+      if (generation !== lmstudioDiscoveryGeneration) return false;
+      state.lmstudioDiscoveryStatus = 'error';
+      state.lmstudioDiscoveryMessage = 'LM Studio model discovery is unavailable';
+      state.lmstudioModels = [];
+      state.lmstudioModel = '';
+      render();
+      return false;
+    }
+
+    let result;
+    try {
+      result = await discovery.discoverModels('lmstudio', '', {
+        baseUrl,
+        timeoutMs: 5000
+      });
+    } catch (error) {
+      result = {
+        ok: false,
+        reason: 'network-failed',
+        message: error && error.message ? error.message : 'Could not connect to LM Studio'
+      };
+    }
+    if (generation !== lmstudioDiscoveryGeneration) return false;
+
+    if (!result || result.ok !== true || !Array.isArray(result.models) || result.models.length === 0) {
+      state.lmstudioDiscoveryStatus = 'error';
+      state.lmstudioDiscoveryMessage = result && result.reason === 'empty-response'
+        ? 'No compatible chat models are loaded in LM Studio'
+        : ((result && result.message) || 'Could not connect to LM Studio');
+      state.lmstudioModels = [];
+      state.lmstudioModel = '';
+      state.lmstudioDiscoveredBaseUrl = baseUrl;
+      render();
+      return false;
+    }
+
+    state.lmstudioModels = result.models.map(model => ({
+      id: String(model.id || ''),
+      displayName: String(model.displayName || model.id || '')
+    })).filter(model => !!model.id);
+    const selectedStillAvailable = state.lmstudioModels.some(model => model.id === state.lmstudioModel);
+    if (!selectedStillAvailable) {
+      state.lmstudioModel = state.lmstudioModels.length === 1
+        ? state.lmstudioModels[0].id
+        : '';
+    }
+    state.lmstudioDiscoveryStatus = 'ready';
+    state.lmstudioDiscoveryMessage = state.lmstudioModels.length === 1
+      ? 'Loaded model: ' + state.lmstudioModel
+      : state.lmstudioModels.length + ' chat models found — choose one';
+    state.lmstudioDiscoveredBaseUrl = baseUrl;
+    state.lmstudioBaseUrl = baseUrl;
+    render();
+    return true;
+  }
+
   // In-place status reset for the key/URL inputs. A full render() on every
   // keystroke rebuilds els.screen.innerHTML, destroying the focused input --
   // the caret jumps out after each character. Only the status icon + message
@@ -442,11 +565,18 @@
     const icon = els.screen.querySelector('.ob-status');
     const msgEl = els.screen.querySelector('.ob-status-msg');
     if (provider.local) {
-      // Mirrors localFieldHtml()'s idle branch.
-      if (icon) icon.innerHTML = '<i class="fa-solid fa-circle-check ok"></i>';
+      const loading = state.lmstudioDiscoveryStatus === 'loading';
+      const failed = state.lmstudioDiscoveryStatus === 'error';
+      if (icon) {
+        icon.innerHTML = loading
+          ? '<i class="fa-solid fa-spinner spin"></i>'
+          : failed
+            ? '<i class="fa-solid fa-circle-xmark bad"></i>'
+            : '';
+      }
       if (msgEl) {
-        msgEl.className = 'ob-status-msg ok';
-        msgEl.textContent = 'No API key required. Models load live from /v1/models';
+        msgEl.className = 'ob-status-msg ' + (failed ? 'bad' : '');
+        msgEl.textContent = state.lmstudioDiscoveryMessage || 'Discovering loaded chat models...';
       }
     } else {
       // Mirrors apiKeyFieldHtml()'s idle branch.
@@ -459,15 +589,36 @@
   }
 
   function localFieldHtml() {
-    const statusIcon = state.validating ? '<i class="fa-solid fa-spinner spin"></i>' : state.keyStatus === 'valid' ? '<i class="fa-solid fa-circle-check ok"></i>' : state.keyStatus === 'invalid' ? '<i class="fa-solid fa-circle-xmark bad"></i>' : '<i class="fa-solid fa-circle-check ok"></i>';
-    const statusClass = state.keyStatus === 'invalid' ? 'bad' : 'ok';
-    const msg = state.keyMessage || 'No API key required. Models load live from /v1/models';
+    const discovering = state.lmstudioDiscoveryStatus === 'loading';
+    const discoveryFailed = state.lmstudioDiscoveryStatus === 'error';
+    const statusIcon = state.validating || discovering
+      ? '<i class="fa-solid fa-spinner spin"></i>'
+      : state.keyStatus === 'valid'
+        ? '<i class="fa-solid fa-circle-check ok"></i>'
+        : state.keyStatus === 'invalid' || discoveryFailed
+          ? '<i class="fa-solid fa-circle-xmark bad"></i>'
+          : state.lmstudioDiscoveryStatus === 'ready'
+            ? '<i class="fa-solid fa-circle-check ok"></i>'
+            : '';
+    const statusClass = state.keyStatus === 'invalid' || discoveryFailed ? 'bad' : 'ok';
+    const msg = state.keyMessage || state.lmstudioDiscoveryMessage || 'Discovering loaded chat models...';
+    const modelOptions = state.lmstudioModels.length > 0
+      ? `${state.lmstudioModels.length > 1 && !state.lmstudioModel
+          ? '<option value="" disabled selected>Choose a loaded model...</option>'
+          : ''}${state.lmstudioModels.map(model => `
+          <option value="${escapeAttr(model.id)}" ${model.id === state.lmstudioModel ? 'selected' : ''}>${escapeHtml(model.displayName)}</option>
+        `).join('')}`
+      : `<option value="">${discovering ? 'Discovering models...' : 'No compatible models available'}</option>`;
     return `
       <div class="ob-field">
         <div class="ob-input-row">
           <div class="ob-input-wrap"><input class="ob-input" id="obLocalUrlInput" value="${escapeAttr(state.lmstudioBaseUrl)}" spellcheck="false"></div>
           <div class="ob-status">${statusIcon}</div>
         </div>
+        <label class="ob-model-label" for="obLocalModelSelect">Loaded chat model</label>
+        <select class="ob-input ob-model-select" id="obLocalModelSelect" ${state.lmstudioModels.length === 0 || discovering ? 'disabled' : ''}>
+          ${modelOptions}
+        </select>
         <div class="ob-status-msg ${statusClass}">${escapeHtml(msg)}</div>
       </div>
     `;
@@ -553,20 +704,17 @@
     state.apiKey = '';
     state.keyStatus = 'idle';
     state.keyMessage = '';
-    await persistProviderSelection();
+    if (providerId === 'lmstudio') {
+      state.lmstudioDiscoveryStatus = 'idle';
+      state.lmstudioDiscoveryMessage = '';
+    }
     render();
   }
 
   async function persistProviderSelection() {
-    const provider = currentProvider();
-    const patch = {
-      modelProvider: provider.id,
-      modelName: PROVIDER_MODELS[provider.id] || ''
-    };
-    if (provider.id === 'lmstudio') {
-      patch.lmstudioBaseUrl = normalizeBaseUrl(state.lmstudioBaseUrl);
-    }
-    await storageSet(patch);
+    // Provider choices are staged in onboarding state. Persisting the provider
+    // before its model is discovered creates an invalid provider/model pair if
+    // the user closes onboarding midway through setup.
     return true;
   }
 
@@ -582,6 +730,18 @@
       return false;
     }
 
+    if (provider.local) {
+      const discovered = await discoverLmStudioModels({ force: true });
+      if (!discovered) return false;
+      if (!state.lmstudioModel
+          || !state.lmstudioModels.some(model => model.id === state.lmstudioModel)) {
+        state.keyStatus = 'invalid';
+        state.keyMessage = 'Select a loaded LM Studio chat model';
+        render();
+        return false;
+      }
+    }
+
     state.validating = true;
     state.keyStatus = 'validating';
     state.keyMessage = '';
@@ -589,7 +749,7 @@
 
     const patch = {
       modelProvider: provider.id,
-      modelName: PROVIDER_MODELS[provider.id] || ''
+      modelName: provider.local ? state.lmstudioModel : (PROVIDER_MODELS[provider.id] || '')
     };
     if (provider.local) {
       patch.lmstudioBaseUrl = baseUrl;
@@ -599,12 +759,12 @@
     }
 
     try {
-      await storageSet(patch);
       await validateProvider(provider.id, {
         apiKey: provider.local ? '' : key,
-        model: PROVIDER_MODELS[provider.id] || '',
+        model: provider.local ? state.lmstudioModel : (PROVIDER_MODELS[provider.id] || ''),
         baseUrl: getValidationBaseUrl(provider.id, baseUrl)
       });
+      await storageSet(patch);
       state.validating = false;
       state.keyStatus = 'valid';
       state.keyMessage = provider.local ? 'LM Studio responded successfully' : `Key ending in ${key.slice(-4)} is valid`;
@@ -719,7 +879,7 @@
       return [
         { k: 'Setup', v: 'MCP server' },
         { k: 'Command', v: 'fsb-mcp-server', mono: true },
-        { k: 'Tools', v: '66 available' },
+        { k: 'Tools', v: '68 available' },
         { k: 'Access', v: 'Granted on install', ok: true },
         { k: 'Version', v: `v${VERSION}`, mono: true }
       ];
@@ -782,7 +942,10 @@
   }
 
   function copyCommand(text, key) {
+    const clientId = key === 'current' ? ROLL_CLIENTS[state.iconIndex].id : key;
+    const source = key === 'current' ? 'base' : (key === 'all' ? 'all' : 'fan');
     writeClipboard(text);
+    persistCopyClick(clientId, source).catch(() => {});
     clearTimeout(copiedTimer);
     state.copied = key;
     copiedTimer = setTimeout(() => {
@@ -791,6 +954,58 @@
     }, 1600);
     showToast('Install command copied');
     render();
+  }
+
+  async function persistCopyClick(clientId, source) {
+    const targetIds = clientId === 'all' ? ALL_INSTALL_CLIENT_IDS : [clientId];
+    if (
+      targetIds.some((id) => typeof id !== 'string' || !id) ||
+      (source !== 'base' && source !== 'fan' && source !== 'all')
+    ) {
+      return;
+    }
+
+    const mutate = async () => {
+      const stored = await storageGet([FSB_AGENT_PROVIDERS_STORAGE_KEY]);
+      const existing = stored && stored[FSB_AGENT_PROVIDERS_STORAGE_KEY];
+      const envelope = existing && typeof existing === 'object' && !Array.isArray(existing)
+        ? Object.assign({}, existing)
+        : {};
+      const clicked = envelope.clicked && typeof envelope.clicked === 'object' && !Array.isArray(envelope.clicked)
+        ? Object.assign({}, envelope.clicked)
+        : {};
+
+      envelope.clicked = clicked;
+      envelope.connected = envelope.connected && typeof envelope.connected === 'object' && !Array.isArray(envelope.connected)
+        ? Object.assign({}, envelope.connected)
+        : {};
+      envelope.installed = envelope.installed && typeof envelope.installed === 'object' && !Array.isArray(envelope.installed)
+        ? Object.assign({}, envelope.installed)
+        : {};
+
+      const now = Date.now();
+      targetIds.forEach((id) => {
+        const previous = clicked[id] && typeof clicked[id] === 'object' && !Array.isArray(clicked[id])
+          ? clicked[id]
+          : {};
+        const previousCount = Number.isFinite(previous.count) ? previous.count : 0;
+        const firstClickedAt = Number.isFinite(previous.firstClickedAt) && previous.firstClickedAt
+          ? previous.firstClickedAt
+          : now;
+        clicked[id] = {
+          count: previousCount + 1,
+          firstClickedAt,
+          lastClickedAt: now,
+          source
+        };
+      });
+
+      await storageSet({ [FSB_AGENT_PROVIDERS_STORAGE_KEY]: envelope });
+    };
+
+    const result = copyClickMutationTail.then(mutate, mutate);
+    copyClickMutationTail = result.catch(() => {});
+    return result;
   }
 
   function writeClipboard(text) {
@@ -827,7 +1042,16 @@
   }
 
   function normalizeBaseUrl(value) {
-    return (value || 'http://localhost:1234').trim().replace(/\/+$/, '') || 'http://localhost:1234';
+    const discovery = globalThis.FSBModelDiscovery;
+    if (discovery && typeof discovery.normalizeLmStudioBaseUrl === 'function') {
+      return discovery.normalizeLmStudioBaseUrl(value);
+    }
+    let url = (value || 'http://localhost:1234').trim();
+    url = url.replace(/\/v1\/chat\/completions\/?$/i, '');
+    url = url.replace(/\/v1\/?$/i, '');
+    url = url.replace(/\/+$/, '');
+    if (!/^https?:\/\//i.test(url)) url = 'http://' + url;
+    return url || 'http://localhost:1234';
   }
 
   function maskStyle(fileName) {

@@ -16,6 +16,7 @@
     SESSION_LOGS: 'fsbSessionLogs',
     SESSION_INDEX: 'fsbSessionIndex',
     DOM_SNAPSHOTS: 'fsbDOMSnapshots',
+    MCP_RETENTION_DAYS: 'fsbMcpSessionRetentionDays',
     ELEMENT_CACHE_SIZE: 'elementCacheSize',
     CAPTCHA_ENABLED: 'captchaSolverEnabled',
     CAPTCHA_API_KEY: 'captchaApiKey'
@@ -25,11 +26,12 @@
     DIAGNOSTIC_ENTRIES: 100,
     DIAGNOSTIC_MESSAGE_CHARS: 512,
     DIAGNOSTIC_RESPONSE_BYTES: 65536,
-    AUTOMATION_LOG_ENTRIES: 100,
-    AUTOMATION_LOG_BATCH: 100,
+    AUTOMATION_LOG_ENTRIES: 400,
+    AUTOMATION_LOG_BATCH: 400,
     AUTOMATION_MESSAGE_CHARS: 512,
     AUTOMATION_RESPONSE_BYTES: 131072,
-    SESSION_COUNT: 50,
+    SESSION_COUNT: 100,
+    SESSION_COUNT_PER_MODE: 50,
     SESSION_LOG_ENTRIES: 500,
     SESSION_ACTION_ENTRIES: 100,
     SESSION_COMMAND_ENTRIES: 25,
@@ -50,6 +52,8 @@
     AUTOMATION_SESSION_LIST: 'fsb:automation-session-list',
     AUTOMATION_SESSION_DELETE: 'fsb:automation-session-delete',
     AUTOMATION_SESSION_CLEAR: 'fsb:automation-session-clear',
+    AUTOMATION_SESSION_UPDATE_OUTCOME: 'fsb:automation-session-update-outcome',
+    AUTOMATION_SESSION_PRUNE_MCP: 'fsb:automation-session-prune-mcp',
     AUTOMATION_DOM_SNAPSHOT_LOAD: 'fsb:automation-dom-snapshot-load',
     ELEMENT_CACHE_GET: 'fsb:element-cache-config-get',
     ELEMENT_CACHE_CHANGED: 'fsb:element-cache-config-changed'
@@ -60,6 +64,9 @@
   }).filter(function(action) {
     return action !== MESSAGE.ELEMENT_CACHE_CHANGED;
   }));
+
+  var FSB_BRIDGE_SECRET_PATTERN = /fsb-auth\.[A-Za-z0-9_-]{43}(?![A-Za-z0-9_-])/g;
+  var FSB_BRIDGE_SECRET_REPLACEMENT = '[REDACTED_FSB_BRIDGE_SECRET]';
 
   function byteLength(value) {
     var text = typeof value === 'string' ? value : JSON.stringify(value);
@@ -72,8 +79,24 @@
     return String(value).slice(0, maxChars);
   }
 
+  function redactBridgeSecrets(value) {
+    var text = String(value === undefined || value === null ? '' : value);
+    try {
+      var shared = typeof globalThis !== 'undefined'
+        ? globalThis.redactBridgeSecretsInString
+        : null;
+      if (typeof shared === 'function') {
+        var sharedResult = shared(text);
+        if (typeof sharedResult === 'string') return sharedResult;
+      }
+    } catch (_error) {
+      // Fall through to the private scrubber so storage never depends on load order.
+    }
+    return text.replace(FSB_BRIDGE_SECRET_PATTERN, FSB_BRIDGE_SECRET_REPLACEMENT);
+  }
+
   function redactText(value, maxChars) {
-    return boundedText(value, maxChars)
+    return boundedText(redactBridgeSecrets(value), maxChars)
       .replace(/\bBearer\s+[A-Za-z0-9._~+\/-]+/gi, '[redacted]')
       .replace(/\b(?:sk|pk)_(?:live|test)_[A-Za-z0-9_-]+/gi, '[redacted]')
       .replace(/\b(?:api[_ -]?key|access[_ -]?token|refresh[_ -]?token|authorization)\s*[:=]\s*[^\s,;]+/gi, '[redacted]')
@@ -199,9 +222,141 @@
         tool: redactText(action.tool || '', 64),
         timestamp: safeTimestamp(action.timestamp, now),
         success: action.result && typeof action.result.success === 'boolean'
-          ? action.result.success : false
+          ? action.result.success : action.success === true,
+        logicalTab: redactText(action.logicalTab || 'primary', 128)
       };
     }).filter(Boolean);
+  }
+
+  function safeReplayValue(value, depth) {
+    depth = Number.isFinite(depth) ? depth : 0;
+    if (value === null || typeof value === 'boolean') return value;
+    if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+    if (typeof value === 'string') return redactText(value, 2048);
+    if (depth >= 6) return null;
+    if (Array.isArray(value)) {
+      return value.slice(0, 100).map(function(item) {
+        return safeReplayValue(item, depth + 1);
+      });
+    }
+    if (!value || typeof value !== 'object') return null;
+    var safe = {};
+    Object.keys(value).slice(0, 32).forEach(function(key) {
+      if (!/^[A-Za-z0-9_.:-]{1,64}$/.test(key) ||
+          key === '__proto__' || key === 'prototype' || key === 'constructor') return;
+      safe[key] = safeReplayValue(value[key], depth + 1);
+    });
+    return safe;
+  }
+
+  function safeReplayUrl(value) {
+    if (typeof value !== 'string' || value.length > 4096) return null;
+    try {
+      var parsed = new URL(value);
+      if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return null;
+      return redactText(value, 4096);
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  function safeReplayCounts(value) {
+    var input = value && typeof value === 'object' ? value : {};
+    return {
+      total: safeNumber(input.total, 0, 0, 100),
+      executable: safeNumber(input.executable, 0, 0, 100),
+      approvalRequired: safeNumber(input.approvalRequired, 0, 0, 100),
+      blocked: safeNumber(input.blocked, 0, 0, 100)
+    };
+  }
+
+  function safeReplayStep(step, index) {
+    if (!step || typeof step !== 'object' || Array.isArray(step)) return null;
+    var target = step.target && typeof step.target === 'object' ? step.target : {};
+    var replay = step.replay && typeof step.replay === 'object' ? step.replay : {};
+    var capability = step.capability && typeof step.capability === 'object' ? {
+      capabilityId: redactText(step.capability.capabilityId || '', 128) || null,
+      sideEffectClass: redactText(step.capability.sideEffectClass || '', 32) || null,
+      service: redactText(step.capability.service || '', 96) || null,
+      tier: redactText(step.capability.tier || '', 32) || null
+    } : null;
+    var safe = {
+      id: redactText(step.id || ('step-' + (index + 1)), 128),
+      index: safeNumber(step.index, index, 0, 99),
+      timestamp: Number.isFinite(Number(step.timestamp)) ? Number(step.timestamp) : null,
+      tool: redactText(step.tool || '', 128),
+      route: redactText(step.route || 'legacy', 64),
+      arguments: safeReplayValue(step.arguments || {}, 0),
+      result: safeReplayValue(step.result || {}, 0),
+      success: step.success !== false,
+      target: {
+        logicalTab: redactText(target.logicalTab || 'primary', 128),
+        url: safeReplayUrl(target.url),
+        origin: safeOrigin(target.origin || target.url) || null,
+        redacted: target.redacted === true
+      },
+      replay: {
+        risk: redactText(replay.risk || 'inspect-only', 32),
+        availability: redactText(replay.availability || 'unsupported', 32),
+        reason: replay.reason == null ? null : redactText(replay.reason, 256)
+      }
+    };
+    if (step.inputState === 'redacted') safe.inputState = 'redacted';
+    if (capability) safe.capability = capability;
+    return safe;
+  }
+
+  function safeReplayRecord(value, now) {
+    if (!value || typeof value !== 'object' || Array.isArray(value) ||
+        !value.manifest || typeof value.manifest !== 'object') return null;
+    var manifest = value.manifest;
+    var source = manifest.source && typeof manifest.source === 'object' ? manifest.source : {};
+    var outcome = manifest.outcome && typeof manifest.outcome === 'object' ? manifest.outcome : {};
+    var steps = (Array.isArray(manifest.steps) ? manifest.steps : []).slice(0, 100)
+      .map(function(step, index) { return safeReplayStep(step, index); }).filter(Boolean);
+    var tabs = (Array.isArray(manifest.tabs) ? manifest.tabs : []).slice(0, 32)
+      .map(function(tab, index) {
+        return {
+          id: redactText(tab && tab.id || ('tab-' + (index + 1)), 128),
+          order: safeNumber(tab && tab.order, index, 0, 31),
+          startUrl: safeReplayUrl(tab && tab.startUrl),
+          startOrigin: safeOrigin(tab && (tab.startOrigin || tab.startUrl)) || null,
+          startUrlState: redactText(tab && tab.startUrlState || 'missing', 16)
+        };
+      });
+    return {
+      version: redactText(value.version || '1.0', 16),
+      integrity: redactText(value.integrity || 'pending', 16),
+      provenance: redactText(value.provenance || 'capture', 32),
+      manifest: {
+        kind: redactText(manifest.kind || '', 64),
+        version: safeNumber(manifest.version, 1, 1, 100),
+        provenance: redactText(manifest.provenance || value.provenance || 'capture', 32),
+        sessionId: redactText(manifest.sessionId || '', 128),
+        task: redactText(manifest.task || '', 2000),
+        recordedAt: safeTimestamp(manifest.recordedAt, now),
+        source: {
+          mode: redactText(source.mode || 'mcp-agent', 32),
+          client: source.client == null ? null : redactText(source.client, 96)
+        },
+        startUrl: safeReplayUrl(manifest.startUrl),
+        startOrigin: safeOrigin(manifest.startOrigin || manifest.startUrl) || null,
+        startUrlState: redactText(manifest.startUrlState || 'missing', 16),
+        tabs: tabs,
+        outcome: {
+          status: redactText(outcome.status || 'unknown', 32),
+          outcome: outcome.outcome == null ? null : redactText(outcome.outcome, 24),
+          reason: outcome.reason == null ? null : redactText(outcome.reason, 1000)
+        },
+        steps: steps
+      },
+      manifestHash: value.manifestHash == null ? null : redactText(value.manifestHash, 256),
+      receipt: safeReplayValue(value.receipt, 0),
+      receiptCid: value.receiptCid == null ? null : redactText(value.receiptCid, 256),
+      signerKid: value.signerKid == null ? null : redactText(value.signerKid, 256),
+      counts: safeReplayCounts(value.counts),
+      error: value.error == null ? null : redactText(value.error, 512)
+    };
   }
 
   function safeSession(sessionId, session, now) {
@@ -216,6 +371,13 @@
       endTime: safeTimestamp(session.endTime, now),
       status: redactText(session.status || 'completed', 32),
       tabId: Number.isInteger(session.tabId) && session.tabId > 0 ? session.tabId : null,
+      tabIds: (Array.isArray(session.tabIds) ? session.tabIds : [])
+        .filter(function(tabId) { return Number.isInteger(tabId) && tabId > 0; })
+        .slice(0, 32),
+      tabCount: safeNumber(session.tabCount, 0, 0, 32),
+      taskRunId: redactText(session.taskRunId || id, 128),
+      mode: session.mode === 'mcp-agent' ? 'mcp-agent' : 'autopilot',
+      mcpClient: typeof session.mcpClient === 'string' ? redactText(session.mcpClient, 96) : null,
       actionCount: safeNumber(session.actionCount, 0, 0, 1000000),
       domSnapshotCount: safeNumber(session.domSnapshotCount, 0, 0, LIMITS.DOM_SNAPSHOTS_PER_SESSION),
       iterationCount: safeNumber(session.iterationCount, 0, 0, 1000000),
@@ -239,7 +401,8 @@
       logs: logs.slice(-LIMITS.SESSION_LOG_ENTRIES).map(function(log) {
         return safeAutomationLog(log, now);
       }).filter(Boolean),
-      actionHistory: safeActionHistory(session.actionHistory, now)
+      actionHistory: safeActionHistory(session.actionHistory, now),
+      replay: safeReplayRecord(session.replay, now)
     };
     while (safe.logs.length && byteLength(safe) > LIMITS.SESSION_RESPONSE_BYTES) safe.logs.shift();
     if (byteLength(safe) > LIMITS.SESSION_RESPONSE_BYTES) return null;
@@ -255,6 +418,11 @@
       status: session.status,
       actionCount: session.actionCount,
       domSnapshotCount: safeNumber(session.domSnapshotCount, 0, 0, LIMITS.DOM_SNAPSHOTS_PER_SESSION),
+      mode: session.mode,
+      mcpClient: session.mcpClient,
+      taskRunId: session.taskRunId,
+      tabIds: session.tabIds,
+      tabCount: session.tabCount,
       totalCost: session.totalCost,
       outcome: session.outcome,
       outcomeDetails: session.outcomeDetails,
@@ -269,7 +437,11 @@
       commandCount: session.commandCount,
       commands: session.commands,
       lastTask: session.lastTask,
-      lastCommandAt: session.lastCommandAt
+      lastCommandAt: session.lastCommandAt,
+      replayIntegrity: session.replay && session.replay.integrity || null,
+      replayProvenance: session.replay && session.replay.provenance || null,
+      replayableCount: session.replay && session.replay.counts && session.replay.counts.executable || 0,
+      replayBlockedCount: session.replay && session.replay.counts && session.replay.counts.blocked || 0
     };
   }
 
@@ -285,6 +457,56 @@
         elementCount: safeNumber(snapshot.elementCount, 0, 0, 1000000)
       };
     }).filter(Boolean);
+  }
+
+  function filterAutomationLogsBySession(logs, sessionIds, removeAllSessionLogs) {
+    var ids = sessionIds instanceof Set ? sessionIds : new Set(sessionIds || []);
+    return (Array.isArray(logs) ? logs : []).map(function(log) {
+      return safeAutomationLog(log, Date.now);
+    }).filter(Boolean).filter(function(log) {
+      var sessionId = log && log.data && log.data.sessionId;
+      if (typeof sessionId !== 'string' || !sessionId) return true;
+      return !(removeAllSessionLogs === true || ids.has(sessionId));
+    }).slice(-LIMITS.AUTOMATION_LOG_ENTRIES);
+  }
+
+  function capSessionHistoryByMode(index, sessions) {
+    var counts = { autopilot: 0, mcp: 0 };
+    var retained = [];
+    var evictedIds = [];
+    (Array.isArray(index) ? index : []).forEach(function(entry) {
+      if (!entry || typeof entry.id !== 'string') return;
+      var record = sessions[entry.id] || entry;
+      var bucket = record && record.mode === 'mcp-agent' ? 'mcp' : 'autopilot';
+      if (counts[bucket] < LIMITS.SESSION_COUNT_PER_MODE) {
+        counts[bucket]++;
+        retained.push(entry);
+        return;
+      }
+      evictedIds.push(entry.id);
+      delete sessions[entry.id];
+    });
+    return { retainedIndex: retained.slice(0, LIMITS.SESSION_COUNT), evictedIds: evictedIds };
+  }
+
+  function applySafeOutcome(target, outcome) {
+    if (!target || !outcome || typeof outcome !== 'object') return;
+    target.status = redactText(outcome.status || target.status || 'completed', 32);
+    target.outcome = redactText(outcome.outcome || target.outcome || '', 24) || null;
+    target.outcomeDetails = {
+      outcome: target.outcome,
+      reason: redactText(outcome.reason || '', 64) || null,
+      summary: redactText(outcome.summary || '', 512) || null,
+      blocker: redactText(outcome.blocker || '', 512) || null,
+      nextStep: redactText(outcome.nextStep || '', 512) || null,
+      result: redactText(outcome.result || outcome.completionMessage || '', 512) || null,
+      error: redactText(outcome.error || '', 256) || null
+    };
+    target.result = redactText(outcome.result || '', 512) || null;
+    target.completionMessage = redactText(outcome.completionMessage || '', 512) || null;
+    target.error = redactText(outcome.error || '', 256) || null;
+    target.blocker = redactText(outcome.blocker || '', 512) || null;
+    target.nextStep = redactText(outcome.nextStep || '', 512) || null;
   }
 
   function hasExactOwnKeys(value, expected) {
@@ -368,6 +590,9 @@
         var stored = await get([KEY.AUTOMATION_LOGS]);
         var existing = Array.isArray(stored[KEY.AUTOMATION_LOGS]) ? stored[KEY.AUTOMATION_LOGS] : [];
         var combined = existing.concat(safeLogs).slice(-LIMITS.AUTOMATION_LOG_ENTRIES);
+        while (combined.length && byteLength({ logs: combined }) > LIMITS.AUTOMATION_RESPONSE_BYTES) {
+          combined.shift();
+        }
         var update = {};
         update[KEY.AUTOMATION_LOGS] = combined;
         await set(update);
@@ -378,6 +603,9 @@
     async function replaceAutomationLogs(logs) {
       var safeLogs = (Array.isArray(logs) ? logs : []).slice(-LIMITS.AUTOMATION_LOG_ENTRIES)
         .map(function(log) { return safeAutomationLog(log, now); }).filter(Boolean);
+      while (safeLogs.length && byteLength({ logs: safeLogs }) > LIMITS.AUTOMATION_RESPONSE_BYTES) {
+        safeLogs.shift();
+      }
       return withWrite(async function() {
         var update = {};
         update[KEY.AUTOMATION_LOGS] = safeLogs;
@@ -411,40 +639,72 @@
       if (!id || !safeRecord) throw new Error('INVALID_SESSION');
       var safeSnapshotList = safeSnapshots(snapshots, now);
       return withWrite(async function() {
-        var stored = await get([KEY.SESSION_LOGS, KEY.SESSION_INDEX, KEY.DOM_SNAPSHOTS]);
+        var stored = await get([
+          KEY.SESSION_LOGS,
+          KEY.SESSION_INDEX,
+          KEY.DOM_SNAPSHOTS,
+          KEY.AUTOMATION_LOGS,
+          KEY.MCP_RETENTION_DAYS
+        ]);
         var sessions = stored[KEY.SESSION_LOGS] && typeof stored[KEY.SESSION_LOGS] === 'object'
           ? stored[KEY.SESSION_LOGS] : {};
         var index = Array.isArray(stored[KEY.SESSION_INDEX]) ? stored[KEY.SESSION_INDEX] : [];
         var allSnapshots = stored[KEY.DOM_SNAPSHOTS] && typeof stored[KEY.DOM_SNAPSHOTS] === 'object'
           ? stored[KEY.DOM_SNAPSHOTS] : {};
+        var automationLogs = Array.isArray(stored[KEY.AUTOMATION_LOGS])
+          ? stored[KEY.AUTOMATION_LOGS] : [];
 
         safeRecord.domSnapshotCount = safeSnapshotList.length;
         sessions[id] = safeRecord;
         index = index.filter(function(entry) { return entry && entry.id !== id; });
         index.unshift(safeIndexEntry(safeRecord));
-        index = index.slice(0, LIMITS.SESSION_COUNT);
-        var retainedIds = new Set(index.map(function(entry) { return entry.id; }));
-        Object.keys(sessions).forEach(function(candidate) {
-          if (!retainedIds.has(candidate)) delete sessions[candidate];
-        });
+        var capped = capSessionHistoryByMode(index, sessions);
+        index = capped.retainedIndex;
+        var removedIds = new Set(capped.evictedIds);
 
         if (safeSnapshotList.length) allSnapshots[id] = safeSnapshotList;
         else delete allSnapshots[id];
-        var snapshotIds = Object.keys(allSnapshots);
-        snapshotIds.sort(function(a, b) {
-          return index.findIndex(function(entry) { return entry.id === a; }) -
-            index.findIndex(function(entry) { return entry.id === b; });
-        });
-        snapshotIds.slice(LIMITS.DOM_SNAPSHOT_SESSIONS).forEach(function(candidate) {
-          delete allSnapshots[candidate];
+
+        var prunedIds = [];
+        if (safeRecord.mode === 'mcp-agent') {
+          var days = safeNumber(stored[KEY.MCP_RETENTION_DAYS], 30, 1, 365);
+          var cutoff = now() - (Math.floor(days) * 24 * 60 * 60 * 1000);
+          var indexById = new Map(index.map(function(entry) { return [entry && entry.id, entry]; }));
+          var candidates = new Set(Object.keys(sessions).concat(Array.from(indexById.keys())));
+          candidates.forEach(function(candidateId) {
+            if (!candidateId) return;
+            var record = sessions[candidateId] || indexById.get(candidateId);
+            if (!record || record.mode !== 'mcp-agent') return;
+            var timestamp = Number(record.endTime == null ? record.startTime : record.endTime);
+            if (Number.isFinite(timestamp) && timestamp <= cutoff) {
+              prunedIds.push(candidateId);
+              removedIds.add(candidateId);
+            }
+          });
+          index = index.filter(function(entry) { return entry && !removedIds.has(entry.id); });
+          removedIds.forEach(function(candidateId) { delete sessions[candidateId]; });
+        }
+
+        removedIds.forEach(function(candidateId) { delete allSnapshots[candidateId]; });
+        var snapshotIdsToKeep = new Set(index.slice(0, LIMITS.DOM_SNAPSHOT_SESSIONS)
+          .map(function(entry) { return entry.id; }));
+        Object.keys(allSnapshots).forEach(function(candidateId) {
+          if (!snapshotIdsToKeep.has(candidateId)) delete allSnapshots[candidateId];
         });
 
         var update = {};
         update[KEY.SESSION_LOGS] = sessions;
         update[KEY.SESSION_INDEX] = index;
         update[KEY.DOM_SNAPSHOTS] = allSnapshots;
+        if (removedIds.size > 0) {
+          update[KEY.AUTOMATION_LOGS] = filterAutomationLogsBySession(automationLogs, removedIds, false);
+        }
         await set(update);
-        return { ok: true };
+        return {
+          ok: true,
+          evictedIds: capped.evictedIds,
+          prunedIds: prunedIds
+        };
       });
     }
 
@@ -462,11 +722,86 @@
       return { sessions: sessions };
     }
 
+    async function updateAutomationSessionOutcome(sessionId, outcome) {
+      var id = safeSessionId(sessionId);
+      if (!id || !outcome || typeof outcome !== 'object' || Array.isArray(outcome)) {
+        return { ok: false };
+      }
+      return withWrite(async function() {
+        var stored = await get([KEY.SESSION_LOGS, KEY.SESSION_INDEX]);
+        var sessions = stored[KEY.SESSION_LOGS] && typeof stored[KEY.SESSION_LOGS] === 'object'
+          ? stored[KEY.SESSION_LOGS] : {};
+        var index = Array.isArray(stored[KEY.SESSION_INDEX]) ? stored[KEY.SESSION_INDEX] : [];
+        var session = safeSession(id, sessions[id], now);
+        if (!session) return { ok: false };
+        applySafeOutcome(session, outcome);
+        sessions[id] = session;
+        index = index.map(function(entry) {
+          return entry && entry.id === id ? safeIndexEntry(session) : entry;
+        });
+        var update = {};
+        update[KEY.SESSION_LOGS] = sessions;
+        update[KEY.SESSION_INDEX] = index;
+        await set(update);
+        return { ok: true };
+      });
+    }
+
+    async function pruneMcpAutomationSessions(retentionDays) {
+      var days = safeNumber(retentionDays, 30, 1, 365);
+      return withWrite(async function() {
+        var stored = await get([
+          KEY.SESSION_LOGS,
+          KEY.SESSION_INDEX,
+          KEY.DOM_SNAPSHOTS,
+          KEY.AUTOMATION_LOGS
+        ]);
+        var sessions = stored[KEY.SESSION_LOGS] && typeof stored[KEY.SESSION_LOGS] === 'object'
+          ? stored[KEY.SESSION_LOGS] : {};
+        var index = Array.isArray(stored[KEY.SESSION_INDEX]) ? stored[KEY.SESSION_INDEX] : [];
+        var snapshots = stored[KEY.DOM_SNAPSHOTS] && typeof stored[KEY.DOM_SNAPSHOTS] === 'object'
+          ? stored[KEY.DOM_SNAPSHOTS] : {};
+        var indexById = new Map(index.map(function(entry) { return [entry && entry.id, entry]; }));
+        var candidates = new Set(Object.keys(sessions).concat(Array.from(indexById.keys())));
+        var cutoff = now() - (Math.floor(days) * 24 * 60 * 60 * 1000);
+        var expiredIds = [];
+        candidates.forEach(function(candidateId) {
+          if (!candidateId) return;
+          var record = sessions[candidateId] || indexById.get(candidateId);
+          if (!record || record.mode !== 'mcp-agent') return;
+          var timestamp = Number(record.endTime == null ? record.startTime : record.endTime);
+          if (Number.isFinite(timestamp) && timestamp <= cutoff) expiredIds.push(candidateId);
+        });
+        if (expiredIds.length === 0) return { ok: true, removed: 0, ids: [] };
+        var expiredSet = new Set(expiredIds);
+        expiredIds.forEach(function(candidateId) {
+          delete sessions[candidateId];
+          delete snapshots[candidateId];
+        });
+        var update = {};
+        update[KEY.SESSION_LOGS] = sessions;
+        update[KEY.SESSION_INDEX] = index.filter(function(entry) {
+          return entry && !expiredSet.has(entry.id);
+        });
+        update[KEY.DOM_SNAPSHOTS] = snapshots;
+        update[KEY.AUTOMATION_LOGS] = filterAutomationLogsBySession(
+          stored[KEY.AUTOMATION_LOGS], expiredSet, false
+        );
+        await set(update);
+        return { ok: true, removed: expiredIds.length, ids: expiredIds };
+      });
+    }
+
     async function deleteAutomationSession(sessionId) {
       var id = safeSessionId(sessionId);
       if (!id) return { ok: false };
       return withWrite(async function() {
-        var stored = await get([KEY.SESSION_LOGS, KEY.SESSION_INDEX, KEY.DOM_SNAPSHOTS]);
+        var stored = await get([
+          KEY.SESSION_LOGS,
+          KEY.SESSION_INDEX,
+          KEY.DOM_SNAPSHOTS,
+          KEY.AUTOMATION_LOGS
+        ]);
         var sessions = stored[KEY.SESSION_LOGS] && typeof stored[KEY.SESSION_LOGS] === 'object'
           ? stored[KEY.SESSION_LOGS] : {};
         var index = Array.isArray(stored[KEY.SESSION_INDEX]) ? stored[KEY.SESSION_INDEX] : [];
@@ -478,6 +813,9 @@
         update[KEY.SESSION_LOGS] = sessions;
         update[KEY.SESSION_INDEX] = index.filter(function(entry) { return entry && entry.id !== id; });
         update[KEY.DOM_SNAPSHOTS] = snapshots;
+        update[KEY.AUTOMATION_LOGS] = filterAutomationLogsBySession(
+          stored[KEY.AUTOMATION_LOGS], new Set([id]), false
+        );
         await set(update);
         return { ok: true };
       });
@@ -485,7 +823,15 @@
 
     async function clearAutomationSessions() {
       return withWrite(async function() {
-        await remove([KEY.SESSION_LOGS, KEY.SESSION_INDEX, KEY.DOM_SNAPSHOTS]);
+        var stored = await get([KEY.AUTOMATION_LOGS]);
+        var update = {};
+        update[KEY.SESSION_LOGS] = {};
+        update[KEY.SESSION_INDEX] = [];
+        update[KEY.DOM_SNAPSHOTS] = {};
+        update[KEY.AUTOMATION_LOGS] = filterAutomationLogsBySession(
+          stored[KEY.AUTOMATION_LOGS], new Set(), true
+        );
+        await set(update);
         return { ok: true };
       });
     }
@@ -612,6 +958,25 @@
             }
             work = deleteAutomationSession(message.sessionId);
             break;
+          case MESSAGE.AUTOMATION_SESSION_UPDATE_OUTCOME:
+            if (!hasExactOwnKeys(message, ['action', 'sessionId', 'outcome']) ||
+                !hasExactOwnKeys(message.outcome, [
+                  'status', 'outcome', 'reason', 'summary', 'result',
+                  'completionMessage', 'error', 'blocker', 'nextStep'
+                ])) {
+              sendResponse({ ok: false, code: 'INVALID_MESSAGE' });
+              return false;
+            }
+            work = updateAutomationSessionOutcome(message.sessionId, message.outcome);
+            break;
+          case MESSAGE.AUTOMATION_SESSION_PRUNE_MCP:
+            if (!hasExactOwnKeys(message, ['action', 'retentionDays']) ||
+                !Number.isFinite(Number(message.retentionDays))) {
+              sendResponse({ ok: false, code: 'INVALID_MESSAGE' });
+              return false;
+            }
+            work = pruneMcpAutomationSessions(message.retentionDays);
+            break;
           case MESSAGE.AUTOMATION_SESSION_CLEAR:
             if (!hasExactOwnKeys(message, ['action'])) {
               sendResponse({ ok: false, code: 'INVALID_MESSAGE' });
@@ -655,6 +1020,8 @@
       saveAutomationSession: saveAutomationSession,
       loadAutomationSession: loadAutomationSession,
       listAutomationSessions: listAutomationSessions,
+      updateAutomationSessionOutcome: updateAutomationSessionOutcome,
+      pruneMcpAutomationSessions: pruneMcpAutomationSessions,
       deleteAutomationSession: deleteAutomationSession,
       clearAutomationSessions: clearAutomationSessions,
       loadAutomationDOMSnapshots: loadAutomationDOMSnapshots,

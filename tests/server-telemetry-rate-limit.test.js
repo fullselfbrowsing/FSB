@@ -54,10 +54,12 @@ function uuidv4() {
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20, 32)}`;
 }
 
+const FIXED_INSTALL_UUID = uuidv4();
+
 function makeValidEvent() {
   return {
     event_id: uuidv4(),
-    install_uuid: uuidv4(),
+    install_uuid: FIXED_INSTALL_UUID,
     ts_minute: Date.now(),
     mcp_client: 'Claude',
     model: 'claude-opus-4-7',

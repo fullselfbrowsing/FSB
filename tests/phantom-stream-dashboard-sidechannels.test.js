@@ -114,13 +114,21 @@ function verifyDiagnosticsSource(name, source) {
     'lastFrameAt',
     'lastSnapshotAt',
     'lastFrameAgo',
-    'last-frame: ',
-    'mutations: ',
-    'apply failures: ',
-    'stale: ',
     'dom-mutations-dispatched',
   ].forEach(needle => {
     ok(source.includes(needle), name + ' dashboard preserves diagnostics source contract: ' + needle);
+  });
+
+  const diagnosticsCopy = name === 'Angular'
+    ? [
+      '@@dashboard.runtime.tooltip.lastFrame',
+      '@@dashboard.runtime.tooltip.mutations',
+      '@@dashboard.runtime.tooltip.applyFailures',
+      '@@dashboard.runtime.tooltip.stale',
+    ]
+    : ['last-frame: ', 'mutations: ', 'apply failures: ', 'stale: '];
+  diagnosticsCopy.forEach(needle => {
+    ok(source.includes(needle), name + ' dashboard preserves diagnostics copy contract: ' + needle);
   });
 
   ok(!source.includes('previewTooltip.textContent = payload.html'),

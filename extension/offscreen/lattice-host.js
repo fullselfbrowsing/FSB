@@ -85,6 +85,14 @@ import {
   createInMemorySigner,
   generateEd25519KeyPairJwk,
   createNoopSurvivabilityAdapter,
+  createReceipt,
+  verifyReceipt,
+  receiptCid,
+  createMemoryKeySet,
+  materializeReplayEnvelope,
+  replayOffline,
+  createPermissionContext,
+  artifact,
   DEFAULT_CHECKPOINT_BAND,
   STEP_TRANSITION_EVENT_NAME,
 } from "lattice";
@@ -252,26 +260,125 @@ const survivability = createNoopSurvivabilityAdapter({ id: "fsb-offscreen-noop" 
 console.log(HOST_TAG, "survivability adapter id:", survivability.id, "kind:", survivability.kind);
 
 /**
- * Per-receipt signer + key set. Phase 5 generates an ephemeral keypair
- * per offscreen boot -- production code (a future phase) will load the
- * keypair from chrome.storage.session managed by the SW-side persistence
- * layer + the SurvivabilityAdapter serialize/deserialize round-trip.
- *
- * The Phase 1 + Phase 2 + Phase 3 receipt contract is end-to-end:
- *   - generateEd25519KeyPairJwk() returns { privateKeyJwk, publicKeyJwk }
- *   - createInMemorySigner() returns a ReceiptSigner with sign(bytes)
- *   - createCheckpointHook() returns a HookHandler that mints receipts
+ * A stable extension-origin signing key makes replay receipts verifiable after
+ * an offscreen-document or service-worker restart. IndexedDB is deliberately
+ * used instead of chrome.storage.local: content scripts share the latter by
+ * default, while their IndexedDB lives under the visited page origin rather
+ * than this extension origin.
  */
+const REPLAY_KEY_DB = "fsb-lattice-replay";
+const REPLAY_KEY_STORE = "signing-keys";
+const REPLAY_ACTIVE_KEY_ID = "active";
 let signer = null;
+let signerRecord = null;
+let signerPersistent = false;
 
-(async () => {
-  const { privateKeyJwk, publicKeyJwk } = await generateEd25519KeyPairJwk();
-  signer = createInMemorySigner(privateKeyJwk, { kid: "fsb-offscreen-ephemeral", publicKeyJwk });
+function openReplayKeyDb() {
+  return new Promise((resolve, reject) => {
+    if (typeof indexedDB === "undefined") {
+      reject(new Error("IndexedDB unavailable"));
+      return;
+    }
+    const request = indexedDB.open(REPLAY_KEY_DB, 1);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(REPLAY_KEY_STORE)) {
+        db.createObjectStore(REPLAY_KEY_STORE, { keyPath: "id" });
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error || new Error("Could not open replay key database"));
+  });
+}
 
-  console.log(HOST_TAG, "ephemeral signer ready");
-})().catch((err) => {
-  console.error(HOST_TAG, "boot init failed:", err && err.message ? err.message : err);
+async function readReplaySigningRecord() {
+  const db = await openReplayKeyDb();
+  try {
+    return await new Promise((resolve, reject) => {
+      const request = db.transaction(REPLAY_KEY_STORE, "readonly")
+        .objectStore(REPLAY_KEY_STORE)
+        .get(REPLAY_ACTIVE_KEY_ID);
+      request.onsuccess = () => resolve(request.result || null);
+      request.onerror = () => reject(request.error || new Error("Could not read replay signing key"));
+    });
+  } finally {
+    db.close();
+  }
+}
+
+async function writeReplaySigningRecord(record) {
+  const db = await openReplayKeyDb();
+  try {
+    await new Promise((resolve, reject) => {
+      const request = db.transaction(REPLAY_KEY_STORE, "readwrite")
+        .objectStore(REPLAY_KEY_STORE)
+        .put(record);
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error || new Error("Could not persist replay signing key"));
+    });
+  } finally {
+    db.close();
+  }
+}
+
+function replayKid() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return "fsb-replay-" + crypto.randomUUID();
+  }
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return "fsb-replay-" + Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+async function loadOrCreateReplaySigner() {
+  let record = await readReplaySigningRecord();
+  if (!record) {
+    const pair = await generateEd25519KeyPairJwk();
+    record = {
+      id: REPLAY_ACTIVE_KEY_ID,
+      kid: replayKid(),
+      privateKeyJwk: pair.privateKeyJwk,
+      publicKeyJwk: pair.publicKeyJwk,
+      createdAt: new Date().toISOString()
+    };
+    await writeReplaySigningRecord(record);
+  }
+  signerRecord = record;
+  signer = createInMemorySigner(record.privateKeyJwk, {
+    kid: record.kid,
+    publicKeyJwk: record.publicKeyJwk
+  });
+  signerPersistent = true;
+  console.log(HOST_TAG, "persistent replay signer ready", record.kid);
+}
+
+const signerReadyPromise = loadOrCreateReplaySigner().catch(async (err) => {
+  // Isolated Node smoke contexts do not expose IndexedDB. Preserve the
+  // pre-existing best-effort checkpoint path there, but replay sealing below
+  // explicitly rejects an ephemeral signer.
+  const pair = await generateEd25519KeyPairJwk();
+  signerRecord = {
+    id: "ephemeral",
+    kid: "fsb-offscreen-ephemeral",
+    privateKeyJwk: pair.privateKeyJwk,
+    publicKeyJwk: pair.publicKeyJwk,
+    createdAt: new Date().toISOString()
+  };
+  signer = createInMemorySigner(pair.privateKeyJwk, {
+    kid: signerRecord.kid,
+    publicKeyJwk: pair.publicKeyJwk
+  });
+  signerPersistent = false;
+  console.warn(HOST_TAG, "persistent signer unavailable; checkpoint-only fallback:", err && err.message);
 });
+
+async function requireReplaySigner() {
+  await signerReadyPromise;
+  if (!signer || !signerRecord || !signerPersistent) {
+    throw new Error("Persistent Lattice replay signer unavailable");
+  }
+  return signer;
+}
 
 /**
  * SW <-> offscreen message bus listener (D-16). Listens for
@@ -371,6 +478,293 @@ if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.onMessage)
   console.log(HOST_TAG, "chrome.runtime.onMessage listener registered for 'lattice-step-transition'");
 } else {
   console.warn(HOST_TAG, "chrome.runtime.onMessage not available; SW <-> offscreen bus unavailable (Node test context?)");
+}
+
+// ===========================================================================
+// Lattice-backed MCP session replay services.
+// ===========================================================================
+
+function canonicalReplayValue(value) {
+  if (Array.isArray(value)) return value.map(canonicalReplayValue);
+  if (!value || typeof value !== "object") return value;
+  return Object.keys(value).sort().reduce((out, key) => {
+    if (value[key] !== undefined) out[key] = canonicalReplayValue(value[key]);
+    return out;
+  }, {});
+}
+
+function canonicalReplayJson(value) {
+  return JSON.stringify(canonicalReplayValue(value));
+}
+
+async function sha256Hex(value) {
+  const bytes = new TextEncoder().encode(value);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+const REPLAY_VOLATILE_RESULT_KEYS = new Set([
+  "timestamp", "timestampms", "createdat", "updatedat", "startedat", "completedat",
+  "duration", "durationms", "elapsed", "elapsedms", "executiontime", "executiontimems",
+  "tabid", "targettabid", "windowid", "agentid", "requestid", "messageid", "mcpmsgid",
+  "ownershiptoken"
+]);
+
+function normalizeReplayResult(value) {
+  if (Array.isArray(value)) return value.map(normalizeReplayResult);
+  if (!value || typeof value !== "object") return value;
+  return Object.keys(value).sort().reduce((out, key) => {
+    const normalizedKey = key.replace(/[^A-Za-z0-9]/g, "").toLowerCase();
+    if (!REPLAY_VOLATILE_RESULT_KEYS.has(normalizedKey) && value[key] !== undefined) {
+      out[key] = normalizeReplayResult(value[key]);
+    }
+    return out;
+  }, {});
+}
+
+function replayResultSummary(result, succeeded) {
+  if (succeeded !== false || !result || typeof result !== "object") return null;
+  const summary = {};
+  ["errorCode", "code", "status", "error", "message", "reason"].forEach((key) => {
+    const value = result[key];
+    if (typeof value === "string" && value) summary[key] = value.slice(0, 1000);
+    else if ((key === "status") && Number.isFinite(value)) summary[key] = value;
+  });
+  return Object.keys(summary).length > 0 ? summary : { failed: true };
+}
+
+function replayKeySet() {
+  if (!signerRecord) throw new Error("Replay signer key unavailable");
+  return createMemoryKeySet([{
+    kid: signerRecord.kid,
+    publicKeyJwk: signerRecord.publicKeyJwk,
+    state: "active"
+  }]);
+}
+
+function replayArtifact(manifest, manifestHash) {
+  return artifact.json(manifest, {
+    id: "fsb-replay-" + manifestHash,
+    label: "FSB browser replay manifest",
+    mediaType: "application/vnd.fsb.browser-replay+json",
+    privacy: "sensitive",
+    fingerprint: { algorithm: "sha256", value: manifestHash },
+    storage: { storeId: "chrome.storage.local", key: manifestHash }
+  });
+}
+
+function validateReplayManifest(manifest) {
+  if (!manifest || typeof manifest !== "object") throw new Error("Replay manifest is required");
+  if (manifest.kind !== "fsb-browser-replay-manifest" || manifest.version !== 1) {
+    throw new Error("Unsupported replay manifest version");
+  }
+  if (manifest.provenance !== "capture" && manifest.provenance !== "legacy-import") {
+    throw new Error("Replay manifest provenance is required");
+  }
+  if (typeof manifest.sessionId !== "string" || !manifest.sessionId) {
+    throw new Error("Replay manifest sessionId is required");
+  }
+  if (!Array.isArray(manifest.steps)) throw new Error("Replay manifest steps are required");
+  if (manifest.steps.length > 100) throw new Error("Replay manifest exceeds the 100-step cap");
+}
+
+async function sealReplayManifest(payload) {
+  const replaySigner = await requireReplaySigner();
+  const suppliedManifest = payload && payload.manifest;
+  validateReplayManifest(suppliedManifest);
+  if (payload.provenance !== suppliedManifest.provenance) {
+    throw new Error("Replay provenance does not match the manifest");
+  }
+  const manifest = canonicalReplayValue(suppliedManifest);
+  manifest.steps = await Promise.all(manifest.steps.map(async (step) => {
+    const { result, resultSummary: priorResultSummary, ...persistedStep } = step;
+    const resultSummary = Object.prototype.hasOwnProperty.call(step, "result")
+      ? replayResultSummary(result, step.success)
+      : (step.success === false && priorResultSummary && typeof priorResultSummary === "object"
+        ? priorResultSummary
+        : null);
+    const normalizedResultHash = Object.prototype.hasOwnProperty.call(step, "result")
+      ? await sha256Hex(canonicalReplayJson(normalizeReplayResult(result || {})))
+      : (/^[a-f0-9]{64}$/.test(String(step.resultHash || ""))
+        ? step.resultHash
+        : await sha256Hex(canonicalReplayJson({})));
+    return {
+      ...persistedStep,
+      argumentHash: await sha256Hex(canonicalReplayJson(step.arguments || {})),
+      resultHash: normalizedResultHash,
+      resultHashVersion: "fsb-normalized-result/v1",
+      ...(resultSummary ? { resultSummary } : {})
+    };
+  }));
+  const canonical = canonicalReplayJson(manifest);
+  if (canonical.length > 2 * 1024 * 1024) throw new Error("Replay manifest exceeds the 2 MiB cap");
+  const manifestHash = await sha256Hex(canonical);
+  const receipt = await createReceipt({
+    runId: "replay-record:" + manifest.sessionId,
+    model: { requested: "fsb-browser-runtime", observed: null },
+    route: { providerId: "fsb-extension", capabilityId: "mcp-session-replay", attemptNumber: 1 },
+    usage: { promptTokens: 0, completionTokens: 0, costUsd: null },
+    contractVerdict: "success",
+    contractHash: null,
+    inputHashes: [manifestHash],
+    outputHash: manifestHash,
+    stepName: "REPLAY_CAPTURE",
+    stepIndex: 0,
+    sessionId: manifest.sessionId,
+    timestamp: new Date().toISOString()
+  }, replaySigner);
+  return {
+    ok: true,
+    manifest,
+    manifestHash,
+    receipt,
+    receiptCid: await receiptCid(receipt),
+    signerKid: signerRecord.kid
+  };
+}
+
+async function materializeReplayManifest(payload) {
+  await requireReplaySigner();
+  const manifest = payload && payload.manifest;
+  const expectedHash = String(payload && payload.manifestHash || "");
+  const receipt = payload && payload.receipt;
+  validateReplayManifest(manifest);
+  if (!expectedHash || !receipt) throw new Error("Replay receipt and manifest hash are required");
+  if (payload.signerKid && payload.signerKid !== signerRecord.kid) {
+    throw new Error("Replay receipt signing key is not available");
+  }
+  const computedHash = await sha256Hex(canonicalReplayJson(manifest));
+  if (computedHash !== expectedHash) throw new Error("Replay manifest hash mismatch");
+  let artifactLoaderCalls = 0;
+  const envelope = await materializeReplayEnvelope(receipt, {
+    keySet: replayKeySet(),
+    artifactLoader: async (requestedHash) => {
+      artifactLoaderCalls++;
+      if (requestedHash !== computedHash) throw new Error("Replay artifact hash mismatch");
+      return replayArtifact(manifest, computedHash);
+    },
+    task: manifest.task || "MCP session replay",
+    outputs: { manifestHash: computedHash },
+    policy: { privacy: "sensitive", noUpload: true, noLogging: true }
+  });
+  const verified = await verifyReceipt(receipt, replayKeySet());
+  if (!verified.ok) throw new Error(verified.error.message);
+  if (artifactLoaderCalls !== 1 || verified.body.inputHashes.length !== 1 ||
+      verified.body.inputHashes[0] !== computedHash || verified.body.outputHash !== computedHash) {
+    throw new Error("Replay receipt does not commit to the supplied manifest");
+  }
+  const offline = await replayOffline(envelope);
+  if (!offline.ok || offline.outputs.manifestHash !== computedHash) {
+    throw new Error(offline.ok ? "Offline replay output mismatch" : offline.error.message);
+  }
+  return {
+    ok: true,
+    verified: true,
+    manifestHash: computedHash,
+    receiptCid: await receiptCid(receipt),
+    offline: {
+      ok: true,
+      planId: envelope.plan.id,
+      artifactCount: envelope.artifacts.length,
+      manifestHash: offline.outputs.manifestHash
+    }
+  };
+}
+
+function authorizeReplay(payload) {
+  const step = payload && payload.step;
+  if (!step || !step.replay) throw new Error("Replay step classification is required");
+  const availability = step.replay.availability;
+  if (availability !== "ready" && availability !== "approval-once" && availability !== "approval-per-step") {
+    return { ok: true, verdict: { allow: false, reason: step.replay.reason || "Replay step is not executable" } };
+  }
+  const approved = new Set(Array.isArray(payload.approvedScopes) ? payload.approvedScopes : []);
+  const rules = [
+    { resource: "read", verdict: "allow" },
+    { resource: "navigation", verdict: "allow" }
+  ];
+  if (approved.has("write")) rules.push({ resource: "write", verdict: "allow" });
+  if (approved.has("step:" + step.id)) {
+    rules.push({ toolName: String(step.tool || ""), resource: String(step.replay.risk || ""), verdict: "allow" });
+  }
+  rules.push({ verdict: "deny", reason: "Replay step has not been approved" });
+  const permission = createPermissionContext(rules);
+  return {
+    ok: true,
+    verdict: permission.decide({
+      toolName: String(step.tool || ""),
+      iterationIndex: Number.isFinite(step.index) ? step.index : 0,
+      resource: String(step.replay.risk || ""),
+      args: step.arguments || {}
+    })
+  };
+}
+
+async function checkpointReplayStep(payload) {
+  const replaySigner = await requireReplaySigner();
+  const step = payload && payload.step;
+  const manifestHash = String(payload && payload.manifestHash || "");
+  if (!step || !manifestHash) throw new Error("Replay checkpoint requires a step and manifest hash");
+  const argsHash = await sha256Hex(canonicalReplayJson(step.arguments || {}));
+  const resultHash = await sha256Hex(canonicalReplayJson(normalizeReplayResult(payload.result || {})));
+  const parentReceiptCid = payload.previousReceiptCid || payload.sourceReceiptCid || null;
+  const receipt = await createReceipt({
+    runId: String(payload.replaySessionId || "replay-run"),
+    model: { requested: "fsb-browser-runtime", observed: null },
+    route: {
+      providerId: "fsb-extension",
+      capabilityId: "replay:" + String(step.tool || "unknown").replace(/[^A-Za-z0-9:_-]/g, "_").slice(0, 100),
+      attemptNumber: Number.isFinite(payload.attemptNumber) && payload.attemptNumber > 0
+        ? Math.floor(payload.attemptNumber)
+        : 1
+    },
+    usage: { promptTokens: 0, completionTokens: 0, costUsd: null },
+    contractVerdict: payload.success === false ? "execution-failed" : "success",
+    contractHash: null,
+    inputHashes: [manifestHash, argsHash],
+    outputHash: resultHash,
+    stepName: "REPLAY_STEP",
+    stepIndex: Number.isFinite(step.index) ? step.index : 0,
+    sessionId: String(payload.replaySessionId || "replay-run"),
+    timestamp: new Date().toISOString(),
+    ...(parentReceiptCid ? { parentReceiptCid } : {})
+  }, replaySigner);
+  return {
+    ok: true,
+    receipt,
+    receiptCid: await receiptCid(receipt),
+    argsHash,
+    resultHash,
+    signerKid: signerRecord.kid
+  };
+}
+
+if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.onMessage) {
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (!message || typeof message !== "object") return false;
+    if (sender && sender.id && sender.id !== chrome.runtime.id) return false;
+    const handlers = {
+      "lattice-replay-seal": sealReplayManifest,
+      "lattice-replay-materialize": materializeReplayManifest,
+      "lattice-replay-authorize": async (payload) => authorizeReplay(payload),
+      "lattice-replay-checkpoint": checkpointReplayStep
+    };
+    const handler = handlers[message.type];
+    if (!handler) return false;
+    Promise.resolve(handler(message.payload || {}))
+      .then((response) => sendResponse(response))
+      .catch((error) => sendResponse({
+        ok: false,
+        error: {
+          kind: error && error.kind ? String(error.kind) : "lattice-replay-error",
+          message: error && error.message ? error.message : String(error)
+        }
+      }));
+    return true;
+  });
+  console.log(HOST_TAG, "Lattice replay services registered");
 }
 
 // ==========================================================================

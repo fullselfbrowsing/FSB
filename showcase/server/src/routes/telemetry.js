@@ -6,7 +6,7 @@
  *
  *   - 32 KB body cap         (express.json({limit:'32kb'}) -> 413 PayloadTooLarge)
  *   - 50-event batch cap     (400 batch_too_large)
- *   - 9-field allowlist      (400 unknown_field)
+ *   - versioned allowlist    (400 unknown_field)
  *   - UUIDv4 shape           (400 invalid_event_id / invalid_install_uuid)
  *   - 13 + 'unknown' mcp_client allowlist (400 invalid_mcp_client)
  *   - event_type allowlist   (400 invalid_event_type)
@@ -32,7 +32,12 @@ const { isValidUuidV4 } = require('../utils/telemetry-hash');
 // stays stable. Posture mirrors hashIp: req.ip is an inline argument, used once
 // then discarded; only the k>=5-floored aggregate region label is retained.
 const { deriveRegion } = require('../utils/ip-geo');
-const { createTelemetryRateLimiter, checkPerUuidBudget } = require('../middleware/telemetry-rate-limit');
+const {
+  createTelemetryRateLimiter,
+  checkPerUuidBudget,
+  checkPerIpDailyContribution,
+  forgetPerUuidBudget,
+} = require('../middleware/telemetry-rate-limit');
 // Phase 274 / AGG-02 + AGG-03 -- in-memory liveness tracker. Hook fires AFTER
 // the SQLite insert succeeds; failure paths (validation, timestamp, budget
 // reject) do NOT record. Only counts/sums leave the module surface.
@@ -42,10 +47,11 @@ const activeTracker = require('../telemetry/active-tracker');
 // Allowlists (hardcoded per CONTEXT specifics -- decoupled from Phase 270's JSON).
 // ---------------------------------------------------------------------------
 
-// Exactly 9 fields are permitted per event. ANY extra key -> 400 unknown_field.
+// Active-count v2 is optional during rollout; legacy collectors omit it.
 const ALLOWED_EVENT_FIELDS = new Set([
   'event_id', 'install_uuid', 'ts_minute', 'mcp_client', 'model',
   'tokens_in', 'tokens_out', 'active_agent_count', 'event_type',
+  'active_count_version',
 ]);
 
 // 13 labels from mcp/src/tools/visual-session.ts (v0.9.36 allowlist) + 'unknown'.
@@ -61,7 +67,17 @@ const FIVE_MIN_MS = 5 * 60 * 1000;
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_BATCH = 50;
 const MAX_MODEL_LEN = 128;
-const NUMERIC_CEILING = 1_000_000_000;
+// A five-minute aggregate may legitimately contain several large-context
+// calls, but billion-token single events are not plausible. Keep generous
+// headroom while bounding one anonymous event's influence on public totals.
+const TOKEN_COUNT_CEILING = 10_000_000;
+// The extension registry enforces the same hard maximum. Rejecting impossible
+// counts prevents one anonymous event from dominating active-now aggregates.
+const ACTIVE_AGENT_COUNT_CEILING = 64;
+const ACTIVE_COUNT_VERSION = 2;
+// Retried queue entries may be accepted for seven days, but an old snapshot
+// must not be reinterpreted as the install's current agent population.
+const ACTIVE_AGENT_LIVENESS_MAX_AGE_MS = 10 * 60 * 1000;
 
 // Quick task 260630-hct -- US state name -> USPS 2-letter code, so the stored
 // region label is compact (e.g. "US-CA") rather than a free-form state string.
@@ -139,11 +155,27 @@ function validateEvent(ev) {
       return { error: 'invalid_model' };
     }
   }
-  for (const n of ['tokens_in', 'tokens_out', 'active_agent_count']) {
+  for (const n of ['tokens_in', 'tokens_out']) {
     const v = ev[n];
-    if (!Number.isInteger(v) || v < 0 || v > NUMERIC_CEILING) {
+    if (!Number.isInteger(v) || v < 0 || v > TOKEN_COUNT_CEILING) {
       return { error: `invalid_${n}` };
     }
+  }
+  const activeCountVersion = ev.active_count_version === undefined ? 0 : ev.active_count_version;
+  if (activeCountVersion !== 0 && activeCountVersion !== ACTIVE_COUNT_VERSION) {
+    return { error: 'invalid_active_count_version' };
+  }
+  // Legacy collectors are known to carry a leaked persistent counter. Accept
+  // their batch so token/user telemetry survives rollout, but the insert path
+  // stores an untrusted zero. V2 counts must satisfy the registry hard cap.
+  const validLegacyCount = typeof ev.active_agent_count === 'number'
+    && Number.isFinite(ev.active_agent_count) && ev.active_agent_count >= 0;
+  const validV2Count = Number.isInteger(ev.active_agent_count)
+    && ev.active_agent_count >= 0
+    && ev.active_agent_count <= ACTIVE_AGENT_COUNT_CEILING;
+  if ((activeCountVersion === ACTIVE_COUNT_VERSION && !validV2Count)
+      || (activeCountVersion === 0 && !validLegacyCount)) {
+    return { error: 'invalid_active_agent_count' };
   }
   if (!ALLOWED_EVENT_TYPES.has(ev.event_type)) {
     return { error: 'invalid_event_type' };
@@ -166,7 +198,10 @@ function createTelemetryRouter(db, queries, hashIp) {
   // -----------------------------------------------------------------
   // POST /api/telemetry/events -- anonymous batch ingest.
   // -----------------------------------------------------------------
-  router.post('/events', bodyCap, limiter, (req, res) => {
+  // The IP limiter intentionally runs before JSON parsing. Malformed and
+  // oversized attempts still consume burst budget instead of giving an
+  // attacker a free, CPU-consuming parser path.
+  router.post('/events', limiter, bodyCap, (req, res) => {
     // INGEST-10: Sec-GPC: 1 -> 204 silent drop BEFORE hashIp / DB writes.
     // Note: express-rate-limit middleware ran before this handler, so it already
     // counted the request in the per-IP bucket. The privacy guarantee we make is
@@ -226,6 +261,15 @@ function createTelemetryRouter(db, queries, hashIp) {
       }
     }
 
+    // The official collector owns one stable install identity, so a valid
+    // retry batch can contain many events but never many identities. Rejecting
+    // mixed UUIDs prevents one anonymous request from manufacturing up to 50
+    // distinct users and 50 independent daily-budget buckets.
+    const batchInstallUuid = body.events[0].install_uuid;
+    if (body.events.some((ev) => ev.install_uuid !== batchInstallUuid)) {
+      return res.status(400).json({ error: 'mixed_install_uuid_batch' });
+    }
+
     // INGEST-07(e): timestamp tolerance. Drop offending events only;
     // remaining events still inserted. If ANY dropped, return 400 AFTER insertion
     // with {error:'timestamp_out_of_window', dropped, accepted}.
@@ -242,13 +286,43 @@ function createTelemetryRouter(db, queries, hashIp) {
       }
     }
 
-    // INGEST-07(d): per-UUID daily budget. Each event is counted independently
-    // (one batch may carry events from multiple install_uuids in pathological
-    // cases; the budget reset is per-UUID/day).
+    // A UUID can be rotated cheaply by an anonymous sender, so the UUID-only
+    // budget is insufficient on its own. Bound the proposed contribution by
+    // the already-computed daily HMAC IP hash. This reads existing rows only;
+    // it neither stores nor exposes a plaintext IP or a new identifier.
+    const ipBudget = checkPerIpDailyContribution(
+      db,
+      clientHash,
+      batchInstallUuid,
+      inWindow,
+      now,
+    );
+    if (!ipBudget.ok) {
+      if (ipBudget.reason === 'event_identity_mismatch') {
+        return res.status(400).json({ error: 'event_id_identity_mismatch' });
+      }
+      const reason = ipBudget.reason === 'token_contribution'
+        ? 'per-ip-token-budget'
+        : 'per-ip-uuid-budget';
+      res.set('X-FSB-Reason', reason);
+      if (Number.isFinite(ipBudget.retryAfter)) {
+        res.set('Retry-After', String(Math.max(1, Math.ceil(ipBudget.retryAfter / 1000))));
+      }
+      return res.status(429).json({
+        error: 'per_ip_daily_budget_exceeded',
+        reason: ipBudget.reason,
+        accepted: 0,
+        inserted: 0,
+        limit: ipBudget.limit,
+      });
+    }
+
+    // INGEST-07(d): per-UUID daily budget. Each event is counted independently;
+    // the single-identity batch gate above guarantees one UUID for this loop.
     const budgetAccepted = [];
     let droppedBudget = 0;
     for (const ev of inWindow) {
-      const b = checkPerUuidBudget(ev.install_uuid);
+      const b = checkPerUuidBudget(ev.install_uuid, now);
       if (b.ok) {
         budgetAccepted.push(ev);
       } else {
@@ -267,11 +341,15 @@ function createTelemetryRouter(db, queries, hashIp) {
           // Quick task 260630-hct -- 12-arg region-bearing insert. The trailing
           // regionTag is a coarse state-granularity label derived inline above,
           // NEVER the raw IP. All other args + batching/budget logic unchanged.
-          const r = queries.insertTelemetryEventWithRegion.run(
+          const activeCountVersion = e.active_count_version === ACTIVE_COUNT_VERSION
+            ? ACTIVE_COUNT_VERSION : 0;
+          const trustedActiveCount = activeCountVersion === ACTIVE_COUNT_VERSION
+            ? e.active_agent_count : 0;
+          const r = queries.insertTelemetryEventWithRegionV2.run(
             e.event_id, e.install_uuid, e.ts_minute,
             e.mcp_client, e.model || null,
-            e.tokens_in, e.tokens_out, e.active_agent_count,
-            e.event_type, clientHash, now, regionTag
+            e.tokens_in, e.tokens_out, trustedActiveCount,
+            activeCountVersion, e.event_type, clientHash, now, regionTag
           );
           n += r.changes;
         }
@@ -280,18 +358,35 @@ function createTelemetryRouter(db, queries, hashIp) {
       inserted = tx(budgetAccepted);
     }
 
-    // Phase 274 / AGG-02 + AGG-03 -- record active liveness in the in-memory
-    // tracker AFTER the SQLite insert succeeded for the batch. We pass the
-    // wall-clock receive time `now` (already captured at line 168), NOT
-    // ev.ts_minute (client clock). A drifted client cannot pin itself as
-    // "active" indefinitely because the tracker stores receive time.
-    // Note: we record once per event in budgetAccepted, even if INSERT OR IGNORE
-    // dropped some as duplicates -- the activity signal is "client beat for this
-    // UUID in this window", which is still true on a replay collision.
-    if (inserted > 0) {
-      for (const ev of budgetAccepted) {
-        activeTracker.recordSeen(ev.install_uuid, ev.active_agent_count, now);
+    // Record one liveness update for this single-install batch, even when
+    // INSERT OR IGNORE recognized a retry. Receive time proves the client is
+    // online; only a recent event is allowed to supply its agent population.
+    // A day-old queued event therefore counts as an active user with an
+    // unknown (zero) current agent count instead of reviving stale concurrency.
+    if (budgetAccepted.length > 0) {
+      let freshest = budgetAccepted[0];
+      for (let i = 1; i < budgetAccepted.length; i += 1) {
+        if (budgetAccepted[i].ts_minute > freshest.ts_minute
+            || (budgetAccepted[i].ts_minute === freshest.ts_minute
+              && budgetAccepted[i].active_count_version === ACTIVE_COUNT_VERSION
+              && freshest.active_count_version !== ACTIVE_COUNT_VERSION)) {
+          freshest = budgetAccepted[i];
+        }
       }
+      const hasFreshActiveSnapshot = freshest.ts_minute >= now - ACTIVE_AGENT_LIVENESS_MAX_AGE_MS;
+      const livenessActiveVersion = hasFreshActiveSnapshot
+          && freshest.active_count_version === ACTIVE_COUNT_VERSION
+        ? ACTIVE_COUNT_VERSION : 0;
+      const livenessAgentCount = livenessActiveVersion === ACTIVE_COUNT_VERSION
+        ? freshest.active_agent_count
+        : 0;
+      activeTracker.recordSeen(
+        batchInstallUuid,
+        livenessAgentCount,
+        now,
+        clientHash,
+        livenessActiveVersion,
+      );
     }
 
     // Build the response. Priority of error status codes:
@@ -340,6 +435,8 @@ function createTelemetryRouter(db, queries, hashIp) {
     }
     queries.deleteEventsByUuid.run(installUuid);
     queries.deleteRollupsByUuid.run(installUuid);
+    activeTracker.forgetInstall(installUuid);
+    forgetPerUuidBudget(installUuid);
     // No row counts in response (no enumeration leak per T-273-05).
     return res.status(204).end();
   });
@@ -355,7 +452,22 @@ function createTelemetryRouter(db, queries, hashIp) {
     }
     queries.deleteEventsByUuid.run(installUuid);
     queries.deleteRollupsByUuid.run(installUuid);
+    activeTracker.forgetInstall(installUuid);
+    forgetPerUuidBudget(installUuid);
     return res.status(204).end();
+  });
+
+  // Keep body-parser failures deterministic and safe in both the standalone
+  // router tests and the production server's generic error stack. Never echo
+  // malformed request content in a response.
+  router.use((err, _req, res, next) => {
+    if (err && (err.status === 413 || err.type === 'entity.too.large')) {
+      return res.status(413).json({ error: 'payload_too_large' });
+    }
+    if (err && (err.status === 400 || err.type === 'entity.parse.failed')) {
+      return res.status(400).json({ error: 'invalid_json' });
+    }
+    return next(err);
   });
 
   return router;
@@ -366,3 +478,7 @@ module.exports.createTelemetryRouter = createTelemetryRouter;
 module.exports.MCP_CLIENT_ALLOWLIST = MCP_CLIENT_ALLOWLIST;
 module.exports.ALLOWED_EVENT_FIELDS = ALLOWED_EVENT_FIELDS;
 module.exports.ALLOWED_EVENT_TYPES = ALLOWED_EVENT_TYPES;
+module.exports.TOKEN_COUNT_CEILING = TOKEN_COUNT_CEILING;
+module.exports.ACTIVE_AGENT_COUNT_CEILING = ACTIVE_AGENT_COUNT_CEILING;
+module.exports.ACTIVE_COUNT_VERSION = ACTIVE_COUNT_VERSION;
+module.exports.ACTIVE_AGENT_LIVENESS_MAX_AGE_MS = ACTIVE_AGENT_LIVENESS_MAX_AGE_MS;

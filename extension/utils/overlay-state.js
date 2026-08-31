@@ -245,6 +245,33 @@
     };
   }
 
+  function buildReplayControl(statusData) {
+    var raw = statusData && statusData.replay;
+    if (!raw || typeof raw !== 'object' || typeof raw.sessionId !== 'string' || !raw.sessionId) return null;
+    var allowedStatuses = { playing: true, paused: true, decision: true, completed: true, stopped: true, failed: true };
+    var allowedSpeeds = { '0.5': true, '1': true, '2': true, '4': true };
+    var durationMs = Math.max(0, Math.round(Number(raw.durationMs) || 0));
+    var positionMs = Math.max(0, Math.min(durationMs, Math.round(Number(raw.positionMs) || 0)));
+    var interpolationTargetMs = Math.max(
+      positionMs,
+      Math.min(durationMs, Math.round(Number(raw.interpolationTargetMs) || positionMs))
+    );
+    var totalSteps = Math.max(0, Math.round(Number(raw.totalSteps) || 0));
+    var currentStep = Math.max(0, Math.min(totalSteps, Math.round(Number(raw.currentStep) || 0)));
+    var speed = Number(raw.speed);
+    return {
+      sessionId: raw.sessionId.slice(0, 200),
+      status: allowedStatuses[raw.status] ? raw.status : 'playing',
+      speed: allowedSpeeds[String(speed)] ? speed : 1,
+      positionMs: positionMs,
+      interpolationTargetMs: interpolationTargetMs,
+      durationMs: durationMs,
+      currentStep: currentStep,
+      totalSteps: totalSteps,
+      forwardSeekOnly: raw.forwardSeekOnly !== false
+    };
+  }
+
   var CAPABILITY_GUARDED_NOTE_TEXT = {
     RECIPE_CONSENT_MUTATING_REQUIRED: 'Blocked — nothing was created. Needs your approval to run write actions.',
     RECIPE_CONSENT_REQUIRED: 'Blocked — this site needs your approval before FSB can act here.',
@@ -425,6 +452,7 @@
     var agentIdShort = _agentIdShort(statusData, session);
     var guarded = !!(statusData && statusData.guarded);
     var capability = buildCapabilityDisplay(statusData || {});
+    var replay = buildReplayControl(statusData || {});
     var stoppable = !!(statusData && statusData.stoppable);
 
     return {
@@ -444,6 +472,7 @@
       },
       guarded: guarded,
       ...(capability ? { capability: capability } : {}),
+      ...(replay ? { replay: replay } : {}),
       stoppable: stoppable
     };
   }
@@ -495,6 +524,7 @@
     buildOverlayState: buildOverlayState,
     shouldApplyOverlayState: shouldApplyOverlayState,
     buildCapabilityDisplay: buildCapabilityDisplay,
+    buildReplayControl: buildReplayControl,
     mapCapabilityErrorToNote: mapCapabilityErrorToNote
   };
 

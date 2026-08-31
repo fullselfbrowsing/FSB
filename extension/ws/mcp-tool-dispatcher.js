@@ -56,6 +56,11 @@ const MCP_CLAIMABLE_RECOVERY_TOOLS = new Set(['navigate', 'switch_tab']);
 // Persistence is fire-and-forget on the dispatcher hot path; the helper
 // _persistAgentClientLabel below catches every failure mode.
 const FSB_AGENT_CLIENT_LABELS_KEY = 'fsbAgentClientLabels';
+const MCP_TASK_OUTCOME_STATUS = Object.freeze({
+  complete_task: 'completed',
+  partial_task: 'partial',
+  fail_task: 'failed'
+});
 
 const MCP_PHASE199_TOOL_ROUTES = {
   navigate: { routeFamily: 'browser', handler: handleNavigateRoute },
@@ -81,6 +86,8 @@ const MCP_PHASE199_TOOL_ROUTES = {
   get_page_snapshot: { routeFamily: 'read-only', messageType: 'mcp:get-page-snapshot', handler: handleToolAliasRoute },
   list_sessions: { routeFamily: 'observability', messageType: 'mcp:list-sessions', handler: handleToolAliasRoute },
   get_session_detail: { routeFamily: 'observability', messageType: 'mcp:get-session', handler: handleToolAliasRoute },
+  get_session_replay: { routeFamily: 'observability', messageType: 'mcp:get-session-replay', handler: handleToolAliasRoute },
+  replay_session: { routeFamily: 'replay', messageType: 'mcp:replay-session', handler: handleToolAliasRoute },
   get_logs: { routeFamily: 'observability', messageType: 'mcp:get-logs', handler: handleToolAliasRoute },
   search_memory: { routeFamily: 'observability', messageType: 'mcp:search-memory', handler: handleToolAliasRoute },
   get_memory_stats: { routeFamily: 'observability', messageType: 'mcp:get-memory', handler: handleToolAliasRoute },
@@ -94,6 +101,7 @@ const MCP_PHASE199_TOOL_ROUTES = {
 
 const MCP_PHASE199_MESSAGE_ROUTES = {
   'mcp:get-tabs': { routeFamily: 'read-only', helperName: '_handleGetTabs' },
+  'mcp:capture-screenshot': { routeFamily: 'developer-uat', handler: handleCaptureScreenshotMessageRoute },
   'mcp:get-diagnostics': { routeFamily: 'diagnostics', handler: handleGetDiagnosticsMessageRoute },
   'mcp:get-site-guides': { routeFamily: 'read-only', handler: handleGetSiteGuidesRoute },
   'mcp:get-page-snapshot': { routeFamily: 'read-only', handler: handleGetPageSnapshotRoute },
@@ -110,6 +118,8 @@ const MCP_PHASE199_MESSAGE_ROUTES = {
   'mcp:list-triggers': { routeFamily: 'trigger', handler: handleTriggerToolMessageRoute },
   'mcp:list-sessions': { routeFamily: 'observability', handler: handleListSessionsMessageRoute },
   'mcp:get-session': { routeFamily: 'observability', handler: handleGetSessionMessageRoute },
+  'mcp:get-session-replay': { routeFamily: 'observability', handler: handleGetSessionReplayMessageRoute },
+  'mcp:replay-session': { routeFamily: 'replay', handler: handleReplaySessionRequestMessageRoute },
   'mcp:get-logs': { routeFamily: 'observability', handler: handleGetLogsMessageRoute },
   'mcp:search-memory': { routeFamily: 'observability', handler: handleSearchMemoryMessageRoute },
   'mcp:get-memory': { routeFamily: 'observability', handler: handleGetMemoryMessageRoute },
@@ -143,6 +153,18 @@ const MCP_PHASE199_MESSAGE_ROUTES = {
   'agent:release':  { routeFamily: 'agent', handler: handleAgentReleaseRoute },
   'agent:status':   { routeFamily: 'agent', handler: handleAgentStatusRoute }
 };
+
+// Non-enumerable, in-process-only recorder context. A Symbol prevents an MCP
+// caller from spoofing the resolved tab/origin metadata and keeps it out of
+// the bridge response JSON.
+const MCP_REPLAY_RECORD_CONTEXT = Symbol('fsb-mcp-replay-record-context');
+
+const MCP_VISUAL_SESSION_TASK_STATUS_TOOLS = new Set([
+  'report_progress',
+  'complete_task',
+  'partial_task',
+  'fail_task'
+]);
 
 const MCP_TRIGGER_MESSAGE_TO_TOOL_NAME = {
   'mcp:trigger': 'trigger',
@@ -453,6 +475,20 @@ async function _persistAgentClientLabel(agentId, label) {
   } catch (_e) { /* swallow -- diagnostic-only path */ }
 }
 
+// Canonical chip label from the MCP initialize clientInfo, so ownership UI can
+// say "Owned by Claude" from the first render after agent:register instead of
+// falling back to the raw agent id until an action-tool sidecar arrives.
+function canonicalLabelFromClientInfo(clientInfo) {
+  if (!clientInfo || typeof clientInfo.name !== 'string') return null;
+  const name = clientInfo.name.toLowerCase();
+  if (name.includes('claude')) return 'Claude';
+  if (name.includes('codex')) return 'Codex';
+  if (name.includes('opencode')) return 'OpenCode';
+  if (name.includes('cursor')) return 'Cursor';
+  if (name.includes('windsurf')) return 'Windsurf';
+  return null;
+}
+
 function resolveMcpClientLabel(payload) {
   const fromPayload = extractMcpClientLabel(payload);
   const agentId = _payloadAgentId(payload);
@@ -511,6 +547,95 @@ function _peekLastKnownMcpClientLabel(agentId) {
   return _agentClientLabelCache.size === 0 ? null : Object.fromEntries(_agentClientLabelCache);
 }
 
+function canonicalizeVisualSessionOwnershipToken(payload, sessionTabId, hasExplicitTabId) {
+  if (hasExplicitTabId || !payload || typeof payload !== 'object') return payload;
+
+  const reg = (typeof globalThis !== 'undefined') ? globalThis.fsbAgentRegistryInstance : null;
+  const agentId = payload.agentId;
+  const ownershipToken = payload.ownershipToken;
+  if (!reg || typeof agentId !== 'string' || !agentId ||
+      typeof ownershipToken !== 'string' || !ownershipToken ||
+      typeof reg.getAgentTabs !== 'function' ||
+      typeof reg.isOwnedBy !== 'function' ||
+      typeof reg.getTabMetadata !== 'function') {
+    return payload;
+  }
+
+  const ownedTabIds = reg.getAgentTabs(agentId);
+  const tokenProvesCurrentAgentOwnership = Array.isArray(ownedTabIds) && ownedTabIds.some((tabId) => (
+    Number.isFinite(tabId) && reg.isOwnedBy(tabId, agentId, ownershipToken)
+  ));
+  if (!tokenProvesCurrentAgentOwnership || getRegistryOwner(reg, sessionTabId) !== agentId) {
+    return payload;
+  }
+
+  const sessionMetadata = reg.getTabMetadata(sessionTabId);
+  const sessionOwnershipToken = sessionMetadata && sessionMetadata.ownershipToken;
+  if (typeof sessionOwnershipToken !== 'string' || !sessionOwnershipToken) return payload;
+
+  return {
+    ...payload,
+    ownershipToken: sessionOwnershipToken
+  };
+}
+
+function canonicalizeVisualSessionTaskParams(tool, params, payload) {
+  if (!MCP_VISUAL_SESSION_TASK_STATUS_TOOLS.has(tool)) {
+    return { params, payload };
+  }
+
+  const sessionToken = boundedString(params?.session_token || params?.sessionToken, 200);
+  if (!sessionToken) return { params, payload };
+
+  const resolver = typeof globalThis !== 'undefined'
+    ? globalThis.resolveMcpVisualSessionTabId
+    : null;
+  if (typeof resolver !== 'function') {
+    return {
+      error: createMcpRouteError(tool, 'visual-session', MCP_ROUTE_RECOVERY_HINT, {
+        errorCode: 'visual_session_unavailable',
+        error: 'Visual-session ownership resolver unavailable'
+      })
+    };
+  }
+
+  let sessionTabId;
+  try {
+    sessionTabId = resolver(sessionToken);
+  } catch (error) {
+    return {
+      error: createMcpRouteError(tool, 'visual-session', MCP_ROUTE_RECOVERY_HINT, {
+        errorCode: 'visual_session_unavailable',
+        error: error?.message || 'Visual-session ownership resolver unavailable'
+      })
+    };
+  }
+
+  // A missing token still follows the existing callback path so callers keep
+  // receiving the canonical visual_session_not_found response.
+  if (!Number.isFinite(sessionTabId) || sessionTabId <= 0) return { params, payload };
+
+  const explicitTabIds = [params?.tabId, params?.tab_id].filter(Number.isFinite);
+  if (explicitTabIds.some((tabId) => tabId !== sessionTabId)) {
+    return {
+      error: createMcpInvalidParamsError(
+        tool,
+        'The supplied tab_id does not match the visual session token',
+        { routeFamily: 'task-status' }
+      )
+    };
+  }
+
+  return {
+    params: {
+      ...params,
+      tabId: sessionTabId,
+      tab_id: sessionTabId
+    },
+    payload: canonicalizeVisualSessionOwnershipToken(payload, sessionTabId, explicitTabIds.length > 0)
+  };
+}
+
 async function dispatchMcpToolRoute({ tool, params = {}, client = null, tab = null, payload = {} }) {
   const route = MCP_PHASE199_TOOL_ROUTES[tool];
   if (!route) {
@@ -520,6 +645,11 @@ async function dispatchMcpToolRoute({ tool, params = {}, client = null, tab = nu
   if (typeof route.handler !== 'function') {
     return createMcpRouteError(tool, route.routeFamily, MCP_ROUTE_RECOVERY_HINT);
   }
+
+  const canonicalized = canonicalizeVisualSessionTaskParams(tool, params, payload);
+  if (canonicalized.error) return canonicalized.error;
+  params = canonicalized.params;
+  payload = canonicalized.payload;
 
   // Phase 240 D-06 / D-07: inline ownership gate. Sync; no await between gate
   // check and route.handler invocation. Same microtask discipline.
@@ -569,13 +699,34 @@ async function dispatchMcpToolRoute({ tool, params = {}, client = null, tab = nu
         globalThis.fsbMcpMetricsRecorder.recordDispatch({
           client: resolveMcpClientLabel(payload),
           tool,
-          requestPayload: payload,
-          response,
+          requestMetadata: {
+            textLength: payload && typeof payload.text === 'string' ? payload.text.length : 0
+          },
           success,
           dispatcher_route: 'tool'
         });
       }
     } catch (_e) { /* defence in depth -- never let metrics break dispatch */ }
+    // Terminal task summaries are the only MCP-to-memory handoff. Record only
+    // a handler-confirmed lifecycle response (fail_task intentionally returns
+    // success:false with status:'failed'); invalid params and ownership
+    // rejections never reach this point with the matching status.
+    try {
+      if (
+        MCP_TASK_OUTCOME_STATUS[tool] &&
+        response && response.status === MCP_TASK_OUTCOME_STATUS[tool] &&
+        typeof globalThis !== 'undefined' &&
+        globalThis.fsbMcpSessionRecorder &&
+        typeof globalThis.fsbMcpSessionRecorder.recordTaskOutcome === 'function'
+      ) {
+        globalThis.fsbMcpSessionRecorder.recordTaskOutcome({ tool, params, payload, response });
+      }
+    } catch (_e) { /* never let task-memory recording break dispatch */ }
+    // NOTE (260707-7id review fix): the session-recorder sibling hook that
+    // lived here moved to MCPBridgeClient._recordMcpSessionAction -- this
+    // route only ever carries background-routed actions (all originating in
+    // _handleExecuteAction, which now records them with the resolved tabId),
+    // so recording here again would double-count every background action.
   }
 }
 
@@ -585,8 +736,8 @@ async function dispatchMcpMessageRoute({ type, payload = {}, client = null, mcpM
     return createMcpRouteError(type, 'message', MCP_ROUTE_RECOVERY_HINT);
   }
 
-  const restrictedReadResponse = await buildRestrictedResponseIfReadRoute({ type, client, payload });
-  if (restrictedReadResponse) return restrictedReadResponse;
+  const readRouteInspection = await buildRestrictedResponseIfReadRoute({ type, client, payload });
+  if (readRouteInspection.restrictedResponse) return readRouteInspection.restrictedResponse;
 
   // Phase 271 / v0.9.69 -- MCP analytics chokepoint (message surface). Same
   // try/finally pattern as dispatchMcpToolRoute: recorder fires from finally
@@ -653,15 +804,104 @@ async function dispatchMcpMessageRoute({ type, payload = {}, client = null, mcpM
           globalThis.fsbMcpMetricsRecorder.recordDispatch({
             client: resolveMcpClientLabel(payload),
             tool: type,
-            requestPayload: payload,
-            response,
+            requestMetadata: {
+              textLength: payload && typeof payload.text === 'string' ? payload.text.length : 0
+            },
             success,
             dispatcher_route: 'message'
           });
         }
       } catch (_e) { /* defence in depth -- never let metrics break dispatch */ }
+      // Quick 260707-7id -- MCP session recorder hook (message surface):
+      // read-only/message traffic JOINs open sessions by agentId. The
+      // action-tool sibling lives in MCPBridgeClient._recordMcpSessionAction
+      // (bridge level, all routes). INSIDE the !_mcpMetricsSuppressInner
+      // gate so alias-routed dispatches (run_task, read_page, ...) cannot be
+      // recorded twice should an action alias ever record upstream.
+      // Separate sibling try/catch AFTER the metrics block (Test 9 regex
+      // spans undisturbed); fire-and-forget, NOT awaited, no return.
+      try {
+        if (
+          typeof globalThis !== 'undefined' &&
+          globalThis.fsbMcpSessionRecorder &&
+          typeof globalThis.fsbMcpSessionRecorder.recordDispatch === 'function'
+        ) {
+          var sessionRecordEntry = {
+            client: resolveMcpClientLabel(payload),
+            tool: type,
+            requestPayload: payload,
+            // Screenshot pixels are transport-only. The session journal keeps
+            // sanitized metadata and never receives base64.
+            response: sanitizeMcpMessageResponseForRecording(type, response),
+            success,
+            dispatcher_route: 'message',
+            tabId: payload && payload[MCP_REPLAY_RECORD_CONTEXT]
+              ? payload[MCP_REPLAY_RECORD_CONTEXT].tabId
+              : (readRouteInspection.recordContext ? readRouteInspection.recordContext.tabId : null),
+            requireTargetOrigin: readRouteInspection.applies === true,
+            targetOriginResolved: readRouteInspection.recordContext
+              ? readRouteInspection.recordContext.targetOriginResolved
+              : true,
+            spreadsheetTarget: readRouteInspection.recordContext
+              ? readRouteInspection.recordContext.spreadsheetTarget
+              : false,
+            replayContext: payload && payload[MCP_REPLAY_RECORD_CONTEXT]
+              ? Object.assign({}, payload[MCP_REPLAY_RECORD_CONTEXT], { routeFamily: route.routeFamily })
+              : Object.assign({}, readRouteInspection.recordContext || {}, { routeFamily: route.routeFamily })
+          };
+          var spreadsheetRedactor = globalThis.FsbSpreadsheetRecordRedaction;
+          var spreadsheetInvoke = type === 'mcp:capabilities-invoke'
+            && payload && typeof payload.slug === 'string' && payload.slug.indexOf('gsheets.') === 0;
+          var spreadsheetRecord = spreadsheetInvoke || sessionRecordEntry.spreadsheetTarget === true ||
+            hasGoogleSheetsDocumentUrlForRecord(sessionRecordEntry);
+          var unresolvedRecordTarget = sessionRecordEntry.requireTargetOrigin === true &&
+            sessionRecordEntry.targetOriginResolved !== true;
+          if (!spreadsheetRedactor || typeof spreadsheetRedactor.recordSafely !== 'function') {
+            if (!spreadsheetRecord && !unresolvedRecordTarget) {
+              globalThis.fsbMcpSessionRecorder.recordDispatch(sessionRecordEntry);
+            }
+          } else {
+            spreadsheetRedactor.recordSafely(
+              globalThis.fsbMcpSessionRecorder,
+              'recordDispatch',
+              sessionRecordEntry
+            );
+          }
+        }
+      } catch (_e) { /* defence in depth -- never let session recording break dispatch */ }
     }
   }
+}
+
+function sanitizeMcpMessageResponseForRecording(type, response) {
+  if (type !== 'mcp:capture-screenshot' || !response || typeof response !== 'object') {
+    return response;
+  }
+  const metadata = response.metadata && typeof response.metadata === 'object'
+    ? response.metadata
+    : {};
+  const recordedMetadata = {};
+  for (const key of [
+    'capture_id',
+    'output_width',
+    'output_height',
+    'byte_length',
+    'duration_ms',
+    'delivery_status'
+  ]) {
+    if (metadata[key] !== undefined) recordedMetadata[key] = metadata[key];
+  }
+
+  const sanitized = {
+    success: response.success !== false,
+    metadata: recordedMetadata
+  };
+  if (response.success === false) {
+    const code = response.code || response.errorCode;
+    if (code) sanitized.code = code;
+    sanitized.retryable = response.retryable === true;
+  }
+  return sanitized;
 }
 
 function buildRestrictedMcpResponse({ currentUrl, pageType, tool, error }) {
@@ -677,8 +917,12 @@ function buildRestrictedMcpResponse({ currentUrl, pageType, tool, error }) {
 }
 
 async function buildRestrictedResponseIfReadRoute({ type, client, payload }) {
-  if (type !== 'mcp:read-page' && type !== 'mcp:get-dom') return null;
-  const tool = type === 'mcp:read-page' ? 'read_page' : 'get_dom_snapshot';
+  if (type !== 'mcp:read-page' && type !== 'mcp:get-dom' && type !== 'mcp:capture-screenshot') {
+    return { applies: false, recordContext: null, restrictedResponse: null };
+  }
+  const tool = type === 'mcp:read-page'
+    ? 'read_page'
+    : (type === 'mcp:get-dom' ? 'get_dom_snapshot' : 'capture_screenshot');
 
   if (typeof globalThis !== 'undefined' && typeof globalThis.resolveAgentTabOrError === 'function') {
     return buildRestrictedResponseForResolvedTab({ tool, client, payload });
@@ -688,22 +932,90 @@ async function buildRestrictedResponseIfReadRoute({ type, client, payload }) {
   // behavior: check the OS-active tab.
   const activeTab = await getActiveTabFromClient(client).catch(() => null);
   const currentUrl = activeTab?.url || '';
-  if (!isRestrictedMcpUrl(currentUrl)) return null;
+  return {
+    applies: true,
+    recordContext: buildReadRouteRecordContext(activeTab),
+    restrictedResponse: isRestrictedMcpUrl(currentUrl)
+      ? buildRestrictedMcpResponse({
+          currentUrl,
+          pageType: getPageTypeDescriptionForMcp(currentUrl),
+          tool,
+          error: 'Active tab is restricted'
+        })
+      : null
+  };
+}
 
-  return buildRestrictedMcpResponse({
-    currentUrl,
-    pageType: getPageTypeDescriptionForMcp(currentUrl),
-    tool,
-    error: 'Active tab is restricted'
-  });
+async function handleCaptureScreenshotMessageRoute({ payload = {}, client = null }) {
+  const engine = (typeof globalThis !== 'undefined') ? globalThis.FsbScreenshotCapture : null;
+  if (!engine || typeof engine.capture !== 'function') {
+    return {
+      success: false,
+      code: 'SCREENSHOT_CAPTURE_FAILED',
+      errorCode: 'SCREENSHOT_CAPTURE_FAILED',
+      error: 'Screenshot capture engine unavailable'
+    };
+  }
+
+  const agentId = payload && payload.agentId ? payload.agentId : null;
+  let resolved;
+  if (typeof globalThis !== 'undefined' && typeof globalThis.resolveAgentTabOrError === 'function') {
+    resolved = await globalThis.resolveAgentTabOrError(agentId, payload, client);
+  } else {
+    const activeTab = await getActiveTabFromClient(client).catch(() => null);
+    resolved = activeTab && Number.isFinite(activeTab.id)
+      ? { tabId: activeTab.id, ownershipToken: null, skipGate: true }
+      : { success: false, code: 'NO_ACTIVE_TAB', errorCode: 'NO_ACTIVE_TAB', error: 'NO_ACTIVE_TAB' };
+  }
+  if (!resolved || resolved.success === false || !Number.isFinite(resolved.tabId)) {
+    const code = resolved && resolved.code ? resolved.code : 'NO_OWNED_TAB';
+    return {
+      success: false,
+      error: code,
+      errorCode: code,
+      ...(resolved || {})
+    };
+  }
+
+  if (resolved.skipGate !== true) {
+    const gateResult = checkOwnershipGate({
+      tool: 'capture_screenshot',
+      params: { tabId: resolved.tabId },
+      payload: { ...payload, tabId: resolved.tabId }
+    });
+    if (gateResult) return gateResult;
+  }
+
+  let tab;
+  try {
+    tab = await getChromeTabsApi().get(resolved.tabId);
+  } catch (error) {
+    return {
+      success: false,
+      code: 'SCREENSHOT_CAPTURE_FAILED',
+      errorCode: 'SCREENSHOT_CAPTURE_FAILED',
+      error: error && error.message ? error.message : String(error)
+    };
+  }
+  const currentUrl = (tab && (tab.url || tab.pendingUrl)) || '';
+  if (isRestrictedMcpUrl(currentUrl)) {
+    return buildRestrictedMcpResponse({
+      currentUrl,
+      pageType: getPageTypeDescriptionForMcp(currentUrl),
+      tool: 'capture_screenshot',
+      error: 'Screenshot capture is unavailable on restricted pages'
+    });
+  }
+
+  return engine.capture(payload, resolved.tabId);
 }
 
 // Checks restriction on the CALLER'S ACTUAL TARGET tab (via the same
 // resolveAgentTabOrError the real _handleGetDOM/_handleReadPage handlers use)
 // instead of Chrome's OS-focused tab. Any resolution failure defers to the
-// real handler (returns null) rather than guessing -- the real handler makes
-// the identical resolveAgentTabOrError call and already returns its error
-// shape verbatim, so duplicating that logic here would risk disagreeing with it.
+// real handler rather than guessing; the unresolved recording context then
+// makes the diagnostic hook fail closed. The real handler makes the identical
+// resolveAgentTabOrError call and returns its error shape verbatim.
 async function buildRestrictedResponseForResolvedTab({ tool, client, payload }) {
   const agentId = (payload && payload.agentId) || null;
   const params = (payload && payload.params) || payload || {}; // matches _handleGetDOM/_handleReadPage
@@ -712,28 +1024,71 @@ async function buildRestrictedResponseForResolvedTab({ tool, client, payload }) 
   try {
     resolved = await globalThis.resolveAgentTabOrError(agentId, params, client);
   } catch (_e) {
-    return null;
+    return { applies: true, recordContext: null, restrictedResponse: null };
   }
   if (!resolved || resolved.success === false || !Number.isFinite(resolved.tabId)) {
-    return null;
+    return { applies: true, recordContext: null, restrictedResponse: null };
   }
 
   let tab;
   try {
     tab = await getChromeTabsApi().get(resolved.tabId);
   } catch (_e) {
-    return null;
+    return { applies: true, recordContext: null, restrictedResponse: null };
   }
 
   const currentUrl = (tab && tab.url) || '';
-  if (!isRestrictedMcpUrl(currentUrl)) return null;
+  return {
+    applies: true,
+    recordContext: buildReadRouteRecordContext(tab),
+    restrictedResponse: isRestrictedMcpUrl(currentUrl)
+      ? buildRestrictedMcpResponse({
+          currentUrl,
+          pageType: getPageTypeDescriptionForMcp(currentUrl),
+          tool,
+          error: 'Active tab is restricted'
+        })
+      : null
+  };
+}
 
-  return buildRestrictedMcpResponse({
-    currentUrl,
-    pageType: getPageTypeDescriptionForMcp(currentUrl),
-    tool,
-    error: 'Active tab is restricted'
-  });
+function buildReadRouteRecordContext(tab) {
+  const currentUrl = (tab && (tab.url || tab.pendingUrl)) || '';
+  let targetOrigin = null;
+  try {
+    const parsed = new URL(currentUrl);
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') targetOrigin = parsed.origin;
+  } catch (_e) { /* unresolved target remains fail-closed */ }
+  return {
+    tabId: tab && Number.isFinite(tab.id) ? tab.id : null,
+    targetOriginResolved: currentUrl.length > 0,
+    spreadsheetTarget: isGoogleSheetsDocumentUrlForRecord(currentUrl),
+    targetUrl: currentUrl || null,
+    targetOrigin
+  };
+}
+
+function isGoogleSheetsDocumentUrlForRecord(value) {
+  if (typeof value !== 'string' || value.length === 0) return false;
+  try {
+    const parsed = new URL(value);
+    return (parsed.protocol === 'https:' || parsed.protocol === 'http:') &&
+      parsed.hostname === 'docs.google.com' &&
+      /^\/spreadsheets\/d\/[^/]+(?:\/|$)/.test(parsed.pathname);
+  } catch (_e) {
+    return false;
+  }
+}
+
+function hasGoogleSheetsDocumentUrlForRecord(entry) {
+  const payload = (entry && entry.requestPayload) || {};
+  const params = payload && payload.params && typeof payload.params === 'object' ? payload.params : {};
+  const response = entry && entry.response && typeof entry.response === 'object' ? entry.response : {};
+  const changeUrl = response.change_report && response.change_report.url && typeof response.change_report.url === 'object'
+    ? response.change_report.url
+    : {};
+  return [params.url, response.url, changeUrl.before, changeUrl.after]
+    .some(isGoogleSheetsDocumentUrlForRecord);
 }
 
 async function maybeBuildRestrictedResponse({ error, tool, client }) {
@@ -911,6 +1266,9 @@ async function handleNavigateRoute({ params, client, tab }) {
       const extra = (bindResult && bindResult.ownershipToken)
         ? { ownershipToken: bindResult.ownershipToken }
         : {};
+      if (createdTab && Number.isFinite(createdTab.id)) {
+        await activateSidePanelAgentTab(agentId, createdTab.id);
+      }
       return sanitizeSingleTab('navigate', createdTab, extra);
     }
 
@@ -934,6 +1292,7 @@ async function handleNavigateRoute({ params, client, tab }) {
       }
     } catch (_e) { /* best-effort */ }
     const updatedTab = await chrome.tabs.update(targetTabId, { url: params.url });
+    await activateSidePanelAgentTab(agentId, targetTabId);
 
     // Phase 240 D-08: bindTab on the navigated tab BEFORE returning success
     // so the originating agent owns the tab; the freshly minted ownershipToken
@@ -1433,6 +1792,7 @@ async function handleOpenTabRoute({ params }) {
         bindResult = null;
       }
     }
+    if (tab && Number.isFinite(tab.id)) await activateSidePanelAgentTab(agentId, tab.id);
     const extra = (bindResult && bindResult.ownershipToken)
       ? { ownershipToken: bindResult.ownershipToken }
       : {};
@@ -1445,7 +1805,7 @@ async function handleOpenTabRoute({ params }) {
 // Phase 34: MCP front door for upload_file. Tab ownership is already enforced
 // by resolveAgentTabOrError + checkOwnershipGate before this runs; the shared
 // background helper (executeUploadFile) owns the denylist + audit chokepoint.
-async function handleUploadFileRoute({ params, tab }) {
+async function handleUploadFileRoute({ params, tab, payload }) {
   const p = params || {};
   const targetTabId = Number.isFinite(p.tabId)
     ? p.tabId
@@ -1466,7 +1826,9 @@ async function handleUploadFileRoute({ params, tab }) {
     return createMcpRouteError('upload_file', 'browser', MCP_ROUTE_RECOVERY_HINT, { error: 'upload handler unavailable' });
   }
   try {
-    const result = await uploadFn(targetTabId, p.selector, p.file_path);
+    const result = await uploadFn(targetTabId, p.selector, p.file_path, {
+      allowManagedScreenshot: payload && payload.managedScreenshotAttested === true
+    });
     if (result && result.success) {
       return { success: true, tool: 'upload_file', method: result.method, selector: result.selector, file: result.file };
     }
@@ -1518,6 +1880,9 @@ async function handleSwitchTabRoute({ params }) {
         await chrome.windows.update(tab.windowId, { focused: true });
       }
     }
+    // A side-panel-started agent's working tab always comes forward, even when the
+    // agent did not ask for it. No-op for ordinary MCP clients.
+    if (!forceForeground) await activateSidePanelAgentTab(agentId, params.tabId);
 
     const extra = (bindResult && bindResult.ownershipToken)
       ? { ownershipToken: bindResult.ownershipToken }
@@ -1571,23 +1936,58 @@ async function handleCloseTabRoute({ params }) {
 
 async function handleListTabsRoute({ params }) {
   const { agentId } = params || {};
-  // Phase 240 will validate agent_id; Phase 238 deliberately ignores it.
-  void agentId;
   try {
     getChromeTabsApi();
-    const queryOptions = {};
-    if (params?.currentWindowOnly === true) {
-      queryOptions.currentWindow = true;
+    const reg = (typeof globalThis !== 'undefined')
+      ? globalThis.fsbAgentRegistryInstance
+      : null;
+    if (!reg || typeof reg.getAgentTabs !== 'function') {
+      return createMcpOwnershipError('AGENT_REGISTRY_UNAVAILABLE', {
+        requestingAgentId: agentId || null
+      });
+    }
+    if (!agentId || (typeof reg.hasAgent === 'function' && !reg.hasAgent(agentId))) {
+      return createMcpOwnershipError('AGENT_NOT_REGISTERED', {
+        requestingAgentId: agentId || null
+      });
+    }
+    const ownedTabIds = reg.getAgentTabs(agentId);
+    if (ownedTabIds === null) {
+      return createMcpOwnershipError('AGENT_NOT_REGISTERED', {
+        requestingAgentId: agentId
+      });
+    }
+    if (!Array.isArray(ownedTabIds)) {
+      return createMcpOwnershipError('AGENT_REGISTRY_UNAVAILABLE', {
+        requestingAgentId: agentId
+      });
     }
 
-    const tabs = await chrome.tabs.query(queryOptions);
-    const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    const sanitizedTabs = tabs.map(sanitizeTab);
+    // Resolve only registry-owned ids. Per-tab failures are expected when a
+    // close races the registry's onRemoved cleanup; omit those stale ids.
+    const ownedTabs = (await Promise.all(ownedTabIds.filter(Number.isFinite).map(async (tabId) => {
+      try { return await chrome.tabs.get(tabId); }
+      catch (_error) { return null; }
+    }))).filter(Boolean);
+
+    // Preserve currentWindowOnly without enumerating the browser. The active
+    // tab lookup is used only to identify the current window and is never
+    // returned unless that exact tab also belongs to the caller.
+    let activeTab = null;
+    try {
+      const activeTabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      activeTab = activeTabs && activeTabs[0] ? activeTabs[0] : null;
+    } catch (_error) { /* activeTabId remains null; owned tabs still return */ }
+    const visibleTabs = params?.currentWindowOnly === true && activeTab
+      ? ownedTabs.filter((tab) => tab && tab.windowId === activeTab.windowId)
+      : (params?.currentWindowOnly === true ? [] : ownedTabs);
+    const sanitizedTabs = visibleTabs.map(sanitizeTab);
+    const visibleIds = new Set(sanitizedTabs.map((tab) => tab.id));
     return {
       success: true,
       tool: 'list_tabs',
       tabs: sanitizedTabs,
-      activeTabId: activeTab?.id ?? null,
+      activeTabId: activeTab && visibleIds.has(activeTab.id) ? activeTab.id : null,
       totalTabs: sanitizedTabs.length
     };
   } catch (error) {
@@ -1691,6 +2091,18 @@ function sanitizeSessionDetail(session) {
   }
 
   const sanitized = sanitizeSessionMetadata(session);
+  // The raw replay record carries a signing receipt and is too deeply nested
+  // for the generic metadata sanitizer. Expose it only through the verified,
+  // receipt-free get_session_replay route below.
+  delete sanitized.replay;
+  if (session.replay && typeof session.replay === 'object') {
+    sanitized.replaySummary = {
+      integrity: session.replay.integrity || null,
+      provenance: session.replay.provenance || null,
+      manifestHash: session.replay.manifestHash || null,
+      counts: sanitizeValue(session.replay.counts || {}, { maxString: 200, maxArray: 10, maxDepth: 3 })
+    };
+  }
   sanitized.logs = filterAndCapLogs(session.logs || [], 200);
   if (Array.isArray(session.actionHistory)) {
     sanitized.actionHistory = session.actionHistory.slice(-100).map(sanitizeActionHistoryEntry);
@@ -1726,6 +2138,37 @@ function getMemoryListStorageUsageBytes(memories) {
 
 function getActiveSessionsMap() {
   return (typeof activeSessions !== 'undefined' && activeSessions instanceof Map) ? activeSessions : new Map();
+}
+
+function isLegacyOrMissingMcpAgent(agentId) {
+  return typeof agentId !== 'string' || agentId.length === 0 || agentId.startsWith('legacy:');
+}
+
+function getAgentScopedAutomationSessions(agentId) {
+  const sessions = getActiveSessionsMap();
+  if (isLegacyOrMissingMcpAgent(agentId)) return sessions;
+  return new Map(Array.from(sessions.entries()).filter((entry) => {
+    const session = entry[1];
+    return session && session.agentId === agentId;
+  }));
+}
+
+function validateRegisteredMcpAgent(agentId) {
+  if (isLegacyOrMissingMcpAgent(agentId)) return null;
+  const reg = (typeof globalThis !== 'undefined')
+    ? globalThis.fsbAgentRegistryInstance
+    : null;
+  if (!reg || typeof reg.hasAgent !== 'function') {
+    return createMcpOwnershipError('AGENT_REGISTRY_UNAVAILABLE', {
+      requestingAgentId: agentId
+    });
+  }
+  if (!reg.hasAgent(agentId)) {
+    return createMcpOwnershipError('AGENT_NOT_REGISTERED', {
+      requestingAgentId: agentId
+    });
+  }
+  return null;
 }
 
 function callCallbackHandler(handlerName, request, sender = {}, routeFamily = 'autopilot') {
@@ -1932,7 +2375,137 @@ async function handleEndVisualSessionRoute({ payload }) {
 // surface (globalThis.fsbAgentRegistryInstance). Phase 240 will validate
 // ownership at every dispatch boundary; Phase 238 is structural setup only.
 
-async function handleAgentRegisterRoute({ payload, client } = {}) {
+function sanitizeMcpClientInfo(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const sanitized = {};
+  if (typeof value.name === 'string') sanitized.name = value.name.slice(0, 200);
+  if (typeof value.version === 'string') sanitized.version = value.version.slice(0, 200);
+  return Object.keys(sanitized).length > 0 ? sanitized : null;
+}
+
+function isPlainMcpEvidenceMap(value) {
+  return !!value && typeof value === 'object'
+    && !Array.isArray(value)
+    && Object.prototype.toString.call(value) === '[object Object]';
+}
+
+function runMcpAgentProviderWrite(method, ...args) {
+  try {
+    const providers = globalThis.FsbMcpAgentProviders;
+    if (!providers || typeof providers[method] !== 'function') return;
+    const result = providers[method](...args);
+    if (result && typeof result.catch === 'function') {
+      result.catch(() => { /* best-effort evidence write */ });
+    }
+  } catch (_e) { /* best-effort evidence write */ }
+}
+
+const FSB_DELEGATION_ID_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
+
+function resolveDelegationRegistrationGate(explicitGate) {
+  if (typeof explicitGate === 'function') return explicitGate;
+  const controller = globalThis.fsbDelegationControllerInstance;
+  if (controller && typeof controller.bindRegisteredAgent === 'function') {
+    return controller.bindRegisteredAgent.bind(controller);
+  }
+  return null;
+}
+
+// Hands the side panel's originating tab to a freshly registered delegated agent,
+// so it continues in the user's tab instead of opening a new one. Every refusal
+// returns null, leaving the agent owning nothing -- i.e. today's open_tab flow.
+const fsbDelegatedAgentIds = new Set();
+const FSB_DELEGATED_AGENT_LIMIT = 64;
+
+// The user watches a delegated run in the side panel, so the tab it is working in
+// is brought to the front. Best-effort: a failure here never fails the tool call.
+// Did this run start in the side panel? Only those may take focus: an API-provider
+// autopilot run (a legacy:* surface agent) or a delegated CLI run. Ordinary MCP
+// clients keep the Phase 246 D-05 background default.
+//
+// The registry is consulted rather than trusting in-memory state, because the service
+// worker can be evicted between agent:register and the first tab action.
+function isSidePanelOriginatedAgent(agentId) {
+  if (typeof agentId !== 'string' || !agentId) return false;
+  if (agentId.indexOf('legacy:') === 0) return true;
+  if (fsbDelegatedAgentIds.has(agentId)) return true;
+  const reg = globalThis.fsbAgentRegistryInstance;
+  if (!reg || typeof reg.listDelegationMappings !== 'function') return false;
+  try {
+    return reg.listDelegationMappings().some((row) => row && row.agentId === agentId);
+  } catch (_e) {
+    return false;
+  }
+}
+
+// The user watches a side-panel run live, so the tab it is working in is brought to
+// the front. Best-effort: a failure here never fails the tool call.
+// Foreground-audit note: this is the one foreground path outside the per-tool
+// _forceForeground opt-in. It is scoped to side-panel-originated agents only (the
+// user started this run and is watching it in the panel); ordinary MCP clients
+// never reach chrome.tabs.update({ active: true }) here.
+async function activateSidePanelAgentTab(agentId, tabId) {
+  const fromSidePanel = isSidePanelOriginatedAgent(agentId);
+  let outcome = 'skipped_not_side_panel';
+  if (fromSidePanel && Number.isFinite(tabId)) {
+    try {
+      const updated = await chrome.tabs.update(tabId, { active: true });
+      outcome = 'activated';
+      if (updated && Number.isFinite(updated.windowId)
+          && chrome.windows && typeof chrome.windows.update === 'function') {
+        try { await chrome.windows.update(updated.windowId, { focused: true }); }
+        catch (_e) { outcome = 'activated_window_focus_failed'; }
+      }
+    } catch (error) {
+      outcome = 'update_failed:' + ((error && error.message) || String(error));
+    }
+  } else if (fromSidePanel) {
+    outcome = 'skipped_bad_tab_id';
+  }
+  if (typeof automationLogger !== 'undefined') {
+    automationLogger.info('Side panel tab activation', {
+      phase: 'side-panel-activation',
+      agentId: typeof agentId === 'string' ? agentId.slice(0, 12) : null,
+      tabId: Number.isFinite(tabId) ? tabId : null,
+      fromSidePanel: fromSidePanel,
+      trackedInMemory: fsbDelegatedAgentIds.size,
+      outcome: outcome
+    });
+  }
+  return outcome === 'activated' || outcome === 'activated_window_focus_failed';
+}
+
+async function adoptDelegationSeedTab(delegationId, agentId) {
+  const seed = globalThis.FsbDelegationTabSeed;
+  const reg = globalThis.fsbAgentRegistryInstance;
+  if (!seed || typeof seed.adopt !== 'function' || !reg) return null;
+  try {
+    return await seed.adopt({
+      registry: reg,
+      tabsApi: (typeof chrome !== 'undefined' && chrome.tabs) ? chrome.tabs : null,
+      hasLiveSession: typeof globalThis.fsbTabHasLiveAutomationSession === 'function'
+        ? globalThis.fsbTabHasLiveAutomationSession
+        : null,
+      delegationId,
+      agentId
+    });
+  } catch (_e) {
+    return null;
+  }
+}
+
+async function rollbackDelegatedAgentRegistration(registry, agentId) {
+  if (!registry || typeof registry.releaseAgent !== 'function' || typeof agentId !== 'string') {
+    return false;
+  }
+  try {
+    return (await registry.releaseAgent(agentId, 'delegation-registration-rejected')) === true;
+  } catch (_e) {
+    return false;
+  }
+}
+
+async function handleAgentRegisterRoute({ payload, client, bindRegisteredAgent, authorizeDelegation } = {}) {
   const reg = globalThis.fsbAgentRegistryInstance;
   if (!reg || typeof reg.registerAgent !== 'function') {
     return { success: false, errorCode: 'agent_registry_unavailable', error: 'AgentRegistry not initialized' };
@@ -1957,6 +2530,39 @@ async function handleAgentRegisterRoute({ payload, client } = {}) {
     || ((globalThis.FsbAgentRegistry && typeof globalThis.FsbAgentRegistry.formatAgentIdForDisplay === 'function')
       ? globalThis.FsbAgentRegistry.formatAgentIdForDisplay(agentId || '')
       : (typeof agentId === 'string' ? agentId.slice(0, 12) : ''));
+  const hasDelegationSidecar = !!payload
+    && Object.prototype.hasOwnProperty.call(payload, 'delegationId');
+  let seededOwnershipTokens = {};
+  if (hasDelegationSidecar) {
+    const delegationId = payload.delegationId;
+    const gate = resolveDelegationRegistrationGate(bindRegisteredAgent || authorizeDelegation);
+    let binding = null;
+    if (typeof delegationId === 'string' && FSB_DELEGATION_ID_PATTERN.test(delegationId) && gate) {
+      try {
+        binding = await gate({ delegationId, agentId });
+      } catch (_e) {
+        binding = null;
+      }
+    }
+    if (!binding || binding.ok !== true) {
+      const rolledBack = await rollbackDelegatedAgentRegistration(reg, agentId);
+      return {
+        success: false,
+        errorCode: (binding && typeof binding.code === 'string')
+          ? binding.code
+          : 'delegation_binding_rejected',
+        rolledBack
+      };
+    }
+    fsbDelegatedAgentIds.add(agentId);
+    console.log('[FSB MCP Dispatcher] delegated agent tracked ' + String(agentId).slice(0, 12));
+    while (fsbDelegatedAgentIds.size > FSB_DELEGATED_AGENT_LIMIT) {
+      fsbDelegatedAgentIds.delete(fsbDelegatedAgentIds.values().next().value);
+    }
+    const seeded = await adoptDelegationSeedTab(delegationId, agentId);
+    console.log('[FSB MCP Dispatcher] seed adopt -> ' + (seeded ? ('tab ' + seeded.tabId) : 'refused'));
+    if (seeded) seededOwnershipTokens[String(seeded.tabId)] = seeded.ownershipToken;
+  }
   // Phase 241 D-08: capture per-bridge connection_id from the caller's payload
   // and stamp it on the agent record so a later bridge onclose can stage all
   // matching agents for grace-window release. The bridge mints the UUID at
@@ -1968,21 +2574,22 @@ async function handleAgentRegisterRoute({ payload, client } = {}) {
   if (connectionId && typeof reg.stampConnectionId === 'function') {
     try { reg.stampConnectionId(agentId, connectionId); } catch (_e) { /* best-effort */ }
   }
+  const clientInfo = sanitizeMcpClientInfo(payload && payload.clientInfo);
+  if (clientInfo) {
+    if (typeof reg.stampClientInfo === 'function') {
+      try { reg.stampClientInfo(agentId, clientInfo); } catch (_e) { /* best-effort */ }
+    }
+    runMcpAgentProviderWrite('recordConnected', agentId, clientInfo);
+    const registerLabel = canonicalLabelFromClientInfo(clientInfo);
+    if (registerLabel) {
+      _agentClientLabelCache.set(agentId, registerLabel);
+      _persistAgentClientLabel(agentId, registerLabel);
+    }
+  }
+  if (isPlainMcpEvidenceMap(payload && payload.platforms)) {
+    runMcpAgentProviderWrite('replaceInstalled', payload.platforms);
+  }
   console.log('[FSB MCP Dispatcher] agent:register minted ' + agentIdShort);
-  // Phase 272 / BEAT-09 sub-requirement: active-agent counter feeds the
-  // telemetry beat's active_agent_count field. Read-modify-write under
-  // best-effort semantics -- a dropped increment is acceptable telemetry
-  // quality cost; throwing here would crash the MCP dispatch chokepoint.
-  // Placed AFTER the cap check returns (so AGENT_CAP_REACHED does NOT
-  // increment) and AFTER stampConnectionId (so connection_id binding still
-  // races independently of counter writes).
-  try {
-    const cur = await chrome.storage.local.get(['fsbActiveAgentsCount']);
-    const n = (cur && typeof cur.fsbActiveAgentsCount === 'number' && cur.fsbActiveAgentsCount >= 0)
-      ? Math.floor(cur.fsbActiveAgentsCount)
-      : 0;
-    await chrome.storage.local.set({ fsbActiveAgentsCount: n + 1 });
-  } catch (_e) { /* best-effort */ }
   // Phase 240 Open Q1 resolution: agent:register response carries an empty
   // ownershipTokens map at register time. Subsequent bindTab-firing handlers
   // include `ownershipToken: <new>` in their per-call response; the MCP
@@ -1990,7 +2597,7 @@ async function handleAgentRegisterRoute({ payload, client } = {}) {
   // accumulates them per-tab.
   // Phase 241 D-08: reflect connectionId on the response so AgentScope can
   // capture it (server-side) -- additive field; older callers ignore it.
-  return { success: true, agentId, agentIdShort, ownershipTokens: {}, connectionId: connectionId };
+  return { success: true, agentId, agentIdShort, ownershipTokens: seededOwnershipTokens, connectionId: connectionId };
 }
 
 async function handleAgentReleaseRoute({ payload } = {}) {
@@ -2007,19 +2614,6 @@ async function handleAgentReleaseRoute({ payload } = {}) {
   // The Phase 237 registry returns a plain boolean today; future evolution may
   // return { released, releasedTabIds }. Accept either shape defensively.
   const released = (result === true) || !!(result && result.released);
-  // Phase 272 / BEAT-09 sub-requirement: clamp-to-zero decrement on release.
-  // Per CONTEXT.md "Guard against negative counts (clamp to 0)". Best-effort:
-  // storage failures are swallowed so a dropped decrement never crashes the
-  // dispatcher chokepoint (threat T-272-04 / T-272-08).
-  if (released) {
-    try {
-      const cur = await chrome.storage.local.get(['fsbActiveAgentsCount']);
-      const n = (cur && typeof cur.fsbActiveAgentsCount === 'number' && cur.fsbActiveAgentsCount > 0)
-        ? Math.floor(cur.fsbActiveAgentsCount)
-        : 0;
-      await chrome.storage.local.set({ fsbActiveAgentsCount: Math.max(0, n - 1) });
-    } catch (_e) { /* best-effort */ }
-  }
   return { success: true, released };
 }
 
@@ -2041,9 +2635,29 @@ async function handleAgentStatusRoute({ payload } = {}) {
 
 async function handleStartAutomationRoute({ payload, client }) {
   const { agentId } = payload || {};
-  // Phase 240 will validate agent_id; Phase 238 deliberately ignores it.
-  void agentId;
-  const tab = await getActiveTabFromClient(client);
+  const validationError = validateRegisteredMcpAgent(agentId);
+  if (validationError) return validationError;
+
+  let tab = null;
+  let resolved = null;
+  if (isLegacyOrMissingMcpAgent(agentId)) {
+    tab = await getActiveTabFromClient(client);
+  } else {
+    resolved = await (typeof globalThis !== 'undefined'
+        && typeof globalThis.resolveAgentTabOrError === 'function'
+      ? globalThis.resolveAgentTabOrError(agentId, payload || {}, client)
+      : { success: false, code: 'AGENT_REGISTRY_UNAVAILABLE', agentId });
+    if (resolved.success === false) return resolved;
+    try {
+      getChromeTabsApi();
+      tab = await chrome.tabs.get(resolved.tabId);
+    } catch (_error) {
+      return createMcpRouteError('run_task', 'autopilot', MCP_ROUTE_RECOVERY_HINT, {
+        errorCode: 'tab_not_found',
+        error: 'The agent-owned tab is no longer available'
+      });
+    }
+  }
   if (!tab?.id) {
     return createMcpRouteError('run_task', 'autopilot', 'Use navigate, open_tab, switch_tab, or list_tabs to move to a normal webpage first.', {
       errorCode: 'no_active_tab',
@@ -2057,7 +2671,9 @@ async function handleStartAutomationRoute({ payload, client }) {
       action: 'startAutomation',
       task: payload.task,
       tabId: tab.id,
-      source: 'mcp'
+      source: 'mcp',
+      ...(agentId ? { agentId } : {}),
+      ...(payload && payload.ownershipToken ? { ownershipToken: payload.ownershipToken } : {})
     },
     { tab: { id: tab.id } }
   );
@@ -2065,17 +2681,22 @@ async function handleStartAutomationRoute({ payload, client }) {
 
 async function handleStopAutomationRoute({ payload, client }) {
   const { agentId } = payload || {};
-  // Phase 240 will validate agent_id; Phase 238 deliberately ignores it.
-  void agentId;
-  const tab = await getActiveTabFromClient(client).catch(() => null);
+  const validationError = validateRegisteredMcpAgent(agentId);
+  if (validationError) return validationError;
+  const sessions = getAgentScopedAutomationSessions(agentId);
 
   // Phase 225-01 (Task 2): MCP stop_task tool ships no sessionId in its
   // schema, so payload.sessionId is undefined and handleStopAutomation cannot
   // find anything in storage. Resolve to the in-flight session via the active
   // sessions map (same source get_task_status uses for currentSessionId).
   let sessionId = payload && payload.sessionId;
+  if (sessionId && !sessions.has(sessionId)) {
+    return createMcpOwnershipError('TAB_NOT_OWNED', {
+      requestingAgentId: agentId || null,
+      sessionId
+    });
+  }
   if (!sessionId) {
-    const sessions = getActiveSessionsMap();
     const ids = Array.from(sessions.keys());
     if (ids.length > 0) {
       sessionId = ids[0];
@@ -2087,6 +2708,11 @@ async function handleStopAutomationRoute({ payload, client }) {
       } catch (_e) { /* logging never blocks dispatch */ }
     }
   }
+
+  const session = sessions.get(sessionId) || null;
+  const tab = session && Number.isFinite(session.tabId)
+    ? { id: session.tabId }
+    : await getActiveTabFromClient(client).catch(() => null);
 
   if (!sessionId) {
     return {
@@ -2111,9 +2737,9 @@ async function handleStopAutomationRoute({ payload, client }) {
 
 async function handleGetStatusRoute({ payload } = {}) {
   const { agentId } = payload || {};
-  // Phase 240 will validate agent_id; Phase 238 deliberately ignores it.
-  void agentId;
-  const sessions = getActiveSessionsMap();
+  const validationError = validateRegisteredMcpAgent(agentId);
+  if (validationError) return validationError;
+  const sessions = getAgentScopedAutomationSessions(agentId);
   const sessionIds = Array.from(sessions.keys());
   const firstSession = sessionIds.length > 0 ? sessions.get(sessionIds[0]) : null;
   return {
@@ -2285,6 +2911,14 @@ async function handleGetSessionMessageRoute({ payload }) {
 
   const session = await automationLogger.loadSession(payload.sessionId);
   if (session) {
+    if (payload.format === 'text') {
+      if (typeof automationLogger.exportHumanReadable !== 'function') {
+        return createMcpRouteError('get_session_detail', 'observability', MCP_ROUTE_RECOVERY_HINT, {
+          error: 'Human-readable session exporter unavailable'
+        });
+      }
+      return { success: true, format: 'text', text: await automationLogger.exportHumanReadable(payload.sessionId) };
+    }
     return {
       success: true,
       session: sanitizeSessionDetail(session)
@@ -2320,6 +2954,65 @@ async function handleGetSessionMessageRoute({ payload }) {
     error: `Session ${payload.sessionId} not found in active or historical sessions`,
     recoveryHint: 'Use list_sessions to see historical sessions, or get_task_status to check for an active session.'
   };
+}
+
+async function handleGetSessionReplayMessageRoute({ payload }) {
+  if (!payload.sessionId) {
+    return createMcpInvalidParamsError('get_session_replay', 'get_session_replay requires sessionId', {
+      routeFamily: 'observability'
+    });
+  }
+  if (typeof globalThis === 'undefined' || !globalThis.FsbLatticeReplay ||
+      typeof globalThis.FsbLatticeReplay.prepareReplay !== 'function') {
+    return createMcpRouteError('get_session_replay', 'observability', MCP_ROUTE_RECOVERY_HINT, {
+      error: 'Verified replay support unavailable'
+    });
+  }
+  try {
+    const prepared = await globalThis.FsbLatticeReplay.prepareReplay(payload.sessionId);
+    if (!prepared || prepared.verified !== true) throw new Error('Replay integrity verification failed');
+    const preview = typeof fsbReplayPublicPreparation === 'function'
+      ? fsbReplayPublicPreparation(prepared)
+      : {
+          success: true,
+          verified: true,
+          sessionId: prepared.sessionId,
+          manifestHash: prepared.replay?.manifestHash || null,
+          startUrl: prepared.startUrl,
+          tabs: prepared.tabs || [],
+          counts: prepared.counts,
+          steps: prepared.steps || []
+        };
+    // Keep step objects structural; omit receipt/signature material entirely.
+    return {
+      success: true,
+      replay: sanitizeValue(preview, { maxString: 10000, maxArray: 100, maxDepth: 10 })
+    };
+  } catch (error) {
+    return createMcpRouteError('get_session_replay', 'observability', MCP_ROUTE_RECOVERY_HINT, {
+      error: error?.message || String(error)
+    });
+  }
+}
+
+async function handleReplaySessionRequestMessageRoute({ payload }) {
+  if (!payload.sessionId) {
+    return createMcpInvalidParamsError('replay_session', 'replay_session requires sessionId', {
+      routeFamily: 'replay'
+    });
+  }
+  if (typeof requestMcpSessionReplay !== 'function') {
+    return createMcpRouteError('replay_session', 'replay', MCP_ROUTE_RECOVERY_HINT, {
+      error: 'Consent-gated replay support unavailable'
+    });
+  }
+  try {
+    return await requestMcpSessionReplay(payload.sessionId);
+  } catch (error) {
+    return createMcpRouteError('replay_session', 'replay', MCP_ROUTE_RECOVERY_HINT, {
+      error: error?.message || String(error)
+    });
+  }
 }
 
 async function handleGetLogsMessageRoute({ payload }) {
@@ -2484,6 +3177,24 @@ async function handleCapabilitiesInvokeMessageRoute({ payload, client }) {
   } catch (_e) {
     origin = null;
   }
+  var replayCatalogEntry = (typeof FsbCapabilityCatalog !== 'undefined' && FsbCapabilityCatalog &&
+    typeof FsbCapabilityCatalog.resolve === 'function')
+    ? FsbCapabilityCatalog.resolve(payload.slug, origin)
+    : null;
+  Object.defineProperty(payload, MCP_REPLAY_RECORD_CONTEXT, {
+    value: {
+      tabId,
+      targetUrl: tab && typeof tab.url === 'string' ? tab.url : null,
+      targetOrigin: origin,
+      slug: typeof payload.slug === 'string' ? payload.slug : null,
+      sideEffectClass: replayCatalogEntry?.descriptor?.sideEffectClass || 'write',
+      service: replayCatalogEntry?.descriptor?.service || null,
+      tier: replayCatalogEntry?.tier || null,
+      routeFamily: 'capabilities'
+    },
+    enumerable: false,
+    configurable: true
+  });
   if (payload.origin && origin && payload.origin !== origin) {
     return createMcpRouteError('invoke_capability', 'capabilities', MCP_ROUTE_RECOVERY_HINT, {
       errorCode: 'RECIPE_CONSENT_REQUIRED',
@@ -3266,6 +3977,10 @@ if (typeof globalThis !== 'undefined') {
   // client can clear it on every fresh _ws.onopen (different MCP client
   // attaching on the same port must not inherit the prior client's label).
   globalThis.clearLastKnownMcpClientLabel = clearLastKnownMcpClientLabel;
+  // 260707-7id review fix: the bridge-level session tap
+  // (MCPBridgeClient._recordMcpSessionAction) resolves the canonical MCP
+  // client label the same way the dispatcher hooks do.
+  globalThis.resolveMcpClientLabel = resolveMcpClientLabel;
 }
 
 if (typeof module !== 'undefined' && module.exports) {

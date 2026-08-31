@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Enable microphone for FSB</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --accent: #ff6b35;
+      --accent-hover: #ed5a25;
+      --bg: #f6f7fb;
+      --card: #ffffff;
+      --text: #17181c;
+      --muted: #626671;
+      --border: #e4e6ec;
+      --success: #15803d;
+      --error: #b91c1c;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #101114;
+        --card: #191b20;
+        --text: #f7f7f8;
+        --muted: #afb2bb;
+        --border: #30333b;
+        --success: #4ade80;
+        --error: #f87171;
+      }
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      min-height: 100vh;
+      margin: 0;
+      display: grid;
+      place-items: center;
+      padding: 28px;
+      background:
+        radial-gradient(circle at top, color-mix(in srgb, var(--accent) 14%, transparent), transparent 42%),
+        var(--bg);
+      color: var(--text);
+      font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    main {
+      width: min(100%, 520px);
+      padding: 36px;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      background: var(--card);
+      box-shadow: 0 18px 55px rgba(0, 0, 0, 0.14);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 24px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .brand img {
+      width: 36px;
+      height: 36px;
+      border-radius: 9px;
+    }
+
+    h1 {
+      margin: 0 0 10px;
+      font-size: clamp(26px, 5vw, 34px);
+      line-height: 1.15;
+      letter-spacing: -0.025em;
+    }
+
+    p { margin: 0; }
+
+    .intro { color: var(--muted); }
+
+    .instruction {
+      margin: 24px 0;
+      padding: 16px 18px;
+      border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--border));
+      border-radius: 12px;
+      background: color-mix(in srgb, var(--accent) 8%, var(--card));
+    }
+
+    .instruction strong { color: var(--accent); }
+
+    #status {
+      min-height: 48px;
+      margin-bottom: 18px;
+      color: var(--muted);
+    }
+
+    #status.success { color: var(--success); }
+    #status.error { color: var(--error); }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    button {
+      min-height: 44px;
+      padding: 0 18px;
+      border: 1px solid transparent;
+      border-radius: 10px;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    button:focus-visible {
+      outline: 3px solid color-mix(in srgb, var(--accent) 42%, transparent);
+      outline-offset: 2px;
+    }
+
+    #allowMicBtn {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    #allowMicBtn:hover:not(:disabled) { background: var(--accent-hover); }
+    #allowMicBtn:disabled { cursor: wait; opacity: 0.65; }
+
+    #openSettingsBtn {
+      border-color: var(--border);
+      background: transparent;
+      color: var(--text);
+    }
+
+    .hidden { display: none; }
+
+    .footnote {
+      margin-top: 22px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="brand">
+      <img src="../assets/icon128.png" alt="">
+      <span>FSB voice input</span>
+    </div>
+
+    <h1>Enable your microphone</h1>
+    <p class="intro">
+      Chrome requires the first microphone approval in a regular extension tab.
+      After that, voice input works from the FSB side panel on every website.
+    </p>
+
+    <div class="instruction">
+      In Chrome’s prompt, choose <strong>Allow while visiting</strong> for a persistent FSB grant.
+    </div>
+
+    <p id="status" role="status" aria-live="polite">Waiting for Chrome’s microphone prompt…</p>
+
+    <div class="actions">
+      <button id="allowMicBtn" type="button">Allow microphone</button>
+      <button id="openSettingsBtn" class="hidden" type="button">Open microphone settings</button>
+    </div>
+
+    <p class="footnote">
+      This permission belongs to the FSB extension—not to the website in your active tab.
+    </p>
+  </main>
+
+  <script src="microphone-permission.js"></script>
+</body>
+</html>

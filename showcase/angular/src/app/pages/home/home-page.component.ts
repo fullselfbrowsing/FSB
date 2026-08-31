@@ -2,6 +2,7 @@ import {
   AfterViewInit,
   Component,
   ElementRef,
+  HostListener,
   OnDestroy,
   OnInit,
   Renderer2,
@@ -40,11 +41,11 @@ interface CapabilityApp {
 
 const ROUTE_PATH = '';
 const OG_IMAGE = `${HOST}/assets/fsb_logo_dark.png`;
-const OG_IMAGE_ALT = 'FSB Full Self-Browsing logo';
-const SITE_NAME = 'FSB - Full Self-Browsing';
+const OG_IMAGE_ALT = $localize`:@@home.og.imageAlt:FSB Full Self-Browsing logo`;
+const SITE_NAME = $localize`:@@site.name:FSB - Full Self-Browsing`;
 const YOUTUBE_CHANNEL = 'https://www.youtube.com/@parzival5707';
 const GITHUB_REPO = 'https://github.com/fullselfbrowsing/FSB';
-const BASE_INSTALL_COMMAND = 'npx -y fsb-mcp-server install';
+const BASE_INSTALL_COMMAND = 'npx -y fsb-mcp-server@latest install';
 const ROTATE_MS = 1800;
 const SIMPLE_ICON_COLOR = '94a3b8';
 function capabilityIcon(name: string): string {
@@ -104,8 +105,8 @@ export class HomePageComponent implements OnInit, AfterViewInit, OnDestroy {
     { id: 'windsurf', name: 'Windsurf', logo: 'windsurf.svg', flag: '--windsurf', cmd: `${BASE_INSTALL_COMMAND} --windsurf` },
     { id: 'codex', name: 'Codex', logo: 'openai.svg', flag: '--codex', cmd: `${BASE_INSTALL_COMMAND} --codex` },
     { id: 'opencode', name: 'OpenCode', logo: 'opencode.svg', flag: '--opencode', cmd: `${BASE_INSTALL_COMMAND} --opencode` },
-    { id: 'openclaw', name: 'OpenClaw', logo: 'openclaw.svg', flag: '', cmd: 'npx -y fsb-mcp-server' },
-    { id: 'all', name: 'All Clients', logo: 'all.svg', flag: '--all', cmd: `${BASE_INSTALL_COMMAND} --all` },
+    { id: 'openclaw', name: 'OpenClaw', logo: 'openclaw.svg', flag: '', cmd: 'npx -y fsb-mcp-server@latest' },
+    { id: 'all', name: $localize`:@@home.install.allClients:All Clients`, logo: 'all.svg', flag: '--all', cmd: `${BASE_INSTALL_COMMAND} --all` },
   ];
   readonly capRow1: readonly CapabilityApp[] = [
     capability('GitHub', 'github'),
@@ -122,6 +123,7 @@ export class HomePageComponent implements OnInit, AfterViewInit, OnDestroy {
     capability('Vercel', 'vercel'),
     capability('Netlify', 'netlify'),
   ];
+  private readonly manualFlagLabel = $localize`:@@home.install.manualFlag:manual`;
   readonly capRow2: readonly CapabilityApp[] = [
     capability('Cloudflare', 'cloudflare'),
     capability('CircleCI', 'circleci'),
@@ -144,6 +146,14 @@ export class HomePageComponent implements OnInit, AfterViewInit, OnDestroy {
   paused = false;
   fanOpen = false;
   copied: string | null = null;
+
+  /* Prerender-safe guard (matchMedia check mirrors the theme bootstrap). On
+     coarse pointers the fan is click-toggled: taps fire synthetic mouseenter,
+     so the 500ms hover-intent timer would reopen it right after a tap-close. */
+  private readonly coarsePointer =
+    typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(pointer: coarse)').matches;
 
   get currentClient(): InstallClient {
     return this.rollClients[this.iconIndex];
@@ -170,7 +180,7 @@ export class HomePageComponent implements OnInit, AfterViewInit, OnDestroy {
   ngOnInit(): void {
     const url = buildLocaleUrl(this.localeId, ROUTE_PATH);
     const t = $localize`:@@home.meta.title:FSB - Full Self-Browsing`;
-    const d = $localize`:@@home.meta.description:Open-source Chrome extension for AI-powered browser automation through natural language, with an MCP server for Claude Code, Codex, Cursor, and other agents.`;
+    const d = $localize`:@@home.meta.description:Local-first Chrome automation and MCP browser layer for AI agents, with trigger watchers, real uploads, and guarded first-party API capability calls.`;
     this.applyMeta(t, d, url);
     this.injectSoftwareApplicationJsonLd();
     if (typeof navigator !== 'undefined' && typeof navigator.userAgent === 'string') {
@@ -209,6 +219,7 @@ export class HomePageComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   onCopyEnter(): void {
+    if (this.coarsePointer) return;
     if (this.hoverTimer) clearTimeout(this.hoverTimer);
     if (this.fanCloseTimer) clearTimeout(this.fanCloseTimer);
     this.hoverTimer = setTimeout(() => {
@@ -217,11 +228,28 @@ export class HomePageComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   onCopyLeave(): void {
+    if (this.coarsePointer) return;
     if (this.hoverTimer) clearTimeout(this.hoverTimer);
     if (this.fanCloseTimer) clearTimeout(this.fanCloseTimer);
     this.fanCloseTimer = setTimeout(() => {
       this.fanOpen = false;
     }, 260);
+  }
+
+  onCopyClick(): void {
+    if (this.coarsePointer) {
+      this.fanOpen = !this.fanOpen;
+      return;
+    }
+    this.copyCurrent();
+  }
+
+  @HostListener('document:click', ['$event'])
+  onDocumentClick(event: Event): void {
+    if (!this.coarsePointer || !this.fanOpen) return;
+    const target = event.target as Element | null;
+    if (target && typeof target.closest === 'function' && target.closest('.install-copy-wrap')) return;
+    this.fanOpen = false;
   }
 
   copyCurrent(): void {
@@ -269,21 +297,25 @@ export class HomePageComponent implements OnInit, AfterViewInit, OnDestroy {
       '@context': 'https://schema.org',
       '@type': 'SoftwareApplication',
       name: 'FSB',
-      description: 'Open-source MCP browser automation layer that lets AI agents act, observe, verify, and iterate in a real Chrome browser',
+      description: $localize`:@@home.schema.description:Local-first Chrome automation and MCP browser layer that lets AI agents act, observe, verify, use trigger watchers, upload real files, and invoke guarded first-party API capabilities in the user's browser`,
       url: 'https://full-selfbrowsing.com',
       applicationCategory: 'BrowserApplication',
-      applicationSubCategory: 'AI browser automation and MCP tools',
+      applicationSubCategory: $localize`:@@home.schema.subcategory:AI browser automation and MCP tools`,
       operatingSystem: 'Chrome',
       softwareVersion: APP_VERSION,
       downloadUrl: GITHUB_REPO,
       sameAs: [GITHUB_REPO, YOUTUBE_CHANNEL],
       featureList: [
-        'MCP server for Claude Code, Codex, Cursor, Windsurf, and OpenClaw',
-        'Real browser automation through a local Chrome extension',
-        'Direct API execution for supported logged-in apps',
-        'DOM-based page understanding, browser actions, visual feedback, and local memory',
+        $localize`:@@home.schema.feature.mcp:MCP server for Claude Code, Codex, Cursor, Windsurf, and OpenClaw`,
+        $localize`:@@home.schema.feature.browser:Real browser automation through a local Chrome extension`,
+        $localize`:@@home.schema.feature.triggers:Trigger watchers for reactive DOM monitoring`,
+        $localize`:@@home.schema.feature.capabilities:Native first-party API capability catalog with guarded invoke_capability calls`,
+        $localize`:@@home.schema.feature.uploads:Real file uploads through upload_file plus synthetic drop_file support`,
+        $localize`:@@home.schema.feature.vault:Vault and payment autofill boundary where raw secrets never cross the MCP bridge`,
+        $localize`:@@home.schema.feature.dom:DOM-based page understanding, browser actions, visual feedback, local memory, and BYO model keys`,
       ],
-      keywords: 'MCP browser automation, AI browser agent, Claude Code browser testing, Codex browser testing, self-browsing automation',
+      keywords: $localize`:@@home.schema.keywords:MCP browser automation, AI browser agent, trigger watchers, first-party API capability calling, Claude Code browser testing, Codex browser testing, self-browsing automation`,
+      license: `${GITHUB_REPO}/blob/main/LICENSE`,
       publisher: { '@id': 'https://full-selfbrowsing.com/#org' },
       offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
     };
@@ -377,7 +409,7 @@ export class HomePageComponent implements OnInit, AfterViewInit, OnDestroy {
       const t = clients.length > 1 ? index / (clients.length - 1) : 0;
       return {
         ...client,
-        flagLabel: client.flag || 'manual',
+        flagLabel: client.flag || this.manualFlagLabel,
         dx: -Math.round((1 - Math.cos(t * (Math.PI * 0.42))) * 60),
         rot: Number((direction * t * 6).toFixed(1)),
       };
@@ -385,11 +417,43 @@ export class HomePageComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 }
 
-function detectBrowserIconClass(nav: Navigator): string {
+/* Declared in the module tail rather than beside the interfaces at the top of the
+   file on purpose: messages.xlf pins a linenumber for every $localize call in this
+   module (the last one sits at line 317) and CI diffs `ng extract-i18n`
+   byte-for-byte, so nothing at or above that line may move. Same reason there is no
+   separate browser-icon.ts -- importing it would shift every one of those numbers.
+
+   Narrower than Navigator so the detector stays a pure function over plain objects
+   in tests; the real `navigator` satisfies it structurally, so the call site needs
+   no cast. `brave` exists only in Brave, and only synchronously. Its isBrave()
+   promise is deliberately never awaited: it resolves to `true` unconditionally --
+   the namespace's existence is the entire signal -- and awaiting it would land the
+   icon a tick after every other browser, adding a second visible flip. */
+export interface BrowserSignals {
+  readonly userAgent: string;
+  readonly brave?: { readonly isBrave: () => Promise<boolean> };
+}
+
+/* Branch order is load-bearing. Every Chromium fork inherits `Chrome/` and every
+   iOS browser is WebKit and inherits `Safari/`, so all brand tokens must be tested
+   before the two engine fallbacks at the bottom. */
+export function detectBrowserIconClass(nav: BrowserSignals): string {
   const ua = nav.userAgent;
-  if (/Edg\//.test(ua)) return 'fa-edge';
-  if (/OPR\/|Opera/.test(ua)) return 'fa-opera';
-  if (/Firefox\//.test(ua)) return 'fa-firefox-browser';
+  // Brave's desktop/Android UA is byte-identical to Chrome's, so the namespace is
+  // the only signal there. iOS Brave is WebKit and carries a UA token instead.
+  if (typeof nav.brave === 'object' && nav.brave !== null) return 'fa-brave';
+  if (/\bBrave\b/.test(ua)) return 'fa-brave';
+  // Edg/ desktop, EdgA/ Android, EdgiOS/ iOS, Edge/ legacy EdgeHTML.
+  if (/\bEdg(?:e|A|iOS)?\//.test(ua)) return 'fa-edge';
+  // OPR/ desktop+Android, OPT/ and OPiOS/ on iOS, bare Opera for Mini/Presto.
+  if (/\bOP(?:R|T|iOS)\//.test(ua) || /\bOpera\b/.test(ua)) return 'fa-opera';
+  if (/\bYaBrowser\//.test(ua)) return 'fa-yandex';
+  if (/\bFirefox\/|\bFxiOS\//.test(ua)) return 'fa-firefox-browser';
+  // Chrome on iOS carries Safari/ but no Chrome/, so it must be claimed here before
+  // the fallback below, even though it returns the same value as the default.
+  if (/\bCriOS\//.test(ua)) return 'fa-chrome';
+  // Engine fallbacks. The negative test is intentionally unanchored: `HeadlessChrome/`
+  // must still read as Chromium, not Safari.
   if (/Safari\//.test(ua) && !/Chrome\/|Chromium\//.test(ua)) return 'fa-safari';
   return 'fa-chrome';
 }

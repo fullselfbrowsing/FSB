@@ -1,18 +1,19 @@
 import { Component, OnInit, Renderer2, inject, DOCUMENT, LOCALE_ID } from '@angular/core';
 import { Title, Meta } from '@angular/platform-browser';
+import { RouterLink } from '@angular/router';
 
 import { HOST, buildLocaleUrl, emitLocaleHead } from '../../core/seo/locale-seo';
 import { PrivacyHistoryArchiveComponent } from './privacy-history-archive.component';
 
 const ROUTE_PATH = '/privacy';
 const OG_IMAGE = `${HOST}/assets/fsb_logo_dark.png`;
-const OG_IMAGE_ALT = 'FSB Full Self-Browsing logo';
-const SITE_NAME = 'FSB - Full Self-Browsing';
+const OG_IMAGE_ALT = $localize`:@@privacy.og.imageAlt:FSB Full Self-Browsing logo`;
+const SITE_NAME = $localize`:@@site.name:FSB - Full Self-Browsing`;
 
 @Component({
   selector: 'app-privacy-page',
   standalone: true,
-  imports: [PrivacyHistoryArchiveComponent],
+  imports: [PrivacyHistoryArchiveComponent, RouterLink],
   templateUrl: './privacy-page.component.html',
   styleUrl: './privacy-page.component.scss',
 })

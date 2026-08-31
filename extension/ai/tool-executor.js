@@ -1,16 +1,16 @@
 /**
  * Unified Tool Executor for FSB Browser Automation
  *
- * Single dispatch function that routes all 42 browser tools to their correct
+ * Single dispatch function that routes shared browser tools to their correct
  * handler based on _route metadata from tool-definitions.js.
  *
  * Replaces duplicated routing logic in background.js (autopilot lines 10892-10955,
  * MCP lines 13647-13740) with one shared function.
  *
  * Routes:
- *   - 'content' (28 tools): chrome.tabs.sendMessage to content script
- *   - 'cdp' (7 tools): options.cdpHandler callback (delegates to executeCDPToolDirect)
- *   - 'background' (7 tools): chrome.tabs APIs or options.dataHandler callback
+ *   - 'content': chrome.tabs.sendMessage to content script
+ *   - 'cdp': options.cdpHandler callback (delegates to executeCDPToolDirect)
+ *   - 'background': chrome.tabs APIs or options.dataHandler callback
  *
  * @module tool-executor
  */
@@ -689,112 +689,131 @@ const CAPABILITY_TOOL_NAMES = new Set(['invoke_capability', 'search_capabilities
  * @param {string} name - 'invoke_capability' | 'search_capabilities'
  * @param {Object} params - Tool params (slug/params for invoke; query for search)
  * @param {number} tabId - Chrome tab ID the autopilot is acting against
+ * @param {Object} [options={}] - Presentation options from the owning agent session
  * @returns {Promise<Object>} makeResult-shaped { success, hadEffect, error, navigationTriggered, result }
  */
-async function executeCapabilityToolForAutopilot(name, params, tabId) {
-  const router = (typeof globalThis !== 'undefined') ? globalThis.FsbCapabilityRouter : null;
-  if (!router || typeof router.invoke !== 'function') {
-    return makeResult({ success: false, error: 'FsbCapabilityRouter unavailable' });
+async function executeCapabilityToolForAutopilot(name, params, tabId, options = {}) {
+  let capabilityIcon = null;
+  if (name === 'invoke_capability' && options.animateActionIcon !== false) {
+    try {
+      const candidate = (typeof globalThis !== 'undefined') ? globalThis.fsbActionIcon : null;
+      if (candidate
+          && typeof candidate.beginCapability === 'function'
+          && typeof candidate.endCapability === 'function') {
+        candidate.beginCapability(tabId);
+        capabilityIcon = candidate;
+      }
+    } catch (_e) { /* icon is presentation-only */ }
   }
-
-  // Strip agent_id/ownership_token, normalize the tab alias, inject tab_id -- the
-  // same ownership-strip the trigger branch uses.
-  const finalParams = buildAutopilotTriggerParams(params, tabId);
-
-  // Resolve the active-tab origin as the catalog bias input. executeBoundSpec re-pins
-  // the active tab regardless, so a null origin here is non-fatal (the pin still holds).
-  let origin = null;
-  let url = '';
   try {
-    const tab = await chrome.tabs.get(tabId);
-    origin = (tab && tab.url) ? new URL(tab.url).origin : null;
-    url = (tab && typeof tab.url === 'string') ? tab.url : '';
-  } catch (_) {
-    origin = null;
-    url = '';
-  }
+    const router = (typeof globalThis !== 'undefined') ? globalThis.FsbCapabilityRouter : null;
+    if (!router || typeof router.invoke !== 'function') {
+      return makeResult({ success: false, error: 'FsbCapabilityRouter unavailable' });
+    }
 
-  let response;
-  if (name === 'invoke_capability') {
-    // Capability-call overlay treatment: same pre/post sendSessionStatus
-    // instrumentation as the MCP front door (extension/ws/mcp-tool-dispatcher.js
-    // handleCapabilitiesInvokeMessageRoute) -- one engine, two thin front
-    // doors, both get overlay coverage. capability-router.js stays untouched.
-    if (tabId !== null && typeof tabId === 'number') {
-      try {
-        const previewEntry = (typeof FsbCapabilityCatalog !== 'undefined' && FsbCapabilityCatalog
-          && typeof FsbCapabilityCatalog.resolve === 'function')
-          ? FsbCapabilityCatalog.resolve(finalParams.slug, origin)
-          : null;
-        const previewService = (previewEntry && previewEntry.descriptor && previewEntry.descriptor.service) || origin || '';
-        const previewReady = !!(previewEntry && (previewEntry.tier === 'T1a' || previewEntry.tier === 'T1b' || previewEntry.tier === 'T0'));
-        const previewStoppable = (typeof getActiveSessionsMap === 'function')
-          ? Array.from(getActiveSessionsMap().values()).some((s) => s && s.tabId === tabId && s.status === 'running')
-          : false;
-        if (typeof sendSessionStatus === 'function') {
-          sendSessionStatus(tabId, {
-            phase: 'calling',
-            guarded: false,
-            capability: {
-              chipText: previewService + ' · ' + String(finalParams.slug || ''),
+    // Strip agent_id/ownership_token, normalize the tab alias, inject tab_id -- the
+    // same ownership-strip the trigger branch uses.
+    const finalParams = buildAutopilotTriggerParams(params, tabId);
+
+    // Resolve the active-tab origin as the catalog bias input. executeBoundSpec re-pins
+    // the active tab regardless, so a null origin here is non-fatal (the pin still holds).
+    let origin = null;
+    let url = '';
+    try {
+      const tab = await chrome.tabs.get(tabId);
+      origin = (tab && tab.url) ? new URL(tab.url).origin : null;
+      url = (tab && typeof tab.url === 'string') ? tab.url : '';
+    } catch (_) {
+      origin = null;
+      url = '';
+    }
+
+    let response;
+    if (name === 'invoke_capability') {
+      // Capability-call overlay treatment: same pre/post sendSessionStatus
+      // instrumentation as the MCP front door (extension/ws/mcp-tool-dispatcher.js
+      // handleCapabilitiesInvokeMessageRoute) -- one engine, two thin front
+      // doors, both get overlay coverage. capability-router.js stays untouched.
+      if (tabId !== null && typeof tabId === 'number') {
+        try {
+          const previewEntry = (typeof FsbCapabilityCatalog !== 'undefined' && FsbCapabilityCatalog
+            && typeof FsbCapabilityCatalog.resolve === 'function')
+            ? FsbCapabilityCatalog.resolve(finalParams.slug, origin)
+            : null;
+          const previewService = (previewEntry && previewEntry.descriptor && previewEntry.descriptor.service) || origin || '';
+          const previewReady = !!(previewEntry && (previewEntry.tier === 'T1a' || previewEntry.tier === 'T1b' || previewEntry.tier === 'T0'));
+          const previewStoppable = (typeof getActiveSessionsMap === 'function')
+            ? Array.from(getActiveSessionsMap().values()).some((s) => s && s.tabId === tabId && s.status === 'running')
+            : false;
+          if (typeof sendSessionStatus === 'function') {
+            sendSessionStatus(tabId, {
+              phase: 'calling',
               guarded: false,
-              readinessLabel: previewReady ? 'T1 ready' : 'Guarded',
-              readinessClass: previewReady ? 'ready' : 'guarded',
-              noteText: null
-            },
-            stoppable: previewStoppable
-          });
+              capability: {
+                chipText: previewService + ' · ' + String(finalParams.slug || ''),
+                guarded: false,
+                readinessLabel: previewReady ? 'T1 ready' : 'Guarded',
+                readinessClass: previewReady ? 'ready' : 'guarded',
+                noteText: null
+              },
+              stoppable: previewStoppable
+            });
+          }
+        } catch (_previewErr) {
+          // Non-blocking: overlay preview is best-effort, never gates the real invoke.
         }
-      } catch (_previewErr) {
-        // Non-blocking: overlay preview is best-effort, never gates the real invoke.
       }
-    }
 
-    // Route a slug through the shared engine -- may mutate.
-    response = await router.invoke(finalParams.slug, finalParams.params || {}, {
-      origin,
-      tabId,
-      url,
-      source: 'autopilot'
-    });
+      // Route a slug through the shared engine -- may mutate.
+      response = await router.invoke(finalParams.slug, finalParams.params || {}, {
+        origin,
+        tabId,
+        url,
+        source: 'autopilot'
+      });
 
-    if (tabId !== null && typeof tabId === 'number' && response && response.success === false && response.code) {
-      try {
-        const guardedNoteText = (typeof FSBOverlayStateUtils !== 'undefined' && FSBOverlayStateUtils.mapCapabilityErrorToNote)
-          ? FSBOverlayStateUtils.mapCapabilityErrorToNote(response.code)
-          : null;
-        if (guardedNoteText && typeof sendSessionStatus === 'function') {
-          sendSessionStatus(tabId, {
-            phase: 'calling',
-            guarded: true,
-            capability: {
-              chipText: (origin || '') + ' · ' + String(finalParams.slug || ''),
+      if (tabId !== null && typeof tabId === 'number' && response && response.success === false && response.code) {
+        try {
+          const guardedNoteText = (typeof FSBOverlayStateUtils !== 'undefined' && FSBOverlayStateUtils.mapCapabilityErrorToNote)
+            ? FSBOverlayStateUtils.mapCapabilityErrorToNote(response.code)
+            : null;
+          if (guardedNoteText && typeof sendSessionStatus === 'function') {
+            sendSessionStatus(tabId, {
+              phase: 'calling',
               guarded: true,
-              noteText: guardedNoteText
-            },
-            stoppable: false
-          });
+              capability: {
+                chipText: (origin || '') + ' · ' + String(finalParams.slug || ''),
+                guarded: true,
+                noteText: guardedNoteText
+              },
+              stoppable: false
+            });
+          }
+        } catch (_guardedErr) {
+          // Non-blocking: overlay status is best-effort, never alters the real result.
         }
-      } catch (_guardedErr) {
-        // Non-blocking: overlay status is best-effort, never alters the real result.
       }
+    } else {
+      // search_capabilities never mutates: it queries the MiniSearch index directly.
+      const searchMod = (typeof FsbCapabilitySearch !== 'undefined') ? FsbCapabilitySearch : null;
+      const results = (searchMod && typeof searchMod.search === 'function')
+        ? searchMod.search(finalParams.query || '', origin, 5)
+        : [];
+      response = { success: true, results };
     }
-  } else {
-    // search_capabilities never mutates: it queries the MiniSearch index directly.
-    const searchMod = (typeof FsbCapabilitySearch !== 'undefined') ? FsbCapabilitySearch : null;
-    const results = (searchMod && typeof searchMod.search === 'function')
-      ? searchMod.search(finalParams.query || '', origin, 5)
-      : [];
-    response = { success: true, results };
-  }
 
-  const success = response && response.success !== false;
-  return makeResult({
-    success,
-    hadEffect: success && name === 'invoke_capability',   // invoke may change state; search never does
-    error: success ? null : (response?.error || response?.errorCode || null),
-    result: response
-  });
+    const success = response && response.success !== false;
+    return makeResult({
+      success,
+      hadEffect: success && name === 'invoke_capability',   // invoke may change state; search never does
+      error: success ? null : (response?.error || response?.errorCode || null),
+      result: response
+    });
+  } finally {
+    try {
+      if (capabilityIcon) capabilityIcon.endCapability(tabId);
+    } catch (_e) { /* icon is presentation-only */ }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -802,7 +821,7 @@ async function executeCapabilityToolForAutopilot(name, params, tabId) {
 // ---------------------------------------------------------------------------
 
 /**
- * Execute any of the 42 browser tools by name.
+ * Execute a shared browser tool by name.
  *
  * Routes to the correct handler based on _route metadata from tool-definitions.js:
  *   - 'content' -> chrome.tabs.sendMessage (content script)
@@ -813,6 +832,7 @@ async function executeCapabilityToolForAutopilot(name, params, tabId) {
  * @param {Object} params - Tool-specific parameters
  * @param {number} tabId - Chrome tab ID to execute against
  * @param {Object} [options={}] - Optional callbacks
+ * @param {boolean} [options.animateActionIcon=true] - Whether capability invokes may animate the toolbar icon
  * @param {Function} [options.cdpHandler] - (cdpVerb, params, tabId) => Promise<result>
  * @param {Function} [options.dataHandler] - (toolName, params, tabId) => Promise<result>
  * @returns {Promise<Object>} Structured result: {success, hadEffect, error, navigationTriggered, result}
@@ -821,7 +841,7 @@ async function executeTool(name, params, tabId, options = {}) {
   // Capability front door (CAT-04): the two capability tools are out-of-registry,
   // so this guard MUST run BEFORE _te_getToolByName (else they die at "Unknown tool").
   if (CAPABILITY_TOOL_NAMES.has(name)) {
-    return executeCapabilityToolForAutopilot(name, params, tabId);
+    return executeCapabilityToolForAutopilot(name, params, tabId, options);
   }
 
   const tool = _te_getToolByName(name);

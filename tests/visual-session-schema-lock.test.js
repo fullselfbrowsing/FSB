@@ -61,11 +61,12 @@ const VISUAL_SESSION_READ_ONLY_TOOLS = [
   'get_dom_snapshot', 'list_tabs', 'get_page_snapshot', 'get_site_guide',
   'search_memory', 'report_progress', 'complete_task', 'partial_task',
   'fail_task', 'wait_for_element', 'wait_for_stable',
-  'stop_trigger', 'get_trigger_status', 'list_triggers'
+  'stop_trigger', 'get_trigger_status', 'list_triggers',
+  'capture_screenshot'
 ];
 
 check(VISUAL_SESSION_ACTION_TOOLS.length === 37, '37 canonical action tools enumerated');
-check(VISUAL_SESSION_READ_ONLY_TOOLS.length === 18, '18 canonical read-only tools enumerated');
+check(VISUAL_SESSION_READ_ONLY_TOOLS.length === 19, '19 canonical read-only tools enumerated');
 check(VISUAL_SESSION_ACTION_TOOLS.indexOf('trigger') < 0,
   'trigger is not in the visual-session action-tool field-bundle list');
 
@@ -146,9 +147,9 @@ if (triggerTool) {
     'trigger detached reporting mode is OPTIONAL');
 }
 
-// getReadOnlyTools() count = 18
-check(getReadOnlyTools().length === 18,
-  'getReadOnlyTools() returns exactly 18 entries');
+// getReadOnlyTools() count = 19
+check(getReadOnlyTools().length === 19,
+  'getReadOnlyTools() returns exactly 19 entries');
 
 // -------------------------------------------------------------------
 // Section 2: Dispatcher rejection runtime invariants

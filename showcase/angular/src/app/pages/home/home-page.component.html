@@ -65,7 +65,7 @@
       <div class="feature-card reveal delay-2">
         <div class="feature-icon"><i class="fa-solid fa-plug"></i></div>
         <h3 i18n="@@home.features.card.mcpIntegration.title"><span [attr.translate]="'no'">MCP</span> Integration</h3>
-        <p i18n="@@home.features.card.mcpIntegration.desc">Use <span [attr.translate]="'no'">FSB</span> as an <span [attr.translate]="'no'">MCP</span> server from <span [attr.translate]="'no'">Claude Code</span>, <span [attr.translate]="'no'">Codex</span>, <span [attr.translate]="'no'">Cursor</span>, <span [attr.translate]="'no'">OpenClaw</span>, or any <span [attr.translate]="'no'">MCP</span> client. 66 tools, with browser automation straight from your IDE.</p>
+        <p i18n="@@home.features.card.mcpIntegration.desc">Use <span [attr.translate]="'no'">FSB</span> as an <span [attr.translate]="'no'">MCP</span> server from <span [attr.translate]="'no'">Claude Code</span>, <span [attr.translate]="'no'">Codex</span>, <span [attr.translate]="'no'">Cursor</span>, <span [attr.translate]="'no'">OpenClaw</span>, or any <span [attr.translate]="'no'">MCP</span> client. 68 tools, with browser automation straight from your IDE.</p>
       </div>
       <div class="feature-card reveal delay-3">
         <div class="feature-icon"><i class="fa-solid fa-tower-broadcast"></i></div>
@@ -168,11 +168,11 @@
             <span class="install-glyph"></span>
           </span>
           <button class="install-cmd" type="button" (click)="copyCurrent()" title="Copy command" i18n-title="@@home.install.copyCurrent.title">
-            <span class="install-base" i18n="@@home.install.baseCommand" [attr.translate]="'no'">npx -y fsb-mcp-server install</span>
+            <span class="install-base" i18n="@@home.install.baseCommand" [attr.translate]="'no'">npx -y fsb-mcp-server@latest install</span>
             <span class="install-flag" [class.is-morphing]="morphing" [attr.translate]="'no'">{{ token }}</span>
           </button>
           <div class="install-copy-wrap" (mouseenter)="onCopyEnter()" (mouseleave)="onCopyLeave()">
-            <button class="install-copy" [class.copied]="copied === 'current'" type="button" (click)="copyCurrent()" aria-label="Copy install command" i18n-aria-label="@@home.install.copyCurrent.aria">
+            <button class="install-copy" [class.copied]="copied === 'current'" type="button" (click)="onCopyClick()" [attr.aria-expanded]="fanOpen" aria-label="Copy install command" i18n-aria-label="@@home.install.copyCurrent.aria">
               <i [class]="copyIconClass"></i>
             </button>
             <div class="install-fan install-fan-up" [class.open]="fanOpen" role="menu" aria-label="Copy command for a specific client" i18n-aria-label="@@home.install.copySpecific.aria">
@@ -362,7 +362,7 @@
 <!-- Open Source CTA -->
 <section class="cta-section section">
   <div class="container reveal">
-    <h2 i18n="@@home.cta.openSource.title">Open Source. <span [attr.translate]="'no'">BSL 1.1</span> Licensed. Built for Everyone.</h2>
+    <h2 i18n="@@home.cta.openSource.title">Open Source. <span [attr.translate]="'no'">MIT</span> Licensed. Built for Everyone.</h2>
     <p i18n="@@home.cta.openSource.desc"><span [attr.translate]="'no'">FSB</span> is free and open source. Inspect the code, contribute features, or fork it for your own use.</p>
     <a [href]="githubRepo" target="_blank" rel="noopener" class="btn btn-primary" i18n="@@home.cta.openSource.github">
       <i class="fa-brands fa-github"></i> View on <span [attr.translate]="'no'">GitHub</span>

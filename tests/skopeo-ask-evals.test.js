@@ -11,7 +11,8 @@ const cases = JSON.parse(fs.readFileSync(path.join(FIXTURE_ROOT, 'cases.json'), 
 const shellSource = fs.readFileSync(path.join(ROOT, 'extension', 'content', 'skopeo-shell.js'), 'utf8');
 const runtimeSource = fs.readFileSync(path.join(ROOT, 'extension', 'content', 'skopeo-runtime.js'), 'utf8');
 const validationSource = fs.readFileSync(path.join(
-  ROOT, '.planning', 'phases', '58-cited-ask-decision-policy', '58-VALIDATION.md'
+  ROOT, '.planning', 'milestones', 'v1.2.0-SKOPEO-phases',
+  '58-cited-ask-decision-policy', '58-VALIDATION.md'
 ), 'utf8');
 const packageJson = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
 

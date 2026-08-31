@@ -13,7 +13,8 @@ const shellSource = fs.readFileSync(path.join(ROOT, 'extension', 'content', 'sko
 const runtimeSource = fs.readFileSync(path.join(ROOT, 'extension', 'content', 'skopeo-runtime.js'), 'utf8');
 const backgroundSource = fs.readFileSync(path.join(ROOT, 'extension', 'background.js'), 'utf8');
 const uatSource = fs.readFileSync(path.join(
-  ROOT, '.planning', 'phases', '57-folder-reading-hud', '57-HUMAN-UAT.md'
+  ROOT, '.planning', 'milestones', 'v1.2.0-SKOPEO-phases',
+  '57-folder-reading-hud', '57-HUMAN-UAT.md'
 ), 'utf8');
 
 const HudSchema = require('../extension/utils/skopeo-hud-schema.js');

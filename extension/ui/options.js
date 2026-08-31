@@ -1,7 +1,9 @@
-// FSB v0.9.90 - Modern Dashboard Control Panel Script
+// FSB Modern Dashboard Control Panel Script
 
 // Default settings
 const defaultSettings = {
+  providerKind: 'api',
+  agentProviderId: '',
   modelProvider: 'xai',
   modelName: 'grok-4-1-fast',
   apiKey: '',
@@ -29,6 +31,9 @@ const defaultSettings = {
   captchaApiKey: '',
   // Speech-to-Text provider ('browser' | 'whisper'); read by ui/speech-to-text.js
   sttProvider: 'browser',
+  // Extension-wide side-panel microphone feature switch. Chrome stores the
+  // actual origin permission separately.
+  voiceInputEnabled: true,
   autoRefineSiteMaps: true,
   // Phase 241 D-05 / POOL-05: max simultaneous agents (range 1-64, fallback 8).
   fsbAgentCap: 8,
@@ -37,7 +42,11 @@ const defaultSettings = {
   // Phase 245 D-07: global toggle for action change_report emission. When
   // false, the dispatcher skips harvest instrumentation entirely (zero
   // overhead) and action tool responses revert to pre-Phase-245 shape.
-  fsbChangeReportsEnabled: true
+  fsbChangeReportsEnabled: true,
+  // Exact-fidelity MCP replay is opt-out. Saved MCP sessions age out
+  // independently of Autopilot history.
+  fsbMcpSessionRecordingEnabled: true,
+  fsbMcpSessionRetentionDays: 30
 };
 
 let fsbRecommendedAgentCap = defaultSettings.fsbAgentCap;
@@ -59,6 +68,15 @@ function clampAgentCapValue(value, fallbackValue) {
   if (raw < 1) return 1;
   if (raw > 64) return 64;
   return raw;
+}
+
+function clampMcpSessionRetentionDays(value) {
+  let days = (typeof value === 'number') ? value : parseInt(value, 10);
+  if (!Number.isFinite(days)) days = defaultSettings.fsbMcpSessionRetentionDays;
+  days = Math.floor(days);
+  if (days < 1) return 1;
+  if (days > 365) return 365;
+  return days;
 }
 
 async function resolveRecommendedAgentCap() {
@@ -104,16 +122,59 @@ const availableModels = {
   ]
 };
 
+const HOSTED_API_KEY_INPUT_IDS = Object.freeze({
+  xai: 'apiKey',
+  gemini: 'geminiApiKey',
+  openai: 'openaiApiKey',
+  anthropic: 'anthropicApiKey',
+  openrouter: 'openrouterApiKey'
+});
+
+function isHostedApiProvider(provider) {
+  return Object.prototype.hasOwnProperty.call(HOSTED_API_KEY_INPUT_IDS, provider);
+}
+
+function getHostedApiKeyValue(provider) {
+  const inputId = HOSTED_API_KEY_INPUT_IDS[provider];
+  if (!inputId || typeof document === 'undefined') return '';
+  const input = document.getElementById(inputId);
+  return input && typeof input.value === 'string' ? input.value.trim() : '';
+}
+
 // Dashboard state
 const dashboardState = {
   currentSection: 'dashboard',
   hasUnsavedChanges: false,
-  isApiTesting: false,
   connectionStatus: 'checking',
   // Dashboard-relay WS connectivity, seeded by the getDashboardWebSocketStatus
   // replay and kept live by the dashboardWsStatusChanged runtime push
   // (initializeSyncSection). Read by _wsIsOpen() for the sync pill.
   wsConnected: false
+};
+
+// The visible selector may contain either kind, while the saved API and agent
+// choices remain separate so an agent id never reaches API provider code.
+const providerPanelState = {
+  providerKind: 'api',
+  modelProvider: 'xai',
+  agentProviderId: '',
+  requiresProviderReselection: false,
+  retiredAgentProviderId: '',
+};
+let grokBuildAuthState = 'unknown';
+let grokBuildAuthRequest = null;
+
+let providerSettingsModelLoadTimer = null;
+let providerSettingsLoadGeneration = 0;
+let voiceInputSettingsController = null;
+let persistedVoiceInputEnabled = defaultSettings.voiceInputEnabled;
+// Mirror of the provider selection currently in chrome.storage.local. A save
+// that leaves all three fields exactly as they already are carries nothing new
+// to verify, so it is exempt from the live-model-list gate below.
+let persistedProviderSelection = {
+  providerKind: defaultSettings.providerKind,
+  modelProvider: defaultSettings.modelProvider,
+  modelName: defaultSettings.modelName
 };
 
 // Initialize analytics
@@ -132,9 +193,18 @@ document.addEventListener('DOMContentLoaded', initializeDashboard);
 
 function initializeDashboard() {
   console.log('FSB Control Panel initializing...');
+
+  const versionLabel = document.querySelector('.fsb-foot-ver');
+  if (versionLabel) {
+    versionLabel.textContent = `▽${chrome.runtime.getManifest().version}`;
+  }
   
   // Cache DOM elements
   cacheElements();
+
+  // Track the extension-origin microphone grant independently from the saved
+  // FSB feature preference.
+  initializeVoiceInputSettings();
   
   // Initialize analytics
   analytics = new FSBAnalytics();
@@ -207,6 +277,19 @@ function cacheElements() {
   
   // Form elements
   elements.modelProvider = document.getElementById('modelProvider');
+  elements.apiProviderDetails = document.getElementById('apiProviderDetails');
+  elements.agentProviderDetails = document.getElementById('agentProviderDetails');
+  elements.agentProviderDetailsHeading = document.getElementById('agentProviderDetailsHeading');
+  elements.agentProviderHelp = document.getElementById('agentProviderHelp');
+  elements.retiredAgentProviderNotice = document.getElementById('retiredAgentProviderNotice');
+  elements.retiredAgentProviderNoticeText = document.getElementById('retiredAgentProviderNoticeText');
+  elements.grokBuildConnectionCard = document.getElementById('grokBuildConnectionCard');
+  elements.grokBuildAuthStatus = document.getElementById('grokBuildAuthStatus');
+  elements.grokBuildCompatibility = document.getElementById('grokBuildCompatibility');
+  elements.connectGrokBuildBtn = document.getElementById('connectGrokBuildBtn');
+  elements.disconnectGrokBuildBtn = document.getElementById('disconnectGrokBuildBtn');
+  elements.grokBuildLoginLink = document.getElementById('grokBuildLoginLink');
+  elements.claudeCodeConnectionCard = document.getElementById('claudeCodeConnectionCard');
   elements.modelSearch = document.getElementById('modelSearch');
   elements.modelName = document.getElementById('modelName');
   elements.apiKey = document.getElementById('apiKey');
@@ -242,6 +325,8 @@ function cacheElements() {
   elements.fsbTriggerCapCurrentActive = document.getElementById('fsbTriggerCapCurrentActive');
   // Phase 245 D-07: Action Change Reports global toggle.
   elements.fsbChangeReportsEnabled = document.getElementById('fsbChangeReportsEnabled');
+  elements.fsbMcpSessionRecordingEnabled = document.getElementById('fsbMcpSessionRecordingEnabled');
+  elements.fsbMcpSessionRetentionDays = document.getElementById('fsbMcpSessionRetentionDays');
   elements.prioritizeViewport = document.getElementById('prioritizeViewport');
   elements.animatedActionHighlights = document.getElementById('animatedActionHighlights');
   elements.showSidepanelProgress = document.getElementById('showSidepanelProgress');
@@ -257,6 +342,11 @@ function cacheElements() {
 
   // Speech-to-Text
   elements.sttProvider = document.getElementById('sttProvider');
+  elements.voiceInputEnabled = document.getElementById('voiceInputEnabled');
+  elements.voiceInputPermissionStatus = document.getElementById('voiceInputPermissionStatus');
+  elements.voiceInputPermissionDetail = document.getElementById('voiceInputPermissionDetail');
+  elements.voiceInputPermissionAction = document.getElementById('voiceInputPermissionAction');
+  elements.voiceInputChromeSettings = document.getElementById('voiceInputChromeSettings');
 
   // Button elements
   elements.toggleApiKey = document.getElementById('toggleApiKey');
@@ -310,6 +400,416 @@ function cacheElements() {
   elements.auditClearBtn = document.getElementById('auditClearBtn');
 }
 
+function initializeVoiceInputSettings() {
+  const module = (typeof globalThis !== 'undefined')
+    ? globalThis.FSBVoiceInputSettings
+    : null;
+  if (!module || typeof module.VoiceInputSettingsController !== 'function') return;
+
+  voiceInputSettingsController = new module.VoiceInputSettingsController({
+    statusElement: elements.voiceInputPermissionStatus,
+    detailElement: elements.voiceInputPermissionDetail,
+    permissionButton: elements.voiceInputPermissionAction,
+    settingsButton: elements.voiceInputChromeSettings,
+    onError: (message) => showToast(message, 'error')
+  });
+  void voiceInputSettingsController.init();
+}
+
+function getProviderPanelHelper() {
+  const helper = (typeof globalThis !== 'undefined') ? globalThis.FSBProvidersPanel : null;
+  return helper
+    && typeof helper.isApiProvider === 'function'
+    && typeof helper.isAgentProvider === 'function'
+    && typeof helper.normalizeSettings === 'function'
+    ? helper
+    : null;
+}
+
+function getAgentProviderLabel(providerId) {
+  const fallback = {
+    'claude-code': 'Claude Code',
+    'grok-build': 'Grok Build',
+    codex: 'Codex',
+    opencode: 'OpenCode'
+  };
+  const registry = (typeof globalThis !== 'undefined')
+    ? globalThis.FsbDelegationProviders
+    : null;
+  try {
+    const provider = registry && typeof registry.get === 'function'
+      ? registry.get(providerId)
+      : null;
+    if (provider && provider.id === providerId && typeof provider.label === 'string') {
+      return provider.label;
+    }
+  } catch (_error) {
+    // Fall back to the static labels used by the selector.
+  }
+  return fallback[providerId] || 'Agent CLI';
+}
+
+function renderProviderKind() {
+  const requiresProviderReselection = providerPanelState.requiresProviderReselection === true;
+  const showAgentDetails = providerPanelState.providerKind === 'agent'
+    && !requiresProviderReselection;
+  const showGrokBuild = showAgentDetails
+    && providerPanelState.agentProviderId === 'grok-build';
+  const showClaudeCode = showAgentDetails
+    && providerPanelState.agentProviderId === 'claude-code';
+  if (elements.apiProviderDetails) {
+    elements.apiProviderDetails.hidden = showAgentDetails || requiresProviderReselection;
+  }
+  if (elements.agentProviderDetails) elements.agentProviderDetails.hidden = !showAgentDetails;
+  if (elements.retiredAgentProviderNotice) {
+    elements.retiredAgentProviderNotice.hidden = !requiresProviderReselection;
+  }
+  if (requiresProviderReselection && elements.retiredAgentProviderNoticeText) {
+    const retiredLabel = getAgentProviderLabel(providerPanelState.retiredAgentProviderId);
+    elements.retiredAgentProviderNoticeText.textContent = `${retiredLabel} is no longer available for Autopilot. Select and save another provider before starting a new task.`;
+  }
+  if (elements.fullApiTest) {
+    elements.fullApiTest.hidden = requiresProviderReselection;
+    // One-directional: only ever force the button off here. Enabling it belongs
+    // to the discovery layer, whose _renderMissingApiKey/_renderLoading path runs
+    // synchronously inside runDiscovery() immediately before setProviderSelection
+    // calls this, so an unconditional write would undo the block it just set.
+    if (requiresProviderReselection) elements.fullApiTest.disabled = true;
+  }
+  if (elements.grokBuildConnectionCard) elements.grokBuildConnectionCard.hidden = !showGrokBuild;
+  if (elements.claudeCodeConnectionCard) elements.claudeCodeConnectionCard.hidden = !showClaudeCode;
+  if (showAgentDetails) {
+    const label = getAgentProviderLabel(providerPanelState.agentProviderId);
+    if (elements.agentProviderDetailsHeading) {
+      elements.agentProviderDetailsHeading.textContent = `${label} connection`;
+    }
+    if (elements.agentProviderHelp) {
+      elements.agentProviderHelp.textContent = showGrokBuild
+        ? 'FSB uses a separate private Grok profile. Connect SuperGrok with browser OAuth; no API key or model selection is used.'
+        : `FSB uses ${label}'s existing local sign-in. Test Connection sends one small no-tools validation request.`;
+    }
+  }
+  if (showGrokBuild) {
+    renderGrokBuildAuthState(grokBuildAuthState);
+    if (!grokBuildAuthRequest) void refreshGrokBuildAuthStatus();
+  }
+}
+
+function safeGrokBuildLoginUrl(value) {
+  if (typeof value !== 'string' || value.length === 0 || value.length > 2048) return null;
+  try {
+    const parsed = new URL(value);
+    const allowed = {
+      'auth.x.ai': true,
+      'accounts.x.ai': true,
+      'grok.com': true,
+      'auth.grok.com': true
+    };
+    if (parsed.hash !== ''
+        || Array.from(parsed.searchParams.keys()).some((key) => (
+          /(?:token|secret|password|credential|api[_-]?key|authorization)/i.test(key)
+        ))) return null;
+    return parsed.protocol === 'https:'
+      && parsed.username === ''
+      && parsed.password === ''
+      && Object.prototype.hasOwnProperty.call(allowed, parsed.hostname.toLowerCase())
+      ? parsed.toString()
+      : null;
+  } catch (_error) {
+    return null;
+  }
+}
+
+function renderGrokBuildAuthState(state, progressState) {
+  const safeState = state === 'oauth' || state === 'unauthenticated' ? state : 'unknown';
+  const labels = {
+    oauth: 'Connected with browser OAuth',
+    unauthenticated: 'Not connected',
+    unknown: 'Sign-in status unavailable'
+  };
+  const progressLabels = {
+    opening_browser: 'Opening Grok sign-in...',
+    waiting: 'Waiting for browser sign-in...',
+    authenticated: 'Connected with browser OAuth',
+    failed: 'Sign-in failed',
+    cancelled: 'Sign-in cancelled'
+  };
+  // Derive the pill's state from whichever label actually renders, so a progress
+  // label never contradicts the dot beside it.
+  const progressLabel = progressLabels[progressState];
+  const connected = progressLabel
+    ? progressState === 'authenticated'
+    : safeState === 'oauth';
+  if (elements.grokBuildAuthStatus) {
+    elements.grokBuildAuthStatus.textContent = progressLabel || labels[safeState];
+    if (elements.grokBuildAuthStatus.dataset) {
+      elements.grokBuildAuthStatus.dataset.state = connected ? 'on' : 'off';
+    }
+  }
+  const busy = progressState === 'opening_browser' || progressState === 'waiting';
+  if (elements.connectGrokBuildBtn) {
+    elements.connectGrokBuildBtn.hidden = safeState === 'oauth';
+    elements.connectGrokBuildBtn.disabled = busy;
+  }
+  if (elements.disconnectGrokBuildBtn) {
+    elements.disconnectGrokBuildBtn.hidden = safeState !== 'oauth';
+    elements.disconnectGrokBuildBtn.disabled = busy;
+  }
+  if (elements.grokBuildLoginLink && progressState !== 'waiting') {
+    elements.grokBuildLoginLink.hidden = true;
+    elements.grokBuildLoginLink.removeAttribute('href');
+  }
+}
+
+function grokBuildDisconnectFailureMessage(errorCode) {
+  if (errorCode === 'provider_auth_locked') {
+    return 'Grok Build could not disconnect while a task is active';
+  }
+  if (errorCode === 'provider_auth_timeout') {
+    return 'Grok Build did not answer the disconnect in time. Check the sign-in status before trying again.';
+  }
+  if (errorCode === 'provider_auth_failed') {
+    return 'Grok Build could not disconnect. Try again.';
+  }
+  return 'Grok Build could not disconnect: the local agent service is unavailable';
+}
+
+// Mirrors GrokBuildAuthBeginReason in mcp/src/agent-providers/grok-auth.ts. A
+// stale version pin used to surface here as a bare "Sign-in failed", which reads
+// as an account problem and sends people round the sign-in loop forever.
+function grokBuildSignInFailureMessage(reason, errorCode) {
+  if (errorCode === 'provider_auth_timeout') {
+    return 'Grok Build did not answer the sign-in in time. Refresh status before trying again.';
+  }
+  if (errorCode && errorCode !== 'provider_auth_failed') {
+    return 'Grok Build could not sign in: the local agent service is unavailable';
+  }
+  if (reason === 'version_unsupported') {
+    return 'Grok Build sign-in is blocked because the installed Grok CLI is not the version FSB supports. Your account is fine. Check the compatibility badge, then install a supported CLI.';
+  }
+  if (reason === 'provider_auth_locked') {
+    return 'Grok Build cannot sign in while a task is running. Wait for the run to finish, then try again.';
+  }
+  if (reason === 'session_cleanup_blocked') {
+    return 'Grok Build could not clean up a previous session, so sign-in is blocked. Refresh status to retry cleanup.';
+  }
+  if (reason === 'sandbox_unavailable') {
+    return 'The Grok CLI refused to start under the strict sandbox FSB requires, so sign-in is blocked. The CLI is installed and your account is fine.';
+  }
+  if (reason === 'adapter_unavailable') {
+    return 'FSB could not run the Grok CLI. Check that it is installed, then refresh status.';
+  }
+  if (reason === 'cancelled') return 'Grok Build sign-in was cancelled';
+  return 'Grok Build sign-in did not complete';
+}
+
+function applyGrokBuildAuthProgress(message) {
+  if (!message
+      || message.type !== 'FSB_GROK_BUILD_AUTH_PROGRESS'
+      || message.providerId !== 'grok-build') return;
+  const safeProgress = {
+    opening_browser: true,
+    waiting: true,
+    authenticated: true,
+    failed: true,
+    cancelled: true
+  };
+  if (!Object.prototype.hasOwnProperty.call(safeProgress, message.state)) return;
+  const loginUrl = safeGrokBuildLoginUrl(message.url);
+  if (elements.grokBuildLoginLink) {
+    if (message.state === 'waiting' && loginUrl) {
+      elements.grokBuildLoginLink.href = loginUrl;
+      elements.grokBuildLoginLink.hidden = false;
+    } else {
+      elements.grokBuildLoginLink.hidden = true;
+      elements.grokBuildLoginLink.removeAttribute('href');
+    }
+  }
+  if (message.state === 'authenticated') grokBuildAuthState = 'oauth';
+  renderGrokBuildAuthState(grokBuildAuthState, message.state);
+}
+
+async function refreshGrokBuildAuthStatus() {
+  if (grokBuildAuthRequest) return grokBuildAuthRequest;
+  const request = (async () => {
+    try {
+      const response = await chrome.runtime.sendMessage({ action: 'getGrokBuildAuthStatus' });
+      grokBuildAuthState = response
+        && response.success === true
+        && (response.state === 'oauth' || response.state === 'unauthenticated')
+        ? response.state
+        : 'unknown';
+      renderGrokBuildAuthState(grokBuildAuthState);
+      return grokBuildAuthState;
+    } catch (_error) {
+      grokBuildAuthState = 'unknown';
+      renderGrokBuildAuthState(grokBuildAuthState);
+      return grokBuildAuthState;
+    } finally {
+      grokBuildAuthRequest = null;
+    }
+  })();
+  grokBuildAuthRequest = request;
+  return request;
+}
+
+async function beginGrokBuildAuth() {
+  if (grokBuildAuthRequest) return grokBuildAuthRequest;
+  renderGrokBuildAuthState(grokBuildAuthState, 'opening_browser');
+  const request = (async () => {
+    try {
+      const response = await chrome.runtime.sendMessage({ action: 'beginGrokBuildAuth' });
+      // The daemon answers 'unknown' when the sign-in could not be attempted at
+      // all -- a delegated run holds the profile, session cleanup is blocked, or
+      // the CLI is outside the supported version -- which is not the same as
+      // being signed out. Keep the three states distinct here exactly as
+      // refreshGrokBuildAuthStatus does, so a refusal never relabels a
+      // still-connected profile as "Not connected".
+      grokBuildAuthState = response
+        && response.success === true
+        && (response.state === 'oauth' || response.state === 'unauthenticated')
+        ? response.state
+        : 'unknown';
+      const reason = response && typeof response.reason === 'string' ? response.reason : '';
+      const errorCode = response && typeof response.errorCode === 'string'
+        ? response.errorCode
+        : '';
+      if (grokBuildAuthState === 'oauth') {
+        renderGrokBuildAuthState(grokBuildAuthState, 'authenticated');
+        showToast('Grok Build connected to the private FSB profile', 'success');
+      } else {
+        renderGrokBuildAuthState(grokBuildAuthState,
+          reason === 'cancelled' ? 'cancelled' : 'failed');
+        showToast(grokBuildSignInFailureMessage(reason, errorCode), 'error');
+      }
+      return grokBuildAuthState;
+    } catch (_error) {
+      grokBuildAuthState = 'unknown';
+      renderGrokBuildAuthState(grokBuildAuthState, 'failed');
+      showToast('Grok Build sign-in failed', 'error');
+      return grokBuildAuthState;
+    } finally {
+      grokBuildAuthRequest = null;
+    }
+  })();
+  grokBuildAuthRequest = request;
+  return request;
+}
+
+async function disconnectGrokBuildAuth() {
+  if (grokBuildAuthRequest) return grokBuildAuthRequest;
+  if (!window.confirm('Disconnect the private FSB Grok Build profile? Your normal Grok login is unchanged.')) {
+    return grokBuildAuthState;
+  }
+  const request = (async () => {
+    try {
+      const response = await chrome.runtime.sendMessage({ action: 'logoutGrokBuildAuth' });
+      if (!response || response.success !== true || response.state !== 'unauthenticated') {
+        renderGrokBuildAuthState(grokBuildAuthState);
+        showToast(grokBuildDisconnectFailureMessage(
+          response && typeof response.errorCode === 'string' ? response.errorCode : ''
+        ), 'error');
+        return grokBuildAuthState;
+      }
+      grokBuildAuthState = 'unauthenticated';
+      if (elements.grokBuildLoginLink) {
+        elements.grokBuildLoginLink.hidden = true;
+        elements.grokBuildLoginLink.removeAttribute('href');
+      }
+      renderGrokBuildAuthState(grokBuildAuthState);
+      showToast('Grok Build disconnected from FSB', 'success');
+      return grokBuildAuthState;
+    } catch (_error) {
+      renderGrokBuildAuthState(grokBuildAuthState);
+      showToast(grokBuildDisconnectFailureMessage(''), 'error');
+      return grokBuildAuthState;
+    } finally {
+      grokBuildAuthRequest = null;
+    }
+  })();
+  grokBuildAuthRequest = request;
+  return request;
+}
+
+function runApiProviderSelectionPath(provider, previousSelection) {
+  const ui = (typeof globalThis !== 'undefined') ? globalThis.FSBDiscoveryUI : null;
+  if (ui && ui.IN_SCOPE_PROVIDERS && ui.IN_SCOPE_PROVIDERS[provider]) {
+    const discoveryOptions = { previousSelection: previousSelection };
+    const discoveryPromise = ui.runDiscovery(provider, discoveryOptions);
+    updateApiKeyVisibility(provider);
+    return discoveryPromise;
+  } else {
+    updateModelOptions(provider);
+    updateApiKeyVisibility(provider);
+    if (ui && typeof ui.setControlsDisabled === 'function') {
+      ui.setControlsDisabled(false);
+    }
+    return Promise.resolve({ ok: true, provider: provider, source: 'static' });
+  }
+}
+
+function invalidateProviderDiscovery(restoreUi) {
+  const ui = (typeof globalThis !== 'undefined') ? globalThis.FSBDiscoveryUI : null;
+  if (ui && typeof ui.invalidateDiscovery === 'function') {
+    ui.invalidateDiscovery({ restoreUi: restoreUi === true });
+  }
+}
+
+function cancelPendingProviderSettingsModelLoad() {
+  providerSettingsLoadGeneration += 1;
+  if (providerSettingsModelLoadTimer !== null) {
+    clearTimeout(providerSettingsModelLoadTimer);
+    providerSettingsModelLoadTimer = null;
+  }
+}
+
+function setProviderSelection(kind, id, { markDirty = true } = {}) {
+  const helper = getProviderPanelHelper();
+  if (!helper) return false;
+  const validSelection = kind === 'api'
+    ? helper.isApiProvider(id)
+    : (kind === 'agent' && helper.isAgentProvider(id));
+  if (!validSelection) return false;
+
+  if (markDirty) cancelPendingProviderSettingsModelLoad();
+  const previousKind = providerPanelState.providerKind;
+  const previousId = previousKind === 'agent'
+    ? providerPanelState.agentProviderId
+    : providerPanelState.modelProvider;
+  if (previousKind !== kind || previousId !== id) {
+    invalidateProviderDiscovery(kind === 'agent');
+  }
+  providerPanelState.requiresProviderReselection = false;
+  providerPanelState.retiredAgentProviderId = '';
+
+  if (kind === 'api') {
+    const previousSelection = previousKind === 'api' && previousId === id
+      ? elements.modelName?.value
+      : '';
+    providerPanelState.providerKind = 'api';
+    providerPanelState.modelProvider = id;
+    if (elements.modelProvider) elements.modelProvider.value = id;
+    const discoveryPromise = runApiProviderSelectionPath(id, previousSelection);
+    renderProviderKind();
+    if (typeof syncFsbSelectLabels === 'function') syncFsbSelectLabels();
+    if (markDirty) markUnsavedChanges();
+    return discoveryPromise;
+  } else {
+    providerPanelState.providerKind = 'agent';
+    providerPanelState.agentProviderId = id;
+    if (elements.modelProvider) elements.modelProvider.value = id;
+    const ui = (typeof globalThis !== 'undefined') ? globalThis.FSBDiscoveryUI : null;
+    if (ui && typeof ui.setControlsDisabled === 'function') {
+      ui.setControlsDisabled(false);
+    }
+  }
+
+  renderProviderKind();
+  if (typeof syncFsbSelectLabels === 'function') syncFsbSelectLabels();
+  if (markDirty) markUnsavedChanges();
+  return Promise.resolve({ ok: true, provider: id, source: 'agent' });
+}
+
 function setupEventListeners() {
   // Navigation
   elements.navItems.forEach(item => {
@@ -348,7 +848,10 @@ function setupEventListeners() {
     elements.enableLogin,
     elements.captchaSolverEnabled,
     elements.captchaApiKey,
-    elements.sttProvider
+    elements.sttProvider,
+    elements.voiceInputEnabled,
+    elements.fsbMcpSessionRecordingEnabled,
+    elements.fsbMcpSessionRetentionDays
   ];
 
   formInputs.forEach(input => {
@@ -613,23 +1116,15 @@ function setupEventListeners() {
   if (elements.modelProvider) {
     elements.modelProvider.addEventListener('change', (e) => {
       const provider = e.target.value;
-      // Phase 228 / Plan 02: in-scope providers route through dynamic discovery;
-      // out-of-scope (lmstudio, custom) keep their existing flows.
-      const ui = (typeof globalThis !== 'undefined') ? globalThis.FSBDiscoveryUI : null;
-      if (ui && ui.IN_SCOPE_PROVIDERS && ui.IN_SCOPE_PROVIDERS[provider]) {
-        ui.runDiscovery(provider, { previousSelection: elements.modelName?.value });
-      } else {
-        updateModelOptions(provider);
-      }
-      updateApiKeyVisibility(provider);
-      markUnsavedChanges();
+      const helper = getProviderPanelHelper();
+      const kind = helper && helper.isAgentProvider(provider) ? 'agent' : 'api';
+      setProviderSelection(kind, provider);
     });
   }
 
-  // Phase 228 / Plan 02: API-key inputs trigger debounced discovery for the
-  // selected provider. We attach to all 5 in-scope key inputs once at wiring
-  // time; the handler is a no-op if the user is currently on a different
-  // provider (we still re-discover when they switch back via provider-change).
+  // API-key inputs and the LM Studio base URL trigger debounced discovery for
+  // the selected provider. Scheduling immediately invalidates the old request
+  // and clears its models before the debounce window begins.
   (function wireDiscoveryKeyInputs() {
     const ui = (typeof globalThis !== 'undefined') ? globalThis.FSBDiscoveryUI : null;
     if (!ui) return;
@@ -644,7 +1139,7 @@ function setupEventListeners() {
     });
   })();
 
-  // Phase 228 / Plan 02: Refresh button — bypasses cache via force=true.
+  // Refresh always performs live discovery for hosted API providers.
   const refreshBtn = document.getElementById('refreshModelsBtn');
   if (refreshBtn) {
     refreshBtn.addEventListener('click', () => {
@@ -655,7 +1150,7 @@ function setupEventListeners() {
         if (provider) updateModelOptions(provider);
         return;
       }
-      ui.runDiscovery(provider, { force: true, previousSelection: elements.modelName?.value });
+      ui.runDiscovery(provider, { previousSelection: elements.modelName?.value });
     });
   }
 
@@ -670,6 +1165,10 @@ function setupEventListeners() {
   // Model name change
   if (elements.modelName) {
     elements.modelName.addEventListener('change', (e) => {
+      const ui = (typeof globalThis !== 'undefined') ? globalThis.FSBDiscoveryUI : null;
+      if (ui && typeof ui.handleSelectionChange === 'function') {
+        ui.handleSelectionChange(providerPanelState.modelProvider, e.target.value);
+      }
       markUnsavedChanges();
     });
   }
@@ -704,18 +1203,12 @@ function setupEventListeners() {
     toggleOpenrouterApiKey.addEventListener('click', () => togglePasswordVisibility('openrouterApiKey'));
   }
 
-  // Re-fetch LM Studio models when base URL changes
+  // Discovery for this input is wired through FSBDiscoveryUI above. Keep the
+  // settings dirty-state behavior separate from that cancellable async path.
   const lmstudioBaseUrl = document.getElementById('lmstudioBaseUrl');
   if (lmstudioBaseUrl) {
-    let debounceTimer;
     lmstudioBaseUrl.addEventListener('input', () => {
       markUnsavedChanges();
-      clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(() => {
-        if (elements.modelProvider?.value === 'lmstudio') {
-          updateModelOptions('lmstudio');
-        }
-      }, 800);
     });
   }
 
@@ -735,7 +1228,22 @@ function setupEventListeners() {
   if (elements.fullApiTest) {
     elements.fullApiTest.addEventListener('click', runFullApiTest);
   }
-  
+  if (elements.connectGrokBuildBtn) {
+    elements.connectGrokBuildBtn.addEventListener('click', () => {
+      void beginGrokBuildAuth();
+    });
+  }
+  if (elements.disconnectGrokBuildBtn) {
+    elements.disconnectGrokBuildBtn.addEventListener('click', () => {
+      void disconnectGrokBuildAuth();
+    });
+  }
+  if (chrome.runtime && chrome.runtime.onMessage && chrome.runtime.onMessage.addListener) {
+    chrome.runtime.onMessage.addListener((message) => {
+      applyGrokBuildAuthProgress(message);
+    });
+  }
+
   // Save bar
   if (elements.saveBtn) {
     elements.saveBtn.addEventListener('click', saveSettings);
@@ -1053,7 +1561,7 @@ let _fsbSelectOutsideClickBound = false;
 // truth -- picking a custom option sets its .value and redispatches a real
 // 'change' event, so every existing change-listener elsewhere keeps working
 // untouched. modelName is excluded (it's the model-combobox's own hidden
-// native select, already driven by a separate custom combobox).
+// native select).
 // After loadSettings' async storage callback assigns `.value` on the underlying
 // native <select>s, call this to bring the wrapped custom-select labels back
 // into sync. Uses each select's already-attached `sync()` (stashed on the DOM
@@ -1067,9 +1575,23 @@ function syncFsbSelectLabels() {
   });
 }
 
+function setFsbSelectCardOpen(wrap, open) {
+  const card = typeof wrap.closest === 'function' ? wrap.closest('.settings-card') : null;
+  if (card) card.classList.toggle('settings-card--select-open', open);
+}
+
+function closeFsbSelect(wrap) {
+  const menu = wrap.querySelector('.fsb-select__menu'); if (menu) menu.hidden = true;
+  const btn = wrap.querySelector('.fsb-select__btn'); if (btn) btn.classList.remove('is-open');
+  const chev = wrap.querySelector('.fsb-select__chev');
+  if (chev) { chev.classList.add('fa-chevron-down'); chev.classList.remove('fa-chevron-up'); }
+  setFsbSelectCardOpen(wrap, false);
+}
+
 function initFsbSelects() {
   document.querySelectorAll('.form-select, .chart-select').forEach((sel) => {
-    if (sel.getAttribute('data-enh') === '1' || sel.classList.contains('model-combobox__native')) return;
+    if (sel.getAttribute('data-enh') === '1'
+        || sel.classList.contains('model-combobox__native')) return;
     sel.setAttribute('data-enh', '1');
     sel.style.display = 'none';
 
@@ -1096,6 +1618,7 @@ function initFsbSelects() {
       btn.classList.toggle('is-open', open);
       chev.classList.toggle('fa-chevron-up', open);
       chev.classList.toggle('fa-chevron-down', !open);
+      setFsbSelectCardOpen(wrap, open);
     }
     function sync() {
       const v = sel.value;
@@ -1137,8 +1660,9 @@ function initFsbSelects() {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       const willOpen = menu.hidden;
-      document.querySelectorAll('.fsb-select__menu').forEach((m) => { if (m !== menu) m.hidden = true; });
-      document.querySelectorAll('.fsb-select__btn').forEach((b) => { if (b !== btn) b.classList.remove('is-open'); });
+      document.querySelectorAll('.fsb-select').forEach((w) => {
+        if (w !== wrap) closeFsbSelect(w);
+      });
       setOpen(willOpen);
     });
     btn.addEventListener('keydown', (e) => {
@@ -1152,17 +1676,19 @@ function initFsbSelects() {
     _fsbSelectOutsideClickBound = true;
     document.addEventListener('click', (e) => {
       document.querySelectorAll('.fsb-select').forEach((w) => {
-        if (w.contains(e.target)) return;
-        const m = w.querySelector('.fsb-select__menu'); if (m) m.hidden = true;
-        const b = w.querySelector('.fsb-select__btn'); if (b) b.classList.remove('is-open');
-        const c = w.querySelector('.fsb-select__chev');
-        if (c) { c.classList.add('fa-chevron-down'); c.classList.remove('fa-chevron-up'); }
+        if (!w.contains(e.target)) closeFsbSelect(w);
       });
     });
   }
 }
 
+function normalizeSectionId(sectionId) {
+  return sectionId === 'providers' ? 'api-config' : sectionId;
+}
+
 function switchSection(sectionId) {
+  sectionId = normalizeSectionId(sectionId);
+
   // Update navigation
   elements.navItems.forEach(item => {
     item.classList.toggle('active', item.dataset.section === sectionId);
@@ -1191,7 +1717,7 @@ function switchSection(sectionId) {
 
 function initializeSections() {
   // Check URL hash for initial section
-  const hash = window.location.hash.slice(1);
+  const hash = normalizeSectionId(window.location.hash.slice(1));
   if (hash && document.getElementById(hash)) {
     switchSection(hash);
   }
@@ -1203,67 +1729,19 @@ function initializeSections() {
 function updateModelOptions(provider) {
   const modelSelect = elements.modelName;
   if (!modelSelect) return;
+  const previousSelection = modelSelect.value;
   
   // Clear existing options
   modelSelect.innerHTML = '';
   
-  // LM Studio: fetch models dynamically from local server
+  // LM Studio discovery is owned by FSBDiscoveryUI so selection preservation,
+  // cancellation, filtering, and loading state stay identical across every
+  // entry point.
   if (provider === 'lmstudio') {
-    const loadingOption = document.createElement('option');
-    loadingOption.value = '';
-    loadingOption.textContent = 'Discovering models...';
-    modelSelect.appendChild(loadingOption);
-    updateModelDescription('Connecting to LM Studio server...');
-
-    const baseUrlInput = document.getElementById('lmstudioBaseUrl');
-    const rawUrl = baseUrlInput?.value || 'http://localhost:1234';
-    // Normalize: strip /v1 suffixes, ensure http://
-    let baseUrl = rawUrl.trim();
-    baseUrl = baseUrl.replace(/\/v1\/chat\/completions\/?$/, '');
-    baseUrl = baseUrl.replace(/\/v1\/?$/, '');
-    baseUrl = baseUrl.replace(/\/+$/, '');
-    if (!/^https?:\/\//i.test(baseUrl)) baseUrl = 'http://' + baseUrl;
-    const modelsEndpoint = baseUrl + '/v1/models';
-
-    fetch(modelsEndpoint)
-      .then(res => res.json())
-      .then(data => {
-        modelSelect.innerHTML = '';
-        const seen = new Set();
-        const ids = [];
-        if (data && Array.isArray(data.data)) {
-          for (const entry of data.data) {
-            if (entry && entry.id && !seen.has(entry.id)) {
-              seen.add(entry.id);
-              ids.push(entry.id);
-            }
-          }
-        }
-        if (ids.length === 0) {
-          const noModel = document.createElement('option');
-          noModel.value = '';
-          noModel.textContent = 'No models loaded in LM Studio';
-          modelSelect.appendChild(noModel);
-          updateModelDescription('Start a model in LM Studio, then re-select the provider to refresh.');
-          return;
-        }
-        ids.forEach(id => {
-          const option = document.createElement('option');
-          option.value = id;
-          option.textContent = id;
-          modelSelect.appendChild(option);
-        });
-        updateModelDescription('Discovered ' + ids.length + ' model(s) from LM Studio');
-      })
-      .catch(() => {
-        modelSelect.innerHTML = '';
-        const errOption = document.createElement('option');
-        errOption.value = '';
-        errOption.textContent = 'Could not connect to LM Studio';
-        modelSelect.appendChild(errOption);
-        updateModelDescription('Ensure LM Studio is running with the local server enabled.');
-      });
-    return;
+    const ui = (typeof globalThis !== 'undefined') ? globalThis.FSBDiscoveryUI : null;
+    return ui && typeof ui.runDiscovery === 'function'
+      ? ui.runDiscovery('lmstudio', { previousSelection: previousSelection })
+      : Promise.resolve({ ok: false, reason: 'discovery-unavailable', provider: 'lmstudio' });
   }
 
   // Add options for selected provider
@@ -1321,14 +1799,43 @@ function updateApiKeyVisibility(provider) {
   }
 }
 
+function stageLatentApiModel(modelName) {
+  if (!elements.modelName || !modelName) return;
+  elements.modelName.value = modelName;
+  if (elements.modelName.value === modelName) return;
+
+  // #modelName starts empty. When an agent is active we intentionally skip
+  // API discovery, so retain the saved API model as a hidden placeholder until
+  // the user switches back and the normal provider path repopulates the list.
+  const option = document.createElement('option');
+  option.value = modelName;
+  option.textContent = modelName;
+  elements.modelName.appendChild(option);
+  elements.modelName.value = modelName;
+}
+
 function loadSettings() {
+  cancelPendingProviderSettingsModelLoad();
+  const loadGeneration = providerSettingsLoadGeneration;
   chrome.storage.local.get(Object.keys(defaultSettings), async (data) => {
     data = data || {};
     fsbRecommendedAgentCap = await resolveRecommendedAgentCap();
+    if (loadGeneration !== providerSettingsLoadGeneration) return;
     const hasStoredAgentCap = Object.prototype.hasOwnProperty.call(data, 'fsbAgentCap')
       && typeof data.fsbAgentCap === 'number'
       && Number.isFinite(data.fsbAgentCap);
-    const settings = { ...defaultSettings, ...data };
+    const mergedSettings = { ...defaultSettings, ...data };
+    const providerHelper = getProviderPanelHelper();
+    const normalizedProviderSettings = providerHelper
+      ? providerHelper.normalizeSettings(mergedSettings)
+      : {
+          providerKind: 'api',
+          modelProvider: 'xai',
+          agentProviderId: '',
+          requiresProviderReselection: false,
+          retiredAgentProviderId: ''
+        };
+    const settings = { ...mergedSettings, ...normalizedProviderSettings };
     if (!hasStoredAgentCap) {
       settings.fsbAgentCap = fsbRecommendedAgentCap;
     }
@@ -1338,72 +1845,115 @@ function loadSettings() {
       settings.modelProvider = 'xai';
       settings.modelName = 'grok-4-1-fast'; // All legacy modes map to new default
     }
-    
-    // Update model provider and options
-    if (elements.modelProvider) {
-      const initialProvider = settings.modelProvider || 'xai';
-      elements.modelProvider.value = initialProvider;
-      const ui = (typeof globalThis !== 'undefined') ? globalThis.FSBDiscoveryUI : null;
-      if (ui && ui.IN_SCOPE_PROVIDERS[initialProvider]) {
-        // Phase 232: discoverModels() now hydrates from chrome.storage.local
-        // before checking cache, so a previously-discovered list shows
-        // immediately on page open (no need to re-click Discover after a
-        // service-worker restart). Sticky selection in renderModelDropdown
-        // ensures settings.modelName is preserved even if not in the list.
-        ui.runDiscovery(initialProvider, {
-          previousSelection: settings.modelName,
-          silentIfNoKey: true
-        });
-      } else {
-        updateModelOptions(initialProvider);
-      }
-      updateApiKeyVisibility(initialProvider);
-    }
-    
-    // Update model name
-    if (elements.modelName && settings.modelName) {
-      // Wait for options to be populated
-      setTimeout(() => {
-        elements.modelName.value = settings.modelName;
-        if (typeof globalThis !== 'undefined' && globalThis.FSBModelCombobox) {
-          globalThis.FSBModelCombobox.refresh();
-        }
-        const models = availableModels[settings.modelProvider || 'xai'];
-        const selectedModel = models.find(m => m.id === settings.modelName);
-        if (selectedModel) {
-          updateModelDescription(selectedModel.description);
-        }
-        updateApiKeyVisibility(settings.modelProvider || 'xai');
-        // Load-order fix: run the API-connection check inside this model-name timer.
-        // By the time it fires, the callback's synchronous body has already populated
-        // the apiKey + provider inputs and modelName was just applied above, so
-        // checkApiConnection reads populated inputs -- not the empty fields the old
-        // page-init call (initializeDashboard) saw, which falsely reported 'No API Key'.
-        checkApiConnection();
-      }, 100);
-    }
-    
-    // Update form elements
+
+    // Provider inputs must be populated before provider selection starts live
+    // discovery. The prior ordering started LM Studio discovery against the
+    // default URL and then tried to restore the saved model on a fixed timer.
     if (elements.apiKey) elements.apiKey.value = settings.apiKey || '';
     if (elements.geminiApiKey) elements.geminiApiKey.value = settings.geminiApiKey || '';
-    // Update new provider API keys
     const openaiApiKey = document.getElementById('openaiApiKey');
     if (openaiApiKey) openaiApiKey.value = settings.openaiApiKey || '';
-    
     const anthropicApiKey = document.getElementById('anthropicApiKey');
     if (anthropicApiKey) anthropicApiKey.value = settings.anthropicApiKey || '';
-    
     const customApiKey = document.getElementById('customApiKey');
     if (customApiKey) customApiKey.value = settings.customApiKey || '';
-    
     const customEndpoint = document.getElementById('customEndpoint');
     if (customEndpoint) customEndpoint.value = settings.customEndpoint || '';
-
     const openrouterApiKey = document.getElementById('openrouterApiKey');
     if (openrouterApiKey) openrouterApiKey.value = settings.openrouterApiKey || '';
-
     const lmstudioBaseUrl = document.getElementById('lmstudioBaseUrl');
     if (lmstudioBaseUrl) lmstudioBaseUrl.value = settings.lmstudioBaseUrl || 'http://localhost:1234';
+
+    const storedModelName = typeof data.modelName === 'string' ? data.modelName.trim() : '';
+    const savedModelName = settings.modelProvider === 'lmstudio'
+      ? storedModelName
+      : settings.modelName;
+
+    // Restore both latent provider choices before applying the saved kind.
+    // Staging the model gives the existing discovery path its sticky previous
+    // selection while allowing saved-agent loads to avoid API work entirely.
+    stageLatentApiModel(savedModelName);
+    providerPanelState.modelProvider = settings.modelProvider;
+    providerPanelState.agentProviderId = settings.agentProviderId;
+    providerPanelState.requiresProviderReselection = settings.requiresProviderReselection === true;
+    providerPanelState.retiredAgentProviderId = settings.retiredAgentProviderId || '';
+    // Record the selection the form is about to be populated from, so "unchanged"
+    // means the user did not touch what they were shown.
+    persistedProviderSelection = {
+      providerKind: settings.providerKind,
+      modelProvider: settings.modelProvider,
+      modelName: settings.modelName
+    };
+    const activeProviderId = settings.providerKind === 'agent'
+      ? settings.agentProviderId
+      : settings.modelProvider;
+    let discoveryResult;
+    if (providerPanelState.requiresProviderReselection) {
+      providerPanelState.providerKind = 'agent';
+      if (elements.modelProvider) elements.modelProvider.value = '';
+      renderProviderKind();
+      if (typeof syncFsbSelectLabels === 'function') syncFsbSelectLabels();
+      discoveryResult = { ok: false, reason: 'provider_reselection_required' };
+    } else {
+      discoveryResult = await setProviderSelection(
+        settings.providerKind,
+        activeProviderId,
+        { markDirty: false }
+      );
+    }
+    if (loadGeneration !== providerSettingsLoadGeneration) return;
+
+    if (settings.providerKind === 'api' && elements.modelName) {
+      if (settings.modelProvider === 'lmstudio') {
+        const models = discoveryResult && discoveryResult.ok && Array.isArray(discoveryResult.models)
+          ? discoveryResult.models
+          : [];
+        const savedStillAvailable = !!savedModelName
+          && models.some(model => String(model.id) === savedModelName);
+
+        if (savedStillAvailable) {
+          elements.modelName.value = savedModelName;
+        } else if (models.length === 1) {
+          // Safe legacy migration: there is no choice to make, so repair the
+          // blank/stale stored value immediately and keep startup usable.
+          const migratedModel = String(models[0].id || '');
+          elements.modelName.value = migratedModel;
+          await new Promise(resolve => {
+            chrome.storage.local.set({ modelName: migratedModel }, resolve);
+          });
+          persistedProviderSelection.modelName = migratedModel;
+          if (loadGeneration !== providerSettingsLoadGeneration) return;
+          const ui = (typeof globalThis !== 'undefined') ? globalThis.FSBDiscoveryUI : null;
+          if (ui && typeof ui.setDiscoveryStatus === 'function') {
+            ui.setDiscoveryStatus({ kind: 'info', text: 'Using loaded model ' + migratedModel });
+          }
+        } else if (models.length > 1 && !savedStillAvailable) {
+          markUnsavedChanges();
+        }
+
+        // Local inference is intentionally not run just by opening Settings.
+        // Live discovery establishes reachability; Test Connection remains an
+        // explicit user action and uses the selected model exactly.
+        updateApiKeyVisibility('lmstudio');
+      } else {
+        updateApiKeyVisibility(settings.modelProvider || 'xai');
+        if (discoveryResult && discoveryResult.ok && discoveryResult.selectedModel) {
+          elements.modelName.value = discoveryResult.selectedModel;
+          const selectedModel = Array.isArray(discoveryResult.models)
+            ? discoveryResult.models.find(model => String(model.id) === discoveryResult.selectedModel)
+            : null;
+          if (selectedModel) updateModelDescription(selectedModel.description);
+          if (savedModelName && discoveryResult.previousSelectionPresent === false) {
+            markUnsavedChanges();
+          }
+          checkApiConnection();
+        }
+      }
+
+      if (typeof globalThis !== 'undefined' && globalThis.FSBModelCombobox) {
+        globalThis.FSBModelCombobox.refresh();
+      }
+    }
 
     // Max iterations
     const maxIter = settings.maxIterations || 100;
@@ -1492,6 +2042,15 @@ function loadSettings() {
       elements.fsbChangeReportsEnabled.checked = settings.fsbChangeReportsEnabled ?? true;
     }
 
+    if (elements.fsbMcpSessionRecordingEnabled) {
+      elements.fsbMcpSessionRecordingEnabled.checked = settings.fsbMcpSessionRecordingEnabled !== false;
+    }
+    if (elements.fsbMcpSessionRetentionDays) {
+      const retentionDays = clampMcpSessionRetentionDays(settings.fsbMcpSessionRetentionDays);
+      elements.fsbMcpSessionRetentionDays.value = String(retentionDays);
+      refreshStepper(elements.fsbMcpSessionRetentionDays);
+    }
+
     // Credential Manager
     if (elements.enableLogin) {
       elements.enableLogin.checked = settings.enableLogin ?? false;
@@ -1512,6 +2071,11 @@ function loadSettings() {
     // Speech-to-Text provider (checkbox maps to 'whisper' | 'browser')
     if (elements.sttProvider) {
       elements.sttProvider.checked = settings.sttProvider === 'whisper';
+    }
+    const voiceInputEnabled = settings.voiceInputEnabled !== false;
+    persistedVoiceInputEnabled = voiceInputEnabled;
+    if (elements.voiceInputEnabled) {
+      elements.voiceInputEnabled.checked = voiceInputEnabled;
     }
 
     // Bring the custom-select widgets' visible labels back into sync with the
@@ -1627,10 +2191,146 @@ function refreshActiveTriggerCount() {
   }
 }
 
+function normalizeProviderFormSelection() {
+  if (providerPanelState.requiresProviderReselection === true) {
+    if (elements.modelProvider) elements.modelProvider.value = '';
+    renderProviderKind();
+    return {
+      providerKind: 'agent',
+      modelProvider: providerPanelState.modelProvider,
+      agentProviderId: '',
+      requiresProviderReselection: true,
+      retiredAgentProviderId: providerPanelState.retiredAgentProviderId
+    };
+  }
+  const providerHelper = getProviderPanelHelper();
+  const normalizedProviderSettings = providerHelper
+    ? providerHelper.normalizeSettings({
+        providerKind: providerPanelState.providerKind,
+        modelProvider: providerPanelState.modelProvider,
+        agentProviderId: providerPanelState.agentProviderId
+      })
+    : {
+        providerKind: 'api',
+        modelProvider: 'xai',
+        agentProviderId: '',
+        requiresProviderReselection: false,
+        retiredAgentProviderId: ''
+      };
+  providerPanelState.providerKind = normalizedProviderSettings.providerKind;
+  providerPanelState.modelProvider = normalizedProviderSettings.modelProvider;
+  providerPanelState.agentProviderId = normalizedProviderSettings.agentProviderId;
+  providerPanelState.requiresProviderReselection =
+    normalizedProviderSettings.requiresProviderReselection === true;
+  providerPanelState.retiredAgentProviderId = normalizedProviderSettings.retiredAgentProviderId || '';
+  if (elements.modelProvider) {
+    elements.modelProvider.value = normalizedProviderSettings.providerKind === 'agent'
+      ? normalizedProviderSettings.agentProviderId
+      : normalizedProviderSettings.modelProvider;
+  }
+  renderProviderKind();
+  if (typeof syncFsbSelectLabels === 'function') syncFsbSelectLabels();
+  return normalizedProviderSettings;
+}
+
+function validateProviderReselection(providerSettings) {
+  if (providerSettings.requiresProviderReselection !== true) return true;
+  showToast('Choose and save another AI provider before starting a new task', 'error');
+  updateConnectionStatus('disconnected', 'AI provider required');
+  return false;
+}
+
+function validateLmStudioSettingsSelection(providerSettings, selectedModelName) {
+  if (providerSettings.providerKind !== 'api'
+      || providerSettings.modelProvider !== 'lmstudio'
+      || selectedModelName) return true;
+  showToast('Load and select an LM Studio chat model before saving', 'error');
+  updateConnectionStatus('disconnected', 'LM Studio model required');
+  updateApiStatusCard(
+    'disconnected',
+    'Model Required',
+    'Start LM Studio, load a chat model, then refresh and select it.'
+  );
+  return false;
+}
+
+// True when saving would leave the stored provider selection byte-for-byte as
+// it already is. An empty selection is what a wiped dropdown reports -- no API
+// key yet, or a discovery call that failed -- and saveSettings keeps the stored
+// model in that case, so the selection still ends up unchanged.
+function providerSelectionMatchesPersisted(providerSettings, selectedModelName) {
+  return persistedProviderSelection.providerKind === providerSettings.providerKind
+    && persistedProviderSelection.modelProvider === providerSettings.modelProvider
+    && (selectedModelName === ''
+      || persistedProviderSelection.modelName === selectedModelName);
+}
+
+function validateHostedApiSettingsSelection(providerSettings, selectedModelName) {
+  if (providerSettings.providerKind !== 'api'
+      || !isHostedApiProvider(providerSettings.modelProvider)) return true;
+
+  // saveSettings() is the single writer for every field on this page, so a
+  // refusal here also discards unrelated edits. Only hold back a save that would
+  // put a new, unverified provider selection into storage; a first run that has
+  // not chosen one yet, and a reload whose discovery call failed, still save.
+  if (providerSelectionMatchesPersisted(providerSettings, selectedModelName)) return true;
+
+  const provider = providerSettings.modelProvider;
+  const apiKey = getHostedApiKeyValue(provider);
+  const ui = (typeof globalThis !== 'undefined') ? globalThis.FSBDiscoveryUI : null;
+  const ready = !!apiKey
+    && !!selectedModelName
+    && ui
+    && typeof ui.isHostedSelectionReady === 'function'
+    && ui.isHostedSelectionReady(provider, selectedModelName);
+  if (ready) return true;
+
+  const missingKey = !apiKey;
+  const message = missingKey
+    ? 'Provide an API key before saving this provider'
+    : 'Load an available model from this provider before saving';
+  showToast(message, 'error');
+  updateConnectionStatus('disconnected', missingKey ? 'API key required' : 'Model list required');
+  updateApiStatusCard(
+    'disconnected',
+    missingKey ? 'API Key Required' : 'Models Required',
+    message + '.'
+  );
+  return false;
+}
+
+function normalizeLmStudioSettingsBaseUrl(rawBaseUrl) {
+  const discovery = (typeof globalThis !== 'undefined')
+    ? globalThis.FSBModelDiscovery
+    : null;
+  if (discovery && typeof discovery.normalizeLmStudioBaseUrl === 'function') {
+    return discovery.normalizeLmStudioBaseUrl(rawBaseUrl);
+  }
+  if (typeof normalizeProviderBaseUrl === 'function') {
+    return normalizeProviderBaseUrl('lmstudio', rawBaseUrl);
+  }
+  let url = String(rawBaseUrl || 'http://localhost:1234').trim()
+    .replace(/\/v1\/chat\/completions\/?$/i, '')
+    .replace(/\/v1\/?$/i, '')
+    .replace(/\/+$/, '');
+  if (!/^https?:\/\//i.test(url)) url = 'http://' + url;
+  return url || 'http://localhost:1234';
+}
+
 function saveSettings() {
+  const normalizedProviderSettings = normalizeProviderFormSelection();
+  const previousVoiceInputEnabled = persistedVoiceInputEnabled;
+  const selectedModelName = String(elements.modelName?.value || '').trim();
+  if (!validateProviderReselection(normalizedProviderSettings)) return false;
+  if (!validateLmStudioSettingsSelection(normalizedProviderSettings, selectedModelName)) return false;
+  if (!validateHostedApiSettingsSelection(normalizedProviderSettings, selectedModelName)) return false;
+  const rawLmStudioBaseUrl = (document.getElementById('lmstudioBaseUrl')?.value || 'http://localhost:1234').trim();
+  const normalizedLmStudioBaseUrl = normalizeLmStudioSettingsBaseUrl(rawLmStudioBaseUrl);
   const settings = {
-    modelProvider: elements.modelProvider?.value || 'xai',
-    modelName: elements.modelName?.value || 'grok-4-1-fast',
+    providerKind: normalizedProviderSettings.providerKind,
+    agentProviderId: normalizedProviderSettings.agentProviderId,
+    modelProvider: normalizedProviderSettings.modelProvider,
+    modelName: selectedModelName || persistedProviderSelection.modelName || 'grok-4-1-fast',
     apiKey: (elements.apiKey?.value || '').trim(),
     geminiApiKey: (elements.geminiApiKey?.value || '').trim(),
     openaiApiKey: (document.getElementById('openaiApiKey')?.value || '').trim(),
@@ -1638,7 +2338,7 @@ function saveSettings() {
     customApiKey: (document.getElementById('customApiKey')?.value || '').trim(),
     customEndpoint: (document.getElementById('customEndpoint')?.value || '').trim(),
     openrouterApiKey: (document.getElementById('openrouterApiKey')?.value || '').trim(),
-    lmstudioBaseUrl: (document.getElementById('lmstudioBaseUrl')?.value || 'http://localhost:1234').trim(),
+    lmstudioBaseUrl: normalizedLmStudioBaseUrl,
     maxIterations: parseInt(elements.maxIterations?.value) || 20,
     debugMode: elements.debugMode?.checked ?? false,
     // DOM Optimization settings
@@ -1652,6 +2352,7 @@ function saveSettings() {
     captchaSolverEnabled: elements.captchaSolverEnabled?.checked ?? false,
     captchaApiKey: (elements.captchaApiKey?.value || '').trim(),
     sttProvider: elements.sttProvider?.checked ? 'whisper' : 'browser',
+    voiceInputEnabled: elements.voiceInputEnabled?.checked ?? true,
     autoRefineSiteMaps: elements.autoRefineSiteMaps?.checked ?? true,
     // Phase 241 D-05 / POOL-05: Agent Concurrency cap. Defense-in-depth
     // layer 2 (input clamp = layer 1; SW setCap on storage.onChanged = layer 3).
@@ -1671,20 +2372,36 @@ function saveSettings() {
     })(),
     // Phase 245 D-07: persist Action Change Reports toggle. Default true so
     // builds where the user has never visited the toggle still emit reports.
-    fsbChangeReportsEnabled: elements.fsbChangeReportsEnabled?.checked ?? true
+    fsbChangeReportsEnabled: elements.fsbChangeReportsEnabled?.checked ?? true,
+    fsbMcpSessionRecordingEnabled: elements.fsbMcpSessionRecordingEnabled?.checked ?? true,
+    fsbMcpSessionRetentionDays: clampMcpSessionRetentionDays(elements.fsbMcpSessionRetentionDays?.value)
   };
   
   chrome.storage.local.set(settings, () => {
+    persistedVoiceInputEnabled = settings.voiceInputEnabled;
+    persistedProviderSelection = {
+      providerKind: settings.providerKind,
+      modelProvider: settings.modelProvider,
+      modelName: settings.modelName
+    };
     dashboardState.hasUnsavedChanges = false;
     hideSaveBar();
     showToast('Settings saved successfully', 'success');
     addLog('info', 'Settings saved successfully');
     
     // Update connection status if API key changed
-    if (settings.apiKey) {
+    if (settings.providerKind === 'api' && settings.apiKey) {
       checkApiConnection();
     }
+
+    if (voiceInputSettingsController) {
+      void voiceInputSettingsController.handleSavedChange(
+        previousVoiceInputEnabled,
+        settings.voiceInputEnabled
+      );
+    }
   });
+  return true;
 }
 
 function discardChanges() {
@@ -1733,18 +2450,24 @@ function togglePasswordVisibility(fieldId) {
 }
 
 async function checkApiConnection() {
-  // Phase 6 Plan 06-04: rewritten to read from input fields directly (NOT from
-  // chrome.storage) and delegate to the Plan 06-03 bridge shim in test-connection
-  // mode. Closes the xai-key-rejected-400 P2 defect (stale storage read trap
-  // when user clicks Test before Save). Per-provider getter map trims input
-  // values defense-in-depth (also closes P1 even though Task 1 already trims at
-  // save time).
+  // Test the values currently visible in the form, including unsaved edits.
   dashboardState.connectionStatus = 'checking';
   updateConnectionStatus('checking', 'Checking connection...');
 
   try {
-    const provider = elements.modelProvider?.value || 'xai';
-    const modelName = elements.modelName?.value || 'grok-4-1-fast';
+    const provider = providerPanelState.modelProvider || 'xai';
+    const selectedModelName = String(elements.modelName?.value || '').trim();
+    if (provider === 'lmstudio' && !selectedModelName) {
+      const error = 'Load and select an LM Studio chat model before testing the connection.';
+      updateConnectionStatus('disconnected', 'LM Studio model required');
+      updateApiStatusCard('disconnected', 'Model Required', error);
+      addLog('error', error);
+      return { ok: false, provider: provider, model: '', error: error };
+    }
+    const modelName = selectedModelName;
+    const lmstudioConnectionBaseUrl = normalizeLmStudioSettingsBaseUrl(
+      document.getElementById('lmstudioBaseUrl')?.value || 'http://localhost:1234'
+    );
 
     const PROVIDER_KEY_GETTERS = {
       xai:        function () { return (elements.apiKey?.value || '').trim(); },
@@ -1769,20 +2492,34 @@ async function checkApiConnection() {
     if (!apiKey && provider !== 'lmstudio') {
       updateConnectionStatus('disconnected', 'No API key configured');
       updateApiStatusCard('disconnected', 'No API Key', 'Configure your ' + (PROVIDER_NAMES[provider] || provider) + ' API key to get started');
-      return;
+      return {
+        ok: false,
+        provider: provider,
+        model: modelName,
+        error: `${PROVIDER_NAMES[provider] || provider} API key is required`
+      };
+    }
+
+    if (isHostedApiProvider(provider)) {
+      const discoveryUi = (typeof globalThis !== 'undefined') ? globalThis.FSBDiscoveryUI : null;
+      const ready = !!modelName
+        && discoveryUi
+        && typeof discoveryUi.isHostedSelectionReady === 'function'
+        && discoveryUi.isHostedSelectionReady(provider, modelName);
+      if (!ready) {
+        const error = 'Load the current model list before testing the connection.';
+        updateConnectionStatus('disconnected', 'Model list required');
+        updateApiStatusCard('disconnected', 'Models Required', error);
+        addLog('error', error);
+        return { ok: false, provider: provider, model: '', error: error };
+      }
     }
 
     const config = {
       apiKey: apiKey,
       model: modelName,
       baseUrl: provider === 'custom' ? (document.getElementById('customEndpoint')?.value || '').trim()
-             // Strip a pasted /v1 or /v1/chat/completions suffix (the model-discovery
-             // normalization idiom above) before re-appending /v1, so the documented
-             // http://localhost:1234/v1 setting never becomes /v1/v1.
-             : provider === 'lmstudio' ? ((document.getElementById('lmstudioBaseUrl')?.value || 'http://localhost:1234').trim()
-                 .replace(/\/v1\/chat\/completions\/?$/, '')
-                 .replace(/\/v1\/?$/, '')
-                 .replace(/\/+$/, '') + '/v1')
+             : provider === 'lmstudio' ? (lmstudioConnectionBaseUrl + '/v1')
              : provider === 'openai' ? 'https://api.openai.com/v1'
              : undefined
     };
@@ -1812,17 +2549,26 @@ async function checkApiConnection() {
         elements.apiStatusCard.style.display = 'none';
       }
       addLog('info', 'API connection successful (' + responseTime + 'ms) with model: ' + modelName);
+      return { ok: true, provider: provider, model: modelName, responseTime: responseTime };
     } catch (err) {
       const responseTime = Date.now() - startTime;
       const errMsg = (err && err.message) ? err.message : 'Unknown error';
       updateConnectionStatus('disconnected', 'Connection failed');
       updateApiStatusCard('disconnected', 'Connection Failed', errMsg);
       addLog('error', 'API connection failed (' + responseTime + 'ms): ' + errMsg);
+      return {
+        ok: false,
+        provider: provider,
+        model: modelName,
+        responseTime: responseTime,
+        error: errMsg
+      };
     }
   } catch (error) {
     updateConnectionStatus('disconnected', 'Connection error');
     updateApiStatusCard('disconnected', 'Connection Error', error.message);
     addLog('error', 'API connection error: ' + error.message);
+    return { ok: false, error: error.message || 'Connection error' };
   }
 }
 
@@ -1858,83 +2604,70 @@ function updateApiStatusCard(status, title, detail) {
   }
 }
 
-async function testApiConnection() {
-  if (dashboardState.isApiTesting) return;
-
-  dashboardState.isApiTesting = true;
-  // No header button in the current layout (reachable via Ctrl/Cmd+T only) --
-  // elements.testApiBtn is intentionally uncached, guard its UI updates.
-  if (elements.testApiBtn) {
-    elements.testApiBtn.disabled = true;
-    elements.testApiBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Testing...';
-  }
-
-  try {
-    await checkApiConnection();
-    showToast('API test completed', 'success');
-  } catch (error) {
-    showToast('API test failed', 'error');
-  } finally {
-    dashboardState.isApiTesting = false;
-    if (elements.testApiBtn) {
-      elements.testApiBtn.disabled = false;
-      elements.testApiBtn.innerHTML = '<i class="fas fa-plug"></i> Test API';
-    }
-  }
-}
-
 async function runFullApiTest() {
-  if (!elements.fullApiTest || !elements.testResults) return;
+  if (!elements.fullApiTest
+      || !elements.testResults
+      || providerPanelState.requiresProviderReselection === true) return;
 
   elements.fullApiTest.disabled = true;
   elements.fullApiTest.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Testing...';
   elements.testResults.classList.remove('show');
 
   try {
-    const settings = await getStoredSettings();
-    const provider = settings.modelProvider || 'xai';
+    const isAgent = providerPanelState.providerKind === 'agent';
+    const providerId = isAgent
+      ? providerPanelState.agentProviderId
+      : providerPanelState.modelProvider;
+    const providerName = isAgent
+      ? getAgentProviderLabel(providerId)
+      : {
+          xai: 'xAI',
+          gemini: 'Gemini',
+          openai: 'OpenAI',
+          anthropic: 'Anthropic',
+          custom: 'Custom',
+          openrouter: 'OpenRouter',
+          lmstudio: 'LM Studio'
+        }[providerId] || providerId;
 
-    // Check appropriate API key based on provider
-    const apiKeyMap = {
-      xai: { key: settings.apiKey, name: 'xAI' },
-      gemini: { key: settings.geminiApiKey, name: 'Gemini' },
-      openai: { key: settings.openaiApiKey, name: 'OpenAI' },
-      anthropic: { key: settings.anthropicApiKey, name: 'Anthropic' },
-      custom: { key: settings.customApiKey, name: 'Custom' },
-      openrouter: { key: settings.openrouterApiKey, name: 'OpenRouter' },
-      lmstudio: { key: 'local', name: 'LM Studio' }
-    };
-
-    const providerInfo = apiKeyMap[provider];
-    if (!providerInfo) {
-      throw new Error(`Unknown provider: ${provider}`);
+    let result;
+    if (isAgent) {
+      const response = await chrome.runtime.sendMessage({
+        action: 'testAgentProviderConnection',
+        providerId: providerId
+      });
+      const ok = !!(response && response.success === true && response.ok === true);
+      result = ok
+        ? { ok: true }
+        : {
+            ok: false,
+            error: response && typeof response.message === 'string'
+              ? response.message
+              : (response && typeof response.errorCode === 'string'
+                  ? response.errorCode.replace(/_/g, ' ')
+                  : 'Connection test failed')
+          };
+    } else {
+      result = await checkApiConnection();
     }
-    if (provider !== 'lmstudio' && !providerInfo.key) {
-      throw new Error(`${providerInfo.name} API key is required for testing`);
+
+    if (isAgent && providerId === 'grok-build' && elements.grokBuildCompatibility) {
+      elements.grokBuildCompatibility.textContent = result.ok
+        ? 'Installed and compatible: Grok Build 1.0.4. Isolation, ACP, and cached OAuth checks passed without sending a prompt.'
+        : `Compatibility check failed: ${result.error || 'installation, version, isolation, ACP, or cached OAuth could not be verified.'}`;
     }
 
-    // Test AI integration
-    const aiIntegration = new AIIntegration(settings);
-
-    const result = await aiIntegration.testConnection();
-
-    // Display results
     elements.testResults.innerHTML = `
-      <h4>API Test Results</h4>
+      <h4>Connection Test</h4>
       <div class="test-result-item">
-        <strong>Provider:</strong> ${escapeHtml(providerInfo.name)}
+        <strong>Provider:</strong> ${escapeHtml(providerName)}
       </div>
       <div class="test-result-item">
         <strong>Status:</strong> ${result.ok ? 'Success' : 'Failed'}
       </div>
-      <div class="test-result-item">
-        <strong>Model:</strong> ${escapeHtml(result.model || 'Unknown')}
-      </div>
-      <div class="test-result-item">
-        <strong>Response Time:</strong> ${escapeHtml(String(result.responseTime || 'N/A'))}ms
-      </div>
+      ${result.model ? `<div class="test-result-item"><strong>Model:</strong> ${escapeHtml(result.model)}</div>` : ''}
+      ${Number.isFinite(result.responseTime) ? `<div class="test-result-item"><strong>Response Time:</strong> ${escapeHtml(String(result.responseTime))}ms</div>` : ''}
       ${result.error ? `<div class="test-result-item error"><strong>Error:</strong> ${escapeHtml(result.error)}</div>` : ''}
-      ${result.data ? `<div class="test-result-item"><strong>Response:</strong> <pre>${escapeHtml(JSON.stringify(result.data, null, 2))}</pre></div>` : ''}
     `;
 
     elements.testResults.classList.add('show');
@@ -1943,21 +2676,21 @@ async function runFullApiTest() {
     } else {
       updateApiStatusCard('disconnected', 'Connection Failed', result.error || 'Test failed');
     }
-    addLog(result.ok ? 'info' : 'error', `Full API test ${result.ok ? 'passed' : 'failed'}: ${result.error || 'Success'}`);
+    addLog(result.ok ? 'info' : 'error', `Connection test ${result.ok ? 'passed' : 'failed'} for ${providerId}`);
 
   } catch (error) {
     elements.testResults.innerHTML = `
-      <h4>API Test Results</h4>
+      <h4>Connection Test</h4>
       <div class="test-result-item error">
         <strong>Error:</strong> ${escapeHtml(error.message)}
       </div>
     `;
     elements.testResults.classList.add('show');
-    addLog('error', `Full API test error: ${error.message}`);
+    addLog('error', `Connection test error: ${error.message}`);
     updateApiStatusCard('disconnected', 'Connection Error', error.message);
   } finally {
     elements.fullApiTest.disabled = false;
-    elements.fullApiTest.innerHTML = '<i class="fas fa-flask"></i> Run Full API Test';
+    elements.fullApiTest.innerHTML = '<i class="fas fa-plug"></i> Test Connection';
   }
 }
 
@@ -2510,12 +3243,6 @@ function denyPendingRequest(row) {
 }
 
 // Refresh the "N pending" count pill + the empty-state from the live row count.
-// Draining the queue (count >0 -> 0) also clears the chrome.action badge (the
-// queue is what the badge surfaces). The clear is transition-guarded: routine
-// empty renders must not clobber the badge's other users (ws-client connection
-// state, error alerts).
-let _pendingCountLastSeen = 0;
-
 function updatePendingCount() {
   const list = elements.pendingRequestList;
   if (!list) return;
@@ -2531,12 +3258,6 @@ function updatePendingCount() {
   if (elements.pendingRequestEmptyState) {
     elements.pendingRequestEmptyState.style.display = count > 0 ? 'none' : '';
   }
-  if (count === 0 && _pendingCountLastSeen > 0
-      && typeof chrome !== 'undefined' && chrome.action
-      && typeof chrome.action.setBadgeText === 'function') {
-    try { chrome.action.setBadgeText({ text: '' }); } catch (_e) { /* best-effort */ }
-  }
-  _pendingCountLastSeen = count;
 }
 
 let _toastTimer = null;
@@ -2587,10 +3308,10 @@ function handleKeyboardShortcuts(e) {
     discardChanges();
   }
   
-  // Ctrl/Cmd + T to test API
+  // Ctrl/Cmd + T to test the selected API or agent provider
   if ((e.ctrlKey || e.metaKey) && e.key === 't') {
     e.preventDefault();
-    testApiConnection();
+    runFullApiTest();
   }
 }
 
@@ -2709,6 +3430,123 @@ let currentViewingSession = null;
 let currentReplayData = null;
 let currentStepIndex = 0;
 
+function journalDescriptorPreview(descriptor) {
+  if (!descriptor || typeof descriptor !== 'object') return null;
+  if (descriptor.storage === 'inline') return descriptor.inline;
+  if (typeof descriptor.preview === 'string') {
+    try { return JSON.parse(descriptor.preview); } catch (_error) { return descriptor.preview; }
+  }
+  return descriptor.storage === 'omitted'
+    ? { omitted: true, reason: descriptor.reason || 'unavailable', sha256: descriptor.sha256 || null }
+    : null;
+}
+
+function hydrateJournalSessionDetail(detail) {
+  const session = { ...(detail?.session || {}) };
+  const events = Array.isArray(detail?.events) ? detail.events : [];
+  session.iterationCount = session.actionCount || 0;
+  session._journalEvents = events;
+  session.logs = events.map((event) => {
+    const metadata = event.metadata || {};
+    const tool = metadata.tool || event.kind;
+    return {
+      timestamp: event.timestamp,
+      level: metadata.success === false ? 'warn' : 'info',
+      message: event.kind === 'tool.call' ? `MCP ${tool}` : event.kind,
+      data: event.kind === 'tool.call' ? {
+        logType: 'actionExec',
+        tool,
+        phase: metadata.route || 'recorded',
+        action: { tool, params: journalDescriptorPreview(metadata.request) },
+        result: journalDescriptorPreview(metadata.result),
+        logicalTab: metadata.logicalTab || 'primary'
+      } : { logType: 'serviceWorker', event: event.kind }
+    };
+  });
+  session.actionHistory = events.filter(event => event.kind === 'tool.call').map((event) => ({
+    tool: event.metadata?.tool || '',
+    params: journalDescriptorPreview(event.metadata?.request),
+    result: journalDescriptorPreview(event.metadata?.result),
+    timestamp: Date.parse(event.timestamp),
+    logicalTab: event.metadata?.logicalTab || 'primary'
+  }));
+  session._journalHasMore = detail?.hasMore === true;
+  session._journalNextSequence = Number.isFinite(detail?.nextSequence) ? detail.nextSequence : null;
+  return session;
+}
+
+async function loadSessionDetail(sessionId, afterSequence = -1) {
+  const response = await chrome.runtime.sendMessage({
+    action: 'getSessionDetail',
+    sessionId,
+    afterSequence,
+    limit: 500
+  });
+  if (!response?.success || !response.session) return null;
+  return response.legacy ? response.session : hydrateJournalSessionDetail(response);
+}
+
+function sessionExportFilename(sessionId, format) {
+  const uniqueId = String(sessionId || '')
+    .replace(/^session_/, '')
+    .replace(/[^A-Za-z0-9._-]+/g, '_')
+    .replace(/^_+|_+$/g, '') || 'unknown';
+  return `fsb-session-${uniqueId}.${format === 'text' ? 'txt' : 'json'}`;
+}
+
+function journalExportPickerOptions(sessionId, format) {
+  const text = format === 'text';
+  return {
+    suggestedName: sessionExportFilename(sessionId, format),
+    types: [{
+      description: text ? 'Text report' : 'JSON session data',
+      accept: { [text ? 'text/plain' : 'application/json']: [text ? '.txt' : '.json'] }
+    }]
+  };
+}
+
+async function saveJournalSessionExport(sessionId, format) {
+  if (typeof window.showSaveFilePicker !== 'function') {
+    const error = new Error('Streaming session export requires a browser with Save As support');
+    error.code = 'session_export_picker_unsupported';
+    throw error;
+  }
+  const transport = globalThis.FsbMcpSessionExportPort;
+  if (!transport || typeof transport.streamExportToWritable !== 'function') {
+    const error = new Error('Session export transport is unavailable');
+    error.code = 'session_export_unavailable';
+    throw error;
+  }
+
+  let fileHandle;
+  try {
+    // Invoke the picker before any other asynchronous work so Chrome retains
+    // the click's transient user activation.
+    fileHandle = await window.showSaveFilePicker(journalExportPickerOptions(sessionId, format));
+  } catch (error) {
+    if (error?.name === 'AbortError') return { cancelled: true };
+    throw error;
+  }
+
+  let writable = null;
+  try {
+    writable = await fileHandle.createWritable();
+    const result = await transport.streamExportToWritable({
+      connect: () => chrome.runtime.connect({ name: 'fsb-session-export-v2' }),
+      sessionId,
+      format,
+      writable
+    });
+    await writable.close();
+    return { cancelled: false, chunks: result.chunks };
+  } catch (error) {
+    if (writable && typeof writable.abort === 'function') {
+      try { await writable.abort(); } catch (_abortError) { /* preserve the export failure */ }
+    }
+    throw error;
+  }
+}
+
 /**
  * Initialize session history UI and event listeners
  */
@@ -2738,7 +3576,7 @@ function initializeSessionHistory() {
         e.stopPropagation();
         const action = actionBtn.dataset.action;
         if (action === 'view') viewSession(sessionId);
-        else if (action === 'download') downloadSessionLogs(sessionId);
+        else if (action === 'download') downloadSessionLogs(sessionId, sessionItem.dataset.storageBackend);
         else if (action === 'delete') deleteSession(sessionId);
       } else {
         viewSession(sessionId);
@@ -2774,13 +3612,16 @@ async function loadSessionList() {
 
     // Render session items (using data-action attributes, no inline onclick)
     sessionList.innerHTML = sessions.map(session => `
-      <div class="session-item" data-session-id="${session.id}">
+      <div class="session-item" data-session-id="${session.id}" data-storage-backend="${session.storageBackend === 'journal-v2' ? 'journal-v2' : 'legacy-v1'}">
         <div class="session-item-info">
           <div class="session-item-task">${escapeHtml(session.task || 'Unknown task')}</div>
           <div class="session-item-meta">
             <span><i class="fas fa-clock"></i> ${formatSessionDate(session.startTime)}</span>
             <span><i class="fas fa-play-circle"></i> ${session.actionCount || 0} actions</span>
             <span><i class="fas fa-hourglass-half"></i> ${formatSessionDuration(session.startTime, session.endTime)}</span>
+            ${session.mode === 'mcp-agent'
+              ? `<span class="session-source-badge mcp">MCP · ${escapeHtml(session.mcpClient || 'Agent')}</span>`
+              : `<span class="session-source-badge">Autopilot</span>`}
           </div>
         </div>
         <div class="session-item-status">
@@ -2834,10 +3675,9 @@ async function viewSession(sessionId) {
   collapseSessionDetail();
 
   try {
-    // Load full session data
-    const stored = await chrome.storage.local.get(['fsbSessionLogs']);
-    const sessionStorage = stored.fsbSessionLogs || {};
-    const session = sessionStorage[sessionId];
+    // V2 details are projected from IndexedDB; legacy and Autopilot rows are
+    // returned through the same background API.
+    const session = await loadSessionDetail(sessionId);
 
     if (!session) {
       showToast('Session not found', 'error');
@@ -2983,6 +3823,7 @@ function createInlineDetailHTML(session) {
         </button>
         <div class="session-logs-container" id="rawLogsContainer" style="display: none;">
           <pre class="session-logs-content" id="sessionLogsContent">Loading...</pre>
+          ${session._journalHasMore ? '<button class="control-btn" id="loadMoreSessionEvents">Load next 500 events</button>' : ''}
         </div>
       </div>
     </div>
@@ -3001,16 +3842,17 @@ function attachInlinePanelListeners(wrapper, session) {
   const prevStepBtn = wrapper.querySelector('#prevStep');
   const nextStepBtn = wrapper.querySelector('#nextStep');
   const toggleRawLogsBtn = wrapper.querySelector('#toggleRawLogs');
+  const loadMoreEventsBtn = wrapper.querySelector('#loadMoreSessionEvents');
 
   if (exportTextBtn) {
     exportTextBtn.addEventListener('click', () => {
-      exportSessionText(session.id);
+      exportSessionText(session.id, session.storageBackend);
     });
   }
 
   if (downloadBtn) {
     downloadBtn.addEventListener('click', () => {
-      downloadSessionLogs(session.id);
+      downloadSessionLogs(session.id, session.storageBackend);
     });
   }
 
@@ -3047,6 +3889,36 @@ function attachInlinePanelListeners(wrapper, session) {
       }
     });
   }
+
+  if (loadMoreEventsBtn) {
+    loadMoreEventsBtn.addEventListener('click', async () => {
+      if (!session._journalHasMore || !Number.isFinite(session._journalNextSequence)) return;
+      loadMoreEventsBtn.disabled = true;
+      loadMoreEventsBtn.textContent = 'Loading...';
+      try {
+        const page = await loadSessionDetail(session.id, session._journalNextSequence);
+        if (!page) throw new Error('Session events could not be loaded');
+        if (currentViewingSession?.id !== session.id) return;
+        session._journalEvents.push(...(page._journalEvents || []));
+        session.logs.push(...(page.logs || []));
+        session.actionHistory.push(...(page.actionHistory || []));
+        session._journalHasMore = page._journalHasMore === true;
+        session._journalNextSequence = page._journalNextSequence;
+        const logsEl = wrapper.querySelector('#sessionLogsContent');
+        if (logsEl) logsEl.textContent = formatSessionLogsForDisplay(session);
+        if (session._journalHasMore) {
+          loadMoreEventsBtn.disabled = false;
+          loadMoreEventsBtn.textContent = 'Load next 500 events';
+        } else {
+          loadMoreEventsBtn.remove();
+        }
+      } catch (error) {
+        loadMoreEventsBtn.disabled = false;
+        loadMoreEventsBtn.textContent = 'Retry loading events';
+        showToast('Failed to load more session events: ' + error.message, 'error');
+      }
+    });
+  }
 }
 
 /**
@@ -3057,15 +3929,28 @@ function downloadCurrentSessionLogs() {
     showToast('No session selected', 'warning');
     return;
   }
-  downloadSessionLogs(currentViewingSession.id);
+  downloadSessionLogs(currentViewingSession.id, currentViewingSession.storageBackend);
 }
 
 /**
  * Download raw JSON data for a specific session
  * @param {string} sessionId - The session ID to download
  */
-async function downloadSessionLogs(sessionId) {
+async function downloadSessionLogs(sessionId, storageBackend) {
   try {
+    if (storageBackend === 'journal-v2') {
+      const result = await saveJournalSessionExport(sessionId, 'json');
+      if (result.cancelled) return;
+      showToast('Session JSON downloaded', 'success');
+      addLog('info', `Downloaded session ${sessionId}`);
+      return;
+    }
+    const detailResponse = await chrome.runtime.sendMessage({
+      action: 'getSessionDetail', sessionId, afterSequence: -1, limit: 1
+    });
+    if (detailResponse?.success && detailResponse.session?.storageBackend === 'journal-v2') {
+      throw new Error('Retry the journal export from its session-history download button');
+    }
     const stored = await chrome.storage.local.get(['fsbSessionLogs']);
     const sessionStorage = stored.fsbSessionLogs || {};
     const session = sessionStorage[sessionId];
@@ -3109,21 +3994,11 @@ async function deleteSession(sessionId) {
   }
 
   try {
-    const stored = await chrome.storage.local.get(['fsbSessionLogs', 'fsbSessionIndex']);
-    const sessionStorage = stored.fsbSessionLogs || {};
-    const sessionIndex = stored.fsbSessionIndex || [];
-
-    // Remove from storage
-    delete sessionStorage[sessionId];
-
-    // Remove from index
-    const updatedIndex = sessionIndex.filter(s => s.id !== sessionId);
-
-    // Save changes
-    await chrome.storage.local.set({
-      fsbSessionLogs: sessionStorage,
-      fsbSessionIndex: updatedIndex
+    const response = await chrome.runtime.sendMessage({
+      action: 'deleteSessionHistory',
+      sessionId
     });
+    if (!response?.success) throw new Error(response?.error || 'Failed to delete session history');
 
     // Close detail panel if viewing this session
     if (currentViewingSession && currentViewingSession.id === sessionId) {
@@ -3151,7 +4026,8 @@ async function clearAllSessions() {
   }
 
   try {
-    await chrome.storage.local.remove(['fsbSessionLogs', 'fsbSessionIndex']);
+    const response = await chrome.runtime.sendMessage({ action: 'clearSessionHistory' });
+    if (!response?.success) throw new Error(response?.error || 'Failed to clear session history');
 
     closeSessionDetail();
     loadSessionList();
@@ -3881,9 +4757,13 @@ function renderReplaySummary() {
   }
 
   const summary = currentReplayData.summary;
+  const retainedRange = summary.truncated
+    ? ` | latest ${summary.totalSteps} of ${summary.totalSourceSteps}`
+    : '';
   let summaryHtml = `
     <strong>Summary:</strong> ${summary.successfulSteps}/${summary.totalSteps} steps successful
     ${summary.failedSteps > 0 ? ` | <span style="color: var(--error-color);">${summary.failedSteps} failed</span>` : ''}
+    ${retainedRange}
   `;
 
   document.getElementById('replaySummary').innerHTML = summaryHtml;
@@ -3894,19 +4774,35 @@ function renderReplaySummary() {
  * Export session as human-readable text
  * @param {string} sessionId - The session ID to export
  */
-async function exportSessionText(sessionId) {
+async function exportSessionText(sessionId, storageBackend) {
   try {
-    const response = await chrome.runtime.sendMessage({
-      action: 'exportSessionHumanReadable',
-      sessionId
+    if (storageBackend === 'journal-v2') {
+      const result = await saveJournalSessionExport(sessionId, 'text');
+      if (result.cancelled) return;
+      showToast('Session report exported', 'success');
+      addLog('info', `Exported session ${sessionId} as text`);
+      return;
+    }
+    const detailResponse = await chrome.runtime.sendMessage({
+      action: 'getSessionDetail', sessionId, afterSequence: -1, limit: 1
     });
+    let parts;
+    if (detailResponse?.success && detailResponse.session?.storageBackend === 'journal-v2') {
+      throw new Error('Retry the journal export from its session-history Export Text button');
+    } else {
+      const response = await chrome.runtime.sendMessage({
+        action: 'exportSessionHumanReadable',
+        sessionId
+      });
+      parts = response?.text ? [response.text] : null;
+    }
 
-    if (response?.text) {
-      const blob = new Blob([response.text], { type: 'text/plain' });
+    if (parts) {
+      const blob = new Blob(parts, { type: 'text/plain' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `fsb-session-${sessionId.substring(0, 8)}.txt`;
+      a.download = sessionExportFilename(sessionId, 'text');
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -6632,19 +7528,19 @@ function renderMemoryList(memories) {
 
     return `
       <div class="session-item memory-item" data-memory-id="${memory.id}" data-expandable="true"${graphAttr} style="cursor: pointer;">
-        <div class="session-item-header" style="display: flex; align-items: center; gap: 10px;">
-          <i class="fas ${typeIcon}" style="color: var(--primary); font-size: 1.1em;" title="${typeLabel}"></i>
-          <div style="flex: 1; min-width: 0;">
-            <div style="font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+        <div class="session-item-header memory-item-header">
+          <i class="fas ${typeIcon} memory-item-icon" title="${typeLabel}"></i>
+          <div class="memory-item-copy">
+            <div class="memory-item-title">
               ${escapeHtml(memory.text)} ${badgeHtml}
             </div>
-            <div style="font-size: 0.82em; color: var(--text-secondary); margin-top: 2px;">
+            <div class="memory-item-meta">
               ${typeLabel} | ${escapeHtml(domain)} | ${age} | ${accesses} accesses | ${confidence}% conf${tags ? ' | ' + escapeHtml(tags) : ''}
             </div>
           </div>
           ${refineBtn}
           ${chevronHtml}
-          <button class="control-btn small memory-delete-btn" data-id="${memory.id}" title="Delete memory" style="color: var(--danger, #ef4444); flex-shrink: 0;">
+          <button class="control-btn small memory-delete-btn" data-id="${memory.id}" title="Delete memory">
             <i class="fas fa-trash"></i>
           </button>
         </div>
@@ -7505,8 +8401,8 @@ function initializeSyncSection() {
 // event listeners below (provider change, API-key input debounce, refresh
 // button click) all delegate into runDiscovery() so behavior is centralized.
 //
-// Out-of-scope providers (lmstudio, custom) are explicitly NOT handled here;
-// updateModelOptions() retains its existing flow for those.
+// Custom endpoints remain on the legacy static/manual flow. LM Studio uses
+// this same cancellable discovery path with its base-URL input as the source.
 //
 // Persistence (chrome.storage.local writes for modelName) is NOT touched by
 // this module — Plan 228-03 owns the validation migration.
@@ -7519,7 +8415,8 @@ function initializeSyncSection() {
     gemini: 'geminiApiKey',
     openai: 'openaiApiKey',
     anthropic: 'anthropicApiKey',
-    openrouter: 'openrouterApiKey'
+    openrouter: 'openrouterApiKey',
+    lmstudio: 'lmstudioBaseUrl'
   });
 
   // Per-provider debounce timers for API-key input handling.
@@ -7527,6 +8424,9 @@ function initializeSyncSection() {
   const DEFAULT_DEBOUNCE_MS = 500;
   let _currentModels = [];
   let _currentSearchQuery = '';
+  let _discoveryGeneration = 0;
+  let _activeDiscoveryRun = null;
+  let _hostedReadyState = null;
 
   function _doc() { return (typeof document !== 'undefined') ? document : null; }
 
@@ -7537,6 +8437,109 @@ function initializeSyncSection() {
     if (!doc) return '';
     const el = doc.getElementById(inputId);
     return (el && typeof el.value === 'string') ? el.value.trim() : '';
+  }
+
+  function _isLocalProvider(provider) {
+    return provider === 'lmstudio';
+  }
+
+  function _isHostedProvider(provider) {
+    return !!IN_SCOPE_PROVIDERS[provider] && !_isLocalProvider(provider);
+  }
+
+  function _clearHostedReadiness() {
+    _hostedReadyState = null;
+  }
+
+  function _recordHostedReadiness(provider, apiKey, models) {
+    _hostedReadyState = {
+      provider,
+      apiKey,
+      modelIds: new Set((models || []).map(model => String(model.id || '')).filter(Boolean))
+    };
+  }
+
+  function isHostedSelectionReady(provider, modelId) {
+    if (!_isHostedProvider(provider) || !_hostedReadyState) return false;
+    return _hostedReadyState.provider === provider
+      && _hostedReadyState.apiKey === _getInputValueForProvider(provider)
+      && _hostedReadyState.modelIds.has(String(modelId || ''));
+  }
+
+  function _captureDiscoveryUiState() {
+    const doc = _doc();
+    if (!doc) return null;
+    const select = doc.getElementById('modelName');
+    const refresh = doc.getElementById('refreshModelsBtn');
+    const status = doc.getElementById('modelDiscoveryStatus');
+    const optionSource = select && (select.options || select.children);
+    return {
+      options: optionSource ? Array.prototype.map.call(optionSource, option => ({
+        value: option.value,
+        textContent: option.textContent,
+        disabled: option.disabled === true
+      })) : [],
+      value: select ? select.value : '',
+      selectDisabled: select ? select.disabled === true : false,
+      refreshDisabled: refresh ? refresh.disabled === true : false,
+      statusText: status ? status.textContent : '',
+      statusHidden: status ? status.hidden === true : true,
+      statusClasses: status && status.classList
+        ? ['info', 'warning', 'error', 'loading'].filter(name => status.classList.contains(name))
+        : []
+    };
+  }
+
+  function _restoreDiscoveryUiState(snapshot) {
+    const doc = _doc();
+    if (!doc || !snapshot) return;
+    const select = doc.getElementById('modelName');
+    const refresh = doc.getElementById('refreshModelsBtn');
+    const status = doc.getElementById('modelDiscoveryStatus');
+    if (select) {
+      select.innerHTML = '';
+      snapshot.options.forEach(saved => {
+        const option = doc.createElement('option');
+        option.value = saved.value;
+        option.textContent = saved.textContent;
+        option.disabled = saved.disabled;
+        select.appendChild(option);
+      });
+      select.value = snapshot.value;
+      select.disabled = snapshot.selectDisabled;
+    }
+    if (refresh) refresh.disabled = snapshot.refreshDisabled;
+    if (status) {
+      ['info', 'warning', 'error', 'loading'].forEach(name => status.classList.remove(name));
+      snapshot.statusClasses.forEach(name => status.classList.add(name));
+      status.textContent = snapshot.statusText;
+      status.hidden = snapshot.statusHidden;
+      if (snapshot.statusHidden) status.setAttribute('hidden', '');
+      else status.removeAttribute('hidden');
+    }
+  }
+
+  function invalidateDiscovery(options) {
+    const activeRun = _activeDiscoveryRun;
+    Object.keys(_debounceTimers).forEach(provider => {
+      const timer = _debounceTimers[provider];
+      if (timer !== null && timer !== undefined) clearTimeout(timer);
+      _debounceTimers[provider] = null;
+    });
+    _discoveryGeneration += 1;
+    _activeDiscoveryRun = null;
+    _clearHostedReadiness();
+    if (options && options.restoreUi === true && activeRun) {
+      _restoreDiscoveryUiState(activeRun.snapshot);
+    }
+  }
+
+  function _isDiscoveryCurrent(generation) {
+    return generation === _discoveryGeneration;
+  }
+
+  function _cancelledDiscoveryResult(provider) {
+    return { ok: false, reason: 'cancelled', provider };
   }
 
   function setDiscoveryStatus(state) {
@@ -7598,7 +8601,8 @@ function initializeSyncSection() {
     });
   }
 
-  function _renderModelDropdownOptions(models, selectedId) {
+  function _renderModelDropdownOptions(models, selectedId, opts) {
+    const options = opts || {};
     const doc = _doc();
     if (!doc) return null;
     const sel = doc.getElementById('modelName');
@@ -7618,17 +8622,12 @@ function initializeSyncSection() {
       return null;
     }
 
-    // Phase 232: sticky selection. If the user previously saved a model that's
-    // not in the freshly-discovered list (preview model expired, provider
-    // pruned the list, etc.), preserve it as a synthetic "(saved)" entry at
-    // the top of the dropdown rather than silently reassigning the selection.
-    const presentIds = new Set(list.map(m => String(m.id)));
-    const savedMissing = selectedId && !presentIds.has(String(selectedId));
-    if (savedMissing) {
-      const opt = doc.createElement('option');
-      opt.value = selectedId;
-      opt.textContent = '(saved) ' + selectedId;
-      sel.appendChild(opt);
+    if (options.requireExplicit === true) {
+      const prompt = doc.createElement('option');
+      prompt.value = '';
+      prompt.textContent = 'Choose a loaded model...';
+      prompt.disabled = true;
+      sel.appendChild(prompt);
     }
 
     let chosen = null;
@@ -7638,19 +8637,18 @@ function initializeSyncSection() {
       opt.textContent = m.displayName || m.name || m.id;
       sel.appendChild(opt);
       if (selectedId && m.id === selectedId) chosen = m.id;
-      if (chosen == null && !savedMissing && idx === 0) chosen = m.id;
+      if (chosen == null && options.requireExplicit !== true && idx === 0) chosen = m.id;
     });
-    if (savedMissing) chosen = selectedId;
     sel.value = chosen || '';
     sel.disabled = false;
     return chosen;
   }
 
-  function renderModelDropdown(models, selectedId) {
+  function renderModelDropdown(models, selectedId, opts) {
     _currentModels = (Array.isArray(models) ? models : []).map(m => ({ ...m }));
     // The unified combobox owns search/filtering as a view concern, so the
     // native select always holds the full discovered list here.
-    return _renderModelDropdownOptions(_currentModels.slice(), selectedId);
+    return _renderModelDropdownOptions(_currentModels.slice(), selectedId, opts);
   }
 
   function applyModelSearch(query, opts) {
@@ -7663,63 +8661,109 @@ function initializeSyncSection() {
   }
 
   function _setControlsDisabled(disabled) {
+    _setControlState({
+      modelDisabled: disabled,
+      refreshDisabled: disabled,
+      actionsDisabled: disabled
+    });
+  }
+
+  function _setControlState(state) {
     const doc = _doc();
     if (!doc) return;
     const sel = doc.getElementById('modelName');
     const btn = doc.getElementById('refreshModelsBtn');
-    if (sel) sel.disabled = !!disabled;
-    if (btn) btn.disabled = !!disabled;
+    if (sel) sel.disabled = state.modelDisabled === true;
+    if (btn) btn.disabled = state.refreshDisabled === true;
+    _setActionControlsDisabled(state.actionsDisabled === true);
+  }
+
+  function _setActionControlsDisabled(disabled) {
+    const doc = _doc();
+    if (!doc) return;
+    const saveBtn = doc.getElementById('saveBtn');
+    const testBtn = doc.getElementById('fullApiTest');
+    if (saveBtn) saveBtn.disabled = !!disabled;
+    if (testBtn) testBtn.disabled = !!disabled;
+  }
+
+  function handleSelectionChange(provider, modelId) {
+    if (_isLocalProvider(provider)) {
+      _setActionControlsDisabled(!String(modelId || '').trim());
+    }
+  }
+
+  function _renderStatePlaceholder(label, state) {
+    const options = state || {};
+    const doc = _doc();
+    if (!doc) return;
+    const sel = doc.getElementById('modelName');
+    _currentModels = [];
+    _currentSearchQuery = '';
+    _clearHostedReadiness();
+    if (sel) {
+      sel.innerHTML = '';
+      const opt = doc.createElement('option');
+      opt.value = '';
+      opt.textContent = label;
+      opt.disabled = true;
+      sel.appendChild(opt);
+      sel.value = '';
+    }
+    const description = doc.getElementById('modelDescription');
+    if (description) description.textContent = 'Select the AI model to use';
+    _setControlState({
+      modelDisabled: true,
+      refreshDisabled: options.refreshDisabled !== false,
+      actionsDisabled: true
+    });
+    setDiscoveryStatus(options.status || { kind: 'hidden' });
+  }
+
+  function _renderMissingApiKey() {
+    _renderStatePlaceholder('Provide API key to list models', {
+      refreshDisabled: true,
+      status: { kind: 'hidden' }
+    });
   }
 
   function _renderLoading() {
-    const doc = _doc();
-    if (!doc) return;
-    const sel = doc.getElementById('modelName');
-    if (sel) {
-      sel.innerHTML = '';
-      const opt = doc.createElement('option');
-      opt.value = '';
-      opt.textContent = 'Discovering models...';
-      sel.appendChild(opt);
-    }
-    _setControlsDisabled(true);
-    setDiscoveryStatus({ kind: 'loading', text: 'Discovering models...' });
+    _renderStatePlaceholder('Discovering models...', {
+      refreshDisabled: true,
+      status: { kind: 'loading', text: 'Discovering models...' }
+    });
   }
 
   function _renderAuthFailed(message) {
-    const doc = _doc();
-    if (!doc) return;
-    const sel = doc.getElementById('modelName');
-    if (sel) {
-      sel.innerHTML = '';
-      const opt = doc.createElement('option');
-      opt.value = '';
-      opt.textContent = 'API key invalid';
-      sel.appendChild(opt);
-    }
-    _setControlsDisabled(false);
-    setDiscoveryStatus({ kind: 'error', text: 'API key invalid for this provider' + (message ? ' (' + message + ')' : '') });
+    _renderStatePlaceholder('Invalid API key', {
+      refreshDisabled: false,
+      status: {
+        kind: 'error',
+        text: 'API key invalid for this provider' + (message ? ' (' + message + ')' : '')
+      }
+    });
   }
 
-  function _renderFallback(provider, chipText) {
-    const fallbackTable = global.FALLBACK_MODELS || {};
-    const list = (fallbackTable[provider] || []).map(m => ({
-      id: m.id,
-      displayName: m.name || m.id,
-      description: m.description,
-      provider
-    }));
-    renderModelDropdown(list);
-    _setControlsDisabled(false);
-    setDiscoveryStatus({ kind: 'warning', text: chipText });
+  function _renderHostedFailure(label, message) {
+    _renderStatePlaceholder(label, {
+      refreshDisabled: false,
+      status: { kind: 'error', text: message }
+    });
+  }
+
+  function _renderLocalFailure(message) {
+    _renderStatePlaceholder('No compatible LM Studio models available', {
+      refreshDisabled: false,
+      status: {
+        kind: 'error',
+        text: message || 'Start LM Studio, load a chat model, and refresh the model list'
+      }
+    });
   }
 
   /**
    * runDiscovery(provider, opts?)
-   *  opts.force            -> clear discovery cache before calling discoverModels
    *  opts.previousSelection-> id to retain in the rendered dropdown if present
-   *  opts.silentIfNoKey    -> when true and no API key present, render fallback
-   *                            silently (no chip). Used on initial page load.
    */
   async function runDiscovery(provider, opts) {
     const options = opts || {};
@@ -7727,113 +8771,183 @@ function initializeSyncSection() {
       // Out-of-scope provider — do nothing; legacy updateModelOptions handles it.
       return { ok: false, reason: 'out-of-scope', provider };
     }
+    const priorSnapshot = _activeDiscoveryRun && _activeDiscoveryRun.snapshot;
+    const generation = _discoveryGeneration + 1;
+    _discoveryGeneration = generation;
+    _activeDiscoveryRun = {
+      generation,
+      snapshot: priorSnapshot || _captureDiscoveryUiState()
+    };
 
-    const apiKey = _getInputValueForProvider(provider);
-    if (!apiKey) {
-      // No key yet. Phase 232: prefer the persistent discovery cache
-      // (chrome.storage.local) so a list discovered in a prior session is
-      // shown immediately on reopen. Fall back to FALLBACK_MODELS only when
-      // the persistent cache is empty/expired.
-      let cachedIds = [];
-      if (typeof global.hydrateDiscoveryCache === 'function') {
-        try { await global.hydrateDiscoveryCache(); } catch (_) { /* noop */ }
-      }
-      if (typeof global.getDiscoveredModelIds === 'function') {
-        try { cachedIds = global.getDiscoveredModelIds(provider) || []; } catch (_) { cachedIds = []; }
-      }
-      if (cachedIds.length) {
-        const list = cachedIds.map(id => ({ id, displayName: id }));
-        renderModelDropdown(list, options.previousSelection);
-        setDiscoveryStatus(options.silentIfNoKey
-          ? { kind: 'hidden' }
-          : { kind: 'info', text: list.length + ' models (cached)' });
-        return { ok: true, models: list, source: 'persistent-cache', provider };
-      }
-      if (options.silentIfNoKey) {
-        const fallbackTable = global.FALLBACK_MODELS || {};
-        const list = (fallbackTable[provider] || []).map(m => ({ id: m.id, displayName: m.name || m.id }));
-        renderModelDropdown(list, options.previousSelection);
-        setDiscoveryStatus({ kind: 'hidden' });
-      } else {
-        _renderFallback(provider, 'Enter an API key to discover live models');
-      }
-      return { ok: false, reason: 'missing-api-key', provider };
-    }
-
-    if (options.force && typeof global.clearDiscoveryCache === 'function') {
-      try { global.clearDiscoveryCache(provider); } catch (_) { /* noop */ }
-    }
-
-    if (typeof global.discoverModels !== 'function') {
-      _renderFallback(provider, 'Using fallback models — discovery unavailable');
-      return { ok: false, reason: 'discovery-unavailable', provider };
-    }
-
-    _renderLoading();
-
-    let result;
     try {
-      result = await global.discoverModels(provider, apiKey);
-    } catch (err) {
-      _renderFallback(provider, 'Using fallback models — discovery unavailable');
-      return { ok: false, reason: 'network-failed', provider, message: String(err && err.message || err) };
-    }
+      const localProvider = _isLocalProvider(provider);
+      const inputValue = _getInputValueForProvider(provider);
+      const apiKey = localProvider ? '' : inputValue;
+      const baseUrl = localProvider ? (inputValue || 'http://localhost:1234') : '';
+      if (!localProvider && !apiKey) {
+        _renderMissingApiKey();
+        return { ok: false, reason: 'missing-api-key', provider };
+      }
 
-    if (result && result.ok) {
-      const list = (result.models || []).map(m => ({
-        id: m.id,
-        displayName: m.displayName || m.name || m.id,
-        name: m.name,
-        description: m.description,
-        provider
-      }));
-      const chosen = renderModelDropdown(list, options.previousSelection);
-      _setControlsDisabled(false);
-      const cached = result.source === 'cache';
-      const text = cached
-        ? list.length + ' models (cached)'
-        : list.length + ' models discovered';
-      setDiscoveryStatus({ kind: 'info', text });
-      // Phase 232: when the user's saved model is not in the discovered list,
-      // renderModelDropdown now keeps it selected as a synthetic "(saved)"
-      // entry, so chosen === previousSelection and no reassignment happens.
-      return result;
-    }
+      if (typeof global.discoverModels !== 'function') {
+        if (localProvider) {
+          _renderLocalFailure('LM Studio model discovery is unavailable');
+        } else {
+          _renderHostedFailure('Couldn\'t load models', 'Model discovery is unavailable');
+        }
+        return { ok: false, reason: 'discovery-unavailable', provider };
+      }
 
-    // Failure path
-    const reason = result && result.reason;
-    if (reason === 'auth-failed') {
-      _renderAuthFailed(result && result.message);
-      return result;
+      _renderLoading();
+
+      let result;
+      try {
+        result = await global.discoverModels(
+          provider,
+          apiKey,
+          localProvider ? { baseUrl: baseUrl } : { bypassCache: true }
+        );
+      } catch (err) {
+        if (!_isDiscoveryCurrent(generation)) return _cancelledDiscoveryResult(provider);
+        if (localProvider) {
+          _renderLocalFailure('Could not connect to LM Studio');
+        } else {
+          _renderHostedFailure('Couldn\'t load models', 'Could not load models from this provider');
+        }
+        return { ok: false, reason: 'network-failed', provider, message: String(err && err.message || err) };
+      }
+
+      if (!_isDiscoveryCurrent(generation)) return _cancelledDiscoveryResult(provider);
+
+      if (result && result.ok) {
+        if (!localProvider && result.source === 'cache') {
+          _renderHostedFailure('Couldn\'t load models', 'Could not refresh the provider model list');
+          return { ok: false, reason: 'cached-result-rejected', provider };
+        }
+        const list = (result.models || []).map(m => ({
+          id: m.id,
+          displayName: m.displayName || m.name || m.id,
+          name: m.name,
+          description: m.description,
+          provider
+        }));
+        if (!list.length) {
+          if (localProvider) {
+            _renderLocalFailure('No compatible chat models are loaded in LM Studio');
+          } else {
+            _renderHostedFailure('No available models', 'The provider returned no available text models');
+          }
+          return { ok: false, reason: 'empty-response', provider };
+        }
+        const previousSelectionPresent = !!options.previousSelection
+          && list.some(model => String(model.id) === String(options.previousSelection));
+        const requiresExplicitSelection = localProvider
+          && list.length > 1
+          && !previousSelectionPresent;
+        const chosen = renderModelDropdown(
+          list,
+          options.previousSelection,
+          {
+            requireExplicit: requiresExplicitSelection
+          }
+        );
+        _setControlsDisabled(false);
+        if (requiresExplicitSelection) _setActionControlsDisabled(true);
+        if (!localProvider) _recordHostedReadiness(provider, apiKey, list);
+        const text = list.length + ' models discovered';
+        if (localProvider && options.previousSelection && !previousSelectionPresent) {
+          setDiscoveryStatus({
+            kind: 'warning',
+            text: 'The saved LM Studio model is unavailable. Choose a loaded model and save.'
+          });
+        } else if (localProvider && !options.previousSelection && list.length > 1) {
+          setDiscoveryStatus({
+            kind: 'warning',
+            text: list.length + ' models discovered — choose one and save'
+          });
+        } else {
+          setDiscoveryStatus({ kind: 'info', text });
+        }
+        return Object.assign({}, result, {
+          selectedModel: chosen || '',
+          previousSelectionPresent: previousSelectionPresent
+        });
+      }
+
+      // Failure path
+      const reason = result && result.reason;
+      if (localProvider) {
+        _renderLocalFailure(
+          reason === 'empty-response'
+            ? 'No compatible chat models are loaded in LM Studio'
+            : (result && result.message) || 'Could not connect to LM Studio'
+        );
+        return result;
+      }
+      if (reason === 'auth-failed') {
+        _renderAuthFailed(result && result.message);
+        return result;
+      }
+      if (reason === 'empty-response') {
+        _renderHostedFailure('No available models', 'The provider returned no available text models');
+        return result;
+      }
+      if (reason === 'missing-api-key') {
+        _renderMissingApiKey();
+        return result;
+      }
+      _renderHostedFailure(
+        'Couldn\'t load models',
+        reason === 'timeout'
+          ? 'Model discovery timed out. Refresh to try again.'
+          : 'Could not load models from this provider'
+      );
+      return result || { ok: false, reason: 'unknown', provider };
+    } finally {
+      if (_activeDiscoveryRun && _activeDiscoveryRun.generation === generation) {
+        _activeDiscoveryRun = null;
+      }
     }
-    if (reason === 'network-failed' || reason === 'timeout' || reason === 'empty-response') {
-      _renderFallback(provider, 'Using fallback models — discovery unavailable');
-      return result;
-    }
-    if (reason === 'missing-api-key') {
-      _renderFallback(provider, 'Enter an API key to discover live models');
-      return result;
-    }
-    // Unknown failure — best-effort fallback
-    _renderFallback(provider, 'Using fallback models — discovery unavailable');
-    return result || { ok: false, reason: 'unknown', provider };
   }
 
   function scheduleDiscoveryFromKeyChange(provider, opts) {
     if (!IN_SCOPE_PROVIDERS[provider]) return;
+    const doc = _doc();
+    const activeProvider = doc && doc.getElementById('modelProvider');
+    if (providerPanelState.providerKind !== 'api'
+        || !activeProvider
+        || activeProvider.value !== provider) {
+      return;
+    }
     const wait = (opts && typeof opts.debounceMs === 'number') ? opts.debounceMs : DEFAULT_DEBOUNCE_MS;
-    if (_debounceTimers[provider]) clearTimeout(_debounceTimers[provider]);
+    invalidateDiscovery();
+    if (_isHostedProvider(provider) && !_getInputValueForProvider(provider)) {
+      _renderMissingApiKey();
+      return;
+    }
+    _renderLoading();
     _debounceTimers[provider] = setTimeout(() => {
       _debounceTimers[provider] = null;
-      runDiscovery(provider, { force: true });
+      const currentDoc = _doc();
+      const currentProvider = currentDoc && currentDoc.getElementById('modelProvider');
+      if (providerPanelState.providerKind !== 'api'
+          || !currentProvider
+          || currentProvider.value !== provider) {
+        return;
+      }
+      runDiscovery(provider);
     }, wait);
   }
 
   const api = {
     IN_SCOPE_PROVIDERS,
     runDiscovery,
+    invalidateDiscovery,
     scheduleDiscoveryFromKeyChange,
     setDiscoveryStatus,
+    setControlsDisabled: _setControlsDisabled,
+    isHostedSelectionReady,
+    handleSelectionChange,
     renderModelDropdown,
     applyModelSearch,
     filterModelsForSearch
@@ -8031,7 +9145,7 @@ function initializeSyncSection() {
   function _syncDisplay() {
     if (!_input || !_select || _open) return;
     const opt = _selectedOption();
-    _input.value = (opt && opt.value !== '') ? (opt.textContent || '') : '';
+    _input.value = opt ? (opt.textContent || '') : '';
   }
 
   function _syncDisabled() {

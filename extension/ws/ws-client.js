@@ -371,6 +371,7 @@ function _getContentScriptFilesForInjection() {
     'content/badge-combine.js',
     'content/visual-feedback.js',
     'content/accessibility.js',
+    'utils/google-sheets-ui.js',
     'content/actions.js',
     'content/dom-analysis.js',
     'content/dom-stream.js',
@@ -1011,7 +1012,11 @@ async function handleRemoteKey(payload) {
       // dispatch the CDP keyboard event directly. Follow the same
       // attach-with-stale-debugger-recovery pattern used by cdpClickAt.
       var debuggerAttached = false;
+      var cdpLease = null;
       try {
+        if (globalThis.FsbCdpLease && typeof globalThis.FsbCdpLease.acquire === 'function') {
+          cdpLease = await globalThis.FsbCdpLease.acquire(tabId, { timeoutMs: 10000 });
+        }
         if (typeof keyboardEmulator !== 'undefined' && keyboardEmulator && keyboardEmulator.isAttachedTo(tabId)) {
           await keyboardEmulator.detachDebugger(tabId);
         }
@@ -1055,6 +1060,7 @@ async function handleRemoteKey(payload) {
         if (debuggerAttached) {
           try { await chrome.debugger.detach({ tabId: tabId }); } catch (_e) { /* ignore */ }
         }
+        if (cdpLease) cdpLease.release();
       }
     } else {
       console.warn('[FSB RC] Key rejected: unknown type', payload.type);
@@ -1391,7 +1397,7 @@ class FSBWebSocket {
       this._sendStateSnapshot('connect');
       // Phase 223 MET-01: push metrics on connect (not polling).
       try { _broadcastMetrics(this, this.serverHashKey); } catch (_e) { /* defensive */ }
-      this._updateBadge(true);
+      try { if (globalThis.fsbActionIcon) globalThis.fsbActionIcon.setConnected(true); } catch (_e) { /* icon optional */ }
       _broadcastDashboardWsStatus(true);
       console.log('[FSB WS] Connected');
     };
@@ -1410,7 +1416,7 @@ class FSBWebSocket {
     this.ws.onclose = (event) => {
       this.connected = false;
       this._stopKeepalive();
-      this._updateBadge(false);
+      try { if (globalThis.fsbActionIcon) globalThis.fsbActionIcon.setConnected(false); } catch (_e) { /* icon optional */ }
       _broadcastDashboardWsStatus(false);
       recordFSBTransportReconnect('ws-close', {
         readyState: this.ws ? this.ws.readyState : null,
@@ -1443,7 +1449,7 @@ class FSBWebSocket {
     }
     this.ws = null;
     this.connected = false;
-    this._clearBadge();
+    try { if (globalThis.fsbActionIcon) globalThis.fsbActionIcon.setConnected(false); } catch (_e) { /* icon optional */ }
   }
 
   /**
@@ -1958,6 +1964,7 @@ class FSBWebSocket {
     if (!task) {
       this.send('ext:task-complete', {
         success: false,
+        errorCode: 'dashboard_task_missing',
         error: 'No task provided',
         elapsed: 0,
         taskRunId: '',
@@ -1975,6 +1982,7 @@ class FSBWebSocket {
       if (hasRunning) {
         this.send('ext:task-complete', {
           success: false,
+          errorCode: 'dashboard_task_already_running',
           error: 'Another task is already running',
           elapsed: 0,
           taskRunId: '',
@@ -2030,6 +2038,7 @@ class FSBWebSocket {
       if (!tabId) {
         this.send('ext:task-complete', {
           success: false,
+          errorCode: 'dashboard_task_no_usable_tab',
           error: 'No usable browser tab found for automation',
           elapsed: 0,
           taskRunId: '',
@@ -2064,6 +2073,7 @@ class FSBWebSocket {
           // task actually finishes.
           this.send('ext:task-complete', {
             success: false,
+            errorCode: 'dashboard_task_start_failed',
             error: (result && result.error) || 'Failed to start automation',
             elapsed: 0,
             taskRunId: '',
@@ -2077,6 +2087,7 @@ class FSBWebSocket {
     } catch (err) {
       this.send('ext:task-complete', {
         success: false,
+        errorCode: 'dashboard_task_start_exception',
         error: err.message,
         elapsed: 0,
         taskRunId: '',
@@ -2293,26 +2304,6 @@ class FSBWebSocket {
     }
   }
 
-  /**
-   * Update badge icon to reflect connection state.
-   * @param {boolean} connected
-   */
-  _updateBadge(connected) {
-    if (connected) {
-      chrome.action.setBadgeText({ text: ' ' });
-      chrome.action.setBadgeBackgroundColor({ color: '#22c55e' });
-    } else {
-      chrome.action.setBadgeText({ text: '!' });
-      chrome.action.setBadgeBackgroundColor({ color: '#ef4444' });
-    }
-  }
-
-  /**
-   * Clear badge (no WS configured or explicitly disconnected).
-   */
-  _clearBadge() {
-    chrome.action.setBadgeText({ text: '' });
-  }
 }
 
 // Global instance for service worker

@@ -164,6 +164,65 @@ check('REGION_K_FLOOR is the HARD k>=5 (not the relaxed mcp floor of 2)', REGION
 }
 
 // =============================================================================
+// Scenario 4: one roaming install appears in five different sub-floor regions.
+// Summing per-region counts would fabricate Other.uniq=5; distinct membership
+// must recognize that the combined cohort has k=1 and suppress it.
+// =============================================================================
+{
+  const db = new Database(':memory:');
+  initializeDatabase(db);
+  const queries = new Queries(db);
+  const roamingUuid = nextUuid();
+  ['US-CA', 'US-NY', 'US-TX', 'US-WA', 'US-FL'].forEach((region, i) => {
+    queries.insertTelemetryEventWithRegion.run(
+      nextEventId(), roamingUuid, TS_TODAY + i * 60000,
+      'Claude', 'm', 1, 1, 0, 'periodic', 'iphash', NOW, region
+    );
+  });
+
+  runHousekeeperTick(db, queries, NOW);
+  const pr = readPopularRegion(db);
+  check('S4: one install across five sub-floor regions does NOT fabricate Other.uniq=5',
+    Array.isArray(pr) && pr.length === 0,
+    `got ${JSON.stringify(pr)}`);
+
+  db.close();
+}
+
+// =============================================================================
+// Scenario 5: the same five installs first appear in an above-floor region and
+// later move into five separate sub-floor regions. They must be assigned once,
+// using their latest daily region, rather than surfacing CA=5 plus Other=5.
+// =============================================================================
+{
+  const db = new Database(':memory:');
+  initializeDatabase(db);
+  const queries = new Queries(db);
+  const roaming = Array.from({ length: 5 }, () => nextUuid());
+  roaming.forEach((installUuid, i) => {
+    queries.insertTelemetryEventWithRegion.run(
+      nextEventId(), installUuid, TS_TODAY + i * 60000,
+      'Claude', 'm', 1, 1, 0, 'periodic', 'iphash', NOW, 'US-CA'
+    );
+    queries.insertTelemetryEventWithRegion.run(
+      nextEventId(), installUuid, TS_TODAY + (i + 10) * 60000,
+      'Claude', 'm', 1, 1, 0, 'periodic', 'iphash', NOW + 1000, `US-X${i}`
+    );
+  });
+
+  runHousekeeperTick(db, queries, NOW + 2000);
+  const pr = readPopularRegion(db);
+  check('S5: roaming installs are counted once across the whole region breakdown',
+    Array.isArray(pr) && pr.length === 1 && pr[0].region === 'Other' && pr[0].uniq === 5,
+    `got ${JSON.stringify(pr)}`);
+  check('S5: prior US-CA membership does not also surface',
+    !pr.some((row) => row.region === 'US-CA'),
+    `got ${JSON.stringify(pr)}`);
+
+  db.close();
+}
+
+// =============================================================================
 // Public headline: buildHeadlineJson exposes popular_regions as {label, uniq}
 // with no sub-floor leak and no UUID/ip_hash fields.
 // =============================================================================

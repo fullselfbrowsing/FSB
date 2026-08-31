@@ -10,45 +10,62 @@ FSB is an AI-powered browser automation Chrome extension that executes tasks thr
 
 ## Current State
 
-**Last completed:** v1.1.0 T1 App Execution Expansion -- milestone gate met and archived 2026-06-30, with artifacts refreshed 2026-07-01. FSB now has a verified T1 readiness surface across all 2,314 descriptors, 1,267 executable T1-ready rows, 556 guarded fail-closed rows, and explicit terminal-state accounting for the remaining bridge-needed, UAT-needed, blocked-policy, and degraded/discovery-pending catalog tail.
+**Active milestone progress:** Phases 57-64 are complete (48/51 requirements). Phase 64 verified 4/4 roadmap success criteria, 66/66 plan truths, 36/36 key links, MULTI-01..03, and all ten registered HIGH/CRITICAL threats; its guarded 25-command matrix and repository test process are green after a clean code-review fix loop. Three genuine OpenCode account/process/browser/accessibility scenarios join the prior 42 in the user-directed milestone-end UAT sweep. Phase 65 (Codex Adapter) is the final implementation phase in v0.9.91; backlog Phase 999.1 remains outside this milestone.
 
-**Current milestone progress:** Phase 53 is automated-complete as of 2026-07-15. Exact-origin Drive/Docs context routing, fail-quiet projection, immutable semantic anchors, withdraw-first rebinding, generation-owned SPA handoff, real local-Chrome mechanics, and exact teardown verify 15/15 automated must-haves for HUD-06/HUD-09. Current authenticated Drive/Docs and VoiceOver evidence remains tracked as human-needed in `53-HUMAN-UAT.md`; Phase 53 is not live-approved. On 2026-07-16 the product scope was clarified: Skopeo is a catalog-wide adaptive HUD platform, not a Drive/Docs-only feature. Phase 53.1 is now next and has not been planned.
+**Last completed:** v1.2.0 Showcase i18n Completeness — Phases 52-56 shipped 2026-07-09. Full-page translation audit, 5-id resync + stats-274 retirement + hero/CTA transcreation, stats lint gate flip, permanent `verify-translation-drift` CI gate, and WARNING-02 locale-cookie redirect fix. VISUAL-01 browser UAT remains human_needed (`53-VISUAL-QA.md`).
+
+> **Post-v1.2 supersession (2026-07-15):** The showcase localization follow-up
+> localized the dashboard and removed its `lint:i18n` exclusion. The v1.2.0
+> scope statements below remain historical; the current policy is
+> `showcase/angular/src/locale/I18N-BOUNDARIES.md`.
 
 **Recent shipping cadence:**
+- v1.2.0 Showcase i18n Completeness -- archived 2026-07-09
 - v1.1.0 T1 App Execution Expansion -- archived 2026-06-30; remaining tail rows carry explicit proof requirements before direct execution
 - v1.0.0 Full App Catalog (OpenTabs Parity) -- archived 2026-06-29; T1 expansion debt carried into v1.1.0
-- v0.12.0 PhantomStream Package Migration -- completed 2026-06-17; live Chrome-extension UAT user-gated
-- v0.11.0 Trigger Tool (Reactive DOM Monitoring) -- completed 2026-06-17; release user-gated
-- v0.10.0 Autopilot via Lattice SDK -- shipped 2026-06-15
-- v0.9.69 Anonymous Telemetry Pipeline + Showcase Dashboard Streaming Fix -- shipped 2026-05-14
-- v0.9.63 Showcase i18n -- shipped 2026-05-13
-- v0.9.62 Implicit Visual Session Contract -- shipped 2026-05-11
-- v0.9.61 FSB Skill (OpenClaw) -- shipped 2026-05-08
-- v0.9.60 Multi-Agent Tab Concurrency (MCP 0.8.0) -- shipped 2026-05-08
-- v0.9.50 Autopilot Refinement (MCP-Parity) -- shipped 2026-05-03
-- v0.9.49 Remote Control Rebrand & Showcase Metrics Wire-up -- shipped 2026-05-02
-- v0.9.48 Angular 20 Migration -- shipped 2026-05-02
-- v0.9.47 Workspace Reorganization -- shipped 2026-05-02
-- v0.9.46 Site Discoverability (SEO + GEO) -- shipped 2026-05-02
 
-**Version:** MCP server package prepared at `fsb-mcp-server@0.10.0`; final npm publish is user-gated. Extension/showcase version bump remains outside this milestone unless separately requested.
 
-**CI:** PRs to `main` gated by `ci / all-green` status check (extension + mcp + showcase jobs).
+## Current Milestone: v0.9.91 MCP Clients as Providers
 
-## Current Milestone: v1.2.0 Skopeo
-
-**Goal:** Give FSB an explicitly invoked, page-native adaptive HUD platform across the full supported capability catalog, compose app- and context-appropriate assistance from one trustworthy interaction grammar, and prove deeper domain intelligence with a permission-scoped Google Drive vendor-contract capability pack.
+**Goal:** Make installed agent CLIs (Claude Code first) first-class side-panel providers -- FSB captures which MCP clients the user installs/connects, presents them as key-less providers in a renamed Providers panel, and delegates side-panel tasks to a spawned agent CLI that drives the browser back through FSB's own MCP tools.
 
 **Target features:**
-- An on-demand Skopeo lifecycle on every supported catalog app, with an obvious toggle, universal kill switch, and no persistent HUD when it is off.
-- A catalog-backed app/context interpreter and adaptive composer that chooses a custom HUD for the current app, page genre, semantic entity, requested task, available capabilities, and action risk instead of reusing one Drive-shaped screen everywhere.
-- A reusable semantic anchoring and genre-routing foundation with app profiles, attention budgets, and six shared primitives: anchor mark, entity chip, halo, rail, ghost layer, and consequence gate.
-- Honest capability-aware controls: only verified executable capabilities appear runnable, guarded or pending capabilities remain visibly unavailable, and consequential actions pass through the existing consent, denylist, and confirmation boundaries.
-- A Google Drive / Docs vendor-contract pack that overlays document state, governing-version lineage, exact renewal and notice facts, owner alerts, corpus gaps, timelines, and cited answers on the existing Drive surface.
-- A Chrome-local FSB knowledge layer that selectively adopts useful Graphify concepts -- stable graph identities, provenance, confidence, incremental replacement, and bounded traversal -- as bundled JavaScript without taking a Graphify runtime or server dependency.
-- Permission-preserving, source-grounded behavior: users can query only material they can access, answers identify what governs today, and consequential conclusions remain visibly verifiable.
+- **Agent identity capture (Phase 57 complete)** -- onboarding copy intent, MCP initialize `clientInfo`, and the 21-client installed inventory now converge into durable clicked/connected/installed evidence and one guarded `getMcpClients` view. The wire additions remain optional and legacy `agent:register` payloads stay byte-compatible.
+- **Providers panel (Phase 58 complete)** -- "API Configuration" is now "Providers"; explicit `api` vs `agent` kinds preserve BYOK settings; agent details report evidence and conditional billing truth; one advisory recommendation follows live > installed > copy-clicked > xAI. Live visual/interaction UAT is deferred to the milestone-end sweep.
+- **Reverse-request security foundation (Phase 59 complete)** -- additive `ext:*` frames now cross the existing loopback bridge behind exact Host/Origin/session authority, deterministic capable-relay routing, secret redaction, topology exact-once cleanup, and a permanent forbidden-flag prebuild gate. Four live pairing/lifecycle/accessibility checks remain pending for the milestone-end sweep.
+- **Adapter contract + Claude Code MVP (Phase 60 complete)** -- the serve daemon owns the five-method adapter contract and safe spawn supervisor; Claude Code runs through the pinned task-mode profile, stdin-only prompt, recorded stream fixture, exact process-tree cleanup, and restart recovery. Seven genuine CLI/OS/browser checks remain in the milestone-end sweep.
+- **Delegation UX + persistence (Phase 61 complete)** -- the side panel has consent, live streaming progress, background-tab ownership, Take Control, Stop/reclaim, honest usage, 20-second liveness, and service-worker-eviction recovery. Eight genuine consent/theme/handoff/stream/endurance/POSIX/restart checks remain pending.
+- **Drift gate + compatibility doctor (Phase 62 complete)** -- one daemon-owned compatibility matrix feeds offline production-parser CI, doctor text/JSON, authenticated durable browser projection, protocol-drift diagnostics, and non-mutating Providers compatibility states. Three genuine installed/rendered/accessibility checks remain pending.
+- **Native wake path (Phase 63 complete)** -- the optional native-messaging host wakes or attaches only to `serve` through exact one-shot framing, exact-owned cross-platform registration, read-only diagnostics, and a background-authoritative wake UI with doctor fallback; it never spawns agent CLIs, and the Phase 59 channel-gate files are byte-identical to the phase base. Eight genuine install/Chrome/accessibility checks remain pending.
+- **OpenCode adapter (Phase 64 complete)** -- the unchanged five-method `AgentProviderAdapter` now drives both cold `opencode run` tasks and verified attaches to an FSB-owned `opencode serve`; exact 1.14.25 private policy, schema-derived JSONL fixture, first-commit drift coverage, transient server authentication, role-aware crash recovery, provider-neutral browser persistence, and honest unknown billing are all verified. Three genuine live scenarios remain pending.
+- **Codex adapter (Phase 65 next)** -- complete the stable adapter roster with hermetic `codex exec --json`, source-pinned fixture/drift coverage, and honest ChatGPT OAuth versus API-key versus unauthenticated disclosure. Gemini remains explicitly deferred until a live help capture and fixture pin exist. Task-mode only for v0.9.91.
 
-**Design reference:** `~/Downloads/HUD.zip`, unpacked only under gitignored `.context/hud-design-reference/`. It establishes the shared interaction and visual grammar, not one fixed layout. Skopeo interprets that grammar per app and context; the reference is not production code or a blanket commitment to every pictured control.
+**Key context:**
+- The spawn channel is security-critical (RCE-adjacent): extension-origin gating + shared secret + explicit consent tiers required. Bridge already rejects untrusted browser origins (`tests/mcp-bridge-topology.test.js`).
+- Daemon lifecycle constraint through Phase 62: the extension has NO nativeMessaging permission and cannot wake any process. Phase 63 adds one optional wake host that starts or attaches only to `serve`; all agent spawn authority stays behind the existing daemon channel gates.
+- INV-01 carries forward: MCP wire contracts stay byte-stable -- all bridge message types and tools are additive.
+- Test suite has source-pin tripwires on extension files (token counts/substrings); extension-side wiring must run the suite from the first commit.
+- Delegation becomes the fifth `EXECUTION_MODES` entry in `extension/ai/engine-config.js` (autopilot, mcp-manual, mcp-agent, dashboard-remote, + delegated).
+- This milestone completes the v0.9.45rc1 arc (background agents retired in favor of external agent runtimes) and the v0.9.36 deferred item "derive trusted MCP client identity from connection/handshake metadata".
+- Phases continue from 57.
+- Per user instruction, all live/human UAT checklists accumulate without fabricated passes and are executed as one milestone-end gate; each phase still requires green automated/source verification and clean review before advancing.
+
+## Last Milestone: v1.2.0 Showcase i18n Completeness
+
+**Status:** Archived 2026-07-09. Phases 52-56 shipped; audit passed. Archive files under `.planning/milestones/v1.2.0-*`. VISUAL-01 browser UAT remains human_needed (`53-VISUAL-QA.md`).
+
+**Goal:** Close the translation gap that reopened after v0.9.63 shipped -- full, drift-free coverage across all six supported locales (en, es, de, ja, zh-CN, zh-TW) for every showcase marketing page plus the stats page, the long-deferred locale-cookie redirect bug, and a CI gate that catches future drift automatically.
+
+**Target features:**
+- Full-page audit: verify every translatable string on every showcase page (lattice, phantom-stream, prometheus, home, mobile nav, and other surfaces added since v0.9.63) is genuinely translated in all 5 non-English locales, not just marked with an `i18n` attribute.
+- Resync the trans-units whose English source actually changed in commit `6d3ad363` ("chore(i18n): sync messages.xlf with showcase copy refinements") across all 5 translated locale files (es/de/ja/zh-CN/zh-TW). Research corrected the initial estimate: only 5 of the 247 touched trans-unit blocks have real `<source>` text drift (`agents.meta.description`, `agents.schema.software.description`, `home.meta.description`, `support.faq.q.tools.a`, `support.schema.faq.tools.a`) -- the other 242 are harmless `<context-group><linenumber>` churn. The full-page audit phase (below) may surface additional drift beyond this one commit's blast radius.
+- Bring the stats page into full translation and drop it from the `lint:i18n` ignore-pattern in `showcase/angular/package.json` (dashboard stays excluded -- app surface, not marketing content, out of scope for this milestone).
+- Fix WARNING-02 (carried since v0.9.63): picker-set `fsb-locale` cookie no longer short-circuits the bare-`/` Accept-Language redirect for returning fresh-tab/shared-link visitors.
+- New CI drift-detection gate: fail the build if `messages.xlf` source content changes without a corresponding update to all 5 translated locale files.
+
+**Key context:** Supported locales are fixed (en source + es/de/ja/zh-CN/zh-TW) -- not up for debate, carried over from v0.9.63's `LocaleService` + locale-constants module. Builds on existing tooling: `lint:i18n` eslint check, `verify-locale-sync.mjs`, `ng extract-i18n`. This is the second attempt at closing this exact gap -- v0.9.63 left dashboard + WARNING-02 as accepted debt that then sat untouched through 6+ subsequent milestones (v0.9.69, v0.10.0, v0.11.0, v0.12.0, v1.0.0, v1.1.0).
+
+**Progress:** Phase 52 (Full-Page Translation Completeness Audit) complete 2026-07-08 -- `audit-translation-completeness.mjs` confirms the true drift/gap scope across all 12 current routes and 5 locales: 5 drifted trans-units (matches the corrected estimate, superseding the original "247" figure), 54 orphaned ids/locale, and the `translations.stats-274.*.json` artifacts traced as 15/21 keys already merged into live XLIFF per locale (6 missing, 0 stale). This is the authoritative scope Phases 53-55 inherit.
 
 ## Last Milestone: v1.1.0 T1 App Execution Expansion
 
@@ -299,8 +316,6 @@ Carry-forward backlog candidates:
 
 ### Validated
 
-- ✓ HUD-06: Closed exact-origin context recognition and concise fail-quiet projection reject missing, conflicting, spoofed, or hostile evidence without guessing page identity -- Phase 53 automated verification (live Drive/Docs UAT remains human-needed)
-- ✓ HUD-09: Immutable semantic identity and revocable bindings survive deterministic reuse, reorder, detach, ABA, SPA, scroll, zoom, and resize mechanics or withdraw synchronously, with exact resource teardown -- Phase 53 automated verification (live paint/VoiceOver UAT remains human-needed)
 - ✓ Chrome Extension MV3 architecture with service worker -- existing
 - ✓ Multi-provider AI integration (xAI, OpenAI, Anthropic, Gemini) -- existing
 - ✓ DOM analysis and element identification -- existing
@@ -430,13 +445,33 @@ Carry-forward backlog candidates:
 
 ### Active
 
-(Milestone v1.2.0 Skopeo -- started 2026-07-14. Atomic requirements are approved in `REQUIREMENTS.md`; the broader milestone hypotheses below remain active until their owning phases are verified.)
+(Milestone v0.9.91 MCP Clients as Providers -- Phases 57-63 are verified complete. NATIVE-01..04 validated in Phase 63: Native-Messaging Host. Remaining active requirements are MULTI-01..06; 45/51 requirements are complete.)
 
-- [ ] Users can invoke and dismiss Skopeo on demand without changing the host page when it is off.
-- [ ] Capability packs compose a small, consistent HUD grammar through semantic anchors and page-genre attention budgets.
-- [ ] Authorized Google Drive users can see vendor-agreement state, deadlines, ownership, gaps, and governing document lineage overlaid on Drive and Docs.
-- [ ] Users can ask contract questions and receive permission-scoped, confidence-marked answers with citations to the governing source spans.
-- [ ] FSB can maintain and query an incremental, provenance-rich document relationship graph locally inside Chrome using selectively adapted Graphify patterns, existing FSB model providers, and optional existing MCP surfaces rather than any new runtime or service.
+### Validated (v0.9.91)
+
+- [x] IDENT-01: Onboarding copy actions persist durable, aggregated per-client intent without changing clipboard feedback -- Phase 57.
+- [x] IDENT-02: Stdio and streamable-HTTP MCP initialization identity crosses the existing bridge through optional additive registration evidence -- Phase 57.
+- [x] IDENT-03: Sanitized client identity persists on live AgentRecords and canonical durable connected rows, with reconnects updating in place -- Phase 57.
+- [x] IDENT-04: The daemon reports the full platform registry inventory with fixed, shell-free Claude Code version probing and dual tolerant delivery -- Phase 57.
+- [x] IDENT-05: A guarded fresh-on-read `getMcpClients` action returns the durable clicked/installed/connected plus live evidence union -- Phase 57.
+- [x] PROV-01: Providers is the canonical route and legacy `#api-config` normalizes without breaking source-pin contracts -- Phase 58.
+- [x] PROV-02: Seven API and three agent providers use explicit closed kind/id domains -- Phase 58.
+- [x] PROV-03: Agent mode removes API controls and presents truthful install, connection, account, setup, usage, and credential-boundary details -- Phase 58.
+- [x] PROV-04: Agent intent remains isolated from API-only `modelProvider`; latent BYOK state survives switching, refresh, delayed work, and cancellation races -- Phase 58.
+- [x] PROV-05: Exactly one non-selecting recommendation follows live > installed > clicked > xAI with raw identities excluded -- Phase 58.
+- [x] PROV-06: Usage and billing avoid fabricated currency or subscription claims; unknown auth reports Billing not reported and links fixed official destinations -- Phase 58.
+- [x] CHAN-01: A separate strict `ext:request` / `ext:event` / `ext:response` family crosses the existing bridge while historical MCP and default relay bytes remain frozen -- Phase 59.
+- [x] CHAN-02: Optional `agent-spawn` capabilities route reverse requests local-first, then to the first capable relay, with a typed offline fallback and no default production advertisement -- Phase 59.
+- [x] CHAN-03: Loopback bind, exact Host, exact extension Origin, pre-registration classification, and per-frame current-session checks enforce the browser-to-daemon trust boundary -- Phase 59.
+- [x] CHAN-04: Explicit session-only pairing uses a 32-byte daemon-session secret, durable exact Origin binding, reset/rebind, secret-free authorization probe, and rotation revocation -- Phase 59.
+- [x] CHAN-05: Caller and diagnostic-sink redaction remove bridge-secret tokens and raw/interior-token tests remain green -- Phase 59.
+- [x] CHAN-06: Hub/relay/stale-socket churn settles reverse work exactly once, clears ownership maps, and never replays automatically -- Phase 59.
+- [x] CHAN-07: Every MCP build recursively rejects forbidden agent auto-approval flags before TypeScript compilation -- Phase 59.
+- [x] ADAPT-01..05: The serve-owned five-method adapter contract, shell-free supervisor, stdin-only prompt path, exact process-tree cancellation, and orphan recovery are enforced -- Phase 60.
+- [x] CLAUDE-01..04: Claude Code uses the pinned hermetic task-mode profile, production stream parser/fixture, closed compatibility classifier, and no session persistence -- Phase 60.
+- [x] UX-01..06: Consent, delegated routing, live feed, background ownership, Take Control/Stop, and honest usage/offline recovery are implemented without weakening BYOK behavior -- Phase 61.
+- [x] LIFE-01..04: Session-backed event persistence, exact recovery, active-only heartbeat, hold/resume, and daemon-restart classification survive MV3 worker eviction -- Phase 61.
+- [x] DRIFT-01..04: Registry-driven offline drift CI, safe doctor text/JSON, sanitized rate-limited runtime diagnostics, and one canonical browser-consumed compatibility matrix are enforced -- Phase 62.
 
 ### Validated (v0.9.99)
 
@@ -605,10 +640,6 @@ The following backlog items are formally retired in v0.9.45rc1. Better external 
 
 **Previous milestones:** v0.9 (Reliability), v9.0.2 (AI Situational Awareness), v9.3 (Tech Debt), v9.4 (Career Search), v10.0 (CLI Architecture), v0.9.2 (Productivity Sites), v0.9.3 (Memory Tab), v0.9.4 (AI Quality), v0.9.5 (Progress Overlay Intelligence), v0.9.6 (Agents & Remote Control), v0.9.7 (MCP Edge Case Validation), v0.9.9 (Excalidraw Mastery + Canvas Vision), v0.9.20 (Autopilot Agent Architecture Rewrite)
 
-**Skopeo v1.2.0 product context:** The initial operational problem is vendor-contract lifecycle and compliance management over a Drive folder named `vendor agreements`, with one subfolder per vendor. The source material calls for state-aware amendments and supersession, exact signed/expiration/termination/notice facts (including written-notice address), 90-day owner alerts, a mandatory Document 10 review rule, exceptional memos for roughly 1% of complex agreements, and permission-scoped natural-language questions such as whether Priceline terms permit airline-channel rental-car sales. The proposed GCP, NotebookLM, Sheets, and LM Studio implementation is context only; this milestone designs the capability natively inside FSB.
-
-**Skopeo design context:** The HUD reference keeps Drive as Drive and adds three on-demand states: folder intelligence, document-reading state awareness, and a cited ask overlay. It defines a shared six-primitive grammar and an ambient -> anchored -> interstitial intensity ladder. Dark FSB surfaces, Space Mono micro-labels, thin borders, and scarce orange glow are the visual language; the anchoring behavior and attention budget matter more than copying the static mockup pixel-for-pixel.
-
 **Tech stack:** Chrome Extension Manifest V3, vanilla JavaScript (ES2021+), xAI Grok / OpenAI / Anthropic / Gemini / OpenRouter APIs.
 **Codebase:** background.js (~11K lines), ai-integration.js (~5K lines), content/ modules (10 files), 50+ site guide files, CLI parser (cli-parser.js), Task Memory system.
 
@@ -626,26 +657,11 @@ The following backlog items are formally retired in v0.9.45rc1. Better external 
 - **No build system**: Direct JavaScript execution, no transpilation - keep it simple
 - **AI dependency**: Relies on external AI APIs - must handle latency, rate limits, failures gracefully
 - **Browser security**: Content scripts run in isolated world, limited access to page JavaScript context
-- **Invocation**: Skopeo is on-demand, never an always-on page layer; dismissal and a universal kill switch must be immediate and reliable.
-- **Host integrity**: Assistance overlays the user's existing page instead of replacing it with a standalone contract application; anchoring must not mutate or destabilize host layouts.
-- **Chrome-local intelligence**: Graph construction, storage, indexing, provenance, and traversal run as bundled JavaScript inside the extension using browser-native storage and existing MiniSearch; no Graphify runtime, Python process, graph database, vector database, daemon, or remote graph service.
-- **Existing AI/MCP only**: Model-assisted extraction and synthesis use the already-configured FSB provider layer with bounded permission-scoped excerpts. MCP is an optional existing interface, not a new server or runtime dependency. No new AI vendor, required LM Studio setup, MCP daemon, or tool-per-feature surface.
-- **Native integration**: Do not depend on GCP, NotebookLM, Google Sheets, or another external orchestration surface for the capability.
-- **Access control**: Retrieval, graph traversal, cached derived data, and answers must never broaden the user's underlying Google Drive permissions.
-- **Trust**: Governing-version claims, extracted dates, compliance answers, and action-driving facts require source citations, provenance, confidence state, and explicit uncertainty when evidence is incomplete or conflicting.
-- **Design system**: Reuse FSB tokens and HUD grammar from the supplied design reference; orange glow remains a scarce attention signal rather than decoration.
 
 ## Key Decisions
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Build Skopeo as an on-demand overlay, not a separate app or always-on assistant | The value is contextual instrumentation on the user's existing workflow; persistent chrome would consume attention and violate the approved product framing | Pending -- v1.2.0 framing |
-| Treat semantic anchoring as the platform and the Drive contract experience as its first capability pack | Reliable placement and page-genre routing are the reusable moat; contract intelligence is the first concrete proof | Pending -- v1.2.0 framing |
-| Standardize six HUD primitives and a four-level attention ladder | A constrained visual grammar keeps future capability packs coherent and makes attention an explicit budget | Pending -- design reference approved |
-| Run the selectively adapted Graphify-style engine locally inside Chrome | Stable identities, provenance, incremental replacement, confidence, retrieval, and bounded traversal can be implemented in bundled JavaScript with browser-native storage; a foreign runtime, graph service, or database would violate the lightweight FSB-native goal | Approved -- v1.2.0 requirements |
-| Reuse only existing FSB AI providers and optional existing MCP surfaces | Model calls may process bounded accessible excerpts through the user's configured provider, while graph execution stays local; no new AI vendor, MCP daemon, or tool-per-feature surface is necessary | Approved -- v1.2.0 requirements |
-| Scope v1.2 notifications to the current FSB Chrome user | A browser-local implementation can reconcile and audit current-user notifications honestly; mapped teammates without a local recipient are surfaced as undeliverable until an authorized team delivery adapter is separately approved | Approved default -- v1.2.0 requirements |
-| Keep Drive as the system of interaction and enforce source permissions end to end | Users should work where the documents live, and derived intelligence must not become a permission bypass | Pending -- v1.2.0 research |
 | Focus on mechanics, not AI | User confirmed AI intent is correct, execution layer is the problem | Good -- v0.9 shipped with reliable execution |
 | Visual feedback with orange glow | User specifically requested seeing what's being targeted | Good -- Shadow DOM isolation prevents CSS conflicts |
 | Single-attempt reliability over retry sophistication | Core value is precision, not recovery from imprecision | Good -- verification + fallback selectors cover edge cases |
@@ -720,4 +736,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-07-16 -- Phase 53 remains automated-complete with Drive/Docs/VoiceOver UAT human-needed; catalog-wide adaptive HUD scope was clarified and inserted as Phase 53.1 before Phase 54.*
+*Last updated: 2026-07-21 -- Phase 64 OpenCode Adapter deterministically complete; 45 live scenarios remain deferred to the milestone-end sweep. Next: Phase 65 Codex Adapter.*

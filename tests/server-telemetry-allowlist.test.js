@@ -1,7 +1,7 @@
 /**
- * Phase 273 / INGEST-09 + D-12 -- 9-field strict allowlist.
+ * Phase 273 / INGEST-09 + D-12 -- strict allowlist with optional active v2.
  *
- * A 10th field (any name) -> 400 unknown_field, with the offending field
+ * An unknown field -> 400 unknown_field, with the offending field
  * name returned in the response. Order of checking is preserved: the first
  * unknown key encountered is reported.
  *
@@ -116,10 +116,10 @@ function post(events) {
   let parsed3 = null; try { parsed3 = JSON.parse(r3.body); } catch {}
   check('field === "innerHTML"', parsed3 && parsed3.field === 'innerHTML', `body=${r3.body}`);
 
-  // The 9-field exact event still passes (sanity).
+  // The legacy exact event without an active-count version still passes.
   const ev4 = baseEvent();
   const r4 = await post([ev4]);
-  check('exact 9 fields -> 200 (sanity)', r4.statusCode === 200, `got ${r4.statusCode}, body=${r4.body}`);
+  check('exact legacy fields -> 200 during rollout', r4.statusCode === 200, `got ${r4.statusCode}, body=${r4.body}`);
 
   // Sanity: bad UUIDv4 shape is a separate error.
   const ev5 = baseEvent();
@@ -152,6 +152,61 @@ function post(events) {
   ev9.mcp_client = 'OpenClaw 🦀';
   const r9 = await post([ev9]);
   check('mcp_client === "OpenClaw 🦀" -> 200 (emoji label survives JSON encoding)', r9.statusCode === 200, `got ${r9.statusCode}, body=${r9.body}`);
+
+  const ev10 = baseEvent();
+  ev10.active_agent_count = 65;
+  const r10 = await post([ev10]);
+  check('legacy leaked active count is accepted so token/user data survives rollout', r10.statusCode === 200,
+    `got ${r10.statusCode}, body=${r10.body}`);
+  const storedLegacy = db.prepare('SELECT active_agent_count, active_count_version FROM telemetry_events WHERE event_id = ?').get(ev10.event_id);
+  check('legacy leaked active count is quarantined as untrusted zero',
+    storedLegacy && storedLegacy.active_agent_count === 0 && storedLegacy.active_count_version === 0,
+    `got ${JSON.stringify(storedLegacy)}`);
+
+  const ev11 = baseEvent();
+  ev11.active_agent_count = 64;
+  ev11.active_count_version = 2;
+  const r11 = await post([ev11]);
+  check('v2 active_agent_count at registry maximum -> 200', r11.statusCode === 200, `got ${r11.statusCode}, body=${r11.body}`);
+  const storedV2 = db.prepare('SELECT active_agent_count, active_count_version FROM telemetry_events WHERE event_id = ?').get(ev11.event_id);
+  check('v2 active count and version persist',
+    storedV2 && storedV2.active_agent_count === 64 && storedV2.active_count_version === 2,
+    `got ${JSON.stringify(storedV2)}`);
+
+  const invalidV2 = baseEvent();
+  invalidV2.active_agent_count = 65;
+  invalidV2.active_count_version = 2;
+  const invalidV2Response = await post([invalidV2]);
+  let parsedInvalidV2 = null; try { parsedInvalidV2 = JSON.parse(invalidV2Response.body); } catch {}
+  check('v2 active count above registry maximum -> 400', invalidV2Response.statusCode === 400,
+    `got ${invalidV2Response.statusCode}, body=${invalidV2Response.body}`);
+  check('invalid v2 count has typed error', parsedInvalidV2 && parsedInvalidV2.error === 'invalid_active_agent_count',
+    `body=${invalidV2Response.body}`);
+
+  const ev12 = baseEvent();
+  ev12.tokens_in = 10_000_001;
+  const r12 = await post([ev12]);
+  let parsed12 = null; try { parsed12 = JSON.parse(r12.body); } catch {}
+  check('tokens_in above plausible five-minute ceiling -> 400', r12.statusCode === 400, `got ${r12.statusCode}, body=${r12.body}`);
+  check('oversized token event has typed error', parsed12 && parsed12.error === 'invalid_tokens_in', `body=${r12.body}`);
+
+  const ev13 = baseEvent();
+  ev13.tokens_out = 10_000_000;
+  const r13 = await post([ev13]);
+  check('tokens_out at plausible ceiling -> 200', r13.statusCode === 200, `got ${r13.statusCode}, body=${r13.body}`);
+
+  const mixedA = baseEvent();
+  const mixedB = baseEvent();
+  const r14 = await post([mixedA, mixedB]);
+  let parsed14 = null; try { parsed14 = JSON.parse(r14.body); } catch {}
+  check('batch containing multiple install UUIDs -> 400', r14.statusCode === 400, `got ${r14.statusCode}, body=${r14.body}`);
+  check('mixed-identity batch has typed error', parsed14 && parsed14.error === 'mixed_install_uuid_batch', `body=${r14.body}`);
+
+  const sameA = baseEvent();
+  const sameB = baseEvent();
+  sameB.install_uuid = sameA.install_uuid;
+  const r15 = await post([sameA, sameB]);
+  check('multi-event batch for one install UUID remains valid -> 200', r15.statusCode === 200, `got ${r15.statusCode}, body=${r15.body}`);
 
   server.close();
   db.close();

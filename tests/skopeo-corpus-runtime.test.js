@@ -968,7 +968,7 @@ function testStaticSafetyAndExistingLifecycle() {
 
 function markedSource(source, startMarker, endMarker) {
   const start = source.indexOf(startMarker);
-  const end = source.indexOf(endMarker);
+  const end = source.indexOf(endMarker, start + startMarker.length);
   assert.notStrictEqual(start, -1, `${startMarker} exists`);
   assert.notStrictEqual(end, -1, `${endMarker} exists`);
   assert.ok(end > start, `${startMarker} precedes ${endMarker}`);
@@ -1048,7 +1048,7 @@ function testBackgroundCorpusIntegrationContract() {
   const contentFiles = markedSource(
     BACKGROUND_SOURCE,
     'const CONTENT_SCRIPT_FILES = [',
-    '/* FSB_SKOPEO_CONTROLLER_START */'
+    '];'
   );
   const injectionFiles = markedSource(
     BACKGROUND_SOURCE,

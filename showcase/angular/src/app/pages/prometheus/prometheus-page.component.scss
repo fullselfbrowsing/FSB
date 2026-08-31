@@ -505,3 +505,54 @@
     display: none;
   }
 }
+
+/* Mobile-native polish. Append-only region: these rules override the
+   @media (max-width: 560px) block above purely by source order — do not
+   move or merge them upward, and never edit the rules above. */
+@media (max-width: 560px) {
+  .pr-wrap {
+    min-height: 100vh;
+    min-height: 100svh;
+  }
+
+  .pr-word {
+    font-size: clamp(2.5rem, 12vw, 3rem);
+    letter-spacing: -0.035em;
+  }
+
+  .pr-sub {
+    margin-top: 14px;
+  }
+
+  .pr-lead {
+    font-size: 0.95rem;
+    line-height: 1.75;
+    margin-top: 24px;
+  }
+
+  .pr-count {
+    margin-top: 40px;
+  }
+
+  .pr-num {
+    border-radius: 14px;
+    font-size: clamp(2.1rem, 11vw, 2.9rem);
+  }
+
+  .pr-unit-label {
+    font-size: 0.64rem;
+    letter-spacing: 0.12em;
+  }
+
+  .pr-approx {
+    align-items: flex-start;
+    font-size: 0.8rem;
+    padding: 0 8px;
+    text-align: left;
+  }
+
+  .pr-footnote {
+    font-size: 0.74rem;
+    margin-top: 36px;
+  }
+}

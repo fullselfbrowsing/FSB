@@ -275,13 +275,13 @@ The override only works because the slug-suffix branch (lines 179-188) saves it.
 
 ---
 
-#### LO-03: `package.json` version/license/badge metadata is internally inconsistent (pre-existing, surfaced by this phase's audit)
+#### LO-03: `package.json` version/package filename metadata is internally inconsistent (pre-existing, surfaced by this phase's audit)
 
-**File:** `package.json:3` (`"version": "0.9.90"`), `:71` (`"license": "BUSL-1.1"`), `:133` (badge `license-MIT`), `:24` (`package` script hardcodes `fsb-v0.9.90.zip`)
+**File:** `package.json:3` (`"version": "0.9.90"`), `:71` (`"license": "MIT"`), `:133` (badge `license-MIT`), `:24` (`package` script hardcodes `fsb-v0.9.90.zip`)
 
-**Issue:** The package declares `version: 0.9.90` while the milestone/requirements target v1.0.0; the SPDX `license` is `BUSL-1.1` but the README badge advertises `license-MIT`; the `package` zip name is hardcoded to the version string (drifts silently on bump). None is a Phase-36 regression, but the OpenTabs descriptors this phase vendors are stamped `license: 'MIT'` in-descriptor while the package is BUSL-1.1, so the license story now spans two values and deserves a deliberate note. Not a code defect.
+**Issue:** The package declares `version: 0.9.90` while the milestone/requirements target v1.0.0, and the `package` zip name is hardcoded to the version string (drifts silently on bump). The SPDX field, README badge, and vendored OpenTabs descriptors now consistently advertise MIT. The remaining version drift is not a Phase-36 regression or a code defect.
 
-**Fix:** Out of Phase-36 scope; recommend a metadata-reconciliation pass (align the SPDX license with the badge, parameterize the zip name) tracked separately.
+**Fix:** Out of Phase-36 scope; recommend a version-metadata reconciliation pass that parameterizes the zip name.
 
 ---
 

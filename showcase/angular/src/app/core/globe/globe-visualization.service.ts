@@ -46,7 +46,9 @@ export class GlobeVisualizationService {
 
   /**
    * Wire the globe into `canvas`, scattering pulsing nodes around `regions`.
-   * Starts its own requestAnimationFrame loop and a window resize listener.
+   * Starts a requestAnimationFrame loop and a window resize listener. Pass
+   * `animate = false` for a single-frame, reduced-motion rendering that still
+   * redraws after resize or coastline load.
    *
    * `random` drives the per-node jitter. Callers that draw other values from
    * the same seeded stream first (region counts, see SiteMapsPageComponent)
@@ -57,7 +59,8 @@ export class GlobeVisualizationService {
   setupGlobe(
     canvas: HTMLCanvasElement,
     regions: readonly GlobeRegion[],
-    random: () => number = createSeededRandom(719)
+    random: () => number = createSeededRandom(719),
+    animate = true
   ): () => void {
     const ctx = canvas.getContext('2d');
     if (!ctx) return () => undefined;
@@ -67,6 +70,7 @@ export class GlobeVisualizationService {
     let radius = 0;
     let cx = 0;
     let cy = 0;
+    let redrawStatic: (() => void) | null = null;
 
     const resize = (): void => {
       const rect = canvas.getBoundingClientRect();
@@ -79,6 +83,7 @@ export class GlobeVisualizationService {
       canvas.width = Math.round(width * dpr);
       canvas.height = Math.round(height * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      redrawStatic?.();
     };
 
     resize();
@@ -120,6 +125,7 @@ export class GlobeVisualizationService {
       : this.loadNaturalEarthDots((dots) => {
           this.cachedLandDots = dots;
           landDots = dots;
+          redrawStatic?.();
         });
 
     const accent = [255, 107, 53] as const;
@@ -211,10 +217,15 @@ export class GlobeVisualizationService {
         ctx.fill();
       }
 
-      rafId = window.requestAnimationFrame(draw);
+      if (animate) rafId = window.requestAnimationFrame(draw);
     };
 
-    rafId = window.requestAnimationFrame(draw);
+    if (animate) {
+      rafId = window.requestAnimationFrame(draw);
+    } else {
+      redrawStatic = () => draw(performance.now());
+      redrawStatic();
+    }
 
     return () => {
       if (rafId !== null) {
@@ -222,6 +233,7 @@ export class GlobeVisualizationService {
         rafId = null;
       }
       window.removeEventListener('resize', resize);
+      redrawStatic = null;
       coastlineAbort?.abort();
     };
   }

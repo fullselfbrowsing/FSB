@@ -353,17 +353,17 @@ function installChromeStub(shim) {
     const m = freshRequire();
 
     // 400 chars -> Math.ceil(400/4) = 100, max(50, 100) = 100
-    const e1 = m._estimateTokensForTool('type_text', { text: 'a'.repeat(400) });
+    const e1 = m._estimateTokensForTool('type_text', { textLength: 400 });
     passAssertEqual(e1.tokens_in, 100, 'type_text 400 chars -> tokens_in = 100');
     passAssertEqual(e1.tokens_out, 30, 'type_text 400 chars -> tokens_out = 30');
     passAssertEqual(e1.token_source, 'estimate', 'type_text 400 chars -> token_source = estimate');
 
     // 2 chars -> Math.ceil(2/4) = 1, max(50, 1) = 50 (floor)
-    const e2 = m._estimateTokensForTool('type_text', { text: 'hi' });
+    const e2 = m._estimateTokensForTool('type_text', { textLength: 2 });
     passAssertEqual(e2.tokens_in, 50, 'type_text "hi" -> tokens_in = 50 (floor)');
 
     // undefined text -> empty string fallback -> Math.ceil(0/4) = 0 -> max(50, 0) = 50
-    const e3 = m._estimateTokensForTool('insert_text', { text: undefined });
+    const e3 = m._estimateTokensForTool('insert_text', {});
     passAssertEqual(e3.tokens_in, 50, 'insert_text undefined text -> tokens_in = 50 (floor)');
 
     // null payload entirely
@@ -371,7 +371,7 @@ function installChromeStub(shim) {
     passAssertEqual(e4.tokens_in, 50, 'type_text null payload -> tokens_in = 50');
 
     // 8 chars -> Math.ceil(8/4) = 2, max(50, 2) = 50
-    const e5 = m._estimateTokensForTool('type_text', { text: '12345678' });
+    const e5 = m._estimateTokensForTool('type_text', { textLength: 8 });
     passAssertEqual(e5.tokens_in, 50, 'type_text 8 chars -> tokens_in = 50 (floor)');
 
     // Now record a dispatch and assert the row carries the scaled value.
@@ -382,8 +382,7 @@ function installChromeStub(shim) {
     await m.recordDispatch({
       client: 'Claude',
       tool: 'type_text',
-      requestPayload: { text: 'a'.repeat(400) },
-      response: { success: true },
+      requestMetadata: { textLength: 400 },
       success: true,
       dispatcher_route: 'tool'
     });

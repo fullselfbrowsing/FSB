@@ -37,13 +37,65 @@ const requiredSmokeTools = [
   'end_visual_session',
   'run_task',
   'stop_task',
+  'complete_task',
+  'partial_task',
+  'fail_task',
   'trigger',
   'stop_trigger',
   'get_trigger_status',
   'list_triggers',
   'get_logs',
+  'get_session_replay',
+  'replay_session',
   'back',
 ];
+
+// Session journals (ac377038) stamp every agent-scoped bridge payload with
+// correlation fields in buildAgentPayload() -- mcp/src/agent-bridge.ts. Two of
+// them are random UUIDs, so a whole-payload deepEqual can never match. Assert
+// the sidecar contract here, once per call, then strip it so the routing
+// assertions below stay about routing.
+const RECORDING_SIDECAR_FIELDS = ['recordingCallId', 'recordingRunId', 'recordingLeaseMs'];
+const RECORDING_UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function describeSidecar(payload) {
+  const seen = {};
+  for (const field of RECORDING_SIDECAR_FIELDS) {
+    if (Object.prototype.hasOwnProperty.call(payload, field)) seen[field] = payload[field];
+  }
+  return JSON.stringify(seen);
+}
+
+function normalizeRecordingSidecar(toolName, call) {
+  const payload = call && call.message && call.message.payload;
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return call;
+
+  // buildAgentPayload() sets agentId and the correlation fields together, so
+  // agentId is the discriminator for whether the sidecar must be present.
+  if (Object.prototype.hasOwnProperty.call(payload, 'agentId')) {
+    // recordingRunId is conditional on the scope supporting the call lifecycle,
+    // so it is optional -- but must still be a UUID when it is emitted.
+    const valid = RECORDING_UUID_PATTERN.test(payload.recordingCallId)
+      && Number.isInteger(payload.recordingLeaseMs)
+      && payload.recordingLeaseMs > 0
+      && (payload.recordingRunId === undefined
+        || RECORDING_UUID_PATTERN.test(payload.recordingRunId));
+    assert(valid,
+      `${toolName} carries a well-formed journal sidecar on its agent-scoped send `
+        + `(got: ${describeSidecar(payload)})`);
+  } else {
+    const leaked = RECORDING_SIDECAR_FIELDS
+      .filter((field) => Object.prototype.hasOwnProperty.call(payload, field));
+    assert(leaked.length === 0,
+      `${toolName} sends no journal sidecar without an agentId to correlate it `
+        + `(unexpected: ${leaked.join(', ') || 'none'})`);
+  }
+
+  const stripped = { ...payload };
+  for (const field of RECORDING_SIDECAR_FIELDS) delete stripped[field];
+  return { ...call, message: { ...call.message, payload: stripped } };
+}
 
 async function invokeTool(harness, toolName, params = {}, extra = null) {
   const handler = harness.getHandler(toolName);
@@ -65,12 +117,13 @@ async function invokeTool(harness, toolName, params = {}, extra = null) {
   }
 
   assert(result && Array.isArray(result.content), `${toolName} smoke returns MCP content output`);
-  return call;
+  return call ? normalizeRecordingSidecar(toolName, call) : call;
 }
 
 async function run() {
   const runtimeModule = await loadBuildModule('runtime.js');
   const readOnlyModule = await loadBuildModule(pathJoin('tools', 'read-only.js'));
+  const screenshotsModule = await loadBuildModule(pathJoin('tools', 'screenshots.js'));
   const manualModule = await loadBuildModule(pathJoin('tools', 'manual.js'));
   const visualSessionModule = await loadBuildModule(pathJoin('tools', 'visual-session.js'));
   const autopilotModule = await loadBuildModule(pathJoin('tools', 'autopilot.js'));
@@ -85,6 +138,7 @@ async function run() {
   console.log('\n--- packaged runtime surface ---');
   assert(typeof runtimeModule.createRuntime === 'function', 'build/runtime.js exports createRuntime');
   assert(typeof readOnlyModule.registerReadOnlyTools === 'function', 'build/tools/read-only.js exports registerReadOnlyTools');
+  assert(typeof screenshotsModule.registerScreenshotTools === 'function', 'build/tools/screenshots.js exports registerScreenshotTools');
   assert(typeof manualModule.registerManualTools === 'function', 'build/tools/manual.js exports registerManualTools');
   assert(typeof visualSessionModule.registerVisualSessionTools === 'function', 'build/tools/visual-session.js exports registerVisualSessionTools');
   assert(typeof autopilotModule.registerAutopilotTools === 'function', 'build/tools/autopilot.js exports registerAutopilotTools');
@@ -100,6 +154,15 @@ async function run() {
       'mcp:get-dom': { success: true, elements: [{ ref: 'e5' }] },
       'mcp:get-page-snapshot': { success: true, snapshot: '# Example\n- e1: button "Submit"', elementCount: 1 },
       'mcp:get-site-guides': { success: true, guide: { site: 'example.com', selectors: {} } },
+      'mcp:get-session-replay': {
+        success: true,
+        replay: { verified: true, manifestHash: 'smoke-manifest-hash', steps: [] }
+      },
+      'mcp:replay-session': {
+        success: true,
+        status: 'approval_required',
+        requestId: 'smoke-replay-approval'
+      },
       'mcp:start-visual-session': ({ payload }) => ({
         success: true,
         sessionToken: 'visual_token_123',
@@ -113,6 +176,22 @@ async function run() {
       }),
       'mcp:start-automation': { success: true, sessionId: 'smoke-session', status: 'started' },
       'mcp:stop-automation': { success: true, stopped: true },
+      'mcp:task-status': ({ payload }) => {
+        if (payload.tool === 'fail_task') {
+          return {
+            success: false,
+            tool: 'fail_task',
+            status: 'failed',
+            error: payload.params.reason,
+            reason: payload.params.reason,
+          };
+        }
+        return {
+          success: true,
+          tool: payload.tool,
+          status: payload.tool === 'complete_task' ? 'completed' : 'partial',
+        };
+      },
       'mcp:trigger': ({ payload }) => ({ success: true, trigger_id: 'trg_smoke', status: 'armed', owner: payload.agentId }),
       'mcp:stop-trigger': ({ payload }) => ({ success: true, trigger_id: payload.trigger_id, stopped: true }),
       'mcp:get-trigger-status': ({ payload }) => ({ success: true, trigger_id: payload.trigger_id, status: 'armed' }),
@@ -126,6 +205,7 @@ async function run() {
   // with a deterministic { agentId: 'agent_test_smoke', ... } payload.
   const agentScope = await loadAgentScope();
   readOnlyModule.registerReadOnlyTools(harness.server, harness.bridge, harness.queue, agentScope);
+  screenshotsModule.registerScreenshotTools(harness.server, harness.bridge, harness.queue, agentScope);
   manualModule.registerManualTools(harness.server, harness.bridge, harness.queue, agentScope);
   visualSessionModule.registerVisualSessionTools(harness.server, harness.bridge, harness.queue, agentScope);
   triggersModule.registerTriggerTools(harness.server, harness.bridge, harness.queue, agentScope);
@@ -139,6 +219,7 @@ async function run() {
   for (const toolName of requiredSmokeTools) {
     assert(harness.handlers.has(toolName), `registered handlers include ${toolName}`);
   }
+  assert(harness.handlers.has('capture_screenshot'), 'registered handlers include capture_screenshot');
 
   console.log('\n--- bridge message families ---');
   const listTabsCall = await invokeTool(harness, 'list_tabs');
@@ -257,11 +338,108 @@ async function run() {
     'stop_task routes through mcp:stop-automation with agentId payload (Phase 238 includes agentId; Phase 240 strengthens with ownershipToken)',
   );
 
+  const completeTaskCall = await invokeTool(harness, 'complete_task', {
+    summary: 'Smoke task completed',
+    tab_id: 7,
+  });
+  assertDeepEqual(
+    completeTaskCall && completeTaskCall.message,
+    {
+      type: 'mcp:task-status',
+      payload: {
+        tool: 'complete_task',
+        params: { summary: 'Smoke task completed', tab_id: 7 },
+        agentId: 'agent_test_smoke',
+        ownershipToken: 'token_test_smoke',
+      },
+    },
+    'complete_task routes its client-authored summary with agent identity and tab_id',
+  );
+
+  const partialTaskCall = await invokeTool(harness, 'partial_task', {
+    summary: 'Useful work completed',
+    blocker: 'Manual approval required',
+    next_step: 'Approve the operation',
+  });
+  assertDeepEqual(
+    partialTaskCall && partialTaskCall.message,
+    {
+      type: 'mcp:task-status',
+      payload: {
+        tool: 'partial_task',
+        params: {
+          summary: 'Useful work completed',
+          blocker: 'Manual approval required',
+          next_step: 'Approve the operation',
+        },
+        agentId: 'agent_test_smoke',
+        ownershipToken: 'token_test_smoke',
+      },
+    },
+    'partial_task routes summary, blocker, and next step through mcp:task-status',
+  );
+
+  const failTaskHandler = harness.getHandler('fail_task');
+  assert(typeof failTaskHandler === 'function', 'fail_task registers a callable MCP handler');
+  const failTaskCallStart = harness.bridgeCalls.length;
+  const failTaskResult = await failTaskHandler(
+    { reason: 'Unrecoverable test failure' },
+    harness.createExtra(),
+  );
+  // Invoked directly rather than through invokeTool (it asserts on the handler's
+  // own error-shaped return), so apply the same sidecar contract by hand.
+  const failTaskCall = normalizeRecordingSidecar(
+    'fail_task',
+    harness.bridgeCalls[failTaskCallStart],
+  );
+  assertDeepEqual(
+    failTaskCall && failTaskCall.message,
+    {
+      type: 'mcp:task-status',
+      payload: {
+        tool: 'fail_task',
+        params: { reason: 'Unrecoverable test failure' },
+        agentId: 'agent_test_smoke',
+        ownershipToken: 'token_test_smoke',
+      },
+    },
+    'fail_task routes the client-authored reason through mcp:task-status',
+  );
+  assert(
+    failTaskResult && failTaskResult.isError !== true,
+    'a recorded fail_task outcome is returned as a normal MCP acknowledgement',
+  );
+  assertDeepEqual(
+    JSON.parse(failTaskResult.content[0].text),
+    {
+      success: false,
+      tool: 'fail_task',
+      status: 'failed',
+      error: 'Unrecoverable test failure',
+      reason: 'Unrecoverable test failure',
+    },
+    'fail_task acknowledgement preserves the recorded failure details',
+  );
+
   const getLogsCall = await invokeTool(harness, 'get_logs', { sessionId: 'smoke-session', count: 10 });
   assertDeepEqual(
     getLogsCall && getLogsCall.message,
     { type: 'mcp:get-logs', payload: { sessionId: 'smoke-session', count: 10 } },
     'get_logs routes through mcp:get-logs with observability payload',
+  );
+
+  const getReplayCall = await invokeTool(harness, 'get_session_replay', { sessionId: 'smoke-session' });
+  assertDeepEqual(
+    getReplayCall && getReplayCall.message,
+    { type: 'mcp:get-session-replay', payload: { sessionId: 'smoke-session' } },
+    'get_session_replay requests the verified structured manifest',
+  );
+
+  const replaySessionCall = await invokeTool(harness, 'replay_session', { sessionId: 'smoke-session' });
+  assertDeepEqual(
+    replaySessionCall && replaySessionCall.message,
+    { type: 'mcp:replay-session', payload: { sessionId: 'smoke-session' } },
+    'replay_session requests side-panel consent without target-page input',
   );
 
   // Phase 242 plan 02: 'back' routes through mcp:go-back. Bridge response
