@@ -3104,15 +3104,22 @@ try {
 
 let automationTimerInterval = null;
 let automationTimerStartedAt = null;
-let automationPixelCycleTimeout = null;
-let automationPixelTimeouts = [];
-let automationPixelRevealIndex = 0;
+let automationPixelRafId = null;
+let automationPixelAnimations = null;
 
+// The loader's letter fade lives in CSS (@keyframes fsb-letter-cycle, one 2.7s
+// iteration per letter, staggered by AUTOMATION_PIXEL_LETTER_SLOT_MS). The pixel
+// fill below does NOT re-time that from scratch -- it reads the CSS animation's
+// own progress each frame and derives which pixels should be lit. Scheduling the
+// fill on a second clock (setTimeout) is what used to make the loader glitch:
+// the two drifted apart, and every mid-run showAutomationRunner() call reset the
+// JS phase while CSS kept its own, so letters rendered blank or half-formed.
 const AUTOMATION_PIXEL_REVEAL_DIRECTIONS = ['bottom-up', 'left-right', 'top-bottom', 'right-left'];
 const AUTOMATION_PIXEL_CYCLE_MS = 2700;
 const AUTOMATION_PIXEL_LETTER_SLOT_MS = 900;
 const AUTOMATION_PIXEL_VISIBLE_OFFSET_MS = 320;
-const AUTOMATION_PIXEL_STEP_MS = 34;
+const AUTOMATION_PIXEL_STEP_MS = 28;
+const AUTOMATION_PIXEL_LETTER_ANIMATION = 'fsb-letter-cycle';
 
 function formatAutomationElapsed(startedAt) {
   if (typeof startedAt !== 'number') return '0.000s';
@@ -3151,28 +3158,6 @@ function clearAutomationPixelClasses() {
   });
 }
 
-function clearAutomationPixelTimeouts() {
-  automationPixelTimeouts.forEach(function (timeoutId) {
-    clearTimeout(timeoutId);
-  });
-  automationPixelTimeouts = [];
-  if (automationPixelCycleTimeout) {
-    clearTimeout(automationPixelCycleTimeout);
-    automationPixelCycleTimeout = null;
-  }
-}
-
-function queueAutomationPixelTimeout(fn, delay) {
-  var timeoutId = setTimeout(function () {
-    automationPixelTimeouts = automationPixelTimeouts.filter(function (id) {
-      return id !== timeoutId;
-    });
-    fn();
-  }, delay);
-  automationPixelTimeouts.push(timeoutId);
-  return timeoutId;
-}
-
 function getAutomationPixelOrder(letter, direction) {
   return Array.from(letter.children)
     .map(function (pixel, index) {
@@ -3196,44 +3181,124 @@ function getAutomationPixelOrder(letter, direction) {
     });
 }
 
-function revealAutomationLetterPixels(letter, direction) {
-  clearAutomationPixelClasses();
-  getAutomationPixelOrder(letter, direction).forEach(function (pixel, index) {
-    queueAutomationPixelTimeout(function () {
-      pixel.classList.add('pixel-lit');
-    }, index * AUTOMATION_PIXEL_STEP_MS);
+// How many pixels of a letter are lit at `progress`, the 0..1 iteration progress
+// of that letter's own CSS animation. `progress` is null while the animation is
+// still inside its animation-delay (the letter is invisible then, so nothing is
+// lit) and wraps back to 0 at each iteration boundary, which is what clears the
+// previous cycle's pixels -- no cross-letter wipe is needed. Pure so the node
+// suite can exercise it without a browser.
+function automationPixelLitCount(progress, pixelCount) {
+  if (typeof progress !== 'number' || !Number.isFinite(progress)) return 0;
+  var start = AUTOMATION_PIXEL_VISIBLE_OFFSET_MS / AUTOMATION_PIXEL_CYCLE_MS;
+  var step = AUTOMATION_PIXEL_STEP_MS / AUTOMATION_PIXEL_CYCLE_MS;
+  var count = Math.floor((progress - start) / step) + 1;
+  if (count < 0) return 0;
+  return count > pixelCount ? pixelCount : count;
+}
+
+// The reveal direction rotates every cycle. The previous scheduler advanced a
+// shared index by letters.length per cycle, so letter i of cycle n used
+// (letterCount * n + i) % 4; deriving it from the CSS iteration counter keeps
+// that sequence identical while removing the mutable index.
+function automationPixelDirectionIndex(iteration, letterIndex, letterCount) {
+  var total = AUTOMATION_PIXEL_REVEAL_DIRECTIONS.length;
+  if (!Number.isSafeInteger(iteration) || iteration < 0) return letterIndex % total;
+  return ((letterCount * iteration) + letterIndex) % total;
+}
+
+function automationPixelReducedMotion() {
+  try {
+    return typeof matchMedia === 'function'
+      && matchMedia('(prefers-reduced-motion: reduce)').matches === true;
+  } catch (_error) {
+    return false;
+  }
+}
+
+// Reduced motion switches the CSS letter cycle off, so there is no animation to
+// read and no reveal to run -- show one fully-lit letter instead of a blank box.
+function renderStaticAutomationPixelLetter() {
+  var letters = getAutomationPixelLetters();
+  if (!letters.length) return;
+  getAutomationPixelOrder(letters[0], 'top-bottom').forEach(function (pixel) {
+    pixel.classList.add('pixel-lit');
+  });
+}
+
+// Animations are recreated whenever the runner leaves display:none, so a cached
+// handle can go stale; re-resolve when it is missing or has been discarded.
+function getAutomationPixelAnimation(letter, letterIndex) {
+  if (!automationPixelAnimations) automationPixelAnimations = [];
+  var cached = automationPixelAnimations[letterIndex];
+  if (cached && cached.playState !== 'idle') return cached;
+  if (!letter || typeof letter.getAnimations !== 'function') return null;
+  var found = letter.getAnimations().filter(function (animation) {
+    return animation && animation.animationName === AUTOMATION_PIXEL_LETTER_ANIMATION;
+  })[0] || null;
+  automationPixelAnimations[letterIndex] = found;
+  return found;
+}
+
+function paintAutomationPixelFrame() {
+  var letters = getAutomationPixelLetters();
+  letters.forEach(function (letter, letterIndex) {
+    var animation = getAutomationPixelAnimation(letter, letterIndex);
+    var timing = (animation && animation.effect && typeof animation.effect.getComputedTiming === 'function')
+      ? animation.effect.getComputedTiming()
+      : null;
+    var direction = AUTOMATION_PIXEL_REVEAL_DIRECTIONS[
+      automationPixelDirectionIndex(timing ? timing.currentIteration : null, letterIndex, letters.length)
+    ];
+    var order = getAutomationPixelOrder(letter, direction);
+    var lit = automationPixelLitCount(timing ? timing.progress : null, order.length);
+    order.forEach(function (pixel, pixelIndex) {
+      pixel.classList.toggle('pixel-lit', pixelIndex < lit);
+    });
   });
 }
 
 function startAutomationPixelReveal() {
-  clearAutomationPixelTimeouts();
+  // Idempotent: showAutomationRunner() is called again on every delegation
+  // snapshot and on every tab-surface resync, and restarting the reveal there is
+  // what desynced it from the CSS letter fade.
+  if (automationPixelRafId !== null) return;
+  automationPixelAnimations = null;
   clearAutomationPixelClasses();
-  automationPixelRevealIndex = 0;
-
-  var letters = getAutomationPixelLetters();
-  if (!letters.length) return;
-
-  function runCycle() {
-    letters.forEach(function (letter, letterIndex) {
-      var directionIndex = (automationPixelRevealIndex + letterIndex) % AUTOMATION_PIXEL_REVEAL_DIRECTIONS.length;
-      var direction = AUTOMATION_PIXEL_REVEAL_DIRECTIONS[directionIndex];
-      queueAutomationPixelTimeout(function () {
-        revealAutomationLetterPixels(letter, direction);
-      }, AUTOMATION_PIXEL_VISIBLE_OFFSET_MS + (letterIndex * AUTOMATION_PIXEL_LETTER_SLOT_MS));
-    });
-
-    automationPixelRevealIndex = (automationPixelRevealIndex + letters.length) % AUTOMATION_PIXEL_REVEAL_DIRECTIONS.length;
-    automationPixelCycleTimeout = setTimeout(runCycle, AUTOMATION_PIXEL_CYCLE_MS);
+  if (automationPixelReducedMotion()) {
+    renderStaticAutomationPixelLetter();
+    return;
   }
+  if (typeof requestAnimationFrame !== 'function') return;
 
-  runCycle();
+  function frame() {
+    paintAutomationPixelFrame();
+    automationPixelRafId = requestAnimationFrame(frame);
+  }
+  automationPixelRafId = requestAnimationFrame(frame);
 }
 
 function stopAutomationPixelReveal() {
-  clearAutomationPixelTimeouts();
+  if (automationPixelRafId !== null) {
+    cancelAnimationFrame(automationPixelRafId);
+    automationPixelRafId = null;
+  }
+  automationPixelAnimations = null;
   clearAutomationPixelClasses();
-  automationPixelRevealIndex = 0;
 }
+
+// Toggling the OS setting mid-run swaps which of the two paths above is correct:
+// turning reduction ON removes the CSS animation the running loop reads from,
+// which would otherwise leave the loader an empty box for the rest of the task.
+try {
+  var automationPixelMotionQuery = matchMedia('(prefers-reduced-motion: reduce)');
+  if (automationPixelMotionQuery && typeof automationPixelMotionQuery.addEventListener === 'function') {
+    automationPixelMotionQuery.addEventListener('change', function () {
+      if (!automationRunner || automationRunner.classList.contains('hidden')) return;
+      stopAutomationPixelReveal();
+      startAutomationPixelReveal();
+    });
+  }
+} catch (_error) { /* reduced-motion changes are best-effort */ }
 
 function setAutomationRunnerText(text) {
   if (!automationRunnerLabel) return;

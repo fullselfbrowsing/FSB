@@ -2135,6 +2135,18 @@ body[data-sidepanel-view="history"] .author-footer {
     transform: none !important;
   }
 
+  /* The letter cycle stops, so the loader would otherwise be a blank box: pin
+     the first letter visible and let renderStaticAutomationPixelLetter() fill it. */
+  .pixel-letter {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+  }
+
+  .pixel-letter-f {
+    opacity: 1;
+  }
+
   .status-dot.running,
   .stop-btn[data-delegation-action="stop"],
   .stop-btn[data-delegation-action="stop"] i {

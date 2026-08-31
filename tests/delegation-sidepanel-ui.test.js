@@ -775,8 +775,11 @@ const replayCssEnd = cssSource.indexOf('/* Phase 11 FINT-20', replayCssStart);
 assert(replayCssStart !== -1 && replayCssEnd > replayCssStart,
   'the session-replay CSS block has stable boundaries');
 const delegationCssSource = cssSource.slice(0, replayCssStart) + cssSource.slice(replayCssEnd);
+// Rolled when the prefers-reduced-motion block gained .pixel-letter coverage:
+// the block already silenced the delegation spinner and status dot, but the
+// automation loader kept animating for users who asked it not to.
 assert.equal(sha256(delegationCssSource),
-  '8350ef7f06ca9d39bf967df14c539acd40f74b2f4aea34e94c2fa6700d7a1872',
+  'db8ee02f3ed61b84b9ced7af1e9c043460b4f8fa24ba222d79e235badb058ef7',
   'the intentional delegated and ownership-status CSS deltas remain exact outside replay UI');
 
 {
