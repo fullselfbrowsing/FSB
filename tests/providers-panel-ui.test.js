@@ -108,6 +108,18 @@ assert.match(apiSection, /id="agentProviderDetailsHeading"/);
 assert.match(apiSection, /existing local sign-in/);
 assert.match(apiSection, /id="grokBuildConnectionCard"[^>]*hidden/);
 assert.match(apiSection, /Connect SuperGrok/);
+assert.match(
+  providerSelects[0],
+  /<optgroup label="Harness Adapters">[\s\S]*claude-code[\s\S]*grok-build[\s\S]*<\/optgroup>/,
+  'the two local agents stay grouped apart from the API providers'
+);
+assert.match(apiSection, /id="claudeCodeConnectionCard"[^>]*hidden/);
+assert.match(
+  apiSection,
+  /id="claudeCodeAuthStatus"[^>]*>Not reported</,
+  'Claude Code reports no readable auth state, so its pill stays the fixed copy'
+);
+assert.match(apiSection, /does not report an auth state that FSB can safely read/);
 assert.match(apiSection, /shared weekly allowance; extra usage may apply/);
 assert.match(apiSection, /task text and FSB MCP results are sent to Grok for inference/);
 assert.equal((apiSection.match(/id="fullApiTest"/g) || []).length, 1);
@@ -136,7 +148,7 @@ assert.doesNotMatch(
 );
 assert.match(
   css,
-  /\.agent-card-actions\s+\[hidden\]\s*\{[^}]*display:\s*none\s*;/,
+  /\.agent-conn-actions\s+\[hidden\]\s*\{[^}]*display:\s*none\s*;/,
   'OAuth controls with hidden are removed even though control buttons use flex'
 );
 assert.match(
@@ -181,6 +193,7 @@ function testGrokBuildAuthRendering() {
   const makeElement = () => ({
     hidden: false,
     disabled: false,
+    dataset: {},
     href: 'https://grok.com/stale',
     textContent: '',
     removeAttribute(name) {
@@ -207,10 +220,17 @@ function testGrokBuildAuthRendering() {
   assert.equal(elements.disconnectGrokBuildBtn.hidden, true);
   assert.equal(elements.grokBuildLoginLink.hidden, true);
   assert.equal('href' in elements.grokBuildLoginLink, false);
+  assert.equal(elements.grokBuildAuthStatus.dataset.state, 'off');
 
   context.renderGrokBuildAuthState('oauth');
   assert.equal(elements.connectGrokBuildBtn.hidden, true);
   assert.equal(elements.disconnectGrokBuildBtn.hidden, false);
+  assert.equal(elements.grokBuildAuthStatus.dataset.state, 'on');
+  // A progress label outranks the stored state: the dot must agree with the
+  // words next to it, not with a sign-in that has since started failing.
+  context.renderGrokBuildAuthState('oauth', 'failed');
+  assert.equal(elements.grokBuildAuthStatus.dataset.state, 'off');
+  context.renderGrokBuildAuthState('oauth');
 
   elements.grokBuildLoginLink.href = 'https://grok.com/continue';
   elements.grokBuildLoginLink.hidden = false;

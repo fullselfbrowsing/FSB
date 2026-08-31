@@ -163,8 +163,10 @@
                   <option value="openrouter">OpenRouter</option>
                   <option value="lmstudio">LM Studio</option>
                   <option value="custom">Custom (OpenAI Compatible)</option>
-                  <option value="claude-code">Claude Code</option>
-                  <option value="grok-build">Grok Build</option>
+                  <optgroup label="Harness Adapters">
+                    <option value="claude-code">Claude Code</option>
+                    <option value="grok-build">Grok Build</option>
+                  </optgroup>
                 </select>
                 <div class="form-help">API providers use local keys. Agent CLIs use their existing local sign-in.</div>
                 <div id="retiredAgentProviderNotice" class="provider-retirement-notice" role="alert" hidden>
@@ -348,21 +350,48 @@
               </div>
 
               <div id="agentProviderDetails" hidden>
-                <h3 id="agentProviderDetailsHeading">Agent CLI</h3>
-                <p id="agentProviderHelp" class="form-help">FSB uses this CLI's existing local sign-in. Test Connection sends one small no-tools validation request.</p>
-                <div id="grokBuildConnectionCard" class="provider-card" hidden>
-                  <div class="provider-card-header">
-                    <h3>Grok Build</h3>
-                    <span id="grokBuildAuthStatus">Checking sign-in...</span>
+                <h3 id="agentProviderDetailsHeading" class="agent-conn-title">Agent CLI</h3>
+                <p id="agentProviderHelp" class="agent-conn-sub">FSB uses this CLI's existing local sign-in. Test Connection sends one small no-tools validation request.</p>
+
+                <div id="grokBuildConnectionCard" class="agent-conn" hidden>
+                  <div class="agent-conn-top">
+                    <span class="agent-conn-mark"><img src="../assets/onboarding/providers/xai.png" alt="" data-invert="1"></span>
+                    <span class="agent-conn-name">
+                      <h4>Grok Build</h4>
+                      <span class="agent-conn-meta">xAI &middot; local harness</span>
+                    </span>
+                    <span class="agent-conn-status" id="grokBuildAuthStatus" data-state="off">Checking sign-in...</span>
                   </div>
-                  <p id="grokBuildCompatibility" class="form-help">Requires the reviewed Grok Build 1.0.4 profile. Test Connection verifies installation, version, isolation, ACP, and cached OAuth without sending a prompt.</p>
-                  <p class="form-help">Uses your signed-in Grok account. SuperGrok usage draws from its shared weekly allowance; extra usage may apply.</p>
-                  <p class="form-help">Browser task text and FSB MCP results are sent to Grok for inference. FSB disables secondary telemetry and trace uploads for this private profile.</p>
-                  <div class="agent-card-actions">
+                  <dl class="agent-conn-rows">
+                    <div class="agent-conn-row"><dt>Profile</dt><dd id="grokBuildCompatibility">Requires the reviewed Grok Build 1.0.4 profile. Test Connection verifies installation, version, isolation, ACP, and cached OAuth without sending a prompt.</dd></div>
+                    <div class="agent-conn-row"><dt>Billing</dt><dd>Uses your signed-in Grok account. SuperGrok usage draws from its shared weekly allowance; extra usage may apply.</dd></div>
+                    <div class="agent-conn-row"><dt>Data</dt><dd>Browser task text and FSB MCP results are sent to Grok for inference. FSB disables secondary telemetry and trace uploads for this private profile.</dd></div>
+                  </dl>
+                  <div class="agent-conn-actions">
                     <button type="button" class="control-btn primary" id="connectGrokBuildBtn">Connect SuperGrok</button>
                     <button type="button" class="control-btn danger" id="disconnectGrokBuildBtn" hidden>Disconnect</button>
                     <a class="control-btn" id="grokBuildLoginLink" href="#" target="_blank" rel="noopener noreferrer" hidden>Continue sign-in</a>
-                    <a class="control-btn" href="https://docs.x.ai/build/overview" target="_blank" rel="noopener noreferrer">Installation guide</a>
+                    <a class="agent-conn-link" href="https://docs.x.ai/grok/faq" target="_blank" rel="noopener noreferrer">Review SuperGrok usage <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i></a>
+                    <a class="agent-conn-link" href="https://docs.x.ai/build/overview" target="_blank" rel="noopener noreferrer">Installation guide <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i></a>
+                  </div>
+                </div>
+
+                <div id="claudeCodeConnectionCard" class="agent-conn" hidden>
+                  <div class="agent-conn-top">
+                    <span class="agent-conn-mark"><span class="agent-conn-claude" role="img" aria-label="Claude"></span></span>
+                    <span class="agent-conn-name">
+                      <h4>Claude Code</h4>
+                      <span class="agent-conn-meta">Anthropic &middot; local harness</span>
+                    </span>
+                    <span class="agent-conn-status" id="claudeCodeAuthStatus" data-state="off">Not reported</span>
+                  </div>
+                  <dl class="agent-conn-rows">
+                    <div class="agent-conn-row"><dt>Sign-in</dt><dd>Uses the account signed into Claude Code. FSB does not need your Anthropic credential.</dd></div>
+                    <div class="agent-conn-row"><dt>Billing</dt><dd>Usage and charges follow that account's Claude plan or API configuration.</dd></div>
+                    <div class="agent-conn-row"><dt>Auth state</dt><dd>Claude Code does not report an auth state that FSB can safely read.</dd></div>
+                  </dl>
+                  <div class="agent-conn-actions">
+                    <a class="agent-conn-link" href="https://claude.com/pricing" target="_blank" rel="noopener noreferrer">Review Claude plans and billing <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i></a>
                   </div>
                 </div>
               </div>

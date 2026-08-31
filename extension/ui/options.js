@@ -289,6 +289,7 @@ function cacheElements() {
   elements.connectGrokBuildBtn = document.getElementById('connectGrokBuildBtn');
   elements.disconnectGrokBuildBtn = document.getElementById('disconnectGrokBuildBtn');
   elements.grokBuildLoginLink = document.getElementById('grokBuildLoginLink');
+  elements.claudeCodeConnectionCard = document.getElementById('claudeCodeConnectionCard');
   elements.modelSearch = document.getElementById('modelSearch');
   elements.modelName = document.getElementById('modelName');
   elements.apiKey = document.getElementById('apiKey');
@@ -454,6 +455,8 @@ function renderProviderKind() {
     && !requiresProviderReselection;
   const showGrokBuild = showAgentDetails
     && providerPanelState.agentProviderId === 'grok-build';
+  const showClaudeCode = showAgentDetails
+    && providerPanelState.agentProviderId === 'claude-code';
   if (elements.apiProviderDetails) {
     elements.apiProviderDetails.hidden = showAgentDetails || requiresProviderReselection;
   }
@@ -474,6 +477,7 @@ function renderProviderKind() {
     if (requiresProviderReselection) elements.fullApiTest.disabled = true;
   }
   if (elements.grokBuildConnectionCard) elements.grokBuildConnectionCard.hidden = !showGrokBuild;
+  if (elements.claudeCodeConnectionCard) elements.claudeCodeConnectionCard.hidden = !showClaudeCode;
   if (showAgentDetails) {
     const label = getAgentProviderLabel(providerPanelState.agentProviderId);
     if (elements.agentProviderDetailsHeading) {
@@ -530,8 +534,17 @@ function renderGrokBuildAuthState(state, progressState) {
     failed: 'Sign-in failed',
     cancelled: 'Sign-in cancelled'
   };
+  // Derive the pill's state from whichever label actually renders, so a progress
+  // label never contradicts the dot beside it.
+  const progressLabel = progressLabels[progressState];
+  const connected = progressLabel
+    ? progressState === 'authenticated'
+    : safeState === 'oauth';
   if (elements.grokBuildAuthStatus) {
-    elements.grokBuildAuthStatus.textContent = progressLabels[progressState] || labels[safeState];
+    elements.grokBuildAuthStatus.textContent = progressLabel || labels[safeState];
+    if (elements.grokBuildAuthStatus.dataset) {
+      elements.grokBuildAuthStatus.dataset.state = connected ? 'on' : 'off';
+    }
   }
   const busy = progressState === 'opening_browser' || progressState === 'waiting';
   if (elements.connectGrokBuildBtn) {
