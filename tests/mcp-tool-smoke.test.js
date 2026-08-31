@@ -50,6 +50,53 @@ const requiredSmokeTools = [
   'back',
 ];
 
+// Session journals (ac377038) stamp every agent-scoped bridge payload with
+// correlation fields in buildAgentPayload() -- mcp/src/agent-bridge.ts. Two of
+// them are random UUIDs, so a whole-payload deepEqual can never match. Assert
+// the sidecar contract here, once per call, then strip it so the routing
+// assertions below stay about routing.
+const RECORDING_SIDECAR_FIELDS = ['recordingCallId', 'recordingRunId', 'recordingLeaseMs'];
+const RECORDING_UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function describeSidecar(payload) {
+  const seen = {};
+  for (const field of RECORDING_SIDECAR_FIELDS) {
+    if (Object.prototype.hasOwnProperty.call(payload, field)) seen[field] = payload[field];
+  }
+  return JSON.stringify(seen);
+}
+
+function normalizeRecordingSidecar(toolName, call) {
+  const payload = call && call.message && call.message.payload;
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return call;
+
+  // buildAgentPayload() sets agentId and the correlation fields together, so
+  // agentId is the discriminator for whether the sidecar must be present.
+  if (Object.prototype.hasOwnProperty.call(payload, 'agentId')) {
+    // recordingRunId is conditional on the scope supporting the call lifecycle,
+    // so it is optional -- but must still be a UUID when it is emitted.
+    const valid = RECORDING_UUID_PATTERN.test(payload.recordingCallId)
+      && Number.isInteger(payload.recordingLeaseMs)
+      && payload.recordingLeaseMs > 0
+      && (payload.recordingRunId === undefined
+        || RECORDING_UUID_PATTERN.test(payload.recordingRunId));
+    assert(valid,
+      `${toolName} carries a well-formed journal sidecar on its agent-scoped send `
+        + `(got: ${describeSidecar(payload)})`);
+  } else {
+    const leaked = RECORDING_SIDECAR_FIELDS
+      .filter((field) => Object.prototype.hasOwnProperty.call(payload, field));
+    assert(leaked.length === 0,
+      `${toolName} sends no journal sidecar without an agentId to correlate it `
+        + `(unexpected: ${leaked.join(', ') || 'none'})`);
+  }
+
+  const stripped = { ...payload };
+  for (const field of RECORDING_SIDECAR_FIELDS) delete stripped[field];
+  return { ...call, message: { ...call.message, payload: stripped } };
+}
+
 async function invokeTool(harness, toolName, params = {}, extra = null) {
   const handler = harness.getHandler(toolName);
   assert(typeof handler === 'function', `${toolName} registers a callable MCP handler`);
@@ -70,7 +117,7 @@ async function invokeTool(harness, toolName, params = {}, extra = null) {
   }
 
   assert(result && Array.isArray(result.content), `${toolName} smoke returns MCP content output`);
-  return call;
+  return call ? normalizeRecordingSidecar(toolName, call) : call;
 }
 
 async function run() {
@@ -339,7 +386,12 @@ async function run() {
     { reason: 'Unrecoverable test failure' },
     harness.createExtra(),
   );
-  const failTaskCall = harness.bridgeCalls[failTaskCallStart];
+  // Invoked directly rather than through invokeTool (it asserts on the handler's
+  // own error-shaped return), so apply the same sidecar contract by hand.
+  const failTaskCall = normalizeRecordingSidecar(
+    'fail_task',
+    harness.bridgeCalls[failTaskCallStart],
+  );
   assertDeepEqual(
     failTaskCall && failTaskCall.message,
     {
