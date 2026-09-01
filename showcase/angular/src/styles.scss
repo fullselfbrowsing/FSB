@@ -487,6 +487,14 @@ body:lang(ja) {
     -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
+body:lang(ko) {
+  font-family:
+    'Apple SD Gothic Neo',
+    'Malgun Gothic', 'Segoe UI',
+    'Noto Sans CJK KR', 'Noto Sans KR', 'Nanum Gothic',
+    -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
 body:lang(zh-CN), body:lang(zh-Hans) {
   font-family:
     'PingFang SC', 'Hiragino Sans GB',
@@ -506,13 +514,14 @@ body:lang(zh-TW), body:lang(zh-Hant) {
 /* Mono fonts under CJK should keep their CJK fallback path too -- otherwise
  * Hiragino-rendered prose mixed with Monaco code creates visual jank. */
 :lang(ja) code, :lang(ja) .mono,
+:lang(ko) code, :lang(ko) .mono,
 :lang(zh-CN) code, :lang(zh-CN) .mono,
 :lang(zh-Hans) code, :lang(zh-Hans) .mono,
 :lang(zh-TW) code, :lang(zh-TW) .mono,
 :lang(zh-Hant) code, :lang(zh-Hant) .mono {
   font-family:
     'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono',
-    'Hiragino Sans', 'PingFang SC', 'PingFang TC',
-    'Microsoft YaHei', 'Microsoft JhengHei',
+    'Hiragino Sans', 'PingFang SC', 'PingFang TC', 'Apple SD Gothic Neo',
+    'Microsoft YaHei', 'Microsoft JhengHei', 'Malgun Gothic',
     monospace;
 }

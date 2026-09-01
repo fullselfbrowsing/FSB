@@ -7,7 +7,7 @@ import { join } from 'node:path';
 
 const BROWSER_DIR = join(process.cwd(), 'showcase/dist/showcase-angular/browser');
 const LIMIT_BYTES = 1024 * 1024;  // 1 MB gzipped
-const LOCALES = ['', 'es', 'de', 'ja', 'zh-CN', 'zh-TW'];  // '' = source locale at dist root
+const LOCALES = ['', 'es', 'de', 'ja', 'ko', 'zh-CN', 'zh-TW'];  // '' = source locale at dist root
 
 let failed = false;
 for (const subPath of LOCALES) {

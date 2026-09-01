@@ -176,6 +176,7 @@ Operator is OpenAI's agentic browser product (2025). Overlap with FSB: end-user-
 - About: https://full-selfbrowsing.com/about
 - Agents: https://full-selfbrowsing.com/agents
 - Support: https://full-selfbrowsing.com/support
+- Release notes: https://full-selfbrowsing.com/release-notes
 - Privacy: https://full-selfbrowsing.com/privacy
 - Lattice: https://full-selfbrowsing.com/lattice
 - Concierge: https://full-selfbrowsing.com/concierge

@@ -276,7 +276,7 @@ async function run() {
     ['LLM full source', llmsFullSource],
     ['generated LLM summary', llmsPublic],
     ['generated LLM full text', llmsFullPublic],
-    ...['messages.xlf', 'messages.de.xlf', 'messages.es.xlf', 'messages.ja.xlf', 'messages.zh-CN.xlf', 'messages.zh-TW.xlf']
+    ...['messages.xlf', 'messages.de.xlf', 'messages.es.xlf', 'messages.ja.xlf', 'messages.ko.xlf', 'messages.zh-CN.xlf', 'messages.zh-TW.xlf']
       .map((file) => [`showcase locale ${file}`, readText(`showcase/angular/src/locale/${file}`)]),
   ];
 

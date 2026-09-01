@@ -864,18 +864,623 @@
       "id": "concierge.integrations.signed.path",
       "sourceSha256": "02b1fb7b18b80bc8c7a595ca9f4d0903a07d1bfc8d5e41954588bcbc83ad2908",
       "reason": "brand, package, version, or machine-owned runtime chrome"
+    },
+    {
+      "id": "releaseNotes.v01.003.xaiAlt",
+      "sourceSha256": "daeed48c26239eefa88416ecb43801d6479a0919015fadd6e33f9956739ec716",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "releaseNotes.v01.004.googleAlt",
+      "sourceSha256": "ce770667e5f9b0d8f55367bb79419689d90c48451bb33f079f3a9a72ae132de8",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "releaseNotes.v01.004.grokGemini",
+      "sourceSha256": "6846573688558962bf581417df08c50522007a4d9d0a04bec198be44ebd02922",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "releaseNotes.v01.011.xai",
+      "sourceSha256": "6a0c4c02105616c60bc393effd306989a1aff8fbca1eff2a99932ff4fd298a83",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v02.001.grok",
+      "sourceSha256": "add92b9cde2bdbf3daaf65a0db79e9b1a7fa428b71b4d6ce38c742eb6dca0c1c",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "releaseNotes.v02.002.gemini",
+      "sourceSha256": "5d72436256ada53828b51895a94bb8489e9f1ac4fe937a8024ef1594e7045ff6",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "releaseNotes.v02.003.openai",
+      "sourceSha256": "7d3194f79e645c42e4396dda38be04766810ec6a00d00aced3ffc2a0a1f1a9ef",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "releaseNotes.v02.008.grok",
+      "sourceSha256": "e82be76c7a7c96cc8c02a09bf056479c0bc81d8160ad21473cfbcd318128ca3c",
+      "reason": "model identifier"
+    },
+    {
+      "id": "releaseNotes.v02.009.grok",
+      "sourceSha256": "e82be76c7a7c96cc8c02a09bf056479c0bc81d8160ad21473cfbcd318128ca3c",
+      "reason": "model identifier"
+    },
+    {
+      "id": "releaseNotes.v02.010.grokVision",
+      "sourceSha256": "263faa462a0ec9ccd8817563b1b56a8d93b2292649e7a9ae1d1996b89a593e91",
+      "reason": "model identifier"
+    },
+    {
+      "id": "releaseNotes.v02.011.geminiPro",
+      "sourceSha256": "9f57f55157ca98f369265eb65d6905735ea9aea00411d601c9ab543742bd60c8",
+      "reason": "model identifier"
+    },
+    {
+      "id": "releaseNotes.v02.012.geminiFlash",
+      "sourceSha256": "2c9d2d235db56c3673680a51cbdf219915b1c60630ac0ccd27038edd221c28ba",
+      "reason": "model identifier"
+    },
+    {
+      "id": "releaseNotes.v03.004.grokFast",
+      "sourceSha256": "9e370093c0120769dd77836114405dba087813b2182ea4dafb393fe06e4d5b32",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "releaseNotes.v03.014.xaiAlt",
+      "sourceSha256": "daeed48c26239eefa88416ecb43801d6479a0919015fadd6e33f9956739ec716",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "releaseNotes.v03.015.grok",
+      "sourceSha256": "e82be76c7a7c96cc8c02a09bf056479c0bc81d8160ad21473cfbcd318128ca3c",
+      "reason": "model identifier"
+    },
+    {
+      "id": "releaseNotes.v03.016.grokFast",
+      "sourceSha256": "9f96afe1617550ab9433d79af795fe70b3b9cb3607591bbf9ccfa8bbc13158f9",
+      "reason": "model identifier"
+    },
+    {
+      "id": "releaseNotes.v090.001.checkoutBtn",
+      "sourceSha256": "339e3a9cd53ca3265b8296c91638346a4e33a8e8a5cd5f838eecb91d51e02f19",
+      "reason": "literal path, selector, or sample address"
+    },
+    {
+      "id": "releaseNotes.v090.002.btnPrimary",
+      "sourceSha256": "5e4919f59583add5c134ec9254629c53a5831d9eab492fdf4b1f50304ac5310c",
+      "reason": "literal path, selector, or sample address"
+    },
+    {
+      "id": "releaseNotes.v090.003.buttonNth",
+      "sourceSha256": "d9bc45f25c025a1b49fef1ca56e002842d266ec265d5ce7e57d08e93f414f717",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v090.039.extension",
+      "sourceSha256": "e261b13e7833d8498c03c36254fdaecba201a1dd8730a67a73303a4fad0a6adf",
+      "reason": "literal path, selector, or sample address"
+    },
+    {
+      "id": "releaseNotes.v090.040.ai",
+      "sourceSha256": "9be0993d3bdff5c2859aa78dbc6f216ac7dbf7a84d114ec0e41dc9d8c65a7545",
+      "reason": "literal path, selector, or sample address"
+    },
+    {
+      "id": "releaseNotes.v090.041.config",
+      "sourceSha256": "bc3b4001d1cdc60662858107c9f02d7b2a95c8b07133ac64a522e83138b0fcf2",
+      "reason": "literal path, selector, or sample address"
+    },
+    {
+      "id": "releaseNotes.v090.042.ui",
+      "sourceSha256": "97f14b90b02c7769d5a85d210cdbacf440818dc90510838ace18198317c27072",
+      "reason": "literal path, selector, or sample address"
+    },
+    {
+      "id": "releaseNotes.v090.043.utils",
+      "sourceSha256": "8b8603a309d990399d31d02d7d3c1afc4ba165294778d0dc18178da09b5c10b3",
+      "reason": "literal path, selector, or sample address"
+    },
+    {
+      "id": "releaseNotes.v090.044.lib",
+      "sourceSha256": "c1693e409af4c5f4f988d056715577f3ebb6ce63304d0cd2d72ca0598a8a7ef2",
+      "reason": "literal path, selector, or sample address"
+    },
+    {
+      "id": "releaseNotes.v091.003.toolClick",
+      "sourceSha256": "40ef4bb56c5bac17ab00acc2dfb7acae3de0e2dc0d9739bf330e99d6106afd52",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v091.004.selectorBtn",
+      "sourceSha256": "9c3f95ba5ac8d5d2af781d9015a60f4c6711452131fdf59254314c2c7ae4825d",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v091.009.checkout",
+      "sourceSha256": "49e25fe950c5a900d518b75eccad0347cce6da462b3ca69db6fe33180fa7fa35",
+      "reason": "literal path, selector, or sample address"
+    },
+    {
+      "id": "releaseNotes.v0920.009.xai",
+      "sourceSha256": "6fcba5d96a4fadfdd63064cf21da843c31de9a702bbee7fe306d4754fc9dd262",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "releaseNotes.v0920.010.openai",
+      "sourceSha256": "7d3194f79e645c42e4396dda38be04766810ec6a00d00aced3ffc2a0a1f1a9ef",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "releaseNotes.v0920.011.anthropic",
+      "sourceSha256": "c70eca6b0f88f44d81a41311647e50fda1ac454ec04ffd442b0eb4743a993131",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "releaseNotes.v0920.012.gemini",
+      "sourceSha256": "5d72436256ada53828b51895a94bb8489e9f1ac4fe937a8024ef1594e7045ff6",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "releaseNotes.v0920.013.openrouter",
+      "sourceSha256": "7f871cbf905f6e0cd598b11609f33f609e60a61892ac6b37e80cf1de282ee367",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "releaseNotes.v0920.028.pip",
+      "sourceSha256": "af7c94f364052cdde98feda3e704b89572c1dd2155342c5e7e75720ba60a5212",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0920.044.lmStudio",
+      "sourceSha256": "7df09a7717ef2feb0615866cd3ae24d0fe54036a3a344ca318e400bee1dace2c",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "releaseNotes.v0920.046.openrouter",
+      "sourceSha256": "7f871cbf905f6e0cd598b11609f33f609e60a61892ac6b37e80cf1de282ee367",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "releaseNotes.v0930.037.ui",
+      "sourceSha256": "d3ef7de562f9a4a34a9a0b05a112955fdecdd0102c3faae5eeb03a195091a5e4",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v094.001.notion",
+      "sourceSha256": "31f61ed3e6e210c5f3f729345968bdbcf267cf0fbfec31eac02ed9966ba1d067",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "releaseNotes.v094.002.calendar",
+      "sourceSha256": "5152790e278eb89039f8bfaa354b944ec1b44c5d3fc144edc5720c3edc045c73",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "releaseNotes.v094.003.trello",
+      "sourceSha256": "1768c21fc46884dfc50dda89562fca6d9eff9d714c30db4a5575ce849632fb61",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "releaseNotes.v094.004.keep",
+      "sourceSha256": "6ca7ea2feefc88ecb5ed6356ed963f47dc9137f82526fdd25d618ea626d0803f",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "releaseNotes.v094.005.todoist",
+      "sourceSha256": "282a6dc5066d47250160de1829201fd824b546dac7fda533fae70be624763a54",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "releaseNotes.v094.006.airtable",
+      "sourceSha256": "40c57bb53c07338bae1af8ebeec59eedf0b1df7452734a66fd67dca50c25a3de",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "releaseNotes.v094.007.jira",
+      "sourceSha256": "1e32847769dc4a1588004a1dfdf10041407a3494ae910bc76783917fffea7789",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "releaseNotes.v0950.005.toolsList",
+      "sourceSha256": "b7721731a8ca0e978c0e041a6fd0ccf17edd247eab04b9ff4d9bf302cb9467a2",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0950.009.claudeCode",
+      "sourceSha256": "246ef8c1130d56f5d9df740a4b26c033a8b9c064daba9bb0a052d18993e87373",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "releaseNotes.v0950.010.cursor",
+      "sourceSha256": "2c014f8f8986f1b274dbfa182498444da048b8caa48e5335d5cdf778352d7e6b",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "releaseNotes.v0950.011.hermes",
+      "sourceSha256": "66e0988d1198afe049f2a5fedbb6e89c20c12dc3bc01ab3f5c13576d624f6e9b",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "releaseNotes.v0950.012.openclaw",
+      "sourceSha256": "a7b90ee8facf0aed66654381629a6ae2983257dfe5daad4ae455dbf49fc6d39b",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "releaseNotes.v0950.016.toolUse",
+      "sourceSha256": "42576899122f9f6a37a8345f34433237e06bccd1e970bd38b4344b4da415cf29",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0950.017.toolResult",
+      "sourceSha256": "d5c41a8cba9764bd981ae71281fbb640ab53657d10caa24334e4759f358a861a",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0950.022.userFsbDev",
+      "sourceSha256": "9940b22c7589f7a49188e992ab83177c212ff5844ee3e40201fe0919f3df41fb",
+      "reason": "literal path, selector, or sample address"
+    },
+    {
+      "id": "releaseNotes.v0950.040.grokFast",
+      "sourceSha256": "9f96afe1617550ab9433d79af795fe70b3b9cb3607591bbf9ccfa8bbc13158f9",
+      "reason": "model identifier"
+    },
+    {
+      "id": "releaseNotes.v0950.046.js",
+      "sourceSha256": "16cedf80ade01c62bdd1ae931d0492330c0b62bf294c08c095ce2fab21a9298d",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0950.047.cdp",
+      "sourceSha256": "700ab86bfeead33ad06430d68af54876510bc4d73843cac030348c4075f09a3f",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0960.013.tabNotOwned",
+      "sourceSha256": "e9b77a80388ed510d330dae6b356c75fa203caab05b16b2a8e9c1243f271dadd",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0960.048.startVisualSession",
+      "sourceSha256": "7bf3fdfa09baf868ceda5779972254f1a433b65d713b435bb5c1884360b54352",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0960.053.visualReason",
+      "sourceSha256": "b75a4ede2e6c433a51aaa5154b9eab55aa95c14dd3c084f2b2cef47beb14add0",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0960.056.claudeCode",
+      "sourceSha256": "28e174396028f226b3bead259d19749205378d9204ce12fd9b1918ab6032a15d",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "releaseNotes.v0960.069.readDom",
+      "sourceSha256": "a8e8a4f08da6d6bf9e1c19517fb190df6c3ad84701ee35e43a301aa5a6e3ab11",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0960.091.claudeCode",
+      "sourceSha256": "a625159d18da57180b7215e56c4ca20cabf8bcd9b7030c8c460aeed7b5588c6c",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "releaseNotes.v0960.092.cursor",
+      "sourceSha256": "46a4eebd20d881ecfc0ecb54f6d8346524fadb143726d256b1a045303fc67717",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "releaseNotes.v0960.093.hermesAlt",
+      "sourceSha256": "66e0988d1198afe049f2a5fedbb6e89c20c12dc3bc01ab3f5c13576d624f6e9b",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "releaseNotes.v0960.094.hermes",
+      "sourceSha256": "8cfde6efdfc4ed5ab1f6acbbd1ba49bf31932f84d0a4c090eb41c7d151e8b180",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "releaseNotes.v0960.095.openclawAlt",
+      "sourceSha256": "a7b90ee8facf0aed66654381629a6ae2983257dfe5daad4ae455dbf49fc6d39b",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "releaseNotes.v0960.096.openclaw",
+      "sourceSha256": "96a4bc2602655473120fcc571ee3d8cfe5f8801f8038ccc06323d305e323331c",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "releaseNotes.v0960.104.openclawAlt",
+      "sourceSha256": "a7b90ee8facf0aed66654381629a6ae2983257dfe5daad4ae455dbf49fc6d39b",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "releaseNotes.v0960.106.clawhub",
+      "sourceSha256": "3f0f3dfe04085114968ac16b5b92b6b0b4d7d0ec746294cbb6231739dbc202c9",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "releaseNotes.v0960.122.mcp",
+      "sourceSha256": "10182ab855ff772753c05b2fea333666b5f312835d32936b6b03e08ef2cbd6d3",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0960.135.readDom",
+      "sourceSha256": "a8e8a4f08da6d6bf9e1c19517fb190df6c3ad84701ee35e43a301aa5a6e3ab11",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0960.137.readDom",
+      "sourceSha256": "a8e8a4f08da6d6bf9e1c19517fb190df6c3ad84701ee35e43a301aa5a6e3ab11",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0960.138.hermes",
+      "sourceSha256": "8cfde6efdfc4ed5ab1f6acbbd1ba49bf31932f84d0a4c090eb41c7d151e8b180",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "releaseNotes.v0960.144.claudeCode",
+      "sourceSha256": "a625159d18da57180b7215e56c4ca20cabf8bcd9b7030c8c460aeed7b5588c6c",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "releaseNotes.v0960.146.hermes",
+      "sourceSha256": "8cfde6efdfc4ed5ab1f6acbbd1ba49bf31932f84d0a4c090eb41c7d151e8b180",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "releaseNotes.v0970.024.claudeCode",
+      "sourceSha256": "a625159d18da57180b7215e56c4ca20cabf8bcd9b7030c8c460aeed7b5588c6c",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "releaseNotes.v0970.026.hermes",
+      "sourceSha256": "8cfde6efdfc4ed5ab1f6acbbd1ba49bf31932f84d0a4c090eb41c7d151e8b180",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "releaseNotes.v0990.003.searchCapabilities",
+      "sourceSha256": "765ef9ddbaee64c5651acae22d56fc9c2ae27a5e794ebaa06d65b11ceb1da702",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0990.004.invokeCapability",
+      "sourceSha256": "9b8d5afb395bbe3e42cc3914a300ab9fb57e30396ebd9587b9d0434581cf4b35",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0990.014.inputTypeFile",
+      "sourceSha256": "3c3d2eff79eb1bfb25d6512bff502767912f9baabbb02d69c506f94d7d4115e7",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0990.015.invoiceQPdf",
+      "sourceSha256": "69cf58a7acd3f31fd23a7909c45443355eb23e09456649ac863b12c5acdf7077",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0990.021.mailExampleCom",
+      "sourceSha256": "406200cfd46da40189f1cdde68792ea5a30b67d6ee0596161fc374f9179ee45c",
+      "reason": "literal path, selector, or sample address"
+    },
+    {
+      "id": "releaseNotes.v0990.023.adsExampleNet",
+      "sourceSha256": "44d82b95afbfd89519c74c7f39284ca8ebc151dcd454795e2fffb3d54035e707",
+      "reason": "literal path, selector, or sample address"
+    },
+    {
+      "id": "releaseNotes.v0990.034.pro",
+      "sourceSha256": "957b0b874524d09a5d035007f821a094a22b678fb157991e28bba1fe21d4e6b9",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "releaseNotes.v0990.035.metheus",
+      "sourceSha256": "53fd49ddf7a955a862d7ffd0bed31040f9757b626e8461174a4cc59f7b612517",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "releaseNotes.v0990.043.pro",
+      "sourceSha256": "957b0b874524d09a5d035007f821a094a22b678fb157991e28bba1fe21d4e6b9",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "releaseNotes.v0990.044.metheus",
+      "sourceSha256": "53fd49ddf7a955a862d7ffd0bed31040f9757b626e8461174a4cc59f7b612517",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "releaseNotes.v0990.051.phantomstream",
+      "sourceSha256": "766575aab91a68ee42174ed84cca4ccca21632578d7becf95149ce9d1a06dae5",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "releaseNotes.v0990.capabilityCredit.opentabs",
+      "sourceSha256": "bb7f3b6bb53814dd4e9ca6665ecd77ee3147447e0f1170086c857fe67005089f",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "releaseNotes.v0991.002.api",
+      "sourceSha256": "c8e5998f6a3955c21d858936fe05c69621724d7f825c6e17793002a0fa798bf9",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "releaseNotes.v0991.002.extension",
+      "sourceSha256": "30a62450b10a36b51f396f042f946256f42006561c39edb6c56a24b65ba63718",
+      "reason": "version chip"
+    },
+    {
+      "id": "releaseNotes.v0991.003.mcp",
+      "sourceSha256": "8c38a909526c114ac3a404a28bc43ba27bd1b5c0043e0015161b4750be666696",
+      "reason": "version chip"
+    },
+    {
+      "id": "releaseNotes.v0991.004.chrome",
+      "sourceSha256": "93e225f07a15e9af97ef69b4569eff842d57e9d55a14436de8ec377f8df2bc18",
+      "reason": "version chip"
+    },
+    {
+      "id": "releaseNotes.v0991.005.node",
+      "sourceSha256": "f987ef9780d1b33004fa3678b582a395a29802eb2923a1b1dd05b924cc2f2483",
+      "reason": "version chip"
+    },
+    {
+      "id": "releaseNotes.v0991.006.mit",
+      "sourceSha256": "e5dcffe836b6ec8a58e492419b550e65fb8cbdc308503979e5dacb33ac7ea3b7",
+      "reason": "license identifier"
+    },
+    {
+      "id": "releaseNotes.v0991.012.xaiAlt",
+      "sourceSha256": "daeed48c26239eefa88416ecb43801d6479a0919015fadd6e33f9956739ec716",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "releaseNotes.v0991.035.claude",
+      "sourceSha256": "0615570f9ea136946c5dc08a250010320707646f57f72cedab1dfb73d95eade6",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "releaseNotes.v0991.044.extRequest",
+      "sourceSha256": "a7340bc3e9e0b6dcfcb5adbb6293af9084d1f3efbf2c97665878f6240992b65d",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0991.045.extResponse",
+      "sourceSha256": "0b4f5f7a0a057c77dd2b848412e9d2bc4dfea8b498437ecdcb9df7da70fac4ad",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0991.046.extEvent",
+      "sourceSha256": "a3aa7f4a5e0b289b0e3770b7cca8d8214dce61ae154c7656b19d171fc745d9e8",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0991.054.vModels",
+      "sourceSha256": "d7b0903584595062c9a8a7bf8cc51283d06c5b6d794a8254e198669236e7bc9d",
+      "reason": "literal path, selector, or sample address"
+    },
+    {
+      "id": "releaseNotes.v0991.055.gpt",
+      "sourceSha256": "b0a9d642d12f553129c39513f7ce26058c34ba4b9062475a8eaac157603e1233",
+      "reason": "model identifier"
+    },
+    {
+      "id": "releaseNotes.v0991.056.oMini",
+      "sourceSha256": "9056e3300ca806c040a2ae2fc7dcc3ef66c693b6b6f53efc27fac3bb367fb152",
+      "reason": "model identifier"
+    },
+    {
+      "id": "releaseNotes.v0991.057.qwenCoderLmStudio",
+      "sourceSha256": "d49c8bfb3d8a1d1336ac6752475750e6c9f60d3093b3d788ad0aed2c3c0afc7e",
+      "reason": "model identifier"
+    },
+    {
+      "id": "releaseNotes.v0991.058.maxCompletionTokens",
+      "sourceSha256": "8325a36592af1aafdaa0ee321daeb57e5c93ebf9cc50a0af3a11f6a8c3882ded",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0991.105.speechrecognition",
+      "sourceSha256": "4c6f529aa506c9e37af3ae46c222f25a16d9404be55efed3f463af1f7ebb4fe0",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "releaseNotes.v0991.106.whisper",
+      "sourceSha256": "41714d2cdc780e91028e222f1a1b62b0926e0f2416e14e71065c3b08c10348b0",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "releaseNotes.v0991.128.en",
+      "sourceSha256": "dbd3a49d0d906b4ed9216b73330d2fb080ef2f758c12f3885068222e5e17151c",
+      "reason": "BCP 47 language subtag"
+    },
+    {
+      "id": "releaseNotes.v0991.129.es",
+      "sourceSha256": "c0bc1e08f9743b2d50d5f1607503bf4e849af0e729fca896515bea955d70a33e",
+      "reason": "BCP 47 language subtag"
+    },
+    {
+      "id": "releaseNotes.v0991.130.fr",
+      "sourceSha256": "67ad8f41a7bb0a18c45f3efd8f6a32bdcd832bcf8f3f2eb44006c03d53076e18",
+      "reason": "BCP 47 language subtag"
+    },
+    {
+      "id": "releaseNotes.v0991.131.de",
+      "sourceSha256": "959a45d44e6fcf58361ed004681556fe50129f2109e817dec098c00c9e5d2578",
+      "reason": "BCP 47 language subtag"
+    },
+    {
+      "id": "releaseNotes.v0991.132.ja",
+      "sourceSha256": "3702fc1866630796050c50e9c829bd32fde7cc4c883f28e3e4ca430307c485b0",
+      "reason": "BCP 47 language subtag"
+    },
+    {
+      "id": "releaseNotes.v0991.133.zh",
+      "sourceSha256": "60cae1d01739facc4543771db2e8fbc4d1ebe5fc66284a5b8b4bd1ed585f452e",
+      "reason": "BCP 47 language subtag"
+    },
+    {
+      "id": "releaseNotes.v0991.134.mcp",
+      "sourceSha256": "8c38a909526c114ac3a404a28bc43ba27bd1b5c0043e0015161b4750be666696",
+      "reason": "version chip"
+    },
+    {
+      "id": "releaseNotes.v0991.135.chrome",
+      "sourceSha256": "93e225f07a15e9af97ef69b4569eff842d57e9d55a14436de8ec377f8df2bc18",
+      "reason": "version chip"
+    },
+    {
+      "id": "releaseNotes.v0991.136.node",
+      "sourceSha256": "f987ef9780d1b33004fa3678b582a395a29802eb2923a1b1dd05b924cc2f2483",
+      "reason": "version chip"
+    },
+    {
+      "id": "releaseNotes.v0990.030.latticeSdk",
+      "sourceSha256": "e4290fe5d92b7da4ba206c1b7337cc33f798d5170122dcdc9c652117d83ea4b5",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "releaseNotes.v0920.032.phantomStream",
+      "sourceSha256": "2ab5f540c364bd657acb7e9e31fa9528689a421008a75cfe432efeeaa4b74782",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "releaseNotes.v090.053.viewportglow",
+      "sourceSha256": "e64fef797fb22200c5886b425d9f21fabf21267ac30260bc7a201d3bbd66ba55",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "releaseNotes.v0920.062.xai",
+      "sourceSha256": "c651dcfa4b2cafb293ac028e33aac99c8a28c1ad89311cc2a186e9158b16ea6f",
+      "reason": "provider identifier with a numeric share"
+    },
+    {
+      "id": "releaseNotes.v0920.063.openrouter",
+      "sourceSha256": "b7890f8207e83a0be1b218965ada9108f9fa85a10de9352688250218dad06ae7",
+      "reason": "provider identifier with a numeric share"
     }
   ],
   "byLocale": {
     "es": [
       {
-        "id": "dashboard.template.002",
-        "sourceSha256": "703390318bd55aef50b7823d2b90a846debff99e6e3d401a24a921b733912a6d",
-        "reason": "natural Spanish technical term or product name"
+        "id": "about.memory.graph.selectorCountOne",
+        "sourceSha256": "83708e301f5eea7ec1f6673e36dbd5274df474c1d294fe88139306e609eaf77a",
+        "reason": "identical term in Spanish"
       },
       {
         "id": "dashboard.runtime.preview.errorLabel",
         "sourceSha256": "ca00fccfb408989eddc401062c4d1219a6aceb6b9b55412357f1790862e8f178",
+        "reason": "natural Spanish technical term or product name"
+      },
+      {
+        "id": "dashboard.template.002",
+        "sourceSha256": "703390318bd55aef50b7823d2b90a846debff99e6e3d401a24a921b733912a6d",
         "reason": "natural Spanish technical term or product name"
       },
       {
@@ -939,6 +1544,16 @@
         "id": "phantomStream.schema.runtimePlatform",
         "sourceSha256": "048b6128f69e4de61fbfdf5386cb32f955d365823a9f03d37b3b1643f5248055",
         "reason": "natural German loanword or product name"
+      },
+      {
+        "id": "releaseNotes.v0990.039.min",
+        "sourceSha256": "dea79332147ffe1fb2a81cf9a5bdf0066ddcc625699996ede0ce140e5cb004b1",
+        "reason": "countdown unit abbreviation is identical in German"
+      },
+      {
+        "id": "releaseNotes.v0990.048.min",
+        "sourceSha256": "dea79332147ffe1fb2a81cf9a5bdf0066ddcc625699996ede0ce140e5cb004b1",
+        "reason": "countdown unit abbreviation is identical in German"
       }
     ],
     "ja": [],
@@ -1018,6 +1633,24 @@
         "sourceSha256": "fae06cb91f85ae21bb15cfab481224254e7ea76c818bb1a0348f9335c3ca5b97",
         "targetSha256": "424452a1b8dd293646049f919bffd03b89986a19a27b2d8595134f7724b06b0b",
         "reason": "German compound punctuation around the invariant FSB brand name"
+      },
+      {
+        "id": "releaseNotes.v0930.003.april",
+        "sourceSha256": "7b35b8759b4c98453f782d6e6deffe11e721e45a62017811e7ac9effad4735de",
+        "targetSha256": "af669edb611a567d0bcf52f5ae9834fbb797bb296c7c50581c7720bfe31a722a",
+        "reason": "month name is identical in German"
+      },
+      {
+        "id": "releaseNotes.v0920.003.april",
+        "sourceSha256": "7b35b8759b4c98453f782d6e6deffe11e721e45a62017811e7ac9effad4735de",
+        "targetSha256": "af669edb611a567d0bcf52f5ae9834fbb797bb296c7c50581c7720bfe31a722a",
+        "reason": "month name is identical in German"
+      },
+      {
+        "id": "releaseNotes.v02.003.august",
+        "sourceSha256": "65f7edb2580687d3a2d6e2a0db29e863936bdc1c28f7d40be3d7ec8d77f8cc6d",
+        "targetSha256": "090f0b931209a96f63f9682872e9680eb050991a7a6fdc21390b92905beb0fc4",
+        "reason": "month name is identical in German"
       }
     ]
   }

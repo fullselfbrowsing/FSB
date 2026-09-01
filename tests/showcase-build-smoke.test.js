@@ -12,7 +12,7 @@
  *   3. BUILD: `npm --prefix showcase/angular run build --silent` exits 0
  *      and `npm --prefix showcase/angular run verify:hreflang` exits 0. The
  *      prerendered home, agents, and concierge pages expose the canonical MIT
- *      license URL in SoftwareApplication JSON-LD for English and all 5 locales.
+ *      license URL in SoftwareApplication JSON-LD for English and all 6 locales.
  *   4. CRAWLER INVARIANT (Easter-egg posture): /stats does NOT appear in
  *      prerender-routes.txt, public/sitemap.xml, public/llms.txt, or
  *      public/llms-full.txt. The angular dist/ folder MUST NOT contain a
@@ -190,7 +190,7 @@ check('source: no hero title rule forces translated text onto one line',
 
 // Each non-en locale must have a <target state="translated"> block for every
 // SHOWCASE_STATS_FSB_* id in the source.
-const LOCALES = ['es', 'de', 'ja', 'zh-CN', 'zh-TW'];
+const LOCALES = ['es', 'de', 'ja', 'ko', 'zh-CN', 'zh-TW'];
 for (const lang of LOCALES) {
   const targetXlfPath = path.join(ROOT, `showcase/angular/src/locale/messages.${lang}.xlf`);
   if (!fs.existsSync(targetXlfPath)) {

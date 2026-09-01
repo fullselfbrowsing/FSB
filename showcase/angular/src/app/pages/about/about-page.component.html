@@ -67,7 +67,7 @@
       <div class="mem-stats reveal">
         @for (stat of memoryStats; track stat.label) {
           <div class="mem-stat">
-            <span class="mem-stat-value" [attr.translate]="'no'">{{ stat.value }}</span>
+            <span class="mem-stat-value" [attr.translate]="'no'">{{ formatStatValue(stat.value) }}</span>
             <span class="mem-stat-label">{{ stat.label }}</span>
           </div>
         }

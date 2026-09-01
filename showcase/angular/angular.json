@@ -26,6 +26,7 @@
           "es":    { "translation": "src/locale/messages.es.xlf",    "subPath": "es" },
           "de":    { "translation": "src/locale/messages.de.xlf",    "subPath": "de" },
           "ja":    { "translation": "src/locale/messages.ja.xlf",    "subPath": "ja" },
+          "ko": { "translation": "src/locale/messages.ko.xlf", "subPath": "ko" },
           "zh-CN": { "translation": "src/locale/messages.zh-CN.xlf", "subPath": "zh-CN" },
           "zh-TW": { "translation": "src/locale/messages.zh-TW.xlf", "subPath": "zh-TW" }
         }

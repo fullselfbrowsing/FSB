@@ -1,4 +1,4 @@
-<!-- generated 2026-08-31 by build-crawler-files.mjs; edit llms-full.source.md -->
+<!-- generated 2026-09-01 by build-crawler-files.mjs; edit llms-full.source.md -->
 # FSB (Full Self-Browsing)
 
 ## 1. Project Description
@@ -177,6 +177,7 @@ Operator is OpenAI's agentic browser product (2025). Overlap with FSB: end-user-
 - About: https://full-selfbrowsing.com/about
 - Agents: https://full-selfbrowsing.com/agents
 - Support: https://full-selfbrowsing.com/support
+- Release notes: https://full-selfbrowsing.com/release-notes
 - Privacy: https://full-selfbrowsing.com/privacy
 - Lattice: https://full-selfbrowsing.com/lattice
 - Concierge: https://full-selfbrowsing.com/concierge

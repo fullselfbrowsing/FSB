@@ -1,6 +1,6 @@
 // Phase 264 / SEO-01 -- Per-locale canonical + hreflang fan-out helper.
 // Used by every marketing page component (home, about, agents, privacy, support)
-// to set the locale-aware <link rel="canonical"> and the 6 locales + x-default
+// to set the locale-aware <link rel="canonical"> and the 7 locales + x-default
 // <link rel="alternate" hreflang> block at prerender time.
 //
 // Contract:

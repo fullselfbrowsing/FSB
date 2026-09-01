@@ -3,14 +3,14 @@
     <div class="privacy-header">
       <div class="section-label" i18n="@@privacy.header.kicker">Legal</div>
       <h1 i18n="@@privacy.header.title">Privacy Policy</h1>
-      <p class="privacy-last-updated" i18n="@@privacy.header.updated">Last updated: July 2026</p>
+      <p class="privacy-last-updated" i18n="@@privacy.header.updated">Last updated: August 2026</p>
     </div>
 
     <div class="privacy-content">
 
       <!-- TLDR -->
       <div class="privacy-callout">
-        <p i18n="@@privacy.tldr.body"><strong>TLDR:</strong>&nbsp;<span [attr.translate]="'no'">FSB</span> operates entirely within your browser. No browsing data is collected by <span [attr.translate]="'no'">FSB</span> servers, and AI calls go directly from your browser to the provider you choose. API keys are encrypted locally with <span [attr.translate]="'no'">AES-GCM</span>, and memory data stays on your device. The only data that ever leaves your machine for <span [attr.translate]="'no'">FSB</span> is opt-out anonymous usage telemetry that powers the public <a routerLink="/stats">/stats</a> page. If you pair <span [attr.translate]="'no'">Remote Dashboard</span>, transient live-preview frames can pass through the relay during the session, but they are not stored. Everything is open source and auditable.</p>
+        <p i18n="@@privacy.tldr.body"><strong>TLDR:</strong>&nbsp;<span [attr.translate]="'no'">FSB</span> runs inside your browser, and no browsing data is collected by <span [attr.translate]="'no'">FSB</span> servers. AI calls go directly from your browser to the provider you choose. API keys and credentials are encrypted locally, and memory data stays on your device. If you install the optional local agent service, <span [attr.translate]="'no'">FSB</span> can also be driven by an <span [attr.translate]="'no'">MCP</span> client running on your own machine over a loopback connection, and by coding-agent <span [attr.translate]="'no'">CLIs</span> you have already installed. The only data that ever leaves your machine for <span [attr.translate]="'no'">FSB</span> is opt-out anonymous usage telemetry that powers the public <a routerLink="/stats">/stats</a> page. If you pair <span [attr.translate]="'no'">Remote Dashboard</span>, transient live-preview frames can pass through the relay during the session, but they are not stored. Everything is open source and auditable.</p>
       </div>
 
       <!-- Data Collection -->
@@ -33,15 +33,16 @@
         <li i18n="@@privacy.section.dataCollection.permissions.li.2"><strong>Advanced automation</strong>, <code [attr.translate]="'no'">debugger</code>: attach the <span [attr.translate]="'no'">Chrome DevTools Protocol</span> for coordinate-based clicks, drag, and key-hold actions that the regular <span [attr.translate]="'no'">DOM</span>&nbsp;<span [attr.translate]="'no'">API</span> cannot perform. <code [attr.translate]="'no'">webNavigation</code>: observe navigation start/finish events so automation waits for the right moment</li>
         <li i18n="@@privacy.section.dataCollection.permissions.li.3"><strong>Local storage</strong>, <code [attr.translate]="'no'">storage</code>, <code [attr.translate]="'no'">unlimitedStorage</code>: store your settings, credentials, payment methods, and memory in <code [attr.translate]="'no'">chrome.storage.local</code> on your device. Unlimited storage lifts the default 10&nbsp;MB quota so memory and session logs can grow without hitting a wall</li>
         <li i18n="@@privacy.section.dataCollection.permissions.li.4"><strong><span [attr.translate]="'no'">UX</span> helpers</strong>, <code [attr.translate]="'no'">clipboardWrite</code>: write copy-to-clipboard results from automation. <code [attr.translate]="'no'">alarms</code>: schedule background housekeeping. <code [attr.translate]="'no'">offscreen</code>: host the speech-to-text recorder in a hidden document because service workers cannot capture audio directly</li>
+        <li i18n="@@privacy.section.dataCollection.permissions.li.5"><strong>Local service</strong>, <code [attr.translate]="'no'">nativeMessaging</code>: start the optional local agent service described under <a href="#local-service">Local Agent Service and Native Messaging</a> below. Nothing about the pages you visit crosses that channel. <code [attr.translate]="'no'">system.memory</code>: read the total installed <span [attr.translate]="'no'">RAM</span> figure only, so <span [attr.translate]="'no'">FSB</span> can suggest a sensible limit on how many agents run at once. The available-memory and per-processor breakdowns are never read, and the figure never leaves the extension</li>
       </ul>
       <p i18n="@@privacy.section.dataCollection.permissions.note">Microphone access for speech-to-text is <em>not</em> declared in the manifest. <span [attr.translate]="'no'">Chrome</span> shows its own permission prompt the first time you use the mic button.</p>
 
       <!-- Data Storage -->
       <h2 i18n="@@privacy.section.dataStorage.title">Data Storage</h2>
-      <p i18n="@@privacy.section.dataStorage.body">All settings and data are stored locally in <span [attr.translate]="'no'">Chrome</span>'s extension storage. <span [attr.translate]="'no'">FSB</span> uses <span [attr.translate]="'no'">AES-GCM</span> encryption for sensitive data like API keys.</p>
+      <p i18n="@@privacy.section.dataStorage.body">All settings and data are stored locally in <span [attr.translate]="'no'">Chrome</span>'s extension storage, with sensitive values encrypted at rest as described in the sections below.</p>
       <ul>
         <li i18n="@@privacy.section.dataStorage.li.1">Configuration is stored in <code [attr.translate]="'no'">chrome.storage.local</code></li>
-        <li i18n="@@privacy.section.dataStorage.li.2">API keys are encrypted before storage using <span [attr.translate]="'no'">AES-GCM</span></li>
+        <li i18n="@@privacy.section.dataStorage.li.2">API keys, credentials, and payment methods are encrypted before storage, each detailed in its own section below</li>
         <li i18n="@@privacy.section.dataStorage.li.3">Session logs are stored locally and can be cleared at any time</li>
         <li i18n="@@privacy.section.dataStorage.li.4">Analytics data (task counts, success rates) stays on your device</li>
       </ul>
@@ -53,15 +54,47 @@
         <li i18n="@@privacy.section.external.li.1">Hosted API calls are made only to the provider you select (<span [attr.translate]="'no'">xAI</span>, <span [attr.translate]="'no'">OpenAI</span>, <span [attr.translate]="'no'">Anthropic</span>, <span [attr.translate]="'no'">Google</span>, or <span [attr.translate]="'no'">OpenRouter</span>)</li>
         <li i18n="@@privacy.section.external.li.2"><span [attr.translate]="'no'">LM Studio</span> uses a local <span [attr.translate]="'no'">OpenAI</span>-compatible server on your device and does not require an API key</li>
         <li i18n="@@privacy.section.external.li.3">Sent data includes: task description, <span [attr.translate]="'no'">DOM</span> structure summary, and action context</li>
-        <li i18n="@@privacy.section.external.li.4">If you pair <span [attr.translate]="'no'">Remote Dashboard</span> or use legacy Background Agents sync, an optional relay server handles <span [attr.translate]="'no'">WebSocket</span> messages for that session. Live-preview frames may pass through the relay transiently, but page content, <span [attr.translate]="'no'">DOM</span> data, screenshots, AI prompts, AI responses, cookies, tokens, and site <span [attr.translate]="'no'">API</span> payloads are not persisted on the server. This is opt-in only</li>
+        <li i18n="@@privacy.section.external.li.4" id="relay-non-persistence">If you pair <span [attr.translate]="'no'">Remote Dashboard</span> or use legacy Background Agents sync, an optional relay server handles <span [attr.translate]="'no'">WebSocket</span> messages for that session. Live-preview frames may pass through the relay transiently, but none of the following is ever persisted on an <span [attr.translate]="'no'">FSB</span> server: page content, <span [attr.translate]="'no'">DOM</span> data, browsing history, screenshots, AI prompts, AI responses, cookies, tokens, or site <span [attr.translate]="'no'">API</span> payloads. This is opt-in only, and the rest of this policy refers back to this list rather than restating it</li>
         <li i18n="@@privacy.section.external.li.5">Each provider has their own privacy policy governing how they handle API requests</li>
+      </ul>
+
+      <!-- Local Agent Service / native messaging (v0.9.91) -->
+      <h2 id="local-service" i18n="@@privacy.section.localService.title">Local Agent Service and Native Messaging</h2>
+      <p i18n="@@privacy.section.localService.body"><span [attr.translate]="'no'">FSB</span> can be driven by an <span [attr.translate]="'no'">MCP</span> client running on your own machine. That requires a small local agent service which you install yourself, and the <code [attr.translate]="'no'">nativeMessaging</code> permission exists solely so the extension can start it. <span [attr.translate]="'no'">Chrome</span> cannot launch a local program directly, so this is the only supported mechanism.</p>
+      <ul>
+        <li i18n="@@privacy.section.localService.li.1">The messaging host <code [attr.translate]="'no'">io.github.fullselfbrowsing.fsb_native_host</code> is registered only by an explicit action you take, by running <code [attr.translate]="'no'">fsb-mcp-server install --native-host</code>. The extension cannot install it, and its registration names one permitted extension origin</li>
+        <li i18n="@@privacy.section.localService.li.2">The exchange is a closed schema. <span [attr.translate]="'no'">FSB</span> sends a version number, an action of either <code [attr.translate]="'no'">wake</code> or <code [attr.translate]="'no'">bootstrap</code>, and a locally generated correlation identifier; it receives that identifier back with an outcome and a reason drawn from a fixed list. Any additional field is rejected outright and messages are capped at 4&nbsp;KB. No <span [attr.translate]="'no'">URL</span>, tab, page content, or <span [attr.translate]="'no'">DOM</span> data exists anywhere in this schema</li>
+        <li i18n="@@privacy.section.localService.li.3">A successful start returns a pairing code. This is a loopback authentication secret generated on your device and stored with owner-only permissions, rotated every time the service starts. It carries no information about you or your browsing</li>
+        <li i18n="@@privacy.section.localService.li.4">The service listens on your machine only. The extension bridge refuses to bind any address that is not loopback, and the <span [attr.translate]="'no'">MCP</span> endpoint binds <code [attr.translate]="'no'">127.0.0.1</code> by default and whenever <span [attr.translate]="'no'">FSB</span> starts it</li>
+        <li i18n="@@privacy.section.localService.li.5">Under its own directory the service keeps only operational records: a diagnostics log of delegated-run outcomes restricted to a fixed field list, and a process-supervision journal. Task text, environment values, binary paths, and error text never reach either of them, and entries carrying credential-shaped values are discarded rather than written</li>
+        <li i18n="@@privacy.section.localService.li.6">If the host is not installed, the feature simply does not start. Nothing is transmitted, and the rest of the extension continues to work normally</li>
+      </ul>
+
+      <!-- Delegated CLI agents (v0.9.91) -->
+      <h2 i18n="@@privacy.section.delegatedAgents.title">Delegated <span [attr.translate]="'no'">CLI</span> Agents</h2>
+      <p i18n="@@privacy.section.delegatedAgents.body"><span [attr.translate]="'no'">FSB</span> can hand a task to a coding-agent command-line tool you have already installed, currently <span [attr.translate]="'no'">Claude Code</span> or <span [attr.translate]="'no'">Grok Build</span>. <span [attr.translate]="'no'">FSB</span> starts that program on your own machine; your task is never proxied through <span [attr.translate]="'no'">FSB</span> servers.</p>
+      <ul>
+        <li i18n="@@privacy.section.delegatedAgents.li.1">Your task text reaches the tool over its standard input and nowhere else. <span [attr.translate]="'no'">FSB</span> checks this before every run: if the task appears in the command line, the working directory, the environment, or any file path, the run is aborted rather than started. Tasks are capped at 64&nbsp;KB</li>
+        <li i18n="@@privacy.section.delegatedAgents.li.2">While the run is in progress the tool calls back into <span [attr.translate]="'no'">FSB</span> over the loopback connection to drive your browser. Whatever it reads that way &mdash; page text, <span [attr.translate]="'no'">DOM</span> snapshots, spreadsheet values, screenshots &mdash; is returned to that tool, and therefore reaches its vendor: <span [attr.translate]="'no'">Anthropic</span> for <span [attr.translate]="'no'">Claude Code</span>, <span [attr.translate]="'no'">xAI</span> for <span [attr.translate]="'no'">Grok Build</span></li>
+        <li i18n="@@privacy.section.delegatedAgents.li.3">The run uses the account already signed in to that tool. <span [attr.translate]="'no'">FSB</span> does not hold, read, or transmit your <span [attr.translate]="'no'">Anthropic</span> or <span [attr.translate]="'no'">xAI</span> credential, and any usage or charges follow that vendor's own plan</li>
+        <li i18n="@@privacy.section.delegatedAgents.li.4"><span [attr.translate]="'no'">Grok Build</span> runs inside a profile directory <span [attr.translate]="'no'">FSB</span> keeps separate from your own. The sign-in credential stored there is written by the <span [attr.translate]="'no'">Grok</span> tool itself during its own sign-in flow</li>
+        <li i18n="@@privacy.section.delegatedAgents.li.5">The agent instructions <span [attr.translate]="'no'">FSB</span> supplies state that passwords, <span [attr.translate]="'no'">CVV</span> values, payment-card data, and saved credentials must never enter prompts, narration, logs, or tool arguments</li>
+      </ul>
+
+      <!-- Google Sheets (v0.9.91) -->
+      <h2 i18n="@@privacy.section.sheets.title">Reading and Filling <span [attr.translate]="'no'">Google Sheets</span></h2>
+      <p i18n="@@privacy.section.sheets.body"><span [attr.translate]="'no'">FSB</span> can read and fill a range in <span [attr.translate]="'no'">Google Sheets</span> by driving the spreadsheet interface in your own already-authenticated browser session.</p>
+      <ul>
+        <li i18n="@@privacy.section.sheets.li.1">Reading a range returns those cell values to the model you selected, exactly like any other page content <span [attr.translate]="'no'">FSB</span> reads on your behalf. Only the range you asked for is read; there is no whole-spreadsheet export</li>
+        <li i18n="@@privacy.section.sheets.li.2">Spreadsheet content is stripped out before anything is written to <span [attr.translate]="'no'">FSB</span>'s local session history. Only shape counts survive &mdash; how many rows, columns, and values were involved. The spreadsheet address, sheet name, cell references, and every cell value are discarded</li>
+        <li i18n="@@privacy.section.sheets.li.3">If that filtering cannot be applied to a record for any reason, the record is dropped rather than stored</li>
       </ul>
 
       <!-- PhantomStream / Remote Dashboard -->
       <h2 i18n="@@privacy.section.phantomStream.title"><span [attr.translate]="'no'">Remote Dashboard</span> and <span [attr.translate]="'no'">PhantomStream</span> Live Preview</h2>
       <p i18n="@@privacy.section.phantomStream.body">When you pair <span [attr.translate]="'no'">Remote Dashboard</span>, <span [attr.translate]="'no'">FSB</span> can show a live preview of the active browser tab using <span [attr.translate]="'no'">PhantomStream</span>. The preview streams structured <span [attr.translate]="'no'">DOM</span> data instead of pixels: an initial snapshot, <span [attr.translate]="'no'">MutationObserver</span> diffs, scroll position, automation overlays, dialog state, media playback state, and remote-control messages over <span [attr.translate]="'no'">WebSocket</span>.</p>
       <ul>
-        <li i18n="@@privacy.section.phantomStream.li.1">The relay forwards those live-preview frames only to the paired dashboard session. <span [attr.translate]="'no'">FSB</span> servers do not persist page <span [attr.translate]="'no'">DOM</span>, page content, screenshots, AI prompts, AI responses, cookies, tokens, or site <span [attr.translate]="'no'">API</span> payloads from the preview stream</li>
+        <li i18n="@@privacy.section.phantomStream.li.1">The relay forwards those live-preview frames only to the paired dashboard session, and nothing from the preview stream is persisted on <span [attr.translate]="'no'">FSB</span> servers &mdash; see the <a href="#relay-non-persistence">list under External Services</a> above</li>
         <li i18n="@@privacy.section.phantomStream.li.2"><span [attr.translate]="'no'">FSB</span> enables <span [attr.translate]="'no'">PhantomStream</span> input masking (<code [attr.translate]="'no'">maskInputs: true</code>), so passwords and form-control values are masked before they leave the captured page</li>
         <li i18n="@@privacy.section.phantomStream.li.3">The dashboard viewer renders mirrored content in a scriptless sandbox and sanitizes mirrored <span [attr.translate]="'no'">DOM</span> and <span [attr.translate]="'no'">CSS</span> before display</li>
         <li i18n="@@privacy.section.phantomStream.li.4">Images, video, and audio are mirrored by reference in current dashboard mode. Media bytes do not cross the relay; the viewer may fetch allowed public <span [attr.translate]="'no'">HTTPS</span> asset or media URLs directly, while private, internal, non-<span [attr.translate]="'no'">HTTPS</span>, or otherwise blocked origins are replaced with placeholders by <span [attr.translate]="'no'">PhantomStream</span>'s fail-closed fetch policy</li>
@@ -132,7 +165,7 @@
       <p i18n="@@privacy.section.bgAgents.body">If you opt into legacy Background Agents server sync or pair <span [attr.translate]="'no'">Remote Dashboard</span>, a relay server facilitates communication between your extension and the dashboard.</p>
       <ul>
         <li i18n="@@privacy.section.bgAgents.li.1">The server stores: agent definitions (name, schedule, target URL), run metrics (token count, cost, duration, success/fail status), and session pairing tokens</li>
-        <li i18n="@@privacy.section.bgAgents.li.2">The server does NOT persist: page content, <span [attr.translate]="'no'">DOM</span> data, browsing history, screenshots, AI prompts, AI responses, cookies, tokens, site <span [attr.translate]="'no'">API</span> payloads, or other data from the pages you visit</li>
+        <li i18n="@@privacy.section.bgAgents.li.2">Beyond that run metadata the server persists nothing derived from the pages you visit &mdash; see the <a href="#relay-non-persistence">list under External Services</a> above</li>
         <li i18n="@@privacy.section.bgAgents.li.3">Authentication uses hash keys (generated locally) and session tokens that expire after 24 hours</li>
         <li i18n="@@privacy.section.bgAgents.li.4">One-time pairing tokens expire after 60 seconds and cannot be reused</li>
         <li i18n="@@privacy.section.bgAgents.li.5">Server sync is disabled by default. You must explicitly enable it in Options</li>
@@ -146,6 +179,17 @@
         <li i18n="@@privacy.section.memory.li.2">No memory data is sent to any external server</li>
         <li i18n="@@privacy.section.memory.li.3">Memory can be viewed and cleared at any time from the Options dashboard</li>
         <li i18n="@@privacy.section.memory.li.4">Site maps and navigation patterns are domain-specific and isolated from each other</li>
+      </ul>
+
+      <!-- Session replay + screenshots (v0.9.91) -->
+      <h2 i18n="@@privacy.section.sessionReplay.title">Session Replay and Screenshots</h2>
+      <p i18n="@@privacy.section.sessionReplay.body">When an <span [attr.translate]="'no'">MCP</span> client drives <span [attr.translate]="'no'">FSB</span>, the extension records what the agent did so you can review or replay the run afterwards. These records stay on your device.</p>
+      <ul>
+        <li i18n="@@privacy.section.sessionReplay.li.1">Runs still in progress are held in <span [attr.translate]="'no'">Chrome</span>'s session storage so they survive the service worker being evicted; finished runs are written to <code [attr.translate]="'no'">chrome.storage.local</code> through the same history store your own automation runs use</li>
+        <li i18n="@@privacy.section.sessionReplay.li.2">Records are redacted before they are stored. Values under credential-shaped keys, text typed into fields that look like password, one-time-code, or card inputs, and signed or token-bearing <span [attr.translate]="'no'">URL</span> parameters are all replaced. Ordinary addresses and selectors are preserved, because replay does not work without them</li>
+        <li i18n="@@privacy.section.sessionReplay.li.3">Recorded runs are kept for 30 days by default, adjustable between 1 and 365 days, and older ones are pruned by a daily job. Recording can be switched off entirely in Advanced Settings</li>
+        <li i18n="@@privacy.section.sessionReplay.li.4">Screenshot images are never written into that history. Only capture metadata such as dimensions and byte size is retained</li>
+        <li i18n="@@privacy.section.sessionReplay.li.5">Screenshots an <span [attr.translate]="'no'">MCP</span> client requests are saved by the local service as files on your own disk with owner-only permissions and deleted automatically after seven days. The image is also handed back to the requesting client, and therefore to that client's model</li>
       </ul>
 
       <!-- Anonymous Usage Telemetry (v0.9.69 / Phase 275) -->

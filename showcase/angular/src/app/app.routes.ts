@@ -5,6 +5,7 @@ export const routes: Routes = [
   { path: 'about', loadComponent: () => import('./pages/about/about-page.component').then(m => m.AboutPageComponent) },
   { path: 'dashboard', loadComponent: () => import('./pages/dashboard/dashboard-page.component').then(m => m.DashboardPageComponent) },
   { path: 'agents', loadComponent: () => import('./pages/agents/agents-page.component').then(m => m.AgentsPageComponent) },
+  { path: 'release-notes', loadComponent: () => import('./pages/release-notes/release-notes-page.component').then(m => m.ReleaseNotesPageComponent) },
   { path: 'privacy', loadComponent: () => import('./pages/privacy/privacy-page.component').then(m => m.PrivacyPageComponent) },
   { path: 'support', loadComponent: () => import('./pages/support/support-page.component').then(m => m.SupportPageComponent) },
   { path: 'stats', loadComponent: () => import('./pages/stats/stats-page.component').then(m => m.StatsPageComponent), data: { shellless: true } },
