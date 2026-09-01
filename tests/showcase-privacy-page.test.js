@@ -71,10 +71,19 @@ check('has PhantomStream live preview disclosure',
     /WebSocket/.test(html) &&
     /live-preview frames/.test(html),
   'PhantomStream live preview disclosure missing or too vague');
-check('discloses PhantomStream relay non-persistence',
-  /do not persist page.*DOM/.test(html) &&
-    /site.*API.*payloads/.test(html),
+// The August 2026 policy states this once, as an anchored list under External
+// Services, and has the PhantomStream and Background Agents sections link back
+// to it instead of restating it. Assert the canonical list AND the link, so
+// neither the disclosure nor the path to it can be dropped silently.
+check('discloses relay non-persistence in one canonical anchored list',
+  /id="relay-non-persistence"/.test(html) &&
+    /none of the following is ever persisted on an .*FSB.* server/.test(html) &&
+    ['page content', 'DOM', 'browsing history', 'screenshots', 'AI prompts',
+     'AI responses', 'cookies', 'tokens', 'payloads'].every((f) => html.includes(f)),
   'relay non-persistence wording missing');
+check('PhantomStream section links to the relay non-persistence list',
+  /phantomStream[\s\S]*?href="#relay-non-persistence"/.test(html),
+  'PhantomStream section no longer reaches the non-persistence disclosure');
 check('discloses PhantomStream input masking',
   /maskInputs: true/.test(html) &&
     /passwords and form-control values are masked/.test(html),
