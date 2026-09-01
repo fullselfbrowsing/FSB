@@ -9,9 +9,12 @@
 //   BASE_URL=http://localhost:3217 node scripts/smoke-crawler.mjs   (custom local target)
 //   node scripts/smoke-crawler.mjs                                  (production default)
 //
-// Zero new npm dependencies -- node:fetch is built into Node 18+; no other
-// imports required. Exit 0 on full pass; exit 1 with a printed report on any
-// failure; exit 2 on fatal (uncaught) errors.
+// Zero new npm dependencies -- node:fetch is built into Node 18+; the only
+// import is node:fs, used to read the locale registry so the expected sitemap
+// set is derived rather than duplicated. Exit 0 on full pass; exit 1 with a
+// printed report on any failure; exit 2 on fatal (uncaught) errors.
+
+import { readFileSync } from 'node:fs';
 
 const BASE_URL = (process.env.BASE_URL || 'https://full-selfbrowsing.com').replace(/\/$/, '');
 const PROD_HOST = 'https://full-selfbrowsing.com';
@@ -61,7 +64,30 @@ const MARKETING_ASSERTIONS = [
   { path: '/sitemaps',       titleSubstr: 'Site Maps',          canonical: `${PROD_HOST}/sitemaps` },
 ];
 
-const EXPECTED_SITEMAP_LOCS = MARKETING_ASSERTIONS.map(({ canonical }) => canonical);
+// The sitemap declares every locale variant of every marketing route, so the
+// expected set is routes x locales. Locales come from the shared registry for
+// the same reason build-crawler-files.mjs reads it: a new locale must not need
+// a second edit here.
+const LOCALE_SUBPATHS_FOR_SITEMAP = (() => {
+  const source = readFileSync(
+    new URL('../src/app/core/i18n/locale-constants.ts', import.meta.url),
+    'utf8'
+  );
+  const order = source.match(/LOCALES\s*=\s*\[([^\]]+)\]/)[1]
+    .split(',').map((s) => s.trim().replace(/^['"]|['"]$/g, '')).filter(Boolean);
+  const block = source.match(/LOCALE_SUBPATHS[^{]*\{([\s\S]*?)\}/)[1];
+  const map = {};
+  for (const m of block.matchAll(/['"]([\w-]+)['"]\s*:\s*['"]([^'"]*)['"]/g)) map[m[1]] = m[2];
+  return order.map((code) => map[code]);
+})();
+
+const EXPECTED_SITEMAP_LOCS = MARKETING_ASSERTIONS.flatMap(({ canonical }) => {
+  const routePath = canonical.slice(PROD_HOST.length);
+  return LOCALE_SUBPATHS_FOR_SITEMAP.map((subpath) => {
+    const prefix = subpath ? `/${subpath}` : '';
+    return routePath === '' ? `${PROD_HOST}${prefix}` : `${PROD_HOST}${prefix}${routePath}`;
+  });
+});
 const EXCLUDED_SITEMAP_LOCS = ['/legal', '/dashboard', '/stats'].map((path) => `${PROD_HOST}${path}`);
 const AEO_MUST_CONTAIN = [
   'trigger',

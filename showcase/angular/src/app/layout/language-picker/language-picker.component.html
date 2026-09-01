@@ -9,6 +9,6 @@
     i18n-aria-label="@@picker.aria.label"
     aria-label="Choose language"
   >
-    <option *ngFor="let code of locales" [value]="code" [selected]="code === current" [attr.translate]="'no'">{{ code.toUpperCase() }}</option>
+    <option *ngFor="let code of locales" [value]="code" [selected]="code === current" [attr.translate]="'no'">{{ labels[code] }}</option>
   </select>
 </label>

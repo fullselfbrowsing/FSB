@@ -1831,7 +1831,7 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
     if (enabledEl) enabledEl.textContent = this.formatStatNumber(totalTokens);
     if (runsEl) runsEl.textContent = this.formatStatNumber(totalRequests);
     if (rateEl) rateEl.textContent = Math.round(successRate) + '%';
-    if (costEl) costEl.textContent = '$' + totalCost.toFixed(2);
+    if (costEl) costEl.textContent = this.formatStatCost(totalCost);
     if (remoteEl) remoteEl.textContent = this.remoteControlOn
       ? this.dashboardCopy.remoteOn
       : (payload.connection?.connected ? this.dashboardCopy.connected : this.dashboardCopy.offline);
@@ -1847,7 +1847,7 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
     if (enabledEl) enabledEl.textContent = '0';
     if (runsEl) runsEl.textContent = '0';
     if (rateEl) rateEl.textContent = '0%';
-    if (costEl) costEl.textContent = '$0.00';
+    if (costEl) costEl.textContent = this.formatStatCost(0);
     if (remoteEl) remoteEl.textContent = this.dashboardCopy.offline;
   }
 
@@ -1856,6 +1856,21 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
   private formatStatNumber(value: number): string {
     const safe = Number.isFinite(value) ? Math.max(0, value) : 0;
     return Math.round(safe).toLocaleString(this.localeId);
+  }
+
+  // Costs are billed in USD, but the separator and symbol placement are the
+  // reader's: toFixed(2) always emits '.', so a German reader saw "$12.50"
+  // where "12,50 $" is expected.
+  private formatStatCost(value: number): string {
+    const safe = Number.isFinite(value) ? Math.max(0, value) : 0;
+    try {
+      return new Intl.NumberFormat(this.localeId, {
+        style: 'currency',
+        currency: 'USD',
+      }).format(safe);
+    } catch {
+      return '$' + safe.toFixed(2);
+    }
   }
 
   private getRemoteViewportSize(): { width: number; height: number } {
@@ -4315,8 +4330,8 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
     if (!isoStr) return '-';
     try {
       const d = new Date(isoStr);
-      return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) +
-             ' ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+      return d.toLocaleDateString(this.localeId, { month: 'short', day: 'numeric' }) +
+             ' ' + d.toLocaleTimeString(this.localeId, { hour: '2-digit', minute: '2-digit' });
     } catch (e) { return isoStr; }
   }
 

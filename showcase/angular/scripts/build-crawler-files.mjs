@@ -80,25 +80,66 @@ function todayIsoDate() {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+// Locales are read from the shared registry rather than duplicated here, so a
+// new locale reaches the sitemap the moment it is declared. Same extraction
+// technique verify-locale-sync.mjs uses against the same file.
+const LOCALE_CONSTANTS_PATH = join(ANGULAR_ROOT, 'src', 'app', 'core', 'i18n', 'locale-constants.ts');
+
+function readLocaleRegistry() {
+  const source = readFileSync(LOCALE_CONSTANTS_PATH, 'utf8');
+  const listMatch = source.match(/LOCALES\s*=\s*\[([^\]]+)\]/);
+  if (!listMatch) throw new Error('build-crawler-files: cannot read LOCALES from locale-constants.ts');
+  const locales = listMatch[1]
+    .split(',')
+    .map((entry) => entry.trim().replace(/^['"]|['"]$/g, ''))
+    .filter(Boolean);
+
+  const subpathBlock = source.match(/LOCALE_SUBPATHS[^{]*\{([\s\S]*?)\}/);
+  if (!subpathBlock) throw new Error('build-crawler-files: cannot read LOCALE_SUBPATHS from locale-constants.ts');
+  const subpaths = {};
+  for (const m of subpathBlock[1].matchAll(/['"]([\w-]+)['"]\s*:\s*['"]([^'"]*)['"]/g)) {
+    subpaths[m[1]] = m[2];
+  }
+  for (const locale of locales) {
+    if (!(locale in subpaths)) throw new Error(`build-crawler-files: LOCALE_SUBPATHS missing ${locale}`);
+  }
+  return { locales, subpaths };
+}
+
+function localeUrl(subpath, routePath) {
+  const prefix = subpath ? `/${subpath}` : '';
+  if (routePath === '/') return prefix ? `${HOST}${prefix}` : HOST;
+  return `${HOST}${prefix}${routePath}`;
+}
+
 function generateSitemap() {
   const lastmod = todayIsoDate();
+  const { locales, subpaths } = readLocaleRegistry();
+  const sourceLocale = locales[0];
   const lines = [];
   lines.push('<?xml version="1.0" encoding="UTF-8"?>');
-  lines.push('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">');
+  lines.push('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">');
   for (const route of ROUTES) {
-    const loc = route.path === '/' ? HOST : `${HOST}${route.path}`;
-    lines.push('  <url>');
-    lines.push(`    <loc>${loc}</loc>`);
-    lines.push(`    <lastmod>${lastmod}</lastmod>`);
-    lines.push(`    <changefreq>${route.changefreq}</changefreq>`);
-    lines.push(`    <priority>${route.priority}</priority>`);
-    lines.push('  </url>');
+    // Every locale variant is its own <url>, and each carries the full
+    // alternate set -- Google requires the reciprocal links on each variant.
+    for (const locale of locales) {
+      lines.push('  <url>');
+      lines.push(`    <loc>${localeUrl(subpaths[locale], route.path)}</loc>`);
+      lines.push(`    <lastmod>${lastmod}</lastmod>`);
+      lines.push(`    <changefreq>${route.changefreq}</changefreq>`);
+      lines.push(`    <priority>${route.priority}</priority>`);
+      for (const alternate of locales) {
+        lines.push(`    <xhtml:link rel="alternate" hreflang="${alternate}" href="${localeUrl(subpaths[alternate], route.path)}"/>`);
+      }
+      lines.push(`    <xhtml:link rel="alternate" hreflang="x-default" href="${localeUrl(subpaths[sourceLocale], route.path)}"/>`);
+      lines.push('  </url>');
+    }
   }
   lines.push('</urlset>');
   lines.push(''); // trailing newline
   const body = lines.join('\n');
   writeFileSync(join(PUBLIC_DIR, 'sitemap.xml'), body, 'utf8');
-  console.log(`[build-crawler-files] sitemap.xml written (${body.length} bytes, lastmod=${lastmod})`);
+  console.log(`[build-crawler-files] sitemap.xml written (${body.length} bytes, ${ROUTES.length * locales.length} urls, lastmod=${lastmod})`);
 }
 
 function copyCrawlerTextFile(sourceName, outputName, maxBytes) {

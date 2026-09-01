@@ -253,6 +253,48 @@ app.use(createShowcaseRouteFallback({
   noIndexClientRoutes,
 }));
 
+// Localized 404. Without this, unmatched paths reach Express's finalhandler,
+// which emits an unstyled English "Cannot GET /x" to every reader regardless of
+// locale. The copy lives here rather than in the XLIFF catalog because this
+// response is served without the Angular app -- keep it to one short sentence.
+const NOT_FOUND_COPY = {
+  'en': { title: 'Page not found', home: 'Go to the home page' },
+  'es': { title: 'Página no encontrada', home: 'Ir a la página de inicio' },
+  'de': { title: 'Seite nicht gefunden', home: 'Zur Startseite' },
+  'ja': { title: 'ページが見つかりません', home: 'ホームページへ移動' },
+  'ko': { title: '페이지를 찾을 수 없습니다', home: '홈페이지로 이동' },
+  'zh-CN': { title: '未找到页面', home: '前往首页' },
+  'zh-TW': { title: '找不到頁面', home: '前往首頁' },
+};
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, (ch) => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]
+  ));
+}
+
+app.use((req, res) => {
+  const segment = String(req.path || '/').split('/')[1] || '';
+  const locale = LOCALES.find((code) => LOCALE_SUBPATHS[code] === segment) || SOURCE_LOCALE;
+  // A locale reaching LOCALES without an entry above falls back to English copy,
+  // so <html lang> must follow the copy served rather than the requested locale.
+  // homeHref still uses `locale` -- that home page exists either way.
+  const copyLocale = NOT_FOUND_COPY[locale] ? locale : SOURCE_LOCALE;
+  const copy = NOT_FOUND_COPY[copyLocale];
+  const homeHref = LOCALE_SUBPATHS[locale] ? `/${LOCALE_SUBPATHS[locale]}` : '/';
+  res.status(404).type('html').send(
+    `<!doctype html><html lang="${escapeHtml(copyLocale)}"><head><meta charset="utf-8">` +
+    `<meta name="viewport" content="width=device-width,initial-scale=1">` +
+    `<meta name="robots" content="noindex"><title>${escapeHtml(copy.title)}</title></head>` +
+    `<body style="margin:0;display:grid;place-items:center;min-height:100vh;` +
+    `background:#000;color:#f1f5f9;font:16px/1.6 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">` +
+    `<main style="text-align:center;padding:2rem">` +
+    `<h1 style="font-size:1.5rem;margin:0 0 1rem">${escapeHtml(copy.title)}</h1>` +
+    `<a href="${escapeHtml(homeHref)}" style="color:#ff6b35">${escapeHtml(copy.home)}</a>` +
+    `</main></body></html>`
+  );
+});
+
 // Error handler
 app.use((err, req, res, _next) => {
   console.error('Server error:', err.message);

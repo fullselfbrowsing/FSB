@@ -2,7 +2,7 @@
 // Phase 264 / SEO-01 / VERIFY-01 partial -- Post-build hreflang + canonical asserter.
 //
 // Walks the prerender output directory and asserts on every emitted index.html:
-//   1. Exactly 7 <link rel="alternate"> tags: 6 locales (en, es, de, ja, zh-CN, zh-TW)
+//   1. Exactly 8 <link rel="alternate"> tags: 7 locales (en, es, de, ja, ko, zh-CN, zh-TW)
 //      and 1 with hreflang="x-default" pointing at the en URL.
 //   2. Exactly 1 <link rel="canonical"> whose href matches the file's locale + route.
 //   3. <html lang="..."> matches the served locale (Angular i18n compiler sets this).
@@ -17,7 +17,7 @@ import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
 const HOST = 'https://full-selfbrowsing.com';
-const LOCALES = ['en', 'es', 'de', 'ja', 'zh-CN', 'zh-TW'];
+const LOCALES = ['en', 'es', 'de', 'ja', 'ko', 'zh-CN', 'zh-TW'];
 const SOURCE_LOCALE = 'en';
 const SERVER_ROUTES_PATH = join(process.cwd(), 'src', 'app', 'app.routes.server.ts');
 
@@ -142,12 +142,13 @@ function verifyFile(filePath) {
   const rel = relative(DIST_ROOT, filePath);
   const html = readFileSync(filePath, 'utf8');
 
-  // 1. Alternates: exactly 7 (6 locales + x-default).
+  // 1. Alternates: one per locale plus x-default.
+  const expectedAlternates = LOCALES.length + 1;
   const alternates = extractAlternates(html);
-  if (alternates.length !== 7) {
-    record(false, `[${rel}] alternates count`, `expected 7, got ${alternates.length}`);
+  if (alternates.length !== expectedAlternates) {
+    record(false, `[${rel}] alternates count`, `expected ${expectedAlternates}, got ${alternates.length}`);
   } else {
-    record(true, `[${rel}] alternates count = 7`);
+    record(true, `[${rel}] alternates count = ${expectedAlternates}`);
   }
 
   // Each locale must appear exactly once with the expected href.

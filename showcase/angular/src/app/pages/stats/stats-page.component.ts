@@ -180,14 +180,13 @@ export class StatsPageComponent implements OnInit, OnDestroy {
     if (this.requiresChartLibrary && this.chartLibraryState === 'error') {
       return {
         kind: 'error',
-        message: $localize`:@@stats.error.chartLibrary:Could not load chart library.`,
+        message: CHART_LIBRARY_ERROR,
       };
     }
     if (this.requiresChartLibrary && this.chartRenderErrorView === this.selectedView) {
       return {
         kind: 'error',
-        message: this.chartRenderErrorMessage ||
-          $localize`:@@stats.error.chartRender:Could not render the selected chart.`,
+        message: this.chartRenderErrorMessage || CHART_RENDER_ERROR,
       };
     }
     return dataState;
@@ -220,9 +219,31 @@ export class StatsPageComponent implements OnInit, OnDestroy {
       this.latestFsbHeadline.popular_mcp_clients.length === 0;
   }
 
+  // Error text reaching the card must always be localized. Upstream messages are
+  // developer diagnostics (and browser-native strings like "Failed to fetch"),
+  // so map the states a reader can act on and send everything else to the
+  // generic fallback rather than rendering raw English.
   get errorMessage(): string {
     const state = this.viewState;
-    return state.kind === 'error' ? state.message : '';
+    if (state.kind !== 'error') return '';
+    const raw = state.message || '';
+    if (PRELOCALIZED_ERRORS.has(raw)) return raw;
+    if (/warming up/i.test(raw)) {
+      return $localize`:@@stats.error.warmingUp:Stats are warming up; retrying shortly.`;
+    }
+    if (/freshness metadata/i.test(raw)) {
+      return $localize`:@@stats.error.missingFreshness:The stats response is missing freshness metadata.`;
+    }
+    if (/24 hours old/i.test(raw)) {
+      return $localize`:@@stats.error.stale:The last usable snapshot is more than 24 hours old.`;
+    }
+    if (/^Malformed/i.test(raw)) {
+      return $localize`:@@stats.error.malformed:The stats response was malformed.`;
+    }
+    if (/browser-only/i.test(raw)) {
+      return $localize`:@@stats.error.browserOnly:Stats are only available in the browser.`;
+    }
+    return this.fallbackErrorMessage;
   }
 
   get chartAriaLabel(): string {
@@ -259,7 +280,7 @@ export class StatsPageComponent implements OnInit, OnDestroy {
         }));
       case 'fsb-popular-mcp':
         return (this.latestFsbHeadline?.popular_mcp_clients ?? []).map((item) => ({
-          label: item.label,
+          label: this.displayLabel(item.label),
           value: this.fmtNum(item.uniq),
         }));
       default:
@@ -267,9 +288,18 @@ export class StatsPageComponent implements OnInit, OnDestroy {
     }
   }
 
+  // The server emits geographic identifiers ('DE', 'US-CA', 'AU-Victoria') that
+  // stay as-is, plus two English sentinels that are prose and must not.
+  // See region-geo.ts for the full label contract.
+  displayLabel(label: string): string {
+    if (label === 'unknown') return $localize`:@@stats.label.unknown:Unknown`;
+    if (label === 'Other') return $localize`:@@stats.label.other:Other`;
+    return label;
+  }
+
   get accessibleGlobeData(): readonly AccessibleDatum[] {
     return (this.latestFsbHeadline?.popular_regions ?? []).map((item) => ({
-      label: item.label,
+      label: this.displayLabel(item.label),
       value: this.fmtNum(item.uniq),
     }));
   }
@@ -332,7 +362,7 @@ export class StatsPageComponent implements OnInit, OnDestroy {
         const top = list[0];
         return [
           { label: $localize`:@@stats.metric.trackedClients:tracked clients`, value: this.fmtNum(list.length) },
-          { label: top ? $localize`:@@stats.metric.topNamed:top: ${top.label}:entityLabel:` : $localize`:@@stats.metric.topClient:top client`, value: top ? this.fmtNum(top.uniq) : '0' },
+          { label: top ? $localize`:@@stats.metric.topNamed:top: ${this.displayLabel(top.label)}:entityLabel:` : $localize`:@@stats.metric.topClient:top client`, value: top ? this.fmtNum(top.uniq) : '0' },
         ];
       }
       default:
@@ -828,8 +858,7 @@ export class StatsPageComponent implements OnInit, OnDestroy {
       console.warn('[stats-page] chart render failed', err);
       this.zone.run(() => {
         this.chartRenderErrorView = this.selectedView;
-        this.chartRenderErrorMessage =
-          $localize`:@@stats.error.chartRender:Could not render the selected chart.`;
+        this.chartRenderErrorMessage = CHART_RENDER_ERROR;
         this.teardownVisualization();
       });
     }
@@ -1010,7 +1039,7 @@ export class StatsPageComponent implements OnInit, OnDestroy {
         return {
           type: 'doughnut',
           data: {
-            labels: list.map((x) => x.label),
+            labels: list.map((x) => this.displayLabel(x.label)),
             datasets: [
               {
                 label: $localize`:@@SHOWCASE_STATS_FSB_CHART_POPULAR_MCP_LEGEND:Popular MCP clients`,
@@ -1061,3 +1090,12 @@ function readChartTokens(): ChartTokens {
     border: (style.getPropertyValue('--border-color') || 'rgba(255,255,255,0.08)').trim(),
   };
 }
+
+/* Declared in the module tail because messages.xlf pins a linenumber for every
+   $localize call above. These two are the only error strings the view layer hands
+   down already localized -- errorMessage passes them through instead of collapsing
+   them into the generic network fallback. Comparing against the same call keeps
+   that correct in every locale: both sides resolve through one trans-unit. */
+const CHART_LIBRARY_ERROR = $localize`:@@stats.error.chartLibrary:Could not load chart library.`;
+const CHART_RENDER_ERROR = $localize`:@@stats.error.chartRender:Could not render the selected chart.`;
+const PRELOCALIZED_ERRORS: ReadonlySet<string> = new Set([CHART_LIBRARY_ERROR, CHART_RENDER_ERROR]);

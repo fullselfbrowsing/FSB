@@ -2,7 +2,7 @@
 
 This list is the authoritative source of terms that MUST NOT be translated when
 preparing the per-locale XLIFF targets (messages.es.xlf, .de.xlf,
-.ja.xlf, .zh-CN.xlf, .zh-TW.xlf). When any of these appear inside a translatable
+.ja.xlf, .ko.xlf, .zh-CN.xlf, .zh-TW.xlf). When any of these appear inside a translatable
 string, they are wrapped in `<span translate="no">...</span>` in the source HTML
 so the XLIFF extractor preserves them as `<ph>` placeholders the translator must
 keep verbatim.
