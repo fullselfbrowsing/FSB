@@ -51,6 +51,7 @@ const MARKETING_ASSERTIONS = [
       && node['@id'] === `${PROD_HOST}/agents#fsb-skill` },
   { path: '/support',        titleSubstr: 'Support',            canonical: `${PROD_HOST}/support` },
   { path: '/privacy',        titleSubstr: 'Privacy',            canonical: `${PROD_HOST}/privacy` },
+  { path: '/release-notes',  titleSubstr: 'Release notes',      canonical: `${PROD_HOST}/release-notes` },
   { path: '/lattice',        titleSubstr: 'Lattice',            canonical: `${PROD_HOST}/lattice` },
   { path: '/concierge',      titleSubstr: 'Concierge',          canonical: `${PROD_HOST}/concierge`,
     licensedSoftware: (node) => node['@type'] === 'SoftwareApplication'

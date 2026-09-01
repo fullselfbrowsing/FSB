@@ -26,6 +26,7 @@ const ROUTES = [
   { path: '/agents',         changefreq: 'weekly',  priority: '0.9' },
   { path: '/support',        changefreq: 'monthly', priority: '0.7' },
   { path: '/privacy',        changefreq: 'yearly',  priority: '0.5' },
+  { path: '/release-notes',  changefreq: 'weekly',  priority: '0.8' },
   { path: '/lattice',        changefreq: 'weekly',  priority: '0.8' },
   { path: '/concierge',      changefreq: 'weekly',  priority: '0.8' },
   { path: '/phantom-stream', changefreq: 'weekly',  priority: '0.8' },

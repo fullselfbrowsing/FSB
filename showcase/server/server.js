@@ -222,6 +222,7 @@ const marketingRoutes = new Set([
   '/about',
   '/agents',
   '/privacy',
+  '/release-notes',
   '/support',
   '/lattice',
   '/concierge',

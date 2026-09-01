@@ -67,6 +67,7 @@ const ROUTE_TABLE = [
   },
   { path: 'agents', componentDir: 'pages/agents', shellless: false, outOfScope: null },
   { path: 'privacy', componentDir: 'pages/privacy', shellless: false, outOfScope: null },
+  { path: 'release-notes', componentDir: 'pages/release-notes', shellless: false, outOfScope: null },
   { path: 'support', componentDir: 'pages/support', shellless: false, outOfScope: null },
   { path: 'stats', componentDir: 'pages/stats', shellless: true, outOfScope: null },
   { path: 'lattice', componentDir: 'pages/lattice', shellless: true, outOfScope: null },

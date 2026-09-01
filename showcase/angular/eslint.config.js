@@ -36,7 +36,7 @@ module.exports = tseslint.config(
           'rel', 'href', 'src', 'srcset', 'loading', 'decoding', 'referrerpolicy',
           'allow', 'allowfullscreen', 'sandbox',
           // SVG geometry / class hooks
-          'd', 'stroke-linejoin', 'stroke-linecap', 'fill', 'viewBox',
+          'd', 'stroke-linejoin', 'stroke-linecap', 'fill', 'viewBox', 'preserveAspectRatio',
           // Data attributes (test ids, internal hooks)
           'data-testid', 'data-tab', 'data-type', 'data-ld',
           // Routing (Angular router takes literal strings, not translations)
