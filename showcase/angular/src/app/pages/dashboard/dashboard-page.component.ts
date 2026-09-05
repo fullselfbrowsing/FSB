@@ -2581,7 +2581,10 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
   private handleScannedQR(decodedText: string): void {
     try {
       const data = JSON.parse(decodedText);
-      if (!data.t) throw new Error(this.dashboardCopy.qrMissingToken);
+      if (!data.t) {
+        this.failScan(this.dashboardCopy.qrMissingToken);
+        return;
+      }
 
       if (this.tabScanContent) {
         this.tabScanContent.innerHTML = '<p class="dash-scan-instruction">' + this.escapeHtml(this.dashboardCopy.connecting) + '</p>';
@@ -2590,6 +2593,10 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
       let exchangeUrl = (data.s || '') + '/api/pair/exchange';
       if (data.s && data.s === location.origin) exchangeUrl = '/api/pair/exchange';
       if (!data.s) exchangeUrl = '/api/pair/exchange';
+
+      // Once the exchange succeeds the scanner must never come back, even if the
+      // post-pairing wiring below throws.
+      let paired = false;
 
       fetch(exchangeUrl, {
         method: 'POST',
@@ -2607,6 +2614,7 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
         }
         return resp.json();
       }).then(result => {
+        paired = true;
         this.storeSession(result.hashKey, result.sessionToken, result.expiresAt);
         this.showDashboard();
         // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
@@ -2615,18 +2623,13 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
         // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
         // this.startPolling();
       }).catch((err: Error & { localizedMessage?: string }) => {
-        this.showScanError(err?.localizedMessage || this.dashboardCopy.scanFailed);
-        if (this.tabScanContent) {
-          this.tabScanContent.innerHTML =
-            '<p class="dash-scan-instruction">' + this.escapeHtml(this.dashboardCopy.pointCamera) + '</p>' +
-            '<div id="qr-reader" class="dash-qr-reader" aria-label="' + this.escapeAttr(this.dashboardCopy.qrViewfinder) + '"></div>' +
-            '<p id="dash-scan-error" class="dash-scan-error" style="display: none;"></p>';
-        }
-        this.switchTab('paste');
+        if (paired) return;
+        this.failScan(err?.localizedMessage || this.dashboardCopy.qrExchangeFailed);
       });
     } catch (err) {
-      this.showScanError(this.dashboardCopy.scanFailed);
-      this.switchTab('paste');
+      // A malformed payload carries an untranslated parser message, so report
+      // our own localized copy instead of err.message.
+      this.failScan(this.dashboardCopy.scanFailed);
     }
   }
 
@@ -2636,6 +2639,23 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
       el.textContent = msg;
       el.style.display = 'block';
     }
+  }
+
+  private resetScanPanel(): void {
+    if (!this.tabScanContent) return;
+    this.tabScanContent.innerHTML =
+      '<p class="dash-scan-instruction">' + this.escapeHtml(this.dashboardCopy.pointCamera) + '</p>' +
+      '<div id="qr-reader" class="dash-qr-reader" aria-label="' + this.escapeAttr(this.dashboardCopy.qrViewfinder) + '"></div>' +
+      '<p id="dash-scan-error" class="dash-scan-error" style="display: none;"></p>';
+    this.scanError = this.el('dash-scan-error');
+  }
+
+  // Rebuild before showing: the connecting state replaces the panel markup, so
+  // writing the error first would target a node that is no longer in the DOM.
+  private failScan(message: string): void {
+    this.resetScanPanel();
+    this.showScanError(message);
+    void this.startQRScanner();
   }
 //
   // ==================== DATA LOADING ====================
