@@ -4831,98 +4831,98 @@
         <source>Last snapshot: <x id="snapshotTime" equiv-text="snapshotTime"/></source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">3994</context>
+          <context context-type="linenumber">4014</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.tooltip.state" datatype="html">
         <source>State: <x id="streamState" equiv-text="state"/></source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">3998</context>
+          <context context-type="linenumber">4018</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.tooltip.reason" datatype="html">
         <source>Reason: <x id="reason" equiv-text="reason"/></source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">4002</context>
+          <context context-type="linenumber">4022</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.tooltip.recoveringFor" datatype="html">
         <source>Recovering for <x id="seconds" equiv-text="seconds"/> s</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">4006</context>
+          <context context-type="linenumber">4026</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.tooltip.lastFrame" datatype="html">
         <source>last frame: <x id="seconds" equiv-text="frameSeconds"/> s ago</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">4012</context>
+          <context context-type="linenumber">4032</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.tooltip.mutations" datatype="html">
         <source>mutations: <x id="count" equiv-text="this.mutationsAppliedTotal"/></source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">4013</context>
+          <context context-type="linenumber">4033</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.tooltip.applyFailures" datatype="html">
         <source>apply failures: <x id="count" equiv-text="this.mutationApplyFailures"/></source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">4014</context>
+          <context context-type="linenumber">4034</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.tooltip.stale" datatype="html">
         <source>stale: <x id="count" equiv-text="this.staleMutationCount"/></source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">4015</context>
+          <context context-type="linenumber">4035</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.tooltip.noData" datatype="html">
         <source>No stream data</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">4016</context>
+          <context context-type="linenumber">4036</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.api.requestFailed" datatype="html">
         <source>Request failed with status <x id="status" equiv-text="status"/></source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">4319</context>
+          <context context-type="linenumber">4339</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.etaMinutes" datatype="html">
         <source>~<x id="minutes" equiv-text="amount"/> min remaining</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">4474</context>
+          <context context-type="linenumber">4494</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.etaSeconds" datatype="html">
         <source>~<x id="seconds" equiv-text="amount"/> s remaining</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">4475</context>
+          <context context-type="linenumber">4495</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.runningFor" datatype="html">
         <source>Running for <x id="duration" equiv-text="duration"/></source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">4549</context>
+          <context context-type="linenumber">4569</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.stoppedWithAction" datatype="html">
         <source>Stopped by user -- was: <x id="action" equiv-text="action"/></source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">4554</context>
+          <context context-type="linenumber">4574</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.hero.title" datatype="html">

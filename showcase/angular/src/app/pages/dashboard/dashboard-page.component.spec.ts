@@ -87,6 +87,26 @@ describe('DashboardPageComponent QR scanner lifecycle', () => {
     };
   }
 
+  // The scan success handler is the third argument html5-qrcode receives.
+  function decodeQR(payload: string): void {
+    const scanner = scannerInstances[scannerInstances.length - 1];
+    const onDecode = scanner.start.calls.mostRecent().args[2] as (text: string) => void;
+    onDecode(payload);
+    flushMicrotasks();
+  }
+
+  function scanErrorEl(fixture: ComponentFixture<DashboardPageComponent>): HTMLElement {
+    // Re-query rather than caching: a failed scan rebuilds the panel markup.
+    return fixture.nativeElement.querySelector('#dash-scan-error') as HTMLElement;
+  }
+
+  function rejectPairing(code: string): jasmine.Spy {
+    return spyOn(window, 'fetch').and.returnValue(Promise.resolve({
+      ok: false,
+      json: () => Promise.resolve({ code }),
+    } as Response));
+  }
+
   it('waits for the QR library and starts the scanner exactly once', fakeAsync(() => {
     const fixture = createFixture();
     const script = qrScript();
@@ -164,6 +184,58 @@ describe('DashboardPageComponent QR scanner lifecycle', () => {
     expect(scanTab.classList).toContain('active');
     expect(error.style.display).toBe('block');
     expect(error.textContent).toBe('Camera unavailable');
+  }));
+
+  it('surfaces a rejected pairing exchange and lets the user rescan', fakeAsync(() => {
+    const fixture = createFixture();
+    const scanTab = fixture.nativeElement.querySelector('#dash-tab-scan') as HTMLButtonElement;
+    const pasteTab = fixture.nativeElement.querySelector('#dash-tab-paste') as HTMLButtonElement;
+
+    installScanner();
+    qrScript().dispatchEvent(new Event('load'));
+    flushMicrotasks();
+    expect(scannerInstances).toHaveSize(1);
+
+    rejectPairing('pair_token_expired');
+    decodeQR(JSON.stringify({ t: 'expired-token' }));
+
+    expect(scanErrorEl(fixture).style.display).toBe('block');
+    expect(scanErrorEl(fixture).textContent).toBe('The pairing code has expired');
+    expect(scanTab.classList).toContain('active');
+    expect(pasteTab.classList).not.toContain('active');
+    expect(scannerInstances).toHaveSize(2);
+  }));
+
+  it('reports a malformed QR payload without leaking the parser message', fakeAsync(() => {
+    const fixture = createFixture();
+    const scanTab = fixture.nativeElement.querySelector('#dash-tab-scan') as HTMLButtonElement;
+    const fetchSpy = spyOn(window, 'fetch');
+
+    installScanner();
+    qrScript().dispatchEvent(new Event('load'));
+    flushMicrotasks();
+
+    decodeQR('not-json');
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(scanErrorEl(fixture).style.display).toBe('block');
+    expect(scanErrorEl(fixture).textContent).toBe('Scan failed -- paste your key instead');
+    expect(scanTab.classList).toContain('active');
+  }));
+
+  it('reports a QR payload that carries no pairing token', fakeAsync(() => {
+    const fixture = createFixture();
+    const fetchSpy = spyOn(window, 'fetch');
+
+    installScanner();
+    qrScript().dispatchEvent(new Event('load'));
+    flushMicrotasks();
+
+    decodeQR(JSON.stringify({ s: 'https://example.test' }));
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(scanErrorEl(fixture).textContent).toBe('QR code does not contain a pairing token');
+    expect(scannerInstances).toHaveSize(2);
   }));
 
   it('reuses in-flight CDN scripts across dashboard component instances', fakeAsync(() => {

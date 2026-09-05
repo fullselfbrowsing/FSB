@@ -6,7 +6,9 @@ The independently published `fsb-mcp-server` npm package keeps its own semver ch
 
 ## [Unreleased]
 
-Nothing yet.
+### Fixed
+
+- **Dashboard QR pairing failures are visible again.** Scanning a pairing code that was expired, already used, or otherwise rejected reported nothing at all: the "Connecting..." state replaced the scan panel markup, so the error was written into a node that had already been removed from the DOM, and the dashboard then switched to the Paste Key tab. Every failure now renders its localized reason, keeps the user on the Scan tab, and restarts the camera so a regenerated code can be scanned directly.
 
 ## v0.9.91 — Version Metadata Alignment — 2026-07-14
 
