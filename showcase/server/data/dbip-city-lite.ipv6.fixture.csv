@@ -1,0 +1,12 @@
+# dbip-city-lite.ipv6.fixture.csv -- TINY committed IPv6 test fixture.
+#
+# Format: start_hi,start_lo,end_hi,end_lo,country,subdivision
+# hi/lo are inclusive uint64 halves of the 128-bit IPv6 address (big-endian).
+# Sorted ascending by (start_hi, start_lo).
+#
+# 2001:db8::/32  -> AU/Victoria     (docs prefix; not a real geo)
+# 2405:201::/32  -> IN/Maharashtra  (synthetic stand-in for Indian IPv6 / Jio)
+#
+# Attribution for the real dataset: IP Geolocation by DB-IP (https://db-ip.com), CC-BY-4.0.
+2306139568115548160,0,2306139572410515455,18446744073709551615,AU,Victoria
+2595482963567181824,0,2595482967862149119,18446744073709551615,IN,Maharashtra

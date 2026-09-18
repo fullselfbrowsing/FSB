@@ -12,7 +12,8 @@
  *   (c) when the total below-k sum is itself <5 the 'Other' bucket is SUPPRESSED;
  *   (d) events whose region is 'unknown' are handled by the same floor;
  *   and the public headline path (buildHeadlineJson) exposes popular_regions as
- *   {label, uniq} with NO sub-floor/UUID/ip_hash leak.
+ *   {label, uniq} with NO sub-floor/UUID/ip_hash leak. users_by_region_365d is
+ *   last successful geo (a newer 'unknown' day does not replace a real region).
  *
  * Run: node tests/server-region-aggregation.test.js
  */
@@ -261,6 +262,76 @@ check('REGION_K_FLOOR is the HARD k>=5 (not the relaxed mcp floor of 2)', REGION
   check('HL: serialized headline contains NO UUIDv4 string', !UUID_REGEX.test(serialized), `serialized=${serialized.slice(0, 200)}`);
   check('HL: serialized headline contains NO ip_hash', !serialized.includes('ip_hash'), 'leaked ip_hash');
   check('HL: serialized headline contains NO install_uuid', !serialized.includes('install_uuid'), 'leaked install_uuid');
+
+  check('HL: headline has users_by_region_365d from persisted rollups',
+    Array.isArray(headline.users_by_region_365d),
+    `got ${JSON.stringify(headline.users_by_region_365d)}`);
+  check('HL: 365d census includes US-CA with uniq=6',
+    headline.users_by_region_365d.some((x) => x.label === 'US-CA' && x.uniq === 6),
+    `got ${JSON.stringify(headline.users_by_region_365d)}`);
+  check('HL: 365d census includes US-NY with uniq=5',
+    headline.users_by_region_365d.some((x) => x.label === 'US-NY' && x.uniq === 5),
+    `got ${JSON.stringify(headline.users_by_region_365d)}`);
+  check('HL: 365d census does NOT leak sub-floor US-TX',
+    !headline.users_by_region_365d.some((x) => x.label === 'US-TX'),
+    `got ${JSON.stringify(headline.users_by_region_365d)}`);
+
+  db.close();
+}
+
+{
+  const db = new Database(':memory:');
+  initializeDatabase(db);
+  const queries = new Queries(db);
+  seedRegion(queries, 'IN-Maharashtra', 6);
+  runHousekeeperTick(db, queries, NOW);
+  db.prepare('DELETE FROM telemetry_events').run();
+  runHousekeeperTick(db, queries, NOW);
+  const headline = buildHeadlineJson(queries);
+  check('persist: 365d still has IN-Maharashtra after raw events are wiped',
+    Array.isArray(headline.users_by_region_365d)
+      && headline.users_by_region_365d.some((x) => x.label === 'IN-Maharashtra' && x.uniq === 6),
+    `got ${JSON.stringify(headline.users_by_region_365d)}`);
+  check('persist: today popular_regions may be empty after wipe, 365d is the durable copy',
+    Array.isArray(headline.popular_regions),
+    `got ${JSON.stringify(headline.popular_regions)}`);
+
+  db.close();
+}
+
+{
+  const db = new Database(':memory:');
+  initializeDatabase(db);
+  const queries = new Queries(db);
+  const yesterdayStart = floorToUtcDayMs(NOW) - 24 * 60 * 60 * 1000;
+  const tsYesterday = yesterdayStart + 3 * 60 * 60 * 1000;
+  const uuids = [];
+  for (let i = 0; i < 6; i++) {
+    const uuid = nextUuid();
+    uuids.push(uuid);
+    queries.insertTelemetryEventWithRegionV3.run(
+      nextEventId(), uuid, tsYesterday + i * 60000,
+      'Claude', 'm', 1, 1, 0, 2, 'periodic', 'iphash', NOW - 24 * 60 * 60 * 1000,
+      'IN-Maharashtra', 'ipv4'
+    );
+  }
+  runHousekeeperTick(db, queries, NOW);
+  for (let i = 0; i < 6; i++) {
+    queries.insertTelemetryEventWithRegionV3.run(
+      nextEventId(), uuids[i], TS_TODAY + i * 60000,
+      'Claude', 'm', 1, 1, 0, 2, 'periodic', 'iphash', NOW,
+      'unknown', 'ipv6-ula'
+    );
+  }
+  runHousekeeperTick(db, queries, NOW);
+  const headline = buildHeadlineJson(queries);
+  check('persist: newer unknown day does not replace last-known IN-Maharashtra',
+    Array.isArray(headline.users_by_region_365d)
+      && headline.users_by_region_365d.some((x) => x.label === 'IN-Maharashtra' && x.uniq === 6),
+    `got ${JSON.stringify(headline.users_by_region_365d)}`);
+  check('persist: 365d census omits unknown when a real region still exists',
+    !headline.users_by_region_365d.some((x) => x.label === 'unknown'),
+    `got ${JSON.stringify(headline.users_by_region_365d)}`);
 
   db.close();
 }

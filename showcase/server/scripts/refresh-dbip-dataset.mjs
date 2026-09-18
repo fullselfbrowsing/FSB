@@ -8,15 +8,17 @@
  * This script transforms the upstream DB-IP IP-to-City Lite CSV into the
  * compact range table that showcase/server/src/utils/ip-geo.js reads:
  *
- *     start_ip_int,end_ip_int,country,subdivision
+ *     start_ip_int,end_ip_int,country,subdivision          (IPv4)
+ *     start_hi,start_lo,end_hi,end_lo,country,subdivision  (IPv6 uint64 halves)
  *
- * (inclusive uint32 IPv4 bounds, sorted ascending by start_ip_int). The output
- * is written to the production dataset path consumed by ip-geo.js
+ * (inclusive bounds, each file sorted ascending). The IPv4 output is written to
+ * the production dataset path consumed by ip-geo.js
  * (process.env.DBIP_DATASET_PATH || showcase/server/data/dbip-city-lite.csv).
+ * IPv6 goes to --ipv6-out or a sibling `*.ipv6.csv` (DBIP_IPV6_DATASET_PATH).
  *
- * The real artifact is ~100MB and is NOT committed (see data/README.md +
+ * The real artifacts are tens of MB and are NOT committed (see data/README.md +
  * .gitignore -- the data/dbip-city-lite.* glob is ignored EXCEPT *.fixture.csv).
- * Production data is generated here (or at Docker build) and dropped in.
+ * Production data is generated here (off the 256 MB Fly VM) and dropped in.
  *
  * Usage:
  *   1. Download the free monthly "IP to City Lite" CSV from DB-IP:
@@ -28,13 +30,7 @@
  *
  *   2. Run:
  *        node showcase/server/scripts/refresh-dbip-dataset.mjs --in <downloaded.csv>
- *      optionally with --out <path> (defaults to DBIP_DATASET_PATH or the
- *      production path under showcase/server/data/).
- *
- * Only IPv4 rows are emitted (ip-geo.js is coarse IPv4-only; IPv6 -> 'unknown').
- * If --in is omitted the script prints the download URL + this format spec and
- * exits non-zero, so it is self-documenting but still runnable against a real
- * downloaded source CSV.
+ *      optionally with --out <path> and --ipv6-out <path>.
  *
  * Run: node showcase/server/scripts/refresh-dbip-dataset.mjs --in dbip-city-lite.csv
  */
@@ -51,15 +47,31 @@ const __dirname = dirname(__filename);
 
 // Default production artifact path (mirrors ip-geo.js DEFAULT_DATASET_PATH).
 const DEFAULT_OUT = join(__dirname, '..', 'data', 'dbip-city-lite.csv');
+const DEFAULT_IPV6_OUT = join(__dirname, '..', 'data', 'dbip-city-lite.ipv6.csv');
 
 const DOWNLOAD_URL = 'https://db-ip.com/db/download/ip-to-city-lite';
 const ATTRIBUTION = 'IP Geolocation by DB-IP (https://db-ip.com), CC-BY-4.0';
+const UINT64_MAX_PLUS_ONE = 1n << 64n;
+
+function siblingIpv6Path(ipv4Path) {
+  if (typeof ipv4Path !== 'string' || ipv4Path === '') return DEFAULT_IPV6_OUT;
+  if (ipv4Path.endsWith('.fixture.csv')) {
+    return ipv4Path.replace(/\.fixture\.csv$/, '.ipv6.fixture.csv');
+  }
+  if (ipv4Path.endsWith('.csv')) return ipv4Path.slice(0, -4) + '.ipv6.csv';
+  return ipv4Path + '.ipv6';
+}
 
 function parseArgs(argv) {
-  const args = { in: null, out: process.env.DBIP_DATASET_PATH || DEFAULT_OUT };
+  const args = {
+    in: null,
+    out: process.env.DBIP_DATASET_PATH || DEFAULT_OUT,
+    ipv6Out: process.env.DBIP_IPV6_DATASET_PATH || null,
+  };
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--in') args.in = argv[++i];
     else if (argv[i] === '--out') args.out = argv[++i];
+    else if (argv[i] === '--ipv6-out') args.ipv6Out = argv[++i];
   }
   return args;
 }
@@ -77,6 +89,67 @@ function ipv4ToInt(ip) {
     acc = acc * 256 + n;
   }
   return acc >>> 0;
+}
+
+/**
+ * Native IPv6 -> big-endian uint64 halves, or null. Same rules as ip-geo.js
+ * (reject CIDR, zone IDs, dotted mixed form).
+ *
+ * @param {unknown} ip
+ * @returns {{hi:bigint, lo:bigint}|null}
+ */
+function ipv6ToHalves(ip) {
+  if (typeof ip !== 'string') return null;
+  const s = ip.trim().toLowerCase();
+  if (s === '' || s.includes('/') || s.includes('%') || s.includes('.')) return null;
+  if (!s.includes(':')) return null;
+
+  const sides = s.split('::');
+  if (sides.length > 2) return null;
+
+  const parseSide = (side) => {
+    if (side === '') return [];
+    const parts = side.split(':');
+    const out = [];
+    for (const p of parts) {
+      if (!/^[0-9a-f]{1,4}$/.test(p)) return null;
+      out.push(parseInt(p, 16));
+    }
+    return out;
+  };
+
+  let groups;
+  if (sides.length === 1) {
+    groups = parseSide(sides[0]);
+    if (!groups || groups.length !== 8) return null;
+  } else {
+    const head = parseSide(sides[0]);
+    const tail = parseSide(sides[1]);
+    if (!head || !tail) return null;
+    const missing = 8 - head.length - tail.length;
+    if (missing < 1) return null;
+    groups = head.concat(new Array(missing).fill(0), tail);
+  }
+
+  let hi = 0n;
+  let lo = 0n;
+  for (let i = 0; i < 4; i++) hi = (hi << 16n) + BigInt(groups[i]);
+  for (let i = 4; i < 8; i++) lo = (lo << 16n) + BigInt(groups[i]);
+  return { hi, lo };
+}
+
+function cmpU128(aHi, aLo, bHi, bLo) {
+  if (aHi < bHi) return -1;
+  if (aHi > bHi) return 1;
+  if (aLo < bLo) return -1;
+  if (aLo > bLo) return 1;
+  return 0;
+}
+
+function addOneU128(hi, lo) {
+  const nlo = lo + 1n;
+  if (nlo === UINT64_MAX_PLUS_ONE) return [hi + 1n, 0n];
+  return [hi, nlo];
 }
 
 /**
@@ -114,11 +187,14 @@ function printSpecAndExit() {
   console.error('  1. Download the free "IP to City Lite" CSV from DB-IP:');
   console.error(`       ${DOWNLOAD_URL}`);
   console.error('     (gunzip the .csv.gz first).');
-  console.error('  2. Re-run with: --in <downloaded.csv> [--out <path>]');
+  console.error('  2. Re-run with: --in <downloaded.csv> [--out <path>] [--ipv6-out <path>]');
   console.error('');
-  console.error('  Output format (consumed by src/utils/ip-geo.js):');
+  console.error('  IPv4 output (consumed by src/utils/ip-geo.js):');
   console.error('     start_ip_int,end_ip_int,country,subdivision');
-  console.error('     (inclusive uint32 IPv4 bounds, sorted ascending; IPv4 rows only)');
+  console.error('     (inclusive uint32 IPv4 bounds, sorted ascending)');
+  console.error('  IPv6 output (sibling *.ipv6.csv unless --ipv6-out / DBIP_IPV6_DATASET_PATH):');
+  console.error('     start_hi,start_lo,end_hi,end_lo,country,subdivision');
+  console.error('     (inclusive uint64 halves, sorted ascending by start)');
   process.exit(2);
 }
 
@@ -133,12 +209,15 @@ async function main() {
   }
 
   const outPath = resolve(args.out);
+  const ipv6OutPath = resolve(args.ipv6Out || siblingIpv6Path(outPath));
   mkdirSync(dirname(outPath), { recursive: true });
+  mkdirSync(dirname(ipv6OutPath), { recursive: true });
 
-  // Stream-transform: read upstream rows, emit IPv4 range rows. We collect into
-  // memory to sort by start_ip_int before writing (ip-geo.js binary-searches a
-  // sorted table). The IP-to-City Lite CSV is large but fits comfortably.
+  // Stream-transform: read upstream rows, emit IPv4 and IPv6 range rows. We
+  // collect into memory to sort before writing (ip-geo.js binary-searches a
+  // sorted table). Run this OFF the 256 MB Fly VM -- the source CSV is ~685 MB.
   const rows = [];
+  const v6rows = [];
   const rl = createInterface({ input: createReadStream(inPath, 'utf8'), crlfDelay: Infinity });
 
   let lineNo = 0;
@@ -148,18 +227,29 @@ async function main() {
     const cols = splitCsvLine(line);
     // Expected upstream order: ip_start, ip_end, continent, country, stateprov, ...
     if (cols.length < 5) continue;
-    const startInt = ipv4ToInt(cols[0]);
-    const endInt = ipv4ToInt(cols[1]);
-    if (startInt === null || endInt === null) continue; // skip IPv6 / malformed
-    if (endInt < startInt) continue;
     const country = (cols[3] || '').trim();
     const subdivision = (cols[4] || '').trim();
     if (country === '') continue;
-    // Strip commas from labels defensively so the compact 4-field format stays parseable.
-    rows.push([startInt, endInt, country.replace(/,/g, ' '), subdivision.replace(/,/g, ' ')]);
+    const countrySafe = country.replace(/,/g, ' ');
+    const subSafe = subdivision.replace(/,/g, ' ');
+
+    const startInt = ipv4ToInt(cols[0]);
+    const endInt = ipv4ToInt(cols[1]);
+    if (startInt !== null && endInt !== null) {
+      if (endInt < startInt) continue;
+      rows.push([startInt, endInt, countrySafe, subSafe]);
+      continue;
+    }
+
+    const startV6 = ipv6ToHalves(cols[0]);
+    const endV6 = ipv6ToHalves(cols[1]);
+    if (!startV6 || !endV6) continue;
+    if (cmpU128(endV6.hi, endV6.lo, startV6.hi, startV6.lo) < 0) continue;
+    v6rows.push([startV6.hi, startV6.lo, endV6.hi, endV6.lo, countrySafe, subSafe]);
   }
 
   rows.sort((a, b) => a[0] - b[0]);
+  v6rows.sort((a, b) => cmpU128(a[0], a[1], b[0], b[1]));
 
   // Range-merge: collapse CONSECUTIVE rows that share country+subdivision AND
   // whose ranges are contiguous or overlapping (nextStart <= lastEnd + 1) into a
@@ -172,13 +262,26 @@ async function main() {
   for (const r of rows) {
     const last = merged.length > 0 ? merged[merged.length - 1] : null;
     if (last && last[2] === r[2] && last[3] === r[3] && r[0] <= last[1] + 1) {
-      // Same label + adjacent/overlapping -> extend the end (max handles a
-      // fully-contained range without shrinking the span). Different
-      // subdivisions within one country stay distinct (US/California vs US/Nevada).
       if (r[1] > last[1]) last[1] = r[1];
     } else {
-      merged.push([r[0], r[1], r[2], r[3]]); // copy so last[1] is safe to mutate
+      merged.push([r[0], r[1], r[2], r[3]]);
     }
+  }
+
+  const mergedV6 = [];
+  for (const r of v6rows) {
+    const last = mergedV6.length > 0 ? mergedV6[mergedV6.length - 1] : null;
+    if (last && last[4] === r[4] && last[5] === r[5]) {
+      const next = addOneU128(last[2], last[3]);
+      if (cmpU128(r[0], r[1], next[0], next[1]) <= 0) {
+        if (cmpU128(r[2], r[3], last[2], last[3]) > 0) {
+          last[2] = r[2];
+          last[3] = r[3];
+        }
+        continue;
+      }
+    }
+    mergedV6.push([r[0], r[1], r[2], r[3], r[4], r[5]]);
   }
 
   const ws = createWriteStream(outPath, 'utf8');
@@ -190,9 +293,21 @@ async function main() {
   }
   await new Promise((res, rej) => { ws.end((err) => (err ? rej(err) : res())); });
 
+  const ws6 = createWriteStream(ipv6OutPath, 'utf8');
+  ws6.write(`# Generated by refresh-dbip-dataset.mjs from a DB-IP IP-to-City Lite source CSV.\n`);
+  ws6.write(`# ${ATTRIBUTION}\n`);
+  ws6.write(`# Format: start_hi,start_lo,end_hi,end_lo,country,subdivision (uint64 IPv6 halves, sorted ascending; adjacent same-region ranges merged).\n`);
+  for (const r of mergedV6) {
+    ws6.write(`${r[0]},${r[1]},${r[2]},${r[3]},${r[4]},${r[5]}\n`);
+  }
+  await new Promise((res, rej) => { ws6.end((err) => (err ? rej(err) : res())); });
+
   const reduction = rows.length > 0 ? Math.round((1 - merged.length / rows.length) * 100) : 0;
+  const reduction6 = v6rows.length > 0 ? Math.round((1 - mergedV6.length / v6rows.length) * 100) : 0;
   console.log(`refresh-dbip-dataset: wrote ${merged.length} IPv4 ranges to ${outPath}`);
   console.log(`  Merged from ${rows.length} raw IPv4 ranges (${reduction}% reduction).`);
+  console.log(`refresh-dbip-dataset: wrote ${mergedV6.length} IPv6 ranges to ${ipv6OutPath}`);
+  console.log(`  Merged from ${v6rows.length} raw IPv6 ranges (${reduction6}% reduction).`);
   console.log(`  Source lines read: ${lineNo}`);
   console.log(`  ${ATTRIBUTION}`);
 }

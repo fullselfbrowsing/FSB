@@ -63,6 +63,12 @@ export interface FSBTelemetryHeadline {
   popular_agents: Array<{ label: string; uniq: number }>;
   /** Latest day's coarse region aggregate with a k>=5 floor. */
   popular_regions: Array<{ label: string; uniq: number }>;
+  /**
+   * Last-known coarse region per install across the retained 365-day rollups,
+   * k>=5 floored. Anonymous (country / US-state labels only). Powers the globe
+   * so location survives the 7-day raw-event wipe.
+   */
+  users_by_region_365d?: Array<{ label: string; uniq: number }>;
   /** Compatibility alias for avg_agents_per_reporting_user. */
   avg_agents_per_user: number;
   /** active_agents_now / active_agents_reporting_users_now. */

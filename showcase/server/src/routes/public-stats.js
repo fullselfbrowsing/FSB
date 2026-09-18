@@ -34,6 +34,7 @@
 const express = require('express');
 const crypto = require('crypto');
 const activeTracker = require('../telemetry/active-tracker');
+const { applyDistinctKFloor, REGION_K_FLOOR } = require('../telemetry/housekeeper');
 
 // 30-second in-process memo TTL.
 const MEMO_TTL_MS = 30 * 1000;
@@ -129,6 +130,15 @@ function buildHeadlineJson(queries) {
          : 'unknown',
     uniq: Number.isInteger(r.uniq) ? r.uniq : 0,
   }));
+  const users_by_region_365d = applyDistinctKFloor(
+    queries.lastKnownRollupRegions(),
+    'region',
+    'install_uuid',
+    REGION_K_FLOOR
+  ).map((r) => ({
+    label: typeof r.region === 'string' ? r.region : 'unknown',
+    uniq: Number.isInteger(r.uniq) ? r.uniq : 0,
+  }));
 
   const avg_agents_per_reporting_user = active_agents_reporting_users_now > 0
     ? Math.round((active_agents_now / active_agents_reporting_users_now) * 10) / 10
@@ -169,6 +179,7 @@ function buildHeadlineJson(queries) {
     popular_mcp_clients,
     popular_agents,
     popular_regions,
+    users_by_region_365d,
     avg_agents_per_reporting_user,
     // Compatibility alias now uses the only valid denominator: installs that
     // supplied a v2 active count in the same ten-minute cohort.

@@ -298,7 +298,7 @@ export class StatsPageComponent implements OnInit, OnDestroy {
   }
 
   get accessibleGlobeData(): readonly AccessibleDatum[] {
-    return (this.latestFsbHeadline?.popular_regions ?? []).map((item) => ({
+    return this.globeRegionList.map((item) => ({
       label: this.displayLabel(item.label),
       value: this.fmtNum(item.uniq),
     }));
@@ -415,8 +415,13 @@ export class StatsPageComponent implements OnInit, OnDestroy {
   // an explicit "still gathering data" message when this is false rather
   // than silently showing a globe with no nodes.
   get hasPlottableRegions(): boolean {
-    const regions = this.latestFsbHeadline?.popular_regions ?? [];
-    return regions.some((r) => regionCentroid(r.label) !== null);
+    return this.globeRegionList.some((r) => regionCentroid(r.label) !== null);
+  }
+
+  private get globeRegionList(): readonly { label: string; uniq: number }[] {
+    const persistent = this.latestFsbHeadline?.users_by_region_365d;
+    if (persistent && persistent.length > 0) return persistent;
+    return this.latestFsbHeadline?.popular_regions ?? [];
   }
 
   get fanItemsLeft(): readonly FanItem[] {
@@ -793,7 +798,7 @@ export class StatsPageComponent implements OnInit, OnDestroy {
 
     if (this.selectedView === 'fsb-active-now') {
       const key = JSON.stringify({
-        regions: this.latestFsbHeadline?.popular_regions ?? [],
+        regions: this.globeRegionList,
         reducedMotion: this.prefersReducedMotion,
         theme: typeof document === 'undefined'
           ? ''
@@ -888,7 +893,7 @@ export class StatsPageComponent implements OnInit, OnDestroy {
   // moderate jitter radius since we only have a single centroid per label,
   // not a real distribution.
   private buildGlobeRegions(): GlobeRegion[] {
-    const list = this.latestFsbHeadline?.popular_regions ?? [];
+    const list = this.globeRegionList;
     const regions: GlobeRegion[] = [];
     for (const { label, uniq } of list) {
       const centroid = regionCentroid(label);

@@ -7,7 +7,8 @@
  *     ranges collapse into ONE row spanning the full range;
  *   - a row with a DIFFERENT label stays separate;
  *   - a same-label row separated by a GAP stays separate;
- *   - IPv6 upstream rows are skipped (IPv4-only output).
+ *   - IPv6 upstream rows are written to the sibling *.ipv6.csv, not the IPv4 file;
+ *     adjacent same-label IPv6 ranges merge.
  *
  * No framework; PASS/FAIL counter + non-zero exit on failure.
  * Run: node tests/server-ip-geo-merge.test.js
@@ -21,6 +22,7 @@ const path = require('path');
 const { execFileSync } = require('child_process');
 
 const SCRIPT = path.join(__dirname, '..', 'showcase', 'server', 'scripts', 'refresh-dbip-dataset.mjs');
+delete process.env.DBIP_IPV6_DATASET_PATH;
 
 let passed = 0;
 let failed = 0;
@@ -31,6 +33,7 @@ function check(label, cond, detail) {
 
 const inPath = path.join(os.tmpdir(), `fsb-dbip-merge-in-${process.pid}.csv`);
 const outPath = path.join(os.tmpdir(), `fsb-dbip-merge-out-${process.pid}.csv`);
+const ipv6OutPath = outPath.slice(0, -4) + '.ipv6.csv';
 
 // Upstream DB-IP IP-to-City Lite shape: ip_start,ip_end,continent,country,stateprov,city,lat,lon
 const upstream = [
@@ -38,7 +41,9 @@ const upstream = [
   '1.0.1.0,1.0.1.255,EU,DE,Bavaria,Nuremberg,49.4,11.0',    //  >- adjacent same label -> merge into one
   '1.0.2.0,1.0.2.255,EU,DE,Bavaria,Augsburg,48.3,10.8',     // /
   '1.0.3.0,1.0.3.255,EU,FR,Île-de-France,Paris,48.8,2.3',   // different label -> separate
-  '2001:db8::,2001:db8::1,AS,JP,Tokyo,Tokyo,35.6,139.6',    // IPv6 -> skipped entirely
+  '2001:db8::,2001:db8::1,AS,JP,Tokyo,Tokyo,35.6,139.6',     // \
+  '2001:db8::2,2001:db8::3,AS,JP,Tokyo,Kyoto,35.0,135.7',    //  >- adjacent same IPv6 label -> merge
+  '2001:db8:1::,2001:db8:1::1,AS,JP,Osaka,Osaka,34.6,135.5', // different IPv6 subdivision
   '2.0.0.0,2.0.0.255,EU,DE,Bavaria,Regensburg,49.0,12.1',   // same label but GAP -> separate
 ];
 
@@ -63,15 +68,24 @@ try {
   check('adjacent same-label DE/Bavaria collapsed to one span', dataLines.includes(MERGED_DE), `got ${JSON.stringify(dataLines)}`);
   check('different label (FR/Île-de-France) stayed separate', dataLines.includes(FR_ROW), `got ${JSON.stringify(dataLines)}`);
   check('gapped same-label DE/Bavaria stayed separate', dataLines.includes(GAP_DE), `got ${JSON.stringify(dataLines)}`);
-  check('IPv6 upstream row skipped (no Tokyo / JP in output)', !text.includes('Tokyo') && !/,JP,/.test(text), 'IPv6 row leaked into output');
+  check('IPv6 upstream row not in IPv4 file', !text.includes('Tokyo') && !/,JP,/.test(text), 'IPv6 row leaked into IPv4 output');
   check('output is sorted ascending by start', (() => {
     const starts = dataLines.map((l) => Number(l.split(',')[0]));
     for (let i = 1; i < starts.length; i++) if (starts[i] < starts[i - 1]) return false;
     return true;
   })(), `starts not ascending: ${JSON.stringify(dataLines)}`);
+
+  const v6text = fs.readFileSync(ipv6OutPath, 'utf8');
+  const v6lines = v6text.split(/\r?\n/).filter((l) => l && !l.startsWith('#'));
+  const MERGED_JP = '2306139568115548160,0,2306139568115548160,3,JP,Tokyo';
+  const OSAKA = '2306139568115613696,0,2306139568115613696,1,JP,Osaka';
+  check('exactly 2 merged IPv6 data rows', v6lines.length === 2, `got ${v6lines.length}: ${JSON.stringify(v6lines)}`);
+  check('adjacent same-label JP/Tokyo IPv6 collapsed', v6lines.includes(MERGED_JP), `got ${JSON.stringify(v6lines)}`);
+  check('different IPv6 subdivision JP/Osaka stayed separate', v6lines.includes(OSAKA), `got ${JSON.stringify(v6lines)}`);
 } finally {
   try { fs.unlinkSync(inPath); } catch { /* best effort */ }
   try { fs.unlinkSync(outPath); } catch { /* best effort */ }
+  try { fs.unlinkSync(ipv6OutPath); } catch { /* best effort */ }
 }
 
 console.log(`\n=== server-ip-geo-merge results: ${passed} passed, ${failed} failed ===`);

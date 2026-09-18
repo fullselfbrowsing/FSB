@@ -7,7 +7,9 @@
  *       {country, subdivision}; out-of-range IP returns 'unknown'.
  *   (b) DBIP_DATASET_PATH -> non-existent path: deriveRegion returns 'unknown'
  *       and does NOT throw (graceful degradation).
- *   (c) malformed / IPv6 / empty input returns 'unknown'.
+ *   (c) malformed / empty / unmapped IPv6 (loopback, Google DNS, CIDR keys)
+ *       returns 'unknown'. Native IPv6 in the sibling fixture (2405:201::/32,
+ *       2001:db8::/32) hits. IPv4-mapped IPv6 (`::ffff:a.b.c.d`) unwraps as IPv4.
  *
  * Each scenario re-requires the module via _resetForTest() so the lazy table
  * cache is rebuilt against the scenario's DBIP_DATASET_PATH.
@@ -20,6 +22,7 @@
 const path = require('path');
 
 const FIXTURE = path.join(__dirname, '..', 'showcase', 'server', 'data', 'dbip-city-lite.fixture.csv');
+delete process.env.DBIP_IPV6_DATASET_PATH;
 const ipGeo = require(path.join(__dirname, '..', 'showcase', 'server', 'src', 'utils', 'ip-geo'));
 
 let passed = 0;
@@ -108,7 +111,7 @@ const BAD_INPUTS = [
   ['empty string', ''],
   ['IPv6 ::1', '::1'],
   ['IPv6 full', '2001:4860:4860::8888'],
-  ['IPv4-mapped-IPv6', '::ffff:8.8.8.8'],
+  ['IPv6 /56 rate-limit key', '2001:4860:4860::/56'],
   ['garbage', 'not-an-ip'],
   ['too few octets', '8.8.8'],
   ['too many octets', '8.8.8.8.8'],
@@ -123,6 +126,55 @@ for (const [label, input] of BAD_INPUTS) {
   try { v = ipGeo.deriveRegion(input); } catch { threw2 = true; }
   check(`malformed input (${label}) -> unknown, no throw`, !threw2 && isUnknown(v), `threw=${threw2} got=${JSON.stringify(v)}`);
 }
+
+check(
+  'IPv4-mapped ::ffff:8.8.8.8 -> US/California (unwrap then fixture hit)',
+  regionEq(ipGeo.deriveRegion('::ffff:8.8.8.8'), 'US', 'California'),
+  `got ${JSON.stringify(ipGeo.deriveRegion('::ffff:8.8.8.8'))}`
+);
+check(
+  'IPv4-mapped :ffff:8.8.8.8 -> US/California',
+  regionEq(ipGeo.deriveRegion(':ffff:8.8.8.8'), 'US', 'California'),
+  `got ${JSON.stringify(ipGeo.deriveRegion(':ffff:8.8.8.8'))}`
+);
+
+check('classifyIp 8.8.8.8 -> ipv4', ipGeo.classifyIp('8.8.8.8') === 'ipv4', ipGeo.classifyIp('8.8.8.8'));
+check('classifyIp ::ffff:8.8.8.8 -> ipv4-mapped', ipGeo.classifyIp('::ffff:8.8.8.8') === 'ipv4-mapped', ipGeo.classifyIp('::ffff:8.8.8.8'));
+check('classifyIp 2001:db8::1 -> ipv6', ipGeo.classifyIp('2001:db8::1') === 'ipv6', ipGeo.classifyIp('2001:db8::1'));
+check('classifyIp fdaa:35:8f81::2 -> ipv6-ula', ipGeo.classifyIp('fdaa:35:8f81::2') === 'ipv6-ula', ipGeo.classifyIp('fdaa:35:8f81::2'));
+check('classifyIp 2001:db8::/56 -> ipv6-cidr', ipGeo.classifyIp('2001:db8::/56') === 'ipv6-cidr', ipGeo.classifyIp('2001:db8::/56'));
+check('classifyIp empty -> empty', ipGeo.classifyIp('') === 'empty', ipGeo.classifyIp(''));
+
+check(
+  'native IPv6 2405:201:e00:1::1 -> IN/Maharashtra (Jio-like fixture hit)',
+  regionEq(ipGeo.deriveRegion('2405:201:e00:1::1'), 'IN', 'Maharashtra'),
+  `got ${JSON.stringify(ipGeo.deriveRegion('2405:201:e00:1::1'))}`
+);
+check(
+  'native IPv6 2405:201:: range start -> IN/Maharashtra',
+  regionEq(ipGeo.deriveRegion('2405:201::'), 'IN', 'Maharashtra'),
+  `got ${JSON.stringify(ipGeo.deriveRegion('2405:201::'))}`
+);
+check(
+  'native IPv6 2001:db8::1 -> AU/Victoria (docs-prefix fixture hit)',
+  regionEq(ipGeo.deriveRegion('2001:db8::1'), 'AU', 'Victoria'),
+  `got ${JSON.stringify(ipGeo.deriveRegion('2001:db8::1'))}`
+);
+check(
+  'native IPv6 2001:4860:4860::8888 -> unknown (not in fixture)',
+  isUnknown(ipGeo.deriveRegion('2001:4860:4860::8888')),
+  `got ${JSON.stringify(ipGeo.deriveRegion('2001:4860:4860::8888'))}`
+);
+
+const indiaHalves = ipGeo.ipv6ToHalves('2405:201:e00:1::1');
+check(
+  'ipv6ToHalves 2405:201:e00:1::1 is 128-bit halves',
+  !!(indiaHalves && indiaHalves.hi === 2595482963802062849n && indiaHalves.lo === 1n),
+  `got ${indiaHalves && indiaHalves.hi.toString() + ',' + indiaHalves.lo.toString()}`
+);
+check('ipv6ToHalves rejects /56 CIDR key', ipGeo.ipv6ToHalves('2001:db8::/56') === null, 'expected null');
+check('ipv6ToHalves parses ::1', !!ipGeo.ipv6ToHalves('::1'), 'expected halves');
+check('::1 -> unknown (loopback not in fixture)', isUnknown(ipGeo.deriveRegion('::1')), 'expected unknown');
 
 console.log(`\n=== server-ip-geo results: ${passed} passed, ${failed} failed ===`);
 if (failed > 0) process.exit(1);

@@ -5,7 +5,11 @@
  *   1. DELETE telemetry_events older than 7 days (retention policy).
  *   2. Enforce 365-day retention on per-UUID telemetry_rollups_daily rows;
  *      pre-v2 active values remain quarantined as untrusted history.
- *   3. Re-aggregate today + yesterday per install_uuid into telemetry_rollups_daily.
+ *   3. Re-aggregate today + yesterday per install_uuid into telemetry_rollups_daily,
+ *      including the install's latest coarse region + geo_kind (anonymous,
+ *      365-day durable last-known location; never an IP).
+ *   3b. Copy region/geo_kind onto existing rollup rows for the rest of the
+ *       7-day event window so a deploy backfills whatever raw events remain.
  *   4. Recompute telemetry_global_aggregates for today + yesterday, applying
  *      a k>=K_ANONYMITY_FLOOR anonymity floor on the mcp_client popular list
  *      (below-k labels bucket as "Other"). Floor history:
@@ -114,17 +118,29 @@ function runHousekeeperTick(db, queries, nowMs = Date.now()) {
       const dayKey = dayUtcKey(dayStart);
 
       const uuids = queries.selectUuidsForDayRange.all(dayStart, dayEnd);
+      const regionMemberships = queries.selectRegionInstallMembershipsForDayRange.all(dayStart, dayEnd);
+      const locationByUuid = new Map();
+      for (const row of regionMemberships) {
+        if (!row || typeof row.install_uuid !== 'string') continue;
+        locationByUuid.set(row.install_uuid, {
+          region: typeof row.region === 'string' && row.region ? row.region : 'unknown',
+          geo_kind: typeof row.geo_kind === 'string' && row.geo_kind ? row.geo_kind : 'unknown',
+        });
+      }
       for (const u of uuids) {
         const row = queries.aggregateRollupForUuidDay.get(dayStart, dayEnd, u.install_uuid);
         if (!row) continue;
-        queries.upsertRollupDailyV2.run(
+        const loc = locationByUuid.get(u.install_uuid) || { region: 'unknown', geo_kind: 'unknown' };
+        queries.upsertRollupDailyV3.run(
           u.install_uuid,
           dayKey,
           row.tokens_in || 0,
           row.tokens_out || 0,
           row.max_active_agents || 0,
           row.trusted_active_sample_count || 0,
-          row.event_count || 0
+          row.event_count || 0,
+          loc.region,
+          loc.geo_kind
         );
       }
 
@@ -158,7 +174,6 @@ function runHousekeeperTick(db, queries, nowMs = Date.now()) {
       // Region rollup uses each install's latest membership for the day.
       // Assigning one region before applying the floor prevents a roaming
       // install from appearing in both a named region and the Other bucket.
-      const regionMemberships = queries.selectRegionInstallMembershipsForDayRange.all(dayStart, dayEnd);
       const popularRegion = applyDistinctKFloor(
         regionMemberships,
         'region',
@@ -179,6 +194,25 @@ function runHousekeeperTick(db, queries, nowMs = Date.now()) {
         ACTIVE_COUNT_VERSION,
         g.trusted_active_installs || 0
       );
+    }
+
+    // Copy last-known region onto rollups for the rest of the 7-day event
+    // window without recomputing (and possibly zeroing) those days' global
+    // aggregates. Today + yesterday already wrote region via upsertRollupDailyV3.
+    for (let dayOffset = 2; dayOffset <= 7; dayOffset += 1) {
+      const dayStart = floorToUtcDayMs(nowMs - dayOffset * ONE_DAY_MS);
+      const dayEnd = dayStart + ONE_DAY_MS;
+      const dayKey = dayUtcKey(dayStart);
+      const regionMemberships = queries.selectRegionInstallMembershipsForDayRange.all(dayStart, dayEnd);
+      for (const row of regionMemberships) {
+        if (!row || typeof row.install_uuid !== 'string') continue;
+        queries.updateRollupRegion.run(
+          typeof row.region === 'string' && row.region ? row.region : 'unknown',
+          typeof row.geo_kind === 'string' && row.geo_kind ? row.geo_kind : 'unknown',
+          row.install_uuid,
+          dayKey
+        );
+      }
     }
 
     // Step 5: nudge salt rotation. The '0.0.0.0' literal is a throwaway value

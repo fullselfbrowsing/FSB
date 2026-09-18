@@ -55,6 +55,7 @@ Research/
 # NEVER committed. The tiny committed test fixture (*.fixture.csv) is kept.
 showcase/server/data/dbip-city-lite.*
 !showcase/server/data/dbip-city-lite.fixture.csv
+!showcase/server/data/dbip-city-lite.ipv6.fixture.csv
 .claude/worktrees/
 BUG-REPORT-*.md
 dist/skill/

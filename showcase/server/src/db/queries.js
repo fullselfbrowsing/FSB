@@ -164,6 +164,9 @@ class Queries {
     this.insertTelemetryEventWithRegionV2 = this.db.prepare(
       'INSERT OR IGNORE INTO telemetry_events (event_id, install_uuid, ts_minute, mcp_client, model, tokens_in, tokens_out, active_agent_count, active_count_version, event_type, ip_hash, received_at, region) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
     );
+    this.insertTelemetryEventWithRegionV3 = this.db.prepare(
+      'INSERT OR IGNORE INTO telemetry_events (event_id, install_uuid, ts_minute, mcp_client, model, tokens_in, tokens_out, active_agent_count, active_count_version, event_type, ip_hash, received_at, region, geo_kind) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    );
 
     this.upsertRollupDaily = this.db.prepare(`
       INSERT INTO telemetry_rollups_daily (install_uuid, day_utc, tokens_in, tokens_out, max_active_agents, event_count)
@@ -185,6 +188,24 @@ class Queries {
         max_active_agents = excluded.max_active_agents,
         trusted_active_sample_count = excluded.trusted_active_sample_count,
         event_count = excluded.event_count
+    `);
+    this.upsertRollupDailyV3 = this.db.prepare(`
+      INSERT INTO telemetry_rollups_daily (
+        install_uuid, day_utc, tokens_in, tokens_out, max_active_agents,
+        trusted_active_sample_count, event_count, region, geo_kind
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(install_uuid, day_utc) DO UPDATE SET
+        tokens_in = excluded.tokens_in,
+        tokens_out = excluded.tokens_out,
+        max_active_agents = excluded.max_active_agents,
+        trusted_active_sample_count = excluded.trusted_active_sample_count,
+        event_count = excluded.event_count,
+        region = excluded.region,
+        geo_kind = excluded.geo_kind
+    `);
+    this.updateRollupRegion = this.db.prepare(`
+      UPDATE telemetry_rollups_daily SET region = ?, geo_kind = ?
+      WHERE install_uuid = ? AND day_utc = ?
     `);
 
     this.upsertGlobalAggregate = this.db.prepare(`
@@ -343,10 +364,11 @@ class Queries {
     // exceed the day's unique-install population and can fabricate k-sized
     // cohorts. UUIDs remain internal and never enter the aggregate JSON.
     this.selectRegionInstallMembershipsForDayRange = this.db.prepare(
-      `SELECT region, install_uuid
+      `SELECT region, geo_kind, install_uuid
        FROM (
          SELECT
            region,
+           geo_kind,
            install_uuid,
            ROW_NUMBER() OVER (
              PARTITION BY install_uuid
@@ -357,6 +379,26 @@ class Queries {
        )
        WHERE membership_rank = 1
        ORDER BY install_uuid ASC`
+    );
+    // Last-known coarse region per install across the 365-day rollup window.
+    // One row per install_uuid; used for the persistent anonymous census.
+    // Recency ranks only successful geo: a newer 'unknown' (dataset miss, Fly
+    // 6PN ULA, failed lookup) must not replace an older real region the globe
+    // is meant to keep. Installs that never resolved stay out of the census.
+    this.selectLastKnownRollupRegions = this.db.prepare(
+      `SELECT region, install_uuid
+       FROM (
+         SELECT
+           region,
+           install_uuid,
+           ROW_NUMBER() OVER (
+             PARTITION BY install_uuid
+             ORDER BY day_utc DESC
+           ) AS recency_rank
+         FROM telemetry_rollups_daily
+         WHERE region IS NOT NULL AND region != '' AND region != 'unknown'
+       )
+       WHERE recency_rank = 1`
     );
 
     this.selectTodaySalt = this.db.prepare('SELECT salt_hex, minted_at FROM telemetry_daily_salt WHERE day_utc = ?');
@@ -662,6 +704,10 @@ class Queries {
 
   regionInstallMembershipsForDayRange(startMs, endMs) {
     return this.selectRegionInstallMembershipsForDayRange.all(startMs, endMs);
+  }
+
+  lastKnownRollupRegions() {
+    return this.selectLastKnownRollupRegions.all();
   }
 
   upsertGlobalAggregateRow(dayUtc, uniqueInstalls, tokensInSum, tokensOutSum, agentsActiveSum, popularMcpJson, popularAgentJson, popularRegionJson) {
