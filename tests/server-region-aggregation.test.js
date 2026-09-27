@@ -13,7 +13,8 @@
  *   (d) events whose region is 'unknown' are handled by the same floor;
  *   and the public headline path (buildHeadlineJson) exposes popular_regions as
  *   {label, uniq} with NO sub-floor/UUID/ip_hash leak. users_by_region_365d is
- *   last successful geo (a newer 'unknown' day does not replace a real region).
+ *   last successful geo (a newer 'unknown' day, or a later unknown event on the
+ *   same day, does not replace a real region).
  *
  * Run: node tests/server-region-aggregation.test.js
  */
@@ -331,6 +332,121 @@ check('REGION_K_FLOOR is the HARD k>=5 (not the relaxed mcp floor of 2)', REGION
     `got ${JSON.stringify(headline.users_by_region_365d)}`);
   check('persist: 365d census omits unknown when a real region still exists',
     !headline.users_by_region_365d.some((x) => x.label === 'unknown'),
+    `got ${JSON.stringify(headline.users_by_region_365d)}`);
+
+  db.close();
+}
+
+{
+  const db = new Database(':memory:');
+  initializeDatabase(db);
+  const queries = new Queries(db);
+  const uuids = [];
+  for (let i = 0; i < 6; i++) {
+    const uuid = nextUuid();
+    uuids.push(uuid);
+    queries.insertTelemetryEventWithRegionV3.run(
+      nextEventId(), uuid, TS_TODAY + i * 60000,
+      'Claude', 'm', 1, 1, 0, 2, 'periodic', 'iphash', NOW,
+      'IN-Maharashtra', 'ipv4'
+    );
+  }
+  runHousekeeperTick(db, queries, NOW);
+  const laterMs = NOW + 60 * 60 * 1000;
+  for (let i = 0; i < 6; i++) {
+    queries.insertTelemetryEventWithRegionV3.run(
+      nextEventId(), uuids[i], TS_TODAY + (6 + i) * 60000,
+      'Claude', 'm', 1, 1, 0, 2, 'periodic', 'iphash', laterMs,
+      'unknown', 'ipv6-ula'
+    );
+  }
+  runHousekeeperTick(db, queries, laterMs);
+  const sameDayRow = db.prepare(
+    'SELECT region, geo_kind FROM telemetry_rollups_daily WHERE install_uuid = ? AND day_utc = ?'
+  ).get(uuids[0], TODAY);
+  check('persist: same-day later unknown keeps IN-Maharashtra on the rollup row',
+    sameDayRow && sameDayRow.region === 'IN-Maharashtra' && sameDayRow.geo_kind === 'ipv4',
+    `got ${JSON.stringify(sameDayRow)}`);
+  const headline = buildHeadlineJson(queries);
+  check('persist: same-day later unknown still counts in 365d IN-Maharashtra',
+    Array.isArray(headline.users_by_region_365d)
+      && headline.users_by_region_365d.some((x) => x.label === 'IN-Maharashtra' && x.uniq === 6),
+    `got ${JSON.stringify(headline.users_by_region_365d)}`);
+
+  db.close();
+}
+
+{
+  const db = new Database(':memory:');
+  initializeDatabase(db);
+  const queries = new Queries(db);
+  const uuids = [];
+  for (let i = 0; i < 6; i++) {
+    const uuid = nextUuid();
+    uuids.push(uuid);
+    queries.insertTelemetryEventWithRegionV3.run(
+      nextEventId(), uuid, TS_TODAY + i * 60000,
+      'Claude', 'm', 1, 1, 0, 2, 'periodic', 'iphash', NOW,
+      'IN-Maharashtra', 'ipv4'
+    );
+    queries.insertTelemetryEventWithRegionV3.run(
+      nextEventId(), uuid, TS_TODAY + (6 + i) * 60000,
+      'Claude', 'm', 1, 1, 0, 2, 'periodic', 'iphash', NOW + 1,
+      'unknown', 'ipv6-ula'
+    );
+  }
+  runHousekeeperTick(db, queries, NOW + 1);
+  const firstTickRow = db.prepare(
+    'SELECT region, geo_kind FROM telemetry_rollups_daily WHERE install_uuid = ? AND day_utc = ?'
+  ).get(uuids[0], TODAY);
+  check('persist: first tick of the day uses last successful geo, not latest unknown',
+    firstTickRow && firstTickRow.region === 'IN-Maharashtra' && firstTickRow.geo_kind === 'ipv4',
+    `got ${JSON.stringify(firstTickRow)}`);
+  const headline = buildHeadlineJson(queries);
+  check('persist: first-tick last-successful geo still surfaces in 365d',
+    Array.isArray(headline.users_by_region_365d)
+      && headline.users_by_region_365d.some((x) => x.label === 'IN-Maharashtra' && x.uniq === 6),
+    `got ${JSON.stringify(headline.users_by_region_365d)}`);
+
+  db.close();
+}
+
+{
+  const db = new Database(':memory:');
+  initializeDatabase(db);
+  const queries = new Queries(db);
+  const threeDaysAgoStart = floorToUtcDayMs(NOW) - 3 * 24 * 60 * 60 * 1000;
+  const threeDaysAgoKey = new Date(threeDaysAgoStart).toISOString().slice(0, 10);
+  const seedAt = threeDaysAgoStart + 12 * 60 * 60 * 1000;
+  const uuids = [];
+  for (let i = 0; i < 6; i++) {
+    const uuid = nextUuid();
+    uuids.push(uuid);
+    queries.insertTelemetryEventWithRegionV3.run(
+      nextEventId(), uuid, threeDaysAgoStart + 3 * 60 * 60 * 1000 + i * 60000,
+      'Claude', 'm', 1, 1, 0, 2, 'periodic', 'iphash', seedAt,
+      'IN-Maharashtra', 'ipv4'
+    );
+  }
+  runHousekeeperTick(db, queries, seedAt);
+  for (let i = 0; i < 6; i++) {
+    queries.insertTelemetryEventWithRegionV3.run(
+      nextEventId(), uuids[i], threeDaysAgoStart + 4 * 60 * 60 * 1000 + i * 60000,
+      'Claude', 'm', 1, 1, 0, 2, 'periodic', 'iphash', NOW,
+      'unknown', 'ipv6-ula'
+    );
+  }
+  runHousekeeperTick(db, queries, NOW);
+  const backfillRow = db.prepare(
+    'SELECT region, geo_kind FROM telemetry_rollups_daily WHERE install_uuid = ? AND day_utc = ?'
+  ).get(uuids[0], threeDaysAgoKey);
+  check('persist: late unknown event does not wipe a day-2–7 rollup region',
+    backfillRow && backfillRow.region === 'IN-Maharashtra' && backfillRow.geo_kind === 'ipv4',
+    `got ${JSON.stringify(backfillRow)}`);
+  const headline = buildHeadlineJson(queries);
+  check('persist: day-2–7 last-known IN-Maharashtra survives a late unknown event',
+    Array.isArray(headline.users_by_region_365d)
+      && headline.users_by_region_365d.some((x) => x.label === 'IN-Maharashtra' && x.uniq === 6),
     `got ${JSON.stringify(headline.users_by_region_365d)}`);
 
   db.close();

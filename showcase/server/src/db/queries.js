@@ -200,8 +200,8 @@ class Queries {
         max_active_agents = excluded.max_active_agents,
         trusted_active_sample_count = excluded.trusted_active_sample_count,
         event_count = excluded.event_count,
-        region = excluded.region,
-        geo_kind = excluded.geo_kind
+        region = CASE WHEN excluded.region != 'unknown' AND excluded.region != '' THEN excluded.region ELSE region END,
+        geo_kind = CASE WHEN excluded.region != 'unknown' AND excluded.region != '' THEN excluded.geo_kind ELSE geo_kind END
     `);
     this.updateRollupRegion = this.db.prepare(`
       UPDATE telemetry_rollups_daily SET region = ?, geo_kind = ?
@@ -376,6 +376,29 @@ class Queries {
            ) AS membership_rank
          FROM telemetry_events
          WHERE ts_minute >= ? AND ts_minute < ?
+       )
+       WHERE membership_rank = 1
+       ORDER BY install_uuid ASC`
+    );
+    // Last successful geo that day for the 365-day rollup copy. Popular-region
+    // membership still uses the unfiltered query above (unknown is a real daily
+    // bucket). Rollup location must not let a later unknown replace an earlier
+    // hit on the same UTC day -- that is the only retained copy for first-day
+    // installs, and lastKnownRollupRegions cannot recover a clobbered row.
+    this.selectLastSuccessfulRegionMembershipsForDayRange = this.db.prepare(
+      `SELECT region, geo_kind, install_uuid
+       FROM (
+         SELECT
+           region,
+           geo_kind,
+           install_uuid,
+           ROW_NUMBER() OVER (
+             PARTITION BY install_uuid
+             ORDER BY received_at DESC, ts_minute DESC, event_id DESC
+           ) AS membership_rank
+         FROM telemetry_events
+         WHERE ts_minute >= ? AND ts_minute < ?
+           AND region IS NOT NULL AND region != '' AND region != 'unknown'
        )
        WHERE membership_rank = 1
        ORDER BY install_uuid ASC`

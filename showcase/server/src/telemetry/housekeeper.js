@@ -6,10 +6,11 @@
  *   2. Enforce 365-day retention on per-UUID telemetry_rollups_daily rows;
  *      pre-v2 active values remain quarantined as untrusted history.
  *   3. Re-aggregate today + yesterday per install_uuid into telemetry_rollups_daily,
- *      including the install's latest coarse region + geo_kind (anonymous,
- *      365-day durable last-known location; never an IP).
- *   3b. Copy region/geo_kind onto existing rollup rows for the rest of the
- *       7-day event window so a deploy backfills whatever raw events remain.
+ *      including the install's last successful coarse region + geo_kind
+ *      (anonymous, 365-day durable last-known location; never an IP). A later
+ *      'unknown' that day must not replace a real region already on the row.
+ *   3b. Copy last-successful region/geo_kind onto existing rollup rows for the
+ *       rest of the 7-day event window so a deploy backfills remaining events.
  *   4. Recompute telemetry_global_aggregates for today + yesterday, applying
  *      a k>=K_ANONYMITY_FLOOR anonymity floor on the mcp_client popular list
  *      (below-k labels bucket as "Other"). Floor history:
@@ -120,7 +121,8 @@ function runHousekeeperTick(db, queries, nowMs = Date.now()) {
       const uuids = queries.selectUuidsForDayRange.all(dayStart, dayEnd);
       const regionMemberships = queries.selectRegionInstallMembershipsForDayRange.all(dayStart, dayEnd);
       const locationByUuid = new Map();
-      for (const row of regionMemberships) {
+      const successfulMemberships = queries.selectLastSuccessfulRegionMembershipsForDayRange.all(dayStart, dayEnd);
+      for (const row of successfulMemberships) {
         if (!row || typeof row.install_uuid !== 'string') continue;
         locationByUuid.set(row.install_uuid, {
           region: typeof row.region === 'string' && row.region ? row.region : 'unknown',
@@ -196,18 +198,22 @@ function runHousekeeperTick(db, queries, nowMs = Date.now()) {
       );
     }
 
-    // Copy last-known region onto rollups for the rest of the 7-day event
+    // Copy last-successful region onto rollups for the rest of the 7-day event
     // window without recomputing (and possibly zeroing) those days' global
     // aggregates. Today + yesterday already wrote region via upsertRollupDailyV3.
+    // Unknown memberships are omitted so a late failed lookup cannot wipe a
+    // real region already stored on that day.
     for (let dayOffset = 2; dayOffset <= 7; dayOffset += 1) {
       const dayStart = floorToUtcDayMs(nowMs - dayOffset * ONE_DAY_MS);
       const dayEnd = dayStart + ONE_DAY_MS;
       const dayKey = dayUtcKey(dayStart);
-      const regionMemberships = queries.selectRegionInstallMembershipsForDayRange.all(dayStart, dayEnd);
-      for (const row of regionMemberships) {
+      const successfulMemberships = queries.selectLastSuccessfulRegionMembershipsForDayRange.all(dayStart, dayEnd);
+      for (const row of successfulMemberships) {
         if (!row || typeof row.install_uuid !== 'string') continue;
+        const region = typeof row.region === 'string' && row.region ? row.region : 'unknown';
+        if (region === 'unknown') continue;
         queries.updateRollupRegion.run(
-          typeof row.region === 'string' && row.region ? row.region : 'unknown',
+          region,
           typeof row.geo_kind === 'string' && row.geo_kind ? row.geo_kind : 'unknown',
           row.install_uuid,
           dayKey
