@@ -305,7 +305,7 @@ export class StatsPageComponent implements OnInit, OnDestroy {
   }
 
   get globeAriaLabel(): string {
-    return $localize`:@@stats.globe.aria:Globe showing today's hourly FSB regional distribution`;
+    return $localize`:@@stats.globe.aria:Globe showing where FSB installs were last seen over the past 365 days, by coarse region`;
   }
 
   get tabMetrics(): readonly TabMetric[] {
