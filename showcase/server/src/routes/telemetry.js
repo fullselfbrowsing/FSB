@@ -30,8 +30,8 @@ const { isValidUuidV4 } = require('../utils/telemetry-hash');
 // Quick task 260630-hct -- coarse IP -> region derive. Required directly as a
 // sibling util (NOT passed through the router factory) so the factory signature
 // stays stable. Posture mirrors hashIp: the plaintext client IP is an inline
-// argument, used once then discarded; only the k>=5-floored aggregate region
-// label is retained.
+// argument, used once then discarded; only the coarse region label and the
+// address family are retained, and only k>=5-floored aggregates are published.
 const { deriveRegion, classifyIp } = require('../utils/ip-geo');
 const { clientIp } = require('../utils/client-ip');
 const {
@@ -218,13 +218,13 @@ function createTelemetryRouter(db, queries, hashIp) {
     //     1. hashIp(ipKeyGenerator(clientIp(req)), db)  -- rate-limit/HMAC hash
     //     2. deriveRegion(clientIp(req))                -- coarse country/US-state geo
     //     3. classifyIp(clientIp(req))                  -- address family enum, never the IP
-    //   BOTH references are inline arguments to an immediately-evaluated call. The
-    //   IP is NEVER assigned to a local that escapes this scope, NEVER logged,
-    //   NEVER stored. Only the derived ip_hash and the k>=5-floored AGGREGATE
-    //   region label are retained; the raw per-event region is rolled up daily
-    //   and dropped by the 7-day retention -- there is no durable
-    //   (install_uuid -> region) profile.
-    //   Test: tests/server-no-ip-leak.test.js (positively asserts the 2-inline count).
+    //   All three references are inline arguments to an immediately-evaluated
+    //   call. The IP is NEVER assigned to a local that escapes this scope, NEVER
+    //   logged, NEVER stored. What is retained is the ip_hash, the coarse region
+    //   label, and the address-family enum: on the raw event (7-day retention)
+    //   and, for region + geo_kind, on the install's daily rollup (365-day
+    //   retention, erased with the install). Public output is k>=5 floored.
+    //   Test: tests/server-no-ip-leak.test.js (positively asserts the 3-inline count).
     //
     // Why clientIp() instead of req.ip: Fly's X-Forwarded-For chain is two hops
     // (client + shared/anycast). trust proxy 1 therefore hashes/geolocates the

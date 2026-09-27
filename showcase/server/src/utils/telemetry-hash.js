@@ -24,7 +24,7 @@ const { getOrMintTodaySalt } = require('./telemetry-salt');
 /**
  * HMAC-SHA256(plaintextIp, todaysSalt) -> 64-char hex string.
  *
- * @param {string} plaintextIp request IP (e.g. req.ip from Express with trust proxy=1)
+ * @param {string} plaintextIp request IP (clientIp(req): Fly-Client-IP, else req.ip)
  * @param {Database} db better-sqlite3 instance
  * @returns {string} 64-char hex digest
  */

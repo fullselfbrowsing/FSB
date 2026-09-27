@@ -125,9 +125,11 @@ file exists is safe — regions resolve to `'unknown'` until the upload + restar
 ## Privacy posture
 
 Plaintext IP is **never** stored or logged. The ingest route
-(`src/routes/telemetry.js`) references `req.ip` exactly twice — once for the
-rate-limit HMAC hash and once for `deriveRegion(...)` — both **inline**, both
-discarding the plaintext immediately. Only the derived, **k>=5-floored,
-aggregate** region label is retained (in the daily global aggregate). There is
-no durable `(install_uuid -> region)` profile. See
+(`src/routes/telemetry.js`) references the client IP (`clientIp(req)`) exactly
+three times — for the rate-limit HMAC hash, `deriveRegion(...)`, and
+`classifyIp(...)` — all **inline**, all discarding the plaintext immediately.
+The coarse region label and address family (`geo_kind`) are kept on the raw
+event (7-day retention) and on the install's daily rollup (365-day retention,
+deleted by the erase endpoint) so the stats globe survives the event wipe.
+Only **k>=5-floored aggregates** are ever published. See
 `tests/server-no-ip-leak.test.js`.
