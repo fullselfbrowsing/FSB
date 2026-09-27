@@ -452,6 +452,59 @@ check('REGION_K_FLOOR is the HARD k>=5 (not the relaxed mcp floor of 2)', REGION
   db.close();
 }
 
+{
+  const db = new Database(':memory:');
+  initializeDatabase(db);
+  const queries = new Queries(db);
+  const rowFor = (uuid) => db.prepare(
+    'SELECT region, geo_kind FROM telemetry_rollups_daily WHERE install_uuid = ? AND day_utc = ?'
+  ).get(uuid, TODAY);
+  const uuids = [];
+  for (let i = 0; i < 6; i++) {
+    const uuid = nextUuid();
+    uuids.push(uuid);
+    queries.insertTelemetryEventWithRegionV3.run(
+      nextEventId(), uuid, TS_TODAY + i * 60000,
+      'Claude', 'm', 1, 1, 0, 2, 'periodic', 'iphash', NOW,
+      'unknown', 'ipv6-ula'
+    );
+  }
+  runHousekeeperTick(db, queries, NOW);
+  const unknownRow = rowFor(uuids[0]);
+  check('persist: unknown-only day keeps the failed lookup geo_kind on the rollup',
+    unknownRow && unknownRow.region === 'unknown' && unknownRow.geo_kind === 'ipv6-ula',
+    `got ${JSON.stringify(unknownRow)}`);
+  const unknownHeadline = buildHeadlineJson(queries);
+  check('persist: unknown-only installs stay out of the 365d census',
+    !unknownHeadline.users_by_region_365d.some((x) => x.label === 'unknown'),
+    `got ${JSON.stringify(unknownHeadline.users_by_region_365d)}`);
+
+  const hitMs = NOW + 60 * 60 * 1000;
+  for (let i = 0; i < 6; i++) {
+    queries.insertTelemetryEventWithRegionV3.run(
+      nextEventId(), uuids[i], TS_TODAY + (6 + i) * 60000,
+      'Claude', 'm', 1, 1, 0, 2, 'periodic', 'iphash', hitMs,
+      'IN-Maharashtra', 'ipv4'
+    );
+  }
+  runHousekeeperTick(db, queries, hitMs);
+  const missMs = hitMs + 60 * 60 * 1000;
+  for (let i = 0; i < 6; i++) {
+    queries.insertTelemetryEventWithRegionV3.run(
+      nextEventId(), uuids[i], TS_TODAY + (12 + i) * 60000,
+      'Claude', 'm', 1, 1, 0, 2, 'periodic', 'iphash', missMs,
+      'unknown', 'ipv6'
+    );
+  }
+  runHousekeeperTick(db, queries, missMs);
+  const resolvedRow = rowFor(uuids[0]);
+  check('persist: a real region keeps its own geo_kind after a later failed lookup',
+    resolvedRow && resolvedRow.region === 'IN-Maharashtra' && resolvedRow.geo_kind === 'ipv4',
+    `got ${JSON.stringify(resolvedRow)}`);
+
+  db.close();
+}
+
 console.log(`\n=== server-region-aggregation results: ${passed} passed, ${failed} failed ===`);
 if (failed > 0) process.exit(1);
 process.exit(0);

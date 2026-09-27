@@ -120,9 +120,12 @@ function runHousekeeperTick(db, queries, nowMs = Date.now()) {
 
       const uuids = queries.selectUuidsForDayRange.all(dayStart, dayEnd);
       const regionMemberships = queries.selectRegionInstallMembershipsForDayRange.all(dayStart, dayEnd);
+      // Seed with the latest event so an install whose lookups all failed keeps
+      // the failure's geo_kind (ipv6-ula, ipv6-cidr, ...) on its rollup, then
+      // let the last successful lookup of the day win over it.
       const locationByUuid = new Map();
       const successfulMemberships = queries.selectLastSuccessfulRegionMembershipsForDayRange.all(dayStart, dayEnd);
-      for (const row of successfulMemberships) {
+      for (const row of [...regionMemberships, ...successfulMemberships]) {
         if (!row || typeof row.install_uuid !== 'string') continue;
         locationByUuid.set(row.install_uuid, {
           region: typeof row.region === 'string' && row.region ? row.region : 'unknown',

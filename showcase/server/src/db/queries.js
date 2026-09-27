@@ -201,7 +201,11 @@ class Queries {
         trusted_active_sample_count = excluded.trusted_active_sample_count,
         event_count = excluded.event_count,
         region = CASE WHEN excluded.region != 'unknown' AND excluded.region != '' THEN excluded.region ELSE region END,
-        geo_kind = CASE WHEN excluded.region != 'unknown' AND excluded.region != '' THEN excluded.geo_kind ELSE geo_kind END
+        geo_kind = CASE
+          WHEN excluded.region != 'unknown' AND excluded.region != '' THEN excluded.geo_kind
+          WHEN region = 'unknown' OR region = '' THEN excluded.geo_kind
+          ELSE geo_kind
+        END
     `);
     this.updateRollupRegion = this.db.prepare(`
       UPDATE telemetry_rollups_daily SET region = ?, geo_kind = ?
