@@ -166,15 +166,60 @@ check(
   `got ${JSON.stringify(ipGeo.deriveRegion('2001:4860:4860::8888'))}`
 );
 
-const indiaHalves = ipGeo.ipv6ToHalves('2405:201:e00:1::1');
+const indiaPrefix = ipGeo.ipv6ToPrefix64('2405:201:e00:1::1');
 check(
-  'ipv6ToHalves 2405:201:e00:1::1 is 128-bit halves',
-  !!(indiaHalves && indiaHalves.hi === 2595482963802062849n && indiaHalves.lo === 1n),
-  `got ${indiaHalves && indiaHalves.hi.toString() + ',' + indiaHalves.lo.toString()}`
+  'ipv6ToPrefix64 2405:201:e00:1::1 is the /64 as two uint32 words',
+  !!(indiaPrefix && indiaPrefix.hi === 0x24050201 && indiaPrefix.lo === 0x0e000001),
+  `got ${JSON.stringify(indiaPrefix)}`
 );
-check('ipv6ToHalves rejects /56 CIDR key', ipGeo.ipv6ToHalves('2001:db8::/56') === null, 'expected null');
-check('ipv6ToHalves parses ::1', !!ipGeo.ipv6ToHalves('::1'), 'expected halves');
+check('ipv6ToPrefix64 rejects /56 CIDR key', ipGeo.ipv6ToPrefix64('2001:db8::/56') === null, 'expected null');
+check('ipv6ToPrefix64 parses ::1', !!ipGeo.ipv6ToPrefix64('::1'), 'expected a prefix');
 check('::1 -> unknown (loopback not in fixture)', isUnknown(ipGeo.deriveRegion('::1')), 'expected unknown');
+
+// =============================================================================
+// (e) DB-IP 'ZZ' (private/reserved) -> 'unknown'; IPv6 /64 boundaries that share
+//     the high word; a retired decimal-halves IPv6 file degrades to 'unknown'.
+// =============================================================================
+{
+  const fs = require('fs');
+  const os = require('os');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fsb-ip-geo-'));
+  const v4 = path.join(dir, 'geo.csv');
+  const v6 = path.join(dir, 'geo.ipv6.csv');
+  fs.writeFileSync(v4, [
+    '167772160,184549375,ZZ,',            // 10.0.0.0/8
+    '134744064,134744319,US,California',  // 8.8.8.0/24
+  ].sort((a, b) => Number(a.split(',')[0]) - Number(b.split(',')[0])).join('\n') + '\n');
+  fs.writeFileSync(v6, [
+    '2405020100000000,2405020100000fff,IN,Maharashtra',
+    '2405020100001000,24050201ffffffff,IN,Delhi',
+    'fd00000000000000,fdffffffffffffff,ZZ,',
+  ].join('\n') + '\n');
+  process.env.DBIP_DATASET_PATH = v4;
+  process.env.DBIP_IPV6_DATASET_PATH = v6;
+  ipGeo._resetForTest();
+
+  check('10.1.2.3 (DB-IP ZZ) -> unknown', isUnknown(ipGeo.deriveRegion('10.1.2.3')), JSON.stringify(ipGeo.deriveRegion('10.1.2.3')));
+  check('8.8.8.8 still resolves beside a ZZ row', regionEq(ipGeo.deriveRegion('8.8.8.8'), 'US', 'California'), JSON.stringify(ipGeo.deriveRegion('8.8.8.8')));
+  check('fdaa:0:1::3 (Fly 6PN, DB-IP ZZ) -> unknown', isUnknown(ipGeo.deriveRegion('fdaa:0:1::3')), JSON.stringify(ipGeo.deriveRegion('fdaa:0:1::3')));
+  check('2405:201:0:fff::1 -> last /64 of the low-word range',
+    regionEq(ipGeo.deriveRegion('2405:201:0:fff::1'), 'IN', 'Maharashtra'), JSON.stringify(ipGeo.deriveRegion('2405:201:0:fff::1')));
+  check('2405:201:0:1000::1 -> first /64 of the next range (low-word compare)',
+    regionEq(ipGeo.deriveRegion('2405:201:0:1000::1'), 'IN', 'Delhi'), JSON.stringify(ipGeo.deriveRegion('2405:201:0:1000::1')));
+  check('2405:201:ffff:ffff:ffff::1 -> upper edge of the high word',
+    regionEq(ipGeo.deriveRegion('2405:201:ffff:ffff:ffff::1'), 'IN', 'Delhi'), JSON.stringify(ipGeo.deriveRegion('2405:201:ffff:ffff:ffff::1')));
+  check('2405:202::1 -> just past the table -> unknown', isUnknown(ipGeo.deriveRegion('2405:202::1')), JSON.stringify(ipGeo.deriveRegion('2405:202::1')));
+
+  fs.writeFileSync(v6, '2595482963567181824,0,2595482967862149119,18446744073709551615,IN,Maharashtra\n');
+  ipGeo._resetForTest();
+  let threw = false;
+  let legacy;
+  try { legacy = ipGeo.deriveRegion('2405:201:e00:1::1'); } catch { threw = true; }
+  check('retired decimal-halves IPv6 file -> unknown, no throw', !threw && isUnknown(legacy), `threw=${threw} got ${JSON.stringify(legacy)}`);
+
+  delete process.env.DBIP_IPV6_DATASET_PATH;
+  fs.rmSync(dir, { recursive: true, force: true });
+}
 
 console.log(`\n=== server-ip-geo results: ${passed} passed, ${failed} failed ===`);
 if (failed > 0) process.exit(1);

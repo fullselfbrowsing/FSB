@@ -9,7 +9,7 @@
  * compact range table that showcase/server/src/utils/ip-geo.js reads:
  *
  *     start_ip_int,end_ip_int,country,subdivision          (IPv4)
- *     start_hi,start_lo,end_hi,end_lo,country,subdivision  (IPv6 uint64 halves)
+ *     start64,end64,country,subdivision                    (IPv6 /64 prefixes, 16 hex digits)
  *
  * (inclusive bounds, each file sorted ascending). The IPv4 output is written to
  * the production dataset path consumed by ip-geo.js
@@ -51,7 +51,6 @@ const DEFAULT_IPV6_OUT = join(__dirname, '..', 'data', 'dbip-city-lite.ipv6.csv'
 
 const DOWNLOAD_URL = 'https://db-ip.com/db/download/ip-to-city-lite';
 const ATTRIBUTION = 'IP Geolocation by DB-IP (https://db-ip.com), CC-BY-4.0';
-const UINT64_MAX_PLUS_ONE = 1n << 64n;
 
 function siblingIpv6Path(ipv4Path) {
   if (typeof ipv4Path !== 'string' || ipv4Path === '') return DEFAULT_IPV6_OUT;
@@ -92,13 +91,13 @@ function ipv4ToInt(ip) {
 }
 
 /**
- * Native IPv6 -> big-endian uint64 halves, or null. Same rules as ip-geo.js
- * (reject CIDR, zone IDs, dotted mixed form).
+ * Native IPv6 -> its top 64 bits (the /64 prefix) as a BigInt, or null. Same
+ * parse rules as ip-geo.js (reject CIDR, zone IDs, dotted mixed form).
  *
  * @param {unknown} ip
- * @returns {{hi:bigint, lo:bigint}|null}
+ * @returns {bigint|null}
  */
-function ipv6ToHalves(ip) {
+function ipv6ToPrefix64(ip) {
   if (typeof ip !== 'string') return null;
   const s = ip.trim().toLowerCase();
   if (s === '' || s.includes('/') || s.includes('%') || s.includes('.')) return null;
@@ -131,26 +130,12 @@ function ipv6ToHalves(ip) {
     groups = head.concat(new Array(missing).fill(0), tail);
   }
 
-  let hi = 0n;
-  let lo = 0n;
-  for (let i = 0; i < 4; i++) hi = (hi << 16n) + BigInt(groups[i]);
-  for (let i = 4; i < 8; i++) lo = (lo << 16n) + BigInt(groups[i]);
-  return { hi, lo };
+  let prefix = 0n;
+  for (let i = 0; i < 4; i++) prefix = (prefix << 16n) + BigInt(groups[i]);
+  return prefix;
 }
 
-function cmpU128(aHi, aLo, bHi, bLo) {
-  if (aHi < bHi) return -1;
-  if (aHi > bHi) return 1;
-  if (aLo < bLo) return -1;
-  if (aLo > bLo) return 1;
-  return 0;
-}
-
-function addOneU128(hi, lo) {
-  const nlo = lo + 1n;
-  if (nlo === UINT64_MAX_PLUS_ONE) return [hi + 1n, 0n];
-  return [hi, nlo];
-}
+const hex64 = (n) => n.toString(16).padStart(16, '0');
 
 /**
  * Split one upstream CSV line on commas, honouring simple double-quoted fields
@@ -193,8 +178,8 @@ function printSpecAndExit() {
   console.error('     start_ip_int,end_ip_int,country,subdivision');
   console.error('     (inclusive uint32 IPv4 bounds, sorted ascending)');
   console.error('  IPv6 output (sibling *.ipv6.csv unless --ipv6-out / DBIP_IPV6_DATASET_PATH):');
-  console.error('     start_hi,start_lo,end_hi,end_lo,country,subdivision');
-  console.error('     (inclusive uint64 halves, sorted ascending by start)');
+  console.error('     start64,end64,country,subdivision');
+  console.error('     (inclusive /64 prefixes as 16 hex digits, sorted ascending)');
   process.exit(2);
 }
 
@@ -229,7 +214,8 @@ async function main() {
     if (cols.length < 5) continue;
     const country = (cols[3] || '').trim();
     const subdivision = (cols[4] || '').trim();
-    if (country === '') continue;
+    // DB-IP's ZZ marks private/reserved space; it is not a place.
+    if (country === '' || country === 'ZZ') continue;
     const countrySafe = country.replace(/,/g, ' ');
     const subSafe = subdivision.replace(/,/g, ' ');
 
@@ -241,15 +227,15 @@ async function main() {
       continue;
     }
 
-    const startV6 = ipv6ToHalves(cols[0]);
-    const endV6 = ipv6ToHalves(cols[1]);
-    if (!startV6 || !endV6) continue;
-    if (cmpU128(endV6.hi, endV6.lo, startV6.hi, startV6.lo) < 0) continue;
-    v6rows.push([startV6.hi, startV6.lo, endV6.hi, endV6.lo, countrySafe, subSafe]);
+    const startV6 = ipv6ToPrefix64(cols[0]);
+    const endV6 = ipv6ToPrefix64(cols[1]);
+    if (startV6 === null || endV6 === null || endV6 < startV6) continue;
+    v6rows.push([startV6, endV6, countrySafe, subSafe]);
   }
 
   rows.sort((a, b) => a[0] - b[0]);
-  v6rows.sort((a, b) => cmpU128(a[0], a[1], b[0], b[1]));
+  // Stable sort: rows sharing a /64 keep upstream (ascending address) order.
+  v6rows.sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
 
   // Range-merge: collapse CONSECUTIVE rows that share country+subdivision AND
   // whose ranges are contiguous or overlapping (nextStart <= lastEnd + 1) into a
@@ -268,20 +254,23 @@ async function main() {
     }
   }
 
+  // IPv6 is keyed on /64 prefixes, so the few upstream ranges narrower than a
+  // /64 collapse onto the same key. The first (lowest-address) label claims the
+  // prefix; later overlapping rows are trimmed past it or dropped. Then adjacent
+  // same-label prefixes merge exactly like IPv4.
   const mergedV6 = [];
-  for (const r of v6rows) {
+  for (const row of v6rows) {
+    const r = [row[0], row[1], row[2], row[3]];
     const last = mergedV6.length > 0 ? mergedV6[mergedV6.length - 1] : null;
-    if (last && last[4] === r[4] && last[5] === r[5]) {
-      const next = addOneU128(last[2], last[3]);
-      if (cmpU128(r[0], r[1], next[0], next[1]) <= 0) {
-        if (cmpU128(r[2], r[3], last[2], last[3]) > 0) {
-          last[2] = r[2];
-          last[3] = r[3];
-        }
-        continue;
-      }
+    if (last && r[0] <= last[1]) {
+      if (r[1] <= last[1]) continue;
+      r[0] = last[1] + 1n;
     }
-    mergedV6.push([r[0], r[1], r[2], r[3], r[4], r[5]]);
+    if (last && last[2] === r[2] && last[3] === r[3] && r[0] <= last[1] + 1n) {
+      last[1] = r[1];
+      continue;
+    }
+    mergedV6.push(r);
   }
 
   const ws = createWriteStream(outPath, 'utf8');
@@ -296,9 +285,9 @@ async function main() {
   const ws6 = createWriteStream(ipv6OutPath, 'utf8');
   ws6.write(`# Generated by refresh-dbip-dataset.mjs from a DB-IP IP-to-City Lite source CSV.\n`);
   ws6.write(`# ${ATTRIBUTION}\n`);
-  ws6.write(`# Format: start_hi,start_lo,end_hi,end_lo,country,subdivision (uint64 IPv6 halves, sorted ascending; adjacent same-region ranges merged).\n`);
+  ws6.write(`# Format: start64,end64,country,subdivision (inclusive IPv6 /64 prefixes as 16 hex digits, sorted ascending; adjacent same-region ranges merged).\n`);
   for (const r of mergedV6) {
-    ws6.write(`${r[0]},${r[1]},${r[2]},${r[3]},${r[4]},${r[5]}\n`);
+    ws6.write(`${hex64(r[0])},${hex64(r[1])},${r[2]},${r[3]}\n`);
   }
   await new Promise((res, rej) => { ws6.end((err) => (err ? rej(err) : res())); });
 

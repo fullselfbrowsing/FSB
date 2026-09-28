@@ -12,7 +12,7 @@
  *
  * Only the *dataset* is third-party (DB-IP IP-to-City Lite, CC-BY-4.0); the
  * lookup logic here is ours -- a sorted-range binary search over uint32 IPv4
- * forms and uint128 IPv6 halves. No live third-party geo API is contacted
+ * forms and 64-bit IPv6 prefixes. No live third-party geo API is contacted
  * (that would leak every user's raw IP to a third party, which is worse than
  * the existing hashed-IP posture).
  *
@@ -48,11 +48,18 @@
  *   there is NO load-time sort; the binary search relies on that ordering (the
  *   committed fixture is likewise kept sorted ascending by start_ip_int).
  *
- *   IPv6 uses a sibling table of uint64 halves (start_hi/lo, end_hi/lo + labelId)
- *   loaded the same chunked way from DBIP_IPV6_DATASET_PATH (or a sibling of the
- *   IPv4 path: `*.ipv6.csv` / `*.ipv6.fixture.csv`). Native IPv6 (Jio / 2405:201::
- *   and similar) looks up here. Fly 6PN ULA (`fd`/`fc`) and CIDR `/56` keys miss
- *   and stay 'unknown'. IPv4-mapped IPv6 (`::ffff:a.b.c.d`) still unwraps to IPv4.
+ *   IPv6 uses a sibling table keyed on the top 64 bits of the address (the /64
+ *   prefix; DB-IP carries no location below it). Each bound is two uint32 words,
+ *   so the table is 5 x Uint32 = 20 bytes/range (~42 MB for the ~2.2 M-range
+ *   worldwide file) and loads without BigInt. It is read the same chunked way
+ *   from DBIP_IPV6_DATASET_PATH (or a sibling of the IPv4 path: `*.ipv6.csv` /
+ *   `*.ipv6.fixture.csv`). Native IPv6 (Jio / 2405:201:: and similar) looks up
+ *   here; CIDR `/56` keys do not parse and stay 'unknown'. IPv4-mapped IPv6
+ *   (`::ffff:a.b.c.d`) still unwraps to IPv4.
+ *
+ *   DB-IP labels private/reserved space (10/8, 127/8, ::1, fe80::, Fly 6PN
+ *   fdaa::) as country 'ZZ'; both tables report that as 'unknown', never as a
+ *   region.
  *
  * GRACEFUL DEGRADATION (HARD requirement): if the production dataset file is
  * absent, unreadable, empty, or pathologically large (Buffer/file size limits),
@@ -178,14 +185,15 @@ function ipv4ToInt(ip) {
 }
 
 /**
- * Parse a native IPv6 address into big-endian uint64 halves, or null.
- * Rejects CIDR (`/56` rate-limit keys), zone IDs, dotted mixed form, and
- * anything that is not exactly 8 hextets after `::` expansion.
+ * Parse a native IPv6 address into its /64 prefix as two big-endian uint32
+ * words, or null. Rejects CIDR (`/56` rate-limit keys), zone IDs, dotted mixed
+ * form, and anything that is not exactly 8 hextets after `::` expansion. The
+ * low 64 bits are validated but dropped: the table carries no location below /64.
  *
  * @param {unknown} ip
- * @returns {{hi:bigint, lo:bigint}|null}
+ * @returns {{hi:number, lo:number}|null}
  */
-function ipv6ToHalves(ip) {
+function ipv6ToPrefix64(ip) {
   if (typeof ip !== 'string') return null;
   const s = ip.trim().toLowerCase();
   if (s === '' || s.includes('/') || s.includes('%') || s.includes('.')) return null;
@@ -219,46 +227,40 @@ function ipv6ToHalves(ip) {
     groups = head.concat(new Array(missing).fill(0), tail);
   }
 
-  let hi = 0n;
-  let lo = 0n;
-  for (let i = 0; i < 4; i++) hi = (hi << 16n) + BigInt(groups[i]);
-  for (let i = 4; i < 8; i++) lo = (lo << 16n) + BigInt(groups[i]);
-  return { hi, lo };
+  return {
+    hi: ((groups[0] << 16) | groups[1]) >>> 0,
+    lo: ((groups[2] << 16) | groups[3]) >>> 0,
+  };
 }
 
-/** Compare two uint128 values given as uint64 halves. */
-function cmpU128(aHi, aLo, bHi, bLo) {
-  if (aHi < bHi) return -1;
-  if (aHi > bHi) return 1;
-  if (aLo < bLo) return -1;
-  if (aLo > bLo) return 1;
+/** Compare two 64-bit values given as uint32 (hi, lo) word pairs. */
+function cmp64(aHi, aLo, bHi, bLo) {
+  if (aHi !== bHi) return aHi < bHi ? -1 : 1;
+  if (aLo !== bLo) return aLo < bLo ? -1 : 1;
   return 0;
 }
 
-const UINT64_MAX = 0xffffffffffffffffn;
-
 /**
- * Parse an ASCII decimal uint64 at buf[p..). Returns { n, p } after the digits
- * or null. Never uses Number() -- uint64 exceeds JS safe-integer range.
+ * Parse exactly 8 ASCII hex digits at buf[p..p+8) into a uint32, or -1.
  *
  * @param {Buffer} buf
  * @param {number} p
  * @param {number} end
- * @returns {{n:bigint, p:number}|null}
+ * @returns {number}
  */
-function _parseDecUint64(buf, p, end) {
-  let n = 0n;
-  let saw = false;
-  let digits = 0;
-  while (p < end && buf[p] >= 48 && buf[p] <= 57) {
-    n = n * 10n + BigInt(buf[p] - 48);
-    p++;
-    saw = true;
-    digits++;
-    if (digits > 20) return null;
+function _parseHex32(buf, p, end) {
+  if (p + 8 > end) return -1;
+  let n = 0;
+  for (let i = p; i < p + 8; i++) {
+    const c = buf[i];
+    let d;
+    if (c >= 48 && c <= 57) d = c - 48;
+    else if (c >= 97 && c <= 102) d = c - 87;
+    else if (c >= 65 && c <= 70) d = c - 55;
+    else return -1;
+    n = n * 16 + d;
   }
-  if (!saw || n > UINT64_MAX) return null;
-  return { n, p };
+  return n;
 }
 
 /**
@@ -435,13 +437,14 @@ function loadTable() {
 }
 
 /**
- * Parse ONE compact IPv6 CSV line: start_hi,start_lo,end_hi,end_lo,country,subdivision
- * with inclusive uint64 halves. Blank/'#'/malformed lines are skipped.
+ * Parse ONE compact IPv6 CSV line: start64,end64,country,subdivision where each
+ * bound is exactly 16 hex digits (the inclusive /64 prefix). Blank, '#', and
+ * malformed lines -- including the old decimal-halves format -- are skipped.
  *
  * @param {Buffer} buf
  * @param {number} start
  * @param {number} end
- * @param {{startHi:BigUint64Array,startLo:BigUint64Array,endHi:BigUint64Array,endLo:BigUint64Array,labelId:Uint32Array,labels:Array,labelMap:Map,w:number}} acc
+ * @param {{startHi:Uint32Array,startLo:Uint32Array,endHi:Uint32Array,endLo:Uint32Array,labelId:Uint32Array,labels:Array,labelMap:Map,w:number}} acc
  */
 function _parseIpv6LineBytes(buf, start, end, acc) {
   if (end > start && buf[end - 1] === 13) end--;
@@ -450,21 +453,15 @@ function _parseIpv6LineBytes(buf, start, end, acc) {
   while (p < end && (buf[p] === 32 || buf[p] === 9)) p++;
   if (p >= end || buf[p] === 35) return;
 
-  const startHi = _parseDecUint64(buf, p, end);
-  if (!startHi || startHi.p >= end || buf[startHi.p] !== 44) return;
-  p = startHi.p + 1;
+  const startHi = _parseHex32(buf, p, end);
+  const startLo = _parseHex32(buf, p + 8, end);
+  if (startHi < 0 || startLo < 0 || p + 16 >= end || buf[p + 16] !== 44) return;
+  p += 17;
 
-  const startLo = _parseDecUint64(buf, p, end);
-  if (!startLo || startLo.p >= end || buf[startLo.p] !== 44) return;
-  p = startLo.p + 1;
-
-  const endHi = _parseDecUint64(buf, p, end);
-  if (!endHi || endHi.p >= end || buf[endHi.p] !== 44) return;
-  p = endHi.p + 1;
-
-  const endLo = _parseDecUint64(buf, p, end);
-  if (!endLo || endLo.p >= end || buf[endLo.p] !== 44) return;
-  p = endLo.p + 1;
+  const endHi = _parseHex32(buf, p, end);
+  const endLo = _parseHex32(buf, p + 8, end);
+  if (endHi < 0 || endLo < 0 || p + 16 >= end || buf[p + 16] !== 44) return;
+  p += 17;
 
   const cStart = p;
   while (p < end && buf[p] !== 44) p++;
@@ -472,7 +469,7 @@ function _parseIpv6LineBytes(buf, start, end, acc) {
   const cEnd = p;
   p++;
 
-  if (cmpU128(endHi.n, endLo.n, startHi.n, startLo.n) < 0) return;
+  if (cmp64(endHi, endLo, startHi, startLo) < 0) return;
   if (cEnd <= cStart) return;
 
   const country = buf.toString('utf8', cStart, cEnd).trim();
@@ -487,10 +484,10 @@ function _parseIpv6LineBytes(buf, start, end, acc) {
     acc.labelMap.set(key, id);
   }
 
-  acc.startHi[acc.w] = startHi.n;
-  acc.startLo[acc.w] = startLo.n;
-  acc.endHi[acc.w] = endHi.n;
-  acc.endLo[acc.w] = endLo.n;
+  acc.startHi[acc.w] = startHi;
+  acc.startLo[acc.w] = startLo;
+  acc.endHi[acc.w] = endHi;
+  acc.endLo[acc.w] = endLo;
   acc.labelId[acc.w] = id;
   acc.w += 1;
 }
@@ -499,7 +496,7 @@ function _parseIpv6LineBytes(buf, start, end, acc) {
  * Lazy, once-only IPv6 dataset load. Same chunked two-pass scan as loadTable.
  * Path: DBIP_IPV6_DATASET_PATH or a sibling of the IPv4 compact CSV.
  *
- * @returns {{n:number, startHi:BigUint64Array, startLo:BigUint64Array, endHi:BigUint64Array, endLo:BigUint64Array, labelId:Uint32Array, labels:Array}|null}
+ * @returns {{n:number, startHi:Uint32Array, startLo:Uint32Array, endHi:Uint32Array, endLo:Uint32Array, labelId:Uint32Array, labels:Array}|null}
  */
 function loadIpv6Table() {
   if (_ipv6Table !== undefined) return _ipv6Table;
@@ -523,10 +520,10 @@ function loadIpv6Table() {
 
     const maxRows = newlineCount + 1;
     const acc = {
-      startHi: new BigUint64Array(maxRows),
-      startLo: new BigUint64Array(maxRows),
-      endHi: new BigUint64Array(maxRows),
-      endLo: new BigUint64Array(maxRows),
+      startHi: new Uint32Array(maxRows),
+      startLo: new Uint32Array(maxRows),
+      endHi: new Uint32Array(maxRows),
+      endLo: new Uint32Array(maxRows),
       labelId: new Uint32Array(maxRows),
       labels: [],
       labelMap: new Map(),
@@ -577,6 +574,16 @@ function loadIpv6Table() {
   return _ipv6Table;
 }
 
+// DB-IP marks private/reserved space (RFC 1918, loopback, link-local, ULA incl.
+// Fly 6PN) as country 'ZZ'. That is not a place, so it must not become a region.
+const RESERVED_COUNTRY = 'ZZ';
+
+// Return a FRESH object so callers cannot mutate the interned label.
+function regionFromLabel(lab) {
+  if (lab.country === RESERVED_COUNTRY) return 'unknown';
+  return { country: lab.country, subdivision: lab.subdivision };
+}
+
 function lookupIpv6(hi, lo) {
   const t = loadIpv6Table();
   if (!t || t.n === 0) return 'unknown';
@@ -585,13 +592,12 @@ function lookupIpv6(hi, lo) {
   let right = t.n - 1;
   while (left <= right) {
     const mid = (left + right) >>> 1;
-    if (cmpU128(hi, lo, t.startHi[mid], t.startLo[mid]) < 0) {
+    if (cmp64(hi, lo, t.startHi[mid], t.startLo[mid]) < 0) {
       right = mid - 1;
-    } else if (cmpU128(hi, lo, t.endHi[mid], t.endLo[mid]) > 0) {
+    } else if (cmp64(hi, lo, t.endHi[mid], t.endLo[mid]) > 0) {
       left = mid + 1;
     } else {
-      const lab = t.labels[t.labelId[mid]];
-      return { country: lab.country, subdivision: lab.subdivision };
+      return regionFromLabel(t.labels[t.labelId[mid]]);
     }
   }
   return 'unknown';
@@ -599,8 +605,8 @@ function lookupIpv6(hi, lo) {
 
 /**
  * Derive a coarse { country, subdivision } region from a plaintext IP, or the
- * literal string 'unknown' when the IP falls outside every range or no dataset
- * is loaded. IPv4 (including mapped ::ffff:a.b.c.d) uses the IPv4 table; native
+ * literal string 'unknown' when the IP falls outside every range, lands in
+ * DB-IP's reserved 'ZZ' space, or no dataset is loaded. IPv4 (including mapped ::ffff:a.b.c.d) uses the IPv4 table; native
  * IPv6 uses the sibling IPv6 table. NEVER throws; NEVER retains or logs the IP.
  *
  * @param {string} ip plaintext request IP (Fly-Client-IP / req.ip)
@@ -623,16 +629,15 @@ function deriveRegion(ip) {
       } else if (key > ends[mid]) {
         lo = mid + 1;
       } else {
-        const lab = labels[labelId[mid]];
-        return { country: lab.country, subdivision: lab.subdivision };
+        return regionFromLabel(labels[labelId[mid]]);
       }
     }
     return 'unknown';
   }
 
-  const halves = ipv6ToHalves(ip);
-  if (!halves) return 'unknown';
-  return lookupIpv6(halves.hi, halves.lo);
+  const prefix = ipv6ToPrefix64(ip);
+  if (!prefix) return 'unknown';
+  return lookupIpv6(prefix.hi, prefix.lo);
 }
 
 /**
@@ -647,7 +652,7 @@ function _resetForTest() {
 module.exports = {
   deriveRegion,
   ipv4ToInt,
-  ipv6ToHalves,
+  ipv6ToPrefix64,
   unwrapIpv4Mapped,
   classifyIp,
   GEO_KIND,

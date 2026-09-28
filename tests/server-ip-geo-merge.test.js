@@ -8,7 +8,9 @@
  *   - a row with a DIFFERENT label stays separate;
  *   - a same-label row separated by a GAP stays separate;
  *   - IPv6 upstream rows are written to the sibling *.ipv6.csv, not the IPv4 file;
- *     adjacent same-label IPv6 ranges merge.
+ *     adjacent same-label IPv6 ranges merge; IPv6 is keyed on /64 prefixes, so a
+ *     later different-label slice of an already-claimed /64 is dropped.
+ *   - DB-IP 'ZZ' (private/reserved) rows are dropped from both outputs.
  *
  * No framework; PASS/FAIL counter + non-zero exit on failure.
  * Run: node tests/server-ip-geo-merge.test.js
@@ -43,7 +45,10 @@ const upstream = [
   '1.0.3.0,1.0.3.255,EU,FR,Île-de-France,Paris,48.8,2.3',   // different label -> separate
   '2001:db8::,2001:db8::1,AS,JP,Tokyo,Tokyo,35.6,139.6',     // \
   '2001:db8::2,2001:db8::3,AS,JP,Tokyo,Kyoto,35.0,135.7',    //  >- adjacent same IPv6 label -> merge
+  '2001:db8::4,2001:db8::5,AS,KR,Seoul,Seoul,37.5,127.0',    // same /64, different label -> dropped (first label wins)
   '2001:db8:1::,2001:db8:1::1,AS,JP,Osaka,Osaka,34.6,135.5', // different IPv6 subdivision
+  '10.0.0.0,10.255.255.255,ZZ,ZZ,,,0,0',                     // DB-IP private/reserved -> dropped
+  'fd00::,fdff:ffff:ffff:ffff:ffff:ffff:ffff:ffff,ZZ,ZZ,,,0,0', // IPv6 ULA reserved -> dropped
   '2.0.0.0,2.0.0.255,EU,DE,Bavaria,Regensburg,49.0,12.1',   // same label but GAP -> separate
 ];
 
@@ -77,11 +82,13 @@ try {
 
   const v6text = fs.readFileSync(ipv6OutPath, 'utf8');
   const v6lines = v6text.split(/\r?\n/).filter((l) => l && !l.startsWith('#'));
-  const MERGED_JP = '2306139568115548160,0,2306139568115548160,3,JP,Tokyo';
-  const OSAKA = '2306139568115613696,0,2306139568115613696,1,JP,Osaka';
+  const MERGED_JP = '20010db800000000,20010db800000000,JP,Tokyo';
+  const OSAKA = '20010db800010000,20010db800010000,JP,Osaka';
   check('exactly 2 merged IPv6 data rows', v6lines.length === 2, `got ${v6lines.length}: ${JSON.stringify(v6lines)}`);
   check('adjacent same-label JP/Tokyo IPv6 collapsed', v6lines.includes(MERGED_JP), `got ${JSON.stringify(v6lines)}`);
   check('different IPv6 subdivision JP/Osaka stayed separate', v6lines.includes(OSAKA), `got ${JSON.stringify(v6lines)}`);
+  check('later different-label slice of a claimed /64 dropped', !v6text.includes('Seoul'), `got ${JSON.stringify(v6lines)}`);
+  check('DB-IP ZZ rows dropped from both outputs', !/,ZZ,/.test(text) && !/,ZZ,/.test(v6text), 'ZZ row written');
 } finally {
   try { fs.unlinkSync(inPath); } catch { /* best effort */ }
   try { fs.unlinkSync(outPath); } catch { /* best effort */ }
