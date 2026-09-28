@@ -1,5 +1,28 @@
 # Project Milestones: FSB (Full Self-Browsing)
 
+## v0.9.91 MCP Clients as Providers (Shipped: 2026-09-28)
+
+**Phases completed:** 9 phases (57-65), 61 plans, 157 tasks
+
+**Delivered:** Installed agent CLIs (Claude Code, OpenCode, Codex) became key-less side-panel providers that drive the live browser back through FSB's own MCP tools.
+
+**Key accomplishments:**
+
+- Agent identity capture: MCP `initialize` clientInfo plus a 21-client installed sweep became durable clicked/connected/installed evidence behind one guarded `getMcpClients` view (Phase 57)
+- Providers panel: "API Configuration" became "Providers" with explicit `api` vs `agent` kinds, one evidence-based recommendation, and BYOK settings preserved (Phase 58)
+- Reverse-request channel: authenticated loopback pairing with a rotating session secret, exact Host/Origin checks, secret redaction, and a permanent CI gate against forbidden agent flags (Phase 59)
+- Supervised adapters: one five-method adapter contract and spawn supervisor running Claude Code 2.1.177, OpenCode 1.14.25 and Codex with pinned profiles, recorded fixtures and CI drift checks (Phases 60, 62, 64, 65)
+- Delegation UX: consent, live streaming feed, background-tab ownership, Take Control, Stop/reclaim, a 20-second heartbeat and service-worker-eviction recovery (Phase 61)
+- Native wake host: an optional native-messaging host that only starts or attaches to `serve` and never spawns agent CLIs (Phase 63)
+
+**Human UAT:** All 48 pending live scenarios in the Phase 58-65 human-UAT ledgers, and the matching human verification items, were closed at the user's direction on 2026-09-28 as waived, not executed. The archived ledgers keep their original pending entries as the record.
+
+**Known deferred items at close:** 117 acknowledged (116 quick-task audit entries and 1 diagnosis-only debug session; see STATE.md Deferred Items)
+
+**Archive:** `.planning/milestones/v0.9.91-ROADMAP.md`, `.planning/milestones/v0.9.91-REQUIREMENTS.md`, `.planning/milestones/v0.9.91-phases/`
+
+---
+
 ## v1.1.0 T1 App Execution Expansion (Shipped: 2026-06-30)
 
 **Phases completed:** 8 phases (44-51), 29 plans, 17/17 requirements satisfied.

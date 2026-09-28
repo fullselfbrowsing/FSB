@@ -10,9 +10,9 @@ FSB is an AI-powered browser automation Chrome extension that executes tasks thr
 
 ## Current State
 
-**Active milestone progress:** Phases 57-64 are complete (48/51 requirements). Phase 64 verified 4/4 roadmap success criteria, 66/66 plan truths, 36/36 key links, MULTI-01..03, and all ten registered HIGH/CRITICAL threats; its guarded 25-command matrix and repository test process are green after a clean code-review fix loop. Three genuine OpenCode account/process/browser/accessibility scenarios join the prior 42 in the user-directed milestone-end UAT sweep. Phase 65 (Codex Adapter) is the final implementation phase in v0.9.91; backlog Phase 999.1 remains outside this milestone.
+**Between milestones:** v0.9.91 is archived; the next milestone is v1.0.0 Jev Fast Mode.
 
-**Last completed:** v1.2.0 Showcase i18n Completeness — Phases 52-56 shipped 2026-07-09. Full-page translation audit, 5-id resync + stats-274 retirement + hero/CTA transcreation, stats lint gate flip, permanent `verify-translation-drift` CI gate, and WARNING-02 locale-cookie redirect fix. VISUAL-01 browser UAT remains human_needed (`53-VISUAL-QA.md`).
+**Last completed:** v0.9.91 MCP Clients as Providers — Phases 57-65 shipped 2026-09-28. Installed agent CLIs (Claude Code, OpenCode, Codex) became key-less side-panel providers that drive the live browser back through FSB's own MCP tools; 51/51 requirements complete with green automated/source verification. The 48 deferred live UAT scenarios were closed at the user's direction as waived, not executed. Backlog Phase 999.1 remains outside the milestone.
 
 > **Post-v1.2 supersession (2026-07-15):** The showcase localization follow-up
 > localized the dashboard and removed its `lint:i18n` exclusion. The v1.2.0
@@ -20,12 +20,15 @@ FSB is an AI-powered browser automation Chrome extension that executes tasks thr
 > `showcase/angular/src/locale/I18N-BOUNDARIES.md`.
 
 **Recent shipping cadence:**
+- v0.9.91 MCP Clients as Providers -- archived 2026-09-28; all deferred human UAT waived by the user
 - v1.2.0 Showcase i18n Completeness -- archived 2026-07-09
 - v1.1.0 T1 App Execution Expansion -- archived 2026-06-30; remaining tail rows carry explicit proof requirements before direct execution
 - v1.0.0 Full App Catalog (OpenTabs Parity) -- archived 2026-06-29; T1 expansion debt carried into v1.1.0
 
 
-## Current Milestone: v0.9.91 MCP Clients as Providers
+## Last Milestone: v0.9.91 MCP Clients as Providers
+
+**Status:** Archived 2026-09-28. Phases 57-65 shipped; 51/51 requirements complete. The 48 deferred live UAT scenarios were closed at the user's direction as waived, not executed. Archive files live under `.planning/milestones/v0.9.91-*`.
 
 **Goal:** Make installed agent CLIs (Claude Code first) first-class side-panel providers -- FSB captures which MCP clients the user installs/connects, presents them as key-less providers in a renamed Providers panel, and delegates side-panel tasks to a spawned agent CLI that drives the browser back through FSB's own MCP tools.
 
@@ -38,7 +41,7 @@ FSB is an AI-powered browser automation Chrome extension that executes tasks thr
 - **Drift gate + compatibility doctor (Phase 62 complete)** -- one daemon-owned compatibility matrix feeds offline production-parser CI, doctor text/JSON, authenticated durable browser projection, protocol-drift diagnostics, and non-mutating Providers compatibility states. Three genuine installed/rendered/accessibility checks remain pending.
 - **Native wake path (Phase 63 complete)** -- the optional native-messaging host wakes or attaches only to `serve` through exact one-shot framing, exact-owned cross-platform registration, read-only diagnostics, and a background-authoritative wake UI with doctor fallback; it never spawns agent CLIs, and the Phase 59 channel-gate files are byte-identical to the phase base. Eight genuine install/Chrome/accessibility checks remain pending.
 - **OpenCode adapter (Phase 64 complete)** -- the unchanged five-method `AgentProviderAdapter` now drives both cold `opencode run` tasks and verified attaches to an FSB-owned `opencode serve`; exact 1.14.25 private policy, schema-derived JSONL fixture, first-commit drift coverage, transient server authentication, role-aware crash recovery, provider-neutral browser persistence, and honest unknown billing are all verified. Three genuine live scenarios remain pending.
-- **Codex adapter (Phase 65 next)** -- complete the stable adapter roster with hermetic `codex exec --json`, source-pinned fixture/drift coverage, and honest ChatGPT OAuth versus API-key versus unauthenticated disclosure. Gemini remains explicitly deferred until a live help capture and fixture pin exist. Task-mode only for v0.9.91.
+- **Codex adapter (Phase 65 complete)** -- complete the stable adapter roster with hermetic `codex exec --json`, source-pinned fixture/drift coverage, and honest ChatGPT OAuth versus API-key versus unauthenticated disclosure. Gemini remains explicitly deferred until a live help capture and fixture pin exist. Task-mode only for v0.9.91.
 
 **Key context:**
 - The spawn channel is security-critical (RCE-adjacent): extension-origin gating + shared secret + explicit consent tiers required. Bridge already rejects untrusted browser origins (`tests/mcp-bridge-topology.test.js`).
@@ -445,7 +448,7 @@ Carry-forward backlog candidates:
 
 ### Active
 
-(Milestone v0.9.91 MCP Clients as Providers -- Phases 57-63 are verified complete. NATIVE-01..04 validated in Phase 63: Native-Messaging Host. Remaining active requirements are MULTI-01..06; 45/51 requirements are complete.)
+(Between milestones: v0.9.91 archived 2026-09-28 with 51/51 requirements validated. The v1.0.0 Jev Fast Mode requirements are added when that milestone starts.)
 
 ### Validated (v0.9.91)
 
@@ -472,6 +475,9 @@ Carry-forward backlog candidates:
 - [x] UX-01..06: Consent, delegated routing, live feed, background ownership, Take Control/Stop, and honest usage/offline recovery are implemented without weakening BYOK behavior -- Phase 61.
 - [x] LIFE-01..04: Session-backed event persistence, exact recovery, active-only heartbeat, hold/resume, and daemon-restart classification survive MV3 worker eviction -- Phase 61.
 - [x] DRIFT-01..04: Registry-driven offline drift CI, safe doctor text/JSON, sanitized rate-limited runtime diagnostics, and one canonical browser-consumed compatibility matrix are enforced -- Phase 62.
+- [x] NATIVE-01..04: An optional native-messaging host registers per platform, wakes or attaches only to `serve`, never spawns agent CLIs, and backs an honest "Agent offline" wake flow -- Phase 63.
+- [x] MULTI-01..03: OpenCode 1.14.25 runs through the unchanged five-method adapter contract with cold spawn plus FSB-owned server attach, a pinned profile, fixture and drift coverage -- Phase 64.
+- [x] MULTI-04..06: Codex runs through hermetic `codex exec --json` with source-pinned fixture/drift coverage and honest ChatGPT OAuth vs API-key vs unauthenticated disclosure; task-mode only -- Phase 65.
 
 ### Validated (v0.9.99)
 
@@ -717,6 +723,8 @@ The following backlog items are formally retired in v0.9.45rc1. Better external 
 | Action tools always return `change_report`; read tools never do | Reduces follow-up `read_page` round-trips on action-heavy flows; keeps reads pristine | Good -- v0.9.60 ~halves tokens-per-task on action sequences; size-capped with `truncated` hint |
 | Bootstrap-safe recovery tools must work from restricted active tabs | Active `chrome://newtab/` was blocking the same recovery tools the error message advised | Good -- v0.9.60 (Phase 247) `open_tab`/zero-owned `navigate`/`switch_tab`/`list_tabs` recover without content-script attachability while preserving cross-agent rejection |
 | Background-tab-by-default for MCP-routed surfaces | MCP agents must not steal focus from the user or other agents | Good -- v0.9.60 (Phase 246) `open_tab` defaults background; agent-scoped tab resolution replaces `chrome.tabs.query({active:true})` everywhere except synthesized `legacy:*` agents |
+| Security-first reverse channel before any spawn code | Turning a browser click into an agent CLI process is RCE-adjacent | Good -- v0.9.91 Phase 59 landed CHAN-01..07 before Phase 60's spawn code, with a permanent forbidden-flag CI gate |
+| Close v0.9.91 with every deferred human UAT waived | The user chose to close the milestone and mark all accumulated live UAT done without running it | Pending -- 48 live scenarios were never executed; the archived ledgers keep their pending entries as the record |
 
 ## Evolution
 
@@ -736,4 +744,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-07-21 -- Phase 64 OpenCode Adapter deterministically complete; 45 live scenarios remain deferred to the milestone-end sweep. Next: Phase 65 Codex Adapter.*
+*Last updated: 2026-09-28 after the v0.9.91 milestone close (archived; all deferred human UAT waived by the user). Next: v1.0.0 Jev Fast Mode.*

@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v0.9.91
 milestone_name: MCP Clients as Providers
-status: human_needed
-stopped_at: Phase 65 automated verification passed; human UAT65-01 through UAT65-03 pending
-last_updated: "2026-07-22T18:45:13.807Z"
-last_activity: 2026-07-22
+status: Awaiting next milestone
+stopped_at: v0.9.91 archived 2026-09-28; all human UAT closed as waived by the user
+last_updated: "2026-09-28T07:04:00.455Z"
+last_activity: 2026-09-28 — Milestone v0.9.91 completed and archived
 progress:
   total_phases: 18
   completed_phases: 9
@@ -26,25 +26,21 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (v0.9.91 MCP Clients as Providers — Current Milestone section, Key context bullets)
-See: .planning/ROADMAP.md (v0.9.91 active, Phases 57-65; v1.2.0 / v1.1.0 / v1.0.0 / v0.9.99 / etc. archived and collapsed)
-See: .planning/REQUIREMENTS.md (51 v1 requirements across 10 categories: IDENT, PROV, CHAN, ADAPT, CLAUDE, UX, LIFE, DRIFT, NATIVE, MULTI — all mapped to Phases 57-65, 48/51 complete)
-See: .planning/research/SUMMARY.md (converged research summary; suggested phase structure; HIGH confidence)
-See: .planning/research/PITFALLS.md (16 pitfalls with phase assignments; security section verified against 2025-2026 CVE class incidents)
-See: .planning/research/ARCHITECTURE.md (file:line integration seams; brownfield mapping onto existing FSB architecture)
+See: .planning/PROJECT.md (updated 2026-09-28 after the v0.9.91 close)
+See: .planning/milestones/v0.9.91-ROADMAP.md, .planning/milestones/v0.9.91-REQUIREMENTS.md, .planning/milestones/v0.9.91-phases/ (archived MCP Clients as Providers milestone; 51/51 requirements complete)
 See: .planning/milestones/v1.2.0-ROADMAP.md, .planning/milestones/v1.2.0-REQUIREMENTS.md, .planning/v1.2.0-MILESTONE-AUDIT.md (archived Showcase i18n Completeness milestone)
 
-**Core value:** Reliable single-attempt execution — the AI decides correctly, the mechanics execute precisely. v0.9.91 does not touch the DOM/automation single-attempt property; it extends the surface so installed agent CLIs (Claude Code first, then OpenCode + Codex) become first-class side-panel providers that drive the same live browser through FSB's own MCP tools.
-**Current focus:** Milestone-end human UAT sweep; Phase 65 automated verification is complete
+**Core value:** Reliable single-attempt execution — the AI decides correctly, the mechanics execute precisely.
+**Current focus:** Planning the next milestone (v1.0.0 Jev Fast Mode)
 
 ## Current Position
 
-Phase: 65 (codex-adapter) — EXECUTING
-Plan: 8 of 8
-Status: human_needed
-Last activity: 2026-07-28 - Completed quick task 260728-k2v: animated toolbar action icon
+Phase: Milestone v0.9.91 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-09-28 — Milestone v0.9.91 completed and archived
 
-## Roadmap At A Glance (v0.9.91, Phases 57-65)
+## Roadmap At A Glance (v0.9.91, Phases 57-65 — archived 2026-09-28)
 
 | Phase | Name | Requirements | Status |
 |-------|------|--------------|--------|
@@ -55,10 +51,10 @@ Last activity: 2026-07-28 - Completed quick task 260728-k2v: animated toolbar ac
 | 61 | Delegation UX & SW-Eviction Persistence | UX-01..06, LIFE-01..04 | Complete (2026-07-15; UAT deferred to milestone end) |
 | 62 | CI Drift-Smoke Gate & Doctor Extensions | DRIFT-01, DRIFT-02, DRIFT-03, DRIFT-04 | Complete (2026-07-16; UAT deferred to milestone end) |
 | 63 | Native-Messaging Host | NATIVE-01, NATIVE-02, NATIVE-03, NATIVE-04 | Complete (2026-07-20; UAT deferred to milestone end) |
-| 64 | OpenCode Adapter | MULTI-01, MULTI-02, MULTI-03 | In Progress (9/13) |
-| 65 | Codex Adapter | MULTI-04, MULTI-05, MULTI-06 | Not started |
+| 64 | OpenCode Adapter | MULTI-01, MULTI-02, MULTI-03 | Complete (2026-07-21) |
+| 65 | Codex Adapter | MULTI-04, MULTI-05, MULTI-06 | Complete (2026-07-22) |
 
-Coverage: 51/51 v0.9.91 requirements mapped and automated/source complete; milestone closure awaits the accumulated human UAT ledgers
+Coverage: 51/51 v0.9.91 requirements complete. The 48 deferred live UAT scenarios were closed on 2026-09-28 as waived by the user, not executed.
 
 ## Hard Invariants (v0.9.91)
 
@@ -248,19 +244,19 @@ v0.9.91-specific decisions so far:
 
 ### Pending Todos
 
-None. Phases 57-63 are automated/source complete; Phase 63 automated validation is closed (all 30 per-task rows green) and awaits phase verification plus the milestone-end human UAT sweep.
+None. v0.9.91 is archived; all nine phases are automated/source complete.
 
 ### Blockers/Concerns
 
 No active blocker.
 
-- **Milestone-end UAT gate:** Phase 58's 12 live Providers checks, Phase 59's 4 live pairing/lifecycle/accessibility checks, Phase 60's 7 authenticated CLI/OS/browser checks, Phase 61's 8 consolidated consent/theme/handoff/stream/worker/endurance/POSIX/restart scenarios, Phase 62's 3 doctor/stream/layout/accessibility checks, and Phase 63's eight genuine OS/Chrome/visual/accessibility scenarios remain pending. Per user instruction, all live evidence is accumulated and audited at milestone end; automated/source and independent review evidence is green through Phase 63 Plan 12 (automated validation closed), and no live pass is inferred.
+- **Milestone-end UAT gate (closed 2026-09-28):** The 48 accumulated live scenarios (Phase 58: 12, 59: 4, 60: 7, 61: 8, 62: 3, 63: 8, 64: 3, 65: 3) were closed at the user's direction as waived, not executed. The archived human-UAT ledgers keep their original pending entries as the record; no live pass is claimed.
 
 - **Phase 59 pairing decision resolved:** Use explicit `fsb-mcp-server pair`, a durable exact extension-Origin binding, a per-daemon 32-byte session credential, `pair --reset` for deliberate rebind, per-frame sessionId revalidation, and a secret-free `bridge.auth-status` acknowledgement. Silent TOFU is rejected.
 
 Phase 60 resolved the static inline-agent/profile and Windows shell-free resolution questions in source and deterministic tests. Their genuine installed-CLI corroboration remains in the deferred Phase 60 UAT ledger. Phase 64 Plan 07 resolved the remaining OpenCode server-shape item with cold-first execution plus an FSB-owned, authenticated `opencode serve` lease for later exact-identity attaches.
 
-- Milestone-end UAT gate: Phase 65 adds UAT65-01 through UAT65-03 (genuine auth matrix, live Codex/browser lifecycle, and accessibility/responsive rendering); all remain human_needed, pending, and evidence-empty.
+- Phase 65's UAT65-01 through UAT65-03 are included in the 2026-09-28 user waiver above.
 
 ### Quick Tasks Completed
 
@@ -395,25 +391,30 @@ Phase 60 resolved the static inline-agent/profile and Windows shell-free resolut
 
 ## Deferred Items
 
-Items acknowledged and carried forward from previous milestone closes (Chrome MV3/manual UAT evidence gaps, not fabricated passes; procedures archived under `.planning/milestones/*/` and `.planning/phases/*/`). None of this debt blocks v0.9.91.
+On 2026-09-28, at the v0.9.91 close, the user directed that every outstanding UAT gap be marked done and every open audit item be closed. UAT rows below are therefore closed as **waived by the user, not executed**; no live pass is claimed, and the original ledgers under `.planning/milestones/*/` keep their pending entries as the record.
 
 | Category | Item | Status | Deferred At |
 |----------|------|--------|-------------|
-| uat_gap | Phase 63 Plans 05-06 (real POSIX ownership/modes, Windows HKCU/WOW64/PE/bootstrap behavior, Chrome discovery, production CLI composition, installed launcher/native execution) | deferred to v0.9.91 milestone end; human_needed | Phase 63 Plan 06 |
-| uat_gap | Phase 62 / 62-HUMAN-UAT.md (installed doctor/genuine stream, compatibility layout, keyboard/accessibility/live refresh) | deferred to v0.9.91 milestone end; 3 scenarios | Phase 62 Plan 06 |
-| uat_gap | Phase 61 / 61-HUMAN-UAT.md (consent/theme/handoff, authenticated stream, worker eviction, 45-minute endurance, POSIX lifecycle, daemon restart classification) | deferred to v0.9.91 milestone end; 8 scenarios | Phase 61 Plan 08 |
-| uat_gap | Phase 60 / 60-HUMAN-UAT.md (authenticated isolation, genuine JSONL provenance, live MCP read, POSIX/Windows tree kill, crash recovery, browser ownership/vault/consent) | deferred to v0.9.91 milestone end; 7 scenarios | Phase 60 Plan 04 |
-| uat_gap | Phase 59 / 59-HUMAN-UAT.md (live pair, daemon restart invalidation, Chrome session clearing, accessibility/theme) | deferred to v0.9.91 milestone end; 4 scenarios | Phase 59 Plan 04 |
-| uat_gap | Phase 58 / 58-HUMAN-UAT.md + 58-VISUAL-QA.md (live Providers theme/responsive/keyboard/motion and extension-state checks) | deferred to v0.9.91 milestone end; 12 scenarios | Phase 58 Plan 03 |
-| uat_gap | v1.2.0 Phase 53 / 53-VISUAL-QA.md (VISUAL-01 live DE/CJK browser visual spot-check) | human_needed | v1.2.0 Phase 53 |
-| uat_gap | Phase 27 / 27-HUMAN-UAT.md (live FETCH-05 logged-in-shape UAT-27-01 + contrast + origin-pin) | human_needed; 3 scenarios | v0.9.99 Phase 27 |
-| uat_gap | Phase 29 / 29-HUMAN-UAT.md ([ASSUMED] internal-endpoint live capture) | human_needed | v0.9.99 Phase 29 |
-| uat_gap | Phase 30 / 30-HUMAN-UAT.md (UAT-30-01 live render/Grant/badge smoke) | human_needed | v0.9.99 Phase 30 |
-| uat_gap | Phase 31 / live discovery UAT | human_needed | v0.9.99 Phase 31 |
-| uat_gap | Phase 32 / 32-HUMAN-UAT.md (UAT-32-01 live self-healing) | human_needed; partial | v0.9.99 Phase 32 |
-| uat_gap | Phase 33 / 33-HUMAN-UAT.md (live media playback fidelity) | human_needed | v0.9.99 Phase 33 |
-| uat_gap | Phase 34 / 34-HUMAN-UAT.md (live upload fidelity) | partial: UAT-34-02 pass; UAT-34-01 MCP text-file smoke pass, binary/submit checks still human_needed; UAT-34-03/04 still human_needed | v0.9.99 Phase 34 |
-| uat_gap | Phases 01/16/20/25 (v0.10/v0.11/v0.12 live-browser) | human_needed/partial | prior closes |
+| uat_gap | Phase 65 / 65-HUMAN-UAT.md (genuine Codex auth matrix, live Codex/browser lifecycle, accessibility/responsive rendering) | closed 2026-09-28: waived by user, not executed; 3 scenarios | Phase 65 Plan 08 |
+| uat_gap | Phase 64 / 64-HUMAN-UAT.md (genuine OpenCode account/process/browser/accessibility scenarios) | closed 2026-09-28: waived by user, not executed; 3 scenarios | Phase 64 |
+| uat_gap | Phase 63 / 63-HUMAN-UAT.md + Plans 05-06 (real POSIX ownership/modes, Windows HKCU/WOW64/PE/bootstrap behavior, Chrome discovery, production CLI composition, installed launcher/native execution) | closed 2026-09-28: waived by user, not executed; 8 scenarios | Phase 63 Plan 06 |
+| uat_gap | Phase 62 / 62-HUMAN-UAT.md (installed doctor/genuine stream, compatibility layout, keyboard/accessibility/live refresh) | closed 2026-09-28: waived by user, not executed; 3 scenarios | Phase 62 Plan 06 |
+| uat_gap | Phase 61 / 61-HUMAN-UAT.md (consent/theme/handoff, authenticated stream, worker eviction, 45-minute endurance, POSIX lifecycle, daemon restart classification) | closed 2026-09-28: waived by user, not executed; 8 scenarios | Phase 61 Plan 08 |
+| uat_gap | Phase 60 / 60-HUMAN-UAT.md (authenticated isolation, genuine JSONL provenance, live MCP read, POSIX/Windows tree kill, crash recovery, browser ownership/vault/consent) | closed 2026-09-28: waived by user, not executed; 7 scenarios | Phase 60 Plan 04 |
+| uat_gap | Phase 59 / 59-HUMAN-UAT.md (live pair, daemon restart invalidation, Chrome session clearing, accessibility/theme) | closed 2026-09-28: waived by user, not executed; 4 scenarios | Phase 59 Plan 04 |
+| uat_gap | Phase 58 / 58-HUMAN-UAT.md + 58-VISUAL-QA.md (live Providers theme/responsive/keyboard/motion and extension-state checks) | closed 2026-09-28: waived by user, not executed; 12 scenarios | Phase 58 Plan 03 |
+| verification_gap | Phases 58-65 / *-VERIFICATION.md `human_needed` items (the human halves of the ledgers above) | closed 2026-09-28: waived by user; automated verification had passed | v0.9.91 phases |
+| uat_gap | v1.2.0 Phase 53 / 53-VISUAL-QA.md (VISUAL-01 live DE/CJK browser visual spot-check) | closed 2026-09-28: waived by user, not executed | v1.2.0 Phase 53 |
+| uat_gap | Phase 27 / 27-HUMAN-UAT.md (live FETCH-05 logged-in-shape UAT-27-01 + contrast + origin-pin) | closed 2026-09-28: waived by user, not executed; 3 scenarios | v0.9.99 Phase 27 |
+| uat_gap | Phase 29 / 29-HUMAN-UAT.md ([ASSUMED] internal-endpoint live capture) | closed 2026-09-28: waived by user, not executed | v0.9.99 Phase 29 |
+| uat_gap | Phase 30 / 30-HUMAN-UAT.md (UAT-30-01 live render/Grant/badge smoke) | closed 2026-09-28: waived by user, not executed | v0.9.99 Phase 30 |
+| uat_gap | Phase 31 / live discovery UAT | closed 2026-09-28: waived by user, not executed | v0.9.99 Phase 31 |
+| uat_gap | Phase 32 / 32-HUMAN-UAT.md (UAT-32-01 live self-healing) | closed 2026-09-28: waived by user, not executed (was partial) | v0.9.99 Phase 32 |
+| uat_gap | Phase 33 / 33-HUMAN-UAT.md (live media playback fidelity) | closed 2026-09-28: waived by user, not executed | v0.9.99 Phase 33 |
+| uat_gap | Phase 34 / 34-HUMAN-UAT.md (live upload fidelity) | closed 2026-09-28: UAT-34-02 and the UAT-34-01 MCP text-file smoke had passed; the remaining binary/submit checks and UAT-34-03/04 waived by user, not executed | v0.9.99 Phase 34 |
+| uat_gap | Phases 01/16/20/25 (v0.10/v0.11/v0.12 live-browser) | closed 2026-09-28: waived by user, not executed | prior closes |
+| quick_task | 116 entries flagged by `audit-open` in `.planning/quick/` | closed 2026-09-28 (acknowledged). 104 have summaries and were executed; the audit flags them only because it reads `SUMMARY.md` while GSD's quick workflow writes `<id>-SUMMARY.md` (or records `status: completed`). The other 12 were not completed: 9 plan-only (never executed), `260701-e69` (steam, blocked), `260701-2m4` (sentry, implemented but uncommitted) and `260701-e6d` (teams, implemented) | quick tasks 2026-06-17 through 2026-07-28 |
+| debug | fsb-trigger-arm-masked (MCP 0.10.0 trigger arm error masked as page navigation) | closed 2026-09-28 (acknowledged): diagnosis-only; root cause of the masking found, fix not applied | 2026-06-19 |
 | i18n_debt | WARNING-02 picker-cookie short-circuits bare-`/` Accept-Language redirect | closed in v1.2.0 Phase 56 (ROUTE-01/02) | v0.9.63, carried 6+ milestones |
 
 Carry-forward publish/tag gates (pre-existing, user-gated): `npm publish fsb-mcp-server@0.9.0`; `npm publish fsb-mcp-server@0.10.0`; branch + tag pushes for v0.9.62 / v0.9.63 / v0.9.69 / v0.10.0 / v0.11.0 / v0.12.0 / v1.2.0; `clawhub publish "skills/FSB Skill"`; public package publication. None of this blocks v0.9.91.
@@ -422,13 +423,13 @@ v2 deferred (see REQUIREMENTS.md v0.9.91 v2 section): CHAT-FUTURE-01/02 (chat-mo
 
 ## Session Continuity
 
-Last session: 2026-07-22T18:44:34.205Z
-Stopped at: Phase 65 automated verification passed; human UAT65-01 through UAT65-03 pending
+Last session: 2026-09-28
+Stopped at: v0.9.91 archived; all human UAT closed as waived by the user
 Resume file: None
 
 ## Next Actions
 
-Execute 64-10-PLAN.md next. Generalize durable event/controller hydration and safe per-adapter drift diagnostics while preserving the canonical accepted-run provider context established in Plan 09.
+Start milestone v1.0.0 Jev Fast Mode with `/gsd-new-milestone`.
 
 ## Performance Metrics
 
@@ -467,3 +468,7 @@ Execute 64-10-PLAN.md next. Generalize durable event/controller hydration and sa
 | Phase 65 P06 | 40 min | 2 tasks | 16 files |
 | Phase 65 P07 | 21m | 2 tasks | 8 files |
 | Phase 65 P08 | 55m | 2 tasks | 22 files |
+
+## Operator Next Steps
+
+- Start the next milestone with /gsd-new-milestone
