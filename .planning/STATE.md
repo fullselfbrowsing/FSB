@@ -1,20 +1,19 @@
 ---
 gsd_state_version: 1.0
-milestone: v0.9.91
-milestone_name: MCP Clients as Providers
-status: Awaiting next milestone
-stopped_at: v0.9.91 archived 2026-09-28; all human UAT closed as waived by the user
-last_updated: "2026-09-28T07:04:00.455Z"
-last_activity: 2026-09-28 — Milestone v0.9.91 completed and archived
+milestone: v1.0.0
+milestone_name: Jev Fast Mode
+status: planning
+last_updated: "2026-09-28T07:15:37.981Z"
+last_activity: 2026-09-28
 progress:
-  total_phases: 18
-  completed_phases: 9
-  total_plans: 61
-  completed_plans: 63
-  percent: 50
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
-*Note: the `total_phases`/`completed_phases` counts above are scoped to the active v0.9.91 milestone (Phases 57-65) only. Some GSD tooling (`roadmap.analyze`, `phase.complete`) reports a noisy multi-phase count including collapsed `## Completed Milestones` archive entries and `## Backlog` sections — treat this file's own numbers as authoritative for v0.9.91 progress.*
+*Note: the `total_phases`/`completed_phases` counts above are scoped to the active v1.0.0 milestone (phases from 66) only. Some GSD tooling (`roadmap.analyze`, `phase.complete`) reports a noisy multi-phase count including collapsed `## Completed Milestones` archive entries and `## Backlog` sections — treat this file's own numbers as authoritative for v1.0.0 progress.*
 
 # Project State
 
@@ -35,10 +34,10 @@ See: .planning/milestones/v1.2.0-ROADMAP.md, .planning/milestones/v1.2.0-REQUIRE
 
 ## Current Position
 
-Phase: Milestone v0.9.91 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-09-28 — Milestone v0.9.91 completed and archived
+Status: Defining requirements
+Last activity: 2026-09-28 — Milestone v1.0.0 started
 
 ## Roadmap At A Glance (v0.9.91, Phases 57-65 — archived 2026-09-28)
 

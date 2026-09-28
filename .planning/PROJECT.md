@@ -10,7 +10,7 @@ FSB is an AI-powered browser automation Chrome extension that executes tasks thr
 
 ## Current State
 
-**Between milestones:** v0.9.91 is archived; the next milestone is v1.0.0 Jev Fast Mode.
+**Active milestone:** v1.0.0 Jev Fast Mode — defining requirements.
 
 **Last completed:** v0.9.91 MCP Clients as Providers — Phases 57-65 shipped 2026-09-28. Installed agent CLIs (Claude Code, OpenCode, Codex) became key-less side-panel providers that drive the live browser back through FSB's own MCP tools; 51/51 requirements complete with green automated/source verification. The 48 deferred live UAT scenarios were closed at the user's direction as waived, not executed. Backlog Phase 999.1 remains outside the milestone.
 
@@ -25,6 +25,29 @@ FSB is an AI-powered browser automation Chrome extension that executes tasks thr
 - v1.1.0 T1 App Execution Expansion -- archived 2026-06-30; remaining tail rows carry explicit proof requirements before direct execution
 - v0.13.0 Full App Catalog (OpenTabs Parity) -- archived 2026-06-29; T1 expansion debt carried into v1.1.0
 
+
+## Current Milestone: v1.0.0 Jev Fast Mode
+
+**Goal:** Make FSB measurably faster in both autopilot and MCP by letting Jev (TypeSafe AI's System One decision model) make the simple step decisions, while the LLM keeps planning, writing text and reading pages, MCP changes stay minimal, and the extension ships as 1.0.0.
+
+**Target features:**
+- **Speed baseline and measurement** -- per-call timing recorded for MCP and autopilot sessions, a working session-detail lookup for journal-backed MCP sessions, and a repeatable benchmark suite comparing wall time per completed task, success rate and cost before and after.
+- **Jev decision provider** -- an optional provider that reuses the OpenRouter key by default (pinned `typesafe/jev-1.13`), accepts a direct TypeSafe key, calls the API with a thin client from the MV3 service worker, never sends secrets or password fields, and falls back cleanly when Jev is unavailable.
+- **Autopilot fast mode (opt-in)** -- each step, Jev picks the operation and target from FSB's element snapshot and checks whether the task is done or stuck; the LLM handles the plan, typed text, extraction and any step below the confidence threshold.
+- **MCP speedups with minimal wire change** -- shorter descriptions for all 73 MCP tools; only additive optional parameters: `expect` on action tools (outcome checked in the same call) and a bounded fast mode on the existing `run_task`; no new tools unless planning proves one is needed.
+- **Safety** -- Jev can only add confirmations, never remove them; page text is treated as untrusted; Jev is never the sole safety gate.
+- **Release** -- extension 1.0.0 via a `CHANGELOG.md` v1.0.0 entry and `npm run version:set:extension -- 1.0.0`; MCP gets a minor bump for the additive parameters (0.11.0 to 0.12.0).
+
+**Key context:**
+- Measured baseline (40 recorded MCP sessions, 2026-09-16 to 2026-09-21): median wall time per tool call is 9.5 s with Claude and 4.6 s with Cursor. FSB's own execution is roughly 0.3-1 s per call (a click waits for 300 ms of DOM stability plus 200 ms of network quiet, capped at 3 s), so the calling agent's turns are about 85-90% of MCP time. Autopilot defaults to xAI `grok-4-1-fast`; no recorded autopilot sessions exist to measure.
+- MCP tool surface today: 73 tools with about 54.5k characters of descriptions (median 730, longest 2,187 for `execute_js`) plus about 34k characters of parameter descriptions; no MCP `annotations` are defined.
+- Jev facts (`.planning/research/JEV-REFERENCE.md`): `POST /v1/systemone` with a `state` plus typed `questions` (Choice up to 255 options, Score 2-10 levels, Noul yes/no probability); about 100 ms server time; $0.042 per million input tokens, output free; 32k tokens for the state plus the longest question; 1,200 requests/min; no SLA. Direct TypeSafe signups have been paused since 2026-09-22; OpenRouter serves the same API with an OpenRouter key.
+- Evidence to respect: per-decision speed and cost wins are real, but whole-agent tests mostly cut cost without raising task success; a third-party benchmark scored Jev 25/49 on raw DOM controls; confidence ranks answers well, but thresholds must be tuned on FSB's own labelled tasks against a pinned model version.
+- Realistic targets: autopilot about 1.5-2x faster on mixed tasks; MCP about 1.3-1.6x on UAT/Jira-style sessions and 2-3x on click-heavy flows; MCP tool-list tokens cut by more than half.
+- INV-01 carries forward: MCP wire contracts stay byte-stable; only additive optional parameters.
+- The version bump goes through `scripts/sync-product-version.mjs`, which refuses to run until the `## v1.0.0` CHANGELOG entry exists.
+- Tests read archived planning files, and source-pin tripwires on extension files require paired test updates in the same commit.
+- Phases continue from 66. The milestone label v1.0.0 matches the extension release; the former v1.0.0 catalog milestone is now v0.13.0.
 
 ## Last Milestone: v0.9.91 MCP Clients as Providers
 
@@ -448,7 +471,7 @@ Carry-forward backlog candidates:
 
 ### Active
 
-(Between milestones: v0.9.91 archived 2026-09-28 with 51/51 requirements validated. The v1.0.0 Jev Fast Mode requirements are added when that milestone starts.)
+(Milestone v1.0.0 Jev Fast Mode -- requirements are being defined in `.planning/REQUIREMENTS.md`.)
 
 ### Validated (v0.9.91)
 
@@ -744,4 +767,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-09-28 after the v0.9.91 milestone close (archived; all deferred human UAT waived by the user). Next: v1.0.0 Jev Fast Mode.*
+*Last updated: 2026-09-28 -- started milestone v1.0.0 Jev Fast Mode after closing v0.9.91.*
