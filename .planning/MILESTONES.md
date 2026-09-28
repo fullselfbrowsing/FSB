@@ -48,11 +48,13 @@
 
 ---
 
-## v1.0.0 Full App Catalog (OpenTabs Parity) (Shipped: 2026-06-29)
+## v0.13.0 Full App Catalog (OpenTabs Parity) (Shipped: 2026-06-29)
+
+*Relabeled from v1.0.0 on 2026-09-28 so that v1.0.0 names the Jev Fast Mode milestone that ships extension 1.0.0. Archive files and references were renamed to match.*
 
 **Phases completed:** 10 phases (35-43, including inserted 39.5), 46 plans, 17/17 requirements satisfied.
 
-**Archive:** `.planning/milestones/v1.0.0-ROADMAP.md`, `.planning/milestones/v1.0.0-REQUIREMENTS.md`, `.planning/milestones/v1.0.0-MILESTONE-AUDIT.md`, and `.planning/milestones/v1.0.0-phases/`.
+**Archive:** `.planning/milestones/v0.13.0-ROADMAP.md`, `.planning/milestones/v0.13.0-REQUIREMENTS.md`, `.planning/milestones/v0.13.0-MILESTONE-AUDIT.md`, and `.planning/milestones/v0.13.0-phases/`.
 
 **Audit status:** `passed` -- automated milestone gate met. Non-blocking debt carried forward: live guarded-write UAT, live discovery first-visit UAT, Pattern-D cross-origin execution, and T1 expansion for the DOM/discovery tail.
 

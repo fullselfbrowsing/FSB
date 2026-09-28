@@ -2,12 +2,12 @@
 
 **Gathered:** 2026-06-26
 **Status:** Ready for planning
-**Mode:** Orchestrator-gathered (the search/eval/self-heal substrate is shipped; the scale budget is already met; the precision re-tune + the self-heal hardening are the two substantive deliverables). The FINAL v1.0.0 phase — `npm test` EXIT 0 IS the milestone gate.
+**Mode:** Orchestrator-gathered (the search/eval/self-heal substrate is shipped; the scale budget is already met; the precision re-tune + the self-heal hardening are the two substantive deliverables). The FINAL v0.13.0 phase — `npm test` EXIT 0 IS the milestone gate.
 
 <domain>
 ## Phase Boundary
 
-CLOSE the v1.0.0 milestone: prove full-corpus performance, drive full-corpus search PRECISION to the
+CLOSE the v0.13.0 milestone: prove full-corpus performance, drive full-corpus search PRECISION to the
 hard bar (DEF-39.5-04-A), harden recipe-rot self-heal for the now-119-app surface, and gate on the
 full test suite — the v0.9.99 Phase-32 milestone-gate posture. OWNS **SCALE-01** + **SCALE-02**.
 
@@ -140,7 +140,7 @@ lifecycle (audit → complete → cleanup).
   recurrence distinguishes a one-off blip from a site-wide change; degraded surfacing makes a stale app
   visible instead of silently failing.
 - THE close is the gate: full npm test EXIT 0 over breadth + depth + discovery + scale, INV-01..04 +
-  Walls 1/2 green, MIT provenance complete — the v1.0.0 milestone is met.
+  Walls 1/2 green, MIT provenance complete — the v0.13.0 milestone is met.
 </specifics>
 
 <deferred>

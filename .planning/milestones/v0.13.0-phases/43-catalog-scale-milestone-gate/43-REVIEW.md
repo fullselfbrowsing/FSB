@@ -30,7 +30,7 @@ resolution_commits:
   LO-02: e0bcf4fe
 ---
 
-# Phase 43: Code Review Report (Catalog-Scale + Milestone Gate, SCALE-01/02 — the v1.0.0 close)
+# Phase 43: Code Review Report (Catalog-Scale + Milestone Gate, SCALE-01/02 — the v0.13.0 close)
 
 **Reviewed:** 2026-06-26
 **Depth:** deep (cross-file: importer data-map -> emitted corpus -> eval; scheduler/store -> router wire-up; full gate run)
@@ -122,7 +122,7 @@ route-through is a confirmed-by-milestone-gate follow-up, not in this plan's sco
 was wired"). That is honest disclosure, but it means the SCALE-02 CONTEXT promises — "one coalesced
 re-learn per origin (no thundering-herd)" and "degraded surfacing makes a stale app visible instead of
 silently failing" — are **NOT delivered by this milestone**. The gate is green only because the tests
-exercise the isolated modules, not the integration. For the FINAL v1.0.0 phase this is a material gap
+exercise the isolated modules, not the integration. For the FINAL v0.13.0 phase this is a material gap
 between the claimed close and the shipped behavior, not a cosmetic nit — hence HIGH, not MEDIUM.
 
 **Fix:** Either (a) wire it before declaring SCALE-02 met — route `_quarantineAndRelearn`'s re-learn

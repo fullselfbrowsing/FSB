@@ -11,7 +11,7 @@ Extend the Phase-37 breadth contract to the comms / social / content apps — th
 where ToS-hostility + write-sensitivity bite. Import each app's descriptors ONLY after Phase 35
 covers its origin (the merge-time classifyGate is the fail-closed enforcer), and route
 ToS-hostile apps to DOM-only/denied rather than API-invocable. Continues BRDTH-01/02/03 (no new
-v1.0.0 REQ-ID). Reuses the FROZEN Phase-37 machinery verbatim + ADDS the per-app sensitivity
+v0.13.0 REQ-ID). Reuses the FROZEN Phase-37 machinery verbatim + ADDS the per-app sensitivity
 screening (a denylist expansion for this batch's origins).
 
 **In scope:** the comms/social/content import batch; the per-app ToS/sensitivity classification

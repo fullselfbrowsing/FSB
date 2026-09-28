@@ -57,7 +57,7 @@ Result: exit `0`. The final output ended with `no-orphan-descriptor: 10 passed, 
 
 An initial environment-only provisioning attempt used dependency links with one extra parent segment and exited `127` at `tsc: command not found`. No product assertion failed. The links were corrected, both `mcp/node_modules/.bin/tsc` and `showcase/angular/node_modules/.bin/ng` were confirmed executable, the worktree was confirmed clean again, and the complete suite then exited `0`. As expected, the suite's build steps regenerated `mcp/build/index.js` and showcase discovery files after the clean precondition had been recorded. The temporary verification worktree was removed afterward.
 
-The shared Conductor worktree also completed `npm test` with exit `0`; its only environment accommodation was a temporary link restoring the user-removed Phase 39 coverage manifest from `.planning/milestones/v1.0.0-phases/`. That link was removed after the run.
+The shared Conductor worktree also completed `npm test` with exit `0`; its only environment accommodation was a temporary link restoring the user-removed Phase 39 coverage manifest from `.planning/milestones/v0.13.0-phases/`. That link was removed after the run.
 
 ## Browser availability
 

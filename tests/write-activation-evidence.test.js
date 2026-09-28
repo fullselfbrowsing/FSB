@@ -10,7 +10,7 @@ const REPO_ROOT = path.resolve(__dirname, '..');
 const requireFromRoot = createRequire(path.join(REPO_ROOT, 'package.json'));
 const STABLE_TEMPLATE_REF = 'catalog/write-activation-live-uat-template.md';
 const ARCHIVED_NOTION_EVIDENCE_REF =
-  '.planning/milestones/v1.0.0-phases/41-depth-2-remaining-hand-ports-guarded-writes/41-HUMAN-UAT.md';
+  '.planning/milestones/v0.13.0-phases/41-depth-2-remaining-hand-ports-guarded-writes/41-HUMAN-UAT.md';
 
 let passed = 0;
 let failed = 0;

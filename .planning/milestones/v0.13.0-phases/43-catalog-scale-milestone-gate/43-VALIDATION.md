@@ -9,7 +9,7 @@ created: 2026-06-26
 
 # Phase 43 — Validation Strategy
 
-> Close v1.0.0: full-corpus scale + the wrong-invoke precision re-tune (DEF-39.5-04-A) + recipe-rot
+> Close v0.13.0: full-corpus scale + the wrong-invoke precision re-tune (DEF-39.5-04-A) + recipe-rot
 > self-heal hardening (per-origin coalescing/back-off, recurrence, degraded surfacing) + INV-03/7-provider
 > + MIT provenance + **full `npm test` EXIT 0 = THE MILESTONE GATE**. Source of truth: 43-CONTEXT.md.
 

@@ -1,12 +1,12 @@
-# Phase 43 / v1.0.0 Milestone Gate -- Sign-Off
+# Phase 43 / v0.13.0 Milestone Gate -- Sign-Off
 
 **Date:** 2026-06-26
-**Milestone:** v1.0.0 (Full App Catalog -- OpenTabs Parity)
+**Milestone:** v0.13.0 (Full App Catalog -- OpenTabs Parity)
 **Phase:** 43 (Catalog-Scale + Milestone Gate, SCALE-01/02) -- the FINAL phase
 **Result:** PASS -- full `npm test` EXIT 0 over the whole catalog + all guards.
 
 The whole-suite pass over breadth + depth + discovery + scale + self-heal + provider parity +
-provenance + every INV/Wall guard IS the v1.0.0 milestone gate (the v0.9.99 Phase-32
+provenance + every INV/Wall guard IS the v0.13.0 milestone gate (the v0.9.99 Phase-32
 milestone-gate posture). Every sub-gate below was run DIRECTLY first (fast, attributable) and
 then confirmed inside the whole-suite run.
 
@@ -29,9 +29,9 @@ then confirmed inside the whole-suite run.
 
 ## THE MILESTONE GATE
 
-**Full `npm test` EXIT 0** -- the authoritative v1.0.0 milestone signal. The whole suite over
+**Full `npm test` EXIT 0** -- the authoritative v0.13.0 milestone signal. The whole suite over
 breadth + depth + discovery + scale + self-heal + provider parity + provenance + every INV/Wall
-guard passes. The v1.0.0 milestone is met.
+guard passes. The v0.13.0 milestone is met.
 
 ## Carried-Forward NON-Blocking UAT Debt (recorded for the milestone audit)
 

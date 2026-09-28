@@ -23,7 +23,7 @@ FSB is an AI-powered browser automation Chrome extension that executes tasks thr
 - v0.9.91 MCP Clients as Providers -- archived 2026-09-28; all deferred human UAT waived by the user
 - v1.2.0 Showcase i18n Completeness -- archived 2026-07-09
 - v1.1.0 T1 App Execution Expansion -- archived 2026-06-30; remaining tail rows carry explicit proof requirements before direct execution
-- v1.0.0 Full App Catalog (OpenTabs Parity) -- archived 2026-06-29; T1 expansion debt carried into v1.1.0
+- v0.13.0 Full App Catalog (OpenTabs Parity) -- archived 2026-06-29; T1 expansion debt carried into v1.1.0
 
 
 ## Last Milestone: v0.9.91 MCP Clients as Providers
@@ -66,7 +66,7 @@ FSB is an AI-powered browser automation Chrome extension that executes tasks thr
 - Fix WARNING-02 (carried since v0.9.63): picker-set `fsb-locale` cookie no longer short-circuits the bare-`/` Accept-Language redirect for returning fresh-tab/shared-link visitors.
 - New CI drift-detection gate: fail the build if `messages.xlf` source content changes without a corresponding update to all 5 translated locale files.
 
-**Key context:** Supported locales are fixed (en source + es/de/ja/zh-CN/zh-TW) -- not up for debate, carried over from v0.9.63's `LocaleService` + locale-constants module. Builds on existing tooling: `lint:i18n` eslint check, `verify-locale-sync.mjs`, `ng extract-i18n`. This is the second attempt at closing this exact gap -- v0.9.63 left dashboard + WARNING-02 as accepted debt that then sat untouched through 6+ subsequent milestones (v0.9.69, v0.10.0, v0.11.0, v0.12.0, v1.0.0, v1.1.0).
+**Key context:** Supported locales are fixed (en source + es/de/ja/zh-CN/zh-TW) -- not up for debate, carried over from v0.9.63's `LocaleService` + locale-constants module. Builds on existing tooling: `lint:i18n` eslint check, `verify-locale-sync.mjs`, `ng extract-i18n`. This is the second attempt at closing this exact gap -- v0.9.63 left dashboard + WARNING-02 as accepted debt that then sat untouched through 6+ subsequent milestones (v0.9.69, v0.10.0, v0.11.0, v0.12.0, v0.13.0, v1.1.0).
 
 **Progress:** Phase 52 (Full-Page Translation Completeness Audit) complete 2026-07-08 -- `audit-translation-completeness.mjs` confirms the true drift/gap scope across all 12 current routes and 5 locales: 5 drifted trans-units (matches the corrected estimate, superseding the original "247" figure), 54 orphaned ids/locale, and the `translations.stats-274.*.json` artifacts traced as 15/21 keys already merged into live XLIFF per locale (6 missing, 0 stale). This is the authoritative scope Phases 53-55 inherit.
 
@@ -74,15 +74,15 @@ FSB is an AI-powered browser automation Chrome extension that executes tasks thr
 
 **Status:** Archived on 2026-06-30. Audit passed; automated milestone gates met. Archive files live under `.planning/milestones/v1.1.0-*`.
 
-**Outcome:** FSB converted the v1.0.0 catalog tail from undifferentiated search/discovery support into an explicit readiness and terminal-state model. The milestone added reusable port contracts, same-origin read ports, bridge decision gates, guarded-write evidence gates, terminal-state reporting, and a write/destructive UAT ledger.
+**Outcome:** FSB converted the v0.13.0 catalog tail from undifferentiated search/discovery support into an explicit readiness and terminal-state model. The milestone added reusable port contracts, same-origin read ports, bridge decision gates, guarded-write evidence gates, terminal-state reporting, and a write/destructive UAT ledger.
 
 **Final counts:** 2,314 descriptors; 1,267 executable T1-ready rows; 556 guarded fail-closed rows; 5 bridge-needed rows; 141 UAT-needed rows; 123 blocked rows; 222 degraded/discovery-pending rows.
 
 **Accepted closeout caveats:** v1.1.0 does not claim all apps are T1-ready. Remaining rows are non-invocable until their documented proof requirements are satisfied. Backlog side phase `999.1 MCP tool gaps -- click heuristics` remains outside the milestone.
 
-## Last Milestone: v1.0.0 Full App Catalog (OpenTabs Parity)
+## Last Milestone: v0.13.0 Full App Catalog (OpenTabs Parity)
 
-**Status:** Archived on 2026-06-29. Audit passed; automated milestone gate met. Archive files live under `.planning/milestones/v1.0.0-*`.
+**Status:** Archived on 2026-06-29. Audit passed; automated milestone gate met. Archive files live under `.planning/milestones/v0.13.0-*`.
 
 **Outcome:** FSB imported the full allowed OpenTabs-derived catalog surface into existing capability tiers: 2,314 descriptors across 128 app stems / 129 services, with side-effect classification, backing-status annotation, denylist/sensitive-origin gating, discovery seeding, scale gates, and selected T1 heads. The milestone deliberately did not hand-port every descriptor; that T1 expansion debt is now the explicit v1.1.0 milestone.
 

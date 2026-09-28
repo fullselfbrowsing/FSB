@@ -34,7 +34,7 @@ human_verification:
 
 # Phase 43: Catalog-Scale + Milestone Gate (SCALE-01/02) Verification Report
 
-**Phase Goal:** Close the v1.0.0 milestone by proving full-corpus performance, driving full-corpus search PRECISION to the hard bar (DEF-39.5-04-A), hardening recipe-rot self-heal for the 119-app surface, and gating on the full test suite. `npm test` EXIT 0 IS the milestone gate.
+**Phase Goal:** Close the v0.13.0 milestone by proving full-corpus performance, driving full-corpus search PRECISION to the hard bar (DEF-39.5-04-A), hardening recipe-rot self-heal for the 119-app surface, and gating on the full test suite. `npm test` EXIT 0 IS the milestone gate.
 **Verified:** 2026-06-26
 **Status:** passed
 **Re-verification:** No -- initial verification (the phase went through 43-REVIEW + a full fix pass; this is the first goal-backward verification).
@@ -42,7 +42,7 @@ human_verification:
 
 ## Verification Posture
 
-This is the FINAL v1.0.0 phase. The starting hypothesis was adversarial: the 43-REVIEW found 2 material HIGH findings (HI-01 the scheduler was DEAD/unwired; HI-02 wrong-invoke=0 was partially overfit + overclaimed). Both were claimed RESOLVED. SUMMARY/MILESTONE-GATE claims were NOT trusted -- every assertion was re-run against the actual code in the real tree, the HI-01 wiring was traced line-by-line in `capability-router.js`, and the wiring test's non-vacuousness was PROVEN by a sandbox sabotage. The authoritative milestone signal -- `npm test` EXIT 0 -- was run HERE in the real tree (not a throwaway worktree).
+This is the FINAL v0.13.0 phase. The starting hypothesis was adversarial: the 43-REVIEW found 2 material HIGH findings (HI-01 the scheduler was DEAD/unwired; HI-02 wrong-invoke=0 was partially overfit + overclaimed). Both were claimed RESOLVED. SUMMARY/MILESTONE-GATE claims were NOT trusted -- every assertion was re-run against the actual code in the real tree, the HI-01 wiring was traced line-by-line in `capability-router.js`, and the wiring test's non-vacuousness was PROVEN by a sandbox sabotage. The authoritative milestone signal -- `npm test` EXIT 0 -- was run HERE in the real tree (not a throwaway worktree).
 
 ## Goal Achievement -- Per-Success-Criterion
 
@@ -68,7 +68,7 @@ This is the FINAL v1.0.0 phase. The starting hypothesis was adversarial: the 43-
 | Chain completion | Ran to the last test `no-orphan-descriptor: 10 passed, 0 failed` (the &&-chain did not short-circuit) |
 | Showcase-infra dep concern | DID NOT materialize -- the showcase-server suites ran WITH deps present. The single stack trace (`PayloadTooLargeError`, server-telemetry-body-cap INGEST-07a) is an INTENTIONAL 413-rejection test that PASSED (3 passed, 0 failed); the express log line is the server logging the deliberately-rejected 33 KB body, not a test failure. |
 
-The whole-suite pass over breadth + depth + discovery + scale + self-heal + provider parity + provenance + every INV/Wall guard IS the v1.0.0 milestone gate. **The v1.0.0 milestone is genuinely met.**
+The whole-suite pass over breadth + depth + discovery + scale + self-heal + provider parity + provenance + every INV/Wall guard IS the v0.13.0 milestone gate. **The v0.13.0 milestone is genuinely met.**
 
 ### Every Sub-Gate (each re-run directly, read-only)
 
@@ -177,7 +177,7 @@ Scanned the phase-modified files (relearn-scheduler.js, capability-router.js, le
 - **Observation:** `FsbLearnedRecipeStore.getOriginHealth(origin)` is defined, exported (learned-recipe-store.js:667), substantive (LO-01 dead branch removed), and -- after the HI-01 wiring made `recordRot` live -- is now backed by accurate production data. It is consumed by `tests/app-degraded-surfacing.test.js` and `tests/relearn-router-wiring.test.js`, but NO production code path (search hit, status query, sidepanel/UI) calls it. In `extension/` it appears outside its own module only in a COMMENT in capability-router.js:212.
 - **Why this is a WARNING, not a BLOCKER:** The ROADMAP SC2 names "an app-level degraded/needs-re-port surfacing"; the 43-CONTEXT (lines 80-81) explicitly defines the deliverable as exposing degraded state "(via the catalog/search result **OR a status accessor**)"; and the 43-03 PLAN must_have contracts specifically "an app-level degraded/needs-re-port **status accessor** (`getOriginHealth`)." The contracted deliverable is the ACCESSOR -- which exists, is correct, is bounded, and is now fed live data via the HI-01 router wiring (the chain recordRot -> dispositionFor 'systemic' -> getOriginHealth degraded:true is proven END-TO-END through the live router in relearn-router-wiring.test.js 9/0). The CONTEXT's "or a status accessor" wording makes the accessor a valid delivery form, and the HI-01 fix's own claim is precise ("the getOriginHealth degraded surfacing is no longer INERT" -- i.e. the state is live -- not "a UI displays it").
 - **What is NOT yet delivered:** a production READER that turns the accessor into a user/agent-VISIBLE "this app needs re-learning" cue. No 43-03/43-04 PLAN task scoped a search-hit/UI consumer, so this is a follow-up to complete the user-visible loop, not an unmet phase task.
-- **Recommendation (human decision):** Accept as the contracted-accessor form for v1.0.0 (the milestone gate is green and the state is live + proven), and track "wire a degraded cue into a search hit / status surface" as a post-milestone follow-up alongside the carried-forward UAT debt. This does NOT block the milestone.
+- **Recommendation (human decision):** Accept as the contracted-accessor form for v0.13.0 (the milestone gate is green and the state is live + proven), and track "wire a degraded cue into a search hit / status surface" as a post-milestone follow-up alongside the carried-forward UAT debt. This does NOT block the milestone.
 
 ## Human Verification Required (carried-forward, NON-blocking milestone debt)
 

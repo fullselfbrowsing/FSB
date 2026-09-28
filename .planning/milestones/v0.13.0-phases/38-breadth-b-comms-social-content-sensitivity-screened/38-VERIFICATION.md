@@ -91,7 +91,7 @@ re_verification:
 | BRDTH-02 | 38-01, 38-03 | Apps imported in sensitivity-ascending batches; each gated on origins being denylist-classified before merge | ✓ SATISFIED | classifyGate fail-closed proven (aborts on unclassified social origin); all batch origins screened before 02/03 import. |
 | BRDTH-03 | 38-01, 38-02, 38-03 | Each descriptor carries invocability/backing-status signal | ✓ SATISFIED | All 24 descriptors backing='dom' → invocable=false / discovery-pending; backing-status annotation distinguishes invocable vs DOM-only. |
 
-BRDTH-01/02/03 are Phase-37-owned; Phase 38 extends them to the comms/social/content category with no new v1.0.0 REQ-ID (consistent with REQUIREMENTS.md line 71). No orphaned requirements.
+BRDTH-01/02/03 are Phase-37-owned; Phase 38 extends them to the comms/social/content category with no new v0.13.0 REQ-ID (consistent with REQUIREMENTS.md line 71). No orphaned requirements.
 
 ### Anti-Patterns Found
 

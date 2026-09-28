@@ -2,13 +2,13 @@
 phase: 43-catalog-scale-milestone-gate
 plan: 04
 subsystem: milestone-gate-signoff
-tags: [SCALE-01, SCALE-02, milestone-gate, INV-03, provenance, npm-test-exit-0, v1.0.0]
+tags: [SCALE-01, SCALE-02, milestone-gate, INV-03, provenance, npm-test-exit-0, v0.13.0]
 requires:
   - all of 43-01/43-02/43-03 (the deliverables this gate confirms)
   - tests/provider-parity.test.js (INV-03)
   - tests/provenance-scaffold.test.js (MIT provenance)
 provides:
-  - the v1.0.0 milestone sign-off (full npm test EXIT 0 over the whole catalog + all guards)
+  - the v0.13.0 milestone sign-off (full npm test EXIT 0 over the whole catalog + all guards)
   - 43-MILESTONE-GATE.md (the gate-results record + carried-forward NON-blocking UAT debt)
 affects:
   - the post-milestone lifecycle (audit -> complete -> cleanup)
@@ -30,7 +30,7 @@ metrics:
 
 # Phase 43 Plan 04: THE MILESTONE GATE -- Sign-Off Summary
 
-THE FINAL CLOSE of v1.0.0. A verification/sign-off battery asserting the WHOLE milestone is green
+THE FINAL CLOSE of v0.13.0. A verification/sign-off battery asserting the WHOLE milestone is green
 -- the SCALE-01 scale + precision HARD bars, the SCALE-02 self-heal tests, INV-03 7-provider
 byte-equality, MIT provenance, INV-01..04 + Walls 1/2 guards -- and that full `npm test` EXITS 0.
 That npm-test-EXIT-0 over the complete catalog IS the milestone gate.
@@ -40,7 +40,7 @@ That npm-test-EXIT-0 over the complete catalog IS the milestone gate.
 **Confirmed EXIT 0.** The whole suite over breadth + depth + discovery + scale + self-heal +
 provider parity + provenance + every INV/Wall guard passes (0 suites failed; 24 suites reported
 `failed: 0`; the &&-chain completed through the last test `no-orphan-descriptor: 10 passed, 0
-failed`). The v1.0.0 milestone is met.
+failed`). The v0.13.0 milestone is met.
 
 ## Measured Sub-Gate Results
 

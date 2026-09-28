@@ -191,7 +191,7 @@ All Critical/High threats are blocking. No plan may defer one to Phase 60, becau
 | Full suite | `npm test` |
 | Expected feedback | focused tests under ~20 seconds; full suite several minutes |
 
-The current workspace has user-owned deletions of old phase artifacts, while one legacy test expects `.planning/phases/39-breadth-c-commerce-travel-misc-most-sensitive/39-06-REMAINING-APPS.md`. For full-suite verification only, create a temporary symlink to `.planning/milestones/v1.0.0-phases/39-breadth-c-commerce-travel-misc-most-sensitive/39-06-REMAINING-APPS.md`, remove it in a shell trap, and never stage it. This is workspace hygiene, not Phase 59 product work.
+The current workspace has user-owned deletions of old phase artifacts, while one legacy test expects `.planning/phases/39-breadth-c-commerce-travel-misc-most-sensitive/39-06-REMAINING-APPS.md`. For full-suite verification only, create a temporary symlink to `.planning/milestones/v0.13.0-phases/39-breadth-c-commerce-travel-misc-most-sensitive/39-06-REMAINING-APPS.md`, remove it in a shell trap, and never stage it. This is workspace hygiene, not Phase 59 product work.
 
 ### Per-requirement verification map
 

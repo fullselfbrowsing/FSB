@@ -105,7 +105,7 @@ Each task was committed atomically:
 
 ## Issues Encountered
 
-- The pre-existing deletion of `.planning/phases/39-breadth-c-commerce-travel-misc-most-sensitive/39-06-REMAINING-APPS.md` caused the first raw Task 1 root-suite run to stop at `coverage-report.test.js`. Required full-suite gates temporarily used the identical archived v1.0.0 milestone copy via a symlink; the link and temporary directory were removed after each run, preserving the deletion.
+- The pre-existing deletion of `.planning/phases/39-breadth-c-commerce-travel-misc-most-sensitive/39-06-REMAINING-APPS.md` caused the first raw Task 1 root-suite run to stop at `coverage-report.test.js`. Required full-suite gates temporarily used the identical archived v0.13.0 milestone copy via a symlink; the link and temporary directory were removed after each run, preserving the deletion.
 
 ## Verification
 

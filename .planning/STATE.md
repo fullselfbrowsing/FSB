@@ -75,7 +75,7 @@ Coverage: 51/51 v0.9.91 requirements complete. The 48 deferred live UAT scenario
 
 ### Decisions
 
-Full decision log for prior milestones (v0.9.99 Phase 26-34, v1.0.0, v1.1.0, v1.2.0) lives in PROJECT.md, ROADMAP.md's `## Completed Milestones` section, and the archived `.planning/milestones/*` files. Those decisions concern the T1 capability-catalog surface and the showcase-i18n surface; they have zero shared surface with v0.9.91's provider/delegation work and are not repeated here to keep this file a digest.
+Full decision log for prior milestones (v0.9.99 Phase 26-34, v0.13.0, v1.1.0, v1.2.0) lives in PROJECT.md, ROADMAP.md's `## Completed Milestones` section, and the archived `.planning/milestones/*` files. Those decisions concern the T1 capability-catalog surface and the showcase-i18n surface; they have zero shared surface with v0.9.91's provider/delegation work and are not repeated here to keep this file a digest.
 
 v0.9.91-specific decisions so far:
 

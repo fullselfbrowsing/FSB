@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * Phase 39 / Plan 07 (v1.0.0 Full App Catalog -- BRDTH-01/02/03, success criterion 3)
+ * Phase 39 / Plan 07 (v0.13.0 Full App Catalog -- BRDTH-01/02/03, success criterion 3)
  * -- the coverage-report proof.
  *
  * THE CONTRACT: drive the REAL scripts/coverage-report.mjs reportCoverage() export
@@ -18,7 +18,7 @@
  *   3. The head bucket is correct: it includes the 3 heads (github/slack/notion handler
  *      slugs) + the hand-authored recipes (reddit.inbox / github.notifications).
  *   4. COMPLETENESS VERIFIED AGAINST THE 39-06 MANIFEST: parse the VENDORED+IMPORTED
- *      rows of the archived v1.0.0 milestone's 39-06-REMAINING-APPS.md and assert
+ *      rows of the archived v0.13.0 milestone's 39-06-REMAINING-APPS.md and assert
  *      EVERY such app (by its slug stem) has at least one catalog descriptor. A
  *      manifest row with NO matching descriptor FAILS naming the gap (the completeness
  *      contract -- the manifest is the source of truth for "what must be covered",
@@ -48,7 +48,7 @@ const CROSSCHECK_PATH = path.join(REPO_ROOT, 'scripts', 'verify-catalog-crossche
 const CATALOG_PATH = path.join(REPO_ROOT, 'extension', 'catalog', 'recipe-index.generated.js');
 const DENYLIST_MODULE = path.join(REPO_ROOT, 'extension', 'utils', 'service-denylist.js');
 const MANIFEST_PATH = path.join(
-  REPO_ROOT, '.planning', 'milestones', 'v1.0.0-phases',
+  REPO_ROOT, '.planning', 'milestones', 'v0.13.0-phases',
   '39-breadth-c-commerce-travel-misc-most-sensitive',
   '39-06-REMAINING-APPS.md'
 );
@@ -180,7 +180,7 @@ function parseManifestVendoredStems(md) {
 
   // (4) COMPLETENESS VERIFIED AGAINST THE 39-06 MANIFEST -----------------------
   check(fs.existsSync(MANIFEST_PATH),
-    'the archived v1.0.0 39-06 remaining-app manifest exists on disk as the canonical completeness source');
+    'the archived v0.13.0 39-06 remaining-app manifest exists on disk as the canonical completeness source');
   const manifestMd = fs.readFileSync(MANIFEST_PATH, 'utf8');
   const vendoredStems = parseManifestVendoredStems(manifestMd);
   check(vendoredStems.length > 0,

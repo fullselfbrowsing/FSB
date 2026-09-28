@@ -75,7 +75,7 @@ Each task was committed atomically (TDD RED→GREEN; Task 3 is the GREEN verific
 **Plan metadata:** see final docs commit.
 
 ## Files Created/Modified
-- `extension/config/service-denylist.json` - Appended 10 denied roster patterns + 15 sensitive roster patterns (8 core + 7 messaging) to the existing seed arrays; extended `_comment` to note the v1.0.0 roster expansion and the exact-host rationale. `v:1` and `deniedReason` unchanged.
+- `extension/config/service-denylist.json` - Appended 10 denied roster patterns + 15 sensitive roster patterns (8 core + 7 messaging) to the existing seed arrays; extended `_comment` to note the v0.13.0 roster expansion and the exact-host rationale. `v:1` and `deniedReason` unchanged.
 - `tests/service-denylist.test.js` - Added a Phase-35 assertion block (inside the existing async IIFE, after the GOV-08 checks): per-origin `classify().denied===true` over the denied roster, per-origin `{sensitive:true, denied:false}` over the sensitive roster, three exact-host discrimination assertions, negative controls (www.fidelity.com non-denied, github.com clean), and a chase-seed regression guard. The pre-existing GOV-08 assertions were extended, not replaced.
 
 ## Decisions Made

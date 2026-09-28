@@ -23,7 +23,7 @@ created: 2026-07-14
 | **Full suite command** | `node scripts/run-phase60-full-tests.mjs` (preflight + temporary Phase 39 link + `npm test` + finally cleanup + dirty/staged preservation checks) |
 | **Estimated runtime** | focused slices < 30 seconds; full root suite several minutes |
 
-The workspace contains user-owned deletions of historical Phase 39 artifacts. For full-suite runs only, create an untracked symlink at `.planning/phases/39-breadth-c-commerce-travel-misc-most-sensitive/39-06-REMAINING-APPS.md` pointing to `.planning/milestones/v1.0.0-phases/39-breadth-c-commerce-travel-misc-most-sensitive/39-06-REMAINING-APPS.md`, install a shell trap that removes the link and empty directory, and never stage or commit it.
+The workspace contains user-owned deletions of historical Phase 39 artifacts. For full-suite runs only, create an untracked symlink at `.planning/phases/39-breadth-c-commerce-travel-misc-most-sensitive/39-06-REMAINING-APPS.md` pointing to `.planning/milestones/v0.13.0-phases/39-breadth-c-commerce-travel-misc-most-sensitive/39-06-REMAINING-APPS.md`, install a shell trap that removes the link and empty directory, and never stage or commit it.
 
 ---
 
