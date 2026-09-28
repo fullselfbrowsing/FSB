@@ -412,6 +412,8 @@ class Queries {
     // Recency ranks only successful geo: a newer 'unknown' (dataset miss, Fly
     // 6PN ULA, failed lookup) must not replace an older real region the globe
     // is meant to keep. Installs that never resolved stay out of the census.
+    // Bounded to the same day window as users_365d so rows past retention do
+    // not count while they wait for the hourly housekeeper delete.
     this.selectLastKnownRollupRegions = this.db.prepare(
       `SELECT region, install_uuid
        FROM (
@@ -423,7 +425,8 @@ class Queries {
              ORDER BY day_utc DESC
            ) AS recency_rank
          FROM telemetry_rollups_daily
-         WHERE region IS NOT NULL AND region != '' AND region != 'unknown'
+         WHERE day_utc >= ? AND day_utc <= ?
+           AND region IS NOT NULL AND region != '' AND region != 'unknown'
        )
        WHERE recency_rank = 1`
     );
@@ -733,8 +736,13 @@ class Queries {
     return this.selectRegionInstallMembershipsForDayRange.all(startMs, endMs);
   }
 
-  lastKnownRollupRegions() {
-    return this.selectLastKnownRollupRegions.all();
+  lastKnownRollupRegions(nowMs = Date.now()) {
+    const snapshotMs = (typeof nowMs === 'number' && Number.isFinite(nowMs)) ? nowMs : Date.now();
+    const todayStartMs = utcDayStartMs(snapshotMs);
+    return this.selectLastKnownRollupRegions.all(
+      utcDayKey(todayStartMs - 364 * ONE_DAY_MS),
+      utcDayKey(todayStartMs)
+    );
   }
 
   upsertGlobalAggregateRow(dayUtc, uniqueInstalls, tokensInSum, tokensOutSum, agentsActiveSum, popularMcpJson, popularAgentJson, popularRegionJson) {

@@ -14,7 +14,8 @@
  *   and the public headline path (buildHeadlineJson) exposes popular_regions as
  *   {label, uniq} with NO sub-floor/UUID/ip_hash leak. users_by_region_365d is
  *   last successful geo (a newer 'unknown' day, or a later unknown event on the
- *   same day, does not replace a real region).
+ *   same day, does not replace a real region) and is bounded to the same
+ *   today..today-364 window as users_365d.
  *
  * Run: node tests/server-region-aggregation.test.js
  */
@@ -238,7 +239,7 @@ check('REGION_K_FLOOR is the HARD k>=5 (not the relaxed mcp floor of 2)', REGION
 
   runHousekeeperTick(db, queries, NOW);
 
-  const headline = buildHeadlineJson(queries);
+  const headline = buildHeadlineJson(queries, NOW);
   check('HL: headline has popular_regions field', 'popular_regions' in headline, `keys=${Object.keys(headline)}`);
   check('HL: popular_regions is an array of {label, uniq}',
     Array.isArray(headline.popular_regions) && headline.popular_regions.every(
@@ -288,7 +289,7 @@ check('REGION_K_FLOOR is the HARD k>=5 (not the relaxed mcp floor of 2)', REGION
   runHousekeeperTick(db, queries, NOW);
   db.prepare('DELETE FROM telemetry_events').run();
   runHousekeeperTick(db, queries, NOW);
-  const headline = buildHeadlineJson(queries);
+  const headline = buildHeadlineJson(queries, NOW);
   check('persist: 365d still has IN-Maharashtra after raw events are wiped',
     Array.isArray(headline.users_by_region_365d)
       && headline.users_by_region_365d.some((x) => x.label === 'IN-Maharashtra' && x.uniq === 6),
@@ -325,7 +326,7 @@ check('REGION_K_FLOOR is the HARD k>=5 (not the relaxed mcp floor of 2)', REGION
     );
   }
   runHousekeeperTick(db, queries, NOW);
-  const headline = buildHeadlineJson(queries);
+  const headline = buildHeadlineJson(queries, NOW);
   check('persist: newer unknown day does not replace last-known IN-Maharashtra',
     Array.isArray(headline.users_by_region_365d)
       && headline.users_by_region_365d.some((x) => x.label === 'IN-Maharashtra' && x.uniq === 6),
@@ -367,7 +368,7 @@ check('REGION_K_FLOOR is the HARD k>=5 (not the relaxed mcp floor of 2)', REGION
   check('persist: same-day later unknown keeps IN-Maharashtra on the rollup row',
     sameDayRow && sameDayRow.region === 'IN-Maharashtra' && sameDayRow.geo_kind === 'ipv4',
     `got ${JSON.stringify(sameDayRow)}`);
-  const headline = buildHeadlineJson(queries);
+  const headline = buildHeadlineJson(queries, NOW);
   check('persist: same-day later unknown still counts in 365d IN-Maharashtra',
     Array.isArray(headline.users_by_region_365d)
       && headline.users_by_region_365d.some((x) => x.label === 'IN-Maharashtra' && x.uniq === 6),
@@ -402,7 +403,7 @@ check('REGION_K_FLOOR is the HARD k>=5 (not the relaxed mcp floor of 2)', REGION
   check('persist: first tick of the day uses last successful geo, not latest unknown',
     firstTickRow && firstTickRow.region === 'IN-Maharashtra' && firstTickRow.geo_kind === 'ipv4',
     `got ${JSON.stringify(firstTickRow)}`);
-  const headline = buildHeadlineJson(queries);
+  const headline = buildHeadlineJson(queries, NOW);
   check('persist: first-tick last-successful geo still surfaces in 365d',
     Array.isArray(headline.users_by_region_365d)
       && headline.users_by_region_365d.some((x) => x.label === 'IN-Maharashtra' && x.uniq === 6),
@@ -443,7 +444,7 @@ check('REGION_K_FLOOR is the HARD k>=5 (not the relaxed mcp floor of 2)', REGION
   check('persist: late unknown event does not wipe a day-2–7 rollup region',
     backfillRow && backfillRow.region === 'IN-Maharashtra' && backfillRow.geo_kind === 'ipv4',
     `got ${JSON.stringify(backfillRow)}`);
-  const headline = buildHeadlineJson(queries);
+  const headline = buildHeadlineJson(queries, NOW);
   check('persist: day-2–7 last-known IN-Maharashtra survives a late unknown event',
     Array.isArray(headline.users_by_region_365d)
       && headline.users_by_region_365d.some((x) => x.label === 'IN-Maharashtra' && x.uniq === 6),
@@ -474,7 +475,7 @@ check('REGION_K_FLOOR is the HARD k>=5 (not the relaxed mcp floor of 2)', REGION
   check('persist: unknown-only day keeps the failed lookup geo_kind on the rollup',
     unknownRow && unknownRow.region === 'unknown' && unknownRow.geo_kind === 'ipv6-ula',
     `got ${JSON.stringify(unknownRow)}`);
-  const unknownHeadline = buildHeadlineJson(queries);
+  const unknownHeadline = buildHeadlineJson(queries, NOW);
   check('persist: unknown-only installs stay out of the 365d census',
     !unknownHeadline.users_by_region_365d.some((x) => x.label === 'unknown'),
     `got ${JSON.stringify(unknownHeadline.users_by_region_365d)}`);
@@ -501,6 +502,37 @@ check('REGION_K_FLOOR is the HARD k>=5 (not the relaxed mcp floor of 2)', REGION
   check('persist: a real region keeps its own geo_kind after a later failed lookup',
     resolvedRow && resolvedRow.region === 'IN-Maharashtra' && resolvedRow.geo_kind === 'ipv4',
     `got ${JSON.stringify(resolvedRow)}`);
+
+  db.close();
+}
+
+// The 365d census uses the same day window as users_365d: a rollup that has
+// aged past retention but not yet been deleted by the hourly tick must not
+// count on the globe.
+{
+  const db = new Database(':memory:');
+  initializeDatabase(db);
+  const queries = new Queries(db);
+  const dayKey = (daysAgo) => new Date(floorToUtcDayMs(NOW) - daysAgo * 24 * 60 * 60 * 1000)
+    .toISOString().slice(0, 10);
+  for (let i = 0; i < 6; i++) {
+    queries.upsertRollupDailyV3.run(nextUuid(), dayKey(365), 1, 1, 0, 0, 1, 'US-CA', 'ipv4');
+  }
+  let headline = buildHeadlineJson(queries, NOW);
+  check('window: expired-but-undeleted rollups do not count in the 365d census',
+    headline.users_365d === 0 && headline.users_by_region_365d.length === 0,
+    `users_365d=${headline.users_365d} census=${JSON.stringify(headline.users_by_region_365d)}`);
+
+  for (let i = 0; i < 6; i++) {
+    queries.upsertRollupDailyV3.run(nextUuid(), dayKey(364), 1, 1, 0, 0, 1, 'US-NY', 'ipv4');
+  }
+  headline = buildHeadlineJson(queries, NOW);
+  check('window: the oldest retained day (today-364) still counts',
+    headline.users_365d === 6
+      && headline.users_by_region_365d.length === 1
+      && headline.users_by_region_365d[0].label === 'US-NY'
+      && headline.users_by_region_365d[0].uniq === 6,
+    `users_365d=${headline.users_365d} census=${JSON.stringify(headline.users_by_region_365d)}`);
 
   db.close();
 }
