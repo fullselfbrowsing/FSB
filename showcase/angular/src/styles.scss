@@ -1,8 +1,11 @@
 @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css');
 @import url('https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css');
 
-/* Shared showcase foundation: tokens, reset, typography, and utilities only. */
+/* Shared showcase foundation: tokens, reset, typography, and utilities only.
+ * color-scheme is required so native form controls (the footer <select> especially)
+ * use a dark Field palette instead of light-on-light in Blink/Gecko. */
 :root {
+  color-scheme: dark;
   --primary: #ff6b35;
   --primary-hover: #e55a2b;
   --primary-gradient: linear-gradient(135deg, #ff6b35, #ff8c42);
@@ -45,6 +48,7 @@
 }
 
 [data-theme="light"] {
+  color-scheme: light;
   --bg-body: #ffffff;
   --bg-card: #f8f9fa;
   --bg-elevated: #f1f5f9;

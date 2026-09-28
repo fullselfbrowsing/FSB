@@ -34,6 +34,7 @@
 const express = require('express');
 const crypto = require('crypto');
 const activeTracker = require('../telemetry/active-tracker');
+const { applyDistinctKFloor, REGION_K_FLOOR } = require('../telemetry/housekeeper');
 
 // 30-second in-process memo TTL.
 const MEMO_TTL_MS = 30 * 1000;
@@ -90,10 +91,11 @@ function isoFromMsOrNull(value) {
  * Build the FSBTelemetryHeadline JSON object.
  *
  * @param {Queries} queries
+ * @param {number}  [nowMs] override Date.now() (test injection only).
  * @returns {Object}
  */
-function buildHeadlineJson(queries) {
-  const activeSnapshotMs = Date.now();
+function buildHeadlineJson(queries, nowMs = Date.now()) {
+  const activeSnapshotMs = nowMs;
   const rows = queries.getPublicHeadlineRows(activeSnapshotMs);
   const active_users_now = activeTracker.countActiveUsers(ACTIVE_WINDOW_MS, activeSnapshotMs);
   const active_agents_now = activeTracker.getActiveAgentSum(ACTIVE_WINDOW_MS, activeSnapshotMs);
@@ -127,6 +129,15 @@ function buildHeadlineJson(queries) {
     label: typeof r.label === 'string' ? r.label
          : typeof r.region === 'string' ? r.region
          : 'unknown',
+    uniq: Number.isInteger(r.uniq) ? r.uniq : 0,
+  }));
+  const users_by_region_365d = applyDistinctKFloor(
+    queries.lastKnownRollupRegions(activeSnapshotMs),
+    'region',
+    'install_uuid',
+    REGION_K_FLOOR
+  ).map((r) => ({
+    label: typeof r.region === 'string' ? r.region : 'unknown',
     uniq: Number.isInteger(r.uniq) ? r.uniq : 0,
   }));
 
@@ -169,6 +180,7 @@ function buildHeadlineJson(queries) {
     popular_mcp_clients,
     popular_agents,
     popular_regions,
+    users_by_region_365d,
     avg_agents_per_reporting_user,
     // Compatibility alias now uses the only valid denominator: installs that
     // supplied a v2 active count in the same ten-minute cohort.

@@ -3,9 +3,11 @@
  *
  * LAYER 1: createTelemetryRateLimiter(db) wraps express-rate-limit@^8.3.0
  * (CVE-2026-30827 IPv4-mapped-IPv6 collision fix) with a CUSTOM keyGenerator
- * that returns hashIp(req.ip, db). The rate-limit bucket and the storage
- * identifier are therefore the same value -- an attacker cannot rotate one
- * without also rotating the other (BLOCKER #2 alignment).
+ * that returns hashIp(ipKeyGenerator(clientIp(req)), db). clientIp prefers
+ * Fly-Client-IP so the bucket is the real peer, not Fly's SJC anycast. The
+ * rate-limit bucket and the storage identifier are therefore the same value
+ * -- an attacker cannot rotate one without also rotating the other
+ * (BLOCKER #2 alignment).
  *
  *   - windowMs:           60 * 1000 (1 minute)
  *   - max:                30 batches/min (env-overridable for tests)
@@ -33,6 +35,7 @@
 const rateLimit = require('express-rate-limit');
 const { ipKeyGenerator } = require('express-rate-limit');
 const { hashIp } = require('../utils/telemetry-hash');
+const { clientIp } = require('../utils/client-ip');
 
 /**
  * @param {Database} db better-sqlite3 instance
@@ -51,13 +54,15 @@ function createTelemetryRateLimiter(db) {
     // BLOCKER #2 alignment: bucket key = HMAC-SHA256(canonicalised_ip, todays_salt).
     // The canonicalisation runs through express-rate-limit's ipKeyGenerator helper
     // which collapses IPv6 to a /56 subnet and resolves IPv4-mapped-IPv6 forms
-    // (CVE-2026-30827 fix; req.ip alone would let dual-stack users escape buckets).
+    // (CVE-2026-30827 fix). clientIp(req) prefers Fly-Client-IP so we do not
+    // hash Fly's shared/anycast address (which collapsed every install into two
+    // daily buckets at the UUID cap of 20).
     // The hashIp() output becomes the same identifier we store as ip_hash in
     // telemetry_events, so an attacker cannot rotate the rate-limit identity
     // without also rotating the storage identity.
-    // PRIVACY: req.ip is referenced exactly here, immediately canonicalised then
-    // hashed; the canonical form is discarded after the digest.
-    keyGenerator: (req) => hashIp(ipKeyGenerator(req.ip), db),
+    // PRIVACY: the plaintext IP is referenced exactly here, immediately
+    // canonicalised then hashed; the canonical form is discarded after the digest.
+    keyGenerator: (req) => hashIp(ipKeyGenerator(clientIp(req)), db),
     handler: (req, res) => {
       res.status(429).json({ error: 'rate_limited' });
     },

@@ -29,9 +29,11 @@ const { ipKeyGenerator } = require('express-rate-limit');
 const { isValidUuidV4 } = require('../utils/telemetry-hash');
 // Quick task 260630-hct -- coarse IP -> region derive. Required directly as a
 // sibling util (NOT passed through the router factory) so the factory signature
-// stays stable. Posture mirrors hashIp: req.ip is an inline argument, used once
-// then discarded; only the k>=5-floored aggregate region label is retained.
-const { deriveRegion } = require('../utils/ip-geo');
+// stays stable. Posture mirrors hashIp: the plaintext client IP is an inline
+// argument, used once then discarded; only the coarse region label and the
+// address family are retained, and only k>=5-floored aggregates are published.
+const { deriveRegion, classifyIp } = require('../utils/ip-geo');
+const { clientIp } = require('../utils/client-ip');
 const {
   createTelemetryRateLimiter,
   checkPerUuidBudget,
@@ -211,34 +213,48 @@ function createTelemetryRouter(db, queries, hashIp) {
     }
 
     // PRIVACY INVARIANT -- Per CONTEXT D-09 + INGEST-13 + quick task 260630-hct:
-    //   req.ip is referenced EXACTLY TWICE per request, on the next two lines:
-    //     1. hashIp(ipKeyGenerator(req.ip), db)      -- rate-limit/HMAC hash
-    //     2. deriveRegion(ipKeyGenerator(req.ip))    -- coarse country/US-state geo
-    //   BOTH references are inline arguments to an immediately-evaluated call. In
-    //   neither case is req.ip (or the canonical form ipKeyGenerator returns)
-    //   assigned to a local variable that escapes this scope, NEVER logged, NEVER
-    //   stored. Plaintext IP is discarded at end-of-function. Only the derived
-    //   ip_hash and the k>=5-floored AGGREGATE region label are retained; the raw
-    //   per-event region is rolled up daily and dropped by the 7-day retention --
-    //   there is no durable (install_uuid -> region) profile.
-    //   Test: tests/server-no-ip-leak.test.js (positively asserts the 2-inline count).
+    //   the plaintext client IP is referenced EXACTLY THREE times per request, on
+    //   the next three lines, via clientIp(req) (Fly-Client-IP, else req.ip):
+    //     1. hashIp(ipKeyGenerator(clientIp(req)), db)  -- rate-limit/HMAC hash
+    //     2. deriveRegion(clientIp(req))                -- coarse country/US-state geo
+    //     3. classifyIp(clientIp(req))                  -- address family enum, never the IP
+    //   All three references are inline arguments to an immediately-evaluated
+    //   call. The IP is NEVER assigned to a local that escapes this scope, NEVER
+    //   logged, NEVER stored. What is retained is the ip_hash, the coarse region
+    //   label, and the address-family enum: on the raw event (7-day retention)
+    //   and, for region + geo_kind, on the install's daily rollup (365-day
+    //   retention, erased with the install). Public output is k>=5 floored.
+    //   Test: tests/server-no-ip-leak.test.js (positively asserts the 3-inline count).
+    //
+    // Why clientIp() instead of req.ip: Fly's X-Forwarded-For chain is two hops
+    // (client + shared/anycast). trust proxy 1 therefore hashes/geolocates the
+    // SJC anycast IPv4 (everyone → US-CA) or a 6PN IPv6 (everyone → unknown),
+    // and the per-IP UUID cap of 20 silently drops the rest of the world.
+    // Fly-Client-IP is the TCP peer Fly accepted. Geo uses the raw address, NOT
+    // ipKeyGenerator's IPv6 /56 form -- that string is not an IPv4 and would
+    // force every IPv6 client (most of India) into 'unknown'.
     //
     // WR-02 alignment (Phase 273 review): ipKeyGenerator is the CVE-2026-30827 fix
     // from express-rate-limit. It collapses IPv6 addresses to a /56 subnet and
     // normalises IPv4-mapped-IPv6 forms so dual-stack users cannot escape buckets
-    // by switching address families. middleware/telemetry-rate-limit.js:54 already
+    // by switching address families. middleware/telemetry-rate-limit.js already
     // applies it to the rate-limit bucket key; applying the same canonicalisation
     // here makes the stored ip_hash equal to the rate-limit bucket key for every
     // request (the "same identifier" invariant claimed by that middleware's
     // docstring). For IPv6 clients this slightly widens anonymity (same /56 ->
     // same stored hash); for IPv4 it is a no-op since ipKeyGenerator returns the
     // address unchanged.
-    const clientHash = hashIp(ipKeyGenerator(req.ip), db);
-    // Second (and only other) inline req.ip touch: coarse geo derive. deriveRegion
-    // returns {country, subdivision} | 'unknown'; regionLabel() collapses it to a
-    // compact state-granularity STRING (e.g. 'US-CA' or 'unknown'). The plaintext
-    // IP is consumed inline here exactly as in the hashIp call above and discarded.
-    const regionTag = regionLabel(deriveRegion(ipKeyGenerator(req.ip)));
+    const clientHash = hashIp(ipKeyGenerator(clientIp(req)), db);
+    // Second inline client-IP touch: coarse geo derive. Pass the raw client
+    // address, not the rate-limit key. deriveRegion unwraps IPv4-mapped IPv6,
+    // returns {country, subdivision} | 'unknown'; regionLabel() collapses it to
+    // a compact state-granularity STRING (e.g. 'US-CA' or 'unknown').
+    const regionTag = regionLabel(deriveRegion(clientIp(req)));
+    // Third inline client-IP touch: address-family enum only (never the IP).
+    // Persisted beside region so 'unknown' is diagnosable after 7-day event
+    // expiry (ipv6-ula = Fly 6PN, ipv6-cidr = /56 rate-limit key, ipv6 = native
+    // IPv6 with no city table, ipv4 = dataset miss).
+    const geoKind = classifyIp(clientIp(req));
 
     const body = req.body;
     if (!body || !Array.isArray(body.events)) {
@@ -345,11 +361,11 @@ function createTelemetryRouter(db, queries, hashIp) {
             ? ACTIVE_COUNT_VERSION : 0;
           const trustedActiveCount = activeCountVersion === ACTIVE_COUNT_VERSION
             ? e.active_agent_count : 0;
-          const r = queries.insertTelemetryEventWithRegionV2.run(
+          const r = queries.insertTelemetryEventWithRegionV3.run(
             e.event_id, e.install_uuid, e.ts_minute,
             e.mcp_client, e.model || null,
             e.tokens_in, e.tokens_out, trustedActiveCount,
-            activeCountVersion, e.event_type, clientHash, now, regionTag
+            activeCountVersion, e.event_type, clientHash, now, regionTag, geoKind
           );
           n += r.changes;
         }

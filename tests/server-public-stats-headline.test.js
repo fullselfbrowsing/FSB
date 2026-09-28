@@ -183,7 +183,8 @@ function getJson(path_, extraHeaders = {}) {
       'active_count_version', 'active_history_since', 'active_history_complete',
       'users_365d', 'total_users', 'agent_days_lifetime',
       'total_agents_lifetime', 'agent_days_since_active_v2', 'tokens_total_lifetime',
-      'tokens_24h', 'popular_mcp_clients', 'popular_agents',
+      'tokens_24h', 'popular_mcp_clients', 'popular_agents', 'popular_regions',
+      'users_by_region_365d',
       'avg_agents_per_user', 'avg_agents_per_reporting_user',
     ];
     for (const f of expectedFields) {

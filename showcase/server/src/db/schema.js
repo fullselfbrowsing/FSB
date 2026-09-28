@@ -241,9 +241,11 @@ function initializeDatabase(db) {
     --   so INSERT OR IGNORE satisfies BEAT-04 (client-side replay-dedup). ip_hash stores ONLY the
     --   HMAC-SHA256(plaintext_ip, todays_salt); plaintext IP never persisted.
     -- Quick task 260630-hct -- short-lived region column (coarse country/US-state
-    -- label, e.g. US-CA, DEFAULT 'unknown'). Derived from req.ip at ingest, rolled
-    -- up daily by the housekeeper behind a k>=5 floor, and dropped by the existing
-    -- 7-day retention. It is NOT a durable per-UUID location profile.
+    -- label, e.g. US-CA, DEFAULT 'unknown'). Derived at ingest from Fly-Client-IP,
+    -- copied onto 365-day rollups (durable anonymous last-known location), and
+    -- the raw event row is still dropped by 7-day retention. geo_kind stores
+    -- only the address family that produced the label (ipv4 / ipv6 / ...), never
+    -- the IP, so 'unknown' is diagnosable after events expire.
     CREATE TABLE IF NOT EXISTS telemetry_events (
       event_id TEXT PRIMARY KEY,
       install_uuid TEXT NOT NULL,
@@ -257,7 +259,8 @@ function initializeDatabase(db) {
       event_type TEXT NOT NULL,
       ip_hash TEXT NOT NULL,
       received_at INTEGER NOT NULL,
-      region TEXT NOT NULL DEFAULT 'unknown'
+      region TEXT NOT NULL DEFAULT 'unknown',
+      geo_kind TEXT NOT NULL DEFAULT 'unknown'
     );
 
     CREATE INDEX IF NOT EXISTS idx_telemetry_events_uuid_ts ON telemetry_events(install_uuid, ts_minute);
@@ -266,6 +269,8 @@ function initializeDatabase(db) {
     CREATE INDEX IF NOT EXISTS idx_telemetry_events_received_at ON telemetry_events(received_at);
 
     -- telemetry_rollups_daily: per-UUID per-day aggregates; 365-day retention; powers Phase 274.
+    -- region / geo_kind are the install's latest coarse location for that UTC day
+    -- (anonymous: country or US-state label + address family, never an IP).
     CREATE TABLE IF NOT EXISTS telemetry_rollups_daily (
       install_uuid TEXT NOT NULL,
       day_utc TEXT NOT NULL,
@@ -274,6 +279,8 @@ function initializeDatabase(db) {
       max_active_agents INTEGER NOT NULL DEFAULT 0,
       trusted_active_sample_count INTEGER NOT NULL DEFAULT 0,
       event_count INTEGER NOT NULL DEFAULT 0,
+      region TEXT NOT NULL DEFAULT 'unknown',
+      geo_kind TEXT NOT NULL DEFAULT 'unknown',
       UNIQUE(install_uuid, day_utc)
     );
 
@@ -366,6 +373,15 @@ function initializeDatabase(db) {
   } catch { /* column already exists */ }
   try {
     db.exec(`ALTER TABLE telemetry_global_aggregates ADD COLUMN trusted_active_installs INTEGER NOT NULL DEFAULT 0`);
+  } catch { /* column already exists */ }
+  try {
+    db.exec(`ALTER TABLE telemetry_events ADD COLUMN geo_kind TEXT NOT NULL DEFAULT 'unknown'`);
+  } catch { /* column already exists */ }
+  try {
+    db.exec(`ALTER TABLE telemetry_rollups_daily ADD COLUMN region TEXT NOT NULL DEFAULT 'unknown'`);
+  } catch { /* column already exists */ }
+  try {
+    db.exec(`ALTER TABLE telemetry_rollups_daily ADD COLUMN geo_kind TEXT NOT NULL DEFAULT 'unknown'`);
   } catch { /* column already exists */ }
 
   // Existing GitHub cache rows predate traversal-completeness metadata. They
