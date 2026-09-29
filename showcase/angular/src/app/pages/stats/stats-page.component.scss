@@ -331,6 +331,12 @@
   margin-top: 0.2rem;
 }
 
+.globe-annotation a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 @media (max-width: 900px) {
   .globe-mount {
     height: 352px;
