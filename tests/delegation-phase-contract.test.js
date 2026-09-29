@@ -127,6 +127,7 @@ const PHASE65_NEW_ROOT_COMMANDS = Object.freeze([
 ]);
 
 const REFINEMENT_ROOT_TEST_COMMANDS = Object.freeze([
+  'node tests/mcp-bridge-events.test.js',
   'node tests/mcp-agent-connection-test.test.js',
   'node tests/lmstudio-agent-request.test.js',
   'node tests/lmstudio-startup-preflight.test.js',

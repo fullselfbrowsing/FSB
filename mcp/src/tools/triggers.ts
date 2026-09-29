@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { isBridgeDisconnectError, type WebSocketBridge } from '../bridge.js';
+import { bridgeDisconnectReason, isBridgeDisconnectError, type WebSocketBridge } from '../bridge.js';
 import type { TaskQueue } from '../queue.js';
 import type { MCPMessageType, MCPResponse } from '../types.js';
 import { AgentScope } from '../agent-scope.js';
@@ -147,6 +147,10 @@ function jsonText(value: Record<string, unknown>): { content: Array<{ type: 'tex
 function disconnectedTriggerResult(
   triggerId: string,
   lookup: Record<string, unknown> | null,
+  // sw_evicted stays true for every disconnect because the recovery is the
+  // same; this reports which disconnect it actually was, so an authorization
+  // failure stops being indistinguishable from a real eviction.
+  disconnectReason = 'bridge_disconnected',
 ): Record<string, unknown> {
   // The extension's get-trigger-status (background.js fsbTriggerHandleToolStatus)
   // returns { success:true, status: <projected-object> } where the projected
@@ -170,6 +174,7 @@ function disconnectedTriggerResult(
       success: true,
       sw_evicted: true,
       outcome: 'fired',
+      disconnect_reason: disconnectReason,
       trigger_id: triggerId,
       event: partialState?.last_event ?? partialState?.last_fire_event ?? null,
       status: partialState,
@@ -181,6 +186,7 @@ function disconnectedTriggerResult(
       success: true,
       sw_evicted: true,
       outcome: 'timed_out',
+      disconnect_reason: disconnectReason,
       trigger_id: triggerId,
       status: partialState,
     };
@@ -190,6 +196,7 @@ function disconnectedTriggerResult(
     success: false,
     sw_evicted: true,
     outcome: 'detached',
+    disconnect_reason: disconnectReason,
     trigger_id: triggerId,
     partial_state: partialState,
     last_heartbeat_at: partialState?.last_heartbeat_at ?? null,
@@ -279,7 +286,11 @@ export function registerTriggerTools(
           } catch (_lookupErr) {
             lookup = null;
           }
-          return jsonText(disconnectedTriggerResult(triggerId, lookup));
+          return jsonText(disconnectedTriggerResult(
+            triggerId,
+            lookup,
+            bridgeDisconnectReason(sendErr) ?? 'bridge_disconnected',
+          ));
         }
 
         if (detached && result && result.success && result.outcome === undefined) {

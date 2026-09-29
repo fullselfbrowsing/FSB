@@ -25,6 +25,7 @@ import {
   bindAllowedExtensionOrigin,
   readBridgeAuthState,
 } from './bridge-auth.js';
+import { logBridgeEvent } from './bridge-events.js';
 import { makeExtError, parseExtFrame } from './ext-protocol.js';
 
 interface PendingRequest {
@@ -71,13 +72,33 @@ const BRIDGE_DISCONNECT_MESSAGES = new Set<string>([
   'Lost connection to hub',
 ]);
 
+const BRIDGE_DISCONNECT_REASON_PATTERN = /^[a-z][a-z0-9_]{0,63}$/;
+
 const HEARTBEAT_NONCE_MIN_LENGTH = 16;
 const HEARTBEAT_NONCE_MAX_LENGTH = 64;
 const HEARTBEAT_NONCE_PATTERN = /^[A-Za-z0-9_-]+$/;
 
+// The specific cause travels on a property, never in the message. Several very
+// different failures share 'Extension disconnected' -- a real MV3 eviction, an
+// authorization revocation, a reaped zombie socket -- and they all want the same
+// recovery, so the message must stay in BRIDGE_DISCONNECT_MESSAGES above. Only
+// the reporting differs, which is what this property is for. Moving a cause into
+// the message would silently disable sw_evicted recovery and no test would catch it.
+export interface BridgeDisconnectError extends Error {
+  bridgeDisconnectReason?: string;
+}
+
 export function isBridgeDisconnectError(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err ?? '');
   return BRIDGE_DISCONNECT_MESSAGES.has(msg);
+}
+
+/** The cause behind a bridge-disconnect rejection. Reporting only; never a branch. */
+export function bridgeDisconnectReason(err: unknown): string | null {
+  const reason = (err as BridgeDisconnectError | null)?.bridgeDisconnectReason;
+  return typeof reason === 'string' && BRIDGE_DISCONNECT_REASON_PATTERN.test(reason)
+    ? reason
+    : null;
 }
 
 export class WebSocketBridge {
@@ -88,6 +109,8 @@ export class WebSocketBridge {
   private host: string;
   private handshakeTimeoutMs: number;
   private relayHandshakeTimeoutMs: number;
+  private extensionPingIntervalMs: number;
+  private extensionHeartbeatTimeoutMs: number;
   private promotionJitterMs: number;
   private maxReconnectDelayMs: number;
   private allowedBrowserOrigins: string[];
@@ -104,6 +127,7 @@ export class WebSocketBridge {
   private messageOrigin = new Map<string, string>(); // msgId -> instanceId | "local"
   private handshakeTimers = new Map<WsWebSocket, ReturnType<typeof setTimeout>>();
   private acceptedSocketMetadata = new WeakMap<WsWebSocket, AcceptedSocketMetadata>();
+  private extensionLivenessTimer: ReturnType<typeof setInterval> | null = null;
 
   // Relay mode state
   private hubConnection: WebSocket | null = null;
@@ -111,6 +135,7 @@ export class WebSocketBridge {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private reconnectDelay = 0;
   private intentionalClose = false;
+  private promotionInFlight = false;
 
   // Shared state
   private pendingRequests = new Map<string, PendingRequest>();
@@ -122,6 +147,8 @@ export class WebSocketBridge {
   private relayExtensionConnected = false;
   private relayCount = 0;
   private lastExtensionHeartbeatAt: number | null = null;
+  private extensionHeartbeatCount = 0;
+  private extensionCloseCause: string | null = null;
   private lastDisconnectReason: string | null = null;
 
   constructor(options: BridgeOptions = {}) {
@@ -135,6 +162,11 @@ export class WebSocketBridge {
     this.instanceId = options.instanceId ?? randomBytes(4).toString('hex');
     this.handshakeTimeoutMs = options.handshakeTimeoutMs ?? 2_000;
     this.relayHandshakeTimeoutMs = options.relayHandshakeTimeoutMs ?? 5_000;
+    // 30s is deliberately not harmonic with the extension's own 25s mcp:ping,
+    // so the two heartbeats interleave instead of beating against each other.
+    // 90s is 3x that ping, so two consecutive extension misses are tolerated.
+    this.extensionPingIntervalMs = options.extensionPingIntervalMs ?? 30_000;
+    this.extensionHeartbeatTimeoutMs = options.extensionHeartbeatTimeoutMs ?? 90_000;
     this.promotionJitterMs = options.promotionJitterMs ?? 500;
     this.maxReconnectDelayMs = options.maxReconnectDelayMs ?? 30_000;
     this.allowedBrowserOrigins = options.allowedBrowserOrigins ?? ['chrome-extension://'];
@@ -195,28 +227,7 @@ export class WebSocketBridge {
     }
 
     if (this.mode === 'hub') {
-      // Close all relay clients
-      for (const [id, ws] of this.relayClients) {
-        ws.close();
-        this.relayClients.delete(id);
-        this.relayCapabilities.delete(id);
-      }
-      // Close extension connection
-      if (this.extensionClient) {
-        this.extensionClient.close();
-        this.extensionClient = null;
-      }
-      // Close server
-      if (this.wss) {
-        this._closeHubServers();
-      } else if (this.httpServer) {
-        this._closeHubServers();
-      }
-      // Clean up handshake timers
-      for (const [, timer] of this.handshakeTimers) {
-        clearTimeout(timer);
-      }
-      this.handshakeTimers.clear();
+      this._closeHubSockets();
     } else if (this.mode === 'relay') {
       if (this.hubConnection) {
         this.hubConnection.close();
@@ -229,12 +240,7 @@ export class WebSocketBridge {
     // the resulting `Error('Bridge disconnected')` and resolves with sw_evicted: true
     // per CONTEXT.md D-05. Removing the rejection would cause sendAndWait Promises
     // to hang indefinitely on bridge disconnect.
-    // Reject all pending requests
-    for (const [id, pending] of this.pendingRequests) {
-      clearTimeout(pending.timeout);
-      pending.reject(new Error('Bridge disconnected'));
-      this.pendingRequests.delete(id);
-    }
+    this._rejectPendingRequests('Bridge disconnected');
     this.progressListeners.clear();
     this.messageOrigin.clear();
     this.relayCapabilities.clear();
@@ -246,6 +252,8 @@ export class WebSocketBridge {
     this.relayExtensionConnected = false;
     this.relayCount = 0;
     this.lastExtensionHeartbeatAt = null;
+    this.extensionHeartbeatCount = 0;
+    this.extensionCloseCause = null;
     this.mode = 'disconnected';
     console.error(`[FSB Bridge ${this.instanceId}] Disconnected`);
   }
@@ -382,15 +390,59 @@ export class WebSocketBridge {
       });
 
       httpServer.on('error', (err: NodeJS.ErrnoException) => {
-        this._closeHubServers();
-        this.hubConnected = false;
         if (!startupSettled) {
           startupSettled = true;
+          this._closeHubServers();
+          this.hubConnected = false;
           reject(err);
-        } else {
-          this.lastDisconnectReason = 'hub_server_error';
-          console.error(`[FSB Bridge ${this.instanceId}] Hub HTTP server error:`, err.message);
+          return;
         }
+
+        // Post-startup the instance fields may already belong to a newer
+        // _startAsHub. A late error from an older server must close only that
+        // server -- otherwise it tears down a healthy listener someone else
+        // just bound.
+        if (this.httpServer !== httpServer) {
+          try {
+            wss.close();
+          } catch {
+            // A noServer WebSocketServer may not have accepted a socket yet.
+          }
+          if (httpServer.listening) {
+            try {
+              httpServer.close();
+            } catch {
+              // The server may already be closing after the error.
+            }
+          }
+          return;
+        }
+
+        const errorCode = typeof err.code === 'string' ? err.code.toLowerCase() : undefined;
+        const logged = logBridgeEvent({
+          event: 'hub_server_error',
+          instanceId: this.instanceId,
+          reason: errorCode,
+        });
+
+        // Node keeps the listening handle open after an accept failure such as
+        // EMFILE, so the hub is still serving. Tearing it down here would turn
+        // a transient error into an outage. Such failures can repeat once per
+        // incoming connection, hence the coalesced log.
+        if (httpServer.listening) {
+          if (logged) {
+            console.error(`[FSB Bridge ${this.instanceId}] Hub HTTP server error (still listening):`, err.message);
+          }
+          return;
+        }
+
+        // The listener is really gone. Staying in 'hub' mode would leave the
+        // extension and every relay attached to a hub that accepts nobody and
+        // never demotes, so drop them all and compete for the port again --
+        // the same path a relay takes when its hub disappears.
+        console.error(`[FSB Bridge ${this.instanceId}] Hub HTTP server error, listener lost:`, err.message);
+        this._abandonHub('hub_server_error');
+        void this._attemptPromotion();
       });
 
       wss.on('connection', (ws: WsWebSocket) => {
@@ -425,6 +477,60 @@ export class WebSocketBridge {
         // The server may already be closing after an error.
       }
     }
+  }
+
+  /** Close every socket and server this process holds as hub. */
+  private _closeHubSockets(): void {
+    for (const [id, ws] of this.relayClients) {
+      ws.close();
+      this.relayClients.delete(id);
+      this.relayCapabilities.delete(id);
+    }
+    this._stopExtensionLiveness();
+    // Cleared before close() so the socket's own close handler sees a stale
+    // client and leaves the bridge state to the caller.
+    const extensionClient = this.extensionClient;
+    this.extensionClient = null;
+    extensionClient?.close();
+    this._closeHubServers();
+    for (const [, timer] of this.handshakeTimers) {
+      clearTimeout(timer);
+    }
+    this.handshakeTimers.clear();
+  }
+
+  private _rejectPendingRequests(message: string, reason?: string): void {
+    for (const [id, pending] of this.pendingRequests) {
+      clearTimeout(pending.timeout);
+      const error = new Error(message) as BridgeDisconnectError;
+      if (reason) error.bridgeDisconnectReason = reason;
+      pending.reject(error);
+      this.pendingRequests.delete(id);
+    }
+  }
+
+  /**
+   * Leave hub mode without shutting down: unlike disconnect() this is not
+   * intentional, so the caller is expected to compete for the port again.
+   */
+  private _abandonHub(reason: string): void {
+    for (const route of [...this.activeExtRequests.values()]) {
+      this._abortExtRoute(route);
+    }
+    this._closeHubSockets();
+    this._rejectPendingRequests('Bridge disconnected', reason);
+    this.progressListeners.clear();
+    this.messageOrigin.clear();
+    this.relayCapabilities.clear();
+    this.activeExtRequests.clear();
+    this.connected = false;
+    this.hubConnected = false;
+    this.activeHubInstanceId = null;
+    this.lastExtensionHeartbeatAt = null;
+    this.extensionHeartbeatCount = 0;
+    this.extensionCloseCause = null;
+    this.mode = 'disconnected';
+    this.lastDisconnectReason = reason;
   }
 
   private _activePort(): number {
@@ -500,13 +606,33 @@ export class WebSocketBridge {
   }
 
   private _classifyUpgrade(req: IncomingMessage): AcceptedSocketMetadata | null {
-    if (!this._hasAllowedHost(req)) return null;
+    if (!this._hasAllowedHost(req)) {
+      logBridgeEvent({ event: 'upgrade_rejected_host', instanceId: this.instanceId });
+      return null;
+    }
 
     const browserOrigin = this._parseBrowserOrigin(req);
     if (browserOrigin === false) return null;
     const state = readBridgeAuthState();
 
     if (browserOrigin && state?.allowedExtensionOrigin && state.allowedExtensionOrigin !== browserOrigin) {
+      // This rejection is a bare 403 with no WebSocket, no close code and no
+      // reason, so the extension sees an indistinguishable generic failure and
+      // retries forever. Naming the pin and its cure here is the only place the
+      // answer can surface. Gated on the journal's write decision so a retry
+      // loop cannot flood stderr.
+      if (logBridgeEvent({
+        event: 'upgrade_rejected_origin_pin',
+        instanceId: this.instanceId,
+        origin: browserOrigin,
+        pinnedOrigin: state.allowedExtensionOrigin,
+      })) {
+        console.error(
+          `[FSB Bridge ${this.instanceId}] Refusing upgrade from ${browserOrigin}: `
+          + `bridge pairing is bound to ${state.allowedExtensionOrigin}. `
+          + 'Cure: npx -y fsb-mcp-server@latest pair --reset',
+        );
+      }
       return null;
     }
 
@@ -524,6 +650,18 @@ export class WebSocketBridge {
       } catch {
         return null;
       }
+    }
+
+    if (browserOrigin && !extAuthorized) {
+      // Worth recording precisely because it is the normal, healthy state for
+      // an unpaired extension: ordinary browser tools work fine, only the
+      // reverse channel is gated. From the outside it is indistinguishable
+      // from the broken case, so the journal is where the difference lives.
+      logBridgeEvent({
+        event: 'upgrade_accepted_unauthorized',
+        instanceId: this.instanceId,
+        origin: browserOrigin,
+      });
     }
 
     return {
@@ -589,7 +727,16 @@ export class WebSocketBridge {
 
     if (metadata.browserOrigin) {
       if (this.extensionClient && !this._isCurrentExtAuthority(ws)) {
-        console.error(`[FSB Bridge ${this.instanceId}] Unprivileged extension candidate cannot replace active extension`);
+        // Coalesced: an extension that keeps retrying lands here once per
+        // attempt, which is how a single lockout produced tens of thousands of
+        // identical lines in the field.
+        if (logBridgeEvent({
+          event: 'extension_slot_refused',
+          instanceId: this.instanceId,
+          origin: metadata.browserOrigin,
+        })) {
+          console.error(`[FSB Bridge ${this.instanceId}] Unprivileged extension candidate cannot replace active extension`);
+        }
         ws.close(1008, 'Extension authorization required');
         return;
       }
@@ -636,9 +783,17 @@ export class WebSocketBridge {
   }
 
   private _registerExtensionClient(ws: WsWebSocket): void {
+    this._stopExtensionLiveness();
+
     if (this.extensionClient) {
       console.error(`[FSB Bridge ${this.instanceId}] New extension connected, closing previous`);
       this.lastDisconnectReason = 'extension_replaced';
+      this.extensionCloseCause = 'extension_replaced';
+      logBridgeEvent({
+        event: 'extension_replaced',
+        instanceId: this.instanceId,
+        origin: this.acceptedSocketMetadata.get(this.extensionClient)?.browserOrigin ?? null,
+      });
       this._abortRoutesForOrigin(this.extensionClient);
       this.extensionClient.close();
     }
@@ -646,9 +801,12 @@ export class WebSocketBridge {
     this.extensionClient = ws;
     this.connected = true;
     this.lastExtensionHeartbeatAt = Date.now();
+    this.extensionHeartbeatCount = 0;
     this.lastDisconnectReason = null;
+    this.extensionCloseCause = null;
     console.error(`[FSB Bridge ${this.instanceId}] Extension connected`);
     this._broadcastRelayState();
+    this._startExtensionLiveness(ws);
 
     // Replace the temporary message handler with the real one
     ws.removeAllListeners('message');
@@ -656,19 +814,40 @@ export class WebSocketBridge {
       this._handleExtensionMessage(ws, typeof data === 'string' ? data : data.toString());
     });
 
-    ws.on('close', () => {
+    ws.on('close', (code: number) => {
       if (this.extensionClient !== ws) return;
+      this._stopExtensionLiveness();
 
-      console.error(`[FSB Bridge ${this.instanceId}] Extension disconnected`);
+      // The rejection message below stays literal so the sw_evicted recovery
+      // keeps arming -- that recovery (reconnect, then fetch the persisted
+      // snapshot) is right for an authorization close too, because the task
+      // really was interrupted. The specific cause rides on a property of the
+      // Error instead, so callers can report what actually happened without
+      // any recovery branch changing.
+      const cause = this.extensionCloseCause
+        ?? (code === 1008 ? 'extension_policy_closed' : 'extension_disconnected');
+      this.extensionCloseCause = null;
+
+      console.error(`[FSB Bridge ${this.instanceId}] Extension disconnected (${cause}, code=${code})`);
+      logBridgeEvent({
+        event: 'extension_closed',
+        instanceId: this.instanceId,
+        origin: this.acceptedSocketMetadata.get(ws)?.browserOrigin ?? null,
+        closeCode: code,
+        reason: cause,
+      });
       this.extensionClient = null;
       this.connected = false;
-      this.lastDisconnectReason = 'extension_disconnected';
+      this.lastDisconnectReason = cause;
       this.lastExtensionHeartbeatAt = null;
+      this.extensionHeartbeatCount = 0;
 
       // Reject all pending local requests
       for (const [id, pending] of this.pendingRequests) {
         clearTimeout(pending.timeout);
-        pending.reject(new Error('Extension disconnected'));
+        const error = new Error('Extension disconnected') as BridgeDisconnectError;
+        error.bridgeDisconnectReason = cause;
+        pending.reject(error);
         this.pendingRequests.delete(id);
       }
       this.progressListeners.clear();
@@ -689,6 +868,97 @@ export class WebSocketBridge {
     ws.on('error', (err: Error) => {
       console.error(`[FSB Bridge ${this.instanceId}] Extension error:`, err.message);
     });
+  }
+
+  /**
+   * The extension slot is freed only by the incumbent socket's own close event,
+   * so a peer that stops answering without ever sending FIN holds it forever.
+   * Two independent tiers close that hole:
+   *
+   *   Tier A (transport) -- protocol ping/pong. Catches half-open sockets and
+   *     dead TCP peers, and cannot false-positive because every RFC 6455
+   *     endpoint must answer a ping.
+   *   Tier B (application) -- the extension's own mcp:ping. Catches a live
+   *     transport whose service worker is gone; a browser answers protocol
+   *     pings below the worker, so a pong alone does not prove the worker is
+   *     running. Armed only once this socket has sent at least one mcp:ping,
+   *     so an older extension build that never sends one is governed by Tier A
+   *     alone and is never terminated merely for staying quiet.
+   */
+  private _startExtensionLiveness(ws: WsWebSocket): void {
+    let awaitingPong = false;
+    let sawAppHeartbeat = false;
+
+    ws.on('pong', () => {
+      awaitingPong = false;
+    });
+
+    const timer = setInterval(() => {
+      if (this.extensionClient !== ws) {
+        this._stopExtensionLiveness();
+        return;
+      }
+      if (ws.readyState !== WebSocket.OPEN) {
+        this._reapExtensionClient(ws, 'transport_closed');
+        return;
+      }
+
+      const heartbeatAt = this.lastExtensionHeartbeatAt;
+      // Counted rather than inferred from timestamps: registration and a fast
+      // first ping can land in the same millisecond, and a comparison would
+      // then never arm this tier at all.
+      if (this.extensionHeartbeatCount > 0) sawAppHeartbeat = true;
+
+      if (awaitingPong) {
+        this._reapExtensionClient(ws, 'pong_timeout');
+        return;
+      }
+      if (
+        sawAppHeartbeat
+        && heartbeatAt !== null
+        && Date.now() - heartbeatAt > this.extensionHeartbeatTimeoutMs
+      ) {
+        this._reapExtensionClient(ws, 'heartbeat_timeout');
+        return;
+      }
+
+      awaitingPong = true;
+      try {
+        ws.ping();
+      } catch {
+        // A socket that cannot even be pinged is already gone; the readyState
+        // check on the next tick reaps it.
+        awaitingPong = false;
+      }
+    }, this.extensionPingIntervalMs);
+
+    timer.unref?.();
+    this.extensionLivenessTimer = timer;
+  }
+
+  private _stopExtensionLiveness(): void {
+    if (!this.extensionLivenessTimer) return;
+    clearInterval(this.extensionLivenessTimer);
+    this.extensionLivenessTimer = null;
+  }
+
+  /**
+   * terminate() rather than close(): a peer that has stopped answering will not
+   * complete a closing handshake either. terminate() still fires the socket's
+   * own 'close' handler, which is the one place that frees the slot.
+   */
+  private _reapExtensionClient(ws: WsWebSocket, reason: string): void {
+    this._stopExtensionLiveness();
+    if (this.extensionClient !== ws) return;
+    console.error(`[FSB Bridge ${this.instanceId}] Extension liveness lost (${reason}), terminating socket`);
+    logBridgeEvent({
+      event: 'extension_reaped',
+      instanceId: this.instanceId,
+      origin: this.acceptedSocketMetadata.get(ws)?.browserOrigin ?? null,
+      reason,
+    });
+    this.extensionCloseCause = `extension_reaped_${reason}`;
+    ws.terminate();
   }
 
   private _registerRelayClient(ws: WsWebSocket, hello: RelayHello): void {
@@ -783,6 +1053,7 @@ export class WebSocketBridge {
         if (!heartbeat) return;
         const heartbeatAt = Date.now();
         this.lastExtensionHeartbeatAt = heartbeatAt;
+        this.extensionHeartbeatCount += 1;
         if (ws.readyState === WebSocket.OPEN) {
           ws.send(JSON.stringify(heartbeat.nonce === undefined
             ? { type: 'mcp:pong', ts: heartbeatAt }
@@ -900,6 +1171,12 @@ export class WebSocketBridge {
     const metadata = this.acceptedSocketMetadata.get(ws);
     if (!metadata) return;
     metadata.extAuthorized = false;
+    if (this.extensionClient === ws) this.extensionCloseCause = 'extension_auth_revoked';
+    logBridgeEvent({
+      event: 'ext_authority_revoked',
+      instanceId: this.instanceId,
+      origin: metadata.browserOrigin,
+    });
     if (!metadata.unauthorizedSent && ws.readyState === WebSocket.OPEN) {
       metadata.unauthorizedSent = true;
       const id = typeof requestId === 'string' && requestId.length > 0 && requestId.length <= 200
@@ -1392,31 +1669,39 @@ export class WebSocketBridge {
    * If the port is still taken (another relay won the race), reconnect as relay.
    */
   private async _attemptPromotion(): Promise<void> {
-    if (this.intentionalClose) return;
-
-    // Random jitter to avoid thundering herd
-    const jitter = Math.floor(Math.random() * this.promotionJitterMs);
-    console.error(`[FSB Bridge ${this.instanceId}] Attempting promotion in ${jitter}ms`);
-
-    await new Promise(r => setTimeout(r, jitter));
-
-    if (this.intentionalClose) return;
+    // The jitter below means two overlapping callers would both wake up and
+    // race to bind the same port, and the loser's failure path schedules yet
+    // another attempt.
+    if (this.intentionalClose || this.promotionInFlight) return;
+    this.promotionInFlight = true;
 
     try {
-      await this._startAsHub();
-      this.hubConnected = true;
-      this.activeHubInstanceId = this.instanceId;
-      this.relayExtensionConnected = false;
-      this.relayCount = 0;
-      console.error(`[FSB Bridge ${this.instanceId}] Promoted to hub mode`);
-    } catch (err: unknown) {
-      if ((err as NodeJS.ErrnoException).code === 'EADDRINUSE') {
-        console.error(`[FSB Bridge ${this.instanceId}] Promotion failed (port taken), reconnecting as relay`);
-        this._scheduleRelayReconnect();
-      } else {
-        console.error(`[FSB Bridge ${this.instanceId}] Promotion failed:`, err);
-        this._scheduleRelayReconnect();
+      // Random jitter to avoid thundering herd
+      const jitter = Math.floor(Math.random() * this.promotionJitterMs);
+      console.error(`[FSB Bridge ${this.instanceId}] Attempting promotion in ${jitter}ms`);
+
+      await new Promise(r => setTimeout(r, jitter));
+
+      if (this.intentionalClose) return;
+
+      try {
+        await this._startAsHub();
+        this.hubConnected = true;
+        this.activeHubInstanceId = this.instanceId;
+        this.relayExtensionConnected = false;
+        this.relayCount = 0;
+        console.error(`[FSB Bridge ${this.instanceId}] Promoted to hub mode`);
+      } catch (err: unknown) {
+        if ((err as NodeJS.ErrnoException).code === 'EADDRINUSE') {
+          console.error(`[FSB Bridge ${this.instanceId}] Promotion failed (port taken), reconnecting as relay`);
+          this._scheduleRelayReconnect();
+        } else {
+          console.error(`[FSB Bridge ${this.instanceId}] Promotion failed:`, err);
+          this._scheduleRelayReconnect();
+        }
       }
+    } finally {
+      this.promotionInFlight = false;
     }
   }
 

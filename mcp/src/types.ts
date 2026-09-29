@@ -80,6 +80,8 @@ export interface BridgeOptions {
   instanceId?: string;
   handshakeTimeoutMs?: number;
   relayHandshakeTimeoutMs?: number;
+  extensionPingIntervalMs?: number;
+  extensionHeartbeatTimeoutMs?: number;
   promotionJitterMs?: number;
   maxReconnectDelayMs?: number;
   allowedBrowserOrigins?: string[];

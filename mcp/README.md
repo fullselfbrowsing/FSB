@@ -292,7 +292,9 @@ npx -y fsb-mcp-server@latest doctor
 npx -y fsb-mcp-server@latest status --watch
 ```
 
-`doctor` reports the primary failing layer: package, bridge, extension, active tab, content script, or configuration. Only restart or reinstall the client when the reported layer points there.
+`doctor` reports the primary failing layer: package, bridge, authorization, extension, active tab, content script, or configuration. Only restart or reinstall the client when the reported layer points there.
+
+The bridge also keeps its own journal at `~/.fsb/agent-runtime/bridge-events.jsonl`. Everything else the bridge prints goes to the stderr of whichever server won the race for port 7225, which is often a session that has since exited, so this file is usually the only surviving record of why a socket was refused, revoked, replaced, or dropped. Repeated identical events are coalesced into one line per minute carrying a `suppressed` count, so a retry loop stays legible instead of filling the file.
 
 ### Common Failure Modes
 
@@ -300,6 +302,8 @@ npx -y fsb-mcp-server@latest status --watch
 |---------|-------------|
 | No tools in client | Confirm the client config and restart/reload the host. |
 | Tools exist but all calls fail | Run `doctor` and confirm the extension is connected. |
+| The extension will not attach, and reinstalling it does not help | The bridge pairing is bound to one extension id, and reinstalling as an unpacked build mints a new one, which deepens the mismatch. Check `bridge-events.jsonl` for `upgrade_rejected_origin_pin`, then run `npx -y fsb-mcp-server@latest pair --reset`. |
+| A tool reports `sw_evicted` but the browser is clearly fine | Read the `disconnect_reason` alongside it. `extension_auth_revoked` means the pairing was rejected, not that the worker was evicted. |
 | Page reads fail | Make sure the active tab is a normal webpage, not `chrome://`, `edge://`, or the web store. |
 | Clicks do nothing | Refresh DOM refs with `get_dom_snapshot`, then try `click_at` or `execute_js` where appropriate. |
 | A task is stuck | Use `get_task_status`, then `stop_task` if it is still running. |

@@ -19,6 +19,7 @@
  *   4. sw_wake_settles_with_sw_evicted
  *   5. no_double_resolve_under_race
  *   6. heartbeat_ticker_cleared_on_safety_net
+ *   7. sw_evicted_reports_disconnect_reason
  *
  * Run: node tests/run-task-resolve-discipline.test.js
  */
@@ -510,6 +511,7 @@ async function runTest(name, fn) {
     assert(parsed && typeof parsed === 'object', 'content[0].text JSON-parses');
     if (parsed) {
       assertEqual(parsed.sw_evicted, true, 'parsed.sw_evicted === true');
+      assertEqual(parsed.disconnect_reason, 'bridge_disconnected', 'a cause-free disconnect reports bridge_disconnected');
       assert(parsed.partial_state && parsed.partial_state.task_id === agentId,
         'parsed.partial_state.task_id matches agentId');
       assert(parsed.last_heartbeat_at === 12345 || parsed.last_heartbeat_at === seededSnapshot.last_heartbeat_at,
@@ -600,6 +602,63 @@ async function runTest(name, fn) {
 
     assertEqual(progressAfter, progressBefore, 'no further heartbeat ticks after safety-net settle');
     assertEqual(harness.clock.activeIntervalCount(), 0, '0 active intervals after safety-net settle');
+  });
+
+  // -----------------------------------------------------------------------
+  // Test 7: sw_evicted_reports_disconnect_reason
+  // -----------------------------------------------------------------------
+  // sw_evicted stays true for every disconnect because the recovery is the
+  // same; the cause the bridge attached must still reach the caller, and a
+  // malformed one must never be echoed.
+  await runTest('sw_evicted_reports_disconnect_reason', async () => {
+    const buildPath = path.join(__dirname, '..', 'mcp', 'build', 'tools', 'autopilot.js');
+    const { registerAutopilotTools } = require(buildPath);
+
+    async function runTaskAfterDisconnect(disconnectError) {
+      let toolBody = null;
+      const serverStub = {
+        tool(name, _desc, _schema, handler) {
+          if (name === 'run_task') toolBody = handler;
+        },
+        sendLoggingMessage() {}
+      };
+      let sendCallCount = 0;
+      let bridgeIsConnected = true;
+      const bridgeStub = {
+        get isConnected() { return bridgeIsConnected; },
+        async sendAndWait(msg) {
+          sendCallCount += 1;
+          if (sendCallCount === 1) {
+            setTimeout(() => { bridgeIsConnected = true; }, 0);
+            bridgeIsConnected = false;
+            throw disconnectError;
+          }
+          if (msg && msg.type === 'mcp:get-task-snapshot') {
+            return { success: true, snapshot: { task_id: 'agent_reason', status: 'in_progress', last_heartbeat_at: 1 } };
+          }
+          throw new Error('unexpected sendAndWait: ' + (msg && msg.type));
+        }
+      };
+      registerAutopilotTools(
+        serverStub,
+        bridgeStub,
+        { async enqueue(_name, fn) { return fn(); } },
+        { async ensure() { return 'agent_reason'; } },
+      );
+      const result = await toolBody({ task: 'a long task' }, { _meta: {} });
+      return JSON.parse(result.content[0].text);
+    }
+
+    const revoked = new Error('Extension disconnected');
+    revoked.bridgeDisconnectReason = 'extension_auth_revoked';
+    const revokedResult = await runTaskAfterDisconnect(revoked);
+    assertEqual(revokedResult.sw_evicted, true, 'a revocation still arms the sw_evicted recovery');
+    assertEqual(revokedResult.disconnect_reason, 'extension_auth_revoked', 'a revocation is reported as one, not as an eviction');
+
+    const malformed = new Error('Extension disconnected');
+    malformed.bridgeDisconnectReason = 'Not A Code!';
+    const malformedResult = await runTaskAfterDisconnect(malformed);
+    assertEqual(malformedResult.disconnect_reason, 'bridge_disconnected', 'a malformed cause falls back to bridge_disconnected');
   });
 
   console.log('\n--- Phase 239 plan 03 run-task-resolve-discipline summary ---');

@@ -41,6 +41,7 @@ export type BridgeDiagnosticLayer =
   | 'package'
   | 'config'
   | 'bridge'
+  | 'auth'
   | 'extension'
   | 'content_script'
   | 'tool_routing'
@@ -166,10 +167,18 @@ export interface BridgeDiagnosticsDependencies {
   readonly now?: () => number;
 }
 
+// Disconnect reasons the bridge reports when it refused or revoked authority,
+// as opposed to the extension simply not being there.
+const AUTH_DISCONNECT_REASONS: ReadonlySet<string> = new Set([
+  'extension_auth_revoked',
+  'extension_policy_closed',
+]);
+
 export const DIAGNOSTIC_LAYER_LABELS: Record<BridgeDiagnosticLayer, string> = {
   package: 'Package / version parity',
   config: 'Configuration',
   bridge: 'Bridge ownership',
+  auth: 'Bridge authorization',
   extension: 'Extension attachment',
   content_script: 'Content script availability',
   tool_routing: 'Tool routing',
@@ -900,6 +909,11 @@ function getGuidanceForLayer(
           : 'The local MCP bridge is disconnected.',
         nextAction: 'Keep one fsb-mcp-server instance running as the bridge owner, then rerun status --watch.',
       };
+    case 'auth':
+      return {
+        why: 'The extension reached the bridge, but its reverse-channel authorization was refused or revoked.',
+        nextAction: 'Run `npx -y fsb-mcp-server@latest pair --reset`, then fully quit and reopen the browser.',
+      };
     case 'extension':
       return {
         why: 'The local bridge is healthy, but no browser extension is attached to it.',
@@ -941,6 +955,17 @@ export function classifyDoctorLayer(snapshot: BridgeDiagnostics): BridgeDiagnost
 
   if (snapshot.bridgeMode === 'disconnected' || (snapshot.bridgeMode === 'relay' && !snapshot.hubConnected)) {
     return 'bridge';
+  }
+
+  // An authorization refusal and a plain absence look identical from here
+  // otherwise, and the cures are opposite: one wants `pair --reset`, the other
+  // wants the browser opened.
+  if (
+    !snapshot.extensionConnected
+    && snapshot.lastDisconnectReason !== null
+    && AUTH_DISCONNECT_REASONS.has(snapshot.lastDisconnectReason)
+  ) {
+    return 'auth';
   }
 
   if (!snapshot.extensionConnected) {

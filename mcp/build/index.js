@@ -8,6 +8,7 @@ import { DEFAULT_HTTP_HOST, DEFAULT_HTTP_PORT, FSB_EXTENSION_BRIDGE_URL, FSB_MCP
 import { getSetupSections, runInstall, runUninstall } from './install.js';
 import { createProductionNativeHostCliOperations, inspectProductionNativeHost, } from './native-host-production.js';
 import { pushMcpClientInventory } from './client-inventory.js';
+import { shutdownWhenStdinEnds } from './stdin-shutdown.js';
 import { FSB_EXT_PROTOCOL, formatPairingCode, readBridgeAuthState, resetBridgePairing, rotateBridgeSessionSecret, } from './bridge-auth.js';
 const productionNativeHostCliOperations = createProductionNativeHostCliOperations();
 const productionNativeHostDiagnostics = Object.freeze({
@@ -305,6 +306,12 @@ async function runStdioServer() {
     };
     process.on('SIGTERM', shutdown);
     process.on('SIGINT', shutdown);
+    // Without this, a host that exits by closing the pipe leaves the bridge
+    // running -- and holding the port -- forever.
+    shutdownWhenStdinEnds(process.stdin, () => {
+        console.error('[FSB MCP] stdin closed by the host; shutting down.');
+        shutdown();
+    });
 }
 async function runHttpMode(flags) {
     const host = readStringFlag(flags, 'host', DEFAULT_HTTP_HOST);
@@ -314,7 +321,8 @@ async function runHttpMode(flags) {
         port,
         dependencies: {
             prepareBridgeAuth: () => {
-                rotateBridgeSessionSecret();
+                if (!readBridgeAuthState())
+                    rotateBridgeSessionSecret();
             },
         },
     });

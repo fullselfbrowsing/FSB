@@ -23,6 +23,7 @@ import {
   inspectProductionNativeHost,
 } from './native-host-production.js';
 import { pushMcpClientInventory } from './client-inventory.js';
+import { shutdownWhenStdinEnds } from './stdin-shutdown.js';
 import {
   FSB_EXT_PROTOCOL,
   formatPairingCode,
@@ -395,6 +396,13 @@ async function runStdioServer(): Promise<void> {
 
   process.on('SIGTERM', shutdown);
   process.on('SIGINT', shutdown);
+
+  // Without this, a host that exits by closing the pipe leaves the bridge
+  // running -- and holding the port -- forever.
+  shutdownWhenStdinEnds(process.stdin, () => {
+    console.error('[FSB MCP] stdin closed by the host; shutting down.');
+    shutdown();
+  });
 }
 
 async function runHttpMode(flags: Record<string, FlagValue>): Promise<void> {
@@ -405,7 +413,7 @@ async function runHttpMode(flags: Record<string, FlagValue>): Promise<void> {
     port,
     dependencies: {
       prepareBridgeAuth: () => {
-        rotateBridgeSessionSecret();
+        if (!readBridgeAuthState()) rotateBridgeSessionSecret();
       },
     },
   });
