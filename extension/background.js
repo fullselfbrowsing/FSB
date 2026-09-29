@@ -19214,6 +19214,10 @@ async function prepareCdpTextTarget(tabId, selector, position) {
       } catch (error) {
         return { success: false, error: `Invalid editable selector: ${error.message}` };
       }
+      // Canvas editors (Google Docs) keep focus in a nested text-event frame
+      // this script cannot reach. The key and insert events go to that focused
+      // frame, so its own editor handles the selection.
+      if (!css && element?.tagName === 'IFRAME') return { success: true };
       if (element?.isContentEditable) {
         element = element.closest('[contenteditable="true"], [contenteditable=""]') || element;
       } else if (element && !['INPUT', 'TEXTAREA'].includes(element.tagName)) {
@@ -19295,6 +19299,8 @@ async function handleCDPInsertTextUnlocked(request, sender, sendResponse) {
 
     const inserted = await dispatchCdpTextInsertion(tabId, text, position, selector);
     if (!inserted.success) {
+      await chrome.debugger.detach({ tabId });
+      debuggerAttached = false;
       sendResponse(inserted);
       return;
     }

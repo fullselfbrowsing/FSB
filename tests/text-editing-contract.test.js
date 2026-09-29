@@ -50,3 +50,55 @@ test('editable target resolution rejects ambiguous wrappers', () => {
   assert.equal(resolve({ tagName: 'DIV', isContentEditable: false,
     querySelectorAll: () => [first] }), first);
 });
+
+function loadCdpTextInsertion(activeElement, commands) {
+  const start = background.indexOf('async function prepareCdpTextTarget(');
+  const end = background.indexOf('\nasync function handleCDPInsertTextUnlocked', start);
+  const context = {
+    document: { activeElement },
+    chrome: {
+      scripting: { executeScript: async ({ func, args }) => [{ result: func(...args) }] },
+      debugger: { sendCommand: async (_target, method, params) => commands.push({ method, params }) }
+    },
+    navigator: { platform: 'MacIntel', userAgent: 'Macintosh' }
+  };
+  return vm.runInNewContext(`${background.slice(start, end)}\ndispatchCdpTextInsertion`, context);
+}
+
+test('CDP replacement reaches a canvas editor focused inside a nested frame', async () => {
+  const commands = [];
+  const dispatch = loadCdpTextInsertion({ tagName: 'IFRAME', querySelectorAll: () => [] }, commands);
+  const result = await dispatch(42, 'replacement', 'replace_all', null);
+  assert.equal(result.success, true);
+  assert.deepEqual(commands.map(c => c.method),
+    ['Input.dispatchKeyEvent', 'Input.dispatchKeyEvent', 'Input.insertText']);
+  assert.equal(commands[2].params.text, 'replacement');
+});
+
+test('CDP replacement still refuses a focused element that is not editable', async () => {
+  const commands = [];
+  const dispatch = loadCdpTextInsertion(
+    { tagName: 'DIV', isContentEditable: false, querySelectorAll: () => [] }, commands);
+  const result = await dispatch(42, 'replacement', 'replace_all', null);
+  assert.equal(result.success, false);
+  assert.deepEqual(commands, []);
+});
+
+test('a CDP insertion that is refused before dispatch releases the debugger', async () => {
+  const start = background.indexOf('async function handleCDPInsertTextUnlocked(');
+  const end = background.indexOf('\n/**\n * Handle CDP-based mouse click', start);
+  const detached = [];
+  const responses = [];
+  const refusal = { success: false, error: 'Target is not editable' };
+  const context = {
+    attachFsbDebugger: async () => {},
+    dispatchCdpTextInsertion: async () => refusal,
+    automationLogger: { logActionExecution() {}, debug() {} },
+    cdpFailureResult: (error) => ({ success: false, error: error.message }),
+    chrome: { debugger: { detach: async (target) => detached.push(target) } }
+  };
+  const handler = vm.runInNewContext(`${background.slice(start, end)}\nhandleCDPInsertTextUnlocked`, context);
+  await handler({ text: 'replacement', clearFirst: true }, { tab: { id: 42 } }, (response) => responses.push(response));
+  assert.deepEqual(JSON.parse(JSON.stringify(detached)), [{ tabId: 42 }]);
+  assert.deepEqual(responses, [refusal]);
+});
