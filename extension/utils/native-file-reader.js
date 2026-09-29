@@ -91,6 +91,10 @@
     });
   }
 
+  async function releaseHandle(token) {
+    try { await sendNative({ v: 1, t: 'readRelease', token: token }); } catch (_e) { /* best effort */ }
+  }
+
   /**
    * Read a file for upload.
    *
@@ -118,7 +122,7 @@
     const chunks = Number(opened.chunks) || 0;
     if (size > MAX_FILE_BYTES || chunks > MAX_CHUNKS || chunks < 1) {
       // Do not trust the host's own bounds; release the handle and refuse.
-      try { await sendNative({ v: 1, t: 'readRelease', token: opened.token }); } catch (_e) { /* best effort */ }
+      await releaseHandle(opened.token);
       return {
         ok: false,
         reason: 'file_too_large',
@@ -127,20 +131,29 @@
     }
 
     const parts = [];
-    for (let i = 0; i < chunks; i += 1) {
-      let chunk;
-      try {
-        chunk = await sendNative({ v: 1, t: 'readChunk', token: opened.token, i: i });
-      } catch (err) {
-        const reason = err && err.reason ? err.reason : 'read_failed';
-        return { ok: false, reason: reason, message: describeReason(reason) };
+    // The host frees a handle by itself only after serving the chunk marked
+    // `last`. Every other exit -- a throw, a not-ok chunk, a host that never
+    // marks the end -- must release it, or up to MAX_FILE_BYTES stays pinned
+    // in the host until its TTL and each retry pins another copy.
+    let drained = false;
+    try {
+      for (let i = 0; i < chunks; i += 1) {
+        let chunk;
+        try {
+          chunk = await sendNative({ v: 1, t: 'readChunk', token: opened.token, i: i });
+        } catch (err) {
+          const reason = err && err.reason ? err.reason : 'read_failed';
+          return { ok: false, reason: reason, message: describeReason(reason) };
+        }
+        if (!chunk || chunk.ok !== true || typeof chunk.data !== 'string') {
+          const reason = (chunk && chunk.reason) || 'read_failed';
+          return { ok: false, reason: reason, message: describeReason(reason, chunk && chunk.detail) };
+        }
+        parts.push(chunk.data);
+        if (chunk.last === true) { drained = true; break; }
       }
-      if (!chunk || chunk.ok !== true || typeof chunk.data !== 'string') {
-        const reason = (chunk && chunk.reason) || 'read_failed';
-        return { ok: false, reason: reason, message: describeReason(reason, chunk && chunk.detail) };
-      }
-      parts.push(chunk.data);
-      if (chunk.last === true) break;
+    } finally {
+      if (!drained) await releaseHandle(opened.token);
     }
 
     return {

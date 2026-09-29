@@ -36,6 +36,7 @@
   var TAG = '[FSB Platform]';
   var DEFAULT_WORKSPACE_PATH = 'ui/sidepanel.html';
   var WORKSPACE_STATE_KEY = 'fsbSafariWorkspace';
+  var CONTENT_TAB_KEY = 'fsbSafariContentTab';
   var WORKSPACE_WIDTH = 460;
   var WORKSPACE_HEIGHT = 920;
   var LOOPBACK_PREFIX = 'lattice-';
@@ -188,20 +189,37 @@
     return /^(chrome|safari-web)-extension:\/\//.test(url);
   }
 
-  function persistWorkspace() {
+  function writeSession(payload) {
     var c = api();
     if (!c || !c.storage || !c.storage.session || typeof c.storage.session.set !== 'function') return;
-    var payload = {};
-    payload[WORKSPACE_STATE_KEY] = {
-      workspaceWindowId: _workspace.windowId,
-      workspaceTabId: _workspace.tabId,
-      lastContentTabId: _workspace.lastContentTabId,
-      path: _workspace.path
-    };
     try {
       var r = c.storage.session.set(payload);
       if (r && typeof r.catch === 'function') r.catch(function () {});
     } catch (_e) { /* best effort */ }
+  }
+
+  /** The workspace window record. Pages and the worker both open and close it. */
+  function persistWorkspace() {
+    var payload = {};
+    payload[WORKSPACE_STATE_KEY] = {
+      workspaceWindowId: _workspace.windowId,
+      workspaceTabId: _workspace.tabId,
+      path: _workspace.path
+    };
+    writeSession(payload);
+  }
+
+  /**
+   * The content tab lives under its OWN key, written only by the context that
+   * runs trackContentTabs() -- the service worker. A page's copy is whatever it
+   * last hydrated. While it shared the window record, a page closing the
+   * workspace wrote that stale id over the worker's, and the agent went back to
+   * driving a tab the user had long since left.
+   */
+  function persistContentTab() {
+    var payload = {};
+    payload[CONTENT_TAB_KEY] = _workspace.lastContentTabId;
+    writeSession(payload);
   }
 
   /**
@@ -225,13 +243,13 @@
         if (saved) {
           if (saved.workspaceWindowId != null) _workspace.windowId = saved.workspaceWindowId;
           if (saved.workspaceTabId != null) _workspace.tabId = saved.workspaceTabId;
-          if (saved.lastContentTabId != null) _workspace.lastContentTabId = saved.lastContentTabId;
           if (typeof saved.path === 'string' && saved.path) _workspace.path = saved.path;
         }
+        if (data && data[CONTENT_TAB_KEY] != null) _workspace.lastContentTabId = data[CONTENT_TAB_KEY];
         resolve();
       }
       try {
-        var out = c.storage.session.get(WORKSPACE_STATE_KEY, apply);
+        var out = c.storage.session.get([WORKSPACE_STATE_KEY, CONTENT_TAB_KEY], apply);
         if (out && typeof out.then === 'function') out.then(apply, function () { resolve(); });
       } catch (_e) { resolve(); }
     });
@@ -374,50 +392,74 @@
     return null;
   }
 
+  /**
+   * Run a tracking listener against the persisted state, not bare module state.
+   * An event that wakes an evicted worker runs its listeners before install()'s
+   * hydration lands, so _workspace is still empty: windows.onRemoved would not
+   * recognise the workspace window and skip the repair, and any persist would
+   * write those empty ids over the saved record. Re-reading on every event also
+   * picks up a workspace a page opened, which this context never saw.
+   */
+  function whenHydrated(fn) {
+    return function () {
+      var args = arguments;
+      Promise.resolve(_hydrating)
+        .then(hydrateWorkspace)
+        .then(function () { fn.apply(null, args); })
+        .catch(function () {});
+    };
+  }
+
   function trackContentTabs() {
     var c = api();
     if (!c || !c.tabs) return;
     if (c.tabs.onActivated && typeof c.tabs.onActivated.addListener === 'function') {
-      c.tabs.onActivated.addListener(function (info) {
+      c.tabs.onActivated.addListener(whenHydrated(function (info) {
         if (!info || info.tabId == null) return;
         if (typeof c.tabs.get !== 'function') return;
         invoke(c.tabs.get, c.tabs, [info.tabId]).then(function (tab) {
           if (tab && !isExtensionUrl(tab.url)) {
             _workspace.lastContentTabId = tab.id;
-            persistWorkspace();
+            persistContentTab();
           }
         }).catch(function () {});
-      });
+      }));
     }
     // Switching to another window whose tab is already active fires no
     // onActivated, so without this the agent keeps driving the previous
     // window's tab.
     if (c.windows && c.windows.onFocusChanged && typeof c.windows.onFocusChanged.addListener === 'function'
         && typeof c.tabs.query === 'function') {
-      c.windows.onFocusChanged.addListener(function (windowId) {
+      c.windows.onFocusChanged.addListener(whenHydrated(function (windowId) {
         if (!isContentWindow(windowId)) return;
         activeContentTabIn(c, windowId).then(function (tab) {
           if (!tab) return;
           _workspace.lastContentTabId = tab.id;
-          persistWorkspace();
+          persistContentTab();
         });
-      });
+      }));
     }
     if (c.tabs.onRemoved && typeof c.tabs.onRemoved.addListener === 'function') {
-      c.tabs.onRemoved.addListener(function (tabId) {
-        if (tabId === _workspace.lastContentTabId) _workspace.lastContentTabId = null;
-        if (tabId === _workspace.tabId) { _workspace.tabId = null; _workspace.windowId = null; }
-        persistWorkspace();
-      });
+      c.tabs.onRemoved.addListener(whenHydrated(function (tabId) {
+        if (tabId === _workspace.lastContentTabId) {
+          _workspace.lastContentTabId = null;
+          persistContentTab();
+        }
+        if (tabId === _workspace.tabId) {
+          _workspace.tabId = null;
+          _workspace.windowId = null;
+          persistWorkspace();
+        }
+      }));
     }
     if (c.windows && c.windows.onRemoved && typeof c.windows.onRemoved.addListener === 'function') {
-      c.windows.onRemoved.addListener(function (windowId) {
+      c.windows.onRemoved.addListener(whenHydrated(function (windowId) {
         if (windowId === _workspace.windowId) {
           _workspace.windowId = null;
           _workspace.tabId = null;
           persistWorkspace();
         }
-      });
+      }));
     }
   }
 

@@ -228,7 +228,7 @@ function safariLikeScope(overrides) {
     s.chrome.storage.session.get = () => {
       readCount += 1;
       // 1st read is install-time hydrate; the worker moves on afterwards.
-      return Promise.resolve({ fsbSafariWorkspace: { lastContentTabId: readCount <= 1 ? 42 : 43 } });
+      return Promise.resolve({ fsbSafariContentTab: readCount <= 1 ? 42 : 43 });
     };
     s.chrome.tabs.get = (id) => Promise.resolve({ id, url: 'https://example.com/' });
   });
@@ -251,7 +251,7 @@ function safariLikeScope(overrides) {
     s.chrome.tabs.query = (q) => Promise.resolve(
       q && typeof q.windowId === 'number' ? (byWindow[q.windowId] || []) : [{ id: 99, url: 'https://any.example.com/' }]);
     s.chrome.windows.onFocusChanged = { addListener(fn) { focusListener = fn; } };
-    s.chrome.storage.session.set = (p) => { persisted.push(p.fsbSafariWorkspace); return Promise.resolve(); };
+    s.chrome.storage.session.set = (p) => { persisted.push(p); return Promise.resolve(); };
   });
   const fPlat = loadAdapter(fScope);
   fPlat.install();
@@ -263,7 +263,7 @@ function safariLikeScope(overrides) {
   focusListener(7);
   await tick();
   passAssertEqual(fState.lastContentTabId, 70, 'focusing a window adopts its active content tab');
-  passAssertEqual(persisted.length && persisted[persisted.length - 1].lastContentTabId, 70, 'and persists it');
+  passAssert(persisted.some((p) => p.fsbSafariContentTab === 70), 'and persists it');
 
   fState.lastContentTabId = 11;
   focusListener(-1);
@@ -276,6 +276,59 @@ function safariLikeScope(overrides) {
   passAssertEqual((await fPlat.resolveTargetTab({ windowId: 5 })).id, 11,
     'a workspace-window hint falls through to the cache');
   passAssertEqual((await fPlat.resolveTargetTab()).id, 11, 'no hint still uses the cache');
+
+  console.log('\n=== 8c. the content tab has exactly one writer ===');
+  // A page's lastContentTabId is only as fresh as its last hydrate. Closing the
+  // workspace from a page used to persist that stale id over the worker's.
+  {
+    const writes = [];
+    const pScope = safariLikeScope((s) => {
+      s.chrome.storage.session.get = () => Promise.resolve({
+        fsbSafariWorkspace: { workspaceWindowId: 5, workspaceTabId: 55 },
+        fsbSafariContentTab: 42
+      });
+      s.chrome.storage.session.set = (p) => { writes.push(p); return Promise.resolve(); };
+    });
+    const pPlat = loadAdapter(pScope);
+    pPlat.install({ loopback: false, trackTabs: false });
+    await tick();
+    pPlat.closeSurface();
+    passAssertEqual(pScope._calls.windowsRemove[0], 5, 'page closes the workspace window');
+    const record = writes.map((p) => p.fsbSafariWorkspace).filter(Boolean).pop();
+    passAssert(record && record.workspaceWindowId === null, 'page clears the window record');
+    passAssert(writes.every((p) => !('fsbSafariContentTab' in p)), 'page never writes the content tab');
+  }
+
+  // An event that wakes an evicted worker runs before install()'s hydration
+  // lands. The listener must wait for it, or it cannot recognise the workspace
+  // window and the repair is skipped.
+  {
+    let openGate;
+    const gate = new Promise((r) => { openGate = r; });
+    let windowRemoved = null;
+    const writes = [];
+    const wScope = safariLikeScope((s) => {
+      s.chrome.storage.session.get = () => gate.then(() => ({
+        fsbSafariWorkspace: { workspaceWindowId: 5, workspaceTabId: 55 },
+        fsbSafariContentTab: 42
+      }));
+      s.chrome.storage.session.set = (p) => { writes.push(p); return Promise.resolve(); };
+      s.chrome.windows.onRemoved = { addListener(fn) { windowRemoved = fn; } };
+    });
+    const wPlat = loadAdapter(wScope);
+    wPlat.install();
+    windowRemoved(5);   // fires before hydration
+    await tick();
+    passAssertEqual(writes.length, 0, 'nothing is written before hydration lands');
+    openGate();
+    await tick();
+    const wState = wPlat._workspaceState();
+    passAssertEqual(wState.windowId, null, 'restarted worker still recognises and clears the closed workspace');
+    const record = writes.map((p) => p.fsbSafariWorkspace).filter(Boolean).pop();
+    passAssert(record && record.workspaceWindowId === null, 'and persists the cleared record');
+    passAssertEqual(wState.lastContentTabId, 42, 'the content tab survives');
+    passAssert(writes.every((p) => !('fsbSafariContentTab' in p)), 'closing the workspace does not touch the content tab');
+  }
 
   console.log('\n=== 9. Lattice loopback ===');
   const lScope = safariLikeScope();

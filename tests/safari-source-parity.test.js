@@ -354,6 +354,14 @@ function extensionResourcePaths(pbx) {
     'GrantedRoots resolves the runtime suite from the signed App Group entitlement');
     passAssert(!/appGroupId\s*=\s*"com\.fullselfbrowsing\.fsb"/.test(grantedRoots),
       'GrantedRoots does not reuse the container bundle id as its suite name');
+    // Preferences are cached per process: a grant written through an App Group
+    // UserDefaults suite stays invisible to a running extension until Safari
+    // quits. The store must be a file in the group container.
+    const grantedRootsCode = grantedRoots.replace(/^\s*\/\/.*$/gm, '');
+    passAssert(!/UserDefaults\s*\(/.test(grantedRootsCode),
+      'GrantedRoots does not persist grants through a per-process-cached UserDefaults suite');
+    passAssert(/containerURL\(forSecurityApplicationGroupIdentifier:/.test(grantedRootsCode),
+      'GrantedRoots stores grants in the shared App Group container');
 
     console.log('\n---');
     console.log('passed:', passed, 'failed:', failed);

@@ -340,6 +340,8 @@ const SAFARI = { caps: { cdp: false, trustedInput: false } };
       'assembled base64 round-trips byte-for-byte');
     passAssertEqual(sent.filter((m) => m.t === 'readChunk').length, encodedParts.length,
       'fetched every native chunk exactly once');
+    passAssertEqual(sent.filter((m) => m.t === 'readRelease').length, 0,
+      'a fully drained read sends no readRelease (the host freed it on the last chunk)');
 
     const input = createFileInput('file');
     const applied = await createDomFileInputTools(input).domSetFileInput({
@@ -366,6 +368,27 @@ const SAFARI = { caps: { cdp: false, trustedInput: false } };
     const out = await reader.readFile('/Users/me/Downloads/huge');
     passAssertEqual(out.ok, false, 'oversized read refused client-side too');
     passAssertEqual(out.reason, 'file_too_large', 'typed as file_too_large');
+  }
+  // A failed chunk read must hand the handle back. The host only frees it on
+  // the chunk marked `last`, so otherwise up to 32 MB sits there until its TTL
+  // and every retry pins another copy.
+  for (const [label, chunkReply] of [
+    ['a rejected readChunk', () => Promise.reject(new Error('host gone'))],
+    ['a not-ok readChunk', () => Promise.resolve({ ok: false, reason: 'unknown_token' })],
+    ['a host that never marks the last chunk', () => Promise.resolve({ ok: true, data: 'QUJD', last: false })]
+  ]) {
+    const sent = [];
+    globalThis.chrome = { runtime: { sendNativeMessage: (_a, m) => {
+      sent.push(m);
+      if (m.t === 'readFile') return Promise.resolve({ ok: true, token: 'tk2', name: 'x', size: 6, chunks: 2 });
+      if (m.t === 'readChunk') return chunkReply();
+      return Promise.resolve({ ok: true });
+    } } };
+    delete require.cache[require.resolve('../extension/utils/native-file-reader.js')];
+    const reader = require('../extension/utils/native-file-reader.js');
+    await reader.readFile('/Users/me/Downloads/x');
+    const releases = sent.filter((m) => m.t === 'readRelease');
+    passAssert(releases.length === 1 && releases[0].token === 'tk2', `${label} releases the host handle`);
   }
   {
     globalThis.chrome = { runtime: {} };

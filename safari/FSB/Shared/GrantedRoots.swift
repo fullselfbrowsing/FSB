@@ -25,7 +25,7 @@ enum GrantedRoots {
 
     private static let appGroupSuffix = "com.fullselfbrowsing.fsb"
     private static let appGroupsEntitlement = "com.apple.security.application-groups"
-    private static let defaultsKey = "fsbGrantedRootBookmarks"
+    private static let storeFileName = "granted-roots.plist"
 
     enum GrantError: LocalizedError {
         case appGroupUnavailable
@@ -55,18 +55,24 @@ enum GrantedRoots {
         }
     }()
 
-    private static var defaults: UserDefaults? {
-        // The App Group suite is what makes a grant taken in the app visible to
-        // the extension process.
-        guard let appGroupId else { return nil }
-        return UserDefaults(suiteName: appGroupId)
+    /// The grants live in a FILE in the shared App Group container, not in an
+    /// App Group UserDefaults suite. Preferences are cached per process, so a
+    /// grant the app wrote stayed invisible to an already-running extension
+    /// process until Safari quit -- the upload retry right after granting still
+    /// said no_granted_folders. An atomically written file re-read on every
+    /// lookup has no such cache.
+    private static var storeURL: URL? {
+        guard let appGroupId,
+              let dir = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupId)
+        else { return nil }
+        return dir.appendingPathComponent(storeFileName)
     }
 
     // MARK: - Grant (container app)
 
     /// Persist a user-selected directory as a security-scoped bookmark.
     static func addGrant(_ url: URL) throws {
-        guard let defaults else { throw GrantError.appGroupUnavailable }
+        guard let storeURL else { throw GrantError.appGroupUnavailable }
         let bookmark = try url.bookmarkData(options: .withSecurityScope,
                                             includingResourceValuesForKeys: nil,
                                             relativeTo: nil)
@@ -80,11 +86,14 @@ enum GrantedRoots {
             return resolved.url.resolvingSymlinksInPath().standardizedFileURL.path == incoming
         }
         all.append(bookmark)
-        defaults.set(all, forKey: defaultsKey)
+        try FileManager.default.createDirectory(at: storeURL.deletingLastPathComponent(),
+                                                withIntermediateDirectories: true)
+        try PropertyListEncoder().encode(all).write(to: storeURL, options: .atomic)
     }
 
     static func clearGrants() {
-        defaults?.removeObject(forKey: defaultsKey)
+        guard let storeURL else { return }
+        try? FileManager.default.removeItem(at: storeURL)
     }
 
     /// Human-readable list of granted roots, for the app UI and for error text.
@@ -104,7 +113,8 @@ enum GrantedRoots {
     }
 
     private static func storedBookmarks() -> [Data] {
-        defaults?.array(forKey: defaultsKey) as? [Data] ?? []
+        guard let storeURL, let data = try? Data(contentsOf: storeURL) else { return [] }
+        return (try? PropertyListDecoder().decode([Data].self, from: data)) ?? []
     }
 
     /// Resolve a bookmark and BEGIN security-scoped access. The caller owns the
