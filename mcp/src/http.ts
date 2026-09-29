@@ -121,6 +121,7 @@ export async function startHttpServer(options: HttpServerOptions): Promise<Runni
         transport: 'streamable-http',
         bridgeMode: options.bridge.topology.mode,
         extensionConnected: options.bridge.topology.extensionConnected,
+        extensionAttachment: options.bridge.topology.extensionAttachment,
         bridgeTopology: options.bridge.topology,
         hubConnected: options.bridge.topology.hubConnected,
         relayCount: options.bridge.topology.relayCount,

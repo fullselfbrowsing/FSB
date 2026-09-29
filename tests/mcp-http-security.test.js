@@ -20,8 +20,11 @@ function request(port, { path = '/health', host = `127.0.0.1:${port}`, origin, m
 test('local HTTP accepts only loopback Host and requests without Origin', async () => {
   const { startHttpServer } = await import('../mcp/build/http.js');
   const topology = {
-    mode: 'hub', extensionConnected: false, hubConnected: true, relayCount: 0,
+    mode: 'hub', extensionConnected: true, hubConnected: true, relayCount: 0,
     activeHubInstanceId: null,
+    extensionAttachment: { extensionId: 'a'.repeat(32), extensionVersion: '0.9.91',
+      installInstanceId: 'install-fixture', normalWindowCount: 0,
+      connectedAt: '2026-09-29T00:00:00.000Z' },
   };
   const running = await startHttpServer({
     host: '127.0.0.1', port: 0,
@@ -32,7 +35,20 @@ test('local HTTP accepts only loopback Host and requests without Origin', async 
     const good = await request(port);
     assert.equal(good.status, 200);
     assert.equal(JSON.parse(good.body).ok, true);
+    assert.deepEqual(JSON.parse(good.body).extensionAttachment, topology.extensionAttachment);
     assert.equal(good.headers['access-control-allow-origin'], undefined);
+
+    const initialize = await fetch(running.endpoint, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: {
+        protocolVersion: '2025-03-26', capabilities: {},
+        clientInfo: { name: 'loopback-test', version: '1' }
+      } })
+    });
+    assert.equal(initialize.status, 200);
+    assert.ok(initialize.headers.get('mcp-session-id'));
+    assert.equal((await initialize.json()).result.serverInfo.name, 'fsb');
 
     for (const path of ['/health', '/mcp']) {
       assert.equal((await request(port, { path, host: `evil.example:${port}` })).status, 403);
