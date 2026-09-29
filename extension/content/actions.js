@@ -149,29 +149,12 @@ async function clickAtCoordinates(params) {
   element.dispatchEvent(new MouseEvent('mouseup', mouseEventInit));
   element.dispatchEvent(new MouseEvent('click', mouseEventInit));
 
-  // Also call native click as fallback
-  if (typeof element.click === 'function') {
-    element.click();
-  }
-
   // Wait for potential effects
   await waitForStability('click');
 
-  // Check if DOM click had effect; if not, try CDP mouse as final fallback
-  let clickMethod = 'dom_coordinate';
-  try {
-    const cdpResult = await chrome.runtime.sendMessage({
-      action: 'cdpMouseClick',
-      x: viewportCenterX,
-      y: viewportCenterY
-    });
-    if (cdpResult?.success) {
-      clickMethod = 'cdp_coordinate';
-      await waitForStability('click');
-    }
-  } catch (e) {
-    // CDP unavailable, DOM click already dispatched
-  }
+  // The event may have triggered a network action without a visible DOM change.
+  // Never dispatch a second click on an uncertain outcome.
+  const clickMethod = 'dom_coordinate';
 
   logger.log('info', 'Coordinate fallback click executed', {
     sessionId: FSB.sessionId,
@@ -186,7 +169,9 @@ async function clickAtCoordinates(params) {
   });
 
   return {
-    success: true,
+    success: false,
+    outcome: 'unknown',
+    mayHaveExecuted: true,
     fallbackUsed: true,
     clickedElement: {
       tag: element.tagName,
@@ -196,7 +181,7 @@ async function clickAtCoordinates(params) {
     coordinates: { x: viewportCenterX, y: viewportCenterY },
     scrolled: scrollResult.scrolled,
     method: clickMethod,
-    message: `Clicked using ${clickMethod} fallback (selector-based approach failed)`
+    message: 'Click dispatched at coordinates; inspect the page before retrying because its effect is unknown'
   };
 }
 
@@ -2437,9 +2422,6 @@ const tools = {
       element.dispatchEvent(new MouseEvent('mouseup', mouseEventInit));
       element.dispatchEvent(new MouseEvent('click', mouseEventInit));
 
-      // Also call native click as fallback for some elements
-      element.click();
-
       // VERIFY-04: Wait for page stability (REPLACE fixed 300ms with dynamic stability detection)
       await waitForPageStability({ maxWait: 1000, stableTime: 200 });
 
@@ -2483,148 +2465,28 @@ const tools = {
       // CRITICAL FIX: Return success=false when click has no effect
       // This prevents AI from continuing after failed clicks
       if (!hadEffect) {
-        // FALLBACK: For anchor tags with valid href, try direct navigation
-        // Google and other sites may intercept click events, preventing programmatic navigation
-        const failedAnchor = element.tagName === 'A' ? element : element.closest('a');
-        if (failedAnchor && failedAnchor.href &&
-            failedAnchor.href.startsWith('http') &&
-            !failedAnchor.href.includes('javascript:')) {
-          logger.logActionExecution(FSB.sessionId, 'click', 'href_fallback', {
-            href: failedAnchor.href,
-            originalSelector: params.selector
-          });
-          window.location.href = failedAnchor.href;
-          return {
-            success: true,
-            clicked: params.selector,
-            hadEffect: true,
-            navigationTriggered: true,
-            method: 'href-fallback',
-            message: 'Click had no effect, navigated via href fallback',
-            targetUrl: failedAnchor.href,
-            elementInfo: {
-              tag: element.tagName,
-              text: element.textContent?.trim().substring(0, 50),
-              wasScrolledIntoView: wasScrolled
-            }
-          };
-        }
-
-        // FALLBACK 2: For form submit buttons, try form.submit()
-        const isSubmitButton = (element.tagName === 'INPUT' && element.type === 'submit') ||
-          (element.tagName === 'BUTTON' && (element.type === 'submit' || !element.type));
-        const parentForm = element.closest('form');
-        if (isSubmitButton && parentForm) {
-          logger.logActionExecution(FSB.sessionId, 'click', 'form_submit_fallback', {
-            formAction: parentForm.action,
-            originalSelector: params.selector
-          });
-          try {
-            parentForm.submit();
-            return {
-              success: true,
-              clicked: params.selector,
-              hadEffect: true,
-              navigationTriggered: true,
-              method: 'form-submit-fallback',
-              message: 'Click had no effect, submitted form directly',
-              elementInfo: {
-                tag: element.tagName,
-                text: element.textContent?.trim().substring(0, 50) || element.value?.substring(0, 50),
-                wasScrolledIntoView: wasScrolled
-              }
-            };
-          } catch (formError) {
-            logger.warn('Form submit fallback failed', { error: formError.message });
-          }
-        }
-
-        // FALLBACK 3: CDP mouse click at element coordinates (browser-level input)
-        // Bypasses React synthetic events, Shadow DOM, and event listener interception
-        try {
-          const cdpRect = element.getBoundingClientRect();
-          const cdpX = cdpRect.left + cdpRect.width / 2;
-          const cdpY = cdpRect.top + cdpRect.height / 2;
-
-          logger.logActionExecution(FSB.sessionId, 'click', 'cdp_mouse_fallback', {
-            x: Math.round(cdpX), y: Math.round(cdpY), selector: params.selector
-          });
-
-          const cdpResult = await chrome.runtime.sendMessage({
-            action: 'cdpMouseClick',
-            x: cdpX,
-            y: cdpY
-          });
-
-          if (cdpResult?.success) {
-            await waitForPageStability({ maxWait: 1500, stableTime: 200 });
-            const postState2 = captureActionState(element, 'click');
-            const verification2 = verifyActionEffect(preState, postState2, 'click');
-            const cdpHadEffect = verification2.verified ||
-              verification2.changes?.urlChanged ||
-              verification2.changes?.contentChanged ||
-              verification2.changes?.elementCountChanged;
-
-            if (cdpHadEffect) {
-              actionRecorder.record(null, 'click', params, {
-                selectorTried, selectorUsed: selectorTried, elementFound: true,
-                coordinatesUsed: { x: Math.round(cdpX), y: Math.round(cdpY) },
-                coordinateSource: 'cdp_mouse', success: true, hadEffect: true,
-                duration: Date.now() - startTime
-              });
-              return {
-                success: true,
-                clicked: params.selector,
-                hadEffect: true,
-                method: 'cdp-mouse-fallback',
-                message: 'DOM click had no effect, CDP mouse click succeeded',
-                elementInfo: {
-                  tag: element.tagName,
-                  text: element.textContent?.trim().substring(0, 50),
-                  wasScrolledIntoView: wasScrolled
-                }
-              };
-            }
-          }
-        } catch (cdpErr) {
-          logger.debug('CDP mouse fallback unavailable', { error: cdpErr.message, sessionId: FSB.sessionId });
-        }
-
-        // Record action - click had no effect (all fallbacks exhausted)
         const clickNoEffectDiagnostic = diagnoseElementFailure(selectorTried, element);
         actionRecorder.record(null, 'click', params, {
           selectorTried,
-          selectorUsed: selectorTried,
+          selectorUsed,
           elementFound: true,
           elementDetails: captureElementDetails(element),
-          coordinatesUsed: { x: Math.round(centerX), y: Math.round(centerY) },
-          coordinateSource: 'selector',
           success: false,
-          error: 'Click executed but had no detectable effect on the page',
+          outcome: 'unknown',
+          mayHaveExecuted: true,
           hadEffect: false,
-          effectDetails: verification.changes,
-          verification: {
-            verified: verification.verified,
-            changes: verification.changes,
-            reason: verification.reason
-          },
           diagnostic: clickNoEffectDiagnostic,
           duration: Date.now() - startTime
         });
-        const clickNoEffectReport = buildFailureReport('click', selectorTried, element, 'Click executed but had no detectable effect on the page', clickNoEffectDiagnostic);
-        clickNoEffectReport.clicked = params.selector;
-        clickNoEffectReport.hadEffect = false;
-        clickNoEffectReport.verification = {
-          preState,
-          postState,
-          verified: verification.verified,
-          changes: verification.changes,
-          reason: verification.reason,
-          localChanges: verification.localChanges,
-          confidence: verification.confidence,
-          whatChanged: verification.whatChanged
+        return {
+          success: false,
+          outcome: 'unknown',
+          mayHaveExecuted: true,
+          clicked: params.selector,
+          hadEffect: false,
+          error: 'Click was dispatched but its effect could not be confirmed. Inspect the page before retrying.',
+          verification
         };
-        return clickNoEffectReport;
       }
 
       // Record successful action
@@ -3870,7 +3732,6 @@ const tools = {
         }
 
         const isInsideForm = !!element.closest('form');
-        const formElement = element.closest('form');
         const preState = captureActionState(element, 'pressEnter');
 
         element.focus();
@@ -3894,51 +3755,16 @@ const tools = {
         lastVerification = verification;
 
         if (!verification.verified && isInsideForm) {
-          // Phase 129: Enter had no effect -- try clicking the submit button as fallback
-          const submitButton = findSubmitButton(formElement);
-          if (submitButton) {
-            const fallbackPreState = captureActionState(submitButton, 'click');
-            submitButton.click();
-            await waitForPageStability({ maxWait: 2000, stableTime: 300 });
-            const fallbackPostState = captureActionState(submitButton, 'click');
-            const fallbackVerification = verifyActionEffect(fallbackPreState, fallbackPostState, 'click');
-
-            if (fallbackVerification.verified) {
-              actionRecorder.record(null, 'pressEnter', params, {
-                selectorTried: params.selector,
-                selectorUsed: currentSelector,
-                elementFound: true,
-                elementDetails: captureElementDetails(submitButton),
-                coordinatesUsed: null,
-                coordinateSource: null,
-                success: true,
-                hadEffect: true,
-                usedSubmitFallback: true,
-                effectDetails: fallbackVerification.changes,
-                duration: Date.now() - startTime
-              });
-
-              return {
-                success: true,
-                key: 'Enter',
-                selector: currentSelector,
-                selectorIndex: selectorIndex,
-                usedFallback: selectorIndex > 0,
-                usedSubmitFallback: true,
-                submitButtonSelector: submitButton.id ? `#${submitButton.id}` : submitButton.className ? `.${submitButton.className.split(' ')[0]}` : submitButton.tagName.toLowerCase(),
-                hadEffect: true,
-                isInsideForm: true,
-                verification: {
-                  verified: true,
-                  reason: 'Submit button click fallback triggered form submission',
-                  changes: fallbackVerification.changes
-                }
-              };
-            }
-          }
-          // Submit button not found or click had no effect either -- continue to next selector
-          lastAttemptError = `Enter key pressed but form submission had no effect${submitButton ? ' (submit button fallback also failed)' : ' (no submit button found in form)'}`;
-          continue;
+          return {
+            success: false,
+            outcome: 'unknown',
+            mayHaveExecuted: true,
+            key: 'Enter',
+            selector: currentSelector,
+            hadEffect: false,
+            error: 'Enter was dispatched but submission could not be confirmed. Inspect the page before retrying.',
+            verification
+          };
         }
 
         actionRecorder.record(null, 'pressEnter', params, {
@@ -4683,12 +4509,26 @@ const tools = {
         if (response.success) {
           return { success: true, key, method: 'debuggerAPI', target: selector || 'activeElement', result: response.result };
         } else {
+          if (response.result?.keyDownDispatched || response.result?.mayHaveExecuted) {
+            return {
+              success: false,
+              outcome: 'unknown',
+              mayHaveExecuted: true,
+              key,
+              error: 'The key may have reached the page. Inspect its effect before retrying.'
+            };
+          }
           cdpError = (response && response.error) || 'debugger API returned failure';
           logger.logRecovery(FSB.sessionId, 'debugger_api_failed', 'dom_events_fallback', 'started', { error: response.error });
         }
       } catch (error) {
-        cdpError = error.message || 'debugger API unavailable';
-        logger.logRecovery(FSB.sessionId, 'debugger_api_unavailable', 'dom_events_fallback', 'started', { error: error.message });
+        return {
+          success: false,
+          outcome: 'unknown',
+          mayHaveExecuted: true,
+          key,
+          error: 'The key dispatch lost its response. Inspect the page before retrying.'
+        };
       }
     }
 

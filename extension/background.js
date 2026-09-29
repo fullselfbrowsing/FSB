@@ -5886,6 +5886,7 @@ async function collectMcpDiagnosticsSnapshot() {
 // Enhanced content script injection with retry logic and page load checks
 async function ensureContentScriptInjected(tabId, maxRetries = 3) {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    let messageDispatched = false;
     try {
       // Wait for page to be fully loaded before health check
       const tab = await chrome.tabs.get(tabId);
@@ -10018,6 +10019,7 @@ async function sendMessageWithRetry(tabId, message, maxRetries = 3) {
 
       // CRITICAL: Use frameId: 0 to target ONLY the main frame
       // This prevents responding from iframes (like Google's RotateCookiesPage iframe)
+      messageDispatched = true;
       const response = await chrome.tabs.sendMessage(tabId, message, { frameId: 0 });
       
       // Success - reset health tracking
@@ -10032,6 +10034,18 @@ async function sendMessageWithRetry(tabId, message, maxRetries = 3) {
     } catch (error) {
       const failureType = classifyFailure(error, message);
       automationLogger.logComm(null, 'send', message.action || 'unknown', false, { tabId, attempt, failureType, error: error.message });
+
+      // A closed port can mean the page acted and navigated before replying.
+      // Only the explicit "no receiving end" error proves non-delivery.
+      if (message.action === 'executeAction' && messageDispatched
+        && !/receiving end does not exist/i.test(error.message || '')) {
+        return {
+          success: false,
+          outcome: 'unknown',
+          mayHaveExecuted: true,
+          error: 'The action may have run before the content-script connection closed. Inspect the page before retrying.'
+        };
+      }
       
       // Update health tracking
       const health = contentScriptHealth.get(tabId) || { failures: 0 };
@@ -10135,14 +10149,9 @@ async function tryAlternativeAction(sessionId, originalAction, originalError) {
   
   // Click action alternatives
   if (tool === 'click') {
-    alternatives.push(
-      // Try different click methods
-      { tool: 'doubleClick', params, description: `Try double-click instead` },
-      { tool: 'rightClick', params, description: `Try right-click to trigger context` },
-      // Try hovering first
-      { tool: 'hover', params, description: `Hover before clicking` },
-      { tool: 'click', params: { ...params, forceClick: true }, description: `Force click ignoring visibility` }
-    );
+    // A dispatched click may have mutated the page even without a visible
+    // response. The caller must inspect state before choosing another action.
+    return null;
   }
   
   // Selector alternatives for any action with selector

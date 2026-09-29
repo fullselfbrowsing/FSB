@@ -426,6 +426,16 @@ export function mapFSBError(
     return { content: [{ type: 'text', text: JSON.stringify(fsbResult, null, 2) }] };
   }
 
+  if (fsbResult?.mayHaveExecuted === true) {
+    return {
+      isError: true,
+      content: [{
+        type: 'text',
+        text: `Detected: Action outcome unknown\nWhy: ${String(fsbResult.error || 'The action was dispatched but its result was not confirmed.')}\nNext action: Inspect the current page with read_page or get_dom_snapshot before deciding whether to retry.\n\n${JSON.stringify({ outcome: 'unknown', mayHaveExecuted: true })}`,
+      }],
+    };
+  }
+
   const errorMsg = String(fsbResult?.error ?? '');
   const validRecoveryTools = getValidRecoveryTools(fsbResult);
   const errorKey = resolveErrorKey(fsbResult, errorMsg);
