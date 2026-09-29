@@ -239,6 +239,80 @@ async function runRejectsUntrustedBrowserOrigin(WebSocketBridge) {
   }
 }
 
+/**
+ * Connect with (or without) an Origin header and report whether the hub closed
+ * us. Unlike attemptRelayWithOrigin, a socket that STAYS OPEN is the success
+ * case here, so the timer resolves rather than rejects.
+ */
+function relayOriginOutcome(port, origin) {
+  return new Promise((resolve, reject) => {
+    const options = origin ? { headers: { Origin: origin } } : {};
+    const socket = new WebSocket(`ws://127.0.0.1:${port}`, options);
+    let closed = null;
+    const timeout = setTimeout(() => {
+      socket.close();
+      resolve({ accepted: closed === null, close: closed });
+    }, 300);
+
+    socket.once('open', () => {
+      socket.send(JSON.stringify({ type: 'relay:hello', instanceId: 'origin-probe' }));
+    });
+    socket.once('close', (code, reason) => {
+      closed = { code, reason: reason.toString() };
+      clearTimeout(timeout);
+      resolve({ accepted: false, close: closed });
+    });
+    socket.once('error', (error) => {
+      clearTimeout(timeout);
+      reject(error);
+    });
+  });
+}
+
+/**
+ * Safari port: the extension may reach :7225 two ways, and BOTH must be
+ * accepted with no server configuration.
+ *
+ *   direct  -- Origin: safari-web-extension://<UUID>, needs the allowlist entry
+ *   native  -- the container app dials with URLSessionWebSocketTask, which
+ *              sends NO Origin header. That relies on the load-bearing
+ *              `if (!originHeader) return true` branch in
+ *              isAllowedWebSocketOrigin; this test is what stops someone
+ *              "hardening" it away.
+ */
+async function runAcceptsSafariAndOriginlessClients(WebSocketBridge) {
+  const port = await getFreePort();
+  const resources = {
+    sockets: [],
+    bridges: [
+      new WebSocketBridge({
+        port,
+        host: '127.0.0.1',
+        instanceId: 'test-hub-safari-origin',
+        handshakeTimeoutMs: 25
+      })
+    ]
+  };
+
+  try {
+    const hub = resources.bridges[0];
+    await hub.connect();
+
+    const safari = await relayOriginOutcome(port, 'safari-web-extension://4C6E0A1B-2F3D-4E5A-9B8C-7D6E5F4A3B2C');
+    assertEqual(safari.accepted, true, 'hub accepts a safari-web-extension:// origin');
+
+    const originless = await relayOriginOutcome(port, null);
+    assertEqual(originless.accepted, true,
+      'hub accepts an origin-less client (the Safari container app native transport)');
+
+    const evil = await relayOriginOutcome(port, 'https://evil.example');
+    assertEqual(evil.accepted, false, 'a untrusted web origin is still rejected');
+    assertEqual(evil.close.code, 1008, 'untrusted origin still closed with 1008');
+  } finally {
+    await cleanup(resources);
+  }
+}
+
 async function runHubExitPromotion(WebSocketBridge) {
   const resources = await createBridgePair(WebSocketBridge);
   try {
@@ -267,6 +341,7 @@ async function run() {
   await runCase('relay waits for extension reachability', () => runRelayWaitsForExtensionReachability(WebSocketBridge));
   await runCase('extension state broadcasts to relays', () => runExtensionStateBroadcastsToRelays(WebSocketBridge));
   await runCase('rejects untrusted browser relay origin', () => runRejectsUntrustedBrowserOrigin(WebSocketBridge));
+  await runCase('accepts safari + origin-less clients', () => runAcceptsSafariAndOriginlessClients(WebSocketBridge));
   await runCase('hub-exit-promotion', () => runHubExitPromotion(WebSocketBridge));
 
   console.log(`\n=== Results: ${passed} passed, ${failed} failed ===`);

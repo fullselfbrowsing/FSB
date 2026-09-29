@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>FSB - Onboarding</title>
-  <link rel="stylesheet" href="../assets/onboarding/fontawesome/css/all.min.css">
+  <link rel="stylesheet" href="../assets/vendor/fontawesome/css/all.min.css">
   <link rel="stylesheet" href="onboarding.css">
 </head>
 <body>
@@ -39,6 +39,10 @@
       <span id="obToastMsg"></span>
     </div>
   </main>
+  <!-- Platform capability shim. MUST be the first script: it installs the
+       Safari stand-ins for chrome.debugger / sidePanel / offscreen before
+       any page script touches them. Inert no-op on Chrome. -->
+  <script src="../utils/platform-adapter.js"></script>
   <script src="onboarding.js"></script>
 </body>
 </html>

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <title>FSB - Side Panel</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css" integrity="sha512-Kc323vGBEqzTmouAECnVceyQqyqdsSiqLQISBL29aUW4U/M7pSPA/gEUZQqv1cwx4OnYxTxve5UMg5GT6L4JJg==" crossorigin="anonymous" referrerpolicy="no-referrer">
+  <link rel="stylesheet" href="../assets/vendor/fontawesome/css/all.min.css">
   <link rel="stylesheet" href="../shared/fsb-ui-core.css">
   <link rel="stylesheet" href="sidepanel.css">
   <link rel="stylesheet" href="markdown.css">
@@ -144,6 +144,10 @@
     </div>
   </div>
   
+  <!-- Platform capability shim. MUST be the first script: it installs the
+       Safari stand-ins for chrome.debugger / sidePanel / offscreen before
+       any page script touches them. Inert no-op on Chrome. -->
+  <script src="../utils/platform-adapter.js"></script>
   <script src="../lib/marked.min.js"></script>
   <script src="../lib/purify.min.js"></script>
   <script src="../lib/mermaid.min.js"></script>

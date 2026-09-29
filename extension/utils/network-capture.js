@@ -284,6 +284,20 @@
     var maxMs = (typeof opts.maxMs === 'number' && opts.maxMs > 0) ? opts.maxMs : DEFAULT_MAX_MS;
     var maxCount = (typeof opts.maxCount === 'number' && opts.maxCount > 0) ? opts.maxCount : DEFAULT_MAX_COUNT;
 
+    // Safari: no CDP, so there is no Network domain to enable. Report the
+    // SAME reason as a missing debugger surface -- semantically that is exactly
+    // what this is, and callers already distinguish it from a consent refusal.
+    //
+    // Deliberately placed AFTER the consent gate above so consent is still
+    // evaluated first on every path; the gate stays the security chokepoint.
+    // Note this cannot be folded into the `dbg` check below: the platform shim
+    // DOES expose attach/sendCommand (they reject), so that check would pass
+    // and we would mislabel this as RECIPE_CAPTURE_ATTACH_FAILED.
+    if (globalThis.FsbPlatform && globalThis.FsbPlatform.caps &&
+        globalThis.FsbPlatform.caps.networkBodies === false) {
+      return { ok: false, reason: 'RECIPE_CAPTURE_UNAVAILABLE' };
+    }
+
     var dbg = _chromeDebugger();
     if (!dbg || typeof dbg.attach !== 'function' || typeof dbg.sendCommand !== 'function') {
       // No debugger surface available -- cannot capture. This is NOT a consent

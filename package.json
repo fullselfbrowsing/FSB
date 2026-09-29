@@ -31,7 +31,10 @@
     "showcase:serve": "npm --prefix showcase/angular run start",
     "showcase:smoke": "npm --prefix showcase/angular run smoke:crawler:local",
     "validate:extension": "node scripts/validate-extension.mjs && node scripts/verify-recipe-path-guard.mjs && node scripts/verify-classification-gate.mjs && node scripts/verify-catalog-crosscheck.mjs && node scripts/verify-no-duplicate-stem.mjs && node scripts/verify-origin-classification.mjs && node scripts/verify-pattern-d-gapi-gate.mjs && node --import tsx scripts/verify-no-orphan-descriptor.mjs && node scripts/verify-t1-readiness-gate.mjs && node tests/t1-tail-worklist.test.js && node tests/generated-same-origin-read-recipes.test.js && node tests/t1-terminal-states.test.js && node scripts/verify-t1-port-contract.mjs && node scripts/verify-write-activation-evidence.mjs && node tests/write-activation-evidence.test.js",
-    "ci": "npm run validate:extension && npm test && npm run test:mcp-smoke && npm run showcase:build && npm run showcase:smoke"
+    "ci": "npm run validate:extension && npm test && npm run build:safari && npm run validate:safari && npm run test:safari && npm run test:mcp-smoke && npm run showcase:build && npm run showcase:smoke",
+    "build:safari": "node esbuild.config.js && node scripts/build-safari.mjs && node scripts/sync-safari-version.mjs",
+    "validate:safari": "node scripts/validate-extension.mjs --root=build/safari --profile=safari",
+    "test:safari": "node tests/platform-adapter.test.js && node tests/build-safari-manifest.test.js && node tests/safari-source-parity.test.js && node tests/safari-preamble-smoke.test.js && node tests/actions-pointer-fallbacks.test.js && node tests/cdp-degradation-routing.test.js && node tests/mcp-native-transport.test.js && node tests/upload-file-safari-native.test.js && node tests/safari-version-parity.test.js"
   },
   "keywords": [
     "chrome-extension",

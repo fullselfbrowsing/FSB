@@ -87,7 +87,13 @@ export class WebSocketBridge {
     this.relayHandshakeTimeoutMs = options.relayHandshakeTimeoutMs ?? 5_000;
     this.promotionJitterMs = options.promotionJitterMs ?? 500;
     this.maxReconnectDelayMs = options.maxReconnectDelayMs ?? 30_000;
-    this.allowedBrowserOrigins = options.allowedBrowserOrigins ?? ['chrome-extension://'];
+    // Safari Web Extensions send Origin: safari-web-extension://<UUID>. Without
+    // this the server closes them with 1008 'Forbidden origin', which surfaces
+    // in the extension only as a bare onclose -> endless 2s..30s backoff with
+    // no diagnostic. Harmless on Chrome, so it ships regardless of which
+    // transport Safari ends up using.
+    this.allowedBrowserOrigins = options.allowedBrowserOrigins ??
+      ['chrome-extension://', 'safari-web-extension://'];
   }
 
   // --------------------------------------------------------------------------
@@ -294,6 +300,17 @@ export class WebSocketBridge {
     });
   }
 
+  /**
+   * LOAD-BEARING: the `if (!originHeader) return true` branch below is what
+   * lets the Safari NATIVE transport work with zero server changes.
+   *
+   * On Safari the container app may hold the socket to :7225 on the
+   * extension's behalf, dialling with URLSessionWebSocketTask -- a non-browser
+   * client that sends no Origin header at all. "Hardening" this to reject
+   * origin-less connections would silently break the entire Safari MCP path.
+   * If you need to tighten it, gate on something else (a shared secret in the
+   * first frame), not on the presence of Origin.
+   */
   private isAllowedWebSocketOrigin(req: IncomingMessage): boolean {
     const originHeader = req.headers.origin;
     if (!originHeader) return true;

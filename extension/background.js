@@ -14881,6 +14881,65 @@ async function executeUploadFile(tabId, selector, filePath) {
     fileName = denylist.basenameOf(filePath);
     automationLogger.logActionExecution(null, 'cdpUploadFile', 'start', { tabId, selector, file: fileName });
 
+    // Safari has no CDP, so DOM.setFileInputFiles does not exist. The container
+    // app reads the bytes -- but ONLY inside a folder the user granted, because
+    // App Sandbox forbids reading arbitrary absolute paths -- and a content
+    // script sets them on the input via DataTransfer.
+    //
+    // This sits AFTER the denylist + audit gate above on purpose: a denied path
+    // must never reach the native host. The bookmark containment check in the
+    // app is a SECOND, independent constraint, not a replacement for the gate.
+    //
+    // globalThis.FsbPlatform is undefined on Chrome and in the chokepoint test
+    // harness, so Chrome always continues to the CDP path below.
+    if (globalThis.FsbPlatform && globalThis.FsbPlatform.caps && globalThis.FsbPlatform.caps.cdp === false) {
+      const reader = globalThis.FsbNativeFileReader;
+      if (!reader || typeof reader.readFile !== 'function') {
+        automationLogger.logActionExecution(null, 'cdpUploadFile', 'complete', { success: false, tabId, blocked: true, reason: 'native-reader-unavailable' });
+        await audit('blocked', 'native-reader-unavailable', null);
+        return { success: false, error: 'upload_file blocked: the native file reader is unavailable', reason: 'native-reader-unavailable' };
+      }
+
+      const read = await reader.readFile(filePath);
+      if (!read || read.ok !== true) {
+        const readReason = (read && read.reason) ? read.reason : 'native-read-failed';
+        automationLogger.logActionExecution(null, 'cdpUploadFile', 'complete', { success: false, tabId, blocked: true, reason: readReason });
+        await audit('blocked', readReason, null);
+        return {
+          success: false,
+          error: 'upload_file blocked: ' + ((read && read.message) ? read.message : 'the file could not be read'),
+          reason: readReason
+        };
+      }
+
+      const applied = await chrome.tabs.sendMessage(tabId, {
+        action: 'executeAction',
+        tool: 'domSetFileInput',
+        params: { selector, name: read.name, mime: read.mime, dataB64: read.dataB64 }
+      });
+      if (!applied || applied.success === false) {
+        const appliedMsg = (applied && applied.error) ? applied.error : 'the page did not accept the file';
+        automationLogger.logActionExecution(null, 'cdpUploadFile', 'complete', { success: false, tabId, error: redactPathForUploadLog(appliedMsg) });
+        await audit('error', 'allow', null);
+        return { success: false, error: 'upload_file failed: ' + redactPathForUploadLog(appliedMsg) };
+      }
+
+      automationLogger.logActionExecution(null, 'cdpUploadFile', 'complete', { success: true, tabId, selector, file: fileName });
+      await audit('success', 'allow', null);
+      // trusted:false is not cosmetic -- a site gating on event.isTrusted will
+      // reject this even though input.files is genuinely populated.
+      return {
+        success: true,
+        method: 'dom_set_file_input',
+        selector,
+        file: fileName,
+        size: read.size,
+        trusted: false,
+        degraded: true,
+        hadEffect: true
+      };
+    }
+
     if (keyboardEmulator && keyboardEmulator.isAttachedTo(tabId)) {
       try { await keyboardEmulator.detachDebugger(tabId); } catch (_e) { /* ignore */ }
     }

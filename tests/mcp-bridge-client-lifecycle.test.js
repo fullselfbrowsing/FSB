@@ -115,9 +115,9 @@ function createRuntimeOnMessageMock() {
   };
 }
 
-function createChromeMock() {
+function createChromeMock(localSeed) {
   const session = createStorageArea();
-  const local = createStorageArea();
+  const local = createStorageArea(localSeed || {});
   const alarms = new Map();
   const cleared = [];
   return {
@@ -182,7 +182,7 @@ function createFakeWebSocketClass(options = {}) {
 }
 
 function buildClientHarness(options = {}) {
-  const chrome = createChromeMock();
+  const chrome = createChromeMock(options.storageLocalSeed);
   const timers = createFakeTimers();
   const FakeWebSocket = createFakeWebSocketClass(options);
   const deterministicMath = Object.create(Math);
@@ -196,6 +196,7 @@ function buildClientHarness(options = {}) {
     Date,
     EventTarget,
     CustomEvent,
+    TextEncoder,
     setTimeout: timers.setTimeout,
     clearTimeout: timers.clearTimeout,
     setInterval: timers.setInterval,
@@ -208,6 +209,16 @@ function buildClientHarness(options = {}) {
   // captures it. background.js installs this on globalThis in real Chrome.
   if (options.installLifecycleBus) {
     context.fsbAutomationLifecycleBus = new EventTarget();
+  }
+
+  // Transport selection reads globalThis.FsbPlatform. It is undefined on
+  // Chrome and in every other harness here, which is exactly what keeps the
+  // Chrome path at `new WebSocket(...)` with no policy machinery at all.
+  if (options.platform === 'safari') {
+    context.FsbPlatform = { id: 'safari', caps: { cdp: false, trustedInput: false } };
+  }
+  if (options.nativeSocketClass) {
+    context.FsbNativeBridgeSocket = options.nativeSocketClass;
   }
 
   const source = fs.readFileSync(path.join(__dirname, '..', 'extension', 'ws', 'mcp-bridge-client.js'), 'utf8');
@@ -574,7 +585,152 @@ function runBackgroundArmingSourceCase() {
   }
 }
 
+/**
+ * Safari transport selection (ws probe -> native pin), including the TTL.
+ *
+ * The pin is remembered in chrome.storage.local for 7 days. _transportPlan()
+ * stops honouring it once it ages out and goes back to probing ws -- so the
+ * outcome recorder MUST score those attempts. When it did not, an expired
+ * native pin was permanent in one direction and unreachable in the other: the
+ * plan said ws, the recorder said "already native, nothing to score", and the
+ * bridge retried a transport that cannot work on that browser forever.
+ */
+async function runSafariTransportPolicyCase() {
+  console.log('\n--- Safari transport policy ---');
+  const TTL = 7 * 24 * 60 * 60 * 1000;
+  const KEY = 'fsbMcpTransportPolicy';
+
+  async function clientWith(policy) {
+    const harness = buildClientHarness({
+      platform: 'safari',
+      storageLocalSeed: policy ? { [KEY]: policy } : undefined
+    });
+    const client = new harness.exports.MCPBridgeClient();
+    await client._policyHydrating;
+    await flushMicrotasks();
+    return { harness, client };
+  }
+
+  // 1. A fresh native pin is honoured.
+  {
+    const { client } = await clientWith({ decided: 'native', decidedAt: Date.now(), wsAttempts: 2 });
+    assertEqual(client._transportPlan(), 'native', 'fresh native pin selects the native transport');
+  }
+
+  // 2. An expired pin re-probes ws.
+  {
+    const { client } = await clientWith({ decided: 'native', decidedAt: Date.now() - TTL - 1, wsAttempts: 2 });
+    assertEqual(client._transportPlan(), 'ws', 'expired native pin falls back to probing ws');
+
+    // ...and the re-probe is scored. Two strikes, from zero -- not inherited
+    // from the attempt count that pinned it last time.
+    client._activeTransport = 'ws';
+    client._recordTransportOutcome('fail', 'socket_close');
+    assertEqual(client._transportPlan(), 'ws', 'one failed re-probe does not re-pin');
+    client._recordTransportOutcome('fail', 'socket_close');
+    assertEqual(client._transportPlan(), 'native', 'a second failure re-pins to native');
+    assert(client._transportPolicy.decidedAt > Date.now() - 5000, 'the renewed pin carries a fresh timestamp');
+  }
+
+  // 3. A working ws under an expired pin wins outright.
+  {
+    const { client } = await clientWith({ decided: 'native', decidedAt: Date.now() - TTL - 1, wsAttempts: 2 });
+    client._activeTransport = 'ws';
+    client._recordTransportOutcome('open');
+    assertEqual(client._transportPlan(), 'ws', 'a successful ws re-probe pins ws');
+  }
+
+  // 4. A live native pin still suppresses scoring, so a plain server outage
+  //    cannot flap the transport back to ws.
+  {
+    const { client } = await clientWith({ decided: 'native', decidedAt: Date.now(), wsAttempts: 2 });
+    client._activeTransport = 'native';
+    client._recordTransportOutcome('fail', 'socket_close');
+    assertEqual(client._transportPlan(), 'native', 'native failures never re-enable ws');
+  }
+
+  // 5. Chrome never enters any of it.
+  {
+    const harness = buildClientHarness();
+    const client = new harness.exports.MCPBridgeClient();
+    assertEqual(client._policyHydrating, null, 'Chrome does not hydrate a transport policy');
+    assertEqual(client._transportPlan(), 'ws', 'Chrome always plans ws');
+    client._recordTransportOutcome('fail', 'security');
+    assertEqual(client._transportPolicy, null, 'Chrome never records a transport policy');
+  }
+
+  // 6. A LIVE ws pin suppresses scoring, symmetrically with the native pin.
+  //
+  //    Without this the probe is one-way: ws gets pinned on first success, then
+  //    the very next time the MCP server is stopped -- a separate local process
+  //    the user starts on demand -- two failed reconnects (~4s at base backoff)
+  //    demote a transport this browser has already PROVEN, for the full 7-day
+  //    TTL. The onclose guard cannot catch it: `!this._connected` only describes
+  //    the current attempt, not "ws has worked here before".
+  {
+    const { client } = await clientWith({ decided: 'ws', decidedAt: Date.now(), wsAttempts: 0 });
+    client._activeTransport = 'ws';
+    client._recordTransportOutcome('fail', 'socket_close');
+    client._recordTransportOutcome('fail', 'socket_close');
+    assertEqual(client._transportPlan(), 'ws',
+      'a live ws pin survives a server outage instead of demoting to native');
+    assertEqual(client._transportPolicy.wsAttempts, 0,
+      'failures under a live ws pin are not scored at all');
+  }
+
+  // 7. Every successful open RENEWS the ws pin. A pin that only ever got its
+  //    timestamp on the first connect ages out while the transport is plainly
+  //    working, which reopens case 6 the moment the TTL lapses.
+  {
+    const aging = Date.now() - TTL + 60_000;
+    const { client } = await clientWith({ decided: 'ws', decidedAt: aging, wsAttempts: 0 });
+    client._activeTransport = 'ws';
+    client._recordTransportOutcome('open');
+    assert(client._transportPolicy.decidedAt > aging, 'a successful open refreshes an aging ws pin');
+    assert(client._policyIsFresh(client._transportPolicy), 'the renewed ws pin is fresh again');
+  }
+}
+
+/**
+ * The native transport's payload ceiling is a BYTE budget, so the guard in
+ * _sendResult has to measure bytes. JSON.stringify(...).length counts UTF-16
+ * units, which under-reports a CJK or emoji payload by up to 3x -- exactly the
+ * oversized result the guard exists to refuse would sail through it and get
+ * base64-chunked over XPC anyway.
+ *
+ * softPayloadLimit is an own property of the native transport and undefined on
+ * a real WebSocket, so Chrome never reaches any of this.
+ */
+async function runNativePayloadCapCase() {
+  console.log('\n--- native payload cap is measured in bytes ---');
+
+  const harness = buildClientHarness({ platform: 'safari' });
+  const client = new harness.exports.MCPBridgeClient();
+
+  const CAP = 1000;
+  const sent = [];
+  client._ws = { softPayloadLimit: CAP, readyState: 1, send: (s) => sent.push(s) };
+
+  // 600 CJK chars = 1800 UTF-8 bytes: under the cap by .length, over it by bytes.
+  const text = '\u6587'.repeat(600);
+  assert(text.length < CAP, 'fixture is under the cap by UTF-16 length');
+  assert(new TextEncoder().encode(text).length > CAP, 'fixture is over the cap in UTF-8 bytes');
+
+  client._sendResult('req-1', { text });
+  assertEqual(sent.length, 1, 'exactly one frame goes out');
+  const frame = JSON.parse(sent[0]);
+  assertEqual(frame.type, 'mcp:error', 'an over-cap multibyte result is refused, not chunked');
+  assert(/payload_too_large/.test(frame.payload.error), 'the refusal names payload_too_large');
+
+  // An ASCII result that genuinely fits still goes through untouched.
+  sent.length = 0;
+  client._sendResult('req-2', { text: 'a'.repeat(100) });
+  assertEqual(JSON.parse(sent[0]).type, 'mcp:result', 'an in-budget result is still delivered');
+}
+
 async function run() {
+  await runSafariTransportPolicyCase();
+  await runNativePayloadCapCase();
   await runBrowserFirstReconnectCase();
   await runServiceWorkerWakeCase();
   await runConnectedTransitionCase();
