@@ -1582,6 +1582,7 @@ class MCPBridgeClient {
    * MV3 content script lifecycle properly.
    */
   async _sendToContentScript(tabId, message) {
+    const operation = async () => {
     // sendMessageWithRetry is defined in background.js (same scope)
     if (typeof sendMessageWithRetry === 'function') {
       return await sendMessageWithRetry(tabId, message);
@@ -1599,6 +1600,28 @@ class MCPBridgeClient {
         resolve(response || {});
       });
     });
+    };
+    let timer;
+    try {
+      return await Promise.race([
+        operation(),
+        new Promise((resolve) => {
+          timer = setTimeout(() => resolve(message.action === 'executeAction'
+            ? { success: false, outcome: 'unknown', mayHaveExecuted: true,
+                errorCode: 'PAGE_UNRESPONSIVE', error: 'The page did not answer. Inspect its state before retrying.' }
+            : { success: false, errorCode: 'PAGE_UNRESPONSIVE',
+                error: 'The page did not answer within 12 seconds.' }), 12000);
+        })
+      ]);
+    } catch (error) {
+      return message.action === 'executeAction'
+        ? { success: false, outcome: 'unknown', mayHaveExecuted: true,
+            errorCode: 'PAGE_UNRESPONSIVE', error: 'The page did not answer. Inspect its state before retrying.' }
+        : { success: false, errorCode: 'PAGE_UNRESPONSIVE',
+            error: `The page did not answer: ${error?.message || String(error)}` };
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   async _handleGetTabs(payload = {}) {
@@ -1730,11 +1753,11 @@ class MCPBridgeClient {
     if (!Number.isFinite(tabId) || tabId <= 0) return;
     if (typeof agentId !== 'string' || !agentId) return;
     try {
-      await MCPVisualSessionLifecycleUtils.recordVisualSessionTick(tabId, agentId, {
+      await Promise.race([MCPVisualSessionLifecycleUtils.recordVisualSessionTick(tabId, agentId, {
         visualReason: typeof sidecar.visualReason === 'string' ? sidecar.visualReason : '',
         client: typeof sidecar.client === 'string' ? sidecar.client : '',
         isFinal: sidecar.isFinal === true
-      });
+      }), new Promise((resolve) => setTimeout(resolve, 750))]);
     } catch (err) {
       // Non-blocking: lifecycle failures must not break the underlying action.
       // The overlay simply does not light up. The action still executes per
@@ -1777,7 +1800,8 @@ class MCPBridgeClient {
     if (!Number.isFinite(tabId) || tabId <= 0) return;
     if (typeof agentId !== 'string' || !agentId) return;
     try {
-      await MCPVisualSessionLifecycleUtils.clearVisualSession(tabId, { reason: 'is_final' });
+      await Promise.race([MCPVisualSessionLifecycleUtils.clearVisualSession(tabId, { reason: 'is_final' }),
+        new Promise((resolve) => setTimeout(resolve, 750))]);
     } catch (err) {
       // Non-blocking: lifecycle failures must not break the underlying action.
       console.warn('[FSB MCP] clearVisualSession (is_final) failed (non-blocking):', err && err.message);

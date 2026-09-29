@@ -1149,12 +1149,15 @@ async function sendSessionStatus(tabId, statusData) {
     ...(statusData?.sessionId ? { sessionId: statusData.sessionId } : {})
   };
   try {
-    await chrome.tabs.sendMessage(tabId, payload, { frameId: 0 });
+    await Promise.race([chrome.tabs.sendMessage(tabId, payload, { frameId: 0 }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Status probe timed out')), 750))]);
   } catch (firstErr) {
     // First attempt failed -- try re-injecting the content script and retry once
     try {
-      await ensureContentScriptInjected(tabId, 1);
-      await chrome.tabs.sendMessage(tabId, payload, { frameId: 0 });
+      await Promise.race([ensureContentScriptInjected(tabId, 1),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Status reinjection timed out')), 1000))]);
+      await Promise.race([chrome.tabs.sendMessage(tabId, payload, { frameId: 0 }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Status retry timed out')), 750))]);
     } catch (retryErr) {
       automationLogger.debug('sendSessionStatus delivery failed', {
         tabId, phase: statusData.phase, error: retryErr.message
@@ -5884,9 +5887,26 @@ async function collectMcpDiagnosticsSnapshot() {
 }
 
 // Enhanced content script injection with retry logic and page load checks
+const contentScriptInjectionFlights = new Map();
 async function ensureContentScriptInjected(tabId, maxRetries = 3) {
+  let flight = contentScriptInjectionFlights.get(tabId);
+  if (!flight) {
+    flight = ensureContentScriptInjectedUnlocked(tabId, maxRetries);
+    contentScriptInjectionFlights.set(tabId, flight);
+    flight.finally(() => {
+      if (contentScriptInjectionFlights.get(tabId) === flight) contentScriptInjectionFlights.delete(tabId);
+    }).catch(() => {});
+  }
+  return Promise.race([flight,
+    new Promise((_, reject) => setTimeout(() => {
+      const error = new Error('Content script injection timed out');
+      error.code = 'PAGE_UNRESPONSIVE';
+      reject(error);
+    }, 12000))]);
+}
+
+async function ensureContentScriptInjectedUnlocked(tabId, maxRetries = 3) {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    let messageDispatched = false;
     try {
       // Wait for page to be fully loaded before health check
       const tab = await chrome.tabs.get(tabId);
@@ -5910,6 +5930,11 @@ async function ensureContentScriptInjected(tabId, maxRetries = 3) {
 
       // Check port connection first - most reliable indicator
       const portInfo = contentScriptPorts.get(tabId);
+      if (portInfo && Date.now() - portInfo.lastHeartbeat >= 10000) {
+        try { portInfo.port.disconnect(); } catch (_error) {}
+        contentScriptPorts.delete(tabId);
+        contentScriptReadyStatus.delete(tabId);
+      }
       if (portInfo && Date.now() - portInfo.lastHeartbeat < 10000) {
         automationLogger.logComm(null, 'health', 'port_healthy', true, { tabId, source: 'port' });
         return true;
@@ -9998,6 +10023,7 @@ async function fsbRestoreLatticeReplayCheckpoints() {
 
 // Enhanced message sending with automatic retry and fallback
 async function sendMessageWithRetry(tabId, message, maxRetries = 3) {
+  let messageDispatched = false;
   // Capture URL before sending - used to detect if action triggered navigation
   let previousUrl = null;
   try {
@@ -10127,10 +10153,14 @@ async function sendMessageWithRetry(tabId, message, maxRetries = 3) {
 
 // Alternative action strategies for failed operations
 async function tryAlternativeAction(sessionId, originalAction, originalError) {
+  if (originalError?.mayHaveExecuted || originalError?.outcome === 'unknown') return null;
   const session = activeSessions.get(sessionId);
   if (!session) return null;
   
   const { tool, params } = originalAction;
+  if (['type', 'type_text', 'insert_text', 'press_key', 'press_enter'].includes(tool)) {
+    return null;
+  }
   const alternatives = [];
   
   // Type action alternatives

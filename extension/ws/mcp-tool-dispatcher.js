@@ -3788,12 +3788,16 @@ async function _injectFn(tabId, func, args) {
     return null;
   }
   try {
-    const results = await chrome.scripting.executeScript({
+    const injection = chrome.scripting.executeScript({
       target: { tabId },
       world: 'MAIN',
       func,
       args: args || []
     });
+    const results = await Promise.race([
+      injection,
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Page injection timed out')), 750))
+    ]);
     return results && results[0] ? results[0].result : null;
   } catch (_) {
     return null;
@@ -3838,7 +3842,8 @@ async function wrapWithChangeReport(ctx) {
   // Gate 2: global toggle
   const globalOn = !!fsbChangeReportsEnabled;
 
-  if (!flagOn || !globalOn || !Number.isFinite(tabId)) {
+  if (!flagOn || !globalOn || !Number.isFinite(tabId) ||
+      ['navigate', 'close_tab', 'refresh', 'go_back', 'go_forward', 'open_tab', 'switch_tab'].includes(toolName)) {
     return execute();
   }
 
