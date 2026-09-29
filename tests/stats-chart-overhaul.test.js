@@ -288,9 +288,9 @@ function commitPunchcardLocal(commits) {
   check('stats globe: redrawChart keeps the running globe when regions are unchanged',
     /if\s*\(this\.stopGlobe\s*&&\s*key\s*===\s*this\.lastGlobeKey\)\s*return;/.test(redrawBlock),
     'redrawChart() lacks the stopGlobe && key === lastGlobeKey early return');
-  check('stats globe: globe signature key derives from popular_regions and motion preference',
-    /JSON\.stringify\(\{[\s\S]*regions:\s*this\.latestFsbHeadline\?\.popular_regions\s*\?\?\s*\[\][\s\S]*reducedMotion:\s*this\.prefersReducedMotion/.test(redrawBlock),
-    'redrawChart() globe key does not include popular_regions + reducedMotion');
+  check('stats globe: globe signature key derives from globeRegionList and motion preference',
+    /JSON\.stringify\(\{[\s\S]*regions:\s*this\.globeRegionList[\s\S]*reducedMotion:\s*this\.prefersReducedMotion/.test(redrawBlock),
+    'redrawChart() globe key does not include globeRegionList + reducedMotion');
   check('stats globe: no unconditional globe teardown ahead of the fsb-active-now branch',
     redrawBlock.indexOf("selectedView === 'fsb-active-now'") !== -1 &&
       redrawBlock.indexOf("selectedView === 'fsb-active-now'") < redrawBlock.indexOf('this.stopGlobe?.();'),
@@ -373,7 +373,7 @@ function commitPunchcardLocal(commits) {
   check('stats globe: region values have an accessible fallback list',
     html.includes("[attr.aria-describedby]=\"accessibleGlobeData.length ? 'stats-globe-data' : null\"") &&
       html.includes('id="stats-globe-data"') &&
-      /get\s+accessibleGlobeData\(\)[\s\S]*popular_regions/.test(src),
+      /get\s+accessibleGlobeData\(\)[\s\S]*globeRegionList/.test(src),
     'globe canvas lacks a described region/count list');
 
   check('stats tabs: grid fallback covers narrow-tablet widths before clipping',

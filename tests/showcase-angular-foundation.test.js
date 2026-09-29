@@ -47,6 +47,7 @@ const shellComponentSource = readIfPresent('showcase/angular/src/app/layout/show
 const shellTemplateSource = readIfPresent('showcase/angular/src/app/layout/showcase-shell/showcase-shell.component.html');
 const shellStyleSource = readIfPresent('showcase/angular/src/app/layout/showcase-shell/showcase-shell.component.scss');
 const globalStylesSource = readIfPresent('showcase/angular/src/styles.scss');
+const languagePickerStyleSource = readIfPresent('showcase/angular/src/app/layout/language-picker/language-picker.component.scss');
 const themeServiceSource = readIfPresent('showcase/angular/src/app/core/theme.service.ts');
 const homeComponentSource = readIfPresent('showcase/angular/src/app/pages/home/home-page.component.ts');
 const homeStyleSource = readIfPresent('showcase/angular/src/app/pages/home/home-page.component.scss');
@@ -246,6 +247,19 @@ assert(
     /\.nav/.test(shellStyleSource) &&
     /\.footer/.test(shellStyleSource),
   'shared styles keep light-theme selector while shell styles own nav/footer/theme-toggle primitives'
+);
+
+assert(
+  /:root\s*\{[\s\S]*?color-scheme:\s*dark;/.test(globalStylesSource) &&
+    /\[data-theme="light"\]\s*\{[\s\S]*?color-scheme:\s*light;/.test(globalStylesSource),
+  'global theme tokens set color-scheme so native form controls follow dark/light mode'
+);
+
+assert(
+  /\.lang-picker__select\s*\{[\s\S]*?background-color:\s*var\(--bg-card\);/.test(languagePickerStyleSource) &&
+    /\.lang-picker__select\s*\{[\s\S]*?color-scheme:\s*inherit;/.test(languagePickerStyleSource) &&
+    !/background:\s*transparent/.test(languagePickerStyleSource),
+  'language picker select uses an opaque theme background instead of transparent UA Field'
 );
 
 assert(

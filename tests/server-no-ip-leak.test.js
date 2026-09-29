@@ -17,8 +17,9 @@
  *   - console.log / console.error references (the request-log middleware in
  *     server.js itself uses console.log and only records method/path/status/duration,
  *     NOT req.ip). console.log isn't in the grep list.
- *   - req.ip read inside the hashIp(req.ip, db) call site (this lives in routes
- *     and middleware; that's the SOLE permitted plaintext touch point).
+ *   - plaintext IP read inside clientIp(req) / hashIp(ipKeyGenerator(...), db)
+ *     / deriveRegion(...) call sites (routes + rate-limit middleware). Those
+ *     are the SOLE permitted plaintext touch points.
  *
  * Failure mode: process.exit(1) with the file path + line number + pattern name.
  *
@@ -93,40 +94,52 @@ for (const file of allFiles) {
 }
 
 // ---------------------------------------------------------------------------
-// Quick task 260630-hct -- POSITIVE assertion on the ingest route's req.ip
-// touchpoints. The ban-list above is necessary but not sufficient: it does not
-// pin HOW MANY times req.ip is referenced or in what form. The privacy invariant
-// (CONTEXT D-09 + 260630-hct) is that req.ip is referenced EXACTLY TWICE in
-// routes/telemetry.js -- once as an inline arg to hashIp() and once as an inline
-// arg to deriveRegion() -- and never assigned to an escaping local. This block
-// fails if a third (or un-inlined) req.ip reference is introduced. It permits
-// the geo-derive call site EXACTLY as it permits the existing hashIp call site;
-// it does NOT weaken any ban above.
+// POSITIVE assertion on the ingest route's plaintext-IP touchpoints.
+// The privacy invariant (CONTEXT D-09 + 260630-hct) is that the client IP is
+// referenced EXACTLY THREE times in routes/telemetry.js -- hashIp, deriveRegion,
+// and classifyIp -- each as an inline clientIp(req) argument, never assigned
+// to an escaping local.
+// Geo must NOT receive ipKeyGenerator's IPv6 /56 form (that is not an IPv4).
 const TELEMETRY_ROUTE = path.join(ROOT, 'routes', 'telemetry.js');
 const telemetrySrc = stripComments(fs.readFileSync(TELEMETRY_ROUTE, 'utf8'));
-const reqIpCount = (telemetrySrc.match(/req\.ip/g) || []).length;
-if (reqIpCount !== 2) {
-  console.error(`FAIL: routes/telemetry.js must reference req.ip EXACTLY TWICE (hashIp + deriveRegion); found ${reqIpCount}.`);
-  console.error('Each reference must be an inline argument; do NOT add a third touchpoint or an escaping local.');
+const clientIpCount = (telemetrySrc.match(/clientIp\(\s*req\s*\)/g) || []).length;
+if (clientIpCount !== 3) {
+  console.error(`FAIL: routes/telemetry.js must call clientIp(req) EXACTLY THREE times (hashIp + deriveRegion + classifyIp); found ${clientIpCount}.`);
+  console.error('Each reference must be an inline argument; do NOT add a fourth touchpoint or an escaping local.');
   process.exit(1);
 }
-// Each req.ip reference must be wrapped in ipKeyGenerator(req.ip) and passed
-// inline to hashIp( / deriveRegion(. Match the canonical inline forms.
-const HASHIP_INLINE = /hashIp\(\s*ipKeyGenerator\(\s*req\.ip\s*\)/;
-const DERIVE_INLINE = /deriveRegion\(\s*ipKeyGenerator\(\s*req\.ip\s*\)/;
+const HASHIP_INLINE = /hashIp\(\s*ipKeyGenerator\(\s*clientIp\(\s*req\s*\)\s*\)/;
+const DERIVE_INLINE = /deriveRegion\(\s*clientIp\(\s*req\s*\)/;
+const CLASSIFY_INLINE = /classifyIp\(\s*clientIp\(\s*req\s*\)/;
 if (!HASHIP_INLINE.test(telemetrySrc)) {
-  console.error('FAIL: routes/telemetry.js -- expected inline hashIp(ipKeyGenerator(req.ip), ...) call site missing.');
+  console.error('FAIL: routes/telemetry.js -- expected inline hashIp(ipKeyGenerator(clientIp(req)), ...) call site missing.');
   process.exit(1);
 }
 if (!DERIVE_INLINE.test(telemetrySrc)) {
-  console.error('FAIL: routes/telemetry.js -- expected inline deriveRegion(ipKeyGenerator(req.ip)) call site missing.');
+  console.error('FAIL: routes/telemetry.js -- expected inline deriveRegion(clientIp(req)) call site missing.');
   process.exit(1);
 }
-// Defensively reject an escaping plaintext-IP local even though the count==2
-// check already covers the common shapes (e.g. const ip = req.ip would push the
-// count to 3 if ip were reused, but a single-use alias would not).
-if (/\bconst\s+ip\s*=\s*req\.ip\b/.test(telemetrySrc)) {
-  console.error('FAIL: routes/telemetry.js introduces an escaping `const ip = req.ip` local; req.ip must stay inline.');
+if (!CLASSIFY_INLINE.test(telemetrySrc)) {
+  console.error('FAIL: routes/telemetry.js -- expected inline classifyIp(clientIp(req)) call site missing.');
+  process.exit(1);
+}
+if (/deriveRegion\(\s*ipKeyGenerator\(/.test(telemetrySrc)) {
+  console.error('FAIL: routes/telemetry.js must not pass ipKeyGenerator(...) into deriveRegion (IPv6 /56 is not geolocatable).');
+  process.exit(1);
+}
+if (/\bconst\s+ip\s*=\s*(req\.ip|clientIp\()/.test(telemetrySrc)) {
+  console.error('FAIL: routes/telemetry.js introduces an escaping plaintext-IP local; clientIp(req) must stay inline.');
+  process.exit(1);
+}
+
+const CLIENT_IP_UTIL = path.join(ROOT, 'utils', 'client-ip.js');
+const clientIpSrc = stripComments(fs.readFileSync(CLIENT_IP_UTIL, 'utf8'));
+if (!/Fly-Client-IP/.test(clientIpSrc)) {
+  console.error('FAIL: utils/client-ip.js must read the Fly-Client-IP header (req.ip on Fly is the anycast hop).');
+  process.exit(1);
+}
+if (/\bconsole\.(log|info|debug|warn|error)\b/.test(clientIpSrc)) {
+  console.error('FAIL: utils/client-ip.js must not log (plaintext IP).');
   process.exit(1);
 }
 
@@ -143,6 +156,6 @@ if (violations.length > 0) {
 console.log(`PASS: scanned ${allFiles.length} .js files under showcase/server/src/`);
 console.log(`  - 6 banned middleware patterns: morgan, winston, express-winston, express-logger, pino-http, express-pino-logger`);
 console.log(`  - 3 leak-pattern checks: fs.write/append + req.ip, fs.write/appendSync + req.ip, container.{push|set|add}(req.ip)`);
-console.log(`  - Positive assertion: routes/telemetry.js references req.ip EXACTLY TWICE, inline to hashIp() + deriveRegion(); no escaping local (260630-hct)`);
+console.log(`  - Positive assertion: routes/telemetry.js calls clientIp(req) EXACTLY THREE times, inline to hashIp(ipKeyGenerator(...)) + deriveRegion() + classifyIp(); no /56-into-geo; no escaping local`);
 console.log(`  - Files scanned: ${allFiles.map(f => path.relative(path.join(__dirname, '..'), f)).join(', ')}`);
 process.exit(0);
