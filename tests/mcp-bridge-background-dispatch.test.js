@@ -493,6 +493,9 @@ async function runListCredentialsSecretStripCase() {
   const harness = buildClientHarness({
     fsbDispatchInternalMessage(request) {
       dispatchCalls.push(request);
+      if (request.action === 'getCredentialVaultStatus') {
+        return Promise.resolve({ configured: true, unlocked: true });
+      }
       return Promise.resolve({
         success: true,
         credentials: [
@@ -505,8 +508,9 @@ async function runListCredentialsSecretStripCase() {
   const client = harness.exports.mcpBridgeClient;
 
   const result = await client._routeMessage('mcp:list-credentials', {}, 'msg-1');
-  assertEqual(dispatchCalls.length, 1, 'list-credentials dispatches once through the internal path');
-  assertDeepEqual(dispatchCalls[0], { action: 'getAllCredentials' }, 'list-credentials sends the getAllCredentials action');
+  assertEqual(dispatchCalls.length, 2, 'list-credentials checks vault state before listing');
+  assertDeepEqual(dispatchCalls[0], { action: 'getCredentialVaultStatus' }, 'list-credentials reads vault status');
+  assertDeepEqual(dispatchCalls[1], { action: 'getAllCredentials' }, 'list-credentials sends the getAllCredentials action');
   assertEqual(result.success, true, 'list-credentials succeeds via internal dispatch');
   assertDeepEqual(
     result.credentials,
