@@ -1,10 +1,15 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import test from 'node:test';
+
+// Node 20 has no global WebSocket; reuse the mcp package's ws client there.
+const WebSocketClient = globalThis.WebSocket
+  ?? createRequire(import.meta.url)('../mcp/node_modules/ws');
 
 const chrome = [process.env.FSB_CHROME_BIN,
   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
@@ -53,7 +58,7 @@ test('Chrome fixture inserts multiline Draft text once and dispatches one click'
         await sleep(100);
       }
       assert.ok(target, 'fixture tab opened');
-      ws = new WebSocket(target.webSocketDebuggerUrl);
+      ws = new WebSocketClient(target.webSocketDebuggerUrl);
       await new Promise((resolve, reject) => {
         ws.addEventListener('open', resolve, { once: true });
         ws.addEventListener('error', reject, { once: true });
@@ -78,7 +83,12 @@ test('Chrome fixture inserts multiline Draft text once and dispatches one click'
       assert.equal(result.d.mayHaveExecuted, true);
     } finally {
       ws?.close();
+      // Chrome keeps writing its profile until it exits; removing it earlier races.
+      const exited = child.exitCode !== null || child.signalCode !== null
+        ? Promise.resolve()
+        : new Promise(resolve => child.once('exit', resolve));
       child.kill('SIGTERM');
+      await Promise.race([exited, sleep(5000)]);
       rmSync(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
     }
   });
