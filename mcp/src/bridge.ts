@@ -423,8 +423,10 @@ export class WebSocketBridge {
         }
 
         const errorCode = typeof err.code === 'string' ? err.code.toLowerCase() : undefined;
+        // Separate events so a burst of accept failures cannot coalesce away
+        // the one line that records the listener actually dying.
         const logged = logBridgeEvent({
-          event: 'hub_server_error',
+          event: httpServer.listening ? 'hub_server_error' : 'hub_listener_lost',
           instanceId: this.instanceId,
           reason: errorCode,
         });
@@ -531,6 +533,7 @@ export class WebSocketBridge {
     this.hubConnected = false;
     this.activeHubInstanceId = null;
     this.lastExtensionHeartbeatAt = null;
+    this.extensionAttachment = null;
     this.extensionHeartbeatCount = 0;
     this.extensionCloseCause = null;
     this.mode = 'disconnected';

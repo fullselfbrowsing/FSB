@@ -102,6 +102,13 @@ async function run() {
       false,
       'a repeating accept failure is coalesced, which is what gates its stderr line',
     );
+    checkEqual(
+      logBridgeEvent({ event: 'hub_listener_lost', instanceId: 'abcd1234', reason: 'ebadf' }, { rootPath: root, now: () => 3_000 }),
+      true,
+      'a lost listener is journaled even inside an accept-failure window',
+    );
+    const lost = readLines(root).find((line) => line.event === 'hub_listener_lost');
+    checkEqual(lost && lost.reason, 'ebadf', 'the lost listener keeps its own errno');
   });
 
   console.log('\n--- credentials and unbounded text never reach the file ---');

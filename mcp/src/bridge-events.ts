@@ -41,6 +41,7 @@ const EVENTS = Object.freeze([
   'extension_reaped',
   'extension_closed',
   'hub_server_error',
+  'hub_listener_lost',
 ] as const);
 
 export type BridgeLogEvent = typeof EVENTS[number];

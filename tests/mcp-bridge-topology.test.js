@@ -1618,7 +1618,7 @@ async function runHubSurvivesAcceptError(WebSocketBridge) {
 // A hub whose listener is really gone must release everything it holds and
 // compete for the port again, rather than sit in a mode nothing can reach.
 async function runHubRebindsAfterListenerLoss(WebSocketBridge, bridgeModule) {
-  await withTempHome('bridge-hub-listener-loss', async () => {
+  await withTempHome('bridge-hub-listener-loss', async (home) => {
     const port = await getFreePort();
     const hub = new WebSocketBridge({
       port,
@@ -1636,6 +1636,15 @@ async function runHubRebindsAfterListenerLoss(WebSocketBridge, bridgeModule) {
       resources.sockets.push(extension);
       answerBridgeRequests(extension);
       await waitFor(() => hub.topology.extensionConnected === true, 'extension registration');
+      extension.send(JSON.stringify({
+        type: 'mcp:extension-state',
+        extensionId: 'a'.repeat(32),
+        extensionVersion: '1.0.0',
+        installInstanceId: 'listener-loss-install',
+        normalWindowCount: 1,
+        connectedAt: null,
+      }));
+      await waitFor(() => hub.topology.extensionAttachment !== null, 'extension attachment report');
 
       const pending = hub.sendAndWait({ type: 'mcp:unanswered', payload: {} }, { timeout: 5000 })
         .then(() => null, (error) => error);
@@ -1644,9 +1653,16 @@ async function runHubRebindsAfterListenerLoss(WebSocketBridge, bridgeModule) {
       // than crashing the suite with an unhandled rejection.
       extensionClosed.catch(() => {});
       const lostServer = hub.httpServer;
+      // An accept failure just before the loss must not coalesce away its record.
+      lostServer.emit('error', Object.assign(new Error('accept EMFILE'), { code: 'EMFILE' }));
       lostServer.close();
       const startedAt = Date.now();
       lostServer.emit('error', Object.assign(new Error('listener lost'), { code: 'EBADF' }));
+      assertEqual(hub.topology.extensionAttachment, null, 'the departed extension is no longer reported as attached');
+      const journal = fs.readFileSync(path.join(home, '.fsb', 'agent-runtime', 'bridge-events.jsonl'), 'utf8')
+        .trim().split('\n').map((line) => JSON.parse(line));
+      assert(journal.some((record) => record.event === 'hub_listener_lost' && record.reason === 'ebadf'),
+        'the lost listener is journaled after an accept failure');
 
       const error = await pending;
       assert(error instanceof Error, 'an in-flight request is rejected when the listener is lost');
