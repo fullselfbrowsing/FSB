@@ -3071,6 +3071,16 @@ class MCPBridgeClient {
   // --------------------------------------------------------------------------
 
   async _handleListCredentials() {
+    const status = await this._dispatchToBackground({ action: 'getCredentialVaultStatus' });
+    if (!status || status.success === false) {
+      return { success: false, errorCode: 'vault_status_unavailable', error: status?.error || 'Credential vault status unavailable' };
+    }
+    if (!status.configured) {
+      return { success: false, errorCode: 'vault_not_configured', error: 'Credential vault is not configured' };
+    }
+    if (!status.unlocked) {
+      return { success: false, errorCode: 'vault_locked', error: 'Credential vault is locked' };
+    }
     const response = await this._dispatchToBackground({ action: 'getAllCredentials' });
     if (!response || !response.success) {
       return { success: false, error: response?.error || 'Failed to list credentials' };
@@ -3132,6 +3142,16 @@ class MCPBridgeClient {
   }
 
   async _handleListPayments() {
+    const status = await this._dispatchToBackground({ action: 'getPaymentVaultStatus' });
+    if (!status || status.success === false) {
+      return { success: false, errorCode: 'vault_status_unavailable', error: status?.error || 'Payment vault status unavailable' };
+    }
+    if (!status.configured) {
+      return { success: false, errorCode: 'vault_not_configured', error: 'Payment vault is not configured' };
+    }
+    if (!status.unlocked || !status.paymentUnlocked) {
+      return { success: false, errorCode: 'vault_locked', error: 'Payment vault is locked' };
+    }
     const response = await this._dispatchToBackground({ action: 'getAllPaymentMethods' });
     if (!response || !response.success) {
       return { success: false, error: response?.error || 'Failed to list payment methods' };
