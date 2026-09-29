@@ -238,6 +238,8 @@ function getGuideForTask(task, url) {
       }
     }
   }
+  if (bestMatch?.site === 'Twitter/X' && url &&
+      !bestMatch.patterns.some(pattern => pattern.test(url))) return null;
   if (bestMatch) return bestMatch;
 
   return null;

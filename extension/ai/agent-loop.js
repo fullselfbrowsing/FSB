@@ -2431,7 +2431,7 @@ async function runAgentIteration(sessionId, options) {
                 replyToPost: guide.workflows && guide.workflows.replyToPost
               },
               warnings: Array.isArray(guide.warnings) ? guide.warnings.slice(0, 6) : [],
-              guidance: typeof guide.guidance === 'string' ? guide.guidance.slice(0, 1400) : ''
+              guidance: typeof guide.guidance === 'string' ? guide.guidance.slice(0, 1600) : ''
             }).slice(0, 5000);
             result = { success: true, hadEffect: false, error: null, navigationTriggered: false,
               result: { domain: domain, site: guide.site || guide.name || domain, guidance: guideGuidance } };

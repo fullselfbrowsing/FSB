@@ -20,6 +20,14 @@ test('X guide only matches real X and Twitter hosts', () => {
   }
 });
 
+test('task keyword fallback cannot apply the X guide to a lookalike host', () => {
+  const index = fs.readFileSync(path.join(__dirname, '../extension/site-guides/index.js'), 'utf8');
+  const context = {};
+  vm.runInNewContext(`${index}\n${source}\nthis.lookup = getGuideForTask;`, context);
+  assert.equal(context.lookup('tweet post reply', 'https://x.com.evil.test/thread'), null);
+  assert.equal(context.lookup('tweet post reply', 'https://x.com/thread').site, 'Twitter/X');
+});
+
 test('compose guidance names both button contexts and account/reply checks', () => {
   assert.equal(guide.selectors.tweetButton, '[data-testid="tweetButtonInline"]');
   assert.equal(guide.selectors.modalTweetButton, '[data-testid="tweetButton"]');
