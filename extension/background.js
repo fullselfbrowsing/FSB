@@ -19115,9 +19115,83 @@ async function handleCDPInsertText(request, sender, sendResponse) {
   return runLegacyCdpMessageWithLease(handleCDPInsertTextUnlocked, request, sender, sendResponse);
 }
 
+async function prepareCdpTextTarget(tabId, selector, position) {
+  if (!selector && position === 'caret') return { success: true };
+  const [result] = await chrome.scripting.executeScript({
+    target: { tabId },
+    func: (css, placement) => {
+      let element;
+      try {
+        if (css) {
+          const matches = Array.from(document.querySelectorAll(css));
+          if (matches.length !== 1) return { success: false, error: 'Selector must identify exactly one editable field' };
+          element = matches[0];
+        } else {
+          element = document.activeElement;
+        }
+      } catch (error) {
+        return { success: false, error: `Invalid editable selector: ${error.message}` };
+      }
+      if (element?.isContentEditable) {
+        element = element.closest('[contenteditable="true"], [contenteditable=""]') || element;
+      } else if (element && !['INPUT', 'TEXTAREA'].includes(element.tagName)) {
+        const candidates = element.querySelectorAll('input:not([type="hidden"]), textarea, [contenteditable="true"], [contenteditable=""]');
+        if (candidates.length !== 1) return { success: false, error: 'Target is not one editable field' };
+        element = candidates[0];
+      }
+      if (!element || (!['INPUT', 'TEXTAREA'].includes(element.tagName) && !element.isContentEditable)) {
+        return { success: false, error: 'Target is not editable' };
+      }
+      element.focus();
+      const previous = ['INPUT', 'TEXTAREA'].includes(element.tagName) ? element.value : element.innerText;
+      if (placement === 'end' || placement === 'replace_all') {
+        if (typeof element.setSelectionRange === 'function') {
+          const at = placement === 'end' ? element.value.length : 0;
+          element.setSelectionRange(at, placement === 'end' ? at : element.value.length);
+        } else {
+          const selection = window.getSelection();
+          const range = document.createRange();
+          range.selectNodeContents(element);
+          if (placement === 'end') range.collapse(false);
+          selection.removeAllRanges();
+          selection.addRange(range);
+        }
+      }
+      return { success: true, previous };
+    },
+    args: [selector || null, position]
+  });
+  return result?.result || { success: false, error: 'Unable to inspect editable field' };
+}
+
+async function dispatchCdpTextInsertion(tabId, text, position = 'caret', selector = null) {
+  if (!['caret', 'end', 'replace_all'].includes(position)) {
+    return { success: false, error: 'Invalid insertion position' };
+  }
+  const prepared = await prepareCdpTextTarget(tabId, selector, position);
+  if (!prepared.success) return prepared;
+  if (position === 'replace_all') {
+    const isMac = typeof navigator !== 'undefined' &&
+      (/Macintosh/.test(navigator.userAgent || '') || /Mac/.test(navigator.platform || ''));
+    const modifiers = isMac ? 4 : 2;
+    await chrome.debugger.sendCommand({ tabId }, 'Input.dispatchKeyEvent', {
+      type: 'keyDown', modifiers, key: 'a', code: 'KeyA',
+      windowsVirtualKeyCode: 65, nativeVirtualKeyCode: 65,
+      commands: ['selectAll']
+    });
+    await chrome.debugger.sendCommand({ tabId }, 'Input.dispatchKeyEvent', {
+      type: 'keyUp', modifiers, key: 'a', code: 'KeyA',
+      windowsVirtualKeyCode: 65, nativeVirtualKeyCode: 65
+    });
+  }
+  await chrome.debugger.sendCommand({ tabId }, 'Input.insertText', { text });
+  return { success: true, text, length: text.length, position, mayHaveExecuted: true };
+}
+
 async function handleCDPInsertTextUnlocked(request, sender, sendResponse) {
   const tabId = sender.tab?.id;
-  const { text, clearFirst } = request;
+  const { text, clearFirst, selector } = request;
+  const position = request.position || (clearFirst ? 'replace_all' : 'caret');
 
   if (!tabId) {
     sendResponse({ success: false, error: 'No tab ID available' });
@@ -19137,67 +19211,11 @@ async function handleCDPInsertTextUnlocked(request, sender, sendResponse) {
     await attachFsbDebugger(tabId, 'cdpInsertText');
     debuggerAttached = true;
 
-    // If clearFirst is requested, select all and delete
-    if (clearFirst) {
-      // Detect platform: modifier 4 = Meta (Cmd) on macOS, modifier 2 = Ctrl on others
-      const isMac = navigator.userAgent?.includes('Macintosh') || navigator.platform?.includes('Mac');
-      const selectAllModifier = isMac ? 4 : 2;
-
-      // Select all text in focused element
-      await chrome.debugger.sendCommand(
-        { tabId },
-        'Input.dispatchKeyEvent',
-        {
-          type: 'keyDown',
-          modifiers: selectAllModifier,
-          key: 'a',
-          code: 'KeyA'
-        }
-      );
-      await chrome.debugger.sendCommand(
-        { tabId },
-        'Input.dispatchKeyEvent',
-        {
-          type: 'keyUp',
-          modifiers: selectAllModifier,
-          key: 'a',
-          code: 'KeyA'
-        }
-      );
-
-      // Delay for selection -- Monaco needs ~200ms to process Ctrl+A and update its internal model
-      await new Promise(r => setTimeout(r, 200));
-
-      // Delete selected text
-      await chrome.debugger.sendCommand(
-        { tabId },
-        'Input.dispatchKeyEvent',
-        {
-          type: 'keyDown',
-          key: 'Backspace',
-          code: 'Backspace'
-        }
-      );
-      await chrome.debugger.sendCommand(
-        { tabId },
-        'Input.dispatchKeyEvent',
-        {
-          type: 'keyUp',
-          key: 'Backspace',
-          code: 'Backspace'
-        }
-      );
-
-      // Delay for deletion -- Monaco needs time to clear its buffer before accepting new input
-      await new Promise(r => setTimeout(r, 200));
+    const inserted = await dispatchCdpTextInsertion(tabId, text, position, selector);
+    if (!inserted.success) {
+      sendResponse(inserted);
+      return;
     }
-
-    // Use Input.insertText for reliable text insertion
-    await chrome.debugger.sendCommand(
-      { tabId },
-      'Input.insertText',
-      { text }
-    );
 
     // Detach debugger
     await chrome.debugger.detach({ tabId });
@@ -19223,7 +19241,8 @@ async function handleCDPInsertTextUnlocked(request, sender, sendResponse) {
       }
     }
 
-    sendResponse(cdpFailureResult(error, { method: 'cdp' }));
+    sendResponse({ ...cdpFailureResult(error, { method: 'cdp' }),
+      outcome: 'unknown', mayHaveExecuted: true });
   }
 }
 
@@ -20044,7 +20063,8 @@ async function executeCDPToolDirectUnlocked(request, tabId) {
     // cdpInsertText: Input.insertText with optional clearFirst
     // -----------------------------------------------------------------
     case 'cdpInsertText': {
-      const { text, clearFirst } = params || {};
+      const { text, clearFirst, selector } = params || {};
+      const position = params?.position || (clearFirst ? 'replace_all' : 'caret');
       if (!text) {
         return { success: false, error: 'cdpInsertText: no text provided' };
       }
@@ -20054,31 +20074,8 @@ async function executeCDPToolDirectUnlocked(request, tabId) {
         await attachDebugger();
         debuggerAttached = true;
 
-        if (clearFirst) {
-          const isMac = (typeof navigator !== 'undefined' && navigator.userAgent?.includes('Macintosh')) ||
-                        (typeof navigator !== 'undefined' && navigator.platform?.includes('Mac'));
-          const selectAllModifier = isMac ? 4 : 2;
-
-          // Select all
-          await chrome.debugger.sendCommand({ tabId }, 'Input.dispatchKeyEvent', {
-            type: 'keyDown', modifiers: selectAllModifier, key: 'a', code: 'KeyA'
-          });
-          await chrome.debugger.sendCommand({ tabId }, 'Input.dispatchKeyEvent', {
-            type: 'keyUp', modifiers: selectAllModifier, key: 'a', code: 'KeyA'
-          });
-          await new Promise(r => setTimeout(r, 200));
-
-          // Delete selected
-          await chrome.debugger.sendCommand({ tabId }, 'Input.dispatchKeyEvent', {
-            type: 'keyDown', key: 'Backspace', code: 'Backspace'
-          });
-          await chrome.debugger.sendCommand({ tabId }, 'Input.dispatchKeyEvent', {
-            type: 'keyUp', key: 'Backspace', code: 'Backspace'
-          });
-          await new Promise(r => setTimeout(r, 200));
-        }
-
-        await chrome.debugger.sendCommand({ tabId }, 'Input.insertText', { text });
+        const inserted = await dispatchCdpTextInsertion(tabId, text, position, selector);
+        if (!inserted.success) return inserted;
 
         await chrome.debugger.detach({ tabId });
         debuggerAttached = false;
@@ -20087,7 +20084,7 @@ async function executeCDPToolDirectUnlocked(request, tabId) {
         return { success: true, method: 'cdp_direct', text, length: text.length };
       } catch (error) {
         automationLogger.logActionExecution(null, 'cdpInsertText', 'complete', { success: false, tabId, error: error.message });
-        return cdpFailureResult(error);
+        return { ...cdpFailureResult(error), outcome: 'unknown', mayHaveExecuted: true };
       } finally {
         if (debuggerAttached) {
           try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* ignore */ }
@@ -20158,7 +20155,7 @@ async function executeCDPToolDirectUnlocked(request, tabId) {
  */
 async function handleMonacoEditorInsert(request, sender, sendResponse) {
   const tabId = sender.tab?.id;
-  const { text } = request;
+  const { text, clearFirst = true } = request;
 
   if (!tabId || !text) {
     sendResponse({ success: false, error: !tabId ? 'No tab ID' : 'No text provided' });
@@ -20169,8 +20166,8 @@ async function handleMonacoEditorInsert(request, sender, sendResponse) {
     const results = await chrome.scripting.executeScript({
       target: { tabId },
       world: 'MAIN',
-      args: [text],
-      func: (codeText) => {
+      args: [text, clearFirst],
+      func: (codeText, replaceAll) => {
         // Attempt 1: Monaco editor API
         if (typeof monaco !== 'undefined' && monaco.editor) {
           const editors = typeof monaco.editor.getEditors === 'function'
@@ -20181,8 +20178,14 @@ async function handleMonacoEditorInsert(request, sender, sendResponse) {
             const model = editor.getModel();
             if (model) {
               const fullRange = model.getFullModelRange();
+              const editRange = replaceAll ? fullRange : {
+                startLineNumber: fullRange.endLineNumber,
+                startColumn: fullRange.endColumn,
+                endLineNumber: fullRange.endLineNumber,
+                endColumn: fullRange.endColumn
+              };
               editor.executeEdits('fsb-automation', [{
-                range: fullRange,
+                range: editRange,
                 text: codeText
               }]);
               // Move cursor to end
@@ -20198,8 +20201,14 @@ async function handleMonacoEditorInsert(request, sender, sendResponse) {
           if (models.length > 0) {
             const model = models[0];
             const fullRange = model.getFullModelRange();
+            const editRange = replaceAll ? fullRange : {
+              startLineNumber: fullRange.endLineNumber,
+              startColumn: fullRange.endColumn,
+              endLineNumber: fullRange.endLineNumber,
+              endColumn: fullRange.endColumn
+            };
             model.pushEditOperations([], [{
-              range: fullRange,
+              range: editRange,
               text: codeText
             }], () => null);
             return { success: true, method: 'monaco_pushEditOperations' };
@@ -20211,7 +20220,7 @@ async function handleMonacoEditorInsert(request, sender, sendResponse) {
         if (cmElement?.cmView?.view) {
           const view = cmElement.cmView.view;
           view.dispatch({
-            changes: { from: 0, to: view.state.doc.length, insert: codeText }
+            changes: { from: replaceAll ? 0 : view.state.doc.length, to: view.state.doc.length, insert: codeText }
           });
           return { success: true, method: 'codemirror6_dispatch' };
         }
