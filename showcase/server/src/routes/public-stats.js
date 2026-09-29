@@ -34,7 +34,8 @@
 const express = require('express');
 const crypto = require('crypto');
 const activeTracker = require('../telemetry/active-tracker');
-const { applyDistinctKFloor, REGION_K_FLOOR } = require('../telemetry/housekeeper');
+const { applyRegionKFloor, REGION_K_FLOOR } = require('../telemetry/housekeeper');
+const { placeCentroid } = require('../utils/ip-geo');
 
 // 30-second in-process memo TTL.
 const MEMO_TTL_MS = 30 * 1000;
@@ -88,6 +89,26 @@ function isoFromMsOrNull(value) {
 }
 
 /**
+ * One public region entry. lat/lon are the dataset's approximate centroid for
+ * the place named by the label (city, subdivision, or country), so the globe
+ * can plot places it has no built-in table for; they are omitted for 'Other',
+ * 'unknown', and labels the places file does not know.
+ *
+ * @param {string} label
+ * @param {unknown} uniq
+ * @returns {{label:string, uniq:number, lat?:number, lon?:number}}
+ */
+function publicRegion(label, uniq) {
+  const entry = { label, uniq: Number.isInteger(uniq) ? uniq : 0 };
+  const centroid = placeCentroid(label);
+  if (centroid) {
+    entry.lat = centroid.lat;
+    entry.lon = centroid.lon;
+  }
+  return entry;
+}
+
+/**
  * Build the FSBTelemetryHeadline JSON object.
  *
  * @param {Queries} queries
@@ -109,9 +130,9 @@ function buildHeadlineJson(queries, nowMs = Date.now()) {
   // follows the same shape (housekeeper writes {agent, uniq} -> rename agent).
   const popularMcpRaw = safeParseArray(rows.latest_global.popular_mcp_json);
   const popularAgentRaw = safeParseArray(rows.latest_global.popular_agent_json);
-  // Quick task 260630-hct -- region breakdown. Stored as {region, uniq} (already
-  // k>=5-floored by the housekeeper; sub-floor regions folded into 'Other'); map
-  // region -> label for the public contract, mirroring the popular_mcp_clients shape.
+  // Region breakdown. Stored as {region, uniq}, already k>=5-floored by the
+  // housekeeper (city -> subdivision -> country -> 'Other'); mapped to the
+  // public {label, uniq} shape plus the place's centroid when one is known.
   const popularRegionRaw = safeParseArray(rows.latest_global.popular_region_json);
   const popular_mcp_clients = popularMcpRaw.map((r) => ({
     label: typeof r.label === 'string' ? r.label
@@ -125,21 +146,17 @@ function buildHeadlineJson(queries, nowMs = Date.now()) {
          : 'unknown',
     uniq: Number.isInteger(r.uniq) ? r.uniq : 0,
   }));
-  const popular_regions = popularRegionRaw.map((r) => ({
-    label: typeof r.label === 'string' ? r.label
-         : typeof r.region === 'string' ? r.region
-         : 'unknown',
-    uniq: Number.isInteger(r.uniq) ? r.uniq : 0,
-  }));
-  const users_by_region_365d = applyDistinctKFloor(
+  const popular_regions = popularRegionRaw.map((r) => publicRegion(
+    typeof r.label === 'string' ? r.label
+      : typeof r.region === 'string' ? r.region
+      : 'unknown',
+    r.uniq
+  ));
+  const users_by_region_365d = applyRegionKFloor(
     queries.lastKnownRollupRegions(activeSnapshotMs),
-    'region',
     'install_uuid',
     REGION_K_FLOOR
-  ).map((r) => ({
-    label: typeof r.region === 'string' ? r.region : 'unknown',
-    uniq: Number.isInteger(r.uniq) ? r.uniq : 0,
-  }));
+  ).map((r) => publicRegion(r.region, r.uniq));
 
   const avg_agents_per_reporting_user = active_agents_reporting_users_now > 0
     ? Math.round((active_agents_now / active_agents_reporting_users_now) * 10) / 10
