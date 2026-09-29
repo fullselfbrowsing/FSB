@@ -5945,6 +5945,9 @@ async function ensureContentScriptInjected(tabId, maxRetries = 3) {
   }
   return Promise.race([flight,
     new Promise((_, reject) => setTimeout(() => {
+      // A flight whose Chrome callback never arrives must not pin the tab;
+      // the next caller starts a fresh injection.
+      if (contentScriptInjectionFlights.get(tabId) === flight) contentScriptInjectionFlights.delete(tabId);
       const error = new Error('Content script injection timed out');
       error.code = 'PAGE_UNRESPONSIVE';
       reject(error);
@@ -10069,7 +10072,6 @@ async function fsbRestoreLatticeReplayCheckpoints() {
 
 // Enhanced message sending with automatic retry and fallback
 async function sendMessageWithRetry(tabId, message, maxRetries = 3) {
-  let messageDispatched = false;
   // Capture URL before sending - used to detect if action triggered navigation
   let previousUrl = null;
   try {
@@ -10081,6 +10083,9 @@ async function sendMessageWithRetry(tabId, message, maxRetries = 3) {
   }
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    // Per attempt: an earlier dispatch only reaches a retry after the
+    // no-receiving-end error, which proves it was not delivered.
+    let messageDispatched = false;
     try {
       // Check content script health before every attempt (not just the first)
       const isHealthy = await checkContentScriptHealth(tabId);
@@ -19256,21 +19261,27 @@ async function dispatchCdpTextInsertion(tabId, text, position = 'caret', selecto
   }
   const prepared = await prepareCdpTextTarget(tabId, selector, position);
   if (!prepared.success) return prepared;
-  if (position === 'replace_all') {
-    const isMac = typeof navigator !== 'undefined' &&
-      (/Macintosh/.test(navigator.userAgent || '') || /Mac/.test(navigator.platform || ''));
-    const modifiers = isMac ? 4 : 2;
-    await chrome.debugger.sendCommand({ tabId }, 'Input.dispatchKeyEvent', {
-      type: 'keyDown', modifiers, key: 'a', code: 'KeyA',
-      windowsVirtualKeyCode: 65, nativeVirtualKeyCode: 65,
-      commands: ['selectAll']
-    });
-    await chrome.debugger.sendCommand({ tabId }, 'Input.dispatchKeyEvent', {
-      type: 'keyUp', modifiers, key: 'a', code: 'KeyA',
-      windowsVirtualKeyCode: 65, nativeVirtualKeyCode: 65
-    });
+  try {
+    if (position === 'replace_all') {
+      const isMac = typeof navigator !== 'undefined' &&
+        (/Macintosh/.test(navigator.userAgent || '') || /Mac/.test(navigator.platform || ''));
+      const modifiers = isMac ? 4 : 2;
+      await chrome.debugger.sendCommand({ tabId }, 'Input.dispatchKeyEvent', {
+        type: 'keyDown', modifiers, key: 'a', code: 'KeyA',
+        windowsVirtualKeyCode: 65, nativeVirtualKeyCode: 65,
+        commands: ['selectAll']
+      });
+      await chrome.debugger.sendCommand({ tabId }, 'Input.dispatchKeyEvent', {
+        type: 'keyUp', modifiers, key: 'a', code: 'KeyA',
+        windowsVirtualKeyCode: 65, nativeVirtualKeyCode: 65
+      });
+    }
+    await chrome.debugger.sendCommand({ tabId }, 'Input.insertText', { text });
+  } catch (error) {
+    // Input may already have reached the page, so a partial edit is possible.
+    if (error && typeof error === 'object') error.mayHaveExecuted = true;
+    throw error;
   }
-  await chrome.debugger.sendCommand({ tabId }, 'Input.insertText', { text });
   return { success: true, text, length: text.length, position, mayHaveExecuted: true };
 }
 
@@ -19290,6 +19301,7 @@ async function handleCDPInsertTextUnlocked(request, sender, sendResponse) {
   }
 
   let debuggerAttached = false;
+  let textInserted = false;
 
   try {
     automationLogger.logActionExecution(null, 'cdpInsertText', 'start', { tabId, textLength: text.length });
@@ -19304,6 +19316,7 @@ async function handleCDPInsertTextUnlocked(request, sender, sendResponse) {
       sendResponse(inserted);
       return;
     }
+    textInserted = true;
 
     // Detach debugger
     await chrome.debugger.detach({ tabId });
@@ -19329,8 +19342,12 @@ async function handleCDPInsertTextUnlocked(request, sender, sendResponse) {
       }
     }
 
-    sendResponse({ ...cdpFailureResult(error, { method: 'cdp' }),
-      outcome: 'unknown', mayHaveExecuted: true });
+    // Attach and target failures happen before any input and keep their
+    // retryable classification.
+    const failure = cdpFailureResult(error, { method: 'cdp' });
+    sendResponse(textInserted || error?.mayHaveExecuted
+      ? { ...failure, outcome: 'unknown', mayHaveExecuted: true, retryable: false }
+      : failure);
   }
 }
 
@@ -20157,6 +20174,7 @@ async function executeCDPToolDirectUnlocked(request, tabId) {
         return { success: false, error: 'cdpInsertText: no text provided' };
       }
       let debuggerAttached = false;
+      let textInserted = false;
       try {
         automationLogger.logActionExecution(null, 'cdpInsertText', 'start', { tabId, textLength: text.length });
         await attachDebugger();
@@ -20164,6 +20182,7 @@ async function executeCDPToolDirectUnlocked(request, tabId) {
 
         const inserted = await dispatchCdpTextInsertion(tabId, text, position, selector);
         if (!inserted.success) return inserted;
+        textInserted = true;
 
         await chrome.debugger.detach({ tabId });
         debuggerAttached = false;
@@ -20172,7 +20191,10 @@ async function executeCDPToolDirectUnlocked(request, tabId) {
         return { success: true, method: 'cdp_direct', text, length: text.length };
       } catch (error) {
         automationLogger.logActionExecution(null, 'cdpInsertText', 'complete', { success: false, tabId, error: error.message });
-        return { ...cdpFailureResult(error), outcome: 'unknown', mayHaveExecuted: true };
+        const failure = cdpFailureResult(error);
+        return textInserted || error?.mayHaveExecuted
+          ? { ...failure, outcome: 'unknown', mayHaveExecuted: true, retryable: false }
+          : failure;
       } finally {
         if (debuggerAttached) {
           try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* ignore */ }
