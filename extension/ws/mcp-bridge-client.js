@@ -1590,24 +1590,29 @@ class MCPBridgeClient {
    * MV3 content script lifecycle properly.
    */
   async _sendToContentScript(tabId, message) {
+    const deliveryDeadline = Date.now() + 12000;
+    if (message.action === 'executeAction') message._fsbDeadlineAt = deliveryDeadline;
     const operation = async () => {
-    // sendMessageWithRetry is defined in background.js (same scope)
-    if (typeof sendMessageWithRetry === 'function') {
-      return await sendMessageWithRetry(tabId, message);
-    }
-    // Fallback: inject then send directly
-    if (typeof ensureContentScriptInjected === 'function') {
-      await ensureContentScriptInjected(tabId);
-    }
-    return new Promise((resolve, reject) => {
-      chrome.tabs.sendMessage(tabId, message, { frameId: 0 }, (response) => {
-        if (chrome.runtime.lastError) {
-          reject(new Error(chrome.runtime.lastError.message));
-          return;
-        }
-        resolve(response || {});
+      // sendMessageWithRetry is defined in background.js (same scope).
+      if (typeof sendMessageWithRetry === 'function') {
+        return await sendMessageWithRetry(tabId, message);
+      }
+      if (typeof ensureContentScriptInjected === 'function') {
+        await ensureContentScriptInjected(tabId);
+      }
+      if (Date.now() >= deliveryDeadline) {
+        return { success: false, errorCode: 'PAGE_UNRESPONSIVE',
+          error: 'The page did not answer before the delivery deadline.' };
+      }
+      return new Promise((resolve, reject) => {
+        chrome.tabs.sendMessage(tabId, message, { frameId: 0 }, (response) => {
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message));
+            return;
+          }
+          resolve(response || {});
+        });
       });
-    });
     };
     let timer;
     try {

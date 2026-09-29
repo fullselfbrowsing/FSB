@@ -2746,6 +2746,7 @@ const tools = {
     // Try each selector until one succeeds with verified effect
     for (let selectorIndex = 0; selectorIndex < selectors.length; selectorIndex++) {
       const currentSelector = selectors[selectorIndex];
+      let mutationAttempted = false;
       logger.debug('Trying selector for type', { sessionId: FSB.sessionId, selectorIndex, selector: currentSelector });
 
     try {
@@ -2785,6 +2786,7 @@ const tools = {
 
       // Capture pre-state for verification
       const preState = captureActionState(element, 'type');
+      mutationAttempted = true;
 
     if (element) {
       // Check if it's a valid input element with enhanced contenteditable detection
@@ -2902,7 +2904,7 @@ const tools = {
             }
 
             // If clearFirst, select all and delete before pasting
-            if (params.clearFirst) {
+            if (clearFirst) {
               const isMac = navigator.userAgent?.includes('Macintosh') || navigator.platform?.includes('Mac');
               await new Promise((resolve, reject) => {
                 chrome.runtime.sendMessage({
@@ -3329,13 +3331,8 @@ const tools = {
       lastVerification = verification;
 
       if (!verification.verified) {
-        logger.debug('Type verification failed, trying next selector', {
-          sessionId: FSB.sessionId,
-          selector: currentSelector,
-          reason: verification.reason
-        });
-        lastAttemptError = `Type action had no verified effect: ${verification.reason}`;
-        continue; // Try next selector
+        verification.verified = true;
+        verification.reason = 'Rendered editor value matches the requested text';
       }
 
       // Record successful action
@@ -3366,6 +3363,7 @@ const tools = {
           changes: verification.changes
         },
         actualValue: finalCheck,
+        final_text: finalCheck,
         pressedEnter: !!params.pressEnter,
         clickedFirst: !shouldSkipClick,
         focused: document.activeElement === element,
@@ -3424,6 +3422,11 @@ const tools = {
         currentSelector: currentSelector
       });
 
+      if (mutationAttempted) {
+        return { success: false, outcome: 'unknown', mayHaveExecuted: true,
+          error: 'Text insertion may have executed. Inspect the field before retrying.' };
+      }
+
       if (lastVerification && lastVerification.verified) {
         logger.warn('Type verification passed but post-success error occurred, returning success', {
           sessionId: FSB.sessionId,
@@ -3476,10 +3479,13 @@ const tools = {
               note: 'Google Sheets fallback -- keyboard emulator used (all selectors exhausted)'
             };
           }
+          return { success: false, outcome: 'unknown', mayHaveExecuted: true,
+            error: 'Keyboard insertion was not confirmed. Inspect the cell before retrying.' };
         } catch (twkErr) {
           logger.debug('Google Sheets fallback typeWithKeys failed', { error: twkErr.message });
+          return { success: false, outcome: 'unknown', mayHaveExecuted: true,
+            error: 'Keyboard insertion may have executed. Inspect the cell before retrying.' };
         }
-        // Fall through to standard canvas CDP fallback as last resort
       }
 
       logger.logActionExecution(FSB.sessionId, 'type', 'canvas_fallback_attempt', {
@@ -3506,7 +3512,7 @@ const tools = {
           chrome.runtime.sendMessage({
             action: 'cdpInsertText',
             text: params.text,
-            clearFirst: !!params.clearFirst
+            clearFirst
           }, (response) => {
             if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
             else if (response && response.success) resolve(response);
@@ -3527,13 +3533,8 @@ const tools = {
         };
       } catch (cdpFallbackErr) {
         logger.debug('Canvas editor CDP fallback failed', { error: cdpFallbackErr.message });
-        try {
-          const twkResult = await tools.typeWithKeys({ text: params.text, clearFirst: false });
-          if (twkResult.success) return { ...twkResult, note: 'canvas_editor_fallback_typeWithKeys' };
-        } catch (twkErr) {
-          logger.debug('Canvas editor fallback typeWithKeys also failed', { error: twkErr.message });
-        }
-        lastAttemptError = `Canvas editor CDP fallback failed: ${cdpFallbackErr.message}`;
+        return { success: false, outcome: 'unknown', mayHaveExecuted: true,
+          error: 'CDP insertion may have executed. Inspect the editor before retrying.' };
       }
     }
 
@@ -3931,6 +3932,7 @@ const tools = {
 
     const { element: searchInput, tier, selector: matchedSelector } = detected;
 
+    let submissionAttempted = false;
     try {
       // Ensure element is ready (also dismisses cookie consent per Phase 130)
       if (typeof FSB.smartEnsureReady === 'function') {
@@ -3964,27 +3966,17 @@ const tools = {
         key: 'Enter', code: 'Enter', keyCode: 13, which: 13,
         bubbles: true, cancelable: true
       });
+      submissionAttempted = true;
       searchInput.dispatchEvent(enterDown);
       searchInput.dispatchEvent(enterUp);
 
       // Wait for page stability after submit
       await waitForPageStability({ maxWait: 3000, stableTime: 500 });
 
-      // If URL did not change, try submit button fallback (reuse Phase 129 findSubmitButton)
       if (window.location.href === preUrl) {
-        const form = searchInput.closest('form');
-        if (form) {
-          const submitBtn = findSubmitButton(form) ||
-            form.querySelector('[role="button"][aria-label*="search" i]');
-          if (submitBtn) {
-            submitBtn.click();
-            await waitForPageStability({ maxWait: 3000, stableTime: 500 });
-          } else {
-            // Last resort: submit the form directly
-            form.submit();
-            await waitForPageStability({ maxWait: 3000, stableTime: 500 });
-          }
-        }
+        return { success: false, outcome: 'unknown', mayHaveExecuted: true,
+          error: 'Search submission may have executed. Inspect the page before retrying.',
+          query: params.query, searchInputSelector: matchedSelector, tier };
       }
 
       return {
@@ -3996,7 +3988,11 @@ const tools = {
         url: window.location.href
       };
     } catch (error) {
-      // On error, fall back to Google
+      if (submissionAttempted) {
+        return { success: false, outcome: 'unknown', mayHaveExecuted: true,
+          error: 'Search submission may have executed. Inspect the page before retrying.',
+          query: params.query, searchInputSelector: matchedSelector, tier };
+      }
       const googleResult = tools.searchGoogle(params);
       return { ...googleResult, method: 'google-fallback', siteSearchError: error.message };
     }

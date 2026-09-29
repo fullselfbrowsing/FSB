@@ -5332,6 +5332,7 @@ chrome.runtime.onConnect.addListener((port) => {
     });
 
     port.onDisconnect.addListener(() => {
+      if (contentScriptPorts.get(tabId)?.port !== port) return;
       contentScriptPorts.delete(tabId);
       contentScriptReadyStatus.delete(tabId);
       contentScriptHealth.delete(tabId);
@@ -10086,6 +10087,12 @@ async function sendMessageWithRetry(tabId, message, maxRetries = 3) {
       if (!isHealthy) {
         automationLogger.logComm(null, 'health', 'pre_message', false, { tabId, attempt, action: 're-inject' });
         await ensureContentScriptInjected(tabId);
+      }
+
+      if (message.action === 'executeAction' && Number.isFinite(message._fsbDeadlineAt)
+          && Date.now() >= message._fsbDeadlineAt) {
+        return { success: false, errorCode: 'PAGE_UNRESPONSIVE', outcome: 'failed',
+          mayHaveExecuted: false, error: 'The page did not respond before action delivery.' };
       }
 
       // CRITICAL: Use frameId: 0 to target ONLY the main frame
