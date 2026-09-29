@@ -87,3 +87,91 @@ test('CDP lease watchdog releases a hung holder for the next tab operation', asy
   secondLease.release();
   lease.release();
 });
+
+test('an injection that never settles does not pin the tab past its timeout', async () => {
+  const start = background.indexOf('const contentScriptInjectionFlights = new Map();');
+  const end = background.indexOf('\nasync function ensureContentScriptInjectedUnlocked', start);
+  const source = background.slice(start, end).replace('12000', '20');
+  let injections = 0;
+  const context = {
+    setTimeout,
+    ensureContentScriptInjectedUnlocked: () => (++injections === 1 ? new Promise(() => {}) : Promise.resolve(true))
+  };
+  const ensure = vm.runInNewContext(`${source}\nensureContentScriptInjected`, context);
+  const results = await Promise.allSettled([ensure(5), ensure(5)]);
+  assert.equal(injections, 1);
+  for (const result of results) {
+    assert.equal(result.status, 'rejected');
+    assert.equal(result.reason.code, 'PAGE_UNRESPONSIVE');
+  }
+  assert.equal(await ensure(5), true);
+  assert.equal(injections, 2);
+});
+
+test('an undelivered mutation is reported as not executed', async () => {
+  const start = bridge.indexOf('  async _sendToContentScript(tabId, message) {');
+  const end = bridge.indexOf('\n  async _handleGetTabs(', start);
+  const context = {
+    sendMessageWithRetry: async () => {
+      throw { message: 'Failed after 3 attempts: Could not establish connection. Receiving end does not exist.' };
+    },
+    setTimeout, clearTimeout
+  };
+  const send = vm.runInNewContext(`({${bridge.slice(start, end)}})._sendToContentScript`, context);
+  const result = await send(9, { action: 'executeAction', tool: 'click' });
+  assert.equal(result.errorCode, 'PAGE_UNRESPONSIVE');
+  assert.equal(result.outcome, 'failed');
+  assert.equal(result.mayHaveExecuted, false);
+});
+
+test('a direct send that loses its port after dispatch stays uncertain', async () => {
+  const start = bridge.indexOf('  async _sendToContentScript(tabId, message) {');
+  const end = bridge.indexOf('\n  async _handleGetTabs(', start);
+  const chrome = { runtime: {}, tabs: {
+    sendMessage(_tabId, _message, _options, callback) {
+      chrome.runtime.lastError = { message: 'The message port closed before a response was received.' };
+      callback();
+      delete chrome.runtime.lastError;
+    }
+  } };
+  const context = { ensureContentScriptInjected: async () => true, chrome, Date, setTimeout, clearTimeout };
+  const send = vm.runInNewContext(`({${bridge.slice(start, end)}})._sendToContentScript`, context);
+  const result = await send(9, { action: 'executeAction', tool: 'click' });
+  assert.equal(result.outcome, 'unknown');
+  assert.equal(result.mayHaveExecuted, true);
+});
+
+test('a retry that fails before sending is not reported as possibly executed', async () => {
+  const start = background.indexOf('async function sendMessageWithRetry(');
+  const end = background.indexOf('\n// Alternative action strategies', start);
+  let sent = 0;
+  let injections = 0;
+  const context = {
+    Date, Math,
+    chrome: { tabs: {
+      get: async () => ({ url: 'https://example.com' }),
+      sendMessage: async () => {
+        sent++;
+        throw new Error('Could not establish connection. Receiving end does not exist.');
+      }
+    } },
+    checkContentScriptHealth: async () => sent === 0,
+    ensureContentScriptInjected: async () => {
+      if (++injections > 1) {
+        const error = new Error('Content script injection timed out');
+        error.code = 'PAGE_UNRESPONSIVE';
+        throw error;
+      }
+      return true;
+    },
+    classifyFailure: (error) => (/receiving end/i.test(error.message) ? 'communication' : 'unknown'),
+    FAILURE_TYPES: { BF_CACHE: 'bf_cache', COMMUNICATION: 'communication' },
+    contentScriptHealth: new Map(),
+    automationLogger: { logComm() {}, logRecovery() {}, logTiming() {}, debug() {} },
+    setTimeout: (callback) => { callback(); return 0; }
+  };
+  const send = vm.runInNewContext(`${background.slice(start, end)}\nsendMessageWithRetry`, context);
+  await assert.rejects(send(7, { action: 'executeAction', tool: 'click' }, 2),
+    (error) => /injection timed out/.test(error.message));
+  assert.equal(sent, 1);
+});

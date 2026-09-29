@@ -1592,6 +1592,10 @@ class MCPBridgeClient {
   async _sendToContentScript(tabId, message) {
     const deliveryDeadline = Date.now() + 12000;
     if (message.action === 'executeAction') message._fsbDeadlineAt = deliveryDeadline;
+    const uncertainResult = () => ({ success: false, outcome: 'unknown', mayHaveExecuted: true,
+      errorCode: 'PAGE_UNRESPONSIVE', error: 'The page did not answer. Inspect its state before retrying.' });
+    // operation() rejects only when the message was never delivered; a
+    // possibly delivered action resolves with an uncertain result instead.
     const operation = async () => {
       // sendMessageWithRetry is defined in background.js (same scope).
       if (typeof sendMessageWithRetry === 'function') {
@@ -1607,7 +1611,12 @@ class MCPBridgeClient {
       return new Promise((resolve, reject) => {
         chrome.tabs.sendMessage(tabId, message, { frameId: 0 }, (response) => {
           if (chrome.runtime.lastError) {
-            reject(new Error(chrome.runtime.lastError.message));
+            const reason = chrome.runtime.lastError.message || '';
+            if (message.action === 'executeAction' && !/receiving end does not exist/i.test(reason)) {
+              resolve(uncertainResult());
+              return;
+            }
+            reject(new Error(reason));
             return;
           }
           resolve(response || {});
@@ -1620,18 +1629,18 @@ class MCPBridgeClient {
         operation(),
         new Promise((resolve) => {
           timer = setTimeout(() => resolve(message.action === 'executeAction'
-            ? { success: false, outcome: 'unknown', mayHaveExecuted: true,
-                errorCode: 'PAGE_UNRESPONSIVE', error: 'The page did not answer. Inspect its state before retrying.' }
+            ? uncertainResult()
             : { success: false, errorCode: 'PAGE_UNRESPONSIVE',
                 error: 'The page did not answer within 12 seconds.' }), 12000);
         })
       ]);
     } catch (error) {
+      const reason = error?.message || String(error);
       return message.action === 'executeAction'
-        ? { success: false, outcome: 'unknown', mayHaveExecuted: true,
-            errorCode: 'PAGE_UNRESPONSIVE', error: 'The page did not answer. Inspect its state before retrying.' }
+        ? { success: false, outcome: 'failed', mayHaveExecuted: false,
+            errorCode: 'PAGE_UNRESPONSIVE', error: `The action was not delivered: ${reason}` }
         : { success: false, errorCode: 'PAGE_UNRESPONSIVE',
-            error: `The page did not answer: ${error?.message || String(error)}` };
+            error: `The page did not answer: ${reason}` };
     } finally {
       clearTimeout(timer);
     }

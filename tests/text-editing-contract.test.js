@@ -102,3 +102,102 @@ test('a CDP insertion that is refused before dispatch releases the debugger', as
   assert.deepEqual(JSON.parse(JSON.stringify(detached)), [{ tabId: 42 }]);
   assert.deepEqual(responses, [refusal]);
 });
+
+function busyDebuggerError() {
+  const error = new Error('The debugger for tab 42 is busy. Retry the operation.');
+  error.code = 'SCREENSHOT_DEBUGGER_BUSY';
+  error.retryable = true;
+  return error;
+}
+
+const cdpFailureResultStub = (error, extra) => Object.assign({
+  success: false, error: error.message, code: error.code, retryable: Boolean(error.retryable)
+}, extra || {});
+
+function loadInsertHandler(overrides) {
+  const start = background.indexOf('async function handleCDPInsertTextUnlocked(');
+  const end = background.indexOf('\n/**\n * Handle CDP-based mouse click', start);
+  const context = {
+    attachFsbDebugger: async () => {},
+    dispatchCdpTextInsertion: async () => ({ success: true }),
+    automationLogger: { logActionExecution() {}, debug() {} },
+    cdpFailureResult: cdpFailureResultStub,
+    chrome: { debugger: { detach: async () => {} } },
+    ...overrides
+  };
+  return vm.runInNewContext(`${background.slice(start, end)}\nhandleCDPInsertTextUnlocked`, context);
+}
+
+test('a CDP insertion that cannot attach the debugger stays retryable', async () => {
+  let dispatched = 0;
+  const detached = [];
+  const responses = [];
+  const handler = loadInsertHandler({
+    attachFsbDebugger: async () => { throw busyDebuggerError(); },
+    dispatchCdpTextInsertion: async () => { dispatched++; return { success: true }; },
+    chrome: { debugger: { detach: async (target) => detached.push(target) } }
+  });
+  await handler({ text: 'replacement' }, { tab: { id: 42 } }, (response) => responses.push(response));
+  assert.equal(responses.length, 1);
+  assert.equal(responses[0].code, 'SCREENSHOT_DEBUGGER_BUSY');
+  assert.equal(responses[0].retryable, true);
+  assert.equal(responses[0].mayHaveExecuted, undefined);
+  assert.equal(dispatched, 0);
+  assert.equal(detached.length, 0);
+});
+
+test('a CDP insertion that fails after input began stays uncertain', async () => {
+  const responses = [];
+  const handler = loadInsertHandler({
+    dispatchCdpTextInsertion: async () => {
+      const error = new Error('Detached while handling command.');
+      error.mayHaveExecuted = true;
+      throw error;
+    }
+  });
+  await handler({ text: 'replacement' }, { tab: { id: 42 } }, (response) => responses.push(response));
+  assert.equal(responses[0].outcome, 'unknown');
+  assert.equal(responses[0].mayHaveExecuted, true);
+  assert.equal(responses[0].retryable, false);
+});
+
+test('CDP text dispatch marks only failures after input as possibly executed', async () => {
+  const start = background.indexOf('async function dispatchCdpTextInsertion(');
+  const end = background.indexOf('\nasync function handleCDPInsertTextUnlocked', start);
+  const load = (context) => vm.runInNewContext(`${background.slice(start, end)}\ndispatchCdpTextInsertion`, {
+    navigator: { platform: 'MacIntel', userAgent: 'Macintosh' }, ...context
+  });
+  const afterInput = load({
+    prepareCdpTextTarget: async () => ({ success: true }),
+    chrome: { debugger: { sendCommand: async (_target, method) => {
+      if (method === 'Input.insertText') throw new Error('Detached while handling command.');
+    } } }
+  });
+  await assert.rejects(afterInput(42, 'text', 'replace_all', '#draft'), (error) => error.mayHaveExecuted === true);
+  let commands = 0;
+  const beforeInput = load({
+    prepareCdpTextTarget: async () => { throw new Error('Cannot access contents of the page.'); },
+    chrome: { debugger: { sendCommand: async () => { commands++; } } }
+  });
+  await assert.rejects(beforeInput(42, 'text', 'caret', '#draft'), (error) => error.mayHaveExecuted === undefined);
+  assert.equal(commands, 0);
+});
+
+test('a direct CDP insertion that cannot attach the debugger stays retryable', async () => {
+  const start = background.indexOf('async function executeCDPToolDirectUnlocked(');
+  const end = background.indexOf('\nasync function handleMonacoEditorInsert', start);
+  let dispatched = 0;
+  const context = {
+    attachFsbDebugger: async () => { throw busyDebuggerError(); },
+    dispatchCdpTextInsertion: async () => { dispatched++; return { success: true }; },
+    automationLogger: { logActionExecution() {}, debug() {} },
+    cdpFailureResult: cdpFailureResultStub,
+    chrome: { debugger: { detach: async () => {} } }
+  };
+  const execute = vm.runInNewContext(`${background.slice(start, end)}\nexecuteCDPToolDirectUnlocked`, context);
+  const result = await execute({ tool: 'cdpInsertText', params: { text: 'replacement' } }, 42);
+  assert.equal(result.code, 'SCREENSHOT_DEBUGGER_BUSY');
+  assert.equal(result.retryable, true);
+  assert.equal(result.mayHaveExecuted, undefined);
+  assert.equal(dispatched, 0);
+});
