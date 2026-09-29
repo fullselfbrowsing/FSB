@@ -240,8 +240,8 @@ function initializeDatabase(db) {
     -- telemetry_events: raw event log; 7-day retention enforced by housekeeper. event_id is PRIMARY KEY
     --   so INSERT OR IGNORE satisfies BEAT-04 (client-side replay-dedup). ip_hash stores ONLY the
     --   HMAC-SHA256(plaintext_ip, todays_salt); plaintext IP never persisted.
-    -- Quick task 260630-hct -- short-lived region column (coarse country/US-state
-    -- label, e.g. US-CA, DEFAULT 'unknown'). Derived at ingest from Fly-Client-IP,
+    -- Quick task 260630-hct -- short-lived region column (coarse city/state/country
+    -- label, e.g. US-CA/San Jose, DEFAULT 'unknown'). Derived at ingest from Fly-Client-IP,
     -- copied onto 365-day rollups (durable anonymous last-known location), and
     -- the raw event row is still dropped by 7-day retention. geo_kind stores
     -- only the address family that produced the label (ipv4 / ipv6 / ...), never
@@ -270,7 +270,7 @@ function initializeDatabase(db) {
 
     -- telemetry_rollups_daily: per-UUID per-day aggregates; 365-day retention; powers Phase 274.
     -- region / geo_kind are the install's latest coarse location for that UTC day
-    -- (anonymous: country or US-state label + address family, never an IP).
+    -- (anonymous: city/state/country label + address family, never an IP).
     CREATE TABLE IF NOT EXISTS telemetry_rollups_daily (
       install_uuid TEXT NOT NULL,
       day_utc TEXT NOT NULL,

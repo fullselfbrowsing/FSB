@@ -33,6 +33,7 @@ const { isValidUuidV4 } = require('../utils/telemetry-hash');
 // argument, used once then discarded; only the coarse region label and the
 // address family are retained, and only k>=5-floored aggregates are published.
 const { deriveRegion, classifyIp } = require('../utils/ip-geo');
+const { regionLabel } = require('../utils/region-label');
 const { clientIp } = require('../utils/client-ip');
 const {
   createTelemetryRateLimiter,
@@ -80,51 +81,6 @@ const ACTIVE_COUNT_VERSION = 2;
 // Retried queue entries may be accepted for seven days, but an old snapshot
 // must not be reinterpreted as the install's current agent population.
 const ACTIVE_AGENT_LIVENESS_MAX_AGE_MS = 10 * 60 * 1000;
-
-// Quick task 260630-hct -- US state name -> USPS 2-letter code, so the stored
-// region label is compact (e.g. "US-CA") rather than a free-form state string.
-const US_STATE_CODES = {
-  'Alabama': 'AL', 'Alaska': 'AK', 'Arizona': 'AZ', 'Arkansas': 'AR',
-  'California': 'CA', 'Colorado': 'CO', 'Connecticut': 'CT', 'Delaware': 'DE',
-  'Florida': 'FL', 'Georgia': 'GA', 'Hawaii': 'HI', 'Idaho': 'ID',
-  'Illinois': 'IL', 'Indiana': 'IN', 'Iowa': 'IA', 'Kansas': 'KS',
-  'Kentucky': 'KY', 'Louisiana': 'LA', 'Maine': 'ME', 'Maryland': 'MD',
-  'Massachusetts': 'MA', 'Michigan': 'MI', 'Minnesota': 'MN', 'Mississippi': 'MS',
-  'Missouri': 'MO', 'Montana': 'MT', 'Nebraska': 'NE', 'Nevada': 'NV',
-  'New Hampshire': 'NH', 'New Jersey': 'NJ', 'New Mexico': 'NM', 'New York': 'NY',
-  'North Carolina': 'NC', 'North Dakota': 'ND', 'Ohio': 'OH', 'Oklahoma': 'OK',
-  'Oregon': 'OR', 'Pennsylvania': 'PA', 'Rhode Island': 'RI', 'South Carolina': 'SC',
-  'South Dakota': 'SD', 'Tennessee': 'TN', 'Texas': 'TX', 'Utah': 'UT',
-  'Vermont': 'VT', 'Virginia': 'VA', 'Washington': 'WA', 'West Virginia': 'WV',
-  'Wisconsin': 'WI', 'Wyoming': 'WY', 'District of Columbia': 'DC',
-};
-
-/**
- * Quick task 260630-hct -- normalise a deriveRegion() result into a compact,
- * state-granularity STRING label for storage (never the raw IP).
- *
- *   { country: 'US', subdivision: 'California' } -> 'US-CA'
- *   { country: 'AU', subdivision: 'Victoria' }   -> 'AU-Victoria' (slugged)
- *   'unknown' / missing country                  -> 'unknown'
- *
- * @param {{country?:string, subdivision?:string}|string} region
- * @returns {string}
- */
-function regionLabel(region) {
-  if (!region || typeof region !== 'object' || typeof region.country !== 'string' || region.country === '') {
-    return 'unknown';
-  }
-  const country = region.country.trim().toUpperCase().slice(0, 8);
-  const sub = typeof region.subdivision === 'string' ? region.subdivision.trim() : '';
-  if (sub === '') return country;
-  if (country === 'US' && US_STATE_CODES[sub]) {
-    return `US-${US_STATE_CODES[sub]}`;
-  }
-  // Generic compact slug for non-US (or unknown US) subdivisions: collapse
-  // whitespace to single hyphens and cap length so labels stay bounded.
-  const slug = sub.replace(/\s+/g, '-').slice(0, 24);
-  return `${country}-${slug}`;
-}
 
 /**
  * Validate one event against the strict allowlist + shape rules.
@@ -216,7 +172,7 @@ function createTelemetryRouter(db, queries, hashIp) {
     //   the plaintext client IP is referenced EXACTLY THREE times per request, on
     //   the next three lines, via clientIp(req) (Fly-Client-IP, else req.ip):
     //     1. hashIp(ipKeyGenerator(clientIp(req)), db)  -- rate-limit/HMAC hash
-    //     2. deriveRegion(clientIp(req))                -- coarse country/US-state geo
+    //     2. deriveRegion(clientIp(req))                -- coarse city/state/country geo
     //     3. classifyIp(clientIp(req))                  -- address family enum, never the IP
     //   All three references are inline arguments to an immediately-evaluated
     //   call. The IP is NEVER assigned to a local that escapes this scope, NEVER
@@ -247,8 +203,8 @@ function createTelemetryRouter(db, queries, hashIp) {
     const clientHash = hashIp(ipKeyGenerator(clientIp(req)), db);
     // Second inline client-IP touch: coarse geo derive. Pass the raw client
     // address, not the rate-limit key. deriveRegion unwraps IPv4-mapped IPv6,
-    // returns {country, subdivision} | 'unknown'; regionLabel() collapses it to
-    // a compact state-granularity STRING (e.g. 'US-CA' or 'unknown').
+    // returns {country, subdivision, city} | 'unknown'; regionLabel() collapses
+    // it to a compact place STRING (e.g. 'US-CA/San Jose', 'US-CA', 'unknown').
     const regionTag = regionLabel(deriveRegion(clientIp(req)));
     // Third inline client-IP touch: address-family enum only (never the IP).
     // Persisted beside region so 'unknown' is diagnosable after 7-day event
@@ -355,7 +311,7 @@ function createTelemetryRouter(db, queries, hashIp) {
         let n = 0;
         for (const e of rows) {
           // Quick task 260630-hct -- 12-arg region-bearing insert. The trailing
-          // regionTag is a coarse state-granularity label derived inline above,
+          // regionTag is a coarse city-granularity label derived inline above,
           // NEVER the raw IP. All other args + batching/budget logic unchanged.
           const activeCountVersion = e.active_count_version === ACTIVE_COUNT_VERSION
             ? ACTIVE_COUNT_VERSION : 0;
