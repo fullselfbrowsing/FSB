@@ -46,6 +46,7 @@ import { FSBTelemetryService } from '../../core/stats/fsb-telemetry.service';
 import {
   DatasetState as FSBDatasetState,
   FSBTelemetryHeadline,
+  FSBTelemetryRegion,
   FSBTelemetrySeries,
 } from '../../core/stats/fsb-telemetry.types';
 import {
@@ -60,7 +61,7 @@ import {
   StatsViewDataState,
   updateStatsSourceState,
 } from '../../core/stats/stats-view.model';
-import { regionCentroid } from '../../core/stats/region-geo';
+import { regionDisplayName, regionPosition, regionSpread } from '../../core/stats/region-geo';
 import { GlobeVisualizationService } from '../../core/globe/globe-visualization.service';
 import { GlobeRegion } from '../../core/globe/globe-visualization.types';
 import { LanguagePickerComponent } from '../../layout/language-picker/language-picker.component';
@@ -288,13 +289,13 @@ export class StatsPageComponent implements OnInit, OnDestroy {
     }
   }
 
-  // The server emits geographic identifiers ('DE', 'US-CA', 'AU-Victoria') that
-  // stay as-is, plus two English sentinels that are prose and must not.
-  // See region-geo.ts for the full label contract.
+  // The server emits geographic identifiers ('DE', 'US-CA', 'US-CA/San Jose')
+  // that stay untranslated, plus two English sentinels that are prose and must
+  // not. See region-geo.ts for the full label contract.
   displayLabel(label: string): string {
     if (label === 'unknown') return $localize`:@@stats.label.unknown:Unknown`;
     if (label === 'Other') return $localize`:@@stats.label.other:Other`;
-    return label;
+    return regionDisplayName(label);
   }
 
   get accessibleGlobeData(): readonly AccessibleDatum[] {
@@ -305,7 +306,7 @@ export class StatsPageComponent implements OnInit, OnDestroy {
   }
 
   get globeAriaLabel(): string {
-    return $localize`:@@stats.globe.aria:Globe showing where FSB installs were last seen over the past 365 days, by coarse region`;
+    return $localize`:@@stats.globe.aria:Globe showing where FSB installs were last seen over the past 365 days, by city, state, or country`;
   }
 
   get tabMetrics(): readonly TabMetric[] {
@@ -415,10 +416,10 @@ export class StatsPageComponent implements OnInit, OnDestroy {
   // an explicit "still gathering data" message when this is false rather
   // than silently showing a globe with no nodes.
   get hasPlottableRegions(): boolean {
-    return this.globeRegionList.some((r) => regionCentroid(r.label) !== null);
+    return this.globeRegionList.some((r) => regionPosition(r) !== null);
   }
 
-  private get globeRegionList(): readonly { label: string; uniq: number }[] {
+  private get globeRegionList(): readonly FSBTelemetryRegion[] {
     const persistent = this.latestFsbHeadline?.users_by_region_365d;
     if (persistent && persistent.length > 0) return persistent;
     return this.latestFsbHeadline?.popular_regions ?? [];
@@ -884,25 +885,25 @@ export class StatsPageComponent implements OnInit, OnDestroy {
     }
   }
 
-  // Redesign -- maps the k>=5-anonymity-floored popular_regions breakdown
-  // (see fsb-telemetry.types.ts) to globe node clusters. Labels that can't be
+  // Redesign -- maps the k>=5-anonymity-floored region breakdown (see
+  // fsb-telemetry.types.ts) to globe node clusters. Labels that can't be
   // geolocated (unmapped, or the literal 'unknown'/'Other' k-floor buckets)
   // are skipped rather than guessed. `count` is a coarse, capped scale of
   // `uniq` (the k-floor already guarantees uniq >= 5 for any real entry) so
-  // one dominant region can't visually swamp the globe; `spread` is a fixed
-  // moderate jitter radius since we only have a single centroid per label,
-  // not a real distribution.
+  // one dominant region can't visually swamp the globe; `spread` jitters nodes
+  // around the single centroid we have per label -- tight for a city, wider
+  // for a state or country.
   private buildGlobeRegions(): GlobeRegion[] {
     const list = this.globeRegionList;
     const regions: GlobeRegion[] = [];
-    for (const { label, uniq } of list) {
-      const centroid = regionCentroid(label);
-      if (!centroid) continue;
+    for (const region of list) {
+      const position = regionPosition(region);
+      if (!position) continue;
       regions.push({
-        lon: centroid.lon,
-        lat: centroid.lat,
-        spread: 6,
-        count: Math.min(16, Math.max(2, Math.round(uniq / 5))),
+        lon: position.lon,
+        lat: position.lat,
+        spread: regionSpread(region.label),
+        count: Math.min(16, Math.max(2, Math.round(region.uniq / 5))),
       });
     }
     return regions;

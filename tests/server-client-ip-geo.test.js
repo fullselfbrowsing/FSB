@@ -4,7 +4,7 @@
  * On Fly, trust proxy 1 resolves req.ip to the app anycast hop (SJC → US-CA)
  * or a 6PN IPv6 (unknown). This test sets X-Forwarded-For to a California-looking
  * address and Fly-Client-IP to the fixture's India range, then asserts the
- * stored region is IN-Maharashtra and that two Fly-Client-IP values do not
+ * stored region is IN-Maharashtra/Mumbai and that two Fly-Client-IP values do not
  * share one ip_hash (the production 20/20 cap bug).
  *
  * Run: node tests/server-client-ip-geo.test.js
@@ -91,7 +91,7 @@ function post(body, headers) {
   assert.strictEqual(clientIp({ get: () => '   ', ip: '8.8.8.8' }), '8.8.8.8');
 
   const flyAnycast = '8.8.8.8'; // fixture US/California -- stands in for SJC
-  const indiaClient = '20.20.20.200'; // fixture IN/Maharashtra
+  const indiaClient = '20.20.20.200'; // fixture IN/Maharashtra/Mumbai
   const nyClient = '9.9.9.100'; // fixture US/New York
 
   const indiaRes = await post({ events: [event()] }, {
@@ -110,11 +110,11 @@ function post(body, headers) {
     'SELECT region, COUNT(DISTINCT ip_hash) AS hashes, COUNT(*) AS n FROM telemetry_events GROUP BY region ORDER BY region'
   ).all();
   const byRegion = Object.fromEntries(rows.map((r) => [r.region, r]));
-  assert.ok(byRegion['IN-Maharashtra'], `expected IN-Maharashtra, got ${JSON.stringify(rows)}`);
-  assert.ok(byRegion['US-NY'], `expected US-NY, got ${JSON.stringify(rows)}`);
-  assert.strictEqual(byRegion['IN-Maharashtra'].n, 1);
-  assert.strictEqual(byRegion['US-NY'].n, 1);
-  assert.ok(!byRegion['US-CA'], `Fly anycast must not win geo, got ${JSON.stringify(rows)}`);
+  assert.ok(byRegion['IN-Maharashtra/Mumbai'], `expected IN-Maharashtra/Mumbai, got ${JSON.stringify(rows)}`);
+  assert.ok(byRegion['US-NY/New York'], `expected US-NY/New York, got ${JSON.stringify(rows)}`);
+  assert.strictEqual(byRegion['IN-Maharashtra/Mumbai'].n, 1);
+  assert.strictEqual(byRegion['US-NY/New York'].n, 1);
+  assert.ok(!rows.some((r) => r.region.startsWith('US-CA')), `Fly anycast must not win geo, got ${JSON.stringify(rows)}`);
 
   const hashCount = db.prepare('SELECT COUNT(DISTINCT ip_hash) AS c FROM telemetry_events').get().c;
   assert.strictEqual(hashCount, 2, `two client IPs must not collapse onto one hash, got ${hashCount}`);
@@ -125,12 +125,12 @@ function post(body, headers) {
   });
   assert.strictEqual(mappedRes.status, 200, mappedRes.body);
   const indiaCount = db.prepare(
-    "SELECT COUNT(*) AS n FROM telemetry_events WHERE region = 'IN-Maharashtra'"
+    "SELECT COUNT(*) AS n FROM telemetry_events WHERE region = 'IN-Maharashtra/Mumbai'"
   ).get().n;
   assert.strictEqual(indiaCount, 2, 'IPv4-mapped Fly-Client-IP must geolocate as India');
 
   const kinds = db.prepare(
-    "SELECT DISTINCT geo_kind FROM telemetry_events WHERE region = 'IN-Maharashtra' ORDER BY 1"
+    "SELECT DISTINCT geo_kind FROM telemetry_events WHERE region = 'IN-Maharashtra/Mumbai' ORDER BY 1"
   ).all().map((r) => r.geo_kind);
   assert.deepStrictEqual(kinds, ['ipv4', 'ipv4-mapped']);
 
@@ -143,9 +143,9 @@ function post(body, headers) {
     "SELECT region, geo_kind FROM telemetry_events WHERE geo_kind = 'ipv6'"
   ).get();
   assert.ok(indiaIpv6, 'native IPv6 Fly-Client-IP must insert a row');
-  assert.strictEqual(indiaIpv6.region, 'IN-Maharashtra');
+  assert.strictEqual(indiaIpv6.region, 'IN-Maharashtra/Mumbai');
   const indiaCountAfterV6 = db.prepare(
-    "SELECT COUNT(*) AS n FROM telemetry_events WHERE region = 'IN-Maharashtra'"
+    "SELECT COUNT(*) AS n FROM telemetry_events WHERE region = 'IN-Maharashtra/Mumbai'"
   ).get().n;
   assert.strictEqual(indiaCountAfterV6, 3, 'IPv4 + mapped + native IPv6 India');
 
