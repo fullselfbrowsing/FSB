@@ -271,6 +271,8 @@ Health check:
 http://127.0.0.1:7226/health
 ```
 
+`serve` accepts loopback binds only (`127.0.0.1`, `localhost`, or `::1`). Local MCP clients must send a matching loopback `Host` and no `Origin` header; browser-origin requests are rejected, including health and preflight requests. If an HTTP client fails after a server restart, reconnect it to the printed local endpoint and create a new MCP session. `/health` reports bridge topology and the attached extension identity without requiring a session.
+
 ---
 
 ## Diagnostics
@@ -294,6 +296,8 @@ npx -y fsb-mcp-server@latest status --watch
 
 `doctor` reports the primary failing layer: package, bridge, authorization, extension, active tab, content script, or configuration. Only restart or reinstall the client when the reported layer points there.
 
+`doctor` and `status` show the extension ID, extension version, persistent install instance ID, connection time, and normal-window count. The tab count comes from the diagnostic route. `NO_BROWSER_WINDOW` means the attached profile has no normal browser window; open one there. `ORIGIN_PIN_MISMATCH` means the bridge is pinned to a different extension ID; run `npx -y fsb-mcp-server@latest pair --reset` and pair again. The bridge serves one attached extension profile at a time and does not switch profiles automatically. MCP server and extension versions are released independently; compare their reported versions with each component's requirements.
+
 The bridge also keeps its own journal at `~/.fsb/agent-runtime/bridge-events.jsonl`. Everything else the bridge prints goes to the stderr of whichever server won the race for port 7225, which is often a session that has since exited, so this file is usually the only surviving record of why a socket was refused, revoked, replaced, or dropped. Repeated identical events are coalesced into one line per minute carrying a `suppressed` count, so a retry loop stays legible instead of filling the file.
 
 ### Common Failure Modes
@@ -305,6 +309,7 @@ The bridge also keeps its own journal at `~/.fsb/agent-runtime/bridge-events.jso
 | The extension will not attach, and reinstalling it does not help | The bridge pairing is bound to one extension id, and reinstalling as an unpacked build mints a new one, which deepens the mismatch. Check `bridge-events.jsonl` for `upgrade_rejected_origin_pin`, then run `npx -y fsb-mcp-server@latest pair --reset`. |
 | A tool reports `sw_evicted` but the browser is clearly fine | Read the `disconnect_reason` alongside it. `extension_auth_revoked` means the pairing was rejected, not that the worker was evicted. |
 | Page reads fail | Make sure the active tab is a normal webpage, not `chrome://`, `edge://`, or the web store. |
+| Page reads return `PAGE_UNRESPONSIVE` | Use `navigate` or `close_tab` to recover the hung tab. Inspect the page before repeating an action whose result says `outcome: "unknown"` and `mayHaveExecuted: true`. |
 | Clicks do nothing | Refresh DOM refs with `get_dom_snapshot`, then try `click_at` or `execute_js` where appropriate. |
 | A task is stuck | Use `get_task_status`, then `stop_task` if it is still running. |
 | Visual overlay remains | Send the last action with `is_final:true`, wait for the 60s idle auto-clear, or reload the tab. |

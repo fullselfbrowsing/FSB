@@ -13,6 +13,10 @@
 
 After code changes, reload the extension from `chrome://extensions` and refresh any open tabs so content scripts re-inject.
 
+Copy the extension ID shown on `chrome://extensions` when pairing an unpacked build. Its ID can differ from the Chrome Web Store ID and can change if you reinstall it from another directory. Run `npx -y fsb-mcp-server@latest pair --reset` if `doctor` reports `ORIGIN_PIN_MISMATCH`, then pair the new installation. `doctor` also shows a persistent install instance ID, the extension version, and the normal-window count so you can identify which browser profile holds the bridge. One extension/profile attaches to the local bridge at a time; another profile may replace it. The MCP server and extension have independent version numbers.
+
+In branded Chrome 137 and later, the `--load-extension` command-line flag no longer loads unpacked extensions. Use the **Load unpacked** button above. [Chrome for Testing and Chromium retain the flag](https://groups.google.com/a/chromium.org/g/chromium-extensions/c/1-g8EFx2BBY/m/S0ET5wPjCAAJ).
+
 ## Google Sheets Development
 
 Google Sheets capabilities reuse an already signed-in, agent-owned spreadsheet tab. They require no Google Cloud client ID, consent prompt, token setup, or Sheets-specific MCP update. Reload the unpacked extension after changes, refresh the open Sheet, and reconnect the existing MCP bridge. See [Google Sheets signed-in session integration](../docs/google-sheets-api.md) for the bounded operation contract and UAT gates.
