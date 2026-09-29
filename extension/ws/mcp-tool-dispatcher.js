@@ -1,11 +1,12 @@
 'use strict';
 
-// In Chrome extension importScripts context, TOOL_REGISTRY and getToolByName
+// In Chrome extension importScripts context, registry helpers
 // are globals from ai/tool-definitions.js. In Node.js/tests, fall back to require().
 var _mcp_defs = (typeof TOOL_REGISTRY !== 'undefined')
-  ? { TOOL_REGISTRY, getToolByName }
+  ? { TOOL_REGISTRY, getToolByName, getToolByNameOrVerb }
   : (typeof require !== 'undefined' ? require('../ai/tool-definitions.js') : {});
 var _mcp_getToolByName = _mcp_defs.getToolByName;
+var _mcp_getToolByNameOrVerb = _mcp_defs.getToolByNameOrVerb;
 
 // Phase 245 D-07: global toggle for change_report emission. Hydrated from
 // chrome.storage.local.fsbChangeReportsEnabled at module load and refreshed
@@ -1187,7 +1188,7 @@ function sanitizeSingleTab(tool, tab, extra = {}) {
 }
 
 function shouldEmitSyntheticChangeReport(tool) {
-  const toolDef = (typeof _mcp_getToolByName === 'function') ? _mcp_getToolByName(tool) : null;
+  const toolDef = (typeof _mcp_getToolByNameOrVerb === 'function') ? _mcp_getToolByNameOrVerb(tool) : null;
   return !!(fsbChangeReportsEnabled && toolDef && toolDef._emitChangeReport === true);
 }
 
@@ -3832,7 +3833,7 @@ async function wrapWithChangeReport(ctx) {
   }
 
   // Gate 1: per-tool flag
-  const toolDef = (typeof _mcp_getToolByName === 'function') ? _mcp_getToolByName(toolName) : null;
+  const toolDef = (typeof _mcp_getToolByNameOrVerb === 'function') ? _mcp_getToolByNameOrVerb(toolName) : null;
   const flagOn = !!(toolDef && toolDef._emitChangeReport === true);
   // Gate 2: global toggle
   const globalOn = !!fsbChangeReportsEnabled;

@@ -1874,8 +1874,8 @@ class MCPBridgeClient {
       const replayContext = targetContext ? {
         routeFamily: (() => {
           try {
-            const definition = typeof getToolByName === 'function'
-              ? getToolByName(payload && payload.tool)
+            const definition = typeof getToolByNameOrVerb === 'function'
+              ? getToolByNameOrVerb(payload && payload.tool)
               : null;
             return definition && definition._route ? definition._route : 'content';
           } catch (_e) {
@@ -1931,7 +1931,17 @@ class MCPBridgeClient {
     const agentId = (payload && payload.agentId) || null;
     const params = payload && payload.params ? payload.params : {};
     const toolName = payload && payload.tool;
-    const toolDef = typeof getToolByName === 'function' ? getToolByName(toolName) : null;
+    const toolDef = typeof getToolByNameOrVerb === 'function' ? getToolByNameOrVerb(toolName) : null;
+    if (!toolDef) {
+      return {
+        success: false,
+        errorCode: 'mcp_route_unavailable',
+        tool: toolName,
+        routeFamily: 'manual',
+        error: `Unknown MCP tool or wire verb: ${toolName}`,
+        recoveryHint: 'Update the FSB extension and MCP server, then retry with a supported tool.'
+      };
+    }
     const usesDispatcherSyntheticChangeReport = MCP_DISPATCHER_SYNTHETIC_CHANGE_REPORT_TOOLS.has(toolName);
 
     const buildRouteParams = (extra) => ({

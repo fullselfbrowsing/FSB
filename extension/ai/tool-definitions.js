@@ -1459,6 +1459,13 @@ function getToolByName(name) {
   return TOOL_REGISTRY.find(t => t.name === name) || null;
 }
 
+/** Resolve the public MCP name or the content/CDP verb sent on the bridge. */
+function getToolByNameOrVerb(nameOrVerb) {
+  const name = typeof nameOrVerb === 'string' ? nameOrVerb.trim() : '';
+  if (!name) return null;
+  return getToolByName(name) || getToolByName(_iconVerbMap().get(name));
+}
+
 /**
  * Get all read-only tools (those that bypass the mutation queue).
  * @returns {ToolDefinition[]} Array of read-only tool definitions
@@ -1518,7 +1525,7 @@ function resolveIconActivity(nameOrVerb) {
   if (!raw) return 'sweep';
   const name = _iconVerbMap().get(raw) || raw;
   if (name === 'invoke_capability') return null;
-  const def = getToolByName(name);
+  const def = getToolByNameOrVerb(raw);
   if ((def && def._readOnly === true) || ICON_READ_ONLY_EXTRAS.has(name)) return 'orbit';
   return 'sweep';
 }
@@ -1533,6 +1540,7 @@ if (typeof module !== 'undefined' && module.exports) {
     TOOL_REGISTRY,
     resolveIconActivity,
     getToolByName,
+    getToolByNameOrVerb,
     getReadOnlyTools,
     getToolsByRoute,
     VISUAL_SESSION_FIELDS,
