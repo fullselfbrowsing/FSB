@@ -1,8 +1,11 @@
 @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css');
 @import url('https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css');
 
-/* Shared showcase foundation: tokens, reset, typography, and utilities only. */
+/* Shared showcase foundation: tokens, reset, typography, and utilities only.
+ * color-scheme is required so native form controls (the footer <select> especially)
+ * use a dark Field palette instead of light-on-light in Blink/Gecko. */
 :root {
+  color-scheme: dark;
   --primary: #ff6b35;
   --primary-hover: #e55a2b;
   --primary-gradient: linear-gradient(135deg, #ff6b35, #ff8c42);
@@ -45,6 +48,7 @@
 }
 
 [data-theme="light"] {
+  color-scheme: light;
   --bg-body: #ffffff;
   --bg-card: #f8f9fa;
   --bg-elevated: #f1f5f9;
@@ -354,6 +358,75 @@ code,
   gap: 24px;
 }
 
+/* Standard footer layout. Page/shell styles own colors only. */
+.footer:not(.stats-footer) {
+  margin-bottom: 0;
+  padding: 48px 0 44px;
+}
+
+.footer-inner {
+  align-items: flex-start;
+  display: flex;
+  gap: 48px;
+  justify-content: space-between;
+  margin-bottom: 32px;
+}
+
+.footer-brand {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+}
+
+.footer-brand .fsb-mark {
+  font-size: 1.32rem;
+}
+
+.footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 48px;
+}
+
+.footer-column h4 {
+  font-size: 0.85rem;
+  font-weight: 700;
+  margin-bottom: 12px;
+  text-transform: uppercase;
+}
+
+.footer-column a {
+  display: block;
+  font-size: 0.9rem;
+  margin-bottom: 8px;
+}
+
+.footer-column a.footer-x-link {
+  align-items: center;
+  display: flex;
+  font-size: 0;
+  line-height: 1;
+  width: fit-content;
+}
+
+.footer-column a.footer-x-link::before {
+  content: '\e61b';
+  font-family: 'Font Awesome 6 Brands';
+  font-size: 0.95rem;
+  font-weight: 400;
+}
+
+.footer-bottom {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  padding-top: 24px;
+}
+
+.footer-bottom p {
+  font-size: 0.85rem;
+}
+
 @media (max-width: 768px) {
   :root {
     --nav-height: 56px;
@@ -362,6 +435,21 @@ code,
 
   .container {
     padding: 0 16px;
+  }
+
+  .footer-inner {
+    flex-direction: column;
+    gap: 28px;
+  }
+
+  .footer-links {
+    gap: 28px 36px;
+  }
+
+  .footer-bottom {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
   }
 }
 
@@ -403,6 +491,14 @@ body:lang(ja) {
     -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
+body:lang(ko) {
+  font-family:
+    'Apple SD Gothic Neo',
+    'Malgun Gothic', 'Segoe UI',
+    'Noto Sans CJK KR', 'Noto Sans KR', 'Nanum Gothic',
+    -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
 body:lang(zh-CN), body:lang(zh-Hans) {
   font-family:
     'PingFang SC', 'Hiragino Sans GB',
@@ -422,13 +518,14 @@ body:lang(zh-TW), body:lang(zh-Hant) {
 /* Mono fonts under CJK should keep their CJK fallback path too -- otherwise
  * Hiragino-rendered prose mixed with Monaco code creates visual jank. */
 :lang(ja) code, :lang(ja) .mono,
+:lang(ko) code, :lang(ko) .mono,
 :lang(zh-CN) code, :lang(zh-CN) .mono,
 :lang(zh-Hans) code, :lang(zh-Hans) .mono,
 :lang(zh-TW) code, :lang(zh-TW) .mono,
 :lang(zh-Hant) code, :lang(zh-Hant) .mono {
   font-family:
     'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono',
-    'Hiragino Sans', 'PingFang SC', 'PingFang TC',
-    'Microsoft YaHei', 'Microsoft JhengHei',
+    'Hiragino Sans', 'PingFang SC', 'PingFang TC', 'Apple SD Gothic Neo',
+    'Microsoft YaHei', 'Microsoft JhengHei', 'Malgun Gothic',
     monospace;
 }

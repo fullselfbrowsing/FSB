@@ -91,7 +91,7 @@ If page is blank: call \`wait_for_stable\` then \`read_page\` again.`,
     'tool-reference',
     {
       title: 'FSB Tool Reference',
-      description: 'Complete reference of all 44 FSB browser automation tools organized by category with usage examples.',
+      description: 'Complete reference of all 49 FSB browser automation tools organized by category with usage examples.',
     },
     () => ({
       messages: [
@@ -99,7 +99,7 @@ If page is blank: call \`wait_for_stable\` then \`read_page\` again.`,
           role: 'user' as const,
           content: {
             type: 'text' as const,
-            text: `# FSB Tool Reference (44 tools)
+            text: `# FSB Tool Reference (49 tools)
 
 > **Default to manual tools for all browser tasks.** Only use run_task (autopilot) if the user explicitly requests it.
 
@@ -173,11 +173,18 @@ If page is blank: call \`wait_for_stable\` then \`read_page\` again.`,
 |------|---------|---------|
 | wait_for_stable | Wait for DOM to settle | wait_for_stable() |
 
-## Observability (5 tools)
+## Developer / UAT (1 tool)
+| Tool | Use For | Example |
+|------|---------|---------|
+| capture_screenshot | Capture the live viewport, full page, region, or element as PNG | capture_screenshot(mode="element", selector="e5") |
+
+## Observability (7 tools)
 | Tool | Use For | Example |
 |------|---------|---------|
 | list_sessions | List past automation sessions | list_sessions(limit=10) |
 | get_session_detail | Inspect session logs/actions | get_session_detail(sessionId="abc123") |
+| get_session_replay | Inspect a verified replay manifest | get_session_replay(sessionId="abc123") |
+| replay_session | Request side-panel approval to replay | replay_session(sessionId="abc123") |
 | get_logs | Get recent logs | get_logs(count=50) |
 | search_memory | Search learned patterns | search_memory(query="amazon checkout", domain="amazon.com") |
 | get_memory_stats | Memory system stats | get_memory_stats() |

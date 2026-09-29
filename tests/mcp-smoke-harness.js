@@ -228,8 +228,16 @@ function buildClientHarness(options = {}) {
   const context = {
     chrome,
     WebSocket: class extends (options.WebSocketImpl || BrowserLikeWebSocket) {
-      constructor(url) {
-        super(url, options.websocketOptions || {});
+      constructor(url, protocols) {
+        const websocketOptions = {
+          ...(options.websocketOptions || {}),
+          connectionOptions: {
+            headers: { Origin: `chrome-extension://${chrome.runtime.id}` },
+            ...(options.websocketOptions?.connectionOptions || {}),
+          },
+          protocols: Array.isArray(protocols) ? protocols : options.websocketOptions?.protocols,
+        };
+        super(url, websocketOptions);
       }
     },
     console,

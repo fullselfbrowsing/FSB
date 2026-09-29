@@ -143,6 +143,28 @@
   function _fetchPrimitive() {
     return (typeof FsbCapabilityFetch !== 'undefined' && FsbCapabilityFetch) ? FsbCapabilityFetch : null;
   }
+  function _googleSheetsContext(ctx) {
+    var session = (typeof FsbGoogleSheetsSession !== 'undefined' && FsbGoogleSheetsSession)
+      ? FsbGoogleSheetsSession
+      : ((typeof globalThis !== 'undefined' && globalThis.FsbGoogleSheetsSession) ? globalThis.FsbGoogleSheetsSession : null);
+    if (!session) { return null; }
+    var methods = ['getSpreadsheet', 'getValues', 'updateValues', 'appendValues', 'clearValues'];
+    var narrow = {};
+    for (var i = 0; i < methods.length; i++) {
+      (function (method) {
+        if (typeof session[method] === 'function') {
+          narrow[method] = function (params) {
+            return session[method](params, {
+              origin: ctx && ctx.origin,
+              tabId: ctx && ctx.tabId,
+              url: ctx && ctx.url
+            });
+          };
+        }
+      })(methods[i]);
+    }
+    return Object.freeze(narrow);
+  }
 
   // ---- Phase 32 (HEAL-01/HEAL-03/HEAL-04) self-healing collaborator accessors --
   //      The post-executeBoundSpec rot classifier, the learned-recipe quarantine
@@ -705,7 +727,8 @@
       url: ctx && ctx.url,
       executeBoundSpec: primitive ? primitive.executeBoundSpec : undefined,
       executeBoundPageRead: primitive ? primitive.executeBoundPageRead : undefined,
-      interpretRecipe: interp ? interp.interpretRecipe : undefined
+      interpretRecipe: interp ? interp.interpretRecipe : undefined,
+      googleSheets: _googleSheetsContext(ctx)
     };
     var out = await handler.handle(args || {}, handlerCtx);
 
@@ -724,11 +747,14 @@
     // T1a endpoint that rots to a 200-with-wrong-shape body is NOT caught here -- it
     // surfaces on the next break -- which is the safe direction (under-detect, never
     // mis-heal). A T1a is a BUNDLED slug, so a broken verdict quarantines via the
-    // catalog (session-only). The handler's OWN typed RECIPE_* security error (e.g.
-    // the pin's RECIPE_ORIGIN_MISMATCH) classifies as NOT broken (typed-passthrough)
-    // and is returned verbatim below -- never healed (Pitfall 3).
+    // catalog (session-only). API-backed handlers opt out with
+    // `rotClassifiable: false` because their operational failures do not describe a
+    // page recipe. The remaining handlers' typed RECIPE_* security errors (e.g. the
+    // pin's RECIPE_ORIGIN_MISMATCH) classify as NOT broken (typed-passthrough) and
+    // are returned verbatim below -- never healed (Pitfall 3).
     var detectorH = _rotDetector();
-    if (detectorH && typeof detectorH.classifyRecipeBroken === 'function') {
+    var rotClassifiable = handler.rotClassifiable !== false;
+    if (rotClassifiable && detectorH && typeof detectorH.classifyRecipeBroken === 'function') {
       // Always null for a T1a entry (see the contract note above); passed for shape
       // parity with the declarative tier's classify call, not because a recipe exists.
       var recipeH = (entry && entry.recipe) ? entry.recipe : null;

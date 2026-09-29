@@ -1,8 +1,8 @@
-// Modern Chat Interface Script for FSB v0.9.90
+// Modern Chat Interface Script for FSB
 
 // Phase 243 plan 03 (UI-02): the popup's surface id (matches the legacy:popup
 // agent synthesized by ensureLegacyPopupAgent below). When the active tab is
-// owned by THIS surface, the "owned by ..." chip stays hidden -- per CONTEXT
+// owned by THIS surface, the ownership status stays hidden -- per CONTEXT
 // D-05, a surface does not announce ownership of its own tab.
 const MY_SURFACE = 'legacy:popup';
 
@@ -11,8 +11,8 @@ let conversationId = null;
 let isRunning = false;
 let stopRequested = false;
 
-// Quick task 260524-7n9 -- chip-owned lock: true while the active tab is owned
-// by a non-self agent and the read-only "owned by <ClientName>" chip is showing.
+// True while the active tab is owned by a non-self agent and the ownership
+// status is showing.
 // Composes with updateSendButtonState's existing hasContent / isRunning gating;
 // it is an ADDITIONAL gate, never a replacement. Set/cleared exclusively by
 // refreshOwnerChip below (no automation-lifecycle setter writes this flag --
@@ -72,6 +72,39 @@ const chatMessages = document.getElementById('chatMessages');
 const statusDot = document.querySelector('.status-dot');
 const statusText = document.querySelector('.status-text');
 
+let _headerBaseStatusLabel = 'Ready';
+let _headerBaseStatusTone = '';
+let _headerOwnerLabel = null;
+let _ownerStatusRefreshGeneration = 0;
+
+function _renderHeaderStatus() {
+  if (!statusText || !statusDot || !statusDot.classList) return;
+  statusDot.classList.remove('running', 'error', 'owned');
+  if (_headerOwnerLabel) {
+    statusText.textContent = (typeof FSBOwnerChip !== 'undefined'
+        && typeof FSBOwnerChip.buildChipText === 'function')
+      ? FSBOwnerChip.buildChipText(_headerOwnerLabel)
+      : 'Owned by ' + _headerOwnerLabel;
+    statusDot.classList.add('owned');
+    return;
+  }
+  statusText.textContent = _headerBaseStatusLabel;
+  if (_headerBaseStatusTone === 'running') statusDot.classList.add('running');
+  if (_headerBaseStatusTone === 'error') statusDot.classList.add('error');
+}
+
+function _setHeaderStatus(label, tone) {
+  _headerBaseStatusLabel = typeof label === 'string' && label.length > 0 ? label : 'Ready';
+  _headerBaseStatusTone = tone === 'running' || tone === 'error' ? tone : '';
+  _renderHeaderStatus();
+}
+
+function _setHeaderOwner(label) {
+  var normalized = typeof label === 'string' ? label.trim() : '';
+  _headerOwnerLabel = normalized || null;
+  _renderHeaderStatus();
+}
+
 // Apply theme based on settings. Preference is 'system' | 'dark' | 'light'
 // (set by the options page's Advanced Settings); 'system' resolves live from
 // the OS via matchMedia instead of hardening into 'light'/'dark' on first run.
@@ -127,17 +160,17 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
 // Quick task 260524-8qv -- Codex PR #78 Finding 3 (P2). Mirrors the
 // sidepanel.js:224..241 listener so an ownership flip mid-popup re-renders
-// the chip without waiting for the user to close + reopen the popup. The
+// the ownership status without waiting for the user to close + reopen the popup. The
 // popup is short-lived (recreated each click) BUT can stay open for many
 // seconds during an automation; an MCP agent claiming the active tab during
-// that window currently leaves the chip stale until close/reopen.
+// that window currently leaves the ownership status stale until close/reopen.
 //
 // Refresh on EITHER:
 //   - fsbAgentRegistry (Phase 237 D-03 envelope mutation -- ownership
 //     claimed / released / transferred for the active tab);
 //   - fsbAgentClientLabels (Quick task 260524-7n9 canonical MCP client name
-//     landed for the owning agent -- chip text should flip from
-//     "owned by agent_<hex>" to "owned by Claude").
+//     landed for the owning agent -- status text should flip from
+//     "Owned by agent_<hex>" to "Owned by Claude").
 //
 // Both keys live in the session namespace (write site:
 // extension/ws/mcp-tool-dispatcher.js _persistAgentClientLabel; envelope
@@ -159,20 +192,19 @@ try {
   }
 } catch (_e) { /* listener best-effort -- never poison popup boot */ }
 
-// Phase 243 plan 03 (UI-02): refresh the read-only "owned by Agent X" chip.
+// Refresh the read-only "Owned by Agent X" header status.
 // Reads the persisted registry envelope from chrome.storage.session (Phase 237
 // D-03 write-through) and the active tab; uses the FSBOwnerChip pure helpers
 // to decide visibility and label format. Bypasses background.js entirely so
 // this plan stays Wave-1 zero-overlap with Plan 02's webNavigation listener.
 async function refreshOwnerChip() {
+  const refreshGeneration = ++_ownerStatusRefreshGeneration;
   try {
-    const chipEl = document.getElementById('fsb-owner-chip');
-    if (!chipEl) return;
     if (typeof FSBOwnerChip === 'undefined') {
-      chipEl.style.display = 'none';
+      _setHeaderOwner(null);
       // Quick task 260524-7n9: helper-unload race -- if we previously locked
       // the input, release it so the user is not stranded with a disabled
-      // input forever just because the chip helper went away.
+      // input forever just because the ownership helper went away.
       if (_chatLockedByOwnerChip) {
         _chatLockedByOwnerChip = false;
         chatInput.setAttribute('contenteditable', 'true');
@@ -183,9 +215,10 @@ async function refreshOwnerChip() {
     }
 
     const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (refreshGeneration !== _ownerStatusRefreshGeneration) return;
     const tab = tabs && tabs[0];
     if (!tab || typeof tab.id !== 'number') {
-      chipEl.style.display = 'none';
+      _setHeaderOwner(null);
       // Quick task 260524-7n9: no active tab -- release any lock to avoid
       // stranding the input disabled across an empty tab query.
       if (_chatLockedByOwnerChip) {
@@ -200,16 +233,16 @@ async function refreshOwnerChip() {
     // Quick task 260524-7n9: read both the registry envelope AND the per-agent
     // canonical client-label map in a single round-trip. The label map is
     // written by mcp-tool-dispatcher.js _persistAgentClientLabel and lets the
-    // chip show "owned by Claude" instead of "owned by agent_<hex>".
+    // status show "Owned by Claude" instead of "Owned by agent_<hex>".
     const stored = await chrome.storage.session.get(['fsbAgentRegistry', 'fsbAgentClientLabels']);
+    if (refreshGeneration !== _ownerStatusRefreshGeneration) return;
     const envelope = stored && stored.fsbAgentRegistry;
     const labelsMap = stored && stored.fsbAgentClientLabels;
     const ownerAgentId = FSBOwnerChip.findOwnerInEnvelope(envelope, tab.id);
 
     if (!FSBOwnerChip.shouldShowOwnerChip(ownerAgentId, MY_SURFACE)) {
-      chipEl.textContent = '';
-      chipEl.style.display = 'none';
-      // Quick task 260524-7n9: chip is hidden -- release the chat-input lock
+      _setHeaderOwner(null);
+      // Quick task 260524-7n9: ownership is hidden -- release the chat-input lock
       // if we previously set it (ownership released, agent disconnected, or
       // user switched to an unowned tab).
       if (_chatLockedByOwnerChip) {
@@ -246,6 +279,7 @@ async function refreshOwnerChip() {
           tab.id,
           (key) => chrome.storage.session.get(key)
         );
+        if (refreshGeneration !== _ownerStatusRefreshGeneration) return;
         if (friendly) {
           label = friendly;
         } else {
@@ -257,9 +291,8 @@ async function refreshOwnerChip() {
         }
       }
     }
-    chipEl.textContent = FSBOwnerChip.buildChipText(label);
-    chipEl.style.display = 'inline-flex';
-    // Quick task 260524-7n9: chip is visible -- lock the chat input + send
+    _setHeaderOwner(label);
+    // Quick task 260524-7n9: ownership is visible -- lock the chat input + send
     // button so the user cannot type into / submit on a tab being actively
     // driven by an external agent. The send button is gated through
     // updateSendButtonState (the new _chatLockedByOwnerChip flag composes
@@ -332,7 +365,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Add welcome message
   addMessage('Welcome to FSB. How can I help?', 'system');
 
-  // Phase 243 plan 03 (UI-02): render the read-only owner chip on load. The
+  // Render the read-only ownership status on load. The
   // popup is short-lived; no chrome.tabs.onActivated subscription needed --
   // the user closes/reopens the popup to "refresh" naturally. Sidepanel does
   // subscribe (it is persistent across tab switches).
@@ -400,11 +433,11 @@ chatInput.addEventListener('paste', (e) => {
 });
 
 // Update send button state based on input content
-// Quick task 260524-7n9: composes the chip-owned chat lock into the existing
+// Compose the foreign-owner chat lock into the existing
 // gating chain via OR -- hasContent governs the empty-input case, isRunning
 // governs in-flight automation, _chatLockedByOwnerChip is the external-agent
 // ownership gate. NO normal lifecycle transition leaves the input enabled
-// while the chip is showing; refreshOwnerChip is the sole writer of the flag.
+// while ownership is showing; refreshOwnerChip is the sole writer of the flag.
 function updateSendButtonState() {
   const hasContent = chatInput.textContent.trim().length > 0;
   sendBtn.disabled = !hasContent || isRunning || _chatLockedByOwnerChip;
@@ -584,8 +617,7 @@ function setRunningState() {
   // so this bare assignment is safe (isRunning=true also keeps it disabled).
   sendBtn.disabled = true;
   stopBtn.classList.remove('hidden');
-  statusDot.classList.add('running');
-  statusText.textContent = 'Working';
+  _setHeaderStatus('Working', 'running');
   updateSendButtonState();
 }
 
@@ -597,8 +629,7 @@ function setIdleState() {
   // so this bare assignment is safe.
   sendBtn.disabled = false;
   stopBtn.classList.add('hidden');
-  statusDot.classList.remove('running', 'error');
-  statusText.textContent = 'Ready';
+  _setHeaderStatus('Ready', '');
 
   // Clean up any remaining status message with loader
   if (currentStatusMessage) {
@@ -623,8 +654,7 @@ function setErrorState() {
   // so this bare assignment is safe.
   sendBtn.disabled = false;
   stopBtn.classList.add('hidden');
-  statusDot.classList.add('error');
-  statusText.textContent = 'Error';
+  _setHeaderStatus('Error', 'error');
   updateSendButtonState();
 }
 

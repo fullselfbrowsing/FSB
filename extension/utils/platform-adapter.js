@@ -25,7 +25,7 @@
  *   - service worker: PREPENDED verbatim to build/safari/background.js by
  *     scripts/build-safari.mjs. It is deliberately NOT script-imported,
  *     because tests/lattice-provider-bridge-smoke.test.js pins background.js
- *     to exactly 309 script-import mentions / 305 call sites.
+ *     to exactly 333 script-import mentions / 329 call sites.
  *   - UI pages: a <script> tag, first in the document.
  * It is not injected into content pages; no content-script module consumes it.
  */
@@ -167,6 +167,11 @@
     cdpInsertText: 'domInsertTextAt',
     cdpDoubleClickAt: 'pointerDoubleClickAt'
   };
+
+  // _cdpVerbs with no DOM equivalent. tool-executor answers these with a typed
+  // capability_unavailable on Safari rather than faking a result: a DOM
+  // re-render is not the composited page image capture_screenshot promises.
+  var CDP_NO_DOM_FALLBACK = ['cdpCaptureScreenshot'];
 
   // ---------------------------------------------------------------------------
   // Workspace surface (Safari has no sidePanel; we use a popup-type window)
@@ -678,6 +683,7 @@
     detect: detect,
     caps: null,
     CDP_DOM_FALLBACKS: CDP_DOM_FALLBACKS,
+    CDP_NO_DOM_FALLBACK: CDP_NO_DOM_FALLBACK,
     install: install,
     unavailable: unavailable,
     openWorkspace: openWorkspace,

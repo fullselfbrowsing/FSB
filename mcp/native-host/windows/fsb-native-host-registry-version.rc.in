@@ -1,0 +1,32 @@
+#include <windows.h>
+
+#define FSB_MCP_VERSION_COMMA @FSB_VERSION_COMMA@
+#define FSB_MCP_VERSION_STRING "@FSB_VERSION_STRING@"
+
+1 VERSIONINFO
+FILEVERSION FSB_MCP_VERSION_COMMA
+PRODUCTVERSION FSB_MCP_VERSION_COMMA
+FILEFLAGSMASK VS_FFI_FILEFLAGSMASK
+FILEFLAGS 0x0L
+FILEOS VOS_NT_WINDOWS32
+FILETYPE VFT_APP
+FILESUBTYPE VFT2_UNKNOWN
+BEGIN
+  BLOCK "StringFileInfo"
+  BEGIN
+    BLOCK "040904B0"
+    BEGIN
+      VALUE "CompanyName", "Full Self-Browsing\0"
+      VALUE "FileDescription", "FSB Native Host Registry Helper\0"
+      VALUE "FileVersion", FSB_MCP_VERSION_STRING "\0"
+      VALUE "InternalName", "fsb-native-host-registry-helper-v1\0"
+      VALUE "OriginalFilename", "fsb-native-host-registry.exe\0"
+      VALUE "ProductName", "FSB MCP Server\0"
+      VALUE "ProductVersion", FSB_MCP_VERSION_STRING "\0"
+    END
+  END
+  BLOCK "VarFileInfo"
+  BEGIN
+    VALUE "Translation", 0x0409, 1200
+  END
+END

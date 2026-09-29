@@ -2,7 +2,8 @@
  * Safari MCP transport -- a WebSocket-shaped object over native messaging.
  *
  * REQUIREMENT: the MCP bridge must keep working against the SAME server on the
- * SAME port, ws://localhost:7225, with mcp/ unchanged.
+ * SAME port, ws://localhost:7225. The host dials with the extension's Origin
+ * (sent in the `open` frame) so the server classifies it as the extension.
  *
  * Safari Web Extensions are documented as unable to open ws://localhost from an
  * extension page: the request is refused by the extension CSP, and the
@@ -87,6 +88,20 @@
     return new TextDecoder().decode(bytes);
   }
 
+  // The host dials :7225 with this as its Origin header. The server only lets
+  // a socket that carries an extension Origin act as the extension; one with
+  // no Origin must identify itself as an MCP relay or be closed. getURL, not
+  // location.origin: the latter is "null" for non-special schemes.
+  function extensionOrigin(runtime) {
+    try {
+      const base = typeof runtime.getURL === 'function' ? runtime.getURL('') : '';
+      const match = /^(safari-web-extension|chrome-extension):\/\/([^/?#@]+)\/?$/.exec(base || '');
+      return match ? match[1] + '://' + match[2] : null;
+    } catch (_e) {
+      return null;
+    }
+  }
+
   function randomId() {
     try {
       if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
@@ -161,13 +176,16 @@
         if (this._readyState === CONNECTING) this._fail('native_open_timeout', 1006);
       }, this._openTimeoutMs);
 
-      this._post({
+      const open = {
         v: NATIVE_PROTOCOL_VERSION,
         t: 'open',
         url: this.url,
         clientId: this._clientId,
         linger: true
-      });
+      };
+      const origin = extensionOrigin(runtime);
+      if (origin) open.origin = origin;
+      this._post(open);
     }
 
     _post(obj) {

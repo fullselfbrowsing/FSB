@@ -1,14 +1,10 @@
 'use strict';
 
 /**
- * debug-sidepanel-agent-name regression test --
- * chrome.storage.onChanged listener in extension/ui/sidepanel.js must
- * also refresh the owner chip when any session-area key prefixed with
- * 'mcpVisualSession:' changes. Without this branch, the chip renders
- * once via Tier 3 (formatAgentIdForDisplay short-prefix) on the
- * fsbAgentRegistry change AND never re-renders to Tier 2 (friendly
- * client label) when recordVisualSessionTick later writes the entry,
- * because no listener observes the visual-session key family.
+ * Provider-neutral side-panel ownership listener regression.
+ * Registry changes must refresh the active-tab ownership lock and delegated
+ * snapshot. Decorative client-label and visual-session writes must not cause
+ * side-panel ownership presentation work.
  *
  * Real-runtime discipline per CLAUDE.md MEMORY (no static-text grep
  * for presence; load + invoke the listener with mocked fixtures).
@@ -67,7 +63,7 @@ const sidepanelSrc = fs.readFileSync(
   'utf8'
 );
 
-console.log('\n--- debug-sidepanel-agent-name -- mcpVisualSession listener ---');
+console.log('\n--- provider-neutral sidepanel ownership listener ---');
 
 // Sanity: the listener exists and we can extract its body
 const listenerBody = extractStorageOnChangedListenerBody(sidepanelSrc);
@@ -79,12 +75,9 @@ if (!listenerBody) {
   process.exit(1);
 }
 
-// Build a stub world. The listener body references several module-scope
-// helpers: refreshOwnerChip (chip refresh -- what we instrument),
-// showSidepanelProgressEnabled (write target for the local-area branch).
-// We provide stubs that record calls and return safe defaults.
-
-let refreshOwnerChipCalls = 0;
+// Build a stub world for the branches under test.
+let surfaceSyncCalls = 0;
+let snapshotRefreshCalls = 0;
 let showSidepanelProgressEnabled = false;
 
 // Install stubs as globals so eval'd code can resolve them via lexical
@@ -93,7 +86,8 @@ let showSidepanelProgressEnabled = false;
 // over the explicit args we pass in.
 const listenerFn = new Function(
   'changes', 'area',
-  'refreshOwnerChip', 'getShowProgress', 'setShowProgress',
+  'syncActiveTabSurface', '_activeTabIdSnapshot', '_refreshSelectedDelegationSnapshot',
+  'getShowProgress', 'setShowProgress',
   // The original body references `showSidepanelProgressEnabled` as a free
   // identifier. Provide a getter/setter pair and string-replace the
   // reference so the test sandbox can observe writes.
@@ -115,7 +109,9 @@ function invoke(changes, area) {
   listenerFn(
     changes,
     area,
-    function () { refreshOwnerChipCalls++; },
+    function () { surfaceSyncCalls++; },
+    42,
+    function () { snapshotRefreshCalls++; },
     function () { return showSidepanelProgressEnabled; },
     function (v) { showSidepanelProgressEnabled = v; }
   );
@@ -123,16 +119,16 @@ function invoke(changes, area) {
 
 // --- Tests -----------------------------------------------------------------
 
-// Test 1: fsbAgentRegistry mutation in session area fires the chip refresh
-// (PRE-EXISTING contract — regression pin to confirm fix did not regress it)
-refreshOwnerChipCalls = 0;
+// Test 1: registry mutation refreshes the internal lock and selected snapshot.
+surfaceSyncCalls = 0;
+snapshotRefreshCalls = 0;
 invoke({ fsbAgentRegistry: { newValue: { v: 1, records: {} } } }, 'session');
-ok(refreshOwnerChipCalls === 1,
-   'Test 1 -- fsbAgentRegistry session-area change fires refreshOwnerChip exactly once');
+ok(surfaceSyncCalls === 1 && snapshotRefreshCalls === 1,
+   'Test 1 -- registry change refreshes lock state and delegated snapshot exactly once');
 
-// Test 2: mcpVisualSession:42 mutation in session area fires the chip refresh
-// (THIS IS THE FIX — fail-pin for the regression)
-refreshOwnerChipCalls = 0;
+// Test 2: visual-session presentation changes are ignored by the side panel.
+surfaceSyncCalls = 0;
+snapshotRefreshCalls = 0;
 invoke({
   'mcpVisualSession:42': {
     newValue: {
@@ -148,78 +144,58 @@ invoke({
     }
   }
 }, 'session');
-ok(refreshOwnerChipCalls === 1,
-   'Test 2 -- mcpVisualSession:<tabId> session-area change fires refreshOwnerChip exactly once');
+ok(surfaceSyncCalls === 0 && snapshotRefreshCalls === 0,
+   'Test 2 -- mcpVisualSession change performs no ownership presentation refresh');
 
-// Test 3: BOTH keys in the SAME change record fires the chip refresh at
-// MOST twice (one per branch). Important — confirms the new branch does
-// not somehow gate the existing branch or vice versa.
-refreshOwnerChipCalls = 0;
+// Test 3: canonical client-label changes are decorative and ignored.
+surfaceSyncCalls = 0;
+snapshotRefreshCalls = 0;
+invoke({ fsbAgentClientLabels: { newValue: { agent_aaa: 'Claude' } } }, 'session');
+ok(surfaceSyncCalls === 0 && snapshotRefreshCalls === 0,
+   'Test 3 -- fsbAgentClientLabels change performs no side-panel refresh');
+
+// Test 4: a registry mutation still refreshes once when decorative keys share
+// the same storage event.
+surfaceSyncCalls = 0;
+snapshotRefreshCalls = 0;
 invoke({
   fsbAgentRegistry: { newValue: { v: 1, records: {} } },
+  fsbAgentClientLabels: { newValue: { agent_aaa: 'Claude' } },
   'mcpVisualSession:42': { newValue: { tabId: 42, client: 'Claude' } }
 }, 'session');
-ok(refreshOwnerChipCalls === 2,
-   'Test 3 -- both fsbAgentRegistry and mcpVisualSession in one change fires refresh twice');
+ok(surfaceSyncCalls === 1 && snapshotRefreshCalls === 1,
+   'Test 4 -- registry plus decorative changes still refresh exactly once');
 
-// Test 4: a non-related session-area key does NOT fire refresh (the loop
-// must not be over-broad).
-refreshOwnerChipCalls = 0;
+// Test 5: unrelated session keys do not refresh ownership.
+surfaceSyncCalls = 0;
+snapshotRefreshCalls = 0;
 invoke({ someOtherSessionKey: { newValue: 'whatever' } }, 'session');
-ok(refreshOwnerChipCalls === 0,
-   'Test 4 -- unrelated session-area key does NOT fire refreshOwnerChip');
+ok(surfaceSyncCalls === 0 && snapshotRefreshCalls === 0,
+   'Test 5 -- unrelated session-area key performs no ownership refresh');
 
-// Test 5: a local-area change with the visual-session-prefix-looking key
-// must NOT fire (visual sessions are session-area only — defense against
-// false positives if a future feature reused the prefix in local).
-refreshOwnerChipCalls = 0;
+// Test 6: a local visual-session-looking key is also ignored.
+surfaceSyncCalls = 0;
+snapshotRefreshCalls = 0;
 invoke({ 'mcpVisualSession:42': { newValue: { tabId: 42 } } }, 'local');
-ok(refreshOwnerChipCalls === 0,
-   'Test 5 -- mcpVisualSession key in LOCAL area does NOT fire refreshOwnerChip');
+ok(surfaceSyncCalls === 0 && snapshotRefreshCalls === 0,
+   'Test 6 -- local mcpVisualSession key performs no ownership refresh');
 
-// Test 6: showSidepanelProgress local-area write still works (regression
-// pin for the pre-existing branch — the new branch must not break local
-// channel handling).
-refreshOwnerChipCalls = 0;
+// Test 7: the unrelated progress-setting branch remains intact.
+surfaceSyncCalls = 0;
+snapshotRefreshCalls = 0;
 showSidepanelProgressEnabled = null;
 invoke({ showSidepanelProgress: { newValue: false } }, 'local');
-ok(showSidepanelProgressEnabled === false && refreshOwnerChipCalls === 0,
-   'Test 6 -- local-area showSidepanelProgress change still flips the flag and does NOT fire refresh');
+ok(showSidepanelProgressEnabled === false
+    && surfaceSyncCalls === 0 && snapshotRefreshCalls === 0,
+   'Test 7 -- local showSidepanelProgress still updates without ownership work');
 
-// Test 7: multiple mcpVisualSession:<tabId> keys in one change record fire
-// the refresh AT MOST ONCE (Object.keys loop has a `break`). Important
-// optimisation pin -- N visual-session writes in a single change must not
-// cascade into N refreshOwnerChip calls.
-refreshOwnerChipCalls = 0;
-invoke({
-  'mcpVisualSession:42': { newValue: { tabId: 42, client: 'Claude' } },
-  'mcpVisualSession:99': { newValue: { tabId: 99, client: 'OpenClaw' } },
-  'mcpVisualSession:1234': { newValue: { tabId: 1234, client: 'Cursor' } }
-}, 'session');
-ok(refreshOwnerChipCalls === 1,
-   'Test 7 -- multiple mcpVisualSession:* keys in one change fires refresh exactly once (break in loop)');
-
-// Test 8: storage-area filter -- 'managed' / 'sync' areas must NOT fire
-// the new branch even when an mcpVisualSession:<tabId> key appears.
-refreshOwnerChipCalls = 0;
+// Test 8: non-session areas cannot trigger ownership refreshes.
+surfaceSyncCalls = 0;
+snapshotRefreshCalls = 0;
 invoke({ 'mcpVisualSession:42': { newValue: { tabId: 42 } } }, 'sync');
-ok(refreshOwnerChipCalls === 0,
-   'Test 8 -- sync-area mcpVisualSession key does NOT fire (session-area only)');
-
-refreshOwnerChipCalls = 0;
 invoke({ 'mcpVisualSession:42': { newValue: { tabId: 42 } } }, 'managed');
-ok(refreshOwnerChipCalls === 0,
-   'Test 8b -- managed-area mcpVisualSession key does NOT fire (session-area only)');
-
-// Test 9: null/undefined changes must not throw or fire refresh (defensive).
-refreshOwnerChipCalls = 0;
-try {
-  invoke(null, 'session');
-  invoke(undefined, 'session');
-  ok(refreshOwnerChipCalls === 0, 'Test 9 -- null/undefined changes are no-ops, do not throw');
-} catch (err) {
-  ok(false, 'Test 9 -- null/undefined changes threw: ' + err.message);
-}
+ok(surfaceSyncCalls === 0 && snapshotRefreshCalls === 0,
+   'Test 8 -- sync and managed visual-session keys perform no refresh');
 
 console.log('\n' + passed + ' PASS / ' + failed + ' FAIL');
 process.exit(failed === 0 ? 0 : 1);

@@ -38,9 +38,14 @@ function passAssertEqual(a, b, msg) { passAssert(a === b, msg + ' (got ' + JSON.
   for (const p of ['activeTab', 'scripting', 'storage', 'unlimitedStorage', 'tabs', 'windows', 'webNavigation', 'alarms', 'clipboardWrite']) {
     passAssert(out.permissions.includes(p), `permission kept: ${p}`);
   }
-  passAssert(out.permissions.includes('nativeMessaging'), 'nativeMessaging added');
-  passAssert(!SRC.permissions.includes('nativeMessaging'),
-    'nativeMessaging is NOT in the Chrome manifest (it would add a scary CWS install prompt)');
+  passAssert(out.permissions.includes('nativeMessaging'), 'nativeMessaging present');
+  passAssertEqual(out.permissions.filter((p) => p === 'nativeMessaging').length, 1,
+    'nativeMessaging is not duplicated when the Chrome manifest already declares it');
+  passAssertEqual(
+    transformManifest({ ...SRC, permissions: SRC.permissions.filter((p) => p !== 'nativeMessaging') })
+      .permissions.includes('nativeMessaging'),
+    true,
+    'nativeMessaging is added even when the Chrome manifest omits it');
 
   console.log('\n=== 3. side_panel key removed ===');
   passAssertEqual(out.side_panel, undefined, 'side_panel key deleted');

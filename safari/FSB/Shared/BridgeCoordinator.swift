@@ -93,7 +93,7 @@ final class BridgeCoordinator {
 
     // MARK: - open
 
-    func handleOpen(url: String, reply: @escaping ([String: Any]) -> Void) {
+    func handleOpen(url: String, origin: String?, reply: @escaping ([String: Any]) -> Void) {
         queue.async {
             self.noteContact()
             // An `open` means a NEW port. Anything the previous port parked is
@@ -125,7 +125,7 @@ final class BridgeCoordinator {
             // extension's 8s NATIVE_OPEN_TIMEOUT_MS and it reconnects.
             if self.socket != nil { self.discardSocket(reason: "superseded_by_new_port") }
 
-            let session = MCPSocketSession(url: parsed)
+            let session = MCPSocketSession(url: parsed, origin: origin)
             self.socket = session
             self.pendingOpenReply = reply
 

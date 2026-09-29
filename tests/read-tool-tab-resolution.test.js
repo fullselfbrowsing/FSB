@@ -11,7 +11,8 @@
  *
  * Coverage (per plan 246-01 Task 1 <behavior>):
  *   Test 1 -- _handleReadPage with single-tab agent auto-resolves.
- *   Test 2 -- _handleReadPage with explicit tab_id wins over registry.
+ *   Test 2 -- _handleReadPage rejects an explicit foreign tab_id before
+ *             sending a content-script message.
  *   Test 3 -- _handleGetDOM with single-tab agent auto-resolves.
  *   Test 4 -- _handleReadPage with 0-owned agent returns NO_OWNED_TAB error envelope.
  *   Test 5 -- handleGetPageSnapshotRoute auto-resolves via dispatcher.
@@ -65,6 +66,9 @@ function buildRegistryMock(opts) {
         if (owner === agentId) tabs.push(tabId);
       });
       return tabs;
+    },
+    getOwner(tabId) {
+      return tabOwners.get(tabId) || null;
     }
   };
 }
@@ -169,19 +173,20 @@ async function test1_readPageAutoResolve() {
 }
 
 // =========================================================================
-// Test 2 -- _handleReadPage explicit tab_id wins
+// Test 2 -- _handleReadPage rejects an explicit foreign tab_id
 // =========================================================================
 async function test2_readPageExplicitTabId() {
-  console.log('--- Test 2: _handleReadPage explicit tab_id wins over registry ---');
+  console.log('--- Test 2: _handleReadPage rejects explicit foreign tab_id ---');
   installRegistry(buildRegistryMock({
-    knownAgents: ['agent_a'],
-    tabOwners: [[42, 'agent_a']]
+    knownAgents: ['agent_a', 'agent_b'],
+    tabOwners: [[42, 'agent_a'], [99, 'agent_b']]
   }));
   try {
     const client = buildMockClient({ activeTab: null });
-    await client._handleReadPage({ agentId: 'agent_a', tab_id: 99 });
-    check(client.sentMessages.length === 1, 'exactly one content-script call');
-    check(client.sentMessages[0].tabId === 99, 'tabId === 99 (from explicit tab_id)');
+    const result = await client._handleReadPage({ agentId: 'agent_a', tab_id: 99 });
+    check(result && result.success === false, 'success === false');
+    check(result && result.code === 'TAB_NOT_OWNED', 'code === TAB_NOT_OWNED');
+    check(client.sentMessages.length === 0, 'no content-script call for foreign tab');
   } finally {
     uninstallRegistry();
   }

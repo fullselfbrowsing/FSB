@@ -61,9 +61,14 @@ async function main() {
 
   const logs = [];
   const originalLog = console.log;
+  const originalWarn = console.warn;
   console.log = (...args) => {
     logs.push(args.map(String).join(' '));
     originalLog.apply(console, args);
+  };
+  console.warn = (...args) => {
+    logs.push(args.map(String).join(' '));
+    originalWarn.apply(console, args);
   };
   const originalEmitWarning = process.emitWarning;
   process.emitWarning = (msg, ...rest) => {
@@ -78,12 +83,14 @@ async function main() {
     const hostPath = path.join(__dirname, '..', 'extension', 'offscreen', 'lattice-host.js');
     await import(pathToFileURL(hostPath).href);
     await waitFor(
-      () => logs.some((line) => line.includes('ephemeral signer ready')),
+      () => logs.some((line) => line.includes('persistent replay signer ready') ||
+        line.includes('checkpoint-only fallback')),
       'offscreen lattice signer boot',
       2000
     );
   } finally {
     console.log = originalLog;
+    console.warn = originalWarn;
     process.emitWarning = originalEmitWarning;
   }
 

@@ -1,16 +1,14 @@
 'use strict';
 
 /**
- * Phase 241 plan 02 task 1 -- chrome.tabs.onCreated forced-pool routing
- * (POOL-03 / D-01 / D-02) + handleAgentRegisterRoute cap-rejection branch
+ * Agent-action child-tab provenance routing + handleAgentRegisterRoute cap-rejection branch
  * (POOL-01 / D-03) + connectionId stamp through dispatcher (D-08).
  *
  * Validates:
- *   - When chrome.tabs.onCreated fires for a new tab whose openerTabId is
- *     owned by an agent, background.js's standalone listener binds the new
- *     tab to that agent via reg.bindTab(agentId, newTabId, { forced: true }).
+ *   - A child tab inherits ownership only while a matching agent action
+ *     intent is live for its owned opener.
  *   - Tab metadata for the bound tab carries forced === true.
- *   - Unowned openerTabId does not bind anything (Pitfall 2).
+ *   - An owned opener without agent-action provenance remains unowned.
  *   - Missing openerTabId does not bind anything (Ctrl+T case).
  *   - Defensive against non-numeric / undefined / null tab payloads.
  *   - D-02: forced-pool routing does NOT consume cap budget (no new agent
@@ -29,12 +27,21 @@ const assert = require('assert');
 const path = require('path');
 
 const REGISTRY_MODULE_PATH = require.resolve('../extension/utils/agent-registry.js');
+const PROVENANCE_MODULE_PATH = require.resolve('../extension/utils/agent-tab-spawn-provenance.js');
 const DISPATCHER_PATH = path.resolve(__dirname, '..', 'extension', 'ws', 'mcp-tool-dispatcher.js');
 const BACKGROUND_PATH = path.resolve(__dirname, '..', 'extension', 'background.js');
 
 function freshRequireRegistry() {
   delete require.cache[REGISTRY_MODULE_PATH];
   return require(REGISTRY_MODULE_PATH);
+}
+
+function freshRequireProvenance() {
+  delete require.cache[PROVENANCE_MODULE_PATH];
+  const provenance = require(PROVENANCE_MODULE_PATH);
+  provenance.clear();
+  globalThis.FsbAgentTabSpawnProvenance = provenance;
+  return provenance;
 }
 
 function createStorageArea(initial) {
@@ -92,6 +99,7 @@ function setupChromeMock() {
 
 function teardownChromeMock() {
   delete globalThis.chrome;
+  delete globalThis.FsbAgentTabSpawnProvenance;
 }
 
 function setupDiagnosticCapture() {
@@ -115,7 +123,7 @@ function teardownDiagnosticCapture() {
 // globalThis.fsbAgentRegistryInstance is the test registry and chrome is the
 // mock. This mirrors the smoke-test convention of testing standalone listeners
 // in isolation (Phase 237 plan 03 precedent).
-function installPhase241OnCreatedListenerFromSource() {
+function installAgentActionOnCreatedListenerFromSource() {
   const fs = require('fs');
   const source = fs.readFileSync(BACKGROUND_PATH, 'utf8');
   // Locate the Phase 241 onCreated listener by its anchor token, then walk
@@ -127,12 +135,12 @@ function installPhase241OnCreatedListenerFromSource() {
   if (anchorIdx === -1) {
     throw new Error('phase-241-onCreated-listener-anchor-not-found-in-background.js');
   }
-  // Find a Phase 241 sentinel within the chars BEFORE the anchor so we
+  // Find the provenance sentinel within the chars BEFORE the anchor so we
   // anchor on the right listener (any future onCreated additions need their
   // own sentinel comment to be selected here).
   const preamble = source.slice(Math.max(0, anchorIdx - 1200), anchorIdx);
-  if (preamble.indexOf('Phase 241') === -1) {
-    throw new Error('phase-241-onCreated-sentinel-comment-missing');
+  if (preamble.indexOf('Agent-action child-tab routing') === -1) {
+    throw new Error('agent-action-onCreated-sentinel-comment-missing');
   }
   // Walk forward balancing parens.
   let depth = 0;
@@ -156,7 +164,7 @@ function installPhase241OnCreatedListenerFromSource() {
 }
 
 (async () => {
-  console.log('--- Test 1: forced-pool routing -- openerTabId owned (POOL-03 / D-01) ---');
+  console.log('--- Test 1: live agent-action provenance pools a child tab ---');
   {
     const mock = setupChromeMock();
     setupDiagnosticCapture();
@@ -168,17 +176,22 @@ function installPhase241OnCreatedListenerFromSource() {
 
       const A = (await reg.registerAgent()).agentId;
       await reg.bindTab(A, 100);
+      const provenance = freshRequireProvenance();
+      const token = provenance.begin({ agentId: A, openerTabId: 100 });
 
-      installPhase241OnCreatedListenerFromSource();
+      installAgentActionOnCreatedListenerFromSource();
       assert.ok(mock.onCreatedListeners.length >= 1, 'at least one chrome.tabs.onCreated listener registered');
       const cb = mock.onCreatedListeners[0];
 
       // Fire the listener as Chrome would.
       cb({ id: 200, openerTabId: 100 });
+      provenance.end(token);
+      cb({ id: 201, openerTabId: 100 });
       // Wait one microtask so the bindTab promise resolves.
       await new Promise((res) => setTimeout(res, 5));
 
       assert.strictEqual(reg.findAgentByTabId(200), A, 'new tab 200 bound to agent A');
+      assert.strictEqual(reg.findAgentByTabId(201), A, 'a second child during the action grace also binds to agent A');
       const meta = reg.getTabMetadata(200);
       assert.ok(meta, 'metadata exists for tab 200');
       assert.strictEqual(meta.forced, true, 'tab metadata for 200 has forced === true');
@@ -188,9 +201,9 @@ function installPhase241OnCreatedListenerFromSource() {
       teardownChromeMock();
     }
   }
-  console.log('  PASS: forced-pool routes new tab to opener\'s agent with forced flag');
+  console.log('  PASS: live agent action routes the child to its opener agent');
 
-  console.log('--- Test 2: unowned opener -- new tab stays unowned (Pitfall 2) ---');
+  console.log('--- Test 2: owned opener without provenance stays unowned ---');
   {
     const mock = setupChromeMock();
     setupDiagnosticCapture();
@@ -199,21 +212,24 @@ function installPhase241OnCreatedListenerFromSource() {
       const reg = new fresh.AgentRegistry();
       reg.setCap(8);
       globalThis.fsbAgentRegistryInstance = reg;
+      const A = (await reg.registerAgent()).agentId;
+      await reg.bindTab(A, 100);
+      freshRequireProvenance();
 
-      installPhase241OnCreatedListenerFromSource();
+      installAgentActionOnCreatedListenerFromSource();
       const cb = mock.onCreatedListeners[0];
 
-      cb({ id: 300, openerTabId: 999 });
+      cb({ id: 300, openerTabId: 100 });
       await new Promise((res) => setTimeout(res, 5));
 
-      assert.strictEqual(reg.findAgentByTabId(300), null, 'unowned-opener tab is unowned');
+      assert.strictEqual(reg.findAgentByTabId(300), null, 'human-created child remains unowned');
     } finally {
       delete globalThis.fsbAgentRegistryInstance;
       teardownDiagnosticCapture();
       teardownChromeMock();
     }
   }
-  console.log('  PASS: unowned openerTabId is a no-op');
+  console.log('  PASS: opener ownership alone is not treated as agent intent');
 
   console.log('--- Test 3: missing openerTabId -- Ctrl+T case unowned ---');
   {
@@ -224,8 +240,9 @@ function installPhase241OnCreatedListenerFromSource() {
       const reg = new fresh.AgentRegistry();
       reg.setCap(8);
       globalThis.fsbAgentRegistryInstance = reg;
+      freshRequireProvenance();
 
-      installPhase241OnCreatedListenerFromSource();
+      installAgentActionOnCreatedListenerFromSource();
       const cb = mock.onCreatedListeners[0];
 
       cb({ id: 400 });
@@ -252,8 +269,10 @@ function installPhase241OnCreatedListenerFromSource() {
 
       const A = (await reg.registerAgent()).agentId;
       await reg.bindTab(A, 100);
+      const provenance = freshRequireProvenance();
+      provenance.begin({ agentId: A, openerTabId: 100 });
 
-      installPhase241OnCreatedListenerFromSource();
+      installAgentActionOnCreatedListenerFromSource();
       const cb = mock.onCreatedListeners[0];
 
       // None of these may throw.
@@ -289,12 +308,15 @@ function installPhase241OnCreatedListenerFromSource() {
       await reg.bindTab(A, 100);
       await reg.bindTab(B, 101);
       assert.strictEqual(reg._agents.size, 2, 'cap full at 2 agents');
+      const provenance = freshRequireProvenance();
+      const token = provenance.begin({ agentId: A, openerTabId: 100 });
 
-      installPhase241OnCreatedListenerFromSource();
+      installAgentActionOnCreatedListenerFromSource();
       const cb = mock.onCreatedListeners[0];
 
       // New tab opened from A's tab -- pools under A, must NOT count as a new agent.
       cb({ id: 500, openerTabId: 100 });
+      provenance.end(token);
       await new Promise((res) => setTimeout(res, 5));
 
       assert.strictEqual(reg._agents.size, 2, 'agent count unchanged (D-02)');
@@ -306,6 +328,44 @@ function installPhase241OnCreatedListenerFromSource() {
     }
   }
   console.log('  PASS: forced-pool routing does not increment agent count');
+
+  console.log('--- Test 5b: settled provenance expires at the one-second boundary ---');
+  {
+    const provenance = freshRequireProvenance();
+    const token = provenance.begin({ agentId: 'agent_a', openerTabId: 100 }, 1000);
+    assert.ok(token, 'valid provenance token minted');
+    assert.strictEqual(provenance.end(token, 1000), true, 'settlement recorded');
+    assert.strictEqual(provenance.match(100, 1999).agentId, 'agent_a', 'intent retained during grace');
+    assert.strictEqual(provenance.match(100, 2000), null, 'intent expires at grace boundary');
+    delete globalThis.FsbAgentTabSpawnProvenance;
+  }
+  console.log('  PASS: provenance grace is bounded and timer-free');
+
+  console.log('--- Test 5c: expired provenance cannot pool a child tab ---');
+  {
+    const mock = setupChromeMock();
+    setupDiagnosticCapture();
+    try {
+      const fresh = freshRequireRegistry();
+      const reg = new fresh.AgentRegistry();
+      reg.setCap(8);
+      globalThis.fsbAgentRegistryInstance = reg;
+      const A = (await reg.registerAgent()).agentId;
+      await reg.bindTab(A, 100);
+      const provenance = freshRequireProvenance();
+      const token = provenance.begin({ agentId: A, openerTabId: 100 });
+      provenance.end(token, Date.now() - provenance.POST_SETTLE_GRACE_MS);
+      installAgentActionOnCreatedListenerFromSource();
+      mock.onCreatedListeners[0]({ id: 501, openerTabId: 100 });
+      await new Promise((res) => setTimeout(res, 5));
+      assert.strictEqual(reg.findAgentByTabId(501), null, 'expired action intent does not pool the child');
+    } finally {
+      delete globalThis.fsbAgentRegistryInstance;
+      teardownDiagnosticCapture();
+      teardownChromeMock();
+    }
+  }
+  console.log('  PASS: expired action intent leaves the child unowned');
 
   console.log('--- Test 6: handleAgentRegisterRoute returns typed AGENT_CAP_REACHED (POOL-01 / D-03) ---');
   {

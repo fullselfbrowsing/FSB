@@ -54,7 +54,10 @@ function buildHarness(denylist, options = {}) {
         },
       },
       debugger: {
-        async attach() { calls.attach += 1; },
+        async attach() {
+          calls.attach += 1;
+          if (options.attachError) throw options.attachError;
+        },
         async sendCommand(_target, method, params) {
           calls.sendCommand += 1;
           calls.debuggerCommands.push({ method, params });
@@ -156,6 +159,24 @@ async function assertFailedUploadRedactsPathInLogs() {
   assert(serializedLogs.includes(fileName), 'failed upload log uses basename in redacted message');
 }
 
+async function assertExternalDebuggerOwnerIsPreserved() {
+  const { executeUploadFile, calls } = buildHarness({
+    isAbsolutePath() { return true; },
+    classify() { return { denied: false, reason: '' }; },
+    basenameOf() { return 'report.pdf'; },
+  }, {
+    attachError: new Error('Another debugger is already attached to the tab with id: 7'),
+  });
+
+  const result = await executeUploadFile(7, 'input[type=file]', '/tmp/report.pdf');
+  assert.strictEqual(result.success, false, 'debugger contention returns failure');
+  assert.strictEqual(result.code, 'SCREENSHOT_DEBUGGER_BUSY', 'debugger contention uses typed busy code');
+  assert.strictEqual(result.retryable, true, 'debugger contention is retryable');
+  assert.strictEqual(calls.attach, 1, 'debugger attach is attempted once');
+  assert.strictEqual(calls.detach, 0, 'external debugger owner is never detached');
+  assert.strictEqual(calls.sendCommand, 0, 'no CDP commands run without ownership');
+}
+
 (async () => {
   console.log('\n--- upload-file chokepoint fail-closed regression ---');
 
@@ -176,6 +197,7 @@ async function assertFailedUploadRedactsPathInLogs() {
   }, 'denylist-error');
   await assertSuccessfulUploadRedactsPathInLogs();
   await assertFailedUploadRedactsPathInLogs();
+  await assertExternalDebuggerOwnerIsPreserved();
 
   console.log('upload-file chokepoint: PASS');
 })().catch((err) => {

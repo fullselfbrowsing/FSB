@@ -453,6 +453,60 @@
   }
 
   /**
+   * Clear every visual session owned by one agent (terminal-time teardown).
+   *
+   * Called from the delegation controller's terminal commit (via the
+   * background-injected releaseVisualSessions callback) so the overlay dies
+   * the moment a delegated run settles instead of waiting out the 60s death
+   * timer. Scans chrome.storage.session directly because the agent registry
+   * has already released the agent's tab bindings by the time the terminal
+   * commits, so the storage entries are the only remaining tab source.
+   *
+   * @param {string} agentId v0.9.60 agent identity that owns the entries.
+   * @param {object} options Forwarded to clearVisualSession ({ reason?, skipBroadcast? }).
+   * @returns {Promise<object>} { ok: true, cleared: number } on success;
+   *                            { ok: false, reason: string } on validation or read errors.
+   */
+  async function clearVisualSessionsForAgent(agentId, options) {
+    if (typeof agentId !== 'string' || agentId.trim().length === 0) {
+      return { ok: false, reason: 'invalid_agent_id' };
+    }
+    var trimmedAgentId = agentId.trim();
+
+    if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.session) {
+      return { ok: true, cleared: 0 };
+    }
+
+    var bag = null;
+    try {
+      bag = await chrome.storage.session.get(null);
+    } catch (_error) {
+      return { ok: false, reason: 'storage_read_failed' };
+    }
+    if (!bag || typeof bag !== 'object') {
+      return { ok: true, cleared: 0 };
+    }
+
+    var cleared = 0;
+    var keys = Object.keys(bag);
+    for (var i = 0; i < keys.length; i++) {
+      var key = keys[i];
+      if (key.indexOf(MCP_VISUAL_LIFECYCLE_STORAGE_KEY_PREFIX) !== 0) continue;
+      var entry = bag[key];
+      if (!entry || typeof entry !== 'object' || entry.agentId !== trimmedAgentId) continue;
+      var tabId = Number(entry.tabId);
+      if (!Number.isFinite(tabId) || tabId <= 0) {
+        tabId = Number(key.slice(MCP_VISUAL_LIFECYCLE_STORAGE_KEY_PREFIX.length));
+      }
+      if (!Number.isFinite(tabId) || tabId <= 0) continue;
+      var result = await clearVisualSession(tabId, options);
+      if (result && result.ok === true && result.action === 'cleared') cleared += 1;
+    }
+
+    return { ok: true, cleared: cleared };
+  }
+
+  /**
    * Tab-close cleanup hook. Called from Plan 03's chrome.tabs.onRemoved listener.
    *
    * Drops the storage entry and the alarm without broadcasting (the tab is gone;
@@ -635,6 +689,7 @@
     MCP_VISUAL_LIFECYCLE_DEATH_MS: MCP_VISUAL_LIFECYCLE_DEATH_MS,
     recordVisualSessionTick: recordVisualSessionTick,
     clearVisualSession: clearVisualSession,
+    clearVisualSessionsForAgent: clearVisualSessionsForAgent,
     handleVisualSessionLifecycleTabRemoved: handleVisualSessionLifecycleTabRemoved,
     handleVisualSessionLifecycleAlarm: handleVisualSessionLifecycleAlarm,
     restoreVisualSessionLifecyclesFromStorage: restoreVisualSessionLifecyclesFromStorage

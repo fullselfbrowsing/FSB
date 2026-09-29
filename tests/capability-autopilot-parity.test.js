@@ -40,7 +40,7 @@ const REPO_ROOT = path.resolve(__dirname, '..');
 // tests/capability-mcp-surface.test.js:58-59 / tool-definitions-parity.test.js:52.
 // The two out-of-registry capability tools must NOT have moved this.
 const EXPECTED_NON_TRIGGER_REGISTRY_HASH =
-  '6354d78836bc8927f55af4562dec099f614ebbe034d018c163d7b8b2e5c6b60d';
+  'b9c30a5a61fbcdae60b851aebfea90d0961cb95d95c3c2adbf8357014bbbd7b9';
 
 // The four trigger tools sit IN TOOL_REGISTRY but are excluded from the frozen
 // non-trigger baseline (mirrors capability-mcp-surface.test.js:63).
@@ -127,6 +127,7 @@ async function run() {
   const priorRouter = globalThis.FsbCapabilityRouter;
   const priorChrome = globalThis.chrome;
   const priorResolveAgentTabOrError = globalThis.resolveAgentTabOrError;
+  const priorActionIcon = globalThis.fsbActionIcon;
 
   // The shared engine: a spy that records every (slug, args) and returns a fixed
   // structured hit. BOTH front doors must reach THIS exact global (INV-02).
@@ -211,9 +212,15 @@ async function run() {
   // then the symbol is absent -> RED.
   let autopilotResult = null;
   let autopilotHitSpyBefore = spyCalls.length;
+  let autopilotFn = null;
+  const capabilityIconEvents = [];
+  globalThis.fsbActionIcon = {
+    beginCapability: function (tabId) { capabilityIconEvents.push(['begin', tabId]); },
+    endCapability: function (tabId) { capabilityIconEvents.push(['end', tabId]); }
+  };
   try {
     const toolExecutor = require(path.join(REPO_ROOT, 'extension', 'ai', 'tool-executor.js'));
-    const autopilotFn = toolExecutor.executeCapabilityToolForAutopilot
+    autopilotFn = toolExecutor.executeCapabilityToolForAutopilot
       || (typeof globalThis !== 'undefined' ? globalThis.executeCapabilityToolForAutopilot : null);
     if (typeof autopilotFn === 'function') {
       autopilotResult = await autopilotFn('invoke_capability', { slug: SLUG, params: ARGS }, 11);
@@ -247,11 +254,69 @@ async function run() {
   check(autopilotResult && autopilotResult.result
     && autopilotResult.result.tier === 'T1b',
     'CAT-04: the autopilot wrapper `result` carries the router response verbatim (tier:T1b)');
+  check(JSON.stringify(capabilityIconEvents) === JSON.stringify([['begin', 11], ['end', 11]]),
+    'autopilot invoke balances beginCapability/endCapability around a successful router promise');
+
+  if (typeof autopilotFn === 'function') {
+    capabilityIconEvents.length = 0;
+    globalThis.FsbCapabilityRouter = {
+      invoke: async function () {
+        return { success: false, errorCode: 'RECIPE_CONSENT_REQUIRED', guarded: true };
+      }
+    };
+    const guarded = await autopilotFn('invoke_capability', { slug: SLUG, params: ARGS }, 11);
+    check(guarded && guarded.success === false,
+      'autopilot preserves a guarded capability result');
+    check(JSON.stringify(capabilityIconEvents) === JSON.stringify([['begin', 11], ['end', 11]]),
+      'autopilot guarded/fallback results still balance capability Ring');
+
+    capabilityIconEvents.length = 0;
+    delete globalThis.FsbCapabilityRouter;
+    const unavailable = await autopilotFn('invoke_capability', { slug: SLUG, params: ARGS }, 11);
+    check(unavailable && unavailable.success === false && unavailable.error === 'FsbCapabilityRouter unavailable',
+      'autopilot reports an unavailable capability router');
+    check(JSON.stringify(capabilityIconEvents) === JSON.stringify([['begin', 11], ['end', 11]]),
+      'an unavailable router still balances capability Ring');
+
+    capabilityIconEvents.length = 0;
+    globalThis.FsbCapabilityRouter = {
+      invoke: async function () { throw new Error('capability router exploded'); }
+    };
+    let invokeError = null;
+    try {
+      await autopilotFn('invoke_capability', { slug: SLUG, params: ARGS }, 11);
+    } catch (error) {
+      invokeError = error;
+    }
+    check(invokeError && invokeError.message === 'capability router exploded',
+      'autopilot router errors still propagate');
+    check(JSON.stringify(capabilityIconEvents) === JSON.stringify([['begin', 11], ['end', 11]]),
+      'a thrown router error balances capability Ring in finally');
+
+    capabilityIconEvents.length = 0;
+    globalThis.FsbCapabilityRouter = {
+      invoke: async function () { return { success: true, status: 200 }; }
+    };
+    await autopilotFn(
+      'invoke_capability',
+      { slug: SLUG, params: ARGS },
+      11,
+      { animateActionIcon: false }
+    );
+    check(capabilityIconEvents.length === 0,
+      'disabled autopilot action highlights suppress the dedicated Ring lifecycle');
+
+    capabilityIconEvents.length = 0;
+    await autopilotFn('search_capabilities', { query: 'notifications' }, 11);
+    check(capabilityIconEvents.length === 0,
+      'capability search never enters the dedicated Ring lifecycle');
+  }
 
   // Restore the spy globals before the Phase-32 block drives the REAL router.
   if (priorRouter === undefined) { delete globalThis.FsbCapabilityRouter; } else { globalThis.FsbCapabilityRouter = priorRouter; }
   if (priorChrome === undefined) { delete globalThis.chrome; } else { globalThis.chrome = priorChrome; }
   if (priorResolveAgentTabOrError === undefined) { delete globalThis.resolveAgentTabOrError; } else { globalThis.resolveAgentTabOrError = priorResolveAgentTabOrError; }
+  if (priorActionIcon === undefined) { delete globalThis.fsbActionIcon; } else { globalThis.fsbActionIcon = priorActionIcon; }
 
   // -------------------------------------------------------------------------
   // PHASE 32 (HEAL-01, D-02): the autopilot front door surfaces the typed reason /

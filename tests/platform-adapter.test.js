@@ -440,15 +440,18 @@ function safariLikeScope(overrides) {
   const verbRe = /_cdpVerb:\s*'([A-Za-z]+)'/g;
   let m;
   while ((m = verbRe.exec(toolDefs)) !== null) cdpVerbs.add(m[1]);
-  const map = loadAdapter(safariLikeScope()).CDP_DOM_FALLBACKS;
+  const adapter = loadAdapter(safariLikeScope());
+  const map = adapter.CDP_DOM_FALLBACKS;
+  const noFallback = adapter.CDP_NO_DOM_FALLBACK;
   passAssert(cdpVerbs.size > 0, 'found _cdpVerb entries in tool-definitions.js (found ' + cdpVerbs.size + ')');
   let missing = [];
-  cdpVerbs.forEach((v) => { if (!map[v]) missing.push(v); });
-  passAssertEqual(missing.length, 0, 'every _cdpVerb has a DOM fallback' + (missing.length ? ' -- missing: ' + missing.join(',') : ''));
+  cdpVerbs.forEach((v) => { if (!map[v] && !noFallback.includes(v)) missing.push(v); });
+  passAssertEqual(missing.length, 0, 'every _cdpVerb has a DOM fallback or is explicitly unavailable' + (missing.length ? ' -- missing: ' + missing.join(',') : ''));
+  passAssertEqual(noFallback.filter((v) => map[v]).length, 0, 'no verb is both mapped and declared unavailable');
 
   console.log('\n=== 11. source hygiene ===');
   passAssert(!/\bimportScripts\b/.test(SOURCE),
-    'adapter source contains no importScripts token (background.js pins 309/305)');
+    'adapter source contains no importScripts token (background.js pins 333/329)');
 
   console.log('\n---');
   console.log('passed:', passed, 'failed:', failed);

@@ -11,9 +11,10 @@
 //  app-extension process is a DIFFERENT subsystem, and that entitlement does
 //  govern it — which is why this class can dial a port the page context cannot.
 //
-//  The mcp/ server needs no changes for this path: URLSessionWebSocketTask is
-//  not a browser and sends no Origin header, and the server's origin check
-//  returns true when Origin is absent.
+//  URLSessionWebSocketTask is not a browser and sends no Origin header of its
+//  own. The server treats an Origin-less socket as an MCP relay that must say
+//  relay:hello, never as the extension, so the extension's origin (from the
+//  `open` frame) is sent explicitly.
 //
 
 import Foundation
@@ -24,6 +25,7 @@ final class MCPSocketSession: NSObject, URLSessionWebSocketDelegate {
 
     private(set) var state: State = .idle
     let url: URL
+    let origin: String?
     let socketId = UUID().uuidString
 
     var onOpen: ((String) -> Void)?
@@ -35,8 +37,9 @@ final class MCPSocketSession: NSObject, URLSessionWebSocketDelegate {
     private var pingTimer: DispatchSourceTimer?
     private let queue = DispatchQueue(label: "com.fullselfbrowsing.fsb.socket")
 
-    init(url: URL) {
+    init(url: URL, origin: String?) {
         self.url = url
+        self.origin = origin
         super.init()
     }
 
@@ -47,7 +50,9 @@ final class MCPSocketSession: NSObject, URLSessionWebSocketDelegate {
         config.waitsForConnectivity = false
         let session = URLSession(configuration: config, delegate: self, delegateQueue: nil)
         self.session = session
-        let task = session.webSocketTask(with: url)
+        var request = URLRequest(url: url)
+        if let origin { request.setValue(origin, forHTTPHeaderField: "Origin") }
+        let task = session.webSocketTask(with: request)
         self.task = task
         task.resume()
         pump()

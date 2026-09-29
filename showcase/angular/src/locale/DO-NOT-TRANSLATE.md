@@ -2,7 +2,7 @@
 
 This list is the authoritative source of terms that MUST NOT be translated when
 preparing the per-locale XLIFF targets (messages.es.xlf, .de.xlf,
-.ja.xlf, .zh-CN.xlf, .zh-TW.xlf). When any of these appear inside a translatable
+.ja.xlf, .ko.xlf, .zh-CN.xlf, .zh-TW.xlf). When any of these appear inside a translatable
 string, they are wrapped in `<span translate="no">...</span>` in the source HTML
 so the XLIFF extractor preserves them as `<ph>` placeholders the translator must
 keep verbatim.
@@ -35,7 +35,6 @@ whole element only when all of its content is genuinely invariant.
 - AI
 - Anthropic
 - Brave
-- BSL 1.1
 - CDP
 - Chrome
 - Chrome DevTools
@@ -56,6 +55,7 @@ whole element only when all of its content is genuinely invariant.
 - Codex
 - Codex MCP
 - Computer Use
+- Concierge
 - CSSOM
 - CSRF
 - Cursor
@@ -91,6 +91,7 @@ whole element only when all of its content is genuinely invariant.
 - LZ-string
 - MCP
 - MCP server
+- MIT
 - MutationObserver
 - MV3
 - npm
@@ -108,10 +109,12 @@ whole element only when all of its content is genuinely invariant.
 - Project Mariner
 - Prometheus
 - pnpm
+- React
 - Remote Dashboard
 - Safari
 - SDK
 - Standard Schema
+- Svelte
 - TypeScript
 - Vivaldi
 - WeakMap
@@ -119,6 +122,7 @@ whole element only when all of its content is genuinely invariant.
 - WebSocket
 - Windsurf
 - X
+- XSS
 - xAI
 - YouTube
 - Zod
@@ -178,7 +182,7 @@ When a `<code>` element wraps a CLI command, mark `translate="no"` directly on
 the `<code>` element:
 
 ```html
-<pre><code translate="no">npx -y fsb-mcp-server install --claude-code</code></pre>
+<pre><code translate="no">npx -y fsb-mcp-server@latest install --claude-code</code></pre>
 ```
 
 ## How this file is used

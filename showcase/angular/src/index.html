@@ -3,9 +3,14 @@
 <head>
   <meta charset="utf-8">
   <!-- Bootstrap metadata stays brand-only because index.html is not extracted
-       by Angular i18n. Each route replaces it with localized metadata. -->
-  <title i18n="@@index.title">FSB</title>
-  <meta name="description" i18n-content="@@index.meta.description" content="FSB">
+       by Angular i18n. Each route replaces it with localized metadata.
+       The i18n markers are disabled rather than declared: they produced no
+       trans-unit (index.html is not an Angular template) but did ship as dead
+       attributes in every prerendered page, in every locale. -->
+  <!-- eslint-disable-next-line @angular-eslint/template/i18n -->
+  <title>FSB</title>
+  <!-- eslint-disable-next-line @angular-eslint/template/i18n -->
+  <meta name="description" content="FSB">
   <base href="/">
   <!-- eslint-disable-next-line @angular-eslint/template/i18n -->
   <meta name="viewport" content="width=device-width, initial-scale=1">

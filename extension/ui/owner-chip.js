@@ -1,11 +1,10 @@
 /**
  * Phase 243 plan 03 (UI-02) -- pure helpers for the popup/sidepanel
- * "owned by Agent X" read-only chip.
+ * "Owned by Agent X" read-only header status.
  *
  * Per CONTEXT D-05: when the active tab is owned by a non-self agent (i.e. the
- * registry says ownerAgentId !== mySurface), display an informational chip
- * `owned by <ownerAgentIdShort>` in the popup or sidepanel header. The chip is
- * READ-ONLY -- no click handler, no enforcement (Threat T-243-03-03).
+ * registry says ownerAgentId !== mySurface), replace the popup or sidepanel
+ * header status with `Owned by <ownerAgentIdShort>`.
  *
  * Hidden when:
  *   - ownerAgentId is null/undefined (unowned tab)
@@ -33,7 +32,7 @@
   /**
    * @param {string|null|undefined} ownerAgentId - The active tab's owner per the registry.
    * @param {string} mySurface - 'legacy:popup' or 'legacy:sidepanel' (the calling surface).
-   * @returns {boolean} true when the chip should render.
+   * @returns {boolean} true when the ownership status should render.
    */
   function shouldShowOwnerChip(ownerAgentId, mySurface) {
     if (!ownerAgentId || typeof ownerAgentId !== 'string') return false;
@@ -44,12 +43,12 @@
 
   /**
    * @param {string} ownerAgentIdShort - Pre-formatted display string.
-   * @returns {string} The chip text. Always begins with "owned by ".
+   * @returns {string} The status text. Always begins with "Owned by ".
    */
   function buildChipText(ownerAgentIdShort) {
     var label = (ownerAgentIdShort === undefined || ownerAgentIdShort === null)
       ? '' : String(ownerAgentIdShort).trim();
-    return 'owned by ' + label;
+    return 'Owned by ' + label;
   }
 
   /**

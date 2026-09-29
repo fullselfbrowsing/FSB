@@ -46,6 +46,8 @@ const requiredPublicRoutes = [
   'get_site_guide',
   'list_sessions',
   'get_session_detail',
+  'get_session_replay',
+  'replay_session',
   'get_logs',
   'search_memory',
   'get_memory_stats',
@@ -71,6 +73,8 @@ const requiredMessageRoutes = [
   'mcp:get-page-snapshot',
   'mcp:list-sessions',
   'mcp:get-session',
+  'mcp:get-session-replay',
+  'mcp:replay-session',
   'mcp:get-logs',
   'mcp:search-memory',
   'mcp:get-memory',
@@ -137,6 +141,8 @@ const groupDefinitions = {
     tools: [
       'list_sessions',
       'get_session_detail',
+      'get_session_replay',
+      'replay_session',
       'get_logs',
       'search_memory',
       'get_memory_stats'
@@ -144,6 +150,8 @@ const groupDefinitions = {
     messages: [
       'mcp:list-sessions',
       'mcp:get-session',
+      'mcp:get-session-replay',
+      'mcp:replay-session',
       'mcp:get-logs',
       'mcp:search-memory',
       'mcp:get-memory'
@@ -224,7 +232,7 @@ function runRegistryChecks() {
 
   for (const toolName of requiredPublicRoutes) {
     const inRegistry = TOOL_REGISTRY.some(tool => tool.name === toolName);
-    const serverOnly = ['start_visual_session', 'end_visual_session', 'run_task', 'stop_task', 'get_task_status', 'list_sessions', 'get_session_detail', 'get_logs', 'search_memory', 'get_memory_stats'].includes(toolName);
+    const serverOnly = ['start_visual_session', 'end_visual_session', 'run_task', 'stop_task', 'get_task_status', 'list_sessions', 'get_session_detail', 'get_session_replay', 'replay_session', 'get_logs', 'search_memory', 'get_memory_stats'].includes(toolName);
     assert(inRegistry || serverOnly, `${toolName} is known through TOOL_REGISTRY or MCP server tool registration`);
   }
 
@@ -365,6 +373,9 @@ async function runObservabilityRedactionCase(dispatcher, groups) {
           }
         ]
       };
+    },
+    async exportHumanReadable(sessionId) {
+      return `Human-readable ${sessionId}`;
     }
   };
 
@@ -403,12 +414,104 @@ async function runObservabilityRedactionCase(dispatcher, groups) {
     ]) {
       assert(!serialized.includes(secret), `mcp:get-session omits raw secret value ${secret}`);
     }
+
+    const textResponse = await dispatcher.dispatchMcpMessageRoute({
+      type: 'mcp:get-session',
+      payload: { sessionId: 'session-redaction', format: 'text' }
+    });
+    assert(textResponse?.success === true && textResponse?.format === 'text',
+      'mcp:get-session implements its advertised text format');
+    assert(textResponse?.text === 'Human-readable session-redaction',
+      'text format returns the human-readable exporter result');
   } finally {
     if (previousAutomationLogger === undefined) {
       delete global.automationLogger;
     } else {
       global.automationLogger = previousAutomationLogger;
     }
+  }
+}
+
+async function runReplayRouteCase(dispatcher, groups) {
+  if (!dispatcher || !groups.includes('observability')) return;
+
+  console.log('\n--- verified replay inspection and consent routing ---');
+
+  const previousReplay = global.FsbLatticeReplay;
+  const previousRequest = global.requestMcpSessionReplay;
+  let requestedSessionId = null;
+  global.FsbLatticeReplay = {
+    async prepareReplay(sessionId) {
+      return {
+        verified: true,
+        sessionId,
+        startUrl: 'https://example.com/start',
+        tabs: [{
+          id: 'primary',
+          order: 0,
+          startUrl: 'https://example.com/start',
+          startOrigin: 'https://example.com',
+          startUrlState: 'ready'
+        }],
+        counts: { total: 1, executable: 1, approvalRequired: 1, blocked: 0 },
+        steps: [{
+          id: 'step-1',
+          index: 0,
+          tool: 'click',
+          arguments: { selector: '#continue', nested: { exact: { value: 'preserved' } } },
+          target: { logicalTab: 'primary', origin: 'https://example.com' },
+          replay: { risk: 'write', availability: 'approval-once' }
+        }],
+        replay: {
+          integrity: 'verified',
+          provenance: 'capture',
+          manifestHash: 'verified-manifest-hash',
+          receipt: 'signing-receipt-must-not-leak'
+        }
+      };
+    }
+  };
+  global.requestMcpSessionReplay = async (sessionId) => {
+    requestedSessionId = sessionId;
+    return {
+      success: true,
+      status: 'approval_required',
+      requestId: 'approval-1',
+      sessionId,
+      manifestHash: 'verified-manifest-hash',
+      message: 'Target pages will open automatically after approval.'
+    };
+  };
+
+  try {
+    const inspection = await dispatcher.dispatchMcpMessageRoute({
+      type: 'mcp:get-session-replay',
+      payload: { sessionId: 'session-replay' }
+    });
+    assert(inspection?.success === true && inspection?.replay?.verified === true,
+      'mcp:get-session-replay returns a verified structural preview');
+    assert(inspection?.replay?.steps?.[0]?.arguments?.nested?.exact?.value === 'preserved',
+      'replay inspection keeps nested step structure instead of flattening objects');
+    assert(inspection?.replay?.manifestHash === 'verified-manifest-hash',
+      'replay inspection binds the preview to its manifest hash');
+    assert(!JSON.stringify(inspection).includes('signing-receipt-must-not-leak'),
+      'replay inspection omits signing receipts');
+
+    const request = await dispatcher.dispatchMcpMessageRoute({
+      type: 'mcp:replay-session',
+      payload: { sessionId: 'session-replay' }
+    });
+    assert(request?.success === true && request?.status === 'approval_required',
+      'mcp:replay-session creates a consent request instead of executing immediately');
+    assert(requestedSessionId === 'session-replay',
+      'replay consent request preserves the selected recorded session');
+    assert(request?.message?.includes('open automatically'),
+      'replay consent response tells the MCP client not to ask for manual page opening');
+  } finally {
+    if (previousReplay === undefined) delete global.FsbLatticeReplay;
+    else global.FsbLatticeReplay = previousReplay;
+    if (previousRequest === undefined) delete global.requestMcpSessionReplay;
+    else global.requestMcpSessionReplay = previousRequest;
   }
 }
 
@@ -473,6 +576,240 @@ async function runTriggerOwnershipGateCase(dispatcher, groups) {
   }
 }
 
+async function runTaskOutcomeRecorderCase(dispatcher, groups) {
+  if (!dispatcher || !groups.includes('browser')) return;
+
+  console.log('\n--- lifecycle summaries are the only task-memory handoff ---');
+  const previousRecorder = global.fsbMcpSessionRecorder;
+  const calls = [];
+  global.fsbMcpSessionRecorder = {
+    recordTaskOutcome(input) { calls.push(input); }
+  };
+
+  try {
+    const payload = { agentId: 'agent-lifecycle', ownershipToken: 'token-lifecycle' };
+    const completed = await dispatcher.dispatchMcpToolRoute({
+      tool: 'complete_task',
+      params: { summary: 'Completed safely', tabId: 9, tab_id: 9 },
+      payload
+    });
+    assert(completed?.status === 'completed', 'complete_task returns a handler-confirmed completed status');
+    assert(calls.length === 1, 'valid complete_task records one client-authored outcome');
+    assert(calls[0].payload.agentId === 'agent-lifecycle', 'outcome hook preserves agent identity');
+    assert(calls[0].params.tab_id === 9, 'outcome hook preserves public tab_id');
+
+    const failed = await dispatcher.dispatchMcpToolRoute({
+      tool: 'fail_task', params: { reason: 'Unrecoverable' }, payload
+    });
+    assert(failed?.status === 'failed' && failed?.success === false,
+      'fail_task valid terminal response remains success:false with failed status');
+    assert(calls.length === 2, 'valid fail_task still records a terminal outcome');
+
+    await dispatcher.dispatchMcpToolRoute({ tool: 'complete_task', params: {}, payload });
+    assert(calls.length === 2, 'invalid lifecycle params never reach the task-memory recorder');
+  } finally {
+    if (previousRecorder === undefined) delete global.fsbMcpSessionRecorder;
+    else global.fsbMcpSessionRecorder = previousRecorder;
+  }
+}
+
+async function runVisualSessionTokenOwnershipCase(dispatcher, groups) {
+  if (!dispatcher || !groups.includes('browser')) return;
+
+  console.log('\n--- visual-session tokens resolve to their authoritative owned tab ---');
+  const previousRegistry = global.fsbAgentRegistryInstance;
+  const previousResolver = global.resolveMcpVisualSessionTabId;
+  const previousHandler = global.handleMcpVisualSessionTaskStatus;
+  const previousRecorder = global.fsbMcpSessionRecorder;
+  const handlerCalls = [];
+  const outcomeCalls = [];
+
+  global.fsbAgentRegistryInstance = {
+    hasAgent(agentId) {
+      return agentId === 'agent-owner' || agentId === 'agent-intruder';
+    },
+    isOwnedBy(tabId, agentId, ownershipToken) {
+      if (tabId === 9) return agentId === 'agent-owner' && ownershipToken === 'owner-token-9';
+      if (tabId === 10) return agentId === 'agent-owner' && ownershipToken === 'owner-token-10';
+      if (tabId === 11) return agentId === 'agent-intruder' && ownershipToken === 'intruder-token-11';
+      return false;
+    },
+    getOwner(tabId) {
+      if (tabId === 9) return 'agent-owner';
+      if (tabId === 10) return 'agent-owner';
+      if (tabId === 11) return 'agent-intruder';
+      return null;
+    },
+    getAgentTabs(agentId) {
+      if (agentId === 'agent-owner') return [9, 10];
+      if (agentId === 'agent-intruder') return [11];
+      return null;
+    },
+    getTabMetadata(tabId) {
+      const tokens = {
+        9: 'owner-token-9',
+        10: 'owner-token-10',
+        11: 'intruder-token-11'
+      };
+      return { incognito: false, windowId: 1, ownershipToken: tokens[tabId] };
+    },
+    getAgentWindowId() {
+      return 1;
+    }
+  };
+  global.resolveMcpVisualSessionTabId = (sessionToken) => (
+    sessionToken === 'session-token-9' ? 9 : null
+  );
+  global.handleMcpVisualSessionTaskStatus = (request, _sender, sendResponse) => {
+    handlerCalls.push(request);
+    if (request.sessionToken !== 'session-token-9') {
+      sendResponse({ success: false, errorCode: 'visual_session_not_found' });
+      return true;
+    }
+    if (request.tool === 'report_progress') {
+      sendResponse({ success: true, tool: request.tool, hadEffect: true, message: request.message });
+    } else if (request.tool === 'fail_task') {
+      sendResponse({ success: false, tool: request.tool, status: 'failed', reason: request.reason });
+    } else {
+      sendResponse({
+        success: true,
+        tool: request.tool,
+        status: request.tool === 'complete_task' ? 'completed' : 'partial'
+      });
+    }
+    return true;
+  };
+  global.fsbMcpSessionRecorder = {
+    recordTaskOutcome(input) {
+      outcomeCalls.push(input);
+    }
+  };
+
+  const toolCases = [
+    { tool: 'report_progress', params: { message: 'Still working' } },
+    { tool: 'complete_task', params: { summary: 'Finished safely' } },
+    { tool: 'partial_task', params: { summary: 'Made progress', blocker: 'Approval required' } },
+    { tool: 'fail_task', params: { reason: 'Unrecoverable' } }
+  ];
+  const ownerPayload = { agentId: 'agent-owner', ownershipToken: 'owner-token-9' };
+  const ownerOtherTabPayload = { agentId: 'agent-owner', ownershipToken: 'owner-token-10' };
+  const intruderPayload = { agentId: 'agent-intruder', ownershipToken: 'intruder-token-11' };
+
+  try {
+    for (const testCase of toolCases) {
+      const response = await dispatcher.dispatchMcpToolRoute({
+        tool: testCase.tool,
+        params: { ...testCase.params, session_token: 'session-token-9' },
+        payload: ownerPayload
+      });
+      assert(response?.tool === testCase.tool,
+        `${testCase.tool} accepts an owner token without explicit tab_id`);
+    }
+    assert(handlerCalls.length === toolCases.length,
+      'all token-backed lifecycle tools reach the visual-session handler for the owner');
+    assert(outcomeCalls.length === 3,
+      'only terminal token-backed lifecycle tools reach task-memory recording');
+    assert(outcomeCalls.every(call => call.params.tabId === 9 && call.params.tab_id === 9),
+      'token-only terminal outcomes are attributed to the authoritative tab');
+
+    for (const testCase of toolCases) {
+      const response = await dispatcher.dispatchMcpToolRoute({
+        tool: testCase.tool,
+        params: { ...testCase.params, session_token: 'session-token-9' },
+        payload: ownerOtherTabPayload
+      });
+      assert(response?.tool === testCase.tool,
+        `${testCase.tool} translates another current same-agent tab token to the session tab`);
+    }
+    assert(handlerCalls.length === toolCases.length * 2,
+      'same-agent cross-tab tokens reach every token-backed lifecycle handler');
+    assert(outcomeCalls.length === 6,
+      'same-agent cross-tab tokens record all three terminal outcomes');
+    assert(outcomeCalls.every(call => call.params.tabId === 9 && call.params.tab_id === 9),
+      'translated token-only outcomes remain attributed to the authoritative tab');
+
+    const matchingExplicit = await dispatcher.dispatchMcpToolRoute({
+      tool: 'complete_task',
+      params: { summary: 'Explicit match', session_token: 'session-token-9', tab_id: 9 },
+      payload: ownerPayload
+    });
+    assert(matchingExplicit?.status === 'completed',
+      'matching explicit tab_id remains compatible with the token-backed route');
+    assert(outcomeCalls.at(-1)?.params.tabId === 9 && outcomeCalls.at(-1)?.params.tab_id === 9,
+      'matching explicit tab_id remains canonical in task-memory recording');
+
+    const callsBeforeRejects = handlerCalls.length;
+    const outcomesBeforeRejects = outcomeCalls.length;
+    for (const testCase of toolCases) {
+      const response = await dispatcher.dispatchMcpToolRoute({
+        tool: testCase.tool,
+        params: { ...testCase.params, session_token: 'session-token-9' },
+        payload: intruderPayload
+      });
+      assert(response?.errorCode === 'TAB_NOT_OWNED',
+        `${testCase.tool} rejects a foreign agent before visual-session mutation`);
+    }
+    assert(handlerCalls.length === callsBeforeRejects,
+      'foreign-agent token calls never invoke the visual-session handler');
+    assert(outcomeCalls.length === outcomesBeforeRejects,
+      'foreign-agent token calls never reach task-memory recording');
+
+    const staleOwnership = await dispatcher.dispatchMcpToolRoute({
+      tool: 'complete_task',
+      params: { summary: 'Stale owner token', session_token: 'session-token-9' },
+      payload: { agentId: 'agent-owner', ownershipToken: 'stale-owner-token' }
+    });
+    assert(staleOwnership?.errorCode === 'TAB_NOT_OWNED',
+      'same-agent calls with a stale ownership token are rejected');
+
+    const explicitWrongOwnership = await dispatcher.dispatchMcpToolRoute({
+      tool: 'complete_task',
+      params: { summary: 'Explicit wrong token', session_token: 'session-token-9', tab_id: 9 },
+      payload: ownerOtherTabPayload
+    });
+    assert(explicitWrongOwnership?.errorCode === 'TAB_NOT_OWNED',
+      'explicit tab calls never translate an ownership token from another tab');
+
+    const spoofedTab = await dispatcher.dispatchMcpToolRoute({
+      tool: 'complete_task',
+      params: { summary: 'Spoofed tab', session_token: 'session-token-9', tab_id: 10 },
+      payload: intruderPayload
+    });
+    assert(spoofedTab?.errorCode === 'mcp_route_invalid_params',
+      'an owned tab_id cannot be paired with another tab\'s visual-session token');
+
+    const missingToken = await dispatcher.dispatchMcpToolRoute({
+      tool: 'complete_task',
+      params: { summary: 'Missing token', session_token: 'missing-session-token' },
+      payload: ownerPayload
+    });
+    assert(missingToken?.errorCode === 'visual_session_not_found',
+      'an unknown session token preserves the existing not-found response');
+
+    delete global.resolveMcpVisualSessionTabId;
+    const unavailableResolver = await dispatcher.dispatchMcpToolRoute({
+      tool: 'complete_task',
+      params: { summary: 'No resolver', session_token: 'session-token-9' },
+      payload: ownerPayload
+    });
+    assert(unavailableResolver?.errorCode === 'visual_session_unavailable',
+      'token-backed lifecycle calls fail closed when the resolver is unavailable');
+    assert(handlerCalls.length === callsBeforeRejects + 1,
+      'only the unknown-token compatibility path reaches the handler after ownership rejections');
+    assert(outcomeCalls.length === outcomesBeforeRejects,
+      'rejected and unknown token calls do not create task outcomes');
+  } finally {
+    if (previousRegistry === undefined) delete global.fsbAgentRegistryInstance;
+    else global.fsbAgentRegistryInstance = previousRegistry;
+    if (previousResolver === undefined) delete global.resolveMcpVisualSessionTabId;
+    else global.resolveMcpVisualSessionTabId = previousResolver;
+    if (previousHandler === undefined) delete global.handleMcpVisualSessionTaskStatus;
+    else global.handleMcpVisualSessionTaskStatus = previousHandler;
+    if (previousRecorder === undefined) delete global.fsbMcpSessionRecorder;
+    else global.fsbMcpSessionRecorder = previousRecorder;
+  }
+}
+
 async function run() {
   const groups = selectedGroups();
   console.log(`\n--- MCP route contract group: ${groups.join(', ')} ---`);
@@ -481,7 +818,10 @@ async function run() {
   const dispatcher = loadDispatcher();
   runDispatcherChecks(dispatcher, groups);
   await runObservabilityRedactionCase(dispatcher, groups);
+  await runReplayRouteCase(dispatcher, groups);
   await runTriggerOwnershipGateCase(dispatcher, groups);
+  await runTaskOutcomeRecorderCase(dispatcher, groups);
+  await runVisualSessionTokenOwnershipCase(dispatcher, groups);
 
   console.log(`\n=== Results: ${passed} passed, ${failed} failed ===`);
   process.exit(failed > 0 ? 1 : 0);

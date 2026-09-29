@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "fixture": "contract-stream.jsonl",
+  "profileVersion": "1.0.4",
+  "provenance": "local-non-inference-acp-capture-and-authenticated-tool-turn",
+  "liveCapturePending": false,
+  "recordedProvenanceStatus": "full_turn_captured",
+  "recordedProvenanceRequirement": "explicit-opt-in-live-delegation",
+  "sanitized": true,
+  "sanitization": {
+    "syntheticIdentifiers": true,
+    "containsRealPrompt": false,
+    "containsBrowserContent": false,
+    "containsCredentials": false,
+    "containsFilesystemPaths": false
+  },
+  "expectedSequence": [
+    "init",
+    "assistant_delta",
+    "tool_discovery",
+    "tool_use",
+    "tool_result",
+    "assistant",
+    "result"
+  ],
+  "terminalLabel": "end_turn",
+  "sourceDocs": [
+    "https://github.com/xai-org/grok-build/blob/v1.0.4/crates/codegen/xai-grok-pager/docs/user-guide/15-agent-mode.md",
+    "https://agentclientprotocol.com/protocol/prompt-turn"
+  ],
+  "milestoneEndTask": "Captured from grok 1.0.4 against a live authenticated session: handshake, MCP notification sequence, the search_tool/use_tool gateway, and a completed prompt turn ending in end_turn. Identifiers are synthetic and the catalog payload is truncated; re-capture on a version bump."
+}

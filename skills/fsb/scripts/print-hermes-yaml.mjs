@@ -6,7 +6,7 @@
 const BLOCK = `mcp_servers:
   fsb:
     command: "npx"
-    args: ["-y", "fsb-mcp-server"]
+    args: ["-y", "fsb-mcp-server@latest"]
 `;
 
 // Defense-in-depth: BLOCK is hand-written YAML. Node has no stdlib YAML parser,
@@ -17,7 +17,7 @@ const EQUIVALENT = {
   mcp_servers: {
     fsb: {
       command: 'npx',
-      args: ['-y', 'fsb-mcp-server']
+      args: ['-y', 'fsb-mcp-server@latest']
     }
   }
 };
@@ -33,13 +33,13 @@ try {
     Array.isArray(parsed.mcp_servers.fsb.args) &&
     parsed.mcp_servers.fsb.args.length === 2 &&
     parsed.mcp_servers.fsb.args[0] === '-y' &&
-    parsed.mcp_servers.fsb.args[1] === 'fsb-mcp-server';
+    parsed.mcp_servers.fsb.args[1] === 'fsb-mcp-server@latest';
   // Structural string-level guards on the hand-written YAML:
   const yamlOk =
     /^mcp_servers:\n/.test(BLOCK) &&
     /\n {2}fsb:\n/.test(BLOCK) &&
     /\n {4}command: "npx"\n/.test(BLOCK) &&
-    /\n {4}args: \["-y", "fsb-mcp-server"\]\n/.test(BLOCK);
+    /\n {4}args: \["-y", "fsb-mcp-server@latest"\]\n/.test(BLOCK);
   if (!ok || !yamlOk) {
     process.stderr.write('[FAIL] BLOCK constant is not valid YAML/JSON or has drifted\n');
     process.exit(1);

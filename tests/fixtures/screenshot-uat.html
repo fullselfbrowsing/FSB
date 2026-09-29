@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FSB Screenshot UAT Fixture</title>
+  <style>
+    @font-face {
+      font-family: "UatSpaceMono";
+      src: url("/extension/assets/onboarding/fonts/space-mono-700.ttf") format("truetype");
+      font-style: normal;
+      font-weight: 700;
+      font-display: block;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-width: 100%; min-height: 100%; }
+    body {
+      min-height: 1800px;
+      overflow-x: hidden;
+      background: rgb(11, 16, 32);
+      color: white;
+      font-family: "UatSpaceMono", monospace;
+    }
+
+    .landmark { position: absolute; width: 140px; height: 100px; }
+    #responsive-marker {
+      position: absolute;
+      left: 32px;
+      top: 32px;
+      width: 180px;
+      height: 56px;
+      display: grid;
+      place-items: center;
+      background: rgb(0, 208, 132);
+      font-size: 20px;
+      font-weight: 700;
+    }
+    #svg-landmark { left: 40px; top: 160px; }
+    #canvas-landmark { left: 220px; top: 160px; }
+    #shadow-host { left: 400px; top: 160px; }
+    #image-landmark { left: 580px; top: 160px; display: block; }
+    #runtime-landmark {
+      left: 40px;
+      top: 320px;
+      width: 680px;
+      height: 96px;
+      padding: 24px;
+      background: rgb(36, 48, 74);
+      font-size: 24px;
+      font-weight: 700;
+    }
+    #bottom-landmark {
+      position: absolute;
+      left: 40px;
+      top: 1500px;
+      width: 320px;
+      height: 120px;
+      background: rgb(116, 85, 255);
+    }
+    #fsb-overlay-fixture {
+      position: fixed;
+      z-index: 2147483647;
+      right: 0;
+      top: 0;
+      width: 120px;
+      height: 80px;
+      background: rgb(255, 140, 0);
+    }
+
+    @media (max-width: 600px) {
+      #responsive-marker {
+        width: 220px;
+        background: rgb(255, 77, 109);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="responsive-marker" data-uat-landmark="responsive">desktop</div>
+
+  <svg id="svg-landmark" class="landmark" viewBox="0 0 140 100" aria-label="SVG landmark">
+    <rect width="140" height="100" fill="rgb(255, 92, 92)"></rect>
+  </svg>
+
+  <canvas id="canvas-landmark" class="landmark" width="140" height="100" aria-label="Canvas landmark"></canvas>
+  <div id="shadow-host" class="landmark"></div>
+  <img
+    id="image-landmark"
+    class="landmark"
+    alt="Image landmark"
+    src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='100'%3E%3Crect width='140' height='100' fill='rgb(255,214,64)'/%3E%3C/svg%3E"
+  >
+
+  <div id="runtime-landmark" class="landmark">runtime state: ready</div>
+  <div id="bottom-landmark" data-uat-landmark="full-page"></div>
+  <div
+    id="fsb-overlay-fixture"
+    data-fsb-overlay="true"
+    data-fsb-overlay-role="uat"
+    style="display:block!important;visibility:visible!important;opacity:1!important"
+  ></div>
+
+  <script>
+    const canvas = document.getElementById('canvas-landmark');
+    const context = canvas.getContext('2d');
+    context.fillStyle = 'rgb(35, 136, 255)';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+
+    const shadow = document.getElementById('shadow-host').attachShadow({ mode: 'open' });
+    shadow.innerHTML = '<style>:host{display:block}.box{width:140px;height:100px;background:rgb(213,72,255)}</style><div class="box"></div>';
+
+    const marker = document.getElementById('responsive-marker');
+    const updateMarker = () => {
+      marker.textContent = matchMedia('(max-width: 600px)').matches ? 'mobile' : 'desktop';
+    };
+    addEventListener('resize', updateMarker);
+    updateMarker();
+    document.documentElement.dataset.fixtureReady = 'true';
+  </script>
+</body>
+</html>

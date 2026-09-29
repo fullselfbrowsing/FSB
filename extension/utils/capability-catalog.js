@@ -378,6 +378,7 @@
     { global: 'FsbHandlerFigma', service: 'figma.com', origin: 'https://www.figma.com' },
     { global: 'FsbHandlerGdrive', service: 'drive.google.com', origin: 'https://drive.google.com' },
     { global: 'FsbHandlerGdocs', service: 'docs.google.com', origin: 'https://docs.google.com' },
+    { global: 'FsbHandlerGsheets', service: 'docs.google.com', origin: 'https://docs.google.com' },
     { global: 'FsbHandlerPowerpoint', service: 'powerpoint.cloud.microsoft', origin: 'https://powerpoint.cloud.microsoft' },
     { global: 'FsbHandlerOutlook', service: 'outlook.cloud.microsoft', origin: 'https://outlook.cloud.microsoft' },
     { global: 'FsbHandlerTeams', service: 'teams.live.com', origin: 'https://teams.live.com' },

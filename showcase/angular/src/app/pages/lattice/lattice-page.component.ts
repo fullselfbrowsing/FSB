@@ -14,6 +14,7 @@ import {
 import { Meta, Title } from '@angular/platform-browser';
 import { RouterLink } from '@angular/router';
 
+import { APP_VERSION } from '../../core/seo/version';
 import { HOST, buildLocaleUrl, emitLocaleHead } from '../../core/seo/locale-seo';
 import { LanguagePickerComponent } from '../../layout/language-picker/language-picker.component';
 
@@ -95,6 +96,7 @@ export class LatticePageComponent implements OnInit, AfterViewInit, OnDestroy {
   readonly copiedLabel = $localize`:@@lattice.copied:Copied`;
   readonly resolveCodeHtml = RESOLVE_CODE_HTML;
   readonly cliCodeHtml = CLI_CODE_HTML;
+  readonly appVersion = APP_VERSION;
 
   pkg: PackageManager = 'pnpm';
   activeSection: LatticeSection = 'install';

@@ -12,6 +12,18 @@ export type { DatasetAvailability } from './dataset-state.types';
 // Cache-Control).
 
 /**
+ * One published place: 'US-CA/San Jose' (city), 'US-CA' (state), 'US'
+ * (country), or the 'Other' / 'unknown' buckets. `lat`/`lon` are the dataset's
+ * approximate centroid for the place itself, present when the server knows it.
+ */
+export interface FSBTelemetryRegion {
+  label: string;
+  uniq: number;
+  lat?: number;
+  lon?: number;
+}
+
+/**
  * Headline response shape from GET /api/public-stats/global.
  *
  * Retained aggregates come from SQLite rollups, while the active values are a
@@ -62,7 +74,13 @@ export interface FSBTelemetryHeadline {
   /** Latest day's agent-label aggregate (currently empty until agent rollups exist). */
   popular_agents: Array<{ label: string; uniq: number }>;
   /** Latest day's coarse region aggregate with a k>=5 floor. */
-  popular_regions: Array<{ label: string; uniq: number }>;
+  popular_regions: FSBTelemetryRegion[];
+  /**
+   * Last-known coarse region per install across the retained 365-day rollups,
+   * k>=5 floored (city, else state, else country, else 'Other'). Powers the
+   * globe so location survives the 7-day raw-event wipe.
+   */
+  users_by_region_365d?: FSBTelemetryRegion[];
   /** Compatibility alias for avg_agents_per_reporting_user. */
   avg_agents_per_user: number;
   /** active_agents_now / active_agents_reporting_users_now. */

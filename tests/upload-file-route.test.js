@@ -15,8 +15,8 @@ const dispatcher = require(path.join(REPO_ROOT, 'extension', 'ws', 'mcp-tool-dis
 async function withUploadSpy(fn) {
   const previousUpload = globalThis.executeUploadFile;
   const calls = [];
-  globalThis.executeUploadFile = async function executeUploadFile(tabId, selector, filePath) {
-    calls.push({ tabId, selector, filePath });
+  globalThis.executeUploadFile = async function executeUploadFile(tabId, selector, filePath, options) {
+    calls.push({ tabId, selector, filePath, options });
     return {
       success: true,
       method: 'cdp_set_file_input',
@@ -32,7 +32,7 @@ async function withUploadSpy(fn) {
   }
 }
 
-async function dispatch(params, tab) {
+async function dispatch(params, tab, payloadExtras = {}) {
   return dispatcher.dispatchMcpToolRoute({
     tool: 'upload_file',
     params,
@@ -40,7 +40,8 @@ async function dispatch(params, tab) {
     payload: {
       tool: 'upload_file',
       agentId: params && params.agentId,
-      params: params || {}
+      params: params || {},
+      ...payloadExtras
     }
   });
 }
@@ -60,6 +61,33 @@ async function dispatch(params, tab) {
     assert.strictEqual(calls[0].tabId, 7, 'tab.id fallback is passed to executeUploadFile');
     assert.strictEqual(calls[0].selector, 'input[type=file]', 'selector forwarded');
     assert.strictEqual(calls[0].filePath, '/tmp/report.pdf', 'file_path forwarded');
+    assert.strictEqual(calls[0].options.allowManagedScreenshot, false,
+      'ordinary uploads receive no managed screenshot exception');
+  });
+
+  await withUploadSpy(async (calls) => {
+    const result = await dispatch({
+      selector: '#upload',
+      file_path: '/Users/me/.fsb/screenshots/fsb-screenshot-1-550e8400-e29b-41d4-a716-446655440000.png',
+      agentId: 'legacy:popup',
+      managedScreenshotAttested: true
+    }, { id: 7 }, { managedScreenshotAttested: true });
+
+    assert.strictEqual(result.success, true, 'attested managed screenshot route succeeds');
+    assert.strictEqual(calls[0].options.allowManagedScreenshot, true,
+      'only the private top-level bridge marker enables the managed screenshot exception');
+  });
+
+  await withUploadSpy(async (calls) => {
+    await dispatch({
+      selector: '#upload',
+      file_path: '/Users/me/.fsb/screenshots/fsb-screenshot-1-550e8400-e29b-41d4-a716-446655440000.png',
+      agentId: 'legacy:popup',
+      managedScreenshotAttested: true
+    }, { id: 7 });
+
+    assert.strictEqual(calls[0].options.allowManagedScreenshot, false,
+      'a marker forged inside public tool params is ignored');
   });
 
   await withUploadSpy(async (calls) => {

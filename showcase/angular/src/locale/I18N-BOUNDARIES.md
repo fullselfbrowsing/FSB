@@ -11,7 +11,7 @@ Policy for Angular templates covered by `npm run lint:i18n`.
 All showcase HTML under `src/app/**`, including:
 
 - Home, about, agents, privacy, support, legal, sitemaps
-- Product pages: lattice, phantom-stream, prometheus
+- Product pages: lattice, concierge, phantom-stream, prometheus
 - Dashboard (authenticated application surface)
 - **Stats** (`src/app/pages/stats/**`) — included as of Phase 54 (CI-01), after Phase 53 verified live XLIFF coverage at 100%/100% across es/de/ja/zh-CN/zh-TW (see `.planning/phases/53-trans-unit-resync-stats-translation-transcreation-review/53-STATS-RECONCILIATION.md`)
 

@@ -1,5 +1,5 @@
 /**
- * Agent Loop Engine for FSB v0.9.90
+ * Agent Loop Engine for FSB
  *
  * Core tool_use protocol loop that replaces startAutomationLoop.
  * Each iteration is a separate setTimeout callback (not a blocking while-loop)
@@ -49,13 +49,14 @@ if (typeof importScripts !== 'undefined') {
 }
 
 // Node.js require for testing -- use var to avoid redeclaration with tool-executor.js in shared scope
-var _al_toolDefs, _al_adapter, _al_executor, _al_provider;
+var _al_toolDefs, _al_adapter, _al_executor, _al_provider, _al_screenshotAttachments;
 if (typeof require !== 'undefined') {
   try {
     _al_toolDefs = require('./tool-definitions.js');
     _al_adapter = require('./tool-use-adapter.js');
     _al_executor = require('./tool-executor.js');
     _al_provider = require('./universal-provider.js');
+    _al_screenshotAttachments = require('./screenshot-attachments.js');
   } catch (_e) {
     // Running in Chrome extension context -- globals already available
   }
@@ -98,15 +99,20 @@ var _formatToolResult = (typeof formatToolResult !== 'undefined') ? formatToolRe
 var _isToolCallResponse = (typeof isToolCallResponse !== 'undefined') ? isToolCallResponse : (_al_adapter?.isToolCallResponse || (() => false));
 var _formatAssistantMessage = (typeof formatAssistantMessage !== 'undefined') ? formatAssistantMessage : (_al_adapter?.formatAssistantMessage || (() => ({})));
 var _extractUsage = (typeof extractUsage !== 'undefined') ? extractUsage : (_al_adapter?.extractUsage || (() => ({ input: 0, output: 0 })));
+var _al_ScreenshotAttachments = (typeof globalThis !== 'undefined' && globalThis.FsbScreenshotAttachments)
+  ? globalThis.FsbScreenshotAttachments
+  : (_al_screenshotAttachments || null);
 var _executeTool = (typeof executeTool !== 'undefined') ? executeTool : (_al_executor?.executeTool || (async () => ({ success: false, error: 'executeTool not available' })));
+var _isReadOnlyTool = (typeof isReadOnly !== 'undefined') ? isReadOnly : (_al_executor?.isReadOnly || function() { return false; });
 var _UniversalProvider = (typeof UniversalProvider !== 'undefined') ? UniversalProvider : (_al_provider?.UniversalProvider || null);
 var _PROVIDER_CONFIGS = (typeof PROVIDER_CONFIGS !== 'undefined') ? PROVIDER_CONFIGS : (_al_provider?.PROVIDER_CONFIGS || {});
 var _al_calculateAdaptiveTimeout = (typeof calculateAdaptiveTimeout !== 'undefined')
   ? calculateAdaptiveTimeout
-  : (_al_provider?.calculateAdaptiveTimeout || function(requestBody, modelName, attempt) {
+  : (_al_provider?.calculateAdaptiveTimeout || function(requestBody, modelName, attempt, providerKey) {
+      var isLmStudio = providerKey === 'lmstudio';
       var isReasoning = /reasoning|grok-4(?!.*(?:fast|mini))/.test(modelName || '');
-      var baseTimeout = isReasoning ? 45000 : 30000;
-      var maxTimeout = isReasoning ? 90000 : 60000;
+      var baseTimeout = isLmStudio ? 180000 : (isReasoning ? 45000 : 30000);
+      var maxTimeout = isLmStudio ? 300000 : (isReasoning ? 90000 : 60000);
       var retryMultiplier = 1 + (Math.min(attempt || 0, 2) * 0.5);
       try {
         var estimatedChars = 0;
@@ -117,11 +123,16 @@ var _al_calculateAdaptiveTimeout = (typeof calculateAdaptiveTimeout !== 'undefin
         } else {
           estimatedChars = JSON.stringify(requestBody || {}).length;
         }
-        var extra = Math.floor((estimatedChars / 4) / 5000) * 5000;
+        var extra = Math.floor((estimatedChars / 4) / 5000) * (isLmStudio ? 30000 : 5000);
         return Math.min(Math.round((baseTimeout + extra) * retryMultiplier), maxTimeout);
       } catch (_e) {
         return Math.min(Math.round(baseTimeout * retryMultiplier), maxTimeout);
       }
+    });
+var _al_normalizeProviderChatRequest = (typeof normalizeProviderChatRequest !== 'undefined')
+  ? normalizeProviderChatRequest
+  : (_al_provider?.normalizeProviderChatRequest || function(providerKey, modelName, requestBody) {
+      return requestBody;
     });
 
 // LM Studio base URLs are normalized through the SAME helper universal-provider.js
@@ -1062,17 +1073,42 @@ async function callProviderWithTools(providerInstance, model, apiKey, messages, 
     }
 
     default: {
-      // OpenAI/xAI/OpenRouter/Custom: standard messages + tools format.
-      // max_tokens: match Anthropic's 4096 budget so the model has room for
-      // multi-tool responses (report_progress + click + type_text in one turn).
+      // OpenAI/xAI/OpenRouter/Custom/LM Studio: standard messages + tools format.
+      // Start from the broadly compatible request shape. Direct OpenAI calls
+      // are normalized below to max_completion_tokens and, for reasoning
+      // model families, omit unsupported sampling parameters.
+      // The 4096 budget matches Anthropic so the model has room for multi-tool
+      // responses (report_progress + click + type_text in one turn).
       // Without this, xAI defaulted to a tight internal limit (~87 tokens/iter)
       // causing the model to truncate after report_progress and never emit click.
       // NOTE: tool_choice intentionally omitted -- xAI returns 400 for it,
       // which crashes the iteration loop via unhandled throw in UniversalProvider.
       // The default behavior (auto) applies when tools are present.
+      //
+      // Local Jinja chat templates (LM Studio serving Qwen 3) reject any turn
+      // that carries no user message with a 400 "No user query found in
+      // messages." Iteration 1 is system-only -- the task lives in the system
+      // prompt -- and every later iteration is system + assistant/tool, so
+      // neither shape qualifies. Hosted OpenAI-compatible APIs accept both,
+      // which is why this only ever surfaced on LM Studio. Seed the same
+      // starter turn the anthropic and gemini branches already do, placed after
+      // the leading system messages so the assistant(tool_calls) -> tool
+      // adjacency OpenAI-compatible APIs require stays intact. Request shaping
+      // only: session.messages is never mutated.
+      var openAiMessages = messages;
+      if (Array.isArray(messages) && !messages.some(m => m && m.role === 'user')) {
+        var insertAt = 0;
+        while (insertAt < messages.length && messages[insertAt] && messages[insertAt].role === 'system') {
+          insertAt++;
+        }
+        openAiMessages = messages.slice(0, insertAt)
+          .concat([{ role: 'user', content: 'Begin.' }])
+          .concat(messages.slice(insertAt));
+      }
+
       requestBody = {
         model,
-        messages,
+        messages: openAiMessages,
         tools: formattedTools,
         temperature: 0,
         max_tokens: 4096
@@ -1080,6 +1116,8 @@ async function callProviderWithTools(providerInstance, model, apiKey, messages, 
       break;
     }
   }
+
+  requestBody = _al_normalizeProviderChatRequest(providerKey, model, requestBody);
 
   // Phase 7 (FINT-09): Lattice provider bridge is the UNCONDITIONAL
   // provider call path. The Phase 6 feature flag has been removed; the
@@ -1098,14 +1136,54 @@ async function callProviderWithTools(providerInstance, model, apiKey, messages, 
   // llm-proxy, etc.), it must be added to computeUrl in a follow-on phase.
   var _cfg = providerInstance.config || {};
   var _settings = providerInstance.settings || {};
-  var timeoutMs = _al_calculateAdaptiveTimeout(requestBody, providerInstance.model, 0);
-  return executeViaBridge(providerKey, {
-    apiKey: _settings[_cfg.keyField] || '',
-    model: providerInstance.model,
-    baseUrl: providerKey === 'custom' ? _settings.customEndpoint
-           : providerKey === 'lmstudio' ? (_al_normalizeProviderBaseUrl('lmstudio', _settings.lmstudioBaseUrl) + '/v1')
-           : undefined,
-  }, requestBody, { mode: 'autopilot', timeoutMs: timeoutMs });
+  var timeoutMs = _al_calculateAdaptiveTimeout(requestBody, providerInstance.model, 0, providerKey);
+  var requestStartedAt = Date.now();
+  if (typeof automationLogger !== 'undefined') {
+    automationLogger.debug('Provider bridge request dispatch', {
+      phase: 'agent-tools',
+      provider: providerKey,
+      model: providerInstance.model,
+      toolCount: formattedTools.length,
+      timeoutMs: timeoutMs,
+      elapsedMs: 0
+    });
+  }
+  try {
+    var bridgeResponse = await executeViaBridge(providerKey, {
+      apiKey: _settings[_cfg.keyField] || '',
+      model: providerInstance.model,
+      baseUrl: providerKey === 'custom' ? _settings.customEndpoint
+             : providerKey === 'lmstudio' ? (_al_normalizeProviderBaseUrl('lmstudio', _settings.lmstudioBaseUrl) + '/v1')
+             : undefined,
+    }, requestBody, { mode: 'autopilot', timeoutMs: timeoutMs });
+    if (typeof automationLogger !== 'undefined') {
+      automationLogger.debug('Provider bridge request completed', {
+        phase: 'agent-tools',
+        provider: providerKey,
+        model: providerInstance.model,
+        toolCount: formattedTools.length,
+        timeoutMs: timeoutMs,
+        elapsedMs: Date.now() - requestStartedAt
+      });
+    }
+    return bridgeResponse;
+  } catch (bridgeError) {
+    if (typeof automationLogger !== 'undefined') {
+      automationLogger.error('Provider bridge request failed', {
+        phase: 'agent-tools',
+        provider: providerKey,
+        model: providerInstance.model,
+        toolCount: formattedTools.length,
+        timeoutMs: timeoutMs,
+        elapsedMs: Date.now() - requestStartedAt,
+        status: bridgeError && bridgeError.status || null,
+        errorKind: bridgeError && typeof bridgeError.code === 'string'
+          ? bridgeError.code
+          : 'provider_request_failed'
+      });
+    }
+    throw bridgeError;
+  }
 }
 
 
@@ -1215,6 +1293,11 @@ async function runAgentLoop(sessionId, options) {
     const systemPrompt = buildSystemPrompt(session.task, tabUrl);
     hydrateAgentRunState(session, systemPrompt);
     hydrateCostTracker(session);
+    // A persisted pending marker without its memory-only attachment means the
+    // service worker restarted before delivery. Keep only a typed text status.
+    if (_al_ScreenshotAttachments && typeof _al_ScreenshotAttachments.expireOrphans === 'function') {
+      _al_ScreenshotAttachments.expireOrphans(sessionId, session.messages);
+    }
 
     // Get provider configuration from chrome.storage.local (where options page saves them)
     let settings = {};
@@ -1552,6 +1635,9 @@ async function runAgentIteration(sessionId, options) {
 
   // Helper: full session finalization (overlays + logger + sidepanel + cleanup)
   async function finalizeSession(sid, sess, terminal) {
+    if (_al_ScreenshotAttachments && typeof _al_ScreenshotAttachments.discard === 'function') {
+      _al_ScreenshotAttachments.discard(sid);
+    }
     saveToLogger(sid, sess, sess.status);
     // QT-wnz Codex-3 -- background-side authoritative terminal persist
     // BEFORE broadcast. Defends against sidepanel context fanout +
@@ -1819,7 +1905,24 @@ async function runAgentIteration(sessionId, options) {
       _ts.compact();
       session.messages = _ts.replay();
     }
+    if (_al_ScreenshotAttachments && typeof _al_ScreenshotAttachments.expireOrphans === 'function') {
+      _al_ScreenshotAttachments.expireOrphans(sessionId, session.messages);
+    }
     var turnMessages = buildTurnMessages(session);
+    var pendingScreenshotAttachments = _al_ScreenshotAttachments
+      && typeof _al_ScreenshotAttachments.pending === 'function'
+      ? _al_ScreenshotAttachments.pending(sessionId)
+      : [];
+    var outboundTurnMessages = pendingScreenshotAttachments.length > 0
+      && _al_ScreenshotAttachments
+      && typeof _al_ScreenshotAttachments.attachForProvider === 'function'
+      ? _al_ScreenshotAttachments.attachForProvider(
+          turnMessages,
+          pendingScreenshotAttachments,
+          providerKey,
+          model
+        )
+      : turnMessages;
 
     await refreshCanonicalOverlay(
       'thinking',
@@ -1847,9 +1950,39 @@ async function runAgentIteration(sessionId, options) {
       // at the end_turn + normal-iteration persist tails, not this property assignment
       // (which is cheap + always-on).
       session._currentStepName = 'BEFORE_API_REQUEST';
-      response = await callProviderWithTools(
-        providerInstance, model, null, turnMessages, session.tools, providerKey
-      );
+      try {
+        response = await callProviderWithTools(
+          providerInstance, model, null, outboundTurnMessages, session.tools, providerKey
+        );
+      } catch (imageRequestError) {
+        var imageFallbackCode = pendingScreenshotAttachments.length > 0
+          && _al_ScreenshotAttachments
+          && typeof _al_ScreenshotAttachments.classifyImageRejection === 'function'
+          ? _al_ScreenshotAttachments.classifyImageRejection(imageRequestError)
+          : null;
+        if (!imageFallbackCode) throw imageRequestError;
+
+        // Retry exactly once, text-only, only for a likely image/shape/size
+        // rejection. Authentication, rate limits, network, and server errors
+        // never enter this branch.
+        _al_ScreenshotAttachments.markRejected(
+          sessionId,
+          session.messages,
+          imageFallbackCode
+        );
+        await persist(sessionId, session);
+        var textOnlyRetryMessages = buildTurnMessages(session);
+        response = await callProviderWithTools(
+          providerInstance, model, null, textOnlyRetryMessages, session.tools, providerKey
+        );
+        pendingScreenshotAttachments = [];
+      }
+      if (pendingScreenshotAttachments.length > 0
+          && _al_ScreenshotAttachments
+          && typeof _al_ScreenshotAttachments.markDelivered === 'function') {
+        _al_ScreenshotAttachments.markDelivered(sessionId, session.messages);
+        await persist(sessionId, session);
+      }
       if (typeof automationLogger !== 'undefined') {
         automationLogger.debug('Agent iteration API call completed', {
           sessionId: sessionId, iteration: iterNum,
@@ -2206,6 +2339,19 @@ async function runAgentIteration(sessionId, options) {
         } catch (_e) { /* swallow - fire-and-forget */ }
       }
 
+      // Toolbar icon: the autopilot's own dispatches classify exactly like a
+      // direct MCP call, so one rule covers both surfaces. call.name is the
+      // canonical tool name here, not the wire verb.
+      try {
+        if (session.animatedActionHighlights !== false
+            && globalThis.fsbActionIcon
+            && typeof globalThis.fsbActionIcon.noteActivity === 'function'
+            && typeof resolveIconActivity === 'function') {
+          var iconActivity = resolveIconActivity(call.name);
+          if (iconActivity) globalThis.fsbActionIcon.noteActivity(session.tabId, iconActivity);
+        }
+      } catch (_e) { /* the icon is presentation-only */ }
+
       // --- Local tool interception (Phase 138 on-demand context) ---
       if (call.name === 'get_page_snapshot') {
         // CTX-01: Fetch markdown snapshot from content script
@@ -2471,30 +2617,139 @@ async function runAgentIteration(sessionId, options) {
           { indeterminate: true, progressLabel: 'Planning' }
         );
         result = { success: true, hadEffect: false, error: null, navigationTriggered: false, result: { displayed: true } };
+      } else if (call.name === 'capture_screenshot'
+          && _al_ScreenshotAttachments
+          && typeof _al_ScreenshotAttachments.canCapture === 'function'
+          && !_al_ScreenshotAttachments.canCapture(sessionId)) {
+        result = {
+          success: false,
+          hadEffect: false,
+          error: 'Autopilot allows at most 4 screenshots per turn.',
+          navigationTriggered: false,
+          result: {
+            success: false,
+            code: 'INVALID_SCREENSHOT_ARGUMENTS',
+            error: 'Autopilot allows at most 4 screenshots per turn.',
+            retryable: false
+          }
+        };
       } else {
         // Standard tool: dispatch through unified executor
-        result = await _executeTool(call.name, call.args, session.tabId, {
-          cdpHandler: executeCDPToolDirect
-            ? function(verb, params, tabId) { return executeCDPToolDirect({ tool: verb, params: params }, tabId); }
-            : null,
-          dataHandler: handleDataTool
+        var actionOpenerTabId = session.tabId;
+        var actionAgentId = session.agentId || null;
+        var actionRegistry = (typeof globalThis !== 'undefined')
+          ? globalThis.fsbAgentRegistryInstance
+          : null;
+        if (!actionAgentId && actionRegistry
+            && typeof actionRegistry.findAgentByTabId === 'function') {
+          actionAgentId = actionRegistry.findAgentByTabId(actionOpenerTabId);
+          if (actionAgentId) session.agentId = actionAgentId;
+        }
+        var spawnProvenance = (typeof globalThis !== 'undefined')
+          ? globalThis.FsbAgentTabSpawnProvenance
+          : null;
+        var spawnIntentToken = null;
+        var actionToolDef = _al_TOOL_REGISTRY.find(function(definition) {
+          return definition && definition.name === call.name;
         });
+        var actionCanSpawnChild = !!(actionToolDef && (
+          actionToolDef._route === 'content'
+          || actionToolDef._route === 'cdp'
+          || call.name === 'execute_js'
+        ));
+        if (actionCanSpawnChild
+            && actionAgentId
+            && !_isReadOnlyTool(call.name)
+            && spawnProvenance
+            && typeof spawnProvenance.begin === 'function') {
+          spawnIntentToken = spawnProvenance.begin({
+            agentId: actionAgentId,
+            openerTabId: actionOpenerTabId
+          });
+        }
+        try {
+          result = await _executeTool(call.name, call.args, actionOpenerTabId, {
+            animateActionIcon: session.animatedActionHighlights,
+            cdpHandler: executeCDPToolDirect
+              ? function(verb, params, tabId) { return executeCDPToolDirect({ tool: verb, params: params }, tabId); }
+              : null,
+            dataHandler: handleDataTool
+          });
+        } finally {
+          if (spawnIntentToken && spawnProvenance
+              && typeof spawnProvenance.end === 'function') {
+            spawnProvenance.end(spawnIntentToken);
+          }
+        }
+      }
+
+      if (call.name === 'capture_screenshot') {
+        if (_al_ScreenshotAttachments && typeof _al_ScreenshotAttachments.storeToolResult === 'function') {
+          result = _al_ScreenshotAttachments.storeToolResult(
+            sessionId,
+            call.id,
+            call.name,
+            result
+          );
+        } else if (result && result.result && typeof result.result.image_data === 'string') {
+          // Fail closed if the attachment manager did not load: never let the
+          // pixel payload fall through into persisted conversation history.
+          delete result.result.image_data;
+          result.success = false;
+          result.error = 'Screenshot attachment manager unavailable';
+          result.result.success = false;
+          result.result.code = 'SCREENSHOT_CAPTURE_FAILED';
+          result.result.error = result.error;
+        }
       }
 
       // Tab-switching tools: update session.tabId so subsequent tools target the new tab
       if ((call.name === 'open_tab' || call.name === 'switch_tab') && result.success && result.result && result.result.tabId) {
         var newTabId = result.result.tabId;
-        console.log('[AgentLoop] Tab changed', { from: session.tabId, to: newTabId, tool: call.name });
-        session.tabId = newTabId;
+        if (call.name === 'open_tab') {
+          var openTabRegistry = (typeof globalThis !== 'undefined')
+            ? globalThis.fsbAgentRegistryInstance
+            : null;
+          var openTabAgentId = session.agentId || (openTabRegistry
+            && typeof openTabRegistry.findAgentByTabId === 'function'
+            ? openTabRegistry.findAgentByTabId(session.tabId)
+            : null);
+          if (openTabAgentId && openTabRegistry
+              && typeof openTabRegistry.bindTab === 'function') {
+            try {
+              var openTabBinding = await openTabRegistry.bindTab(openTabAgentId, newTabId);
+              if (!openTabBinding || openTabBinding.success === false) {
+                try { await chrome.tabs.remove(newTabId); } catch (_removeError) { /* best-effort cleanup */ }
+                result.success = false;
+                result.hadEffect = false;
+                result.error = (openTabBinding && openTabBinding.error) || 'Could not reserve the new tab for this agent';
+              } else {
+                session.agentId = openTabAgentId;
+                session.ownershipToken = openTabBinding.ownershipToken || session.ownershipToken || null;
+              }
+            } catch (bindError) {
+              try { await chrome.tabs.remove(newTabId); } catch (_removeError) { /* best-effort cleanup */ }
+              result.success = false;
+              result.hadEffect = false;
+              result.error = bindError && bindError.message
+                ? bindError.message
+                : 'Could not reserve the new tab for this agent';
+            }
+          }
+        }
+        if (result.success) {
+          console.log('[AgentLoop] Tab changed', { from: session.tabId, to: newTabId, tool: call.name });
+          session.tabId = newTabId;
 
-        // Ensure content script is injected on the new tab
-        try {
-          await chrome.scripting.executeScript({
-            target: { tabId: newTabId },
-            files: ['content/messaging.js']
-          });
-        } catch (_e) {
-          // Content script may already be injected or tab may be restricted
+          // Ensure content script is injected on the new tab
+          try {
+            await chrome.scripting.executeScript({
+              target: { tabId: newTabId },
+              files: ['content/messaging.js']
+            });
+          } catch (_e) {
+            // Content script may already be injected or tab may be restricted
+          }
         }
       }
 
@@ -2525,7 +2780,9 @@ async function runAgentIteration(sessionId, options) {
           globalThis.fsbMcpMetricsRecorder.recordDispatch({
             client: 'FSB Autopilot',
             tool: call.name,
-            requestPayload: call.args,
+            requestMetadata: {
+              textLength: call.args && typeof call.args.text === 'string' ? call.args.text.length : 0
+            },
             success: result.success,
             dispatcher_route: 'autopilot',
             drivingModel: {

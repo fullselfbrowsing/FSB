@@ -66,7 +66,10 @@ function ok(condition, message) {
     'createLiteLLMProvider',
     'collectStream',
     'createOtelRunEventSink',
-    'createRemoteReceiptSigner'
+    'createRemoteReceiptSigner',
+    'materializeReplayEnvelope',
+    'replayOffline',
+    'createPermissionContext'
   ];
   for (const key of expectedFunctions) {
     ok(typeof lattice[key] === 'function', 'lattice.' + key + ' is exported');

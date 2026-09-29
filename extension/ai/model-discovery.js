@@ -83,6 +83,15 @@
   // OpenRouter where ids carry the modality hint inline.
   const NON_TEXT_RX = /(embedding|embed-|whisper|tts-|-audio|-realtime|dall-e|imagen|image-generation|image-1212|-image-)/i;
 
+  function normalizeLmStudioBaseUrl(baseUrl) {
+    let url = String(baseUrl || 'http://localhost:1234').trim();
+    url = url.replace(/\/v1\/chat\/completions\/?$/i, '');
+    url = url.replace(/\/v1\/?$/i, '');
+    url = url.replace(/\/+$/, '');
+    if (!/^https?:\/\//i.test(url)) url = 'http://' + url;
+    return url || 'http://localhost:1234';
+  }
+
   // ---------------------------------------------------------------------------
   // PROVIDER_DISCOVERY_CONFIG
   // Each entry exposes the four hooks discoverModels() needs.
@@ -198,6 +207,30 @@
       // to skip embedding / vision-only entries that report 0, and drop any id
       // matching the non-text modality regex.
       filter: (m) => (m.contextWindow || 0) > 0 && !NON_TEXT_RX.test(m.id)
+    },
+
+    // LM Studio: local OpenAI-compatible endpoint with no authentication.
+    // Its /v1/models response does not expose capability metadata, so filter
+    // obvious non-chat modalities by id. Discovery intentionally bypasses the
+    // persistent 24h provider cache because the locally loaded model set can
+    // change at any time.
+    lmstudio: {
+      requiresApiKey: false,
+      cacheable: false,
+      endpoint: (_apiKey, options) => normalizeLmStudioBaseUrl(options && options.baseUrl) + '/v1/models',
+      headers: () => ({}),
+      parse: (json) => {
+        const arr = (json && Array.isArray(json.data)) ? json.data : [];
+        const seen = new Set();
+        return arr.reduce((models, entry) => {
+          const id = String(entry && entry.id || '').trim();
+          if (!id || seen.has(id)) return models;
+          seen.add(id);
+          models.push({ id, displayName: id, raw: entry });
+          return models;
+        }, []);
+      },
+      filter: (m) => !!m.id && !NON_TEXT_RX.test(m.id)
     }
   };
 
@@ -318,6 +351,9 @@
   //
   // opts.timeoutMs (optional): overrides the 5000ms default. Tests use a small
   //   value to exercise the timeout branch deterministically.
+  // opts.bypassCache (optional): skips cache reads while still recording a
+  //   successful live response. The Control Panel uses this so its model list
+  //   always reflects the provider's current response.
   // ---------------------------------------------------------------------------
   async function discoverModels(provider, apiKey, opts) {
     const options = opts || {};
@@ -333,7 +369,7 @@
       };
     }
 
-    if (!apiKey) {
+    if (cfg.requiresApiKey !== false && !apiKey) {
       return {
         ok: false,
         reason: 'missing-api-key',
@@ -342,18 +378,25 @@
       };
     }
 
-    // Phase 232: hydrate persistent cache before reading (no-op in tests).
-    await _hydrateCacheFromStorage();
+    const cacheable = cfg.cacheable !== false;
+    const bypassCache = options.bypassCache === true;
+    let key = null;
+    if (cacheable) {
+      // Phase 232: hydrate persistent cache before reading (no-op in tests).
+      await _hydrateCacheFromStorage();
 
-    // Cache hit?
-    const key = _cacheKey(provider, apiKey);
-    const cached = _cache.get(key);
-    if (cached && cached.expiresAt > Date.now()) {
-      return Object.assign({}, cached.result, { source: 'cache' });
+      // Cache hit?
+      key = _cacheKey(provider, apiKey);
+      if (!bypassCache) {
+        const cached = _cache.get(key);
+        if (cached && cached.expiresAt > Date.now()) {
+          return Object.assign({}, cached.result, { source: 'cache' });
+        }
+      }
     }
 
     // Build request
-    const url = cfg.endpoint(apiKey);
+    const url = cfg.endpoint(apiKey, options);
     const headers = Object.assign({ 'Accept': 'application/json' }, cfg.headers(apiKey) || {});
 
     // AbortController for the timeout
@@ -461,8 +504,10 @@
       provider
     };
 
-    _cache.set(key, { result, expiresAt: Date.now() + CACHE_TTL_MS });
-    _persistCacheToStorage();
+    if (cacheable) {
+      _cache.set(key, { result, expiresAt: Date.now() + CACHE_TTL_MS });
+      _persistCacheToStorage();
+    }
 
     return result;
   }
@@ -484,7 +529,8 @@
     clearDiscoveryCache,
     getDiscoveredModelIds,
     hashApiKey,
-    hydrateDiscoveryCache
+    hydrateDiscoveryCache,
+    normalizeLmStudioBaseUrl
   };
 
   if (global) {

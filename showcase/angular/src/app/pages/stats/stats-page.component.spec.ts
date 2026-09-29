@@ -284,6 +284,39 @@ describe('StatsPageComponent visualization lifecycle', () => {
     );
   });
 
+  it('plots published places at the server centroid, tight for a city', async () => {
+    const fixture = await createFixture('fsb-active-now');
+    fsb.headline$.next(readyState(fsbHeadline({
+      users_by_region_365d: [
+        { label: 'US-CA/San Jose', uniq: 5, lat: 37.3, lon: -121.9 },
+        { label: 'JP', uniq: 6, lat: 36.2, lon: 138.3 },
+        { label: 'US-TX', uniq: 5 },
+        { label: 'Other', uniq: 25 },
+      ],
+    })));
+    await settle(fixture);
+
+    expect(globe.setupGlobe.calls.mostRecent().args[1]).toEqual([
+      { lon: -121.9, lat: 37.3, spread: 1.5, count: 2 },
+      { lon: 138.3, lat: 36.2, spread: 6, count: 2 },
+      { lon: -99.3, lat: 31.5, spread: 3, count: 2 },
+    ]);
+    expect(fixture.componentInstance.hasPlottableRegions).toBeTrue();
+    expect(fixture.componentInstance.accessibleGlobeData.map((d) => d.label))
+      .toEqual(['San Jose, US-CA', 'JP', 'US-TX', 'Other']);
+  });
+
+  it('shows the empty-globe caption when only Other is published', async () => {
+    const fixture = await createFixture('fsb-active-now');
+    fsb.headline$.next(readyState(fsbHeadline({
+      users_by_region_365d: [{ label: 'Other', uniq: 55 }],
+    })));
+    await settle(fixture);
+
+    expect(globe.setupGlobe.calls.mostRecent().args[1]).toEqual([]);
+    expect(fixture.componentInstance.hasPlottableRegions).toBeFalse();
+  });
+
   it('does not mount a chart when the loader resolves after destruction', async () => {
     const fixture = await createFixture();
     github.stars$.next(starState());

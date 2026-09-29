@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "fixture": "contract-stream.jsonl",
+  "profileVersion": "2.1.177",
+  "provenance": "schema-derived-contract",
+  "liveCapturePending": true,
+  "recordedProvenanceStatus": "human_needed",
+  "recordedProvenanceRequirement": "CLAUDE-03/D-27",
+  "sanitized": true,
+  "sanitization": {
+    "syntheticIdentifiers": true,
+    "containsRealPrompt": false,
+    "containsBrowserContent": false,
+    "containsCredentials": false,
+    "containsFilesystemPaths": false
+  },
+  "expectedSequence": [
+    "init",
+    "assistant",
+    "tool_use",
+    "assistant_delta",
+    "user",
+    "tool_result",
+    "retry",
+    "result"
+  ],
+  "terminalLabel": "success",
+  "sourceDocs": [
+    "https://code.claude.com/docs/en/headless",
+    "https://code.claude.com/docs/en/cli-usage"
+  ],
+  "milestoneEndTask": "At the milestone-end UAT gate, obtain one genuine sanitized Claude Code 2.1.177 stream, compare its required shapes with this contract, and keep liveCapturePending true until that comparison is reviewed."
+}

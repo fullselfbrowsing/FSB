@@ -215,6 +215,7 @@ const RECIPE_PATH_ALLOWLIST = [
   'catalog/handlers/minimax.js',
   'catalog/handlers/figma.js',
   'catalog/handlers/gdrive.js',
+  'catalog/handlers/gsheets.js',
   'catalog/handlers/outlook.js',
   'catalog/handlers/teams.js',
   'catalog/handlers/onenote.js',

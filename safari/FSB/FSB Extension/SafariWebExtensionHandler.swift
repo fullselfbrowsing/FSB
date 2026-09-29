@@ -62,7 +62,8 @@ class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
         switch type {
         case "open":
             let url = (msg["url"] as? String) ?? "ws://localhost:7225"
-            BridgeCoordinator.shared.handleOpen(url: url) { reply in complete(reply) }
+            let origin = msg["origin"] as? String
+            BridgeCoordinator.shared.handleOpen(url: url, origin: origin) { reply in complete(reply) }
 
         case "frame", "chunk":
             BridgeCoordinator.shared.handleFrame(msg)

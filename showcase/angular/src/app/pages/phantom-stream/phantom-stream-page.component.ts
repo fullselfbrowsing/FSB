@@ -14,6 +14,7 @@ import {
 import { Meta, Title } from '@angular/platform-browser';
 import { RouterLink } from '@angular/router';
 
+import { APP_VERSION } from '../../core/seo/version';
 import { HOST, buildLocaleUrl, emitLocaleHead } from '../../core/seo/locale-seo';
 import { LanguagePickerComponent } from '../../layout/language-picker/language-picker.component';
 
@@ -154,6 +155,7 @@ export class PhantomStreamPageComponent implements OnInit, AfterViewInit, OnDest
   readonly captureCodeHtml = CAPTURE_CODE_HTML;
   readonly viewerCodeHtml = VIEWER_CODE_HTML;
   readonly relayCodeHtml = RELAY_CODE_HTML;
+  readonly appVersion = APP_VERSION;
 
   activeSection: PhantomSection = 'overview';
   copied: CopyTarget | null = null;

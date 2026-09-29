@@ -37,7 +37,7 @@ const SUPPORT_FAQ: ReadonlyArray<{ q: string; a: string }> = [
   },
   {
     q: $localize`:@@support.schema.faq.mcp.q:What is MCP and how do I use it?`,
-    a: $localize`:@@support.schema.faq.mcp.a:MCP (Model Context Protocol) lets you control FSB from AI coding tools like Claude Code, Codex, Cursor, Windsurf, and OpenClaw. The MCP server runs as npx -y fsb-mcp-server and pairs with the running extension over a local WebSocket bridge. FSB exposes 66 MCP tools (click, type, navigate, read DOM, fill vault credentials, and more). For OpenClaw users specifically, the fastest path is the one-click install on ClawHub at https://clawhub.ai/lakshmanturlapati/full-selfbrowsing, or load the FSB skill at skills/fsb/ which prints the stdio config block and runs the doctor diagnostic. The full rundown lives at https://full-selfbrowsing.com/agents.`,
+    a: $localize`:@@support.schema.faq.mcp.a:MCP (Model Context Protocol) lets you control FSB from AI coding tools like Claude Code, Codex, Cursor, Windsurf, and OpenClaw. The MCP server runs as npx -y fsb-mcp-server@latest and pairs with the running extension over a local WebSocket bridge. FSB exposes 68 MCP tools (click, type, navigate, read DOM, fill vault credentials, and more). For OpenClaw users specifically, the fastest path is the one-click install on ClawHub at https://clawhub.ai/lakshmanturlapati/full-selfbrowsing, or load the FSB skill at skills/fsb/ which prints the stdio config block and runs the doctor diagnostic. The full rundown lives at https://full-selfbrowsing.com/agents.`,
   },
   {
     q: $localize`:@@support.schema.faq.testApps.q:How does FSB help Claude Code or Codex test apps?`,
@@ -53,11 +53,11 @@ const SUPPORT_FAQ: ReadonlyArray<{ q: string; a: string }> = [
   },
   {
     q: $localize`:@@support.schema.faq.ideSetup.q:How do I set up FSB's MCP server with my IDE?`,
-    a: $localize`:@@support.schema.faq.ideSetup.a:Run npx -y fsb-mcp-server install --list to see which MCP hosts the installer detects on your machine, then run the installer for one (for example npx -y fsb-mcp-server install --claude-desktop). Cursor, Codex, Windsurf, and others have matching flags from --list. For OpenClaw, paste the canonical stdio block printed by the FSB skill (loaded from skills/fsb/) into your OpenClaw MCP config -- the bare --openclaw installer flag is intentionally manual because OpenClaw's MCP config schema is still unstable across builds. Verify the install with npx -y fsb-mcp-server doctor; six green layers means you're ready.`,
+    a: $localize`:@@support.schema.faq.ideSetup.a:Run npx -y fsb-mcp-server@latest install --list to see which MCP hosts the installer detects on your machine, then run the installer for one (for example npx -y fsb-mcp-server@latest install --claude-desktop). Cursor, Codex, Windsurf, and others have matching flags from --list. For OpenClaw, paste the canonical stdio block printed by the FSB skill (loaded from skills/fsb/) into your OpenClaw MCP config -- the bare --openclaw installer flag is intentionally manual because OpenClaw's MCP config schema is still unstable across builds. Verify the install with npx -y fsb-mcp-server@latest doctor; six green layers means you're ready.`,
   },
   {
     q: $localize`:@@support.schema.faq.tools.q:What can I do with FSB through MCP tools?`,
-    a: $localize`:@@support.schema.faq.tools.a:FSB exposes two modes through MCP. Manual mode is the default and gives the calling agent 66 granular tools: navigate, click, type, scroll, read page state, take screenshots, upload real local files with upload_file, arm trigger watchers with trigger / get_trigger_status / list_triggers, and search or invoke guarded first-party API capabilities with search_capabilities and invoke_capability. Vault and payment helpers fill inside the encrypted extension store, so raw secrets do not cross the MCP bridge. Autopilot mode (run_task) only fires when the user explicitly delegates the whole task. For everything else the calling agent stays in the loop on every action.`,
+    a: $localize`:@@support.schema.faq.tools.a:FSB exposes two modes through MCP. Manual mode is the default and gives the calling agent 68 granular tools: navigate, click, type, scroll, read page state, take screenshots, upload real local files with upload_file, arm trigger watchers with trigger / get_trigger_status / list_triggers, and search or invoke guarded first-party API capabilities with search_capabilities and invoke_capability. Vault and payment helpers fill inside the encrypted extension store, so raw secrets do not cross the MCP bridge. Autopilot mode (run_task) only fires when the user explicitly delegates the whole task. For everything else the calling agent stays in the loop on every action.`,
   },
   {
     q: $localize`:@@support.schema.faq.openclawInstall.q:How do I install FSB on OpenClaw?`,
@@ -65,7 +65,7 @@ const SUPPORT_FAQ: ReadonlyArray<{ q: string; a: string }> = [
   },
   {
     q: $localize`:@@support.schema.faq.mcpHealth.q:How do I verify the FSB MCP server is healthy?`,
-    a: $localize`:@@support.schema.faq.mcpHealth.a:Run npx -y fsb-mcp-server doctor. The doctor walks six layers -- package, bridge, extension, active-tab, content-script, config -- and exits non-zero on the first failure with a one-line next-step recommendation. The full recovery table for each layer lives in skills/fsb/USAGE.md, and the same diagnostic runs automatically when the FSB skill is loaded into OpenClaw.`,
+    a: $localize`:@@support.schema.faq.mcpHealth.a:Run npx -y fsb-mcp-server@latest doctor. The doctor walks six layers -- package, bridge, extension, active-tab, content-script, config -- and exits non-zero on the first failure with a one-line next-step recommendation. The full recovery table for each layer lives in skills/fsb/USAGE.md, and the same diagnostic runs automatically when the FSB skill is loaded into OpenClaw.`,
   },
 ];
 

@@ -145,6 +145,12 @@ body {
   animation: pulse 2s infinite;
 }
 
+.status-dot.owned {
+  color: #f59e0b;
+  text-shadow: 0 0 4px rgba(245, 158, 11, 0.3);
+  animation: none;
+}
+
 .status-dot.error {
   color: #ef4444;
   text-shadow: 0 0 4px rgba(239, 68, 68, 0.3);

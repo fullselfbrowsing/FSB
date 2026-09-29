@@ -46,7 +46,7 @@ lattice/
 # Log files with potential secrets
 Logs/
 Extenive logs, multiple scenariaos.txt
-showcase/server/fsb-data.db
+showcase/server/fsb-data.db*
 Research/
 
 # Quick task 260630-hct -- self-hosted DB-IP IP-to-City Lite region dataset.
@@ -55,6 +55,8 @@ Research/
 # NEVER committed. The tiny committed test fixture (*.fixture.csv) is kept.
 showcase/server/data/dbip-city-lite.*
 !showcase/server/data/dbip-city-lite.fixture.csv
+!showcase/server/data/dbip-city-lite.ipv6.fixture.csv
+!showcase/server/data/dbip-city-lite.places.fixture.csv
 .claude/worktrees/
 BUG-REPORT-*.md
 dist/skill/

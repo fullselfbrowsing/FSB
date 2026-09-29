@@ -69,6 +69,12 @@ const CODE_ONLY_ERROR_KEYS = new Set([
   // ambiguity. Surfaced verbatim so the MCP host can distinguish "ambiguous -- ask
   // the user" from a generic action_rejected. INV-01-safe (no MCP tool schema touched).
   'RECOVERY_AMBIGUOUS',
+  'INVALID_SCREENSHOT_ARGUMENTS',
+  'SCREENSHOT_TARGET_NOT_FOUND',
+  'SCREENSHOT_REGION_OUT_OF_BOUNDS',
+  'SCREENSHOT_TOO_LARGE',
+  'SCREENSHOT_DEBUGGER_BUSY',
+  'SCREENSHOT_CAPTURE_FAILED',
 ]);
 
 type LayerLabel = typeof LAYER_LABELS[keyof typeof LAYER_LABELS];

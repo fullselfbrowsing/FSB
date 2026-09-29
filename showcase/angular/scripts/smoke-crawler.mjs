@@ -1,20 +1,24 @@
 #!/usr/bin/env node
 // Phase 216 SMOKE-01..03: production-or-local crawler smoke.
 // Curls marketing routes under GPTBot UA; curls crawler files; resolves every
-// sitemap <loc>. Asserts route-specific titles, canonicals, JSON-LD presence
-// (home), Content-Type headers, and llms-full.txt size budget.
+// sitemap <loc>. Asserts route-specific titles, canonicals, licensed JSON-LD
+// software metadata, Content-Type headers, and llms-full.txt size budget.
 //
 // Run:
 //   npm --prefix showcase/angular run smoke:crawler:local           (local static build)
 //   BASE_URL=http://localhost:3217 node scripts/smoke-crawler.mjs   (custom local target)
 //   node scripts/smoke-crawler.mjs                                  (production default)
 //
-// Zero new npm dependencies -- node:fetch is built into Node 18+; no other
-// imports required. Exit 0 on full pass; exit 1 with a printed report on any
-// failure; exit 2 on fatal (uncaught) errors.
+// Zero new npm dependencies -- node:fetch is built into Node 18+; the only
+// import is node:fs, used to read the locale registry so the expected sitemap
+// set is derived rather than duplicated. Exit 0 on full pass; exit 1 with a
+// printed report on any failure; exit 2 on fatal (uncaught) errors.
+
+import { readFileSync } from 'node:fs';
 
 const BASE_URL = (process.env.BASE_URL || 'https://full-selfbrowsing.com').replace(/\/$/, '');
 const PROD_HOST = 'https://full-selfbrowsing.com';
+const LICENSE_URL = 'https://github.com/fullselfbrowsing/FSB/blob/main/LICENSE';
 const UA = 'GPTBot';
 
 const failures = [];
@@ -39,19 +43,51 @@ async function fetchText(url, opts = {}) {
   return { status: res.status, contentType: res.headers.get('content-type') || '', body };
 }
 
+// licensedSoftware, where present, selects the SoftwareApplication node whose
+// `license` must be the canonical MIT URL. Routes without one skip the JSON-LD asserts.
 const MARKETING_ASSERTIONS = [
-  { path: '/',               titleSubstr: 'Full Self-Browsing', canonical: `${PROD_HOST}` },
+  { path: '/',               titleSubstr: 'Full Self-Browsing', canonical: `${PROD_HOST}`,
+    licensedSoftware: (node) => node['@type'] === 'SoftwareApplication' && node.name === 'FSB' },
   { path: '/about',          titleSubstr: 'About',              canonical: `${PROD_HOST}/about` },
-  { path: '/agents',         titleSubstr: 'Agents',             canonical: `${PROD_HOST}/agents` },
+  { path: '/agents',         titleSubstr: 'Agents',             canonical: `${PROD_HOST}/agents`,
+    licensedSoftware: (node) => node['@type'] === 'SoftwareApplication'
+      && node['@id'] === `${PROD_HOST}/agents#fsb-skill` },
   { path: '/support',        titleSubstr: 'Support',            canonical: `${PROD_HOST}/support` },
   { path: '/privacy',        titleSubstr: 'Privacy',            canonical: `${PROD_HOST}/privacy` },
+  { path: '/release-notes',  titleSubstr: 'Release notes',      canonical: `${PROD_HOST}/release-notes` },
   { path: '/lattice',        titleSubstr: 'Lattice',            canonical: `${PROD_HOST}/lattice` },
+  { path: '/concierge',      titleSubstr: 'Concierge',          canonical: `${PROD_HOST}/concierge`,
+    licensedSoftware: (node) => node['@type'] === 'SoftwareApplication'
+      && node['@id'] === `${PROD_HOST}/concierge#concierge-sdk` },
   { path: '/phantom-stream', titleSubstr: 'PhantomStream',      canonical: `${PROD_HOST}/phantom-stream` },
   { path: '/prometheus',     titleSubstr: 'Prometheus',         canonical: `${PROD_HOST}/prometheus` },
   { path: '/sitemaps',       titleSubstr: 'Site Maps',          canonical: `${PROD_HOST}/sitemaps` },
 ];
 
-const EXPECTED_SITEMAP_LOCS = MARKETING_ASSERTIONS.map(({ canonical }) => canonical);
+// The sitemap declares every locale variant of every marketing route, so the
+// expected set is routes x locales. Locales come from the shared registry for
+// the same reason build-crawler-files.mjs reads it: a new locale must not need
+// a second edit here.
+const LOCALE_SUBPATHS_FOR_SITEMAP = (() => {
+  const source = readFileSync(
+    new URL('../src/app/core/i18n/locale-constants.ts', import.meta.url),
+    'utf8'
+  );
+  const order = source.match(/LOCALES\s*=\s*\[([^\]]+)\]/)[1]
+    .split(',').map((s) => s.trim().replace(/^['"]|['"]$/g, '')).filter(Boolean);
+  const block = source.match(/LOCALE_SUBPATHS[^{]*\{([\s\S]*?)\}/)[1];
+  const map = {};
+  for (const m of block.matchAll(/['"]([\w-]+)['"]\s*:\s*['"]([^'"]*)['"]/g)) map[m[1]] = m[2];
+  return order.map((code) => map[code]);
+})();
+
+const EXPECTED_SITEMAP_LOCS = MARKETING_ASSERTIONS.flatMap(({ canonical }) => {
+  const routePath = canonical.slice(PROD_HOST.length);
+  return LOCALE_SUBPATHS_FOR_SITEMAP.map((subpath) => {
+    const prefix = subpath ? `/${subpath}` : '';
+    return routePath === '' ? `${PROD_HOST}${prefix}` : `${PROD_HOST}${prefix}${routePath}`;
+  });
+});
 const EXCLUDED_SITEMAP_LOCS = ['/legal', '/dashboard', '/stats'].map((path) => `${PROD_HOST}${path}`);
 const AEO_MUST_CONTAIN = [
   'trigger',
@@ -74,14 +110,43 @@ const AEO_MUST_CONTAIN = [
   'Flight Booking: Powered by Codex MCP',
   'OpenClaw Monitoring Doge Price',
   'An Aha Moment by Claude Opus 4.6',
+  'MIT License',
+  LICENSE_URL,
 ];
 const AEO_MUST_NOT_CONTAIN = [
   'Watch FSB drive Google, search Amazon, and book travel autonomously.',
   'Claude Opus 4.7',
 ];
 
+function extractJsonLdNodes(html) {
+  const nodes = [];
+  const parseErrors = [];
+  const scriptRe = /<script\b[^>]*\btype=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+  let match;
+
+  function visit(value) {
+    if (Array.isArray(value)) {
+      value.forEach(visit);
+      return;
+    }
+    if (!value || typeof value !== 'object') return;
+    nodes.push(value);
+    if (value['@graph']) visit(value['@graph']);
+  }
+
+  while ((match = scriptRe.exec(html)) !== null) {
+    try {
+      visit(JSON.parse(match[1]));
+    } catch (err) {
+      parseErrors.push(err.message);
+    }
+  }
+
+  return { nodes, parseErrors };
+}
+
 async function checkMarketingRoutes() {
-  for (const { path, titleSubstr, canonical } of MARKETING_ASSERTIONS) {
+  for (const { path, titleSubstr, canonical, licensedSoftware } of MARKETING_ASSERTIONS) {
     const url = `${BASE_URL}${path}`;
     let r;
     try {
@@ -95,11 +160,23 @@ async function checkMarketingRoutes() {
     record(r.body.includes(titleSubstr), `GET ${path} body contains title substring "${titleSubstr}"`, '');
     record(r.body.includes(`href="${canonical}"`), `GET ${path} canonical href="${canonical}"`, '');
     record(r.body.includes('<app-root'), `GET ${path} contains <app-root>`, '');
-    if (path === '/') {
+    if (licensedSoftware) {
+      const { nodes, parseErrors } = extractJsonLdNodes(r.body);
       record(
         r.body.includes('type="application/ld+json"'),
-        'GET / contains JSON-LD <script type="application/ld+json">',
+        `GET ${path} contains JSON-LD <script type="application/ld+json">`,
         ''
+      );
+      record(
+        parseErrors.length === 0,
+        `GET ${path} JSON-LD parses`,
+        parseErrors.join('; ')
+      );
+      const software = nodes.find(licensedSoftware);
+      record(
+        software?.license === LICENSE_URL,
+        `GET ${path} SoftwareApplication license is canonical MIT URL`,
+        software ? `actual ${software.license || '(missing)'}` : 'SoftwareApplication node not found'
       );
     }
   }

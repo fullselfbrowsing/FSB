@@ -17,6 +17,7 @@ const INVARIANT_TECHNICAL_LITERALS = [
   'FSB',
   'PhantomStream',
   'Lattice',
+  'Concierge',
   'Prometheus',
   'Playwright',
   'OpenAI',

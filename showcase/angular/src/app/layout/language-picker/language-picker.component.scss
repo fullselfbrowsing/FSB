@@ -67,9 +67,12 @@
   appearance: none;
   -webkit-appearance: none;
   -moz-appearance: none;
-  background: transparent;
+  /* Blink ignores a fully transparent select background and keeps UA Field
+   * (white unless color-scheme is dark). --bg-card is opaque and matches the footer. */
+  background-color: var(--bg-card);
   border: 0;
   color: inherit;
+  color-scheme: inherit;
   font: inherit;
   padding: 0.25rem 1.25rem 0.25rem 0.5rem;
   cursor: pointer;

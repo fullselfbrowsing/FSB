@@ -39,6 +39,19 @@ function loadOverlayStateModule() {
   return sandbox.module.exports;
 }
 
+function declarationSource(source, name) {
+  let start = source.indexOf('function ' + name + '(');
+  if (start === -1) start = source.indexOf('async function ' + name + '(');
+  if (start === -1) throw new Error('missing function ' + name);
+  const open = source.indexOf('{', start);
+  let depth = 0;
+  for (let index = open; index < source.length; index++) {
+    if (source[index] === '{') depth++;
+    if (source[index] === '}' && --depth === 0) return source.slice(start, index + 1);
+  }
+  throw new Error('unterminated function ' + name);
+}
+
 // ---------------------------------------------------------------------------
 // DOM/window shim (mirrors overlay-stability-cadence.test.js)
 // ---------------------------------------------------------------------------
@@ -80,6 +93,9 @@ function makeElement(tag, opts) {
     style: {},
     attributes: {},
     dataset: {},
+    disabled: false,
+    value: '',
+    _listeners: {},
     _textContent: '',
     _innerHTML: '',
     _isConnected: true,
@@ -98,7 +114,8 @@ function makeElement(tag, opts) {
         'fsb-meta','fsb-phase','fsb-eta','fsb-progress-bar','fsb-progress-fill'
       ];
       this.children = childClasses.map(c => {
-        const ch = makeElement(c === 'fsb-logo' ? 'img' : 'span');
+        const tagName = c === 'fsb-logo' ? 'img' : 'span';
+        const ch = makeElement(tagName);
         ch.classList.add(c);
         ch.parentNode = this;
         return ch;
@@ -119,6 +136,13 @@ function makeElement(tag, opts) {
     getAttribute(k) { return this.attributes[k]; },
     hasAttribute(k) { return Object.prototype.hasOwnProperty.call(this.attributes, k); },
     removeAttribute(k) { delete this.attributes[k]; },
+    addEventListener(type, listener) {
+      if (!this._listeners[type]) this._listeners[type] = [];
+      this._listeners[type].push(listener);
+    },
+    dispatchEvent(event) {
+      (this._listeners[event.type] || []).forEach(listener => listener(event));
+    },
     querySelector(sel) {
       if (sel.startsWith('.')) {
         const cls = sel.slice(1);
@@ -230,7 +254,7 @@ const sandbox = {
   cancelAnimationFrame: cancelAnimationFrameStub,
   setTimeout, clearTimeout, setInterval, clearInterval,
   console,
-  chrome: { runtime: { getURL: (p) => 'chrome-extension://test/' + p } },
+  chrome: { runtime: { getURL: (p) => 'chrome-extension://test/' + p, sendMessage: () => Promise.resolve({ success: true }) } },
   module: { exports: {} },
   Set, Map, WeakMap, WeakSet, Promise, Date, Math, JSON, String, Number, Boolean, Array, Object, Error, RegExp,
   Symbol, Reflect
@@ -249,6 +273,10 @@ const { ProgressOverlay, ActionGlowOverlay } = sandbox.module.exports;
 // Capture the raw shadow-style source by re-reading the file (simpler than
 // trying to execute the create() Popover path inside the stub).
 const visualFeedbackSrc = src;
+const messagingSrc = fs.readFileSync(
+  path.resolve(__dirname, '..', 'extension', 'content', 'messaging.js'),
+  'utf8'
+);
 
 // ---------------------------------------------------------------------------
 // Test harness
@@ -290,11 +318,13 @@ function makeState(opts) {
       mode: 'indeterminate', percent: null, label: 'Working', eta: ''
     },
     actionCount: opts.actionCount,
-    clientLabel: '',
+    clientLabel: opts.clientLabel || '',
+    agentIdShort: opts.agentIdShort,
     result: opts.result,
     guarded: opts.guarded,
     capability: opts.capability,
-    stoppable: opts.stoppable
+    stoppable: opts.stoppable,
+    replay: opts.replay
   };
 }
 
@@ -319,6 +349,72 @@ assertEq(overlayStateExports.isThinkingPhase(null), false, 'isThinkingPhase(null
 assertEq(overlayStateExports.isThinkingPhase(undefined), false, 'isThinkingPhase(undefined) === false');
 assertEq(overlayStateExports.isThinkingPhase(''), false, "isThinkingPhase('') === false");
 assertEq(overlayStateExports.isThinkingPhase('PLANNING'), true, "isThinkingPhase('PLANNING') case-insensitive");
+const replacementPolicyContext = { Boolean };
+vm.createContext(replacementPolicyContext);
+vm.runInContext(
+  declarationSource(messagingSrc, 'fsbShouldReplaceFinalOverlay') + '\n' +
+    'this.shouldReplaceFinalOverlay = fsbShouldReplaceFinalOverlay;',
+  replacementPolicyContext,
+  { filename: 'extension/content/messaging.js' }
+);
+const shouldReplaceFinalOverlay = replacementPolicyContext.shouldReplaceFinalOverlay;
+assert(
+  messagingSrc.includes('fsbShouldReplaceFinalOverlay(previousOverlayState, overlayState)') &&
+    messagingSrc.indexOf('FSB.progressOverlay.destroy();') < messagingSrc.indexOf('FSB.overlayState = overlayState;') &&
+    messagingSrc.indexOf('FSB.replayPlayerOverlay.destroy();') < messagingSrc.indexOf('FSB.overlayState = overlayState;'),
+  'an accepted replacement destroys both finalized overlay surfaces before rendering'
+);
+assertEq(shouldReplaceFinalOverlay(
+  { lifecycle: 'final', sessionToken: 'replay-token' },
+  { lifecycle: 'running' }
+), true, 'a tokenless automation replaces a finalized replay overlay');
+assertEq(shouldReplaceFinalOverlay(
+  { lifecycle: 'final' },
+  { lifecycle: 'running' }
+), true, 'tokenless running lifecycles replace tokenless finalized overlays');
+assertEq(shouldReplaceFinalOverlay(
+  { lifecycle: 'final', sessionToken: 'old-token' },
+  { lifecycle: 'final', sessionToken: 'new-token' }
+), true, 'a different finalized session replaces the prior final overlay');
+assertEq(shouldReplaceFinalOverlay(
+  { lifecycle: 'final', sessionToken: 'same-token' },
+  { lifecycle: 'final', sessionToken: 'same-token' }
+), false, 'same-session final updates preserve the frozen overlay');
+assertEq(shouldReplaceFinalOverlay(
+  { lifecycle: 'final', sessionToken: 'old-token' },
+  { lifecycle: 'cleared', sessionToken: 'new-token' }
+), false, 'explicit clears continue through the existing clear path');
+
+console.log('\n--- Test: final overlay fades after three seconds and then destroys its state ---');
+{
+  const scheduled = [];
+  const realSetTimeout = sandbox.setTimeout;
+  const realClearTimeout = sandbox.clearTimeout;
+  sandbox.setTimeout = function(fn, delay) {
+    const timer = { fn, delay, cleared: false };
+    scheduled.push(timer);
+    return timer;
+  };
+  sandbox.clearTimeout = function(timer) {
+    if (timer) timer.cleared = true;
+  };
+
+  const o = buildOverlay();
+  o.update(makeState({ lifecycle: 'final', result: 'success', detail: 'Replay complete' }));
+  const hideTimer = scheduled.find((timer) => timer.delay === 3000);
+  assert(!!hideTimer, 'final overlay schedules its three-second display window');
+  hideTimer.fn();
+  assert(o.container.classList.contains('hidden'), 'final overlay starts its fade after three seconds');
+  const destroyTimer = scheduled.find((timer) => timer.delay === 200);
+  assert(!!destroyTimer, 'final overlay schedules destruction after the fade');
+  destroyTimer.fn();
+  assertEq(o.host, null, 'final overlay host is destroyed after the fade');
+  assertEq(o.container, null, 'final overlay DOM references are cleared after the fade');
+  assertEq(o._frozen, false, 'final overlay frozen state resets after destruction');
+
+  sandbox.setTimeout = realSetTimeout;
+  sandbox.clearTimeout = realClearTimeout;
+}
 
 // ===========================================================================
 // describe('thinking suppression in ProgressOverlay.update()')
@@ -570,6 +666,95 @@ console.log('\n--- Test: ordinary non-capability update leaves every new element
   assert(o.container.querySelector('.fsb-stop').classList.contains('hidden'), 'ordinary update: .fsb-stop stays hidden');
   assert(!o.container.querySelector('.fsb-step-number').classList.contains('calling'), 'ordinary update: pill has no .calling class');
   assert(!o.container.querySelector('.fsb-progress-fill').classList.contains('guarded'), 'ordinary update: fill has no .guarded class');
+  o.destroy();
+}
+
+console.log('\n--- Test: replay metadata does not add controls to the ordinary overlay ---');
+{
+  setNow(105000);
+  const o = buildOverlay();
+  o.update(makeState({
+    phase: 'acting',
+    detail: 'Clicking submit',
+    replay: {
+      sessionId: 'replay-overlay-test',
+      status: 'paused',
+      speed: 2,
+      positionMs: 4200,
+      durationMs: 10000,
+      currentStep: 2,
+      totalSteps: 5,
+      forwardSeekOnly: true
+    }
+  }));
+  assertEq(o.container.querySelector('.fsb-replay-toggle'), null, 'ordinary overlay contains no replay button');
+  assertEq(o.container.querySelector('.fsb-replay-scrubber'), null, 'ordinary overlay contains no replay timeline');
+  assert(!o.container.classList.contains('replay'), 'ordinary overlay receives no replay presentation class');
+  o.destroy();
+}
+
+console.log('\n--- Test: replay status card uses normal presentation with Replay-only identity ---');
+{
+  setNow(106000);
+  const replayState = overlayStateExports.buildOverlayState({
+    sessionId: 'replay-overlay-test',
+    sessionToken: 'replay-overlay-test',
+    phase: 'acting',
+    taskName: 'Replay: Safe demo',
+    statusText: 'Scrolling page',
+    progress: { mode: 'determinate', percent: 40, label: '' },
+    clientLabel: 'Replay',
+    stoppable: false,
+    replay: {
+      sessionId: 'replay-overlay-test',
+      status: 'playing',
+      speed: 1,
+      positionMs: 4000,
+      durationMs: 10000,
+      currentStep: 2,
+      totalSteps: 5,
+      forwardSeekOnly: true
+    }
+  }, null);
+  const o = buildOverlay();
+  o.update(replayState);
+  await sleep(500);
+
+  assertEq(o.container.querySelector('.fsb-client-badge').textContent, 'Replay',
+    'replay badge contains only the Replay label');
+  assert(o.container.querySelector('.fsb-stop').classList.contains('hidden'),
+    'replay card keeps the shared stop control hidden');
+  assertEq(o.container.querySelector('.fsb-step-number').textContent, 'Acting…',
+    'replay card uses the normal acting phase label instead of a step count');
+  assertEq(o.container.querySelector('.fsb-task').textContent, 'Replay: Safe demo',
+    'replay card retains the task title');
+  assertEq(o.container.querySelector('.fsb-step-text').textContent, 'Scrolling page',
+    'replay card retains the current action text');
+  assertEq(o.container.querySelector('.fsb-phase').textContent, '0:00',
+    'replay card retains the normal elapsed timer');
+  assertEq(o.container.querySelector('.fsb-progress-fill').style.transform, 'scaleX(0.4)',
+    'replay card retains determinate progress');
+  o.destroy();
+}
+
+console.log('\n--- Test: ordinary sessions retain agent identity and stop controls ---');
+{
+  setNow(107000);
+  const o = buildOverlay();
+  o.update(makeState({
+    phase: 'acting',
+    detail: 'Clicking submit',
+    clientLabel: 'Codex',
+    agentIdShort: 'agent_abc123',
+    stoppable: true,
+    progress: { mode: 'determinate', percent: 25, label: 'Acting…', eta: null }
+  }));
+  await sleep(500);
+
+  assertEq(o.container.querySelector('.fsb-client-badge').textContent, 'Codex / agent_abc123',
+    'ordinary session badge retains client and agent identity');
+  assert(!o.container.querySelector('.fsb-stop').classList.contains('hidden'),
+    'ordinary stoppable session retains the stop control');
   o.destroy();
 }
 

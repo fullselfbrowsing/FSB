@@ -4,8 +4,8 @@
  *
  * FSB keeps ONE source tree. `extension/` targets Chrome MV3 and must stay
  * byte-identical wherever a test reads it -- 15 test files assert on extension
- * source contents, and two pin exact counts (background.js is pinned to 309
- * script-import mentions / 305 call sites; the tool registry is pinned by
+ * source contents, and two pin exact counts (background.js is pinned to 333
+ * script-import mentions / 329 call sites; the tool registry is pinned by
  * SHA-256). So Safari behaviour is delivered by transforming the OUTPUT, never
  * the source.
  *
@@ -13,7 +13,7 @@
  *   1. manifest.json  -- permissions/keys Safari does not implement removed,
  *                        nativeMessaging + CSP + strict_min_version added.
  *   2. background.js  -- platform-adapter.js PREPENDED (never script-imported,
- *                        which would break the 309/305 pins) and the Lattice
+ *                        which would break the 333/329 pins) and the Lattice
  *                        IIFE bundle loaded at EOF (Safari has no offscreen
  *                        document, so the host runs inside the SW).
  *   3. dist/offscreen/lattice-host.iife.js copied in place of the ESM build.
@@ -47,7 +47,8 @@ const EXT_ROOT = join(ROOT, 'extension');
 
 const PERMISSIONS_KEEP = [
   'activeTab', 'scripting', 'storage', 'unlimitedStorage', 'tabs',
-  'windows', 'webNavigation', 'alarms', 'clipboardWrite'
+  'windows', 'webNavigation', 'alarms', 'clipboardWrite',
+  'nativeMessaging' // Chrome uses it for the native host; Safari for the container app.
 ];
 
 const PERMISSIONS_DROP = [
@@ -57,6 +58,8 @@ const PERMISSIONS_DROP = [
   'system.memory'   // Chrome-proprietary.
 ];
 
+// Added even if the Chrome manifest ever drops it: the Safari MCP transport and
+// upload_file both depend on the container app.
 const PERMISSIONS_ADD = ['nativeMessaging'];
 
 // Safari baseline. content_scripts.world:"MAIN" (which canvas-interceptor.js
@@ -285,7 +288,7 @@ export function transformBackground(source, opts) {
     '',
     '// Safari-only modules, inlined for the same reason as the adapter: they must',
     '// register their globals BEFORE background.js runs, and adding script-import',
-    '// lines to the Chrome source would break the 309/305 count pins.',
+    '// lines to the Chrome source would break the 333/329 count pins.',
     ...modules.flatMap((m) => ['', '// ' + m.label, m.src]),
     '// --------------------------- END SAFARI PREAMBLE ---------------------------',
     ''
@@ -311,7 +314,7 @@ export function transformBackground(source, opts) {
     '// The captureLoopback() wrapper is synchronous, so importScripts still runs',
     '// during the service worker\'s initial evaluation as MV3 requires.',
     '//',
-    '// NOTE: the 309/305 count pins in tests/lattice-provider-bridge-smoke.test.js',
+    '// NOTE: the 333/329 count pins in tests/lattice-provider-bridge-smoke.test.js',
     '// read extension/background.js. This line only ever lands in the generated',
     '// build/safari/background.js, so it cannot affect them.',
     'globalThis.FsbPlatform.captureLoopback(function () {',

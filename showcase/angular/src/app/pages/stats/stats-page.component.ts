@@ -46,6 +46,7 @@ import { FSBTelemetryService } from '../../core/stats/fsb-telemetry.service';
 import {
   DatasetState as FSBDatasetState,
   FSBTelemetryHeadline,
+  FSBTelemetryRegion,
   FSBTelemetrySeries,
 } from '../../core/stats/fsb-telemetry.types';
 import {
@@ -60,7 +61,7 @@ import {
   StatsViewDataState,
   updateStatsSourceState,
 } from '../../core/stats/stats-view.model';
-import { regionCentroid } from '../../core/stats/region-geo';
+import { regionDisplayName, regionPosition, regionSpread } from '../../core/stats/region-geo';
 import { GlobeVisualizationService } from '../../core/globe/globe-visualization.service';
 import { GlobeRegion } from '../../core/globe/globe-visualization.types';
 import { LanguagePickerComponent } from '../../layout/language-picker/language-picker.component';
@@ -180,14 +181,13 @@ export class StatsPageComponent implements OnInit, OnDestroy {
     if (this.requiresChartLibrary && this.chartLibraryState === 'error') {
       return {
         kind: 'error',
-        message: $localize`:@@stats.error.chartLibrary:Could not load chart library.`,
+        message: CHART_LIBRARY_ERROR,
       };
     }
     if (this.requiresChartLibrary && this.chartRenderErrorView === this.selectedView) {
       return {
         kind: 'error',
-        message: this.chartRenderErrorMessage ||
-          $localize`:@@stats.error.chartRender:Could not render the selected chart.`,
+        message: this.chartRenderErrorMessage || CHART_RENDER_ERROR,
       };
     }
     return dataState;
@@ -220,9 +220,31 @@ export class StatsPageComponent implements OnInit, OnDestroy {
       this.latestFsbHeadline.popular_mcp_clients.length === 0;
   }
 
+  // Error text reaching the card must always be localized. Upstream messages are
+  // developer diagnostics (and browser-native strings like "Failed to fetch"),
+  // so map the states a reader can act on and send everything else to the
+  // generic fallback rather than rendering raw English.
   get errorMessage(): string {
     const state = this.viewState;
-    return state.kind === 'error' ? state.message : '';
+    if (state.kind !== 'error') return '';
+    const raw = state.message || '';
+    if (PRELOCALIZED_ERRORS.has(raw)) return raw;
+    if (/warming up/i.test(raw)) {
+      return $localize`:@@stats.error.warmingUp:Stats are warming up; retrying shortly.`;
+    }
+    if (/freshness metadata/i.test(raw)) {
+      return $localize`:@@stats.error.missingFreshness:The stats response is missing freshness metadata.`;
+    }
+    if (/24 hours old/i.test(raw)) {
+      return $localize`:@@stats.error.stale:The last usable snapshot is more than 24 hours old.`;
+    }
+    if (/^Malformed/i.test(raw)) {
+      return $localize`:@@stats.error.malformed:The stats response was malformed.`;
+    }
+    if (/browser-only/i.test(raw)) {
+      return $localize`:@@stats.error.browserOnly:Stats are only available in the browser.`;
+    }
+    return this.fallbackErrorMessage;
   }
 
   get chartAriaLabel(): string {
@@ -259,7 +281,7 @@ export class StatsPageComponent implements OnInit, OnDestroy {
         }));
       case 'fsb-popular-mcp':
         return (this.latestFsbHeadline?.popular_mcp_clients ?? []).map((item) => ({
-          label: item.label,
+          label: this.displayLabel(item.label),
           value: this.fmtNum(item.uniq),
         }));
       default:
@@ -267,15 +289,24 @@ export class StatsPageComponent implements OnInit, OnDestroy {
     }
   }
 
+  // The server emits geographic identifiers ('DE', 'US-CA', 'US-CA/San Jose')
+  // that stay untranslated, plus two English sentinels that are prose and must
+  // not. See region-geo.ts for the full label contract.
+  displayLabel(label: string): string {
+    if (label === 'unknown') return $localize`:@@stats.label.unknown:Unknown`;
+    if (label === 'Other') return $localize`:@@stats.label.other:Other`;
+    return regionDisplayName(label);
+  }
+
   get accessibleGlobeData(): readonly AccessibleDatum[] {
-    return (this.latestFsbHeadline?.popular_regions ?? []).map((item) => ({
-      label: item.label,
+    return this.globeRegionList.map((item) => ({
+      label: this.displayLabel(item.label),
       value: this.fmtNum(item.uniq),
     }));
   }
 
   get globeAriaLabel(): string {
-    return $localize`:@@stats.globe.aria:Globe showing today's hourly FSB regional distribution`;
+    return $localize`:@@stats.globe.aria:Globe showing where FSB installs were last seen over the past 365 days, by city, state, or country`;
   }
 
   get tabMetrics(): readonly TabMetric[] {
@@ -332,7 +363,7 @@ export class StatsPageComponent implements OnInit, OnDestroy {
         const top = list[0];
         return [
           { label: $localize`:@@stats.metric.trackedClients:tracked clients`, value: this.fmtNum(list.length) },
-          { label: top ? $localize`:@@stats.metric.topNamed:top: ${top.label}:entityLabel:` : $localize`:@@stats.metric.topClient:top client`, value: top ? this.fmtNum(top.uniq) : '0' },
+          { label: top ? $localize`:@@stats.metric.topNamed:top: ${this.displayLabel(top.label)}:entityLabel:` : $localize`:@@stats.metric.topClient:top client`, value: top ? this.fmtNum(top.uniq) : '0' },
         ];
       }
       default:
@@ -385,8 +416,13 @@ export class StatsPageComponent implements OnInit, OnDestroy {
   // an explicit "still gathering data" message when this is false rather
   // than silently showing a globe with no nodes.
   get hasPlottableRegions(): boolean {
-    const regions = this.latestFsbHeadline?.popular_regions ?? [];
-    return regions.some((r) => regionCentroid(r.label) !== null);
+    return this.globeRegionList.some((r) => regionPosition(r) !== null);
+  }
+
+  private get globeRegionList(): readonly FSBTelemetryRegion[] {
+    const persistent = this.latestFsbHeadline?.users_by_region_365d;
+    if (persistent && persistent.length > 0) return persistent;
+    return this.latestFsbHeadline?.popular_regions ?? [];
   }
 
   get fanItemsLeft(): readonly FanItem[] {
@@ -763,7 +799,7 @@ export class StatsPageComponent implements OnInit, OnDestroy {
 
     if (this.selectedView === 'fsb-active-now') {
       const key = JSON.stringify({
-        regions: this.latestFsbHeadline?.popular_regions ?? [],
+        regions: this.globeRegionList,
         reducedMotion: this.prefersReducedMotion,
         theme: typeof document === 'undefined'
           ? ''
@@ -828,8 +864,7 @@ export class StatsPageComponent implements OnInit, OnDestroy {
       console.warn('[stats-page] chart render failed', err);
       this.zone.run(() => {
         this.chartRenderErrorView = this.selectedView;
-        this.chartRenderErrorMessage =
-          $localize`:@@stats.error.chartRender:Could not render the selected chart.`;
+        this.chartRenderErrorMessage = CHART_RENDER_ERROR;
         this.teardownVisualization();
       });
     }
@@ -850,25 +885,25 @@ export class StatsPageComponent implements OnInit, OnDestroy {
     }
   }
 
-  // Redesign -- maps the k>=5-anonymity-floored popular_regions breakdown
-  // (see fsb-telemetry.types.ts) to globe node clusters. Labels that can't be
+  // Redesign -- maps the k>=5-anonymity-floored region breakdown (see
+  // fsb-telemetry.types.ts) to globe node clusters. Labels that can't be
   // geolocated (unmapped, or the literal 'unknown'/'Other' k-floor buckets)
   // are skipped rather than guessed. `count` is a coarse, capped scale of
   // `uniq` (the k-floor already guarantees uniq >= 5 for any real entry) so
-  // one dominant region can't visually swamp the globe; `spread` is a fixed
-  // moderate jitter radius since we only have a single centroid per label,
-  // not a real distribution.
+  // one dominant region can't visually swamp the globe; `spread` jitters nodes
+  // around the single centroid we have per label -- tight for a city, wider
+  // for a state or country.
   private buildGlobeRegions(): GlobeRegion[] {
-    const list = this.latestFsbHeadline?.popular_regions ?? [];
+    const list = this.globeRegionList;
     const regions: GlobeRegion[] = [];
-    for (const { label, uniq } of list) {
-      const centroid = regionCentroid(label);
-      if (!centroid) continue;
+    for (const region of list) {
+      const position = regionPosition(region);
+      if (!position) continue;
       regions.push({
-        lon: centroid.lon,
-        lat: centroid.lat,
-        spread: 6,
-        count: Math.min(16, Math.max(2, Math.round(uniq / 5))),
+        lon: position.lon,
+        lat: position.lat,
+        spread: regionSpread(region.label),
+        count: Math.min(16, Math.max(2, Math.round(region.uniq / 5))),
       });
     }
     return regions;
@@ -1010,7 +1045,7 @@ export class StatsPageComponent implements OnInit, OnDestroy {
         return {
           type: 'doughnut',
           data: {
-            labels: list.map((x) => x.label),
+            labels: list.map((x) => this.displayLabel(x.label)),
             datasets: [
               {
                 label: $localize`:@@SHOWCASE_STATS_FSB_CHART_POPULAR_MCP_LEGEND:Popular MCP clients`,
@@ -1061,3 +1096,12 @@ function readChartTokens(): ChartTokens {
     border: (style.getPropertyValue('--border-color') || 'rgba(255,255,255,0.08)').trim(),
   };
 }
+
+/* Declared in the module tail because messages.xlf pins a linenumber for every
+   $localize call above. These two are the only error strings the view layer hands
+   down already localized -- errorMessage passes them through instead of collapsing
+   them into the generic network fallback. Comparing against the same call keeps
+   that correct in every locale: both sides resolve through one trans-unit. */
+const CHART_LIBRARY_ERROR = $localize`:@@stats.error.chartLibrary:Could not load chart library.`;
+const CHART_RENDER_ERROR = $localize`:@@stats.error.chartRender:Could not render the selected chart.`;
+const PRELOCALIZED_ERRORS: ReadonlySet<string> = new Set([CHART_LIBRARY_ERROR, CHART_RENDER_ERROR]);

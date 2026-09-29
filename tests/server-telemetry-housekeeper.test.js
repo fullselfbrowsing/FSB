@@ -69,7 +69,7 @@ for (let i = 0; i < 3; i++) {
     '00000000-0000-4000-8000-000000000' + (10 + i),
     UUID_A,
     tsToday + i * 60000,
-    'Claude', 'm', 100, 50, 2, 2, 'periodic', 'h1', NOW, 'unknown'
+    'Claude', 'm', 100, 50, 2, 2, 'periodic', 'h1', NOW, 'IN-Maharashtra'
   );
 }
 
@@ -79,7 +79,7 @@ for (let i = 0; i < 2; i++) {
     '00000000-0000-4000-8000-000000000' + (20 + i),
     UUID_B,
     tsToday + i * 60000,
-    'Codex', 'm', 200, 100, 1, 2, 'periodic', 'h2', NOW, 'unknown'
+    'Codex', 'm', 200, 100, 1, 2, 'periodic', 'h2', NOW, 'US-NY'
   );
 }
 
@@ -89,7 +89,7 @@ queries.insertTelemetryEventWithRegionV2.run(
   '00000000-0000-4000-8000-000000000030',
   UUID_A,
   tsYesterday,
-  'Claude', 'm', 50, 25, 1, 2, 'periodic', 'h1', NOW - 12 * 60 * 60 * 1000, 'unknown'
+  'Claude', 'm', 50, 25, 1, 2, 'periodic', 'h1', NOW - 12 * 60 * 60 * 1000, 'IN-Maharashtra'
 );
 
 // Seed rollup retention boundaries plus deliberately corrupt historical
@@ -151,14 +151,20 @@ check('rollup (A, today).event_count === 3', rollupAToday && rollupAToday.event_
 check('rollup (A, today).tokens_in === 300', rollupAToday && rollupAToday.tokens_in === 300, `got ${JSON.stringify(rollupAToday)}`);
 check('rollup (A, today).tokens_out === 150', rollupAToday && rollupAToday.tokens_out === 150, `got ${JSON.stringify(rollupAToday)}`);
 check('rollup (A, today).max_active_agents === 2', rollupAToday && rollupAToday.max_active_agents === 2, `got ${JSON.stringify(rollupAToday)}`);
+check('rollup (A, today).region persists IN-Maharashtra on the 365d row',
+  rollupAToday && rollupAToday.region === 'IN-Maharashtra', `got ${JSON.stringify(rollupAToday)}`);
 
 const rollupAYesterday = db.prepare('SELECT * FROM telemetry_rollups_daily WHERE install_uuid = ? AND day_utc = ?').get(UUID_A, YESTERDAY);
 check('rollup row exists for (A, yesterday)', !!rollupAYesterday, `got ${JSON.stringify(rollupAYesterday)}`);
 check('rollup (A, yesterday).event_count === 1', rollupAYesterday && rollupAYesterday.event_count === 1, `got ${JSON.stringify(rollupAYesterday)}`);
+check('rollup (A, yesterday).region persists IN-Maharashtra',
+  rollupAYesterday && rollupAYesterday.region === 'IN-Maharashtra', `got ${JSON.stringify(rollupAYesterday)}`);
 
 const rollupBToday = db.prepare('SELECT * FROM telemetry_rollups_daily WHERE install_uuid = ? AND day_utc = ?').get(UUID_B, TODAY);
 check('rollup row exists for (B, today)', !!rollupBToday, `got ${JSON.stringify(rollupBToday)}`);
 check('rollup (B, today).event_count === 2', rollupBToday && rollupBToday.event_count === 2, `got ${JSON.stringify(rollupBToday)}`);
+check('rollup (B, today).region persists US-NY on the 365d row',
+  rollupBToday && rollupBToday.region === 'US-NY', `got ${JSON.stringify(rollupBToday)}`);
 
 // Step 3: global aggregates for today + yesterday.
 const globalToday = db.prepare('SELECT * FROM telemetry_global_aggregates WHERE day_utc = ?').get(TODAY);

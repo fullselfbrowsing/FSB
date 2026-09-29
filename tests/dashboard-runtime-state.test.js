@@ -533,6 +533,19 @@ assert(angularDashboardTsSource.includes('this.translateTaskError(')
 assert(angularDashboardTsSource.includes('this.pairingErrorMessage(body?.code)')
   && !angularDashboardTsSource.includes('body.error || this.dashboardCopy.qrExchangeFailed'),
   'QR pairing failures use trusted codes instead of rendering server English');
+// The connecting state replaces the scan panel markup, so a pairing error written
+// before the rebuild lands on a detached node and is never seen.
+assert(/failScan\(message: string\): void \{\s*this\.resetScanPanel\(\);\s*this\.showScanError\(message\);\s*void this\.startQRScanner\(\);/
+  .test(angularDashboardTsSource),
+  'failScan rebuilds the scan panel before showing the error, then restarts the scanner');
+const handleScannedQRStart = angularDashboardTsSource.indexOf('private handleScannedQR');
+const handleScannedQREnd = angularDashboardTsSource.indexOf('private showScanError');
+assert(handleScannedQRStart >= 0 && handleScannedQREnd > handleScannedQRStart,
+  'Angular dashboard still defines handleScannedQR ahead of showScanError');
+const handleScannedQRBody = angularDashboardTsSource.slice(handleScannedQRStart, handleScannedQREnd);
+assert(!handleScannedQRBody.includes("switchTab('paste')")
+  && (handleScannedQRBody.match(/this\.failScan\(/g) || []).length === 3,
+  'every QR scan failure reports through failScan and keeps the user on the Scan tab');
 assert(angularDashboardTsSource.includes('inject(LOCALE_ID)')
   && angularDashboardTsSource.includes('Math.round(safe).toLocaleString(this.localeId)')
   && angularDashboardTsSource.includes('new Date(this.lastSnapshotTime).toLocaleTimeString(this.localeId)'),

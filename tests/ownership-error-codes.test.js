@@ -288,7 +288,7 @@ const TASK3_LANDED = _bridgeClientHasResolverInExecuteAction();
 require(RESOLVER_PATH_O);
 
 async function test6_d16CrossAgentRejectViaResolver() {
-  console.log('--- Phase 246 / Test 6: D-16 cross-agent action with resolved tabId rejects TAB_NOT_OWNED ---');
+  console.log('--- Phase 246 / Test 6: D-16 resolver rejects cross-agent explicit tab before dispatch ---');
   if (!TASK3_LANDED) {
     console.log('  PASS: skipped (Task 3 _handleExecuteAction migration not yet landed)');
     passed++;
@@ -302,29 +302,15 @@ async function test6_d16CrossAgentRejectViaResolver() {
   });
   installRegistry(mock);
   try {
-    // Mirror Plan 02 Task 3 _handleExecuteAction's routeParams composition
-    // pattern. Agent B passes explicit tab_id targeting T1 (which A owns)
-    // along with B's ownershipToken.
+    // Agent B passes explicit tab_id targeting T1 (which A owns). The
+    // resolver is the first authoritative chokepoint because several direct
+    // read/action paths never reach the dispatcher gate.
     const resolved = await globalThis.resolveAgentTabOrError('agent_b', { tab_id: 100 }, {});
-    if (resolved.success === false) {
-      check(false, 'resolver did not error: got ' + JSON.stringify(resolved));
-      return;
-    }
-    const routeParams = {
-      tab_id: 100,
-      ...(resolved.skipGate ? {} : { tabId: resolved.tabId }),
-      agentId: 'agent_b',
-      ownershipToken: 'tB-bogus'
-    };
-    const result = await dispatchMcpToolRoute({
-      tool: 'navigate',
-      params: { url: 'https://example.com', ...routeParams }
-    });
-    check(result && result.success === false, 'dispatch returns success === false');
-    check(result && result.code === 'TAB_NOT_OWNED',
-      'code === TAB_NOT_OWNED (gate fires on resolver-fed tabId; D-16); got ' + (result && result.code));
-    check(result && result.ownerAgentId === 'agent_a',
-      'ownerAgentId === agent_a; got ' + (result && result.ownerAgentId));
+    check(resolved && resolved.success === false, 'resolver returns success === false');
+    check(resolved && resolved.code === 'TAB_NOT_OWNED',
+      'resolver code === TAB_NOT_OWNED; got ' + (resolved && resolved.code));
+    check(resolved && resolved.ownerAgentId === 'agent_a',
+      'resolver ownerAgentId === agent_a; got ' + (resolved && resolved.ownerAgentId));
   } finally {
     uninstallRegistry();
   }

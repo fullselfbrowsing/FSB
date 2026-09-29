@@ -233,78 +233,29 @@
   background: var(--bg-elevated);
 }
 
-/* --- Footer --- */
+/* --- Footer colors only; layout lives in styles.scss --- */
 .footer {
   background: var(--bg-card);
   border-top: 1px solid var(--border-color);
-  padding: 48px 0 32px;
-}
-
-.footer-inner {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 48px;
-  margin-bottom: 32px;
-}
-
-.footer-brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.footer-links {
-  display: flex;
-  gap: 48px;
-  flex-wrap: wrap;
 }
 
 .footer-column h4 {
-  font-size: 0.85rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
   color: var(--text-muted);
-  margin-bottom: 12px;
 }
 
 .footer-column a {
-  display: block;
   color: var(--text-secondary);
-  font-size: 0.9rem;
-  padding: 4px 0;
 }
 
 .footer-column a:hover {
   color: var(--text-primary);
 }
 
-.footer-column a.footer-x-link {
-  align-items: center;
-  display: flex;
-  font-size: 0;
-  line-height: 1;
-  width: fit-content;
-}
-
-.footer-column a.footer-x-link::before {
-  content: '\e61b';
-  font-family: 'Font Awesome 6 Brands';
-  font-size: 0.95rem;
-  font-weight: 400;
-}
-
 .footer-bottom {
   border-top: 1px solid var(--border-color);
-  padding-top: 24px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 12px;
 }
 
 .footer-bottom p {
-  font-size: 0.85rem;
   color: var(--text-muted);
 }
 
@@ -331,48 +282,6 @@
     display: flex;
   }
 
-  .footer {
-    padding: 32px 0 24px;
-  }
-
-  .footer-inner {
-    grid-template-columns: 1fr;
-    gap: 24px;
-  }
-
-  .footer-links {
-    flex-direction: column;
-    gap: 20px;
-  }
-
-  .footer-bottom {
-    flex-direction: column;
-    text-align: center;
-    gap: 8px;
-  }
-}
-
-@media (max-width: 480px) {
-  .footer {
-    padding: 24px 0 20px;
-  }
-
-  .footer-brand .fsb-mark {
-    font-size: 1rem;
-  }
-
-  .footer-column h4 {
-    font-size: 0.8rem;
-    margin-bottom: 8px;
-  }
-
-  .footer-column a {
-    font-size: 0.85rem;
-  }
-
-  .footer-bottom p {
-    font-size: 0.8rem;
-  }
 }
 
 @media (min-width: 769px) {

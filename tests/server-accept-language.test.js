@@ -9,7 +9,7 @@ const { pickBestLocale, createAcceptLanguageMiddleware, parseCookieHeader } = re
   path.join(__dirname, '..', 'showcase', 'server', 'src', 'middleware', 'accept-language')
 );
 
-const SUPPORTED = ['es', 'de', 'ja', 'zh-CN', 'zh-TW'];
+const SUPPORTED = ['es', 'de', 'ja', 'ko', 'zh-CN', 'zh-TW'];
 let passed = 0;
 let failed = 0;
 
@@ -27,6 +27,8 @@ function check(label, expected, actual) {
 console.log('--- pickBestLocale ---');
 check('ja,en;q=0.8 -> ja', 'ja', pickBestLocale('ja,en;q=0.8', SUPPORTED));
 check('zh-Hant-TW,en;q=0.8 -> zh-TW', 'zh-TW', pickBestLocale('zh-Hant-TW,en;q=0.8', SUPPORTED));
+check('ko-KR -> ko', 'ko', pickBestLocale('ko-KR', SUPPORTED));
+check('ko,en;q=0.8 -> ko', 'ko', pickBestLocale('ko,en;q=0.8', SUPPORTED));
 check('zh-Hans-CN -> zh-CN', 'zh-CN', pickBestLocale('zh-Hans-CN', SUPPORTED));
 check('zh-Hant -> zh-TW', 'zh-TW', pickBestLocale('zh-Hant', SUPPORTED));
 check('zh-Hans -> zh-CN', 'zh-CN', pickBestLocale('zh-Hans', SUPPORTED));
@@ -37,7 +39,7 @@ check('zh-SG -> zh-CN', 'zh-CN', pickBestLocale('zh-SG', SUPPORTED));
 check('es-MX,en;q=0.9 -> es', 'es', pickBestLocale('es-MX,en;q=0.9', SUPPORTED));
 check('de-AT;q=0.9,en;q=0.5 -> de', 'de', pickBestLocale('de-AT;q=0.9,en;q=0.5', SUPPORTED));
 check('en-US,en;q=0.9 -> null (EN not in SUPPORTED list -> falls through; let middleware decide)', null, pickBestLocale('en-US,en;q=0.9', SUPPORTED));
-check('ko,fr -> null', null, pickBestLocale('ko,fr', SUPPORTED));
+check('fr,it -> null', null, pickBestLocale('fr,it', SUPPORTED));
 check('empty string -> null', null, pickBestLocale('', SUPPORTED));
 check('null -> null', null, pickBestLocale(null, SUPPORTED));
 check('undefined -> null', null, pickBestLocale(undefined, SUPPORTED));
@@ -143,9 +145,9 @@ check(
 );
 
 check(
-  'GET / + Accept-Language ko,fr -> next() (unsupported)',
+  'GET / + Accept-Language fr,it -> next() (unsupported)',
   { nextCalled: true, redirectArgs: null },
-  mockReqRes('GET', '/', { 'accept-language': 'ko,fr' })
+  mockReqRes('GET', '/', { 'accept-language': 'fr,it' })
 );
 
 check(

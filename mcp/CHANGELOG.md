@@ -2,6 +2,28 @@
 
 All notable changes to `fsb-mcp-server` are documented in this file. Each entry corresponds to a published npm release; FSB extension milestones map to MCP package versions in the entry header.
 
+<a id="v0.11.0"></a>
+
+## 0.11.0 (2026-07-15)
+
+Milestone: FSB v0.9.91 terminal task-outcome handoff. Minor release that makes the existing `complete_task`, `partial_task`, and `fail_task` schemas callable through a dedicated bridge contract and records their confirmed outcomes in local MCP task memory.
+
+### Added
+
+- **Terminal task-outcome bridge contract.** Added the `mcp:task-status` wire route for `complete_task`, `partial_task`, and `fail_task`. The MCP server preserves the caller's agent identity, ownership token, optional `tab_id`, and client-authored summary while the extension applies its normal ownership gate before recording an outcome.
+- **Callable lifecycle tools.** The three lifecycle schemas that already existed in the shared registry are now registered with bridge message builders. A canonical `fail_task` response remains `success:false` to describe the task outcome but is returned to the MCP client as a successful tool acknowledgement rather than being remapped as a transport failure.
+- **Ordered memory handoff.** Terminal lifecycle calls serialize behind pending browser mutations so a completion, partial, or failure summary cannot overtake the action it describes. Handler-confirmed terminal responses are the only MCP-to-memory handoff; validation and ownership failures are not recorded.
+
+### Compatibility
+
+- `fsb-mcp-server` 0.11.0 requires FSB extension 0.9.91 or newer for the new `mcp:task-status` route. Upgrade the extension and restart the MCP host together; an older extension does not recognize terminal lifecycle messages from this package.
+- Existing manual actions, trigger watchers, observability tools, installer configuration, and npm package identity remain compatible. No dependency versions changed.
+
+### Anti-scope (NOT in 0.11.0)
+
+- No automatic task summaries are synthesized by the MCP server. Only explicit, client-authored `complete_task`, `partial_task`, or `fail_task` calls create the terminal memory handoff.
+- No publish or tag action is performed by this release prep. Final `npm publish fsb-mcp-server@0.11.0` remains user-gated through the `mcp-v0.11.0` release tag.
+
 <a id="v0.10.0"></a>
 
 ## 0.10.0 (2026-06-17)

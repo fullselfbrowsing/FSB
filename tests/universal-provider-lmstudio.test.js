@@ -2,6 +2,7 @@
 
 const {
   UniversalProvider,
+  calculateAdaptiveTimeout,
   normalizeProviderBaseUrl,
   buildProviderModelsEndpoint,
   parseOpenAICompatibleModelList
@@ -79,6 +80,31 @@ assertEqual(
   'LM Studio provider defaults to localhost:1234 when no URL is configured'
 );
 
+console.log('\n--- LM Studio adaptive timeout policy ---');
+assertEqual(
+  calculateAdaptiveTimeout({ messages: [{ role: 'user', content: 'hello' }] }, 'qwen/qwen3.6-27b', 0, 'lmstudio'),
+  180000,
+  'small LM Studio requests receive the 180s local-inference floor'
+);
+const largeLocalRequest = {
+  messages: [{ role: 'system', content: 'x'.repeat(63000) }]
+};
+assertEqual(
+  calculateAdaptiveTimeout(largeLocalRequest, 'qwen/qwen3.6-27b', 0, 'lmstudio'),
+  270000,
+  'approximately 15.8K input tokens receive a 270s timeout'
+);
+assertEqual(
+  calculateAdaptiveTimeout(largeLocalRequest, 'qwen/qwen3.6-27b', 1, 'lmstudio'),
+  300000,
+  'LM Studio retry timeout remains capped at 300s'
+);
+assertEqual(
+  calculateAdaptiveTimeout(largeLocalRequest, 'gpt-4o', 0, 'openai'),
+  45000,
+  'hosted-provider timeout behavior remains unchanged'
+);
+
 console.log('\n--- LM Studio base-URL construction sites route through normalization ---');
 // The bridge path (agent-loop) and the options test-connection path each append
 // /v1 to the stored base URL. Both must strip a pasted /v1 (LM Studio's documented
@@ -99,8 +125,10 @@ const optionsSrc = fs.readFileSync(path.join(__dirname, '..', 'extension', 'ui',
 const latticeIdx = optionsSrc.indexOf('lattice-test-connection');
 const optionsTestConn = optionsSrc.slice(Math.max(0, latticeIdx - 4000), latticeIdx);
 assert(
-  optionsTestConn.indexOf("replace(/\\/v1\\/?$/, '')") !== -1,
-  'options test-connection path strips a pasted /v1 suffix before re-appending /v1'
+  optionsSrc.indexOf('function normalizeLmStudioSettingsBaseUrl(') !== -1
+    && optionsTestConn.indexOf('normalizeLmStudioSettingsBaseUrl(') !== -1
+    && optionsTestConn.indexOf("lmstudioConnectionBaseUrl + '/v1'") !== -1,
+  'options test-connection path uses shared normalization before re-appending /v1'
 );
 
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===');

@@ -15,6 +15,7 @@ import { RouterLink } from '@angular/router';
 import { Title, Meta } from '@angular/platform-browser';
 
 import { PixelLoaderComponent } from '../../components/pixel-loader/pixel-loader.component';
+import { CAPABILITY_ROW_1, CAPABILITY_ROW_2, type CapabilityApp } from '../../core/capabilities/capability-apps';
 import { APP_VERSION } from '../../core/seo/version';
 import { HOST, buildLocaleUrl, emitLocaleHead } from '../../core/seo/locale-seo';
 import { ThemeService } from '../../core/theme.service';
@@ -33,35 +34,14 @@ interface FanClient extends InstallClient {
   readonly flagLabel: string;
 }
 
-interface CapabilityApp {
-  readonly name: string;
-  readonly icon: string;
-  readonly cls?: string;
-}
-
 const ROUTE_PATH = '';
 const OG_IMAGE = `${HOST}/assets/fsb_logo_dark.png`;
 const OG_IMAGE_ALT = $localize`:@@home.og.imageAlt:FSB Full Self-Browsing logo`;
 const SITE_NAME = $localize`:@@site.name:FSB - Full Self-Browsing`;
 const YOUTUBE_CHANNEL = 'https://www.youtube.com/@parzival5707';
 const GITHUB_REPO = 'https://github.com/fullselfbrowsing/FSB';
-const BASE_INSTALL_COMMAND = 'npx -y fsb-mcp-server install';
+const BASE_INSTALL_COMMAND = 'npx -y fsb-mcp-server@latest install';
 const ROTATE_MS = 1800;
-const SIMPLE_ICON_COLOR = '94a3b8';
-function capabilityIcon(name: string): string {
-  const label = name.slice(0, 1).toUpperCase();
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect width="24" height="24" rx="6" fill="none"/><text x="12" y="16" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="700" fill="#94a3b8">${label}</text></svg>`;
-  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
-}
-
-function simpleIcon(slug: string): string {
-  return `https://cdn.simpleicons.org/${slug}/${SIMPLE_ICON_COLOR}`;
-}
-
-function capability(name: string, slug?: string): CapabilityApp {
-  return { name, icon: slug ? simpleIcon(slug) : capabilityIcon(name), cls: '' };
-}
-
 @Component({
   selector: 'app-home-page',
   standalone: true,
@@ -105,40 +85,12 @@ export class HomePageComponent implements OnInit, AfterViewInit, OnDestroy {
     { id: 'windsurf', name: 'Windsurf', logo: 'windsurf.svg', flag: '--windsurf', cmd: `${BASE_INSTALL_COMMAND} --windsurf` },
     { id: 'codex', name: 'Codex', logo: 'openai.svg', flag: '--codex', cmd: `${BASE_INSTALL_COMMAND} --codex` },
     { id: 'opencode', name: 'OpenCode', logo: 'opencode.svg', flag: '--opencode', cmd: `${BASE_INSTALL_COMMAND} --opencode` },
-    { id: 'openclaw', name: 'OpenClaw', logo: 'openclaw.svg', flag: '', cmd: 'npx -y fsb-mcp-server' },
+    { id: 'openclaw', name: 'OpenClaw', logo: 'openclaw.svg', flag: '', cmd: 'npx -y fsb-mcp-server@latest' },
     { id: 'all', name: $localize`:@@home.install.allClients:All Clients`, logo: 'all.svg', flag: '--all', cmd: `${BASE_INSTALL_COMMAND} --all` },
   ];
-  readonly capRow1: readonly CapabilityApp[] = [
-    capability('GitHub', 'github'),
-    capability('Slack'),
-    capability('Notion', 'notion'),
-    capability('Linear', 'linear'),
-    capability('Jira', 'jira'),
-    capability('Confluence', 'confluence'),
-    capability('ClickUp', 'clickup'),
-    capability('Asana', 'asana'),
-    capability('Airtable', 'airtable'),
-    capability('GitLab', 'gitlab'),
-    capability('Bitbucket', 'bitbucket'),
-    capability('Vercel', 'vercel'),
-    capability('Netlify', 'netlify'),
-  ];
+  readonly capRow1: readonly CapabilityApp[] = CAPABILITY_ROW_1;
   private readonly manualFlagLabel = $localize`:@@home.install.manualFlag:manual`;
-  readonly capRow2: readonly CapabilityApp[] = [
-    capability('Cloudflare', 'cloudflare'),
-    capability('CircleCI', 'circleci'),
-    capability('Datadog', 'datadog'),
-    capability('Sentry', 'sentry'),
-    capability('PostHog', 'posthog'),
-    { name: 'ChatGPT', icon: '/assets/providers/openai.svg', cls: 'cap-logo-inv' },
-    capability('Claude', 'claude'),
-    capability('Bluesky', 'bluesky'),
-    capability('Mastodon', 'mastodon'),
-    capability('Threads', 'threads'),
-    capability('Discord', 'discord'),
-    capability('Reddit', 'reddit'),
-  ];
-
+  readonly capRow2: readonly CapabilityApp[] = CAPABILITY_ROW_2;
   browserIconClass = 'fa-chrome';
   iconIndex = 0;
   token = '--claude-code';
@@ -315,6 +267,7 @@ export class HomePageComponent implements OnInit, AfterViewInit, OnDestroy {
         $localize`:@@home.schema.feature.dom:DOM-based page understanding, browser actions, visual feedback, local memory, and BYO model keys`,
       ],
       keywords: $localize`:@@home.schema.keywords:MCP browser automation, AI browser agent, trigger watchers, first-party API capability calling, Claude Code browser testing, Codex browser testing, self-browsing automation`,
+      license: `${GITHUB_REPO}/blob/main/LICENSE`,
       publisher: { '@id': 'https://full-selfbrowsing.com/#org' },
       offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
     };
@@ -418,7 +371,7 @@ export class HomePageComponent implements OnInit, AfterViewInit, OnDestroy {
 
 /* Declared in the module tail rather than beside the interfaces at the top of the
    file on purpose: messages.xlf pins a linenumber for every $localize call in this
-   module (the last one sits at line 317) and CI diffs `ng extract-i18n`
+   module (the last one sits at line 269) and CI diffs `ng extract-i18n`
    byte-for-byte, so nothing at or above that line may move. Same reason there is no
    separate browser-icon.ts -- importing it would shift every one of those numbers.
 

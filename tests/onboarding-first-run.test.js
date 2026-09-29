@@ -8,6 +8,7 @@ const initConfigPath = path.join(ROOT, 'extension', 'config', 'init-config.js');
 const onboardingHtmlPath = path.join(ROOT, 'extension', 'ui', 'onboarding.html');
 const onboardingCssPath = path.join(ROOT, 'extension', 'ui', 'onboarding.css');
 const onboardingJsPath = path.join(ROOT, 'extension', 'ui', 'onboarding.js');
+const PRODUCT_VERSION = require('../extension/manifest.json').version;
 
 function read(relPath) {
   return fs.readFileSync(path.join(ROOT, relPath), 'utf8');
@@ -23,7 +24,7 @@ async function loadInitConfigHarness() {
     console,
     chrome: {
       runtime: {
-        getManifest: () => ({ version: '0.9.90' }),
+        getManifest: () => ({ version: PRODUCT_VERSION }),
         getURL: (rel) => `chrome-extension://fsb/${rel}`,
         openOptionsPage: () => openedOptions.push(true),
         onInstalled: {
@@ -91,13 +92,18 @@ async function loadInitConfigHarness() {
     assert(!/<link[^>]+https?:\/\//i.test(html), 'onboarding.html has no remote stylesheet/script links');
     assert(!/@import\s+url\(["']?https?:\/\//i.test(css), 'onboarding.css has no remote font imports');
     assert(html.includes('onboarding.js'), 'onboarding.html loads onboarding.js');
+    assert(html.includes('../ai/model-discovery.js'), 'onboarding.html loads shared model discovery');
+    assert(
+      html.indexOf('../ai/model-discovery.js') < html.indexOf('onboarding.js'),
+      'shared model discovery loads before onboarding.js'
+    );
     assert(html.includes('onboarding.css'), 'onboarding.html loads onboarding.css');
   }
 
   console.log('--- onboarding provider storage mapping ---');
   {
     const context = {
-      chrome: { runtime: { getManifest: () => ({ version: '0.9.90' }) } },
+      chrome: { runtime: { getManifest: () => ({ version: PRODUCT_VERSION }) } },
       document: { addEventListener: () => {} },
       window: { addEventListener: () => {} },
       console,
@@ -134,6 +140,11 @@ async function loadInitConfigHarness() {
     );
     assert(js.includes("patch[PROVIDER_KEY_FIELDS[provider.id]] = key;"), 'BYOK validation saves selected provider key field');
     assert(js.includes("patch.lmstudioBaseUrl = baseUrl;"), 'LM Studio validation saves lmstudioBaseUrl');
+    assert(js.includes("modelName: provider.local ? state.lmstudioModel"), 'LM Studio validation persists the discovered model id');
+    assert(
+      js.indexOf('await validateProvider(provider.id') < js.indexOf('await storageSet(patch)', js.indexOf('async function validateAndContinue')),
+      'onboarding stores provider configuration only after validation succeeds'
+    );
     assert(js.includes("chrome.sidePanel.open"), 'Open FSB uses chrome.sidePanel.open');
     assert(js.includes("url: chrome.runtime.getURL('ui/popup.html')"), 'Open FSB has popup fallback');
   }

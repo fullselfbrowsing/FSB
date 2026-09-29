@@ -11,6 +11,16 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const toolDefs = require(path.resolve(__dirname, '../ai/tool-definitions.cjs'));
 const registryReadOnly: string[] = toolDefs.getReadOnlyTools().map((t: { name: string }) => t.name);
 
+// These tools are registry-read-only for schema and registration purposes, but
+// their terminal recorder state must be ordered after any pending mutation.
+const SERIALIZED_LIFECYCLE_TOOLS = new Set([
+  'complete_task',
+  'partial_task',
+  'fail_task',
+  // Semantically read-only, but consumes the exclusive per-tab CDP resource.
+  'capture_screenshot',
+]);
+
 // ---------------------------------------------------------------------------
 // TaskQueue
 // ---------------------------------------------------------------------------
@@ -26,9 +36,10 @@ export class TaskQueue {
   private running = false;
 
   // Derived from tool-definitions.js registry + non-registry read-only tools
-  // (observability, agents, etc. registered by agents.ts and observability.ts)
+  // (observability, agents, etc. registered by agents.ts and observability.ts).
+  // Terminal lifecycle tools are deliberately excluded so they serialize.
   private readonly readOnlyTools = new Set([
-    ...registryReadOnly,
+    ...registryReadOnly.filter(toolName => !SERIALIZED_LIFECYCLE_TOOLS.has(toolName)),
     // Non-registry read-only tools
     'get_task_status',
     'get_site_guides',
@@ -36,6 +47,7 @@ export class TaskQueue {
     'get_extension_config',
     'list_sessions',
     'get_session_detail',
+    'get_session_replay',
     'get_logs',
     'search_memory',
     'search_capabilities',

@@ -496,7 +496,20 @@ this.__phase241bridge = {
       client._intentionalClose = true;
       if (client._reconnectTimer) { clearTimeout(client._reconnectTimer); client._reconnectTimer = null; }
       if (client._pingTimer) { clearInterval(client._pingTimer); client._pingTimer = null; }
+      if (client._delegationHeartbeatTimer) {
+        clearInterval(client._delegationHeartbeatTimer);
+        client._delegationHeartbeatTimer = null;
+      }
     } catch (_e) { /* best-effort */ }
+  }
+
+  async function connectBridgeClient(client) {
+    client.connect();
+    // Phase 59 validates trusted session pairing state before constructing
+    // either the legacy or credential-subprotocol socket.
+    for (let i = 0; i < 12; i++) await Promise.resolve();
+    assert.ok(client._ws, 'pairing preload eventually constructs the bridge socket');
+    client._ws.open();
   }
 
   console.log('--- Test 9 (bridge): onopen mints connection_id ---');
@@ -515,9 +528,7 @@ this.__phase241bridge = {
         'bridge module exposes RECONNECT_GRACE_MS = 10000');
 
       assert.strictEqual(client._connectionId, null, 'no connectionId pre-connect');
-      client.connect();
-      // Trigger onopen via the fake socket.
-      client._ws.open();
+      await connectBridgeClient(client);
       assert.strictEqual(typeof client._connectionId, 'string',
         'connectionId is a string after onopen');
       assert.ok(client._connectionId.length > 8, 'connectionId is non-trivial in length');
@@ -546,8 +557,7 @@ this.__phase241bridge = {
 
       harness = buildBridgeWithRegistry(reg);
       const client = harness.exports.mcpBridgeClient;
-      client.connect();
-      client._ws.open();
+      await connectBridgeClient(client);
       const conn = client._connectionId;
 
       const A = (await reg.registerAgent()).agentId;
@@ -585,8 +595,7 @@ this.__phase241bridge = {
       harness = buildBridgeWithRegistry(reg);
       const client = harness.exports.mcpBridgeClient;
 
-      client.connect();
-      client._ws.open();
+      await connectBridgeClient(client);
       const firstConn = client._connectionId;
       const A = (await reg.registerAgent()).agentId;
       reg.stampConnectionId(A, firstConn);
@@ -598,8 +607,7 @@ this.__phase241bridge = {
       assert.ok(reg._stagedReleases.has(firstConn), 'first conn staged');
 
       // Reconnect: assigns a NEW connection_id and cancels the prior staged release.
-      client.connect();
-      client._ws.open();
+      await connectBridgeClient(client);
       const secondConn = client._connectionId;
       assert.notStrictEqual(secondConn, firstConn, 'reconnect mints a fresh connection_id');
       await new Promise((r) => setTimeout(r, 20));
@@ -633,8 +641,7 @@ this.__phase241bridge = {
       harness = buildBridgeWithRegistry(reg);
       const client = harness.exports.mcpBridgeClient;
 
-      client.connect();
-      client._ws.open();
+      await connectBridgeClient(client);
       const firstConn = client._connectionId;
       const A = (await reg.registerAgent()).agentId;
       reg.stampConnectionId(A, firstConn);
@@ -643,8 +650,7 @@ this.__phase241bridge = {
       await new Promise((r) => setTimeout(r, 20));
       assert.ok(reg._stagedReleases.has(firstConn), 'first conn staged');
 
-      client.connect();
-      client._ws.open();
+      await connectBridgeClient(client);
       await new Promise((r) => setTimeout(r, 100));
 
       assert.deepStrictEqual(ownerRelease.calls, [],
@@ -672,8 +678,7 @@ this.__phase241bridge = {
       harness = buildBridgeWithRegistry(reg);
       const client = harness.exports.mcpBridgeClient;
 
-      client.connect();
-      client._ws.open();
+      await connectBridgeClient(client);
       // No agents stamped under this connection_id.
       client._ws.close();
       await new Promise((r) => setTimeout(r, 20));
@@ -701,8 +706,7 @@ this.__phase241bridge = {
       harness = buildBridgeWithRegistry(reg);
       const client = harness.exports.mcpBridgeClient;
 
-      client.connect();
-      client._ws.open();
+      await connectBridgeClient(client);
       const conn = client._connectionId;
       const A = (await reg.registerAgent()).agentId;
       reg.stampConnectionId(A, conn);
@@ -726,6 +730,72 @@ this.__phase241bridge = {
     }
   }
   console.log('  PASS: bridge passes RECONNECT_GRACE_MS=10000 to stageReleaseByConnectionId');
+
+  console.log('--- Test 14 (bridge): delegation heartbeat remains separate from reconnect grace ---');
+  {
+    const bridgeSource = fs.readFileSync(
+      path.join(__dirname, '..', 'extension', 'ws', 'mcp-bridge-client.js'),
+      'utf8'
+    );
+    assert.ok(
+      bridgeSource.includes('const RECONNECT_GRACE_MS = 10000;'),
+      'legacy agent transport grace remains exactly ten seconds'
+    );
+    assert.ok(
+      bridgeSource.includes('const DELEGATION_HEARTBEAT_INTERVAL_MS = 20000;'),
+      'active delegation acknowledgement interval is independently pinned to twenty seconds'
+    );
+    assert.ok(
+      bridgeSource.includes('const DELEGATION_HEARTBEAT_MISS_LIMIT = 3;'),
+      'active delegation connection classification requires three misses'
+    );
+    assert.ok(
+      bridgeSource.includes('this._delegationHeartbeatOwners = new Set();'),
+      'heartbeat owners use one Set-backed refcount roster'
+    );
+    assert.ok(
+      bridgeSource.includes('retainDelegationHeartbeat(ownerId)')
+        && bridgeSource.includes('releaseDelegationHeartbeat(ownerId)'),
+      'bridge exposes paired retain/release heartbeat APIs'
+    );
+    assert.ok(
+      bridgeSource.includes('stageReleaseByConnectionId(this._connectionId, RECONNECT_GRACE_MS)'),
+      'socket-close agent release still uses only the legacy reconnect grace'
+    );
+    assert.ok(
+      !/stageReleaseByConnectionId\([^\n]*DELEGATION_HEARTBEAT/.test(bridgeSource),
+      'delegation heartbeat timing never replaces or widens agent transport grace'
+    );
+  }
+  console.log('  PASS: 20s/three-miss heartbeat and 10s agent grace are independent contracts');
+
+  console.log('--- Test 15 (bridge): heartbeat recovery has no native or restart authority ---');
+  {
+    const bridgeSource = fs.readFileSync(
+      path.join(__dirname, '..', 'extension', 'ws', 'mcp-bridge-client.js'),
+      'utf8'
+    );
+    const heartbeatStart = bridgeSource.indexOf('retainDelegationHeartbeat(ownerId)');
+    const heartbeatEnd = bridgeSource.indexOf('// Message handling', heartbeatStart);
+    assert.ok(heartbeatStart >= 0 && heartbeatEnd > heartbeatStart,
+      'heartbeat implementation region is present for closed source audit');
+    const heartbeatSource = bridgeSource.slice(heartbeatStart, heartbeatEnd);
+    for (const pattern of [
+      /connectNative|sendNativeMessage|nativeMessaging/,
+      /child_process|\bprocess\s*\./,
+      /\b(?:execFile|execSync|spawn|spawnSync|fork)\s*\(/,
+      /restart|replay/i,
+      /sendExtRequest|dispatchMcpMessageRoute|chrome\.runtime\.sendMessage/,
+    ]) {
+      assert.strictEqual(pattern.test(heartbeatSource), false,
+        'heartbeat region has no native, restart, execute, or work-dispatch path matching ' + pattern);
+    }
+    assert.ok(
+      heartbeatSource.includes("this._ws.send(JSON.stringify({ type: 'mcp:ping', ts: Date.now(), nonce }))"),
+      'heartbeat authority is limited to its exact mcp:ping frame'
+    );
+  }
+  console.log('  PASS: heartbeat classifies connectivity without native execution or restart inference');
 
   console.log('PASS grace');
 })().catch(err => {

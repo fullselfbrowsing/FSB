@@ -3,7 +3,7 @@
 import { readFileSync, renameSync, writeFileSync } from 'node:fs';
 
 const SOURCE_PATH = 'src/locale/messages.xlf';
-const DEFAULT_LOCALES = ['es', 'de', 'ja', 'zh-CN', 'zh-TW'];
+const DEFAULT_LOCALES = ['es', 'de', 'ja', 'ko', 'zh-CN', 'zh-TW'];
 const locales = process.argv.slice(2);
 const selectedLocales = locales.length ? locales : DEFAULT_LOCALES;
 

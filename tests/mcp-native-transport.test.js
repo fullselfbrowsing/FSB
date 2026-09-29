@@ -77,6 +77,16 @@ const { FsbNativeBridgeSocket, utf8ToBase64, base64ToUtf8 } = require('../extens
     passAssertEqual(openMsg.t, 'open', 'dials with an open frame');
     passAssertEqual(openMsg.url, 'ws://localhost:7225', 'open frame carries the 7225 URL');
     passAssertEqual(openMsg.linger, true, 'requests linger for fast SW-eviction reconnect');
+    passAssertEqual(openMsg.origin, undefined, 'omits origin when runtime.getURL is unavailable');
+  }
+
+  console.log('\n=== 1b. open frame carries the extension Origin ===');
+  {
+    const port = installFakePort();
+    globalThis.chrome.runtime.getURL = (p) => 'safari-web-extension://ABCD-1234/' + p;
+    new FsbNativeBridgeSocket({ url: 'ws://localhost:7225' });
+    passAssertEqual(port.posted[0].origin, 'safari-web-extension://ABCD-1234',
+      'origin is the bare extension origin the server classifies as the extension');
   }
 
   console.log('\n=== 2. TWO-STAGE open ===');

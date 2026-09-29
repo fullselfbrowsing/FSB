@@ -98,6 +98,20 @@ async function testManualNavigateAgentIdThreading() {
     observedIds.has('agent_test_smoke'),
     'observed agentId equals the harness-minted deterministic value (agent_test_smoke)',
   );
+  const observedRunIds = new Set(execCalls.map((c) => c.message.payload.recordingRunId));
+  assert(
+    observedRunIds.size === 1 && /^[0-9a-f-]{36}$/i.test([...observedRunIds][0]),
+    'parallel calls share one internal recordingRunId',
+  );
+  const observedCallIds = new Set(execCalls.map((c) => c.message.payload.recordingCallId));
+  assert(
+    observedCallIds.size === N && [...observedCallIds].every((id) => /^[0-9a-f-]{36}$/i.test(id)),
+    'each logical bridge call carries a unique internal recordingCallId',
+  );
+  assert(
+    execCalls.every((c) => c.message.payload.recordingLeaseMs === 35_000),
+    'manual calls carry a timeout-derived recording lease with settle grace',
+  );
 
   console.log(
     '\nagent-id-threading.test.js manual.ts: ' +
@@ -145,6 +159,9 @@ async function testReadOnlyAgentIdThreading() {
   const payload = readPageCalls[0].message.payload;
   assert(typeof payload.agentId === 'string', 'mcp:read-page payload contains agentId (Phase 246 D-02 overturn)');
   assert(payload.agentId === 'agent_test_smoke', 'agentId is the harness-minted deterministic value');
+  assert(typeof payload.recordingRunId === 'string', 'mcp:read-page carries internal recording run correlation');
+  assert(typeof payload.recordingCallId === 'string', 'mcp:read-page carries internal call deduplication correlation');
+  assert(payload.recordingLeaseMs === 50_000, 'mcp:read-page carries its 45s timeout plus recording settle grace');
 }
 
 // Phase 246 Plan 03 Task 3 -- Case B: read_page with explicit tab_id forwards
@@ -218,7 +235,116 @@ async function testStaleAgentSelfHealsOnce() {
   assert(execCalls.length === 2, 'stale-agent path retries the tool exactly once');
   assert(execCalls[0].message.payload.agentId === 'agent_stale', 'first tool call used stale agent id');
   assert(execCalls[1].message.payload.agentId === 'agent_fresh', 'retry tool call used fresh agent id');
+  assert(
+    execCalls[0].message.payload.recordingCallId !== execCalls[1].message.payload.recordingCallId,
+    'self-heal retry gives each physical attempt a distinct recording call id',
+  );
+  assert(
+    execCalls[0].message.payload.recordingRunId !== execCalls[1].message.payload.recordingRunId,
+    'self-heal retry journals the fresh agent in a distinct recording run',
+  );
   assert(agentScope.current() === 'agent_fresh', 'AgentScope cache now holds the fresh agent id');
+}
+
+async function testTerminalLifecycleRotatesRecordingRun() {
+  const agentBridgeModule = await loadBuildModule('agent-bridge.js');
+  const agentScope = await loadAgentScope();
+  const calls = [];
+  const bridge = {
+    isConnected: true,
+    async sendAndWait(message) {
+      calls.push(message);
+      if (message.type === 'agent:register') {
+        return { success: true, agentId: 'agent_terminal', ownershipTokens: {} };
+      }
+      if (message.type === 'mcp:task-status') {
+        return { success: true, status: 'completed' };
+      }
+      return { success: true };
+    },
+  };
+
+  const firstBase = { tool: 'read_page', params: {} };
+  await agentBridgeModule.sendAgentScopedBridgeMessage(
+    bridge, agentScope, 'mcp:read-page', firstBase, {},
+  );
+  await agentBridgeModule.sendAgentScopedBridgeMessage(
+    bridge, agentScope, 'mcp:task-status', { tool: 'complete_task', params: { summary: 'done' } }, {},
+  );
+  await agentBridgeModule.sendAgentScopedBridgeMessage(
+    bridge, agentScope, 'mcp:read-page', { tool: 'read_page', params: {} }, {},
+  );
+
+  const toolCalls = calls.filter((message) => message.type !== 'agent:register');
+  assert(toolCalls[0].payload.recordingRunId === toolCalls[1].payload.recordingRunId,
+    'confirmed terminal call stays in the run it closes');
+  assert(toolCalls[2].payload.recordingRunId !== toolCalls[1].payload.recordingRunId,
+    'the first post-terminal bridge call starts a new recording run');
+  assert(!Object.prototype.hasOwnProperty.call(firstBase, 'recordingRunId'),
+    'recordingRunId does not mutate public tool arguments');
+}
+
+async function testLongBridgeAttemptsRefreshRecordingActivity() {
+  const agentBridgeModule = await loadBuildModule('agent-bridge.js');
+  const originalNow = Date.now;
+  let now = 1_000;
+  Date.now = () => now;
+  try {
+    const successScope = await loadAgentScope();
+    const successCalls = [];
+    const successBridge = {
+      isConnected: true,
+      async sendAndWait(message) {
+        if (message.type === 'agent:register') {
+          return { success: true, agentId: 'agent_long_success', ownershipTokens: {} };
+        }
+        successCalls.push(message);
+        if (successCalls.length === 1) now += 60_000;
+        return { success: true };
+      },
+    };
+    await agentBridgeModule.sendAgentScopedBridgeMessage(
+      successBridge, successScope, 'mcp:execute-action', { tool: 'fill_sheet', params: {} }, {},
+    );
+    await agentBridgeModule.sendAgentScopedBridgeMessage(
+      successBridge, successScope, 'mcp:read-page', { tool: 'read_page', params: {} }, {},
+    );
+    assert(successCalls[0].payload.recordingRunId === successCalls[1].payload.recordingRunId,
+      'a successful 60s bridge attempt refreshes recording activity on completion');
+
+    now = 100_000;
+    const failureScope = await loadAgentScope();
+    const failureCalls = [];
+    const failureBridge = {
+      isConnected: true,
+      async sendAndWait(message) {
+        if (message.type === 'agent:register') {
+          return { success: true, agentId: 'agent_long_failure', ownershipTokens: {} };
+        }
+        failureCalls.push(message);
+        if (failureCalls.length === 1) {
+          now += 60_000;
+          throw new Error('simulated bridge timeout');
+        }
+        return { success: true };
+      },
+    };
+    try {
+      await agentBridgeModule.sendAgentScopedBridgeMessage(
+        failureBridge, failureScope, 'mcp:execute-action', { tool: 'fill_sheet', params: {} }, {},
+      );
+    } catch (error) {
+      assert(error && error.message === 'simulated bridge timeout',
+        'the simulated long bridge failure reaches the caller');
+    }
+    await agentBridgeModule.sendAgentScopedBridgeMessage(
+      failureBridge, failureScope, 'mcp:read-page', { tool: 'read_page', params: {} }, {},
+    );
+    assert(failureCalls[0].payload.recordingRunId === failureCalls[1].payload.recordingRunId,
+      'a failed 60s bridge attempt refreshes recording activity in finally');
+  } finally {
+    Date.now = originalNow;
+  }
 }
 
 async function testStaleAgentRetryLimitAndNoRetryForOtherErrors() {
@@ -289,6 +415,8 @@ async function run() {
   await testReadOnlyAgentIdThreading();
   await testReadOnlyTabIdForwarded();
   await testStaleAgentSelfHealsOnce();
+  await testTerminalLifecycleRotatesRecordingRun();
+  await testLongBridgeAttemptsRefreshRecordingActivity();
   await testStaleAgentRetryLimitAndNoRetryForOtherErrors();
   console.log(`\n=== Results: ${passed} passed, ${failed} failed ===`);
   process.exit(failed > 0 ? 1 : 0);

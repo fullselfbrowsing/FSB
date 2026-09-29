@@ -83,10 +83,22 @@ const KNOWLEDGE_SITE_LABELS: Readonly<Record<string, string>> = {
 
 const KNOWLEDGE_GRAPH_COPY = {
   unknown: $localize`:@@about.memory.graph.unknown:Unknown`,
-  siteCount: (count: number) => $localize`:@@about.memory.graph.siteCount:${count}:count: sites`,
-  selectorCount: (count: number) => $localize`:@@about.memory.graph.selectorCount:${count}:count: selectors`,
-  workflowCount: (count: number) => $localize`:@@about.memory.graph.workflowCount:${count}:count: workflows`,
-  warningCount: (count: number) => $localize`:@@about.memory.graph.warningCount:${count}:count: warnings`,
+  // Graph nodes routinely carry a count of 1, so a single form rendered
+  // "1 selectors" in en/de/es. Of the supported locales only those three
+  // inflect, and all three are two-form, so a singular/plural pair is
+  // sufficient -- ja/ko/zh simply translate both forms identically.
+  siteCount: (count: number) => count === 1
+    ? $localize`:@@about.memory.graph.siteCountOne:${count}:count: site`
+    : $localize`:@@about.memory.graph.siteCount:${count}:count: sites`,
+  selectorCount: (count: number) => count === 1
+    ? $localize`:@@about.memory.graph.selectorCountOne:${count}:count: selector`
+    : $localize`:@@about.memory.graph.selectorCount:${count}:count: selectors`,
+  workflowCount: (count: number) => count === 1
+    ? $localize`:@@about.memory.graph.workflowCountOne:${count}:count: workflow`
+    : $localize`:@@about.memory.graph.workflowCount:${count}:count: workflows`,
+  warningCount: (count: number) => count === 1
+    ? $localize`:@@about.memory.graph.warningCountOne:${count}:count: warning`
+    : $localize`:@@about.memory.graph.warningCount:${count}:count: warnings`,
   taskDiscovered: $localize`:@@about.memory.graph.taskDiscovered:task-discovered`,
 };
 
@@ -169,13 +181,24 @@ export class AboutPageComponent implements OnInit, AfterViewInit, OnDestroy {
   categories: KnowledgeCategory[] = [];
   graphDetail: GraphDetail = 'simple';
 
+  // Counts are formatted per locale, not hardcoded: a literal '1,440' rendered a
+  // comma separator next to the translated '1.440' in the card meta below on
+  // /de/about. Keep these numeric and let Intl pick the separator.
   readonly memoryStats = [
-    { value: '130', label: $localize`:@@about.memory.stats.sites:Sites` },
-    { value: '19', label: $localize`:@@about.memory.stats.categories:Categories` },
-    { value: '1,440', label: $localize`:@@about.memory.stats.selectors:Selectors` },
-    { value: '342', label: $localize`:@@about.memory.stats.workflows:Workflows` },
-    { value: '639', label: $localize`:@@about.memory.stats.warnings:Warnings` },
+    { value: 130, label: $localize`:@@about.memory.stats.sites:Sites` },
+    { value: 19, label: $localize`:@@about.memory.stats.categories:Categories` },
+    { value: 1440, label: $localize`:@@about.memory.stats.selectors:Selectors` },
+    { value: 342, label: $localize`:@@about.memory.stats.workflows:Workflows` },
+    { value: 639, label: $localize`:@@about.memory.stats.warnings:Warnings` },
   ] as const;
+
+  formatStatValue(value: number): string {
+    try {
+      return new Intl.NumberFormat(this.localeId).format(value);
+    } catch {
+      return String(value);
+    }
+  }
 
   get graphTheme(): 'dark' | 'light' {
     return this.themeService.isDark() ? 'dark' : 'light';

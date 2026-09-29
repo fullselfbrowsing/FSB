@@ -353,9 +353,9 @@ export const PLATFORMS: PlatformRegistry = {
  */
 export function getServerEntry(): ServerEntry {
   if (process.platform === 'win32') {
-    return { command: 'cmd', args: ['/c', 'npx', '-y', 'fsb-mcp-server'] };
+    return { command: 'cmd', args: ['/c', 'npx', '-y', 'fsb-mcp-server@latest'] };
   }
-  return { command: 'npx', args: ['-y', 'fsb-mcp-server'] };
+  return { command: 'npx', args: ['-y', 'fsb-mcp-server@latest'] };
 }
 
 /**

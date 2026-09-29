@@ -11,7 +11,8 @@
  *   2. The shared tool-registry object must NOT be mutated: tool-definitions
  *      is pinned by SHA-256 in tests/tool-definitions-parity.test.js.
  *   3. Every _cdpVerb must map to a DOM verb that actually exists in
- *      content/actions.js -- a typo here would silently dead-end a tool.
+ *      content/actions.js -- a typo here would silently dead-end a tool --
+ *      or be declared in CDP_NO_DOM_FALLBACK and fail with a typed error.
  *
  * Run: node tests/cdp-degradation-routing.test.js
  */
@@ -116,6 +117,15 @@ function withPlatform(platform, fn) {
     });
   });
 
+  console.log('\n=== 4b. capture_screenshot has no DOM fallback -> capability_unavailable ===');
+  await withPlatform(safariPlatform, async () => {
+    sent.length = 0;
+    const res = await executeTool('capture_screenshot', {}, 1, {});
+    passAssert(res.success === false, 'fails on Safari');
+    passAssert(/capability_unavailable/.test(res.error), 'error is typed capability_unavailable');
+    passAssertEqual(sent.length, 0, 'no content dispatch');
+  });
+
   console.log('\n=== 5. the shared registry object is NOT mutated ===');
   {
     const tool = defs.getToolByName('click_at');
@@ -134,9 +144,11 @@ function withPlatform(platform, fn) {
   console.log('\n=== 6. every _cdpVerb maps to a DOM verb that EXISTS in actions.js ===');
   {
     const map = safariPlatform.CDP_DOM_FALLBACKS;
+    const noFallback = safariPlatform.CDP_NO_DOM_FALLBACK;
     const cdpTools = defs.TOOL_REGISTRY.filter((t) => t._route === 'cdp');
-    passAssert(cdpTools.length === 7, `found ${cdpTools.length} _route:'cdp' tools (expected 7)`);
+    passAssert(cdpTools.length === 8, `found ${cdpTools.length} _route:'cdp' tools (expected 8)`);
     for (const t of cdpTools) {
+      if (noFallback.includes(t._cdpVerb)) continue;
       const domVerb = map[t._cdpVerb];
       passAssert(!!domVerb, `${t.name} (${t._cdpVerb}) has a mapping`);
       if (domVerb) {

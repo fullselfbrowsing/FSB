@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // doctor.mjs -- FSB skill diagnostic dispatcher (SKILL-03 / SKILL-06)
-// Wraps `npx -y fsb-mcp-server doctor`, parses the failing layer,
+// Wraps `npx -y fsb-mcp-server@latest doctor`, parses the failing layer,
 // and prints a focused [OK]/[FAIL]/[WARN] branch with a one-line next step.
 // Cross-platform: Node ESM only; no shell-specific assumptions.
 //
@@ -17,12 +17,12 @@ import process from 'node:process';
 const LAYERS = ['package', 'bridge', 'extension', 'active-tab', 'content-script', 'config'];
 
 const NEXT_STEPS = {
-  package:        'Run `npx -y fsb-mcp-server --version` to confirm npm can reach the package.',
-  bridge:         'Start the FSB extension and run `npx -y fsb-mcp-server status --watch` to confirm ws://localhost:7225 is reachable.',
+  package:        'Run `npx -y fsb-mcp-server@latest --version` to confirm npm can reach the package.',
+  bridge:         'Start the FSB extension and run `npx -y fsb-mcp-server@latest status --watch` to confirm ws://localhost:7225 is reachable.',
   extension:      'Install the FSB Chrome extension from https://chromewebstore.google.com/detail/badgafnfchcihdfnjneklogedcdkmjfk -- then reopen this session.',
-  'active-tab':   'Open a normal http(s) tab (not chrome://, edge://, or the Web Store) and run `npx -y fsb-mcp-server status --watch` to re-attach.',
+  'active-tab':   'Open a normal http(s) tab (not chrome://, edge://, or the Web Store) and run `npx -y fsb-mcp-server@latest status --watch` to re-attach.',
   'content-script': 'Reload the active tab. The FSB content script attaches on page load; reloads after extension install are required.',
-  config:         'Re-run `npx -y fsb-mcp-server install --<host>` for your MCP host (replace <host> with claude-desktop, cursor, etc.).',
+  config:         'Re-run `npx -y fsb-mcp-server@latest install --<host>` for your MCP host (replace <host> with claude-desktop, cursor, etc.).',
   ok:             'All layers green. Run a small read_page or list_tabs call to confirm end-to-end.',
 };
 
@@ -104,7 +104,7 @@ function main() {
   let combined = '';
   let launched = false;
 
-  const child = spawn('npx', ['-y', 'fsb-mcp-server', 'doctor'], {
+  const child = spawn('npx', ['-y', 'fsb-mcp-server@latest', 'doctor'], {
     stdio: ['ignore', 'pipe', 'pipe'],
     shell: false,
   });
@@ -114,7 +114,7 @@ function main() {
     if (!launched) {
       process.stderr.write(`spawn error: ${err && err.message ? err.message : String(err)}\n`);
       emitSummary([
-        '[FAIL] cannot launch `npx -y fsb-mcp-server doctor` -- is Node 18+ installed and on PATH?',
+        '[FAIL] cannot launch `npx -y fsb-mcp-server@latest doctor` -- is Node 18+ installed and on PATH?',
         'next-step: Install Node 18+ (https://nodejs.org/en/download) and reopen the session.',
       ]);
       process.exit(2);
@@ -161,7 +161,7 @@ function main() {
       void code;
       emitSummary([
         '[WARN] doctor output did not match a known layer pattern; raw output above',
-        'next-step: re-run `npx -y fsb-mcp-server doctor` and report this output if it persists.',
+        'next-step: re-run `npx -y fsb-mcp-server@latest doctor` and report this output if it persists.',
       ]);
       process.exit(3);
     }

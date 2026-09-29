@@ -1,0 +1,2 @@
+#!__FSB_ABSOLUTE_NODE__
+import '../runtime/package/build/native-host/index.js';

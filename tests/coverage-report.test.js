@@ -18,11 +18,11 @@
  *   3. The head bucket is correct: it includes the 3 heads (github/slack/notion handler
  *      slugs) + the hand-authored recipes (reddit.inbox / github.notifications).
  *   4. COMPLETENESS VERIFIED AGAINST THE 39-06 MANIFEST: parse the VENDORED+IMPORTED
- *      rows of .planning/phases/39-.../39-06-REMAINING-APPS.md and assert EVERY such
- *      app (by its slug stem) has at least one catalog descriptor. A manifest row with
- *      NO matching descriptor FAILS naming the gap (the completeness contract -- the
- *      manifest is the source of truth for "what must be covered", NOT a hand-kept
- *      number). realAppCount is reported vs the ~117 milestone target.
+ *      rows of the archived v1.0.0 milestone's 39-06-REMAINING-APPS.md and assert
+ *      EVERY such app (by its slug stem) has at least one catalog descriptor. A
+ *      manifest row with NO matching descriptor FAILS naming the gap (the completeness
+ *      contract -- the manifest is the source of truth for "what must be covered",
+ *      NOT a hand-kept number). realAppCount is reported vs the ~117 milestone target.
  *   5. No payment op is on an ungated origin: the payment-op crosscheck may allow
  *      handler-backed payment ops when their services classify sensitive/denied.
  *
@@ -48,7 +48,7 @@ const CROSSCHECK_PATH = path.join(REPO_ROOT, 'scripts', 'verify-catalog-crossche
 const CATALOG_PATH = path.join(REPO_ROOT, 'extension', 'catalog', 'recipe-index.generated.js');
 const DENYLIST_MODULE = path.join(REPO_ROOT, 'extension', 'utils', 'service-denylist.js');
 const MANIFEST_PATH = path.join(
-  REPO_ROOT, '.planning', 'phases',
+  REPO_ROOT, '.planning', 'milestones', 'v1.0.0-phases',
   '39-breadth-c-commerce-travel-misc-most-sensitive',
   '39-06-REMAINING-APPS.md'
 );
@@ -180,7 +180,7 @@ function parseManifestVendoredStems(md) {
 
   // (4) COMPLETENESS VERIFIED AGAINST THE 39-06 MANIFEST -----------------------
   check(fs.existsSync(MANIFEST_PATH),
-    'the 39-06 remaining-app manifest (39-06-REMAINING-APPS.md) exists on disk (the completeness source of truth)');
+    'the archived v1.0.0 39-06 remaining-app manifest exists on disk as the canonical completeness source');
   const manifestMd = fs.readFileSync(MANIFEST_PATH, 'utf8');
   const vendoredStems = parseManifestVendoredStems(manifestMd);
   check(vendoredStems.length > 0,
