@@ -253,6 +253,7 @@ class MCPBridgeClient {
       this._reconnectDelay = MCP_RECONNECT_BASE_MS;
       this._nextReconnectAt = null;
       this._lastConnectedAt = this._timestamp();
+      this._sendExtensionState().catch(() => {});
       this._lastDisconnectReason = null;
       this._clearReconnectAlarm();
       this._delegationHeartbeatNonce = null;
@@ -1049,6 +1050,7 @@ class MCPBridgeClient {
       }
       this._unansweredPings += 1;
       socket.send(JSON.stringify({ type: 'mcp:ping', ts: Date.now() }));
+      this._sendExtensionState().catch(() => {});
     }, MCP_PING_INTERVAL_MS);
   }
 
@@ -1304,6 +1306,12 @@ class MCPBridgeClient {
     if (this._ws && this._ws.readyState === WebSocket.OPEN) {
       this._ws.send(typeof data === 'string' ? data : JSON.stringify(data));
     }
+  }
+
+  async _sendExtensionState() {
+    if (typeof getMcpAttachmentMetadata !== 'function') return;
+    const attachment = await getMcpAttachmentMetadata();
+    this._send({ type: 'mcp:extension-state', ...attachment, connectedAt: this._lastConnectedAt || null });
   }
 
   _sendResult(id, payload) {

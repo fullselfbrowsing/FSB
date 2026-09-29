@@ -5845,6 +5845,30 @@ function getContentScriptDiagnosticsForTab(tabId, activeTabUrl = '') {
   };
 }
 
+let mcpInstallInstanceIdPromise = null;
+async function getMcpAttachmentMetadata() {
+  if (!mcpInstallInstanceIdPromise) {
+    mcpInstallInstanceIdPromise = (async () => {
+      const key = 'mcpInstallInstanceId';
+      const stored = await chrome.storage.local.get(key);
+      if (typeof stored[key] === 'string' && stored[key]) return stored[key];
+      const id = crypto.randomUUID();
+      await chrome.storage.local.set({ [key]: id });
+      return id;
+    })().catch((error) => { mcpInstallInstanceIdPromise = null; throw error; });
+  }
+  const [installInstanceId, windows] = await Promise.all([
+    mcpInstallInstanceIdPromise,
+    chrome.windows.getAll({ windowTypes: ['normal'] })
+  ]);
+  return {
+    extensionId: chrome.runtime.id,
+    extensionVersion: chrome.runtime.getManifest().version,
+    installInstanceId,
+    normalWindowCount: windows.length
+  };
+}
+
 async function collectMcpDiagnosticsSnapshot() {
   let activeTab = {
     id: null,
@@ -5870,6 +5894,21 @@ async function collectMcpDiagnosticsSnapshot() {
     }
   } catch (_error) {}
 
+  let attachment = null;
+  let tabsSummary = { totalTabs: 0, activeTabId: activeTab.id };
+  try {
+    attachment = await getMcpAttachmentMetadata();
+    const [windows, tabs] = await Promise.all([
+      chrome.windows.getAll({ windowTypes: ['normal'] }),
+      chrome.tabs.query({})
+    ]);
+    const normalWindowIds = new Set(windows.map(window => window.id));
+    tabsSummary = {
+      totalTabs: tabs.filter(tab => normalWindowIds.has(tab.windowId)).length,
+      activeTabId: activeTab.id
+    };
+  } catch (_error) {}
+
   let bridgeClient = null;
   try {
     if (chrome.storage?.session?.get) {
@@ -5878,11 +5917,17 @@ async function collectMcpDiagnosticsSnapshot() {
     }
   } catch (_error) {}
 
+  if (attachment && bridgeClient) {
+    attachment.connectedAt = bridgeClient.lastConnectedAt || null;
+  }
+
   return {
     success: true,
     activeTab,
     contentScript: getContentScriptDiagnosticsForTab(activeTab.id, activeTab.url),
-    bridgeClient
+    bridgeClient,
+    attachment,
+    tabsSummary
   };
 }
 

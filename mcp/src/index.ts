@@ -227,6 +227,19 @@ export function buildCompactStatusFields(
     ['Relays', String(diagnostics.relayCount)],
     ['Disconnect', diagnostics.lastDisconnectReason ?? 'none'],
     ['Layer', diagnostics.diagnosticLayer],
+    ...(diagnostics.diagnosticCode ? [['Code', diagnostics.diagnosticCode] as [string, string]] : []),
+  ];
+}
+
+function formatExtensionAttachment(diagnostics: DiagnosticsSnapshot): string[] {
+  const attachment = diagnostics.extensionAttachment;
+  if (!attachment) return [];
+  return [
+    `Extension ID: ${attachment.extensionId}`,
+    `Extension version: ${attachment.extensionVersion}`,
+    `Install instance: ${attachment.installInstanceId}`,
+    `Normal windows: ${attachment.normalWindowCount}`,
+    `Connected at: ${attachment.connectedAt ?? 'not reported'}`,
   ];
 }
 
@@ -253,6 +266,8 @@ export function formatStatus(diagnostics: DiagnosticsSnapshot): string {
     const model = diagnostics.extensionConfig.modelName ?? 'unknown';
     lines.push(`Extension model: ${provider} / ${model}`);
   }
+
+  lines.push(...formatExtensionAttachment(diagnostics));
 
   if (diagnostics.tabsSummary) {
     lines.push(`Open tabs: ${diagnostics.tabsSummary.totalTabs}`);
@@ -282,6 +297,8 @@ export function formatWatchSnapshot(diagnostics: DiagnosticsSnapshot): string {
     lines.push(`Active page: ${diagnostics.activeTab.pageType} (${diagnostics.activeTab.url})`);
   }
 
+  lines.push(...formatExtensionAttachment(diagnostics));
+
   if (diagnostics.probeNotes && diagnostics.probeNotes.length > 0) {
     lines.push(`Note: ${diagnostics.probeNotes[0].message}`);
   }
@@ -296,6 +313,7 @@ export function formatDoctor(diagnostics: DiagnosticsSnapshot): string {
     `Why: ${diagnostics.diagnosticWhy}`,
     `Next action: ${diagnostics.nextAction}`,
     ...formatFieldLines(buildCompactStatusFields(diagnostics)),
+    ...formatExtensionAttachment(diagnostics),
   ];
 
   if (diagnostics.activeTab.url) {

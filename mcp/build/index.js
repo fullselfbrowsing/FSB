@@ -168,6 +168,19 @@ export function buildCompactStatusFields(diagnostics, nowMs = Date.now()) {
         ['Relays', String(diagnostics.relayCount)],
         ['Disconnect', diagnostics.lastDisconnectReason ?? 'none'],
         ['Layer', diagnostics.diagnosticLayer],
+        ...(diagnostics.diagnosticCode ? [['Code', diagnostics.diagnosticCode]] : []),
+    ];
+}
+function formatExtensionAttachment(diagnostics) {
+    const attachment = diagnostics.extensionAttachment;
+    if (!attachment)
+        return [];
+    return [
+        `Extension ID: ${attachment.extensionId}`,
+        `Extension version: ${attachment.extensionVersion}`,
+        `Install instance: ${attachment.installInstanceId}`,
+        `Normal windows: ${attachment.normalWindowCount}`,
+        `Connected at: ${attachment.connectedAt ?? 'not reported'}`,
     ];
 }
 function formatFieldLines(fields) {
@@ -190,6 +203,7 @@ export function formatStatus(diagnostics) {
         const model = diagnostics.extensionConfig.modelName ?? 'unknown';
         lines.push(`Extension model: ${provider} / ${model}`);
     }
+    lines.push(...formatExtensionAttachment(diagnostics));
     if (diagnostics.tabsSummary) {
         lines.push(`Open tabs: ${diagnostics.tabsSummary.totalTabs}`);
         lines.push(`Active tab ID: ${diagnostics.tabsSummary.activeTabId ?? 'none'}`);
@@ -211,6 +225,7 @@ export function formatWatchSnapshot(diagnostics) {
     if (diagnostics.activeTab.url) {
         lines.push(`Active page: ${diagnostics.activeTab.pageType} (${diagnostics.activeTab.url})`);
     }
+    lines.push(...formatExtensionAttachment(diagnostics));
     if (diagnostics.probeNotes && diagnostics.probeNotes.length > 0) {
         lines.push(`Note: ${diagnostics.probeNotes[0].message}`);
     }
@@ -223,6 +238,7 @@ export function formatDoctor(diagnostics) {
         `Why: ${diagnostics.diagnosticWhy}`,
         `Next action: ${diagnostics.nextAction}`,
         ...formatFieldLines(buildCompactStatusFields(diagnostics)),
+        ...formatExtensionAttachment(diagnostics),
     ];
     if (diagnostics.activeTab.url) {
         lines.push(`Active page: ${diagnostics.activeTab.pageType} (${diagnostics.activeTab.url})`);

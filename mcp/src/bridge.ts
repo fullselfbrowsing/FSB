@@ -8,6 +8,7 @@ import type {
   BridgeCapability,
   BridgeOptions,
   BridgeTopologyState,
+  ExtensionAttachmentState,
   ExtEvent,
   ExtRequest,
   ExtResponse,
@@ -150,6 +151,7 @@ export class WebSocketBridge {
   private extensionHeartbeatCount = 0;
   private extensionCloseCause: string | null = null;
   private lastDisconnectReason: string | null = null;
+  private extensionAttachment: ExtensionAttachmentState | null = null;
 
   constructor(options: BridgeOptions = {}) {
     this.port = options.port ?? 7225;
@@ -252,6 +254,7 @@ export class WebSocketBridge {
     this.relayExtensionConnected = false;
     this.relayCount = 0;
     this.lastExtensionHeartbeatAt = null;
+    this.extensionAttachment = null;
     this.extensionHeartbeatCount = 0;
     this.extensionCloseCause = null;
     this.mode = 'disconnected';
@@ -334,6 +337,7 @@ export class WebSocketBridge {
       activeHubInstanceId: this.mode === 'hub' ? this.instanceId : this.activeHubInstanceId,
       lastExtensionHeartbeatAt: this.lastExtensionHeartbeatAt,
       lastDisconnectReason: this.lastDisconnectReason,
+      extensionAttachment: this.extensionAttachment,
     };
   }
 
@@ -633,6 +637,8 @@ export class WebSocketBridge {
           + 'Cure: npx -y fsb-mcp-server@latest pair --reset',
         );
       }
+      this.lastDisconnectReason = 'extension_origin_pin_mismatch';
+      this._broadcastRelayState();
       return null;
     }
 
@@ -803,6 +809,7 @@ export class WebSocketBridge {
     this.lastExtensionHeartbeatAt = Date.now();
     this.extensionHeartbeatCount = 0;
     this.lastDisconnectReason = null;
+    this.extensionAttachment = null;
     this.extensionCloseCause = null;
     console.error(`[FSB Bridge ${this.instanceId}] Extension connected`);
     this._broadcastRelayState();
@@ -840,6 +847,7 @@ export class WebSocketBridge {
       this.connected = false;
       this.lastDisconnectReason = cause;
       this.lastExtensionHeartbeatAt = null;
+      this.extensionAttachment = null;
       this.extensionHeartbeatCount = 0;
 
       // Reject all pending local requests
@@ -988,6 +996,7 @@ export class WebSocketBridge {
       relayCount: this.relayClients.size,
       lastExtensionHeartbeatAt: this.lastExtensionHeartbeatAt,
       lastDisconnectReason: this.lastDisconnectReason,
+      extensionAttachment: this.extensionAttachment,
     };
     ws.send(JSON.stringify(welcome));
     this._broadcastRelayState();
@@ -1028,6 +1037,7 @@ export class WebSocketBridge {
       relayCount: this.relayClients.size,
       lastExtensionHeartbeatAt: this.lastExtensionHeartbeatAt,
       lastDisconnectReason: this.lastDisconnectReason,
+      extensionAttachment: this.extensionAttachment,
     };
   }
 
@@ -1060,6 +1070,20 @@ export class WebSocketBridge {
             : { type: 'mcp:pong', ts: heartbeatAt, nonce: heartbeat.nonce }));
         }
         this._broadcastRelayState();
+        return;
+      }
+      if (parsed.type === 'mcp:extension-state' && this.extensionClient === ws) {
+        const { extensionId, extensionVersion, installInstanceId, normalWindowCount, connectedAt } = parsed;
+        if (typeof extensionId === 'string' && /^[a-p]{32}$/.test(extensionId)
+          && typeof extensionVersion === 'string' && extensionVersion.length <= 64
+          && typeof installInstanceId === 'string' && installInstanceId.length <= 128
+          && Number.isInteger(normalWindowCount) && (normalWindowCount as number) >= 0
+          && (normalWindowCount as number) <= 1000
+          && (connectedAt === null || (typeof connectedAt === 'string' && connectedAt.length <= 64))) {
+          this.extensionAttachment = { extensionId, extensionVersion, installInstanceId,
+            normalWindowCount: normalWindowCount as number, connectedAt: connectedAt as string | null };
+          this._broadcastRelayState();
+        }
         return;
       }
     } catch {
@@ -1419,6 +1443,7 @@ export class WebSocketBridge {
     this.lastDisconnectReason = typeof state.lastDisconnectReason === 'string'
       ? state.lastDisconnectReason
       : null;
+    this.extensionAttachment = state.extensionAttachment ?? null;
     this.connected = this.relayExtensionConnected;
   }
 
