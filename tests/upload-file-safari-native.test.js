@@ -50,7 +50,7 @@ const OK_DENYLIST = {
 };
 
 function buildHarness(opts = {}) {
-  const calls = { attach: 0, sendCommand: 0, audit: [], log: [], readFile: [], tabMessages: [] };
+  const calls = { attach: 0, sendCommand: 0, audit: [], log: [], readFile: [], tabMessages: [], injected: [], order: [] };
   const context = {
     console: { log() {}, warn() {}, error() {} },
     URL,
@@ -60,8 +60,9 @@ function buildHarness(opts = {}) {
     chrome: {
       tabs: {
         async get(tabId) { return { id: tabId, url: 'https://example.test/upload' }; },
-        async sendMessage(tabId, msg) {
-          calls.tabMessages.push({ tabId, msg });
+        async sendMessage(tabId, msg, options) {
+          calls.tabMessages.push({ tabId, msg, options });
+          calls.order.push('send');
           if (typeof opts.tabReply === 'function') return opts.tabReply(msg);
           return { success: true };
         }
@@ -82,6 +83,14 @@ function buildHarness(opts = {}) {
     FsbUploadPathDenylist: opts.denylist === undefined ? OK_DENYLIST : opts.denylist,
     keyboardEmulator: null
   };
+  if (opts.inject !== false) {
+    context.ensureContentScriptInjected = async (tabId) => {
+      calls.injected.push(tabId);
+      calls.order.push('inject');
+      if (typeof opts.inject === 'function') return opts.inject(tabId);
+      return true;
+    };
+  }
   if (opts.platform !== undefined) context.FsbPlatform = opts.platform;
   if (opts.reader !== undefined) {
     context.FsbNativeFileReader = opts.reader === null ? undefined : opts.reader;
@@ -158,6 +167,10 @@ const SAFARI = { caps: { cdp: false, trustedInput: false } };
     passAssertEqual(calls.tabMessages.length, 1, 'one content-script dispatch');
     passAssertEqual(calls.tabMessages[0].msg.tool, 'domSetFileInput', 'routed to domSetFileInput');
     passAssertEqual(calls.tabMessages[0].msg.params.dataB64, 'YWJj', 'bytes forwarded as base64');
+    passAssertEqual(calls.tabMessages[0].options && calls.tabMessages[0].options.frameId, 0,
+      'sent to the main frame only (frameId 0)');
+    passAssertEqual(calls.order.join(','), 'inject,send',
+      'content script injected before the file is sent (a fresh or reloaded tab has none yet)');
 
     const logged = JSON.stringify(calls.log) + JSON.stringify(calls.audit);
     passAssert(!logged.includes('/Users/me/Downloads/report.pdf'),
@@ -166,6 +179,40 @@ const SAFARI = { caps: { cdp: false, trustedInput: false } };
     const success = calls.audit.find((a) => a.outcome === 'success');
     passAssert(!!success, 'success is audited');
     passAssert(success && success.path === undefined, 'audit record has no path field');
+  }
+
+  console.log('\n=== 3b. injection failure and a lost reply are not retried ===');
+  {
+    const { executeUploadFile, calls } = buildHarness({
+      platform: SAFARI,
+      inject: () => { throw new Error('Cannot access contents of the page'); }
+    });
+    const res = await executeUploadFile(7, '#f', '/Users/me/Downloads/report.pdf');
+    passAssertEqual(res.success, false, 'an uninjectable page fails');
+    passAssert(/Cannot access contents of the page/.test(res.error), 'injection error is surfaced');
+    passAssertEqual(calls.tabMessages.length, 0, 'nothing sent when injection fails');
+  }
+  {
+    // A retry after a lost reply would set the file twice and fire change twice.
+    const { executeUploadFile, calls } = buildHarness({
+      platform: SAFARI,
+      tabReply: () => { throw new Error('Receiving end does not exist.'); }
+    });
+    const res = await executeUploadFile(7, '#f', '/Users/me/Downloads/report.pdf');
+    passAssertEqual(res.success, false, 'a failed send is reported');
+    passAssertEqual(calls.tabMessages.length, 1, 'sent exactly once (no retry, no double upload)');
+  }
+  {
+    // The chokepoint test harnesses slice this function without the injector.
+    const { executeUploadFile, calls } = buildHarness({ platform: SAFARI, inject: false });
+    const res = await executeUploadFile(7, '#f', '/Users/me/Downloads/report.pdf');
+    passAssertEqual(res.success, true, 'still works where ensureContentScriptInjected is undefined');
+    passAssertEqual(calls.tabMessages.length, 1, 'still dispatched once');
+  }
+  {
+    const { executeUploadFile, calls } = buildHarness({ platform: undefined });
+    await executeUploadFile(7, '#f', '/tmp/a.txt');
+    passAssertEqual(calls.injected.length, 0, 'Chrome (CDP) path never injects a content script');
   }
 
   console.log('\n=== 4. native read refusals are typed and audited ===');

@@ -19698,11 +19698,18 @@ async function executeUploadFileUnlocked(tabId, selector, filePath, options = {}
         };
       }
 
+      // Inject + send once, deliberately NOT sendMessageWithRetry: a retry after
+      // a lost reply would set the file again and fire a second change event,
+      // which on auto-upload inputs is a double upload. frameId 0 because that
+      // is the only frame the content scripts are injected into.
+      if (typeof ensureContentScriptInjected === 'function') {
+        await ensureContentScriptInjected(tabId);
+      }
       const applied = await chrome.tabs.sendMessage(tabId, {
         action: 'executeAction',
         tool: 'domSetFileInput',
         params: { selector, name: read.name, mime: read.mime, dataB64: read.dataB64 }
-      });
+      }, { frameId: 0 });
       if (!applied || applied.success === false) {
         const appliedMsg = (applied && applied.error) ? applied.error : 'the page did not accept the file';
         automationLogger.logActionExecution(null, 'cdpUploadFile', 'complete', { success: false, tabId, error: redactPathForUploadLog(appliedMsg) });

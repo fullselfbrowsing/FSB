@@ -277,6 +277,44 @@ function safariLikeScope(overrides) {
     'a workspace-window hint falls through to the cache');
   passAssertEqual((await fPlat.resolveTargetTab()).id, 11, 'no hint still uses the cache');
 
+  console.log('\n=== 8b2. a cold cache resolves to the focused window, not any window ===');
+  // An unscoped {active:true} query returns every window's active tab in no
+  // particular order. With the background window listed first, only the
+  // last-focused lookup gets the right one.
+  {
+    const unscoped = [{ id: 30, url: 'https://background.example.com/' }, { id: 70, url: 'https://focused.example.com/' }];
+    const coldScope = (lastFocused, getInfoLog) => safariLikeScope((s) => {
+      const byWindow = { 3: [unscoped[0]], 5: [{ id: 55, url: 'safari-web-extension://sfr/ui/sidepanel.html' }], 7: [unscoped[1]] };
+      s.chrome.tabs.query = (q) => Promise.resolve(
+        q && typeof q.windowId === 'number' ? (byWindow[q.windowId] || []) : unscoped);
+      s.chrome.tabs.get = () => Promise.reject(new Error('gone'));
+      if (lastFocused !== undefined) {
+        s.chrome.windows.getLastFocused = (info) => {
+          if (getInfoLog) getInfoLog.push(info);
+          return lastFocused instanceof Error ? Promise.reject(lastFocused) : Promise.resolve(lastFocused);
+        };
+      }
+    });
+    const load = (scope) => {
+      const plat = loadAdapter(scope);
+      plat.install({ loopback: false, trackTabs: false });
+      plat._workspaceState().windowId = 5;
+      return plat;
+    };
+
+    const infos = [];
+    passAssertEqual((await load(coldScope({ id: 7 }, infos)).resolveTargetTab()).id, 70,
+      'uses the last-focused window\'s active tab');
+    passAssert(infos.length === 1 && JSON.stringify(infos[0].windowTypes) === '["normal"]',
+      'asks for normal windows only, which excludes the popup workspace');
+    passAssertEqual((await load(coldScope({ id: 5 })).resolveTargetTab()).id, 30,
+      'a browser that returns the workspace anyway falls back to the unscoped query');
+    passAssertEqual((await load(coldScope(new Error('No window'))).resolveTargetTab()).id, 30,
+      'a rejected getLastFocused falls back to the unscoped query');
+    passAssertEqual((await load(coldScope(undefined)).resolveTargetTab()).id, 30,
+      'no windows.getLastFocused falls back to the unscoped query');
+  }
+
   console.log('\n=== 8c. the content tab has exactly one writer ===');
   // A page's lastContentTabId is only as fresh as its last hydrate. Closing the
   // workspace from a page used to persist that stale id over the worker's.

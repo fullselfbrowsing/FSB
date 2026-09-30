@@ -371,6 +371,12 @@
       } catch (_e) { _workspace.lastContentTabId = null; }
     }
 
+    // Cold cache. The unscoped query below returns the active tab of EVERY
+    // window in no particular order, so with two browser windows it can hand
+    // back a background one. Ask for the focused content window first.
+    var lastFocused = await lastFocusedContentTab(c);
+    if (lastFocused) return lastFocused;
+
     var active = await invoke(c.tabs.query, c.tabs, [{ active: true }]);
     if (Array.isArray(active)) {
       for (var i = 0; i < active.length; i += 1) {
@@ -394,6 +400,18 @@
         }
       }
     } catch (_e) { /* window closed mid-query */ }
+    return null;
+  }
+
+  // windowTypes:['normal'] skips the workspace, which is a popup window. A
+  // browser that ignores the filter can still return the workspace; the
+  // isContentWindow check turns that into a miss rather than a wrong answer.
+  async function lastFocusedContentTab(c) {
+    if (!c.windows || typeof c.windows.getLastFocused !== 'function') return null;
+    try {
+      var win = await invoke(c.windows.getLastFocused, c.windows, [{ windowTypes: ['normal'] }]);
+      if (win && isContentWindow(win.id)) return await activeContentTabIn(c, win.id);
+    } catch (_e) { /* no normal window open */ }
     return null;
   }
 
