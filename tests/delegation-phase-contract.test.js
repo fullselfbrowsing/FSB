@@ -172,6 +172,7 @@ const REFINEMENT_ROOT_TEST_COMMANDS = Object.freeze([
   'node tests/jev-gateway-log-hygiene.test.js',
   'node tests/jev-calibration-profile.test.js',
   'node tests/server-jev-gateway-boot.test.js',
+  'node --test tests/content-click-single-activation.test.js',
 ]);
 
 const PHASE64_RETAINED_ROOT_COMMANDS = Object.freeze([
