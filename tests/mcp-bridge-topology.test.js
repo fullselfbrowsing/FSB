@@ -1103,6 +1103,53 @@ async function runRejectsUntrustedBrowserOrigin(WebSocketBridge) {
   }
 }
 
+/**
+ * Safari port: the extension reaches :7225 either directly or through the
+ * container app's native socket, and both dial with
+ * Origin: safari-web-extension://<UUID>. The hub must classify that as an
+ * extension candidate. An Origin-less socket is still only ever a relay, which
+ * is why the native transport has to send the Origin explicitly.
+ */
+async function runAcceptsSafariExtensionOrigin(WebSocketBridge) {
+  await withTempHome('bridge-safari-origin', async () => {
+    const port = await getFreePort();
+    const hub = new WebSocketBridge({
+      port,
+      host: '127.0.0.1',
+      instanceId: 'test-hub-safari-origin',
+      handshakeTimeoutMs: 25,
+    });
+    const resources = { sockets: [], bridges: [hub] };
+    const safariOrigin = 'safari-web-extension://4C6E0A1B-2F3D-4E5A-9B8C-7D6E5F4A3B2C';
+
+    try {
+      await hub.connect();
+
+      for (const [label, origin] of [
+        ['safari Origin with path', `${safariOrigin}/path`],
+        ['safari Origin without host', 'safari-web-extension://'],
+      ]) {
+        const response = await rawUpgrade(port, [`Host: 127.0.0.1:${port}`, `Origin: ${origin}`]);
+        assert(response.startsWith('HTTP/1.1 403'), `${label} receives HTTP 403 before upgrade`);
+      }
+
+      const safari = await createBrowserSocket(port, { origin: safariOrigin });
+      resources.sockets.push(safari);
+      await waitFor(() => hub.topology.extensionConnected, 'safari extension registration', 1000, 10);
+      assertEqual(hub.topology.extensionConnected, true, 'hub registers a safari-web-extension:// origin as the extension');
+      assertEqual(hub.topology.relayCount, 0, 'safari extension socket is not counted as a relay');
+
+      const originless = await createOriginlessSocket(port);
+      resources.sockets.push(originless);
+      const close = await waitForSocketClose(originless);
+      assertEqual(close.code, 1008, 'origin-less socket without relay:hello is closed, never made the extension');
+      assertEqual(hub.topology.extensionConnected, true, 'safari extension survives the origin-less socket');
+    } finally {
+      await cleanup(resources);
+    }
+  });
+}
+
 async function runRejectsNonLoopbackBind(WebSocketBridge) {
   const rejectedHosts = ['0.0.0.0', '::', '192.168.1.20', 'bridge.local', '', '127.0.0.1:7225'];
   for (const host of rejectedHosts) {
@@ -2163,6 +2210,7 @@ async function run() {
   await runCase('relay waits for extension reachability', () => runRelayWaitsForExtensionReachability(WebSocketBridge));
   await runCase('extension state broadcasts to relays', () => runExtensionStateBroadcastsToRelays(WebSocketBridge));
   await runCase('rejects untrusted browser relay origin', () => runRejectsUntrustedBrowserOrigin(WebSocketBridge));
+  await runCase('accepts safari extension origin', () => runAcceptsSafariExtensionOrigin(WebSocketBridge));
   await runCase('pre-handler Host and Origin upgrade gate', () => runPreHandlerUpgradeGate(WebSocketBridge, auth));
   await runCase('pairing authority matrix', () => runPairingAuthorityMatrix(WebSocketBridge, auth));
   await runCase('unprivileged sockets cannot displace the active extension', () => runUnprivilegedCannotDisplaceExtension(WebSocketBridge, auth));

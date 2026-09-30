@@ -42,6 +42,46 @@ let showSidepanelProgressEnabled = true;
 var _tabRunningMap = new Map();
 var _activeTabIdSnapshot = null;
 
+/**
+ * Resolve the CONTENT tab this panel should act on.
+ *
+ * On Chrome the panel is a docked side panel -- not a tab -- so
+ * {active:true, currentWindow:true} correctly returns the page the user is
+ * looking at. On Safari there is no sidePanel API and the workspace is its own
+ * popup window, which makes `currentWindow` actively WRONG: it is the FSB
+ * window, so the query would return this very page and the agent would target
+ * its own UI (see the startAutomation call site below).
+ *
+ * Returns an ARRAY so every existing call site keeps its current shape.
+ *
+ * @param {{windowId?: number}} [opts] - windowId hint (focus-change path)
+ * @returns {Promise<Array>} zero or one tab
+ */
+async function getTargetTabs(opts) {
+  var P = globalThis.FsbPlatform;
+  if (P && P.caps && P.caps.sidePanel === false) {
+    var resolved = await P.resolveTargetTab(opts);
+    return resolved ? [resolved] : [];
+  }
+  var query = (opts && typeof opts.windowId === 'number')
+    ? { active: true, windowId: opts.windowId }
+    : { active: true, currentWindow: true };
+  var found = await chrome.tabs.query(query);
+  return found || [];
+}
+
+/**
+ * Dismiss the panel. On Chrome window.close() collapses the docked panel; on
+ * Safari the workspace is a real window, so closing it would destroy the
+ * user's workspace rather than collapse a panel. FsbPlatform.closeSurface()
+ * handles the difference.
+ */
+function closeWorkspaceSurface() {
+  var P = globalThis.FsbPlatform;
+  if (P && typeof P.closeSurface === 'function') { P.closeSurface(); return; }
+  window.close();
+}
+
 function _getTabRunningEntry(tabId) {
   if (typeof tabId !== 'number') return { isRunning: false, sessionId: null, startedAt: null };
   var entry = _tabRunningMap.get(tabId);
@@ -214,7 +254,7 @@ async function initTabConversationStore() {
     }
     var activeTabId = null;
     try {
-      var tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      var tabs = await getTargetTabs();
       if (tabs && tabs[0] && typeof tabs[0].id === 'number') activeTabId = tabs[0].id;
     } catch (_e) { /* swallow */ }
 
@@ -330,7 +370,7 @@ async function ensureTabConversationForActiveTab(overwrite) {
       conversationId = fallback;
       return fallback;
     }
-    var tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    var tabs = await getTargetTabs();
     var tab = tabs && tabs[0];
     if (!tab || typeof tab.id !== 'number') {
       // Phase 11 FINT-21 WR-02 fix -- surface the no-active-tab edge
@@ -3813,7 +3853,7 @@ function applyInputLockout(foreignOwned) {
 async function _isActiveTabForeignOwned() {
   try {
     if (typeof FSBOwnerChip === 'undefined') return false;
-    var tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    var tabs = await getTargetTabs();
     var tab = tabs && tabs[0];
     if (!tab || typeof tab.id !== 'number') return false;
     var stored = await chrome.storage.session.get('fsbAgentRegistry');
@@ -3851,7 +3891,7 @@ async function refreshActiveTabOwnership(tabId, surfaceGeneration) {
         return { verified: false, code: 'tab_lookup_mismatch' };
       }
     } else {
-      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      const tabs = await getTargetTabs();
       tab = tabs && tabs[0];
     }
     if (!isCurrent()) return { verified: false, stale: true };
@@ -3906,10 +3946,9 @@ async function syncActiveTabSurface(tabId, windowId) {
   let incomingTabId = Number.isSafeInteger(tabId) ? tabId : null;
   try {
     if (incomingTabId === null) {
-      const query = Number.isSafeInteger(windowId)
-        ? { active: true, windowId: windowId }
-        : { active: true, currentWindow: true };
-      const tabs = await chrome.tabs.query(query);
+      const tabs = await getTargetTabs(Number.isSafeInteger(windowId)
+        ? { windowId: windowId }
+        : undefined);
       if (syncGeneration !== _activeTabSurfaceSyncGeneration) return false;
       incomingTabId = tabs && tabs[0] && Number.isSafeInteger(tabs[0].id)
         ? tabs[0].id
@@ -4474,7 +4513,7 @@ async function _handleLegacySendMessage(message) {
     updateSendButtonState();
     
     // Get current tab
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const [tab] = await getTargetTabs();
     
     // Note: Restriction checking is now handled by background script with smart navigation
     
@@ -5383,7 +5422,7 @@ function openSettings() {
   chrome.runtime.openOptionsPage();
 
   // Then close the side panel
-  window.close();
+  closeWorkspaceSurface();
 }
 
 async function openControlPanelSection(sectionId) {
@@ -5396,10 +5435,10 @@ async function openControlPanelSection(sectionId) {
     } else {
       chrome.runtime.openOptionsPage();
     }
-    window.close();
+    closeWorkspaceSurface();
   } catch (_error) {
     chrome.runtime.openOptionsPage();
-    window.close();
+    closeWorkspaceSurface();
   }
 }
 
@@ -5549,7 +5588,7 @@ function renderAutomationCompletionPayload(payload) {
   if (outcome === 'partial') {
     (async () => {
       try {
-        const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+        const tabs = await getTargetTabs();
         const currentUrl = tabs[0]?.url;
         if (currentUrl && currentUrl.startsWith('http')) {
           const domain = new URL(currentUrl).hostname;
@@ -5804,7 +5843,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       if (isPartial && isOriginatingActive) {
         (async () => {
           try {
-            const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+            const tabs = await getTargetTabs();
             const currentUrl = tabs[0]?.url;
             if (currentUrl && currentUrl.startsWith('http')) {
               const domain = new URL(currentUrl).hostname;

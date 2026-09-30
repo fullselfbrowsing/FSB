@@ -141,6 +141,10 @@
     </div>
   </div>
 
+  <!-- Platform capability shim. MUST be the first script: it installs the
+       Safari stand-ins for chrome.debugger / sidePanel / offscreen before
+       any page script touches them. Inert no-op on Chrome. -->
+  <script src="../utils/platform-adapter.js"></script>
   <script src="pin-input.js"></script>
   <script src="unlock.js"></script>
 </body>

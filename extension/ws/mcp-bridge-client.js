@@ -96,6 +96,34 @@ function isMcpSpreadsheetRecord(payload, response) {
 // SW-eviction-during-grace case via the persisted stagedReleases envelope.
 const RECONNECT_GRACE_MS = 10000;
 
+// ---------------------------------------------------------------------------
+// Safari transport selection.
+//
+// The MCP server, its port (7225) and the wire protocol are IDENTICAL on both
+// transports. Only the pipe differs:
+//   'ws'     -- new WebSocket(MCP_BRIDGE_URL). What Chrome always uses.
+//   'native' -- ws/mcp-native-transport.js, where the Safari container app
+//               holds the real socket to :7225 and relays frames over
+//               a native-messaging port.
+//
+// Which one Safari can actually use is genuinely undetermined: Apple forum
+// reports of CSP-blocked localhost WebSockets run from Safari 14 through 2025,
+// but none of them tried an explicit MV3 extension_pages connect-src (which
+// scripts/build-safari.mjs now emits). So we probe rather than guess -- try
+// direct first, pin to native after two failures, and remember the answer.
+//
+// Stored in chrome.storage.LOCAL, not session: session is wiped on browser
+// restart, which would re-probe on every launch.
+// ---------------------------------------------------------------------------
+const MCP_TRANSPORT_POLICY_KEY = 'fsbMcpTransportPolicy';
+const MCP_TRANSPORT_OVERRIDE_KEY = 'fsbMcpTransportOverride';
+const MCP_TRANSPORT_POLICY_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const MCP_WS_PROBE_MAX_ATTEMPTS = 2;
+const MCP_POLICY_HYDRATE_TIMEOUT_MS = 500;
+// Safari evicts idle background service workers more aggressively than Chrome,
+// so the ping sits further inside the idle window there. Chrome is unchanged.
+const MCP_PING_INTERVAL_SAFARI_MS = 20000;
+
 function isPlainMcpClientInventory(value) {
   return !!value && typeof value === 'object'
     && !Array.isArray(value)
@@ -105,6 +133,9 @@ function isPlainMcpClientInventory(value) {
 class MCPBridgeClient {
   constructor(options = {}) {
     this._ws = null;
+    this._activeTransport = 'ws';
+    this._transportPolicy = null;
+    this._policyHydrating = null;
     this._reconnectDelay = MCP_RECONNECT_BASE_MS;
     this._reconnectTimer = null;
     this._pingTimer = null;
@@ -149,6 +180,11 @@ class MCPBridgeClient {
     this._extRequestCounter = 0;
     this._replacementSockets = new Set();
     this._socketWaiters = new Set();
+
+    // Fire-and-forget so _policyHydrating is already set by the time
+    // background.js arms the bridge at service-worker evaluation time.
+    // Resolves immediately to null on Chrome.
+    this._hydrateTransportPolicy();
   }
 
   getState() {
@@ -157,6 +193,9 @@ class MCPBridgeClient {
       connected: this._connected,
       pairingStatus: this._pairingStatus,
       url: MCP_BRIDGE_URL,
+      // Which pipe carried this connection. Surfaces in the diagnostics panel
+      // via chrome.storage.session.mcpBridgeState; always 'ws' on Chrome.
+      transport: this._activeTransport,
       reconnectDelayMs: this._reconnectDelay,
       maxReconnectDelayMs: MCP_RECONNECT_MAX_MS,
       nextReconnectAt: this._nextReconnectAt,
@@ -182,6 +221,16 @@ class MCPBridgeClient {
    * Start the connection. Safe to call multiple times.
    */
   connect() {
+    // background.js arms the bridge at service-worker evaluation time, before
+    // any async storage read can resolve. Without this deferral every Safari SW
+    // wake would burn one direct-WebSocket attempt (and log one CSP error)
+    // before the pinned policy loaded. Chrome never enters this branch:
+    // _policyHydrating is only ever set on Safari.
+    if (this._policyHydrating) {
+      const pending = this._policyHydrating;
+      pending.then(() => this.connect(), () => this.connect());
+      return;
+    }
     if (!this._pairingLoaded) {
       this._ensurePairingLoaded().then(() => this.connect()).catch(() => this.connect());
       return;
@@ -198,9 +247,9 @@ class MCPBridgeClient {
     this._persistState();
 
     try {
-      this._ws = this._pairingCode
-        ? new WebSocket(MCP_BRIDGE_URL, [FSB_EXT_PROTOCOL, this._pairingCode])
-        : new WebSocket(MCP_BRIDGE_URL);
+      this._ws = this._createSocket(this._pairingCode
+        ? [FSB_EXT_PROTOCOL, this._pairingCode]
+        : null);
     } catch (err) {
       console.log('[FSB MCP Bridge] WebSocket construction failed');
       this._ws = null;
@@ -208,6 +257,9 @@ class MCPBridgeClient {
       this._status = 'disconnected';
       this._lastDisconnectedAt = this._timestamp();
       this._lastDisconnectReason = 'construct_failed';
+      // A synchronous SecurityError is Safari's CSP refusal -- unambiguous, so
+      // pin to native immediately rather than spending a second attempt.
+      this._recordTransportOutcome('fail', this._classifyWsFailure(err));
       this._persistState();
       this._scheduleReconnect();
       this._notifySocketWaiters('offline', null);
@@ -218,7 +270,8 @@ class MCPBridgeClient {
 
     socket.onopen = () => {
       if (this._ws !== socket) return;
-      console.log('[FSB MCP Bridge] Connected to local MCP bridge');
+      console.log('[FSB MCP Bridge] Connected to local MCP bridge (transport=' + this._activeTransport + ')');
+      this._recordTransportOutcome('open');
       this._connected = true;
       this._status = 'connected';
       this._reconnectDelay = MCP_RECONNECT_BASE_MS;
@@ -299,6 +352,17 @@ class MCPBridgeClient {
       }
       this._ws = null;
       console.log('[FSB MCP Bridge] Disconnected from local MCP bridge');
+      // Scored only when the socket never reached OPEN -- a working-then-broken
+      // connection means the SERVER went away, not that the transport is wrong.
+      //
+      // Always 'socket_close': onerror hands a real WebSocket an opaque Event
+      // with no message, so there is nothing to classify here. The one failure
+      // that IS identifiable -- Safari's synchronous SecurityError from
+      // new WebSocket() under a blocking CSP -- is classified in connect()'s
+      // construct catch, which scores it as 'security' and pins immediately.
+      if (!this._connected) {
+        this._recordTransportOutcome('fail', 'socket_close');
+      }
       this._connected = false;
       this._status = 'disconnected';
       this._lastDisconnectedAt = this._timestamp();
@@ -886,6 +950,192 @@ class MCPBridgeClient {
   // Keepalive
   // --------------------------------------------------------------------------
 
+  // --------------------------------------------------------------------------
+  // Transport selection (Safari). Every method here is a no-op on Chrome.
+  // --------------------------------------------------------------------------
+
+  _isSafari() {
+    const p = globalThis.FsbPlatform;
+    return !!(p && p.id === 'safari');
+  }
+
+  _pingIntervalMs() {
+    return this._isSafari() ? MCP_PING_INTERVAL_SAFARI_MS : MCP_PING_INTERVAL_MS;
+  }
+
+  /**
+   * Is a recorded decision still in force?
+   *
+   * SHARED BY _transportPlan() AND _recordTransportOutcome() ON PURPOSE. When
+   * these two disagreed about what 'pinned' meant, an expired native pin was
+   * unreachable in one direction and permanent in the other: the plan reverted
+   * to ws while the recorder still saw decided === 'native' and refused to
+   * score the failure, so the probe could never re-pin and the bridge retried
+   * a transport that cannot work, forever.
+   */
+  _policyIsFresh(policy) {
+    return !!(policy && policy.decidedAt &&
+      (Date.now() - policy.decidedAt) < MCP_TRANSPORT_POLICY_TTL_MS);
+  }
+
+  /**
+   * Synchronous. Reads the memoized policy only -- connect() guarantees
+   * hydration already ran (see the _policyHydrating deferral).
+   */
+  _transportPlan() {
+    if (!this._isSafari()) return 'ws';
+    const policy = this._transportPolicy;
+    if (!policy) return 'ws';
+    if (policy.override === 'ws' || policy.override === 'native') return policy.override;
+    if (policy.decided === 'native' || policy.decided === 'ws') {
+      if (this._policyIsFresh(policy)) return policy.decided;
+    }
+    return 'ws';
+  }
+
+  /**
+   * @param {string[]|null} protocols - pairing subprotocols. The native
+   *   transport has no subprotocol channel, so a native socket always connects
+   *   unpaired; Safari has no native host to mint a pairing code anyway.
+   */
+  _createSocket(protocols) {
+    const plan = this._transportPlan();
+    this._activeTransport = plan;
+    if (plan === 'native' && typeof globalThis.FsbNativeBridgeSocket === 'function') {
+      return new globalThis.FsbNativeBridgeSocket({ url: MCP_BRIDGE_URL });
+    }
+    this._activeTransport = 'ws';
+    return protocols
+      ? new WebSocket(MCP_BRIDGE_URL, protocols)
+      : new WebSocket(MCP_BRIDGE_URL);
+  }
+
+  _classifyWsFailure(err) {
+    if (err && err.name === 'SecurityError') return 'security';
+    const msg = (err && err.message) ? String(err.message).toLowerCase() : '';
+    if (msg.indexOf('content security policy') !== -1 || msg.indexOf('insecure') !== -1) return 'security';
+    return 'construct_throw';
+  }
+
+  _hydrateTransportPolicy() {
+    if (!this._isSafari()) return Promise.resolve(null);
+    if (this._transportPolicy) return Promise.resolve(this._transportPolicy);
+
+    const storage = (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) || null;
+    if (!storage || typeof storage.get !== 'function') {
+      this._transportPolicy = { decided: null, wsAttempts: 0 };
+      return Promise.resolve(this._transportPolicy);
+    }
+
+    const read = new Promise((resolve) => {
+      try {
+        const out = storage.get([MCP_TRANSPORT_POLICY_KEY, MCP_TRANSPORT_OVERRIDE_KEY], (data) => resolve(data || {}));
+        if (out && typeof out.then === 'function') out.then((d) => resolve(d || {}), () => resolve({}));
+      } catch (_e) { resolve({}); }
+    });
+
+    // Hard timeout so a wedged storage read can never hang the bridge.
+    const guarded = Promise.race([
+      read,
+      new Promise((resolve) => setTimeout(() => resolve({}), MCP_POLICY_HYDRATE_TIMEOUT_MS))
+    ]);
+
+    this._policyHydrating = guarded.then((data) => {
+      const stored = data[MCP_TRANSPORT_POLICY_KEY] || {};
+      this._transportPolicy = {
+        decided: stored.decided || null,
+        decidedAt: stored.decidedAt || 0,
+        wsAttempts: stored.wsAttempts || 0,
+        override: data[MCP_TRANSPORT_OVERRIDE_KEY] || null
+      };
+      this._policyHydrating = null;
+      return this._transportPolicy;
+    }, () => {
+      this._transportPolicy = { decided: null, wsAttempts: 0 };
+      this._policyHydrating = null;
+      return this._transportPolicy;
+    });
+
+    return this._policyHydrating;
+  }
+
+  _persistTransportPolicy() {
+    const storage = (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) || null;
+    if (!storage || typeof storage.set !== 'function' || !this._transportPolicy) return;
+    try {
+      const payload = {};
+      payload[MCP_TRANSPORT_POLICY_KEY] = {
+        decided: this._transportPolicy.decided,
+        decidedAt: this._transportPolicy.decidedAt || 0,
+        wsAttempts: this._transportPolicy.wsAttempts || 0
+      };
+      const r = storage.set(payload);
+      if (r && typeof r.catch === 'function') r.catch(() => {});
+    } catch (_e) { /* best effort */ }
+  }
+
+  /**
+   * Two-strikes-then-pin, with one deliberate asymmetry: the pin is sticky in
+   * ONE direction only. A native failure never re-enables ws (it just feeds the
+   * normal backoff), because flapping between transports would turn a plain
+   * server outage into an unreadable reconnect storm.
+   */
+  _recordTransportOutcome(kind, detail) {
+    if (!this._isSafari() || !this._transportPolicy) return;
+    const policy = this._transportPolicy;
+
+    if (kind === 'open') {
+      if (this._activeTransport === 'ws') {
+        // Renew on EVERY successful open, not just the first. A pin that is
+        // never refreshed ages out while the transport is demonstrably
+        // working, and the next two-failure window -- a plain server restart
+        // -- then demotes it.
+        const firstTime = policy.decided !== 'ws';
+        policy.decided = 'ws';
+        policy.decidedAt = Date.now();
+        policy.wsAttempts = 0;
+        this._persistTransportPolicy();
+        if (firstTime) {
+          console.log('[FSB MCP Bridge] direct ws://localhost:7225 works on this browser; pinning transport=ws');
+        }
+      } else if (this._activeTransport === 'native' && policy.decided !== 'native') {
+        policy.decided = 'native';
+        policy.decidedAt = Date.now();
+        this._persistTransportPolicy();
+      }
+      return;
+    }
+
+    // Only a LIVE pin suppresses scoring, in EITHER direction. Once a pin ages
+    // out, _transportPlan() re-probes ws and those attempts have to be scored
+    // or the expired pin can never be renewed. While a ws pin is still live,
+    // though, a failure means the SERVER went away -- ws is already proven on
+    // this browser -- so scoring it would let a plain server restart demote a
+    // working transport for the whole TTL.
+    if (this._activeTransport !== 'ws') return;
+    if (policy.decided === 'native' && this._policyIsFresh(policy)) return;
+    if (policy.decided === 'ws' && this._policyIsFresh(policy)) return;
+
+    // An expired native pin means _transportPlan() has already gone back to
+    // probing ws. Clear it so the probe starts from zero instead of inheriting
+    // the attempt count that pinned it last time, which would re-pin on the
+    // first failure rather than the documented two.
+    if (policy.decided === 'native') {
+      policy.decided = null;
+      policy.decidedAt = 0;
+      policy.wsAttempts = 0;
+    }
+
+    policy.wsAttempts = (policy.wsAttempts || 0) + (detail === 'security' ? MCP_WS_PROBE_MAX_ATTEMPTS : 1);
+    if (policy.wsAttempts >= MCP_WS_PROBE_MAX_ATTEMPTS) {
+      policy.decided = 'native';
+      policy.decidedAt = Date.now();
+      console.log('[FSB MCP Bridge] direct WebSocket unavailable (' + (detail || 'unknown') +
+        '); pinning transport=native -- the container app will hold ws://localhost:7225');
+    }
+    this._persistTransportPolicy();
+  }
+
   _startPing() {
     this._stopPing();
     if (this._delegationHeartbeatOwners.size > 0) return;
@@ -893,7 +1143,7 @@ class MCPBridgeClient {
       if (this._ws && this._ws.readyState === WebSocket.OPEN) {
         this._ws.send(JSON.stringify({ type: 'mcp:ping', ts: Date.now() }));
       }
-    }, MCP_PING_INTERVAL_MS);
+    }, this._pingIntervalMs());
   }
 
   _stopPing() {
@@ -1130,6 +1380,30 @@ class MCPBridgeClient {
   }
 
   _sendResult(id, payload) {
+    // Native messaging has a per-message ceiling that a plain WebSocket does
+    // not, and FSB routinely exceeds it (read_page full:true, get_dom_snapshot
+    // with a large max_elements). Chunking removes the cap but not the cost, so
+    // refuse oversized results with something the model can act on.
+    //
+    // softPayloadLimit is an own property of the native transport and undefined
+    // on a real WebSocket, so this needs no platform branch. Truncating is NOT
+    // an option: a truncated JSON string is unparseable at the far end.
+    const cap = this._ws && this._ws.softPayloadLimit;
+    if (cap) {
+      const raw = JSON.stringify({ id, type: 'mcp:result', payload });
+      // UTF-8 bytes, not UTF-16 units: cap is a byte budget, and a CJK or
+      // emoji-heavy result runs up to 3x its character count. Constructed
+      // inline rather than at module scope -- this branch is unreachable on
+      // Chrome (softPayloadLimit is undefined on a real WebSocket), and the
+      // Node test sandbox has no TextEncoder until a case opts into one.
+      const size = new TextEncoder().encode(raw).length;
+      if (size > cap) {
+        this._sendError(id,
+          'payload_too_large: result is ' + size + ' bytes, over this transport\'s ' + cap +
+          ' byte limit. Retry with a narrower selector or a smaller max_elements.');
+        return;
+      }
+    }
     this._send({ id, type: 'mcp:result', payload });
   }
 

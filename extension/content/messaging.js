@@ -1003,8 +1003,11 @@
               }
             }
 
-            // Timeout wrapper
-            const longTimeoutTools = ['solveCaptcha', 'fillsheet', 'readsheet', 'sheetsSession'];
+            // Timeout wrapper. pointerClickAndHoldAt is the Safari DOM fallback
+            // for click_and_hold: it sleeps for the caller's holdMs in-page,
+            // where the CDP original holds in the service worker with no cap,
+            // so the default 10s would fail any hold at or above that.
+            const longTimeoutTools = ['solveCaptcha', 'fillsheet', 'readsheet', 'sheetsSession', 'pointerClickAndHoldAt'];
             const actionTimeout = longTimeoutTools.includes(tool) ? 120000 : 10000;
             const timeoutPromise = new Promise((_, reject) => {
               setTimeout(() => reject(new Error(`Action ${tool} timed out after ${actionTimeout / 1000} seconds`)), actionTimeout);
