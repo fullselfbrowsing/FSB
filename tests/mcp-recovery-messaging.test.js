@@ -171,6 +171,15 @@ async function run() {
         assert(!text.includes('Refresh page state'), 'session_not_found fixture does NOT use the misleading Refresh page state hint');
       },
     },
+    {
+      label: 'uncertain_mutation',
+      input: { success: false, outcome: 'unknown', mayHaveExecuted: true, error: 'Port closed after dispatch' },
+      checks(text) {
+        assert(text.includes('Action outcome unknown'), 'uncertain action names the outcome');
+        assert(text.includes('Inspect the current page'), 'uncertain action requires inspection');
+        assert(!text.includes('then retry.'), 'uncertain action never recommends an immediate retry');
+      },
+    },
   ];
 
   for (const fixture of fixtures) {

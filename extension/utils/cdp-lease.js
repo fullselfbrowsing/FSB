@@ -20,11 +20,12 @@
 
   function makeLease(tabId, state) {
     let released = false;
-    return {
+    const lease = {
       tabId,
       release() {
         if (released) return;
         released = true;
+        clearTimeout(watchdog);
 
         while (state.waiters.length > 0) {
           const waiter = state.waiters.shift();
@@ -38,6 +39,9 @@
         queues.delete(tabId);
       }
     };
+    const watchdog = setTimeout(() => lease.release(), 20000);
+    if (typeof watchdog.unref === 'function') watchdog.unref();
+    return lease;
   }
 
   function acquire(tabId, options = {}) {

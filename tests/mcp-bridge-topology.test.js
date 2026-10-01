@@ -156,13 +156,14 @@ function createBrowserSocket(port, options = {}) {
       : options.stableProtocol
         ? ['fsb-ext-v1']
         : undefined;
+    const socketOptions = {
+      headers: options.origin ? { Origin: options.origin } : undefined,
+      // false stands in for a peer that has stopped answering protocol pings.
+      ...(options.autoPong === undefined ? {} : { autoPong: options.autoPong }),
+    };
     const socket = protocols
-      ? new WebSocket(`ws://127.0.0.1:${port}`, protocols, {
-          headers: options.origin ? { Origin: options.origin } : undefined,
-        })
-      : new WebSocket(`ws://127.0.0.1:${port}`, {
-          headers: options.origin ? { Origin: options.origin } : undefined,
-        });
+      ? new WebSocket(`ws://127.0.0.1:${port}`, protocols, socketOptions)
+      : new WebSocket(`ws://127.0.0.1:${port}`, socketOptions);
     const timeout = setTimeout(() => {
       socket.terminate();
       reject(new Error(`browser socket did not open on ${port}`));
@@ -1415,6 +1416,315 @@ async function runUnprivilegedCannotDisplaceExtension(WebSocketBridge, auth) {
   });
 }
 
+// The slot is freed only by the incumbent socket's own close, so before the
+// liveness reaper existed an extension whose worker died without the socket
+// closing held it indefinitely -- and every legitimate reconnect was refused
+// for as long as that lasted. A real ws client answers protocol pings from
+// under the application, exactly as a browser does, so this exercises the
+// application tier: the incumbent proves it speaks mcp:ping, then stops.
+async function runStaleIncumbentIsReaped(WebSocketBridge, auth) {
+  await withTempHome('bridge-stale-incumbent', async (home) => {
+    const port = await getFreePort();
+    const authPath = auth.getBridgeAuthPath(home);
+    let state = auth.rotateBridgeSessionSecret(authPath, 23_000);
+    state = auth.bindAllowedExtensionOrigin('chrome-extension://stale-incumbent-extension', authPath);
+    const hub = new WebSocketBridge({
+      port,
+      host: '127.0.0.1',
+      instanceId: 'stale-incumbent-hub',
+      handshakeTimeoutMs: 40,
+      extensionPingIntervalMs: 30,
+      extensionHeartbeatTimeoutMs: 60,
+    });
+    const resources = { sockets: [], bridges: [hub] };
+
+    try {
+      await hub.connect();
+      const incumbent = await createBrowserSocket(port, {
+        origin: 'chrome-extension://stale-incumbent-extension',
+        pairingCode: auth.formatPairingCode(state),
+      });
+      resources.sockets.push(incumbent);
+      await waitFor(() => hub.topology.extensionConnected === true, 'incumbent extension registration');
+      const incumbentServerSocket = hub.extensionClient;
+
+      // One application heartbeat arms the application tier for this socket.
+      incumbent.send(JSON.stringify({ type: 'mcp:ping', ts: Date.now() }));
+      await waitFor(
+        () => hub.topology.lastExtensionHeartbeatAt !== null,
+        'incumbent application heartbeat recorded',
+      );
+
+      const incumbentClosed = waitForSocketClose(incumbent, 4000);
+      // Observed now so a failure elsewhere in the case reports as a FAIL rather
+      // than crashing the suite with an unhandled rejection.
+      incumbentClosed.catch(() => {});
+      await waitFor(
+        () => hub.topology.extensionConnected === false,
+        'stale incumbent is reaped',
+        4000,
+      );
+      await incumbentClosed;
+      assertEqual(hub.extensionClient, null, 'reaping the stale incumbent frees the extension slot');
+      assertEqual(
+        hub.topology.lastDisconnectReason,
+        'extension_reaped_heartbeat_timeout',
+        'the application tier names itself as the cause',
+      );
+
+      const successor = await createBrowserSocket(port, {
+        origin: 'chrome-extension://stale-incumbent-extension',
+      });
+      resources.sockets.push(successor);
+      await waitFor(() => hub.topology.extensionConnected === true, 'successor extension registration');
+      assert(
+        hub.extensionClient !== incumbentServerSocket,
+        'an unpaired successor wins the freed slot rather than being refused',
+      );
+    } finally {
+      await cleanup(resources);
+    }
+  });
+}
+
+// The transport tier: a peer that stops answering protocol pings is gone even
+// if it never proved it speaks mcp:ping, so it must not hold the slot.
+async function runUnresponsiveIncumbentIsReaped(WebSocketBridge) {
+  await withTempHome('bridge-unresponsive-incumbent', async () => {
+    const port = await getFreePort();
+    const hub = new WebSocketBridge({
+      port,
+      host: '127.0.0.1',
+      instanceId: 'unresponsive-incumbent-hub',
+      handshakeTimeoutMs: 40,
+      extensionPingIntervalMs: 30,
+      extensionHeartbeatTimeoutMs: 60_000,
+    });
+    const resources = { sockets: [], bridges: [hub] };
+
+    try {
+      await hub.connect();
+      const incumbent = await createBrowserSocket(port, {
+        origin: 'chrome-extension://unresponsive-incumbent-extension',
+        autoPong: false,
+      });
+      resources.sockets.push(incumbent);
+      await waitFor(() => hub.topology.extensionConnected === true, 'unresponsive incumbent registration');
+
+      const incumbentClosed = waitForSocketClose(incumbent, 4000);
+      // Observed now so a failure elsewhere in the case reports as a FAIL rather
+      // than crashing the suite with an unhandled rejection.
+      incumbentClosed.catch(() => {});
+      await waitFor(
+        () => hub.topology.extensionConnected === false,
+        'unresponsive incumbent is reaped',
+        4000,
+      );
+      await incumbentClosed;
+      assertEqual(hub.extensionClient, null, 'reaping the unresponsive incumbent frees the extension slot');
+      assertEqual(
+        hub.topology.lastDisconnectReason,
+        'extension_reaped_pong_timeout',
+        'the transport tier names itself as the cause',
+      );
+    } finally {
+      await cleanup(resources);
+    }
+  });
+}
+
+// An extension build that predates mcp:ping still answers protocol pings. The
+// application tier must stay disarmed for it, however long it stays quiet.
+async function runQuietLegacyExtensionIsKept(WebSocketBridge) {
+  await withTempHome('bridge-quiet-legacy', async () => {
+    const port = await getFreePort();
+    const hub = new WebSocketBridge({
+      port,
+      host: '127.0.0.1',
+      instanceId: 'quiet-legacy-hub',
+      handshakeTimeoutMs: 40,
+      extensionPingIntervalMs: 30,
+      extensionHeartbeatTimeoutMs: 60,
+    });
+    const resources = { sockets: [], bridges: [hub] };
+
+    try {
+      await hub.connect();
+      const legacy = await createBrowserSocket(port, {
+        origin: 'chrome-extension://quiet-legacy-extension',
+      });
+      resources.sockets.push(legacy);
+      await waitFor(() => hub.topology.extensionConnected === true, 'legacy extension registration');
+      const registered = hub.extensionClient;
+
+      await sleep(400);
+      assertEqual(hub.topology.extensionConnected, true, 'a quiet extension that answers protocol pings stays connected');
+      assert(hub.extensionClient === registered, 'the quiet extension keeps the slot it registered in');
+      assertEqual(legacy.readyState, WebSocket.OPEN, 'the quiet extension socket is never closed');
+    } finally {
+      await cleanup(resources);
+    }
+  });
+}
+
+function answerBridgeRequests(socket) {
+  socket.on('message', (raw) => {
+    let message;
+    try {
+      message = JSON.parse(raw.toString());
+    } catch (_error) {
+      return;
+    }
+    if (typeof message.id !== 'string' || message.type === 'mcp:unanswered') return;
+    socket.send(JSON.stringify({
+      id: message.id,
+      type: 'mcp:response',
+      payload: { success: true, answered: message.type },
+    }));
+  });
+}
+
+// Node keeps a server listening after an accept failure such as EMFILE, so an
+// 'error' event on a listening hub is not an outage and must not become one.
+async function runHubSurvivesAcceptError(WebSocketBridge) {
+  await withTempHome('bridge-hub-accept-error', async () => {
+    const port = await getFreePort();
+    const hub = new WebSocketBridge({ port, host: '127.0.0.1', instanceId: 'accept-error-hub' });
+    const resources = { sockets: [], bridges: [hub] };
+
+    try {
+      await hub.connect();
+      const extension = await createBrowserSocket(port, {
+        origin: 'chrome-extension://accept-error-extension',
+      });
+      resources.sockets.push(extension);
+      answerBridgeRequests(extension);
+      await waitFor(() => hub.topology.extensionConnected === true, 'extension registration');
+      const server = hub.httpServer;
+
+      server.emit('error', Object.assign(new Error('accept EMFILE'), { code: 'EMFILE' }));
+
+      assertEqual(hub.currentMode, 'hub', 'an accept error leaves the bridge in hub mode');
+      assert(hub.httpServer === server && server.listening, 'an accept error keeps the same listener');
+      assertEqual(hub.topology.extensionConnected, true, 'an accept error keeps the extension attached');
+      const response = await hub.sendAndWait({ type: 'mcp:get-tabs', payload: {} }, { timeout: 1000 });
+      assertEqual(response.answered, 'mcp:get-tabs', 'requests still reach the extension after an accept error');
+    } finally {
+      await cleanup(resources);
+    }
+  });
+}
+
+// A hub whose listener is really gone must release everything it holds and
+// compete for the port again, rather than sit in a mode nothing can reach.
+async function runHubRebindsAfterListenerLoss(WebSocketBridge, bridgeModule) {
+  await withTempHome('bridge-hub-listener-loss', async (home) => {
+    const port = await getFreePort();
+    const hub = new WebSocketBridge({
+      port,
+      host: '127.0.0.1',
+      instanceId: 'listener-loss-hub',
+      promotionJitterMs: 1,
+    });
+    const resources = { sockets: [], bridges: [hub] };
+
+    try {
+      await hub.connect();
+      const extension = await createBrowserSocket(port, {
+        origin: 'chrome-extension://listener-loss-extension',
+      });
+      resources.sockets.push(extension);
+      answerBridgeRequests(extension);
+      await waitFor(() => hub.topology.extensionConnected === true, 'extension registration');
+      extension.send(JSON.stringify({
+        type: 'mcp:extension-state',
+        extensionId: 'a'.repeat(32),
+        extensionVersion: '1.0.0',
+        installInstanceId: 'listener-loss-install',
+        normalWindowCount: 1,
+        connectedAt: null,
+      }));
+      await waitFor(() => hub.topology.extensionAttachment !== null, 'extension attachment report');
+
+      const pending = hub.sendAndWait({ type: 'mcp:unanswered', payload: {} }, { timeout: 5000 })
+        .then(() => null, (error) => error);
+      const extensionClosed = waitForSocketClose(extension, 2000);
+      // Observed now so a failure elsewhere in the case reports as a FAIL rather
+      // than crashing the suite with an unhandled rejection.
+      extensionClosed.catch(() => {});
+      const lostServer = hub.httpServer;
+      // An accept failure just before the loss must not coalesce away its record.
+      lostServer.emit('error', Object.assign(new Error('accept EMFILE'), { code: 'EMFILE' }));
+      lostServer.close();
+      const startedAt = Date.now();
+      lostServer.emit('error', Object.assign(new Error('listener lost'), { code: 'EBADF' }));
+      assertEqual(hub.topology.extensionAttachment, null, 'the departed extension is no longer reported as attached');
+      const journal = fs.readFileSync(path.join(home, '.fsb', 'agent-runtime', 'bridge-events.jsonl'), 'utf8')
+        .trim().split('\n').map((line) => JSON.parse(line));
+      assert(journal.some((record) => record.event === 'hub_listener_lost' && record.reason === 'ebadf'),
+        'the lost listener is journaled after an accept failure');
+
+      const error = await pending;
+      assert(error instanceof Error, 'an in-flight request is rejected when the listener is lost');
+      assert(Date.now() - startedAt < 1000, 'the rejection is immediate rather than waiting out the request timeout');
+      assertEqual(bridgeModule.isBridgeDisconnectError(error), true, 'the rejection arms the sw_evicted recovery');
+      assertEqual(bridgeModule.bridgeDisconnectReason(error), 'hub_server_error', 'the rejection carries the real cause');
+      await extensionClosed;
+      assert(true, 'the extension socket is closed so it reconnects to whoever binds next');
+
+      await waitFor(
+        () => hub.currentMode === 'hub' && hub.httpServer !== lostServer && hub.httpServer?.listening === true,
+        'hub re-binds the port',
+        5000,
+      );
+      const successor = await createBrowserSocket(port, {
+        origin: 'chrome-extension://listener-loss-extension',
+      });
+      resources.sockets.push(successor);
+      answerBridgeRequests(successor);
+      await waitFor(() => hub.topology.extensionConnected === true, 'extension re-registration');
+      const response = await hub.sendAndWait({ type: 'mcp:get-tabs', payload: {} }, { timeout: 1000 });
+      assertEqual(response.answered, 'mcp:get-tabs', 'requests reach the extension again after the hub re-binds');
+    } finally {
+      await cleanup(resources);
+    }
+  });
+}
+
+async function runStdinShutdownHelper() {
+  const { PassThrough } = require('node:stream');
+  const helperUrl = pathToFileURL(path.join(repoRoot, 'mcp', 'build', 'stdin-shutdown.js')).href;
+  const { shutdownWhenStdinEnds } = await import(helperUrl);
+
+  const ended = new PassThrough();
+  ended.end();
+  ended.resume();
+  await new Promise((resolve) => ended.once('end', resolve));
+  let endedCalls = 0;
+  const firedImmediately = shutdownWhenStdinEnds(ended, () => { endedCalls += 1; });
+  assertEqual(firedImmediately, true, 'stdin that already hit EOF is reported as ended');
+  assertEqual(endedCalls, 1, 'stdin that already hit EOF shuts down synchronously');
+
+  const live = new PassThrough();
+  let liveCalls = 0;
+  assertEqual(shutdownWhenStdinEnds(live, () => { liveCalls += 1; }), false, 'open stdin is left running');
+  assertEqual(liveCalls, 0, 'open stdin does not shut down');
+  const closed = new Promise((resolve) => live.once('close', resolve));
+  live.end();
+  await closed;
+  assertEqual(liveCalls, 1, 'end followed by close shuts down exactly once');
+
+  const source = fs.readFileSync(path.join(repoRoot, 'mcp', 'src', 'index.ts'), 'utf8');
+  const stdioSource = source.slice(
+    source.indexOf('async function runStdioServer'),
+    source.indexOf('async function runHttpMode'),
+  );
+  assert(
+    /shutdownWhenStdinEnds\(process\.stdin,[\s\S]*?shutdown\(\);/.test(stdioSource),
+    'the stdio server shuts down when the host closes stdin',
+  );
+}
+
 async function runAuthStatusProbe(WebSocketBridge, auth) {
   await withTempHome('bridge-auth-status', async (home) => {
     const port = await getFreePort();
@@ -2153,6 +2463,7 @@ async function runHubExitPromotion(WebSocketBridge) {
 
 async function run() {
   const WebSocketBridge = await loadBridgeClass();
+  const bridgeModule = await import(pathToFileURL(path.join(repoRoot, 'mcp', 'build', 'bridge.js')).href);
   const auth = await loadAuthModule();
   const lifecycleModule = await loadServeDelegationModule();
 
@@ -2173,6 +2484,12 @@ async function run() {
   await runCase('active socket revocation and new-ID rebind after reset', () => runActiveSocketRevocation(WebSocketBridge, auth, true));
   await runCase('hub exits with an active ext request', () => runHubExitWithActiveExtRequest(WebSocketBridge, auth));
   await runCase('capable relay exits mid ext frame', () => runCapableRelayExitMidExtFrame(WebSocketBridge, auth));
+  await runCase('stale incumbent is reaped and the slot is reusable', () => runStaleIncumbentIsReaped(WebSocketBridge, auth));
+  await runCase('unresponsive incumbent is reaped by the transport tier', () => runUnresponsiveIncumbentIsReaped(WebSocketBridge));
+  await runCase('quiet legacy extension is never reaped', () => runQuietLegacyExtensionIsKept(WebSocketBridge));
+  await runCase('hub keeps serving through an accept error', () => runHubSurvivesAcceptError(WebSocketBridge));
+  await runCase('hub that loses its listener tears down and re-binds', () => runHubRebindsAfterListenerLoss(WebSocketBridge, bridgeModule));
+  await runCase('stdio server exits when the host closes stdin', () => runStdinShutdownHelper());
   await runCase('hub-exit-promotion', () => runHubExitPromotion(WebSocketBridge));
 
   console.log(`\n=== Results: ${passed} passed, ${failed} failed ===`);

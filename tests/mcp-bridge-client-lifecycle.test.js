@@ -175,9 +175,22 @@ function createFakeWebSocketClass(options = {}) {
       this.finishClose();
     }
 
-    finishClose() {
+    finishClose(detail) {
       this.readyState = FakeWebSocket.CLOSED;
-      if (typeof this.onclose === 'function') this.onclose();
+      if (typeof this.onclose !== 'function') return;
+      // Zero-argument delivery is what every existing case relies on and what
+      // the client must keep surviving, so it stays the default. Only opt in to
+      // a CloseEvent when a case is specifically about the code or reason.
+      if (detail === undefined) {
+        this.onclose();
+        return;
+      }
+      this.onclose(detail);
+    }
+
+    closeWith(code, reason) {
+      this.closeCount += 1;
+      this.finishClose({ code, reason });
     }
 
     send(payload) {
@@ -252,6 +265,9 @@ this.__phase198 = {
   DELEGATION_START_REQUEST_TIMEOUT_MS: typeof DELEGATION_START_REQUEST_TIMEOUT_MS !== 'undefined' ? DELEGATION_START_REQUEST_TIMEOUT_MS : undefined,
   PROVIDER_AUTH_BEGIN_REQUEST_TIMEOUT_MS: typeof PROVIDER_AUTH_BEGIN_REQUEST_TIMEOUT_MS !== 'undefined' ? PROVIDER_AUTH_BEGIN_REQUEST_TIMEOUT_MS : undefined,
   ADAPTER_COMPATIBILITY_REQUEST_TIMEOUT_MS: typeof ADAPTER_COMPATIBILITY_REQUEST_TIMEOUT_MS !== 'undefined' ? ADAPTER_COMPATIBILITY_REQUEST_TIMEOUT_MS : undefined,
+  MCP_PING_MISS_LIMIT: typeof MCP_PING_MISS_LIMIT !== 'undefined' ? MCP_PING_MISS_LIMIT : undefined,
+  MCP_KEEPALIVE_CLOSE_GRACE_MS: typeof MCP_KEEPALIVE_CLOSE_GRACE_MS !== 'undefined' ? MCP_KEEPALIVE_CLOSE_GRACE_MS : undefined,
+  MCP_AUTH_BACKOFF_STEP_LIMIT: typeof MCP_AUTH_BACKOFF_STEP_LIMIT !== 'undefined' ? MCP_AUTH_BACKOFF_STEP_LIMIT : undefined,
   MCP_BRIDGE_PAIRING_KEY: typeof MCP_BRIDGE_PAIRING_KEY !== 'undefined' ? MCP_BRIDGE_PAIRING_KEY : undefined,
   FSB_EXT_PROTOCOL: typeof FSB_EXT_PROTOCOL !== 'undefined' ? FSB_EXT_PROTOCOL : undefined,
   lifecycleBus: typeof fsbAutomationLifecycleBus !== 'undefined' ? fsbAutomationLifecycleBus : null
@@ -1600,6 +1616,311 @@ async function runDelegationHeartbeatCases() {
   }
 }
 
+function latestTimeout(harness) {
+  return harness.timers.timeouts[harness.timers.timeouts.length - 1];
+}
+
+async function runAuthRefusalBackoffCase() {
+  console.log('\n--- daemon authorization refusal backoff ---');
+
+  const harness = buildClientHarness();
+  const client = harness.exports.mcpBridgeClient;
+  assertEqual(harness.exports.MCP_AUTH_BACKOFF_STEP_LIMIT, 8, 'refusal backoff is bounded to eight escalation steps');
+
+  client.connect();
+  await flushMicrotasks();
+  const first = harness.sockets[0];
+  first.open();
+  assertEqual(client.getState().reconnectDelayMs, 2000, 'a successful upgrade still resets the base reconnect delay');
+  assertEqual(client.getState().authRefusalStreak, 0, 'a fresh client carries no refusal streak');
+
+  first.closeWith(1008, 'Extension authorization required');
+  await flushMicrotasks();
+  assertEqual(
+    client.getState().lastDisconnectReason,
+    'socket_close_1008:Extension authorization required',
+    'the refusal code and reason survive into the persisted disconnect reason',
+  );
+  assertEqual(client.getState().authRefusalStreak, 1, 'one refusal counts once');
+  assertEqual(client.getState().reconnectDelayMs, 3000, 'the refusal overrides the reset the successful upgrade just performed');
+  assertEqual(latestTimeout(harness).delay, 3000, 'the scheduled reconnect uses the escalated delay');
+
+  const expected = [4500, 6750, 10125, 15188, 22781, 30000, 30000];
+  for (let step = 0; step < expected.length; step += 1) {
+    latestTimeout(harness).fn();
+    await flushMicrotasks();
+    const socket = harness.sockets[step + 1];
+    assert(!!socket, `refusal cycle ${step + 2} opens one replacement socket`);
+    socket.open();
+    assertEqual(client.getState().reconnectDelayMs, 2000, `refusal cycle ${step + 2} still sees the upgrade reset the delay`);
+    socket.closeWith(1008, 'Extension authorization required');
+    await flushMicrotasks();
+    assertEqual(client.getState().reconnectDelayMs, expected[step], `refusal ${step + 2} escalates instead of retrying at a flat rate`);
+  }
+  assertEqual(client.getState().authRefusalStreak, 8, 'the refusal streak stops at its bound');
+  assertEqual(client.getState().status, 'reconnecting', 'a refused bridge stays in the ordinary reconnect state machine');
+}
+
+async function runCloseEventShapeCase() {
+  console.log('\n--- argument-free and coded close events ---');
+
+  {
+    const harness = buildClientHarness();
+    const client = harness.exports.mcpBridgeClient;
+    client.connect();
+    await flushMicrotasks();
+    const socket = harness.sockets[0];
+    socket.open();
+    socket.close();
+    await flushMicrotasks();
+    assertEqual(client.getState().lastDisconnectReason, 'socket_close', 'an argument-free close keeps the legacy reason and never throws');
+    assertEqual(client.getState().reconnectDelayMs, 2000, 'an argument-free close cannot escalate the backoff');
+    assertEqual(client.getState().authRefusalStreak, 0, 'an argument-free close records no refusal');
+  }
+
+  {
+    const harness = buildClientHarness();
+    const client = harness.exports.mcpBridgeClient;
+    client.connect();
+    await flushMicrotasks();
+    const socket = harness.sockets[0];
+    socket.open();
+    socket.closeWith(1006, '');
+    await flushMicrotasks();
+    assertEqual(client.getState().lastDisconnectReason, 'socket_close_1006', 'a reason-free coded close records only the code');
+    assertEqual(client.getState().reconnectDelayMs, 2000, 'a non-1008 close leaves the backoff to the ordinary schedule');
+  }
+}
+
+async function runRevokedPairingSelfHealCase() {
+  console.log('\n--- revoked pairing credential self-heal ---');
+
+  {
+    const harness = buildClientHarness({
+      session: { fsbMcpBridgePairing: { pairingCode: VALID_PAIRING_CODE, storedAt: Date.now() } }
+    });
+    const client = harness.exports.mcpBridgeClient;
+    client.connect();
+    await flushMicrotasks();
+    const socket = harness.sockets[0];
+    socket.open();
+    await flushMicrotasks();
+    const probe = JSON.parse(socket.sent[0]);
+    socket.receive({
+      id: probe.id,
+      type: 'ext:response',
+      error: { code: 'ext_unauthorized', message: 'Extension authorization is unavailable', retryable: false }
+    });
+    await flushMicrotasks();
+
+    assertEqual(client.getState().pairingStatus, 'expired', 'an unauthorized probe still reports expired');
+    assertEqual(client._pairingCode, null, 'an unauthorized probe drops the rejected credential from memory');
+    assertEqual(
+      harness.chrome.storage.session._dump().fsbMcpBridgePairing,
+      undefined,
+      'an unauthorized probe removes the stored pairing record',
+    );
+
+    socket.closeWith(1008, 'Extension authorization revoked');
+    await flushMicrotasks();
+    assertEqual(
+      client.getState().authRefusalStreak,
+      0,
+      'a revocation arriving after the error frame already dropped the credential is not counted as a refusal',
+    );
+    assertEqual(client.getState().reconnectDelayMs, 2000, 'the reconnect after a revocation goes out at the base delay');
+    latestTimeout(harness).fn();
+    await flushMicrotasks();
+    const replacement = harness.sockets[1];
+    assertEqual(replacement.protocols, undefined, 'the reconnect after a revoke goes out unpaired');
+    replacement.open();
+    await flushMicrotasks();
+    assertEqual(replacement.sent.length, 0, 'an unpaired reconnect sends no auth probe and cannot be revoked again');
+    assertEqual(client.getState().pairingStatus, 'unpaired', 'the unpaired reconnect reports honest unpaired status');
+  }
+
+  {
+    const harness = buildClientHarness({
+      session: { fsbMcpBridgePairing: { pairingCode: VALID_PAIRING_CODE, storedAt: Date.now() } }
+    });
+    const client = harness.exports.mcpBridgeClient;
+    client.connect();
+    await flushMicrotasks();
+    const socket = harness.sockets[0];
+    socket.open();
+    await flushMicrotasks();
+    socket.closeWith(1008, 'Extension authorization revoked');
+    await flushMicrotasks();
+    assertEqual(client._pairingCode, null, 'a revoked close clears the credential without the error frame');
+    assertEqual(
+      harness.chrome.storage.session._dump().fsbMcpBridgePairing,
+      undefined,
+      'a revoked close removes the stored pairing record',
+    );
+    assertEqual(
+      client.getState().reconnectDelayMs,
+      2000,
+      'clearing the credential makes the next handshake different, so it is not counted as a repeat refusal',
+    );
+  }
+
+  {
+    const harness = buildClientHarness({
+      session: { fsbMcpBridgePairing: { pairingCode: VALID_PAIRING_CODE, storedAt: Date.now() } }
+    });
+    const client = harness.exports.mcpBridgeClient;
+    client.connect();
+    await flushMicrotasks();
+    const socket = harness.sockets[0];
+    socket.open();
+    await flushMicrotasks();
+    socket.closeWith(1008, 'Extension authorization required');
+    await flushMicrotasks();
+    // Asserted as booleans so a failure message can never echo the credential.
+    assertEqual(client._pairingCode === null, false, 'a slot-contention refusal preserves the credential');
+    assertEqual(
+      harness.chrome.storage.session._dump().fsbMcpBridgePairing === undefined,
+      false,
+      'a slot-contention refusal preserves the stored pairing record',
+    );
+    assertEqual(client.getState().reconnectDelayMs, 3000, 'a slot-contention refusal escalates instead');
+  }
+
+  {
+    const harness = buildClientHarness();
+    const client = harness.exports.mcpBridgeClient;
+    client.connect();
+    await flushMicrotasks();
+    const socket = harness.sockets[0];
+    assertEqual(socket.protocols, undefined, 'the socket opens without a credential');
+    socket.open();
+    await flushMicrotasks();
+    socket.closeWith(1008, 'Extension authorization revoked');
+    await flushMicrotasks();
+    assertEqual(
+      client.getState().authRefusalStreak,
+      1,
+      'revoking a socket that presented no credential is an ordinary refusal',
+    );
+    assertEqual(client.getState().reconnectDelayMs, 3000, 'a repeated unpaired revocation backs off instead of looping at the base delay');
+  }
+}
+
+async function runOrdinaryKeepaliveLivenessCase() {
+  console.log('\n--- ordinary keepalive liveness ---');
+
+  const harness = buildClientHarness();
+  const client = harness.exports.mcpBridgeClient;
+  assertEqual(harness.exports.MCP_PING_MISS_LIMIT, 3, 'the ordinary keepalive tolerates exactly three unanswered ticks');
+
+  client.connect();
+  await flushMicrotasks();
+  const socket = harness.sockets[0];
+  socket.open();
+  const ping = harness.timers.intervals.find((timer) => timer.delay === 25000 && !timer.cleared);
+  assert(!!ping, 'an open socket owns exactly one ordinary keepalive interval');
+
+  ping.fn();
+  assertDeepEqual(
+    Object.keys(JSON.parse(socket.sent[0])).sort(),
+    ['ts', 'type'],
+    'the ordinary keepalive ping keeps its exact nonce-free shape',
+  );
+  socket.receive({ type: 'mcp:pong', ts: Date.now() });
+  assertEqual(client._unansweredPings, 0, 'the two-key daemon pong is recorded instead of dropped');
+  assert(Number.isSafeInteger(client.getState().lastPongAt), 'the two-key daemon pong records a liveness timestamp');
+
+  ping.fn();
+  ping.fn();
+  ping.fn();
+  assertEqual(socket.sent.length, 4, 'three unanswered ticks still send their pings');
+  assertEqual(socket.closeCount, 0, 'three unanswered ticks do not yet close the socket');
+
+  ping.fn();
+  await flushMicrotasks();
+  assertEqual(socket.closeCount, 1, 'the fourth unanswered tick closes the silent socket exactly once');
+  assertEqual(socket.sent.length, 4, 'the closing tick sends no further ping');
+  assertEqual(client.getState().lastDisconnectReason, 'keepalive_timeout', 'a keepalive close is labelled as such');
+  assertEqual(client.getState().status, 'reconnecting', 'a keepalive close runs the ordinary reconnect path');
+  assertEqual(client._ws, null, 'a keepalive close releases the socket so connect() can no longer no-op');
+  assertEqual(
+    harness.timers.intervals.filter((t) => t.delay === 25000 && !t.cleared).length,
+    0,
+    'the keepalive interval is cleared by the close it caused',
+  );
+  assertEqual(
+    harness.timers.timeouts.filter((t) => !t.cleared && t.delay >= 2000).length,
+    1,
+    'a keepalive close schedules exactly one reconnect timer',
+  );
+  const grace = harness.timers.timeouts.find((t) => t.delay === harness.exports.MCP_KEEPALIVE_CLOSE_GRACE_MS);
+  assert(!!grace, 'a keepalive close arms a grace timer for a stalled closing handshake');
+  grace.fn();
+  await flushMicrotasks();
+  assertEqual(
+    harness.timers.timeouts.filter((t) => !t.cleared && t.delay >= 2000).length,
+    1,
+    'the grace timer does nothing once the close has already run',
+  );
+}
+
+async function runStalledKeepaliveCloseCase() {
+  console.log('\n--- keepalive close whose handshake never completes ---');
+
+  const harness = buildClientHarness({ deferClose: true });
+  const client = harness.exports.mcpBridgeClient;
+  assertEqual(harness.exports.MCP_KEEPALIVE_CLOSE_GRACE_MS, 1000, 'a stalled close is abandoned after one second, like a pairing reload');
+
+  client.connect();
+  await flushMicrotasks();
+  const socket = harness.sockets[0];
+  socket.open();
+  const ping = harness.timers.intervals.find((timer) => timer.delay === 25000 && !timer.cleared);
+  for (let tick = 0; tick < 4; tick += 1) ping.fn();
+  await flushMicrotasks();
+
+  assertEqual(socket.closeCount, 1, 'the silent socket is asked to close');
+  assertEqual(socket.readyState, 2, 'the peer never finishes the handshake, so the socket sits in CLOSING');
+  assertEqual(client._ws, socket, 'nothing has reconnected yet while the close is pending');
+  const reconnectTimers = () => harness.timers.timeouts.filter((t) => !t.cleared && t.delay >= 2000).length;
+  assertEqual(reconnectTimers(), 0, 'no reconnect is scheduled before the grace expires');
+
+  const grace = harness.timers.timeouts.find((t) => t.delay === 1000 && !t.cleared);
+  assert(!!grace, 'the keepalive close armed its grace timer');
+  grace.fn();
+  await flushMicrotasks();
+  assertEqual(client._ws, null, 'the grace timer releases the stalled socket');
+  assertEqual(client.getState().status, 'reconnecting', 'the grace timer runs the ordinary reconnect path');
+  assertEqual(client.getState().lastDisconnectReason, 'keepalive_timeout', 'the abandoned close keeps its keepalive label');
+  assertEqual(reconnectTimers(), 1, 'the grace timer schedules exactly one reconnect');
+  assertEqual(
+    harness.timers.intervals.filter((t) => t.delay === 25000 && !t.cleared).length,
+    0,
+    'the keepalive interval stops with the abandoned socket',
+  );
+
+  socket.finishClose({ code: 1006, reason: '' });
+  await flushMicrotasks();
+  assertEqual(reconnectTimers(), 1, 'the late real close does not schedule a second reconnect');
+  assertEqual(client.getState().lastDisconnectReason, 'keepalive_timeout', 'the late real close does not relabel the disconnect');
+
+  latestTimeout(harness).fn();
+  await flushMicrotasks();
+  assertEqual(harness.sockets.length, 2, 'the reconnect opens a fresh socket');
+}
+
+async function runReconnectAlarmBackstopCase() {
+  console.log('\n--- reconnect alarm backstop ---');
+
+  const harness = buildClientHarness({ throwOnConstruct: true });
+  harness.exports.mcpBridgeClient.connect();
+  await flushMicrotasks();
+  const alarm = harness.chrome.alarms._created().find((entry) => entry.name === 'fsb-mcp-bridge-reconnect');
+  assert(!!alarm, 'a failed connect arms the reconnect alarm');
+  assertEqual(alarm.delayInMinutes, 0.5, 'the first wake still lands at the alarms floor');
+  assertEqual(alarm.periodInMinutes, 1, 'the alarm repeats so one onopen clear cannot end the eviction backstop');
+}
+
 async function run() {
   await runBrowserFirstReconnectCase();
   await runServiceWorkerWakeCase();
@@ -1620,6 +1941,12 @@ async function run() {
   await runAsyncExtObserverCases();
   runAsyncObserverSourceShapeCase();
   await runDelegationHeartbeatCases();
+  await runAuthRefusalBackoffCase();
+  await runCloseEventShapeCase();
+  await runRevokedPairingSelfHealCase();
+  await runOrdinaryKeepaliveLivenessCase();
+  await runStalledKeepaliveCloseCase();
+  await runReconnectAlarmBackstopCase();
 
   console.log(`\n=== Results: ${passed} passed, ${failed} failed ===`);
   process.exit(failed > 0 ? 1 : 0);

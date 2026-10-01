@@ -2424,8 +2424,17 @@ async function runAgentIteration(sessionId, options) {
             ? getGuideForTask('', 'https://' + domain)
             : null;
           if (guide) {
+            var guideGuidance = JSON.stringify({
+              selectors: guide.selectors || {},
+              workflows: {
+                createPost: guide.workflows && guide.workflows.createPost,
+                replyToPost: guide.workflows && guide.workflows.replyToPost
+              },
+              warnings: Array.isArray(guide.warnings) ? guide.warnings.slice(0, 6) : [],
+              guidance: typeof guide.guidance === 'string' ? guide.guidance.slice(0, 1600) : ''
+            }).slice(0, 5000);
             result = { success: true, hadEffect: false, error: null, navigationTriggered: false,
-              result: { domain: domain, site: guide.site || guide.name || domain, guidance: JSON.stringify(guide.selectors || guide) } };
+              result: { domain: domain, site: guide.site || guide.name || domain, guidance: guideGuidance } };
           } else {
             result = { success: true, hadEffect: false, error: null, navigationTriggered: false,
               result: { domain: domain, guidance: 'No site guide available for ' + domain + '. Use get_page_snapshot and get_dom_snapshot to discover elements.' } };

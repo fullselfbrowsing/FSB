@@ -571,6 +571,49 @@ async function bridge_disconnect_partial() {
   check(parsed && parsed.trigger_id === 'trg_disconnect', 'bridge disconnect result keeps trigger_id');
   check(parsed && parsed.outcome === 'detached', 'bridge disconnect armed state maps to detached outcome');
   check(parsed && parsed.partial_state && parsed.partial_state.status === 'armed', 'bridge disconnect returns partial_state snapshot');
+  check(parsed && parsed.disconnect_reason === 'bridge_disconnected', 'a cause-free disconnect reports bridge_disconnected');
+}
+
+async function bridge_disconnect_reports_cause() {
+  console.log('\n--- bridge_disconnect_reports_cause ---');
+  const triggersModule = await loadBuildModule(path.join('tools', 'triggers.js'));
+  const agentScope = await loadAgentScope();
+
+  async function triggerAfterDisconnect(reason) {
+    const harness = createToolHarness({
+      onSendAndWait: async (message) => {
+        if (message.type === 'mcp:trigger') {
+          const error = new Error('Extension disconnected');
+          error.bridgeDisconnectReason = reason;
+          throw error;
+        }
+        if (message.type === 'mcp:get-trigger-status') {
+          return {
+            success: true,
+            trigger_id: message.payload.trigger_id,
+            status: 'armed',
+            watch: 'live-observe',
+          };
+        }
+        return { success: true };
+      },
+    });
+    triggersModule.registerTriggerTools(harness.server, harness.bridge, harness.queue, agentScope);
+    const result = await harness.getHandler('trigger')({
+      trigger_id: 'trg_disconnect_cause',
+      selector: '#price',
+      condition: { kind: 'changed' },
+      watch: 'live-observe',
+    }, harness.createExtra());
+    return readJsonTextResult(result);
+  }
+
+  const reaped = await triggerAfterDisconnect('extension_reaped_pong_timeout');
+  check(reaped && reaped.sw_evicted === true, 'a reaped socket still arms the sw_evicted recovery');
+  check(reaped && reaped.disconnect_reason === 'extension_reaped_pong_timeout', 'the bridge-attached cause reaches the caller');
+
+  const malformed = await triggerAfterDisconnect('Not A Code!');
+  check(malformed && malformed.disconnect_reason === 'bridge_disconnected', 'a malformed cause falls back to bridge_disconnected');
 }
 
 async function run() {
@@ -582,6 +625,7 @@ async function run() {
   await blocking_timeout_marks_timed_out();
   await blocking_rearm_fire_resolves_still_armed();
   await bridge_disconnect_partial();
+  await bridge_disconnect_reports_cause();
 
   console.log(`\n=== Results: ${passed} passed, ${failed} failed ===`);
   process.exit(failed > 0 ? 1 : 0);

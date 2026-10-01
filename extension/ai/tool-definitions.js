@@ -242,12 +242,13 @@ const TOOL_REGISTRY = [
 
   withVisualSessionFields({
     name: 'type_text',
-    description: 'Type text into an input field by selector. When to use: to fill text inputs, search boxes, or text areas. Use clear_input first if the field already has text. Returns confirmation of typed text. Related: clear_input (clear field before typing), press_enter (submit after typing), get_dom_snapshot (find input selectors). Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64). Pass tab_id only when this agent owns multiple tabs; auto-resolves otherwise.',
+    description: 'Replace text in an editable field by selector. Set clear_first to false to append. Returns the rendered text after insertion. Related: clear_input, press_enter, get_dom_snapshot. Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64).',
     inputSchema: {
       type: 'object',
       properties: {
         selector: { type: 'string', description: 'CSS selector or element ref for the input field (e.g., "#email", "input[name=search]", or "e12" from get_dom_snapshot)' },
         text: { type: 'string', description: 'Text to type into the field' },
+        clear_first: { type: 'boolean', description: 'Replace existing text (default true); false appends at the end.' },
         tab_id: { type: 'number', description: 'Optional. Tab id this action targets. Omit when the calling agent owns exactly one tab; pass to disambiguate when the agent owns multiple. Single-tab agents and legacy popup/sidepanel/autopilot do not need to pass this.' }
       },
       required: ['selector', 'text']
@@ -869,11 +870,13 @@ const TOOL_REGISTRY = [
 
   withVisualSessionFields({
     name: 'insert_text',
-    description: 'Insert text at the current cursor position via CDP Input.insertText. Bypasses DOM event dispatch and directly inserts into the focused element. When to use: for canvas-based editors (Excalidraw, Google Docs, Slack) where type_text does not work because there is no real input element. The element must already be focused or in edit mode (use double_click_at or click_at first). Related: type_text (for real DOM input fields), double_click_at (enter edit mode in canvas editors before inserting text), click_at (focus canvas element before inserting). Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64). Pass tab_id only when this agent owns multiple tabs; auto-resolves otherwise.',
+    description: 'Insert text through CDP at the caret by default. Use position end to append or replace_all to replace an editable field; selector can identify that field. Canvas editors require focus first. Related: type_text, double_click_at, click_at. Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64).',
     inputSchema: {
       type: 'object',
       properties: {
         text: { type: 'string', description: 'Text to insert at current cursor position via CDP' },
+        position: { type: 'string', enum: ['caret', 'end', 'replace_all'], description: 'Insertion position; defaults to caret.' },
+        selector: { type: 'string', description: 'Optional CSS selector identifying exactly one editable field.' },
         tab_id: { type: 'number', description: 'Optional. Tab id this action targets. Omit when the calling agent owns exactly one tab; pass to disambiguate when the agent owns multiple. Single-tab agents and legacy popup/sidepanel/autopilot do not need to pass this.' }
       },
       required: ['text']
@@ -1459,6 +1462,13 @@ function getToolByName(name) {
   return TOOL_REGISTRY.find(t => t.name === name) || null;
 }
 
+/** Resolve the public MCP name or the content/CDP verb sent on the bridge. */
+function getToolByNameOrVerb(nameOrVerb) {
+  const name = typeof nameOrVerb === 'string' ? nameOrVerb.trim() : '';
+  if (!name) return null;
+  return getToolByName(name) || getToolByName(_iconVerbMap().get(name));
+}
+
 /**
  * Get all read-only tools (those that bypass the mutation queue).
  * @returns {ToolDefinition[]} Array of read-only tool definitions
@@ -1518,7 +1528,7 @@ function resolveIconActivity(nameOrVerb) {
   if (!raw) return 'sweep';
   const name = _iconVerbMap().get(raw) || raw;
   if (name === 'invoke_capability') return null;
-  const def = getToolByName(name);
+  const def = getToolByNameOrVerb(raw);
   if ((def && def._readOnly === true) || ICON_READ_ONLY_EXTRAS.has(name)) return 'orbit';
   return 'sweep';
 }
@@ -1533,6 +1543,7 @@ if (typeof module !== 'undefined' && module.exports) {
     TOOL_REGISTRY,
     resolveIconActivity,
     getToolByName,
+    getToolByNameOrVerb,
     getReadOnlyTools,
     getToolsByRoute,
     VISUAL_SESSION_FIELDS,

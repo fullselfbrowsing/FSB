@@ -15,7 +15,7 @@ registerSiteGuide({
   site: 'Twitter/X',
   category: 'Social Media',
   patterns: [
-    /(twitter\.com|x\.com)/i
+    /^https?:\/\/(?:www\.|mobile\.)?(?:twitter\.com|x\.com)(?::\d+)?(?:[/?#]|$)/i
   ],
   guidance: `AUTOPILOT STRATEGY HINTS (from v0.9.7 diagnostic SCROLL-01):
 - [scroll] Track tweets by permalink href Set -- virtualized DOM recycles ~20-40 elements
@@ -45,7 +45,10 @@ SEARCH:
 COMPOSING POSTS:
 - Post text area: [data-testid="tweetTextarea_0"]
 - Post/Tweet button (inline): [data-testid="tweetButtonInline"]
+- Post/Tweet button (modal composer): [data-testid="tweetButton"]
 - New post button (sidebar): [data-testid="SideNav_NewTweet_Button"] or [aria-label="Post"]
+- Before posting, inspect the account switcher and confirm the intended account is active.
+- Before replying, open the intended post and verify its author and permalink in the reply context.
 - Schedule post: [data-testid="scheduleOption"] or [aria-label="Schedule post"]
 - Grok AI enhancement: [data-testid="grokImgGen"] or [aria-label="Enhance your post with Grok"]
 - Add GIF: [data-testid="gifSearchButton"]
@@ -137,8 +140,9 @@ SCROLL TIMING:
     searchBox: 'input[data-testid="SearchBox_Search_Input"]',
     tweetCompose: '[data-testid="tweetTextarea_0"]',
     tweetButton: '[data-testid="tweetButtonInline"]',
+    modalTweetButton: '[data-testid="tweetButton"]',
     replyInput: '[data-testid="tweetTextarea_0"]',
-    replyButton: '[data-testid="tweetButton"]',
+    replyButton: '[data-testid="tweetButtonInline"]',
     likeButton: '[data-testid="like"]',
     retweetButton: '[data-testid="retweet"]',
     dmButton: '[data-testid="sendDMFromProfile"]',
@@ -173,11 +177,19 @@ SCROLL TIMING:
   },
   workflows: {
     createPost: [
+      'Check [data-testid="SideNav_AccountSwitcher_Button"] and confirm the intended account',
       'Click the compose area or new post button',
       'Wait for editor to load',
       'Type the post content in [data-testid="tweetTextarea_0"]',
-      'Click the Post button [data-testid="tweetButtonInline"]',
+      'Use [data-testid="tweetButtonInline"] for inline compose or [data-testid="tweetButton"] for the modal composer',
       'Verify post was created'
+    ],
+    replyToPost: [
+      'Open the intended post and verify its author and /status/ permalink',
+      'Confirm the active account in [data-testid="SideNav_AccountSwitcher_Button"]',
+      'Type in the reply editor [data-testid="tweetTextarea_0"]',
+      'Click the Post button inside the same reply composer only once',
+      'Verify the reply appears under the intended post before trying again'
     ],
     sendMessage: [
       'Click Messages tab [data-testid="AppTabBar_DirectMessage_Link"]',
@@ -209,6 +221,8 @@ SCROLL TIMING:
     ]
   },
   warnings: [
+    'Check the active account before posting, replying, liking, or sending a message',
+    'Check the author and permalink of the parent post before replying',
     'Twitter/X rate-limits actions -- avoid rapid clicking',
     'X/Twitter now has Grok AI integration for post enhancement via [data-testid="grokImgGen"]',
     'X/Twitter navigation uses AppTabBar data-testid pattern -- more reliable than aria-label which can include notification counts',

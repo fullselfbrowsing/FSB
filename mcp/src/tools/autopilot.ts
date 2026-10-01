@@ -1,6 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { isBridgeDisconnectError, type WebSocketBridge } from '../bridge.js';
+import { bridgeDisconnectReason, isBridgeDisconnectError, type WebSocketBridge } from '../bridge.js';
 import type { TaskQueue } from '../queue.js';
 import type { MCPResponse } from '../types.js';
 import { AgentScope } from '../agent-scope.js';
@@ -193,6 +193,11 @@ export function registerAutopilotTools(
             const swEvictedResult = {
               success,
               sw_evicted: true,
+              // sw_evicted is the recovery arm and stays true for every
+              // disconnect, but an authorization revocation is not an eviction.
+              // Reporting the real cause is what keeps "restart Chrome" from
+              // being the only advice anyone ever gets.
+              disconnect_reason: bridgeDisconnectReason(sendErr) ?? 'bridge_disconnected',
               partial_state,
               last_heartbeat_at,
             };

@@ -23,6 +23,8 @@ export const FSB_ERROR_MESSAGES: Record<string, string> = {
     'Content script communication failed. The content script may not be injected or has lost connection. Try navigating to the page again.',
   'injection_failed':
     'Content script injection failed. The extension could not inject its scripts into the current page.',
+  'PAGE_UNRESPONSIVE':
+    'The page did not answer within the bounded wait. Navigation and tab close remain available. Inspect the page before retrying an action.',
   'queue_timeout':
     'Tool call timed out waiting in queue. Another task is running and did not complete in time. Use stop_task to cancel the running task, or use read-only tools which bypass the queue.',
   'invalid_client_label':
@@ -42,6 +44,7 @@ const LAYER_LABELS = {
   bridge: 'Bridge ownership',
   extension: 'Extension attachment',
   contentScript: 'Content script availability',
+  pageResponsiveness: 'Page responsiveness',
   toolRouting: 'Tool routing',
   agentScope: 'Agent scope',
   tabOwnership: 'Tab ownership',
@@ -75,6 +78,7 @@ const CODE_ONLY_ERROR_KEYS = new Set([
   'SCREENSHOT_TOO_LARGE',
   'SCREENSHOT_DEBUGGER_BUSY',
   'SCREENSHOT_CAPTURE_FAILED',
+  'PAGE_UNRESPONSIVE',
 ]);
 
 type LayerLabel = typeof LAYER_LABELS[keyof typeof LAYER_LABELS];
@@ -251,6 +255,12 @@ function buildLayeredDetail(
           : 'The active tab does not have a ready content script.',
         nextAction: 'Refresh or navigate the tab, wait for page readiness, then retry.',
       };
+    case 'PAGE_UNRESPONSIVE':
+      return {
+        detected: LAYER_LABELS.pageResponsiveness,
+        why: 'The current page did not respond before the page-read deadline.',
+        nextAction: 'Use navigate or close_tab to recover the tab. Inspect page state before repeating any mutation.',
+      };
     case 'restricted_active_tab':
       return {
         detected: LAYER_LABELS.restrictedPage,
@@ -424,6 +434,16 @@ export function mapFSBError(
 ): { content: Array<{ type: 'text'; text: string }>; isError?: boolean } {
   if (fsbResult && fsbResult.success) {
     return { content: [{ type: 'text', text: JSON.stringify(fsbResult, null, 2) }] };
+  }
+
+  if (fsbResult?.mayHaveExecuted === true) {
+    return {
+      isError: true,
+      content: [{
+        type: 'text',
+        text: `Detected: Action outcome unknown\nWhy: ${String(fsbResult.error || 'The action was dispatched but its result was not confirmed.')}\nNext action: Inspect the current page with read_page or get_dom_snapshot before deciding whether to retry.\n\n${JSON.stringify({ outcome: 'unknown', mayHaveExecuted: true })}`,
+      }],
+    };
   }
 
   const errorMsg = String(fsbResult?.error ?? '');

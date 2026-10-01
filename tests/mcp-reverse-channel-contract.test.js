@@ -188,8 +188,8 @@ async function run() {
   const indexSource = fs.readFileSync(path.join(repoRoot, 'mcp', 'src', 'index.ts'), 'utf8');
   assert(indexSource.includes("import { startServeDelegation } from './agent-providers/serve-delegation.js';"));
   assert(
-    /const lifecycle = await startServeDelegation\(\{\s*host,\s*port,\s*dependencies:\s*\{\s*prepareBridgeAuth: \(\) => \{\s*rotateBridgeSessionSecret\(\);\s*\},\s*\},\s*\}\);/.test(indexSource),
-    'serve startup injects secret rotation only through the post-bind lifecycle hook',
+    /const lifecycle = await startServeDelegation\(\{\s*host,\s*port,\s*dependencies:\s*\{\s*prepareBridgeAuth: \(\) => \{\s*if \(!readBridgeAuthState\(\)\) rotateBridgeSessionSecret\(\);\s*\},\s*\},\s*\}\);/.test(indexSource),
+    'serve startup mints a bridge secret only when none exists, and only through the post-bind lifecycle hook',
   );
   const supervisorSource = fs.readFileSync(
     path.join(repoRoot, 'mcp', 'src', 'agent-providers', 'spawn-supervisor.ts'),

@@ -404,8 +404,8 @@ async function main() {
     );
     assert.match(
       indexSource,
-      /const lifecycle = await startServeDelegation\(\{\s*host,\s*port,\s*dependencies:\s*\{\s*prepareBridgeAuth: \(\) => \{\s*rotateBridgeSessionSecret\(\);\s*\},\s*\},\s*\}\);/,
-      'serve mode composes inventory startup with post-bind bridge-auth rotation',
+      /const lifecycle = await startServeDelegation\(\{\s*host,\s*port,\s*dependencies:\s*\{\s*prepareBridgeAuth: \(\) => \{\s*if \(!readBridgeAuthState\(\)\) rotateBridgeSessionSecret\(\);\s*\},\s*\},\s*\}\);/,
+      'serve mode composes inventory startup with post-bind bridge-auth minting',
     );
     const serveLifecycleSource = fs.readFileSync(
       path.join(repoRoot, 'mcp', 'src', 'agent-providers', 'serve-delegation.ts'),

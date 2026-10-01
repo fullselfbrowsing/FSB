@@ -1,7 +1,7 @@
 'use strict';
 
 const path = require('path');
-const { pathToFileURL } = require('url');
+const { fileURLToPath, pathToFileURL } = require('url');
 
 let passed = 0;
 let failed = 0;
@@ -246,11 +246,38 @@ function makeNativeHostInspection(overrides = {}) {
   };
 }
 
+function makeDisconnectedSnapshot(lastDisconnectReason) {
+  return makeSnapshot({
+    extensionConnected: false,
+    lastDisconnectReason,
+    bridgeTopology: { ...makeSnapshot().bridgeTopology, extensionConnected: false, lastDisconnectReason },
+  });
+}
+
 async function run() {
   const diagnosticsUrl = pathToFileURL(path.join(repoRoot, 'mcp', 'build', 'diagnostics.js')).href;
   const indexUrl = pathToFileURL(path.join(repoRoot, 'mcp', 'build', 'index.js')).href;
   const diagnostics = await import(diagnosticsUrl);
-  const indexModule = await import(indexUrl);
+  // Importing the CLI entry runs its main(). With no command that starts the
+  // stdio server, which attaches to whatever hub owns the real bridge port and
+  // exits the moment stdin is closed -- ending this suite early with status 0.
+  // `help` is the one command that is synchronous and side-effect free.
+  const savedArgv = process.argv;
+  const savedLog = console.log;
+  const importOutput = [];
+  process.argv = [process.execPath, fileURLToPath(indexUrl), 'help'];
+  console.log = (...args) => { importOutput.push(args.join(' ')); };
+  let indexModule;
+  try {
+    indexModule = await import(indexUrl);
+  } finally {
+    process.argv = savedArgv;
+    console.log = savedLog;
+  }
+  assert(
+    importOutput.join('\n').includes('Usage:'),
+    'importing the CLI entry takes the inert help branch instead of starting a server',
+  );
   const compatibilityUrl = pathToFileURL(
     path.join(repoRoot, 'mcp', 'build', 'agent-providers', 'compatibility.js'),
   ).href;
@@ -483,6 +510,14 @@ async function run() {
       extensionConnected: false,
       bridgeTopology: { ...makeSnapshot().bridgeTopology, extensionConnected: false },
     }), 'extension'],
+    ['revoked authorization', makeDisconnectedSnapshot('extension_auth_revoked'), 'auth'],
+    ['policy close', makeDisconnectedSnapshot('extension_policy_closed'), 'auth'],
+    ['plain extension disconnect', makeDisconnectedSnapshot('extension_disconnected'), 'extension'],
+    ['reaped extension', makeDisconnectedSnapshot('extension_reaped_pong_timeout'), 'extension'],
+    ['reconnected after a revocation', makeSnapshot({
+      lastDisconnectReason: 'extension_auth_revoked',
+      bridgeTopology: { ...makeSnapshot().bridgeTopology, lastDisconnectReason: 'extension_auth_revoked' },
+    }), 'healthy'],
     ['content_script', makeSnapshot({
       contentScript: {
         ready: false,
@@ -527,6 +562,11 @@ async function run() {
   assert(packageDoctor.includes('Why:'), 'doctor output includes Why:');
   assert(packageDoctor.includes('Next action:'), 'doctor output includes Next action:');
   assert(packageDoctor.includes('Package / version parity'), 'doctor output includes package label');
+  const authDoctor = indexModule.formatDoctor(
+    diagnostics.applyDiagnosticClassification(makeDisconnectedSnapshot('extension_auth_revoked')),
+  );
+  assert(authDoctor.includes('Bridge authorization'), 'doctor output names the authorization layer');
+  assert(authDoctor.includes('pair --reset'), 'doctor output gives the pairing reset as the next action');
 
   const formattedSnapshot = makeSnapshot();
   const formattedDoctor = indexModule.formatDoctor(formattedSnapshot);

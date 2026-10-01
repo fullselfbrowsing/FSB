@@ -1,0 +1,11 @@
+<!doctype html><html><body>
+<div id="draft" contenteditable="true" role="textbox"><div>old</div><div>line</div></div>
+<div id="ambiguous"><div contenteditable="true"></div><div contenteditable="true"></div></div>
+<button id="send" type="button">Send</button><pre id="result">pending</pre>
+<script>
+window.FSB={sessionId:'fixture',_modules:{},logger:{logActionExecution(){},debug(){},warn(){},error(){},logActionRecord(){}},querySelectorWithShadow:s=>document.querySelector(s),smartEnsureReady:async()=>({ready:true,scrolled:false}),isCanvasBasedEditor:()=>false,detectCodeEditor:()=>({isCodeEditor:false}),getClassName:e=>e.className||'',generateMessagingSelectors:()=>[]};
+</script>
+<script src="../../extension/content/actions.js"></script>
+<script>
+(async()=>{try{const a=await FSB.tools.type({selector:'#draft',text:'first\nsecond',clear_first:true});const first=document.querySelector('#draft').innerText;const b=await FSB.tools.type({selector:'#draft',text:'\nthird',clear_first:false});const second=document.querySelector('#draft').innerText;const c=await FSB.tools.type({selector:'#ambiguous',text:'bad'});let clickEvents=0;document.querySelector('#send').addEventListener('click',()=>clickEvents++);const d=await FSB.tools.click({selector:'#send'});document.querySelector('#result').textContent=JSON.stringify({a,b,c,d,first,second,clickEvents});}catch(e){document.querySelector('#result').textContent='ERROR '+e.stack}})();
+</script></body></html>

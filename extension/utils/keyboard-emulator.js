@@ -343,6 +343,7 @@ class KeyboardEmulator {
    * @returns {Promise<Object>} Result object
    */
   async sendKeyEvent(tabId, type, key, modifiers = {}) {
+    let commandSent = false;
     try {
       const attached = await this.attachDebugger(tabId);
       if (!attached) {
@@ -399,6 +400,7 @@ class KeyboardEmulator {
         }
       }
 
+      commandSent = true;
       await chrome.debugger.sendCommand({ tabId }, 'Input.dispatchKeyEvent', params);
 
       return { 
@@ -416,6 +418,7 @@ class KeyboardEmulator {
         error: error.message || 'Key event dispatch failed',
         code: error && error.code,
         retryable: Boolean(error && error.retryable),
+        mayHaveExecuted: commandSent,
         key,
         type
       };
@@ -434,7 +437,7 @@ class KeyboardEmulator {
       // Send keyDown event
       const downResult = await this.sendKeyEvent(tabId, 'keyDown', key, modifiers);
       if (!downResult.success) {
-        return downResult;
+        return { ...downResult, keyDownDispatched: Boolean(downResult.mayHaveExecuted) };
       }
 
       // Small delay between down and up
@@ -443,7 +446,7 @@ class KeyboardEmulator {
       // Send keyUp event
       const upResult = await this.sendKeyEvent(tabId, 'keyUp', key, modifiers);
       if (!upResult.success) {
-        return upResult;
+        return { ...upResult, keyDownDispatched: true, mayHaveExecuted: true };
       }
 
       return {

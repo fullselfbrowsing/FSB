@@ -56,7 +56,7 @@ const REPO_ROOT = path.resolve(__dirname, '..');
 // The INV-01 lock value -- reused verbatim from tests/tool-definitions-parity.test.js:52.
 // The two out-of-registry capability tools must NOT have moved this.
 const EXPECTED_NON_TRIGGER_REGISTRY_HASH =
-  'b9c30a5a61fbcdae60b851aebfea90d0961cb95d95c3c2adbf8357014bbbd7b9';
+  '5b9731c2282461ff85a4e5ac5bab18ca6d4eae55f8695cdcaf0fb8d457322c29';
 
 // The four trigger tools sit IN TOOL_REGISTRY but are excluded from the frozen
 // non-trigger baseline (mirrors tool-definitions-parity.test.js:35).
@@ -154,7 +154,7 @@ async function run() {
   const actualHash = registryHash(nonTriggerTools);
   check(
     actualHash === EXPECTED_NON_TRIGGER_REGISTRY_HASH,
-    'EXPECTED_NON_TRIGGER_REGISTRY_HASH is unchanged -- the two new tools are out-of-registry (INV-01)'
+    'non-trigger registry hash matches the approved text-editing schema baseline'
   );
   if (actualHash !== EXPECTED_NON_TRIGGER_REGISTRY_HASH) {
     console.error('  DIAG: expected ' + EXPECTED_NON_TRIGGER_REGISTRY_HASH);

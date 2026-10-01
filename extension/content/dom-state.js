@@ -529,6 +529,18 @@
         return null;
       }
 
+      if (!selector.includes('>>>') && !selector.startsWith('/')) {
+        try {
+          if (typeof element.matches !== 'function' || !element.matches(selector)) {
+            this.cache.delete(selector);
+            return null;
+          }
+        } catch (_error) {
+          this.cache.delete(selector);
+          return null;
+        }
+      }
+
       return element;
     }
 
