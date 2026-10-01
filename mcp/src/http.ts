@@ -109,7 +109,8 @@ export async function startHttpServer(options: HttpServerOptions): Promise<Runni
       return;
     }
 
-    const url = new URL(req.url ?? '/', `http://${options.host}:${options.port}`);
+    // Only the path is read; a fixed base keeps an IPv6 bind host from breaking URL parsing.
+    const url = new URL(req.url ?? '/', 'http://localhost');
 
     if (url.pathname === '/health') {
       sendJson(res, 200, {
