@@ -460,8 +460,11 @@
 
   /**
    * Write HTML to the system clipboard and simulate paste via CDP.
+   * nothingInserted is true only when the paste provably left the document
+   * unchanged, so the caller can fall back to a plain insert without duplicating text.
    */
   async function clipboardPasteHTML(html, plainText) {
+    let pasteDispatched = false;
     try {
       const htmlBlob = new Blob([html], { type: 'text/html' });
       const textBlob = new Blob([plainText], { type: 'text/plain' });
@@ -474,24 +477,28 @@
         await navigator.clipboard.write([clipboardItem]);
       } catch (clipErr) {
         logger.warn('clipboardPasteHTML: clipboard.write() failed', { error: clipErr.message });
-        return { success: false, method: 'clipboard_paste_html', error: 'Clipboard write failed: ' + clipErr.message };
+        return { success: false, method: 'clipboard_paste_html', error: 'Clipboard write failed: ' + clipErr.message,
+          nothingInserted: true };
       }
 
       logger.debug('clipboardPasteHTML: clipboard written', { htmlLength: html.length, plainTextLength: plainText.length });
 
       await new Promise(r => setTimeout(r, 150));
 
-      const getDocTextLength = () => {
+      // Canvas-rendered Docs have no paragraph elements, so an unchanged length there proves nothing.
+      const measureDocText = () => {
         const pageElements = document.querySelectorAll('.kix-paragraphrenderer');
-        let totalLen = 0;
+        let length = 0;
         for (const el of pageElements) {
-          totalLen += (el.textContent || '').length;
+          length += (el.textContent || '').length;
         }
-        return totalLen;
+        return { length, measurable: pageElements.length > 0 };
       };
-      const textLenBefore = getDocTextLength();
+      const before = measureDocText();
+      const textLenBefore = before.length;
 
       const isMac = navigator.userAgent?.includes('Macintosh') || navigator.platform?.includes('Mac');
+      pasteDispatched = true;
       const pasteResult = await new Promise((resolve, reject) => {
         chrome.runtime.sendMessage({
           action: 'keyboardDebuggerAction',
@@ -514,13 +521,20 @@
 
       await new Promise(r => setTimeout(r, 800));
 
-      const textLenAfter = getDocTextLength();
+      // A large paste can land late; recheck before treating it as absent.
+      let after = measureDocText();
+      for (let recheck = 0; recheck < 3 && after.length <= textLenBefore; recheck++) {
+        await new Promise(r => setTimeout(r, 400));
+        after = measureDocText();
+      }
+      const textLenAfter = after.length;
       const textInserted = textLenAfter > textLenBefore;
 
       logger.debug('clipboardPasteHTML: verification', {
         textLenBefore,
         textLenAfter,
         textInserted,
+        measurable: before.measurable && after.measurable,
         expectedMinChars: Math.min(plainText.length, 10)
       });
 
@@ -531,14 +545,15 @@
           method: 'clipboard_paste_html',
           error: 'Paste dispatched but no text appeared in editor (cursor may not be in editable area)',
           textLenBefore,
-          textLenAfter
+          textLenAfter,
+          nothingInserted: before.measurable && after.measurable && textLenAfter === textLenBefore
         };
       }
 
       return { success: true, method: 'clipboard_paste_html', textLenBefore, textLenAfter };
     } catch (error) {
       logger.warn('clipboardPasteHTML failed', { error: error.message });
-      return { success: false, method: 'clipboard_paste_html', error: error.message };
+      return { success: false, method: 'clipboard_paste_html', error: error.message, nothingInserted: !pasteDispatched };
     }
   }
 

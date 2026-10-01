@@ -2958,10 +2958,14 @@ const tools = {
             logger.warn('Formatted paste was not confirmed', {
               error: pasteResult.error,
               textLenBefore: pasteResult.textLenBefore,
-              textLenAfter: pasteResult.textLenAfter
+              textLenAfter: pasteResult.textLenAfter,
+              nothingInserted: !!pasteResult.nothingInserted
             });
-            return { success: false, outcome: 'unknown', mayHaveExecuted: true,
-              error: 'Formatted paste may have executed. Inspect the document before retrying.' };
+            if (!pasteResult.nothingInserted) {
+              return { success: false, outcome: 'unknown', mayHaveExecuted: true,
+                error: 'Formatted paste may have executed. Inspect the document before retrying.' };
+            }
+            // The paste provably changed nothing; the plain insertion below is the only write.
           } catch (fmtError) {
             return { success: false, outcome: 'unknown', mayHaveExecuted: true,
               error: 'Formatted paste may have executed. Inspect the document before retrying.' };
