@@ -19227,7 +19227,7 @@ async function prepareCdpTextTarget(tabId, selector, position) {
       // Canvas editors (Google Docs) keep focus in a nested text-event frame
       // this script cannot reach. The key and insert events go to that focused
       // frame, so its own editor handles the selection.
-      if (!css && element?.tagName === 'IFRAME') return { success: true };
+      if (!css && element?.tagName === 'IFRAME') return { success: true, nestedFrame: true };
       if (element?.isContentEditable) {
         element = element.closest('[contenteditable="true"], [contenteditable=""]') || element;
       } else if (element && !['INPUT', 'TEXTAREA'].includes(element.tagName)) {
@@ -19276,11 +19276,22 @@ async function dispatchCdpTextInsertion(tabId, text, position = 'caret', selecto
   }
   const prepared = await prepareCdpTextTarget(tabId, selector, position);
   if (!prepared.success) return prepared;
+  const isMac = typeof navigator !== 'undefined' &&
+    (/Macintosh/.test(navigator.userAgent || '') || /Mac/.test(navigator.platform || ''));
+  const modifiers = isMac ? 4 : 2;
   const input = (async () => {
+    if (position === 'end' && prepared.nestedFrame) {
+      // The caret is in a frame the lookup could not reach, so move it with
+      // the editor's own end-of-document shortcut.
+      const endKey = isMac
+        ? { key: 'ArrowDown', code: 'ArrowDown', windowsVirtualKeyCode: 40, nativeVirtualKeyCode: 40 }
+        : { key: 'End', code: 'End', windowsVirtualKeyCode: 35, nativeVirtualKeyCode: 35 };
+      await chrome.debugger.sendCommand({ tabId }, 'Input.dispatchKeyEvent', {
+        type: 'keyDown', modifiers, ...endKey, commands: ['moveToEndOfDocument']
+      });
+      await chrome.debugger.sendCommand({ tabId }, 'Input.dispatchKeyEvent', { type: 'keyUp', modifiers, ...endKey });
+    }
     if (position === 'replace_all') {
-      const isMac = typeof navigator !== 'undefined' &&
-        (/Macintosh/.test(navigator.userAgent || '') || /Mac/.test(navigator.platform || ''));
-      const modifiers = isMac ? 4 : 2;
       await chrome.debugger.sendCommand({ tabId }, 'Input.dispatchKeyEvent', {
         type: 'keyDown', modifiers, key: 'a', code: 'KeyA',
         windowsVirtualKeyCode: 65, nativeVirtualKeyCode: 65,

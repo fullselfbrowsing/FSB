@@ -77,6 +77,19 @@ test('CDP replacement reaches a canvas editor focused inside a nested frame', as
   assert.equal(commands[2].params.text, 'replacement');
 });
 
+test('CDP append moves the caret to the end of an editor focused inside a nested frame', async () => {
+  const commands = [];
+  const dispatch = loadCdpTextInsertion({ tagName: 'IFRAME', querySelectorAll: () => [] }, commands);
+  const result = await dispatch(42, ' more', 'end', null);
+  assert.equal(result.success, true);
+  assert.deepEqual(commands.map(c => c.method),
+    ['Input.dispatchKeyEvent', 'Input.dispatchKeyEvent', 'Input.insertText']);
+  assert.deepEqual(commands.map(c => c.params.type).slice(0, 2), ['keyDown', 'keyUp']);
+  assert.equal(commands[0].params.key, 'ArrowDown');
+  assert.equal(commands[0].params.modifiers, 4);
+  assert.equal(commands[0].params.commands[0], 'moveToEndOfDocument');
+});
+
 test('CDP replacement still refuses a focused element that is not editable', async () => {
   const commands = [];
   const dispatch = loadCdpTextInsertion(

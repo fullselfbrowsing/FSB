@@ -133,6 +133,30 @@ test('Chrome fixture inserts multiline Draft text once and dispatches one click'
     }
   });
 
+test('appending to an editor focused inside a nested frame lands at its end',
+  { skip: !chrome }, async () => {
+    const { ws, close } = await openFixture('nested-text-editor.html');
+    try {
+      const editorText = 'document.querySelector("#editor").contentDocument?.body?.textContent';
+      for (let i = 0; i < 50 && await evaluate(ws, editorText) !== 'hello'; i++) await sleep(100);
+      assert.equal(await evaluate(ws, `(() => {
+        const doc = document.querySelector('#editor').contentDocument;
+        doc.body.focus();
+        const range = doc.createRange();
+        range.setStart(doc.body.firstChild, 0);
+        doc.getSelection().removeAllRanges();
+        doc.getSelection().addRange(range);
+        return document.activeElement.tagName;
+      })()`), 'IFRAME');
+      const { dispatch } = loadCdpTextInsertion(ws);
+      const result = await dispatch(1, ' world', 'end', null);
+      assert.equal(result.success, true);
+      assert.equal(await evaluate(ws, editorText), 'hello world');
+    } finally {
+      await close();
+    }
+  });
+
 test('a hung page gets no CDP text once its target lookup times out',
   { skip: !chrome }, async () => {
     const { ws, close } = await openFixture('nested-text-editor.html');
