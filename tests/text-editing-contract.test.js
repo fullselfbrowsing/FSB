@@ -90,6 +90,20 @@ test('CDP append moves the caret to the end of an editor focused inside a nested
   assert.equal(commands[0].params.commands[0], 'moveToEndOfDocument');
 });
 
+test('CDP append reaches a field focused inside a shadow root', async () => {
+  const commands = [];
+  const input = { tagName: 'INPUT', value: 'hello', focus() {},
+    setSelectionRange(start, end) { this.selection = [start, end]; } };
+  const host = { tagName: 'SHADOW-FIELD', isContentEditable: false, querySelectorAll: () => [],
+    shadowRoot: { activeElement: input } };
+  const dispatch = loadCdpTextInsertion(host, commands);
+  const result = await dispatch(42, ' world', 'end', null);
+  assert.equal(result.success, true, result.error);
+  assert.deepEqual(input.selection, [5, 5]);
+  assert.deepEqual(commands.map(c => c.method), ['Input.insertText']);
+  assert.equal(commands[0].params.text, ' world');
+});
+
 test('CDP replacement still refuses a focused element that is not editable', async () => {
   const commands = [];
   const dispatch = loadCdpTextInsertion(

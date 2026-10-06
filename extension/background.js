@@ -19225,6 +19225,8 @@ async function prepareCdpTextTarget(tabId, selector, position) {
           element = matches[0];
         } else {
           element = document.activeElement;
+          // Focus inside a web component is reported as its host.
+          while (element?.shadowRoot?.activeElement) element = element.shadowRoot.activeElement;
         }
       } catch (error) {
         return { success: false, error: `Invalid editable selector: ${error.message}` };

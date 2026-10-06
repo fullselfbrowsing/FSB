@@ -157,6 +157,49 @@ test('appending to an editor focused inside a nested frame lands at its end',
     }
   });
 
+test('typing into a field inside a shadow root lands the text',
+  { skip: !chrome }, async () => {
+    const { ws, close } = await openFixture('shadow-text-field.html');
+    try {
+      let raw = 'pending';
+      for (let i = 0; i < 100; i++) {
+        raw = await evaluate(ws, 'document.querySelector("#result")?.textContent');
+        if (raw && raw !== 'pending') break;
+        await sleep(100);
+      }
+      assert.notEqual(raw, 'pending', 'fixture completed within 10 seconds');
+      const { result, value } = JSON.parse(raw);
+      assert.equal(result.success, true, result.error);
+      assert.equal(value, 'typed');
+    } finally {
+      await close();
+    }
+  });
+
+test('appending to a field focused inside a shadow root lands at its end',
+  { skip: !chrome }, async () => {
+    const { ws, close } = await openFixture('shadow-text-field.html');
+    try {
+      for (let i = 0; i < 100 && await evaluate(ws, 'document.querySelector("#result")?.textContent') === 'pending'; i++) {
+        await sleep(100);
+      }
+      const inner = 'document.querySelector("shadow-field").shadowRoot.querySelector("#inner")';
+      assert.equal(await evaluate(ws, `(() => {
+        const input = ${inner};
+        input.value = 'hello';
+        input.focus();
+        input.setSelectionRange(0, 0);
+        return document.activeElement.tagName;
+      })()`), 'SHADOW-FIELD');
+      const { dispatch } = loadCdpTextInsertion(ws);
+      const result = await dispatch(1, ' world', 'end', null);
+      assert.equal(result.success, true, result.error);
+      assert.equal(await evaluate(ws, `${inner}.value`), 'hello world');
+    } finally {
+      await close();
+    }
+  });
+
 test('a hung page gets no CDP text once its target lookup times out',
   { skip: !chrome }, async () => {
     const { ws, close } = await openFixture('nested-text-editor.html');

@@ -3063,9 +3063,11 @@ const tools = {
       element.focus();
       await waitForStability('type_keystroke');
 
-      // Final verification - ensure element is truly focused and ready
+      // Final verification - ensure element is truly focused and ready.
+      // Inside a shadow root the document only reports the host, so ask the
+      // element's own root which element has focus.
       const focusAttempts = 0;
-      if (document.activeElement !== element) {
+      if (element.getRootNode().activeElement !== element) {
         return { success: false, outcome: 'failed', mayHaveExecuted: false,
           error: 'Editable field did not receive focus' };
       }
@@ -3410,7 +3412,7 @@ const tools = {
         final_text: finalCheck,
         pressedEnter: !!params.pressEnter,
         clickedFirst: !shouldSkipClick,
-        focused: document.activeElement === element,
+        focused: element.getRootNode().activeElement === element,
         focusAttempts: focusAttempts,
         scrolled: readiness.scrolled || false,
         insertionSuccess: isContentEditable ? insertionSuccess : true,
