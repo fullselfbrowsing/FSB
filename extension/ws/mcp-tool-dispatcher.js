@@ -3531,12 +3531,15 @@ async function handleFailTaskRoute({ params, payload }) {
 // `change_report_hint`) attached, or the unmodified response on any error.
 
 const _CHANGE_REPORT_SAFETY_NET_MS = 500;
+const _PAGE_INJECTION_TIMEOUT_MS = 750;
+let _changeReportSeq = 0;
 
 // Page-context harvest start: captures beforeState and starts a scoped
-// MutationObserver. Stores the handle on window.__fsbChangeReportHandle.
+// MutationObserver. Stores the handle under its token in
+// window.__fsbChangeReportHandles so overlapping harvests stay separate.
 // This function is serialized and injected via chrome.scripting.executeScript;
 // it must be self-contained (no closures over SW scope).
-function _fsbHarvestStartInPage(targetSelector) {
+function _fsbHarvestStartInPage(targetSelector, token, deadline) {
   try {
     function getClassName(el) {
       if (!el) return '';
@@ -3587,15 +3590,31 @@ function _fsbHarvestStartInPage(targetSelector) {
       }
       return cur || target.parentElement || document.documentElement;
     }
+    // The service worker stops waiting for this injection at `deadline`. An
+    // observer installed after that would never be stopped.
+    if (Date.now() > deadline) return { ok: false, expired: true };
+    const handles = window.__fsbChangeReportHandles || (window.__fsbChangeReportHandles = {});
     const beforeState = captureState();
     const root = resolveScope(targetSelector);
+    const handle = { beforeState, mutations: [], mutationCount: 0, startedAt: Date.now() };
+    // A stop that never arrives must not leave the observer running: retain
+    // at most 5000 records and disconnect after two minutes.
+    handle.expiry = setTimeout(() => {
+      if (handle.observer) {
+        try { handle.observer.disconnect(); } catch (_) { /* idempotent */ }
+      }
+      if (handles[token] === handle) delete handles[token];
+    }, 120000);
+    handles[token] = handle;
     if (typeof MutationObserver === 'undefined' || !root) {
-      window.__fsbChangeReportHandle = { beforeState, mutations: [], startedAt: Date.now(), noObserver: true };
+      handle.noObserver = true;
       return { ok: true, beforeState };
     }
-    const handle = { beforeState, mutations: [], startedAt: Date.now() };
     const observer = new MutationObserver((records) => {
-      for (let i = 0; i < records.length; i++) handle.mutations.push(records[i]);
+      handle.mutationCount += records.length;
+      for (let i = 0; i < records.length && handle.mutations.length < 5000; i++) {
+        handle.mutations.push(records[i]);
+      }
     });
     try {
       observer.observe(root, {
@@ -3605,7 +3624,6 @@ function _fsbHarvestStartInPage(targetSelector) {
       });
       handle.observer = observer;
     } catch (_) { /* observation failed; handle continues with empty mutations */ }
-    window.__fsbChangeReportHandle = handle;
     return { ok: true, beforeState };
   } catch (e) {
     return { ok: false, error: String(e && e.message || e) };
@@ -3614,7 +3632,7 @@ function _fsbHarvestStartInPage(targetSelector) {
 
 // Page-context harvest stop: serializes mutation records, captures afterState,
 // disconnects the observer, returns plain-data shape buildChangeReport accepts.
-function _fsbHarvestStopInPage() {
+function _fsbHarvestStopInPage(token) {
   try {
     function getClassName(el) {
       if (!el) return '';
@@ -3695,8 +3713,11 @@ function _fsbHarvestStopInPage() {
         get className() { return this._className; }
       };
     }
-    const handle = window.__fsbChangeReportHandle;
+    const handles = window.__fsbChangeReportHandles || {};
+    const handle = handles[token];
     if (!handle) return { ok: true, mutations: [], afterState: captureState(), settle_ms: 0 };
+    delete handles[token];
+    clearTimeout(handle.expiry);
     if (handle.observer && typeof handle.observer.disconnect === 'function') {
       try { handle.observer.disconnect(); } catch (_) { /* idempotent */ }
     }
@@ -3718,8 +3739,7 @@ function _fsbHarvestStopInPage() {
       });
     }
     const afterState = captureState();
-    delete window.__fsbChangeReportHandle;
-    return { ok: true, mutations: serialized, afterState, settle_ms };
+    return { ok: true, mutations: serialized, afterState, settle_ms, mutation_count: handle.mutationCount };
   } catch (e) {
     return { ok: false, error: String(e && e.message || e) };
   }
@@ -3796,7 +3816,7 @@ async function _injectFn(tabId, func, args) {
     });
     const results = await Promise.race([
       injection,
-      new Promise((_, reject) => setTimeout(() => reject(new Error('Page injection timed out')), 750))
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Page injection timed out')), _PAGE_INJECTION_TIMEOUT_MS))
     ]);
     return results && results[0] ? results[0].result : null;
   } catch (_) {
@@ -3851,8 +3871,13 @@ async function wrapWithChangeReport(ctx) {
   // missing chrome.scripting), skip wrap and run action without change_report.
   const beforeUrl = await _safeGetTabUrl(tabId);
   const targetSelector = _resolveTargetSelector(params);
-  const startResult = await _injectFn(tabId, _fsbHarvestStartInPage, [targetSelector]);
+  const harvestToken = `${Date.now()}-${++_changeReportSeq}`;
+  const startResult = await _injectFn(tabId, _fsbHarvestStartInPage,
+    [targetSelector, harvestToken, Date.now() + _PAGE_INJECTION_TIMEOUT_MS]);
   const startedHarvest = !!(startResult && startResult.ok);
+  // A start that timed out can still run once the page is idle. Queue its
+  // stop behind it so that observer is torn down as soon as it exists.
+  if (!startedHarvest) _injectFn(tabId, _fsbHarvestStopInPage, [harvestToken]);
 
   let response;
   try {
@@ -3881,13 +3906,13 @@ async function wrapWithChangeReport(ctx) {
 
     let stop = null;
     if (!crossOrigin) {
-      stop = await _injectFn(tabId, _fsbHarvestStopInPage, []);
+      stop = await _injectFn(tabId, _fsbHarvestStopInPage, [harvestToken]);
     }
 
     const builders = _resolveChangeReportBuilders();
     if (!builders) {
       // Builder unavailable; clean up the page-side handle and skip.
-      if (!crossOrigin) await _injectFn(tabId, _fsbHarvestStopInPage, []);
+      if (!crossOrigin) await _injectFn(tabId, _fsbHarvestStopInPage, [harvestToken]);
       return response;
     }
 
@@ -3895,18 +3920,20 @@ async function wrapWithChangeReport(ctx) {
     let afterState = (stop && stop.afterState) || { url: afterUrl };
     let mutations = (stop && stop.mutations) || [];
     let settleMs = (stop && typeof stop.settle_ms === 'number') ? stop.settle_ms : 0;
+    let mutationCount = (stop && typeof stop.mutation_count === 'number') ? stop.mutation_count : undefined;
 
     if (crossOrigin) {
       beforeState = beforeState || { url: beforeUrl };
       afterState = { url: afterUrl };
       mutations = [];
+      mutationCount = undefined;
     }
 
     const raw = builders.buildChangeReport(
       beforeState,
       afterState,
       mutations,
-      { crossOrigin, settleMs }
+      { crossOrigin, settleMs, mutationCount }
     );
     if (partial) raw.partial = true;
     const capped = builders.applyChangeReportSizeCap(raw);
