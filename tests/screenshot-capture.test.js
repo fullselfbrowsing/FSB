@@ -28,6 +28,7 @@ function harness(options = {}) {
     async detach(target) { calls.push(['detach', target.tabId]); },
     async sendCommand(target, method, params) {
       calls.push([method, params]);
+      if (options.hangMethod === method) return new Promise(() => {});
       if (options.failMethod === method) throw new Error(`failed ${method}`);
       if (method === 'Page.getLayoutMetrics') return metrics;
       if (method === 'Runtime.evaluate') return { result: { value: options.dpr || 1 } };
@@ -42,6 +43,7 @@ function harness(options = {}) {
   const scripting = {
     async executeScript(request) {
       calls.push(['script', request.func.name, request.args]);
+      if (options.hangScript === request.func.name) return new Promise(() => {});
       if (request.func.name === 'elementRectScript') {
         return [{ result: options.elementRect === undefined
           ? { x: 40, y: 60, width: 100, height: 50 }
@@ -192,6 +194,35 @@ test('capture failure still restores emulation, overlay, touch, and attachment',
   assert.ok(h.calls.some((call) => call[0] === 'Emulation.clearDeviceMetricsOverride'));
   assert.ok(h.calls.some((call) => call[0] === 'script' && call[1] === 'overlayRemoveScript'));
   assert.equal(h.calls.at(-1)[0], 'detach');
+});
+
+test('a hung page script fails the capture at its deadline and detaches', async () => {
+  const h = harness({ hangScript: 'settleScript' });
+  const result = await captureEngine.capture({
+    device_mode: 'mobile', viewport_width: 390, viewport_height: 844,
+  }, 7, { ...h.options, deadlineMs: 20 });
+  assert.equal(result.success, false);
+  assert.equal(result.code, 'PAGE_UNRESPONSIVE');
+  assert.equal(h.calls.some((call) => call[0] === 'Page.captureScreenshot'), false);
+  // Resets would queue behind the hung page; ending the session drops them.
+  assert.equal(h.calls.some((call) => call[0] === 'Emulation.clearDeviceMetricsOverride'), false);
+  assert.ok(h.calls.some((call) => call[0] === 'script' && call[1] === 'overlayRemoveScript'));
+  assert.equal(h.calls.at(-1)[0], 'detach');
+});
+
+test('a hung CDP command is cut off at the deadline before the lease is released', async () => {
+  const h = harness({ hangMethod: 'Page.getLayoutMetrics' });
+  let callsAtRelease = null;
+  const result = await captureEngine.capture({}, 7, {
+    ...h.options,
+    deadlineMs: 20,
+    skipLease: false,
+    lease: {
+      acquire: async () => ({ release: () => { callsAtRelease = h.calls.map((call) => call[0]); } }),
+    },
+  });
+  assert.equal(result.code, 'PAGE_UNRESPONSIVE');
+  assert.equal(callsAtRelease.at(-1), 'detach');
 });
 
 test('rejects oversized output before capture and never tiles or downscales', async () => {

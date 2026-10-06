@@ -12,6 +12,9 @@
   const MAX_EDGE = 16384;
   const MAX_PIXELS = 25000000;
   const MAX_BYTES = 25 * 1024 * 1024;
+  // A hung page never settles an injected script or a CDP command. Give up
+  // before the 20s lease watchdog and the MCP call timeout do.
+  const CAPTURE_DEADLINE_MS = 15000;
   const VALID_MODES = new Set(['viewport', 'full_page', 'region', 'element']);
   const VALID_COORDINATE_SPACES = new Set(['viewport', 'page']);
   const VALID_DEVICE_MODES = new Set(['current', 'desktop', 'mobile']);
@@ -429,6 +432,13 @@
     let metricsApplied = false;
     let touchApplied = false;
     let overlayStyleId = null;
+    let expiry = null;
+    let expiredError = null;
+    let deadlineTimer = null;
+    const bounded = (work) => (expiry ? Promise.race([work, expiry]) : work);
+    const deadlineMs = finite(options.deadlineMs) && options.deadlineMs > 0
+      ? options.deadlineMs
+      : CAPTURE_DEADLINE_MS;
     const startedAt = Date.now();
 
     if (!Number.isInteger(targetTabId) || targetTabId <= 0) {
@@ -475,6 +485,18 @@
         throw error;
       }
 
+      // Every step from here waits on the page. One shared deadline turns a
+      // hung page into a typed error while this capture still owns the tab;
+      // detaching in the finally block fails any command still pending.
+      expiry = new Promise((_, reject) => {
+        deadlineTimer = setTimeout(() => {
+          expiredError = new ScreenshotError('PAGE_UNRESPONSIVE',
+            'The page did not respond before the capture deadline. Navigate or close the tab to recover it.');
+          reject(expiredError);
+        }, deadlineMs);
+      });
+      expiry.catch(() => {});
+
       const emulating = params.device_mode !== 'current';
       if (emulating) {
         const mobile = params.device_mode === 'mobile';
@@ -494,36 +516,36 @@
             ? { type: 'landscapePrimary', angle: 90 }
             : { type: 'portraitPrimary', angle: 0 };
         }
-        await debuggerApi.sendCommand({ tabId: targetTabId }, 'Emulation.setDeviceMetricsOverride', metricsParams);
+        await bounded(debuggerApi.sendCommand({ tabId: targetTabId }, 'Emulation.setDeviceMetricsOverride', metricsParams));
         metricsApplied = true;
         if (mobile) {
-          await debuggerApi.sendCommand({ tabId: targetTabId }, 'Emulation.setTouchEmulationEnabled', {
+          await bounded(debuggerApi.sendCommand({ tabId: targetTabId }, 'Emulation.setTouchEmulationEnabled', {
             enabled: true,
             maxTouchPoints: 5
-          });
+          }));
           touchApplied = true;
         }
       }
 
       if (!params.include_fsb_overlays) {
         overlayStyleId = `fsb-screenshot-hide-${captureId(cryptoApi)}`;
-        await executeScript(scripting, targetTabId, overlayInstallScript, [overlayStyleId]);
+        await bounded(executeScript(scripting, targetTabId, overlayInstallScript, [overlayStyleId]));
       }
 
       try {
-        await executeScript(scripting, targetTabId, settleScript, [params.wait_ms]);
+        await bounded(executeScript(scripting, targetTabId, settleScript, [params.wait_ms]));
       } catch (_error) {
         warnings.push({ code: 'SCREENSHOT_SETTLE_INCOMPLETE', message: 'The page settle wait did not complete; the live frame was captured.' });
       }
       if (overlayStyleId) {
-        await executeScript(scripting, targetTabId, overlayInstallScript, [overlayStyleId]);
+        await bounded(executeScript(scripting, targetTabId, overlayInstallScript, [overlayStyleId]));
       }
 
-      const metrics = await debuggerApi.sendCommand({ tabId: targetTabId }, 'Page.getLayoutMetrics');
+      const metrics = await bounded(debuggerApi.sendCommand({ tabId: targetTabId }, 'Page.getLayoutMetrics'));
       let elementRect = null;
       if (params.mode === 'element') {
         try {
-          elementRect = await executeScript(scripting, targetTabId, elementRectScript, [params.selector]);
+          elementRect = await bounded(executeScript(scripting, targetTabId, elementRectScript, [params.selector]));
         } catch (error) {
           fail('SCREENSHOT_TARGET_NOT_FOUND', `Unable to resolve element ${params.selector}: ${error.message}`);
         }
@@ -533,10 +555,10 @@
       let scaleFactor = params.device_mode === 'current' ? 1 : params.device_scale_factor;
       if (params.device_mode === 'current') {
         try {
-          const evaluated = await debuggerApi.sendCommand({ tabId: targetTabId }, 'Runtime.evaluate', {
+          const evaluated = await bounded(debuggerApi.sendCommand({ tabId: targetTabId }, 'Runtime.evaluate', {
             expression: 'window.devicePixelRatio',
             returnByValue: true
-          });
+          }));
           const measured = evaluated && evaluated.result && evaluated.result.value;
           if (finite(measured) && measured > 0) scaleFactor = measured;
         } catch (_error) {
@@ -545,12 +567,12 @@
       }
       assertSize(Math.ceil(rect.width * scaleFactor), Math.ceil(rect.height * scaleFactor));
 
-      const captured = await debuggerApi.sendCommand({ tabId: targetTabId }, 'Page.captureScreenshot', {
+      const captured = await bounded(debuggerApi.sendCommand({ tabId: targetTabId }, 'Page.captureScreenshot', {
         format: 'png',
         fromSurface: true,
         captureBeyondViewport: params.mode !== 'viewport',
         clip: { x: rect.x, y: rect.y, width: rect.width, height: rect.height, scale: 1 }
-      });
+      }));
       const imageData = captured && captured.data;
       const bytes = decodeBase64(imageData);
       const output = pngDimensions(bytes);
@@ -592,17 +614,23 @@
         }
       };
     } catch (error) {
-      return errorResult(error);
+      return errorResult(expiredError || error);
     } finally {
+      clearTimeout(deadlineTimer);
       if (overlayStyleId) {
-        try { await executeScript(scripting, targetTabId, overlayRemoveScript, [overlayStyleId]); } catch (_error) { /* best-effort */ }
+        // A hung page holds the restore until it answers again, so past the
+        // deadline it runs on its own instead of pinning the tab.
+        const restore = executeScript(scripting, targetTabId, overlayRemoveScript, [overlayStyleId]).catch(() => {});
+        if (!expiredError) await restore;
       }
-      if (touchApplied) {
+      // Past the deadline these would queue behind the hung command. The
+      // detach below ends the session, which drops its emulation overrides.
+      if (touchApplied && !expiredError) {
         try {
           await debuggerApi.sendCommand({ tabId: targetTabId }, 'Emulation.setTouchEmulationEnabled', { enabled: false });
         } catch (_error) { /* best-effort */ }
       }
-      if (metricsApplied) {
+      if (metricsApplied && !expiredError) {
         try { await debuggerApi.sendCommand({ tabId: targetTabId }, 'Emulation.clearDeviceMetricsOverride'); } catch (_error) { /* best-effort */ }
       }
       if (attached) {
