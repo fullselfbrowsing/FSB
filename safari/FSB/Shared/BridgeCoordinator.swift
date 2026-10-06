@@ -233,6 +233,10 @@ final class BridgeCoordinator {
                 self.pollTimer = nil
                 guard let parked = self.parkedPoll else { return }
                 self.parkedPoll = nil
+                // The port was waiting on us until now, so silence starts here,
+                // not when this poll arrived. Otherwise a held 5s poll used up
+                // the whole silence window, and every idle cycle armed a linger.
+                self.lastContactAt = Date()
                 parked(self.hasOutbound
                        ? self.nextOutbound()
                        : ["v": NativeFraming.protocolVersion, "t": "pollempty"])
@@ -254,6 +258,7 @@ final class BridgeCoordinator {
         parkedPoll = nil
         pollTimer?.cancel()
         pollTimer = nil
+        lastContactAt = Date()
         parked(nextOutbound())
     }
 
@@ -327,6 +332,7 @@ final class BridgeCoordinator {
             parkedPoll = nil
             pollTimer?.cancel()
             pollTimer = nil
+            lastContactAt = Date()
             parked(msg)
             return
         }
@@ -408,24 +414,27 @@ final class BridgeCoordinator {
     /// native side no real port-teardown callback, so inferred silence is the
     /// only available trigger. `noteContact()` aborts the linger if the port
     /// turns out to still be alive.
-    func portDisconnected() {
-        queue.async {
-            self.cancelLinger()
-            guard self.socket != nil else { return }
-            let timer = DispatchSource.makeTimerSource(queue: self.queue)
-            timer.schedule(deadline: .now() + Self.lingerSeconds)
-            timer.setEventHandler { [weak self] in
-                guard let self else { return }
-                self.lingerTimer = nil
-                // Nobody adopted it. Close :7225 so the server sees a real
-                // disconnect and arms its own eviction recovery.
-                self.retirePreviousPort()
-                self.discardSocket(reason: "port_gone")
-            }
-            timer.resume()
-            self.lingerTimer = timer
-            self.enforceLingerCap()
+    ///
+    /// Runs on `queue`, synchronously. Deferring it with `queue.async` let an
+    /// `open` or `poll` land between the watchdog's silence check and the
+    /// linger arming; that contact cancelled nothing, and the linger then
+    /// closed a live socket without the extension ever hearing about it.
+    private func portDisconnected() {
+        cancelLinger()
+        guard socket != nil else { return }
+        let timer = DispatchSource.makeTimerSource(queue: queue)
+        timer.schedule(deadline: .now() + Self.lingerSeconds)
+        timer.setEventHandler { [weak self] in
+            guard let self else { return }
+            self.lingerTimer = nil
+            // Nobody adopted it. Close :7225 so the server sees a real
+            // disconnect and arms its own eviction recovery.
+            self.retirePreviousPort()
+            self.discardSocket(reason: "port_gone")
         }
+        timer.resume()
+        lingerTimer = timer
+        enforceLingerCap()
     }
 
     /// Buffer overflow during the linger means we can no longer present a

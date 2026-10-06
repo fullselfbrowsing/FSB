@@ -281,6 +281,26 @@ function extensionResourcePaths(pbx) {
       const enqueueCode = sliceFn('    private func enqueueInbound(', '\n    }');
       passAssert(/enforceLingerCap\(\)/.test(enqueueCode),
         'enqueueInbound enforces the linger buffer cap on every frame');
+
+      // The watchdog checks silence on `queue`. A queue.async hop before arming
+      // the linger let a poll or open land in between, and the linger then
+      // closed a live socket with no `closed` frame to tell the extension.
+      const lingerCode = sliceFn('    private func portDisconnected()', '    /// Buffer overflow during the linger');
+      passAssert(lingerCode.length > 0 && !/queue\.async/.test(lingerCode),
+        'portDisconnected arms the linger in the same queue turn as the silence check');
+
+      // Silence counts from when a held poll is answered, not from its arrival;
+      // otherwise the 5s poll wait alone fills the 5s silence window.
+      const pollCode = sliceFn('    func handlePoll(', '    private func enqueueInbound(');
+      const flushCode = sliceFn('    private func flushToPoll()', '\n    }');
+      const deliverCode = sliceFn('    private func deliver(', '\n    }');
+      const retireCode = sliceFn('    private func retirePreviousPort()', '\n    }\n');
+      passAssert(/self\.parkedPoll = nil\s+self\.lastContactAt = Date\(\)/.test(pollCode),
+        'the poll timer stamps contact when it answers the held poll');
+      passAssert(/lastContactAt = Date\(\)/.test(flushCode), 'flushToPoll stamps contact when it answers the held poll');
+      passAssert(/lastContactAt = Date\(\)/.test(deliverCode), 'deliver stamps contact when it answers the held poll');
+      passAssert(retireCode.length > 0 && !/lastContactAt/.test(retireCode),
+        'retirePreviousPort does not stamp contact for a port that is going away');
     } else {
       passAssert(true, 'BridgeCoordinator.swift not present (skipped)');
     }

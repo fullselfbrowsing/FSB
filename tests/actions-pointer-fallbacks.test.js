@@ -77,7 +77,7 @@ function makeEl(tag, opts = {}) {
   return el;
 }
 
-function buildEnv({ hit, scroller, active, execOk = true }) {
+function buildEnv({ hit, scroller, active, execOk = true, pageScroller }) {
   const calls = { exec: [], stability: [] };
   class Ev {
     constructor(type, init) {
@@ -101,7 +101,7 @@ function buildEnv({ hit, scroller, active, execOk = true }) {
   const html = makeEl('html');
   const doc = {
     body, documentElement: html,
-    scrollingElement: scroller || html,
+    scrollingElement: pageScroller || scroller || html,
     activeElement: active || null,
     elementFromPoint: () => hit,
     querySelector: () => hit,
@@ -251,6 +251,46 @@ const DEGRADED_NOTE = /chrome\.debugger unavailable/;
     passAssertEqual(scroller.scrollTop, 0, 'a consumed map zoom does not also scroll its ancestor');
     passAssertEqual(r.scrolled.top, 0, 'reports zero observed scroll for a consumed wheel tick');
     passAssert(calls.stability.includes('scroll'), 'still waits for the listener-driven effect to settle');
+  }
+
+  console.log('\n=== 6b. wheelScrollAt walks the composed tree ===');
+  // _fsbHitTest lands inside open shadow roots, where parentElement is null at
+  // the shadow root. A walk that stops there scrolls the document instead, so
+  // each case gives the document its own scroller to catch exactly that.
+  {
+    const host = makeEl('x-panel', { id: 'host', scrollHeight: 5000, clientHeight: 500 });
+    const inner = makeEl('span');
+    inner.parentNode = { nodeType: 11, host };
+    const page = makeEl('html');
+    const { tools } = buildEnv({ hit: inner, scroller: host, pageScroller: page });
+    const r = await tools.wheelScrollAt({ x: 5, y: 5, deltaY: 240 });
+    passAssertEqual(host.scrollTop, 240, 'shadow content scrolls its scrolling host');
+    passAssertEqual(page.scrollCalls, 0, 'not the document');
+    passAssertEqual(r.scroller, '<x-panel#host>', 'reports the host as the scroller');
+  }
+  {
+    const outer = makeEl('div', { id: 'feed', scrollHeight: 5000, clientHeight: 500 });
+    const host = makeEl('x-card', { parentElement: outer });
+    const inner = makeEl('span');
+    inner.parentNode = { nodeType: 11, host };
+    const page = makeEl('html');
+    const { tools } = buildEnv({ hit: inner, scroller: outer, pageScroller: page });
+    await tools.wheelScrollAt({ x: 5, y: 5, deltaY: 240 });
+    passAssertEqual(outer.scrollTop, 240, 'continues past the host to a light-DOM scroller above it');
+    passAssertEqual(page.scrollCalls, 0, 'and does not fall through to the document');
+  }
+  {
+    // Slotted content is laid out inside the component's own scroll box, which
+    // its light-DOM parentElement (the host) skips straight over.
+    const shadowScroller = makeEl('div', { id: 'list', scrollHeight: 5000, clientHeight: 500 });
+    const slot = makeEl('slot', { parentElement: shadowScroller });
+    const host = makeEl('x-list');
+    const item = makeEl('li', { parentElement: host });
+    item.assignedSlot = slot;
+    const { tools } = buildEnv({ hit: item, scroller: shadowScroller, pageScroller: makeEl('html') });
+    await tools.wheelScrollAt({ x: 5, y: 5, deltaY: 240 });
+    passAssertEqual(shadowScroller.scrollTop, 240, 'slotted content scrolls the scroll box inside the component');
+    passAssertEqual(host.scrollCalls, 0, 'not the host it is slotted into');
   }
 
   console.log('\n=== 7. domInsertTextAt ===');

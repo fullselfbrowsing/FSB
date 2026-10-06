@@ -75,7 +75,9 @@ final class FileReadService {
                 return fail("file_too_large", detail: "\(size) > \(Self.maxFileBytes)")
             }
 
-            guard let data = try? Data(contentsOf: url, options: [.mappedIfSafe]) else {
+            // Read eagerly, never mapped: the handle outlives the security-scoped
+            // access the defer above releases, so it must hold its own copy.
+            guard let data = try? Data(contentsOf: url) else {
                 return fail("read_failed")
             }
 

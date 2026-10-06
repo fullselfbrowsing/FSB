@@ -338,6 +338,8 @@ const SAFARI = { caps: { cdp: false, trustedInput: false } };
     const chunkBytes = chunkMatch ? Number(chunkMatch[1]) * 1024 : 0;
     passAssertEqual(chunkBytes % 3, 0,
       'every full native chunk is divisible by 3 so independently encoded base64 has no padding');
+    passAssert(!/\.mappedIfSafe/.test(swift),
+      'beginRead copies the file eagerly; a read handle never depends on a mapping');
 
     const original = Buffer.alloc(chunkBytes * 2 + 17);
     for (let i = 0; i < original.length; i += 1) original[i] = i % 251;

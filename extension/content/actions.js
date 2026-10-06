@@ -6121,6 +6121,16 @@ const tools = {
     }
   }
 
+  // The parent as rendered. _fsbHitTest descends into open shadow roots, and
+  // parentElement stops at one, so the walk has to step from a shadow root to
+  // its host, and from slotted content into the slot that lays it out.
+  function _fsbComposedParent(node) {
+    if (node.assignedSlot) return node.assignedSlot;
+    if (node.parentElement) return node.parentElement;
+    const parent = node.parentNode;
+    return parent && parent.nodeType === 11 && parent.host ? parent.host : null;
+  }
+
   function _fsbScrollableAncestor(el) {
     let node = el;
     while (node && node !== document.body && node !== document.documentElement) {
@@ -6128,7 +6138,7 @@ const tools = {
       const canY = (style.overflowY === 'auto' || style.overflowY === 'scroll') && node.scrollHeight > node.clientHeight;
       const canX = (style.overflowX === 'auto' || style.overflowX === 'scroll') && node.scrollWidth > node.clientWidth;
       if (canY || canX) return node;
-      node = node.parentElement;
+      node = _fsbComposedParent(node);
     }
     return document.scrollingElement || document.documentElement;
   }
