@@ -6,7 +6,7 @@
 //  GrantedRoots). Safari native messaging caps a single message near 1 MB, so a
 //  read is a handshake plus N chunk fetches rather than one response:
 //
-//      {t:"readFile",  path}          -> {ok, token, name, mime, size, chunks}
+//      {t:"readFile",  path}          -> {ok, token, name, mime, size, chunks, resolvedPath}
 //      {t:"readChunk", token, i}      -> {ok, i, data(base64)}
 //
 //  Every failure is a TYPED reason string so the extension can surface
@@ -52,7 +52,7 @@ final class FileReadService {
                 return fail("path_not_absolute")
             }
 
-            guard let root = GrantedRoots.rootContaining(path) else {
+            guard let match = GrantedRoots.rootContaining(path) else {
                 // Report only WHETHER anything is granted, never the granted
                 // paths themselves. executeUploadFile deliberately keeps
                 // filesystem structure out of results and audit records, and the
@@ -60,9 +60,9 @@ final class FileReadService {
                 let granted = GrantedRoots.grantedPaths()
                 return fail(granted.isEmpty ? "no_granted_folders" : "outside_granted_folders")
             }
-            defer { root.url.stopAccessingSecurityScopedResource() }
+            defer { match.root.url.stopAccessingSecurityScopedResource() }
 
-            let url = URL(fileURLWithPath: path).resolvingSymlinksInPath().standardizedFileURL
+            let url = match.target
 
             var isDir: ObjCBool = false
             guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir), !isDir.boolValue else {
@@ -97,7 +97,12 @@ final class FileReadService {
                 "mime": Self.mimeType(for: url),
                 "size": data.count,
                 "chunks": chunks,
-                "chunkBytes": Self.chunkBytes
+                "chunkBytes": Self.chunkBytes,
+                // The denylist only ever saw the REQUESTED path, and a link in a
+                // broad grant (say ~) can be called notes.txt while naming
+                // ~/.ssh/id_rsa. The extension re-runs it on this before fetching
+                // a single chunk, and keeps it out of results and audit records.
+                "resolvedPath": url.path
             ]
         }
     }

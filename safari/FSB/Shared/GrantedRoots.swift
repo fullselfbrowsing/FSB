@@ -15,7 +15,8 @@
 //  LAYERING: this is an ADDITIONAL constraint, never a replacement. The
 //  sensitive-path denylist + audit chokepoint in background.js
 //  (executeUploadFile) still runs first, in the extension, before any native
-//  message is sent. A path must pass BOTH to be read.
+//  message is sent, and again on the resolved path FileReadService reports
+//  back, before any bytes are fetched. A path must pass BOTH to be read.
 //
 
 import Foundation
@@ -130,6 +131,14 @@ enum GrantedRoots {
         return Resolved(url: url, stale: stale)
     }
 
+    struct Containment {
+        /// Access already started; the caller owns the matching stop.
+        let root: Resolved
+        /// The target as resolved under `root`'s access. Read this url, never
+        /// the requested path: it is the one the containment check approved.
+        let target: URL
+    }
+
     /// Find the granted root that contains `path`, with access already started.
     ///
     /// Containment is checked on SYMLINK-RESOLVED, standardized paths and at a
@@ -138,19 +147,24 @@ enum GrantedRoots {
     ///     grant for /Users/me/Downloads
     ///   - without resolving symlinks, a link placed inside the granted folder
     ///     could point at ~/.ssh and escape the grant entirely
-    static func rootContaining(_ path: String) -> Resolved? {
-        let target = URL(fileURLWithPath: path).resolvingSymlinksInPath().standardizedFileURL
-        let targetComponents = target.pathComponents
-
+    ///
+    /// The target is resolved per root, only once that root's access has
+    /// started. Before then the sandbox hides a link inside the grant, and
+    /// resolvingSymlinksInPath does not fail on a link it cannot read -- it
+    /// returns the link's own path, which IS contained. Resolving up front let
+    /// a link to ~/.ssh pass this check and then be followed by the read.
+    static func rootContaining(_ path: String) -> Containment? {
         for data in storedBookmarks() {
             guard let resolved = resolve(data) else { continue }
             let root = resolved.url.resolvingSymlinksInPath().standardizedFileURL
+            let target = URL(fileURLWithPath: path).resolvingSymlinksInPath().standardizedFileURL
             let rootComponents = root.pathComponents
+            let targetComponents = target.pathComponents
 
             let contained = targetComponents.count > rootComponents.count
                 && Array(targetComponents.prefix(rootComponents.count)) == rootComponents
 
-            if contained { return Resolved(url: resolved.url, stale: resolved.stale) }
+            if contained { return Containment(root: resolved, target: target) }
             resolved.url.stopAccessingSecurityScopedResource()
         }
         return nil

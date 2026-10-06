@@ -19686,7 +19686,14 @@ async function executeUploadFileUnlocked(tabId, selector, filePath, options = {}
         return { success: false, error: 'upload_file blocked: the native file reader is unavailable', reason: 'native-reader-unavailable' };
       }
 
-      const read = await reader.readFile(filePath);
+      // The gate above only saw filePath. A symlink in a granted folder can
+      // name a secret under an innocent path, so the reader re-runs the same
+      // rules on the path the host actually opened.
+      const read = await reader.readFile(filePath, {
+        screenResolvedPath: (resolvedPath) => denylist.classify(resolvedPath, {
+          allowManagedScreenshot: options.allowManagedScreenshot === true
+        })
+      });
       if (!read || read.ok !== true) {
         const readReason = (read && read.reason) ? read.reason : 'native-read-failed';
         automationLogger.logActionExecution(null, 'cdpUploadFile', 'complete', { success: false, tabId, blocked: true, reason: readReason });

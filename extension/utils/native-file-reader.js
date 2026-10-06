@@ -10,7 +10,9 @@
  *
  *   1. extension/background.js executeUploadFile() runs the sensitive-path
  *      denylist + audit chokepoint FIRST, in the service worker, before any
- *      native message is sent. That is unchanged from Chrome.
+ *      native message is sent. That is unchanged from Chrome. The same rules
+ *      then run on the symlink-resolved path the host reports, before any
+ *      bytes are fetched (screenResolvedPath below).
  *   2. The container app will only serve files inside a folder the user
  *      explicitly granted (security-scoped bookmark, see GrantedRoots.swift).
  *      App Sandbox forbids reading arbitrary absolute paths -- this is true for
@@ -48,6 +50,8 @@
     read_failed: 'the file could not be read.',
     unknown_token: 'the read handle expired; retry the upload.',
     chunk_out_of_range: 'the native host returned an unexpected chunk index.',
+    unverified_path: 'the native host did not report which file it opened, so the sensitive-path check could not run.',
+    'denylist-error': 'the sensitive-path denylist failed while checking the resolved file.',
     native_unavailable:
       'the FSB companion app is not reachable. Make sure the FSB app has been launched at least once.'
   };
@@ -96,15 +100,46 @@
   }
 
   /**
+   * The caller's denylist cleared the path it was GIVEN. A symlink inside a
+   * granted folder can carry a harmless name while the host opened
+   * ~/.ssh/id_rsa, so the same rules run again on the path the host resolved.
+   * Fails closed: no reported path, or a screen that throws, refuses the read.
+   */
+  function screenResolvedPath(screen, resolvedPath) {
+    if (typeof resolvedPath !== 'string' || !resolvedPath) {
+      return { ok: false, reason: 'unverified_path', message: describeReason('unverified_path') };
+    }
+    let verdict;
+    try {
+      verdict = screen(resolvedPath);
+    } catch (_e) {
+      return { ok: false, reason: 'denylist-error', message: describeReason('denylist-error') };
+    }
+    if (verdict && verdict.denied) {
+      const reason = verdict.reason || 'sensitive-path';
+      return {
+        ok: false,
+        reason: reason,
+        message: 'the file resolves to a path that matches a sensitive-path denylist rule (' + reason +
+          '); uploading secrets is not permitted.'
+      };
+    }
+    return null;
+  }
+
+  /**
    * Read a file for upload.
    *
    * @param {string} path absolute path, already cleared by the denylist gate
+   * @param {{screenResolvedPath?: function(string): {denied:boolean, reason?:string}}} [options]
+   *        screenResolvedPath re-runs the denylist on the path the host actually
+   *        opened, before any chunk is fetched.
    * @returns {Promise<{ok:boolean, name?:string, mime?:string, size?:number,
    *                    dataB64?:string, reason?:string, message?:string}>}
    *          Never throws: every failure is a typed {ok:false, reason, message}
    *          so executeUploadFile can audit it like any other refusal.
    */
-  async function readFile(path) {
+  async function readFile(path, options) {
     let opened;
     try {
       opened = await sendNative({ v: 1, t: 'readFile', path: path });
@@ -128,6 +163,14 @@
         reason: 'file_too_large',
         message: describeReason('file_too_large', size + ' bytes / ' + chunks + ' chunks')
       };
+    }
+
+    if (options && typeof options.screenResolvedPath === 'function') {
+      const refusal = screenResolvedPath(options.screenResolvedPath, opened.resolvedPath);
+      if (refusal) {
+        await releaseHandle(opened.token);
+        return refusal;
+      }
     }
 
     const parts = [];

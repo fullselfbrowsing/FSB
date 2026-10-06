@@ -166,7 +166,7 @@ So the user grants folders once, in the FSB app ("Grant Folder Access…"). The
 grant is stored as a security-scoped bookmark in the shared App Group and
 resolved by the extension process.
 
-**Two independent constraints apply, in this order:**
+**Two independent constraints apply, in this order (the first one twice):**
 
 1. `background.js executeUploadFile()` runs the sensitive-path denylist + audit
    chokepoint, in the service worker, before any native message is sent. This is
@@ -174,7 +174,13 @@ resolved by the extension process.
 2. `FileReadService` serves the file only if it is contained by a granted root.
    Containment is checked on symlink-resolved paths at a path-component
    boundary, so neither `…/Downloads-old` nor a symlink planted inside a granted
-   folder can escape the grant.
+   folder can escape the grant. The path is resolved only after the root's
+   security-scoped access starts: before that the sandbox hides the link, and
+   `resolvingSymlinksInPath` quietly returns it unresolved.
+3. The host reports the resolved path back, and the denylist runs again on it
+   before any chunk is fetched. A link inside a broad grant (say `~`) can be
+   named `notes.txt` and point at `~/.ssh/id_rsa`, and step 1 only ever saw
+   the name.
 
 The read is a handshake plus N chunk fetches (`readFile` → `readChunk`) because
 Safari caps a single native message near 1 MB; files are bounded at 32 MB. The

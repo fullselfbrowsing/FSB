@@ -24,6 +24,7 @@ const ROOT = path.resolve(__dirname, '..');
 const BACKGROUND = path.join(ROOT, 'extension', 'background.js');
 const ACTIONS = path.join(ROOT, 'extension', 'content', 'actions.js');
 const FILE_READ_SERVICE = path.join(ROOT, 'safari', 'FSB', 'Shared', 'FileReadService.swift');
+const GRANTED_ROOTS = path.join(ROOT, 'safari', 'FSB', 'Shared', 'GrantedRoots.swift');
 
 let passed = 0;
 let failed = 0;
@@ -447,6 +448,110 @@ const SAFARI = { caps: { cdp: false, trustedInput: false } };
     passAssertEqual(out.ok, false, 'no native messaging -> ok:false');
     passAssertEqual(out.reason, 'native_unavailable', 'typed as native_unavailable');
     passAssert(/companion app/i.test(out.message), 'message names the companion app');
+  }
+
+  // The denylist gate in section 1 only ever sees the REQUESTED path. A link
+  // inside a granted folder can be called notes.txt and name ~/.ssh/id_rsa.
+  console.log('\n=== 8. a symlink in a granted folder cannot launder a secret ===');
+  {
+    const stripComments = (s) => s.replace(/^\s*\/\/.*$/gm, '');
+    const roots = stripComments(fs.readFileSync(GRANTED_ROOTS, 'utf8'));
+    const fnAt = roots.indexOf('static func rootContaining(');
+    const fn = fnAt >= 0 ? roots.slice(fnAt, roots.indexOf('\n    }\n', fnAt)) : '';
+    const accessAt = fn.indexOf('resolve(data)');
+    const targetAt = fn.indexOf('URL(fileURLWithPath: path).resolvingSymlinksInPath()');
+    // Before access starts the sandbox hides the link, and
+    // resolvingSymlinksInPath returns it unresolved -- which IS contained.
+    passAssert(accessAt >= 0 && targetAt > accessAt,
+      'rootContaining resolves the target only after the root\'s security-scoped access starts');
+
+    const service = stripComments(fs.readFileSync(FILE_READ_SERVICE, 'utf8'));
+    const beginAt = service.indexOf('func beginRead(');
+    const begin = beginAt >= 0 ? service.slice(beginAt, service.indexOf('func readChunk(', beginAt)) : '';
+    passAssert(begin.length > 0 && !/resolvingSymlinksInPath/.test(begin),
+      'beginRead never re-resolves the path the containment check approved');
+    passAssert(/let url = match\.target/.test(begin), 'beginRead reads the containment check\'s own target');
+    passAssert(/"resolvedPath": url\.path/.test(begin), 'beginRead reports the resolved path back');
+  }
+
+  const realDenylist = require('../extension/utils/upload-path-denylist.js');
+  function loadReader(sendNativeMessage) {
+    globalThis.chrome = { runtime: { sendNativeMessage } };
+    delete require.cache[require.resolve('../extension/utils/native-file-reader.js')];
+    return require('../extension/utils/native-file-reader.js');
+  }
+  function hostResolvingTo(resolvedPath, sent) {
+    return async (_app, msg) => {
+      sent.push(msg);
+      if (msg.t === 'readFile') {
+        const opened = { ok: true, token: 'tk3', name: 'id_rsa', mime: 'text/plain', size: 3, chunks: 1 };
+        if (resolvedPath !== undefined) opened.resolvedPath = resolvedPath;
+        return opened;
+      }
+      if (msg.t === 'readChunk') return { ok: true, i: msg.i, last: true, data: 'YWJj' };
+      return { ok: true };
+    };
+  }
+  const chunksFetched = (sent) => sent.filter((m) => m.t === 'readChunk').length;
+  const released = (sent) => sent.some((m) => m.t === 'readRelease' && m.token === 'tk3');
+
+  {
+    const sent = [];
+    const screened = [];
+    const reader = loadReader(hostResolvingTo('/Users/me/.ssh/id_rsa', sent));
+    const out = await reader.readFile('/Users/me/Downloads/notes.txt', {
+      screenResolvedPath: (p) => { screened.push(p); return realDenylist.classify(p); }
+    });
+    passAssertEqual(screened[0], '/Users/me/.ssh/id_rsa', 'the screen sees the host-resolved path, not the requested one');
+    passAssertEqual(out.ok, false, 'a link to a secret is refused');
+    passAssertEqual(out.reason, 'sensitive-directory', 'refused with the denylist\'s own reason token');
+    passAssertEqual(chunksFetched(sent), 0, 'no chunk is fetched for a refused file');
+    passAssert(released(sent), 'the host handle is released');
+    passAssert(!out.message.includes('.ssh'), 'the resolved path is not echoed into the message');
+  }
+  {
+    const sent = [];
+    const reader = loadReader(hostResolvingTo('/Users/me/Downloads/notes.txt', sent));
+    const out = await reader.readFile('/Users/me/Downloads/notes.txt', {
+      screenResolvedPath: (p) => realDenylist.classify(p)
+    });
+    passAssertEqual(out.ok, true, 'a clean resolved path reads normally');
+    passAssertEqual(chunksFetched(sent), 1, 'and fetches its chunk');
+  }
+  for (const [label, resolvedPath, screen, reason] of [
+    ['a host that reports no resolved path', undefined, () => ({ denied: false }), 'unverified_path'],
+    ['a screen that throws', '/Users/me/Downloads/notes.txt', () => { throw new Error('boom'); }, 'denylist-error']
+  ]) {
+    const sent = [];
+    const reader = loadReader(hostResolvingTo(resolvedPath, sent));
+    const out = await reader.readFile('/Users/me/Downloads/notes.txt', { screenResolvedPath: screen });
+    passAssertEqual(out.reason, reason, `${label} fails closed`);
+    passAssertEqual(chunksFetched(sent), 0, `${label}: no chunk fetched`);
+    passAssert(released(sent), `${label}: handle released`);
+  }
+  {
+    const sent = [];
+    const reader = loadReader(hostResolvingTo('/Users/me/.ssh/id_rsa', sent));
+    const { executeUploadFile, calls } = buildHarness({ platform: SAFARI, denylist: realDenylist, reader });
+    const res = await executeUploadFile(7, '#f', '/Users/me/Downloads/notes.txt');
+    passAssertEqual(res.success, false, 'executeUploadFile refuses a granted-folder link to ~/.ssh');
+    passAssertEqual(res.reason, 'sensitive-directory', 'reason is the denylist token');
+    passAssertEqual(chunksFetched(sent), 0, 'no bytes leave the host');
+    passAssertEqual(calls.tabMessages.length, 0, 'nothing reaches the page');
+    passAssert(calls.audit.some((a) => a.outcome === 'blocked' && a.consentDecision === 'sensitive-directory'),
+      'audited as a block');
+    const recorded = JSON.stringify(res) + JSON.stringify(calls.log) + JSON.stringify(calls.audit);
+    passAssert(!recorded.includes('/Users/me/.ssh'), 'the resolved path stays out of the result, logs and audit');
+  }
+  {
+    // The private screenshot exception has to reach the re-check too, or every
+    // attested screenshot upload would now be refused on the second pass.
+    const shot = '/Users/me/.fsb/screenshots/fsb-screenshot-1712345678901-1234abcd-1234-4abc-8def-1234567890ab.png';
+    const sent = [];
+    const reader = loadReader(hostResolvingTo(shot, sent));
+    const { executeUploadFile } = buildHarness({ platform: SAFARI, denylist: realDenylist, reader });
+    const res = await executeUploadFile(7, '#f', shot, { allowManagedScreenshot: true });
+    passAssertEqual(res.success, true, 'an attested managed screenshot still uploads');
   }
 
   console.log('\n---');
