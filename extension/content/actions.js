@@ -217,6 +217,25 @@ async function clickAtCoordinates(params) {
 // END COORDINATE FALLBACK UTILITIES
 // =============================================================================
 
+/**
+ * The background marks every cdpInsertText outcome that may have reached the
+ * page with mayHaveExecuted. Any other refusal (a busy debugger, an
+ * unresponsive page, an unmatched target) happened before text was sent.
+ * @param {Object|undefined} response - The background's cdpInsertText reply
+ * @returns {Object|null} A retryable failure, or null when the outcome is unknown
+ */
+function cdpRefusedBeforeInput(response) {
+  if (!response || response.success || response.mayHaveExecuted) return null;
+  return {
+    success: false,
+    outcome: 'failed',
+    mayHaveExecuted: false,
+    error: response.error || 'Text insertion was refused before any text was sent.',
+    code: response.code,
+    retryable: Boolean(response.retryable)
+  };
+}
+
 // =============================================================================
 // ACTION VERIFICATION UTILITIES
 // =============================================================================
@@ -2885,12 +2904,14 @@ const tools = {
         const isGoogleDocs = window.location.hostname === 'docs.google.com' &&
                              window.location.pathname.startsWith('/document/');
         const textHasFormatting = FSB.hasMarkdownFormatting(params.text);
+        let clearSent = false;
 
         if (isGoogleDocs && textHasFormatting) {
           logger.logActionExecution(FSB.sessionId, 'type', 'gdocs_formatted_paste_attempt', {
             textLength: params.text.length,
             hasFormatting: true
           });
+          let pasteStarted = false;
           try {
             const cursorTarget = document.querySelector('.kix-page-content-wrapper') ||
                                  document.querySelector('.kix-paginateddocumentplugin') ||
@@ -2906,7 +2927,7 @@ const tools = {
             // If clearFirst, select all and delete before pasting
             if (clearFirst) {
               const isMac = navigator.userAgent?.includes('Macintosh') || navigator.platform?.includes('Mac');
-              await new Promise((resolve, reject) => {
+              const selected = await new Promise((resolve, reject) => {
                 chrome.runtime.sendMessage({
                   action: 'keyboardDebuggerAction',
                   method: 'pressKey',
@@ -2917,8 +2938,11 @@ const tools = {
                   else resolve(response);
                 });
               });
+              // Backspace without a selection would delete a character at the caret.
+              if (!selected?.success) throw new Error(selected?.error || 'Select-all was not confirmed');
               await waitForStability('type_complete');
-              await new Promise((resolve, reject) => {
+              clearSent = true;
+              const deleted = await new Promise((resolve, reject) => {
                 chrome.runtime.sendMessage({
                   action: 'keyboardDebuggerAction',
                   method: 'pressKey',
@@ -2929,11 +2953,13 @@ const tools = {
                   else resolve(response);
                 });
               });
+              if (!deleted?.success) throw new Error(deleted?.error || 'Clearing the document was not confirmed');
               await waitForStability('type_complete');
             }
 
             const html = FSB.markdownToHTML(params.text);
             const plainText = FSB.stripMarkdown(params.text);
+            pasteStarted = true;
             const pasteResult = await FSB.clipboardPasteHTML(html, plainText);
 
             if (pasteResult.success) {
@@ -2967,8 +2993,14 @@ const tools = {
             }
             // The paste provably changed nothing; the plain insertion below is the only write.
           } catch (fmtError) {
-            return { success: false, outcome: 'unknown', mayHaveExecuted: true,
-              error: 'Formatted paste may have executed. Inspect the document before retrying.' };
+            if (pasteStarted) {
+              return { success: false, outcome: 'unknown', mayHaveExecuted: true,
+                error: 'Formatted paste may have executed. Inspect the document before retrying.' };
+            }
+            // Nothing before the paste inserts text, and with clearFirst the plain
+            // insertion below replaces the whole document, so it lands the same
+            // whether or not the clear did.
+            logger.warn('Formatted paste was not attempted', { error: fmtError.message });
           }
         }
         // --- END FORMATTED PASTE PATH ---
@@ -2984,7 +3016,7 @@ const tools = {
             }, (response) => {
               if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
               else if (response && response.success) resolve(response);
-              else reject(new Error(response?.error || 'CDP insertion failed'));
+              else reject(Object.assign(new Error(response?.error || 'CDP insertion failed'), { response }));
             });
           });
           // Trust CDP on canvas editors -- no DOM validation possible
@@ -3002,6 +3034,12 @@ const tools = {
             note: 'Canvas-based editor -- CDP insertion used, DOM validation skipped'
           };
         } catch (cdpError) {
+          const refused = cdpRefusedBeforeInput(cdpError.response);
+          if (refused && clearSent) {
+            return { success: false, outcome: 'unknown', mayHaveExecuted: true,
+              error: 'The document may have been cleared, but the text was not inserted. Inspect it before retrying.' };
+          }
+          if (refused) return refused;
           return { success: false, outcome: 'unknown', mayHaveExecuted: true,
             error: 'CDP insertion may have executed. Inspect the editor before retrying.', typed: params.text };
         }
@@ -3112,7 +3150,7 @@ const tools = {
             }, (response) => {
               if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
               else if (response?.success) resolve(response);
-              else reject(new Error(response?.error || 'CDP failed'));
+              else reject(Object.assign(new Error(response?.error || 'CDP failed'), { response }));
             });
           });
 
@@ -3138,6 +3176,8 @@ const tools = {
             }
           };
         } catch (cdpCodeEditorError) {
+          const refused = cdpRefusedBeforeInput(cdpCodeEditorError.response);
+          if (refused) return refused;
           logger.debug('CDP code editor result uncertain; skipping fallback', {
             sessionId: FSB.sessionId,
             error: cdpCodeEditorError.message
@@ -3520,7 +3560,7 @@ const tools = {
           }, (response) => {
             if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
             else if (response && response.success) resolve(response);
-            else reject(new Error(response?.error || 'CDP insertion failed'));
+            else reject(Object.assign(new Error(response?.error || 'CDP insertion failed'), { response }));
           });
         });
         if (params.pressEnter) {
@@ -3537,6 +3577,8 @@ const tools = {
         };
       } catch (cdpFallbackErr) {
         logger.debug('Canvas editor CDP fallback failed', { error: cdpFallbackErr.message });
+        const refused = cdpRefusedBeforeInput(cdpFallbackErr.response);
+        if (refused) return refused;
         return { success: false, outcome: 'unknown', mayHaveExecuted: true,
           error: 'CDP insertion may have executed. Inspect the editor before retrying.' };
       }

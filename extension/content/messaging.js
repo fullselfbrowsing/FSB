@@ -513,7 +513,16 @@
         }, (response) => {
           if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
           else if (response && response.success) resolve(response);
-          else reject(new Error(response?.error || 'Paste key simulation failed'));
+          else {
+            // The emulator reports keyDownDispatched once it sends the key; with
+            // no result, only a retryable refusal (a busy debugger) precedes it.
+            const result = response && response.result;
+            const neverSent = result
+              ? !result.keyDownDispatched && !result.mayHaveExecuted
+              : response?.retryable === true;
+            if (neverSent) pasteDispatched = false;
+            reject(new Error(response?.error || 'Paste key simulation failed'));
+          }
         });
       });
 

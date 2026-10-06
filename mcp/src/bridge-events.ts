@@ -13,7 +13,9 @@
  *
  * Coalesced on purpose. The events worth recording are exactly the ones that
  * fire in hot retry loops, so an uncoalesced journal would reproduce the
- * pathology it exists to explain.
+ * pathology it exists to explain. Repeats collapse per cause -- event, origin,
+ * reason, and close code -- so a loop folds into one line while a different
+ * death in the same window still gets its own.
  */
 
 import { appendFileSync, mkdirSync, renameSync, statSync } from 'node:fs';
@@ -107,7 +109,9 @@ export function logBridgeEvent(
     if (!projected) return false;
 
     const stamp = options.now ? options.now() : Date.now();
-    const key = `${projected.event as string}|${(projected.origin as string) ?? ''}`;
+    const key = [projected.event, projected.origin, projected.reason, projected.closeCode]
+      .map((part) => (part === undefined ? '' : String(part)))
+      .join('|');
     const previous = coalesced.get(key);
     if (previous && stamp - previous.at < COALESCE_WINDOW_MS) {
       previous.suppressed += 1;

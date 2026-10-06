@@ -173,6 +173,28 @@ async function run() {
     );
   });
 
+  console.log('\n--- distinct deaths in one window each keep their cause ---');
+  withTempRoot('bridge-events-distinct-causes', (root) => {
+    _resetBridgeEventCoalescing();
+    const origin = 'chrome-extension://aaaabbbbccccddddeeeeffffgggghhhh';
+    let clock = 20_000;
+    const now = () => clock;
+    const closed = (reason, closeCode) => {
+      clock += 1_000;
+      return logBridgeEvent({ event: 'extension_closed', origin, reason, closeCode }, { rootPath: root, now });
+    };
+
+    checkEqual(closed('extension_reaped_pong_timeout', 1006), true, 'a reaped close is written');
+    checkEqual(closed('extension_auth_revoked', 1006), true, 'a different reason in the same window is written');
+    checkEqual(closed('extension_auth_revoked', 1008), true, 'a different close code in the same window is written');
+    checkEqual(closed('extension_auth_revoked', 1008), false, 'the same cause repeated is still coalesced');
+    checkEqual(
+      readLines(root).map((line) => line.reason).join(','),
+      'extension_reaped_pong_timeout,extension_auth_revoked,extension_auth_revoked',
+      'each distinct death keeps its own reason in the journal',
+    );
+  });
+
   console.log('\n--- rotation keeps the journal bounded ---');
   withTempRoot('bridge-events-rotation', (root) => {
     _resetBridgeEventCoalescing();

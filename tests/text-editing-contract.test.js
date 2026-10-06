@@ -340,3 +340,69 @@ test('Docs formatted paste falls back to plain insertion only when nothing was i
   assert.match(block, /if \(!pasteResult\.nothingInserted\) \{\s*return \{ success: false, outcome: 'unknown', mayHaveExecuted: true,/);
   assert.equal(block.split("outcome: 'unknown'").length - 1, 2);
 });
+
+test('a formatted paste whose key was never sent reports that nothing was inserted', async () => {
+  // Unmeasurable Docs text, so only the key reply can decide.
+  const busy = await loadClipboardPaste({ lengths: [null],
+    keyReply: { success: false, error: 'The debugger for tab 1 is busy.', retryable: true } }).paste();
+  assert.equal(busy.nothingInserted, true);
+  const unattached = await loadClipboardPaste({ lengths: [null],
+    keyReply: { success: false, error: 'Failed to attach debugger', result: { success: false, keyDownDispatched: false } } }).paste();
+  assert.equal(unattached.nothingInserted, true);
+  const sent = await loadClipboardPaste({ lengths: [null],
+    keyReply: { success: false, error: 'Detached', result: { success: false, keyDownDispatched: true, mayHaveExecuted: true } } }).paste();
+  assert.equal(sent.nothingInserted, false);
+});
+
+function formattedPasteBlock() {
+  const start = actions.indexOf('// --- FORMATTED PASTE PATH ---');
+  const end = actions.indexOf('// --- END FORMATTED PASTE PATH ---', start);
+  return actions.slice(start, end);
+}
+
+test('Docs formatted paste never presses Backspace without a confirmed select-all', () => {
+  const block = formattedPasteBlock();
+  const backspace = block.indexOf("key: 'Backspace'");
+  const selectCheck = block.indexOf('if (!selected?.success) throw');
+  assert.ok(selectCheck > 0 && selectCheck < backspace);
+  assert.ok(block.indexOf('clearSent = true;') < backspace);
+  assert.match(block, /if \(!deleted\?\.success\) throw/);
+});
+
+test('Docs formatted paste falls back to plain insertion when it fails before pasting', () => {
+  const block = formattedPasteBlock();
+  assert.ok(block.indexOf('pasteStarted = true;') < block.indexOf('FSB.clipboardPasteHTML('));
+  assert.match(block, /catch \(fmtError\) \{\s*if \(pasteStarted\) \{/);
+});
+
+function loadCdpRefusal() {
+  const start = actions.indexOf('function cdpRefusedBeforeInput(');
+  const end = actions.indexOf('\n}\n', start) + 2;
+  return vm.runInNewContext(`${actions.slice(start, end)}\ncdpRefusedBeforeInput`, {});
+}
+
+test('a CDP insertion refused before input is a retryable failure, not an unknown outcome', () => {
+  const refused = loadCdpRefusal();
+  const busy = refused({ success: false, error: 'busy', code: 'SCREENSHOT_DEBUGGER_BUSY', retryable: true });
+  assert.equal(busy.success, false);
+  assert.equal(busy.outcome, 'failed');
+  assert.equal(busy.mayHaveExecuted, false);
+  assert.equal(busy.retryable, true);
+  assert.equal(busy.code, 'SCREENSHOT_DEBUGGER_BUSY');
+  const hung = refused({ success: false, errorCode: 'PAGE_UNRESPONSIVE', retryable: true,
+    error: 'The page did not respond while locating the editable field. No text was sent.' });
+  assert.equal(hung.outcome, 'failed');
+  assert.equal(hung.retryable, true);
+  assert.equal(refused({ success: false, outcome: 'unknown', mayHaveExecuted: true, retryable: false }), null);
+  assert.equal(refused({ success: true }), null);
+  assert.equal(refused(undefined), null);
+});
+
+test('every content-script CDP insertion keeps the background reply for classification', () => {
+  const sites = actions.split("action: 'cdpInsertText'").length - 1;
+  assert.equal(sites, 3);
+  assert.equal(actions.split('{ response }))').length - 1, sites);
+  assert.equal(actions.split('cdpRefusedBeforeInput(').length - 1, sites + 1);
+  // A refusal after the formatted path cleared the document is not a no-op.
+  assert.match(actions, /if \(refused && clearSent\) \{\s*return \{ success: false, outcome: 'unknown', mayHaveExecuted: true,/);
+});

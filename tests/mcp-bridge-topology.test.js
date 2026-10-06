@@ -1567,6 +1567,62 @@ async function runQuietLegacyExtensionIsKept(WebSocketBridge) {
   });
 }
 
+// A replaced socket can still deliver a ping already in flight. Counted, it
+// would arm the application tier for a successor that never pings, and that
+// successor would then be reaped merely for staying quiet.
+async function runReplacedSocketPingIsIgnored(WebSocketBridge, auth) {
+  await withTempHome('bridge-replaced-ping', async (home) => {
+    const port = await getFreePort();
+    const authPath = auth.getBridgeAuthPath(home);
+    let state = auth.rotateBridgeSessionSecret(authPath, 24_000);
+    state = auth.bindAllowedExtensionOrigin('chrome-extension://replaced-ping-extension', authPath);
+    const hub = new WebSocketBridge({
+      port,
+      host: '127.0.0.1',
+      instanceId: 'replaced-ping-hub',
+      handshakeTimeoutMs: 40,
+      extensionPingIntervalMs: 30,
+      extensionHeartbeatTimeoutMs: 60,
+    });
+    const resources = { sockets: [], bridges: [hub] };
+
+    try {
+      await hub.connect();
+      const options = {
+        origin: 'chrome-extension://replaced-ping-extension',
+        pairingCode: auth.formatPairingCode(state),
+      };
+      const first = await createBrowserSocket(port, options);
+      resources.sockets.push(first);
+      await waitFor(() => hub.topology.extensionConnected === true, 'first extension registration');
+      const replaced = hub.extensionClient;
+
+      const successor = await createBrowserSocket(port, options);
+      resources.sockets.push(successor);
+      await waitFor(
+        () => hub.extensionClient !== null && hub.extensionClient !== replaced,
+        'an authorized successor replaces the first socket',
+      );
+      const registered = hub.extensionClient;
+      const heartbeatAt = hub.topology.lastExtensionHeartbeatAt;
+
+      hub._handleExtensionMessage(replaced, JSON.stringify({ type: 'mcp:ping', ts: Date.now() }));
+      assertEqual(hub.extensionHeartbeatCount, 0, 'a ping from the replaced socket is not counted for its successor');
+      assertEqual(
+        hub.topology.lastExtensionHeartbeatAt,
+        heartbeatAt,
+        'a ping from the replaced socket does not refresh the successor heartbeat',
+      );
+
+      await sleep(400);
+      assert(hub.extensionClient === registered, 'a successor that never pings keeps the slot');
+      assertEqual(successor.readyState, WebSocket.OPEN, 'the successor socket is never closed');
+    } finally {
+      await cleanup(resources);
+    }
+  });
+}
+
 function answerBridgeRequests(socket) {
   socket.on('message', (raw) => {
     let message;
@@ -2487,6 +2543,7 @@ async function run() {
   await runCase('stale incumbent is reaped and the slot is reusable', () => runStaleIncumbentIsReaped(WebSocketBridge, auth));
   await runCase('unresponsive incumbent is reaped by the transport tier', () => runUnresponsiveIncumbentIsReaped(WebSocketBridge));
   await runCase('quiet legacy extension is never reaped', () => runQuietLegacyExtensionIsKept(WebSocketBridge));
+  await runCase('a replaced socket ping cannot arm its successor', () => runReplacedSocketPingIsIgnored(WebSocketBridge, auth));
   await runCase('hub keeps serving through an accept error', () => runHubSurvivesAcceptError(WebSocketBridge));
   await runCase('hub that loses its listener tears down and re-binds', () => runHubRebindsAfterListenerLoss(WebSocketBridge, bridgeModule));
   await runCase('stdio server exits when the host closes stdin', () => runStdinShutdownHelper());

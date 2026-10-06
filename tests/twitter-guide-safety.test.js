@@ -36,6 +36,18 @@ test('compose guidance names both button contexts and account/reply checks', () 
   assert.match(guide.workflows.replyToPost.join(' '), /only once/);
 });
 
+// On the home timeline, tweetButtonInline publishes a new post. A reply dialog
+// sits over that composer, so its controls must be scoped to the dialog.
+test('reply guidance separates the post page from the reply dialog', () => {
+  assert.equal(guide.selectors.replyButton, '[data-testid="tweetButtonInline"]');
+  assert.equal(guide.selectors.replyDialogInput, '[role="dialog"] [data-testid="tweetTextarea_0"]');
+  assert.equal(guide.selectors.replyDialogButton, '[role="dialog"] [data-testid="tweetButton"]');
+  const reply = guide.workflows.replyToPost.join(' ');
+  assert.match(reply, /tweetButtonInline/);
+  assert.match(reply, /\[role="dialog"\] \[data-testid="tweetButton"\]/);
+  assert.match(guide.guidance, /\[role="dialog"\] \[data-testid="tweetButton"\]/);
+});
+
 test('autopilot forwards bounded guide workflows and warnings', () => {
   const agentLoop = fs.readFileSync(path.join(__dirname, '../extension/ai/agent-loop.js'), 'utf8');
   const start = agentLoop.indexOf("} else if (call.name === 'get_site_guide') {");

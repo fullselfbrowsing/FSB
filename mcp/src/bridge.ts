@@ -1065,14 +1065,19 @@ export class WebSocketBridge {
         const heartbeat = this._parseHeartbeatPing(parsed);
         if (!heartbeat) return;
         const heartbeatAt = Date.now();
-        this.lastExtensionHeartbeatAt = heartbeatAt;
-        this.extensionHeartbeatCount += 1;
+        // A socket just replaced can still deliver a ping already in flight. It
+        // is answered, but must not arm or refresh its successor's liveness.
+        const current = this.extensionClient === ws;
+        if (current) {
+          this.lastExtensionHeartbeatAt = heartbeatAt;
+          this.extensionHeartbeatCount += 1;
+        }
         if (ws.readyState === WebSocket.OPEN) {
           ws.send(JSON.stringify(heartbeat.nonce === undefined
             ? { type: 'mcp:pong', ts: heartbeatAt }
             : { type: 'mcp:pong', ts: heartbeatAt, nonce: heartbeat.nonce }));
         }
-        this._broadcastRelayState();
+        if (current) this._broadcastRelayState();
         return;
       }
       if (parsed.type === 'mcp:extension-state' && this.extensionClient === ws) {

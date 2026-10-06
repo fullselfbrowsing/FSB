@@ -49,6 +49,8 @@ COMPOSING POSTS:
 - New post button (sidebar): [data-testid="SideNav_NewTweet_Button"] or [aria-label="Post"]
 - Before posting, inspect the account switcher and confirm the intended account is active.
 - Before replying, open the intended post and verify its author and permalink in the reply context.
+- Reply on the post's own page: type in [data-testid="tweetTextarea_0"], then click its Reply button [data-testid="tweetButtonInline"].
+- Reply dialog (opened from a timeline reply icon): scope both to the dialog -- [role="dialog"] [data-testid="tweetTextarea_0"] and [role="dialog"] [data-testid="tweetButton"]. The timeline composer behind it uses the same text area test id, and its inline button publishes a new post, not a reply.
 - Schedule post: [data-testid="scheduleOption"] or [aria-label="Schedule post"]
 - Grok AI enhancement: [data-testid="grokImgGen"] or [aria-label="Enhance your post with Grok"]
 - Add GIF: [data-testid="gifSearchButton"]
@@ -143,6 +145,8 @@ SCROLL TIMING:
     modalTweetButton: '[data-testid="tweetButton"]',
     replyInput: '[data-testid="tweetTextarea_0"]',
     replyButton: '[data-testid="tweetButtonInline"]',
+    replyDialogInput: '[role="dialog"] [data-testid="tweetTextarea_0"]',
+    replyDialogButton: '[role="dialog"] [data-testid="tweetButton"]',
     likeButton: '[data-testid="like"]',
     retweetButton: '[data-testid="retweet"]',
     dmButton: '[data-testid="sendDMFromProfile"]',
@@ -187,8 +191,8 @@ SCROLL TIMING:
     replyToPost: [
       'Open the intended post and verify its author and /status/ permalink',
       'Confirm the active account in [data-testid="SideNav_AccountSwitcher_Button"]',
-      'Type in the reply editor [data-testid="tweetTextarea_0"]',
-      'Click the Post button inside the same reply composer only once',
+      'On the post page, type in [data-testid="tweetTextarea_0"] and click Reply [data-testid="tweetButtonInline"] only once',
+      'In a reply dialog, use [role="dialog"] [data-testid="tweetTextarea_0"] and [role="dialog"] [data-testid="tweetButton"] instead -- the timeline composer behind it publishes a new post',
       'Verify the reply appears under the intended post before trying again'
     ],
     sendMessage: [
