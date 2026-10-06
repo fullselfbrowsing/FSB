@@ -19204,9 +19204,14 @@ async function handleCDPInsertText(request, sender, sendResponse) {
 
 async function prepareCdpTextTarget(tabId, selector, position) {
   if (!selector && position === 'caret') return { success: true };
-  const [result] = await chrome.scripting.executeScript({
+  // A hung page (an open dialog, a busy main thread) holds the injection until
+  // it recovers. Give up well before the MCP call does, and make a script that
+  // runs after that do nothing, so no text is sent once the caller has moved on.
+  const deadline = Date.now() + 6000;
+  const injection = chrome.scripting.executeScript({
     target: { tabId },
-    func: (css, placement) => {
+    func: (css, placement, notAfter) => {
+      if (Date.now() > notAfter) return { success: false, expired: true };
       let element;
       try {
         if (css) {
@@ -19250,8 +19255,18 @@ async function prepareCdpTextTarget(tabId, selector, position) {
       }
       return { success: true, previous };
     },
-    args: [selector || null, position]
+    args: [selector || null, position, deadline]
   });
+  injection.catch(() => {});
+  const timedOut = {};
+  let timer;
+  const expired = new Promise(resolve => { timer = setTimeout(() => resolve(timedOut), 6000); });
+  const results = await Promise.race([injection, expired]).finally(() => clearTimeout(timer));
+  if (results === timedOut) {
+    return { success: false, errorCode: 'PAGE_UNRESPONSIVE', retryable: true,
+      error: 'The page did not respond while locating the editable field. No text was sent.' };
+  }
+  const [result] = results || [];
   return result?.result || { success: false, error: 'Unable to inspect editable field' };
 }
 
@@ -19261,7 +19276,7 @@ async function dispatchCdpTextInsertion(tabId, text, position = 'caret', selecto
   }
   const prepared = await prepareCdpTextTarget(tabId, selector, position);
   if (!prepared.success) return prepared;
-  try {
+  const input = (async () => {
     if (position === 'replace_all') {
       const isMac = typeof navigator !== 'undefined' &&
         (/Macintosh/.test(navigator.userAgent || '') || /Mac/.test(navigator.platform || ''));
@@ -19277,10 +19292,22 @@ async function dispatchCdpTextInsertion(tabId, text, position = 'caret', selecto
       });
     }
     await chrome.debugger.sendCommand({ tabId }, 'Input.insertText', { text });
+  })();
+  input.catch(() => {});
+  // Sent input cannot be recalled. A page that stops answering here leaves the
+  // outcome unknown, which must be reported before the MCP call times out.
+  let timer;
+  const stalled = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error('The page did not acknowledge the text input in time.')), 8000);
+  });
+  try {
+    await Promise.race([input, stalled]);
   } catch (error) {
     // Input may already have reached the page, so a partial edit is possible.
     if (error && typeof error === 'object') error.mayHaveExecuted = true;
     throw error;
+  } finally {
+    clearTimeout(timer);
   }
   return { success: true, text, length: text.length, position, mayHaveExecuted: true };
 }

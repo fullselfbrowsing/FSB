@@ -24,7 +24,8 @@ test('CDP replacement selects once before one insertion', async () => {
   const context = {
     prepareCdpTextTarget: async () => ({ success: true }),
     chrome: { debugger: { sendCommand: async (_target, method, params) => commands.push({ method, params }) } },
-    navigator: { platform: 'MacIntel', userAgent: 'Macintosh' }
+    navigator: { platform: 'MacIntel', userAgent: 'Macintosh' },
+    setTimeout, clearTimeout
   };
   const dispatch = vm.runInNewContext(`${background.slice(start, end)}\ndispatchCdpTextInsertion`, context);
   const result = await dispatch(42, 'new\ntext', 'replace_all', '#draft');
@@ -60,7 +61,8 @@ function loadCdpTextInsertion(activeElement, commands) {
       scripting: { executeScript: async ({ func, args }) => [{ result: func(...args) }] },
       debugger: { sendCommand: async (_target, method, params) => commands.push({ method, params }) }
     },
-    navigator: { platform: 'MacIntel', userAgent: 'Macintosh' }
+    navigator: { platform: 'MacIntel', userAgent: 'Macintosh' },
+    setTimeout, clearTimeout
   };
   return vm.runInNewContext(`${background.slice(start, end)}\ndispatchCdpTextInsertion`, context);
 }
@@ -165,7 +167,7 @@ test('CDP text dispatch marks only failures after input as possibly executed', a
   const start = background.indexOf('async function dispatchCdpTextInsertion(');
   const end = background.indexOf('\nasync function handleCDPInsertTextUnlocked', start);
   const load = (context) => vm.runInNewContext(`${background.slice(start, end)}\ndispatchCdpTextInsertion`, {
-    navigator: { platform: 'MacIntel', userAgent: 'Macintosh' }, ...context
+    navigator: { platform: 'MacIntel', userAgent: 'Macintosh' }, setTimeout, clearTimeout, ...context
   });
   const afterInput = load({
     prepareCdpTextTarget: async () => ({ success: true }),
@@ -181,6 +183,59 @@ test('CDP text dispatch marks only failures after input as possibly executed', a
   });
   await assert.rejects(beforeInput(42, 'text', 'caret', '#draft'), (error) => error.mayHaveExecuted === undefined);
   assert.equal(commands, 0);
+});
+
+test('a CDP text target on a hung page fails before any input is sent', async () => {
+  const start = background.indexOf('async function prepareCdpTextTarget(');
+  const end = background.indexOf('\nasync function handleCDPInsertTextUnlocked', start);
+  const commands = [];
+  const dispatch = vm.runInNewContext(`${background.slice(start, end).replaceAll('6000', '20')}\ndispatchCdpTextInsertion`, {
+    chrome: {
+      scripting: { executeScript: () => new Promise(() => {}) },
+      debugger: { sendCommand: async (_target, method) => commands.push(method) }
+    },
+    navigator: { platform: 'MacIntel', userAgent: 'Macintosh' },
+    setTimeout, clearTimeout
+  });
+  const result = await dispatch(42, 'late', 'end', '#draft');
+  assert.equal(result.success, false);
+  assert.equal(result.errorCode, 'PAGE_UNRESPONSIVE');
+  assert.equal(result.retryable, true);
+  assert.equal(result.mayHaveExecuted, undefined);
+  assert.deepEqual(commands, []);
+});
+
+test('a CDP text target script that runs after its deadline leaves the page alone', async () => {
+  const start = background.indexOf('async function prepareCdpTextTarget(');
+  const end = background.indexOf('\nasync function dispatchCdpTextInsertion', start);
+  let injected;
+  let focused = 0;
+  const field = { tagName: 'TEXTAREA', value: 'kept', focus: () => { focused++; }, setSelectionRange() {} };
+  const prepare = vm.runInNewContext(`${background.slice(start, end)}\nprepareCdpTextTarget`, {
+    document: { querySelectorAll: () => [field] },
+    chrome: { scripting: { executeScript: async (options) => {
+      injected = options;
+      return [{ result: options.func(...options.args) }];
+    } } },
+    setTimeout, clearTimeout
+  });
+  assert.equal((await prepare(42, '#draft', 'end')).success, true);
+  assert.equal(focused, 1);
+  const late = injected.func('#draft', 'end', Date.now() - 1);
+  assert.equal(late.success, false);
+  assert.equal(focused, 1);
+});
+
+test('CDP text input the page never acknowledges is reported as possibly executed', async () => {
+  const start = background.indexOf('async function dispatchCdpTextInsertion(');
+  const end = background.indexOf('\nasync function handleCDPInsertTextUnlocked', start);
+  const dispatch = vm.runInNewContext(`${background.slice(start, end).replaceAll('8000', '20')}\ndispatchCdpTextInsertion`, {
+    prepareCdpTextTarget: async () => ({ success: true }),
+    chrome: { debugger: { sendCommand: () => new Promise(() => {}) } },
+    navigator: { platform: 'MacIntel', userAgent: 'Macintosh' },
+    setTimeout, clearTimeout
+  });
+  await assert.rejects(dispatch(42, 'text', 'caret', null), (error) => error.mayHaveExecuted === true);
 });
 
 test('a direct CDP insertion that cannot attach the debugger stays retryable', async () => {
