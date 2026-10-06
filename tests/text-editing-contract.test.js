@@ -272,7 +272,8 @@ test('a direct CDP insertion that cannot attach the debugger stays retryable', a
 
 const messaging = fs.readFileSync(path.join(__dirname, '../extension/content/messaging.js'), 'utf8');
 
-// lengths: Docs paragraph text length per measurement (before, then after); null means no paragraph elements.
+// lengths: Docs paragraph text per measurement (before, then after) as a length or the text itself;
+// null means no paragraph elements.
 function loadClipboardPaste({ clipboardWrite = async () => {}, lengths = [0], keyReply = { success: true } } = {}) {
   const start = messaging.indexOf('  async function clipboardPasteHTML(');
   const end = messaging.indexOf('\n  /**', start);
@@ -283,8 +284,9 @@ function loadClipboardPaste({ clipboardWrite = async () => {}, lengths = [0], ke
     ClipboardItem: class {},
     navigator: { platform: 'MacIntel', userAgent: 'Macintosh', clipboard: { write: clipboardWrite } },
     document: { querySelectorAll: () => {
-      const length = lengths[Math.min(measurements++, lengths.length - 1)];
-      return length === null ? [] : [{ textContent: 'x'.repeat(length) }];
+      const entry = lengths[Math.min(measurements++, lengths.length - 1)];
+      if (entry === null) return [];
+      return [{ textContent: typeof entry === 'string' ? entry : 'x'.repeat(entry) }];
     } },
     chrome: { runtime: { lastError: null, sendMessage: (message, reply) => { sent.push(message); reply(keyReply); } } },
     logger: { warn() {}, debug() {} },
@@ -317,6 +319,12 @@ test('a formatted paste stays uncertain when Docs text cannot be measured or cha
   const keyFailed = await loadClipboardPaste({ lengths: [5], keyReply: { success: false, error: 'Detached' } }).paste();
   assert.equal(keyFailed.success, false);
   assert.equal(keyFailed.nothingInserted, false);
+});
+
+test('a formatted paste that replaces an equally long selection stays uncertain', async () => {
+  const result = await loadClipboardPaste({ lengths: ['old cat', 'old dog'] }).paste();
+  assert.equal(result.success, false);
+  assert.equal(result.nothingInserted, false);
 });
 
 test('a formatted paste that lands late still counts as inserted', async () => {

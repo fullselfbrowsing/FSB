@@ -485,14 +485,14 @@
 
       await new Promise(r => setTimeout(r, 150));
 
-      // Canvas-rendered Docs have no paragraph elements, so an unchanged length there proves nothing.
+      // Canvas-rendered Docs have no paragraph elements, so unchanged text there proves nothing.
       const measureDocText = () => {
         const pageElements = document.querySelectorAll('.kix-paragraphrenderer');
-        let length = 0;
+        let text = '';
         for (const el of pageElements) {
-          length += (el.textContent || '').length;
+          text += el.textContent || '';
         }
-        return { length, measurable: pageElements.length > 0 };
+        return { text, length: text.length, measurable: pageElements.length > 0 };
       };
       const before = measureDocText();
       const textLenBefore = before.length;
@@ -546,7 +546,9 @@
           error: 'Paste dispatched but no text appeared in editor (cursor may not be in editable area)',
           textLenBefore,
           textLenAfter,
-          nothingInserted: before.measurable && after.measurable && textLenAfter === textLenBefore
+          // A paste over an equally long selection keeps the length, so only
+          // identical text proves nothing landed.
+          nothingInserted: before.measurable && after.measurable && after.text === before.text
         };
       }
 
