@@ -323,6 +323,50 @@ test('a direct send that loses its port after dispatch stays uncertain', async (
   assert.equal(result.mayHaveExecuted, true);
 });
 
+test('a direct send to a closed tab is reported as not delivered', async () => {
+  const start = bridge.indexOf('  async _sendToContentScript(tabId, message) {');
+  const end = bridge.indexOf('\n  async _handleGetTabs(', start);
+  const chrome = { runtime: {}, tabs: {
+    sendMessage(_tabId, _message, _options, callback) {
+      chrome.runtime.lastError = { message: 'No tab with id: 9.' };
+      callback();
+      delete chrome.runtime.lastError;
+    }
+  } };
+  const context = { ensureContentScriptInjected: async () => true, chrome, Date, setTimeout, clearTimeout };
+  const send = vm.runInNewContext(`({${bridge.slice(start, end)}})._sendToContentScript`, context);
+  const result = await send(9, { action: 'executeAction', tool: 'click' });
+  assert.equal(result.outcome, 'failed');
+  assert.equal(result.mayHaveExecuted, false);
+});
+
+test('a send to a closed tab is not reported as possibly executed', async () => {
+  const start = background.indexOf('async function sendMessageWithRetry(');
+  const end = background.indexOf('\n// Alternative action strategies', start);
+  let sent = 0;
+  const context = {
+    Date, Math,
+    chrome: { tabs: {
+      get: async () => ({ url: 'https://example.com' }),
+      sendMessage: async () => {
+        sent++;
+        throw new Error('No tab with id: 7.');
+      }
+    } },
+    checkContentScriptHealth: async () => true,
+    ensureContentScriptInjected: async () => true,
+    classifyFailure: () => 'communication',
+    FAILURE_TYPES: { BF_CACHE: 'bf_cache', COMMUNICATION: 'communication' },
+    contentScriptHealth: new Map(),
+    automationLogger: { logComm() {}, logRecovery() {}, logTiming() {}, debug() {} },
+    setTimeout: (callback) => { callback(); return 0; }
+  };
+  const send = vm.runInNewContext(`${background.slice(start, end)}\nsendMessageWithRetry`, context);
+  await assert.rejects(send(7, { action: 'executeAction', tool: 'click' }, 1),
+    (error) => /No tab with id/.test(error.message));
+  assert.equal(sent, 1);
+});
+
 test('a retry that fails before sending is not reported as possibly executed', async () => {
   const start = background.indexOf('async function sendMessageWithRetry(');
   const end = background.indexOf('\n// Alternative action strategies', start);

@@ -10119,9 +10119,9 @@ async function sendMessageWithRetry(tabId, message, maxRetries = 3) {
       automationLogger.logComm(null, 'send', message.action || 'unknown', false, { tabId, attempt, failureType, error: error.message });
 
       // A closed port can mean the page acted and navigated before replying.
-      // Only the explicit "no receiving end" error proves non-delivery.
+      // Only "no receiving end" or a tab Chrome cannot find proves non-delivery.
       if (message.action === 'executeAction' && messageDispatched
-        && !/receiving end does not exist/i.test(error.message || '')) {
+        && !/receiving end does not exist|no tab with id/i.test(error.message || '')) {
         return {
           success: false,
           outcome: 'unknown',

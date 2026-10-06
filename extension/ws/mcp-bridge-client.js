@@ -1612,7 +1612,7 @@ class MCPBridgeClient {
         chrome.tabs.sendMessage(tabId, message, { frameId: 0 }, (response) => {
           if (chrome.runtime.lastError) {
             const reason = chrome.runtime.lastError.message || '';
-            if (message.action === 'executeAction' && !/receiving end does not exist/i.test(reason)) {
+            if (message.action === 'executeAction' && !/receiving end does not exist|no tab with id/i.test(reason)) {
               resolve(uncertainResult());
               return;
             }
