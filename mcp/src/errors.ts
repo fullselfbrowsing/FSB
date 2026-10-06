@@ -437,11 +437,17 @@ export function mapFSBError(
   }
 
   if (fsbResult?.mayHaveExecuted === true) {
+    // A page that stopped answering holds reads to the same deadline, so
+    // inspecting it first only waits out that deadline again.
+    const pageUnresponsive = fsbResult.errorCode === 'PAGE_UNRESPONSIVE' || fsbResult.code === 'PAGE_UNRESPONSIVE';
+    const nextAction = pageUnresponsive
+      ? 'The page stopped responding, so reads will wait on it too. Use navigate or close_tab to recover the tab, then check whether the action took effect before repeating it.'
+      : 'Inspect the current page with read_page or get_dom_snapshot before deciding whether to retry.';
     return {
       isError: true,
       content: [{
         type: 'text',
-        text: `Detected: Action outcome unknown\nWhy: ${String(fsbResult.error || 'The action was dispatched but its result was not confirmed.')}\nNext action: Inspect the current page with read_page or get_dom_snapshot before deciding whether to retry.\n\n${JSON.stringify({ outcome: 'unknown', mayHaveExecuted: true })}`,
+        text: `Detected: Action outcome unknown\nWhy: ${String(fsbResult.error || 'The action was dispatched but its result was not confirmed.')}\nNext action: ${nextAction}\n\n${JSON.stringify({ outcome: 'unknown', mayHaveExecuted: true })}`,
       }],
     };
   }

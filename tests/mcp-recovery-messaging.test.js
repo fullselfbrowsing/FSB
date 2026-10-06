@@ -180,6 +180,23 @@ async function run() {
         assert(!text.includes('then retry.'), 'uncertain action never recommends an immediate retry');
       },
     },
+    {
+      label: 'hung_uncertain_mutation',
+      input: {
+        success: false,
+        outcome: 'unknown',
+        mayHaveExecuted: true,
+        errorCode: 'PAGE_UNRESPONSIVE',
+        error: 'The page did not answer. Inspect its state before retrying.',
+      },
+      checks(text) {
+        assert(text.includes('Action outcome unknown'), 'hung mutation still names the unknown outcome');
+        assert(text.includes('"mayHaveExecuted":true'), 'hung mutation keeps the mayHaveExecuted marker');
+        assert(text.includes('navigate') && text.includes('close_tab'), 'hung mutation points at the tab recovery tools');
+        assert(!text.includes('read_page or get_dom_snapshot'), 'hung mutation does not send the agent to a read that will hang too');
+        assert(!text.includes('then retry.'), 'hung mutation never recommends an immediate retry');
+      },
+    },
   ];
 
   for (const fixture of fixtures) {
