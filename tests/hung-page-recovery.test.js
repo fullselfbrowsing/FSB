@@ -135,6 +135,34 @@ test('long typing and hold verbs size their lease past the work they do', () => 
   assert.equal(verbHold(undefined), 20000);
 });
 
+test('content-script hold and drag requests size their lease like the direct verbs', async () => {
+  const pick = (name) => {
+    const start = background.indexOf(`function ${name}(`);
+    return background.slice(start, background.indexOf('\n}\n', start) + 3);
+  };
+  const acquired = [];
+  const context = {
+    Number,
+    FsbCdpLease: {
+      acquire: async (tabId, options) => {
+        acquired.push(options);
+        return { release() {} };
+      }
+    }
+  };
+  const run = vm.runInNewContext(
+    `async ${pick('runLegacyCdpMessageWithLease')}\n${pick('cdpToolLeaseHoldMs')}\nrunLegacyCdpMessageWithLease`,
+    context);
+  const sender = { tab: { id: 4 } };
+  await run(async () => {}, { x: 1, y: 2, holdMs: 30000 }, sender, () => {});
+  await run(async () => {}, { startX: 0, startY: 0, endX: 9, endY: 9, steps: 500, maxDelayMs: 40 }, sender, () => {});
+  await run(async () => {}, { x: 1, y: 2 }, sender, () => {});
+  assert.ok(acquired[0].holdMs >= 30000 + 20000);
+  assert.ok(acquired[1].holdMs > 500 * 40 + 20000);
+  assert.equal(acquired[2].holdMs, 20000);
+  assert.ok(acquired.every(options => options.timeoutMs === 10000));
+});
+
 function harvestPage() {
   const startAt = dispatcher.indexOf('function _fsbHarvestStartInPage(');
   const stopAt = dispatcher.indexOf('function _fsbHarvestStopInPage(');

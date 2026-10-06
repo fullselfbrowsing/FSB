@@ -19189,7 +19189,12 @@ async function runLegacyCdpMessageWithLease(handler, request, sender, sendRespon
   }
   let lease = null;
   try {
-    lease = await globalThis.FsbCdpLease.acquire(tabId, { timeoutMs: 10000 });
+    // Content-script hold and drag requests carry the same timing fields as
+    // the direct verbs, so they get the same lease length.
+    lease = await globalThis.FsbCdpLease.acquire(tabId, {
+      timeoutMs: 10000,
+      holdMs: cdpToolLeaseHoldMs(request)
+    });
     return await handler(request, sender, sendResponse);
   } catch (error) {
     sendResponse(cdpFailureResult(error));
