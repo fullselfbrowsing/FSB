@@ -298,12 +298,13 @@
     }
 
     // Hold the same per-tab FIFO lease used by screenshots and Input/DOM CDP
-    // operations for the entire time-boxed discovery session.
+    // operations for the entire time-boxed discovery session, plus time for
+    // the Network.disable/detach that runs before endSession releases it.
     var cdpLease = null;
     var leaseApi = _cdpLease();
     if (leaseApi && typeof leaseApi.acquire === 'function') {
       try {
-        cdpLease = await leaseApi.acquire(tabId, { timeoutMs: 10000 });
+        cdpLease = await leaseApi.acquire(tabId, { timeoutMs: 10000, holdMs: maxMs + 10000 });
       } catch (_leaseErr) {
         return { ok: false, reason: 'RECIPE_CAPTURE_BUSY' };
       }

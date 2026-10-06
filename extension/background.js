@@ -19906,11 +19906,19 @@ async function executeCDPToolDirect(request, tabId) {
     return await leaseApi.run(
       tabId,
       () => executeCDPToolDirectUnlocked(request, tabId),
-      { timeoutMs: 10000 }
+      { timeoutMs: 10000, holdMs: cdpToolLeaseHoldMs(request.params) }
     );
   } catch (error) {
     return cdpFailureResult(error);
   }
+}
+
+// Hold and drag verbs run for as long as the caller asks; the lease watchdog
+// has to outlast them.
+function cdpToolLeaseHoldMs(params) {
+  const p = params || {};
+  const perStepMs = (Number(p.stepDelayMs) || Number(p.maxDelayMs) || 0) + 50;
+  return 20000 + (Number(p.holdMs) || 0) + (Number(p.steps) || 0) * perStepMs;
 }
 
 async function executeCDPToolDirectUnlocked(request, tabId) {
@@ -20575,7 +20583,10 @@ async function handleKeyboardDebuggerAction(request, sender, sendResponse) {
     tabId = sender.tab.id;
 
     if (globalThis.FsbCdpLease && typeof globalThis.FsbCdpLease.acquire === 'function') {
-      cdpLease = await globalThis.FsbCdpLease.acquire(tabId, { timeoutMs: 10000 });
+      cdpLease = await globalThis.FsbCdpLease.acquire(tabId, {
+        timeoutMs: 10000,
+        holdMs: keyboardActionLeaseHoldMs(method, text, keys, delay)
+      });
     }
 
     automationLogger.logActionExecution(null, `keyboard_${method}`, 'start', { tabId, key, specialKey });
@@ -20649,6 +20660,17 @@ async function handleKeyboardDebuggerAction(request, sender, sendResponse) {
   } finally {
     if (cdpLease) cdpLease.release();
   }
+}
+
+// Typing holds the debugger for every key. Budget each one generously (the
+// inter-key delay, the key down/up gap, and two CDP round trips) so a long
+// string is never handed to the next CDP caller part-way through.
+function keyboardActionLeaseHoldMs(method, text, keys, delay) {
+  let presses = 1;
+  if (method === 'typeText' && typeof text === 'string') presses = text.length;
+  if (method === 'pressKeySequence' && Array.isArray(keys)) presses = keys.length;
+  const perPressMs = (Number.isFinite(delay) ? Math.max(0, delay) : 50) + 100;
+  return 20000 + presses * perPressMs;
 }
 
 /**

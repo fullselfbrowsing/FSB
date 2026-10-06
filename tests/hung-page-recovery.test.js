@@ -88,6 +88,53 @@ test('CDP lease watchdog releases a hung holder for the next tab operation', asy
   lease.release();
 });
 
+function leaseContext() {
+  const source = fs.readFileSync(path.join(__dirname, '../extension/utils/cdp-lease.js'), 'utf8');
+  const timers = [];
+  const context = {
+    Map, Promise, Number, Error, TypeError,
+    setTimeout(callback, delay) {
+      const timer = { callback, delay, unref() {} };
+      timers.push(timer);
+      return timer;
+    },
+    clearTimeout(timer) { timer.cancelled = true; },
+    module: { exports: {} }
+  };
+  context.globalThis = context;
+  vm.runInNewContext(source, context);
+  return { lease: context.module.exports, timers };
+}
+
+test('a holder that asks for a longer lease is not preempted at the default watchdog', async () => {
+  const { lease, timers } = leaseContext();
+  const capture = await lease.acquire(11, { holdMs: 40000 });
+  assert.deepEqual(timers.map(timer => timer.delay), [40000]);
+  const typing = lease.acquire(11, { holdMs: 65000 });
+  capture.release();
+  const handedOff = await typing;
+  assert.equal(timers.filter(timer => !timer.cancelled && timer.delay !== 10000).at(-1).delay, 65000);
+  handedOff.release();
+});
+
+test('long typing and hold verbs size their lease past the work they do', () => {
+  const pick = (name, endMarker) => {
+    const start = background.indexOf(`function ${name}(`);
+    return background.slice(start, background.indexOf(endMarker, start));
+  };
+  const typingHold = vm.runInNewContext(
+    `${pick('keyboardActionLeaseHoldMs', '\n}\n')}\n}\nkeyboardActionLeaseHoldMs`, { Number, Math, Array });
+  const verbHold = vm.runInNewContext(
+    `${pick('cdpToolLeaseHoldMs', '\n}\n')}\n}\ncdpToolLeaseHoldMs`, { Number });
+  // typeWithKeys spends ~45ms a character at delay 30; 400 characters already pass 20s.
+  assert.ok(typingHold('typeText', 'x'.repeat(400), undefined, 30) > 400 * 45 + 20000);
+  assert.ok(typingHold('pressKeySequence', undefined, new Array(300).fill('a'), 50) > 300 * 60 + 20000);
+  assert.equal(typingHold('pressKey', undefined, undefined, 50), 20150);
+  assert.ok(verbHold({ holdMs: 30000 }) > 30000 + 20000 - 1);
+  assert.ok(verbHold({ steps: 500, maxDelayMs: 40 }) > 500 * 40 + 20000);
+  assert.equal(verbHold(undefined), 20000);
+});
+
 function harvestPage() {
   const startAt = dispatcher.indexOf('function _fsbHarvestStartInPage(');
   const stopAt = dispatcher.indexOf('function _fsbHarvestStopInPage(');
