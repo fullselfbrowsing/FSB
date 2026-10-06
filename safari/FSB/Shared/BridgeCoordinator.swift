@@ -124,6 +124,11 @@ final class BridgeCoordinator {
             // `self.socket?.send`. Reachable whenever a dial outlives the
             // extension's 8s NATIVE_OPEN_TIMEOUT_MS and it reconnects.
             if self.socket != nil { self.discardSocket(reason: "superseded_by_new_port") }
+            // A server-side close nils the socket without passing through
+            // discardSocket(), so half-built messages from that connection can
+            // still be here. Left in place, the new socket's watchdog would
+            // expire them and tear down a connection that did nothing wrong.
+            self.reassembly.removeAll()
 
             let session = MCPSocketSession(url: parsed, origin: origin)
             self.socket = session
@@ -190,12 +195,23 @@ final class BridgeCoordinator {
             case .complete(let payload):
                 self.socket?.send(payload)
             case .failed(let reason):
-                self.deliver(["v": NativeFraming.protocolVersion, "t": "error",
-                              "phase": "frame", "message": reason])
+                self.failReassembly(reason)
             case .pending, .ignored:
                 break
             }
         }
+    }
+
+    /// A message that cannot be reassembled is a reply the server will never
+    /// get. Telling only the extension is not enough: its reconnect would ADOPT
+    /// this still-open socket (handleOpen), the hub would never see a close, and
+    /// sendAndWait would sit out its 30s and reject with a timeout that does not
+    /// arm sw_evicted recovery. Closing :7225 is what turns the lost message
+    /// into a disconnect the server recovers from.
+    private func failReassembly(_ reason: String) {
+        discardSocket(reason: reason)
+        deliver(["v": NativeFraming.protocolVersion, "t": "error",
+                 "phase": "frame", "message": reason])
     }
 
     func handleClose(code: Int, reason: String) {
@@ -393,6 +409,13 @@ final class BridgeCoordinator {
         timer.setEventHandler { [weak self] in
             guard let self else { return }
             guard self.socket != nil else { self.stopWatchdog(); return }
+            // Ahead of the parked-poll guard: a lost tail chunk leaves the port
+            // looking perfectly healthy, polls and all, so this is the only
+            // place a stalled reassembly is ever noticed.
+            if NativeFraming.expireStalled(&self.reassembly) {
+                self.failReassembly("reassembly_timeout")
+                return
+            }
             // A held poll is not silence — it is the extension waiting on us.
             guard self.parkedPoll == nil else { return }
             guard Date().timeIntervalSince(self.lastContactAt) > Self.portSilenceSeconds else { return }

@@ -301,6 +301,45 @@ function extensionResourcePaths(pbx) {
       passAssert(/lastContactAt = Date\(\)/.test(deliverCode), 'deliver stamps contact when it answers the held poll');
       passAssert(retireCode.length > 0 && !/lastContactAt/.test(retireCode),
         'retirePreviousPort does not stamp contact for a port that is going away');
+
+      // A lost tail chunk never sends the next chunk that ingest() needs to
+      // notice the stall, and the port keeps polling the whole time, so the
+      // watchdog has to sweep reassembly BEFORE it bails out on a parked poll.
+      const watchdogCode = sliceFn('    private func armWatchdog()', '    private func stopWatchdog()');
+      const sweepAt = watchdogCode.indexOf('NativeFraming.expireStalled(');
+      const pollGuardAt = watchdogCode.indexOf('guard self.parkedPoll == nil');
+      passAssert(sweepAt >= 0 && pollGuardAt > sweepAt,
+        'the watchdog expires stalled reassemblies ahead of its parked-poll guard');
+
+      // Telling only the extension lets its reconnect adopt the still-open
+      // socket, so the server never sees the loss and sits out its 30s timeout.
+      const failCode = sliceFn('    private func failReassembly(', '\n    }');
+      passAssert(/discardSocket\(/.test(failCode) && /deliver\(/.test(failCode),
+        'a failed reassembly closes the MCP socket as well as telling the extension');
+      const frameCode = sliceFn('    func handleFrame(', '    private func failReassembly(');
+      passAssert(/case \.failed\(let reason\):\s*self\.failReassembly\(reason\)/.test(frameCode),
+        'every ingest failure goes through failReassembly');
+
+      // A server-side close nils the socket without discardSocket(); a new
+      // socket must not inherit, then expire, the old connection's buffers.
+      const clearAt = openCode.indexOf('self.reassembly.removeAll()');
+      const dialAt = openCode.indexOf('MCPSocketSession(url:');
+      passAssert(clearAt >= 0 && dialAt > clearAt,
+        'handleOpen clears leftover reassembly before dialing a new socket');
+
+      const framing = fs.readFileSync(
+        path.join(ROOT, 'safari', 'FSB', 'Shared', 'NativeFraming.swift'), 'utf8'
+      );
+      const timeoutMatch = framing.match(/static let reassemblyTimeout: TimeInterval = (\d+)/);
+      const reassemblyTimeout = timeoutMatch ? Number(timeoutMatch[1]) : NaN;
+      passAssert(reassemblyTimeout > 0 && reassemblyTimeout <= 10,
+        `reassemblyTimeout leaves room inside the server's 30s sendAndWait (got ${reassemblyTimeout}s)`);
+      const ingestAt = framing.indexOf('static func ingest(');
+      const ingestCode = (ingestAt >= 0
+        ? framing.slice(ingestAt, framing.indexOf('static func expireStalled(', ingestAt))
+        : '').replace(/^\s*\/\/.*$/gm, '');
+      passAssert(/buf\.lastChunkAt = Date\(\)/.test(ingestCode),
+        'every accepted chunk restarts the reassembly deadline');
     } else {
       passAssert(true, 'BridgeCoordinator.swift not present (skipped)');
     }

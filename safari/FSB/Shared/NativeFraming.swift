@@ -22,13 +22,18 @@ enum NativeFraming {
     /// re-advertised to the extension in the `opened` frame.
     static let defaultMaxFrameBytes = 512 * 1024
     static let maxReassemblyBytes = 32 * 1024 * 1024
-    static let reassemblyTimeout: TimeInterval = 30
+    /// Measured from the LAST chunk, not the first. The extension posts every
+    /// chunk of a message back-to-back in one loop (send() in
+    /// ws/mcp-native-transport.js), so a gap this long means one was lost. It
+    /// has to fire well inside the server's 30s sendAndWait, whose clock started
+    /// before the tool even ran -- a 30s budget here could never win that race.
+    static let reassemblyTimeout: TimeInterval = 5
 
     struct ChunkBuffer {
         var parts: [String?]
         var received: Int
         var bytes: Int
-        var startedAt: Date
+        var lastChunkAt: Date
     }
 
     enum IngestResult {
@@ -82,6 +87,9 @@ enum NativeFraming {
     /// hang until its own 30s timeout, and that timeout string is not one of
     /// the bridge-disconnect messages, so the sw_evicted recovery would never
     /// arm. Failing loudly turns a permanent hang into a fast reconnect.
+    ///
+    /// The time check in here only catches a chunk that arrives late. The
+    /// bound itself is expireStalled(), which needs no further chunk to run.
     static func ingest(_ msg: [String: Any], into buffers: inout [String: ChunkBuffer]) -> IngestResult {
         guard let type = msg["t"] as? String else { return .ignored }
 
@@ -100,9 +108,9 @@ enum NativeFraming {
         let data = msg["data"] as? String ?? ""
 
         var buf = buffers[cid] ?? ChunkBuffer(parts: Array(repeating: nil, count: n),
-                                              received: 0, bytes: 0, startedAt: Date())
+                                              received: 0, bytes: 0, lastChunkAt: Date())
 
-        if Date().timeIntervalSince(buf.startedAt) > reassemblyTimeout {
+        if Date().timeIntervalSince(buf.lastChunkAt) > reassemblyTimeout {
             buffers.removeValue(forKey: cid)
             return .failed("reassembly_timeout")
         }
@@ -111,6 +119,7 @@ enum NativeFraming {
             buf.parts[i] = data
             buf.received += 1
             buf.bytes += data.utf8.count
+            buf.lastChunkAt = Date()
         }
 
         if buf.bytes > maxReassemblyBytes {
@@ -132,5 +141,15 @@ enum NativeFraming {
 
         buffers[cid] = buf
         return .pending
+    }
+
+    /// Drop every reassembly that has gone `reassemblyTimeout` without a chunk,
+    /// returning whether any did. ingest() only notices a stall when the next
+    /// chunk of the SAME message arrives, and a lost tail chunk means it never
+    /// does -- so the coordinator calls this from its watchdog instead.
+    static func expireStalled(_ buffers: inout [String: ChunkBuffer], now: Date = Date()) -> Bool {
+        let before = buffers.count
+        buffers = buffers.filter { now.timeIntervalSince($0.value.lastChunkAt) <= reassemblyTimeout }
+        return buffers.count < before
     }
 }
