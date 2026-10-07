@@ -111,6 +111,32 @@ test('CDP append moves the caret to the end of an editor focused inside a nested
   assert.equal(commands[0].params.commands[0], 'moveToEndOfDocument');
 });
 
+test('CDP append moves a code editor cursor with its own shortcut, not a DOM selection', async () => {
+  const start = background.indexOf('async function dispatchCdpTextInsertion(');
+  const end = background.indexOf('\nasync function handleCDPInsertTextUnlocked', start);
+  const commands = [];
+  let prepared = 0;
+  const dispatch = vm.runInNewContext(`${background.slice(start, end)}\ndispatchCdpTextInsertion`, {
+    prepareCdpTextTarget: async () => { prepared++; return { success: true }; },
+    chrome: { debugger: { sendCommand: async (_target, method, params) => commands.push({ method, params }) } },
+    navigator: { platform: 'MacIntel', userAgent: 'Macintosh' },
+    setTimeout, clearTimeout
+  });
+  const result = await dispatch(42, ' more', 'end', null, { editorOwnsCaret: true });
+  assert.equal(result.success, true);
+  assert.equal(prepared, 0);
+  assert.deepEqual(commands.map(c => c.method),
+    ['Input.dispatchKeyEvent', 'Input.dispatchKeyEvent', 'Input.insertText']);
+  assert.deepEqual(commands.map(c => c.params.type).slice(0, 2), ['keyDown', 'keyUp']);
+  assert.equal(commands[0].params.key, 'ArrowDown');
+  assert.equal(commands[0].params.modifiers, 4);
+  assert.equal(commands[0].params.commands[0], 'moveToEndOfDocument');
+  // Replacement and selector-targeted appends still go through the DOM lookup.
+  await dispatch(42, 'new', 'replace_all', null, { editorOwnsCaret: true });
+  await dispatch(42, ' more', 'end', '#draft', { editorOwnsCaret: true });
+  assert.equal(prepared, 2);
+});
+
 test('CDP append reaches a field focused inside a shadow root', async () => {
   const commands = [];
   const input = { tagName: 'INPUT', value: 'hello', focus() {},
@@ -208,6 +234,19 @@ test('a CDP insertion that cannot attach the debugger stays retryable', async ()
   assert.equal(responses[0].mayHaveExecuted, undefined);
   assert.equal(dispatched, 0);
   assert.equal(detached.length, 0);
+});
+
+test('a content-script CDP insertion passes the code editor caret hint through', async () => {
+  const calls = [];
+  const handler = loadInsertHandler({
+    dispatchCdpTextInsertion: async (...args) => { calls.push(args); return { success: true }; }
+  });
+  await handler({ text: ' more', position: 'end', editorOwnsCaret: true }, { tab: { id: 42 } }, () => {});
+  await handler({ text: ' more', position: 'end' }, { tab: { id: 42 } }, () => {});
+  assert.deepEqual(JSON.parse(JSON.stringify(calls.map(args => args.slice(2)))), [
+    ['end', null, { editorOwnsCaret: true }],
+    ['end', null, { editorOwnsCaret: false }]
+  ]);
 });
 
 test('a CDP insertion that fails after input began stays uncertain', async () => {
@@ -534,6 +573,16 @@ test('ordinary fields still replace by default and append when requested', async
     const { type, field } = loadTypeAction();
     assert.equal((await type({ selector: '#input', text: 'new', ...options })).success, true);
     assert.equal(field.value, expected);
+  }
+});
+
+test('code editor CDP typing appends at the end and replaces by default', async () => {
+  for (const [options, position] of [[{ clear_first: false }, 'end'], [{}, 'replace_all']]) {
+    const { type, requests } = loadTypeAction({ editorType: 'ace' });
+    assert.equal((await type({ selector: '#editor', text: 'new', ...options })).success, true);
+    const request = requests.find(r => r.action === 'cdpInsertText');
+    assert.equal(request.position, position);
+    assert.equal(request.editorOwnsCaret, true);
   }
 });
 

@@ -3195,7 +3195,10 @@ const tools = {
             chrome.runtime.sendMessage({
               action: 'cdpInsertText',
               text: params.text,
-              clearFirst
+              clearFirst,
+              // The editor keeps its own cursor, so appending moves it with a keystroke.
+              position: clearFirst ? 'replace_all' : 'end',
+              editorOwnsCaret: true
             }, (response) => {
               if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
               else if (response?.success) resolve(response);

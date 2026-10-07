@@ -166,6 +166,23 @@ test('appending to an editor focused inside a nested frame lands at its end',
     }
   });
 
+test('appending to a code editor moves its own cursor to the end',
+  { skip: !chrome }, async () => {
+    const { ws, close } = await openFixture('code-editor.html');
+    try {
+      const editorText = 'document.getElementById("view").textContent';
+      for (let i = 0; i < 50 && await evaluate(ws, editorText) !== 'hello'; i++) await sleep(100);
+      await evaluate(ws, 'document.getElementById("input").focus()');
+      const { dispatch, input } = loadCdpTextInsertion(ws);
+      const result = await dispatch(1, ' world', 'end', null, { editorOwnsCaret: true });
+      assert.equal(result.success, true, result.error);
+      assert.equal(await evaluate(ws, editorText), 'hello world');
+      assert.equal(input.filter(method => method === 'Input.insertText').length, 1);
+    } finally {
+      await close();
+    }
+  });
+
 test('typing into a field inside a shadow root lands the text',
   { skip: !chrome }, async () => {
     const { ws, close } = await openFixture('shadow-text-field.html');

@@ -19314,11 +19314,14 @@ async function prepareCdpTextTarget(tabId, selector, position) {
   return result?.result || { success: false, error: 'Unable to inspect editable field' };
 }
 
-async function dispatchCdpTextInsertion(tabId, text, position = 'caret', selector = null) {
+async function dispatchCdpTextInsertion(tabId, text, position = 'caret', selector = null, options = {}) {
   if (!['caret', 'end', 'replace_all'].includes(position)) {
     return { success: false, error: 'Invalid insertion position' };
   }
-  const prepared = await prepareCdpTextTarget(tabId, selector, position);
+  // Code editors keep their own cursor, so a DOM selection cannot move it.
+  const prepared = options.editorOwnsCaret && !selector && position === 'end'
+    ? { success: true, editorOwnsCaret: true }
+    : await prepareCdpTextTarget(tabId, selector, position);
   if (!prepared.success) return prepared;
   const isMac = typeof navigator !== 'undefined' &&
     (/Macintosh/.test(navigator.userAgent || '') || /Mac/.test(navigator.platform || ''));
@@ -19331,9 +19334,10 @@ async function dispatchCdpTextInsertion(tabId, text, position = 'caret', selecto
       });
       await chrome.debugger.sendCommand({ tabId }, 'Input.dispatchKeyEvent', { type: 'keyUp', ...endKey });
     }
-    if (position === 'end' && prepared.nestedFrame) {
-      // The caret is in a frame the lookup could not reach, so move it with
-      // the editor's own end-of-document shortcut.
+    if (position === 'end' && (prepared.nestedFrame || prepared.editorOwnsCaret)) {
+      // The caret is in a frame the lookup could not reach, or in an editor
+      // that ignores DOM selection, so move it with the editor's own
+      // end-of-document shortcut.
       const endKey = isMac
         ? { key: 'ArrowDown', code: 'ArrowDown', windowsVirtualKeyCode: 40, nativeVirtualKeyCode: 40 }
         : { key: 'End', code: 'End', windowsVirtualKeyCode: 35, nativeVirtualKeyCode: 35 };
@@ -19376,7 +19380,7 @@ async function dispatchCdpTextInsertion(tabId, text, position = 'caret', selecto
 
 async function handleCDPInsertTextUnlocked(request, sender, sendResponse) {
   const tabId = sender.tab?.id;
-  const { text, clearFirst, selector } = request;
+  const { text, clearFirst, selector, editorOwnsCaret } = request;
   const position = request.position || (clearFirst ? 'replace_all' : 'caret');
 
   if (!tabId) {
@@ -19398,7 +19402,8 @@ async function handleCDPInsertTextUnlocked(request, sender, sendResponse) {
     await attachFsbDebugger(tabId, 'cdpInsertText');
     debuggerAttached = true;
 
-    const inserted = await dispatchCdpTextInsertion(tabId, text, position, selector);
+    const inserted = await dispatchCdpTextInsertion(tabId, text, position, selector,
+      { editorOwnsCaret: editorOwnsCaret === true });
     if (!inserted.success) {
       await chrome.debugger.detach({ tabId });
       debuggerAttached = false;
