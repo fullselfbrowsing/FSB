@@ -219,7 +219,8 @@ test('typing reaches fields inside web components through the real readiness che
     const { ws, close } = await openFixture('shadow-components.html');
     try {
       const results = await shadowComponentResults(ws);
-      for (const selector of ['open-field >>> #inner', 'closed-field >>> #inner', 'open-field', 'closed-field']) {
+      for (const selector of ['open-field >>> #inner', 'closed-field >>> #inner', 'open-field', 'closed-field',
+        'editor-field >>> #inner', 'editor-field']) {
         const { success, error, value, expected } = results[selector];
         assert.equal(success, true, `${selector}: ${error}`);
         assert.equal(value, expected, selector);
