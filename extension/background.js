@@ -10071,7 +10071,7 @@ async function fsbRestoreLatticeReplayCheckpoints() {
 }
 
 // Enhanced message sending with automatic retry and fallback
-async function sendMessageWithRetry(tabId, message, maxRetries = 3) {
+async function sendMessageWithRetry(tabId, message, maxRetries = 3, options = {}) {
   // Capture URL before sending - used to detect if action triggered navigation
   let previousUrl = null;
   try {
@@ -10103,6 +10103,7 @@ async function sendMessageWithRetry(tabId, message, maxRetries = 3) {
       // CRITICAL: Use frameId: 0 to target ONLY the main frame
       // This prevents responding from iframes (like Google's RotateCookiesPage iframe)
       messageDispatched = true;
+      options.onDeliveryState?.('dispatching');
       const response = await chrome.tabs.sendMessage(tabId, message, { frameId: 0 });
       
       // Success - reset health tracking
@@ -10115,6 +10116,9 @@ async function sendMessageWithRetry(tabId, message, maxRetries = 3) {
       return response;
       
     } catch (error) {
+      if (messageDispatched && /receiving end does not exist|no tab with id/i.test(error.message || '')) {
+        options.onDeliveryState?.('undelivered');
+      }
       const failureType = classifyFailure(error, message);
       automationLogger.logComm(null, 'send', message.action || 'unknown', false, { tabId, attempt, failureType, error: error.message });
 
@@ -19265,22 +19269,35 @@ async function prepareCdpTextTarget(tabId, selector, position) {
       if (!element || (!['INPUT', 'TEXTAREA'].includes(element.tagName) && !element.isContentEditable)) {
         return { success: false, error: 'Target is not editable' };
       }
-      element.focus();
-      const previous = ['INPUT', 'TEXTAREA'].includes(element.tagName) ? element.value : element.innerText;
-      if (placement === 'end' || placement === 'replace_all') {
-        if (typeof element.setSelectionRange === 'function') {
-          const at = placement === 'end' ? element.value.length : 0;
-          element.setSelectionRange(at, placement === 'end' ? at : element.value.length);
-        } else {
-          const selection = window.getSelection();
-          const range = document.createRange();
-          range.selectNodeContents(element);
-          if (placement === 'end') range.collapse(false);
-          selection.removeAllRanges();
-          selection.addRange(range);
+      try {
+        element.focus();
+        const previous = ['INPUT', 'TEXTAREA'].includes(element.tagName) ? element.value : element.innerText;
+        let keyboardEnd = false;
+        if (placement === 'end' || placement === 'replace_all') {
+          if (typeof element.setSelectionRange === 'function') {
+            const at = placement === 'end' ? element.value.length : 0;
+            try {
+              element.setSelectionRange(at, placement === 'end' ? at : element.value.length);
+            } catch (error) {
+              if (error.name !== 'InvalidStateError') throw error;
+              // Email/number inputs expose the method but reject selection.
+              // CDP can position their caret with a native key instead.
+              keyboardEnd = true;
+            }
+          } else {
+            const selection = window.getSelection();
+            const range = document.createRange();
+            range.selectNodeContents(element);
+            if (placement === 'end') range.collapse(false);
+            selection.removeAllRanges();
+            selection.addRange(range);
+          }
         }
+        return { success: true, previous, keyboardEnd };
+      } catch (error) {
+        return { success: false, mayHaveExecuted: false,
+          error: `Unable to prepare editable field: ${error.message}` };
       }
-      return { success: true, previous };
     },
     args: [selector || null, position, deadline]
   });
@@ -19307,6 +19324,13 @@ async function dispatchCdpTextInsertion(tabId, text, position = 'caret', selecto
     (/Macintosh/.test(navigator.userAgent || '') || /Mac/.test(navigator.platform || ''));
   const modifiers = isMac ? 4 : 2;
   const input = (async () => {
+    if (position === 'end' && prepared.keyboardEnd) {
+      const endKey = { key: 'End', code: 'End', windowsVirtualKeyCode: 35, nativeVirtualKeyCode: 35 };
+      await chrome.debugger.sendCommand({ tabId }, 'Input.dispatchKeyEvent', {
+        type: 'keyDown', ...endKey, commands: ['moveToEndOfDocument']
+      });
+      await chrome.debugger.sendCommand({ tabId }, 'Input.dispatchKeyEvent', { type: 'keyUp', ...endKey });
+    }
     if (position === 'end' && prepared.nestedFrame) {
       // The caret is in a frame the lookup could not reach, so move it with
       // the editor's own end-of-document shortcut.

@@ -242,13 +242,13 @@ const TOOL_REGISTRY = [
 
   withVisualSessionFields({
     name: 'type_text',
-    description: 'Replace text in an editable field by selector. Set clear_first to false to append. Returns the rendered text after insertion. Related: clear_input, press_enter, get_dom_snapshot. Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64).',
+    description: 'Type text into an editable field by selector. Normal fields replace existing text by default; set clear_first to false to append. Google Docs inserts at the cursor by default; explicitly set clear_first to true to replace the document. Returns the rendered text after insertion. Related: clear_input, press_enter, get_dom_snapshot. Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64).',
     inputSchema: {
       type: 'object',
       properties: {
         selector: { type: 'string', description: 'CSS selector or element ref for the input field (e.g., "#email", "input[name=search]", or "e12" from get_dom_snapshot)' },
         text: { type: 'string', description: 'Text to type into the field' },
-        clear_first: { type: 'boolean', description: 'Replace existing text (default true); false appends at the end.' },
+        clear_first: { type: 'boolean', description: 'Replace existing text (default true for normal fields, false for Google Docs document editing). False appends to normal fields or inserts at the Docs cursor.' },
         tab_id: { type: 'number', description: 'Optional. Tab id this action targets. Omit when the calling agent owns exactly one tab; pass to disambiguate when the agent owns multiple. Single-tab agents and legacy popup/sidepanel/autopilot do not need to pass this.' }
       },
       required: ['selector', 'text']

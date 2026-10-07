@@ -1592,23 +1592,61 @@ class MCPBridgeClient {
   async _sendToContentScript(tabId, message) {
     const deliveryDeadline = Date.now() + 12000;
     if (message.action === 'executeAction') message._fsbDeadlineAt = deliveryDeadline;
-    const uncertainResult = () => ({ success: false, outcome: 'unknown', mayHaveExecuted: true,
-      errorCode: 'PAGE_UNRESPONSIVE', error: 'The page did not answer. Inspect its state before retrying.' });
+    const isAction = message.action === 'executeAction';
+    const isSheet = isAction && ['fillsheet', 'readsheet', 'fill_sheet', 'read_sheet'].includes(message.tool);
+    const isMutation = isAction && !['readsheet', 'read_sheet'].includes(message.tool);
+    let dispatched = false;
+    let settled = false;
+    let timer;
+    let resolveTimeout;
+    const uncertainResult = () => ({ success: false, outcome: isMutation ? 'unknown' : 'failed',
+      mayHaveExecuted: isMutation, errorCode: 'PAGE_UNRESPONSIVE',
+      error: 'The page did not answer. Inspect its state before retrying.' });
+    const timeoutResult = () => {
+      if (isSheet && dispatched) {
+        return { success: false, outcome: isMutation ? 'unknown' : 'failed', mayHaveExecuted: isMutation,
+          errorCode: 'ACTION_RESPONSE_TIMEOUT',
+          error: 'The sheet operation exceeded its response deadline and may still be running. Wait and inspect its state before retrying.' };
+      }
+      if (isAction && dispatched) return uncertainResult();
+      return { success: false, errorCode: 'PAGE_UNRESPONSIVE',
+        ...(isAction ? { outcome: 'failed', mayHaveExecuted: false } : {}),
+        error: 'The page did not answer before the delivery deadline.' };
+    };
+    const timeout = new Promise(resolve => { resolveTimeout = resolve; });
+    const armWait = (milliseconds) => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        settled = true;
+        resolveTimeout(timeoutResult());
+      }, milliseconds);
+    };
+    const onDeliveryState = (state) => {
+      if (settled) return;
+      dispatched = state === 'dispatching';
+      // An undelivered attempt may retry only within the original delivery
+      // window. A sheet that was dispatched gets its own execution budget.
+      if (!dispatched) armWait(Math.max(0, deliveryDeadline - Date.now()));
+      else if (isSheet) armWait(125000);
+    };
+    armWait(12000);
     // operation() rejects only when the message was never delivered; a
     // possibly delivered action resolves with an uncertain result instead.
     const operation = async () => {
       // sendMessageWithRetry is defined in background.js (same scope).
       if (typeof sendMessageWithRetry === 'function') {
-        return await sendMessageWithRetry(tabId, message);
+        return await sendMessageWithRetry(tabId, message, 3, { onDeliveryState });
       }
       if (typeof ensureContentScriptInjected === 'function') {
         await ensureContentScriptInjected(tabId);
       }
       if (Date.now() >= deliveryDeadline) {
         return { success: false, errorCode: 'PAGE_UNRESPONSIVE',
+          ...(isAction ? { outcome: 'failed', mayHaveExecuted: false } : {}),
           error: 'The page did not answer before the delivery deadline.' };
       }
       return new Promise((resolve, reject) => {
+        onDeliveryState('dispatching');
         chrome.tabs.sendMessage(tabId, message, { frameId: 0 }, (response) => {
           if (chrome.runtime.lastError) {
             const reason = chrome.runtime.lastError.message || '';
@@ -1616,6 +1654,7 @@ class MCPBridgeClient {
               resolve(uncertainResult());
               return;
             }
+            onDeliveryState('undelivered');
             reject(new Error(reason));
             return;
           }
@@ -1623,25 +1662,20 @@ class MCPBridgeClient {
         });
       });
     };
-    let timer;
     try {
-      return await Promise.race([
-        operation(),
-        new Promise((resolve) => {
-          timer = setTimeout(() => resolve(message.action === 'executeAction'
-            ? uncertainResult()
-            : { success: false, errorCode: 'PAGE_UNRESPONSIVE',
-                error: 'The page did not answer within 12 seconds.' }), 12000);
-        })
-      ]);
+      return await Promise.race([operation(), timeout]);
     } catch (error) {
       const reason = error?.message || String(error);
+      if (isAction && dispatched && !/receiving end does not exist|no tab with id/i.test(reason)) {
+        return uncertainResult();
+      }
       return message.action === 'executeAction'
         ? { success: false, outcome: 'failed', mayHaveExecuted: false,
             errorCode: 'PAGE_UNRESPONSIVE', error: `The action was not delivered: ${reason}` }
         : { success: false, errorCode: 'PAGE_UNRESPONSIVE',
             error: `The page did not answer: ${reason}` };
     } finally {
+      settled = true;
       clearTimeout(timer);
     }
   }

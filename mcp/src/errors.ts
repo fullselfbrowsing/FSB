@@ -25,6 +25,8 @@ export const FSB_ERROR_MESSAGES: Record<string, string> = {
     'Content script injection failed. The extension could not inject its scripts into the current page.',
   'PAGE_UNRESPONSIVE':
     'The page did not answer within the bounded wait. Navigation and tab close remain available. Inspect the page before retrying an action.',
+  'ACTION_RESPONSE_TIMEOUT':
+    'The operation exceeded its response deadline and may still be running. Wait and inspect its state before retrying.',
   'queue_timeout':
     'Tool call timed out waiting in queue. Another task is running and did not complete in time. Use stop_task to cancel the running task, or use read-only tools which bypass the queue.',
   'invalid_client_label':
@@ -45,6 +47,7 @@ const LAYER_LABELS = {
   extension: 'Extension attachment',
   contentScript: 'Content script availability',
   pageResponsiveness: 'Page responsiveness',
+  actionResponse: 'Action response deadline',
   toolRouting: 'Tool routing',
   agentScope: 'Agent scope',
   tabOwnership: 'Tab ownership',
@@ -79,6 +82,7 @@ const CODE_ONLY_ERROR_KEYS = new Set([
   'SCREENSHOT_DEBUGGER_BUSY',
   'SCREENSHOT_CAPTURE_FAILED',
   'PAGE_UNRESPONSIVE',
+  'ACTION_RESPONSE_TIMEOUT',
 ]);
 
 type LayerLabel = typeof LAYER_LABELS[keyof typeof LAYER_LABELS];
@@ -261,6 +265,12 @@ function buildLayeredDetail(
         why: 'The current page did not respond before the page-read deadline.',
         nextAction: 'Use navigate or close_tab to recover the tab. Inspect page state before repeating any mutation.',
       };
+    case 'ACTION_RESPONSE_TIMEOUT':
+      return {
+        detected: LAYER_LABELS.actionResponse,
+        why: 'The dispatched operation did not finish before its response deadline and may still be running.',
+        nextAction: 'Wait for the operation to settle, then inspect its state before deciding whether to retry.',
+      };
     case 'restricted_active_tab':
       return {
         detected: LAYER_LABELS.restrictedPage,
@@ -442,7 +452,9 @@ export function mapFSBError(
     const pageUnresponsive = fsbResult.errorCode === 'PAGE_UNRESPONSIVE' || fsbResult.code === 'PAGE_UNRESPONSIVE';
     const nextAction = pageUnresponsive
       ? 'The page stopped responding, so reads will wait on it too. Use navigate or close_tab to recover the tab, then check whether the action took effect before repeating it.'
-      : 'Inspect the current page with read_page or get_dom_snapshot before deciding whether to retry.';
+      : fsbResult.errorCode === 'ACTION_RESPONSE_TIMEOUT' || fsbResult.code === 'ACTION_RESPONSE_TIMEOUT'
+        ? 'The operation may still be running. Wait for it to settle, then inspect the current page before deciding whether to retry.'
+        : 'Inspect the current page with read_page or get_dom_snapshot before deciding whether to retry.';
     return {
       isError: true,
       content: [{

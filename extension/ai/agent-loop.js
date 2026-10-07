@@ -2421,18 +2421,10 @@ async function runAgentIteration(sessionId, options) {
         var domain = (call.args && call.args.domain) || '';
         try {
           var guide = (typeof getGuideForTask === 'function')
-            ? getGuideForTask('', 'https://' + domain)
+            ? getGuideForTask('', domain)
             : null;
           if (guide) {
-            var guideGuidance = JSON.stringify({
-              selectors: guide.selectors || {},
-              workflows: {
-                createPost: guide.workflows && guide.workflows.createPost,
-                replyToPost: guide.workflows && guide.workflows.replyToPost
-              },
-              warnings: Array.isArray(guide.warnings) ? guide.warnings.slice(0, 6) : [],
-              guidance: typeof guide.guidance === 'string' ? guide.guidance.slice(0, 1600) : ''
-            }).slice(0, 5000);
+            var guideGuidance = formatSiteGuideForAgent(guide);
             result = { success: true, hadEffect: false, error: null, navigationTriggered: false,
               result: { domain: domain, site: guide.site || guide.name || domain, guidance: guideGuidance } };
           } else {

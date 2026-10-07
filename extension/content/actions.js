@@ -14,6 +14,21 @@
     return String(value ?? '').replace(/\r\n?/g, '\n').replace(/\u00a0/g, ' ');
   }
 
+  function resolveTextReplacement(params, insertAtCursorByDefault = false) {
+    if (params.clear_first === false || params.clearFirst === false) return false;
+    return params.clear_first === true || params.clearFirst === true || !insertAtCursorByDefault;
+  }
+
+  function readInitialEditorText(element) {
+    const text = readEditorText(element);
+    // An empty rich-text field often renders its one placeholder BR as a
+    // newline. Preserve whitespace in text nodes and multiple blank lines.
+    if (element.isContentEditable && text === '\n' && element.textContent === '' &&
+        element.querySelectorAll('br').length === 1 &&
+        !element.querySelector('img, video, audio, iframe, [contenteditable="false"]')) return '';
+    return text;
+  }
+
   function resolveTextEntryTarget(element) {
     if (!element) return null;
     if (element.tagName === 'INPUT' || element.tagName === 'TEXTAREA') return element;
@@ -234,7 +249,7 @@ async function clickAtCoordinates(params) {
  * @returns {Object|null} A retryable failure, or null when the outcome is unknown
  */
 function cdpRefusedBeforeInput(response) {
-  if (!response || response.success || response.mayHaveExecuted) return null;
+  if (!response || response.success !== false || response.outcome === 'unknown' || response.mayHaveExecuted) return null;
   return {
     success: false,
     outcome: 'failed',
@@ -268,7 +283,7 @@ function captureActionState(element, actionType) {
   };
 
   // Element-specific state (if element provided)
-  if (element && document.contains(element)) {
+  if (element && element.isConnected) {
     state.element = {
       exists: true,
       tagName: element.tagName,
@@ -655,7 +670,7 @@ function diagnoseElementFailure(selector, element = null) {
     diagnostic.checks.push({ check: 'no_hover_needed', passed: !needsHover, detail: needsHover ? 'May need hover to reveal' : 'No hover dependency detected' });
 
     // 8. Element still in DOM?
-    const inDOM = document.contains(element);
+    const inDOM = element.isConnected;
     diagnostic.checks.push({ check: 'in_dom', passed: inDOM, detail: inDOM ? 'In DOM' : 'REMOVED from DOM since snapshot' });
 
     // Build summary and suggestions
@@ -708,7 +723,7 @@ function buildFailureReport(action, selector, element, error, diagnostic = null)
   };
 
   // Build element state snapshot if element exists and is still in DOM
-  if (element && document.contains(element)) {
+  if (element && element.isConnected) {
     try {
       const rect = element.getBoundingClientRect();
       const style = getComputedStyle(element);
@@ -2189,6 +2204,8 @@ const tools = {
   // Click an element
   click: async (params) => {
     const startTime = Date.now();
+    let clickDispatched = false;
+    try {
 
     // Explicit error when called with neither selector nor text (TE-04)
     if (!params.selector && !params.selectors && !params.text && !params.coordinates && !params.ref) {
@@ -2316,6 +2333,7 @@ const tools = {
       if (params.coordinates && typeof params.coordinates.x === 'number' && typeof params.coordinates.y === 'number') {
         coordinatesUsed = { x: params.coordinates.x, y: params.coordinates.y };
         coordinateSource = 'fallback';
+        clickDispatched = true;
         const result = await clickAtCoordinates({
           x: params.coordinates.x,
           y: params.coordinates.y,
@@ -2374,12 +2392,16 @@ const tools = {
         const isObscured = readiness.failureReason && readiness.failureReason.includes('obscured');
         if (isObscured && element && typeof element.click === 'function') {
           try {
+            if (!element.isConnected) {
+              return buildFailureReport('click', selectorUsed, null, 'Element no longer in DOM');
+            }
             if (selectorUsed && !selectorUsed.startsWith('[text-match:') &&
                 FSB.querySelectorWithShadow(selectorUsed) !== element) {
               return buildFailureReport('click', selectorUsed, null, 'Selector changed before click');
             }
+            clickDispatched = true;
             element.click();
-            await delay(300);
+            await waitForPageStability({ maxWait: 1000, stableTime: 200 });
             return {
               success: true,
               clicked: params.selector,
@@ -2391,7 +2413,7 @@ const tools = {
               duration: Date.now() - startTime
             };
           } catch (fallbackErr) {
-            // Fallback also failed, continue to original error
+            if (clickDispatched) throw fallbackErr;
           }
         }
         // Record failure - element not ready
@@ -2424,7 +2446,7 @@ const tools = {
 
     if (element) {
       // Verify element is still interactive
-      if (!document.contains(element)) {
+      if (!element.isConnected) {
         return buildFailureReport('click', params.selector, null, 'Element no longer in DOM');
       }
       if (selectorUsed && !selectorUsed.startsWith('[text-match:') &&
@@ -2448,6 +2470,7 @@ const tools = {
 
           // Navigate directly using window.location for same-tab navigation
           const targetUrl = anchor.href;
+          clickDispatched = true;
           window.location.href = targetUrl;
 
           return {
@@ -2485,6 +2508,7 @@ const tools = {
       };
 
       // Dispatch full mouse event sequence for proper JS handler triggering
+      clickDispatched = true;
       element.dispatchEvent(new MouseEvent('mousedown', mouseEventInit));
       element.dispatchEvent(new MouseEvent('mouseup', mouseEventInit));
       element.dispatchEvent(new MouseEvent('click', mouseEventInit));
@@ -2594,6 +2618,16 @@ const tools = {
           text: element.textContent?.trim().substring(0, 50),
           wasScrolledIntoView: wasScrolled
         }
+      };
+    }
+    } catch (error) {
+      return {
+        success: false,
+        outcome: clickDispatched ? 'unknown' : 'failed',
+        mayHaveExecuted: clickDispatched,
+        error: clickDispatched
+          ? 'Click may have executed before verification failed. Inspect the page before retrying.'
+          : error.message || 'Click failed before dispatch.'
       };
     }
   },
@@ -2761,7 +2795,10 @@ const tools = {
   // Type text into an input
   type: async (params) => {
     const startTime = Date.now();
-    const clearFirst = params.clear_first !== false && params.clearFirst !== false;
+    const clearFirst = resolveTextReplacement(params);
+    const isGoogleDocsPage = window.location.hostname === 'docs.google.com' &&
+      window.location.pathname.startsWith('/document/');
+    const clearCanvasFirst = resolveTextReplacement(params, isGoogleDocsPage);
     logger.logActionExecution(FSB.sessionId, 'type', 'start', params);
 
     // Build selectors array for alternative selector support
@@ -2934,7 +2971,7 @@ const tools = {
             }
 
             // If clearFirst, select all and delete before pasting
-            if (clearFirst) {
+            if (clearCanvasFirst) {
               const isMac = navigator.userAgent?.includes('Macintosh') || navigator.platform?.includes('Mac');
               const selected = await new Promise((resolve, reject) => {
                 chrome.runtime.sendMessage({
@@ -3006,7 +3043,7 @@ const tools = {
               return { success: false, outcome: 'unknown', mayHaveExecuted: true,
                 error: 'Formatted paste may have executed. Inspect the document before retrying.' };
             }
-            // Nothing before the paste inserts text, and with clearFirst the plain
+            // Nothing before the paste inserts text, and with explicit replacement the plain
             // insertion below replaces the whole document, so it lands the same
             // whether or not the clear did.
             logger.warn('Formatted paste was not attempted', { error: fmtError.message });
@@ -3021,7 +3058,7 @@ const tools = {
             chrome.runtime.sendMessage({
               action: 'cdpInsertText',
               text: cdpText,
-              clearFirst
+              clearFirst: clearCanvasFirst
             }, (response) => {
               if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
               else if (response && response.success) resolve(response);
@@ -3084,6 +3121,7 @@ const tools = {
       // Universal text insertion handling for both input elements and contenteditable
       let previousValue = '';
       let insertionSuccess = false;
+      let textMayHaveExecuted = false;
 
       // CODE EDITOR CDP FAST-PATH
       if (codeEditorInfo.isCodeEditor) {
@@ -3188,13 +3226,16 @@ const tools = {
           };
         } catch (cdpCodeEditorError) {
           const refused = cdpRefusedBeforeInput(cdpCodeEditorError.response);
-          if (refused) return refused;
-          logger.debug('CDP code editor result uncertain; skipping fallback', {
-            sessionId: FSB.sessionId,
-            error: cdpCodeEditorError.message
-          });
-          return { success: false, outcome: 'unknown', mayHaveExecuted: true,
-            error: 'CDP insertion may have executed. Inspect the editor before retrying.' };
+          if (refused) {
+            logger.debug('CDP sent no input; trying DOM editor insertion', { sessionId: FSB.sessionId });
+          } else {
+            logger.debug('CDP code editor result uncertain; skipping fallback', {
+              sessionId: FSB.sessionId,
+              error: cdpCodeEditorError.message
+            });
+            return { success: false, outcome: 'unknown', mayHaveExecuted: true,
+              error: 'CDP insertion may have executed. Inspect the editor before retrying.' };
+          }
         }
       }
 
@@ -3211,6 +3252,7 @@ const tools = {
             else element.setSelectionRange(element.value.length, element.value.length);
             if (document.execCommand('insertText', false, params.text)) {
               codeInserted = true;
+              textMayHaveExecuted = true;
             }
           } catch (e) {
             logger.debug('Code editor execCommand failed', { error: e.message });
@@ -3223,6 +3265,7 @@ const tools = {
               error: 'Editor content changed unexpectedly. Inspect it before retrying.' };
           }
           element.value = clearFirst ? params.text : previousValue + params.text;
+          textMayHaveExecuted = true;
           element.dispatchEvent(new Event('input', { bubbles: true }));
           element.dispatchEvent(new Event('change', { bubbles: true }));
         }
@@ -3237,11 +3280,12 @@ const tools = {
       } else if (isInput) {
         previousValue = element.value;
         element.value = clearFirst ? params.text : previousValue + params.text;
+        textMayHaveExecuted = true;
         element.dispatchEvent(new Event('input', { bubbles: true }));
         element.dispatchEvent(new Event('change', { bubbles: true }));
         element.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true }));
       } else if (isContentEditable) {
-        previousValue = readEditorText(element);
+        previousValue = readInitialEditorText(element);
         element.focus();
         selectEditableInsertion(element, clearFirst);
         let commandReportedSuccess = false;
@@ -3271,6 +3315,32 @@ const tools = {
             final_text: observed
           };
         }
+      }
+
+      // Verify insertion before Enter or Tab can submit and clear the field.
+      const insertionCheck = readEditorText(element);
+      const expectedValue = clearFirst
+        ? normalizeEditorText(params.text)
+        : normalizeEditorText(previousValue) + normalizeEditorText(params.text);
+      const finalSuccess = insertionCheck === expectedValue;
+      const isAmazonSearch = element.id === 'twotabsearchtextbox' ||
+                             element.name === 'searchtext' ||
+                             window.location.hostname.includes('amazon');
+
+      if (!finalSuccess || (isContentEditable && !insertionSuccess)) {
+        const mayHaveExecuted = textMayHaveExecuted || insertionCheck !== normalizeEditorText(previousValue);
+        return {
+          success: false,
+          outcome: mayHaveExecuted ? 'unknown' : 'failed',
+          mayHaveExecuted,
+          error: mayHaveExecuted
+            ? 'Text insertion was attempted but could not be verified. Inspect the field before retrying.'
+            : 'The field did not accept the requested text.',
+          typed: params.text,
+          actualValue: insertionCheck,
+          expectedValue,
+          final_text: insertionCheck
+        };
       }
 
       // Gmail/email recipient field: dispatch Tab to confirm the recipient "chip"
@@ -3309,19 +3379,10 @@ const tools = {
         element.dispatchEvent(enterUpEvent);
       }
 
-      // Compare the rendered editor value, preserving line breaks and detecting
-      // duplicate inserts before any further action can mutate the field.
       const finalCheck = readEditorText(element);
-      const expectedValue = clearFirst
-        ? normalizeEditorText(params.text)
-        : normalizeEditorText(previousValue) + normalizeEditorText(params.text);
-      const finalSuccess = finalCheck === expectedValue;
-      const isAmazonSearch = element.id === 'twotabsearchtextbox' ||
-                             element.name === 'searchtext' ||
-                             window.location.hostname.includes('amazon');
 
       // Gmail recipient chip check
-      if (isRecipientField && looksLikeEmail && !finalSuccess) {
+      if (isRecipientField && looksLikeEmail && finalCheck !== expectedValue) {
         const chipEl = element.closest('[role="list"], .fX, .afV')?.querySelector(
           '.vR, [data-hovercard-id], [data-name], .afX'
         );
@@ -3345,22 +3406,6 @@ const tools = {
             }
           };
         }
-      }
-
-      if (!finalSuccess || (isContentEditable && !insertionSuccess)) {
-        const mayHaveExecuted = finalCheck !== normalizeEditorText(previousValue);
-        return {
-          success: false,
-          outcome: mayHaveExecuted ? 'unknown' : 'failed',
-          mayHaveExecuted,
-          error: mayHaveExecuted
-            ? 'Text changed but did not match the requested value. Inspect the field before retrying.'
-            : 'The field did not accept the requested text.',
-          typed: params.text,
-          actualValue: finalCheck,
-          expectedValue,
-          final_text: finalCheck
-        };
       }
 
       if (isContentEditable) {
@@ -3387,7 +3432,7 @@ const tools = {
 
       if (!verification.verified) {
         verification.verified = true;
-        verification.reason = 'Rendered editor value matches the requested text';
+        verification.reason = 'Text insertion was verified before follow-up keys';
       }
 
       // Record successful action
@@ -3567,7 +3612,7 @@ const tools = {
           chrome.runtime.sendMessage({
             action: 'cdpInsertText',
             text: params.text,
-            clearFirst
+            clearFirst: clearCanvasFirst
           }, (response) => {
             if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
             else if (response && response.success) resolve(response);

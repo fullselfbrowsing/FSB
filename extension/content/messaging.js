@@ -9,6 +9,25 @@
   // Local aliases for cross-module dependencies
   const getClassName = FSB.getClassName;
 
+  async function executeContentAction(tool, params) {
+    const longTimeoutTools = ['solveCaptcha', 'fillsheet', 'readsheet', 'sheetsSession'];
+    const actionTimeout = longTimeoutTools.includes(tool) ? 120000 : 10000;
+    let actionTimer;
+    const timeout = new Promise((_, reject) => {
+      actionTimer = setTimeout(() => reject(Object.assign(
+        new Error(`Action ${tool} exceeded its response deadline and may still be running.`),
+        { errorCode: 'ACTION_RESPONSE_TIMEOUT',
+          outcome: tool === 'readsheet' ? 'failed' : 'unknown',
+          mayHaveExecuted: tool !== 'readsheet' }
+      )), actionTimeout);
+    });
+    try {
+      return await Promise.race([FSB.tools[tool](params), timeout]);
+    } finally {
+      clearTimeout(actionTimer);
+    }
+  }
+
   function fsbShouldReplaceFinalOverlay(previousOverlayState, overlayState) {
     if (previousOverlayState?.lifecycle !== 'final' ||
         !overlayState || overlayState.lifecycle === 'cleared') return false;
@@ -1029,17 +1048,9 @@
               }
             }
 
-            // Timeout wrapper
-            const longTimeoutTools = ['solveCaptcha', 'fillsheet', 'readsheet', 'sheetsSession'];
-            const actionTimeout = longTimeoutTools.includes(tool) ? 120000 : 10000;
-            const timeoutPromise = new Promise((_, reject) => {
-              setTimeout(() => reject(new Error(`Action ${tool} timed out after ${actionTimeout / 1000} seconds`)), actionTimeout);
-            });
-
             try {
               const execStart = Date.now();
-              const actionPromise = FSB.tools[tool](params);
-              result = await Promise.race([actionPromise, timeoutPromise]);
+              result = await executeContentAction(tool, params);
               logger.logTiming(FSB.sessionId, 'ACTION', tool, Date.now() - execStart, { success: result?.success });
 
               // Invalidate cached element indexes
@@ -1109,6 +1120,9 @@
       logger.error('Error in async message handler', { sessionId: FSB.sessionId, action: request.action, error: error.message });
       sendResponse({
         success: false,
+        ...(error.errorCode === 'ACTION_RESPONSE_TIMEOUT' ? {
+          errorCode: error.errorCode, outcome: error.outcome, mayHaveExecuted: error.mayHaveExecuted
+        } : {}),
         error: error.message || 'Unknown error in async handler',
         stack: error.stack,
         action: request.action,

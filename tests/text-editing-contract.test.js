@@ -455,3 +455,153 @@ test('every content-script CDP insertion keeps the background reply for classifi
   // A refusal after the formatted path cleared the document is not a no-op.
   assert.match(actions, /if \(refused && clearSent\) \{\s*return \{ success: false, outcome: 'unknown', mayHaveExecuted: true,/);
 });
+
+function loadTypeAction({ docs = false, formatted = false, missingTarget = false,
+  editorType = null, cdpReply = { success: true }, rejectDomInput = false, commandSucceeds = true } = {}) {
+  const requests = [];
+  const events = [];
+  let domInsertions = 0;
+  const field = {
+    tagName: docs ? 'DIV' : 'TEXTAREA', value: 'old', isContentEditable: false,
+    focus() {}, click() {}, select() { this.selection = [0, this.value.length]; },
+    setSelectionRange(start, end) { this.selection = [start, end]; },
+    getRootNode() { return { activeElement: this }; }, getAttribute() { return null; },
+    dispatchEvent(event) {
+      events.push({ type: event.type, key: event.key });
+      if (rejectDomInput && event.type === 'input') this.value = 'old';
+    },
+  };
+  const logger = { logActionExecution() {}, debug() {}, warn() {}, error() {} };
+  const context = {
+    logger, FSB: { sessionId: 'test',
+      querySelectorWithShadow: () => missingTarget ? null : field,
+      smartEnsureReady: async () => ({ ready: true }), isCanvasBasedEditor: () => docs,
+      detectCodeEditor: () => ({ isCodeEditor: Boolean(editorType), type: editorType }),
+      hasMarkdownFormatting: () => formatted, stripMarkdown: text => text.replaceAll('**', ''),
+      markdownToHTML: text => `<b>${text}</b>`, clipboardPasteHTML: async () => ({ success: true }),
+      generateMessagingSelectors: () => [], getClassName: () => '' },
+    window: { location: { hostname: docs ? 'docs.google.com' : 'example.test', pathname: docs ? '/document/d/test/edit' : '/' } },
+    document: { querySelector: () => field, querySelectorAll: () => [],
+      execCommand(_command, _ui, text) {
+        domInsertions++;
+        if (!commandSucceeds) return false;
+        const [start, end] = field.selection;
+        field.value = field.value.slice(0, start) + text + field.value.slice(end);
+        return true;
+      } },
+    chrome: { runtime: { sendMessage(request, callback) { requests.push(request); callback(cdpReply); } } },
+    navigator: { platform: 'MacIntel', userAgent: 'Macintosh' },
+    Event: class { constructor(type) { this.type = type; } },
+    KeyboardEvent: class { constructor(type, options) { this.type = type; Object.assign(this, options); } },
+    waitForStability: async () => {}, waitForPageStability: async () => {},
+    captureActionState: () => ({}), verifyActionEffect: () => ({ verified: true, changes: {} }),
+    captureElementDetails: () => ({}), actionRecorder: { record() {} },
+    cdpRefusedBeforeInput: loadCdpRefusal(),
+  };
+  const helpers = actions.slice(actions.indexOf('  function normalizeEditorText('),
+    actions.indexOf('// COORDINATE FALLBACK UTILITIES'));
+  const method = actions.slice(actions.indexOf('  type: async (params) => {'),
+    actions.indexOf('  // Press Enter key on an element with verification'));
+  const type = vm.runInNewContext(`${helpers}\n({${method}}).type`, context);
+  return { type, field, requests, events, domInsertions: () => domInsertions };
+}
+
+for (const formatted of [false, true]) {
+  for (const [options, expected] of [ [{}, false], [{ clear_first: true }, true],
+    [{ clear_first: false }, false], [{ clearFirst: true }, true], [{ clearFirst: false }, false],
+    [{ clear_first: true, clearFirst: false }, false] ]) {
+    test(`Docs ${formatted ? 'formatted' : 'plain'} typing preserves explicit/default replacement: ${JSON.stringify(options)}`, async () => {
+      const { type, requests } = loadTypeAction({ docs: true, formatted });
+      const result = await type({ selector: '#document', text: formatted ? '**new**' : 'new', ...options });
+      assert.equal(result.success, true, result.error);
+      if (formatted) {
+        assert.equal(requests.filter(r => r.action === 'keyboardDebuggerAction').length, expected ? 2 : 0);
+      } else {
+        assert.equal(requests.find(r => r.action === 'cdpInsertText').clearFirst, expected);
+      }
+    });
+  }
+}
+
+test('Docs selector fallback inserts at the cursor by default', async () => {
+  const { type, requests } = loadTypeAction({ docs: true, missingTarget: true });
+  assert.equal((await type({ selector: '#missing', text: 'new' })).success, true);
+  assert.equal(requests.find(r => r.action === 'cdpInsertText').clearFirst, false);
+});
+
+test('ordinary fields still replace by default and append when requested', async () => {
+  for (const [options, expected] of [[{}, 'new'], [{ clear_first: false }, 'oldnew']]) {
+    const { type, field } = loadTypeAction();
+    assert.equal((await type({ selector: '#input', text: 'new', ...options })).success, true);
+    assert.equal(field.value, expected);
+  }
+});
+
+for (const editorType of ['ace', 'codemirror']) {
+  test(`${editorType} DOM fallback runs once after confirmed CDP refusal`, async () => {
+    const { type, field, domInsertions, requests } = loadTypeAction({ editorType,
+      cdpReply: { success: false, code: 'SCREENSHOT_DEBUGGER_BUSY', retryable: true } });
+    const result = await type({ selector: '#editor', text: 'new' });
+    assert.equal(result.success, true, result.error);
+    assert.equal(field.value, 'new');
+    assert.equal(domInsertions(), 1);
+    assert.equal(requests.length, 1);
+  });
+}
+
+for (const reply of [null, {}, { success: false, outcome: 'unknown' },
+  { success: false, mayHaveExecuted: true, outcome: 'unknown' }]) {
+  test(`uncertain CDP insertion never falls back: ${JSON.stringify(reply)}`, async () => {
+    const other = loadTypeAction({ editorType: 'ace', cdpReply: reply });
+    const result = await other.type({ selector: '#editor', text: 'new' });
+    assert.equal(result.outcome, 'unknown');
+    assert.equal(result.mayHaveExecuted, true);
+    assert.equal(other.domInsertions(), 0);
+    assert.equal(other.field.value, 'old');
+  });
+}
+
+test('DOM editor fallback cannot report success when the editor rejects the input', async () => {
+  const { type, domInsertions } = loadTypeAction({ editorType: 'ace', rejectDomInput: true, commandSucceeds: false,
+    cdpReply: { success: false, mayHaveExecuted: false, retryable: true } });
+  // A refused execCommand allows the value/input-event fallback to run.
+  // The simulated editor resets its hidden input when it rejects that event.
+  const result = await type({ selector: '#editor', text: 'new' });
+  assert.equal(result.success, false);
+  assert.equal(result.outcome, 'unknown');
+  assert.equal(result.mayHaveExecuted, true);
+  assert.equal(domInsertions(), 1);
+});
+
+test('an input handler consuming text before Enter cannot report that retrying is safe', async () => {
+  const { type, events } = loadTypeAction({ rejectDomInput: true });
+  const result = await type({ selector: '#input', text: 'new', pressEnter: true });
+  assert.equal(result.success, false);
+  assert.equal(result.outcome, 'unknown');
+  assert.equal(result.mayHaveExecuted, true);
+  assert.equal(events.filter(event => event.key === 'Enter').length, 0);
+});
+
+for (const type of ['email', 'number']) {
+  for (const position of ['end', 'replace_all']) {
+    test(`unsupported ${type} DOM selection uses native ${position} placement`, async () => {
+      const commands = [];
+      const field = { tagName: 'INPUT', value: '12', focus() {},
+        setSelectionRange() { throw Object.assign(new Error('unsupported selection'), { name: 'InvalidStateError' }); } };
+      const dispatch = loadCdpTextInsertion(field, commands);
+      assert.equal((await dispatch(42, '34', position, null)).success, true);
+      assert.equal(commands.filter(c => c.method === 'Input.insertText').length, 1);
+      assert.equal(commands[0].params.key, position === 'end' ? 'End' : 'a');
+    });
+  }
+}
+
+test('unexpected selection failure sends no CDP input', async () => {
+  const commands = [];
+  const dispatch = loadCdpTextInsertion({ tagName: 'INPUT', value: 'old', focus() {},
+    setSelectionRange() { throw new Error('selection failed'); } }, commands);
+  const result = await dispatch(42, 'new', 'replace_all');
+  assert.equal(result.success, false);
+  assert.equal(result.mayHaveExecuted, false);
+  assert.deepEqual(commands, []);
+});

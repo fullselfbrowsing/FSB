@@ -34,7 +34,9 @@ function cdp(ws, method, params = {}) {
 }
 
 async function evaluate(ws, expression) {
-  return (await cdp(ws, 'Runtime.evaluate', { expression, returnByValue: true }))?.result?.value;
+  const result = await cdp(ws, 'Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
+  if (result.exceptionDetails) throw new Error(result.exceptionDetails.exception?.description || result.exceptionDetails.text);
+  return result.result?.value;
 }
 
 async function openFixture(name) {
@@ -79,6 +81,13 @@ async function openFixture(name) {
       ws.addEventListener('open', resolve, { once: true });
       ws.addEventListener('error', reject, { once: true });
     });
+    let loaded = false;
+    for (let i = 0; i < 100; i++) {
+      loaded = await evaluate(ws, `location.href === ${JSON.stringify(fixture)} && document.readyState === 'complete'`);
+      if (loaded) break;
+      await sleep(100);
+    }
+    assert.ok(loaded, 'fixture document and scripts loaded');
     return { ws, close };
   } catch (error) {
     await close();
@@ -286,4 +295,123 @@ test('a hung page gets no CDP text once its target lookup times out',
     } finally {
       await close();
     }
+  });
+
+test('Enter/Tab consumption, empty rich text, and refused editor CDP preserve truthful results',
+  { skip: !chrome }, async () => {
+    const { ws, close } = await openFixture('editing-regressions.html');
+    try {
+      const results = await evaluate(ws, `(async () => {
+        const out = {};
+        for (const id of ['enter-clear', 'enter-remove']) {
+          const element = document.getElementById(id);
+          let submissions = 0;
+          element.addEventListener('keydown', event => {
+            if (event.key === 'Enter') {
+              submissions++;
+              if (id === 'enter-remove') element.remove(); else element.value = '';
+            }
+          });
+          out[id] = { result: await FSB.tools.type({selector:'#'+id,text:'message',pressEnter:true}), submissions };
+        }
+        let tabs = 0;
+        document.querySelector('#recipient').addEventListener('keydown', event => {
+          if (event.key === 'Tab') { tabs++; event.target.value = ''; }
+        });
+        out.recipient = { result: await FSB.tools.type({selector:'#recipient',text:'a@example.com'}), tabs };
+        out.empty = await FSB.tools.type({selector:'#empty',text:'hello',clear_first:false});
+        out.multiline = await FSB.tools.type({selector:'#multiline',text:'\\nthird',clear_first:false});
+        let cdpRequests = 0, inputEvents = 0;
+        FSB.detectCodeEditor = () => ({isCodeEditor:true,type:'ace'});
+        window.chrome = Object.assign(window.chrome || {}, {runtime:{sendMessage(_request, callback) {
+          cdpRequests++; callback({success:false,code:'SCREENSHOT_DEBUGGER_BUSY',retryable:true});
+        }}});
+        document.querySelector('#code').addEventListener('input', event => {
+          inputEvents++; document.querySelector('#model').textContent = event.target.value;
+        });
+        out.editor = { result: await FSB.tools.type({selector:'#code',text:'new code'}),
+          model:document.querySelector('#model').textContent, inputEvents, cdpRequests };
+        return out;
+      })()`);
+      for (const id of ['enter-clear', 'enter-remove']) {
+        assert.equal(results[id].result.success, true, results[id].result.error);
+        assert.equal(results[id].result.pressedEnter, true);
+        assert.equal(results[id].submissions, 1);
+        assert.notEqual(results[id].result.mayHaveExecuted, false);
+      }
+      assert.equal(results.recipient.result.success, true, results.recipient.result.error);
+      assert.equal(results.recipient.tabs, 1);
+      assert.equal(results.empty.success, true, results.empty.error);
+      assert.equal(results.empty.final_text, 'hello');
+      assert.equal(results.multiline.success, true, results.multiline.error);
+      assert.equal(results.multiline.final_text, 'first\nsecond\nthird');
+      assert.equal(results.editor.result.success, true, results.editor.result.error);
+      assert.equal(results.editor.model, 'new code');
+      assert.equal(results.editor.inputEvents, 1);
+      assert.equal(results.editor.cdpRequests, 1);
+    } finally { await close(); }
+  });
+
+test('shadow clicks pass real readiness and post-click failures never invite another click',
+  { skip: !chrome }, async () => {
+    const { ws, close } = await openFixture('shadow-components.html');
+    try {
+      await shadowComponentResults(ws);
+      const results = await evaluate(ws, `(async () => {
+        const out = {};
+        for (const host of ['open-field', 'closed-field']) {
+          const root = chrome.dom.openOrClosedShadowRoot(document.querySelector(host));
+          const button = document.createElement('button'); button.id='click'; button.textContent='Expand';
+          button.setAttribute('aria-expanded','false'); root.append(button);
+          let clicks=0; button.addEventListener('click',()=>{clicks++;button.setAttribute('aria-expanded','true');});
+          out[host]={result:await FSB.tools.click({selector:host+' >>> #click'}),clicks};
+        }
+        const button=document.createElement('button');button.id='obscured';button.textContent='Send';document.body.append(button);
+        let clicks=0;button.addEventListener('click',()=>clicks++);
+        const ready=FSB.smartEnsureReady;
+        FSB.smartEnsureReady=async()=>({ready:false,failureReason:'obscured'});
+        out.obscured={result:await FSB.tools.click({selector:'#obscured'}),clicks};
+        const nativeClick=button.click;
+        button.click=function(){nativeClick.call(this);throw new Error('after click');};
+        out.afterClick={result:await FSB.tools.click({selector:'#obscured'}),clicks};
+        FSB.smartEnsureReady=async element=>{element.remove();return {ready:true};};
+        out.disconnected={result:await FSB.tools.click({selector:'#obscured'}),clicks};
+        FSB.smartEnsureReady=ready;
+        return out;
+      })()`);
+      for (const host of ['open-field', 'closed-field']) {
+        assert.equal(results[host].result.success, true, results[host].result.error);
+        assert.equal(results[host].clicks, 1);
+      }
+      assert.equal(results.obscured.result.success, true, results.obscured.result.error);
+      assert.equal(results.obscured.clicks, 1);
+      assert.equal(results.afterClick.result.outcome, 'unknown');
+      assert.equal(results.afterClick.result.mayHaveExecuted, true);
+      assert.equal(results.afterClick.clicks, 2);
+      assert.equal(results.disconnected.result.success, false);
+      assert.equal(results.disconnected.clicks, 2);
+    } finally { await close(); }
+  });
+
+test('native email and number inputs append at the end and replace with one insertion',
+  { skip: !chrome }, async () => {
+    const { ws, close } = await openFixture('editing-regressions.html');
+    try {
+      for (const [type, initial, extra, replacement] of [
+        ['email', 'a@example.com', '.test', 'b@example.com'], ['number', '12', '34', '88']
+      ]) {
+        await evaluate(ws, `(() => {const field=document.getElementById('${type}');field.value=${JSON.stringify(initial)};field.focus();})()`);
+        // Start at the beginning so the test proves End placement actually moved the caret.
+        await cdp(ws, 'Input.dispatchKeyEvent', {type:'keyDown',key:'Home',code:'Home',windowsVirtualKeyCode:36,commands:['moveToBeginningOfDocument']});
+        await cdp(ws, 'Input.dispatchKeyEvent', {type:'keyUp',key:'Home',code:'Home',windowsVirtualKeyCode:36});
+        const { dispatch, input } = loadCdpTextInsertion(ws);
+        assert.equal((await dispatch(1, extra, 'end', '#'+type)).success, true);
+        assert.equal(await evaluate(ws, `document.getElementById('${type}').value`), initial+extra);
+        assert.equal(input.filter(method => method === 'Input.insertText').length, 1);
+        input.length=0;
+        assert.equal((await dispatch(1, replacement, 'replace_all', '#'+type)).success, true);
+        assert.equal(await evaluate(ws, `document.getElementById('${type}').value`), replacement);
+        assert.equal(input.filter(method => method === 'Input.insertText').length, 1);
+      }
+    } finally { await close(); }
   });

@@ -108,12 +108,49 @@ function extractDomain(url) {
  */
 function getGuideForUrl(url) {
   if (!url) return null;
+  // MCP supplies a bare domain; browser callers supply a complete URL.
+  try {
+    url = new URL(/^[a-z][a-z\d+.-]*:\/\//i.test(url) ? url : 'https://' + url).href;
+  } catch (_error) {
+    return null;
+  }
   for (const guide of SITE_GUIDES_REGISTRY) {
     if (guide.patterns.some(pattern => pattern.test(url))) {
       return guide;
     }
   }
   return null;
+}
+
+/** Serialize complete guide fields within the agent's character budget. */
+function formatSiteGuideForAgent(guide, charBudget = 5000) {
+  const content = { warnings: [], workflows: {}, guidance: '', selectors: {}, truncated: false };
+  const fits = () => JSON.stringify(content).length <= charBudget;
+  // Reserve the longer boolean spelling even when content is omitted.
+  const add = (object, key, value) => {
+    object[key] = value;
+    if (fits()) return true;
+    delete object[key];
+    content.truncated = true;
+    return false;
+  };
+  const warnings = Array.isArray(guide.warnings) ? guide.warnings : [];
+  for (const warning of warnings.slice(0, 6)) {
+    content.warnings.push(warning);
+    if (!fits()) { content.warnings.pop(); content.truncated = true; }
+  }
+  if (warnings.length > 6) content.truncated = true;
+  for (const name of ['createPost', 'replyToPost']) {
+    const workflow = guide.workflows?.[name];
+    if (workflow !== undefined) add(content.workflows, name, workflow);
+  }
+  const guidance = typeof guide.guidance === 'string' ? guide.guidance : '';
+  let length = Math.min(1600, guidance.length);
+  content.guidance = guidance.slice(0, length);
+  while (!fits() && length > 0) content.guidance = guidance.slice(0, --length);
+  if (length < guidance.length) content.truncated = true;
+  for (const [key, value] of Object.entries(guide.selectors || {})) add(content.selectors, key, value);
+  return JSON.stringify(content);
 }
 
 /**
