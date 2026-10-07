@@ -104,7 +104,7 @@ function lockWithoutReleaseVersion(lock) {
 function main() {
   const liveCheck = run(['--check']);
   assert.equal(liveCheck.status, 0, liveCheck.stderr || liveCheck.stdout);
-  assert.match(liveCheck.stdout, /extension 0\.9\.91; MCP 0\.11\.0/u);
+  assert.match(liveCheck.stdout, /extension 0\.9\.92; MCP 0\.11\.0/u);
 
   const targetResult = run(['--print-targets']);
   assert.equal(targetResult.status, 0, targetResult.stderr);
@@ -138,9 +138,9 @@ function main() {
     }
 
     const beforeUnpreparedExtension = targetDigests(fixtureRoot, targets);
-    const unpreparedExtension = run(['extension', '0.9.92'], fixtureRoot);
+    const unpreparedExtension = run(['extension', '0.9.93'], fixtureRoot);
     assert.notEqual(unpreparedExtension.status, 0, 'extension setter accepted a missing changelog entry');
-    assert.match(unpreparedExtension.stderr, /author the 0\.9\.92 entry at the top of CHANGELOG\.md/u);
+    assert.match(unpreparedExtension.stderr, /author the 0\.9\.93 entry at the top of CHANGELOG\.md/u);
     assert.doesNotMatch(unpreparedExtension.stderr, /mcp\/CHANGELOG\.md/u);
     assert.deepEqual(
       targetDigests(fixtureRoot, targets),
@@ -148,7 +148,7 @@ function main() {
       'unprepared extension release changed a target',
     );
 
-    prepareExtensionChangelog(fixtureRoot, '0.9.92');
+    prepareExtensionChangelog(fixtureRoot, '0.9.93');
     const readmePath = path.join(fixtureRoot, 'README.md');
     const validReadme = fs.readFileSync(readmePath, 'utf8');
     fs.writeFileSync(
@@ -156,7 +156,7 @@ function main() {
       validReadme.replace(/^# FSB v\d+\.\d+\.\d+ Full Self Browsing$/mu, '# FSB Full Self Browsing'),
     );
     const beforeMalformedExtension = targetDigests(fixtureRoot, targets);
-    const malformedExtension = run(['extension', '0.9.92'], fixtureRoot);
+    const malformedExtension = run(['extension', '0.9.93'], fixtureRoot);
     assert.notEqual(malformedExtension.status, 0, 'extension setter accepted a malformed surface');
     assert.match(malformedExtension.stderr, /README\.md: expected exactly one current README title/u);
     assert.deepEqual(
@@ -176,25 +176,25 @@ function main() {
       relativePath,
       lockWithoutReleaseVersion(readJson(fixtureRoot, relativePath)),
     ]));
-    const extensionSet = run(['extension', '0.9.92'], fixtureRoot);
+    const extensionSet = run(['extension', '0.9.93'], fixtureRoot);
     assert.equal(extensionSet.status, 0, extensionSet.stderr || extensionSet.stdout);
-    assert.match(extensionSet.stdout, /version-set:extension: updated 0\.9\.92/u);
+    assert.match(extensionSet.stdout, /version-set:extension: updated 0\.9\.93/u);
     assert.deepEqual(
       targetDigests(fixtureRoot, mcpExclusiveTargets),
       mcpBeforeExtensionSet,
       'extension setter changed MCP-owned files',
     );
-    assert.equal(readJson(fixtureRoot, 'extension/manifest.json').version, '0.9.92');
-    assert.equal(readJson(fixtureRoot, 'extension/manifest.json').name, 'FSB v0.9.92');
+    assert.equal(readJson(fixtureRoot, 'extension/manifest.json').version, '0.9.93');
+    assert.equal(readJson(fixtureRoot, 'extension/manifest.json').name, 'FSB v0.9.93');
     for (const [packagePath, lockPath] of [
       ['package.json', 'package-lock.json'],
       ['showcase/angular/package.json', 'showcase/angular/package-lock.json'],
       ['showcase/server/package.json', 'showcase/server/package-lock.json'],
     ]) {
-      assert.equal(readJson(fixtureRoot, packagePath).version, '0.9.92', packagePath);
+      assert.equal(readJson(fixtureRoot, packagePath).version, '0.9.93', packagePath);
       const lock = readJson(fixtureRoot, lockPath);
-      assert.equal(lock.version, '0.9.92', `${lockPath} top-level version`);
-      assert.equal(lock.packages[''].version, '0.9.92', `${lockPath} root version`);
+      assert.equal(lock.version, '0.9.93', `${lockPath} top-level version`);
+      assert.equal(lock.packages[''].version, '0.9.93', `${lockPath} root version`);
       assert.deepEqual(
         lockWithoutReleaseVersion(lock),
         preservedExtensionLocks[lockPath],
@@ -203,7 +203,7 @@ function main() {
     }
     const mixedCheck = run(['--check'], fixtureRoot);
     assert.equal(mixedCheck.status, 0, mixedCheck.stderr || mixedCheck.stdout);
-    assert.match(mixedCheck.stdout, /extension 0\.9\.92; MCP 0\.11\.0/u);
+    assert.match(mixedCheck.stdout, /extension 0\.9\.93; MCP 0\.11\.0/u);
 
     const beforeUnpreparedMcp = targetDigests(fixtureRoot, targets);
     const unpreparedMcp = run(['mcp', '0.11.1'], fixtureRoot);
@@ -257,21 +257,21 @@ function main() {
 
     const independentCheck = run(['--check'], fixtureRoot);
     assert.equal(independentCheck.status, 0, independentCheck.stderr || independentCheck.stdout);
-    assert.match(independentCheck.stdout, /extension 0\.9\.92; MCP 0\.11\.1/u);
+    assert.match(independentCheck.stdout, /extension 0\.9\.93; MCP 0\.11\.1/u);
 
     const firstSetDigests = targetDigests(fixtureRoot, targets);
-    const secondExtensionSet = run(['extension', '0.9.92'], fixtureRoot);
+    const secondExtensionSet = run(['extension', '0.9.93'], fixtureRoot);
     const secondMcpSet = run(['mcp', '0.11.1'], fixtureRoot);
     assert.equal(secondExtensionSet.status, 0, secondExtensionSet.stderr || secondExtensionSet.stdout);
     assert.equal(secondMcpSet.status, 0, secondMcpSet.stderr || secondMcpSet.stdout);
-    assert.match(secondExtensionSet.stdout, /already synchronized at 0\.9\.92/u);
+    assert.match(secondExtensionSet.stdout, /already synchronized at 0\.9\.93/u);
     assert.match(secondMcpSet.stdout, /already synchronized at 0\.11\.1/u);
     assert.deepEqual(targetDigests(fixtureRoot, targets), firstSetDigests, 'idempotent setters changed output');
 
     const synchronizedReadme = fs.readFileSync(readmePath, 'utf8');
     fs.writeFileSync(
       readmePath,
-      synchronizedReadme.replace('> FSB v0.9.92 is functional', '> FSB v9.9.9 is functional'),
+      synchronizedReadme.replace('> FSB v0.9.93 is functional', '> FSB v9.9.9 is functional'),
     );
     const extensionDrift = run(['--check'], fixtureRoot);
     assert.notEqual(extensionDrift.status, 0, 'check accepted extension public-surface drift');
@@ -309,11 +309,11 @@ function main() {
     fs.writeFileSync(mcpReadmePath, synchronizedMcpReadme);
 
     if (process.platform !== 'win32') {
-      prepareExtensionChangelog(fixtureRoot, '0.9.93');
+      prepareExtensionChangelog(fixtureRoot, '0.9.94');
       const beforeCommitFailure = targetDigests(fixtureRoot, targets);
       const rootLockPath = path.join(fixtureRoot, 'package-lock.json');
       fs.chmodSync(rootLockPath, 0o444);
-      const commitFailure = run(['extension', '0.9.93'], fixtureRoot);
+      const commitFailure = run(['extension', '0.9.94'], fixtureRoot);
       fs.chmodSync(rootLockPath, 0o644);
       assert.notEqual(commitFailure.status, 0, 'read-only target did not fail the commit');
       assert.match(commitFailure.stderr, /could not commit version updates/u);

@@ -309,7 +309,8 @@ async function run() {
     .find(section => section.startsWith(`v${extensionVersion} `));
   assert(currentProductRelease
       && currentProductRelease.includes(`align at \`${extensionVersion}\``)
-      && currentProductRelease.includes(`advances to \`${canonicalVersion}\``),
+      && (currentProductRelease.includes(`advances to \`${canonicalVersion}\``)
+        || currentProductRelease.includes(`stays at \`${canonicalVersion}\``)),
     'current product changelog documents the independent extension and MCP releases');
   for (const [name, content] of [
     ['LLM summary source', llmsSource],

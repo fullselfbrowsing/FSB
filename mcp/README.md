@@ -46,7 +46,7 @@ This is the terminal task-outcome handoff release. Full details live in `CHANGEL
 - The new `mcp:task-status` bridge message preserves agent ownership context and optional `tab_id` while handing a client-authored terminal summary to the extension's local MCP task memory.
 - Terminal outcome calls serialize behind pending browser mutations, so the summary cannot overtake the final action it describes.
 - A confirmed `fail_task` response remains `success:false` as task data but is returned as a normal MCP tool acknowledgement rather than a transport error.
-- **Compatibility:** `fsb-mcp-server` 0.11.0 requires FSB extension 0.9.91 or newer for `mcp:task-status`. Upgrade the extension and restart the MCP host together.
+- **Compatibility:** `fsb-mcp-server` 0.11.0 requires FSB extension 0.9.92 or newer for `mcp:task-status`. Upgrade the extension and restart the MCP host together.
 
 ### What's New In v0.10.0
 
@@ -647,9 +647,9 @@ The build command copies `extension/ai/tool-definitions.js` into `mcp/ai/tool-de
 
 ### Versioning
 
-The MCP package has its own version (`0.11.0`) because it is published independently from the extension release (`0.9.91`). Use `npm run version:set:mcp -- X.Y.Z` for MCP releases and `npm run version:set:extension -- X.Y.Z` for extension releases; `npm run version:check` verifies both domains without requiring them to match.
+The MCP package has its own version (`0.11.0`) because it is published independently from the extension release (`0.9.92`). Use `npm run version:set:mcp -- X.Y.Z` for MCP releases and `npm run version:set:extension -- X.Y.Z` for extension releases; `npm run version:check` verifies both domains without requiring them to match.
 
-Compatibility for this release: MCP 0.11.0 requires extension 0.9.91 or newer for the `mcp:task-status` route used by `complete_task`, `partial_task`, and `fail_task`. Existing `0.10.0` tool routes remain additive and unchanged.
+Compatibility for this release: MCP 0.11.0 requires extension 0.9.92 or newer for the `mcp:task-status` route used by `complete_task`, `partial_task`, and `fail_task`. Existing `0.10.0` tool routes remain additive and unchanged.
 
 Contract-sensitive changes should be covered by tests before publishing:
 

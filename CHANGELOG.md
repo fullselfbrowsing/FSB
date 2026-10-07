@@ -1,10 +1,14 @@
 # Changelog
 
-All notable changes to the FSB product (Chrome extension + showcase dashboard) are documented in this file. Entries are organized by FSB milestone. The extension version is `0.9.91`; milestone versions such as `v0.11.0` and `v0.12.0` are the meaningful release units.
+All notable changes to the FSB product (Chrome extension + showcase dashboard) are documented in this file. Entries are organized by FSB milestone. The extension version is `0.9.92`; milestone versions such as `v0.11.0` and `v0.12.0` are the meaningful release units.
 
 The independently published `fsb-mcp-server` npm package keeps its own semver changelog in [`mcp/CHANGELOG.md`](./mcp/CHANGELOG.md).
 
 ## [Unreleased]
+
+## v0.9.92 — Bridge Reliability and Editing Fixes — 2026-10-07
+
+The extension, showcase, skill, documentation, and store metadata align at `0.9.92`. The independently versioned `fsb-mcp-server` stays at `0.11.0`; see [`mcp/CHANGELOG.md`](./mcp/CHANGELOG.md) for its package-specific release notes and compatibility requirements.
 
 ### Fixed
 
@@ -14,6 +18,10 @@ The independently published `fsb-mcp-server` npm package keeps its own semver ch
 - **A pairing mismatch says so.** An extension id that does not match the pinned pairing was refused with a bare HTTP 403 — no WebSocket, no close code, no reason — which is why the failure so often ended in a reinstall that could not fix it. The refusal now names both origins and the `pair --reset` cure, and `doctor` reports an authorization layer instead of blaming the browser.
 - **The bridge keeps a journal.** Refusals, revocations, replacements, reaps, and closes are recorded in `~/.fsb/agent-runtime/bridge-events.jsonl`, coalesced so a retry loop leaves one line a minute rather than tens of thousands. Previously every bridge diagnostic went to the stderr of whichever server won the port race, which was frequently a session that had already exited.
 - **`sw_evicted` no longer hides the real cause.** Authorization failures were reported to callers as a service-worker eviction, sending everyone to restart the browser. The recovery is unchanged — the task really was interrupted — but the response now carries a `disconnect_reason` that distinguishes a revoked credential from an evicted worker.
+- **Typing into code editors lands where you asked.** Appending to Monaco, Ace, or CodeMirror (`clear_first: false`) inserted the text at the editor's old cursor, usually before the existing code, because those editors ignore the page's text selection. FSB now moves the editor's own cursor with its end-of-document shortcut, and replacing text also works in editors such as Monaco 0.57 that take input through EditContext and expose no text field.
+- **Fields inside web components are reachable.** Typing finds the field inside a component a selector names, sees focus inside open and closed shadow roots, and no longer treats a shadow-root target as covered by its own host.
+- **A hung page receives nothing after its deadline.** Once a CDP text insertion or a screenshot has given up on an unresponsive page, no further keystrokes, text, or scripts are sent to it, so the page cannot receive input after the caller has been told the outcome.
+- **Nested editors and Google Docs pastes are safer.** Appends move the caret to the end of an editor focused inside a frame, and a Docs paste is compared by its text, not its length, before plain text is inserted again.
 
 - **Dashboard QR pairing failures are visible again.** Scanning a pairing code that was expired, already used, or otherwise rejected reported nothing at all: the "Connecting..." state replaced the scan panel markup, so the error was written into a node that had already been removed from the DOM, and the dashboard then switched to the Paste Key tab. Every failure now renders its localized reason, keeps the user on the Scan tab, and restarts the camera so a regenerated code can be scanned directly.
 
