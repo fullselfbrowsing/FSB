@@ -339,6 +339,28 @@ test('CDP text input the page never acknowledges is reported as possibly execute
   await assert.rejects(dispatch(42, 'text', 'caret', null), (error) => error.mayHaveExecuted === true);
 });
 
+test('CDP text input sends nothing more once the page has timed out', async () => {
+  const start = background.indexOf('async function dispatchCdpTextInsertion(');
+  const end = background.indexOf('\nasync function handleCDPInsertTextUnlocked', start);
+  const sent = [];
+  let acknowledgeFirst;
+  const dispatch = vm.runInNewContext(`${background.slice(start, end).replaceAll('8000', '20')}\ndispatchCdpTextInsertion`, {
+    prepareCdpTextTarget: async () => ({ success: true }),
+    chrome: { debugger: { sendCommand: (_target, method, params) => {
+      sent.push(params.type || method);
+      // The page answers the first key only after the call has given up.
+      return sent.length === 1 ? new Promise(resolve => { acknowledgeFirst = resolve; }) : Promise.resolve();
+    } } },
+    navigator: { platform: 'MacIntel', userAgent: 'Macintosh' },
+    setTimeout, clearTimeout
+  });
+  await assert.rejects(dispatch(42, 'replacement', 'replace_all', '#draft'),
+    (error) => error.mayHaveExecuted === true);
+  acknowledgeFirst();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(sent, ['keyDown']);
+});
+
 test('a direct CDP insertion that cannot attach the debugger stays retryable', async () => {
   const start = background.indexOf('async function executeCDPToolDirectUnlocked(');
   const end = background.indexOf('\nasync function handleMonacoEditorInsert', start);

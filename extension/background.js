@@ -19326,13 +19326,18 @@ async function dispatchCdpTextInsertion(tabId, text, position = 'caret', selecto
   const isMac = typeof navigator !== 'undefined' &&
     (/Macintosh/.test(navigator.userAgent || '') || /Mac/.test(navigator.platform || ''));
   const modifiers = isMac ? 4 : 2;
+  // Once the caller has been told the outcome, no further step may reach the page.
+  let abandoned = false;
+  const send = (method, params) => abandoned
+    ? Promise.reject(new Error('Text input was abandoned after the page stopped responding.'))
+    : chrome.debugger.sendCommand({ tabId }, method, params);
   const input = (async () => {
     if (position === 'end' && prepared.keyboardEnd) {
       const endKey = { key: 'End', code: 'End', windowsVirtualKeyCode: 35, nativeVirtualKeyCode: 35 };
-      await chrome.debugger.sendCommand({ tabId }, 'Input.dispatchKeyEvent', {
+      await send('Input.dispatchKeyEvent', {
         type: 'keyDown', ...endKey, commands: ['moveToEndOfDocument']
       });
-      await chrome.debugger.sendCommand({ tabId }, 'Input.dispatchKeyEvent', { type: 'keyUp', ...endKey });
+      await send('Input.dispatchKeyEvent', { type: 'keyUp', ...endKey });
     }
     if (position === 'end' && (prepared.nestedFrame || prepared.editorOwnsCaret)) {
       // The caret is in a frame the lookup could not reach, or in an editor
@@ -19341,30 +19346,33 @@ async function dispatchCdpTextInsertion(tabId, text, position = 'caret', selecto
       const endKey = isMac
         ? { key: 'ArrowDown', code: 'ArrowDown', windowsVirtualKeyCode: 40, nativeVirtualKeyCode: 40 }
         : { key: 'End', code: 'End', windowsVirtualKeyCode: 35, nativeVirtualKeyCode: 35 };
-      await chrome.debugger.sendCommand({ tabId }, 'Input.dispatchKeyEvent', {
+      await send('Input.dispatchKeyEvent', {
         type: 'keyDown', modifiers, ...endKey, commands: ['moveToEndOfDocument']
       });
-      await chrome.debugger.sendCommand({ tabId }, 'Input.dispatchKeyEvent', { type: 'keyUp', modifiers, ...endKey });
+      await send('Input.dispatchKeyEvent', { type: 'keyUp', modifiers, ...endKey });
     }
     if (position === 'replace_all') {
-      await chrome.debugger.sendCommand({ tabId }, 'Input.dispatchKeyEvent', {
+      await send('Input.dispatchKeyEvent', {
         type: 'keyDown', modifiers, key: 'a', code: 'KeyA',
         windowsVirtualKeyCode: 65, nativeVirtualKeyCode: 65,
         commands: ['selectAll']
       });
-      await chrome.debugger.sendCommand({ tabId }, 'Input.dispatchKeyEvent', {
+      await send('Input.dispatchKeyEvent', {
         type: 'keyUp', modifiers, key: 'a', code: 'KeyA',
         windowsVirtualKeyCode: 65, nativeVirtualKeyCode: 65
       });
     }
-    await chrome.debugger.sendCommand({ tabId }, 'Input.insertText', { text });
+    await send('Input.insertText', { text });
   })();
   input.catch(() => {});
   // Sent input cannot be recalled. A page that stops answering here leaves the
   // outcome unknown, which must be reported before the MCP call times out.
   let timer;
   const stalled = new Promise((_, reject) => {
-    timer = setTimeout(() => reject(new Error('The page did not acknowledge the text input in time.')), 8000);
+    timer = setTimeout(() => {
+      abandoned = true;
+      reject(new Error('The page did not acknowledge the text input in time.'));
+    }, 8000);
   });
   try {
     await Promise.race([input, stalled]);
