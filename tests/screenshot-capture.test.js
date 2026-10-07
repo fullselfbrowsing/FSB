@@ -205,6 +205,8 @@ test('a hung page script fails the capture at its deadline and detaches', async 
   assert.equal(result.success, false);
   assert.equal(result.code, 'PAGE_UNRESPONSIVE');
   assert.equal(h.calls.some((call) => call[0] === 'Page.captureScreenshot'), false);
+  // Nothing more goes to the page once the deadline has passed.
+  assert.equal(h.calls.filter((call) => call[0] === 'script' && call[1] === 'overlayInstallScript').length, 1);
   // Resets would queue behind the hung page; ending the session drops them.
   assert.equal(h.calls.some((call) => call[0] === 'Emulation.clearDeviceMetricsOverride'), false);
   assert.ok(h.calls.some((call) => call[0] === 'script' && call[1] === 'overlayRemoveScript'));

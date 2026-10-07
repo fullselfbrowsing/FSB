@@ -544,7 +544,9 @@
 
       try {
         await bounded(executeScript(scripting, targetTabId, settleScript, [params.wait_ms]));
-      } catch (_error) {
+      } catch (error) {
+        // An unsettled page still yields the live frame; a missed deadline ends the capture.
+        if (error === expiredError) throw error;
         warnings.push({ code: 'SCREENSHOT_SETTLE_INCOMPLETE', message: 'The page settle wait did not complete; the live frame was captured.' });
       }
       if (overlayStyleId) {
