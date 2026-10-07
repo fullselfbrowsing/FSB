@@ -19318,8 +19318,9 @@ async function dispatchCdpTextInsertion(tabId, text, position = 'caret', selecto
   if (!['caret', 'end', 'replace_all'].includes(position)) {
     return { success: false, error: 'Invalid insertion position' };
   }
-  // Code editors keep their own cursor, so a DOM selection cannot move it.
-  const prepared = options.editorOwnsCaret && !selector && position === 'end'
+  // Code editors keep their own cursor, so a DOM selection cannot move it, and
+  // EditContext editors (Monaco 0.57+) have no text field for the lookup to find.
+  const prepared = options.editorOwnsCaret && !selector && position !== 'caret'
     ? { success: true, editorOwnsCaret: true }
     : await prepareCdpTextTarget(tabId, selector, position);
   if (!prepared.success) return prepared;

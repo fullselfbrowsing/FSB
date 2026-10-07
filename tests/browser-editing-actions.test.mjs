@@ -183,6 +183,25 @@ test('appending to a code editor moves its own cursor to the end',
     }
   });
 
+test('an EditContext editor with no text field takes appends and replacements',
+  { skip: !chrome }, async () => {
+    const { ws, close } = await openFixture('edit-context-editor.html');
+    try {
+      const editorText = 'document.getElementById("editor").textContent';
+      for (let i = 0; i < 50 && await evaluate(ws, editorText) !== 'hello'; i++) await sleep(100);
+      await evaluate(ws, 'document.getElementById("editor").focus()');
+      const { dispatch } = loadCdpTextInsertion(ws);
+      const appended = await dispatch(1, ' world', 'end', null, { editorOwnsCaret: true });
+      assert.equal(appended.success, true, appended.error);
+      assert.equal(await evaluate(ws, editorText), 'hello world');
+      const replaced = await dispatch(1, 'new', 'replace_all', null, { editorOwnsCaret: true });
+      assert.equal(replaced.success, true, replaced.error);
+      assert.equal(await evaluate(ws, editorText), 'new');
+    } finally {
+      await close();
+    }
+  });
+
 test('typing into a field inside a shadow root lands the text',
   { skip: !chrome }, async () => {
     const { ws, close } = await openFixture('shadow-text-field.html');

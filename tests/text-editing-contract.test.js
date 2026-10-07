@@ -131,10 +131,16 @@ test('CDP append moves a code editor cursor with its own shortcut, not a DOM sel
   assert.equal(commands[0].params.key, 'ArrowDown');
   assert.equal(commands[0].params.modifiers, 4);
   assert.equal(commands[0].params.commands[0], 'moveToEndOfDocument');
-  // Replacement and selector-targeted appends still go through the DOM lookup.
+  // Replacement selects all with the editor's own shortcut, also without a lookup.
+  commands.length = 0;
   await dispatch(42, 'new', 'replace_all', null, { editorOwnsCaret: true });
+  assert.equal(prepared, 0);
+  assert.deepEqual(commands.map(c => c.method),
+    ['Input.dispatchKeyEvent', 'Input.dispatchKeyEvent', 'Input.insertText']);
+  assert.equal(commands[0].params.commands[0], 'selectAll');
+  // A selector names the field, so the DOM lookup still runs.
   await dispatch(42, ' more', 'end', '#draft', { editorOwnsCaret: true });
-  assert.equal(prepared, 2);
+  assert.equal(prepared, 1);
 });
 
 test('CDP append reaches a field focused inside a shadow root', async () => {
