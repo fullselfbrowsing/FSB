@@ -19217,6 +19217,14 @@ async function prepareCdpTextTarget(tabId, selector, position) {
     target: { tabId },
     func: (css, placement, notAfter) => {
       if (Date.now() > notAfter) return { success: false, expired: true };
+      // chrome.dom reaches closed shadow roots; without it only open ones are visible.
+      const shadowOf = (node) => {
+        try {
+          const root = globalThis.chrome?.dom?.openOrClosedShadowRoot?.(node);
+          if (root) return root;
+        } catch (_error) { /* chrome.dom accepts HTML elements only */ }
+        return node?.shadowRoot || null;
+      };
       let element;
       try {
         if (css) {
@@ -19226,7 +19234,7 @@ async function prepareCdpTextTarget(tabId, selector, position) {
         } else {
           element = document.activeElement;
           // Focus inside a web component is reported as its host.
-          while (element?.shadowRoot?.activeElement) element = element.shadowRoot.activeElement;
+          while (element && shadowOf(element)?.activeElement) element = shadowOf(element).activeElement;
         }
       } catch (error) {
         return { success: false, error: `Invalid editable selector: ${error.message}` };

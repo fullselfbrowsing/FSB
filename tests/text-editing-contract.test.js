@@ -52,12 +52,13 @@ test('editable target resolution rejects ambiguous wrappers', () => {
     querySelectorAll: () => [first] }), first);
 });
 
-function loadCdpTextInsertion(activeElement, commands) {
+function loadCdpTextInsertion(activeElement, commands, dom) {
   const start = background.indexOf('async function prepareCdpTextTarget(');
   const end = background.indexOf('\nasync function handleCDPInsertTextUnlocked', start);
   const context = {
     document: { activeElement },
     chrome: {
+      dom,
       scripting: { executeScript: async ({ func, args }) => [{ result: func(...args) }] },
       debugger: { sendCommand: async (_target, method, params) => commands.push({ method, params }) }
     },
@@ -102,6 +103,20 @@ test('CDP append reaches a field focused inside a shadow root', async () => {
   assert.deepEqual(input.selection, [5, 5]);
   assert.deepEqual(commands.map(c => c.method), ['Input.insertText']);
   assert.equal(commands[0].params.text, ' world');
+});
+
+test('CDP append reaches a field focused inside a closed shadow root', async () => {
+  const commands = [];
+  const input = { tagName: 'INPUT', value: 'hello', focus() {},
+    setSelectionRange(start, end) { this.selection = [start, end]; } };
+  const host = { tagName: 'CLOSED-FIELD', isContentEditable: false, querySelectorAll: () => [], shadowRoot: null };
+  const closedRoot = { activeElement: input };
+  const dispatch = loadCdpTextInsertion(host, commands,
+    { openOrClosedShadowRoot: (node) => (node === host ? closedRoot : null) });
+  const result = await dispatch(42, ' world', 'end', null);
+  assert.equal(result.success, true, result.error);
+  assert.deepEqual(input.selection, [5, 5]);
+  assert.deepEqual(commands.map(c => c.method), ['Input.insertText']);
 });
 
 test('CDP replacement still refuses a focused element that is not editable', async () => {

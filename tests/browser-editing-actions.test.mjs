@@ -219,11 +219,32 @@ test('typing reaches fields inside web components through the real readiness che
     const { ws, close } = await openFixture('shadow-components.html');
     try {
       const results = await shadowComponentResults(ws);
-      for (const selector of ['open-field >>> #inner']) {
+      for (const selector of ['open-field >>> #inner', 'closed-field >>> #inner']) {
         const { success, error, value, expected } = results[selector];
         assert.equal(success, true, `${selector}: ${error}`);
         assert.equal(value, expected, selector);
       }
+    } finally {
+      await close();
+    }
+  });
+
+test('appending to a field focused inside a closed shadow root lands at its end',
+  { skip: !chrome }, async () => {
+    const { ws, close } = await openFixture('shadow-components.html');
+    try {
+      await shadowComponentResults(ws);
+      assert.equal(await evaluate(ws, `(() => {
+        const input = innerField('closed-field');
+        input.value = 'hello';
+        input.focus();
+        input.setSelectionRange(0, 0);
+        return document.activeElement.tagName;
+      })()`), 'CLOSED-FIELD');
+      const { dispatch } = loadCdpTextInsertion(ws);
+      const result = await dispatch(1, ' world', 'end', null);
+      assert.equal(result.success, true, result.error);
+      assert.equal(await evaluate(ws, 'innerField("closed-field").value'), 'hello world');
     } finally {
       await close();
     }

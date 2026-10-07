@@ -2,6 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const vm = require('node:vm');
 const captureEngine = require('../extension/utils/screenshot-capture.js');
 const cdpLease = require('../extension/utils/cdp-lease.js');
 
@@ -284,6 +285,23 @@ test('per-tab lease is FIFO and independent across tabs', async () => {
   first.release();
   await secondPromise;
   assert.deepEqual(order, ['other', 'second']);
+});
+
+test('element mode finds a target inside a closed shadow root', () => {
+  const field = { isConnected: true, getBoundingClientRect: () => ({ left: 5, top: 6, width: 70, height: 20 }) };
+  const host = { shadowRoot: null };
+  const closedRoot = {
+    querySelector: (query) => (query === '#inner' ? field : null),
+    querySelectorAll: () => [],
+  };
+  const context = {
+    scrollX: 0,
+    scrollY: 100,
+    chrome: { dom: { openOrClosedShadowRoot: (node) => (node === host ? closedRoot : null) } },
+    document: { querySelector: () => null, querySelectorAll: () => [host] },
+  };
+  const elementRect = vm.runInNewContext(`(${captureEngine._test.elementRectScript})`, context);
+  assert.deepEqual({ ...elementRect('#inner') }, { x: 5, y: 106, width: 70, height: 20 });
 });
 
 test('lease timeout returns retryable screenshot busy error', async () => {

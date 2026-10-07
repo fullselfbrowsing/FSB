@@ -246,14 +246,24 @@
   }
 
   function elementRectScript(selector) {
+    // chrome.dom reaches closed shadow roots; without it only open ones are visible.
+    function shadowOf(node) {
+      try {
+        const root = globalThis.chrome?.dom?.openOrClosedShadowRoot?.(node);
+        if (root) return root;
+      } catch (_error) { /* chrome.dom accepts HTML elements only */ }
+      return node.shadowRoot || null;
+    }
+
     function deepQuery(rootNode, query) {
       let match = null;
       try { match = rootNode.querySelector(query); } catch (_error) { return null; }
       if (match) return match;
       const all = rootNode.querySelectorAll('*');
       for (const node of all) {
-        if (!node.shadowRoot) continue;
-        const nested = deepQuery(node.shadowRoot, query);
+        const shadowRoot = shadowOf(node);
+        if (!shadowRoot) continue;
+        const nested = deepQuery(shadowRoot, query);
         if (nested) return nested;
       }
       return null;
@@ -653,7 +663,7 @@
   root.FsbScreenshotCapture = api;
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = Object.assign({}, api, {
-      _test: { overlayInstallScript, overlayRemoveScript }
+      _test: { overlayInstallScript, overlayRemoveScript, elementRectScript }
     });
   }
 })(typeof globalThis !== 'undefined' ? globalThis : self);

@@ -30,6 +30,25 @@ test('selector handling preserves :has and does not broaden unsupported syntax',
   assert.deepEqual(queried, ['button:has(.ready)', 'button:contains("Send")']);
 });
 
+test('a shadow-piercing selector reaches into a closed shadow root', () => {
+  const start = selectors.indexOf('  function sanitizeSelector(');
+  const end = selectors.indexOf('  /**\n   * Resolve a compact ref', start);
+  const field = { id: 'inner' };
+  const host = { shadowRoot: null };
+  const closedRoot = { querySelector: (selector) => (selector === '#inner' ? field : null) };
+  const context = {
+    FSB: {
+      sessionId: 'test',
+      elementCache: { get: () => null, set() {} },
+      openOrClosedShadowRoot: (element) => (element === host ? closedRoot : element.shadowRoot || null)
+    },
+    logger: { warn() {}, debug() {} },
+    document: { querySelector: (selector) => (selector === 'closed-field' ? host : null) }
+  };
+  const helpers = vm.runInNewContext(`${selectors.slice(start, end)}\n({ querySelectorWithShadow })`, context);
+  assert.equal(helpers.querySelectorWithShadow('closed-field >>> #inner'), field);
+});
+
 test('cached element is discarded when its selector condition changes', () => {
   const start = domState.indexOf('  class ElementCache {');
   const end = domState.indexOf('  const elementCache =', start);

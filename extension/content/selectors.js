@@ -504,9 +504,10 @@
       }
 
       for (let i = 1; i < parts.length && element; i++) {
-        if (element.shadowRoot) {
+        const shadowRoot = FSB.openOrClosedShadowRoot(element);
+        if (shadowRoot) {
           try {
-            element = element.shadowRoot.querySelector(parts[i]);
+            element = shadowRoot.querySelector(parts[i]);
           } catch (e) {
             logger.warn('Invalid shadow selector part', { sessionId: FSB.sessionId, part: parts[i], error: e.message });
             return null;
