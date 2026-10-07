@@ -619,8 +619,8 @@ function diagnoseElementFailure(selector, element = null) {
     // 3. Covered by overlay/modal?
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
-    const topEl = document.elementFromPoint(centerX, centerY);
-    const isCovered = topEl && topEl !== element && !element.contains(topEl) && !topEl.contains(element);
+    const topEl = FSB.deepElementFromPoint(centerX, centerY);
+    const isCovered = topEl && topEl !== element && !FSB.composedContains(element, topEl) && !FSB.composedContains(topEl, element);
     diagnostic.checks.push({ check: 'not_covered', passed: !isCovered, detail: isCovered ? `Covered by ${topEl.tagName}.${topEl.className?.split?.(' ')?.[0] || ''}` : 'Not covered' });
 
     // 4. Needs scroll into view?

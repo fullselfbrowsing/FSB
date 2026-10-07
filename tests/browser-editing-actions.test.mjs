@@ -200,6 +200,35 @@ test('appending to a field focused inside a shadow root lands at its end',
     }
   });
 
+// Loads the real selector, readiness, and typing modules, so nothing in the
+// shadow-root path is stubbed except the chrome.dom API itself.
+async function shadowComponentResults(ws) {
+  let raw = 'pending';
+  for (let i = 0; i < 100; i++) {
+    raw = await evaluate(ws, 'document.querySelector("#result")?.textContent');
+    if (raw && raw !== 'pending') break;
+    await sleep(100);
+  }
+  assert.notEqual(raw, 'pending', 'fixture completed within 10 seconds');
+  assert.doesNotMatch(raw, /^ERROR/);
+  return JSON.parse(raw);
+}
+
+test('typing reaches fields inside web components through the real readiness checks',
+  { skip: !chrome }, async () => {
+    const { ws, close } = await openFixture('shadow-components.html');
+    try {
+      const results = await shadowComponentResults(ws);
+      for (const selector of ['open-field >>> #inner']) {
+        const { success, error, value, expected } = results[selector];
+        assert.equal(success, true, `${selector}: ${error}`);
+        assert.equal(value, expected, selector);
+      }
+    } finally {
+      await close();
+    }
+  });
+
 test('a hung page gets no CDP text once its target lookup times out',
   { skip: !chrome }, async () => {
     const { ws, close } = await openFixture('nested-text-editor.html');

@@ -267,8 +267,8 @@
       // Only check if center point is in viewport
       if (centerX >= 0 && centerX <= window.innerWidth &&
           centerY >= 0 && centerY <= window.innerHeight) {
-        const topElement = document.elementFromPoint(centerX, centerY);
-        if (topElement && topElement !== node && !node.contains(topElement) && !topElement.contains(node)) {
+        const topElement = FSB.deepElementFromPoint(centerX, centerY);
+        if (topElement && topElement !== node && !FSB.composedContains(node, topElement) && !FSB.composedContains(topElement, node)) {
           // Ignore FSB's own overlay elements (including shadow DOM children)
           if (!FSB.isFsbElement(topElement)) {
             result.actionable = false;
@@ -708,13 +708,14 @@
     let obscuredBy = null;
 
     for (const point of pointsInViewport) {
-      const hitElement = document.elementFromPoint(point.x, point.y);
+      const hitElement = FSB.deepElementFromPoint(point.x, point.y);
       checkedPoints.push(point.name);
 
       // Check if hit element is the target, or they have a parent/child relationship
+      // across shadow boundaries
       const hitIsTarget = hitElement === element;
-      const targetContainsHit = hitElement && element.contains(hitElement);
-      const hitContainsTarget = hitElement && hitElement.contains(element);
+      const targetContainsHit = hitElement && FSB.composedContains(element, hitElement);
+      const hitContainsTarget = hitElement && FSB.composedContains(hitElement, element);
 
       if (hitIsTarget || targetContainsHit || hitContainsTarget) {
         passedPoints.push(point.name);
@@ -756,22 +757,24 @@
     if (!passed && obscuredBy) {
       const centerX = rect.left + rect.width / 2;
       const centerY = rect.top + rect.height / 2;
-      const obscuringElement = document.elementFromPoint(centerX, centerY);
+      const obscuringElement = FSB.deepElementFromPoint(centerX, centerY);
 
-      if (obscuringElement && obscuringElement !== element && !element.contains(obscuringElement)) {
+      if (obscuringElement && obscuringElement !== element && !FSB.composedContains(element, obscuringElement)) {
         const obscStyle = getComputedStyle(obscuringElement);
         let isFixedOrSticky = obscStyle.position === 'fixed' || obscStyle.position === 'sticky';
 
-        // Also check ancestors -- the obscuring element might be inside a fixed container
+        // Also check ancestors -- the obscuring element might be inside a fixed
+        // container, including a header built as a web component
         if (!isFixedOrSticky) {
-          let ancestor = obscuringElement.parentElement;
+          const composedParent = (el) => el.parentElement || el.getRootNode().host || null;
+          let ancestor = composedParent(obscuringElement);
           while (ancestor && ancestor !== document.body) {
             const aStyle = getComputedStyle(ancestor);
             if (aStyle.position === 'fixed' || aStyle.position === 'sticky') {
               isFixedOrSticky = true;
               break;
             }
-            ancestor = ancestor.parentElement;
+            ancestor = composedParent(ancestor);
           }
         }
 
@@ -1017,8 +1020,8 @@
     } else {
       const centerX = rect.left + rect.width / 2;
       const centerY = rect.top + rect.height / 2;
-      const elementAtPoint = document.elementFromPoint(centerX, centerY);
-      checks.receivesEvents = elementAtPoint === element || element.contains(elementAtPoint);
+      const elementAtPoint = FSB.deepElementFromPoint(centerX, centerY);
+      checks.receivesEvents = elementAtPoint === element || FSB.composedContains(element, elementAtPoint);
     }
 
     // Determine overall status

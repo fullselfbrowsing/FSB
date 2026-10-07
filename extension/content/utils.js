@@ -112,6 +112,57 @@
   }
 
   /**
+   * Return an element's shadow root, closed ones included. chrome.dom gives
+   * extension content scripts access to closed roots; without it only open
+   * roots are visible.
+   * @param {Element} element
+   * @returns {ShadowRoot|null}
+   */
+  function openOrClosedShadowRoot(element) {
+    if (!element) return null;
+    try {
+      const root = globalThis.chrome?.dom?.openOrClosedShadowRoot?.(element);
+      if (root) return root;
+    } catch (_error) {
+      // chrome.dom accepts HTML elements only.
+    }
+    return element.shadowRoot || null;
+  }
+
+  /**
+   * document.elementFromPoint stops at the outermost shadow host. Follow the
+   * point into each shadow root to the element that is actually under it.
+   * @param {number} x - Viewport x
+   * @param {number} y - Viewport y
+   * @returns {Element|null}
+   */
+  function deepElementFromPoint(x, y) {
+    let hit = document.elementFromPoint(x, y);
+    let root = openOrClosedShadowRoot(hit);
+    while (root) {
+      const inner = root.elementFromPoint(x, y);
+      if (!inner || inner === hit) break;
+      hit = inner;
+      root = openOrClosedShadowRoot(hit);
+    }
+    return hit;
+  }
+
+  /**
+   * Node.contains() stops at shadow boundaries. Walk up the composed tree
+   * instead, treating slotted content as inside the slot that shows it.
+   * @param {Node} ancestor
+   * @param {Node} node
+   * @returns {boolean}
+   */
+  function composedContains(ancestor, node) {
+    for (let current = node; current; current = current.assignedSlot || current.parentNode || current.host) {
+      if (current === ancestor) return true;
+    }
+    return false;
+  }
+
+  /**
    * PERF: Lightweight shallow object equality check.
    * Replaces JSON.stringify(a) !== JSON.stringify(b) for small flat objects
    * like interactionState and attributes. Avoids full serialization overhead.
@@ -136,6 +187,9 @@
   FSB.findElementByNormalizedAriaLabel = findElementByNormalizedAriaLabel;
   FSB.FSB_HOST_IDS = FSB_HOST_IDS;
   FSB.isFsbElement = isFsbElement;
+  FSB.openOrClosedShadowRoot = openOrClosedShadowRoot;
+  FSB.deepElementFromPoint = deepElementFromPoint;
+  FSB.composedContains = composedContains;
   FSB.shallowEqual = shallowEqual;
 
   window.FSB._modules['utils'] = { loaded: true, timestamp: Date.now() };

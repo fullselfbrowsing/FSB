@@ -6,6 +6,7 @@ customElements.define('shadow-field',class extends HTMLElement{constructor(){sup
 const deep=s=>document.querySelector(s)||[...document.querySelectorAll('*')].map(e=>e.shadowRoot&&e.shadowRoot.querySelector(s)).find(Boolean)||null;
 window.FSB={sessionId:'fixture',_modules:{},logger:{logActionExecution(){},debug(){},warn(){},error(){},logActionRecord(){}},querySelectorWithShadow:deep,smartEnsureReady:async()=>({ready:true,scrolled:false}),isCanvasBasedEditor:()=>false,detectCodeEditor:()=>({isCodeEditor:false}),getClassName:e=>e.className||'',generateMessagingSelectors:()=>[]};
 </script>
+<script src="../../extension/content/utils.js"></script>
 <script src="../../extension/content/actions.js"></script>
 <script>
 (async()=>{try{const result=await FSB.tools.type({selector:'#inner',text:'typed',clear_first:true});const value=deep('#inner').value;document.querySelector('#result').textContent=JSON.stringify({result,value});}catch(e){document.querySelector('#result').textContent='ERROR '+e.stack}})();
