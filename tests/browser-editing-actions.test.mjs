@@ -55,7 +55,18 @@ async function openFixture(name) {
       : new Promise(resolve => child.once('exit', resolve));
     child.kill('SIGTERM');
     await Promise.race([exited, sleep(5000)]);
-    rmSync(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+    // On Linux, Chrome's helper processes outlive the browser briefly and can
+    // still write into the profile, so give them a few seconds to finish. A
+    // leftover temp profile is harmless and must not fail the test.
+    for (let attempt = 1; attempt <= 10; attempt++) {
+      try {
+        rmSync(profile, { recursive: true, force: true, maxRetries: 2, retryDelay: 100 });
+        return;
+      } catch (error) {
+        if (attempt === 10) console.warn(`Left Chrome test profile ${profile}: ${error.code}`);
+        else await sleep(500);
+      }
+    }
   };
   try {
     let port;
