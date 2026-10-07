@@ -219,7 +219,7 @@ test('typing reaches fields inside web components through the real readiness che
     const { ws, close } = await openFixture('shadow-components.html');
     try {
       const results = await shadowComponentResults(ws);
-      for (const selector of ['open-field >>> #inner', 'closed-field >>> #inner']) {
+      for (const selector of ['open-field >>> #inner', 'closed-field >>> #inner', 'open-field', 'closed-field']) {
         const { success, error, value, expected } = results[selector];
         assert.equal(success, true, `${selector}: ${error}`);
         assert.equal(value, expected, selector);
@@ -245,6 +245,24 @@ test('appending to a field focused inside a closed shadow root lands at its end'
       const result = await dispatch(1, ' world', 'end', null);
       assert.equal(result.success, true, result.error);
       assert.equal(await evaluate(ws, 'innerField("closed-field").value'), 'hello world');
+    } finally {
+      await close();
+    }
+  });
+
+test('CDP insertion accepts a shadow-piercing selector or the component itself',
+  { skip: !chrome }, async () => {
+    const { ws, close } = await openFixture('shadow-components.html');
+    try {
+      await shadowComponentResults(ws);
+      await evaluate(ws, 'innerField("open-field").value = "open"; innerField("closed-field").value = "closed"; true');
+      const { dispatch } = loadCdpTextInsertion(ws);
+      const pierced = await dispatch(1, '!', 'end', 'closed-field >>> #inner');
+      assert.equal(pierced.success, true, pierced.error);
+      assert.equal(await evaluate(ws, 'innerField("closed-field").value'), 'closed!');
+      const host = await dispatch(1, '?', 'end', 'open-field');
+      assert.equal(host.success, true, host.error);
+      assert.equal(await evaluate(ws, 'innerField("open-field").value'), 'open?');
     } finally {
       await close();
     }

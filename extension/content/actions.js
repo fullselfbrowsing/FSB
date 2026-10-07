@@ -20,8 +20,17 @@
     if (element.isContentEditable) {
       return element.closest('[contenteditable="true"], [contenteditable=""]') || element;
     }
-    const descendants = element.querySelectorAll('input:not([type="hidden"]), textarea, [contenteditable="true"], [contenteditable=""]');
-    return descendants.length === 1 ? descendants[0] : null;
+    const editable = 'input:not([type="hidden"]), textarea, [contenteditable="true"], [contenteditable=""]';
+    const descendants = element.querySelectorAll(editable);
+    if (descendants.length > 0) return descendants.length === 1 ? descendants[0] : null;
+    // A web component keeps its field in its shadow root. A field that already
+    // has focus there wins; otherwise the root must hold exactly one.
+    const root = FSB.openOrClosedShadowRoot(element);
+    if (!root) return null;
+    const focused = root.activeElement && resolveTextEntryTarget(root.activeElement);
+    if (focused) return focused;
+    const inner = root.querySelectorAll(editable);
+    return inner.length === 1 ? inner[0] : null;
   }
 
   function readEditorText(element) {

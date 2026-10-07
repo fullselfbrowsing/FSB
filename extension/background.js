@@ -19225,11 +19225,21 @@ async function prepareCdpTextTarget(tabId, selector, position) {
         } catch (_error) { /* chrome.dom accepts HTML elements only */ }
         return node?.shadowRoot || null;
       };
+      const editable = 'input:not([type="hidden"]), textarea, [contenteditable="true"], [contenteditable=""]';
+      const notOneField = { success: false, error: 'Selector must identify exactly one editable field' };
       let element;
       try {
         if (css) {
-          const matches = Array.from(document.querySelectorAll(css));
-          if (matches.length !== 1) return { success: false, error: 'Selector must identify exactly one editable field' };
+          // "host >>> field" steps into each named host's shadow root.
+          const parts = css.split('>>>').map(part => part.trim());
+          let scope = document;
+          for (const part of parts.slice(0, -1)) {
+            const host = scope.querySelector(part);
+            scope = host && shadowOf(host);
+            if (!scope) return notOneField;
+          }
+          const matches = Array.from(scope.querySelectorAll(parts[parts.length - 1]));
+          if (matches.length !== 1) return notOneField;
           element = matches[0];
         } else {
           element = document.activeElement;
@@ -19246,7 +19256,9 @@ async function prepareCdpTextTarget(tabId, selector, position) {
       if (element?.isContentEditable) {
         element = element.closest('[contenteditable="true"], [contenteditable=""]') || element;
       } else if (element && !['INPUT', 'TEXTAREA'].includes(element.tagName)) {
-        const candidates = element.querySelectorAll('input:not([type="hidden"]), textarea, [contenteditable="true"], [contenteditable=""]');
+        let candidates = element.querySelectorAll(editable);
+        // A web component keeps its field in its shadow root.
+        if (candidates.length === 0 && shadowOf(element)) candidates = shadowOf(element).querySelectorAll(editable);
         if (candidates.length !== 1) return { success: false, error: 'Target is not one editable field' };
         element = candidates[0];
       }

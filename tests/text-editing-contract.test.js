@@ -52,6 +52,26 @@ test('editable target resolution rejects ambiguous wrappers', () => {
     querySelectorAll: () => [first] }), first);
 });
 
+test('editable target resolution finds the field inside a web component', () => {
+  const start = actions.indexOf('  function resolveTextEntryTarget(');
+  const end = actions.indexOf('\n  function readEditorText(', start);
+  const roots = new Map();
+  const resolve = vm.runInNewContext(`${actions.slice(start, end)}\nresolveTextEntryTarget`, {
+    FSB: { openOrClosedShadowRoot: (element) => roots.get(element) || null }
+  });
+  const component = (fields, activeElement = null) => {
+    const host = { tagName: 'TEXT-FIELD', isContentEditable: false, querySelectorAll: () => [] };
+    roots.set(host, { activeElement, querySelectorAll: () => fields });
+    return host;
+  };
+  const first = { tagName: 'INPUT' };
+  const second = { tagName: 'INPUT' };
+  assert.equal(resolve(component([first])), first);
+  assert.equal(resolve(component([first, second], second)), second);
+  assert.equal(resolve(component([first, second])), null);
+  assert.equal(resolve({ tagName: 'DIV', isContentEditable: false, querySelectorAll: () => [] }), null);
+});
+
 function loadCdpTextInsertion(activeElement, commands, dom) {
   const start = background.indexOf('async function prepareCdpTextTarget(');
   const end = background.indexOf('\nasync function handleCDPInsertTextUnlocked', start);
