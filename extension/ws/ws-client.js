@@ -1017,11 +1017,11 @@ async function handleRemoteKey(payload) {
         if (globalThis.FsbCdpLease && typeof globalThis.FsbCdpLease.acquire === 'function') {
           cdpLease = await globalThis.FsbCdpLease.acquire(tabId, { timeoutMs: 10000 });
         }
-        if (typeof keyboardEmulator !== 'undefined' && keyboardEmulator && keyboardEmulator.isAttachedTo(tabId)) {
+        if (!globalThis.FsbDebuggerSessions && typeof keyboardEmulator !== 'undefined' && keyboardEmulator && keyboardEmulator.isAttachedTo(tabId)) {
           await keyboardEmulator.detachDebugger(tabId);
         }
         try {
-          await chrome.debugger.attach({ tabId: tabId }, '1.3');
+          await (globalThis.FsbDebuggerSessions || chrome.debugger).attach({ tabId: tabId }, '1.3');
         } catch (attachErr) {
           if (attachErr && attachErr.message && attachErr.message.includes('Another debugger is already attached')) {
             _remoteControlActive = false;
@@ -1042,7 +1042,7 @@ async function handleRemoteKey(payload) {
           modifiers: mods
         });
 
-        await chrome.debugger.detach({ tabId: tabId });
+        await (globalThis.FsbDebuggerSessions || chrome.debugger).detach({ tabId: tabId });
         debuggerAttached = false;
       } catch (keyErr) {
         console.warn('[FSB RC] Key', payload.type, 'CDP dispatch failed:', keyErr && keyErr.message ? keyErr.message : keyErr);
@@ -1058,7 +1058,7 @@ async function handleRemoteKey(payload) {
         recordFSBRemoteControlFailure('remote-control-dispatch-failed', 'dash:remote-key', payload, keyErr, keyReason, tabId);
       } finally {
         if (debuggerAttached) {
-          try { await chrome.debugger.detach({ tabId: tabId }); } catch (_e) { /* ignore */ }
+          try { await (globalThis.FsbDebuggerSessions || chrome.debugger).detach({ tabId: tabId }); } catch (_e) { /* ignore */ }
         }
         if (cdpLease) cdpLease.release();
       }

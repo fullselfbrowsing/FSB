@@ -146,6 +146,8 @@ test('content-script hold and drag requests size their lease like the direct ver
   const acquired = [];
   const context = {
     Number,
+    handleCDPInsertTextUnlocked() {},
+    requireForegroundNativeInput: async () => {},
     FsbCdpLease: {
       acquire: async (tabId, options) => {
         acquired.push(options);
@@ -528,4 +530,211 @@ test('MCP execution timeout advice preserves the pending write without suggestin
   assert.match(text, /may still be running/);
   assert.match(text, /outcome unknown/);
   assert.doesNotMatch(text, /navigate|close_tab/);
+});
+
+function navigationHarness({ commit, recover, pendingUpdate = false } = {}) {
+  const event = () => {
+    const listeners = new Set();
+    return { addListener: fn => listeners.add(fn), removeListener: fn => listeners.delete(fn),
+      emit: details => { for (const fn of [...listeners]) fn(details); }, listeners };
+  };
+  const events = Object.fromEntries(['onCommitted', 'onReferenceFragmentUpdated', 'onHistoryStateUpdated', 'onErrorOccurred'].map(k => [k, event()]));
+  const removed = event();
+  let recoveryCalls = 0;
+  let updateCalls = 0;
+  const start = dispatcher.indexOf('async function navigateTabAndWaitForCommit(');
+  const end = dispatcher.indexOf('\nasync function handleNavigateRoute', start);
+  const navigate = vm.runInNewContext(`${dispatcher.slice(start, end)}\nnavigateTabAndWaitForCommit`, {
+    chrome: { webNavigation: events,
+      tabs: { onRemoved: removed,
+        get: async () => ({ id: 9, url: 'https://old.test/', pendingUrl: 'https://new.test/' }),
+        update: async () => { updateCalls++; if (commit) setTimeout(() => events[commit.event || 'onCommitted'].emit({
+          tabId: 9, frameId: 0, url: commit.url, error: commit.error
+        }), 2); return pendingUpdate ? new Promise(() => {}) : { id: 9, url: 'https://old.test/' }; } } },
+    recoverStalledTabNavigation: async (...args) => { recoveryCalls++; return recover?.(events, ...args) || false; },
+    setTimeout: (fn, ms) => setTimeout(fn, ms === 10000 ? 45 : ms === 3000 ? 10 : ms), clearTimeout
+  });
+  return { navigate, events, removed, recoveryCalls: () => recoveryCalls, updateCalls: () => updateCalls };
+}
+
+test('navigate returns the committed redirect URL rather than the previous tab URL', async () => {
+  const h = navigationHarness({ commit: { url: 'https://new.test/redirected' } });
+  const result = await h.navigate(9, 'https://new.test/');
+  assert.equal(result.success, true);
+  assert.equal(result.tab.url, 'https://new.test/redirected');
+  assert.equal(h.recoveryCalls(), 1);
+  assert.ok(Object.values(h.events).every(e => e.listeners.size === 0));
+  assert.equal(h.removed.listeners.size, 0);
+});
+
+test('navigate without a commit reports the pending navigation as uncertain', async () => {
+  const h = navigationHarness();
+  const result = await h.navigate(9, 'https://new.test/');
+  assert.equal(result.success, false);
+  assert.equal(result.errorCode, 'PAGE_UNRESPONSIVE');
+  assert.equal(result.pendingUrl, 'https://new.test/');
+  assert.equal(result.mayHaveExecuted, true);
+  assert.ok(Object.values(h.events).every(e => e.listeners.size === 0));
+});
+
+test('navigate can recover a stalled renderer and waits for its actual commit', async () => {
+  const h = navigationHarness({ recover(events) {
+    setTimeout(() => events.onCommitted.emit({ tabId: 9, frameId: 0, url: 'https://new.test/' }), 2);
+    return true;
+  } });
+  const result = await h.navigate(9, 'https://new.test/');
+  assert.equal(result.success, true);
+  assert.equal(result.recovered, true);
+  assert.equal(h.recoveryCalls(), 1);
+});
+
+test('navigate recovery proceeds while the tabs.update callback is stalled', async () => {
+  let attempts = 0;
+  const h = navigationHarness({ pendingUpdate: true, recover(events) {
+    if (++attempts === 1) return false;
+    setTimeout(() => events.onCommitted.emit({ tabId: 9, frameId: 0, url: 'https://new.test/' }), 2);
+    return true;
+  } });
+  const result = await h.navigate(9, 'https://new.test/');
+  assert.equal(result.success, true);
+  assert.equal(result.recovered, true);
+  assert.equal(h.recoveryCalls(), 2);
+});
+
+test('navigate deadline is bounded even if tabs.update never answers', async () => {
+  const h = navigationHarness({ pendingUpdate: true });
+  const result = await h.navigate(9, 'https://new.test/');
+  assert.equal(result.success, false);
+  assert.equal(result.errorCode, 'PAGE_UNRESPONSIVE');
+  assert.equal(h.recoveryCalls(), 2);
+  assert.ok(Object.values(h.events).every(e => e.listeners.size === 0));
+});
+
+test('navigate does not dispatch a late navigation after renderer recovery times out', async () => {
+  let finishRecovery;
+  const h = navigationHarness({ recover: () => new Promise(resolve => { finishRecovery = resolve; }) });
+  const result = await h.navigate(9, 'https://new.test/');
+  assert.equal(result.success, false);
+  assert.equal(result.mayHaveExecuted, false);
+  assert.equal(result.outcome, 'failed');
+  finishRecovery(true);
+  await new Promise(resolve => setTimeout(resolve, 5));
+  assert.equal(h.updateCalls(), 0);
+  assert.ok(Object.values(h.events).every(e => e.listeners.size === 0));
+});
+
+for (const event of ['onReferenceFragmentUpdated', 'onHistoryStateUpdated']) {
+  test(`navigate recognizes same-document commits from ${event}`, async () => {
+    const h = navigationHarness({ commit: { event, url: 'https://new.test/#fragment' } });
+    assert.equal((await h.navigate(9, 'https://new.test/#fragment')).tab.url, 'https://new.test/#fragment');
+  });
+}
+
+function debuggerSessionContext(overrides = {}) {
+  const owners = new Map([[11, 'agent-a'], [12, 'agent-b']]);
+  const detachedListeners = [], removedListeners = [], events = [];
+  const context = {
+    setTimeout, clearTimeout, console,
+    fsbAgentRegistryInstance: { getOwner: tabId => owners.get(tabId) },
+    chrome: {
+      debugger: {
+        attach: async target => { events.push(['attach', target.tabId]); },
+        detach: async target => { events.push(['detach', target.tabId]); },
+        sendCommand: async (target, method) => { events.push([method, target.tabId]); return {}; },
+        onDetach: { addListener: callback => detachedListeners.push(callback) }
+      },
+      tabs: { onRemoved: { addListener: callback => removedListeners.push(callback) } }
+    }
+  };
+  Object.assign(context.chrome.debugger, overrides);
+  vm.createContext(context);
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '../extension/utils/cdp-lease.js'), 'utf8'), context);
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '../extension/utils/debugger-sessions.js'), 'utf8').replace('2000);', '20);'), context);
+  return { context, owners, events, sessions: context.FsbDebuggerSessions,
+    detached: tabId => detachedListeners.forEach(listener => listener({ tabId })),
+    removed: tabId => removedListeners.forEach(listener => listener(tabId)) };
+}
+
+test('controlled tabs acknowledge debugger readiness before input and retain it after keyboard cleanup', async () => {
+  const { context, sessions, events } = debuggerSessionContext();
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '../extension/utils/keyboard-emulator.js'), 'utf8'), context);
+  const emulator = vm.runInContext('new KeyboardEmulator()', context);
+  await sessions.retain(11);
+  assert.equal(sessions.isReady(11), true);
+  assert.equal((await emulator.pressKey(11, 'ArrowRight')).success, true);
+  await emulator.detachDebugger(11);
+  await sessions.attach({ tabId: 11 }); // the next screenshot/mouse/upload operation
+  await sessions.detach({ tabId: 11 });
+  assert.equal(sessions.isReady(11), true);
+  assert.deepEqual(events.slice(0, 2), [['attach', 11], ['Runtime.enable', 11]]);
+  assert.equal(events.filter(([method]) => method === 'attach').length, 1);
+  assert.equal(events.filter(([method]) => method === 'detach').length, 0);
+});
+
+test('owned tabs keep independent sessions and release only after ownership and active work end', async () => {
+  const { context, sessions, owners, events } = debuggerSessionContext();
+  await sessions.retain(11);
+  await sessions.retain(12);
+  const operation = await context.FsbCdpLease.acquire(11);
+  owners.delete(11);
+  const cleanup = sessions.releaseUnowned();
+  await Promise.resolve();
+  assert.equal(sessions.isAttachedTo(11), true);
+  operation.release();
+  await cleanup;
+  assert.equal(sessions.isAttachedTo(11), false);
+  assert.equal(sessions.isReady(12), true);
+  assert.deepEqual(events.filter(([method]) => method === 'detach'), [['detach', 11]]);
+});
+
+test('a foreign debugger is neither adopted nor detached', async () => {
+  const { sessions, events } = debuggerSessionContext({ attach: async () => {
+    throw new Error('Another debugger is already attached');
+  } });
+  await assert.rejects(sessions.retain(11), /Another debugger/);
+  await sessions.detach({ tabId: 11 }, true);
+  assert.equal(sessions.isAttachedTo(11), false);
+  assert.equal(events.length, 0);
+});
+
+test('external detach and tab close invalidate retained sessions without automatic reattachment', async () => {
+  const { sessions, detached, removed, events } = debuggerSessionContext();
+  await sessions.retain(11);
+  await sessions.retain(12);
+  detached(11);
+  assert.equal(sessions.isReady(11), false);
+  assert.equal(sessions.isReady(12), true);
+  assert.equal(events.filter(([method]) => method === 'attach').length, 2);
+  await sessions.retain(11);
+  assert.equal(events.filter(([method]) => method === 'attach').length, 3);
+  removed(12);
+  assert.equal(sessions.isAttachedTo(12), false);
+});
+
+test('renderer initialization times out, releases the lease, and permits a later fresh session', async () => {
+  const { context, sessions, events } = debuggerSessionContext({ sendCommand: () => new Promise(() => {}) });
+  await assert.rejects(sessions.retain(11), /initialization timed out/);
+  assert.equal(sessions.isAttachedTo(11), false);
+  assert.equal(context.FsbCdpLease._queues.size, 0);
+  context.chrome.debugger.sendCommand = async () => ({});
+  await sessions.retain(11);
+  assert.equal(sessions.isReady(11), true);
+  assert.deepEqual(events.filter(([method]) => method === 'detach'), [['detach', 11]]);
+});
+
+test('new controlled tabs establish the debugger before loading destination scripts', async () => {
+  const events = [];
+  const start = dispatcher.indexOf('async function createMcpControlledTab(');
+  const end = dispatcher.indexOf('\nasync function handleOpenTabRoute(', start);
+  const create = vm.runInNewContext(`${dispatcher.slice(start, end)}\ncreateMcpControlledTab`, {
+    chrome: { tabs: {
+      create: async params => { events.push(['create', params.url, params.active]); return { id: 11 }; },
+      update: async (tabId, params) => { events.push(['navigate', tabId, params.url]); return { id: tabId, ...params }; }
+    } },
+    bindClaimedTabOrError: async () => { events.push(['bind']); return { ownershipToken: 'token' }; },
+    FsbDebuggerSessions: { retain: async tabId => { events.push(['ready', tabId]); } }
+  });
+  const result = await create({ tool: 'open_tab', url: 'https://example.com/loop', agentId: 'agent-a' });
+  assert.deepEqual(events, [['create', 'about:blank', false], ['bind'], ['ready', 11], ['navigate', 11, 'https://example.com/loop']]);
+  assert.equal(result.bindResult.ownershipToken, 'token');
 });

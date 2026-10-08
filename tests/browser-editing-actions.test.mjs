@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
@@ -44,7 +45,7 @@ async function openFixture(name) {
   const fixture = new URL(`./fixtures/${name}`, import.meta.url).href;
   const child = spawn(chrome, [
     '--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check',
-    '--remote-debugging-port=0', `--user-data-dir=${profile}`, fixture
+    '--remote-debugging-port=0', '--enable-unsafe-extension-debugging', `--user-data-dir=${profile}`, fixture
   ], { stdio: 'ignore' });
   let ws;
   const close = async () => {
@@ -99,7 +100,8 @@ async function openFixture(name) {
       await sleep(100);
     }
     assert.ok(loaded, 'fixture document and scripts loaded');
-    return { ws, close };
+    const version = await (await fetch(`http://127.0.0.1:${port}/json/version`)).json();
+    return { ws, close, debuggerUrl: target.webSocketDebuggerUrl, browserDebuggerUrl: version.webSocketDebuggerUrl, port };
   } catch (error) {
     await close();
     throw error;
@@ -115,6 +117,8 @@ function loadCdpTextInsertion(ws, edit = source => source) {
   const input = [];
   const dispatch = vm.runInNewContext(`${edit(background.slice(start, end))}\ndispatchCdpTextInsertion`, {
     chrome: {
+      tabs: { get: async () => ({ active: true, windowId: 1 }) },
+      windows: { get: async () => ({ focused: true, state: 'normal' }) },
       scripting: { executeScript: async ({ func, args }) => [{
         result: await evaluate(ws, `(${func})(${args.map(arg => JSON.stringify(arg)).join(', ')})`)
       }] },
@@ -371,6 +375,7 @@ test('Enter/Tab consumption, empty rich text, and refused editor CDP preserve tr
         let cdpRequests = 0, inputEvents = 0;
         FSB.detectCodeEditor = () => ({isCodeEditor:true,type:'ace'});
         window.chrome = Object.assign(window.chrome || {}, {runtime:{sendMessage(_request, callback) {
+          if (_request.action === 'monacoEditorInsert') return callback({success:false,error:'No editor API found on page'});
           cdpRequests++; callback({success:false,code:'SCREENSHOT_DEBUGGER_BUSY',retryable:true});
         }}});
         document.querySelector('#code').addEventListener('input', event => {
@@ -462,3 +467,193 @@ test('native email and number inputs append at the end and replace with one inse
       }
     } finally { await close(); }
   });
+
+test('Chrome can recover a hung renderer over an established debugger session', { skip: !chrome }, async () => {
+  const { ws, close } = await openFixture('nested-text-editor.html');
+  try {
+    const background = readFileSync(new URL('../extension/background.js', import.meta.url), 'utf8');
+    const start = background.indexOf('async function recoverStalledTabNavigation(');
+    const end = background.indexOf('\nasync function requireForegroundNativeInput', start);
+    const recover = vm.runInNewContext(`${background.slice(start, end)}\nrecoverStalledTabNavigation`, {
+      chrome: {
+        scripting: { executeScript: async ({ func }) => [{ result: await evaluate(ws, `(${func})()`) }] },
+        debugger: { sendCommand: (_target, method) => cdp(ws, method), detach: async () => {} }
+      },
+      FsbCdpLease: { acquire: async () => ({ release() {} }) },
+      keyboardEmulator: { isAttachedTo: () => true },
+      attachFsbDebugger: async () => { throw new Error('Must reuse the established FSB debugger session'); },
+      setTimeout, clearTimeout
+    });
+    await evaluate(ws, 'setTimeout(() => { const end = Date.now() + 30000; while (Date.now() < end) {} }, 0); true');
+    await sleep(100);
+    const startedAt = Date.now();
+    assert.equal(await recover(1, () => true), true);
+    assert.ok(Date.now() - startedAt < 5000, 'recovery interrupts the loop before it expires');
+    await cdp(ws, 'Page.navigate', { url: new URL('./fixtures/nested-text-editor.html', import.meta.url).href });
+    let ready = false;
+    for (let i = 0; i < 30 && !ready; i++) {
+      ready = await evaluate(ws, 'location.href.includes("nested-text-editor.html") && document.readyState === "complete"');
+      if (!ready) await sleep(50);
+    }
+    assert.equal(ready, true);
+  } finally { await close(); }
+});
+
+test('Chrome recovery stays bounded when attaching to an already-hung renderer', { skip: !chrome }, async () => {
+  const { ws, close, debuggerUrl } = await openFixture('nested-text-editor.html');
+  let recoverySocket;
+  let released = false;
+  try {
+    const background = readFileSync(new URL('../extension/background.js', import.meta.url), 'utf8');
+    const start = background.indexOf('async function recoverStalledTabNavigation(');
+    const end = background.indexOf('\nasync function requireForegroundNativeInput', start);
+    const recover = vm.runInNewContext(`${background.slice(start, end)}\nrecoverStalledTabNavigation`, {
+      chrome: {
+        scripting: { executeScript: async ({ func }) => [{ result: await evaluate(ws, `(${func})()`) }] },
+        debugger: { sendCommand: (_target, method) => cdp(recoverySocket, method),
+          detach: async () => { recoverySocket?.close(); } }
+      },
+      FsbCdpLease: { acquire: async () => ({ release() { released = true; } }) },
+      attachFsbDebugger: async () => {
+        recoverySocket = new WebSocketClient(debuggerUrl);
+        await new Promise((resolve, reject) => {
+          recoverySocket.addEventListener('open', resolve, { once: true });
+          recoverySocket.addEventListener('error', reject, { once: true });
+        });
+      }, setTimeout, clearTimeout
+    });
+    await evaluate(ws, 'setTimeout(() => { const end = Date.now() + 30000; while (Date.now() < end) {} }, 0); true');
+    await sleep(100);
+    const startedAt = Date.now();
+    try {
+      assert.equal(await recover(1, () => true), true);
+    } catch (error) {
+      assert.match(error.message, /Navigation recovery timed out/);
+    }
+    assert.ok(Date.now() - startedAt < 5000);
+    assert.equal(released, true);
+  } finally { recoverySocket?.close(); await close(); }
+});
+
+// A disposable MV3 extension uses the real debugger API and the production
+// dispatcher/registry/session code. No inspector session is opened on the
+// controlled page by the test runner, so it cannot accidentally warm that page.
+test('MV3 public navigation recovers owned tabs before and after keyboard input', { skip: !chrome }, async () => {
+  const fixture = await openFixture('nested-text-editor.html');
+  const server = createServer((request, response) => {
+    response.writeHead(200, { 'content-type': 'text/html' });
+    response.end(request.url === '/loop'
+      ? '<script>const end=Date.now()+30000;while(Date.now()<end){}</script>'
+      : request.url === '/destination' ? '<p id="destination">recovered</p>' : '<input id="field">');
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  const extensionDir = mkdtempSync(join(tmpdir(), 'fsb-navigation-extension-'));
+  let browserSocket, workerSocket;
+  try {
+    mkdirSync(join(extensionDir, 'utils'));
+    mkdirSync(join(extensionDir, 'ws'));
+    for (const file of ['utils/cdp-lease.js', 'utils/debugger-sessions.js', 'utils/agent-registry.js',
+      'utils/keyboard-emulator.js', 'utils/screenshot-capture.js', 'ws/mcp-tool-dispatcher.js']) {
+      cpSync(new URL('../extension/' + file, import.meta.url), join(extensionDir, file));
+    }
+    const source = readFileSync(new URL('../extension/background.js', import.meta.url), 'utf8');
+    const section = (start, end) => source.slice(source.indexOf(start), source.indexOf(end, source.indexOf(start)));
+    const workerSource = `
+      importScripts('utils/cdp-lease.js', 'utils/debugger-sessions.js', 'utils/agent-registry.js', 'utils/keyboard-emulator.js', 'utils/screenshot-capture.js', 'ws/mcp-tool-dispatcher.js');
+      globalThis.__uatLogs = [];
+      globalThis.automationLogger = { debug: (name, data) => __uatLogs.push({name, ...data}), logActionExecution() {}, error() {}, info() {}, warn() {} };
+      let keyboardEmulator = null;
+      ${section('function isCdpDebuggerContention(', '\nasync function runLegacyCdpMessageWithLease(')}
+      ${section('async function recoverStalledTabNavigation(', '\nasync function dispatchCdpTextInsertion(')}
+      ${section('function initializeKeyboardEmulator(', '\n// Reconcile the KeyboardEmulator')}
+      ${section('async function handleKeyboardDebuggerAction(', '\n/**\n * Clean up keyboard emulator resources')}
+      globalThis.fsbAgentRegistryInstance = new FsbAgentRegistry.AgentRegistry();
+      globalThis.__uatReady = fsbAgentRegistryInstance.hydrate();
+    `;
+    writeFileSync(join(extensionDir, 'background.js'), workerSource);
+    writeFileSync(join(extensionDir, 'manifest.json'), JSON.stringify({
+      manifest_version: 3, name: 'FSB navigation test', version: '1.0',
+      permissions: ['debugger', 'scripting', 'tabs', 'storage', 'webNavigation'],
+      host_permissions: ['<all_urls>'], background: { service_worker: 'background.js' }
+    }));
+    browserSocket = new WebSocketClient(fixture.browserDebuggerUrl);
+    await new Promise(resolve => browserSocket.addEventListener('open', resolve, { once: true }));
+    const loaded = await cdp(browserSocket, 'Extensions.loadUnpacked', { path: extensionDir });
+    let worker;
+    for (let i = 0; i < 60 && !worker; i++) {
+      const targets = await (await fetch(`http://127.0.0.1:${fixture.port}/json`)).json();
+      worker = targets.find(target => target.type === 'service_worker' && target.url.startsWith(`chrome-extension://${loaded.id}/`));
+      if (!worker) await sleep(100);
+    }
+    assert.ok(worker, 'test extension service worker started');
+    workerSocket = new WebSocketClient(worker.webSocketDebuggerUrl);
+    await new Promise(resolve => workerSocket.addEventListener('open', resolve, { once: true }));
+    await evaluate(workerSocket, '__uatReady');
+    const agent = await evaluate(workerSocket, 'fsbAgentRegistryInstance.registerAgent()');
+    const agentId = agent.agentId;
+    assert.ok(agentId);
+    const open = async (url, active = false) => evaluate(workerSocket,
+      `dispatchMcpToolRoute({tool:'open_tab',params:${JSON.stringify({ url, active, agentId })}})`);
+    const route = async (tool, params) => evaluate(workerSocket,
+      `dispatchMcpToolRoute({tool:${JSON.stringify(tool)},params:${JSON.stringify({ ...params, agentId })}})`);
+    for (const keyboard of [false, true]) {
+      // Timer starts only after the debugger is confirmed ready, via the same
+      // public tab creation and binding paths that the installed extension uses.
+      const opened = await open(origin + '/field', keyboard);
+      assert.equal(opened.success, true, JSON.stringify(opened));
+      const tabId = opened.tabId;
+      assert.equal(await evaluate(workerSocket, `FsbDebuggerSessions.isReady(${tabId})`), true);
+      await sleep(200);
+      if (keyboard) {
+        await evaluate(workerSocket, `chrome.scripting.executeScript({target:{tabId:${tabId}},func:()=>document.getElementById('field').focus()})`);
+        const pressed = await evaluate(workerSocket, `new Promise(resolve=>handleKeyboardDebuggerAction({method:'pressKey',key:'ArrowRight'},{tab:{id:${tabId}}},resolve))`);
+        assert.equal(pressed.success, true, JSON.stringify(pressed));
+        assert.equal(await evaluate(workerSocket, `FsbDebuggerSessions.isReady(${tabId})`), true);
+        const captured = await evaluate(workerSocket, `FsbScreenshotCapture.capture({mode:'viewport'},${tabId}).then(result=>({success:result.success,code:result.code}))`);
+        assert.equal(captured.success, true, JSON.stringify(captured));
+      }
+      await evaluate(workerSocket, `chrome.scripting.executeScript({target:{tabId:${tabId}},func:()=>{const end=Date.now()+30000;while(Date.now()<end){}}}).catch(()=>{}); true`);
+      await sleep(250);
+      if (keyboard) {
+        const capture = await evaluate(workerSocket, `FsbScreenshotCapture.capture({mode:'viewport'},${tabId},{deadlineMs:50}).then(result=>({success:result.success,code:result.code}))`);
+        assert.equal(capture.code, 'PAGE_UNRESPONSIVE');
+        assert.equal(await evaluate(workerSocket, `FsbDebuggerSessions.isReady(${tabId})`), true);
+      }
+      const started = Date.now();
+      const navigated = await route('navigate', { tabId, ownershipToken: opened.ownershipToken,
+        url: origin + '/destination' });
+      assert.equal(navigated.success, true, JSON.stringify(navigated));
+      assert.equal(navigated.recovered, true, JSON.stringify(await evaluate(workerSocket, '__uatLogs')));
+      assert.ok(Date.now() - started < 5000, 'navigation interrupts rather than waiting for the loop');
+      const destination = await evaluate(workerSocket, `chrome.scripting.executeScript({target:{tabId:${tabId}},func:()=>document.getElementById('destination')?.textContent})`);
+      assert.equal(destination[0].result, 'recovered');
+      await evaluate(workerSocket, `chrome.tabs.remove(${tabId})`);
+    }
+    // A loop running immediately at destination load is protected by the blank
+    // page attachment too; it does not depend on a preceding keyboard request.
+    const immediate = await open(origin + '/loop');
+    assert.equal(immediate.success, true);
+    await sleep(200);
+    const nav = await route('navigate', { tabId: immediate.tabId, ownershipToken: immediate.ownershipToken,
+      url: origin + '/destination' });
+    assert.equal(nav.success, true, JSON.stringify(nav));
+    assert.equal(nav.recovered, true);
+    await evaluate(workerSocket, `chrome.tabs.remove(${immediate.tabId})`);
+    const released = await open(origin + '/field');
+    await evaluate(workerSocket, `fsbAgentRegistryInstance.releaseAgent(${JSON.stringify(agentId)})`);
+    await evaluate(workerSocket, 'FsbDebuggerSessions.releaseUnowned()');
+    assert.equal(await evaluate(workerSocket, `FsbDebuggerSessions.isAttachedTo(${released.tabId})`), false);
+    const target = await evaluate(workerSocket, `chrome.debugger.getTargets().then(targets=>targets.find(target=>target.tabId===${released.tabId}))`);
+    assert.equal(target.attached, false);
+    await evaluate(workerSocket, `chrome.tabs.remove(${released.tabId})`);
+    const logs = await evaluate(workerSocket, '__uatLogs');
+    assert.ok(logs.filter(row => row.name === 'Navigation renderer recovery attached').every(row => row.reused === true));
+  } finally {
+    workerSocket?.close(); browserSocket?.close();
+    server.closeAllConnections();
+    await new Promise(resolve => server.close(resolve));
+    await fixture.close();
+    rmSync(extensionDir, { recursive: true, force: true });
+  }
+});

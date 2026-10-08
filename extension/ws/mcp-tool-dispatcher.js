@@ -1247,6 +1247,103 @@ function hasActiveAutomationSessionForTab(tabId) {
   return false;
 }
 
+async function navigateTabAndWaitForCommit(tabId, url) {
+  const events = chrome.webNavigation;
+  if (!events?.onCommitted) {
+    // Embedded hosts without webNavigation still have to confirm the requested URL.
+    const updated = await chrome.tabs.update(tabId, { url });
+    return updated?.url === url ? { success: true, tab: updated } : {
+      success: false, errorCode: 'PAGE_UNRESPONSIVE', outcome: 'unknown', mayHaveExecuted: true,
+      error: 'Navigation was requested but the destination has not committed. Use close_tab if the page remains stuck.'
+    };
+  }
+  let settled = false;
+  let timer;
+  let recoveryTimer;
+  let recovered = false;
+  let navigationRequested = false;
+  const listeners = [];
+  let finish;
+  const result = new Promise(resolve => { finish = value => {
+    if (settled) return;
+    settled = true;
+    clearTimeout(timer);
+    clearTimeout(recoveryTimer);
+    for (const [event, listener] of listeners) event.removeListener(listener);
+    resolve(value);
+  }; });
+  const listen = (event, listener) => {
+    if (!event) return;
+    event.addListener(listener);
+    listeners.push([event, listener]);
+  };
+  const committed = details => {
+    if (details.tabId === tabId && details.frameId === 0) finish({ success: true, url: details.url });
+  };
+  listen(events.onCommitted, committed);
+  listen(events.onReferenceFragmentUpdated, committed);
+  listen(events.onHistoryStateUpdated, committed);
+  listen(events.onErrorOccurred, details => {
+    if (details.tabId === tabId && details.frameId === 0) finish({
+      success: false, errorCode: 'navigation_failed', error: details.error,
+      outcome: 'failed', mayHaveExecuted: false
+    });
+  });
+  listen(chrome.tabs.onRemoved, removedId => {
+    if (removedId === tabId) finish({ success: false, errorCode: 'navigation_failed', error: 'Tab closed during navigation' });
+  });
+  timer = setTimeout(() => finish({ success: false, errorCode: 'PAGE_UNRESPONSIVE',
+    outcome: navigationRequested ? 'unknown' : 'failed', mayHaveExecuted: navigationRequested, retryable: false,
+    error: navigationRequested
+      ? 'Navigation did not commit before its deadline. Use close_tab to recover the stuck tab.'
+      : 'The renderer did not recover before the navigation deadline. Use close_tab to recover the stuck tab.' }), 10000);
+  try {
+    const recoverRenderer = async () => {
+      if (typeof recoverStalledTabNavigation !== 'function') return false;
+      try { return await recoverStalledTabNavigation(tabId, () => !settled); }
+      catch (error) {
+        globalThis.automationLogger?.debug('Navigation renderer recovery failed', { tabId, error: error.message || String(error) });
+        return false;
+      }
+    };
+    const requestNavigation = async () => {
+      // Recover the outgoing renderer before a navigation changes its debugger
+      // target. Responsive pages only incur the short responsiveness probe.
+      recovered = await recoverRenderer();
+      if (settled) return;
+      if (globalThis.FsbDebuggerSessions && !globalThis.FsbDebuggerSessions.isReady(tabId)) {
+        try { await globalThis.FsbDebuggerSessions.retain(tabId); }
+        catch (error) {
+          globalThis.automationLogger?.debug('Navigation debugger initialization failed', { tabId, error: error.message });
+        }
+      }
+      if (settled) return;
+      navigationRequested = true;
+      // A hung renderer can also delay the tabs.update callback. The commit
+      // listener and recovery deadline keep running while it is pending.
+      const updating = chrome.tabs.update(tabId, { url });
+      updating.catch(error => finish({ success: false, errorCode: 'navigation_failed',
+        error: error.message || String(error), outcome: 'failed', mayHaveExecuted: false }));
+      if (!settled) recoveryTimer = setTimeout(async () => {
+        recovered = (await recoverRenderer()) || recovered;
+      }, 3000);
+    };
+    requestNavigation().catch(error => finish({ success: false, errorCode: 'navigation_failed',
+      error: error.message || String(error), outcome: 'failed', mayHaveExecuted: false }));
+    const navigation = await result;
+    if (!navigation.success && globalThis.FsbDebuggerSessions) {
+      globalThis.FsbDebuggerSessions.releaseUnowned().catch(() => {});
+    }
+    const current = await chrome.tabs.get(tabId);
+    return navigation.success
+      ? { success: true, tab: { ...current, url: navigation.url }, recovered }
+      : { ...navigation, tabId, currentUrl: current.url, pendingUrl: current.pendingUrl };
+  } catch (error) {
+    finish({ success: false });
+    throw error;
+  }
+}
+
 async function handleNavigateRoute({ params, client, tab }) {
   const { agentId } = params || {};
   // Phase 240: agentId now load-bearing for the bindTab D-08 site below.
@@ -1261,8 +1358,7 @@ async function handleNavigateRoute({ params, client, tab }) {
       : (tab && Number.isFinite(tab.id) ? tab.id : null);
 
     if (targetTabId === null) {
-      const createdTab = await chrome.tabs.create({ url: params.url, active: false });
-      const bindResult = await bindClaimedTabOrError({ tool: 'navigate', tabId: createdTab && createdTab.id, agentId });
+      const { tab: createdTab, bindResult } = await createMcpControlledTab({ tool: 'navigate', url: params.url, active: false, agentId });
       if (bindResult && bindResult.success === false) return bindResult;
       const extra = (bindResult && bindResult.ownershipToken)
         ? { ownershipToken: bindResult.ownershipToken }
@@ -1292,7 +1388,9 @@ async function handleNavigateRoute({ params, client, tab }) {
         globalThis.fsbAgentRegistryInstance.stampAgentNavigation(targetTabId);
       }
     } catch (_e) { /* best-effort */ }
-    const updatedTab = await chrome.tabs.update(targetTabId, { url: params.url });
+    const navigation = await navigateTabAndWaitForCommit(targetTabId, params.url);
+    if (!navigation.success) return navigation;
+    const updatedTab = navigation.tab;
     await activateSidePanelAgentTab(agentId, targetTabId);
 
     // Phase 240 D-08: bindTab on the navigated tab BEFORE returning success
@@ -1303,6 +1401,7 @@ async function handleNavigateRoute({ params, client, tab }) {
     const extra = (bindResult && bindResult.ownershipToken)
       ? { ownershipToken: bindResult.ownershipToken }
       : {};
+    if (navigation.recovered) extra.recovered = true;
     return sanitizeSingleTab('navigate', { ...updatedTab, id: targetTabId, url: updatedTab?.url || params.url }, extra);
   } catch (error) {
     return createMcpRouteError('navigate', 'browser', MCP_ROUTE_RECOVERY_HINT, { error: error.message || String(error) });
@@ -1767,6 +1866,24 @@ async function handleBackRoute({ payload = {}, client = null }) {
   return response;
 }
 
+async function createMcpControlledTab({ tool, url = 'about:blank', active = false, agentId }) {
+  const sessions = globalThis.FsbDebuggerSessions;
+  const tab = await chrome.tabs.create({ url: sessions ? 'about:blank' : url, active });
+  const bindResult = await bindClaimedTabOrError({ tool, tabId: tab?.id, agentId });
+  if (bindResult?.success === false) {
+    if (Number.isFinite(tab?.id)) await chrome.tabs.remove(tab.id).catch(() => {});
+    return { tab, bindResult };
+  }
+  if (!sessions || !Number.isFinite(tab?.id)) return { tab, bindResult };
+  try { await sessions.retain(tab.id); }
+  catch (error) {
+    globalThis.automationLogger?.debug('Controlled tab debugger initialization failed', { tabId: tab.id, error: error.message });
+  }
+  // Establish the interruption channel before any destination scripts run.
+  const updated = url === 'about:blank' ? tab : await chrome.tabs.update(tab.id, { url });
+  return { tab: updated, bindResult };
+}
+
 async function handleOpenTabRoute({ params }) {
   const { agentId } = params || {};
   // Phase 240: agentId now load-bearing for the bindTab D-08 site below.
@@ -1776,23 +1893,8 @@ async function handleOpenTabRoute({ params }) {
     // steal focus. This eliminates the "open_tab steals user focus mid-task"
     // multi-agent UX bug. The bindTab + ownershipToken contract (D-08) below
     // is preserved byte-for-byte.
-    const tab = await chrome.tabs.create({ url: params.url || 'about:blank', active: params.active === true });
-
-    // Phase 240 D-08: bindTab on the freshly created tab BEFORE returning
-    // success. open_tab claims a tab no other agent has touched, so the
-    // bind is unconditional once the create succeeds.
-    let bindResult = null;
-    if (agentId
-        && typeof globalThis !== 'undefined'
-        && globalThis.fsbAgentRegistryInstance
-        && typeof globalThis.fsbAgentRegistryInstance.bindTab === 'function'
-        && tab && Number.isFinite(tab.id)) {
-      try {
-        bindResult = await globalThis.fsbAgentRegistryInstance.bindTab(agentId, tab.id);
-      } catch (_e) {
-        bindResult = null;
-      }
-    }
+    const { tab, bindResult } = await createMcpControlledTab({ tool: 'open_tab', url: params.url || 'about:blank', active: params.active === true, agentId });
+    if (bindResult?.success === false) return bindResult;
     if (tab && Number.isFinite(tab.id)) await activateSidePanelAgentTab(agentId, tab.id);
     const extra = (bindResult && bindResult.ownershipToken)
       ? { ownershipToken: bindResult.ownershipToken }

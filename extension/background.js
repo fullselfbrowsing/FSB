@@ -29,6 +29,7 @@ importScripts('ai/tool-definitions.js');
 // All FSB-owned chrome.debugger consumers share a per-tab FIFO lease. The
 // capture engine is loaded before both MCP dispatch and autopilot execution.
 importScripts('utils/cdp-lease.js');
+importScripts('utils/debugger-sessions.js');
 importScripts('utils/screenshot-capture.js');
 importScripts('utils/mcp-visual-session.js');
 importScripts('utils/mcp-visual-session-lifecycle.js');
@@ -10072,6 +10073,13 @@ async function fsbRestoreLatticeReplayCheckpoints() {
 
 // Enhanced message sending with automatic retry and fallback
 async function sendMessageWithRetry(tabId, message, maxRetries = 3, options = {}) {
+  if (message.action === 'executeAction' && globalThis.FsbDebuggerSessions &&
+      globalThis.fsbAgentRegistryInstance?.getOwner?.(tabId) && !globalThis.FsbDebuggerSessions.isReady(tabId)) {
+    try { await globalThis.FsbDebuggerSessions.retain(tabId); }
+    catch (error) {
+      globalThis.automationLogger?.debug('Controlled tab debugger initialization failed', { tabId, error: error.message });
+    }
+  }
   // Capture URL before sending - used to detect if action triggered navigation
   let previousUrl = null;
   try {
@@ -19018,10 +19026,11 @@ async function handleOpenNewTab(request, sender, sendResponse) {
     const { url, active } = request;
     automationLogger.debug('Opening new tab', { url, active });
     
-    const tab = await chrome.tabs.create({
-      url: url || 'about:blank',
-      active: active !== false // Default to true
+    const { tab, bindResult } = await createMcpControlledTab({
+      tool: 'open_tab', url: url || 'about:blank', active: active !== false,
+      agentId: globalThis.fsbAgentRegistryInstance?.getOwner?.(sender.tab?.id)
     });
+    if (bindResult?.success === false) { sendResponse(bindResult); return; }
     
     // If we need to inject content script into the new tab
     if (url && url !== 'about:blank') {
@@ -19172,6 +19181,15 @@ function cdpFailureResult(error, extra) {
 }
 
 async function attachFsbDebugger(tabId, operation) {
+  if (globalThis.FsbDebuggerSessions) {
+    try {
+      await globalThis.FsbDebuggerSessions.attach({ tabId }, '1.3');
+    } catch (error) {
+      if (isCdpDebuggerContention(error)) throw cdpDebuggerBusyError(tabId, error);
+      throw error;
+    }
+    return;
+  }
   // The per-tab lease makes it safe to release FSB's own warm Input-domain
   // attachment. A foreign owner is never detached.
   if (keyboardEmulator && keyboardEmulator.isAttachedTo(tabId)) {
@@ -19193,6 +19211,7 @@ async function runLegacyCdpMessageWithLease(handler, request, sender, sendRespon
   }
   let lease = null;
   try {
+    if (handler !== handleCDPInsertTextUnlocked) await requireForegroundNativeInput(tabId);
     // Content-script hold and drag requests carry the same timing fields as
     // the direct verbs, so they get the same lease length.
     lease = await globalThis.FsbCdpLease.acquire(tabId, {
@@ -19256,7 +19275,11 @@ async function prepareCdpTextTarget(tabId, selector, position) {
       // Canvas editors (Google Docs) keep focus in a nested text-event frame
       // this script cannot reach. The key and insert events go to that focused
       // frame, so its own editor handles the selection.
-      if (!css && element?.tagName === 'IFRAME') return { success: true, nestedFrame: true };
+      if (!css && element?.tagName === 'IFRAME') return {
+        success: true, nestedFrame: true,
+        docsCanvas: globalThis.location?.hostname === 'docs.google.com' && location.pathname.startsWith('/document/') &&
+          element.classList?.contains('docs-texteventtarget-iframe') === true
+      };
       if (element?.isContentEditable) {
         element = element.closest('[contenteditable="true"], [contenteditable=""]') || element;
       } else if (element && !['INPUT', 'TEXTAREA'].includes(element.tagName)) {
@@ -19314,6 +19337,55 @@ async function prepareCdpTextTarget(tabId, selector, position) {
   return result?.result || { success: false, error: 'Unable to inspect editable field' };
 }
 
+async function recoverStalledTabNavigation(tabId, stillPending) {
+  // A slow network can delay a commit too; terminate only a renderer that cannot answer.
+  let probeTimer;
+  const probe = chrome.scripting.executeScript({ target: { tabId }, func: () => true });
+  const responsive = await Promise.race([
+    probe.then(() => true, () => true),
+    new Promise(resolve => { probeTimer = setTimeout(() => resolve(false), 500); })
+  ]).finally(() => clearTimeout(probeTimer));
+  globalThis.automationLogger?.debug('Navigation renderer responsiveness probe', { tabId, responsive });
+  if (responsive || !stillPending()) return false;
+  let lease;
+  let attached = false;
+  try {
+    lease = await globalThis.FsbCdpLease.acquire(tabId, { timeoutMs: 1000, holdMs: 5000 });
+    if (!stillPending()) return false;
+    // Preserve an established FSB session: attaching a fresh inspector to an
+    // already-busy renderer may queue Runtime commands behind the busy task.
+    const reuseOwnedSession = globalThis.FsbDebuggerSessions?.isAttachedTo(tabId) ||
+      (typeof keyboardEmulator !== 'undefined' && keyboardEmulator?.isAttachedTo(tabId));
+    if (!reuseOwnedSession) {
+      await attachFsbDebugger(tabId, 'navigation recovery');
+      attached = true;
+    }
+    globalThis.automationLogger?.debug('Navigation renderer recovery attached', { tabId, reused: !!reuseOwnedSession });
+    if (!stillPending()) return false;
+    let commandTimer;
+    await Promise.race([
+      chrome.debugger.sendCommand({ tabId }, 'Runtime.terminateExecution'),
+      new Promise((_, reject) => { commandTimer = setTimeout(() => reject(new Error('Navigation recovery timed out')), 2000); })
+    ]).finally(() => clearTimeout(commandTimer));
+    return true;
+  } finally {
+    if (attached) {
+      try { await (globalThis.FsbDebuggerSessions || chrome.debugger).detach({ tabId }); } catch (_error) { /* target may have navigated */ }
+    }
+    lease?.release();
+  }
+}
+
+async function requireForegroundNativeInput(tabId) {
+  const tab = await chrome.tabs.get(tabId);
+  const window = await chrome.windows.get(tab.windowId);
+  if (!tab.active || !window.focused || window.state === 'minimized') {
+    throw Object.assign(new Error('Native keyboard and mouse input requires the tab in the foreground. Use switch_tab with active:true, then retry.'), {
+      code: 'TAB_NOT_FOREGROUND', retryable: true, outcome: 'failed', mayHaveExecuted: false
+    });
+  }
+}
+
 async function dispatchCdpTextInsertion(tabId, text, position = 'caret', selector = null, options = {}) {
   if (!['caret', 'end', 'replace_all'].includes(position)) {
     return { success: false, error: 'Invalid insertion position' };
@@ -19324,14 +19396,21 @@ async function dispatchCdpTextInsertion(tabId, text, position = 'caret', selecto
     ? { success: true, editorOwnsCaret: true }
     : await prepareCdpTextTarget(tabId, selector, position);
   if (!prepared.success) return prepared;
+  const needsKeys = position !== 'caret' &&
+    (prepared.keyboardEnd || prepared.nestedFrame || prepared.editorOwnsCaret);
+  if (needsKeys) await requireForegroundNativeInput(tabId);
   const isMac = typeof navigator !== 'undefined' &&
     (/Macintosh/.test(navigator.userAgent || '') || /Mac/.test(navigator.platform || ''));
   const modifiers = isMac ? 4 : 2;
   // Once the caller has been told the outcome, no further step may reach the page.
   let abandoned = false;
-  const send = (method, params) => abandoned
-    ? Promise.reject(new Error('Text input was abandoned after the page stopped responding.'))
-    : chrome.debugger.sendCommand({ tabId }, method, params);
+  let inputSent = false;
+  const send = async (method, params) => {
+    if (needsKeys) await requireForegroundNativeInput(tabId);
+    if (abandoned) throw new Error('Text input was abandoned after the page stopped responding.');
+    inputSent = true;
+    return chrome.debugger.sendCommand({ tabId }, method, params);
+  };
   const input = (async () => {
     if (position === 'end' && prepared.keyboardEnd) {
       const endKey = { key: 'End', code: 'End', windowsVirtualKeyCode: 35, nativeVirtualKeyCode: 35 };
@@ -19348,20 +19427,28 @@ async function dispatchCdpTextInsertion(tabId, text, position = 'caret', selecto
         ? { key: 'ArrowDown', code: 'ArrowDown', windowsVirtualKeyCode: 40, nativeVirtualKeyCode: 40 }
         : { key: 'End', code: 'End', windowsVirtualKeyCode: 35, nativeVirtualKeyCode: 35 };
       await send('Input.dispatchKeyEvent', {
-        type: 'keyDown', modifiers, ...endKey, commands: ['moveToEndOfDocument']
+        type: 'keyDown', modifiers, ...endKey,
+        ...(prepared.docsCanvas ? {} : { commands: ['moveToEndOfDocument'] })
       });
       await send('Input.dispatchKeyEvent', { type: 'keyUp', modifiers, ...endKey });
     }
-    if (position === 'replace_all') {
+    if (position === 'replace_all' && needsKeys) {
       await send('Input.dispatchKeyEvent', {
         type: 'keyDown', modifiers, key: 'a', code: 'KeyA',
         windowsVirtualKeyCode: 65, nativeVirtualKeyCode: 65,
-        commands: ['selectAll']
+        // Docs handles the shortcut itself; Blink's selectAll command selects its hidden input.
+        ...(prepared.docsCanvas ? {} : { commands: ['selectAll'] })
       });
       await send('Input.dispatchKeyEvent', {
         type: 'keyUp', modifiers, key: 'a', code: 'KeyA',
         windowsVirtualKeyCode: 65, nativeVirtualKeyCode: 65
       });
+      if (prepared.docsCanvas) {
+        await new Promise(resolve => setTimeout(resolve, 150));
+        const backspace = { key: 'Backspace', code: 'Backspace', windowsVirtualKeyCode: 8, nativeVirtualKeyCode: 8 };
+        await send('Input.dispatchKeyEvent', { type: 'keyDown', ...backspace });
+        await send('Input.dispatchKeyEvent', { type: 'keyUp', ...backspace });
+      }
     }
     await send('Input.insertText', { text });
   })();
@@ -19379,7 +19466,7 @@ async function dispatchCdpTextInsertion(tabId, text, position = 'caret', selecto
     await Promise.race([input, stalled]);
   } catch (error) {
     // Input may already have reached the page, so a partial edit is possible.
-    if (error && typeof error === 'object') error.mayHaveExecuted = true;
+    if (error && typeof error === 'object') error.mayHaveExecuted = inputSent;
     throw error;
   } finally {
     clearTimeout(timer);
@@ -19414,7 +19501,7 @@ async function handleCDPInsertTextUnlocked(request, sender, sendResponse) {
     const inserted = await dispatchCdpTextInsertion(tabId, text, position, selector,
       { editorOwnsCaret: editorOwnsCaret === true });
     if (!inserted.success) {
-      await chrome.debugger.detach({ tabId });
+      await (globalThis.FsbDebuggerSessions || chrome.debugger).detach({ tabId });
       debuggerAttached = false;
       sendResponse(inserted);
       return;
@@ -19422,7 +19509,7 @@ async function handleCDPInsertTextUnlocked(request, sender, sendResponse) {
     textInserted = true;
 
     // Detach debugger
-    await chrome.debugger.detach({ tabId });
+    await (globalThis.FsbDebuggerSessions || chrome.debugger).detach({ tabId });
     debuggerAttached = false;
 
     automationLogger.logActionExecution(null, 'cdpInsertText', 'complete', { success: true, tabId, textLength: text.length });
@@ -19439,7 +19526,7 @@ async function handleCDPInsertTextUnlocked(request, sender, sendResponse) {
     // Try to detach debugger if it was attached
     if (debuggerAttached) {
       try {
-        await chrome.debugger.detach({ tabId });
+        await (globalThis.FsbDebuggerSessions || chrome.debugger).detach({ tabId });
       } catch (detachError) {
         automationLogger.debug('Debugger already detached', { tabId });
       }
@@ -19500,7 +19587,7 @@ async function handleCDPMouseClickUnlocked(request, sender, sendResponse) {
       type: 'mouseReleased', x, y, button: 'left', clickCount: 1, modifiers
     });
 
-    await chrome.debugger.detach({ tabId });
+    await (globalThis.FsbDebuggerSessions || chrome.debugger).detach({ tabId });
     debuggerAttached = false;
 
     automationLogger.logActionExecution(null, 'cdpMouseClick', 'complete', { success: true, tabId, x, y });
@@ -19509,7 +19596,7 @@ async function handleCDPMouseClickUnlocked(request, sender, sendResponse) {
   } catch (error) {
     automationLogger.logActionExecution(null, 'cdpMouseClick', 'complete', { success: false, tabId, error: error.message });
     if (debuggerAttached) {
-      try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* ignore */ }
+      try { await (globalThis.FsbDebuggerSessions || chrome.debugger).detach({ tabId }); } catch (_e) { /* ignore */ }
     }
     sendResponse(cdpFailureResult(error));
   }
@@ -19563,7 +19650,7 @@ async function handleCDPMouseClickAndHoldUnlocked(request, sender, sendResponse)
       type: 'mouseReleased', x, y, button: 'left', clickCount: 1
     });
 
-    await chrome.debugger.detach({ tabId });
+    await (globalThis.FsbDebuggerSessions || chrome.debugger).detach({ tabId });
     debuggerAttached = false;
 
     automationLogger.logActionExecution(null, 'cdpMouseClickAndHold', 'complete', { success: true, tabId, x, y, holdMs });
@@ -19572,7 +19659,7 @@ async function handleCDPMouseClickAndHoldUnlocked(request, sender, sendResponse)
   } catch (error) {
     automationLogger.logActionExecution(null, 'cdpMouseClickAndHold', 'complete', { success: false, tabId, error: error.message });
     if (debuggerAttached) {
-      try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* ignore */ }
+      try { await (globalThis.FsbDebuggerSessions || chrome.debugger).detach({ tabId }); } catch (_e) { /* ignore */ }
     }
     sendResponse(cdpFailureResult(error));
   }
@@ -19640,7 +19727,7 @@ async function handleCDPMouseDragUnlocked(request, sender, sendResponse) {
       type: 'mouseReleased', x: endX, y: endY, button: 'left', clickCount: 1, modifiers
     });
 
-    await chrome.debugger.detach({ tabId });
+    await (globalThis.FsbDebuggerSessions || chrome.debugger).detach({ tabId });
     debuggerAttached = false;
 
     automationLogger.logActionExecution(null, 'cdpMouseDrag', 'complete', { success: true, tabId, startX, startY, endX, endY, steps });
@@ -19649,7 +19736,7 @@ async function handleCDPMouseDragUnlocked(request, sender, sendResponse) {
   } catch (error) {
     automationLogger.logActionExecution(null, 'cdpMouseDrag', 'complete', { success: false, tabId, error: error.message });
     if (debuggerAttached) {
-      try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* ignore */ }
+      try { await (globalThis.FsbDebuggerSessions || chrome.debugger).detach({ tabId }); } catch (_e) { /* ignore */ }
     }
     sendResponse(cdpFailureResult(error));
   }
@@ -19717,7 +19804,7 @@ async function handleCDPMouseDragVariableSpeedUnlocked(request, sender, sendResp
       type: 'mouseReleased', x: endX, y: endY, button: 'left', clickCount: 1
     });
 
-    await chrome.debugger.detach({ tabId });
+    await (globalThis.FsbDebuggerSessions || chrome.debugger).detach({ tabId });
     debuggerAttached = false;
 
     automationLogger.logActionExecution(null, 'cdpMouseDragVariableSpeed', 'complete', { success: true, tabId, startX, startY, endX, endY, steps });
@@ -19726,7 +19813,7 @@ async function handleCDPMouseDragVariableSpeedUnlocked(request, sender, sendResp
   } catch (error) {
     automationLogger.logActionExecution(null, 'cdpMouseDragVariableSpeed', 'complete', { success: false, tabId, error: error.message });
     if (debuggerAttached) {
-      try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* ignore */ }
+      try { await (globalThis.FsbDebuggerSessions || chrome.debugger).detach({ tabId }); } catch (_e) { /* ignore */ }
     }
     sendResponse(cdpFailureResult(error));
   }
@@ -19773,7 +19860,7 @@ async function handleCDPMouseWheelUnlocked(request, sender, sendResponse) {
       type: 'mouseWheel', x, y, deltaX, deltaY
     });
 
-    await chrome.debugger.detach({ tabId });
+    await (globalThis.FsbDebuggerSessions || chrome.debugger).detach({ tabId });
     debuggerAttached = false;
 
     automationLogger.logActionExecution(null, 'cdpMouseWheel', 'complete', { success: true, tabId, x, y, deltaX, deltaY });
@@ -19782,7 +19869,7 @@ async function handleCDPMouseWheelUnlocked(request, sender, sendResponse) {
   } catch (error) {
     automationLogger.logActionExecution(null, 'cdpMouseWheel', 'complete', { success: false, tabId, error: error.message });
     if (debuggerAttached) {
-      try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* ignore */ }
+      try { await (globalThis.FsbDebuggerSessions || chrome.debugger).detach({ tabId }); } catch (_e) { /* ignore */ }
     }
     sendResponse(cdpFailureResult(error));
   }
@@ -19903,22 +19990,7 @@ async function executeUploadFileUnlocked(tabId, selector, filePath, options = {}
     fileName = denylist.basenameOf(filePath);
     automationLogger.logActionExecution(null, 'cdpUploadFile', 'start', { tabId, selector, file: fileName });
 
-    if (keyboardEmulator && keyboardEmulator.isAttachedTo(tabId)) {
-      await keyboardEmulator.detachDebugger(tabId);
-    }
-    try {
-      await chrome.debugger.attach({ tabId }, '1.3');
-    } catch (attachError) {
-      const message = attachError && attachError.message ? attachError.message : String(attachError || '');
-      if (/another debugger|already attached|debugger is busy|target is being debugged/i.test(message)) {
-        const busyError = new Error(`The debugger for tab ${tabId} is busy. Retry the operation.`);
-        busyError.code = 'SCREENSHOT_DEBUGGER_BUSY';
-        busyError.retryable = true;
-        busyError.cause = attachError;
-        throw busyError;
-      }
-      throw attachError;
-    }
+    await attachFsbDebugger(tabId, 'upload_file');
     debuggerAttached = true;
 
     const doc = await chrome.debugger.sendCommand({ tabId }, 'DOM.getDocument', { depth: 0 });
@@ -19978,7 +20050,7 @@ async function executeUploadFileUnlocked(tabId, selector, filePath, options = {}
     return { success: false, error: 'upload_file failed: ' + redactedMsg };
   } finally {
     if (debuggerAttached) {
-      try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* ignore */ }
+      try { await (globalThis.FsbDebuggerSessions || chrome.debugger).detach({ tabId }); } catch (_e) { /* ignore */ }
     }
   }
 }
@@ -20034,6 +20106,7 @@ async function executeCDPToolDirectUnlocked(request, tabId) {
   // Attach only after the caller owns the per-tab lease. Internal warm
   // attachments may be released, but external debugger owners are preserved.
   async function attachDebugger() {
+    if (verb !== 'cdpInsertText') await requireForegroundNativeInput(tabId);
     await attachFsbDebugger(tabId, `executeCDPToolDirect:${verb}`);
   }
 
@@ -20079,7 +20152,7 @@ async function executeCDPToolDirectUnlocked(request, tabId) {
           type: 'mouseReleased', x, y, button: 'left', clickCount: 1, modifiers
         });
 
-        await chrome.debugger.detach({ tabId });
+        await (globalThis.FsbDebuggerSessions || chrome.debugger).detach({ tabId });
         debuggerAttached = false;
 
         automationLogger.logActionExecution(null, 'cdpClickAt', 'complete', { success: true, tabId, x, y });
@@ -20089,7 +20162,7 @@ async function executeCDPToolDirectUnlocked(request, tabId) {
         return cdpFailureResult(error);
       } finally {
         if (debuggerAttached) {
-          try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* ignore */ }
+          try { await (globalThis.FsbDebuggerSessions || chrome.debugger).detach({ tabId }); } catch (_e) { /* ignore */ }
         }
       }
     }
@@ -20118,7 +20191,7 @@ async function executeCDPToolDirectUnlocked(request, tabId) {
           type: 'mouseReleased', x, y, button: 'left', clickCount: 1
         });
 
-        await chrome.debugger.detach({ tabId });
+        await (globalThis.FsbDebuggerSessions || chrome.debugger).detach({ tabId });
         debuggerAttached = false;
 
         automationLogger.logActionExecution(null, 'cdpClickAndHold', 'complete', { success: true, tabId, x, y, holdMs });
@@ -20128,7 +20201,7 @@ async function executeCDPToolDirectUnlocked(request, tabId) {
         return cdpFailureResult(error);
       } finally {
         if (debuggerAttached) {
-          try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* ignore */ }
+          try { await (globalThis.FsbDebuggerSessions || chrome.debugger).detach({ tabId }); } catch (_e) { /* ignore */ }
         }
       }
     }
@@ -20171,7 +20244,7 @@ async function executeCDPToolDirectUnlocked(request, tabId) {
           type: 'mouseReleased', x: endX, y: endY, button: 'left', clickCount: 1, modifiers
         });
 
-        await chrome.debugger.detach({ tabId });
+        await (globalThis.FsbDebuggerSessions || chrome.debugger).detach({ tabId });
         debuggerAttached = false;
 
         automationLogger.logActionExecution(null, 'cdpDrag', 'complete', { success: true, tabId, startX, startY, endX, endY, steps });
@@ -20181,7 +20254,7 @@ async function executeCDPToolDirectUnlocked(request, tabId) {
         return cdpFailureResult(error);
       } finally {
         if (debuggerAttached) {
-          try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* ignore */ }
+          try { await (globalThis.FsbDebuggerSessions || chrome.debugger).detach({ tabId }); } catch (_e) { /* ignore */ }
         }
       }
     }
@@ -20224,7 +20297,7 @@ async function executeCDPToolDirectUnlocked(request, tabId) {
           type: 'mouseReleased', x: endX, y: endY, button: 'left', clickCount: 1
         });
 
-        await chrome.debugger.detach({ tabId });
+        await (globalThis.FsbDebuggerSessions || chrome.debugger).detach({ tabId });
         debuggerAttached = false;
 
         automationLogger.logActionExecution(null, 'cdpDragVariableSpeed', 'complete', { success: true, tabId, startX, startY, endX, endY, steps });
@@ -20234,7 +20307,7 @@ async function executeCDPToolDirectUnlocked(request, tabId) {
         return cdpFailureResult(error);
       } finally {
         if (debuggerAttached) {
-          try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* ignore */ }
+          try { await (globalThis.FsbDebuggerSessions || chrome.debugger).detach({ tabId }); } catch (_e) { /* ignore */ }
         }
       }
     }
@@ -20260,7 +20333,7 @@ async function executeCDPToolDirectUnlocked(request, tabId) {
           type: 'mouseWheel', x, y, deltaX, deltaY
         });
 
-        await chrome.debugger.detach({ tabId });
+        await (globalThis.FsbDebuggerSessions || chrome.debugger).detach({ tabId });
         debuggerAttached = false;
 
         automationLogger.logActionExecution(null, 'cdpScrollAt', 'complete', { success: true, tabId, x, y, deltaX, deltaY });
@@ -20270,7 +20343,7 @@ async function executeCDPToolDirectUnlocked(request, tabId) {
         return cdpFailureResult(error);
       } finally {
         if (debuggerAttached) {
-          try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* ignore */ }
+          try { await (globalThis.FsbDebuggerSessions || chrome.debugger).detach({ tabId }); } catch (_e) { /* ignore */ }
         }
       }
     }
@@ -20295,7 +20368,7 @@ async function executeCDPToolDirectUnlocked(request, tabId) {
         if (!inserted.success) return inserted;
         textInserted = true;
 
-        await chrome.debugger.detach({ tabId });
+        await (globalThis.FsbDebuggerSessions || chrome.debugger).detach({ tabId });
         debuggerAttached = false;
 
         automationLogger.logActionExecution(null, 'cdpInsertText', 'complete', { success: true, tabId, textLength: text.length });
@@ -20308,7 +20381,7 @@ async function executeCDPToolDirectUnlocked(request, tabId) {
           : failure;
       } finally {
         if (debuggerAttached) {
-          try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* ignore */ }
+          try { await (globalThis.FsbDebuggerSessions || chrome.debugger).detach({ tabId }); } catch (_e) { /* ignore */ }
         }
       }
     }
@@ -20344,7 +20417,7 @@ async function executeCDPToolDirectUnlocked(request, tabId) {
           type: 'mouseReleased', x, y, button: 'left', clickCount: 2
         });
 
-        await chrome.debugger.detach({ tabId });
+        await (globalThis.FsbDebuggerSessions || chrome.debugger).detach({ tabId });
         debuggerAttached = false;
 
         automationLogger.logActionExecution(null, 'cdpDoubleClickAt', 'complete', { success: true, tabId, x, y });
@@ -20354,7 +20427,7 @@ async function executeCDPToolDirectUnlocked(request, tabId) {
         return cdpFailureResult(error);
       } finally {
         if (debuggerAttached) {
-          try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* ignore */ }
+          try { await (globalThis.FsbDebuggerSessions || chrome.debugger).detach({ tabId }); } catch (_e) { /* ignore */ }
         }
       }
     }
@@ -20368,15 +20441,14 @@ async function executeCDPToolDirectUnlocked(request, tabId) {
 }
 
 /**
- * Handle Monaco/CodeMirror editor insert via MAIN world script injection.
- * Bypasses auto-indent by using the editor's native API (executeEdits) directly.
+ * Insert through the selected code editor's API in the page's JavaScript world.
  * @param {Object} request - The request object containing text to insert
  * @param {Object} sender - The message sender
  * @param {Function} sendResponse - Function to send response
  */
 async function handleMonacoEditorInsert(request, sender, sendResponse) {
   const tabId = sender.tab?.id;
-  const { text, clearFirst = true } = request;
+  const { text, clearFirst = true, selector } = request;
 
   if (!tabId || !text) {
     sendResponse({ success: false, error: !tabId ? 'No tab ID' : 'No text provided' });
@@ -20387,14 +20459,21 @@ async function handleMonacoEditorInsert(request, sender, sendResponse) {
     const results = await chrome.scripting.executeScript({
       target: { tabId },
       world: 'MAIN',
-      args: [text, clearFirst],
-      func: (codeText, replaceAll) => {
+      args: [text, clearFirst, selector || null, Date.now() + 6000],
+      func: (codeText, replaceAll, css, notAfter) => {
+        if (Date.now() > notAfter) return { success: false, retryable: true, mayHaveExecuted: false,
+          error: 'Editor API lookup expired before any edit was sent' };
+        const target = css ? document.querySelector(css) : document.activeElement;
         // Attempt 1: Monaco editor API
         if (typeof monaco !== 'undefined' && monaco.editor) {
           const editors = typeof monaco.editor.getEditors === 'function'
             ? monaco.editor.getEditors() : [];
-          // Prefer the focused editor, fall back to first
-          const editor = editors.find(e => e.hasTextFocus?.()) || editors[0];
+          // A selector must identify its editor; never edit another model on the page.
+          const candidates = css ? editors.filter(e => {
+            const node = e.getDomNode?.();
+            return node && (node === target || node.contains(target) || target?.contains(node));
+          }) : editors;
+          const editor = candidates.find(e => e.hasTextFocus?.()) || (candidates.length === 1 ? candidates[0] : null);
           if (editor) {
             const model = editor.getModel();
             if (model) {
@@ -20419,7 +20498,7 @@ async function handleMonacoEditorInsert(request, sender, sendResponse) {
           // Fallback: try models directly
           const models = typeof monaco.editor.getModels === 'function'
             ? monaco.editor.getModels() : [];
-          if (models.length > 0) {
+          if (!css && editors.length === 0 && models.length === 1) {
             const model = models[0];
             const fullRange = model.getFullModelRange();
             const editRange = replaceAll ? fullRange : {
@@ -20437,13 +20516,39 @@ async function handleMonacoEditorInsert(request, sender, sendResponse) {
         }
 
         // Attempt 2: CodeMirror 6 API
-        const cmElement = document.querySelector('.cm-editor');
-        if (cmElement?.cmView?.view) {
-          const view = cmElement.cmView.view;
+        const cmElement = target?.closest('.cm-editor') || target?.querySelector('.cm-editor');
+        const cmContent = cmElement?.querySelector('.cm-content');
+        const view = cmContent?.cmTile?.root?.view || cmContent?.cmView?.rootView?.view ||
+          cmContent?.cmView?.view || cmElement?.cmView?.view;
+        if (view) {
           view.dispatch({
-            changes: { from: replaceAll ? 0 : view.state.doc.length, to: view.state.doc.length, insert: codeText }
+            changes: { from: replaceAll ? 0 : view.state.doc.length, to: view.state.doc.length, insert: codeText },
+            selection: { anchor: (replaceAll ? 0 : view.state.doc.length) + codeText.length }
           });
           return { success: true, method: 'codemirror6_dispatch' };
+        }
+
+        const cm5 = target?.closest('.CodeMirror') || target?.querySelector('.CodeMirror');
+        if (cm5?.CodeMirror) {
+          const editor = cm5.CodeMirror;
+          const doc = editor.getDoc();
+          const end = { line: doc.lastLine(), ch: doc.getLine(doc.lastLine()).length };
+          doc.replaceRange(codeText, replaceAll ? { line: doc.firstLine(), ch: 0 } : end, end, '+input');
+          editor.setCursor(editor.posFromIndex(editor.getValue().length));
+          return { success: true, method: 'codemirror5_replaceRange' };
+        }
+
+        const aceElement = target?.closest('.ace_editor') || target?.querySelector('.ace_editor');
+        const aceEditor = aceElement?.env?.editor;
+        if (aceEditor) {
+          if (replaceAll) aceEditor.setValue(codeText, -1);
+          else {
+            const session = aceEditor.session;
+            const row = session.getLength() - 1;
+            session.insert({ row, column: session.getLine(row).length }, codeText);
+          }
+          aceEditor.navigateFileEnd();
+          return { success: true, method: 'ace_session_insert' };
         }
 
         return { success: false, error: 'No editor API found on page' };
@@ -20680,10 +20785,17 @@ async function handleKeyboardDebuggerAction(request, sender, sendResponse) {
   const emulator = initializeKeyboardEmulator();
   let tabId;
   let cdpLease = null;
+  let keyboardStarted = false;
 
   try {
     const { method, key, keys, text, specialKey, modifiers = {}, delay = 50 } = request;
     tabId = sender.tab.id;
+
+    await requireForegroundNativeInput(tabId);
+    if (method === 'checkForeground') {
+      sendResponse({ success: true });
+      return;
+    }
 
     if (globalThis.FsbCdpLease && typeof globalThis.FsbCdpLease.acquire === 'function') {
       cdpLease = await globalThis.FsbCdpLease.acquire(tabId, {
@@ -20695,13 +20807,14 @@ async function handleKeyboardDebuggerAction(request, sender, sendResponse) {
     automationLogger.logActionExecution(null, `keyboard_${method}`, 'start', { tabId, key, specialKey });
 
     let result;
+    keyboardStarted = true;
 
     switch (method) {
       case 'pressKey':
         if (!key) {
           throw new Error('Key parameter is required for pressKey');
         }
-        result = await emulator.pressKey(tabId, key, modifiers);
+        result = await emulator.pressKey(tabId, key, modifiers, request.commands);
         break;
 
       case 'pressKeySequence':
@@ -20729,7 +20842,7 @@ async function handleKeyboardDebuggerAction(request, sender, sendResponse) {
         throw new Error(`Unknown keyboard emulator method: ${method}`);
     }
 
-    // Detach debugger after each operation to avoid blocking other CDP callers
+    // Release the keyboard operation; controlled tabs keep their debugger session.
     await emulator.detachDebugger(tabId);
 
     automationLogger.logActionExecution(null, `keyboard_${method}`, 'complete', { tabId, success: result.success });
@@ -20740,12 +20853,14 @@ async function handleKeyboardDebuggerAction(request, sender, sendResponse) {
       method: method,
       tabId: tabId,
       code: result && result.code ? result.code : undefined,
-      retryable: Boolean(result && result.retryable)
+      retryable: Boolean(result && result.retryable),
+      error: result?.error,
+      mayHaveExecuted: result?.mayHaveExecuted
     });
 
   } catch (error) {
-    // Ensure debugger is detached even on error
-    if (tabId) {
+    // Release the keyboard operation even on error.
+    if (tabId && keyboardStarted) {
       try {
         await emulator.detachDebugger(tabId);
       } catch (detachErr) {

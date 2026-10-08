@@ -63,10 +63,14 @@ async function readJsonBody(req: IncomingMessage): Promise<unknown> {
   return JSON.parse(raw);
 }
 
-export async function startHttpServer(options: HttpServerOptions): Promise<RunningHttpServer> {
-  if (!LOOPBACK_HOSTS.has(options.host)) {
+export function validateHttpBindHost(host: string): void {
+  if (!LOOPBACK_HOSTS.has(host)) {
     throw new Error('The FSB HTTP server only accepts a loopback --host (127.0.0.1, localhost, or ::1).');
   }
+}
+
+export async function startHttpServer(options: HttpServerOptions): Promise<RunningHttpServer> {
+  validateHttpBindHost(options.host);
   const sessions = new Map<string, SessionContext>();
   let closed = false;
   let serveReady = false;
@@ -215,7 +219,8 @@ export async function startHttpServer(options: HttpServerOptions): Promise<Runni
   });
 
   const address = server.address() as AddressInfo;
-  const endpointHost = options.host === '::1' ? '[::1]' : options.host;
+  // Delegate to the address the listener owns, including when localhost resolves to IPv6.
+  const endpointHost = address.family === 'IPv6' ? `[${address.address}]` : address.address;
   const endpoint = `http://${endpointHost}:${address.port}/mcp`;
   const healthEndpoint = `http://${endpointHost}:${address.port}/health`;
 

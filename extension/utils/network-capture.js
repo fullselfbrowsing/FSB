@@ -139,12 +139,12 @@
   // awaits the returned promise (the form the test stub + MV3 both provide).
   function _attach(dbg, tabId) {
     return Promise.resolve().then(function() {
-      return dbg.attach({ tabId: tabId }, '1.3');
+      return (globalThis.FsbDebuggerSessions || dbg).attach({ tabId: tabId }, '1.3');
     });
   }
   function _detach(dbg, tabId) {
     return Promise.resolve().then(function() {
-      return dbg.detach({ tabId: tabId });
+      return (globalThis.FsbDebuggerSessions || dbg).detach({ tabId: tabId });
     }).catch(function() { /* best-effort; a stale/foreign attach detach may fail */ });
   }
   function _send(dbg, tabId, method, params) {

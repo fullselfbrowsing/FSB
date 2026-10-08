@@ -482,9 +482,57 @@
    * nothingInserted is true only when the paste provably left the document
    * unchanged, so the caller can fall back to a plain insert without duplicating text.
    */
-  async function clipboardPasteHTML(html, plainText) {
+  async function clipboardPasteHTML(html, plainText, options = {}) {
     let pasteDispatched = false;
     try {
+      const ready = await new Promise((resolve, reject) => {
+        chrome.runtime.sendMessage({ action: 'keyboardDebuggerAction', method: 'checkForeground' }, response => {
+          if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+          else resolve(response);
+        });
+      });
+      if (!ready?.success) return { ...ready, success: false, nothingInserted: true };
+
+      // Saved text can confirm a paste, but an unchanged response can still be awaiting autosave.
+      const normalize = text => text.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').trim();
+      const verificationDeadline = Date.now() + 7500;
+      let preferSavedHtml = false;
+      const readSavedText = async () => {
+        const here = globalThis.location;
+        const doc = here?.pathname?.match(/^\/document\/(u\/\d+\/)?d\/([^/]+)/);
+        if (here?.hostname !== 'docs.google.com' || !doc) return null;
+        const read = async (suffix, htmlResponse) => {
+          if (Date.now() >= verificationDeadline) return null;
+          const url = new URL(`/document/${doc[1] || ''}d/${encodeURIComponent(doc[2])}/${suffix}`, here.origin);
+          if (!htmlResponse) url.searchParams.set('format', 'txt');
+          const account = new URL(here.href).searchParams.get('authuser');
+          if (account) url.searchParams.set('authuser', account);
+          try {
+            const response = await fetch(url.href, { credentials: 'include', cache: 'no-store',
+              signal: AbortSignal.timeout(Math.max(1, Math.min(1000, verificationDeadline - Date.now()))) });
+            if (!response.ok) return null;
+            const type = response.headers.get('content-type') || '';
+            if (!htmlResponse) return /text\/html/i.test(type) ? null : normalize(await response.text());
+            // The export endpoint can redirect across origins. The mobile view stays
+            // on docs.google.com and contains the saved document as ordinary HTML.
+            const saved = new DOMParser().parseFromString(await response.text(), 'text/html');
+            const content = saved.querySelector('.doc-content');
+            if (!content) return null;
+            for (const br of content.querySelectorAll('br')) br.replaceWith(saved.createTextNode('\n'));
+            for (const block of content.querySelectorAll('p,div,li,h1,h2,h3,h4,h5,h6,tr')) {
+              block.appendChild(saved.createTextNode('\n'));
+            }
+            return normalize(content.textContent || '');
+          } catch (_error) { return null; }
+        };
+        if (preferSavedHtml) return read('mobilebasic', true);
+        const exported = await read('export', false);
+        if (exported !== null) return exported;
+        const mobile = await read('mobilebasic', true);
+        if (mobile !== null) preferSavedHtml = true;
+        return mobile;
+      };
+      const savedBefore = await readSavedText();
       const htmlBlob = new Blob([html], { type: 'text/html' });
       const textBlob = new Blob([plainText], { type: 'text/plain' });
       const clipboardItem = new ClipboardItem({
@@ -523,6 +571,7 @@
           action: 'keyboardDebuggerAction',
           method: 'pressKey',
           key: 'v',
+          commands: isMac ? ['paste'] : [],
           modifiers: {
             ctrl: !isMac,
             meta: isMac,
@@ -557,6 +606,21 @@
       }
       const textLenAfter = after.length;
       const textInserted = textLenAfter > textLenBefore;
+
+      if (!before.measurable || !after.measurable || !textInserted) {
+        const expected = normalize(plainText);
+        for (let attempt = 0; attempt < 4; attempt++) {
+          const savedAfter = await readSavedText();
+          if (expected && savedAfter !== null && (options.replaceAll
+            ? savedAfter === expected
+            : savedBefore !== null && savedAfter !== savedBefore && savedAfter.includes(expected))) {
+            return { success: true, method: 'clipboard_paste_html', textLenBefore,
+              textLenAfter: savedAfter.length, verifiedVia: 'saved_document' };
+          }
+          if (savedAfter === null) break;
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      }
 
       logger.debug('clipboardPasteHTML: verification', {
         textLenBefore,

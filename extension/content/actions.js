@@ -2950,7 +2950,6 @@ const tools = {
         const isGoogleDocs = window.location.hostname === 'docs.google.com' &&
                              window.location.pathname.startsWith('/document/');
         const textHasFormatting = FSB.hasMarkdownFormatting(params.text);
-        let clearSent = false;
 
         if (isGoogleDocs && textHasFormatting) {
           logger.logActionExecution(FSB.sessionId, 'type', 'gdocs_formatted_paste_attempt', {
@@ -2970,7 +2969,7 @@ const tools = {
               await waitForStability('click');
             }
 
-            // If clearFirst, select all and delete before pasting
+            // Paste over the selection so a refused paste preserves the document.
             if (clearCanvasFirst) {
               const isMac = navigator.userAgent?.includes('Macintosh') || navigator.platform?.includes('Mac');
               const selected = await new Promise((resolve, reject) => {
@@ -2984,29 +2983,18 @@ const tools = {
                   else resolve(response);
                 });
               });
-              // Backspace without a selection would delete a character at the caret.
-              if (!selected?.success) throw new Error(selected?.error || 'Select-all was not confirmed');
-              await waitForStability('type_complete');
-              clearSent = true;
-              const deleted = await new Promise((resolve, reject) => {
-                chrome.runtime.sendMessage({
-                  action: 'keyboardDebuggerAction',
-                  method: 'pressKey',
-                  key: 'Backspace',
-                  modifiers: { ctrl: false, meta: false, shift: false, alt: false }
-                }, (response) => {
-                  if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
-                  else resolve(response);
-                });
-              });
-              if (!deleted?.success) throw new Error(deleted?.error || 'Clearing the document was not confirmed');
+              if (!selected?.success) return { ...selected, success: false,
+                outcome: selected?.result?.mayHaveExecuted ? 'unknown' : 'failed',
+                mayHaveExecuted: !!selected?.result?.mayHaveExecuted };
               await waitForStability('type_complete');
             }
 
             const html = FSB.markdownToHTML(params.text);
             const plainText = FSB.stripMarkdown(params.text);
             pasteStarted = true;
-            const pasteResult = await FSB.clipboardPasteHTML(html, plainText);
+            const pasteResult = await FSB.clipboardPasteHTML(html, plainText, { replaceAll: clearCanvasFirst });
+            if (pasteResult.code === 'TAB_NOT_FOREGROUND') return { ...pasteResult,
+              outcome: 'failed', mayHaveExecuted: false };
 
             if (pasteResult.success) {
               logger.logActionExecution(FSB.sessionId, 'type', 'gdocs_formatted_paste_verified', {
@@ -3043,9 +3031,7 @@ const tools = {
               return { success: false, outcome: 'unknown', mayHaveExecuted: true,
                 error: 'Formatted paste may have executed. Inspect the document before retrying.' };
             }
-            // Nothing before the paste inserts text, and with explicit replacement the plain
-            // insertion below replaces the whole document, so it lands the same
-            // whether or not the clear did.
+            // Selection alone does not change document text.
             logger.warn('Formatted paste was not attempted', { error: fmtError.message });
           }
         }
@@ -3081,10 +3067,6 @@ const tools = {
           };
         } catch (cdpError) {
           const refused = cdpRefusedBeforeInput(cdpError.response);
-          if (refused && clearSent) {
-            return { success: false, outcome: 'unknown', mayHaveExecuted: true,
-              error: 'The document may have been cleared, but the text was not inserted. Inspect it before retrying.' };
-          }
           if (refused) return refused;
           return { success: false, outcome: 'unknown', mayHaveExecuted: true,
             error: 'CDP insertion may have executed. Inspect the editor before retrying.', typed: params.text };
@@ -3125,8 +3107,8 @@ const tools = {
 
       // CODE EDITOR CDP FAST-PATH
       if (codeEditorInfo.isCodeEditor) {
-        // STEP 1: Try MAIN world executeEdits (Monaco/CM6)
-        if (codeEditorInfo.type === 'monaco' || codeEditorInfo.type === 'codemirror6') {
+        // Use editor APIs to move their model cursors even in background tabs.
+        if (['monaco', 'codemirror6', 'codemirror', 'ace'].includes(codeEditorInfo.type)) {
           try {
             logger.debug('Trying editor API via MAIN world injection', {
               sessionId: FSB.sessionId,
@@ -3138,7 +3120,8 @@ const tools = {
               chrome.runtime.sendMessage({
                 action: 'monacoEditorInsert',
                 text: params.text,
-                clearFirst
+                clearFirst,
+                selector: currentSelector
               }, (response) => {
                 if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
                 else if (response?.success) resolve(response);
@@ -3229,6 +3212,7 @@ const tools = {
           };
         } catch (cdpCodeEditorError) {
           const refused = cdpRefusedBeforeInput(cdpCodeEditorError.response);
+          if (refused?.code === 'TAB_NOT_FOREGROUND') return refused;
           if (refused) {
             logger.debug('CDP sent no input; trying DOM editor insertion', { sessionId: FSB.sessionId });
           } else {
@@ -4479,6 +4463,8 @@ const tools = {
               error: 'The key may have reached the page. Inspect its effect before retrying.'
             };
           }
+          if (response?.code === 'TAB_NOT_FOREGROUND') return { ...response,
+            outcome: 'failed', mayHaveExecuted: false };
           cdpError = (response && response.error) || 'debugger API returned failure';
           logger.logRecovery(FSB.sessionId, 'debugger_api_failed', 'dom_events_fallback', 'started', { error: response.error });
         }
@@ -4557,6 +4543,8 @@ const tools = {
         if (response.success) {
           return { success: true, action: 'pressKeySequence', keys, modifiers, method: 'debuggerAPI', result: response.result };
         } else {
+          if (response?.code === 'TAB_NOT_FOREGROUND') return { ...response,
+            outcome: response.mayHaveExecuted ? 'unknown' : 'failed', mayHaveExecuted: !!response.mayHaveExecuted };
           logger.logRecovery(FSB.sessionId, 'debugger_api_key_sequence_failed', 'dom_events_fallback', 'started', { error: response.error });
         }
       } catch (error) {
@@ -4615,6 +4603,8 @@ const tools = {
         if (response.success) {
           return { success: true, action: 'typeWithKeys', text, method: 'debuggerAPI', characterCount: text.length, result: response.result };
         } else {
+          if (response?.code === 'TAB_NOT_FOREGROUND') return { ...response,
+            outcome: response.mayHaveExecuted ? 'unknown' : 'failed', mayHaveExecuted: !!response.mayHaveExecuted };
           logger.logRecovery(FSB.sessionId, 'debugger_api_text_failed', 'return_error', 'failed', { error: response.error });
           return { success: false, error: response.error || 'Keyboard debugger API failed', completedChars: response.result?.completedChars || 0, method: 'debugger-failed', text, action: 'typeWithKeys' };
         }
@@ -4695,6 +4685,8 @@ const tools = {
         if (response.success) {
           return { success: true, action: 'sendSpecialKey', specialKey, method: 'debuggerAPI', result: response.result };
         } else {
+          if (response?.code === 'TAB_NOT_FOREGROUND') return { ...response,
+            outcome: response.mayHaveExecuted ? 'unknown' : 'failed', mayHaveExecuted: !!response.mayHaveExecuted };
           logger.logRecovery(FSB.sessionId, 'debugger_api_special_key_failed', 'dom_events_fallback', 'started', { error: response.error });
         }
       } catch (error) {

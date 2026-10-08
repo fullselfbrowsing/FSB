@@ -430,6 +430,8 @@
 
     const chromeApi = options.chrome || root.chrome;
     const debuggerApi = options.debugger || (chromeApi && chromeApi.debugger);
+    const sessions = options.sessions || ((!options.debugger && !options.chrome) ? root.FsbDebuggerSessions : null);
+    const connectionApi = sessions || debuggerApi;
     const scripting = options.scripting || (chromeApi && chromeApi.scripting);
     const tabs = options.tabs || (chromeApi && chromeApi.tabs);
     const leaseApi = options.lease || root.FsbCdpLease;
@@ -470,11 +472,7 @@
         }
       }
 
-      // KeyboardEmulator intentionally keeps an FSB-owned attachment warm.
-      // Once this operation owns the per-tab lease it is safe to relinquish
-      // that internal attachment; external DevTools/debugger owners are never
-      // detached here.
-      if (typeof releaseOwnedDebugger === 'function') {
+      if (!sessions && typeof releaseOwnedDebugger === 'function') {
         try {
           await releaseOwnedDebugger(targetTabId);
         } catch (_error) {
@@ -486,7 +484,7 @@
       }
 
       try {
-        await debuggerApi.attach({ tabId: targetTabId }, '1.3');
+        await connectionApi.attach({ tabId: targetTabId }, '1.3');
         attached = true;
       } catch (error) {
         if (isDebuggerContention(error)) {
@@ -496,8 +494,7 @@
       }
 
       // Every step from here waits on the page. One shared deadline turns a
-      // hung page into a typed error while this capture still owns the tab;
-      // detaching in the finally block fails any command still pending.
+      // hung page into a typed error while this capture still owns the lease.
       expiry = new Promise((_, reject) => {
         deadlineTimer = setTimeout(() => {
           expiredError = new ScreenshotError('PAGE_UNRESPONSIVE',
@@ -635,18 +632,19 @@
         const restore = executeScript(scripting, targetTabId, overlayRemoveScript, [overlayStyleId]).catch(() => {});
         if (!expiredError) await restore;
       }
-      // Past the deadline these would queue behind the hung command. The
-      // detach below ends the session, which drops its emulation overrides.
-      if (touchApplied && !expiredError) {
-        try {
-          await debuggerApi.sendCommand({ tabId: targetTabId }, 'Emulation.setTouchEmulationEnabled', { enabled: false });
-        } catch (_error) { /* best-effort */ }
+      // Retained sessions survive capture timeouts so navigation can interrupt
+      // the renderer. Queue their restores before releasing the lease; after
+      // interruption they run before the next operation's page commands.
+      if (touchApplied && (!expiredError || sessions)) {
+        const restore = debuggerApi.sendCommand({ tabId: targetTabId }, 'Emulation.setTouchEmulationEnabled', { enabled: false }).catch(() => {});
+        if (!expiredError) await restore;
       }
-      if (metricsApplied && !expiredError) {
-        try { await debuggerApi.sendCommand({ tabId: targetTabId }, 'Emulation.clearDeviceMetricsOverride'); } catch (_error) { /* best-effort */ }
+      if (metricsApplied && (!expiredError || sessions)) {
+        const restore = debuggerApi.sendCommand({ tabId: targetTabId }, 'Emulation.clearDeviceMetricsOverride').catch(() => {});
+        if (!expiredError) await restore;
       }
       if (attached) {
-        try { await debuggerApi.detach({ tabId: targetTabId }); } catch (_error) { /* best-effort */ }
+        try { await connectionApi.detach({ tabId: targetTabId }); } catch (_error) { /* best-effort */ }
       }
       if (lease) lease.release();
     }

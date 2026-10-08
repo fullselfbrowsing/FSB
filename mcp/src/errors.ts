@@ -83,6 +83,7 @@ const CODE_ONLY_ERROR_KEYS = new Set([
   'SCREENSHOT_CAPTURE_FAILED',
   'PAGE_UNRESPONSIVE',
   'ACTION_RESPONSE_TIMEOUT',
+  'TAB_NOT_FOREGROUND',
 ]);
 
 type LayerLabel = typeof LAYER_LABELS[keyof typeof LAYER_LABELS];
@@ -264,6 +265,12 @@ function buildLayeredDetail(
         detected: LAYER_LABELS.pageResponsiveness,
         why: 'The current page did not respond before the page-read deadline.',
         nextAction: 'Use navigate or close_tab to recover the tab. Inspect page state before repeating any mutation.',
+      };
+    case 'TAB_NOT_FOREGROUND':
+      return {
+        detected: LAYER_LABELS.agentScope,
+        why: 'Native keyboard and mouse input requires the target tab in the foreground.',
+        nextAction: 'Use switch_tab with active:true to bring the owned tab forward, then retry.',
       };
     case 'ACTION_RESPONSE_TIMEOUT':
       return {

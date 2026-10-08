@@ -314,3 +314,29 @@ test('lease timeout returns retryable screenshot busy error', async () => {
   );
   first.release();
 });
+
+test('capture reuses the shared session without releasing an established debugger', async () => {
+  const h = harness();
+  const connections = [];
+  h.options.sessions = {
+    attach: async target => connections.push(['reuse', target.tabId]),
+    detach: async target => connections.push(['release-operation', target.tabId])
+  };
+  h.options.releaseOwnedDebugger = async () => { throw new Error('Established debugger must be preserved'); };
+  const result = await captureEngine.capture({ mode: 'viewport' }, 7, h.options);
+  assert.equal(result.success, true);
+  assert.deepEqual(connections, [['reuse', 7], ['release-operation', 7]]);
+  assert.equal(h.calls.some(([method]) => method === 'attach' || method === 'detach'), false);
+});
+
+test('a retained capture timeout queues emulation restores while preserving the interruption channel', async () => {
+  const h = harness({ hangMethod: 'Page.captureScreenshot' });
+  h.options.deadlineMs = 10;
+  h.options.sessions = { attach: async () => {}, detach: async () => {} };
+  const result = await captureEngine.capture({ mode: 'viewport', device_mode: 'mobile',
+    viewport_width: 390, viewport_height: 844 }, 7, h.options);
+  assert.equal(result.code, 'PAGE_UNRESPONSIVE');
+  assert.equal(h.calls.some(([method]) => method === 'Emulation.clearDeviceMetricsOverride'), true);
+  assert.equal(h.calls.some(([method, params]) => method === 'Emulation.setTouchEmulationEnabled' && params.enabled === false), true);
+  assert.equal(h.calls.some(([method]) => method === 'detach'), false);
+});

@@ -90,3 +90,45 @@ test('local HTTP refuses a non-loopback bind', async () => {
     /loopback --host/,
   );
 });
+
+for (const host of ['::1', 'localhost']) {
+  test(`serve startup passes delegation authority using the bound ${host} listener`, async t => {
+    const { startServeDelegation } = await import('../mcp/build/agent-providers/serve-delegation.js');
+    const { validateDirectRuntimeReference } = await import('../mcp/build/agent-providers/effective-authority.js');
+    const bridge = {
+      topology: { mode: 'relay', extensionConnected: false, hubConnected: true, relayCount: 0 },
+      currentMode: 'relay', connect: async () => {}, disconnect() {}
+    };
+    let runtimeEndpoint;
+    let running;
+    try {
+      running = await startServeDelegation({ host, port: 0, dependencies: {
+        createBridge: () => bridge,
+        createGrokBuildRuntime: () => ({}),
+        createGrokBuildAuthCoordinator: () => ({}),
+        createSupervisor(endpoint, _degraded, reference) {
+          assert.equal(validateDirectRuntimeReference(reference).endpoint, endpoint);
+          runtimeEndpoint = endpoint;
+          return { recover: async () => ({ spawnAvailable: true }),
+            close: async () => ({ cancelled: 0, failed: 0, alreadySettled: 0 }) };
+        },
+        prepareBridgeAuth() {}, pushInventory: async () => {}, registerSignal() {}, exit() {}
+      } });
+      assert.equal(runtimeEndpoint, running.endpoint);
+      assert.ok(['127.0.0.1', '[::1]'].includes(new URL(runtimeEndpoint).hostname));
+      const response = await fetch(running.healthEndpoint);
+      assert.equal(response.status, 200);
+      assert.equal((await response.json()).serveReady, true);
+    } catch (error) {
+      if (host === '::1' && ['EADDRNOTAVAIL', 'EAFNOSUPPORT'].includes(error.code)) return t.skip('no IPv6 loopback');
+      throw error;
+    } finally { if (running) await running.shutdown(); }
+  });
+}
+
+test('serve rejects an external bind with the actionable host error before constructing recovery', async () => {
+  const { startServeDelegation } = await import('../mcp/build/agent-providers/serve-delegation.js');
+  await assert.rejects(startServeDelegation({ host: '0.0.0.0', port: 0, dependencies: {
+    createGrokBuildRuntime() { throw new Error('recovery must not start'); }
+  } }), /loopback --host/);
+});

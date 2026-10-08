@@ -326,6 +326,29 @@ img[src*="xai"] { filter: invert(1); }
 @keyframes rnMbOut{0%,6%{left:100%;opacity:0}10%{left:100%;opacity:1}30%{left:0%;opacity:1}34%,100%{left:0%;opacity:0}}
 @keyframes rnMbExt{0%,28%{border-color:var(--line);background:var(--panel2)}34%,46%{border-color:var(--ac);background:rgba(255,107,53,.07)}54%,100%{border-color:var(--line);background:var(--panel2)}}
 @keyframes rnLock{0%,45%{opacity:.25}55%,100%{opacity:1}}
+@keyframes rnBrPing{0%{left:0;opacity:0}5%{opacity:1}45%{left:100%;opacity:1}50%,100%{left:100%;opacity:0}}
+@keyframes rnBrPong{0%,50%{left:100%;opacity:0}55%{opacity:1}95%{left:0;opacity:1}100%{left:0;opacity:0}}
+@keyframes rnBrLost{0%{left:0;opacity:0}5%{opacity:1}40%{left:55%;opacity:1}60%,100%{left:62%;opacity:0}}
+@keyframes rnJnDim{0%,40%{opacity:1}52%,88%{opacity:.4}100%{opacity:1}}
+@keyframes rnTap{0%,8%{opacity:0;transform:scale(.5)}12%{opacity:.9;transform:scale(.7)}45%,100%{opacity:0;transform:scale(2.1)}}
+@keyframes rnPress{0%,6%{transform:none}11%{transform:translate(-2px,-2px) scale(.9)}18%,100%{transform:none}}
+@keyframes rnCaretJump{0%{transform:translate(-36px,-44px);opacity:0}4%,30%{transform:translate(-36px,-44px);opacity:1}40%,92%{transform:none;opacity:1}100%{transform:none;opacity:0}}
+@keyframes rnBlink{0%,49%{opacity:1}50%,100%{opacity:0}}
+@keyframes rnCodeType{0%,42%{width:0;animation-timing-function:steps(12,end)}72%,100%{width:64px}}
+@keyframes rnKeyHit{0%,28%{border-color:var(--line);color:var(--dim2)}32%,44%{border-color:var(--ac);color:var(--ac)}52%,100%{border-color:var(--line);color:var(--dim2)}}
+@keyframes rnPierce{0%{left:0;right:0;top:0;height:150px;opacity:0}6%{left:0;right:0;top:0;height:150px;opacity:1}22%,30%{left:12px;right:12px;top:30px;height:108px;opacity:1}46%,90%{left:24px;right:24px;top:70px;height:42px;opacity:1}100%{left:24px;right:24px;top:70px;height:42px;opacity:0}}
+@keyframes rnFieldFocus{0%,44%{border-color:var(--line2)}50%,92%{border-color:var(--ac)}100%{border-color:var(--line2)}}
+@keyframes rnFieldType{0%,50%{width:0;animation-timing-function:steps(14,end)}76%,100%{width:76px}}
+@keyframes rnDlPass{0%{left:0;opacity:0}4%{opacity:1}30%{left:200px;opacity:1}34%,100%{left:200px;opacity:0}}
+@keyframes rnDlStop{0%,40%{left:0;opacity:0}44%{opacity:1}58%,90%{left:108px;opacity:1}100%{left:108px;opacity:0}}
+@keyframes rnDlX{0%,58%{opacity:0}62%,90%{opacity:1}100%{opacity:0}}
+@keyframes rnDlChip{0%,64%{opacity:0;transform:translateY(6px)}70%,90%{opacity:1;transform:none}100%{opacity:0;transform:none}}
+@keyframes rnDlGate{0%,36%{background:var(--line2);box-shadow:0 0 0 rgba(255,107,53,0)}42%,92%{background:var(--ac);box-shadow:0 0 10px rgba(255,107,53,.6)}100%{background:var(--line2);box-shadow:0 0 0 rgba(255,107,53,0)}}
+@keyframes rnLbPass{0%{transform:translateX(-182px);opacity:0}6%{opacity:1}30%,88%{transform:none;opacity:1}100%{transform:none;opacity:0}}
+@keyframes rnLbOk{0%,30%{opacity:0}36%,88%{opacity:1}100%{opacity:0}}
+@keyframes rnLbReject{0%{transform:translateX(-70px);opacity:0}6%{opacity:1}24%{transform:none}28%{transform:translateX(-4px)}32%{transform:translateX(3px)}36%{transform:translateX(-2px)}40%,88%{transform:none;opacity:1}100%{transform:none;opacity:0}}
+@keyframes rnLbStrike{0%,40%{transform:scaleX(0)}48%,100%{transform:scaleX(1)}}
+@keyframes rnLbDeny{0%,42%{opacity:0}48%,88%{opacity:1}100%{opacity:0}}
   img[data-mono-mark] { filter: brightness(0) invert(1); }
   img[data-invert-art] { filter: invert(1); }
   :host-context([data-theme="light"]) img[data-mono-mark] { filter: brightness(0); }
@@ -625,6 +648,36 @@ img[src*="xai"] { filter: invert(1); }
 .rn-a81 { animation: rnMbRow2 12s linear infinite; }
 .rn-a84 { animation: rnMbRow3 12s linear infinite; }
 .rn-a87 { animation: rnMbRow4 12s linear infinite; }
+.rn-a88 { animation: rnBrPing 2s linear infinite; }
+.rn-a89 { animation: rnBrPong 2s linear infinite; }
+.rn-a90 { animation: rnBrLost 2s linear infinite; }
+.rn-a91 { animation: rnRise 6s ease-out infinite; animation-delay: 0s; }
+.rn-a92 { animation: rnRise 6s ease-out infinite; animation-delay: .25s; }
+.rn-a93 { animation: rnRise 6s ease-out infinite; animation-delay: .5s; }
+.rn-a94 { animation: rnRise 6s ease-out infinite; animation-delay: .75s; }
+.rn-a95 { animation: rnJnDim 6s ease-in-out infinite; }
+.rn-a96 { animation: rnTap 2s ease-out infinite; }
+.rn-a97 { animation: rnPress 2s ease-in-out infinite; }
+.rn-a98 { animation: rnCaretJump 6s cubic-bezier(.4,0,.2,1) infinite; }
+.rn-a99 { animation: rnBlink 1s linear infinite; }
+.rn-a100 { animation: rnCodeType 6s linear infinite; }
+.rn-a101 { animation: rnKeyHit 6s linear infinite; }
+.rn-a102 { animation: rnPierce 6s cubic-bezier(.4,0,.2,1) infinite; }
+.rn-a103 { animation: rnFieldFocus 6s linear infinite; }
+.rn-a104 { animation: rnFieldType 6s linear infinite; }
+.rn-a105 { animation: rnDlPass 6s linear infinite; }
+.rn-a106 { animation: rnDlPass 6s linear infinite; animation-delay: .7s; }
+.rn-a107 { animation: rnDlStop 6s cubic-bezier(.2,.7,.3,1) infinite; }
+.rn-a108 { animation: rnDlX 6s linear infinite; }
+.rn-a109 { animation: rnDlChip 6s ease-out infinite; }
+.rn-a110 { animation: rnDlGate 6s ease-in-out infinite; }
+.rn-a111 { animation: rnLbPass 6s cubic-bezier(.2,.7,.3,1) infinite; animation-delay: 0s; }
+.rn-a112 { animation: rnLbPass 6s cubic-bezier(.2,.7,.3,1) infinite; animation-delay: .4s; }
+.rn-a113 { animation: rnLbOk 6s linear infinite; animation-delay: 0s; }
+.rn-a114 { animation: rnLbOk 6s linear infinite; animation-delay: .4s; }
+.rn-a115 { animation: rnLbReject 6s ease-out infinite; animation-delay: .8s; }
+.rn-a116 { animation: rnLbStrike 6s ease-out infinite; animation-delay: .8s; }
+.rn-a117 { animation: rnLbDeny 6s linear infinite; animation-delay: .8s; }
 
 /* =============================================
    Responsive

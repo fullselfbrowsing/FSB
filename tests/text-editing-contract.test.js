@@ -17,12 +17,13 @@ test('text tools publish replacement, append, and position controls', () => {
   assert.equal(getToolByName('insert_text').inputSchema.properties.selector.type, 'string');
 });
 
-test('CDP replacement selects once before one insertion', async () => {
+test('CDP native replacement selects once before one insertion', async () => {
   const start = background.indexOf('async function dispatchCdpTextInsertion(');
   const end = background.indexOf('\nasync function handleCDPInsertTextUnlocked', start);
   const commands = [];
   const context = {
-    prepareCdpTextTarget: async () => ({ success: true }),
+    requireForegroundNativeInput: async () => {},
+    prepareCdpTextTarget: async (_tab, _css, position) => ({ success: true, keyboardEnd: position === 'replace_all' }),
     chrome: { debugger: { sendCommand: async (_target, method, params) => commands.push({ method, params }) } },
     navigator: { platform: 'MacIntel', userAgent: 'Macintosh' },
     setTimeout, clearTimeout
@@ -77,8 +78,11 @@ function loadCdpTextInsertion(activeElement, commands, dom) {
   const end = background.indexOf('\nasync function handleCDPInsertTextUnlocked', start);
   const context = {
     document: { activeElement },
+    location: { hostname: 'fixture.test', pathname: '/' },
     chrome: {
       dom,
+      tabs: { get: async () => ({ active: true, windowId: 1 }) },
+      windows: { get: async () => ({ focused: true, state: 'normal' }) },
       scripting: { executeScript: async ({ func, args }) => [{ result: func(...args) }] },
       debugger: { sendCommand: async (_target, method, params) => commands.push({ method, params }) }
     },
@@ -117,6 +121,7 @@ test('CDP append moves a code editor cursor with its own shortcut, not a DOM sel
   const commands = [];
   let prepared = 0;
   const dispatch = vm.runInNewContext(`${background.slice(start, end)}\ndispatchCdpTextInsertion`, {
+    requireForegroundNativeInput: async () => {},
     prepareCdpTextTarget: async () => { prepared++; return { success: true }; },
     chrome: { debugger: { sendCommand: async (_target, method, params) => commands.push({ method, params }) } },
     navigator: { platform: 'MacIntel', userAgent: 'Macintosh' },
@@ -277,6 +282,7 @@ test('CDP text dispatch marks only failures after input as possibly executed', a
     navigator: { platform: 'MacIntel', userAgent: 'Macintosh' }, setTimeout, clearTimeout, ...context
   });
   const afterInput = load({
+    requireForegroundNativeInput: async () => {},
     prepareCdpTextTarget: async () => ({ success: true }),
     chrome: { debugger: { sendCommand: async (_target, method) => {
       if (method === 'Input.insertText') throw new Error('Detached while handling command.');
@@ -337,6 +343,7 @@ test('CDP text input the page never acknowledges is reported as possibly execute
   const start = background.indexOf('async function dispatchCdpTextInsertion(');
   const end = background.indexOf('\nasync function handleCDPInsertTextUnlocked', start);
   const dispatch = vm.runInNewContext(`${background.slice(start, end).replaceAll('8000', '20')}\ndispatchCdpTextInsertion`, {
+    requireForegroundNativeInput: async () => {},
     prepareCdpTextTarget: async () => ({ success: true }),
     chrome: { debugger: { sendCommand: () => new Promise(() => {}) } },
     navigator: { platform: 'MacIntel', userAgent: 'Macintosh' },
@@ -351,7 +358,8 @@ test('CDP text input sends nothing more once the page has timed out', async () =
   const sent = [];
   let acknowledgeFirst;
   const dispatch = vm.runInNewContext(`${background.slice(start, end).replaceAll('8000', '20')}\ndispatchCdpTextInsertion`, {
-    prepareCdpTextTarget: async () => ({ success: true }),
+    requireForegroundNativeInput: async () => {},
+    prepareCdpTextTarget: async () => ({ success: true, keyboardEnd: true }),
     chrome: { debugger: { sendCommand: (_target, method, params) => {
       sent.push(params.type || method);
       // The page answers the first key only after the call has given up.
@@ -390,11 +398,16 @@ const messaging = fs.readFileSync(path.join(__dirname, '../extension/content/mes
 
 // lengths: Docs paragraph text per measurement (before, then after) as a length or the text itself;
 // null means no paragraph elements.
-function loadClipboardPaste({ clipboardWrite = async () => {}, lengths = [0], keyReply = { success: true } } = {}) {
+function loadClipboardPaste({ clipboardWrite = async () => {}, lengths = [0], keyReply = { success: true },
+  foregroundReply = { success: true }, savedTexts = [], savedViewTexts = [], replaceAll = false,
+  locationHref = 'https://docs.google.com/document/d/test/edit?authuser=tvnm%40example.test' } = {}) {
   const start = messaging.indexOf('  async function clipboardPasteHTML(');
   const end = messaging.indexOf('\n  /**', start);
   const sent = [];
+  const savedUrls = [];
   let measurements = 0;
+  let savesRead = 0;
+  let viewsRead = 0;
   const context = {
     Blob: class {},
     ClipboardItem: class {},
@@ -404,12 +417,33 @@ function loadClipboardPaste({ clipboardWrite = async () => {}, lengths = [0], ke
       if (entry === null) return [];
       return [{ textContent: typeof entry === 'string' ? entry : 'x'.repeat(entry) }];
     } },
-    chrome: { runtime: { lastError: null, sendMessage: (message, reply) => { sent.push(message); reply(keyReply); } } },
+    chrome: { runtime: { lastError: null, sendMessage: (message, reply) => {
+      if (message.method === 'checkForeground') return reply(foregroundReply);
+      sent.push(message); reply(keyReply);
+    } } },
     logger: { warn() {}, debug() {} },
+    URL, AbortSignal,
+    location: savedTexts.length || savedViewTexts.length ? new URL(locationHref) : undefined,
+    DOMParser: class {
+      parseFromString(text) {
+        return { querySelector: () => ({ textContent: text, querySelectorAll: () => [] }) };
+      }
+    },
+    fetch: async url => {
+      savedUrls.push(url);
+      assert.equal(new URL(url).searchParams.get('authuser'), new URL(locationHref).searchParams.get('authuser'));
+      if (new URL(url).pathname.endsWith('/mobilebasic')) {
+        return { ok: true, headers: { get: () => 'text/html' },
+          text: async () => savedViewTexts[Math.min(viewsRead++, savedViewTexts.length - 1)] };
+      }
+      if (!savedTexts.length) throw new Error('Cross-origin export blocked');
+      return { ok: true, headers: { get: () => 'text/plain' },
+        text: async () => savedTexts[Math.min(savesRead++, savedTexts.length - 1)] };
+    },
     setTimeout: (fn) => fn()
   };
   const paste = vm.runInNewContext(`${messaging.slice(start, end)}\nclipboardPasteHTML`, context);
-  return { paste: () => paste('<p><strong>hi</strong></p>', 'hi'), sent, measurements: () => measurements };
+  return { paste: () => paste('<p><strong>hi</strong></p>', 'hi', { replaceAll }), sent, savedUrls, measurements: () => measurements };
 }
 
 test('a formatted paste whose clipboard write fails reports that nothing was inserted', async () => {
@@ -476,13 +510,11 @@ function formattedPasteBlock() {
   return actions.slice(start, end);
 }
 
-test('Docs formatted paste never presses Backspace without a confirmed select-all', () => {
+test('Docs formatted replacement selects the document without deleting before paste', () => {
   const block = formattedPasteBlock();
-  const backspace = block.indexOf("key: 'Backspace'");
-  const selectCheck = block.indexOf('if (!selected?.success) throw');
-  assert.ok(selectCheck > 0 && selectCheck < backspace);
-  assert.ok(block.indexOf('clearSent = true;') < backspace);
-  assert.match(block, /if \(!deleted\?\.success\) throw/);
+  assert.equal(block.includes("key: 'Backspace'"), false);
+  assert.match(block, /if \(!selected\?\.success\) return/);
+  assert.ok(block.indexOf("key: 'a'") < block.indexOf('FSB.clipboardPasteHTML('));
 });
 
 test('Docs formatted paste falls back to plain insertion when it fails before pasting', () => {
@@ -519,8 +551,7 @@ test('every content-script CDP insertion keeps the background reply for classifi
   assert.equal(sites, 3);
   assert.equal(actions.split('{ response }))').length - 1, sites);
   assert.equal(actions.split('cdpRefusedBeforeInput(').length - 1, sites + 1);
-  // A refusal after the formatted path cleared the document is not a no-op.
-  assert.match(actions, /if \(refused && clearSent\) \{\s*return \{ success: false, outcome: 'unknown', mayHaveExecuted: true,/);
+  assert.equal(actions.includes('clearSent'), false);
 });
 
 function loadTypeAction({ docs = false, formatted = false, missingTarget = false,
@@ -556,7 +587,8 @@ function loadTypeAction({ docs = false, formatted = false, missingTarget = false
         field.value = field.value.slice(0, start) + text + field.value.slice(end);
         return true;
       } },
-    chrome: { runtime: { sendMessage(request, callback) { requests.push(request); callback(cdpReply); } } },
+    chrome: { runtime: { sendMessage(request, callback) { requests.push(request); callback(request.action === 'monacoEditorInsert'
+        ? { success: false, error: 'No editor API found on page' } : cdpReply); } } },
     navigator: { platform: 'MacIntel', userAgent: 'Macintosh' },
     Event: class { constructor(type) { this.type = type; } },
     KeyboardEvent: class { constructor(type, options) { this.type = type; Object.assign(this, options); } },
@@ -582,7 +614,7 @@ for (const formatted of [false, true]) {
       const result = await type({ selector: '#document', text: formatted ? '**new**' : 'new', ...options });
       assert.equal(result.success, true, result.error);
       if (formatted) {
-        assert.equal(requests.filter(r => r.action === 'keyboardDebuggerAction').length, expected ? 2 : 0);
+        assert.equal(requests.filter(r => r.action === 'keyboardDebuggerAction').length, expected ? 1 : 0);
       } else {
         assert.equal(requests.find(r => r.action === 'cdpInsertText').clearFirst, expected);
       }
@@ -622,7 +654,7 @@ for (const editorType of ['ace', 'codemirror']) {
     assert.equal(result.success, true, result.error);
     assert.equal(field.value, 'new');
     assert.equal(domInsertions(), 1);
-    assert.equal(requests.length, 1);
+    assert.equal(requests.filter(r => r.action === 'cdpInsertText').length, 1);
   });
 }
 
@@ -682,3 +714,168 @@ test('unexpected selection failure sends no CDP input', async () => {
   assert.equal(result.mayHaveExecuted, false);
   assert.deepEqual(commands, []);
 });
+
+for (const state of [
+  { active: false, focused: true, state: 'normal' },
+  { active: true, focused: false, state: 'normal' },
+  { active: true, focused: true, state: 'minimized' }
+]) {
+  test(`native text placement refuses a hidden or unfocused target without sending input: ${JSON.stringify(state)}`, async () => {
+    const start = background.indexOf('async function requireForegroundNativeInput(');
+    const end = background.indexOf('\nasync function handleCDPInsertTextUnlocked', start);
+    const sent = [];
+    const dispatch = vm.runInNewContext(`${background.slice(start, end)}\ndispatchCdpTextInsertion`, {
+      prepareCdpTextTarget: async () => ({ success: true, nestedFrame: true }),
+      chrome: { tabs: { get: async () => ({ active: state.active, windowId: 1 }) },
+        windows: { get: async () => state },
+        debugger: { sendCommand: async (...args) => sent.push(args) } },
+      setTimeout, clearTimeout
+    });
+    await assert.rejects(dispatch(42, 'new', 'replace_all'), error =>
+      error.code === 'TAB_NOT_FOREGROUND' && error.mayHaveExecuted === false && error.retryable === true);
+    assert.equal(sent.length, 0);
+    assert.equal((await dispatch(42, 'new', 'caret')).success, true);
+    assert.equal(sent.length, 1);
+  });
+}
+
+test('Docs plain replacement uses its own select-all followed by deletion and one insertion', async () => {
+  const sent = [];
+  const start = background.indexOf('async function dispatchCdpTextInsertion(');
+  const end = background.indexOf('\nasync function handleCDPInsertTextUnlocked', start);
+  const dispatch = vm.runInNewContext(`${background.slice(start, end)}\ndispatchCdpTextInsertion`, {
+    prepareCdpTextTarget: async () => ({ success: true, nestedFrame: true, docsCanvas: true }),
+    requireForegroundNativeInput: async () => {},
+    navigator: { platform: 'MacIntel', userAgent: 'Macintosh' },
+    chrome: { debugger: { sendCommand: async (_target, method, params) => sent.push({ method, params }) } },
+    setTimeout: (fn, ms) => setTimeout(fn, ms === 150 ? 0 : ms), clearTimeout
+  });
+  await dispatch(42, 'replacement', 'replace_all');
+  assert.deepEqual(sent.map(c => c.params.key || c.method), ['a', 'a', 'Backspace', 'Backspace', 'Input.insertText']);
+  assert.equal(sent[0].params.commands, undefined);
+  assert.equal(sent.at(-1).params.text, 'replacement');
+});
+
+test('native paste on macOS sends the paste editing command exactly once', async () => {
+  const harness = loadClipboardPaste({ lengths: [0, 2] });
+  assert.equal((await harness.paste()).success, true);
+  assert.equal(harness.sent.length, 1);
+  assert.equal(harness.sent[0].commands[0], 'paste');
+});
+
+test('a foreground refusal never falls back to writing a code editor hidden textarea', async () => {
+  const harness = loadTypeAction({ editorType: 'ace', cdpReply: {
+    success: false, code: 'TAB_NOT_FOREGROUND', retryable: true, mayHaveExecuted: false
+  } });
+  const result = await harness.type({ selector: '#editor', text: 'new' });
+  assert.equal(result.success, false);
+  assert.equal(result.code, 'TAB_NOT_FOREGROUND');
+  assert.equal(harness.domInsertions(), 0);
+  assert.equal(harness.field.value, 'old');
+});
+
+test('canvas Docs can confirm an equally long formatted replacement from its saved text', async () => {
+  const h = loadClipboardPaste({ lengths: [null], savedTexts: ['no', 'no', 'hi'], replaceAll: true });
+  const result = await h.paste();
+  assert.equal(result.success, true);
+  assert.equal(result.verifiedVia, 'saved_document');
+  assert.equal(h.sent.length, 1);
+});
+
+test('a stale Docs export never authorizes a second insertion', async () => {
+  const h = loadClipboardPaste({ lengths: [null], savedTexts: ['old'] });
+  const result = await h.paste();
+  assert.equal(result.success, false);
+  assert.equal(result.nothingInserted, false);
+  assert.equal(h.sent.length, 1);
+});
+
+test('Docs confirms a formatted replacement through its saved HTML when export is blocked', async () => {
+  const h = loadClipboardPaste({ lengths: [null], savedViewTexts: ['old', 'old', 'hi'], replaceAll: true });
+  const result = await h.paste();
+  assert.equal(result.success, true);
+  assert.equal(result.verifiedVia, 'saved_document');
+  assert.equal(h.sent.length, 1);
+});
+
+test('a stale saved HTML view never authorizes a second insertion', async () => {
+  const h = loadClipboardPaste({ lengths: [null], savedViewTexts: ['old'] });
+  const result = await h.paste();
+  assert.equal(result.success, false);
+  assert.equal(result.nothingInserted, false);
+  assert.equal(h.sent.length, 1);
+});
+
+test('Docs saved-document verification keeps the signed-in account path', async () => {
+  const h = loadClipboardPaste({ lengths: [null], savedViewTexts: ['old', 'hi'], replaceAll: true,
+    locationHref: 'https://docs.google.com/document/u/2/d/test/edit' });
+  assert.equal((await h.paste()).success, true);
+  assert.ok(h.savedUrls.every(url => new URL(url).pathname.startsWith('/document/u/2/d/test/')));
+  assert.equal(h.savedUrls.filter(url => new URL(url).pathname.endsWith('/export')).length, 1);
+});
+
+test('a background formatted paste refuses before touching the clipboard', async () => {
+  let writes = 0;
+  const h = loadClipboardPaste({ clipboardWrite: async () => { writes++; },
+    foregroundReply: { success: false, code: 'TAB_NOT_FOREGROUND', retryable: true } });
+  const result = await h.paste();
+  assert.equal(result.code, 'TAB_NOT_FOREGROUND');
+  assert.equal(result.nothingInserted, true);
+  assert.equal(writes, 0);
+  assert.equal(h.sent.length, 0);
+});
+
+function editorApiHarness(document, globals = {}) {
+  const start = background.indexOf('async function handleMonacoEditorInsert(');
+  const end = background.indexOf('\nasync function handleListTabs', start);
+  const handler = vm.runInNewContext(`${background.slice(start, end)}\nhandleMonacoEditorInsert`, {
+    document, ...globals,
+    chrome: { scripting: { executeScript: async ({ func, args }) => [{ result: func(...args) }] } }
+  });
+  return async request => {
+    let reply;
+    await handler(request, { tab: { id: 42 } }, result => { reply = result; });
+    return reply;
+  };
+}
+
+test('a selector chooses its Monaco model even when neither editor has foreground focus', async () => {
+  const first = { contains: node => node === first };
+  const second = { contains: node => node === second };
+  const edits = [[], []];
+  const editors = [first, second].map((node, i) => ({
+    getDomNode: () => node, hasTextFocus: () => false,
+    getModel: () => ({ getFullModelRange: () => ({ endLineNumber: 1, endColumn: 4 }),
+      getLineCount: () => 1, getLineMaxColumn: () => 7 }),
+    executeEdits: (_source, operations) => edits[i].push(operations), setPosition() {}
+  }));
+  const insert = editorApiHarness({ querySelector: () => second }, { monaco: {
+    editor: { getEditors: () => editors, getModels: () => [] }
+  } });
+  const result = await insert({ text: 'new', selector: '#second', clearFirst: true });
+  assert.equal(result.success, true);
+  assert.equal(edits[0].length, 0);
+  assert.equal(edits[1].length, 1);
+});
+
+for (const binding of ['cmTile', 'rootView', 'cmView']) {
+  test(`CodeMirror 6 appends and replaces through its ${binding} model binding`, async () => {
+    let value = 'old';
+    let transactions = 0;
+    const view = { state: { get doc() { return { length: value.length }; } }, dispatch({ changes, selection }) {
+      transactions++;
+      value = value.slice(0, changes.from) + changes.insert + value.slice(changes.to);
+      assert.equal(selection.anchor, value.length);
+    } };
+    const content = binding === 'cmTile' ? { cmTile: { root: { view } } }
+      : binding === 'rootView' ? { cmView: { rootView: { view } } } : { cmView: { view } };
+    const wrapper = { querySelector: () => content };
+    const target = { closest: selector => selector === '.cm-editor' ? wrapper : null };
+    const insert = editorApiHarness({ querySelector: () => target });
+    assert.equal((await insert({ text: ' more', clearFirst: false, selector: '#cm' })).success, true);
+    assert.equal(value, 'old more');
+    assert.equal((await insert({ text: 'replacement', clearFirst: true, selector: '#cm' })).success, true);
+    assert.equal(value, 'replacement');
+    assert.equal(transactions, 2);
+  });
+}
