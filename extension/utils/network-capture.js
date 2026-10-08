@@ -41,12 +41,10 @@
    *   * a non-Network method is a no-op (Input sendCommand traffic is unaffected
    *     -- DISC-02)
    *
-   * Ownership-safe release (RESEARCH Pitfall 1): endSession removes the listeners
-   * and sends Network.disable (release the domain, KEEP the attachment), and
-   * detaches the tab ONLY if capture was the attaching owner (weAttached) AND no
-   * Input op holds the tab (keyboardEmulator.isAttachedTo). A capture session
-   * NEVER breaks the KeyboardEmulator Input emulation and never leaks an
-   * attachment.
+   * Ownership-safe release: endSession disables Network before releasing the
+   * capture's attachment under its CDP lease. The shared session manager keeps
+   * controlled-tab attachments and detaches temporary ones. Without that manager,
+   * the keyboard ownership check prevents interrupting an Input operation.
    *
    * Module shell: the dual-export IIFE mirror of consent-policy-store.js /
    * service-denylist.js. The service worker reads global.FsbNetworkCapture after
@@ -146,6 +144,16 @@
     return Promise.resolve().then(function() {
       return (globalThis.FsbDebuggerSessions || dbg).detach({ tabId: tabId });
     }).catch(function() { /* best-effort; a stale/foreign attach detach may fail */ });
+  }
+  function _releaseCaptureAttachment(dbg, tabId) {
+    // Shared attachment visibility does not mean keyboard input owns the tab.
+    // The session manager alone decides whether this connection is retained.
+    if (globalThis.FsbDebuggerSessions) { return _detach(dbg, tabId); }
+    var ke = _keyboardEmulator();
+    if (ke && typeof ke.isAttachedTo === 'function' && ke.isAttachedTo(tabId)) {
+      return Promise.resolve();
+    }
+    return _detach(dbg, tabId);
   }
   function _send(dbg, tabId, method, params) {
     return Promise.resolve().then(function() {
@@ -326,10 +334,7 @@
     } catch (enableErr) {
       // Could not enable Network -- release ownership-safely and bail.
       if (attachResult && attachResult.weAttached) {
-        var ke = _keyboardEmulator();
-        if (!(ke && typeof ke.isAttachedTo === 'function' && ke.isAttachedTo(tabId))) {
-          await _detach(dbg, tabId);
-        }
+        await _releaseCaptureAttachment(dbg, tabId);
       }
       if (cdpLease) { cdpLease.release(); }
       return { ok: false, reason: 'RECIPE_CAPTURE_ENABLE_FAILED' };
@@ -396,10 +401,10 @@
   }
 
   // ---- endSession(reason) -> ObservedCall[] (Pitfall 1) --------------------
-  // Removes the per-session onDetach listener, releases the Network domain
-  // (Network.disable -- KEEP the attachment), and detaches the tab ONLY if WE
-  // attached AND no Input op holds the tab. Returns the collected ObservedCalls
-  // (those with a method + path) for Plan 06's glue, then clears the session.
+  // Removes the per-session onDetach listener, disables Network, and releases
+  // the capture's attachment according to controlled-tab or keyboard ownership.
+  // Returns the collected ObservedCalls with a method and path, then clears
+  // the session.
   //
   // ME-01: the onEvent (_onCdpEvent) listener is owned by the boot-time
   // registration (background.js) and is NOT removed here -- removing it would tear
@@ -444,17 +449,12 @@
       }).catch(function() { /* best-effort */ });
     }
 
-    // Detach the tab ONLY if capture was the attaching owner AND no Input op
-    // holds the tab (do NOT detach out from under a concurrent KeyboardEmulator
-    // Input op -- Pitfall 1). Mirror the bg.js:13915 isAttachedTo coordination.
+    // Release after Network.disable while still holding the capture lease.
+    // Controlled tabs retain their connection through the shared manager.
     if (session.weAttached && dbg && typeof dbg.detach === 'function' && session.tabId != null) {
-      var ke = _keyboardEmulator();
-      var inputHolds = !!(ke && typeof ke.isAttachedTo === 'function' && ke.isAttachedTo(session.tabId));
-      if (!inputHolds) {
-        releaseChain = releaseChain.then(function() {
-          return _detach(dbg, session.tabId);
-        }).catch(function() { /* best-effort */ });
-      }
+      releaseChain = releaseChain.then(function() {
+        return _releaseCaptureAttachment(dbg, session.tabId);
+      }).catch(function() { /* best-effort */ });
     }
 
     if (session.cdpLease && typeof session.cdpLease.release === 'function') {

@@ -28,7 +28,13 @@ const classSource = source.slice(classStart, classEnd);
 const OPEN_LATENCY_MS = 120;
 const CLOSE_LATENCY_MS = 80;
 
-function createHarness() {
+function deferred() {
+  let resolve, reject;
+  const promise = new Promise((yes, no) => { resolve = yes; reject = no; });
+  return { promise, resolve, reject };
+}
+
+function createHarness(options = {}) {
   let now = 0;
   let nextTimerId = 0;
   const timers = [];
@@ -66,9 +72,12 @@ function createHarness() {
   const sockets = [];
   const iconStates = [];
   const statusBroadcasts = [];
+  const reconnectDiagnostics = [];
+  const storageWrites = [];
   const storage = {
     serverHashKey: 'a'.repeat(64),
-    serverUrl: 'https://full-selfbrowsing.com'
+    serverUrl: 'https://full-selfbrowsing.com',
+    ...options.storage
   };
 
   class FakeWebSocket {
@@ -122,14 +131,18 @@ function createHarness() {
             for (const key of keys) out[key] = storage[key];
             return out;
           },
-          set: async (values) => { Object.assign(storage, values); }
+          set: async (values) => {
+            storageWrites.push({ ...values });
+            if (options.set) await options.set(values);
+            Object.assign(storage, values);
+          }
         }
       },
       runtime: { getManifest: () => ({ version: 'test' }) }
     },
-    fetch: async () => { throw new Error('no network in this test'); },
+    fetch: options.fetch || (async () => { throw new Error('no network in this test'); }),
     _normalizeFsbServerUrl: (value) => (typeof value === 'string' && value.trim() ? value.trim() : 'https://full-selfbrowsing.com').replace(/\/+$/, ''),
-    recordFSBTransportReconnect() {},
+    recordFSBTransportReconnect(kind, data) { reconnectDiagnostics.push({ kind, ...data }); },
     recordFSBTransportFailure() {},
     recordFSBTransportCount() {},
     _installMetricsStorageListener() {},
@@ -152,6 +165,8 @@ function createHarness() {
     iconStates,
     statusBroadcasts,
     storage,
+    storageWrites,
+    reconnectDiagnostics,
     advance,
     openSockets: () => sockets.filter((s) => s.readyState === FakeWebSocket.OPEN),
     dimmedCount: () => iconStates.filter((v) => v === false).length
@@ -264,6 +279,144 @@ async function run() {
     h.client.disconnect();
     await h.advance(60000);
     assert.strictEqual(h.sockets.length, 0, 'a connect() still reading storage does not open a socket after disconnect()');
+    console.log('  PASS');
+  }
+
+  for (const supersededBy of ['disconnect', 'newer-connect']) {
+    for (const failure of ['http', 'fetch', 'json', 'storage']) {
+      console.log(`--- stale ${failure} registration failure after ${supersededBy} is ignored ---`);
+      const request = deferred(), body = deferred(), write = deferred();
+      let fetchCount = 0;
+      const h = createHarness({
+        storage: { serverHashKey: undefined },
+        fetch: () => { fetchCount++; return request.promise; },
+        set: failure === 'storage' ? () => write.promise : undefined
+      });
+      const pending = h.client.connect();
+      await h.advance(0);
+      if (failure === 'json' || failure === 'storage') {
+        request.resolve({ ok: true, json: () => body.promise });
+        await h.advance(0);
+      }
+      if (failure === 'storage') {
+        body.resolve({ hashKey: 'c'.repeat(64) });
+        await h.advance(0);
+      }
+      if (supersededBy === 'disconnect') h.client.disconnect();
+      else {
+        h.storage.serverHashKey = 'b'.repeat(64);
+        await h.client.connect();
+        await h.advance(200);
+      }
+      const seq = h.client.connectSeq;
+      const diagnostics = h.reconnectDiagnostics.length;
+      const writes = h.storageWrites.length;
+      if (failure === 'http') request.resolve({ ok: false, status: 503 });
+      else if (failure === 'fetch') request.reject(new Error('offline'));
+      else if (failure === 'json') body.reject(new Error('invalid JSON'));
+      else write.reject(new Error('storage unavailable'));
+      await pending;
+      await h.advance(60000);
+      assert.equal(h.client.connectSeq, seq, 'stale failure does not create another attempt');
+      assert.equal(fetchCount, 1, 'stale failure does not register again');
+      assert.equal(h.client.reconnectTimer, null, 'stale failure does not schedule a timer');
+      assert.equal(h.reconnectDiagnostics.length, diagnostics, 'no stale reconnect diagnostic');
+      assert.equal(h.storageWrites.length, writes, 'no additional credential write');
+      assert.equal(h.sockets.length, supersededBy === 'disconnect' ? 0 : 1);
+      assert.equal(h.client.serverHashKey, supersededBy === 'disconnect' ? undefined : 'b'.repeat(64));
+      assert.equal(h.storage.serverHashKey, supersededBy === 'disconnect' ? undefined : 'b'.repeat(64));
+      console.log('  PASS');
+    }
+
+    for (const stage of ['fetch', 'json']) {
+      console.log(`--- stale registration success during ${stage} after ${supersededBy} does not save credentials ---`);
+      const request = deferred(), body = deferred();
+      const h = createHarness({ storage: { serverHashKey: undefined }, fetch: () => request.promise });
+      const pending = h.client.connect();
+      await h.advance(0);
+      if (stage === 'json') {
+        request.resolve({ ok: true, json: () => body.promise });
+        await h.advance(0);
+      }
+      if (supersededBy === 'disconnect') h.client.disconnect();
+      else {
+        h.storage.serverHashKey = 'b'.repeat(64);
+        await h.client.connect();
+        await h.advance(200);
+      }
+      if (stage === 'fetch') request.resolve({ ok: true, json: async () => ({ hashKey: 'c'.repeat(64) }) });
+      else body.resolve({ hashKey: 'c'.repeat(64) });
+      await pending;
+      await h.advance(60000);
+      assert.equal(h.storageWrites.length, 0, 'stale credentials never reach storage');
+      assert.equal(h.sockets.length, supersededBy === 'disconnect' ? 0 : 1);
+      assert.equal(h.client.serverHashKey, supersededBy === 'disconnect' ? undefined : 'b'.repeat(64));
+      assert.equal(h.storage.serverHashKey, supersededBy === 'disconnect' ? undefined : 'b'.repeat(64));
+      console.log('  PASS');
+    }
+  }
+
+  for (const failure of ['http', 'fetch', 'json']) {
+    console.log(`--- stale ${failure} failure cannot cancel a newer pending registration ---`);
+    const requests = [], body = deferred();
+    const h = createHarness({
+      storage: { serverHashKey: undefined },
+      fetch: () => { const request = deferred(); requests.push(request); return request.promise; }
+    });
+    const first = h.client.connect();
+    await h.advance(0);
+    if (failure === 'json') {
+      requests[0].resolve({ ok: true, json: () => body.promise });
+      await h.advance(0);
+    }
+    const newer = h.client.connect();
+    await h.advance(0);
+    const seq = h.client.connectSeq;
+    if (failure === 'http') requests[0].resolve({ ok: false, status: 503 });
+    else if (failure === 'fetch') requests[0].reject(new Error('offline'));
+    else body.reject(new Error('invalid JSON'));
+    await first;
+    await h.advance(0);
+    assert.equal(requests.length, 2, 'no third registration supersedes the pending attempt');
+    assert.equal(h.client.connectSeq, seq);
+    assert.equal(h.reconnectDiagnostics.length, 0);
+    requests[1].resolve({ ok: true, json: async () => ({ hashKey: 'b'.repeat(64) }) });
+    await newer;
+    await h.advance(200);
+    assert.equal(h.sockets.length, 1);
+    assert.equal(h.client.connected, true);
+    assert.equal(h.storage.serverHashKey, 'b'.repeat(64));
+    console.log('  PASS');
+  }
+
+  for (const failure of ['http', 'fetch', 'json']) {
+    console.log(`--- active ${failure} registration failure retries immediately, then backs off ---`);
+    const requests = [];
+    const h = createHarness({
+      storage: { serverHashKey: undefined },
+      fetch: () => { const request = deferred(); requests.push(request); return request.promise; }
+    });
+    const pending = h.client.connect();
+    await h.advance(0);
+    if (failure === 'http') requests[0].resolve({ ok: false, status: 503 });
+    else if (failure === 'fetch') requests[0].reject(new Error('offline'));
+    else requests[0].resolve({ ok: true, json: async () => { throw new Error('invalid JSON'); } });
+    await pending;
+    await h.advance(0);
+    assert.equal(requests.length, 2, 'first retry is immediate');
+    requests[1].resolve({ ok: false, status: 503 });
+    await h.advance(0);
+    assert.deepEqual(h.reconnectDiagnostics.map(d => d.delayMs), [0, 1000]);
+    await h.advance(999);
+    assert.equal(requests.length, 2, 'next retry respects backoff');
+    await h.advance(1);
+    assert.equal(requests.length, 3);
+    requests[2].resolve({ ok: true, json: async () => ({ hashKey: 'd'.repeat(64) }) });
+    await h.advance(200);
+    assert.equal(h.sockets.length, 1);
+    assert.equal(h.client.connected, true);
+    assert.equal(h.client.reconnectDelay, 0);
+    assert.equal(h.storage.serverHashKey, 'd'.repeat(64));
     console.log('  PASS');
   }
 

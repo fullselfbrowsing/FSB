@@ -1357,12 +1357,13 @@ class FSBWebSocket {
     if (!serverHashKey) {
       try {
         const resp = await fetch(resolvedServerUrl + '/api/auth/register', { method: 'POST' });
+        if (attempt !== this.connectSeq) return;
         if (resp.ok) {
           const data = await resp.json();
+          if (attempt !== this.connectSeq) return;
           serverHashKey = data.hashKey;
-          this.serverHashKey = serverHashKey;
-          this.serverUrl = resolvedServerUrl;
           await chrome.storage.local.set({ serverHashKey, serverUrl: resolvedServerUrl });
+          if (attempt !== this.connectSeq) return;
           console.log('[FSB WS] Auto-registered with server');
         } else {
           console.warn('[FSB WS] Auto-register failed:', resp.status);
@@ -1370,6 +1371,7 @@ class FSBWebSocket {
           return;
         }
       } catch (err) {
+        if (attempt !== this.connectSeq) return;
         console.warn('[FSB WS] Auto-register failed:', err.message);
         this._scheduleReconnect();
         return;
