@@ -1,15 +1,17 @@
-// Quick task 260630-hct follow-up -- label -> approximate centroid lookup for the
-// Stats page "Active now" globe. Mirrors the server's region label format from
-// showcase/server/src/routes/telemetry.js (regionLabel()):
+// Label -> approximate centroid lookup for the Stats page globe. Mirrors the
+// server's region label format (showcase/server/src/utils/region-label.js):
+//   'US-CA/San Jose' -- city, after its state (or bare country: 'SG/Singapore')
 //   'US-CA'          -- US state, 2-letter USPS code (US_STATE_CODES there)
 //   'DE'             -- bare ISO 3166-1 alpha-2 country code (no subdivision)
 //   'AU-Victoria'    -- non-US country + slugged subdivision name
 //   'unknown'/'Other' -- never geolocatable; callers must not plot these
 //
-// This is a coarse, best-effort lookup for visualization only (which continent /
-// part of a country to glow a node in) -- NOT a precise geocoder. Countries or
-// subdivisions absent from these tables simply return null so callers can skip
-// them; the globe degrades gracefully rather than guessing a location.
+// The server sends lat/lon for every place its dataset knows, cities included;
+// these tables are the fallback when it does not. This is a coarse, best-effort
+// lookup for visualization only (which continent / part of a country to glow a
+// node in) -- NOT a precise geocoder. Countries or subdivisions absent from
+// these tables simply return null so callers can skip them; the globe degrades
+// gracefully rather than guessing a location.
 
 /** Approximate geographic centroid, in degrees. */
 export interface RegionCentroid {
@@ -94,6 +96,10 @@ const US_STATE_CENTROIDS: Readonly<Record<string, RegionCentroid>> = {
 export function regionCentroid(label: string): RegionCentroid | null {
   if (!label || label === 'unknown' || label === 'Other') return null;
 
+  // No city table here: a city label falls back to its state or country.
+  const slash = label.indexOf('/');
+  if (slash !== -1) return regionCentroid(label.slice(0, slash));
+
   const dash = label.indexOf('-');
   if (dash === -1) return COUNTRY_CENTROIDS[label] ?? null;
 
@@ -103,4 +109,33 @@ export function regionCentroid(label: string): RegionCentroid | null {
   // Non-US subdivisions aren't individually tabulated -- fall back to the
   // country centroid so the region is still placed on the right landmass.
   return COUNTRY_CENTROIDS[country] ?? null;
+}
+
+/**
+ * Where to plot a published place: the server's centroid when it sent one,
+ * else the tables above.
+ */
+export function regionPosition(region: {
+  readonly label: string;
+  readonly lat?: number;
+  readonly lon?: number;
+}): RegionCentroid | null {
+  if (region.label === 'unknown' || region.label === 'Other') return null;
+  const { lat, lon } = region;
+  if (typeof lat === 'number' && typeof lon === 'number' && Number.isFinite(lat) && Number.isFinite(lon)) {
+    return { lon, lat };
+  }
+  return regionCentroid(region.label);
+}
+
+/** Globe jitter radius in degrees: tight for a city, wide for a country. */
+export function regionSpread(label: string): number {
+  if (label.includes('/')) return 1.5;
+  return label.includes('-') ? 3 : 6;
+}
+
+/** 'US-CA/San Jose' -> 'San Jose, US-CA'; other labels unchanged. */
+export function regionDisplayName(label: string): string {
+  const slash = label.indexOf('/');
+  return slash === -1 ? label : `${label.slice(slash + 1)}, ${label.slice(0, slash)}`;
 }

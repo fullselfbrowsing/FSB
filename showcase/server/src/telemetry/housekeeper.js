@@ -38,6 +38,7 @@
 
 const Queries = require('../db/queries');
 const { hashIp } = require('../utils/telemetry-hash');
+const { regionDepth, regionParent } = require('../utils/region-label');
 
 const ONE_HOUR_MS = 60 * 60 * 1000;
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
@@ -47,37 +48,70 @@ const ACTIVE_COUNT_VERSION = 2;
 const K_ANONYMITY_FLOOR = 1;
 // Quick task 260630-hct -- region anonymity floor. HARD-required at k>=5 by
 // CONTEXT (do NOT reuse the relaxed K_ANONYMITY_FLOOR=1 used for mcp_client).
-// Regions with fewer than 5 unique installs collapse into a single 'Other'
-// bucket; that bucket is suppressed entirely when its summed install count is
-// itself < 5. This guarantees no surfaced region label represents < 5 installs.
+// No published region label -- city, subdivision, country, or 'Other' -- ever
+// represents fewer than 5 unique installs; see applyRegionKFloor.
 const REGION_K_FLOOR = 5;
 
 /**
- * Apply a k-floor using distinct membership, not a sum of per-label counts.
- * One install can move between regions in a day; it must count once in the
- * combined Other bucket even when it appears under several sub-floor labels.
+ * Publish each install at the most specific place that clears the k-floor.
+ *
+ * Labels nest city -> subdivision -> country (region-label.js). Working from
+ * the finest level up, a label with >= `floor` installs is published and the
+ * installs of one below the floor move to its parent: 'US-CA/Fresno' (2) joins
+ * 'US-CA', which may then clear the floor on its own. Top-level labels still
+ * short (countries, 'unknown') pool into 'Other', which is itself dropped when
+ * under the floor. Every install lands in exactly one bucket, so the published
+ * counts are disjoint and each is >= `floor`.
+ *
+ * An install that appears under several labels keeps the first; the callers'
+ * queries already return one row per install.
+ *
+ * @param {Array<{region:string}>} rows
+ * @param {string} memberKey install id field on each row
+ * @param {number} floor
+ * @returns {Array<{region:string, uniq:number}>} published labels by size, 'Other' last
  */
-function applyDistinctKFloor(rows, key, memberKey, floor) {
-  const memberships = new Map();
+function applyRegionKFloor(rows, memberKey, floor) {
+  const pools = new Map();
+  const addMember = (label, member) => {
+    let members = pools.get(label);
+    if (!members) { members = new Set(); pools.set(label, members); }
+    members.add(member);
+  };
+
+  const placed = new Set();
   for (const row of rows) {
-    if (!row || typeof row[key] !== 'string' || typeof row[memberKey] !== 'string') continue;
-    if (!memberships.has(row[key])) memberships.set(row[key], new Set());
-    memberships.get(row[key]).add(row[memberKey]);
+    if (!row || typeof row.region !== 'string' || row.region === '') continue;
+    const member = row[memberKey];
+    if (typeof member !== 'string' || placed.has(member)) continue;
+    placed.add(member);
+    addMember(row.region, member);
   }
 
-  const above = [];
-  const belowMembers = new Set();
-  for (const [label, members] of memberships) {
-    if (members.size >= floor) {
-      above.push({ [key]: label, uniq: members.size });
-    } else {
-      for (const member of members) belowMembers.add(member);
+  const published = [];
+  const other = new Set();
+  let depth = 0;
+  for (const label of pools.keys()) depth = Math.max(depth, regionDepth(label));
+  for (; depth >= 0; depth--) {
+    for (const [label, members] of [...pools]) {
+      if (regionDepth(label) !== depth) continue;
+      pools.delete(label);
+      if (members.size >= floor) {
+        published.push({ region: label, uniq: members.size });
+        continue;
+      }
+      const parent = regionParent(label);
+      for (const member of members) {
+        if (parent === null) other.add(member);
+        else addMember(parent, member);
+      }
     }
   }
-  above.sort((a, b) => b.uniq - a.uniq || a[key].localeCompare(b[key]));
-  return belowMembers.size >= floor
-    ? [...above, { [key]: 'Other', uniq: belowMembers.size }]
-    : above;
+
+  published.sort((a, b) => b.uniq - a.uniq || a.region.localeCompare(b.region));
+  return other.size >= floor
+    ? [...published, { region: 'Other', uniq: other.size }]
+    : published;
 }
 
 function floorToUtcDayMs(ms) {
@@ -178,13 +212,8 @@ function runHousekeeperTick(db, queries, nowMs = Date.now()) {
 
       // Region rollup uses each install's latest membership for the day.
       // Assigning one region before applying the floor prevents a roaming
-      // install from appearing in both a named region and the Other bucket.
-      const popularRegion = applyDistinctKFloor(
-        regionMemberships,
-        'region',
-        'install_uuid',
-        REGION_K_FLOOR
-      );
+      // install from being counted in two published places.
+      const popularRegion = applyRegionKFloor(regionMemberships, 'install_uuid', REGION_K_FLOOR);
 
       queries.upsertGlobalAggregateV2.run(
         dayKey,
@@ -254,7 +283,7 @@ module.exports = {
   startHousekeeper,
   runHousekeeperTick,
   floorToUtcDayMs,
-  applyDistinctKFloor,
+  applyRegionKFloor,
   K_ANONYMITY_FLOOR,
   REGION_K_FLOOR,
   ROLLUP_RETENTION_DAYS,
