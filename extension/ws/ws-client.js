@@ -1321,20 +1321,36 @@ async function handleRemoteNavigate(payload) {
 class FSBWebSocket {
   constructor() {
     this.ws = null;
+    this.wsUrl = null;
     this.keepaliveTimer = null;
     this.reconnectTimer = null;
     this.reconnectDelay = 0;
     this.maxReconnectDelay = 30000;
     this.connected = false;
     this.intentionalClose = false;
+    // Bumped by every connect() and disconnect(). A connect() that resumes from
+    // an await and finds a newer number has been superseded and stops there.
+    this.connectSeq = 0;
   }
 
   /**
    * Connect to the relay server WebSocket endpoint.
    * Auto-registers a hash key on first run if none exists.
+   *
+   * Safe to call while already connected: a socket that is open, or opening, to
+   * the same room is kept. Several paths call this for one event (a Sync-tab key
+   * save fires both the storage listener and reconnectDashboardWebSocket).
    */
   async connect() {
+    var attempt = ++this.connectSeq;
+    // A backoff retry still pending would otherwise land on top of this attempt.
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+
     let { serverHashKey, serverUrl } = await chrome.storage.local.get(['serverHashKey', 'serverUrl']);
+    if (attempt !== this.connectSeq) return;
     var resolvedServerUrl = _normalizeFsbServerUrl(serverUrl);
 
     // Auto-register with the server if no hash key exists
@@ -1360,29 +1376,45 @@ class FSBWebSocket {
       }
     }
 
+    // Registration awaited the network, so a newer connect() may have started.
+    if (attempt !== this.connectSeq) return;
+
     // Phase 223 MET-02: capture for metrics broadcast (truncated to 8 chars when emitted).
     this.serverHashKey = serverHashKey;
     this.serverUrl = resolvedServerUrl;
 
-    // Close any existing connection before opening a new one
+    const wsUrl = resolvedServerUrl.replace(/^http/, 'ws') + '/ws?key=' + encodeURIComponent(serverHashKey) + '&role=extension';
+
+    if (this.ws && this.wsUrl === wsUrl
+        && (this.ws.readyState === WebSocket.CONNECTING || this.ws.readyState === WebSocket.OPEN)) {
+      return;
+    }
+
+    // Close any existing connection before opening a new one. Its handlers below
+    // stop acting once this.ws no longer points at it, so its close cannot report
+    // a disconnect or schedule a reconnect that would replace the new socket.
     if (this.ws) {
       try { this.ws.close(); } catch (_) { /* ignore */ }
       this.ws = null;
+      this.connected = false;
+      this._stopKeepalive();
     }
-
-    const wsUrl = resolvedServerUrl.replace(/^http/, 'ws') + '/ws?key=' + encodeURIComponent(serverHashKey) + '&role=extension';
 
     this.intentionalClose = false;
 
+    let socket;
     try {
-      this.ws = new WebSocket(wsUrl);
+      socket = new WebSocket(wsUrl);
     } catch (err) {
       console.warn('[FSB WS] Failed to create WebSocket:', err.message);
       this._scheduleReconnect();
       return;
     }
+    this.ws = socket;
+    this.wsUrl = wsUrl;
 
     this.ws.onopen = () => {
+      if (this.ws !== socket) return;
       this.reconnectDelay = 0;
       this.connected = true;
       this._startKeepalive();
@@ -1403,6 +1435,7 @@ class FSBWebSocket {
     };
 
     this.ws.onmessage = (event) => {
+      if (this.ws !== socket) return;
       var decoded = decodeFSBWebSocketEnvelope(event.data);
       if (!decoded || decoded.ok !== true) {
         var decodeError = decoded && decoded.error ? decoded.error : 'envelope-decode-failed';
@@ -1414,6 +1447,11 @@ class FSBWebSocket {
     };
 
     this.ws.onclose = (event) => {
+      // A socket this client already replaced or dropped. Reconnecting from here
+      // used to tear down its replacement, whose own close then did the same: two
+      // sockets swapping places every couple of seconds, forever, with the
+      // toolbar icon dimming on each swap.
+      if (this.ws !== socket) return;
       this.connected = false;
       this._stopKeepalive();
       try { if (globalThis.fsbActionIcon) globalThis.fsbActionIcon.setConnected(false); } catch (_e) { /* icon optional */ }
@@ -1439,6 +1477,7 @@ class FSBWebSocket {
    */
   disconnect() {
     this.intentionalClose = true;
+    this.connectSeq++;
     this._stopKeepalive();
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
@@ -1448,8 +1487,11 @@ class FSBWebSocket {
       this.ws.close();
     }
     this.ws = null;
+    this.wsUrl = null;
     this.connected = false;
     try { if (globalThis.fsbActionIcon) globalThis.fsbActionIcon.setConnected(false); } catch (_e) { /* icon optional */ }
+    // The socket's own onclose no longer reports once it is detached above.
+    _broadcastDashboardWsStatus(false);
   }
 
   /**
