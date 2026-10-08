@@ -1,0 +1,19 @@
+{
+  "name": "full-self-browsing",
+  "version": "0.1.0",
+  "description": "Connect Grok Bot to Full Self Browsing on its own computer for supervised browser actions, DOM reads and application capabilities.",
+  "author": {
+    "name": "Full Self Browsing"
+  },
+  "homepage": "https://www.full-selfbrowsing.com",
+  "license": "MIT",
+  "mcpServers": "mcp.json",
+  "keywords": [
+    "full self browsing",
+    "fsb mcp",
+    "fsb-mcp-server",
+    "fsb extension"
+  ],
+  "logo": "assets/logo.png",
+  "repository": "https://github.com/fullselfbrowsing/FSB"
+}
