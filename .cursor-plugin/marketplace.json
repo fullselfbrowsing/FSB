@@ -1,0 +1,13 @@
+{
+  "name": "full-self-browsing",
+  "owner": {
+    "name": "Full Self Browsing"
+  },
+  "plugins": [
+    {
+      "name": "full-self-browsing",
+      "source": "plugins/grok-bot",
+      "description": "Connect Grok Bot to Full Self Browsing on its own computer for supervised browser actions, DOM reads and application capabilities."
+    }
+  ]
+}

@@ -72,6 +72,8 @@ Want to run FSB standalone from the extension popup/side panel? Open settings, p
 
 **On Hermes?** Use the same skill at [`skills/fsb/`](./skills/fsb/SKILL.md). Run `node skills/fsb/scripts/print-hermes-yaml.mjs` to print the canonical `~/.hermes/config.yaml` `mcp_servers.fsb` block, or run `node skills/fsb/scripts/install-host.mjs` to detect a local Hermes config and gate the install on consent.
 
+**On Grok Bot?** The marketplace wrapper lives in [`plugins/grok-bot/`](./plugins/grok-bot/README.md), with a pinned npm MCP server and one FSB skill. It uses Chrome on Bot's own computer; see its setup and privacy disclosures. Marketplace listing is pending publisher review.
+
 ### What It Does
 
 - Runs natural language browser tasks from the popup or side panel.
