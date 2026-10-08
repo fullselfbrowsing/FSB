@@ -9733,7 +9733,7 @@ https://full-selfbrowsing.com/api/telemetry/forget<x id="CLOSE_TAG_CODE" ctype="
         </context-group>
       </trans-unit>
       <trans-unit id="releaseNotes.v0992.003.mcp" datatype="html">
-        <source>mcp 0.11.0</source>
+        <source>mcp 0.11.1</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/release-notes/release-notes-page.component.html</context>
           <context context-type="linenumber">16,17</context>
@@ -10493,7 +10493,7 @@ https://full-selfbrowsing.com/api/telemetry/forget<x id="CLOSE_TAG_CODE" ctype="
         </context-group>
       </trans-unit>
       <trans-unit id="releaseNotes.v0992.042.canvasEditorsAreReachable" datatype="html">
-        <source>Canvas editors are reachable for replace, and the debugger is released if an insertion is refused.</source>
+        <source>Canvas editors support replacement, and a refused insertion is reported without repeating it.</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/release-notes/release-notes-page.component.html</context>
           <context context-type="linenumber">364,365</context>
@@ -10507,7 +10507,7 @@ https://full-selfbrowsing.com/api/telemetry/forget<x id="CLOSE_TAG_CODE" ctype="
         </context-group>
       </trans-unit>
       <trans-unit id="releaseNotes.v0992.044.aGoogleDocsPaste" datatype="html">
-        <source>A Google Docs paste is compared by its text, not its length, and falls back to plain insertion when it inserted nothing.</source>
+        <source>Google Docs confirms formatted edits against saved document text. An uncertain paste is never repeated.</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/release-notes/release-notes-page.component.html</context>
           <context context-type="linenumber">366,371</context>
@@ -10584,7 +10584,7 @@ https://full-selfbrowsing.com/api/telemetry/forget<x id="CLOSE_TAG_CODE" ctype="
         </context-group>
       </trans-unit>
       <trans-unit id="releaseNotes.v0992.055.aHungPageGets" datatype="html">
-        <source>A hung page gets a deadline</source>
+        <source>Navigation can recover a hung page</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/release-notes/release-notes-page.component.html</context>
           <context context-type="linenumber">416,417</context>
@@ -10605,14 +10605,14 @@ https://full-selfbrowsing.com/api/telemetry/forget<x id="CLOSE_TAG_CODE" ctype="
         </context-group>
       </trans-unit>
       <trans-unit id="releaseNotes.v0992.058.anEditStuckOn" datatype="html">
-        <source>An edit stuck on a hung page points straight to tab recovery with <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot; style=&quot;font-family: &apos;Space Mono&apos;, monospace; font-size: .9em;&quot;&gt;"/>navigate<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> or <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot; style=&quot;font-family: &apos;Space Mono&apos;, monospace; font-size: .9em;&quot;&gt;"/>close_tab<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>.</source>
+        <source>Navigation interrupts stuck JavaScript on controlled tabs and confirms the destination has loaded before reporting success.</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/release-notes/release-notes-page.component.html</context>
           <context context-type="linenumber">420,421</context>
         </context-group>
       </trans-unit>
       <trans-unit id="releaseNotes.v0992.059.theDebuggerLeaseIs" datatype="html">
-        <source>The debugger lease is sized for holders that run past 20 seconds: long typing, network capture, hold, and drag.</source>
+        <source>A tab already hung before FSB establishes control may still need to be closed.</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/release-notes/release-notes-page.component.html</context>
           <context context-type="linenumber">421,426</context>
@@ -10668,7 +10668,7 @@ https://full-selfbrowsing.com/api/telemetry/forget<x id="CLOSE_TAG_CODE" ctype="
         </context-group>
       </trans-unit>
       <trans-unit id="releaseNotes.v0992.067.extensionAndShowcaseVersion" datatype="html">
-        <source>Extension and showcase version 0.9.92; the MCP package stays at 0.11.0. The editing fixes are covered by tests that drive a real Chrome in CI.</source>
+        <source>This release pairs extension and showcase version 0.9.92 with MCP package 0.11.1. After updating, restart your MCP client or native host. Editing and hung-navigation recovery are verified in real Chrome.</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/release-notes/release-notes-page.component.html</context>
           <context context-type="linenumber">456,462</context>

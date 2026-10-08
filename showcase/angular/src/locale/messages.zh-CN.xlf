@@ -11123,8 +11123,8 @@ https://full-selfbrowsing.com/api/telemetry/forget<x id="CLOSE_TAG_CODE" ctype="
         </context-group>
       </trans-unit>
       <trans-unit id="releaseNotes.v0992.003.mcp" datatype="html">
-        <source>mcp 0.11.0</source>
-        <target state="translated">mcp 0.11.0</target>
+        <source>mcp 0.11.1</source>
+        <target state="translated">mcp 0.11.1</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/release-notes/release-notes-page.component.html</context>
           <context context-type="linenumber">16,17</context>
@@ -11991,8 +11991,8 @@ https://full-selfbrowsing.com/api/telemetry/forget<x id="CLOSE_TAG_CODE" ctype="
         </context-group>
       </trans-unit>
       <trans-unit id="releaseNotes.v0992.042.canvasEditorsAreReachable" datatype="html">
-        <source>Canvas editors are reachable for replace, and the debugger is released if an insertion is refused.</source>
-        <target state="translated">基于 canvas 的编辑器也可进行替换，插入被拒绝时会释放调试器。</target>
+        <source>Canvas editors support replacement, and a refused insertion is reported without repeating it.</source>
+        <target state="translated">画布型编辑器支持替换文本；插入被拒绝时会报告结果，不会重复执行。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/release-notes/release-notes-page.component.html</context>
           <context context-type="linenumber">364,365</context>
@@ -12007,8 +12007,8 @@ https://full-selfbrowsing.com/api/telemetry/forget<x id="CLOSE_TAG_CODE" ctype="
         </context-group>
       </trans-unit>
       <trans-unit id="releaseNotes.v0992.044.aGoogleDocsPaste" datatype="html">
-        <source>A Google Docs paste is compared by its text, not its length, and falls back to plain insertion when it inserted nothing.</source>
-        <target state="translated">Google Docs 粘贴按文本而非长度进行比较，若未插入任何内容，则回退为纯文本插入。</target>
+        <source>Google Docs confirms formatted edits against saved document text. An uncertain paste is never repeated.</source>
+        <target state="translated">Google Docs 会将带格式的编辑与已保存的文档文本进行核对。结果不确定的粘贴操作不会重复执行。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/release-notes/release-notes-page.component.html</context>
           <context context-type="linenumber">366,371</context>
@@ -12095,8 +12095,8 @@ https://full-selfbrowsing.com/api/telemetry/forget<x id="CLOSE_TAG_CODE" ctype="
         </context-group>
       </trans-unit>
       <trans-unit id="releaseNotes.v0992.055.aHungPageGets" datatype="html">
-        <source>A hung page gets a deadline</source>
-        <target state="translated">无响应的页面有了期限</target>
+        <source>Navigation can recover a hung page</source>
+        <target state="translated">导航可以恢复卡死的页面</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/release-notes/release-notes-page.component.html</context>
           <context context-type="linenumber">416,417</context>
@@ -12119,16 +12119,16 @@ https://full-selfbrowsing.com/api/telemetry/forget<x id="CLOSE_TAG_CODE" ctype="
         </context-group>
       </trans-unit>
       <trans-unit id="releaseNotes.v0992.058.anEditStuckOn" datatype="html">
-        <source>An edit stuck on a hung page points straight to tab recovery with <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot; style=&quot;font-family: &apos;Space Mono&apos;, monospace; font-size: .9em;&quot;&gt;"/>navigate<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> or <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot; style=&quot;font-family: &apos;Space Mono&apos;, monospace; font-size: .9em;&quot;&gt;"/>close_tab<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>.</source>
-        <target state="translated">卡在无响应页面上的编辑会直接指向通过 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot; style=&quot;font-family: &apos;Space Mono&apos;, monospace; font-size: .9em;&quot;&gt;"/>navigate<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 或 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot; style=&quot;font-family: &apos;Space Mono&apos;, monospace; font-size: .9em;&quot;&gt;"/>close_tab<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 进行的标签页恢复。</target>
+        <source>Navigation interrupts stuck JavaScript on controlled tabs and confirms the destination has loaded before reporting success.</source>
+        <target state="translated">导航会中断受控标签页中卡住的 JavaScript，并在确认目标页面加载完成后才报告成功。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/release-notes/release-notes-page.component.html</context>
           <context context-type="linenumber">420,421</context>
         </context-group>
       </trans-unit>
       <trans-unit id="releaseNotes.v0992.059.theDebuggerLeaseIs" datatype="html">
-        <source>The debugger lease is sized for holders that run past 20 seconds: long typing, network capture, hold, and drag.</source>
-        <target state="translated">调试器租约会按持有超过 20 秒的操作来设定时长，例如长时间输入、网络捕获、按住和拖动。</target>
+        <source>A tab already hung before FSB establishes control may still need to be closed.</source>
+        <target state="translated">如果标签页在 FSB 开始控制之前就已卡死，可能仍需要将其关闭。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/release-notes/release-notes-page.component.html</context>
           <context context-type="linenumber">421,426</context>
@@ -12191,8 +12191,8 @@ https://full-selfbrowsing.com/api/telemetry/forget<x id="CLOSE_TAG_CODE" ctype="
         </context-group>
       </trans-unit>
       <trans-unit id="releaseNotes.v0992.067.extensionAndShowcaseVersion" datatype="html">
-        <source>Extension and showcase version 0.9.92; the MCP package stays at 0.11.0. The editing fixes are covered by tests that drive a real Chrome in CI.</source>
-        <target state="translated">扩展程序与网站版本为 0.9.92；MCP 包仍为 0.11.0。编辑相关的修复由在 CI 中驱动真实 Chrome 的测试覆盖。</target>
+        <source>This release pairs extension and showcase version 0.9.92 with MCP package 0.11.1. After updating, restart your MCP client or native host. Editing and hung-navigation recovery are verified in real Chrome.</source>
+        <target state="translated">此版本将扩展程序和展示站点版本 0.9.92 与 MCP 软件包 0.11.1 配套提供。更新后，请重新启动 MCP 客户端或原生主机。编辑和卡死页面恢复功能均已在真实 Chrome 中验证。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/release-notes/release-notes-page.component.html</context>
           <context context-type="linenumber">456,462</context>

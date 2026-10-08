@@ -13,7 +13,7 @@
       <p style="margin: 0 0 32px; font-size: 1.0625rem; line-height: 1.7; color: var(--dim); max-width: 62ch; text-wrap: pretty;" i18n="@@releaseNotes.v0992.001.sevenChangesInThis">Seven changes in this release. Connections recover on their own, every action runs at most once, typing reaches code editors and web components, and a hung page stops receiving input once its deadline passes.</p>
       <div style="display: flex; flex-wrap: wrap; gap: 8px; font-family: 'Space Mono', monospace; font-size: 11px; color: var(--dim);">
         <span [attr.translate]="'no'" style="border: 1px solid var(--line); border-radius: 999px; padding: 6px 13px; white-space: nowrap;" i18n="@@releaseNotes.v0992.002.extension">extension 0.9.92</span>
-        <span [attr.translate]="'no'" style="border: 1px solid var(--line); border-radius: 999px; padding: 6px 13px; white-space: nowrap;" i18n="@@releaseNotes.v0992.003.mcp">mcp 0.11.0</span>
+        <span [attr.translate]="'no'" style="border: 1px solid var(--line); border-radius: 999px; padding: 6px 13px; white-space: nowrap;" i18n="@@releaseNotes.v0992.003.mcp">mcp 0.11.1</span>
         <span [attr.translate]="'no'" style="border: 1px solid var(--line); border-radius: 999px; padding: 6px 13px; white-space: nowrap;" i18n="@@releaseNotes.v0992.004.chrome">chrome 116+</span>
         <span [attr.translate]="'no'" style="border: 1px solid var(--line); border-radius: 999px; padding: 6px 13px; white-space: nowrap;" i18n="@@releaseNotes.v0992.005.node">node 24</span>
         <span [attr.translate]="'no'" style="border: 1px solid var(--line); border-radius: 999px; padding: 6px 13px; white-space: nowrap;" i18n="@@releaseNotes.v0992.006.mit">MIT</span>
@@ -361,9 +361,9 @@
       <ul style="margin: 0; padding-left: 18px; color: var(--dim); font-size: 1rem; line-height: 1.65;">
         <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0992.040.appendingToMonacoAce">Appending to Monaco, Ace, or CodeMirror moves the editor's own cursor to the end of the document first, so text no longer lands before the existing code.</li>
         <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0992.041.replacingTextWorksIn">Replacing text works in editors that take input through EditContext and expose no text field, such as Monaco 0.57.</li>
-        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0992.042.canvasEditorsAreReachable">Canvas editors are reachable for replace, and the debugger is released if an insertion is refused.</li>
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0992.042.canvasEditorsAreReachable">Canvas editors support replacement, and a refused insertion is reported without repeating it.</li>
         <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0992.043.appendsToAnEditor">Appends to an editor focused inside a frame move the caret to the end first.</li>
-        <li style="margin-bottom: 0;" i18n="@@releaseNotes.v0992.044.aGoogleDocsPaste">A Google Docs paste is compared by its text, not its length, and falls back to plain insertion when it inserted nothing.</li>
+        <li style="margin-bottom: 0;" i18n="@@releaseNotes.v0992.044.aGoogleDocsPaste">Google Docs confirms formatted edits against saved document text. An uncertain paste is never repeated.</li>
       </ul>
     </div>
   </section>
@@ -413,12 +413,12 @@
     </div>
     <div class="rn-sec-copy" style="order: 1;">
       <div class="rn-sec-num" [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: 11px; letter-spacing: .22em; color: var(--ac); margin-bottom: 14px;">06</div>
-      <h2 style="margin: 0 0 18px; font-size: clamp(1.5rem, 3vw, 2rem); font-weight: 700; letter-spacing: -.02em; line-height: 1.15;" i18n="@@releaseNotes.v0992.055.aHungPageGets">A hung page gets a deadline</h2>
+      <h2 style="margin: 0 0 18px; font-size: clamp(1.5rem, 3vw, 2rem); font-weight: 700; letter-spacing: -.02em; line-height: 1.15;" i18n="@@releaseNotes.v0992.055.aHungPageGets">Navigation can recover a hung page</h2>
       <ul style="margin: 0; padding-left: 18px; color: var(--dim); font-size: 1rem; line-height: 1.65;">
         <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0992.056.pageProbesScriptReinjection">Page probes, script reinjection, and screenshot capture are time-bounded on a tab that stops responding.</li>
         <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0992.057.onceATextInsertion">Once a text insertion or screenshot has given up, no further keystrokes, text, or scripts are sent to that page.</li>
-        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0992.058.anEditStuckOn">An edit stuck on a hung page points straight to tab recovery with <span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">navigate</span> or <span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">close_tab</span>.</li>
-        <li style="margin-bottom: 0;" i18n="@@releaseNotes.v0992.059.theDebuggerLeaseIs">The debugger lease is sized for holders that run past 20 seconds: long typing, network capture, hold, and drag.</li>
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0992.058.anEditStuckOn">Navigation interrupts stuck JavaScript on controlled tabs and confirms the destination has loaded before reporting success.</li>
+        <li style="margin-bottom: 0;" i18n="@@releaseNotes.v0992.059.theDebuggerLeaseIs">A tab already hung before FSB establishes control may still need to be closed.</li>
       </ul>
     </div>
   </section>
@@ -453,7 +453,7 @@
   </section>
 
   <section class="rn-sec" style="margin: 0; padding: 72px 0 0;">
-    <p style="margin: 0; padding-top: 26px; border-top: 1px solid var(--line); font-family: 'Space Mono', monospace; font-size: 11.5px; line-height: 1.8; color: var(--dim2); max-width: 76ch; text-wrap: pretty;" i18n="@@releaseNotes.v0992.067.extensionAndShowcaseVersion">Extension and showcase version 0.9.92; the MCP package stays at 0.11.0. The editing fixes are covered by tests that drive a real Chrome in CI.</p>
+    <p style="margin: 0; padding-top: 26px; border-top: 1px solid var(--line); font-family: 'Space Mono', monospace; font-size: 11.5px; line-height: 1.8; color: var(--dim2); max-width: 76ch; text-wrap: pretty;" i18n="@@releaseNotes.v0992.067.extensionAndShowcaseVersion">This release pairs extension and showcase version 0.9.92 with MCP package 0.11.1. After updating, restart your MCP client or native host. Editing and hung-navigation recovery are verified in real Chrome.</p>
   </section>
 
     }

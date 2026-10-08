@@ -11123,8 +11123,8 @@ https://full-selfbrowsing.com/api/telemetry/forget<x id="CLOSE_TAG_CODE" ctype="
         </context-group>
       </trans-unit>
       <trans-unit id="releaseNotes.v0992.003.mcp" datatype="html">
-        <source>mcp 0.11.0</source>
-        <target state="translated">mcp 0.11.0</target>
+        <source>mcp 0.11.1</source>
+        <target state="translated">mcp 0.11.1</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/release-notes/release-notes-page.component.html</context>
           <context context-type="linenumber">16,17</context>
@@ -11991,8 +11991,8 @@ https://full-selfbrowsing.com/api/telemetry/forget<x id="CLOSE_TAG_CODE" ctype="
         </context-group>
       </trans-unit>
       <trans-unit id="releaseNotes.v0992.042.canvasEditorsAreReachable" datatype="html">
-        <source>Canvas editors are reachable for replace, and the debugger is released if an insertion is refused.</source>
-        <target state="translated">canvas ベースのエディターも置き換えの対象にでき、挿入が拒否された場合はデバッガーが解放されます。</target>
+        <source>Canvas editors support replacement, and a refused insertion is reported without repeating it.</source>
+        <target state="translated">キャンバス型エディターでテキストを置き換えられます。挿入が拒否された場合は、繰り返さずにその結果を報告します。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/release-notes/release-notes-page.component.html</context>
           <context context-type="linenumber">364,365</context>
@@ -12007,8 +12007,8 @@ https://full-selfbrowsing.com/api/telemetry/forget<x id="CLOSE_TAG_CODE" ctype="
         </context-group>
       </trans-unit>
       <trans-unit id="releaseNotes.v0992.044.aGoogleDocsPaste" datatype="html">
-        <source>A Google Docs paste is compared by its text, not its length, and falls back to plain insertion when it inserted nothing.</source>
-        <target state="translated">Google Docs への貼り付けは長さではなくテキストで比較され、何も挿入されなかった場合はプレーンテキストの挿入に切り替わります。</target>
+        <source>Google Docs confirms formatted edits against saved document text. An uncertain paste is never repeated.</source>
+        <target state="translated">Google Docs は、保存済みの文書テキストと照合して書式付きの編集を確認します。結果が不明な貼り付けは繰り返しません。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/release-notes/release-notes-page.component.html</context>
           <context context-type="linenumber">366,371</context>
@@ -12095,8 +12095,8 @@ https://full-selfbrowsing.com/api/telemetry/forget<x id="CLOSE_TAG_CODE" ctype="
         </context-group>
       </trans-unit>
       <trans-unit id="releaseNotes.v0992.055.aHungPageGets" datatype="html">
-        <source>A hung page gets a deadline</source>
-        <target state="translated">応答しないページには期限が設けられます</target>
+        <source>Navigation can recover a hung page</source>
+        <target state="translated">ページが応答しなくなってもナビゲーションで復旧できます</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/release-notes/release-notes-page.component.html</context>
           <context context-type="linenumber">416,417</context>
@@ -12119,16 +12119,16 @@ https://full-selfbrowsing.com/api/telemetry/forget<x id="CLOSE_TAG_CODE" ctype="
         </context-group>
       </trans-unit>
       <trans-unit id="releaseNotes.v0992.058.anEditStuckOn" datatype="html">
-        <source>An edit stuck on a hung page points straight to tab recovery with <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot; style=&quot;font-family: &apos;Space Mono&apos;, monospace; font-size: .9em;&quot;&gt;"/>navigate<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> or <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot; style=&quot;font-family: &apos;Space Mono&apos;, monospace; font-size: .9em;&quot;&gt;"/>close_tab<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>.</source>
-        <target state="translated">応答しないページで止まった編集には、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot; style=&quot;font-family: &apos;Space Mono&apos;, monospace; font-size: .9em;&quot;&gt;"/>navigate<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> または <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot; style=&quot;font-family: &apos;Space Mono&apos;, monospace; font-size: .9em;&quot;&gt;"/>close_tab<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> によるタブの復旧が直接案内されます。</target>
+        <source>Navigation interrupts stuck JavaScript on controlled tabs and confirms the destination has loaded before reporting success.</source>
+        <target state="translated">操作対象のタブで停止しない JavaScript をナビゲーションが中断し、移動先の読み込み完了を確認してから成功を報告します。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/release-notes/release-notes-page.component.html</context>
           <context context-type="linenumber">420,421</context>
         </context-group>
       </trans-unit>
       <trans-unit id="releaseNotes.v0992.059.theDebuggerLeaseIs" datatype="html">
-        <source>The debugger lease is sized for holders that run past 20 seconds: long typing, network capture, hold, and drag.</source>
-        <target state="translated">デバッガーのリースは、長いタイピング、ネットワークの記録、長押し、ドラッグなど 20 秒を超えて保持する処理に合わせて確保されます。</target>
+        <source>A tab already hung before FSB establishes control may still need to be closed.</source>
+        <target state="translated">FSB が制御を開始する前から応答しないタブは、閉じる必要がある場合があります。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/release-notes/release-notes-page.component.html</context>
           <context context-type="linenumber">421,426</context>
@@ -12191,8 +12191,8 @@ https://full-selfbrowsing.com/api/telemetry/forget<x id="CLOSE_TAG_CODE" ctype="
         </context-group>
       </trans-unit>
       <trans-unit id="releaseNotes.v0992.067.extensionAndShowcaseVersion" datatype="html">
-        <source>Extension and showcase version 0.9.92; the MCP package stays at 0.11.0. The editing fixes are covered by tests that drive a real Chrome in CI.</source>
-        <target state="translated">拡張機能とサイトのバージョンは 0.9.92、MCP パッケージは 0.11.0 のままです。編集まわりの修正は、CI で実際の Chrome を操作するテストで確認されています。</target>
+        <source>This release pairs extension and showcase version 0.9.92 with MCP package 0.11.1. After updating, restart your MCP client or native host. Editing and hung-navigation recovery are verified in real Chrome.</source>
+        <target state="translated">このリリースでは、拡張機能と紹介サイトのバージョン 0.9.92 に MCP パッケージ 0.11.1 を組み合わせます。更新後は MCP クライアントまたはネイティブホストを再起動してください。編集と応答しないページからの復旧は、実際の Chrome で検証済みです。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/release-notes/release-notes-page.component.html</context>
           <context context-type="linenumber">456,462</context>

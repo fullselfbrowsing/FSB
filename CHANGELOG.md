@@ -8,7 +8,7 @@ The independently published `fsb-mcp-server` npm package keeps its own semver ch
 
 ## v0.9.92 — Bridge Reliability and Editing Fixes — 2026-10-07
 
-The extension, showcase, skill, documentation, and store metadata align at `0.9.92`. The independently versioned `fsb-mcp-server` stays at `0.11.0`; see [`mcp/CHANGELOG.md`](./mcp/CHANGELOG.md) for its package-specific release notes and compatibility requirements.
+The extension, showcase, skill, documentation, and store metadata align at `0.9.92`. The independently versioned `fsb-mcp-server` advances to `0.11.1` with the accompanying patch; see [`mcp/CHANGELOG.md`](./mcp/CHANGELOG.md) for its package-specific release notes and compatibility requirements.
 
 ### Fixed
 

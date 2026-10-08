@@ -11123,8 +11123,8 @@ https://full-selfbrowsing.com/api/telemetry/forget<x id="CLOSE_TAG_CODE" ctype="
         </context-group>
       </trans-unit>
       <trans-unit id="releaseNotes.v0992.003.mcp" datatype="html">
-        <source>mcp 0.11.0</source>
-        <target state="translated">mcp 0.11.0</target>
+        <source>mcp 0.11.1</source>
+        <target state="translated">mcp 0.11.1</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/release-notes/release-notes-page.component.html</context>
           <context context-type="linenumber">16,17</context>
@@ -11991,8 +11991,8 @@ https://full-selfbrowsing.com/api/telemetry/forget<x id="CLOSE_TAG_CODE" ctype="
         </context-group>
       </trans-unit>
       <trans-unit id="releaseNotes.v0992.042.canvasEditorsAreReachable" datatype="html">
-        <source>Canvas editors are reachable for replace, and the debugger is released if an insertion is refused.</source>
-        <target state="translated">캔버스 기반 편집기도 바꾸기 대상으로 접근할 수 있으며, 삽입이 거부되면 디버거가 해제됩니다.</target>
+        <source>Canvas editors support replacement, and a refused insertion is reported without repeating it.</source>
+        <target state="translated">캔버스 기반 편집기에서 텍스트를 바꿀 수 있습니다. 삽입이 거부되면 반복하지 않고 결과를 보고합니다.</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/release-notes/release-notes-page.component.html</context>
           <context context-type="linenumber">364,365</context>
@@ -12007,8 +12007,8 @@ https://full-selfbrowsing.com/api/telemetry/forget<x id="CLOSE_TAG_CODE" ctype="
         </context-group>
       </trans-unit>
       <trans-unit id="releaseNotes.v0992.044.aGoogleDocsPaste" datatype="html">
-        <source>A Google Docs paste is compared by its text, not its length, and falls back to plain insertion when it inserted nothing.</source>
-        <target state="translated">Google Docs 붙여넣기는 길이가 아닌 텍스트로 비교하며, 아무것도 삽입되지 않았으면 일반 텍스트 삽입으로 전환합니다.</target>
+        <source>Google Docs confirms formatted edits against saved document text. An uncertain paste is never repeated.</source>
+        <target state="translated">Google Docs는 저장된 문서 텍스트와 대조하여 서식이 있는 편집을 확인합니다. 결과가 불확실한 붙여넣기는 반복하지 않습니다.</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/release-notes/release-notes-page.component.html</context>
           <context context-type="linenumber">366,371</context>
@@ -12095,8 +12095,8 @@ https://full-selfbrowsing.com/api/telemetry/forget<x id="CLOSE_TAG_CODE" ctype="
         </context-group>
       </trans-unit>
       <trans-unit id="releaseNotes.v0992.055.aHungPageGets" datatype="html">
-        <source>A hung page gets a deadline</source>
-        <target state="translated">응답하지 않는 페이지에는 기한이 있습니다</target>
+        <source>Navigation can recover a hung page</source>
+        <target state="translated">페이지가 멈춰도 탐색으로 복구할 수 있습니다</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/release-notes/release-notes-page.component.html</context>
           <context context-type="linenumber">416,417</context>
@@ -12119,16 +12119,16 @@ https://full-selfbrowsing.com/api/telemetry/forget<x id="CLOSE_TAG_CODE" ctype="
         </context-group>
       </trans-unit>
       <trans-unit id="releaseNotes.v0992.058.anEditStuckOn" datatype="html">
-        <source>An edit stuck on a hung page points straight to tab recovery with <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot; style=&quot;font-family: &apos;Space Mono&apos;, monospace; font-size: .9em;&quot;&gt;"/>navigate<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> or <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot; style=&quot;font-family: &apos;Space Mono&apos;, monospace; font-size: .9em;&quot;&gt;"/>close_tab<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>.</source>
-        <target state="translated">응답하지 않는 페이지에서 멈춘 편집은 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot; style=&quot;font-family: &apos;Space Mono&apos;, monospace; font-size: .9em;&quot;&gt;"/>navigate<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 또는 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot; style=&quot;font-family: &apos;Space Mono&apos;, monospace; font-size: .9em;&quot;&gt;"/>close_tab<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 을 통한 탭 복구로 바로 안내합니다.</target>
+        <source>Navigation interrupts stuck JavaScript on controlled tabs and confirms the destination has loaded before reporting success.</source>
+        <target state="translated">탐색은 제어 중인 탭에서 멈춘 JavaScript 실행을 중단하고, 대상 페이지의 로딩이 끝났는지 확인한 뒤 성공을 보고합니다.</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/release-notes/release-notes-page.component.html</context>
           <context context-type="linenumber">420,421</context>
         </context-group>
       </trans-unit>
       <trans-unit id="releaseNotes.v0992.059.theDebuggerLeaseIs" datatype="html">
-        <source>The debugger lease is sized for holders that run past 20 seconds: long typing, network capture, hold, and drag.</source>
-        <target state="translated">디버거 임대는 긴 타이핑, 네트워크 캡처, 길게 누르기, 드래그처럼 20초 넘게 붙잡는 작업에 맞춰 크기가 정해집니다.</target>
+        <source>A tab already hung before FSB establishes control may still need to be closed.</source>
+        <target state="translated">FSB가 제어를 시작하기 전에 이미 멈춘 탭은 여전히 닫아야 할 수 있습니다.</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/release-notes/release-notes-page.component.html</context>
           <context context-type="linenumber">421,426</context>
@@ -12191,8 +12191,8 @@ https://full-selfbrowsing.com/api/telemetry/forget<x id="CLOSE_TAG_CODE" ctype="
         </context-group>
       </trans-unit>
       <trans-unit id="releaseNotes.v0992.067.extensionAndShowcaseVersion" datatype="html">
-        <source>Extension and showcase version 0.9.92; the MCP package stays at 0.11.0. The editing fixes are covered by tests that drive a real Chrome in CI.</source>
-        <target state="translated">확장 프로그램과 사이트 버전은 0.9.92이며 MCP 패키지는 0.11.0 그대로입니다. 편집 관련 수정은 CI에서 실제 Chrome을 조작하는 테스트로 검증됩니다.</target>
+        <source>This release pairs extension and showcase version 0.9.92 with MCP package 0.11.1. After updating, restart your MCP client or native host. Editing and hung-navigation recovery are verified in real Chrome.</source>
+        <target state="translated">이번 릴리스는 확장 프로그램과 소개 사이트 버전 0.9.92를 MCP 패키지 0.11.1과 함께 제공합니다. 업데이트 후 MCP 클라이언트 또는 네이티브 호스트를 다시 시작하세요. 편집과 멈춘 페이지 복구는 실제 Chrome에서 검증했습니다.</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/release-notes/release-notes-page.component.html</context>
           <context context-type="linenumber">456,462</context>

@@ -1,6 +1,6 @@
 import { NATIVE_HOST_SERVICE_PORT } from './native-host/constants.js';
 export const FSB_SERVER_NAME = 'fsb';
-export const FSB_MCP_VERSION = '0.11.0';
+export const FSB_MCP_VERSION = '0.11.1';
 export const FSB_EXTENSION_BRIDGE_PORT = 7225;
 export const FSB_EXTENSION_BRIDGE_URL = `ws://localhost:${FSB_EXTENSION_BRIDGE_PORT}`;
 export const DEFAULT_HTTP_HOST = '127.0.0.1';

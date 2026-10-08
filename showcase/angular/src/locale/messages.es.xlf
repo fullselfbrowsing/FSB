@@ -11123,8 +11123,8 @@ https://full-selfbrowsing.com/api/telemetry/forget<x id="CLOSE_TAG_CODE" ctype="
         </context-group>
       </trans-unit>
       <trans-unit id="releaseNotes.v0992.003.mcp" datatype="html">
-        <source>mcp 0.11.0</source>
-        <target state="translated">mcp 0.11.0</target>
+        <source>mcp 0.11.1</source>
+        <target state="translated">mcp 0.11.1</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/release-notes/release-notes-page.component.html</context>
           <context context-type="linenumber">16,17</context>
@@ -11991,8 +11991,8 @@ https://full-selfbrowsing.com/api/telemetry/forget<x id="CLOSE_TAG_CODE" ctype="
         </context-group>
       </trans-unit>
       <trans-unit id="releaseNotes.v0992.042.canvasEditorsAreReachable" datatype="html">
-        <source>Canvas editors are reachable for replace, and the debugger is released if an insertion is refused.</source>
-        <target state="translated">Los editores basados en canvas son accesibles para reemplazar, y el depurador se libera si se rechaza una inserción.</target>
+        <source>Canvas editors support replacement, and a refused insertion is reported without repeating it.</source>
+        <target state="translated">Los editores de lienzo permiten reemplazar texto. Si se rechaza una inserción, se informa sin repetirla.</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/release-notes/release-notes-page.component.html</context>
           <context context-type="linenumber">364,365</context>
@@ -12007,8 +12007,8 @@ https://full-selfbrowsing.com/api/telemetry/forget<x id="CLOSE_TAG_CODE" ctype="
         </context-group>
       </trans-unit>
       <trans-unit id="releaseNotes.v0992.044.aGoogleDocsPaste" datatype="html">
-        <source>A Google Docs paste is compared by its text, not its length, and falls back to plain insertion when it inserted nothing.</source>
-        <target state="translated">Un pegado en Google Docs se compara por su texto, no por su longitud, y recurre a la inserción de texto sin formato cuando no insertó nada.</target>
+        <source>Google Docs confirms formatted edits against saved document text. An uncertain paste is never repeated.</source>
+        <target state="translated">Google Docs confirma los cambios de formato comparándolos con el texto guardado del documento. Nunca se repite un pegado cuyo resultado es incierto.</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/release-notes/release-notes-page.component.html</context>
           <context context-type="linenumber">366,371</context>
@@ -12095,8 +12095,8 @@ https://full-selfbrowsing.com/api/telemetry/forget<x id="CLOSE_TAG_CODE" ctype="
         </context-group>
       </trans-unit>
       <trans-unit id="releaseNotes.v0992.055.aHungPageGets" datatype="html">
-        <source>A hung page gets a deadline</source>
-        <target state="translated">Una página bloqueada tiene un plazo</target>
+        <source>Navigation can recover a hung page</source>
+        <target state="translated">La navegación puede recuperar una página bloqueada</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/release-notes/release-notes-page.component.html</context>
           <context context-type="linenumber">416,417</context>
@@ -12119,16 +12119,16 @@ https://full-selfbrowsing.com/api/telemetry/forget<x id="CLOSE_TAG_CODE" ctype="
         </context-group>
       </trans-unit>
       <trans-unit id="releaseNotes.v0992.058.anEditStuckOn" datatype="html">
-        <source>An edit stuck on a hung page points straight to tab recovery with <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot; style=&quot;font-family: &apos;Space Mono&apos;, monospace; font-size: .9em;&quot;&gt;"/>navigate<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> or <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot; style=&quot;font-family: &apos;Space Mono&apos;, monospace; font-size: .9em;&quot;&gt;"/>close_tab<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>.</source>
-        <target state="translated">Una edición atascada en una página bloqueada remite directamente a la recuperación de la pestaña con <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot; style=&quot;font-family: &apos;Space Mono&apos;, monospace; font-size: .9em;&quot;&gt;"/>navigate<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> o <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot; style=&quot;font-family: &apos;Space Mono&apos;, monospace; font-size: .9em;&quot;&gt;"/>close_tab<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>.</target>
+        <source>Navigation interrupts stuck JavaScript on controlled tabs and confirms the destination has loaded before reporting success.</source>
+        <target state="translated">La navegación interrumpe el JavaScript bloqueado en las pestañas controladas y confirma que la página de destino se ha cargado antes de comunicar el éxito.</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/release-notes/release-notes-page.component.html</context>
           <context context-type="linenumber">420,421</context>
         </context-group>
       </trans-unit>
       <trans-unit id="releaseNotes.v0992.059.theDebuggerLeaseIs" datatype="html">
-        <source>The debugger lease is sized for holders that run past 20 seconds: long typing, network capture, hold, and drag.</source>
-        <target state="translated">La concesión del depurador se dimensiona para quienes la retienen más de 20 segundos: escritura larga, captura de red, mantener pulsado y arrastrar.</target>
+        <source>A tab already hung before FSB establishes control may still need to be closed.</source>
+        <target state="translated">Una pestaña que ya estaba bloqueada antes de que FSB asumiera el control puede seguir necesitando cerrarse.</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/release-notes/release-notes-page.component.html</context>
           <context context-type="linenumber">421,426</context>
@@ -12191,8 +12191,8 @@ https://full-selfbrowsing.com/api/telemetry/forget<x id="CLOSE_TAG_CODE" ctype="
         </context-group>
       </trans-unit>
       <trans-unit id="releaseNotes.v0992.067.extensionAndShowcaseVersion" datatype="html">
-        <source>Extension and showcase version 0.9.92; the MCP package stays at 0.11.0. The editing fixes are covered by tests that drive a real Chrome in CI.</source>
-        <target state="translated">Versión 0.9.92 de la extensión y del sitio; el paquete MCP se mantiene en 0.11.0. Las correcciones de edición están cubiertas por pruebas que controlan un Chrome real en CI.</target>
+        <source>This release pairs extension and showcase version 0.9.92 with MCP package 0.11.1. After updating, restart your MCP client or native host. Editing and hung-navigation recovery are verified in real Chrome.</source>
+        <target state="translated">Esta versión combina la extensión y el sitio web de presentación 0.9.92 con el paquete MCP 0.11.1. Después de actualizar, reinicia tu cliente MCP o el host nativo. La edición y la recuperación de páginas bloqueadas se han verificado en Chrome real.</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/release-notes/release-notes-page.component.html</context>
           <context context-type="linenumber">456,462</context>
