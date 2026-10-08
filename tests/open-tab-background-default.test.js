@@ -258,7 +258,7 @@ async function test6_delegationLeavesBackgroundDefaultUntouched() {
   const body = source.slice(start, end === -1 ? source.length : end);
   check(start !== -1, 'handleOpenTabRoute source exists');
   check(
-    body.includes("chrome.tabs.create({ url: params.url || 'about:blank', active: params.active === true })"),
+    body.includes("createMcpControlledTab({ tool: 'open_tab', url: params.url || 'about:blank', active: params.active === true, agentId })"),
     'open_tab still defaults to background and focuses only on explicit active:true',
   );
   check(!body.includes('sealHoldLease') && !body.includes('restoreHoldLease')

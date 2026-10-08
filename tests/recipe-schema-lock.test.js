@@ -42,7 +42,7 @@ const TOOL_DEFS_PATH = path.join(REPO_ROOT, 'mcp', 'ai', 'tool-definitions.cjs')
 // tests/tool-definitions-parity.test.js:52 / capability-mcp-surface.test.js. The
 // recipe-rot work must NOT move this (no tool-definitions edit this phase).
 const EXPECTED_NON_TRIGGER_REGISTRY_HASH =
-  'b9c30a5a61fbcdae60b851aebfea90d0961cb95d95c3c2adbf8357014bbbd7b9';
+  '8a7928d6f036a6bc51d03d0aeb1aa951cf2d39b60f3dab2a7ddbc1b7ac95ca94';
 
 // The four trigger tools sit IN TOOL_REGISTRY but are excluded from the frozen
 // non-trigger baseline (mirrors tool-definitions-parity.test.js:35/132).

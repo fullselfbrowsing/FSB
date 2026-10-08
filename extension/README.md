@@ -1,6 +1,6 @@
 # FSB Chrome Extension
 
-`extension/` is the unpacked Chrome extension package for FSB v0.9.91. Public users should install FSB from the Chrome Web Store so Chrome can apply release updates automatically. Load this directory only for local development or an urgent unreleased fix.
+`extension/` is the unpacked Chrome extension package for FSB v0.9.92. Public users should install FSB from the Chrome Web Store so Chrome can apply release updates automatically. Load this directory only for local development or an urgent unreleased fix.
 
 ## Load Unpacked
 
@@ -12,6 +12,10 @@
 6. Right-click the extension and choose **Open side panel**.
 
 After code changes, reload the extension from `chrome://extensions` and refresh any open tabs so content scripts re-inject.
+
+Copy the extension ID shown on `chrome://extensions` when pairing an unpacked build. Its ID can differ from the Chrome Web Store ID and can change if you reinstall it from another directory. Run `npx -y fsb-mcp-server@latest pair --reset` if `doctor` reports `ORIGIN_PIN_MISMATCH`, then pair the new installation. `doctor` also shows a persistent install instance ID, the extension version, and the normal-window count so you can identify which browser profile holds the bridge. One extension/profile attaches to the local bridge at a time; another profile may replace it. The MCP server and extension have independent version numbers.
+
+In branded Chrome 137 and later, the `--load-extension` command-line flag no longer loads unpacked extensions. Use the **Load unpacked** button above. [Chrome for Testing and Chromium retain the flag](https://groups.google.com/a/chromium.org/g/chromium-extensions/c/1-g8EFx2BBY/m/S0ET5wPjCAAJ).
 
 ## Google Sheets Development
 

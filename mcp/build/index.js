@@ -8,6 +8,7 @@ import { DEFAULT_HTTP_HOST, DEFAULT_HTTP_PORT, FSB_EXTENSION_BRIDGE_URL, FSB_MCP
 import { getSetupSections, runInstall, runUninstall } from './install.js';
 import { createProductionNativeHostCliOperations, inspectProductionNativeHost, } from './native-host-production.js';
 import { pushMcpClientInventory } from './client-inventory.js';
+import { shutdownWhenStdinEnds } from './stdin-shutdown.js';
 import { FSB_EXT_PROTOCOL, formatPairingCode, readBridgeAuthState, resetBridgePairing, rotateBridgeSessionSecret, } from './bridge-auth.js';
 const productionNativeHostCliOperations = createProductionNativeHostCliOperations();
 const productionNativeHostDiagnostics = Object.freeze({
@@ -167,6 +168,19 @@ export function buildCompactStatusFields(diagnostics, nowMs = Date.now()) {
         ['Relays', String(diagnostics.relayCount)],
         ['Disconnect', diagnostics.lastDisconnectReason ?? 'none'],
         ['Layer', diagnostics.diagnosticLayer],
+        ...(diagnostics.diagnosticCode ? [['Code', diagnostics.diagnosticCode]] : []),
+    ];
+}
+function formatExtensionAttachment(diagnostics) {
+    const attachment = diagnostics.extensionAttachment;
+    if (!attachment)
+        return [];
+    return [
+        `Extension ID: ${attachment.extensionId}`,
+        `Extension version: ${attachment.extensionVersion}`,
+        `Install instance: ${attachment.installInstanceId}`,
+        `Normal windows: ${attachment.normalWindowCount}`,
+        `Connected at: ${attachment.connectedAt ?? 'not reported'}`,
     ];
 }
 function formatFieldLines(fields) {
@@ -189,6 +203,7 @@ export function formatStatus(diagnostics) {
         const model = diagnostics.extensionConfig.modelName ?? 'unknown';
         lines.push(`Extension model: ${provider} / ${model}`);
     }
+    lines.push(...formatExtensionAttachment(diagnostics));
     if (diagnostics.tabsSummary) {
         lines.push(`Open tabs: ${diagnostics.tabsSummary.totalTabs}`);
         lines.push(`Active tab ID: ${diagnostics.tabsSummary.activeTabId ?? 'none'}`);
@@ -210,6 +225,7 @@ export function formatWatchSnapshot(diagnostics) {
     if (diagnostics.activeTab.url) {
         lines.push(`Active page: ${diagnostics.activeTab.pageType} (${diagnostics.activeTab.url})`);
     }
+    lines.push(...formatExtensionAttachment(diagnostics));
     if (diagnostics.probeNotes && diagnostics.probeNotes.length > 0) {
         lines.push(`Note: ${diagnostics.probeNotes[0].message}`);
     }
@@ -222,6 +238,7 @@ export function formatDoctor(diagnostics) {
         `Why: ${diagnostics.diagnosticWhy}`,
         `Next action: ${diagnostics.nextAction}`,
         ...formatFieldLines(buildCompactStatusFields(diagnostics)),
+        ...formatExtensionAttachment(diagnostics),
     ];
     if (diagnostics.activeTab.url) {
         lines.push(`Active page: ${diagnostics.activeTab.pageType} (${diagnostics.activeTab.url})`);
@@ -305,6 +322,12 @@ async function runStdioServer() {
     };
     process.on('SIGTERM', shutdown);
     process.on('SIGINT', shutdown);
+    // Without this, a host that exits by closing the pipe leaves the bridge
+    // running -- and holding the port -- forever.
+    shutdownWhenStdinEnds(process.stdin, () => {
+        console.error('[FSB MCP] stdin closed by the host; shutting down.');
+        shutdown();
+    });
 }
 async function runHttpMode(flags) {
     const host = readStringFlag(flags, 'host', DEFAULT_HTTP_HOST);
@@ -314,7 +337,8 @@ async function runHttpMode(flags) {
         port,
         dependencies: {
             prepareBridgeAuth: () => {
-                rotateBridgeSessionSecret();
+                if (!readBridgeAuthState())
+                    rotateBridgeSessionSecret();
             },
         },
     });

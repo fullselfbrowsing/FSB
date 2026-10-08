@@ -52,7 +52,7 @@ function loadBridgeHarness() {
       return { success: true, tool: args.tool, params: args.params };
     },
     hasMcpToolRoute: () => true,
-    getToolByName: (name) => ({ name, _route: 'background', _emitChangeReport: true }),
+    getToolByNameOrVerb: (name) => ({ name, _route: 'background', _emitChangeReport: true }),
     wrapWithChangeReport: async (args) => {
       wrappedChangeReports.push(args);
       return args.execute();

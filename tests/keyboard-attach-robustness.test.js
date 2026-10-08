@@ -12,11 +12,9 @@
  *   Test 2 (external owner preservation / Tier 1a): on an 'Another debugger is
  *     already attached' error, attachDebugger fails with a retryable busy result
  *     without detaching DevTools or another extension.
- *   Test 3 (post-op detach preserved / regression guard): after a successful op,
- *     detachDebugger (as handleKeyboardDebuggerAction does after every op) resets state
- *     so isAttachedTo(tabId) is false and the next attach starts fresh -- confirming we
- *     did NOT switch to a persistent debugger hold (resolved issue
- *     cdp-tab-debugger-attachment.md must not regress).
+ *   Test 3 (unowned-tab cleanup): without the shared session owner,
+ *     detachDebugger resets state so the next attach starts fresh. Controlled
+ *     tabs retain their connection through the shared session owner instead.
  *
  * Zero-framework sibling convention (tests/service-denylist.test.js,
  * tests/network-capture.test.js): passed/failed counters + check(cond,msg) +
@@ -121,9 +119,8 @@ const { KeyboardEmulator } = require('../extension/utils/keyboard-emulator.js');
     check(emu.isAttachedTo(TAB_ID) === false, 'Test 2: emulator does not claim the externally owned tab');
   }
 
-  // === Test 3: post-op detach preserved (regression guard) =================
-  // A clean attach, then detachDebugger (as handleKeyboardDebuggerAction does after
-  // every op) must reset state -- no persistent hold. A following attach starts fresh.
+  // === Test 3: unowned-tab detach ==========================================
+  // Without a shared session owner, cleanup resets the standalone emulator.
   {
     const { chromeMock, counts } = makeChromeMock([{ ok: true }, { ok: true }]);
     globalThis.chrome = chromeMock;
@@ -159,6 +156,31 @@ const { KeyboardEmulator } = require('../extension/utils/keyboard-emulator.js');
     const reset = emu.handleExternalDetach(TAB_ID);
     check(reset === true, 'Test 4: handleExternalDetach returns true for the attached tab');
     check(emu.isAttachedTo(TAB_ID) === false && emu.attachPromise === null, 'Test 4: emulator state reset after external detach');
+  }
+
+  {
+    const { chromeMock, counts } = makeChromeMock([]);
+    globalThis.chrome = chromeMock;
+    globalThis.requireForegroundNativeInput = async () => {
+      throw Object.assign(new Error('foreground required'), { code: 'TAB_NOT_FOREGROUND', retryable: true });
+    };
+    const result = await new KeyboardEmulator().typeText(TAB_ID, 'hello', 0);
+    check(result.success === false && result.code === 'TAB_NOT_FOREGROUND', 'hidden keyboard typing returns the foreground refusal');
+    check(counts.attach === 0 && counts.sendCommand === 0, 'hidden keyboard typing sends no native input or insertText fallback');
+    delete globalThis.requireForegroundNativeInput;
+  }
+
+  {
+    const { chromeMock, counts } = makeChromeMock([]);
+    globalThis.chrome = chromeMock;
+    let checks = 0;
+    globalThis.requireForegroundNativeInput = async () => {
+      if (++checks === 2) throw Object.assign(new Error('foreground lost'), { code: 'TAB_NOT_FOREGROUND' });
+    };
+    const result = await new KeyboardEmulator().typeText(TAB_ID, 'a', 0);
+    check(result.success === false && result.mayHaveExecuted === true, 'losing foreground after keyDown preserves the uncertain outcome');
+    check(counts.sendCommand === 1, 'a delivered key is never duplicated by the insertText fallback');
+    delete globalThis.requireForegroundNativeInput;
   }
 
   console.log(`\n${passed} passed, ${failed} failed`);

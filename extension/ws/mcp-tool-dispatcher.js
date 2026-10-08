@@ -1,11 +1,12 @@
 'use strict';
 
-// In Chrome extension importScripts context, TOOL_REGISTRY and getToolByName
+// In Chrome extension importScripts context, registry helpers
 // are globals from ai/tool-definitions.js. In Node.js/tests, fall back to require().
 var _mcp_defs = (typeof TOOL_REGISTRY !== 'undefined')
-  ? { TOOL_REGISTRY, getToolByName }
+  ? { TOOL_REGISTRY, getToolByName, getToolByNameOrVerb }
   : (typeof require !== 'undefined' ? require('../ai/tool-definitions.js') : {});
 var _mcp_getToolByName = _mcp_defs.getToolByName;
+var _mcp_getToolByNameOrVerb = _mcp_defs.getToolByNameOrVerb;
 
 // Phase 245 D-07: global toggle for change_report emission. Hydrated from
 // chrome.storage.local.fsbChangeReportsEnabled at module load and refreshed
@@ -1187,7 +1188,7 @@ function sanitizeSingleTab(tool, tab, extra = {}) {
 }
 
 function shouldEmitSyntheticChangeReport(tool) {
-  const toolDef = (typeof _mcp_getToolByName === 'function') ? _mcp_getToolByName(tool) : null;
+  const toolDef = (typeof _mcp_getToolByNameOrVerb === 'function') ? _mcp_getToolByNameOrVerb(tool) : null;
   return !!(fsbChangeReportsEnabled && toolDef && toolDef._emitChangeReport === true);
 }
 
@@ -1246,6 +1247,103 @@ function hasActiveAutomationSessionForTab(tabId) {
   return false;
 }
 
+async function navigateTabAndWaitForCommit(tabId, url) {
+  const events = chrome.webNavigation;
+  if (!events?.onCommitted) {
+    // Embedded hosts without webNavigation still have to confirm the requested URL.
+    const updated = await chrome.tabs.update(tabId, { url });
+    return updated?.url === url ? { success: true, tab: updated } : {
+      success: false, errorCode: 'PAGE_UNRESPONSIVE', outcome: 'unknown', mayHaveExecuted: true,
+      error: 'Navigation was requested but the destination has not committed. Use close_tab if the page remains stuck.'
+    };
+  }
+  let settled = false;
+  let timer;
+  let recoveryTimer;
+  let recovered = false;
+  let navigationRequested = false;
+  const listeners = [];
+  let finish;
+  const result = new Promise(resolve => { finish = value => {
+    if (settled) return;
+    settled = true;
+    clearTimeout(timer);
+    clearTimeout(recoveryTimer);
+    for (const [event, listener] of listeners) event.removeListener(listener);
+    resolve(value);
+  }; });
+  const listen = (event, listener) => {
+    if (!event) return;
+    event.addListener(listener);
+    listeners.push([event, listener]);
+  };
+  const committed = details => {
+    if (details.tabId === tabId && details.frameId === 0) finish({ success: true, url: details.url });
+  };
+  listen(events.onCommitted, committed);
+  listen(events.onReferenceFragmentUpdated, committed);
+  listen(events.onHistoryStateUpdated, committed);
+  listen(events.onErrorOccurred, details => {
+    if (details.tabId === tabId && details.frameId === 0) finish({
+      success: false, errorCode: 'navigation_failed', error: details.error,
+      outcome: 'failed', mayHaveExecuted: false
+    });
+  });
+  listen(chrome.tabs.onRemoved, removedId => {
+    if (removedId === tabId) finish({ success: false, errorCode: 'navigation_failed', error: 'Tab closed during navigation' });
+  });
+  timer = setTimeout(() => finish({ success: false, errorCode: 'PAGE_UNRESPONSIVE',
+    outcome: navigationRequested ? 'unknown' : 'failed', mayHaveExecuted: navigationRequested, retryable: false,
+    error: navigationRequested
+      ? 'Navigation did not commit before its deadline. Use close_tab to recover the stuck tab.'
+      : 'The renderer did not recover before the navigation deadline. Use close_tab to recover the stuck tab.' }), 10000);
+  try {
+    const recoverRenderer = async () => {
+      if (typeof recoverStalledTabNavigation !== 'function') return false;
+      try { return await recoverStalledTabNavigation(tabId, () => !settled); }
+      catch (error) {
+        globalThis.automationLogger?.debug('Navigation renderer recovery failed', { tabId, error: error.message || String(error) });
+        return false;
+      }
+    };
+    const requestNavigation = async () => {
+      // Recover the outgoing renderer before a navigation changes its debugger
+      // target. Responsive pages only incur the short responsiveness probe.
+      recovered = await recoverRenderer();
+      if (settled) return;
+      if (globalThis.FsbDebuggerSessions && !globalThis.FsbDebuggerSessions.isReady(tabId)) {
+        try { await globalThis.FsbDebuggerSessions.retain(tabId); }
+        catch (error) {
+          globalThis.automationLogger?.debug('Navigation debugger initialization failed', { tabId, error: error.message });
+        }
+      }
+      if (settled) return;
+      navigationRequested = true;
+      // A hung renderer can also delay the tabs.update callback. The commit
+      // listener and recovery deadline keep running while it is pending.
+      const updating = chrome.tabs.update(tabId, { url });
+      updating.catch(error => finish({ success: false, errorCode: 'navigation_failed',
+        error: error.message || String(error), outcome: 'failed', mayHaveExecuted: false }));
+      if (!settled) recoveryTimer = setTimeout(async () => {
+        recovered = (await recoverRenderer()) || recovered;
+      }, 3000);
+    };
+    requestNavigation().catch(error => finish({ success: false, errorCode: 'navigation_failed',
+      error: error.message || String(error), outcome: 'failed', mayHaveExecuted: false }));
+    const navigation = await result;
+    if (!navigation.success && globalThis.FsbDebuggerSessions) {
+      globalThis.FsbDebuggerSessions.releaseUnowned().catch(() => {});
+    }
+    const current = await chrome.tabs.get(tabId);
+    return navigation.success
+      ? { success: true, tab: { ...current, url: navigation.url }, recovered }
+      : { ...navigation, tabId, currentUrl: current.url, pendingUrl: current.pendingUrl };
+  } catch (error) {
+    finish({ success: false });
+    throw error;
+  }
+}
+
 async function handleNavigateRoute({ params, client, tab }) {
   const { agentId } = params || {};
   // Phase 240: agentId now load-bearing for the bindTab D-08 site below.
@@ -1260,8 +1358,7 @@ async function handleNavigateRoute({ params, client, tab }) {
       : (tab && Number.isFinite(tab.id) ? tab.id : null);
 
     if (targetTabId === null) {
-      const createdTab = await chrome.tabs.create({ url: params.url, active: false });
-      const bindResult = await bindClaimedTabOrError({ tool: 'navigate', tabId: createdTab && createdTab.id, agentId });
+      const { tab: createdTab, bindResult } = await createMcpControlledTab({ tool: 'navigate', url: params.url, active: false, agentId });
       if (bindResult && bindResult.success === false) return bindResult;
       const extra = (bindResult && bindResult.ownershipToken)
         ? { ownershipToken: bindResult.ownershipToken }
@@ -1291,7 +1388,9 @@ async function handleNavigateRoute({ params, client, tab }) {
         globalThis.fsbAgentRegistryInstance.stampAgentNavigation(targetTabId);
       }
     } catch (_e) { /* best-effort */ }
-    const updatedTab = await chrome.tabs.update(targetTabId, { url: params.url });
+    const navigation = await navigateTabAndWaitForCommit(targetTabId, params.url);
+    if (!navigation.success) return navigation;
+    const updatedTab = navigation.tab;
     await activateSidePanelAgentTab(agentId, targetTabId);
 
     // Phase 240 D-08: bindTab on the navigated tab BEFORE returning success
@@ -1302,6 +1401,7 @@ async function handleNavigateRoute({ params, client, tab }) {
     const extra = (bindResult && bindResult.ownershipToken)
       ? { ownershipToken: bindResult.ownershipToken }
       : {};
+    if (navigation.recovered) extra.recovered = true;
     return sanitizeSingleTab('navigate', { ...updatedTab, id: targetTabId, url: updatedTab?.url || params.url }, extra);
   } catch (error) {
     return createMcpRouteError('navigate', 'browser', MCP_ROUTE_RECOVERY_HINT, { error: error.message || String(error) });
@@ -1766,6 +1866,24 @@ async function handleBackRoute({ payload = {}, client = null }) {
   return response;
 }
 
+async function createMcpControlledTab({ tool, url = 'about:blank', active = false, agentId }) {
+  const sessions = globalThis.FsbDebuggerSessions;
+  const tab = await chrome.tabs.create({ url: sessions ? 'about:blank' : url, active });
+  const bindResult = await bindClaimedTabOrError({ tool, tabId: tab?.id, agentId });
+  if (bindResult?.success === false) {
+    if (Number.isFinite(tab?.id)) await chrome.tabs.remove(tab.id).catch(() => {});
+    return { tab, bindResult };
+  }
+  if (!sessions || !Number.isFinite(tab?.id)) return { tab, bindResult };
+  try { await sessions.retain(tab.id); }
+  catch (error) {
+    globalThis.automationLogger?.debug('Controlled tab debugger initialization failed', { tabId: tab.id, error: error.message });
+  }
+  // Establish the interruption channel before any destination scripts run.
+  const updated = url === 'about:blank' ? tab : await chrome.tabs.update(tab.id, { url });
+  return { tab: updated, bindResult };
+}
+
 async function handleOpenTabRoute({ params }) {
   const { agentId } = params || {};
   // Phase 240: agentId now load-bearing for the bindTab D-08 site below.
@@ -1775,23 +1893,8 @@ async function handleOpenTabRoute({ params }) {
     // steal focus. This eliminates the "open_tab steals user focus mid-task"
     // multi-agent UX bug. The bindTab + ownershipToken contract (D-08) below
     // is preserved byte-for-byte.
-    const tab = await chrome.tabs.create({ url: params.url || 'about:blank', active: params.active === true });
-
-    // Phase 240 D-08: bindTab on the freshly created tab BEFORE returning
-    // success. open_tab claims a tab no other agent has touched, so the
-    // bind is unconditional once the create succeeds.
-    let bindResult = null;
-    if (agentId
-        && typeof globalThis !== 'undefined'
-        && globalThis.fsbAgentRegistryInstance
-        && typeof globalThis.fsbAgentRegistryInstance.bindTab === 'function'
-        && tab && Number.isFinite(tab.id)) {
-      try {
-        bindResult = await globalThis.fsbAgentRegistryInstance.bindTab(agentId, tab.id);
-      } catch (_e) {
-        bindResult = null;
-      }
-    }
+    const { tab, bindResult } = await createMcpControlledTab({ tool: 'open_tab', url: params.url || 'about:blank', active: params.active === true, agentId });
+    if (bindResult?.success === false) return bindResult;
     if (tab && Number.isFinite(tab.id)) await activateSidePanelAgentTab(agentId, tab.id);
     const extra = (bindResult && bindResult.ownershipToken)
       ? { ownershipToken: bindResult.ownershipToken }
@@ -3530,12 +3633,15 @@ async function handleFailTaskRoute({ params, payload }) {
 // `change_report_hint`) attached, or the unmodified response on any error.
 
 const _CHANGE_REPORT_SAFETY_NET_MS = 500;
+const _PAGE_INJECTION_TIMEOUT_MS = 750;
+let _changeReportSeq = 0;
 
 // Page-context harvest start: captures beforeState and starts a scoped
-// MutationObserver. Stores the handle on window.__fsbChangeReportHandle.
+// MutationObserver. Stores the handle under its token in
+// window.__fsbChangeReportHandles so overlapping harvests stay separate.
 // This function is serialized and injected via chrome.scripting.executeScript;
 // it must be self-contained (no closures over SW scope).
-function _fsbHarvestStartInPage(targetSelector) {
+function _fsbHarvestStartInPage(targetSelector, token, deadline) {
   try {
     function getClassName(el) {
       if (!el) return '';
@@ -3586,15 +3692,31 @@ function _fsbHarvestStartInPage(targetSelector) {
       }
       return cur || target.parentElement || document.documentElement;
     }
+    // The service worker stops waiting for this injection at `deadline`. An
+    // observer installed after that would never be stopped.
+    if (Date.now() > deadline) return { ok: false, expired: true };
+    const handles = window.__fsbChangeReportHandles || (window.__fsbChangeReportHandles = {});
     const beforeState = captureState();
     const root = resolveScope(targetSelector);
+    const handle = { beforeState, mutations: [], mutationCount: 0, startedAt: Date.now() };
+    // A stop that never arrives must not leave the observer running: retain
+    // at most 5000 records and disconnect after two minutes.
+    handle.expiry = setTimeout(() => {
+      if (handle.observer) {
+        try { handle.observer.disconnect(); } catch (_) { /* idempotent */ }
+      }
+      if (handles[token] === handle) delete handles[token];
+    }, 120000);
+    handles[token] = handle;
     if (typeof MutationObserver === 'undefined' || !root) {
-      window.__fsbChangeReportHandle = { beforeState, mutations: [], startedAt: Date.now(), noObserver: true };
+      handle.noObserver = true;
       return { ok: true, beforeState };
     }
-    const handle = { beforeState, mutations: [], startedAt: Date.now() };
     const observer = new MutationObserver((records) => {
-      for (let i = 0; i < records.length; i++) handle.mutations.push(records[i]);
+      handle.mutationCount += records.length;
+      for (let i = 0; i < records.length && handle.mutations.length < 5000; i++) {
+        handle.mutations.push(records[i]);
+      }
     });
     try {
       observer.observe(root, {
@@ -3604,7 +3726,6 @@ function _fsbHarvestStartInPage(targetSelector) {
       });
       handle.observer = observer;
     } catch (_) { /* observation failed; handle continues with empty mutations */ }
-    window.__fsbChangeReportHandle = handle;
     return { ok: true, beforeState };
   } catch (e) {
     return { ok: false, error: String(e && e.message || e) };
@@ -3613,7 +3734,7 @@ function _fsbHarvestStartInPage(targetSelector) {
 
 // Page-context harvest stop: serializes mutation records, captures afterState,
 // disconnects the observer, returns plain-data shape buildChangeReport accepts.
-function _fsbHarvestStopInPage() {
+function _fsbHarvestStopInPage(token) {
   try {
     function getClassName(el) {
       if (!el) return '';
@@ -3694,8 +3815,11 @@ function _fsbHarvestStopInPage() {
         get className() { return this._className; }
       };
     }
-    const handle = window.__fsbChangeReportHandle;
+    const handles = window.__fsbChangeReportHandles || {};
+    const handle = handles[token];
     if (!handle) return { ok: true, mutations: [], afterState: captureState(), settle_ms: 0 };
+    delete handles[token];
+    clearTimeout(handle.expiry);
     if (handle.observer && typeof handle.observer.disconnect === 'function') {
       try { handle.observer.disconnect(); } catch (_) { /* idempotent */ }
     }
@@ -3717,8 +3841,7 @@ function _fsbHarvestStopInPage() {
       });
     }
     const afterState = captureState();
-    delete window.__fsbChangeReportHandle;
-    return { ok: true, mutations: serialized, afterState, settle_ms };
+    return { ok: true, mutations: serialized, afterState, settle_ms, mutation_count: handle.mutationCount };
   } catch (e) {
     return { ok: false, error: String(e && e.message || e) };
   }
@@ -3787,12 +3910,16 @@ async function _injectFn(tabId, func, args) {
     return null;
   }
   try {
-    const results = await chrome.scripting.executeScript({
+    const injection = chrome.scripting.executeScript({
       target: { tabId },
       world: 'MAIN',
       func,
       args: args || []
     });
+    const results = await Promise.race([
+      injection,
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Page injection timed out')), _PAGE_INJECTION_TIMEOUT_MS))
+    ]);
     return results && results[0] ? results[0].result : null;
   } catch (_) {
     return null;
@@ -3832,12 +3959,13 @@ async function wrapWithChangeReport(ctx) {
   }
 
   // Gate 1: per-tool flag
-  const toolDef = (typeof _mcp_getToolByName === 'function') ? _mcp_getToolByName(toolName) : null;
+  const toolDef = (typeof _mcp_getToolByNameOrVerb === 'function') ? _mcp_getToolByNameOrVerb(toolName) : null;
   const flagOn = !!(toolDef && toolDef._emitChangeReport === true);
   // Gate 2: global toggle
   const globalOn = !!fsbChangeReportsEnabled;
 
-  if (!flagOn || !globalOn || !Number.isFinite(tabId)) {
+  if (!flagOn || !globalOn || !Number.isFinite(tabId) ||
+      ['navigate', 'close_tab', 'refresh', 'go_back', 'go_forward', 'open_tab', 'switch_tab'].includes(toolName)) {
     return execute();
   }
 
@@ -3845,8 +3973,13 @@ async function wrapWithChangeReport(ctx) {
   // missing chrome.scripting), skip wrap and run action without change_report.
   const beforeUrl = await _safeGetTabUrl(tabId);
   const targetSelector = _resolveTargetSelector(params);
-  const startResult = await _injectFn(tabId, _fsbHarvestStartInPage, [targetSelector]);
+  const harvestToken = `${Date.now()}-${++_changeReportSeq}`;
+  const startResult = await _injectFn(tabId, _fsbHarvestStartInPage,
+    [targetSelector, harvestToken, Date.now() + _PAGE_INJECTION_TIMEOUT_MS]);
   const startedHarvest = !!(startResult && startResult.ok);
+  // A start that timed out can still run once the page is idle. Queue its
+  // stop behind it so that observer is torn down as soon as it exists.
+  if (!startedHarvest) _injectFn(tabId, _fsbHarvestStopInPage, [harvestToken]);
 
   let response;
   try {
@@ -3875,13 +4008,13 @@ async function wrapWithChangeReport(ctx) {
 
     let stop = null;
     if (!crossOrigin) {
-      stop = await _injectFn(tabId, _fsbHarvestStopInPage, []);
+      stop = await _injectFn(tabId, _fsbHarvestStopInPage, [harvestToken]);
     }
 
     const builders = _resolveChangeReportBuilders();
     if (!builders) {
       // Builder unavailable; clean up the page-side handle and skip.
-      if (!crossOrigin) await _injectFn(tabId, _fsbHarvestStopInPage, []);
+      if (!crossOrigin) await _injectFn(tabId, _fsbHarvestStopInPage, [harvestToken]);
       return response;
     }
 
@@ -3889,18 +4022,20 @@ async function wrapWithChangeReport(ctx) {
     let afterState = (stop && stop.afterState) || { url: afterUrl };
     let mutations = (stop && stop.mutations) || [];
     let settleMs = (stop && typeof stop.settle_ms === 'number') ? stop.settle_ms : 0;
+    let mutationCount = (stop && typeof stop.mutation_count === 'number') ? stop.mutation_count : undefined;
 
     if (crossOrigin) {
       beforeState = beforeState || { url: beforeUrl };
       afterState = { url: afterUrl };
       mutations = [];
+      mutationCount = undefined;
     }
 
     const raw = builders.buildChangeReport(
       beforeState,
       afterState,
       mutations,
-      { crossOrigin, settleMs }
+      { crossOrigin, settleMs, mutationCount }
     );
     if (partial) raw.partial = true;
     const capped = builders.applyChangeReportSizeCap(raw);

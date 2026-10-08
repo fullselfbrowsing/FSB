@@ -9,6 +9,25 @@
   // Local aliases for cross-module dependencies
   const getClassName = FSB.getClassName;
 
+  async function executeContentAction(tool, params) {
+    const longTimeoutTools = ['solveCaptcha', 'fillsheet', 'readsheet', 'sheetsSession'];
+    const actionTimeout = longTimeoutTools.includes(tool) ? 120000 : 10000;
+    let actionTimer;
+    const timeout = new Promise((_, reject) => {
+      actionTimer = setTimeout(() => reject(Object.assign(
+        new Error(`Action ${tool} exceeded its response deadline and may still be running.`),
+        { errorCode: 'ACTION_RESPONSE_TIMEOUT',
+          outcome: tool === 'readsheet' ? 'failed' : 'unknown',
+          mayHaveExecuted: tool !== 'readsheet' }
+      )), actionTimeout);
+    });
+    try {
+      return await Promise.race([FSB.tools[tool](params), timeout]);
+    } finally {
+      clearTimeout(actionTimer);
+    }
+  }
+
   function fsbShouldReplaceFinalOverlay(previousOverlayState, overlayState) {
     if (previousOverlayState?.lifecycle !== 'final' ||
         !overlayState || overlayState.lifecycle === 'cleared') return false;
@@ -460,9 +479,60 @@
 
   /**
    * Write HTML to the system clipboard and simulate paste via CDP.
+   * nothingInserted is true only when the paste provably left the document
+   * unchanged, so the caller can fall back to a plain insert without duplicating text.
    */
-  async function clipboardPasteHTML(html, plainText) {
+  async function clipboardPasteHTML(html, plainText, options = {}) {
+    let pasteDispatched = false;
     try {
+      const ready = await new Promise((resolve, reject) => {
+        chrome.runtime.sendMessage({ action: 'keyboardDebuggerAction', method: 'checkForeground' }, response => {
+          if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+          else resolve(response);
+        });
+      });
+      if (!ready?.success) return { ...ready, success: false, nothingInserted: true };
+
+      // Saved text can confirm a paste, but an unchanged response can still be awaiting autosave.
+      const normalize = text => text.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').trim();
+      const verificationDeadline = Date.now() + 7500;
+      let preferSavedHtml = false;
+      const readSavedText = async () => {
+        const here = globalThis.location;
+        const doc = here?.pathname?.match(/^\/document\/(u\/\d+\/)?d\/([^/]+)/);
+        if (here?.hostname !== 'docs.google.com' || !doc) return null;
+        const read = async (suffix, htmlResponse) => {
+          if (Date.now() >= verificationDeadline) return null;
+          const url = new URL(`/document/${doc[1] || ''}d/${encodeURIComponent(doc[2])}/${suffix}`, here.origin);
+          if (!htmlResponse) url.searchParams.set('format', 'txt');
+          const account = new URL(here.href).searchParams.get('authuser');
+          if (account) url.searchParams.set('authuser', account);
+          try {
+            const response = await fetch(url.href, { credentials: 'include', cache: 'no-store',
+              signal: AbortSignal.timeout(Math.max(1, Math.min(1000, verificationDeadline - Date.now()))) });
+            if (!response.ok) return null;
+            const type = response.headers.get('content-type') || '';
+            if (!htmlResponse) return /text\/html/i.test(type) ? null : normalize(await response.text());
+            // The export endpoint can redirect across origins. The mobile view stays
+            // on docs.google.com and contains the saved document as ordinary HTML.
+            const saved = new DOMParser().parseFromString(await response.text(), 'text/html');
+            const content = saved.querySelector('.doc-content');
+            if (!content) return null;
+            for (const br of content.querySelectorAll('br')) br.replaceWith(saved.createTextNode('\n'));
+            for (const block of content.querySelectorAll('p,div,li,h1,h2,h3,h4,h5,h6,tr')) {
+              block.appendChild(saved.createTextNode('\n'));
+            }
+            return normalize(content.textContent || '');
+          } catch (_error) { return null; }
+        };
+        if (preferSavedHtml) return read('mobilebasic', true);
+        const exported = await read('export', false);
+        if (exported !== null) return exported;
+        const mobile = await read('mobilebasic', true);
+        if (mobile !== null) preferSavedHtml = true;
+        return mobile;
+      };
+      const savedBefore = await readSavedText();
       const htmlBlob = new Blob([html], { type: 'text/html' });
       const textBlob = new Blob([plainText], { type: 'text/plain' });
       const clipboardItem = new ClipboardItem({
@@ -474,29 +544,34 @@
         await navigator.clipboard.write([clipboardItem]);
       } catch (clipErr) {
         logger.warn('clipboardPasteHTML: clipboard.write() failed', { error: clipErr.message });
-        return { success: false, method: 'clipboard_paste_html', error: 'Clipboard write failed: ' + clipErr.message };
+        return { success: false, method: 'clipboard_paste_html', error: 'Clipboard write failed: ' + clipErr.message,
+          nothingInserted: true };
       }
 
       logger.debug('clipboardPasteHTML: clipboard written', { htmlLength: html.length, plainTextLength: plainText.length });
 
       await new Promise(r => setTimeout(r, 150));
 
-      const getDocTextLength = () => {
+      // Canvas-rendered Docs have no paragraph elements, so unchanged text there proves nothing.
+      const measureDocText = () => {
         const pageElements = document.querySelectorAll('.kix-paragraphrenderer');
-        let totalLen = 0;
+        let text = '';
         for (const el of pageElements) {
-          totalLen += (el.textContent || '').length;
+          text += el.textContent || '';
         }
-        return totalLen;
+        return { text, length: text.length, measurable: pageElements.length > 0 };
       };
-      const textLenBefore = getDocTextLength();
+      const before = measureDocText();
+      const textLenBefore = before.length;
 
       const isMac = navigator.userAgent?.includes('Macintosh') || navigator.platform?.includes('Mac');
+      pasteDispatched = true;
       const pasteResult = await new Promise((resolve, reject) => {
         chrome.runtime.sendMessage({
           action: 'keyboardDebuggerAction',
           method: 'pressKey',
           key: 'v',
+          commands: isMac ? ['paste'] : [],
           modifiers: {
             ctrl: !isMac,
             meta: isMac,
@@ -506,7 +581,16 @@
         }, (response) => {
           if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
           else if (response && response.success) resolve(response);
-          else reject(new Error(response?.error || 'Paste key simulation failed'));
+          else {
+            // The emulator reports keyDownDispatched once it sends the key; with
+            // no result, only a retryable refusal (a busy debugger) precedes it.
+            const result = response && response.result;
+            const neverSent = result
+              ? !result.keyDownDispatched && !result.mayHaveExecuted
+              : response?.retryable === true;
+            if (neverSent) pasteDispatched = false;
+            reject(new Error(response?.error || 'Paste key simulation failed'));
+          }
         });
       });
 
@@ -514,13 +598,35 @@
 
       await new Promise(r => setTimeout(r, 800));
 
-      const textLenAfter = getDocTextLength();
+      // A large paste can land late; recheck before treating it as absent.
+      let after = measureDocText();
+      for (let recheck = 0; recheck < 3 && after.length <= textLenBefore; recheck++) {
+        await new Promise(r => setTimeout(r, 400));
+        after = measureDocText();
+      }
+      const textLenAfter = after.length;
       const textInserted = textLenAfter > textLenBefore;
+
+      if (!before.measurable || !after.measurable || !textInserted) {
+        const expected = normalize(plainText);
+        for (let attempt = 0; attempt < 4; attempt++) {
+          const savedAfter = await readSavedText();
+          if (expected && savedAfter !== null && (options.replaceAll
+            ? savedAfter === expected
+            : savedBefore !== null && savedAfter !== savedBefore && savedAfter.includes(expected))) {
+            return { success: true, method: 'clipboard_paste_html', textLenBefore,
+              textLenAfter: savedAfter.length, verifiedVia: 'saved_document' };
+          }
+          if (savedAfter === null) break;
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      }
 
       logger.debug('clipboardPasteHTML: verification', {
         textLenBefore,
         textLenAfter,
         textInserted,
+        measurable: before.measurable && after.measurable,
         expectedMinChars: Math.min(plainText.length, 10)
       });
 
@@ -531,14 +637,17 @@
           method: 'clipboard_paste_html',
           error: 'Paste dispatched but no text appeared in editor (cursor may not be in editable area)',
           textLenBefore,
-          textLenAfter
+          textLenAfter,
+          // A paste over an equally long selection keeps the length, so only
+          // identical text proves nothing landed.
+          nothingInserted: before.measurable && after.measurable && after.text === before.text
         };
       }
 
       return { success: true, method: 'clipboard_paste_html', textLenBefore, textLenAfter };
     } catch (error) {
       logger.warn('clipboardPasteHTML failed', { error: error.message });
-      return { success: false, method: 'clipboard_paste_html', error: error.message };
+      return { success: false, method: 'clipboard_paste_html', error: error.message, nothingInserted: !pasteDispatched };
     }
   }
 
@@ -1003,17 +1112,9 @@
               }
             }
 
-            // Timeout wrapper
-            const longTimeoutTools = ['solveCaptcha', 'fillsheet', 'readsheet', 'sheetsSession'];
-            const actionTimeout = longTimeoutTools.includes(tool) ? 120000 : 10000;
-            const timeoutPromise = new Promise((_, reject) => {
-              setTimeout(() => reject(new Error(`Action ${tool} timed out after ${actionTimeout / 1000} seconds`)), actionTimeout);
-            });
-
             try {
               const execStart = Date.now();
-              const actionPromise = FSB.tools[tool](params);
-              result = await Promise.race([actionPromise, timeoutPromise]);
+              result = await executeContentAction(tool, params);
               logger.logTiming(FSB.sessionId, 'ACTION', tool, Date.now() - execStart, { success: result?.success });
 
               // Invalidate cached element indexes
@@ -1083,6 +1184,9 @@
       logger.error('Error in async message handler', { sessionId: FSB.sessionId, action: request.action, error: error.message });
       sendResponse({
         success: false,
+        ...(error.errorCode === 'ACTION_RESPONSE_TIMEOUT' ? {
+          errorCode: error.errorCode, outcome: error.outcome, mayHaveExecuted: error.mayHaveExecuted
+        } : {}),
         error: error.message || 'Unknown error in async handler',
         stack: error.stack,
         action: request.action,

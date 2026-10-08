@@ -448,44 +448,7 @@
    * @returns {string} A valid CSS selector
    */
   function sanitizeSelector(selector) {
-    if (!selector || typeof selector !== 'string') {
-      return selector;
-    }
-
-    // Remove jQuery-style pseudo-selectors that aren't valid CSS
-    const invalidPseudos = [
-      /:contains\([^)]*\)/gi,      // :contains('text') - jQuery only
-      /:has\([^)]*\)/gi,           // :has() - limited browser support, can cause issues
-      /:eq\(\d+\)/gi,              // :eq(n) - jQuery only
-      /:gt\(\d+\)/gi,              // :gt(n) - jQuery only
-      /:lt\(\d+\)/gi,              // :lt(n) - jQuery only
-      /:first(?![-\w])/gi,         // :first - jQuery only (but not :first-child, :first-of-type)
-      /:last(?![-\w])/gi,          // :last - jQuery only (but not :last-child, :last-of-type)
-      /:even/gi,                   // :even - jQuery only
-      /:odd/gi,                    // :odd - jQuery only
-      /:visible/gi,                // :visible - jQuery only
-      /:hidden/gi,                 // :hidden - jQuery only
-      /:animated/gi,               // :animated - jQuery only
-      /:parent/gi                  // :parent - jQuery only
-    ];
-
-    let sanitized = selector;
-    for (const pattern of invalidPseudos) {
-      sanitized = sanitized.replace(pattern, '');
-    }
-
-    // Clean up any resulting empty selectors or dangling commas
-    // Split by comma, filter out empty parts, rejoin
-    const parts = sanitized.split(',')
-      .map(s => s.trim())
-      .filter(s => s.length > 0 && s !== '*'); // Remove empty or just asterisk
-
-    if (parts.length === 0) {
-      logger.warn('Selector completely invalidated after sanitization', { sessionId: FSB.sessionId, selector });
-      return null;
-    }
-
-    return parts.join(', ');
+    return typeof selector === 'string' ? selector.trim() || null : null;
   }
 
   // ============================================================================
@@ -495,7 +458,7 @@
   // Query selector that supports shadow DOM
   // SPEED-04: Uses elementCache for faster repeated lookups
   function querySelectorWithShadow(selector) {
-    // Sanitize selector first to remove invalid pseudo-selectors
+    // Never strip selector conditions: unsupported syntax must fail closed.
     const sanitized = sanitizeSelector(selector);
     if (!sanitized) {
       logger.warn('Cannot query with invalid selector', { sessionId: FSB.sessionId, selector });
@@ -541,9 +504,10 @@
       }
 
       for (let i = 1; i < parts.length && element; i++) {
-        if (element.shadowRoot) {
+        const shadowRoot = FSB.openOrClosedShadowRoot(element);
+        if (shadowRoot) {
           try {
-            element = element.shadowRoot.querySelector(parts[i]);
+            element = shadowRoot.querySelector(parts[i]);
           } catch (e) {
             logger.warn('Invalid shadow selector part', { sessionId: FSB.sessionId, part: parts[i], error: e.message });
             return null;

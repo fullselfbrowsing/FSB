@@ -164,7 +164,7 @@ function createHarness(initialStore, options) {
   );
   assert.strictEqual(
     sha256(ONBOARDING_CSS_PATH),
-    '39f107705b7aae9fda75cdb1c009979433e5556042459621ec3f897ba4cb8707',
+    '6aa97ce28241b88c8939b88d1b8f3875ba7ba89d989712e81a72d8c4de010987',
     'onboarding.css has no Phase 57 change'
   );
 

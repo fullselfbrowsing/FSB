@@ -16,6 +16,7 @@ import {
 import { FSB_MCP_VERSION } from './version.js';
 
 const DELEGATION_ID_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
+const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '::1']);
 
 type SessionContext = {
   server: McpServer;
@@ -36,20 +37,12 @@ type RunningHttpServer = {
   close: () => Promise<void>;
 };
 
-function setCorsHeaders(res: ServerResponse): void {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Mcp-Session-Id, X-Fsb-Delegation-Id');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Expose-Headers', 'Mcp-Session-Id');
-}
-
 function sendJson(
   res: ServerResponse,
   statusCode: number,
   payload: Record<string, unknown>,
 ): void {
   if (!res.headersSent) {
-    setCorsHeaders(res);
     res.statusCode = statusCode;
     res.setHeader('Content-Type', 'application/json');
     res.end(JSON.stringify(payload, null, 2));
@@ -70,7 +63,14 @@ async function readJsonBody(req: IncomingMessage): Promise<unknown> {
   return JSON.parse(raw);
 }
 
+export function validateHttpBindHost(host: string): void {
+  if (!LOOPBACK_HOSTS.has(host)) {
+    throw new Error('The FSB HTTP server only accepts a loopback --host (127.0.0.1, localhost, or ::1).');
+  }
+}
+
 export async function startHttpServer(options: HttpServerOptions): Promise<RunningHttpServer> {
+  validateHttpBindHost(options.host);
   const sessions = new Map<string, SessionContext>();
   let closed = false;
   let serveReady = false;
@@ -87,7 +87,25 @@ export async function startHttpServer(options: HttpServerOptions): Promise<Runni
   });
 
   const handleRequest = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
-    setCorsHeaders(res);
+    const address = server.address() as AddressInfo | null;
+    const port = address?.port;
+    const allowedHosts = new Set([
+      `127.0.0.1:${port}`,
+      `localhost:${port}`,
+      `[::1]:${port}`,
+    ]);
+    const rawHosts: string[] = [];
+    let hasOrigin = false;
+    for (let i = 0; i < req.rawHeaders.length; i += 2) {
+      const name = req.rawHeaders[i]?.toLowerCase();
+      if (name === 'host') rawHosts.push(req.rawHeaders[i + 1] ?? '');
+      if (name === 'origin') hasOrigin = true;
+    }
+    if (rawHosts.length !== 1 || !allowedHosts.has(rawHosts[0].toLowerCase())
+      || req.headers.host?.toLowerCase() !== rawHosts[0].toLowerCase() || hasOrigin) {
+      sendJson(res, 403, { error: 'Forbidden Host or Origin' });
+      return;
+    }
 
     if (req.method === 'OPTIONS') {
       res.statusCode = 204;
@@ -95,7 +113,8 @@ export async function startHttpServer(options: HttpServerOptions): Promise<Runni
       return;
     }
 
-    const url = new URL(req.url ?? '/', `http://${options.host}:${options.port}`);
+    // Only the path is read; a fixed base keeps an IPv6 bind host from breaking URL parsing.
+    const url = new URL(req.url ?? '/', 'http://localhost');
 
     if (url.pathname === '/health') {
       sendJson(res, 200, {
@@ -107,6 +126,7 @@ export async function startHttpServer(options: HttpServerOptions): Promise<Runni
         transport: 'streamable-http',
         bridgeMode: options.bridge.topology.mode,
         extensionConnected: options.bridge.topology.extensionConnected,
+        extensionAttachment: options.bridge.topology.extensionAttachment,
         bridgeTopology: options.bridge.topology,
         hubConnected: options.bridge.topology.hubConnected,
         relayCount: options.bridge.topology.relayCount,
@@ -154,6 +174,8 @@ export async function startHttpServer(options: HttpServerOptions): Promise<Runni
 
         transport = new StreamableHTTPServerTransport({
           enableJsonResponse: true,
+          enableDnsRebindingProtection: true,
+          allowedHosts: [...allowedHosts],
           sessionIdGenerator: () => randomUUID(),
           onsessioninitialized: (newSessionId) => {
             sessions.set(newSessionId, { server: runtime.server, transport });
@@ -197,8 +219,10 @@ export async function startHttpServer(options: HttpServerOptions): Promise<Runni
   });
 
   const address = server.address() as AddressInfo;
-  const endpoint = `http://${options.host}:${address.port}/mcp`;
-  const healthEndpoint = `http://${options.host}:${address.port}/health`;
+  // Delegate to the address the listener owns, including when localhost resolves to IPv6.
+  const endpointHost = address.family === 'IPv6' ? `[${address.address}]` : address.address;
+  const endpoint = `http://${endpointHost}:${address.port}/mcp`;
+  const healthEndpoint = `http://${endpointHost}:${address.port}/health`;
 
   return {
     endpoint,

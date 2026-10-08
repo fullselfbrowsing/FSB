@@ -2,6 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const vm = require('node:vm');
 const captureEngine = require('../extension/utils/screenshot-capture.js');
 const cdpLease = require('../extension/utils/cdp-lease.js');
 
@@ -28,6 +29,7 @@ function harness(options = {}) {
     async detach(target) { calls.push(['detach', target.tabId]); },
     async sendCommand(target, method, params) {
       calls.push([method, params]);
+      if (options.hangMethod === method) return new Promise(() => {});
       if (options.failMethod === method) throw new Error(`failed ${method}`);
       if (method === 'Page.getLayoutMetrics') return metrics;
       if (method === 'Runtime.evaluate') return { result: { value: options.dpr || 1 } };
@@ -42,6 +44,7 @@ function harness(options = {}) {
   const scripting = {
     async executeScript(request) {
       calls.push(['script', request.func.name, request.args]);
+      if (options.hangScript === request.func.name) return new Promise(() => {});
       if (request.func.name === 'elementRectScript') {
         return [{ result: options.elementRect === undefined
           ? { x: 40, y: 60, width: 100, height: 50 }
@@ -194,6 +197,37 @@ test('capture failure still restores emulation, overlay, touch, and attachment',
   assert.equal(h.calls.at(-1)[0], 'detach');
 });
 
+test('a hung page script fails the capture at its deadline and detaches', async () => {
+  const h = harness({ hangScript: 'settleScript' });
+  const result = await captureEngine.capture({
+    device_mode: 'mobile', viewport_width: 390, viewport_height: 844,
+  }, 7, { ...h.options, deadlineMs: 20 });
+  assert.equal(result.success, false);
+  assert.equal(result.code, 'PAGE_UNRESPONSIVE');
+  assert.equal(h.calls.some((call) => call[0] === 'Page.captureScreenshot'), false);
+  // Nothing more goes to the page once the deadline has passed.
+  assert.equal(h.calls.filter((call) => call[0] === 'script' && call[1] === 'overlayInstallScript').length, 1);
+  // Resets would queue behind the hung page; ending the session drops them.
+  assert.equal(h.calls.some((call) => call[0] === 'Emulation.clearDeviceMetricsOverride'), false);
+  assert.ok(h.calls.some((call) => call[0] === 'script' && call[1] === 'overlayRemoveScript'));
+  assert.equal(h.calls.at(-1)[0], 'detach');
+});
+
+test('a hung CDP command is cut off at the deadline before the lease is released', async () => {
+  const h = harness({ hangMethod: 'Page.getLayoutMetrics' });
+  let callsAtRelease = null;
+  const result = await captureEngine.capture({}, 7, {
+    ...h.options,
+    deadlineMs: 20,
+    skipLease: false,
+    lease: {
+      acquire: async () => ({ release: () => { callsAtRelease = h.calls.map((call) => call[0]); } }),
+    },
+  });
+  assert.equal(result.code, 'PAGE_UNRESPONSIVE');
+  assert.equal(callsAtRelease.at(-1), 'detach');
+});
+
 test('rejects oversized output before capture and never tiles or downscales', async () => {
   const h = harness({
     metrics: {
@@ -255,6 +289,23 @@ test('per-tab lease is FIFO and independent across tabs', async () => {
   assert.deepEqual(order, ['other', 'second']);
 });
 
+test('element mode finds a target inside a closed shadow root', () => {
+  const field = { isConnected: true, getBoundingClientRect: () => ({ left: 5, top: 6, width: 70, height: 20 }) };
+  const host = { shadowRoot: null };
+  const closedRoot = {
+    querySelector: (query) => (query === '#inner' ? field : null),
+    querySelectorAll: () => [],
+  };
+  const context = {
+    scrollX: 0,
+    scrollY: 100,
+    chrome: { dom: { openOrClosedShadowRoot: (node) => (node === host ? closedRoot : null) } },
+    document: { querySelector: () => null, querySelectorAll: () => [host] },
+  };
+  const elementRect = vm.runInNewContext(`(${captureEngine._test.elementRectScript})`, context);
+  assert.deepEqual({ ...elementRect('#inner') }, { x: 5, y: 106, width: 70, height: 20 });
+});
+
 test('lease timeout returns retryable screenshot busy error', async () => {
   const first = await cdpLease.acquire(903, { timeoutMs: 100 });
   await assert.rejects(
@@ -262,4 +313,30 @@ test('lease timeout returns retryable screenshot busy error', async () => {
     (error) => error.code === 'SCREENSHOT_DEBUGGER_BUSY' && error.retryable === true,
   );
   first.release();
+});
+
+test('capture reuses the shared session without releasing an established debugger', async () => {
+  const h = harness();
+  const connections = [];
+  h.options.sessions = {
+    attach: async target => connections.push(['reuse', target.tabId]),
+    detach: async target => connections.push(['release-operation', target.tabId])
+  };
+  h.options.releaseOwnedDebugger = async () => { throw new Error('Established debugger must be preserved'); };
+  const result = await captureEngine.capture({ mode: 'viewport' }, 7, h.options);
+  assert.equal(result.success, true);
+  assert.deepEqual(connections, [['reuse', 7], ['release-operation', 7]]);
+  assert.equal(h.calls.some(([method]) => method === 'attach' || method === 'detach'), false);
+});
+
+test('a retained capture timeout queues emulation restores while preserving the interruption channel', async () => {
+  const h = harness({ hangMethod: 'Page.captureScreenshot' });
+  h.options.deadlineMs = 10;
+  h.options.sessions = { attach: async () => {}, detach: async () => {} };
+  const result = await captureEngine.capture({ mode: 'viewport', device_mode: 'mobile',
+    viewport_width: 390, viewport_height: 844 }, 7, h.options);
+  assert.equal(result.code, 'PAGE_UNRESPONSIVE');
+  assert.equal(h.calls.some(([method]) => method === 'Emulation.clearDeviceMetricsOverride'), true);
+  assert.equal(h.calls.some(([method, params]) => method === 'Emulation.setTouchEmulationEnabled' && params.enabled === false), true);
+  assert.equal(h.calls.some(([method]) => method === 'detach'), false);
 });

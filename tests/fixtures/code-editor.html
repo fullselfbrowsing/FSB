@@ -1,0 +1,26 @@
+<!doctype html><html><body>
+<div class="code-editor">
+<textarea id="input" autocomplete="off" style="position:absolute;opacity:0;width:1px;height:1px"></textarea>
+<pre id="view"></pre>
+</div>
+<script>
+// Like Monaco or Ace, this editor keeps its own text and cursor. The hidden
+// textarea only receives keystrokes, so its DOM selection means nothing here.
+const editor = { text: 'hello', cursor: 0 };
+const input = document.getElementById('input');
+const render = () => { document.getElementById('view').textContent = editor.text; };
+input.addEventListener('keydown', (event) => {
+  const toEnd = (event.metaKey && event.key === 'ArrowDown') || (event.ctrlKey && event.key === 'End');
+  if (!toEnd) return;
+  event.preventDefault();
+  editor.cursor = editor.text.length;
+});
+input.addEventListener('input', () => {
+  editor.text = editor.text.slice(0, editor.cursor) + input.value + editor.text.slice(editor.cursor);
+  editor.cursor += input.value.length;
+  input.value = '';
+  render();
+});
+render();
+</script>
+</body></html>

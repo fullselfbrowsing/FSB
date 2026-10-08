@@ -1,4 +1,4 @@
-# FSB v0.9.91 Full Self Browsing
+# FSB v0.9.92 Full Self Browsing
 
 <div align="center">
 
@@ -9,7 +9,7 @@
 </picture>
 
 ![FSB](https://img.shields.io/badge/FSB-Full_Self_Browsing-000000?style=for-the-badge)
-![Version](https://img.shields.io/badge/version-0.9.91-0078D4?style=for-the-badge)
+![Version](https://img.shields.io/badge/version-0.9.92-0078D4?style=for-the-badge)
 ![Manifest V3](https://img.shields.io/badge/Manifest_V3-Chrome-34A853?style=for-the-badge&logo=googlechrome&logoColor=white)
 ![License](https://img.shields.io/badge/license-MIT-F5C518?style=for-the-badge)
 
@@ -32,7 +32,7 @@
 
 FSB (Full Self Browsing) is an open source Chrome extension for AI powered browser automation. Describe a task in plain English; FSB reads the live DOM, builds a plan, executes browser actions, verifies results, and reports progress through the popup, side panel, or MCP.
 
-> FSB v0.9.91 is functional and production ready for supervised automation. Browser automation can still behave unpredictably on complex or sensitive sites, so monitor actions and test on non critical pages first.
+> FSB v0.9.92 is functional and production ready for supervised automation. Browser automation can still behave unpredictably on complex or sensitive sites, so monitor actions and test on non critical pages first.
 
 ### Why DOM First
 
@@ -233,6 +233,8 @@ Start with simple tasks such as:
 
 Reload the extension from `chrome://extensions/` after local code changes. Reload open tabs after the extension reloads so content scripts re-inject.
 
+For an unpacked build, record the ID on `chrome://extensions/`. A different install path or profile can produce a different ID; if `doctor` reports `ORIGIN_PIN_MISMATCH`, run `npx -y fsb-mcp-server@latest pair --reset` and pair the new installation. One browser profile attaches to the local bridge at a time. `doctor` and `status` show the attached extension ID, version, install instance, connection time, and normal-window count. The MCP server and extension have independent versions. Branded Chrome 137 removed the `--load-extension` flag; use **Load unpacked** in Chrome, or use [Chrome for Testing or Chromium when a command-line flag is required](https://groups.google.com/a/chromium.org/g/chromium-extensions/c/1-g8EFx2BBY/m/S0ET5wPjCAAJ).
+
 ### First Run Checklist
 
 1. Open the FSB control panel from the extension.
@@ -288,6 +290,8 @@ Optional Streamable HTTP mode exposes:
 ```text
 http://127.0.0.1:7226/mcp
 ```
+
+The HTTP endpoint binds to loopback only and rejects requests with an `Origin` header or a foreign `Host`. Use the printed local endpoint from an MCP client. If a tab stops responding, page reads return `PAGE_UNRESPONSIVE`; `navigate` and `close_tab` remain available. Inspect page state before repeating any action reported as `outcome: "unknown"` and `mayHaveExecuted: true`.
 
 ### One Command Install
 
