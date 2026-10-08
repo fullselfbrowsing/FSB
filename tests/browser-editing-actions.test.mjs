@@ -46,12 +46,15 @@ async function openFixture(name) {
   const child = spawn(chrome, [
     '--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check',
     '--remote-debugging-port=0', '--enable-unsafe-extension-debugging', `--user-data-dir=${profile}`, fixture
-  ], { stdio: 'ignore' });
+  ], { stdio: ['ignore', 'ignore', 'pipe'] });
+  let launchError, launchStderr = '';
+  child.once('error', error => { launchError = error; });
+  child.stderr.on('data', chunk => { launchStderr = (launchStderr + chunk).slice(-8192); });
   let ws;
   const close = async () => {
     ws?.close();
     // Chrome keeps writing its profile until it exits; removing it earlier races.
-    const exited = child.exitCode !== null || child.signalCode !== null
+    const exited = launchError || child.exitCode !== null || child.signalCode !== null
       ? Promise.resolve()
       : new Promise(resolve => child.once('exit', resolve));
     child.kill('SIGTERM');
@@ -71,15 +74,24 @@ async function openFixture(name) {
   };
   try {
     let port;
-    for (let i = 0; i < 100; i++) {
+    // Cold Chrome startup can exceed ten seconds on shared CI runners.
+    const launchDeadline = Date.now() + 30000;
+    while (Date.now() < launchDeadline) {
+      if (launchError) throw launchError;
+      if (child.exitCode !== null || child.signalCode !== null) {
+        throw new Error(`Chrome exited before opening its debugging port (${child.exitCode ?? child.signalCode}): ${launchStderr}`);
+      }
       const portFile = join(profile, 'DevToolsActivePort');
       if (existsSync(portFile)) {
-        port = Number(readFileSync(portFile, 'utf8').split('\n')[0]);
-        break;
+        const candidate = Number(readFileSync(portFile, 'utf8').split('\n')[0]);
+        if (Number.isInteger(candidate) && candidate > 0) {
+          port = candidate;
+          break;
+        }
       }
       await sleep(100);
     }
-    assert.ok(port, 'Chrome debugging port opened');
+    assert.ok(port, `Chrome debugging port did not open within 30 seconds: ${launchStderr}`);
     let target;
     for (let i = 0; i < 100; i++) {
       const pages = await (await fetch(`http://127.0.0.1:${port}/json`)).json();
