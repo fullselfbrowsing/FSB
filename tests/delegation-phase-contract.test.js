@@ -154,6 +154,7 @@ const REFINEMENT_ROOT_TEST_COMMANDS = Object.freeze([
   'node --test tests/google-sheets-session.test.js tests/google-sheets-content-actions.test.js tests/gsheets-handler.test.js tests/google-sheets-wiring.test.js tests/spreadsheet-record-redaction.test.js',
   'node tests/sidepanel-automation-runner.test.js',
   'node tests/server-client-ip-geo.test.js',
+  'node tests/ws-client-relay-reconnect.test.js',
 ]);
 
 const PHASE64_RETAINED_ROOT_COMMANDS = Object.freeze([
