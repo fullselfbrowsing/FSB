@@ -5828,6 +5828,438 @@ const tools = {
   };
 
   // =========================================================================
+  // DOM POINTER/WHEEL FALLBACKS (Safari port)
+  //
+  // Safari Web Extensions have no chrome.debugger, so the seven _route:'cdp'
+  // tools above have no trusted-input path. These are their DOM equivalents,
+  // selected by ai/tool-executor.js when FsbPlatform.caps.trustedInput is
+  // false (the mapping lives in utils/platform-adapter.js CDP_DOM_FALLBACKS).
+  //
+  // Every one returns the SAME honest degradation shape that tools.keyPress
+  // already uses -- trusted:false, degraded:true -- because synthetic events
+  // carry isTrusted:false. Sites that gate on event.isTrusted, native HTML5
+  // file-drop targets, and canvas apps reading getCoalescedEvents() will not
+  // respond to these. That is reported, never masked as a plain success.
+  // =========================================================================
+
+  const FSB_UNTRUSTED_NOTE = 'chrome.debugger unavailable on this platform; dispatched untrusted DOM events';
+
+  function _fsbDegraded(base) {
+    return Object.assign({}, base, { trusted: false, degraded: true, cdpError: FSB_UNTRUSTED_NOTE });
+  }
+
+  function _fsbCheckPoint(x, y) {
+    if (typeof x !== 'number' || typeof y !== 'number') {
+      return 'x and y coordinates required (viewport-relative numbers)';
+    }
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    if (x < 0 || y < 0 || x > vw || y > vh) {
+      return `Coordinates (${x}, ${y}) outside viewport bounds (${vw}x${vh}). Use values within 0-${vw} for x and 0-${vh} for y.`;
+    }
+    return null;
+  }
+
+  // elementFromPoint stops at a shadow host, so descend open shadow roots to
+  // reach the element a real click would actually land on.
+  function _fsbHitTest(x, y) {
+    let el = document.elementFromPoint(x, y);
+    let guard = 0;
+    while (el && el.shadowRoot && typeof el.shadowRoot.elementFromPoint === 'function' && guard < 10) {
+      const inner = el.shadowRoot.elementFromPoint(x, y);
+      if (!inner || inner === el) break;
+      el = inner;
+      guard += 1;
+    }
+    return el;
+  }
+
+  function _fsbPointerInit(x, y, extra) {
+    return Object.assign({
+      pointerId: 1,
+      pointerType: 'mouse',
+      isPrimary: true,
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+      view: window,
+      clientX: x,
+      clientY: y,
+      screenX: x + (window.screenX || 0),
+      screenY: y + (window.screenY || 0),
+      button: 0,
+      buttons: 1,
+      detail: 1
+    }, extra || {});
+  }
+
+  function _fsbEventCtor(type) {
+    if (type.indexOf('pointer') === 0) return window.PointerEvent || window.MouseEvent;
+    return window.MouseEvent;
+  }
+
+  function _fsbDispatchSeq(el, types, x, y, extra) {
+    for (const type of types) {
+      // buttons is a bitmask of currently-held buttons: 0 once released.
+      const released = (type === 'pointerup' || type === 'mouseup' || type === 'click' || type === 'dblclick');
+      const init = _fsbPointerInit(x, y, Object.assign({ buttons: released ? 0 : 1 }, extra || {}));
+      const Ctor = _fsbEventCtor(type);
+      try {
+        el.dispatchEvent(new Ctor(type, init));
+      } catch (_e) {
+        // PointerEvent is unavailable in a few embedded contexts; MouseEvent
+        // alone is still better than aborting the whole sequence.
+        try { el.dispatchEvent(new MouseEvent(type.replace(/^pointer/, 'mouse'), init)); } catch (_e2) { /* give up on this type */ }
+      }
+    }
+  }
+
+  // The parent as rendered. _fsbHitTest descends into open shadow roots, and
+  // parentElement stops at one, so the walk has to step from a shadow root to
+  // its host, and from slotted content into the slot that lays it out.
+  function _fsbComposedParent(node) {
+    if (node.assignedSlot) return node.assignedSlot;
+    if (node.parentElement) return node.parentElement;
+    const parent = node.parentNode;
+    return parent && parent.nodeType === 11 && parent.host ? parent.host : null;
+  }
+
+  function _fsbScrollableAncestor(el) {
+    let node = el;
+    while (node && node !== document.body && node !== document.documentElement) {
+      const style = window.getComputedStyle(node);
+      const canY = (style.overflowY === 'auto' || style.overflowY === 'scroll') && node.scrollHeight > node.clientHeight;
+      const canX = (style.overflowX === 'auto' || style.overflowX === 'scroll') && node.scrollWidth > node.clientWidth;
+      if (canY || canX) return node;
+      node = _fsbComposedParent(node);
+    }
+    return document.scrollingElement || document.documentElement;
+  }
+
+  function _fsbDescribe(el) {
+    if (!el) return null;
+    const id = el.id ? '#' + el.id : '';
+    return '<' + (el.tagName || '?').toLowerCase() + id + '>';
+  }
+
+  function _fsbMods(params) {
+    return {
+      shiftKey: !!params.shiftKey,
+      ctrlKey: !!params.ctrlKey,
+      altKey: !!params.altKey,
+      metaKey: !!params.metaKey
+    };
+  }
+
+  tools.pointerClickAt = async (params) => {
+    const bad = _fsbCheckPoint(params.x, params.y);
+    if (bad) return { success: false, error: bad };
+    const { x, y } = params;
+    const el = _fsbHitTest(x, y);
+    if (!el) return { success: false, error: `No element at (${x}, ${y})` };
+
+    const mods = _fsbMods(params);
+    // The dispatched `click` already runs onclick handlers and activation
+    // behaviour (checkbox toggle, link follow). Do NOT follow it with
+    // el.click(): that is just as untrusted, so it reaches nothing new and a
+    // second click undoes every toggle.
+    _fsbDispatchSeq(el, ['pointerover', 'pointerenter', 'pointermove', 'pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'], x, y, mods);
+    await waitForStability('click');
+    return _fsbDegraded({ success: true, method: 'domPointerEvents', x, y, target: _fsbDescribe(el), modifiers: mods });
+  };
+
+  tools.pointerDoubleClickAt = async (params) => {
+    const bad = _fsbCheckPoint(params.x, params.y);
+    if (bad) return { success: false, error: bad };
+    const { x, y } = params;
+    const el = _fsbHitTest(x, y);
+    if (!el) return { success: false, error: `No element at (${x}, ${y})` };
+
+    _fsbDispatchSeq(el, ['pointerover', 'pointermove', 'pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'], x, y, { detail: 1 });
+    _fsbDispatchSeq(el, ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'], x, y, { detail: 2 });
+    _fsbDispatchSeq(el, ['dblclick'], x, y, { detail: 2 });
+    await waitForStability('click');
+    return _fsbDegraded({ success: true, method: 'domPointerEvents', x, y, target: _fsbDescribe(el) });
+  };
+
+  tools.pointerClickAndHoldAt = async (params) => {
+    const bad = _fsbCheckPoint(params.x, params.y);
+    if (bad) return { success: false, error: bad };
+    const { x, y } = params;
+    const holdMs = typeof params.holdMs === 'number' ? params.holdMs : 5000;
+    const el = _fsbHitTest(x, y);
+    if (!el) return { success: false, error: `No element at (${x}, ${y})` };
+
+    _fsbDispatchSeq(el, ['pointerover', 'pointermove', 'pointerdown', 'mousedown'], x, y);
+    await new Promise((resolve) => setTimeout(resolve, holdMs));
+    _fsbDispatchSeq(el, ['pointerup', 'mouseup', 'click'], x, y);
+    return _fsbDegraded({ success: true, method: 'domPointerEvents', x, y, holdMs, target: _fsbDescribe(el) });
+  };
+
+  // HTML5 drag-and-drop does NOT observe pointer events at all -- it is a
+  // separate event family driven by the native drag source. So when the origin
+  // element is draggable we must fire the drag sequence too, with a shared
+  // DataTransfer so the drop target can read what the source set.
+  async function _fsbPointerDragImpl(params, easing, label) {
+    const { startX, startY, endX, endY } = params;
+    for (const [n, v] of [['startX', startX], ['startY', startY], ['endX', endX], ['endY', endY]]) {
+      if (typeof v !== 'number') return { success: false, error: `${n} required (viewport-relative number)` };
+    }
+    const badStart = _fsbCheckPoint(startX, startY);
+    if (badStart) return { success: false, error: badStart };
+    const badEnd = _fsbCheckPoint(endX, endY);
+    if (badEnd) return { success: false, error: badEnd };
+
+    const steps = Math.max(2, Math.min(200, typeof params.steps === 'number' ? params.steps : 20));
+    const source = _fsbHitTest(startX, startY);
+    if (!source) return { success: false, error: `No element at (${startX}, ${startY})` };
+
+    const mods = _fsbMods(params);
+    const isDraggable = source.draggable === true || source.getAttribute('draggable') === 'true';
+    let dt = null;
+    if (isDraggable && typeof DataTransfer === 'function') {
+      try { dt = new DataTransfer(); } catch (_e) { dt = null; }
+    }
+
+    function fireDrag(el, type, x, y) {
+      if (!isDraggable) return;
+      try {
+        const init = _fsbPointerInit(x, y, { dataTransfer: dt });
+        el.dispatchEvent(new DragEvent(type, init));
+      } catch (_e) { /* DragEvent unsupported here; pointer events already fired */ }
+    }
+
+    _fsbDispatchSeq(source, ['pointerover', 'pointermove', 'pointerdown', 'mousedown'], startX, startY, mods);
+    fireDrag(source, 'dragstart', startX, startY);
+
+    let last = source;
+    for (let i = 1; i <= steps; i += 1) {
+      const t = easing(i / steps);
+      const px = startX + (endX - startX) * t;
+      const py = startY + (endY - startY) * t;
+      const over = _fsbHitTest(px, py) || last;
+      _fsbDispatchSeq(over, ['pointermove', 'mousemove'], px, py, mods);
+      fireDrag(source, 'drag', px, py);
+      if (over !== last) fireDrag(over, 'dragenter', px, py);
+      fireDrag(over, 'dragover', px, py);
+      last = over;
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+
+    const target = _fsbHitTest(endX, endY) || last;
+    fireDrag(target, 'drop', endX, endY);
+    _fsbDispatchSeq(target, ['pointerup', 'mouseup'], endX, endY, mods);
+    fireDrag(source, 'dragend', endX, endY);
+    await waitForStability('click');
+
+    return _fsbDegraded({
+      success: true,
+      method: label,
+      startX, startY, endX, endY, steps,
+      html5Drag: isDraggable,
+      target: _fsbDescribe(target)
+    });
+  }
+
+  tools.pointerDrag = async (params) => _fsbPointerDragImpl(params, (t) => t, 'domPointerEvents');
+
+  tools.pointerDragVariableSpeed = async (params) => {
+    // easeInOutQuad: slow start, fast middle, slow finish.
+    const ease = (t) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
+    const steps = typeof params.steps === 'number' ? params.steps : 30;
+    return _fsbPointerDragImpl(Object.assign({}, params, { steps }), ease, 'domPointerEventsVariableSpeed');
+  };
+
+  tools.wheelScrollAt = async (params) => {
+    const bad = _fsbCheckPoint(params.x, params.y);
+    if (bad) return { success: false, error: bad };
+    const { x, y } = params;
+    const deltaX = typeof params.deltaX === 'number' ? params.deltaX : 0;
+    const deltaY = typeof params.deltaY === 'number' ? params.deltaY : -120;
+    const el = _fsbHitTest(x, y);
+    if (!el) return { success: false, error: `No element at (${x}, ${y})` };
+
+    // An untrusted WheelEvent does NOT scroll anything -- the browser only
+    // scrolls on a real user wheel. So dispatch the event for listener parity
+    // (infinite-scroll handlers, custom zoom) and then perform the actual
+    // scroll programmatically unless a listener consumed the wheel tick with
+    // preventDefault(). dispatchEvent() returns false in that case.
+    let shouldScroll = true;
+    try {
+      shouldScroll = el.dispatchEvent(new WheelEvent('wheel', _fsbPointerInit(x, y, {
+        deltaX, deltaY, deltaMode: 0, buttons: 0
+      }))) !== false;
+    } catch (_e) { /* WheelEvent unsupported; the scrollBy below still applies */ }
+
+    const scroller = _fsbScrollableAncestor(el);
+    const beforeTop = scroller.scrollTop;
+    const beforeLeft = scroller.scrollLeft;
+    if (shouldScroll) {
+      scroller.scrollBy({ top: deltaY, left: deltaX, behavior: 'auto' });
+    }
+    await waitForStability('scroll');
+
+    return _fsbDegraded({
+      success: true,
+      method: 'domWheelEvent',
+      x, y, deltaX, deltaY,
+      scroller: _fsbDescribe(scroller),
+      scrolled: { top: scroller.scrollTop - beforeTop, left: scroller.scrollLeft - beforeLeft },
+      target: _fsbDescribe(el)
+    });
+  };
+
+  tools.domInsertTextAt = async (params) => {
+    const text = typeof params.text === 'string' ? params.text : '';
+    // Opt-IN, matching cdpInsertText's `if (clearFirst)`. The insert_text tool
+    // schema does not expose this parameter at all, so defaulting it to true
+    // would make every Safari insert_text wipe the field the model meant to
+    // insert INTO -- exactly backwards for the canvas/rich-editor cases the
+    // tool exists for.
+    const clearFirst = params.clearFirst === true;
+    let el = null;
+
+    if (params.selector) {
+      el = FSB.elementCache.get(params.selector) || document.querySelector(params.selector);
+      if (!el) return { success: false, error: `Element not found: ${params.selector}` };
+    } else {
+      el = document.activeElement;
+      if (!el || el === document.body || el === document.documentElement) {
+        return { success: false, error: 'No focused element and no selector provided' };
+      }
+    }
+
+    try { el.focus(); } catch (_e) { /* already focused or not focusable */ }
+
+    const isFormField = el.tagName === 'INPUT' || el.tagName === 'TEXTAREA';
+    if (clearFirst) {
+      if (isFormField) {
+        el.value = '';
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+      } else {
+        try {
+          document.execCommand('selectAll', false, null);
+          document.execCommand('delete', false, null);
+        } catch (_e) { /* contenteditable without execCommand support */ }
+      }
+    }
+
+    // execCommand('insertText') is what makes rich editors (Slack, Notion,
+    // Google Docs) see a real edit rather than a value assignment. It is
+    // deprecated but still the only in-page path that fires the right
+    // composition/input events. Fall back to direct assignment.
+    let inserted = false;
+    try {
+      inserted = document.execCommand('insertText', false, text);
+    } catch (_e) {
+      inserted = false;
+    }
+    if (!inserted && isFormField) {
+      el.value = (el.value || '') + text;
+      inserted = true;
+    }
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+    await waitForStability('type');
+
+    if (!inserted) {
+      return { success: false, error: 'insertText was rejected and the element is not a form field', target: _fsbDescribe(el) };
+    }
+    return _fsbDegraded({
+      success: true,
+      method: 'domInsertText',
+      textLength: text.length,
+      clearFirst,
+      target: _fsbDescribe(el)
+    });
+  };
+
+  // =========================================================================
+  // SAFARI upload_file: set a real File on an <input type="file"> from bytes.
+  //
+  // Chrome uses CDP DOM.setFileInputFiles, which hands the browser process an
+  // absolute path. Safari has no CDP, so the container app reads the bytes (only
+  // inside a user-granted folder) and they arrive here as base64.
+  //
+  // input.files is read-only, but it is settable from a DataTransfer's FileList
+  // -- that is the one supported in-page route, and sites that read
+  // input.files see a genuine File. Sites that gate on event.isTrusted will not
+  // be satisfied, which is why the result reports trusted:false.
+  // =========================================================================
+  tools.domSetFileInput = async (params) => {
+    const { selector, name, mime, dataB64 } = params || {};
+    if (typeof selector !== 'string' || !selector.trim()) {
+      return { success: false, error: 'domSetFileInput requires a selector' };
+    }
+    if (typeof dataB64 !== 'string') {
+      return { success: false, error: 'domSetFileInput requires base64 file data' };
+    }
+    if (typeof DataTransfer !== 'function' || typeof File !== 'function') {
+      return { success: false, error: 'this browser cannot construct a FileList (no DataTransfer/File)' };
+    }
+
+    let el = FSB.elementCache.get(selector) || document.querySelector(selector);
+    if (!el) return { success: false, error: `Element not found: ${selector}` };
+
+    // Mirror the CDP path: accept a styled dropzone or <label> that wraps a
+    // hidden input, not just the input itself.
+    let input = (el.tagName === 'INPUT' && String(el.type).toLowerCase() === 'file') ? el : null;
+    if (!input) input = el.querySelector('input[type="file"]');
+    if (!input) {
+      return {
+        success: false,
+        error: `selector did not resolve to an <input type="file"> (or a container holding one): ${selector}`
+      };
+    }
+
+    // Validate the charset explicitly. Browser atob() does throw on malformed
+    // input, but relying on that leaves the behaviour at the mercy of the host's
+    // atob implementation (Node's Buffer, for instance, silently discards
+    // invalid characters and would hand us corrupt bytes).
+    if (dataB64.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/.test(dataB64)) {
+      return { success: false, error: 'file data was not valid base64' };
+    }
+
+    let bytes;
+    try {
+      const bin = atob(dataB64);
+      bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i);
+    } catch (_e) {
+      return { success: false, error: 'file data was not valid base64' };
+    }
+
+    const fileName = (typeof name === 'string' && name) ? name : 'upload';
+    const fileType = (typeof mime === 'string' && mime) ? mime : 'application/octet-stream';
+
+    try {
+      const file = new File([bytes], fileName, { type: fileType });
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      input.files = dt.files;
+      if (input.files.length !== 1) {
+        return { success: false, error: 'assigning input.files did not take effect' };
+      }
+    } catch (err) {
+      return { success: false, error: 'could not set input.files: ' + (err && err.message ? err.message : String(err)) };
+    }
+
+    // Frameworks listen for one or the other; fire both.
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    await waitForStability('click');
+
+    return _fsbDegraded({
+      success: true,
+      method: 'domSetFileInput',
+      selector,
+      file: fileName,
+      size: bytes.length,
+      hadEffect: true
+    });
+  };
+
+  // =========================================================================
   // VAULT FILL: fillCredentialFields -- fill login form using classified inputs
   // Uses FSB.inferElementPurpose to detect credential-input fields by role/intent.
   // Params: { username, password } -- decrypted values from background vault lookup.

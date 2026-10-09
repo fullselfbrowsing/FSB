@@ -913,6 +913,36 @@ function handleRemoteControlStop() {
 // same bitmask format the dashboard sends, so keyDown/keyUp pass it
 // through unchanged.
 
+/**
+ * Safari has no chrome.debugger, so NO remote-control input path here can be
+ * trusted-input. Report it as a typed capability gap rather than letting the
+ * adapter's rejecting attach shim reach classifyFSBRemoteControlDispatchFailure:
+ * that message contains the word "debugger", so every click / key / scroll
+ * would be misclassified as 'debugger-blocked' (which wrongly implies an
+ * EXTERNAL debugger is holding the tab) and would silently kill the session.
+ * FsbPlatform is undefined on Chrome, so this never fires there.
+ *
+ * @param {string} type - dashboard message type, e.g. 'dash:remote-click'
+ * @param {Object} payload - the original dashboard payload
+ * @param {number} tabId - target tab
+ * @returns {boolean} true when the caller must abort before dispatching
+ */
+function _fsbRemoteControlCdpUnavailable(type, payload, tabId) {
+  if (!globalThis.FsbPlatform || !globalThis.FsbPlatform.caps ||
+      globalThis.FsbPlatform.caps.cdp !== false) {
+    return false;
+  }
+  recordFSBRemoteControlFailure(
+    'remote-control-dispatch-unsupported',
+    type,
+    payload,
+    new Error('capability_unavailable: trusted input dispatch requires chrome.debugger'),
+    'capability-unavailable',
+    tabId
+  );
+  return true;
+}
+
 async function handleRemoteClick(payload) {
   if (!_remoteControlActive) {
     console.warn('[FSB RC] Click ignored: remote control not active');
@@ -928,6 +958,7 @@ async function handleRemoteClick(payload) {
     _broadcastRemoteControlState(globalThis.__fsbWsInstance, false, 'no-tab', null);
     return;
   }
+  if (_fsbRemoteControlCdpUnavailable('dash:remote-click', payload, tabId)) return;
   // Decompose dashboard bitmask modifiers into boolean flags for cdpClickAt.
   // Dashboard bitmask: alt=1, ctrl=2, meta=4, shift=8.
   var mods = typeof payload.modifiers === 'number' ? payload.modifiers : 0;
@@ -985,6 +1016,7 @@ async function handleRemoteKey(payload) {
     _broadcastRemoteControlState(globalThis.__fsbWsInstance, false, 'no-tab', null);
     return;
   }
+  if (_fsbRemoteControlCdpUnavailable('dash:remote-key', payload, tabId)) return;
   var mods = typeof payload.modifiers === 'number' ? payload.modifiers : 0;
 
   try {
@@ -1085,6 +1117,7 @@ async function handleRemoteScroll(payload) {
     _broadcastRemoteControlState(globalThis.__fsbWsInstance, false, 'no-tab', null);
     return;
   }
+  if (_fsbRemoteControlCdpUnavailable('dash:remote-scroll', payload, tabId)) return;
   var deltaX = Number.isFinite(payload.deltaX) ? payload.deltaX : 0;
   var deltaY = Number.isFinite(payload.deltaY) ? payload.deltaY : 0;
   try {
