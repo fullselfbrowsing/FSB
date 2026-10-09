@@ -40,7 +40,7 @@ const REPO_ROOT = path.resolve(__dirname, '..');
 // tests/capability-mcp-surface.test.js:58-59 / tool-definitions-parity.test.js:52.
 // The two out-of-registry capability tools must NOT have moved this.
 const EXPECTED_NON_TRIGGER_REGISTRY_HASH =
-  'b9c30a5a61fbcdae60b851aebfea90d0961cb95d95c3c2adbf8357014bbbd7b9';
+  '8a7928d6f036a6bc51d03d0aeb1aa951cf2d39b60f3dab2a7ddbc1b7ac95ca94';
 
 // The four trigger tools sit IN TOOL_REGISTRY but are excluded from the frozen
 // non-trigger baseline (mirrors capability-mcp-surface.test.js:63).
@@ -105,7 +105,7 @@ async function run() {
   const actualHash = registryHash(nonTriggerTools);
   check(
     actualHash === EXPECTED_NON_TRIGGER_REGISTRY_HASH,
-    'EXPECTED_NON_TRIGGER_REGISTRY_HASH is unchanged -- the two capability tools are out-of-registry (INV-01)'
+    'non-trigger registry hash matches the approved text-editing schema baseline'
   );
   if (actualHash !== EXPECTED_NON_TRIGGER_REGISTRY_HASH) {
     console.error('  DIAG: expected ' + EXPECTED_NON_TRIGGER_REGISTRY_HASH);

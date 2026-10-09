@@ -5,6 +5,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { createDirectRuntimeReference } = require('../mcp/build/agent-providers/effective-authority.js');
 
 let passed = 0;
 let failed = 0;
@@ -78,7 +79,16 @@ assert(adapterSource.includes('export interface DirectRuntimeReference'), 'adapt
 assert(adapterSource.includes('export interface PreSpawnIdentityProbe'), 'adapter exposes the private pre-spawn identity descriptor');
 assert(adapterSource.includes('export interface EffectiveAuthorityAttestation'), 'adapter exposes the private effective-authority descriptor');
 assert(authoritySource.includes("endpointRef: 'direct_runtime_endpoint'"), 'authority descriptor resolves only a supervisor-owned endpoint reference');
-assert(authoritySource.includes("parsed.hostname !== '127.0.0.1'"), 'direct runtime materialization pins numeric loopback');
+for (const endpoint of ['http://127.0.0.1:7225/mcp', 'http://[::1]:7225/mcp']) {
+  assert(createDirectRuntimeReference(endpoint, 'runtime-generation').endpoint === endpoint,
+    `direct runtime accepts numeric loopback: ${endpoint}`);
+}
+for (const endpoint of ['http://localhost:7225/mcp', 'http://0.0.0.0:7225/mcp', 'http://192.0.2.1:7225/mcp']) {
+  let rejected = false;
+  try { createDirectRuntimeReference(endpoint, 'runtime-generation'); }
+  catch (error) { rejected = error.code === 'invalid_direct_runtime'; }
+  assert(rejected, `direct runtime rejects non-owned endpoint: ${endpoint}`);
+}
 assert(serveDelegationSource.indexOf('await dependencies.startHttp') < serveDelegationSource.indexOf('createDirectRuntimeReference('), 'serve materializes the direct reference only after HTTP ownership');
 assert(serveDelegationSource.includes('dependencies.mintGeneration()'), 'serve owns the direct runtime generation');
 assert(!registrySource.includes('CODEX_ADAPTER_ID') && !registrySource.includes('createCodexAdapter'), 'production adapter roster excludes retired Codex registration');

@@ -489,7 +489,7 @@ function safariLikeScope(overrides) {
 
   console.log('\n=== 11. source hygiene ===');
   passAssert(!/\bimportScripts\b/.test(SOURCE),
-    'adapter source contains no importScripts token (background.js pins 333/329)');
+    'adapter source contains no importScripts token (background.js pins 334/330)');
 
   console.log('\n---');
   console.log('passed:', passed, 'failed:', failed);

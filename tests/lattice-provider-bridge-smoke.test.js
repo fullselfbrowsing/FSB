@@ -631,8 +631,9 @@ async function loadOffscreenHandlerSource(chromeMock) {
   // and attachment helper -> 330. Agent tab-spawn provenance and shared model
   // discovery add two more classic-SW loads -> 332. The delegation tab seed
   // (side-panel active tab handed to the delegated agent) adds one -> 333.
+  // The retained debugger session manager adds one shared load -> 334.
   const importScriptsCount = (bgSource.match(/importScripts/g) || []).length;
-  passAssertEqual(importScriptsCount, 333, 'background.js importScripts count includes provenance, LM Studio discovery, and delegation tab seed helpers');
+  passAssertEqual(importScriptsCount, 334, 'background.js importScripts count includes the retained debugger session manager');
   // Companion call-site-only count (regex requires open paren): Phase 5 baseline
   // was 150 actual importScripts() calls; Phase 6 adds 1 -> 151; Phase 8 adds 1 -> 152;
   // Phase 14 adds 2 (trigger-store + trigger-lifecycle) -> 154; Phase 15 adds 2
@@ -678,9 +679,15 @@ async function loadOffscreenHandlerSource(chromeMock) {
   // journal is call site 322. The export helper is call site 323, and screenshot
   // capture adds three call sites -> 326. Agent tab-spawn provenance and
   // shared model discovery add two more call sites -> 328. The delegation tab
-  // seed is call site 329.
+  // seed is call site 329. The debugger session manager is call site 330.
   const importScriptsCallSites = (bgSource.match(/importScripts\(/g) || []).length;
-  passAssertEqual(importScriptsCallSites, 329, 'background.js importScripts() call sites include provenance, LM Studio discovery, and delegation tab seed helpers');
+  passAssertEqual(importScriptsCallSites, 330, 'background.js importScripts() call sites include the retained debugger session manager');
+  passAssertEqual((bgSource.match(/importScripts\(['"]utils\/debugger-sessions\.js['"]\)/g) || []).length, 1,
+    'debugger session manager is loaded exactly once');
+  const lineLease = bgLines.findIndex(line => /importScripts\(['"]utils\/cdp-lease\.js['"]\)/.test(line));
+  const lineSessions = bgLines.findIndex(line => /importScripts\(['"]utils\/debugger-sessions\.js['"]\)/.test(line));
+  passAssert(lineLease >= 0 && lineSessions > lineLease,
+    'debugger session manager loads after its CDP lease dependency');
 
   const lineCli = bgLines.findIndex(l => /importScripts\(['"]ai\/cli-parser\.js['"]\)/.test(l));
   const lineBridge = bgLines.findIndex(l => /importScripts\(['"]ai\/lattice-provider-bridge\.js['"]\)/.test(l));

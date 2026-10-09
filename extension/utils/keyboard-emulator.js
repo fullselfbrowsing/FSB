@@ -229,7 +229,7 @@ class KeyboardEmulator {
     }
 
     // If already attached to THIS tab, reuse
-    if (this.debuggerAttached && this.attachedTabId === tabId) {
+    if (this.isAttachedTo(tabId)) {
       return true;
     }
 
@@ -250,7 +250,7 @@ class KeyboardEmulator {
       let lastError = null;
       for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
         try {
-          await chrome.debugger.attach({ tabId }, '1.3');
+          await (globalThis.FsbDebuggerSessions || chrome.debugger).attach({ tabId }, '1.3');
           this.debuggerAttached = true;
           this.attachedTabId = tabId;
           this.lastAttachError = null;
@@ -291,7 +291,7 @@ class KeyboardEmulator {
     if (!this.debuggerAttached || !targetTabId) return;
 
     try {
-      await chrome.debugger.detach({ tabId: targetTabId });
+      await (globalThis.FsbDebuggerSessions || chrome.debugger).detach({ tabId: targetTabId });
       console.log(`[FSB KeyboardEmulator] Debugger detached from tab ${targetTabId}`);
     } catch (error) {
       // Debugger may already be detached (e.g., tab navigated or closed)
@@ -309,7 +309,9 @@ class KeyboardEmulator {
    * @returns {boolean} True if debugger is attached to this tab
    */
   isAttachedTo(tabId) {
-    return this.debuggerAttached && this.attachedTabId === tabId;
+    return globalThis.FsbDebuggerSessions
+      ? globalThis.FsbDebuggerSessions.isAttachedTo(tabId)
+      : this.debuggerAttached && this.attachedTabId === tabId;
   }
 
   /**
@@ -355,8 +357,10 @@ class KeyboardEmulator {
    * @param {Object} modifiers - Modifier key states
    * @returns {Promise<Object>} Result object
    */
-  async sendKeyEvent(tabId, type, key, modifiers = {}) {
+  async sendKeyEvent(tabId, type, key, modifiers = {}, commands = []) {
+    let commandSent = false;
     try {
+      if (typeof requireForegroundNativeInput === 'function') await requireForegroundNativeInput(tabId);
       const attached = await this.attachDebugger(tabId);
       if (!attached) {
         return {
@@ -384,6 +388,7 @@ class KeyboardEmulator {
         key: keyData.key,
         code: keyData.code
       };
+      if (type === 'keyDown' && commands.length > 0) params.commands = commands;
 
       // Add text parameter only for printable keys WITHOUT modifier shortcuts.
       // When Ctrl/Meta/Alt modifiers are active, the key event is a shortcut (e.g. Cmd+V = paste),
@@ -412,6 +417,7 @@ class KeyboardEmulator {
         }
       }
 
+      commandSent = true;
       await chrome.debugger.sendCommand({ tabId }, 'Input.dispatchKeyEvent', params);
 
       return { 
@@ -429,6 +435,7 @@ class KeyboardEmulator {
         error: error.message || 'Key event dispatch failed',
         code: error && error.code,
         retryable: Boolean(error && error.retryable),
+        mayHaveExecuted: commandSent,
         key,
         type
       };
@@ -442,12 +449,12 @@ class KeyboardEmulator {
    * @param {Object} modifiers - Modifier key states
    * @returns {Promise<Object>} Result object
    */
-  async pressKey(tabId, key, modifiers = {}) {
+  async pressKey(tabId, key, modifiers = {}, commands = []) {
     try {
       // Send keyDown event
-      const downResult = await this.sendKeyEvent(tabId, 'keyDown', key, modifiers);
+      const downResult = await this.sendKeyEvent(tabId, 'keyDown', key, modifiers, commands);
       if (!downResult.success) {
-        return downResult;
+        return { ...downResult, keyDownDispatched: Boolean(downResult.mayHaveExecuted) };
       }
 
       // Small delay between down and up
@@ -456,7 +463,7 @@ class KeyboardEmulator {
       // Send keyUp event
       const upResult = await this.sendKeyEvent(tabId, 'keyUp', key, modifiers);
       if (!upResult.success) {
-        return upResult;
+        return { ...upResult, keyDownDispatched: true, mayHaveExecuted: true };
       }
 
       return {
@@ -495,9 +502,11 @@ class KeyboardEmulator {
         
         if (!result.success) {
           return {
+            ...result,
             success: false,
             error: `Failed at key: ${key}`,
             completedKeys: results.length - 1,
+            mayHaveExecuted: results.length > 1 || !!result.mayHaveExecuted || !!result.keyDownDispatched,
             results
           };
         }
@@ -570,6 +579,12 @@ class KeyboardEmulator {
         results.push({ char, key, modifiers, result });
 
         if (!result.success) {
+          // Retry only characters with no key mapping. A delivered key or a focus
+          // refusal must not turn into a second insertion through another API.
+          if (result.keyDownDispatched || result.mayHaveExecuted || !/^Unknown key:/.test(result.error || '')) {
+            return { ...result, success: false, completedChars: results.length - 1,
+              mayHaveExecuted: results.length > 1 || !!result.mayHaveExecuted || !!result.keyDownDispatched, results };
+          }
           // Fallback: use Input.insertText for characters not in KEY_MAPPINGS (Unicode, special symbols)
           // This handles middle-dot ·, em-dash —, smart quotes "", etc.
           try {

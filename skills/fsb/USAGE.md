@@ -28,6 +28,8 @@ The goal of this page: get a new user from a clean machine to a green doctor in 
    https://github.com/fullselfbrowsing/FSB/releases
    ```
 
+   For an unpacked install, record the extension ID shown on `chrome://extensions`; changing the install path or browser profile can change that ID. Branded Chrome 137 no longer accepts `--load-extension`; use the **Load unpacked** button. [Chrome for Testing and Chromium still support the flag](https://groups.google.com/a/chromium.org/g/chromium-extensions/c/1-g8EFx2BBY/m/S0ET5wPjCAAJ).
+
    This skill prints the URL for the user to click. It does NOT auto-launch the browser to that URL.
 
 2. **Install the FSB MCP server config.**
@@ -141,3 +143,5 @@ Each `[FAIL]` from `node scripts/doctor.mjs` maps to one of six layers. Find you
 | config | The MCP host config does not include the FSB stdio block. | Re-run `npx -y fsb-mcp-server@latest install --<host>` for your MCP host (replace `<host>` with `claude-desktop`, `cursor`, etc.). Or paste the block printed by `node scripts/print-stdio.mjs` into your host config. |
 
 Re-run `node scripts/doctor.mjs` after each fix. If a layer keeps flipping or you see `[WARN]`, capture the raw output and file an issue at `https://github.com/fullselfbrowsing/FSB/issues`.
+
+For MCP attachment problems, `npx -y fsb-mcp-server@latest doctor` shows the attached extension ID, extension version, install instance ID, connection time, and normal-window count. `NO_BROWSER_WINDOW` means to open a normal window in that profile. `ORIGIN_PIN_MISMATCH` means to run `npx -y fsb-mcp-server@latest pair --reset` and pair again. Only one browser profile holds the bridge attachment at a time; the MCP server and extension are versioned independently. Local HTTP `serve` accepts loopback clients only. After an HTTP restart, reconnect the client to the printed endpoint. If a page read returns `PAGE_UNRESPONSIVE`, recover with `navigate` or `close_tab`; inspect state before repeating an uncertain mutation.

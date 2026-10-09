@@ -80,6 +80,7 @@ const MESSAGE_TYPE_MAP: Record<
 // ---------------------------------------------------------------------------
 
 const TIMEOUT_OVERRIDES: Record<string, number> = {
+  read_sheet: 150_000,
   read_page: 45_000,
   list_tabs: 5_000,
   get_page_snapshot: 45_000,

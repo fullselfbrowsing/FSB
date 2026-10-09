@@ -8,6 +8,17 @@
         <span class="rn-hero-sep" aria-hidden="true">|</span>
         <span class="rn-hero-ver" [attr.translate]="'no'">&#9661;{{ versionLabel() }}</span>
       </h1>
+@if (version() === '0.9.92') {
+
+      <p style="margin: 0 0 32px; font-size: 1.0625rem; line-height: 1.7; color: var(--dim); max-width: 62ch; text-wrap: pretty;" i18n="@@releaseNotes.v0992.001.sevenChangesInThis">Seven changes in this release. Connections recover on their own, every action runs at most once, typing reaches code editors and web components, and a hung page stops receiving input once its deadline passes.</p>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px; font-family: 'Space Mono', monospace; font-size: 11px; color: var(--dim);">
+        <span [attr.translate]="'no'" style="border: 1px solid var(--line); border-radius: 999px; padding: 6px 13px; white-space: nowrap;" i18n="@@releaseNotes.v0992.002.extension">extension 0.9.92</span>
+        <span [attr.translate]="'no'" style="border: 1px solid var(--line); border-radius: 999px; padding: 6px 13px; white-space: nowrap;" i18n="@@releaseNotes.v0992.003.mcp">mcp 0.11.1</span>
+        <span [attr.translate]="'no'" style="border: 1px solid var(--line); border-radius: 999px; padding: 6px 13px; white-space: nowrap;" i18n="@@releaseNotes.v0992.004.chrome">chrome 116+</span>
+        <span [attr.translate]="'no'" style="border: 1px solid var(--line); border-radius: 999px; padding: 6px 13px; white-space: nowrap;" i18n="@@releaseNotes.v0992.005.node">node 24</span>
+        <span [attr.translate]="'no'" style="border: 1px solid var(--line); border-radius: 999px; padding: 6px 13px; white-space: nowrap;" i18n="@@releaseNotes.v0992.006.mit">MIT</span>
+      </div>
+      }
 @if (version() === '0.9.91') {
 
       <p style="margin: 0 0 32px; font-size: 1.0625rem; line-height: 1.7; color: var(--dim); max-width: 62ch; text-wrap: pretty;" i18n="@@releaseNotes.v0991.001.thirteenChangesInThis">Thirteen changes in this release. Delegated agent runtimes, a live activity icon, provider discovery that reads real evidence, and a Sheets path that needs no OAuth credentials of its own.</p>
@@ -169,6 +180,284 @@
     </aside>
 
     <div class="rn-content" [class.is-swapping]="swapping()">
+@if (version() === '0.9.92') {
+  <section class="rn-sec rn-sec-split" style="margin: 0; padding: 72px 0 0; display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 56px; align-items: center;">
+    <div class="rn-sec-viz" style="display: flex; align-items: center; justify-content: center;">
+      <div style="width: 290px; display: flex; flex-direction: column; gap: 18px;">
+        <div style="display: flex; align-items: center; font-family: 'Space Mono', monospace; font-size: 10px; color: var(--dim);">
+          <span [attr.translate]="'no'" style="flex: 0 0 auto; border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; background: var(--panel2);" i18n="@@releaseNotes.v0992.001.extension">extension</span>
+          <div style="position: relative; flex: 1 1 auto; height: 34px; margin: 0 8px;">
+            <div class="rn-a02 rn-cycle rn-cycle-first" style="position: absolute; inset: 0; opacity: 0; animation-delay: 0s">
+              <div style="position: absolute; left: 0; right: 14px; top: 16px; height: 1px; background: var(--line2);"></div>
+              <div style="position: absolute; left: 0; right: 14px; top: 13.5px; height: 6px;">
+                <span class="rn-a88" style="position: absolute; top: 0; width: 6px; height: 6px; margin-left: -3px; border-radius: 999px; background: var(--ac); box-shadow: 0 0 8px rgba(255,107,53,.6); opacity: 0;"></span>
+                <span class="rn-a89" style="position: absolute; top: 0; width: 6px; height: 6px; margin-left: -3px; border-radius: 999px; background: var(--dim); opacity: 0;"></span>
+              </div>
+              <span style="position: absolute; right: 0; top: 10.5px; width: 12px; height: 12px; border-radius: 3px; background: var(--ac);"></span>
+            </div>
+            <div class="rn-a04 rn-cycle" style="position: absolute; inset: 0; opacity: 0; animation-delay: 4s">
+              <div style="position: absolute; left: 0; right: 14px; top: 16px; border-top: 1px dashed var(--dim2);"></div>
+              <div style="position: absolute; left: 0; right: 14px; top: 13.5px; height: 6px;">
+                <span class="rn-a90" style="position: absolute; top: 0; width: 6px; height: 6px; margin-left: -3px; border-radius: 999px; background: var(--dim); opacity: 0;"></span>
+              </div>
+              <span style="position: absolute; right: 0; top: 10.5px; width: 12px; height: 12px; border-radius: 3px; background: var(--dim2);"></span>
+            </div>
+            <div class="rn-a07 rn-cycle" style="position: absolute; inset: 0; opacity: 0; animation-delay: 8s">
+              <span class="rn-a16" style="position: absolute; right: 0; top: 10.5px; width: 12px; height: 12px; border-radius: 3px; border: 1.5px dashed var(--ac);"></span>
+            </div>
+            <div class="rn-a09 rn-cycle" style="position: absolute; inset: 0; opacity: 0; animation-delay: 12s">
+              <div style="position: absolute; left: 0; right: 14px; top: 16px; height: 1px; background: var(--ac); opacity: .7;"></div>
+              <div style="position: absolute; left: 0; right: 14px; top: 13.5px; height: 6px;">
+                <span class="rn-a88" style="position: absolute; top: 0; width: 6px; height: 6px; margin-left: -3px; border-radius: 999px; background: var(--ac); box-shadow: 0 0 8px rgba(255,107,53,.6); opacity: 0;"></span>
+                <span class="rn-a89" style="position: absolute; top: 0; width: 6px; height: 6px; margin-left: -3px; border-radius: 999px; background: var(--dim); opacity: 0;"></span>
+              </div>
+              <span style="position: absolute; right: 0; top: 10.5px; width: 12px; height: 12px; border-radius: 3px; background: var(--ac); box-shadow: 0 0 10px rgba(255,107,53,.5);"></span>
+            </div>
+          </div>
+          <span [attr.translate]="'no'" style="flex: 0 0 auto; border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; background: var(--panel2);" i18n="@@releaseNotes.v0992.002.bridge">bridge</span>
+        </div>
+        <div style="position: relative; height: 14px; font-family: 'Space Mono', monospace; font-size: 10px; letter-spacing: .1em; text-transform: uppercase;">
+          <span [attr.translate]="'no'" class="rn-a02 rn-cycle rn-cycle-first" style="position: absolute; left: 0; right: 0; text-align: center; color: var(--ac); opacity: 0; animation-delay: 0s" i18n="@@releaseNotes.v0992.003.connected">connected</span>
+          <span [attr.translate]="'no'" class="rn-a04 rn-cycle" style="position: absolute; left: 0; right: 0; text-align: center; color: var(--dim); opacity: 0; animation-delay: 4s" i18n="@@releaseNotes.v0992.004.noReplyNoHeartbeat">no reply · no heartbeat</span>
+          <span [attr.translate]="'no'" class="rn-a07 rn-cycle" style="position: absolute; left: 0; right: 0; text-align: center; color: var(--dim); opacity: 0; animation-delay: 8s" i18n="@@releaseNotes.v0992.005.socketReapedSlotFreed">socket reaped · slot freed</span>
+          <span [attr.translate]="'no'" class="rn-a09 rn-cycle" style="position: absolute; left: 0; right: 0; text-align: center; color: var(--ac); opacity: 0; animation-delay: 12s" i18n="@@releaseNotes.v0992.006.reconnected">reconnected</span>
+        </div>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 10px; margin-top: 6px; font-family: 'Space Mono', monospace;">
+          <div style="display: flex; gap: 6px; font-size: 10px;">
+            <span [attr.translate]="'no'" class="rn-a29" style="border: 1px solid var(--line); border-radius: 999px; padding: 5px 10px; white-space: nowrap; color: var(--dim2); animation-delay: 0s">2</span>
+            <span [attr.translate]="'no'" class="rn-a30" style="border: 1px solid var(--line); border-radius: 999px; padding: 5px 10px; white-space: nowrap; color: var(--dim2); animation-delay: 1s">3</span>
+            <span [attr.translate]="'no'" class="rn-a31" style="border: 1px solid var(--line); border-radius: 999px; padding: 5px 10px; white-space: nowrap; color: var(--dim2); animation-delay: 2s">4.5</span>
+            <span [attr.translate]="'no'" class="rn-a32" style="border: 1px solid var(--line); border-radius: 999px; padding: 5px 10px; white-space: nowrap; color: var(--dim2); animation-delay: 3s">…</span>
+            <span [attr.translate]="'no'" class="rn-a33" style="border: 1px solid var(--line); border-radius: 999px; padding: 5px 10px; white-space: nowrap; color: var(--dim2); animation-delay: 4s">30</span>
+          </div>
+          <div [attr.translate]="'no'" style="font-size: 9.5px; color: var(--dim2); text-align: center;" i18n="@@releaseNotes.v0992.007.reconnectBackoffSeconds">reconnect backoff, seconds</div>
+        </div>
+      </div>
+    </div>
+    <div class="rn-sec-copy">
+      <div class="rn-sec-num" [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: 11px; letter-spacing: .22em; color: var(--ac); margin-bottom: 14px;">01</div>
+      <h2 style="margin: 0 0 18px; font-size: clamp(1.5rem, 3vw, 2rem); font-weight: 700; letter-spacing: -.02em; line-height: 1.15;" i18n="@@releaseNotes.v0992.008.connectionsRecoverOnTheir">Connections recover on their own</h2>
+      <ul style="margin: 0; padding-left: 18px; color: var(--dim); font-size: 1rem; line-height: 1.65;">
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0992.009.aSocketThatStops">A socket that stops answering both pings and the heartbeat is closed, freeing the bridge's single extension slot.</li>
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0992.010.theExtensionReadsThe">The extension reads the close code and backs off by 1.5× toward a 30-second ceiling instead of retrying every two seconds forever.</li>
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0992.011.aPairingCredentialThe">A pairing credential the bridge has rejected is dropped, not replayed.</li>
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0992.012.keepaliveRepliesAreNow">Keepalive replies are now read, so a half-open socket is noticed and reconnected.</li>
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0992.013.fsbMcpServerExitsWhen"><span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">fsb-mcp-server</span> exits when its host closes the stdio pipe, so an orphaned server no longer ends up owning the bridge port.</li>
+        <li style="margin-bottom: 0;" i18n="@@releaseNotes.v0992.014.theDashboardRelaySocket">The dashboard relay socket no longer replaces itself every two seconds, which also ends the toolbar icon's gray pulse.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="rn-sec rn-sec-split" style="margin: 0; padding: 72px 0 0; display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 56px; align-items: center;">
+    <div class="rn-sec-viz" style="order: 2; display: flex; align-items: center; justify-content: center;">
+      <div style="width: 280px; display: flex; flex-direction: column; gap: 16px;">
+        <div style="border: 1px solid var(--line); border-radius: 8px; background: var(--panel2); overflow: hidden;">
+          <div style="display: flex; align-items: center; gap: 5px; padding: 8px 11px; border-bottom: 1px solid var(--line);">
+            <span style="width: 6px; height: 6px; border-radius: 999px; background: var(--line2);"></span>
+            <span style="width: 6px; height: 6px; border-radius: 999px; background: var(--line2);"></span>
+            <span style="width: 6px; height: 6px; border-radius: 999px; background: var(--line2);"></span>
+            <span [attr.translate]="'no'" style="margin-left: auto; font-family: 'Space Mono', monospace; font-size: 9px; color: var(--dim2);" i18n="@@releaseNotes.v0992.015.bridgeEventsJsonl">bridge-events.jsonl</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 8px; padding: 12px 11px 14px; font-family: 'Space Mono', monospace; font-size: 9.5px;">
+            <div class="rn-a91 rn-enter" style="display: flex; gap: 10px; white-space: nowrap; opacity: 0; animation-delay: 0s">
+              <span [attr.translate]="'no'" style="color: var(--dim2);">04:12</span>
+              <span [attr.translate]="'no'" style="color: var(--ac);" i18n="@@releaseNotes.v0992.016.extensionSlotRefused">extension_slot_refused</span>
+            </div>
+            <div class="rn-a92 rn-enter" style="display: flex; gap: 10px; white-space: nowrap; opacity: 0; animation-delay: .25s">
+              <span [attr.translate]="'no'" style="color: var(--dim2);">04:13</span>
+              <span [attr.translate]="'no'" style="color: var(--ink);" i18n="@@releaseNotes.v0992.017.upgradeRejectedOriginPin">upgrade_rejected_origin_pin</span>
+            </div>
+            <div class="rn-a93 rn-enter" style="display: flex; gap: 10px; white-space: nowrap; opacity: 0; animation-delay: .5s">
+              <span [attr.translate]="'no'" style="color: var(--dim2);">04:14</span>
+              <span [attr.translate]="'no'" style="color: var(--ink);" i18n="@@releaseNotes.v0992.018.extensionReaped">extension_reaped</span>
+            </div>
+            <div class="rn-a94 rn-enter" style="display: flex; gap: 10px; white-space: nowrap; opacity: 0; animation-delay: .75s">
+              <span [attr.translate]="'no'" style="color: var(--dim2);">04:15</span>
+              <span [attr.translate]="'no'" style="color: var(--ink);" i18n="@@releaseNotes.v0992.019.extAuthorityRevoked">ext_authority_revoked</span>
+            </div>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 10px; font-family: 'Space Mono', monospace; font-size: 10px;">
+          <span [attr.translate]="'no'" class="rn-a95" style="color: var(--dim);" i18n="@@releaseNotes.v0992.020.refusals">13,328 refusals</span>
+          <span [attr.translate]="'no'" class="rn-a24 rn-enter" style="display: inline-block; color: var(--dim2); opacity: 0;">→</span>
+          <span [attr.translate]="'no'" class="rn-a24 rn-enter" style="display: inline-block; border: 1px solid var(--ac); border-radius: 999px; padding: 4px 10px; white-space: nowrap; color: var(--ac); opacity: 0;" i18n="@@releaseNotes.v0992.021.lineMin">1 line / min</span>
+        </div>
+      </div>
+    </div>
+    <div class="rn-sec-copy" style="order: 1;">
+      <div class="rn-sec-num" [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: 11px; letter-spacing: .22em; color: var(--ac); margin-bottom: 14px;">02</div>
+      <h2 style="margin: 0 0 18px; font-size: clamp(1.5rem, 3vw, 2rem); font-weight: 700; letter-spacing: -.02em; line-height: 1.15;" i18n="@@releaseNotes.v0992.022.bridgeFailuresNameTheir">Bridge failures name their cause</h2>
+      <ul style="margin: 0; padding-left: 18px; color: var(--dim); font-size: 1rem; line-height: 1.65;">
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0992.023.refusalsRevocationsReplacementsAnd">Refusals, revocations, replacements, reaps, and closes are journaled to <span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">bridge-events.jsonl</span>, coalesced to one line a minute per cause.</li>
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0992.024.aPairingMismatchNames">A pairing mismatch names both extension origins and the <span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">pair --reset</span> fix instead of a bare HTTP 403.</li>
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0992.025.doctorReportsAnAuthorization"><span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">doctor</span> reports an authorization failure instead of blaming the browser.</li>
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0992.026.disconnectReasonSeparatesA"><span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">disconnect_reason</span> separates a revoked credential from an evicted service worker.</li>
+        <li style="margin-bottom: 0;" i18n="@@releaseNotes.v0992.027.localHealthShowsWhether">Local health shows whether the extension is attached, which Chrome profile it runs in, and its window state.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="rn-sec rn-sec-split" style="margin: 0; padding: 72px 0 0; display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 56px; align-items: center;">
+    <div class="rn-sec-viz" style="display: flex; align-items: center; justify-content: center;">
+      <div style="width: 260px; display: flex; flex-direction: column; align-items: center; gap: 26px;">
+        <div style="display: flex; align-items: center; gap: 36px;">
+          <div style="position: relative;">
+            <span [attr.translate]="'no'" style="display: inline-block; padding: 11px 24px; border: 1px solid var(--ac); border-radius: 8px; background: rgba(255,107,53,.1); font-family: 'Space Mono', monospace; font-size: 11px; letter-spacing: .06em; color: var(--ink);" i18n="@@releaseNotes.v0992.028.send">Send</span>
+            <span class="rn-a96" style="position: absolute; left: 50%; top: 50%; width: 44px; height: 44px; margin: -22px 0 0 -22px; border-radius: 999px; border: 1.5px solid var(--ac); opacity: 0; pointer-events: none;"></span>
+            <svg class="rn-a97" viewBox="0 0 14 18" aria-hidden="true" style="position: absolute; right: -8px; bottom: -14px; width: 14px; height: 18px; fill: var(--ink); stroke: var(--bg); stroke-width: 1.2px; transform-origin: 0 0;"><path d="M1 1 L1 14.5 L4.6 11.2 L7.2 16.6 L9.6 15.5 L7 10.3 L12 10.3 Z"></path></svg>
+          </div>
+          <div style="display: flex; flex-direction: column; align-items: center; gap: 7px;">
+            <span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: 30px; font-weight: 700; line-height: 1; color: var(--ac);">1×</span>
+            <span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .14em; text-transform: uppercase; color: var(--dim2); white-space: nowrap;" i18n="@@releaseNotes.v0992.029.perAction">per action</span>
+          </div>
+        </div>
+        <div style="position: relative; width: 100%; height: 16px; font-family: 'Space Mono', monospace; font-size: 10px;">
+          <span [attr.translate]="'no'" class="rn-a25 rn-cycle rn-cycle-first" style="position: absolute; left: 0; right: 0; text-align: center; color: var(--ac); opacity: 0; animation-delay: 0s" i18n="@@releaseNotes.v0992.030.executed">executed</span>
+          <span [attr.translate]="'no'" class="rn-a26 rn-cycle" style="position: absolute; left: 0; right: 0; text-align: center; color: var(--dim); opacity: 0; animation-delay: 2s" i18n="@@releaseNotes.v0992.031.notExecutedSafeTo">not executed · safe to retry</span>
+          <span [attr.translate]="'no'" class="rn-a27 rn-cycle" style="position: absolute; left: 0; right: 0; text-align: center; color: var(--dim); opacity: 0; animation-delay: 4s" i18n="@@releaseNotes.v0992.032.uncertainNotRepeated">uncertain · not repeated</span>
+        </div>
+      </div>
+    </div>
+    <div class="rn-sec-copy">
+      <div class="rn-sec-num" [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: 11px; letter-spacing: .22em; color: var(--ac); margin-bottom: 14px;">03</div>
+      <h2 style="margin: 0 0 18px; font-size: clamp(1.5rem, 3vw, 2rem); font-weight: 700; letter-spacing: -.02em; line-height: 1.15;" i18n="@@releaseNotes.v0992.033.everyActionRunsAt">Every action runs at most once</h2>
+      <ul style="margin: 0; padding-left: 18px; color: var(--dim); font-size: 1rem; line-height: 1.65;">
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0992.034.aClickIsDispatched">A click is dispatched once, never repeated by a retry layer.</li>
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0992.035.anActionThatNever">An action that never reached the page, including one aimed at a closed tab, is reported as not executed and is safe to retry.</li>
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0992.036.whenDeliveryIsUncertain">When delivery is uncertain, the result says so instead of repeating the edit.</li>
+        <li style="margin-bottom: 0;" i18n="@@releaseNotes.v0992.037.textInsertionTargetsA">Text insertion targets a position and lands at most once.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="rn-sec rn-sec-split" style="margin: 0; padding: 72px 0 0; display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 56px; align-items: center;">
+    <div class="rn-sec-viz" style="order: 2; display: flex; align-items: center; justify-content: center;">
+      <div style="width: 260px; display: flex; flex-direction: column; align-items: center; gap: 18px;">
+        <div style="width: 100%; border: 1px solid var(--line); border-radius: 8px; background: var(--panel2); overflow: hidden;">
+          <div style="display: flex; gap: 5px; padding: 8px 11px; border-bottom: 1px solid var(--line);">
+            <span style="width: 6px; height: 6px; border-radius: 999px; background: var(--line2);"></span>
+            <span style="width: 6px; height: 6px; border-radius: 999px; background: var(--line2);"></span>
+            <span style="width: 6px; height: 6px; border-radius: 999px; background: var(--line2);"></span>
+          </div>
+          <div style="display: grid; grid-template-columns: 28px minmax(0,1fr); padding: 10px 0 12px; font-family: 'Space Mono', monospace; font-size: 9.5px; line-height: 22px; color: var(--dim2);">
+            <div [attr.translate]="'no'" style="display: flex; flex-direction: column; align-items: flex-end; padding-right: 8px;"><span>1</span><span>2</span><span>3</span></div>
+            <div style="position: relative; height: 66px;">
+              <span style="position: absolute; left: 10px; top: 8px; width: 150px; height: 6px; border-radius: 3px; background: var(--line2);"></span>
+              <span style="position: absolute; left: 24px; top: 30px; width: 96px; height: 6px; border-radius: 3px; background: var(--line2);"></span>
+              <span style="position: absolute; left: 10px; top: 52px; width: 64px; height: 6px; border-radius: 3px; background: var(--line2);"></span>
+              <div class="rn-a98" style="position: absolute; left: 76px; top: 44px; height: 22px; display: flex; align-items: center; gap: 1px;">
+                <span class="rn-a100" style="width: 64px; height: 6px; border-radius: 3px; background: var(--ac);"></span>
+                <span class="rn-a99" style="width: 1.5px; height: 14px; background: var(--ink);"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <span [attr.translate]="'no'" class="rn-a101" style="border: 1px solid var(--line); border-radius: 6px; padding: 5px 10px; font-family: 'Space Mono', monospace; font-size: 10px; color: var(--dim2); white-space: nowrap;" i18n="@@releaseNotes.v0992.038.ctrlEnd">Ctrl+End / ⌘↓</span>
+      </div>
+    </div>
+    <div class="rn-sec-copy" style="order: 1;">
+      <div class="rn-sec-num" [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: 11px; letter-spacing: .22em; color: var(--ac); margin-bottom: 14px;">04</div>
+      <h2 style="margin: 0 0 18px; font-size: clamp(1.5rem, 3vw, 2rem); font-weight: 700; letter-spacing: -.02em; line-height: 1.15;" i18n="@@releaseNotes.v0992.039.typingLandsWhereYou">Typing lands where you asked in code editors</h2>
+      <ul style="margin: 0; padding-left: 18px; color: var(--dim); font-size: 1rem; line-height: 1.65;">
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0992.040.appendingToMonacoAce">Appending to Monaco, Ace, or CodeMirror moves the editor's own cursor to the end of the document first, so text no longer lands before the existing code.</li>
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0992.041.replacingTextWorksIn">Replacing text works in editors that take input through EditContext and expose no text field, such as Monaco 0.57.</li>
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0992.042.canvasEditorsAreReachable">Canvas editors support replacement, and a refused insertion is reported without repeating it.</li>
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0992.043.appendsToAnEditor">Appends to an editor focused inside a frame move the caret to the end first.</li>
+        <li style="margin-bottom: 0;" i18n="@@releaseNotes.v0992.044.aGoogleDocsPaste">Google Docs confirms formatted edits against saved document text. An uncertain paste is never repeated.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="rn-sec rn-sec-split" style="margin: 0; padding: 72px 0 0; display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 56px; align-items: center;">
+    <div class="rn-sec-viz" style="display: flex; align-items: center; justify-content: center;">
+      <div style="position: relative; width: 260px; height: 150px; font-family: 'Space Mono', monospace; font-size: 9.5px;">
+        <div style="position: absolute; inset: 0; border: 1px solid var(--line2); border-radius: 10px; background: var(--panel2);"></div>
+        <span [attr.translate]="'no'" style="position: absolute; left: 12px; top: 9px; color: var(--dim);" i18n="@@releaseNotes.v0992.045.xEditor">x-editor</span>
+        <div style="position: absolute; left: 14px; right: 14px; top: 32px; bottom: 14px; border: 1px dashed var(--dim2); border-radius: 8px;"></div>
+        <span [attr.translate]="'no'" style="position: absolute; left: 24px; top: 40px; color: var(--dim2);" i18n="@@releaseNotes.v0992.046.shadowRootClosed">#shadow-root (closed)</span>
+        <div class="rn-a103" style="position: absolute; left: 28px; right: 28px; top: 74px; height: 34px; border: 1px solid var(--ac); border-radius: 6px; background: var(--bg);">
+          <span class="rn-a104" style="position: absolute; left: 10px; top: 13px; width: 76px; height: 6px; border-radius: 3px; background: var(--dim);"></span>
+        </div>
+        <div class="rn-a102" style="position: absolute; left: 24px; right: 24px; top: 70px; height: 42px; border: 2px solid var(--ac); border-radius: 9px; box-shadow: 0 0 14px rgba(255,107,53,.35); pointer-events: none;"></div>
+      </div>
+    </div>
+    <div class="rn-sec-copy">
+      <div class="rn-sec-num" [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: 11px; letter-spacing: .22em; color: var(--ac); margin-bottom: 14px;">05</div>
+      <h2 style="margin: 0 0 18px; font-size: clamp(1.5rem, 3vw, 2rem); font-weight: 700; letter-spacing: -.02em; line-height: 1.15;" i18n="@@releaseNotes.v0992.047.fieldsInsideWebComponents">Fields inside web components are reachable</h2>
+      <ul style="margin: 0; padding-left: 18px; color: var(--dim); font-size: 1rem; line-height: 1.65;">
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0992.048.aSelectorThatNames">A selector that names a component now reaches the field inside it.</li>
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0992.049.focusIsDetectedInside">Focus is detected inside open and closed shadow roots.</li>
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0992.050.closedShadowRootsAre">Closed shadow roots are reached through <span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">chrome.dom</span>.</li>
+        <li style="margin-bottom: 0;" i18n="@@releaseNotes.v0992.051.aTargetInsideA">A target inside a shadow root is no longer treated as covered by its own host.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="rn-sec rn-sec-split" style="margin: 0; padding: 72px 0 0; display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 56px; align-items: center;">
+    <div class="rn-sec-viz" style="order: 2; display: flex; align-items: center; justify-content: center;">
+      <div style="position: relative; width: 290px; height: 140px; font-family: 'Space Mono', monospace;">
+        <span [attr.translate]="'no'" style="position: absolute; left: 121px; top: 0; transform: translateX(-50%); font-size: 9px; letter-spacing: .1em; text-transform: uppercase; color: var(--ac); white-space: nowrap;" i18n="@@releaseNotes.v0992.052.deadline">deadline</span>
+        <div style="position: absolute; left: 0; right: 92px; top: 61px; height: 1px; background: var(--line2);"></div>
+        <div class="rn-a110" style="position: absolute; left: 120px; top: 22px; width: 2px; height: 78px; border-radius: 1px; background: var(--ac); box-shadow: 0 0 10px rgba(255,107,53,.6);"></div>
+        <div style="position: absolute; right: 0; top: 26px; width: 92px; height: 70px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px; border: 1px solid var(--line2); border-radius: 8px; background: var(--panel2);">
+          <span style="width: 13px; height: 13px; border-radius: 999px; border: 1.5px solid var(--line2); border-top-color: var(--dim2);"></span>
+          <span [attr.translate]="'no'" style="padding: 0 6px; font-size: 8.5px; line-height: 1.35; text-align: center; color: var(--dim2);" i18n="@@releaseNotes.v0992.053.pageNotResponding">page not responding</span>
+        </div>
+        <span class="rn-a105" style="position: absolute; top: 57px; width: 8px; height: 8px; border-radius: 2px; background: var(--ac); opacity: 0;"></span>
+        <span class="rn-a106" style="position: absolute; top: 57px; width: 8px; height: 8px; border-radius: 2px; background: var(--ac); opacity: 0; animation-delay: .7s"></span>
+        <span class="rn-a107 rn-enter" style="position: absolute; left: 108px; top: 57px; width: 8px; height: 8px; border-radius: 2px; background: var(--dim2); opacity: 0;">
+          <span [attr.translate]="'no'" class="rn-a108 rn-enter" style="position: absolute; left: 50%; top: -15px; transform: translateX(-50%); font-size: 11px; line-height: 1; color: var(--ac); opacity: 0;">×</span>
+        </span>
+        <span [attr.translate]="'no'" class="rn-a109 rn-enter" style="position: absolute; right: 0; top: 112px; border: 1px solid var(--ac); border-radius: 999px; padding: 4px 10px; font-size: 9.5px; white-space: nowrap; color: var(--ac); opacity: 0;" i18n="@@releaseNotes.v0992.054.tabRecovery">tab recovery</span>
+      </div>
+    </div>
+    <div class="rn-sec-copy" style="order: 1;">
+      <div class="rn-sec-num" [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: 11px; letter-spacing: .22em; color: var(--ac); margin-bottom: 14px;">06</div>
+      <h2 style="margin: 0 0 18px; font-size: clamp(1.5rem, 3vw, 2rem); font-weight: 700; letter-spacing: -.02em; line-height: 1.15;" i18n="@@releaseNotes.v0992.055.aHungPageGets">Navigation can recover a hung page</h2>
+      <ul style="margin: 0; padding-left: 18px; color: var(--dim); font-size: 1rem; line-height: 1.65;">
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0992.056.pageProbesScriptReinjection">Page probes, script reinjection, and screenshot capture are time-bounded on a tab that stops responding.</li>
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0992.057.onceATextInsertion">Once a text insertion or screenshot has given up, no further keystrokes, text, or scripts are sent to that page.</li>
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0992.058.anEditStuckOn">Navigation interrupts stuck JavaScript on controlled tabs and confirms the destination has loaded before reporting success.</li>
+        <li style="margin-bottom: 0;" i18n="@@releaseNotes.v0992.059.theDebuggerLeaseIs">A tab already hung before FSB establishes control may still need to be closed.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="rn-sec rn-sec-split" style="margin: 0; padding: 72px 0 0; display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 56px; align-items: center;">
+    <div class="rn-sec-viz" style="display: flex; align-items: center; justify-content: center;">
+      <div style="width: 280px; display: flex; flex-direction: column; gap: 16px; font-family: 'Space Mono', monospace; font-size: 10px;">
+        <div style="position: relative; height: 104px;">
+          <div style="position: absolute; left: 0; width: 168px; top: 18.5px; border-top: 1px dashed var(--line);"></div>
+          <div style="position: absolute; left: 0; width: 168px; top: 52.5px; border-top: 1px dashed var(--line);"></div>
+          <div style="position: absolute; left: 0; width: 168px; top: 86.5px; border-top: 1px dashed var(--line);"></div>
+          <div style="position: absolute; left: 168px; top: 0; bottom: 0; width: 2px; border-radius: 1px; background: var(--ac); opacity: .8;"></div>
+          <span [attr.translate]="'no'" class="rn-a111 rn-enter" style="position: absolute; left: 180px; top: 6px; display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line2); border-radius: 999px; padding: 5px 10px; background: var(--panel2); color: var(--ink); white-space: nowrap; opacity: 0; animation-delay: 0s">127.0.0.1<span class="rn-a113 rn-enter" style="color: var(--ac); opacity: 0; animation-delay: 0s">✓</span></span>
+          <span [attr.translate]="'no'" class="rn-a112 rn-enter" style="position: absolute; left: 180px; top: 40px; display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line2); border-radius: 999px; padding: 5px 10px; background: var(--panel2); color: var(--ink); white-space: nowrap; opacity: 0; animation-delay: .4s">[::1]<span class="rn-a114 rn-enter" style="color: var(--ac); opacity: 0; animation-delay: .4s">✓</span></span>
+          <span [attr.translate]="'no'" class="rn-a115 rn-enter" style="position: absolute; left: 70px; top: 74px; display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 999px; padding: 5px 10px; background: var(--panel2); color: var(--dim); white-space: nowrap; opacity: 0; animation-delay: .8s">192.168.1.20<span class="rn-a116" style="position: absolute; left: 8px; right: 8px; top: 50%; height: 1px; background: var(--ac); transform-origin: left center; animation-delay: .8s"></span></span>
+          <span [attr.translate]="'no'" class="rn-a117 rn-enter" style="position: absolute; left: 180px; top: 79px; font-weight: 700; color: var(--ac); opacity: 0; animation-delay: .8s">403</span>
+        </div>
+        <div [attr.translate]="'no'" class="rn-a16" style="text-align: center; font-size: 9.5px; color: var(--dim2);" i18n="@@releaseNotes.v0992.060.loopbackOnly">loopback only</div>
+      </div>
+    </div>
+    <div class="rn-sec-copy">
+      <div class="rn-sec-num" [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: 11px; letter-spacing: .22em; color: var(--ac); margin-bottom: 14px;">07</div>
+      <h2 style="margin: 0 0 18px; font-size: clamp(1.5rem, 3vw, 2rem); font-weight: 700; letter-spacing: -.02em; line-height: 1.15;" i18n="@@releaseNotes.v0992.061.loopbackOnlyHttpAnd">Loopback-only HTTP and smaller fixes</h2>
+      <ul style="margin: 0; padding-left: 18px; color: var(--dim); font-size: 1rem; line-height: 1.65;">
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0992.062.theMcpHttpServer">The MCP HTTP server binds only to a loopback host and answers any other Host header, or any request that carries an Origin header, with a 403. The IPv6 loopback now works instead of answering every request with a 500.</li>
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0992.063.selectorsKeepTheirCss">Selectors keep their CSS conditions, and cached matches are rechecked before use.</li>
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0992.064.theVaultListTells">The vault list tells a locked vault apart from one that was never set up.</li>
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0992.065.siteGuidanceForX">Site guidance for X applies only on genuine X hosts.</li>
+        <li style="margin-bottom: 0;" i18n="@@releaseNotes.v0992.066.dashboardQrPairingFailures">Dashboard QR pairing failures show their reason again and keep the camera on the Scan tab.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="rn-sec" style="margin: 0; padding: 72px 0 0;">
+    <p style="margin: 0; padding-top: 26px; border-top: 1px solid var(--line); font-family: 'Space Mono', monospace; font-size: 11.5px; line-height: 1.8; color: var(--dim2); max-width: 76ch; text-wrap: pretty;" i18n="@@releaseNotes.v0992.067.extensionAndShowcaseVersion">This release pairs extension and showcase version 0.9.92 with MCP package 0.11.1. After updating, restart your MCP client or native host. Editing and hung-navigation recovery are verified in real Chrome.</p>
+  </section>
+
+    }
+
 @if (version() === '0.9.91') {
   <section class="rn-sec rn-sec-split" style="margin: 0; padding: 72px 0 0; display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 56px; align-items: center;">
     <div class="rn-sec-viz" style="display: flex; align-items: center; justify-content: center;">

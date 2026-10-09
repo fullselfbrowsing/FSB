@@ -40,7 +40,12 @@ function executeUploadFileSource() {
   const start = src.indexOf('async function executeUploadFile');
   const end = src.indexOf('/**\n * Direct CDP tool dispatcher', start);
   if (start < 0 || end <= start) throw new Error('could not extract executeUploadFile');
-  return src.slice(start, end);
+  // Chrome upload attaches through the shared helper, which lives above the
+  // function. The slice has to carry it or the Chrome path throws before CDP.
+  const attachStart = src.indexOf('function isCdpDebuggerContention(');
+  const attachEnd = src.indexOf('async function runLegacyCdpMessageWithLease(', attachStart);
+  if (attachStart < 0 || attachEnd <= attachStart) throw new Error('could not extract attachFsbDebugger');
+  return src.slice(attachStart, attachEnd) + src.slice(start, end);
 }
 
 const OK_DENYLIST = {

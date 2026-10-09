@@ -80,6 +80,8 @@ export interface BridgeOptions {
   instanceId?: string;
   handshakeTimeoutMs?: number;
   relayHandshakeTimeoutMs?: number;
+  extensionPingIntervalMs?: number;
+  extensionHeartbeatTimeoutMs?: number;
   promotionJitterMs?: number;
   maxReconnectDelayMs?: number;
   allowedBrowserOrigins?: string[];
@@ -97,6 +99,15 @@ export interface BridgeTopologyState {
   activeHubInstanceId: string | null;
   lastExtensionHeartbeatAt: number | null;
   lastDisconnectReason: string | null;
+  extensionAttachment: ExtensionAttachmentState | null;
+}
+
+export interface ExtensionAttachmentState {
+  extensionId: string;
+  extensionVersion: string;
+  installInstanceId: string;
+  normalWindowCount: number;
+  connectedAt: string | null;
 }
 
 // Relay protocol: MCP instance -> hub handshake
@@ -115,6 +126,7 @@ export interface RelayWelcome {
   relayCount: number;
   lastExtensionHeartbeatAt: number | null;
   lastDisconnectReason: string | null;
+  extensionAttachment?: ExtensionAttachmentState | null;
   capabilities?: BridgeCapability[];
 }
 
@@ -125,6 +137,7 @@ export interface RelayState {
   relayCount: number;
   lastExtensionHeartbeatAt: number | null;
   lastDisconnectReason: string | null;
+  extensionAttachment?: ExtensionAttachmentState | null;
   capabilities?: BridgeCapability[];
 }
 

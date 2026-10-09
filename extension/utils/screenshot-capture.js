@@ -12,6 +12,9 @@
   const MAX_EDGE = 16384;
   const MAX_PIXELS = 25000000;
   const MAX_BYTES = 25 * 1024 * 1024;
+  // A hung page never settles an injected script or a CDP command. Give up
+  // before the 20s lease watchdog and the MCP call timeout do.
+  const CAPTURE_DEADLINE_MS = 15000;
   const VALID_MODES = new Set(['viewport', 'full_page', 'region', 'element']);
   const VALID_COORDINATE_SPACES = new Set(['viewport', 'page']);
   const VALID_DEVICE_MODES = new Set(['current', 'desktop', 'mobile']);
@@ -243,14 +246,24 @@
   }
 
   function elementRectScript(selector) {
+    // chrome.dom reaches closed shadow roots; without it only open ones are visible.
+    function shadowOf(node) {
+      try {
+        const root = globalThis.chrome?.dom?.openOrClosedShadowRoot?.(node);
+        if (root) return root;
+      } catch (_error) { /* chrome.dom accepts HTML elements only */ }
+      return node.shadowRoot || null;
+    }
+
     function deepQuery(rootNode, query) {
       let match = null;
       try { match = rootNode.querySelector(query); } catch (_error) { return null; }
       if (match) return match;
       const all = rootNode.querySelectorAll('*');
       for (const node of all) {
-        if (!node.shadowRoot) continue;
-        const nested = deepQuery(node.shadowRoot, query);
+        const shadowRoot = shadowOf(node);
+        if (!shadowRoot) continue;
+        const nested = deepQuery(shadowRoot, query);
         if (nested) return nested;
       }
       return null;
@@ -417,6 +430,8 @@
 
     const chromeApi = options.chrome || root.chrome;
     const debuggerApi = options.debugger || (chromeApi && chromeApi.debugger);
+    const sessions = options.sessions || ((!options.debugger && !options.chrome) ? root.FsbDebuggerSessions : null);
+    const connectionApi = sessions || debuggerApi;
     const scripting = options.scripting || (chromeApi && chromeApi.scripting);
     const tabs = options.tabs || (chromeApi && chromeApi.tabs);
     const leaseApi = options.lease || root.FsbCdpLease;
@@ -429,6 +444,13 @@
     let metricsApplied = false;
     let touchApplied = false;
     let overlayStyleId = null;
+    let expiry = null;
+    let expiredError = null;
+    let deadlineTimer = null;
+    const bounded = (work) => (expiry ? Promise.race([work, expiry]) : work);
+    const deadlineMs = finite(options.deadlineMs) && options.deadlineMs > 0
+      ? options.deadlineMs
+      : CAPTURE_DEADLINE_MS;
     const startedAt = Date.now();
 
     if (!Number.isInteger(targetTabId) || targetTabId <= 0) {
@@ -450,11 +472,7 @@
         }
       }
 
-      // KeyboardEmulator intentionally keeps an FSB-owned attachment warm.
-      // Once this operation owns the per-tab lease it is safe to relinquish
-      // that internal attachment; external DevTools/debugger owners are never
-      // detached here.
-      if (typeof releaseOwnedDebugger === 'function') {
+      if (!sessions && typeof releaseOwnedDebugger === 'function') {
         try {
           await releaseOwnedDebugger(targetTabId);
         } catch (_error) {
@@ -466,7 +484,7 @@
       }
 
       try {
-        await debuggerApi.attach({ tabId: targetTabId }, '1.3');
+        await connectionApi.attach({ tabId: targetTabId }, '1.3');
         attached = true;
       } catch (error) {
         if (isDebuggerContention(error)) {
@@ -474,6 +492,17 @@
         }
         throw error;
       }
+
+      // Every step from here waits on the page. One shared deadline turns a
+      // hung page into a typed error while this capture still owns the lease.
+      expiry = new Promise((_, reject) => {
+        deadlineTimer = setTimeout(() => {
+          expiredError = new ScreenshotError('PAGE_UNRESPONSIVE',
+            'The page did not respond before the capture deadline. Navigate or close the tab to recover it.');
+          reject(expiredError);
+        }, deadlineMs);
+      });
+      expiry.catch(() => {});
 
       const emulating = params.device_mode !== 'current';
       if (emulating) {
@@ -494,36 +523,38 @@
             ? { type: 'landscapePrimary', angle: 90 }
             : { type: 'portraitPrimary', angle: 0 };
         }
-        await debuggerApi.sendCommand({ tabId: targetTabId }, 'Emulation.setDeviceMetricsOverride', metricsParams);
+        await bounded(debuggerApi.sendCommand({ tabId: targetTabId }, 'Emulation.setDeviceMetricsOverride', metricsParams));
         metricsApplied = true;
         if (mobile) {
-          await debuggerApi.sendCommand({ tabId: targetTabId }, 'Emulation.setTouchEmulationEnabled', {
+          await bounded(debuggerApi.sendCommand({ tabId: targetTabId }, 'Emulation.setTouchEmulationEnabled', {
             enabled: true,
             maxTouchPoints: 5
-          });
+          }));
           touchApplied = true;
         }
       }
 
       if (!params.include_fsb_overlays) {
         overlayStyleId = `fsb-screenshot-hide-${captureId(cryptoApi)}`;
-        await executeScript(scripting, targetTabId, overlayInstallScript, [overlayStyleId]);
+        await bounded(executeScript(scripting, targetTabId, overlayInstallScript, [overlayStyleId]));
       }
 
       try {
-        await executeScript(scripting, targetTabId, settleScript, [params.wait_ms]);
-      } catch (_error) {
+        await bounded(executeScript(scripting, targetTabId, settleScript, [params.wait_ms]));
+      } catch (error) {
+        // An unsettled page still yields the live frame; a missed deadline ends the capture.
+        if (error === expiredError) throw error;
         warnings.push({ code: 'SCREENSHOT_SETTLE_INCOMPLETE', message: 'The page settle wait did not complete; the live frame was captured.' });
       }
       if (overlayStyleId) {
-        await executeScript(scripting, targetTabId, overlayInstallScript, [overlayStyleId]);
+        await bounded(executeScript(scripting, targetTabId, overlayInstallScript, [overlayStyleId]));
       }
 
-      const metrics = await debuggerApi.sendCommand({ tabId: targetTabId }, 'Page.getLayoutMetrics');
+      const metrics = await bounded(debuggerApi.sendCommand({ tabId: targetTabId }, 'Page.getLayoutMetrics'));
       let elementRect = null;
       if (params.mode === 'element') {
         try {
-          elementRect = await executeScript(scripting, targetTabId, elementRectScript, [params.selector]);
+          elementRect = await bounded(executeScript(scripting, targetTabId, elementRectScript, [params.selector]));
         } catch (error) {
           fail('SCREENSHOT_TARGET_NOT_FOUND', `Unable to resolve element ${params.selector}: ${error.message}`);
         }
@@ -533,10 +564,10 @@
       let scaleFactor = params.device_mode === 'current' ? 1 : params.device_scale_factor;
       if (params.device_mode === 'current') {
         try {
-          const evaluated = await debuggerApi.sendCommand({ tabId: targetTabId }, 'Runtime.evaluate', {
+          const evaluated = await bounded(debuggerApi.sendCommand({ tabId: targetTabId }, 'Runtime.evaluate', {
             expression: 'window.devicePixelRatio',
             returnByValue: true
-          });
+          }));
           const measured = evaluated && evaluated.result && evaluated.result.value;
           if (finite(measured) && measured > 0) scaleFactor = measured;
         } catch (_error) {
@@ -545,12 +576,12 @@
       }
       assertSize(Math.ceil(rect.width * scaleFactor), Math.ceil(rect.height * scaleFactor));
 
-      const captured = await debuggerApi.sendCommand({ tabId: targetTabId }, 'Page.captureScreenshot', {
+      const captured = await bounded(debuggerApi.sendCommand({ tabId: targetTabId }, 'Page.captureScreenshot', {
         format: 'png',
         fromSurface: true,
         captureBeyondViewport: params.mode !== 'viewport',
         clip: { x: rect.x, y: rect.y, width: rect.width, height: rect.height, scale: 1 }
-      });
+      }));
       const imageData = captured && captured.data;
       const bytes = decodeBase64(imageData);
       const output = pngDimensions(bytes);
@@ -592,21 +623,28 @@
         }
       };
     } catch (error) {
-      return errorResult(error);
+      return errorResult(expiredError || error);
     } finally {
+      clearTimeout(deadlineTimer);
       if (overlayStyleId) {
-        try { await executeScript(scripting, targetTabId, overlayRemoveScript, [overlayStyleId]); } catch (_error) { /* best-effort */ }
+        // A hung page holds the restore until it answers again, so past the
+        // deadline it runs on its own instead of pinning the tab.
+        const restore = executeScript(scripting, targetTabId, overlayRemoveScript, [overlayStyleId]).catch(() => {});
+        if (!expiredError) await restore;
       }
-      if (touchApplied) {
-        try {
-          await debuggerApi.sendCommand({ tabId: targetTabId }, 'Emulation.setTouchEmulationEnabled', { enabled: false });
-        } catch (_error) { /* best-effort */ }
+      // Retained sessions survive capture timeouts so navigation can interrupt
+      // the renderer. Queue their restores before releasing the lease; after
+      // interruption they run before the next operation's page commands.
+      if (touchApplied && (!expiredError || sessions)) {
+        const restore = debuggerApi.sendCommand({ tabId: targetTabId }, 'Emulation.setTouchEmulationEnabled', { enabled: false }).catch(() => {});
+        if (!expiredError) await restore;
       }
-      if (metricsApplied) {
-        try { await debuggerApi.sendCommand({ tabId: targetTabId }, 'Emulation.clearDeviceMetricsOverride'); } catch (_error) { /* best-effort */ }
+      if (metricsApplied && (!expiredError || sessions)) {
+        const restore = debuggerApi.sendCommand({ tabId: targetTabId }, 'Emulation.clearDeviceMetricsOverride').catch(() => {});
+        if (!expiredError) await restore;
       }
       if (attached) {
-        try { await debuggerApi.detach({ tabId: targetTabId }); } catch (_error) { /* best-effort */ }
+        try { await connectionApi.detach({ tabId: targetTabId }); } catch (_error) { /* best-effort */ }
       }
       if (lease) lease.release();
     }
@@ -625,7 +663,7 @@
   root.FsbScreenshotCapture = api;
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = Object.assign({}, api, {
-      _test: { overlayInstallScript, overlayRemoveScript }
+      _test: { overlayInstallScript, overlayRemoveScript, elementRectScript }
     });
   }
 })(typeof globalThis !== 'undefined' ? globalThis : self);

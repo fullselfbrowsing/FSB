@@ -18,7 +18,7 @@ import {
   createProductionAdapterRegistry,
   type AgentProviderRegistry,
 } from './agent-providers/registry.js';
-import type { BridgeTopologyState } from './types.js';
+import type { BridgeTopologyState, ExtensionAttachmentState } from './types.js';
 import {
   DEFAULT_HTTP_HOST,
   DEFAULT_HTTP_PORT,
@@ -41,7 +41,9 @@ export type BridgeDiagnosticLayer =
   | 'package'
   | 'config'
   | 'bridge'
+  | 'auth'
   | 'extension'
+  | 'no_browser_window'
   | 'content_script'
   | 'tool_routing'
   | 'healthy';
@@ -144,10 +146,12 @@ export type BridgeDiagnostics = {
   bridgeAuthMetadata: BridgeAuthDoctorMetadata;
   nativeHost: NativeHostDoctor;
   bridgeClient?: Record<string, unknown> | null;
+  extensionAttachment: ExtensionAttachmentState | null;
   extensionConfig?: Record<string, unknown> | null;
   tabsSummary?: { totalTabs: number; activeTabId: number | null };
   probeNotes?: BridgeDiagnosticNote[];
   diagnosticLayer: BridgeDiagnosticLayer;
+  diagnosticCode?: string | null;
   diagnosticWhy: string;
   nextAction: string;
   error?: string;
@@ -166,11 +170,21 @@ export interface BridgeDiagnosticsDependencies {
   readonly now?: () => number;
 }
 
+// Disconnect reasons the bridge reports when it refused or revoked authority,
+// as opposed to the extension simply not being there.
+const AUTH_DISCONNECT_REASONS: ReadonlySet<string> = new Set([
+  'extension_auth_revoked',
+  'extension_policy_closed',
+  'extension_origin_pin_mismatch',
+]);
+
 export const DIAGNOSTIC_LAYER_LABELS: Record<BridgeDiagnosticLayer, string> = {
   package: 'Package / version parity',
   config: 'Configuration',
   bridge: 'Bridge ownership',
+  auth: 'Bridge authorization',
   extension: 'Extension attachment',
+  no_browser_window: 'Browser window',
   content_script: 'Content script availability',
   tool_routing: 'Tool routing',
   healthy: 'Healthy',
@@ -856,6 +870,7 @@ function withTopology(diagnostics: BridgeDiagnostics, topology: BridgeTopologySt
     activeHubInstanceId: topology.activeHubInstanceId,
     lastExtensionHeartbeatAt: topology.lastExtensionHeartbeatAt,
     lastDisconnectReason: topology.lastDisconnectReason,
+    extensionAttachment: topology.extensionAttachment,
   };
 }
 
@@ -900,10 +915,22 @@ function getGuidanceForLayer(
           : 'The local MCP bridge is disconnected.',
         nextAction: 'Keep one fsb-mcp-server instance running as the bridge owner, then rerun status --watch.',
       };
+    case 'auth':
+      return {
+        why: snapshot.lastDisconnectReason === 'extension_origin_pin_mismatch'
+          ? 'A browser extension reached the bridge from an origin different from the paired extension ID.'
+          : 'The extension reached the bridge, but its reverse-channel authorization was refused or revoked.',
+        nextAction: 'Run `npx -y fsb-mcp-server@latest pair --reset`, then fully quit and reopen the browser.',
+      };
     case 'extension':
       return {
         why: 'The local bridge is healthy, but no browser extension is attached to it.',
         nextAction: 'Open Chrome, Edge, or Brave with the FSB extension enabled and wait for it to attach.',
+      };
+    case 'no_browser_window':
+      return {
+        why: 'The FSB extension is attached, but its browser profile has no normal window open.',
+        nextAction: 'Open a normal browser window in the attached profile, then rerun doctor.',
       };
     case 'content_script':
       return {
@@ -931,20 +958,33 @@ export function classifyDoctorLayer(snapshot: BridgeDiagnostics): BridgeDiagnost
     return 'package';
   }
 
-  if (snapshot.extensionConnected) {
-    const configProbeFailed = snapshot.probeNotes?.some((note) => note.scope === 'config') ?? false;
-    const configWasProbed = configProbeFailed || snapshot.extensionConfig !== undefined;
-    if (configWasProbed && (configProbeFailed || !hasConfiguredModel(snapshot.extensionConfig))) {
-      return 'config';
-    }
-  }
-
   if (snapshot.bridgeMode === 'disconnected' || (snapshot.bridgeMode === 'relay' && !snapshot.hubConnected)) {
     return 'bridge';
   }
 
+  // An authorization refusal and a plain absence look identical from here
+  // otherwise, and the cures are opposite: one wants `pair --reset`, the other
+  // wants the browser opened.
+  if (
+    !snapshot.extensionConnected
+    && snapshot.lastDisconnectReason !== null
+    && AUTH_DISCONNECT_REASONS.has(snapshot.lastDisconnectReason)
+  ) {
+    return 'auth';
+  }
+
   if (!snapshot.extensionConnected) {
     return 'extension';
+  }
+
+  if (snapshot.extensionAttachment?.normalWindowCount === 0) {
+    return 'no_browser_window';
+  }
+
+  const configProbeFailed = snapshot.probeNotes?.some((note) => note.scope === 'config') ?? false;
+  const configWasProbed = configProbeFailed || snapshot.extensionConfig !== undefined;
+  if (configWasProbed && (configProbeFailed || !hasConfiguredModel(snapshot.extensionConfig))) {
+    return 'config';
   }
 
   const normalWebPage = Boolean(snapshot.activeTab.url) && snapshot.activeTab.restricted === false;
@@ -968,6 +1008,9 @@ export function applyDiagnosticClassification(snapshot: BridgeDiagnostics): Brid
   return {
     ...snapshot,
     diagnosticLayer,
+    diagnosticCode: diagnosticLayer === 'no_browser_window' ? 'NO_BROWSER_WINDOW'
+      : diagnosticLayer === 'auth' && snapshot.lastDisconnectReason === 'extension_origin_pin_mismatch'
+        ? 'ORIGIN_PIN_MISMATCH' : null,
     diagnosticWhy: guidance.why,
     nextAction: guidance.nextAction,
   };
@@ -1045,6 +1088,7 @@ export async function collectBridgeDiagnostics(options: {
     nativeHost,
     extensionConfig: undefined,
     bridgeClient: null,
+    extensionAttachment: bridge.topology.extensionAttachment,
     tabsSummary: undefined,
     probeNotes: versionMetadata.notes.length > 0 ? versionMetadata.notes : undefined,
     diagnosticLayer: 'healthy',
@@ -1067,25 +1111,32 @@ export async function collectBridgeDiagnostics(options: {
       diagnostics.extensionConfig = normalizeConfig(payload?.config ?? payload);
     }
 
-    if (bridge.isConnected && options.includeTabs) {
-      const { payload, note } = await runBridgeProbe(bridge, 'tabs', 'mcp:get-tabs', 5_000);
-      if (note) notes.push(note);
-      const tabList = Array.isArray(payload?.tabs)
-        ? payload.tabs as Array<Record<string, unknown>>
-        : [];
-      const active = tabList.find((tab) => tab.active === true);
-      diagnostics.tabsSummary = {
-        totalTabs: tabList.length,
-        activeTabId: typeof active?.id === 'number' ? active.id : null,
-      };
-    }
-
     if (bridge.isConnected) {
       const { payload, note } = await runBridgeProbe(bridge, 'diagnostics', 'mcp:get-diagnostics', 5_000);
       if (note) notes.push(note);
       diagnostics.activeTab = normalizeActiveTab(payload?.activeTab);
       diagnostics.contentScript = normalizeContentScript(payload?.contentScript);
       diagnostics.bridgeClient = toRecord(payload?.bridgeClient);
+      const attachment = toRecord(payload?.attachment);
+      if (attachment && typeof attachment.extensionId === 'string'
+        && typeof attachment.extensionVersion === 'string'
+        && typeof attachment.installInstanceId === 'string'
+        && typeof attachment.normalWindowCount === 'number') {
+        diagnostics.extensionAttachment = {
+          extensionId: attachment.extensionId,
+          extensionVersion: attachment.extensionVersion,
+          installInstanceId: attachment.installInstanceId,
+          normalWindowCount: attachment.normalWindowCount,
+          connectedAt: typeof attachment.connectedAt === 'string' ? attachment.connectedAt : null,
+        };
+      }
+      if (options.includeTabs) {
+        const summary = toRecord(payload?.tabsSummary);
+        diagnostics.tabsSummary = summary && typeof summary.totalTabs === 'number'
+          ? { totalTabs: summary.totalTabs,
+              activeTabId: typeof summary.activeTabId === 'number' ? summary.activeTabId : null }
+          : undefined;
+      }
     }
   } catch (err) {
     notes.push(createProbeNote('connect', err instanceof Error ? err.message : String(err)));

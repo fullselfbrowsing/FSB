@@ -1,5 +1,13 @@
 'use strict';
 
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+// Bridge pairing is machine-local. Keep smoke sockets independent of the
+// developer's active extension pin and credential.
+const smokeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'fsb-bridge-smoke-'));
+process.env.HOME = smokeHome;
+
 const {
   buildClientHarness,
   cleanupResources,
@@ -238,6 +246,7 @@ async function run() {
   await runCase('relay recovery', runRelayRecoveryCase);
 
   console.log(`\n=== Results: ${passed} passed, ${failed} failed ===`);
+  fs.rmSync(smokeHome, { recursive: true, force: true });
   process.exit(failed > 0 ? 1 : 0);
 }
 
@@ -245,5 +254,6 @@ run().catch((error) => {
   failed++;
   console.error('  FAIL: Test harness failed:', error);
   console.log(`\n=== Results: ${passed} passed, ${failed} failed ===`);
+  fs.rmSync(smokeHome, { recursive: true, force: true });
   process.exit(1);
 });

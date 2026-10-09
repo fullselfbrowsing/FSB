@@ -2421,11 +2421,12 @@ async function runAgentIteration(sessionId, options) {
         var domain = (call.args && call.args.domain) || '';
         try {
           var guide = (typeof getGuideForTask === 'function')
-            ? getGuideForTask('', 'https://' + domain)
+            ? getGuideForTask('', domain)
             : null;
           if (guide) {
+            var guideGuidance = formatSiteGuideForAgent(guide);
             result = { success: true, hadEffect: false, error: null, navigationTriggered: false,
-              result: { domain: domain, site: guide.site || guide.name || domain, guidance: JSON.stringify(guide.selectors || guide) } };
+              result: { domain: domain, site: guide.site || guide.name || domain, guidance: guideGuidance } };
           } else {
             result = { success: true, hadEffect: false, error: null, navigationTriggered: false,
               result: { domain: domain, guidance: 'No site guide available for ' + domain + '. Use get_page_snapshot and get_dom_snapshot to discover elements.' } };

@@ -7,7 +7,7 @@ import type {
   ExtRequestHandler,
 } from '../types.js';
 import { WebSocketBridge } from '../bridge.js';
-import { startHttpServer } from '../http.js';
+import { startHttpServer, validateHttpBindHost } from '../http.js';
 import { pushMcpClientInventory } from '../client-inventory.js';
 import { TaskQueue } from '../queue.js';
 import {
@@ -435,6 +435,8 @@ async function closeStartupResources(
 export async function startServeDelegation(
   options: StartServeDelegationOptions,
 ): Promise<RunningServeDelegation> {
+  // Reject invalid CLI hosts before the recovery wrapper can hide the bind error.
+  validateHttpBindHost(options.host);
   const dependencies = { ...defaultDependencies(), ...options.dependencies };
   let supervisor: SpawnSupervisor | null = null;
   let httpServer: ServeDelegationHttpServer | null = null;

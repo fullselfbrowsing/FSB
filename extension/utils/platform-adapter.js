@@ -25,7 +25,7 @@
  *   - service worker: PREPENDED verbatim to build/safari/background.js by
  *     scripts/build-safari.mjs. It is deliberately NOT script-imported,
  *     because tests/lattice-provider-bridge-smoke.test.js pins background.js
- *     to exactly 333 script-import mentions / 329 call sites.
+ *     to exactly 334 script-import mentions / 330 call sites.
  *   - UI pages: a <script> tag, first in the document.
  * It is not injected into content pages; no content-script module consumes it.
  */

@@ -20,7 +20,10 @@ function extractExecuteUploadFileSource() {
   const end = src.indexOf('/**\n * Direct CDP tool dispatcher', start);
   assert(start >= 0, 'executeUploadFile function exists in background.js');
   assert(end > start, 'executeUploadFile function end anchor exists');
-  return src.slice(start, end);
+  const attachStart = src.indexOf('function isCdpDebuggerContention(');
+  const attachEnd = src.indexOf('async function runLegacyCdpMessageWithLease(', attachStart);
+  assert(attachStart >= 0 && attachEnd > attachStart, 'shared debugger attach helpers exist');
+  return src.slice(attachStart, attachEnd) + src.slice(start, end);
 }
 
 function buildHarness(denylist, options = {}) {

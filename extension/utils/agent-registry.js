@@ -1015,6 +1015,9 @@
     this._heldTabTokens = shadow._heldTabTokens;
     this._delegationReleaseReceipts = shadow._delegationReleaseReceipts;
     this._hydrationFailed = shadow._hydrationFailed === true;
+    if (typeof globalThis !== 'undefined' && globalThis.FsbDebuggerSessions) {
+      globalThis.FsbDebuggerSessions.releaseUnowned().catch(() => {});
+    }
   };
 
   function canonicalOwnedTabs(value) {
@@ -1734,6 +1737,10 @@
       });
 
       await self._persist();
+      if (!incognitoFlag && typeof globalThis !== 'undefined' && globalThis.FsbDebuggerSessions) {
+        try { await globalThis.FsbDebuggerSessions.retain(tabId); }
+        catch (_e) { /* Browsing remains available when DevTools owns the tab. */ }
+      }
       return {
         agentId: agentId,
         tabId: tabId,
@@ -3020,6 +3027,10 @@
     }
     await writePersistedAgentRegistry(records, extras, strict === true);
     await this._reconcileActiveAgentCount();
+    if (typeof globalThis !== 'undefined' && globalThis.FsbDebuggerSessions) {
+      // Do not hold the registry mutex while waiting for an in-flight CDP operation.
+      globalThis.FsbDebuggerSessions.releaseUnowned().catch(() => {});
+    }
   };
 
   /**

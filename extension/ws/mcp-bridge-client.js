@@ -35,6 +35,24 @@ const MCP_RECONNECT_ALARM = 'fsb-mcp-bridge-reconnect';
 const MCP_RECONNECT_BASE_MS = 2000;
 const MCP_RECONNECT_MAX_MS = 30000;
 const MCP_PING_INTERVAL_MS = 25000;
+// The ordinary keepalive is the only liveness detector a non-delegation socket
+// has. The daemon answers every mcp:ping inline before any routing, so a miss
+// means the peer is gone rather than busy; four consecutive unanswered ticks
+// (~100s) is the point at which a silent socket is treated as dead. That sits
+// just above the daemon's own 90s staleness window so the two reapers do not
+// race to claim the same socket.
+const MCP_PING_MISS_LIMIT = 3;
+// A peer that has stopped answering will not finish a closing handshake
+// either, and Chrome waits 60s for one before it fires onclose. Past this grace
+// the close path runs without it, as the pairing reload already does.
+const MCP_KEEPALIVE_CLOSE_GRACE_MS = 1000;
+// A 1008 close is the daemon deciding, not the transport failing, and the
+// upgrade that preceded it already reset the backoff. Refusals are counted
+// separately and the delay derives from the count, so the reset cannot flatten
+// it back into an unbounded flat-rate retry.
+const MCP_AUTH_BACKOFF_STEP_LIMIT = 8;
+const MCP_CLOSE_REASON_MAX_LENGTH = 64;
+const MCP_CLOSE_REASON_AUTH_REVOKED = 'Extension authorization revoked';
 const DELEGATION_HEARTBEAT_INTERVAL_MS = 20000;
 const DELEGATION_HEARTBEAT_MISS_LIMIT = 3;
 const DELEGATION_HEARTBEAT_NONCE_MIN_LENGTH = 16;
@@ -158,6 +176,12 @@ class MCPBridgeClient {
     this._lastDisconnectReason = null;
     this._nextReconnectAt = null;
     this._reconnectAttemptCount = 0;
+    // Consecutive daemon refusals (close code 1008). Deliberately not reset by
+    // onopen: the upgrade succeeding is exactly what makes a refusal invisible
+    // to the ordinary delay. Only a completed round trip clears it.
+    this._authRefusalStreak = 0;
+    this._lastPongAt = null;
+    this._unansweredPings = 0;
     // Phase 241 D-08 -- per-bridge-connect connection_id state.
     // _connectionId is minted at every _ws.onopen via crypto.randomUUID() and
     // threaded through agent:register so the registry can stamp it on each
@@ -206,6 +230,8 @@ class MCPBridgeClient {
       lastConnectedAt: this._lastConnectedAt,
       lastDisconnectedAt: this._lastDisconnectedAt,
       lastDisconnectReason: this._lastDisconnectReason,
+      authRefusalStreak: this._authRefusalStreak,
+      lastPongAt: this._lastPongAt,
       delegationConnection: this.getDelegationConnectionSnapshot(),
       updatedAt: this._timestamp()
     };
@@ -246,6 +272,9 @@ class MCPBridgeClient {
     this._lastConnectAttemptAt = this._timestamp();
     this._persistState();
 
+    // Captured here because the credential this socket presents may be gone by
+    // the time it closes -- see the 1008 handling in onclose.
+    const openedWithCredential = !!this._pairingCode;
     try {
       this._ws = this._createSocket(this._pairingCode
         ? [FSB_EXT_PROTOCOL, this._pairingCode]
@@ -277,6 +306,7 @@ class MCPBridgeClient {
       this._reconnectDelay = MCP_RECONNECT_BASE_MS;
       this._nextReconnectAt = null;
       this._lastConnectedAt = this._timestamp();
+      this._sendExtensionState().catch(() => {});
       this._lastDisconnectReason = null;
       this._clearReconnectAlarm();
       this._delegationHeartbeatNonce = null;
@@ -343,7 +373,11 @@ class MCPBridgeClient {
       this._handleMessage(event.data);
     };
 
-    socket.onclose = () => {
+    socket.onclose = (event) => {
+      // A browser delivers a CloseEvent here, but several synthetic close paths
+      // invoke this with no argument at all, so every read is optional.
+      const closeCode = event && typeof event.code === 'number' ? event.code : null;
+      const closeReason = this._sanitizeCloseReason(event && event.reason);
       const wasReplacement = this._replacementSockets.delete(socket);
       if (this._ws !== socket) {
         this._rejectExtPendingForSocket(socket);
@@ -368,7 +402,7 @@ class MCPBridgeClient {
       this._lastDisconnectedAt = this._timestamp();
       this._lastDisconnectReason = this._intentionalClose
         ? 'intentional_close'
-        : (this._lastDisconnectReason === 'socket_error' ? 'socket_error' : 'socket_close');
+        : this._describeSocketClose(closeCode, closeReason, this._lastDisconnectReason);
       // Phase 241 D-08 -- stage release for ALL agents stamped with the
       // current connection_id. The registry resolves the agentIds snapshot
       // at stage time (Q2 resolution) so a fresh agent claimed under a
@@ -387,6 +421,35 @@ class MCPBridgeClient {
       // Phase 239 plan 03 -- arm reconciler for the next connect cycle.
       this._inFlightTasksReconciled = false;
       this._rejectAllExtPending();
+      // A 1008 close is the daemon refusing this socket, not the transport
+      // failing. The upgrade succeeded milliseconds earlier, so onopen has
+      // already reset _reconnectDelay to the base; honouring that reset is what
+      // turns a refusal into an unbounded flat-rate retry. The refusal streak
+      // owns the delay instead, and only a completed round trip clears it.
+      //
+      // The exception is a revocation of a credential this socket presented:
+      // that is a verdict on the credential, the next handshake goes out
+      // without it, so it is not a repeat refusal. The daemon sends
+      // ext_unauthorized before this close and that frame usually drops the
+      // credential first, so the decision rests on what the socket opened
+      // with, not on what is still stored. A revocation of a socket that
+      // presented nothing is an ordinary refusal and backs off like one.
+      if (!this._intentionalClose && !wasReplacement && closeCode === 1008) {
+        const revokedCredential = closeReason === MCP_CLOSE_REASON_AUTH_REVOKED
+          && openedWithCredential;
+        if (revokedCredential) {
+          this._forgetPairingCredential('authorization_revoked');
+        } else {
+          this._authRefusalStreak = Math.min(
+            this._authRefusalStreak + 1,
+            MCP_AUTH_BACKOFF_STEP_LIMIT,
+          );
+          this._reconnectDelay = Math.min(
+            Math.round(MCP_RECONNECT_BASE_MS * Math.pow(1.5, this._authRefusalStreak)),
+            MCP_RECONNECT_MAX_MS,
+          );
+        }
+      }
       if (this._pairingStatus === 'paired') {
         this._setPairingStatus(this._pairingCode ? 'configured' : 'unpaired');
       }
@@ -541,6 +604,45 @@ class MCPBridgeClient {
     return this._pairingLoadPromise;
   }
 
+  /**
+   * Drop a credential the daemon has told us is dead, in memory and in
+   * chrome.storage.session. The stored record has no expiry and no other
+   * remover, and it is scoped to the browser session rather than to the
+   * service worker, so without this it outlives every worker restart and every
+   * reconnect until the browser itself exits.
+   *
+   * Going unpaired is a downgrade, not an outage: authorization gates only the
+   * reverse channel, so every ordinary browser tool keeps working, and a
+   * delegation run mints a fresh code on its next preflight.
+   *
+   * Returns true when a credential was actually dropped.
+   */
+  _forgetPairingCredential(reason) {
+    // A pairing reload has already written and loaded a fresh credential; a
+    // late failure from the socket being retired must not delete it.
+    if (this._pairingReloadPromise) return false;
+    if (!this._pairingCode) return false;
+
+    this._pairingCode = null;
+    this._pairingLoaded = true;
+    this._pairingLoadPromise = null;
+    if (this._pairingStatus === 'configured' || this._pairingStatus === 'paired') {
+      this._setPairingStatus('expired');
+    }
+
+    try {
+      const area = typeof chrome !== 'undefined' ? chrome.storage?.session : null;
+      if (area && typeof area.remove === 'function') {
+        const result = area.remove(MCP_BRIDGE_PAIRING_KEY);
+        if (result && typeof result.catch === 'function') result.catch(() => {});
+      }
+    } catch (_error) { /* best-effort; the in-memory clear is authoritative */ }
+
+    console.log('[FSB MCP Bridge] Dropped a rejected pairing credential:', reason);
+    this._persistState();
+    return true;
+  }
+
   _notifySocketWaiters(event, socket) {
     for (const waiter of [...this._socketWaiters]) {
       try { waiter(event, socket); } catch (_error) { /* isolated waiter */ }
@@ -616,6 +718,9 @@ class MCPBridgeClient {
     this._pairingLoaded = false;
     this._pairingLoadPromise = null;
     await this._ensurePairingLoaded();
+    // A fresh credential is a materially different handshake, so re-pairing
+    // should not inherit a backoff the old one earned.
+    this._authRefusalStreak = 0;
 
     if (this._reconnectTimer) {
       clearTimeout(this._reconnectTimer);
@@ -738,7 +843,14 @@ class MCPBridgeClient {
       pending.resolve(response.payload);
       return;
     }
-    if (response.error.code === 'ext_unauthorized') this._setPairingStatus('expired');
+    if (response.error.code === 'ext_unauthorized') {
+      // This error has exactly one producer: the daemon evaluated our
+      // credential against its current session and rejected it. Unlike a slot
+      // refusal, that is a verdict on the credential itself, so keeping it
+      // would just replay the same rejection on every reconnect forever.
+      this._setPairingStatus('expired');
+      this._forgetPairingCredential('ext_unauthorized');
+    }
     pending.reject(this._makeExtError(
       response.error.message,
       response.error.code,
@@ -893,6 +1005,23 @@ class MCPBridgeClient {
     }, delay);
   }
 
+  _sanitizeCloseReason(value) {
+    if (value === undefined || value === null) return '';
+    const text = String(value).slice(0, MCP_CLOSE_REASON_MAX_LENGTH);
+    // The daemon's close reasons are a closed set of four literals, but the
+    // reason is peer-controlled text that lands in persisted diagnostics, so
+    // anything credential-shaped is dropped rather than echoed.
+    if (text.includes('fsb-auth.')) return '';
+    return text.replace(/[^A-Za-z0-9 ._:-]/g, '');
+  }
+
+  _describeSocketClose(code, reason, priorReason) {
+    if (priorReason === 'keepalive_timeout') return 'keepalive_timeout';
+    const base = priorReason === 'socket_error' ? 'socket_error' : 'socket_close';
+    if (code === null) return base;
+    return reason ? `${base}_${code}:${reason}` : `${base}_${code}`;
+  }
+
   _timestamp(time = Date.now()) {
     return new Date(time).toISOString();
   }
@@ -937,7 +1066,15 @@ class MCPBridgeClient {
     if (!alarms || typeof alarms.create !== 'function') return;
 
     try {
-      const result = alarms.create(MCP_RECONNECT_ALARM, { delayInMinutes: 0.5 });
+      // delayInMinutes sits at the alarms floor rather than tracking the
+      // in-memory delay, which never exceeds it. periodInMinutes is what makes
+      // this a backstop: onopen clears this alarm on every cycle, so a one-shot
+      // wake is lost the moment an upgrade succeeds and is then refused --
+      // exactly the state that needs a wake.
+      const result = alarms.create(MCP_RECONNECT_ALARM, {
+        delayInMinutes: 0.5,
+        periodInMinutes: 1,
+      });
       if (result && typeof result.catch === 'function') {
         result.catch(() => {});
       }
@@ -1139,10 +1276,31 @@ class MCPBridgeClient {
   _startPing() {
     this._stopPing();
     if (this._delegationHeartbeatOwners.size > 0) return;
+    this._lastPongAt = null;
+    this._unansweredPings = 0;
     this._pingTimer = setInterval(() => {
-      if (this._ws && this._ws.readyState === WebSocket.OPEN) {
-        this._ws.send(JSON.stringify({ type: 'mcp:ping', ts: Date.now() }));
+      const socket = this._ws;
+      if (!socket || socket.readyState !== WebSocket.OPEN) return;
+      if (this._unansweredPings >= MCP_PING_MISS_LIMIT) {
+        // The peer has ignored MCP_PING_MISS_LIMIT consecutive pings. A socket
+        // that still reads OPEN but answers nothing is what makes connect()
+        // no-op forever at its readyState guard, so hand the existing
+        // onclose -> _scheduleReconnect path a real close rather than adding
+        // another timer to watch this one.
+        this._lastDisconnectReason = 'keepalive_timeout';
+        try { socket.close(); } catch (_error) { /* the grace timer below still runs onclose */ }
+        setTimeout(() => {
+          // onclose clears _ws, so still owning the socket means it has not run.
+          // When the real close arrives later it finds a stale socket and only
+          // settles that socket's leftovers.
+          if (this._ws !== socket || typeof socket.onclose !== 'function') return;
+          socket.onclose();
+        }, MCP_KEEPALIVE_CLOSE_GRACE_MS);
+        return;
       }
+      this._unansweredPings += 1;
+      socket.send(JSON.stringify({ type: 'mcp:ping', ts: Date.now() }));
+      this._sendExtensionState().catch(() => {});
     }, this._pingIntervalMs());
   }
 
@@ -1302,6 +1460,27 @@ class MCPBridgeClient {
     this._persistState();
   }
 
+  /**
+   * Liveness bookkeeping for any daemon pong, in both the nonce-free two-key
+   * shape the ordinary keepalive gets back and the three-key acknowledged
+   * shape. This is liveness only -- acknowledging a specific beat stays in
+   * _handleDelegationHeartbeatPong and still requires the exact nonce.
+   */
+  _notePongFrame(msg) {
+    if (!this._isPlainRecord(msg) || msg.type !== 'mcp:pong') return;
+    if (!Number.isSafeInteger(msg.ts) || msg.ts < 0) return;
+    const keys = Object.keys(msg).sort();
+    const plain = keys.length === 2 && keys[0] === 'ts' && keys[1] === 'type';
+    const acknowledged = keys.length === 3
+      && keys[0] === 'nonce' && keys[1] === 'ts' && keys[2] === 'type';
+    if (!plain && !acknowledged) return;
+    this._lastPongAt = Date.now();
+    this._unansweredPings = 0;
+    // A completed round trip is the only evidence that this socket was
+    // accepted rather than refused microseconds after the upgrade.
+    this._authRefusalStreak = 0;
+  }
+
   // --------------------------------------------------------------------------
   // Message handling
   // --------------------------------------------------------------------------
@@ -1379,6 +1558,12 @@ class MCPBridgeClient {
     }
   }
 
+  async _sendExtensionState() {
+    if (typeof getMcpAttachmentMetadata !== 'function') return;
+    const attachment = await getMcpAttachmentMetadata();
+    this._send({ type: 'mcp:extension-state', ...attachment, connectedAt: this._lastConnectedAt || null });
+  }
+
   _sendResult(id, payload) {
     // Native messaging has a per-message ceiling that a plain WebSocket does
     // not, and FSB routinely exceeds it (read_page full:true, get_dom_snapshot
@@ -1431,6 +1616,7 @@ class MCPBridgeClient {
     }
 
     if (msg.type === 'mcp:pong') {
+      this._notePongFrame(msg);
       this._handleDelegationHeartbeatPong(msg);
       return;
     }
@@ -1678,23 +1864,94 @@ class MCPBridgeClient {
    * MV3 content script lifecycle properly.
    */
   async _sendToContentScript(tabId, message) {
-    // sendMessageWithRetry is defined in background.js (same scope)
-    if (typeof sendMessageWithRetry === 'function') {
-      return await sendMessageWithRetry(tabId, message);
-    }
-    // Fallback: inject then send directly
-    if (typeof ensureContentScriptInjected === 'function') {
-      await ensureContentScriptInjected(tabId);
-    }
-    return new Promise((resolve, reject) => {
-      chrome.tabs.sendMessage(tabId, message, { frameId: 0 }, (response) => {
-        if (chrome.runtime.lastError) {
-          reject(new Error(chrome.runtime.lastError.message));
-          return;
-        }
-        resolve(response || {});
+    const deliveryDeadline = Date.now() + 12000;
+    if (message.action === 'executeAction') message._fsbDeadlineAt = deliveryDeadline;
+    const isAction = message.action === 'executeAction';
+    const isSheet = isAction && ['fillsheet', 'readsheet', 'fill_sheet', 'read_sheet'].includes(message.tool);
+    const isMutation = isAction && !['readsheet', 'read_sheet'].includes(message.tool);
+    let dispatched = false;
+    let settled = false;
+    let timer;
+    let resolveTimeout;
+    const uncertainResult = () => ({ success: false, outcome: isMutation ? 'unknown' : 'failed',
+      mayHaveExecuted: isMutation, errorCode: 'PAGE_UNRESPONSIVE',
+      error: 'The page did not answer. Inspect its state before retrying.' });
+    const timeoutResult = () => {
+      if (isSheet && dispatched) {
+        return { success: false, outcome: isMutation ? 'unknown' : 'failed', mayHaveExecuted: isMutation,
+          errorCode: 'ACTION_RESPONSE_TIMEOUT',
+          error: 'The sheet operation exceeded its response deadline and may still be running. Wait and inspect its state before retrying.' };
+      }
+      if (isAction && dispatched) return uncertainResult();
+      return { success: false, errorCode: 'PAGE_UNRESPONSIVE',
+        ...(isAction ? { outcome: 'failed', mayHaveExecuted: false } : {}),
+        error: 'The page did not answer before the delivery deadline.' };
+    };
+    const timeout = new Promise(resolve => { resolveTimeout = resolve; });
+    const armWait = (milliseconds) => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        settled = true;
+        resolveTimeout(timeoutResult());
+      }, milliseconds);
+    };
+    const onDeliveryState = (state) => {
+      if (settled) return;
+      dispatched = state === 'dispatching';
+      // An undelivered attempt may retry only within the original delivery
+      // window. A sheet that was dispatched gets its own execution budget.
+      if (!dispatched) armWait(Math.max(0, deliveryDeadline - Date.now()));
+      else if (isSheet) armWait(125000);
+    };
+    armWait(12000);
+    // operation() rejects only when the message was never delivered; a
+    // possibly delivered action resolves with an uncertain result instead.
+    const operation = async () => {
+      // sendMessageWithRetry is defined in background.js (same scope).
+      if (typeof sendMessageWithRetry === 'function') {
+        return await sendMessageWithRetry(tabId, message, 3, { onDeliveryState });
+      }
+      if (typeof ensureContentScriptInjected === 'function') {
+        await ensureContentScriptInjected(tabId);
+      }
+      if (Date.now() >= deliveryDeadline) {
+        return { success: false, errorCode: 'PAGE_UNRESPONSIVE',
+          ...(isAction ? { outcome: 'failed', mayHaveExecuted: false } : {}),
+          error: 'The page did not answer before the delivery deadline.' };
+      }
+      return new Promise((resolve, reject) => {
+        onDeliveryState('dispatching');
+        chrome.tabs.sendMessage(tabId, message, { frameId: 0 }, (response) => {
+          if (chrome.runtime.lastError) {
+            const reason = chrome.runtime.lastError.message || '';
+            if (message.action === 'executeAction' && !/receiving end does not exist|no tab with id/i.test(reason)) {
+              resolve(uncertainResult());
+              return;
+            }
+            onDeliveryState('undelivered');
+            reject(new Error(reason));
+            return;
+          }
+          resolve(response || {});
+        });
       });
-    });
+    };
+    try {
+      return await Promise.race([operation(), timeout]);
+    } catch (error) {
+      const reason = error?.message || String(error);
+      if (isAction && dispatched && !/receiving end does not exist|no tab with id/i.test(reason)) {
+        return uncertainResult();
+      }
+      return message.action === 'executeAction'
+        ? { success: false, outcome: 'failed', mayHaveExecuted: false,
+            errorCode: 'PAGE_UNRESPONSIVE', error: `The action was not delivered: ${reason}` }
+        : { success: false, errorCode: 'PAGE_UNRESPONSIVE',
+            error: `The page did not answer: ${reason}` };
+    } finally {
+      settled = true;
+      clearTimeout(timer);
+    }
   }
 
   async _handleGetTabs(payload = {}) {
@@ -1826,11 +2083,11 @@ class MCPBridgeClient {
     if (!Number.isFinite(tabId) || tabId <= 0) return;
     if (typeof agentId !== 'string' || !agentId) return;
     try {
-      await MCPVisualSessionLifecycleUtils.recordVisualSessionTick(tabId, agentId, {
+      await Promise.race([MCPVisualSessionLifecycleUtils.recordVisualSessionTick(tabId, agentId, {
         visualReason: typeof sidecar.visualReason === 'string' ? sidecar.visualReason : '',
         client: typeof sidecar.client === 'string' ? sidecar.client : '',
         isFinal: sidecar.isFinal === true
-      });
+      }), new Promise((resolve) => setTimeout(resolve, 750))]);
     } catch (err) {
       // Non-blocking: lifecycle failures must not break the underlying action.
       // The overlay simply does not light up. The action still executes per
@@ -1873,7 +2130,8 @@ class MCPBridgeClient {
     if (!Number.isFinite(tabId) || tabId <= 0) return;
     if (typeof agentId !== 'string' || !agentId) return;
     try {
-      await MCPVisualSessionLifecycleUtils.clearVisualSession(tabId, { reason: 'is_final' });
+      await Promise.race([MCPVisualSessionLifecycleUtils.clearVisualSession(tabId, { reason: 'is_final' }),
+        new Promise((resolve) => setTimeout(resolve, 750))]);
     } catch (err) {
       // Non-blocking: lifecycle failures must not break the underlying action.
       console.warn('[FSB MCP] clearVisualSession (is_final) failed (non-blocking):', err && err.message);
@@ -1970,8 +2228,8 @@ class MCPBridgeClient {
       const replayContext = targetContext ? {
         routeFamily: (() => {
           try {
-            const definition = typeof getToolByName === 'function'
-              ? getToolByName(payload && payload.tool)
+            const definition = typeof getToolByNameOrVerb === 'function'
+              ? getToolByNameOrVerb(payload && payload.tool)
               : null;
             return definition && definition._route ? definition._route : 'content';
           } catch (_e) {
@@ -2027,7 +2285,17 @@ class MCPBridgeClient {
     const agentId = (payload && payload.agentId) || null;
     const params = payload && payload.params ? payload.params : {};
     const toolName = payload && payload.tool;
-    const toolDef = typeof getToolByName === 'function' ? getToolByName(toolName) : null;
+    const toolDef = typeof getToolByNameOrVerb === 'function' ? getToolByNameOrVerb(toolName) : null;
+    if (!toolDef) {
+      return {
+        success: false,
+        errorCode: 'mcp_route_unavailable',
+        tool: toolName,
+        routeFamily: 'manual',
+        error: `Unknown MCP tool or wire verb: ${toolName}`,
+        recoveryHint: 'Update the FSB extension and MCP server, then retry with a supported tool.'
+      };
+    }
     const usesDispatcherSyntheticChangeReport = MCP_DISPATCHER_SYNTHETIC_CHANGE_REPORT_TOOLS.has(toolName);
 
     const buildRouteParams = (extra) => ({
@@ -3133,6 +3401,16 @@ class MCPBridgeClient {
   // --------------------------------------------------------------------------
 
   async _handleListCredentials() {
+    const status = await this._dispatchToBackground({ action: 'getCredentialVaultStatus' });
+    if (!status || status.success === false) {
+      return { success: false, errorCode: 'vault_status_unavailable', error: status?.error || 'Credential vault status unavailable' };
+    }
+    if (!status.configured) {
+      return { success: false, errorCode: 'vault_not_configured', error: 'Credential vault is not configured' };
+    }
+    if (!status.unlocked) {
+      return { success: false, errorCode: 'vault_locked', error: 'Credential vault is locked' };
+    }
     const response = await this._dispatchToBackground({ action: 'getAllCredentials' });
     if (!response || !response.success) {
       return { success: false, error: response?.error || 'Failed to list credentials' };
@@ -3194,6 +3472,16 @@ class MCPBridgeClient {
   }
 
   async _handleListPayments() {
+    const status = await this._dispatchToBackground({ action: 'getPaymentVaultStatus' });
+    if (!status || status.success === false) {
+      return { success: false, errorCode: 'vault_status_unavailable', error: status?.error || 'Payment vault status unavailable' };
+    }
+    if (!status.configured) {
+      return { success: false, errorCode: 'vault_not_configured', error: 'Payment vault is not configured' };
+    }
+    if (!status.unlocked || !status.paymentUnlocked) {
+      return { success: false, errorCode: 'vault_locked', error: 'Payment vault is locked' };
+    }
     const response = await this._dispatchToBackground({ action: 'getAllPaymentMethods' });
     if (!response || !response.success) {
       return { success: false, error: response?.error || 'Failed to list payment methods' };

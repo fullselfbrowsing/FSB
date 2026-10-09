@@ -1441,6 +1441,71 @@
       "reason": "version chip"
     },
     {
+      "id": "releaseNotes.v0992.002.extension",
+      "sourceSha256": "3039976f6d97d81c8f1108a15709ac9293795a0b0150ca075bd58a3cef27e92c",
+      "reason": "version chip"
+    },
+    {
+      "id": "releaseNotes.v0992.003.mcp",
+      "sourceSha256": "a67c35eaa7fb3e47681aa68837ce88c20ec6043b86d1b02a0f4fd8786272f4e1",
+      "reason": "version chip"
+    },
+    {
+      "id": "releaseNotes.v0992.004.chrome",
+      "sourceSha256": "93e225f07a15e9af97ef69b4569eff842d57e9d55a14436de8ec377f8df2bc18",
+      "reason": "version chip"
+    },
+    {
+      "id": "releaseNotes.v0992.005.node",
+      "sourceSha256": "f987ef9780d1b33004fa3678b582a395a29802eb2923a1b1dd05b924cc2f2483",
+      "reason": "version chip"
+    },
+    {
+      "id": "releaseNotes.v0992.006.mit",
+      "sourceSha256": "e5dcffe836b6ec8a58e492419b550e65fb8cbdc308503979e5dacb33ac7ea3b7",
+      "reason": "license identifier"
+    },
+    {
+      "id": "releaseNotes.v0992.015.bridgeEventsJsonl",
+      "sourceSha256": "5b7f8d4494e33b6f54762a48295cd1a9e46760b7e1d765515582f28b595145a2",
+      "reason": "literal path, selector, or sample address"
+    },
+    {
+      "id": "releaseNotes.v0992.016.extensionSlotRefused",
+      "sourceSha256": "e6fef2bd5ef19767bf3ea09acbe63088ed7700cb40b1aaa2c44eb6aea8a43c7d",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0992.017.upgradeRejectedOriginPin",
+      "sourceSha256": "eef03d4f2915b48d52ab70860075c162880139a71f4eaba0ed7c207c3846f909",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0992.018.extensionReaped",
+      "sourceSha256": "35dc28cb178758021353bb08638d271f562c36f87f34aec4b6cd010fbfbbca63",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0992.019.extAuthorityRevoked",
+      "sourceSha256": "213ac1f0c3d8f90e7c86185784e5538c0447bfe596e4f8b6e61baad89f670c9e",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0992.038.ctrlEnd",
+      "sourceSha256": "3eaf35246db42dc846171e218ffec32863a7647ea2ccd63b4e1d6af45e20be86",
+      "reason": "keyboard shortcut"
+    },
+    {
+      "id": "releaseNotes.v0992.045.xEditor",
+      "sourceSha256": "93db73a153196995fe1f468b317ece348d74657a5516de25d12b84e9d187c1e6",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0992.046.shadowRootClosed",
+      "sourceSha256": "06d0a586b04ab2cc519ab7cc875f231120fe25082c26fcd028cc69a1042af37a",
+      "reason": "code identifier or wire token"
+    },
+    {
       "id": "releaseNotes.v0990.030.latticeSdk",
       "sourceSha256": "e4290fe5d92b7da4ba206c1b7337cc33f798d5170122dcdc9c652117d83ea4b5",
       "reason": "brand, package, or CLI name"

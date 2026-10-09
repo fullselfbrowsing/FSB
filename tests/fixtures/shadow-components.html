@@ -1,0 +1,25 @@
+<!doctype html><html><body>
+<open-field></open-field>
+<closed-field></closed-field>
+<editor-field></editor-field>
+<pre id="result">pending</pre>
+<script>
+const closedRoots=new WeakMap();
+customElements.define('open-field',class extends HTMLElement{constructor(){super();this.attachShadow({mode:'open'}).innerHTML='<input id="inner" value="old">';}});
+customElements.define('editor-field',class extends HTMLElement{constructor(){super();this.attachShadow({mode:'open'}).innerHTML='<div id="inner" contenteditable="true" style="min-height:20px">old</div>';}});
+customElements.define('closed-field',class extends HTMLElement{constructor(){super();const root=this.attachShadow({mode:'closed'});root.innerHTML='<input id="inner" value="old">';closedRoots.set(this,root);}});
+// A page cannot see closed roots; chrome.dom gives extension content scripts that access.
+window.chrome=Object.assign(window.chrome||{},{dom:{openOrClosedShadowRoot:e=>closedRoots.get(e)||e.shadowRoot||null}});
+window.__FSB_COOKIE_DISMISSED__=true;
+window.innerField=name=>chrome.dom.openOrClosedShadowRoot(document.querySelector(name)).querySelector('#inner');
+</script>
+<script src="../../extension/content/init.js"></script>
+<script src="../../extension/content/utils.js"></script>
+<script src="../../extension/content/dom-state.js"></script>
+<script src="../../extension/content/selectors.js"></script>
+<script src="../../extension/content/accessibility.js"></script>
+<script>Object.assign(FSB,{isCanvasBasedEditor:()=>false,generateMessagingSelectors:()=>[]});Object.assign(FSB.logger,{logActionRecord(){},logActionExecution(){}});</script>
+<script src="../../extension/content/actions.js"></script>
+<script>
+(async()=>{const cases=[['open-field >>> #inner','open-field','a'],['closed-field >>> #inner','closed-field','b'],['open-field','open-field','c'],['closed-field','closed-field','d'],['editor-field >>> #inner','editor-field','e'],['editor-field','editor-field','f']];const out={};try{for(const[selector,host,text]of cases){const r=await FSB.tools.type({selector,text,clear_first:true});out[selector]={success:r.success,error:r.error||null,value:innerField(host).value??innerField(host).innerText,expected:text};}document.querySelector('#result').textContent=JSON.stringify(out);}catch(e){document.querySelector('#result').textContent='ERROR '+e.stack}})();
+</script></body></html>

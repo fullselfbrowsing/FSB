@@ -271,9 +271,9 @@ a:hover {
 }
 
 .ob-node.active {
-  background: rgba(255, 107, 53, 0.12);
+  background: var(--primary);
   border-color: var(--primary);
-  color: var(--primary);
+  color: #111827;
   box-shadow: 0 0 0 4px rgba(255, 107, 53, 0.1);
 }
 

@@ -497,7 +497,7 @@ function parseOwnedLoopbackEndpoint(endpoint: unknown): string {
     const port = Number(parsed.port);
     if (
       parsed.protocol !== 'http:'
-      || parsed.hostname !== '127.0.0.1'
+      || !['127.0.0.1', '[::1]'].includes(parsed.hostname)
       || parsed.port.length === 0
       || !Number.isSafeInteger(port)
       || port < 1

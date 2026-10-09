@@ -10,6 +10,58 @@
   const FSB = window.FSB;
   const logger = FSB.logger;
 
+  function normalizeEditorText(value) {
+    return String(value ?? '').replace(/\r\n?/g, '\n').replace(/\u00a0/g, ' ');
+  }
+
+  function resolveTextReplacement(params, insertAtCursorByDefault = false) {
+    if (params.clear_first === false || params.clearFirst === false) return false;
+    return params.clear_first === true || params.clearFirst === true || !insertAtCursorByDefault;
+  }
+
+  function readInitialEditorText(element) {
+    const text = readEditorText(element);
+    // An empty rich-text field often renders its one placeholder BR as a
+    // newline. Preserve whitespace in text nodes and multiple blank lines.
+    if (element.isContentEditable && text === '\n' && element.textContent === '' &&
+        element.querySelectorAll('br').length === 1 &&
+        !element.querySelector('img, video, audio, iframe, [contenteditable="false"]')) return '';
+    return text;
+  }
+
+  function resolveTextEntryTarget(element) {
+    if (!element) return null;
+    if (element.tagName === 'INPUT' || element.tagName === 'TEXTAREA') return element;
+    if (element.isContentEditable) {
+      return element.closest('[contenteditable="true"], [contenteditable=""]') || element;
+    }
+    const editable = 'input:not([type="hidden"]), textarea, [contenteditable="true"], [contenteditable=""]';
+    const descendants = element.querySelectorAll(editable);
+    if (descendants.length > 0) return descendants.length === 1 ? descendants[0] : null;
+    // A web component keeps its field in its shadow root. A field that already
+    // has focus there wins; otherwise the root must hold exactly one.
+    const root = FSB.openOrClosedShadowRoot(element);
+    if (!root) return null;
+    const focused = root.activeElement && resolveTextEntryTarget(root.activeElement);
+    if (focused) return focused;
+    const inner = root.querySelectorAll(editable);
+    return inner.length === 1 ? inner[0] : null;
+  }
+
+  function readEditorText(element) {
+    return normalizeEditorText(element.tagName === 'INPUT' || element.tagName === 'TEXTAREA'
+      ? element.value : element.innerText);
+  }
+
+  function selectEditableInsertion(element, replace) {
+    const selection = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(element);
+    if (!replace) range.collapse(false);
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }
+
 // =============================================================================
 // COORDINATE FALLBACK UTILITIES
 // Used when all selectors fail and stored coordinates are available
@@ -149,29 +201,12 @@ async function clickAtCoordinates(params) {
   element.dispatchEvent(new MouseEvent('mouseup', mouseEventInit));
   element.dispatchEvent(new MouseEvent('click', mouseEventInit));
 
-  // Also call native click as fallback
-  if (typeof element.click === 'function') {
-    element.click();
-  }
-
   // Wait for potential effects
   await waitForStability('click');
 
-  // Check if DOM click had effect; if not, try CDP mouse as final fallback
-  let clickMethod = 'dom_coordinate';
-  try {
-    const cdpResult = await chrome.runtime.sendMessage({
-      action: 'cdpMouseClick',
-      x: viewportCenterX,
-      y: viewportCenterY
-    });
-    if (cdpResult?.success) {
-      clickMethod = 'cdp_coordinate';
-      await waitForStability('click');
-    }
-  } catch (e) {
-    // CDP unavailable, DOM click already dispatched
-  }
+  // The event may have triggered a network action without a visible DOM change.
+  // Never dispatch a second click on an uncertain outcome.
+  const clickMethod = 'dom_coordinate';
 
   logger.log('info', 'Coordinate fallback click executed', {
     sessionId: FSB.sessionId,
@@ -186,7 +221,9 @@ async function clickAtCoordinates(params) {
   });
 
   return {
-    success: true,
+    success: false,
+    outcome: 'unknown',
+    mayHaveExecuted: true,
     fallbackUsed: true,
     clickedElement: {
       tag: element.tagName,
@@ -196,13 +233,32 @@ async function clickAtCoordinates(params) {
     coordinates: { x: viewportCenterX, y: viewportCenterY },
     scrolled: scrollResult.scrolled,
     method: clickMethod,
-    message: `Clicked using ${clickMethod} fallback (selector-based approach failed)`
+    message: 'Click dispatched at coordinates; inspect the page before retrying because its effect is unknown'
   };
 }
 
 // =============================================================================
 // END COORDINATE FALLBACK UTILITIES
 // =============================================================================
+
+/**
+ * The background marks every cdpInsertText outcome that may have reached the
+ * page with mayHaveExecuted. Any other refusal (a busy debugger, an
+ * unresponsive page, an unmatched target) happened before text was sent.
+ * @param {Object|undefined} response - The background's cdpInsertText reply
+ * @returns {Object|null} A retryable failure, or null when the outcome is unknown
+ */
+function cdpRefusedBeforeInput(response) {
+  if (!response || response.success !== false || response.outcome === 'unknown' || response.mayHaveExecuted) return null;
+  return {
+    success: false,
+    outcome: 'failed',
+    mayHaveExecuted: false,
+    error: response.error || 'Text insertion was refused before any text was sent.',
+    code: response.code,
+    retryable: Boolean(response.retryable)
+  };
+}
 
 // =============================================================================
 // ACTION VERIFICATION UTILITIES
@@ -227,7 +283,7 @@ function captureActionState(element, actionType) {
   };
 
   // Element-specific state (if element provided)
-  if (element && document.contains(element)) {
+  if (element && element.isConnected) {
     state.element = {
       exists: true,
       tagName: element.tagName,
@@ -587,8 +643,8 @@ function diagnoseElementFailure(selector, element = null) {
     // 3. Covered by overlay/modal?
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
-    const topEl = document.elementFromPoint(centerX, centerY);
-    const isCovered = topEl && topEl !== element && !element.contains(topEl) && !topEl.contains(element);
+    const topEl = FSB.deepElementFromPoint(centerX, centerY);
+    const isCovered = topEl && topEl !== element && !FSB.composedContains(element, topEl) && !FSB.composedContains(topEl, element);
     diagnostic.checks.push({ check: 'not_covered', passed: !isCovered, detail: isCovered ? `Covered by ${topEl.tagName}.${topEl.className?.split?.(' ')?.[0] || ''}` : 'Not covered' });
 
     // 4. Needs scroll into view?
@@ -614,7 +670,7 @@ function diagnoseElementFailure(selector, element = null) {
     diagnostic.checks.push({ check: 'no_hover_needed', passed: !needsHover, detail: needsHover ? 'May need hover to reveal' : 'No hover dependency detected' });
 
     // 8. Element still in DOM?
-    const inDOM = document.contains(element);
+    const inDOM = element.isConnected;
     diagnostic.checks.push({ check: 'in_dom', passed: inDOM, detail: inDOM ? 'In DOM' : 'REMOVED from DOM since snapshot' });
 
     // Build summary and suggestions
@@ -667,7 +723,7 @@ function buildFailureReport(action, selector, element, error, diagnostic = null)
   };
 
   // Build element state snapshot if element exists and is still in DOM
-  if (element && document.contains(element)) {
+  if (element && element.isConnected) {
     try {
       const rect = element.getBoundingClientRect();
       const style = getComputedStyle(element);
@@ -2148,6 +2204,8 @@ const tools = {
   // Click an element
   click: async (params) => {
     const startTime = Date.now();
+    let clickDispatched = false;
+    try {
 
     // Explicit error when called with neither selector nor text (TE-04)
     if (!params.selector && !params.selectors && !params.text && !params.coordinates && !params.ref) {
@@ -2275,6 +2333,7 @@ const tools = {
       if (params.coordinates && typeof params.coordinates.x === 'number' && typeof params.coordinates.y === 'number') {
         coordinatesUsed = { x: params.coordinates.x, y: params.coordinates.y };
         coordinateSource = 'fallback';
+        clickDispatched = true;
         const result = await clickAtCoordinates({
           x: params.coordinates.x,
           y: params.coordinates.y,
@@ -2333,8 +2392,16 @@ const tools = {
         const isObscured = readiness.failureReason && readiness.failureReason.includes('obscured');
         if (isObscured && element && typeof element.click === 'function') {
           try {
+            if (!element.isConnected) {
+              return buildFailureReport('click', selectorUsed, null, 'Element no longer in DOM');
+            }
+            if (selectorUsed && !selectorUsed.startsWith('[text-match:') &&
+                FSB.querySelectorWithShadow(selectorUsed) !== element) {
+              return buildFailureReport('click', selectorUsed, null, 'Selector changed before click');
+            }
+            clickDispatched = true;
             element.click();
-            await delay(300);
+            await waitForPageStability({ maxWait: 1000, stableTime: 200 });
             return {
               success: true,
               clicked: params.selector,
@@ -2346,7 +2413,7 @@ const tools = {
               duration: Date.now() - startTime
             };
           } catch (fallbackErr) {
-            // Fallback also failed, continue to original error
+            if (clickDispatched) throw fallbackErr;
           }
         }
         // Record failure - element not ready
@@ -2379,8 +2446,15 @@ const tools = {
 
     if (element) {
       // Verify element is still interactive
-      if (!document.contains(element)) {
+      if (!element.isConnected) {
         return buildFailureReport('click', params.selector, null, 'Element no longer in DOM');
+      }
+      if (selectorUsed && !selectorUsed.startsWith('[text-match:') &&
+          FSB.querySelectorWithShadow(selectorUsed) !== element) {
+        return buildFailureReport('click', selectorUsed, null, 'Selector changed before click');
+      }
+      if (params.text && !(element.innerText || element.textContent || '').toLowerCase().includes(params.text.toLowerCase())) {
+        return buildFailureReport('click', params.text, null, 'Text target changed before click');
       }
 
       // FIX: Handle target="_blank" links that would open in a new tab
@@ -2396,6 +2470,7 @@ const tools = {
 
           // Navigate directly using window.location for same-tab navigation
           const targetUrl = anchor.href;
+          clickDispatched = true;
           window.location.href = targetUrl;
 
           return {
@@ -2433,12 +2508,10 @@ const tools = {
       };
 
       // Dispatch full mouse event sequence for proper JS handler triggering
+      clickDispatched = true;
       element.dispatchEvent(new MouseEvent('mousedown', mouseEventInit));
       element.dispatchEvent(new MouseEvent('mouseup', mouseEventInit));
       element.dispatchEvent(new MouseEvent('click', mouseEventInit));
-
-      // Also call native click as fallback for some elements
-      element.click();
 
       // VERIFY-04: Wait for page stability (REPLACE fixed 300ms with dynamic stability detection)
       await waitForPageStability({ maxWait: 1000, stableTime: 200 });
@@ -2483,148 +2556,28 @@ const tools = {
       // CRITICAL FIX: Return success=false when click has no effect
       // This prevents AI from continuing after failed clicks
       if (!hadEffect) {
-        // FALLBACK: For anchor tags with valid href, try direct navigation
-        // Google and other sites may intercept click events, preventing programmatic navigation
-        const failedAnchor = element.tagName === 'A' ? element : element.closest('a');
-        if (failedAnchor && failedAnchor.href &&
-            failedAnchor.href.startsWith('http') &&
-            !failedAnchor.href.includes('javascript:')) {
-          logger.logActionExecution(FSB.sessionId, 'click', 'href_fallback', {
-            href: failedAnchor.href,
-            originalSelector: params.selector
-          });
-          window.location.href = failedAnchor.href;
-          return {
-            success: true,
-            clicked: params.selector,
-            hadEffect: true,
-            navigationTriggered: true,
-            method: 'href-fallback',
-            message: 'Click had no effect, navigated via href fallback',
-            targetUrl: failedAnchor.href,
-            elementInfo: {
-              tag: element.tagName,
-              text: element.textContent?.trim().substring(0, 50),
-              wasScrolledIntoView: wasScrolled
-            }
-          };
-        }
-
-        // FALLBACK 2: For form submit buttons, try form.submit()
-        const isSubmitButton = (element.tagName === 'INPUT' && element.type === 'submit') ||
-          (element.tagName === 'BUTTON' && (element.type === 'submit' || !element.type));
-        const parentForm = element.closest('form');
-        if (isSubmitButton && parentForm) {
-          logger.logActionExecution(FSB.sessionId, 'click', 'form_submit_fallback', {
-            formAction: parentForm.action,
-            originalSelector: params.selector
-          });
-          try {
-            parentForm.submit();
-            return {
-              success: true,
-              clicked: params.selector,
-              hadEffect: true,
-              navigationTriggered: true,
-              method: 'form-submit-fallback',
-              message: 'Click had no effect, submitted form directly',
-              elementInfo: {
-                tag: element.tagName,
-                text: element.textContent?.trim().substring(0, 50) || element.value?.substring(0, 50),
-                wasScrolledIntoView: wasScrolled
-              }
-            };
-          } catch (formError) {
-            logger.warn('Form submit fallback failed', { error: formError.message });
-          }
-        }
-
-        // FALLBACK 3: CDP mouse click at element coordinates (browser-level input)
-        // Bypasses React synthetic events, Shadow DOM, and event listener interception
-        try {
-          const cdpRect = element.getBoundingClientRect();
-          const cdpX = cdpRect.left + cdpRect.width / 2;
-          const cdpY = cdpRect.top + cdpRect.height / 2;
-
-          logger.logActionExecution(FSB.sessionId, 'click', 'cdp_mouse_fallback', {
-            x: Math.round(cdpX), y: Math.round(cdpY), selector: params.selector
-          });
-
-          const cdpResult = await chrome.runtime.sendMessage({
-            action: 'cdpMouseClick',
-            x: cdpX,
-            y: cdpY
-          });
-
-          if (cdpResult?.success) {
-            await waitForPageStability({ maxWait: 1500, stableTime: 200 });
-            const postState2 = captureActionState(element, 'click');
-            const verification2 = verifyActionEffect(preState, postState2, 'click');
-            const cdpHadEffect = verification2.verified ||
-              verification2.changes?.urlChanged ||
-              verification2.changes?.contentChanged ||
-              verification2.changes?.elementCountChanged;
-
-            if (cdpHadEffect) {
-              actionRecorder.record(null, 'click', params, {
-                selectorTried, selectorUsed: selectorTried, elementFound: true,
-                coordinatesUsed: { x: Math.round(cdpX), y: Math.round(cdpY) },
-                coordinateSource: 'cdp_mouse', success: true, hadEffect: true,
-                duration: Date.now() - startTime
-              });
-              return {
-                success: true,
-                clicked: params.selector,
-                hadEffect: true,
-                method: 'cdp-mouse-fallback',
-                message: 'DOM click had no effect, CDP mouse click succeeded',
-                elementInfo: {
-                  tag: element.tagName,
-                  text: element.textContent?.trim().substring(0, 50),
-                  wasScrolledIntoView: wasScrolled
-                }
-              };
-            }
-          }
-        } catch (cdpErr) {
-          logger.debug('CDP mouse fallback unavailable', { error: cdpErr.message, sessionId: FSB.sessionId });
-        }
-
-        // Record action - click had no effect (all fallbacks exhausted)
         const clickNoEffectDiagnostic = diagnoseElementFailure(selectorTried, element);
         actionRecorder.record(null, 'click', params, {
           selectorTried,
-          selectorUsed: selectorTried,
+          selectorUsed,
           elementFound: true,
           elementDetails: captureElementDetails(element),
-          coordinatesUsed: { x: Math.round(centerX), y: Math.round(centerY) },
-          coordinateSource: 'selector',
           success: false,
-          error: 'Click executed but had no detectable effect on the page',
+          outcome: 'unknown',
+          mayHaveExecuted: true,
           hadEffect: false,
-          effectDetails: verification.changes,
-          verification: {
-            verified: verification.verified,
-            changes: verification.changes,
-            reason: verification.reason
-          },
           diagnostic: clickNoEffectDiagnostic,
           duration: Date.now() - startTime
         });
-        const clickNoEffectReport = buildFailureReport('click', selectorTried, element, 'Click executed but had no detectable effect on the page', clickNoEffectDiagnostic);
-        clickNoEffectReport.clicked = params.selector;
-        clickNoEffectReport.hadEffect = false;
-        clickNoEffectReport.verification = {
-          preState,
-          postState,
-          verified: verification.verified,
-          changes: verification.changes,
-          reason: verification.reason,
-          localChanges: verification.localChanges,
-          confidence: verification.confidence,
-          whatChanged: verification.whatChanged
+        return {
+          success: false,
+          outcome: 'unknown',
+          mayHaveExecuted: true,
+          clicked: params.selector,
+          hadEffect: false,
+          error: 'Click was dispatched but its effect could not be confirmed. Inspect the page before retrying.',
+          verification
         };
-        return clickNoEffectReport;
       }
 
       // Record successful action
@@ -2665,6 +2618,16 @@ const tools = {
           text: element.textContent?.trim().substring(0, 50),
           wasScrolledIntoView: wasScrolled
         }
+      };
+    }
+    } catch (error) {
+      return {
+        success: false,
+        outcome: clickDispatched ? 'unknown' : 'failed',
+        mayHaveExecuted: clickDispatched,
+        error: clickDispatched
+          ? 'Click may have executed before verification failed. Inspect the page before retrying.'
+          : error.message || 'Click failed before dispatch.'
       };
     }
   },
@@ -2832,6 +2795,10 @@ const tools = {
   // Type text into an input
   type: async (params) => {
     const startTime = Date.now();
+    const clearFirst = resolveTextReplacement(params);
+    const isGoogleDocsPage = window.location.hostname === 'docs.google.com' &&
+      window.location.pathname.startsWith('/document/');
+    const clearCanvasFirst = resolveTextReplacement(params, isGoogleDocsPage);
     logger.logActionExecution(FSB.sessionId, 'type', 'start', params);
 
     // Build selectors array for alternative selector support
@@ -2844,6 +2811,7 @@ const tools = {
     // Try each selector until one succeeds with verified effect
     for (let selectorIndex = 0; selectorIndex < selectors.length; selectorIndex++) {
       const currentSelector = selectors[selectorIndex];
+      let mutationAttempted = false;
       logger.debug('Trying selector for type', { sessionId: FSB.sessionId, selectorIndex, selector: currentSelector });
 
     try {
@@ -2870,22 +2838,27 @@ const tools = {
         }
       }
 
+      if (!FSB.isCanvasBasedEditor()) {
+        const editingTarget = resolveTextEntryTarget(element);
+        if (!editingTarget) {
+          lastAttemptError = 'Selector does not identify a single editable field';
+          continue;
+        }
+        element = editingTarget;
+      }
+
       logger.logActionExecution(FSB.sessionId, 'type', 'element_ready', { tagName: element.tagName, scrolled: readiness.scrolled });
 
       // Capture pre-state for verification
       const preState = captureActionState(element, 'type');
+      mutationAttempted = true;
 
     if (element) {
       // Check if it's a valid input element with enhanced contenteditable detection
       const isInput = element.tagName === 'INPUT' || element.tagName === 'TEXTAREA';
 
       // Enhanced universal text input detection for all platforms
-      const isContentEditable = element.contentEditable === 'true' ||
-                                element.getAttribute('contenteditable') === 'true' ||
-                                element.hasAttribute('contenteditable') ||
-                                element.getAttribute('role') === 'textbox' ||
-                                // Universal messaging patterns
-                                FSB.isUniversalMessageInput(element);
+      const isContentEditable = element.isContentEditable === true;
 
       const codeEditorInfo = FSB.detectCodeEditor(element);
       const isCodeEditorInput = isInput && codeEditorInfo.isCodeEditor;
@@ -2928,8 +2901,11 @@ const tools = {
                 note: 'Google Sheets Name Box guard -- data redirected to active cell via keyboard emulator'
               };
             }
+            return { success: false, outcome: 'unknown', mayHaveExecuted: true,
+              error: 'Keyboard insertion was not confirmed. Inspect the cell before retrying.' };
           } catch (e) {
-            logger.debug('Name Box guard typeWithKeys failed, falling through', { error: e.message });
+            return { success: false, outcome: 'unknown', mayHaveExecuted: true,
+              error: 'Keyboard insertion may have executed. Inspect the cell before retrying.' };
           }
         }
       }
@@ -2961,9 +2937,11 @@ const tools = {
               };
             }
           } catch (twkError) {
-            logger.debug('Google Sheets typeWithKeys failed, falling through to CDP', { error: twkError.message });
+            return { success: false, outcome: 'unknown', mayHaveExecuted: true,
+              error: 'Keyboard insertion may have executed. Inspect the cell before retrying.' };
           }
-          // Fall through to standard CDP path as last resort
+          return { success: false, outcome: 'unknown', mayHaveExecuted: true,
+            error: 'Keyboard insertion was not confirmed. Inspect the cell before retrying.' };
         }
 
         logger.logActionExecution(FSB.sessionId, 'type', 'canvas_editor_cdp_direct', { hostname: window.location.hostname });
@@ -2978,6 +2956,7 @@ const tools = {
             textLength: params.text.length,
             hasFormatting: true
           });
+          let pasteStarted = false;
           try {
             const cursorTarget = document.querySelector('.kix-page-content-wrapper') ||
                                  document.querySelector('.kix-paginateddocumentplugin') ||
@@ -2990,10 +2969,10 @@ const tools = {
               await waitForStability('click');
             }
 
-            // If clearFirst, select all and delete before pasting
-            if (params.clearFirst) {
+            // Paste over the selection so a refused paste preserves the document.
+            if (clearCanvasFirst) {
               const isMac = navigator.userAgent?.includes('Macintosh') || navigator.platform?.includes('Mac');
-              await new Promise((resolve, reject) => {
+              const selected = await new Promise((resolve, reject) => {
                 chrome.runtime.sendMessage({
                   action: 'keyboardDebuggerAction',
                   method: 'pressKey',
@@ -3004,24 +2983,18 @@ const tools = {
                   else resolve(response);
                 });
               });
-              await waitForStability('type_complete');
-              await new Promise((resolve, reject) => {
-                chrome.runtime.sendMessage({
-                  action: 'keyboardDebuggerAction',
-                  method: 'pressKey',
-                  key: 'Backspace',
-                  modifiers: { ctrl: false, meta: false, shift: false, alt: false }
-                }, (response) => {
-                  if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
-                  else resolve(response);
-                });
-              });
+              if (!selected?.success) return { ...selected, success: false,
+                outcome: selected?.result?.mayHaveExecuted ? 'unknown' : 'failed',
+                mayHaveExecuted: !!selected?.result?.mayHaveExecuted };
               await waitForStability('type_complete');
             }
 
             const html = FSB.markdownToHTML(params.text);
             const plainText = FSB.stripMarkdown(params.text);
-            const pasteResult = await FSB.clipboardPasteHTML(html, plainText);
+            pasteStarted = true;
+            const pasteResult = await FSB.clipboardPasteHTML(html, plainText, { replaceAll: clearCanvasFirst });
+            if (pasteResult.code === 'TAB_NOT_FOREGROUND') return { ...pasteResult,
+              outcome: 'failed', mayHaveExecuted: false };
 
             if (pasteResult.success) {
               logger.logActionExecution(FSB.sessionId, 'type', 'gdocs_formatted_paste_verified', {
@@ -3042,14 +3015,24 @@ const tools = {
                 note: 'Google Docs -- markdown converted to HTML, pasted via clipboard for rich formatting'
               };
             }
-            // If clipboard paste failed (verified -- no text appeared), fall through to plain CDP insertText
-            logger.warn('Formatted paste failed (verified), falling back to plain CDP insertText', {
+            logger.warn('Formatted paste was not confirmed', {
               error: pasteResult.error,
               textLenBefore: pasteResult.textLenBefore,
-              textLenAfter: pasteResult.textLenAfter
+              textLenAfter: pasteResult.textLenAfter,
+              nothingInserted: !!pasteResult.nothingInserted
             });
+            if (!pasteResult.nothingInserted) {
+              return { success: false, outcome: 'unknown', mayHaveExecuted: true,
+                error: 'Formatted paste may have executed. Inspect the document before retrying.' };
+            }
+            // The paste provably changed nothing; the plain insertion below is the only write.
           } catch (fmtError) {
-            logger.debug('Formatted paste error, falling back to plain CDP insertText', { error: fmtError.message });
+            if (pasteStarted) {
+              return { success: false, outcome: 'unknown', mayHaveExecuted: true,
+                error: 'Formatted paste may have executed. Inspect the document before retrying.' };
+            }
+            // Selection alone does not change document text.
+            logger.warn('Formatted paste was not attempted', { error: fmtError.message });
           }
         }
         // --- END FORMATTED PASTE PATH ---
@@ -3061,11 +3044,11 @@ const tools = {
             chrome.runtime.sendMessage({
               action: 'cdpInsertText',
               text: cdpText,
-              clearFirst: !!params.clearFirst
+              clearFirst: clearCanvasFirst
             }, (response) => {
               if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
               else if (response && response.success) resolve(response);
-              else reject(new Error(response?.error || 'CDP insertion failed'));
+              else reject(Object.assign(new Error(response?.error || 'CDP insertion failed'), { response }));
             });
           });
           // Trust CDP on canvas editors -- no DOM validation possible
@@ -3083,14 +3066,10 @@ const tools = {
             note: 'Canvas-based editor -- CDP insertion used, DOM validation skipped'
           };
         } catch (cdpError) {
-          logger.debug('Canvas editor CDP failed, trying typeWithKeys', { error: cdpError.message });
-          try {
-            const twkResult = await tools.typeWithKeys({ text: params.text, clearFirst: false });
-            if (twkResult.success) return { ...twkResult, note: 'canvas_editor_typeWithKeys_fallback' };
-          } catch (twkError) {
-            logger.debug('Canvas editor typeWithKeys also failed', { error: twkError.message });
-          }
-          return { success: false, error: 'Canvas-based editor: CDP and typeWithKeys both failed', typed: params.text };
+          const refused = cdpRefusedBeforeInput(cdpError.response);
+          if (refused) return refused;
+          return { success: false, outcome: 'unknown', mayHaveExecuted: true,
+            error: 'CDP insertion may have executed. Inspect the editor before retrying.', typed: params.text };
         }
       }
 
@@ -3106,42 +3085,30 @@ const tools = {
       if (!shouldSkipClick) {
         element.click();
         await waitForStability('light');
-
-        if (document.activeElement !== element && element.id) {
-          const label = document.querySelector(`label[for="${element.id}"]`);
-          if (label) {
-            label.click();
-            await waitForStability('type_keystroke');
-          }
-        }
-
-        if (document.activeElement !== element && element.parentElement) {
-          element.parentElement.click();
-          await waitForStability('type_keystroke');
-        }
       }
 
       // Always focus after clicking
       element.focus();
       await waitForStability('type_keystroke');
 
-      // Final verification - ensure element is truly focused and ready
-      let focusAttempts = 0;
-      while (document.activeElement !== element && focusAttempts < 3) {
-        element.click();
-        element.focus();
-        await waitForStability('light');
-        focusAttempts++;
+      // Final verification - ensure element is truly focused and ready.
+      // Inside a shadow root the document only reports the host, so ask the
+      // element's own root which element has focus.
+      const focusAttempts = 0;
+      if (element.getRootNode().activeElement !== element) {
+        return { success: false, outcome: 'failed', mayHaveExecuted: false,
+          error: 'Editable field did not receive focus' };
       }
 
       // Universal text insertion handling for both input elements and contenteditable
       let previousValue = '';
       let insertionSuccess = false;
+      let textMayHaveExecuted = false;
 
       // CODE EDITOR CDP FAST-PATH
       if (codeEditorInfo.isCodeEditor) {
-        // STEP 1: Try MAIN world executeEdits (Monaco/CM6)
-        if (codeEditorInfo.type === 'monaco' || codeEditorInfo.type === 'codemirror6') {
+        // Use editor APIs to move their model cursors even in background tabs.
+        if (['monaco', 'codemirror6', 'codemirror', 'ace'].includes(codeEditorInfo.type)) {
           try {
             logger.debug('Trying editor API via MAIN world injection', {
               sessionId: FSB.sessionId,
@@ -3152,7 +3119,9 @@ const tools = {
             const editorResult = await new Promise((resolve, reject) => {
               chrome.runtime.sendMessage({
                 action: 'monacoEditorInsert',
-                text: params.text
+                text: params.text,
+                clearFirst,
+                selector: currentSelector
               }, (response) => {
                 if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
                 else if (response?.success) resolve(response);
@@ -3183,10 +3152,16 @@ const tools = {
               }
             };
           } catch (editorApiError) {
-            logger.debug('Editor API failed, falling through to CDP', {
+            if (/No editor API found on page/.test(editorApiError.message)) {
+              logger.debug('No editor API available; trying CDP', { sessionId: FSB.sessionId });
+            } else {
+            logger.debug('Editor API result uncertain; skipping fallback', {
               sessionId: FSB.sessionId,
               error: editorApiError.message
             });
+            return { success: false, outcome: 'unknown', mayHaveExecuted: true,
+              error: 'Editor insertion may have executed. Inspect the editor before retrying.' };
+            }
           }
         }
 
@@ -3203,11 +3178,14 @@ const tools = {
             chrome.runtime.sendMessage({
               action: 'cdpInsertText',
               text: params.text,
-              clearFirst: true
+              clearFirst,
+              // The editor keeps its own cursor, so appending moves it with a keystroke.
+              position: clearFirst ? 'replace_all' : 'end',
+              editorOwnsCaret: true
             }, (response) => {
               if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
               else if (response?.success) resolve(response);
-              else reject(new Error(response?.error || 'CDP failed'));
+              else reject(Object.assign(new Error(response?.error || 'CDP failed'), { response }));
             });
           });
 
@@ -3233,10 +3211,18 @@ const tools = {
             }
           };
         } catch (cdpCodeEditorError) {
-          logger.debug('CDP code editor fast-path failed, falling through to standard methods', {
-            sessionId: FSB.sessionId,
-            error: cdpCodeEditorError.message
-          });
+          const refused = cdpRefusedBeforeInput(cdpCodeEditorError.response);
+          if (refused?.code === 'TAB_NOT_FOREGROUND') return refused;
+          if (refused) {
+            logger.debug('CDP sent no input; trying DOM editor insertion', { sessionId: FSB.sessionId });
+          } else {
+            logger.debug('CDP code editor result uncertain; skipping fallback', {
+              sessionId: FSB.sessionId,
+              error: cdpCodeEditorError.message
+            });
+            return { success: false, outcome: 'unknown', mayHaveExecuted: true,
+              error: 'CDP insertion may have executed. Inspect the editor before retrying.' };
+          }
         }
       }
 
@@ -3249,9 +3235,11 @@ const tools = {
 
         if (!codeInserted && document.execCommand) {
           try {
-            element.select();
+            if (clearFirst) element.select();
+            else element.setSelectionRange(element.value.length, element.value.length);
             if (document.execCommand('insertText', false, params.text)) {
               codeInserted = true;
+              textMayHaveExecuted = true;
             }
           } catch (e) {
             logger.debug('Code editor execCommand failed', { error: e.message });
@@ -3259,44 +3247,12 @@ const tools = {
         }
 
         if (!codeInserted) {
-          try {
-            element.select();
-            element.dispatchEvent(new InputEvent('beforeinput', {
-              inputType: 'insertText',
-              data: params.text,
-              bubbles: true,
-              cancelable: true,
-              composed: true
-            }));
-            element.dispatchEvent(new InputEvent('input', {
-              inputType: 'insertText',
-              data: params.text,
-              bubbles: true
-            }));
-            codeInserted = true;
-          } catch (e) {
-            logger.debug('Code editor InputEvent failed', { error: e.message });
+          if (element.value !== previousValue) {
+            return { success: false, outcome: 'unknown', mayHaveExecuted: true,
+              error: 'Editor content changed unexpectedly. Inspect it before retrying.' };
           }
-        }
-
-        if (!codeInserted) {
-          try {
-            const dataTransfer = new DataTransfer();
-            dataTransfer.setData('text/plain', params.text);
-            element.dispatchEvent(new ClipboardEvent('paste', {
-              clipboardData: dataTransfer,
-              bubbles: true,
-              cancelable: true
-            }));
-            await waitForStability('type_keystroke');
-            codeInserted = true;
-          } catch (e) {
-            logger.debug('Code editor clipboard paste failed', { error: e.message });
-          }
-        }
-
-        if (!codeInserted) {
-          element.value = params.text;
+          element.value = clearFirst ? params.text : previousValue + params.text;
+          textMayHaveExecuted = true;
           element.dispatchEvent(new Event('input', { bubbles: true }));
           element.dispatchEvent(new Event('change', { bubbles: true }));
         }
@@ -3310,96 +3266,68 @@ const tools = {
 
       } else if (isInput) {
         previousValue = element.value;
-        element.value = '';
-        element.value = params.text;
+        element.value = clearFirst ? params.text : previousValue + params.text;
+        textMayHaveExecuted = true;
         element.dispatchEvent(new Event('input', { bubbles: true }));
         element.dispatchEvent(new Event('change', { bubbles: true }));
         element.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true }));
       } else if (isContentEditable) {
-        previousValue = element.textContent || element.innerText || '';
-        insertionSuccess = false;
-
-        if (!insertionSuccess && document.execCommand) {
-          try {
-            element.focus();
-            document.execCommand('selectAll', false, null);
-            if (document.execCommand('insertText', false, params.text)) {
-              insertionSuccess = true;
-            }
-          } catch (e) {
-            logger.debug('execCommand insertText failed', { sessionId: FSB.sessionId, error: e.message });
-          }
+        previousValue = readInitialEditorText(element);
+        element.focus();
+        selectEditableInsertion(element, clearFirst);
+        let commandReportedSuccess = false;
+        try {
+          commandReportedSuccess = Boolean(document.execCommand &&
+            document.execCommand('insertText', false, params.text));
+        } catch (error) {
+          logger.debug('Editable insertText failed', { sessionId: FSB.sessionId, error: error.message });
         }
-
-        if (!insertionSuccess) {
-          try {
-            const dataTransfer = new DataTransfer();
-            dataTransfer.setData('text/plain', params.text);
-            const pasteEvent = new ClipboardEvent('paste', {
-              clipboardData: dataTransfer,
-              bubbles: true,
-              cancelable: true
-            });
-            element.dispatchEvent(pasteEvent);
-            await waitForStability('type_keystroke');
-            if (element.textContent.includes(params.text)) {
-              insertionSuccess = true;
-            }
-          } catch (e) {
-            logger.debug('Clipboard paste simulation failed', { sessionId: FSB.sessionId, error: e.message });
-          }
-        }
-
-        if (!insertionSuccess) {
-          try {
-            element.innerHTML = '';
-            element.textContent = '';
-            const textNode = document.createTextNode(params.text);
-            element.appendChild(textNode);
-            const range = document.createRange();
-            const selection = window.getSelection();
-            range.setStartAfter(textNode);
-            range.collapse(true);
-            selection.removeAllRanges();
-            selection.addRange(range);
-            insertionSuccess = true;
-          } catch (e) {
-            logger.debug('Range/Selection API insertion failed', { sessionId: FSB.sessionId, error: e.message });
-          }
-        }
-
-        if (!insertionSuccess) {
-          if (element.innerHTML.includes('<p><br></p>') || element.innerHTML.includes('<br>')) {
-            element.innerHTML = '';
-          } else {
-            element.textContent = '';
-          }
-          try {
-            element.textContent = params.text;
-            insertionSuccess = true;
-          } catch (e) {
-            logger.debug('Direct manipulation failed', { sessionId: FSB.sessionId, error: e.message });
-          }
-        }
-
-        const events = [
-          new Event('input', { bubbles: true }),
-          new Event('change', { bubbles: true }),
-          new KeyboardEvent('keydown', { bubbles: true }),
-          new KeyboardEvent('keyup', { bubbles: true }),
-          new Event('blur', { bubbles: true }),
-          new Event('focus', { bubbles: true })
-        ];
-
-        events.forEach(event => {
-          try {
-            element.dispatchEvent(event);
-          } catch (e) {
-            logger.debug('Event dispatch failed', { sessionId: FSB.sessionId, eventType: event.type, error: e.message });
-          }
-        });
-
         await waitForStability('type_keystroke');
+        const expected = clearFirst
+          ? normalizeEditorText(params.text)
+          : previousValue + normalizeEditorText(params.text);
+        const observed = readEditorText(element);
+        insertionSuccess = observed === expected;
+        if (!insertionSuccess) {
+          const mayHaveExecuted = commandReportedSuccess || observed !== previousValue;
+          return {
+            success: false,
+            outcome: mayHaveExecuted ? 'unknown' : 'failed',
+            mayHaveExecuted,
+            error: mayHaveExecuted
+              ? 'Editable text changed but did not match the requested text. Inspect it before retrying.'
+              : 'The editable field did not accept the text.',
+            expectedValue: expected,
+            actualValue: observed,
+            final_text: observed
+          };
+        }
+      }
+
+      // Verify insertion before Enter or Tab can submit and clear the field.
+      const insertionCheck = readEditorText(element);
+      const expectedValue = clearFirst
+        ? normalizeEditorText(params.text)
+        : normalizeEditorText(previousValue) + normalizeEditorText(params.text);
+      const finalSuccess = insertionCheck === expectedValue;
+      const isAmazonSearch = element.id === 'twotabsearchtextbox' ||
+                             element.name === 'searchtext' ||
+                             window.location.hostname.includes('amazon');
+
+      if (!finalSuccess || (isContentEditable && !insertionSuccess)) {
+        const mayHaveExecuted = textMayHaveExecuted || insertionCheck !== normalizeEditorText(previousValue);
+        return {
+          success: false,
+          outcome: mayHaveExecuted ? 'unknown' : 'failed',
+          mayHaveExecuted,
+          error: mayHaveExecuted
+            ? 'Text insertion was attempted but could not be verified. Inspect the field before retrying.'
+            : 'The field did not accept the requested text.',
+          typed: params.text,
+          actualValue: insertionCheck,
+          expectedValue,
+          final_text: insertionCheck
+        };
       }
 
       // Gmail/email recipient field: dispatch Tab to confirm the recipient "chip"
@@ -3438,52 +3366,14 @@ const tools = {
         element.dispatchEvent(enterUpEvent);
       }
 
-      // Post-typing validation
-      const finalValue = isInput ? (element.value || '') : (element.textContent || element.value || '');
-      const typingSuccessful = finalValue.includes(params.text) || finalValue === params.text;
-
-      // Amazon-specific validation
-      const isAmazonSearch = element.id === 'twotabsearchtextbox' ||
-                           element.name === 'searchtext' ||
-                           window.location.hostname.includes('amazon');
-
-      if (isAmazonSearch && !typingSuccessful) {
-        logger.logActionExecution(FSB.sessionId, 'type', 'amazon_retry', { reason: 'initial_typing_failed' });
-        try {
-          element.focus();
-          await waitForStability('light');
-          element.value = '';
-          element.value = params.text;
-          element.dispatchEvent(new Event('input', { bubbles: true }));
-          element.dispatchEvent(new Event('change', { bubbles: true }));
-          element.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: params.text.slice(-1) }));
-          element.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: params.text.slice(-1) }));
-          await waitForStability('type_complete');
-          const retryValue = element.value || '';
-          if (retryValue.includes(params.text) || retryValue === params.text) {
-            logger.logActionExecution(FSB.sessionId, 'type', 'amazon_retry_success', {});
-          }
-        } catch (amazonError) {
-          logger.warn('Amazon-specific retry failed', { sessionId: FSB.sessionId, error: amazonError.message });
-        }
-      }
-
-      // CRITICAL FIX: Strengthen validation
-      const finalCheck = isInput ? (element.value || '') : (element.textContent || element.value || '');
-      const trimmedFinal = finalCheck.trim();
-      const trimmedExpected = params.text.trim();
-      const exactMatch = trimmedFinal === trimmedExpected;
-      const contentEditableMatch = isContentEditable &&
-                                   trimmedFinal.replace(/\s+/g, ' ') === trimmedExpected.replace(/\s+/g, ' ');
-      const finalSuccess = exactMatch || contentEditableMatch;
-      const contentEditableActuallyWorked = !isContentEditable || (insertionSuccess && finalSuccess);
+      const finalCheck = readEditorText(element);
 
       // Gmail recipient chip check
-      if (isRecipientField && looksLikeEmail && !finalSuccess) {
+      if (isRecipientField && looksLikeEmail && finalCheck !== expectedValue) {
         const chipEl = element.closest('[role="list"], .fX, .afV')?.querySelector(
           '.vR, [data-hovercard-id], [data-name], .afX'
         );
-        const fieldCleared = trimmedFinal === '' || !trimmedFinal.includes(params.text);
+        const fieldCleared = finalCheck.trim() === '' || !finalCheck.includes(params.text);
         if (chipEl || fieldCleared) {
           logger.debug('Recipient chip detected or field cleared after Tab, treating as success', {
             sessionId: FSB.sessionId, chipFound: !!chipEl, fieldCleared
@@ -3505,96 +3395,17 @@ const tools = {
         }
       }
 
-      // Return failure if typing didn't work
-      if (!finalSuccess || (isContentEditable && !isCodeEditorInput && !insertionSuccess)) {
-        const recheck = isInput ? (element.value || '') : (element.textContent || element.innerText || '');
-        if (recheck.includes(params.text)) {
-          return {
-            success: true,
-            typed: params.text,
-            method: 'standard',
-            pressedEnter: !!params.pressEnter,
-            clickedFirst: !shouldSkipClick,
-            hadEffect: true,
-            note: 'recheck_confirmed_text_present',
-            elementInfo: {
-              tag: element.tagName,
-              type: isInput ? element.type : 'contenteditable',
-              name: element.name || element.id || element.className
-            }
-          };
-        }
-
-        // ENHANCED: Try CDP-based text insertion as last resort
-        logger.logActionExecution(FSB.sessionId, 'type', 'cdp_fallback_attempt', { reason: 'standard_methods_failed' });
-
-        try {
-          const cdpResult = await new Promise((resolve, reject) => {
-            chrome.runtime.sendMessage({
-              action: 'cdpInsertText',
-              text: params.text,
-              clearFirst: true
-            }, (response) => {
-              if (chrome.runtime.lastError) {
-                reject(new Error(chrome.runtime.lastError.message));
-              } else if (response && response.success) {
-                resolve(response);
-              } else {
-                reject(new Error(response?.error || 'CDP insertion failed'));
-              }
-            });
-          });
-
-          await waitForStability('type_complete');
-          const cdpCanvasEditor = FSB.isCanvasBasedEditor();
-          const cdpFinalCheck = cdpCanvasEditor ? '' : (isInput ? (element.value || '') : (element.textContent || element.value || ''));
-          const cdpSuccess = cdpCanvasEditor || cdpFinalCheck.includes(params.text) || cdpFinalCheck.trim() === params.text.trim();
-
-          if (cdpSuccess) {
-            logger.logActionExecution(FSB.sessionId, 'type', cdpCanvasEditor ? 'cdp_fallback_canvas_success' : 'cdp_fallback_success', {});
-            return {
-              success: true,
-              typed: params.text,
-              method: cdpCanvasEditor ? 'cdp_fallback_canvas' : 'cdp_fallback',
-              pressedEnter: !!params.pressEnter,
-              clickedFirst: !shouldSkipClick,
-              hadEffect: true,
-              note: cdpCanvasEditor ? 'Canvas-based editor -- DOM validation skipped, CDP trusted' : undefined,
-              elementInfo: {
-                tag: element.tagName,
-                type: isInput ? element.type : 'contenteditable',
-                name: element.name || element.id || element.className
-              }
-            };
-          }
-        } catch (cdpError) {
-          logger.debug('CDP fallback failed', { sessionId: FSB.sessionId, error: cdpError.message });
-        }
-
+      if (isContentEditable) {
         return {
-          success: false,
-          error: isContentEditable
-            ? 'ContentEditable insertion failed - text not entered correctly (CDP fallback also failed)'
-            : 'Text validation failed - expected text not found in element',
+          success: true,
           typed: params.text,
+          final_text: finalCheck,
           actualValue: finalCheck,
-          expectedValue: params.text,
-          pressedEnter: !!params.pressEnter,
-          clickedFirst: !shouldSkipClick,
-          focused: document.activeElement === element,
-          insertionSuccess: isContentEditable ? insertionSuccess : undefined,
-          validationPassed: false,
-          cdpAttempted: true,
-          elementInfo: {
-            tag: element.tagName,
-            type: isInput ? element.type : 'contenteditable',
-            previousValue: previousValue.substring(0, 20),
-            name: element.name || element.id || FSB.getClassName(element),
-            contentEditable: isContentEditable
-          },
-          suggestion: isContentEditable
-            ? 'Try alternative selector or wait for page to be ready'
-            : 'Element may not accept input correctly'
+          selector: currentSelector,
+          hadEffect: true,
+          insertionSuccess: true,
+          validationPassed: true,
+          pressedEnter: !!params.pressEnter
         };
       }
 
@@ -3607,13 +3418,8 @@ const tools = {
       lastVerification = verification;
 
       if (!verification.verified) {
-        logger.debug('Type verification failed, trying next selector', {
-          sessionId: FSB.sessionId,
-          selector: currentSelector,
-          reason: verification.reason
-        });
-        lastAttemptError = `Type action had no verified effect: ${verification.reason}`;
-        continue; // Try next selector
+        verification.verified = true;
+        verification.reason = 'Text insertion was verified before follow-up keys';
       }
 
       // Record successful action
@@ -3644,9 +3450,10 @@ const tools = {
           changes: verification.changes
         },
         actualValue: finalCheck,
+        final_text: finalCheck,
         pressedEnter: !!params.pressEnter,
         clickedFirst: !shouldSkipClick,
-        focused: document.activeElement === element,
+        focused: element.getRootNode().activeElement === element,
         focusAttempts: focusAttempts,
         scrolled: readiness.scrolled || false,
         insertionSuccess: isContentEditable ? insertionSuccess : true,
@@ -3702,6 +3509,11 @@ const tools = {
         currentSelector: currentSelector
       });
 
+      if (mutationAttempted) {
+        return { success: false, outcome: 'unknown', mayHaveExecuted: true,
+          error: 'Text insertion may have executed. Inspect the field before retrying.' };
+      }
+
       if (lastVerification && lastVerification.verified) {
         logger.warn('Type verification passed but post-success error occurred, returning success', {
           sessionId: FSB.sessionId,
@@ -3754,10 +3566,13 @@ const tools = {
               note: 'Google Sheets fallback -- keyboard emulator used (all selectors exhausted)'
             };
           }
+          return { success: false, outcome: 'unknown', mayHaveExecuted: true,
+            error: 'Keyboard insertion was not confirmed. Inspect the cell before retrying.' };
         } catch (twkErr) {
           logger.debug('Google Sheets fallback typeWithKeys failed', { error: twkErr.message });
+          return { success: false, outcome: 'unknown', mayHaveExecuted: true,
+            error: 'Keyboard insertion may have executed. Inspect the cell before retrying.' };
         }
-        // Fall through to standard canvas CDP fallback as last resort
       }
 
       logger.logActionExecution(FSB.sessionId, 'type', 'canvas_fallback_attempt', {
@@ -3784,11 +3599,11 @@ const tools = {
           chrome.runtime.sendMessage({
             action: 'cdpInsertText',
             text: params.text,
-            clearFirst: !!params.clearFirst
+            clearFirst: clearCanvasFirst
           }, (response) => {
             if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
             else if (response && response.success) resolve(response);
-            else reject(new Error(response?.error || 'CDP insertion failed'));
+            else reject(Object.assign(new Error(response?.error || 'CDP insertion failed'), { response }));
           });
         });
         if (params.pressEnter) {
@@ -3805,13 +3620,10 @@ const tools = {
         };
       } catch (cdpFallbackErr) {
         logger.debug('Canvas editor CDP fallback failed', { error: cdpFallbackErr.message });
-        try {
-          const twkResult = await tools.typeWithKeys({ text: params.text, clearFirst: false });
-          if (twkResult.success) return { ...twkResult, note: 'canvas_editor_fallback_typeWithKeys' };
-        } catch (twkErr) {
-          logger.debug('Canvas editor fallback typeWithKeys also failed', { error: twkErr.message });
-        }
-        lastAttemptError = `Canvas editor CDP fallback failed: ${cdpFallbackErr.message}`;
+        const refused = cdpRefusedBeforeInput(cdpFallbackErr.response);
+        if (refused) return refused;
+        return { success: false, outcome: 'unknown', mayHaveExecuted: true,
+          error: 'CDP insertion may have executed. Inspect the editor before retrying.' };
       }
     }
 
@@ -3870,7 +3682,6 @@ const tools = {
         }
 
         const isInsideForm = !!element.closest('form');
-        const formElement = element.closest('form');
         const preState = captureActionState(element, 'pressEnter');
 
         element.focus();
@@ -3894,51 +3705,16 @@ const tools = {
         lastVerification = verification;
 
         if (!verification.verified && isInsideForm) {
-          // Phase 129: Enter had no effect -- try clicking the submit button as fallback
-          const submitButton = findSubmitButton(formElement);
-          if (submitButton) {
-            const fallbackPreState = captureActionState(submitButton, 'click');
-            submitButton.click();
-            await waitForPageStability({ maxWait: 2000, stableTime: 300 });
-            const fallbackPostState = captureActionState(submitButton, 'click');
-            const fallbackVerification = verifyActionEffect(fallbackPreState, fallbackPostState, 'click');
-
-            if (fallbackVerification.verified) {
-              actionRecorder.record(null, 'pressEnter', params, {
-                selectorTried: params.selector,
-                selectorUsed: currentSelector,
-                elementFound: true,
-                elementDetails: captureElementDetails(submitButton),
-                coordinatesUsed: null,
-                coordinateSource: null,
-                success: true,
-                hadEffect: true,
-                usedSubmitFallback: true,
-                effectDetails: fallbackVerification.changes,
-                duration: Date.now() - startTime
-              });
-
-              return {
-                success: true,
-                key: 'Enter',
-                selector: currentSelector,
-                selectorIndex: selectorIndex,
-                usedFallback: selectorIndex > 0,
-                usedSubmitFallback: true,
-                submitButtonSelector: submitButton.id ? `#${submitButton.id}` : submitButton.className ? `.${submitButton.className.split(' ')[0]}` : submitButton.tagName.toLowerCase(),
-                hadEffect: true,
-                isInsideForm: true,
-                verification: {
-                  verified: true,
-                  reason: 'Submit button click fallback triggered form submission',
-                  changes: fallbackVerification.changes
-                }
-              };
-            }
-          }
-          // Submit button not found or click had no effect either -- continue to next selector
-          lastAttemptError = `Enter key pressed but form submission had no effect${submitButton ? ' (submit button fallback also failed)' : ' (no submit button found in form)'}`;
-          continue;
+          return {
+            success: false,
+            outcome: 'unknown',
+            mayHaveExecuted: true,
+            key: 'Enter',
+            selector: currentSelector,
+            hadEffect: false,
+            error: 'Enter was dispatched but submission could not be confirmed. Inspect the page before retrying.',
+            verification
+          };
         }
 
         actionRecorder.record(null, 'pressEnter', params, {
@@ -4245,6 +4021,7 @@ const tools = {
 
     const { element: searchInput, tier, selector: matchedSelector } = detected;
 
+    let submissionAttempted = false;
     try {
       // Ensure element is ready (also dismisses cookie consent per Phase 130)
       if (typeof FSB.smartEnsureReady === 'function') {
@@ -4278,27 +4055,17 @@ const tools = {
         key: 'Enter', code: 'Enter', keyCode: 13, which: 13,
         bubbles: true, cancelable: true
       });
+      submissionAttempted = true;
       searchInput.dispatchEvent(enterDown);
       searchInput.dispatchEvent(enterUp);
 
       // Wait for page stability after submit
       await waitForPageStability({ maxWait: 3000, stableTime: 500 });
 
-      // If URL did not change, try submit button fallback (reuse Phase 129 findSubmitButton)
       if (window.location.href === preUrl) {
-        const form = searchInput.closest('form');
-        if (form) {
-          const submitBtn = findSubmitButton(form) ||
-            form.querySelector('[role="button"][aria-label*="search" i]');
-          if (submitBtn) {
-            submitBtn.click();
-            await waitForPageStability({ maxWait: 3000, stableTime: 500 });
-          } else {
-            // Last resort: submit the form directly
-            form.submit();
-            await waitForPageStability({ maxWait: 3000, stableTime: 500 });
-          }
-        }
+        return { success: false, outcome: 'unknown', mayHaveExecuted: true,
+          error: 'Search submission may have executed. Inspect the page before retrying.',
+          query: params.query, searchInputSelector: matchedSelector, tier };
       }
 
       return {
@@ -4310,7 +4077,11 @@ const tools = {
         url: window.location.href
       };
     } catch (error) {
-      // On error, fall back to Google
+      if (submissionAttempted) {
+        return { success: false, outcome: 'unknown', mayHaveExecuted: true,
+          error: 'Search submission may have executed. Inspect the page before retrying.',
+          query: params.query, searchInputSelector: matchedSelector, tier };
+      }
       const googleResult = tools.searchGoogle(params);
       return { ...googleResult, method: 'google-fallback', siteSearchError: error.message };
     }
@@ -4683,12 +4454,28 @@ const tools = {
         if (response.success) {
           return { success: true, key, method: 'debuggerAPI', target: selector || 'activeElement', result: response.result };
         } else {
+          if (response.result?.keyDownDispatched || response.result?.mayHaveExecuted) {
+            return {
+              success: false,
+              outcome: 'unknown',
+              mayHaveExecuted: true,
+              key,
+              error: 'The key may have reached the page. Inspect its effect before retrying.'
+            };
+          }
+          if (response?.code === 'TAB_NOT_FOREGROUND') return { ...response,
+            outcome: 'failed', mayHaveExecuted: false };
           cdpError = (response && response.error) || 'debugger API returned failure';
           logger.logRecovery(FSB.sessionId, 'debugger_api_failed', 'dom_events_fallback', 'started', { error: response.error });
         }
       } catch (error) {
-        cdpError = error.message || 'debugger API unavailable';
-        logger.logRecovery(FSB.sessionId, 'debugger_api_unavailable', 'dom_events_fallback', 'started', { error: error.message });
+        return {
+          success: false,
+          outcome: 'unknown',
+          mayHaveExecuted: true,
+          key,
+          error: 'The key dispatch lost its response. Inspect the page before retrying.'
+        };
       }
     }
 
@@ -4756,6 +4543,8 @@ const tools = {
         if (response.success) {
           return { success: true, action: 'pressKeySequence', keys, modifiers, method: 'debuggerAPI', result: response.result };
         } else {
+          if (response?.code === 'TAB_NOT_FOREGROUND') return { ...response,
+            outcome: response.mayHaveExecuted ? 'unknown' : 'failed', mayHaveExecuted: !!response.mayHaveExecuted };
           logger.logRecovery(FSB.sessionId, 'debugger_api_key_sequence_failed', 'dom_events_fallback', 'started', { error: response.error });
         }
       } catch (error) {
@@ -4814,6 +4603,8 @@ const tools = {
         if (response.success) {
           return { success: true, action: 'typeWithKeys', text, method: 'debuggerAPI', characterCount: text.length, result: response.result };
         } else {
+          if (response?.code === 'TAB_NOT_FOREGROUND') return { ...response,
+            outcome: response.mayHaveExecuted ? 'unknown' : 'failed', mayHaveExecuted: !!response.mayHaveExecuted };
           logger.logRecovery(FSB.sessionId, 'debugger_api_text_failed', 'return_error', 'failed', { error: response.error });
           return { success: false, error: response.error || 'Keyboard debugger API failed', completedChars: response.result?.completedChars || 0, method: 'debugger-failed', text, action: 'typeWithKeys' };
         }
@@ -4894,6 +4685,8 @@ const tools = {
         if (response.success) {
           return { success: true, action: 'sendSpecialKey', specialKey, method: 'debuggerAPI', result: response.result };
         } else {
+          if (response?.code === 'TAB_NOT_FOREGROUND') return { ...response,
+            outcome: response.mayHaveExecuted ? 'unknown' : 'failed', mayHaveExecuted: !!response.mayHaveExecuted };
           logger.logRecovery(FSB.sessionId, 'debugger_api_special_key_failed', 'dom_events_fallback', 'started', { error: response.error });
         }
       } catch (error) {

@@ -127,6 +127,7 @@ const PHASE65_NEW_ROOT_COMMANDS = Object.freeze([
 ]);
 
 const REFINEMENT_ROOT_TEST_COMMANDS = Object.freeze([
+  'node tests/mcp-bridge-events.test.js',
   'node tests/mcp-agent-connection-test.test.js',
   'node tests/lmstudio-agent-request.test.js',
   'node tests/lmstudio-startup-preflight.test.js',
@@ -153,6 +154,8 @@ const REFINEMENT_ROOT_TEST_COMMANDS = Object.freeze([
   'node --test tests/google-sheets-session.test.js tests/google-sheets-content-actions.test.js tests/gsheets-handler.test.js tests/google-sheets-wiring.test.js tests/spreadsheet-record-redaction.test.js',
   'node tests/sidepanel-automation-runner.test.js',
   'node tests/server-client-ip-geo.test.js',
+  'node tests/ws-client-relay-reconnect.test.js',
+  'node --test tests/network-capture-debugger-lifecycle.test.js',
 ]);
 
 const PHASE64_RETAINED_ROOT_COMMANDS = Object.freeze([
