@@ -1,0 +1,688 @@
+{
+  "_fixture": "Synthetic sample for tests/bench-export-history.test.mjs. It follows the Phase 66 H1 export format written by scripts/bench/history-export-snippet.js (schema fsb-history-export v1). Every id, task, URL and page string in it is fake.",
+  "schema": "fsb-history-export",
+  "schemaVersion": 1,
+  "exportedAt": "2026-09-30T12:00:00.000Z",
+  "extensionId": "badgafnfchcihdfnjneklogedcdkmjfk",
+  "version": "0.9.91",
+  "timeZone": "America/Los_Angeles",
+  "window": {
+    "from": "2026-09-16",
+    "to": "2026-09-21"
+  },
+  "index": [
+    {
+      "id": "session_1789873200000",
+      "task": "SAMPLE_TASK_TEXT_a91f",
+      "startTime": 1789873200000,
+      "endTime": 1789873260000,
+      "status": "completed",
+      "actionCount": 3,
+      "iterationCount": 3,
+      "mode": "mcp-agent",
+      "mcpClient": "Cursor",
+      "outcome": null,
+      "tabCount": 1,
+      "lastUrl": "https://intranet.example.test/secret-path?q=1"
+    },
+    {
+      "id": "session_1789745400000",
+      "task": "navigate",
+      "taskSource": "tool",
+      "startTime": 1789745400000,
+      "endTime": 1789745700000,
+      "status": "completed",
+      "actionCount": 3,
+      "eventCount": 4,
+      "domSnapshotCount": 0,
+      "mode": "mcp-agent",
+      "mcpClient": "Claude",
+      "taskRunId": "session_1789745400000",
+      "recordingRunId": "rec_fx_b2c3d4e5",
+      "agentId": "agent_fx_claude_b2",
+      "tabIds": [102],
+      "tabCount": 1,
+      "storageBackend": "journal-v2",
+      "schemaVersion": 2,
+      "recordingState": "healthy",
+      "degradedReason": null,
+      "replayTrusted": true,
+      "replayIntegrity": null,
+      "replayProvenance": "capture",
+      "replayableCount": 3,
+      "replayBlockedCount": 0,
+      "outcome": "timeout",
+      "outcomeDetails": null,
+      "result": null,
+      "completionMessage": null,
+      "error": null,
+      "blocker": null,
+      "nextStep": null,
+      "journalGap": false
+    },
+    {
+      "id": "session_1789639200000",
+      "task": "SAMPLE_TASK_TEXT_a91f",
+      "taskSource": "visual",
+      "startTime": 1789639200000,
+      "endTime": 1789639500000,
+      "status": "completed",
+      "actionCount": 4,
+      "eventCount": 5,
+      "domSnapshotCount": 0,
+      "mode": "mcp-agent",
+      "mcpClient": "Claude",
+      "taskRunId": "session_1789639200000",
+      "recordingRunId": "rec_fx_a1b2c3d4",
+      "agentId": "agent_fx_claude_a1",
+      "tabIds": [101],
+      "tabCount": 1,
+      "storageBackend": "journal-v2",
+      "schemaVersion": 2,
+      "recordingState": "healthy",
+      "degradedReason": null,
+      "replayTrusted": true,
+      "replayIntegrity": null,
+      "replayProvenance": "capture",
+      "replayableCount": 4,
+      "replayBlockedCount": 0,
+      "outcome": "completed",
+      "outcomeDetails": null,
+      "result": "SAMPLE_RESULT_TEXT_5b20",
+      "completionMessage": null,
+      "error": null,
+      "blocker": null,
+      "nextStep": null,
+      "journalGap": false
+    }
+  ],
+  "sessions": [
+    {
+      "indexEntry": {
+        "id": "session_1789873200000",
+        "task": "SAMPLE_TASK_TEXT_a91f",
+        "startTime": 1789873200000,
+        "endTime": 1789873260000,
+        "status": "completed",
+        "actionCount": 3,
+        "iterationCount": 3,
+        "mode": "mcp-agent",
+        "mcpClient": "Cursor",
+        "outcome": null,
+        "tabCount": 1,
+        "lastUrl": "https://intranet.example.test/secret-path?q=1"
+      },
+      "legacy": true,
+      "session": {
+        "id": "session_1789873200000",
+        "task": "SAMPLE_TASK_TEXT_a91f",
+        "lastTask": "SAMPLE_TASK_TEXT_a91f follow-up request",
+        "status": "completed",
+        "startTime": 1789873200000,
+        "endTime": 1789873260000,
+        "tabId": 202,
+        "tabIds": [202],
+        "tabCount": 1,
+        "taskRunId": "session_1789873200000",
+        "actionHistory": [
+          {
+            "tool": "navigate",
+            "params": {
+              "url": "https://intranet.example.test/secret-path?q=1"
+            },
+            "result": {
+              "success": true
+            },
+            "timestamp": 1789873201000,
+            "logicalTab": "primary"
+          },
+          {
+            "tool": "get_text",
+            "params": {
+              "selector": "#balance-due"
+            },
+            "result": {
+              "text": "SAMPLE_PAGE_TEXT_7c1d balance due on the statement"
+            },
+            "timestamp": 1789873205000,
+            "logicalTab": "primary"
+          },
+          {
+            "tool": "goBack",
+            "params": {},
+            "result": {
+              "note": "completed",
+              "success": true
+            },
+            "timestamp": 1789873210000,
+            "logicalTab": "primary"
+          }
+        ],
+        "iterationCount": 3,
+        "lastUrl": "https://intranet.example.test/secret-path?q=1",
+        "mode": "mcp-agent",
+        "mcpClient": "Cursor",
+        "outcome": null,
+        "outcomeDetails": null
+      },
+      "events": []
+    },
+    {
+      "indexEntry": {
+        "id": "session_1789745400000",
+        "task": "navigate",
+        "taskSource": "tool",
+        "startTime": 1789745400000,
+        "endTime": 1789745700000,
+        "status": "completed",
+        "actionCount": 3,
+        "eventCount": 4,
+        "domSnapshotCount": 0,
+        "mode": "mcp-agent",
+        "mcpClient": "Claude",
+        "taskRunId": "session_1789745400000",
+        "recordingRunId": "rec_fx_b2c3d4e5",
+        "agentId": "agent_fx_claude_b2",
+        "tabIds": [102],
+        "tabCount": 1,
+        "storageBackend": "journal-v2",
+        "schemaVersion": 2,
+        "recordingState": "healthy",
+        "degradedReason": null,
+        "replayTrusted": true,
+        "replayIntegrity": null,
+        "replayProvenance": "capture",
+        "replayableCount": 3,
+        "replayBlockedCount": 0,
+        "outcome": "timeout",
+        "outcomeDetails": null,
+        "result": null,
+        "completionMessage": null,
+        "error": null,
+        "blocker": null,
+        "nextStep": null,
+        "journalGap": false
+      },
+      "legacy": false,
+      "session": {
+        "id": "session_1789745400000",
+        "task": "navigate",
+        "taskSource": "tool",
+        "startTime": 1789745400000,
+        "endTime": 1789745700000,
+        "status": "completed",
+        "actionCount": 3,
+        "eventCount": 4,
+        "domSnapshotCount": 0,
+        "mode": "mcp-agent",
+        "mcpClient": "Claude",
+        "taskRunId": "session_1789745400000",
+        "recordingRunId": "rec_fx_b2c3d4e5",
+        "agentId": "agent_fx_claude_b2",
+        "tabIds": [102],
+        "tabCount": 1,
+        "storageBackend": "journal-v2",
+        "schemaVersion": 2,
+        "recordingState": "healthy",
+        "degradedReason": null,
+        "replayTrusted": true,
+        "replayIntegrity": null,
+        "replayProvenance": "capture",
+        "replayableCount": 3,
+        "replayBlockedCount": 0,
+        "outcome": "timeout",
+        "outcomeDetails": null,
+        "result": null,
+        "completionMessage": null,
+        "error": null,
+        "blocker": null,
+        "nextStep": null,
+        "journalGap": false
+      },
+      "events": [
+        {
+          "schemaVersion": 2,
+          "eventId": "evt_fx_b_0",
+          "runId": "session_1789745400000",
+          "sequence": 0,
+          "kind": "recording.start",
+          "timestamp": "2026-09-18T15:30:00.000Z",
+          "callId": null,
+          "metadata": {
+            "agentId": "agent_fx_claude_b2",
+            "client": "Claude"
+          },
+          "byteCost": 180
+        },
+        {
+          "schemaVersion": 2,
+          "eventId": "evt_fx_b_1",
+          "runId": "session_1789745400000",
+          "sequence": 1,
+          "kind": "tool.call",
+          "timestamp": "2026-09-18T15:30:00.500Z",
+          "callId": "call_fx_b_1",
+          "metadata": {
+            "schemaVersion": 2,
+            "agentId": "agent_fx_claude_b2",
+            "recordingRunId": "rec_fx_b2c3d4e5",
+            "callId": "call_fx_b_1",
+            "tool": "navigate",
+            "route": "message",
+            "client": "Claude",
+            "taskSource": "tool",
+            "resultProjection": null,
+            "success": true,
+            "tabId": 102,
+            "logicalTab": "primary",
+            "request": {
+              "storage": "inline",
+              "inline": {
+                "url": "https://intranet.example.test/secret-path?q=1"
+              },
+              "sha256": "fx-sha-b1-req",
+              "byteLength": 53,
+              "preview": "{\"url\":\"https://intranet.example.test/secret-path?q=1\"}"
+            },
+            "result": {
+              "storage": "inline",
+              "inline": {
+                "success": true,
+                "title": "SAMPLE_PAGE_TEXT_7c1d account overview"
+              },
+              "sha256": "fx-sha-b1-res",
+              "byteLength": 67,
+              "preview": "{\"success\":true,\"title\":\"SAMPLE_PAGE_TEXT_7c1d account overview\"}"
+            },
+            "replayContext": {
+              "logicalTab": "primary"
+            },
+            "redactedInputs": false,
+            "targetRedacted": false,
+            "lateAfterClose": false
+          },
+          "byteCost": 610
+        },
+        {
+          "schemaVersion": 2,
+          "eventId": "evt_fx_b_2",
+          "runId": "session_1789745400000",
+          "sequence": 2,
+          "kind": "tool.call",
+          "timestamp": "2026-09-18T15:30:08.500Z",
+          "callId": "call_fx_b_2",
+          "metadata": {
+            "schemaVersion": 2,
+            "agentId": "agent_fx_claude_b2",
+            "recordingRunId": "rec_fx_b2c3d4e5",
+            "callId": "call_fx_b_2",
+            "tool": "mcp:read-page",
+            "route": "message",
+            "client": "Claude",
+            "taskSource": "tool",
+            "resultProjection": null,
+            "success": true,
+            "tabId": 102,
+            "logicalTab": "primary",
+            "request": {
+              "storage": "omitted",
+              "sha256": "fx-sha-b2-req",
+              "byteLength": 90000,
+              "preview": "{\"full\":true,\"selector\":\"#ledger-table\"}",
+              "reason": "budget"
+            },
+            "result": {
+              "storage": "inline",
+              "inline": "SAMPLE_PAGE_TEXT_7c1d plain text result for the ledger",
+              "sha256": "fx-sha-b2-res",
+              "byteLength": 56,
+              "preview": "\"SAMPLE_PAGE_TEXT_7c1d plain text result for the ledger\""
+            },
+            "replayContext": {
+              "logicalTab": "primary"
+            },
+            "redactedInputs": false,
+            "targetRedacted": false,
+            "lateAfterClose": false
+          },
+          "byteCost": 590
+        },
+        {
+          "schemaVersion": 2,
+          "eventId": "evt_fx_b_3",
+          "runId": "session_1789745400000",
+          "sequence": 3,
+          "kind": "tool.call",
+          "timestamp": "2026-09-18T15:30:20.500Z",
+          "callId": "call_fx_b_3",
+          "metadata": {
+            "schemaVersion": 2,
+            "agentId": "agent_fx_claude_b2",
+            "recordingRunId": "rec_fx_b2c3d4e5",
+            "callId": "call_fx_b_3",
+            "tool": "click",
+            "route": "message",
+            "client": "Claude",
+            "taskSource": "tool",
+            "resultProjection": null,
+            "success": true,
+            "tabId": 102,
+            "logicalTab": "primary",
+            "request": {
+              "storage": "inline",
+              "inline": {
+                "selector": "#next-page"
+              },
+              "sha256": "fx-sha-b3-req",
+              "byteLength": 25,
+              "preview": "{\"selector\":\"#next-page\"}"
+            },
+            "result": {
+              "storage": "inline",
+              "inline": {
+                "success": true
+              },
+              "sha256": "fx-sha-b3-res",
+              "byteLength": 16,
+              "preview": "{\"success\":true}"
+            },
+            "replayContext": {
+              "logicalTab": "primary"
+            },
+            "redactedInputs": false,
+            "targetRedacted": false,
+            "lateAfterClose": false
+          },
+          "byteCost": 560
+        }
+      ]
+    },
+    {
+      "indexEntry": {
+        "id": "session_1789639200000",
+        "task": "SAMPLE_TASK_TEXT_a91f",
+        "taskSource": "visual",
+        "startTime": 1789639200000,
+        "endTime": 1789639500000,
+        "status": "completed",
+        "actionCount": 4,
+        "eventCount": 5,
+        "domSnapshotCount": 0,
+        "mode": "mcp-agent",
+        "mcpClient": "Claude",
+        "taskRunId": "session_1789639200000",
+        "recordingRunId": "rec_fx_a1b2c3d4",
+        "agentId": "agent_fx_claude_a1",
+        "tabIds": [101],
+        "tabCount": 1,
+        "storageBackend": "journal-v2",
+        "schemaVersion": 2,
+        "recordingState": "healthy",
+        "degradedReason": null,
+        "replayTrusted": true,
+        "replayIntegrity": null,
+        "replayProvenance": "capture",
+        "replayableCount": 4,
+        "replayBlockedCount": 0,
+        "outcome": "completed",
+        "outcomeDetails": null,
+        "result": "SAMPLE_RESULT_TEXT_5b20",
+        "completionMessage": null,
+        "error": null,
+        "blocker": null,
+        "nextStep": null,
+        "journalGap": false
+      },
+      "legacy": false,
+      "session": {
+        "id": "session_1789639200000",
+        "task": "SAMPLE_TASK_TEXT_a91f",
+        "taskSource": "visual",
+        "startTime": 1789639200000,
+        "endTime": 1789639500000,
+        "status": "completed",
+        "actionCount": 4,
+        "eventCount": 5,
+        "domSnapshotCount": 0,
+        "mode": "mcp-agent",
+        "mcpClient": "Claude",
+        "taskRunId": "session_1789639200000",
+        "recordingRunId": "rec_fx_a1b2c3d4",
+        "agentId": "agent_fx_claude_a1",
+        "tabIds": [101],
+        "tabCount": 1,
+        "storageBackend": "journal-v2",
+        "schemaVersion": 2,
+        "recordingState": "healthy",
+        "degradedReason": null,
+        "replayTrusted": true,
+        "replayIntegrity": null,
+        "replayProvenance": "capture",
+        "replayableCount": 4,
+        "replayBlockedCount": 0,
+        "outcome": "completed",
+        "outcomeDetails": null,
+        "result": "SAMPLE_RESULT_TEXT_5b20",
+        "completionMessage": null,
+        "error": null,
+        "blocker": null,
+        "nextStep": null,
+        "journalGap": false
+      },
+      "events": [
+        {
+          "schemaVersion": 2,
+          "eventId": "evt_fx_a_0",
+          "runId": "session_1789639200000",
+          "sequence": 0,
+          "kind": "recording.start",
+          "timestamp": "2026-09-17T10:00:00.000Z",
+          "callId": null,
+          "metadata": {
+            "agentId": "agent_fx_claude_a1",
+            "client": "Claude"
+          },
+          "byteCost": 180
+        },
+        {
+          "schemaVersion": 2,
+          "eventId": "evt_fx_a_1",
+          "runId": "session_1789639200000",
+          "sequence": 1,
+          "kind": "tool.call",
+          "timestamp": "2026-09-17T10:00:01.000Z",
+          "callId": "call_fx_a_1",
+          "metadata": {
+            "schemaVersion": 2,
+            "agentId": "agent_fx_claude_a1",
+            "recordingRunId": "rec_fx_a1b2c3d4",
+            "callId": "call_fx_a_1",
+            "tool": "mcp:read-page",
+            "route": "message",
+            "client": "Claude",
+            "taskSource": "visual",
+            "resultProjection": null,
+            "success": true,
+            "tabId": 101,
+            "logicalTab": "primary",
+            "request": {
+              "storage": "inline",
+              "inline": {
+                "full": false,
+                "tabId": 101
+              },
+              "sha256": "fx-sha-a1-req",
+              "byteLength": 26,
+              "preview": "{\"full\":false,\"tabId\":101}"
+            },
+            "result": {
+              "storage": "inline",
+              "inline": {
+                "status": "completed",
+                "text": "SAMPLE_PAGE_TEXT_7c1d quarterly summary for the account",
+                "url": "https://intranet.example.test/secret-path?q=1"
+              },
+              "sha256": "fx-sha-a1-res",
+              "byteLength": 140,
+              "preview": "{\"status\":\"completed\",\"text\":\"SAMPLE_PAGE_TEXT_7c1d quarterly summary for the account\",\"url\":\"https://intranet.example.test/secret-path?q=1\"}"
+            },
+            "replayContext": {
+              "logicalTab": "primary"
+            },
+            "redactedInputs": false,
+            "targetRedacted": false,
+            "lateAfterClose": false
+          },
+          "byteCost": 660
+        },
+        {
+          "schemaVersion": 2,
+          "eventId": "evt_fx_a_3",
+          "runId": "session_1789639200000",
+          "sequence": 3,
+          "kind": "tool.call",
+          "timestamp": "2026-09-17T10:00:21.000Z",
+          "callId": "call_fx_a_3",
+          "metadata": {
+            "schemaVersion": 2,
+            "agentId": "agent_fx_claude_a1",
+            "recordingRunId": "rec_fx_a1b2c3d4",
+            "callId": "call_fx_a_3",
+            "tool": "type_text",
+            "route": "message",
+            "client": "Claude",
+            "taskSource": "visual",
+            "resultProjection": null,
+            "success": true,
+            "tabId": 101,
+            "logicalTab": "primary",
+            "request": {
+              "storage": "inline",
+              "inline": {
+                "selector": "#order-note",
+                "text": "SAMPLE_PAGE_TEXT_7c1d"
+              },
+              "sha256": "fx-sha-a3-req",
+              "byteLength": 54,
+              "preview": "{\"selector\":\"#order-note\",\"text\":\"SAMPLE_PAGE_TEXT_7c1d\"}"
+            },
+            "result": {
+              "storage": "inline",
+              "inline": {
+                "nextTool": "mcp:read-page",
+                "success": true
+              },
+              "sha256": "fx-sha-a3-res",
+              "byteLength": 42,
+              "preview": "{\"nextTool\":\"mcp:read-page\",\"success\":true}"
+            },
+            "replayContext": {
+              "logicalTab": "primary"
+            },
+            "redactedInputs": false,
+            "targetRedacted": false,
+            "lateAfterClose": false
+          },
+          "byteCost": 620
+        },
+        {
+          "schemaVersion": 2,
+          "eventId": "evt_fx_a_2",
+          "runId": "session_1789639200000",
+          "sequence": 2,
+          "kind": "tool.call",
+          "timestamp": "2026-09-17T10:00:10.000Z",
+          "callId": "call_fx_a_2",
+          "metadata": {
+            "schemaVersion": 2,
+            "agentId": "agent_fx_claude_a1",
+            "recordingRunId": "rec_fx_a1b2c3d4",
+            "callId": "call_fx_a_2",
+            "tool": "click",
+            "route": "message",
+            "client": "Claude",
+            "taskSource": "visual",
+            "resultProjection": null,
+            "success": true,
+            "tabId": 101,
+            "logicalTab": "primary",
+            "request": {
+              "storage": "inline",
+              "inline": {
+                "selector": "#submit-order"
+              },
+              "sha256": "fx-sha-a2-req",
+              "byteLength": 28,
+              "preview": "{\"selector\":\"#submit-order\"}"
+            },
+            "result": {
+              "storage": "artifact",
+              "artifactId": "fx-sha-a2-res",
+              "sha256": "fx-sha-a2-res",
+              "byteLength": 70000,
+              "storedBytes": 9000,
+              "encoding": "gzip",
+              "preview": "{\"message\":\"SAMPLE_PREVIEW_TEXT_3e5b\",\"success\":true,\"text\":\"Order confirmation page whose long body the journal cut off at the preview lim"
+            },
+            "replayContext": {
+              "logicalTab": "primary"
+            },
+            "redactedInputs": false,
+            "targetRedacted": false,
+            "lateAfterClose": false
+          },
+          "byteCost": 700
+        },
+        {
+          "schemaVersion": 2,
+          "eventId": "evt_fx_a_4",
+          "runId": "session_1789639200000",
+          "sequence": 4,
+          "kind": "tool.call",
+          "timestamp": "2026-09-17T10:00:26.000Z",
+          "callId": "call_fx_a_4",
+          "metadata": {
+            "schemaVersion": 2,
+            "agentId": "agent_fx_claude_a1",
+            "recordingRunId": "rec_fx_a1b2c3d4",
+            "callId": "call_fx_a_4",
+            "tool": "mcp:read-page",
+            "route": "message",
+            "client": "Claude",
+            "taskSource": "visual",
+            "resultProjection": null,
+            "success": true,
+            "tabId": 101,
+            "logicalTab": "primary",
+            "request": {
+              "storage": "inline",
+              "inline": {
+                "full": true,
+                "tabId": 101
+              },
+              "sha256": "fx-sha-a4-req",
+              "byteLength": 25,
+              "preview": "{\"full\":true,\"tabId\":101}"
+            },
+            "result": {
+              "storage": "inline",
+              "inline": {
+                "text": "SAMPLE_PAGE_TEXT_7c1d second read of the confirmation page"
+              },
+              "sha256": "fx-sha-a4-res",
+              "byteLength": 70,
+              "preview": "{\"text\":\"SAMPLE_PAGE_TEXT_7c1d second read of the confirmation page\"}"
+            },
+            "replayContext": {
+              "logicalTab": "primary"
+            },
+            "redactedInputs": false,
+            "targetRedacted": false,
+            "lateAfterClose": false
+          },
+          "byteCost": 640
+        }
+      ]
+    }
+  ]
+}

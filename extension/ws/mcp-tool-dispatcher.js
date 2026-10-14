@@ -159,6 +159,8 @@ const MCP_PHASE199_MESSAGE_ROUTES = {
 // caller from spoofing the resolved tab/origin metadata and keeps it out of
 // the bridge response JSON.
 const MCP_REPLAY_RECORD_CONTEXT = Symbol('fsb-mcp-replay-record-context');
+// Ingress stamp { receivedAt } from the bridge client (Phase 66, D-04): the same registry symbol under this file's own name.
+const MCP_DISPATCHER_CALL_TIMING = Symbol.for('fsb.mcp.call-timing');
 
 const MCP_VISUAL_SESSION_TASK_STATUS_TOOLS = new Set([
   'report_progress',
@@ -637,6 +639,36 @@ function canonicalizeVisualSessionTaskParams(tool, params, payload) {
   };
 }
 
+// Phase 66 (MEAS-01, D-04): per-call timing on the dispatcher's own recording
+// paths. The stamp is read only from the symbol property, so a caller-supplied
+// string key named timing is never trusted. Date.now() only.
+function readDispatcherCallStamp(payload) {
+  try {
+    if (!payload || typeof payload !== 'object') return null;
+    const stamp = payload[MCP_DISPATCHER_CALL_TIMING];
+    if (!stamp || typeof stamp !== 'object') return null;
+    const receivedAt = stamp.receivedAt;
+    if (!Number.isSafeInteger(receivedAt) || receivedAt < 0) return null;
+    return { receivedAt };
+  } catch (_error) {
+    return null;
+  }
+}
+
+// Completion is taken synchronously at the recorder call site. No stamp, or a
+// wall clock that stepped backwards, gives null: never an invented 0.
+function buildDispatcherCallTiming(stamp) {
+  try {
+    const receivedAt = stamp ? stamp.receivedAt : null;
+    if (!Number.isSafeInteger(receivedAt) || receivedAt < 0) return null;
+    const completedAt = Date.now();
+    if (!Number.isSafeInteger(completedAt) || completedAt < receivedAt) return null;
+    return { v: 1, receivedAt, completedAt, fsbMs: completedAt - receivedAt };
+  } catch (_error) {
+    return null;
+  }
+}
+
 async function dispatchMcpToolRoute({ tool, params = {}, client = null, tab = null, payload = {} }) {
   const route = MCP_PHASE199_TOOL_ROUTES[tool];
   if (!route) {
@@ -647,6 +679,9 @@ async function dispatchMcpToolRoute({ tool, params = {}, client = null, tab = nu
     return createMcpRouteError(tool, route.routeFamily, MCP_ROUTE_RECOVERY_HINT);
   }
 
+  // Canonicalization may hand back a spread copy of the payload, which drops
+  // the symbol stamp, so the timing stamp is read from the original first.
+  const callTimingStamp = readDispatcherCallStamp(payload);
   const canonicalized = canonicalizeVisualSessionTaskParams(tool, params, payload);
   if (canonicalized.error) return canonicalized.error;
   params = canonicalized.params;
@@ -720,7 +755,7 @@ async function dispatchMcpToolRoute({ tool, params = {}, client = null, tab = nu
         globalThis.fsbMcpSessionRecorder &&
         typeof globalThis.fsbMcpSessionRecorder.recordTaskOutcome === 'function'
       ) {
-        globalThis.fsbMcpSessionRecorder.recordTaskOutcome({ tool, params, payload, response });
+        globalThis.fsbMcpSessionRecorder.recordTaskOutcome({ tool, params, payload, response, timing: buildDispatcherCallTiming(callTimingStamp) });
       }
     } catch (_e) { /* never let task-memory recording break dispatch */ }
     // NOTE (260707-7id review fix): the session-recorder sibling hook that
@@ -848,7 +883,8 @@ async function dispatchMcpMessageRoute({ type, payload = {}, client = null, mcpM
               : false,
             replayContext: payload && payload[MCP_REPLAY_RECORD_CONTEXT]
               ? Object.assign({}, payload[MCP_REPLAY_RECORD_CONTEXT], { routeFamily: route.routeFamily })
-              : Object.assign({}, readRouteInspection.recordContext || {}, { routeFamily: route.routeFamily })
+              : Object.assign({}, readRouteInspection.recordContext || {}, { routeFamily: route.routeFamily }),
+            timing: buildDispatcherCallTiming(readDispatcherCallStamp(payload))
           };
           var spreadsheetRedactor = globalThis.FsbSpreadsheetRecordRedaction;
           var spreadsheetInvoke = type === 'mcp:capabilities-invoke'
@@ -2184,7 +2220,10 @@ function sanitizeActionHistoryEntry(action) {
     result: {
       success: Boolean(result.success),
       ...(result.error ? { error: boundedString(result.error, 500) } : {})
-    }
+    },
+    // Phase 66 (D-05): only measured values; an unmeasured call has no key.
+    ...(Number.isFinite(action?.durationMs) && action.durationMs >= 0 ? { durationMs: action.durationMs } : {}),
+    ...(validProjectionTiming(action?.timing) ? { timing: validProjectionTiming(action.timing) } : {})
   };
 }
 
@@ -2215,7 +2254,410 @@ function sanitizeSessionDetail(session) {
   if (Array.isArray(session.toolCallLog)) {
     sanitized.toolCallLog = session.toolCallLog.slice(-200);
   }
+  // Phase 66 (MEAS-01; D-05, D-10, D-12): stored measurement fields leave only
+  // through the explicit block below. The generic sanitizer drops every
+  // /token/i key and flattens deep objects, so it would mangle them.
+  delete sanitized.iterationTiming;
+  delete sanitized.measurementSummary;
+  sanitized.measurement = session.mode === 'mcp-agent'
+    ? buildMcpMeasurementFromLegacy(session)
+    : buildAutopilotMeasurement(session);
+  withLegacyCostBasis(sanitized, session);
   return sanitized;
+}
+
+// ---- Phase 66 (MEAS-01/MEAS-02; D-03, D-06..D-08, D-12) -----------------------
+//
+// Journal-backed MCP sessions for get_session_detail. Journal tool.call events
+// hold full request and result payloads, so they never leave as-is: each one
+// becomes a pseudo-action fed through sanitizeActionHistoryEntry, then gains
+// its sequence, route, logical tab and validated call timing. Paging is
+// internal and bounded; the tool gains no parameters (MCP-04).
+const JOURNAL_DETAIL_MAX_PAGES = 20;
+const JOURNAL_DETAIL_PAGE_LIMIT = 500;
+const JOURNAL_DETAIL_ROW_LIMIT = 100;
+
+// Only an inline descriptor contributes, and only when it holds a plain
+// object. Artifact and omitted descriptors contribute nothing.
+function projectJournalDescriptorObject(descriptor) {
+  if (!descriptor || typeof descriptor !== 'object' || descriptor.storage !== 'inline') return {};
+  const inline = descriptor.inline;
+  return inline && typeof inline === 'object' && !Array.isArray(inline) ? inline : {};
+}
+
+// The v1 call-timing contract: safe non-negative integer times, completedAt
+// at or after receivedAt, fsbMs recomputed. Returns a fresh object or null.
+function validProjectionTiming(value) {
+  try {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    if (value.v !== 1) return null;
+    const receivedAt = value.receivedAt;
+    const completedAt = value.completedAt;
+    if (!Number.isSafeInteger(receivedAt) || receivedAt < 0) return null;
+    if (!Number.isSafeInteger(completedAt) || completedAt < receivedAt) return null;
+    return { v: 1, receivedAt, completedAt, fsbMs: completedAt - receivedAt };
+  } catch (_error) {
+    return null;
+  }
+}
+
+function projectJournalToolCall(event) {
+  const metadata = event && event.metadata && typeof event.metadata === 'object' ? event.metadata : {};
+  const request = projectJournalDescriptorObject(metadata.request);
+  const requestParams = request.params && typeof request.params === 'object' && !Array.isArray(request.params)
+    ? request.params
+    : {};
+  const result = projectJournalDescriptorObject(metadata.result);
+  const row = sanitizeActionHistoryEntry({
+    tool: typeof metadata.tool === 'string' ? metadata.tool.slice(0, 100) : '',
+    timestamp: Date.parse(event && event.timestamp),
+    iteration: null,
+    params: requestParams,
+    // A result kept as an artifact (or omitted) has no inline object, so the
+    // journal's own success flag stands in for it.
+    result: {
+      success: typeof result.success === 'boolean' ? result.success : metadata.success !== false,
+      error: result.error
+    }
+  });
+  row.sequence = event && Number.isSafeInteger(event.sequence) ? event.sequence : null;
+  row.route = typeof metadata.route === 'string' ? metadata.route.slice(0, 40) : null;
+  row.logicalTab = typeof metadata.logicalTab === 'string' ? metadata.logicalTab.slice(0, 40) : null;
+  const timing = validProjectionTiming(metadata.timing);
+  if (timing) {
+    row.timing = timing;
+    row.durationMs = timing.fsbMs;
+  }
+  return row;
+}
+
+// Running per-call statistics, shared by the journal and legacy MCP paths so
+// both report the same measures. Caller gap = receivedAt(n) - completedAt(n-1)
+// and call interval = receivedAt(n) - receivedAt(n-1), both over consecutive
+// timed calls in sequence order. An untimed call breaks the chain; a negative
+// gap counts as overlapped and a negative interval is left out.
+function createMcpCallStats() {
+  return {
+    calls: 0,
+    callsWithTiming: 0,
+    fsbValues: [],
+    gapValues: [],
+    intervalValues: [],
+    overlapped: 0,
+    firstReceivedAt: null,
+    lastCompletedAt: null,
+    previousTiming: null,
+    pagesRead: 0,
+    truncated: false
+  };
+}
+
+function addMcpCallToStats(stats, timing) {
+  stats.calls += 1;
+  if (timing) {
+    stats.callsWithTiming += 1;
+    stats.fsbValues.push(timing.fsbMs);
+    if (stats.firstReceivedAt === null || timing.receivedAt < stats.firstReceivedAt) {
+      stats.firstReceivedAt = timing.receivedAt;
+    }
+    if (stats.lastCompletedAt === null || timing.completedAt > stats.lastCompletedAt) {
+      stats.lastCompletedAt = timing.completedAt;
+    }
+    const previous = stats.previousTiming;
+    if (previous) {
+      const gap = timing.receivedAt - previous.completedAt;
+      if (gap >= 0) stats.gapValues.push(gap);
+      else stats.overlapped += 1;
+      const interval = timing.receivedAt - previous.receivedAt;
+      if (interval >= 0) stats.intervalValues.push(interval);
+    }
+  }
+  stats.previousTiming = timing || null;
+}
+
+// Linear interpolation between order statistics, the same rule as the bench
+// report's quantile (scripts/bench/lib/stats.mjs).
+function measurementQuantile(sorted, q) {
+  if (!sorted.length) return null;
+  const h = (sorted.length - 1) * q;
+  const lo = Math.floor(h);
+  return sorted[lo] + (h - lo) * (sorted[Math.ceil(h)] - sorted[lo]);
+}
+
+// Total, median and p90 over the finite values; all null (count 0) when there
+// are none, so "no data" never reads as a measured zero.
+function summarizeMeasurementValues(values) {
+  const finite = (Array.isArray(values) ? values : [])
+    .filter((value) => typeof value === 'number' && Number.isFinite(value));
+  if (!finite.length) return { total: null, median: null, p90: null, count: 0 };
+  const sorted = finite.slice().sort((a, b) => a - b);
+  let total = 0;
+  for (const value of sorted) total += value;
+  return {
+    total,
+    median: measurementQuantile(sorted, 0.5),
+    p90: measurementQuantile(sorted, 0.9),
+    count: sorted.length
+  };
+}
+
+function readMcpEndReason(session) {
+  const details = session && session.outcomeDetails;
+  const reason = details && typeof details === 'object' ? details.reason : null;
+  return typeof reason === 'string' && reason ? reason.slice(0, 64) : null;
+}
+
+// The MCP measurement block (v1). It is attached after the generic sanitizer,
+// so it is never passed through the key filter. activeSpanMs spans the timed
+// calls only, never the session end minus its start, so an idle-timeout tail
+// is never counted (D-06). Queue wait and the host's own model time, tokens
+// and cost are not visible to FSB and are labelled, never 0 (D-03, D-12).
+function buildMcpMeasurementFromStats(stats, sessionMeta, source) {
+  const fsb = summarizeMeasurementValues(stats.fsbValues);
+  const gaps = summarizeMeasurementValues(stats.gapValues);
+  const intervals = summarizeMeasurementValues(stats.intervalValues);
+  const endReason = readMcpEndReason(sessionMeta);
+  const hasSpan = Number.isSafeInteger(stats.firstReceivedAt) && Number.isSafeInteger(stats.lastCompletedAt) &&
+    stats.lastCompletedAt >= stats.firstReceivedAt;
+  return {
+    v: 1,
+    kind: 'mcp',
+    source: source === 'journal' ? 'journal' : 'legacy',
+    calls: stats.calls,
+    callsWithTiming: stats.callsWithTiming,
+    fsbMs: { total: fsb.total, median: fsb.median, p90: fsb.p90 },
+    callerGapMs: {
+      total: gaps.total,
+      median: gaps.median,
+      p90: gaps.p90,
+      count: gaps.count,
+      overlapped: stats.overlapped,
+      label: 'upper bound on host thinking time'
+    },
+    callIntervalMs: { median: intervals.median, p90: intervals.p90, count: intervals.count },
+    activeSpanMs: hasSpan ? stats.lastCompletedAt - stats.firstReceivedAt : null,
+    endReason,
+    idleTimeout: endReason === 'idle_timeout',
+    idleTailExcluded: true,
+    queueWaitMs: null,
+    queueWaitStatus: 'not_measured',
+    host: {
+      modelMs: null,
+      inputTokens: null,
+      outputTokens: null,
+      costUsd: null,
+      status: 'unavailable',
+      reason: 'host does not report to FSB'
+    },
+    truncated: stats.truncated === true,
+    pagesRead: stats.pagesRead
+  };
+}
+
+// Pages journal.getSessionDetail 500 events at a time, for at most
+// JOURNAL_DETAIL_MAX_PAGES pages. Statistics cover every call read; only the
+// last JOURNAL_DETAIL_ROW_LIMIT calls are projected into rows. Reading stops
+// early, with truncated true, when the bound is hit or the cursor stalls.
+async function collectJournalToolCalls(journal, sessionId) {
+  const stats = createMcpCallStats();
+  const recent = [];
+  let session = null;
+  let afterSequence = -1;
+  let more = true;
+  while (more && stats.pagesRead < JOURNAL_DETAIL_MAX_PAGES) {
+    const detail = await journal.getSessionDetail({ sessionId, afterSequence, limit: JOURNAL_DETAIL_PAGE_LIMIT });
+    if (!detail || typeof detail !== 'object') break;
+    stats.pagesRead += 1;
+    if (!session && detail.session && typeof detail.session === 'object') session = detail.session;
+    const events = Array.isArray(detail.events) ? detail.events : [];
+    for (const event of events) {
+      if (!event || typeof event !== 'object' || event.kind !== 'tool.call') continue;
+      const metadata = event.metadata && typeof event.metadata === 'object' ? event.metadata : {};
+      addMcpCallToStats(stats, validProjectionTiming(metadata.timing));
+      recent.push(event);
+      if (recent.length > JOURNAL_DETAIL_ROW_LIMIT) recent.shift();
+    }
+    more = detail.hasMore === true;
+    if (more) {
+      const next = detail.nextSequence;
+      if (!Number.isSafeInteger(next) || next <= afterSequence) break;
+      afterSequence = next;
+    }
+  }
+  if (!session) throw new Error('Journal session detail missing');
+  stats.truncated = more;
+  delete stats.previousTiming;
+  return { session, rows: recent.map(projectJournalToolCall), stats };
+}
+
+function projectJournalSessionForMcp(collected) {
+  const sanitized = sanitizeSessionMetadata(collected.session) || {};
+  sanitized.logs = [];
+  sanitized.actionHistory = collected.rows;
+  sanitized.callsTotal = collected.stats.calls;
+  sanitized.actionHistoryTruncated = collected.stats.calls > collected.rows.length;
+  sanitized.measurement = buildMcpMeasurementFromStats(collected.stats, collected.session, 'journal');
+  return sanitized;
+}
+
+// Legacy (history-store) MCP sessions: the same statistics over the timing
+// stored on their actionHistory rows. No paging applies.
+function buildMcpMeasurementFromLegacy(session) {
+  const stats = createMcpCallStats();
+  const actions = Array.isArray(session && session.actionHistory) ? session.actionHistory : [];
+  for (const action of actions) {
+    addMcpCallToStats(stats, validProjectionTiming(action && action.timing));
+  }
+  delete stats.previousTiming;
+  return buildMcpMeasurementFromStats(stats, session, 'legacy');
+}
+
+function measurementNumberOrNull(value) {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null;
+}
+
+function measurementCountOrNull(value) {
+  return Number.isSafeInteger(value) && value >= 0 ? value : null;
+}
+
+function measurementPositiveOrNull(value) {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null;
+}
+
+function measurementSourceLabel(value, allowed) {
+  return allowed.indexOf(value) !== -1 ? value : 'unavailable';
+}
+
+function measurementModelName(value) {
+  return typeof value === 'string' && value ? value.slice(0, 128) : null;
+}
+
+// Basis of the legacy totalCost (BASIS LABELS, W1/I-B). The legacy total is
+// always a price-table sum, so it is never 'provider'. With a measurement
+// summary it is 'unavailable' when the measured cost is unavailable or any
+// stored row had no price row, because the legacy total then holds the
+// unknown-model display fallback. LM Studio rows are priced by a local $0
+// rule that the legacy total never applied, so a positive legacy total next
+// to them is that same fallback and is 'unavailable' too. Otherwise
+// 'estimate', even at 0. Without a summary (pre-Phase-66 sessions) it is
+// 'estimate' only for a positive total. automation-logger.js applies the same
+// rule at save time.
+function legacyCostBasisFor(session) {
+  const source = session && typeof session === 'object' ? session : {};
+  const summary = source.measurementSummary;
+  const positiveTotal = measurementPositiveOrNull(source.totalCost) !== null;
+  if (summary && typeof summary === 'object' && !Array.isArray(summary)) {
+    const rows = Array.isArray(source.iterationTiming) ? source.iterationTiming : [];
+    const isRow = (row) => !!row && typeof row === 'object';
+    const unpriced = rows.some((row) => isRow(row) && row.pricingKey === null);
+    const localFallback = positiveTotal && rows.some((row) => isRow(row) && row.pricingKey === 'lmstudio-local');
+    return (summary.costSource === 'unavailable' || unpriced || localFallback) ? 'unavailable' : 'estimate';
+  }
+  return positiveTotal ? 'estimate' : 'unavailable';
+}
+
+// The label stored at save time wins when it is valid (I-2): index entries
+// never carry the summary, so list_sessions could not recompute the rule, and
+// both routes must agree. Anything else is recomputed.
+function resolveLegacyCostBasis(session) {
+  const stored = session && typeof session === 'object' ? session.totalCostBasis : null;
+  if (stored === 'estimate' || stored === 'unavailable') return stored;
+  return legacyCostBasisFor(session);
+}
+
+// Legacy token totals sum provider-reported usage.
+function legacyUsageBasisFor(session) {
+  const source = session && typeof session === 'object' ? session : {};
+  return measurementPositiveOrNull(source.totalInputTokens) !== null ||
+    measurementPositiveOrNull(source.totalOutputTokens) !== null ? 'provider' : 'unavailable';
+}
+
+// Adds totalCostBasis beside an existing totalCost key; changes no value.
+function withLegacyCostBasis(target, source) {
+  if (target && typeof target === 'object' && Object.prototype.hasOwnProperty.call(target, 'totalCost')) {
+    target.totalCostBasis = resolveLegacyCostBasis(source);
+  }
+  return target;
+}
+
+function projectAutopilotIterationRow(row) {
+  const usage = row.usage && typeof row.usage === 'object' ? row.usage : {};
+  return {
+    iteration: measurementCountOrNull(row.iteration),
+    startedAt: measurementNumberOrNull(row.startedAt),
+    modelMs: measurementNumberOrNull(row.modelMs),
+    modelRetried: row.modelRetried === true,
+    toolMs: measurementNumberOrNull(row.toolMs),
+    toolCount: measurementCountOrNull(row.toolCount),
+    inputTokens: measurementNumberOrNull(usage.input),
+    outputTokens: measurementNumberOrNull(usage.output),
+    reasoningTokens: measurementNumberOrNull(usage.reasoning),
+    cachedInputTokens: measurementNumberOrNull(usage.cachedInput),
+    usageSource: measurementSourceLabel(row.usageSource, ['provider', 'unavailable']),
+    costUsd: measurementNumberOrNull(row.costUsd),
+    costSource: measurementSourceLabel(row.costSource, ['provider', 'estimate', 'unavailable']),
+    servedModel: measurementModelName(row.servedModel),
+    estimateDeltaPct: typeof row.estimateDeltaPct === 'number' && Number.isFinite(row.estimateDeltaPct)
+      ? row.estimateDeltaPct
+      : null
+  };
+}
+
+// The autopilot measurement block (v1), built from the flat stored fields
+// (D-05, D-10). Stored usage.input/output/reasoning/cachedInput become the
+// *Tokens names only here, after the key filter. Model and tool median and
+// p90 cover the stored per-iteration rows (the last 100). A session saved
+// before Phase 66 reports recorded: false with every measured value null.
+function buildAutopilotMeasurement(session) {
+  const source = session && typeof session === 'object' ? session : {};
+  const rawSummary = source.measurementSummary;
+  const summary = rawSummary && typeof rawSummary === 'object' && !Array.isArray(rawSummary) && rawSummary.v === 1
+    ? rawSummary
+    : null;
+  const rows = summary && Array.isArray(source.iterationTiming)
+    ? source.iterationTiming.filter((row) => !!row && typeof row === 'object' && !Array.isArray(row)).slice(-100)
+    : [];
+  const usage = summary && summary.usage && typeof summary.usage === 'object' ? summary.usage : {};
+  const model = summarizeMeasurementValues(rows.map((row) => measurementNumberOrNull(row.modelMs)));
+  const tool = summarizeMeasurementValues(rows.map((row) => measurementNumberOrNull(row.toolMs)));
+  return {
+    v: 1,
+    kind: 'autopilot',
+    recorded: !!summary,
+    iterations: summary ? measurementCountOrNull(summary.iterations) : null,
+    modelMs: {
+      total: summary ? measurementNumberOrNull(summary.modelMsTotal) : null,
+      median: model.median,
+      p90: model.p90
+    },
+    toolMs: {
+      total: summary ? measurementNumberOrNull(summary.toolMsTotal) : null,
+      median: tool.median,
+      p90: tool.p90,
+      calls: summary ? measurementCountOrNull(summary.toolCount) : null
+    },
+    inputTokens: measurementNumberOrNull(usage.input),
+    outputTokens: measurementNumberOrNull(usage.output),
+    reasoningTokens: measurementNumberOrNull(usage.reasoning),
+    cachedInputTokens: measurementNumberOrNull(usage.cachedInput),
+    usageSource: summary ? measurementSourceLabel(summary.usageSource, ['provider', 'mixed', 'unavailable']) : 'unavailable',
+    costUsd: summary ? measurementNumberOrNull(summary.costUsd) : null,
+    costSource: summary ? measurementSourceLabel(summary.costSource, ['provider', 'estimate', 'mixed', 'unavailable']) : 'unavailable',
+    costIterations: summary ? measurementCountOrNull(summary.costIterations) : null,
+    requestedModel: summary ? measurementModelName(summary.requestedModel) : null,
+    servedModels: summary && Array.isArray(summary.servedModels)
+      ? summary.servedModels.map(measurementModelName).filter(Boolean).slice(0, 10)
+      : [],
+    perIteration: rows.map(projectAutopilotIterationRow),
+    legacyTotals: {
+      costUsd: measurementPositiveOrNull(source.totalCost),
+      costBasis: resolveLegacyCostBasis(source),
+      inputTokens: measurementPositiveOrNull(source.totalInputTokens),
+      outputTokens: measurementPositiveOrNull(source.totalOutputTokens),
+      usageBasis: legacyUsageBasisFor(source),
+      label: 'legacy price-table total; not provider-reported'
+    }
+  };
 }
 
 function sanitizeMemoryEntry(memory) {
@@ -2979,7 +3421,10 @@ async function handleListSessionsMessageRoute({ payload }) {
   const sessions = await automationLogger.listSessions();
   return {
     success: true,
+    // Phase 66 (I-2): an entry's totalCost gains the same basis label that
+    // get_session_detail returns for that session.
     sessions: (Array.isArray(sessions) ? sessions : []).slice(0, limit).map(sanitizeSessionMetadata).filter(Boolean)
+      .map((entry) => withLegacyCostBasis(entry, entry))
   };
 }
 
@@ -3008,6 +3453,46 @@ async function handleGetSessionMessageRoute({ payload }) {
   if (!payload.sessionId) {
     return createMcpInvalidParamsError('get_session_detail', 'get_session_detail requires sessionId', { routeFamily: 'observability' });
   }
+
+  // Phase 66 (MEAS-02, D-07): journal-backed MCP sessions resolve first, then
+  // the history store, then in-flight sessions. The branch is skipped when
+  // the journal module is not loaded, and a failing lookup falls through.
+  const journal = (typeof globalThis !== 'undefined') ? globalThis.FsbMcpLatticeJournal : null;
+  if (journal && typeof journal.hasSession === 'function' && typeof journal.getSessionDetail === 'function') {
+    let isJournal = false;
+    try {
+      isJournal = (await journal.hasSession(payload.sessionId)) === true;
+    } catch (_error) {
+      isJournal = false;
+    }
+    if (isJournal) {
+      if (payload.format === 'text') {
+        if (typeof journal.exportHumanReadable !== 'function') {
+          return createMcpRouteError('get_session_detail', 'observability', MCP_ROUTE_RECOVERY_HINT, {
+            error: 'Human-readable session exporter unavailable'
+          });
+        }
+        try {
+          return { success: true, format: 'text', text: await journal.exportHumanReadable(payload.sessionId) };
+        } catch (_error) {
+          return createMcpRouteError('get_session_detail', 'observability', MCP_ROUTE_RECOVERY_HINT, {
+            error: 'Journal session detail unavailable'
+          });
+        }
+      }
+      try {
+        return {
+          success: true,
+          session: projectJournalSessionForMcp(await collectJournalToolCalls(journal, payload.sessionId))
+        };
+      } catch (_error) {
+        return createMcpRouteError('get_session_detail', 'observability', MCP_ROUTE_RECOVERY_HINT, {
+          error: 'Journal session detail unavailable'
+        });
+      }
+    }
+  }
+
   if (typeof automationLogger === 'undefined' || typeof automationLogger?.loadSession !== 'function') {
     return createMcpRouteError('get_session_detail', 'observability', MCP_ROUTE_RECOVERY_HINT, { error: 'Automation logger session loader unavailable' });
   }
@@ -4091,7 +4576,10 @@ const _mcp_dispatcher_exports = {
   // client-label cache to chrome.storage.session so popup + sidepanel
   // surfaces (different contexts from the SW where _agentClientLabelCache
   // lives) can read it and render "owned by <ClientName>" in the chip.
-  FSB_AGENT_CLIENT_LABELS_KEY
+  FSB_AGENT_CLIENT_LABELS_KEY,
+  // Phase 66 call timing (test-only)
+  readDispatcherCallStamp,
+  buildDispatcherCallTiming
 };
 
 if (typeof globalThis !== 'undefined') {

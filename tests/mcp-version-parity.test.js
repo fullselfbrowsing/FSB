@@ -240,7 +240,7 @@ async function run() {
   const canonicalVersion = packageJson.version;
   const backgroundSource = readText('extension/background.js');
   const bridgeSource = readText('extension/ws/mcp-bridge-client.js');
-  const delegationUiSpec = readText('.planning/phases/61-delegation-ux-sw-eviction-persistence/61-UI-SPEC.md');
+  const delegationUiSpec = readText('.planning/milestones/v0.9.91-phases/61-delegation-ux-sw-eviction-persistence/61-UI-SPEC.md');
   const extProtocolSource = readText('mcp/src/ext-protocol.ts');
   const adapterSource = readText('mcp/src/agent-providers/adapter.ts');
   const adapterRegistrySource = readText('mcp/src/agent-providers/registry.ts');

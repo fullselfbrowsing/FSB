@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "core-mixed-invoice-lookup",
+  "version": 1,
+  "set": "core",
+  "category": "mixed",
+  "startPath": "/fixtures/invoice-lookup/index.html",
+  "instruction": "Open {startUrl}. Find the unpaid invoice with the highest amount for customer Northwind Traders, enter its invoice ID in the review form, and submit it.",
+  "timeBudgetMs": 300000,
+  "success": {
+    "all": [
+      { "kind": "request", "method": "POST", "path": "/api/invoice-lookup/select", "count": 1, "jsonEquals": { "invoiceId": "INV-1029" } },
+      { "kind": "request", "method": "POST", "path": "/api/invoice-lookup/select", "count": 1 },
+      { "kind": "finalUrl", "pathEquals": "/fixtures/invoice-lookup/index.html", "queryIncludes": { "view": "selected" } },
+      { "kind": "marker", "name": "selected-invoice", "equals": "INV-1029" }
+    ]
+  },
+  "fixtureFiles": ["_shared/bench.js", "invoice-lookup/index.html"]
+}

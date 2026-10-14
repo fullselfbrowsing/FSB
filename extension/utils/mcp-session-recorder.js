@@ -498,13 +498,20 @@
     if (!Array.isArray(history)) return [];
     return history.slice(-MCP_SESSION_ACTION_HISTORY_CAP).map(function (entry) {
       var item = (entry && typeof entry === 'object') ? entry : {};
-      return {
+      var row = {
         tool: typeof item.tool === 'string' ? item.tool : '',
         params: cloneParamsForReplay(item.params, item.result),
         result: cloneResultForReplay(item.result, item.params),
         timestamp: typeof item.timestamp === 'number' ? item.timestamp : null,
         logicalTab: typeof item.logicalTab === 'string' ? item.logicalTab : 'primary'
       };
+      // Restored rows keep a valid call timing; durationMs is re-derived.
+      var rowTiming = _sanitizeCallTiming(item.timing);
+      if (rowTiming) {
+        row.timing = rowTiming;
+        row.durationMs = rowTiming.fsbMs;
+      }
+      return row;
     });
   }
 
@@ -851,6 +858,25 @@
     }
   }
 
+  // Per-call MCP timing (Phase 66, D-04) arrives from the call site as
+  // { v, receivedAt, completedAt, fsbMs }. Keep a fresh copy only when it
+  // matches the v1 contract: safe non-negative integer times, completedAt at
+  // or after receivedAt, fsbMs recomputed. Anything else is dropped, so an
+  // unmeasured call never carries an invented duration.
+  function _sanitizeCallTiming(value) {
+    try {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+      if (value.v !== 1) return null;
+      var receivedAt = value.receivedAt;
+      var completedAt = value.completedAt;
+      if (!Number.isSafeInteger(receivedAt) || receivedAt < 0) return null;
+      if (!Number.isSafeInteger(completedAt) || completedAt < receivedAt) return null;
+      return { v: 1, receivedAt: receivedAt, completedAt: completedAt, fsbMs: completedAt - receivedAt };
+    } catch (_e) {
+      return null;
+    }
+  }
+
   function _snapshotEntry(entry) {
     var sourcePayload = (entry.requestPayload && typeof entry.requestPayload === 'object')
       ? entry.requestPayload
@@ -863,7 +889,7 @@
     var rawTargetUrl = entry.replayContext && typeof entry.replayContext.targetUrl === 'string'
       ? entry.replayContext.targetUrl
       : null;
-    return {
+    var snapshot = {
       client: entry.client,
       tool: entry.tool,
       requestPayload: sanitizedPayload,
@@ -877,6 +903,9 @@
       targetRedacted: entry.targetRedacted === true ||
         (rawTargetUrl !== null && safeContext.targetUrl !== rawTargetUrl)
     };
+    var callTiming = _sanitizeCallTiming(entry.timing);
+    if (callTiming) snapshot.timing = callTiming;
+    return snapshot;
   }
 
   function _journalUsesFullResult(entry) {
@@ -943,7 +972,7 @@
     var taskSource = hasVisualTask
       ? JOURNAL_TASK_SOURCE_VISUAL
       : (hasCapabilityTask ? JOURNAL_TASK_SOURCE_CAPABILITY : JOURNAL_TASK_SOURCE_TOOL);
-    return {
+    var snapshot = {
       agentId: typeof sourcePayload.agentId === 'string' ? sourcePayload.agentId : '',
       recordingRunId: typeof sourcePayload.recordingRunId === 'string' ? sourcePayload.recordingRunId : '',
       recordingCallId: typeof sourcePayload.recordingCallId === 'string' ? sourcePayload.recordingCallId : null,
@@ -963,6 +992,9 @@
       targetRedacted: entry.targetRedacted === true ||
         (rawTargetUrl !== null && safeContext.targetUrl !== rawTargetUrl)
     };
+    var callTiming = _sanitizeCallTiming(entry && entry.timing);
+    if (callTiming) snapshot.timing = callTiming;
+    return snapshot;
   }
 
   function _legacyCanRetainRawEntry(entry) {
@@ -1782,7 +1814,8 @@
             success: !(input.response && input.response.success === false),
             dispatcher_route: 'task-status',
             tabId: snapshot.tabId,
-            replayContext: { routeFamily: 'lifecycle' }
+            replayContext: { routeFamily: 'lifecycle' },
+            timing: input.timing
           });
           var result = await journal.recordTaskOutcome(journalEntry, outcome);
           if (result && result.candidate) {
@@ -2143,13 +2176,20 @@
       var replayParams = cloneParamsForReplay(params, entry.response);
       var replayResult = cloneResultForReplay(entry.response, params);
       var logicalTab = _registerSessionTab(session, numericTabId);
-      session.actionHistory.push({
+      var historyRow = {
         tool: storedTool,
         params: replayParams,
         result: replayResult,
         timestamp: now,
         logicalTab: logicalTab
-      });
+      };
+      // Legacy rows carry the measured call timing; unmeasured rows omit it.
+      var rowTiming = _sanitizeCallTiming(entry.timing);
+      if (rowTiming) {
+        historyRow.timing = rowTiming;
+        historyRow.durationMs = rowTiming.fsbMs;
+      }
+      session.actionHistory.push(historyRow);
       if (session.actionHistory.length > MCP_SESSION_ACTION_HISTORY_CAP) {
         session.actionHistory.splice(0, session.actionHistory.length - MCP_SESSION_ACTION_HISTORY_CAP);
       }
@@ -2346,7 +2386,8 @@
         success: input.success !== false,
         dispatcher_route: 'bridge-action',
         tabId: input.tabId,
-        replayContext: input.replayContext
+        replayContext: input.replayContext,
+        timing: input.timing
       });
     } catch (_e) { /* fire-and-forget */ }
   }

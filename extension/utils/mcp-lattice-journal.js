@@ -1227,6 +1227,9 @@
         targetRedacted: entry.targetRedacted === true,
         lateAfterClose: run.status !== 'running'
       };
+      // Optional, validated per-call timing; untimed calls add no bytes.
+      var callTiming = sanitizeCallTiming(entry.timing);
+      if (callTiming) metadata.timing = callTiming;
       var artifactRows = coalesceArtifacts([requestPrepared.artifact, resultPrepared.artifact].filter(Boolean));
       var startEvent = recordingStartEvent(run, at, run.nextSequence);
       var startRows = startEvent ? [startEvent] : [];
@@ -2016,6 +2019,50 @@
     return !!(run && run.type === 'recording');
   }
 
+  // ---- Per-call timing (Phase 66, D-03/D-04/D-09) ---------------------------
+
+  // Validates { v, receivedAt, completedAt, fsbMs } against the v1 contract:
+  // safe non-negative integer times, completedAt >= receivedAt, and fsbMs
+  // recomputed. Anything else returns null, so it is never stored or shown.
+  function sanitizeCallTiming(value) {
+    try {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+      if (value.v !== 1) return null;
+      var receivedAt = value.receivedAt;
+      var completedAt = value.completedAt;
+      if (!Number.isSafeInteger(receivedAt) || receivedAt < 0) return null;
+      if (!Number.isSafeInteger(completedAt) || completedAt < receivedAt) return null;
+      return { v: 1, receivedAt: receivedAt, completedAt: completedAt, fsbMs: completedAt - receivedAt };
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  var CALL_TIMING_LEGEND = 'Timing: fsb = extension receive to completion; ' +
+    'caller gap = receive(n) - completion(n-1), an upper bound on host thinking time; ' +
+    'MCP queue wait not measured';
+
+  // Shared call-line suffix for both text exports, so they stay byte-identical.
+  // previousCompletedAt is the prior call's completion, or null when untimed.
+  function formatCallTimingSuffix(metadata, previousCompletedAt) {
+    var timing = sanitizeCallTiming(metadata && metadata.timing);
+    if (!timing) return ' | timing not recorded';
+    var suffix = ' | fsb ' + String(timing.fsbMs) + ' ms';
+    if (typeof previousCompletedAt === 'number' && Number.isFinite(previousCompletedAt)) {
+      var gap = timing.receivedAt - previousCompletedAt;
+      suffix += gap >= 0
+        ? ' | caller gap ' + String(gap) + ' ms (upper bound)'
+        : ' | overlapped previous call';
+    }
+    return suffix;
+  }
+
+  // The completion time the next call's caller gap is measured from.
+  function callTimingCompletedAt(metadata) {
+    var timing = sanitizeCallTiming(metadata && metadata.timing);
+    return timing ? timing.completedAt : null;
+  }
+
   async function exportHumanReadable(sessionId) {
     var run = await backend().getRun(sessionId);
     if (!run || run.type !== 'recording') return 'Session not found.';
@@ -2035,11 +2082,15 @@
     if (run.replaySourceCount > 100) {
       lines.push('Executable replay: latest 100 of ' + String(run.replaySourceCount));
     }
+    lines.push(CALL_TIMING_LEGEND);
     lines.push('');
+    var previousCompletedAt = null;
     rows.forEach(function (event, index) {
       var metadata = event.metadata || {};
       lines.push((metadata.success === false ? '[FAILED] ' : '[OK] ') +
-        'Call ' + String(index + 1) + ': ' + (metadata.tool || 'unknown'));
+        'Call ' + String(index + 1) + ': ' + (metadata.tool || 'unknown') +
+        formatCallTimingSuffix(metadata, previousCompletedAt));
+      previousCompletedAt = callTimingCompletedAt(metadata);
     });
     return lines.join('\n');
   }
@@ -2132,10 +2183,13 @@
       if (run.replaySourceCount > 100) {
         lines.push('Executable replay: latest 100 of ' + String(run.replaySourceCount));
       }
+      lines.push(CALL_TIMING_LEGEND);
       lines.push('');
       await emitChunked(lines.join('\n'));
       var textAfter = -1;
       var callIndex = 0;
+      // Survives page boundaries, like callIndex, so gaps stay continuous.
+      var previousCompletedAt = null;
       while (true) {
         var textRows = await backend().getEvents(sessionId, textAfter, DETAIL_MAX_LIMIT);
         if (!textRows.length) break;
@@ -2145,7 +2199,9 @@
           var textMetadata = textRows[t].metadata || {};
           callIndex++;
           await emitChunked('\n' + (textMetadata.success === false ? '[FAILED] ' : '[OK] ') +
-            'Call ' + String(callIndex) + ': ' + (textMetadata.tool || 'unknown'));
+            'Call ' + String(callIndex) + ': ' + (textMetadata.tool || 'unknown') +
+            formatCallTimingSuffix(textMetadata, previousCompletedAt));
+          previousCompletedAt = callTimingCompletedAt(textMetadata);
         }
         if (textRows.length < DETAIL_MAX_LIMIT) break;
       }

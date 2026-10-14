@@ -486,6 +486,253 @@ async function runRecordingLeaseDoesNotGateRoutingCase() {
     'lease settlement retains FIFO ordering after non-blocking routing');
 }
 
+async function runCallTimingIngressCase() {
+  console.log('\n--- Phase 66: MCP call timing is stamped at ingress on a hidden symbol ---');
+  const timingSymbol = Symbol.for('fsb.mcp.call-timing');
+  const harness = buildClientHarness();
+  const client = harness.exports.mcpBridgeClient;
+  const routed = [];
+  const wire = [];
+  client._send = (data) => {
+    wire.push(typeof data === 'string' ? data : JSON.stringify(data));
+  };
+  // The real _routeMessage runs. Only the action handler is replaced, so the
+  // case sees the exact payload object and can echo it into the response.
+  client._handleExecuteAction = async (payload) => {
+    routed.push(payload);
+    return { echoedPayload: payload, echoedKeys: Object.keys(payload) };
+  };
+
+  const startedAt = Date.now();
+  await client._handleMessage(JSON.stringify({
+    id: 'timing-ingress-message',
+    type: 'mcp:execute-action',
+    payload: { tool: 'click', params: {} }
+  }));
+  const finishedAt = Date.now();
+
+  assertEqual(routed.length, 1, 'execute-action reaches the action handler once');
+  const payload = routed[0] || {};
+  const stamp = payload[timingSymbol];
+  assert(Boolean(stamp) && Number.isFinite(stamp.receivedAt),
+    'the routed payload carries a finite receivedAt under Symbol.for(fsb.mcp.call-timing)');
+  assert(Boolean(stamp) && stamp.receivedAt >= startedAt && stamp.receivedAt <= finishedAt,
+    'receivedAt is a Date.now() taken while the message is handled');
+  const descriptor = Object.getOwnPropertyDescriptor(payload, timingSymbol) || {};
+  assertEqual(descriptor.enumerable, false, 'the timing stamp is non-enumerable');
+  assertDeepEqual(Object.keys(payload), ['tool', 'params'], 'Object.keys(payload) does not show the stamp');
+  assertEqual(JSON.stringify(payload), JSON.stringify({ tool: 'click', params: {} }),
+    'JSON.stringify(payload) does not show the stamp');
+  assertEqual(wire.length, 1, 'exactly one result frame is sent');
+  const frame = wire[0] || '';
+  assert(frame.includes('"type":"mcp:result"') && frame.includes('"tool":"click"'),
+    'the result frame echoes the routed payload back to the caller');
+  for (const needle of ['receivedAt', 'completedAt', 'fsbMs', 'call-timing']) {
+    assert(!frame.includes(needle), `the result JSON handed to the wire never contains ${needle}`);
+  }
+
+  // The durable call lease identity stays exactly the seven existing keys.
+  const identities = [];
+  harness.context.fsbMcpSessionRecorder = {
+    async beginCall(identity) { identities.push(toPlainObject(identity)); },
+    async endCall(identity) { identities.push(toPlainObject(identity)); }
+  };
+  await client._handleMessage(JSON.stringify({
+    id: 'timing-ingress-leased',
+    type: 'mcp:execute-action',
+    payload: {
+      agentId: 'agent-timing-ingress',
+      recordingRunId: 'recording-run-timing-ingress',
+      recordingCallId: 'recording-call-timing-ingress',
+      tool: 'click',
+      params: {}
+    }
+  }));
+  assertEqual(identities.length, 2, 'the leased call begins and ends once');
+  assertDeepEqual(Object.keys(identities[0] || {}).sort(),
+    ['agentId', 'client', 'recordingCallId', 'recordingRunId', 'task', 'taskSource', 'tool'],
+    'timing is never added to the beginCall identity');
+  assertDeepEqual(identities[0], identities[1], 'begin and end identities still match exactly');
+  assert(routed.length === 2 && Boolean(routed[1][timingSymbol]),
+    'a leased call is stamped the same way as an unleased one');
+
+  // A message without a payload object routes unchanged and gets no stamp.
+  const bare = [];
+  client._routeMessage = async (type, routedPayload) => {
+    bare.push({ type, symbols: Object.getOwnPropertySymbols(routedPayload).length });
+    return { routed: true };
+  };
+  await client._handleMessage(JSON.stringify({ id: 'timing-ingress-bare', type: 'mcp:get-status' }));
+  assertDeepEqual(bare, [{ type: 'mcp:get-status', symbols: 0 }],
+    'a payload-free message routes with no stamp');
+  assertEqual(wire.length, 3, 'the payload-free message still produces its result frame');
+}
+
+async function runCallTimingActionTapCase() {
+  console.log('\n--- Phase 66: the bridge action tap records validated call timing ---');
+  const timingSymbol = Symbol.for('fsb.mcp.call-timing');
+  const harness = buildClientHarness();
+  const client = harness.exports.mcpBridgeClient;
+  const entries = [];
+  harness.context.fsbMcpSessionRecorder = {
+    recordAction(entry) { entries.push(entry); }
+  };
+  const resolvedTarget = {
+    targetOriginResolved: true,
+    targetUrl: 'https://example.test/page',
+    targetOrigin: 'https://example.test'
+  };
+  const stampPayload = (payload, stamp) => {
+    Object.defineProperty(payload, timingSymbol, { value: stamp, enumerable: false, configurable: true });
+    return payload;
+  };
+
+  const receivedAt = Date.now() - 40;
+  client._recordMcpSessionAction(
+    stampPayload({ tool: 'click', params: { selector: '#go' } }, { receivedAt }),
+    { success: true },
+    7,
+    resolvedTarget
+  );
+  const recordedBy = Date.now();
+  assertEqual(entries.length, 1, 'the stamped action is recorded once');
+  const timing = (entries[0] && entries[0].timing) || {};
+  assertDeepEqual(Object.keys(timing), ['v', 'receivedAt', 'completedAt', 'fsbMs'],
+    'timing carries exactly v, receivedAt, completedAt and fsbMs');
+  assertEqual(timing.v, 1, 'timing.v is 1');
+  assertEqual(timing.receivedAt, receivedAt, 'timing.receivedAt comes from the ingress stamp');
+  assert(timing.completedAt >= timing.receivedAt && timing.completedAt <= recordedBy,
+    'completedAt is taken synchronously at the recording call site');
+  assert(timing.fsbMs >= 40, `fsbMs covers the 40 ms since receipt (got ${timing.fsbMs})`);
+  assertEqual(timing.fsbMs, timing.completedAt - timing.receivedAt, 'fsbMs equals completedAt - receivedAt');
+
+  client._recordMcpSessionAction({ tool: 'click', params: {} }, { success: true }, 7, resolvedTarget);
+  assertEqual(entries.length, 2, 'the unstamped action is recorded once');
+  assert(entries[1] && entries[1].timing === null, 'an unstamped payload records timing null, never 0');
+
+  for (const [label, stamp] of [
+    ['negative receivedAt', { receivedAt: -5 }],
+    ['string receivedAt', { receivedAt: String(receivedAt) }],
+    ['fractional receivedAt', { receivedAt: receivedAt + 0.5 }],
+    ['missing receivedAt', {}],
+    ['receivedAt after completion (clock stepped back)', { receivedAt: Date.now() + 60_000 }]
+  ]) {
+    client._recordMcpSessionAction(stampPayload({ tool: 'click', params: {} }, stamp), { success: true }, 7, resolvedTarget);
+    const last = entries[entries.length - 1];
+    assert(last && last.timing === null, `a stamp with ${label} records timing null`);
+  }
+
+  // Spoofing: a caller-supplied string key "timing" is inert. The recorded
+  // timing always comes from the hidden stamp set at ingress.
+  client._handleExecuteAction = async (payload) => {
+    client._recordMcpSessionAction(payload, { success: true }, 7, resolvedTarget);
+    return { success: true };
+  };
+  client._send = () => {};
+  const spoofStartedAt = Date.now();
+  await client._handleMessage(JSON.stringify({
+    id: 'timing-spoof-message',
+    type: 'mcp:execute-action',
+    payload: { tool: 'click', params: {}, timing: { v: 1, receivedAt: 1, completedAt: 2, fsbMs: 1 } }
+  }));
+  const spoofed = entries[entries.length - 1] || {};
+  const spoofedTiming = spoofed.timing || {};
+  assert(spoofedTiming.receivedAt >= spoofStartedAt,
+    `a JSON key named timing never overrides the hidden stamp (receivedAt ${spoofedTiming.receivedAt})`);
+  assert(spoofedTiming.completedAt >= spoofedTiming.receivedAt && spoofedTiming.fsbMs >= 0,
+    'the spoof-proof timing is internally consistent');
+}
+
+async function runGetConfigIdentityCase() {
+  console.log('\n--- Phase 66: fsb://config returns only the allowlisted run identity ---');
+  const expectedMeasurement = { callTiming: 1, sessionDetailJournal: 1 };
+  const harness = buildClientHarness();
+  const client = harness.exports.mcpBridgeClient;
+  await harness.chrome.storage.local.set({
+    providerKind: 'api',
+    modelProvider: 'xai',
+    modelName: ' grok-4.3 ',
+    maxIterations: 50,
+    apiKey: 'xai-SECRET-1',
+    geminiApiKey: 'g-SECRET-2',
+    customEndpoint: 'https://secret.example.test'
+  });
+  harness.chrome.runtime.getManifest = () => ({ version: '0.9.91' });
+  const localArea = harness.chrome.storage.local;
+  const originalGet = localArea.get;
+  const requestedKeys = [];
+  localArea.get = async (keys) => {
+    requestedKeys.push(toPlainObject(keys));
+    return originalGet.call(localArea, keys);
+  };
+
+  const expected = {
+    config: { providerKind: 'api', modelProvider: 'xai', modelName: 'grok-4.3', maxIterations: 50 },
+    extension: { id: 'dispatch-test-extension', version: '0.9.91', measurement: expectedMeasurement }
+  };
+  const identity = await client._handleGetConfig();
+  assertDeepEqual(identity, expected, '_handleGetConfig returns the allowlisted identity and the Phase 66 marker');
+  const serialized = JSON.stringify(identity);
+  assert(!serialized.includes('SECRET'), 'no secret-bearing storage value is returned');
+  assert(!serialized.includes('secret.example'), 'the custom endpoint value is never returned');
+  assertDeepEqual(requestedKeys,
+    [['providerKind', 'modelProvider', 'modelName', 'maxIterations', 'domOptimization', 'maxDOMElements']],
+    'storage is read with exactly the six allowlisted keys');
+
+  const wire = [];
+  client._send = (data) => {
+    wire.push(typeof data === 'string' ? data : JSON.stringify(data));
+  };
+  await client._handleMessage(JSON.stringify({ id: 'config-identity-message', type: 'mcp:get-config', payload: {} }));
+  assertEqual(wire.length, 1, 'mcp:get-config produces one result frame');
+  const frame = JSON.parse(wire[0] || '{}');
+  assertDeepEqual(frame.payload, { success: true, ...expected },
+    'the mcp:get-config route carries the same identity on the wire');
+  assert(!String(wire[0]).includes('SECRET') && !String(wire[0]).includes('secret.example'),
+    'the wire frame carries no secret-bearing value');
+
+  const bare = buildClientHarness();
+  assertDeepEqual(await bare.exports.mcpBridgeClient._handleGetConfig(), {
+    config: { providerKind: 'api', modelProvider: 'xai', modelName: '' },
+    extension: { id: 'dispatch-test-extension', version: null, measurement: expectedMeasurement }
+  }, 'empty storage and no getManifest fall back to the provider defaults and a null version');
+
+  const typed = buildClientHarness();
+  await typed.chrome.storage.local.set({
+    providerKind: 7,
+    modelProvider: null,
+    modelName: 42,
+    maxIterations: '50',
+    domOptimization: 'yes',
+    maxDOMElements: Infinity
+  });
+  typed.chrome.runtime.getManifest = () => { throw new Error('manifest unavailable'); };
+  assertDeepEqual(await typed.exports.mcpBridgeClient._handleGetConfig(), {
+    config: { providerKind: 'api', modelProvider: 'xai', modelName: '' },
+    extension: { id: 'dispatch-test-extension', version: null, measurement: expectedMeasurement }
+  }, 'mistyped values fall back or are omitted, and a throwing getManifest yields a null version');
+
+  const optional = buildClientHarness();
+  await optional.chrome.storage.local.set({
+    providerKind: 'agent',
+    modelProvider: 'anthropic',
+    modelName: 'claude-test',
+    domOptimization: false,
+    maxDOMElements: 2000
+  });
+  optional.chrome.runtime.getManifest = () => ({ version: 91 });
+  assertDeepEqual(await optional.exports.mcpBridgeClient._handleGetConfig(), {
+    config: {
+      providerKind: 'agent',
+      modelProvider: 'anthropic',
+      modelName: 'claude-test',
+      domOptimization: false,
+      maxDOMElements: 2000
+    },
+    extension: { id: 'dispatch-test-extension', version: null, measurement: expectedMeasurement }
+  }, 'boolean and finite optional settings are kept, and a non-string manifest version is null');
+}
+
 async function runListCredentialsSecretStripCase() {
   console.log('\n--- A5: mcp:list-credentials end-to-end strips secrets (MCP-01) ---');
 
@@ -3618,6 +3865,9 @@ async function run() {
   await runSendMessageFallbackCase();
   await runRecordingLeaseLifecycleCase();
   await runRecordingLeaseDoesNotGateRoutingCase();
+  await runCallTimingIngressCase();
+  await runCallTimingActionTapCase();
+  await runGetConfigIdentityCase();
   await runListCredentialsSecretStripCase();
   await runAgentActionDeprecationCase();
   await runDriftSettlementCases();

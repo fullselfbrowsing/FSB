@@ -60,6 +60,9 @@ const DELEGATION_HEARTBEAT_NONCE_MAX_LENGTH = 64;
 const DELEGATION_HEARTBEAT_NONCE_PATTERN = /^[A-Za-z0-9_-]+$/;
 const MCP_DELEGATION_ID_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
 const MCP_DISPATCHER_SYNTHETIC_CHANGE_REPORT_TOOLS = new Set(['open_tab', 'close_tab']);
+// In-process-only call timing stamp (D-04). JSON and structuredClone drop
+// Symbol keys, so the stamp never reaches a response or storage.
+const MCP_BRIDGE_CALL_TIMING = Symbol.for('fsb.mcp.call-timing');
 // Toolbar icon classes keyed by message type. Read-only tools never reach
 // mcp:execute-action -- they have their own routes and carry no tool name, so
 // the route itself is what identifies them as reading.
@@ -1350,6 +1353,18 @@ class MCPBridgeClient {
     const { id, type, payload } = msg;
     if (!id || !type) return;
 
+    // Stamp the moment this call entered the extension. The action tap reads
+    // it back to compute FSB-side execution time for the session record.
+    if (payload && typeof payload === 'object') {
+      try {
+        Object.defineProperty(payload, MCP_BRIDGE_CALL_TIMING, {
+          value: { receivedAt: Date.now() },
+          enumerable: false,
+          configurable: true
+        });
+      } catch (_error) { /* timing capture never gates routing */ }
+    }
+
     const recorder = (typeof globalThis !== 'undefined') ? globalThis.fsbMcpSessionRecorder : null;
     const recordingIdentity = payload && typeof payload.agentId === 'string' &&
       typeof payload.recordingRunId === 'string' && typeof payload.recordingCallId === 'string'
@@ -1944,6 +1959,23 @@ class MCPBridgeClient {
     } catch (_error) { /* unsupported-route inspection never changes the wire error */ }
   }
 
+  // Builds the recorder's call timing from the hidden ingress stamp only.
+  // completedAt is taken here, synchronously, when the action has finished;
+  // a missing or malformed stamp yields null rather than an invented zero.
+  _buildMcpCallTiming(payload) {
+    try {
+      const stamp = payload && payload[MCP_BRIDGE_CALL_TIMING];
+      const receivedAt = stamp ? stamp.receivedAt : null;
+      if (!Number.isSafeInteger(receivedAt) || receivedAt < 0) return null;
+      const completedAt = Date.now();
+      // A wall clock that stepped backwards has no measurable duration.
+      if (!Number.isSafeInteger(completedAt) || completedAt < receivedAt) return null;
+      return { v: 1, receivedAt, completedAt, fsbMs: completedAt - receivedAt };
+    } catch (_error) {
+      return null;
+    }
+  }
+
   _recordMcpSessionAction(payload, response, resolvedTabId, targetContext) {
     try {
       if (typeof globalThis === 'undefined' ||
@@ -1980,7 +2012,8 @@ class MCPBridgeClient {
         requireTargetOrigin: true,
         targetOriginResolved: targetContext && targetContext.targetOriginResolved === true,
         spreadsheetTarget: targetContext && targetContext.spreadsheetTarget === true,
-        replayContext
+        replayContext,
+        timing: this._buildMcpCallTiming(payload)
       };
       const spreadsheetRedactor = globalThis.FsbSpreadsheetRecordRedaction;
       const spreadsheetTool = sessionRecordEntry.spreadsheetTarget === true ||
@@ -2968,11 +3001,40 @@ class MCPBridgeClient {
   }
 
   async _handleGetConfig() {
-    const config = await chrome.storage.local.get([
-      'selectedModel', 'selectedProvider', 'defaultModel',
-      'maxIterations', 'domOptimization', 'maxDOMElements',
-    ]);
-    return { config };
+    // fsb://config run identity (D-18): an explicit allowlist of non-secret
+    // settings plus the loaded build. No other stored setting is ever read.
+    // Defaults match fsbReadAuthoritativeProviderConfig in background.js.
+    const stored = (await chrome.storage.local.get([
+      'providerKind', 'modelProvider', 'modelName',
+      'maxIterations', 'domOptimization', 'maxDOMElements'
+    ])) || {};
+    const config = {
+      providerKind: typeof stored.providerKind === 'string' ? stored.providerKind : 'api',
+      modelProvider: typeof stored.modelProvider === 'string' ? stored.modelProvider : 'xai',
+      modelName: typeof stored.modelName === 'string' ? stored.modelName.trim() : ''
+    };
+    if (Number.isFinite(stored.maxIterations)) config.maxIterations = stored.maxIterations;
+    if (typeof stored.domOptimization === 'boolean') config.domOptimization = stored.domOptimization;
+    if (Number.isFinite(stored.maxDOMElements)) config.maxDOMElements = stored.maxDOMElements;
+    const runtime = (chrome && chrome.runtime) || null;
+    let version = null;
+    try {
+      if (runtime && typeof runtime.getManifest === 'function') {
+        const manifest = runtime.getManifest();
+        version = manifest && typeof manifest.version === 'string' ? manifest.version : null;
+      }
+    } catch (_error) {
+      version = null;
+    }
+    return {
+      config,
+      extension: {
+        id: (runtime && runtime.id) || null,
+        version,
+        // Marks a build that carries the Phase 66 measurement changes.
+        measurement: { callTiming: 1, sessionDetailJournal: 1 }
+      }
+    };
   }
 
   async _handleGetSiteGuides(payload) {

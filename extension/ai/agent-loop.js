@@ -155,6 +155,13 @@ var _al_normalizeProviderBaseUrl = (typeof normalizeProviderBaseUrl !== 'undefin
 // Phase 156-158 module references
 var _al_estimateCost = (typeof estimateCost !== 'undefined') ? estimateCost : (_al_costTracker?.estimateCost || function() { return 0; });
 var _al_CostTracker = (typeof CostTracker !== 'undefined') ? CostTracker : (_al_costTracker?.CostTracker || null);
+// Phase 66 measurement helpers (cost-tracker.js). A missing helper resolves to
+// null so the measurement block is skipped; nothing falls back to a stub 0.
+var _al_readProviderUsage = (typeof readProviderUsage !== 'undefined') ? readProviderUsage : (_al_costTracker?.readProviderUsage || null);
+var _al_estimateCostDetailed = (typeof estimateCostDetailed !== 'undefined') ? estimateCostDetailed : (_al_costTracker?.estimateCostDetailed || null);
+var _al_buildIterationTimingRow = (typeof buildIterationTimingRow !== 'undefined') ? buildIterationTimingRow : (_al_costTracker?.buildIterationTimingRow || null);
+var _al_appendIterationTiming = (typeof appendIterationTiming !== 'undefined') ? appendIterationTiming : (_al_costTracker?.appendIterationTiming || null);
+var _al_addIterationToolTime = (typeof addIterationToolTime !== 'undefined') ? addIterationToolTime : (_al_costTracker?.addIterationToolTime || null);
 var _al_TranscriptStore = (typeof TranscriptStore !== 'undefined') ? TranscriptStore : (_al_transcriptStore?.TranscriptStore || null);
 var _al_estimateTokens = (typeof estimateTokens !== 'undefined') ? estimateTokens : (_al_transcriptStore?.estimateTokens || function() { return 0; });
 var _al_HookPipeline = (typeof HookPipeline !== 'undefined') ? HookPipeline : (_al_hookPipeline?.HookPipeline || null);
@@ -1934,6 +1941,8 @@ async function runAgentIteration(sessionId, options) {
     // DIAG: Log API call start/end to automationLogger so MCP get_logs can surface
     // agent loop lifecycle (console.log only goes to DevTools, invisible to MCP).
     var apiCallStartTime = Date.now();
+    var _timingModelRetried = false;
+    var _timingModelMs = null;
     if (typeof automationLogger !== 'undefined') {
       automationLogger.debug('Agent iteration API call starting', {
         sessionId: sessionId, iteration: iterNum,
@@ -1961,6 +1970,7 @@ async function runAgentIteration(sessionId, options) {
           ? _al_ScreenshotAttachments.classifyImageRejection(imageRequestError)
           : null;
         if (!imageFallbackCode) throw imageRequestError;
+        _timingModelRetried = true;
 
         // Retry exactly once, text-only, only for a likely image/shape/size
         // rejection. Authentication, rate limits, network, and server errors
@@ -1977,6 +1987,7 @@ async function runAgentIteration(sessionId, options) {
         );
         pendingScreenshotAttachments = [];
       }
+      _timingModelMs = Date.now() - apiCallStartTime;
       if (pendingScreenshotAttachments.length > 0
           && _al_ScreenshotAttachments
           && typeof _al_ScreenshotAttachments.markDelivered === 'function') {
@@ -2028,6 +2039,28 @@ async function runAgentIteration(sessionId, options) {
       session.totalCost = session.agentState.totalCost;
     }
     session.iterationCount = iterNum;
+
+    // h1a. Phase 66 (MEAS-01): one measurement row per iteration with model time,
+    // provider-first usage and labelled cost. Additive only: the legacy numbers
+    // above keep their meaning and nothing here changes what the loop decides.
+    // Appended before the end_turn check, so every path (terminal tools too)
+    // records its row.
+    var _timingRow = null;
+    if (_al_readProviderUsage && _al_estimateCostDetailed && _al_buildIterationTimingRow && _al_appendIterationTiming) {
+      try {
+        var _timingUsage = _al_readProviderUsage(response, providerKey);
+        _timingRow = _al_appendIterationTiming(session, _al_buildIterationTimingRow({
+          iteration: iterNum,
+          startedAt: apiCallStartTime,
+          modelMs: _timingModelMs,
+          modelRetried: _timingModelRetried,
+          usage: _timingUsage,
+          estimate: _al_estimateCostDetailed(model, _timingUsage, providerKey),
+          requestedModel: model,
+          provider: providerKey
+        }), 100);
+      } catch (_timingErr) { /* measurement is diagnostic-only */ }
+    }
 
     // h1b. Track usage in BackgroundAnalytics (control panel dashboard).
     //
@@ -2291,6 +2324,10 @@ async function runAgentIteration(sessionId, options) {
           continue; // Skip to next tool
         }
       }
+
+      // Phase 66 (MEAS-01): tool time runs from here (the permission hook let the
+      // call through) to the success push into the action history below.
+      var _timingToolStartedAt = Date.now();
 
       // Phase 9 FINT-14 -- mark in-flight tool dispatch boundary. Adapter resume() maps
       // this marker to ResumePolicy 'ON_ERROR_SW_EVICTION_MID_TOOL_DISPATCH'. Marker set
@@ -2795,12 +2832,18 @@ async function runAgentIteration(sessionId, options) {
         } catch (_e) { /* swallow - recorder is fire-and-forget */ }
       }
 
+      // Phase 66 (MEAS-01): executed-tool time, measured up to this push. A wall
+      // clock that stepped back leaves it unmeasured (null), never negative.
+      var _timingToolMs = Date.now() - _timingToolStartedAt;
+      if (!(_timingToolMs >= 0)) _timingToolMs = null;
+
       // ADOPT-04: Use ActionHistory instance or fallback to raw array
       if (session._actionHistory) {
         session._actionHistory.push({
           tool: call.name, params: call.args,
           result: { success: result.success, hadEffect: result.hadEffect, error: result.error || null },
-          timestamp: Date.now(), iteration: iterNum
+          timestamp: Date.now(), iteration: iterNum,
+          durationMs: _timingToolMs
         });
         session.actionHistory = session._actionHistory.events; // backward compat sync
       } else {
@@ -2808,8 +2851,15 @@ async function runAgentIteration(sessionId, options) {
         session.actionHistory.push(_al_createActionEvent({
           tool: call.name, params: call.args,
           result: { success: result.success, hadEffect: result.hadEffect, error: result.error || null },
-          timestamp: Date.now(), iteration: iterNum
+          timestamp: Date.now(), iteration: iterNum,
+          durationMs: _timingToolMs
         }));
+      }
+
+      if (_al_addIterationToolTime && _timingRow) {
+        try {
+          _al_addIterationToolTime(session, _timingRow, _timingToolMs);
+        } catch (_timingErr) { /* measurement is diagnostic-only */ }
       }
 
       // Emit afterToolExecution hook

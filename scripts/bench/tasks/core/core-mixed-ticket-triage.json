@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "core-mixed-ticket-triage",
+  "version": 1,
+  "set": "core",
+  "category": "mixed",
+  "startPath": "/fixtures/ticket-triage/index.html",
+  "instruction": "Open {startUrl}. Find the open ticket labelled billing that was reported by Dana, change its status to In Progress, and save it.",
+  "timeBudgetMs": 300000,
+  "success": {
+    "all": [
+      { "kind": "request", "method": "POST", "path": "/api/ticket-triage/update", "count": 1, "jsonEquals": { "ticketId": "OPS-226", "status": "In Progress" } },
+      { "kind": "request", "method": "POST", "path": "/api/ticket-triage/update", "count": 1 },
+      { "kind": "finalUrl", "pathEquals": "/fixtures/ticket-triage/index.html", "queryIncludes": { "view": "saved", "ticket": "OPS-226" } },
+      { "kind": "marker", "name": "ticket-status", "equals": "OPS-226:In Progress" }
+    ]
+  },
+  "fixtureFiles": ["_shared/bench.js", "ticket-triage/index.html"]
+}

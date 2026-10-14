@@ -7,6 +7,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const util = require('util');
 const vm = require('vm');
 
 const LOGGER_PATH = path.resolve(__dirname, '..', 'extension', 'utils', 'automation-logger.js');
@@ -103,6 +104,45 @@ function actionRecord(sessionId, marker) {
     success: true
   };
 }
+
+// Phase 66 (plan 66-04) fixtures: v1 iterationTiming rows and measurementSummary.
+function timingRow(iteration, overrides) {
+  return Object.assign({
+    v: 1, iteration, startedAt: 1790726400000 + iteration * 1000, modelMs: 2000 + iteration,
+    modelRetried: false, toolMs: 400 + iteration, toolCount: 1,
+    usage: { input: 12000, output: 350, reasoning: 420, cachedInput: 8000 },
+    usageSource: 'provider', costUsd: 0.008525, costSource: 'provider',
+    estimateUsd: 0.016925, estimateDeltaPct: 0.9853, pricingKey: 'grok-4.3',
+    requestedModel: 'grok-4.3', servedModel: 'grok-4.3', provider: 'xai'
+  }, overrides || {});
+}
+
+function measurementSummary(overrides) {
+  return Object.assign({
+    v: 1, iterations: 2, modelMsTotal: 4003, toolMsTotal: 803, toolCount: 2,
+    usage: { input: 24000, output: 700, reasoning: 840, cachedInput: 16000 },
+    usageIterations: 2, usageSource: 'provider', costUsd: 0.01705, costIterations: 2,
+    costSource: 'provider', requestedModel: 'grok-4.3', servedModels: ['grok-4.3']
+  }, overrides || {});
+}
+
+function sameJson(actual, expected) {
+  return util.isDeepStrictEqual(clone(actual), clone(expected));
+}
+
+function hasOwn(object, key) {
+  return !!object && Object.prototype.hasOwnProperty.call(object, key);
+}
+
+// Index fields written before Phase 66 (automation-logger.js indexEntry literal).
+const PRE_PHASE66_INDEX_FIELDS = [
+  'id', 'task', 'startTime', 'endTime', 'status', 'actionCount', 'domSnapshotCount',
+  'mode', 'mcpClient', 'taskRunId', 'tabIds', 'tabCount', 'totalCost', 'outcome',
+  'outcomeDetails', 'result', 'completionMessage', 'error', 'blocker', 'nextStep',
+  'conversationId', 'uiSurface', 'historySessionId', 'commandCount', 'commands',
+  'lastTask', 'lastCommandAt', 'replayIntegrity', 'replayProvenance', 'replayableCount',
+  'replayBlockedCount'
+];
 
 (async function main() {
   console.log('--- AutomationLogger concurrent save serialization ---');
@@ -590,6 +630,331 @@ function actionRecord(sessionId, marker) {
       'concurrent persistence preserves fresh MCP logs');
     check(storage.store.automationLogs.some((log) => log.data?.sessionId === 'autopilot'),
       'concurrent persistence preserves Autopilot logs');
+  }
+
+  // ---------------------------------------------------------------------------
+  // Phase 66 (plan 66-04): measurement persistence, save-time cost basis (I-2)
+  // and timing lines in the autopilot text export
+  // ---------------------------------------------------------------------------
+
+  console.log('\n--- AutomationLogger Phase 66: new-session save persists measurement fields ---');
+  {
+    const storage = makeStorage({ fsbSessionLogs: {}, fsbSessionIndex: [] }, 0);
+    const logger = loadLogger(storage);
+    const sessionId = 'measured-new';
+    logger.logSessionStart(sessionId, 'Measured autopilot session', 21);
+    const timedClick = action('click');
+    timedClick.durationMs = 412;
+    const untimedType = action('type_text');
+    const rows = [timingRow(1), timingRow(2)];
+    const summary = measurementSummary();
+    const saved = await logger.saveSession(sessionId, {
+      task: 'Measured autopilot session', mode: 'autopilot', startTime: Date.now(),
+      status: 'completed', totalCost: 0.12, actionHistory: [timedClick, untimedType],
+      iterationTiming: rows, measurementSummary: summary
+    });
+    const full = storage.store.fsbSessionLogs[sessionId];
+    const indexed = storage.store.fsbSessionIndex.find((entry) => entry.id === sessionId);
+    check(saved === true, 'measured autopilot session saves successfully');
+    check(full.actionHistory[0].durationMs === 412, 'an executed action keeps its measured durationMs');
+    check(hasOwn(full.actionHistory[1], 'durationMs') && full.actionHistory[1].durationMs === null,
+      'an action without a measurement persists durationMs null, never 0');
+    check(!hasOwn(full.actionHistory[0], 'timing'), 'autopilot action rows carry no MCP timing key');
+    check(full.actionHistory[0].logicalTab === 'primary' && full.actionHistory[0].tool === 'click',
+      'existing action-row fields are unchanged');
+    check(sameJson(full.iterationTiming, rows), 'iterationTiming persists deep-equal to the session rows');
+    check(sameJson(full.measurementSummary, summary), 'measurementSummary persists deep-equal to the session summary');
+    check(full.totalCost === 0.12 && full.totalInputTokens === 0 && full.totalOutputTokens === 0,
+      'legacy totals keep their existing values and defaults (D-02)');
+    check(full.totalCostBasis === 'estimate' && indexed.totalCostBasis === full.totalCostBasis,
+      'record and index carry the same save-time totalCostBasis');
+    check(!hasOwn(indexed, 'iterationTiming') && !hasOwn(indexed, 'measurementSummary'),
+      'index entry stays lean: no iterationTiming or measurementSummary');
+    check(indexed.totalCost === 0.12 && indexed.status === 'completed' && indexed.mode === 'autopilot' &&
+          indexed.actionCount === 2 && indexed.taskRunId === sessionId,
+      'existing index fields keep their values');
+  }
+
+  console.log('\n--- AutomationLogger Phase 66: index entry gains exactly one field ---');
+  {
+    const storage = makeStorage({ fsbSessionLogs: {}, fsbSessionIndex: [] }, 0);
+    const logger = loadLogger(storage);
+    logger.logSessionStart('plain-session', 'Plain session', 22);
+    logger.logSessionStart('rich-session', 'Rich session', 23);
+    await logger.saveSession('plain-session', {
+      task: 'Plain session', mode: 'autopilot', startTime: Date.now(),
+      status: 'completed', actionHistory: [action('click')]
+    });
+    await logger.saveSession('rich-session', {
+      task: 'Rich session', mode: 'autopilot', startTime: Date.now(), status: 'completed',
+      actionHistory: [action('click')], iterationTiming: [timingRow(1)], measurementSummary: measurementSummary()
+    });
+    const plainKeys = Object.keys(storage.store.fsbSessionIndex.find((entry) => entry.id === 'plain-session')).sort();
+    const richKeys = Object.keys(storage.store.fsbSessionIndex.find((entry) => entry.id === 'rich-session')).sort();
+    check(JSON.stringify(plainKeys) === JSON.stringify(richKeys),
+      'measurement data adds nothing to the index beyond the always-present basis');
+    check(richKeys.filter((key) => !PRE_PHASE66_INDEX_FIELDS.includes(key)).join(',') === 'totalCostBasis',
+      'the only new index field is totalCostBasis');
+    check(PRE_PHASE66_INDEX_FIELDS.every((key) => richKeys.includes(key)),
+      'every pre-Phase-66 index field is still written');
+  }
+
+  console.log('\n--- AutomationLogger Phase 66: existing-session saves replace or keep measurement fields ---');
+  {
+    const storage = makeStorage({ fsbSessionLogs: {}, fsbSessionIndex: [] }, 0);
+    const logger = loadLogger(storage);
+    const sessionId = 'measured-existing';
+    logger.logSessionStart(sessionId, 'Measured existing session', 24);
+    await logger.saveSession(sessionId, {
+      task: 'Measured existing session', mode: 'autopilot', startTime: Date.now(), status: 'running',
+      actionHistory: [action('click')], iterationTiming: [timingRow(1)],
+      measurementSummary: measurementSummary({ iterations: 1 })
+    });
+    const rows3 = [timingRow(1), timingRow(2), timingRow(3)];
+    const summary3 = measurementSummary({ iterations: 3, modelMsTotal: 6006 });
+    const timedNavigate = action('navigate');
+    timedNavigate.durationMs = 250;
+    await logger.saveSession(sessionId, {
+      task: 'Measured existing session', mode: 'autopilot', status: 'running',
+      actionHistory: [action('click'), timedNavigate], iterationTiming: rows3, measurementSummary: summary3
+    });
+    let full = storage.store.fsbSessionLogs[sessionId];
+    check(sameJson(full.iterationTiming, rows3), 'a later save with 3 rows replaces the stored iterationTiming');
+    check(sameJson(full.measurementSummary, summary3), 'a later save with a new summary replaces measurementSummary');
+    check(full.actionHistory[0].durationMs === null && full.actionHistory[1].durationMs === 250,
+      'the existing-session action projection keeps durationMs (null when unmeasured)');
+    await logger.saveSession(sessionId, {
+      task: 'Measured existing session', mode: 'autopilot', status: 'completed',
+      actionHistory: [action('click'), timedNavigate]
+    });
+    full = storage.store.fsbSessionLogs[sessionId];
+    check(sameJson(full.iterationTiming, rows3), 'a save without iterationTiming keeps the stored rows');
+    check(sameJson(full.measurementSummary, summary3), 'a save without measurementSummary keeps the stored summary');
+    check(full.status === 'completed', 'the later save still updates status');
+  }
+
+  console.log('\n--- AutomationLogger Phase 66: iterationTiming cap and row filter ---');
+  {
+    const storage = makeStorage({ fsbSessionLogs: {}, fsbSessionIndex: [] }, 0);
+    const logger = loadLogger(storage);
+    const rows = [];
+    for (let i = 1; i <= 150; i++) rows.push(timingRow(i));
+    logger.logSessionStart('capped-timing', 'Capped timing', 26);
+    await logger.saveSession('capped-timing', {
+      task: 'Capped timing', mode: 'autopilot', startTime: Date.now(), status: 'completed',
+      actionHistory: [action('click')], iterationTiming: rows, measurementSummary: measurementSummary({ iterations: 150 })
+    });
+    const persisted = storage.store.fsbSessionLogs['capped-timing'].iterationTiming;
+    check(Array.isArray(persisted) && persisted.length === 100, 'a 150-row iterationTiming persists 100 rows');
+    check(Array.isArray(persisted) && persisted.length === 100 && persisted[0].iteration === 51 && persisted[99].iteration === 150,
+      'the last 100 rows are kept');
+
+    logger.logSessionStart('filtered-timing', 'Filtered timing', 27);
+    await logger.saveSession('filtered-timing', {
+      task: 'Filtered timing', mode: 'autopilot', startTime: Date.now(), status: 'completed',
+      actionHistory: [action('click')], iterationTiming: [null, 'corrupt', timingRow(1), [1, 2], timingRow(2)],
+      measurementSummary: ['not', 'a', 'summary']
+    });
+    const filtered = storage.store.fsbSessionLogs['filtered-timing'];
+    check(sameJson(filtered.iterationTiming, [timingRow(1), timingRow(2)]), 'only plain-object rows persist');
+    check(!hasOwn(filtered, 'measurementSummary'), 'a non-object measurementSummary is not persisted');
+  }
+
+  console.log('\n--- AutomationLogger Phase 66: legacy MCP call timing survives both save branches ---');
+  {
+    const storage = makeStorage({ fsbSessionLogs: {}, fsbSessionIndex: [] }, 0);
+    const logger = loadLogger(storage);
+    const sessionId = 'legacy-mcp-timing';
+    logger.logSessionStart(sessionId, 'Legacy MCP timing', 25);
+    const timed = action('click');
+    timed.timing = { v: 1, receivedAt: 1000, completedAt: 1400, fsbMs: 400 };
+    timed.durationMs = 400;
+    const invalid = action('read_page');
+    invalid.timing = { v: 1, receivedAt: 2000, completedAt: 1500, fsbMs: 500 };
+    const wrongFsb = action('scroll');
+    wrongFsb.timing = { v: 1, receivedAt: 3000, completedAt: 3250, fsbMs: 9999 };
+    wrongFsb.durationMs = 250;
+    const otherVersion = action('type_text');
+    otherVersion.timing = { v: 2, receivedAt: 1, completedAt: 2, fsbMs: 1 };
+    otherVersion.durationMs = -5;
+    const history = [timed, invalid, wrongFsb, otherVersion];
+    await logger.saveSession(sessionId, {
+      task: 'Legacy MCP timing', mode: 'mcp-agent', mcpClient: 'Claude', startTime: Date.now(),
+      status: 'running', actionHistory: history
+    });
+    const checkRows = (label) => {
+      const rows = storage.store.fsbSessionLogs[sessionId].actionHistory;
+      check(sameJson(rows[0].timing, { v: 1, receivedAt: 1000, completedAt: 1400, fsbMs: 400 }) && rows[0].durationMs === 400,
+        label + ': valid timing and durationMs persist');
+      check(!hasOwn(rows[1], 'timing') && rows[1].durationMs === null,
+        label + ': invalid timing (completedAt < receivedAt) persists no timing key and durationMs null');
+      check(rows[2].timing && rows[2].timing.fsbMs === 250 && rows[2].durationMs === 250,
+        label + ': fsbMs is recomputed from receivedAt and completedAt');
+      check(!hasOwn(rows[3], 'timing') && rows[3].durationMs === null,
+        label + ': a non-v1 timing and a negative durationMs are dropped');
+    };
+    checkRows('new-session branch');
+    await logger.saveSession(sessionId, {
+      task: 'Legacy MCP timing', mode: 'mcp-agent', mcpClient: 'Claude', status: 'completed', actionHistory: history
+    });
+    checkRows('existing-session branch');
+  }
+
+  console.log('\n--- AutomationLogger Phase 66: save-time totalCostBasis on record and index (I-2) ---');
+  {
+    const storage = makeStorage({ fsbSessionLogs: {}, fsbSessionIndex: [] }, 0);
+    const logger = loadLogger(storage);
+    const basisOf = (id) => ({
+      full: storage.store.fsbSessionLogs[id].totalCostBasis,
+      indexed: storage.store.fsbSessionIndex.find((entry) => entry.id === id).totalCostBasis
+    });
+    const saveBasis = async (id, data) => {
+      logger.logSessionStart(id, id, 30);
+      await logger.saveSession(id, Object.assign({
+        task: id, mode: 'autopilot', startTime: Date.now(), status: 'completed', actionHistory: [action('click')]
+      }, data));
+      return basisOf(id);
+    };
+    const unpricedRow = timingRow(2, {
+      pricingKey: null, costUsd: null, costSource: 'unavailable', estimateUsd: null, estimateDeltaPct: null,
+      requestedModel: 'totally-unknown-model'
+    });
+    const noUsageRow = timingRow(1, {
+      usage: { input: null, output: null, reasoning: null, cachedInput: null }, usageSource: 'unavailable',
+      costUsd: null, costSource: 'unavailable', estimateUsd: null, estimateDeltaPct: null
+    });
+
+    let basis = await saveBasis('basis-summary-unavailable', {
+      totalCost: 0.70, iterationTiming: [noUsageRow],
+      measurementSummary: measurementSummary({ costUsd: null, costIterations: 0, costSource: 'unavailable' })
+    });
+    check(basis.full === 'unavailable' && basis.indexed === 'unavailable',
+      'totalCost 0.70 with summary costSource unavailable -> unavailable (record and index)');
+
+    basis = await saveBasis('basis-unpriced-row', {
+      totalCost: 0.40, iterationTiming: [timingRow(1, { costSource: 'estimate' }), unpricedRow],
+      measurementSummary: measurementSummary({ costSource: 'estimate' })
+    });
+    check(basis.full === 'unavailable' && basis.indexed === 'unavailable',
+      'summary costSource estimate with a pricingKey null row -> unavailable');
+
+    basis = await saveBasis('basis-provider-priced', {
+      totalCost: 0.03, iterationTiming: [timingRow(1), timingRow(2)], measurementSummary: measurementSummary()
+    });
+    check(basis.full === 'estimate' && basis.indexed === 'estimate',
+      'summary costSource provider with priced rows -> estimate (the legacy total is a price-table sum)');
+
+    basis = await saveBasis('basis-provider-zero', {
+      totalCost: 0, iterationTiming: [timingRow(1)], measurementSummary: measurementSummary()
+    });
+    check(basis.full === 'estimate' && basis.indexed === 'estimate', 'a priced summary is estimate even when totalCost is 0');
+
+    // LM Studio rows carry the local $0 estimate, but the legacy record()
+    // call does not pass the provider, so a positive legacy total beside
+    // them was priced at the unknown-model display fallback (66-06).
+    const lmstudioRow = timingRow(1, {
+      costUsd: 0, costSource: 'estimate', estimateUsd: 0, estimateDeltaPct: null, pricingKey: 'lmstudio-local',
+      requestedModel: 'qwen2.5-7b-instruct', servedModel: 'qwen2.5-7b-instruct', provider: 'lmstudio'
+    });
+    const lmstudioSummary = measurementSummary({
+      costUsd: 0, costSource: 'estimate', requestedModel: 'qwen2.5-7b-instruct', servedModels: ['qwen2.5-7b-instruct']
+    });
+    basis = await saveBasis('basis-lmstudio-fallback', {
+      totalCost: 0.35, iterationTiming: [lmstudioRow], measurementSummary: lmstudioSummary
+    });
+    check(basis.full === 'unavailable' && basis.indexed === 'unavailable',
+      'LM Studio rows with a positive (fallback-priced) legacy total -> unavailable (record and index)');
+    basis = await saveBasis('basis-lmstudio-zero', {
+      totalCost: 0, iterationTiming: [lmstudioRow], measurementSummary: lmstudioSummary
+    });
+    check(basis.full === 'estimate' && basis.indexed === 'estimate', 'LM Studio rows with a legacy total of 0 -> estimate');
+    check(storage.store.fsbSessionLogs['basis-lmstudio-fallback'].totalCost === 0.35,
+      'the LM Studio legacy totalCost keeps its value (D-02)');
+
+    basis = await saveBasis('basis-no-summary-cost', { totalCost: 0.12 });
+    check(basis.full === 'estimate' && basis.indexed === 'estimate', 'no summary with totalCost 0.12 -> estimate');
+
+    basis = await saveBasis('basis-no-summary-zero', { totalCost: 0 });
+    check(basis.full === 'unavailable' && basis.indexed === 'unavailable', 'no summary with totalCost 0 -> unavailable');
+
+    basis = await saveBasis('basis-no-summary-missing', {});
+    check(basis.full === 'unavailable' && basis.indexed === 'unavailable', 'no summary and no totalCost -> unavailable');
+
+    const recomputeId = 'basis-recompute';
+    basis = await saveBasis(recomputeId, {
+      totalCost: 0.70, iterationTiming: [noUsageRow],
+      measurementSummary: measurementSummary({ costUsd: null, costIterations: 0, costSource: 'unavailable' })
+    });
+    check(basis.full === 'unavailable' && basis.indexed === 'unavailable', 'recompute case starts unavailable');
+    await logger.saveSession(recomputeId, {
+      task: recomputeId, mode: 'autopilot', status: 'completed', totalCost: 0.70, actionHistory: [action('click')],
+      iterationTiming: [timingRow(1), timingRow(2)], measurementSummary: measurementSummary()
+    });
+    basis = basisOf(recomputeId);
+    check(basis.full === 'estimate' && basis.indexed === 'estimate', 'a second save with a new summary recomputes both places');
+    await logger.saveSession(recomputeId, {
+      task: recomputeId, mode: 'autopilot', status: 'completed', totalCost: 0.70, actionHistory: [action('click')]
+    });
+    basis = basisOf(recomputeId);
+    check(basis.full === 'estimate' && basis.indexed === 'estimate',
+      'a save without summary fields keeps the stored summary and so the same basis');
+    check(sameJson(storage.store.fsbSessionLogs[recomputeId].measurementSummary, measurementSummary()),
+      'the kept summary is the one stored by the previous save');
+  }
+
+  console.log('\n--- AutomationLogger Phase 66: autopilot text export shows per-iteration and per-call ms ---');
+  {
+    const storage = makeStorage({ fsbSessionLogs: {}, fsbSessionIndex: [] }, 0);
+    const logger = loadLogger(storage);
+    logger.logSessionStart('export-measured', 'Export measured', 31);
+    const timedClick = action('click');
+    timedClick.durationMs = 412;
+    await logger.saveSession('export-measured', {
+      task: 'Export measured', mode: 'autopilot', startTime: Date.now(), status: 'completed',
+      actionHistory: [timedClick, action('type_text')],
+      iterationTiming: [
+        timingRow(1, { modelRetried: true }),
+        timingRow(2, { toolMs: null, toolCount: 0, costUsd: null, costSource: 'unavailable', servedModel: null, modelMs: null })
+      ],
+      measurementSummary: measurementSummary()
+    });
+    const text = await logger.exportHumanReadable('export-measured');
+    const lines = text.split('\n');
+    check(lines.some((line) => line.startsWith('Timing: model ')), 'export includes a line starting "Timing: model "');
+    check(lines.some((line) => line.startsWith('Iteration 1: model ')), 'export includes a line starting "Iteration 1: model "');
+    check(lines.some((line) => /^Call \d+: \S+ \| \d+ ms$/.test(line)), 'export includes a per-call ms line');
+    check(lines.includes('Timing: model 4003 ms over 2 iterations | tools 803 ms over 2 calls | cost $0.017050 (provider)'),
+      'the session line shows model, tool and labelled cost totals');
+    check(lines.includes('Iteration 1: model 2001 ms, retried | tools 401 ms (1 calls) | cost $0.008525 (provider) | served grok-4.3'),
+      'an iteration line shows model ms, the retry mark, tool ms, labelled cost and the served model');
+    check(lines.includes('Iteration 2: model n/a | tools none (0 calls) | cost unavailable | served unknown'),
+      'unmeasured iteration values are labelled, never shown as 0');
+    check(lines.includes('Call 1: click | 412 ms'), 'the executed call shows its measured ms');
+    check(!lines.some((line) => line.startsWith('Call 2:')), 'an unmeasured call gets no timing line');
+    check(text.indexOf('[OK] Step 1: click') !== -1 && text.indexOf('[OK] Step 1: click') < text.indexOf('Timing: model '),
+      'timing lines follow the step lines');
+
+    logger.logSessionStart('export-plain', 'Export plain', 32);
+    await logger.saveSession('export-plain', {
+      task: 'Export plain', mode: 'autopilot', startTime: Date.now(), status: 'completed', actionHistory: [action('click')]
+    });
+    const plainLines = (await logger.exportHumanReadable('export-plain')).split('\n');
+    check(plainLines.includes('Timing: not recorded for this session'), 'a session with no timing says so');
+    check(!plainLines.some((line) => line.startsWith('Call ')), 'a session with no timing has no call lines');
+
+    logger.logSessionStart('export-mcp', 'Export legacy MCP', 33);
+    const mcpRow = action('read_page');
+    mcpRow.timing = { v: 1, receivedAt: 5000, completedAt: 5400, fsbMs: 400 };
+    mcpRow.durationMs = 400;
+    await logger.saveSession('export-mcp', {
+      task: 'Export legacy MCP', mode: 'mcp-agent', mcpClient: 'Claude', startTime: Date.now(),
+      status: 'completed', actionHistory: [mcpRow]
+    });
+    const mcpLines = (await logger.exportHumanReadable('export-mcp')).split('\n');
+    check(mcpLines.includes('Call 1: read_page | 400 ms'), 'a legacy MCP session shows per-call ms');
+    check(!mcpLines.some((line) => line.startsWith('Timing: model ')) &&
+          !mcpLines.includes('Timing: not recorded for this session'),
+      'a legacy MCP session has call lines but no autopilot summary line');
   }
 
   console.log(`\n=== Results: ${passed} passed, ${failed} failed ===`);
