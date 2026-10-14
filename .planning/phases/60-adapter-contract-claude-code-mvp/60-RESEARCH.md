@@ -1,7 +1,7 @@
 # Phase 60 Research: Adapter Contract & Claude Code MVP
 
-**Researched:** 2026-07-14  
-**Scope:** Daemon-side adapter, supervision, recovery, Claude profile, normalized events, and reverse-channel harness  
+**Researched:** 2026-07-14
+**Scope:** Daemon-side adapter, supervision, recovery, Claude profile, normalized events, and reverse-channel harness
 **Live boundary:** Claude authentication/model calls, real OS tree cleanup, daemon-crash recovery, and browser-driving remain pending for the single milestone-end UAT gate
 
 ## Summary

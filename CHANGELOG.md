@@ -1,10 +1,14 @@
 # Changelog
 
-All notable changes to the FSB product (Chrome extension + showcase dashboard) are documented in this file. Entries are organized by FSB milestone. The extension version is `0.9.92`; milestone versions such as `v0.11.0` and `v0.12.0` are the meaningful release units.
+All notable changes to the FSB product (Chrome extension + showcase dashboard) are documented in this file. Entries are organized by FSB milestone. The extension version is `1.0.0`; milestone versions such as `v0.11.0` and `v0.12.0` are the meaningful release units.
 
 The independently published `fsb-mcp-server` npm package keeps its own semver changelog in [`mcp/CHANGELOG.md`](./mcp/CHANGELOG.md).
 
 ## [Unreleased]
+
+## v1.0.0 — Unified Product Version — 2026-10-13
+
+The extension, showcase, skill, documentation, and store metadata align at `1.0.0`. The independently published `fsb-mcp-server` package advances to `1.0.0` as part of the same version-alignment release. Runtime behavior, wire contracts, schemas, and dependency versions are unchanged.
 
 ## v0.9.92 — Bridge Reliability and Editing Fixes — 2026-10-07
 

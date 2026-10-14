@@ -69,7 +69,7 @@ export class ReleaseNotesPageComponent implements OnInit, OnDestroy {
     { version: '0.1' },
   ];
 
-  readonly version = signal(APP_VERSION);
+  readonly version = signal(DOCUMENTED_VERSIONS.has(APP_VERSION) ? APP_VERSION : this.releases[0].version);
   readonly swapping = signal(false);
   /* The rail can outlive the written archive: any release without a section
      block falls through to the "notes pending" state instead of a blank column. */

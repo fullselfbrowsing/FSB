@@ -980,7 +980,7 @@
         </context-group>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.ts</context>
-          <context context-type="linenumber">34</context>
+          <context context-type="linenumber">35</context>
         </context-group>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.ts</context>
@@ -3109,49 +3109,49 @@
         <source>FSB Full Self-Browsing logo</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.ts</context>
-          <context context-type="linenumber">33</context>
+          <context context-type="linenumber">34</context>
         </context-group>
       </trans-unit>
       <trans-unit id="concierge.copy" datatype="html">
         <source>Copy</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.ts</context>
-          <context context-type="linenumber">99</context>
+          <context context-type="linenumber">100</context>
         </context-group>
       </trans-unit>
       <trans-unit id="concierge.copied" datatype="html">
         <source>Copied</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.ts</context>
-          <context context-type="linenumber">100</context>
+          <context context-type="linenumber">101</context>
         </context-group>
       </trans-unit>
       <trans-unit id="concierge.meta.title" datatype="html">
         <source>Concierge - Safe Action Layer</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.ts</context>
-          <context context-type="linenumber">132</context>
+          <context context-type="linenumber">134</context>
         </context-group>
       </trans-unit>
       <trans-unit id="concierge.meta.description" datatype="html">
         <source>Concierge is the safe action layer for agent-ready web applications: typed verbs, live catalogs, consent-bound dispatch, and signed replay-protected batches.</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.ts</context>
-          <context context-type="linenumber">133</context>
+          <context context-type="linenumber">135</context>
         </context-group>
       </trans-unit>
       <trans-unit id="concierge.schema.subcategory" datatype="html">
         <source>Safe action layer for agent-ready web applications</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.ts</context>
-          <context context-type="linenumber">236</context>
+          <context context-type="linenumber">238</context>
         </context-group>
       </trans-unit>
       <trans-unit id="concierge.schema.description" datatype="html">
         <source>Concierge lets a cooperating application publish typed verbs, resolve a live action catalog, and keep execution behind the application&apos;s own state, policy, and interface.</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.ts</context>
-          <context context-type="linenumber">239</context>
+          <context context-type="linenumber">241</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.template.001" datatype="html">

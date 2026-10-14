@@ -48,6 +48,7 @@ const currentSurfaceTargets = Object.freeze([
   'mcp/src/install.ts',
   'mcp/src/platforms.ts',
   'showcase/about.html',
+  'showcase/dashboard.html',
   'showcase/angular/scripts/llms.source.md',
   'showcase/angular/scripts/llms-full.source.md',
   'showcase/angular/public/llms.txt',
@@ -358,6 +359,12 @@ function setExtensionPublicSurfaces(version) {
     /FSB v\d+\.\d+\.\d+/gu,
     `FSB v${version}`,
     'legacy showcase current version',
+  ));
+  changed.push(replaceExactly(
+    'showcase/dashboard.html',
+    /FSB v\d+\.\d+\.\d+/gu,
+    `FSB v${version}`,
+    'legacy dashboard current version',
   ));
   changed.push(setLlmsExtensionSurfaces(version));
   return changed.some(Boolean);

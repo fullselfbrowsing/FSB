@@ -2,6 +2,21 @@
 
 All notable changes to `fsb-mcp-server` are documented in this file. Each entry corresponds to a published npm release; FSB extension milestones map to MCP package versions in the entry header.
 
+<a id="v1.0.0"></a>
+
+## 1.0.0 (2026-10-13)
+
+Version-alignment release for FSB v1.0.0. Package metadata, generated runtime version artifacts, documentation, and release instructions now use `1.0.0`.
+
+### Compatibility
+
+- `fsb-mcp-server` 1.0.0 requires FSB extension 1.0.0 or newer for the existing `mcp:task-status` route.
+- Runtime behavior, MCP wire contracts, tool schemas, installer behavior, and dependency versions are unchanged from 0.11.2, including its dark-logo server icon.
+
+### Anti-scope (NOT in 1.0.0)
+
+- No publish or tag action is performed by this version update itself. Merging it into `main` automatically publishes `fsb-mcp-server@1.0.0` and creates the `mcp-v1.0.0` GitHub release.
+
 <a id="v0.11.2"></a>
 
 ## 0.11.2 (2026-10-14)

@@ -72,4 +72,3 @@ Two fresh cross-file accessibility/presentation issues remain. Semantic evidence
 _Reviewed: 2026-07-12T22:23:25Z_
 _Reviewer: the agent (gsd-code-reviewer)_
 _Depth: standard_
-

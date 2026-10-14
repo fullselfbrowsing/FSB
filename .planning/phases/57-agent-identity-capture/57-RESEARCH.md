@@ -248,4 +248,3 @@ Plans 1 and the pure extension helper/test scaffolding in Plan 2 may share Wave 
 - `.planning/codebase/ARCHITECTURE.md`
 - `.planning/codebase/INTEGRATIONS.md`
 - Current source/test files named in the integration table above.
-

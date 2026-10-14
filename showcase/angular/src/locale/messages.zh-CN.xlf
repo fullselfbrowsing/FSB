@@ -1119,7 +1119,7 @@
         </context-group>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.ts</context>
-          <context context-type="linenumber">34</context>
+          <context context-type="linenumber">35</context>
         </context-group>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.ts</context>
@@ -3547,7 +3547,7 @@
         <target state="translated">FSB Full Self-Browsing 标志</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.ts</context>
-          <context context-type="linenumber">33</context>
+          <context context-type="linenumber">34</context>
         </context-group>
       </trans-unit>
       <trans-unit id="concierge.copy" datatype="html">
@@ -3555,7 +3555,7 @@
         <target state="translated">复制</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.ts</context>
-          <context context-type="linenumber">99</context>
+          <context context-type="linenumber">100</context>
         </context-group>
       </trans-unit>
       <trans-unit id="concierge.copied" datatype="html">
@@ -3563,7 +3563,7 @@
         <target state="translated">已复制</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.ts</context>
-          <context context-type="linenumber">100</context>
+          <context context-type="linenumber">101</context>
         </context-group>
       </trans-unit>
       <trans-unit id="concierge.meta.title" datatype="html">
@@ -3571,7 +3571,7 @@
         <target state="translated">Concierge - 安全动作层</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.ts</context>
-          <context context-type="linenumber">132</context>
+          <context context-type="linenumber">134</context>
         </context-group>
       </trans-unit>
       <trans-unit id="concierge.meta.description" datatype="html">
@@ -3579,7 +3579,7 @@
         <target state="translated">Concierge 是面向智能体就绪 Web 应用的安全动作层：带类型的动词、实时目录、受同意约束的分发，以及已签名且防重放的批次。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.ts</context>
-          <context context-type="linenumber">133</context>
+          <context context-type="linenumber">135</context>
         </context-group>
       </trans-unit>
       <trans-unit id="concierge.schema.subcategory" datatype="html">
@@ -3587,7 +3587,7 @@
         <target state="translated">面向智能体就绪 Web 应用的安全动作层</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.ts</context>
-          <context context-type="linenumber">236</context>
+          <context context-type="linenumber">238</context>
         </context-group>
       </trans-unit>
       <trans-unit id="concierge.schema.description" datatype="html">
@@ -3595,7 +3595,7 @@
         <target state="translated">Concierge 让协作应用发布带类型的动词、解析实时动作目录，并把执行留在应用自己的状态、策略和界面之后。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.ts</context>
-          <context context-type="linenumber">239</context>
+          <context context-type="linenumber">241</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.template.001" datatype="html">

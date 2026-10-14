@@ -10,11 +10,200 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
   // Automation Logger for FSB
   // Provides structured logging for debugging automation loops
 
+  const TRUSTED_MESSAGE = Object.freeze({
+    LOG_REPLACE: 'fsb:automation-log-replace',
+    LOG_LOAD: 'fsb:automation-log-load',
+    SESSION_SAVE: 'fsb:automation-session-save',
+    SESSION_LOAD: 'fsb:automation-session-load',
+    SESSION_LIST: 'fsb:automation-session-list',
+    SESSION_DELETE: 'fsb:automation-session-delete',
+    SESSION_CLEAR: 'fsb:automation-session-clear',
+    SESSION_UPDATE_OUTCOME: 'fsb:automation-session-update-outcome',
+    SESSION_PRUNE_MCP: 'fsb:automation-session-prune-mcp',
+    SNAPSHOT_LOAD: 'fsb:automation-dom-snapshot-load'
+  });
+
+  function getTrustedFeatureStore() {
+    const store = globalThis.fsbTrustedLocalFeatureStore;
+    return store && typeof store === 'object' ? store : null;
+  }
+
+  function sendTrustedFeatureMessage(message) {
+    if (typeof chrome === 'undefined' || !chrome.runtime || typeof chrome.runtime.sendMessage !== 'function') {
+      return Promise.resolve(null);
+    }
+    return new Promise((resolve) => {
+      try {
+        chrome.runtime.sendMessage(message, (response) => {
+          if (chrome.runtime.lastError) {
+            resolve(null);
+            return;
+          }
+          resolve(response || null);
+        });
+      } catch (_error) {
+        resolve(null);
+      }
+    });
+  }
+
+  function trustedMessageByteLength(value) {
+    const serialized = JSON.stringify(value) || '';
+    if (typeof TextEncoder !== 'undefined') return new TextEncoder().encode(serialized).length;
+    return unescape(encodeURIComponent(serialized)).length;
+  }
+
+  function trustedReplaceAutomationLogs(logs) {
+    const boundedLogs = (Array.isArray(logs) ? logs : []).slice(-AUTOMATION_LOGS_PERSISTED_TAIL);
+    while (boundedLogs.length && trustedMessageByteLength({
+      action: TRUSTED_MESSAGE.LOG_REPLACE,
+      logs: boundedLogs
+    }) > 240000) boundedLogs.shift();
+    const store = getTrustedFeatureStore();
+    if (store && typeof store.replaceAutomationLogs === 'function') {
+      return Promise.resolve(store.replaceAutomationLogs(boundedLogs));
+    }
+    return sendTrustedFeatureMessage({ action: TRUSTED_MESSAGE.LOG_REPLACE, logs: boundedLogs });
+  }
+
+  function trustedLoadAutomationLogs() {
+    const store = getTrustedFeatureStore();
+    if (store && typeof store.loadAutomationLogs === 'function') {
+      return Promise.resolve(store.loadAutomationLogs());
+    }
+    return sendTrustedFeatureMessage({ action: TRUSTED_MESSAGE.LOG_LOAD });
+  }
+
+  function trustedSaveAutomationSession(sessionId, session, snapshots) {
+    const store = getTrustedFeatureStore();
+    if (store && typeof store.saveAutomationSession === 'function') {
+      return Promise.resolve(store.saveAutomationSession(sessionId, session, snapshots));
+    }
+    return sendTrustedFeatureMessage({
+      action: TRUSTED_MESSAGE.SESSION_SAVE,
+      sessionId,
+      session,
+      snapshots
+    });
+  }
+
+  function trustedLoadAutomationSession(sessionId) {
+    const store = getTrustedFeatureStore();
+    if (store && typeof store.loadAutomationSession === 'function') {
+      return Promise.resolve(store.loadAutomationSession(sessionId));
+    }
+    return sendTrustedFeatureMessage({ action: TRUSTED_MESSAGE.SESSION_LOAD, sessionId });
+  }
+
+  function trustedListAutomationSessions() {
+    const store = getTrustedFeatureStore();
+    if (store && typeof store.listAutomationSessions === 'function') {
+      return Promise.resolve(store.listAutomationSessions());
+    }
+    return sendTrustedFeatureMessage({ action: TRUSTED_MESSAGE.SESSION_LIST });
+  }
+
+  function trustedDeleteAutomationSession(sessionId) {
+    const store = getTrustedFeatureStore();
+    if (store && typeof store.deleteAutomationSession === 'function') {
+      return Promise.resolve(store.deleteAutomationSession(sessionId));
+    }
+    return sendTrustedFeatureMessage({ action: TRUSTED_MESSAGE.SESSION_DELETE, sessionId });
+  }
+
+  function trustedClearAutomationSessions() {
+    const store = getTrustedFeatureStore();
+    if (store && typeof store.clearAutomationSessions === 'function') {
+      return Promise.resolve(store.clearAutomationSessions());
+    }
+    return sendTrustedFeatureMessage({ action: TRUSTED_MESSAGE.SESSION_CLEAR });
+  }
+
+  function trustedUpdateAutomationSessionOutcome(sessionId, outcome) {
+    const store = getTrustedFeatureStore();
+    if (store && typeof store.updateAutomationSessionOutcome === 'function') {
+      return Promise.resolve(store.updateAutomationSessionOutcome(sessionId, outcome));
+    }
+    return sendTrustedFeatureMessage({
+      action: TRUSTED_MESSAGE.SESSION_UPDATE_OUTCOME,
+      sessionId,
+      outcome
+    });
+  }
+
+  function trustedPruneMcpAutomationSessions(retentionDays) {
+    const store = getTrustedFeatureStore();
+    if (store && typeof store.pruneMcpAutomationSessions === 'function') {
+      return Promise.resolve(store.pruneMcpAutomationSessions(retentionDays));
+    }
+    return sendTrustedFeatureMessage({
+      action: TRUSTED_MESSAGE.SESSION_PRUNE_MCP,
+      retentionDays
+    });
+  }
+
+  function trustedLoadAutomationDOMSnapshots(sessionId) {
+    const store = getTrustedFeatureStore();
+    if (store && typeof store.loadAutomationDOMSnapshots === 'function') {
+      return Promise.resolve(store.loadAutomationDOMSnapshots(sessionId));
+    }
+    return sendTrustedFeatureMessage({ action: TRUSTED_MESSAGE.SNAPSHOT_LOAD, sessionId });
+  }
+
+  function getSafeSnapshotOrigin(value) {
+    if (typeof value !== 'string' || value.length > 2048) return '';
+    try {
+      const parsed = new URL(value);
+      return parsed.protocol === 'https:' || parsed.protocol === 'http:' ? parsed.origin : '';
+    } catch (_error) {
+      return '';
+    }
+  }
+
+  const FSB_BRIDGE_SECRET_PATTERN = /fsb-auth\.[A-Za-z0-9_-]{43}(?![A-Za-z0-9_-])/g;
+
+  function getSafePersistedText(value, maxChars) {
+    let text = String(value === undefined || value === null ? '' : value);
+    try {
+      if (typeof globalThis.redactBridgeSecretsInString === 'function') {
+        const sharedResult = globalThis.redactBridgeSecretsInString(text);
+        if (typeof sharedResult === 'string') text = sharedResult;
+      } else {
+        text = text.replace(FSB_BRIDGE_SECRET_PATTERN, '[REDACTED_FSB_BRIDGE_SECRET]');
+      }
+    } catch (_error) {
+      text = text.replace(FSB_BRIDGE_SECRET_PATTERN, '[REDACTED_FSB_BRIDGE_SECRET]');
+    }
+    return text
+      .replace(/\bBearer\s+[A-Za-z0-9._~+\/-]+/gi, '[redacted]')
+      .replace(/\b(?:sk|pk)_(?:live|test)_[A-Za-z0-9_-]+/gi, '[redacted]')
+      .replace(/\b(?:api[_ -]?key|access[_ -]?token|authorization)\s*[:=]\s*[^\s,;]+/gi, '[redacted]')
+      .slice(0, maxChars);
+  }
+
+  function getSafePersistedLogData(data) {
+    if (!data || typeof data !== 'object' || Array.isArray(data)) return {};
+    const safe = {};
+    ['logType', 'provider', 'category', 'action', 'reason', 'sessionId'].forEach((key) => {
+      if (typeof data[key] === 'string') safe[key] = getSafePersistedText(data[key], 96);
+    });
+    ['statusCode', 'durationMs', 'iterationCount', 'actionCount', 'tabId'].forEach((key) => {
+      if (Number.isFinite(Number(data[key]))) safe[key] = Number(data[key]);
+    });
+    if (typeof data.success === 'boolean') safe.success = data.success;
+    return safe;
+  }
+
   function filterPersistedSessionLogs(sessionLogs) {
     return (sessionLogs || []).filter(log => {
       const logType = log?.data?.logType || log?.logType || null;
       return logType !== 'prompt' && logType !== 'rawResponse';
-    });
+    }).slice(-500).map(log => ({
+      timestamp: Number.isFinite(Date.parse(log?.timestamp)) ? new Date(log.timestamp).toISOString() : new Date().toISOString(),
+      level: getSafePersistedText(log?.level || 'info', 16),
+      message: getSafePersistedText(log?.message || '', 512),
+      data: getSafePersistedLogData(log?.data)
+    }));
   }
 
   const SESSION_HISTORY_CAP_PER_MODE = 50;
@@ -222,13 +411,132 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
     };
   }
 
-  function cloneReplayRecordForPersistence(replay) {
-    if (!replay || typeof replay !== 'object') return null;
+  function getSafeReplayValue(value, depth = 0) {
+    if (value === null || typeof value === 'boolean') return value;
+    if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+    if (typeof value === 'string') return getSafePersistedText(value, 2048);
+    if (depth >= 6) return null;
+    if (Array.isArray(value)) {
+      return value.slice(0, 100).map(item => getSafeReplayValue(item, depth + 1));
+    }
+    if (!value || typeof value !== 'object') return null;
+    const safe = {};
+    Object.keys(value).slice(0, 32).forEach((key) => {
+      if (!/^[A-Za-z0-9_.:-]{1,64}$/.test(key)) return;
+      safe[key] = getSafeReplayValue(value[key], depth + 1);
+    });
+    return safe;
+  }
+
+  function getSafeReplayUrl(value) {
+    if (typeof value !== 'string' || value.length > 4096) return null;
     try {
-      return JSON.parse(JSON.stringify(replay));
-    } catch (_e) {
+      const parsed = new URL(value);
+      if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return null;
+      return getSafePersistedText(value, 4096);
+    } catch (_error) {
       return null;
     }
+  }
+
+  function getSafeReplayCounts(value) {
+    const input = value && typeof value === 'object' ? value : {};
+    return {
+      total: Math.max(0, Math.min(100, Number(input.total) || 0)),
+      executable: Math.max(0, Math.min(100, Number(input.executable) || 0)),
+      approvalRequired: Math.max(0, Math.min(100, Number(input.approvalRequired) || 0)),
+      blocked: Math.max(0, Math.min(100, Number(input.blocked) || 0))
+    };
+  }
+
+  function getSafeReplayStep(step, index) {
+    if (!step || typeof step !== 'object') return null;
+    const target = step.target && typeof step.target === 'object' ? step.target : {};
+    const replay = step.replay && typeof step.replay === 'object' ? step.replay : {};
+    const capability = step.capability && typeof step.capability === 'object'
+      ? {
+          capabilityId: getSafePersistedText(step.capability.capabilityId || '', 128) || null,
+          sideEffectClass: getSafePersistedText(step.capability.sideEffectClass || '', 32) || null,
+          service: getSafePersistedText(step.capability.service || '', 96) || null,
+          tier: getSafePersistedText(step.capability.tier || '', 32) || null
+        }
+      : null;
+    return {
+      id: getSafePersistedText(step.id || `step-${index + 1}`, 128),
+      index: Number.isFinite(Number(step.index)) ? Number(step.index) : index,
+      timestamp: Number.isFinite(Number(step.timestamp)) ? Number(step.timestamp) : null,
+      tool: getSafePersistedText(step.tool || '', 128),
+      route: getSafePersistedText(step.route || 'legacy', 64),
+      arguments: getSafeReplayValue(step.arguments || {}, 0),
+      result: getSafeReplayValue(step.result || {}, 0),
+      success: step.success !== false,
+      target: {
+        logicalTab: getSafePersistedText(target.logicalTab || 'primary', 128),
+        url: getSafeReplayUrl(target.url),
+        origin: getSafeSnapshotOrigin(target.origin || target.url) || null,
+        redacted: target.redacted === true
+      },
+      ...(step.inputState === 'redacted' ? { inputState: 'redacted' } : {}),
+      ...(capability ? { capability } : {}),
+      replay: {
+        risk: getSafePersistedText(replay.risk || 'inspect-only', 32),
+        availability: getSafePersistedText(replay.availability || 'unsupported', 32),
+        reason: replay.reason == null ? null : getSafePersistedText(replay.reason, 256)
+      }
+    };
+  }
+
+  function cloneReplayRecordForPersistence(replay) {
+    if (!replay || typeof replay !== 'object' || !replay.manifest || typeof replay.manifest !== 'object') {
+      return null;
+    }
+    const manifest = replay.manifest;
+    const source = manifest.source && typeof manifest.source === 'object' ? manifest.source : {};
+    const outcome = manifest.outcome && typeof manifest.outcome === 'object' ? manifest.outcome : {};
+    const steps = (Array.isArray(manifest.steps) ? manifest.steps : [])
+      .slice(0, 100)
+      .map(getSafeReplayStep)
+      .filter(Boolean);
+    const tabs = (Array.isArray(manifest.tabs) ? manifest.tabs : []).slice(0, 32).map((tab, index) => ({
+      id: getSafePersistedText(tab?.id || `tab-${index + 1}`, 128),
+      order: Number.isFinite(Number(tab?.order)) ? Number(tab.order) : index,
+      startUrl: getSafeReplayUrl(tab?.startUrl),
+      startOrigin: getSafeSnapshotOrigin(tab?.startOrigin || tab?.startUrl) || null,
+      startUrlState: getSafePersistedText(tab?.startUrlState || 'missing', 16)
+    }));
+    return {
+      version: getSafePersistedText(replay.version || '1.0', 16),
+      integrity: getSafePersistedText(replay.integrity || 'pending', 16),
+      provenance: getSafePersistedText(replay.provenance || 'capture', 32),
+      manifest: {
+        kind: getSafePersistedText(manifest.kind || '', 64),
+        version: Number.isFinite(Number(manifest.version)) ? Number(manifest.version) : 1,
+        provenance: getSafePersistedText(manifest.provenance || replay.provenance || 'capture', 32),
+        sessionId: getSafePersistedText(manifest.sessionId || '', 128),
+        task: getSafePersistedText(manifest.task || '', 2000),
+        recordedAt: Number.isFinite(Number(manifest.recordedAt)) ? Number(manifest.recordedAt) : Date.now(),
+        source: {
+          mode: getSafePersistedText(source.mode || 'mcp-agent', 32),
+          client: source.client == null ? null : getSafePersistedText(source.client, 96)
+        },
+        startUrl: getSafeReplayUrl(manifest.startUrl),
+        startOrigin: getSafeSnapshotOrigin(manifest.startOrigin || manifest.startUrl) || null,
+        startUrlState: getSafePersistedText(manifest.startUrlState || 'missing', 16),
+        tabs,
+        outcome: {
+          status: getSafePersistedText(outcome.status || 'unknown', 32),
+          outcome: outcome.outcome == null ? null : getSafePersistedText(outcome.outcome, 24),
+          reason: outcome.reason == null ? null : getSafePersistedText(outcome.reason, 1000)
+        },
+        steps
+      },
+      manifestHash: replay.manifestHash == null ? null : getSafePersistedText(replay.manifestHash, 256),
+      receipt: getSafeReplayValue(replay.receipt, 0),
+      receiptCid: replay.receiptCid == null ? null : getSafePersistedText(replay.receiptCid, 256),
+      signerKid: replay.signerKid == null ? null : getSafePersistedText(replay.signerKid, 256),
+      counts: getSafeReplayCounts(replay.counts),
+      error: replay.error == null ? null : getSafePersistedText(replay.error, 512)
+    };
   }
 
   // Persisted tail of the in-memory log ring. Large enough that a short delegated run
@@ -500,12 +808,11 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
         return this._domSnapshots[sessionId];
       }
       // Guard against invalidated extension context
-      if (!chrome.runtime?.id) return [];
-      // Then check persisted storage
+      if (typeof chrome === 'undefined' || !chrome.runtime?.id) return [];
+      // Then ask the fixed trusted feature bridge.
       try {
-        const stored = await chrome.storage.local.get('fsbDOMSnapshots');
-        const allSnapshots = stored.fsbDOMSnapshots || {};
-        return allSnapshots[sessionId] || [];
+        const result = await trustedLoadAutomationDOMSnapshots(sessionId);
+        return result && Array.isArray(result.snapshots) ? result.snapshots : [];
       } catch (error) {
         if (chrome.runtime?.id) {
           console.error('[FSB Logger] Failed to load DOM snapshots:', error);
@@ -787,10 +1094,12 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
 
     async _persistLogsUnlocked() {
       // Guard against invalidated extension context (service worker killed mid-timer)
-      if (!chrome.runtime?.id) return;
+      if (typeof chrome === 'undefined' || !chrome.runtime?.id) return;
       try {
-        const recentLogs = this.logs.slice(-AUTOMATION_LOGS_PERSISTED_TAIL);
-        await chrome.storage.local.set({ automationLogs: recentLogs });
+        const recentLogs = filterPersistedSessionLogs(this.logs)
+          .slice(-AUTOMATION_LOGS_PERSISTED_TAIL);
+        const result = await trustedReplaceAutomationLogs(recentLogs);
+        if (!result || result.ok !== true) throw new Error('Trusted log persistence failed');
       } catch (error) {
         // Only log if context is still valid (avoid noisy errors during shutdown)
         if (chrome.runtime?.id) {
@@ -801,10 +1110,10 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
 
     async loadLogs() {
       // Guard against invalidated extension context (service worker killed or extension reloaded)
-      if (!chrome.runtime?.id) return;
+      if (typeof chrome === 'undefined' || !chrome.runtime?.id) return;
       try {
-        const stored = await chrome.storage.local.get('automationLogs');
-        const persisted = Array.isArray(stored.automationLogs) ? stored.automationLogs : [];
+        const result = await trustedLoadAutomationLogs();
+        const persisted = result && Array.isArray(result.logs) ? result.logs : [];
         if (persisted.length === 0) return;
         // Merge, never replace: a fresh service worker has already logged its own
         // boot entries, and the previous worker's tail is what explains the run
@@ -843,26 +1152,20 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
 
     async _saveSessionUnlocked(sessionId, sessionData = {}) {
       // Guard against invalidated extension context
-      if (!chrome.runtime?.id) return false;
+      if (typeof chrome === 'undefined' || !chrome.runtime?.id) return false;
       try {
         const sessionLogs = this.getSessionLogs(sessionId);
         const persistedLogs = filterPersistedSessionLogs(sessionLogs);
         if (sessionLogs.length === 0 && persistedLogs.length === 0) return false;
 
-        const stored = await chrome.storage.local.get([
-          'fsbSessionLogs',
-          'fsbSessionIndex',
-          'fsbDOMSnapshots',
-          'automationLogs'
-        ]);
-        const sessionStorage = stored.fsbSessionLogs || {};
-        const sessionIndex = stored.fsbSessionIndex || [];
-        const allSnapshots = stored.fsbDOMSnapshots || {};
-        const persistedAutomationLogs = Array.isArray(stored.automationLogs) ? stored.automationLogs : [];
+        const loaded = await trustedLoadAutomationSession(sessionId);
+        let savedSession = loaded && loaded.session
+          ? hydratePersistedSessionRecord(sessionId, loaded.session)
+          : null;
 
-        if (sessionStorage[sessionId]) {
+        if (savedSession) {
           // APPEND MODE: Update existing session entry
-          const existing = sessionStorage[sessionId];
+          const existing = savedSession;
           const metadata = buildPersistedSessionMetadata(sessionId, sessionData, existing);
           const normalizedOutcome = normalizePersistedOutcomeFields(sessionData, existing);
           // Merge logs: add only new logs (those with timestamps after existing endTime)
@@ -907,22 +1210,21 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
               .filter(a => a.result?.success)
               .slice(-100)
               .map(a => ({
-                tool: a.tool,
-                params: a.params,
-                result: a.result,
-                timestamp: a.timestamp,
-                logicalTab: a.logicalTab || 'primary'
+                tool: getSafePersistedText(a.tool || '', 64),
+                result: { success: true },
+                timestamp: Number.isFinite(Number(a.timestamp)) ? Number(a.timestamp) : Date.now(),
+                logicalTab: getSafePersistedText(a.logicalTab || 'primary', 128)
               }));
           }
           if (sessionData.replay) {
             existing.replay = cloneReplayRecordForPersistence(sessionData.replay) || existing.replay || null;
           }
-          sessionStorage[sessionId] = existing;
+          savedSession = existing;
         } else {
           // NEW MODE: Create session entry
           const metadata = buildPersistedSessionMetadata(sessionId, sessionData);
           const normalizedOutcome = normalizePersistedOutcomeFields(sessionData);
-          const session = {
+          savedSession = {
             id: sessionId,
             task: metadata.commands.length > 1
               ? metadata.commands.map((cmd, i) => `[${i + 1}] ${cmd}`).join(' | ')
@@ -965,84 +1267,32 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
               .filter(a => a.result?.success)
               .slice(-100)
               .map(a => ({
-                tool: a.tool,
-                params: a.params,
-                result: a.result,
-                timestamp: a.timestamp,
-                logicalTab: a.logicalTab || 'primary'
+                tool: getSafePersistedText(a.tool || '', 64),
+                result: { success: true },
+                timestamp: Number.isFinite(Number(a.timestamp)) ? Number(a.timestamp) : Date.now(),
+                logicalTab: getSafePersistedText(a.logicalTab || 'primary', 128)
               }))
           };
-          sessionStorage[sessionId] = session;
         }
 
-        // Update index
-        const savedSession = sessionStorage[sessionId];
-        const snapshotCount = (this._domSnapshots && this._domSnapshots[sessionId])
-          ? this._domSnapshots[sessionId].length : 0;
-        const indexEntry = {
-          id: sessionId, task: savedSession.task, startTime: savedSession.startTime,
-          endTime: savedSession.endTime, status: savedSession.status, actionCount: savedSession.actionCount,
-          domSnapshotCount: snapshotCount,
-          // Quick 260707-7id: source badge fields (entries predating this
-          // change lack them and default to Autopilot in the UI)
-          mode: savedSession.mode || 'autopilot',
-          mcpClient: savedSession.mcpClient || null,
-          taskRunId: savedSession.taskRunId || sessionId,
-          tabIds: Array.isArray(savedSession.tabIds) ? savedSession.tabIds : [],
-          tabCount: Number.isFinite(savedSession.tabCount) ? savedSession.tabCount : 0,
-          totalCost: savedSession.totalCost || 0,
-          outcome: savedSession.outcome || null,
-          outcomeDetails: savedSession.outcomeDetails || null,
-          result: savedSession.result || null,
-          completionMessage: savedSession.completionMessage || null,
-          error: savedSession.error || null,
-          blocker: savedSession.blocker || null,
-          nextStep: savedSession.nextStep || null,
-          conversationId: savedSession.conversationId || null,
-          uiSurface: savedSession.uiSurface || 'unknown',
-          historySessionId: savedSession.historySessionId || sessionId,
-          commandCount: savedSession.commandCount || 1,
-          commands: savedSession.commands || [],
-          lastTask: savedSession.lastTask || savedSession.task || null,
-          lastCommandAt: savedSession.lastCommandAt || savedSession.endTime || savedSession.startTime,
-          replayIntegrity: savedSession.replay?.integrity || null,
-          replayProvenance: savedSession.replay?.provenance || null,
-          replayableCount: savedSession.replay?.counts?.executable || 0,
-          replayBlockedCount: savedSession.replay?.counts?.blocked || 0
-        };
-        const existingIndex = sessionIndex.findIndex(s => s.id === sessionId);
-        if (existingIndex !== -1) sessionIndex[existingIndex] = indexEntry;
-        else sessionIndex.unshift(indexEntry);
-        const cappedHistory = capPersistedSessionHistory(sessionIndex, sessionStorage);
-        const retainedSessionIndex = cappedHistory.retainedIndex;
-        const evictedIds = new Set(cappedHistory.removedIds);
-        const nextStorage = {
-          fsbSessionLogs: sessionStorage,
-          fsbSessionIndex: retainedSessionIndex
-        };
-
-        if (evictedIds.size > 0) {
-          evictedIds.forEach(id => delete allSnapshots[id]);
-          nextStorage.fsbDOMSnapshots = allSnapshots;
-          nextStorage.automationLogs = filterAutomationLogsBySession(persistedAutomationLogs, evictedIds);
-        }
-
-        await chrome.storage.local.set(nextStorage);
-        if (evictedIds.size > 0) this._removeInMemorySessionArtifacts(evictedIds);
-
-        // Persist DOM snapshots to dedicated storage key
-        if (!evictedIds.has(sessionId)) {
-          await this._persistDOMSnapshots(sessionId, retainedSessionIndex);
-        }
-
-        if (savedSession.mode === 'mcp-agent') {
-          let retentionDays = 30;
-          try {
-            const policy = await chrome.storage.local.get('fsbMcpSessionRetentionDays');
-            retentionDays = policy?.fsbMcpSessionRetentionDays;
-          } catch (_policyError) { /* save succeeded; prune with the default */ }
-          await this._pruneMcpSessionsUnlocked(retentionDays);
-        }
+        const snapshots = (this._domSnapshots && this._domSnapshots[sessionId])
+          ? this._domSnapshots[sessionId].slice(-30).map(snapshot => ({
+            url: getSafeSnapshotOrigin(snapshot?.url),
+            timestamp: Number.isFinite(Number(snapshot?.timestamp)) ? Number(snapshot.timestamp) : Date.now(),
+            iteration: Number.isFinite(Number(snapshot?.iteration)) ? Number(snapshot.iteration) : 0,
+            elementCount: Number.isFinite(Number(snapshot?.elementCount)) ? Number(snapshot.elementCount) : 0
+          }))
+          : [];
+        const snapshotCount = snapshots.length;
+        savedSession.domSnapshotCount = snapshotCount;
+        const result = await trustedSaveAutomationSession(sessionId, savedSession, snapshots);
+        if (!result || result.ok !== true) return false;
+        const removedIds = new Set([
+          ...(Array.isArray(result.evictedIds) ? result.evictedIds : []),
+          ...(Array.isArray(result.prunedIds) ? result.prunedIds : [])
+        ]);
+        if (removedIds.size > 0) this._removeInMemorySessionArtifacts(removedIds);
+        if (this._domSnapshots) delete this._domSnapshots[sessionId];
 
         console.log(`[FSB Logger] Session ${sessionId} saved with ${savedSession.logs?.length || 0} total logs, ${snapshotCount} DOM snapshots`);
         return true;
@@ -1063,26 +1313,23 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
     }
 
     async _updateSessionOutcomeUnlocked(sessionId, sessionData = {}) {
-      if (!chrome.runtime?.id || typeof sessionId !== 'string' || !sessionId) return false;
+      if (typeof chrome === 'undefined' || !chrome.runtime?.id ||
+          typeof sessionId !== 'string' || !sessionId) return false;
       try {
-        const stored = await chrome.storage.local.get(['fsbSessionLogs', 'fsbSessionIndex']);
-        const sessionStorage = stored.fsbSessionLogs || {};
-        const sessionIndex = Array.isArray(stored.fsbSessionIndex) ? stored.fsbSessionIndex : [];
-        const session = sessionStorage[sessionId];
-        if (!session || typeof session !== 'object') return false;
-
-        const status = getPersistedTextValue(sessionData.status, session.status) || 'completed';
-        const normalized = normalizePersistedOutcomeFields(sessionData, session);
-        applyPersistedOutcomeFields(session, status, normalized);
-
-        const indexEntry = sessionIndex.find(entry => entry?.id === sessionId);
-        if (indexEntry) applyPersistedOutcomeFields(indexEntry, status, normalized);
-
-        await chrome.storage.local.set({
-          fsbSessionLogs: sessionStorage,
-          fsbSessionIndex: sessionIndex
+        const status = getPersistedTextValue(sessionData.status) || 'completed';
+        const normalized = normalizePersistedOutcomeFields(sessionData, { status });
+        const result = await trustedUpdateAutomationSessionOutcome(sessionId, {
+          status: getSafePersistedText(status, 32),
+          outcome: getSafePersistedText(normalized.outcome, 24),
+          reason: getSafePersistedText(normalized.outcomeDetails?.reason || '', 64),
+          summary: getSafePersistedText(normalized.outcomeDetails?.summary || '', 512),
+          result: getSafePersistedText(normalized.result || '', 512),
+          completionMessage: getSafePersistedText(normalized.completionMessage || '', 512),
+          error: getSafePersistedText(normalized.error || '', 256),
+          blocker: getSafePersistedText(normalized.blocker || '', 512),
+          nextStep: getSafePersistedText(normalized.nextStep || '', 512)
         });
-        return true;
+        return !!result && result.ok === true;
       } catch (error) {
         if (chrome.runtime?.id) {
           console.error('[FSB Logger] Failed to update session outcome:', error);
@@ -1092,55 +1339,16 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
     }
 
     async _pruneMcpSessionsUnlocked(retentionDays = 30) {
-      if (!chrome.runtime?.id) return { removed: 0, ids: [] };
+      if (typeof chrome === 'undefined' || !chrome.runtime?.id) return { removed: 0, ids: [] };
       try {
         let days = typeof retentionDays === 'number' ? retentionDays : parseInt(retentionDays, 10);
         if (!Number.isFinite(days)) days = 30;
         days = Math.min(365, Math.max(1, Math.floor(days)));
-        const cutoff = Date.now() - (days * 24 * 60 * 60 * 1000);
-        const stored = await chrome.storage.local.get([
-          'fsbSessionLogs',
-          'fsbSessionIndex',
-          'fsbDOMSnapshots',
-          'automationLogs'
-        ]);
-        const sessionStorage = stored.fsbSessionLogs || {};
-        const sessionIndex = Array.isArray(stored.fsbSessionIndex) ? stored.fsbSessionIndex : [];
-        const allSnapshots = stored.fsbDOMSnapshots || {};
-        const persistedAutomationLogs = Array.isArray(stored.automationLogs) ? stored.automationLogs : [];
-        const indexById = new Map(sessionIndex.map(entry => [entry?.id, entry]));
-        const candidateIds = new Set([...Object.keys(sessionStorage), ...indexById.keys()]);
-        const expiredIds = [];
-
-        for (const id of candidateIds) {
-          if (!id) continue;
-          // The full log entry is authoritative when both stores exist. This
-          // guarantees a stale index badge can never delete Autopilot history.
-          const record = sessionStorage[id] || indexById.get(id);
-          if (!record || record.mode !== 'mcp-agent') continue;
-          const rawTimestamp = record.endTime ?? record.startTime;
-          const timestamp = typeof rawTimestamp === 'number' ? rawTimestamp : Date.parse(rawTimestamp);
-          if (Number.isFinite(timestamp) && timestamp <= cutoff) expiredIds.push(id);
-        }
-
-        if (expiredIds.length === 0) return { removed: 0, ids: [] };
-        const expiredSet = new Set(expiredIds);
-        for (const id of expiredIds) {
-          delete sessionStorage[id];
-          delete allSnapshots[id];
-        }
-        const retainedIndex = sessionIndex.filter(entry => !expiredSet.has(entry?.id));
-        const retainedAutomationLogs = filterAutomationLogsBySession(persistedAutomationLogs, expiredSet);
-        await chrome.storage.local.set({
-          fsbSessionLogs: sessionStorage,
-          fsbSessionIndex: retainedIndex,
-          fsbDOMSnapshots: allSnapshots,
-          automationLogs: retainedAutomationLogs
-        });
-        // Keep the in-memory source of future debounced persists in sync so a
-        // timer queued after this prune cannot resurrect expired raw rows.
-        this._removeInMemorySessionArtifacts(expiredSet);
-        return { removed: expiredIds.length, ids: expiredIds };
+        const result = await trustedPruneMcpAutomationSessions(days);
+        if (!result || result.ok !== true) return { removed: 0, ids: [] };
+        const removedIds = Array.isArray(result.ids) ? result.ids : [];
+        if (removedIds.length > 0) this._removeInMemorySessionArtifacts(new Set(removedIds));
+        return { removed: Number(result.removed) || removedIds.length, ids: removedIds };
       } catch (error) {
         if (chrome.runtime?.id) {
           console.error('[FSB Logger] Failed to prune MCP sessions:', error);
@@ -1148,55 +1356,12 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
         return { removed: 0, ids: [] };
       }
     }
-
-    async _persistDOMSnapshots(sessionId, sessionIndex) {
-      // Guard against invalidated extension context
-      if (!chrome.runtime?.id) return;
-      try {
-        const snapshots = (this._domSnapshots && this._domSnapshots[sessionId])
-          ? this._domSnapshots[sessionId] : [];
-        if (snapshots.length === 0) return;
-
-        const stored = await chrome.storage.local.get('fsbDOMSnapshots');
-        const allSnapshots = stored.fsbDOMSnapshots || {};
-
-        // Store snapshots for this session
-        allSnapshots[sessionId] = snapshots;
-
-        // Cleanup: cap at 20 sessions of snapshots (FIFO -- oldest deleted first)
-        const snapshotSessionIds = Object.keys(allSnapshots);
-        if (snapshotSessionIds.length > 20) {
-          // Use session index order to determine age; sessions not in index are oldest
-          const indexIds = new Set((sessionIndex || []).map(s => s.id));
-          // Sort: sessions in index come last (newest), sessions not in index first (oldest)
-          const sorted = snapshotSessionIds.sort((a, b) => {
-            const aInIndex = indexIds.has(a);
-            const bInIndex = indexIds.has(b);
-            if (aInIndex && !bInIndex) return 1;
-            if (!aInIndex && bInIndex) return -1;
-            return 0;
-          });
-          const toRemove = sorted.slice(0, snapshotSessionIds.length - 20);
-          toRemove.forEach(id => delete allSnapshots[id]);
-        }
-
-        await chrome.storage.local.set({ fsbDOMSnapshots: allSnapshots });
-
-        // Clear in-memory snapshots for this session after persisting
-        delete this._domSnapshots[sessionId];
-      } catch (error) {
-        if (chrome.runtime?.id) {
-          console.error('[FSB Logger] Failed to persist DOM snapshots:', error);
-        }
-      }
-    }
-
     async loadSession(sessionId) {
       // Guard against invalidated extension context
-      if (!chrome.runtime?.id) return null;
+      if (typeof chrome === 'undefined' || !chrome.runtime?.id) return null;
       try {
-        const stored = await chrome.storage.local.get(['fsbSessionLogs']);
-        const session = (stored.fsbSessionLogs || {})[sessionId] || null;
+        const result = await trustedLoadAutomationSession(sessionId);
+        const session = result && result.session ? result.session : null;
         return hydratePersistedSessionRecord(sessionId, session);
       } catch (error) {
         if (chrome.runtime?.id) {
@@ -1208,10 +1373,10 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
 
     async listSessions() {
       // Guard against invalidated extension context
-      if (!chrome.runtime?.id) return [];
+      if (typeof chrome === 'undefined' || !chrome.runtime?.id) return [];
       try {
-        const stored = await chrome.storage.local.get(['fsbSessionIndex']);
-        return (stored.fsbSessionIndex || [])
+        const result = await trustedListAutomationSessions();
+        return (result && Array.isArray(result.sessions) ? result.sessions : [])
           .map(entry => hydratePersistedSessionRecord(entry?.id, entry))
           .filter(Boolean);
       } catch (error) {
@@ -1225,29 +1390,12 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
 
     async _deleteSessionUnlocked(sessionId) {
       // Guard against invalidated extension context
-      if (!chrome.runtime?.id || typeof sessionId !== 'string' || !sessionId) return false;
+      if (typeof chrome === 'undefined' || !chrome.runtime?.id ||
+          typeof sessionId !== 'string' || !sessionId) return false;
       try {
-        const stored = await chrome.storage.local.get([
-          'fsbSessionLogs',
-          'fsbSessionIndex',
-          'fsbDOMSnapshots',
-          'automationLogs'
-        ]);
-        const sessionStorage = stored.fsbSessionLogs || {};
-        const sessionIndex = Array.isArray(stored.fsbSessionIndex) ? stored.fsbSessionIndex : [];
-        const allSnapshots = stored.fsbDOMSnapshots || {};
-        const removedIds = new Set([sessionId]);
-        delete sessionStorage[sessionId];
-        delete allSnapshots[sessionId];
-        const updatedIndex = sessionIndex.filter(s => s.id !== sessionId);
-        const retainedAutomationLogs = filterAutomationLogsBySession(stored.automationLogs, removedIds);
-        await chrome.storage.local.set({
-          fsbSessionLogs: sessionStorage,
-          fsbSessionIndex: updatedIndex,
-          fsbDOMSnapshots: allSnapshots,
-          automationLogs: retainedAutomationLogs
-        });
-        this._removeInMemorySessionArtifacts(removedIds);
+        const result = await trustedDeleteAutomationSession(sessionId);
+        if (!result || result.ok !== true) return false;
+        this._removeInMemorySessionArtifacts(new Set([sessionId]));
         return true;
       } catch (error) {
         return false;
@@ -1292,16 +1440,10 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
 
     async _clearAllSessionsUnlocked() {
       // Guard against invalidated extension context
-      if (!chrome.runtime?.id) return false;
+      if (typeof chrome === 'undefined' || !chrome.runtime?.id) return false;
       try {
-        const stored = await chrome.storage.local.get('automationLogs');
-        const retainedAutomationLogs = filterAutomationLogsBySession(stored.automationLogs, [], true);
-        await chrome.storage.local.set({
-          fsbSessionLogs: {},
-          fsbSessionIndex: [],
-          fsbDOMSnapshots: {},
-          automationLogs: retainedAutomationLogs
-        });
+        const result = await trustedClearAutomationSessions();
+        if (!result || result.ok !== true) return false;
         this._removeInMemorySessionArtifacts([], true);
         return true;
       } catch (error) {

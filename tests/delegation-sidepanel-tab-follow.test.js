@@ -440,19 +440,19 @@ async function adopt(options) {
       { timestamp: '2026-08-22T07:45:52.000Z', level: 'info', message: 'Side panel tab activation', data: { outcome: 'activated' } },
       { timestamp: '2026-08-22T07:45:53.000Z', level: 'info', message: 'Side panel auto-collapse', data: { outcome: 'kept_after_grace' } }
     ];
-    const writes = [];
+    let trustedLoads = 0;
     const context = vm.createContext({
       globalThis: null,
       console: { log() {}, warn() {}, error() {} },
       setTimeout, clearTimeout, setInterval, clearInterval, Date, Math, JSON, Promise, Set, Map, Array, Object, Number, String,
-      chrome: {
-        runtime: { id: 'ext' },
-        storage: {
-          local: {
-            get: async function() { return { automationLogs: stored }; },
-            set: async function(payload) { writes.push(payload); }
-          }
+      fsbTrustedLocalFeatureStore: {
+        async loadAutomationLogs() {
+          trustedLoads += 1;
+          return { ok: true, logs: stored };
         }
+      },
+      chrome: {
+        runtime: { id: 'ext' }
       }
     });
     context.globalThis = context;
@@ -464,6 +464,8 @@ async function adopt(options) {
       'loadLogs prepends the persisted tail and keeps the fresh worker entries');
     await logger.loadLogs();
     check(logger.logs.length === 3, 'loadLogs is idempotent (no duplicates on a second merge)');
+    check(trustedLoads === 2 && !Object.prototype.hasOwnProperty.call(context.chrome, 'storage'),
+      'loadLogs uses the background-owned trusted feature store without direct chrome.storage access');
     check(backgroundSource.includes('Promise.resolve(automationLogger.loadLogs()).catch(() => {});'),
       'background restores the previous worker log tail on wake');
     check(/var AUTOMATION_LOGS_PERSISTED_TAIL = (\d+);/.test(loggerSource)
