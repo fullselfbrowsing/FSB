@@ -330,7 +330,7 @@ var _streamingActive = false;
 
 function _isRestrictedTabUrlForStream(url) {
   if (!url || typeof url !== 'string') return true;
-  return /^(chrome|chrome-extension|moz-extension|edge|brave|about|file):/i.test(url);
+  return /^(chrome|chrome-extension|moz-extension|safari-web-extension|edge|brave|about|file):/i.test(url);
 }
 
 function _isDashboardTabUrlForStream(url) {
@@ -354,6 +354,38 @@ function _getStreamTabNotReadyReason(tab) {
   if (!tab || !tab.url) return 'no-streamable-tab';
   if (_isRestrictedTabUrlForStream(tab.url)) return 'restricted-tab';
   return 'no-streamable-tab';
+}
+
+// Any tab but the dashboard: the rule for navigating or starting a task, which
+// may begin from a new-tab page that cannot be streamed.
+function _isNotDashboardTabUrl(url) {
+  return !_isDashboardTabUrlForStream(url);
+}
+
+/**
+ * The page the user is working in, on Safari only. There the FSB workspace is
+ * its own window, so "the active tab in the last focused window" is often
+ * FSB's own page. FsbPlatform.resolveTargetTab() follows the last real content
+ * tab instead, but it only screens out extension pages, so `accept` still
+ * decides (streamable, or merely not the dashboard).
+ *
+ * Resolves to null on Chrome, where the callers' own tab queries are right.
+ *
+ * @param {function(string): boolean} [accept] - URL predicate, default streamable
+ * @returns {Promise<Object|null>} a tabs.Tab, or null
+ */
+async function _fsbSafariContentTab(accept) {
+  var platform = globalThis.FsbPlatform;
+  if (!platform || !platform.caps || platform.caps.sidePanel !== false
+      || typeof platform.resolveTargetTab !== 'function') {
+    return null;
+  }
+  var isAcceptable = typeof accept === 'function' ? accept : _isStreamableTabUrl;
+  try {
+    var tab = await platform.resolveTargetTab();
+    if (tab && typeof tab.id === 'number' && isAcceptable(tab.url)) return tab;
+  } catch (_e) { /* fall back to the caller's tab queries */ }
+  return null;
 }
 
 function _getContentScriptFilesForInjection() {
@@ -913,6 +945,120 @@ function handleRemoteControlStop() {
 // same bitmask format the dashboard sends, so keyDown/keyUp pass it
 // through unchanged.
 
+/**
+ * The content-script verb that stands in for one dashboard input on Safari,
+ * or null for input that needs no dispatch of its own. domKeyPress fires
+ * keydown and keyup together, so the dashboard's separate keyUp frame is
+ * already covered by the keyDown before it.
+ *
+ * @param {string} type - dashboard message type, e.g. 'dash:remote-click'
+ * @param {Object} payload - the validated dashboard payload
+ * @returns {{verb: string, params: Object}|null}
+ */
+function _fsbRemoteControlDomStep(type, payload) {
+  var mods = typeof payload.modifiers === 'number' ? payload.modifiers : 0;
+  var flags = {
+    altKey: !!(mods & 1),
+    ctrlKey: !!(mods & 2),
+    metaKey: !!(mods & 4),
+    shiftKey: !!(mods & 8)
+  };
+  if (type === 'dash:remote-click') {
+    return { verb: 'pointerClickAt', params: Object.assign({ x: payload.x, y: payload.y }, flags) };
+  }
+  if (type === 'dash:remote-scroll') {
+    return {
+      verb: 'wheelScrollAt',
+      params: {
+        x: payload.x,
+        y: payload.y,
+        deltaX: Number.isFinite(payload.deltaX) ? payload.deltaX : 0,
+        deltaY: Number.isFinite(payload.deltaY) ? payload.deltaY : 0
+      }
+    };
+  }
+  if (type === 'dash:remote-key' && payload.type === 'insertText') {
+    return { verb: 'domInsertTextAt', params: { text: payload.text || payload.key || '', clearFirst: false } };
+  }
+  if (type === 'dash:remote-key' && payload.type === 'keyDown') {
+    return { verb: 'domKeyPress', params: Object.assign({ key: payload.key, code: payload.code || '' }, flags) };
+  }
+  return null;
+}
+
+/**
+ * Run a content-script verb on the tab's top frame and return its result. A
+ * tab that has not had the content script injected yet (or lost it on a
+ * navigation) gets it injected once, then the call is retried.
+ */
+async function _fsbRemoteControlSendVerb(tabId, verb, params) {
+  var message = { action: 'executeAction', tool: verb, params: params };
+  try {
+    return await chrome.tabs.sendMessage(tabId, message, { frameId: 0 });
+  } catch (_firstErr) {
+    // Fall through to injection; if the tab is gone, that throws instead.
+  }
+  await chrome.scripting.executeScript({
+    target: { tabId: tabId, allFrames: false },
+    files: _getContentScriptFilesForInjection()
+  });
+  if (!(await _waitForContentScriptReady(tabId))) {
+    throw new Error('Content script did not become ready on tab ' + tabId);
+  }
+  return chrome.tabs.sendMessage(tabId, message, { frameId: 0 });
+}
+
+/**
+ * Safari has no chrome.debugger, so drive remote control through the same DOM
+ * fallbacks the AI tools use there (content/actions.js). Those dispatch
+ * untrusted events: sites that check event.isTrusted ignore them, and they do
+ * not reach into iframes.
+ *
+ * This must run before any CDP dispatch. The adapter's rejecting attach shim
+ * says "debugger", which classifyFSBRemoteControlDispatchFailure would read
+ * as 'debugger-blocked' -- an EXTERNAL debugger holding the tab -- and end the
+ * session. FsbPlatform is undefined on Chrome, so this never fires there.
+ *
+ * A miss on the page (nothing at the point, nothing focused to type into) is
+ * logged and the session stays up, since the user can simply try again. A tab
+ * that cannot be reached at all ends the session with 'retarget-required'.
+ *
+ * @param {string} type - dashboard message type, e.g. 'dash:remote-click'
+ * @param {Object} payload - the validated dashboard payload
+ * @param {number} tabId - target tab
+ * @returns {Promise<boolean>} true when the input was handled here
+ */
+async function _fsbRemoteControlDomDispatch(type, payload, tabId) {
+  var platform = globalThis.FsbPlatform;
+  if (!platform || !platform.caps || platform.caps.trustedInput !== false) {
+    return false;
+  }
+  var step = _fsbRemoteControlDomStep(type, payload);
+  if (!step) return true;
+
+  var result;
+  try {
+    result = await _fsbRemoteControlSendVerb(tabId, step.verb, step.params);
+  } catch (err) {
+    console.warn('[FSB RC] DOM dispatch could not reach tab', tabId, err && err.message ? err.message : err);
+    _remoteControlActive = false;
+    _broadcastRemoteControlState(globalThis.__fsbWsInstance, false, 'retarget-required', tabId);
+    recordFSBRemoteControlFailure('remote-control-dispatch-failed', type, payload, err, 'retarget-required', tabId);
+    return true;
+  }
+  if (!result || result.success === false) {
+    recordFSBRemoteControlFailure(
+      'remote-control-dispatch-missed',
+      type,
+      payload,
+      (result && result.error) || 'no response from the content script',
+      'dispatch-failed',
+      tabId
+    );
+  }
+  return true;
+}
+
 async function handleRemoteClick(payload) {
   if (!_remoteControlActive) {
     console.warn('[FSB RC] Click ignored: remote control not active');
@@ -928,6 +1074,7 @@ async function handleRemoteClick(payload) {
     _broadcastRemoteControlState(globalThis.__fsbWsInstance, false, 'no-tab', null);
     return;
   }
+  if (await _fsbRemoteControlDomDispatch('dash:remote-click', payload, tabId)) return;
   // Decompose dashboard bitmask modifiers into boolean flags for cdpClickAt.
   // Dashboard bitmask: alt=1, ctrl=2, meta=4, shift=8.
   var mods = typeof payload.modifiers === 'number' ? payload.modifiers : 0;
@@ -985,6 +1132,7 @@ async function handleRemoteKey(payload) {
     _broadcastRemoteControlState(globalThis.__fsbWsInstance, false, 'no-tab', null);
     return;
   }
+  if (await _fsbRemoteControlDomDispatch('dash:remote-key', payload, tabId)) return;
   var mods = typeof payload.modifiers === 'number' ? payload.modifiers : 0;
 
   try {
@@ -1085,6 +1233,7 @@ async function handleRemoteScroll(payload) {
     _broadcastRemoteControlState(globalThis.__fsbWsInstance, false, 'no-tab', null);
     return;
   }
+  if (await _fsbRemoteControlDomDispatch('dash:remote-scroll', payload, tabId)) return;
   var deltaX = Number.isFinite(payload.deltaX) ? payload.deltaX : 0;
   var deltaY = Number.isFinite(payload.deltaY) ? payload.deltaY : 0;
   try {
@@ -1236,6 +1385,10 @@ async function handleRemoteNavigateHistory(payload) {
   }
   var tabId = _getRemoteControlTabId();
   if (typeof tabId !== 'number') {
+    var safariTab = await _fsbSafariContentTab(_isNotDashboardTabUrl);
+    if (safariTab) tabId = safariTab.id;
+  }
+  if (typeof tabId !== 'number') {
     try {
       var tabs = await new Promise(function (resolve) {
         chrome.tabs.query({ active: true, lastFocusedWindow: true }, function (t) { resolve(t || []); });
@@ -1286,6 +1439,10 @@ async function handleRemoteNavigate(payload) {
   }
 
   var tabId = _getRemoteControlTabId();
+  if (typeof tabId !== 'number') {
+    var safariTab = await _fsbSafariContentTab(_isNotDashboardTabUrl);
+    if (safariTab) tabId = safariTab.id;
+  }
   if (typeof tabId !== 'number') {
     // Fall back: navigate the active tab in the focused window. This lets the
     // user steer the browser away from chrome://newtab even before streaming
@@ -1418,6 +1575,7 @@ class FSBWebSocket {
     this.ws.onopen = () => {
       if (this.ws !== socket) return;
       this.reconnectDelay = 0;
+      this._clearReconnectAlarm();
       this.connected = true;
       this._startKeepalive();
       // Phase 209: Expose this instance so bare-function remote control
@@ -1485,6 +1643,7 @@ class FSBWebSocket {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
     }
+    this._clearReconnectAlarm();
     if (this.ws) {
       this.ws.close();
     }
@@ -1571,6 +1730,7 @@ class FSBWebSocket {
       delayMs: this.reconnectDelay === 0 ? 0 : this.reconnectDelay,
       readyState: this.ws ? this.ws.readyState : 'missing'
     });
+    this._armReconnectAlarm();
     if (this.reconnectDelay === 0) {
       this.reconnectDelay = 1000;
       console.log('[FSB WS] Reconnecting immediately');
@@ -1579,6 +1739,35 @@ class FSBWebSocket {
       console.log('[FSB WS] Reconnecting in ' + this.reconnectDelay + 'ms');
       this.reconnectTimer = setTimeout(() => this.connect(), this.reconnectDelay);
       this.reconnectDelay = Math.min(this.reconnectDelay * 2, this.maxReconnectDelay);
+    }
+  }
+
+  /**
+   * The backoff timer above dies with the service worker, and onStartup /
+   * onInstalled do not fire again after an eviction, so a relay that dropped
+   * while the worker went idle stayed down until the browser restarted. This
+   * alarm outlives the worker: it wakes it, background.js arms the relay on
+   * every start, and it keeps firing each minute until a socket opens.
+   */
+  _armReconnectAlarm() {
+    var alarms = typeof chrome !== 'undefined' ? chrome.alarms : null;
+    if (!alarms || typeof alarms.create !== 'function') return;
+    try {
+      var result = alarms.create(FSB_RELAY_RECONNECT_ALARM, { delayInMinutes: 0.5, periodInMinutes: 1 });
+      if (result && typeof result.catch === 'function') result.catch(function () {});
+    } catch (_e) {
+      // The in-memory timer still retries while the service worker is alive.
+    }
+  }
+
+  _clearReconnectAlarm() {
+    var alarms = typeof chrome !== 'undefined' ? chrome.alarms : null;
+    if (!alarms || typeof alarms.clear !== 'function') return;
+    try {
+      var result = alarms.clear(FSB_RELAY_RECONNECT_ALARM);
+      if (result && typeof result.catch === 'function') result.catch(function () {});
+    } catch (_e) {
+      // Best effort: a stray firing only re-arms a relay that is already up.
     }
   }
 
@@ -1743,6 +1932,16 @@ class FSBWebSocket {
           source: 'streaming-tab'
         };
       }
+    }
+
+    var safariTab = await _fsbSafariContentTab();
+    if (safariTab && !seenTabIds.has(safariTab.id)) {
+      return {
+        ready: true,
+        tabId: safariTab.id,
+        url: safariTab.url || '',
+        source: 'safari-content-tab'
+      };
     }
 
     var queries = [
@@ -2053,6 +2252,12 @@ class FSBWebSocket {
         } catch (e) { tabId = null; }
       }
 
+      // On Safari the last focused window can be FSB's own workspace window.
+      if (!tabId) {
+        var safariTab = await _fsbSafariContentTab(_isNotDashboardTabUrl);
+        if (safariTab) tabId = safariTab.id;
+      }
+
       // Fallback 1: active tab in last focused window
       if (!tabId) {
         var tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
@@ -2267,6 +2472,10 @@ class FSBWebSocket {
         ? _streamingTabId
         : (typeof _dashboardTaskTabId !== 'undefined' ? _dashboardTaskTabId : null);
       if (!tabId) {
+        var safariTab = await _fsbSafariContentTab();
+        if (safariTab) tabId = safariTab.id;
+      }
+      if (!tabId) {
         // Last resort: query active tab (unreliable from service worker)
         var tabs = await chrome.tabs.query({ active: true, currentWindow: true });
         tabId = tabs[0]?.id;
@@ -2349,6 +2558,10 @@ class FSBWebSocket {
   }
 
 }
+
+// Backstop alarm for the relay; background.js's onAlarm listener arms the
+// relay when it fires.
+var FSB_RELAY_RECONNECT_ALARM = 'fsb-dashboard-relay-reconnect';
 
 // Global instance for service worker
 const fsbWebSocket = new FSBWebSocket();

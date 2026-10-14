@@ -171,7 +171,10 @@ export class WebSocketBridge {
     this.extensionHeartbeatTimeoutMs = options.extensionHeartbeatTimeoutMs ?? 90_000;
     this.promotionJitterMs = options.promotionJitterMs ?? 500;
     this.maxReconnectDelayMs = options.maxReconnectDelayMs ?? 30_000;
-    this.allowedBrowserOrigins = options.allowedBrowserOrigins ?? ['chrome-extension://'];
+    // Safari Web Extensions send Origin: safari-web-extension://<UUID>, both
+    // from a direct WebSocket and from the container app's native socket.
+    this.allowedBrowserOrigins = options.allowedBrowserOrigins ??
+      ['chrome-extension://', 'safari-web-extension://'];
     this.handleExtRequest = typeof options.handleExtRequest === 'function'
       ? options.handleExtRequest
       : null;
@@ -587,7 +590,7 @@ export class WebSocketBridge {
     try {
       const parsed = new URL(originHeader);
       if (
-        parsed.protocol !== 'chrome-extension:'
+        (parsed.protocol !== 'chrome-extension:' && parsed.protocol !== 'safari-web-extension:')
         || !parsed.host
         || parsed.port
         || parsed.username
@@ -598,7 +601,7 @@ export class WebSocketBridge {
       ) {
         return false;
       }
-      const canonical = `chrome-extension://${parsed.host}`;
+      const canonical = `${parsed.protocol}//${parsed.host}`;
       if (originHeader !== canonical && originHeader !== `${canonical}/`) return false;
       if (!this.allowedBrowserOrigins.some((allowedOrigin) =>
         allowedOrigin.endsWith('://')

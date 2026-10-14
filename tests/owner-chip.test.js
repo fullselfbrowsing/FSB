@@ -501,7 +501,7 @@ async function runSidepanelOwnershipLockContract(source) {
     applyInputLockout(value) { lockoutCalls.push(value); }
   };
   vm.createContext(context);
-  for (const name of ['_renderHeaderStatus', '_setHeaderStatus', 'refreshActiveTabOwnership']) {
+  for (const name of ['getTargetTabs', '_renderHeaderStatus', '_setHeaderStatus', 'refreshActiveTabOwnership']) {
     const definition = extractNamedFunction(source, name);
     ok(!!definition, 'sidepanel: ' + name + ' is extractable for ownership-lock behavior');
     if (definition) vm.runInContext(definition, context);

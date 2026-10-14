@@ -70,6 +70,7 @@ function createHarness(options = {}) {
   }
 
   const sockets = [];
+  const alarmCalls = [];
   const iconStates = [];
   const statusBroadcasts = [];
   const reconnectDiagnostics = [];
@@ -138,7 +139,11 @@ function createHarness(options = {}) {
           }
         }
       },
-      runtime: { getManifest: () => ({ version: 'test' }) }
+      runtime: { getManifest: () => ({ version: 'test' }) },
+      alarms: {
+        create: async (name, info) => { alarmCalls.push({ op: 'create', name, info }); },
+        clear: async (name) => { alarmCalls.push({ op: 'clear', name }); return true; }
+      }
     },
     fetch: options.fetch || (async () => { throw new Error('no network in this test'); }),
     _normalizeFsbServerUrl: (value) => (typeof value === 'string' && value.trim() ? value.trim() : 'https://full-selfbrowsing.com').replace(/\/+$/, ''),
@@ -162,6 +167,8 @@ function createHarness(options = {}) {
   return {
     client,
     sockets,
+    alarmCalls,
+    alarmName: context.FSB_RELAY_RECONNECT_ALARM,
     iconStates,
     statusBroadcasts,
     storage,
@@ -269,6 +276,73 @@ async function run() {
     assert.strictEqual(h.client.connected, false, 'client reports disconnected');
     assert.strictEqual(h.iconStates[h.iconStates.length - 1], false, 'icon shows the relay as down');
     assert.strictEqual(h.statusBroadcasts[h.statusBroadcasts.length - 1], false, 'Sync tab is told the relay dropped');
+    console.log('  PASS');
+  }
+
+  console.log('--- a drop arms the reconnect alarm, and the reopen clears it ---');
+  {
+    // The backoff timer dies with the service worker; the alarm does not.
+    const h = createHarness();
+    assert.strictEqual(h.alarmName, 'fsb-dashboard-relay-reconnect', 'alarm name');
+    h.client.connect();
+    await h.advance(1000);
+    assert(!h.alarmCalls.some((c) => c.op === 'create'), 'a connect that opens never arms the alarm');
+    h.sockets[0].drop(1006);
+    await h.advance(1000);
+    const creates = h.alarmCalls.filter((c) => c.op === 'create');
+    assert.strictEqual(creates.length, 1, 'the drop arms the alarm once');
+    assert.strictEqual(creates[0].name, h.alarmName, 'under the relay alarm name');
+    // info is built inside the vm, so compare by value rather than prototype.
+    assert.strictEqual(JSON.stringify(creates[0].info), JSON.stringify({ delayInMinutes: 0.5, periodInMinutes: 1 }),
+      'a backstop that keeps waking the worker until a socket opens');
+    const createdAt = h.alarmCalls.indexOf(creates[0]);
+    assert(h.alarmCalls.slice(createdAt + 1).some((c) => c.op === 'clear' && c.name === h.alarmName),
+      'the reconnect that opens clears it');
+    console.log('  PASS');
+  }
+
+  console.log('--- disconnect() clears the reconnect alarm ---');
+  {
+    const h = createHarness();
+    h.client.connect();
+    await h.advance(1000);
+    h.sockets[0].drop(1006);
+    h.client.disconnect();
+    await h.advance(60000);
+    const last = h.alarmCalls[h.alarmCalls.length - 1];
+    assert.deepStrictEqual(last, { op: 'clear', name: h.alarmName }, 'the last alarm call is the clear from disconnect()');
+    assert.strictEqual(h.sockets.length, 1, 'and nothing reconnects');
+    console.log('  PASS');
+  }
+
+  console.log('--- background.js arms the relay on every worker start ---');
+  {
+    const bg = fs.readFileSync(path.join(__dirname, '..', 'extension', 'background.js'), 'utf8');
+    const importAt = bg.indexOf("importScripts('ws/ws-client.js')");
+    const fnStart = bg.indexOf('function armDashboardRelay() {');
+    const callAt = bg.indexOf('\narmDashboardRelay();\n');
+    assert(importAt !== -1 && fnStart > importAt, 'armDashboardRelay is defined after ws-client loads');
+    assert(callAt > fnStart, 'and called at top level, so it runs on every worker start');
+    assert(/if \(typeof FSB_RELAY_RECONNECT_ALARM !== 'undefined' && alarm\.name === FSB_RELAY_RECONNECT_ALARM\) \{\n\s+armDashboardRelay\(\);\n\s+return;/.test(bg),
+      'the relay alarm re-arms the relay');
+
+    const fnSource = bg.slice(fnStart, callAt);
+    async function arm(stored, withClient = true) {
+      const calls = [];
+      const ctx = {
+        chrome: { storage: { local: { get: async () => stored } } },
+        Promise
+      };
+      if (withClient) ctx.fsbWebSocket = { connect() { calls.push('connect'); } };
+      vm.createContext(ctx);
+      vm.runInContext(fnSource + '\narmDashboardRelay();', ctx);
+      for (let i = 0; i < 5; i++) await new Promise((resolve) => setImmediate(resolve));
+      return calls;
+    }
+    assert.deepStrictEqual(await arm({}), ['connect'], 'connects when the sync setting was never written');
+    assert.deepStrictEqual(await arm({ serverSyncEnabled: true }), ['connect'], 'connects when sync is on');
+    assert.deepStrictEqual(await arm({ serverSyncEnabled: false }), [], 'stays down when sync is explicitly off');
+    assert.deepStrictEqual(await arm({}, false), [], 'does nothing, without throwing, if ws-client failed to load');
     console.log('  PASS');
   }
 

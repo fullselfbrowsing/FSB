@@ -181,6 +181,32 @@ async function executeContentTool(tool, params, tabId) {
  * @returns {Promise<Object>} Structured result
  */
 async function executeCdpTool(tool, params, tabId, cdpHandler) {
+  // Safari has no chrome.debugger, so there is no trusted-input path for the
+  // seven _route:'cdp' tools. Rather than hard-fail them, route to the DOM
+  // equivalents in content/actions.js. Those return trusted:false + degraded:
+  // true, so the agent still sees honestly that the input was untrusted.
+  //
+  // The mapping lives in utils/platform-adapter.js rather than on the tool
+  // definitions because tests/tool-definitions-parity.test.js pins a SHA-256
+  // over the whole registry (cross-checked against mcp/ai/tool-definitions.cjs);
+  // adding a field there would break both files. For the same reason the tool
+  // object is SHALLOW-CLONED here -- mutating the shared registry entry would
+  // change that hash at runtime.
+  //
+  // globalThis.FsbPlatform is undefined on Chrome and in the Node test
+  // harnesses, so Chrome always falls through to the cdpHandler path below.
+  const platform = globalThis.FsbPlatform;
+  if (platform && platform.caps && platform.caps.trustedInput === false) {
+    const domVerb = platform.CDP_DOM_FALLBACKS && platform.CDP_DOM_FALLBACKS[tool._cdpVerb];
+    if (domVerb) {
+      return executeContentTool(Object.assign({}, tool, { _contentVerb: domVerb }), params, tabId);
+    }
+    return makeResult({
+      success: false,
+      error: `capability_unavailable: ${tool.name} requires chrome.debugger, which this browser does not provide`
+    });
+  }
+
   if (typeof cdpHandler !== 'function') {
     return makeResult({
       success: false,
