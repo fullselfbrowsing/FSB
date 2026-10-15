@@ -1,0 +1,4011 @@
+{
+  "locale_seed_greeting": {
+    "message": "FSB가 준비되었습니다",
+    "description": "Seed string that proves a locale catalog can replace English."
+  },
+  "locale_seed_replay": {
+    "message": "재생 속도 $SPEED$",
+    "description": "Seed string with one placeholder.",
+    "placeholders": {
+      "speed": {
+        "content": "$1",
+        "example": "1x"
+      }
+    }
+  },
+  "locale_seed_brand": {
+    "message": "FSB",
+    "description": "Allowlisted invariant brand token."
+  },
+  "ext_name": {
+    "message": "FSB"
+  },
+  "ext_description": {
+    "message": "FSB는 AI 기반의 범용 브라우저 자동화 도우미입니다."
+  },
+  "shell_fast_task": {
+    "message": "빠른 작업 시작"
+  },
+  "shell_workspace": {
+    "message": "항상 여는 작업 공간"
+  },
+  "shell_ready": {
+    "message": "준비됨"
+  },
+  "shell_pin_window": {
+    "message": "창 고정"
+  },
+  "shell_test_api": {
+    "message": "API 연결 테스트"
+  },
+  "shell_settings": {
+    "message": "설정"
+  },
+  "shell_ask": {
+    "message": "자동화할 일을 입력하세요..."
+  },
+  "shell_stop": {
+    "message": "자동화 중지"
+  },
+  "shell_voice": {
+    "message": "음성 입력"
+  },
+  "shell_send": {
+    "message": "메시지 보내기"
+  },
+  "shell_pin_hint": {
+    "message": "고정 창이 필요할 때 고정하세요"
+  },
+  "shell_lockout": {
+    "message": "이 탭에서 자동화가 작동하는 동안 사이드 패널 입력은 비활성화됩니다"
+  },
+  "shell_history": {
+    "message": "세션 기록"
+  },
+  "shell_delete_all": {
+    "message": "모든 세션 삭제"
+  },
+  "shell_clear_all": {
+    "message": "모두 지우기"
+  },
+  "shell_running": {
+    "message": "자동화 실행 중"
+  },
+  "shell_confirm_payment": {
+    "message": "결제 입력 확인"
+  },
+  "shell_payment_note": {
+    "message": "카드 정보는 양식 칸에 채워집니다. FSB는 결제를 제출하지 않습니다."
+  },
+  "shell_allow": {
+    "message": "허용"
+  },
+  "shell_deny": {
+    "message": "거부"
+  },
+  "shell_new_chat": {
+    "message": "새 채팅 시작"
+  },
+  "shell_welcome": {
+    "message": "FSB에 오신 것을 환영합니다. 무엇을 도와드릴까요?"
+  },
+  "shell_no_automation": {
+    "message": "중지할 실행 중인 자동화가 없습니다."
+  },
+  "shell_stopped": {
+    "message": "자동화를 중지했습니다. 다른 도움이 필요하면 알려 주세요."
+  },
+  "shell_partial": {
+    "message": "부분 결과"
+  },
+  "shell_try_again": {
+    "message": "다시 시도할까요? "
+  },
+  "shell_retry": {
+    "message": "다시 시도"
+  },
+  "shell_switched_popup": {
+    "message": "팝업 모드로 전환했습니다. 바깥쪽을 클릭하면 확장 프로그램이 닫힙니다."
+  },
+  "shell_persistent": {
+    "message": "고정 창에서 실행 중입니다."
+  },
+  "shell_try_again_help": {
+    "message": "다시 시도하거나 다른 도움이 필요하면 알려 주세요."
+  },
+  "shell_locked_tab": {
+    "message": "이 탭에서 자동화가 작동하는 동안 비활성화됨"
+  },
+  "shell_doctor_copied": {
+    "message": "진단 명령을 복사했습니다"
+  },
+  "shell_pair_copied": {
+    "message": "페어링 재설정 명령을 복사했습니다"
+  },
+  "shell_install_copied": {
+    "message": "네이티브 도우미 설치 명령을 복사했습니다"
+  },
+  "shell_site_map_ready": {
+    "message": "사이트 맵이 준비되었습니다. 작업을 다시 시도할까요? "
+  },
+  "shell_retry_sitemap": {
+    "message": "사이트 맵으로 다시 시도"
+  },
+  "shell_locked_ext": {
+    "message": "확장 프로그램이 잠겨 있습니다. 먼저 팝업을 열어 잠금을 해제하세요."
+  },
+  "shell_already_done": {
+    "message": "이미 완료됨"
+  },
+  "shell_session_ended": {
+    "message": "세션이 예기치 않게 종료되었습니다. 다음 작업을 진행할 수 있습니다."
+  },
+  "shell_no_map": {
+    "message": "이 사이트에는 아직 지도가 없습니다. 정찰을 하면 FSB가 사이트 구조를 학습해 성능을 높일 수 있습니다."
+  },
+  "shell_run_recon": {
+    "message": "정찰 실행"
+  },
+  "shell_stuck": {
+    "message": "자동화가 같은 동작을 반복하다 멈췄습니다. 몇 가지 팁입니다:"
+  },
+  "shell_tip_specific": {
+    "message": "이루고 싶은 일을 더 구체적으로 적어 보세요"
+  },
+  "shell_tip_captcha": {
+    "message": "CAPTCHA 풀기처럼 페이지에 수동 단계가 필요한지 확인하세요"
+  },
+  "shell_tip_loaded": {
+    "message": "시작하기 전에 페이지가 완전히 로드되었는지 확인하세요"
+  },
+  "shell_no_worries": {
+    "message": "걱정하지 마세요. 사이드 패널은 그대로입니다. 다시 시도하거나 다른 도움을 요청하세요."
+  },
+  "shell_password": {
+    "message": "비밀번호"
+  },
+  "shell_signing_in": {
+    "message": "로그인하는 중..."
+  },
+  "shell_login_skipped": {
+    "message": "로그인을 건너뛰었습니다. 자동화를 계속합니다..."
+  },
+  "shell_payment_selected": {
+    "message": "저장된 결제 수단을 선택했습니다. FSB가 카드 정보를 채우지만, 최종 결제는 제출하지 않습니다."
+  },
+  "shell_payment_skipped": {
+    "message": "저장된 결제 수단을 건너뛰었습니다. 최종 결제 전에 결제 양식을 확인하세요."
+  },
+  "shell_replay_preview": {
+    "message": "검증된 재생 미리보기"
+  },
+  "shell_fresh_tab_fallback": {
+    "message": "녹화된 사이트의 새 탭"
+  },
+  "shell_approve_replay": {
+    "message": "재생 승인"
+  },
+  "shell_cancel": {
+    "message": "취소"
+  },
+  "shell_replay_busy": {
+    "message": "다른 자동화가 실행 중일 때는 재생할 수 없습니다. 먼저 현재 작업을 중지하세요."
+  },
+  "shell_replay_cancelled_request": {
+    "message": "재생 요청을 취소했습니다. 대상 탭은 열리지 않았습니다."
+  },
+  "shell_replay_inspect_only": {
+    "message": "이 녹화는 검사용으로 검증되었지만 실행할 수 있는 단계가 없습니다."
+  },
+  "shell_replay_cancelled": {
+    "message": "재생을 취소했습니다. 원래 녹화는 변경되지 않았습니다."
+  },
+  "shell_session_missing": {
+    "message": "세션 데이터를 찾을 수 없습니다."
+  },
+  "shell_no_actions": {
+    "message": "이 세션에는 기록된 동작이 없습니다."
+  },
+  "shell_history_failed": {
+    "message": "세션을 불러오지 못했습니다."
+  },
+  "shell_replay_session": {
+    "message": "세션 재생"
+  },
+  "shell_delete_session": {
+    "message": "세션 삭제"
+  },
+  "shell_autopilot": {
+    "message": "오토파일럿"
+  },
+  "shell_checking_local": {
+    "message": "로컬 에이전트 서비스를 확인하는 중"
+  },
+  "shell_checking_local_sent": {
+    "message": "로컬 에이전트 서비스를 확인하는 중입니다. 메시지는 아직 전송되지 않았습니다."
+  },
+  "shell_wake_body": {
+    "message": "FSB가 로컬 에이전트 서비스를 사용할 수 있게 하는 중입니다. 메시지는 아직 전송되지 않았습니다."
+  },
+  "shell_checking_agent": {
+    "message": "에이전트 서비스를 확인하는 중"
+  },
+  "shell_agent_offline": {
+    "message": "에이전트 오프라인"
+  },
+  "shell_offline_body": {
+    "message": "FSB가 로컬 에이전트 서비스에 연결할 수 없습니다. 진단 명령을 실행한 뒤 이 메시지를 다시 시도하세요."
+  },
+  "shell_copy_doctor": {
+    "message": "진단 명령 복사"
+  },
+  "shell_open_provider": {
+    "message": "공급자 설정 열기"
+  },
+  "shell_needs_helper": {
+    "message": "자동 연결에는 네이티브 도우미가 필요합니다"
+  },
+  "shell_install_body": {
+    "message": "FSB 네이티브 도우미를 설치하거나 업데이트한 뒤 이 메시지를 다시 시도하세요. FSB가 이 브라우저를 자동으로 연결합니다."
+  },
+  "shell_copy_install": {
+    "message": "설치 명령 복사"
+  },
+  "shell_back_to_message": {
+    "message": "메시지로 돌아가기"
+  },
+  "shell_checking_provider": {
+    "message": "공급자를 확인하는 중"
+  },
+  "shell_checking_provider_body": {
+    "message": "FSB가 메시지를 보내기 전에 AI 공급자를 확인하고 있습니다."
+  },
+  "shell_starting_agent": {
+    "message": "에이전트를 시작하는 중"
+  },
+  "shell_starting_agent_body": {
+    "message": "FSB가 메시지를 에이전트에게 전달하는 중입니다."
+  },
+  "shell_owned_by": {
+    "message": "$LABEL$ 사용 중",
+    "placeholders": {
+      "label": {
+        "content": "$1"
+      }
+    }
+  },
+  "shell_owned_title": {
+    "message": "$LABEL$이(가) 이 탭을 사용하는 동안 비활성화됨",
+    "placeholders": {
+      "label": {
+        "content": "$1"
+      }
+    }
+  },
+  "shell_error_encountered": {
+    "message": "오류가 발생했습니다: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "shell_error_generic": {
+    "message": "문제가 발생했습니다: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "shell_error_background": {
+    "message": "백그라운드 스크립트와 통신하는 중 오류: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "shell_error_stop": {
+    "message": "자동화를 중지하는 중 오류: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "shell_starting": {
+    "message": "자동화를 시작하는 중..."
+  },
+  "shell_continuing": {
+    "message": "계속하는 중..."
+  },
+  "shell_connecting": {
+    "message": "페이지에 연결하는 중..."
+  },
+  "shell_connected_analyzing": {
+    "message": "연결됨. 페이지를 분석하는 중..."
+  },
+  "shell_analyzing": {
+    "message": "페이지를 분석하는 중..."
+  },
+  "shell_starting_plain": {
+    "message": "자동화 시작"
+  },
+  "shell_testing_api": {
+    "message": "$NAME$ API 연결을 테스트하는 중...",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "shell_api_ok": {
+    "message": "$NAME$ API 연결이 정상입니다.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "shell_api_model": {
+    "message": "모델에 연결됨: $MODEL$",
+    "placeholders": {
+      "model": {
+        "content": "$1"
+      }
+    }
+  },
+  "shell_api_failed": {
+    "message": "$NAME$ API 연결에 실패했습니다. 설정을 확인하세요.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "shell_api_status": {
+    "message": "상태: $STATUS$ - $DETAIL$",
+    "placeholders": {
+      "status": {
+        "content": "$1"
+      },
+      "detail": {
+        "content": "$2"
+      }
+    }
+  },
+  "shell_api_details": {
+    "message": "세부 정보: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "shell_error_details": {
+    "message": "오류 세부 정보: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "shell_working": {
+    "message": "작업 중"
+  },
+  "shell_error_status": {
+    "message": "오류"
+  },
+  "panel_67b6964686": {
+    "message": "대시보드"
+  },
+  "panel_8ad747d05c": {
+    "message": "API 구성"
+  },
+  "panel_8d261a372f": {
+    "message": "동기화"
+  },
+  "panel_703390318b": {
+    "message": "베타"
+  },
+  "panel_be146b37a0": {
+    "message": "비밀번호"
+  },
+  "panel_632e1c5839": {
+    "message": "결제"
+  },
+  "panel_22d4f6088b": {
+    "message": "고급 설정"
+  },
+  "panel_c3963aedaa": {
+    "message": "메모리"
+  },
+  "panel_480d3c119a": {
+    "message": "로그 및 디버그"
+  },
+  "panel_2ccff1d108": {
+    "message": "도움말 및 문서"
+  },
+  "panel_db17c74beb": {
+    "message": "AI 사용량, 비용, 자동화 성능을 살펴봅니다"
+  },
+  "panel_cd41bf0d3e": {
+    "message": "총 토큰"
+  },
+  "panel_dfa5cc738d": {
+    "message": "총 비용"
+  },
+  "panel_ada27592c9": {
+    "message": "요청"
+  },
+  "panel_5068c6c343": {
+    "message": "성공률"
+  },
+  "panel_d909750b1b": {
+    "message": "자동화"
+  },
+  "panel_cddf50281d": {
+    "message": "시간에 따른 토큰 사용량"
+  },
+  "panel_615c5daff4": {
+    "message": "지난 24시간"
+  },
+  "panel_b84372e5cb": {
+    "message": "지난 7일"
+  },
+  "panel_e9ddf63b38": {
+    "message": "지난 30일"
+  },
+  "panel_5e4bc34faf": {
+    "message": "AI 모델 공급자와 API 설정을 구성합니다"
+  },
+  "panel_9b3cf4a154": {
+    "message": "AI 모델 구성"
+  },
+  "panel_84e1ec2c5b": {
+    "message": "AI 공급자"
+  },
+  "panel_994f468aae": {
+    "message": "다른 공급자 선택"
+  },
+  "panel_e65d5614f4": {
+    "message": "사용자 지정 (OpenAI 호환)"
+  },
+  "panel_e69daa3849": {
+    "message": "API 공급자는 로컬 키를 사용합니다. 에이전트 CLI는 기존 로컬 로그인을 사용합니다."
+  },
+  "panel_daa5fed227": {
+    "message": "다른 AI 공급자 선택"
+  },
+  "panel_822a9fabc1": {
+    "message": "이 공급자는 오토파일럿에서 더 이상 사용할 수 없습니다. 새 작업을 시작하기 전에 다른 공급자를 선택하고 저장하세요."
+  },
+  "panel_5e2c614c23": {
+    "message": "모델"
+  },
+  "panel_dfa17046ae": {
+    "message": "모델 목록을 보려면 API 키를 입력하세요"
+  },
+  "panel_00889a77ec": {
+    "message": "사용할 AI 모델을 선택"
+  },
+  "panel_bc3286fa36": {
+    "message": "xAI API 키"
+  },
+  "panel_a3fb46f4c6": {
+    "message": "API 키를 받는 곳"
+  },
+  "panel_8e9faa30de": {
+    "message": ". 키는 브라우저에 로컬로 저장됩니다."
+  },
+  "panel_53bca734db": {
+    "message": "Gemini API 키"
+  },
+  "panel_8418bdbdcd": {
+    "message": "OpenAI API 키"
+  },
+  "panel_e07165f5ce": {
+    "message": "OpenAI 플랫폼"
+  },
+  "panel_959bc25166": {
+    "message": "Anthropic API 키"
+  },
+  "panel_c481af39b2": {
+    "message": "Anthropic 콘솔"
+  },
+  "panel_36e0497429": {
+    "message": "OpenRouter API 키"
+  },
+  "panel_84de34181d": {
+    "message": ". 키 하나로 200개 이상의 모델을 사용합니다."
+  },
+  "panel_018833a024": {
+    "message": "LM Studio 서버 URL"
+  },
+  "panel_3efaf1b1c1": {
+    "message": "LM Studio의 로컬 OpenAI 호환 서버를 사용합니다. API 키가 필요 없습니다. 모델은 다음에서 바로 찾습니다"
+  },
+  "panel_83419f15b8": {
+    "message": "사용자 지정 API 엔드포인트"
+  },
+  "panel_cfb67fffe3": {
+    "message": "OpenAI 호환 API 엔드포인트의 전체 URL을 입력"
+  },
+  "panel_acb781f972": {
+    "message": "사용자 지정 API 키"
+  },
+  "panel_5e2e7207a6": {
+    "message": "키는 브라우저에 로컬로 저장됩니다."
+  },
+  "panel_abfe6d40e5": {
+    "message": "음성을 텍스트로"
+  },
+  "panel_5303c4374c": {
+    "message": "OpenAI Whisper 사용"
+  },
+  "panel_14e36783b5": {
+    "message": "OpenAI API 키가 필요합니다. 끄면 브라우저 기본 음성 인식을 사용합니다."
+  },
+  "panel_e1461bf33a": {
+    "message": "CAPTCHA 해결"
+  },
+  "panel_2909841c62": {
+    "message": "CAPTCHA 해결 사용"
+  },
+  "panel_1955b2ec44": {
+    "message": "2Captcha로 reCAPTCHA v2, hCaptcha, Cloudflare Turnstile 문제를 풉니다"
+  },
+  "panel_5ac544cb2f": {
+    "message": "2Captcha API 키"
+  },
+  "panel_a003f76423": {
+    "message": "가입 위치"
+  },
+  "panel_b6ff7ee96e": {
+    "message": "에이전트 CLI"
+  },
+  "panel_a1272b91cf": {
+    "message": "로그인 확인 중..."
+  },
+  "panel_d696a35bdd": {
+    "message": "프로필"
+  },
+  "panel_3ac8bbca9a": {
+    "message": "결제"
+  },
+  "panel_cec3a9b89b": {
+    "message": "데이터"
+  },
+  "panel_ccf75fb483": {
+    "message": "SuperGrok 연결"
+  },
+  "panel_acfc5be785": {
+    "message": "연결 해제"
+  },
+  "panel_1771a5d0f6": {
+    "message": "로그인 계속"
+  },
+  "panel_888a2f4fc6": {
+    "message": "SuperGrok 사용량 검토"
+  },
+  "panel_d334745b85": {
+    "message": "설치 안내"
+  },
+  "panel_adadface01": {
+    "message": "보고되지 않음"
+  },
+  "panel_5bbbe53187": {
+    "message": "로그인"
+  },
+  "panel_774bf7db76": {
+    "message": "인증 상태"
+  },
+  "panel_2e5f79bb94": {
+    "message": "확인 중..."
+  },
+  "panel_02600e6189": {
+    "message": "API 연결 확인 중"
+  },
+  "panel_c02977b07e": {
+    "message": "연결 테스트"
+  },
+  "panel_3907fa7f80": {
+    "message": "모양"
+  },
+  "panel_efb52e7172": {
+    "message": "테마"
+  },
+  "panel_6725e7bbcd": {
+    "message": "시스템"
+  },
+  "panel_60acc53f13": {
+    "message": "어둡게"
+  },
+  "panel_dbcd5e7bb7": {
+    "message": "밝게"
+  },
+  "panel_19766ed6cc": {
+    "message": "취소"
+  },
+  "panel_1509f561f2": {
+    "message": "저장"
+  },
+  "panel_35322b5bb5": {
+    "message": "변경 내용 저장"
+  },
+  "panel_eb1a70e392": {
+    "message": "버리기"
+  },
+  "panel_49e49bb440": {
+    "message": "생성"
+  },
+  "panel_0e91610117": {
+    "message": "새로고침"
+  },
+  "panel_3664895579": {
+    "message": "내보내기"
+  },
+  "panel_2cff9baabf": {
+    "message": "가져오기"
+  },
+  "panel_78b7d0379d": {
+    "message": "허용"
+  },
+  "panel_05a2d7332e": {
+    "message": "거부"
+  },
+  "panel_ca7981b46e": {
+    "message": "끄기"
+  },
+  "panel_b8c209cdea": {
+    "message": "묻기"
+  },
+  "panel_0286249762": {
+    "message": "자동"
+  },
+  "panel_1a3a4b99db": {
+    "message": "FSB가 봇으로 감지되어 작업을 방해했다는 보고는 없습니다. 그래도 매일 순탄하지는 않습니다. 그렇지 않은 날을 위한 기능입니다."
+  },
+  "panel_1a187ac034": {
+    "message": ", 잔액을 충전한 뒤 대시보드에서 API 키를 복사하세요. reCAPTCHA v2, hCaptcha, Turnstile을 풉니다."
+  },
+  "panel_92f1115a37": {
+    "message": "FSB는 이 CLI의 기존 로컬 로그인을 사용합니다. 연결 테스트는 도구 없는 작은 확인 요청을 하나 보냅니다."
+  },
+  "panel_cfaa352b86": {
+    "message": "xAI · 로컬 하네스"
+  },
+  "panel_fd05c3a95a": {
+    "message": "검토된 Grok Build 1.0.4 프로필이 필요합니다. 연결 테스트는 프롬프트를 보내지 않고 설치, 버전, 격리, ACP, 캐시된 OAuth를 확인합니다."
+  },
+  "panel_ce4f452059": {
+    "message": "로그인한 Grok 계정을 사용합니다. SuperGrok 사용량은 공유 주간 허용량에서 차감되며, 추가 사용이 발생할 수 있습니다."
+  },
+  "panel_ba5c14963d": {
+    "message": "브라우저 작업 텍스트와 FSB MCP 결과는 추론을 위해 Grok으로 전송됩니다. FSB는 이 비공개 프로필에서 보조 원격 측정과 추적 업로드를 끕니다."
+  },
+  "panel_baf4338a6f": {
+    "message": "Anthropic · 로컬 하네스"
+  },
+  "panel_7b14b6ca11": {
+    "message": "Claude Code에 로그인한 계정을 사용합니다. FSB에는 Anthropic 자격 증명이 필요 없습니다."
+  },
+  "panel_8cceeb4d83": {
+    "message": "사용량과 요금은 해당 계정의 Claude 요금제 또는 API 구성을 따릅니다."
+  },
+  "panel_d9daa99f67": {
+    "message": "Claude Code는 FSB가 안전하게 읽을 수 있는 인증 상태를 보고하지 않습니다."
+  },
+  "panel_00604d2592": {
+    "message": "Claude 요금제와 결제 검토"
+  },
+  "panel_b9f2d95fd0": {
+    "message": "자동화 동작과 성능을 조정합니다"
+  },
+  "panel_d987fa1b93": {
+    "message": "제어판 모양"
+  },
+  "panel_1b0daa3cbf": {
+    "message": "운영 체제 모양을 따릅니다. 기본값: 시스템."
+  },
+  "panel_0c2634ded4": {
+    "message": "실행 및 한도"
+  },
+  "panel_a429108292": {
+    "message": "자동화 한도"
+  },
+  "panel_a6db09cd31": {
+    "message": "작업 실행 경계를 제어합니다"
+  },
+  "panel_7f9bd64777": {
+    "message": "최대 반복"
+  },
+  "panel_efb8da8405": {
+    "message": "폭주하는 자동화 반복을 막습니다"
+  },
+  "panel_217a08135e": {
+    "message": "DOM 분석"
+  },
+  "panel_f57d34cd62": {
+    "message": "페이지 요소 처리를 최적화합니다"
+  },
+  "panel_f239d1c5e2": {
+    "message": "요소 한도"
+  },
+  "panel_a0981cec31": {
+    "message": "범위와 속도의 균형"
+  },
+  "panel_44551744d4": {
+    "message": "요소 캐시 크기"
+  },
+  "panel_bc63ff6878": {
+    "message": "50 (최소, 단순한 페이지)"
+  },
+  "panel_6e13b13acc": {
+    "message": "100 (가벼움, 일반 페이지)"
+  },
+  "panel_f5e5f028c7": {
+    "message": "200 (표준, 권장)"
+  },
+  "panel_51a4656787": {
+    "message": "500 (무거움, 복잡한 SPA)"
+  },
+  "panel_b497c0b77d": {
+    "message": "사용자 지정..."
+  },
+  "panel_3bba622285": {
+    "message": "반복 조회를 빠르게 하는 요소 캐시입니다. 값이 클수록 복잡한 페이지에서 빠르고 메모리도 더 씁니다."
+  },
+  "panel_964b6d2feb": {
+    "message": "에이전트 동시 실행"
+  },
+  "panel_93bdf716dc": {
+    "message": "동시에 실행할 에이전트 상한"
+  },
+  "panel_05f46c29ed": {
+    "message": "동시 실행 상한"
+  },
+  "panel_599bc7e4ae": {
+    "message": "권장값(8)으로 재설정"
+  },
+  "panel_26f41aac5c": {
+    "message": "1에서 64 사이여야 합니다"
+  },
+  "panel_dd39c865d3": {
+    "message": "8개 중 0개 실행 중"
+  },
+  "panel_8b2e97f4e5": {
+    "message": "트리거 동시 실행"
+  },
+  "panel_1844d05c26": {
+    "message": "동시에 감시할 트리거 상한"
+  },
+  "panel_5aa4aff46c": {
+    "message": "기본값(8)으로 재설정"
+  },
+  "panel_4f6e909317": {
+    "message": "자동화 동작"
+  },
+  "panel_87fb620509": {
+    "message": "동작 변경 보고"
+  },
+  "panel_8807532414": {
+    "message": "각 동작과 함께 반환되는 차이"
+  },
+  "panel_5d2f08be69": {
+    "message": "동작 변경 보고 반환 (권장)"
+  },
+  "panel_814f4c658e": {
+    "message": "MCP 세션 재생"
+  },
+  "panel_d93120e9c3": {
+    "message": "MCP 에이전트 동작의 로컬 원본 기록"
+  },
+  "panel_e3d0d26ac8": {
+    "message": "재생을 위해 MCP 세션을 기록"
+  },
+  "panel_8c338dcb22": {
+    "message": "MCP 재생 보관 일수"
+  },
+  "panel_a3a33e657a": {
+    "message": "성능 최적화"
+  },
+  "panel_318ba4fefb": {
+    "message": "속도와 정확도를 높이는 기능을 켭니다"
+  },
+  "panel_718ec50194": {
+    "message": "델타 비교"
+  },
+  "panel_4df3ccd4f7": {
+    "message": "첫 검사 이후에는 DOM 변경만 보냅니다 (컨텍스트 70-90% 감소)"
+  },
+  "panel_386c10cfbb": {
+    "message": "표시 영역 우선"
+  },
+  "panel_55b7c33a00": {
+    "message": "보이는 요소에 집중해 더 빠르고 관련 있는 결과를 얻습니다"
+  },
+  "panel_56cb122532": {
+    "message": "AI 사이트 맵 개선"
+  },
+  "panel_bbabb56b4f": {
+    "message": "AI로 사이트 맵을 자동으로 다듬어 탐색 전략과 작업 흐름을 찾습니다"
+  },
+  "panel_6a63ec792f": {
+    "message": "시각적 피드백"
+  },
+  "panel_d9db4fd5a6": {
+    "message": "자동화 중 시각 표시를 제어합니다"
+  },
+  "panel_882726c86c": {
+    "message": "동작 애니메이션 강조"
+  },
+  "panel_525c3926bb": {
+    "message": "동작이 실행되는 동안 요소 주위에 깜빡이는 빛을 표시합니다"
+  },
+  "panel_b8c545e36f": {
+    "message": "사이드 패널 단계 진행"
+  },
+  "panel_cd7487b136": {
+    "message": "자동화 중 사이드 패널에 동작 단계를 표시합니다"
+  },
+  "panel_915c0ef81c": {
+    "message": "개인정보 및 개발자"
+  },
+  "panel_02d7d5cfae": {
+    "message": "음성 입력"
+  },
+  "panel_936f490e8e": {
+    "message": "FSB 사이드 패널의 마이크 입력을 제어합니다"
+  },
+  "panel_92f7b96921": {
+    "message": "마이크 음성 입력 사용"
+  },
+  "panel_e007c1f5fd": {
+    "message": "마이크 권한을 확인하는 중…"
+  },
+  "panel_7df7702416": {
+    "message": "Chrome이 확장 프로그램 전체의 마이크 권한을 관리합니다."
+  },
+  "panel_5e09a0b0eb": {
+    "message": "마이크 사용"
+  },
+  "panel_2c0acdeddf": {
+    "message": "Chrome 설정 열기"
+  },
+  "panel_d7de9cfa12": {
+    "message": "개발자 옵션"
+  },
+  "panel_fef2fc10ae": {
+    "message": "디버그와 문제 해결 도구"
+  },
+  "panel_5f75368293": {
+    "message": "디버그 모드"
+  },
+  "panel_64b2d259ae": {
+    "message": "자동화 문제 해결을 위해 자세한 콘솔 기록을 켭니다"
+  },
+  "panel_38d35a351e": {
+    "message": "개인정보 및 원격 측정"
+  },
+  "panel_21bf1bebea": {
+    "message": "익명 사용 데이터"
+  },
+  "panel_451d787c00": {
+    "message": "익명 사용 데이터 보내기"
+  },
+  "panel_57f9a109d4": {
+    "message": "사용한 토큰, MCP 클라이언트 이름, 활성 에이전트 수. URL, 프롬프트, DOM은 포함하지 않습니다."
+  },
+  "panel_9ec9376910": {
+    "message": "전체 정책 읽기 →"
+  },
+  "panel_04dfac3671": {
+    "message": "연결 끊김"
+  },
+  "panel_acf2db1614": {
+    "message": "서버 동기화"
+  },
+  "panel_609bbbdf07": {
+    "message": "해시 키"
+  },
+  "panel_534803768c": {
+    "message": "대시보드 페어링"
+  },
+  "panel_9a177de63c": {
+    "message": "스캔하여 페어링"
+  },
+  "panel_43e3ece73f": {
+    "message": "남음"
+  },
+  "panel_5ad3dbd124": {
+    "message": "확인"
+  },
+  "panel_c9b3c38247": {
+    "message": "합계"
+  },
+  "panel_a69c4dece1": {
+    "message": "저장소"
+  },
+  "panel_ae65d09655": {
+    "message": "용량"
+  },
+  "panel_a039dfb962": {
+    "message": "토큰"
+  },
+  "panel_4bc74b2135": {
+    "message": "작업"
+  },
+  "panel_2f36130ebc": {
+    "message": "통합"
+  },
+  "panel_ddceb7adfd": {
+    "message": "모두 지우기"
+  },
+  "panel_6cc8519b91": {
+    "message": "이동"
+  },
+  "panel_d3f7409ad7": {
+    "message": "모두 중지"
+  },
+  "panel_f00611c47f": {
+    "message": "시스템에 맞게 자동으로 권장됩니다. 범위는 1에서 64입니다. 낮을수록 자원 사용이 예측 가능하고, 높을수록 병렬 에이전트가 늘어납니다. 실행 중에 낮춰도 기존 에이전트는 종료되지 않으며, 새 상한을 넘는 요청은 거부됩니다."
+  },
+  "panel_bfd6b0808c": {
+    "message": "기본값은 8입니다. 범위는 1에서 64입니다. 낮을수록 자원 사용이 예측 가능하고, 높을수록 병렬 감시가 늘어납니다. 실행 중에 낮춰도 기존 감시는 멈추지 않으며, 새 상한을 넘는 트리거는 거부됩니다."
+  },
+  "panel_552aa7152b": {
+    "message": "각 동작이 바꾼 내용을 짧은 차이로 반환하므로 AI가 페이지를 다시 읽지 않아도 됩니다. 기본값은 켜짐입니다."
+  },
+  "panel_bb0522a484": {
+    "message": "기본값은 30일입니다. 범위는 1일에서 365일입니다. 만료된 MCP 재생 세션만 자동으로 삭제하며, 오토파일럿 기록은 이 설정으로 줄이지 않습니다."
+  },
+  "panel_77f6039567": {
+    "message": "사이드 패널에 마이크를 표시하고 브라우저 음성 인식 또는 OpenAI Whisper를 허용합니다. 기본값은 켜짐입니다."
+  },
+  "panel_509f0b9d50": {
+    "message": "음성 입력을 끄면 FSB가 마이크를 쓰지 않지만, Chrome이 저장한 권한은 취소되지 않습니다."
+  },
+  "panel_76e917ee87": {
+    "message": "원격 제어와 결과 저장을 위해 이 확장 프로그램을 FSB 대시보드와 페어링합니다"
+  },
+  "panel_c11de3bb2e": {
+    "message": "결과 저장과 대시보드 이용을 위해 FSB 서버에 연결합니다"
+  },
+  "panel_097b5fa7f6": {
+    "message": "키를 만든 뒤 대시보드를 페어링하여 이 브라우저를 FSB 서버에 연결합니다."
+  },
+  "panel_75d0625c55": {
+    "message": "백그라운드 에이전트가 자리를 비웠습니다"
+  },
+  "panel_d17d0cfd98": {
+    "message": "FSB는 한 번의 정확한 브라우저 실행에 집중합니다. 예약되고 반복되는 작업은 그것을 위해 만든 도구가 더 적합합니다:"
+  },
+  "panel_5a694f4532": {
+    "message": "오픈 소스 에이전트 루프에는, 그리고"
+  },
+  "panel_6e34781c2f": {
+    "message": "관리되는 장시간 자동화에는. 일하는 방식에 맞는 쪽을 고르세요."
+  },
+  "panel_e76c360683": {
+    "message": "OpenClaw 사용해 보기"
+  },
+  "panel_1a58d9154d": {
+    "message": "Claude Routines 사용해 보기"
+  },
+  "panel_582ba53e9e": {
+    "message": "v0.9.45rc1에서 종료 · 2026년 4월"
+  },
+  "panel_daa7068396": {
+    "message": "이전 에이전트"
+  },
+  "panel_3107f72f47": {
+    "message": "이 프로필에 있던 에이전트 이름을 잃지 않도록 남겨 둡니다. 정의는 chrome.storage.local['bgAgents']에 그대로 있습니다."
+  },
+  "panel_9f83a0b7bf": {
+    "message": "지난 자동화 세션에서 배운 장기 메모리"
+  },
+  "panel_76a6bcf157": {
+    "message": "자동 분석"
+  },
+  "panel_50d0c5511b": {
+    "message": "일화"
+  },
+  "panel_9c11c99c77": {
+    "message": "의미"
+  },
+  "panel_2e3e91ffbd": {
+    "message": "절차"
+  },
+  "panel_ee6cfab445": {
+    "message": "비용 (30일)"
+  },
+  "panel_bc01325482": {
+    "message": "모든 유형"
+  },
+  "panel_96452046b5": {
+    "message": "저장된 메모리가 아직 없습니다. 완료된 자동화 세션에서 자동으로 추출됩니다."
+  },
+  "panel_ba7fab765c": {
+    "message": "정찰"
+  },
+  "panel_cf0e1ec867": {
+    "message": "사이트를 순회하여 상호작용 구조, 탐색, 선택자를 지도로 만듭니다"
+  },
+  "panel_ad2f160b7b": {
+    "message": "최대 깊이"
+  },
+  "panel_53e4d8efcc": {
+    "message": "최대 페이지"
+  },
+  "panel_8ccc2c0e78": {
+    "message": "조사 결과"
+  },
+  "panel_452d842e33": {
+    "message": "사이트 정찰 데이터를 보거나 내려받거나, 사이트 맵 메모리로 저장합니다"
+  },
+  "panel_df63a2da5f": {
+    "message": "조사 결과가 아직 없습니다. 위의 정찰로 사이트를 순회하세요."
+  },
+  "panel_30c19209ac": {
+    "message": "통합 메모리"
+  },
+  "panel_ba41142e62": {
+    "message": "사이트 맵"
+  },
+  "panel_bb501d7877": {
+    "message": "커뮤니티"
+  },
+  "panel_d4b1ea5708": {
+    "message": "개요"
+  },
+  "panel_e72d5d8d0b": {
+    "message": "펼침"
+  },
+  "panel_73cde2ba51": {
+    "message": "전자상거래와 쇼핑"
+  },
+  "panel_8dfdbc2ef4": {
+    "message": "소셜 미디어"
+  },
+  "panel_6c335e2a76": {
+    "message": "금융과 거래"
+  },
+  "panel_822c302ddc": {
+    "message": "여행과 예약"
+  },
+  "panel_7b1b7b315b": {
+    "message": "이메일 플랫폼"
+  },
+  "panel_cbb811ada2": {
+    "message": "코딩 플랫폼"
+  },
+  "panel_c47f423a0a": {
+    "message": "커리어와 구직"
+  },
+  "panel_08cf7301b0": {
+    "message": "게임 플랫폼"
+  },
+  "panel_2d995d5860": {
+    "message": "생산성 도구"
+  },
+  "panel_95bfe584eb": {
+    "message": "디자인과 화이트보드"
+  },
+  "panel_d9dae78103": {
+    "message": "게임"
+  },
+  "panel_d357175cfe": {
+    "message": "미디어"
+  },
+  "panel_6eb00b4b26": {
+    "message": "음악"
+  },
+  "panel_69752f2313": {
+    "message": "뉴스"
+  },
+  "panel_71bf90935f": {
+    "message": "참고"
+  },
+  "panel_9b1f5daf0a": {
+    "message": "스포츠"
+  },
+  "panel_0a035c2b85": {
+    "message": "유틸리티"
+  },
+  "panel_4b7ef9d8cd": {
+    "message": "자동화 활동을 살펴보고 문제를 조사합니다"
+  },
+  "panel_65e5078378": {
+    "message": "로그 지우기"
+  },
+  "panel_5ddbf16ab1": {
+    "message": "로그 내보내기"
+  },
+  "panel_03f1acb9e6": {
+    "message": "모든 로그"
+  },
+  "panel_ee585cc4bd": {
+    "message": "오류만"
+  },
+  "panel_0b3ff2c6ee": {
+    "message": "경고와 오류"
+  },
+  "panel_2d9e112fc2": {
+    "message": "정보 이상"
+  },
+  "panel_122df75095": {
+    "message": "FSB 제어판을 불러왔습니다"
+  },
+  "panel_edeead3f19": {
+    "message": "세션 기록"
+  },
+  "panel_fba294fa8b": {
+    "message": "지난 자동화 세션의 로그를 보고 내보냅니다"
+  },
+  "panel_7a28e26099": {
+    "message": "모든 세션 지우기"
+  },
+  "panel_600cf8138b": {
+    "message": "기록된 세션이 아직 없습니다. 자동화 작업을 실행하면 여기에 로그가 나타납니다."
+  },
+  "panel_e38737d4e5": {
+    "message": "분석 디버그 도구"
+  },
+  "panel_c0b1dd0e52": {
+    "message": "분석 데이터 수집을 시험하고 확인합니다"
+  },
+  "panel_bc93dddbb3": {
+    "message": "토큰 추적 테스트"
+  },
+  "panel_4267998cbe": {
+    "message": "저장소 데이터 보기"
+  },
+  "panel_056a9215e5": {
+    "message": "분석 데이터 지우기"
+  },
+  "panel_2ed2274015": {
+    "message": "데이터 내보내기"
+  },
+  "panel_a239457076": {
+    "message": "디버그 출력:"
+  },
+  "panel_38b6a17864": {
+    "message": "동의 및 감사"
+  },
+  "panel_94ef5e0fd6": {
+    "message": "아래 기본값은 설정하지 않은 모든 사이트에 적용됩니다. 출처별 목록에서 개별 사이트를 제외할 수 있습니다."
+  },
+  "panel_6e133ee86d": {
+    "message": "새 사이트의 기본값"
+  },
+  "panel_9693a6dbf3": {
+    "message": "금융 및 정부 서비스는 이 설정과 관계없이 항상 차단됩니다. 출고 값은 자동이며, 끄기로 바꾸면 엄격한 선택 가입으로 돌아갑니다."
+  },
+  "panel_01914d2038": {
+    "message": "출처별 동의"
+  },
+  "panel_96db3ff001": {
+    "message": "여기서 바꾸지 않으면 각 사이트는 위의 기본값을 따릅니다. 사이트를 끄기로 두면 FSB가 그 사이트에서 동작하지 않습니다."
+  },
+  "panel_48cfb671aa": {
+    "message": "사이트가 아직 없습니다. FSB가 동작한 모든 사이트가 여기에 나타나며 끄기로 둘 수 있습니다. 새 사이트는 위의 기본값을 따릅니다."
+  },
+  "panel_2c64c030d4": {
+    "message": "민감"
+  },
+  "panel_18f2a0947f": {
+    "message": "차단됨"
+  },
+  "panel_5f351832fd": {
+    "message": "변경(쓰기) 호출 허용"
+  },
+  "panel_45a8c38cdf": {
+    "message": "POST/PUT/PATCH/DELETE의 호환 메타데이터입니다. 자동에서는 FSB가 차단되지 않은 출처에서 읽고 쓸 수 있습니다."
+  },
+  "panel_87b1794408": {
+    "message": "대기 중인 요청"
+  },
+  "panel_0334c4fb39": {
+    "message": "대기 0건"
+  },
+  "panel_10fd874b68": {
+    "message": "쓰기"
+  },
+  "panel_47751f88ed": {
+    "message": "감사 로그"
+  },
+  "panel_818cb91030": {
+    "message": "로그 내보내기"
+  },
+  "panel_533e26bdcc": {
+    "message": "로그 지우기"
+  },
+  "panel_33b93476cf": {
+    "message": "시간"
+  },
+  "panel_d3e1c5f8a6": {
+    "message": "출처"
+  },
+  "panel_5faf58a69d": {
+    "message": "기능"
+  },
+  "panel_52a0f9b65b": {
+    "message": "메서드"
+  },
+  "panel_bce87826df": {
+    "message": "부수 효과"
+  },
+  "panel_d37e0cd00f": {
+    "message": "동의"
+  },
+  "panel_4e80abb5b1": {
+    "message": "결과"
+  },
+  "panel_5934628d0f": {
+    "message": "법률 및 서비스 정책"
+  },
+  "panel_fea0aab06e": {
+    "message": "법적 입장 읽기 →"
+  },
+  "panel_4fc14539b2": {
+    "message": "차단된 서비스 보기 →"
+  },
+  "panel_efc0b9cac2": {
+    "message": "개인정보 처리방침 →"
+  },
+  "panel_bfe73827c5": {
+    "message": "자동 로그인 사용"
+  },
+  "panel_bbf6a83734": {
+    "message": "자격 증명 보관함"
+  },
+  "panel_07dd5f0064": {
+    "message": "보관함 상태를 확인하는 중..."
+  },
+  "panel_50b231118c": {
+    "message": "보관함 잠그기"
+  },
+  "panel_ac22d297f8": {
+    "message": "PIN 길이 선택"
+  },
+  "panel_3e785bbc44": {
+    "message": "4자리"
+  },
+  "panel_7856e511a2": {
+    "message": "6자리"
+  },
+  "panel_f246c76813": {
+    "message": "PIN 입력"
+  },
+  "panel_4fa10c7baa": {
+    "message": "PIN 확인"
+  },
+  "panel_73134c8143": {
+    "message": "보관함 설정"
+  },
+  "panel_872ac152d2": {
+    "message": "잠금 해제하려면 PIN을 입력"
+  },
+  "panel_b41986e3f5": {
+    "message": "보관함 잠금 해제"
+  },
+  "panel_c1dc92c680": {
+    "message": "새로 추가"
+  },
+  "panel_35d74dfd8d": {
+    "message": "자격 증명 추가"
+  },
+  "panel_85a85dc9a2": {
+    "message": "웹사이트 / 도메인"
+  },
+  "panel_657144f3f7": {
+    "message": "사용자 이름 / 이메일"
+  },
+  "panel_e7cf3ef4f1": {
+    "message": "비밀번호"
+  },
+  "panel_6239b93e96": {
+    "message": "메모 (선택)"
+  },
+  "panel_9caa27b9d0": {
+    "message": "이 자격 증명을 하위 도메인에서 허용"
+  },
+  "panel_8816182605": {
+    "message": "예: 다음을 위해 저장한 자격 증명"
+  },
+  "panel_eb1c90412b": {
+    "message": "에서도 사용할 수 있습니다"
+  },
+  "panel_195ab9772f": {
+    "message": "저장된 결제 수단 사용"
+  },
+  "panel_b45d64e4a3": {
+    "message": "저장된 결제 수단"
+  },
+  "panel_a92743920d": {
+    "message": "결제 수단 상태를 확인하는 중..."
+  },
+  "panel_bbc3d7eb41": {
+    "message": "결제 수단 잠그기"
+  },
+  "panel_24e06db48e": {
+    "message": "비밀번호 열기"
+  },
+  "panel_186f818f5f": {
+    "message": "저장된 결제 수단 잠금 해제"
+  },
+  "panel_82f87079c6": {
+    "message": "카드 추가"
+  },
+  "panel_b610b1ecca": {
+    "message": "결제 수단 추가"
+  },
+  "panel_7cbcb92acd": {
+    "message": "별명 (선택)"
+  },
+  "panel_85dfa9ba97": {
+    "message": "카드 선택과 저장된 카드 목록에 표시됩니다."
+  },
+  "panel_d6bc26851d": {
+    "message": "카드 소유자 이름"
+  },
+  "panel_4566e068a2": {
+    "message": "카드 번호"
+  },
+  "panel_b764cdc0ea": {
+    "message": "알 수 없음"
+  },
+  "panel_25ec19a82f": {
+    "message": "입력하는 동안 카드 브랜드를 자동으로 감지합니다."
+  },
+  "panel_43533009b2": {
+    "message": "만료 월"
+  },
+  "panel_310ca503ef": {
+    "message": "월"
+  },
+  "panel_ca7aaef8c5": {
+    "message": "만료 연도"
+  },
+  "panel_8a944d3d0e": {
+    "message": "청구 이름"
+  },
+  "panel_1b77352e0b": {
+    "message": "청구 주소 1행"
+  },
+  "panel_ff2bc02380": {
+    "message": "청구 주소 2행 (선택)"
+  },
+  "panel_fc33f73246": {
+    "message": "도시"
+  },
+  "panel_9630a4b030": {
+    "message": "주 / 지역"
+  },
+  "panel_8198b202a8": {
+    "message": "우편번호"
+  },
+  "panel_701d021d08": {
+    "message": "국가"
+  },
+  "panel_d00eca1bae": {
+    "message": "시작하기"
+  },
+  "panel_c772928cb0": {
+    "message": "FSB로 브라우저 자동화의 기초를 배웁니다"
+  },
+  "panel_584aa47f13": {
+    "message": "웹사이트 방문"
+  },
+  "panel_b50c780ec8": {
+    "message": "안내 설정"
+  },
+  "panel_01c470e51f": {
+    "message": "설정 다시 시작"
+  },
+  "panel_c205924de0": {
+    "message": "문서"
+  },
+  "panel_ed16cec106": {
+    "message": "저장소 보기"
+  },
+  "panel_4c4a152a2b": {
+    "message": "지원 및 FAQ"
+  },
+  "panel_7302582a6f": {
+    "message": "지원 열기"
+  },
+  "panel_d4a48a753a": {
+    "message": "MCP 설정"
+  },
+  "panel_2df575344e": {
+    "message": "MCP 가이드 보기"
+  },
+  "panel_506ff39462": {
+    "message": "개인정보 처리방침"
+  },
+  "panel_377733b622": {
+    "message": "개인정보 처리방침 보기"
+  },
+  "panel_666067dd37": {
+    "message": "이슈"
+  },
+  "panel_cf82dd02e8": {
+    "message": "이슈 보기"
+  },
+  "panel_bc47da663d": {
+    "message": "소스 코드"
+  },
+  "panel_6209d4d395": {
+    "message": "GitHub 보기"
+  },
+  "panel_bd4702c187": {
+    "message": "릴리스 노트"
+  },
+  "panel_1705ccc5a5": {
+    "message": "릴리스 보기"
+  },
+  "panel_c011d6097b": {
+    "message": "라이선스"
+  },
+  "panel_b392d33f2e": {
+    "message": "라이선스 보기"
+  },
+  "panel_a4b17bc7db": {
+    "message": "저장하지 않은 변경 내용이 있습니다"
+  },
+  "panel_8e0f9288e2": {
+    "message": "설정하지 않은 사이트를 FSB가 어떻게 다루는지입니다. 자동은 차단되지 않은 사이트의 인증된 API를 FSB가 호출하게 합니다(읽기와 쓰기). 끄기는 각 사이트를 먼저 켜야 합니다. 묻기는 승인을 위해 요청을 대기열에 넣습니다."
+  },
+  "panel_811f8544eb": {
+    "message": "당신의 결정을 기다리는 요청입니다. 허용하면 호출자가 다시 시도할 수 있습니다. FSB는 승인 없이 동작하지 않습니다."
+  },
+  "panel_b04eb08367": {
+    "message": "대기 중인 요청이 없습니다. 도구에 동의가 필요하면 여기에 나타납니다. 위의 목록에서 미리 접근을 허용할 수도 있습니다."
+  },
+  "panel_1fdd802663": {
+    "message": "기능 호출의 가려진 추가 전용 기록입니다. 인수, 토큰, 쿠키, 응답 본문은 저장되지 않습니다."
+  },
+  "panel_787513f4fd": {
+    "message": "감사 항목이 아직 없습니다. 출처를 허용하면 기능 호출이 여기에 기록됩니다. 항목은 가려지며 로컬에만 저장됩니다."
+  },
+  "panel_323d6ff1f1": {
+    "message": "FSB의 자동화 입장, 감사 보관, 동의 모델은 LEGAL.md에 문서화되어 있습니다. 일부 출처는 서비스 거부 목록으로 자동화에서 차단됩니다."
+  },
+  "panel_e31b2a3d3f": {
+    "message": "지원 로그인을 위한 저장된 자격 증명과 공유 보관함을 관리합니다"
+  },
+  "panel_93f508370d": {
+    "message": "켜면 FSB가 로그인 페이지를 감지하고 저장된 자격 증명으로 자동 로그인을 제안합니다"
+  },
+  "panel_10f7c25d31": {
+    "message": "저장된 자격 증명을 보호할 PIN을 선택하세요. 기존 레거시 자격 증명은 자동으로 이전됩니다."
+  },
+  "panel_50c3db852a": {
+    "message": "잠금을 해제하면 비밀번호를 보거나 편집하거나 자동 입력하거나 저장할 수 있습니다."
+  },
+  "panel_b6680d54b2": {
+    "message": "이 브라우저 세션에서 보관함 잠금이 해제되었습니다. 저장된 자격 증명은 아래에 있습니다."
+  },
+  "panel_8d5ab0fe44": {
+    "message": "자동 로그인이 현재 꺼져 있습니다. 저장된 자격 증명은 여기서 관리할 수 있지만, 켜기 전까지 FSB가 자동으로 사용하거나 저장하지 않습니다."
+  },
+  "panel_c533cc0b87": {
+    "message": "저장된 자격 증명이 아직 없습니다. 자동화 중 로그인하면 자동으로 저장되거나, 직접 추가할 수 있습니다."
+  },
+  "panel_0153e2da59": {
+    "message": "웹사이트 도메인을 입력하세요 (예: github.com, mail.google.com)"
+  },
+  "panel_83c6ad5aef": {
+    "message": "지원 결제를 위한 저장된 카드를 관리합니다. 결제 수단은 비밀번호에서 설정한 자격 증명 보관함을 공유합니다."
+  },
+  "panel_ff7378d58d": {
+    "message": "켜면 FSB가 결제 페이지에서 저장된 카드를 채우도록 제안할 수 있습니다. 최종 결제는 자동으로 제출하지 않습니다."
+  },
+  "panel_7d1624ea92": {
+    "message": "저장된 결제 수단을 관리하기 전에 자격 증명 보관함의 잠금을 해제하세요."
+  },
+  "panel_ad5f8e8263": {
+    "message": "결제 수단 잠금 해제에 보관함 PIN을 입력"
+  },
+  "panel_2035e1f48d": {
+    "message": "저장된 카드는 같은 암호화 보관함을 쓰지만, 이 브라우저 세션에서 결제 입력이 되기 전에 따로 잠금 해제가 필요합니다."
+  },
+  "panel_0ec4dc2534": {
+    "message": "이 브라우저 세션에서 저장된 결제 수단의 잠금이 해제되었습니다. FSB는 감지된 결제 페이지에서 저장된 카드 입력을 제안할 수 있지만, 최종 결제는 자동으로 제출하지 않습니다."
+  },
+  "panel_5d38d8a7cf": {
+    "message": "저장된 결제 수단이 현재 꺼져 있습니다. 저장된 카드는 여기서 관리할 수 있지만, 기능을 켜기 전까지 FSB가 결제 중에 제안하지 않습니다."
+  },
+  "panel_2fd67f06e0": {
+    "message": "저장된 결제 수단이 아직 없습니다. 여기에 카드를 추가하면 결제 접근을 잠금 해제한 뒤 FSB가 결제 페이지에서 제안할 수 있습니다."
+  },
+  "panel_928895f662": {
+    "message": "CVV와 청구 프로필 데이터는 로컬 보관함 안에 암호화되어 저장됩니다. 이 기능을 쓰기 전에 로컬 기기 보안을 확인하세요."
+  },
+  "panel_39d561254a": {
+    "message": "카드 저장"
+  },
+  "panel_e4d896bcce": {
+    "message": "도움을 받고 FSB 기능에 대해 더 알아보기"
+  },
+  "panel_32623395c6": {
+    "message": "온보딩을 다시 실행하여 공급자 또는 MCP 설정을 바꿉니다"
+  },
+  "panel_db4cec18bf": {
+    "message": "FSB의 전체 문서와 설정 안내"
+  },
+  "panel_63dfe63d28": {
+    "message": "FAQ를 살펴보고 흔한 연결 문제를 해결합니다"
+  },
+  "panel_d2286811e6": {
+    "message": "Claude Code와 Cursor 같은 MCP 클라이언트를 연결한 뒤 doctor 명령으로 확인합니다"
+  },
+  "panel_f3cb441c27": {
+    "message": "FSB가 데이터, 저장, 선택적 서버 동기화를 어떻게 다루는지 읽습니다"
+  },
+  "panel_476481e410": {
+    "message": "버그를 보고하고, 기능을 요청하고, 개발 진행을 추적합니다"
+  },
+  "panel_89b47ad370": {
+    "message": "소스 코드를 보고 FSB 개발에 기여합니다"
+  },
+  "panel_f775bb5cbf": {
+    "message": "각 FSB 릴리스의 새로운 점과 변경점을 봅니다"
+  },
+  "panel_8abc0aef4e": {
+    "message": "FSB는 MIT 라이선스의 오픈 소스입니다"
+  },
+  "panel_e235f8135c": {
+    "message": "다른 FSB 사용자와 함께 업데이트를 따라갑니다"
+  },
+  "panel_53e5555e9a": {
+    "message": "비밀이 있는 항목과 민감한 입력을 가린 뒤 재생 데이터를 로컬에 저장합니다. 일반적인 입력 텍스트와 동작 결과는 재생에 남습니다. MCP 클라이언트는 비밀이 없는 완료, 부분, 실패 요약을 제공해 로컬 작업 메모리를 저장할 수 있습니다. 별도의 AI 공급자 호출은 하지 않습니다. 끄면 이후 MCP 기록이 멈추고, 열려 있는 기록은 저장됩니다. 기존 MCP 재생 기록은 최근 50개 세션까지 보관하며, 설정한 보관 기간보다 오래 남는 세션은 없습니다. 오토파일럿 기록은 영향을 받지 않습니다."
+  },
+  "panel_65b7096b6d": {
+    "message": "이 출처에서는 자동화가 금지되어 있습니다. "
+  },
+  "panel_d50f8b527c": {
+    "message": "민감한 출처입니다. 기능 호출은 자동에서 실행될 수 있습니다. 네트워크 캡처 발견은 여전히 확인이 필요합니다."
+  },
+  "panel_47d2a515ef": {
+    "message": "불러오는 중..."
+  },
+  "panel_90e89ecfe7": {
+    "message": "다음 500개 이벤트 불러오기"
+  },
+  "panel_935f2565d7": {
+    "message": "이벤트 불러오기 다시 시도"
+  },
+  "panel_4eee87e82f": {
+    "message": "보관함 서비스에 연결할 수 없습니다"
+  },
+  "panel_08bf951eda": {
+    "message": "보관함이 설정되지 않았습니다. 저장된 자격 증명을 보호하려면 만드세요."
+  },
+  "panel_949bcb5f38": {
+    "message": "보관함이 잠겨 있습니다."
+  },
+  "panel_30cef3bfb8": {
+    "message": "이 세션에서 보관함 잠금이 해제되었습니다."
+  },
+  "panel_05dc3c4c0a": {
+    "message": "보관함 상태 확인 중 오류가 발생했습니다."
+  },
+  "panel_890a216b7c": {
+    "message": "잠금 해제 중..."
+  },
+  "panel_def70944c9": {
+    "message": "만드는 중..."
+  },
+  "panel_93ad91e855": {
+    "message": "먼저 자격 증명 보관함의 잠금을 해제하세요."
+  },
+  "panel_8221f05f8b": {
+    "message": "결제 수단이 잠겨 있습니다."
+  },
+  "panel_0b4ba676b0": {
+    "message": "이 세션에서 결제 수단 잠금이 해제되었습니다."
+  },
+  "panel_b82d31b688": {
+    "message": "결제 상태 확인 중 오류가 발생했습니다."
+  },
+  "panel_b197ab1d9b": {
+    "message": "먼저 비밀번호에서 보관함 PIN을 설정하세요."
+  },
+  "panel_160419ae70": {
+    "message": "결제 수단 잠금이 해제되었습니다."
+  },
+  "panel_507fc32dc5": {
+    "message": "에이전트 편집"
+  },
+  "panel_fb25598ed0": {
+    "message": "새 에이전트 만들기"
+  },
+  "panel_6c02a28421": {
+    "message": "테스트 중..."
+  },
+  "panel_22965568d2": {
+    "message": "연결됨"
+  },
+  "panel_ee172faa9c": {
+    "message": "잘못된 키"
+  },
+  "panel_031a8f0f65": {
+    "message": "실패"
+  },
+  "panel_424a2551d3": {
+    "message": "만료됨"
+  },
+  "panel_c7730178f4": {
+    "message": "새 코드 생성"
+  },
+  "panel_ac116124f7": {
+    "message": "페어링 코드를 만들지 못했습니다. 다시 시도하세요."
+  },
+  "panel_d03fd96d28": {
+    "message": "불러온 모델 선택..."
+  },
+  "panel_e189657f5a": {
+    "message": "일치하는 모델이 없습니다"
+  },
+  "entry_step": {
+    "message": "$TOTAL$단계 중 $CURRENT$단계",
+    "placeholders": {
+      "current": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "entry_label_welcome": {
+    "message": "시작"
+  },
+  "entry_label_path": {
+    "message": "경로"
+  },
+  "entry_label_mcp": {
+    "message": "MCP 연결"
+  },
+  "entry_label_provider": {
+    "message": "공급자"
+  },
+  "entry_label_apikey": {
+    "message": "API 키"
+  },
+  "entry_label_setup": {
+    "message": "설정"
+  },
+  "entry_label_pin": {
+    "message": "고정"
+  },
+  "entry_label_done": {
+    "message": "완료"
+  },
+  "entry_future_lead": {
+    "message": "앞으로의"
+  },
+  "entry_future_word": {
+    "message": "자율"
+  },
+  "entry_future_tail": {
+    "message": "브라우징."
+  },
+  "entry_welcome_sub": {
+    "message": "좋은 선택입니다. 에이전트는 최고의 자율 브라우징 엔진을 쓰게 됩니다. DOM 정밀도뿐이고, 시각이나 추측은 없습니다. 보이지 않는 클릭으로는 돌아가지 않습니다."
+  },
+  "entry_feat_api": {
+    "message": "직접 API"
+  },
+  "entry_feat_api_sub": {
+    "message": "클릭만이 아니라 앱과 대화합니다"
+  },
+  "entry_feat_guides": {
+    "message": "130개 이상의 안내"
+  },
+  "entry_feat_guides_sub": {
+    "message": "17개 범주에 걸쳐 있습니다"
+  },
+  "entry_feat_tools": {
+    "message": "MCP 도구 68개"
+  },
+  "entry_feat_tools_sub": {
+    "message": "코딩 에이전트에서"
+  },
+  "entry_get_started": {
+    "message": "시작하기"
+  },
+  "entry_skip_setup": {
+    "message": "지금은 설정 건너뛰기"
+  },
+  "entry_pick_path": {
+    "message": "경로 선택"
+  },
+  "entry_how_run": {
+    "message": "FSB를 어떻게 실행할까요?"
+  },
+  "entry_two_ways": {
+    "message": "들어가는 방법은 두 가지입니다. 지금 하나를 설정하고 나머지는 설정에서 언제든 추가하세요."
+  },
+  "entry_agent": {
+    "message": "에이전트"
+  },
+  "entry_recommended": {
+    "message": "권장"
+  },
+  "entry_agent_desc": {
+    "message": "Claude Code, Cursor, VS Code, OpenClaw 등에서 FSB를 MCP 서버로 사용합니다. 도구 68개, API 키 없음, 브라우저 설정 없음."
+  },
+  "entry_in_browser": {
+    "message": "이 브라우저에서"
+  },
+  "entry_byok": {
+    "message": "내 키"
+  },
+  "entry_byok_desc": {
+    "message": "사이드 패널에서 FSB와 대화합니다. xAI, Anthropic, Google 키를 가져오거나 키 없는 로컬 모델을 실행합니다."
+  },
+  "entry_most_people": {
+    "message": "대부분 FSB를 가장 빠르고 저렴하게 쓰는 MCP로 시작합니다."
+  },
+  "entry_skip_mcp": {
+    "message": "MCP로 건너뛰기"
+  },
+  "entry_mcp_eyebrow": {
+    "message": "권장 경로 / MCP"
+  },
+  "entry_install_h": {
+    "message": "FSB MCP 서버 설치"
+  },
+  "entry_one_command": {
+    "message": "명령은 하나. 에이전트를 고르면 FSB가 자동으로 등록합니다. API 키는 필요 없습니다."
+  },
+  "entry_one_command_short": {
+    "message": "명령은 하나. 에이전트를 고르세요."
+  },
+  "entry_copy_command": {
+    "message": "명령 복사"
+  },
+  "entry_copy_install": {
+    "message": "설치 명령 복사"
+  },
+  "entry_mcp_1a": {
+    "message": "터미널에서 명령을 실행합니다."
+  },
+  "entry_mcp_1b": {
+    "message": "복사에 마우스를 올리기"
+  },
+  "entry_mcp_1c": {
+    "message": "하면 특정 클라이언트를 고를 수 있습니다."
+  },
+  "entry_mcp_2a": {
+    "message": "FSB가 에이전트의 MCP 구성에 자신을 기록합니다."
+  },
+  "entry_mcp_2b": {
+    "message": "도구 68개"
+  },
+  "entry_mcp_2c": {
+    "message": ", 수동 JSON은 없습니다."
+  },
+  "entry_mcp_3": {
+    "message": "에이전트에게 브라우징을 시키면 FSB의 DOM 엔진을 운전합니다."
+  },
+  "entry_claw_name": {
+    "message": "Claw용으로 설정"
+  },
+  "entry_claw_desc": {
+    "message": "제어판의 안내형 OpenClaw 설치"
+  },
+  "entry_prefer_key": {
+    "message": "내 키를 쓸까요?"
+  },
+  "entry_byok_eyebrow": {
+    "message": "브라우저 안 / 내 키"
+  },
+  "entry_choose_provider": {
+    "message": "AI 공급자 선택"
+  },
+  "entry_dont_need": {
+    "message": "이것은 사실 필요 없습니다."
+  },
+  "entry_best_way": {
+    "message": "FSB는 MCP로 실행하는 것이 가장 좋습니다. 키도 비용 상한도 없습니다."
+  },
+  "entry_setup_mcp": {
+    "message": "대신 MCP 설정"
+  },
+  "entry_once_key": {
+    "message": "키를 설정하면 FSB가 사용 가능한 텍스트 모델을 자동으로 나열합니다."
+  },
+  "entry_key_heading": {
+    "message": "$NAME$ 키 추가",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_optional": {
+    "message": "이 단계는 선택입니다."
+  },
+  "entry_shines": {
+    "message": "FSB는 MCP에서 가장 빛나므로 키를 완전히 건너뛸 수 있습니다."
+  },
+  "entry_skip_use_mcp": {
+    "message": "건너뛰고 MCP 사용"
+  },
+  "entry_checking": {
+    "message": "확인 중..."
+  },
+  "entry_continue": {
+    "message": "계속"
+  },
+  "entry_almost": {
+    "message": "거의 다 됐습니다"
+  },
+  "entry_pin_h": {
+    "message": "한 번의 클릭으로 열리도록 FSB를 고정"
+  },
+  "entry_pin_sub": {
+    "message": "단계는 이것뿐입니다. Chrome이 설치하는 순간 FSB 권한이 자동으로 켜집니다. 바꿀 스위치는 없습니다."
+  },
+  "entry_other_ext": {
+    "message": "다른 확장 프로그램"
+  },
+  "entry_pinned": {
+    "message": "FSB를 고정했습니다"
+  },
+  "entry_ive_pinned": {
+    "message": "FSB를 고정했습니다"
+  },
+  "entry_skip_step": {
+    "message": "이 단계 건너뛰기"
+  },
+  "entry_all_set": {
+    "message": "모두 준비되었습니다."
+  },
+  "entry_ready_sub": {
+    "message": "FSB가 준비되었습니다. 이것이 설정입니다. 나중에 설정에서 바꿀 수 있습니다."
+  },
+  "entry_running": {
+    "message": "FSB가 실행 중입니다"
+  },
+  "entry_open": {
+    "message": "FSB 열기"
+  },
+  "entry_more": {
+    "message": "FSB에 대해 알아볼 것이 아직 많습니다. 다음에서 확인하세요"
+  },
+  "entry_control_panel": {
+    "message": "제어판"
+  },
+  "entry_docs": {
+    "message": "문서"
+  },
+  "entry_back": {
+    "message": "뒤로"
+  },
+  "entry_sum_setup": {
+    "message": "설정"
+  },
+  "entry_sum_mcp": {
+    "message": "MCP 서버"
+  },
+  "entry_sum_command": {
+    "message": "명령"
+  },
+  "entry_sum_tools": {
+    "message": "도구"
+  },
+  "entry_sum_68": {
+    "message": "68개 사용 가능"
+  },
+  "entry_sum_access": {
+    "message": "접근"
+  },
+  "entry_sum_granted": {
+    "message": "설치 시 허용됨"
+  },
+  "entry_sum_version": {
+    "message": "버전"
+  },
+  "entry_sum_byok": {
+    "message": "브라우저 안의 내 키"
+  },
+  "entry_sum_provider": {
+    "message": "공급자"
+  },
+  "entry_sum_apikey": {
+    "message": "API 키"
+  },
+  "entry_sum_none": {
+    "message": "설정되지 않음"
+  },
+  "entry_sum_tip": {
+    "message": "팁"
+  },
+  "entry_sum_finish": {
+    "message": "설정에서 설정을 마치기"
+  },
+  "entry_free_tier": {
+    "message": "무료 등급"
+  },
+  "entry_local_nokey": {
+    "message": "로컬 / 키 없음"
+  },
+  "entry_all_clients": {
+    "message": "모든 클라이언트"
+  },
+  "entry_discovering": {
+    "message": "불러온 채팅 모델을 찾는 중..."
+  },
+  "entry_waiting_url": {
+    "message": "서버 URL이 안정되기를 기다리는 중..."
+  },
+  "entry_choose_model": {
+    "message": "불러온 모델 선택..."
+  },
+  "entry_paste_key": {
+    "message": "$NAME$ API 키 붙여넣기",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_toggle_key": {
+    "message": "키 표시 전환"
+  },
+  "entry_key_valid": {
+    "message": "끝이 $LAST$인 키는 유효합니다",
+    "placeholders": {
+      "last": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_key_required": {
+    "message": "$NAME$ API 키가 필요합니다",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_discovering_models": {
+    "message": "모델을 찾는 중..."
+  },
+  "entry_no_models": {
+    "message": "사용 가능한 호환 모델이 없습니다"
+  },
+  "entry_get_key": {
+    "message": "키를 받는 곳"
+  },
+  "entry_stored_locally": {
+    "message": "브라우저에 로컬로 저장됩니다."
+  },
+  "entry_paste_clip": {
+    "message": "클립보드에서 붙여넣기"
+  },
+  "entry_unlock_title": {
+    "message": "FSB 잠금 해제"
+  },
+  "entry_unlock_h": {
+    "message": "보관함 잠금 해제"
+  },
+  "entry_unlock_sub": {
+    "message": "잠금 해제하려면 PIN을 입력"
+  },
+  "entry_unlock": {
+    "message": "잠금 해제"
+  },
+  "entry_unlocking": {
+    "message": "잠금 해제 중..."
+  },
+  "entry_unlock_failed": {
+    "message": "잠금 해제에 실패했습니다"
+  },
+  "entry_no_vault": {
+    "message": "보관함이 설정되지 않았습니다. 먼저 설정을 실행하세요."
+  },
+  "entry_bad_pin": {
+    "message": "PIN이 올바르지 않습니다"
+  },
+  "entry_comm_error": {
+    "message": "통신 오류입니다. 다시 시도하세요."
+  },
+  "entry_first_setup": {
+    "message": "처음이신가요? 설정 실행"
+  },
+  "entry_mic_title": {
+    "message": "FSB용 마이크 사용"
+  },
+  "entry_mic_brand": {
+    "message": "FSB 음성 입력"
+  },
+  "entry_mic_h": {
+    "message": "마이크 사용"
+  },
+  "entry_mic_intro": {
+    "message": "Chrome은 첫 마이크 승인을 일반 확장 프로그램 탭에서 요구합니다. 그 뒤에는 모든 사이트에서 FSB 사이드 패널의 음성 입력이 동작합니다."
+  },
+  "entry_mic_instruction_lead": {
+    "message": "Chrome 안내에서"
+  },
+  "entry_mic_instruction_action": {
+    "message": "방문하는 동안 허용"
+  },
+  "entry_mic_instruction_tail": {
+    "message": "옵션을 고르면 FSB 권한이 유지됩니다."
+  },
+  "entry_mic_waiting": {
+    "message": "Chrome 마이크 안내를 기다리는 중…"
+  },
+  "entry_mic_allow": {
+    "message": "마이크 허용"
+  },
+  "entry_mic_settings": {
+    "message": "마이크 설정 열기"
+  },
+  "entry_mic_footnote": {
+    "message": "이 권한은 활성 탭의 사이트가 아니라 FSB 확장 프로그램의 것입니다."
+  },
+  "entry_mic_try": {
+    "message": "다시 시도"
+  },
+  "entry_mic_no_api": {
+    "message": "이 Chrome 빌드는 확장 프로그램에 마이크 접근을 제공하지 않습니다."
+  },
+  "entry_mic_enabled": {
+    "message": "마이크를 사용하도록 설정했습니다. FSB로 돌아갑니다…"
+  },
+  "entry_mic_blocked": {
+    "message": "FSB의 마이크 접근이 차단되었습니다. Chrome 마이크 설정에서 차단된 FSB 항목을 제거한 뒤 다시 시도하세요."
+  },
+  "entry_mic_none": {
+    "message": "마이크를 찾지 못했습니다. 입력 장치를 연결하거나 켠 뒤 다시 시도하세요."
+  },
+  "entry_mic_busy": {
+    "message": "마이크가 사용 중이거나 사용할 수 없습니다. 다른 녹음 앱을 닫고 다시 시도하세요."
+  },
+  "entry_mic_macos": {
+    "message": "Chrome이 마이크에 접근하지 못했습니다. macOS에서는 시스템 설정 → 개인정보 보호 및 보안 → 마이크에서 Google Chrome을 켠 뒤 다시 시도하세요."
+  },
+  "entry_mic_generic": {
+    "message": "FSB가 마이크에 접근하지 못했습니다. Chrome과 macOS 마이크 설정을 확인한 뒤 다시 시도하세요."
+  },
+  "entry_mic_manual": {
+    "message": "주소창에서 chrome://settings/content/microphone 를 열고 차단된 FSB 항목을 제거하세요."
+  },
+  "entry_automating": {
+    "message": "FSB 자동화 중"
+  },
+  "entry_stop": {
+    "message": "중지"
+  },
+  "entry_planning": {
+    "message": "계획 중"
+  },
+  "entry_initializing": {
+    "message": "초기화 중..."
+  },
+  "entry_done_pill": {
+    "message": "완료"
+  },
+  "entry_actions": {
+    "message": "동작: $COUNT$",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_replay_controls": {
+    "message": "재생 컨트롤"
+  },
+  "entry_pause_replay": {
+    "message": "재생 일시중지"
+  },
+  "entry_replay_position": {
+    "message": "재생 위치, 앞으로만 이동"
+  },
+  "entry_seek_forward": {
+    "message": "재생을 앞으로 이동"
+  },
+  "entry_replay_speed": {
+    "message": "재생 속도 $SPEED$. 활성화하면 $NEXT$(으)로 바뀝니다",
+    "placeholders": {
+      "speed": {
+        "content": "$1"
+      },
+      "next": {
+        "content": "$2"
+      }
+    }
+  },
+  "entry_replay_speed_title": {
+    "message": "재생 속도: $SPEED$ (클릭하여 변경)",
+    "placeholders": {
+      "speed": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_inspect": {
+    "message": "검사할 요소를 클릭"
+  },
+  "entry_selectors": {
+    "message": "FSB가 시도할 선택자"
+  },
+  "entry_attributes": {
+    "message": "속성"
+  },
+  "entry_interact": {
+    "message": "상호작용 가능 여부"
+  },
+  "entry_position": {
+    "message": "위치"
+  },
+  "entry_inspector": {
+    "message": "FSB 검사 모드 (종료는 Ctrl+Shift+E)"
+  },
+  "entry_crawling": {
+    "message": "$DOMAIN$ 순회 중",
+    "placeholders": {
+      "domain": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_pages": {
+    "message": "$COLLECTED$ / $MAX$ 페이지",
+    "placeholders": {
+      "collected": {
+        "content": "$1"
+      },
+      "max": {
+        "content": "$2"
+      }
+    }
+  },
+  "entry_toast_ready": {
+    "message": "FSB가 준비되었습니다. 사이드 패널을 엽니다"
+  },
+  "entry_toast_opened": {
+    "message": "FSB 사이드 패널을 열었습니다"
+  },
+  "entry_toast_popup": {
+    "message": "팝업 창에서 FSB를 여는 중"
+  },
+  "entry_toast_copied": {
+    "message": "설치 명령을 복사했습니다"
+  },
+  "entry_onboarding_tag": {
+    "message": "시작 설정"
+  },
+  "copy_26b2f925d8": {
+    "message": "FSB - 사이드 패널"
+  },
+  "copy_9ca9c869e9": {
+    "message": "파일을 편집하거나, 셸 명령을 실행하거나, 임의의 URL을 가져올 수 없습니다."
+  },
+  "copy_65974683e8": {
+    "message": "이후 실행에서 $NAME$ 신뢰",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_a9780e01fc": {
+    "message": "이 브라우저에서 이후 $NAME$ 실행의 확인을 끕니다.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_88cad98751": {
+    "message": "확인 기본 설정을 저장할 수 없습니다. 다시 시도하거나 신뢰 없이 계속하세요."
+  },
+  "copy_b6b3428299": {
+    "message": "에이전트를 시작할 수 없습니다. 권한을 확인한 뒤 다시 시도하세요."
+  },
+  "copy_02df469915": {
+    "message": "$NAME$ 허용 및 시작",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_63b90cc26c": {
+    "message": "네이티브 도우미가 다른 확장 프로그램과 페어링되어 있습니다"
+  },
+  "copy_606b6c7b99": {
+    "message": "네이티브 도우미 페어링을 재설정한 뒤 이 메시지를 다시 시도하세요. FSB가 이 확장 프로그램을 자동으로 페어링합니다."
+  },
+  "copy_4662e7e99e": {
+    "message": "재설정 명령 복사"
+  },
+  "copy_7d6ee224d7": {
+    "message": "로컬 에이전트 세션을 사용할 수 없습니다"
+  },
+  "copy_abc3c6a9b5": {
+    "message": "doctor 명령을 실행하고, 안내되면 로컬 FSB 서비스를 다시 시작한 뒤 이 메시지를 다시 시도하세요."
+  },
+  "copy_392182513b": {
+    "message": "선택한 공급자는 브라우저 탭을 제어하는 에이전트를 지원하지 않습니다. 지원되는 에이전트 공급자를 선택한 뒤 이 메시지를 다시 시도하세요."
+  },
+  "copy_664ba782e6": {
+    "message": "로컬에서 $NAME$에 로그인한 뒤 이 메시지를 다시 시도하세요.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_1c5510dd75": {
+    "message": "연결 테스트는 위임 실행을 시작하지 않으므로 계속 성공할 수 있습니다. 메시지를 다시 시도하거나 공급자 설정을 검토하세요."
+  },
+  "copy_266c761925": {
+    "message": "에이전트가 이 작업을 시작할 수 없습니다"
+  },
+  "copy_6271a1aa0b": {
+    "message": "이 메시지를 입력창에 둔 채 공급자 설정을 확인하고 다시 시도하세요."
+  },
+  "copy_07eab3e346": {
+    "message": "데몬 재시작 후 에이전트 실행이 종료되었습니다"
+  },
+  "copy_00143d759f": {
+    "message": "에이전트가 이 작업을 마치지 못했습니다"
+  },
+  "copy_81dfbf1a8a": {
+    "message": "에이전트 연결이 끊어졌습니다"
+  },
+  "copy_c1db132cee": {
+    "message": "에이전트 정리에 확인이 필요합니다"
+  },
+  "copy_66defff597": {
+    "message": "에이전트가 제어를 다시 시작하지 못했습니다"
+  },
+  "copy_f5bb81be63": {
+    "message": "FSB가 이 실행을 수락했지만 저장하지 못했고, 중지가 확인되지 않았습니다."
+  },
+  "copy_1c86e2b334": {
+    "message": "이전 에이전트 프로세스가 중지되었고 다시 연결되지 않았습니다. 로컬 서비스가 준비되면 새 작업을 시작하세요."
+  },
+  "copy_1a103bf447": {
+    "message": "새 작업 시작"
+  },
+  "copy_6c845be6a5": {
+    "message": "FSB가 로컬 에이전트 서비스의 응답 세 번을 놓쳤습니다. 이 실행은 안전하게 계속할 수 없습니다."
+  },
+  "copy_4cf5603fc8": {
+    "message": "FSB 네이티브 도우미를 설치하거나 업데이트한 뒤 다시 시도하세요. FSB가 이 브라우저를 자동으로 연결합니다."
+  },
+  "copy_87db7a3927": {
+    "message": "FSB가 이 탭을 $NAME$에 되돌리지 못해 실행이 끝났고 탭은 계속 사용자 제어에 있습니다. 준비되면 새 작업을 시작하세요.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_d1708202db": {
+    "message": "메시지 다시 시도"
+  },
+  "copy_39ccfe7853": {
+    "message": "자동화가 작동 중입니다"
+  },
+  "copy_e609da84a5": {
+    "message": "이 탭에서는 자동화 제어를 더 이상 사용할 수 없습니다."
+  },
+  "copy_a6b6ef6c4e": {
+    "message": "중지를 확인할 수 없습니다. 이전 에이전트 상태가 계속 표시됩니다."
+  },
+  "copy_ba4af741ad": {
+    "message": "원래 메시지가 아직 있습니다. 중지를 다시 시도해 정리를 마치세요."
+  },
+  "copy_e71b7995e6": {
+    "message": "FSB가 이 에이전트 실행을 저장하지 못했습니다. 해당 실행의 중지는 확인되었고 메시지는 유지되었습니다. 다시 시도하세요."
+  },
+  "copy_ee776a7565": {
+    "message": "다른 작업을 시작하기 전에 원래 탭과 대화에서 보류 중인 에이전트 정리를 마치세요. 메시지는 유지되었습니다."
+  },
+  "copy_b3715a6900": {
+    "message": "FSB가 이 탭을 $NAME$에 되돌리지 못해 실행이 끝났고 탭은 계속 사용자 제어에 있습니다.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_47220517c7": {
+    "message": "FSB 로컬 도우미가 설치되어 있지 않습니다. 실행: npx -y fsb-mcp-server@latest install --native-host"
+  },
+  "copy_d0b5d103f7": {
+    "message": "$DOMAIN$에서 정찰을 시작하는 중...",
+    "placeholders": {
+      "domain": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_7654da628e": {
+    "message": "정찰을 시작하지 못했습니다: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_ca79bcd4d7": {
+    "message": "정찰이 완료되었습니다. $DOMAIN$의 사이트 맵을 저장했습니다.",
+    "placeholders": {
+      "domain": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_0f654a723b": {
+    "message": "자동화는 완료되었지만 요약이 제공되지 않았습니다. 작업이 예상대로 끝나지 않았다면 다시 시도하세요."
+  },
+  "copy_b6c7f59d4f": {
+    "message": "로그인 페이지가 감지되었습니다..."
+  },
+  "copy_43d71bc905": {
+    "message": "이 결제에는 저장된 결제 수단을 사용할 수 없습니다."
+  },
+  "copy_e46796d601": {
+    "message": "저장된 카드가 없습니다"
+  },
+  "copy_40a0d5700e": {
+    "message": "금고 설정이 필요합니다"
+  },
+  "copy_eef91deafe": {
+    "message": "결제 접근이 잠겨 있습니다"
+  },
+  "copy_583fe8b004": {
+    "message": "저장된 결제를 사용할 수 없습니다"
+  },
+  "copy_5932e9b23f": {
+    "message": "청구 프로필이 저장되었습니다"
+  },
+  "copy_fbbc8ab36d": {
+    "message": "저장된 카드를 입력하는 중..."
+  },
+  "copy_e09653448c": {
+    "message": "중복될 수 있는 쓰기 전에 재생을 일시 중지했습니다."
+  },
+  "copy_a378a72986": {
+    "message": "재생 결정을 실패했습니다"
+  },
+  "copy_aacf80d079": {
+    "message": "재생 단계를 다시 시도하는 중..."
+  },
+  "copy_8e731074ee": {
+    "message": "재생 단계를 건너뛰는 중..."
+  },
+  "copy_2d7848007e": {
+    "message": "재생 결정을 적용할 수 없습니다: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_0d3db7357d": {
+    "message": "차단됨 · 가려진 입력"
+  },
+  "copy_4916a64c38": {
+    "message": "MCP 클라이언트가 이 재생을 새 탭 $COUNT$개에서 요청했습니다.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_c15b9f2acd": {
+    "message": "MCP 클라이언트가 이 재생을 새 탭 $COUNT$개에서 요청했습니다.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_552d4905b4": {
+    "message": "한 번의 승인은 검증된 매니페스트 자체만 다루며, 영향이 큰 단계 $COUNT$개를 포함합니다.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_4c946b4834": {
+    "message": "한 번의 승인은 검증된 매니페스트 자체만 다루며, 영향이 큰 단계 $COUNT$개를 포함합니다.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_9240c9c130": {
+    "message": "한 번의 승인은 검증된 매니페스트 자체만 다룹니다."
+  },
+  "copy_b0802ca35d": {
+    "message": "기록된 재생 탭을 여는 중..."
+  },
+  "copy_c8a00bd3b5": {
+    "message": "재생을 시작하지 못했습니다"
+  },
+  "copy_1a0ef83852": {
+    "message": "요청한 재생을 시작하지 못했습니다: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_98db9dc8c5": {
+    "message": "재생 취소에 실패했습니다"
+  },
+  "copy_4ed0e5ecba": {
+    "message": "재생 요청을 취소할 수 없습니다: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_0d9f4051eb": {
+    "message": "재생 검증에 실패했습니다"
+  },
+  "copy_fc1f569fa7": {
+    "message": "이 기록은 검사 전용입니다. 기록된 호출 $TOTAL$개 중 최근 $LATEST$개만 사용할 수 있습니다. 더 이전의 브라우저 상태는 안전하게 재구성할 수 없습니다.",
+    "placeholders": {
+      "latest": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "copy_a2f62124e7": {
+    "message": "검증된 타임라인을 새 탭 $COUNT$개에서 재생할까요?",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_4c55f6bc6e": {
+    "message": "검증된 타임라인을 새 탭 $COUNT$개에서 재생할까요?",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_dea4fcd3a0": {
+    "message": "이 한 번의 승인은 서명된 매니페스트 자체를 다룹니다: $DETAIL$.",
+    "placeholders": {
+      "detail": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_82e80a0531": {
+    "message": "타임라인에는 읽기와 탐색 단계만 있습니다."
+  },
+  "copy_99b908db8f": {
+    "message": "새 재생 탭을 여는 중..."
+  },
+  "copy_b33e852b38": {
+    "message": "재생을 시작하지 못했습니다."
+  },
+  "copy_816797656b": {
+    "message": "재생을 시작하지 못했습니다: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_6a7fdeaea6": {
+    "message": "세션 기록을 삭제하지 못했습니다"
+  },
+  "copy_f50146d7ac": {
+    "message": "캡처 검증에 실패했습니다"
+  },
+  "copy_8249b3f554": {
+    "message": "캡처가 검증을 기다리고 있습니다"
+  },
+  "copy_712090559d": {
+    "message": "세션을 불러오지 못했습니다: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_c249c35164": {
+    "message": "모든 세션 기록을 삭제할까요? 이 작업은 취소할 수 없습니다."
+  },
+  "copy_357bab7911": {
+    "message": "세션 기록을 지우지 못했습니다"
+  },
+  "copy_0d3875c352": {
+    "message": "작업이 부분적으로 완료되었습니다"
+  },
+  "copy_2786eaaa0e": {
+    "message": "권장값으로 재설정 ($COUNT$)",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_03cea39622": {
+    "message": "아래에 모델 이름을 입력하세요"
+  },
+  "copy_df3a34abef": {
+    "message": "FSB는 별도의 비공개 Grok 프로필을 사용합니다. 브라우저 OAuth로 SuperGrok을 연결하세요. API 키나 모델 선택은 사용하지 않습니다."
+  },
+  "copy_5eb9258e1b": {
+    "message": "브라우저 OAuth로 연결됨"
+  },
+  "copy_4ebee382f9": {
+    "message": "로그인 상태를 사용할 수 없습니다"
+  },
+  "copy_ee531932b4": {
+    "message": "Grok 로그인을 여는 중..."
+  },
+  "copy_e591c14068": {
+    "message": "브라우저 로그인을 기다리는 중..."
+  },
+  "copy_82d261c870": {
+    "message": "작업이 진행 중일 때 Grok Build 연결을 끊지 못했습니다"
+  },
+  "copy_ab442992e8": {
+    "message": "Grok Build가 제때 연결 해제에 응답하지 않았습니다. 다시 시도하기 전에 로그인 상태를 확인하세요."
+  },
+  "copy_10e5c2a8ad": {
+    "message": "Grok Build 연결을 끊지 못했습니다. 다시 시도하세요."
+  },
+  "copy_2becee5507": {
+    "message": "Grok Build 연결을 끊지 못했습니다. 로컬 에이전트 서비스를 사용할 수 없습니다"
+  },
+  "copy_1d29342190": {
+    "message": "Grok Build가 제때 로그인에 응답하지 않았습니다. 다시 시도하기 전에 상태를 새로고침하세요."
+  },
+  "copy_b0fca87a8b": {
+    "message": "Grok Build에 로그인하지 못했습니다. 로컬 에이전트 서비스를 사용할 수 없습니다"
+  },
+  "copy_90ac4e0d62": {
+    "message": "설치된 Grok CLI가 FSB가 지원하는 버전이 아니어서 Grok Build 로그인이 차단되었습니다. 계정은 문제없습니다. 호환성 배지를 확인한 뒤 지원되는 CLI를 설치하세요."
+  },
+  "copy_9144f84f5c": {
+    "message": "작업이 실행 중일 때는 Grok Build에 로그인할 수 없습니다. 실행이 끝날 때까지 기다린 뒤 다시 시도하세요."
+  },
+  "copy_ca4a99be2b": {
+    "message": "이전 세션을 정리하지 못해 로그인이 차단되었습니다. 상태를 새로고침해 정리를 다시 시도하세요."
+  },
+  "copy_28c4c69520": {
+    "message": "Grok CLI가 FSB가 요구하는 엄격한 샌드박스에서 시작을 거부해 로그인이 차단되었습니다. CLI는 설치되어 있고 계정은 문제없습니다."
+  },
+  "copy_0b9a54a7f8": {
+    "message": "FSB가 Grok CLI를 실행하지 못했습니다. 설치되어 있는지 확인한 뒤 상태를 새로고침하세요."
+  },
+  "copy_3f7ae97289": {
+    "message": "Grok Build 로그인이 취소되었습니다"
+  },
+  "copy_6725ea7cca": {
+    "message": "Grok Build 로그인이 완료되지 않았습니다"
+  },
+  "copy_80d9a75cd7": {
+    "message": "Grok Build가 비공개 FSB 프로필에 연결되었습니다"
+  },
+  "copy_ec4c183761": {
+    "message": "Grok Build 로그인에 실패했습니다"
+  },
+  "copy_53296a80a3": {
+    "message": "비공개 FSB Grok Build 프로필의 연결을 끊을까요? 일반 Grok 로그인은 그대로입니다."
+  },
+  "copy_ca0786266f": {
+    "message": "Grok Build가 FSB에서 연결 해제되었습니다"
+  },
+  "copy_eb14344a7c": {
+    "message": "불러온 모델을 사용하는 중"
+  },
+  "copy_97e5afb52c": {
+    "message": "새 작업을 시작하기 전에 다른 AI 공급자를 선택하고 저장하세요"
+  },
+  "copy_682cc533d5": {
+    "message": "AI 공급자가 필요합니다"
+  },
+  "copy_0947800d1f": {
+    "message": "저장하기 전에 LM Studio 채팅 모델을 불러와 선택하세요"
+  },
+  "copy_eec68a3001": {
+    "message": "LM Studio 모델이 필요합니다"
+  },
+  "copy_79b57ba0c8": {
+    "message": "LM Studio를 시작하고 채팅 모델을 불러온 뒤 새로고침하고 선택하세요."
+  },
+  "copy_6dd8239043": {
+    "message": "이 공급자를 저장하기 전에 API 키를 입력하세요"
+  },
+  "copy_14249339ac": {
+    "message": "저장하기 전에 이 공급자에서 사용 가능한 모델을 불러오세요"
+  },
+  "copy_3b855d546e": {
+    "message": "API 키가 필요합니다"
+  },
+  "copy_32afa3cc46": {
+    "message": "모델 목록이 필요합니다"
+  },
+  "copy_954e78bbdc": {
+    "message": "API 키 필요"
+  },
+  "copy_074a372298": {
+    "message": "설정을 저장했습니다"
+  },
+  "copy_cdb46a2041": {
+    "message": "연결을 테스트하기 전에 LM Studio 채팅 모델을 불러와 선택하세요."
+  },
+  "copy_8332d4b3d9": {
+    "message": "API 키가 구성되지 않았습니다"
+  },
+  "copy_6bec306893": {
+    "message": "API 키 없음"
+  },
+  "copy_ec6c5d7132": {
+    "message": "시작하려면 $NAME$ API 키를 구성하세요",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_59b831ea1c": {
+    "message": "API 키가 필요합니다"
+  },
+  "copy_7e4840a26d": {
+    "message": "연결을 테스트하기 전에 현재 모델 목록을 불러오세요."
+  },
+  "copy_220b5a97ab": {
+    "message": "알 수 없는 브리지 오류"
+  },
+  "copy_a45a37ddcc": {
+    "message": "연결 테스트에 실패했습니다"
+  },
+  "copy_ad0770f1aa": {
+    "message": "설치되었고 호환됩니다: Grok Build 1.0.4. 격리, ACP, 캐시된 OAuth 검사가 프롬프트를 보내지 않고 통과했습니다."
+  },
+  "copy_aab517a207": {
+    "message": "호환성 검사 실패: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_b33e732cc1": {
+    "message": "로그를 내보냈습니다"
+  },
+  "copy_11eb704622": {
+    "message": "$ORIGIN$의 동의 모드",
+    "placeholders": {
+      "origin": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_7655b9531e": {
+    "message": "감사 로그를 사용할 수 없습니다"
+  },
+  "copy_07856dc7ea": {
+    "message": "감사 로그를 내보냈습니다"
+  },
+  "copy_1945edab68": {
+    "message": "감사 로그 내보내기에 실패했습니다"
+  },
+  "copy_27efbed83b": {
+    "message": "감사 로그 지우기: 로컬 감사 항목이 모두 영구적으로 삭제됩니다. 사본이 필요하면 먼저 내보내세요. 계속할까요?"
+  },
+  "copy_1b9414c45e": {
+    "message": "감사 로그를 지웠습니다"
+  },
+  "copy_5e4c340bf4": {
+    "message": "감사 로그를 지우지 못했습니다"
+  },
+  "copy_e55422c604": {
+    "message": "이 출처는 자동화에서 차단되어 있습니다"
+  },
+  "copy_74f10b929e": {
+    "message": "접근이 허용되었습니다(민감한 출처)"
+  },
+  "copy_8378642189": {
+    "message": "모든 분석 데이터를 지울까요? 이 작업은 취소할 수 없습니다."
+  },
+  "copy_a58a92d42a": {
+    "message": "분석 데이터를 지웠습니다"
+  },
+  "copy_53dd8a177f": {
+    "message": "분석 데이터를 내보냈습니다"
+  },
+  "copy_f5db4312c2": {
+    "message": "JSON 세션 데이터"
+  },
+  "copy_b0e3e5d7c3": {
+    "message": "스트리밍 세션 내보내기에는 다른 이름으로 저장을 지원하는 브라우저가 필요합니다"
+  },
+  "copy_0eecfd3ae0": {
+    "message": "세션 내보내기 전송을 사용할 수 없습니다"
+  },
+  "copy_0969eab862": {
+    "message": "세션을 찾을 수 없습니다"
+  },
+  "copy_fe13bdd0d0": {
+    "message": "세션 세부 정보를 불러오지 못했습니다"
+  },
+  "copy_3096433e6f": {
+    "message": "세션 이벤트를 불러오지 못했습니다"
+  },
+  "copy_952bb703c9": {
+    "message": "세션 이벤트를 더 불러오지 못했습니다: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_ce10cc25bb": {
+    "message": "선택된 세션이 없습니다"
+  },
+  "copy_d633c264e7": {
+    "message": "세션 JSON을 다운로드했습니다"
+  },
+  "copy_19404e5435": {
+    "message": "세션 기록의 다운로드 버튼에서 저널 내보내기를 다시 시도하세요"
+  },
+  "copy_f431c1057b": {
+    "message": "세션 로그를 다운로드하지 못했습니다"
+  },
+  "copy_ac475c80e9": {
+    "message": "이 세션을 삭제할까요? 이 작업은 취소할 수 없습니다."
+  },
+  "copy_5c9c6608b4": {
+    "message": "세션을 삭제하지 못했습니다"
+  },
+  "copy_1a0b431718": {
+    "message": "모든 세션 기록을 삭제할까요? 이 작업은 취소할 수 없습니다."
+  },
+  "copy_40260f861d": {
+    "message": "모든 세션을 지웠습니다"
+  },
+  "copy_ed9e6fe6eb": {
+    "message": "세션을 지우지 못했습니다"
+  },
+  "copy_14d37a14df": {
+    "message": "이 세션에 기록된 로그가 없습니다."
+  },
+  "copy_c892490bc5": {
+    "message": "FSB 자동화 세션 보고서"
+  },
+  "copy_76eb674a8c": {
+    "message": "AI 대화 로그"
+  },
+  "copy_5a60378692": {
+    "message": "범주 | 횟수 | 평균(ms) | 최소 | 최대 | 합계"
+  },
+  "copy_87968c8b4f": {
+    "message": "토큰 사용 요약"
+  },
+  "copy_09ed6ac4d2": {
+    "message": "세션 보고서를 내보냈습니다"
+  },
+  "copy_cc1e1981fb": {
+    "message": "세션 기록의 텍스트 내보내기 버튼에서 저널 내보내기를 다시 시도하세요"
+  },
+  "copy_c183663b5c": {
+    "message": "세션을 내보내지 못했습니다"
+  },
+  "copy_30784a43b1": {
+    "message": "금고 잠금 해제 오류: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_b621934f80": {
+    "message": "PIN이 일치하지 않습니다"
+  },
+  "copy_038efc029d": {
+    "message": "자격 증명 금고를 만들었습니다"
+  },
+  "copy_b27730b0ad": {
+    "message": "금고를 만들지 못했습니다"
+  },
+  "copy_be90a4301c": {
+    "message": "금고 만들기 오류: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_344e10f557": {
+    "message": "PIN을 입력하세요"
+  },
+  "copy_d8689df745": {
+    "message": "금고 잠금 오류: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_025f3d105c": {
+    "message": "도메인은 필수입니다"
+  },
+  "copy_f0413d8913": {
+    "message": "사용자 이름 또는 비밀번호가 필요합니다"
+  },
+  "copy_9afaa0cd06": {
+    "message": "저장하지 못했습니다: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_161d5eb702": {
+    "message": "자격 증명 저장 오류: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_2be1559933": {
+    "message": "\"$DOMAIN$\"의 저장된 자격 증명을 삭제할까요? 이 작업은 취소할 수 없습니다.",
+    "placeholders": {
+      "domain": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_742e696153": {
+    "message": "삭제하지 못했습니다: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_f91e85ab50": {
+    "message": "자격 증명 삭제 오류: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_6ddb0ed270": {
+    "message": "결제 수단 잠금을 해제했습니다"
+  },
+  "copy_c75e2cc897": {
+    "message": "결제 수단 잠금 해제 오류: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_b69b2dc301": {
+    "message": "결제 수단을 잠갔습니다"
+  },
+  "copy_454a57b219": {
+    "message": "결제 수단을 잠그지 못했습니다"
+  },
+  "copy_af2ea4b480": {
+    "message": "결제 수단 잠금 오류: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_38c2cc72e3": {
+    "message": "숫자 PIN을 입력하세요"
+  },
+  "copy_97334b1737": {
+    "message": "결제 수단 편집"
+  },
+  "copy_f8ab13ff2a": {
+    "message": "별칭과 주소 2행을 제외한 모든 항목은 필수입니다"
+  },
+  "copy_2389d7d2a2": {
+    "message": "카드 번호가 올바르지 않습니다"
+  },
+  "copy_cc08ac8162": {
+    "message": "카드가 만료되었거나 만료일이 올바르지 않습니다"
+  },
+  "copy_0aed24cdfa": {
+    "message": "결제 수단을 업데이트했습니다"
+  },
+  "copy_8fb5f3db97": {
+    "message": "결제 수단을 저장했습니다"
+  },
+  "copy_58adb591be": {
+    "message": "결제 수단 저장 오류: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_f03b63954b": {
+    "message": "이 결제 수단을 삭제할까요? 이 작업은 취소할 수 없습니다."
+  },
+  "copy_62dd24dab7": {
+    "message": "결제 수단을 삭제했습니다"
+  },
+  "copy_2a0de92af3": {
+    "message": "결제 수단 삭제 오류: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_4f15f65f6e": {
+    "message": "탐색할 URL을 입력하세요"
+  },
+  "copy_fb05645171": {
+    "message": "URL 형식이 올바르지 않습니다"
+  },
+  "copy_a6215dba6d": {
+    "message": "탐색기를 시작하지 못했습니다: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_284429f90b": {
+    "message": "모든 크롤러를 중지했습니다"
+  },
+  "copy_aee9e10eae": {
+    "message": "$DOMAIN$ 크롤링에 실패했습니다",
+    "placeholders": {
+      "domain": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_d604ffed30": {
+    "message": "조사 데이터를 찾을 수 없습니다"
+  },
+  "copy_600bbdc0cf": {
+    "message": "조사 세부 정보를 불러오지 못했습니다"
+  },
+  "copy_b784ed64e1": {
+    "message": "조사 JSON을 다운로드했습니다"
+  },
+  "copy_4a64e6ca83": {
+    "message": "조사를 다운로드하지 못했습니다"
+  },
+  "copy_1a2e7f1116": {
+    "message": "이 조사 결과를 삭제할까요?"
+  },
+  "copy_ec95ccc29e": {
+    "message": "조사를 삭제하지 못했습니다"
+  },
+  "copy_dc94971b24": {
+    "message": "조사를 사이트 맵으로 변환하지 못했습니다"
+  },
+  "copy_382f902a79": {
+    "message": "메모리를 저장하지 못했습니다"
+  },
+  "copy_2049875d89": {
+    "message": "메모리에 저장했습니다"
+  },
+  "copy_d504fbf25e": {
+    "message": "AI로 사이트 맵을 다듬는 중..."
+  },
+  "copy_a249e56325": {
+    "message": "$DOMAIN$의 사이트 맵을 저장하고 다듬었습니다",
+    "placeholders": {
+      "domain": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_237923127b": {
+    "message": "$DOMAIN$의 사이트 맵을 저장했습니다(다듬기에서 데이터가 반환되지 않음)",
+    "placeholders": {
+      "domain": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_35d9e0c46c": {
+    "message": "사이트 맵을 저장했습니다(AI 다듬기 실패: $ERROR$)",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_c8c83ca919": {
+    "message": "$DOMAIN$의 사이트 맵을 메모리에 저장했습니다",
+    "placeholders": {
+      "domain": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_c32ea6d22f": {
+    "message": "메모리에 저장하지 못했습니다: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_963ba004ea": {
+    "message": "모든 조사 결과를 삭제할까요? 이 작업은 취소할 수 없습니다."
+  },
+  "copy_1044224528": {
+    "message": "모든 조사 결과를 지웠습니다"
+  },
+  "copy_84e9814ece": {
+    "message": "조사 결과를 지우지 못했습니다"
+  },
+  "copy_491c2ddc8e": {
+    "message": "먼저 서버 URL을 입력하세요"
+  },
+  "copy_9526d57756": {
+    "message": "해시 키를 생성하고 저장했습니다"
+  },
+  "copy_fdc08c5f7b": {
+    "message": "해시 키를 생성하지 못했습니다"
+  },
+  "copy_52b3b70484": {
+    "message": "서버에 연결할 수 없습니다: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_cbdbc53db1": {
+    "message": "복사할 해시 키가 없습니다"
+  },
+  "copy_f0b64c63d8": {
+    "message": "해시 키를 복사했습니다"
+  },
+  "copy_0cf23c4489": {
+    "message": "복사하지 못했습니다"
+  },
+  "copy_8cab3b4552": {
+    "message": "서버 URL과 해시 키를 입력하세요"
+  },
+  "copy_271b7b0f3b": {
+    "message": "서버에 연결했습니다"
+  },
+  "copy_3e8bcabc0b": {
+    "message": "해시 키가 올바르지 않습니다"
+  },
+  "copy_09f7c3ac2a": {
+    "message": "서버에 연결할 수 없습니다"
+  },
+  "copy_0ea446a05f": {
+    "message": "서버가 해시 키를 반환하지 않았습니다"
+  },
+  "copy_e5697f10b5": {
+    "message": "페어링 응답 형식이 올바르지 않습니다"
+  },
+  "copy_30fa7c27e5": {
+    "message": "페어링 코드를 생성할 수 없습니다: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_acce51c1d3": {
+    "message": "해시 키를 등록할 수 없습니다: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_cb4c956be2": {
+    "message": "이 메모리를 삭제할까요?"
+  },
+  "copy_7402b5cdc1": {
+    "message": "메모리 데이터를 불러오지 못했습니다"
+  },
+  "copy_3d391897c3": {
+    "message": "메모리를 찾을 수 없습니다"
+  },
+  "copy_1c461596d3": {
+    "message": "그래프 엔진을 사용할 수 없습니다"
+  },
+  "copy_d85c704af2": {
+    "message": "이 메모리에 사이트 패턴 데이터가 없습니다"
+  },
+  "copy_a658647978": {
+    "message": "사이트 맵에서 페이지를 찾지 못했습니다"
+  },
+  "copy_4b23a9fe70": {
+    "message": "AI 다듬기를 사용할 수 없습니다"
+  },
+  "copy_920d3a68d9": {
+    "message": "메모리를 찾을 수 없거나 사이트 맵이 아닙니다"
+  },
+  "copy_99a619a944": {
+    "message": "사이트 맵을 다듬었습니다"
+  },
+  "copy_a266f3a3ce": {
+    "message": "AI 다듬기 실패: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_0b0bdbabab": {
+    "message": "모든 메모리를 삭제할까요? 이 작업은 취소할 수 없습니다."
+  },
+  "copy_58589924e2": {
+    "message": "모든 메모리를 지웠습니다"
+  },
+  "copy_e158cd5a5e": {
+    "message": "메모리를 지우지 못했습니다: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_21ce69d58b": {
+    "message": "원격 제어가 활성입니다"
+  },
+  "copy_23a711ebd2": {
+    "message": "검색과 일치하는 모델이 없습니다"
+  },
+  "copy_a5a9895b02": {
+    "message": "사용 가능한 모델이 없습니다"
+  },
+  "copy_df9da4e214": {
+    "message": "API 키가 올바르지 않습니다"
+  },
+  "copy_e93db4ad9a": {
+    "message": "이 공급자에서 API 키가 올바르지 않습니다"
+  },
+  "copy_7b582d9989": {
+    "message": "호환되는 LM Studio 모델이 없습니다"
+  },
+  "copy_5742edc9d8": {
+    "message": "LM Studio를 시작하고 채팅 모델을 불러온 뒤 모델 목록을 새로고침하세요"
+  },
+  "copy_4b1527fd68": {
+    "message": "LM Studio 모델 검색을 사용할 수 없습니다"
+  },
+  "copy_bd94818b82": {
+    "message": "모델을 불러오지 못했습니다"
+  },
+  "copy_11c964536c": {
+    "message": "모델 검색을 사용할 수 없습니다"
+  },
+  "copy_c77feaa41e": {
+    "message": "LM Studio에 연결할 수 없습니다"
+  },
+  "copy_bdaaf4fde3": {
+    "message": "이 공급자에서 모델을 불러오지 못했습니다"
+  },
+  "copy_6b3e293f22": {
+    "message": "공급자 모델 목록을 새로고침하지 못했습니다"
+  },
+  "copy_9aed9949c4": {
+    "message": "LM Studio에 호환되는 채팅 모델이 로드되어 있지 않습니다"
+  },
+  "copy_d068f8bbe0": {
+    "message": "사용 가능한 모델이 없습니다"
+  },
+  "copy_ec819bcca6": {
+    "message": "공급자가 사용 가능한 텍스트 모델을 반환하지 않았습니다"
+  },
+  "copy_3329b92927": {
+    "message": "저장된 LM Studio 모델을 사용할 수 없습니다. 불러온 모델을 선택하고 저장하세요."
+  },
+  "copy_5cb6d3f4e6": {
+    "message": "모델 검색 시간이 초과되었습니다. 새로고침하여 다시 시도하세요."
+  },
+  "copy_e21ca6d204": {
+    "message": "모델 검색 및 선택"
+  },
+  "copy_d6699494ff": {
+    "message": "모델 목록 전환"
+  },
+  "copy_9606bfc49e": {
+    "message": "모델 목록 새로고침"
+  },
+  "copy_881bf7079c": {
+    "message": "xAI API 키 입력"
+  },
+  "copy_1e9720ad1e": {
+    "message": "Gemini API 키 입력"
+  },
+  "copy_699e26dc48": {
+    "message": "OpenAI API 키 입력"
+  },
+  "copy_e73283ba69": {
+    "message": "Anthropic API 키 입력"
+  },
+  "copy_c545294348": {
+    "message": "OpenRouter API 키 입력"
+  },
+  "copy_8001f1687a": {
+    "message": "사용자 지정 API 키 입력"
+  },
+  "copy_ec8571e74c": {
+    "message": "2Captcha API 키 입력"
+  },
+  "copy_9a679edbd3": {
+    "message": "최대 반복 횟수 줄이기"
+  },
+  "copy_7ff25a6879": {
+    "message": "최대 반복 횟수 늘리기"
+  },
+  "copy_1da98f8734": {
+    "message": "요소 한도 줄이기"
+  },
+  "copy_396f15bbfe": {
+    "message": "요소 한도 늘리기"
+  },
+  "copy_8418bb6be8": {
+    "message": "요소 캐시 크기 줄이기"
+  },
+  "copy_4d09f69eb1": {
+    "message": "요소 캐시 크기 늘리기"
+  },
+  "copy_8afc6eb606": {
+    "message": "에이전트 동시 실행 상한 낮추기"
+  },
+  "copy_484366fe68": {
+    "message": "에이전트 동시 실행 상한 높이기"
+  },
+  "copy_cffeed4c47": {
+    "message": "트리거 동시 실행 상한 낮추기"
+  },
+  "copy_3816b69dee": {
+    "message": "트리거 동시 실행 상한 높이기"
+  },
+  "copy_2a1df07657": {
+    "message": "MCP 재생 보존 기간 줄이기"
+  },
+  "copy_a346fdf291": {
+    "message": "MCP 재생 보존 일수"
+  },
+  "copy_71c20adba6": {
+    "message": "MCP 재생 보존 기간 늘리기"
+  },
+  "copy_f38984cf15": {
+    "message": "익명 사용 데이터를 보내는 중입니다. 클릭하여 중지하세요."
+  },
+  "copy_81649d0543": {
+    "message": "서버 해시 키"
+  },
+  "copy_e4cdf160f5": {
+    "message": "해시 키 복사"
+  },
+  "copy_81f7adf295": {
+    "message": "이전에 만든 백그라운드 에이전트"
+  },
+  "copy_8c16fe2070": {
+    "message": "사용하면 새 메모리가 AI에 의해 자동으로 분석되어 더 깊은 인사이트를 얻습니다"
+  },
+  "copy_0a221bc876": {
+    "message": "메모리를 JSON으로 내보내기"
+  },
+  "copy_70e6248096": {
+    "message": "JSON에서 메모리 가져오기"
+  },
+  "copy_1152ae520b": {
+    "message": "새 사이트의 기본 동의 모드"
+  },
+  "copy_f5af3ff4e6": {
+    "message": "출처의 동의 모드"
+  },
+  "copy_8371bee1a3": {
+    "message": "카드, 브랜드 또는 청구 정보 검색..."
+  },
+  "copy_18bf091ea7": {
+    "message": "카드 명의"
+  },
+  "copy_eb59dcee20": {
+    "message": "청구 프로필 이름"
+  },
+  "copy_e151fee074": {
+    "message": "아파트, 스위트, 호수"
+  },
+  "copy_7ec33c22aa": {
+    "message": "FSB - 제어판"
+  },
+  "copy_34c70e4722": {
+    "message": "FSB - 시작 설정"
+  },
+  "copy_1398385080": {
+    "message": "5단계 중 1단계"
+  },
+  "copy_b51e205a4a": {
+    "message": "불러온 LM Studio 채팅 모델 선택"
+  },
+  "copy_434171c580": {
+    "message": "LM Studio가 정상적으로 응답했습니다"
+  },
+  "copy_900b7aa263": {
+    "message": "클립보드에 API 키가 없었습니다"
+  },
+  "copy_8d78737e31": {
+    "message": "클립보드를 읽지 못했습니다"
+  },
+  "copy_08aae6eb74": {
+    "message": "지금은 건너뛰었습니다"
+  },
+  "lang_choose": {
+    "message": "언어"
+  },
+  "lang_follow_browser": {
+    "message": "브라우저 언어"
+  },
+  "lang_extensions_page": {
+    "message": "chrome://extensions의 이름은 브라우저 언어를 따릅니다."
+  },
+  "copy_9a19a25438": {
+    "message": "작업 $COUNT$개 완료",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_5bb3cc9bbc": {
+    "message": "작업 $COUNT$개 완료",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_89858f87f6": {
+    "message": "로그인이 필요합니다"
+  },
+  "copy_969ccbd3cf": {
+    "message": "이메일"
+  },
+  "copy_657144f3f7": {
+    "message": "사용자 이름 / 이메일"
+  },
+  "copy_fb625242db": {
+    "message": "이 사이트"
+  },
+  "copy_3a4ba4367b": {
+    "message": "이 세션에서는 저장할 수 없습니다."
+  },
+  "copy_88712c434b": {
+    "message": "로그인 필요"
+  },
+  "copy_9a15079bb0": {
+    "message": "로그인하려면 자격 증명을 입력하세요. 암호화되어 다음에 사용할 수 있도록 저장됩니다."
+  },
+  "copy_5c4fb64721": {
+    "message": "다음에 사용하도록 저장"
+  },
+  "copy_bcc0bcc914": {
+    "message": "로그인"
+  },
+  "copy_28d03596d2": {
+    "message": "건너뛰기"
+  },
+  "copy_71b27d1772": {
+    "message": "이 결제"
+  },
+  "copy_3953987f92": {
+    "message": "결제 페이지 감지됨"
+  },
+  "copy_0fa359b5b5": {
+    "message": "결제가 꺼져 있습니다"
+  },
+  "copy_22a8f98173": {
+    "message": "금고가 잠겨 있습니다"
+  },
+  "copy_869a552f3f": {
+    "message": "결제 열기"
+  },
+  "copy_48845bff33": {
+    "message": "닫기"
+  },
+  "copy_b764cdc0ea": {
+    "message": "알 수 없음"
+  },
+  "copy_23f19f7bd3": {
+    "message": "$BRAND$(끝자리 $LAST$)",
+    "placeholders": {
+      "brand": {
+        "content": "$1"
+      },
+      "last": {
+        "content": "$2"
+      }
+    }
+  },
+  "copy_9a09841b76": {
+    "message": "만료 $MONTH$/$YEAR$",
+    "placeholders": {
+      "month": {
+        "content": "$1"
+      },
+      "year": {
+        "content": "$2"
+      }
+    }
+  },
+  "copy_e73906185a": {
+    "message": "저장된 카드 입력"
+  },
+  "copy_297f2fc07e": {
+    "message": "아직 세션이 없습니다. 자동화를 실행하면 여기에 기록이 표시됩니다."
+  },
+  "copy_1369c6877b": {
+    "message": "유휴 상태로 종료됨"
+  },
+  "copy_a5fbb5c6ed": {
+    "message": "알 수 없는 작업"
+  },
+  "copy_a147891596": {
+    "message": "작업 $COUNT$개",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_loaded_model": {
+    "message": "불러온 채팅 모델"
+  },
+  "entry_watching": {
+    "message": "$COUNT$개 감시 중",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_fired": {
+    "message": "$COUNT$개 발동",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_check_visible": {
+    "message": "표시됨"
+  },
+  "entry_check_enabled": {
+    "message": "사용 가능"
+  },
+  "entry_check_viewport": {
+    "message": "표시 영역 안"
+  },
+  "entry_check_pointer": {
+    "message": "포인터 이벤트"
+  },
+  "entry_text_content": {
+    "message": "텍스트 내용"
+  },
+  "entry_crawl_title": {
+    "message": "FSB 순회 중"
+  },
+  "panel_b2693770d3": {
+    "message": "연결 테스트"
+  },
+  "panel_672f1efd8b": {
+    "message": "공급자:"
+  },
+  "panel_755c8b2a9f": {
+    "message": "상태:"
+  },
+  "panel_c88a0b9074": {
+    "message": "성공"
+  },
+  "panel_11a931060d": {
+    "message": "모델:"
+  },
+  "panel_8f6bed11e7": {
+    "message": "응답 시간:"
+  },
+  "panel_5e1834d89d": {
+    "message": "$MS$ms",
+    "placeholders": {
+      "ms": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_6170629067": {
+    "message": "오류:"
+  },
+  "panel_9ec41ffd77": {
+    "message": "로그 보기"
+  },
+  "panel_9af63d68f9": {
+    "message": "로그 다운로드"
+  },
+  "panel_1c01ad70fe": {
+    "message": "세션을 불러오지 못했습니다: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_aaa0442372": {
+    "message": "읽기 쉬운 텍스트로 내보내기"
+  },
+  "panel_52a0e8b87e": {
+    "message": "텍스트 내보내기"
+  },
+  "panel_2e80d6e9a5": {
+    "message": "JSON 로그 다운로드"
+  },
+  "panel_49e0e6d56e": {
+    "message": "JSON 다운로드"
+  },
+  "panel_7d9eb7acb1": {
+    "message": "닫기"
+  },
+  "panel_cb9ac5c561": {
+    "message": "세션 ID"
+  },
+  "panel_ecbc89cd37": {
+    "message": "시작"
+  },
+  "panel_7cdc804e69": {
+    "message": "종료"
+  },
+  "panel_4fc52a3c4c": {
+    "message": "소요 시간"
+  },
+  "panel_ff8059dc67": {
+    "message": "작업"
+  },
+  "panel_4740b57371": {
+    "message": "반복"
+  },
+  "panel_73912999fa": {
+    "message": "이전"
+  },
+  "panel_1ff57a29d7": {
+    "message": "다음"
+  },
+  "panel_f03788e116": {
+    "message": "$TOTAL$단계 중 $CURRENT$단계",
+    "placeholders": {
+      "current": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "panel_a75ab6920d": {
+    "message": "재생 데이터를 불러오는 중..."
+  },
+  "panel_881c9fdb90": {
+    "message": "원시 로그 표시"
+  },
+  "panel_57df179c4f": {
+    "message": "원시 로그 숨기기"
+  },
+  "panel_51cbb3bf88": {
+    "message": "이 세션에는 재생 데이터가 없습니다"
+  },
+  "panel_dfa4ae555e": {
+    "message": "대상 지정"
+  },
+  "panel_14b981a43b": {
+    "message": "선택자:"
+  },
+  "panel_9216cbad79": {
+    "message": "요소 찾음: 예"
+  },
+  "panel_2dbfbc21aa": {
+    "message": "요소 찾음: 아니요"
+  },
+  "panel_fe3d6f1947": {
+    "message": "좌표: ($X$, $Y$)",
+    "placeholders": {
+      "x": {
+        "content": "$1"
+      },
+      "y": {
+        "content": "$2"
+      }
+    }
+  },
+  "panel_4e5b548d6d": {
+    "message": "요소"
+  },
+  "panel_848bf594dd": {
+    "message": "텍스트: \"$TEXT$\"",
+    "placeholders": {
+      "text": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_e68b36b17c": {
+    "message": "매개변수"
+  },
+  "panel_b1fa878a98": {
+    "message": "진단"
+  },
+  "panel_27c2ccd962": {
+    "message": "알 수 없는 오류"
+  },
+  "panel_407fab696b": {
+    "message": "제안:"
+  },
+  "panel_4de32d57f8": {
+    "message": "$TOTAL$개 중 최근 $COUNT$개",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "panel_23e0248aa9": {
+    "message": "요약:"
+  },
+  "panel_d6f290028c": {
+    "message": "$DONE$/$TOTAL$단계 성공",
+    "placeholders": {
+      "done": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "panel_ba5c173754": {
+    "message": "$COUNT$개 실패",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_af3c60331d": {
+    "message": "사용자 이름 없음"
+  },
+  "panel_6aeaa6a53d": {
+    "message": "비밀번호 표시"
+  },
+  "panel_464c4ffd01": {
+    "message": "편집"
+  },
+  "panel_e2d0a54968": {
+    "message": "삭제"
+  },
+  "panel_be3702e3f1": {
+    "message": "카드"
+  },
+  "panel_cae7d57bc0": {
+    "message": "중지"
+  },
+  "panel_ada26b6a54": {
+    "message": "순회를 시작하는 중..."
+  },
+  "panel_7eae8fd81d": {
+    "message": "$COLLECTED$ / $MAX$ 페이지",
+    "placeholders": {
+      "collected": {
+        "content": "$1"
+      },
+      "max": {
+        "content": "$2"
+      }
+    }
+  },
+  "panel_a854c3e6d9": {
+    "message": "$DOMAIN$ 순회 중",
+    "placeholders": {
+      "domain": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_b837e392c5": {
+    "message": "순회 완료: $DOMAIN$에서 $COUNT$페이지",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "domain": {
+        "content": "$2"
+      }
+    }
+  },
+  "panel_44761df9d9": {
+    "message": "$COUNT$페이지",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_d1bf045bb5": {
+    "message": "세부 정보 보기"
+  },
+  "panel_6c0a28c891": {
+    "message": "사이트 맵 메모리로 저장"
+  },
+  "panel_0f4baebaa0": {
+    "message": "조사 결과를 불러오지 못했습니다: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_1c1944d338": {
+    "message": "$TOTAL$개 중 $START$-$END$",
+    "placeholders": {
+      "start": {
+        "content": "$1"
+      },
+      "end": {
+        "content": "$2"
+      },
+      "total": {
+        "content": "$3"
+      }
+    }
+  },
+  "panel_9046da16ae": {
+    "message": "페이지"
+  },
+  "panel_e1ff7a9061": {
+    "message": "요소"
+  },
+  "panel_858451263b": {
+    "message": "양식"
+  },
+  "panel_9024c197d8": {
+    "message": "링크"
+  },
+  "panel_a6d5df3737": {
+    "message": "시작 URL:"
+  },
+  "panel_298d6c7549": {
+    "message": "소요 시간:"
+  },
+  "panel_184ab6989d": {
+    "message": "깊이:"
+  },
+  "panel_068fbd1599": {
+    "message": "순회한 페이지($COUNT$)",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_59ba6ff1da": {
+    "message": "요소 $COUNT$개",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_d81ab3063e": {
+    "message": "다듬음"
+  },
+  "panel_0e35f6e974": {
+    "message": "기본"
+  },
+  "panel_6ab098444e": {
+    "message": "사이트 맵 다듬기"
+  },
+  "panel_1e7f34ee8f": {
+    "message": "다듬기"
+  },
+  "panel_d9483244b6": {
+    "message": "세부 정보 펼치기/접기"
+  },
+  "panel_cdf8d330f5": {
+    "message": "$COUNT$회 접근",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_008de64db2": {
+    "message": "신뢰도 $PERCENT$%",
+    "placeholders": {
+      "percent": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_3aba541421": {
+    "message": "메모리 삭제"
+  },
+  "panel_aab6c5e605": {
+    "message": "기록 없음"
+  },
+  "panel_dc937b5989": {
+    "message": "없음"
+  },
+  "panel_060b7c4116": {
+    "message": "최종 URL"
+  },
+  "panel_e7dcad8673": {
+    "message": "완료한 단계"
+  },
+  "panel_7bd31a025d": {
+    "message": "실패"
+  },
+  "panel_304230dd7b": {
+    "message": "사이트 맵"
+  },
+  "panel_f02a172a35": {
+    "message": "선택자"
+  },
+  "panel_217baacf82": {
+    "message": "사이트 패턴"
+  },
+  "panel_c910d474dc": {
+    "message": "일반"
+  },
+  "panel_2502651aed": {
+    "message": "사이트 간 패턴"
+  },
+  "panel_22e2dbcfc1": {
+    "message": "사용자 기본 설정"
+  },
+  "panel_82ac23744f": {
+    "message": "...외 $COUNT$개",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_b2fc7c1a37": {
+    "message": "(양식 $COUNT$개)",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_34a07bf033": {
+    "message": "(양식 $COUNT$개)",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_b358b78f08": {
+    "message": "(탐색 항목 $COUNT$개)",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_2d597de6ea": {
+    "message": "(탐색 항목 $COUNT$개)",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_1b786c0eff": {
+    "message": "탐색 섹션"
+  },
+  "panel_df71c8b46d": {
+    "message": "순회 시각"
+  },
+  "panel_2521c156e7": {
+    "message": "(다듬음)"
+  },
+  "panel_c555ac6ba2": {
+    "message": "발견한 페이지"
+  },
+  "panel_8083e76d16": {
+    "message": "찾은 양식"
+  },
+  "panel_3db65f8c2a": {
+    "message": "탐색"
+  },
+  "panel_97100721e2": {
+    "message": "선택자 정보"
+  },
+  "panel_041f11ea06": {
+    "message": "분석한 도메인"
+  },
+  "panel_92f41ed9cf": {
+    "message": "자주 쓰는 양식 유형"
+  },
+  "panel_7ea2d98ace": {
+    "message": "공통 선택자 패턴"
+  },
+  "panel_53e6cf4452": {
+    "message": "검증 시각"
+  },
+  "panel_292c06f004": {
+    "message": "범주"
+  },
+  "panel_7baf29fa69": {
+    "message": "기록된 단계가 없습니다"
+  },
+  "panel_5b341c960f": {
+    "message": "대상 URL"
+  },
+  "panel_4ccf1d74a7": {
+    "message": "총 실행 횟수"
+  },
+  "panel_1de3df70dd": {
+    "message": "단계"
+  },
+  "panel_01b7cdd40d": {
+    "message": "사용한 선택자"
+  },
+  "panel_e70d8eb905": {
+    "message": "분석"
+  },
+  "panel_0a30a815d6": {
+    "message": "페이지"
+  },
+  "panel_96a5ba634b": {
+    "message": "발견됨"
+  },
+  "panel_2e0e960ab3": {
+    "message": "양식"
+  },
+  "panel_2e2d5c5649": {
+    "message": "워크플로"
+  },
+  "panel_3fee95da5a": {
+    "message": "간단히"
+  },
+  "panel_008dacb6d1": {
+    "message": "전체"
+  }
+}

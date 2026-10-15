@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>FSB - Side Panel</title>
+  <title data-i18n="copy_26b2f925d8">FSB - Side Panel</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css" integrity="sha512-Kc323vGBEqzTmouAECnVceyQqyqdsSiqLQISBL29aUW4U/M7pSPA/gEUZQqv1cwx4OnYxTxve5UMg5GT6L4JJg==" crossorigin="anonymous" referrerpolicy="no-referrer">
   <link rel="stylesheet" href="../shared/fsb-ui-core.css">
   <link rel="stylesheet" href="sidepanel.css">
@@ -13,23 +13,26 @@
     <header class="sidepanel-header">
       <div class="header-info">
         <div class="brand-row">
-          <h1>FSB</h1>
-          <span class="surface-subtitle">Persistent workspace</span>
+          <h1 data-i18n="ext_name">FSB</h1>
+          <span class="surface-subtitle" data-i18n="shell_workspace">Persistent workspace</span>
         </div>
         <div class="status-indicator">
           <i class="fa fa-circle status-dot"></i>
-          <span class="status-text">Ready</span>
-          <span id="fsb-lockout-aria-description" class="sr-only">Side panel input is disabled while automation is working on this tab</span>
+          <span class="status-text" data-i18n="shell_ready">Ready</span>
+          <span id="fsb-lockout-aria-description" class="sr-only" data-i18n="shell_lockout">Side panel input is disabled while automation is working on this tab</span>
         </div>
       </div>
       <div class="header-actions">
-        <button id="historyBtn" class="icon-btn" title="Session History">
+        <label class="sr-only" for="fsbUiLocaleSelect" data-i18n="lang_choose">Language</label>
+        <select id="fsbUiLocaleSelect" translate="no" aria-describedby="fsbLocaleNote"></select>
+        <span id="fsbLocaleNote" class="sr-only" data-i18n="lang_extensions_page">The name on chrome://extensions follows the browser language.</span>
+        <button id="historyBtn" class="icon-btn" data-i18n-attr="title:shell_history" title="Session History">
           <i class="fa fa-clock-rotate-left"></i>
         </button>
-        <button id="newChatBtn" class="icon-btn" title="Start New Chat">
+        <button id="newChatBtn" class="icon-btn" data-i18n-attr="title:shell_new_chat" title="Start New Chat">
           <i class="fa fa-plus"></i>
         </button>
-        <button id="settingsBtn" class="icon-btn" title="Settings">
+        <button id="settingsBtn" class="icon-btn" data-i18n-attr="title:shell_settings" title="Settings">
           <i class="fa fa-cog"></i>
         </button>
       </div>
@@ -37,10 +40,10 @@
 
     <div id="historyView" class="history-view hidden">
       <div class="history-header">
-        <h3>Session History</h3>
-        <button id="clearAllHistoryBtn" class="history-clear-all-btn" title="Delete All Sessions">
+        <h3 data-i18n="shell_history">Session History</h3>
+        <button id="clearAllHistoryBtn" class="history-clear-all-btn" data-i18n-attr="title:shell_delete_all" title="Delete All Sessions">
           <i class="fa fa-trash"></i>
-          <span>Clear All</span>
+          <span data-i18n="shell_clear_all">Clear All</span>
         </button>
       </div>
       <div class="history-list" id="historyList">
@@ -96,7 +99,7 @@
         </div>
       </div>
       <span id="automationTimer" class="automation-timer">0s</span>
-      <span id="automationRunnerLabel" class="sr-only">Automation running</span>
+      <span id="automationRunnerLabel" class="sr-only" data-i18n="shell_running">Automation running</span>
     </div>
 
     <div class="chat-input-area">
@@ -111,13 +114,13 @@
             aria-multiline="true"
           ></div>
           <div class="input-actions">
-            <button id="stopBtn" class="stop-btn hidden" title="Stop Automation">
+            <button id="stopBtn" class="stop-btn hidden" data-i18n-attr="title:shell_stop" title="Stop Automation">
               <i class="fa fa-stop"></i>
             </button>
-            <button id="micBtn" class="mic-btn" title="Voice input">
+            <button id="micBtn" class="mic-btn" data-i18n-attr="title:shell_voice" title="Voice input">
               <i class="fa fa-microphone"></i>
             </button>
-            <button id="sendBtn" class="send-btn" title="Send Message">
+            <button id="sendBtn" class="send-btn" data-i18n-attr="title:shell_send" title="Send Message">
               <i class="fa fa-arrow-up"></i>
             </button>
           </div>
@@ -138,7 +141,7 @@
       <div class="payment-fill-confirm-card">
         <div class="payment-fill-confirm-header">
           <i class="fas fa-shield-halved"></i>
-          <span>Confirm Payment Fill</span>
+          <span data-i18n="shell_confirm_payment">Confirm Payment Fill</span>
         </div>
         <div class="payment-fill-confirm-body">
           <div class="payment-fill-confirm-detail">
@@ -146,11 +149,11 @@
             <span class="payment-fill-confirm-last4" id="pfcLast4"></span>
           </div>
           <div class="payment-fill-confirm-domain" id="pfcDomain"></div>
-          <p class="payment-fill-confirm-note">Card details will be filled into the form fields. FSB will not submit the payment.</p>
+          <p class="payment-fill-confirm-note" data-i18n="shell_payment_note">Card details will be filled into the form fields. FSB will not submit the payment.</p>
         </div>
         <div class="payment-fill-confirm-actions">
-          <button class="payment-fill-confirm-btn allow" id="pfcAllow">Allow</button>
-          <button class="payment-fill-confirm-btn deny" id="pfcDeny">Deny</button>
+          <button class="payment-fill-confirm-btn allow" id="pfcAllow" data-i18n="shell_allow">Allow</button>
+          <button class="payment-fill-confirm-btn deny" id="pfcDeny" data-i18n="shell_deny">Deny</button>
         </div>
       </div>
     </div>
@@ -170,6 +173,8 @@
   <script src="../utils/native-host-install-command.js"></script>
   <script src="delegation-feed.js"></script>
   <script src="speech-to-text.js"></script>
+  <script src="../utils/ui-locale.js"></script>
+  <script src="../utils/copy-exact.js"></script>
   <script src="sidepanel.js"></script>
 </body>
 </html>

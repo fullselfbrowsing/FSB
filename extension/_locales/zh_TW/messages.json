@@ -1,0 +1,4011 @@
+{
+  "locale_seed_greeting": {
+    "message": "FSB 已就緒",
+    "description": "Seed string that proves a locale catalog can replace English."
+  },
+  "locale_seed_replay": {
+    "message": "重播速度 $SPEED$",
+    "description": "Seed string with one placeholder.",
+    "placeholders": {
+      "speed": {
+        "content": "$1",
+        "example": "1x"
+      }
+    }
+  },
+  "locale_seed_brand": {
+    "message": "FSB",
+    "description": "Allowlisted invariant brand token."
+  },
+  "ext_name": {
+    "message": "FSB"
+  },
+  "ext_description": {
+    "message": "FSB 是一款由 AI 驅動的通用瀏覽器自動化助手。"
+  },
+  "shell_fast_task": {
+    "message": "快速開始任務"
+  },
+  "shell_workspace": {
+    "message": "常駐工作區"
+  },
+  "shell_ready": {
+    "message": "就緒"
+  },
+  "shell_pin_window": {
+    "message": "固定視窗"
+  },
+  "shell_test_api": {
+    "message": "測試 API 連線"
+  },
+  "shell_settings": {
+    "message": "設定"
+  },
+  "shell_ask": {
+    "message": "告訴我要自動化的事情..."
+  },
+  "shell_stop": {
+    "message": "停止自動化"
+  },
+  "shell_voice": {
+    "message": "語音輸入"
+  },
+  "shell_send": {
+    "message": "傳送訊息"
+  },
+  "shell_pin_hint": {
+    "message": "需要固定視窗時再固定"
+  },
+  "shell_lockout": {
+    "message": "當自動化正在此分頁工作時，側邊欄輸入已停用"
+  },
+  "shell_history": {
+    "message": "工作階段紀錄"
+  },
+  "shell_delete_all": {
+    "message": "刪除所有工作階段"
+  },
+  "shell_clear_all": {
+    "message": "全部清除"
+  },
+  "shell_running": {
+    "message": "自動化執行中"
+  },
+  "shell_confirm_payment": {
+    "message": "確認填寫付款資訊"
+  },
+  "shell_payment_note": {
+    "message": "卡資訊會填入表單欄位。FSB 不會提交這筆付款。"
+  },
+  "shell_allow": {
+    "message": "允許"
+  },
+  "shell_deny": {
+    "message": "拒絕"
+  },
+  "shell_new_chat": {
+    "message": "開始新對話"
+  },
+  "shell_welcome": {
+    "message": "歡迎使用 FSB。需要我做什麼？"
+  },
+  "shell_no_automation": {
+    "message": "沒有正在執行的自動化可以停止。"
+  },
+  "shell_stopped": {
+    "message": "自動化已停止。如果還需要協助，請告訴我。"
+  },
+  "shell_partial": {
+    "message": "部分結果"
+  },
+  "shell_try_again": {
+    "message": "要再試一次嗎？ "
+  },
+  "shell_retry": {
+    "message": "重試"
+  },
+  "shell_switched_popup": {
+    "message": "已切換到彈出式視窗模式。在外部點擊後，擴充功能會關閉。"
+  },
+  "shell_persistent": {
+    "message": "正在固定視窗中執行。"
+  },
+  "shell_try_again_help": {
+    "message": "如果想再試一次，或需要其他協助，請告訴我。"
+  },
+  "shell_locked_tab": {
+    "message": "當自動化正在此分頁工作時已停用"
+  },
+  "shell_doctor_copied": {
+    "message": "已複製診斷命令"
+  },
+  "shell_pair_copied": {
+    "message": "已複製配對重設命令"
+  },
+  "shell_install_copied": {
+    "message": "已複製原生助手安裝命令"
+  },
+  "shell_site_map_ready": {
+    "message": "網站地圖已就緒。要重試這項工作嗎？ "
+  },
+  "shell_retry_sitemap": {
+    "message": "使用網站地圖重試"
+  },
+  "shell_locked_ext": {
+    "message": "擴充功能已鎖定。請先打開彈出式視窗解鎖。"
+  },
+  "shell_already_done": {
+    "message": "已經完成"
+  },
+  "shell_session_ended": {
+    "message": "工作階段意外結束。可以開始下一個工作。"
+  },
+  "shell_no_map": {
+    "message": "此網站還沒有地圖。偵察可以幫助 FSB 學習網站結構，從而提升表現。"
+  },
+  "shell_run_recon": {
+    "message": "開始偵察"
+  },
+  "shell_stuck": {
+    "message": "自動化一直在重複同樣的操作。這裡有一些提示："
+  },
+  "shell_tip_specific": {
+    "message": "請把想完成的事情說得更具體一些"
+  },
+  "shell_tip_captcha": {
+    "message": "請檢查頁面是否需要手動步驟，例如完成 CAPTCHA"
+  },
+  "shell_tip_loaded": {
+    "message": "開始之前，請確認頁面已完全載入"
+  },
+  "shell_no_worries": {
+    "message": "沒關係。側邊欄還在。可以再試一次，或讓我幫你做別的事。"
+  },
+  "shell_password": {
+    "message": "密碼"
+  },
+  "shell_signing_in": {
+    "message": "正在登入..."
+  },
+  "shell_login_skipped": {
+    "message": "已略過登入。正在繼續自動化..."
+  },
+  "shell_payment_selected": {
+    "message": "已選擇儲存的付款方式。FSB 會填寫卡資訊，但不會替你提交最終付款。"
+  },
+  "shell_payment_skipped": {
+    "message": "已略過儲存的付款方式。在任何最終付款步驟之前，請檢查結帳表單。"
+  },
+  "shell_replay_preview": {
+    "message": "已驗證的重播預覽"
+  },
+  "shell_fresh_tab_fallback": {
+    "message": "所記錄網站的新分頁"
+  },
+  "shell_approve_replay": {
+    "message": "核准重播"
+  },
+  "shell_cancel": {
+    "message": "取消"
+  },
+  "shell_replay_busy": {
+    "message": "另一項自動化正在執行時無法重播。請先停止目前的工作。"
+  },
+  "shell_replay_cancelled_request": {
+    "message": "已取消重播要求。沒有開啟目標分頁。"
+  },
+  "shell_replay_inspect_only": {
+    "message": "這段錄製已通過檢查驗證，但沒有可執行的步驟。"
+  },
+  "shell_replay_cancelled": {
+    "message": "已取消重播。原始錄製沒有變更。"
+  },
+  "shell_session_missing": {
+    "message": "找不到工作階段資料。"
+  },
+  "shell_no_actions": {
+    "message": "此工作階段沒有錄製任何操作。"
+  },
+  "shell_history_failed": {
+    "message": "無法載入工作階段。"
+  },
+  "shell_replay_session": {
+    "message": "重播工作階段"
+  },
+  "shell_delete_session": {
+    "message": "刪除工作階段"
+  },
+  "shell_autopilot": {
+    "message": "自動駕駛"
+  },
+  "shell_checking_local": {
+    "message": "正在檢查本機代理服務"
+  },
+  "shell_checking_local_sent": {
+    "message": "正在檢查本機代理服務。你的訊息尚未傳送。"
+  },
+  "shell_wake_body": {
+    "message": "FSB 正在嘗試讓本機代理服務可用。你的訊息尚未傳送。"
+  },
+  "shell_checking_agent": {
+    "message": "正在檢查代理服務"
+  },
+  "shell_agent_offline": {
+    "message": "代理離線"
+  },
+  "shell_offline_body": {
+    "message": "FSB 無法連線到本機代理服務。請執行診斷命令，然後重試這則訊息。"
+  },
+  "shell_copy_doctor": {
+    "message": "複製診斷命令"
+  },
+  "shell_open_provider": {
+    "message": "開啟提供者設定"
+  },
+  "shell_needs_helper": {
+    "message": "自動連線需要原生助手"
+  },
+  "shell_install_body": {
+    "message": "請安裝或更新 FSB 原生助手，然後重試這則訊息。FSB 會自動連線此瀏覽器。"
+  },
+  "shell_copy_install": {
+    "message": "複製安裝命令"
+  },
+  "shell_back_to_message": {
+    "message": "返回訊息"
+  },
+  "shell_checking_provider": {
+    "message": "正在檢查提供者"
+  },
+  "shell_checking_provider_body": {
+    "message": "FSB 正在傳送你的訊息之前檢查 AI 提供者。"
+  },
+  "shell_starting_agent": {
+    "message": "正在啟動代理"
+  },
+  "shell_starting_agent_body": {
+    "message": "FSB 正在把你的訊息交給代理。"
+  },
+  "shell_owned_by": {
+    "message": "由 $LABEL$ 佔用",
+    "placeholders": {
+      "label": {
+        "content": "$1"
+      }
+    }
+  },
+  "shell_owned_title": {
+    "message": "當 $LABEL$ 正在使用此分頁時已停用",
+    "placeholders": {
+      "label": {
+        "content": "$1"
+      }
+    }
+  },
+  "shell_error_encountered": {
+    "message": "發生錯誤：$ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "shell_error_generic": {
+    "message": "發生問題：$ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "shell_error_background": {
+    "message": "與背景指令碼通訊時發生錯誤：$ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "shell_error_stop": {
+    "message": "停止自動化時發生錯誤：$ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "shell_starting": {
+    "message": "正在啟動自動化..."
+  },
+  "shell_continuing": {
+    "message": "正在繼續..."
+  },
+  "shell_connecting": {
+    "message": "正在連線到頁面..."
+  },
+  "shell_connected_analyzing": {
+    "message": "已連線。正在分析頁面..."
+  },
+  "shell_analyzing": {
+    "message": "正在分析頁面..."
+  },
+  "shell_starting_plain": {
+    "message": "正在啟動自動化"
+  },
+  "shell_testing_api": {
+    "message": "正在測試 $NAME$ 的 API 連線...",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "shell_api_ok": {
+    "message": "$NAME$ 的 API 連線正常。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "shell_api_model": {
+    "message": "已連線到模型：$MODEL$",
+    "placeholders": {
+      "model": {
+        "content": "$1"
+      }
+    }
+  },
+  "shell_api_failed": {
+    "message": "$NAME$ 的 API 連線失敗。請檢查設定。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "shell_api_status": {
+    "message": "狀態：$STATUS$ - $DETAIL$",
+    "placeholders": {
+      "status": {
+        "content": "$1"
+      },
+      "detail": {
+        "content": "$2"
+      }
+    }
+  },
+  "shell_api_details": {
+    "message": "詳細資訊：$ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "shell_error_details": {
+    "message": "錯誤詳細資訊：$ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "shell_working": {
+    "message": "工作中"
+  },
+  "shell_error_status": {
+    "message": "錯誤"
+  },
+  "panel_67b6964686": {
+    "message": "儀表板"
+  },
+  "panel_8ad747d05c": {
+    "message": "API 設定"
+  },
+  "panel_8d261a372f": {
+    "message": "同步"
+  },
+  "panel_703390318b": {
+    "message": "測試版"
+  },
+  "panel_be146b37a0": {
+    "message": "密碼"
+  },
+  "panel_632e1c5839": {
+    "message": "付款"
+  },
+  "panel_22d4f6088b": {
+    "message": "進階設定"
+  },
+  "panel_c3963aedaa": {
+    "message": "記憶"
+  },
+  "panel_480d3c119a": {
+    "message": "紀錄與除錯"
+  },
+  "panel_2ccff1d108": {
+    "message": "說明與文件"
+  },
+  "panel_db17c74beb": {
+    "message": "查看 AI 用量、費用和自動化表現"
+  },
+  "panel_cd41bf0d3e": {
+    "message": "總 Token 數"
+  },
+  "panel_dfa5cc738d": {
+    "message": "總費用"
+  },
+  "panel_ada27592c9": {
+    "message": "要求"
+  },
+  "panel_5068c6c343": {
+    "message": "成功率"
+  },
+  "panel_d909750b1b": {
+    "message": "自動化"
+  },
+  "panel_cddf50281d": {
+    "message": "Token 用量隨時間變化"
+  },
+  "panel_615c5daff4": {
+    "message": "過去 24 小時"
+  },
+  "panel_b84372e5cb": {
+    "message": "過去 7 天"
+  },
+  "panel_e9ddf63b38": {
+    "message": "過去 30 天"
+  },
+  "panel_5e4bc34faf": {
+    "message": "設定 AI 模型提供者和 API 設定"
+  },
+  "panel_9b3cf4a154": {
+    "message": "AI 模型設定"
+  },
+  "panel_84e1ec2c5b": {
+    "message": "AI 提供者"
+  },
+  "panel_994f468aae": {
+    "message": "選擇其他提供者"
+  },
+  "panel_e65d5614f4": {
+    "message": "自訂（相容 OpenAI）"
+  },
+  "panel_e69daa3849": {
+    "message": "API 提供者使用本機金鑰。代理 CLI 使用現有的本機登入。"
+  },
+  "panel_daa5fed227": {
+    "message": "選擇其他 AI 提供者"
+  },
+  "panel_822a9fabc1": {
+    "message": "此提供者已不能用於自動駕駛。開始新工作前，請選擇並儲存其他提供者。"
+  },
+  "panel_5e2c614c23": {
+    "message": "模型"
+  },
+  "panel_dfa17046ae": {
+    "message": "提供 API 金鑰以列出模型"
+  },
+  "panel_00889a77ec": {
+    "message": "選擇要使用的 AI 模型"
+  },
+  "panel_bc3286fa36": {
+    "message": "xAI API 金鑰"
+  },
+  "panel_a3fb46f4c6": {
+    "message": "在此取得 API 金鑰"
+  },
+  "panel_8e9faa30de": {
+    "message": "。金鑰儲存在此瀏覽器本機。"
+  },
+  "panel_53bca734db": {
+    "message": "Gemini API 金鑰"
+  },
+  "panel_8418bdbdcd": {
+    "message": "OpenAI API 金鑰"
+  },
+  "panel_e07165f5ce": {
+    "message": "OpenAI 平台"
+  },
+  "panel_959bc25166": {
+    "message": "Anthropic API 金鑰"
+  },
+  "panel_c481af39b2": {
+    "message": "Anthropic 主控台"
+  },
+  "panel_36e0497429": {
+    "message": "OpenRouter API 金鑰"
+  },
+  "panel_84de34181d": {
+    "message": "。一把金鑰即可使用 200 多種模型。"
+  },
+  "panel_018833a024": {
+    "message": "LM Studio 伺服器 URL"
+  },
+  "panel_3efaf1b1c1": {
+    "message": "使用 LM Studio 的本機 OpenAI 相容伺服器。不需要 API 金鑰。模型即時發現自"
+  },
+  "panel_83419f15b8": {
+    "message": "自訂 API 端點"
+  },
+  "panel_cfb67fffe3": {
+    "message": "輸入相容 OpenAI 的 API 端點完整 URL"
+  },
+  "panel_acb781f972": {
+    "message": "自訂 API 金鑰"
+  },
+  "panel_5e2e7207a6": {
+    "message": "金鑰儲存在此瀏覽器本機。"
+  },
+  "panel_abfe6d40e5": {
+    "message": "語音轉文字"
+  },
+  "panel_5303c4374c": {
+    "message": "使用 OpenAI Whisper"
+  },
+  "panel_14e36783b5": {
+    "message": "需要 OpenAI API 金鑰。關閉後使用瀏覽器內建的語音辨識。"
+  },
+  "panel_e1461bf33a": {
+    "message": "CAPTCHA 求解"
+  },
+  "panel_2909841c62": {
+    "message": "啟用 CAPTCHA 求解"
+  },
+  "panel_1955b2ec44": {
+    "message": "使用 2Captcha 解決 reCAPTCHA v2、hCaptcha 和 Cloudflare Turnstile"
+  },
+  "panel_5ac544cb2f": {
+    "message": "2Captcha API 金鑰"
+  },
+  "panel_a003f76423": {
+    "message": "在此註冊"
+  },
+  "panel_b6ff7ee96e": {
+    "message": "代理 CLI"
+  },
+  "panel_a1272b91cf": {
+    "message": "正在檢查登入..."
+  },
+  "panel_d696a35bdd": {
+    "message": "設定檔"
+  },
+  "panel_3ac8bbca9a": {
+    "message": "帳單"
+  },
+  "panel_cec3a9b89b": {
+    "message": "資料"
+  },
+  "panel_ccf75fb483": {
+    "message": "連線 SuperGrok"
+  },
+  "panel_acfc5be785": {
+    "message": "中斷連線"
+  },
+  "panel_1771a5d0f6": {
+    "message": "繼續登入"
+  },
+  "panel_888a2f4fc6": {
+    "message": "查看 SuperGrok 用量"
+  },
+  "panel_d334745b85": {
+    "message": "安裝指南"
+  },
+  "panel_adadface01": {
+    "message": "未回報"
+  },
+  "panel_5bbbe53187": {
+    "message": "登入"
+  },
+  "panel_774bf7db76": {
+    "message": "驗證狀態"
+  },
+  "panel_2e5f79bb94": {
+    "message": "正在檢查..."
+  },
+  "panel_02600e6189": {
+    "message": "正在驗證 API 連線"
+  },
+  "panel_c02977b07e": {
+    "message": "測試連線"
+  },
+  "panel_3907fa7f80": {
+    "message": "外觀"
+  },
+  "panel_efb52e7172": {
+    "message": "主題"
+  },
+  "panel_6725e7bbcd": {
+    "message": "跟隨系統"
+  },
+  "panel_60acc53f13": {
+    "message": "深色"
+  },
+  "panel_dbcd5e7bb7": {
+    "message": "淺色"
+  },
+  "panel_19766ed6cc": {
+    "message": "取消"
+  },
+  "panel_1509f561f2": {
+    "message": "儲存"
+  },
+  "panel_35322b5bb5": {
+    "message": "儲存變更"
+  },
+  "panel_eb1a70e392": {
+    "message": "捨棄"
+  },
+  "panel_49e49bb440": {
+    "message": "產生"
+  },
+  "panel_0e91610117": {
+    "message": "重新整理"
+  },
+  "panel_3664895579": {
+    "message": "匯出"
+  },
+  "panel_2cff9baabf": {
+    "message": "匯入"
+  },
+  "panel_78b7d0379d": {
+    "message": "授予"
+  },
+  "panel_05a2d7332e": {
+    "message": "拒絕"
+  },
+  "panel_ca7981b46e": {
+    "message": "關閉"
+  },
+  "panel_b8c209cdea": {
+    "message": "詢問"
+  },
+  "panel_0286249762": {
+    "message": "自動"
+  },
+  "panel_1a3a4b99db": {
+    "message": "還沒有人回報 FSB 被辨識為機器人並打斷工作。不過並非每天都順利。這是為不順利的時候準備的。"
+  },
+  "panel_1a187ac034": {
+    "message": "，儲值後從儀表板複製 API 金鑰。可解決 reCAPTCHA v2、hCaptcha 和 Turnstile。"
+  },
+  "panel_92f1115a37": {
+    "message": "FSB 使用此 CLI 現有的本機登入。測試連線會傳送一個不含工具的小型驗證要求。"
+  },
+  "panel_cfaa352b86": {
+    "message": "xAI · 本機工具"
+  },
+  "panel_fd05c3a95a": {
+    "message": "需要已審核的 Grok Build 1.0.4 設定。測試連線會核對安裝、版本、隔離、ACP 和快取的 OAuth，且不傳送提示。"
+  },
+  "panel_ce4f452059": {
+    "message": "使用已登入的 Grok 帳戶。SuperGrok 用量來自共享的每週額度；可能產生額外用量。"
+  },
+  "panel_ba5c14963d": {
+    "message": "瀏覽器工作文字和 FSB 的 MCP 結果會傳送給 Grok 做推理。FSB 會為這個私有設定關閉次要遙測和追蹤上傳。"
+  },
+  "panel_baf4338a6f": {
+    "message": "Anthropic · 本機工具"
+  },
+  "panel_7b14b6ca11": {
+    "message": "使用已登入 Claude Code 的帳戶。FSB 不需要你的 Anthropic 憑證。"
+  },
+  "panel_8cceeb4d83": {
+    "message": "用量和費用遵循該帳戶的 Claude 方案或 API 設定。"
+  },
+  "panel_d9daa99f67": {
+    "message": "Claude Code 不會回報 FSB 可以安全讀取的驗證狀態。"
+  },
+  "panel_00604d2592": {
+    "message": "查看 Claude 方案和帳單"
+  },
+  "panel_b9f2d95fd0": {
+    "message": "微調自動化行為和效能"
+  },
+  "panel_d987fa1b93": {
+    "message": "控制面板的外觀"
+  },
+  "panel_1b0daa3cbf": {
+    "message": "跟隨作業系統外觀。預設：跟隨系統。"
+  },
+  "panel_0c2634ded4": {
+    "message": "執行與限制"
+  },
+  "panel_a429108292": {
+    "message": "自動化限制"
+  },
+  "panel_a6db09cd31": {
+    "message": "控制工作執行邊界"
+  },
+  "panel_7f9bd64777": {
+    "message": "最大疊代次數"
+  },
+  "panel_efb8da8405": {
+    "message": "防止自動化迴圈失控"
+  },
+  "panel_217a08135e": {
+    "message": "DOM 分析"
+  },
+  "panel_f57d34cd62": {
+    "message": "最佳化頁面元素處理"
+  },
+  "panel_f239d1c5e2": {
+    "message": "元素上限"
+  },
+  "panel_a0981cec31": {
+    "message": "涵蓋範圍與速度的平衡"
+  },
+  "panel_44551744d4": {
+    "message": "元素快取大小"
+  },
+  "panel_bc63ff6878": {
+    "message": "50（最小：簡單頁面）"
+  },
+  "panel_6e13b13acc": {
+    "message": "100（輕量：一般頁面）"
+  },
+  "panel_f5e5f028c7": {
+    "message": "200（標準：建議）"
+  },
+  "panel_51a4656787": {
+    "message": "500（較重：複雜 SPA）"
+  },
+  "panel_b497c0b77d": {
+    "message": "自訂..."
+  },
+  "panel_3bba622285": {
+    "message": "快取元素查詢，加快重複查詢。數值越高，複雜頁面越快，記憶體占用也越高。"
+  },
+  "panel_964b6d2feb": {
+    "message": "代理並行"
+  },
+  "panel_93bdf716dc": {
+    "message": "同時執行的代理上限"
+  },
+  "panel_05f46c29ed": {
+    "message": "並行上限"
+  },
+  "panel_599bc7e4ae": {
+    "message": "恢復為建議值 (8)"
+  },
+  "panel_26f41aac5c": {
+    "message": "必須在 1 到 64 之間"
+  },
+  "panel_dd39c865d3": {
+    "message": "8 個中有 0 個在執行"
+  },
+  "panel_8b2e97f4e5": {
+    "message": "觸發程序並行"
+  },
+  "panel_1844d05c26": {
+    "message": "同時監看的觸發程序上限"
+  },
+  "panel_5aa4aff46c": {
+    "message": "恢復為預設值 (8)"
+  },
+  "panel_4f6e909317": {
+    "message": "自動化行為"
+  },
+  "panel_87fb620509": {
+    "message": "操作變更報告"
+  },
+  "panel_8807532414": {
+    "message": "每次操作附帶傳回的行內差異"
+  },
+  "panel_5d2f08be69": {
+    "message": "傳回操作變更報告（建議）"
+  },
+  "panel_814f4c658e": {
+    "message": "MCP 工作階段重播"
+  },
+  "panel_d93120e9c3": {
+    "message": "MCP 代理操作的本機精確紀錄"
+  },
+  "panel_e3d0d26ac8": {
+    "message": "記錄 MCP 工作階段以便重播"
+  },
+  "panel_8c338dcb22": {
+    "message": "MCP 重播保留天數"
+  },
+  "panel_a3a33e657a": {
+    "message": "效能最佳化"
+  },
+  "panel_318ba4fefb": {
+    "message": "啟用智慧功能以提高速度和準確性"
+  },
+  "panel_718ec50194": {
+    "message": "增量差異"
+  },
+  "panel_4df3ccd4f7": {
+    "message": "首次掃描後只傳送 DOM 變化（上下文減少 70-90%）"
+  },
+  "panel_386c10cfbb": {
+    "message": "視窗優先"
+  },
+  "panel_55b7c33a00": {
+    "message": "聚焦可見元素，獲得更快、更相關的結果"
+  },
+  "panel_56cb122532": {
+    "message": "AI 網站地圖最佳化"
+  },
+  "panel_bbabb56b4f": {
+    "message": "用 AI 自動最佳化網站地圖，以發現導覽策略和工作流程"
+  },
+  "panel_6a63ec792f": {
+    "message": "視覺回饋"
+  },
+  "panel_d9db4fd5a6": {
+    "message": "控制自動化期間的視覺提示"
+  },
+  "panel_882726c86c": {
+    "message": "操作的動畫醒目提示"
+  },
+  "panel_525c3926bb": {
+    "message": "執行操作時在元素周圍顯示脈動光暈"
+  },
+  "panel_b8c545e36f": {
+    "message": "側邊欄步驟進度"
+  },
+  "panel_cd7487b136": {
+    "message": "自動化期間在側邊欄顯示操作步驟"
+  },
+  "panel_915c0ef81c": {
+    "message": "隱私與開發者"
+  },
+  "panel_02d7d5cfae": {
+    "message": "語音輸入"
+  },
+  "panel_936f490e8e": {
+    "message": "控制 FSB 側邊欄中的麥克風輸入"
+  },
+  "panel_92f7b96921": {
+    "message": "啟用麥克風語音輸入"
+  },
+  "panel_e007c1f5fd": {
+    "message": "正在檢查麥克風權限…"
+  },
+  "panel_7df7702416": {
+    "message": "Chrome 管理整個擴充功能的麥克風授權。"
+  },
+  "panel_5e09a0b0eb": {
+    "message": "啟用麥克風"
+  },
+  "panel_2c0acdeddf": {
+    "message": "開啟 Chrome 設定"
+  },
+  "panel_d7de9cfa12": {
+    "message": "開發人員選項"
+  },
+  "panel_fef2fc10ae": {
+    "message": "用於除錯和排查的工具"
+  },
+  "panel_5f75368293": {
+    "message": "除錯模式"
+  },
+  "panel_64b2d259ae": {
+    "message": "啟用詳細主控台紀錄，以便排查自動化問題"
+  },
+  "panel_38d35a351e": {
+    "message": "隱私與遙測"
+  },
+  "panel_21bf1bebea": {
+    "message": "匿名使用資料"
+  },
+  "panel_451d787c00": {
+    "message": "傳送匿名使用資料"
+  },
+  "panel_57f9a109d4": {
+    "message": "已用 Token、MCP 用戶端名稱、使用中代理數量。不含網址、提示或 DOM。"
+  },
+  "panel_9ec9376910": {
+    "message": "閱讀完整政策 →"
+  },
+  "panel_04dfac3671": {
+    "message": "未連線"
+  },
+  "panel_acf2db1614": {
+    "message": "伺服器同步"
+  },
+  "panel_609bbbdf07": {
+    "message": "雜湊金鑰"
+  },
+  "panel_534803768c": {
+    "message": "配對儀表板"
+  },
+  "panel_9a177de63c": {
+    "message": "掃描配對"
+  },
+  "panel_43e3ece73f": {
+    "message": "剩餘"
+  },
+  "panel_5ad3dbd124": {
+    "message": "知道了"
+  },
+  "panel_c9b3c38247": {
+    "message": "合計"
+  },
+  "panel_a69c4dece1": {
+    "message": "儲存"
+  },
+  "panel_ae65d09655": {
+    "message": "容量"
+  },
+  "panel_a039dfb962": {
+    "message": "Token 數"
+  },
+  "panel_4bc74b2135": {
+    "message": "工作"
+  },
+  "panel_2f36130ebc": {
+    "message": "合併"
+  },
+  "panel_ddceb7adfd": {
+    "message": "全部清除"
+  },
+  "panel_6cc8519b91": {
+    "message": "開始"
+  },
+  "panel_d3f7409ad7": {
+    "message": "全部停止"
+  },
+  "panel_f00611c47f": {
+    "message": "依你的系統自動建議。範圍 1 到 64。較低則資源使用更可預期，較高則並行代理更多。執行中降低此值不會趕走現有代理；超出新上限的新要求會被拒絕。"
+  },
+  "panel_bfd6b0808c": {
+    "message": "預設 8。範圍 1 到 64。較低則資源使用更可預期，較高則並行監看更多。監看中降低此值不會停止現有監看；超出新上限的新觸發程序會被拒絕。"
+  },
+  "panel_552aa7152b": {
+    "message": "傳回精簡差異，說明每次操作改變了什麼，這樣 AI 不必重新閱讀頁面。預設開啟。"
+  },
+  "panel_bb0522a484": {
+    "message": "預設 30。範圍 1 到 365 天。只會自動刪除過期的 MCP 重播工作階段；自動駕駛紀錄不會因此被裁剪。"
+  },
+  "panel_77f6039567": {
+    "message": "在側邊欄顯示麥克風，並允許瀏覽器語音辨識或 OpenAI Whisper。預設開啟。"
+  },
+  "panel_509f0b9d50": {
+    "message": "關閉語音輸入後，FSB 不再使用麥克風，但不會撤銷 Chrome 已儲存的權限。"
+  },
+  "panel_76e917ee87": {
+    "message": "將此擴充功能與 FSB 儀表板配對，以便遠端控制和儲存結果"
+  },
+  "panel_c11de3bb2e": {
+    "message": "連線 FSB 伺服器以儲存結果並使用儀表板"
+  },
+  "panel_097b5fa7f6": {
+    "message": "產生金鑰，然後配對儀表板，將此瀏覽器連到 FSB 伺服器。"
+  },
+  "panel_75d0625c55": {
+    "message": "背景代理已經離開"
+  },
+  "panel_d17d0cfd98": {
+    "message": "FSB 專注於一次到位的精確瀏覽器執行。排程和重複工作更適合專為此設計的工具："
+  },
+  "panel_5a694f4532": {
+    "message": "用於開源代理迴圈，以及"
+  },
+  "panel_6e34781c2f": {
+    "message": "用於託管的長時間自動化。選擇適合你工作方式的那個。"
+  },
+  "panel_e76c360683": {
+    "message": "試用 OpenClaw"
+  },
+  "panel_1a58d9154d": {
+    "message": "試用 Claude Routines"
+  },
+  "panel_582ba53e9e": {
+    "message": "已在 v0.9.45rc1 停用 · 2026 年 4 月"
+  },
+  "panel_daa7068396": {
+    "message": "你以前的代理"
+  },
+  "panel_3107f72f47": {
+    "message": "曾在此設定中的代理名稱保留在這裡，以免感覺遺失。定義仍在 chrome.storage.local['bgAgents']（未改動）。"
+  },
+  "panel_9f83a0b7bf": {
+    "message": "從過往自動化工作階段中學到的長期記憶"
+  },
+  "panel_76a6bcf157": {
+    "message": "自動分析"
+  },
+  "panel_50d0c5511b": {
+    "message": "情節"
+  },
+  "panel_9c11c99c77": {
+    "message": "語意"
+  },
+  "panel_2e3e91ffbd": {
+    "message": "程序"
+  },
+  "panel_ee6cfab445": {
+    "message": "費用（30 天）"
+  },
+  "panel_bc01325482": {
+    "message": "所有類型"
+  },
+  "panel_96452046b5": {
+    "message": "還沒有儲存的記憶。記憶會從已完成的自動化工作階段中自動擷取。"
+  },
+  "panel_ba7fab765c": {
+    "message": "偵察"
+  },
+  "panel_cf0e1ec867": {
+    "message": "爬取網站，繪製其互動結構、導覽和選擇器"
+  },
+  "panel_ad2f160b7b": {
+    "message": "最大深度"
+  },
+  "panel_53e4d8efcc": {
+    "message": "最大頁數"
+  },
+  "panel_8ccc2c0e78": {
+    "message": "研究結果"
+  },
+  "panel_452d842e33": {
+    "message": "查看並下載網站偵察資料，或儲存為網站地圖記憶"
+  },
+  "panel_df63a2da5f": {
+    "message": "還沒有研究結果。使用上方的偵察來爬取網站。"
+  },
+  "panel_30c19209ac": {
+    "message": "合併記憶"
+  },
+  "panel_ba41142e62": {
+    "message": "網站地圖"
+  },
+  "panel_bb501d7877": {
+    "message": "社群"
+  },
+  "panel_d4b1ea5708": {
+    "message": "概覽"
+  },
+  "panel_e72d5d8d0b": {
+    "message": "展開"
+  },
+  "panel_73cde2ba51": {
+    "message": "電商與購物"
+  },
+  "panel_8dfdbc2ef4": {
+    "message": "社群媒體"
+  },
+  "panel_6c335e2a76": {
+    "message": "金融與交易"
+  },
+  "panel_822c302ddc": {
+    "message": "旅行與預訂"
+  },
+  "panel_7b1b7b315b": {
+    "message": "電子郵件平台"
+  },
+  "panel_cbb811ada2": {
+    "message": "程式設計平台"
+  },
+  "panel_c47f423a0a": {
+    "message": "職涯與求職"
+  },
+  "panel_08cf7301b0": {
+    "message": "遊戲平台"
+  },
+  "panel_2d995d5860": {
+    "message": "生產力工具"
+  },
+  "panel_95bfe584eb": {
+    "message": "設計與白板"
+  },
+  "panel_d9dae78103": {
+    "message": "遊戲"
+  },
+  "panel_d357175cfe": {
+    "message": "媒體"
+  },
+  "panel_6eb00b4b26": {
+    "message": "音樂"
+  },
+  "panel_69752f2313": {
+    "message": "新聞"
+  },
+  "panel_71bf90935f": {
+    "message": "參考"
+  },
+  "panel_9b1f5daf0a": {
+    "message": "體育"
+  },
+  "panel_0a035c2b85": {
+    "message": "工具"
+  },
+  "panel_4b7ef9d8cd": {
+    "message": "監看自動化活動並排查問題"
+  },
+  "panel_65e5078378": {
+    "message": "清除紀錄"
+  },
+  "panel_5ddbf16ab1": {
+    "message": "匯出紀錄"
+  },
+  "panel_03f1acb9e6": {
+    "message": "全部紀錄"
+  },
+  "panel_ee585cc4bd": {
+    "message": "僅錯誤"
+  },
+  "panel_0b3ff2c6ee": {
+    "message": "警告與錯誤"
+  },
+  "panel_2d9e112fc2": {
+    "message": "資訊及以上"
+  },
+  "panel_122df75095": {
+    "message": "FSB 控制面板已成功載入"
+  },
+  "panel_edeead3f19": {
+    "message": "工作階段紀錄"
+  },
+  "panel_fba294fa8b": {
+    "message": "查看並匯出過往自動化工作階段的紀錄"
+  },
+  "panel_7a28e26099": {
+    "message": "清除所有工作階段"
+  },
+  "panel_600cf8138b": {
+    "message": "還沒有記錄的工作階段。執行自動化工作後，工作階段紀錄會顯示在這裡。"
+  },
+  "panel_e38737d4e5": {
+    "message": "分析除錯工具"
+  },
+  "panel_c0b1dd0e52": {
+    "message": "測試並驗證分析資料收集"
+  },
+  "panel_bc93dddbb3": {
+    "message": "測試 Token 追蹤"
+  },
+  "panel_4267998cbe": {
+    "message": "查看儲存資料"
+  },
+  "panel_056a9215e5": {
+    "message": "清除分析資料"
+  },
+  "panel_2ed2274015": {
+    "message": "匯出資料"
+  },
+  "panel_a239457076": {
+    "message": "除錯輸出："
+  },
+  "panel_38b6a17864": {
+    "message": "同意與稽核"
+  },
+  "panel_94ef5e0fd6": {
+    "message": "下面的預設值適用於你尚未設定的每個網站；按來源清單可以把個別網站排除。"
+  },
+  "panel_6e133ee86d": {
+    "message": "新網站的預設值"
+  },
+  "panel_9693a6dbf3": {
+    "message": "金融和政府服務始終被封鎖，與此設定無關。出廠為自動；設為關閉可恢復嚴格的逐項啟用。"
+  },
+  "panel_01914d2038": {
+    "message": "按來源同意"
+  },
+  "panel_96db3ff001": {
+    "message": "除非你在這裡覆寫，否則每個網站都遵循上面的預設值。把網站設為關閉後，FSB 不再在該網站上操作。"
+  },
+  "panel_48cfb671aa": {
+    "message": "還沒有網站。FSB 操作過的每個網站都會出現在這裡，你可以設為關閉。新網站遵循上面的預設值。"
+  },
+  "panel_2c64c030d4": {
+    "message": "敏感"
+  },
+  "panel_18f2a0947f": {
+    "message": "已封鎖"
+  },
+  "panel_5f351832fd": {
+    "message": "允許會修改的（寫入）呼叫"
+  },
+  "panel_45a8c38cdf": {
+    "message": "POST/PUT/PATCH/DELETE 的相容中繼資料。在自動模式下，FSB 可以對未封鎖的來源進行讀寫。"
+  },
+  "panel_87b1794408": {
+    "message": "待處理要求"
+  },
+  "panel_0334c4fb39": {
+    "message": "0 個待處理"
+  },
+  "panel_10fd874b68": {
+    "message": "寫入"
+  },
+  "panel_47751f88ed": {
+    "message": "稽核紀錄"
+  },
+  "panel_818cb91030": {
+    "message": "匯出紀錄"
+  },
+  "panel_533e26bdcc": {
+    "message": "清除紀錄"
+  },
+  "panel_33b93476cf": {
+    "message": "時間"
+  },
+  "panel_d3e1c5f8a6": {
+    "message": "來源"
+  },
+  "panel_5faf58a69d": {
+    "message": "能力"
+  },
+  "panel_52a0f9b65b": {
+    "message": "方法"
+  },
+  "panel_bce87826df": {
+    "message": "副作用"
+  },
+  "panel_d37e0cd00f": {
+    "message": "同意"
+  },
+  "panel_4e80abb5b1": {
+    "message": "結果"
+  },
+  "panel_5934628d0f": {
+    "message": "法律與服務政策"
+  },
+  "panel_fea0aab06e": {
+    "message": "閱讀法律立場 →"
+  },
+  "panel_4fc14539b2": {
+    "message": "查看已封鎖的服務 →"
+  },
+  "panel_efc0b9cac2": {
+    "message": "隱私權政策 →"
+  },
+  "panel_bfe73827c5": {
+    "message": "啟用自動登入"
+  },
+  "panel_bbf6a83734": {
+    "message": "憑證保險庫"
+  },
+  "panel_07dd5f0064": {
+    "message": "正在檢查保險庫狀態..."
+  },
+  "panel_50b231118c": {
+    "message": "鎖定保險庫"
+  },
+  "panel_ac22d297f8": {
+    "message": "選擇 PIN 長度"
+  },
+  "panel_3e785bbc44": {
+    "message": "4 位"
+  },
+  "panel_7856e511a2": {
+    "message": "6 位"
+  },
+  "panel_f246c76813": {
+    "message": "輸入 PIN"
+  },
+  "panel_4fa10c7baa": {
+    "message": "確認 PIN"
+  },
+  "panel_73134c8143": {
+    "message": "設定保險庫"
+  },
+  "panel_872ac152d2": {
+    "message": "輸入 PIN 以解除鎖定"
+  },
+  "panel_b41986e3f5": {
+    "message": "解除保險庫鎖定"
+  },
+  "panel_c1dc92c680": {
+    "message": "新增"
+  },
+  "panel_35d74dfd8d": {
+    "message": "新增憑證"
+  },
+  "panel_85a85dc9a2": {
+    "message": "網站 / 網域"
+  },
+  "panel_657144f3f7": {
+    "message": "使用者名稱 / 電子郵件"
+  },
+  "panel_e7cf3ef4f1": {
+    "message": "密碼"
+  },
+  "panel_6239b93e96": {
+    "message": "備註（選填）"
+  },
+  "panel_9caa27b9d0": {
+    "message": "允許此憑證用於子網域"
+  },
+  "panel_8816182605": {
+    "message": "例如：為以下位址儲存的憑證"
+  },
+  "panel_eb1c90412b": {
+    "message": "也可用於"
+  },
+  "panel_195ab9772f": {
+    "message": "啟用已儲存的付款方式"
+  },
+  "panel_b45d64e4a3": {
+    "message": "已儲存的付款方式"
+  },
+  "panel_a92743920d": {
+    "message": "正在檢查付款方式狀態..."
+  },
+  "panel_bbc3d7eb41": {
+    "message": "鎖定付款方式"
+  },
+  "panel_24e06db48e": {
+    "message": "開啟密碼"
+  },
+  "panel_186f818f5f": {
+    "message": "解除已儲存付款方式的鎖定"
+  },
+  "panel_82f87079c6": {
+    "message": "新增卡片"
+  },
+  "panel_b610b1ecca": {
+    "message": "新增付款方式"
+  },
+  "panel_7cbcb92acd": {
+    "message": "暱稱（選填）"
+  },
+  "panel_85dfa9ba97": {
+    "message": "顯示在卡片選擇器和已儲存卡片清單中。"
+  },
+  "panel_d6bc26851d": {
+    "message": "持卡人姓名"
+  },
+  "panel_4566e068a2": {
+    "message": "卡號"
+  },
+  "panel_b764cdc0ea": {
+    "message": "未知"
+  },
+  "panel_25ec19a82f": {
+    "message": "輸入時會自動辨識卡組織。"
+  },
+  "panel_43533009b2": {
+    "message": "到期月份"
+  },
+  "panel_310ca503ef": {
+    "message": "月"
+  },
+  "panel_ca7aaef8c5": {
+    "message": "到期年份"
+  },
+  "panel_8a944d3d0e": {
+    "message": "帳單姓名"
+  },
+  "panel_1b77352e0b": {
+    "message": "帳單地址第 1 行"
+  },
+  "panel_ff2bc02380": {
+    "message": "帳單地址第 2 行（選填）"
+  },
+  "panel_fc33f73246": {
+    "message": "城市"
+  },
+  "panel_9630a4b030": {
+    "message": "州 / 地區"
+  },
+  "panel_8198b202a8": {
+    "message": "郵遞區號"
+  },
+  "panel_701d021d08": {
+    "message": "國家"
+  },
+  "panel_d00eca1bae": {
+    "message": "入門"
+  },
+  "panel_c772928cb0": {
+    "message": "了解使用 FSB 進行瀏覽器自動化的基礎"
+  },
+  "panel_584aa47f13": {
+    "message": "造訪網站"
+  },
+  "panel_b50c780ec8": {
+    "message": "引導式設定"
+  },
+  "panel_01c470e51f": {
+    "message": "重新開始設定"
+  },
+  "panel_c205924de0": {
+    "message": "文件"
+  },
+  "panel_ed16cec106": {
+    "message": "查看存放庫"
+  },
+  "panel_4c4a152a2b": {
+    "message": "支援與常見問題"
+  },
+  "panel_7302582a6f": {
+    "message": "開啟支援"
+  },
+  "panel_d4a48a753a": {
+    "message": "MCP 設定"
+  },
+  "panel_2df575344e": {
+    "message": "查看 MCP 指南"
+  },
+  "panel_506ff39462": {
+    "message": "隱私權政策"
+  },
+  "panel_377733b622": {
+    "message": "查看隱私權政策"
+  },
+  "panel_666067dd37": {
+    "message": "議題"
+  },
+  "panel_cf82dd02e8": {
+    "message": "查看議題"
+  },
+  "panel_bc47da663d": {
+    "message": "原始碼"
+  },
+  "panel_6209d4d395": {
+    "message": "查看 GitHub"
+  },
+  "panel_bd4702c187": {
+    "message": "發行說明"
+  },
+  "panel_1705ccc5a5": {
+    "message": "查看版本"
+  },
+  "panel_c011d6097b": {
+    "message": "授權"
+  },
+  "panel_b392d33f2e": {
+    "message": "查看授權"
+  },
+  "panel_a4b17bc7db": {
+    "message": "你有未儲存的變更"
+  },
+  "panel_8e0f9288e2": {
+    "message": "FSB 如何對待你尚未設定的網站。自動允許 FSB 呼叫任何未封鎖網站的已驗證 API（讀取和寫入）。關閉要求你先逐個啟用網站。詢問會把要求排入佇列等待你核准。"
+  },
+  "panel_811f8544eb": {
+    "message": "等待你決定的要求。授予後呼叫方可以重試；未經你核准，FSB 不會行動。"
+  },
+  "panel_b04eb08367": {
+    "message": "沒有待處理要求。工具需要同意時會顯示在這裡。你也可以從上方清單提前授予存取。"
+  },
+  "panel_1fdd802663": {
+    "message": "能力呼叫的經遮罩、只追加紀錄。從不儲存參數、Token、Cookie 或回應本文。"
+  },
+  "panel_787513f4fd": {
+    "message": "還沒有稽核項目。允許某個來源後，能力呼叫會記錄在這裡。項目已遮罩，且只儲存在本機。"
+  },
+  "panel_323d6ff1f1": {
+    "message": "FSB 的自動化立場、稽核保留和同意模型記錄在 LEGAL.md 中。部分來源被服務拒絕清單排除在自動化之外。"
+  },
+  "panel_e31b2a3d3f": {
+    "message": "管理已儲存的憑證和用於輔助登入的共享保險庫"
+  },
+  "panel_93f508370d": {
+    "message": "啟用後，FSB 會偵測登入頁，並用已儲存的憑證提議自動登入"
+  },
+  "panel_10f7c25d31": {
+    "message": "選擇 PIN 以保護已儲存的憑證。現有舊憑證會自動遷移。"
+  },
+  "panel_50c3db852a": {
+    "message": "解除鎖定後可查看、編輯、自動填入或儲存密碼。"
+  },
+  "panel_b6680d54b2": {
+    "message": "此瀏覽器工作階段的保險庫已解除鎖定。已儲存的憑證顯示在下方。"
+  },
+  "panel_8d5ab0fe44": {
+    "message": "自動登入目前已關閉。你仍可在此管理已儲存的憑證，但在啟用之前，FSB 不會自動使用或儲存它們。"
+  },
+  "panel_c533cc0b87": {
+    "message": "還沒有已儲存的憑證。自動化期間登入時會自動儲存，也可以手動新增。"
+  },
+  "panel_0153e2da59": {
+    "message": "輸入網站網域（例如 github.com、mail.google.com）"
+  },
+  "panel_83c6ad5aef": {
+    "message": "管理用於輔助結帳的已儲存卡片。付款方式共用在密碼中設定的憑證保險庫。"
+  },
+  "panel_ff7378d58d": {
+    "message": "啟用後，FSB 可以在結帳頁提示填寫已儲存的卡片。它從不會自動送出最終付款。"
+  },
+  "panel_7d1624ea92": {
+    "message": "管理已儲存的付款方式之前，請先解除憑證保險庫的鎖定。"
+  },
+  "panel_ad5f8e8263": {
+    "message": "輸入保險庫 PIN 以解除付款方式鎖定"
+  },
+  "panel_2035e1f48d": {
+    "message": "已儲存的卡片使用同一個加密保險庫，但在此瀏覽器工作階段中填寫結帳前需要單獨解除鎖定。"
+  },
+  "panel_0ec4dc2534": {
+    "message": "此瀏覽器工作階段的已儲存付款方式已解除鎖定。FSB 可以在偵測到的結帳頁提示填寫已儲存卡片，但從不會自動送出最終付款。"
+  },
+  "panel_5d38d8a7cf": {
+    "message": "已儲存的付款方式目前已關閉。你仍可在此管理已存卡片，但在啟用該功能之前，FSB 不會在結帳時提供它們。"
+  },
+  "panel_2fd67f06e0": {
+    "message": "還沒有已儲存的付款方式。在此新增卡片後，解除付款存取，FSB 就可以在結帳頁提供它。"
+  },
+  "panel_928895f662": {
+    "message": "CVV 和帳單資料以加密形式儲存在本機保險庫中。使用此功能前，請檢查本機裝置的安全。"
+  },
+  "panel_39d561254a": {
+    "message": "儲存卡片"
+  },
+  "panel_e4d896bcce": {
+    "message": "取得說明並進一步了解 FSB 功能"
+  },
+  "panel_32623395c6": {
+    "message": "重新執行新手引導，以變更提供者或 MCP 設定"
+  },
+  "panel_db4cec18bf": {
+    "message": "FSB 的完整文件和設定指南"
+  },
+  "panel_63dfe63d28": {
+    "message": "瀏覽常見問題並修復常見連線問題"
+  },
+  "panel_d2286811e6": {
+    "message": "連接 Claude Code 和 Cursor 等 MCP 用戶端，然後用 doctor 命令驗證"
+  },
+  "panel_f3cb441c27": {
+    "message": "閱讀 FSB 如何處理資料、儲存和選用的伺服器同步"
+  },
+  "panel_476481e410": {
+    "message": "回報缺陷、要求功能並追蹤開發進度"
+  },
+  "panel_89b47ad370": {
+    "message": "查看原始碼並為 FSB 開發做出貢獻"
+  },
+  "panel_f775bb5cbf": {
+    "message": "查看每個 FSB 版本的新增和變更"
+  },
+  "panel_8abc0aef4e": {
+    "message": "FSB 以 MIT 授權開源"
+  },
+  "panel_e235f8135c": {
+    "message": "加入其他 FSB 使用者並關注更新"
+  },
+  "panel_53e5555e9a": {
+    "message": "在遮罩含密欄位和敏感輸入後，將重播資料儲存在本機。一般輸入文字和操作結果仍可用於重播。MCP 用戶端可以提供不含機密的完成、部分或失敗摘要，以儲存本機工作記憶；不會另外呼叫 AI 提供者。關閉後會停止以後的 MCP 錄製，並儲存任何未結束的錄製。現有 MCP 重播紀錄最多保留最近 50 個工作階段，且不會超過所設定的保留期。自動駕駛紀錄不受影響。"
+  },
+  "panel_65b7096b6d": {
+    "message": "此來源禁止自動化。"
+  },
+  "panel_d50f8b527c": {
+    "message": "敏感來源。能力呼叫可以在自動模式下執行；網路擷取發現仍需要確認。"
+  },
+  "panel_47d2a515ef": {
+    "message": "正在載入..."
+  },
+  "panel_90e89ecfe7": {
+    "message": "載入接下來的 500 筆事件"
+  },
+  "panel_935f2565d7": {
+    "message": "重試載入事件"
+  },
+  "panel_4eee87e82f": {
+    "message": "無法連線保險庫服務"
+  },
+  "panel_08bf951eda": {
+    "message": "尚未設定保險庫。請建立一個以保護已儲存的憑證。"
+  },
+  "panel_949bcb5f38": {
+    "message": "保險庫已鎖定。"
+  },
+  "panel_30cef3bfb8": {
+    "message": "此工作階段的保險庫已解除鎖定。"
+  },
+  "panel_05dc3c4c0a": {
+    "message": "檢查保險庫狀態時發生錯誤。"
+  },
+  "panel_890a216b7c": {
+    "message": "正在解除鎖定..."
+  },
+  "panel_def70944c9": {
+    "message": "正在建立..."
+  },
+  "panel_93ad91e855": {
+    "message": "請先解除憑證保險庫的鎖定。"
+  },
+  "panel_8221f05f8b": {
+    "message": "付款方式已鎖定。"
+  },
+  "panel_0b4ba676b0": {
+    "message": "此工作階段的付款方式已解除鎖定。"
+  },
+  "panel_b82d31b688": {
+    "message": "檢查付款狀態時發生錯誤。"
+  },
+  "panel_b197ab1d9b": {
+    "message": "請先在密碼中設定保險庫 PIN。"
+  },
+  "panel_160419ae70": {
+    "message": "付款方式已解除鎖定。"
+  },
+  "panel_507fc32dc5": {
+    "message": "編輯代理"
+  },
+  "panel_fb25598ed0": {
+    "message": "建立新代理"
+  },
+  "panel_6c02a28421": {
+    "message": "正在測試..."
+  },
+  "panel_22965568d2": {
+    "message": "已連線"
+  },
+  "panel_ee172faa9c": {
+    "message": "無效金鑰"
+  },
+  "panel_031a8f0f65": {
+    "message": "失敗"
+  },
+  "panel_424a2551d3": {
+    "message": "已過期"
+  },
+  "panel_c7730178f4": {
+    "message": "產生新代碼"
+  },
+  "panel_ac116124f7": {
+    "message": "無法產生配對碼。請再試一次。"
+  },
+  "panel_d03fd96d28": {
+    "message": "選擇已載入的模型..."
+  },
+  "panel_e189657f5a": {
+    "message": "沒有相符的模型"
+  },
+  "entry_step": {
+    "message": "第 $CURRENT$ 步，共 $TOTAL$ 步",
+    "placeholders": {
+      "current": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "entry_label_welcome": {
+    "message": "歡迎"
+  },
+  "entry_label_path": {
+    "message": "路徑"
+  },
+  "entry_label_mcp": {
+    "message": "MCP 連線"
+  },
+  "entry_label_provider": {
+    "message": "提供者"
+  },
+  "entry_label_apikey": {
+    "message": "API 金鑰"
+  },
+  "entry_label_setup": {
+    "message": "設定"
+  },
+  "entry_label_pin": {
+    "message": "釘選"
+  },
+  "entry_label_done": {
+    "message": "完成"
+  },
+  "entry_future_lead": {
+    "message": "未來的"
+  },
+  "entry_future_word": {
+    "message": "自主"
+  },
+  "entry_future_tail": {
+    "message": "瀏覽。"
+  },
+  "entry_welcome_sub": {
+    "message": "你選對了。你的代理將用上最好的自主瀏覽引擎。純 DOM 精度，不靠視覺，也不靠猜測。它們不會再盲目點擊。"
+  },
+  "entry_feat_api": {
+    "message": "直接 API"
+  },
+  "entry_feat_api_sub": {
+    "message": "與應用程式對話，不只是點擊"
+  },
+  "entry_feat_guides": {
+    "message": "130 多份指南"
+  },
+  "entry_feat_guides_sub": {
+    "message": "涵蓋 17 個類別"
+  },
+  "entry_feat_tools": {
+    "message": "68 個 MCP 工具"
+  },
+  "entry_feat_tools_sub": {
+    "message": "來自你的程式設計代理"
+  },
+  "entry_get_started": {
+    "message": "開始使用"
+  },
+  "entry_skip_setup": {
+    "message": "暫時跳過設定"
+  },
+  "entry_pick_path": {
+    "message": "選擇你的路徑"
+  },
+  "entry_how_run": {
+    "message": "你想如何執行 FSB？"
+  },
+  "entry_two_ways": {
+    "message": "兩種方式。現在設定一種，另一種可以隨時在設定裡新增。"
+  },
+  "entry_agent": {
+    "message": "代理"
+  },
+  "entry_recommended": {
+    "message": "建議"
+  },
+  "entry_agent_desc": {
+    "message": "在 Claude Code、Cursor、VS Code、OpenClaw 等中把 FSB 用作 MCP 伺服器。68 個工具，無需 API 金鑰，瀏覽器裡不用設定。"
+  },
+  "entry_in_browser": {
+    "message": "在此瀏覽器中"
+  },
+  "entry_byok": {
+    "message": "自備金鑰"
+  },
+  "entry_byok_desc": {
+    "message": "在側邊欄與 FSB 對話。使用 xAI、Anthropic 或 Google 的金鑰，或執行完全不需要金鑰的本機模型。"
+  },
+  "entry_most_people": {
+    "message": "大多數人從 MCP 開始，這是使用 FSB 最快、最省的方式。"
+  },
+  "entry_skip_mcp": {
+    "message": "跳到 MCP"
+  },
+  "entry_mcp_eyebrow": {
+    "message": "建議路徑 / MCP"
+  },
+  "entry_install_h": {
+    "message": "安裝 FSB 的 MCP 伺服器"
+  },
+  "entry_one_command": {
+    "message": "一條命令。選擇你的代理。FSB 會自動註冊。不需要 API 金鑰。"
+  },
+  "entry_one_command_short": {
+    "message": "一條命令。選擇你的代理。"
+  },
+  "entry_copy_command": {
+    "message": "複製命令"
+  },
+  "entry_copy_install": {
+    "message": "複製安裝命令"
+  },
+  "entry_mcp_1a": {
+    "message": "在終端機中執行該命令。"
+  },
+  "entry_mcp_1b": {
+    "message": "懸停複製"
+  },
+  "entry_mcp_1c": {
+    "message": "以選擇特定用戶端。"
+  },
+  "entry_mcp_2a": {
+    "message": "FSB 會把自己寫入代理的 MCP 設定。"
+  },
+  "entry_mcp_2b": {
+    "message": "68 個工具"
+  },
+  "entry_mcp_2c": {
+    "message": "，無需手寫 JSON。"
+  },
+  "entry_mcp_3": {
+    "message": "讓你的代理去瀏覽。它會為你驅動 FSB 的 DOM 引擎。"
+  },
+  "entry_claw_name": {
+    "message": "為你的 Claw 進行設定"
+  },
+  "entry_claw_desc": {
+    "message": "在控制面板中引導安裝 OpenClaw"
+  },
+  "entry_prefer_key": {
+    "message": "更想用自己的金鑰？"
+  },
+  "entry_byok_eyebrow": {
+    "message": "瀏覽器內 / 自備金鑰"
+  },
+  "entry_choose_provider": {
+    "message": "選擇你的 AI 提供者"
+  },
+  "entry_dont_need": {
+    "message": "你其實不需要這一步。"
+  },
+  "entry_best_way": {
+    "message": "執行 FSB 的最佳方式是 MCP。無需金鑰，也沒有費用上限。"
+  },
+  "entry_setup_mcp": {
+    "message": "改為設定 MCP"
+  },
+  "entry_once_key": {
+    "message": "設定金鑰後，FSB 會自動列出每個可用的文字模型。"
+  },
+  "entry_key_heading": {
+    "message": "新增你的 $NAME$ 金鑰",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_optional": {
+    "message": "此步驟是選填的。"
+  },
+  "entry_shines": {
+    "message": "FSB 透過 MCP 最出色，因此你可以完全跳過金鑰。"
+  },
+  "entry_skip_use_mcp": {
+    "message": "跳過並使用 MCP"
+  },
+  "entry_checking": {
+    "message": "正在檢查..."
+  },
+  "entry_continue": {
+    "message": "繼續"
+  },
+  "entry_almost": {
+    "message": "就快好了"
+  },
+  "entry_pin_h": {
+    "message": "釘選 FSB，讓它一鍵可達"
+  },
+  "entry_pin_sub": {
+    "message": "這是唯一的步驟。Chrome 安裝 FSB 時，權限會自動打開。你不用切換任何開關。"
+  },
+  "entry_other_ext": {
+    "message": "其他擴充功能"
+  },
+  "entry_pinned": {
+    "message": "已釘選 FSB"
+  },
+  "entry_ive_pinned": {
+    "message": "我已釘選 FSB"
+  },
+  "entry_skip_step": {
+    "message": "跳過此步驟"
+  },
+  "entry_all_set": {
+    "message": "一切就緒。"
+  },
+  "entry_ready_sub": {
+    "message": "FSB 已就緒。這是你的設定。以後可以在設定中變更。"
+  },
+  "entry_running": {
+    "message": "FSB 正在執行"
+  },
+  "entry_open": {
+    "message": "開啟 FSB"
+  },
+  "entry_more": {
+    "message": "關於 FSB 總有更多可發現的內容。請到"
+  },
+  "entry_control_panel": {
+    "message": "控制面板"
+  },
+  "entry_docs": {
+    "message": "文件"
+  },
+  "entry_back": {
+    "message": "返回"
+  },
+  "entry_sum_setup": {
+    "message": "設定"
+  },
+  "entry_sum_mcp": {
+    "message": "MCP 伺服器"
+  },
+  "entry_sum_command": {
+    "message": "命令"
+  },
+  "entry_sum_tools": {
+    "message": "工具"
+  },
+  "entry_sum_68": {
+    "message": "68 個可用"
+  },
+  "entry_sum_access": {
+    "message": "存取"
+  },
+  "entry_sum_granted": {
+    "message": "安裝時已授予"
+  },
+  "entry_sum_version": {
+    "message": "版本"
+  },
+  "entry_sum_byok": {
+    "message": "瀏覽器內自備金鑰"
+  },
+  "entry_sum_provider": {
+    "message": "提供者"
+  },
+  "entry_sum_apikey": {
+    "message": "API 金鑰"
+  },
+  "entry_sum_none": {
+    "message": "未設定"
+  },
+  "entry_sum_tip": {
+    "message": "提示"
+  },
+  "entry_sum_finish": {
+    "message": "在設定中完成設定"
+  },
+  "entry_free_tier": {
+    "message": "免費層級"
+  },
+  "entry_local_nokey": {
+    "message": "本機 / 無金鑰"
+  },
+  "entry_all_clients": {
+    "message": "所有用戶端"
+  },
+  "entry_discovering": {
+    "message": "正在發現已載入的聊天模型..."
+  },
+  "entry_waiting_url": {
+    "message": "正在等待伺服器 URL 穩定..."
+  },
+  "entry_choose_model": {
+    "message": "選擇已載入的模型..."
+  },
+  "entry_paste_key": {
+    "message": "貼上你的 $NAME$ API 金鑰",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_toggle_key": {
+    "message": "切換金鑰可見性"
+  },
+  "entry_key_valid": {
+    "message": "以 $LAST$ 結尾的金鑰有效",
+    "placeholders": {
+      "last": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_key_required": {
+    "message": "需要 $NAME$ API 金鑰",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_discovering_models": {
+    "message": "正在發現模型..."
+  },
+  "entry_no_models": {
+    "message": "沒有可用的相容模型"
+  },
+  "entry_get_key": {
+    "message": "在此取得金鑰"
+  },
+  "entry_stored_locally": {
+    "message": "儲存在此瀏覽器本機。"
+  },
+  "entry_paste_clip": {
+    "message": "從剪貼簿貼上"
+  },
+  "entry_unlock_title": {
+    "message": "解除 FSB 鎖定"
+  },
+  "entry_unlock_h": {
+    "message": "解除保險庫鎖定"
+  },
+  "entry_unlock_sub": {
+    "message": "輸入 PIN 以解除鎖定"
+  },
+  "entry_unlock": {
+    "message": "解除鎖定"
+  },
+  "entry_unlocking": {
+    "message": "正在解除鎖定..."
+  },
+  "entry_unlock_failed": {
+    "message": "解除鎖定失敗"
+  },
+  "entry_no_vault": {
+    "message": "尚未設定保險庫。請先執行設定。"
+  },
+  "entry_bad_pin": {
+    "message": "PIN 不正確"
+  },
+  "entry_comm_error": {
+    "message": "通訊錯誤。請再試一次。"
+  },
+  "entry_first_setup": {
+    "message": "第一次使用？執行設定"
+  },
+  "entry_mic_title": {
+    "message": "為 FSB 啟用麥克風"
+  },
+  "entry_mic_brand": {
+    "message": "FSB 語音輸入"
+  },
+  "entry_mic_h": {
+    "message": "啟用你的麥克風"
+  },
+  "entry_mic_intro": {
+    "message": "Chrome 要求第一次麥克風核准發生在一般的擴充功能分頁。之後，每個網站上的 FSB 側邊欄都可以使用語音輸入。"
+  },
+  "entry_mic_instruction_lead": {
+    "message": "在 Chrome 的提示中選擇"
+  },
+  "entry_mic_instruction_action": {
+    "message": "造訪時允許"
+  },
+  "entry_mic_instruction_tail": {
+    "message": "選項，以便 FSB 獲得持久授權。"
+  },
+  "entry_mic_waiting": {
+    "message": "正在等待 Chrome 的麥克風提示…"
+  },
+  "entry_mic_allow": {
+    "message": "允許麥克風"
+  },
+  "entry_mic_settings": {
+    "message": "開啟麥克風設定"
+  },
+  "entry_mic_footnote": {
+    "message": "此權限屬於 FSB 擴充功能，不屬於目前分頁中的網站。"
+  },
+  "entry_mic_try": {
+    "message": "重試"
+  },
+  "entry_mic_no_api": {
+    "message": "此 Chrome 版本不向擴充功能提供麥克風存取。"
+  },
+  "entry_mic_enabled": {
+    "message": "麥克風已啟用。正在返回 FSB…"
+  },
+  "entry_mic_blocked": {
+    "message": "FSB 的麥克風存取已被封鎖。開啟 Chrome 麥克風設定，移除被封鎖的 FSB 項目，然後重試。"
+  },
+  "entry_mic_none": {
+    "message": "未找到麥克風。請連接或啟用輸入裝置，然後重試。"
+  },
+  "entry_mic_busy": {
+    "message": "麥克風正忙或無法使用。請關閉其他錄音應用程式，然後重試。"
+  },
+  "entry_mic_macos": {
+    "message": "Chrome 無法存取麥克風。在 macOS 上，請在系統設定 → 隱私權與安全性 → 麥克風中啟用 Google Chrome，然後重試。"
+  },
+  "entry_mic_generic": {
+    "message": "FSB 無法存取麥克風。請檢查 Chrome 和 macOS 的麥克風設定，然後重試。"
+  },
+  "entry_mic_manual": {
+    "message": "在網址列開啟 chrome://settings/content/microphone，然後移除被封鎖的 FSB 項目。"
+  },
+  "entry_automating": {
+    "message": "FSB 正在自動化"
+  },
+  "entry_stop": {
+    "message": "停止"
+  },
+  "entry_planning": {
+    "message": "規劃中"
+  },
+  "entry_initializing": {
+    "message": "正在初始化..."
+  },
+  "entry_done_pill": {
+    "message": "完成"
+  },
+  "entry_actions": {
+    "message": "操作：$COUNT$",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_replay_controls": {
+    "message": "重播控制項"
+  },
+  "entry_pause_replay": {
+    "message": "暫停重播"
+  },
+  "entry_replay_position": {
+    "message": "重播位置，只能向前拖動"
+  },
+  "entry_seek_forward": {
+    "message": "在重播中向前跳轉"
+  },
+  "entry_replay_speed": {
+    "message": "重播速度 $SPEED$。啟用後改為 $NEXT$",
+    "placeholders": {
+      "speed": {
+        "content": "$1"
+      },
+      "next": {
+        "content": "$2"
+      }
+    }
+  },
+  "entry_replay_speed_title": {
+    "message": "重播速度：$SPEED$（點擊變更）",
+    "placeholders": {
+      "speed": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_inspect": {
+    "message": "點擊一個元素進行檢查"
+  },
+  "entry_selectors": {
+    "message": "FSB 會嘗試的選擇器"
+  },
+  "entry_attributes": {
+    "message": "屬性"
+  },
+  "entry_interact": {
+    "message": "可互動性"
+  },
+  "entry_position": {
+    "message": "位置"
+  },
+  "entry_inspector": {
+    "message": "FSB 檢查模式（按 Ctrl+Shift+E 結束）"
+  },
+  "entry_crawling": {
+    "message": "正在爬取 $DOMAIN$",
+    "placeholders": {
+      "domain": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_pages": {
+    "message": "$COLLECTED$ / $MAX$ 頁",
+    "placeholders": {
+      "collected": {
+        "content": "$1"
+      },
+      "max": {
+        "content": "$2"
+      }
+    }
+  },
+  "entry_toast_ready": {
+    "message": "FSB 已就緒。正在開啟側邊欄"
+  },
+  "entry_toast_opened": {
+    "message": "已開啟 FSB 側邊欄"
+  },
+  "entry_toast_popup": {
+    "message": "正在彈出視窗中開啟 FSB"
+  },
+  "entry_toast_copied": {
+    "message": "已複製安裝命令"
+  },
+  "entry_onboarding_tag": {
+    "message": "初始設定"
+  },
+  "copy_26b2f925d8": {
+    "message": "FSB - 側邊欄"
+  },
+  "copy_9ca9c869e9": {
+    "message": "它不能編輯檔案、執行 shell 命令或擷取任意 URL。"
+  },
+  "copy_65974683e8": {
+    "message": "在之後的執行中信任 $NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_a9780e01fc": {
+    "message": "這會關閉此瀏覽器上之後 $NAME$ 執行的確認。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_88cad98751": {
+    "message": "無法儲存確認偏好。請重試，或不建立信任並繼續。"
+  },
+  "copy_b6b3428299": {
+    "message": "無法啟動代理。請檢查權限後重試。"
+  },
+  "copy_02df469915": {
+    "message": "允許並啟動 $NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_63b90cc26c": {
+    "message": "原生小幫手已與另一個擴充功能配對"
+  },
+  "copy_606b6c7b99": {
+    "message": "重設原生小幫手配對，然後重試此訊息。FSB 會自動配對此擴充功能。"
+  },
+  "copy_4662e7e99e": {
+    "message": "複製重設命令"
+  },
+  "copy_7d6ee224d7": {
+    "message": "本機代理工作階段無法使用"
+  },
+  "copy_abc3c6a9b5": {
+    "message": "執行 doctor 命令，若出現提示請重新啟動本機 FSB 服務，然後重試此訊息。"
+  },
+  "copy_392182513b": {
+    "message": "所選提供者不支援控制瀏覽器分頁的代理。請選擇支援的代理提供者，然後重試此訊息。"
+  },
+  "copy_664ba782e6": {
+    "message": "請在本機登入 $NAME$，然後重試此訊息。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_1c5510dd75": {
+    "message": "「測試連線」仍可能成功，因為它不會啟動委派執行。請重試訊息或檢查提供者設定。"
+  },
+  "copy_266c761925": {
+    "message": "代理無法啟動此工作"
+  },
+  "copy_6271a1aa0b": {
+    "message": "將此訊息留在輸入框中，檢查提供者設定，然後重試。"
+  },
+  "copy_07eab3e346": {
+    "message": "守護行程重新啟動後，代理執行已結束"
+  },
+  "copy_00143d759f": {
+    "message": "代理無法完成此工作"
+  },
+  "copy_81dfbf1a8a": {
+    "message": "代理連線已中斷"
+  },
+  "copy_c1db132cee": {
+    "message": "代理清理需要處理"
+  },
+  "copy_66defff597": {
+    "message": "代理無法恢復控制"
+  },
+  "copy_f5bb81be63": {
+    "message": "FSB 已接受這次執行，但無法儲存，且未確認停止。"
+  },
+  "copy_1c86e2b334": {
+    "message": "上一個代理行程已停止且未重新連接。本機服務就緒後請開始新工作。"
+  },
+  "copy_1a103bf447": {
+    "message": "開始新工作"
+  },
+  "copy_6c845be6a5": {
+    "message": "FSB 錯過了本機代理服務的三次回覆。這次執行無法安全繼續。"
+  },
+  "copy_4cf5603fc8": {
+    "message": "請安裝或更新 FSB 原生小幫手，然後重試。FSB 會自動連接此瀏覽器。"
+  },
+  "copy_87db7a3927": {
+    "message": "FSB 無法將此分頁交還給 $NAME$，因此執行已結束，分頁仍由你控制。準備好後請開始新工作。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_d1708202db": {
+    "message": "重試訊息"
+  },
+  "copy_39ccfe7853": {
+    "message": "自動化正在進行"
+  },
+  "copy_e609da84a5": {
+    "message": "此分頁已無法使用自動化控制。"
+  },
+  "copy_a6b6ef6c4e": {
+    "message": "無法確認停止。仍顯示先前的代理狀態。"
+  },
+  "copy_ba4af741ad": {
+    "message": "你的原始訊息還在。請重試停止以完成清理。"
+  },
+  "copy_e71b7995e6": {
+    "message": "FSB 無法儲存這次代理執行。該次執行的停止已確認，你的訊息已保留。請重試。"
+  },
+  "copy_ee776a7565": {
+    "message": "開始另一項工作之前，請在原來的分頁和對話中完成待處理的代理清理。你的訊息已保留。"
+  },
+  "copy_b3715a6900": {
+    "message": "FSB 無法將此分頁交還給 $NAME$，因此執行已結束，分頁仍由你控制。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_47220517c7": {
+    "message": "未安裝 FSB 的本機小幫手。請執行：npx -y fsb-mcp-server@latest install --native-host"
+  },
+  "copy_d0b5d103f7": {
+    "message": "正在對 $DOMAIN$ 開始偵察...",
+    "placeholders": {
+      "domain": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_7654da628e": {
+    "message": "偵察未能開始：$ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_ca79bcd4d7": {
+    "message": "偵察完成！已儲存 $DOMAIN$ 的網站地圖。",
+    "placeholders": {
+      "domain": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_0f654a723b": {
+    "message": "自動化已完成，但沒有提供摘要。如果工作未按預期完成，請重試。"
+  },
+  "copy_b6c7f59d4f": {
+    "message": "偵測到登入頁..."
+  },
+  "copy_43d71bc905": {
+    "message": "此結帳無法使用已儲存的付款方式。"
+  },
+  "copy_e46796d601": {
+    "message": "沒有已儲存的卡片"
+  },
+  "copy_40a0d5700e": {
+    "message": "需要設定保險庫"
+  },
+  "copy_eef91deafe": {
+    "message": "付款存取已鎖定"
+  },
+  "copy_583fe8b004": {
+    "message": "已儲存的付款無法使用"
+  },
+  "copy_5932e9b23f": {
+    "message": "已儲存帳單資料"
+  },
+  "copy_fbbc8ab36d": {
+    "message": "正在填寫已儲存的卡片..."
+  },
+  "copy_e09653448c": {
+    "message": "在可能重複的寫入之前，重播已暫停。"
+  },
+  "copy_a378a72986": {
+    "message": "重播決定失敗"
+  },
+  "copy_aacf80d079": {
+    "message": "正在重試重播步驟..."
+  },
+  "copy_8e731074ee": {
+    "message": "正在略過重播步驟..."
+  },
+  "copy_2d7848007e": {
+    "message": "無法套用重播決定：$ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_0d3db7357d": {
+    "message": "已封鎖 · 已隱去的輸入"
+  },
+  "copy_4916a64c38": {
+    "message": "MCP 用戶端要求在 $COUNT$ 個新分頁中重播。",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_c15b9f2acd": {
+    "message": "MCP 用戶端要求在 $COUNT$ 個新分頁中重播。",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_552d4905b4": {
+    "message": "一次核准只涵蓋經核實的清單本身，其中包括 $COUNT$ 個高影響步驟。",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_4c946b4834": {
+    "message": "一次核准只涵蓋經核實的清單本身，其中包括 $COUNT$ 個高影響步驟。",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_9240c9c130": {
+    "message": "一次核准只涵蓋經核實的清單本身。"
+  },
+  "copy_b0802ca35d": {
+    "message": "正在開啟已記錄的重播分頁..."
+  },
+  "copy_c8a00bd3b5": {
+    "message": "無法開始重播"
+  },
+  "copy_1a0ef83852": {
+    "message": "無法開始所要求的重播：$ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_98db9dc8c5": {
+    "message": "取消重播失敗"
+  },
+  "copy_4ed0e5ecba": {
+    "message": "無法取消重播要求：$ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_0d9f4051eb": {
+    "message": "重播驗證失敗"
+  },
+  "copy_fc1f569fa7": {
+    "message": "此記錄僅可檢查，因為 $TOTAL$ 次已記錄呼叫中只有最近的 $LATEST$ 次可用。更早的瀏覽器狀態無法安全重建。",
+    "placeholders": {
+      "latest": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "copy_a2f62124e7": {
+    "message": "要在 $COUNT$ 個新分頁中重播此已核實的時間軸嗎？",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_4c55f6bc6e": {
+    "message": "要在 $COUNT$ 個新分頁中重播此已核實的時間軸嗎？",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_dea4fcd3a0": {
+    "message": "這一次核准只涵蓋已簽名的清單本身：$DETAIL$。",
+    "placeholders": {
+      "detail": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_82e80a0531": {
+    "message": "時間軸只包含讀取和導覽步驟。"
+  },
+  "copy_99b908db8f": {
+    "message": "正在開啟一個新的重播分頁..."
+  },
+  "copy_b33e852b38": {
+    "message": "無法開始重播。"
+  },
+  "copy_816797656b": {
+    "message": "無法開始重播：$ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_6a7fdeaea6": {
+    "message": "無法刪除工作階段歷程"
+  },
+  "copy_f50146d7ac": {
+    "message": "擷取驗證失敗"
+  },
+  "copy_8249b3f554": {
+    "message": "擷取正在等待驗證"
+  },
+  "copy_712090559d": {
+    "message": "無法載入工作階段：$ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_c249c35164": {
+    "message": "刪除全部工作階段歷程？此操作無法復原。"
+  },
+  "copy_357bab7911": {
+    "message": "無法清除工作階段歷程"
+  },
+  "copy_0d3875c352": {
+    "message": "工作部分完成"
+  },
+  "copy_2786eaaa0e": {
+    "message": "重設為建議值 ($COUNT$)",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_03cea39622": {
+    "message": "在下方輸入模型名稱"
+  },
+  "copy_df3a34abef": {
+    "message": "FSB 使用單獨的私人 Grok 設定檔。透過瀏覽器 OAuth 連接 SuperGrok；不使用 API 金鑰或模型選擇。"
+  },
+  "copy_5eb9258e1b": {
+    "message": "已透過瀏覽器 OAuth 連線"
+  },
+  "copy_4ebee382f9": {
+    "message": "登入狀態無法使用"
+  },
+  "copy_ee531932b4": {
+    "message": "正在開啟 Grok 登入..."
+  },
+  "copy_e591c14068": {
+    "message": "正在等待瀏覽器登入..."
+  },
+  "copy_82d261c870": {
+    "message": "有工作進行時，Grok Build 無法中斷連線"
+  },
+  "copy_ab442992e8": {
+    "message": "Grok Build 未及時回應中斷。重試前請檢查登入狀態。"
+  },
+  "copy_10e5c2a8ad": {
+    "message": "Grok Build 無法中斷連線。請重試。"
+  },
+  "copy_2becee5507": {
+    "message": "Grok Build 無法中斷：本機代理服務無法使用"
+  },
+  "copy_1d29342190": {
+    "message": "Grok Build 未及時回應登入。重試前請重新整理狀態。"
+  },
+  "copy_b0fca87a8b": {
+    "message": "Grok Build 無法登入：本機代理服務無法使用"
+  },
+  "copy_90ac4e0d62": {
+    "message": "Grok Build 登入被阻止，因為已安裝的 Grok CLI 不是 FSB 支援的版本。你的帳戶沒有問題。請查看相容性標記，然後安裝受支援的 CLI。"
+  },
+  "copy_9144f84f5c": {
+    "message": "工作執行時 Grok Build 無法登入。請等待執行結束後重試。"
+  },
+  "copy_ca4a99be2b": {
+    "message": "Grok Build 無法清理先前的工作階段，因此登入被阻止。請重新整理狀態以重試清理。"
+  },
+  "copy_28c4c69520": {
+    "message": "Grok CLI 拒絕在 FSB 要求的嚴格沙箱中啟動，因此登入被阻止。CLI 已安裝，你的帳戶沒有問題。"
+  },
+  "copy_0b9a54a7f8": {
+    "message": "FSB 無法執行 Grok CLI。請確認已安裝，然後重新整理狀態。"
+  },
+  "copy_3f7ae97289": {
+    "message": "Grok Build 登入已取消"
+  },
+  "copy_6725ea7cca": {
+    "message": "Grok Build 登入未完成"
+  },
+  "copy_80d9a75cd7": {
+    "message": "Grok Build 已連線到私人 FSB 設定檔"
+  },
+  "copy_ec4c183761": {
+    "message": "Grok Build 登入失敗"
+  },
+  "copy_53296a80a3": {
+    "message": "中斷私人的 FSB Grok Build 設定檔？你平常的 Grok 登入不會改變。"
+  },
+  "copy_ca0786266f": {
+    "message": "Grok Build 已從 FSB 中斷"
+  },
+  "copy_eb14344a7c": {
+    "message": "正在使用已載入的模型"
+  },
+  "copy_97e5afb52c": {
+    "message": "開始新工作之前，請選擇並儲存另一個 AI 提供者"
+  },
+  "copy_682cc533d5": {
+    "message": "需要 AI 提供者"
+  },
+  "copy_0947800d1f": {
+    "message": "儲存前請載入並選擇一個 LM Studio 聊天模型"
+  },
+  "copy_eec68a3001": {
+    "message": "需要 LM Studio 模型"
+  },
+  "copy_79b57ba0c8": {
+    "message": "啟動 LM Studio，載入一個聊天模型，然後重新整理並選擇它。"
+  },
+  "copy_6dd8239043": {
+    "message": "儲存此提供者之前請提供 API 金鑰"
+  },
+  "copy_14249339ac": {
+    "message": "儲存前請從此提供者載入一個可用模型"
+  },
+  "copy_3b855d546e": {
+    "message": "需要 API 金鑰"
+  },
+  "copy_32afa3cc46": {
+    "message": "需要模型清單"
+  },
+  "copy_954e78bbdc": {
+    "message": "需要 API 金鑰"
+  },
+  "copy_074a372298": {
+    "message": "設定已儲存"
+  },
+  "copy_cdb46a2041": {
+    "message": "測試連線之前，請載入並選擇一個 LM Studio 聊天模型。"
+  },
+  "copy_8332d4b3d9": {
+    "message": "未設定 API 金鑰"
+  },
+  "copy_6bec306893": {
+    "message": "沒有 API 金鑰"
+  },
+  "copy_ec6c5d7132": {
+    "message": "設定你的 $NAME$ API 金鑰以開始使用",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_59b831ea1c": {
+    "message": "需要 API 金鑰"
+  },
+  "copy_7e4840a26d": {
+    "message": "測試連線之前請載入目前的模型清單。"
+  },
+  "copy_220b5a97ab": {
+    "message": "未知的橋接錯誤"
+  },
+  "copy_a45a37ddcc": {
+    "message": "連線測試失敗"
+  },
+  "copy_ad0770f1aa": {
+    "message": "已安裝且相容：Grok Build 1.0.4。隔離、ACP 和快取的 OAuth 檢查已通過，且未傳送提示。"
+  },
+  "copy_aab517a207": {
+    "message": "相容性檢查失敗：$ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_b33e732cc1": {
+    "message": "紀錄已匯出"
+  },
+  "copy_11eb704622": {
+    "message": "$ORIGIN$ 的同意模式",
+    "placeholders": {
+      "origin": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_7655b9531e": {
+    "message": "稽核紀錄無法使用"
+  },
+  "copy_07856dc7ea": {
+    "message": "稽核紀錄已匯出"
+  },
+  "copy_1945edab68": {
+    "message": "稽核紀錄匯出失敗"
+  },
+  "copy_27efbed83b": {
+    "message": "清除稽核紀錄：這會永久刪除所有本機稽核項目。如需副本請先匯出。繼續？"
+  },
+  "copy_1b9414c45e": {
+    "message": "稽核紀錄已清除"
+  },
+  "copy_5e4c340bf4": {
+    "message": "無法清除稽核紀錄"
+  },
+  "copy_e55422c604": {
+    "message": "此來源已被禁止自動化"
+  },
+  "copy_74f10b929e": {
+    "message": "已授予存取（敏感來源）"
+  },
+  "copy_8378642189": {
+    "message": "確定清除全部分析資料嗎？此操作無法復原。"
+  },
+  "copy_a58a92d42a": {
+    "message": "分析資料已清除"
+  },
+  "copy_53dd8a177f": {
+    "message": "分析資料已匯出"
+  },
+  "copy_f5db4312c2": {
+    "message": "JSON 工作階段資料"
+  },
+  "copy_b0e3e5d7c3": {
+    "message": "串流匯出工作階段需要支援「另存新檔」的瀏覽器"
+  },
+  "copy_0eecfd3ae0": {
+    "message": "工作階段匯出傳輸無法使用"
+  },
+  "copy_0969eab862": {
+    "message": "找不到工作階段"
+  },
+  "copy_fe13bdd0d0": {
+    "message": "無法載入工作階段詳細資料"
+  },
+  "copy_3096433e6f": {
+    "message": "無法載入工作階段事件"
+  },
+  "copy_952bb703c9": {
+    "message": "無法載入更多工作階段事件：$ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_ce10cc25bb": {
+    "message": "未選擇工作階段"
+  },
+  "copy_d633c264e7": {
+    "message": "已下載工作階段 JSON"
+  },
+  "copy_19404e5435": {
+    "message": "請從該工作階段歷程的下載按鈕重試日誌匯出"
+  },
+  "copy_f431c1057b": {
+    "message": "無法下載工作階段紀錄"
+  },
+  "copy_ac475c80e9": {
+    "message": "確定刪除此工作階段嗎？此操作無法復原。"
+  },
+  "copy_5c9c6608b4": {
+    "message": "無法刪除工作階段"
+  },
+  "copy_1a0b431718": {
+    "message": "確定刪除全部工作階段歷程嗎？此操作無法復原。"
+  },
+  "copy_40260f861d": {
+    "message": "已清除全部工作階段"
+  },
+  "copy_ed9e6fe6eb": {
+    "message": "無法清除工作階段"
+  },
+  "copy_14d37a14df": {
+    "message": "此工作階段沒有記錄的紀錄。"
+  },
+  "copy_c892490bc5": {
+    "message": "FSB 自動化工作階段報告"
+  },
+  "copy_76eb674a8c": {
+    "message": "AI 對話紀錄"
+  },
+  "copy_5a60378692": {
+    "message": "類別 | 次數 | 平均（毫秒）| 最小 | 最大 | 合計"
+  },
+  "copy_87968c8b4f": {
+    "message": "權杖用量摘要"
+  },
+  "copy_09ed6ac4d2": {
+    "message": "工作階段報告已匯出"
+  },
+  "copy_cc1e1981fb": {
+    "message": "請從該工作階段歷程的「匯出文字」按鈕重試日誌匯出"
+  },
+  "copy_c183663b5c": {
+    "message": "無法匯出工作階段"
+  },
+  "copy_30784a43b1": {
+    "message": "解除保險庫鎖定時發生錯誤：$ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_b621934f80": {
+    "message": "PIN 不一致"
+  },
+  "copy_038efc029d": {
+    "message": "已建立憑證保險庫"
+  },
+  "copy_b27730b0ad": {
+    "message": "無法建立保險庫"
+  },
+  "copy_be90a4301c": {
+    "message": "建立保險庫時發生錯誤：$ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_344e10f557": {
+    "message": "輸入你的 PIN"
+  },
+  "copy_d8689df745": {
+    "message": "鎖定保險庫時發生錯誤：$ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_025f3d105c": {
+    "message": "網域為必填"
+  },
+  "copy_f0413d8913": {
+    "message": "需要使用者名稱或密碼"
+  },
+  "copy_9afaa0cd06": {
+    "message": "儲存失敗：$ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_161d5eb702": {
+    "message": "儲存憑證時發生錯誤：$ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_2be1559933": {
+    "message": "刪除「$DOMAIN$」的已儲存憑證？此操作無法復原。",
+    "placeholders": {
+      "domain": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_742e696153": {
+    "message": "刪除失敗：$ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_f91e85ab50": {
+    "message": "刪除憑證時發生錯誤：$ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_6ddb0ed270": {
+    "message": "付款方式已解除鎖定"
+  },
+  "copy_c75e2cc897": {
+    "message": "解除付款方式鎖定時發生錯誤：$ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_b69b2dc301": {
+    "message": "付款方式已鎖定"
+  },
+  "copy_454a57b219": {
+    "message": "無法鎖定付款方式"
+  },
+  "copy_af2ea4b480": {
+    "message": "鎖定付款方式時發生錯誤：$ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_38c2cc72e3": {
+    "message": "請輸入數字 PIN"
+  },
+  "copy_97334b1737": {
+    "message": "編輯付款方式"
+  },
+  "copy_f8ab13ff2a": {
+    "message": "除暱稱和地址第 2 行外，所有欄位均為必填"
+  },
+  "copy_2389d7d2a2": {
+    "message": "卡號無效"
+  },
+  "copy_cc08ac8162": {
+    "message": "卡片已過期或到期日無效"
+  },
+  "copy_0aed24cdfa": {
+    "message": "付款方式已更新"
+  },
+  "copy_8fb5f3db97": {
+    "message": "付款方式已儲存"
+  },
+  "copy_58adb591be": {
+    "message": "儲存付款方式時發生錯誤：$ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_f03b63954b": {
+    "message": "刪除此付款方式？此操作無法復原。"
+  },
+  "copy_62dd24dab7": {
+    "message": "付款方式已刪除"
+  },
+  "copy_2a0de92af3": {
+    "message": "刪除付款方式時發生錯誤：$ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_4f15f65f6e": {
+    "message": "請輸入要探索的 URL"
+  },
+  "copy_fb05645171": {
+    "message": "URL 格式無效"
+  },
+  "copy_a6215dba6d": {
+    "message": "無法啟動探索：$ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_284429f90b": {
+    "message": "已停止所有爬取"
+  },
+  "copy_aee9e10eae": {
+    "message": "$DOMAIN$ 的爬取失敗",
+    "placeholders": {
+      "domain": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_d604ffed30": {
+    "message": "找不到研究資料"
+  },
+  "copy_600bbdc0cf": {
+    "message": "無法載入研究詳細資料"
+  },
+  "copy_b784ed64e1": {
+    "message": "已下載研究 JSON"
+  },
+  "copy_4a64e6ca83": {
+    "message": "無法下載研究資料"
+  },
+  "copy_1a2e7f1116": {
+    "message": "確定刪除此研究結果嗎？"
+  },
+  "copy_ec95ccc29e": {
+    "message": "無法刪除研究資料"
+  },
+  "copy_dc94971b24": {
+    "message": "無法將研究資料轉換為網站地圖"
+  },
+  "copy_382f902a79": {
+    "message": "無法儲存記憶"
+  },
+  "copy_2049875d89": {
+    "message": "已儲存到記憶"
+  },
+  "copy_d504fbf25e": {
+    "message": "正在用 AI 精煉網站地圖..."
+  },
+  "copy_a249e56325": {
+    "message": "已儲存並精煉 $DOMAIN$ 的網站地圖",
+    "placeholders": {
+      "domain": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_237923127b": {
+    "message": "已儲存 $DOMAIN$ 的網站地圖（精煉未傳回資料）",
+    "placeholders": {
+      "domain": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_35d9e0c46c": {
+    "message": "網站地圖已儲存（AI 精煉失敗：$ERROR$）",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_c8c83ca919": {
+    "message": "已將 $DOMAIN$ 的網站地圖儲存到記憶",
+    "placeholders": {
+      "domain": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_c32ea6d22f": {
+    "message": "儲存到記憶失敗：$ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_963ba004ea": {
+    "message": "確定刪除全部研究結果嗎？此操作無法復原。"
+  },
+  "copy_1044224528": {
+    "message": "已清除全部研究結果"
+  },
+  "copy_84e9814ece": {
+    "message": "無法清除研究結果"
+  },
+  "copy_491c2ddc8e": {
+    "message": "請先輸入伺服器 URL"
+  },
+  "copy_9526d57756": {
+    "message": "已產生並儲存雜湊金鑰"
+  },
+  "copy_fdc08c5f7b": {
+    "message": "無法產生雜湊金鑰"
+  },
+  "copy_52b3b70484": {
+    "message": "無法連接伺服器：$ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_cbdbc53db1": {
+    "message": "沒有可複製的雜湊金鑰"
+  },
+  "copy_f0b64c63d8": {
+    "message": "已複製雜湊金鑰"
+  },
+  "copy_0cf23c4489": {
+    "message": "複製失敗"
+  },
+  "copy_8cab3b4552": {
+    "message": "請輸入伺服器 URL 和雜湊金鑰"
+  },
+  "copy_271b7b0f3b": {
+    "message": "伺服器連線成功"
+  },
+  "copy_3e8bcabc0b": {
+    "message": "雜湊金鑰無效"
+  },
+  "copy_09f7c3ac2a": {
+    "message": "無法連接伺服器"
+  },
+  "copy_0ea446a05f": {
+    "message": "伺服器未傳回雜湊金鑰"
+  },
+  "copy_e5697f10b5": {
+    "message": "配對回應格式錯誤"
+  },
+  "copy_30fa7c27e5": {
+    "message": "無法產生配對碼：$ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_acce51c1d3": {
+    "message": "無法註冊雜湊金鑰：$ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_cb4c956be2": {
+    "message": "刪除此記憶？"
+  },
+  "copy_7402b5cdc1": {
+    "message": "無法載入記憶資料"
+  },
+  "copy_3d391897c3": {
+    "message": "找不到記憶"
+  },
+  "copy_1c461596d3": {
+    "message": "圖引擎無法使用"
+  },
+  "copy_d85c704af2": {
+    "message": "此記憶中沒有網站模式資料"
+  },
+  "copy_a658647978": {
+    "message": "網站地圖中找不到頁面"
+  },
+  "copy_4b23a9fe70": {
+    "message": "AI 精煉器無法使用"
+  },
+  "copy_920d3a68d9": {
+    "message": "找不到記憶，或它不是網站地圖"
+  },
+  "copy_99a619a944": {
+    "message": "網站地圖已精煉"
+  },
+  "copy_a266f3a3ce": {
+    "message": "AI 精煉失敗：$ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_0b0bdbabab": {
+    "message": "刪除全部記憶？此操作無法復原。"
+  },
+  "copy_58589924e2": {
+    "message": "已清除全部記憶"
+  },
+  "copy_e158cd5a5e": {
+    "message": "無法清除記憶：$ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_21ce69d58b": {
+    "message": "遠端控制已啟用"
+  },
+  "copy_23a711ebd2": {
+    "message": "沒有模型符合搜尋"
+  },
+  "copy_a5a9895b02": {
+    "message": "沒有可用模型"
+  },
+  "copy_df9da4e214": {
+    "message": "API 金鑰無效"
+  },
+  "copy_e93db4ad9a": {
+    "message": "此提供者的 API 金鑰無效"
+  },
+  "copy_7b582d9989": {
+    "message": "沒有相容的 LM Studio 模型"
+  },
+  "copy_5742edc9d8": {
+    "message": "啟動 LM Studio，載入一個聊天模型，並重新整理模型清單"
+  },
+  "copy_4b1527fd68": {
+    "message": "LM Studio 模型探索無法使用"
+  },
+  "copy_bd94818b82": {
+    "message": "無法載入模型"
+  },
+  "copy_11c964536c": {
+    "message": "模型探索無法使用"
+  },
+  "copy_c77feaa41e": {
+    "message": "無法連接 LM Studio"
+  },
+  "copy_bdaaf4fde3": {
+    "message": "無法從此提供者載入模型"
+  },
+  "copy_6b3e293f22": {
+    "message": "無法重新整理提供者的模型清單"
+  },
+  "copy_9aed9949c4": {
+    "message": "LM Studio 中沒有載入相容的聊天模型"
+  },
+  "copy_d068f8bbe0": {
+    "message": "沒有可用的模型"
+  },
+  "copy_ec819bcca6": {
+    "message": "提供者沒有傳回可用的文字模型"
+  },
+  "copy_3329b92927": {
+    "message": "已儲存的 LM Studio 模型無法使用。請選擇一個已載入的模型並儲存。"
+  },
+  "copy_5cb6d3f4e6": {
+    "message": "模型探索逾時。請重新整理後重試。"
+  },
+  "copy_e21ca6d204": {
+    "message": "搜尋並選擇模型"
+  },
+  "copy_d6699494ff": {
+    "message": "切換模型清單"
+  },
+  "copy_9606bfc49e": {
+    "message": "重新整理模型清單"
+  },
+  "copy_881bf7079c": {
+    "message": "輸入你的 xAI API 金鑰"
+  },
+  "copy_1e9720ad1e": {
+    "message": "輸入你的 Gemini API 金鑰"
+  },
+  "copy_699e26dc48": {
+    "message": "輸入你的 OpenAI API 金鑰"
+  },
+  "copy_e73283ba69": {
+    "message": "輸入你的 Anthropic API 金鑰"
+  },
+  "copy_c545294348": {
+    "message": "輸入你的 OpenRouter API 金鑰"
+  },
+  "copy_8001f1687a": {
+    "message": "輸入你的自訂 API 金鑰"
+  },
+  "copy_ec8571e74c": {
+    "message": "輸入你的 2Captcha API 金鑰"
+  },
+  "copy_9a679edbd3": {
+    "message": "減少最大反覆次數"
+  },
+  "copy_7ff25a6879": {
+    "message": "增加最大反覆次數"
+  },
+  "copy_1da98f8734": {
+    "message": "減少元素上限"
+  },
+  "copy_396f15bbfe": {
+    "message": "增加元素上限"
+  },
+  "copy_8418bb6be8": {
+    "message": "減小元素快取"
+  },
+  "copy_4d09f69eb1": {
+    "message": "增大元素快取"
+  },
+  "copy_8afc6eb606": {
+    "message": "降低代理並行上限"
+  },
+  "copy_484366fe68": {
+    "message": "提高代理並行上限"
+  },
+  "copy_cffeed4c47": {
+    "message": "降低觸發程序並行上限"
+  },
+  "copy_3816b69dee": {
+    "message": "提高觸發程序並行上限"
+  },
+  "copy_2a1df07657": {
+    "message": "縮短 MCP 重播保留期"
+  },
+  "copy_a346fdf291": {
+    "message": "MCP 重播保留天數"
+  },
+  "copy_71c20adba6": {
+    "message": "延長 MCP 重播保留期"
+  },
+  "copy_f38984cf15": {
+    "message": "正在傳送匿名使用資料。點選以停止。"
+  },
+  "copy_81649d0543": {
+    "message": "你的伺服器雜湊金鑰"
+  },
+  "copy_e4cdf160f5": {
+    "message": "複製雜湊金鑰"
+  },
+  "copy_81f7adf295": {
+    "message": "先前建立的背景代理"
+  },
+  "copy_8c16fe2070": {
+    "message": "啟用後，新記憶會由 AI 自動分析以獲得更深入的見解"
+  },
+  "copy_0a221bc876": {
+    "message": "將記憶匯出為 JSON"
+  },
+  "copy_70e6248096": {
+    "message": "從 JSON 匯入記憶"
+  },
+  "copy_1152ae520b": {
+    "message": "新網站的預設同意模式"
+  },
+  "copy_f5af3ff4e6": {
+    "message": "來源的同意模式"
+  },
+  "copy_8371bee1a3": {
+    "message": "搜尋卡片、品牌或帳單資訊..."
+  },
+  "copy_18bf091ea7": {
+    "message": "卡片上的姓名"
+  },
+  "copy_eb59dcee20": {
+    "message": "帳單資料名稱"
+  },
+  "copy_e151fee074": {
+    "message": "公寓、套房、單位"
+  },
+  "copy_7ec33c22aa": {
+    "message": "FSB - 控制台"
+  },
+  "copy_34c70e4722": {
+    "message": "FSB - 初始設定"
+  },
+  "copy_1398385080": {
+    "message": "第 1 步，共 5 步"
+  },
+  "copy_b51e205a4a": {
+    "message": "選擇一個已載入的 LM Studio 聊天模型"
+  },
+  "copy_434171c580": {
+    "message": "LM Studio 已成功回應"
+  },
+  "copy_900b7aa263": {
+    "message": "剪貼簿中沒有 API 金鑰"
+  },
+  "copy_8d78737e31": {
+    "message": "讀取剪貼簿失敗"
+  },
+  "copy_08aae6eb74": {
+    "message": "暫時略過"
+  },
+  "lang_choose": {
+    "message": "語言"
+  },
+  "lang_follow_browser": {
+    "message": "瀏覽器語言"
+  },
+  "lang_extensions_page": {
+    "message": "chrome://extensions 上的名稱跟隨瀏覽器語言。"
+  },
+  "copy_9a19a25438": {
+    "message": "已完成 $COUNT$ 個操作",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_5bb3cc9bbc": {
+    "message": "已完成 $COUNT$ 個操作",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_89858f87f6": {
+    "message": "需要登入"
+  },
+  "copy_969ccbd3cf": {
+    "message": "電子郵件"
+  },
+  "copy_657144f3f7": {
+    "message": "使用者名稱 / 電子郵件"
+  },
+  "copy_fb625242db": {
+    "message": "此網站"
+  },
+  "copy_3a4ba4367b": {
+    "message": "此工作階段無法儲存。"
+  },
+  "copy_88712c434b": {
+    "message": "需要登入"
+  },
+  "copy_9a15079bb0": {
+    "message": "輸入憑證以登入。憑證會加密並儲存，供日後使用。"
+  },
+  "copy_5c4fb64721": {
+    "message": "儲存以供日後使用"
+  },
+  "copy_bcc0bcc914": {
+    "message": "登入"
+  },
+  "copy_28d03596d2": {
+    "message": "略過"
+  },
+  "copy_71b27d1772": {
+    "message": "此結帳"
+  },
+  "copy_3953987f92": {
+    "message": "偵測到結帳"
+  },
+  "copy_0fa359b5b5": {
+    "message": "付款已停用"
+  },
+  "copy_22a8f98173": {
+    "message": "保險庫已鎖定"
+  },
+  "copy_869a552f3f": {
+    "message": "開啟付款"
+  },
+  "copy_48845bff33": {
+    "message": "關閉"
+  },
+  "copy_b764cdc0ea": {
+    "message": "未知"
+  },
+  "copy_23f19f7bd3": {
+    "message": "$BRAND$（末四碼 $LAST$）",
+    "placeholders": {
+      "brand": {
+        "content": "$1"
+      },
+      "last": {
+        "content": "$2"
+      }
+    }
+  },
+  "copy_9a09841b76": {
+    "message": "有效期限 $MONTH$/$YEAR$",
+    "placeholders": {
+      "month": {
+        "content": "$1"
+      },
+      "year": {
+        "content": "$2"
+      }
+    }
+  },
+  "copy_e73906185a": {
+    "message": "填入已儲存的卡片"
+  },
+  "copy_297f2fc07e": {
+    "message": "還沒有工作階段。執行一次自動化即可在此查看紀錄。"
+  },
+  "copy_1369c6877b": {
+    "message": "因閒置而關閉"
+  },
+  "copy_a5fbb5c6ed": {
+    "message": "未知工作"
+  },
+  "copy_a147891596": {
+    "message": "$COUNT$ 個操作",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_loaded_model": {
+    "message": "已載入的聊天模型"
+  },
+  "entry_watching": {
+    "message": "$COUNT$ 個監看中",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_fired": {
+    "message": "$COUNT$ 個已觸發",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_check_visible": {
+    "message": "可見"
+  },
+  "entry_check_enabled": {
+    "message": "已啟用"
+  },
+  "entry_check_viewport": {
+    "message": "在視窗內"
+  },
+  "entry_check_pointer": {
+    "message": "指標事件"
+  },
+  "entry_text_content": {
+    "message": "文字內容"
+  },
+  "entry_crawl_title": {
+    "message": "FSB 正在爬取"
+  },
+  "panel_b2693770d3": {
+    "message": "連線測試"
+  },
+  "panel_672f1efd8b": {
+    "message": "提供者："
+  },
+  "panel_755c8b2a9f": {
+    "message": "狀態："
+  },
+  "panel_c88a0b9074": {
+    "message": "成功"
+  },
+  "panel_11a931060d": {
+    "message": "模型："
+  },
+  "panel_8f6bed11e7": {
+    "message": "回應時間："
+  },
+  "panel_5e1834d89d": {
+    "message": "$MS$ 毫秒",
+    "placeholders": {
+      "ms": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_6170629067": {
+    "message": "錯誤："
+  },
+  "panel_9ec41ffd77": {
+    "message": "檢視紀錄"
+  },
+  "panel_9af63d68f9": {
+    "message": "下載紀錄"
+  },
+  "panel_1c01ad70fe": {
+    "message": "無法載入工作階段：$ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_aaa0442372": {
+    "message": "匯出為易讀文字"
+  },
+  "panel_52a0e8b87e": {
+    "message": "匯出文字"
+  },
+  "panel_2e80d6e9a5": {
+    "message": "下載 JSON 紀錄"
+  },
+  "panel_49e0e6d56e": {
+    "message": "下載 JSON"
+  },
+  "panel_7d9eb7acb1": {
+    "message": "關閉"
+  },
+  "panel_cb9ac5c561": {
+    "message": "工作階段 ID"
+  },
+  "panel_ecbc89cd37": {
+    "message": "開始時間"
+  },
+  "panel_7cdc804e69": {
+    "message": "結束時間"
+  },
+  "panel_4fc52a3c4c": {
+    "message": "時長"
+  },
+  "panel_ff8059dc67": {
+    "message": "操作"
+  },
+  "panel_4740b57371": {
+    "message": "疊代次數"
+  },
+  "panel_73912999fa": {
+    "message": "上一個"
+  },
+  "panel_1ff57a29d7": {
+    "message": "下一個"
+  },
+  "panel_f03788e116": {
+    "message": "第 $CURRENT$ 步，共 $TOTAL$ 步",
+    "placeholders": {
+      "current": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "panel_a75ab6920d": {
+    "message": "正在載入重播資料..."
+  },
+  "panel_881c9fdb90": {
+    "message": "顯示原始紀錄"
+  },
+  "panel_57df179c4f": {
+    "message": "隱藏原始紀錄"
+  },
+  "panel_51cbb3bf88": {
+    "message": "此工作階段沒有重播資料"
+  },
+  "panel_dfa4ae555e": {
+    "message": "目標定位"
+  },
+  "panel_14b981a43b": {
+    "message": "選擇器："
+  },
+  "panel_9216cbad79": {
+    "message": "找到元素：是"
+  },
+  "panel_2dbfbc21aa": {
+    "message": "找到元素：否"
+  },
+  "panel_fe3d6f1947": {
+    "message": "座標：($X$, $Y$)",
+    "placeholders": {
+      "x": {
+        "content": "$1"
+      },
+      "y": {
+        "content": "$2"
+      }
+    }
+  },
+  "panel_4e5b548d6d": {
+    "message": "元素"
+  },
+  "panel_848bf594dd": {
+    "message": "文字：「$TEXT$」",
+    "placeholders": {
+      "text": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_e68b36b17c": {
+    "message": "參數"
+  },
+  "panel_b1fa878a98": {
+    "message": "診斷"
+  },
+  "panel_27c2ccd962": {
+    "message": "未知錯誤"
+  },
+  "panel_407fab696b": {
+    "message": "建議："
+  },
+  "panel_4de32d57f8": {
+    "message": "共 $TOTAL$ 個中的最近 $COUNT$ 個",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "panel_23e0248aa9": {
+    "message": "摘要："
+  },
+  "panel_d6f290028c": {
+    "message": "$DONE$/$TOTAL$ 個步驟成功",
+    "placeholders": {
+      "done": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "panel_ba5c173754": {
+    "message": "$COUNT$ 個失敗",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_af3c60331d": {
+    "message": "無使用者名稱"
+  },
+  "panel_6aeaa6a53d": {
+    "message": "顯示密碼"
+  },
+  "panel_464c4ffd01": {
+    "message": "編輯"
+  },
+  "panel_e2d0a54968": {
+    "message": "刪除"
+  },
+  "panel_be3702e3f1": {
+    "message": "卡片"
+  },
+  "panel_cae7d57bc0": {
+    "message": "停止"
+  },
+  "panel_ada26b6a54": {
+    "message": "正在開始爬取..."
+  },
+  "panel_7eae8fd81d": {
+    "message": "$COLLECTED$ / $MAX$ 頁",
+    "placeholders": {
+      "collected": {
+        "content": "$1"
+      },
+      "max": {
+        "content": "$2"
+      }
+    }
+  },
+  "panel_a854c3e6d9": {
+    "message": "正在爬取 $DOMAIN$",
+    "placeholders": {
+      "domain": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_b837e392c5": {
+    "message": "爬取完成：來自 $DOMAIN$ 的 $COUNT$ 個頁面",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "domain": {
+        "content": "$2"
+      }
+    }
+  },
+  "panel_44761df9d9": {
+    "message": "$COUNT$ 個頁面",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_d1bf045bb5": {
+    "message": "檢視詳細資料"
+  },
+  "panel_6c0a28c891": {
+    "message": "儲存為網站地圖記憶"
+  },
+  "panel_0f4baebaa0": {
+    "message": "無法載入研究結果：$ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_1c1944d338": {
+    "message": "第 $START$-$END$ 項，共 $TOTAL$ 項",
+    "placeholders": {
+      "start": {
+        "content": "$1"
+      },
+      "end": {
+        "content": "$2"
+      },
+      "total": {
+        "content": "$3"
+      }
+    }
+  },
+  "panel_9046da16ae": {
+    "message": "頁面"
+  },
+  "panel_e1ff7a9061": {
+    "message": "元素"
+  },
+  "panel_858451263b": {
+    "message": "表單"
+  },
+  "panel_9024c197d8": {
+    "message": "連結"
+  },
+  "panel_a6d5df3737": {
+    "message": "起始 URL："
+  },
+  "panel_298d6c7549": {
+    "message": "時長："
+  },
+  "panel_184ab6989d": {
+    "message": "深度："
+  },
+  "panel_068fbd1599": {
+    "message": "已爬取頁面（$COUNT$）",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_59ba6ff1da": {
+    "message": "$COUNT$ 個元素",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_d81ab3063e": {
+    "message": "已精煉"
+  },
+  "panel_0e35f6e974": {
+    "message": "基本"
+  },
+  "panel_6ab098444e": {
+    "message": "精煉網站地圖"
+  },
+  "panel_1e7f34ee8f": {
+    "message": "精煉"
+  },
+  "panel_d9483244b6": {
+    "message": "展開或收合詳細資料"
+  },
+  "panel_cdf8d330f5": {
+    "message": "$COUNT$ 次存取",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_008de64db2": {
+    "message": "信賴度 $PERCENT$%",
+    "placeholders": {
+      "percent": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_3aba541421": {
+    "message": "刪除記憶"
+  },
+  "panel_aab6c5e605": {
+    "message": "無記錄"
+  },
+  "panel_dc937b5989": {
+    "message": "無"
+  },
+  "panel_060b7c4116": {
+    "message": "最終 URL"
+  },
+  "panel_e7dcad8673": {
+    "message": "已完成的步驟"
+  },
+  "panel_7bd31a025d": {
+    "message": "失敗"
+  },
+  "panel_304230dd7b": {
+    "message": "網站地圖"
+  },
+  "panel_f02a172a35": {
+    "message": "選擇器"
+  },
+  "panel_217baacf82": {
+    "message": "網站模式"
+  },
+  "panel_c910d474dc": {
+    "message": "一般"
+  },
+  "panel_2502651aed": {
+    "message": "跨網站模式"
+  },
+  "panel_22e2dbcfc1": {
+    "message": "使用者偏好"
+  },
+  "panel_82ac23744f": {
+    "message": "...還有 $COUNT$ 個",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_b2fc7c1a37": {
+    "message": "（$COUNT$ 個表單）",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_34a07bf033": {
+    "message": "（$COUNT$ 個表單）",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_b358b78f08": {
+    "message": "（$COUNT$ 個導覽項目）",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_2d597de6ea": {
+    "message": "（$COUNT$ 個導覽項目）",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_1b786c0eff": {
+    "message": "導覽區塊"
+  },
+  "panel_df71c8b46d": {
+    "message": "爬取時間"
+  },
+  "panel_2521c156e7": {
+    "message": "（已精煉）"
+  },
+  "panel_c555ac6ba2": {
+    "message": "發現的頁面"
+  },
+  "panel_8083e76d16": {
+    "message": "找到的表單"
+  },
+  "panel_3db65f8c2a": {
+    "message": "導覽"
+  },
+  "panel_97100721e2": {
+    "message": "選擇器資訊"
+  },
+  "panel_041f11ea06": {
+    "message": "已分析的網域"
+  },
+  "panel_92f41ed9cf": {
+    "message": "常見表單類型"
+  },
+  "panel_7ea2d98ace": {
+    "message": "共用選擇器模式"
+  },
+  "panel_53e6cf4452": {
+    "message": "驗證時間"
+  },
+  "panel_292c06f004": {
+    "message": "類別"
+  },
+  "panel_7baf29fa69": {
+    "message": "沒有記錄的步驟"
+  },
+  "panel_5b341c960f": {
+    "message": "目標 URL"
+  },
+  "panel_4ccf1d74a7": {
+    "message": "總執行次數"
+  },
+  "panel_1de3df70dd": {
+    "message": "步驟"
+  },
+  "panel_01b7cdd40d": {
+    "message": "使用的選擇器"
+  },
+  "panel_e70d8eb905": {
+    "message": "分析"
+  },
+  "panel_0a30a815d6": {
+    "message": "頁面"
+  },
+  "panel_96a5ba634b": {
+    "message": "已發現"
+  },
+  "panel_2e0e960ab3": {
+    "message": "表單"
+  },
+  "panel_2e2d5c5649": {
+    "message": "工作流程"
+  },
+  "panel_3fee95da5a": {
+    "message": "簡單"
+  },
+  "panel_008dacb6d1": {
+    "message": "完整"
+  }
+}

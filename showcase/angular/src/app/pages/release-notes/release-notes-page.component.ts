@@ -52,6 +52,7 @@ export class ReleaseNotesPageComponent implements OnInit, OnDestroy {
   readonly capRow2: readonly CapabilityApp[] = CAPABILITY_ROW_2;
 
   readonly releases: readonly ReleaseEntry[] = [
+    { version: '0.9.93' },
     { version: '0.9.92' },
     { version: '0.9.91' },
     { version: '0.9.90' },

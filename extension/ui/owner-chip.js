@@ -48,7 +48,11 @@
   function buildChipText(ownerAgentIdShort) {
     var label = (ownerAgentIdShort === undefined || ownerAgentIdShort === null)
       ? '' : String(ownerAgentIdShort).trim();
-    return 'Owned by ' + label;
+    var english = 'Owned by ' + label;
+    if (globalThis.fsbUiLocale && typeof fsbUiLocale.text === 'function') {
+      return fsbUiLocale.text('shell_owned_by', english, { label: label });
+    }
+    return english;
   }
 
   /**

@@ -1,0 +1,4011 @@
+{
+  "locale_seed_greeting": {
+    "message": "FSBの準備ができました",
+    "description": "Seed string that proves a locale catalog can replace English."
+  },
+  "locale_seed_replay": {
+    "message": "再生速度 $SPEED$",
+    "description": "Seed string with one placeholder.",
+    "placeholders": {
+      "speed": {
+        "content": "$1",
+        "example": "1x"
+      }
+    }
+  },
+  "locale_seed_brand": {
+    "message": "FSB",
+    "description": "Allowlisted invariant brand token."
+  },
+  "ext_name": {
+    "message": "FSB"
+  },
+  "ext_description": {
+    "message": "FSB は、AI を活用した汎用ブラウザ自動化アシスタントです。"
+  },
+  "shell_fast_task": {
+    "message": "タスクをすばやく開始"
+  },
+  "shell_workspace": {
+    "message": "常駐ワークスペース"
+  },
+  "shell_ready": {
+    "message": "準備完了"
+  },
+  "shell_pin_window": {
+    "message": "ウィンドウを固定"
+  },
+  "shell_test_api": {
+    "message": "API 接続をテスト"
+  },
+  "shell_settings": {
+    "message": "設定"
+  },
+  "shell_ask": {
+    "message": "自動化したいことを入力..."
+  },
+  "shell_stop": {
+    "message": "自動化を停止"
+  },
+  "shell_voice": {
+    "message": "音声入力"
+  },
+  "shell_send": {
+    "message": "メッセージを送信"
+  },
+  "shell_pin_hint": {
+    "message": "常駐ウィンドウが必要なときに固定します"
+  },
+  "shell_lockout": {
+    "message": "このタブで自動化が動作している間、サイドパネルの入力は無効です"
+  },
+  "shell_history": {
+    "message": "セッション履歴"
+  },
+  "shell_delete_all": {
+    "message": "すべてのセッションを削除"
+  },
+  "shell_clear_all": {
+    "message": "すべて消去"
+  },
+  "shell_running": {
+    "message": "自動化を実行中"
+  },
+  "shell_confirm_payment": {
+    "message": "支払い入力を確認"
+  },
+  "shell_payment_note": {
+    "message": "カード情報はフォームの欄に入力されます。FSB は支払いを送信しません。"
+  },
+  "shell_allow": {
+    "message": "許可"
+  },
+  "shell_deny": {
+    "message": "拒否"
+  },
+  "shell_new_chat": {
+    "message": "新しいチャットを開始"
+  },
+  "shell_welcome": {
+    "message": "FSB へようこそ。何をお手伝いしましょうか？"
+  },
+  "shell_no_automation": {
+    "message": "停止できる実行中の自動化はありません。"
+  },
+  "shell_stopped": {
+    "message": "自動化を停止しました。ほかに手伝えることがあれば知らせてください。"
+  },
+  "shell_partial": {
+    "message": "部分的な結果"
+  },
+  "shell_try_again": {
+    "message": "もう一度試しますか？ "
+  },
+  "shell_retry": {
+    "message": "再試行"
+  },
+  "shell_switched_popup": {
+    "message": "ポップアップモードに切り替えました。外側をクリックすると拡張機能は閉じます。"
+  },
+  "shell_persistent": {
+    "message": "常駐ウィンドウで実行中です。"
+  },
+  "shell_try_again_help": {
+    "message": "もう一度試すか、ほかのことで助けが必要なら知らせてください。"
+  },
+  "shell_locked_tab": {
+    "message": "このタブで自動化が動作している間は無効です"
+  },
+  "shell_doctor_copied": {
+    "message": "診断コマンドをコピーしました"
+  },
+  "shell_pair_copied": {
+    "message": "ペアリング解除コマンドをコピーしました"
+  },
+  "shell_install_copied": {
+    "message": "ネイティブヘルパーのインストールコマンドをコピーしました"
+  },
+  "shell_site_map_ready": {
+    "message": "サイトマップの準備ができました。タスクを再試行しますか？ "
+  },
+  "shell_retry_sitemap": {
+    "message": "サイトマップで再試行"
+  },
+  "shell_locked_ext": {
+    "message": "拡張機能はロックされています。先にポップアップを開いてロックを解除してください。"
+  },
+  "shell_already_done": {
+    "message": "すでに完了しています"
+  },
+  "shell_session_ended": {
+    "message": "セッションが予期せず終了しました。次のタスクの準備ができています。"
+  },
+  "shell_no_map": {
+    "message": "このサイトにはまだ地図がありません。偵察すると、FSB がサイト構造を学習して性能を高められます。"
+  },
+  "shell_run_recon": {
+    "message": "偵察を実行"
+  },
+  "shell_stuck": {
+    "message": "自動化が同じ操作を繰り返して止まっています。ヒントです:"
+  },
+  "shell_tip_specific": {
+    "message": "達成したいことをより具体的にしてください"
+  },
+  "shell_tip_captcha": {
+    "message": "CAPTCHA の解決など、ページに手動の手順が必要か確認してください"
+  },
+  "shell_tip_loaded": {
+    "message": "開始する前に、ページが完全に読み込まれていることを確認してください"
+  },
+  "shell_no_worries": {
+    "message": "大丈夫です。サイドパネルはそのままです。もう一度試すか、別のことを頼んでください。"
+  },
+  "shell_password": {
+    "message": "パスワード"
+  },
+  "shell_signing_in": {
+    "message": "サインインしています..."
+  },
+  "shell_login_skipped": {
+    "message": "ログインをスキップしました。自動化を続けます..."
+  },
+  "shell_payment_selected": {
+    "message": "保存済みの支払い方法を選択しました。FSB はカード情報を入力しますが、最終的な支払いは送信しません。"
+  },
+  "shell_payment_skipped": {
+    "message": "保存済みの支払い方法をスキップしました。最終的な支払いの前に、チェックアウトフォームを確認してください。"
+  },
+  "shell_replay_preview": {
+    "message": "検証済みの再生プレビュー"
+  },
+  "shell_fresh_tab_fallback": {
+    "message": "記録されたサイトの新しいタブ"
+  },
+  "shell_approve_replay": {
+    "message": "再生を承認"
+  },
+  "shell_cancel": {
+    "message": "キャンセル"
+  },
+  "shell_replay_busy": {
+    "message": "別の自動化が実行中は再生できません。先に現在のタスクを停止してください。"
+  },
+  "shell_replay_cancelled_request": {
+    "message": "再生リクエストを取り消しました。対象のタブは開いていません。"
+  },
+  "shell_replay_inspect_only": {
+    "message": "この記録は検査用に検証されていますが、実行できる手順はありません。"
+  },
+  "shell_replay_cancelled": {
+    "message": "再生を取り消しました。元の記録は変更されていません。"
+  },
+  "shell_session_missing": {
+    "message": "セッションデータが見つかりません。"
+  },
+  "shell_no_actions": {
+    "message": "このセッションには記録された操作がありません。"
+  },
+  "shell_history_failed": {
+    "message": "セッションを読み込めませんでした。"
+  },
+  "shell_replay_session": {
+    "message": "セッションを再生"
+  },
+  "shell_delete_session": {
+    "message": "セッションを削除"
+  },
+  "shell_autopilot": {
+    "message": "オートパイロット"
+  },
+  "shell_checking_local": {
+    "message": "ローカルエージェントサービスを確認しています"
+  },
+  "shell_checking_local_sent": {
+    "message": "ローカルエージェントサービスを確認しています。メッセージはまだ送信されていません。"
+  },
+  "shell_wake_body": {
+    "message": "FSB はローカルエージェントサービスを使えるようにしています。メッセージはまだ送信されていません。"
+  },
+  "shell_checking_agent": {
+    "message": "エージェントサービスを確認しています"
+  },
+  "shell_agent_offline": {
+    "message": "エージェントはオフラインです"
+  },
+  "shell_offline_body": {
+    "message": "FSB はローカルエージェントサービスに接続できません。診断コマンドを実行してから、このメッセージをもう一度試してください。"
+  },
+  "shell_copy_doctor": {
+    "message": "診断コマンドをコピー"
+  },
+  "shell_open_provider": {
+    "message": "プロバイダー設定を開く"
+  },
+  "shell_needs_helper": {
+    "message": "自動接続にはネイティブヘルパーが必要です"
+  },
+  "shell_install_body": {
+    "message": "FSB のネイティブヘルパーをインストールまたは更新してから、このメッセージをもう一度試してください。FSB がこのブラウザを自動的に接続します。"
+  },
+  "shell_copy_install": {
+    "message": "インストールコマンドをコピー"
+  },
+  "shell_back_to_message": {
+    "message": "メッセージに戻る"
+  },
+  "shell_checking_provider": {
+    "message": "プロバイダーを確認しています"
+  },
+  "shell_checking_provider_body": {
+    "message": "FSB はメッセージを送る前に、AI プロバイダーを確認しています。"
+  },
+  "shell_starting_agent": {
+    "message": "エージェントを開始しています"
+  },
+  "shell_starting_agent_body": {
+    "message": "FSB がメッセージをエージェントに渡しています。"
+  },
+  "shell_owned_by": {
+    "message": "$LABEL$ が使用中",
+    "placeholders": {
+      "label": {
+        "content": "$1"
+      }
+    }
+  },
+  "shell_owned_title": {
+    "message": "$LABEL$ がこのタブを使用している間は無効です",
+    "placeholders": {
+      "label": {
+        "content": "$1"
+      }
+    }
+  },
+  "shell_error_encountered": {
+    "message": "エラーが発生しました: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "shell_error_generic": {
+    "message": "問題が発生しました: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "shell_error_background": {
+    "message": "バックグラウンドスクリプトとの通信エラー: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "shell_error_stop": {
+    "message": "自動化の停止中にエラー: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "shell_starting": {
+    "message": "自動化を開始しています..."
+  },
+  "shell_continuing": {
+    "message": "続行しています..."
+  },
+  "shell_connecting": {
+    "message": "ページに接続しています..."
+  },
+  "shell_connected_analyzing": {
+    "message": "接続しました。ページを分析しています..."
+  },
+  "shell_analyzing": {
+    "message": "ページを分析しています..."
+  },
+  "shell_starting_plain": {
+    "message": "自動化を開始しています"
+  },
+  "shell_testing_api": {
+    "message": "$NAME$ の API 接続をテストしています...",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "shell_api_ok": {
+    "message": "$NAME$ の API 接続は正常です。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "shell_api_model": {
+    "message": "モデルに接続しました: $MODEL$",
+    "placeholders": {
+      "model": {
+        "content": "$1"
+      }
+    }
+  },
+  "shell_api_failed": {
+    "message": "$NAME$ の API 接続に失敗しました。設定を確認してください。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "shell_api_status": {
+    "message": "状態: $STATUS$ - $DETAIL$",
+    "placeholders": {
+      "status": {
+        "content": "$1"
+      },
+      "detail": {
+        "content": "$2"
+      }
+    }
+  },
+  "shell_api_details": {
+    "message": "詳細: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "shell_error_details": {
+    "message": "エラーの詳細: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "shell_working": {
+    "message": "作業中"
+  },
+  "shell_error_status": {
+    "message": "エラー"
+  },
+  "panel_67b6964686": {
+    "message": "ダッシュボード"
+  },
+  "panel_8ad747d05c": {
+    "message": "API 設定"
+  },
+  "panel_8d261a372f": {
+    "message": "同期"
+  },
+  "panel_703390318b": {
+    "message": "ベータ"
+  },
+  "panel_be146b37a0": {
+    "message": "パスワード"
+  },
+  "panel_632e1c5839": {
+    "message": "支払い"
+  },
+  "panel_22d4f6088b": {
+    "message": "詳細設定"
+  },
+  "panel_c3963aedaa": {
+    "message": "メモリ"
+  },
+  "panel_480d3c119a": {
+    "message": "ログとデバッグ"
+  },
+  "panel_2ccff1d108": {
+    "message": "ヘルプとドキュメント"
+  },
+  "panel_db17c74beb": {
+    "message": "AI の使用量、費用、自動化の性能を確認します"
+  },
+  "panel_cd41bf0d3e": {
+    "message": "トークン合計"
+  },
+  "panel_dfa5cc738d": {
+    "message": "合計費用"
+  },
+  "panel_ada27592c9": {
+    "message": "リクエスト"
+  },
+  "panel_5068c6c343": {
+    "message": "成功率"
+  },
+  "panel_d909750b1b": {
+    "message": "自動化"
+  },
+  "panel_cddf50281d": {
+    "message": "時間ごとのトークン使用量"
+  },
+  "panel_615c5daff4": {
+    "message": "過去 24 時間"
+  },
+  "panel_b84372e5cb": {
+    "message": "過去 7 日間"
+  },
+  "panel_e9ddf63b38": {
+    "message": "過去 30 日間"
+  },
+  "panel_5e4bc34faf": {
+    "message": "AI モデルのプロバイダーと API 設定を構成します"
+  },
+  "panel_9b3cf4a154": {
+    "message": "AI モデルの設定"
+  },
+  "panel_84e1ec2c5b": {
+    "message": "AI プロバイダー"
+  },
+  "panel_994f468aae": {
+    "message": "別のプロバイダーを選ぶ"
+  },
+  "panel_e65d5614f4": {
+    "message": "カスタム（OpenAI 互換）"
+  },
+  "panel_e69daa3849": {
+    "message": "API プロバイダーはローカルの鍵を使います。エージェント CLI は既存のローカルサインインを使います。"
+  },
+  "panel_daa5fed227": {
+    "message": "別の AI プロバイダーを選ぶ"
+  },
+  "panel_822a9fabc1": {
+    "message": "このプロバイダーはオートパイロットでは使えません。新しいタスクの前に、別のプロバイダーを選んで保存してください。"
+  },
+  "panel_5e2c614c23": {
+    "message": "モデル"
+  },
+  "panel_dfa17046ae": {
+    "message": "モデル一覧には API キーが必要です"
+  },
+  "panel_00889a77ec": {
+    "message": "使用する AI モデルを選択"
+  },
+  "panel_bc3286fa36": {
+    "message": "xAI API キー"
+  },
+  "panel_a3fb46f4c6": {
+    "message": "API キーの取得先"
+  },
+  "panel_8e9faa30de": {
+    "message": "。鍵はこのブラウザにローカル保存されます。"
+  },
+  "panel_53bca734db": {
+    "message": "Gemini API キー"
+  },
+  "panel_8418bdbdcd": {
+    "message": "OpenAI API キー"
+  },
+  "panel_e07165f5ce": {
+    "message": "OpenAI プラットフォーム"
+  },
+  "panel_959bc25166": {
+    "message": "Anthropic API キー"
+  },
+  "panel_c481af39b2": {
+    "message": "Anthropic コンソール"
+  },
+  "panel_36e0497429": {
+    "message": "OpenRouter API キー"
+  },
+  "panel_84de34181d": {
+    "message": "。1 つの鍵で 200 以上のモデルを使えます。"
+  },
+  "panel_018833a024": {
+    "message": "LM Studio サーバー URL"
+  },
+  "panel_3efaf1b1c1": {
+    "message": "LM Studio のローカル OpenAI 互換サーバーを使います。API キーは不要です。モデルは次からその場で見つかります"
+  },
+  "panel_83419f15b8": {
+    "message": "カスタム API エンドポイント"
+  },
+  "panel_cfb67fffe3": {
+    "message": "OpenAI 互換 API エンドポイントの完全な URL を入力"
+  },
+  "panel_acb781f972": {
+    "message": "カスタム API キー"
+  },
+  "panel_5e2e7207a6": {
+    "message": "鍵はこのブラウザにローカル保存されます。"
+  },
+  "panel_abfe6d40e5": {
+    "message": "音声テキスト変換"
+  },
+  "panel_5303c4374c": {
+    "message": "OpenAI Whisper を使う"
+  },
+  "panel_14e36783b5": {
+    "message": "OpenAI API キーが必要です。無効にすると、ブラウザ内蔵の音声認識を使います。"
+  },
+  "panel_e1461bf33a": {
+    "message": "CAPTCHA ソルバー"
+  },
+  "panel_2909841c62": {
+    "message": "CAPTCHA 解決を有効にする"
+  },
+  "panel_1955b2ec44": {
+    "message": "2Captcha で reCAPTCHA v2、hCaptcha、Cloudflare Turnstile を解決します"
+  },
+  "panel_5ac544cb2f": {
+    "message": "2Captcha API キー"
+  },
+  "panel_a003f76423": {
+    "message": "登録先"
+  },
+  "panel_b6ff7ee96e": {
+    "message": "エージェント CLI"
+  },
+  "panel_a1272b91cf": {
+    "message": "サインインを確認しています..."
+  },
+  "panel_d696a35bdd": {
+    "message": "プロフィール"
+  },
+  "panel_3ac8bbca9a": {
+    "message": "請求"
+  },
+  "panel_cec3a9b89b": {
+    "message": "データ"
+  },
+  "panel_ccf75fb483": {
+    "message": "SuperGrok に接続"
+  },
+  "panel_acfc5be785": {
+    "message": "切断"
+  },
+  "panel_1771a5d0f6": {
+    "message": "サインインを続ける"
+  },
+  "panel_888a2f4fc6": {
+    "message": "SuperGrok の使用状況を確認"
+  },
+  "panel_d334745b85": {
+    "message": "インストールガイド"
+  },
+  "panel_adadface01": {
+    "message": "未報告"
+  },
+  "panel_5bbbe53187": {
+    "message": "サインイン"
+  },
+  "panel_774bf7db76": {
+    "message": "認証状態"
+  },
+  "panel_2e5f79bb94": {
+    "message": "確認しています..."
+  },
+  "panel_02600e6189": {
+    "message": "API 接続を確認しています"
+  },
+  "panel_c02977b07e": {
+    "message": "接続をテスト"
+  },
+  "panel_3907fa7f80": {
+    "message": "外観"
+  },
+  "panel_efb52e7172": {
+    "message": "テーマ"
+  },
+  "panel_6725e7bbcd": {
+    "message": "システム"
+  },
+  "panel_60acc53f13": {
+    "message": "ダーク"
+  },
+  "panel_dbcd5e7bb7": {
+    "message": "ライト"
+  },
+  "panel_19766ed6cc": {
+    "message": "キャンセル"
+  },
+  "panel_1509f561f2": {
+    "message": "保存"
+  },
+  "panel_35322b5bb5": {
+    "message": "変更を保存"
+  },
+  "panel_eb1a70e392": {
+    "message": "破棄"
+  },
+  "panel_49e49bb440": {
+    "message": "生成"
+  },
+  "panel_0e91610117": {
+    "message": "更新"
+  },
+  "panel_3664895579": {
+    "message": "書き出し"
+  },
+  "panel_2cff9baabf": {
+    "message": "読み込み"
+  },
+  "panel_78b7d0379d": {
+    "message": "許可"
+  },
+  "panel_05a2d7332e": {
+    "message": "拒否"
+  },
+  "panel_ca7981b46e": {
+    "message": "オフ"
+  },
+  "panel_b8c209cdea": {
+    "message": "確認する"
+  },
+  "panel_0286249762": {
+    "message": "自動"
+  },
+  "panel_1a3a4b99db": {
+    "message": "FSB がボットとして検出され、作業を中断したという報告はありません。それでも毎日が順調とは限りません。そうでない日のための機能です。"
+  },
+  "panel_1a187ac034": {
+    "message": "、残高を追加し、ダッシュボードから API キーをコピーします。reCAPTCHA v2、hCaptcha、Turnstile を解決します。"
+  },
+  "panel_92f1115a37": {
+    "message": "FSB はこの CLI の既存のローカルサインインを使います。接続テストはツールなしの小さな検証要求を 1 件送ります。"
+  },
+  "panel_cfaa352b86": {
+    "message": "xAI · ローカルハーネス"
+  },
+  "panel_fd05c3a95a": {
+    "message": "確認済みの Grok Build 1.0.4 プロファイルが必要です。接続テストはプロンプトを送らずに、インストール、バージョン、分離、ACP、キャッシュ済み OAuth を確認します。"
+  },
+  "panel_ce4f452059": {
+    "message": "サインイン済みの Grok アカウントを使います。SuperGrok の使用は共有の週間枠から消費され、追加使用が発生する場合があります。"
+  },
+  "panel_ba5c14963d": {
+    "message": "ブラウザのタスク文と FSB の MCP 結果は推論のため Grok に送られます。FSB はこの非公開プロファイルで二次テレメトリとトレース送信を無効にします。"
+  },
+  "panel_baf4338a6f": {
+    "message": "Anthropic · ローカルハーネス"
+  },
+  "panel_7b14b6ca11": {
+    "message": "Claude Code にサインインしたアカウントを使います。FSB に Anthropic の資格情報は不要です。"
+  },
+  "panel_8cceeb4d83": {
+    "message": "使用量と料金はそのアカウントの Claude プランまたは API 設定に従います。"
+  },
+  "panel_d9daa99f67": {
+    "message": "Claude Code は FSB が安全に読める認証状態を報告しません。"
+  },
+  "panel_00604d2592": {
+    "message": "Claude のプランと請求を確認"
+  },
+  "panel_b9f2d95fd0": {
+    "message": "自動化の動作と性能を調整します"
+  },
+  "panel_d987fa1b93": {
+    "message": "コントロールパネルの外観"
+  },
+  "panel_1b0daa3cbf": {
+    "message": "システムの外観に従います。既定: システム。"
+  },
+  "panel_0c2634ded4": {
+    "message": "実行と上限"
+  },
+  "panel_a429108292": {
+    "message": "自動化の上限"
+  },
+  "panel_a6db09cd31": {
+    "message": "タスク実行の境界を制御します"
+  },
+  "panel_7f9bd64777": {
+    "message": "最大反復回数"
+  },
+  "panel_efb8da8405": {
+    "message": "暴走する自動化ループを防ぎます"
+  },
+  "panel_217a08135e": {
+    "message": "DOM 分析"
+  },
+  "panel_f57d34cd62": {
+    "message": "ページ要素の処理を最適化します"
+  },
+  "panel_f239d1c5e2": {
+    "message": "要素の上限"
+  },
+  "panel_a0981cec31": {
+    "message": "範囲と速度のバランス"
+  },
+  "panel_44551744d4": {
+    "message": "要素キャッシュの大きさ"
+  },
+  "panel_bc63ff6878": {
+    "message": "50（最小：単純なページ）"
+  },
+  "panel_6e13b13acc": {
+    "message": "100（軽量：標準的なページ）"
+  },
+  "panel_f5e5f028c7": {
+    "message": "200（標準：推奨）"
+  },
+  "panel_51a4656787": {
+    "message": "500（高負荷：複雑な SPA）"
+  },
+  "panel_b497c0b77d": {
+    "message": "カスタム..."
+  },
+  "panel_3bba622285": {
+    "message": "繰り返す検索を速くするための要素キャッシュです。大きいほど複雑なページで速く、メモリも増えます。"
+  },
+  "panel_964b6d2feb": {
+    "message": "エージェントの同時実行"
+  },
+  "panel_93bdf716dc": {
+    "message": "同時に動かすエージェントの上限"
+  },
+  "panel_05f46c29ed": {
+    "message": "同時実行の上限"
+  },
+  "panel_599bc7e4ae": {
+    "message": "推奨値 (8) に戻す"
+  },
+  "panel_26f41aac5c": {
+    "message": "1 から 64 の間にしてください"
+  },
+  "panel_dd39c865d3": {
+    "message": "8 件中 0 件が実行中"
+  },
+  "panel_8b2e97f4e5": {
+    "message": "トリガーの同時実行"
+  },
+  "panel_1844d05c26": {
+    "message": "同時に監視するトリガーの上限"
+  },
+  "panel_5aa4aff46c": {
+    "message": "既定値 (8) に戻す"
+  },
+  "panel_4f6e909317": {
+    "message": "自動化の動作"
+  },
+  "panel_87fb620509": {
+    "message": "操作変更レポート"
+  },
+  "panel_8807532414": {
+    "message": "各操作とともに返る差分"
+  },
+  "panel_5d2f08be69": {
+    "message": "操作変更レポートを返す（推奨）"
+  },
+  "panel_814f4c658e": {
+    "message": "MCP セッション再生"
+  },
+  "panel_d93120e9c3": {
+    "message": "MCP エージェント操作のローカルで正確な履歴"
+  },
+  "panel_e3d0d26ac8": {
+    "message": "再生用に MCP セッションを記録する"
+  },
+  "panel_8c338dcb22": {
+    "message": "MCP 再生の保持日数"
+  },
+  "panel_a3a33e657a": {
+    "message": "性能の最適化"
+  },
+  "panel_318ba4fefb": {
+    "message": "速度と精度を高める機能を有効にします"
+  },
+  "panel_718ec50194": {
+    "message": "差分比較"
+  },
+  "panel_4df3ccd4f7": {
+    "message": "最初の走査のあと DOM の変更だけを送ります（コンテキストを 70-90% 削減）"
+  },
+  "panel_386c10cfbb": {
+    "message": "表示領域の優先"
+  },
+  "panel_55b7c33a00": {
+    "message": "見える要素に集中し、より速く適切な結果を得ます"
+  },
+  "panel_56cb122532": {
+    "message": "AI によるサイトマップ改善"
+  },
+  "panel_bbabb56b4f": {
+    "message": "AI でサイトマップを自動的に整え、移動方針と作業の流れを検出します"
+  },
+  "panel_6a63ec792f": {
+    "message": "視覚的なフィードバック"
+  },
+  "panel_d9db4fd5a6": {
+    "message": "自動化中の視覚表示を制御します"
+  },
+  "panel_882726c86c": {
+    "message": "操作のアニメーション強調"
+  },
+  "panel_525c3926bb": {
+    "message": "操作中の要素の周りに脈打つ光を表示します"
+  },
+  "panel_b8c545e36f": {
+    "message": "サイドパネルの手順の進行"
+  },
+  "panel_cd7487b136": {
+    "message": "自動化中にサイドパネルへ操作手順を表示します"
+  },
+  "panel_915c0ef81c": {
+    "message": "プライバシーと開発者"
+  },
+  "panel_02d7d5cfae": {
+    "message": "音声入力"
+  },
+  "panel_936f490e8e": {
+    "message": "FSB サイドパネルのマイク入力を制御します"
+  },
+  "panel_92f7b96921": {
+    "message": "マイクによる音声入力を有効にする"
+  },
+  "panel_e007c1f5fd": {
+    "message": "マイクの許可を確認しています…"
+  },
+  "panel_7df7702416": {
+    "message": "Chrome が拡張機能全体のマイク許可を管理します。"
+  },
+  "panel_5e09a0b0eb": {
+    "message": "マイクを有効にする"
+  },
+  "panel_2c0acdeddf": {
+    "message": "Chrome の設定を開く"
+  },
+  "panel_d7de9cfa12": {
+    "message": "開発者向けオプション"
+  },
+  "panel_fef2fc10ae": {
+    "message": "デバッグとトラブルシューティングのツール"
+  },
+  "panel_5f75368293": {
+    "message": "デバッグモード"
+  },
+  "panel_64b2d259ae": {
+    "message": "自動化の問題調査のため、詳しいコンソール記録を有効にします"
+  },
+  "panel_38d35a351e": {
+    "message": "プライバシーとテレメトリ"
+  },
+  "panel_21bf1bebea": {
+    "message": "匿名の使用状況データ"
+  },
+  "panel_451d787c00": {
+    "message": "匿名の使用状況データを送る"
+  },
+  "panel_57f9a109d4": {
+    "message": "使用トークン、MCP クライアント名、実行中のエージェント数。URL、プロンプト、DOM は含みません。"
+  },
+  "panel_9ec9376910": {
+    "message": "ポリシー全文を読む →"
+  },
+  "panel_04dfac3671": {
+    "message": "未接続"
+  },
+  "panel_acf2db1614": {
+    "message": "サーバー同期"
+  },
+  "panel_609bbbdf07": {
+    "message": "ハッシュ鍵"
+  },
+  "panel_534803768c": {
+    "message": "ダッシュボードをペアリング"
+  },
+  "panel_9a177de63c": {
+    "message": "スキャンしてペアリング"
+  },
+  "panel_43e3ece73f": {
+    "message": "残り"
+  },
+  "panel_5ad3dbd124": {
+    "message": "了解"
+  },
+  "panel_c9b3c38247": {
+    "message": "合計"
+  },
+  "panel_a69c4dece1": {
+    "message": "ストレージ"
+  },
+  "panel_ae65d09655": {
+    "message": "容量"
+  },
+  "panel_a039dfb962": {
+    "message": "トークン"
+  },
+  "panel_4bc74b2135": {
+    "message": "タスク"
+  },
+  "panel_2f36130ebc": {
+    "message": "統合"
+  },
+  "panel_ddceb7adfd": {
+    "message": "すべて消去"
+  },
+  "panel_6cc8519b91": {
+    "message": "開始"
+  },
+  "panel_d3f7409ad7": {
+    "message": "すべて停止"
+  },
+  "panel_f00611c47f": {
+    "message": "システムに合わせて自動で推奨されます。範囲は 1 から 64 です。低いほど資源の使い方が安定し、高いほど並列エージェントが増えます。実行中に下げても既存のエージェントは止まりません。上限を超える新しい要求は拒否されます。"
+  },
+  "panel_bfd6b0808c": {
+    "message": "既定は 8 です。範囲は 1 から 64 です。低いほど資源の使い方が安定し、高いほど並列の監視が増えます。監視中に下げても既存の監視は止まりません。上限を超える新しいトリガーは拒否されます。"
+  },
+  "panel_552aa7152b": {
+    "message": "各操作が何を変えたかを短い差分で返すため、AI がページを読み直す必要がありません。既定でオンです。"
+  },
+  "panel_bb0522a484": {
+    "message": "既定は 30 日です。範囲は 1 から 365 日です。期限切れの MCP 再生セッションだけを自動削除し、オートパイロットの履歴はこの設定では削りません。"
+  },
+  "panel_77f6039567": {
+    "message": "サイドパネルにマイクを表示し、ブラウザの音声認識または OpenAI Whisper を許可します。既定でオンです。"
+  },
+  "panel_509f0b9d50": {
+    "message": "音声入力を切ると FSB はマイクを使いませんが、Chrome が保存した許可は取り消されません。"
+  },
+  "panel_76e917ee87": {
+    "message": "リモート操作と結果の保存のため、この拡張機能を FSB ダッシュボードとペアリングします"
+  },
+  "panel_c11de3bb2e": {
+    "message": "結果の保存とダッシュボード利用のため FSB サーバーに接続します"
+  },
+  "panel_097b5fa7f6": {
+    "message": "鍵を生成し、ダッシュボードをペアリングしてこのブラウザを FSB サーバーに結びます。"
+  },
+  "panel_75d0625c55": {
+    "message": "バックグラウンドのエージェントは退場しました"
+  },
+  "panel_d17d0cfd98": {
+    "message": "FSB は一度きりの正確なブラウザ実行に集中します。予定された繰り返し作業には、そのための道具の方が向いています:"
+  },
+  "panel_5a694f4532": {
+    "message": "オープンソースのエージェントループには、そして"
+  },
+  "panel_6e34781c2f": {
+    "message": "管理された長時間の自動化には。働き方に合う方を選んでください。"
+  },
+  "panel_e76c360683": {
+    "message": "OpenClaw を試す"
+  },
+  "panel_1a58d9154d": {
+    "message": "Claude Routines を試す"
+  },
+  "panel_582ba53e9e": {
+    "message": "v0.9.45rc1 で退役 · 2026年4月"
+  },
+  "panel_daa7068396": {
+    "message": "以前のエージェント"
+  },
+  "panel_3107f72f47": {
+    "message": "このプロファイルにいたエージェントの名前を、失われないように残しています。定義は chrome.storage.local['bgAgents'] にそのままあります。"
+  },
+  "panel_9f83a0b7bf": {
+    "message": "過去の自動化セッションから学んだ長期メモリ"
+  },
+  "panel_76a6bcf157": {
+    "message": "自動分析"
+  },
+  "panel_50d0c5511b": {
+    "message": "エピソード"
+  },
+  "panel_9c11c99c77": {
+    "message": "意味"
+  },
+  "panel_2e3e91ffbd": {
+    "message": "手順"
+  },
+  "panel_ee6cfab445": {
+    "message": "費用（30日）"
+  },
+  "panel_bc01325482": {
+    "message": "すべての種類"
+  },
+  "panel_96452046b5": {
+    "message": "保存されたメモリはまだありません。完了した自動化セッションから自動的に取り出されます。"
+  },
+  "panel_ba7fab765c": {
+    "message": "偵察"
+  },
+  "panel_cf0e1ec867": {
+    "message": "サイトを巡回し、操作できる構造、移動、セレクターを地図にします"
+  },
+  "panel_ad2f160b7b": {
+    "message": "最大の深さ"
+  },
+  "panel_53e4d8efcc": {
+    "message": "最大ページ数"
+  },
+  "panel_8ccc2c0e78": {
+    "message": "調査結果"
+  },
+  "panel_452d842e33": {
+    "message": "サイト偵察データを表示・ダウンロードするか、サイトマップのメモリとして保存します"
+  },
+  "panel_df63a2da5f": {
+    "message": "調査結果はまだありません。上の偵察でサイトを巡回してください。"
+  },
+  "panel_30c19209ac": {
+    "message": "統合メモリ"
+  },
+  "panel_ba41142e62": {
+    "message": "サイトマップ"
+  },
+  "panel_bb501d7877": {
+    "message": "コミュニティ"
+  },
+  "panel_d4b1ea5708": {
+    "message": "概要"
+  },
+  "panel_e72d5d8d0b": {
+    "message": "展開"
+  },
+  "panel_73cde2ba51": {
+    "message": "通販と買い物"
+  },
+  "panel_8dfdbc2ef4": {
+    "message": "ソーシャルメディア"
+  },
+  "panel_6c335e2a76": {
+    "message": "金融と取引"
+  },
+  "panel_822c302ddc": {
+    "message": "旅行と予約"
+  },
+  "panel_7b1b7b315b": {
+    "message": "メールのプラットフォーム"
+  },
+  "panel_cbb811ada2": {
+    "message": "開発プラットフォーム"
+  },
+  "panel_c47f423a0a": {
+    "message": "キャリアと求人検索"
+  },
+  "panel_08cf7301b0": {
+    "message": "ゲームのプラットフォーム"
+  },
+  "panel_2d995d5860": {
+    "message": "生産性ツール"
+  },
+  "panel_95bfe584eb": {
+    "message": "デザインとホワイトボード"
+  },
+  "panel_d9dae78103": {
+    "message": "ゲーム"
+  },
+  "panel_d357175cfe": {
+    "message": "メディア"
+  },
+  "panel_6eb00b4b26": {
+    "message": "音楽"
+  },
+  "panel_69752f2313": {
+    "message": "ニュース"
+  },
+  "panel_71bf90935f": {
+    "message": "参考"
+  },
+  "panel_9b1f5daf0a": {
+    "message": "スポーツ"
+  },
+  "panel_0a035c2b85": {
+    "message": "ユーティリティ"
+  },
+  "panel_4b7ef9d8cd": {
+    "message": "自動化の活動を監視し、問題を調べます"
+  },
+  "panel_65e5078378": {
+    "message": "ログを消去"
+  },
+  "panel_5ddbf16ab1": {
+    "message": "ログを書き出す"
+  },
+  "panel_03f1acb9e6": {
+    "message": "すべてのログ"
+  },
+  "panel_ee585cc4bd": {
+    "message": "エラーのみ"
+  },
+  "panel_0b3ff2c6ee": {
+    "message": "警告とエラー"
+  },
+  "panel_2d9e112fc2": {
+    "message": "情報以上"
+  },
+  "panel_122df75095": {
+    "message": "FSB コントロールパネルを読み込みました"
+  },
+  "panel_edeead3f19": {
+    "message": "セッション履歴"
+  },
+  "panel_fba294fa8b": {
+    "message": "過去の自動化セッションのログを表示し、書き出します"
+  },
+  "panel_7a28e26099": {
+    "message": "すべてのセッションを消去"
+  },
+  "panel_600cf8138b": {
+    "message": "記録されたセッションはまだありません。自動化タスクを実行すると、ここにログが表示されます。"
+  },
+  "panel_e38737d4e5": {
+    "message": "分析デバッグツール"
+  },
+  "panel_c0b1dd0e52": {
+    "message": "分析データの収集をテストして確認します"
+  },
+  "panel_bc93dddbb3": {
+    "message": "トークン追跡をテスト"
+  },
+  "panel_4267998cbe": {
+    "message": "ストレージデータを表示"
+  },
+  "panel_056a9215e5": {
+    "message": "分析データを消去"
+  },
+  "panel_2ed2274015": {
+    "message": "データを書き出す"
+  },
+  "panel_a239457076": {
+    "message": "デバッグ出力:"
+  },
+  "panel_38b6a17864": {
+    "message": "同意と監査"
+  },
+  "panel_94ef5e0fd6": {
+    "message": "下の既定値は未設定のすべてのサイトに適用されます。オリジンごとの一覧で個別のサイトを対象外にできます。"
+  },
+  "panel_6e133ee86d": {
+    "message": "新しいサイトの既定"
+  },
+  "panel_9693a6dbf3": {
+    "message": "金融と政府のサービスは、この設定に関係なく常にブロックされます。出荷時は自動です。オフにすると厳密なオプトインに戻ります。"
+  },
+  "panel_01914d2038": {
+    "message": "オリジンごとの同意"
+  },
+  "panel_96db3ff001": {
+    "message": "ここで上書きしない限り、各サイトは上の既定に従います。サイトをオフにすると FSB はそのサイトで動作しません。"
+  },
+  "panel_48cfb671aa": {
+    "message": "サイトはまだありません。FSB が動作したサイトがここに表示され、オフにできます。新しいサイトは上の既定に従います。"
+  },
+  "panel_2c64c030d4": {
+    "message": "機密"
+  },
+  "panel_18f2a0947f": {
+    "message": "ブロック"
+  },
+  "panel_5f351832fd": {
+    "message": "変更（書き込み）呼び出しを許可"
+  },
+  "panel_45a8c38cdf": {
+    "message": "POST/PUT/PATCH/DELETE の互換メタデータです。自動では、FSB はブロックされていないオリジンで読み書きできます。"
+  },
+  "panel_87b1794408": {
+    "message": "保留中の要求"
+  },
+  "panel_0334c4fb39": {
+    "message": "保留 0 件"
+  },
+  "panel_10fd874b68": {
+    "message": "書き込み"
+  },
+  "panel_47751f88ed": {
+    "message": "監査ログ"
+  },
+  "panel_818cb91030": {
+    "message": "ログを書き出す"
+  },
+  "panel_533e26bdcc": {
+    "message": "ログを消去"
+  },
+  "panel_33b93476cf": {
+    "message": "時刻"
+  },
+  "panel_d3e1c5f8a6": {
+    "message": "オリジン"
+  },
+  "panel_5faf58a69d": {
+    "message": "機能"
+  },
+  "panel_52a0f9b65b": {
+    "message": "メソッド"
+  },
+  "panel_bce87826df": {
+    "message": "副作用"
+  },
+  "panel_d37e0cd00f": {
+    "message": "同意"
+  },
+  "panel_4e80abb5b1": {
+    "message": "結果"
+  },
+  "panel_5934628d0f": {
+    "message": "法務とサービス方針"
+  },
+  "panel_fea0aab06e": {
+    "message": "法的な姿勢を読む →"
+  },
+  "panel_4fc14539b2": {
+    "message": "ブロックされたサービスを見る →"
+  },
+  "panel_efc0b9cac2": {
+    "message": "プライバシーポリシー →"
+  },
+  "panel_bfe73827c5": {
+    "message": "自動サインインを有効にする"
+  },
+  "panel_bbf6a83734": {
+    "message": "資格情報ボールト"
+  },
+  "panel_07dd5f0064": {
+    "message": "ボールトの状態を確認しています..."
+  },
+  "panel_50b231118c": {
+    "message": "ボールトをロック"
+  },
+  "panel_ac22d297f8": {
+    "message": "PIN の長さを選ぶ"
+  },
+  "panel_3e785bbc44": {
+    "message": "4 桁"
+  },
+  "panel_7856e511a2": {
+    "message": "6 桁"
+  },
+  "panel_f246c76813": {
+    "message": "PIN を入力"
+  },
+  "panel_4fa10c7baa": {
+    "message": "PIN を確認"
+  },
+  "panel_73134c8143": {
+    "message": "ボールトを設定"
+  },
+  "panel_872ac152d2": {
+    "message": "解除するには PIN を入力"
+  },
+  "panel_b41986e3f5": {
+    "message": "ボールトのロックを解除"
+  },
+  "panel_c1dc92c680": {
+    "message": "新しく追加"
+  },
+  "panel_35d74dfd8d": {
+    "message": "資格情報を追加"
+  },
+  "panel_85a85dc9a2": {
+    "message": "ウェブサイト / ドメイン"
+  },
+  "panel_657144f3f7": {
+    "message": "ユーザー名 / メール"
+  },
+  "panel_e7cf3ef4f1": {
+    "message": "パスワード"
+  },
+  "panel_6239b93e96": {
+    "message": "メモ（任意）"
+  },
+  "panel_9caa27b9d0": {
+    "message": "この資格情報をサブドメインで許可"
+  },
+  "panel_8816182605": {
+    "message": "例: 次のために保存した資格情報"
+  },
+  "panel_eb1c90412b": {
+    "message": "でも使えます"
+  },
+  "panel_195ab9772f": {
+    "message": "保存した支払い方法を有効にする"
+  },
+  "panel_b45d64e4a3": {
+    "message": "保存した支払い方法"
+  },
+  "panel_a92743920d": {
+    "message": "支払い方法の状態を確認しています..."
+  },
+  "panel_bbc3d7eb41": {
+    "message": "支払い方法をロック"
+  },
+  "panel_24e06db48e": {
+    "message": "パスワードを開く"
+  },
+  "panel_186f818f5f": {
+    "message": "保存した支払い方法のロックを解除"
+  },
+  "panel_82f87079c6": {
+    "message": "カードを追加"
+  },
+  "panel_b610b1ecca": {
+    "message": "支払い方法を追加"
+  },
+  "panel_7cbcb92acd": {
+    "message": "ニックネーム（任意）"
+  },
+  "panel_85dfa9ba97": {
+    "message": "カード選択と保存済みカード一覧に表示されます。"
+  },
+  "panel_d6bc26851d": {
+    "message": "カード名義"
+  },
+  "panel_4566e068a2": {
+    "message": "カード番号"
+  },
+  "panel_b764cdc0ea": {
+    "message": "不明"
+  },
+  "panel_25ec19a82f": {
+    "message": "入力に合わせてカードブランドを自動検出します。"
+  },
+  "panel_43533009b2": {
+    "message": "有効期限の月"
+  },
+  "panel_310ca503ef": {
+    "message": "月"
+  },
+  "panel_ca7aaef8c5": {
+    "message": "有効期限の年"
+  },
+  "panel_8a944d3d0e": {
+    "message": "請求先の名前"
+  },
+  "panel_1b77352e0b": {
+    "message": "請求先住所 1 行目"
+  },
+  "panel_ff2bc02380": {
+    "message": "請求先住所 2 行目（任意）"
+  },
+  "panel_fc33f73246": {
+    "message": "市区町村"
+  },
+  "panel_9630a4b030": {
+    "message": "州 / 地域"
+  },
+  "panel_8198b202a8": {
+    "message": "郵便番号"
+  },
+  "panel_701d021d08": {
+    "message": "国"
+  },
+  "panel_d00eca1bae": {
+    "message": "はじめに"
+  },
+  "panel_c772928cb0": {
+    "message": "FSB でブラウザ自動化の基本を学びます"
+  },
+  "panel_584aa47f13": {
+    "message": "ウェブサイトを開く"
+  },
+  "panel_b50c780ec8": {
+    "message": "ガイド付きセットアップ"
+  },
+  "panel_01c470e51f": {
+    "message": "セットアップをやり直す"
+  },
+  "panel_c205924de0": {
+    "message": "ドキュメント"
+  },
+  "panel_ed16cec106": {
+    "message": "リポジトリを見る"
+  },
+  "panel_4c4a152a2b": {
+    "message": "サポートと FAQ"
+  },
+  "panel_7302582a6f": {
+    "message": "サポートを開く"
+  },
+  "panel_d4a48a753a": {
+    "message": "MCP の設定"
+  },
+  "panel_2df575344e": {
+    "message": "MCP ガイドを見る"
+  },
+  "panel_506ff39462": {
+    "message": "プライバシーポリシー"
+  },
+  "panel_377733b622": {
+    "message": "プライバシーポリシーを見る"
+  },
+  "panel_666067dd37": {
+    "message": "課題"
+  },
+  "panel_cf82dd02e8": {
+    "message": "課題を見る"
+  },
+  "panel_bc47da663d": {
+    "message": "ソースコード"
+  },
+  "panel_6209d4d395": {
+    "message": "GitHub を見る"
+  },
+  "panel_bd4702c187": {
+    "message": "リリースノート"
+  },
+  "panel_1705ccc5a5": {
+    "message": "リリースを見る"
+  },
+  "panel_c011d6097b": {
+    "message": "ライセンス"
+  },
+  "panel_b392d33f2e": {
+    "message": "ライセンスを見る"
+  },
+  "panel_a4b17bc7db": {
+    "message": "保存していない変更があります"
+  },
+  "panel_8e0f9288e2": {
+    "message": "未設定のサイトを FSB がどう扱うかです。自動では、ブロックされていないサイトの認証済み API を FSB が呼び出します（読み書き）。オフでは、先に各サイトを有効にする必要があります。確認するは、承認待ちの要求をキューに入れます。"
+  },
+  "panel_811f8544eb": {
+    "message": "あなたの判断を待っている要求です。許可すると呼び出し元が再試行できます。FSB は承認なしに動作しません。"
+  },
+  "panel_b04eb08367": {
+    "message": "保留中の要求はありません。ツールに同意が必要になるとここに表示されます。上の一覧から事前にアクセスを許可することもできます。"
+  },
+  "panel_1fdd802663": {
+    "message": "機能呼び出しの、秘匿済みで追記のみの記録です。引数、トークン、Cookie、応答本文は保存されません。"
+  },
+  "panel_787513f4fd": {
+    "message": "監査項目はまだありません。オリジンを許可すると、機能呼び出しがここに記録されます。項目は秘匿され、ローカルにだけ保存されます。"
+  },
+  "panel_323d6ff1f1": {
+    "message": "FSB の自動化の姿勢、監査の保持、同意モデルは LEGAL.md に記載されています。一部のオリジンはサービスの拒否リストにより自動化からブロックされます。"
+  },
+  "panel_e31b2a3d3f": {
+    "message": "支援サインイン用の保存済み資格情報と共有ボールトを管理します"
+  },
+  "panel_93f508370d": {
+    "message": "有効にすると、FSB はログインページを検出し、保存した資格情報で自動サインインを提案します"
+  },
+  "panel_10f7c25d31": {
+    "message": "保存した資格情報を守る PIN を選んでください。既存の旧資格情報は自動的に移行されます。"
+  },
+  "panel_50c3db852a": {
+    "message": "ロックを解除すると、パスワードの表示、編集、自動入力、保存ができます。"
+  },
+  "panel_b6680d54b2": {
+    "message": "このブラウザセッションではボールトのロックが解除されています。保存した資格情報は下にあります。"
+  },
+  "panel_8d5ab0fe44": {
+    "message": "自動サインインは現在オフです。保存した資格情報はここで管理できますが、有効にするまで FSB は自動では使いませんし保存しません。"
+  },
+  "panel_c533cc0b87": {
+    "message": "保存した資格情報はまだありません。自動化中にサインインすると自動保存されるか、手動で追加できます。"
+  },
+  "panel_0153e2da59": {
+    "message": "ウェブサイトのドメインを入力（例: github.com、mail.google.com）"
+  },
+  "panel_83c6ad5aef": {
+    "message": "支援チェックアウト用の保存済みカードを管理します。支払い方法はパスワードで設定した資格情報ボールトを共有します。"
+  },
+  "panel_ff7378d58d": {
+    "message": "有効にすると、FSB はチェックアウトページで保存したカードの入力を提案できます。最終的な支払いは自動では送信しません。"
+  },
+  "panel_7d1624ea92": {
+    "message": "保存した支払い方法を管理する前に、資格情報ボールトのロックを解除してください。"
+  },
+  "panel_ad5f8e8263": {
+    "message": "支払い方法のロック解除にボールトの PIN を入力"
+  },
+  "panel_2035e1f48d": {
+    "message": "保存したカードは同じ暗号化ボールトを使いますが、このブラウザセッションでチェックアウトを埋める前に別途ロック解除が必要です。"
+  },
+  "panel_0ec4dc2534": {
+    "message": "このブラウザセッションでは保存した支払い方法のロックが解除されています。FSB は検出したチェックアウトページで保存カードの入力を提案できますが、最終支払いは自動では送信しません。"
+  },
+  "panel_5d38d8a7cf": {
+    "message": "保存した支払い方法は現在オフです。保存したカードはここで管理できますが、機能を有効にするまで FSB はチェックアウトで提案しません。"
+  },
+  "panel_2fd67f06e0": {
+    "message": "保存した支払い方法はまだありません。ここにカードを追加すると、支払いアクセスのロック解除後に FSB がチェックアウトページで提案できます。"
+  },
+  "panel_928895f662": {
+    "message": "CVV と請求プロファイルのデータはローカルのボールト内に暗号化して保存されます。この機能を使う前に、端末の安全性を確認してください。"
+  },
+  "panel_39d561254a": {
+    "message": "カードを保存"
+  },
+  "panel_e4d896bcce": {
+    "message": "ヘルプを見て FSB の機能をさらに知る"
+  },
+  "panel_32623395c6": {
+    "message": "オンボーディングをやり直して、プロバイダーまたは MCP の設定を変更します"
+  },
+  "panel_db4cec18bf": {
+    "message": "FSB の完全なドキュメントとセットアップガイド"
+  },
+  "panel_63dfe63d28": {
+    "message": "FAQ を見て、よくある接続の問題を直します"
+  },
+  "panel_d2286811e6": {
+    "message": "Claude Code や Cursor などの MCP クライアントを接続し、doctor コマンドで確認します"
+  },
+  "panel_f3cb441c27": {
+    "message": "FSB がデータ、保存、任意のサーバー同期をどう扱うかを読みます"
+  },
+  "panel_476481e410": {
+    "message": "不具合の報告、機能の要望、開発の進捗確認ができます"
+  },
+  "panel_89b47ad370": {
+    "message": "ソースコードを見て FSB の開発に参加します"
+  },
+  "panel_f775bb5cbf": {
+    "message": "各 FSB リリースの新機能と変更点を見ます"
+  },
+  "panel_8abc0aef4e": {
+    "message": "FSB は MIT ライセンスのオープンソースです"
+  },
+  "panel_e235f8135c": {
+    "message": "ほかの FSB ユーザーと一緒に更新をフォローします"
+  },
+  "panel_53e5555e9a": {
+    "message": "秘密を含む項目と機密入力を秘匿したうえで、再生データをローカルに保存します。通常の入力テキストと操作結果は再生に使えます。MCP クライアントは、秘密を含まない完了、部分、失敗の要約を渡してローカルのタスクメモリを保存できます。別の AI プロバイダー呼び出しは行いません。オフにすると今後の MCP 記録が止まり、開いている記録は保存されます。既存の MCP 再生履歴は最新 50 セッションまで保持し、設定した保持期間を超えるセッションは残しません。オートパイロットの履歴には影響しません。"
+  },
+  "panel_65b7096b6d": {
+    "message": "このオリジンでは自動化が禁止されています。"
+  },
+  "panel_d50f8b527c": {
+    "message": "機密オリジンです。機能の呼び出しは自動で実行できます。ネットワークキャプチャによる発見には引き続き確認が必要です。"
+  },
+  "panel_47d2a515ef": {
+    "message": "読み込み中..."
+  },
+  "panel_90e89ecfe7": {
+    "message": "次の 500 件を読み込む"
+  },
+  "panel_935f2565d7": {
+    "message": "イベントの読み込みを再試行"
+  },
+  "panel_4eee87e82f": {
+    "message": "ボールトサービスに到達できません"
+  },
+  "panel_08bf951eda": {
+    "message": "ボールトが未設定です。保存した資格情報を守るために作成してください。"
+  },
+  "panel_949bcb5f38": {
+    "message": "ボールトはロックされています。"
+  },
+  "panel_30cef3bfb8": {
+    "message": "このセッションではボールトのロックが解除されています。"
+  },
+  "panel_05dc3c4c0a": {
+    "message": "ボールトの状態確認でエラーが発生しました。"
+  },
+  "panel_890a216b7c": {
+    "message": "ロック解除中..."
+  },
+  "panel_def70944c9": {
+    "message": "作成中..."
+  },
+  "panel_93ad91e855": {
+    "message": "先に資格情報ボールトのロックを解除してください。"
+  },
+  "panel_8221f05f8b": {
+    "message": "支払い方法はロックされています。"
+  },
+  "panel_0b4ba676b0": {
+    "message": "このセッションでは支払い方法のロックが解除されています。"
+  },
+  "panel_b82d31b688": {
+    "message": "支払い状態の確認でエラーが発生しました。"
+  },
+  "panel_b197ab1d9b": {
+    "message": "先にパスワードでボールトの PIN を設定してください。"
+  },
+  "panel_160419ae70": {
+    "message": "支払い方法のロックは解除されています。"
+  },
+  "panel_507fc32dc5": {
+    "message": "エージェントを編集"
+  },
+  "panel_fb25598ed0": {
+    "message": "新しいエージェントを作成"
+  },
+  "panel_6c02a28421": {
+    "message": "テスト中..."
+  },
+  "panel_22965568d2": {
+    "message": "接続済み"
+  },
+  "panel_ee172faa9c": {
+    "message": "無効な鍵"
+  },
+  "panel_031a8f0f65": {
+    "message": "失敗"
+  },
+  "panel_424a2551d3": {
+    "message": "期限切れ"
+  },
+  "panel_c7730178f4": {
+    "message": "新しいコードを生成"
+  },
+  "panel_ac116124f7": {
+    "message": "ペアリングコードを生成できませんでした。もう一度試してください。"
+  },
+  "panel_d03fd96d28": {
+    "message": "読み込み済みのモデルを選ぶ..."
+  },
+  "panel_e189657f5a": {
+    "message": "一致するモデルがありません"
+  },
+  "entry_step": {
+    "message": "ステップ $CURRENT$ / $TOTAL$",
+    "placeholders": {
+      "current": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "entry_label_welcome": {
+    "message": "ようこそ"
+  },
+  "entry_label_path": {
+    "message": "経路"
+  },
+  "entry_label_mcp": {
+    "message": "MCP 接続"
+  },
+  "entry_label_provider": {
+    "message": "プロバイダー"
+  },
+  "entry_label_apikey": {
+    "message": "API キー"
+  },
+  "entry_label_setup": {
+    "message": "セットアップ"
+  },
+  "entry_label_pin": {
+    "message": "ピン留め"
+  },
+  "entry_label_done": {
+    "message": "完了"
+  },
+  "entry_future_lead": {
+    "message": "これからの"
+  },
+  "entry_future_word": {
+    "message": "自律"
+  },
+  "entry_future_tail": {
+    "message": "ブラウジング。"
+  },
+  "entry_welcome_sub": {
+    "message": "正しい選択です。エージェントは最高の自律ブラウジングエンジンを使います。DOM の精度だけで、画像認識も推測もありません。見えないクリックには戻りません。"
+  },
+  "entry_feat_api": {
+    "message": "直接 API"
+  },
+  "entry_feat_api_sub": {
+    "message": "クリックだけでなくアプリと話します"
+  },
+  "entry_feat_guides": {
+    "message": "130 以上のガイド"
+  },
+  "entry_feat_guides_sub": {
+    "message": "17 カテゴリにわたります"
+  },
+  "entry_feat_tools": {
+    "message": "68 個の MCP ツール"
+  },
+  "entry_feat_tools_sub": {
+    "message": "コーディングエージェントから"
+  },
+  "entry_get_started": {
+    "message": "はじめる"
+  },
+  "entry_skip_setup": {
+    "message": "セットアップを今はスキップ"
+  },
+  "entry_pick_path": {
+    "message": "経路を選ぶ"
+  },
+  "entry_how_run": {
+    "message": "FSB をどう実行しますか？"
+  },
+  "entry_two_ways": {
+    "message": "入り方は二つです。今ひとつ設定し、もうひとつは設定でいつでも追加できます。"
+  },
+  "entry_agent": {
+    "message": "エージェント"
+  },
+  "entry_recommended": {
+    "message": "推奨"
+  },
+  "entry_agent_desc": {
+    "message": "Claude Code、Cursor、VS Code、OpenClaw などで FSB を MCP サーバーとして使います。ツール 68 個、API キー不要、ブラウザの設定も不要です。"
+  },
+  "entry_in_browser": {
+    "message": "このブラウザで"
+  },
+  "entry_byok": {
+    "message": "自分の鍵"
+  },
+  "entry_byok_desc": {
+    "message": "サイドパネルで FSB とチャットします。xAI、Anthropic、Google の鍵を持参するか、鍵なしのローカルモデルを使います。"
+  },
+  "entry_most_people": {
+    "message": "多くの人は、FSB を最も速く安く使う MCP から始めます。"
+  },
+  "entry_skip_mcp": {
+    "message": "MCP へ進む"
+  },
+  "entry_mcp_eyebrow": {
+    "message": "推奨経路 / MCP"
+  },
+  "entry_install_h": {
+    "message": "FSB の MCP サーバーをインストール"
+  },
+  "entry_one_command": {
+    "message": "コマンドは一つ。エージェントを選ぶと FSB が自動登録します。API キーは不要です。"
+  },
+  "entry_one_command_short": {
+    "message": "コマンドは一つ。エージェントを選ぶ。"
+  },
+  "entry_copy_command": {
+    "message": "コマンドをコピー"
+  },
+  "entry_copy_install": {
+    "message": "インストールコマンドをコピー"
+  },
+  "entry_mcp_1a": {
+    "message": "ターミナルでコマンドを実行します。"
+  },
+  "entry_mcp_1b": {
+    "message": "コピーに合わせる"
+  },
+  "entry_mcp_1c": {
+    "message": "と特定のクライアントを選べます。"
+  },
+  "entry_mcp_2a": {
+    "message": "FSB はエージェントの MCP 設定へ自分を書き込みます。"
+  },
+  "entry_mcp_2b": {
+    "message": "ツール 68 個"
+  },
+  "entry_mcp_2c": {
+    "message": "、手動の JSON は不要です。"
+  },
+  "entry_mcp_3": {
+    "message": "エージェントに閲覧を頼むと、FSB の DOM エンジンを動かします。"
+  },
+  "entry_claw_name": {
+    "message": "Claw 向けに設定"
+  },
+  "entry_claw_desc": {
+    "message": "コントロールパネルでの OpenClaw ガイド付きインストール"
+  },
+  "entry_prefer_key": {
+    "message": "自分の鍵を使いますか？"
+  },
+  "entry_byok_eyebrow": {
+    "message": "ブラウザ内 / 自分の鍵"
+  },
+  "entry_choose_provider": {
+    "message": "AI プロバイダーを選ぶ"
+  },
+  "entry_dont_need": {
+    "message": "これは実際には不要です。"
+  },
+  "entry_best_way": {
+    "message": "FSB は MCP で使うのが最適です。鍵も費用の上限もありません。"
+  },
+  "entry_setup_mcp": {
+    "message": "代わりに MCP を設定"
+  },
+  "entry_once_key": {
+    "message": "鍵を設定すると、FSB は使えるテキストモデルを自動で一覧します。"
+  },
+  "entry_key_heading": {
+    "message": "$NAME$ の鍵を追加",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_optional": {
+    "message": "この手順は任意です。"
+  },
+  "entry_shines": {
+    "message": "FSB は MCP で最も力を発揮するので、鍵は完全に省略できます。"
+  },
+  "entry_skip_use_mcp": {
+    "message": "スキップして MCP を使う"
+  },
+  "entry_checking": {
+    "message": "確認しています..."
+  },
+  "entry_continue": {
+    "message": "続ける"
+  },
+  "entry_almost": {
+    "message": "もう少しです"
+  },
+  "entry_pin_h": {
+    "message": "FSB をピン留めしてワンクリックに"
+  },
+  "entry_pin_sub": {
+    "message": "手順はこれだけです。Chrome がインストールした瞬間に FSB の許可は自動でオンになります。切り替えるものはありません。"
+  },
+  "entry_other_ext": {
+    "message": "ほかの拡張機能"
+  },
+  "entry_pinned": {
+    "message": "FSB をピン留めしました"
+  },
+  "entry_ive_pinned": {
+    "message": "FSB をピン留めしました"
+  },
+  "entry_skip_step": {
+    "message": "この手順をスキップ"
+  },
+  "entry_all_set": {
+    "message": "準備ができました。"
+  },
+  "entry_ready_sub": {
+    "message": "FSB の準備ができました。これが設定です。あとで設定から変更できます。"
+  },
+  "entry_running": {
+    "message": "FSB は実行中です"
+  },
+  "entry_open": {
+    "message": "FSB を開く"
+  },
+  "entry_more": {
+    "message": "FSB について知ることはまだたくさんあります。見る場所は"
+  },
+  "entry_control_panel": {
+    "message": "コントロールパネル"
+  },
+  "entry_docs": {
+    "message": "ドキュメント"
+  },
+  "entry_back": {
+    "message": "戻る"
+  },
+  "entry_sum_setup": {
+    "message": "セットアップ"
+  },
+  "entry_sum_mcp": {
+    "message": "MCP サーバー"
+  },
+  "entry_sum_command": {
+    "message": "コマンド"
+  },
+  "entry_sum_tools": {
+    "message": "ツール"
+  },
+  "entry_sum_68": {
+    "message": "68 個が利用可能"
+  },
+  "entry_sum_access": {
+    "message": "アクセス"
+  },
+  "entry_sum_granted": {
+    "message": "インストール時に許可"
+  },
+  "entry_sum_version": {
+    "message": "バージョン"
+  },
+  "entry_sum_byok": {
+    "message": "ブラウザ内の自分の鍵"
+  },
+  "entry_sum_provider": {
+    "message": "プロバイダー"
+  },
+  "entry_sum_apikey": {
+    "message": "API キー"
+  },
+  "entry_sum_none": {
+    "message": "未設定"
+  },
+  "entry_sum_tip": {
+    "message": "ヒント"
+  },
+  "entry_sum_finish": {
+    "message": "設定でセットアップを終える"
+  },
+  "entry_free_tier": {
+    "message": "無料枠"
+  },
+  "entry_local_nokey": {
+    "message": "ローカル / 鍵なし"
+  },
+  "entry_all_clients": {
+    "message": "すべてのクライアント"
+  },
+  "entry_discovering": {
+    "message": "読み込み済みのチャットモデルを探しています..."
+  },
+  "entry_waiting_url": {
+    "message": "サーバー URL が安定するのを待っています..."
+  },
+  "entry_choose_model": {
+    "message": "読み込み済みのモデルを選ぶ..."
+  },
+  "entry_paste_key": {
+    "message": "$NAME$ の API キーを貼り付け",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_toggle_key": {
+    "message": "鍵の表示を切り替える"
+  },
+  "entry_key_valid": {
+    "message": "末尾が $LAST$ の鍵は有効です",
+    "placeholders": {
+      "last": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_key_required": {
+    "message": "$NAME$ の API キーが必要です",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_discovering_models": {
+    "message": "モデルを探しています..."
+  },
+  "entry_no_models": {
+    "message": "互換性のあるモデルがありません"
+  },
+  "entry_get_key": {
+    "message": "鍵の取得先"
+  },
+  "entry_stored_locally": {
+    "message": "このブラウザにローカル保存されます。"
+  },
+  "entry_paste_clip": {
+    "message": "クリップボードから貼り付け"
+  },
+  "entry_unlock_title": {
+    "message": "FSB のロックを解除"
+  },
+  "entry_unlock_h": {
+    "message": "ボールトのロックを解除"
+  },
+  "entry_unlock_sub": {
+    "message": "解除するには PIN を入力"
+  },
+  "entry_unlock": {
+    "message": "ロック解除"
+  },
+  "entry_unlocking": {
+    "message": "ロック解除中..."
+  },
+  "entry_unlock_failed": {
+    "message": "ロック解除に失敗しました"
+  },
+  "entry_no_vault": {
+    "message": "ボールトが未設定です。先にセットアップを実行してください。"
+  },
+  "entry_bad_pin": {
+    "message": "PIN が違います"
+  },
+  "entry_comm_error": {
+    "message": "通信エラーです。もう一度試してください。"
+  },
+  "entry_first_setup": {
+    "message": "初めてですか？セットアップを実行"
+  },
+  "entry_mic_title": {
+    "message": "FSB のマイクを有効にする"
+  },
+  "entry_mic_brand": {
+    "message": "FSB 音声入力"
+  },
+  "entry_mic_h": {
+    "message": "マイクを有効にする"
+  },
+  "entry_mic_intro": {
+    "message": "Chrome は最初のマイク許可を通常の拡張機能タブで求めます。その後は、どのサイトでも FSB サイドパネルから音声入力できます。"
+  },
+  "entry_mic_instruction_lead": {
+    "message": "Chrome の確認で"
+  },
+  "entry_mic_instruction_action": {
+    "message": "アクセス中は許可"
+  },
+  "entry_mic_instruction_tail": {
+    "message": "を選ぶと、FSB の許可が維持されます。"
+  },
+  "entry_mic_waiting": {
+    "message": "Chrome のマイク確認を待っています…"
+  },
+  "entry_mic_allow": {
+    "message": "マイクを許可"
+  },
+  "entry_mic_settings": {
+    "message": "マイク設定を開く"
+  },
+  "entry_mic_footnote": {
+    "message": "この許可は FSB 拡張機能のもので、表示中のサイトのものではありません。"
+  },
+  "entry_mic_try": {
+    "message": "もう一度試す"
+  },
+  "entry_mic_no_api": {
+    "message": "この Chrome では拡張機能がマイクを使えません。"
+  },
+  "entry_mic_enabled": {
+    "message": "マイクを有効にしました。FSB に戻ります…"
+  },
+  "entry_mic_blocked": {
+    "message": "FSB のマイクアクセスはブロックされています。Chrome のマイク設定を開き、ブロックされた FSB を削除してから再試行してください。"
+  },
+  "entry_mic_none": {
+    "message": "マイクが見つかりません。入力装置を接続または有効にしてから再試行してください。"
+  },
+  "entry_mic_busy": {
+    "message": "マイクは使用中か利用できません。ほかの録音アプリを閉じてから再試行してください。"
+  },
+  "entry_mic_macos": {
+    "message": "Chrome はマイクにアクセスできませんでした。macOS では、システム設定 → プライバシーとセキュリティ → マイクで Google Chrome を有効にしてから再試行してください。"
+  },
+  "entry_mic_generic": {
+    "message": "FSB はマイクにアクセスできませんでした。Chrome と macOS のマイク設定を確認してから再試行してください。"
+  },
+  "entry_mic_manual": {
+    "message": "アドレスバーで chrome://settings/content/microphone を開き、ブロックされた FSB を削除してください。"
+  },
+  "entry_automating": {
+    "message": "FSB が自動化中"
+  },
+  "entry_stop": {
+    "message": "停止"
+  },
+  "entry_planning": {
+    "message": "計画中"
+  },
+  "entry_initializing": {
+    "message": "初期化しています..."
+  },
+  "entry_done_pill": {
+    "message": "完了"
+  },
+  "entry_actions": {
+    "message": "操作: $COUNT$",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_replay_controls": {
+    "message": "再生コントロール"
+  },
+  "entry_pause_replay": {
+    "message": "再生を一時停止"
+  },
+  "entry_replay_position": {
+    "message": "再生位置。先へだけ移動できます"
+  },
+  "entry_seek_forward": {
+    "message": "再生を先へ移動"
+  },
+  "entry_replay_speed": {
+    "message": "再生速度 $SPEED$。有効にすると $NEXT$ に変わります",
+    "placeholders": {
+      "speed": {
+        "content": "$1"
+      },
+      "next": {
+        "content": "$2"
+      }
+    }
+  },
+  "entry_replay_speed_title": {
+    "message": "再生速度: $SPEED$（クリックで変更）",
+    "placeholders": {
+      "speed": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_inspect": {
+    "message": "調べる要素をクリック"
+  },
+  "entry_selectors": {
+    "message": "FSB が試すセレクター"
+  },
+  "entry_attributes": {
+    "message": "属性"
+  },
+  "entry_interact": {
+    "message": "操作可能性"
+  },
+  "entry_position": {
+    "message": "位置"
+  },
+  "entry_inspector": {
+    "message": "FSB インスペクターモード（終了は Ctrl+Shift+E）"
+  },
+  "entry_crawling": {
+    "message": "$DOMAIN$ を巡回中",
+    "placeholders": {
+      "domain": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_pages": {
+    "message": "$COLLECTED$ / $MAX$ ページ",
+    "placeholders": {
+      "collected": {
+        "content": "$1"
+      },
+      "max": {
+        "content": "$2"
+      }
+    }
+  },
+  "entry_toast_ready": {
+    "message": "FSB の準備ができました。サイドパネルを開きます"
+  },
+  "entry_toast_opened": {
+    "message": "FSB のサイドパネルを開きました"
+  },
+  "entry_toast_popup": {
+    "message": "ポップアップウィンドウで FSB を開いています"
+  },
+  "entry_toast_copied": {
+    "message": "インストールコマンドをコピーしました"
+  },
+  "entry_onboarding_tag": {
+    "message": "初期設定"
+  },
+  "copy_26b2f925d8": {
+    "message": "FSB - サイドパネル"
+  },
+  "copy_9ca9c869e9": {
+    "message": "ファイルの編集、シェルコマンドの実行、任意の URL の取得はできません。"
+  },
+  "copy_65974683e8": {
+    "message": "今後の実行で $NAME$ を信頼する",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_a9780e01fc": {
+    "message": "このブラウザでの今後の $NAME$ 実行について確認をオフにします。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_88cad98751": {
+    "message": "確認の設定を保存できませんでした。再試行するか、信頼せずに続行してください。"
+  },
+  "copy_b6b3428299": {
+    "message": "エージェントを開始できませんでした。権限を確認して再試行してください。"
+  },
+  "copy_02df469915": {
+    "message": "$NAME$ を許可して開始",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_63b90cc26c": {
+    "message": "ネイティブヘルパーは別の拡張機能とペアリングされています"
+  },
+  "copy_606b6c7b99": {
+    "message": "ネイティブヘルパーのペアリングをリセットしてから、このメッセージを再試行してください。FSB がこの拡張機能を自動的にペアリングします。"
+  },
+  "copy_4662e7e99e": {
+    "message": "リセットコマンドをコピー"
+  },
+  "copy_7d6ee224d7": {
+    "message": "ローカルエージェントのセッションを利用できません"
+  },
+  "copy_abc3c6a9b5": {
+    "message": "doctor コマンドを実行し、求められたらローカルの FSB サービスを再起動してから、このメッセージを再試行してください。"
+  },
+  "copy_392182513b": {
+    "message": "選択したプロバイダーは、ブラウザのタブを操作するエージェントに対応していません。対応するエージェントプロバイダーを選んで、このメッセージを再試行してください。"
+  },
+  "copy_664ba782e6": {
+    "message": "ローカルで $NAME$ にサインインしてから、このメッセージを再試行してください。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_1c5510dd75": {
+    "message": "接続テストは委任実行を開始しないため、成功することがあります。メッセージを再試行するか、プロバイダー設定を確認してください。"
+  },
+  "copy_266c761925": {
+    "message": "エージェントはこのタスクを開始できませんでした"
+  },
+  "copy_6271a1aa0b": {
+    "message": "このメッセージを入力欄に残し、プロバイダー設定を確認して再試行してください。"
+  },
+  "copy_07eab3e346": {
+    "message": "デーモン再起動後にエージェントの実行が終了しました"
+  },
+  "copy_00143d759f": {
+    "message": "エージェントはこのタスクを完了できませんでした"
+  },
+  "copy_81dfbf1a8a": {
+    "message": "エージェント接続が失われました"
+  },
+  "copy_c1db132cee": {
+    "message": "エージェントの後処理に対応が必要です"
+  },
+  "copy_66defff597": {
+    "message": "エージェントは制御を再開できませんでした"
+  },
+  "copy_f5bb81be63": {
+    "message": "FSB はこの実行を受け付けましたが保存できず、停止も確認されていません。"
+  },
+  "copy_1c86e2b334": {
+    "message": "以前のエージェントプロセスは停止され、再接続されませんでした。ローカルサービスが準備できたら新しいタスクを開始してください。"
+  },
+  "copy_1a103bf447": {
+    "message": "新しいタスクを開始"
+  },
+  "copy_6c845be6a5": {
+    "message": "FSB はローカルエージェントサービスからの応答を 3 回受け取りませんでした。この実行を安全に続行できません。"
+  },
+  "copy_4cf5603fc8": {
+    "message": "FSB ネイティブヘルパーをインストールまたは更新してから再試行してください。FSB がこのブラウザを自動的に接続します。"
+  },
+  "copy_87db7a3927": {
+    "message": "FSB はこのタブを $NAME$ に戻せなかったため、実行は終了し、タブはあなたの制御下に残っています。準備ができたら新しいタスクを開始してください。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_d1708202db": {
+    "message": "メッセージを再試行"
+  },
+  "copy_39ccfe7853": {
+    "message": "自動化を実行中です"
+  },
+  "copy_e609da84a5": {
+    "message": "このタブでは自動化の制御を利用できなくなりました。"
+  },
+  "copy_a6b6ef6c4e": {
+    "message": "停止を確認できませんでした。以前のエージェント状態がまだ表示されています。"
+  },
+  "copy_ba4af741ad": {
+    "message": "元のメッセージは残っています。停止を再試行して後処理を終えてください。"
+  },
+  "copy_e71b7995e6": {
+    "message": "FSB はこのエージェント実行を保存できませんでした。その実行の停止は確認され、メッセージは保持されています。再試行してください。"
+  },
+  "copy_ee776a7565": {
+    "message": "別のタスクを始める前に、元のタブと会話で保留中のエージェント後処理を終えてください。メッセージは保持されています。"
+  },
+  "copy_b3715a6900": {
+    "message": "FSB はこのタブを $NAME$ に戻せなかったため、実行は終了し、タブはあなたの制御下に残っています。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_47220517c7": {
+    "message": "FSB のローカルヘルパーがインストールされていません。実行: npx -y fsb-mcp-server@latest install --native-host"
+  },
+  "copy_d0b5d103f7": {
+    "message": "$DOMAIN$ の偵察を開始しています...",
+    "placeholders": {
+      "domain": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_7654da628e": {
+    "message": "偵察を開始できませんでした: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_ca79bcd4d7": {
+    "message": "偵察が完了しました。$DOMAIN$ のサイトマップを保存しました。",
+    "placeholders": {
+      "domain": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_0f654a723b": {
+    "message": "自動化は完了しましたが、要約がありません。タスクが期待どおりに完了していない場合は再試行してください。"
+  },
+  "copy_b6c7f59d4f": {
+    "message": "ログインページを検出しました..."
+  },
+  "copy_43d71bc905": {
+    "message": "この購入手続きでは保存済みの支払い方法を利用できません。"
+  },
+  "copy_e46796d601": {
+    "message": "保存済みのカードはありません"
+  },
+  "copy_40a0d5700e": {
+    "message": "保管庫の設定が必要です"
+  },
+  "copy_eef91deafe": {
+    "message": "支払いアクセスはロックされています"
+  },
+  "copy_583fe8b004": {
+    "message": "保存済みの支払いは利用できません"
+  },
+  "copy_5932e9b23f": {
+    "message": "請求先プロフィールを保存しました"
+  },
+  "copy_fbbc8ab36d": {
+    "message": "保存済みのカードを入力しています..."
+  },
+  "copy_e09653448c": {
+    "message": "重複の可能性がある書き込みの前に再生を一時停止しました。"
+  },
+  "copy_a378a72986": {
+    "message": "再生の判断に失敗しました"
+  },
+  "copy_aacf80d079": {
+    "message": "再生ステップを再試行しています..."
+  },
+  "copy_8e731074ee": {
+    "message": "再生ステップをスキップしています..."
+  },
+  "copy_2d7848007e": {
+    "message": "再生の判断を適用できませんでした: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_0d3db7357d": {
+    "message": "ブロック済み · 伏せた入力"
+  },
+  "copy_4916a64c38": {
+    "message": "MCP クライアントがこの再生を $COUNT$ 個の新しいタブで要求しました。",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_c15b9f2acd": {
+    "message": "MCP クライアントがこの再生を $COUNT$ 個の新しいタブで要求しました。",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_552d4905b4": {
+    "message": "1 回の承認は検証済みのマニフェストそのものだけを対象とし、影響の大きいステップ $COUNT$ 個を含みます。",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_4c946b4834": {
+    "message": "1 回の承認は検証済みのマニフェストそのものだけを対象とし、影響の大きいステップ $COUNT$ 個を含みます。",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_9240c9c130": {
+    "message": "1 回の承認は検証済みのマニフェストそのものだけを対象とします。"
+  },
+  "copy_b0802ca35d": {
+    "message": "記録された再生タブを開いています..."
+  },
+  "copy_c8a00bd3b5": {
+    "message": "再生を開始できませんでした"
+  },
+  "copy_1a0ef83852": {
+    "message": "要求された再生を開始できませんでした: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_98db9dc8c5": {
+    "message": "再生のキャンセルに失敗しました"
+  },
+  "copy_4ed0e5ecba": {
+    "message": "再生リクエストをキャンセルできませんでした: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_0d9f4051eb": {
+    "message": "再生の検証に失敗しました"
+  },
+  "copy_fc1f569fa7": {
+    "message": "この記録は検査専用です。記録された呼び出し $TOTAL$ 件のうち最新の $LATEST$ 件だけが利用できます。それより前のブラウザ状態は安全に再構成できません。",
+    "placeholders": {
+      "latest": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "copy_a2f62124e7": {
+    "message": "検証済みのタイムラインを $COUNT$ 個の新しいタブで再生しますか？",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_4c55f6bc6e": {
+    "message": "検証済みのタイムラインを $COUNT$ 個の新しいタブで再生しますか？",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_dea4fcd3a0": {
+    "message": "この 1 回の承認は、署名済みマニフェストそのものを対象とします: $DETAIL$。",
+    "placeholders": {
+      "detail": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_82e80a0531": {
+    "message": "タイムラインには読み取りとナビゲーションのステップだけが含まれます。"
+  },
+  "copy_99b908db8f": {
+    "message": "新しい再生タブを開いています..."
+  },
+  "copy_b33e852b38": {
+    "message": "再生を開始できませんでした。"
+  },
+  "copy_816797656b": {
+    "message": "再生を開始できませんでした: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_6a7fdeaea6": {
+    "message": "セッション履歴を削除できませんでした"
+  },
+  "copy_f50146d7ac": {
+    "message": "キャプチャの検証に失敗しました"
+  },
+  "copy_8249b3f554": {
+    "message": "キャプチャは検証待ちです"
+  },
+  "copy_712090559d": {
+    "message": "セッションを読み込めませんでした: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_c249c35164": {
+    "message": "すべてのセッション履歴を削除しますか？この操作は元に戻せません。"
+  },
+  "copy_357bab7911": {
+    "message": "セッション履歴を消去できませんでした"
+  },
+  "copy_0d3875c352": {
+    "message": "タスクは一部完了しました"
+  },
+  "copy_2786eaaa0e": {
+    "message": "推奨値に戻す ($COUNT$)",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_03cea39622": {
+    "message": "下にモデル名を入力してください"
+  },
+  "copy_df3a34abef": {
+    "message": "FSB は別の非公開 Grok プロフィールを使います。ブラウザの OAuth で SuperGrok を接続します。API キーやモデル選択は使いません。"
+  },
+  "copy_5eb9258e1b": {
+    "message": "ブラウザの OAuth で接続しました"
+  },
+  "copy_4ebee382f9": {
+    "message": "サインイン状態を取得できません"
+  },
+  "copy_ee531932b4": {
+    "message": "Grok のサインインを開いています..."
+  },
+  "copy_e591c14068": {
+    "message": "ブラウザのサインインを待っています..."
+  },
+  "copy_82d261c870": {
+    "message": "タスクの実行中は Grok Build を切断できませんでした"
+  },
+  "copy_ab442992e8": {
+    "message": "Grok Build が時間内に切断へ応答しませんでした。再試行する前にサインイン状態を確認してください。"
+  },
+  "copy_10e5c2a8ad": {
+    "message": "Grok Build を切断できませんでした。再試行してください。"
+  },
+  "copy_2becee5507": {
+    "message": "Grok Build を切断できませんでした。ローカルエージェントサービスを利用できません"
+  },
+  "copy_1d29342190": {
+    "message": "Grok Build が時間内にサインインへ応答しませんでした。再試行する前に状態を更新してください。"
+  },
+  "copy_b0fca87a8b": {
+    "message": "Grok Build にサインインできませんでした。ローカルエージェントサービスを利用できません"
+  },
+  "copy_90ac4e0d62": {
+    "message": "インストールされている Grok CLI が FSB の対応バージョンではないため、Grok Build のサインインはブロックされています。アカウントに問題はありません。互換性バッジを確認し、対応する CLI をインストールしてください。"
+  },
+  "copy_9144f84f5c": {
+    "message": "タスクの実行中は Grok Build にサインインできません。実行が終わるまで待ってから再試行してください。"
+  },
+  "copy_ca4a99be2b": {
+    "message": "以前のセッションを片付けられなかったため、サインインはブロックされています。状態を更新して後処理を再試行してください。"
+  },
+  "copy_28c4c69520": {
+    "message": "Grok CLI が FSB の求める厳密なサンドボックスでは起動しなかったため、サインインはブロックされています。CLI はインストール済みで、アカウントに問題はありません。"
+  },
+  "copy_0b9a54a7f8": {
+    "message": "FSB は Grok CLI を実行できませんでした。インストールを確認してから状態を更新してください。"
+  },
+  "copy_3f7ae97289": {
+    "message": "Grok Build のサインインがキャンセルされました"
+  },
+  "copy_6725ea7cca": {
+    "message": "Grok Build のサインインが完了しませんでした"
+  },
+  "copy_80d9a75cd7": {
+    "message": "Grok Build が非公開の FSB プロフィールに接続しました"
+  },
+  "copy_ec4c183761": {
+    "message": "Grok Build のサインインに失敗しました"
+  },
+  "copy_53296a80a3": {
+    "message": "非公開の FSB Grok Build プロフィールを切断しますか？通常の Grok ログインは変わりません。"
+  },
+  "copy_ca0786266f": {
+    "message": "Grok Build が FSB から切断されました"
+  },
+  "copy_eb14344a7c": {
+    "message": "読み込み済みのモデルを使用しています"
+  },
+  "copy_97e5afb52c": {
+    "message": "新しいタスクを始める前に、別の AI プロバイダーを選んで保存してください"
+  },
+  "copy_682cc533d5": {
+    "message": "AI プロバイダーが必要です"
+  },
+  "copy_0947800d1f": {
+    "message": "保存する前に LM Studio のチャットモデルを読み込んで選択してください"
+  },
+  "copy_eec68a3001": {
+    "message": "LM Studio のモデルが必要です"
+  },
+  "copy_79b57ba0c8": {
+    "message": "LM Studio を起動し、チャットモデルを読み込んでから更新して選択してください。"
+  },
+  "copy_6dd8239043": {
+    "message": "このプロバイダーを保存する前に API キーを入力してください"
+  },
+  "copy_14249339ac": {
+    "message": "保存する前に、このプロバイダーから利用可能なモデルを読み込んでください"
+  },
+  "copy_3b855d546e": {
+    "message": "API キーが必要です"
+  },
+  "copy_32afa3cc46": {
+    "message": "モデル一覧が必要です"
+  },
+  "copy_954e78bbdc": {
+    "message": "API キーが必要です"
+  },
+  "copy_074a372298": {
+    "message": "設定を保存しました"
+  },
+  "copy_cdb46a2041": {
+    "message": "接続をテストする前に LM Studio のチャットモデルを読み込んで選択してください。"
+  },
+  "copy_8332d4b3d9": {
+    "message": "API キーが設定されていません"
+  },
+  "copy_6bec306893": {
+    "message": "API キーなし"
+  },
+  "copy_ec6c5d7132": {
+    "message": "始めるには $NAME$ の API キーを設定してください",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_59b831ea1c": {
+    "message": "API キーが必要です"
+  },
+  "copy_7e4840a26d": {
+    "message": "接続をテストする前に、現在のモデル一覧を読み込んでください。"
+  },
+  "copy_220b5a97ab": {
+    "message": "不明なブリッジエラー"
+  },
+  "copy_a45a37ddcc": {
+    "message": "接続テストに失敗しました"
+  },
+  "copy_ad0770f1aa": {
+    "message": "インストール済みで互換性あり: Grok Build 1.0.4。分離、ACP、キャッシュされた OAuth の確認はプロンプトを送らずに成功しました。"
+  },
+  "copy_aab517a207": {
+    "message": "互換性の確認に失敗しました: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_b33e732cc1": {
+    "message": "ログをエクスポートしました"
+  },
+  "copy_11eb704622": {
+    "message": "$ORIGIN$ の同意モード",
+    "placeholders": {
+      "origin": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_7655b9531e": {
+    "message": "監査ログを利用できません"
+  },
+  "copy_07856dc7ea": {
+    "message": "監査ログをエクスポートしました"
+  },
+  "copy_1945edab68": {
+    "message": "監査ログのエクスポートに失敗しました"
+  },
+  "copy_27efbed83b": {
+    "message": "監査ログを消去します。ローカルの監査項目がすべて完全に削除されます。控えが必要なら先にエクスポートしてください。続行しますか？"
+  },
+  "copy_1b9414c45e": {
+    "message": "監査ログを消去しました"
+  },
+  "copy_5e4c340bf4": {
+    "message": "監査ログを消去できませんでした"
+  },
+  "copy_e55422c604": {
+    "message": "このオリジンは自動化からブロックされています"
+  },
+  "copy_74f10b929e": {
+    "message": "アクセスを許可しました（機密オリジン）"
+  },
+  "copy_8378642189": {
+    "message": "すべての分析データを消去しますか？この操作は元に戻せません。"
+  },
+  "copy_a58a92d42a": {
+    "message": "分析データを消去しました"
+  },
+  "copy_53dd8a177f": {
+    "message": "分析データをエクスポートしました"
+  },
+  "copy_f5db4312c2": {
+    "message": "JSON セッションデータ"
+  },
+  "copy_b0e3e5d7c3": {
+    "message": "ストリーミングのセッション書き出しには、名前を付けて保存できるブラウザが必要です"
+  },
+  "copy_0eecfd3ae0": {
+    "message": "セッション書き出しの転送を利用できません"
+  },
+  "copy_0969eab862": {
+    "message": "セッションが見つかりません"
+  },
+  "copy_fe13bdd0d0": {
+    "message": "セッションの詳細を読み込めませんでした"
+  },
+  "copy_3096433e6f": {
+    "message": "セッションイベントを読み込めませんでした"
+  },
+  "copy_952bb703c9": {
+    "message": "追加のセッションイベントを読み込めませんでした: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_ce10cc25bb": {
+    "message": "セッションが選択されていません"
+  },
+  "copy_d633c264e7": {
+    "message": "セッション JSON をダウンロードしました"
+  },
+  "copy_19404e5435": {
+    "message": "セッション履歴のダウンロードボタンからジャーナルの書き出しを再試行してください"
+  },
+  "copy_f431c1057b": {
+    "message": "セッションログをダウンロードできませんでした"
+  },
+  "copy_ac475c80e9": {
+    "message": "このセッションを削除しますか？この操作は元に戻せません。"
+  },
+  "copy_5c9c6608b4": {
+    "message": "セッションを削除できませんでした"
+  },
+  "copy_1a0b431718": {
+    "message": "すべてのセッション履歴を削除しますか？この操作は元に戻せません。"
+  },
+  "copy_40260f861d": {
+    "message": "すべてのセッションを消去しました"
+  },
+  "copy_ed9e6fe6eb": {
+    "message": "セッションを消去できませんでした"
+  },
+  "copy_14d37a14df": {
+    "message": "このセッションには記録されたログがありません。"
+  },
+  "copy_c892490bc5": {
+    "message": "FSB 自動化セッションレポート"
+  },
+  "copy_76eb674a8c": {
+    "message": "AI 会話ログ"
+  },
+  "copy_5a60378692": {
+    "message": "分類 | 回数 | 平均 (ms) | 最小 | 最大 | 合計"
+  },
+  "copy_87968c8b4f": {
+    "message": "トークン使用量の概要"
+  },
+  "copy_09ed6ac4d2": {
+    "message": "セッションレポートをエクスポートしました"
+  },
+  "copy_cc1e1981fb": {
+    "message": "セッション履歴の「テキストを書き出す」ボタンからジャーナルの書き出しを再試行してください"
+  },
+  "copy_c183663b5c": {
+    "message": "セッションをエクスポートできませんでした"
+  },
+  "copy_30784a43b1": {
+    "message": "保管庫のロック解除エラー: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_b621934f80": {
+    "message": "PIN が一致しません"
+  },
+  "copy_038efc029d": {
+    "message": "資格情報の保管庫を作成しました"
+  },
+  "copy_b27730b0ad": {
+    "message": "保管庫を作成できませんでした"
+  },
+  "copy_be90a4301c": {
+    "message": "保管庫の作成エラー: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_344e10f557": {
+    "message": "PIN を入力してください"
+  },
+  "copy_d8689df745": {
+    "message": "保管庫のロックエラー: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_025f3d105c": {
+    "message": "ドメインは必須です"
+  },
+  "copy_f0413d8913": {
+    "message": "ユーザー名またはパスワードが必要です"
+  },
+  "copy_9afaa0cd06": {
+    "message": "保存に失敗しました: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_161d5eb702": {
+    "message": "資格情報の保存エラー: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_2be1559933": {
+    "message": "「$DOMAIN$」の保存済み資格情報を削除しますか？この操作は元に戻せません。",
+    "placeholders": {
+      "domain": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_742e696153": {
+    "message": "削除に失敗しました: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_f91e85ab50": {
+    "message": "資格情報の削除エラー: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_6ddb0ed270": {
+    "message": "支払い方法のロックを解除しました"
+  },
+  "copy_c75e2cc897": {
+    "message": "支払い方法のロック解除エラー: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_b69b2dc301": {
+    "message": "支払い方法をロックしました"
+  },
+  "copy_454a57b219": {
+    "message": "支払い方法をロックできませんでした"
+  },
+  "copy_af2ea4b480": {
+    "message": "支払い方法のロックエラー: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_38c2cc72e3": {
+    "message": "数字の PIN を入力してください"
+  },
+  "copy_97334b1737": {
+    "message": "支払い方法を編集"
+  },
+  "copy_f8ab13ff2a": {
+    "message": "ニックネームと住所 2 行目以外のすべての項目が必須です"
+  },
+  "copy_2389d7d2a2": {
+    "message": "カード番号が無効です"
+  },
+  "copy_cc08ac8162": {
+    "message": "カードの有効期限が切れているか、期限が無効です"
+  },
+  "copy_0aed24cdfa": {
+    "message": "支払い方法を更新しました"
+  },
+  "copy_8fb5f3db97": {
+    "message": "支払い方法を保存しました"
+  },
+  "copy_58adb591be": {
+    "message": "支払い方法の保存エラー: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_f03b63954b": {
+    "message": "この支払い方法を削除しますか？この操作は元に戻せません。"
+  },
+  "copy_62dd24dab7": {
+    "message": "支払い方法を削除しました"
+  },
+  "copy_2a0de92af3": {
+    "message": "支払い方法の削除エラー: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_4f15f65f6e": {
+    "message": "探索する URL を入力してください"
+  },
+  "copy_fb05645171": {
+    "message": "URL の形式が無効です"
+  },
+  "copy_a6215dba6d": {
+    "message": "エクスプローラーを開始できませんでした: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_284429f90b": {
+    "message": "すべてのクローラーを停止しました"
+  },
+  "copy_aee9e10eae": {
+    "message": "$DOMAIN$ のクロールに失敗しました",
+    "placeholders": {
+      "domain": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_d604ffed30": {
+    "message": "調査データが見つかりません"
+  },
+  "copy_600bbdc0cf": {
+    "message": "調査の詳細を読み込めませんでした"
+  },
+  "copy_b784ed64e1": {
+    "message": "調査 JSON をダウンロードしました"
+  },
+  "copy_4a64e6ca83": {
+    "message": "調査をダウンロードできませんでした"
+  },
+  "copy_1a2e7f1116": {
+    "message": "この調査結果を削除しますか？"
+  },
+  "copy_ec95ccc29e": {
+    "message": "調査を削除できませんでした"
+  },
+  "copy_dc94971b24": {
+    "message": "調査をサイトマップに変換できませんでした"
+  },
+  "copy_382f902a79": {
+    "message": "メモリを保存できませんでした"
+  },
+  "copy_2049875d89": {
+    "message": "メモリに保存しました"
+  },
+  "copy_d504fbf25e": {
+    "message": "AI でサイトマップを精緻化しています..."
+  },
+  "copy_a249e56325": {
+    "message": "$DOMAIN$ のサイトマップを保存して精緻化しました",
+    "placeholders": {
+      "domain": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_237923127b": {
+    "message": "$DOMAIN$ のサイトマップを保存しました（精緻化はデータを返しませんでした）",
+    "placeholders": {
+      "domain": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_35d9e0c46c": {
+    "message": "サイトマップを保存しました（AI の精緻化に失敗: $ERROR$）",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_c8c83ca919": {
+    "message": "$DOMAIN$ のサイトマップをメモリに保存しました",
+    "placeholders": {
+      "domain": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_c32ea6d22f": {
+    "message": "メモリへの保存に失敗しました: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_963ba004ea": {
+    "message": "すべての調査結果を削除しますか？この操作は元に戻せません。"
+  },
+  "copy_1044224528": {
+    "message": "すべての調査結果を消去しました"
+  },
+  "copy_84e9814ece": {
+    "message": "調査結果を消去できませんでした"
+  },
+  "copy_491c2ddc8e": {
+    "message": "先にサーバー URL を入力してください"
+  },
+  "copy_9526d57756": {
+    "message": "ハッシュキーを生成して保存しました"
+  },
+  "copy_fdc08c5f7b": {
+    "message": "ハッシュキーを生成できませんでした"
+  },
+  "copy_52b3b70484": {
+    "message": "サーバーに接続できません: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_cbdbc53db1": {
+    "message": "コピーするハッシュキーがありません"
+  },
+  "copy_f0b64c63d8": {
+    "message": "ハッシュキーをコピーしました"
+  },
+  "copy_0cf23c4489": {
+    "message": "コピーに失敗しました"
+  },
+  "copy_8cab3b4552": {
+    "message": "サーバー URL とハッシュキーを入力してください"
+  },
+  "copy_271b7b0f3b": {
+    "message": "サーバーに接続しました"
+  },
+  "copy_3e8bcabc0b": {
+    "message": "ハッシュキーが無効です"
+  },
+  "copy_09f7c3ac2a": {
+    "message": "サーバーに接続できません"
+  },
+  "copy_0ea446a05f": {
+    "message": "サーバーはハッシュキーを返しませんでした"
+  },
+  "copy_e5697f10b5": {
+    "message": "ペアリング応答の形式が正しくありません"
+  },
+  "copy_30fa7c27e5": {
+    "message": "ペアリングコードを生成できませんでした: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_acce51c1d3": {
+    "message": "ハッシュキーを登録できませんでした: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_cb4c956be2": {
+    "message": "このメモリを削除しますか？"
+  },
+  "copy_7402b5cdc1": {
+    "message": "メモリデータを読み込めませんでした"
+  },
+  "copy_3d391897c3": {
+    "message": "メモリが見つかりません"
+  },
+  "copy_1c461596d3": {
+    "message": "グラフエンジンを利用できません"
+  },
+  "copy_d85c704af2": {
+    "message": "このメモリにサイトパターンデータがありません"
+  },
+  "copy_a658647978": {
+    "message": "サイトマップにページが見つかりません"
+  },
+  "copy_4b23a9fe70": {
+    "message": "AI リファイナーを利用できません"
+  },
+  "copy_920d3a68d9": {
+    "message": "メモリが見つからないか、サイトマップではありません"
+  },
+  "copy_99a619a944": {
+    "message": "サイトマップを精緻化しました"
+  },
+  "copy_a266f3a3ce": {
+    "message": "AI の精緻化に失敗しました: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_0b0bdbabab": {
+    "message": "すべてのメモリを削除しますか？この操作は元に戻せません。"
+  },
+  "copy_58589924e2": {
+    "message": "すべてのメモリを消去しました"
+  },
+  "copy_e158cd5a5e": {
+    "message": "メモリを消去できませんでした: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_21ce69d58b": {
+    "message": "リモート制御が有効です"
+  },
+  "copy_23a711ebd2": {
+    "message": "検索に一致するモデルがありません"
+  },
+  "copy_a5a9895b02": {
+    "message": "利用できるモデルがありません"
+  },
+  "copy_df9da4e214": {
+    "message": "API キーが無効です"
+  },
+  "copy_e93db4ad9a": {
+    "message": "このプロバイダーでは API キーが無効です"
+  },
+  "copy_7b582d9989": {
+    "message": "互換性のある LM Studio モデルがありません"
+  },
+  "copy_5742edc9d8": {
+    "message": "LM Studio を起動し、チャットモデルを読み込んでモデル一覧を更新してください"
+  },
+  "copy_4b1527fd68": {
+    "message": "LM Studio のモデル検出を利用できません"
+  },
+  "copy_bd94818b82": {
+    "message": "モデルを読み込めませんでした"
+  },
+  "copy_11c964536c": {
+    "message": "モデル検出を利用できません"
+  },
+  "copy_c77feaa41e": {
+    "message": "LM Studio に接続できませんでした"
+  },
+  "copy_bdaaf4fde3": {
+    "message": "このプロバイダーからモデルを読み込めませんでした"
+  },
+  "copy_6b3e293f22": {
+    "message": "プロバイダーのモデル一覧を更新できませんでした"
+  },
+  "copy_9aed9949c4": {
+    "message": "LM Studio に互換性のあるチャットモデルが読み込まれていません"
+  },
+  "copy_d068f8bbe0": {
+    "message": "利用できるモデルがありません"
+  },
+  "copy_ec819bcca6": {
+    "message": "プロバイダーは利用可能なテキストモデルを返しませんでした"
+  },
+  "copy_3329b92927": {
+    "message": "保存済みの LM Studio モデルは利用できません。読み込み済みのモデルを選んで保存してください。"
+  },
+  "copy_5cb6d3f4e6": {
+    "message": "モデル検出がタイムアウトしました。更新して再試行してください。"
+  },
+  "copy_e21ca6d204": {
+    "message": "モデルを検索して選択"
+  },
+  "copy_d6699494ff": {
+    "message": "モデル一覧の表示を切り替える"
+  },
+  "copy_9606bfc49e": {
+    "message": "モデル一覧を更新"
+  },
+  "copy_881bf7079c": {
+    "message": "xAI の API キーを入力"
+  },
+  "copy_1e9720ad1e": {
+    "message": "Gemini の API キーを入力"
+  },
+  "copy_699e26dc48": {
+    "message": "OpenAI の API キーを入力"
+  },
+  "copy_e73283ba69": {
+    "message": "Anthropic の API キーを入力"
+  },
+  "copy_c545294348": {
+    "message": "OpenRouter の API キーを入力"
+  },
+  "copy_8001f1687a": {
+    "message": "カスタム API キーを入力"
+  },
+  "copy_ec8571e74c": {
+    "message": "2Captcha の API キーを入力"
+  },
+  "copy_9a679edbd3": {
+    "message": "最大反復回数を減らす"
+  },
+  "copy_7ff25a6879": {
+    "message": "最大反復回数を増やす"
+  },
+  "copy_1da98f8734": {
+    "message": "要素の上限を減らす"
+  },
+  "copy_396f15bbfe": {
+    "message": "要素の上限を増やす"
+  },
+  "copy_8418bb6be8": {
+    "message": "要素キャッシュのサイズを減らす"
+  },
+  "copy_4d09f69eb1": {
+    "message": "要素キャッシュのサイズを増やす"
+  },
+  "copy_8afc6eb606": {
+    "message": "エージェント同時実行の上限を下げる"
+  },
+  "copy_484366fe68": {
+    "message": "エージェント同時実行の上限を上げる"
+  },
+  "copy_cffeed4c47": {
+    "message": "トリガー同時実行の上限を下げる"
+  },
+  "copy_3816b69dee": {
+    "message": "トリガー同時実行の上限を上げる"
+  },
+  "copy_2a1df07657": {
+    "message": "MCP 再生の保持期間を短くする"
+  },
+  "copy_a346fdf291": {
+    "message": "MCP 再生の保持日数"
+  },
+  "copy_71c20adba6": {
+    "message": "MCP 再生の保持期間を長くする"
+  },
+  "copy_f38984cf15": {
+    "message": "匿名の使用状況データを送信しています。クリックして停止します。"
+  },
+  "copy_81649d0543": {
+    "message": "サーバーのハッシュキー"
+  },
+  "copy_e4cdf160f5": {
+    "message": "ハッシュキーをコピー"
+  },
+  "copy_81f7adf295": {
+    "message": "以前作成したバックグラウンドエージェント"
+  },
+  "copy_8c16fe2070": {
+    "message": "有効にすると、新しいメモリが AI によって自動分析され、より深い洞察が得られます"
+  },
+  "copy_0a221bc876": {
+    "message": "メモリを JSON として書き出す"
+  },
+  "copy_70e6248096": {
+    "message": "JSON からメモリを読み込む"
+  },
+  "copy_1152ae520b": {
+    "message": "新しいサイトの既定の同意モード"
+  },
+  "copy_f5af3ff4e6": {
+    "message": "オリジンの同意モード"
+  },
+  "copy_8371bee1a3": {
+    "message": "カード、ブランド、請求先を検索..."
+  },
+  "copy_18bf091ea7": {
+    "message": "カード名義"
+  },
+  "copy_eb59dcee20": {
+    "message": "請求先プロフィール名"
+  },
+  "copy_e151fee074": {
+    "message": "アパート、スイート、部屋番号"
+  },
+  "copy_7ec33c22aa": {
+    "message": "FSB - コントロールパネル"
+  },
+  "copy_34c70e4722": {
+    "message": "FSB - 初期設定"
+  },
+  "copy_1398385080": {
+    "message": "ステップ 1 / 5"
+  },
+  "copy_b51e205a4a": {
+    "message": "読み込み済みの LM Studio チャットモデルを選択"
+  },
+  "copy_434171c580": {
+    "message": "LM Studio が正常に応答しました"
+  },
+  "copy_900b7aa263": {
+    "message": "クリップボードに API キーがありませんでした"
+  },
+  "copy_8d78737e31": {
+    "message": "クリップボードを読み取れませんでした"
+  },
+  "copy_08aae6eb74": {
+    "message": "今はスキップしました"
+  },
+  "lang_choose": {
+    "message": "言語"
+  },
+  "lang_follow_browser": {
+    "message": "ブラウザの言語"
+  },
+  "lang_extensions_page": {
+    "message": "chrome://extensions の名前はブラウザの言語に従います。"
+  },
+  "copy_9a19a25438": {
+    "message": "$COUNT$ 件の操作が完了",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_5bb3cc9bbc": {
+    "message": "$COUNT$ 件の操作が完了",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_89858f87f6": {
+    "message": "ログインが必要です"
+  },
+  "copy_969ccbd3cf": {
+    "message": "メールアドレス"
+  },
+  "copy_657144f3f7": {
+    "message": "ユーザー名 / メールアドレス"
+  },
+  "copy_fb625242db": {
+    "message": "このサイト"
+  },
+  "copy_3a4ba4367b": {
+    "message": "このセッションでは保存できません。"
+  },
+  "copy_88712c434b": {
+    "message": "ログインが必要です"
+  },
+  "copy_9a15079bb0": {
+    "message": "サインインするには資格情報を入力してください。暗号化して今後のために保存します。"
+  },
+  "copy_5c4fb64721": {
+    "message": "今後のために保存"
+  },
+  "copy_bcc0bcc914": {
+    "message": "サインイン"
+  },
+  "copy_28d03596d2": {
+    "message": "スキップ"
+  },
+  "copy_71b27d1772": {
+    "message": "この購入手続き"
+  },
+  "copy_3953987f92": {
+    "message": "購入手続きを検出しました"
+  },
+  "copy_0fa359b5b5": {
+    "message": "支払いは無効です"
+  },
+  "copy_22a8f98173": {
+    "message": "保管庫はロックされています"
+  },
+  "copy_869a552f3f": {
+    "message": "支払いを開く"
+  },
+  "copy_48845bff33": {
+    "message": "閉じる"
+  },
+  "copy_b764cdc0ea": {
+    "message": "不明"
+  },
+  "copy_23f19f7bd3": {
+    "message": "$BRAND$（末尾 $LAST$）",
+    "placeholders": {
+      "brand": {
+        "content": "$1"
+      },
+      "last": {
+        "content": "$2"
+      }
+    }
+  },
+  "copy_9a09841b76": {
+    "message": "有効期限 $MONTH$/$YEAR$",
+    "placeholders": {
+      "month": {
+        "content": "$1"
+      },
+      "year": {
+        "content": "$2"
+      }
+    }
+  },
+  "copy_e73906185a": {
+    "message": "保存済みのカードを入力"
+  },
+  "copy_297f2fc07e": {
+    "message": "まだセッションはありません。自動化を実行すると、ここに履歴が表示されます。"
+  },
+  "copy_1369c6877b": {
+    "message": "無操作で終了"
+  },
+  "copy_a5fbb5c6ed": {
+    "message": "不明なタスク"
+  },
+  "copy_a147891596": {
+    "message": "$COUNT$ 件の操作",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_loaded_model": {
+    "message": "読み込み済みのチャットモデル"
+  },
+  "entry_watching": {
+    "message": "$COUNT$ 件を監視中",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_fired": {
+    "message": "$COUNT$ 件が発動",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "entry_check_visible": {
+    "message": "表示"
+  },
+  "entry_check_enabled": {
+    "message": "有効"
+  },
+  "entry_check_viewport": {
+    "message": "表示領域内"
+  },
+  "entry_check_pointer": {
+    "message": "ポインターイベント"
+  },
+  "entry_text_content": {
+    "message": "テキスト内容"
+  },
+  "entry_crawl_title": {
+    "message": "FSB が巡回中"
+  },
+  "panel_b2693770d3": {
+    "message": "接続テスト"
+  },
+  "panel_672f1efd8b": {
+    "message": "プロバイダー:"
+  },
+  "panel_755c8b2a9f": {
+    "message": "状態:"
+  },
+  "panel_c88a0b9074": {
+    "message": "成功"
+  },
+  "panel_11a931060d": {
+    "message": "モデル:"
+  },
+  "panel_8f6bed11e7": {
+    "message": "応答時間:"
+  },
+  "panel_5e1834d89d": {
+    "message": "$MS$ ミリ秒",
+    "placeholders": {
+      "ms": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_6170629067": {
+    "message": "エラー:"
+  },
+  "panel_9ec41ffd77": {
+    "message": "ログを表示"
+  },
+  "panel_9af63d68f9": {
+    "message": "ログをダウンロード"
+  },
+  "panel_1c01ad70fe": {
+    "message": "セッションを読み込めませんでした: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_aaa0442372": {
+    "message": "読みやすいテキストとして書き出す"
+  },
+  "panel_52a0e8b87e": {
+    "message": "テキストを書き出す"
+  },
+  "panel_2e80d6e9a5": {
+    "message": "JSON ログをダウンロード"
+  },
+  "panel_49e0e6d56e": {
+    "message": "JSON をダウンロード"
+  },
+  "panel_7d9eb7acb1": {
+    "message": "閉じる"
+  },
+  "panel_cb9ac5c561": {
+    "message": "セッション ID"
+  },
+  "panel_ecbc89cd37": {
+    "message": "開始"
+  },
+  "panel_7cdc804e69": {
+    "message": "終了"
+  },
+  "panel_4fc52a3c4c": {
+    "message": "所要時間"
+  },
+  "panel_ff8059dc67": {
+    "message": "操作"
+  },
+  "panel_4740b57371": {
+    "message": "反復回数"
+  },
+  "panel_73912999fa": {
+    "message": "前へ"
+  },
+  "panel_1ff57a29d7": {
+    "message": "次へ"
+  },
+  "panel_f03788e116": {
+    "message": "ステップ $CURRENT$ / $TOTAL$",
+    "placeholders": {
+      "current": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "panel_a75ab6920d": {
+    "message": "再生データを読み込み中..."
+  },
+  "panel_881c9fdb90": {
+    "message": "生ログを表示"
+  },
+  "panel_57df179c4f": {
+    "message": "生ログを隠す"
+  },
+  "panel_51cbb3bf88": {
+    "message": "このセッションには再生データがありません"
+  },
+  "panel_dfa4ae555e": {
+    "message": "ターゲット指定"
+  },
+  "panel_14b981a43b": {
+    "message": "セレクター:"
+  },
+  "panel_9216cbad79": {
+    "message": "要素の検出: あり"
+  },
+  "panel_2dbfbc21aa": {
+    "message": "要素の検出: なし"
+  },
+  "panel_fe3d6f1947": {
+    "message": "座標: ($X$, $Y$)",
+    "placeholders": {
+      "x": {
+        "content": "$1"
+      },
+      "y": {
+        "content": "$2"
+      }
+    }
+  },
+  "panel_4e5b548d6d": {
+    "message": "要素"
+  },
+  "panel_848bf594dd": {
+    "message": "テキスト: 「$TEXT$」",
+    "placeholders": {
+      "text": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_e68b36b17c": {
+    "message": "パラメーター"
+  },
+  "panel_b1fa878a98": {
+    "message": "診断"
+  },
+  "panel_27c2ccd962": {
+    "message": "不明なエラー"
+  },
+  "panel_407fab696b": {
+    "message": "提案:"
+  },
+  "panel_4de32d57f8": {
+    "message": "$TOTAL$ 件中の最新 $COUNT$ 件",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "panel_23e0248aa9": {
+    "message": "概要:"
+  },
+  "panel_d6f290028c": {
+    "message": "$DONE$/$TOTAL$ ステップ成功",
+    "placeholders": {
+      "done": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "panel_ba5c173754": {
+    "message": "$COUNT$ 件失敗",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_af3c60331d": {
+    "message": "ユーザー名なし"
+  },
+  "panel_6aeaa6a53d": {
+    "message": "パスワードを表示"
+  },
+  "panel_464c4ffd01": {
+    "message": "編集"
+  },
+  "panel_e2d0a54968": {
+    "message": "削除"
+  },
+  "panel_be3702e3f1": {
+    "message": "カード"
+  },
+  "panel_cae7d57bc0": {
+    "message": "停止"
+  },
+  "panel_ada26b6a54": {
+    "message": "巡回を開始しています..."
+  },
+  "panel_7eae8fd81d": {
+    "message": "$COLLECTED$ / $MAX$ ページ",
+    "placeholders": {
+      "collected": {
+        "content": "$1"
+      },
+      "max": {
+        "content": "$2"
+      }
+    }
+  },
+  "panel_a854c3e6d9": {
+    "message": "$DOMAIN$ を巡回中",
+    "placeholders": {
+      "domain": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_b837e392c5": {
+    "message": "巡回が完了しました: $DOMAIN$ から $COUNT$ ページ",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "domain": {
+        "content": "$2"
+      }
+    }
+  },
+  "panel_44761df9d9": {
+    "message": "$COUNT$ ページ",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_d1bf045bb5": {
+    "message": "詳細を表示"
+  },
+  "panel_6c0a28c891": {
+    "message": "サイトマップのメモリとして保存"
+  },
+  "panel_0f4baebaa0": {
+    "message": "調査結果を読み込めませんでした: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_1c1944d338": {
+    "message": "$TOTAL$ 件中 $START$-$END$",
+    "placeholders": {
+      "start": {
+        "content": "$1"
+      },
+      "end": {
+        "content": "$2"
+      },
+      "total": {
+        "content": "$3"
+      }
+    }
+  },
+  "panel_9046da16ae": {
+    "message": "ページ"
+  },
+  "panel_e1ff7a9061": {
+    "message": "要素"
+  },
+  "panel_858451263b": {
+    "message": "フォーム"
+  },
+  "panel_9024c197d8": {
+    "message": "リンク"
+  },
+  "panel_a6d5df3737": {
+    "message": "開始 URL:"
+  },
+  "panel_298d6c7549": {
+    "message": "所要時間:"
+  },
+  "panel_184ab6989d": {
+    "message": "深さ:"
+  },
+  "panel_068fbd1599": {
+    "message": "巡回したページ（$COUNT$）",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_59ba6ff1da": {
+    "message": "要素 $COUNT$ 件",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_d81ab3063e": {
+    "message": "精緻化済み"
+  },
+  "panel_0e35f6e974": {
+    "message": "基本"
+  },
+  "panel_6ab098444e": {
+    "message": "サイトマップを精緻化"
+  },
+  "panel_1e7f34ee8f": {
+    "message": "精緻化"
+  },
+  "panel_d9483244b6": {
+    "message": "詳細の表示を切り替え"
+  },
+  "panel_cdf8d330f5": {
+    "message": "$COUNT$ 回アクセス",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_008de64db2": {
+    "message": "信頼度 $PERCENT$%",
+    "placeholders": {
+      "percent": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_3aba541421": {
+    "message": "メモリを削除"
+  },
+  "panel_aab6c5e605": {
+    "message": "記録なし"
+  },
+  "panel_dc937b5989": {
+    "message": "なし"
+  },
+  "panel_060b7c4116": {
+    "message": "最終 URL"
+  },
+  "panel_e7dcad8673": {
+    "message": "完了した手順"
+  },
+  "panel_7bd31a025d": {
+    "message": "失敗"
+  },
+  "panel_304230dd7b": {
+    "message": "サイトマップ"
+  },
+  "panel_f02a172a35": {
+    "message": "セレクター"
+  },
+  "panel_217baacf82": {
+    "message": "サイトのパターン"
+  },
+  "panel_c910d474dc": {
+    "message": "一般"
+  },
+  "panel_2502651aed": {
+    "message": "サイト横断パターン"
+  },
+  "panel_22e2dbcfc1": {
+    "message": "ユーザー設定"
+  },
+  "panel_82ac23744f": {
+    "message": "...ほか $COUNT$ 件",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_b2fc7c1a37": {
+    "message": "（フォーム $COUNT$ 件）",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_34a07bf033": {
+    "message": "（フォーム $COUNT$ 件）",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_b358b78f08": {
+    "message": "（ナビゲーション項目 $COUNT$ 件）",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_2d597de6ea": {
+    "message": "（ナビゲーション項目 $COUNT$ 件）",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_1b786c0eff": {
+    "message": "ナビゲーション区画"
+  },
+  "panel_df71c8b46d": {
+    "message": "巡回日時"
+  },
+  "panel_2521c156e7": {
+    "message": "（精緻化済み）"
+  },
+  "panel_c555ac6ba2": {
+    "message": "見つかったページ"
+  },
+  "panel_8083e76d16": {
+    "message": "見つかったフォーム"
+  },
+  "panel_3db65f8c2a": {
+    "message": "ナビゲーション"
+  },
+  "panel_97100721e2": {
+    "message": "セレクター情報"
+  },
+  "panel_041f11ea06": {
+    "message": "分析したドメイン"
+  },
+  "panel_92f41ed9cf": {
+    "message": "よくあるフォームの種類"
+  },
+  "panel_7ea2d98ace": {
+    "message": "共通のセレクターパターン"
+  },
+  "panel_53e6cf4452": {
+    "message": "検証日時"
+  },
+  "panel_292c06f004": {
+    "message": "分類"
+  },
+  "panel_7baf29fa69": {
+    "message": "記録された手順はありません"
+  },
+  "panel_5b341c960f": {
+    "message": "対象 URL"
+  },
+  "panel_4ccf1d74a7": {
+    "message": "総実行回数"
+  },
+  "panel_1de3df70dd": {
+    "message": "手順"
+  },
+  "panel_01b7cdd40d": {
+    "message": "使用したセレクター"
+  },
+  "panel_e70d8eb905": {
+    "message": "分析"
+  },
+  "panel_0a30a815d6": {
+    "message": "ページ"
+  },
+  "panel_96a5ba634b": {
+    "message": "検出済み"
+  },
+  "panel_2e0e960ab3": {
+    "message": "フォーム"
+  },
+  "panel_2e2d5c5649": {
+    "message": "ワークフロー"
+  },
+  "panel_3fee95da5a": {
+    "message": "簡易"
+  },
+  "panel_008dacb6d1": {
+    "message": "詳細"
+  }
+}

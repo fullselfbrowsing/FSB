@@ -180,6 +180,8 @@ assert.match(selection, /providerPanelState\.agentProviderId = id/);
 assert.doesNotMatch(selection, /providerPanelState\.modelProvider = id[\s\S]*?kind === 'agent'/);
 
 const connectionTest = extractFunction(js, 'runFullApiTest');
+// runFullApiTest renders its copy through these; with no fsbUiLocale they return English.
+const uiCopyHelpers = ['fsbUiLine', 'fsbUiEscape', 'fsbUiHtml'].map((name) => extractFunction(js, name)).join('\n');
 assert.match(
   connectionTest,
   /action:\s*'testAgentProviderConnection',\s*providerId:\s*providerId/
@@ -361,7 +363,7 @@ async function renderAgentConnectionResponse(response) {
   };
   context.globalThis = context;
   vm.runInNewContext(
-    `${connectionTest}\nthis.runFullApiTest = runFullApiTest;`,
+    `${uiCopyHelpers}\n${connectionTest}\nthis.runFullApiTest = runFullApiTest;`,
     context,
     { filename: 'options.js#runFullApiTest' }
   );

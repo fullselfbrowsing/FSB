@@ -313,6 +313,18 @@ body {
   gap: var(--space-sm);
 }
 
+.fsb-locale-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fsb-locale-control p {
+  margin: 0;
+  max-width: 16rem;
+  font-size: 12px;
+}
+
 .header-btn {
   display: flex;
   align-items: center;

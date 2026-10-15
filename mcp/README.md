@@ -42,7 +42,7 @@ Use this package when you want your AI client to drive the browser directly whil
 
 - The FSB dark logo ships with the MCP package and is advertised as an embedded PNG server icon. Update the package and restart the MCP host to make it available to clients that render MCP icons.
 - The MCP Registry uses the matching hosted dark logo. Rendering remains client-controlled.
-- **Compatibility:** `fsb-mcp-server` 0.11.2 requires FSB extension 0.9.92 or newer for `mcp:task-status`. Upgrade the extension and restart the MCP host together.
+- **Compatibility:** `fsb-mcp-server` 0.11.2 requires FSB extension 0.9.93 or newer for `mcp:task-status`. Upgrade the extension and restart the MCP host together.
 
 ### What's New In v0.11.1
 
@@ -664,9 +664,9 @@ The build command copies `extension/ai/tool-definitions.js` into `mcp/ai/tool-de
 
 ### Versioning
 
-The MCP package has its own version (`0.11.2`) because it is published independently from the extension release (`0.9.92`). Use `npm run version:set:mcp -- X.Y.Z` for MCP releases and `npm run version:set:extension -- X.Y.Z` for extension releases; `npm run version:check` verifies both domains without requiring them to match.
+The MCP package has its own version (`0.11.2`) because it is published independently from the extension release (`0.9.93`). Use `npm run version:set:mcp -- X.Y.Z` for MCP releases and `npm run version:set:extension -- X.Y.Z` for extension releases; `npm run version:check` verifies both domains without requiring them to match.
 
-Compatibility for this release: MCP 0.11.2 requires extension 0.9.92 or newer for the `mcp:task-status` route used by `complete_task`, `partial_task`, and `fail_task`. Existing `0.10.0` tool routes remain additive and unchanged.
+Compatibility for this release: MCP 0.11.2 requires extension 0.9.93 or newer for the `mcp:task-status` route used by `complete_task`, `partial_task`, and `fail_task`. Existing `0.10.0` tool routes remain additive and unchanged.
 
 Contract-sensitive changes should be covered by tests before publishing:
 

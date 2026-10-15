@@ -363,7 +363,7 @@ function installDomStub(idMap) {
      'Part 4.4 -- sidepanel.css carries .fsb-foreign-owned-disabled rule with opacity 0.45 + pointer-events none');
 
   // 4.5 sidepanel.html carries the aria-describedby description span
-  ok(/<span\s+id=\"fsb-lockout-aria-description\"\s+class=\"sr-only\">/.test(sidepanelHtmlSrc),
+  ok(/<span\s+id="fsb-lockout-aria-description"\s+class="sr-only"(?:\s+data-i18n="shell_lockout")?>/.test(sidepanelHtmlSrc),
      'Part 4.5 -- sidepanel.html carries fsb-lockout-aria-description sr-only span');
 
   // Phase 61 Plan 07: the delegation renderer is loaded exactly once before

@@ -5,6 +5,11 @@ const errorMsg = document.getElementById('errorMsg');
 const setupLink = document.getElementById('setupLink');
 const pinContainer = document.getElementById('pinContainer');
 
+function unlockText(key, english) {
+  if (globalThis.fsbUiLocale && typeof fsbUiLocale.text === 'function') return fsbUiLocale.text(key, english);
+  return english;
+}
+
 let pinInput = null;
 let submitting = false;
 
@@ -12,7 +17,7 @@ async function submitUnlock(pin) {
   if (submitting) return;
   submitting = true;
   unlockBtn.disabled = true;
-  unlockBtn.textContent = 'Unlocking...';
+  unlockBtn.textContent = unlockText('entry_unlocking', 'Unlocking...');
   errorMsg.style.display = 'none';
 
   try {
@@ -24,21 +29,21 @@ async function submitUnlock(pin) {
     if (response && response.success) {
       window.close();
     } else {
-      const msg = (response && response.error) || 'Unlock failed';
+      const msg = (response && response.error) || unlockText('entry_unlock_failed', 'Unlock failed');
       errorMsg.textContent = msg.includes('not configured')
-        ? 'No vault configured. Please run setup first.'
-        : 'Incorrect PIN';
+        ? unlockText('entry_no_vault', 'No vault configured. Please run setup first.')
+        : unlockText('entry_bad_pin', 'Incorrect PIN');
       errorMsg.style.display = 'block';
       if (pinInput) pinInput.clear();
     }
   } catch (error) {
-    errorMsg.textContent = 'Communication error. Please try again.';
+    errorMsg.textContent = unlockText('entry_comm_error', 'Communication error. Please try again.');
     errorMsg.style.display = 'block';
     if (pinInput) pinInput.clear();
   } finally {
     submitting = false;
     unlockBtn.disabled = false;
-    unlockBtn.textContent = 'Unlock';
+    unlockBtn.textContent = unlockText('entry_unlock', 'Unlock');
   }
 }
 
@@ -70,7 +75,7 @@ chrome.runtime.sendMessage({ action: 'getCredentialVaultStatus' }).then(response
     pinInput.focus();
   } else {
     // No vault configured
-    errorMsg.textContent = 'No vault configured. Please run setup first.';
+    errorMsg.textContent = unlockText('entry_no_vault', 'No vault configured. Please run setup first.');
     errorMsg.style.display = 'block';
   }
 }).catch(() => {

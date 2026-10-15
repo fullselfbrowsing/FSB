@@ -631,7 +631,8 @@ let _activeTabSurfaceSyncGeneration = 0;
 function _renderHeaderStatus() {
   if (!statusText || !statusDot || !statusDot.classList) return;
   statusDot.classList.remove('running', 'error');
-  statusText.textContent = _headerBaseStatusLabel;
+  if (globalThis.fsbUiLocale && typeof fsbUiLocale.markExact === 'function') fsbUiLocale.markExact(statusText, _headerBaseStatusLabel);
+  else statusText.textContent = _headerBaseStatusLabel;
   if (_headerBaseStatusTone === 'running') statusDot.classList.add('running');
   if (_headerBaseStatusTone === 'error') statusDot.classList.add('error');
 }
@@ -1253,7 +1254,9 @@ function _delegationElement(tagName, className, textValue) {
   var element = document.createElement(tagName);
   if (className) element.className = className;
   if (textValue !== undefined && textValue !== null) {
-    element.textContent = String(textValue);
+    var english = String(textValue);
+    if (globalThis.fsbUiLocale && typeof fsbUiLocale.markExact === 'function') fsbUiLocale.markExact(element, english);
+    else element.textContent = english;
   }
   return element;
 }
@@ -1596,13 +1599,16 @@ function _renderDelegationConsent(options) {
   checkbox.checked = false;
   checkbox.disabled = _delegationUiState.pendingStart || _delegationUiState.pendingTrust;
   trust.appendChild(checkbox);
-  trust.appendChild(document.createTextNode('Trust ' + providerLabel + ' for future runs'));
+  trust.appendChild(document.createTextNode((globalThis.fsbUiLocale && fsbUiLocale.line)
+    ? fsbUiLocale.line('Trust $NAME$ for future runs', { name: providerLabel })
+    : 'Trust $NAME$ for future runs'.replace('$NAME$', providerLabel)));
   mount.state.appendChild(trust);
   mount.state.appendChild(_delegationElement(
     'p',
     'delegation-state-note',
-    'This turns off confirmation for future ' + providerLabel
-      + ' runs on this browser.'
+    (globalThis.fsbUiLocale && fsbUiLocale.line)
+      ? fsbUiLocale.line('This turns off confirmation for future $NAME$ runs on this browser.', { name: providerLabel })
+      : 'This turns off confirmation for future $NAME$ runs on this browser.'.replace('$NAME$', providerLabel)
   ));
 
   if (_delegationUiState.errorCode) {
@@ -1616,7 +1622,9 @@ function _renderDelegationConsent(options) {
 
   var actions = _delegationElement('div', 'delegation-state-actions');
   var allow = _delegationAction(
-    'Allow & start ' + providerLabel,
+    (globalThis.fsbUiLocale && fsbUiLocale.line)
+      ? fsbUiLocale.line('Allow & start $NAME$', { name: providerLabel })
+      : 'Allow & start $NAME$'.replace('$NAME$', providerLabel),
     'delegation-action-primary',
     function() { _allowDelegationFromConsent(checkbox); }
   );
@@ -1643,7 +1651,10 @@ async function _copyDelegationDoctorCommand() {
         && typeof navigator.clipboard.writeText === 'function') {
       await navigator.clipboard.writeText(command);
       var mount = _ensureDelegationMount();
-      if (mount.announcer) mount.announcer.textContent = 'Doctor command copied';
+      if (mount.announcer) {
+        if (globalThis.fsbUiLocale && fsbUiLocale.markExact) fsbUiLocale.markExact(mount.announcer, 'Doctor command copied');
+        else mount.announcer.textContent = 'Doctor command copied';
+      }
     }
   } catch (_error) { /* clipboard failure leaves the visible literal available */ }
 }
@@ -1656,7 +1667,10 @@ async function _copyDelegationPairResetCommand() {
         && typeof navigator.clipboard.writeText === 'function') {
       await navigator.clipboard.writeText(command);
       var mount = _ensureDelegationMount();
-      if (mount.announcer) mount.announcer.textContent = 'Pairing reset command copied';
+      if (mount.announcer) {
+        if (globalThis.fsbUiLocale && fsbUiLocale.markExact) fsbUiLocale.markExact(mount.announcer, 'Pairing reset command copied');
+        else mount.announcer.textContent = 'Pairing reset command copied';
+      }
     }
   } catch (_error) { /* clipboard failure leaves the visible literal available */ }
 }
@@ -1681,7 +1695,10 @@ async function _copyDelegationNativeHostInstallCommand() {
         && typeof navigator.clipboard.writeText === 'function') {
       await navigator.clipboard.writeText(command);
       var mount = _ensureDelegationMount();
-      if (mount.announcer) mount.announcer.textContent = 'Native helper install command copied';
+      if (mount.announcer) {
+        if (globalThis.fsbUiLocale && fsbUiLocale.markExact) fsbUiLocale.markExact(mount.announcer, 'Native helper install command copied');
+        else mount.announcer.textContent = 'Native helper install command copied';
+      }
     }
   } catch (_error) { /* the visible recovery copy remains actionable */ }
 }
@@ -1845,8 +1862,9 @@ function _renderDelegationPreflightFailure(result) {
     secondaryAction = null;
   } else if (code === 'auth_unauthenticated') {
     headingText = providerLabel + ' cannot start this task';
-    bodyText = 'Sign in to ' + providerLabel
-      + ' locally, then try this message again.';
+    bodyText = (globalThis.fsbUiLocale && fsbUiLocale.line)
+      ? fsbUiLocale.line('Sign in to $NAME$ locally, then try this message again.', { name: providerLabel })
+      : 'Sign in to $NAME$ locally, then try this message again.'.replace('$NAME$', providerLabel);
     primaryLabel = 'Open provider setup';
     primaryAction = _openDelegationProviderSetup;
     secondaryLabel = 'Back to message';
@@ -2230,8 +2248,9 @@ function _renderDelegationRunHeader(container, snapshot) {
     container.appendChild(_delegationElement(
       'p',
       'delegation-state-body',
-      'FSB could not return this tab to ' + providerLabel
-        + ', so the run ended and the tab remains under your control. Start a new task when you are ready.'
+      (globalThis.fsbUiLocale && fsbUiLocale.line)
+        ? fsbUiLocale.line('FSB could not return this tab to $NAME$, so the run ended and the tab remains under your control. Start a new task when you are ready.', { name: providerLabel })
+        : 'FSB could not return this tab to $NAME$, so the run ended and the tab remains under your control. Start a new task when you are ready.'.replace('$NAME$', providerLabel)
     ));
     var resumeFailureActions = _delegationElement('div', 'delegation-state-actions');
     resumeFailureActions.appendChild(_delegationAction(
@@ -3302,7 +3321,9 @@ try {
 
 function setAutomationRunnerText(text) {
   if (!automationRunnerLabel) return;
-  automationRunnerLabel.textContent = text || 'Automation running';
+  var label = text || 'Automation running';
+  if (globalThis.fsbUiLocale && typeof fsbUiLocale.markExact === 'function') fsbUiLocale.markExact(automationRunnerLabel, label);
+  else automationRunnerLabel.textContent = label;
 }
 
 function showAutomationRunner(startedAt, text) {
@@ -3378,10 +3399,14 @@ function _renderAutomationRetryPrompt(taskText, onRetry) {
   if (!taskText) return null;
   const retryDiv = document.createElement('div');
   retryDiv.className = 'message system new';
-  retryDiv.textContent = 'Would you like to try again? ';
+  retryDiv.textContent = (globalThis.fsbUiLocale && fsbUiLocale.markExact)
+    ? fsbUiLocale.markExact(retryDiv, 'Would you like to try again? ')
+    : 'Would you like to try again? ';
   const retryBtn = document.createElement('button');
   retryBtn.className = 'retry-btn';
-  retryBtn.textContent = 'Retry';
+  retryBtn.textContent = (globalThis.fsbUiLocale && fsbUiLocale.markExact)
+    ? fsbUiLocale.markExact(retryBtn, 'Retry')
+    : 'Retry';
   retryBtn.addEventListener('click', async () => {
     // WR-03: without this gate the click silently drops the user's intent,
     // because handleSendMessage's runtime gate fail-closes without surfacing why.
@@ -3408,7 +3433,9 @@ function _delegatedRunErrorMessage(snapshot) {
     return 'The previous agent process was stopped and was not reattached. Start a new task when the local service is ready.';
   }
   if (code === 'resume_ownership_lost' || code === 'hold_expired') {
-    return 'FSB could not return this tab to ' + label + ', so the run ended and the tab remains under your control.';
+    return (globalThis.fsbUiLocale && fsbUiLocale.line)
+      ? fsbUiLocale.line('FSB could not return this tab to $NAME$, so the run ended and the tab remains under your control.', { name: label })
+      : 'FSB could not return this tab to $NAME$, so the run ended and the tab remains under your control.'.replace('$NAME$', label);
   }
   if (code === 'wall_clock_timeout') return label + ' ran past the time limit for this task.';
   if (code === 'event_silence_timeout') return label + ' stopped sending updates, so FSB ended the run.';
@@ -3596,7 +3623,9 @@ async function startReconFromSidepanel(url, originalTask) {
   pendingReconTask = originalTask;
   const domain = new URL(url).hostname;
 
-  addMessage('Starting reconnaissance on ' + domain + '...', 'system');
+  addMessage((globalThis.fsbUiLocale && fsbUiLocale.line)
+    ? fsbUiLocale.line('Starting reconnaissance on $DOMAIN$...', { domain: domain })
+    : 'Starting reconnaissance on $DOMAIN$...'.replace('$DOMAIN$', domain), 'system');
 
   try {
     const response = await chrome.runtime.sendMessage({
@@ -3608,7 +3637,9 @@ async function startReconFromSidepanel(url, originalTask) {
     });
 
     if (!response || !response.success) {
-      addMessage('Reconnaissance failed to start: ' + (response?.error || 'Unknown error'), 'system');
+      addMessage((globalThis.fsbUiLocale && fsbUiLocale.line)
+        ? fsbUiLocale.line('Reconnaissance failed to start: $ERROR$', { error: response?.error || 'Unknown error' })
+        : 'Reconnaissance failed to start: $ERROR$'.replace('$ERROR$', response?.error || 'Unknown error'), 'system');
       pendingReconTask = null;
     }
   } catch (error) {
@@ -3657,16 +3688,22 @@ function handleReconComplete(data) {
     reconProgressMessages.delete(id);
   }
 
-  addMessage('Reconnaissance complete! Site map saved for ' + (data?.domain || 'this site') + '.', 'system');
+  addMessage((globalThis.fsbUiLocale && fsbUiLocale.line)
+    ? fsbUiLocale.line('Reconnaissance complete! Site map saved for $DOMAIN$.', { domain: data?.domain || 'this site' })
+    : 'Reconnaissance complete! Site map saved for $DOMAIN$.'.replace('$DOMAIN$', data?.domain || 'this site'), 'system');
 
   // Offer retry with the original task
   if (pendingReconTask) {
     const retryDiv = document.createElement('div');
     retryDiv.className = 'message system new';
-    retryDiv.textContent = 'Site map ready. Retry your task? ';
+    retryDiv.textContent = (globalThis.fsbUiLocale && fsbUiLocale.markExact)
+      ? fsbUiLocale.markExact(retryDiv, 'Site map ready. Retry your task? ')
+      : 'Site map ready. Retry your task? ';
     const retryBtn = document.createElement('button');
     retryBtn.className = 'retry-btn';
-    retryBtn.textContent = 'Retry with Site Map';
+    retryBtn.textContent = (globalThis.fsbUiLocale && fsbUiLocale.markExact)
+      ? fsbUiLocale.markExact(retryBtn, 'Retry with Site Map')
+      : 'Retry with Site Map';
     retryBtn.addEventListener('click', async () => {
       // Phase 11 FINT-20 WR-03 fix -- gate the retry on the foreign-owned
       // check. applyInputLockout dims chatInput/sendBtn/stopBtn/micBtn when
@@ -3883,7 +3920,10 @@ async function refreshActiveTabOwnership(tabId, surfaceGeneration) {
     // while the visible automation presentation stays provider-neutral.
     _chatLockedByOwnerChip = true;
     applyInputLockout(true);
-    chatInput.title = 'Disabled while automation is working on this tab';
+    chatInput.title = (globalThis.fsbUiLocale && fsbUiLocale.text)
+      ? fsbUiLocale.text('shell_locked_tab', 'Disabled while automation is working on this tab')
+      : 'Disabled while automation is working on this tab';
+    chatInput.setAttribute('data-i18n-attr', 'title:shell_locked_tab');
     updateSendButtonState();
     return {
       verified: true,
@@ -4494,7 +4534,9 @@ async function _handleLegacySendMessage(message) {
       ownershipToken: legacy && legacy.ownershipToken
     }, (response) => {
       if (chrome.runtime.lastError) {
-        addMessage(`Error communicating with background script: ${chrome.runtime.lastError.message}`, 'error');
+        addMessage((globalThis.fsbUiLocale && fsbUiLocale.text)
+          ? fsbUiLocale.text('shell_error_background', 'Error communicating with background script: $ERROR$', { error: chrome.runtime.lastError.message })
+          : 'Error communicating with background script: $ERROR$'.replace('$ERROR$', chrome.runtime.lastError.message), 'error');
         return;
       }
 
@@ -4511,14 +4553,18 @@ async function _handleLegacySendMessage(message) {
           // Show Chrome page error as plain text, not in a bubble
           showChromepageError(errorMsg);
         } else {
-          addMessage(`I encountered an error: ${errorMsg}`, 'error');
+          addMessage((globalThis.fsbUiLocale && fsbUiLocale.text)
+            ? fsbUiLocale.text('shell_error_encountered', 'I encountered an error: $ERROR$', { error: errorMsg })
+            : 'I encountered an error: $ERROR$'.replace('$ERROR$', errorMsg), 'error');
         }
         setIdleState(_activeTabIdSnapshot);
       }
     });
     
   } catch (error) {
-    addMessage(`Something went wrong: ${error.message}`, 'error');
+    addMessage((globalThis.fsbUiLocale && fsbUiLocale.text)
+      ? fsbUiLocale.text('shell_error_generic', 'Something went wrong: $ERROR$', { error: error.message })
+      : 'Something went wrong: $ERROR$'.replace('$ERROR$', error.message), 'error');
     setIdleState(_activeTabIdSnapshot);
   }
 }
@@ -4545,7 +4591,9 @@ function stopAutomation() {
     
     if (chrome.runtime.lastError) {
       console.error('Side panel: Chrome runtime error:', chrome.runtime.lastError);
-      addMessage(`Error communicating with background script: ${chrome.runtime.lastError.message}`, 'error');
+      addMessage((globalThis.fsbUiLocale && fsbUiLocale.text)
+          ? fsbUiLocale.text('shell_error_background', 'Error communicating with background script: $ERROR$', { error: chrome.runtime.lastError.message })
+          : 'Error communicating with background script: $ERROR$'.replace('$ERROR$', chrome.runtime.lastError.message), 'error');
       stopRequested = false;
       return;
     }
@@ -4577,7 +4625,9 @@ function stopAutomation() {
         stopRequested = false;
         console.log('Side panel: Stop arrived after natural completion (alreadyEnded)');
       } else {
-        addMessage(`Error stopping automation: ${errorMsg}`, 'error');
+        addMessage((globalThis.fsbUiLocale && fsbUiLocale.text)
+          ? fsbUiLocale.text('shell_error_stop', 'Error stopping automation: $ERROR$', { error: errorMsg })
+          : 'Error stopping automation: $ERROR$'.replace('$ERROR$', errorMsg), 'error');
         stopRequested = false;
         console.error('Side panel: Stop automation failed:', errorMsg);
       }
@@ -4843,7 +4893,7 @@ function ensureActionGroup() {
   group.className = 'action-summary-group';
   const header = document.createElement('div');
   header.className = 'action-summary-header';
-  header.innerHTML = '<span class="action-chevron">></span><span class="action-summary-count">0 actions completed</span>';
+  header.innerHTML = '<span class="action-chevron">></span><span class="action-summary-count">' + escapeHtml(actionCountLabel(0)) + '</span>';
   header.addEventListener('click', () => {
     const list = group.querySelector('.action-summary-list');
     const chevron = group.querySelector('.action-chevron');
@@ -4888,7 +4938,7 @@ function addActionMessage(text) {
   // Update count label
   const countEl = group.querySelector('.action-summary-count');
   if (countEl) {
-    countEl.textContent = `${list.children.length} action${list.children.length === 1 ? '' : 's'} completed`;
+    countEl.textContent = actionCountLabel(list.children.length);
   }
 
   scrollToBottom();
@@ -4912,6 +4962,7 @@ function addStatusMessage(text, type = 'ai') {
   const statusTextEl = document.createElement('span');
   statusTextEl.className = 'status-text';
   statusTextEl.textContent = text;
+  if (globalThis.fsbUiLocale && typeof fsbUiLocale.markExact === 'function') fsbUiLocale.markExact(statusTextEl, text);
   setAutomationRunnerText(text);
   
   // Progress container (hidden until progress data arrives)
@@ -5004,7 +5055,9 @@ function _renderCompletionDomOnly(text, type, isPartial) {
     messageDiv.classList.add('partial-result');
     var label = document.createElement('div');
     label.className = 'partial-result-label';
-    label.textContent = 'Partial result';
+    label.textContent = (globalThis.fsbUiLocale && fsbUiLocale.markExact)
+      ? fsbUiLocale.markExact(label, 'Partial result')
+      : 'Partial result';
     messageDiv.appendChild(label);
   }
 
@@ -5043,7 +5096,9 @@ function addCompletionMessage(text, type = 'ai', isPartial = false) {
     messageDiv.classList.add('partial-result');
     const label = document.createElement('div');
     label.className = 'partial-result-label';
-    label.textContent = 'Partial result';
+    label.textContent = (globalThis.fsbUiLocale && fsbUiLocale.markExact)
+      ? fsbUiLocale.markExact(label, 'Partial result')
+      : 'Partial result';
     messageDiv.appendChild(label);
   }
 
@@ -5322,6 +5377,10 @@ function addMessage(text, type = 'system', kind) {
   } else {
     messageDiv.textContent = text;
   }
+  if (type !== 'user' && type !== 'ai' && type !== 'action'
+      && globalThis.fsbUiLocale && typeof fsbUiLocale.markExact === 'function') {
+    fsbUiLocale.markExact(messageDiv, messageDiv.textContent);
+  }
 
   // Add dismiss button for error messages
   if (type === 'error') {
@@ -5563,13 +5622,17 @@ function renderAutomationCompletionPayload(payload) {
             reconDiv.className = 'message system new recon-suggestion';
             const textSpan = document.createElement('span');
             textSpan.className = 'recon-suggestion-text';
-            textSpan.textContent = 'This site does not have a map yet. Reconnaissance can help FSB learn the site structure for better performance.';
+            textSpan.textContent = (globalThis.fsbUiLocale && fsbUiLocale.markExact)
+              ? fsbUiLocale.markExact(textSpan, 'This site does not have a map yet. Reconnaissance can help FSB learn the site structure for better performance.')
+              : 'This site does not have a map yet. Reconnaissance can help FSB learn the site structure for better performance.';
             reconDiv.appendChild(textSpan);
 
             const reconBtn = document.createElement('button');
             reconBtn.className = 'recon-btn';
             reconBtn.id = 'reconFromSidepanel';
-            reconBtn.textContent = 'Run Reconnaissance';
+            reconBtn.textContent = (globalThis.fsbUiLocale && fsbUiLocale.markExact)
+              ? fsbUiLocale.markExact(reconBtn, 'Run Reconnaissance')
+              : 'Run Reconnaissance';
             reconBtn.addEventListener('click', () => {
               startReconFromSidepanel(currentUrl, payload.task || completionMessage);
             });
@@ -5818,13 +5881,17 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 reconDiv.className = 'message system new recon-suggestion';
                 const textSpan = document.createElement('span');
                 textSpan.className = 'recon-suggestion-text';
-                textSpan.textContent = 'This site does not have a map yet. Reconnaissance can help FSB learn the site structure for better performance.';
+                textSpan.textContent = (globalThis.fsbUiLocale && fsbUiLocale.markExact)
+              ? fsbUiLocale.markExact(textSpan, 'This site does not have a map yet. Reconnaissance can help FSB learn the site structure for better performance.')
+              : 'This site does not have a map yet. Reconnaissance can help FSB learn the site structure for better performance.';
                 reconDiv.appendChild(textSpan);
 
                 const reconBtn = document.createElement('button');
                 reconBtn.className = 'recon-btn';
                 reconBtn.id = 'reconFromSidepanel';
-                reconBtn.textContent = 'Run Reconnaissance';
+                reconBtn.textContent = (globalThis.fsbUiLocale && fsbUiLocale.markExact)
+              ? fsbUiLocale.markExact(reconBtn, 'Run Reconnaissance')
+              : 'Run Reconnaissance';
                 reconBtn.addEventListener('click', () => {
                   startReconFromSidepanel(currentUrl, request.task || completionMessage);
                 });
@@ -5861,7 +5928,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         // Snapshot previous status as completed action message
         const prevText = currentStatusMessage?.querySelector('.status-text')?.textContent;
         const skipTexts = ['Starting automation...', 'Connecting to page...', 'Connected. Analyzing page...', 'Analyzing page...'];
-        if (prevText && !skipTexts.includes(prevText)) {
+        // addStatusMessage() shows these through fsbUiLocale, so the DOM may hold a translation.
+        const isTransient = (english) => prevText === english
+          || (globalThis.fsbUiLocale && typeof fsbUiLocale.isLine === 'function' && fsbUiLocale.isLine(english, prevText));
+        if (prevText && !skipTexts.some(isTransient)) {
           addActionMessage(prevText);
         }
         updateStatusMessage(request.message, {
@@ -6014,34 +6084,30 @@ function showLoginPrompt(domain, fields) {
   container.className = 'message login-prompt new';
   container.id = 'login-prompt';
 
-  const fieldLabel = (fields && fields.usernameType === 'email') ? 'Email' : 'Username / Email';
+  const fieldLabel = escapeAttr(spLine((fields && fields.usernameType === 'email') ? 'Email' : 'Username / Email'));
 
   // Escape domain for safe HTML insertion
-  const safeDomain = (domain || 'this site').replace(/[<>&"']/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c]));
+  const safeDomain = escapeAttr(domain || spLine('this site'));
   const authPrompt = null;
-  const promptDetail = (authPrompt && authPrompt.detail) || 'Submit credentials once to let FSB sign in and resume this same session.';
-  const handoffDetail = (authPrompt && authPrompt.handoff) || 'If you skip or the site still needs manual approval, FSB will preserve the completed work and finish with a manual handoff.';
   const allowSave = authPrompt?.allowSave !== false;
-  const saveDisabledReason = authPrompt?.saveDisabledReason || 'Saving is unavailable for this session.';
-  const safeSubtext = `${promptDetail} ${handoffDetail}`.trim().replace(/[<>&"']/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c]));
-  const safeSaveDisabledReason = saveDisabledReason.replace(/[<>&"']/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c]));
+  const safeSaveDisabledReason = escapeAttr(authPrompt?.saveDisabledReason || spLine('Saving is unavailable for this session.'));
 
   container.innerHTML = `
     <div class="login-prompt-header">
       <i class="fas fa-lock"></i>
-      <span>Login Required</span>
+      <span>${escapeHtml(spLine('Login Required'))}</span>
     </div>
     <div class="login-prompt-domain">${safeDomain}</div>
-    <div class="login-prompt-subtext">Enter your credentials to sign in. They will be encrypted and saved for future use.</div>
+    <div class="login-prompt-subtext">${escapeHtml(spLine('Enter your credentials to sign in. They will be encrypted and saved for future use.'))}</div>
     <div class="login-prompt-form">
       <div class="login-prompt-field">
         <label>${fieldLabel}</label>
         <input type="text" id="loginPromptUsername" placeholder="${fieldLabel}" autocomplete="username">
       </div>
       <div class="login-prompt-field">
-        <label>Password</label>
+        <label>${escapeHtml(spLine('Password'))}</label>
         <div class="login-prompt-password-wrapper">
-          <input type="password" id="loginPromptPassword" placeholder="Password" autocomplete="current-password">
+          <input type="password" id="loginPromptPassword" placeholder="${escapeAttr(spLine('Password'))}" autocomplete="current-password">
           <button type="button" class="login-prompt-eye" id="loginPromptTogglePw">
             <i class="fas fa-eye"></i>
           </button>
@@ -6049,12 +6115,12 @@ function showLoginPrompt(domain, fields) {
       </div>
       <label class="login-prompt-save-label">
         <input type="checkbox" id="loginPromptSave" ${allowSave ? 'checked' : ''} ${allowSave ? '' : 'disabled'}>
-        <span>Save for future use</span>
+        <span>${escapeHtml(spLine('Save for future use'))}</span>
       </label>
       ${allowSave ? '' : `<div class="login-prompt-subtext">${safeSaveDisabledReason}</div>`}
       <div class="login-prompt-actions">
-        <button class="login-prompt-btn primary" id="loginPromptSubmit">Sign In</button>
-        <button class="login-prompt-btn ghost" id="loginPromptSkip">Skip</button>
+        <button class="login-prompt-btn primary" id="loginPromptSubmit">${escapeHtml(spLine('Sign In'))}</button>
+        <button class="login-prompt-btn ghost" id="loginPromptSkip">${escapeHtml(spLine('Skip'))}</button>
       </div>
     </div>
   `;
@@ -6153,9 +6219,9 @@ function showPaymentPrompt(domain, paymentPrompt) {
   container.className = 'message payment-prompt new';
   container.id = 'payment-prompt';
 
-  const safeDomain = escapeHtml(domain || 'this checkout');
-  const headerText = 'Checkout Detected';
-  const detailText = escapeHtml(paymentPrompt?.detail || paymentPrompt?.blockedReason || 'Saved payment methods are not available for this checkout.');
+  const safeDomain = escapeHtml(domain || spLine('this checkout'));
+  const headerText = escapeHtml(spLine('Checkout Detected'));
+  const detailText = escapeHtml(paymentPrompt?.detail || paymentPrompt?.blockedReason || spLine('Saved payment methods are not available for this checkout.'));
   const stateLabelMap = {
     no_saved_methods: 'No saved cards',
     feature_disabled: 'Payments disabled',
@@ -6163,9 +6229,9 @@ function showPaymentPrompt(domain, paymentPrompt) {
     vault_locked: 'Vault locked',
     payment_locked: 'Payment access locked'
   };
-  const stateLabel = escapeHtml(stateLabelMap[state] || 'Saved payments unavailable');
+  const stateLabel = escapeHtml(spLine(stateLabelMap[state] || 'Saved payments unavailable'));
   const primaryAction = paymentPrompt?.primaryAction || '';
-  const primaryActionLabel = escapeHtml(paymentPrompt?.primaryActionLabel || 'Open Payments');
+  const primaryActionLabel = escapeHtml(paymentPrompt?.primaryActionLabel || spLine('Open Payments'));
 
   if (!available) {
     container.innerHTML = `
@@ -6178,7 +6244,7 @@ function showPaymentPrompt(domain, paymentPrompt) {
       <div class="login-prompt-subtext">${detailText}</div>
       <div class="login-prompt-actions">
         ${primaryAction ? `<button class="login-prompt-btn primary" id="paymentPromptPrimaryAction">${primaryActionLabel}</button>` : ''}
-        <button class="login-prompt-btn ghost" id="paymentPromptDismiss">Dismiss</button>
+        <button class="login-prompt-btn ghost" id="paymentPromptDismiss">${escapeHtml(spLine('Dismiss'))}</button>
       </div>
     `;
 
@@ -6215,10 +6281,13 @@ function showPaymentPrompt(domain, paymentPrompt) {
       diners: 'Diners',
       jcb: 'JCB'
     };
-    const brandLabel = brandLabelMap[method.cardBrand] || 'Unknown';
-    const title = escapeHtml(method.nickname || `${brandLabel} ending in ${method.last4 || '****'}`);
-    const subtitle = escapeHtml(`${method.maskedNumber || '****'}${method.expiryMonth && method.expiryYearLast2 ? ` | Exp ${method.expiryMonth}/${method.expiryYearLast2}` : ''}`);
-    const billing = escapeHtml(method.billingSummary || 'Billing profile stored');
+    const brandLabel = brandLabelMap[method.cardBrand] || spLine('Unknown');
+    const title = escapeHtml(method.nickname || spLine('$BRAND$ ending in $LAST$', { brand: brandLabel, last: method.last4 || '****' }));
+    const expiry = method.expiryMonth && method.expiryYearLast2
+      ? ' | ' + spLine('Exp $MONTH$/$YEAR$', { month: method.expiryMonth, year: method.expiryYearLast2 })
+      : '';
+    const subtitle = escapeHtml(`${method.maskedNumber || '****'}${expiry}`);
+    const billing = escapeHtml(method.billingSummary || spLine('Billing profile stored'));
     const brand = (method.cardBrand || 'unknown').replace(/[^a-z]/gi, '').toLowerCase() || 'unknown';
     return `
       <button class="payment-prompt-option ${index === 0 ? 'selected' : ''}" data-payment-id="${method.id}">
@@ -6241,8 +6310,8 @@ function showPaymentPrompt(domain, paymentPrompt) {
     <div class="login-prompt-subtext">${detailText}</div>
     <div class="payment-prompt-options">${methodOptions}</div>
     <div class="login-prompt-actions">
-      <button class="login-prompt-btn primary" id="paymentPromptFill">Fill Saved Card</button>
-      <button class="login-prompt-btn ghost" id="paymentPromptSkip">Skip</button>
+      <button class="login-prompt-btn primary" id="paymentPromptFill">${escapeHtml(spLine('Fill Saved Card'))}</button>
+      <button class="login-prompt-btn ghost" id="paymentPromptSkip">${escapeHtml(spLine('Skip'))}</button>
     </div>
   `;
 
@@ -6425,7 +6494,7 @@ async function loadHistoryList() {
     if (sessions.length === 0) {
       historyList.innerHTML = '<div class="history-empty-state">' +
         '<i class="fa fa-inbox"></i>' +
-        '<p>No sessions yet. Run an automation to see your history here.</p>' +
+        '<p>' + escapeHtml(spLine('No sessions yet. Run an automation to see your history here.')) + '</p>' +
         '</div>';
       return;
     }
@@ -6436,27 +6505,27 @@ async function loadHistoryList() {
         : '';
       var idleClosed = session.status === 'expired' ||
         (session.status === 'stopped' && session.outcomeDetails?.reason === 'idle_timeout');
-      var statusLabel = idleClosed ? 'Idle-closed' : (session.status || 'unknown');
+      var statusLabel = idleClosed ? spLine('Idle-closed') : (session.status || 'unknown');
       var statusClass = idleClosed ? 'idle-closed' : (session.status || '');
       var hasReplayDetails = (session.actionCount > 0) || !!session.replayIntegrity;
       return '<div class="history-item" data-session-id="' + escapeHtml(session.id) + '">' +
         '<div class="history-item-info">' +
-          '<div class="history-item-task">' + escapeHtml(session.task || 'Unknown task') + '</div>' +
+          '<div class="history-item-task">' + escapeHtml(session.task || spLine('Unknown task')) + '</div>' +
           '<div class="history-item-meta">' +
             '<span>' + formatSessionDate(session.startTime) + '</span>' +
-            '<span>' + (session.actionCount || 0) + ' actions</span>' +
+            '<span>' + escapeHtml(spLine('$COUNT$ actions', { count: session.actionCount || 0 })) + '</span>' +
             costDisplay +
             (session.mode === 'mcp-agent'
               ? '<span class="history-source-badge mcp">MCP · ' + escapeHtml(session.mcpClient || 'Agent') + '</span>'
-              : '<span class="history-source-badge">Autopilot</span>') +
+              : '<span class="history-source-badge">' + escapeHtml(spLine('Autopilot')) + '</span>') +
             '<span class="history-status ' + escapeHtml(statusClass) + '">' + escapeHtml(statusLabel) + '</span>' +
           '</div>' +
         '</div>' +
         (hasReplayDetails ?
-          '<button class="history-replay-btn" data-session-id="' + escapeHtml(session.id) + '" title="Replay session">' +
+          '<button class="history-replay-btn" data-session-id="' + escapeHtml(session.id) + '" title="' + escapeAttr(spLine('Replay session')) + '">' +
             '<i class="fa fa-play"></i>' +
           '</button>' : '') +
-        '<button class="history-delete-btn" data-session-id="' + escapeHtml(session.id) + '" title="Delete session">' +
+        '<button class="history-delete-btn" data-session-id="' + escapeHtml(session.id) + '" title="' + escapeAttr(spLine('Delete session')) + '">' +
           '<i class="fa fa-trash"></i>' +
         '</button>' +
       '</div>';
@@ -6465,7 +6534,7 @@ async function loadHistoryList() {
     console.error('Failed to load history list:', error);
     historyList.innerHTML = '<div class="history-empty-state">' +
       '<i class="fa fa-exclamation-triangle"></i>' +
-      '<p>Failed to load sessions.</p>' +
+      '<p>' + escapeHtml(spLine('Failed to load sessions.')) + '</p>' +
       '</div>';
   }
 }
@@ -6515,7 +6584,9 @@ function renderReplayDecisionPrompt(request) {
         }
       } catch (error) {
         Array.from(actions.querySelectorAll('button')).forEach((item) => { item.disabled = false; });
-        addMessage('Could not apply replay decision: ' + error.message, 'error');
+        addMessage((globalThis.fsbUiLocale && fsbUiLocale.line)
+          ? fsbUiLocale.line('Could not apply replay decision: $ERROR$', { error: error.message })
+          : 'Could not apply replay decision: $ERROR$'.replace('$ERROR$', error.message), 'error');
       }
     });
     actions.appendChild(button);
@@ -6540,7 +6611,9 @@ function renderReplayPreview(preview) {
 
   const heading = document.createElement('div');
   heading.className = 'replay-preview-heading';
-  heading.textContent = 'Verified replay preview';
+  heading.textContent = (globalThis.fsbUiLocale && fsbUiLocale.markExact)
+    ? fsbUiLocale.markExact(heading, 'Verified replay preview')
+    : 'Verified replay preview';
   card.appendChild(heading);
 
   const meta = document.createElement('div');
@@ -6556,7 +6629,11 @@ function renderReplayPreview(preview) {
   const origin = document.createElement('div');
   origin.className = 'replay-preview-origin';
   try { origin.textContent = 'Fresh tab: ' + new URL(preview.startUrl).origin; }
-  catch (_error) { origin.textContent = 'Fresh recorded-site tab'; }
+  catch (_error) {
+    origin.textContent = (globalThis.fsbUiLocale && fsbUiLocale.markExact)
+      ? fsbUiLocale.markExact(origin, 'Fresh recorded-site tab')
+      : 'Fresh recorded-site tab';
+  }
   card.appendChild(origin);
 
   const timeline = document.createElement('div');
@@ -6604,8 +6681,25 @@ function renderMcpReplayApproval(approval) {
   const tabCount = Math.max(1, approval.preview.tabs?.length || 0);
   const highImpact = (approval.preview.steps || [])
     .filter((step) => step.replay?.availability === 'approval-per-step').length;
-  copy.textContent = `An MCP client requested this replay in ${tabCount} fresh tab${tabCount === 1 ? '' : 's'}. ` +
-    `One approval covers only the exact verified manifest${highImpact ? `, including ${highImpact} high-impact step${highImpact === 1 ? '' : 's'}` : ''}.`;
+  var tabSentence = (globalThis.fsbUiLocale && fsbUiLocale.line)
+    ? fsbUiLocale.line(tabCount === 1
+      ? 'An MCP client requested this replay in $COUNT$ fresh tab.'
+      : 'An MCP client requested this replay in $COUNT$ fresh tabs.', { count: tabCount })
+    : (tabCount === 1
+      ? 'An MCP client requested this replay in $COUNT$ fresh tab.'
+      : 'An MCP client requested this replay in $COUNT$ fresh tabs.').replace('$COUNT$', String(tabCount));
+  var impactSentence = highImpact
+    ? ((globalThis.fsbUiLocale && fsbUiLocale.line)
+      ? fsbUiLocale.line(highImpact === 1
+        ? 'One approval covers only the exact verified manifest, including $COUNT$ high-impact step.'
+        : 'One approval covers only the exact verified manifest, including $COUNT$ high-impact steps.', { count: highImpact })
+      : (highImpact === 1
+        ? 'One approval covers only the exact verified manifest, including $COUNT$ high-impact step.'
+        : 'One approval covers only the exact verified manifest, including $COUNT$ high-impact steps.').replace('$COUNT$', String(highImpact)))
+    : ((globalThis.fsbUiLocale && fsbUiLocale.line)
+      ? fsbUiLocale.line('One approval covers only the exact verified manifest.')
+      : 'One approval covers only the exact verified manifest.');
+  copy.textContent = tabSentence + ' ' + impactSentence;
   card.appendChild(copy);
 
   const actions = document.createElement('div');
@@ -6613,11 +6707,15 @@ function renderMcpReplayApproval(approval) {
   const approve = document.createElement('button');
   approve.type = 'button';
   approve.className = 'replay-decision-btn retry';
-  approve.textContent = 'Approve replay';
+  approve.textContent = (globalThis.fsbUiLocale && fsbUiLocale.markExact)
+    ? fsbUiLocale.markExact(approve, 'Approve replay')
+    : 'Approve replay';
   const cancel = document.createElement('button');
   cancel.type = 'button';
   cancel.className = 'replay-decision-btn stop';
-  cancel.textContent = 'Cancel';
+  cancel.textContent = (globalThis.fsbUiLocale && fsbUiLocale.markExact)
+    ? fsbUiLocale.markExact(cancel, 'Cancel')
+    : 'Cancel';
   actions.appendChild(approve);
   actions.appendChild(cancel);
   card.appendChild(actions);
@@ -6647,7 +6745,9 @@ function renderMcpReplayApproval(approval) {
     } catch (error) {
       setDisabled(false);
       completeStatusMessage('Replay error', 'error');
-      addMessage('Failed to start requested replay: ' + error.message, 'error');
+      addMessage((globalThis.fsbUiLocale && fsbUiLocale.line)
+        ? fsbUiLocale.line('Failed to start requested replay: $ERROR$', { error: error.message })
+        : 'Failed to start requested replay: $ERROR$'.replace('$ERROR$', error.message), 'error');
     }
   });
   cancel.addEventListener('click', async () => {
@@ -6663,7 +6763,9 @@ function renderMcpReplayApproval(approval) {
       addMessage('Replay request cancelled. No target tabs were opened.', 'system');
     } catch (error) {
       setDisabled(false);
-      addMessage('Could not cancel replay request: ' + error.message, 'error');
+      addMessage((globalThis.fsbUiLocale && fsbUiLocale.line)
+        ? fsbUiLocale.line('Could not cancel replay request: $ERROR$', { error: error.message })
+        : 'Could not cancel replay request: $ERROR$'.replace('$ERROR$', error.message), 'error');
     }
   });
 
@@ -6696,9 +6798,9 @@ async function startReplay(sessionId) {
     renderReplayPreview(preview);
 
     if (preview.truncated) {
-      addMessage(
-        `This recording is inspect-only because only the latest ${preview.steps.length} of ` +
-          `${preview.totalSourceSteps} recorded calls are available. Earlier browser state cannot be reconstructed safely.`,
+      addMessage((globalThis.fsbUiLocale && fsbUiLocale.line)
+        ? fsbUiLocale.line('This recording is inspect-only because only the latest $LATEST$ of $TOTAL$ recorded calls are available. Earlier browser state cannot be reconstructed safely.', { latest: preview.steps.length, total: preview.totalSourceSteps })
+        : 'This recording is inspect-only because only the latest $LATEST$ of $TOTAL$ recorded calls are available. Earlier browser state cannot be reconstructed safely.'.replace('$LATEST$', String(preview.steps.length)).replace('$TOTAL$', String(preview.totalSourceSteps)),
         'system'
       );
       return;
@@ -6716,10 +6818,20 @@ async function startReplay(sessionId) {
     const approvals = [];
     if (onceSteps.length > 0) approvals.push(`${onceSteps.length} write step${onceSteps.length === 1 ? '' : 's'}`);
     if (perStep.length > 0) approvals.push(`${perStep.length} high-impact step${perStep.length === 1 ? '' : 's'}`);
-    const summary = `Replay this verified timeline in ${tabCount} fresh tab${tabCount === 1 ? '' : 's'}?` +
-      (approvals.length > 0
-        ? ` This one approval covers the exact signed manifest: ${approvals.join(' and ')}.`
-        : ' The timeline contains only read and navigation steps.');
+    const tabQuestion = (globalThis.fsbUiLocale && fsbUiLocale.line)
+      ? fsbUiLocale.line(tabCount === 1
+        ? 'Replay this verified timeline in $COUNT$ fresh tab?'
+        : 'Replay this verified timeline in $COUNT$ fresh tabs?', { count: tabCount })
+      : (tabCount === 1
+        ? 'Replay this verified timeline in $COUNT$ fresh tab?'
+        : 'Replay this verified timeline in $COUNT$ fresh tabs?').replace('$COUNT$', String(tabCount));
+    const summary = approvals.length > 0
+      ? tabQuestion + ' ' + ((globalThis.fsbUiLocale && fsbUiLocale.line)
+        ? fsbUiLocale.line('This one approval covers the exact signed manifest: $DETAIL$.', { detail: approvals.join(' and ') })
+        : 'This one approval covers the exact signed manifest: $DETAIL$.'.replace('$DETAIL$', approvals.join(' and ')))
+      : tabQuestion + ' ' + ((globalThis.fsbUiLocale && fsbUiLocale.line)
+        ? fsbUiLocale.line('The timeline contains only read and navigation steps.')
+        : 'The timeline contains only read and navigation steps.');
     if (!confirm(summary)) {
       addMessage('Replay cancelled. The original recording was not changed.', 'system');
       return;
@@ -6745,7 +6857,9 @@ async function startReplay(sessionId) {
     }
   } catch (error) {
     completeStatusMessage('Replay error', 'error');
-    addMessage('Failed to start replay: ' + error.message, 'error');
+    addMessage((globalThis.fsbUiLocale && fsbUiLocale.line)
+      ? fsbUiLocale.line('Failed to start replay: $ERROR$', { error: error.message })
+      : 'Failed to start replay: $ERROR$'.replace('$ERROR$', error.message), 'error');
   }
 }
 
@@ -6872,7 +6986,9 @@ async function loadSessionView(sessionId) {
 
   } catch (error) {
     console.error('Failed to load session view:', error);
-    addMessage('Failed to load session: ' + error.message, 'error');
+    addMessage((globalThis.fsbUiLocale && fsbUiLocale.line)
+      ? fsbUiLocale.line('Failed to load session: $ERROR$', { error: error.message })
+      : 'Failed to load session: $ERROR$'.replace('$ERROR$', error.message), 'error');
   }
 }
 
@@ -6909,6 +7025,25 @@ function escapeHtml(str) {
   var div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
+}
+
+// escapeHtml() leaves quotes alone, which breaks attribute values.
+function escapeAttr(str) {
+  return String(str == null ? '' : str).replace(/[<>&"']/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// Side panel copy from the exact maps (ui-locale.js and copy-exact.js).
+function spLine(english, subs) {
+  if (globalThis.fsbUiLocale && typeof fsbUiLocale.line === 'function') return fsbUiLocale.line(english, subs);
+  if (!subs) return english;
+  return english.replace(/\$([A-Za-z0-9_]+)\$/g, (all, name) => {
+    const value = subs[name] != null ? subs[name] : subs[name.toLowerCase()];
+    return value == null ? all : String(value);
+  });
+}
+
+function actionCountLabel(count) {
+  return spLine(count === 1 ? '$COUNT$ action completed' : '$COUNT$ actions completed', { count });
 }
 
 
@@ -7020,3 +7155,12 @@ console.log(`FSB v${chrome.runtime.getManifest().version} side panel script load
 //       return schedule.type;
 //   }
 // }
+
+
+if (globalThis.fsbUiLocale && typeof fsbUiLocale.boot === 'function') {
+  fsbUiLocale.boot().then(function () {
+    if (typeof fsbUiLocale.mountSelect === 'function') fsbUiLocale.mountSelect(document.getElementById('fsbUiLocaleSelect'));
+    fsbUiLocale.apply(document);
+    if (typeof _renderHeaderStatus === 'function') _renderHeaderStatus();
+  });
+}

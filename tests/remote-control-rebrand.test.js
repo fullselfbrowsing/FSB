@@ -42,7 +42,7 @@ const CSS = read(path.join('extension', 'ui', 'options.css'));
 console.log('\n--- Sync nav: Beta badge on Sync (consolidation) ---');
 
 assert(
-  CP.includes('<span>Sync <span class="feature-badge beta">Beta</span></span>'),
+  CP.includes('<span><span data-i18n="panel_8d261a372f">Sync</span> <span class="feature-badge beta" data-i18n="panel_703390318b">Beta</span></span>'),
   '[SYNC-01] control_panel.html Sync nav-item carries the Beta badge inline'
 );
 assert(

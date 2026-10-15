@@ -172,6 +172,11 @@ body {
   align-self: flex-start;
 }
 
+#fsbUiLocaleSelect {
+  max-width: 9rem;
+  font: inherit;
+}
+
 .icon-btn {
   width: 32px;
   height: 32px;
