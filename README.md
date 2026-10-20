@@ -59,6 +59,8 @@ Project Mariner, Claude Computer Use, and OpenAI Operator rely heavily on visual
 | Codex | `npx -y fsb-mcp-server@latest install --codex` |
 | All at once | `npx -y fsb-mcp-server@latest install --all` |
 
+**LM Studio (0.3.17+):** [![Add MCP Server fsb to LM Studio](https://files.lmstudio.ai/deeplink/mcp-install-light.svg)](lmstudio://add_mcp?name=fsb&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsImZzYi1tY3Atc2VydmVyIl19) · **Gemini CLI:** `gemini extensions install https://github.com/fullselfbrowsing/FSB`
+
 Preview before writing: append `--dry-run`. Sanity check with `npx -y fsb-mcp-server@latest doctor`. Restart the client so the new MCP server appears.
 
 **Then install the browser side** (the MCP bridge talks to the extension):
