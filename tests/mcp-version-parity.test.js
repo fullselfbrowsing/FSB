@@ -331,13 +331,25 @@ async function run() {
   for (const retired of ['start_visual_session', 'end_visual_session', 'back']) {
     assert(!registeredToolNames.includes(retired), `retired ${retired} tool stays off the MCP surface`);
   }
-  // A count claim is "N tools", "N MCP tools", "N registered (MCP) tools" or "N-tool".
-  const TOOL_COUNT_CLAIM = /(?<![\w.])(\d+)(?:-tool\b|\s+(?:registered\s+)?(?:MCP\s+)?tools\b)/gu;
-  const claimedCounts = (text) => Array.from(text.matchAll(TOOL_COUNT_CLAIM), (match) => Number(match[1]));
+  // A count claim is "N-tool", "N [registered|granular] [MCP [browser]] tools",
+  // or a "Tools ... N available" row. Markup is stripped first, so
+  // "68 <span>MCP</span> tools" reads as "68 MCP tools". "53 browser tools" and
+  // "4 trigger tools" count the extension's own registry, not MCP, and stay out.
+  const TOOL_COUNT_CLAIM = /(?<![\w.])(\d+)(?:-tool\b|\s+(?:(?:registered|granular)\s+)?(?:MCP\s+(?:browser\s+)?)?tools\b)|\btools?\b[^\d\n]{0,12}?(?<![\w.])(\d+)\s+available\b/giu;
+  const withoutMarkup = (text) => text
+    .replace(/<x\b[^>]*\/>/gu, '')
+    .replace(/<[^>]+>/gu, ' ')
+    .replace(/\s+/gu, ' ');
+  const claimedCounts = (text) => Array.from(withoutMarkup(text).matchAll(TOOL_COUNT_CLAIM),
+    (match) => Number(match[1] ?? match[2]));
   const statesToolCount = new RegExp(`(?<![\\d.])${toolCount}(?![\\d.])`, 'u');
+  // Scanned for stale claims only; neither states the count today.
+  const sourcesWithoutClaims = new Set(['showcase about metadata', 'showcase support page']);
   for (const [name, content] of liveToolCountSources) {
     if (!name.startsWith('showcase locale ')) {
       const counts = claimedCounts(content);
+      assert(counts.length > 0 || sourcesWithoutClaims.has(name),
+        `${name} still states a tool count the check can read`);
       assert(counts.every((count) => count === toolCount),
         `${name} states the ${toolCount}-tool registered surface (claims found: ${counts.join(', ') || 'none'})`);
       continue;
@@ -353,7 +365,7 @@ async function run() {
         `${name} ${unit[1]} source states ${toolCount} tools (got ${counts.join(', ')})`);
       const target = (unit[0].match(/<target[^>]*>([\s\S]*?)<\/target>/u) || [])[1];
       if (target !== undefined) {
-        assert(statesToolCount.test(target), `${name} ${unit[1]} translation states ${toolCount} tools`);
+        assert(statesToolCount.test(withoutMarkup(target)), `${name} ${unit[1]} translation states ${toolCount} tools`);
       }
     }
   }

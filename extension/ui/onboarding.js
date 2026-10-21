@@ -879,7 +879,7 @@
       return [
         { k: 'Setup', v: 'MCP server' },
         { k: 'Command', v: 'fsb-mcp-server', mono: true },
-        { k: 'Tools', v: '68 available' },
+        { k: 'Tools', v: '69 available' },
         { k: 'Access', v: 'Granted on install', ok: true },
         { k: 'Version', v: `v${VERSION}`, mono: true }
       ];

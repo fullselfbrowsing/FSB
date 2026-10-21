@@ -1621,8 +1621,8 @@
       },
       {
         "id": "home.engine.mcp.fact.tools",
-        "sourceSha256": "be82197e9662c8e2c9788aea0a27c4dc9e51db4ae7e456eefb39ab88c021de34",
-        "targetSha256": "04d914741631f87377073bf5fa253d9b4a9d90379573b16c970f16d2afaa886f",
+        "sourceSha256": "485c669be39838cb5f5e9593d6393b2eeb78676f283835af645bb7f1625946e6",
+        "targetSha256": "dedc78f12f58994c4f436de0107e23cc658ee138e559e5b14b9ab9c1f1a0027e",
         "reason": "Tools is the standard German technical loanword, capitalized as a noun; the MCP compound uses a German hyphen."
       }
     ]
