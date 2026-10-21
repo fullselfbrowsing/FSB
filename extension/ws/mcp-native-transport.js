@@ -54,7 +54,11 @@
   // structured error the model can act on.
   const NATIVE_SOFT_PAYLOAD_LIMIT = 4 * 1024 * 1024;
   const NATIVE_MAX_REASSEMBLY_BYTES = 32 * 1024 * 1024;
-  const NATIVE_REASSEMBLY_TIMEOUT_MS = 30000;
+  // Measured from the LAST chunk, like NativeFraming.reassemblyTimeout on the
+  // host. The host drains a chunked message one chunk per poll reply at
+  // round-trip speed, so a gap this long means one was lost. It has to fire
+  // well inside the server's 30s sendAndWait, whose clock started first.
+  const NATIVE_REASSEMBLY_TIMEOUT_MS = 5000;
   // Long-poll hold time. Inside any plausible NSExtension request watchdog.
   const NATIVE_POLL_TIMEOUT_MS = 5000;
 
@@ -116,6 +120,7 @@
       this._appId = opts.appId || NATIVE_APP_ID;
       this._openTimeoutMs = opts.openTimeoutMs || NATIVE_OPEN_TIMEOUT_MS;
       this._maxFrameBytes = opts.maxFrameBytes || NATIVE_MAX_FRAME_BYTES;
+      this._reassemblyTimeoutMs = opts.reassemblyTimeoutMs || NATIVE_REASSEMBLY_TIMEOUT_MS;
 
       this._readyState = CONNECTING;
       this._port = null;
@@ -215,10 +220,17 @@
      * staged agent release and reconnect scheduling. queueMicrotask (not
      * setTimeout) keeps both in the same task so service-worker suspension
      * cannot split them.
+     *
+     * A port that is still attached is told to close :7225 first. Safari gives
+     * the host no signal when the port is dropped, only silence, and the
+     * bridge's reconnect lands inside the host's linger and ADOPTS the
+     * still-open socket. The server then never sees a close, and its
+     * sendAndWait rejects with a timeout that does not arm sw_evicted recovery.
      */
     _fail(reason, code) {
       if (this._readyState === CLOSED) return;
       this._readyState = CLOSING;
+      this._postClose(code || 1006, reason);
       this._teardown();
       try { if (this.onerror) this.onerror(new Error(reason)); } catch (_e) { /* consumer threw */ }
       queueMicrotask(() => {
@@ -229,8 +241,25 @@
       });
     }
 
+    // Not _post(): a throwing post calls _fail(), which calls this while the
+    // state is CLOSING, and its CLOSED guard would not stop the recursion. In
+    // close() it would also fire a second onclose.
+    _postClose(code, reason) {
+      if (!this._port) return;
+      try {
+        this._port.postMessage({
+          v: NATIVE_PROTOCOL_VERSION,
+          t: 'close',
+          seq: (this._seqOut += 1),
+          code: code,
+          reason: reason
+        });
+      } catch (_e) { /* port already gone; teardown follows */ }
+    }
+
     _teardown() {
       if (this._openTimer) { clearTimeout(this._openTimer); this._openTimer = null; }
+      for (const buf of this._reassembly.values()) clearTimeout(buf.timer);
       this._reassembly.clear();
       this._pollOutstanding = false;
       if (this._port) {
@@ -323,15 +352,6 @@
       let buf = this._reassembly.get(cid);
       if (!buf) {
         buf = { parts: new Array(msg.n).fill(null), received: 0, bytes: 0, timer: null };
-        // Never let a truncated multipart message sit forever: a stalled
-        // reassembly would hang the corresponding sendAndWait until the
-        // server's 30s timeout, and that timeout string is NOT one of the
-        // bridge-disconnect messages, so the sw_evicted recovery would never
-        // arm. Fail loudly instead.
-        buf.timer = setTimeout(() => {
-          this._reassembly.delete(cid);
-          this._fail('reassembly_timeout', 1006);
-        }, NATIVE_REASSEMBLY_TIMEOUT_MS);
         this._reassembly.set(cid, buf);
       }
 
@@ -339,6 +359,17 @@
         buf.parts[msg.i] = msg.data || '';
         buf.received += 1;
         buf.bytes += (msg.data || '').length;
+        // Never let a truncated multipart message sit forever: a stalled
+        // reassembly would hang the corresponding sendAndWait until the
+        // server's 30s timeout, and that timeout string is NOT one of the
+        // bridge-disconnect messages, so the sw_evicted recovery would never
+        // arm. Every accepted chunk restarts the deadline, and _fail() closes
+        // :7225 so the server sees the loss as a disconnect.
+        clearTimeout(buf.timer);
+        buf.timer = setTimeout(() => {
+          this._reassembly.delete(cid);
+          this._fail('reassembly_timeout', 1006);
+        }, this._reassemblyTimeoutMs);
       }
 
       if (buf.bytes > NATIVE_MAX_REASSEMBLY_BYTES) {
@@ -397,13 +428,7 @@
     close(code, reason) {
       if (this._readyState === CLOSED || this._readyState === CLOSING) return;
       this._readyState = CLOSING;
-      this._post({
-        v: NATIVE_PROTOCOL_VERSION,
-        t: 'close',
-        seq: (this._seqOut += 1),
-        code: code || 1000,
-        reason: reason || 'intentional'
-      });
+      this._postClose(code || 1000, reason || 'intentional');
       this._teardown();
       queueMicrotask(() => {
         this._readyState = CLOSED;
@@ -418,6 +443,7 @@
   FsbNativeBridgeSocket.NATIVE_SOFT_PAYLOAD_LIMIT = NATIVE_SOFT_PAYLOAD_LIMIT;
   FsbNativeBridgeSocket.NATIVE_MAX_FRAME_BYTES = NATIVE_MAX_FRAME_BYTES;
   FsbNativeBridgeSocket.NATIVE_POLL_TIMEOUT_MS = NATIVE_POLL_TIMEOUT_MS;
+  FsbNativeBridgeSocket.NATIVE_REASSEMBLY_TIMEOUT_MS = NATIVE_REASSEMBLY_TIMEOUT_MS;
 
   globalScope.FsbNativeBridgeSocket = FsbNativeBridgeSocket;
   if (typeof module !== 'undefined' && module.exports) {

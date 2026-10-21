@@ -40,8 +40,9 @@ function installFakePort() {
     _msgListeners: [],
     _discListeners: [],
     disconnected: false,
+    postedBeforeDisconnect: -1,
     postMessage(o) { port.posted.push(o); },
-    disconnect() { port.disconnected = true; },
+    disconnect() { port.disconnected = true; port.postedBeforeDisconnect = port.posted.length; },
     onMessage: { addListener: (f) => port._msgListeners.push(f) },
     onDisconnect: { addListener: (f) => port._discListeners.push(f) },
     emit(msg) { port._msgListeners.slice().forEach((f) => f(msg)); },
@@ -257,6 +258,107 @@ const { FsbNativeBridgeSocket, utf8ToBase64, base64ToUtf8 } = require('../extens
     let threw = false;
     try { s.send('{"a":1}'); } catch (_e) { threw = true; }
     passAssert(!threw, 'send() while CONNECTING does not throw');
+  }
+
+  // Splits a payload into the chunk frames the host would drain, one per poll.
+  function chunkFrames(payload, cid, size) {
+    const b64 = utf8ToBase64(payload);
+    const n = Math.ceil(b64.length / size);
+    const frames = [];
+    for (let i = 0; i < n; i += 1) {
+      frames.push({ v: 1, t: 'chunk', cid, i, n, enc: 'b64', data: b64.slice(i * size, (i + 1) * size) });
+    }
+    return frames;
+  }
+
+  console.log('\n=== 13. a stalled inbound reassembly closes :7225, not just the port ===');
+  {
+    // Safari gives the host no signal when the port drops. Without an explicit
+    // close the reconnect adopts the still-open socket, the server never sees
+    // the loss, and its sendAndWait times out without arming sw_evicted.
+    const port = installFakePort();
+    const s = new FsbNativeBridgeSocket({ url: 'u', reassemblyTimeoutMs: 30 });
+    const ev = attach(s);
+    port.emit({ v: 1, t: 'opened' });
+    const frames = chunkFrames('x'.repeat(300), 'stall', 40);
+    passAssert(frames.length > 2, `payload spans ${frames.length} chunks`);
+    port.emit(frames[0]);
+    await new Promise((r) => setTimeout(r, 80));
+    passAssertEqual(ev.close.length, 1, 'onclose once');
+    passAssertEqual(ev.close[0] && ev.close[0].reason, 'reassembly_timeout', 'reason names the stall');
+    const closeAt = port.posted.findIndex((m) => m.t === 'close');
+    passAssert(closeAt >= 0, 'tells the host to close :7225');
+    passAssertEqual(port.posted[closeAt] && port.posted[closeAt].reason, 'reassembly_timeout',
+      'the close carries the failure reason');
+    passAssert(port.disconnected && closeAt < port.postedBeforeDisconnect,
+      'the close is posted BEFORE the port is disconnected');
+  }
+
+  console.log('\n=== 14. every accepted chunk restarts the reassembly deadline ===');
+  {
+    // 3 chunks 50ms apart take 100ms in total, past an 80ms budget counted from
+    // the first chunk, but never 80ms between two chunks.
+    const port = installFakePort();
+    const s = new FsbNativeBridgeSocket({ url: 'u', reassemblyTimeoutMs: 80 });
+    const ev = attach(s);
+    port.emit({ v: 1, t: 'opened' });
+    const payload = JSON.stringify({ id: 'slow', type: 'mcp:result', payload: { s: 'y'.repeat(60) } });
+    const frames = chunkFrames(payload, 'slow', Math.ceil(utf8ToBase64(payload).length / 3));
+    passAssertEqual(frames.length, 3, 'payload spans 3 chunks');
+    for (let i = 0; i < frames.length; i += 1) {
+      if (i > 0) await new Promise((r) => setTimeout(r, 50));
+      port.emit(frames[i]);
+    }
+    passAssertEqual(ev.messages.length, 1, 'a slow but steady message still reassembles');
+    passAssertEqual(ev.messages[0], payload, 'reassembled payload is exact');
+    await new Promise((r) => setTimeout(r, 120));
+    passAssertEqual(ev.close.length, 0, 'no late reassembly_timeout after completion');
+  }
+
+  console.log('\n=== 15. the default reassembly budget beats the server\'s 30s sendAndWait ===');
+  {
+    const ms = FsbNativeBridgeSocket.NATIVE_REASSEMBLY_TIMEOUT_MS;
+    passAssert(ms > 0 && ms <= 10000, `NATIVE_REASSEMBLY_TIMEOUT_MS leaves room inside 30s (got ${ms})`);
+  }
+
+  console.log('\n=== 16. a dropped port posts no close ===');
+  {
+    const port = installFakePort();
+    const s = new FsbNativeBridgeSocket({ url: 'u' });
+    attach(s);
+    port.emit({ v: 1, t: 'opened' });
+    port.drop();
+    await tick();
+    passAssert(!port.posted.some((m) => m.t === 'close'), 'nothing is posted to a port that is gone');
+  }
+
+  console.log('\n=== 17. a throwing port fails exactly once ===');
+  {
+    // _fail() posts the close itself; routing it through _post() would re-enter
+    // _fail() on the same throw, and its CLOSED guard does not cover CLOSING.
+    const port = installFakePort();
+    const s = new FsbNativeBridgeSocket({ url: 'u' });
+    const ev = attach(s);
+    port.emit({ v: 1, t: 'opened' });
+    let calls = 0;
+    port.postMessage = () => { calls += 1; throw new Error('port gone'); };
+    s.send('{"a":1}');
+    await tick();
+    passAssertEqual(ev.error.length, 1, 'onerror once');
+    passAssertEqual(ev.close.length, 1, 'onclose once');
+    passAssert(/^post_failed:/.test(ev.close[0] && ev.close[0].reason), 'reason names the failed post');
+    passAssertEqual(calls, 2, 'the frame, then one close attempt -- no recursion');
+  }
+  {
+    const port = installFakePort();
+    const s = new FsbNativeBridgeSocket({ url: 'u' });
+    const ev = attach(s);
+    port.emit({ v: 1, t: 'opened' });
+    port.postMessage = () => { throw new Error('port gone'); };
+    s.close(1000, 'intentional');
+    await tick();
+    passAssertEqual(ev.close.length, 1, 'close() whose post throws still fires onclose once');
+    passAssertEqual(ev.close[0] && ev.close[0].wasClean, true, 'and it stays the clean close');
   }
 
   console.log('\n---');
