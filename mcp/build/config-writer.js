@@ -1,6 +1,7 @@
 import { readFile, writeFile, copyFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { dirname } from 'node:path';
+import { isDeepStrictEqual } from 'node:util';
 import stripJsonComments from 'strip-json-comments';
 import { parse as parseToml, stringify as stringifyToml } from 'smol-toml';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
@@ -101,9 +102,8 @@ function findExistingEntry(data, serverMapKey, serverName, mergeStrategy) {
     return container[serverName];
 }
 /**
- * Copy the platform's preserved keys from the existing entry onto the new one,
- * in the order the existing entry lists them, so a reinstall keeps settings the
- * user chose in the client and an otherwise unchanged entry still compares equal.
+ * Copy the platform's preserved keys from the existing entry onto the new one
+ * so a reinstall keeps settings the user chose in the client.
  * @param entry - Server entry FSB would write
  * @param existing - Entry currently in the config, if any
  * @param keys - Keys the client owns on the entry
@@ -137,13 +137,13 @@ function checkIdempotent(data, serverMapKey, serverName, entry, mergeStrategy) {
         const found = arr.find((item) => item.name === serverName);
         if (!found)
             return false;
-        return JSON.stringify({ name: serverName, ...entry }) === JSON.stringify(found);
+        return isDeepStrictEqual({ name: serverName, ...entry }, found);
     }
     else {
         const map = data[serverMapKey];
         if (!map?.[serverName])
             return false;
-        return JSON.stringify(map[serverName]) === JSON.stringify(entry);
+        return isDeepStrictEqual(map[serverName], entry);
     }
 }
 /**

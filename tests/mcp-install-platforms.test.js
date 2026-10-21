@@ -264,6 +264,38 @@ function run() {
     assertIncludes(config, '- fsb-mcp-server@latest', 'continue install writes the latest-channel fsb command args');
   });
 
+  console.log('\n--- continue reinstall ignores property order but respects argument order ---');
+  withTempHome('mcp-install-continue-reordered', (fixture) => {
+    const configPath = path.join(fixture.home, '.continue', 'config.yaml');
+    const original = [
+      '# Keep this formatting on a no-op reinstall',
+      'theme: dark',
+      'mcpServers:',
+      '  - args: ["-y", "fsb-mcp-server@latest"]',
+      '    command: npx',
+      '    name: fsb',
+      '',
+    ].join('\n');
+    writeText(configPath, original);
+    const unchanged = runCli(['install', '--continue'], fixture);
+    assertEqual(unchanged.status, 0, 'continue reinstall with reordered properties exits cleanly');
+    assertIncludes(`${unchanged.stdout}${unchanged.stderr}`, 'Continue already configured',
+      'named-array property order does not trigger an update');
+    assertEqual(readText(configPath), original, 'continue no-op preserves the complete YAML file');
+    assertEqual(readText(configPath + '.bak'), original, 'continue no-op still backs up the original file');
+
+    const reversedArgs = original.replace('["-y", "fsb-mcp-server@latest"]', '["fsb-mcp-server@latest", "-y"]');
+    writeText(configPath, reversedArgs);
+    const changed = runCli(['install', '--continue'], fixture);
+    assertEqual(changed.status, 0, 'continue reinstall with changed arguments exits cleanly');
+    assertIncludes(`${changed.stdout}${changed.stderr}`, 'Updated Continue',
+      'named-array argument order remains significant');
+    assertEqual(readText(configPath + '.bak'), reversedArgs, 'continue update backs up the changed argument order');
+    const restored = runCli(['install', '--continue'], fixture);
+    assertIncludes(`${restored.stdout}${restored.stderr}`, 'Continue already configured',
+      'continue update restores the expected argument order');
+  });
+
   console.log('\n--- antigravity config path ---');
   withTempHome('mcp-install-antigravity', (fixture) => {
     const configPath = path.join(fixture.home, '.gemini', 'config', 'mcp_config.json');
@@ -394,19 +426,31 @@ function run() {
       autoApprove: ['navigate', 'read_page'],
       disabled: false,
     };
-    writeText(settingsPath, JSON.stringify({ mcpServers: { fsb: userEntry } }, null, 2));
+    for (const [label, keys] of [
+      ['transport first', ['command', 'args', 'timeout', 'autoApprove', 'disabled']],
+      ['client settings first', ['autoApprove', 'disabled', 'timeout', 'command', 'args']],
+      ['interleaved settings', ['disabled', 'command', 'autoApprove', 'args', 'timeout']],
+    ]) {
+      const reordered = Object.fromEntries(keys.map((key) => [key, userEntry[key]]));
+      const original = JSON.stringify({ mcpServers: { fsb: reordered } }, null, 4) + '\n';
+      writeText(settingsPath, original);
+      const unchanged = runCli(['install', '--cline'], fixture);
+      assertEqual(unchanged.status, 0, `cline reinstall exits cleanly with ${label}`);
+      assertIncludes(`${unchanged.stdout}${unchanged.stderr}`, 'Cline already configured',
+        `cline reinstall skips an unchanged entry with ${label}`);
+      assertEqual(readText(settingsPath), original,
+        `cline reinstall preserves file bytes and client settings with ${label}`);
+      assertEqual(readText(settingsPath + '.bak'), original,
+        `cline reinstall preserves the backup behavior with ${label}`);
+    }
 
-    const unchanged = runCli(['install', '--cline'], fixture);
-    assertIncludes(
-      `${unchanged.stdout}${unchanged.stderr}`,
-      'Cline already configured',
-      'an entry that differs only in Cline-owned settings counts as configured',
-    );
-    assertEqual(
-      JSON.stringify(readJson(settingsPath).mcpServers.fsb),
-      JSON.stringify(userEntry),
-      'reinstall leaves the timeout, auto-approve list, and toggle untouched',
-    );
+    writeText(settingsPath, JSON.stringify({ mcpServers: { fsb: { ...userEntry, command: 'node' } } }));
+    const changedCommand = runCli(['install', '--cline'], fixture);
+    assertEqual(changedCommand.status, 0, 'cline reinstall with a stale command exits cleanly');
+    assertIncludes(`${changedCommand.stdout}${changedCommand.stderr}`, 'Updated Cline',
+      'a changed command still triggers an update');
+    assertEqual(JSON.stringify(readJson(settingsPath).mcpServers.fsb), JSON.stringify(userEntry),
+      'updating the command keeps the client timeout, auto-approve list, and disabled toggle');
 
     writeText(settingsPath, JSON.stringify({
       mcpServers: {
