@@ -23,7 +23,7 @@ import {
   inspectProductionNativeHost,
 } from './native-host-production.js';
 import { pushMcpClientInventory } from './client-inventory.js';
-import { shutdownWhenStdinEnds } from './stdin-shutdown.js';
+import { shutdownOnBrokenStdout, shutdownWhenStdinEnds } from './stdin-shutdown.js';
 import {
   FSB_EXT_PROTOCOL,
   formatPairingCode,
@@ -394,6 +394,20 @@ function printSetup(): void {
 
 async function runStdioServer(): Promise<void> {
   const runtime = createRuntime();
+  const shutdown = (): void => {
+    console.error('[FSB MCP] Shutting down...');
+    runtime.bridge.disconnect();
+    process.exit(0);
+  };
+
+  // A host that closes the pipe mid-response would otherwise crash the server
+  // with an unhandled EPIPE on stdout. Registered before stdio starts so a
+  // response written while the bridge is still connecting is covered too.
+  shutdownOnBrokenStdout(process.stdout, () => {
+    console.error('[FSB MCP] stdout pipe closed by the host; shutting down.');
+    shutdown();
+  });
+
   const transport = new StdioServerTransport();
   await runtime.server.connect(transport);
 
@@ -405,12 +419,6 @@ async function runStdioServer(): Promise<void> {
   }
 
   console.error(`[FSB MCP] Server started (stdio + WebSocket bridge in ${runtime.bridge.currentMode} mode)`);
-
-  const shutdown = (): void => {
-    console.error('[FSB MCP] Shutting down...');
-    runtime.bridge.disconnect();
-    process.exit(0);
-  };
 
   process.on('SIGTERM', shutdown);
   process.on('SIGINT', shutdown);

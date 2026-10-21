@@ -1,16 +1,16 @@
 {
   "schema": 1,
   "packageName": "fsb-mcp-server",
-  "packageVersion": "0.11.2",
-  "lockSha256": "babe9349d46451732308aa53f9204093357e8f7768bcf4f1fd5c590a5a6d0667",
+  "packageVersion": "0.11.3",
+  "lockSha256": "0026f090fa3aabe8b7b53ccbac893928b971e603ca74ce5bec9eb3e2d383ee2d",
   "directDependencies": [
     {
       "name": "@modelcontextprotocol/sdk",
-      "version": "1.29.0"
+      "version": "1.32.1"
     },
     {
       "name": "smol-toml",
-      "version": "1.6.1"
+      "version": "1.9.1"
     },
     {
       "name": "strip-json-comments",
@@ -18,7 +18,7 @@
     },
     {
       "name": "ws",
-      "version": "8.19.0"
+      "version": "8.22.0"
     },
     {
       "name": "yaml",
@@ -41,14 +41,14 @@
     {
       "path": "node_modules/@hono/node-server",
       "name": "@hono/node-server",
-      "version": "1.19.11",
-      "integrity": "sha512-dr8/3zEaB+p0D2n/IUrlPF1HZm586qgJNXK1a9fhg/PzdtkK7Ksd5l312tJX2yBuALqDYBlG20QEbayqPyxn+g=="
+      "version": "1.19.17",
+      "integrity": "sha512-dSneS5qhiauZWGDCeK4o695Xd9nUNjviSZCMQrj10eetr8Uln1ucn6bbphOM6UynAMMtNIzZNSpL9vnASJwrPQ=="
     },
     {
       "path": "node_modules/@modelcontextprotocol/sdk",
       "name": "@modelcontextprotocol/sdk",
-      "version": "1.29.0",
-      "integrity": "sha512-zo37mZA9hJWpULgkRpowewez1y6ML5GsXJPY8FI0tBBCd77HEvza4jDqRKOXgHNn867PVGCyTdzqpz0izu5ZjQ=="
+      "version": "1.32.1",
+      "integrity": "sha512-2DdE+SJDtzLEEWzY1ZjY7Q+VcPhcV1KisD3zI4u0XZyktsjHum1mwbMI+JaulUBi2OZk+KJAi2uPXzxichPkdw=="
     },
     {
       "path": "node_modules/accepts",
@@ -173,8 +173,8 @@
     {
       "path": "node_modules/es-object-atoms",
       "name": "es-object-atoms",
-      "version": "1.1.1",
-      "integrity": "sha512-FGgH2h8zKNim9ljj7dankFPcICIK9Cp5bm+c2gQSYePhpaG5+esrLODihIorn+Pe6FGJzWhXQotPv73jTaldXA=="
+      "version": "1.1.2",
+      "integrity": "sha512-HWcBoN6NileqtSydK2FqHbS/LoDd2pqrnQHLyJzBj4kOp/ky2MWMN694xOfkK8/SnUsW2DH7EfyVlydKCsm1Zw=="
     },
     {
       "path": "node_modules/escape-html",
@@ -209,8 +209,8 @@
     {
       "path": "node_modules/express-rate-limit",
       "name": "express-rate-limit",
-      "version": "8.3.1",
-      "integrity": "sha512-D1dKN+cmyPWuvB+G2SREQDzPY1agpBIcTa9sJxOPMCNeH3gwzhqJRDWCXW3gg0y//+LQ/8j52JbMROWyrKdMdw=="
+      "version": "8.7.1",
+      "integrity": "sha512-2FXbqkygil3mZiXzEtM0IjE/UBmBNot0J1GEVrJT4JbrvwOSoEtqtO+wHbiMQELWe1eNvHoYRg2dkjOid+6JkA=="
     },
     {
       "path": "node_modules/fast-deep-equal",
@@ -221,8 +221,8 @@
     {
       "path": "node_modules/fast-uri",
       "name": "fast-uri",
-      "version": "3.1.0",
-      "integrity": "sha512-iPeeDKJSWf4IEOasVVrknXpaBV0IApz/gp7S2bb7Z4Lljbl2MGJRqInZiUrQwV16cpzw/D3S5j5Julj/gT52AA=="
+      "version": "3.1.9",
+      "integrity": "sha512-hS/0Wt3Ya043oKXs0sIxrMpKQITXhMLIrVAKKXi4gozGC9v7YRWVnXIZzjNPTO02M9BdxLCWqK1yRXgNziVyJQ=="
     },
     {
       "path": "node_modules/finalhandler",
@@ -275,14 +275,14 @@
     {
       "path": "node_modules/hasown",
       "name": "hasown",
-      "version": "2.0.2",
-      "integrity": "sha512-0hJU9SCPvmMzIBdZFqNPXWa6dqh7WdH0cII9y+CyS8rG3nL48Bclra9HmKhVVUHyPWNH5Y7xDwAB7bfgSjkUMQ=="
+      "version": "2.0.4",
+      "integrity": "sha512-T2UbfbBEF32wiepXIsMlTW9+dDYC6wMh/t/vYA4tuOMKqWz/n3vr1NFSxQiyP+zk2mXsoMA/i/7qV6LKut1t1A=="
     },
     {
       "path": "node_modules/hono",
       "name": "hono",
-      "version": "4.12.8",
-      "integrity": "sha512-VJCEvtrezO1IAR+kqEYnxUOoStaQPGrCmX3j4wDTNOcD1uRPFpGlwQUIW8niPuvHXaTUxeOUl5MMDGrl+tmO9A=="
+      "version": "4.13.13",
+      "integrity": "sha512-CQ46U0ZkAGmbT/4UxdzzGJpacP2IeKgY4a5/tOI9AABbpOMfK739wfDXmv1usCk+3RkKj1hQy4/fjhiwa2xlrA=="
     },
     {
       "path": "node_modules/http-errors",
@@ -305,8 +305,8 @@
     {
       "path": "node_modules/ip-address",
       "name": "ip-address",
-      "version": "10.1.0",
-      "integrity": "sha512-XXADHxXmvT9+CRxhXg56LJovE+bmWnEWB78LB83VZTprKTmaC5QfruXocxzTZ2Kl0DNwKuBdlIhjL8LeY8Sf8Q=="
+      "version": "10.7.4",
+      "integrity": "sha512-DWBMKyeM25D70nrIiTkgQth59/G+naKOTep6huF9j+GmeK3DMD60Zvxg5d5qQnz+38AHgou6ean2LECX+lrKDg=="
     },
     {
       "path": "node_modules/ipaddr.js",
@@ -425,8 +425,8 @@
     {
       "path": "node_modules/path-to-regexp",
       "name": "path-to-regexp",
-      "version": "8.3.0",
-      "integrity": "sha512-7jdwVIRtsP8MYpdXSwOS0YdD0Du+qOoF/AEPIt88PcCFrZCzx41oxku1jD88hZBwbNUIEfpqvuhjFaMAqMTWnA=="
+      "version": "8.4.2",
+      "integrity": "sha512-qRcuIdP69NPm4qbACK+aDogI5CBDMi1jKe0ry5rSQJz8JVLsC7jV8XpiJjGRLLol3N+R5ihGYcrPLTno6pAdBA=="
     },
     {
       "path": "node_modules/pkce-challenge",
@@ -437,14 +437,14 @@
     {
       "path": "node_modules/proxy-addr",
       "name": "proxy-addr",
-      "version": "2.0.7",
-      "integrity": "sha512-llQsMLSUDUPT44jdrU/O37qlnifitDP+ZwrmmZcoSKyLKvtZxpyV0n2/bD/N4tBAAZ/gJEdZU7KMraoK1+XYAg=="
+      "version": "2.0.8",
+      "integrity": "sha512-5nnx0yGyVUcY6t9RnWcARWtwT9F1D8O9rt08htPvnd49W1IgZtmLkhu9WfMzQj1cFxjHIO6connUNVW5k7AVyQ=="
     },
     {
       "path": "node_modules/qs",
       "name": "qs",
-      "version": "6.15.0",
-      "integrity": "sha512-mAZTtNCeetKMH+pSjrb76NAM8V9a05I9aBZOHztWy/UqcJdQYNsf59vrRKWnojAT9Y+GbIvoTBC++CPHqpDBhQ=="
+      "version": "6.16.1",
+      "integrity": "sha512-5Px6J7rfHBAGUhNQ3es4YzcOdBBw0SDcVtThJml4RdnKw4tKs2epA0kPZ+K8X+WiHktT93RHVcQ/3ym5aTCgtg=="
     },
     {
       "path": "node_modules/range-parser",
@@ -509,14 +509,14 @@
     {
       "path": "node_modules/side-channel",
       "name": "side-channel",
-      "version": "1.1.0",
-      "integrity": "sha512-ZX99e6tRweoUXqR+VBrslhda51Nh5MTQwou5tnUDgbtyM0dBgmhEDtWGP/xbKn6hqfPRHujUNwz5fy/wbbhnpw=="
+      "version": "1.1.1",
+      "integrity": "sha512-6x6dK6zJdpTzF4sQeNYxwtvBzf6Eg4GtlesS94HOvTudUeyK2WXAaIfmDgsyslYrRBeFIlsi54AYsFGUuhmvrQ=="
     },
     {
       "path": "node_modules/side-channel-list",
       "name": "side-channel-list",
-      "version": "1.0.0",
-      "integrity": "sha512-FCLHtRD/gnpCiCHEiJLOwdmFP+wzCmDEkc9y7NsYxeF4u7Btsn1ZuwgwJGxImImHicJArLP4R0yX4c2KCrMrTA=="
+      "version": "1.0.1",
+      "integrity": "sha512-mjn/0bi/oUURjc5Xl7IaWi/OJJJumuoJFQJfDDyO46+hBWsfaVM65TBHq2eoZBhzl9EchxOijpkbRC8SVBQU0w=="
     },
     {
       "path": "node_modules/side-channel-map",
@@ -533,8 +533,8 @@
     {
       "path": "node_modules/smol-toml",
       "name": "smol-toml",
-      "version": "1.6.1",
-      "integrity": "sha512-dWUG8F5sIIARXih1DTaQAX4SsiTXhInKf1buxdY9DIg4ZYPZK5nGM1VRIYmEbDbsHt7USo99xSLFu5Q1IqTmsg=="
+      "version": "1.9.1",
+      "integrity": "sha512-j7WyPdf0CJoutMzMoPLF/bVXHtKZIT9Rb4eGeEbWw8X2t5oirjPgpL+OpaENZrILYaXqYwnVH+qgUwVbl+pUJQ=="
     },
     {
       "path": "node_modules/statuses",
@@ -587,8 +587,8 @@
     {
       "path": "node_modules/ws",
       "name": "ws",
-      "version": "8.19.0",
-      "integrity": "sha512-blAT2mjOEIi0ZzruJfIhb3nps74PRWTCz1IjglWEEpQl5XS/UNama6u2/rjFkDDouqr4L67ry+1aGIALViWjDg=="
+      "version": "8.22.0",
+      "integrity": "sha512-Ydggc987+RO0AnWtZ/7Wq9FtNvcrL1b/RO0ud9mWjUPgDrsAAwQSF51sm2hm1XofbU/4jkpGEsLFsZZxU+1DOg=="
     },
     {
       "path": "node_modules/yaml",

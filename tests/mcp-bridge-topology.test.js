@@ -1779,6 +1779,24 @@ async function runStdinShutdownHelper() {
     /shutdownWhenStdinEnds\(process\.stdin,[\s\S]*?shutdown\(\);/.test(stdioSource),
     'the stdio server shuts down when the host closes stdin',
   );
+
+  const { shutdownOnBrokenStdout } = await import(helperUrl);
+  const { EventEmitter } = await import('node:events');
+  const stdout = new EventEmitter();
+  let pipeCalls = 0;
+  const otherErrors = [];
+  shutdownOnBrokenStdout(stdout, () => { pipeCalls += 1; }, (err) => otherErrors.push(err));
+  const epipe = Object.assign(new Error('write EPIPE'), { code: 'EPIPE' });
+  stdout.emit('error', epipe);
+  stdout.emit('error', epipe);
+  assertEqual(pipeCalls, 1, 'EPIPE on stdout shuts down exactly once instead of crashing');
+  const other = Object.assign(new Error('boom'), { code: 'EIO' });
+  stdout.emit('error', other);
+  assertEqual(otherErrors.length, 1, 'non-pipe stdout errors are not swallowed as shutdown');
+  assert(
+    /shutdownOnBrokenStdout\(process\.stdout,[\s\S]*?shutdown\(\);/.test(stdioSource),
+    'the stdio server shuts down when the host breaks the stdout pipe',
+  );
 }
 
 async function runAuthStatusProbe(WebSocketBridge, auth) {

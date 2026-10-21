@@ -51,10 +51,10 @@ const bundledProductionDependencies = Object.freeze([
 ]);
 
 const exactProductionDependencies = Object.freeze({
-  '@modelcontextprotocol/sdk': '1.29.0',
-  'smol-toml': '1.6.1',
+  '@modelcontextprotocol/sdk': '1.32.1',
+  'smol-toml': '1.9.1',
   'strip-json-comments': '5.0.3',
-  ws: '8.19.0',
+  ws: '8.22.0',
   yaml: '2.8.3',
   zod: '3.25.76',
 });

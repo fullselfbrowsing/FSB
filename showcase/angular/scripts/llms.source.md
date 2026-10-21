@@ -1,6 +1,6 @@
 # FSB (Full Self-Browsing)
 
-FSB (Full Self-Browsing) is an open-source Chrome extension that automates the browser through natural language. You describe a task; FSB plans the clicks, types, and navigation to complete it. Multi-model AI (xAI, OpenAI, Anthropic, Gemini, OpenRouter, LM Studio, local), 60 browser actions, a 68-tool MCP surface, 142+ site guides, local-first execution, and BYO API keys. Current release: FSB v0.9.92 (extension) with fsb-mcp-server 0.11.2 (npm).
+FSB (Full Self-Browsing) is an open-source Chrome extension that automates the browser through natural language. You describe a task; FSB plans the clicks, types, and navigation to complete it. Multi-model AI (xAI, OpenAI, Anthropic, Gemini, OpenRouter, LM Studio, local), 60 browser actions, a 68-tool MCP surface, 142+ site guides, local-first execution, and BYO API keys. Current release: FSB v0.9.92 (extension) with fsb-mcp-server 0.11.3 (npm).
 
 License: [MIT License](https://github.com/fullselfbrowsing/FSB/blob/main/LICENSE).
 

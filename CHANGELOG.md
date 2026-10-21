@@ -12,6 +12,8 @@ The extension, showcase, skill, documentation, and store metadata align at `0.9.
 
 MCP-only update (2026-10-14): the package advances to `0.11.2` to advertise the FSB dark logo. The extension remains at `0.9.92`.
 
+MCP-only update (2026-10-20): the package advances to `0.11.3`, a security patch that updates bundled dependencies (`npm audit` 13 findings to 1 low) and stops the stdio server crashing with `EPIPE` when the host closes the pipe. The extension remains at `0.9.92`.
+
 ### Fixed
 
 - **The bridge no longer dies until you restart Chrome.** The local bridge keeps a single extension socket, and it was freed only when that socket closed itself. An extension whose service worker died without the socket closing therefore held the slot indefinitely, and every legitimate reconnect was refused — one episode in the field ran 13,328 refusals over roughly 25 hours, ending only when the browser quit. The extension could not learn from any of it: its `onclose` handler discarded the close code, and because the WebSocket upgrade *succeeded* before the refusal arrived, `onopen` reset the reconnect backoff on every cycle, so it retried at a flat two seconds forever. The bridge now reaps a socket that stops answering both protocol pings and its own heartbeat; the extension reads the close code, escalates its backoff toward the 30-second ceiling instead of flattening it, and drops a pairing credential the bridge has explicitly rejected rather than replaying it until the browser exits.

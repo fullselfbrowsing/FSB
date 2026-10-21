@@ -1,6 +1,6 @@
 {
   "name": "fsb-mcp-server",
-  "version": "0.11.2",
+  "version": "0.11.3",
   "description": "FSB Browser Automation MCP Server",
   "license": "MIT",
   "author": "Lakshman Turlapati",
@@ -55,10 +55,10 @@
     "prepublishOnly": "npm run build && node ../scripts/verify-native-host-boundary.mjs --all"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "1.29.0",
-    "smol-toml": "1.6.1",
+    "@modelcontextprotocol/sdk": "1.32.1",
+    "smol-toml": "1.9.1",
     "strip-json-comments": "5.0.3",
-    "ws": "8.19.0",
+    "ws": "8.22.0",
     "yaml": "2.8.3",
     "zod": "3.25.76"
   },
@@ -75,5 +75,8 @@
     "@types/ws": "^8.18.1",
     "tsx": "^4.19.0",
     "typescript": "^5.9.3"
+  },
+  "overrides": {
+    "@hono/node-server": "1.19.17"
   }
 }
