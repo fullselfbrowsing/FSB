@@ -439,10 +439,14 @@ test('replay player interpolation stops at its anchor and accepts authoritative 
     path.resolve(__dirname, '..', 'extension', 'content', 'visual-feedback.js'),
     'utf8'
   );
-  // The overlay labels its controls through the module's ov() locale helper.
+  // The overlay labels its controls through the module's ov() locale helper,
+  // and writes the speed labels through writeKeyed() so a language change can
+  // redraw them.
   vm.runInContext(
     'const REPLAY_PLAYER_SPEEDS = Object.freeze([0.5, 1, 2, 4, 8]);\n' +
     declarationSource(visualFeedback, 'ov') + '\n' +
+    'var keyedSources = new WeakMap();\n' +
+    declarationSource(visualFeedback, 'writeKeyed') + '\n' +
     classSource(visualFeedback, 'ReplayPlayerOverlay') + '\nthis.ReplayPlayerOverlay = ReplayPlayerOverlay;',
     context,
     { filename: 'extension/content/visual-feedback.js' }
