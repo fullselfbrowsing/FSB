@@ -69,16 +69,21 @@ final class FileReadService {
                 return fail("not_a_file")
             }
 
+            // Only an early refusal. A stat that fails says nothing about the
+            // size, and the file can grow after it, so readBounded() below is
+            // what actually enforces the cap.
             let attrs = try? FileManager.default.attributesOfItem(atPath: url.path)
-            let size = (attrs?[.size] as? NSNumber)?.intValue ?? 0
-            guard size <= Self.maxFileBytes else {
+            if let size = (attrs?[.size] as? NSNumber)?.intValue, size > Self.maxFileBytes {
                 return fail("file_too_large", detail: "\(size) > \(Self.maxFileBytes)")
             }
 
             // Read eagerly, never mapped: the handle outlives the security-scoped
             // access the defer above releases, so it must hold its own copy.
-            guard let data = try? Data(contentsOf: url) else {
+            guard let data = Self.readBounded(url, limit: Self.maxFileBytes) else {
                 return fail("read_failed")
+            }
+            guard data.count <= Self.maxFileBytes else {
+                return fail("file_too_large", detail: "> \(Self.maxFileBytes)")
             }
 
             let token = UUID().uuidString
@@ -153,6 +158,24 @@ final class FileReadService {
         ]
         if let detail, !detail.isEmpty { out["detail"] = detail }
         return out
+    }
+
+    /// At most `limit + 1` bytes: one past the cap is enough to tell "too large"
+    /// from "exactly at the cap" without loading the rest of the file.
+    private static func readBounded(_ url: URL, limit: Int) -> Data? {
+        do {
+            let handle = try FileHandle(forReadingFrom: url)
+            defer { try? handle.close() }
+            var data = Data()
+            while data.count <= limit,
+                  let next = try handle.read(upToCount: limit + 1 - data.count),
+                  !next.isEmpty {
+                data.append(next)
+            }
+            return data
+        } catch {
+            return nil
+        }
     }
 
     private static func mimeType(for url: URL) -> String {

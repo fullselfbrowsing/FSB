@@ -346,6 +346,17 @@ const SAFARI = { caps: { cdp: false, trustedInput: false } };
       'every full native chunk is divisible by 3 so independently encoded base64 has no padding');
     passAssert(!/\.mappedIfSafe/.test(swift),
       'beginRead copies the file eagerly; a read handle never depends on a mapping');
+    // A failed stat used to read as size 0 and pass the cap, and nothing checked
+    // the bytes actually loaded, so a file could also grow past it after the stat.
+    const beginReadAt = swift.indexOf('func beginRead(');
+    const beginRead = beginReadAt >= 0 ? swift.slice(beginReadAt, swift.indexOf('// MARK: - chunk', beginReadAt)) : '';
+    passAssert(beginRead.length > 0, 'finds beginRead in FileReadService.swift');
+    passAssert(!/Data\(contentsOf:/.test(beginRead), 'beginRead never loads a file without a bound');
+    passAssert(/readBounded\(url, limit: Self\.maxFileBytes\)/.test(beginRead),
+      'beginRead reads through readBounded, capped at maxFileBytes');
+    passAssert(/guard data\.count <= Self\.maxFileBytes else \{\s*return fail\("file_too_large"/.test(beginRead),
+      'the bytes actually loaded are re-checked against the cap');
+    passAssert(!/\.size\][^\n]*\?\?\s*0/.test(beginRead), 'an unknown size is never treated as 0');
 
     const original = Buffer.alloc(chunkBytes * 2 + 17);
     for (let i = 0; i < original.length; i += 1) original[i] = i % 251;
