@@ -111,6 +111,20 @@ function _setHeaderOwner(label) {
   _renderHeaderStatus();
 }
 
+function _ownerLockTitle(label) {
+  return (globalThis.fsbUiLocale && fsbUiLocale.text)
+    ? fsbUiLocale.text('shell_owned_title', 'Disabled while tab is owned by $LABEL$', { label: label })
+    : 'Disabled while tab is owned by $LABEL$'.replace('$LABEL$', label);
+}
+
+// The owner header and the locked composer tooltip carry the owner's name as
+// sent, so they are not keyed; a language change redraws both from the label.
+function _refreshOwnerCopy() {
+  if (!_headerOwnerLabel) return;
+  _renderHeaderStatus();
+  if (_chatLockedByOwnerChip && chatInput) chatInput.title = _ownerLockTitle(_headerOwnerLabel);
+}
+
 // Apply theme based on settings. Preference is 'system' | 'dark' | 'light'
 // (set by the options page's Advanced Settings); 'system' resolves live from
 // the OS via matchMedia instead of hardening into 'light'/'dark' on first run.
@@ -307,9 +321,7 @@ async function refreshOwnerChip() {
     // `.disabled` property does NOT block typing on contenteditable elements.
     _chatLockedByOwnerChip = true;
     chatInput.setAttribute('contenteditable', 'false');
-    chatInput.title = (globalThis.fsbUiLocale && fsbUiLocale.text)
-    ? fsbUiLocale.text('shell_owned_title', 'Disabled while tab is owned by $LABEL$', { label: label })
-    : 'Disabled while tab is owned by $LABEL$'.replace('$LABEL$', label);
+    chatInput.title = _ownerLockTitle(label);
     updateSendButtonState();
   } catch (_e) {
     // Chip is best-effort -- never poison popup boot.
@@ -735,9 +747,10 @@ function collapseOldActions() {
   if (countEl) {
     const count = list.children.length;
     const label = count === 1 ? '$COUNT$ action completed' : '$COUNT$ actions completed';
-    countEl.textContent = (globalThis.fsbUiLocale && typeof fsbUiLocale.line === 'function')
-      ? fsbUiLocale.line(label, { count })
-      : label.replace('$COUNT$', count);
+    // The template keeps its catalog key, so a language change rewrites the
+    // count before the next action arrives.
+    if (globalThis.fsbUiLocale && typeof fsbUiLocale.markExact === 'function') fsbUiLocale.markExact(countEl, label, { count });
+    else countEl.textContent = label.replace('$COUNT$', count);
   }
 }
 
@@ -1247,6 +1260,7 @@ console.log(`FSB v${chrome.runtime.getManifest().version} chat interface loaded`
 
 
 if (globalThis.fsbUiLocale && typeof fsbUiLocale.boot === 'function') {
+  if (typeof fsbUiLocale.onChange === 'function') fsbUiLocale.onChange(_refreshOwnerCopy);
   fsbUiLocale.boot().then(function () {
     fsbUiLocale.apply(document);
     if (typeof _renderHeaderStatus === 'function') _renderHeaderStatus();

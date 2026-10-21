@@ -1029,6 +1029,84 @@ function extractNamedFunction(source, name) {
     `no translated sentence falls back to a lowercase English 'unknown'${lowercaseFallbacks.length ? ': ' + lowercaseFallbacks.join(' | ') : ''}`);
 }
 
+// The popup's collapsed action count keeps its key, and the owner header and
+// locked composer tooltip are redrawn from the stored owner name on a switch.
+{
+  const shipped = freshLocale().fsbUiLocale;
+  const de = shippedCatalogs.de;
+  const ja = shippedCatalogs.ja;
+  shipped.setOverride('de');
+  const popupSource = fs.readFileSync(path.join(root, 'extension/ui/popup.js'), 'utf8');
+
+  const countEl = fakeNode({}, '');
+  const collapsed = [];
+  const list = { children: collapsed, appendChild: (node) => collapsed.push(node) };
+  const group = { querySelector: (selector) => ({ '.action-summary-list': list, '.action-summary-count': countEl })[selector] || null };
+  const actionContext = {
+    fsbUiLocale: shipped,
+    chatMessages: { querySelector: (selector) => (selector === '.action-summary-group' ? group : null) },
+    document: { createElement: () => ({ className: '', textContent: '' }) },
+    MAX_VISIBLE_ACTIONS: 2,
+    actionMessageQueue: []
+  };
+  actionContext.globalThis = actionContext;
+  vm.createContext(actionContext);
+  vm.runInContext(extractNamedFunction(popupSource, 'collapseOldActions'), actionContext);
+  const queueActions = (n) => {
+    for (let i = 0; i < n; i++) actionContext.actionMessageQueue.push({ textContent: 'Step ' + i, parentNode: {}, remove() {} });
+  };
+  queueActions(3);
+  actionContext.collapseOldActions();
+  check(countEl.textContent === de.copy_9a19a25438.replace('$COUNT$', '1'), 'the popup action count renders the singular in the active language');
+  queueActions(2);
+  actionContext.collapseOldActions();
+  check(countEl.textContent === de.copy_5bb3cc9bbc.replace('$COUNT$', '3'), 'the popup action count renders the plural in the active language');
+  shipped.setOverride('ja');
+  shipped.apply(fakeDoc([countEl]));
+  check(countEl.textContent === ja.copy_5bb3cc9bbc.replace('$COUNT$', '3'),
+    'a language change re-renders the popup action count before the next action');
+
+  shipped.setOverride('de');
+  const statusText = fakeNode({}, '');
+  const ownerContext = {
+    fsbUiLocale: shipped,
+    statusText,
+    statusDot: { classList: { add() {}, remove() {} } },
+    chatInput: { title: '' },
+    _headerBaseStatusLabel: 'Ready',
+    _headerBaseStatusTone: '',
+    _headerOwnerLabel: null,
+    _chatLockedByOwnerChip: false
+  };
+  ownerContext.globalThis = ownerContext;
+  vm.createContext(ownerContext);
+  vm.runInContext(fs.readFileSync(path.join(root, 'extension/ui/owner-chip.js'), 'utf8'), ownerContext);
+  for (const name of ['_renderHeaderStatus', '_setHeaderOwner', '_ownerLockTitle', '_refreshOwnerCopy']) {
+    vm.runInContext(extractNamedFunction(popupSource, name), ownerContext);
+  }
+  ownerContext._refreshOwnerCopy();
+  check(statusText.textContent === '' && ownerContext.chatInput.title === '',
+    'with no owner the refresh leaves the header and composer to apply()');
+  ownerContext._setHeaderOwner('Claude');
+  ownerContext._chatLockedByOwnerChip = true;
+  ownerContext.chatInput.title = ownerContext._ownerLockTitle('Claude');
+  check(statusText.textContent === de.shell_owned_by.replace('$LABEL$', 'Claude')
+      && ownerContext.chatInput.title === de.shell_owned_title.replace('$LABEL$', 'Claude'),
+    'the popup owner header and tooltip render in the active language');
+  shipped.setOverride('ja');
+  ownerContext._refreshOwnerCopy();
+  check(statusText.textContent === ja.shell_owned_by.replace('$LABEL$', 'Claude')
+      && ownerContext.chatInput.title === ja.shell_owned_title.replace('$LABEL$', 'Claude'),
+    'a language change redraws the popup owner header and locked composer tooltip');
+  shipped.setOverride('de');
+  ownerContext._setHeaderOwner('Autopilot');
+  check(statusText.textContent === de.shell_owned_by.replace('$LABEL$', 'Autopilot'),
+    'the owner name stays as sent even when it is also catalog copy');
+  check(popupSource.includes('fsbUiLocale.onChange(_refreshOwnerCopy)')
+      && extractNamedFunction(popupSource, 'refreshOwnerChip').includes('chatInput.title = _ownerLockTitle(label);'),
+    'the popup redraws owner copy on a language change, and one helper builds the tooltip');
+}
+
 // The dashboard chart draws its legend, axis titles and tooltip on a canvas,
 // so analytics.js translates them itself. The service worker loads the same
 // file without the locale helper and keeps English.
