@@ -50,7 +50,8 @@
       ? '' : String(ownerAgentIdShort).trim();
     var english = 'Owned by ' + label;
     if (globalThis.fsbUiLocale && typeof fsbUiLocale.text === 'function') {
-      return fsbUiLocale.text('shell_owned_by', english, { label: label });
+      return fsbUiLocale.text('shell_owned_by', 'Owned by $LABEL$')
+        .replace(/\$LABEL\$/g, function () { return label; });
     }
     return english;
   }

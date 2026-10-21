@@ -112,9 +112,11 @@ function _setHeaderOwner(label) {
 }
 
 function _ownerLockTitle(label) {
-  return (globalThis.fsbUiLocale && fsbUiLocale.text)
-    ? fsbUiLocale.text('shell_owned_title', 'Disabled while tab is owned by $LABEL$', { label: label })
-    : 'Disabled while tab is owned by $LABEL$'.replace('$LABEL$', label);
+  var english = 'Disabled while tab is owned by $LABEL$';
+  var template = (globalThis.fsbUiLocale && fsbUiLocale.text)
+    ? fsbUiLocale.text('shell_owned_title', english)
+    : english;
+  return template.replace(/\$LABEL\$/g, function () { return label; });
 }
 
 // The owner header and the locked composer tooltip carry the owner's name as
@@ -1264,5 +1266,6 @@ if (globalThis.fsbUiLocale && typeof fsbUiLocale.boot === 'function') {
   fsbUiLocale.boot().then(function () {
     fsbUiLocale.apply(document);
     if (typeof _renderHeaderStatus === 'function') _renderHeaderStatus();
+    _refreshOwnerCopy();
   });
 }

@@ -172,11 +172,12 @@
   // is translated too; raw values such as domains and provider names are not.
   function line(english, subs) {
     var key = exactKey(english);
-    if (key) return text(key, english, liveSubs(subs));
+    if (key) return text(key, english, subs);
     return applySubs(english, liveSubs(subs));
   }
 
   function text(key, english, subs) {
+    subs = liveSubs(subs);
     var value = t(key, subs);
     if (typeof value !== 'string' || value.length === 0 || value === key) {
       if (typeof english !== 'string') return value;
@@ -240,7 +241,7 @@
       if (subs && typeof subs === 'object') node.setAttribute('data-i18n-subs', JSON.stringify(subs));
       else if (typeof node.removeAttribute === 'function') node.removeAttribute('data-i18n-subs');
     }
-    var shown = text(key, english, liveSubs(subs));
+    var shown = text(key, english, subs);
     writeText(node, shown);
     if (node && typeof node.setAttribute === 'function') node.setAttribute('data-i18n-shown', shown);
     return shown;
@@ -645,7 +646,7 @@
       if (rawSubs) {
         try { storedSubs = JSON.parse(rawSubs); } catch (err) { storedSubs = null; }
       }
-      var shown = text(liveKey, liveEnglish, liveSubs(storedSubs));
+      var shown = text(liveKey, liveEnglish, storedSubs);
       writeText(live[i], shown);
       live[i].setAttribute('data-i18n-shown', shown);
     }

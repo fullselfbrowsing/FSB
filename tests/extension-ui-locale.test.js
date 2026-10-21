@@ -525,6 +525,57 @@ function extractNamedFunction(source, name) {
   throw new Error('unbalanced function ' + name);
 }
 
+// Keyed popup messages translate catalog reasons as well as the sentence.
+{
+  const shipped = freshLocale().fsbUiLocale;
+  const popupSource = fs.readFileSync(path.join(root, 'extension/ui/popup.js'), 'utf8');
+  const messages = [];
+  let response;
+  const context = {
+    fsbUiLocale: shipped,
+    chrome: { runtime: { sendMessage: (_message, callback) => callback(response) } },
+    console: { log() {}, error() {} },
+    currentSessionId: 'session-1',
+    isRunning: true,
+    stopRequested: false,
+    addMessage: (text, type) => messages.push({ text, type })
+  };
+  context.globalThis = context;
+  vm.createContext(context);
+  for (const name of ['uiLine', 'stopAutomation']) {
+    vm.runInContext(extractNamedFunction(popupSource, name), context);
+  }
+  for (const code of shipped.PUBLIC_LOCALES.filter((code) => code !== 'en')) {
+    shipped.setOverride(code);
+    for (const error of ['Already completed', 'Session not found', 'Unknown error']) {
+      const subs = Object.freeze({ error });
+      const reason = shippedCatalogs[code][shipped.exact[error]];
+      const expected = shippedCatalogs[code].shell_error_stop.replace('$ERROR$', () => reason);
+      check(shipped.text('shell_error_stop', 'Error stopping automation: $ERROR$', subs) === expected,
+        `${code} text() translates the catalog reason ${error}`);
+      check(shipped.text('missing_stop_key', 'Error stopping automation: $ERROR$', subs)
+          === 'Error stopping automation: ' + reason && subs.error === error,
+        `${code} text() translates substitutions in an English fallback without changing the input`);
+      response = { success: false, error };
+      context.stopAutomation();
+      check(messages.at(-1).text === expected && messages.at(-1).type === 'error' && !context.stopRequested,
+        `${code} a failed popup Stop translates ${error} and releases the stop request`);
+    }
+    response = undefined;
+    context.stopAutomation();
+    check(messages.at(-1).text === shippedCatalogs[code].shell_error_stop
+        .replace('$ERROR$', shippedCatalogs[code][shipped.exact['Unknown error']]),
+      `${code} a missing popup Stop response translates Unknown error`);
+    check(shipped.text('missing_raw_key', '$NAME$ on $DOMAIN$ ($COUNT$)',
+      { name: 'Grok Build', domain: 'shop.example', count: 3 }) === 'Grok Build on shop.example (3)',
+    `${code} text() keeps provider names, domains, and numbers unchanged`);
+    check(shipped.t('shell_error_stop', { error: 'Already completed' })
+        === shippedCatalogs[code].shell_error_stop.replace('$ERROR$', 'Already completed')
+        && shipped.text('missing_positional_key', '$1', ['Already completed']) === 'Already completed',
+      `${code} low-level and positional substitutions remain raw`);
+  }
+}
+
 // Provider names survive every catalog, and no template token is left behind.
 {
   const shipped = freshLocale().fsbUiLocale;
@@ -1210,6 +1261,16 @@ function extractNamedFunction(source, name) {
   ownerContext._setHeaderOwner('Autopilot');
   check(statusText.textContent === de.shell_owned_by.replace('$LABEL$', 'Autopilot'),
     'the owner name stays as sent even when it is also catalog copy');
+  for (const code of ['de', 'ja']) {
+    shipped.setOverride(code);
+    for (const label of ['Autopilot', 'Ready', 'Agent $& $` $\' $$']) {
+      ownerContext._setHeaderOwner(label);
+      ownerContext._refreshOwnerCopy();
+      check(statusText.textContent === shippedCatalogs[code].shell_owned_by.replace('$LABEL$', () => label)
+          && ownerContext.chatInput.title === shippedCatalogs[code].shell_owned_title.replace('$LABEL$', () => label),
+        `${code} owner header and tooltip preserve the raw label ${label}`);
+    }
+  }
   check(popupSource.includes('fsbUiLocale.onChange(_refreshOwnerCopy)')
       && extractNamedFunction(popupSource, 'refreshOwnerChip').includes('chatInput.title = _ownerLockTitle(label);'),
     'the popup redraws owner copy on a language change, and one helper builds the tooltip');
@@ -1296,6 +1357,75 @@ function extractNamedFunction(source, name) {
 }
 
 async function asyncChecks() {
+  // Run the popup's actual boot callback with catalogs held until ownership
+  // has rendered, then cover the opposite startup order as well.
+  const popupSource = fs.readFileSync(path.join(root, 'extension/ui/popup.js'), 'utf8');
+  const bootStart = popupSource.lastIndexOf("if (globalThis.fsbUiLocale && typeof fsbUiLocale.boot === 'function')");
+  assert(bootStart !== -1, 'popup locale boot block exists');
+  for (const ownerBeforeBoot of [true, false]) {
+    let releaseCatalogs;
+    let catalogRequested;
+    const catalogsReady = new Promise((resolve) => { releaseCatalogs = resolve; });
+    const catalogsStarted = new Promise((resolve) => { catalogRequested = resolve; });
+    const statusText = fakeNode({}, '');
+    const document = Object.assign(fakeDoc([statusText]), { documentElement: fakeNode({}, '') });
+    const sandbox = freshLocale({
+      location: { protocol: 'chrome-extension:' },
+      document,
+      chrome: {
+        i18n: { getUILanguage: () => 'en', getMessage: () => '' },
+        storage: { local: { get: (_key, callback) => callback({ fsbUiLocale: 'de' }) }, onChanged: { addListener() {} } },
+        runtime: { getURL: (file) => file }
+      },
+      fetch: (url) => {
+        catalogRequested();
+        return catalogsReady.then(() => ({ json: () => JSON.parse(fs.readFileSync(path.join(root, 'extension', url), 'utf8')) }));
+      },
+      statusText,
+      statusDot: { classList: { add() {}, remove() {} } },
+      chatInput: { title: '' },
+      _headerBaseStatusLabel: 'Ready',
+      _headerBaseStatusTone: '',
+      _headerOwnerLabel: null,
+      _chatLockedByOwnerChip: false
+    });
+    const shipped = sandbox.fsbUiLocale;
+    for (const code of shipped.PUBLIC_LOCALES) shipped.setCatalog(code, {});
+    vm.runInContext(fs.readFileSync(path.join(root, 'extension/ui/owner-chip.js'), 'utf8'), sandbox);
+    for (const name of ['_renderHeaderStatus', '_setHeaderOwner', '_ownerLockTitle', '_refreshOwnerCopy']) {
+      vm.runInContext(extractNamedFunction(popupSource, name), sandbox);
+    }
+    const showOwner = () => {
+      sandbox._setHeaderOwner('Claude');
+      sandbox._chatLockedByOwnerChip = true;
+      sandbox.chatInput.title = sandbox._ownerLockTitle('Claude');
+    };
+    let bootPromise;
+    const originalBoot = shipped.boot;
+    shipped.boot = () => { bootPromise = originalBoot(); return bootPromise; };
+    vm.runInContext(popupSource.slice(bootStart), sandbox);
+    if (ownerBeforeBoot) showOwner();
+    await catalogsStarted;
+    if (ownerBeforeBoot) {
+      check(statusText.textContent === 'Owned by Claude' && sandbox.chatInput.title === 'Disabled while tab is owned by Claude',
+        'an owner rendered before catalogs load initially uses English');
+    }
+    releaseCatalogs();
+    await bootPromise;
+    if (!ownerBeforeBoot) {
+      check(statusText.textContent === shippedCatalogs.de.shell_ready && sandbox.chatInput.title === '',
+        'locale boot without an owner translates the normal header and leaves the tooltip alone');
+      showOwner();
+    }
+    check(statusText.textContent === shippedCatalogs.de.shell_owned_by.replace('$LABEL$', 'Claude')
+        && sandbox.chatInput.title === shippedCatalogs.de.shell_owned_title.replace('$LABEL$', 'Claude'),
+      `owner header and tooltip use the saved language when ownership arrives ${ownerBeforeBoot ? 'before' : 'after'} locale boot`);
+    await shipped.saveOverride('ja');
+    check(statusText.textContent === shippedCatalogs.ja.shell_owned_by.replace('$LABEL$', 'Claude')
+        && sandbox.chatInput.title === shippedCatalogs.ja.shell_owned_title.replace('$LABEL$', 'Claude'),
+      'the popup boot subscription refreshes owner copy on a later language change');
+  }
+
   const requested = [];
   await locale.loadCatalogs((url) => {
     requested.push(url);
