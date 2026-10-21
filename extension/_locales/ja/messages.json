@@ -332,6 +332,27 @@
   "shell_starting_plain": {
     "message": "自動化を開始しています"
   },
+  "shell_completed": {
+    "message": "完了"
+  },
+  "shell_run_ended": {
+    "message": "実行終了"
+  },
+  "shell_stopping_plain": {
+    "message": "自動化を停止しています"
+  },
+  "shell_paused": {
+    "message": "自動化を一時停止しました"
+  },
+  "shell_resuming": {
+    "message": "自動化を再開しています"
+  },
+  "shell_pausing": {
+    "message": "自動化を一時停止しています"
+  },
+  "shell_resumed": {
+    "message": "自動化を再開しました"
+  },
   "shell_testing_api": {
     "message": "$NAME$ の API 接続をテストしています...",
     "placeholders": {

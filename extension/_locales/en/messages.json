@@ -332,6 +332,27 @@
   "shell_starting_plain": {
     "message": "Starting automation"
   },
+  "shell_completed": {
+    "message": "Completed"
+  },
+  "shell_run_ended": {
+    "message": "Run ended"
+  },
+  "shell_stopping_plain": {
+    "message": "Stopping automation"
+  },
+  "shell_paused": {
+    "message": "Automation paused"
+  },
+  "shell_resuming": {
+    "message": "Resuming automation"
+  },
+  "shell_pausing": {
+    "message": "Pausing automation"
+  },
+  "shell_resumed": {
+    "message": "Automation resumed"
+  },
   "shell_testing_api": {
     "message": "Testing $NAME$ API connection...",
     "placeholders": {

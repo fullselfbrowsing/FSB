@@ -2525,6 +2525,9 @@ function _delegationLifecycleAnnouncement(snapshot, previousSnapshot, hydrated) 
     textValue = 'Automation resumed';
   }
   if (!suffix) return '';
+  if (globalThis.fsbUiLocale && typeof fsbUiLocale.line === 'function') {
+    textValue = fsbUiLocale.line(textValue);
+  }
   return _delegationOneShotTransition(
     snapshot.delegationId + ':lifecycle:' + suffix,
     textValue,

@@ -284,6 +284,8 @@ const controlPanelMap = pageExactMap(['extension/utils/ui-locale.js', 'extension
 for (const [file, exactMap, texts] of [
   ['extension/ui/sidepanel.js', sidePanelMap, [
     'Stop Automation', 'Stopping Automation…', 'Task complete', 'Automation stopped', 'Replay error',
+    'Completed', 'Run ended', 'Starting automation', 'Stopping automation',
+    'Automation paused', 'Resuming automation', 'Pausing automation', 'Automation resumed',
     'Technical details', 'Step $NUMBER$ complete', 'Replaying...', 'Working...', 'Retrying...', 'Error: $ERROR$',
     'Choose another provider', 'Selected provider', 'The agent',
     'Let $NAME$ control this browser?', '$NAME$ may drive FSB browser tools for this task.',
@@ -805,6 +807,112 @@ function extractNamedFunction(source, name) {
     'a sitting "Step N complete" status follows a language change');
   context.updateStatusMessage('Clicked the Submit button');
   check(statusNode.textContent === 'Clicked the Submit button', 'status line leaves AI text as sent');
+}
+
+// Terminal delegation headings retain their keys when the language changes.
+{
+  const panelSource = fs.readFileSync(path.join(root, 'extension/ui/sidepanel.js'), 'utf8');
+  const context = freshLocale({ document: { createElement: () => fakeNode({}, '') } });
+  const shipped = context.fsbUiLocale;
+  for (const name of ['_delegationElement', '_delegationIsActiveSnapshot', '_delegationStateLabel']) {
+    vm.runInContext(extractNamedFunction(panelSource, name), context);
+  }
+  shipped.setOverride('en');
+  const headings = ['completed', 'restart_lost'].map((state) => context._delegationElement(
+    'span', 'delegation-heading-copy',
+    context._delegationStateLabel({ state, connection: 'connected', terminal: null })
+  ));
+  for (const code of shipped.PUBLIC_LOCALES) {
+    shipped.setOverride(code);
+    shipped.apply(fakeDoc(headings));
+    check(headings[0].textContent === shippedCatalogs[code].shell_completed
+        && headings[1].textContent === shippedCatalogs[code].shell_run_ended
+        && (code === 'en' || (headings[0].textContent !== 'Completed' && headings[1].textContent !== 'Run ended'))
+        && headings[0].getAttribute('data-i18n-live') === 'shell_completed'
+        && headings[1].getAttribute('data-i18n-live') === 'shell_run_ended',
+      `completed and generic restart-lost headings follow a language change to ${code}`);
+  }
+}
+
+// Both snapshot and live-update announcements translate lifecycle copy before
+// combining it with provider output, without changing one-shot identities.
+{
+  const panelSource = fs.readFileSync(path.join(root, 'extension/ui/sidepanel.js'), 'utf8');
+  const transitions = [
+    ['starting', 'shell_starting_plain'],
+    ['holding', 'shell_pausing'],
+    ['held', 'shell_paused'],
+    ['resuming', 'shell_resuming'],
+    ['running', 'shell_resumed'],
+    ['stopping', 'shell_stopping_plain']
+  ];
+  for (const renderPath of ['snapshot', 'runtime']) {
+    for (const code of locale.PUBLIC_LOCALES) {
+      const mount = {
+        run: Object.assign(fakeNode({}, ''), { classList: { remove() {} } }),
+        state: fakeNode({}, ''),
+        feed: fakeNode({}, ''),
+        announcer: fakeNode({}, '')
+      };
+      const uiState = {
+        delegationId: 'locale-run', snapshot: null, lastRenderedSequence: null,
+        announced: Object.create(null), announcedTransitions: Object.create(null)
+      };
+      const context = freshLocale({
+        _delegationUiState: uiState,
+        _ensureDelegationMount: () => mount,
+        FsbDelegationFeed: {
+          validateSnapshot: () => true,
+          render: (_feed, snapshot) => ({ ok: true, lastSequence: snapshot.entries.length })
+        },
+        _renderDelegationRunHeader() {},
+        _delegationSnapshotAlertKey: () => null,
+        _delegationHeaderPresentation: () => ({ label: 'Working', tone: 'running' }),
+        _setDelegationHeaderStatus() {},
+        _delegationSnapshotLocksComposer: () => true,
+        _setDelegationComposerLocked() {},
+        _delegationAnnouncement: (entry) => entry.text
+      });
+      context.fsbUiLocale.setOverride(code);
+      for (const name of ['_delegationOneShotTransition', '_delegationLifecycleAnnouncement',
+        '_renderDelegationSnapshot', '_renderDelegationRuntimeMetadata']) {
+        vm.runInContext(extractNamedFunction(panelSource, name), context);
+      }
+      let previous = null;
+      function render(snapshot, hydrated = false) {
+        if (renderPath === 'snapshot') {
+          context._renderDelegationSnapshot(snapshot, { hydrated, announceSequence: snapshot.entries.length || null });
+        } else {
+          context._renderDelegationRuntimeMetadata(mount, snapshot, previous,
+            previous ? previous.entries.length : 0,
+            { announceSequence: snapshot.entries.length || null, entry: snapshot.entries.at(-1) });
+        }
+        previous = snapshot;
+      }
+      for (const [state, key] of transitions) {
+        const entry = { sequence: (previous ? previous.entries.length : 0) + 1, text: 'Provider output: Completed' };
+        const snapshot = { delegationId: 'locale-run', state, entries: [...(previous ? previous.entries : []), entry] };
+        render(snapshot);
+        check(mount.announcer.textContent === shippedCatalogs[code][key] + '. ' + entry.text,
+          `${renderPath} ${state} announces the ${code} lifecycle phrase with provider output preserved`);
+        mount.announcer.textContent = 'dedupe sentinel';
+        render(snapshot);
+        check(mount.announcer.textContent === 'dedupe sentinel',
+          `${renderPath} ${state} in ${code} is announced only once`);
+      }
+      if (renderPath === 'snapshot') {
+        uiState.announcedTransitions = Object.create(null);
+        for (const [state] of transitions) {
+          const snapshot = { delegationId: 'locale-run', state, entries: previous.entries };
+          mount.announcer.textContent = 'hydration sentinel';
+          render(snapshot, true);
+          render(snapshot);
+          check(mount.announcer.textContent === 'hydration sentinel',
+            `hydrated ${state} in ${code} stays silent on later unchanged snapshots`);
+        }
+      }
+    }
+  }
 }
 
 // Delegation cards pass a template and its subs, never a filled line(), so a

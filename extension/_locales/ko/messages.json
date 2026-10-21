@@ -332,6 +332,27 @@
   "shell_starting_plain": {
     "message": "자동화 시작"
   },
+  "shell_completed": {
+    "message": "완료"
+  },
+  "shell_run_ended": {
+    "message": "실행 종료"
+  },
+  "shell_stopping_plain": {
+    "message": "자동화를 중지하는 중"
+  },
+  "shell_paused": {
+    "message": "자동화가 일시 중지됨"
+  },
+  "shell_resuming": {
+    "message": "자동화를 재개하는 중"
+  },
+  "shell_pausing": {
+    "message": "자동화를 일시 중지하는 중"
+  },
+  "shell_resumed": {
+    "message": "자동화가 재개됨"
+  },
   "shell_testing_api": {
     "message": "$NAME$ API 연결을 테스트하는 중...",
     "placeholders": {

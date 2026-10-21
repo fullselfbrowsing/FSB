@@ -332,6 +332,27 @@
   "shell_starting_plain": {
     "message": "Iniciando la automatización"
   },
+  "shell_completed": {
+    "message": "Completado"
+  },
+  "shell_run_ended": {
+    "message": "Ejecución finalizada"
+  },
+  "shell_stopping_plain": {
+    "message": "Deteniendo la automatización"
+  },
+  "shell_paused": {
+    "message": "Automatización en pausa"
+  },
+  "shell_resuming": {
+    "message": "Reanudando la automatización"
+  },
+  "shell_pausing": {
+    "message": "Pausando la automatización"
+  },
+  "shell_resumed": {
+    "message": "Automatización reanudada"
+  },
   "shell_testing_api": {
     "message": "Probando la conexión de API de $NAME$...",
     "placeholders": {

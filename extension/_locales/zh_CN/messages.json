@@ -332,6 +332,27 @@
   "shell_starting_plain": {
     "message": "正在启动自动化"
   },
+  "shell_completed": {
+    "message": "已完成"
+  },
+  "shell_run_ended": {
+    "message": "运行已结束"
+  },
+  "shell_stopping_plain": {
+    "message": "正在停止自动化"
+  },
+  "shell_paused": {
+    "message": "自动化已暂停"
+  },
+  "shell_resuming": {
+    "message": "正在恢复自动化"
+  },
+  "shell_pausing": {
+    "message": "正在暂停自动化"
+  },
+  "shell_resumed": {
+    "message": "自动化已恢复"
+  },
   "shell_testing_api": {
     "message": "正在测试 $NAME$ 的 API 连接...",
     "placeholders": {

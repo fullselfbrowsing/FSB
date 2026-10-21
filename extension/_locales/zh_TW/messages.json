@@ -332,6 +332,27 @@
   "shell_starting_plain": {
     "message": "正在啟動自動化"
   },
+  "shell_completed": {
+    "message": "已完成"
+  },
+  "shell_run_ended": {
+    "message": "執行已結束"
+  },
+  "shell_stopping_plain": {
+    "message": "正在停止自動化"
+  },
+  "shell_paused": {
+    "message": "自動化已暫停"
+  },
+  "shell_resuming": {
+    "message": "正在恢復自動化"
+  },
+  "shell_pausing": {
+    "message": "正在暫停自動化"
+  },
+  "shell_resumed": {
+    "message": "自動化已恢復"
+  },
   "shell_testing_api": {
     "message": "正在測試 $NAME$ 的 API 連線...",
     "placeholders": {
