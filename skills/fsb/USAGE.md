@@ -1,6 +1,6 @@
 # FSB Skill -- Usage
 
-> **v0.9.0 breaking change** -- The explicit `start_visual_session` / `end_visual_session` tools were REMOVED in fsb-mcp-server v0.9.0 (FSB milestone v0.9.62). Action tools now require `visual_reason` + `client` fields in every call (validated against the v0.9.36 badge allowlist). The visual session is created implicitly on the first action call, refreshed on a sliding 60-second window, and cleared by `is_final: true` (immediate) or 60 seconds of silence (auto-clear). Calling the removed tools returns the typed `TOOL_REMOVED` error. See [`mcp/CHANGELOG.md`](../../mcp/CHANGELOG.md#v0.9.0) and [`mcp/README.md`](../../mcp/README.md#visual-session-lifecycle) for the migration recipe with concrete before/after code.
+> **v0.9.0 breaking change** -- The explicit `start_visual_session` / `end_visual_session` tools were REMOVED in fsb-mcp-server v0.9.0 (FSB milestone v0.9.62). Action tools now require `visual_reason` + `client` fields in every call (validated against the v0.9.36 badge allowlist). The visual session is created implicitly on the first action call, refreshed on a sliding 60-second window, and cleared by `is_final: true` (immediate) or 60 seconds of silence (auto-clear). The removed names are no longer registered at all. See [`mcp/CHANGELOG.md`](../../mcp/CHANGELOG.md#v0.9.0) and [`mcp/README.md`](../../mcp/README.md#visual-session-lifecycle) for the migration recipe with concrete before/after code.
 
 FSB drives the user's real Chrome via the FSB extension and a local MCP bridge so OpenClaw can run live web tasks (clicks, typing, multi-tab flows, auth-gated reads).
 
@@ -121,7 +121,6 @@ Three typed errors guard the contract; match on the name, not the human-readable
 
 - **`VISUAL_FIELDS_REQUIRED`** -- raised when an action call is missing `visual_reason` or `client`. Schema-layer reject; no DOM mutation occurs.
 - **`BADGE_NOT_ALLOWED`** -- raised when `client` is not on the v0.9.36 allowlist. Use one of the labels above.
-- **`TOOL_REMOVED`** -- raised when a caller invokes `start_visual_session` or `end_visual_session` by name. The body names the new contract; do not retry with the removed tool names.
 
 ### Autopilot exception
 

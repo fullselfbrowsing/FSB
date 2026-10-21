@@ -2,6 +2,21 @@
 
 All notable changes to `fsb-mcp-server` are documented in this file. Each entry corresponds to a published npm release; FSB extension milestones map to MCP package versions in the entry header.
 
+## Unreleased
+
+### Removed
+
+- **`start_visual_session`, `end_visual_session` and `back` are no longer registered.** The two visual-session tools have only returned a `TOOL_REMOVED` error since 0.9.0, and `back` duplicated `go_back`. The server now registers 69 tools. A client that still calls one of these names gets its MCP host's unknown-tool error; use `go_back` for history navigation.
+- The `TOOL_REMOVED` typed error is gone along with the stubs that returned it.
+
+### Changed
+
+- Every published tool count (both READMEs, extension onboarding, showcase pages and their translations, and the `llms` files) is now checked against the tools the built server actually registers. `tests/mcp-version-parity.test.js` fails when any of them disagrees, so the count can no longer drift.
+
+### Compatibility and update
+
+- Removing tools changes the advertised tool list, so release this as a minor version rather than a patch.
+
 <a id="v0.11.2"></a>
 
 ## 0.11.2 (2026-10-14)

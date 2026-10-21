@@ -132,7 +132,7 @@ const typedErrors = ['TAB_NOT_OWNED', 'AGENT_CAP_REACHED', 'TAB_INCOGNITO_NOT_SU
 for (const err of typedErrors) {
   check(macSrc.includes(err), `multi-agent-contract.md mentions ${err}`);
 }
-check(/\bback\b/.test(macSrc), 'multi-agent-contract.md mentions back tool');
+check(/\[GOOD\] go_back\(/.test(macSrc) && !/\[GOOD\] back\(|Prefer `back`/.test(macSrc), 'multi-agent-contract.md points history navigation at go_back, not the removed back tool');
 
 // tool-decision-tree.md tool token cross-reference
 const tdtSrc = fs.existsSync(refs['tool-decision-tree.md'])

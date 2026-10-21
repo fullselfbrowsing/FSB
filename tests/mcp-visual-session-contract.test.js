@@ -52,13 +52,11 @@
  *          resolveAgentTabOrError, dispatchMcpToolRoute, wrapWithChangeReport,
  *          and the agent-registry instance, which is out of scope here.)
  *
- *   5. runToolRemovedCase
- *        - Calling either removed tool name (start_visual_session,
- *          end_visual_session) through the MCP server's registerVisualSessionTools
- *          dispatcher (mcp/build/tools/visual-session.js) returns the typed
- *          TOOL_REMOVED error envelope. The response body references the
- *          CHANGELOG anchor and the README migration recipe. No bridge call,
- *          no queue call.
+ *   5. runRetiredToolsCase
+ *        - The built runtime no longer registers start_visual_session or
+ *          end_visual_session (their error-only stubs were removed), and
+ *          mcp/build/tools/visual-session.js still exports the client-label
+ *          helpers that the action tools use.
  *
  * Run: node tests/mcp-visual-session-contract.test.js
  */
@@ -637,89 +635,34 @@ async function runOwnershipPrecedenceCase() {
 }
 
 // ------------------------------------------------------------------
-// Case 5: TOOL_REMOVED -- both removed tool names return the typed
-// error envelope with the migration recipe pointer (CHANGELOG anchor
-// + README anchor); no bridge call, no queue call.
+// Case 5: the removed visual-session tools stay off the MCP surface,
+// while the shared client-label helpers keep working.
 // ------------------------------------------------------------------
 
-async function runToolRemovedCase() {
-  console.log('\n--- Case 5: TOOL_REMOVED for start_visual_session and end_visual_session ---');
+async function runRetiredToolsCase() {
+  console.log('\n--- Case 5: start_visual_session and end_visual_session are not registered ---');
 
-  const BUILD_PATH = path.resolve(__dirname, '..', 'mcp', 'build', 'tools', 'visual-session.js');
-  if (!fs.existsSync(BUILD_PATH)) {
-    console.error('  FAIL: mcp/build/tools/visual-session.js missing -- run `cd mcp && npm run build` before this test');
+  const BUILD_DIR = path.resolve(__dirname, '..', 'mcp', 'build');
+  const runtimePath = path.join(BUILD_DIR, 'runtime.js');
+  const visualSessionPath = path.join(BUILD_DIR, 'tools', 'visual-session.js');
+  if (!fs.existsSync(runtimePath) || !fs.existsSync(visualSessionPath)) {
+    console.error('  FAIL: mcp/build is missing -- run `cd mcp && npm run build` before this test');
     failed++;
     return;
   }
 
-  const visualSessionModule = await import(BUILD_PATH);
-  const recordingServer = makeRecordingServer();
-  const mockBridge = makeRecordingBridge();
-  const mockQueue = makeRecordingQueue();
-  const mockAgentScope = makeStubAgentScope();
+  const { createRuntime } = await import(runtimePath);
+  const registered = Object.keys(createRuntime().server._registeredTools || {});
+  assert(!registered.includes('start_visual_session'), '5.1 start_visual_session is not registered');
+  assert(!registered.includes('end_visual_session'), '5.2 end_visual_session is not registered');
 
-  visualSessionModule.registerVisualSessionTools(
-    recordingServer.server,
-    mockBridge.bridge,
-    mockQueue.queue,
-    mockAgentScope,
-  );
-
-  // Both removed tools must be registered (so the MCP tools/list surface
-  // still advertises them with the [REMOVED in v0.9.0] banner).
-  assert(recordingServer.tools.has('start_visual_session'), '5.0a start_visual_session handler registered (stub for tools/list visibility)');
-  assert(recordingServer.tools.has('end_visual_session'), '5.0b end_visual_session handler registered (stub for tools/list visibility)');
-
-  // Sub-case A: start_visual_session returns TOOL_REMOVED with migration recipe.
-  mockBridge.calls.length = 0;
-  mockQueue.calls.length = 0;
-  const startHandler = recordingServer.tools.get('start_visual_session');
-  const startRes = await startHandler({
-    client: 'Claude',
-    task: 'Drive checkout',
-    detail: 'should be ignored',
-  });
-  assertEqual(startRes.isError, true, '5.A start_visual_session returns isError: true');
-  assertEqual(mockBridge.calls.length, 0, '5.A no bridge.sendAndWait call on removed tool');
-  assertEqual(mockQueue.calls.length, 0, '5.A no queue.enqueue call on removed tool');
-  assert(typeof startRes.content[0].text === 'string', '5.A response has a text body');
-
-  const startText = startRes.content[0].text;
-  assert(startText.includes('start_visual_session'), '5.A response body names the removed tool start_visual_session');
-  assert(startText.includes('0.9.0'), '5.A response body cites the removed_in_version 0.9.0');
-  assert(startText.includes('visual_reason'), '5.A migration recipe references visual_reason field');
-  assert(startText.includes('client'), '5.A migration recipe references client field');
-  assert(startText.includes('is_final'), '5.A migration recipe references is_final field');
-  // The TOOL_REMOVED migration recipe in mcp/src/errors.ts cites CHANGELOG.md
-  // and mcp/README.md as the migration recipe anchors.
-  assert(startText.includes('CHANGELOG'), '5.A response references CHANGELOG anchor');
-  assert(startText.includes('README'), '5.A response references README anchor');
-
-  // Sub-case B: end_visual_session returns TOOL_REMOVED with migration recipe.
-  mockBridge.calls.length = 0;
-  mockQueue.calls.length = 0;
-  const endHandler = recordingServer.tools.get('end_visual_session');
-  const endRes = await endHandler({
-    session_token: 'visual_token_irrelevant',
-    reason: 'ended',
-  });
-  assertEqual(endRes.isError, true, '5.B end_visual_session returns isError: true');
-  assertEqual(mockBridge.calls.length, 0, '5.B no bridge.sendAndWait call on removed tool');
-  assertEqual(mockQueue.calls.length, 0, '5.B no queue.enqueue call on removed tool');
-  const endText = endRes.content[0].text;
-  assert(endText.includes('end_visual_session'), '5.B response body names the removed tool end_visual_session');
-  assert(endText.includes('0.9.0'), '5.B response body cites the removed_in_version 0.9.0');
-  assert(endText.includes('visual_reason'), '5.B migration recipe references visual_reason field');
-  assert(endText.includes('client'), '5.B migration recipe references client field');
-  assert(endText.includes('is_final'), '5.B migration recipe references is_final field');
-  assert(endText.includes('CHANGELOG'), '5.B response references CHANGELOG anchor');
-  assert(endText.includes('README'), '5.B response references README anchor');
-
-  // Both responses must route through the same TOOL_REMOVED layered detail
-  // (rather than a generic "tool not found" surface). Loose match: the
-  // response carries the "Visual session contract" layer label.
-  assert(startText.includes('Visual session contract'), '5.A response detected layer is Visual session contract');
-  assert(endText.includes('Visual session contract'), '5.B response detected layer is Visual session contract');
+  const visualSessionModule = await import(visualSessionPath);
+  assertEqual(typeof visualSessionModule.registerVisualSessionTools, 'undefined',
+    '5.3 visual-session.js no longer exports a tool registrar');
+  assertEqual(visualSessionModule.normalizeMcpVisualClientLabel(' codex '), 'Codex',
+    '5.4 client labels still normalize for the action tools');
+  assertEqual(visualSessionModule.isAllowedMcpVisualClientLabel('Not A Client'), false,
+    '5.5 unknown client labels are still rejected');
 }
 
 // ------------------------------------------------------------------
@@ -731,7 +674,7 @@ async function runToolRemovedCase() {
   await runPersistenceReplayCase();
   await runImplicitDispatcherValidationCase();
   await runOwnershipPrecedenceCase();
-  await runToolRemovedCase();
+  await runRetiredToolsCase();
 
   console.log(`\n=== Results: ${passed} passed, ${failed} failed ===`);
   process.exit(failed === 0 ? 0 : 1);

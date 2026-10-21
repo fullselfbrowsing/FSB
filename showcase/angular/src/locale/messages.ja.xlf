@@ -499,8 +499,8 @@
         </context-group>
       </trans-unit>
       <trans-unit id="about.actions.subtitle" datatype="html">
-        <source>60 browser actions organized by category, all executable through natural language, and surfaced to agents as part of the 68-tool <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> catalog.</source>
-        <target state="translated">カテゴリごとに整理された60種類のブラウザアクションを、すべて自然言語で実行でき、68ツールの<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>カタログの一部としてエージェントに提供します。</target>
+        <source>60 browser actions organized by category, all executable through natural language, and surfaced to agents as part of the 69-tool <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> catalog.</source>
+        <target state="translated">カテゴリごとに整理された60種類のブラウザアクションを、すべて自然言語で実行でき、69ツールの<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>カタログの一部としてエージェントに提供します。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/about/about-page.component.html</context>
           <context context-type="linenumber">102,104</context>
@@ -1839,8 +1839,8 @@
         </context-group>
       </trans-unit>
       <trans-unit id="agents.with.agent.foot" datatype="html">
-        <source>via <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> · 68 tools</source>
-        <target state="translated"><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 経由 · 68 個のツール</target>
+        <source>via <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> · 69 tools</source>
+        <target state="translated"><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 経由 · 69 個のツール</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/agents/agents-page.component.html</context>
           <context context-type="linenumber">92,93</context>
@@ -1879,8 +1879,8 @@
         </context-group>
       </trans-unit>
       <trans-unit id="agents.power.card.tools.stat" datatype="html">
-        <source>68 tools</source>
-        <target state="translated">68 個のツール</target>
+        <source>69 tools</source>
+        <target state="translated">69 個のツール</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/agents/agents-page.component.html</context>
           <context context-type="linenumber">122,123</context>
@@ -2279,8 +2279,8 @@
         </context-group>
       </trans-unit>
       <trans-unit id="agents.schema.software.feature.tools" datatype="html">
-        <source>68 MCP tools for browser action, observation, verification, and recovery</source>
-        <target state="translated">ブラウザ操作、観察、検証、復旧に対応する 68 個の MCP ツール</target>
+        <source>69 MCP tools for browser action, observation, verification, and recovery</source>
+        <target state="translated">ブラウザ操作、観察、検証、復旧に対応する 69 個の MCP ツール</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/agents/agents-page.component.ts</context>
           <context context-type="linenumber">296</context>
@@ -4147,7 +4147,7 @@
         <target state="translated">バックグラウンドエージェントは移行しました。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.html</context>
-          <context context-type="linenumber">279,280</context>
+          <context context-type="linenumber">278,279</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.template.073" datatype="html">
@@ -4155,7 +4155,7 @@
         <target state="translated">FSB ではスケジュール実行や定期的なエージェント実行を提供しなくなりました。この用途には、後継として <x id="START_LINK" ctype="x-a" equiv-text="&lt;a href=&quot;https://github.com/openclaw/openclaw&quot; target=&quot;_blank&quot; rel=&quot;noopener noreferrer&quot;&gt;"/>OpenClaw<x id="CLOSE_LINK" ctype="x-a" equiv-text="&lt;/a&gt;"/>（オープンソースのエージェントループ）と <x id="START_LINK_1" equiv-text="&lt;a href=&quot;https://www.anthropic.com/claude/routines&quot; target=&quot;_blank&quot; rel=&quot;noopener noreferrer&quot;&gt;"/>Claude Routines<x id="CLOSE_LINK" ctype="x-a" equiv-text="&lt;/a&gt;"/>（マネージド型の長時間自動化）を推奨します。上のダッシュボードでは引き続き、単発タスク実行のライブリモート操作状態と DOM ストリーミングを確認できます。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.html</context>
-          <context context-type="linenumber">280,281</context>
+          <context context-type="linenumber">279,280</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.template.067" datatype="html">
@@ -4163,7 +4163,7 @@
         <target state="translated">v0.9.45rc1（2026 年 4 月）で廃止</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.html</context>
-          <context context-type="linenumber">281,283</context>
+          <context context-type="linenumber">280,282</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.meta.title" datatype="html">
@@ -5459,7 +5459,7 @@
         <target state="translated">タスクの復旧がタイムアウトしました — 直前の操作：<x id="action" equiv-text="this.lastProgressAction"/></target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">1699</context>
+          <context context-type="linenumber">1461</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.tooltip.lastSnapshot" datatype="html">
@@ -5467,7 +5467,7 @@
         <target state="translated">最終スナップショット：<x id="snapshotTime" equiv-text="snapshotTime"/></target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">4014</context>
+          <context context-type="linenumber">3186</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.tooltip.state" datatype="html">
@@ -5475,7 +5475,7 @@
         <target state="translated">状態：<x id="streamState" equiv-text="state"/></target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">4018</context>
+          <context context-type="linenumber">3190</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.tooltip.reason" datatype="html">
@@ -5483,7 +5483,7 @@
         <target state="translated">理由：<x id="reason" equiv-text="reason"/></target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">4022</context>
+          <context context-type="linenumber">3194</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.tooltip.recoveringFor" datatype="html">
@@ -5491,7 +5491,7 @@
         <target state="translated">復旧開始から <x id="seconds" equiv-text="seconds"/> 秒</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">4026</context>
+          <context context-type="linenumber">3198</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.tooltip.lastFrame" datatype="html">
@@ -5499,7 +5499,7 @@
         <target state="translated">最終フレーム：<x id="seconds" equiv-text="frameSeconds"/> 秒前</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">4032</context>
+          <context context-type="linenumber">3204</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.tooltip.mutations" datatype="html">
@@ -5507,7 +5507,7 @@
         <target state="translated">適用済みミューテーション：<x id="count" equiv-text="this.mutationsAppliedTotal"/></target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">4033</context>
+          <context context-type="linenumber">3205</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.tooltip.applyFailures" datatype="html">
@@ -5515,7 +5515,7 @@
         <target state="translated">適用失敗：<x id="count" equiv-text="this.mutationApplyFailures"/></target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">4034</context>
+          <context context-type="linenumber">3206</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.tooltip.stale" datatype="html">
@@ -5523,7 +5523,7 @@
         <target state="translated">古いミューテーション：<x id="count" equiv-text="this.staleMutationCount"/></target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">4035</context>
+          <context context-type="linenumber">3207</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.tooltip.noData" datatype="html">
@@ -5531,7 +5531,7 @@
         <target state="translated">ストリームデータなし</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">4036</context>
+          <context context-type="linenumber">3208</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.api.requestFailed" datatype="html">
@@ -5539,7 +5539,7 @@
         <target state="translated">ステータス <x id="status" equiv-text="status"/> でリクエストに失敗しました</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">4339</context>
+          <context context-type="linenumber">3453</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.etaMinutes" datatype="html">
@@ -5547,7 +5547,7 @@
         <target state="translated">残り約<x id="minutes" equiv-text="amount"/>分</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">4494</context>
+          <context context-type="linenumber">3608</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.etaSeconds" datatype="html">
@@ -5555,7 +5555,7 @@
         <target state="translated">残り約<x id="seconds" equiv-text="amount"/>秒</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">4495</context>
+          <context context-type="linenumber">3609</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.runningFor" datatype="html">
@@ -5563,7 +5563,7 @@
         <target state="translated">実行時間：<x id="duration" equiv-text="duration"/></target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">4569</context>
+          <context context-type="linenumber">3683</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.stoppedWithAction" datatype="html">
@@ -5571,7 +5571,7 @@
         <target state="translated">ユーザーが停止しました — 直前の操作：<x id="action" equiv-text="action"/></target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">4574</context>
+          <context context-type="linenumber">3688</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.hero.title" datatype="html">
@@ -5759,8 +5759,8 @@
         </context-group>
       </trans-unit>
       <trans-unit id="home.features.card.mcpIntegration.desc" datatype="html">
-        <source>Use <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> as an <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> server from <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Claude Code<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Codex<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Cursor<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>OpenClaw<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, or any <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> client. 68 tools, with browser automation straight from your IDE.</source>
-        <target state="translated"><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> を <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> サーバーとして <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Claude Code<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Codex<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Cursor<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>OpenClaw<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、または任意の <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> クライアントから利用できます。68 個のツールにより、IDE から直接ブラウザを自動化できます。</target>
+        <source>Use <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> as an <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> server from <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Claude Code<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Codex<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Cursor<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>OpenClaw<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, or any <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> client. 69 tools, with browser automation straight from your IDE.</source>
+        <target state="translated"><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> を <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> サーバーとして <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Claude Code<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Codex<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Cursor<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>OpenClaw<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、または任意の <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> クライアントから利用できます。69 個のツールにより、IDE から直接ブラウザを自動化できます。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
           <context context-type="linenumber">68,70</context>
@@ -6127,8 +6127,8 @@
         </context-group>
       </trans-unit>
       <trans-unit id="home.engine.mcp.meta" datatype="html">
-        <source>68 tools · no API key</source>
-        <target state="translated">68 個のツール · API キー不要</target>
+        <source>69 tools · no API key</source>
+        <target state="translated">69 個のツール · API キー不要</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
           <context context-type="linenumber">276,278</context>
@@ -19435,8 +19435,8 @@ https://full-selfbrowsing.com/api/telemetry/forget<x id="CLOSE_TAG_CODE" ctype="
         </context-group>
       </trans-unit>
       <trans-unit id="support.schema.faq.mcp.a" datatype="html">
-        <source>MCP (Model Context Protocol) lets you control FSB from AI coding tools like Claude Code, Codex, Cursor, Windsurf, and OpenClaw. The MCP server runs as npx -y fsb-mcp-server@latest and pairs with the running extension over a local WebSocket bridge. FSB exposes 68 MCP tools (click, type, navigate, read DOM, fill vault credentials, and more). For OpenClaw users specifically, the fastest path is the one-click install on ClawHub at https://clawhub.ai/lakshmanturlapati/full-selfbrowsing, or load the FSB skill at skills/fsb/ which prints the stdio config block and runs the doctor diagnostic. The full rundown lives at https://full-selfbrowsing.com/agents.</source>
-        <target state="translated">MCP（Model Context Protocol）を使うと、FSB を Claude Code、Codex、Cursor、Windsurf、OpenClaw などの AI コーディングツールから操作できます。MCP サーバーは npx -y fsb-mcp-server@latest として動作し、ローカル WebSocket ブリッジ経由で実行中の拡張機能とペアリングします。FSB は 68 個の MCP ツール（クリック、入力、移動、DOM 読み取り、保管庫の認証情報入力など）を公開します。特に OpenClaw ユーザーは、https://clawhub.ai/lakshmanturlapati/full-selfbrowsing の ClawHub からワンクリックでインストールするのが最短です。または skills/fsb/ から FSB スキルを読み込むと、stdio 設定ブロックが表示され、doctor 診断が実行されます。詳しい手順は https://full-selfbrowsing.com/agents を参照してください。</target>
+        <source>MCP (Model Context Protocol) lets you control FSB from AI coding tools like Claude Code, Codex, Cursor, Windsurf, and OpenClaw. The MCP server runs as npx -y fsb-mcp-server@latest and pairs with the running extension over a local WebSocket bridge. FSB exposes 69 MCP tools (click, type, navigate, read DOM, fill vault credentials, and more). For OpenClaw users specifically, the fastest path is the one-click install on ClawHub at https://clawhub.ai/lakshmanturlapati/full-selfbrowsing, or load the FSB skill at skills/fsb/ which prints the stdio config block and runs the doctor diagnostic. The full rundown lives at https://full-selfbrowsing.com/agents.</source>
+        <target state="translated">MCP（Model Context Protocol）を使うと、FSB を Claude Code、Codex、Cursor、Windsurf、OpenClaw などの AI コーディングツールから操作できます。MCP サーバーは npx -y fsb-mcp-server@latest として動作し、ローカル WebSocket ブリッジ経由で実行中の拡張機能とペアリングします。FSB は 69 個の MCP ツール（クリック、入力、移動、DOM 読み取り、保管庫の認証情報入力など）を公開します。特に OpenClaw ユーザーは、https://clawhub.ai/lakshmanturlapati/full-selfbrowsing の ClawHub からワンクリックでインストールするのが最短です。または skills/fsb/ から FSB スキルを読み込むと、stdio 設定ブロックが表示され、doctor 診断が実行されます。詳しい手順は https://full-selfbrowsing.com/agents を参照してください。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/support/support-page.component.ts</context>
           <context context-type="linenumber">41</context>

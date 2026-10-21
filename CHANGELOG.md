@@ -6,6 +6,16 @@ The independently published `fsb-mcp-server` npm package keeps its own semver ch
 
 ## [Unreleased]
 
+### Removed
+
+- **What background agents left behind.** Background agents were retired in v0.9.45rc1, but their saved definitions stayed in `chrome.storage.local['bgAgents']` and several thousand lines of commented-out agent code stayed in the extension and both dashboards. When the extension updates, it now deletes `bgAgents`, the `fsb_sync_queue` sync queue and any scheduled `fsb_agent_*` alarms. The control-panel list of old agent names, the commented-out code, and the unused `executeAutomationTask` entry point are gone.
+- **Agent sync endpoints on the server.** `/api/agents` and the agent-only `/api/stats` route are removed from `showcase/server`, and the agents, stats and SSE routers from `server-py`. The `agents` and `agent_runs` tables are kept, so previously synced rows are untouched.
+- **Three MCP tools.** `start_visual_session`, `end_visual_session` and `back` are no longer registered, leaving 69 tools; see [`mcp/CHANGELOG.md`](./mcp/CHANGELOG.md).
+
+### Changed
+
+- Every published MCP tool count now says 69 and is checked against the built server, so the README, onboarding, showcase and `llms` figures can no longer disagree.
+
 ## v0.9.92 — Bridge Reliability and Editing Fixes — 2026-10-07
 
 The extension, showcase, skill, documentation, and store metadata align at `0.9.92`. The independently versioned `fsb-mcp-server` advances to `0.11.1` with the accompanying patch; see [`mcp/CHANGELOG.md`](./mcp/CHANGELOG.md) for its package-specific release notes and compatibility requirements.

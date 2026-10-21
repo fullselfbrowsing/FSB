@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { execSync } = require('child_process');
+const { pathToFileURL } = require('url');
 
 let passed = 0;
 let failed = 0;
@@ -268,6 +269,8 @@ async function run() {
     ['MCP README', packageReadme],
     ['extension onboarding', readText('extension/ui/onboarding.js')],
     ['showcase about page', readText('showcase/angular/src/app/pages/about/about-page.component.html')],
+    ['showcase about metadata', readText('showcase/angular/src/app/pages/about/about-page.component.ts')],
+    ['showcase home page', readText('showcase/angular/src/app/pages/home/home-page.component.html')],
     ['showcase agents page', readText('showcase/angular/src/app/pages/agents/agents-page.component.html')],
     ['showcase agents metadata', readText('showcase/angular/src/app/pages/agents/agents-page.component.ts')],
     ['showcase support page', readText('showcase/angular/src/app/pages/support/support-page.component.html')],
@@ -320,18 +323,54 @@ async function run() {
   ]) {
     assert(content.includes(`fsb-mcp-server ${canonicalVersion}`), `${name} advertises the canonical MCP release`);
   }
-  for (const [name, content] of liveToolCountSources) {
-    assert(!/\b66(?:-tool| MCP| granular| registered)|\(66 tools\)|Tools \(66 Total\)/u.test(content),
-      `${name} contains no stale 66-tool surface claim`);
+  console.log('\n--- published tool counts match the built server ---');
+  const runtimeModule = await import(pathToFileURL(path.join(repoRoot, 'mcp', 'build', 'runtime.js')).href);
+  const registeredToolNames = Object.keys(runtimeModule.createRuntime().server._registeredTools || {});
+  const toolCount = registeredToolNames.length;
+  assert(toolCount > 0, `built runtime registers MCP tools (got ${toolCount})`);
+  for (const retired of ['start_visual_session', 'end_visual_session', 'back']) {
+    assert(!registeredToolNames.includes(retired), `retired ${retired} tool stays off the MCP surface`);
   }
-  assert(rootReadme.includes('69 registered MCP tools') && packageReadme.includes('## Tools (69 Total)'),
-    'primary README authorities advertise the 69-tool registered surface');
-  const rootSurfaceTable = rootReadme.match(/\| Visual sessions \|[\s\S]*?\n\nRead-only tools bypass/u);
+  // A count claim is "N tools", "N MCP tools", "N registered (MCP) tools" or "N-tool".
+  const TOOL_COUNT_CLAIM = /(?<![\w.])(\d+)(?:-tool\b|\s+(?:registered\s+)?(?:MCP\s+)?tools\b)/gu;
+  const claimedCounts = (text) => Array.from(text.matchAll(TOOL_COUNT_CLAIM), (match) => Number(match[1]));
+  const statesToolCount = new RegExp(`(?<![\\d.])${toolCount}(?![\\d.])`, 'u');
+  for (const [name, content] of liveToolCountSources) {
+    if (!name.startsWith('showcase locale ')) {
+      const counts = claimedCounts(content);
+      assert(counts.every((count) => count === toolCount),
+        `${name} states the ${toolCount}-tool registered surface (claims found: ${counts.join(', ') || 'none'})`);
+      continue;
+    }
+    // Catalogs: every unit whose English source states a count must state the
+    // live count, and so must its translation. Release notes are history.
+    for (const unit of content.matchAll(/<trans-unit id="([^"]+)"[\s\S]*?<\/trans-unit>/gu)) {
+      if (unit[1].startsWith('releaseNotes.')) continue;
+      const source = (unit[0].match(/<source>([\s\S]*?)<\/source>/u) || [])[1] || '';
+      const counts = claimedCounts(source);
+      if (counts.length === 0) continue;
+      assert(counts.every((count) => count === toolCount),
+        `${name} ${unit[1]} source states ${toolCount} tools (got ${counts.join(', ')})`);
+      const target = (unit[0].match(/<target[^>]*>([\s\S]*?)<\/target>/u) || [])[1];
+      if (target !== undefined) {
+        assert(statesToolCount.test(target), `${name} ${unit[1]} translation states ${toolCount} tools`);
+      }
+    }
+  }
+  assert(rootReadme.includes(`${toolCount} registered MCP tools`) && packageReadme.includes(`\`fsb-mcp-server\` registers ${toolCount} tools.`),
+    `primary README authorities advertise the ${toolCount}-tool registered surface`);
+  const rootSurfaceTable = rootReadme.match(/\| Surface \| Count \| Examples \|[\s\S]*?\n\nRead-only tools bypass/u);
   const rootSurfaceCounts = rootSurfaceTable
     ? Array.from(rootSurfaceTable[0].matchAll(/^\|[^|]+\|\s*(\d+)\s*\|/gmu), (match) => Number(match[1]))
     : [];
-  assert(rootSurfaceCounts.length === 9 && rootSurfaceCounts.reduce((sum, count) => sum + count, 0) === 69,
-    'root README category table contains nine surfaces totaling 69 tools');
+  assert(rootSurfaceCounts.length > 0 && rootSurfaceCounts.reduce((sum, count) => sum + count, 0) === toolCount,
+    `root README category table totals ${toolCount} tools (got ${rootSurfaceCounts.join(' + ')})`);
+  const packageToolsSection = packageReadme.match(/\n## Tools\n[\s\S]*?\n### Tool Count Contract\n/u);
+  const packageSectionCounts = packageToolsSection
+    ? Array.from(packageToolsSection[0].matchAll(/^### [^\n]*\((\d+)\)$/gmu), (match) => Number(match[1]))
+    : [];
+  assert(packageSectionCounts.length > 0 && packageSectionCounts.reduce((sum, count) => sum + count, 0) === toolCount,
+    `MCP README tool sections total ${toolCount} tools (got ${packageSectionCounts.join(' + ')})`);
   assert(promptSource.includes('FSB Tool Reference (49 tools)') &&
     promptSource.includes('## Developer / UAT (1 tool)') &&
     promptSource.includes('## Observability (7 tools)') &&

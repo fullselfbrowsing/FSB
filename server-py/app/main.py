@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
 from .db import close_pool, init_pool
-from .routers import agents, auth, sse, stats
+from .routers import auth
 
 
 @asynccontextmanager
@@ -41,17 +41,12 @@ async def log_requests(request: Request, call_next):
     start = time.time()
     response = await call_next(request)
     duration = int((time.time() - start) * 1000)
-    path = request.url.path
-    if path != "/api/sse":
-        print(f"{request.method} {path} {response.status_code} {duration}ms")
+    print(f"{request.method} {request.url.path} {response.status_code} {duration}ms")
     return response
 
 
 # Routers
 app.include_router(auth.router)
-app.include_router(agents.router)
-app.include_router(stats.router)
-app.include_router(sse.router)
 
 
 @app.get("/")

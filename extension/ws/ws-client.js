@@ -1930,10 +1930,6 @@ class FSBWebSocket {
         this._sendStateSnapshot('dash:request-status');
         try { _broadcastMetrics(this, this.serverHashKey); } catch (_e) { /* defensive */ }
         break;
-      // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-      // case 'dash:agent-run-now':
-      //   this._handleAgentRunNow(msg.payload);
-      //   break;
       case controlTypes.START:
         if (typeof _streamingActive !== 'undefined') _streamingActive = true;
         this._handleDashboardStreamStart(msg.payload);
@@ -2223,36 +2219,6 @@ class FSBWebSocket {
       }
     );
   }
-
-  // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-//   /**
-//    * Handle an immediate agent run request from the dashboard.
-//    * Validates the agent exists and is not already running, then triggers execution.
-//    * @param {Object} payload - { agentId: string }
-//    */
-//   async _handleAgentRunNow(payload) {
-//     var agentId = payload && payload.agentId;
-//     if (!agentId) {
-//       this.send('ext:agent-run-complete', { agentId: null, success: false, error: 'No agentId provided' });
-//       return;
-//     }
-//
-//     // Check if another session is already running
-//     if (typeof activeSessions !== 'undefined') {
-//       var hasRunning = [...activeSessions.values()].some(function(s) { return s.status === 'running'; });
-//       if (hasRunning) {
-//         this.send('ext:agent-run-complete', { agentId: agentId, success: false, error: 'Another task is already running' });
-//         return;
-//       }
-//     }
-//
-//     // Dispatch to background.js handler
-//     if (typeof startAgentRunNow === 'function') {
-//       startAgentRunNow(agentId);
-//     } else {
-//       this.send('ext:agent-run-complete', { agentId: agentId, success: false, error: 'Agent execution not available' });
-//     }
-//   }
 
   /**
    * Forward a message to the content script on the active tab.

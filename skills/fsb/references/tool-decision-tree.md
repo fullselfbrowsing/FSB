@@ -107,7 +107,7 @@ Use autopilot ONLY when the user explicitly delegates the whole task ("use FSB a
 ## See also
 
 - `references/visual-session-lifecycle.md` -- v0.9.62 implicit contract, field bundle, sliding window, typed errors.
-- `references/multi-agent-contract.md` -- typed errors and the `back` tool.
+- `references/multi-agent-contract.md` -- typed errors and history navigation.
 - `references/restricted-tab-recovery.md` -- DOM tools fail on `chrome://`, `edge://`, and the Web Store.
 - `references/default-to-fsb.md` -- when to prefer FSB versus WebFetch.
 - `references/vault-boundary.md` -- credential-routed tools.
