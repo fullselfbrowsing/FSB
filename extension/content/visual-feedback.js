@@ -68,18 +68,31 @@
     return true;
   }
 
-  // The action counter keeps its count the same way, so a language change can
-  // redraw "Actions: N" before the next action arrives.
-  var actionCounts = new WeakMap();
-  function writeActions(el, count) {
+  // Counters and lines drawn from a catalog template keep the template and its
+  // subs, so a language change can redraw them before the next update. attr
+  // names an attribute; text is written when it is omitted.
+  var keyedSources = new WeakMap();
+  function writeKeyed(el, key, english, subs, attr) {
     if (!el) return;
-    var shown = ov('entry_actions', 'Actions: $COUNT$', { count: count });
-    el.textContent = shown;
-    actionCounts.set(el, { count: count, shown: shown });
+    var shown = ov(key, english, subs);
+    if (attr) el.setAttribute(attr, shown);
+    else el.textContent = shown;
+    var sources = keyedSources.get(el) || {};
+    sources[attr || ''] = { key: key, english: english, subs: subs, shown: shown };
+    keyedSources.set(el, sources);
   }
-  function rewriteActions(el) {
-    var source = el ? actionCounts.get(el) : null;
-    if (source && el.textContent === source.shown) writeActions(el, source.count);
+  // Leaves any value that other code has replaced since it was written.
+  function rewriteKeyed(el) {
+    var sources = el ? keyedSources.get(el) : null;
+    if (!sources) return;
+    Object.keys(sources).forEach(function (attr) {
+      var source = sources[attr];
+      var current = attr ? el.getAttribute(attr) : el.textContent;
+      if (current === source.shown) writeKeyed(el, source.key, source.english, source.subs, attr);
+    });
+  }
+  function writeActions(el, count) {
+    writeKeyed(el, 'entry_actions', 'Actions: $COUNT$', { count: count });
   }
 
   var chromeRoots = [];
@@ -103,7 +116,9 @@
     var detail = root.querySelector('.fsb-step-text');
     if (detail && !rewriteLabel(detail) && ownedText(detail.textContent, 'entry_initializing', 'Initializing...')) detail.textContent = ov('entry_initializing', 'Initializing...');
     if (typeof root.querySelectorAll === 'function') Array.prototype.forEach.call(root.querySelectorAll('.fsb-log-line'), rewriteLabel);
-    rewriteActions(root.querySelector('.fsb-eta'));
+    ['.fsb-eta', '.fsb-crawl-domain', '.fsb-crawl-pages', '.fsb-replay-speed', '.badge-watching', '.badge-fired'].forEach(function (selector) {
+      rewriteKeyed(root.querySelector(selector));
+    });
     if (root.getAttribute && ownedText(root.getAttribute('aria-label'), 'entry_replay_controls', 'Replay controls')) {
       root.setAttribute('aria-label', ov('entry_replay_controls', 'Replay controls'));
     }
@@ -1344,8 +1359,8 @@
       var button = this.container.querySelector('.fsb-replay-speed');
       if (!button) return;
       button.textContent = label;
-      button.setAttribute('aria-label', ov('entry_replay_speed', 'Replay speed ' + label + '. Activate to change to ' + nextLabel, { speed: label, next: nextLabel }));
-      button.setAttribute('title', ov('entry_replay_speed_title', 'Replay speed: ' + label + ' (click to change)', { speed: label }));
+      writeKeyed(button, 'entry_replay_speed', 'Replay speed $SPEED$. Activate to change to $NEXT$', { speed: label, next: nextLabel }, 'aria-label');
+      writeKeyed(button, 'entry_replay_speed_title', 'Replay speed: $SPEED$ (click to change)', { speed: label }, 'title');
     }
 
     _isTerminal(replay, lifecycle) {
@@ -2445,6 +2460,7 @@
       this.watchingEl = this.root.querySelector('.badge-watching');
       this.firedEl = this.root.querySelector('.badge-fired');
       this.firedSepEl = this.root.querySelector('.badge-fired-sep');
+      watchChrome(this.root);
 
       this._inTopLayer = promoteToTopLayer(this.host);
       if (!this._inTopLayer) {
@@ -2472,11 +2488,9 @@
         this.root.classList.add('visible');
       }
 
-      if (this.watchingEl) {
-        this.watchingEl.textContent = ov('entry_watching', '$COUNT$ watching', { count: watching });
-      }
+      writeKeyed(this.watchingEl, 'entry_watching', '$COUNT$ watching', { count: watching });
       if (this.firedEl) {
-        this.firedEl.textContent = ov('entry_fired', '$COUNT$ fired', { count: fired });
+        writeKeyed(this.firedEl, 'entry_fired', '$COUNT$ fired', { count: fired });
         this.firedEl.classList.toggle('zero', fired === 0);
       }
       if (this.firedSepEl) {
@@ -3597,10 +3611,10 @@
       if (!this.container) return;
 
       if (data.domain !== undefined) {
-        this.container.querySelector('.fsb-crawl-domain').textContent = ov('entry_crawling', 'Crawling ' + data.domain, { domain: data.domain });
+        writeKeyed(this.container.querySelector('.fsb-crawl-domain'), 'entry_crawling', 'Crawling $DOMAIN$', { domain: data.domain });
       }
       if (data.pagesCollected !== undefined && data.maxPages !== undefined) {
-        this.container.querySelector('.fsb-crawl-pages').textContent = ov('entry_pages', data.pagesCollected + ' / ' + data.maxPages + ' pages', { collected: data.pagesCollected, max: data.maxPages });
+        writeKeyed(this.container.querySelector('.fsb-crawl-pages'), 'entry_pages', '$COLLECTED$ / $MAX$ pages', { collected: data.pagesCollected, max: data.maxPages });
       }
       if (data.percent !== undefined) {
         const clamped = Math.min(100, Math.max(0, data.percent));

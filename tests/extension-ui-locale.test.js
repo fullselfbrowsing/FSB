@@ -601,6 +601,59 @@ function extractNamedFunction(source, name) {
   check(pill.textContent === ja.entry_phase_acting + '…' && detail.textContent === 'Clicked the Submit button',
     'a language change leaves overlay text that was replaced since its label was written');
 
+  // The trigger badge, the crawl overlay lines and the replay speed labels are
+  // written from a template and its subs, so a switch redraws them too.
+  const watchingEl = fakeNode({}, '');
+  const firedEl = fakeNode({}, '');
+  const crawlDomain = fakeNode({}, '');
+  const crawlPages = fakeNode({}, '');
+  const speedButton = fakeNode({}, '2×');
+  const keyedRoot = {
+    querySelector: (selector) => ({
+      '.badge-watching': watchingEl, '.badge-fired': firedEl,
+      '.fsb-crawl-domain': crawlDomain, '.fsb-crawl-pages': crawlPages, '.fsb-replay-speed': speedButton
+    })[selector] || null,
+    querySelectorAll: () => []
+  };
+  overlay.writeKeyed(watchingEl, 'entry_watching', '$COUNT$ watching', { count: 2 });
+  overlay.writeKeyed(firedEl, 'entry_fired', '$COUNT$ fired', { count: 1 });
+  overlay.writeKeyed(crawlDomain, 'entry_crawling', 'Crawling $DOMAIN$', { domain: 'shop.example' });
+  overlay.writeKeyed(crawlPages, 'entry_pages', '$COLLECTED$ / $MAX$ pages', { collected: 3, max: 10 });
+  overlay.writeKeyed(speedButton, 'entry_replay_speed', 'Replay speed $SPEED$. Activate to change to $NEXT$', { speed: '2×', next: '4×' }, 'aria-label');
+  overlay.writeKeyed(speedButton, 'entry_replay_speed_title', 'Replay speed: $SPEED$ (click to change)', { speed: '2×' }, 'title');
+  const keyedIn = (cat) => ({
+    watching: cat.entry_watching.replace('$COUNT$', '2'),
+    fired: cat.entry_fired.replace('$COUNT$', '1'),
+    domain: cat.entry_crawling.replace('$DOMAIN$', 'shop.example'),
+    pages: cat.entry_pages.replace('$COLLECTED$', '3').replace('$MAX$', '10'),
+    speed: cat.entry_replay_speed.replace('$SPEED$', '2×').replace('$NEXT$', '4×'),
+    speedTitle: cat.entry_replay_speed_title.replace('$SPEED$', '2×')
+  });
+  const keyedNow = () => ({
+    watching: watchingEl.textContent, fired: firedEl.textContent, domain: crawlDomain.textContent, pages: crawlPages.textContent,
+    speed: speedButton.getAttribute('aria-label'), speedTitle: speedButton.getAttribute('title')
+  });
+  check(JSON.stringify(keyedNow()) === JSON.stringify(keyedIn(ja)), 'badge, crawl and replay speed labels render in the active language');
+  shipped.setOverride('de');
+  overlay.refreshOwnedChrome(keyedRoot);
+  check(JSON.stringify(keyedNow()) === JSON.stringify(keyedIn(de)) && speedButton.textContent === '2×',
+    'a language change redraws the trigger badge, the crawl overlay lines and the replay speed labels');
+  crawlDomain.textContent = '--';
+  speedButton.setAttribute('title', 'set elsewhere');
+  shipped.setOverride('ja');
+  overlay.refreshOwnedChrome(keyedRoot);
+  check(crawlDomain.textContent === '--' && speedButton.getAttribute('title') === 'set elsewhere'
+      && speedButton.getAttribute('aria-label') === keyedIn(ja).speed && watchingEl.textContent === keyedIn(ja).watching,
+    'a language change leaves keyed text and attributes that were replaced since');
+  check(overlaySource.includes("writeKeyed(this.watchingEl, 'entry_watching', '$COUNT$ watching', { count: watching })")
+      && overlaySource.includes("writeKeyed(this.firedEl, 'entry_fired', '$COUNT$ fired', { count: fired })")
+      && /this\.firedSepEl = [^\n]+\n\s*watchChrome\(this\.root\);/.test(overlaySource)
+      && overlaySource.includes("writeKeyed(this.container.querySelector('.fsb-crawl-domain'), 'entry_crawling', 'Crawling $DOMAIN$'")
+      && overlaySource.includes("writeKeyed(this.container.querySelector('.fsb-crawl-pages'), 'entry_pages', '$COLLECTED$ / $MAX$ pages'")
+      && overlaySource.includes("writeKeyed(button, 'entry_replay_speed', ")
+      && overlaySource.includes("writeKeyed(button, 'entry_replay_speed_title', "),
+    'the trigger badge, crawl overlay and replay speed write through writeKeyed(), and the badge is a watched root');
+
   const englishCatalogMessages = JSON.parse(fs.readFileSync(path.join(root, 'extension/_locales/en/messages.json'), 'utf8'));
   const labelMisses = Object.entries(overlay.OVERLAY_LABELS)
     .filter(([english, key]) => !englishCatalogMessages[key] || englishCatalogMessages[key].message !== english);
@@ -611,6 +664,15 @@ function extractNamedFunction(source, name) {
     if (!entry || entry.message !== match[2].replace(/\\'/g, "'")) ovMisses.push(match[1]);
   }
   check(ovMisses.length === 0, `overlay ov() fallbacks match the English catalog${ovMisses.length ? ': ' + ovMisses.join(', ') : ''}`);
+  const keyedMisses = [];
+  let keyedCalls = 0;
+  for (const match of overlaySource.matchAll(/\bwriteKeyed\([^,]+,\s*'([a-z0-9_]+)',\s*'((?:[^'\\]|\\.)*)'\s*[,)]/g)) {
+    keyedCalls += 1;
+    const entry = englishCatalogMessages[match[1]];
+    if (!entry || entry.message !== match[2].replace(/\\'/g, "'")) keyedMisses.push(match[1]);
+  }
+  check(keyedCalls >= 7 && keyedMisses.length === 0,
+    `overlay writeKeyed() fallbacks match the English catalog${keyedMisses.length ? ': ' + keyedMisses.join(', ') : ''}`);
 
   // Drift guard: every label and default detail overlay-state.js builds is mapped.
   const overlayState = require('../extension/utils/overlay-state.js');
@@ -686,6 +748,34 @@ function extractNamedFunction(source, name) {
   shipped.apply(fakeDoc([stopBtn]));
   check(stopBtn.getAttribute('title') === shippedCatalogs.ja.shell_stop && shippedCatalogs.ja.shell_stop === '自動化を停止',
     'a language switch re-translates the restored Stop tooltip');
+
+  // apply() cannot reach the delegated accessible name or the pending label,
+  // so a language change re-runs the sync for the button's current state.
+  vm.runInContext(extractNamedFunction(panelSource, '_relabelDelegationStop'), context);
+  context._delegationUiState = { snapshot: {} };
+  shipped.setOverride('de');
+  pending = true;
+  context._syncDelegationStopControls({});
+  shipped.setOverride('ja');
+  context._relabelDelegationStop();
+  check(stopBtn.getAttribute('title') === shippedCatalogs.ja.copy_26de247a57
+      && stopBtn.getAttribute('aria-label') === shippedCatalogs.ja.copy_26de247a57,
+    'a language change relabels the pending delegated Stop title and accessible name');
+  pending = false;
+  context._syncDelegationStopControls({});
+  shipped.setOverride('ko');
+  context._relabelDelegationStop();
+  check(stopBtn.getAttribute('title') === shippedCatalogs.ko.shell_stop
+      && stopBtn.getAttribute('aria-label') === shippedCatalogs.ko.shell_stop,
+    'a language change relabels the delegated Stop accessible name, not only its tooltip');
+  context._restoreLegacyStopControl();
+  const legacyTitle = stopBtn.getAttribute('title');
+  shipped.setOverride('de');
+  context._relabelDelegationStop();
+  check(stopBtn.getAttribute('aria-label') == null && stopBtn.getAttribute('title') === legacyTitle,
+    'the relabel leaves the legacy Stop button to apply()');
+  check(panelSource.includes("fsbUiLocale.onChange(_relabelDelegationStop)"),
+    'the side panel relabels the Stop button on a language change');
 }
 
 // Side panel status lines: plain lines are keyed, templates are filled, and
@@ -847,6 +937,96 @@ function extractNamedFunction(source, name) {
     'an explorer exception uses the failed-to-start template');
   check(!panelSource.includes("+ ' could not start this task."),
     'the start-failure line is not concatenated');
+}
+
+// The side panel action count and the control panel crawl card keep their
+// keys across a switch, and a fallback word inside a sentence is the
+// cataloged one rather than a lowercase English literal.
+{
+  const sandbox = freshLocale();
+  vm.runInContext(fs.readFileSync(path.join(root, 'extension/utils/panel-exact.js'), 'utf8'), sandbox);
+  const shipped = sandbox.fsbUiLocale;
+  const de = shippedCatalogs.de;
+  const ja = shippedCatalogs.ja;
+  shipped.setOverride('de');
+
+  const panelSource = fs.readFileSync(path.join(root, 'extension/ui/sidepanel.js'), 'utf8');
+  const panelContext = { fsbUiLocale: shipped };
+  panelContext.globalThis = panelContext;
+  vm.createContext(panelContext);
+  for (const name of ['spLine', 'actionCountTemplate', 'actionCountLabel', 'setActionCount']) {
+    vm.runInContext(extractNamedFunction(panelSource, name), panelContext);
+  }
+  const oneAction = fakeNode({}, '');
+  const threeActions = fakeNode({}, '');
+  panelContext.setActionCount(oneAction, 1);
+  panelContext.setActionCount(threeActions, 3);
+  check(oneAction.textContent === de.copy_9a19a25438.replace('$COUNT$', '1')
+      && threeActions.textContent === de.copy_5bb3cc9bbc.replace('$COUNT$', '3'),
+    'the side panel action count renders in the active language');
+  check(extractNamedFunction(panelSource, 'addActionMessage').includes("setActionCount(group.querySelector('.action-summary-count'), list.children.length)"),
+    'each action writes the count through setActionCount()');
+
+  const optionsSource = fs.readFileSync(path.join(root, 'extension/ui/options.js'), 'utf8');
+  const toasts = [];
+  const cards = [];
+  function fakeCrawlerCard() {
+    const parts = {
+      '.crawler-stop-btn': { addEventListener() {} },
+      '.crawler-stop-label': fakeNode({}, ''),
+      '.crawler-progress-text': fakeNode({}, ''),
+      '.crawler-progress-count': fakeNode({}, ''),
+      '.crawler-progress-fill': { style: {} },
+      '.crawler-current-url': fakeNode({}, '')
+    };
+    return { dataset: {}, innerHTML: '', parts, querySelector: (selector) => parts[selector] || null, remove() {} };
+  }
+  const optionsContext = {
+    fsbUiLocale: shipped,
+    activeCrawlerUIs: new Map(),
+    elements: { explorerCrawlers: { appendChild: (card) => cards.push(card) } },
+    document: { createElement: fakeCrawlerCard },
+    escapeHtml: (value) => String(value),
+    updateStopAllVisibility() {},
+    addLog() {},
+    loadResearchList() {},
+    showToast: (message, type) => toasts.push({ message, type })
+  };
+  optionsContext.globalThis = optionsContext;
+  vm.createContext(optionsContext);
+  for (const name of ['fsbUiLine', 'fsbUiSet', 'createCrawlerCard', 'updateExplorerProgress']) {
+    vm.runInContext(extractNamedFunction(optionsSource, name), optionsContext);
+  }
+  const fresh = optionsContext.createCrawlerCard('c0', 'shop.example', 10);
+  check(fresh.parts['.crawler-stop-label'].textContent === de.panel_cae7d57bc0
+      && fresh.parts['.crawler-progress-text'].textContent === de.panel_ada26b6a54
+      && fresh.parts['.crawler-progress-count'].textContent === de.panel_7eae8fd81d.replace('$COLLECTED$', '0').replace('$MAX$', '10'),
+    'a new crawl card renders Stop, the starting line and the count in the active language');
+  optionsContext.updateExplorerProgress({ crawlerId: 'c1', status: 'crawling', domain: 'shop.example', pagesCollected: 3, maxPages: 10 });
+  const card = cards[0].parts;
+  check(card['.crawler-progress-text'].textContent === de.panel_a854c3e6d9.replace('$DOMAIN$', 'shop.example')
+      && card['.crawler-progress-count'].textContent === de.panel_7eae8fd81d.replace('$COLLECTED$', '3').replace('$MAX$', '10'),
+    'crawl progress renders in the active language');
+  optionsContext.updateExplorerProgress({ crawlerId: 'c2', status: 'error' });
+  check(toasts.length === 1 && toasts[0].message === de.copy_aee9e10eae.replace('$DOMAIN$', de.copy_b764cdc0ea)
+      && !toasts[0].message.includes('unknown'),
+    'a crawl failure with no domain uses the translated Unknown');
+
+  shipped.setOverride('ja');
+  shipped.apply(fakeDoc([card['.crawler-stop-label'], card['.crawler-progress-text'], card['.crawler-progress-count'], oneAction, threeActions]));
+  check(card['.crawler-stop-label'].textContent === ja.panel_cae7d57bc0
+      && card['.crawler-progress-text'].textContent === ja.panel_a854c3e6d9.replace('$DOMAIN$', 'shop.example')
+      && card['.crawler-progress-count'].textContent === ja.panel_7eae8fd81d.replace('$COLLECTED$', '3').replace('$MAX$', '10'),
+    'a language change re-renders the crawl card before the next status event');
+  check(oneAction.textContent === ja.copy_9a19a25438.replace('$COUNT$', '1')
+      && threeActions.textContent === ja.copy_5bb3cc9bbc.replace('$COUNT$', '3'),
+    'a language change re-renders the side panel action count before the next action');
+
+  const popupSource = fs.readFileSync(path.join(root, 'extension/ui/popup.js'), 'utf8');
+  const lowercaseFallbacks = [optionsSource, popupSource]
+    .flatMap((source) => source.match(/(?:fsbUiLine|uiLine)\([^\n]*\|\| 'unknown'[^\n]*/g) || []);
+  check(lowercaseFallbacks.length === 0,
+    `no translated sentence falls back to a lowercase English 'unknown'${lowercaseFallbacks.length ? ': ' + lowercaseFallbacks.join(' | ') : ''}`);
 }
 
 // The dashboard chart draws its legend, axis titles and tooltip on a canvas,

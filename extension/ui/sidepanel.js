@@ -2132,6 +2132,13 @@ function _syncDelegationStopControls(snapshot) {
   return true;
 }
 
+// apply() only re-translates the idle Stop tooltip; it cannot reach the
+// accessible name or the pending label, so a language change re-runs the sync.
+function _relabelDelegationStop() {
+  if (!stopBtn || stopBtn.getAttribute('data-delegation-action') !== 'stop') return;
+  _syncDelegationStopControls(_delegationUiState.snapshot);
+}
+
 function _handleFixedStop(event) {
   if (_delegationUsesFixedStop(_delegationUiState.snapshot)) {
     return _stopDelegation(event);
@@ -4972,10 +4979,7 @@ function addActionMessage(text) {
   list.appendChild(entry);
 
   // Update count label
-  const countEl = group.querySelector('.action-summary-count');
-  if (countEl) {
-    countEl.textContent = actionCountLabel(list.children.length);
-  }
+  setActionCount(group.querySelector('.action-summary-count'), list.children.length);
 
   scrollToBottom();
 }
@@ -7094,8 +7098,20 @@ function spLine(english, subs) {
   });
 }
 
+function actionCountTemplate(count) {
+  return count === 1 ? '$COUNT$ action completed' : '$COUNT$ actions completed';
+}
+
 function actionCountLabel(count) {
-  return spLine(count === 1 ? '$COUNT$ action completed' : '$COUNT$ actions completed', { count });
+  return spLine(actionCountTemplate(count), { count });
+}
+
+// The count keeps its catalog key, so a language change rewrites it before
+// the next action arrives.
+function setActionCount(el, count) {
+  if (!el) return;
+  if (globalThis.fsbUiLocale && typeof fsbUiLocale.markExact === 'function') fsbUiLocale.markExact(el, actionCountTemplate(count), { count });
+  else el.textContent = actionCountLabel(count);
 }
 
 
@@ -7210,6 +7226,7 @@ console.log(`FSB v${chrome.runtime.getManifest().version} side panel script load
 
 
 if (globalThis.fsbUiLocale && typeof fsbUiLocale.boot === 'function') {
+  if (typeof fsbUiLocale.onChange === 'function') fsbUiLocale.onChange(_relabelDelegationStop);
   fsbUiLocale.boot().then(function () {
     fsbUiLocale.apply(document);
     if (typeof _renderHeaderStatus === 'function') _renderHeaderStatus();

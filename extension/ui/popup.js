@@ -600,7 +600,7 @@ async function testAPI() {
     if (response.success) {
       addMessage(uiLine('shell_api_ok', '$NAME$ API connection is working.', { name: displayName }), 'system');
       if (response.result && response.result.data) {
-        addMessage(uiLine('shell_api_model', 'Connected to model: $MODEL$', { model: response.result.model || 'unknown' }), 'ai');
+        addMessage(uiLine('shell_api_model', 'Connected to model: $MODEL$', { model: response.result.model || uiLine('copy_b764cdc0ea', 'Unknown') }), 'ai');
       }
     } else {
       addMessage(uiLine('shell_api_failed', '$NAME$ API connection failed. Please check your settings.', { name: displayName }), 'error');

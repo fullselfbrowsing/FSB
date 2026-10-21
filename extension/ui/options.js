@@ -6190,18 +6190,22 @@ function createCrawlerCard(crawlerId, domain, maxPages) {
     <div class="crawler-header">
       <span class="crawler-domain">${escapeHtml(domain)}</span>
       <button class="crawler-stop-btn" data-crawler-id="${crawlerId}">
-        <i class="fas fa-stop"></i> ${fsbUiHtml('Stop')}
+        <i class="fas fa-stop"></i> <span class="crawler-stop-label"></span>
       </button>
     </div>
     <div class="crawler-progress-info">
-      <span class="crawler-progress-text">${fsbUiHtml('Starting crawl...')}</span>
-      <span class="crawler-progress-count">${fsbUiHtml('$COLLECTED$ / $MAX$ pages', { collected: 0, max: maxPages })}</span>
+      <span class="crawler-progress-text"></span>
+      <span class="crawler-progress-count"></span>
     </div>
     <div class="crawler-progress-bar">
       <div class="crawler-progress-fill" style="width: 0%;"></div>
     </div>
     <div class="crawler-current-url"></div>
   `;
+  // Keyed writes, so a language change redraws the card before the next event.
+  fsbUiSet(card.querySelector('.crawler-stop-label'), 'Stop');
+  fsbUiSet(card.querySelector('.crawler-progress-text'), 'Starting crawl...');
+  fsbUiSet(card.querySelector('.crawler-progress-count'), '$COLLECTED$ / $MAX$ pages', { collected: 0, max: maxPages });
 
   // Wire up stop button
   card.querySelector('.crawler-stop-btn').addEventListener('click', () => {
@@ -6231,10 +6235,8 @@ function updateExplorerProgress(data) {
       const percent = data.maxPages > 0 ? Math.round((data.pagesCollected / data.maxPages) * 100) : 0;
       const fill = card.querySelector('.crawler-progress-fill');
       if (fill) fill.style.width = percent + '%';
-      const text = card.querySelector('.crawler-progress-text');
-      if (text) text.textContent = fsbUiLine('Crawling $DOMAIN$', { domain: data.domain || '' });
-      const count = card.querySelector('.crawler-progress-count');
-      if (count) count.textContent = fsbUiLine('$COLLECTED$ / $MAX$ pages', { collected: data.pagesCollected, max: data.maxPages });
+      fsbUiSet(card.querySelector('.crawler-progress-text'), 'Crawling $DOMAIN$', { domain: data.domain || '' });
+      fsbUiSet(card.querySelector('.crawler-progress-count'), '$COLLECTED$ / $MAX$ pages', { collected: data.pagesCollected, max: data.maxPages });
       const urlEl = card.querySelector('.crawler-current-url');
       if (urlEl) urlEl.textContent = data.currentUrl || '';
     }
@@ -6251,7 +6253,7 @@ function updateExplorerProgress(data) {
       showToast(fsbUiLine('Crawl completed: $COUNT$ pages from $DOMAIN$', { count: data.pagesCollected, domain: data.domain || '' }), 'success');
       addLog('info', 'Site Explorer completed: ' + data.pagesCollected + ' pages from ' + data.domain);
     } else if (data.status === 'error') {
-      showToast(fsbUiLine('Crawl failed for $DOMAIN$', { domain: data.domain || 'unknown' }), 'error');
+      showToast(fsbUiLine('Crawl failed for $DOMAIN$', { domain: data.domain || 'Unknown' }), 'error');
     }
 
     // Refresh research list
