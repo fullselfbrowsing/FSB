@@ -56,6 +56,8 @@ async function main() {
     const committed = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
     check(`${theme} SVG matches the generator`, committed === assets.renderBenchmarkSvg(data, theme), `rerun node scripts/build-benchmark-assets.mjs (${path.relative(ROOT, file)})`);
     check(`${theme} SVG states the FSB result`, committed.includes(result), result);
+    // The README prose stays short; the chart is where its readers see the site's two caveats.
+    check(`${theme} SVG carries both site notes`, committed.includes(RESULT_NOTE) && committed.includes(METHOD_NOTE), 'note missing');
     check(`${theme} SVG honors reduced motion`, committed.includes('prefers-reduced-motion'), 'missing reduced-motion rule');
   }
   const og = pngSize(assets.OG_PATH);
@@ -74,7 +76,6 @@ async function main() {
     check(`README table row ${rank}`, readme.includes(line), line);
   }
   check('README states the result with its report link', readme.includes(`[${result}](${data.reportUrl})`), result);
-  check('README carries both site notes', readme.includes(RESULT_NOTE) && readme.includes(METHOD_NOTE), 'note missing');
 
   console.log('\n--- showcase ---');
   const home = read('showcase/angular/src/app/pages/home/home-page.component.ts');
