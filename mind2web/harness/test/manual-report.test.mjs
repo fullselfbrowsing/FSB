@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, readFile, writeFile, rm, readdir, cp } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
@@ -23,7 +24,11 @@ const firstJob = jobs[0].id;
 // The judge runner fingerprints these shared configuration files beside its Python sources.
 const EVALUATOR_CONFIG = ['codex-tool-isolation.json', 'codex-gpt61sol-browser-policy.json', 'codex-gpt61sol-browser-policy.receipt.json', 'model-family.json'];
 const datasetPath = path.join(BENCH_ROOT, 'cache/dataset/eacad896a84dc5b65e29b0b06e4699ab0544d701.json');
-const dataset = JSON.parse(await readFile(datasetPath));
+const dataset = existsSync(datasetPath) ? JSON.parse(await readFile(datasetPath)) : null;
+const diagnosticPath = path.join(REPO_ROOT, '.context/om2w/postmortem-cases-sample.json');
+// The gated dataset and the local postmortem sample are never committed, so a fresh clone skips these.
+const needsDataset = { skip: !dataset && 'Pinned gated dataset is not cached; no network or model calls in tests' };
+const needsDiagnostic = { skip: needsDataset.skip || (!existsSync(diagnosticPath) && 'Local postmortem sample is not present') };
 const json = file => readFile(file, 'utf8').then(JSON.parse);
 async function temporary(t) {
   const directory = await mkdtemp(path.join(tmpdir(), 'om2w-report-test-'));
@@ -135,7 +140,7 @@ async function fixture(t, count = 4, exportFirst = false) {
       historical: { public_index: '/fixture/historical' }, fresh: { public_index: '/fixture/fresh' } }) } };
 }
 
-test('checkpoint reports separate task-format zeros, missing inputs and provisional infrastructure', async t => {
+test('checkpoint reports separate task-format zeros, missing inputs and provisional infrastructure', needsDataset, async t => {
   const f = await fixture(t), file = path.join(f.directory, 'judge', firstJob, 'results.jsonl');
   const rows = [
     { task_id: f.manifest.task_ids[0], predicted_label: 1, infrastructure_error: false },
@@ -151,7 +156,7 @@ test('checkpoint reports separate task-format zeros, missing inputs and provisio
   assert.equal(summary.human_calibrated, false); assert.equal(summary.finalized, false);
 });
 
-test('final report verifies all300 selected/input/source/summary/preservation bytes before writing its audit', async t => {
+test('final report verifies all300 selected/input/source/summary/preservation bytes before writing its audit', needsDataset, async t => {
   const f = await fixture(t, 300, true), options = { ...f.options, finalize: true };
   const finalize = async () => { await atomicJson(path.join(f.directory, 'manifest.json'), f.manifest); return writeManualReport(f.directory, f.manifest, options); };
   const summary = await finalize();
@@ -204,7 +209,7 @@ test('final report verifies all300 selected/input/source/summary/preservation by
   await assert.rejects(finalize(), /source archive changed/);
 });
 
-test('finalization excludes collectors and publishers and binds the on-disk manifest', async t => {
+test('finalization excludes collectors and publishers and binds the on-disk manifest', needsDataset, async t => {
   const f = await fixture(t), releaseRun = await acquireRunLock(f.directory);
   await assert.rejects(writeManualReport(f.directory, f.manifest, { ...f.options, finalize: true }), /already active/);
   await releaseRun();
@@ -222,7 +227,7 @@ test('finalization excludes collectors and publishers and binds the on-disk mani
   await assert.rejects(writeManualReport(f.directory, f.manifest, { ...f.options, finalize: true }), /On-disk manifest differs/);
 });
 
-test('normal verdict history and correlated usage cannot be silently replaced', async t => {
+test('normal verdict history and correlated usage cannot be silently replaced', needsDataset, async t => {
   const f = await fixture(t), directory = path.join(f.directory, 'judge', firstJob);
   await writeFile(path.join(directory, 'results.jsonl'), JSON.stringify({ task_id: f.manifest.task_ids[0], predicted_label: 0 }) + '\n' +
     JSON.stringify({ task_id: f.manifest.task_ids[0], predicted_label: 1 }) + '\n');
@@ -232,9 +237,9 @@ test('normal verdict history and correlated usage cannot be silently replaced', 
   await assert.rejects(writeManualReport(f.directory, f.manifest, f.options), /correlated judge usage/);
 });
 
-test('blinded holdout uses frozen exclusions and seeded level quotas, preserving evidence and review edits on repeat', async t => {
+test('blinded holdout uses frozen exclusions and seeded level quotas, preserving evidence and review edits on repeat', needsDiagnostic, async t => {
   const directory = await temporary(t), historical = path.join(directory, 'historical'), output = path.join(directory, 'bundle');
-  const diagnostic = await json(path.join(REPO_ROOT, '.context/om2w/postmortem-cases-sample.json'));
+  const diagnostic = await json(diagnosticPath);
   const excludedTaskIds = [...diagnostic.selected.map(row => row.task_id), '9829f3087ab1f9c8eba6b6dd2b831d25_112325'];
   const selected = Object.entries({ easy: 16, medium: 28, hard: 16 }).flatMap(([level, count]) => dataset.filter(task => task.level === level && !excludedTaskIds.includes(task.task_id)).slice(0, count + 2));
   for (const task of selected) {

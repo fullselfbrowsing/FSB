@@ -106,7 +106,8 @@ test('local model catalog changes only the two declared non-browser tool creatio
   assert.equal(digest(ascii), receipt.original_selected_model_sha256);
 });
 
-test('collector fingerprints bind the model family, the pinned actor CLI bytes and its prompt variant', async t => {
+test('collector fingerprints bind the model family, the pinned actor CLI bytes and its prompt variant',
+  { skip: !existsSync(CLAUDE_CLI) && 'Pinned Claude CLI is not installed locally' }, async t => {
   const root = await mkdtemp(path.join(tmpdir(), 'codex-policy-fingerprint-'));
   t.after(() => rm(root, { recursive: true, force: true }));
   for (const directory of ['runtime/build', 'runtime/ai', 'runtime/node_modules', 'extension']) await mkdir(path.join(root, directory), { recursive: true });
