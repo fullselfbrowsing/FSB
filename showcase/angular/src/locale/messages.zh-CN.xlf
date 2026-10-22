@@ -1123,7 +1123,7 @@
         </context-group>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.ts</context>
-          <context context-type="linenumber">41</context>
+          <context context-type="linenumber">42</context>
         </context-group>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/lattice/lattice-page.component.ts</context>
@@ -5630,264 +5630,36 @@
           <context context-type="linenumber">26,27</context>
         </context-group>
       </trans-unit>
+      <trans-unit id="home.features.benchmark.intro" datatype="html">
+        <source>Average success rates on <x id="START_LINK" ctype="x-a" equiv-text="&lt;a href=&quot;https://huggingface.co/spaces/osunlp/Online_Mind2Web_Leaderboard&quot; target=&quot;_blank&quot; rel=&quot;noopener&quot; [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Online-Mind2Web<x id="CLOSE_LINK" ctype="x-a" equiv-text="&lt;/a&gt;"/>, with <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> included.</source>
+        <target state="translated"><x id="START_LINK" ctype="x-a" equiv-text="&lt;a href=&quot;https://huggingface.co/spaces/osunlp/Online_Mind2Web_Leaderboard&quot; target=&quot;_blank&quot; rel=&quot;noopener&quot; [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Online-Mind2Web<x id="CLOSE_LINK" ctype="x-a" equiv-text="&lt;/a&gt;"/> 上的平均成功率，包含 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
+          <context context-type="linenumber">27,28</context>
+        </context-group>
+      </trans-unit>
       <trans-unit id="home.features.subtitle" datatype="html">
         <source>Everything you need for intelligent browser automation, powered by leading AI models.</source>
         <target state="translated">由领先的 AI 模型驱动，提供智能浏览器自动化所需的一切。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">27,29</context>
+          <context context-type="linenumber">28,30</context>
         </context-group>
       </trans-unit>
-      <trans-unit id="home.features.card.directApi.title" datatype="html">
-        <source>Direct API Execution</source>
-        <target state="translated">直接执行 API</target>
+      <trans-unit id="home.features.benchmark.title" datatype="html">
+        <source>Top 10 agents</source>
+        <target state="translated">前 10 名智能体</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">32,33</context>
+          <context context-type="linenumber">34,36</context>
         </context-group>
       </trans-unit>
-      <trans-unit id="home.features.card.directApi.desc" datatype="html">
-        <source>Beyond clicking. <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> can call an app&apos;s own authenticated API through your logged-in session. Faster and more reliable than DOM automation, with DOM as the automatic fallback. Inspired by <x id="START_LINK" ctype="x-a" equiv-text="&lt;a href=&quot;https://github.com/opentabs-dev/opentabs&quot; target=&quot;_blank&quot; rel=&quot;noopener&quot; [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>OpenTabs<x id="CLOSE_LINK" ctype="x-a" equiv-text="&lt;/a&gt;"/>.</source>
-        <target state="translated">除了点击之外。 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 可以通过您登录的会话调用应用程序自己经过身份验证的 API。比 DOM 自动化更快、更可靠，以 DOM 作为自动后备。灵感来自 <x id="START_LINK" ctype="x-a" equiv-text="&lt;a href=&quot;https://github.com/opentabs-dev/opentabs&quot; target=&quot;_blank&quot; rel=&quot;noopener&quot; [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>OpenTabs<x id="CLOSE_LINK" ctype="x-a" equiv-text="&lt;/a&gt;"/>。</target>
+      <trans-unit id="home.features.benchmark.metric" datatype="html">
+        <source>Average success rate</source>
+        <target state="translated">平均成功率</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">33,34</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="home.features.card.actions.title" datatype="html">
-        <source>60 Browser Actions</source>
-        <target state="translated">60 浏览器操作</target>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">37,38</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="home.features.card.actions.desc" datatype="html">
-        <source>Click, type, scroll, drag-and-drop, canvas drawing, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>CDP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> mouse control, multi-tab management, and more. 53 DOM actions plus 7 through the <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Chrome DevTools Protocol<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>.</source>
-        <target state="translated">单击、键入、滚动、拖放、画布绘图、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>CDP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 鼠标控制、多选项卡管理等等。 53 个 DOM 操作加上通过 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Chrome DevTools Protocol<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 执行的 7 个操作。</target>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">38,40</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="home.features.card.reactiveTriggers.title" datatype="html">
-        <source>Reactive Triggers</source>
-        <target state="translated">反应性触发器</target>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">42,43</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="home.features.card.reactiveTriggers.desc" datatype="html">
-        <source>Watch any element and get notified the instant a value changes, crosses a threshold, or matches a pattern.</source>
-        <target state="translated">监视任何元素，并在值发生变化、超过阈值或匹配模式时立即收到通知。</target>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">43,45</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="home.features.card.domAnalysis.title" datatype="html">
-        <source>Smart DOM Analysis</source>
-        <target state="translated">智能 DOM 分析</target>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">47,48</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="home.features.card.domAnalysis.desc" datatype="html">
-        <source>Incremental DOM diffing, multi-strategy selectors, and element identification for reliable automation.</source>
-        <target state="translated">增量 DOM 差分、多策略选择器以及元素识别，让自动化更可靠。</target>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">48,50</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="home.features.card.autopilot.title" datatype="html">
-        <source>Autopilot</source>
-        <target state="translated">自动驾驶仪</target>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">52,53</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="home.features.card.autopilot.desc" datatype="html">
-        <source>Rebuilt on the <x id="START_LINK" ctype="x-a" equiv-text="&lt;a routerLink=&quot;/lattice&quot; [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Lattice<x id="CLOSE_LINK" ctype="x-a" equiv-text="&lt;/a&gt;"/> SDK, long runs survive <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Chrome<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>&apos;s <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MV3<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> shutdowns and finish. Up to 64 concurrent tabs, plus real file uploads from disk.</source>
-        <target state="translated">在 <x id="START_LINK" ctype="x-a" equiv-text="&lt;a routerLink=&quot;/lattice&quot; [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Lattice<x id="CLOSE_LINK" ctype="x-a" equiv-text="&lt;/a&gt;"/> SDK 上重建，长期运行 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Chrome<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MV3<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 关闭并完成。最多 64 个并发选项卡，以及从磁盘上传的实际文件。</target>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">53,55</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="home.features.card.visualFeedback.title" datatype="html">
-        <source>Visual Feedback</source>
-        <target state="translated">可视化反馈</target>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">57,58</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="home.features.card.visualFeedback.desc" datatype="html">
-        <source>Glow borders, pulsing element highlights, and a floating progress overlay show exactly what <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> is doing.</source>
-        <target state="translated">发光边框、脉冲元素高光和浮动进度叠加层准确显示了 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 正在做什么。</target>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">58,60</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="home.features.card.siteIntel.title" datatype="html">
-        <source>Site Intelligence</source>
-        <target state="translated">站点情报</target>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">62,63</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="home.features.card.siteIntel.desc" datatype="html">
-        <source>130+ built-in site guides across 17 categories, from commerce to coding.</source>
-        <target state="translated">130 多个内置网站指南，涵盖 17 个类别，从商业到编码。</target>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">63,65</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="home.features.card.mcpIntegration.title" datatype="html">
-        <source><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> Integration</source>
-        <target state="translated"><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 集成</target>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">67,68</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="home.features.card.mcpIntegration.desc" datatype="html">
-        <source>Use <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> as an <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> server from <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Claude Code<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Codex<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Cursor<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>OpenClaw<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, or any <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> client. 69 tools, with browser automation straight from your IDE.</source>
-        <target state="translated">使用<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>作为<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>服务器来自<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Claude Code<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>,<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Codex<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>,<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Cursor<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>,<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>OpenClaw<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>，或任何<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>客户。 69 个工具，可直接从 IDE 实现浏览器自动化。</target>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">68,70</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="home.features.card.remoteDashboard.title" datatype="html">
-        <source>Remote Dashboard</source>
-        <target state="translated">远程控制台</target>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">72,73</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="home.features.card.remoteDashboard.desc" datatype="html">
-        <source>Monitor and control <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> from any device. QR-code pairing, a live DOM preview powered by <x id="START_LINK" ctype="x-a" equiv-text="&lt;a routerLink=&quot;/phantom-stream&quot; [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>PhantomStream<x id="CLOSE_LINK" ctype="x-a" equiv-text="&lt;/a&gt;"/>, now with media mirroring, and real-time task execution.</source>
-        <target state="translated">从任何设备监视和控制 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>。 QR 代码配对，由 <x id="START_LINK" ctype="x-a" equiv-text="&lt;a routerLink=&quot;/phantom-stream&quot; [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>PhantomStream<x id="CLOSE_LINK" ctype="x-a" equiv-text="&lt;/a&gt;"/> 提供支持的实时 DOM 预览，现在具有媒体镜像和实时任务执行功能。</target>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">73,74</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="home.features.card.memoryLearning.title" datatype="html">
-        <source>Memory &amp; Learning</source>
-        <target state="translated">记忆与学习</target>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">77,78</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="home.features.card.memoryLearning.desc" datatype="html">
-        <source><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> remembers navigation patterns across sites. Semantic, episodic, and procedural memory for smarter automation over time.</source>
-        <target state="translated"><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 跨站点记住导航模式。语义、情景、过程性三类记忆让自动化随着时间越来越聪明。</target>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">78,80</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="home.comparison.title" datatype="html">
-        <source>Better Than All of Them. <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span class=&quot;highlight&quot;&gt;"/>Without Vision.<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/></source>
-        <target state="translated">比它们都强。<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span class=&quot;highlight&quot;&gt;"/>无需视觉。<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/></target>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">88,89</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="home.comparison.subtitle" datatype="html">
-        <source><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Project Mariner<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Claude Computer Use<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>OpenAI Operator<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>OpenClaw<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>. They all rely on vision to understand the page. <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> reads the actual DOM. No vision needed. Faster. Cheaper. More accurate.</source>
-        <target state="translated"><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Project Mariner<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Claude Computer Use<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>OpenAI Operator<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>OpenClaw<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>。它们都依靠视觉理解页面。<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 读取真实的 DOM。无需视觉，更快、更便宜、更准确。</target>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">89,92</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="home.comparison.competitor.mariner.logo.alt" datatype="html">
-        <source>Google</source>
-        <target state="translated">Google</target>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">95</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="home.comparison.competitor.mariner" datatype="html">
-        <source>Project Mariner</source>
-        <target state="translated">Project Mariner</target>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">97,98</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="home.comparison.competitor.tag.vision" datatype="html">
-        <source><x id="START_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;i class=&quot;fa-solid fa-eye&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/> Vision</source>
-        <target state="translated"><x id="START_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;i class=&quot;fa-solid fa-eye&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/> 视觉</target>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">98,100</context>
-        </context-group>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">105,107</context>
-        </context-group>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">112,114</context>
-        </context-group>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">119,121</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="home.comparison.competitor.computerUse.logo.alt" datatype="html">
-        <source>Anthropic</source>
-        <target state="translated">Anthropic</target>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">102</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="home.comparison.competitor.computerUse" datatype="html">
-        <source>Computer Use</source>
-        <target state="translated">Computer Use</target>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">104,105</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="home.comparison.competitor.operator" datatype="html">
-        <source>Operator</source>
-        <target state="translated">Operator</target>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">111,112</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="home.comparison.competitor.openclaw.logo.alt" datatype="html">
-        <source>OpenClaw</source>
-        <target state="translated">OpenClaw</target>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">116</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="home.comparison.competitor.openclaw" datatype="html">
-        <source>OpenClaw</source>
-        <target state="translated">OpenClaw</target>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">118,119</context>
+          <context context-type="linenumber">36,38</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.comparison.fsb.name" datatype="html">
@@ -5895,19 +5667,167 @@
         <target state="translated">FSB</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">125,126</context>
+          <context context-type="linenumber">44,45</context>
         </context-group>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">306,307</context>
+          <context context-type="linenumber">134,135</context>
         </context-group>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">358,359</context>
+          <context context-type="linenumber">315,316</context>
         </context-group>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">408,409</context>
+          <context context-type="linenumber">367,368</context>
+        </context-group>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
+          <context context-type="linenumber">417,418</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="home.features.benchmark.trend" datatype="html">
+        <source>Trending up</source>
+        <target state="translated">呈上升趋势</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
+          <context context-type="linenumber">66</context>
+        </context-group>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
+          <context context-type="linenumber">66,68</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="home.features.benchmark.note.fsb" datatype="html">
+        <source><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>: <x id="START_LINK" ctype="x-a" equiv-text="&lt;a href=&quot;https://github.com/fullselfbrowsing/FSB/tree/mind2web/mind2web&quot; target=&quot;_blank&quot; rel=&quot;noopener&quot;&gt;"/>AI-reviewed result (277/300)<x id="CLOSE_LINK" ctype="x-a" equiv-text="&lt;/a&gt;"/>. Other values are transcribed from the leaderboard.</source>
+        <target state="translated"><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>：<x id="START_LINK" ctype="x-a" equiv-text="&lt;a href=&quot;https://github.com/fullselfbrowsing/FSB/tree/mind2web/mind2web&quot; target=&quot;_blank&quot; rel=&quot;noopener&quot;&gt;"/>AI 审核结果（277/300）<x id="CLOSE_LINK" ctype="x-a" equiv-text="&lt;/a&gt;"/>。其他数值转录自排行榜。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
+          <context context-type="linenumber">81,82</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="home.features.benchmark.note.method" datatype="html">
+        <source>Evaluation methods differ; numerical placement is illustrative, not an official leaderboard ranking.</source>
+        <target state="translated">评估方法各不相同；数值排名仅作示意，并非排行榜官方排名。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
+          <context context-type="linenumber">82,84</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="home.features.benchmark.tested" datatype="html">
+        <source>Tested on <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> v0.9.92 · <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> v0.11.2</source>
+        <target state="translated">测试版本：<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> v0.9.92 · <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> v0.11.2</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
+          <context context-type="linenumber">84,85</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="home.features.benchmark.tagline" datatype="html">
+        <source>It only gets better</source>
+        <target state="translated">只会越来越好</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
+          <context context-type="linenumber">85,86</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="home.features.benchmark.wink" datatype="html">
+        <source>wink</source>
+        <target state="translated">眨眼</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
+          <context context-type="linenumber">86,89</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="home.comparison.title" datatype="html">
+        <source>Better Than All of Them. <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span class=&quot;highlight&quot;&gt;"/>Without Vision.<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/></source>
+        <target state="translated">比它们都强。<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span class=&quot;highlight&quot;&gt;"/>无需视觉。<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/></target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
+          <context context-type="linenumber">97,98</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="home.comparison.subtitle" datatype="html">
+        <source><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Project Mariner<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Claude Computer Use<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>OpenAI Operator<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>OpenClaw<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>. They all rely on vision to understand the page. <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> reads the actual DOM. No vision needed. Faster. Cheaper. More accurate.</source>
+        <target state="translated"><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Project Mariner<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Claude Computer Use<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>OpenAI Operator<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>OpenClaw<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>。它们都依靠视觉理解页面。<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 读取真实的 DOM。无需视觉，更快、更便宜、更准确。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
+          <context context-type="linenumber">98,101</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="home.comparison.competitor.mariner.logo.alt" datatype="html">
+        <source>Google</source>
+        <target state="translated">Google</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
+          <context context-type="linenumber">104</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="home.comparison.competitor.mariner" datatype="html">
+        <source>Project Mariner</source>
+        <target state="translated">Project Mariner</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
+          <context context-type="linenumber">106,107</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="home.comparison.competitor.tag.vision" datatype="html">
+        <source><x id="START_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;i class=&quot;fa-solid fa-eye&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/> Vision</source>
+        <target state="translated"><x id="START_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;i class=&quot;fa-solid fa-eye&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/> 视觉</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
+          <context context-type="linenumber">107,109</context>
+        </context-group>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
+          <context context-type="linenumber">114,116</context>
+        </context-group>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
+          <context context-type="linenumber">121,123</context>
+        </context-group>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
+          <context context-type="linenumber">128,130</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="home.comparison.competitor.computerUse.logo.alt" datatype="html">
+        <source>Anthropic</source>
+        <target state="translated">Anthropic</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
+          <context context-type="linenumber">111</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="home.comparison.competitor.computerUse" datatype="html">
+        <source>Computer Use</source>
+        <target state="translated">Computer Use</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
+          <context context-type="linenumber">113,114</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="home.comparison.competitor.operator" datatype="html">
+        <source>Operator</source>
+        <target state="translated">Operator</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
+          <context context-type="linenumber">120,121</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="home.comparison.competitor.openclaw.logo.alt" datatype="html">
+        <source>OpenClaw</source>
+        <target state="translated">OpenClaw</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
+          <context context-type="linenumber">125</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="home.comparison.competitor.openclaw" datatype="html">
+        <source>OpenClaw</source>
+        <target state="translated">OpenClaw</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
+          <context context-type="linenumber">127,128</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.comparison.fsb.tag" datatype="html">
@@ -5915,7 +5835,7 @@
         <target state="translated"><x id="START_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;i class=&quot;fa-solid fa-code&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/> 基于 DOM</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">134,136</context>
+          <context context-type="linenumber">143,145</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.comparison.fsb.desc" datatype="html">
@@ -5923,7 +5843,7 @@
         <target state="translated">比它们都强。纯结构化智能，零视觉，零猜测。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">136,138</context>
+          <context context-type="linenumber">145,147</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.comparison.stat.perStep.value" datatype="html">
@@ -5931,7 +5851,7 @@
         <target state="translated">50-200ms</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">139,140</context>
+          <context context-type="linenumber">148,149</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.comparison.stat.perStep" datatype="html">
@@ -5939,7 +5859,7 @@
         <target state="translated">每步耗时 <x id="START_TAG_SPAN_1" ctype="x-span_1" equiv-text="&lt;span class=&quot;fsb-stat-vs&quot;&gt;"/>对比 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>1-3s<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/><x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/></target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">140,141</context>
+          <context context-type="linenumber">149,150</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.comparison.stat.per100.value" datatype="html">
@@ -5947,7 +5867,7 @@
         <target state="translated">~$0.03</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">143,144</context>
+          <context context-type="linenumber">152,153</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.comparison.stat.per100" datatype="html">
@@ -5955,7 +5875,7 @@
         <target state="translated">每 100 步 <x id="START_TAG_SPAN_1" ctype="x-span_1" equiv-text="&lt;span class=&quot;fsb-stat-vs&quot;&gt;"/>对比 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>$0.18<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/><x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/></target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">144,145</context>
+          <context context-type="linenumber">153,154</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.comparison.stat.hiddenValue" datatype="html">
@@ -5963,7 +5883,7 @@
         <target state="translated">是</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">147,148</context>
+          <context context-type="linenumber">156,157</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.comparison.stat.hiddenLabel" datatype="html">
@@ -5971,7 +5891,7 @@
         <target state="translated">隐藏元素 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span class=&quot;fsb-stat-vs&quot;&gt;"/>对比 否<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/></target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">148,149</context>
+          <context context-type="linenumber">157,158</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.comparison.worksWith.title" datatype="html">
@@ -5979,7 +5899,7 @@
         <target state="translated">与它们协同工作</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">159,160</context>
+          <context context-type="linenumber">168,169</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.comparison.worksWith.desc" datatype="html">
@@ -5987,7 +5907,7 @@
         <target state="translated"><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 不只是竞争，更是互补。通过它的 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 服务器，<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Claude Code<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Codex<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Cursor<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>、<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Windsurf<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 以及任何兼容 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 的智能体都能把 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 用作浏览器自动化层。把任意 AI 的智能与 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> DOM 引擎的精度结合在一起。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">160,161</context>
+          <context context-type="linenumber">169,170</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.install.label" datatype="html">
@@ -5995,7 +5915,7 @@
         <target state="translated">一声令下。选择你的经纪人。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">165,166</context>
+          <context context-type="linenumber">174,175</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.install.copyCurrent.title" datatype="html">
@@ -6003,7 +5923,7 @@
         <target state="translated">复制命令</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">170</context>
+          <context context-type="linenumber">179</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.install.baseCommand" datatype="html">
@@ -6011,7 +5931,7 @@
         <target state="translated">npx -y fsb-mcp-server@latest install</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">171,172</context>
+          <context context-type="linenumber">180,181</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.install.copyCurrent.aria" datatype="html">
@@ -6019,7 +5939,7 @@
         <target state="translated">复制安装命令</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">175</context>
+          <context context-type="linenumber">184</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.install.copySpecific.aria" datatype="html">
@@ -6027,11 +5947,11 @@
         <target state="translated">复制特定客户端的命令</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">178</context>
+          <context context-type="linenumber">187</context>
         </context-group>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">190</context>
+          <context context-type="linenumber">199</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.capabilities.eyebrow" datatype="html">
@@ -6039,7 +5959,7 @@
         <target state="translated"><x id="START_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;i class=&quot;fa-solid fa-bolt&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/> 本机 API 处理程序</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">213,214</context>
+          <context context-type="linenumber">222,223</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.capabilities.title" datatype="html">
@@ -6047,7 +5967,7 @@
         <target state="translated">它在必要时发出咔嗒声。 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span class=&quot;highlight&quot;&gt;"/>它可以调用API。<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/></target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">214,215</context>
+          <context context-type="linenumber">223,224</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.capabilities.subtitle" datatype="html">
@@ -6055,7 +5975,7 @@
         <target state="translated"><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 不再需要为所有事情驱动 UI。对于受支持的应用程序，它会通过您的登录会话直接与应用程序自己经过身份验证的 API 进行对话，比 DOM 自动化更快、更可靠，并且在不存在 API 时回退到自动单击。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">215,218</context>
+          <context context-type="linenumber">224,227</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.capabilities.marquee.aria" datatype="html">
@@ -6063,7 +5983,7 @@
         <target state="translated">应用 FSB 支持</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">218</context>
+          <context context-type="linenumber">227</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.capabilities.credit.prefix" datatype="html">
@@ -6071,7 +5991,7 @@
         <target state="translated">灵感来自</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">255,256</context>
+          <context context-type="linenumber">264,265</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.capabilities.credit.opentabs" datatype="html">
@@ -6079,7 +5999,7 @@
         <target state="translated">OpenTabs</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">257,261</context>
+          <context context-type="linenumber">266,270</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.engine.title" datatype="html">
@@ -6087,7 +6007,7 @@
         <target state="translated">任意智能体。任意模型。<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span class=&quot;highlight&quot;&gt;"/>一个浏览器引擎。<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/></target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">267,268</context>
+          <context context-type="linenumber">276,277</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.engine.subtitle" datatype="html">
@@ -6095,7 +6015,7 @@
         <target state="translated"><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 是浏览器层，而不是另一个聊天机器人。无论谁负责思考，<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 都会读取页面结构、执行操作并验证结果。提供三种连接方式。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">268,270</context>
+          <context context-type="linenumber">277,279</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.engine.tabs.aria" datatype="html">
@@ -6103,7 +6023,7 @@
         <target state="translated">FSB 的运行方式</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">271</context>
+          <context context-type="linenumber">280</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.providers.badge.recommended" datatype="html">
@@ -6111,7 +6031,7 @@
         <target state="translated">推荐</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">274,275</context>
+          <context context-type="linenumber">283,284</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.engine.mcp.title" datatype="html">
@@ -6119,11 +6039,11 @@
         <target state="translated">你的智能体驱动 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/></target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">275,276</context>
+          <context context-type="linenumber">284,285</context>
         </context-group>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">324,325</context>
+          <context context-type="linenumber">333,334</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.engine.mcp.meta" datatype="html">
@@ -6131,7 +6051,7 @@
         <target state="translated">69 个工具 · 无需 API 密钥</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">276,278</context>
+          <context context-type="linenumber">285,287</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.engine.cli.kind" datatype="html">
@@ -6139,7 +6059,7 @@
         <target state="translated">智能体 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>CLI<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/></target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">280,281</context>
+          <context context-type="linenumber">289,290</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.engine.cli.title" datatype="html">
@@ -6147,11 +6067,11 @@
         <target state="translated">使用你已付费的套餐运行</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">281,282</context>
+          <context context-type="linenumber">290,291</context>
         </context-group>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">376,377</context>
+          <context context-type="linenumber">385,386</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.engine.byok.kind" datatype="html">
@@ -6159,7 +6079,7 @@
         <target state="translated">使用自己的密钥</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">286,287</context>
+          <context context-type="linenumber">295,296</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.engine.byok.title" datatype="html">
@@ -6167,11 +6087,11 @@
         <target state="translated">独立运行，支持任意模型</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">287,288</context>
+          <context context-type="linenumber">296,297</context>
         </context-group>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">426,427</context>
+          <context context-type="linenumber">435,436</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.engine.byok.meta" datatype="html">
@@ -6179,7 +6099,7 @@
         <target state="translated">7 家提供商 · 本地或托管</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">288,290</context>
+          <context context-type="linenumber">297,299</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.engine.tabs.foot" datatype="html">
@@ -6187,7 +6107,7 @@
         <target state="translated">先设置一种方式，随时从设置中添加其他方式。它们共享同一个引擎、网站指南和记忆。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">290,292</context>
+          <context context-type="linenumber">299,301</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.engine.flow.mcp.agent" datatype="html">
@@ -6195,7 +6115,7 @@
         <target state="translated">你的智能体负责思考</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">301,303</context>
+          <context context-type="linenumber">310,312</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.engine.flow.core" datatype="html">
@@ -6203,15 +6123,15 @@
         <target state="translated">读取 · 操作 · 验证</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">316,318</context>
+          <context context-type="linenumber">325,327</context>
         </context-group>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">368,370</context>
+          <context context-type="linenumber">377,379</context>
         </context-group>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">418,420</context>
+          <context context-type="linenumber">427,429</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.engine.flow.browser" datatype="html">
@@ -6219,15 +6139,15 @@
         <target state="translated">你的浏览器</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">321,323</context>
+          <context context-type="linenumber">330,332</context>
         </context-group>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">373,375</context>
+          <context context-type="linenumber">382,384</context>
         </context-group>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">423,425</context>
+          <context context-type="linenumber">432,434</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.engine.mcp.desc" datatype="html">
@@ -6235,7 +6155,7 @@
         <target state="translated">编程智能体和 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 客户端会直接调用 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 的工具。推理由智能体自身的模型完成，因此无需添加 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 密钥，也不会多一份账单。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">325,326</context>
+          <context context-type="linenumber">334,335</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.engine.mcp.fact.tools" datatype="html">
@@ -6243,7 +6163,7 @@
         <target state="translated">69 个 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 工具</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">327,328</context>
+          <context context-type="linenumber">336,337</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.engine.mcp.fact.install" datatype="html">
@@ -6251,7 +6171,7 @@
         <target state="translated">一条命令完成安装</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">328,329</context>
+          <context context-type="linenumber">337,338</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.engine.mcp.fact.noKey" datatype="html">
@@ -6259,7 +6179,7 @@
         <target state="translated">无需 API 密钥</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">329,331</context>
+          <context context-type="linenumber">338,340</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.engine.mcp.chip.any" datatype="html">
@@ -6267,7 +6187,7 @@
         <target state="translated">任意 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 客户端</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">342,343</context>
+          <context context-type="linenumber">351,352</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.engine.flow.cli.agent" datatype="html">
@@ -6275,7 +6195,7 @@
         <target state="translated">你的套餐负责思考</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">353,355</context>
+          <context context-type="linenumber">362,364</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.engine.cli.desc" datatype="html">
@@ -6283,7 +6203,7 @@
         <target state="translated">在侧边栏下达任务，<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 会将推理交给 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Claude Code<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 或 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Grok Build<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>，使用你现有的账号登录。<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 不会接触该凭据。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">377,378</context>
+          <context context-type="linenumber">386,387</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.engine.cli.fact.billing" datatype="html">
@@ -6291,7 +6211,7 @@
         <target state="translated">计入你的 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Claude<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 套餐或 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>SuperGrok<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 账单</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">379,380</context>
+          <context context-type="linenumber">388,389</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.engine.cli.fact.noCredential" datatype="html">
@@ -6299,7 +6219,7 @@
         <target state="translated">无需共享凭据</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">380,382</context>
+          <context context-type="linenumber">389,391</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.engine.flow.byok.agent" datatype="html">
@@ -6307,7 +6227,7 @@
         <target state="translated">你的模型负责思考</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">403,405</context>
+          <context context-type="linenumber">412,414</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.engine.byok.desc" datatype="html">
@@ -6315,7 +6235,7 @@
         <target state="translated">在侧边栏与 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 聊天，使用自己的 API 密钥，或使用完全不需要密钥的本地模型。密钥经过加密并保留在浏览器中。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">427,428</context>
+          <context context-type="linenumber">436,437</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.engine.byok.fact.models" datatype="html">
@@ -6323,7 +6243,7 @@
         <target state="translated">实时模型列表</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">429,430</context>
+          <context context-type="linenumber">438,439</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.engine.byok.fact.encrypted" datatype="html">
@@ -6331,7 +6251,7 @@
         <target state="translated">本地加密</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">430,432</context>
+          <context context-type="linenumber">439,441</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.engine.byok.tag.default" datatype="html">
@@ -6339,7 +6259,7 @@
         <target state="translated">默认</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">443,445</context>
+          <context context-type="linenumber">452,454</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.engine.byok.tag.freeTier" datatype="html">
@@ -6347,7 +6267,7 @@
         <target state="translated">免费额度</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">446,448</context>
+          <context context-type="linenumber">455,457</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.engine.byok.tag.local" datatype="html">
@@ -6355,7 +6275,7 @@
         <target state="translated">本地</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">449,451</context>
+          <context context-type="linenumber">458,460</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.engine.byok.chip.any" datatype="html">
@@ -6363,7 +6283,7 @@
         <target state="translated">任意兼容 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>OpenAI<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 的端点</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">454,455</context>
+          <context context-type="linenumber">463,464</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.cta.openSource.title" datatype="html">
@@ -6371,7 +6291,7 @@
         <target state="translated">开源。<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MIT<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 许可。为每个人而建。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">465,466</context>
+          <context context-type="linenumber">474,475</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.cta.openSource.desc" datatype="html">
@@ -6379,7 +6299,7 @@
         <target state="translated"><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 免费开源。检查代码、贡献功能，或 fork 供自己使用。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">466,467</context>
+          <context context-type="linenumber">475,476</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.cta.openSource.github" datatype="html">
@@ -6387,15 +6307,15 @@
         <target state="translated"><x id="START_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;i class=&quot;fa-brands fa-github&quot;&gt;"/><x id="CLOSE_ITALIC_TEXT" ctype="x-i" equiv-text="&lt;/i&gt;"/> 在 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>GitHub<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> 上查看</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
-          <context context-type="linenumber">468,470</context>
+          <context context-type="linenumber">477,479</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.og.imageAlt" datatype="html">
-        <source>FSB Full Self-Browsing logo</source>
-        <target state="translated">FSB Full Self-Browsing 徽标</target>
+        <source>Online-Mind2Web top 10 agents chart. FSB: AI-reviewed result (277/300), 92.3%.</source>
+        <target state="translated">Online-Mind2Web 前 10 名智能体图表。FSB：AI 审核结果（277/300），92.3%。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.ts</context>
-          <context context-type="linenumber">40</context>
+          <context context-type="linenumber">41</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.install.allClients" datatype="html">
@@ -6403,7 +6323,7 @@
         <target state="translated">所有客户端</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.ts</context>
-          <context context-type="linenumber">95</context>
+          <context context-type="linenumber">96</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.install.manualFlag" datatype="html">
@@ -6411,23 +6331,23 @@
         <target state="translated">手动</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.ts</context>
-          <context context-type="linenumber">98</context>
+          <context context-type="linenumber">99</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.meta.title" datatype="html">
-        <source>Full Self-Browsing | AI Browser Automation &amp; MCP</source>
-        <target state="translated">Full Self-Browsing | AI 浏览器自动化与 MCP</target>
+        <source>Full Self-Browsing | 92.3% on Online-Mind2Web | AI Browser Automation &amp; MCP</source>
+        <target state="translated">Full Self-Browsing | Online-Mind2Web 92.3% | AI 浏览器自动化与 MCP</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.ts</context>
-          <context context-type="linenumber">147</context>
+          <context context-type="linenumber">151</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.meta.description" datatype="html">
-        <source>Automate Chrome with natural-language instructions or connect AI agents through MCP. FSB is open source and works in your real browser session.</source>
-        <target state="translated">通过自然语言指令自动操作 Chrome，或通过 MCP 连接 AI 智能体。FSB 是开源软件，可在你的真实浏览器会话中运行。</target>
+        <source>FSB on Online-Mind2Web: AI-reviewed result (277/300), 92.3%. Automate Chrome with natural-language instructions or connect AI agents through MCP. FSB is open source and works in your real browser session.</source>
+        <target state="translated">FSB 在 Online-Mind2Web 上：AI 审核结果（277/300），92.3%。通过自然语言指令自动操作 Chrome，或通过 MCP 连接 AI 智能体。FSB 是开源软件，可在你的真实浏览器会话中运行。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.ts</context>
-          <context context-type="linenumber">148</context>
+          <context context-type="linenumber">152</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.schema.description" datatype="html">
@@ -6435,7 +6355,7 @@
         <target state="translated">本地优先的 Chrome 自动化与 MCP 浏览器层，使 AI 智能体能够在用户的浏览器中执行操作、观察、验证、使用触发器监视功能、上传真实文件，并调用受控的第一方 API 能力</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.ts</context>
-          <context context-type="linenumber">303</context>
+          <context context-type="linenumber">307</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.schema.subcategory" datatype="html">
@@ -6443,7 +6363,15 @@
         <target state="translated">AI 浏览器自动化与 MCP 工具</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.ts</context>
-          <context context-type="linenumber">306</context>
+          <context context-type="linenumber">310</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="home.schema.feature.benchmark" datatype="html">
+        <source>Online-Mind2Web: AI-reviewed result (277/300), 92.3%</source>
+        <target state="translated">Online-Mind2Web：AI 审核结果（277/300），92.3%</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/home/home-page.component.ts</context>
+          <context context-type="linenumber">317</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.schema.feature.mcp" datatype="html">
@@ -6451,7 +6379,7 @@
         <target state="translated">适用于 Claude Code、Codex、Cursor、Windsurf 和 OpenClaw 的 MCP 服务器</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.ts</context>
-          <context context-type="linenumber">312</context>
+          <context context-type="linenumber">318</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.schema.feature.browser" datatype="html">
@@ -6459,7 +6387,7 @@
         <target state="translated">通过本地 Chrome 扩展程序实现真实浏览器自动化</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.ts</context>
-          <context context-type="linenumber">313</context>
+          <context context-type="linenumber">319</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.schema.feature.triggers" datatype="html">
@@ -6467,7 +6395,7 @@
         <target state="translated">用于响应式 DOM 监控的触发器监视功能</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.ts</context>
-          <context context-type="linenumber">314</context>
+          <context context-type="linenumber">320</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.schema.feature.capabilities" datatype="html">
@@ -6475,7 +6403,7 @@
         <target state="translated">原生第一方 API 能力目录，通过受控的 invoke_capability 调用执行</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.ts</context>
-          <context context-type="linenumber">315</context>
+          <context context-type="linenumber">321</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.schema.feature.uploads" datatype="html">
@@ -6483,7 +6411,7 @@
         <target state="translated">通过 upload_file 上传真实文件，并支持模拟 drop_file</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.ts</context>
-          <context context-type="linenumber">316</context>
+          <context context-type="linenumber">322</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.schema.feature.vault" datatype="html">
@@ -6491,7 +6419,7 @@
         <target state="translated">Vault 与付款自动填充的安全边界，原始密钥绝不会穿过 MCP 桥接器</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.ts</context>
-          <context context-type="linenumber">317</context>
+          <context context-type="linenumber">323</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.schema.feature.dom" datatype="html">
@@ -6499,7 +6427,7 @@
         <target state="translated">基于 DOM 的页面理解、浏览器操作、视觉反馈、本地记忆和自备模型密钥</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.ts</context>
-          <context context-type="linenumber">318</context>
+          <context context-type="linenumber">324</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.schema.keywords" datatype="html">
@@ -6507,7 +6435,31 @@
         <target state="translated">MCP 浏览器自动化、AI 浏览器智能体、触发器监视、第一方 API 能力调用、Claude Code 浏览器测试、Codex 浏览器测试、自主浏览自动化</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.ts</context>
-          <context context-type="linenumber">320</context>
+          <context context-type="linenumber">326</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="home.schema.benchmark.name" datatype="html">
+        <source>FSB on Online-Mind2Web: top 10 agents by average success rate</source>
+        <target state="translated">FSB 在 Online-Mind2Web 上：按平均成功率排列的前 10 名智能体</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/home/home-page.component.ts</context>
+          <context context-type="linenumber">336</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="home.schema.benchmark.description" datatype="html">
+        <source>Average success rates on Online-Mind2Web, with FSB included. FSB: AI-reviewed result (277/300), 92.3%. Other values are transcribed from the leaderboard. Evaluation methods differ; numerical placement is illustrative, not an official leaderboard ranking. Tested on FSB v0.9.92 · MCP v0.11.2.</source>
+        <target state="translated">Online-Mind2Web 上的平均成功率，包含 FSB。FSB：AI 审核结果（277/300），92.3%。其他数值转录自排行榜。评估方法各不相同；数值排名仅作示意，并非排行榜官方排名。测试版本：FSB v0.9.92 · MCP v0.11.2。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/home/home-page.component.ts</context>
+          <context context-type="linenumber">337</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="home.schema.benchmark.metric" datatype="html">
+        <source>Average success rate</source>
+        <target state="translated">平均成功率</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/home/home-page.component.ts</context>
+          <context context-type="linenumber">349</context>
         </context-group>
       </trans-unit>
       <trans-unit id="lattice.screen.label" datatype="html">

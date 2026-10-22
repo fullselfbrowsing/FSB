@@ -1,0 +1,139 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1008" height="744" viewBox="0 0 1008 744" role="img" aria-labelledby="om2w-title om2w-desc">
+<title id="om2w-title">Online-Mind2Web: top 10 agents by average success rate</title>
+<desc id="om2w-desc">Hark 97.7%, Navigator (n1.5) 97.3%, ACT-2 92.7%, FSB 92.3% (AI-reviewed result, 277/300), Navigator (n1-preview) 78.7%, Google Computer Use 69.0%, Operator 61.3%, ACT-1 (Aug 2025) 57.3%, Claude Computer Use 56.3%, ACT-1 (Jul 2025) 45.7%. Other values are transcribed from the leaderboard. Evaluation methods differ; numerical placement is illustrative, not an official leaderboard ranking.</desc>
+<style>
+.sans{font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif}.mono{font-family:ui-monospace, 'SF Mono', Monaco, 'Roboto Mono', Menlo, Consolas, monospace}
+.grow{transform-origin:316px 0;animation:om2wGrow 900ms cubic-bezier(.16,1,.3,1) both}
+.fade{animation:om2wFade 450ms ease-out both}
+.glow{opacity:.8;animation:om2wGlow 3.2s ease-in-out infinite}
+.shine{transform:translateX(-216.31px);animation:om2wShine 3.2s ease-in-out 1.6s infinite}
+.rise{animation:om2wRise 1.8s ease-in-out infinite}
+@keyframes om2wGrow{from{transform:scaleX(0)}}
+@keyframes om2wFade{from{opacity:0}}
+@keyframes om2wGlow{0%,100%{opacity:.55}50%{opacity:1}}
+@keyframes om2wShine{0%{transform:translateX(-216.31px)}55%,100%{transform:translateX(576.84px)}}
+@keyframes om2wRise{0%,100%{transform:translateY(1px);opacity:.75}50%{transform:translateY(-3px);opacity:1}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important}}
+</style>
+<defs>
+<pattern id="om2w-dots" width="18" height="18" patternUnits="userSpaceOnUse"><circle cx="9" cy="9" r="1" fill="rgba(100,116,139,0.22)"/></pattern>
+<linearGradient id="om2w-fsb" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e04e12"/><stop offset="1" stop-color="#f26a1b"/></linearGradient>
+<linearGradient id="om2w-shine" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".5" stop-color="#fff" stop-opacity=".35"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+<filter id="om2w-glow" x="-10%" y="-150%" width="120%" height="400%"><feGaussianBlur stdDeviation="9"/></filter>
+</defs>
+<rect width="1008" height="744" rx="16" fill="#000000"/>
+<rect width="1008" height="744" rx="16" fill="url(#om2w-dots)"/>
+<rect x="24.5" y="24.5" width="959" height="695.2" rx="16" fill="#000000" stroke="rgba(255,255,255,0.08)"/>
+<text class="mono" x="60" y="65.8" font-size="12" letter-spacing="0.96" fill="#64748b" textLength="121.44" lengthAdjust="spacingAndGlyphs">ONLINE-MIND2WEB</text>
+<path d="M191.64 57.2H188.44V66.2H197.44V63M193.64 57.2H197.44V61M197.44 57.2L192.44 62.2" fill="none" stroke="#64748b" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+<text class="sans" x="60" y="100.04" font-size="21.6" font-weight="700" fill="#f1f5f9">Top 10 agents</text>
+<text class="sans" x="948" y="103.64" font-size="13.6" text-anchor="end" fill="#94a3b8">Average success rate</text>
+<text class="mono" x="70" y="153.96" font-size="12" fill="#64748b">01</text>
+<text class="sans" x="302" y="154.76" font-size="14.4" font-weight="500" text-anchor="end" fill="#f1f5f9">Hark</text>
+<rect x="316" y="136.76" width="1" height="26" fill="rgba(255,255,255,0.08)"/>
+<rect x="427.6" y="136.76" width="1" height="26" fill="rgba(255,255,255,0.08)"/>
+<rect x="539.2" y="136.76" width="1" height="26" fill="rgba(255,255,255,0.08)"/>
+<rect x="650.8" y="136.76" width="1" height="26" fill="rgba(255,255,255,0.08)"/>
+<rect x="762.4" y="136.76" width="1" height="26" fill="rgba(255,255,255,0.08)"/>
+<path class="grow" style="animation-delay:250ms" d="M316 140.76h541.17a4 4 0 0 1 4 4v10a4 4 0 0 1 -4 4h-541.17z" fill="rgba(148,163,184,0.38)"/>
+<text class="mono fade" style="animation-delay:800ms" x="869.17" y="154.26" font-size="12.8" font-weight="500" fill="#94a3b8">97.7%</text>
+<text class="mono" x="70" y="197.96" font-size="12" fill="#64748b">02</text>
+<text class="sans" x="302" y="198.76" font-size="14.4" font-weight="500" text-anchor="end" fill="#f1f5f9">Navigator (n1.5)</text>
+<rect x="316" y="180.76" width="1" height="26" fill="rgba(255,255,255,0.08)"/>
+<rect x="427.6" y="180.76" width="1" height="26" fill="rgba(255,255,255,0.08)"/>
+<rect x="539.2" y="180.76" width="1" height="26" fill="rgba(255,255,255,0.08)"/>
+<rect x="650.8" y="180.76" width="1" height="26" fill="rgba(255,255,255,0.08)"/>
+<rect x="762.4" y="180.76" width="1" height="26" fill="rgba(255,255,255,0.08)"/>
+<path class="grow" style="animation-delay:340ms" d="M316 184.76h538.93a4 4 0 0 1 4 4v10a4 4 0 0 1 -4 4h-538.93z" fill="rgba(148,163,184,0.38)"/>
+<text class="mono fade" style="animation-delay:890ms" x="866.93" y="198.26" font-size="12.8" font-weight="500" fill="#94a3b8">97.3%</text>
+<text class="mono" x="70" y="241.96" font-size="12" fill="#64748b">03</text>
+<text class="sans" x="302" y="242.76" font-size="14.4" font-weight="500" text-anchor="end" fill="#f1f5f9">ACT-2</text>
+<rect x="316" y="224.76" width="1" height="26" fill="rgba(255,255,255,0.08)"/>
+<rect x="427.6" y="224.76" width="1" height="26" fill="rgba(255,255,255,0.08)"/>
+<rect x="539.2" y="224.76" width="1" height="26" fill="rgba(255,255,255,0.08)"/>
+<rect x="650.8" y="224.76" width="1" height="26" fill="rgba(255,255,255,0.08)"/>
+<rect x="762.4" y="224.76" width="1" height="26" fill="rgba(255,255,255,0.08)"/>
+<path class="grow" style="animation-delay:430ms" d="M316 228.76h513.27a4 4 0 0 1 4 4v10a4 4 0 0 1 -4 4h-513.27z" fill="rgba(148,163,184,0.38)"/>
+<text class="mono fade" style="animation-delay:980ms" x="841.27" y="242.26" font-size="12.8" font-weight="500" fill="#94a3b8">92.7%</text>
+<rect x="60" y="261.76" width="888" height="40" rx="8" fill="rgba(255,107,53,0.07)"/>
+<text class="mono" x="70" y="285.96" font-size="12" fill="#e04e12">04</text>
+<g fill="#f1f5f9" aria-hidden="true"><path transform="translate(268.71 288.76) scale(0.02)" d="M429 -704V-686H105V-361H399V-343H105V0H85V-704Z"/><path transform="translate(278.09 288.76) scale(0.02)" d="M28 -227H264Q269 -166 318 -166Q336 -166 348.5 -174.5Q361 -183 361 -201Q361 -226 334 -241.5Q307 -257 250 -277Q182 -301 137.5 -324Q93 -347 61 -391Q29 -435 30 -504Q30 -573 65.5 -621.5Q101 -670 162.5 -695Q224 -720 301 -720Q431 -720 507.5 -660Q584 -600 588 -491H349Q348 -521 334 -534Q320 -547 300 -547Q286 -547 277 -537.5Q268 -528 268 -511Q268 -487 294.5 -471.5Q321 -456 379 -434Q446 -409 489.5 -386Q533 -363 565 -322Q597 -281 597 -219Q597 -154 565 -102.5Q533 -51 472 -22Q411 7 327 7Q200 7 117.5 -52.5Q35 -112 28 -227Z"/><path transform="translate(291.22 274.39) scale(0.14)" d="M0 0 L40 0 C58 0 70 10 70 26 C70 38 62 46 50 49 C64 51 72 60 72 74 C72 90 60 100 40 100 L0 100 Z"/></g>
+<rect x="316" y="268.76" width="1" height="26" fill="rgba(255,255,255,0.08)"/>
+<rect x="427.6" y="268.76" width="1" height="26" fill="rgba(255,255,255,0.08)"/>
+<rect x="539.2" y="268.76" width="1" height="26" fill="rgba(255,255,255,0.08)"/>
+<rect x="650.8" y="268.76" width="1" height="26" fill="rgba(255,255,255,0.08)"/>
+<rect x="762.4" y="268.76" width="1" height="26" fill="rgba(255,255,255,0.08)"/>
+<g class="grow" style="animation-delay:520ms">
+<path class="glow" d="M316 272.76h511.03a4 4 0 0 1 4 4v10a4 4 0 0 1 -4 4h-511.03z" fill="rgba(255,107,53,0.3)" filter="url(#om2w-glow)"/>
+<clipPath id="om2w-fsb-bar"><path d="M316 272.76h511.03a4 4 0 0 1 4 4v10a4 4 0 0 1 -4 4h-511.03z"/></clipPath>
+<path d="M316 272.76h511.03a4 4 0 0 1 4 4v10a4 4 0 0 1 -4 4h-511.03z" fill="url(#om2w-fsb)"/>
+<g clip-path="url(#om2w-fsb-bar)"><rect class="shine" x="316" y="272.76" width="180.26" height="18" fill="url(#om2w-shine)"/></g>
+</g>
+<g class="fade" style="animation-delay:1070ms">
+<text class="mono" x="839.03" y="286.26" font-size="12.8" font-weight="700" fill="#e04e12" textLength="38.4" lengthAdjust="spacingAndGlyphs">92.3%</text>
+<path class="rise" d="M883.43 283.76h9l-4.5-5.4z" fill="#e04e12" stroke="#e04e12" stroke-width="1.6" stroke-linejoin="round"/>
+</g>
+<text class="mono" x="70" y="329.96" font-size="12" fill="#64748b">05</text>
+<text class="sans" x="302" y="330.76" font-size="14.4" font-weight="500" text-anchor="end" fill="#f1f5f9">Navigator (n1-preview)</text>
+<rect x="316" y="312.76" width="1" height="26" fill="rgba(255,255,255,0.08)"/>
+<rect x="427.6" y="312.76" width="1" height="26" fill="rgba(255,255,255,0.08)"/>
+<rect x="539.2" y="312.76" width="1" height="26" fill="rgba(255,255,255,0.08)"/>
+<rect x="650.8" y="312.76" width="1" height="26" fill="rgba(255,255,255,0.08)"/>
+<rect x="762.4" y="312.76" width="1" height="26" fill="rgba(255,255,255,0.08)"/>
+<path class="grow" style="animation-delay:610ms" d="M316 316.76h435.15a4 4 0 0 1 4 4v10a4 4 0 0 1 -4 4h-435.15z" fill="rgba(148,163,184,0.38)"/>
+<text class="mono fade" style="animation-delay:1160ms" x="763.15" y="330.26" font-size="12.8" font-weight="500" fill="#94a3b8">78.7%</text>
+<text class="mono" x="70" y="373.96" font-size="12" fill="#64748b">06</text>
+<text class="sans" x="302" y="374.76" font-size="14.4" font-weight="500" text-anchor="end" fill="#f1f5f9">Google Computer Use</text>
+<rect x="316" y="356.76" width="1" height="26" fill="rgba(255,255,255,0.08)"/>
+<rect x="427.6" y="356.76" width="1" height="26" fill="rgba(255,255,255,0.08)"/>
+<rect x="539.2" y="356.76" width="1" height="26" fill="rgba(255,255,255,0.08)"/>
+<rect x="650.8" y="356.76" width="1" height="26" fill="rgba(255,255,255,0.08)"/>
+<rect x="762.4" y="356.76" width="1" height="26" fill="rgba(255,255,255,0.08)"/>
+<path class="grow" style="animation-delay:700ms" d="M316 360.76h381.02a4 4 0 0 1 4 4v10a4 4 0 0 1 -4 4h-381.02z" fill="rgba(148,163,184,0.38)"/>
+<text class="mono fade" style="animation-delay:1250ms" x="709.02" y="374.26" font-size="12.8" font-weight="500" fill="#94a3b8">69.0%</text>
+<text class="mono" x="70" y="417.96" font-size="12" fill="#64748b">07</text>
+<text class="sans" x="302" y="418.76" font-size="14.4" font-weight="500" text-anchor="end" fill="#f1f5f9">Operator</text>
+<rect x="316" y="400.76" width="1" height="26" fill="rgba(255,255,255,0.08)"/>
+<rect x="427.6" y="400.76" width="1" height="26" fill="rgba(255,255,255,0.08)"/>
+<rect x="539.2" y="400.76" width="1" height="26" fill="rgba(255,255,255,0.08)"/>
+<rect x="650.8" y="400.76" width="1" height="26" fill="rgba(255,255,255,0.08)"/>
+<rect x="762.4" y="400.76" width="1" height="26" fill="rgba(255,255,255,0.08)"/>
+<path class="grow" style="animation-delay:790ms" d="M316 404.76h338.05a4 4 0 0 1 4 4v10a4 4 0 0 1 -4 4h-338.05z" fill="rgba(148,163,184,0.38)"/>
+<text class="mono fade" style="animation-delay:1340ms" x="666.05" y="418.26" font-size="12.8" font-weight="500" fill="#94a3b8">61.3%</text>
+<text class="mono" x="70" y="461.96" font-size="12" fill="#64748b">08</text>
+<text class="sans" x="302" y="462.76" font-size="14.4" font-weight="500" text-anchor="end" fill="#f1f5f9">ACT-1 (Aug 2025)</text>
+<rect x="316" y="444.76" width="1" height="26" fill="rgba(255,255,255,0.08)"/>
+<rect x="427.6" y="444.76" width="1" height="26" fill="rgba(255,255,255,0.08)"/>
+<rect x="539.2" y="444.76" width="1" height="26" fill="rgba(255,255,255,0.08)"/>
+<rect x="650.8" y="444.76" width="1" height="26" fill="rgba(255,255,255,0.08)"/>
+<rect x="762.4" y="444.76" width="1" height="26" fill="rgba(255,255,255,0.08)"/>
+<path class="grow" style="animation-delay:880ms" d="M316 448.76h315.73a4 4 0 0 1 4 4v10a4 4 0 0 1 -4 4h-315.73z" fill="rgba(148,163,184,0.38)"/>
+<text class="mono fade" style="animation-delay:1430ms" x="643.73" y="462.26" font-size="12.8" font-weight="500" fill="#94a3b8">57.3%</text>
+<text class="mono" x="70" y="505.96" font-size="12" fill="#64748b">09</text>
+<text class="sans" x="302" y="506.76" font-size="14.4" font-weight="500" text-anchor="end" fill="#f1f5f9">Claude Computer Use</text>
+<rect x="316" y="488.76" width="1" height="26" fill="rgba(255,255,255,0.08)"/>
+<rect x="427.6" y="488.76" width="1" height="26" fill="rgba(255,255,255,0.08)"/>
+<rect x="539.2" y="488.76" width="1" height="26" fill="rgba(255,255,255,0.08)"/>
+<rect x="650.8" y="488.76" width="1" height="26" fill="rgba(255,255,255,0.08)"/>
+<rect x="762.4" y="488.76" width="1" height="26" fill="rgba(255,255,255,0.08)"/>
+<path class="grow" style="animation-delay:970ms" d="M316 492.76h310.15a4 4 0 0 1 4 4v10a4 4 0 0 1 -4 4h-310.15z" fill="rgba(148,163,184,0.38)"/>
+<text class="mono fade" style="animation-delay:1520ms" x="638.15" y="506.26" font-size="12.8" font-weight="500" fill="#94a3b8">56.3%</text>
+<text class="mono" x="70" y="549.96" font-size="12" fill="#64748b">10</text>
+<text class="sans" x="302" y="550.76" font-size="14.4" font-weight="500" text-anchor="end" fill="#f1f5f9">ACT-1 (Jul 2025)</text>
+<rect x="316" y="532.76" width="1" height="26" fill="rgba(255,255,255,0.08)"/>
+<rect x="427.6" y="532.76" width="1" height="26" fill="rgba(255,255,255,0.08)"/>
+<rect x="539.2" y="532.76" width="1" height="26" fill="rgba(255,255,255,0.08)"/>
+<rect x="650.8" y="532.76" width="1" height="26" fill="rgba(255,255,255,0.08)"/>
+<rect x="762.4" y="532.76" width="1" height="26" fill="rgba(255,255,255,0.08)"/>
+<path class="grow" style="animation-delay:1060ms" d="M316 536.76h251.01a4 4 0 0 1 4 4v10a4 4 0 0 1 -4 4h-251.01z" fill="rgba(148,163,184,0.38)"/>
+<text class="mono fade" style="animation-delay:1610ms" x="579.01" y="550.26" font-size="12.8" font-weight="500" fill="#94a3b8">45.7%</text>
+<text class="mono" x="316" y="584.66" font-size="11.2" text-anchor="middle" fill="#64748b">0%</text>
+<text class="mono" x="427.6" y="584.66" font-size="11.2" text-anchor="middle" fill="#64748b">20%</text>
+<text class="mono" x="539.2" y="584.66" font-size="11.2" text-anchor="middle" fill="#64748b">40%</text>
+<text class="mono" x="650.8" y="584.66" font-size="11.2" text-anchor="middle" fill="#64748b">60%</text>
+<text class="mono" x="762.4" y="584.66" font-size="11.2" text-anchor="middle" fill="#64748b">80%</text>
+<rect x="60" y="609.76" width="888" height="1" fill="rgba(255,255,255,0.08)"/>
+<text class="sans" x="60" y="640.46" font-size="12.48" fill="#64748b">FSB: <tspan fill="#ff6b35" text-decoration="underline">AI-reviewed result (277/300)</tspan>. Other values are transcribed from the leaderboard.</text>
+<text class="sans" x="60" y="663.18" font-size="12.48" fill="#64748b">Evaluation methods differ; numerical placement is illustrative, not an official leaderboard ranking.</text>
+<text class="mono" x="60" y="691.4" font-size="12" fill="#94a3b8">Tested on FSB v0.9.92 · MCP v0.11.2<tspan dx="10" font-style="italic">It only gets better</tspan><tspan dx="10" fill="#ff6b35" font-weight="700">;)</tspan></text>
+</svg>
