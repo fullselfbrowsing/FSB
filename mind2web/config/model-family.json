@@ -1,0 +1,15 @@
+{
+  "family": "claude",
+  "model": "claude-opus-5-5",
+  "effort": "medium",
+  "client_label": "Claude",
+  "judge_engine": "claude",
+  "judge_engine_class": "ClaudeCodeEngine",
+  "cli": {
+    "path": ".context/om2w/public-v1/toolchain/claude-2.1.302",
+    "version": "2.1.302 (Claude Code)",
+    "sha256": "5262ce9de86243fed0d21edc39b271555d56780d0112e2b194439fe1c6662d37"
+  },
+  "quota_headroom": { "five_hour": 0.9, "seven_day": 0.97 },
+  "circuit": ".context/om2w/public-v1/claude-circuit.json"
+}

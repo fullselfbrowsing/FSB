@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>FSB manual browser gate</title>
+  <style>
+    body { font: 15px system-ui; margin: 18px; color: #16354a; background: #edf4fa; }
+    main { max-width: 1000px; padding: 18px; background: white; border: 2px solid #235c86; }
+    h1 { margin: 0 0 8px; font-size: 24px; }
+    button, input, select { font: inherit; margin: 5px; padding: 7px; }
+    #controls { display: grid; grid-template-columns: repeat(3, minmax(180px, 1fr)); gap: 8px; }
+    #controls[hidden] { display: none; }
+    label { display: block; }
+    canvas { border: 2px solid #173e73; cursor: pointer; }
+    pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; }
+    #marker { font-weight: bold; background: #fff3ab; padding: 6px; }
+  </style>
+</head>
+<body><main>
+  <h1>FSB manual browser gate</h1>
+  <p id="marker"></p>
+  <button id="gate-click" aria-label="Gate click">Increment this tab</button>
+  <button id="gate-popup" aria-label="Gate popup">Open owned popup</button>
+  <section id="controls">
+    <div><label for="gate-text">Typed value</label><input id="gate-text" aria-label="Gate text" autocomplete="off"></div>
+    <form id="gate-form"><label for="gate-enter">Enter event</label><input id="gate-enter" aria-label="Gate Enter" autocomplete="off"></form>
+    <div><label for="gate-select">Selection</label><select id="gate-select" aria-label="Gate selection"><option value="red">Red</option><option value="blue">Blue</option></select></div>
+    <div><input id="gate-checkbox" type="checkbox" aria-label="Gate checkbox"><label for="gate-checkbox">Checked state</label></div>
+    <button id="gate-hover" aria-label="Gate hover">Hover target</button>
+    <button id="gate-read" aria-label="Gate read"></button>
+    <canvas id="gate-canvas" width="180" height="50" aria-label="Gate canvas"></canvas>
+    <button id="gate-churn" aria-label="Gate churn">Start DOM changes</button>
+  </section>
+  <svg id="gate-svg" width="28" height="28" aria-hidden="true"><circle cx="14" cy="14" r="12" fill="#247a4b"></circle></svg>
+  <p id="after-svg"></p>
+  <pre id="gate-state" aria-live="polite"></pre>
+  <span id="gate-tick"></span>
+</main>
+<script>
+  const parameters = new URLSearchParams(location.search);
+  const marker = parameters.get('marker');
+  const isolation = parameters.get('mode') === 'isolation';
+  const child = parameters.get('child') === '1';
+  const byId = id => document.getElementById(id);
+  const state = { marker, clicks: 0, typed: '', enters: 0, selected: 'red', checked: false,
+    hovered: 0, hover_synthetic: 0, hover_trusted: 0, canvas: 0, churn: false };
+  const render = () => { byId('gate-state').textContent = JSON.stringify(state); };
+  byId('marker').textContent = 'TASK MARKER ' + marker;
+  byId('after-svg').textContent = 'AFTER_SVG ' + marker;
+  byId('gate-read').textContent = 'READ_TEXT ' + marker;
+  byId('controls').hidden = isolation;
+  byId('gate-popup').hidden = child;
+  byId('gate-click').addEventListener('click', () => { state.clicks++; render(); });
+  byId('gate-text').addEventListener('input', event => { state.typed = event.target.value; render(); });
+  byId('gate-form').addEventListener('submit', event => event.preventDefault());
+  byId('gate-enter').addEventListener('keydown', event => {
+    if (event.key === 'Enter') { event.preventDefault(); state.enters++; render(); }
+  });
+  byId('gate-select').addEventListener('change', event => { state.selected = event.target.value; render(); });
+  byId('gate-checkbox').addEventListener('change', event => { state.checked = event.target.checked; render(); });
+  byId('gate-hover').addEventListener('mouseenter', event => {
+    state.hovered++;
+    if (event.isTrusted === false) state.hover_synthetic++;
+    if (event.isTrusted === true) state.hover_trusted++;
+    render();
+  });
+  byId('gate-canvas').addEventListener('click', () => { state.canvas++; render(); });
+  byId('gate-popup').addEventListener('click', () => {
+    const destination = new URL(location.href);
+    destination.searchParams.set('child', '1');
+    destination.searchParams.set('marker', marker + '-popup');
+    window.open(destination.href, '_blank');
+    byId('gate-popup').hidden = true;
+  });
+  byId('gate-churn').addEventListener('click', () => {
+    state.churn = true; render();
+    let tick = 0;
+    const timer = setInterval(() => { byId('gate-tick').textContent = 'DOM tick ' + ++tick; }, 60);
+    setTimeout(() => { clearInterval(timer); state.churn = false; render(); }, 12000);
+  });
+  const context = byId('gate-canvas').getContext('2d');
+  context.fillStyle = '#247a4b'; context.fillRect(0, 0, 180, 50);
+  context.fillStyle = 'white'; context.font = '16px system-ui'; context.fillText('Canvas click target', 12, 30);
+  render();
+</script>
+</body>
+</html>

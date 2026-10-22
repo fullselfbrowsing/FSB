@@ -1,0 +1,27 @@
+{
+  "sealed_at": "2026-10-22T05:49:57.071213+00:00",
+  "status": "finalized",
+  "files": {
+    "mind2web/FINAL-REPORT.md": "95fe106d4078aee57411a1d6f49ea8a067bc90922a4a49a3bc1606a01c1d463d",
+    "mind2web/results/final-review-20261022/FINAL-AUDIT.json": "9636fbc1dd49e750bacc636cdc83b7ba8db31858c0d28c7530df84c7314ffd40",
+    "mind2web/results/final-review-20261022/REPORT.md": "13ddf564b7f9a561011905947f2d7feea6cbe6c4131ace0702c6a722b230b29e",
+    "mind2web/results/final-review-20261022/SCORES.json": "227dfdf19dfc0f2a6877c17e6f4b16cd5b15661fed25ccac2489241d9d739897",
+    "mind2web/results/final-review-20261022/build_final.py": "7955e5707ce1e904e61f0734a285fc4e4718e68edef71b17b7894f041297b99f",
+    "mind2web/results/final-review-20261022/inputs/corrected-per-task.json": "c8e66a3a4ba6dbf22aecbca08f39d77985694e43b533515f0e88a8d3db581783",
+    "mind2web/results/final-review-20261022/inputs/corrected-scores.json": "c6b0ad25bb80632d678c15a5ce3193960042b4818b156f3611c43e9490fd249d",
+    "mind2web/results/final-review-20261022/inputs/dataset.json": "7dedf381531d423dc0fc48d21dc1d425655dd75f38b10211a880fa09102f257f",
+    "mind2web/results/final-review-20261022/inputs/manual-evidence-audit.json": "d32ab368b277929e3bd96a1ac59d9ac1562b8fd44d0e9dde30053ecddbfd4ec7",
+    "mind2web/results/final-review-20261022/inputs/manual-evidence-review.json": "52f464548871ad7ac45a7309628dcd28994d2da0fdcb4e82929f335f17694254",
+    "mind2web/results/final-review-20261022/inputs/manual-manifest.json": "4c896a49f7c955d5d211be6ac38bfb98f157de7021a361a18349fa0f29b1f663",
+    "mind2web/results/final-review-20261022/inputs/manual-reconnection.json": "50ad68613b51991ce52256ec5c5b55d085d73175ca319744ad96792a3eefeb90",
+    "mind2web/results/final-review-20261022/inputs/manual-results.json": "4897b952c53af6c587c457573720e59fa40e4804550fa2b28a59fe498a7d691f",
+    "mind2web/results/final-review-20261022/inputs/manual-resume-status.json": "bd90b32b09e31e76b4389de48f3ecd6ef04133f24f3f53aeb7fd2403b5b558c4",
+    "mind2web/results/final-review-20261022/inputs/prior-preservation-audit.json": "30e2e6b12abe5bfc89208974a4b2cbdef3c88c960e3ee0f8b529e1841c7a4f34",
+    "mind2web/results/final-review-20261022/per-task-final.csv": "47e92b2e61164726e174fe0b679189861f3d59941d0862cbcb4c3104e06afe79",
+    "mind2web/results/final-review-20261022/per-task-final.json": "32a0b924f00f1a793e150262e4719bcfc2d25f778d275528bfa2415f3e4a007e",
+    "mind2web/results/final-review-20261022/review-decisions.json": "c7254b3317d0d85216a117475813c7a918f4be27c2ab1e9a812ecc0ce83641bf",
+    "mind2web/results/final-review-20261022/review-manifest.json": "380492ea7c7081e705212cde99e6a0cc775011af042425b84f7f4a69b55128ea",
+    "mind2web/results/final-review-20261022/task-reviews.csv": "10091234174718a2a2b15a3786a656fcf0f693052c5d08f87ed17c79148e3643",
+    "mind2web/results/final-review-20261022/task-reviews.json": "e8e299d6e181737ecb0cd0b9dc48ef8d93536c24da0cc5fbf254aef1317557cf"
+  }
+}

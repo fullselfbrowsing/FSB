@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "status": "finalized",
+  "published_at": "2026-10-22T06:43:05.185314+00:00",
+  "primary_result": true,
+  "publication_label": "FSB benchmark — AI-reviewed",
+  "agent_label": "FSB",
+  "successes": 277,
+  "expected": 300,
+  "success_rate": 0.9233333333333333,
+  "score_type": "combined_task_verdicts",
+  "review_type": "AI-reviewed",
+  "reviewer": "Codex AI assistant",
+  "human_reviewed": false,
+  "review_is_blind": false,
+  "autonomous_benchmark_score": false,
+  "task_coverage": {
+    "retained_claude_majority_verdicts": 228,
+    "tasks_reassessed_by_ai": 72,
+    "supported_reassessments": 49,
+    "qualified_without_credit": 6,
+    "unmet_without_credit": 17
+  },
+  "source_scores": "mind2web/results/final-review-20261022/SCORES.json",
+  "source_scores_sha256": "227dfdf19dfc0f2a6877c17e6f4b16cd5b15661fed25ccac2489241d9d739897",
+  "methodology": "mind2web/results/benchmark-publication-20261022/METHODOLOGY.md",
+  "report": "mind2web/BENCHMARK-REPORT.md",
+  "by_difficulty": {
+    "easy": {
+      "expected": 80,
+      "retained": 69,
+      "manual_supported": 9,
+      "manual_qualified": 1,
+      "manual_not_met": 1,
+      "composite_supported": 78
+    },
+    "medium": {
+      "expected": 141,
+      "retained": 112,
+      "manual_supported": 21,
+      "manual_qualified": 1,
+      "manual_not_met": 7,
+      "composite_supported": 133
+    },
+    "hard": {
+      "expected": 79,
+      "retained": 47,
+      "manual_supported": 19,
+      "manual_qualified": 4,
+      "manual_not_met": 9,
+      "composite_supported": 66
+    }
+  },
+  "pending_evaluations": 0
+}
