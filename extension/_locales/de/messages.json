@@ -940,9 +940,6 @@
   "panel_43e3ece73f": {
     "message": "verbleibend"
   },
-  "panel_5ad3dbd124": {
-    "message": "Verstanden"
-  },
   "panel_c9b3c38247": {
     "message": "Summe"
   },
@@ -1017,12 +1014,6 @@
   },
   "panel_582ba53e9e": {
     "message": "Eingestellt in v0.9.45rc1 · April 2026"
-  },
-  "panel_daa7068396": {
-    "message": "Deine früheren Agenten"
-  },
-  "panel_3107f72f47": {
-    "message": "Namen der Agenten, die auf diesem Profil gelebt haben, damit nichts verloren wirkt. Die Definitionen bleiben in chrome.storage.local['bgAgents'] (unverändert)."
   },
   "panel_9f83a0b7bf": {
     "message": "Langzeitgedächtnis aus früheren Automatisierungssitzungen"
@@ -1639,12 +1630,6 @@
   "panel_160419ae70": {
     "message": "Zahlungsmethoden sind entsperrt."
   },
-  "panel_507fc32dc5": {
-    "message": "Agent bearbeiten"
-  },
-  "panel_fb25598ed0": {
-    "message": "Neuen Agenten erstellen"
-  },
   "panel_6c02a28421": {
     "message": "Wird getestet..."
   },
@@ -1732,7 +1717,7 @@
     "message": "In 17 Kategorien"
   },
   "entry_feat_tools": {
-    "message": "68 MCP-Werkzeuge"
+    "message": "69 MCP-Werkzeuge"
   },
   "entry_feat_tools_sub": {
     "message": "Von deinem Programmieragenten"
@@ -1759,7 +1744,7 @@
     "message": "Empfohlen"
   },
   "entry_agent_desc": {
-    "message": "Nutze FSB als MCP-Server in Claude Code, Cursor, VS Code, OpenClaw und weiteren. 68 Werkzeuge, kein API-Schlüssel, nichts im Browser einzurichten."
+    "message": "Nutze FSB als MCP-Server in Claude Code, Cursor, VS Code, OpenClaw und weiteren. 69 Werkzeuge, kein API-Schlüssel, nichts im Browser einzurichten."
   },
   "entry_in_browser": {
     "message": "In diesem Browser"
@@ -1807,7 +1792,7 @@
     "message": "FSB schreibt sich selbst in die MCP-Konfiguration deines Agenten."
   },
   "entry_mcp_2b": {
-    "message": "68 Werkzeuge"
+    "message": "69 Werkzeuge"
   },
   "entry_mcp_2c": {
     "message": ", kein manuelles JSON."
@@ -1923,7 +1908,7 @@
     "message": "Werkzeuge"
   },
   "entry_sum_68": {
-    "message": "68 verfügbar"
+    "message": "69 verfügbar"
   },
   "entry_sum_access": {
     "message": "Zugriff"
@@ -3335,9 +3320,6 @@
   },
   "copy_e4cdf160f5": {
     "message": "Hash-Schlüssel kopieren"
-  },
-  "copy_81f7adf295": {
-    "message": "Zuvor erstellte Hintergrundagenten"
   },
   "copy_8c16fe2070": {
     "message": "Wenn aktiviert, werden neue Speicher automatisch von der KI auf tiefere Erkenntnisse analysiert"

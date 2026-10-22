@@ -1,13 +1,11 @@
 /**
  * Phase 274 / STATS-04 + T-274-09 -- public-stats no-auth + no-cookie + no-PII.
  *
- * Mounts BOTH the auth-gated /api/stats handler AND the public /api/public-stats
- * router in the same Express app, then asserts:
+ * Mounts the public /api/public-stats router next to /api/auth in the same
+ * Express app, then asserts:
  *  - GET /api/public-stats/global with NO auth headers returns 200.
  *  - No Set-Cookie or WWW-Authenticate header on the public response.
- *  - GET /api/stats with NO auth header returns 401 (proves path-shadow safety:
- *    /api/public-stats and /api/stats are distinct namespaces).
- *  - Both endpoints' bodies (where applicable) carry no PII signatures.
+ *  - The public bodies carry no PII signatures.
  *
  * Run: node tests/server-public-stats-no-auth.test.js
  */
@@ -24,7 +22,6 @@ const cors = require(require.resolve('cors', { paths: [SERVER_NM] }));
 
 const { initializeDatabase } = require(path.join(__dirname, '..', 'showcase', 'server', 'src', 'db', 'schema'));
 const Queries = require(path.join(__dirname, '..', 'showcase', 'server', 'src', 'db', 'queries'));
-const authMiddleware = require(path.join(__dirname, '..', 'showcase', 'server', 'src', 'middleware', 'auth'));
 const createAuthRouter = require(path.join(__dirname, '..', 'showcase', 'server', 'src', 'routes', 'auth'));
 const createPublicStatsRouter = require(path.join(__dirname, '..', 'showcase', 'server', 'src', 'routes', 'public-stats'));
 const activeTracker = require(path.join(__dirname, '..', 'showcase', 'server', 'src', 'telemetry', 'active-tracker'));
@@ -41,13 +38,8 @@ const app = express();
 app.use(cors({ origin: true, credentials: true, exposedHeaders: ['X-FSB-Hash-Key'] }));
 app.use(express.json());
 
-// Mount /api/auth + auth-gated /api/stats + public /api/public-stats in the same
-// app so we can verify they don't shadow each other.
+// Mount /api/auth next to the public /api/public-stats router, as server.js does.
 app.use('/api/auth', createAuthRouter(queries));
-const auth = authMiddleware(queries);
-app.use('/api/stats', auth, (req, res) => {
-  res.json(queries.getAgentStats(req.hashKey));
-});
 app.use('/api/public-stats', createPublicStatsRouter(db, queries));
 
 const server = http.createServer(app).listen(0);
@@ -89,16 +81,8 @@ function rawGet(path_, extraHeaders = {}) {
   check('Public response has NO WWW-Authenticate header',
     pub.headers['www-authenticate'] === undefined, `got ${pub.headers['www-authenticate']}`);
 
-  // --- 2. AUTH-GATED endpoint with NO auth header -> 401. ---
-  const auth401 = await rawGet('/api/stats');
-  check('GET /api/stats (no auth) -> 401 (path-shadow safety)', auth401.statusCode === 401,
-    `got ${auth401.statusCode} body=${auth401.body}`);
-
-  // --- 3. Confirm /api/public-stats does NOT accidentally satisfy the auth gate either.
-  //        Path shape: /api/public-stats/global vs /api/stats. Exact-prefix routing
-  //        means /api/stats does NOT match /api/public-stats/global. Repeat the
-  //        public GET with the same headers a typical browser would carry to ensure
-  //        no quirk pops up. ---
+  // --- 3. Repeat the public GET with the headers a typical browser would carry
+  //        to make sure no quirk pops up. ---
   const pub2 = await rawGet('/api/public-stats/global', {
     'Accept': 'application/json',
     'User-Agent': 'Mozilla/5.0 (test)',
@@ -135,14 +119,6 @@ function rawGet(path_, extraHeaders = {}) {
     pubAdvers.statusCode === 200, `got ${pubAdvers.statusCode}`);
   check('Public route does NOT leak Authorization back as Set-Cookie',
     pubAdvers.headers['set-cookie'] === undefined, `got ${JSON.stringify(pubAdvers.headers['set-cookie'])}`);
-
-  // --- 7. Verify request path /api/public-stats does NOT cross-match /api/stats. ---
-  // Try a deliberate prefix-walk: ensure /api/public-stats does NOT match the auth-gated handler.
-  const crossPrefix = await rawGet('/api/public-stats');
-  // The router has no root handler so Express returns 404. Anything other than
-  // 401 means the auth gate didn't fire on /api/public-stats.
-  check('GET /api/public-stats (no auth, no inner route) -> NOT 401',
-    crossPrefix.statusCode !== 401, `got ${crossPrefix.statusCode}`);
 
   server.close();
   db.close();

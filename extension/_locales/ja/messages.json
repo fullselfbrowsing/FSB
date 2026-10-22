@@ -940,9 +940,6 @@
   "panel_43e3ece73f": {
     "message": "残り"
   },
-  "panel_5ad3dbd124": {
-    "message": "了解"
-  },
   "panel_c9b3c38247": {
     "message": "合計"
   },
@@ -1017,12 +1014,6 @@
   },
   "panel_582ba53e9e": {
     "message": "v0.9.45rc1 で退役 · 2026年4月"
-  },
-  "panel_daa7068396": {
-    "message": "以前のエージェント"
-  },
-  "panel_3107f72f47": {
-    "message": "このプロファイルにいたエージェントの名前を、失われないように残しています。定義は chrome.storage.local['bgAgents'] にそのままあります。"
   },
   "panel_9f83a0b7bf": {
     "message": "過去の自動化セッションから学んだ長期メモリ"
@@ -1639,12 +1630,6 @@
   "panel_160419ae70": {
     "message": "支払い方法のロックは解除されています。"
   },
-  "panel_507fc32dc5": {
-    "message": "エージェントを編集"
-  },
-  "panel_fb25598ed0": {
-    "message": "新しいエージェントを作成"
-  },
   "panel_6c02a28421": {
     "message": "テスト中..."
   },
@@ -1732,7 +1717,7 @@
     "message": "17 カテゴリにわたります"
   },
   "entry_feat_tools": {
-    "message": "68 個の MCP ツール"
+    "message": "69 個の MCP ツール"
   },
   "entry_feat_tools_sub": {
     "message": "コーディングエージェントから"
@@ -1759,7 +1744,7 @@
     "message": "推奨"
   },
   "entry_agent_desc": {
-    "message": "Claude Code、Cursor、VS Code、OpenClaw などで FSB を MCP サーバーとして使います。ツール 68 個、API キー不要、ブラウザの設定も不要です。"
+    "message": "Claude Code、Cursor、VS Code、OpenClaw などで FSB を MCP サーバーとして使います。ツール 69 個、API キー不要、ブラウザの設定も不要です。"
   },
   "entry_in_browser": {
     "message": "このブラウザで"
@@ -1807,7 +1792,7 @@
     "message": "FSB はエージェントの MCP 設定へ自分を書き込みます。"
   },
   "entry_mcp_2b": {
-    "message": "ツール 68 個"
+    "message": "ツール 69 個"
   },
   "entry_mcp_2c": {
     "message": "、手動の JSON は不要です。"
@@ -1923,7 +1908,7 @@
     "message": "ツール"
   },
   "entry_sum_68": {
-    "message": "68 個が利用可能"
+    "message": "69 個が利用可能"
   },
   "entry_sum_access": {
     "message": "アクセス"
@@ -3335,9 +3320,6 @@
   },
   "copy_e4cdf160f5": {
     "message": "ハッシュキーをコピー"
-  },
-  "copy_81f7adf295": {
-    "message": "以前作成したバックグラウンドエージェント"
   },
   "copy_8c16fe2070": {
     "message": "有効にすると、新しいメモリが AI によって自動分析され、より深い洞察が得られます"

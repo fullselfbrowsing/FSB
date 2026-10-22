@@ -8,7 +8,7 @@ The independently published `fsb-mcp-server` npm package keeps its own semver ch
 
 ## v0.9.95 — Multilingual Extension Interface and Official Cline Support — 2026-10-18
 
-The extension, showcase, skill, documentation, and store metadata align at `0.9.95`. The independently versioned `fsb-mcp-server` advances to `0.11.5` with the accompanying Cline installer fix; see [`mcp/CHANGELOG.md`](./mcp/CHANGELOG.md) for its package-specific release notes and compatibility requirements. The language work leaves MCP tool schemas and bridge messages unchanged.
+The extension, showcase, skill, documentation, and store metadata align at `0.9.95`. The independently versioned `fsb-mcp-server` advances to `0.11.5` with the accompanying Cline installer fix and the removal of three dead tools; see [`mcp/CHANGELOG.md`](./mcp/CHANGELOG.md) for its package-specific release notes and compatibility requirements. The language work leaves MCP tool schemas and bridge messages unchanged.
 
 ### Added
 
@@ -27,6 +27,13 @@ The extension, showcase, skill, documentation, and store metadata align at `0.9.
 - The Grok Bot plugin launches `fsb-mcp-server@0.11.5` and sends `client: "Grok Bot"`; it previously pinned 0.11.0 and sent `client: "Grok"`.
 - The extension's own autopilot uses the client label `Autopilot` instead of `FSB Autopilot`, so its page overlay badge reads "Autopilot".
 - Windsurf is no longer an install target or an allowed `client` label, and its default-model cost row is gone. The telemetry server still accepts Windsurf from extensions older than 0.9.95.
+- Every published MCP tool count now says 69 and is checked against the built server, so the README, onboarding, showcase and `llms` figures can no longer disagree.
+
+### Removed
+
+- **What background agents left behind.** Background agents were retired in v0.9.45rc1, but their saved definitions stayed in `chrome.storage.local['bgAgents']` and several thousand lines of commented-out agent code stayed in the extension and both dashboards. When the extension updates, it now deletes `bgAgents`, the `fsb_sync_queue` sync queue and any scheduled `fsb_agent_*` alarms. The control-panel list of old agent names, the commented-out code, and the unused `executeAutomationTask` entry point are gone.
+- **Agent sync endpoints on the server.** `/api/agents` and the agent-only `/api/stats` route are removed from `showcase/server`, and the agents, stats and SSE routers from `server-py`. The `agents` and `agent_runs` tables are kept, so previously synced rows are untouched.
+- **Three MCP tools.** `start_visual_session`, `end_visual_session` and `back` are no longer registered, leaving 69 tools; see [`mcp/CHANGELOG.md`](./mcp/CHANGELOG.md).
 
 ### Unchanged
 

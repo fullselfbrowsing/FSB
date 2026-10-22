@@ -940,9 +940,6 @@
   "panel_43e3ece73f": {
     "message": "restantes"
   },
-  "panel_5ad3dbd124": {
-    "message": "Entendido"
-  },
   "panel_c9b3c38247": {
     "message": "En total"
   },
@@ -1017,12 +1014,6 @@
   },
   "panel_582ba53e9e": {
     "message": "Retirado en v0.9.45rc1 · abril de 2026"
-  },
-  "panel_daa7068396": {
-    "message": "Tus agentes anteriores"
-  },
-  "panel_3107f72f47": {
-    "message": "Nombres de los agentes que vivieron en este perfil, conservados para que nada parezca perdido. Las definiciones siguen en chrome.storage.local['bgAgents'] (sin cambios)."
   },
   "panel_9f83a0b7bf": {
     "message": "Memoria a largo plazo aprendida de sesiones de automatización anteriores"
@@ -1639,12 +1630,6 @@
   "panel_160419ae70": {
     "message": "Los métodos de pago están desbloqueados."
   },
-  "panel_507fc32dc5": {
-    "message": "Editar agente"
-  },
-  "panel_fb25598ed0": {
-    "message": "Crear agente nuevo"
-  },
   "panel_6c02a28421": {
     "message": "Probando..."
   },
@@ -1732,7 +1717,7 @@
     "message": "En 17 categorías"
   },
   "entry_feat_tools": {
-    "message": "68 herramientas MCP"
+    "message": "69 herramientas MCP"
   },
   "entry_feat_tools_sub": {
     "message": "Desde tu agente de código"
@@ -1759,7 +1744,7 @@
     "message": "Recomendado"
   },
   "entry_agent_desc": {
-    "message": "Usa FSB como servidor MCP en Claude Code, Cursor, VS Code, OpenClaw y más. 68 herramientas, sin clave de API y sin configurar nada en el navegador."
+    "message": "Usa FSB como servidor MCP en Claude Code, Cursor, VS Code, OpenClaw y más. 69 herramientas, sin clave de API y sin configurar nada en el navegador."
   },
   "entry_in_browser": {
     "message": "En este navegador"
@@ -1807,7 +1792,7 @@
     "message": "FSB se escribe solo en la configuración MCP de tu agente."
   },
   "entry_mcp_2b": {
-    "message": "68 herramientas"
+    "message": "69 herramientas"
   },
   "entry_mcp_2c": {
     "message": ", sin JSON manual."
@@ -1923,7 +1908,7 @@
     "message": "Herramientas"
   },
   "entry_sum_68": {
-    "message": "68 disponibles"
+    "message": "69 disponibles"
   },
   "entry_sum_access": {
     "message": "Acceso"
@@ -3335,9 +3320,6 @@
   },
   "copy_e4cdf160f5": {
     "message": "Copiar clave hash"
-  },
-  "copy_81f7adf295": {
-    "message": "Agentes en segundo plano creados antes"
   },
   "copy_8c16fe2070": {
     "message": "Si está activado, la IA analiza automáticamente las memorias nuevas para obtener información más profunda"

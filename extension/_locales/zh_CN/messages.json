@@ -940,9 +940,6 @@
   "panel_43e3ece73f": {
     "message": "剩余"
   },
-  "panel_5ad3dbd124": {
-    "message": "知道了"
-  },
   "panel_c9b3c38247": {
     "message": "合计"
   },
@@ -1017,12 +1014,6 @@
   },
   "panel_582ba53e9e": {
     "message": "已在 v0.9.45rc1 停用 · 2026 年 4 月"
-  },
-  "panel_daa7068396": {
-    "message": "你以前的代理"
-  },
-  "panel_3107f72f47": {
-    "message": "曾在此配置中的代理名称保留在这里，以免感觉丢失。定义仍在 chrome.storage.local['bgAgents']（未改动）。"
   },
   "panel_9f83a0b7bf": {
     "message": "从过往自动化会话中学到的长期记忆"
@@ -1639,12 +1630,6 @@
   "panel_160419ae70": {
     "message": "付款方式已解锁。"
   },
-  "panel_507fc32dc5": {
-    "message": "编辑代理"
-  },
-  "panel_fb25598ed0": {
-    "message": "创建新代理"
-  },
   "panel_6c02a28421": {
     "message": "正在测试..."
   },
@@ -1732,7 +1717,7 @@
     "message": "覆盖 17 个类别"
   },
   "entry_feat_tools": {
-    "message": "68 个 MCP 工具"
+    "message": "69 个 MCP 工具"
   },
   "entry_feat_tools_sub": {
     "message": "来自你的编程代理"
@@ -1759,7 +1744,7 @@
     "message": "推荐"
   },
   "entry_agent_desc": {
-    "message": "在 Claude Code、Cursor、VS Code、OpenClaw 等中把 FSB 用作 MCP 服务器。68 个工具，无需 API 密钥，浏览器里不用配置。"
+    "message": "在 Claude Code、Cursor、VS Code、OpenClaw 等中把 FSB 用作 MCP 服务器。69 个工具，无需 API 密钥，浏览器里不用配置。"
   },
   "entry_in_browser": {
     "message": "在此浏览器中"
@@ -1807,7 +1792,7 @@
     "message": "FSB 会把自己写入代理的 MCP 配置。"
   },
   "entry_mcp_2b": {
-    "message": "68 个工具"
+    "message": "69 个工具"
   },
   "entry_mcp_2c": {
     "message": "，无需手写 JSON。"
@@ -1923,7 +1908,7 @@
     "message": "工具"
   },
   "entry_sum_68": {
-    "message": "68 个可用"
+    "message": "69 个可用"
   },
   "entry_sum_access": {
     "message": "访问"
@@ -3335,9 +3320,6 @@
   },
   "copy_e4cdf160f5": {
     "message": "复制哈希密钥"
-  },
-  "copy_81f7adf295": {
-    "message": "先前创建的后台代理"
   },
   "copy_8c16fe2070": {
     "message": "启用后，新记忆会由 AI 自动分析以获得更深入的见解"

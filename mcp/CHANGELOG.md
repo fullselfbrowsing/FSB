@@ -6,7 +6,7 @@ All notable changes to `fsb-mcp-server` are documented in this file. Each entry 
 
 ## 0.11.5 (2026-10-18)
 
-Patch release making Cline and Antigravity officially supported install targets, released alongside FSB extension 0.9.95.
+Patch release making Cline and Antigravity officially supported install targets and removing three tools that did nothing useful, released alongside FSB extension 0.9.95.
 
 ### Fixed
 
@@ -20,10 +20,16 @@ Patch release making Cline and Antigravity officially supported install targets,
 - `setup` prints a Cline section with the settings path and entry.
 - **`install --antigravity` replaces `install --windsurf`.** It writes `~/.gemini/config/mcp_config.json`, the global file current Antigravity releases read, and falls back to `~/.gemini/antigravity/mcp_config.json` for older releases when `~/.gemini/config` does not exist. `setup` prints an Antigravity section in place of Windsurf's. `--windsurf` is no longer a flag, and `install --all` and `uninstall --all` no longer touch Windsurf configs; an `fsb` entry already in one keeps working until it is removed by hand.
 - Action tools accept `Muse`, `Grok Bot`, and `Dots` as `client` labels and no longer accept `Windsurf`.
+- Every published tool count (both READMEs, extension onboarding, showcase pages and their translations, and the `llms` files) is now checked against the tools the built server actually registers. `tests/mcp-version-parity.test.js` fails when any of them disagrees, so the count can no longer drift.
+
+### Removed
+
+- **`start_visual_session`, `end_visual_session` and `back` are no longer registered.** The two visual-session tools have only returned a `TOOL_REMOVED` error since 0.9.0, and `back` duplicated `go_back`. The server now registers 69 tools. A client that still calls one of these names gets its MCP host's unknown-tool error; use `go_back` for history navigation.
+- The `TOOL_REMOVED` typed error is gone along with the stubs that returned it.
 
 ### Compatibility and update
 
-- Server identity, capabilities, tool schemas, bridge contracts, and dependency versions are unchanged. The installer, its `setup` guidance, and the accepted `client` labels changed. Pair it with FSB extension 0.9.95, which adds Cline and Antigravity to onboarding, labels their sessions, and accepts the same client labels.
+- Server identity, capabilities, bridge contracts, and dependency versions are unchanged, and so are the schemas of the 69 tools that remain. `start_visual_session`, `end_visual_session`, and `back` are no longer registered (see Removed); use `go_back` in place of `back`. The installer, its `setup` guidance, and the accepted `client` labels changed. Pair it with FSB extension 0.9.95, which adds Cline and Antigravity to onboarding, labels their sessions, and accepts the same client labels.
 - Cline users who installed with an earlier version should rerun `npx -y fsb-mcp-server@latest install --cline` so FSB lands in the shared settings file.
 - Merging this release into `main` automatically publishes `fsb-mcp-server@0.11.5` and creates the `mcp-v0.11.5` GitHub release. Later main pushes skip publication when the MCP version is already on npm; explicit MCP release tags remain supported.
 

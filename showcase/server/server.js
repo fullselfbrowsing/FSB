@@ -13,7 +13,6 @@ const { initializeDatabase } = require('./src/db/schema');
 const Queries = require('./src/db/queries');
 const authMiddleware = require('./src/middleware/auth');
 const createAuthRouter = require('./src/routes/auth');
-const createAgentsRouter = require('./src/routes/agents');
 const createPairRouter = require('./src/routes/pair');
 const { setupWSHandler } = require('./src/ws/handler');
 const { RELAY_PER_MESSAGE_LIMIT_BYTES } = require('./src/ws/phantomstream-relay-compat');
@@ -117,20 +116,11 @@ app.use('/api/auth', createAuthRouter(queries));
 
 // Routes - protected (require hash key)
 const auth = authMiddleware(queries);
-app.use('/api/agents', auth, createAgentsRouter(queries));
 app.use('/api/pair', createPairRouter(queries, auth));
-app.use('/api/stats', auth, (req, res) => {
-  try {
-    const stats = queries.getAgentStats(req.hashKey);
-    res.json(stats);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
 
 // Phase 273 / INGEST-01..13 -- anonymous telemetry ingest (PUBLIC, no auth).
 // Mount order: AFTER trust-proxy line (top of file), AFTER existing routes
-// (no path overlap with /api/auth /api/agents /api/pair /api/stats),
+// (no path overlap with /api/auth /api/pair),
 // BEFORE static-file middleware so the static handler doesn't shadow /api/telemetry/*.
 const createTelemetryRouter = require('./src/routes/telemetry');
 const { hashIp } = require('./src/utils/telemetry-hash');

@@ -88,7 +88,7 @@ Want to run FSB standalone from the extension popup/side panel? Open settings, p
 - Includes secure credential and payment vault flows for supervised autofill.
 - Exposes a local MCP server so Claude Code, Codex, Cursor, VS Code, Antigravity, Cline, and other MCP clients can drive the browser.
 
-Background agents are retired. Existing `chrome.storage.local['bgAgents']` data is preserved for users who had old agents, but scheduled or recurring automation is no longer an active FSB feature.
+Background agents were removed in v0.9.45rc1. When the extension updates, it deletes the saved agent definitions and alarms they left behind. For scheduled or recurring work, use [OpenClaw](https://github.com/openclaw/openclaw) or [Claude Routines](https://www.anthropic.com/claude/routines).
 
 ### Common Use Cases
 
@@ -278,7 +278,7 @@ The extension reads bundled scripts directly from `extension/`. The MCP package 
 
 ## MCP Server
 
-FSB ships [`fsb-mcp-server`](https://www.npmjs.com/package/fsb-mcp-server), a local MCP server that lets external AI clients control the same browser extension. It exposes 69 registered tools across visual sessions, trigger watchers, manual browser control, Developer/UAT capture, capability search/invoke, read-only page inspection, autopilot, vault, and observability.
+FSB ships [`fsb-mcp-server`](https://www.npmjs.com/package/fsb-mcp-server), a local MCP server that lets external AI clients control the same browser extension. It exposes 69 registered tools across autopilot, trigger watchers, manual browser control, read-only page inspection, task outcome reporting, Developer/UAT capture, capability search/invoke, observability, and vault.
 
 The extension connects to the MCP bridge on:
 
@@ -442,11 +442,11 @@ The MCP server exposes a curated public surface around that registry plus direct
 
 | Surface | Count | Examples |
 |---------|-------|----------|
-| Visual sessions | 2 | `start_visual_session`, `end_visual_session` |
-| Autopilot and agent navigation | 4 | `run_task`, `stop_task`, `get_task_status`, `back` |
+| Autopilot | 3 | `run_task`, `stop_task`, `get_task_status` |
 | Trigger watchers | 4 | `trigger`, `stop_trigger`, `get_trigger_status`, `list_triggers` |
 | Manual control | 37 | `execute_js`, `navigate`, `click`, `type_text`, `drag`, `upload_file` |
 | Read-only inspection | 8 | `read_page`, `get_dom_snapshot`, `get_site_guide`, `read_sheet` |
+| Task outcome | 3 | `complete_task`, `partial_task`, `fail_task` |
 | Developer / UAT | 1 | `capture_screenshot` |
 | Capabilities | 2 | `search_capabilities`, `invoke_capability` |
 | Observability and replay | 7 | `list_sessions`, `get_session_replay`, `replay_session` |

@@ -17,7 +17,7 @@
 
 *Manual browser tools, capabilities, trigger watchers, visual sessions, autopilot, vault, and observability for the FSB Chrome Extension.*
 
-[Quick Start](#quick-start) · [Trigger Watchers](#trigger-watchers) · [Tools](#tools-69-total) · [Diagnostics](#diagnostics) · [Architecture](#architecture)
+[Quick Start](#quick-start) · [Trigger Watchers](#trigger-watchers) · [Tools](#tools) · [Diagnostics](#diagnostics) · [Architecture](#architecture)
 
 </div>
 
@@ -43,6 +43,7 @@ Use this package when you want your AI client to drive the browser directly whil
 - `install --cline` writes `~/.cline/data/settings/cline_mcp_settings.json`, the settings file Cline's VS Code extension, JetBrains plugin, and CLI share. Earlier versions wrote a VS Code extension-storage file that current Cline ignores after its one-time import, so rerun the install if FSB never appeared in Cline.
 - Cline entries set `timeout: 1800` (seconds) so long `run_task` calls are not cut off by Cline's fixed 60-second request timeout.
 - Reinstalling keeps the `timeout`, `disabled`, and `autoApprove` settings Cline stores on the `fsb` entry.
+- `start_visual_session`, `end_visual_session`, and `back` are no longer registered, so the server lists 69 tools. Use `go_back` in place of `back`.
 - **Compatibility:** `fsb-mcp-server` 0.11.5 requires FSB extension 0.9.95 or newer for `mcp:task-status`. Upgrade the extension and restart the MCP host together.
 
 ### What's New In v0.11.2
@@ -112,7 +113,7 @@ This is the FSB v0.9.60 milestone release. The headline change is the new multi-
 - Secure vault tools that avoid sending raw secrets over the bridge.
 - One-command installer coverage for 21 platforms.
 
-Background-agent MCP tools were retired with the extension's background-agent sunset. The agent registrar now only exposes `back` for ownership-gated history navigation.
+Background-agent MCP tools were retired with the extension's background-agent sunset. The last tool left in that module, `back`, duplicated `go_back` and has been removed.
 
 ---
 
@@ -375,7 +376,7 @@ Move to a normal `http` or `https` page before calling DOM tools such as `read_p
 
 ## Visual Session Lifecycle
 
-> **v0.9.0 breaking change** -- The explicit `start_visual_session` and `end_visual_session` tools were REMOVED in v0.9.0. Action tools now require `visual_reason` + `client` fields; the visual session is created implicitly on the first action call, refreshed on a sliding 60-second window, and cleared by `is_final: true` (immediate) or 60 seconds of silence (auto-clear). Calling the removed tools returns the typed `TOOL_REMOVED` error. See [CHANGELOG.md](./CHANGELOG.md#v0.9.0) for the migration recipe with concrete before/after code.
+> **v0.9.0 breaking change** -- The explicit `start_visual_session` and `end_visual_session` tools were REMOVED in v0.9.0. Action tools now require `visual_reason` + `client` fields; the visual session is created implicitly on the first action call, refreshed on a sliding 60-second window, and cleared by `is_final: true` (immediate) or 60 seconds of silence (auto-clear). The two names are no longer registered at all, so they do not appear in `tools/list`. See [CHANGELOG.md](./CHANGELOG.md#v0.9.0) for the migration recipe with concrete before/after code.
 
 Use the implicit visual session when your MCP client controls the browser and you still want FSB's visible trusted overlay. The session is per-tab and per-agent; the v0.9.60 ownership gate (`TAB_NOT_OWNED`) fires before any session state is touched.
 
@@ -393,7 +394,7 @@ type_text(selector="#email", text="user@example.com", visual_reason="Complete ch
 
 If the task ends without an explicit `is_final: true` signal, the overlay auto-clears after 60 seconds of no further carrying action calls. Read-only tools (`read_page`, `get_dom_snapshot`, `get_text`, ...) do NOT carry the field bundle and do NOT re-arm the sliding window -- reads stay silent by design.
 
-Calling the removed `start_visual_session` or `end_visual_session` tools by name returns the typed `TOOL_REMOVED` error whose body names the new contract and points at this CHANGELOG entry. See `mcp/CHANGELOG.md` v0.9.0 for the full migration recipe and the typed-error catalogue (`VISUAL_FIELDS_REQUIRED`, `BADGE_NOT_ALLOWED`, `TOOL_REMOVED`).
+A client that still calls `start_visual_session` or `end_visual_session` gets its MCP host's unknown-tool error. See `mcp/CHANGELOG.md` v0.9.0 for the full migration recipe and the typed-error catalogue (`VISUAL_FIELDS_REQUIRED`, `BADGE_NOT_ALLOWED`).
 
 Use `run_task` only when the user explicitly wants FSB autopilot to decide and execute the steps -- autopilot manages its own overlay lifecycle internally and is NOT affected by the v0.9.0 implicit-contract change.
 
@@ -487,15 +488,9 @@ There is no idle timeout. An idle agent keeps its tab indefinitely until one of 
 - If the bridge cannot recover after eviction, the server resolves `run_task` with a structured `partial_outcome` whose `disposition` is `'sw_evicted'`. The hint string is the literal `lifecycle event missing -- audit cleanup paths`.
 - The agent registry mirrors to `chrome.storage.session` write-through; on SW wake, `hydrate()` reconciles persisted records against `chrome.tabs.query()` and reaps ghost records before servicing any request.
 
-### `back` tool
+### Going back in history
 
-The new ownership-gated `back` tool is the typed replacement for `execute_js("history.back()")`. It returns:
-
-```text
-{ status, resultingUrl, historyDepth }
-```
-
-where `status` is one of `ok`, `no_history`, `cross_origin`, `bf_cache`, `fragment_only`. Settle verification uses `pageshow` with a 2s timeout; cross-origin transitions reuse the v0.9.11 BF-cache resilience path to re-inject the content script. The tool is background-tab compatible and does not steal focus.
+Use `go_back` and `go_forward`. Both are ownership-gated, run on background tabs without stealing focus, and return the resulting URL. The separate `back` tool, which duplicated `go_back`, has been removed.
 
 ### Background-tab execution
 
@@ -503,23 +498,17 @@ Most tools execute on background tabs without stealing focus. Tools that genuine
 
 ---
 
-## Tools (69 Total)
+## Tools
 
-### Visual Sessions (2)
+`fsb-mcp-server` registers 69 tools.
 
-| Tool | Purpose |
-|------|---------|
-| `start_visual_session` | Removed in v0.9.0 -- see Visual Session Lifecycle section. Calling returns `TOOL_REMOVED`. |
-| `end_visual_session` | Removed in v0.9.0 -- see Visual Session Lifecycle section. Calling returns `TOOL_REMOVED`. |
-
-### Autopilot And Agent Navigation (4)
+### Autopilot (3)
 
 | Tool | Purpose |
 |------|---------|
 | `run_task` | Let FSB's AI perform a natural language browser task end to end. |
 | `stop_task` | Cancel the active automation task. |
 | `get_task_status` | Check task progress, phase, and ETA. |
-| `back` | Single-step browser-history back, ownership-gated. Returns `{ status, resultingUrl, historyDepth }`. |
 
 ### Trigger Watchers (4)
 
@@ -562,6 +551,14 @@ Notes:
 | `get_site_guide` | Retrieve site-specific automation guidance. |
 | `list_tabs` | List open tabs. |
 | `read_sheet` | Read spreadsheet ranges. |
+
+### Task Outcome (3)
+
+| Tool | Purpose |
+|------|---------|
+| `complete_task` | Report that the task is fully done, with a summary. |
+| `partial_task` | Report useful work that an external blocker stopped short of the final step. |
+| `fail_task` | Report that the task cannot be completed, and why. |
 
 ### Developer / UAT (1)
 
@@ -607,7 +604,7 @@ Vault responses expose metadata only. Passwords, full card numbers, and CVV valu
 
 ### Tool Count Contract
 
-The public count is intentionally based on registered MCP handlers, not every internal helper in the extension. The extension's canonical registry also contains task-lifecycle signals and internal context tools used by the browser runtime. The MCP README documents the tool surface an MCP client can call.
+The public count is intentionally based on registered MCP handlers, not every internal helper in the extension. The extension's canonical registry also contains task-lifecycle signals and internal context tools used by the browser runtime. The MCP README documents the tool surface an MCP client can call. `tests/mcp-version-parity.test.js` counts the tools the built server registers and fails when any published count disagrees.
 
 ---
 
@@ -698,7 +695,7 @@ Contract-sensitive changes should be covered by tests before publishing:
 - restricted-tab recovery messages
 - visual-session token lifecycle
 - vault redaction boundaries
-- multi-agent contract: `agent_id` capture, ownership gate, configurable cap, ownership tokens, `back` tool
+- multi-agent contract: `agent_id` capture, ownership gate, configurable cap, ownership tokens
 - trigger contract: `trigger`, `stop_trigger`, `get_trigger_status`, `list_triggers`, blocking/detached reporting, and local browser-open limits
 - terminal task-outcome contract: `mcp:task-status`, agent/ownership context, serialized lifecycle ordering, and `fail_task` acknowledgement semantics
 

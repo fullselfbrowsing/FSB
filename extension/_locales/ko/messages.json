@@ -940,9 +940,6 @@
   "panel_43e3ece73f": {
     "message": "남음"
   },
-  "panel_5ad3dbd124": {
-    "message": "확인"
-  },
   "panel_c9b3c38247": {
     "message": "합계"
   },
@@ -1017,12 +1014,6 @@
   },
   "panel_582ba53e9e": {
     "message": "v0.9.45rc1에서 종료 · 2026년 4월"
-  },
-  "panel_daa7068396": {
-    "message": "이전 에이전트"
-  },
-  "panel_3107f72f47": {
-    "message": "이 프로필에 있던 에이전트 이름을 잃지 않도록 남겨 둡니다. 정의는 chrome.storage.local['bgAgents']에 그대로 있습니다."
   },
   "panel_9f83a0b7bf": {
     "message": "지난 자동화 세션에서 배운 장기 메모리"
@@ -1639,12 +1630,6 @@
   "panel_160419ae70": {
     "message": "결제 수단 잠금이 해제되었습니다."
   },
-  "panel_507fc32dc5": {
-    "message": "에이전트 편집"
-  },
-  "panel_fb25598ed0": {
-    "message": "새 에이전트 만들기"
-  },
   "panel_6c02a28421": {
     "message": "테스트 중..."
   },
@@ -1732,7 +1717,7 @@
     "message": "17개 범주에 걸쳐 있습니다"
   },
   "entry_feat_tools": {
-    "message": "MCP 도구 68개"
+    "message": "MCP 도구 69개"
   },
   "entry_feat_tools_sub": {
     "message": "코딩 에이전트에서"
@@ -1759,7 +1744,7 @@
     "message": "권장"
   },
   "entry_agent_desc": {
-    "message": "Claude Code, Cursor, VS Code, OpenClaw 등에서 FSB를 MCP 서버로 사용합니다. 도구 68개, API 키 없음, 브라우저 설정 없음."
+    "message": "Claude Code, Cursor, VS Code, OpenClaw 등에서 FSB를 MCP 서버로 사용합니다. 도구 69개, API 키 없음, 브라우저 설정 없음."
   },
   "entry_in_browser": {
     "message": "이 브라우저에서"
@@ -1807,7 +1792,7 @@
     "message": "FSB가 에이전트의 MCP 구성에 자신을 기록합니다."
   },
   "entry_mcp_2b": {
-    "message": "도구 68개"
+    "message": "도구 69개"
   },
   "entry_mcp_2c": {
     "message": ", 수동 JSON은 없습니다."
@@ -1923,7 +1908,7 @@
     "message": "도구"
   },
   "entry_sum_68": {
-    "message": "68개 사용 가능"
+    "message": "69개 사용 가능"
   },
   "entry_sum_access": {
     "message": "접근"
@@ -3335,9 +3320,6 @@
   },
   "copy_e4cdf160f5": {
     "message": "해시 키 복사"
-  },
-  "copy_81f7adf295": {
-    "message": "이전에 만든 백그라운드 에이전트"
   },
   "copy_8c16fe2070": {
     "message": "사용하면 새 메모리가 AI에 의해 자동으로 분석되어 더 깊은 인사이트를 얻습니다"

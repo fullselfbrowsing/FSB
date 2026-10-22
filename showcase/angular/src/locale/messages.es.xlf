@@ -499,8 +499,8 @@
         </context-group>
       </trans-unit>
       <trans-unit id="about.actions.subtitle" datatype="html">
-        <source>60 browser actions organized by category, all executable through natural language, and surfaced to agents as part of the 68-tool <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> catalog.</source>
-        <target state="translated">60 acciones del navegador organizadas por categoría, todas ejecutables mediante lenguaje natural y expuestas a los agentes como parte del catálogo <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> de 68 herramientas.</target>
+        <source>60 browser actions organized by category, all executable through natural language, and surfaced to agents as part of the 69-tool <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> catalog.</source>
+        <target state="translated">60 acciones del navegador organizadas por categoría, todas ejecutables mediante lenguaje natural y expuestas a los agentes como parte del catálogo <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> de 69 herramientas.</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/about/about-page.component.html</context>
           <context context-type="linenumber">102,104</context>
@@ -1735,8 +1735,8 @@
         </context-group>
       </trans-unit>
       <trans-unit id="agents.hero.subtitle" datatype="html">
-        <source> Always-on agents like <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Grok Bot<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Muse<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, and <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Dots<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> ship with a cloud computer. <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> hands them yours: the <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Chrome<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> you are already signed into, 68 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> tools, and a verified result after every action. </source>
-        <target state="translated">Agentes siempre activos como <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Grok Bot<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Muse<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> y <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Dots<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> incluyen un ordenador en la nube. <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> les da acceso al tuyo: el <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Chrome<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> donde ya has iniciado sesión, 68 herramientas <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> y un resultado verificado después de cada acción.</target>
+        <source> Always-on agents like <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Grok Bot<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Muse<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, and <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Dots<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> ship with a cloud computer. <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> hands them yours: the <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Chrome<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> you are already signed into, 69 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> tools, and a verified result after every action. </source>
+        <target state="translated">Agentes siempre activos como <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Grok Bot<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Muse<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> y <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Dots<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> incluyen un ordenador en la nube. <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> les da acceso al tuyo: el <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Chrome<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> donde ya has iniciado sesión, 69 herramientas <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> y un resultado verificado después de cada acción.</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/agents/agents-page.component.html</context>
           <context context-type="linenumber">15,17</context>
@@ -1839,8 +1839,8 @@
         </context-group>
       </trans-unit>
       <trans-unit id="agents.with.agent.foot" datatype="html">
-        <source>via <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> · 68 tools</source>
-        <target state="translated">mediante <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> · 68 herramientas</target>
+        <source>via <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> · 69 tools</source>
+        <target state="translated">mediante <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> · 69 herramientas</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/agents/agents-page.component.html</context>
           <context context-type="linenumber">92,93</context>
@@ -1879,8 +1879,8 @@
         </context-group>
       </trans-unit>
       <trans-unit id="agents.power.card.tools.stat" datatype="html">
-        <source>68 tools</source>
-        <target state="translated">68 herramientas</target>
+        <source>69 tools</source>
+        <target state="translated">69 herramientas</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/agents/agents-page.component.html</context>
           <context context-type="linenumber">122,123</context>
@@ -2271,16 +2271,16 @@
         </context-group>
       </trans-unit>
       <trans-unit id="agents.schema.software.description" datatype="html">
-        <source>Canonical OpenClaw and Hermes onboarding path for FSB. Doctor flow, stdio config printer, consent-gated multi-host installer, and 68 MCP browser tools for the FSB MCP server.</source>
-        <target state="translated">Ruta canónica de onboarding OpenClaw y Hermes para FSB. Flujo Doctor, impresora de config stdio, instalador multi-host con consentimiento y 68 herramientas de navegador MCP para el servidor MCP de FSB.</target>
+        <source>Canonical OpenClaw and Hermes onboarding path for FSB. Doctor flow, stdio config printer, consent-gated multi-host installer, and 69 MCP browser tools for the FSB MCP server.</source>
+        <target state="translated">Ruta canónica de onboarding OpenClaw y Hermes para FSB. Flujo Doctor, impresora de config stdio, instalador multi-host con consentimiento y 69 herramientas de navegador MCP para el servidor MCP de FSB.</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/agents/agents-page.component.ts</context>
           <context context-type="linenumber">294</context>
         </context-group>
       </trans-unit>
       <trans-unit id="agents.schema.software.feature.tools" datatype="html">
-        <source>68 MCP tools for browser action, observation, verification, and recovery</source>
-        <target state="translated">68 herramientas MCP para actuar en el navegador, observar, verificar y recuperar</target>
+        <source>69 MCP tools for browser action, observation, verification, and recovery</source>
+        <target state="translated">69 herramientas MCP para actuar en el navegador, observar, verificar y recuperar</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/agents/agents-page.component.ts</context>
           <context context-type="linenumber">296</context>
@@ -4147,7 +4147,7 @@
         <target state="translated">Los agentes en segundo plano se han trasladado.</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.html</context>
-          <context context-type="linenumber">279,280</context>
+          <context context-type="linenumber">278,279</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.template.073" datatype="html">
@@ -4155,7 +4155,7 @@
         <target state="translated">FSB ya no incluye ejecuciones de agentes programadas o recurrentes. Para ese trabajo, los sucesores recomendados son <x id="START_LINK" ctype="x-a" equiv-text="&lt;a href=&quot;https://github.com/openclaw/openclaw&quot; target=&quot;_blank&quot; rel=&quot;noopener noreferrer&quot;&gt;"/>OpenClaw<x id="CLOSE_LINK" ctype="x-a" equiv-text="&lt;/a&gt;"/> (bucle de agente de código abierto) y <x id="START_LINK_1" equiv-text="&lt;a href=&quot;https://www.anthropic.com/claude/routines&quot; target=&quot;_blank&quot; rel=&quot;noopener noreferrer&quot;&gt;"/>Claude Routines<x id="CLOSE_LINK" ctype="x-a" equiv-text="&lt;/a&gt;"/> (automatizaciones administradas de larga duración). El panel anterior sigue mostrando el estado del control remoto en directo y la transmisión del DOM para ejecutar tareas puntuales.</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.html</context>
-          <context context-type="linenumber">280,281</context>
+          <context context-type="linenumber">279,280</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.template.067" datatype="html">
@@ -4163,7 +4163,7 @@
         <target state="translated">Retirado en v0.9.45rc1 (abril de 2026)</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.html</context>
-          <context context-type="linenumber">281,283</context>
+          <context context-type="linenumber">280,282</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.meta.title" datatype="html">
@@ -5459,7 +5459,7 @@
         <target state="translated">La recuperación de la tarea agotó el tiempo de espera; antes: <x id="action" equiv-text="this.lastProgressAction"/></target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">1699</context>
+          <context context-type="linenumber">1461</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.tooltip.lastSnapshot" datatype="html">
@@ -5467,7 +5467,7 @@
         <target state="translated">Última instantánea: <x id="snapshotTime" equiv-text="snapshotTime"/></target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">4014</context>
+          <context context-type="linenumber">3186</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.tooltip.state" datatype="html">
@@ -5475,7 +5475,7 @@
         <target state="translated">Estado: <x id="streamState" equiv-text="state"/></target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">4018</context>
+          <context context-type="linenumber">3190</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.tooltip.reason" datatype="html">
@@ -5483,7 +5483,7 @@
         <target state="translated">Motivo: <x id="reason" equiv-text="reason"/></target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">4022</context>
+          <context context-type="linenumber">3194</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.tooltip.recoveringFor" datatype="html">
@@ -5491,7 +5491,7 @@
         <target state="translated">Recuperando desde hace <x id="seconds" equiv-text="seconds"/> s</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">4026</context>
+          <context context-type="linenumber">3198</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.tooltip.lastFrame" datatype="html">
@@ -5499,7 +5499,7 @@
         <target state="translated">último fotograma: hace <x id="seconds" equiv-text="frameSeconds"/> s</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">4032</context>
+          <context context-type="linenumber">3204</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.tooltip.mutations" datatype="html">
@@ -5507,7 +5507,7 @@
         <target state="translated">mutaciones: <x id="count" equiv-text="this.mutationsAppliedTotal"/></target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">4033</context>
+          <context context-type="linenumber">3205</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.tooltip.applyFailures" datatype="html">
@@ -5515,7 +5515,7 @@
         <target state="translated">fallos de aplicación: <x id="count" equiv-text="this.mutationApplyFailures"/></target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">4034</context>
+          <context context-type="linenumber">3206</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.tooltip.stale" datatype="html">
@@ -5523,7 +5523,7 @@
         <target state="translated">obsoleto: <x id="count" equiv-text="this.staleMutationCount"/></target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">4035</context>
+          <context context-type="linenumber">3207</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.tooltip.noData" datatype="html">
@@ -5531,7 +5531,7 @@
         <target state="translated">No hay datos de transmisión</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">4036</context>
+          <context context-type="linenumber">3208</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.api.requestFailed" datatype="html">
@@ -5539,7 +5539,7 @@
         <target state="translated">La solicitud falló con el estado <x id="status" equiv-text="status"/></target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">4339</context>
+          <context context-type="linenumber">3453</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.etaMinutes" datatype="html">
@@ -5547,7 +5547,7 @@
         <target state="translated">~<x id="minutes" equiv-text="amount"/> min restantes</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">4494</context>
+          <context context-type="linenumber">3608</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.etaSeconds" datatype="html">
@@ -5555,7 +5555,7 @@
         <target state="translated">~<x id="seconds" equiv-text="amount"/> s restantes</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">4495</context>
+          <context context-type="linenumber">3609</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.runningFor" datatype="html">
@@ -5563,7 +5563,7 @@
         <target state="translated">En ejecución durante <x id="duration" equiv-text="duration"/></target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">4569</context>
+          <context context-type="linenumber">3683</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.stoppedWithAction" datatype="html">
@@ -5571,7 +5571,7 @@
         <target state="translated">Detenida por el usuario; antes: <x id="action" equiv-text="action"/></target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">4574</context>
+          <context context-type="linenumber">3688</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.hero.title" datatype="html">
@@ -5759,8 +5759,8 @@
         </context-group>
       </trans-unit>
       <trans-unit id="home.features.card.mcpIntegration.desc" datatype="html">
-        <source>Use <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> as an <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> server from <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Claude Code<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Codex<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Cursor<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>OpenClaw<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, or any <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> client. 68 tools, with browser automation straight from your IDE.</source>
-        <target state="translated">Usa <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> como servidor <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> desde <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Claude Code<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Codex<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Cursor<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>OpenClaw<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> o cualquier cliente <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>. Incluye 68 herramientas para automatizar el navegador directamente desde tu IDE.</target>
+        <source>Use <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> as an <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> server from <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Claude Code<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Codex<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Cursor<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>OpenClaw<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, or any <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> client. 69 tools, with browser automation straight from your IDE.</source>
+        <target state="translated">Usa <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>FSB<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> como servidor <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> desde <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Claude Code<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Codex<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Cursor<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>, <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>OpenClaw<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> o cualquier cliente <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>. Incluye 69 herramientas para automatizar el navegador directamente desde tu IDE.</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
           <context context-type="linenumber">68,70</context>
@@ -6127,8 +6127,8 @@
         </context-group>
       </trans-unit>
       <trans-unit id="home.engine.mcp.meta" datatype="html">
-        <source>68 tools · no API key</source>
-        <target state="translated">68 herramientas · sin clave API</target>
+        <source>69 tools · no API key</source>
+        <target state="translated">69 herramientas · sin clave API</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
           <context context-type="linenumber">276,278</context>
@@ -6239,8 +6239,8 @@
         </context-group>
       </trans-unit>
       <trans-unit id="home.engine.mcp.fact.tools" datatype="html">
-        <source>68 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> tools</source>
-        <target state="translated">68 herramientas <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/></target>
+        <source>69 <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/> tools</source>
+        <target state="translated">69 herramientas <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>MCP<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/></target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.html</context>
           <context context-type="linenumber">327,328</context>
@@ -19971,8 +19971,8 @@ https://full-selfbrowsing.com/api/telemetry/forget<x id="CLOSE_TAG_CODE" ctype="
         </context-group>
       </trans-unit>
       <trans-unit id="support.schema.faq.mcp.a" datatype="html">
-        <source>MCP (Model Context Protocol) lets you control FSB from AI coding tools like Claude Code, Codex, Cursor, Antigravity, and OpenClaw. The MCP server runs as npx -y fsb-mcp-server@latest and pairs with the running extension over a local WebSocket bridge. FSB exposes 68 MCP tools (click, type, navigate, read DOM, fill vault credentials, and more). For OpenClaw users specifically, the fastest path is the one-click install on ClawHub at https://clawhub.ai/lakshmanturlapati/full-selfbrowsing, or load the FSB skill at skills/fsb/ which prints the stdio config block and runs the doctor diagnostic. The full rundown lives at https://full-selfbrowsing.com/agents.</source>
-        <target state="translated">MCP (Model Context Protocol) te permite controlar FSB desde herramientas de programación con IA como Claude Code, Codex, Cursor, Antigravity y OpenClaw. El servidor MCP se ejecuta como npx -y fsb-mcp-server@latest y se empareja con la extensión en ejecución mediante un puente WebSocket local. FSB ofrece 68 herramientas MCP (hacer clic, escribir, navegar, leer el DOM, rellenar credenciales del almacén y mucho más). Para quienes usan OpenClaw, la vía más rápida es la instalación con un clic en ClawHub, en https://clawhub.ai/lakshmanturlapati/full-selfbrowsing, o cargar la skill de FSB desde skills/fsb/, que imprime el bloque de configuración stdio y ejecuta el diagnóstico doctor. Encontrarás todos los detalles en https://full-selfbrowsing.com/agents.</target>
+        <source>MCP (Model Context Protocol) lets you control FSB from AI coding tools like Claude Code, Codex, Cursor, Antigravity, and OpenClaw. The MCP server runs as npx -y fsb-mcp-server@latest and pairs with the running extension over a local WebSocket bridge. FSB exposes 69 MCP tools (click, type, navigate, read DOM, fill vault credentials, and more). For OpenClaw users specifically, the fastest path is the one-click install on ClawHub at https://clawhub.ai/lakshmanturlapati/full-selfbrowsing, or load the FSB skill at skills/fsb/ which prints the stdio config block and runs the doctor diagnostic. The full rundown lives at https://full-selfbrowsing.com/agents.</source>
+        <target state="translated">MCP (Model Context Protocol) te permite controlar FSB desde herramientas de programación con IA como Claude Code, Codex, Cursor, Antigravity y OpenClaw. El servidor MCP se ejecuta como npx -y fsb-mcp-server@latest y se empareja con la extensión en ejecución mediante un puente WebSocket local. FSB ofrece 69 herramientas MCP (hacer clic, escribir, navegar, leer el DOM, rellenar credenciales del almacén y mucho más). Para quienes usan OpenClaw, la vía más rápida es la instalación con un clic en ClawHub, en https://clawhub.ai/lakshmanturlapati/full-selfbrowsing, o cargar la skill de FSB desde skills/fsb/, que imprime el bloque de configuración stdio y ejecuta el diagnóstico doctor. Encontrarás todos los detalles en https://full-selfbrowsing.com/agents.</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/support/support-page.component.ts</context>
           <context context-type="linenumber">41</context>
@@ -20051,8 +20051,8 @@ https://full-selfbrowsing.com/api/telemetry/forget<x id="CLOSE_TAG_CODE" ctype="
         </context-group>
       </trans-unit>
       <trans-unit id="support.schema.faq.tools.a" datatype="html">
-        <source>FSB exposes two modes through MCP. Manual mode is the default and gives the calling agent 68 granular tools: navigate, click, type, scroll, read page state, take screenshots, upload real local files with upload_file, arm trigger watchers with trigger / get_trigger_status / list_triggers, and search or invoke guarded first-party API capabilities with search_capabilities and invoke_capability. Vault and payment helpers fill inside the encrypted extension store, so raw secrets do not cross the MCP bridge. Autopilot mode (run_task) only fires when the user explicitly delegates the whole task. For everything else the calling agent stays in the loop on every action.</source>
-        <target state="translated">FSB expone dos modos a través de MCP. El modo Manual es el predeterminado y da al agente llamante 68 herramientas granulares: navegar, hacer clic, escribir, desplazarse, leer el estado de la página, capturar pantallas, subir archivos locales reales con upload_file, armar vigilantes de triggers con trigger / get_trigger_status / list_triggers, y buscar o invocar capacidades API de primera parte protegidas con search_capabilities e invoke_capability. Los ayudantes de vault y pagos rellenan dentro del almacén cifrado de la extensión, así que los secretos en bruto no cruzan el puente MCP. El modo Autopilot (run_task) solo se activa cuando el usuario delega explícitamente toda la tarea. En todo lo demás, el agente llamante permanece en el bucle en cada acción.</target>
+        <source>FSB exposes two modes through MCP. Manual mode is the default and gives the calling agent 69 granular tools: navigate, click, type, scroll, read page state, take screenshots, upload real local files with upload_file, arm trigger watchers with trigger / get_trigger_status / list_triggers, and search or invoke guarded first-party API capabilities with search_capabilities and invoke_capability. Vault and payment helpers fill inside the encrypted extension store, so raw secrets do not cross the MCP bridge. Autopilot mode (run_task) only fires when the user explicitly delegates the whole task. For everything else the calling agent stays in the loop on every action.</source>
+        <target state="translated">FSB expone dos modos a través de MCP. El modo Manual es el predeterminado y da al agente llamante 69 herramientas granulares: navegar, hacer clic, escribir, desplazarse, leer el estado de la página, capturar pantallas, subir archivos locales reales con upload_file, armar vigilantes de triggers con trigger / get_trigger_status / list_triggers, y buscar o invocar capacidades API de primera parte protegidas con search_capabilities e invoke_capability. Los ayudantes de vault y pagos rellenan dentro del almacén cifrado de la extensión, así que los secretos en bruto no cruzan el puente MCP. El modo Autopilot (run_task) solo se activa cuando el usuario delega explícitamente toda la tarea. En todo lo demás, el agente llamante permanece en el bucle en cada acción.</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/support/support-page.component.ts</context>
           <context context-type="linenumber">61</context>

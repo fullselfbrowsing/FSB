@@ -940,9 +940,6 @@
   "panel_43e3ece73f": {
     "message": "remaining"
   },
-  "panel_5ad3dbd124": {
-    "message": "Got it"
-  },
   "panel_c9b3c38247": {
     "message": "Total"
   },
@@ -1017,12 +1014,6 @@
   },
   "panel_582ba53e9e": {
     "message": "Retired in v0.9.45rc1 · April 2026"
-  },
-  "panel_daa7068396": {
-    "message": "Your previous agents"
-  },
-  "panel_3107f72f47": {
-    "message": "Names of agents that lived on this profile, kept here so nothing feels lost. Definitions remain in chrome.storage.local['bgAgents'] (untouched)."
   },
   "panel_9f83a0b7bf": {
     "message": "Long-term memory learned from past automation sessions"
@@ -1639,12 +1630,6 @@
   "panel_160419ae70": {
     "message": "Payment methods are unlocked."
   },
-  "panel_507fc32dc5": {
-    "message": "Edit Agent"
-  },
-  "panel_fb25598ed0": {
-    "message": "Create New Agent"
-  },
   "panel_6c02a28421": {
     "message": "Testing..."
   },
@@ -1732,7 +1717,7 @@
     "message": "Across 17 categories"
   },
   "entry_feat_tools": {
-    "message": "68 MCP tools"
+    "message": "69 MCP tools"
   },
   "entry_feat_tools_sub": {
     "message": "From your coding agent"
@@ -1759,7 +1744,7 @@
     "message": "Recommended"
   },
   "entry_agent_desc": {
-    "message": "Use FSB as an MCP server in Claude Code, Cursor, VS Code, OpenClaw and more. 68 tools, no API key, nothing to configure in the browser."
+    "message": "Use FSB as an MCP server in Claude Code, Cursor, VS Code, OpenClaw and more. 69 tools, no API key, nothing to configure in the browser."
   },
   "entry_in_browser": {
     "message": "In this browser"
@@ -1807,7 +1792,7 @@
     "message": "FSB writes itself into your agent's MCP config."
   },
   "entry_mcp_2b": {
-    "message": "68 tools"
+    "message": "69 tools"
   },
   "entry_mcp_2c": {
     "message": ", zero manual JSON."
@@ -1923,7 +1908,7 @@
     "message": "Tools"
   },
   "entry_sum_68": {
-    "message": "68 available"
+    "message": "69 available"
   },
   "entry_sum_access": {
     "message": "Access"
@@ -3335,9 +3320,6 @@
   },
   "copy_e4cdf160f5": {
     "message": "Copy hash key"
-  },
-  "copy_81f7adf295": {
-    "message": "Previously created background agents"
   },
   "copy_8c16fe2070": {
     "message": "When enabled, new memories are automatically analyzed by AI for deeper insights"

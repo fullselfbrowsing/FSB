@@ -1,6 +1,6 @@
 # FSB multi-agent contract (current as of v0.9.95)
 
-This file documents the rules that make FSB's per-agent tab ownership work. Anyone calling FSB tools through MCP MUST follow these rules; breaking them produces typed errors that recover cleanly only when the caller knows the contract. The contract is small (six error names + the `agent_id` rule + the `back` tool), but every rule matters: bypassing one corrupts the ownership graph and the only recovery is closing the affected tab.
+This file documents the rules that make FSB's per-agent tab ownership work. Anyone calling FSB tools through MCP MUST follow these rules; breaking them produces typed errors that recover cleanly only when the caller knows the contract. The contract is small (six error names + the `agent_id` rule), but every rule matters: bypassing one corrupts the ownership graph and the only recovery is closing the affected tab.
 
 ## Tab ownership behavior (v0.8.0+)
 
@@ -54,22 +54,22 @@ When an FSB tool call hits one of the dispatcher boundaries, the server returns 
 - What it means: The targeted tab is in a different Chrome window than the agent's session window. Each agent only sees tabs in the window where its session began.
 - What to do: Use `list_tabs` to enumerate this agent's owned tabs and pick one; if the work belongs in a different window, open a new tab in the current window with `open_tab`.
 
-## Use back instead of execute_js('history.back()')
+## Use go_back instead of execute_js('history.back()')
 
-Use the typed `back` tool (FSB v0.8.0+) for one-step history navigation. Do NOT call `execute_js("history.back()")`.
+Use `go_back` for one-step history navigation, and `go_forward` to undo it. Do NOT call `execute_js("history.back()")`.
 
-`back` is typed, ownership-gated, BF-cache aware, and history-depth-tracking. It returns a structured result with status fields the caller can branch on. `execute_js("history.back()")` is none of those: it bypasses ownership, lies about success on BF-cached pages, and returns whatever the JS evaluator coerced last.
+`go_back` is ownership-gated, carries the `visual_reason`/`client` field bundle like other action tools, and returns the resulting URL. `execute_js("history.back()")` bypasses ownership, lies about success on BF-cached pages, and returns whatever the JS evaluator coerced last.
 
 ```
 [BAD]  execute_js("history.back()")
-[GOOD] back({})
+[GOOD] go_back({ visual_reason: "Return to results", client: "OpenClaw" })
 ```
 
-Note: `go_back` (`mcp/ai/tool-definitions.cjs`, part of the 37-tool action-tool field-bundle contract) and `back` (`mcp/src/tools/agents.ts`, outside that contract) are two distinct tools that coexist in the current build, not version alternates for the same surface. `go_back` carries the `visual_reason`/`client` field bundle like other action tools; `back` does not, but adds a richer `change_report` (URL, dialogs, node/attribute/input changes, focus shift) plus explicit `status` values (`ok`, `no_history`, `cross_origin`, `bf_cache`, `fragment_only`). Prefer `back` for its structured result. Both are typed, ownership-gated, and BF-cache aware; never fall back to `execute_js`.
+The separate `back` tool that older builds registered was removed; it duplicated `go_back`.
 
 ## Why the contract matters
 
-FSB's per-agent ownership is what lets multiple AI sessions share one Chrome instance without fighting. The contract is small (six error names plus `agent_id` plus `back`), but every rule matters -- bypassing one rule corrupts the ownership graph and the only recovery is closing the affected tab.
+FSB's per-agent ownership is what lets multiple AI sessions share one Chrome instance without fighting. The contract is small (six error names plus `agent_id`), but every rule matters -- bypassing one rule corrupts the ownership graph and the only recovery is closing the affected tab.
 
 ## Default recovery ladder
 

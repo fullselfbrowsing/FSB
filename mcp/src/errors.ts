@@ -32,7 +32,7 @@ export const FSB_ERROR_MESSAGES: Record<string, string> = {
   'invalid_client_label':
     'The MCP client label is not on the trusted visual-session allowlist. Use one of the approved client names exactly as documented.',
   'visual_session_not_found':
-    'The provided visual-session token does not match an active client-owned visual session. The token may be stale, already finalized, or already cleared. Start a new visual session or use the latest token returned by start_visual_session.',
+    'The provided visual-session token does not match an active client-owned visual session. The token may be stale, already finalized, or already cleared. Omit session_token: the next action call that carries visual_reason and client starts a new visual session.',
   'visual_surface_busy':
     'The active visual surface is already owned by an FSB automation session. Wait for the current run to finish or stop it before starting a client-owned visual session.',
   'session_not_found':
@@ -69,8 +69,6 @@ const CODE_ONLY_ERROR_KEYS = new Set([
   // v0.9.62 implicit visual session contract (Phase 255 Plan 02)
   'VISUAL_FIELDS_REQUIRED',
   'BADGE_NOT_ALLOWED',
-  // v0.9.62 removal of explicit visual-session tools (Phase 258 Plan 01)
-  'TOOL_REMOVED',
   // v0.9.99 Native Capability Catalog (Phase 27 FETCH-04): mid-mutation SW-eviction
   // ambiguity. Surfaced verbatim so the MCP host can distinguish "ambiguous -- ask
   // the user" from a generic action_rejected. INV-01-safe (no MCP tool schema touched).
@@ -222,8 +220,6 @@ function buildLayeredDetail(
     : [];
   const cap = typeof fsbResult?.cap === 'number' ? fsbResult.cap : undefined;
   const active = typeof fsbResult?.active === 'number' ? fsbResult.active : undefined;
-  const removedTool = typeof fsbResult?.removed_tool === 'string' ? fsbResult.removed_tool : '';
-  const removedInVersion = typeof fsbResult?.removed_in_version === 'string' ? fsbResult.removed_in_version : '0.9.0';
 
   switch (errorKey) {
     case 'package_version_mismatch':
@@ -382,19 +378,11 @@ function buildLayeredDetail(
           ? `Retry with one of the approved client labels: ${allowedClients.join(', ')}.`
           : 'Retry with one of the approved client labels enumerated by getAllowedMcpVisualClientLabels() in mcp/src/tools/visual-session.ts.',
       };
-    case 'TOOL_REMOVED':
-      return {
-        detected: LAYER_LABELS.visualSession,
-        why: removedTool
-          ? `The ${removedTool} tool was removed in v${removedInVersion} of fsb-mcp-server (v0.9.62 implicit visual-session contract).`
-          : `The explicit visual_session start/end tools were removed in v${removedInVersion} of fsb-mcp-server (v0.9.62 implicit visual-session contract).`,
-        nextAction: 'Use the implicit contract: every action tool (click, type_text, navigate, ...) now requires visual_reason (string) and client (allowlisted label) in its input, the visual session is created implicitly on the first action call and refreshed on a sliding 60-second window, and is_final: true on the last action of a task clears the overlay immediately. See CHANGELOG.md#v0.9.0 and the Visual Session Lifecycle section of mcp/README.md for the migration recipe.',
-      };
     case 'visual_session_not_found':
       return {
         detected: LAYER_LABELS.visualSession,
         why: 'The provided visual-session token does not match an active client-owned visual session, which usually means it is stale, already finalized, or already cleared.',
-        nextAction: 'Start a new visual session or retry with the latest token returned by start_visual_session before sending more progress or final-status updates.',
+        nextAction: 'Omit session_token. The visual session is implicit: the next action call that carries visual_reason and client starts a new one.',
       };
     case 'visual_surface_busy':
       return {
