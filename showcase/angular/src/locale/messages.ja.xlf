@@ -1119,7 +1119,7 @@
         </context-group>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.ts</context>
-          <context context-type="linenumber">34</context>
+          <context context-type="linenumber">35</context>
         </context-group>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.ts</context>
@@ -3547,7 +3547,7 @@
         <target state="translated">FSB Full Self-Browsing のロゴ</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.ts</context>
-          <context context-type="linenumber">33</context>
+          <context context-type="linenumber">34</context>
         </context-group>
       </trans-unit>
       <trans-unit id="concierge.copy" datatype="html">
@@ -3555,7 +3555,7 @@
         <target state="translated">コピー</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.ts</context>
-          <context context-type="linenumber">99</context>
+          <context context-type="linenumber">100</context>
         </context-group>
       </trans-unit>
       <trans-unit id="concierge.copied" datatype="html">
@@ -3563,7 +3563,7 @@
         <target state="translated">コピーしました</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.ts</context>
-          <context context-type="linenumber">100</context>
+          <context context-type="linenumber">101</context>
         </context-group>
       </trans-unit>
       <trans-unit id="concierge.meta.title" datatype="html">
@@ -3571,7 +3571,7 @@
         <target state="translated">Concierge - 安全なアクション層</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.ts</context>
-          <context context-type="linenumber">132</context>
+          <context context-type="linenumber">134</context>
         </context-group>
       </trans-unit>
       <trans-unit id="concierge.meta.description" datatype="html">
@@ -3579,7 +3579,7 @@
         <target state="translated">Concierge はエージェント対応ウェブアプリケーションのための安全なアクション層です。型付き動詞、ライブカタログ、同意に結びついたディスパッチ、署名済みの再実行防止バッチを備えます。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.ts</context>
-          <context context-type="linenumber">133</context>
+          <context context-type="linenumber">135</context>
         </context-group>
       </trans-unit>
       <trans-unit id="concierge.schema.subcategory" datatype="html">
@@ -3587,7 +3587,7 @@
         <target state="translated">エージェント対応ウェブアプリケーションのための安全なアクション層</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.ts</context>
-          <context context-type="linenumber">236</context>
+          <context context-type="linenumber">238</context>
         </context-group>
       </trans-unit>
       <trans-unit id="concierge.schema.description" datatype="html">
@@ -3595,7 +3595,7 @@
         <target state="translated">Concierge は、協調するアプリケーションが型付き動詞を公開し、ライブのアクションカタログを解決し、実行をアプリケーション自身の状態・ポリシー・インターフェースの内側に留めることを可能にします。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.ts</context>
-          <context context-type="linenumber">239</context>
+          <context context-type="linenumber">241</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.template.001" datatype="html">

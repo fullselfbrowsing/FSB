@@ -42,6 +42,487 @@ let showSidepanelProgressEnabled = true;
 var _tabRunningMap = new Map();
 var _activeTabIdSnapshot = null;
 
+/* FSB_SKOPEO_SIDEPANEL_CONTROLLER_START */
+(function initializeFSBSkopeoSidepanelController(global) {
+  'use strict';
+
+  var COMMAND = 'toggle-skopeo-current-tab';
+  var SHORTCUTS_URL = 'chrome://extensions/shortcuts';
+  var UNASSIGNED_SHORTCUT = 'Shortcut not assigned \u00b7 Set in Chrome shortcuts';
+  var ACTIVE_KILL_HINT = 'Esc Esc: turn off Skopeo in this tab';
+  var _nodes = null;
+  var _initialized = false;
+  var _shortcutHint = UNASSIGNED_SHORTCUT;
+  var _activationSerial = 0;
+  var _currentActivation = null;
+  var _requestSerial = 0;
+  var _latestRequestByLane = new Map();
+  var _presentationSerial = 0;
+  var _latestPresentation = null;
+  var _highestGenerationByTab = new Map();
+  var _lifecyclePresentationByTab = new Map();
+
+  function positiveTabId(value) {
+    return typeof value === 'number' && Number.isSafeInteger(value) && value > 0;
+  }
+
+  function activeTabMatches(tabId) {
+    return positiveTabId(tabId) && tabId === _activeTabIdSnapshot;
+  }
+
+  function claimActivation(tabId) {
+    if (!positiveTabId(tabId)) return null;
+    _activationSerial += 1;
+    _currentActivation = Object.freeze({ tabId: tabId, token: _activationSerial });
+    return _currentActivation;
+  }
+
+  function claimPresentation(capture) {
+    if (!capture || (capture.lane !== 'status' && capture.lane !== 'toggle') ||
+        !positiveTabId(capture.tabId) || !activeTabMatches(capture.tabId) ||
+        !_currentActivation || _currentActivation.tabId !== capture.tabId ||
+        _currentActivation.token !== capture.activationToken) {
+      return null;
+    }
+    _presentationSerial += 1;
+    _latestPresentation = Object.freeze({
+      tabId: capture.tabId,
+      activationToken: capture.activationToken,
+      token: _presentationSerial
+    });
+    return _latestPresentation;
+  }
+
+  function captureRequest(tabId, lane) {
+    if (!positiveTabId(tabId) || !activeTabMatches(tabId)) return null;
+    if (lane !== 'status' && lane !== 'toggle' && lane !== 'shortcut') return null;
+    var activation = _currentActivation;
+    if (!activation) activation = claimActivation(tabId);
+    if (!activation || activation.tabId !== tabId) return null;
+    _requestSerial += 1;
+    var capture = {
+      tabId: tabId,
+      activationToken: activation.token,
+      requestToken: _requestSerial,
+      lane: lane
+    };
+    if (lane === 'status' || lane === 'toggle') {
+      var presentation = claimPresentation(capture);
+      if (!presentation) return null;
+      capture.presentationToken = presentation.token;
+    }
+    capture = Object.freeze(capture);
+    _latestRequestByLane.set(lane, capture.requestToken);
+    return capture;
+  }
+
+  function requestIsCurrent(capture) {
+    return !!capture && positiveTabId(capture.tabId) && activeTabMatches(capture.tabId) &&
+      !!_currentActivation && _currentActivation.tabId === capture.tabId &&
+      _currentActivation.token === capture.activationToken &&
+      _latestRequestByLane.get(capture.lane) === capture.requestToken;
+  }
+
+  function presentationIsCurrent(capture) {
+    return !!capture && (capture.lane === 'status' || capture.lane === 'toggle') &&
+      positiveTabId(capture.tabId) && activeTabMatches(capture.tabId) &&
+      !!_currentActivation && _currentActivation.tabId === capture.tabId &&
+      _currentActivation.token === capture.activationToken &&
+      !!_latestPresentation && _latestPresentation.tabId === capture.tabId &&
+      _latestPresentation.activationToken === capture.activationToken &&
+      _latestPresentation.token === capture.presentationToken;
+  }
+
+  function lifecycleStage(response) {
+    var state = localStateCopy(response).state;
+    if (state === 'starting') return 1;
+    if (state === 'active') return 2;
+    return 3;
+  }
+
+  function acceptLifecyclePresentation(tabId, response, options) {
+    if (!positiveTabId(tabId) || !response || typeof response !== 'object' ||
+        Array.isArray(response)) return false;
+    var generation = response.generation;
+    var floor = _highestGenerationByTab.get(tabId);
+    var lifecycle = _lifecyclePresentationByTab.get(tabId);
+    var hasFloor = typeof floor === 'number' && Number.isSafeInteger(floor) && floor > 0;
+    var isPositiveGeneration = typeof generation === 'number' &&
+      Number.isSafeInteger(generation) && generation > 0;
+    if (!isPositiveGeneration) {
+      var resetLifecycleBaseline = options && options.allowLifecycleBaselineReset === true &&
+        options.advance !== false && response.success === true && response.tabId === tabId &&
+        response.status === 'off' && generation === 0;
+      if (resetLifecycleBaseline) {
+        _highestGenerationByTab.delete(tabId);
+        _lifecyclePresentationByTab.delete(tabId);
+        return true;
+      }
+      var allowUnversionedTerminal = options && options.allowUnversionedTerminal === true &&
+        lifecycleStage(response) === 3;
+      return !hasFloor || allowUnversionedTerminal;
+    }
+    if (hasFloor && generation < floor) return false;
+    var stage = lifecycleStage(response);
+    if (lifecycle && (generation < lifecycle.generation ||
+        (generation === lifecycle.generation && stage < lifecycle.stage))) {
+      return false;
+    }
+    if (!options || options.advance !== false) {
+      if (!hasFloor || generation > floor) _highestGenerationByTab.set(tabId, generation);
+      if (!lifecycle || generation > lifecycle.generation || stage > lifecycle.stage) {
+        _lifecyclePresentationByTab.set(tabId, Object.freeze({
+          generation: generation,
+          stage: stage
+        }));
+      }
+    }
+    return true;
+  }
+
+  function getSkopeoNodes() {
+    if (_nodes) return _nodes;
+    var nodes = {
+      row: document.getElementById('skopeoControl'),
+      title: document.getElementById('skopeoTitle'),
+      toggle: document.getElementById('skopeoToggle'),
+      status: document.getElementById('skopeoStatus'),
+      body: document.getElementById('skopeoStatusBody'),
+      action: document.getElementById('skopeoAction'),
+      hint: document.getElementById('skopeoHint')
+    };
+    if (!nodes.row || !nodes.title || !nodes.toggle || !nodes.status ||
+        !nodes.body || !nodes.action || !nodes.hint) {
+      return null;
+    }
+    _nodes = nodes;
+    return _nodes;
+  }
+
+  function setSkopeoText(node, value) {
+    if (!node) return;
+    var next = typeof value === 'string' ? value : '';
+    if (node.textContent !== next) node.textContent = next;
+  }
+
+  function setSkopeoAttribute(node, name, value) {
+    if (!node) return;
+    var next = String(value);
+    if (node.getAttribute(name) !== next) node.setAttribute(name, next);
+  }
+
+  function setSkopeoOptionalCopy(node, value) {
+    var present = typeof value === 'string' && value.length > 0;
+    setSkopeoText(node, present ? value : '');
+    node.hidden = !present;
+  }
+
+  function localStateCopy(response) {
+    var status = response && typeof response.status === 'string' ? response.status : 'error';
+    var code = response && typeof response.code === 'string' ? response.code : '';
+    if (code === 'SKOPEO_UNSAFE_LAYOUT') {
+      return {
+        state: 'error',
+        status: 'Skopeo can\u2019t open safely on this layout.',
+        body: 'Zoom out or resize the page, then try again.',
+        action: 'Try again',
+        checked: false,
+        busy: false,
+        disabled: false
+      };
+    }
+    if (status === 'off') {
+      return {
+        state: 'off',
+        status: 'Off for this tab',
+        body: '',
+        action: 'Turn on Skopeo',
+        checked: false,
+        busy: false,
+        disabled: false
+      };
+    }
+    if (status === 'starting') {
+      return {
+        state: 'starting',
+        status: 'Starting on this tab\u2026',
+        body: '',
+        action: 'Turn off Skopeo',
+        checked: true,
+        busy: true,
+        disabled: false
+      };
+    }
+    if (status === 'active') {
+      return {
+        state: 'active',
+        status: 'On \u00b7 Ambient',
+        body: '',
+        action: 'Turn off Skopeo',
+        checked: true,
+        busy: false,
+        disabled: false
+      };
+    }
+    if (status === 'unsupported' || code === 'SKOPEO_UNSUPPORTED_TAB') {
+      return {
+        state: 'unsupported',
+        status: 'Skopeo can\u2019t run on this page.',
+        body: 'Open a standard web page, then try again.',
+        action: '',
+        checked: false,
+        busy: false,
+        disabled: true
+      };
+    }
+    return {
+      state: 'error',
+      status: 'Skopeo didn\u2019t start.',
+      body: 'Nothing was added to the page. Try again.',
+      action: 'Try again',
+      checked: false,
+      busy: false,
+      disabled: false
+    };
+  }
+
+  function renderSkopeoState(tabId, response, requestCapture, generationOptions) {
+    if (requestCapture && (!requestIsCurrent(requestCapture) ||
+        !presentationIsCurrent(requestCapture))) return false;
+    if (!activeTabMatches(tabId)) return false;
+    if (response && positiveTabId(response.tabId) && response.tabId !== tabId) return false;
+    var nodes = getSkopeoNodes();
+    if (!nodes || !activeTabMatches(tabId) ||
+        (requestCapture && (!requestIsCurrent(requestCapture) ||
+          !presentationIsCurrent(requestCapture)))) return false;
+    var view = localStateCopy(response);
+    if (requestCapture && (!requestIsCurrent(requestCapture) ||
+        !presentationIsCurrent(requestCapture))) return false;
+    if (generationOptions &&
+        !acceptLifecyclePresentation(tabId, response, generationOptions)) return false;
+
+    if (nodes.row.dataset.state !== view.state) nodes.row.dataset.state = view.state;
+    setSkopeoAttribute(nodes.row, 'aria-live', view.state === 'off' ? 'off' : 'polite');
+    setSkopeoAttribute(nodes.row, 'aria-atomic', 'true');
+    setSkopeoAttribute(nodes.row, 'aria-busy', view.busy ? 'true' : 'false');
+    setSkopeoAttribute(nodes.toggle, 'aria-checked', view.checked ? 'true' : 'false');
+    nodes.toggle.disabled = view.disabled;
+    if (view.disabled) {
+      setSkopeoAttribute(nodes.toggle, 'aria-disabled', 'true');
+    } else {
+      nodes.toggle.removeAttribute('aria-disabled');
+    }
+
+    setSkopeoText(nodes.status, view.status);
+    setSkopeoOptionalCopy(nodes.body, view.body);
+    setSkopeoOptionalCopy(nodes.action, view.action);
+    setSkopeoText(nodes.hint, view.state === 'active' ? ACTIVE_KILL_HINT : _shortcutHint);
+    nodes.hint.disabled = view.state === 'active';
+    nodes.hint.tabIndex = view.state === 'active' ? -1 : 0;
+    setSkopeoAttribute(
+      nodes.hint,
+      'aria-label',
+      view.state === 'active' ? ACTIVE_KILL_HINT : 'Open Chrome shortcut settings'
+    );
+    if (view.state === 'active') {
+      setSkopeoAttribute(nodes.hint, 'aria-disabled', 'true');
+    } else {
+      nodes.hint.removeAttribute('aria-disabled');
+    }
+    return true;
+  }
+
+  function resetSkopeoControl(tabId) {
+    if (!activeTabMatches(tabId)) return false;
+    var nodes = getSkopeoNodes();
+    if (!nodes || !activeTabMatches(tabId)) return false;
+    nodes.row.dataset.state = 'loading';
+    setSkopeoAttribute(nodes.row, 'aria-live', 'off');
+    setSkopeoAttribute(nodes.row, 'aria-busy', 'true');
+    setSkopeoAttribute(nodes.toggle, 'aria-checked', 'false');
+    setSkopeoAttribute(nodes.toggle, 'aria-disabled', 'true');
+    nodes.toggle.disabled = true;
+    setSkopeoText(nodes.status, '');
+    setSkopeoOptionalCopy(nodes.body, '');
+    setSkopeoOptionalCopy(nodes.action, '');
+    setSkopeoText(nodes.hint, _shortcutHint);
+    return true;
+  }
+
+  async function refreshSkopeoControl(tabId) {
+    var capturedTabId = positiveTabId(tabId) ? tabId : _activeTabIdSnapshot;
+    var requestCapture = captureRequest(capturedTabId, 'status');
+    if (!requestIsCurrent(requestCapture) || !presentationIsCurrent(requestCapture)) return false;
+    try {
+      if (!requestIsCurrent(requestCapture) || !presentationIsCurrent(requestCapture)) return false;
+      var response = await chrome.runtime.sendMessage({
+        action: 'skopeo:get-status',
+        tabId: capturedTabId
+      });
+      if (!requestIsCurrent(requestCapture) || !presentationIsCurrent(requestCapture)) return false;
+      if (response && positiveTabId(response.tabId) && response.tabId !== capturedTabId) return false;
+      if (!requestIsCurrent(requestCapture) || !presentationIsCurrent(requestCapture)) return false;
+      return renderSkopeoState(capturedTabId, response, requestCapture, {
+        advance: true,
+        allowUnversionedTerminal: true,
+        allowLifecycleBaselineReset: true
+      });
+    } catch (_error) {
+      if (!requestIsCurrent(requestCapture) || !presentationIsCurrent(requestCapture)) return false;
+      return renderSkopeoState(capturedTabId, {
+        success: false,
+        tabId: capturedTabId,
+        status: 'error',
+        code: 'SKOPEO_START_FAILED'
+      }, requestCapture, { advance: true, allowUnversionedTerminal: true });
+    }
+  }
+
+  async function handleSkopeoToggle() {
+    var capturedTabId = _activeTabIdSnapshot;
+    var requestCapture = captureRequest(capturedTabId, 'toggle');
+    if (!requestIsCurrent(requestCapture) || !presentationIsCurrent(requestCapture)) return false;
+    var nodes = getSkopeoNodes();
+    if (!nodes || nodes.row.dataset.state === 'loading' || nodes.toggle.disabled) return false;
+
+    if (nodes.row.dataset.state !== 'starting' && nodes.row.dataset.state !== 'active') {
+      if (!requestIsCurrent(requestCapture) || !presentationIsCurrent(requestCapture)) return false;
+      renderSkopeoState(capturedTabId, { status: 'starting' }, requestCapture);
+    }
+    try {
+      if (!requestIsCurrent(requestCapture) || !presentationIsCurrent(requestCapture)) return false;
+      var response = await chrome.runtime.sendMessage({
+        action: 'skopeo:toggle-tab',
+        tabId: capturedTabId
+      });
+      if (!requestIsCurrent(requestCapture) || !presentationIsCurrent(requestCapture)) return false;
+      if (response && positiveTabId(response.tabId) && response.tabId !== capturedTabId) return false;
+      if (!requestIsCurrent(requestCapture) || !presentationIsCurrent(requestCapture)) return false;
+      return renderSkopeoState(capturedTabId, response, requestCapture, {
+        advance: true,
+        allowUnversionedTerminal: true
+      });
+    } catch (_error) {
+      if (!requestIsCurrent(requestCapture) || !presentationIsCurrent(requestCapture)) return false;
+      return renderSkopeoState(capturedTabId, {
+        success: false,
+        tabId: capturedTabId,
+        status: 'error',
+        code: 'SKOPEO_START_FAILED'
+      }, requestCapture, { advance: true, allowUnversionedTerminal: true });
+    }
+  }
+
+  function normalizeSkopeoShortcut(shortcut) {
+    if (typeof shortcut !== 'string' || shortcut.trim().length === 0) return null;
+    var raw = shortcut.trim();
+    if (raw === 'Alt+Space') return '\u2325 Space';
+    return raw.split('+').map(function (part) { return part.trim(); }).filter(Boolean).join(' ');
+  }
+
+  async function refreshSkopeoShortcut(tabId) {
+    var capturedTabId = positiveTabId(tabId) ? tabId : _activeTabIdSnapshot;
+    var requestCapture = captureRequest(capturedTabId, 'shortcut');
+    if (!requestIsCurrent(requestCapture)) return false;
+    try {
+      if (!requestIsCurrent(requestCapture)) return false;
+      var commands = await chrome.commands.getAll();
+      if (!requestIsCurrent(requestCapture)) return false;
+      var command = Array.isArray(commands)
+        ? commands.find(function (entry) { return entry && entry.name === COMMAND; })
+        : null;
+      var normalized = normalizeSkopeoShortcut(command && command.shortcut);
+      if (!requestIsCurrent(requestCapture)) return false;
+      _shortcutHint = normalized
+        ? 'Shortcut: ' + normalized + ' \u00b7 Change shortcut'
+        : UNASSIGNED_SHORTCUT;
+      var nodes = getSkopeoNodes();
+      if (!nodes || !requestIsCurrent(requestCapture)) return false;
+      if (nodes.row.dataset.state !== 'active') setSkopeoText(nodes.hint, _shortcutHint);
+      return _shortcutHint;
+    } catch (_error) {
+      if (!requestIsCurrent(requestCapture)) return false;
+      _shortcutHint = UNASSIGNED_SHORTCUT;
+      var nodes = getSkopeoNodes();
+      if (!nodes || !requestIsCurrent(requestCapture)) return false;
+      if (nodes.row.dataset.state !== 'active') setSkopeoText(nodes.hint, _shortcutHint);
+      return _shortcutHint;
+    }
+  }
+
+  function handleSkopeoStatusEvent(message) {
+    var capturedTabId = _activeTabIdSnapshot;
+    if (!message || message.action !== 'skopeo:status-changed' ||
+        !activeTabMatches(capturedTabId) || message.tabId !== capturedTabId) {
+      return false;
+    }
+    if (!acceptLifecyclePresentation(capturedTabId, message, { advance: false })) {
+      return false;
+    }
+    var requestCapture = captureRequest(capturedTabId, 'status');
+    if (!requestIsCurrent(requestCapture) || !presentationIsCurrent(requestCapture)) return false;
+    return renderSkopeoState(capturedTabId, message, requestCapture, { advance: true });
+  }
+
+  function onSkopeoStatusMessage(message) {
+    handleSkopeoStatusEvent(message);
+  }
+
+  function handleSkopeoShortcutClick() {
+    var capturedTabId = _activeTabIdSnapshot;
+    if (!activeTabMatches(capturedTabId)) return false;
+    var nodes = getSkopeoNodes();
+    if (!nodes || nodes.row.dataset.state === 'active' || nodes.hint.disabled) return false;
+    try {
+      var created = chrome.tabs.create({ url: SHORTCUTS_URL });
+      if (created && typeof created.catch === 'function') created.catch(function () {});
+      return true;
+    } catch (_error) {
+      return false;
+    }
+  }
+
+  function initialize() {
+    if (_initialized) return true;
+    var nodes = getSkopeoNodes();
+    if (!nodes) return false;
+    nodes.toggle.addEventListener('click', handleSkopeoToggle);
+    nodes.hint.addEventListener('click', handleSkopeoShortcutClick);
+    chrome.runtime.onMessage.addListener(onSkopeoStatusMessage);
+    _initialized = true;
+    return true;
+  }
+
+  function activateTab(tabId) {
+    if (!positiveTabId(tabId)) return Promise.resolve(false);
+    var activation = claimActivation(tabId);
+    if (!activation) return Promise.resolve(false);
+    _activeTabIdSnapshot = tabId;
+    resetSkopeoControl(tabId);
+    return Promise.allSettled([
+      refreshSkopeoControl(tabId),
+      refreshSkopeoShortcut(tabId)
+    ]);
+  }
+
+  global.FSBSkopeoSidepanelController = Object.freeze({
+    initialize: initialize,
+    activateTab: activateTab,
+    renderSkopeoState: renderSkopeoState,
+    refreshSkopeoControl: refreshSkopeoControl,
+    handleSkopeoToggle: handleSkopeoToggle,
+    refreshSkopeoShortcut: refreshSkopeoShortcut,
+    handleSkopeoStatusEvent: handleSkopeoStatusEvent
+  });
+})(globalThis);
+/* FSB_SKOPEO_SIDEPANEL_CONTROLLER_END */
+
+try {
+  FSBSkopeoSidepanelController.initialize();
+} catch (_e) {
+  // Skopeo is an optional side-panel surface; unrelated chat must still boot.
+}
+
 function _getTabRunningEntry(tabId) {
   if (typeof tabId !== 'number') return { isRunning: false, sessionId: null, startedAt: null };
   var entry = _tabRunningMap.get(tabId);
@@ -215,15 +696,11 @@ async function initTabConversationStore() {
     var activeTabId = null;
     try {
       var tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (tabs && tabs[0] && typeof tabs[0].id === 'number') activeTabId = tabs[0].id;
+      if (tabs && tabs[0] && typeof tabs[0].id === 'number'
+          && Number.isSafeInteger(tabs[0].id) && tabs[0].id > 0) {
+        activeTabId = tabs[0].id;
+      }
     } catch (_e) { /* swallow */ }
-
-    // QT-93i-02 -- cache active tab id at boot so the per-tab map and
-    // setRunningState/setIdleState/setErrorState can resolve "active tab"
-    // BEFORE chrome.tabs.onActivated fires for the first time.
-    if (activeTabId !== null) {
-      _activeTabIdSnapshot = activeTabId;
-    }
 
     tabConvEnvelope = await FSBSidepanelTabConvStore.migrateLegacyConversationKey(
       function (keys) { return chrome.storage.session.get(keys); },
@@ -272,8 +749,17 @@ async function initTabConversationStore() {
 // conversation render their transcript, and they render the SAME
 // transcript that a fresh sidepanel reopen on that tab would.
 async function swapToTabConversation(tabId) {
+  var expectedSurfaceGeneration = typeof _activeTabSurfaceSyncGeneration === 'number'
+    ? _activeTabSurfaceSyncGeneration
+    : null;
+  var surfaceIsCurrent = function() {
+    return expectedSurfaceGeneration === null
+      || (typeof _activeTabSurfaceSyncGeneration === 'number'
+        && expectedSurfaceGeneration === _activeTabSurfaceSyncGeneration);
+  };
   try {
     await _envelopeReadyPromise;
+    if (!surfaceIsCurrent()) return false;
     if (typeof FSBSidepanelTabConvStore === 'undefined') return false;
     if (!FSBSidepanelTabConvStore.isValidEnvelope(tabConvEnvelope)) return false;
     var nextConvId = FSBSidepanelTabConvStore.getTabConversation(tabConvEnvelope, tabId);
@@ -284,9 +770,11 @@ async function swapToTabConversation(tabId) {
           : (typeof chatMessages.innerHTML === 'undefined' || chatMessages.innerHTML.length === 0));
       if (nextConvId && surfaceIsEmpty) {
         try { await hydrateChatFromConversationId(nextConvId); } catch (_e) { /* best-effort */ }
+        if (!surfaceIsCurrent()) return false;
       }
       return true;
     }
+    if (!surfaceIsCurrent()) return false;
     _delegationUiState.subscribed = false;
     conversationId = nextConvId; // may be null (D-17 lazy mint deferred)
     if (chatMessages && typeof chatMessages.innerHTML !== 'undefined') {
@@ -298,6 +786,7 @@ async function swapToTabConversation(tabId) {
     // null-convId / unminted-tab case where hydrate early-returns 0).
     if (nextConvId) {
       try { await hydrateChatFromConversationId(nextConvId); } catch (_e) { /* swallow */ }
+      if (!surfaceIsCurrent()) return false;
     }
     return true;
   } catch (_e) {
@@ -376,9 +865,18 @@ async function ensureTabConversationForActiveTab(overwrite) {
 //      is bound to a conversation. This is what a freshly opened panel (or
 //      one Chrome re-created) relies on, since it has no in-memory run.
 async function _adoptTabIntoRunningDelegationConversation(tabId) {
+  var expectedSurfaceGeneration = typeof _activeTabSurfaceSyncGeneration === 'number'
+    ? _activeTabSurfaceSyncGeneration
+    : null;
+  var surfaceIsCurrent = function() {
+    return expectedSurfaceGeneration === null
+      || (typeof _activeTabSurfaceSyncGeneration === 'number'
+        && expectedSurfaceGeneration === _activeTabSurfaceSyncGeneration);
+  };
   try {
     if (!Number.isSafeInteger(tabId)) return false;
     await _envelopeReadyPromise;
+    if (!surfaceIsCurrent()) return false;
     if (typeof FSBSidepanelTabConvStore === 'undefined'
         || !FSBSidepanelTabConvStore.isValidEnvelope(tabConvEnvelope)) return false;
     var existing = FSBSidepanelTabConvStore.getTabConversation(tabConvEnvelope, tabId);
@@ -392,14 +890,16 @@ async function _adoptTabIntoRunningDelegationConversation(tabId) {
     }
     if (!runConversationId) {
       runConversationId = await _delegationConversationForOwnedTab(tabId);
+      if (!surfaceIsCurrent()) return false;
     }
     if (!runConversationId) return false;
 
+    if (!surfaceIsCurrent()) return false;
     FSBSidepanelTabConvStore.ensureTabConversation(
       tabConvEnvelope, tabId, function() { return runConversationId; }
     );
     await _persistEnvelope();
-    return true;
+    return surfaceIsCurrent();
   } catch (_error) {
     return false;
   }
@@ -3903,7 +4403,7 @@ async function syncActiveTabSurface(tabId, windowId) {
   // Invalidate delegation hydration as soon as a tab transition begins. The
   // replacement hydration later in this function will mint its own generation.
   _delegationHydrationGeneration += 1;
-  let incomingTabId = Number.isSafeInteger(tabId) ? tabId : null;
+  let incomingTabId = Number.isSafeInteger(tabId) && tabId > 0 ? tabId : null;
   try {
     if (incomingTabId === null) {
       const query = Number.isSafeInteger(windowId)
@@ -3911,11 +4411,12 @@ async function syncActiveTabSurface(tabId, windowId) {
         : { active: true, currentWindow: true };
       const tabs = await chrome.tabs.query(query);
       if (syncGeneration !== _activeTabSurfaceSyncGeneration) return false;
-      incomingTabId = tabs && tabs[0] && Number.isSafeInteger(tabs[0].id)
+      incomingTabId = tabs && tabs[0] && Number.isSafeInteger(tabs[0].id) && tabs[0].id > 0
         ? tabs[0].id
         : null;
     }
 
+    const outgoingTabId = _activeTabIdSnapshot;
     if (incomingTabId === null) {
       if (syncGeneration !== _activeTabSurfaceSyncGeneration) return false;
       _chatLockedByOwnerChip = false;
@@ -3926,14 +4427,30 @@ async function syncActiveTabSurface(tabId, windowId) {
       return true;
     }
 
-    const outgoingTabId = _activeTabIdSnapshot;
-    if (outgoingTabId !== incomingTabId) {
+    const tabChanged = outgoingTabId !== incomingTabId;
+    if (tabChanged) {
       try { _persistTabStatusIntent(outgoingTabId); } catch (_e) { /* best-effort */ }
+    }
+
+    // This generation is the sole active-tab authority. Commit before any
+    // later await so Skopeo and the tab-scoped UI agree on the selected tab.
+    if (syncGeneration !== _activeTabSurfaceSyncGeneration) return false;
+    _activeTabIdSnapshot = incomingTabId;
+    if (tabChanged) {
+      try {
+        const activation = globalThis.FSBSkopeoSidepanelController
+          && globalThis.FSBSkopeoSidepanelController.activateTab(incomingTabId);
+        if (activation && typeof activation.catch === 'function') {
+          activation.catch(function () {});
+        }
+      } catch (_e) {
+        // Skopeo is optional; the winning tab remains authoritative.
+      }
     }
 
     const ownerState = await refreshActiveTabOwnership(incomingTabId, syncGeneration);
     if (syncGeneration !== _activeTabSurfaceSyncGeneration) return false;
-    if (!ownerState || ownerState.verified !== true) return false;
+    if (!ownerState || ownerState.verified !== true || ownerState.tabId !== incomingTabId) return false;
 
     if (typeof _adoptTabIntoRunningDelegationConversation === 'function') {
       await _adoptTabIntoRunningDelegationConversation(incomingTabId);
@@ -3976,7 +4493,6 @@ async function syncActiveTabSurface(tabId, windowId) {
     }
     if (syncGeneration !== _activeTabSurfaceSyncGeneration) return false;
 
-    _activeTabIdSnapshot = incomingTabId;
     try {
       var snap = _getTabRunningEntry(incomingTabId);
       if (snap.isRunning) setRunningState(incomingTabId, snap.sessionId || null);
@@ -3984,6 +4500,7 @@ async function syncActiveTabSurface(tabId, windowId) {
     } catch (_e) { /* best-effort */ }
     try { _restoreTabStatusIntent(incomingTabId); } catch (_e) { /* best-effort */ }
     try { await _hydrateDelegationForSelectedConversation(); } catch (_e) { /* best-effort */ }
+    if (syncGeneration !== _activeTabSurfaceSyncGeneration) return false;
     return syncGeneration === _activeTabSurfaceSyncGeneration;
   } catch (error) {
     console.warn('[sidepanel] active-tab sync failed', error && error.message ? error.message : error);

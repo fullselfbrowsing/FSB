@@ -1,7 +1,7 @@
 # Phase 64: OpenCode Adapter — Research
 
-**Researched:** 2026-07-20 [VERIFIED: codebase inspection]  
-**Overall confidence:** HIGH for the pinned OpenCode 1.14.25 CLI/source contract and repository integration map; MEDIUM for hermetic configuration because the safest isolation uses version-bound upstream test flags and genuine authenticated behavior is intentionally deferred. [VERIFIED: codebase inspection] [CITED: https://github.com/anomalyco/opencode/blob/v1.14.25/packages/opencode/src/config/config.ts]  
+**Researched:** 2026-07-20 [VERIFIED: codebase inspection]
+**Overall confidence:** HIGH for the pinned OpenCode 1.14.25 CLI/source contract and repository integration map; MEDIUM for hermetic configuration because the safest isolation uses version-bound upstream test flags and genuine authenticated behavior is intentionally deferred. [VERIFIED: codebase inspection] [CITED: https://github.com/anomalyco/opencode/blob/v1.14.25/packages/opencode/src/config/config.ts]
 **Scope:** Planning research and deterministic validation design only. No authenticated model call, live browser delegation, user OpenCode server, or provider credential was used. [VERIFIED: codebase inspection]
 
 <user_constraints>

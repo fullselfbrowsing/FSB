@@ -239,11 +239,20 @@ async function runRelayRecoveryCase() {
 }
 
 async function run() {
-  await runCase('server before extension', runServerBeforeExtensionCase);
-  await runCase('extension before server', runExtensionBeforeServerCase);
-  await runCase('server restart', runServerRestartCase);
-  await runCase('service-worker wake', runServiceWorkerWakeCase);
-  await runCase('relay recovery', runRelayRecoveryCase);
+  const previousHome = process.env.HOME;
+  const isolatedHome = fs.mkdtempSync(path.join(os.tmpdir(), 'fsb-mcp-lifecycle-'));
+  process.env.HOME = isolatedHome;
+  try {
+    await runCase('server before extension', runServerBeforeExtensionCase);
+    await runCase('extension before server', runExtensionBeforeServerCase);
+    await runCase('server restart', runServerRestartCase);
+    await runCase('service-worker wake', runServiceWorkerWakeCase);
+    await runCase('relay recovery', runRelayRecoveryCase);
+  } finally {
+    if (previousHome === undefined) delete process.env.HOME;
+    else process.env.HOME = previousHome;
+    fs.rmSync(isolatedHome, { recursive: true, force: true });
+  }
 
   console.log(`\n=== Results: ${passed} passed, ${failed} failed ===`);
   fs.rmSync(smokeHome, { recursive: true, force: true });

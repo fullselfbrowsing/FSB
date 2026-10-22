@@ -15,6 +15,7 @@ import { Meta, Title } from '@angular/platform-browser';
 import { RouterLink } from '@angular/router';
 
 import { HOST, buildLocaleUrl, emitLocaleHead } from '../../core/seo/locale-seo';
+import { APP_VERSION } from '../../core/seo/version';
 import { LanguagePickerComponent } from '../../layout/language-picker/language-picker.component';
 
 type PackageManager = 'pnpm' | 'npm';
@@ -99,6 +100,7 @@ export class ConciergePageComponent implements OnInit, AfterViewInit, OnDestroy 
   readonly copyLabel = $localize`:@@concierge.copy:Copy`;
   readonly copiedLabel = $localize`:@@concierge.copied:Copied`;
   readonly actionCodeHtml = ACTION_CODE_HTML;
+  readonly appVersion = APP_VERSION;
 
   pkg: PackageManager = 'pnpm';
   activeSection: ConciergeSection = 'install';

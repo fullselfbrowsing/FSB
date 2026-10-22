@@ -1,8 +1,8 @@
 # Phase 64: OpenCode Adapter — Pattern Map
 
-**Mapped:** 2026-07-20  
-**Phase inputs:** `64-CONTEXT.md`, `64-RESEARCH.md`, `64-UI-SPEC.md`, `64-VALIDATION.md`  
-**Proposed files classified:** 54  
+**Mapped:** 2026-07-20
+**Phase inputs:** `64-CONTEXT.md`, `64-RESEARCH.md`, `64-UI-SPEC.md`, `64-VALIDATION.md`
+**Proposed files classified:** 54
 **Closest analog clusters:** 5
 
 This phase should extend the Phase 60 delegation architecture, not fork it. OpenCode is the second member of the same closed provider system: the adapter still has exactly five methods, the supervisor still owns every process and secret, browser state still receives only sanitized provider identity, and terminal success still belongs to the supervisor rather than the stream parser.
@@ -504,56 +504,56 @@ Authenticated live capture and browser evidence are explicitly `human_needed` mi
 
 ### Exact records and closed rosters
 
-**Sources:** `registry.ts:46-95`, `compatibility.ts:70-176`, `mcp-agent-providers.js:25-166`  
+**Sources:** `registry.ts:46-95`, `compatibility.ts:70-176`, `mcp-agent-providers.js:25-166`
 **Apply to:** provider IDs, topology discriminators, compatibility rows, fixture contracts, drift reasons, runtime journal kinds, consent/trust records.
 
 Accept own data properties only, reject accessors/prototype tricks/unknown keys, require dense bounded arrays, and compare complete closed sets. Never replace a one-provider literal with an open string.
 
 ### Authority stays in the supervisor/background
 
-**Sources:** `claude-code.ts:31-35`, `spawn-supervisor.ts:730-819`, `background.js:1559-1593`  
+**Sources:** `claude-code.ts:31-35`, `spawn-supervisor.ts:730-819`, `background.js:1559-1593`
 **Apply to:** process creation, server ownership, secret minting, adapter selection, consent.
 
 Adapters describe; the supervisor spawns/kills/journals. The sidepanel requests; the background reads authoritative settings and authorizes. This is the central boundary to preserve.
 
 ### Immutable identity at acceptance
 
-**Sources:** `adapter.ts:111-121`, `delegation-controller.js:90-195`, `delegation-event-store.js:227-245`  
+**Sources:** `adapter.ts:111-121`, `delegation-controller.js:90-195`, `delegation-event-store.js:227-245`
 **Apply to:** SpawnSpec/topology, detection identity, compatibility rows, run provider metadata, stored snapshots.
 
 Reconstruct and deeply freeze values at module boundaries. Do not retain mutable caller objects or recompute a run's provider from current settings.
 
 ### Candidate versus authoritative terminal
 
-**Sources:** `claude-stream.ts:193-233`, `spawn-supervisor.ts:924-1062,1152-1173`, `delegation-event-store.js:293-319`  
+**Sources:** `claude-stream.ts:193-233`, `spawn-supervisor.ts:924-1062,1152-1173`, `delegation-event-store.js:293-319`
 **Apply to:** OpenCode parser, supervisor, controller/store.
 
 The parser decides protocol completeness and yields one candidate. The supervisor decides process success. The browser closes only on an explicit canonical terminal entry.
 
 ### Persist before publish
 
-**Sources:** `spawn-supervisor.ts:924-1008`, `delegation-controller.js:4-10,546-591`  
+**Sources:** `spawn-supervisor.ts:924-1008`, `delegation-controller.js:4-10,546-591`
 **Apply to:** process journals and browser events.
 
 Record recoverable state before acquiring/publishing authority. Journal before spawn/activation; append before fanout.
 
 ### Bounded, sanitized failures
 
-**Sources:** `claude-stream.ts:96-154,312-385`, `spawn-supervisor.ts:579-626`, `agent-protocol-drift-diagnostics.js:38-173`  
+**Sources:** `claude-stream.ts:96-154,312-385`, `spawn-supervisor.ts:579-626`, `agent-protocol-drift-diagnostics.js:38-173`
 **Apply to:** both parsers, MCP terminal details, browser diagnostics.
 
 Use closed reason/expected labels, bounded indices/paths, and provider id. Never forward raw native events, exception messages, paths, argv, environment, auth material, or stream fragments.
 
 ### Existing UI primitives only
 
-**Sources:** `providers-panel.js:58-129,288-350`, `delegation-feed.js:303-312`, `sidepanel.js:1934-2085`  
+**Sources:** `providers-panel.js:58-129,288-350`, `delegation-feed.js:303-312`, `sidepanel.js:1934-2085`
 **Apply to:** OpenCode Providers row and delegation lifecycle.
 
 Data-drive existing rows and copy. Do not add markup/CSS merely because a second provider exists.
 
 ### Preservation-aware commands
 
-**Sources:** `run-mcp-build-preserving-workspace.mjs:83-137,208-323,419-573`, `run-phase60-full-tests.mjs:476-777`  
+**Sources:** `run-mcp-build-preserving-workspace.mjs:83-137,208-323,419-573`, `run-phase60-full-tests.mjs:476-777`
 **Apply to:** every plan verification block that compiles MCP or runs broad suites.
 
 The command is successful only if tests pass and the pre-existing workspace/index identity is restored.
@@ -570,8 +570,8 @@ Every proposed file has at least a role-match analog. Three Phase 64 behaviors h
 
 ## Metadata
 
-**Analog search scope:** `mcp/src/agent-providers/`, MCP diagnostics/inventory/platform registry, `extension/utils/`, `extension/ui/`, `extension/background.js`, `tests/`, `scripts/`, root package/CI configuration.  
-**Representative files deeply analyzed:** 35 source, fixture, test, and runner files, plus the four Phase 64 inputs and pattern-mapper contract.  
-**Pattern extraction date:** 2026-07-20  
-**Coverage:** 48 files with an exact/self or sibling analog; 6 files with a role-match analog; 0 files without any analog.  
+**Analog search scope:** `mcp/src/agent-providers/`, MCP diagnostics/inventory/platform registry, `extension/utils/`, `extension/ui/`, `extension/background.js`, `tests/`, `scripts/`, root package/CI configuration.
+**Representative files deeply analyzed:** 35 source, fixture, test, and runner files, plus the four Phase 64 inputs and pattern-mapper contract.
+**Pattern extraction date:** 2026-07-20
+**Coverage:** 48 files with an exact/self or sibling analog; 6 files with a role-match analog; 0 files without any analog.
 **Planner caution:** “verification-only” files should not receive speculative edits. Write a failing test or find a concrete hard-coded assumption before changing already-generic production code.

@@ -1,0 +1,53 @@
+{
+  "version": "skopeo-hud-evals/v1",
+  "fixture_policy": "synthetic-or-irreversibly-redacted",
+  "network_allowed": false,
+  "llm_judge_allowed": false,
+  "configured_provider_run_allowed": false,
+  "provisional_results_are_gold": false,
+  "domain_fidelity_policy": "human_needed_until_genuine_required_role_approval",
+  "authorized_live_drive_docs_policy": "human_needed_until_authorized_live_observation",
+  "case_file": "cases.json",
+  "ordered_case_ids": [
+    "E01", "E02", "E03", "E04", "E05", "E06", "E07", "E08", "E09",
+    "E10", "E11", "E12", "E13", "E14", "E15", "E16", "E17", "E18", "E19",
+    "R01", "R02", "R03", "R04", "R05", "R06", "S01",
+    "A01", "A02", "A03", "A04", "A05", "A06", "A07", "X01"
+  ],
+  "category_counts": {
+    "semantic": 19,
+    "runtime-security": 6,
+    "hostile-input": 1,
+    "admission": 7,
+    "accessibility-lifecycle": 1
+  },
+  "caps": {
+    "vendors": 32,
+    "vendor_page": 8,
+    "summary_dates": 3,
+    "summary_urgent_gaps": 4,
+    "vendor_gaps": 3,
+    "reading_facts": 10,
+    "reading_conflicts_gaps": 6
+  },
+  "forbidden_disclosure_probes": [
+    "rawUrl", "sourceFileId", "rootFileId", "tabId", "accountId",
+    "storageKey", "raw page text", "providerData"
+  ],
+  "forbidden_control_probes": [
+    "Ask Skopeo", "Draft notice", "Send notice", "Approve", "Document 10",
+    "Edit policy", "Schedule notification", "Mark memo required"
+  ],
+  "production_versions": {
+    "projection": "skopeo-hud-projection/1",
+    "projector": "skopeo-hud-projector/1",
+    "contract_model": "skopeo-contract-view/1"
+  },
+  "provisional_oracle_sha256": "dceba0e80442172aba68f838a77114d868d4e205dcb0e79cbb4d1319e40fe96a",
+  "report_lines": [
+    "deterministic_structural_security",
+    "provisional_regression",
+    "domain_fidelity",
+    "authorized_live_drive_docs"
+  ]
+}

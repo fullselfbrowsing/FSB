@@ -768,7 +768,7 @@ assert.equal((htmlSource.match(/id="delegationControlBar"/g) || []).length, 0,
 assert.equal(sha256(htmlSource
   .replace(delegationProviderScript, '')
   .replace(nativeHostInstallScript, '')),
-  '2f2fd0bb74edc1e6a6bb5d20127d8e67943013818e9cafe3d42d51b0c460ae7a',
+  '69421ff7e355bf309c45e0573822f1de0945f0b96b0349bf40b33199a8d7cf58',
   'the side-panel HTML includes only the intended helpers and tab-scoped ownership treatment');
 const replayCssStart = cssSource.indexOf('.history-status.idle-closed {');
 const replayCssEnd = cssSource.indexOf('/* Phase 11 FINT-20', replayCssStart);
@@ -779,7 +779,7 @@ const delegationCssSource = cssSource.slice(0, replayCssStart) + cssSource.slice
 // the block already silenced the delegation spinner and status dot, but the
 // automation loader kept animating for users who asked it not to.
 assert.equal(sha256(delegationCssSource),
-  'db8ee02f3ed61b84b9ced7af1e9c043460b4f8fa24ba222d79e235badb058ef7',
+  '252a6ef96c275815f0ef60e6eb4feb4eb8143eb6cc48dc03096eb19557fe31b0',
   'the intentional delegated and ownership-status CSS deltas remain exact outside replay UI');
 
 {

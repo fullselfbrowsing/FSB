@@ -742,6 +742,7 @@ function buildMcpClientsRuntimeHarness({ readCachedImpl, refreshImpl }) {
   const handlerSource = backgroundSource.slice(start, end);
   const context = {
     chrome: { runtime: { id: 'mcp-clients-runtime-extension' } },
+    fsbHandlesTrustedFeatureAction() { return false; },
     armMcpBridge() {},
     fsbHandleDelegationCommand() { return null; },
     automationLogger: { logComm() {} },
@@ -2421,6 +2422,7 @@ function buildPairingRuntimeHarness(reloadImpl) {
   const calls = [];
   const context = {
     chrome: { runtime: { id: 'pairing-runtime-extension' } },
+    fsbHandlesTrustedFeatureAction() { return false; },
     armMcpBridge() {},
     fsbHandleDelegationCommand() { return null; },
     automationLogger: { logComm() {} },

@@ -10,8 +10,8 @@ iteration: 2
 
 # Phase 65 Code Review Fix Report
 
-**Fixed at:** 2026-07-22T17:22:31Z  
-**Source review:** `.planning/phases/65-codex-adapter/65-REVIEW.md`  
+**Fixed at:** 2026-07-22T17:22:31Z
+**Source review:** `.planning/phases/65-codex-adapter/65-REVIEW.md`
 **Iteration:** 2
 
 Both iteration-2 findings were fixed. No finding was skipped. The already-closed
@@ -21,8 +21,8 @@ W-02 finding was preserved and is not counted in this iteration.
 
 ### CR-01 — App-server stdin closed before `config/read` completed
 
-**Status:** fixed  
-**Commit:** `42420ba0` (`fix(65): await Codex config response before EOF`)  
+**Status:** fixed
+**Commit:** `42420ba0` (`fix(65): await Codex config response before EOF`)
 **Files modified:** `mcp/src/agent-providers/adapter.ts`,
 `mcp/src/agent-providers/codex-profile.ts`,
 `mcp/src/agent-providers/effective-authority.ts`,
@@ -60,8 +60,8 @@ event emission, and task stdin while retaining zeroization and tree settlement.
 
 ### W-01 — Successful probes did not settle detached descendants
 
-**Status:** fixed  
-**Commit:** `067464a3` (`fix(65): settle successful probe trees`)  
+**Status:** fixed
+**Commit:** `067464a3` (`fix(65): settle successful probe trees`)
 **Files modified:** `mcp/src/agent-providers/process-probe.ts`,
 `mcp/src/agent-providers/process-tree.ts`, and
 `tests/mcp-codex-adapter.test.js`
@@ -99,6 +99,6 @@ as human UAT in `65-HUMAN-UAT.md`; they are not code-review findings.
 
 ---
 
-_Fixed: 2026-07-22T17:22:31Z_  
-_Fixer: Codex (`gsd-code-review` / `gsd-autonomous`)_  
+_Fixed: 2026-07-22T17:22:31Z_
+_Fixer: Codex (`gsd-code-review` / `gsd-autonomous`)_
 _Iteration: 2_

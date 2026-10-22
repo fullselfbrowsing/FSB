@@ -1,0 +1,51 @@
+{
+  "version": "skopeo-truth-evals/v1",
+  "fixture_policy": "synthetic-or-irreversibly-redacted",
+  "network_allowed": false,
+  "llm_judge_allowed": false,
+  "configured_provider_run_allowed": false,
+  "domain_fidelity_policy": "human_needed_until_genuine_required_role_approval",
+  "case_file": "cases.json",
+  "ordered_case_ids": [
+    "G01", "G02", "G03", "G04", "G05", "G06",
+    "F01", "F02", "F03", "F04", "F05", "F06",
+    "D01", "D02", "D03", "D04", "D05", "D06",
+    "R01", "R02", "R03", "R04", "R05", "R06"
+  ],
+  "category_counts": {
+    "G": 6,
+    "F": 6,
+    "D": 6,
+    "R": 6
+  },
+  "category_names": {
+    "G": "governing-lineage",
+    "F": "fact-evidence",
+    "D": "deadline",
+    "R": "runtime-security"
+  },
+  "production_versions": {
+    "fixture": "skopeo-truth-evals/v1",
+    "truth_schema": "skopeo-truth-schema/1",
+    "prompt": "skopeo-truth-extraction-prompt/1",
+    "extractor": "skopeo-truth-extractor/v1",
+    "adjudicator": "skopeo-lineage-adjudicator/1",
+    "deadline": "skopeo-deadline-engine/1",
+    "calendar": "skopeo-business-calendar/1",
+    "store": "skopeo-truth-store/1",
+    "runtime": "skopeo-truth-engine/1",
+    "graph_snapshot": "skopeo-graph-exact-set/1"
+  },
+  "required_reviewer_role_codes": [
+    "commercial-contracts-counsel",
+    "legal-operations",
+    "source-system-steward",
+    "privacy-security",
+    "evaluation-lead"
+  ],
+  "report_lines": [
+    "deterministic_structural_security",
+    "provisional_regression",
+    "domain_fidelity"
+  ]
+}

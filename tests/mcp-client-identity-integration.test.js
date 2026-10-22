@@ -218,6 +218,7 @@ function loadRuntimeQueryHarness(providers, registry) {
     Promise,
     setTimeout,
     clearTimeout,
+    fsbHandlesTrustedFeatureAction() { return false; },
     armMcpBridge() {},
     fsbHandleDelegationCommand() { return null; },
     automationLogger: { logComm() {} },

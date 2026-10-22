@@ -1119,7 +1119,7 @@
         </context-group>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.ts</context>
-          <context context-type="linenumber">34</context>
+          <context context-type="linenumber">35</context>
         </context-group>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/home/home-page.component.ts</context>
@@ -3547,7 +3547,7 @@
         <target state="translated">FSB Full Self-Browsing 로고</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.ts</context>
-          <context context-type="linenumber">33</context>
+          <context context-type="linenumber">34</context>
         </context-group>
       </trans-unit>
       <trans-unit id="concierge.copy" datatype="html">
@@ -3555,7 +3555,7 @@
         <target state="translated">복사</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.ts</context>
-          <context context-type="linenumber">99</context>
+          <context context-type="linenumber">100</context>
         </context-group>
       </trans-unit>
       <trans-unit id="concierge.copied" datatype="html">
@@ -3563,7 +3563,7 @@
         <target state="translated">복사됨</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.ts</context>
-          <context context-type="linenumber">100</context>
+          <context context-type="linenumber">101</context>
         </context-group>
       </trans-unit>
       <trans-unit id="concierge.meta.title" datatype="html">
@@ -3571,7 +3571,7 @@
         <target state="translated">Concierge - 안전한 동작 계층</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.ts</context>
-          <context context-type="linenumber">132</context>
+          <context context-type="linenumber">134</context>
         </context-group>
       </trans-unit>
       <trans-unit id="concierge.meta.description" datatype="html">
@@ -3579,7 +3579,7 @@
         <target state="translated">Concierge는 에이전트를 위한 웹 애플리케이션의 안전한 동작 계층입니다. 유형화된 동사, 실시간 카탈로그, 동의에 결속된 전달, 서명되고 재생이 방지된 배치를 제공합니다.</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.ts</context>
-          <context context-type="linenumber">133</context>
+          <context context-type="linenumber">135</context>
         </context-group>
       </trans-unit>
       <trans-unit id="concierge.schema.subcategory" datatype="html">
@@ -3587,7 +3587,7 @@
         <target state="translated">에이전트를 위한 웹 애플리케이션의 안전한 동작 계층</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.ts</context>
-          <context context-type="linenumber">236</context>
+          <context context-type="linenumber">238</context>
         </context-group>
       </trans-unit>
       <trans-unit id="concierge.schema.description" datatype="html">
@@ -3595,7 +3595,7 @@
         <target state="translated">Concierge는 협조하는 애플리케이션이 유형화된 동사를 게시하고, 실시간 동작 카탈로그를 확정하며, 실행을 애플리케이션 자체의 상태와 정책과 인터페이스 뒤에 두도록 합니다.</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/concierge/concierge-page.component.ts</context>
-          <context context-type="linenumber">239</context>
+          <context context-type="linenumber">241</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.template.001" datatype="html">

@@ -10,8 +10,8 @@ needs_human_review: false
 
 # Phase 57 — UI Review
 
-**Audited:** 2026-07-12  
-**Baseline:** `57-UI-SPEC.md` approved zero-visible-delta contract  
+**Audited:** 2026-07-12
+**Baseline:** `57-UI-SPEC.md` approved zero-visible-delta contract
 **Screenshots:** Not captured. No dev server responded on ports 3000, 5173, or 8080, and Phase 57 intentionally changes no rendered UI. The byte/source/timing locks provide the relevant verification for this data-only phase.
 
 ---

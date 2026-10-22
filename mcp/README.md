@@ -38,11 +38,19 @@ Use this package when you want your AI client to drive the browser directly whil
 
 > **PhantomStream (engineering milestone 0.12.0):** the dashboard live-preview and remote-control relay are now powered by the published `@full-self-browsing/phantom-stream` package on the extension and showcase side. This is an internal capture/renderer/transport change — the MCP tool schemas, routes, and bridge contracts in this server are unchanged.
 
+### What's New In v1.0.0
+
+This is the unified product version release. Full details live in `CHANGELOG.md`.
+
+- The FSB extension, showcase, skill, documentation, and store metadata align at 1.0.0, and `fsb-mcp-server` advances to 1.0.0 alongside them.
+- Runtime behavior, MCP wire contracts, tool schemas, installer behavior, and dependency versions are unchanged from 0.11.2, including its dark-logo server icon.
+- **Compatibility:** `fsb-mcp-server` 1.0.0 requires FSB extension 1.0.0 or newer for `mcp:task-status`. Upgrade the extension and restart the MCP host together.
+
 ### What's New In v0.11.2
 
 - The FSB dark logo ships with the MCP package and is advertised as an embedded PNG server icon. Update the package and restart the MCP host to make it available to clients that render MCP icons.
 - The MCP Registry uses the matching hosted dark logo. Rendering remains client-controlled.
-- **Compatibility:** `fsb-mcp-server` 0.11.2 requires FSB extension 0.9.92 or newer for `mcp:task-status`. Upgrade the extension and restart the MCP host together.
+- **0.11.2 compatibility:** `fsb-mcp-server` 0.11.2 requires FSB extension 0.9.92 or newer for `mcp:task-status`. Upgrade the extension and restart the MCP host together.
 
 ### What's New In v0.11.1
 
@@ -664,9 +672,9 @@ The build command copies `extension/ai/tool-definitions.js` into `mcp/ai/tool-de
 
 ### Versioning
 
-The MCP package has its own version (`0.11.2`) because it is published independently from the extension release (`0.9.92`). Use `npm run version:set:mcp -- X.Y.Z` for MCP releases and `npm run version:set:extension -- X.Y.Z` for extension releases; `npm run version:check` verifies both domains without requiring them to match.
+The MCP package has its own version (`1.0.0`) because it is published independently from the extension release (`1.0.0`). Use `npm run version:set:mcp -- X.Y.Z` for MCP releases and `npm run version:set:extension -- X.Y.Z` for extension releases; `npm run version:check` verifies both domains without requiring them to match.
 
-Compatibility for this release: MCP 0.11.2 requires extension 0.9.92 or newer for the `mcp:task-status` route used by `complete_task`, `partial_task`, and `fail_task`. Existing `0.10.0` tool routes remain additive and unchanged.
+Compatibility for this release: MCP 1.0.0 requires extension 1.0.0 or newer for the `mcp:task-status` route used by `complete_task`, `partial_task`, and `fail_task`. Existing `0.10.0` tool routes remain additive and unchanged.
 
 Contract-sensitive changes should be covered by tests before publishing:
 
@@ -680,14 +688,14 @@ Contract-sensitive changes should be covered by tests before publishing:
 - trigger contract: `trigger`, `stop_trigger`, `get_trigger_status`, `list_triggers`, blocking/detached reporting, and local browser-open limits
 - terminal task-outcome contract: `mcp:task-status`, agent/ownership context, serialized lifecycle ordering, and `fail_task` acknowledgement semantics
 
-### Releasing 0.11.2
+### Releasing 1.0.0
 
-This 0.11.2 build is release-prep ready. Merging a new MCP version into `main` automatically publishes the verified npm package to `latest` and creates its `mcp-vX.Y.Z` tag and GitHub release. Main pushes whose MCP version is already published skip publishing. Bump the MCP version with `npm run version:set:mcp -- X.Y.Z` before merging a new release.
+This 1.0.0 build is release-prep ready. Merging a new MCP version into `main` automatically publishes the verified npm package to `latest` and creates its `mcp-vX.Y.Z` tag and GitHub release. Main pushes whose MCP version is already published skip publishing. Bump the MCP version with `npm run version:set:mcp -- X.Y.Z` before merging a new release.
 
 To publish:
 
 - Preferred: merge the versioned release into `main`; the npm workflow builds the Windows native-host artifacts, verifies the packed payload, publishes to npm, and creates the release automatically.
-- Explicit tag alternative: for an unpublished version already on `main`, run `git tag mcp-v0.11.2 && git push origin mcp-v0.11.2`. Tag-triggered releases still require the tag to match the package version and reject an already-published version.
+- Explicit tag alternative: for an unpublished version already on `main`, run `git tag mcp-v1.0.0 && git push origin mcp-v1.0.0`. Tag-triggered releases still require the tag to match the package version and reject an already-published version.
 - Manual MCP fallback: from the release commit, run `cd mcp && npm publish --tag latest` only after confirming `npm whoami`, `npm --prefix mcp run build`, and the MCP smoke/parity/schema gates all pass.
 
 Use the release workflow for normal releases so the native-host packaging and integrity checks run before publication.

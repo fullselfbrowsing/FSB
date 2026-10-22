@@ -45,7 +45,7 @@ const prePhase61ExtensionPermissions = [
 ];
 const phase63ExtensionPermissions = [
   'activeTab', 'scripting', 'storage', 'unlimitedStorage', 'tabs', 'windows',
-  'sidePanel', 'debugger', 'webNavigation', 'alarms', 'clipboardWrite',
+  'sidePanel', 'debugger', 'webNavigation', 'alarms', 'notifications', 'clipboardWrite',
   'offscreen', 'nativeMessaging', 'system.memory',
 ];
 const phase63ExactProductionDependencies = Object.freeze({
@@ -622,7 +622,7 @@ async function run() {
   );
   assert(
     JSON.stringify(manifest.permissions) === JSON.stringify(phase63ExtensionPermissions),
-    'Phase 63 permission roster is the established ordered roster plus nativeMessaging',
+    'merged permission roster retains nativeMessaging and Skopeo notifications',
   );
   assert(
     JSON.stringify(manifest.host_permissions) === JSON.stringify(['<all_urls>']),

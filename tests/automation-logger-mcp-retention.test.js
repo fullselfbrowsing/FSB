@@ -10,7 +10,9 @@ const path = require('path');
 const vm = require('vm');
 
 const LOGGER_PATH = path.resolve(__dirname, '..', 'extension', 'utils', 'automation-logger.js');
+const STORE_PATH = path.resolve(__dirname, '..', 'extension', 'utils', 'trusted-local-feature-store.js');
 const LOGGER_SOURCE = fs.readFileSync(LOGGER_PATH, 'utf8');
+const TRUSTED_STORE = require(STORE_PATH);
 
 let passed = 0;
 let failed = 0;
@@ -36,8 +38,8 @@ function makeStorage(initial, delayMs) {
     store,
     async get(keys) {
       const requested = Array.isArray(keys) ? keys : [keys];
-      // Snapshot at invocation time. Without the logger's mutation lock, two
-      // concurrent saves would both read the same stale state and one wins.
+      // Snapshot at invocation time. The background trusted store must keep
+      // concurrent read-modify-write cycles on its private write lane.
       const snapshot = {};
       for (const key of requested) {
         if (Object.prototype.hasOwnProperty.call(store, key)) snapshot[key] = clone(store[key]);
@@ -58,8 +60,13 @@ function makeStorage(initial, delayMs) {
 }
 
 function loadLogger(storage) {
+  const chrome = { runtime: { id: 'test-extension' }, storage: { local: storage } };
+  const trustedStore = TRUSTED_STORE.create({ chrome });
   const sandbox = {
-    chrome: { runtime: { id: 'test-extension' }, storage: { local: storage } },
+    // The logger/content-side VM receives runtime messaging only. The local
+    // storage area is held exclusively by the injected background store.
+    chrome: { runtime: chrome.runtime },
+    fsbTrustedLocalFeatureStore: trustedStore,
     console: { log() {}, warn() {}, error() {} },
     setTimeout() { return 1; },
     clearTimeout() {},
@@ -105,6 +112,9 @@ function actionRecord(sessionId, marker) {
 }
 
 (async function main() {
+  check(!/chrome\s*\.\s*storage\s*\.\s*local/.test(LOGGER_SOURCE),
+    'AutomationLogger has no direct chrome.storage.local authority');
+
   console.log('--- AutomationLogger concurrent save serialization ---');
   {
     const storage = makeStorage({ fsbMcpSessionRetentionDays: 30 }, 8);
@@ -554,6 +564,108 @@ function actionRecord(sessionId, marker) {
       'serialized full and index rows retain partial outcome details');
     check(full.actionHistory.length === 1 && full.actionHistory[0].tool === 'click',
       'serialized outcome patch leaves the saved replay history intact');
+  }
+
+  console.log('\n--- AutomationLogger trusted replay and log redaction ---');
+  {
+    const bridgeSecret = 'fsb-auth.' + 'B'.repeat(43);
+  const apiSecret = 'sk_' + 'live_super_secret_value';
+    const sessionId = 'redacted-replay';
+    const storage = makeStorage({ fsbSessionLogs: {}, fsbSessionIndex: [] }, 0);
+    const logger = loadLogger(storage);
+    logger.logs = [{
+      timestamp: new Date().toISOString(),
+      level: 'warn',
+      message: `request failed Bearer provider-token ${bridgeSecret}`,
+      data: {
+        sessionId,
+        provider: `api_key=${apiSecret}`,
+        action: `navigate-${bridgeSecret}`,
+        rawResponse: `provider body ${apiSecret}`
+      }
+    }, {
+      timestamp: new Date().toISOString(),
+      level: 'debug',
+      message: 'prompt must not persist',
+      data: { sessionId, logType: 'prompt', systemPrompt: `prompt-body-${bridgeSecret}` }
+    }, {
+      timestamp: new Date().toISOString(),
+      level: 'debug',
+      message: 'raw response must not persist',
+      data: { sessionId, logType: 'rawResponse', rawResponse: `raw-body-${apiSecret}` }
+    }];
+
+    const saved = await logger.saveSession(sessionId, {
+      task: `inspect ${bridgeSecret}`,
+      mode: 'mcp-agent',
+      startTime: Date.now(),
+      status: 'completed',
+      actionHistory: [{
+        tool: 'click',
+        params: { text: `credential ${apiSecret}` },
+        result: { success: true, body: `raw-result-${bridgeSecret}` },
+        timestamp: Date.now(),
+        logicalTab: 'primary'
+      }],
+      replay: {
+        version: '1.0',
+        integrity: 'verified',
+        provenance: 'capture',
+        manifest: {
+          kind: 'fsb.replay-manifest',
+          version: 1,
+          provenance: 'capture',
+          sessionId,
+          task: `replay ${bridgeSecret}`,
+          recordedAt: Date.now(),
+          source: { mode: 'mcp-agent', client: `client-${bridgeSecret}` },
+          startUrl: `https://example.test/start?token=${bridgeSecret}`,
+          startOrigin: 'https://example.test',
+          startUrlState: 'known',
+          tabs: [],
+          outcome: { status: 'completed', outcome: 'success', reason: null },
+          steps: [{
+            id: 'step-1',
+            index: 0,
+            timestamp: Date.now(),
+            tool: 'type',
+            route: 'legacy',
+            arguments: { text: `authorization=${apiSecret}` },
+            result: { success: true, note: `Bearer replay-token ${bridgeSecret}` },
+            success: true,
+            target: {
+              logicalTab: 'primary',
+              url: `https://example.test/form?token=${bridgeSecret}`,
+              origin: 'https://example.test',
+              redacted: true
+            },
+            replay: { risk: 'write', availability: 'approval-once', reason: bridgeSecret }
+          }]
+        },
+        counts: { total: 1, executable: 1, approvalRequired: 1, blocked: 0 },
+        receipt: { note: `receipt-${bridgeSecret}` }
+      }
+    });
+
+    const persisted = storage.store.fsbSessionLogs[sessionId];
+    const serialized = JSON.stringify(persisted);
+    check(saved === true, 'trusted store accepts the redaction fixture');
+    check(persisted.logs.length === 1 && persisted.logs[0].message.includes('[redacted]'),
+      'prompt/raw-response records are dropped and the retained log is redacted');
+    check(!serialized.includes(bridgeSecret) && !serialized.includes(apiSecret) &&
+          !serialized.includes('provider-token') && !serialized.includes('replay-token'),
+      'session and replay persistence contain no bridge, API-key, or Bearer credential');
+    check(serialized.includes('[REDACTED_FSB_BRIDGE_SECRET]'),
+      'session and replay persistence use the stable bridge-secret replacement');
+    check(!serialized.includes('prompt-body-') && !serialized.includes('raw-body-') &&
+          !serialized.includes('raw-result-'),
+      'prompt bodies, raw responses, and action result payloads do not cross the trusted boundary');
+    check(persisted.replay.manifest.steps.length === 1 &&
+          persisted.replay.manifest.steps[0].target.redacted === true,
+      'sanitized replay structure and redaction marker remain usable');
+    check(!Object.hasOwn(persisted.actionHistory[0], 'params') &&
+          !Object.hasOwn(persisted.actionHistory[0], 'result'),
+      'legacy action history retains replay metadata without raw params or results');
   }
 
   console.log('\n--- AutomationLogger pending persistence cannot resurrect pruned logs ---');
