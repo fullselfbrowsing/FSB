@@ -4,6 +4,7 @@ import type { WebSocketBridge } from '../bridge.js';
 import type { TaskQueue } from '../queue.js';
 import { AgentScope } from '../agent-scope.js';
 import { mapFSBError } from '../errors.js';
+import { mcpToolDescription, mcpParamDescription } from './descriptions.js';
 
 // Approved visual-session client labels (must match the extension's allowlist)
 const MCP_VISUAL_CLIENT_LABELS: string[] = [
@@ -45,12 +46,12 @@ export function registerVisualSessionTools(
 ): void {
   server.tool(
     'start_visual_session',
-    '[REMOVED in v0.9.0] This tool was removed in fsb-mcp-server v0.9.0 (FSB v0.9.62 implicit visual-session contract). Calling it returns the typed TOOL_REMOVED error with a migration recipe pointer. The visual session is now implicit on every action tool call via the required visual_reason + client field bundle -- there is no longer a separate start call. See CHANGELOG.md#v0.9.0 and the Visual Session Lifecycle section of mcp/README.md for the migration recipe.',
+    mcpToolDescription('start_visual_session'),
     {
-      client: z.string().describe('Trusted MCP client label, for example Codex, ChatGPT, Claude, or Gemini. Must be on the approved allowlist.'),
-      task: z.string().describe('Short task title shown in the visible automation surface.'),
-      detail: z.string().optional().describe('Optional initial detail line for the overlay, such as "Preparing checkout flow".'),
-      tab_id: z.coerce.number().int().positive().finite().optional().describe('Optional. Tab id the visual session attaches to. Omit when this agent owns exactly one tab; required to disambiguate when this agent owns multiple. Legacy popup/sidepanel/autopilot do not need to pass this.'),
+      client: z.string().describe(mcpParamDescription('start_visual_session', 'client')),
+      task: z.string().describe(mcpParamDescription('start_visual_session', 'task')),
+      detail: z.string().optional().describe(mcpParamDescription('start_visual_session', 'detail')),
+      tab_id: z.coerce.number().int().positive().finite().optional().describe(mcpParamDescription('start_visual_session', 'tab_id')),
     },
     async () => {
       // Phase 258 Plan 01 -- TOOL_REMOVED stub. Synchronous rejection
@@ -69,10 +70,10 @@ export function registerVisualSessionTools(
 
   server.tool(
     'end_visual_session',
-    '[REMOVED in v0.9.0] This tool was removed in fsb-mcp-server v0.9.0 (FSB v0.9.62 implicit visual-session contract). Calling it returns the typed TOOL_REMOVED error with a migration recipe pointer. The visual session now clears either automatically after 60 seconds of silence (sliding window) or immediately when an action tool is called with is_final: true -- there is no longer a separate end call. See CHANGELOG.md#v0.9.0 and the Visual Session Lifecycle section of mcp/README.md for the migration recipe.',
+    mcpToolDescription('end_visual_session'),
     {
-      session_token: z.string().describe('Session token returned by start_visual_session.'),
-      reason: z.enum(['cancelled', 'ended']).optional().describe('Optional end reason for analytics/debugging.'),
+      session_token: z.string().describe(mcpParamDescription('end_visual_session', 'session_token')),
+      reason: z.enum(['cancelled', 'ended']).optional().describe(mcpParamDescription('end_visual_session', 'reason')),
     },
     async () => {
       // Phase 258 Plan 01 -- TOOL_REMOVED stub. Synchronous rejection

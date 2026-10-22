@@ -5,6 +5,7 @@ import type { TaskQueue } from '../queue.js';
 import { AgentScope } from '../agent-scope.js';
 import { sendAgentScopedBridgeMessage } from '../agent-bridge.js';
 import { mapFSBError } from '../errors.js';
+import { mcpToolDescription, mcpParamDescription } from './descriptions.js';
 
 // invoke_capability does a real authenticated network round-trip in the page
 // MAIN world (interpretRecipe -> executeBoundSpec), so it gets a longer timeout
@@ -40,12 +41,12 @@ export function registerCapabilityTools(
   // enqueue() below serializes instead of bypassing (search_memory precedent).
   server.tool(
     'search_capabilities',
-    'Search the FSB capability catalog by intent. Use before DOM tools for first-party actions on the current site. Returns up to topN ranked capabilities with slug, service, side-effect class (read/mutate/destructive), readiness status, description, and params JSON-Schema (schema-on-hit). Results are biased toward the resolved tab origin; only t1-ready hits are direct API executable.',
+    mcpToolDescription('search_capabilities'),
     {
-      query: z.string().describe('Natural-language intent, e.g. "show my github notifications"'),
-      origin: z.string().optional().describe('Optional expected-origin hint (e.g. "https://github.com"). For agent-scoped calls, omit to use the resolved owned tab origin; if supplied, it must match that tab origin. Legacy callers may still use it as an origin override.'),
-      tab_id: z.coerce.number().int().positive().finite().optional().describe('Optional tab id; omit to use the active/owned tab'),
-      topN: z.coerce.number().int().positive().finite().optional().describe('Max results (default 5, max 5)'),
+      query: z.string().describe(mcpParamDescription('search_capabilities', 'query')),
+      origin: z.string().optional().describe(mcpParamDescription('search_capabilities', 'origin')),
+      tab_id: z.coerce.number().int().positive().finite().optional().describe(mcpParamDescription('search_capabilities', 'tab_id')),
+      topN: z.coerce.number().int().positive().finite().optional().describe(mcpParamDescription('search_capabilities', 'topN')),
     },
     async ({ query, origin, tab_id, topN }) => {
       if (!bridge.isConnected) {
@@ -77,11 +78,11 @@ export function registerCapabilityTools(
   // precedent), so a mutating invoke can never race an in-flight mutation.
   server.tool(
     'invoke_capability',
-    'Invoke a capability by slug (from a search_capabilities hit) with validated params. Verified T1/T1b capabilities execute the service\'s real web API in your authenticated session and return a structured result; guarded or catalog-tail hits return typed pending/fallback responses. Mutating ready capabilities perform real side effects -- check the side-effect class first. If it returns RECIPE_DOM_FALLBACK_PENDING, RECIPE_LEARN_PENDING, or RECIPE_EXPIRED, continue the same task with DOM tools.',
+    mcpToolDescription('invoke_capability'),
     {
-      slug: z.string().describe('Capability slug from a search_capabilities hit'),
-      params: z.record(z.any()).optional().describe('Parameters matching the hit\'s params JSON-Schema'),
-      tab_id: z.coerce.number().int().positive().finite().optional().describe('Optional tab id; omit to use the active/owned tab'),
+      slug: z.string().describe(mcpParamDescription('invoke_capability', 'slug')),
+      params: z.record(z.any()).optional().describe(mcpParamDescription('invoke_capability', 'params')),
+      tab_id: z.coerce.number().int().positive().finite().optional().describe(mcpParamDescription('invoke_capability', 'tab_id')),
     },
     async ({ slug, params, tab_id }) => {
       if (!bridge.isConnected) {

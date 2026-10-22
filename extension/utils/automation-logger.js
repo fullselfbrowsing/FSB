@@ -231,6 +231,183 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
     }
   }
 
+  // Phase 66 (MEAS-01; D-05, D-09, D-10): autopilot measurement fields and
+  // per-call durations survive session saves. Unmeasured values persist as
+  // null, never 0. Callers treat undefined as "keep what is stored".
+  function cloneIterationTimingForPersistence(rows) {
+    if (!Array.isArray(rows)) return undefined;
+    try {
+      const plainRows = rows.filter(row => !!row && typeof row === 'object' && !Array.isArray(row));
+      return JSON.parse(JSON.stringify(plainRows.slice(-100)));
+    } catch (_e) {
+      return undefined;
+    }
+  }
+
+  function cloneMeasurementSummaryForPersistence(summary) {
+    if (!summary || typeof summary !== 'object' || Array.isArray(summary)) return undefined;
+    try {
+      return JSON.parse(JSON.stringify(summary));
+    } catch (_e) {
+      return undefined;
+    }
+  }
+
+  // Phase 68 (AUTO-04, D-23): the fast-mode measurement block persists only
+  // when a session has one, as a fresh object built from the keys below. A
+  // string survives only as a code word or a bounded model id, so no label,
+  // URL or page text can be stored; a number that is missing or not finite
+  // stays null, never 0. Jev cost stays in this block: it is never added to
+  // the legacy session cost or the provider measurement. The suite
+  // tests/jev-fast-measurement.test.js holds this allowlist to the 68-04
+  // producers and to the dispatcher's projectJevMeasurement.
+  const persistedJevCodeWord = /^[a-z][a-z0-9_]{0,63}$/;
+  const persistedJevIsObject = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
+  const persistedJevNumber = (value) => (typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null);
+  const persistedJevCount = (value) => (Number.isSafeInteger(value) && value >= 0 ? value : null);
+  const persistedJevCode = (value) => (typeof value === 'string' && persistedJevCodeWord.test(value) ? value : null);
+  const persistedJevString = (value, max) => (typeof value === 'string' && value.length > 0 && value.length <= max ? value : null);
+  const persistedJevSource = (value, allowed) => (allowed.indexOf(value) !== -1 ? value : 'unavailable');
+
+  const cloneJevAttemptForPersistence = (attempt) => {
+    const usage = persistedJevIsObject(attempt.usage) ? attempt.usage : {};
+    const cost = persistedJevIsObject(attempt.cost) ? attempt.cost : {};
+    return {
+      iteration: persistedJevCount(attempt.iteration),
+      command: persistedJevCount(attempt.command),
+      decisionSource: attempt.decisionSource === 'jev' ? 'jev' : null,
+      jevCalled: attempt.jevCalled === true,
+      servedModel: persistedJevString(attempt.servedModel, 128),
+      instrumentVersion: persistedJevString(attempt.instrumentVersion, 64),
+      calibrationStatus: persistedJevCode(attempt.calibrationStatus),
+      latencyMs: persistedJevNumber(attempt.latencyMs),
+      usage: {
+        inputTokens: persistedJevCount(usage.inputTokens),
+        source: persistedJevSource(usage.source, ['provider', 'unavailable'])
+      },
+      cost: {
+        usd: persistedJevNumber(cost.usd),
+        source: persistedJevSource(cost.source, ['provider', 'estimate', 'unavailable'])
+      },
+      fallback: persistedJevCode(attempt.fallback),
+      outcome: persistedJevCode(attempt.outcome),
+      escalationReason: persistedJevCode(attempt.escalationReason),
+      op: persistedJevCode(attempt.op),
+      stepOutcome: persistedJevCode(attempt.stepOutcome)
+    };
+  };
+
+  const cloneJevCommandForPersistence = (command) => {
+    const usd = persistedJevIsObject(command.usd) ? command.usd : {};
+    const escalations = {};
+    if (persistedJevIsObject(command.escalations)) {
+      for (const reason of Object.keys(command.escalations).slice(0, 100)) {
+        const count = persistedJevCount(command.escalations[reason]);
+        if (persistedJevCodeWord.test(reason) && count !== null) escalations[reason] = count;
+      }
+    }
+    return {
+      command: persistedJevCount(command.command),
+      fastSteps: persistedJevCount(command.fastSteps),
+      jevCalls: persistedJevCount(command.jevCalls),
+      jevMs: persistedJevNumber(command.jevMs),
+      usd: { provider: persistedJevNumber(usd.provider), estimate: persistedJevNumber(usd.estimate) },
+      escalations
+    };
+  };
+
+  function cloneJevMeasurementForPersistence(block) {
+    if (!persistedJevIsObject(block)) return undefined;
+    try {
+      const attempts = Array.isArray(block.attempts) ? block.attempts.filter(persistedJevIsObject).slice(-100) : [];
+      const commands = Array.isArray(block.commands) ? block.commands.filter(persistedJevIsObject).slice(-100) : [];
+      return {
+        v: 1,
+        attempts: attempts.map(cloneJevAttemptForPersistence),
+        commands: commands.map(cloneJevCommandForPersistence)
+      };
+    } catch (_e) {
+      return undefined;
+    }
+  }
+
+  // durationMs is always written (null when unmeasured). An MCP call timing
+  // is kept only when it passes the v1 contract (safe non-negative integers,
+  // completedAt >= receivedAt); fsbMs is recomputed, never trusted.
+  function projectPersistedActionTiming(actionRow) {
+    const projected = {
+      durationMs: Number.isFinite(actionRow?.durationMs) && actionRow.durationMs >= 0 ? actionRow.durationMs : null
+    };
+    const timing = actionRow?.timing;
+    if (timing && typeof timing === 'object' && timing.v === 1 &&
+        Number.isSafeInteger(timing.receivedAt) && timing.receivedAt >= 0 &&
+        Number.isSafeInteger(timing.completedAt) && timing.completedAt >= timing.receivedAt) {
+      projected.timing = {
+        v: 1,
+        receivedAt: timing.receivedAt,
+        completedAt: timing.completedAt,
+        fsbMs: timing.completedAt - timing.receivedAt
+      };
+    }
+    return projected;
+  }
+
+  // Basis label for the legacy totalCost (I-2; the cost half of BASIS LABELS
+  // in 66-06-PLAN.md). The legacy total is always a price-table sum, so it is
+  // never 'provider'. With a measurement summary it is 'unavailable' when the
+  // summary cost is unavailable or any stored row had no price row (the legacy
+  // total then holds the unknown-model display fallback), else 'estimate' even
+  // at 0. LM Studio rows carry the local $0 estimate, but the legacy total is
+  // recorded without the provider, so a positive legacy total beside them is
+  // that same fallback and is 'unavailable' too. Without a summary it is
+  // 'estimate' only for a positive finite total. The MCP dispatcher applies
+  // the same rule to records saved without a label.
+  function computeLegacyCostBasis(session) {
+    const summary = session?.measurementSummary;
+    if (summary && typeof summary === 'object' && !Array.isArray(summary)) {
+      const rows = Array.isArray(session.iterationTiming) ? session.iterationTiming : [];
+      const unpriced = rows.some(row => !!row && typeof row === 'object' && row.pricingKey === null);
+      const localFallback = Number.isFinite(session.totalCost) && session.totalCost > 0 &&
+        rows.some(row => !!row && typeof row === 'object' && row.pricingKey === 'lmstudio-local');
+      return (summary.costSource === 'unavailable' || unpriced || localFallback) ? 'unavailable' : 'estimate';
+    }
+    return Number.isFinite(session?.totalCost) && session.totalCost > 0 ? 'estimate' : 'unavailable';
+  }
+
+  // Timing lines for the autopilot text export (D-09): a session line, one
+  // line per stored iteration, then one line per measured call. A unit is
+  // printed only beside a measured number; missing values get a word.
+  function formatSessionTimingLines(session) {
+    const msText = (value, missing) => (Number.isFinite(value) && value >= 0 ? `${Math.round(value)} ms` : missing);
+    const countText = (value) => (Number.isFinite(value) && value >= 0 ? String(value) : '0');
+    const costText = (usd, source) => (Number.isFinite(usd) && usd >= 0
+      ? `$${usd.toFixed(6)} (${typeof source === 'string' && source ? source : 'unlabelled'})`
+      : 'unavailable');
+    const lines = [];
+    const summary = session?.measurementSummary;
+    if (summary && typeof summary === 'object' && !Array.isArray(summary)) {
+      lines.push(`Timing: model ${msText(summary.modelMsTotal, 'n/a')} over ${countText(summary.iterations)} iterations` +
+        ` | tools ${msText(summary.toolMsTotal, 'not recorded')} over ${countText(summary.toolCount)} calls` +
+        ` | cost ${costText(summary.costUsd, summary.costSource)}`);
+      (Array.isArray(session.iterationTiming) ? session.iterationTiming : []).forEach(row => {
+        if (!row || typeof row !== 'object') return;
+        lines.push(`Iteration ${Number.isFinite(row.iteration) ? row.iteration : '?'}: model ${msText(row.modelMs, 'n/a')}` +
+          (row.modelRetried === true ? ', retried' : '') +
+          ` | tools ${msText(row.toolMs, 'none')} (${countText(row.toolCount)} calls)` +
+          ` | cost ${costText(row.costUsd, row.costSource)}` +
+          ` | served ${typeof row.servedModel === 'string' && row.servedModel ? row.servedModel : 'unknown'}`);
+      });
+    }
+    const actions = Array.isArray(session?.actionHistory) ? session.actionHistory : [];
+    const firstIndex = Math.max(0, actions.length - 100);
+    actions.slice(firstIndex).forEach((action, offset) => {
+      if (!action || !Number.isFinite(action.durationMs) || action.durationMs < 0) return;
+      lines.push(`Call ${firstIndex + offset + 1}: ${action.tool || 'unknown'} | ${Math.round(action.durationMs)} ms`);
+    });
+    if (lines.length === 0) lines.push('Timing: not recorded for this session');
+    return lines;
+  }
+
   // Persisted tail of the in-memory log ring. Large enough that a short delegated run
   // (register, open_tab, navigate, read, result: ~40-80 lines) survives a service-worker
   // restart or an extension reload and is still readable through get_logs.
@@ -710,6 +887,8 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
         lines.push(`${status} Step ${step.stepNumber}: ${step.action.tool}`);
         lines.push(`    Selector: ${step.targeting.selectorUsed || step.targeting.selectorTried || 'N/A'}`);
       });
+      lines.push('');
+      lines.push(...formatSessionTimingLines(session));
       return lines.join('\n');
     }
 
@@ -911,17 +1090,26 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
                 params: a.params,
                 result: a.result,
                 timestamp: a.timestamp,
-                logicalTab: a.logicalTab || 'primary'
+                logicalTab: a.logicalTab || 'primary',
+                ...projectPersistedActionTiming(a),
+                ...(a.decisionSource === 'jev' ? { decisionSource: 'jev' } : {})
               }));
           }
           if (sessionData.replay) {
             existing.replay = cloneReplayRecordForPersistence(sessionData.replay) || existing.replay || null;
           }
+          existing.iterationTiming = cloneIterationTimingForPersistence(sessionData.iterationTiming) || existing.iterationTiming;
+          existing.measurementSummary = cloneMeasurementSummaryForPersistence(sessionData.measurementSummary) || existing.measurementSummary;
+          // Phase 68 (D-23): a session without fast-mode activity keeps what is stored.
+          const jevMeasurementClone = cloneJevMeasurementForPersistence(sessionData.jevMeasurement);
+          if (jevMeasurementClone) existing.jevMeasurement = jevMeasurementClone;
           sessionStorage[sessionId] = existing;
         } else {
           // NEW MODE: Create session entry
           const metadata = buildPersistedSessionMetadata(sessionId, sessionData);
           const normalizedOutcome = normalizePersistedOutcomeFields(sessionData);
+          // Phase 68 (D-23): undefined, so no key, without fast-mode activity.
+          const jevMeasurementClone = cloneJevMeasurementForPersistence(sessionData.jevMeasurement);
           const session = {
             id: sessionId,
             task: metadata.commands.length > 1
@@ -969,14 +1157,22 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
                 params: a.params,
                 result: a.result,
                 timestamp: a.timestamp,
-                logicalTab: a.logicalTab || 'primary'
-              }))
+                logicalTab: a.logicalTab || 'primary',
+                ...projectPersistedActionTiming(a),
+                ...(a.decisionSource === 'jev' ? { decisionSource: 'jev' } : {})
+              })),
+            iterationTiming: cloneIterationTimingForPersistence(sessionData.iterationTiming),
+            measurementSummary: cloneMeasurementSummaryForPersistence(sessionData.measurementSummary),
+            ...(jevMeasurementClone ? { jevMeasurement: jevMeasurementClone } : {})
           };
           sessionStorage[sessionId] = session;
         }
 
         // Update index
         const savedSession = sessionStorage[sessionId];
+        // I-2: label the legacy totalCost once, at save time, on the record and
+        // its index entry, so list_sessions and get_session_detail agree.
+        savedSession.totalCostBasis = computeLegacyCostBasis(savedSession);
         const snapshotCount = (this._domSnapshots && this._domSnapshots[sessionId])
           ? this._domSnapshots[sessionId].length : 0;
         const indexEntry = {
@@ -991,6 +1187,7 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
           tabIds: Array.isArray(savedSession.tabIds) ? savedSession.tabIds : [],
           tabCount: Number.isFinite(savedSession.tabCount) ? savedSession.tabCount : 0,
           totalCost: savedSession.totalCost || 0,
+          totalCostBasis: savedSession.totalCostBasis,
           outcome: savedSession.outcome || null,
           outcomeDetails: savedSession.outcomeDetails || null,
           result: savedSession.result || null,

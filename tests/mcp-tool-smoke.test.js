@@ -48,6 +48,7 @@ const requiredSmokeTools = [
   'get_session_replay',
   'replay_session',
   'back',
+  'settings',
 ];
 
 // Session journals (ac377038) stamp every agent-scoped bridge payload with
@@ -56,6 +57,10 @@ const requiredSmokeTools = [
 // the sidecar contract here, once per call, then strip it so the routing
 // assertions below stay about routing.
 const RECORDING_SIDECAR_FIELDS = ['recordingCallId', 'recordingRunId', 'recordingLeaseMs'];
+// Phase 69 D-15: the same-call `expect` check also travels as a top-level
+// sidecar, but only when the caller sent one. This suite never sends it, so no
+// captured payload may carry it (tests/expect-parity.test.js pins this line).
+const EXPECT_SIDECAR_FIELDS = ['expect'];
 const RECORDING_UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -70,6 +75,12 @@ function describeSidecar(payload) {
 function normalizeRecordingSidecar(toolName, call) {
   const payload = call && call.message && call.message.payload;
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return call;
+
+  const expectLeaked = EXPECT_SIDECAR_FIELDS
+    .filter((field) => Object.prototype.hasOwnProperty.call(payload, field));
+  assert(expectLeaked.length === 0,
+    `${toolName} sends no expect sidecar when the caller sent none`
+      + (expectLeaked.length === 0 ? '' : ` (unexpected: ${expectLeaked.join(', ')})`));
 
   // buildAgentPayload() sets agentId and the correlation fields together, so
   // agentId is the discriminator for whether the sidecar must be present.
@@ -120,6 +131,99 @@ async function invokeTool(harness, toolName, params = {}, extra = null) {
   return call ? normalizeRecordingSidecar(toolName, call) : call;
 }
 
+// Phase 66.1: settings tool fixtures. These key names are test data only; the
+// tool source itself carries no setting key literal (SC4).
+const SMOKE_SETTINGS = { debugMode: false, maxIterations: 100, apiKey: '[set]' };
+const SMOKE_SETTING_TYPES = { debugMode: 'boolean', maxIterations: 'integer', apiKey: 'string' };
+const SMOKE_READ_ONLY = ['apiKey'];
+const SETTINGS_FALLBACK_NEXT_ACTION =
+  'Call settings with only a key to see its type and allowed values, or with no arguments to list every setting.';
+const SETTINGS_UNSUPPORTED_NEXT_ACTION =
+  'Update the FSB extension, or change the setting in the FSB Control Panel.';
+
+function hasOwn(object, key) {
+  return Object.prototype.hasOwnProperty.call(object, key);
+}
+
+function smokeSettingsRead({ payload }) {
+  if (!hasOwn(payload, 'key')) {
+    return { success: true, settings: { ...SMOKE_SETTINGS }, readOnly: [...SMOKE_READ_ONLY] };
+  }
+  if (payload.key === 'storageBroken') {
+    return {
+      success: false,
+      code: 'SETTING_STORAGE_FAILED',
+      errorCode: 'SETTING_STORAGE_FAILED',
+      error: 'Settings storage could not be read.',
+    };
+  }
+  if (!hasOwn(SMOKE_SETTINGS, payload.key)) {
+    return {
+      success: false,
+      code: 'SETTING_UNKNOWN_KEY',
+      errorCode: 'SETTING_UNKNOWN_KEY',
+      error: 'Unknown setting key. Call settings with no arguments to list keys.',
+    };
+  }
+  const answer = {
+    success: true,
+    key: payload.key,
+    value: SMOKE_SETTINGS[payload.key],
+    type: SMOKE_SETTING_TYPES[payload.key],
+    writable: payload.key !== 'apiKey',
+  };
+  if (payload.key === 'maxIterations') answer.range = { min: 50, max: 500 };
+  return answer;
+}
+
+function smokeSettingsWrite({ payload }) {
+  // The extension refuses an unknown or protected key before it reads a value,
+  // so the tool sends those writes without one.
+  if (!hasOwn(payload, 'value')) {
+    if (payload.key === 'apiKey') {
+      return {
+        success: false,
+        code: 'SETTING_PROTECTED_KEY',
+        errorCode: 'SETTING_PROTECTED_KEY',
+        error: 'apiKey is read-only over MCP; change it in the FSB Control Panel.',
+        recoveryHint: 'Change this setting in the FSB Control Panel.',
+      };
+    }
+    return {
+      success: false,
+      code: 'SETTING_UNKNOWN_KEY',
+      errorCode: 'SETTING_UNKNOWN_KEY',
+      error: 'Unknown setting key. Call settings with no arguments to list keys.',
+    };
+  }
+  return { success: true, key: payload.key, value: true, previous: false, changed: [payload.key] };
+}
+
+// Calls the settings handler and returns its result plus every tool-owned
+// bridge message it sent (agent:register skipped, journal sidecar stripped).
+async function invokeSettings(harness, params = {}) {
+  const handler = harness.getHandler('settings');
+  assert(typeof handler === 'function', 'settings registers a callable MCP handler');
+  if (typeof handler !== 'function') return { result: null, calls: [], stderr: [] };
+  const before = harness.bridgeCalls.length;
+  const stderr = [];
+  const originalConsoleError = console.error;
+  console.error = (...args) => { stderr.push(args.map(String).join(' ')); };
+  let result;
+  try {
+    result = await handler(params, harness.createExtra());
+  } finally {
+    console.error = originalConsoleError;
+  }
+  const calls = harness.bridgeCalls.slice(before)
+    .filter((entry) => !(entry && entry.message && entry.message.type === 'agent:register'))
+    .map((entry) => normalizeRecordingSidecar('settings', entry));
+  assert(result && Array.isArray(result.content) && result.content.length === 1
+    && result.content[0].type === 'text' && typeof result.content[0].text === 'string',
+  'settings returns exactly one MCP text content item');
+  return { result, calls, stderr };
+}
+
 async function run() {
   const runtimeModule = await loadBuildModule('runtime.js');
   const readOnlyModule = await loadBuildModule(pathJoin('tools', 'read-only.js'));
@@ -134,6 +238,8 @@ async function run() {
   // alongside the other surfaces; without this, 'back' stays in
   // requiredSmokeTools but its handler never lands in harness.handlers.
   const agentsModule = await loadBuildModule(pathJoin('tools', 'agents.js'));
+  // Phase 66.1: the settings tool registers directly (out of TOOL_REGISTRY).
+  const settingsModule = await loadBuildModule(pathJoin('tools', 'settings.js'));
 
   console.log('\n--- packaged runtime surface ---');
   assert(typeof runtimeModule.createRuntime === 'function', 'build/runtime.js exports createRuntime');
@@ -145,6 +251,7 @@ async function run() {
   assert(typeof triggersModule.registerTriggerTools === 'function', 'build/tools/triggers.js exports registerTriggerTools');
   assert(typeof observabilityModule.registerObservabilityTools === 'function', 'build/tools/observability.js exports registerObservabilityTools');
   assert(typeof agentsModule.registerAgentTools === 'function', 'build/tools/agents.js exports registerAgentTools');
+  assert(typeof settingsModule.registerSettingsTool === 'function', 'build/tools/settings.js exports registerSettingsTool');
 
   const harness = createToolHarness({
     bridgeResponses: {
@@ -197,6 +304,8 @@ async function run() {
       'mcp:get-trigger-status': ({ payload }) => ({ success: true, trigger_id: payload.trigger_id, status: 'armed' }),
       'mcp:list-triggers': { success: true, triggers: [] },
       'mcp:get-logs': { success: true, logs: [] },
+      'mcp:get-settings': smokeSettingsRead,
+      'mcp:set-setting': smokeSettingsWrite,
     },
   });
 
@@ -214,6 +323,7 @@ async function run() {
   // Phase 242 D-01: registerAgentTools registers the 'back' MCP tool. Loaded
   // last so the smoke test's registered-handlers assertion (line 118) sees it.
   agentsModule.registerAgentTools(harness.server, harness.bridge, harness.queue, agentScope);
+  settingsModule.registerSettingsTool(harness.server, harness.bridge, harness.queue, agentScope);
 
   console.log('\n--- registered smoke tools ---');
   for (const toolName of requiredSmokeTools) {
@@ -615,6 +725,217 @@ async function run() {
     'close_tab with tab_id uses ownershipTokenFor(tab_id) + v0.9.62 visualSession sidecar',
   );
 
+  console.log('\n--- settings tool (Phase 66.1: queue-free, compact, value-safe) ---');
+  const settingsEntry = harness.handlers.get('settings');
+  assert(
+    settingsEntry && settingsEntry.description === 'Read or change FSB settings. No args returns all; key returns one with its allowed values; key and value sets it. API keys and endpoints are read-only.',
+    'settings registers the exact D-03 description',
+  );
+  assertDeepEqual(
+    settingsEntry && Object.keys(settingsEntry.schema || {}),
+    ['key', 'value'],
+    'settings input schema has exactly the optional key and value params',
+  );
+
+  const settingsReadAll = await invokeSettings(harness);
+  assertDeepEqual(
+    settingsReadAll.calls.map((call) => call.message),
+    [{ type: 'mcp:get-settings', payload: { agentId: 'agent_test_smoke' } }],
+    'settings with no args sends exactly one mcp:get-settings with agent identity and no ownershipToken',
+  );
+  assertDeepEqual(
+    settingsReadAll.calls[0] && settingsReadAll.calls[0].options,
+    { timeout: 10_000, onProgress: undefined },
+    'settings uses a bounded 10s bridge timeout',
+  );
+  const readAllText = settingsReadAll.result.content[0].text;
+  assert(settingsReadAll.result.isError !== true, 'settings read-all succeeds');
+  assert(!readAllText.includes('\n'), 'settings read-all output is compact single-line JSON');
+  assertDeepEqual(
+    JSON.parse(readAllText),
+    { settings: SMOKE_SETTINGS, readOnly: SMOKE_READ_ONLY },
+    'settings read-all output is {settings, readOnly} only',
+  );
+
+  const settingsReadOne = await invokeSettings(harness, { key: 'maxIterations' });
+  assertDeepEqual(
+    settingsReadOne.calls.map((call) => call.message),
+    [{ type: 'mcp:get-settings', payload: { key: 'maxIterations', agentId: 'agent_test_smoke' } }],
+    'settings with only a key sends one mcp:get-settings {key}',
+  );
+  const readOneText = settingsReadOne.result.content[0].text;
+  assert(!readOneText.includes('\n'), 'settings read-one output is compact single-line JSON');
+  assertDeepEqual(
+    JSON.parse(readOneText),
+    { key: 'maxIterations', value: 100, type: 'integer', writable: true, range: { min: 50, max: 500 } },
+    'settings read-one output is {key, value, type, writable} plus range',
+  );
+
+  const settingsWrite = await invokeSettings(harness, { key: 'debugMode', value: 'true' });
+  assertDeepEqual(
+    settingsWrite.calls.map((call) => call.message),
+    [
+      { type: 'mcp:get-settings', payload: { key: 'debugMode', agentId: 'agent_test_smoke' } },
+      { type: 'mcp:set-setting', payload: { key: 'debugMode', value: 'true', agentId: 'agent_test_smoke' } },
+    ],
+    'settings write reads the key first, then sends mcp:set-setting {key, value} for a writable key',
+  );
+  assertDeepEqual(
+    settingsWrite.calls.map((call) => call.options),
+    [{ timeout: 10_000, onProgress: undefined }, { timeout: 10_000, onProgress: undefined }],
+    'settings write uses the bounded 10s timeout for the preflight and the write',
+  );
+  const writeText = settingsWrite.result.content[0].text;
+  assert(settingsWrite.result.isError !== true, 'settings write succeeds');
+  assert(!writeText.includes('\n'), 'settings write output is compact single-line JSON');
+  assertDeepEqual(
+    JSON.parse(writeText),
+    { key: 'debugMode', value: true, previous: false, changed: ['debugMode'] },
+    'settings write output is {key, value, previous, changed} only',
+  );
+
+  const secretSentinel = 'sk-SMOKE-SENTINEL';
+  const secretBridgeStart = harness.bridgeCalls.length;
+  const settingsSecret = await invokeSettings(harness, { key: 'apiKey', value: secretSentinel });
+  assertDeepEqual(
+    settingsSecret.calls.map((call) => call.message),
+    [
+      { type: 'mcp:get-settings', payload: { key: 'apiKey', agentId: 'agent_test_smoke' } },
+      { type: 'mcp:set-setting', payload: { key: 'apiKey', agentId: 'agent_test_smoke' } },
+    ],
+    'a write to a read-only key sends mcp:set-setting {key} without the value',
+  );
+  const rawSecretWrite = harness.bridgeCalls.slice(secretBridgeStart)
+    .find((entry) => entry.message && entry.message.type === 'mcp:set-setting');
+  assert(rawSecretWrite && !hasOwn(rawSecretWrite.message.payload, 'value'),
+    'the raw mcp:set-setting payload for a read-only key has no value field');
+  assert(!JSON.stringify(harness.bridgeCalls).includes('SMOKE-SENTINEL'),
+    'no recorded bridge message contains the submitted secret value');
+  const secretText = settingsSecret.result.content[0].text;
+  assert(settingsSecret.result.isError === true, 'a read-only key write returns an MCP error');
+  assert(secretText.startsWith('Detected: Settings\nWhy: SETTING_PROTECTED_KEY: '),
+    'a read-only key write renders SETTING_PROTECTED_KEY under the Settings layer');
+  assert(secretText.includes('Next action: Change this setting in the FSB Control Panel.'),
+    'the extension recovery hint is the Next action');
+  assert(!secretText.includes('SMOKE-SENTINEL') && !settingsSecret.stderr.join('\n').includes('SMOKE-SENTINEL'),
+    'neither the error text nor stderr contains the submitted value');
+
+  const unknownSentinel = 'UNKNOWN-KEY-SENTINEL';
+  const unknownBridgeStart = harness.bridgeCalls.length;
+  const settingsUnknown = await invokeSettings(harness, { key: 'noSuchSetting', value: unknownSentinel });
+  assertDeepEqual(
+    settingsUnknown.calls.map((call) => call.message),
+    [
+      { type: 'mcp:get-settings', payload: { key: 'noSuchSetting', agentId: 'agent_test_smoke' } },
+      { type: 'mcp:set-setting', payload: { key: 'noSuchSetting', agentId: 'agent_test_smoke' } },
+    ],
+    'a write to an unknown key sends mcp:set-setting {key} without the value so the extension logs the refusal',
+  );
+  assert(!JSON.stringify(harness.bridgeCalls.slice(unknownBridgeStart)).includes(unknownSentinel),
+    'no bridge message carries the value for an unknown key');
+  const unknownText = settingsUnknown.result.content[0].text;
+  assert(unknownText.startsWith('Detected: Settings\nWhy: SETTING_UNKNOWN_KEY: '),
+    'an unknown key renders SETTING_UNKNOWN_KEY, not element_not_found');
+  assert(unknownText.includes('Next action: ' + SETTINGS_FALLBACK_NEXT_ACTION),
+    'an extension failure without recoveryHint uses the settings fallback Next action');
+  assert(!unknownText.includes(unknownSentinel) && !settingsUnknown.stderr.join('\n').includes(unknownSentinel),
+    'the unknown-key error text and stderr carry no value');
+
+  const settingsPreflightFailure = await invokeSettings(harness, { key: 'storageBroken', value: '1' });
+  assertDeepEqual(
+    settingsPreflightFailure.calls.map((call) => call.message.type),
+    ['mcp:get-settings'],
+    'any other preflight failure returns without sending a write',
+  );
+  assert(settingsPreflightFailure.result.content[0].text.startsWith('Detected: Settings\nWhy: SETTING_STORAGE_FAILED: '),
+    'the preflight failure renders its own SETTING_ code');
+
+  const localChecks = [
+    { label: 'value without key', params: { value: 'x' } },
+    { label: 'a key longer than 64 characters', params: { key: 'k'.repeat(65) } },
+    { label: 'a value longer than 2048 characters', params: { key: 'debugMode', value: 'V'.repeat(2049) } },
+  ];
+  for (const check of localChecks) {
+    const localBridgeStart = harness.bridgeCalls.length;
+    const local = await invokeSettings(harness, check.params);
+    const localText = local.result.content[0].text;
+    assert(harness.bridgeCalls.length === localBridgeStart, `settings with ${check.label} makes no bridge call`);
+    assert(local.result.isError === true && localText.startsWith('Detected: Settings\nWhy: SETTING_REQUEST_INVALID: '),
+      `settings with ${check.label} returns SETTING_REQUEST_INVALID locally`);
+    assert(localText.includes('Next action: ' + SETTINGS_FALLBACK_NEXT_ACTION),
+      `settings with ${check.label} points to a key-only read`);
+    assert(!localText.includes('VVVV') && !local.stderr.join('\n').includes('VVVV'),
+      `settings with ${check.label} does not echo the value`);
+  }
+  const boundaryKey = await invokeSettings(harness, { key: 'k'.repeat(64) });
+  assert(boundaryKey.calls.length === 1, 'a 64-character key is within the local limit and reaches the extension');
+
+  console.log('\n--- settings tool against an extension without settings support ---');
+  const unsupportedHarness = createToolHarness({
+    bridgeResponses: {
+      'mcp:get-settings': { success: false, error: 'Unknown MCP message type: mcp:get-settings' },
+    },
+  });
+  settingsModule.registerSettingsTool(
+    unsupportedHarness.server, unsupportedHarness.bridge, unsupportedHarness.queue, await loadAgentScope(),
+  );
+  const unsupportedSentinel = 'UNSUPPORTED-VALUE-SENTINEL';
+  const unsupportedWrite = await invokeSettings(unsupportedHarness, { key: 'debugMode', value: unsupportedSentinel });
+  const unsupportedText = unsupportedWrite.result.content[0].text;
+  assert(unsupportedWrite.result.isError === true
+    && unsupportedText.startsWith('Detected: Settings\nWhy: SETTING_UNSUPPORTED: '),
+  'a write to an extension without settings support returns SETTING_UNSUPPORTED');
+  assert(unsupportedText.includes('Next action: ' + SETTINGS_UNSUPPORTED_NEXT_ACTION),
+    'SETTING_UNSUPPORTED tells the client to update the extension or use the Control Panel');
+  assert(!unsupportedHarness.bridgeCalls.some((entry) => entry.message && entry.message.type === 'mcp:set-setting'),
+    'no mcp:set-setting is sent when the preflight read is unsupported');
+  assert(!JSON.stringify(unsupportedHarness.bridgeCalls).includes(unsupportedSentinel),
+    'the value never leaves the MCP process when settings are unsupported');
+  const unsupportedRead = await invokeSettings(unsupportedHarness);
+  assert(unsupportedRead.result.content[0].text.startsWith('Detected: Settings\nWhy: SETTING_UNSUPPORTED: '),
+    'a read from an extension without settings support returns SETTING_UNSUPPORTED');
+  assert(unsupportedHarness.queueCalls.length === 0, 'the unsupported settings path never enqueues');
+
+  const setUnsupportedHarness = createToolHarness({
+    bridgeResponses: {
+      'mcp:get-settings': smokeSettingsRead,
+      'mcp:set-setting': { success: false, error: 'Unknown MCP message type: mcp:set-setting' },
+    },
+  });
+  settingsModule.registerSettingsTool(
+    setUnsupportedHarness.server, setUnsupportedHarness.bridge, setUnsupportedHarness.queue, await loadAgentScope(),
+  );
+  const setUnsupported = await invokeSettings(setUnsupportedHarness, { key: 'debugMode', value: 'false' });
+  assert(setUnsupported.result.content[0].text.startsWith('Detected: Settings\nWhy: SETTING_UNSUPPORTED: '),
+    'an unsupported mcp:set-setting reply also returns SETTING_UNSUPPORTED');
+
+  const disconnectedHarness = createToolHarness({ connected: false });
+  settingsModule.registerSettingsTool(
+    disconnectedHarness.server, disconnectedHarness.bridge, disconnectedHarness.queue, await loadAgentScope(),
+  );
+  const disconnected = await invokeSettings(disconnectedHarness, { key: 'debugMode', value: 'true' });
+  assert(disconnected.result.isError === true && disconnectedHarness.bridgeCalls.length === 0,
+    'settings without an extension connection returns an error and makes no bridge call');
+
+  const throwingHarness = createToolHarness({
+    onSendAndWait(message) {
+      throw new Error(`Request smoke-1 (${message.type}) timed out after 10000ms`);
+    },
+  });
+  settingsModule.registerSettingsTool(
+    throwingHarness.server, throwingHarness.bridge, throwingHarness.queue, await loadAgentScope(),
+  );
+  let thrownResult = null;
+  try {
+    thrownResult = await invokeSettings(throwingHarness, { key: 'debugMode', value: 'THROWN-SENTINEL' });
+  } catch (_error) {
+    thrownResult = null;
+  }
+  assert(thrownResult && thrownResult.result && thrownResult.result.isError === true,
+    'a bridge timeout is caught and rendered as an MCP error');
+  assert(thrownResult && !thrownResult.result.content[0].text.includes('THROWN-SENTINEL'),
+    'a rendered bridge timeout carries no value');
+
   console.log('\n--- agent:register lazy-mint invariant (Phase 238 D-13.4) ---');
   const registerCalls = harness.bridgeCalls.filter((c) => c.message && c.message.type === 'agent:register');
   assert(registerCalls.length === 1, 'agent:register must fire exactly once across all tool invocations; saw ' + registerCalls.length);
@@ -625,7 +946,7 @@ async function run() {
   // mcp/src/tools/visual-session.ts). They are excluded from queue coverage
   // alongside stop_task (which stays direct so cancellation does not wait
   // behind queued work).
-  const DIRECT_TOOLS = new Set(['stop_task', 'start_visual_session', 'end_visual_session', 'trigger', 'stop_trigger', 'get_trigger_status', 'list_triggers']);
+  const DIRECT_TOOLS = new Set(['stop_task', 'start_visual_session', 'end_visual_session', 'trigger', 'stop_trigger', 'get_trigger_status', 'list_triggers', 'settings']);
   for (const toolName of requiredSmokeTools.filter((name) => !DIRECT_TOOLS.has(name))) {
     assert(harness.queueCalls.includes(toolName), `${toolName} passes through the shared queue surface`);
   }
@@ -636,6 +957,7 @@ async function run() {
   assert(!harness.queueCalls.includes('list_triggers'), 'list_triggers dispatches directly so listing does not wait behind queued work');
   assert(!harness.queueCalls.includes('start_visual_session'), 'start_visual_session is a TOOL_REMOVED stub and does not enqueue');
   assert(!harness.queueCalls.includes('end_visual_session'), 'end_visual_session is a TOOL_REMOVED stub and does not enqueue');
+  assert(!harness.queueCalls.includes('settings'), 'settings bypasses the queue for reads and writes (Phase 66.1 D-05)');
 
   console.log(`\n=== Results: ${passed} passed, ${failed} failed ===`);
   process.exit(failed > 0 ? 1 : 0);

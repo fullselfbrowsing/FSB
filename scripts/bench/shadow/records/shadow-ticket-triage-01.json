@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "id": "shadow-ticket-triage-01",
+  "provenance": "hand",
+  "task": {
+    "id": "core-mixed-ticket-triage",
+    "version": 1,
+    "fixtureSha256": "22b31a541ad0e3bd050f3c93bbb22619638195bc8a9750cc685f7949e93d7d25"
+  },
+  "step": 0,
+  "request": {
+    "v": 1,
+    "kinds": ["operation", "target", "completion"],
+    "goal": "Find the open ticket labelled billing that was reported by Dana, change its status to In Progress, and save it.",
+    "page": {
+      "origin": "http://127.0.0.1:4173",
+      "path": "/fixtures/ticket-triage/index.html",
+      "title": "Operations tickets",
+      "text": "Operations tickets\nAll tickets\nKey Summary Labels Reporter Status\nOPS-214 Refund button returns an error for partial refunds billing payments Priya Nair To Do\nOPS-217 Dashboard charts render blank after login frontend Dana Kim To Do\nOPS-221 Nightly backup job runs past its window infra Marco Rossi In Progress\nOPS-226 Invoice PDF shows the wrong tax rate billing Dana Kim To Do\nOPS-230 Rotate the staging database credentials infra security Priya Nair Blocked\nOPS-233 Duplicate charge after a card retry billing Dana Kim Done"
+    },
+    "elements": [
+      { "id": "e0", "role": "button", "label": "OPS-214", "ops": ["click"] },
+      { "id": "e1", "role": "button", "label": "OPS-217", "ops": ["click"] },
+      { "id": "e2", "role": "button", "label": "OPS-221", "ops": ["click"] },
+      { "id": "e3", "role": "button", "label": "OPS-226", "ops": ["click"] },
+      { "id": "e4", "role": "button", "label": "OPS-230", "ops": ["click"] },
+      { "id": "e5", "role": "button", "label": "OPS-233", "ops": ["click"] },
+      { "id": "e6", "role": "button", "label": "OPS-238", "ops": ["click"] },
+      { "id": "e7", "role": "button", "label": "OPS-241", "ops": ["click"] },
+      { "id": "e8", "role": "button", "label": "OPS-245", "ops": ["click"] },
+      { "id": "e9", "role": "button", "label": "OPS-249", "ops": ["click"] }
+    ],
+    "recentActions": [],
+    "offeredOps": ["click", "scroll"]
+  },
+  "labels": {
+    "operation": "click",
+    "target": "e3",
+    "completion": false,
+    "stuck": null,
+    "risk": null
+  },
+  "note": "OPS-226 (e3) is the open billing ticket reported by Dana Kim. OPS-233 is billing and Dana's too but already Done, the near-miss."
+}

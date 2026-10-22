@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "profileId": "uncalibrated-v1",
+  "status": "uncalibrated",
+  "note": "Explicit UNCALIBRATED default (D-28). No Jev decision acts and no Jev flag contributes until a V3-calibrated profile for the deployed pin and INSTRUMENT_HASH is committed beside this file.",
+  "model": null,
+  "snapshot": null,
+  "instrumentVersion": null,
+  "instrumentHash": null,
+  "thresholds": {
+    "operation": null,
+    "target": null,
+    "completion": null,
+    "stuck": null,
+    "risk": null
+  }
+}

@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en" data-bench-app="wizard-submit">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Workspace setup</title>
+<link rel="icon" href="data:,">
+<style>
+  :root { color-scheme: light; --ink: #1c2230; --muted: #5b6475; --line: #d9dde5; --accent: #2457c5; --bg: #f5f6f8; --card: #fff; }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--ink); background: var(--bg); }
+  main { max-width: 720px; margin: 0 auto; padding: 20px 24px 32px; }
+  h1 { font-size: 1.4rem; margin: 0 0 6px; }
+  h2 { font-size: 1.1rem; margin: 0 0 12px; }
+  .panel { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 16px 18px; margin-bottom: 14px; }
+  .btn { font: inherit; padding: 6px 14px; border: 1px solid #b8bfcc; border-radius: 6px; background: #fff; color: var(--ink); cursor: pointer; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn:disabled { opacity: 0.6; cursor: default; }
+  .status { margin: 10px 0 0; color: #1f7a3a; font-weight: 600; }
+  .error { margin: 10px 0 0; color: #b42318; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .progress { color: var(--muted); margin: 0 0 14px; }
+  .field { margin-bottom: 14px; }
+  .field > label { display: block; font-weight: 600; margin-bottom: 4px; }
+  .field input[type="text"], .field input[type="number"] { font: inherit; width: 16rem; padding: 6px 8px; border: 1px solid #b8bfcc; border-radius: 6px; }
+  fieldset { border: 1px solid var(--line); border-radius: 6px; margin: 0 0 14px; padding: 8px 12px 10px; }
+  legend { font-weight: 600; padding: 0 4px; }
+  .choice { display: flex; align-items: baseline; gap: 8px; padding: 4px 0; cursor: pointer; }
+  .choice small { color: var(--muted); }
+  .actions { display: flex; gap: 10px; margin-top: 6px; }
+  .summary { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0 0 14px; }
+  .summary dt { color: var(--muted); }
+  .summary dd { margin: 0; font-weight: 600; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Set up your workspace</h1>
+  <p id="progress" class="progress">Step 1 of 3: Account</p>
+
+  <form id="step-1" class="panel" aria-labelledby="step-1-heading" novalidate>
+    <h2 id="step-1-heading" tabindex="-1">Account</h2>
+    <div class="field">
+      <label for="account-name">Account name</label>
+      <input id="account-name" name="accountName" type="text" autocomplete="off" spellcheck="false">
+    </div>
+    <p id="step-1-error" class="error" role="alert" hidden></p>
+    <div class="actions">
+      <button class="btn primary" type="submit">Next</button>
+    </div>
+  </form>
+
+  <form id="step-2" class="panel" aria-labelledby="step-2-heading" novalidate hidden>
+    <h2 id="step-2-heading" tabindex="-1">Plan and seats</h2>
+    <fieldset>
+      <legend>Plan</legend>
+      <label class="choice"><input type="radio" name="plan" value="starter"> <span>Starter</span> <small>$8 per seat per month</small></label>
+      <label class="choice"><input type="radio" name="plan" value="team"> <span>Team</span> <small>$15 per seat per month</small></label>
+      <label class="choice"><input type="radio" name="plan" value="enterprise"> <span>Enterprise</span> <small>$32 per seat per month</small></label>
+    </fieldset>
+    <div class="field">
+      <label for="seats">Seats</label>
+      <input id="seats" name="seats" type="number" min="1" max="500" step="1" inputmode="numeric">
+    </div>
+    <p id="step-2-error" class="error" role="alert" hidden></p>
+    <div class="actions">
+      <button id="step-2-back" class="btn" type="button">Back</button>
+      <button class="btn primary" type="submit">Next</button>
+    </div>
+  </form>
+
+  <form id="step-3" class="panel" aria-labelledby="step-3-heading" novalidate hidden>
+    <h2 id="step-3-heading" tabindex="-1">Review</h2>
+    <dl class="summary">
+      <dt>Account name</dt><dd id="review-name"></dd>
+      <dt>Plan</dt><dd id="review-plan"></dd>
+      <dt>Seats</dt><dd id="review-seats"></dd>
+      <dt>Monthly total</dt><dd id="review-total"></dd>
+    </dl>
+    <p id="step-3-error" class="error" role="alert" hidden></p>
+    <div class="actions">
+      <button id="step-3-back" class="btn" type="button">Back</button>
+      <button id="submit" class="btn primary" type="submit">Submit</button>
+    </div>
+  </form>
+
+  <section id="done" class="panel" aria-labelledby="done-heading" hidden>
+    <h2 id="done-heading" tabindex="-1">Workspace created</h2>
+    <p class="status" role="status">Setup submitted: <output data-bench-marker="wizard-result"></output></p>
+  </section>
+</main>
+<script src="../_shared/bench.js"></script>
+<script>
+  (() => {
+    'use strict';
+    const PLANS = {
+      starter: { label: 'Starter', price: 8 },
+      team: { label: 'Team', price: 15 },
+      enterprise: { label: 'Enterprise', price: 32 },
+    };
+    const STEP_TITLES = { 1: 'Account', 2: 'Plan and seats', 3: 'Review' };
+    const forms = { 1: document.getElementById('step-1'), 2: document.getElementById('step-2'), 3: document.getElementById('step-3') };
+    const progress = document.getElementById('progress');
+    const nameInput = document.getElementById('account-name');
+    const seatsInput = document.getElementById('seats');
+    const done = document.getElementById('done');
+    const submitButton = document.getElementById('submit');
+    let busy = false;
+    let submitted = false;
+
+    // Each control goes to a named step, never "current + 1", so a repeated
+    // activation of the same button cannot skip a step.
+    function showStep(step) {
+      if (submitted) return;
+      for (const [key, form] of Object.entries(forms)) form.hidden = Number(key) !== step;
+      progress.textContent = `Step ${step} of 3: ${STEP_TITLES[step]}`;
+      document.getElementById(`step-${step}-heading`).focus();
+    }
+
+    function showError(step, message) {
+      const error = document.getElementById(`step-${step}-error`);
+      error.textContent = message;
+      error.hidden = !message;
+    }
+
+    function accountName() {
+      return nameInput.value.trim().replace(/\s+/g, ' ');
+    }
+
+    function selectedPlan() {
+      const checked = forms[2].querySelector('input[name="plan"]:checked');
+      return checked ? checked.value : null;
+    }
+
+    function seatCount() {
+      const raw = seatsInput.value.trim();
+      if (!/^\d+$/.test(raw)) return null;
+      const seats = Number(raw);
+      return seats >= 1 && seats <= 500 ? seats : null;
+    }
+
+    forms[1].addEventListener('submit', (event) => {
+      event.preventDefault();
+      if (!accountName()) {
+        showError(1, 'Enter an account name.');
+        return;
+      }
+      showError(1, '');
+      showStep(2);
+    });
+
+    forms[2].addEventListener('submit', (event) => {
+      event.preventDefault();
+      const plan = selectedPlan();
+      const seats = seatCount();
+      if (!plan) {
+        showError(2, 'Choose a plan.');
+        return;
+      }
+      if (seats === null) {
+        showError(2, 'Enter a whole number of seats from 1 to 500.');
+        return;
+      }
+      showError(2, '');
+      document.getElementById('review-name').textContent = accountName();
+      document.getElementById('review-plan').textContent = PLANS[plan].label;
+      document.getElementById('review-seats').textContent = String(seats);
+      document.getElementById('review-total').textContent = `$${(seats * PLANS[plan].price).toFixed(2)} per month`;
+      showStep(3);
+    });
+
+    document.getElementById('step-2-back').addEventListener('click', () => showStep(1));
+    document.getElementById('step-3-back').addEventListener('click', () => showStep(2));
+
+    forms[3].addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (busy || submitted) return;
+      const name = accountName();
+      const plan = selectedPlan();
+      const seats = seatCount();
+      if (!name || !plan || seats === null) {
+        showError(3, 'Some details are missing. Go back and complete every step.');
+        return;
+      }
+      busy = true;
+      submitButton.disabled = true;
+      showError(3, '');
+      try {
+        await benchPost('submit', { accountName: name, plan, seats });
+        submitted = true;
+        for (const form of Object.values(forms)) form.hidden = true;
+        progress.textContent = 'Setup complete';
+        setView({ view: 'done' });
+        setMarker('wizard-result', `${name}|${plan}|${seats}`);
+        done.hidden = false;
+        document.getElementById('done-heading').focus();
+      } catch {
+        showError(3, 'The setup could not be submitted. Try again.');
+      } finally {
+        busy = false;
+        submitButton.disabled = submitted;
+      }
+    });
+  })();
+</script>
+</body>
+</html>

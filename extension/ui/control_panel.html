@@ -632,6 +632,38 @@
               </div>
             </div>
 
+            <!-- Phase 68 D-06: autopilot fast mode switch (default off). Static disclosure only: no status line, no button, no network call. -->
+            <div class="settings-card" id="fsbJevFastModeCard">
+              <div class="settings-card-header">
+                <div class="settings-card-icon">
+                  <i class="fas fa-bolt"></i>
+                </div>
+                <div class="settings-card-title">
+                  <h3>Jev fast mode (experimental)</h3>
+                  <p>Faster simple clicks during autopilot</p>
+                </div>
+              </div>
+              <div class="settings-card-content">
+                <div class="setting-item">
+                  <label class="modern-toggle">
+                    <input type="checkbox" id="fsbJevFastModeEnabled">
+                    <span class="toggle-track">
+                      <span class="toggle-thumb"></span>
+                    </span>
+                    <div class="toggle-content">
+                      <span class="toggle-label">Use Jev for simple steps</span>
+                      <span class="toggle-desc">Off by default. When on, FSB's autopilot sends a short description of the current step to FSB's server, which asks TypeSafe AI's Jev model (directly or through OpenRouter) to pick simple clicks faster.</span>
+                    </div>
+                  </label>
+                  <div class="setting-hint">Sent to FSB's server: your task text; the page address without its query string or fragment; the page title; an excerpt of visible text (fast mode leaves out form fields and text you are editing); the labels and roles of visible buttons, links and fields; and a short record of recent simple steps (which listed control was used and whether the page changed).</div>
+                  <div class="setting-hint">Never sent to FSB's server: anything typed into fields or any field value; passwords, payment, hidden and file fields; fields FSB filled from your saved passwords or payment methods; URL query strings and fragments; cookies and API keys. Secrets that match FSB's patterns are removed first, and if your task text itself contains one, nothing is sent for that task.</div>
+                  <div class="setting-hint">FSB's server keeps no page content. Your AI provider still plans, types and reads, and gets the same page descriptions as with fast mode off.</div>
+                  <div class="setting-hint">Experimental: until FSB has calibrated it, fast mode stays inactive and acts on nothing, though a task may still send one step description before it stops asking. You can turn it off at any time.</div>
+                </div>
+              </div>
+            </div>
+            <!-- /fsbJevFastModeCard -->
+
             <div class="settings-card full-width" id="mcpSessionReplaySettings">
               <div class="settings-card-header">
                 <div class="settings-card-icon">

@@ -1,0 +1,4 @@
+{"type":"_fixture","note":"synthetic; shaped per cursor.com/docs/cli/reference/output-format; no network"}
+{"type":"system","subtype":"init","apiKeySource":"login","cwd":"/tmp/bench-cwd-4f2e","session_id":"cursor-session-01","model":"cursor-model-fixture","permissionMode":"default"}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"CURSOR_ASSISTANT_TEXT_6d1e"}]},"session_id":"cursor-session-01"}
+{"type":"result","subtype":"success","duration_ms":45678,"duration_api_ms":40111,"is_error":false,"result":"CURSOR_RESULT_TEXT_91aa","session_id":"cursor-session-01","request_id":"cursor-request-01"}

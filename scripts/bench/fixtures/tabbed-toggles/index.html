@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en" data-bench-app="tabbed-toggles">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Preferences</title>
+<link rel="icon" href="data:,">
+<style>
+  :root { color-scheme: light; --ink: #1c2230; --muted: #5b6475; --line: #d9dde5; --accent: #2457c5; --bg: #f5f6f8; --card: #fff; }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--ink); background: var(--bg); }
+  main { max-width: 720px; margin: 0 auto; padding: 20px 24px 32px; }
+  h1 { font-size: 1.4rem; margin: 0 0 14px; }
+  .panel { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; margin-bottom: 14px; }
+  .btn { font: inherit; padding: 6px 14px; border: 1px solid #b8bfcc; border-radius: 6px; background: #fff; color: var(--ink); cursor: pointer; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn:disabled { opacity: 0.6; cursor: default; }
+  .status { margin: 10px 0 0; color: #1f7a3a; font-weight: 600; }
+  .error { margin: 10px 0 0; color: #b42318; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .tablist { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 12px; }
+  .tab { font: inherit; padding: 8px 14px; border: 0; border-bottom: 3px solid transparent; background: none; color: var(--muted); cursor: pointer; }
+  .tab[aria-selected="true"] { color: var(--ink); font-weight: 600; border-bottom-color: var(--accent); }
+  .switch-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 8px 10px; margin: 6px 0; border: 1px solid var(--line); border-radius: 6px; background: #fff; cursor: pointer; user-select: none; }
+  .switch-row .switch-text { flex: 1; }
+  .switch-track { position: relative; flex: none; width: 40px; height: 22px; border-radius: 999px; background: #c3c8d2; }
+  .switch-thumb { position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; }
+  .switch-state { flex: none; width: 2rem; color: var(--muted); }
+  .switch-row[aria-checked="true"] .switch-track { background: var(--accent); }
+  .switch-row[aria-checked="true"] .switch-thumb { left: 21px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Preferences</h1>
+  <section class="panel" aria-label="Preferences">
+    <div class="tablist" role="tablist" aria-label="Preference groups">
+      <button type="button" class="tab" role="tab" id="tab-general" aria-selected="true" aria-controls="panel-general" tabindex="0">General</button>
+      <button type="button" class="tab" role="tab" id="tab-notifications" aria-selected="false" aria-controls="panel-notifications" tabindex="-1">Notifications</button>
+      <button type="button" class="tab" role="tab" id="tab-privacy" aria-selected="false" aria-controls="panel-privacy" tabindex="-1">Privacy</button>
+    </div>
+    <div class="tabpanel" role="tabpanel" id="panel-general" aria-labelledby="tab-general">
+      <div class="switch-row" role="switch" tabindex="0" aria-checked="false" aria-label="Compact mode" data-key="compactMode"><span class="switch-text">Compact mode</span><span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span><span class="switch-state" aria-hidden="true">Off</span></div>
+      <div class="switch-row" role="switch" tabindex="0" aria-checked="true" aria-label="Show avatars" data-key="showAvatars"><span class="switch-text">Show avatars</span><span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span><span class="switch-state" aria-hidden="true">On</span></div>
+      <div class="switch-row" role="switch" tabindex="0" aria-checked="false" aria-label="Reduce motion" data-key="reduceMotion"><span class="switch-text">Reduce motion</span><span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span><span class="switch-state" aria-hidden="true">Off</span></div>
+    </div>
+    <div class="tabpanel" role="tabpanel" id="panel-notifications" aria-labelledby="tab-notifications" hidden>
+      <div class="switch-row" role="switch" tabindex="0" aria-checked="true" aria-label="Email mentions" data-key="emailMentions"><span class="switch-text">Email mentions</span><span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span><span class="switch-state" aria-hidden="true">On</span></div>
+      <div class="switch-row" role="switch" tabindex="0" aria-checked="true" aria-label="Push mentions" data-key="pushMentions"><span class="switch-text">Push mentions</span><span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span><span class="switch-state" aria-hidden="true">On</span></div>
+      <div class="switch-row" role="switch" tabindex="0" aria-checked="false" aria-label="Weekly summary" data-key="weeklySummary"><span class="switch-text">Weekly summary</span><span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span><span class="switch-state" aria-hidden="true">Off</span></div>
+    </div>
+    <div class="tabpanel" role="tabpanel" id="panel-privacy" aria-labelledby="tab-privacy" hidden>
+      <div class="switch-row" role="switch" tabindex="0" aria-checked="false" aria-label="Hide online status" data-key="hideOnlineStatus"><span class="switch-text">Hide online status</span><span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span><span class="switch-state" aria-hidden="true">Off</span></div>
+      <div class="switch-row" role="switch" tabindex="0" aria-checked="true" aria-label="Share read receipts" data-key="shareReadReceipts"><span class="switch-text">Share read receipts</span><span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span><span class="switch-state" aria-hidden="true">On</span></div>
+      <div class="switch-row" role="switch" tabindex="0" aria-checked="false" aria-label="Allow indexing" data-key="allowIndexing"><span class="switch-text">Allow indexing</span><span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span><span class="switch-state" aria-hidden="true">Off</span></div>
+    </div>
+  </section>
+  <button id="save" class="btn primary" type="button">Save</button>
+  <p id="save-error" class="error" role="alert" hidden></p>
+  <p id="save-status" class="status" role="status" hidden>Saved. Settings changed from their defaults: <output data-bench-marker="changed-count"></output></p>
+</main>
+<script src="../_shared/bench.js"></script>
+<script>
+  (() => {
+    'use strict';
+    // Save sends every key in this fixed order.
+    const KEYS = ['compactMode', 'showAvatars', 'reduceMotion', 'emailMentions', 'pushMentions', 'weeklySummary', 'hideOnlineStatus', 'shareReadReceipts', 'allowIndexing'];
+    const switches = new Map([...document.querySelectorAll('.switch-row')].map((row) => [row.dataset.key, row]));
+    const defaults = new Map([...switches].map(([key, row]) => [key, row.getAttribute('aria-checked') === 'true']));
+    const tabs = [...document.querySelectorAll('[role="tab"]')];
+    const saveButton = document.getElementById('save');
+    const error = document.getElementById('save-error');
+    const status = document.getElementById('save-status');
+    let busy = false;
+
+    function selectTab(tab, focus) {
+      for (const each of tabs) {
+        const selected = each === tab;
+        each.setAttribute('aria-selected', String(selected));
+        each.tabIndex = selected ? 0 : -1;
+        document.getElementById(each.getAttribute('aria-controls')).hidden = !selected;
+      }
+      if (focus) tab.focus();
+    }
+
+    tabs.forEach((tab, index) => {
+      tab.addEventListener('click', () => selectTab(tab, false));
+      tab.addEventListener('keydown', (event) => {
+        let next = null;
+        if (event.key === 'ArrowRight') next = tabs[(index + 1) % tabs.length];
+        else if (event.key === 'ArrowLeft') next = tabs[(index - 1 + tabs.length) % tabs.length];
+        else if (event.key === 'Home') next = tabs[0];
+        else if (event.key === 'End') next = tabs[tabs.length - 1];
+        if (next) {
+          event.preventDefault();
+          selectTab(next, true);
+        }
+      });
+    });
+
+    const isOn = (row) => row.getAttribute('aria-checked') === 'true';
+
+    for (const row of switches.values()) {
+      onActivate(row, () => {
+        const on = !isOn(row);
+        row.setAttribute('aria-checked', String(on));
+        row.querySelector('.switch-state').textContent = on ? 'On' : 'Off';
+      });
+    }
+
+    saveButton.addEventListener('click', async () => {
+      if (busy) return;
+      const body = {};
+      for (const key of KEYS) body[key] = isOn(switches.get(key));
+      const changed = KEYS.filter((key) => body[key] !== defaults.get(key)).length;
+      busy = true;
+      saveButton.disabled = true;
+      error.hidden = true;
+      try {
+        await benchPost('save', body);
+        setView({ view: 'saved' });
+        setMarker('changed-count', String(changed));
+        status.hidden = false;
+      } catch {
+        error.textContent = 'The preferences could not be saved. Try again.';
+        error.hidden = false;
+      } finally {
+        busy = false;
+        saveButton.disabled = false;
+      }
+    });
+  })();
+</script>
+</body>
+</html>

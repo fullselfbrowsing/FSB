@@ -6,6 +6,8 @@ import type { MCPResponse } from '../types.js';
 import { AgentScope } from '../agent-scope.js';
 import { sendAgentScopedBridgeMessage } from '../agent-bridge.js';
 import { mapFSBError } from '../errors.js';
+import { mcpToolDescription, mcpParamDescription } from './descriptions.js';
+import { EXPECT_SHAPE, clampExpectTimeoutMs, EXPECT_BRIDGE_HEADROOM_MS, withUnsupportedExpectFill } from './manual.js';
 
 /**
  * Register agent management tools: create, list, run, stop, delete, toggle,
@@ -31,9 +33,9 @@ export function registerAgentTools(
   // Routes through extension dispatcher via the new 'mcp:go-back' bridge message.
   server.tool(
     'back',
-    'Navigate one step back in browser history on the agent\'s active tab. Single-step only (no back(n)); no companion forward tool in v0.9.60. Agent-scoped: targets the agent\'s active tab unless tab_id is supplied. Ownership-enforced via the Phase 240 dispatch gate -- cross-agent calls reject with TAB_NOT_OWNED. Returns a structured result of shape { status, resultingUrl, historyDepth } where status is one of: ok (back navigation settled cleanly), no_history (history depth <= 1, nothing to go back to), cross_origin (target page is on a different origin from the source), bf_cache (back was served from the back/forward cache and the pageshow listener observed event.persisted=true), fragment_only (only the URL fragment changed via history navigation). Background-tab compatible: does not steal focus or call chrome.tabs.update({active: true}). Multi-agent contract: agent_id is FSB-issued and required (the server captures it via agent:register on first tool call -- callers do not provide it). tab_id is agent-scoped: only tabs owned by the calling agent can be addressed. The concurrency cap is configurable (default 8, range 1-64); the (N+1)th agent claim is rejected with AGENT_CAP_REACHED { cap, active }. Ownership enforcement: cross-agent calls reject with TAB_NOT_OWNED; incognito tabs reject with TAB_INCOGNITO_NOT_SUPPORTED; cross-window tabs reject with TAB_OUT_OF_SCOPE. Tool-specific typed error codes returnable by this tool: NO_BACK_HISTORY, CROSS_ORIGIN, BF_CACHE, FRAGMENT_ONLY. RETURNS change_report: the response includes a `change_report` field with a compact diff of what the back navigation mutated (URL, dialogs_opened, nodes_added, nodes_removed, attrs_changed, inputs_changed, focus_shift). Cross-origin transitions emit a URL-only report with `cross_origin:true`. Use this to learn the consequence without calling read_page next; if `change_report.truncated:true` is set, call read_page for the full state.',
-    { tab_id: z.coerce.number().int().positive().finite().optional().describe('Target tab in agent pool. If omitted, defaults to the agent\'s active tab.') },
-    async ({ tab_id }) => {
+    mcpToolDescription('back'),
+    { tab_id: z.coerce.number().int().positive().finite().optional().describe(mcpParamDescription('back', 'tab_id')), ...EXPECT_SHAPE },
+    async ({ tab_id, expect }) => {
       if (!bridge.isConnected) {
         return mapFSBError({ success: false, error: 'extension_not_connected' });
       }
@@ -41,14 +43,22 @@ export function registerAgentTools(
         const targetTabId = typeof tab_id === 'number' ? tab_id : null;
         const payload: Record<string, unknown> = {};
         if (typeof tab_id === 'number') payload.tabId = tab_id;
+        // Phase 69 D-15: top-level sidecar, only when sent (no-expect payload unchanged).
+        if (expect !== undefined) payload.expect = expect;
+        // Phase 69 (RESEARCH Finding 1): the check runs after back's own settle,
+        // so with expect the bridge waits for it too; without expect the timeout
+        // stays exactly 5_000.
+        const timeout = expect === undefined
+          ? 5_000  // 2s settle + 3s headroom (RESEARCH Pattern 1)
+          : 5_000 + clampExpectTimeoutMs(expect.timeout_ms) + EXPECT_BRIDGE_HEADROOM_MS;
         const result = await sendAgentScopedBridgeMessage(
           bridge,
           agentScope,
           'mcp:go-back',
           payload,
-          { timeout: 5_000, targetTabId },  // 2s settle + 3s headroom (RESEARCH Pattern 1)
+          { timeout, targetTabId },
         );
-        return mapFSBError(result);
+        return mapFSBError(withUnsupportedExpectFill(result, expect));
       });
     },
   );

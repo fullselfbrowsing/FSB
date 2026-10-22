@@ -6,9 +6,11 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
+const { pathToFileURL } = require('node:url');
 
 const repositoryRoot = path.resolve(__dirname, '..');
 const scriptPath = path.join(repositoryRoot, 'scripts', 'sync-product-version.mjs');
+const compatPath = path.join(repositoryRoot, 'scripts', 'lib', 'mcp-extension-compat.mjs');
 
 const extensionExclusiveTargets = [
   'extension/manifest.json',
@@ -111,7 +113,54 @@ function assertIncludes(actual, expected) {
   assert(actual.includes(expected), `Expected ${JSON.stringify(expected)} in:\n${actual}`);
 }
 
-function main() {
+function assertExcludes(actual, unexpected, message) {
+  assert(!actual.includes(unexpected), `${message}: found ${JSON.stringify(unexpected)}`);
+}
+
+// D-22: each MCP release states its own declared minimum extension version.
+function assertCompatDeclarations(compat) {
+  const { MCP_EXTENSION_COMPAT, compatFor, compatBullet, compatPairLine } = compat;
+  assert(Object.isFrozen(MCP_EXTENSION_COMPAT), 'the compatibility map is frozen');
+  assert.equal(compatFor('0.11.2').minimum, '0.9.92');
+  assert.equal(compatFor('0.11.2').feature, null);
+  assert.equal(compatFor('0.11.3'), MCP_EXTENSION_COMPAT['0.11.2'], '0.11.3 inherits the 0.11.2 entry');
+  assert.equal(compatFor('0.12.0').minimum, '0.9.92');
+  assert.deepEqual(compatFor('0.12.0').feature, { version: '1.0.0', names: ['settings', 'expect'] });
+  assert.equal(compatFor('0.12.4'), MCP_EXTENSION_COMPAT['0.12.0'], '0.12.4 inherits the 0.12.0 entry');
+  // IN-07: inheritance runs forward only; an earlier patch never takes a later patch's reasons.
+  assert.throws(() => compatFor('0.11.0'), /no declared extension compatibility for MCP 0\.11\.0;/u);
+  assert.throws(() => compatFor('0.11.1'), /no declared extension compatibility for MCP 0\.11\.1;/u);
+  assert.throws(
+    () => compatFor('0.13.0'),
+    /^Error: no declared extension compatibility for MCP 0\.13\.0; add it to scripts\/lib\/mcp-extension-compat\.mjs$/u,
+  );
+  assert.throws(() => compatFor('0.12'), /no declared extension compatibility for MCP 0\.12;/u);
+
+  // Today's mcp/README.md sentences at 0.11.2 are reproduced byte for byte.
+  assert.equal(
+    compatBullet('0.11.2'),
+    '- **Compatibility:** `fsb-mcp-server` 0.11.2 requires FSB extension 0.9.92 or newer for `mcp:task-status`. Upgrade the extension and restart the MCP host together.',
+  );
+  assert.equal(
+    compatPairLine('0.11.2'),
+    'Compatibility for this release: MCP 0.11.2 requires extension 0.9.92 or newer for the `mcp:task-status` route used by `complete_task`, `partial_task`, and `fail_task`. Existing `0.10.0` tool routes remain additive and unchanged.',
+  );
+  // 0.12.0: existing tools keep 0.9.92; settings and expect need 1.0.0 (66.1-03, 69-06).
+  assert.equal(
+    compatBullet('0.12.0'),
+    '- **Compatibility:** `fsb-mcp-server` 0.12.0 requires FSB extension 0.9.92 or newer for existing tools; `settings` and the optional `expect` need FSB extension 1.0.0 or newer. Upgrade the extension and restart the MCP host together.',
+  );
+  assert.equal(
+    compatPairLine('0.12.0'),
+    'Compatibility for this release: MCP 0.12.0 requires extension 0.9.92 or newer for existing tools. `settings` and the optional `expect` need extension 1.0.0 or newer; older extensions answer `SETTING_UNSUPPORTED` and report `expect_result` as `uncertain` with `extension_unsupported`. Existing tool routes remain additive and unchanged.',
+  );
+}
+
+async function main() {
+  const compat = await import(pathToFileURL(compatPath).href);
+  assertCompatDeclarations(compat);
+  const { compatFor, compatBullet, compatPairLine } = compat;
+
   const currentExtensionVersion = readJson(repositoryRoot, 'extension/manifest.json').version;
   const currentMcpVersion = readJson(repositoryRoot, 'mcp/package.json').version;
   const nextExtensionVersion = nextPatch(currentExtensionVersion);
@@ -120,6 +169,9 @@ function main() {
   const liveCheck = run(['--check']);
   assert.equal(liveCheck.status, 0, liveCheck.stderr || liveCheck.stdout);
   assertIncludes(liveCheck.stdout, `extension ${currentExtensionVersion}; MCP ${currentMcpVersion}`);
+  const liveMcpReadme = fs.readFileSync(path.join(repositoryRoot, 'mcp/README.md'), 'utf8');
+  assertIncludes(liveMcpReadme, compatBullet(currentMcpVersion));
+  assertIncludes(liveMcpReadme, compatPairLine(currentMcpVersion));
 
   const targetResult = run(['--print-targets']);
   assert.equal(targetResult.status, 0, targetResult.stderr);
@@ -219,6 +271,24 @@ function main() {
     const mixedCheck = run(['--check'], fixtureRoot);
     assert.equal(mixedCheck.status, 0, mixedCheck.stderr || mixedCheck.stdout);
     assertIncludes(mixedCheck.stdout, `extension ${nextExtensionVersion}; MCP ${currentMcpVersion}`);
+    // An extension-only release keeps the MCP release's own declared minimum (the step-A trap, D-22).
+    const mcpReadmePathAfterExtension = path.join(fixtureRoot, 'mcp/README.md');
+    const mcpReadmeAfterExtension = fs.readFileSync(mcpReadmePathAfterExtension, 'utf8');
+    assertIncludes(
+      mcpReadmeAfterExtension,
+      `MCP ${currentMcpVersion} requires extension ${compatFor(currentMcpVersion).minimum} or newer`,
+    );
+    assertIncludes(mcpReadmeAfterExtension, compatBullet(currentMcpVersion));
+    assertExcludes(
+      mcpReadmeAfterExtension,
+      `requires extension ${nextExtensionVersion}`,
+      'extension setter claimed the current MCP release needs the new extension',
+    );
+    assertExcludes(
+      mcpReadmeAfterExtension,
+      `requires FSB extension ${nextExtensionVersion}`,
+      'extension setter claimed the current MCP release needs the new extension',
+    );
 
     const beforeUnpreparedMcp = targetDigests(fixtureRoot, targets);
     const unpreparedMcp = run(['mcp', nextMcpVersion], fixtureRoot);
@@ -268,6 +338,19 @@ function main() {
     assertIncludes(
       fs.readFileSync(path.join(fixtureRoot, 'mcp/build/version.d.ts'), 'utf8'),
       `FSB_MCP_VERSION = "${nextMcpVersion}"`,
+    );
+    // A patch release inherits its minor's declared minimum, not the current extension version.
+    const mcpReadmeAfterMcp = fs.readFileSync(path.join(fixtureRoot, 'mcp/README.md'), 'utf8');
+    assertIncludes(
+      mcpReadmeAfterMcp,
+      `MCP ${nextMcpVersion} requires extension ${compatFor(nextMcpVersion).minimum} or newer`,
+    );
+    assertIncludes(mcpReadmeAfterMcp, compatPairLine(nextMcpVersion));
+    assertIncludes(mcpReadmeAfterMcp, compatBullet(nextMcpVersion));
+    assertExcludes(
+      mcpReadmeAfterMcp,
+      `requires extension ${nextExtensionVersion}`,
+      'MCP setter copied the current extension version into the compatibility pair',
     );
 
     const independentCheck = run(['--check'], fixtureRoot);
@@ -323,6 +406,24 @@ function main() {
     assert.match(duplicateHeading.stderr, /MCP README contains duplicate What's New release headings/u);
     fs.writeFileSync(mcpReadmePath, synchronizedMcpReadme);
 
+    // An MCP minor with no declared compatibility is refused before any write.
+    const mcpChangelogPath = path.join(fixtureRoot, 'mcp/CHANGELOG.md');
+    const synchronizedMcpChangelog = fs.readFileSync(mcpChangelogPath, 'utf8');
+    prepareMcpChangelog(fixtureRoot, '0.99.0');
+    const beforeUndeclaredMcp = targetDigests(fixtureRoot, targets);
+    const undeclaredMcp = run(['mcp', '0.99.0'], fixtureRoot);
+    assert.notEqual(undeclaredMcp.status, 0, 'MCP setter accepted a release with no declared extension compatibility');
+    assertIncludes(
+      undeclaredMcp.stderr,
+      'version-sync: no declared extension compatibility for MCP 0.99.0; add it to scripts/lib/mcp-extension-compat.mjs',
+    );
+    assert.deepEqual(
+      targetDigests(fixtureRoot, targets),
+      beforeUndeclaredMcp,
+      'undeclared MCP compatibility left partial writes',
+    );
+    fs.writeFileSync(mcpChangelogPath, synchronizedMcpChangelog);
+
     if (process.platform !== 'win32') {
       prepareExtensionChangelog(fixtureRoot, rollbackExtensionVersion);
       const beforeCommitFailure = targetDigests(fixtureRoot, targets);
@@ -355,4 +456,7 @@ function main() {
   console.log('version-sync: PASS');
 }
 
-main();
+main().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});

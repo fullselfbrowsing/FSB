@@ -1036,6 +1036,27 @@
             }
           }
 
+          // FAST-MODE TARGET RESOLUTION (Phase 68 D-14): only fast-mode calls carry
+          // jevHandle. It is resolved strictly with no CSS fallback, and every
+          // failure returns here, so a refused fast step never reaches the
+          // ref-less focused-element fallback below.
+          if (params && params.jevHandle !== undefined) {
+            let jevVerdict = null;
+            try {
+              jevVerdict = FSB.resolveJevHandle(params, tool);
+            } catch (_jevError) {
+              jevVerdict = null;
+            }
+            if (!jevVerdict || jevVerdict.ok !== true) {
+              const jevReason = (jevVerdict && typeof jevVerdict.reason === 'string') ? jevVerdict.reason : 'unavailable';
+              logger.warn('Fast-mode target refused', { sessionId: FSB.sessionId, reason: jevReason });
+              sendResponse({ success: false, error: 'Fast-mode target is no longer current (' + jevReason + ').', tool, refStale: true, reason: jevReason });
+              return;
+            }
+            params.selector = jevVerdict.selector;
+            FSB.elementCache.set(params.selector, jevVerdict.element);
+          }
+
           // COMPACT REF RESOLUTION
           if (params && params.ref && !params.selector) {
             const resolvedElement = FSB.resolveRef(params.ref);
@@ -1085,6 +1106,11 @@
           }
 
           if (FSB.tools[tool]) {
+            if (FSB._jevCaptureArm) {
+              try {
+                FSB.noteJevCaptureObservation(tool, params);
+              } catch (_jevCaptureError) { /* capture is diagnostic-only */ }
+            }
             // VIS-01/VIS-03: Show highlight on target element
             if (params && (params.selector || params.ref)) {
               try {
@@ -1142,7 +1168,13 @@
                 sendResponse({
                   ...result,
                   tool: tool,
-                  executionTime: Date.now() - startTime
+                  executionTime: Date.now() - startTime,
+                  // Phase 68 (WR-05): a fast-mode call reports the selector the
+                  // strict resolver chose, so its replay record can target the
+                  // element instead of a one-time handle. Other calls: unchanged.
+                  ...(params && params.jevHandle !== undefined && typeof params.selector === 'string'
+                    ? { jevSelector: params.selector }
+                    : {})
                 });
               }
             } catch (actionError) {
@@ -1394,6 +1426,25 @@
       case 'executeAction':
         // Handled above in async handler
         break;
+
+      case 'getJevMenu': {
+        // Phase 68 fast-mode menu: value-free, main frame only; building it
+        // resets only FSB.jevRefMap. capture:true arms one capture observation
+        // for the next action; any other request disarms it.
+        const jevMenuOptions = request.options && typeof request.options === 'object' ? request.options : {};
+        let jevMenu = null;
+        try {
+          jevMenu = FSB.buildJevMenu({ cap: jevMenuOptions.cap, recent: jevMenuOptions.recent });
+        } catch (_jevMenuError) {
+          jevMenu = null;
+        }
+        if (!jevMenu || typeof jevMenu !== 'object') jevMenu = { success: false, reason: 'menu_error' };
+        FSB._jevCaptureArm = jevMenuOptions.capture === true && jevMenu.success === true
+          ? { generation: jevMenu.generation }
+          : null;
+        sendResponse(jevMenu);
+        break;
+      }
 
       case 'highlightElement':
         (async () => {

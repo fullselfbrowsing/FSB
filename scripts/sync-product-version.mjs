@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { compatBullet, compatFor, compatPairLine } from './lib/mcp-extension-compat.mjs';
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = resolve(
@@ -279,7 +280,7 @@ function setMcpReadmeSurfaces(extensionVersion, mcpVersion) {
   changed.push(replaceExactly(
     'mcp/README.md',
     /^- \*\*(?:Unified product version|Compatibility):\*\* .*$/gmu,
-    `- **Compatibility:** \`fsb-mcp-server\` ${mcpVersion} requires FSB extension ${extensionVersion} or newer for \`mcp:task-status\`. Upgrade the extension and restart the MCP host together.`,
+    compatBullet(mcpVersion),
     'MCP README current compatibility summary',
   ));
   changed.push(replaceExactly(
@@ -291,7 +292,7 @@ function setMcpReadmeSurfaces(extensionVersion, mcpVersion) {
   changed.push(replaceExactly(
     'mcp/README.md',
     /^Compatibility for this release: .*$/gmu,
-    `Compatibility for this release: MCP ${mcpVersion} requires extension ${extensionVersion} or newer for the \`mcp:task-status\` route used by \`complete_task\`, \`partial_task\`, and \`fail_task\`. Existing \`0.10.0\` tool routes remain additive and unchanged.`,
+    compatPairLine(mcpVersion),
     'MCP README compatibility pair',
   ));
   changed.push(replaceExactly(
@@ -546,11 +547,19 @@ function collectParityErrors() {
   if (new Set(mcpHeadings).size !== mcpHeadings.length) {
     errors.push('MCP README contains duplicate What\'s New release headings');
   }
-  contains(
-    'mcp/README.md',
-    `MCP ${mcpVersion} requires extension ${extensionVersion} or newer`,
-    'MCP README compatibility pair',
-  );
+  let compatMinimum = null;
+  try {
+    compatMinimum = compatFor(mcpVersion).minimum;
+  } catch (error) {
+    errors.push(`MCP README compatibility pair: ${error.message}`);
+  }
+  if (compatMinimum) {
+    contains(
+      'mcp/README.md',
+      `MCP ${mcpVersion} requires extension ${compatMinimum} or newer`,
+      'MCP README compatibility pair',
+    );
+  }
   contains('mcp/README.md', `### Releasing ${mcpVersion}`, 'MCP README release heading');
   contains(
     'mcp/README.md',

@@ -21,6 +21,8 @@ const { createAcceptLanguageMiddleware } = require('./src/middleware/accept-lang
 const { createLegacyHtmlRedirectHandler } = require('./src/middleware/legacy-html-redirects');
 const { createShowcaseRouteFallback } = require('./src/middleware/showcase-route-fallback');
 const { createGlobalJsonParser } = require('./src/middleware/global-json-parser');
+const { loadJevConfig } = require('./src/jev/config');
+const createJevRouter = require('./src/routes/jev');
 const { LOCALES, SOURCE_LOCALE, LOCALE_SUBPATHS } = require('./src/utils/locale-constants');
 
 // Configuration
@@ -31,6 +33,9 @@ const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'fsb-data.db');
 const db = new Database(DB_PATH);
 initializeDatabase(db);
 const queries = new Queries(db);
+// Phase 67 / D-04 -- Jev gateway config, read once after dotenv. Never throws;
+// an invalid config logs one fixed line naming variables only (D-05).
+const jevConfig = loadJevConfig(process.env, { log: console });
 
 // Express app
 const app = express();
@@ -142,6 +147,18 @@ app.use('/api/telemetry', createTelemetryRouter(db, queries, hashIp));
 // Memo + ETag handling lives inside the router; this mount is the only wiring.
 const createPublicStatsRouter = require('./src/routes/public-stats');
 app.use('/api/public-stats', createPublicStatsRouter(db, queries));
+
+// Phase 67 / JEV-01..07 -- hosted Jev decision gateway (PUBLIC, no auth).
+// Route-local 48 KB parser and error handler; never reaches the generic error
+// handler; disabled unless JEV_ENABLED and a valid config. The global JSON
+// parser skips /api/jev so the route-local cap sees the original stream.
+app.use('/api/jev', createJevRouter({
+  db,
+  config: jevConfig,
+  fetchImpl: (...args) => globalThis.fetch(...args),
+  now: Date.now,
+  log: console,
+}));
 
 // Serve showcase static files with cache headers
 // In Docker: Angular dist is copied to /app/public

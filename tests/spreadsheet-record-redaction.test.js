@@ -769,6 +769,95 @@ test('unrelated records pass through unchanged', () => {
   assert.strictEqual(sink.entries[0], source);
 });
 
+test('Google Sheets records keep only a validated call timing', () => {
+  const timing = { v: 1, receivedAt: 1000, completedAt: 1120, fsbMs: 120 };
+  const sheetsEntry = (extra) => ({
+    client: 'test-client',
+    tool: 'fill_sheet',
+    params: { startCell: RANGE, csvData: `${SENTINEL},2` },
+    payload: {
+      tool: 'fill_sheet',
+      params: { startCell: RANGE, csvData: `${SENTINEL},2` },
+      agentId: 'agent:timing'
+    },
+    response: { success: true, message: `Filled ${RANGE} with ${SENTINEL}` },
+    success: true,
+    tabId: 8,
+    ...extra
+  });
+
+  const kept = redaction.sanitizeEntry(sheetsEntry({ timing }));
+  assert.deepEqual(kept.timing, timing);
+  assert.notStrictEqual(kept.timing, timing);
+  assertNoContent(kept);
+
+  const corrected = redaction.sanitizeEntry(sheetsEntry({ timing: { ...timing, fsbMs: 5 } }));
+  assert.deepEqual(corrected.timing, timing, 'fsbMs is recomputed from completedAt - receivedAt');
+
+  const invalidTimings = [
+    { v: 1, receivedAt: -1, completedAt: 1120, fsbMs: 1121 },
+    { v: 1, receivedAt: '1000', completedAt: 1120, fsbMs: 120 },
+    { v: 1, receivedAt: 1200, completedAt: 1120, fsbMs: 0 },
+    { v: 2, receivedAt: 1000, completedAt: 1120, fsbMs: 120 },
+    { v: 1, receivedAt: 1000.5, completedAt: 1120, fsbMs: 119.5 },
+    { v: 1, receivedAt: 1000, completedAt: Number.MAX_SAFE_INTEGER + 2, fsbMs: 1 },
+    { v: 1, receivedAt: 1000 },
+    'v1:1000:1120',
+    null
+  ];
+  for (const invalid of invalidTimings) {
+    const dropped = redaction.sanitizeEntry(sheetsEntry({ timing: invalid }));
+    assert.equal(Object.prototype.hasOwnProperty.call(dropped, 'timing'), false,
+      `invalid timing is dropped: ${JSON.stringify(invalid)}`);
+  }
+  const absent = redaction.sanitizeEntry(sheetsEntry({}));
+  assert.equal(Object.prototype.hasOwnProperty.call(absent, 'timing'), false);
+
+  const sink = recorder('recordAction');
+  assert.equal(redaction.recordSafely(sink.target, 'recordAction', sheetsEntry({ timing })), true);
+  assert.deepEqual(sink.entries[0].timing, timing);
+  assertNoContent(sink.entries[0]);
+
+  const plain = {
+    client: 'test-client',
+    tool: 'click',
+    params: { selector: '#go' },
+    payload: { tool: 'click', params: { selector: '#go' } },
+    response: { success: true },
+    success: true,
+    tabId: 3,
+    timing: { v: 2, receivedAt: 'not-validated-here' }
+  };
+  assert.strictEqual(redaction.sanitizeEntry(plain), plain);
+  const plainSink = recorder('recordAction');
+  redaction.recordSafely(plainSink.target, 'recordAction', plain);
+  assert.strictEqual(plainSink.entries[0], plain);
+});
+
+test('real bridge keeps the ingress call timing on redacted Sheets records', () => {
+  const timingSymbol = Symbol.for('fsb.mcp.call-timing');
+  const harness = bridgeHarness();
+  const payload = {
+    tool: 'fillsheet',
+    params: { startCell: 'A1', data: `${SENTINEL},2`, tab_id: 8 },
+    agentId: 'agent:wire',
+    ownershipToken: SENTINEL
+  };
+  const receivedAt = Date.now() - 25;
+  Object.defineProperty(payload, timingSymbol, { value: { receivedAt }, enumerable: false, configurable: true });
+  harness.client._recordMcpSessionAction(payload, { success: true, action: 'fillsheet', hadEffect: true }, 8);
+
+  assert.equal(harness.entries.length, 1);
+  const recorded = harness.entries[0];
+  assert.equal(recorded.timing.v, 1);
+  assert.equal(recorded.timing.receivedAt, receivedAt);
+  assert.ok(recorded.timing.completedAt >= receivedAt);
+  assert.equal(recorded.timing.fsbMs, recorded.timing.completedAt - receivedAt);
+  assert.ok(recorded.timing.fsbMs >= 25);
+  assert.deepEqual(Object.keys(recorded.timing), ['v', 'receivedAt', 'completedAt', 'fsbMs']);
+  assertNoContent(recorded);
+});
+
 test('both recording hooks call the shared ingress sanitizer and fail closed for Sheets', () => {
   const background = fs.readFileSync(path.join(ROOT, 'extension/background.js'), 'utf8');
   const dispatcher = fs.readFileSync(path.join(ROOT, 'extension/ws/mcp-tool-dispatcher.js'), 'utf8');

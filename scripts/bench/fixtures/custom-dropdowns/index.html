@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en" data-bench-app="custom-dropdowns">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Order options</title>
+<link rel="icon" href="data:,">
+<style>
+  :root { color-scheme: light; --ink: #1c2230; --muted: #5b6475; --line: #d9dde5; --accent: #2457c5; --bg: #f5f6f8; --card: #fff; }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--ink); background: var(--bg); }
+  main { max-width: 720px; margin: 0 auto; padding: 20px 24px 32px; }
+  h1 { font-size: 1.4rem; margin: 0 0 14px; }
+  .panel { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; margin-bottom: 14px; }
+  .btn { font: inherit; padding: 6px 14px; border: 1px solid #b8bfcc; border-radius: 6px; background: #fff; color: var(--ink); cursor: pointer; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn:disabled { opacity: 0.6; cursor: default; }
+  .status { margin: 10px 0 0; color: #1f7a3a; font-weight: 600; }
+  .error { margin: 10px 0 0; color: #b42318; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .field { margin-bottom: 14px; }
+  .field-label { display: block; font-weight: 600; margin-bottom: 4px; }
+  .combo-box { display: flex; justify-content: space-between; align-items: center; width: 18rem; padding: 6px 10px; border: 1px solid #b8bfcc; border-radius: 6px; background: #fff; cursor: pointer; user-select: none; }
+  .combo-box::after { content: "\25BE"; color: var(--muted); margin-left: 12px; }
+  .combo-box .placeholder { color: var(--muted); }
+  .combo-list { width: 18rem; margin-top: 4px; border: 1px solid #b8bfcc; border-radius: 6px; background: #fff; box-shadow: 0 4px 12px rgba(28, 34, 48, 0.12); }
+  .combo-option { padding: 6px 10px; cursor: pointer; user-select: none; }
+  .combo-option:hover, .combo-option:focus { background: #eef3ff; outline: none; }
+  .combo-option[aria-selected="true"] { font-weight: 600; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Order options</h1>
+  <section class="panel" aria-label="Order options">
+    <div class="field">
+      <span class="field-label" id="region-label">Region</span>
+      <div class="combo" data-name="region">
+        <div class="combo-box" id="region-combo" role="combobox" tabindex="0" aria-label="Region" aria-haspopup="listbox" aria-expanded="false" aria-controls="region-listbox"><span class="combo-value placeholder">Choose a region</span></div>
+        <div class="combo-list" id="region-listbox" role="listbox" aria-label="Region" hidden>
+          <div class="combo-option" role="option" tabindex="0" aria-selected="false" data-value="us-east">US East</div>
+          <div class="combo-option" role="option" tabindex="0" aria-selected="false" data-value="us-west">US West</div>
+          <div class="combo-option" role="option" tabindex="0" aria-selected="false" data-value="eu-west">Europe (West)</div>
+          <div class="combo-option" role="option" tabindex="0" aria-selected="false" data-value="ap-south">Asia Pacific</div>
+        </div>
+      </div>
+    </div>
+    <div class="field">
+      <span class="field-label" id="size-label">Size</span>
+      <div class="combo" data-name="size">
+        <div class="combo-box" id="size-combo" role="combobox" tabindex="0" aria-label="Size" aria-haspopup="listbox" aria-expanded="false" aria-controls="size-listbox"><span class="combo-value placeholder">Choose a size</span></div>
+        <div class="combo-list" id="size-listbox" role="listbox" aria-label="Size" hidden>
+          <div class="combo-option" role="option" tabindex="0" aria-selected="false" data-value="small">Small</div>
+          <div class="combo-option" role="option" tabindex="0" aria-selected="false" data-value="medium">Medium</div>
+          <div class="combo-option" role="option" tabindex="0" aria-selected="false" data-value="large">Large</div>
+          <div class="combo-option" role="option" tabindex="0" aria-selected="false" data-value="x-large">X-Large</div>
+        </div>
+      </div>
+    </div>
+    <div class="field">
+      <span class="field-label" id="color-label">Color</span>
+      <div class="combo" data-name="color">
+        <div class="combo-box" id="color-combo" role="combobox" tabindex="0" aria-label="Color" aria-haspopup="listbox" aria-expanded="false" aria-controls="color-listbox"><span class="combo-value placeholder">Choose a color</span></div>
+        <div class="combo-list" id="color-listbox" role="listbox" aria-label="Color" hidden>
+          <div class="combo-option" role="option" tabindex="0" aria-selected="false" data-value="silver">Silver</div>
+          <div class="combo-option" role="option" tabindex="0" aria-selected="false" data-value="graphite">Graphite</div>
+          <div class="combo-option" role="option" tabindex="0" aria-selected="false" data-value="navy">Navy</div>
+          <div class="combo-option" role="option" tabindex="0" aria-selected="false" data-value="sand">Sand</div>
+        </div>
+      </div>
+    </div>
+    <div class="field">
+      <span class="field-label" id="shipping-label">Shipping</span>
+      <div class="combo" data-name="shipping">
+        <div class="combo-box" id="shipping-combo" role="combobox" tabindex="0" aria-label="Shipping" aria-haspopup="listbox" aria-expanded="false" aria-controls="shipping-listbox"><span class="combo-value placeholder">Choose a shipping speed</span></div>
+        <div class="combo-list" id="shipping-listbox" role="listbox" aria-label="Shipping" hidden>
+          <div class="combo-option" role="option" tabindex="0" aria-selected="false" data-value="standard">Standard</div>
+          <div class="combo-option" role="option" tabindex="0" aria-selected="false" data-value="express">Express</div>
+          <div class="combo-option" role="option" tabindex="0" aria-selected="false" data-value="overnight">Overnight</div>
+        </div>
+      </div>
+    </div>
+    <button id="submit" class="btn primary" type="button">Submit</button>
+    <p id="submit-error" class="error" role="alert" hidden></p>
+    <p id="submit-status" class="status" role="status" hidden>Submitted: <output data-bench-marker="selection"></output></p>
+  </section>
+</main>
+<script src="../_shared/bench.js"></script>
+<script>
+  (() => {
+    'use strict';
+    const LABELS = { region: 'Region', size: 'Size', color: 'Color', shipping: 'Shipping' };
+    const combos = [...document.querySelectorAll('.combo')].map((root) => {
+      const box = root.querySelector('[role="combobox"]');
+      const list = root.querySelector('[role="listbox"]');
+      const valueText = box.querySelector('.combo-value');
+      const options = [...list.querySelectorAll('[role="option"]')];
+      return { name: root.dataset.name, root, box, list, valueText, options, value: null };
+    });
+    const submitButton = document.getElementById('submit');
+    const error = document.getElementById('submit-error');
+    const status = document.getElementById('submit-status');
+    let busy = false;
+
+    const isOpen = (combo) => combo.box.getAttribute('aria-expanded') === 'true';
+
+    function close(combo, focusBox) {
+      combo.list.hidden = true;
+      combo.box.setAttribute('aria-expanded', 'false');
+      if (focusBox) combo.box.focus();
+    }
+
+    function open(combo) {
+      for (const other of combos) if (other !== combo) close(other, false);
+      combo.list.hidden = false;
+      combo.box.setAttribute('aria-expanded', 'true');
+      (combo.options.find((option) => option.dataset.value === combo.value) || combo.options[0]).focus();
+    }
+
+    function choose(combo, option) {
+      combo.value = option.dataset.value;
+      for (const each of combo.options) each.setAttribute('aria-selected', String(each === option));
+      combo.valueText.textContent = option.textContent;
+      combo.valueText.classList.remove('placeholder');
+      close(combo, true);
+    }
+
+    for (const combo of combos) {
+      onActivate(combo.box, () => (isOpen(combo) ? close(combo, false) : open(combo)));
+      combo.box.addEventListener('keydown', (event) => {
+        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+          event.preventDefault();
+          if (!isOpen(combo)) open(combo);
+        } else if (event.key === 'Escape') {
+          close(combo, false);
+        }
+      });
+      combo.options.forEach((option, index) => {
+        onActivate(option, () => choose(combo, option));
+        option.addEventListener('keydown', (event) => {
+          if (event.key === 'ArrowDown') {
+            event.preventDefault();
+            combo.options[Math.min(index + 1, combo.options.length - 1)].focus();
+          } else if (event.key === 'ArrowUp') {
+            event.preventDefault();
+            combo.options[Math.max(index - 1, 0)].focus();
+          } else if (event.key === 'Escape') {
+            event.preventDefault();
+            close(combo, true);
+          }
+        });
+      });
+    }
+
+    document.addEventListener('click', (event) => {
+      for (const combo of combos) if (isOpen(combo) && !combo.root.contains(event.target)) close(combo, false);
+    });
+
+    submitButton.addEventListener('click', async () => {
+      if (busy) return;
+      const missing = combos.filter((combo) => combo.value === null).map((combo) => LABELS[combo.name]);
+      if (missing.length) {
+        error.textContent = `Choose a value for ${missing.join(', ')}.`;
+        error.hidden = false;
+        return;
+      }
+      const [region, size, color, shipping] = ['region', 'size', 'color', 'shipping']
+        .map((name) => combos.find((combo) => combo.name === name).value);
+      busy = true;
+      submitButton.disabled = true;
+      error.hidden = true;
+      try {
+        await benchPost('submit', { region, size, color, shipping });
+        setView({ view: 'submitted' });
+        setMarker('selection', `${region}|${size}|${color}|${shipping}`);
+        status.hidden = false;
+      } catch {
+        error.textContent = 'The options could not be submitted. Try again.';
+        error.hidden = false;
+      } finally {
+        busy = false;
+        submitButton.disabled = false;
+      }
+    });
+  })();
+</script>
+</body>
+</html>

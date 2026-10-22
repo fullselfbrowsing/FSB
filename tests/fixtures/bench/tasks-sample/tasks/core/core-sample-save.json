@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "id": "core-sample-save",
+  "version": 1,
+  "set": "core",
+  "category": "click-heavy",
+  "startPath": "/fixtures/sample/index.html",
+  "instruction": "Open {startUrl}. Type alpha into the Value field, then press Save.",
+  "timeBudgetMs": 120000,
+  "success": {
+    "all": [
+      { "kind": "request", "method": "POST", "path": "/api/sample/save", "count": 1, "jsonEquals": { "value": "alpha" } },
+      { "kind": "finalUrl", "pathEquals": "/fixtures/sample/index.html", "queryIncludes": { "view": "saved" } },
+      { "kind": "marker", "name": "saved-value", "equals": "alpha" }
+    ]
+  },
+  "fixtureFiles": ["sample/index.html"]
+}

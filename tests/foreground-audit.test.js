@@ -27,7 +27,7 @@ const DISPATCHER_PATH = path.join(ROOT, 'extension/ws/mcp-tool-dispatcher.js');
 const EXECUTOR_PATH = path.join(ROOT, 'extension/ai/tool-executor.js');
 const AUDIT_DOC_PATH = path.join(
   ROOT,
-  '.planning/phases/243-background-tab-audit-ui-badge-integration/243-BACKGROUND-TAB-AUDIT.md'
+  '.planning/milestones/v0.9.60-phases/243-background-tab-audit-ui-badge-integration/243-BACKGROUND-TAB-AUDIT.md'
 );
 
 let passed = 0;

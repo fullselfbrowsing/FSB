@@ -1,0 +1,5 @@
+{
+  "_fixture": "synthetic run_task response for an autopilot provider failure (66-08 W-A); written by hand, not captured; no network. The sentinel PROVIDER_ERROR_TEXT_77c1 must never reach a committed run row.",
+  "success": false,
+  "error": "Provider request failed: HTTP 429 rate limit exceeded (PROVIDER_ERROR_TEXT_77c1)"
+}

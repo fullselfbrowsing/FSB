@@ -1,0 +1,1948 @@
+{
+  "note": "The V1 schedule produced by the Phase 66 buildSchedule (scripts/bench/lib/runs.mjs before Phase 71) for core-baseline-66. Golden fixture: never regenerate it; tests/bench-conditions.test.mjs asserts that buildSchedule without conditions still deep-equals it.",
+  "args": {
+    "campaignId": "core-baseline-66",
+    "taskIds": [
+      "core-click-accordion-drilldown",
+      "core-click-checklist",
+      "core-click-confirm-modals",
+      "core-click-custom-dropdowns",
+      "core-click-kanban-moves",
+      "core-click-tabbed-toggles",
+      "core-mixed-invoice-lookup",
+      "core-mixed-paginate-find",
+      "core-mixed-search-detail",
+      "core-mixed-settings-change",
+      "core-mixed-ticket-triage",
+      "core-mixed-wizard-submit"
+    ],
+    "rounds": 10,
+    "arms": [
+      "autopilot",
+      "claude"
+    ],
+    "seed": 66
+  },
+  "schedule": [
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r1-core-mixed-invoice-lookup-autopilot",
+      "round": 1,
+      "order": 1,
+      "taskId": "core-mixed-invoice-lookup",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r1-core-mixed-invoice-lookup-claude",
+      "round": 1,
+      "order": 2,
+      "taskId": "core-mixed-invoice-lookup",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r1-core-mixed-search-detail-autopilot",
+      "round": 1,
+      "order": 3,
+      "taskId": "core-mixed-search-detail",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r1-core-mixed-search-detail-claude",
+      "round": 1,
+      "order": 4,
+      "taskId": "core-mixed-search-detail",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r1-core-click-accordion-drilldown-autopilot",
+      "round": 1,
+      "order": 5,
+      "taskId": "core-click-accordion-drilldown",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r1-core-click-accordion-drilldown-claude",
+      "round": 1,
+      "order": 6,
+      "taskId": "core-click-accordion-drilldown",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r1-core-mixed-paginate-find-autopilot",
+      "round": 1,
+      "order": 7,
+      "taskId": "core-mixed-paginate-find",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r1-core-mixed-paginate-find-claude",
+      "round": 1,
+      "order": 8,
+      "taskId": "core-mixed-paginate-find",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r1-core-click-checklist-autopilot",
+      "round": 1,
+      "order": 9,
+      "taskId": "core-click-checklist",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r1-core-click-checklist-claude",
+      "round": 1,
+      "order": 10,
+      "taskId": "core-click-checklist",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r1-core-click-custom-dropdowns-autopilot",
+      "round": 1,
+      "order": 11,
+      "taskId": "core-click-custom-dropdowns",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r1-core-click-custom-dropdowns-claude",
+      "round": 1,
+      "order": 12,
+      "taskId": "core-click-custom-dropdowns",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r1-core-mixed-settings-change-autopilot",
+      "round": 1,
+      "order": 13,
+      "taskId": "core-mixed-settings-change",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r1-core-mixed-settings-change-claude",
+      "round": 1,
+      "order": 14,
+      "taskId": "core-mixed-settings-change",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r1-core-click-confirm-modals-autopilot",
+      "round": 1,
+      "order": 15,
+      "taskId": "core-click-confirm-modals",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r1-core-click-confirm-modals-claude",
+      "round": 1,
+      "order": 16,
+      "taskId": "core-click-confirm-modals",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r1-core-mixed-ticket-triage-autopilot",
+      "round": 1,
+      "order": 17,
+      "taskId": "core-mixed-ticket-triage",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r1-core-mixed-ticket-triage-claude",
+      "round": 1,
+      "order": 18,
+      "taskId": "core-mixed-ticket-triage",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r1-core-click-tabbed-toggles-autopilot",
+      "round": 1,
+      "order": 19,
+      "taskId": "core-click-tabbed-toggles",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r1-core-click-tabbed-toggles-claude",
+      "round": 1,
+      "order": 20,
+      "taskId": "core-click-tabbed-toggles",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r1-core-click-kanban-moves-autopilot",
+      "round": 1,
+      "order": 21,
+      "taskId": "core-click-kanban-moves",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r1-core-click-kanban-moves-claude",
+      "round": 1,
+      "order": 22,
+      "taskId": "core-click-kanban-moves",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r1-core-mixed-wizard-submit-autopilot",
+      "round": 1,
+      "order": 23,
+      "taskId": "core-mixed-wizard-submit",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r1-core-mixed-wizard-submit-claude",
+      "round": 1,
+      "order": 24,
+      "taskId": "core-mixed-wizard-submit",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r2-core-click-accordion-drilldown-claude",
+      "round": 2,
+      "order": 25,
+      "taskId": "core-click-accordion-drilldown",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r2-core-click-accordion-drilldown-autopilot",
+      "round": 2,
+      "order": 26,
+      "taskId": "core-click-accordion-drilldown",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r2-core-mixed-invoice-lookup-claude",
+      "round": 2,
+      "order": 27,
+      "taskId": "core-mixed-invoice-lookup",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r2-core-mixed-invoice-lookup-autopilot",
+      "round": 2,
+      "order": 28,
+      "taskId": "core-mixed-invoice-lookup",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r2-core-mixed-paginate-find-claude",
+      "round": 2,
+      "order": 29,
+      "taskId": "core-mixed-paginate-find",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r2-core-mixed-paginate-find-autopilot",
+      "round": 2,
+      "order": 30,
+      "taskId": "core-mixed-paginate-find",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r2-core-click-tabbed-toggles-claude",
+      "round": 2,
+      "order": 31,
+      "taskId": "core-click-tabbed-toggles",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r2-core-click-tabbed-toggles-autopilot",
+      "round": 2,
+      "order": 32,
+      "taskId": "core-click-tabbed-toggles",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r2-core-mixed-wizard-submit-claude",
+      "round": 2,
+      "order": 33,
+      "taskId": "core-mixed-wizard-submit",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r2-core-mixed-wizard-submit-autopilot",
+      "round": 2,
+      "order": 34,
+      "taskId": "core-mixed-wizard-submit",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r2-core-click-confirm-modals-claude",
+      "round": 2,
+      "order": 35,
+      "taskId": "core-click-confirm-modals",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r2-core-click-confirm-modals-autopilot",
+      "round": 2,
+      "order": 36,
+      "taskId": "core-click-confirm-modals",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r2-core-mixed-ticket-triage-claude",
+      "round": 2,
+      "order": 37,
+      "taskId": "core-mixed-ticket-triage",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r2-core-mixed-ticket-triage-autopilot",
+      "round": 2,
+      "order": 38,
+      "taskId": "core-mixed-ticket-triage",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r2-core-mixed-settings-change-claude",
+      "round": 2,
+      "order": 39,
+      "taskId": "core-mixed-settings-change",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r2-core-mixed-settings-change-autopilot",
+      "round": 2,
+      "order": 40,
+      "taskId": "core-mixed-settings-change",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r2-core-mixed-search-detail-claude",
+      "round": 2,
+      "order": 41,
+      "taskId": "core-mixed-search-detail",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r2-core-mixed-search-detail-autopilot",
+      "round": 2,
+      "order": 42,
+      "taskId": "core-mixed-search-detail",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r2-core-click-checklist-claude",
+      "round": 2,
+      "order": 43,
+      "taskId": "core-click-checklist",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r2-core-click-checklist-autopilot",
+      "round": 2,
+      "order": 44,
+      "taskId": "core-click-checklist",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r2-core-click-custom-dropdowns-claude",
+      "round": 2,
+      "order": 45,
+      "taskId": "core-click-custom-dropdowns",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r2-core-click-custom-dropdowns-autopilot",
+      "round": 2,
+      "order": 46,
+      "taskId": "core-click-custom-dropdowns",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r2-core-click-kanban-moves-claude",
+      "round": 2,
+      "order": 47,
+      "taskId": "core-click-kanban-moves",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r2-core-click-kanban-moves-autopilot",
+      "round": 2,
+      "order": 48,
+      "taskId": "core-click-kanban-moves",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r3-core-click-kanban-moves-autopilot",
+      "round": 3,
+      "order": 49,
+      "taskId": "core-click-kanban-moves",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r3-core-click-kanban-moves-claude",
+      "round": 3,
+      "order": 50,
+      "taskId": "core-click-kanban-moves",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r3-core-click-checklist-autopilot",
+      "round": 3,
+      "order": 51,
+      "taskId": "core-click-checklist",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r3-core-click-checklist-claude",
+      "round": 3,
+      "order": 52,
+      "taskId": "core-click-checklist",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r3-core-click-confirm-modals-autopilot",
+      "round": 3,
+      "order": 53,
+      "taskId": "core-click-confirm-modals",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r3-core-click-confirm-modals-claude",
+      "round": 3,
+      "order": 54,
+      "taskId": "core-click-confirm-modals",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r3-core-click-tabbed-toggles-autopilot",
+      "round": 3,
+      "order": 55,
+      "taskId": "core-click-tabbed-toggles",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r3-core-click-tabbed-toggles-claude",
+      "round": 3,
+      "order": 56,
+      "taskId": "core-click-tabbed-toggles",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r3-core-click-accordion-drilldown-autopilot",
+      "round": 3,
+      "order": 57,
+      "taskId": "core-click-accordion-drilldown",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r3-core-click-accordion-drilldown-claude",
+      "round": 3,
+      "order": 58,
+      "taskId": "core-click-accordion-drilldown",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r3-core-mixed-invoice-lookup-autopilot",
+      "round": 3,
+      "order": 59,
+      "taskId": "core-mixed-invoice-lookup",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r3-core-mixed-invoice-lookup-claude",
+      "round": 3,
+      "order": 60,
+      "taskId": "core-mixed-invoice-lookup",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r3-core-mixed-ticket-triage-autopilot",
+      "round": 3,
+      "order": 61,
+      "taskId": "core-mixed-ticket-triage",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r3-core-mixed-ticket-triage-claude",
+      "round": 3,
+      "order": 62,
+      "taskId": "core-mixed-ticket-triage",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r3-core-mixed-search-detail-autopilot",
+      "round": 3,
+      "order": 63,
+      "taskId": "core-mixed-search-detail",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r3-core-mixed-search-detail-claude",
+      "round": 3,
+      "order": 64,
+      "taskId": "core-mixed-search-detail",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r3-core-mixed-wizard-submit-autopilot",
+      "round": 3,
+      "order": 65,
+      "taskId": "core-mixed-wizard-submit",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r3-core-mixed-wizard-submit-claude",
+      "round": 3,
+      "order": 66,
+      "taskId": "core-mixed-wizard-submit",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r3-core-mixed-paginate-find-autopilot",
+      "round": 3,
+      "order": 67,
+      "taskId": "core-mixed-paginate-find",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r3-core-mixed-paginate-find-claude",
+      "round": 3,
+      "order": 68,
+      "taskId": "core-mixed-paginate-find",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r3-core-click-custom-dropdowns-autopilot",
+      "round": 3,
+      "order": 69,
+      "taskId": "core-click-custom-dropdowns",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r3-core-click-custom-dropdowns-claude",
+      "round": 3,
+      "order": 70,
+      "taskId": "core-click-custom-dropdowns",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r3-core-mixed-settings-change-autopilot",
+      "round": 3,
+      "order": 71,
+      "taskId": "core-mixed-settings-change",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r3-core-mixed-settings-change-claude",
+      "round": 3,
+      "order": 72,
+      "taskId": "core-mixed-settings-change",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r4-core-mixed-invoice-lookup-claude",
+      "round": 4,
+      "order": 73,
+      "taskId": "core-mixed-invoice-lookup",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r4-core-mixed-invoice-lookup-autopilot",
+      "round": 4,
+      "order": 74,
+      "taskId": "core-mixed-invoice-lookup",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r4-core-click-checklist-claude",
+      "round": 4,
+      "order": 75,
+      "taskId": "core-click-checklist",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r4-core-click-checklist-autopilot",
+      "round": 4,
+      "order": 76,
+      "taskId": "core-click-checklist",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r4-core-mixed-search-detail-claude",
+      "round": 4,
+      "order": 77,
+      "taskId": "core-mixed-search-detail",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r4-core-mixed-search-detail-autopilot",
+      "round": 4,
+      "order": 78,
+      "taskId": "core-mixed-search-detail",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r4-core-click-confirm-modals-claude",
+      "round": 4,
+      "order": 79,
+      "taskId": "core-click-confirm-modals",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r4-core-click-confirm-modals-autopilot",
+      "round": 4,
+      "order": 80,
+      "taskId": "core-click-confirm-modals",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r4-core-mixed-wizard-submit-claude",
+      "round": 4,
+      "order": 81,
+      "taskId": "core-mixed-wizard-submit",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r4-core-mixed-wizard-submit-autopilot",
+      "round": 4,
+      "order": 82,
+      "taskId": "core-mixed-wizard-submit",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r4-core-click-accordion-drilldown-claude",
+      "round": 4,
+      "order": 83,
+      "taskId": "core-click-accordion-drilldown",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r4-core-click-accordion-drilldown-autopilot",
+      "round": 4,
+      "order": 84,
+      "taskId": "core-click-accordion-drilldown",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r4-core-click-tabbed-toggles-claude",
+      "round": 4,
+      "order": 85,
+      "taskId": "core-click-tabbed-toggles",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r4-core-click-tabbed-toggles-autopilot",
+      "round": 4,
+      "order": 86,
+      "taskId": "core-click-tabbed-toggles",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r4-core-mixed-paginate-find-claude",
+      "round": 4,
+      "order": 87,
+      "taskId": "core-mixed-paginate-find",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r4-core-mixed-paginate-find-autopilot",
+      "round": 4,
+      "order": 88,
+      "taskId": "core-mixed-paginate-find",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r4-core-click-kanban-moves-claude",
+      "round": 4,
+      "order": 89,
+      "taskId": "core-click-kanban-moves",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r4-core-click-kanban-moves-autopilot",
+      "round": 4,
+      "order": 90,
+      "taskId": "core-click-kanban-moves",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r4-core-mixed-ticket-triage-claude",
+      "round": 4,
+      "order": 91,
+      "taskId": "core-mixed-ticket-triage",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r4-core-mixed-ticket-triage-autopilot",
+      "round": 4,
+      "order": 92,
+      "taskId": "core-mixed-ticket-triage",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r4-core-click-custom-dropdowns-claude",
+      "round": 4,
+      "order": 93,
+      "taskId": "core-click-custom-dropdowns",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r4-core-click-custom-dropdowns-autopilot",
+      "round": 4,
+      "order": 94,
+      "taskId": "core-click-custom-dropdowns",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r4-core-mixed-settings-change-claude",
+      "round": 4,
+      "order": 95,
+      "taskId": "core-mixed-settings-change",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r4-core-mixed-settings-change-autopilot",
+      "round": 4,
+      "order": 96,
+      "taskId": "core-mixed-settings-change",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r5-core-click-accordion-drilldown-autopilot",
+      "round": 5,
+      "order": 97,
+      "taskId": "core-click-accordion-drilldown",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r5-core-click-accordion-drilldown-claude",
+      "round": 5,
+      "order": 98,
+      "taskId": "core-click-accordion-drilldown",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r5-core-click-confirm-modals-autopilot",
+      "round": 5,
+      "order": 99,
+      "taskId": "core-click-confirm-modals",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r5-core-click-confirm-modals-claude",
+      "round": 5,
+      "order": 100,
+      "taskId": "core-click-confirm-modals",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r5-core-click-kanban-moves-autopilot",
+      "round": 5,
+      "order": 101,
+      "taskId": "core-click-kanban-moves",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r5-core-click-kanban-moves-claude",
+      "round": 5,
+      "order": 102,
+      "taskId": "core-click-kanban-moves",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r5-core-click-tabbed-toggles-autopilot",
+      "round": 5,
+      "order": 103,
+      "taskId": "core-click-tabbed-toggles",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r5-core-click-tabbed-toggles-claude",
+      "round": 5,
+      "order": 104,
+      "taskId": "core-click-tabbed-toggles",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r5-core-mixed-paginate-find-autopilot",
+      "round": 5,
+      "order": 105,
+      "taskId": "core-mixed-paginate-find",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r5-core-mixed-paginate-find-claude",
+      "round": 5,
+      "order": 106,
+      "taskId": "core-mixed-paginate-find",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r5-core-mixed-search-detail-autopilot",
+      "round": 5,
+      "order": 107,
+      "taskId": "core-mixed-search-detail",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r5-core-mixed-search-detail-claude",
+      "round": 5,
+      "order": 108,
+      "taskId": "core-mixed-search-detail",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r5-core-mixed-ticket-triage-autopilot",
+      "round": 5,
+      "order": 109,
+      "taskId": "core-mixed-ticket-triage",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r5-core-mixed-ticket-triage-claude",
+      "round": 5,
+      "order": 110,
+      "taskId": "core-mixed-ticket-triage",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r5-core-click-custom-dropdowns-autopilot",
+      "round": 5,
+      "order": 111,
+      "taskId": "core-click-custom-dropdowns",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r5-core-click-custom-dropdowns-claude",
+      "round": 5,
+      "order": 112,
+      "taskId": "core-click-custom-dropdowns",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r5-core-mixed-wizard-submit-autopilot",
+      "round": 5,
+      "order": 113,
+      "taskId": "core-mixed-wizard-submit",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r5-core-mixed-wizard-submit-claude",
+      "round": 5,
+      "order": 114,
+      "taskId": "core-mixed-wizard-submit",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r5-core-mixed-invoice-lookup-autopilot",
+      "round": 5,
+      "order": 115,
+      "taskId": "core-mixed-invoice-lookup",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r5-core-mixed-invoice-lookup-claude",
+      "round": 5,
+      "order": 116,
+      "taskId": "core-mixed-invoice-lookup",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r5-core-click-checklist-autopilot",
+      "round": 5,
+      "order": 117,
+      "taskId": "core-click-checklist",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r5-core-click-checklist-claude",
+      "round": 5,
+      "order": 118,
+      "taskId": "core-click-checklist",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r5-core-mixed-settings-change-autopilot",
+      "round": 5,
+      "order": 119,
+      "taskId": "core-mixed-settings-change",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r5-core-mixed-settings-change-claude",
+      "round": 5,
+      "order": 120,
+      "taskId": "core-mixed-settings-change",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r6-core-mixed-invoice-lookup-claude",
+      "round": 6,
+      "order": 121,
+      "taskId": "core-mixed-invoice-lookup",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r6-core-mixed-invoice-lookup-autopilot",
+      "round": 6,
+      "order": 122,
+      "taskId": "core-mixed-invoice-lookup",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r6-core-mixed-search-detail-claude",
+      "round": 6,
+      "order": 123,
+      "taskId": "core-mixed-search-detail",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r6-core-mixed-search-detail-autopilot",
+      "round": 6,
+      "order": 124,
+      "taskId": "core-mixed-search-detail",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r6-core-mixed-paginate-find-claude",
+      "round": 6,
+      "order": 125,
+      "taskId": "core-mixed-paginate-find",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r6-core-mixed-paginate-find-autopilot",
+      "round": 6,
+      "order": 126,
+      "taskId": "core-mixed-paginate-find",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r6-core-click-custom-dropdowns-claude",
+      "round": 6,
+      "order": 127,
+      "taskId": "core-click-custom-dropdowns",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r6-core-click-custom-dropdowns-autopilot",
+      "round": 6,
+      "order": 128,
+      "taskId": "core-click-custom-dropdowns",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r6-core-click-tabbed-toggles-claude",
+      "round": 6,
+      "order": 129,
+      "taskId": "core-click-tabbed-toggles",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r6-core-click-tabbed-toggles-autopilot",
+      "round": 6,
+      "order": 130,
+      "taskId": "core-click-tabbed-toggles",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r6-core-click-kanban-moves-claude",
+      "round": 6,
+      "order": 131,
+      "taskId": "core-click-kanban-moves",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r6-core-click-kanban-moves-autopilot",
+      "round": 6,
+      "order": 132,
+      "taskId": "core-click-kanban-moves",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r6-core-mixed-settings-change-claude",
+      "round": 6,
+      "order": 133,
+      "taskId": "core-mixed-settings-change",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r6-core-mixed-settings-change-autopilot",
+      "round": 6,
+      "order": 134,
+      "taskId": "core-mixed-settings-change",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r6-core-click-accordion-drilldown-claude",
+      "round": 6,
+      "order": 135,
+      "taskId": "core-click-accordion-drilldown",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r6-core-click-accordion-drilldown-autopilot",
+      "round": 6,
+      "order": 136,
+      "taskId": "core-click-accordion-drilldown",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r6-core-mixed-ticket-triage-claude",
+      "round": 6,
+      "order": 137,
+      "taskId": "core-mixed-ticket-triage",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r6-core-mixed-ticket-triage-autopilot",
+      "round": 6,
+      "order": 138,
+      "taskId": "core-mixed-ticket-triage",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r6-core-mixed-wizard-submit-claude",
+      "round": 6,
+      "order": 139,
+      "taskId": "core-mixed-wizard-submit",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r6-core-mixed-wizard-submit-autopilot",
+      "round": 6,
+      "order": 140,
+      "taskId": "core-mixed-wizard-submit",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r6-core-click-checklist-claude",
+      "round": 6,
+      "order": 141,
+      "taskId": "core-click-checklist",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r6-core-click-checklist-autopilot",
+      "round": 6,
+      "order": 142,
+      "taskId": "core-click-checklist",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r6-core-click-confirm-modals-claude",
+      "round": 6,
+      "order": 143,
+      "taskId": "core-click-confirm-modals",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r6-core-click-confirm-modals-autopilot",
+      "round": 6,
+      "order": 144,
+      "taskId": "core-click-confirm-modals",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r7-core-click-tabbed-toggles-autopilot",
+      "round": 7,
+      "order": 145,
+      "taskId": "core-click-tabbed-toggles",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r7-core-click-tabbed-toggles-claude",
+      "round": 7,
+      "order": 146,
+      "taskId": "core-click-tabbed-toggles",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r7-core-click-confirm-modals-autopilot",
+      "round": 7,
+      "order": 147,
+      "taskId": "core-click-confirm-modals",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r7-core-click-confirm-modals-claude",
+      "round": 7,
+      "order": 148,
+      "taskId": "core-click-confirm-modals",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r7-core-click-kanban-moves-autopilot",
+      "round": 7,
+      "order": 149,
+      "taskId": "core-click-kanban-moves",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r7-core-click-kanban-moves-claude",
+      "round": 7,
+      "order": 150,
+      "taskId": "core-click-kanban-moves",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r7-core-click-custom-dropdowns-autopilot",
+      "round": 7,
+      "order": 151,
+      "taskId": "core-click-custom-dropdowns",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r7-core-click-custom-dropdowns-claude",
+      "round": 7,
+      "order": 152,
+      "taskId": "core-click-custom-dropdowns",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r7-core-mixed-invoice-lookup-autopilot",
+      "round": 7,
+      "order": 153,
+      "taskId": "core-mixed-invoice-lookup",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r7-core-mixed-invoice-lookup-claude",
+      "round": 7,
+      "order": 154,
+      "taskId": "core-mixed-invoice-lookup",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r7-core-mixed-wizard-submit-autopilot",
+      "round": 7,
+      "order": 155,
+      "taskId": "core-mixed-wizard-submit",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r7-core-mixed-wizard-submit-claude",
+      "round": 7,
+      "order": 156,
+      "taskId": "core-mixed-wizard-submit",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r7-core-click-accordion-drilldown-autopilot",
+      "round": 7,
+      "order": 157,
+      "taskId": "core-click-accordion-drilldown",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r7-core-click-accordion-drilldown-claude",
+      "round": 7,
+      "order": 158,
+      "taskId": "core-click-accordion-drilldown",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r7-core-mixed-paginate-find-autopilot",
+      "round": 7,
+      "order": 159,
+      "taskId": "core-mixed-paginate-find",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r7-core-mixed-paginate-find-claude",
+      "round": 7,
+      "order": 160,
+      "taskId": "core-mixed-paginate-find",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r7-core-click-checklist-autopilot",
+      "round": 7,
+      "order": 161,
+      "taskId": "core-click-checklist",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r7-core-click-checklist-claude",
+      "round": 7,
+      "order": 162,
+      "taskId": "core-click-checklist",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r7-core-mixed-ticket-triage-autopilot",
+      "round": 7,
+      "order": 163,
+      "taskId": "core-mixed-ticket-triage",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r7-core-mixed-ticket-triage-claude",
+      "round": 7,
+      "order": 164,
+      "taskId": "core-mixed-ticket-triage",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r7-core-mixed-settings-change-autopilot",
+      "round": 7,
+      "order": 165,
+      "taskId": "core-mixed-settings-change",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r7-core-mixed-settings-change-claude",
+      "round": 7,
+      "order": 166,
+      "taskId": "core-mixed-settings-change",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r7-core-mixed-search-detail-autopilot",
+      "round": 7,
+      "order": 167,
+      "taskId": "core-mixed-search-detail",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r7-core-mixed-search-detail-claude",
+      "round": 7,
+      "order": 168,
+      "taskId": "core-mixed-search-detail",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r8-core-mixed-ticket-triage-claude",
+      "round": 8,
+      "order": 169,
+      "taskId": "core-mixed-ticket-triage",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r8-core-mixed-ticket-triage-autopilot",
+      "round": 8,
+      "order": 170,
+      "taskId": "core-mixed-ticket-triage",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r8-core-mixed-wizard-submit-claude",
+      "round": 8,
+      "order": 171,
+      "taskId": "core-mixed-wizard-submit",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r8-core-mixed-wizard-submit-autopilot",
+      "round": 8,
+      "order": 172,
+      "taskId": "core-mixed-wizard-submit",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r8-core-mixed-invoice-lookup-claude",
+      "round": 8,
+      "order": 173,
+      "taskId": "core-mixed-invoice-lookup",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r8-core-mixed-invoice-lookup-autopilot",
+      "round": 8,
+      "order": 174,
+      "taskId": "core-mixed-invoice-lookup",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r8-core-click-custom-dropdowns-claude",
+      "round": 8,
+      "order": 175,
+      "taskId": "core-click-custom-dropdowns",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r8-core-click-custom-dropdowns-autopilot",
+      "round": 8,
+      "order": 176,
+      "taskId": "core-click-custom-dropdowns",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r8-core-click-accordion-drilldown-claude",
+      "round": 8,
+      "order": 177,
+      "taskId": "core-click-accordion-drilldown",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r8-core-click-accordion-drilldown-autopilot",
+      "round": 8,
+      "order": 178,
+      "taskId": "core-click-accordion-drilldown",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r8-core-click-tabbed-toggles-claude",
+      "round": 8,
+      "order": 179,
+      "taskId": "core-click-tabbed-toggles",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r8-core-click-tabbed-toggles-autopilot",
+      "round": 8,
+      "order": 180,
+      "taskId": "core-click-tabbed-toggles",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r8-core-click-confirm-modals-claude",
+      "round": 8,
+      "order": 181,
+      "taskId": "core-click-confirm-modals",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r8-core-click-confirm-modals-autopilot",
+      "round": 8,
+      "order": 182,
+      "taskId": "core-click-confirm-modals",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r8-core-mixed-search-detail-claude",
+      "round": 8,
+      "order": 183,
+      "taskId": "core-mixed-search-detail",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r8-core-mixed-search-detail-autopilot",
+      "round": 8,
+      "order": 184,
+      "taskId": "core-mixed-search-detail",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r8-core-click-kanban-moves-claude",
+      "round": 8,
+      "order": 185,
+      "taskId": "core-click-kanban-moves",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r8-core-click-kanban-moves-autopilot",
+      "round": 8,
+      "order": 186,
+      "taskId": "core-click-kanban-moves",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r8-core-mixed-settings-change-claude",
+      "round": 8,
+      "order": 187,
+      "taskId": "core-mixed-settings-change",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r8-core-mixed-settings-change-autopilot",
+      "round": 8,
+      "order": 188,
+      "taskId": "core-mixed-settings-change",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r8-core-mixed-paginate-find-claude",
+      "round": 8,
+      "order": 189,
+      "taskId": "core-mixed-paginate-find",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r8-core-mixed-paginate-find-autopilot",
+      "round": 8,
+      "order": 190,
+      "taskId": "core-mixed-paginate-find",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r8-core-click-checklist-claude",
+      "round": 8,
+      "order": 191,
+      "taskId": "core-click-checklist",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r8-core-click-checklist-autopilot",
+      "round": 8,
+      "order": 192,
+      "taskId": "core-click-checklist",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r9-core-click-checklist-autopilot",
+      "round": 9,
+      "order": 193,
+      "taskId": "core-click-checklist",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r9-core-click-checklist-claude",
+      "round": 9,
+      "order": 194,
+      "taskId": "core-click-checklist",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r9-core-mixed-wizard-submit-autopilot",
+      "round": 9,
+      "order": 195,
+      "taskId": "core-mixed-wizard-submit",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r9-core-mixed-wizard-submit-claude",
+      "round": 9,
+      "order": 196,
+      "taskId": "core-mixed-wizard-submit",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r9-core-mixed-paginate-find-autopilot",
+      "round": 9,
+      "order": 197,
+      "taskId": "core-mixed-paginate-find",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r9-core-mixed-paginate-find-claude",
+      "round": 9,
+      "order": 198,
+      "taskId": "core-mixed-paginate-find",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r9-core-mixed-settings-change-autopilot",
+      "round": 9,
+      "order": 199,
+      "taskId": "core-mixed-settings-change",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r9-core-mixed-settings-change-claude",
+      "round": 9,
+      "order": 200,
+      "taskId": "core-mixed-settings-change",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r9-core-mixed-invoice-lookup-autopilot",
+      "round": 9,
+      "order": 201,
+      "taskId": "core-mixed-invoice-lookup",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r9-core-mixed-invoice-lookup-claude",
+      "round": 9,
+      "order": 202,
+      "taskId": "core-mixed-invoice-lookup",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r9-core-click-tabbed-toggles-autopilot",
+      "round": 9,
+      "order": 203,
+      "taskId": "core-click-tabbed-toggles",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r9-core-click-tabbed-toggles-claude",
+      "round": 9,
+      "order": 204,
+      "taskId": "core-click-tabbed-toggles",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r9-core-click-kanban-moves-autopilot",
+      "round": 9,
+      "order": 205,
+      "taskId": "core-click-kanban-moves",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r9-core-click-kanban-moves-claude",
+      "round": 9,
+      "order": 206,
+      "taskId": "core-click-kanban-moves",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r9-core-click-custom-dropdowns-autopilot",
+      "round": 9,
+      "order": 207,
+      "taskId": "core-click-custom-dropdowns",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r9-core-click-custom-dropdowns-claude",
+      "round": 9,
+      "order": 208,
+      "taskId": "core-click-custom-dropdowns",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r9-core-mixed-ticket-triage-autopilot",
+      "round": 9,
+      "order": 209,
+      "taskId": "core-mixed-ticket-triage",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r9-core-mixed-ticket-triage-claude",
+      "round": 9,
+      "order": 210,
+      "taskId": "core-mixed-ticket-triage",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r9-core-mixed-search-detail-autopilot",
+      "round": 9,
+      "order": 211,
+      "taskId": "core-mixed-search-detail",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r9-core-mixed-search-detail-claude",
+      "round": 9,
+      "order": 212,
+      "taskId": "core-mixed-search-detail",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r9-core-click-accordion-drilldown-autopilot",
+      "round": 9,
+      "order": 213,
+      "taskId": "core-click-accordion-drilldown",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r9-core-click-accordion-drilldown-claude",
+      "round": 9,
+      "order": 214,
+      "taskId": "core-click-accordion-drilldown",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r9-core-click-confirm-modals-autopilot",
+      "round": 9,
+      "order": 215,
+      "taskId": "core-click-confirm-modals",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r9-core-click-confirm-modals-claude",
+      "round": 9,
+      "order": 216,
+      "taskId": "core-click-confirm-modals",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r10-core-click-confirm-modals-claude",
+      "round": 10,
+      "order": 217,
+      "taskId": "core-click-confirm-modals",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r10-core-click-confirm-modals-autopilot",
+      "round": 10,
+      "order": 218,
+      "taskId": "core-click-confirm-modals",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r10-core-mixed-wizard-submit-claude",
+      "round": 10,
+      "order": 219,
+      "taskId": "core-mixed-wizard-submit",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r10-core-mixed-wizard-submit-autopilot",
+      "round": 10,
+      "order": 220,
+      "taskId": "core-mixed-wizard-submit",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r10-core-click-accordion-drilldown-claude",
+      "round": 10,
+      "order": 221,
+      "taskId": "core-click-accordion-drilldown",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r10-core-click-accordion-drilldown-autopilot",
+      "round": 10,
+      "order": 222,
+      "taskId": "core-click-accordion-drilldown",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r10-core-mixed-settings-change-claude",
+      "round": 10,
+      "order": 223,
+      "taskId": "core-mixed-settings-change",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r10-core-mixed-settings-change-autopilot",
+      "round": 10,
+      "order": 224,
+      "taskId": "core-mixed-settings-change",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r10-core-click-kanban-moves-claude",
+      "round": 10,
+      "order": 225,
+      "taskId": "core-click-kanban-moves",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r10-core-click-kanban-moves-autopilot",
+      "round": 10,
+      "order": 226,
+      "taskId": "core-click-kanban-moves",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r10-core-mixed-invoice-lookup-claude",
+      "round": 10,
+      "order": 227,
+      "taskId": "core-mixed-invoice-lookup",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r10-core-mixed-invoice-lookup-autopilot",
+      "round": 10,
+      "order": 228,
+      "taskId": "core-mixed-invoice-lookup",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r10-core-click-custom-dropdowns-claude",
+      "round": 10,
+      "order": 229,
+      "taskId": "core-click-custom-dropdowns",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r10-core-click-custom-dropdowns-autopilot",
+      "round": 10,
+      "order": 230,
+      "taskId": "core-click-custom-dropdowns",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r10-core-mixed-ticket-triage-claude",
+      "round": 10,
+      "order": 231,
+      "taskId": "core-mixed-ticket-triage",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r10-core-mixed-ticket-triage-autopilot",
+      "round": 10,
+      "order": 232,
+      "taskId": "core-mixed-ticket-triage",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r10-core-click-checklist-claude",
+      "round": 10,
+      "order": 233,
+      "taskId": "core-click-checklist",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r10-core-click-checklist-autopilot",
+      "round": 10,
+      "order": 234,
+      "taskId": "core-click-checklist",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r10-core-mixed-search-detail-claude",
+      "round": 10,
+      "order": 235,
+      "taskId": "core-mixed-search-detail",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r10-core-mixed-search-detail-autopilot",
+      "round": 10,
+      "order": 236,
+      "taskId": "core-mixed-search-detail",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r10-core-mixed-paginate-find-claude",
+      "round": 10,
+      "order": 237,
+      "taskId": "core-mixed-paginate-find",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r10-core-mixed-paginate-find-autopilot",
+      "round": 10,
+      "order": 238,
+      "taskId": "core-mixed-paginate-find",
+      "arm": "autopilot"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r10-core-click-tabbed-toggles-claude",
+      "round": 10,
+      "order": 239,
+      "taskId": "core-click-tabbed-toggles",
+      "arm": "claude"
+    },
+    {
+      "campaignId": "core-baseline-66",
+      "runId": "core-baseline-66-r10-core-click-tabbed-toggles-autopilot",
+      "round": 10,
+      "order": 240,
+      "taskId": "core-click-tabbed-toggles",
+      "arm": "autopilot"
+    }
+  ]
+}

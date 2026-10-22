@@ -17,7 +17,7 @@
 
 *Manual browser tools, capabilities, trigger watchers, visual sessions, autopilot, vault, and observability for the FSB Chrome Extension.*
 
-[Quick Start](#quick-start) · [Trigger Watchers](#trigger-watchers) · [Tools](#tools-69-total) · [Diagnostics](#diagnostics) · [Architecture](#architecture)
+[Quick Start](#quick-start) · [Trigger Watchers](#trigger-watchers) · [Tools](#tools-73-total) · [Diagnostics](#diagnostics) · [Architecture](#architecture)
 
 </div>
 
@@ -481,7 +481,7 @@ Most tools execute on background tabs without stealing focus. Tools that genuine
 
 ---
 
-## Tools (69 Total)
+## Tools (73 Total)
 
 ### Visual Sessions (2)
 
@@ -583,9 +583,50 @@ One MCP task is recorded as one history session even when it uses several tabs. 
 
 Vault responses expose metadata only. Passwords, full card numbers, and CVV values are resolved inside the extension and are not returned to the MCP client.
 
+### Task Lifecycle (3)
+
+| Tool | Purpose |
+|------|---------|
+| `complete_task` | Signal that everything the user asked for is done, with a summary of what was accomplished. |
+| `partial_task` | Signal that useful work is done but a blocker such as login, missing or failed credentials, MFA or manual approval stops the final step; report the work done, the exact blocker and the manual next step. |
+| `fail_task` | Signal that the task cannot be completed, with the reason, instead of just stopping. |
+
+Each call closes the task's logical history recording through the `mcp:task-status` route, which needs FSB extension 0.9.92 or newer. Never put passwords, tokens, API keys or sensitive form values in a summary, blocker or reason.
+
+### Settings (1)
+
+| Tool | Purpose |
+|------|---------|
+| `settings` | Read every FSB control-panel setting in one call, read one setting with its type and allowed values, or change one setting by key. |
+
+- No arguments returns every setting; `key` returns that setting with its type and allowed values; `key` and `value` change it. `value` is a string, and `true`/`false` and numbers are accepted.
+- API keys and other secrets are masked on read and refused on write. Endpoints that receive keys or page data are shown as origin only and are refused on write too; change them in the FSB Control Panel.
+- Every accepted change is logged for the operator with the key, the previous and new value and the MCP client label. Delegated agent runs can read settings but cannot change them.
+- `settings` arrives in fsb-mcp-server 0.12.0 and needs FSB extension 1.0.0. An older extension answers `SETTING_UNSUPPORTED`; update the extension or change the setting in the FSB Control Panel.
+
+### Same-call checks (`expect`)
+
+29 action tools take an optional `expect` object: `execute_js`, `click`, `right_click`, `double_click`, `click_at`, `double_click_at`, `click_and_hold`, `type_text`, `insert_text`, `press_enter`, `press_key`, `clear_input`, `select_option`, `check_box`, `set_attribute`, `drag_drop`, `drag`, `drag_variable_speed`, `drop_file`, `upload_file`, `select_text_range`, `scroll_to_top`, `scroll_to_bottom`, `scroll_to_element`, `navigate`, `go_back`, `go_forward`, `refresh` and `back`. After the action, FSB watches the page for a bounded time and returns `expect_result` in the same response, so an observable effect needs no follow-up read.
+
+| Check | Holds when |
+|-------|------------|
+| `url_includes` | The tab URL contains the text. |
+| `title_includes` | The page title contains the text. |
+| `text_visible` / `text_gone` | The text is shown on the page / is no longer shown. |
+| `selector` with `state` | The element is `visible` (the default), `gone`, `checked` or `unchecked`. |
+| `selector` with `value` | The field's value equals the text exactly; sensitive or non-matching values are redacted in the result. |
+| `dialog_open` | A dialog is open (`true`) or not (`false`). |
+| `timeout_ms` | How long to watch: default 2000, at most 5000. |
+
+Give at least one check besides `timeout_ms`. `expect_result.status` is `verified` when every check holds, `unmet` when one does not, and `uncertain` when FSB could not tell; each check is listed with its own status. On `verified`, do not repeat the action. On `unmet` or `uncertain`, inspect the page before retrying. Without `expect`, every tool behaves and answers exactly as before.
+
+`expect` arrives in fsb-mcp-server 0.12.0 and needs FSB extension 1.0.0. With an older extension the action still runs, and `expect_result` comes back `uncertain` with reason `extension_unsupported`.
+
 ### Tool Count Contract
 
-The public count is intentionally based on registered MCP handlers, not every internal helper in the extension. The extension's canonical registry also contains task-lifecycle signals and internal context tools used by the browser runtime. The MCP README documents the tool surface an MCP client can call.
+The documented count is the length of the registered `tools/list`: every tool an MCP client can call, including the three task-lifecycle tools (`complete_task`, `partial_task`, `fail_task`) and `settings`. Internal helpers in the extension's canonical registry that are not registered MCP tools are not counted. `tests/mcp-version-parity.test.js` checks the count, the category headings and the contents link against the built `tools/list`, so the documented count cannot drift from the server.
+
+The documented count includes the tools added in fsb-mcp-server 0.12.0.
 
 ---
 

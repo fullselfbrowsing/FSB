@@ -1,4 +1,5 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { z } from 'zod';
 import type { WebSocketBridge } from '../bridge.js';
 import type { TaskQueue } from '../queue.js';
 import { AgentScope } from '../agent-scope.js';
@@ -12,22 +13,203 @@ import {
   type ToolDefinition,
 } from './schema-bridge.js';
 import { isAllowedMcpVisualClientLabel, getAllowedMcpVisualClientLabels, normalizeMcpVisualClientLabel } from './visual-session.js';
+import { MCP_CHANGE_REPORT_SENTENCE, MCP_EXPECT_DESCRIPTION, mcpToolDescription, mcpParamDescriptions } from './descriptions.js';
 
 type ToolCallResult = { content: Array<{ type: 'text'; text: string }>; isError?: boolean };
 
-// Phase 245 D-04 / D-05: action tools return a `change_report` field describing
-// what the action mutated -- URL changes, dialogs opened, nodes added/removed,
-// attribute changes, focus shift -- so the agent can learn the consequence
-// without a follow-up read_page. Read-only tools (get_text, get_attribute,
-// read_page, get_dom_snapshot, list_tabs, etc.) do not include this field.
-// Tools where the diff is reliably noise (scroll, scroll_at, hover, focus)
-// also opt out per D-06. The contract is gated by the Action Change Reports
-// toggle in the extension control panel (default on); when off, action tools
-// revert to pre-Phase-245 response shape with zero observer overhead.
-const CHANGE_REPORT_DESCRIPTION_SUFFIX =
-  ' RETURNS change_report: when this tool runs, the response includes a `change_report` field with a compact diff of what the action mutated (URL, dialogs_opened, nodes_added, nodes_removed, attrs_changed, inputs_changed, focus_shift). Use this to learn the consequence without calling read_page next. If the report exceeds the size cap, `change_report.truncated:true` and `change_report_hint` are set; call read_page for the full state.';
+// Phase 245 D-04 / D-05: tools with _emitChangeReport return a `change_report` diff.
+// Phase 69 D-09: the MCP suffix is one sentence from ./descriptions.ts.
+const CHANGE_REPORT_DESCRIPTION_SUFFIX = ` ${MCP_CHANGE_REPORT_SENTENCE}`;
 
 const TRIGGER_MANUAL_EXCLUSIONS = new Set(['trigger']); function isManualTool(t: ToolDefinition): boolean { return !t._readOnly && !TRIGGER_MANUAL_EXCLUSIONS.has(t.name); }
+
+// ---------------------------------------------------------------------------
+// Phase 69 D-11..D-16: the optional same-call `expect` check.
+//
+// MCP-only: added as an extra zod key at registration for the 29 D-12 tools
+// (28 registry action tools here, plus `back` in ./agents.ts), never in the
+// registry inputSchema. Values mirror extension/utils/action-verification.js
+// (plan 69-03); plan 69-07's parity test compares the two sides.
+// ---------------------------------------------------------------------------
+
+// D-12: the fixed set of tools that accept `expect`, in this exact order.
+export const EXPECT_TOOL_NAMES: readonly string[] = Object.freeze([
+  'execute_js', 'click', 'right_click', 'double_click', 'click_at', 'double_click_at', 'click_and_hold',
+  'type_text', 'insert_text', 'press_enter', 'press_key', 'clear_input',
+  'select_option', 'check_box', 'set_attribute',
+  'drag_drop', 'drag', 'drag_variable_speed', 'drop_file', 'upload_file',
+  'select_text_range', 'scroll_to_top', 'scroll_to_bottom', 'scroll_to_element',
+  'navigate', 'go_back', 'go_forward', 'refresh', 'back',
+]);
+export const EXPECT_TOOL_SET: ReadonlySet<string> = new Set(EXPECT_TOOL_NAMES);
+
+// D-20 bounds, uncalibrated pending V4.
+export const EXPECT_DEFAULT_TIMEOUT_MS = 2_000;
+export const EXPECT_MAX_TIMEOUT_MS = 5_000;
+export const EXPECT_STRING_MAX = 2_000;
+// Bridge headroom added to `back`'s timeout when expect is sent. Uncalibrated
+// (V4); it must exceed the extension's 750 ms probe race.
+export const EXPECT_BRIDGE_HEADROOM_MS = 1_500;
+
+// D-19 result vocabulary used by the version-skew fill.
+const EXPECT_OBSERVED_MAX = 120;
+const EXPECT_REDACTED = '[redacted]';
+const EXPECT_STRING_KEYS = ['url_includes', 'title_includes', 'text_visible', 'text_gone', 'selector', 'value'] as const;
+const EXPECT_PREDICATE_KEYS = ['url_includes', 'title_includes', 'text_visible', 'text_gone', 'selector', 'dialog_open'] as const;
+
+/**
+ * D-20: clamp a caller timeout to [0, EXPECT_MAX_TIMEOUT_MS]. Absent or
+ * non-finite values give the default; numeric strings are accepted; values
+ * are truncated toward zero. Same table as the extension.
+ */
+export function clampExpectTimeoutMs(raw: unknown): number {
+  let n: number;
+  if (typeof raw === 'number') {
+    n = raw;
+  } else if (typeof raw === 'string' && raw.trim() !== '') {
+    n = Number(raw);
+  } else {
+    return EXPECT_DEFAULT_TIMEOUT_MS;
+  }
+  if (!Number.isFinite(n)) return EXPECT_DEFAULT_TIMEOUT_MS;
+  n = Math.trunc(n) || 0;
+  if (n < 0) return 0;
+  if (n > EXPECT_MAX_TIMEOUT_MS) return EXPECT_MAX_TIMEOUT_MS;
+  return n;
+}
+
+/**
+ * D-14 / RESEARCH Finding 11: `null` means omitted; a string whose trimmed
+ * text starts with `{` is parsed (hosts stringify object arguments). An
+ * unparseable string is returned unchanged so validation rejects it.
+ */
+export function parseExpectArg(v: unknown): unknown {
+  if (v === null) return undefined;
+  if (typeof v === 'string' && v.trim().startsWith('{')) {
+    try {
+      return JSON.parse(v.trim());
+    } catch {
+      return v;
+    }
+  }
+  return v;
+}
+
+// D-13: one flat, closed object. No .min()/.max() and no sub-property
+// descriptions (they would publish bytes, RESEARCH Finding 12); the length,
+// non-empty, non-blank, at-least-one-predicate and selector rules live in one
+// superRefine, which the SDK does not publish. `value` may be '' (the natural
+// check after clear_input), mirroring the extension's normalizeExpectSpec.
+//
+// timeout_ms: null means omitted (as D-14 treats a null expect), so the
+// default applies. Only numbers and non-blank strings reach Number(); any
+// other type (boolean, array, object, a blank string) becomes NaN and is
+// rejected instead of being coerced to 0 or 1. Same rule as the extension.
+function preprocessExpectTimeout(v: unknown): unknown {
+  if (v === null || v === undefined) return undefined;
+  if (typeof v === 'number') return v;
+  if (typeof v === 'string' && v.trim() !== '') return v;
+  return NaN;
+}
+
+const expectObject = z.object({
+  url_includes: z.string().optional(),
+  title_includes: z.string().optional(),
+  text_visible: z.string().optional(),
+  text_gone: z.string().optional(),
+  selector: z.string().optional(),
+  state: z.enum(['visible', 'gone', 'checked', 'unchecked']).optional(),
+  value: z.string().optional(),
+  dialog_open: z.boolean().optional(),
+  timeout_ms: z.preprocess(
+    preprocessExpectTimeout,
+    z.coerce.number().int().finite().optional(),
+  ).optional(),
+}).strict().superRefine((spec, ctx) => {
+  const record = spec as Record<string, unknown>;
+  for (const key of EXPECT_STRING_KEYS) {
+    const value = record[key];
+    if (typeof value !== 'string') continue;
+    if (value.length === 0 && key !== 'value') {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: [key], message: `${key} must not be empty` });
+    } else if (key !== 'value' && value.trim().length === 0) {
+      // Text matching collapses whitespace, so a blank predicate would match
+      // every page (or none): reject it like ''. value keeps '' and blanks.
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: [key], message: `${key} must not be blank` });
+    }
+    if (value.length > EXPECT_STRING_MAX) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: [key], message: `${key} must be at most ${EXPECT_STRING_MAX} characters` });
+    }
+  }
+  if (!EXPECT_PREDICATE_KEYS.some((key) => record[key] !== undefined)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'expect needs at least one check besides timeout_ms' });
+  }
+  if ((record.state !== undefined || record.value !== undefined) && record.selector === undefined) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'state and value require selector' });
+  }
+});
+
+export type ExpectSpec = z.infer<typeof expectObject>;
+
+export const EXPECT_SHAPE = {
+  expect: z.preprocess(parseExpectArg, expectObject.optional()).optional().describe(MCP_EXPECT_DESCRIPTION),
+};
+
+function capExpected(value: unknown): unknown {
+  if (typeof value !== 'string' || value.length <= EXPECT_OBSERVED_MAX) return value;
+  return `${value.slice(0, EXPECT_OBSERVED_MAX - 3)}...`;
+}
+
+/**
+ * RESEARCH Finding 10 / Open Question 1: the expect_result an older extension
+ * could not produce. Every check is uncertain with observed null, in the
+ * extension's fixed order (url_includes, title_includes, text_visible,
+ * text_gone, state, value, dialog_open); a value check's expected is always
+ * the redaction marker, since nothing observed the field.
+ */
+export function buildUnsupportedExpectResult(expect: unknown): Record<string, unknown> {
+  const spec = (expect && typeof expect === 'object' ? expect : {}) as Record<string, unknown>;
+  const has = (key: string): boolean => spec[key] !== undefined;
+  const checks: Array<{ kind: string; expected: unknown }> = [];
+  if (has('url_includes')) checks.push({ kind: 'url_includes', expected: spec.url_includes });
+  if (has('title_includes')) checks.push({ kind: 'title_includes', expected: spec.title_includes });
+  if (has('text_visible')) checks.push({ kind: 'text_visible', expected: spec.text_visible });
+  if (has('text_gone')) checks.push({ kind: 'text_gone', expected: spec.text_gone });
+  if (has('selector')) {
+    if (has('state') || !has('value')) checks.push({ kind: 'state', expected: has('state') ? spec.state : 'visible' });
+    if (has('value')) checks.push({ kind: 'value', expected: EXPECT_REDACTED });
+  }
+  if (has('dialog_open')) checks.push({ kind: 'dialog_open', expected: spec.dialog_open });
+  return {
+    status: 'uncertain',
+    checks: checks.map((check) => ({
+      kind: check.kind,
+      expected: capExpected(check.expected),
+      observed: null,
+      status: 'uncertain',
+    })),
+    waited_ms: 0,
+    timeout_ms: clampExpectTimeoutMs(spec.timeout_ms),
+    reason: 'extension_unsupported',
+  };
+}
+
+/**
+ * Version-skew fill: when expect was sent and the extension returned a
+ * success or unknown-outcome result without expect_result, add an uncertain /
+ * extension_unsupported expect_result (last key, on a shallow copy) so a
+ * caller never mistakes "not checked" for "not requested". Otherwise the same
+ * result reference is returned, so every no-expect response is unchanged.
+ */
+export function withUnsupportedExpectFill<T>(result: T, expect: unknown): T {
+  if (expect === undefined || expect === null) return result;
+  if (!result || typeof result !== 'object' || Array.isArray(result)) return result;
+  const record = result as unknown as Record<string, unknown>;
+  if (record.success !== true && record.mayHaveExecuted !== true) return result;
+  if (record.expect_result !== undefined && record.expect_result !== null) return result;
+  const { expect_result: _missing, ...rest } = record;
+  return { ...rest, expect_result: buildUnsupportedExpectResult(expect) } as unknown as T;
+}
 
 /**
  * Phase 255 Plan 03: visual-session field-bundle validator.
@@ -168,6 +350,7 @@ async function execAction(
   params: Record<string, unknown>,
   visualSession: VisualSessionSidecar | null,
   screenshotAttestor: ManagedScreenshotAttestor,
+  expect?: unknown,
 ): Promise<ToolCallResult> {
   if (!bridge.isConnected) {
     console.error(`[FSB Manual] ${toolName}: bridge not connected`);
@@ -211,6 +394,10 @@ async function execAction(
       if (managedScreenshotAttested) {
         basePayload.managedScreenshotAttested = true;
       }
+      // Phase 69 D-15: `expect` is a top-level sidecar like visualSession,
+      // set only when the caller sent it, so the no-expect payload is
+      // byte-identical to the pre-69 wire. It never enters `params`.
+      if (expect !== undefined) basePayload.expect = expect;
       const result = await sendAgentScopedBridgeMessage(
         bridge,
         agentScope,
@@ -221,7 +408,7 @@ async function execAction(
       if (!result?.success) {
         console.error(`[FSB Manual] ${toolName}: FAILED - ${result?.error || 'unknown error'}`);
       }
-      return mapFSBError(result);
+      return mapFSBError(withUnsupportedExpectFill(result, expect));
     } catch (err: unknown) {
       const errMsg = err instanceof Error ? err.message : String(err);
       console.error(`[FSB Manual] ${toolName}: EXCEPTION - ${errMsg}`);
@@ -248,27 +435,41 @@ export function registerManualTools(
   const manualTools = TOOL_REGISTRY.filter(isManualTool);
 
   for (const tool of manualTools) {
-    const zodShape = jsonSchemaToZod(tool.inputSchema);
+    // Phase 69 D-07: MCP-only short text from ./descriptions.ts; the registry
+    // text stays the autopilot source and is only the fallback here.
+    // Phase 69 D-11/D-12: the optional `expect` key joins the shape only for
+    // the D-12 tools; it never enters the registry inputSchema.
+    const zodShape = {
+      ...jsonSchemaToZod(tool.inputSchema, mcpParamDescriptions(tool.name)),
+      ...(EXPECT_TOOL_SET.has(tool.name) ? EXPECT_SHAPE : {}),
+    };
     const fsbVerb = tool._contentVerb || tool._cdpVerb || tool.name;
     const transform = PARAM_TRANSFORMS[tool.name];
 
     // Phase 245 D-04 / D-05: append change_report contract to descriptions of
     // action tools whose _emitChangeReport flag is true (per D-05 INCLUDE list,
     // minus D-06 opt-outs scroll/scroll_at/hover/focus).
+    const baseDescription = mcpToolDescription(tool.name, tool.description);
     const description = (tool._emitChangeReport === true)
-      ? `${tool.description}${CHANGE_REPORT_DESCRIPTION_SUFFIX}`
-      : tool.description;
+      ? `${baseDescription}${CHANGE_REPORT_DESCRIPTION_SUFFIX}`
+      : baseDescription;
 
     server.tool(
       tool.name,
       description,
       zodShape,
       async (params: Record<string, unknown>) => {
+        // Phase 69 D-15: lift `expect` out first, so the validator, the
+        // strip and PARAM_TRANSFORMS (which rebuild params from scratch)
+        // run on exactly the params they saw before Phase 69. zod already
+        // rejected a malformed expect (D-16); null arrives as undefined.
+        const { expect, ...callerParams } = params;
+
         // Phase 255 Plan 03: visual-session field-bundle gate runs
         // BEFORE the param transform + execAction. Rejections do not
         // proceed to queue.enqueue or sendAgentScopedBridgeMessage, so
         // no DOM mutation, no change_report, no overlay change.
-        const rejection = validateVisualSessionFields(tool.name, params);
+        const rejection = validateVisualSessionFields(tool.name, callerParams);
         if (rejection) return rejection;
 
         // Phase 256 Plan 02: capture the validated field bundle as a
@@ -278,9 +479,9 @@ export function registerManualTools(
         // connectionId in agent-bridge.ts buildAgentPayload), so the
         // extension-side lifecycle code (Phase 256 Plan 03) can record
         // a tick after the v0.9.60 ownership gate fires.
-        const visualSession = buildVisualSessionSidecar(params);
+        const visualSession = buildVisualSessionSidecar(callerParams);
 
-        const cleanedParams = stripVisualSessionFields(params);
+        const cleanedParams = stripVisualSessionFields(callerParams);
         const finalParams = transform ? transform(cleanedParams) : cleanedParams;
         return execAction(
           bridge,
@@ -291,6 +492,7 @@ export function registerManualTools(
           finalParams,
           visualSession,
           screenshotAttestor,
+          expect,
         );
       },
     );

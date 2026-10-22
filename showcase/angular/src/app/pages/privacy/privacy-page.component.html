@@ -3,22 +3,22 @@
     <div class="privacy-header">
       <div class="section-label" i18n="@@privacy.header.kicker">Legal</div>
       <h1 i18n="@@privacy.header.title">Privacy Policy</h1>
-      <p class="privacy-last-updated" i18n="@@privacy.header.updated">Last updated: September 29, 2026</p>
+      <p class="privacy-last-updated" i18n="@@privacy.header.updated">Last updated: October 17, 2026</p>
     </div>
 
     <div class="privacy-content">
 
       <!-- TLDR -->
       <div class="privacy-callout">
-        <p i18n="@@privacy.tldr.body"><strong>TLDR:</strong>&nbsp;<span [attr.translate]="'no'">FSB</span> runs inside your browser, and no browsing data is collected by <span [attr.translate]="'no'">FSB</span> servers. AI calls go directly from your browser to the provider you choose. API keys and credentials are encrypted locally, and memory data stays on your device. If you install the optional local agent service, <span [attr.translate]="'no'">FSB</span> can also be driven by an <span [attr.translate]="'no'">MCP</span> client running on your own machine over a loopback connection, and by coding-agent <span [attr.translate]="'no'">CLIs</span> you have already installed. The only data that ever leaves your machine for <span [attr.translate]="'no'">FSB</span> is opt-out anonymous usage telemetry that powers the public <a routerLink="/stats">/stats</a> page. If you pair <span [attr.translate]="'no'">Remote Dashboard</span>, transient live-preview frames can pass through the relay during the session, but they are not stored. Everything is open source and auditable.</p>
+        <p i18n="@@privacy.tldr.body"><strong>TLDR:</strong>&nbsp;<span [attr.translate]="'no'">FSB</span> runs inside your browser, and <span [attr.translate]="'no'">FSB</span> servers collect no browsing data unless you turn on the optional fast mode described below. Calls to the AI provider you choose go directly from your browser to that provider. API keys and credentials are encrypted locally, and memory data stays on your device. If you install the optional local agent service, <span [attr.translate]="'no'">FSB</span> can also be driven by an <span [attr.translate]="'no'">MCP</span> client running on your own machine over a loopback connection, and by coding-agent <span [attr.translate]="'no'">CLIs</span> you have already installed. Apart from fast mode, the only data that ever leaves your machine for <span [attr.translate]="'no'">FSB</span> is opt-out anonymous usage telemetry that powers the public <a routerLink="/stats">/stats</a> page. Fast mode is off by default; when you turn it on, <span [attr.translate]="'no'">FSB</span>'s autopilot sends short step descriptions to <span [attr.translate]="'no'">FSB</span>'s server, which asks <span [attr.translate]="'no'">TypeSafe AI</span> to pick simple clicks. If you pair <span [attr.translate]="'no'">Remote Dashboard</span>, transient live-preview frames can pass through the relay during the session, but they are not stored. Everything is open source and auditable.</p>
       </div>
 
       <!-- Data Collection -->
       <h2 i18n="@@privacy.section.dataCollection.title">Data Collection</h2>
-      <p i18n="@@privacy.section.dataCollection.body"><span [attr.translate]="'no'">FSB</span> operates entirely within your browser. When you initiate an automation task, the extension may inspect the active tab's <span [attr.translate]="'no'">DOM</span> (Document Object Model) and, when you invoke a capability, make same-origin site <span [attr.translate]="'no'">API</span> requests from your browser session.</p>
+      <p i18n="@@privacy.section.dataCollection.body">Apart from the optional fast mode described below, <span [attr.translate]="'no'">FSB</span> operates entirely within your browser. When you initiate an automation task, the extension may inspect the active tab's <span [attr.translate]="'no'">DOM</span> (Document Object Model) and, when you invoke a capability, make same-origin site <span [attr.translate]="'no'">API</span> requests from your browser session.</p>
       <ul>
-        <li i18n="@@privacy.section.dataCollection.li.1">No browsing history is collected or stored beyond the current session</li>
-        <li i18n="@@privacy.section.dataCollection.li.2"><span [attr.translate]="'no'">DOM</span> data and site <span [attr.translate]="'no'">API</span> results are analyzed locally and discarded after each automation step unless you explicitly save them in memory</li>
+        <li i18n="@@privacy.section.dataCollection.li.1">No browsing history is collected or stored beyond the current session. The one exception is the optional fast mode, which sends the origin, path and title of the page it is working on to <span [attr.translate]="'no'">FSB</span>'s server, where they are not kept</li>
+        <li i18n="@@privacy.section.dataCollection.li.2"><span [attr.translate]="'no'">DOM</span> data and site <span [attr.translate]="'no'">API</span> results are analyzed locally and discarded after each automation step unless you explicitly save them in memory. With the optional fast mode on, a short step description also goes to <span [attr.translate]="'no'">FSB</span>'s server, which keeps no page content</li>
         <li i18n="@@privacy.section.dataCollection.li.3">No personal information is harvested from pages you visit</li>
       </ul>
 
@@ -51,12 +51,47 @@
       <h2 i18n="@@privacy.section.external.title">External Services</h2>
       <p i18n="@@privacy.section.external.body"><span [attr.translate]="'no'">FSB</span> contacts hosted AI providers only when you configure and use them. <span [attr.translate]="'no'">LM Studio</span> offers a local <span [attr.translate]="'no'">OpenAI</span>-compatible alternative. You control the provider and the data sent.</p>
       <ul>
-        <li i18n="@@privacy.section.external.li.1">Hosted API calls are made only to the provider you select (<span [attr.translate]="'no'">xAI</span>, <span [attr.translate]="'no'">OpenAI</span>, <span [attr.translate]="'no'">Anthropic</span>, <span [attr.translate]="'no'">Google</span>, or <span [attr.translate]="'no'">OpenRouter</span>)</li>
+        <li i18n="@@privacy.section.external.li.1">Apart from the optional fast mode below, hosted API calls are made only to the provider you select (<span [attr.translate]="'no'">xAI</span>, <span [attr.translate]="'no'">OpenAI</span>, <span [attr.translate]="'no'">Anthropic</span>, <span [attr.translate]="'no'">Google</span>, or <span [attr.translate]="'no'">OpenRouter</span>)</li>
         <li i18n="@@privacy.section.external.li.2"><span [attr.translate]="'no'">LM Studio</span> uses a local <span [attr.translate]="'no'">OpenAI</span>-compatible server on your device and does not require an API key</li>
         <li i18n="@@privacy.section.external.li.3">Sent data includes: task description, <span [attr.translate]="'no'">DOM</span> structure summary, and action context</li>
         <li i18n="@@privacy.section.external.li.4" id="relay-non-persistence">If you pair <span [attr.translate]="'no'">Remote Dashboard</span> or use legacy Background Agents sync, an optional relay server handles <span [attr.translate]="'no'">WebSocket</span> messages for that session. Live-preview frames may pass through the relay transiently, but none of the following is ever persisted on an <span [attr.translate]="'no'">FSB</span> server: page content, <span [attr.translate]="'no'">DOM</span> data, browsing history, screenshots, AI prompts, AI responses, cookies, tokens, or site <span [attr.translate]="'no'">API</span> payloads. This is opt-in only</li>
         <li i18n="@@privacy.section.external.li.5">Each provider has their own privacy policy governing how they handle API requests</li>
+        <li i18n="@@privacy.section.external.li.6">If you turn on the optional <span [attr.translate]="'no'">Jev</span> fast mode, short step descriptions also go to <span [attr.translate]="'no'">FSB</span>'s server, which asks <span [attr.translate]="'no'">TypeSafe AI</span>, directly or through <span [attr.translate]="'no'">OpenRouter</span>, to pick simple clicks. See <a href="#jev-fast-mode">the fast mode section</a> below for what is and is not sent</li>
       </ul>
+
+      <!-- Jev fast mode (Phase 68) -->
+      <h2 id="jev-fast-mode" i18n="@@privacy.section.jevFastMode.title"><span [attr.translate]="'no'">Jev</span> fast mode (optional, off by default)</h2>
+      <p i18n="@@privacy.section.jevFastMode.intro"><span [attr.translate]="'no'">Jev</span> fast mode is an optional, experimental setting for <span [attr.translate]="'no'">FSB</span>'s autopilot. When it is on, the autopilot sends a short description of the current step to <span [attr.translate]="'no'">FSB</span>'s server, which asks <span [attr.translate]="'no'">TypeSafe AI</span>'s <span [attr.translate]="'no'">Jev</span> model to pick simple clicks faster.</p>
+      <p i18n="@@privacy.section.jevFastMode.control">Fast mode is off by default. You can turn it on or off in Advanced Settings in the <span [attr.translate]="'no'">FSB</span> Control Panel, and you can turn it off at any time; while it is off, nothing is sent. An <span [attr.translate]="'no'">MCP</span> client connected to <span [attr.translate]="'no'">FSB</span> can also change this setting through <span [attr.translate]="'no'">FSB</span>'s settings tool.</p>
+      <p i18n="@@privacy.section.jevFastMode.calibration">Fast mode is experimental. Until <span [attr.translate]="'no'">FSB</span> has calibrated it, fast mode acts on nothing, though a task may still send one step description before it stops asking.</p>
+      <p i18n="@@privacy.section.jevFastMode.scope">Fast mode does not change what <span [attr.translate]="'no'">FSB</span> sends to the AI provider you chose (see External Services above). That provider still plans, types and reads, and after fast steps it gets the same kind of page description it gets with fast mode off; those descriptions can include the contents of form fields. The lists below cover only what fast mode sends to <span [attr.translate]="'no'">FSB</span>'s server, and through it to <span [attr.translate]="'no'">TypeSafe AI</span> or <span [attr.translate]="'no'">OpenRouter</span>.</p>
+
+      <h3 i18n="@@privacy.section.jevFastMode.sent.title">What fast mode sends to <span [attr.translate]="'no'">FSB</span>'s server</h3>
+      <ul>
+        <li i18n="@@privacy.section.jevFastMode.sent.li.1">Your task text</li>
+        <li i18n="@@privacy.section.jevFastMode.sent.li.2">The page origin and path, without the query string or fragment</li>
+        <li i18n="@@privacy.section.jevFastMode.sent.li.3">The page title</li>
+        <li i18n="@@privacy.section.jevFastMode.sent.li.4">A short excerpt of visible text; fast mode leaves out form fields and text you are editing</li>
+        <li i18n="@@privacy.section.jevFastMode.sent.li.5">The labels and roles of visible buttons, links and fields</li>
+        <li i18n="@@privacy.section.jevFastMode.sent.li.6">A short record of recent simple steps: the kind of action, which listed control it used and whether the page changed</li>
+      </ul>
+
+      <h3 i18n="@@privacy.section.jevFastMode.notSent.title">What is never sent to <span [attr.translate]="'no'">FSB</span>'s server</h3>
+      <ul>
+        <li i18n="@@privacy.section.jevFastMode.notSent.li.1">Anything typed into fields, or any field value</li>
+        <li i18n="@@privacy.section.jevFastMode.notSent.li.2">Passwords, payment, hidden and file fields, and fields <span [attr.translate]="'no'">FSB</span> filled from your saved passwords or payment methods</li>
+        <li i18n="@@privacy.section.jevFastMode.notSent.li.3">URL query strings and fragments</li>
+        <li i18n="@@privacy.section.jevFastMode.notSent.li.4">Cookies, API keys and credentials</li>
+      </ul>
+      <p i18n="@@privacy.section.jevFastMode.secrets">Secrets that match <span [attr.translate]="'no'">FSB</span>'s patterns are removed from the text first. If your task text itself contains such a secret, nothing is sent for that task.</p>
+
+      <p i18n="@@privacy.section.jevFastMode.recipients">Fast mode's requests go to <span [attr.translate]="'no'">FSB</span>'s server at <span [attr.translate]="'no'">full-selfbrowsing.com</span>, which asks <span [attr.translate]="'no'">TypeSafe AI</span>'s <span [attr.translate]="'no'">Jev</span> model for the decision, either directly or through <span [attr.translate]="'no'">OpenRouter</span>. The extension itself never contacts either service for this feature and holds no key for them.</p>
+      <p i18n="@@privacy.section.jevFastMode.retention">For each fast-mode decision, <span [attr.translate]="'no'">FSB</span>'s server keeps a record without any request content for 7 days: the time, model version, calibration status, element count, request size, token counts, cost, latency and outcome. It also keeps daily totals for 365 days. Neither ever holds your task text, page address, page title, page text, control labels, install hash key or IP address. These records are kept apart from the Anonymous Usage Telemetry described below, whose lists cover telemetry only.</p>
+      <p i18n="@@privacy.section.jevFastMode.typesafe"><span [attr.translate]="'no'">TypeSafe AI</span> states that it does not train or fine-tune models on these requests and that its service is hosted in the United States. Under its privacy policy, it keeps data as long as reasonably necessary to provide its services.</p>
+      <p i18n="@@privacy.section.jevFastMode.openrouter">If a request goes through <span [attr.translate]="'no'">OpenRouter</span>, <span [attr.translate]="'no'">FSB</span> keeps <span [attr.translate]="'no'">OpenRouter</span>'s prompt logging turned off for its account.</p>
+
+      <h3 i18n="@@privacy.section.jevFastMode.limitedUse.title"><span [attr.translate]="'no'">Limited Use</span> statement for fast mode</h3>
+      <p i18n="@@privacy.section.jevFastMode.limitedUse.body"><span [attr.translate]="'no'">FSB</span>'s use of information received through fast mode complies with the <span [attr.translate]="'no'">Chrome Web Store</span> User Data Policy, including the <span [attr.translate]="'no'">Limited Use</span> requirements. This information is used only to choose simple steps for the task you started, and it is transferred to <span [attr.translate]="'no'">TypeSafe AI</span>, directly or through <span [attr.translate]="'no'">OpenRouter</span>, only to provide that feature. It is never sold, never used for advertising or to determine creditworthiness, and it is not read by people except as that policy allows.</p>
 
       <!-- Local Agent Service / native messaging (v0.9.91) -->
       <h2 id="local-service" i18n="@@privacy.section.localService.title">Local Agent Service and Native Messaging</h2>
@@ -102,7 +137,7 @@
 
       <!-- No Third-Party Tracking -->
       <h2 i18n="@@privacy.section.noTracking.title">No Third-Party Tracking</h2>
-      <p i18n="@@privacy.section.noTracking.body"><span [attr.translate]="'no'">FSB</span> does not include any third-party analytics, ad trackers, or cross-site fingerprinting. There are no cookies and no third-party scripts beyond the <span [attr.translate]="'no'">AI</span> provider <span [attr.translate]="'no'">APIs</span> you explicitly configure. The one piece of first-party data <span [attr.translate]="'no'">FSB</span> sends home is the opt-out Anonymous Usage Telemetry described below, used solely to power the public <a routerLink="/stats">/stats</a> dashboard.</p>
+      <p i18n="@@privacy.section.noTracking.body"><span [attr.translate]="'no'">FSB</span> does not include any third-party analytics, ad trackers, or cross-site fingerprinting. There are no cookies and no third-party scripts beyond the <span [attr.translate]="'no'">AI</span> provider <span [attr.translate]="'no'">APIs</span> you explicitly configure. Apart from the optional fast mode described above, the one piece of first-party data <span [attr.translate]="'no'">FSB</span> sends home is the opt-out Anonymous Usage Telemetry described below, used solely to power the public <a routerLink="/stats">/stats</a> dashboard.</p>
 
       <!-- API Keys -->
       <h2 i18n="@@privacy.section.apiKeys.title">API Keys</h2>
@@ -143,7 +178,7 @@
         <li i18n="@@privacy.section.speechToText.li.1">Default provider: the browser's native <code [attr.translate]="'no'">SpeechRecognition</code>&nbsp;<span [attr.translate]="'no'">API</span>. Audio is processed by <span [attr.translate]="'no'">Chrome</span> and never leaves your device through <span [attr.translate]="'no'">FSB</span></li>
         <li i18n="@@privacy.section.speechToText.li.2">Optional Whisper provider: when <code [attr.translate]="'no'">sttProvider</code> is set to <code [attr.translate]="'no'">whisper</code> and an <span [attr.translate]="'no'">OpenAI</span> key is configured, recorded audio chunks are uploaded directly from your browser to <span [attr.translate]="'no'">OpenAI</span>'s transcription endpoint. <span [attr.translate]="'no'">FSB</span> never sees or stores the audio</li>
         <li i18n="@@privacy.section.speechToText.li.3">The microphone is only active while you are holding or have toggled the mic button. <span [attr.translate]="'no'">Chrome</span> prompts for permission the first time you use it; <span [attr.translate]="'no'">FSB</span> does not request microphone access in the extension manifest</li>
-        <li i18n="@@privacy.section.speechToText.li.4">Transcripts are inserted into the prompt textarea only and are never logged, persisted, or transmitted outside the active AI request you choose to send</li>
+        <li i18n="@@privacy.section.speechToText.li.4">Transcripts are inserted into the prompt textarea only and are never logged or persisted. They leave your device only as part of the task you choose to send: to your AI provider and, if fast mode is on, as task text to <span [attr.translate]="'no'">FSB</span>'s server</li>
         <li i18n="@@privacy.section.speechToText.li.5">Disable speech entirely by leaving the mic button untouched, or by clearing the optional Whisper provider in <span [attr.translate]="'no'">Chrome</span> extension storage</li>
       </ul>
 

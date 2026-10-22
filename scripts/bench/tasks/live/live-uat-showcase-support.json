@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "id": "live-uat-showcase-support",
+  "version": 1,
+  "set": "live",
+  "category": "reading",
+  "startUrl": "https://full-selfbrowsing.com/support",
+  "instruction": "Open {startUrl} and check, as a UAT reviewer would, that the support page has a Frequently Asked Questions section and a Common Issues section. Report both headings.",
+  "timeBudgetMs": 180000,
+  "success": {
+    "all": [
+      { "kind": "finalUrl", "urlIncludes": "/support" },
+      { "kind": "text", "includes": "Frequently Asked Questions" },
+      { "kind": "text", "includes": "Common Issues" }
+    ]
+  }
+}

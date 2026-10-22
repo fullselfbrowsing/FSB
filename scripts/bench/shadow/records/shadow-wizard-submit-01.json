@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "id": "shadow-wizard-submit-01",
+  "provenance": "hand",
+  "task": {
+    "id": "core-mixed-wizard-submit",
+    "version": 1,
+    "fixtureSha256": "27764daec414c297e8914799bcd4cabd3c0c6111eac1f9080f256fbe21a31400"
+  },
+  "step": 3,
+  "request": {
+    "v": 1,
+    "kinds": ["operation", "target", "completion"],
+    "goal": "Complete the setup wizard for the account Acme Robotics on the Team plan with 12 seats and submit it.",
+    "page": {
+      "origin": "http://127.0.0.1:4173",
+      "path": "/fixtures/wizard-submit/index.html",
+      "title": "Workspace setup",
+      "text": "Set up your workspace\nStep 2 of 3: Plan and seats\nPlan and seats\nPlan\nStarter $8 per seat per month\nTeam $15 per seat per month\nEnterprise $32 per seat per month\nSeats\nBack\nNext"
+    },
+    "elements": [
+      { "id": "e0", "role": "radio", "label": "Starter $8 per seat per month", "ops": ["check_box", "click"] },
+      { "id": "e1", "role": "radio", "label": "Team $15 per seat per month", "ops": ["check_box", "click"] },
+      { "id": "e2", "role": "radio", "label": "Enterprise $32 per seat per month", "ops": ["check_box", "click"] },
+      { "id": "e3", "role": "spinbutton", "label": "Seats", "ops": ["type_text", "click", "press_enter"] },
+      { "id": "e4", "role": "button", "label": "Back", "ops": ["click"] },
+      { "id": "e5", "role": "button", "label": "Next", "ops": ["click"] }
+    ],
+    "recentActions": [
+      { "op": "type_text", "targetId": null, "changed": true },
+      { "op": "click", "targetId": null, "changed": true },
+      { "op": "check_box", "targetId": "e1", "changed": true }
+    ],
+    "offeredOps": ["click", "type_text", "check_box", "press_enter", "scroll"]
+  },
+  "labels": {
+    "operation": "type_text",
+    "target": "e3",
+    "completion": false,
+    "stuck": null,
+    "risk": null
+  },
+  "note": "Step 2 of 3: the account name is entered and Team (e1) is chosen. Typing 12 into Seats (e3) is next; Next before that would fail validation."
+}

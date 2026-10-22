@@ -1,0 +1,532 @@
+{
+  "_comment": "Phase 68 plan 09 golden: get_session_detail output for fast-mode-off sessions BEFORE the jevMeasurement projection edit. input.stored is the updateMode record of jev-fast-logger-off-session.json, read through the real automation-logger.js loadSession; input.storedMcp is a legacy MCP history record; input.inFlight is a live autopilot session. tests/jev-fast-measurement.test.js requires byte-identical output. Never regenerate.",
+  "capturedAt": "a7569a6e",
+  "input": {
+    "stored": {
+      "sessionId": "session_jev_off_golden",
+      "record": "tests/fixtures/jev-fast-logger-off-session.json#updateMode.record"
+    },
+    "storedMcp": {
+      "id": "session_jev_off_mcp",
+      "task": "Read the dashboard",
+      "mode": "mcp-agent",
+      "mcpClient": "claude-code",
+      "status": "completed",
+      "startTime": 1790726400000,
+      "endTime": 1790726404000,
+      "totalCost": 0,
+      "totalCostBasis": "unavailable",
+      "actionCount": 2,
+      "iterationCount": 0,
+      "logs": [],
+      "actionHistory": [
+        {
+          "tool": "navigate",
+          "params": {
+            "url": "https://dash.example/home"
+          },
+          "result": {
+            "success": true
+          },
+          "timestamp": 1790726400500,
+          "logicalTab": "primary",
+          "durationMs": 220,
+          "timing": {
+            "v": 1,
+            "receivedAt": 1790726400400,
+            "completedAt": 1790726400620,
+            "fsbMs": 220
+          }
+        },
+        {
+          "tool": "read_page",
+          "params": {},
+          "result": {
+            "success": true
+          },
+          "timestamp": 1790726401500,
+          "logicalTab": "primary",
+          "durationMs": null
+        }
+      ]
+    },
+    "inFlight": {
+      "sessionId": "session_jev_off_live",
+      "status": "running",
+      "startTime": 1790726400000,
+      "iterationCount": 3,
+      "maxIterations": 40,
+      "task": "Fill the order form",
+      "tabId": 41,
+      "lastUrl": "https://shop.example/order",
+      "messages": [
+        {
+          "role": "system",
+          "content": "system prompt"
+        }
+      ],
+      "agentState": {
+        "iterationCount": 3
+      },
+      "actionHistory": [
+        {
+          "tool": "navigate",
+          "params": {
+            "url": "https://shop.example/order"
+          },
+          "result": {
+            "success": true,
+            "hadEffect": true,
+            "error": null
+          },
+          "timestamp": 1790726401200,
+          "iteration": 1,
+          "durationMs": 301
+        },
+        {
+          "tool": "click",
+          "params": {
+            "selector": "#start"
+          },
+          "result": {
+            "success": false,
+            "hadEffect": false,
+            "error": "Element not found"
+          },
+          "timestamp": 1790726402600,
+          "iteration": 2,
+          "durationMs": 302,
+          "timing": {
+            "v": 1,
+            "receivedAt": 1790726402500,
+            "completedAt": 1790726402700
+          }
+        }
+      ]
+    }
+  },
+  "output": {
+    "stored": {
+      "success": true,
+      "session": {
+        "id": "session_jev_off_golden",
+        "task": "Fill the order form",
+        "startTime": 1790726400000,
+        "endTime": 1790726408000,
+        "status": "completed",
+        "tabId": 41,
+        "tabIds": [
+          41,
+          42
+        ],
+        "tabCount": 2,
+        "taskRunId": "session_jev_off_golden",
+        "mode": "autopilot",
+        "mcpClient": null,
+        "actionCount": 5,
+        "iterationCount": 3,
+        "conversationId": "conv-68-09",
+        "uiSurface": "sidepanel",
+        "historySessionId": "session_jev_off_golden",
+        "commandCount": 1,
+        "commands": [
+          "Fill the order form"
+        ],
+        "lastTask": "Fill the order form",
+        "lastCommandAt": 1790726400000,
+        "totalCost": 0.04815,
+        "outcome": "success",
+        "outcomeDetails": {
+          "outcome": "success",
+          "reason": "completed",
+          "summary": "The order form was submitted.",
+          "blocker": null,
+          "nextStep": null,
+          "result": "The order form was submitted.",
+          "error": null
+        },
+        "result": "The order form was submitted.",
+        "completionMessage": "The order form was submitted.",
+        "error": null,
+        "blocker": null,
+        "nextStep": null,
+        "totalCostBasis": "estimate",
+        "logs": [
+          {
+            "timestamp": "2026-09-30T00:00:00.010Z",
+            "level": "info",
+            "message": "Automation session started",
+            "data": {
+              "sessionId": "session_jev_off_golden",
+              "task": "Fill the order form",
+              "tabId": 41,
+              "startTime": "2026-09-30T00:00:00.010Z"
+            }
+          },
+          {
+            "timestamp": "2026-09-30T00:00:01.210Z",
+            "level": "info",
+            "message": "Action navigate succeeded",
+            "data": {
+              "sessionId": "session_jev_off_golden",
+              "action": {
+                "tool": "navigate",
+                "params": {
+                  "url": "https://shop.example/order"
+                }
+              },
+              "result": {
+                "success": true
+              },
+              "timestamp": "2026-09-30T00:00:01.210Z"
+            }
+          },
+          {
+            "timestamp": "2026-09-30T00:00:02.310Z",
+            "level": "info",
+            "message": "Action click succeeded",
+            "data": {
+              "sessionId": "session_jev_off_golden",
+              "action": {
+                "tool": "click",
+                "params": {
+                  "selector": "#start"
+                }
+              },
+              "result": {
+                "success": true
+              },
+              "timestamp": "2026-09-30T00:00:02.310Z"
+            }
+          },
+          {
+            "timestamp": "2026-09-30T00:00:02.610Z",
+            "level": "warn",
+            "message": "Action click failed",
+            "data": {
+              "sessionId": "session_jev_off_golden",
+              "action": {
+                "tool": "click",
+                "params": {
+                  "selector": "#missing"
+                }
+              },
+              "result": {
+                "success": false,
+                "error": "Element not found"
+              },
+              "timestamp": "2026-09-30T00:00:02.610Z"
+            }
+          },
+          {
+            "timestamp": "2026-09-30T00:00:06.110Z",
+            "level": "info",
+            "message": "Action type_text succeeded",
+            "data": {
+              "sessionId": "session_jev_off_golden",
+              "action": {
+                "tool": "type_text",
+                "params": {
+                  "selector": "#name"
+                }
+              },
+              "result": {
+                "success": true
+              },
+              "timestamp": "2026-09-30T00:00:06.110Z"
+            }
+          },
+          {
+            "timestamp": "2026-09-30T00:00:06.910Z",
+            "level": "info",
+            "message": "Action click succeeded",
+            "data": {
+              "sessionId": "session_jev_off_golden",
+              "action": {
+                "tool": "click",
+                "params": {
+                  "selector": "#submit"
+                }
+              },
+              "result": {
+                "success": true
+              },
+              "timestamp": "2026-09-30T00:00:06.910Z"
+            }
+          }
+        ],
+        "actionHistory": [
+          {
+            "tool": "navigate",
+            "timestamp": 1790726401200,
+            "iteration": null,
+            "domain": "shop.example",
+            "result": {
+              "success": true
+            },
+            "durationMs": 301
+          },
+          {
+            "tool": "click",
+            "timestamp": 1790726402300,
+            "iteration": null,
+            "selector": "#start",
+            "result": {
+              "success": true
+            },
+            "durationMs": 302
+          },
+          {
+            "tool": "type_text",
+            "timestamp": 1790726406100,
+            "iteration": null,
+            "selector": "#name",
+            "result": {
+              "success": true
+            },
+            "durationMs": 303
+          },
+          {
+            "tool": "click",
+            "timestamp": 1790726406900,
+            "iteration": null,
+            "selector": "#submit",
+            "result": {
+              "success": true
+            },
+            "durationMs": 303,
+            "timing": {
+              "v": 1,
+              "receivedAt": 1790726406800,
+              "completedAt": 1790726406950,
+              "fsbMs": 150
+            }
+          }
+        ],
+        "measurement": {
+          "v": 1,
+          "kind": "autopilot",
+          "recorded": true,
+          "iterations": 3,
+          "modelMs": {
+            "total": 8500,
+            "median": 3000,
+            "p90": 3400
+          },
+          "toolMs": {
+            "total": 1450,
+            "median": 500,
+            "p90": 540,
+            "calls": 4
+          },
+          "inputTokens": 27000,
+          "outputTokens": 1050,
+          "reasoningTokens": 450,
+          "cachedInputTokens": 13500,
+          "usageSource": "provider",
+          "costUsd": 0.04815,
+          "costSource": "provider",
+          "costIterations": 3,
+          "requestedModel": "grok-4.3",
+          "servedModels": [
+            "grok-4.3"
+          ],
+          "perIteration": [
+            {
+              "iteration": 1,
+              "startedAt": 1790726401000,
+              "modelMs": 2500,
+              "modelRetried": false,
+              "toolMs": 450,
+              "toolCount": 1,
+              "inputTokens": 9000,
+              "outputTokens": 350,
+              "reasoningTokens": 150,
+              "cachedInputTokens": 4500,
+              "usageSource": "provider",
+              "costUsd": 0.01605,
+              "costSource": "provider",
+              "servedModel": "grok-4.3",
+              "estimateDeltaPct": -0.2212
+            },
+            {
+              "iteration": 2,
+              "startedAt": 1790726402000,
+              "modelMs": 3000,
+              "modelRetried": true,
+              "toolMs": 500,
+              "toolCount": 2,
+              "inputTokens": 9000,
+              "outputTokens": 350,
+              "reasoningTokens": 150,
+              "cachedInputTokens": 4500,
+              "usageSource": "provider",
+              "costUsd": 0.01605,
+              "costSource": "provider",
+              "servedModel": "grok-4.3",
+              "estimateDeltaPct": -0.2212
+            },
+            {
+              "iteration": 3,
+              "startedAt": 1790726403000,
+              "modelMs": 3500,
+              "modelRetried": false,
+              "toolMs": 550,
+              "toolCount": 2,
+              "inputTokens": 9000,
+              "outputTokens": 350,
+              "reasoningTokens": 150,
+              "cachedInputTokens": 4500,
+              "usageSource": "provider",
+              "costUsd": 0.01605,
+              "costSource": "provider",
+              "servedModel": "grok-4.3",
+              "estimateDeltaPct": -0.2212
+            }
+          ],
+          "legacyTotals": {
+            "costUsd": 0.04815,
+            "costBasis": "estimate",
+            "inputTokens": 27000,
+            "outputTokens": 1050,
+            "usageBasis": "provider",
+            "label": "legacy price-table total; not provider-reported"
+          }
+        }
+      }
+    },
+    "storedMcp": {
+      "success": true,
+      "session": {
+        "id": "session_jev_off_mcp",
+        "task": "Read the dashboard",
+        "mode": "mcp-agent",
+        "mcpClient": "claude-code",
+        "status": "completed",
+        "startTime": 1790726400000,
+        "endTime": 1790726404000,
+        "totalCost": 0,
+        "totalCostBasis": "unavailable",
+        "actionCount": 2,
+        "iterationCount": 0,
+        "outcome": "success",
+        "outcomeDetails": {
+          "outcome": "success",
+          "reason": "completed",
+          "summary": null,
+          "blocker": null,
+          "nextStep": null,
+          "result": null,
+          "error": null
+        },
+        "result": null,
+        "completionMessage": null,
+        "error": null,
+        "blocker": null,
+        "nextStep": null,
+        "logs": [],
+        "actionHistory": [
+          {
+            "tool": "navigate",
+            "timestamp": 1790726400500,
+            "iteration": null,
+            "domain": "dash.example",
+            "result": {
+              "success": true
+            },
+            "durationMs": 220,
+            "timing": {
+              "v": 1,
+              "receivedAt": 1790726400400,
+              "completedAt": 1790726400620,
+              "fsbMs": 220
+            }
+          },
+          {
+            "tool": "read_page",
+            "timestamp": 1790726401500,
+            "iteration": null,
+            "result": {
+              "success": true
+            }
+          }
+        ],
+        "measurement": {
+          "v": 1,
+          "kind": "mcp",
+          "source": "legacy",
+          "calls": 2,
+          "callsWithTiming": 1,
+          "fsbMs": {
+            "total": 220,
+            "median": 220,
+            "p90": 220
+          },
+          "callerGapMs": {
+            "total": null,
+            "median": null,
+            "p90": null,
+            "count": 0,
+            "overlapped": 0,
+            "label": "upper bound on host thinking time"
+          },
+          "callIntervalMs": {
+            "median": null,
+            "p90": null,
+            "count": 0
+          },
+          "activeSpanMs": 220,
+          "endReason": "completed",
+          "idleTimeout": false,
+          "idleTailExcluded": true,
+          "queueWaitMs": null,
+          "queueWaitStatus": "not_measured",
+          "host": {
+            "modelMs": null,
+            "inputTokens": null,
+            "outputTokens": null,
+            "costUsd": null,
+            "status": "unavailable",
+            "reason": "host does not report to FSB"
+          },
+          "truncated": false,
+          "pagesRead": 0
+        }
+      }
+    },
+    "inFlight": {
+      "success": true,
+      "session": {
+        "sessionId": "session_jev_off_live",
+        "final": false,
+        "status": "running",
+        "startedAt": 1790726400000,
+        "iterationCount": 3,
+        "maxIterations": 40,
+        "actionCount": 2,
+        "currentAction": {
+          "tool": "click",
+          "timestamp": 1790726402600,
+          "iteration": 2,
+          "selector": "#start",
+          "result": {
+            "success": false,
+            "error": "Element not found"
+          },
+          "durationMs": 302,
+          "timing": {
+            "v": 1,
+            "receivedAt": 1790726402500,
+            "completedAt": 1790726402700,
+            "fsbMs": 200
+          }
+        },
+        "taskDescription": "Fill the order form",
+        "tabId": 41,
+        "lastUrl": "https://shop.example/order",
+        "note": "In-flight session: no terminal outcome yet. Re-query after completion (or via list_sessions) for full history."
+      },
+      "inFlight": true
+    }
+  }
+}

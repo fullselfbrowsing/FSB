@@ -666,6 +666,89 @@
   }
 
   const refMap = new RefMap();
+  // ---- Phase 68 fast-mode registry (begin) ----
+  /**
+   * Fast-mode element registry, separate from the LLM's RefMap (Phase 68 D-14).
+   *
+   * Only the fast-mode menu resets and fills it, so building a menu never
+   * renumbers the e-refs the LLM holds. Handles are j1..jN so they can never be
+   * mistaken for LLM refs, and the generation is "<8 hex nonce>-<count>": the
+   * nonce is random per registry instance (one per document), so a handle from
+   * an earlier document can never match after the content script restarts.
+   * Entries hold a WeakRef plus the role and name recorded at menu time.
+   */
+  class JevRefRegistry {
+    constructor() {
+      this.map = new Map();    // handle -> { element: WeakRef, role, name }
+      this.counter = 0;
+      this._nonce = null;
+      this._generationCount = 0;
+    }
+
+    _ensureNonce() {
+      if (this._nonce) return this._nonce;
+      const bytes = new Uint8Array(4);
+      if (typeof crypto !== 'undefined' && crypto && typeof crypto.getRandomValues === 'function') {
+        crypto.getRandomValues(bytes);
+      } else {
+        for (let i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256);
+      }
+      let hex = '';
+      for (let i = 0; i < bytes.length; i++) hex += (bytes[i] & 0xff).toString(16).padStart(2, '0');
+      this._nonce = hex;
+      return hex;
+    }
+
+    get generation() {
+      return `${this._ensureNonce()}-${this._generationCount}`;
+    }
+
+    reset() {
+      this._ensureNonce();
+      this.map.clear();
+      this.counter = 0;
+      this._generationCount++;
+    }
+
+    register(element, role, name) {
+      this.counter++;
+      const handle = `j${this.counter}`;
+      this.map.set(handle, {
+        element: new WeakRef(element),
+        role: role || 'generic',
+        name: name || ''
+      });
+      return handle;
+    }
+
+    get(handle) {
+      if (typeof handle !== 'string') return null;
+      return this.map.get(handle) || null;
+    }
+
+    findHandle(element) {
+      if (!element) return null;
+      for (const [handle, entry] of this.map) {
+        if (entry.element.deref() === element) return handle;
+      }
+      return null;
+    }
+
+    get size() { return this.map.size; }
+  }
+
+  const jevRefMap = new JevRefRegistry();
+
+  // Elements filled by the credential or payment fill tools in this document.
+  // Membership only: no value is recorded here or sent anywhere (Phase 68 D-13).
+  const vaultFilledElements = new WeakSet();
+
+  function noteVaultFilled(element) {
+    if (element && (typeof element === 'object' || typeof element === 'function')) {
+      vaultFilledElements.add(element);
+    }
+  }
+  // ---- Phase 68 fast-mode registry (end) ----
 
   /**
    * Check if the document is fully ready for interaction
@@ -786,6 +869,10 @@
   FSB.elementCache = elementCache;
   FSB.RefMap = RefMap;
   FSB.refMap = refMap;
+  FSB.JevRefRegistry = JevRefRegistry;
+  FSB.jevRefMap = jevRefMap;
+  FSB.vaultFilledElements = vaultFilledElements;
+  FSB.noteVaultFilled = noteVaultFilled;
   FSB.checkDocumentReady = checkDocumentReady;
   FSB.previousDOMState = previousDOMState;
   FSB.domStateCache = domStateCache;

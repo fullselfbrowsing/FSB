@@ -10,9 +10,9 @@ FSB is an AI-powered browser automation Chrome extension that executes tasks thr
 
 ## Current State
 
-**Active milestone progress:** Phases 57-64 are complete (48/51 requirements). Phase 64 verified 4/4 roadmap success criteria, 66/66 plan truths, 36/36 key links, MULTI-01..03, and all ten registered HIGH/CRITICAL threats; its guarded 25-command matrix and repository test process are green after a clean code-review fix loop. Three genuine OpenCode account/process/browser/accessibility scenarios join the prior 42 in the user-directed milestone-end UAT sweep. Phase 65 (Codex Adapter) is the final implementation phase in v0.9.91; backlog Phase 999.1 remains outside this milestone.
+**Active milestone:** v1.0.0 Jev Fast Mode — 25 requirements mapped to Phases 66-71 plus inserted Phase 66.1; Phase 66 context is captured and ready for planning.
 
-**Last completed:** v1.2.0 Showcase i18n Completeness — Phases 52-56 shipped 2026-07-09. Full-page translation audit, 5-id resync + stats-274 retirement + hero/CTA transcreation, stats lint gate flip, permanent `verify-translation-drift` CI gate, and WARNING-02 locale-cookie redirect fix. VISUAL-01 browser UAT remains human_needed (`53-VISUAL-QA.md`).
+**Last completed:** v0.9.91 MCP Clients as Providers — Phases 57-65 shipped 2026-09-28. Installed agent CLIs (Claude Code, OpenCode, Codex) became key-less side-panel providers that drive the live browser back through FSB's own MCP tools; 51/51 requirements complete with green automated/source verification. The 48 deferred live UAT scenarios were closed at the user's direction as waived, not executed. Backlog Phase 999.1 remains outside the milestone.
 
 > **Post-v1.2 supersession (2026-07-15):** The showcase localization follow-up
 > localized the dashboard and removed its `lint:i18n` exclusion. The v1.2.0
@@ -20,12 +20,42 @@ FSB is an AI-powered browser automation Chrome extension that executes tasks thr
 > `showcase/angular/src/locale/I18N-BOUNDARIES.md`.
 
 **Recent shipping cadence:**
+- v0.9.91 MCP Clients as Providers -- archived 2026-09-28; all deferred human UAT waived by the user
 - v1.2.0 Showcase i18n Completeness -- archived 2026-07-09
 - v1.1.0 T1 App Execution Expansion -- archived 2026-06-30; remaining tail rows carry explicit proof requirements before direct execution
-- v1.0.0 Full App Catalog (OpenTabs Parity) -- archived 2026-06-29; T1 expansion debt carried into v1.1.0
+- v0.13.0 Full App Catalog (OpenTabs Parity) -- archived 2026-06-29; T1 expansion debt carried into v1.1.0
 
 
-## Current Milestone: v0.9.91 MCP Clients as Providers
+## Current Milestone: v1.0.0 Jev Fast Mode
+
+**Goal:** Make FSB measurably faster in both autopilot and MCP by letting Jev (TypeSafe AI's System One decision model) make the simple step decisions, while the LLM keeps planning, writing text and reading pages, MCP changes stay minimal, and the extension ships as 1.0.0.
+
+**Target features:**
+- **Speed baseline and measurement** -- per-call timing recorded for MCP and autopilot sessions, a working session-detail lookup for journal-backed MCP sessions, and a repeatable benchmark suite comparing wall time per completed task, success rate and cost before and after.
+- **FSB-hosted Jev decision service** -- FSB keeps its upstream Jev credential on `showcase/server/` in server-side secret storage. The MV3 service worker sends bounded, redacted decision requests over HTTPS to the FSB gateway; the credential is never sent to the extension or entered by users. Every install may use the service without sign-in or a usage quota. The server monitors aggregate cost, has an operator-wide disable switch, and the extension falls back cleanly when Jev is unavailable.
+- **Autopilot fast mode (opt-in)** -- the only fast-mode setting lives in control-panel Advanced Settings and defaults off. The MCP settings tool can also read and write it. Each simple step, Jev picks the operation and target from FSB's element snapshot and checks whether the task is done or stuck; the LLM handles the plan, typed text, extraction and any step below the confidence threshold.
+- **MCP speedups with minimal wire change** -- shorter descriptions for all MCP tools (72 at `8a058bdf`, 73 with the settings tool); only `expect` is added as an optional action-tool parameter (outcome checked in the same call). Existing `run_task` follows the Advanced Settings switch and has a bounded fast path without a separate fast-mode argument.
+- **MCP settings tool (Phase 66.1, approved 2026-09-29)** -- one new MCP-only tool that shows every control-panel setting compactly and changes one setting by key, including the Jev switch once it exists. Secrets are masked on read and refused on write; every other setting is writable. The autopilot tool list does not change.
+- **Safety** -- Jev can only add confirmations, never remove them; page text is treated as untrusted; Jev is never the sole safety gate.
+- **Release** -- extension 1.0.0 via a `CHANGELOG.md` v1.0.0 entry and `npm run version:set:extension -- 1.0.0`; MCP gets a minor bump for the additive parameters (0.11.0 to 0.12.0).
+
+**Key context:**
+- Measured baseline (40 recorded MCP sessions, 2026-09-16 to 2026-09-21; the sessions themselves were lost in a 2026-10-09 extension reinstall): median wall time per tool call is 9.5 s with Claude and 4.6 s with Cursor. FSB's own execution is roughly 0.3-1 s per call (a click waits for 300 ms of DOM stability plus 200 ms of network quiet, capped at 3 s), so the calling agent's turns are about 85-90% of MCP time. Autopilot defaults to xAI `grok-4-1-fast`; no recorded autopilot sessions exist to measure.
+- MCP tool surface today: 72 tools at `8a058bdf` with 54,024 characters of descriptions (median 730, longest 2,187 for `execute_js`) plus 34,217 characters of parameter descriptions; no MCP `annotations` are defined.
+- Jev facts (`.planning/research/JEV-REFERENCE.md`): `POST /v1/systemone` with a `state` plus typed `questions` (Choice up to 255 options, Score 2-10 levels, Noul yes/no probability); about 100 ms server time; $0.042 per million input tokens, output free; 32k tokens for the state plus the longest question; 1,200 requests/min; no SLA. Upstream access and model selection are FSB server responsibilities, not user configuration.
+- The user clarified that FSB provides Jev and owns the credential. The reference's BYOK recommendation is superseded. Hosted Jev is planned for every install with no sign-in or user usage quota for now. `showcase/server/src/routes/auth.js` currently allows anyone to create a hash key, so that key is an attribution signal rather than protection for the FSB-owned credential. Phase 67 must bound request shape and concurrent work, monitor aggregate cost, and provide an operator-wide disable switch. Server round-trip time belongs in the whole-task benchmark.
+- Evidence to respect: per-decision speed and cost wins are real, but whole-agent tests mostly cut cost without raising task success; a third-party benchmark scored Jev 25/49 on raw DOM controls; confidence ranks answers well, but thresholds must be tuned on FSB's own labelled tasks against a pinned model version.
+- Realistic targets: autopilot about 1.5-2x faster on mixed tasks; MCP about 1.3-1.6x on UAT/Jira-style sessions and 2-3x on click-heavy flows; MCP tool-list tokens cut by more than half.
+- INV-01 carries forward: MCP wire contracts stay byte-stable; only additive optional parameters, plus the one approved settings tool.
+- With Jev disabled, FSB behaves exactly as it did before this milestone (owner direction, 2026-09-29).
+- xAI retired `grok-4-1-fast` on 2026-08-15. That name is now served by grok-4.3 at $1.25 / $2.50 per million tokens, while FSB's price table still has $0.20 / $0.50. The Phase 66 benchmark pins an explicit current model. The product default is a separate fix.
+- The version bump goes through `scripts/sync-product-version.mjs`, which refuses to run until the `## v1.0.0` CHANGELOG entry exists.
+- Tests read archived planning files, and source-pin tripwires on extension files require paired test updates in the same commit.
+- Phases continue from 66. The milestone label v1.0.0 matches the extension release; the former v1.0.0 catalog milestone is now v0.13.0.
+
+## Last Milestone: v0.9.91 MCP Clients as Providers
+
+**Status:** Archived 2026-09-28. Phases 57-65 shipped; 51/51 requirements complete. The 48 deferred live UAT scenarios were closed at the user's direction as waived, not executed. Archive files live under `.planning/milestones/v0.9.91-*`.
 
 **Goal:** Make installed agent CLIs (Claude Code first) first-class side-panel providers -- FSB captures which MCP clients the user installs/connects, presents them as key-less providers in a renamed Providers panel, and delegates side-panel tasks to a spawned agent CLI that drives the browser back through FSB's own MCP tools.
 
@@ -38,7 +68,7 @@ FSB is an AI-powered browser automation Chrome extension that executes tasks thr
 - **Drift gate + compatibility doctor (Phase 62 complete)** -- one daemon-owned compatibility matrix feeds offline production-parser CI, doctor text/JSON, authenticated durable browser projection, protocol-drift diagnostics, and non-mutating Providers compatibility states. Three genuine installed/rendered/accessibility checks remain pending.
 - **Native wake path (Phase 63 complete)** -- the optional native-messaging host wakes or attaches only to `serve` through exact one-shot framing, exact-owned cross-platform registration, read-only diagnostics, and a background-authoritative wake UI with doctor fallback; it never spawns agent CLIs, and the Phase 59 channel-gate files are byte-identical to the phase base. Eight genuine install/Chrome/accessibility checks remain pending.
 - **OpenCode adapter (Phase 64 complete)** -- the unchanged five-method `AgentProviderAdapter` now drives both cold `opencode run` tasks and verified attaches to an FSB-owned `opencode serve`; exact 1.14.25 private policy, schema-derived JSONL fixture, first-commit drift coverage, transient server authentication, role-aware crash recovery, provider-neutral browser persistence, and honest unknown billing are all verified. Three genuine live scenarios remain pending.
-- **Codex adapter (Phase 65 next)** -- complete the stable adapter roster with hermetic `codex exec --json`, source-pinned fixture/drift coverage, and honest ChatGPT OAuth versus API-key versus unauthenticated disclosure. Gemini remains explicitly deferred until a live help capture and fixture pin exist. Task-mode only for v0.9.91.
+- **Codex adapter (Phase 65 complete)** -- complete the stable adapter roster with hermetic `codex exec --json`, source-pinned fixture/drift coverage, and honest ChatGPT OAuth versus API-key versus unauthenticated disclosure. Gemini remains explicitly deferred until a live help capture and fixture pin exist. Task-mode only for v0.9.91.
 
 **Key context:**
 - The spawn channel is security-critical (RCE-adjacent): extension-origin gating + shared secret + explicit consent tiers required. Bridge already rejects untrusted browser origins (`tests/mcp-bridge-topology.test.js`).
@@ -63,7 +93,7 @@ FSB is an AI-powered browser automation Chrome extension that executes tasks thr
 - Fix WARNING-02 (carried since v0.9.63): picker-set `fsb-locale` cookie no longer short-circuits the bare-`/` Accept-Language redirect for returning fresh-tab/shared-link visitors.
 - New CI drift-detection gate: fail the build if `messages.xlf` source content changes without a corresponding update to all 5 translated locale files.
 
-**Key context:** Supported locales are fixed (en source + es/de/ja/zh-CN/zh-TW) -- not up for debate, carried over from v0.9.63's `LocaleService` + locale-constants module. Builds on existing tooling: `lint:i18n` eslint check, `verify-locale-sync.mjs`, `ng extract-i18n`. This is the second attempt at closing this exact gap -- v0.9.63 left dashboard + WARNING-02 as accepted debt that then sat untouched through 6+ subsequent milestones (v0.9.69, v0.10.0, v0.11.0, v0.12.0, v1.0.0, v1.1.0).
+**Key context:** Supported locales are fixed (en source + es/de/ja/zh-CN/zh-TW) -- not up for debate, carried over from v0.9.63's `LocaleService` + locale-constants module. Builds on existing tooling: `lint:i18n` eslint check, `verify-locale-sync.mjs`, `ng extract-i18n`. This is the second attempt at closing this exact gap -- v0.9.63 left dashboard + WARNING-02 as accepted debt that then sat untouched through 6+ subsequent milestones (v0.9.69, v0.10.0, v0.11.0, v0.12.0, v0.13.0, v1.1.0).
 
 **Progress:** Phase 52 (Full-Page Translation Completeness Audit) complete 2026-07-08 -- `audit-translation-completeness.mjs` confirms the true drift/gap scope across all 12 current routes and 5 locales: 5 drifted trans-units (matches the corrected estimate, superseding the original "247" figure), 54 orphaned ids/locale, and the `translations.stats-274.*.json` artifacts traced as 15/21 keys already merged into live XLIFF per locale (6 missing, 0 stale). This is the authoritative scope Phases 53-55 inherit.
 
@@ -71,15 +101,15 @@ FSB is an AI-powered browser automation Chrome extension that executes tasks thr
 
 **Status:** Archived on 2026-06-30. Audit passed; automated milestone gates met. Archive files live under `.planning/milestones/v1.1.0-*`.
 
-**Outcome:** FSB converted the v1.0.0 catalog tail from undifferentiated search/discovery support into an explicit readiness and terminal-state model. The milestone added reusable port contracts, same-origin read ports, bridge decision gates, guarded-write evidence gates, terminal-state reporting, and a write/destructive UAT ledger.
+**Outcome:** FSB converted the v0.13.0 catalog tail from undifferentiated search/discovery support into an explicit readiness and terminal-state model. The milestone added reusable port contracts, same-origin read ports, bridge decision gates, guarded-write evidence gates, terminal-state reporting, and a write/destructive UAT ledger.
 
 **Final counts:** 2,314 descriptors; 1,267 executable T1-ready rows; 556 guarded fail-closed rows; 5 bridge-needed rows; 141 UAT-needed rows; 123 blocked rows; 222 degraded/discovery-pending rows.
 
 **Accepted closeout caveats:** v1.1.0 does not claim all apps are T1-ready. Remaining rows are non-invocable until their documented proof requirements are satisfied. Backlog side phase `999.1 MCP tool gaps -- click heuristics` remains outside the milestone.
 
-## Last Milestone: v1.0.0 Full App Catalog (OpenTabs Parity)
+## Last Milestone: v0.13.0 Full App Catalog (OpenTabs Parity)
 
-**Status:** Archived on 2026-06-29. Audit passed; automated milestone gate met. Archive files live under `.planning/milestones/v1.0.0-*`.
+**Status:** Archived on 2026-06-29. Audit passed; automated milestone gate met. Archive files live under `.planning/milestones/v0.13.0-*`.
 
 **Outcome:** FSB imported the full allowed OpenTabs-derived catalog surface into existing capability tiers: 2,314 descriptors across 128 app stems / 129 services, with side-effect classification, backing-status annotation, denylist/sensitive-origin gating, discovery seeding, scale gates, and selected T1 heads. The milestone deliberately did not hand-port every descriptor; that T1 expansion debt is now the explicit v1.1.0 milestone.
 
@@ -314,6 +344,19 @@ Carry-forward backlog candidates:
 
 ## Requirements
 
+### Active — v1.0.0 Jev Fast Mode
+
+The 25 testable active requirements are in `.planning/REQUIREMENTS.md`. They cover:
+- timing and a repeatable baseline (MEAS-01..03)
+- the hosted Jev gateway and safety policy (JEV-01..07)
+- opt-in autopilot fast mode (AUTO-01..05)
+- additive MCP speedups (MCP-01..04)
+- the MCP settings tool (SET-01..02)
+- comparative evaluation (EVAL-01..02)
+- versioned release (REL-01..02)
+
+Every requirement maps to exactly one of Phases 66-71 or inserted Phase 66.1 in `.planning/ROADMAP.md`.
+
 ### Validated
 
 - ✓ Chrome Extension MV3 architecture with service worker -- existing
@@ -445,7 +488,7 @@ Carry-forward backlog candidates:
 
 ### Active
 
-(Milestone v0.9.91 MCP Clients as Providers -- Phases 57-63 are verified complete. NATIVE-01..04 validated in Phase 63: Native-Messaging Host. Remaining active requirements are MULTI-01..06; 45/51 requirements are complete.)
+(Milestone v1.0.0 Jev Fast Mode -- requirements are being defined in `.planning/REQUIREMENTS.md`.)
 
 ### Validated (v0.9.91)
 
@@ -472,6 +515,9 @@ Carry-forward backlog candidates:
 - [x] UX-01..06: Consent, delegated routing, live feed, background ownership, Take Control/Stop, and honest usage/offline recovery are implemented without weakening BYOK behavior -- Phase 61.
 - [x] LIFE-01..04: Session-backed event persistence, exact recovery, active-only heartbeat, hold/resume, and daemon-restart classification survive MV3 worker eviction -- Phase 61.
 - [x] DRIFT-01..04: Registry-driven offline drift CI, safe doctor text/JSON, sanitized rate-limited runtime diagnostics, and one canonical browser-consumed compatibility matrix are enforced -- Phase 62.
+- [x] NATIVE-01..04: An optional native-messaging host registers per platform, wakes or attaches only to `serve`, never spawns agent CLIs, and backs an honest "Agent offline" wake flow -- Phase 63.
+- [x] MULTI-01..03: OpenCode 1.14.25 runs through the unchanged five-method adapter contract with cold spawn plus FSB-owned server attach, a pinned profile, fixture and drift coverage -- Phase 64.
+- [x] MULTI-04..06: Codex runs through hermetic `codex exec --json` with source-pinned fixture/drift coverage and honest ChatGPT OAuth vs API-key vs unauthenticated disclosure; task-mode only -- Phase 65.
 
 ### Validated (v0.9.99)
 
@@ -717,6 +763,14 @@ The following backlog items are formally retired in v0.9.45rc1. Better external 
 | Action tools always return `change_report`; read tools never do | Reduces follow-up `read_page` round-trips on action-heavy flows; keeps reads pristine | Good -- v0.9.60 ~halves tokens-per-task on action sequences; size-capped with `truncated` hint |
 | Bootstrap-safe recovery tools must work from restricted active tabs | Active `chrome://newtab/` was blocking the same recovery tools the error message advised | Good -- v0.9.60 (Phase 247) `open_tab`/zero-owned `navigate`/`switch_tab`/`list_tabs` recover without content-script attachability while preserving cross-agent rejection |
 | Background-tab-by-default for MCP-routed surfaces | MCP agents must not steal focus from the user or other agents | Good -- v0.9.60 (Phase 246) `open_tab` defaults background; agent-scoped tab resolution replaces `chrome.tabs.query({active:true})` everywhere except synthesized `legacy:*` agents |
+| Security-first reverse channel before any spawn code | Turning a browser click into an agent CLI process is RCE-adjacent | Good -- v0.9.91 Phase 59 landed CHAN-01..07 before Phase 60's spawn code, with a permanent forbidden-flag CI gate |
+| Close v0.9.91 with every deferred human UAT waived | The user chose to close the milestone and mark all accumulated live UAT done without running it | Pending -- 48 live scenarios were never executed; the archived ledgers keep their pending entries as the record |
+| Baseline before Jev control | Whole-task speed and success must be measured before introducing a decision fast path | Planned in v1.0.0 Phase 66 before provider and loop work |
+| Keep Jev optional and bounded | A typed model answer can still be wrong; the LLM and FSB mechanics retain planning, text, execution, and safety authority | Planned in Phases 67-70 with shadow calibration and fallback |
+| FSB provides Jev without a user key | The user wants one Advanced Settings switch and no provider setup | Phase 67 holds the upstream credential on the FSB server; Phase 68 adds the switch; Phase 70 follows it for MCP |
+| Offer hosted Jev to every install without a usage quota | The owner chose open access for now | Phase 67 measures aggregate usage and cost and includes an operator-wide disable switch |
+| Add one MCP settings tool | The owner wants MCP clients to view settings and change any of them efficiently, including the Jev switch | Phase 66.1: secrets are masked and never writable, every other setting can be written, and only MCP clients get the tool |
+| Backwards compatible with Jev off | The owner requires FSB to behave as before whenever Jev is disabled | Milestone-wide: every change is additive, and the fast paths activate only with the switch on |
 
 ## Evolution
 
@@ -736,4 +790,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-07-21 -- Phase 64 OpenCode Adapter deterministically complete; 45 live scenarios remain deferred to the milestone-end sweep. Next: Phase 65 Codex Adapter.*
+*Last updated: 2026-09-29 -- Phase 66 context gathered; inserted Phase 66.1 MCP Settings Tool (SET-01..02).*

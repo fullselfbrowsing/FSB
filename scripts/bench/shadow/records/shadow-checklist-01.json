@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "id": "shadow-checklist-01",
+  "provenance": "hand",
+  "task": {
+    "id": "core-click-checklist",
+    "version": 1,
+    "fixtureSha256": "8caa34348a9c81cd59f24a1e74c0c9be84e2da0d2d0c903d5f0c60c9b7977096"
+  },
+  "step": 2,
+  "request": {
+    "v": 1,
+    "kinds": ["operation", "target", "completion", "stuck"],
+    "goal": "Tick Alpha, Delta, Echo and Juliet, leave every other box unticked, then press Save.",
+    "page": {
+      "origin": "http://127.0.0.1:4173",
+      "path": "/fixtures/checklist/index.html",
+      "title": "Checklist",
+      "text": "Checklist\nItems\nAlpha\nBravo\nCharlie\nDelta\nEcho\nFoxtrot\nGolf\nHotel\nIndia\nJuliet\nSave"
+    },
+    "elements": [
+      { "id": "e0", "role": "checkbox", "label": "Alpha", "ops": ["check_box", "click"] },
+      { "id": "e1", "role": "checkbox", "label": "Bravo", "ops": ["check_box", "click"] },
+      { "id": "e2", "role": "checkbox", "label": "Charlie", "ops": ["check_box", "click"] },
+      { "id": "e3", "role": "checkbox", "label": "Delta", "ops": ["check_box", "click"] },
+      { "id": "e4", "role": "checkbox", "label": "Echo", "ops": ["check_box", "click"] },
+      { "id": "e5", "role": "checkbox", "label": "Foxtrot", "ops": ["check_box", "click"] },
+      { "id": "e6", "role": "checkbox", "label": "Golf", "ops": ["check_box", "click"] },
+      { "id": "e7", "role": "checkbox", "label": "Hotel", "ops": ["check_box", "click"] },
+      { "id": "e8", "role": "checkbox", "label": "India", "ops": ["check_box", "click"] },
+      { "id": "e9", "role": "checkbox", "label": "Juliet", "ops": ["check_box", "click"] },
+      { "id": "e10", "role": "button", "label": "Save", "ops": ["click"] }
+    ],
+    "recentActions": [
+      { "op": "check_box", "targetId": "e0", "changed": true },
+      { "op": "check_box", "targetId": "e3", "changed": true }
+    ],
+    "offeredOps": ["click", "check_box", "scroll"]
+  },
+  "labels": {
+    "operation": "check_box",
+    "target": "e4",
+    "completion": false,
+    "stuck": false,
+    "risk": null
+  },
+  "note": "Alpha and Delta are ticked; Echo (e4) is next, then Juliet and Save. Nothing is saved yet."
+}

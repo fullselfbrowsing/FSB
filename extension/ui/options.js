@@ -43,6 +43,8 @@ const defaultSettings = {
   // false, the dispatcher skips harvest instrumentation entirely (zero
   // overhead) and action tool responses revert to pre-Phase-245 shape.
   fsbChangeReportsEnabled: true,
+  // Phase 68 (AUTO-01): autopilot fast mode switch, off by default.
+  fsbJevFastModeEnabled: false,
   // Exact-fidelity MCP replay is opt-out. Saved MCP sessions age out
   // independently of Autopilot history.
   fsbMcpSessionRecordingEnabled: true,
@@ -325,6 +327,8 @@ function cacheElements() {
   elements.fsbTriggerCapCurrentActive = document.getElementById('fsbTriggerCapCurrentActive');
   // Phase 245 D-07: Action Change Reports global toggle.
   elements.fsbChangeReportsEnabled = document.getElementById('fsbChangeReportsEnabled');
+  // Phase 68 (AUTO-01): autopilot fast mode switch (null until its card exists).
+  elements.fsbJevFastModeEnabled = document.getElementById('fsbJevFastModeEnabled');
   elements.fsbMcpSessionRecordingEnabled = document.getElementById('fsbMcpSessionRecordingEnabled');
   elements.fsbMcpSessionRetentionDays = document.getElementById('fsbMcpSessionRetentionDays');
   elements.prioritizeViewport = document.getElementById('prioritizeViewport');
@@ -1007,6 +1011,13 @@ function setupEventListeners() {
     });
   }
 
+  // Phase 68 (AUTO-01): autopilot fast mode switch, same pattern.
+  if (elements.fsbJevFastModeEnabled) {
+    elements.fsbJevFastModeEnabled.addEventListener('change', () => {
+      markUnsavedChanges();
+    });
+  }
+
   // Phase 243 Plan 04 / UI-03: subscribe chrome.storage.onChanged so the
   // live current-active counter refreshes whenever the registry envelope
   // mutates (session/fsbAgentRegistry, written by Phase 237's write-through)
@@ -1033,6 +1044,10 @@ function setupEventListeners() {
       }
     });
   }
+
+  // Phase 66.1 D-16: follow settings written outside this panel (the MCP
+  // settings tool, another panel tab) and track the fields the user edits.
+  if (globalThis.FSBSettingsSync && typeof globalThis.FSBSettingsSync.attach === 'function') globalThis.FSBSettingsSync.attach();
 
   // Phase 30 (GOV-07): Consent & Audit wiring. Consent/audit state lives in its
   // OWN stores (consent-policy-store.js, audit-log.js), NOT defaultSettings, so
@@ -1819,6 +1834,7 @@ function loadSettings() {
   const loadGeneration = providerSettingsLoadGeneration;
   chrome.storage.local.get(Object.keys(defaultSettings), async (data) => {
     data = data || {};
+    if (globalThis.FSBSettingsSync) globalThis.FSBSettingsSync.reset(data);
     fsbRecommendedAgentCap = await resolveRecommendedAgentCap();
     if (loadGeneration !== providerSettingsLoadGeneration) return;
     const hasStoredAgentCap = Object.prototype.hasOwnProperty.call(data, 'fsbAgentCap')
@@ -1919,6 +1935,7 @@ function loadSettings() {
           const migratedModel = String(models[0].id || '');
           elements.modelName.value = migratedModel;
           await new Promise(resolve => {
+            if (globalThis.FSBSettingsSync) globalThis.FSBSettingsSync.noteSelfWrite({ modelName: migratedModel });
             chrome.storage.local.set({ modelName: migratedModel }, resolve);
           });
           persistedProviderSelection.modelName = migratedModel;
@@ -2042,6 +2059,11 @@ function loadSettings() {
       elements.fsbChangeReportsEnabled.checked = settings.fsbChangeReportsEnabled ?? true;
     }
 
+    // Phase 68 (AUTO-01): autopilot fast mode. Default false when the key is absent.
+    if (elements.fsbJevFastModeEnabled) {
+      elements.fsbJevFastModeEnabled.checked = settings.fsbJevFastModeEnabled ?? false;
+    }
+
     if (elements.fsbMcpSessionRecordingEnabled) {
       elements.fsbMcpSessionRecordingEnabled.checked = settings.fsbMcpSessionRecordingEnabled !== false;
     }
@@ -2077,6 +2099,11 @@ function loadSettings() {
     if (elements.voiceInputEnabled) {
       elements.voiceInputEnabled.checked = voiceInputEnabled;
     }
+
+    // Phase 66.1 D-16: a setting written outside the panel while this load was
+    // awaiting (the agent cap, provider discovery) is shown again now, so the
+    // older snapshot used above does not hide it.
+    if (globalThis.FSBSettingsSync) globalThis.FSBSettingsSync.reconcile();
 
     // Bring the custom-select widgets' visible labels back into sync with the
     // now-populated native <select> values. initFsbSelects() runs synchronously
@@ -2322,8 +2349,6 @@ function saveSettings() {
   const previousVoiceInputEnabled = persistedVoiceInputEnabled;
   const selectedModelName = String(elements.modelName?.value || '').trim();
   if (!validateProviderReselection(normalizedProviderSettings)) return false;
-  if (!validateLmStudioSettingsSelection(normalizedProviderSettings, selectedModelName)) return false;
-  if (!validateHostedApiSettingsSelection(normalizedProviderSettings, selectedModelName)) return false;
   const rawLmStudioBaseUrl = (document.getElementById('lmstudioBaseUrl')?.value || 'http://localhost:1234').trim();
   const normalizedLmStudioBaseUrl = normalizeLmStudioSettingsBaseUrl(rawLmStudioBaseUrl);
   const settings = {
@@ -2373,17 +2398,44 @@ function saveSettings() {
     // Phase 245 D-07: persist Action Change Reports toggle. Default true so
     // builds where the user has never visited the toggle still emit reports.
     fsbChangeReportsEnabled: elements.fsbChangeReportsEnabled?.checked ?? true,
+    fsbJevFastModeEnabled: elements.fsbJevFastModeEnabled?.checked ?? false,
     fsbMcpSessionRecordingEnabled: elements.fsbMcpSessionRecordingEnabled?.checked ?? true,
     fsbMcpSessionRetentionDays: clampMcpSessionRetentionDays(elements.fsbMcpSessionRetentionDays?.value)
   };
-  
+
+  // Phase 66.1 D-16: the provider guards judge only a selection this Save
+  // writes. When the provider group changed outside the panel and the user
+  // has not touched it, filterForSave below leaves it out, so an unrelated
+  // edit must still save (an MCP switch to lmstudio stores an empty model).
+  // Reading the form above has no side effect, so a refusal here loses nothing.
+  const providerGroupWritten = !globalThis.FSBSettingsSync
+    || globalThis.FSBSettingsSync.willWriteProviderGroup();
+  if (providerGroupWritten) {
+    if (!validateLmStudioSettingsSelection(normalizedProviderSettings, selectedModelName)) return false;
+    if (!validateHostedApiSettingsSelection(normalizedProviderSettings, selectedModelName)) return false;
+  }
+
+  // Phase 66.1 D-16: leave out keys another writer changed that the user has
+  // not touched, then record what this Save actually writes and which fields
+  // it covers.
+  let touchedAtSave = null;
+  if (globalThis.FSBSettingsSync) {
+    globalThis.FSBSettingsSync.filterForSave(settings);
+    globalThis.FSBSettingsSync.noteSelfWrite(settings);
+    touchedAtSave = globalThis.FSBSettingsSync.inspect().touched;
+  }
+
   chrome.storage.local.set(settings, () => {
-    persistedVoiceInputEnabled = settings.voiceInputEnabled;
+    const wroteVoiceInput = Object.prototype.hasOwnProperty.call(settings, 'voiceInputEnabled');
+    if (wroteVoiceInput) persistedVoiceInputEnabled = settings.voiceInputEnabled;
+    const previousProviderSelection = persistedProviderSelection;
+    const wrote = (key) => Object.prototype.hasOwnProperty.call(settings, key);
     persistedProviderSelection = {
-      providerKind: settings.providerKind,
-      modelProvider: settings.modelProvider,
-      modelName: settings.modelName
+      providerKind: wrote('providerKind') ? settings.providerKind : previousProviderSelection.providerKind,
+      modelProvider: wrote('modelProvider') ? settings.modelProvider : previousProviderSelection.modelProvider,
+      modelName: wrote('modelName') ? settings.modelName : previousProviderSelection.modelName
     };
+    if (globalThis.FSBSettingsSync) globalThis.FSBSettingsSync.noteSaved(Object.keys(settings), touchedAtSave);
     dashboardState.hasUnsavedChanges = false;
     hideSaveBar();
     showToast('Settings saved successfully', 'success');
@@ -2394,7 +2446,7 @@ function saveSettings() {
       checkApiConnection();
     }
 
-    if (voiceInputSettingsController) {
+    if (voiceInputSettingsController && wroteVoiceInput) {
       void voiceInputSettingsController.handleSavedChange(
         previousVoiceInputEnabled,
         settings.voiceInputEnabled
@@ -9314,6 +9366,618 @@ function initializeSyncSection() {
   global.FSBModelCombobox = { init, refresh };
 })(typeof globalThis !== 'undefined' ? globalThis : (typeof self !== 'undefined' ? self : this));
 
+/**
+ * FSBSettingsSync (Phase 66.1, D-16): keeps an open Control Panel in step with
+ * settings written to chrome.storage.local from outside it, such as the MCP
+ * settings tool or a second panel tab.
+ *
+ * - The guarantee is the Save-time filter. filterForSave drops every schema
+ *   key that changed in storage since the last load or save and that the user
+ *   has not touched, so the whole-form Save never writes an old value back.
+ * - Untouched fields that have a refresh mapping are shown in place with the
+ *   statements the load path uses, together with their persisted baselines.
+ *   The provider group is refreshed without model discovery or any network
+ *   call; listing more models stays an explicit Refresh by the user.
+ * - The panel's own writes are recorded, only for values that change storage,
+ *   so their onChanged echo is not mistaken for an external change.
+ * - Secret and endpoint inputs are never refreshed, and values are never logged.
+ *
+ * Pure at load: nothing is installed until setupEventListeners calls attach().
+ */
+(function (global) {
+  'use strict';
+
+  const hasOwn = (obj, key) => Object.prototype.hasOwnProperty.call(obj, key);
+
+  const PROVIDER_GROUP_KEYS = Object.freeze(['providerKind', 'agentProviderId', 'modelProvider', 'modelName']);
+
+  // Control ids that edit a schema key under another name. Any other control
+  // whose id is itself a schema key edits that key. #modelSearch is left out on
+  // purpose: it only filters the model list, and a committed choice fires
+  // change on #modelName itself, so typing a filter is not an edit.
+  const ELEMENT_KEY_ALIASES = Object.freeze({
+    maxIterationsSlider: 'maxIterations',
+    maxDOMElementsSlider: 'maxDOMElements',
+    elementCacheSizePreset: 'elementCacheSize',
+    elementCacheSizeCustom: 'elementCacheSize',
+    fsbAgentCapReset: 'fsbAgentCap',
+    fsbTriggerCapReset: 'fsbTriggerCap',
+    autoAnalyzeToggle: 'autoAnalyzeMemories'
+  });
+
+  // Buttons that change a value on click without an input or change event.
+  const CLICK_EDIT_SELECTOR = '#fsbAgentCapReset, #fsbTriggerCapReset';
+
+  // The labels install-identity-ui.js gives the inverse telemetry toggle.
+  const TELEMETRY_ARIA_ON = 'Anonymous usage data is being sent. Click to stop.';
+  const TELEMETRY_ARIA_OFF = 'Anonymous usage data is NOT being sent. Click to re-enable.';
+
+  const PROVIDER_CHANGED_STATUS = 'Provider changed outside this panel. Refresh models to list more.';
+  const SELF_WRITE_QUEUE_LIMIT = 8;
+
+  const touched = new Set();
+  const pending = new Set();
+  const selfWrites = new Map();
+  let lastKnown = new Map();
+  let attached = false;
+
+  function getSchema() {
+    const schema = global.FsbSettingsSchema;
+    return schema && typeof schema.get === 'function' && typeof schema.isWritable === 'function'
+      ? schema
+      : null;
+  }
+
+  function isSchemaKey(key) {
+    const schema = getSchema();
+    return !!(schema && typeof key === 'string' && key !== '' && schema.get(key));
+  }
+
+  function isWritableKey(key) {
+    const schema = getSchema();
+    return isSchemaKey(key) && schema.isWritable(key) === true;
+  }
+
+  function isProviderKey(key) {
+    return PROVIDER_GROUP_KEYS.indexOf(key) !== -1;
+  }
+
+  // JSON-equality token; settings are plain JSON values.
+  function serialize(value) {
+    if (value === undefined) return '#undefined';
+    try {
+      const text = JSON.stringify(value);
+      return text === undefined ? '#undefined' : text;
+    } catch (_error) {
+      return '#unserializable';
+    }
+  }
+
+  function warnRefreshFailed() {
+    if (typeof console !== 'undefined' && console && typeof console.warn === 'function') {
+      console.warn('[FSB] Settings sync could not refresh a control panel field');
+    }
+  }
+
+  function keyForElementId(id) {
+    if (typeof id !== 'string' || id === '') return null;
+    const key = hasOwn(ELEMENT_KEY_ALIASES, id) ? ELEMENT_KEY_ALIASES[id] : id;
+    return isSchemaKey(key) ? key : null;
+  }
+
+  function noteTouched(key) {
+    if (!isSchemaKey(key)) return;
+    if (isProviderKey(key)) {
+      PROVIDER_GROUP_KEYS.forEach((providerKey) => touched.add(providerKey));
+      return;
+    }
+    touched.add(key);
+  }
+
+  // Record a value the panel is about to write, but only when it differs from
+  // what storage will hold just before the write lands. An unchanged value
+  // produces no onChanged echo, so a record for it could later swallow a real
+  // external change back to that value.
+  function noteSelfWrite(values) {
+    if (!values || typeof values !== 'object' || !getSchema()) return;
+    Object.keys(values).forEach((key) => {
+      if (!isSchemaKey(key)) return;
+      const token = serialize(values[key]);
+      const queue = selfWrites.get(key);
+      const expected = queue && queue.length > 0
+        ? queue[queue.length - 1]
+        : (lastKnown.has(key) ? lastKnown.get(key) : null);
+      if (expected !== null && expected === token) return;
+      if (queue) {
+        queue.push(token);
+        if (queue.length > SELF_WRITE_QUEUE_LIMIT) queue.shift();
+      } else {
+        selfWrites.set(key, [token]);
+      }
+    });
+  }
+
+  function hasFieldRefresher(key) {
+    return isProviderKey(key) || hasOwn(FIELD_REFRESHERS, key);
+  }
+
+  function noteStorageChanges(changes, area) {
+    const apply = {};
+    if (area !== 'local' || !changes || typeof changes !== 'object' || !getSchema()) return { apply };
+    Object.keys(changes).forEach((key) => {
+      if (!isSchemaKey(key)) return;
+      const change = changes[key];
+      const hasNewValue = !!change && typeof change === 'object' && hasOwn(change, 'newValue');
+      const value = hasNewValue ? change.newValue : undefined;
+      const token = serialize(value);
+      if (hasNewValue) lastKnown.set(key, token);
+      else lastKnown.delete(key);
+
+      const queue = selfWrites.get(key);
+      const at = queue ? queue.indexOf(token) : -1;
+      if (at !== -1) {
+        queue.splice(0, at + 1);
+        if (queue.length === 0) selfWrites.delete(key);
+        return;
+      }
+
+      pending.add(key);
+      if (!touched.has(key) && isWritableKey(key) && hasFieldRefresher(key)) apply[key] = value;
+    });
+    return { apply };
+  }
+
+  function filterForSave(toWrite) {
+    const dropped = [];
+    if (!toWrite || typeof toWrite !== 'object' || !getSchema()) return dropped;
+    pending.forEach((key) => {
+      if (touched.has(key) || !hasOwn(toWrite, key)) return;
+      delete toWrite[key];
+      dropped.push(key);
+    });
+    return dropped;
+  }
+
+  // True when the next Save writes the provider group: the user edited it, or
+  // nothing outside the panel changed it since the last load or save. False
+  // means filterForSave will leave the changed provider keys out, so the Save
+  // cannot change the stored provider selection.
+  function willWriteProviderGroup() {
+    if (!getSchema()) return true;
+    if (PROVIDER_GROUP_KEYS.some((key) => touched.has(key))) return true;
+    return !PROVIDER_GROUP_KEYS.some((key) => pending.has(key));
+  }
+
+  // touchedAtSave: the touched keys when Save was clicked. Only those are
+  // cleared, so a field first edited while the storage write was in flight
+  // stays touched. Without it every touched mark is cleared.
+  function noteSaved(writtenKeys, touchedAtSave) {
+    if (Array.isArray(touchedAtSave)) touchedAtSave.forEach((key) => touched.delete(key));
+    else touched.clear();
+    if (Array.isArray(writtenKeys)) writtenKeys.forEach((key) => pending.delete(key));
+  }
+
+  function reset(snapshot) {
+    touched.clear();
+    pending.clear();
+    selfWrites.clear();
+    lastKnown = new Map();
+    if (!snapshot || typeof snapshot !== 'object' || !getSchema()) return;
+    Object.keys(snapshot).forEach((key) => {
+      if (isSchemaKey(key)) lastKnown.set(key, serialize(snapshot[key]));
+    });
+  }
+
+  // Key names only, never values.
+  function inspect() {
+    return {
+      touched: Array.from(touched),
+      pending: Array.from(pending),
+      selfWriteKeys: Array.from(selfWrites.keys()),
+      lastKnownKeys: Array.from(lastKnown.keys())
+    };
+  }
+
+  // A removed key shows its default, as the load path merges defaultSettings.
+  function effectiveValue(key, value) {
+    if (value !== undefined && value !== null) return value;
+    if (key === 'fsbAgentCap' && typeof fsbRecommendedAgentCap === 'number') return fsbRecommendedAgentCap;
+    if (typeof defaultSettings === 'object' && defaultSettings !== null && hasOwn(defaultSettings, key)) {
+      return defaultSettings[key];
+    }
+    const schema = getSchema();
+    const entry = schema ? schema.get(key) : null;
+    return entry && (typeof entry.default !== 'object' || entry.default === null) ? entry.default : undefined;
+  }
+
+  function getDefaultDeps() {
+    const ui = () => global.FSBDiscoveryUI;
+    return {
+      getElement: (id) => (typeof document !== 'undefined' && document && typeof document.getElementById === 'function'
+        ? document.getElementById(id)
+        : null),
+      refreshStepper: (input) => {
+        if (input && typeof input.closest === 'function' && typeof refreshStepper === 'function') refreshStepper(input);
+      },
+      setAgentCap: (value) => {
+        if (typeof setAgentCapControlValue === 'function') setAgentCapControlValue(value);
+      },
+      setPersistedVoiceInputEnabled: (value) => {
+        persistedVoiceInputEnabled = value;
+      },
+      getProviderState: () => (typeof providerPanelState === 'object' ? providerPanelState : null),
+      getPersistedProviderSelection: () => persistedProviderSelection,
+      setPersistedProviderSelection: (selection) => {
+        persistedProviderSelection = selection;
+      },
+      normalizeProviderSettings: (selection) => {
+        const helper = typeof getProviderPanelHelper === 'function' ? getProviderPanelHelper() : null;
+        return helper ? helper.normalizeSettings(selection) : null;
+      },
+      // Cancels any list request or debounce for the old provider so it cannot
+      // repopulate the model select later; restoreUi puts back the controls an
+      // in-flight request had disabled. No request is started.
+      invalidateDiscovery: () => {
+        if (typeof invalidateProviderDiscovery === 'function') invalidateProviderDiscovery(true);
+      },
+      updateApiKeyVisibility: (provider) => {
+        if (typeof updateApiKeyVisibility === 'function') updateApiKeyVisibility(provider);
+      },
+      updateModelDescription: (text) => {
+        if (typeof updateModelDescription === 'function') updateModelDescription(text);
+      },
+      setDiscoveryStatus: (status) => {
+        const discoveryUi = ui();
+        if (discoveryUi && typeof discoveryUi.setDiscoveryStatus === 'function') discoveryUi.setDiscoveryStatus(status);
+      },
+      setControlsDisabled: (disabled) => {
+        const discoveryUi = ui();
+        if (discoveryUi && typeof discoveryUi.setControlsDisabled === 'function') discoveryUi.setControlsDisabled(disabled);
+      },
+      refreshCombobox: () => {
+        const combobox = global.FSBModelCombobox;
+        if (combobox && typeof combobox.refresh === 'function') combobox.refresh();
+      },
+      renderProviderKind: () => {
+        if (typeof renderProviderKind === 'function') renderProviderKind();
+      },
+      syncSelectLabels: () => {
+        if (typeof syncFsbSelectLabels === 'function') syncFsbSelectLabels();
+      },
+      createOption: () => (typeof document !== 'undefined' && document && typeof document.createElement === 'function'
+        ? document.createElement('option')
+        : null)
+    };
+  }
+
+  function resolveDeps(overrides) {
+    const deps = getDefaultDeps();
+    if (overrides && typeof overrides === 'object') {
+      Object.keys(deps).forEach((name) => {
+        if (typeof overrides[name] === 'function') deps[name] = overrides[name];
+      });
+    }
+    return deps;
+  }
+
+  function setControlValue(deps, id, value) {
+    const el = deps.getElement(id);
+    if (el) el.value = value;
+  }
+
+  function setControlText(deps, id, text) {
+    const el = deps.getElement(id);
+    if (el) el.textContent = text;
+  }
+
+  function setControlChecked(deps, id, checked) {
+    const el = deps.getElement(id);
+    if (el) el.checked = checked;
+  }
+
+  function refreshStepperFor(deps, id) {
+    const el = deps.getElement(id);
+    if (el) deps.refreshStepper(el);
+  }
+
+  // One refresher per writable non-provider key, mirroring the load path. A
+  // refresher returns true when the custom-select labels need a re-sync.
+  const FIELD_REFRESHERS = Object.freeze({
+    maxIterations: (value, deps) => {
+      const maxIter = value || 100;
+      setControlValue(deps, 'maxIterations', maxIter);
+      setControlValue(deps, 'maxIterationsSlider', maxIter);
+      setControlText(deps, 'maxIterationsDisplay', maxIter);
+      refreshStepperFor(deps, 'maxIterationsSlider');
+    },
+    debugMode: (value, deps) => setControlChecked(deps, 'debugMode', value === true),
+    domOptimization: (value, deps) => setControlChecked(deps, 'domOptimization', value !== false),
+    maxDOMElements: (value, deps) => {
+      const maxDOM = value || 2000;
+      setControlValue(deps, 'maxDOMElements', maxDOM);
+      setControlValue(deps, 'maxDOMElementsSlider', maxDOM);
+      setControlText(deps, 'maxDOMElementsDisplay', maxDOM);
+      refreshStepperFor(deps, 'maxDOMElementsSlider');
+    },
+    elementCacheSize: (value, deps) => {
+      const cacheSize = value || 200;
+      setControlValue(deps, 'elementCacheSize', cacheSize);
+      setControlText(deps, 'elementCacheSizeDisplay', cacheSize);
+      const preset = deps.getElement('elementCacheSizePreset');
+      if (!preset) return false;
+      const customWrap = deps.getElement('elementCacheSizeCustomWrap');
+      const presetOption = typeof preset.querySelector === 'function'
+        ? preset.querySelector('option[value="' + Number(cacheSize) + '"]')
+        : null;
+      if (presetOption) {
+        preset.value = String(cacheSize);
+        if (customWrap) customWrap.style.display = 'none';
+      } else {
+        preset.value = 'custom';
+        if (customWrap) customWrap.style.display = '';
+        setControlValue(deps, 'elementCacheSizeCustom', cacheSize);
+        refreshStepperFor(deps, 'elementCacheSizeCustom');
+      }
+      return true;
+    },
+    prioritizeViewport: (value, deps) => setControlChecked(deps, 'prioritizeViewport', value !== false),
+    animatedActionHighlights: (value, deps) => setControlChecked(deps, 'animatedActionHighlights', value !== false),
+    showSidepanelProgress: (value, deps) => setControlChecked(deps, 'showSidepanelProgress', value === true),
+    enableLogin: (value, deps) => {
+      setControlChecked(deps, 'enableLogin', value === true);
+      if (typeof updateCredentialsManagerVisibility === 'function') updateCredentialsManagerVisibility(value === true);
+    },
+    captchaSolverEnabled: (value, deps) => {
+      setControlChecked(deps, 'captchaSolverEnabled', value === true);
+      if (typeof updateCaptchaSolverVisibility === 'function') updateCaptchaSolverVisibility(value === true);
+    },
+    sttProvider: (value, deps) => setControlChecked(deps, 'sttProvider', value === 'whisper'),
+    voiceInputEnabled: (value, deps) => {
+      const enabled = value !== false;
+      setControlChecked(deps, 'voiceInputEnabled', enabled);
+      deps.setPersistedVoiceInputEnabled(enabled);
+    },
+    autoRefineSiteMaps: (value, deps) => setControlChecked(deps, 'autoRefineSiteMaps', value !== false),
+    fsbAgentCap: (value, deps) => deps.setAgentCap(value),
+    fsbTriggerCap: (value, deps) => {
+      let triggerCapValue = (typeof value === 'number' && Number.isFinite(value)) ? value : 8;
+      if (triggerCapValue < 1) triggerCapValue = 1;
+      if (triggerCapValue > 64) triggerCapValue = 64;
+      triggerCapValue = Math.floor(triggerCapValue);
+      setControlValue(deps, 'fsbTriggerCap', String(triggerCapValue));
+      setControlText(deps, 'fsbTriggerCapDisplay', String(triggerCapValue));
+      refreshStepperFor(deps, 'fsbTriggerCap');
+    },
+    fsbChangeReportsEnabled: (value, deps) => setControlChecked(deps, 'fsbChangeReportsEnabled', value !== false),
+    fsbJevFastModeEnabled: (value, deps) => setControlChecked(deps, 'fsbJevFastModeEnabled', value === true),
+    fsbMcpSessionRecordingEnabled: (value, deps) => setControlChecked(deps, 'fsbMcpSessionRecordingEnabled', value !== false),
+    fsbMcpSessionRetentionDays: (value, deps) => {
+      const days = typeof clampMcpSessionRetentionDays === 'function' ? clampMcpSessionRetentionDays(value) : value;
+      setControlValue(deps, 'fsbMcpSessionRetentionDays', String(days));
+      refreshStepperFor(deps, 'fsbMcpSessionRetentionDays');
+    },
+    autoAnalyzeMemories: (value, deps) => setControlChecked(deps, 'autoAnalyzeToggle', value !== false),
+    fsbTelemetryOptOut: (value, deps) => {
+      // Inverse toggle: checked means telemetry is on.
+      const toggle = deps.getElement('fsbTelemetryOptOut');
+      if (!toggle) return;
+      toggle.checked = value !== true;
+      if (typeof toggle.setAttribute === 'function') {
+        toggle.setAttribute('aria-label', toggle.checked ? TELEMETRY_ARIA_ON : TELEMETRY_ARIA_OFF);
+      }
+    }
+  });
+
+  function selectHasOption(select, value) {
+    const list = select.options || select.children || [];
+    for (let i = 0; i < list.length; i += 1) {
+      if (list[i] && list[i].value === value) return true;
+    }
+    return false;
+  }
+
+  // Shows an external provider-group write the way the panel would show a
+  // stored selection, without listing models: the stored model becomes the
+  // model select's choice (the only option when the provider changed), and the
+  // persisted baseline follows so the hosted Save gate sees it as unchanged.
+  function refreshProviderGroup(changes, deps) {
+    const state = deps.getProviderState();
+    if (!state || typeof state !== 'object') return;
+    const persisted = deps.getPersistedProviderSelection() || {};
+    const previousModelProvider = state.modelProvider;
+    const reselection = state.requiresProviderReselection === true;
+    const next = {
+      providerKind: reselection ? 'agent' : state.providerKind,
+      modelProvider: state.modelProvider,
+      agentProviderId: reselection && state.retiredAgentProviderId
+        ? state.retiredAgentProviderId
+        : state.agentProviderId,
+      modelName: typeof persisted.modelName === 'string' ? persisted.modelName : ''
+    };
+    PROVIDER_GROUP_KEYS.forEach((key) => {
+      if (hasOwn(changes, key)) next[key] = effectiveValue(key, changes[key]);
+    });
+    if (typeof next.modelName !== 'string') next.modelName = '';
+
+    const normalized = deps.normalizeProviderSettings(next) || {
+      providerKind: next.providerKind,
+      modelProvider: next.modelProvider,
+      agentProviderId: next.agentProviderId,
+      requiresProviderReselection: false,
+      retiredAgentProviderId: ''
+    };
+
+    deps.invalidateDiscovery();
+
+    state.providerKind = normalized.providerKind;
+    state.modelProvider = normalized.modelProvider;
+    state.agentProviderId = normalized.agentProviderId;
+    state.requiresProviderReselection = normalized.requiresProviderReselection === true;
+    state.retiredAgentProviderId = normalized.retiredAgentProviderId || '';
+
+    let activeProviderId = state.modelProvider;
+    if (state.requiresProviderReselection) activeProviderId = '';
+    else if (state.providerKind === 'agent') activeProviderId = state.agentProviderId;
+    const providerSelect = deps.getElement('modelProvider');
+    if (providerSelect) providerSelect.value = activeProviderId;
+
+    const providerChanged = state.modelProvider !== previousModelProvider;
+    const modelSelect = deps.getElement('modelName');
+    if (modelSelect) {
+      if (providerChanged) modelSelect.innerHTML = '';
+      if (next.modelName) {
+        if (!selectHasOption(modelSelect, next.modelName)) {
+          const option = deps.createOption();
+          if (option) {
+            option.value = next.modelName;
+            option.textContent = next.modelName;
+            modelSelect.appendChild(option);
+          }
+        }
+        modelSelect.value = next.modelName;
+      }
+    }
+
+    deps.updateApiKeyVisibility(state.modelProvider);
+    if (providerChanged) {
+      deps.updateModelDescription('');
+      deps.setControlsDisabled(false);
+      deps.setDiscoveryStatus({ kind: 'info', text: PROVIDER_CHANGED_STATUS });
+    }
+    deps.refreshCombobox();
+    deps.renderProviderKind();
+    deps.syncSelectLabels();
+
+    deps.setPersistedProviderSelection({
+      providerKind: state.providerKind,
+      modelProvider: state.modelProvider,
+      modelName: next.modelName
+    });
+  }
+
+  // Updates the visible controls for each key in `apply`. It never dispatches
+  // events, never marks the form dirty and never shows a toast.
+  function applyToForm(apply, deps) {
+    const applied = [];
+    if (!apply || typeof apply !== 'object') return applied;
+    const resolved = resolveDeps(deps);
+    const providerChanges = {};
+    let hasProviderChange = false;
+    let syncLabels = false;
+    Object.keys(apply).forEach((key) => {
+      if (!isWritableKey(key)) return;
+      if (isProviderKey(key)) {
+        providerChanges[key] = apply[key];
+        hasProviderChange = true;
+        return;
+      }
+      if (!hasOwn(FIELD_REFRESHERS, key)) return;
+      try {
+        if (FIELD_REFRESHERS[key](effectiveValue(key, apply[key]), resolved) === true) syncLabels = true;
+        applied.push(key);
+      } catch (_error) {
+        warnRefreshFailed();
+      }
+    });
+    if (hasProviderChange) {
+      try {
+        refreshProviderGroup(providerChanges, resolved);
+        Object.keys(providerChanges).forEach((key) => applied.push(key));
+      } catch (_error) {
+        warnRefreshFailed();
+      }
+    } else if (syncLabels) {
+      resolved.syncSelectLabels();
+    }
+    return applied;
+  }
+
+  // The value lastKnown holds for a key, or NO_VALUE when its token cannot be
+  // read back. A pending key missing from lastKnown was removed, and reads as
+  // undefined, which refreshes to its default.
+  const NO_VALUE = Object.freeze({});
+  function lastKnownValue(key) {
+    if (!lastKnown.has(key)) return undefined;
+    const token = lastKnown.get(key);
+    if (token === '#undefined') return undefined;
+    if (token === '#unserializable') return NO_VALUE;
+    try {
+      return JSON.parse(token);
+    } catch (_error) {
+      return NO_VALUE;
+    }
+  }
+
+  // Shows again every untouched key that changed outside the panel since the
+  // last reset. The load path calls this once it has filled the form from its
+  // own storage snapshot, so a write that landed while the load was awaiting
+  // wins over that older snapshot instead of being hidden by it.
+  function reconcile(deps) {
+    const apply = {};
+    if (!getSchema()) return [];
+    pending.forEach((key) => {
+      if (touched.has(key) || !isWritableKey(key) || !hasFieldRefresher(key)) return;
+      const value = lastKnownValue(key);
+      if (value !== NO_VALUE) apply[key] = value;
+    });
+    return Object.keys(apply).length > 0 ? applyToForm(apply, deps) : [];
+  }
+
+  function onStorageChanged(changes, area) {
+    try {
+      const result = noteStorageChanges(changes, area);
+      if (result && Object.keys(result.apply).length > 0) applyToForm(result.apply);
+    } catch (_error) {
+      warnRefreshFailed();
+    }
+  }
+
+  function onEdit(event) {
+    const target = event && event.target;
+    const key = keyForElementId(target && typeof target.id === 'string' ? target.id : '');
+    if (key) noteTouched(key);
+  }
+
+  function onClickEdit(event) {
+    const target = event && event.target;
+    const button = target && typeof target.closest === 'function' ? target.closest(CLICK_EDIT_SELECTOR) : null;
+    if (button) onEdit({ target: button });
+  }
+
+  function attach() {
+    if (attached) return false;
+    attached = true;
+    if (typeof chrome !== 'undefined' && chrome && chrome.storage && chrome.storage.onChanged
+        && typeof chrome.storage.onChanged.addListener === 'function') {
+      chrome.storage.onChanged.addListener(onStorageChanged);
+    }
+    if (typeof document !== 'undefined' && document && typeof document.addEventListener === 'function') {
+      document.addEventListener('input', onEdit, true);
+      document.addEventListener('change', onEdit, true);
+      document.addEventListener('click', onClickEdit, true);
+    }
+    return true;
+  }
+
+  const api = {
+    PROVIDER_GROUP_KEYS,
+    keyForElementId,
+    noteTouched,
+    noteSelfWrite,
+    noteStorageChanges,
+    filterForSave,
+    willWriteProviderGroup,
+    noteSaved,
+    reset,
+    applyToForm,
+    reconcile,
+    attach,
+    inspect
+  };
+
+  global.FSBSettingsSync = Object.freeze(api);
+})(typeof globalThis !== 'undefined' ? globalThis : (typeof self !== 'undefined' ? self : this));
+
 
 // Export for potential use by other scripts
 if (typeof module !== 'undefined' && module.exports) {
@@ -9325,6 +9989,7 @@ if (typeof module !== 'undefined' && module.exports) {
     loadSessionList,
     viewSession,
     deleteSession,
-    FSBDiscoveryUI: globalThis.FSBDiscoveryUI
+    FSBDiscoveryUI: globalThis.FSBDiscoveryUI,
+    FSBSettingsSync: globalThis.FSBSettingsSync
   };
 }

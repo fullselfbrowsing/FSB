@@ -4,7 +4,7 @@ The About page embeds the public 33-second FSB trailer (uploaded September 6, 20
 
 ## 1. Project Description
 
-FSB (Full Self-Browsing) is an open-source Chrome extension that automates the browser through natural language. You describe a task in plain English; FSB plans the clicks, types, and navigation to complete it. The extension runs in your browser with your own API keys, encrypted local storage, and opt-out anonymous usage telemetry for aggregate public stats only. Multi-model AI (xAI Grok, OpenAI, Anthropic Claude, Google Gemini, OpenRouter, LM Studio, custom OpenAI-compatible endpoints), 56 canonical browser tools, a 68-tool MCP surface, 142+ site-specific guides, reactive trigger watchers, real file uploads, and a 128-app native capability catalog for verified first-party API execution. Current release: FSB v0.9.92 (Chrome extension) with fsb-mcp-server 0.11.2 (npm MCP package). On Online-Mind2Web, FSB's AI-reviewed result (277/300) is 92.3%; see the benchmark under Comparison.
+FSB (Full Self-Browsing) is an open-source Chrome extension that automates the browser through natural language. You describe a task in plain English; FSB plans the clicks, types, and navigation to complete it. The extension runs in your browser with your own API keys, encrypted local storage, and opt-out anonymous usage telemetry for aggregate public stats only. Multi-model AI (xAI Grok, OpenAI, Anthropic Claude, Google Gemini, OpenRouter, LM Studio, custom OpenAI-compatible endpoints), 56 canonical browser tools, a 73-tool MCP surface, 142+ site-specific guides, reactive trigger watchers, real file uploads, and a 128-app native capability catalog for verified first-party API execution. Current release: FSB v0.9.92 (Chrome extension) with fsb-mcp-server 0.11.2 (npm MCP package). On Online-Mind2Web, FSB's AI-reviewed result (277/300) is 92.3%; see the benchmark under Comparison.
 
 License: [MIT License](https://github.com/fullselfbrowsing/FSB/blob/main/LICENSE).
 
@@ -40,7 +40,7 @@ The bring-your-own-key model is deliberate. The user picks the model -- frontier
 - Operator loop: every workflow can act on the page, observe what changed, verify the outcome, report errors, and recover when the web app shifts.
 - Reactive monitoring: arm a trigger watcher on one page element and get notified on value changes, thresholds, deltas, or regex matches instead of polling manually.
 
-### MCP tool surface (68 tools)
+### MCP tool surface (73 tools)
 - Navigation and tabs: navigate, search, refresh, go_back, go_forward, back, open_tab, close_tab, switch_tab, list_tabs
 - Clicking and pointer: click, double_click, right_click, hover, click_at, double_click_at, click_and_hold, drag, drag_drop, drag_variable_speed
 - Text and keyboard: type_text, insert_text, clear_input, press_key, press_enter, select_text_range, focus

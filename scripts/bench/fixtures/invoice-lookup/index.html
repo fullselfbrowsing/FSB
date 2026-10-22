@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en" data-bench-app="invoice-lookup">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Invoices</title>
+<link rel="icon" href="data:,">
+<style>
+  :root { color-scheme: light; --ink: #1c2230; --muted: #5b6475; --line: #d9dde5; --accent: #2457c5; --bg: #f5f6f8; --card: #fff; }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--ink); background: var(--bg); }
+  main { max-width: 980px; margin: 0 auto; padding: 20px 24px 32px; }
+  h1 { font-size: 1.4rem; margin: 0 0 14px; }
+  h2 { font-size: 1.05rem; margin: 0 0 10px; }
+  .panel { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; margin-bottom: 14px; }
+  .btn { font: inherit; padding: 6px 14px; border: 1px solid #b8bfcc; border-radius: 6px; background: #fff; color: var(--ink); cursor: pointer; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn:disabled { opacity: 0.6; cursor: default; }
+  .status { margin: 10px 0 0; color: #1f7a3a; font-weight: 600; }
+  .error { margin: 10px 0 0; color: #b42318; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .layout { display: grid; grid-template-columns: minmax(0, 1.8fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+  @media (max-width: 900px) { .layout { grid-template-columns: minmax(0, 1fr); } }
+  .review { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; }
+  .review label { display: block; font-weight: 600; margin-bottom: 4px; }
+  .review input { font: inherit; width: 12rem; padding: 6px 8px; border: 1px solid #b8bfcc; border-radius: 6px; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 4px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th { color: var(--muted); font-weight: 600; }
+  .amount { text-align: right; font-variant-numeric: tabular-nums; }
+  tr.selected td { background: #eef3ff; }
+  .badge { display: inline-block; padding: 0 8px; border-radius: 999px; font-size: 0.85rem; }
+  .badge.paid { background: #e6f4ea; color: #1f7a3a; }
+  .badge.unpaid { background: #fdecea; color: #b42318; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Invoices</h1>
+  <div class="layout">
+    <section class="panel" aria-labelledby="invoices-heading">
+      <h2 id="invoices-heading">All invoices</h2>
+      <table id="invoices">
+        <thead>
+          <tr><th scope="col">Invoice</th><th scope="col">Customer</th><th scope="col" class="amount">Amount</th><th scope="col">Status</th></tr>
+        </thead>
+        <tbody>
+          <tr data-invoice-id="INV-1003"><td>INV-1003</td><td>Contoso Ltd</td><td class="amount">$1,240.00</td><td><span class="badge paid">Paid</span></td></tr>
+          <tr data-invoice-id="INV-1007"><td>INV-1007</td><td>Northwind Traders</td><td class="amount">$860.50</td><td><span class="badge unpaid">Unpaid</span></td></tr>
+          <tr data-invoice-id="INV-1012"><td>INV-1012</td><td>Fabrikam Inc</td><td class="amount">$3,975.00</td><td><span class="badge unpaid">Unpaid</span></td></tr>
+          <tr data-invoice-id="INV-1016"><td>INV-1016</td><td>Northwind Traders</td><td class="amount">$4,310.00</td><td><span class="badge paid">Paid</span></td></tr>
+          <tr data-invoice-id="INV-1021"><td>INV-1021</td><td>Tailspin Toys</td><td class="amount">$512.25</td><td><span class="badge paid">Paid</span></td></tr>
+          <tr data-invoice-id="INV-1024"><td>INV-1024</td><td>Contoso Ltd</td><td class="amount">$2,780.00</td><td><span class="badge unpaid">Unpaid</span></td></tr>
+          <tr data-invoice-id="INV-1029"><td>INV-1029</td><td>Northwind Traders</td><td class="amount">$2,145.75</td><td><span class="badge unpaid">Unpaid</span></td></tr>
+          <tr data-invoice-id="INV-1033"><td>INV-1033</td><td>Fabrikam Inc</td><td class="amount">$690.00</td><td><span class="badge paid">Paid</span></td></tr>
+          <tr data-invoice-id="INV-1038"><td>INV-1038</td><td>Northwind Traders</td><td class="amount">$1,980.00</td><td><span class="badge unpaid">Unpaid</span></td></tr>
+          <tr data-invoice-id="INV-1041"><td>INV-1041</td><td>Tailspin Toys</td><td class="amount">$3,120.40</td><td><span class="badge unpaid">Unpaid</span></td></tr>
+          <tr data-invoice-id="INV-1045"><td>INV-1045</td><td>Contoso Ltd</td><td class="amount">$415.00</td><td><span class="badge unpaid">Unpaid</span></td></tr>
+          <tr data-invoice-id="INV-1052"><td>INV-1052</td><td>Northwind Traders</td><td class="amount">$2,990.00</td><td><span class="badge paid">Paid</span></td></tr>
+          <tr data-invoice-id="INV-1056"><td>INV-1056</td><td>Fabrikam Inc</td><td class="amount">$1,655.10</td><td><span class="badge paid">Paid</span></td></tr>
+          <tr data-invoice-id="INV-1063"><td>INV-1063</td><td>Northwind Traders</td><td class="amount">$1,270.00</td><td><span class="badge unpaid">Unpaid</span></td></tr>
+          <tr data-invoice-id="INV-1068"><td>INV-1068</td><td>Tailspin Toys</td><td class="amount">$2,210.00</td><td><span class="badge paid">Paid</span></td></tr>
+        </tbody>
+      </table>
+    </section>
+    <section class="panel" aria-labelledby="review-heading">
+      <h2 id="review-heading">Review form</h2>
+      <form id="review-form" class="review" novalidate>
+        <div>
+          <label for="invoice-id">Invoice ID</label>
+          <input id="invoice-id" name="invoiceId" type="text" autocomplete="off" spellcheck="false">
+        </div>
+        <button id="review-submit" class="btn primary" type="submit">Submit</button>
+      </form>
+      <p id="review-error" class="error" role="alert" hidden></p>
+      <p id="review-status" class="status" role="status" hidden>Selected for review: <output data-bench-marker="selected-invoice"></output></p>
+    </section>
+  </div>
+</main>
+<script src="../_shared/bench.js"></script>
+<script>
+  (() => {
+    'use strict';
+    const form = document.getElementById('review-form');
+    const input = document.getElementById('invoice-id');
+    const button = document.getElementById('review-submit');
+    const error = document.getElementById('review-error');
+    const status = document.getElementById('review-status');
+    const rows = new Map([...document.querySelectorAll('#invoices tbody tr')].map((row) => [row.dataset.invoiceId, row]));
+    let busy = false;
+
+    function showError(message) {
+      error.textContent = message;
+      error.hidden = false;
+    }
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (busy) return;
+      error.hidden = true;
+      const invoiceId = input.value.trim().toUpperCase();
+      if (!invoiceId) {
+        showError('Enter an invoice ID.');
+        return;
+      }
+      if (!rows.has(invoiceId)) {
+        showError(`No invoice with ID ${invoiceId} was found.`);
+        return;
+      }
+      busy = true;
+      button.disabled = true;
+      try {
+        await benchPost('select', { invoiceId });
+        for (const [id, row] of rows) row.classList.toggle('selected', id === invoiceId);
+        setView({ view: 'selected' });
+        setMarker('selected-invoice', invoiceId);
+        status.hidden = false;
+      } catch {
+        showError('The review could not be submitted. Try again.');
+      } finally {
+        busy = false;
+        button.disabled = false;
+      }
+    });
+  })();
+</script>
+</body>
+</html>

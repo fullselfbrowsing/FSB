@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "live-sample-read",
+  "version": 1,
+  "set": "live",
+  "category": "reading",
+  "startUrl": "https://issues.apache.org/jira/browse/HADOOP-1",
+  "instruction": "Open {startUrl} and report the issue key and its summary.",
+  "timeBudgetMs": 120000,
+  "success": {
+    "all": [
+      { "kind": "finalUrl", "urlIncludes": "/jira/browse/HADOOP-1" },
+      { "kind": "text", "includes": "HADOOP-1" }
+    ]
+  }
+}

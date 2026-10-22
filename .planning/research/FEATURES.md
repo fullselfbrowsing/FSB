@@ -1,195 +1,289 @@
 # Feature Research
 
-**Domain:** Local agent CLIs / agent subscriptions as first-class providers in another surface (browser side panel), mixed provider pickers, delegated-run streaming UX, browser-control consent, agent detection
-**Milestone:** v0.9.91 MCP Clients as Providers
-**Researched:** 2026-07-10
-**Confidence:** HIGH (core UX conventions verified against official docs: Zed, Cline, Claude Code, ACP, Apple, GitHub, Google, OpenAI; individual items flagged where lower)
+**Domain:** Decision-model-accelerated browser automation (Jev as a fast "System One" beside an LLM) inside a Chrome MV3 extension, plus latency-focused design of an MCP tool surface driven by external agent callers
+**Milestone:** v1.0.0 Jev Fast Mode
+**Researched:** 2026-09-28
+**Confidence:** MEDIUM overall. HIGH for MCP client behavior and SDK support (official docs, the MCP spec 2026-07-28, VS Code and Claude Code source, the installed SDK types) and for FSB code facts (read and measured in this repo). MEDIUM for Jev integration patterns (consistent across many builds, but nearly all self-reported and small-n). LOW for any claim that Jev raises task success.
 
-> Supersedes the prior v1.2.0 FEATURES.md (Showcase i18n Completeness research, archived milestone -- unrelated domain). This file is the active v0.9.91 MCP Clients as Providers research.
+> Supersedes the v0.9.91 feature research (archived as `FEATURES-v0.9.91-MCP-CLIENTS.md`). Jev facts are consolidated in `JEV-REFERENCE.md`; this file cites it instead of repeating it.
 
-## How Comparable Products Do This (survey)
+**Evidence labels used below:** **(official)** vendor documentation or protocol spec; **(source)** read directly in code, FSB's or a client's; **(measured)** computed locally on this repo; **(independent)** measured by someone other than the builder; **(self-reported)** a builder's own numbers on its own workload; **(vendor)** a company measuring its own product; **(community)** wiki, blog, forum or issue thread, unverified.
 
-The "front-end someone else's agent" pattern now exists in four distinct shapes, all shipping as of mid-2026:
+## How comparable systems do this (survey)
 
-1. **Same-dropdown provider pattern** — Cline and Roo Code list "Claude Code" as an entry in the *same* API Provider dropdown as Anthropic/OpenAI/etc. Selecting it swaps the API-key field for a CLI-path field ("usually `claude` if in PATH") and the tool spawns a `claude` process per message, billing against the user's Pro/Max subscription — "Max subscribers will see $0.00 costs" ([Cline docs](https://docs.cline.bot/provider-config/claude-code), [Cline blog](https://cline.bot/blog/how-to-use-your-claude-max-subscription-in-cline), [Roo Code PR #4864](https://github.com/RooCodeInc/Roo-Code/pull/4864)). Cline later added "Bring your ChatGPT subscription" via sanctioned Codex OAuth ([Cline blog](https://cline.ghost.io/introducing-openai-codex-oauth/)).
-2. **Separate "External Agents" section pattern** — Zed keeps ACP agents (Claude Agent, Gemini CLI, Codex, Copilot) in the Agent Panel's new-thread menu, distinct from Zed-hosted/API-key model providers. Auth is agent-owned (`/login` inside the thread); "An Anthropic API key configured for Zed Agent does not automatically configure Claude Agent" ([Zed external-agents docs](https://zed.dev/docs/ai/external-agents), [Zed ACP blog](https://zed.dev/blog/bring-your-own-agent-to-zed)).
-3. **Account-sign-in provider pattern** — Xcode 26 mixes built-in ChatGPT/Claude *account* providers (Sign In button, no key) with add-your-own API-key providers; agentic coding only works with the preconfigured account providers ([Apple docs](https://developer.apple.com/documentation/xcode/setting-up-coding-intelligence), [9to5Mac 2025-08-28](https://9to5mac.com/2025/08/28/new-xcode-beta-now-available-with-gpt-5-and-claude-support/)).
-4. **Hosted pick-your-agent pattern** — GitHub Agent HQ ("mission control") lets users pick Copilot, Claude, or Codex per task, metered as one premium request per agent session ([GitHub blog](https://github.blog/news-insights/company-news/pick-your-agent-use-claude-and-codex-on-agent-hq/)).
+**1. The jev-ultrafast pattern and its Chrome-extension port.** Browser Use's jev-ultrafast is the template almost every Jev browser agent copies. One in-page script builds a numbered table of visible, enabled, in-viewport controls (capped at 250 actions) plus up to 6,000 characters of visible text. Each step sends one request carrying an `operation` Choice over only the operations currently possible and a speculative target Choice per operation ("Two decisions, one network round trip"). A small LLM writes text only for `TYPE_TEXT`, returning exactly `{"text": ...}` or `{"text": null}` when the value is missing. Code rejects any answer that is not an offered ID, whose probabilities do not sum to about 1, or that is not the argmax; it re-checks freshness and occlusion before input, and "model output never becomes selectors, coordinates, shell commands, or executable JavaScript" (self-reported, [README](https://github.com/browser-use/jev-ultrafast)). **Jev for Chrome** is the closest analogue to FSB: an unofficial MV3 port that drives the user's own tab, gives each element a code-owned index, role, accessible name, current value and section heading, sends input through CDP via the `debugger` permission, and adds two independent Nouls ("task achieved", "stuck") that withhold a DONE or BLOCKED once when they score it below 50%. It never presses Enter implicitly, ends a run as BLOCKED when one control is chosen 3 times in 6 steps, stops after 3 consecutive actions that change nothing, and passed 13 of 17 tasks judged by URL or text checks; its longest failure was a stale-DOM executor bug fixed by hit-testing every control (self-reported, [repo](https://github.com/chy4pro/jev-for-chrome)). Per-decision speed is real across builds (150–450 ms), but the third-party checks are sobering: 25/49 on raw DOM controls versus 49/49 with WebMCP tools (independent, [WindTunnel](https://github.com/nekuda-ai/WindTunnel)), an LLM-only loop beat jev-ultrafast's published flight time (independent, [dejevu](https://github.com/idovmamane/dejevu)), and one WebArena subset saw median task time double even as each decision got faster (self-reported, Jevry via jevwiki).
 
-Adjacent delegation front-ends: Conductor (Mac app; "sign in or confirm your machine already has a Claude Code or Codex session"; bundles its own CLI copies; "uses Claude Code however you're already logged in" — [docs](https://docs.conductor.build/)), Happy (mobile/web mirror of Claude Code/Codex with realtime streaming + push-notification permission approvals — [happy.engineering](https://happy.engineering/docs/features/)), Vibe Kanban (10+ executors behind one profile abstraction; auto-scans existing `.claude` dirs — [docs](https://vibekanban.com/docs/configuration-customisation/agent-configurations)), OpenCode (client/server split, `opencode serve` + remote clients — [docs](https://opencode.ai/docs/server/)).
+**2. Bounded one-call executors behind MCP.** The builds that save the calling agent time run the whole loop server-side and return a typed outcome. `jev-ultrafast-mcp`'s `browser_goal(goal, url, verify=[...])` returns `status`, `steps`, a per-step trace with model and browser milliseconds, and a code-checked `verified: PASS` that "outranks the model's own account"; its example 3-step form took 3.3 s in one caller turn, and it also offers `needs_confirmation`, domain allow/deny lists and zero-model macro replay (self-reported, [README](https://github.com/jiawei686/jev-ultrafast-mcp)). Ying-Kai-Liao's server returns `ambiguous` or `likely_done` on low confidence and reports 40 of 42 live tasks with zero false "done" (self-reported, via aggregator). forvela's executor takes explicit values from the parent agent so Jev never generates text, puts `none_of_the_above` on every target head, ends on `goal_reached ≥ 0.8` (or `≥ 0.6` plus completion evidence), and escalates a structured state when ambiguous, repetitive or blocked (self-reported, [decision.js](https://github.com/forvela/jev-agent-browser/blob/HEAD/src/decision.js)). The most transferable number is Mahmoud Adelbghany's: a Jev executor under Claude finished 12 of 12 tasks in 12.2 s for $0.20 against 18.4 s and $0.31 for Claude on Playwright MCP, using confidence floors of 0.3 for reversible actions with next-step verification and 0.5 otherwise (self-reported, Claude arms run once, [RESULTS.md](https://github.com/MahmoudAdelbghany/jev-browser/blob/HEAD/RESULTS.md)). Non-Jev bounded executors converge on the same contract: Stagehand's `agent.execute({instruction, maxSteps, output})` returns `success`, `completed`, `message`, `actions`, a typed `output` and `usage` including inference time (official, [docs](https://docs.stagehand.dev/v3/references/agent)).
 
-Browser-control consent baselines: Claude in Chrome, ChatGPT Atlas agent mode, Gemini-in-Chrome auto-browse (details under Table Stakes / consent).
+**3. Verify-in-the-same-call.** Playwright MCP returns a fresh accessibility snapshot after most actions and offers `browser_wait_for` plus `browser_verify_*` assertion tools behind `--caps=testing`, which "fail immediately if the condition isn't met", so action, wait and verify cost three caller turns (official, [assertions](https://microsoft-playwright-mcp.mintlify.app/tools/test-assertions)). The Jev executors above fold the check into the executing call. FSB already returns a `change_report` on every change-reporting action after a stability race capped at 500 ms (source, `wrapWithChangeReport` in `extension/ws/mcp-tool-dispatcher.js`), but its `execute_js` description tells callers to "verify with read_page or get_page_snapshot" after a JS click, which costs an extra turn each time (source, `extension/ai/tool-definitions.js`).
 
-**FSB's structural difference:** every comparable front-ends an agent for *coding in a repo*. FSB front-ends the agent for *driving the user's live browser*, and the spawned agent loops back through FSB's own MCP tools — the delegation target and the visual surface are the same product. No surveyed product does side-panel-initiated spawn of a local CLI that then controls the user's real logged-in browser.
+**4. What MCP clients actually do with descriptions, annotations and instructions (Sep 2026).**
+- **Claude Code** turns on tool search by default: "Only tool names and server instructions load at session start", and it truncates each tool description and the server instructions at 2 KB (official, [MCP docs](https://code.claude.com/docs/en/mcp-servers)). Its client maps `readOnlyHint` to both "concurrency safe" and "read only", so read-only tools can be dispatched in parallel (source, client snapshot; MEDIUM because the snapshot is a third-party mirror), but its permission engine does not auto-approve on annotations (open issues [#87452](https://github.com/anthropics/claude-code/issues/87452), [#83886](https://github.com/anthropics/claude-code/issues/83886)). It honors per-tool `_meta["anthropic/alwaysLoad"]` (v2.1.121+) and `_meta["anthropic/requiresUserInteraction"]` (v2.1.199+, prompts on every call even in bypass modes), warns above 10,000 output tokens and caps at 25,000, supports elicitation dialogs, and lets an `Elicitation` hook auto-answer them (official). It prefers `structuredContent` over text when both are present (Anthropic staff reply on [#9962](https://github.com/anthropics/claude-code/issues/9962)).
+- **Cursor** has synced MCP tool descriptions to files since January 2026 and gives the agent only tool names up front, which cut total agent tokens by 46.9% in runs that used an MCP tool (vendor A/B, [blog](https://cursor.com/blog/dynamic-context-discovery)). It supports elicitation and routes approvals through Auto-review, allowlists and `permissions.json` (official, [docs](https://cursor.com/docs/mcp)). A result carrying only `structuredContent` reaches its model empty, so Cursor effectively reads the text channel (community forum, staff-confirmed). Whether Cursor reads server instructions or annotations is unverified.
+- **VS Code Copilot** stores `InitializeResult.instructions` (source, [mcpServer.ts](https://github.com/microsoft/vscode/blob/234229df/src/vs/workbench/contrib/mcp/common/mcpServer.ts)) and reportedly skips its confirmation dialog only for tools marked `readOnlyHint: true` (community, consistent with its documented confirm-by-default behavior).
+- **Claude Desktop and claude.ai** drop server instructions (community, [#23808](https://github.com/anthropics/claude-code/issues/23808), [claude-ai-mcp#131](https://github.com/anthropics/claude-ai-mcp/issues/131)).
+- **The spec** has defined `title`, `readOnlyHint`, `destructiveHint`, `idempotentHint` and `openWorldHint` since 2025-03-26 with conservative defaults (not read-only, destructive, open-world), and clients "MUST consider tool annotations to be untrusted unless they come from trusted servers" (official, [tools spec 2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28/server/tools)). The 2026-07-28 revision also adds an `input_required` tool result carrying elicitation requests, which is too new to rely on.
+- **FSB's pinned SDK (1.29.0)** already exposes the annotations overload of `server.tool()`, per-tool `_meta`, the server `instructions` option and `elicitInput` (source, installed type definitions), so none of these needs an SDK upgrade.
+
+## What this means for FSB
+
+1. **MCP time is the caller's time.** FSB executes a call in roughly 0.3–1 s of a 4.6–9.5 s median, so a feature speeds MCP only if it removes caller turns or shrinks what each turn must read. `expect` removes verification turns, a bounded `run_task` fast mode collapses a click sequence into one call, `readOnlyHint` enables parallel reads in Claude Code and removes read prompts in VS Code, and server `instructions` help discovery. Shorter descriptions mainly cut tokens and cost.
+2. **Claude Code sees almost nothing of FSB at session start.** With tool search on by default it loads names and server instructions, and FSB sends no instructions (source, `mcp/src/server.ts`). `execute_js` goes out at 2,187 characters, so Claude Code already cuts the end of its `change_report` contract (measured).
+3. **The ">50% shorter" target is mostly deduplication.** About 45k of the roughly 88k characters in FSB's tool list are four blocks repeated verbatim: the `change_report` suffix (434 characters on 32 tools, 13.9k), the visual-session field descriptions (111 parameters, 13.4k), the `tab_id` description (51 parameters, 10.0k) and the multi-agent sentence (43 tools, 7.9k) (measured from `TOOL_REGISTRY` plus `manual.ts`).
+4. **Autopilot has no pre-execution confirmation gate for Jev to tighten.** `PermissionContext.isAllowed()` always returns true, the `confirmSensitive: true` default has no reader, and the only irrevocable-verb logic records clicks into memory after they happen (source). "Jev can only add confirmations" therefore needs a deterministic gate built first; otherwise Jev becomes the sole gate, the design the evidence warns against most.
+5. **Journal-backed MCP sessions list but cannot be opened.** The Lattice journal stores runs in IndexedDB and adds them to `fsbSessionIndex`, which `list_sessions` reads, but `get_session_detail` reads only `fsbSessionLogs` and the in-flight map (source). The benchmark depends on fixing this.
+6. **Tool descriptions are shared with autopilot.** The tool-use adapter sends each registry `description` to the autopilot LLM (source, `extension/ai/tool-use-adapter.js`), so the description cut is also an autopilot change: it trims every iteration's input and must be benchmarked on both sides.
+7. **Plan for speed and cost, not success.** Whole-agent A/B tests mostly cut cost and context without raising success (community), and DOM-only Jev scored 25/49 (independent). Every fast path must escalate rather than guess, and "done" must be earned by code checks.
 
 ## Feature Landscape
 
-### Table Stakes (Users Expect These)
+### Table Stakes (the milestone's promise fails without these)
 
-| Feature | Why Expected | Complexity | Notes |
-|---------|--------------|------------|-------|
-| Agent providers listed in the same picker as API providers, with kind-specific fields (agent kind hides API-key field) | Cline/Roo set the convention: "Claude Code" sits in the API Provider dropdown; key field disappears, CLI-path field appears | LOW | FSB: rename "API Configuration" → "Providers" (`control_panel.html:146`), add `kind: api\|agent`. Existing 7 BYOK providers unchanged (INV-03) |
-| "Uses your existing subscription/login — no API key needed" labeling on agent providers | Every comparable states this explicitly (Cline: "uses your Claude subscription limits instead of API token billing"; Xcode: account sign-in rows) | LOW | Copy only. Also state the inverse: FSB's Anthropic BYOK key does NOT make Claude Code work (Zed documents this exact confusion) |
-| Installed/not-installed state per agent in the picker + detection from disk | Conductor gates onboarding on an existing Claude Code/Codex session; Vibe Kanban scans `.claude` dirs; Smithery CLI lists clients from config paths | MEDIUM | FSB already has the 21-client `platforms.ts` registry with per-OS config paths. Detection must run daemon-side (extension can't read disk); picker must degrade gracefully when daemon offline (show "unknown", not "not installed") |
-| Live streaming progress with per-tool-call visibility | Zed shows tool-call status cards; Gemini-in-Chrome "details each step in a work log"; Atlas narrates actions; Happy streams responses in real time | HIGH | Map `claude -p --output-format stream-json --include-partial-messages` events (`system/init`, `stream_event` deltas, tool_use, `system/api_retry`, `result`) into a side-panel feed. Requires the new reverse-request channel over ws://7225 |
-| Stop/kill button that actually interrupts the run | Universal: Zed stop button, Gemini "stop it and take over at any time", Atlas pause/take control, OpenCode remote "stop a running action", ACP `session/cancel` | MEDIUM | Kill spawned process tree + release the delegated agent's owned tabs (v0.9.60 ownership) + clear the visual session |
-| Explicit offline/unavailable state with a recovery path | Claude Code ships an error table ("Browser extension is not connected" → fix steps) and a `/chrome` reconnect action; Zed exposes ACP logs for failed agent starts | MEDIUM | FSB constraint: no nativeMessaging → daemon can't be woken. Honest "agent offline → run `fsb-mcp-server doctor`" card is the floor; doctor already classifies layers |
-| Consent gate before an agent can control the browser, with ask-vs-auto modes | Claude in Chrome: "Ask before acting" vs "Act without asking" + site-level always-allow + upfront plan listing sites; Atlas pauses on sensitive actions and forces watch mode on financial sites; Gemini auto-browse pauses before purchases/messages with "take over task" | MEDIUM-HIGH | Spawn channel is RCE-adjacent: first-enable opt-in (explicit toggle + warning), plus a per-run or per-session confirmation tier. Spawned CLI runs with strict permission defaults + `--strict-mcp-config` (FSB tools only) — never `--dangerously-skip-permissions` |
-| Usage/cost reporting appropriate to provider kind | Cline shows $0.00 for Max-subscription runs; Claude Code `result` event carries `total_cost_usd` + per-model breakdown; GitHub meters premium requests per agent session; OpenCode TUI shows tokens+cost top-right | LOW-MEDIUM | Agent kind: show tokens/turns/duration + "included in your subscription", not fabricated dollars. API kind keeps the existing cost tracker. `result` event feeds the existing MCP request log |
-| Follow-up messages keep context (thread ≈ session) | Zed threads map to agent sessions (ACP `session/load`); Codex `resume --last` / `codex exec resume`; Gemini `--resume` + `/chat` checkpoints; Claude Code `--continue`/`--resume <session_id>` (scoped to cwd) | MEDIUM | MVP can use Cline's stateless pattern (spawn per message, replay conversation) OR `--resume`; either way the side-panel thread must not amnesia between turns |
-| Visible in-browser activity while the delegated agent works | All three browser agents keep actions visible; Claude Code --chrome runs "in a visible Chrome window in real time" and pauses at login/CAPTCHA for the human | LOW | Already built: orange glow, visual session badges, implicit visual-session contract (v0.9.36/v0.9.62). Ensure the spawned CLI's client identity maps to an allowlisted badge |
+| Feature | Why Expected | Complexity | Depends on (existing FSB) and notes |
+|---|---|---|---|
+| **Per-call timing split** for MCP and autopilot | Every speed claim needs FSB time separated from caller time; the current baseline was assembled by hand | MEDIUM | MCP session recorder and Lattice journal already stamp events and attempts. Stamp received, dispatched and completed at the MCP server boundary; derive `fsb_ms`, `settle_ms` (already in `change_report`) and `caller_gap_ms`; per autopilot iteration record `llm_ms`, `jev_ms`, `tool_ms` |
+| **`get_session_detail` resolves journal-backed MCP sessions** | Benchmark runs and users inspect MCP work through it | LOW | Additive fallback in `handleGetSessionMessageRoute` to the journal's `getRun`/`getEvents`/`exportHumanReadable`; same response shape; confirm with a live repro first |
+| **Repeatable before/after benchmark suite** | The goal is "measurably faster"; jev-ultrafast's own authors call three matched pairs "too few for a strong statistical claim" (self-reported) | HIGH | Tasks drawn from the recorded categories (UAT checks, Jira reading, hotel booking) plus click-heavy forms; success judged by URL, text or DOM checks, never by DONE; at least 5 runs per arm; pinned client, model and Jev snapshot. No recorded autopilot sessions exist, so the autopilot baseline must be produced from scratch before anything else lands |
+| **Jev decision provider (opt-in)** | Core dependency of every Jev seam | MEDIUM | New provider type beside `UniversalProvider`, since `/v1/systemone` is not a chat endpoint. Default: the stored OpenRouter key, `POST https://openrouter.ai/api/v1/systemone`, pinned `typesafe/jev-1.13` (official); optional direct TypeSafe key with `jev-1.13.0`. Thin `fetch` client in the service worker; base URL, key and model bound together; returned model/snapshot logged on every call; `usage.cost` fed to `cost-tracker.js`; Providers panel entry with a test button |
+| **Clean fallback and availability states** | No SLA, dynamically adjusted rate limits, direct signups closed (official) | LOW–MEDIUM | Short per-call timeout (about 1.5–2 s), bounded retries on 429/503/529 only, no retry on 400/401/422, a circuit breaker. Each seam defines its no-Jev behavior: autopilot falls back to today's LLM loop, `run_task` fast returns a typed `unavailable`. A task never fails because Jev failed |
+| **State hygiene** | Every call sends page text and URLs off the machine; one popular build also sends typed passwords (self-reported, [jev-browse](https://github.com/kyrylosyzonenko/jev-browse)) | MEDIUM | Skip password, file and hidden inputs and their values; never serialize vault values (route logins to `fill_credential`); reuse `redactForLog`; mark page text untrusted in the instructions; keep state plus all questions under OpenRouter's 32k-token total (official), which is tighter than direct TypeSafe's per-question budget. Disclose in the Providers panel that page text leaves the machine |
+| **Per-step element table and operation menu** | Jev can only pick what code offers; jev-ultrafast's first DOM reader "failed independent verification because name/value extraction was incomplete" (self-reported) | MEDIUM–HIGH | Build from `getFilteredElements` and `refMap`, which today cut names to 60 characters and do not list values. Include index, role, full accessible name, current value, checked/selected/expanded, section heading and href; offer only operations possible now; rebuild every step; keep each target head under about 200 options (255 is the hard cap) |
+| **One fan-out Jev request per step** | "Two decisions, one network round trip" (self-reported); batching 13 questions was about 10× faster and 12× cheaper (official) | MEDIUM | Operation Choice plus one target Choice per offered operation, each with `none_of_the_above`, plus goal-reached and stuck Nouls. Pace at most about 2 requests/s per agent: 8 agents at jev-ultrafast's 2.4 requests/s would reach about 1,150 of TypeSafe's documented 1,200 per minute (OpenRouter's Jev limits are undocumented) |
+| **Validate, re-check, then act** | Jev can pick a wrong index with high confidence, and stale DOM was Jev for Chrome's longest failure (self-reported) | MEDIUM | Reject answers that are not offered, do not sum to about 1 or are not the argmax; confirm same URL and snapshot generation, element attached, visible and not covered. Use strict readiness: FSB's click paths fall back to a programmatic click when a target is obscured (`content/actions.js`), which Jev picks must not do. Consume each decision once so a retry cannot double-click |
+| **LLM keeps plan, text, reading and hard steps** | Jev cannot write text; reading and extraction were better left to the LLM (self-reported, Mahmoud); counting and sorting are documented Jev weaknesses (official) | MEDIUM–HIGH | `TYPE_TEXT` goes to a small LLM with the jev-ultrafast `{"text": ...}` contract; reading questions go to the LLM; anything below threshold, `none_of_the_above`, BLOCKED or stuck gets one ordinary LLM iteration, then Jev resumes. Same tool registry (INV-02) and provider parity (INV-03) |
+| **DONE veto and a separate step budget** | "DONE is never independent evidence of success" (self-reported, jev-ultrafast); FSB's iteration cap counts LLM turns | MEDIUM | Accept a Jev DONE only when the goal Noul clears its cut and FSB's completion signals agree; the goal Noul may also veto the LLM's `complete_task` (tighten only). Cap Jev steps and wall time separately from `maxIterations`; stop after 3 actions that change nothing |
+| **Decision log, then shadow mode before thresholds go live** | Thresholds must come from FSB's own labels on a pinned version; community cut points ran from 0.77 to 0.95 across datasets (community) | MEDIUM | Log per step: decider (Jev, LLM or code), operation, target, confidence, latency, model snapshot, instrument version. Shadow mode runs Jev beside the normal loop and records its pick against the LLM's actual call and the code-verified outcome, then reports accuracy per confidence bucket |
+| **Shorter, deduplicated tool descriptions** (names and schemas unchanged) | Milestone target; about half the tool-list text is repetition (measured); Claude Code cuts each description at 2 KB (official) | MEDIUM | Edits `tool-definitions.js` (shared with autopilot), `CHANGE_REPORT_DESCRIPTION_SUFFIX` in `mcp/src/tools/manual.ts`, and the visual-session and `tab_id` parameter text. Shared contracts move to server instructions, the FSB skill and typed-error `recoveryHint`s. Source-pin tests need paired updates |
+| **`expect` on action tools, checked in the same call** | Removes the verification turn Playwright MCP spends two extra calls on; each removed caller turn saves one median turn (4.6–9.5 s) | MEDIUM | Evaluated in code after `wrapWithChangeReport`'s stability wait, with a bounded poll; returns `expect_result` and leaves the meaning of `success` unchanged. Adds one optional property to each action tool's schema, so the schema-lock tests change. The baseline phase should count how many recorded calls were post-action verification reads, to size the win |
+| **Bounded fast mode on the existing `run_task`, with typed outcomes** | Collapsing N clicks into one call is where "one call instead of a turn per click" and the 1.5× result come from (self-reported) | HIGH | Additive optional parameters only; reuses the autopilot fast-mode executor, `run_task`'s lifecycle (30 s heartbeats, 600 s safety net, `partial_state`) and the `mcp-agent` execution mode with a much tighter budget. With no new parameters, `run_task` behaves exactly as today |
+| **`run_task` description invites the bounded mode** | Its description says to use it only when the user asks for autopilot (source), and agents ignore optional tools they are not steered to (0 calls in 150, community) | LOW | Keep the full-autopilot opt-in wording; add one line recommending fast mode with `verify` for short, checkable sub-goals |
+| **Deterministic sensitive-action gate (the baseline Jev tightens)** | "Keep classification separate from authorization" (official, Vercel); no source recommends Jev as the only gate | MEDIUM–HIGH | Replaces the stub path: code rules for purchase, payment, delete, send, post, account and permission changes, `use_payment_method`, and checkout-form submits. Autopilot shows a side-panel approval card (reuse the replay consent-card pattern); `run_task` fast returns `needs_confirmation`; manual MCP tools are unchanged because the caller already confirms per `skills/fsb/SKILL.md` |
+| **Jev risk signals can only add confirmations** | Several narrow signals plus policy code had 0.0% false allows against 12.4% for a single Jev verdict (self-reported, authors' own labels, [Kinde](https://github.com/kinde-starter-kits/jev-agent-authorization)) | MEDIUM | Nouls for irreversible, moves money, publishes or sends, matches the request, follows page-text instructions, plus a severity Score, OR-combined with the code gate. Asked in a second short request only for actions code flags as possibly consequential. If Jev is down, the code gate alone applies, so users never get fewer confirmations than the baseline |
+| **Release and version discipline** | Milestone requirement | LOW | `CHANGELOG.md` `## v1.0.0` first, then `npm run version:set:extension -- 1.0.0` (`sync-product-version.mjs` refuses otherwise); MCP 0.11.0 → 0.12.0 for the additive parameters; update `skills/fsb/SKILL.md` and the MCP README for `expect`, fast mode and the new descriptions |
 
-### Differentiators (Competitive Advantage)
+### Differentiators (valuable, not required for launch)
 
-| Feature | Value Proposition | Complexity | Notes |
-|---------|-------------------|------------|-------|
-| Ground-truth recommended default (connected > installed > copy-clicked) | Nobody recommends from evidence. Cline preselects its own paid gateway; Xcode just preconfigures accounts. FSB can badge "Recommended — Claude Code connected 2m ago" | MEDIUM | Needs the identity-capture trio: onboarding copy-click persist (client id already in `onboarding.js` handler), MCP `initialize` clientInfo capture (currently discarded), disk detection. Recommend, never auto-switch |
-| Connected-agent ground truth from the MCP handshake (clientInfo through `agent:register`) | Comparables detect installs at best; none show *live* connections. A control-panel "Connected agents" roster with last-seen is unique observability | LOW-MEDIUM | clientInfo has zero references in `mcp/` today; `agent:register` payload is empty `{}`. Additive fields only (INV-01). Completes the v0.9.36 deferred item |
-| Closed-loop delegation: side panel → spawn agent CLI → agent drives the same browser via FSB MCP tools | Inverts Claude Code --chrome (CLI-initiated) into panel-initiated. User asks in the browser; a subscription-grade agent does the work *in that browser* with FSB's visual feedback and tab ownership | HIGH | The spawned CLI connects back as a normal FSB agent (agent id, ownership token, cap 8). Ship a first-party `fsb` agent definition via `--agents` instead of prompt stuffing; hermetic `--strict-mcp-config` |
-| Multi-agent adapter contract (detect / build / events / kill / caps) covering Claude Code → OpenCode → Codex → Gemini | Vibe Kanban proves 10+ executors behind one profile abstraction is tractable and valued; from a browser surface it's unowned territory | HIGH | Per-CLI interfaces differ: Claude stream-json; `codex exec` (+ `resume`/`--last`, JSONL sessions in `~/.codex/sessions/`); OpenCode is an HTTP server (OpenAPI), not a spawn; Gemini `--resume`. Caps matrix: task-mode vs chat-mode per adapter |
-| Task-mode vs chat-mode (`--resume`) capability flags per adapter | Matches how users think: quick task vs ongoing conversation. Zed/ACP gate this with the `loadSession` capability; FSB can badge "supports follow-ups" | MEDIUM | Claude Code: `--resume <id>` scoped to project dir/worktree — daemon must pin cwd per thread. Codex: `exec resume`. Gemini: `--resume`. OpenCode: server sessions |
-| Cross-surface session continuity (side-panel thread resumable in the terminal) | Because the delegated run IS a genuine Claude Code session on disk, `claude --resume <session_id>` continues it in the terminal. Happy's desktop↔mobile mirroring proves the appeal | LOW | Just surface the `session_id` from `system/init` in the thread UI ("Continue in terminal: claude --resume …"). Zed offers the reverse (import external-agent threads) |
-| Doctor-integrated failure UX | Zed's answer to a broken agent is raw ACP logs; FSB's is a layer-classifying `doctor` with guided recovery — friendlier by design | LOW-MEDIUM | Extend doctor with delegation checks: agent binary found, version, auth state, spawn-channel secret. Deep-link from the side-panel offline card |
-| Per-run plan/scope preview in the consent prompt | Claude in Chrome reviews an upfront plan with the sites it will touch; applying that to "spawn X locally, it may control tabs A/B" beats a bare Allow/Deny | MEDIUM | Tier it: first enable (scary, explicit) → per-run summary (task + agent + scope) → in-run high-risk confirmations already governed by FSB's existing consent surfaces |
-| Kill switch that also reclaims tabs and shows what the agent still owns | Comparables kill the process; none reconcile browser state afterward. FSB's tab ownership makes "agent stopped, 2 tabs released" reportable | MEDIUM | Builds directly on v0.9.60 ownership + reconnect-grace machinery |
+| Feature | Value Proposition | Complexity | Notes and dependencies |
+|---|---|---|---|
+| **Accurate tool `annotations` from an explicit per-tool table** | VS Code stops prompting on reads; Claude Code can run read-only tools in parallel (source) | LOW–MEDIUM | The SDK overload already exists (source). Do not derive hints from `_readOnly`: it also marks `complete_task`, `partial_task`, `fail_task` and `stop_trigger`, which change state. Adds tool-list metadata, so it needs an explicit INV-01 ruling |
+| **Server `instructions`** (2 KB or less, most important first) | Claude Code's tool search loads only names and instructions (official); VS Code stores them (source) | LOW | What FSB is for, the fast path (navigate, read, act with `expect`, or `run_task` fast for multi-step flows), and the multi-agent, visual-session and vault rules in one line each. Never the only home for a rule |
+| **`anthropic/alwaysLoad` on 5–8 core tools** | Skips a ToolSearch round trip, which is a model turn, in Claude Code (official) | LOW | Only after descriptions shrink; measure context cost; needs the same INV-01 ruling |
+| **Caller-supplied `values` for fast mode** | The calling LLM already knows what to type; Jev maps provided strings to fields (self-reported, forvela and Mahmoud), removing the second model and working when FSB has no LLM key configured | MEDIUM | Returns `needs_input` instead of inventing a value |
+| **Timing trace in every fast-mode result** | Makes speed checkable per call, as jev-ultrafast-mcp's "4 decisions · 1.8 s model + 1.1 s page · 3.3 s wall" line does (self-reported) | LOW | Reuses per-call timing |
+| **Automated caller-side benchmark driver** | MCP arms are 85–90% caller time; scripted headless runs beat hand runs | MEDIUM | The Claude Code, OpenCode and Codex adapters from v0.9.91 already spawn agents and parse their streams (the Claude result event is parsed with passthrough; confirm timing and cost fields at phase time). Include a stub arm (FSB heuristics only, or always escalate) |
+| **Tool-list size budget in CI** | Stops description creep after the cut | LOW | Sits beside the existing source-pin tests |
+| **Instrument versioning and model-drift refusal** | "A reworded question is a new instrument", and aliases move silently (community, official) | LOW–MEDIUM | Hash question text, criteria and their order, the state builder, thresholds and the model pin into one version; refuse to act on answers from an unexpected model; re-run calibration on any change |
+| **Fast-mode visibility** | Users should see why a run was faster and when it asked the LLM | LOW–MEDIUM | Overlay "Fast" state; session detail shows "Jev decided N of M steps, K escalations"; Providers status (ready, rate-limited, unavailable); no raw probabilities for end users |
+| **Faster LLM steps inside fast mode** | The LLM steps that remain dominate wall time | MEDIUM | Small fast model for `TYPE_TEXT`; cache-friendly prompt order (history before page state); screenshots only when needed, about 0.8 s each (vendor, [Browser Use](https://browser-use.com/posts/speed-matters)) |
+| **Jev pre-ranking of elements for the normal LLM path** | Could shrink what the LLM reads: 4.4× fewer tokens at equal accuracy in a skill router (community) | MEDIUM | Scores flatten with about 53 near-identical candidates; batch 16–32 (community). Defer until shadow data exists |
+| **Elicitation for `needs_confirmation`** | An in-client confirm dialog in Claude Code, Cursor and VS Code (official) | MEDIUM | Not a hard gate, because Claude Code's `Elicitation` hook can auto-answer; the typed return stays the primary path |
+| **Zero-model replay of a verified fast-mode path** | The second run costs no model calls (self-reported, jev-ultrafast-mcp) | MEDIUM | FSB already has signed session replay and procedural memory; defer |
 
-### Anti-Features (Commonly Requested, Often Problematic)
+### Anti-Features (commonly proposed, harmful here)
 
 | Feature | Why Requested | Why Problematic | Alternative |
-|---------|---------------|-----------------|-------------|
-| Reuse subscription OAuth tokens / spoof Claude Code headers / use Agent SDK with consumer OAuth | "Just call the API with my Max token — no spawn needed" | Banned. Anthropic blocked it Jan 9 2026 (silent), ToS-clarified Feb 18-20 2026, fully enforced Apr 4 2026; tools get "This credential is only authorized for use with Claude Code". OpenClaw/OpenCode/NanoClaw all hit it ([The Register](https://www.theregister.com/2026/02/20/anthropic_clarifies_ban_third_party_claude_access/), [claude-code#28091](https://github.com/anthropics/claude-code/issues/28091)) | Spawn the genuine `claude` binary under the user's own login (Cline/Roo/Zed/Conductor all still ship this; "running the official Claude Code binary… you are fine"). Keep BYOK API kind as a first-class fallback. Note: OpenAI *sanctions* ChatGPT-subscription OAuth for third parties (Cline Codex OAuth) — auth policy is per-vendor, so encode it in the adapter |
-| Bundle or silently auto-install agent CLIs | "One-click setup" (Conductor bundles Claude Code + Codex) | Conductor is a signed native Mac app; FSB is an MV3 extension + npm daemon. Silent installs from a browser-adjacent surface are a security smell, create version drift, and can't happen extension-side at all | Detect from disk + show the copy-able install command (onboarding already has per-client commands) + doctor verification |
-| PTY/TUI screen-scraping of the agent's interactive UI | "The TUI already shows everything — just mirror it" | Brittle (ANSI parsing, resize, version drift), no structured tool-call/cost/session data, no clean cancel semantics | Structured headless interfaces only: `claude -p` stream-json, `codex exec` (JSONL sessions), `opencode serve` HTTP API, `gemini` non-interactive |
-| Default the spawned agent to `--dangerously-skip-permissions` (or equivalent) for smooth demos | "Permission prompts interrupt the magic" | RCE-adjacent channel + agent with Bash access + browser control = worst-case blast radius. Claude Code's own plan mode auto-allows only read-only browser calls and prompts on state changes | Strict defaults: `--allowedTools`/permission-mode allowlist scoped to FSB MCP tools, `--strict-mcp-config`, no filesystem/Bash beyond what delegation needs; escalation prompts surface in the side panel (Happy's remote Allow/Deny proves this works) |
-| General remote-access layer (LAN/tunnel/mobile) for delegation | OpenCode-remote ecosystem (Tailscale/ngrok clients) shows real demand | Scope explosion; every remote hop widens the RCE surface FSB just gated to extension-origin + shared secret on localhost:7225 | Stay localhost-only this milestone; FSB's dashboard-remote mode remains the separate, existing remote surface |
-| Show dollar costs for subscription-backed runs | "Cost tracker already exists — reuse it" | Fabricated numbers (user pays $0 marginal); Cline deliberately shows $0.00 for Max runs. Misleads users into thinking delegation is expensive | Show tokens/turns/duration + "included in your <agent> subscription"; keep `MODEL_PRICING` estimates for telemetry aggregates only, labeled as estimates |
-| Force/funnel users to agent providers (degrade BYOK) | "Subscriptions are the future; simplify to one path" | Cursor's BYOK restrictions (agent features require their plan even with your key) generate durable resentment; FSB's INV-03 promises provider parity | Both kinds first-class; recommendation badge only. BYOK autopilot remains the zero-daemon path |
-| Auto-switch the selected provider when a "better" agent connects | "Ground truth says Claude Code is here — use it" | Surprise provider swaps mid-workflow break trust and mask cost/behavior changes; no comparable does this | Recommend with a badge + one-tap switch; persist explicit user choice as sticky |
+|---|---|---|---|
+| An "ask Jev" MCP tool, or Jev offered to the caller as a tool | Looks like the simplest integration | An optional Jev tool was called 0 times in 150 (community); it would also add a tool | Call Jev from code inside FSB |
+| Jev removing or auto-approving confirmations | Fewer prompts feel faster | Approval-framed injections got dangerous commands through, and catching all attacks escalated 58% of normal traffic (community); OpenRouter's own cookbook uses Jev to auto-approve routine permission prompts, the opposite of FSB's rule | Jev only adds confirmations; the code gate is final |
+| Jev writing text, selectors, coordinates, JavaScript or tool arguments, or doing counting, sorting or date math | "One model for everything" | Jev is not trained to generate, and its counting error grows with size (official) | The LLM or caller `values` supply text; code counts and compares |
+| Treating DONE, from Jev or the LLM, as success | Simple scoring | A progress probability read low on a real success, and DONE is not evidence (self-reported, community) | Code checks via URL, text, DOM or `verify`; `likely_done` when nothing can be checked |
+| Using aliases (`jev-latest`, `~typesafe/jev-latest`) or copied demo thresholds | Convenience | Aliases move without notice; thresholds did not transfer across datasets (official, community) | Pin `typesafe/jev-1.13` or `jev-1.13.0`; set thresholds from FSB shadow data per version |
+| Re-asking until an answer clears its threshold | A tempting fix for low confidence | Biases the decision (community production guide) | Escalate to the LLM in autopilot or to the caller as `ambiguous` |
+| Parallel per-question calls, or whole-page state | "More context is better" | 529 errors at 100 concurrent requests but none at 16; accuracy falls as irrelevant state grows (official, community); 32k-token ceiling on OpenRouter | One batched request per step with a filtered element table and at most 6,000 characters of text |
+| Renaming, removing or merging tools, or new tools for `expect` or fast mode | A cleaner surface | Breaks INV-01 and callers' learned habits | Additive optional parameters and description edits only |
+| Relying on server `instructions` for rules a call's correctness depends on | Removes duplication | Claude Desktop and claude.ai drop them, Cursor is unverified, Claude Code truncates at 2 KB | Keep each tool's essentials in its description; teach recovery in typed errors |
+| Jev-judged natural-language `expect` ("cart shows 2 items") | Easier for callers to write | A Noul is a veto, not proof, and counting is a documented weakness | Code-evaluated predicates only in v1.0.0 |
+| `outputSchema`, or structured-only results, on existing tools | "Typed outcomes" | Cursor delivers structured-only results empty; Claude Code prefers structured content when both are present, so any divergence changes behavior (community, staff-confirmed) | Keep JSON text; if `structuredContent` is ever added, mirror the text exactly |
+| The official TypeSafe JS SDK inside the service worker | Less code | Targets Node 20 and gates browser use behind `dangerouslyAllowBrowser` (official); broke its API in its first week | A small `fetch` client |
+| `requiresUserInteraction` on common action tools | "Tighten confirmations" | Prompts on every call even in bypass modes and cannot distinguish one call from another (official), so every click slows down | Per-call `needs_confirmation`; decide separately whether `use_payment_method` warrants the flag |
+| Fast mode on by default, or a changed default for `run_task` | Maximizes the speed win | No evidence of a success gain and documented failure modes; surprises existing callers | Opt-in toggle for autopilot and an explicit `mode` parameter for MCP |
+| Public benchmark claims (WebArena, WebVoyager) this milestone | Marketing | Deferred in PROJECT.md; small-n numbers invite over-claiming | Publish FSB's own before/after results with method and n |
 
-## UX Convention Notes (per research question)
+## Behavior specs for FSB's versions
 
-**Provider picker mixing kinds.** Two proven layouts: same-dropdown-with-morphing-fields (Cline/Roo — lowest friction, fits FSB's existing single panel) and separate-section (Zed External Agents; Xcode accounts vs API providers). Either way: agent entries never show a key field; they show install/auth state instead. "Recommended" defaults exist everywhere but are vendor-motivated (Cline preselects its own gateway; free-tier suggestions for beginners) — an evidence-based badge is FSB's opening. Unavailable states today are weak across the board (Cline documents no missing-CLI error UX; Zed points at raw logs) — treat "installed but unavailable", "not installed", and "daemon offline" as three distinct picker states.
+These sketches give the requirements author concrete defaults; parameter names and numbers are proposals to settle in planning, and every threshold is a shadow-mode starting point, not a shipping value.
 
-**Streaming-progress conventions.** The converged grammar: narrated step feed + collapsible tool-call cards with status + prominent stop + final result card with usage. Zed adds "follow the agent" (jump to what it touches — FSB's equivalent is the already-visible glow/badge on the live tab) and review-before-apply (not applicable: browser actions aren't diffs, which is exactly why consent must be *pre*-action). Claude Code's stream gives everything needed: `system/init` (session_id, model, tools — render "Claude Code session started"), tool_use blocks (feed rows), `system/api_retry` (transient-state row with typed error categories), `result` (`total_cost_usd`, `num_turns`, duration → summary card).
+### Autopilot fast mode (opt-in)
 
-**Consent for browser control.** Three-layer convention across Claude in Chrome / Atlas / Gemini auto-browse: (1) mode choice (ask-before-acting vs act-with-guardrails), (2) scope disclosure upfront (plan with sites), (3) hard confirmations for sensitive actions + categorical blocks (financial) + pause-for-human at login/CAPTCHA. FSB must add a layer none of them need: consent to *spawn a local process* (first-enable toggle + per-run confirm), because the delegation channel, not the browsing, is the new risk.
+Each step observes the element table, up to 6,000 characters of visible text and the last 10 actions with their observed effect (taken from `change_report`: navigated, page changed, no visible change). It then sends one request with the operation Choice (`CLICK`, `TYPE_TEXT`, `SELECT`, `PRESS_ENTER` only when a focused field holds text, `SCROLL_DOWN`/`SCROLL_UP`, `WAIT`, `DONE`, `BLOCKED`), one target Choice per offered operation with `none_of_the_above`, and the goal-reached and stuck Nouls. Code acts only when the operation's confidence and the chosen target's probability clear per-operation cuts scaled to reversibility: scrolling and waiting get the lowest bar, opening menus or tabs next, link clicks moderate, and submit-like clicks or Enter the highest bar plus the deterministic gate. Execution goes through the same tool executor as the LLM path, with strict readiness. Three consecutive steps with no visible change mark the run stuck, which triggers one LLM iteration; a second stall ends the run as BLOCKED with a reason. A `TYPE_TEXT` whose helper returns `{"text": null}` escalates to the LLM, and login fields always route to `fill_credential`. Starting cuts from the evidence: never act below about 0.5 confidence; allow about 0.3 on reversible operations only when the next step verifies them (self-reported, Mahmoud); read Nouls through a 0.3–0.7 review band (official cookbook); treat anything within 0.05 of a cut as a tie and escalate (community).
 
-**Session continuity.** Users now expect thread↔session mapping (Zed/ACP `session/load`; Codex/Gemini/Claude resume). Stateless replay-per-message (Cline) is acceptable for task-mode MVP but wastes subscription tokens and loses agent-side context (todos, plan state); `--resume` chat-mode is the expected v1.x follow-up. Claude Code resume is cwd-scoped — the daemon must keep a stable working directory per thread.
+### `run_task` bounded fast mode (MCP)
 
-**Detection UX.** Convention is confirm-not-configure: Conductor "confirm your machine already has a Claude Code session"; Vibe Kanban silently reuses `.claude` config; Claude Code's Chrome flow auto-opens a connect tab once on first install, then never again (v2.1.199 behavior). So: "We found Claude Code installed — connect it?" with one action, remembered forever, re-verifiable via doctor. Never nag on every panel open.
+Proposed additive parameters: `mode: "fast"` (absent means today's autopilot), `verify` (code predicates, same vocabulary as `expect`), `values` (field purpose to caller-supplied text), `max_steps` (default about 15, cap about 40) and `max_seconds` (default about 60, cap about 180). Proposed `status` values:
+
+- `done`: every `verify` predicate passed in code.
+- `likely_done`: Jev's goal Noul cleared its cut, but no `verify` was supplied or checkable.
+- `ambiguous`: confidence fell below the floor or the answer was `none_of_the_above`; returns the top candidates (index, label, probability) and the question left unsettled.
+- `needs_input`: text is required but no value was supplied and FSB's own LLM is not allowed or configured.
+- `needs_confirmation`: the code gate or a Jev risk signal flagged the next action; returns the action, target label, site and any visible amount or recipient, and does not execute it.
+- `blocked`: bot wall, error page, restricted tab or the stuck rule.
+- `budget_exhausted`: the step or time cap was hit.
+- `unavailable`: Jev is not configured, rate-limited or behind an open circuit breaker; the caller should continue with manual tools.
+
+Every result carries a compact step trace (operation, target label, outcome, milliseconds), a `timing` block (wall, Jev, browser, LLM), the final URL and the verification details. After `needs_confirmation`, the caller confirms with the user and performs the final action itself with the manual tool, which matches the confirmation rule callers already follow.
+
+### `expect` on action tools
+
+Proposed code-evaluated predicates: `url_includes`, `title_includes`, `text_visible`, `text_gone`, `selector_visible`, `selector_gone`, `value_equals` (selector and value) and `dialog_opened`, plus `timeout_ms` (default about 2,000, cap about 10,000). Evaluation starts right after the existing stability wait, returns immediately when already met, and otherwise polls until met or timed out. The response gains `expect_result: {met, checks: [{kind, expected, observed, met}], waited_ms}`; `success` keeps meaning that the action ran, and `met: false` is not an error. Use substring or glob matching rather than caller-supplied regular expressions, and never echo the value of a password field; report only whether it matched.
+
+### What stays in a tool description and what moves
+
+A description keeps four things: a first sentence that says what the tool does in searchable words (Claude Code's tool search and Cursor's file lookup both read it); when to use it instead of its nearest sibling; any non-obvious parameter meaning and the return shape in a clause; and any rule whose violation causes harm the error response cannot undo, such as never passing secrets. Everything else moves. The multi-agent sentence goes to server instructions and the skill, because the typed errors it describes already carry `recoveryHint`s at the moment of failure. The `change_report` suffix becomes "Returns change_report." with field details in the skill. Visual-session and `tab_id` parameter text shrinks to one short clause each and drops internal file paths such as `mcp/src/tools/visual-session.ts`, which callers cannot use. Long how-to prose, such as `execute_js` patterns, moves to the existing `tool-reference` prompt and skill references. Milestone labels like "v0.9.62" leave descriptions entirely. The target is at least a 50% cut in tool-list characters with no description over 2,048 characters, measured before and after on both the MCP wire and the autopilot request.
+
+### Annotation mapping (if INV-01 allows)
+
+Mark `readOnlyHint: true` on tools that only read: `read_page`, `get_text`, `get_attribute`, `get_dom_snapshot`, `get_page_snapshot`, `list_tabs`, `read_sheet`, `get_site_guide`, the session and log readers, `search_memory`, `get_memory_stats`, `get_task_status`, `get_trigger_status`, `list_triggers` and `search_capabilities`. Leave unannotated the tools that change task or trigger state (`complete_task`, `partial_task`, `fail_task`, `trigger`, `stop_trigger`, `run_task`, `stop_task`, `replay_session`). Decide explicitly on `list_credentials` and `list_payment_methods`: they are read-only, but leaving them unannotated keeps clients prompting before vault metadata is listed. Set `destructiveHint: false` only for scrolling, hovering, focusing, opening and switching tabs and waiting; leave the destructive default on clicks, typing, key presses, `execute_js`, drags, uploads, vault fills, `invoke_capability`, closing tabs and navigation, since navigating can discard unsaved input. Set `openWorldHint: false` only on tools that read FSB's local data.
+
+### Confidence thresholds and escalation UX
+
+Keep every threshold in one reviewed constants file keyed by question, operation, decision backend and pinned model version. Prefer the chosen option's probability where it and the `confidence` field disagree, since `confidence` depends only on the top probability and the option count (community). In autopilot, escalation is silent: the LLM takes the step and the overlay shows a "Fast" or "Thinking" state; the user is prompted only for sensitive actions. Over MCP, escalation is typed (`ambiguous`, `needs_input`, `needs_confirmation`) and carries enough context for the caller to finish in one more call. Never re-roll a low-confidence answer, log every escalation, and watch the escalation rate: a rise suggests inputs or questions degraded, a fall suggests a bug bypassing the gate (community).
+
+### Benchmark and measurement
+
+Record at the MCP server boundary, per call: received, sent to the extension, answered by the extension, responded; the caller gap is the time from one response to the next request on the same connection. The suite should hold roughly 20–30 tasks: read-and-verify tasks like the recorded UAT and Jira sessions, click-heavy forms and filters, and booking-style multi-page flows, each with code-checked success, using local fixtures where live sites are unstable. Arms: autopilot today versus autopilot fast; Claude Code and Cursor on manual tools before and after the description, `expect` and annotation changes; `run_task` fast; and a stub arm. Report median and 90th-percentile wall time per completed task, success rate with n, cost (LLM plus Jev from `usage.cost`), tool-list and per-turn tokens, calls and caller turns per task, the FSB versus caller time split, the escalation rate and the share of steps Jev decided.
 
 ## Feature Dependencies
 
 ```
-Providers panel rename + kind field (api|agent)
-    └──requires──> existing control panel API Configuration section (control_panel.html:146)
+Per-call timing split ──┐
+get_session_detail fix ─┼──> Benchmark suite (baseline arm captured first) ──> every speed claim
+                        │
+Jev decision provider ──> Fallback + availability ──> any Jev seam
+State hygiene ──> Element table ──> Fan-out request ──> Validate/re-check/act ──> Autopilot fast mode
+Decision log ──> Shadow mode + calibration ──> thresholds used by both fast modes
+Autopilot fast-mode executor ──> run_task bounded fast mode (same executor, MCP entry)
+Deterministic sensitive-action gate ──> Jev risk signals (tighten-only) ──> run_task needs_confirmation
+wrapWithChangeReport / change_report ──> expect ──> run_task `verify` (shared predicate vocabulary)
+Shorter descriptions ──> server instructions / annotations / alwaysLoad (layered on after)
 
-Recommended-default badge
-    └──requires──> Identity capture trio:
-                      onboarding copy-click persist (extension/ui/onboarding.js handler has client id)
-                      MCP initialize clientInfo capture ──> agent:register payload (empty {} today; additive, INV-01)
-                      disk detection (platforms.ts 21-client registry, daemon-side)
-
-Side-panel delegation (Claude Code MVP)
-    └──requires──> reverse-request channel over ws://localhost:7225 (extension-origin gating + shared secret)
-    └──requires──> consent tiers (first-enable + per-run)
-    └──requires──> Claude Code adapter (spawn claude -p, stream-json, strict permissions, --strict-mcp-config, fsb agent definition)
-    └──requires──> tab ownership + agent ids + cap 8 (v0.9.60, exists)
-    └──requires──> visual session badges + client allowlist (v0.9.36/v0.9.62, exists)
-    └──requires──> fifth EXECUTION_MODES entry "delegated" (extension/ai/engine-config.js)
-
-Streaming progress feed + kill switch ──requires──> delegation channel
-Usage/cost summary card ──requires──> stream-json result event; ──enhances──> existing MCP request logging + cost tracker
-Offline → doctor handoff ──requires──> doctor (exists); ──enhances──> delegation (graceful degradation)
-Chat-mode (--resume) ──requires──> task-mode adapter + per-thread cwd pinning
-Multi-agent adapters (OpenCode/Codex/Gemini) ──requires──> AgentProviderAdapter contract proven on Claude Code
-Cross-surface resume hint ──requires──> session_id surfaced from system/init
-
-Auto-switch on detection ──conflicts──> sticky explicit provider choice
-Subscription-token proxying ──conflicts──> Anthropic ToS (spawn genuine binary instead)
+Jev risk signals ──conflicts──> any mode where Jev can remove a confirmation
+alwaysLoad ──conflicts──> long descriptions (pays their full context cost on every session)
+Jev-judged expect ──conflicts──> "code outranks the model" verification rule
 ```
 
-### Dependency Notes
+### Dependency notes
 
-- **Delegation requires a live daemon:** the extension has no nativeMessaging permission and cannot wake any process — agent-kind providers are only *runnable* when `fsb-mcp-server serve` (or an open agent session) is up. This makes the offline state a first-class picker/thread state, not an error path.
-- **Identity capture is independent of delegation:** the trio (clicks/clientInfo/disk) ships value on its own (control-panel roster, recommended badge) and can land before the spawn channel — a natural phase boundary.
-- **Adapter contract before adapter breadth:** Codex/OpenCode/Gemini adapters are cheap only if the Claude Code MVP fixes the contract (detect/build/events/kill/caps) rather than hardcoding Claude shapes. OpenCode will stress it usefully (HTTP server, not spawn).
-- **Test-suite tripwires:** extension-side wiring (onboarding persist, providers panel, side-panel feed) trips source-pin tests (token counts/substrings) — run the suite from the first commit.
+- **The benchmark needs timing and session lookup first**, and its baseline arm must run before descriptions, `expect` or Jev change anything; otherwise there is no "before".
+- **Both fast modes need calibrated thresholds**, which need the decision log and a period of shadow mode on FSB's own tasks against the pinned version.
+- **The `run_task` fast mode is the autopilot fast-mode executor behind an MCP entry point**, so it cannot ship before the executor; the MCP phase adds only parameters, typed outcomes and budgets.
+- **Jev risk signals need the deterministic gate** because "tighten only" presumes something to tighten; without it Jev would be the sole gate.
+- **`expect` and `verify` should share one predicate evaluator** so MCP callers learn one vocabulary and fast mode's `done` uses the same code path.
+- **Instructions, annotations and `alwaysLoad` come after the description cut**, because they are meant to point at short descriptions and `alwaysLoad` pays each loaded description's full cost.
 
 ## MVP Definition
 
-### Launch With (v1 — this milestone)
+### Launch with v1.0.0
 
-- [ ] Providers panel rename + `api`/`agent` kinds; agent kind hides key field, shows install/auth/connection state — the naming and framing everything else hangs on
-- [ ] Identity capture trio (copy-click persist, clientInfo capture through `agent:register`, disk detection) + control-panel connected/installed roster — ground truth
-- [ ] Recommended-default badge from ground truth (connected > installed > copy-clicked); never auto-switch
-- [ ] Claude Code delegation MVP: consent-gated spawn over ws://7225, `claude -p` stream-json, strict permissions + `--strict-mcp-config` + shipped `fsb` agent definition, spawned CLI connects back with its own agent id/tab ownership
-- [ ] Live progress feed (init/tool/retry/result events) + kill switch that releases owned tabs
-- [ ] Honest offline state → doctor handoff
-- [ ] Usage summary card per delegated run (tokens/turns/duration, "included in your subscription")
+- [ ] Per-call timing split and the `get_session_detail` journal fallback — the measurement floor.
+- [ ] Benchmark suite with the baseline captured first — no speed claim without it.
+- [ ] Shorter, deduplicated descriptions with no description over 2 KB — the stated tool-list target, and it trims every autopilot iteration.
+- [ ] `expect` on action tools — the cheapest caller-turn reduction, with no Jev dependency.
+- [ ] Deterministic sensitive-action gate — prerequisite for every Jev safety claim.
+- [ ] Jev decision provider (opt-in) with fallback and state hygiene.
+- [ ] Decision log and shadow mode, then autopilot fast mode behind the opt-in toggle.
+- [ ] `run_task` bounded fast mode with typed outcomes, `verify`, and the updated description.
+- [ ] Jev risk signals, tighten only.
+- [ ] Release: extension 1.0.0, MCP 0.12.0, docs.
 
-### Add After Validation (v1.x)
+### Add after validation (v1.0.x)
 
-- [ ] Chat-mode continuity via `--resume` + per-thread cwd pinning — add once task-mode proves the channel; trigger: users sending follow-ups that lose context
-- [ ] OpenCode → Codex → Gemini adapters behind the proven contract; trigger: adapter contract stable through one release
-- [ ] Cross-surface resume hint (`claude --resume <id>`) — trivial once session ids are surfaced
-- [ ] Doctor delegation checks (binary found/version/auth/spawn-secret)
+- [ ] Annotations and server instructions — once the INV-01 ruling allows tool-list metadata; low cost, client-specific wins.
+- [ ] `alwaysLoad` on core tools — once short descriptions make the context cost small.
+- [ ] Caller-supplied `values` — once fast-mode telemetry shows how often `needs_input` fires.
+- [ ] Automated caller-side benchmark driver — once the manual suite has stabilized.
+- [ ] Faster LLM steps inside fast mode — once timing shows the LLM steps dominate.
 
-### Future Consideration (v2+)
+### Future consideration (v1.1+)
 
-- [ ] Native-messaging host to wake the daemon — removes the biggest UX cliff but adds an installer + attack surface; explicitly deferred in milestone context
-- [ ] ACP-based adapter unification (speak ACP to `claude-code-acp`/Gemini instead of per-CLI formats) — watch ACP adoption; would collapse adapter maintenance
-- [ ] Remote delegation surfaces (mobile approvals à la Happy) — only after the localhost security posture has soak time
+- [ ] Jev pre-ranking for the normal LLM path — needs shadow data and candidate batching.
+- [ ] Elicitation-based confirmation — needs broader client support and a policy for hook auto-answers.
+- [ ] Zero-model replay of verified fast paths — builds on existing signed replay.
+- [ ] A local or self-hosted decision backend — thresholds would need recalibration per backend.
+- [ ] Page-exposed WebMCP tools as Jev options — the one setting where DOM-only Jev's 25/49 became 49/49 (independent).
 
 ## Feature Prioritization Matrix
 
 | Feature | User Value | Implementation Cost | Priority |
-|---------|------------|---------------------|----------|
-| Providers panel + kinds | HIGH | LOW | P1 |
-| Identity capture trio + roster | HIGH | MEDIUM | P1 |
-| Recommended badge (ground truth) | MEDIUM | LOW | P1 |
-| Claude Code delegation + consent + spawn channel | HIGH | HIGH | P1 |
-| Streaming feed + kill switch | HIGH | MEDIUM | P1 |
-| Offline → doctor UX | HIGH | LOW | P1 |
-| Usage summary (subscription framing) | MEDIUM | LOW | P1 |
-| Chat-mode `--resume` | HIGH | MEDIUM | P2 |
-| OpenCode/Codex/Gemini adapters | MEDIUM | HIGH | P2 |
-| Cross-surface resume hint | MEDIUM | LOW | P2 |
-| Native-messaging wake | HIGH | HIGH | P3 |
-| ACP adapter unification | MEDIUM | HIGH | P3 |
+|---|---|---|---|
+| Per-call timing split + session lookup fix | HIGH | LOW–MEDIUM | P1 |
+| Benchmark suite (baseline first) | HIGH | HIGH | P1 |
+| Shorter, deduplicated descriptions | HIGH | MEDIUM | P1 |
+| `expect` on action tools | HIGH | MEDIUM | P1 |
+| Deterministic sensitive-action gate | HIGH | MEDIUM–HIGH | P1 |
+| Jev provider + fallback + hygiene | HIGH | MEDIUM | P1 |
+| Decision log + shadow mode | HIGH | MEDIUM | P1 |
+| Autopilot fast mode (opt-in) | HIGH | HIGH | P1 |
+| `run_task` bounded fast mode + description | HIGH | HIGH | P1 |
+| Jev risk signals (tighten only) | MEDIUM | MEDIUM | P1 |
+| Release discipline | MEDIUM | LOW | P1 |
+| Annotations, server instructions | MEDIUM | LOW | P2 |
+| `alwaysLoad` on core tools | MEDIUM | LOW | P2 |
+| Caller-supplied `values` | MEDIUM | MEDIUM | P2 |
+| Timing trace in fast-mode results | MEDIUM | LOW | P2 |
+| Automated caller-side benchmark driver | MEDIUM | MEDIUM | P2 |
+| Tool-list size budget in CI | MEDIUM | LOW | P2 |
+| Instrument versioning + drift refusal | MEDIUM | LOW–MEDIUM | P2 |
+| Fast-mode visibility | MEDIUM | LOW–MEDIUM | P2 |
+| Faster LLM steps inside fast mode | MEDIUM | MEDIUM | P2 |
+| Jev pre-ranking for the LLM path | LOW–MEDIUM | MEDIUM | P3 |
+| Elicitation for confirmations | LOW–MEDIUM | MEDIUM | P3 |
+| Zero-model replay of fast paths | MEDIUM | MEDIUM | P3 |
 
-**Priority key:**
-- P1: Must have for this milestone's goal (agent CLIs as first-class side-panel providers)
-- P2: Should have; natural fast-follow within the milestone arc
-- P3: Deferred; revisit after the delegation channel has soak time
+**Priority key:** P1 = must have for v1.0.0; P2 = add when possible; P3 = future.
 
 ## Competitor Feature Analysis
 
-| Feature | Cline/Roo (Claude Code provider) | Zed (ACP external agents) | Claude in Chrome / Atlas / Gemini auto-browse | Our Approach |
-|---------|----------------------------------|---------------------------|-----------------------------------------------|--------------|
-| Provider mixing | Agent entry in same dropdown; key field → CLI path | Separate External Agents section; agent-owned auth | N/A (single first-party agent) | Same-panel with `kind` field; agent kind shows state, not keys |
-| Detection | Manual CLI path ("usually `claude`") | Registry install, no disk detection | Extension auto-connect tab on first install | Disk detection via 21-client registry + connected ground truth from the MCP handshake |
-| Streaming | Wraps CLI per message; "may not stream token-by-token" | Tool-call cards, follow-agent, stop, review diffs | Narrated work log, step details, stop/take-over | stream-json event feed + existing in-browser glow/badges as "follow the agent" |
-| Consent | None specific to spawning | Tool-forwarding permissions; native perms agent-owned | Ask-vs-auto modes, site allowlists, sensitive-action confirms, watch mode | Two new tiers (enable spawn, per-run) on top of FSB's existing browsing consent |
-| Sessions | Stateless replay per message | Threads = agent sessions; import/restore | Per-task; no CLI session concept | Task-mode v1 → `--resume` chat-mode v1.x; thread↔session id surfaced |
-| Cost | $0.00 for subscription runs | Agent-owned; not surfaced | Subscription-metered invisibly | Tokens/turns/duration + "included in subscription"; dollars only for API kind |
+| Feature | jev-ultrafast / Jev for Chrome | Jev MCP executors (jev-ultrafast-mcp, Ying-Kai-Liao, forvela) | Playwright MCP | FSB v1.0.0 approach |
+|---|---|---|---|---|
+| Who picks the next action | Jev, from a code-built element table | Jev server-side, escalating to the caller | The calling LLM, from an accessibility snapshot | Jev when confident; FSB's LLM (autopilot) or the caller (MCP) otherwise |
+| Who writes text | A small LLM | The caller supplies values, or a small LLM | The calling LLM | FSB's LLM in autopilot; caller `values` or FSB's LLM in `run_task` fast |
+| Outcome check | External, or goal/stuck Nouls veto DONE | Code assertions outrank the model | Separate `browser_verify_*` tools, one turn each | `expect` inside each action call; `verify` inside `run_task` fast |
+| Typed stop states | DONE / BLOCKED | done, ambiguous, likely_done, blocked, needs_confirmation | Not applicable | done, likely_done, ambiguous, needs_input, needs_confirmation, blocked, budget_exhausted, unavailable |
+| Safety gate | Freshness and occlusion checks; model never emits selectors | Domain lists, keyword interception, `needs_confirmation` | Client approval prompts | Deterministic gate first; Jev can only add confirmations |
+| Speed evidence | 7.1 s Google Flights, 3 matched pairs (self-reported) | 3.3 s three-step form; 1.5× faster under Claude (self-reported) | Baseline arm in others' comparisons | FSB's own before/after suite, at least 5 runs per arm |
 
 ## Sources
 
-- [Zed external agents docs](https://zed.dev/docs/ai/external-agents) + [GitHub source](https://github.com/zed-industries/zed/blob/main/docs/src/ai/external-agents.md) (fetched 2026-07-10); [Bring Your Own Agent blog](https://zed.dev/blog/bring-your-own-agent-to-zed); [Agent Panel docs](https://zed.dev/docs/ai/agent-panel); [zed#50142 diff-review gap for external agents](https://github.com/zed-industries/zed/issues/50142)
-- [Agent Client Protocol — protocol overview](https://agentclientprotocol.com/protocol/overview) (`session/new`, `session/load`, `session/update`, `session/request_permission`, `session/cancel`, `initialize`/`authenticate`) (fetched 2026-07-10)
-- [Cline Claude Code provider docs](https://docs.cline.bot/provider-config/claude-code); [Cline blog: Claude Max in Cline ($0.00 display)](https://cline.bot/blog/how-to-use-your-claude-max-subscription-in-cline); [Cline: ChatGPT subscription via Codex OAuth](https://cline.ghost.io/introducing-openai-codex-oauth/); [Roo Code PR #4864](https://github.com/RooCodeInc/Roo-Code/pull/4864)
-- [Claude Code headless docs — `-p`, stream-json events, `--resume`, permissions, `--agents`, `total_cost_usd`](https://code.claude.com/docs/en/headless) (fetched 2026-07-10); [Claude Code with Chrome docs — connection, plan-mode read/write split, error table](https://code.claude.com/docs/en/chrome) (fetched 2026-07-10)
-- [Claude in Chrome permissions guide](https://support.claude.com/en/articles/12902446-claude-in-chrome-permissions-guide); [Use Claude in Chrome safely](https://support.claude.com/en/articles/12902428-use-claude-in-chrome-safely)
-- [OpenAI: Introducing ChatGPT Atlas (2025-10-21)](https://openai.com/index/introducing-chatgpt-atlas/); [Atlas agent help](https://help.openai.com/en/articles/12628199-using-ask-chatgpt-sidebar-and-chatgpt-agent-on-atlas)
-- [Google: Gemini 3 auto-browse in Chrome (Dec 2025)](https://blog.google/products-and-platforms/products/chrome/gemini-3-auto-browse/); [9to5Google on agentic security (2025-12-08)](https://9to5google.com/2025/12/08/gemini-chrome-agentic-security/)
-- [Apple: Setting up coding intelligence (Xcode 26)](https://developer.apple.com/documentation/xcode/setting-up-coding-intelligence); [9to5Mac (2025-08-28)](https://9to5mac.com/2025/08/28/new-xcode-beta-now-available-with-gpt-5-and-claude-support/)
-- [GitHub Agent HQ announcement (2025-10)](https://github.blog/news-insights/company-news/welcome-home-agents/); [Pick your agent: Claude and Codex on Agent HQ](https://github.blog/news-insights/company-news/pick-your-agent-use-claude-and-codex-on-agent-hq/)
-- [Conductor docs (bundled CLIs, login detection)](https://docs.conductor.build/); [Happy features (remote permission approvals, streaming)](https://happy.engineering/docs/features/); [Vibe Kanban agent profiles](https://vibekanban.com/docs/configuration-customisation/agent-configurations); [OpenCode server docs](https://opencode.ai/docs/server/); [Smithery CLI](https://smithery.ai/docs/concepts/cli)
-- Codex sessions/resume: [developers.openai.com Codex CLI](https://developers.openai.com/codex/cli/features); [codex resume guide](https://inventivehq.com/knowledge-base/openai/how-to-resume-sessions). Gemini sessions: [Gemini CLI session management](https://geminicli.com/docs/cli/session-management/)
-- Anthropic subscription-OAuth ban (Jan-Apr 2026): [The Register (2026-02-20)](https://www.theregister.com/2026/02/20/anthropic_clarifies_ban_third_party_claude_access/); [anthropics/claude-code#28091](https://github.com/anthropics/claude-code/issues/28091); [Kersai workaround survey](https://kersai.com/anthropic-killed-third-party-claude-access-heres-every-workaround-that-still-works/). **Note:** wrapping the *genuine* binary is not explicitly blessed in writing — LOW-MEDIUM confidence on formal permission, HIGH confidence on ecosystem practice (Cline/Roo/Zed/Conductor all ship it as of 2026-07)
-- Cursor BYOK restrictions (anti-feature evidence): [APIpie fix guide](https://apipie.ai/docs/blog/Cursors-Does-Not-Work-with-Your-Current-Plan-or-API-Key-Fix)
+**Official documentation and specifications**
+- TypeSafe Jev docs, limits, confidence and failure modes, as consolidated in `.planning/research/JEV-REFERENCE.md` (citations inside).
+- OpenRouter Jev hub: model ID `typesafe/jev-1.13`, `POST /api/v1/systemone`, 32k-token context covering state plus questions, `usage.cost` — https://openrouter.ai/docs/guides/community/jev (fetched 2026-09-28).
+- MCP tools specification 2026-07-28 (annotations, untrusted-hint rule, `outputSchema`, `structuredContent`, `input_required`) — https://modelcontextprotocol.io/specification/2026-07-28/server/tools.
+- Claude Code MCP docs (tool search default, 2 KB truncation, `alwaysLoad`, `requiresUserInteraction`, output limits, elicitation) — https://code.claude.com/docs/en/mcp-servers.
+- Cursor MCP docs and help (elicitation, approvals, Auto-review) — https://cursor.com/docs/mcp, https://cursor.com/help/customization/mcp.
+- Playwright MCP assertion and snapshot docs — https://playwright.dev/mcp/tools/assertions, https://playwright.dev/mcp/snapshots.
+- Stagehand agent reference — https://docs.stagehand.dev/v3/references/agent.
+- Anthropic, "Writing effective tools for AI agents" — https://www.anthropic.com/engineering/writing-tools-for-agents.
+
+**Source code read**
+- FSB: `mcp/src/server.ts`, `mcp/src/tools/{autopilot,manual,read-only,observability,schema-bridge}.ts`, `mcp/src/agent-providers/claude-stream.ts`, `extension/ai/{tool-definitions,tool-use-adapter,permission-context,engine-config,ai-integration}.js`, `extension/ws/mcp-tool-dispatcher.js`, `extension/utils/{action-verification,automation-logger,mcp-lattice-journal,mcp-session-recorder,setup}.js`, `extension/content/{dom-analysis,actions}.js`; installed `@modelcontextprotocol/sdk` 1.29.0 type definitions.
+- VS Code MCP server metadata handling — https://github.com/microsoft/vscode/blob/234229df/src/vs/workbench/contrib/mcp/common/mcpServer.ts.
+- Claude Code client snapshot (annotation mapping; third-party mirror, MEDIUM) — https://github.com/zackautocracy/claude-code/blob/4b9d30f7/src/services/mcp/client.ts.
+
+**Measured locally (2026-09-28)**
+- Registry: 57 tools; 34.6k description and 32.9k parameter-description characters; repeated blocks as listed under "What this means for FSB"; `execute_js` at 2,187 characters on the wire; 19 registry tools flagged `_readOnly`.
+
+**Independent third-party evidence**
+- WindTunnel (25/49 DOM-only vs 49/49 WebMCP) — https://github.com/nekuda-ai/WindTunnel.
+- dejevu (LLM-only loop faster than jev-ultrafast's published run) — https://github.com/idovmamane/dejevu.
+- Bear Huddleston approval assay (1.24× speed, truncated-policy failure) — https://bearhuddleston.dev/reports/jev-approvals-live-sandbox/.
+
+**Self-reported builds**
+- jev-ultrafast (README, performance.md, snapshot.js, questions.py) — https://github.com/browser-use/jev-ultrafast.
+- Jev for Chrome — https://github.com/chy4pro/jev-for-chrome.
+- jev-ultrafast-mcp — https://github.com/jiawei686/jev-ultrafast-mcp (README fetched 2026-09-28).
+- MahmoudAdelbghany/jev-browser — https://github.com/MahmoudAdelbghany/jev-browser/blob/HEAD/RESULTS.md.
+- forvela/jev-agent-browser — https://github.com/forvela/jev-agent-browser.
+- Kinde Jev Gatehouse — https://github.com/kinde-starter-kits/jev-agent-authorization.
+- Ying-Kai-Liao/jev-browser, via jevwiki builds page — https://jevwiki.ai/wiki/ideas/builds-browser-and-interface.md.
+
+**Vendor and community**
+- Cursor, "Dynamic context discovery" (46.9% token A/B) — https://cursor.com/blog/dynamic-context-discovery.
+- Browser Use, "Speed Matters" (KV-cache ordering, screenshot cost, output-token cost) — https://browser-use.com/posts/speed-matters.
+- Claude Code issues on instructions, annotations and structured content: #23808, #87452, #83886, #9962; claude-ai-mcp#131.
+- Cursor forum on structured-only results being dropped — https://forum.cursor.com/t/mcp-tool-results-containing-only-structuredcontent-are-silently-dropped/167346.
+- jevwiki community and mixed-tier pages (confidence failure reports, production operations, head-to-head agents), via `research_notes/Jev by TypeSafe AI/`.
+- LOW-confidence blogs used only for leads, not claims: mcpblog.dev on annotations, baeseokjae.github.io on Cursor annotations.
 
 ---
-*Feature research for: v0.9.91 MCP Clients as Providers (agent CLIs as side-panel providers)*
-*Researched: 2026-07-10*
+*Feature research for: v1.0.0 Jev Fast Mode (decision-model-accelerated browser automation and MCP speedups)*
+*Researched: 2026-09-28*

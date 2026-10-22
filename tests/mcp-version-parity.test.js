@@ -4,6 +4,9 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { execSync } = require('child_process');
+const { pathToFileURL } = require('url');
+const { releaseDocParityChecks } = require('./helpers/release-doc-parity');
+const { checkToolCountDocs, TOOL_COUNT_MARKERS } = require('./helpers/tool-count-docs');
 
 let passed = 0;
 let failed = 0;
@@ -192,11 +195,6 @@ function extractRuntimeVersion(versionSource) {
   return match ? match[1] : null;
 }
 
-function extractLatestChangelogVersion(changelogSource) {
-  const match = changelogSource.match(/^## (\d+\.\d+\.\d+)(?:\s|$)/m);
-  return match ? match[1] : null;
-}
-
 function collectExplicitVersions(text) {
   const matches = [];
   const patterns = [
@@ -215,6 +213,79 @@ function collectExplicitVersions(text) {
   return matches;
 }
 
+// Minimal README shapes for the outcome-aware tool-count rule (Phase 71 D-27).
+// Ten groups sum to 72; the Settings group makes 73.
+function syntheticToolCountDocs({
+  count,
+  marker,
+  release = '0.12.0',
+  linkCount = count,
+  settingsCounted = true,
+  rootRowDelta = 0,
+  settingsMentionedIn = null,
+}) {
+  const groups = [
+    ['Visual sessions', 2, 'start_visual_session'],
+    ['Autopilot and agent navigation', 4, 'run_task'],
+    ['Trigger watchers', 4, 'trigger'],
+    ['Manual control', 37, 'click'],
+    ['Read-only inspection', 8, 'read_page'],
+    ['Developer / UAT', 1, 'capture_screenshot'],
+    ['Capabilities', 2, 'search_capabilities'],
+    ['Observability and replay', 7, 'list_sessions'],
+    ['Vault', 4, 'list_credentials'],
+    ['Task lifecycle', 3, 'complete_task'],
+  ];
+  if (settingsCounted) groups.push(['Settings', 1, 'settings']);
+  const rootRows = groups.map(([name, k, example], index) => {
+    const shown = index === 0 ? k + rootRowDelta : k;
+    const extra = settingsMentionedIn === 'root' && index === 8 ? ', `settings`' : '';
+    return `| ${name} | ${shown} | \`${example}\`${extra} |`;
+  });
+  const mcpSections = groups.map(([name, k, example], index) => {
+    const extra = settingsMentionedIn === 'mcp' && index === 8 ? '\nThe `settings` tool also lives here.\n' : '';
+    return `### ${name} (${k})\n\n| Tool | Purpose |\n|------|---------|\n| \`${example}\` | Example. |\n${extra}`;
+  });
+  const markers = TOOL_COUNT_MARKERS(release);
+  const markerLines = {
+    includes: [markers.includes],
+    excludes: [markers.excludes],
+    none: [],
+    both: [markers.includes, markers.excludes],
+  }[marker];
+  const rootReadme = [
+    '# FSB',
+    '',
+    `- Uses ${count} registered MCP tools for external clients.`,
+    '',
+    '| Surface | Count | Examples |',
+    '|---------|-------|----------|',
+    ...rootRows,
+    '',
+    'Read-only tools bypass the queue.',
+    '',
+  ].join('\n');
+  const mcpReadme = [
+    '# FSB MCP Server',
+    '',
+    `[Quick Start](#quick-start) - [Tools](#tools-${linkCount}-total)`,
+    '',
+    `## Tools (${count} Total)`,
+    '',
+    ...mcpSections,
+    '### Tool Count Contract',
+    '',
+    'The documented count is the registered tools/list length.',
+    '',
+    ...markerLines.flatMap((line) => [line, '']),
+    '---',
+    '',
+    '## Architecture',
+    '',
+  ].join('\n');
+  return { rootReadme, mcpReadme };
+}
+
 function runCommand(command) {
   return execSync(command, {
     cwd: repoRoot,
@@ -223,6 +294,7 @@ function runCommand(command) {
 }
 
 async function run() {
+  const { compatFor } = await import(pathToFileURL(path.join(repoRoot, 'scripts/lib/mcp-extension-compat.mjs')).href);
   const rootPackageJson = readJson('package.json');
   const packageJson = readJson('mcp/package.json');
   const packageLock = readJson('mcp/package-lock.json');
@@ -240,7 +312,7 @@ async function run() {
   const canonicalVersion = packageJson.version;
   const backgroundSource = readText('extension/background.js');
   const bridgeSource = readText('extension/ws/mcp-bridge-client.js');
-  const delegationUiSpec = readText('.planning/phases/61-delegation-ux-sw-eviction-persistence/61-UI-SPEC.md');
+  const delegationUiSpec = readText('.planning/milestones/v0.9.91-phases/61-delegation-ux-sw-eviction-persistence/61-UI-SPEC.md');
   const extProtocolSource = readText('mcp/src/ext-protocol.ts');
   const adapterSource = readText('mcp/src/agent-providers/adapter.ts');
   const adapterRegistrySource = readText('mcp/src/agent-providers/registry.ts');
@@ -267,6 +339,7 @@ async function run() {
     ['root README', rootReadme],
     ['MCP README', packageReadme],
     ['extension onboarding', readText('extension/ui/onboarding.js')],
+    ['showcase home page', readText('showcase/angular/src/app/pages/home/home-page.component.html')],
     ['showcase about page', readText('showcase/angular/src/app/pages/about/about-page.component.html')],
     ['showcase agents page', readText('showcase/angular/src/app/pages/agents/agents-page.component.html')],
     ['showcase agents metadata', readText('showcase/angular/src/app/pages/agents/agents-page.component.ts')],
@@ -289,13 +362,16 @@ async function run() {
   assertEqual(serverJson.packages[0].version, canonicalVersion, 'server.json package version matches canonical package version');
 
   console.log('\n--- release documentation parity ---');
-  assertEqual(extractLatestChangelogVersion(packageChangelog), canonicalVersion, 'latest MCP changelog entry matches canonical package version');
-  assert(packageChangelog.includes('`mcp:task-status`'), 'MCP changelog documents the new task-status wire contract');
-  assert(packageChangelog.includes(`fsb-mcp-server@${canonicalVersion}`), 'MCP changelog names the current publish artifact');
-  assert(packageReadme.includes(`### What's New In v${canonicalVersion}`), 'MCP README has a current release summary');
-  assert(packageReadme.includes(`### Releasing ${canonicalVersion}`), 'MCP README release instructions match canonical package version');
-  assert(packageReadme.includes(`git tag mcp-v${canonicalVersion} && git push origin mcp-v${canonicalVersion}`), 'MCP README uses the MCP-only release tag');
-  assert(packageReadme.includes(`MCP ${canonicalVersion} requires extension ${extensionVersion} or newer`), 'MCP README documents independent compatibility requirements');
+  for (const { ok, msg } of releaseDocParityChecks({
+    rootChangelog,
+    packageReadme,
+    packageChangelog,
+    extensionVersion,
+    mcpVersion: canonicalVersion,
+    compatMinimum: compatFor(canonicalVersion).minimum,
+  })) {
+    assert(ok, msg);
+  }
   assert(publishWorkflow.includes("- 'mcp-v*'"), 'MCP release workflow supports MCP tags');
   assert(publishWorkflow.includes('test "$GITHUB_REF_NAME" = "mcp-v${{ steps.package-version.outputs.version }}"'), 'MCP workflow binds the tag to mcp/package.json');
   assert(publishWorkflow.includes('git merge-base --is-ancestor "$release_commit" origin/main'), 'release workflow requires the tagged commit to be on main');
@@ -304,14 +380,6 @@ async function run() {
   assert(extensionWorkflow.includes("- 'extension-v*'"), 'extension workflow owns the extension release tag');
   assert(extensionWorkflow.includes('test "$GITHUB_REF_NAME" = "extension-v${{ steps.extension-version.outputs.version }}"'), 'extension workflow binds its tag to extension/manifest.json');
   assert(!extensionWorkflow.includes("- 'mcp-v*'") && !/^\s+- 'v\*'$/mu.test(extensionWorkflow), 'extension workflow has no MCP or shared tag trigger');
-  const currentProductRelease = rootChangelog
-    .split(/^## /m)
-    .find(section => section.startsWith(`v${extensionVersion} `));
-  assert(currentProductRelease
-      && currentProductRelease.includes(`align at \`${extensionVersion}\``)
-      && (currentProductRelease.includes(`advances to \`${canonicalVersion}\``)
-        || currentProductRelease.includes(`stays at \`${canonicalVersion}\``)),
-    'current product changelog documents the independent extension and MCP releases');
   for (const [name, content] of [
     ['LLM summary source', llmsSource],
     ['LLM full source', llmsFullSource],
@@ -321,23 +389,82 @@ async function run() {
     assert(content.includes(`fsb-mcp-server ${canonicalVersion}`), `${name} advertises the canonical MCP release`);
   }
   for (const [name, content] of liveToolCountSources) {
-    assert(!/\b66(?:-tool| MCP| granular| registered)|\(66 tools\)|Tools \(66 Total\)/u.test(content),
-      `${name} contains no stale 66-tool surface claim`);
+    // Phase 71 (71-11): 68 and 69 are stale too, including the '68 available'
+    // summary form and the '68 <span>MCP</span> tools' / '68 <x .../>MCP'
+    // placeholder form in the templates and the xlf catalogs.
+    assert(!/\b6[689](?:-tool| MCP| granular| registered| tools| Tools| available)|\b6[689] <(?:span|x)\b[^>]*>MCP|\(6[689] tools\)|Tools \(6[689] Total\)/u.test(content),
+      `${name} contains no stale 66/68/69-tool surface claim`);
   }
-  assert(rootReadme.includes('69 registered MCP tools') && packageReadme.includes('## Tools (69 Total)'),
-    'primary README authorities advertise the 69-tool registered surface');
-  const rootSurfaceTable = rootReadme.match(/\| Visual sessions \|[\s\S]*?\n\nRead-only tools bypass/u);
-  const rootSurfaceCounts = rootSurfaceTable
-    ? Array.from(rootSurfaceTable[0].matchAll(/^\|[^|]+\|\s*(\d+)\s*\|/gmu), (match) => Number(match[1]))
-    : [];
-  assert(rootSurfaceCounts.length === 9 && rootSurfaceCounts.reduce((sum, count) => sum + count, 0) === 69,
-    'root README category table contains nine surfaces totaling 69 tools');
+  // Phase 71 D-27: the documented count follows the Tool Count Contract marker
+  // in mcp/README.md against the built tools/list length, never a literal.
+  const { listCurrentTools } = await import(pathToFileURL(path.join(repoRoot, 'tests/helpers/mcp-in-process.mjs')).href);
+  const builtToolNames = (await listCurrentTools()).map((tool) => tool.name);
+  const releaseDelta = JSON.parse(readText('tests/fixtures/mcp-release-delta-0.12.0.json'));
+  const toolCount = checkToolCountDocs({
+    rootReadme,
+    mcpReadme: packageReadme,
+    builtToolNames,
+    manifest: releaseDelta,
+    mcpVersion: canonicalVersion,
+  });
+  assert(toolCount.ok,
+    `README tool counts follow the Tool Count Contract against the built tools/list (state: ${toolCount.state}, expected: ${toolCount.expected}, built: ${builtToolNames.length}, errors: ${toolCount.errors.join('; ') || 'none'})`);
   assert(promptSource.includes('FSB Tool Reference (49 tools)') &&
     promptSource.includes('## Developer / UAT (1 tool)') &&
     promptSource.includes('## Observability (7 tools)') &&
     promptSource.includes('| get_session_replay |') &&
     promptSource.includes('| replay_session |'),
   'shipped tool-reference prompt advertises its 49 listed tools, screenshot capture, and both replay observability tools');
+
+  console.log('\n--- tool count rule, both doc states ---');
+  {
+    const markers = TOOL_COUNT_MARKERS('0.12.0');
+    assertEqual(markers.includes, 'The documented count includes the tools added in fsb-mcp-server 0.12.0.',
+      'includes marker sentence is exact');
+    assertEqual(markers.excludes,
+      'The documented count excludes the tools added in fsb-mcp-server 0.12.0, which is not published yet.',
+      'excludes marker sentence is exact');
+    assertEqual(collectExplicitVersions(`${markers.includes}\n${markers.excludes}`).length, 0,
+      'marker sentences name the release without an explicit fsb-mcp-server@ version');
+    const syntheticBuilt = [...Array.from({ length: 72 }, (_, index) => `tool_${index}`), 'settings'];
+    const syntheticCase = (name, docsOptions, mcpVersion, expectation) => {
+      const docs = syntheticToolCountDocs(docsOptions);
+      const result = checkToolCountDocs({ ...docs, builtToolNames: syntheticBuilt, manifest: releaseDelta, mcpVersion });
+      if (expectation.ok) {
+        assert(result.ok && result.state === expectation.state && result.expected === expectation.expected,
+          `${name} (state: ${result.state}, expected: ${result.expected}, errors: ${result.errors.join('; ') || 'none'})`);
+      } else {
+        assert(!result.ok && result.errors.some((error) => error.startsWith(expectation.rule)),
+          `${name} (errors: ${result.errors.join('; ') || 'none'})`);
+      }
+    };
+    syntheticCase('includes with 73 documented, 73 built at 0.11.2 passes',
+      { count: 73, marker: 'includes' }, '0.11.2', { ok: true, state: 'includes', expected: 73 });
+    syntheticCase('includes with 73 documented, 73 built at 0.12.0 passes',
+      { count: 73, marker: 'includes' }, '0.12.0', { ok: true, state: 'includes', expected: 73 });
+    syntheticCase('excludes with 72 documented and no settings row, 73 built at 0.11.2 passes (the M-71-11b state)',
+      { count: 72, marker: 'excludes', settingsCounted: false }, '0.11.2', { ok: true, state: 'excludes', expected: 72 });
+    syntheticCase('excludes with 72 documented at 0.12.0 is refused',
+      { count: 72, marker: 'excludes', settingsCounted: false }, '0.12.0', { ok: false, rule: 'excludes_after_release' });
+    syntheticCase('excludes with 72 documented at 0.12.1 is refused',
+      { count: 72, marker: 'excludes', settingsCounted: false }, '0.12.1', { ok: false, rule: 'excludes_after_release' });
+    syntheticCase('includes with 72 documented is refused',
+      { count: 72, marker: 'includes', settingsCounted: false }, '0.11.2', { ok: false, rule: 'mcp_tools_heading' });
+    syntheticCase('excludes with 72 documented that still lists settings in a counted root row is refused',
+      { count: 72, marker: 'excludes', settingsCounted: false, settingsMentionedIn: 'root' }, '0.11.2',
+      { ok: false, rule: 'excluded_tool_counted' });
+    syntheticCase('excludes with 72 documented that still lists settings under a counted MCP heading is refused',
+      { count: 72, marker: 'excludes', settingsCounted: false, settingsMentionedIn: 'mcp' }, '0.11.2',
+      { ok: false, rule: 'excluded_tool_counted' });
+    syntheticCase('no marker sentence is refused',
+      { count: 73, marker: 'none' }, '0.11.2', { ok: false, rule: 'marker_missing' });
+    syntheticCase('both marker sentences are refused',
+      { count: 73, marker: 'both' }, '0.11.2', { ok: false, rule: 'marker_ambiguous' });
+    syntheticCase('a root table summing to 72 under "73 registered MCP tools" is refused',
+      { count: 73, marker: 'includes', rootRowDelta: -1 }, '0.11.2', { ok: false, rule: 'root_table_sum' });
+    syntheticCase('a "## Tools (73 Total)" heading whose contents link targets #tools-69-total is refused',
+      { count: 73, marker: 'includes', linkCount: 69 }, '0.11.2', { ok: false, rule: 'contents_link' });
+  }
 
   console.log('\n--- cli output parity ---');
   const helpOutput = runCommand('node mcp/build/index.js help');
@@ -367,6 +494,8 @@ async function run() {
     'mcp:get-session-replay',
     'mcp:replay-session',
     'system:client-inventory',
+    'mcp:get-settings',
+    'mcp:set-setting',
   ];
   const historicalMessageTypes = messageTypes.filter(
     (type) => !mergedAdditiveMessageTypes.includes(type),
@@ -378,7 +507,7 @@ async function run() {
   assert(
     JSON.stringify(messageTypes.filter((type) => mergedAdditiveMessageTypes.includes(type)))
       === JSON.stringify(mergedAdditiveMessageTypes),
-    'the merged branch retains the reviewed task-status, replay, and client-inventory additive MCPMessageType values',
+    'the merged branch retains the reviewed task-status, replay, client-inventory and Phase 66.1 settings additive MCPMessageType values, in order',
   );
   assert(
     /type: 'mcp:result' \| 'mcp:progress' \| 'mcp:error';/.test(typesSource),

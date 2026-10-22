@@ -268,6 +268,12 @@
     if (entry && entry.success === false) {
       return { risk: 'inspect-only', availability: 'unsupported', reason: 'Recorded call did not succeed' };
     }
+    // Phase 68 (WR-05): a fast-mode step whose resolved selector was not
+    // recorded still targets a one-time page handle, which never resolves
+    // on a later page load.
+    if (args.jevHandle !== undefined) {
+      return { risk: 'inspect-only', availability: 'unsupported', reason: 'Fast-mode step recorded against a one-time page handle' };
+    }
     if (entry && entry.result && (
       entry.result.errorCode === 'mcp_route_unavailable' ||
       entry.result.code === 'mcp_route_unavailable'

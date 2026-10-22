@@ -155,6 +155,13 @@ var _al_normalizeProviderBaseUrl = (typeof normalizeProviderBaseUrl !== 'undefin
 // Phase 156-158 module references
 var _al_estimateCost = (typeof estimateCost !== 'undefined') ? estimateCost : (_al_costTracker?.estimateCost || function() { return 0; });
 var _al_CostTracker = (typeof CostTracker !== 'undefined') ? CostTracker : (_al_costTracker?.CostTracker || null);
+// Phase 66 measurement helpers (cost-tracker.js). A missing helper resolves to
+// null so the measurement block is skipped; nothing falls back to a stub 0.
+var _al_readProviderUsage = (typeof readProviderUsage !== 'undefined') ? readProviderUsage : (_al_costTracker?.readProviderUsage || null);
+var _al_estimateCostDetailed = (typeof estimateCostDetailed !== 'undefined') ? estimateCostDetailed : (_al_costTracker?.estimateCostDetailed || null);
+var _al_buildIterationTimingRow = (typeof buildIterationTimingRow !== 'undefined') ? buildIterationTimingRow : (_al_costTracker?.buildIterationTimingRow || null);
+var _al_appendIterationTiming = (typeof appendIterationTiming !== 'undefined') ? appendIterationTiming : (_al_costTracker?.appendIterationTiming || null);
+var _al_addIterationToolTime = (typeof addIterationToolTime !== 'undefined') ? addIterationToolTime : (_al_costTracker?.addIterationToolTime || null);
 var _al_TranscriptStore = (typeof TranscriptStore !== 'undefined') ? TranscriptStore : (_al_transcriptStore?.TranscriptStore || null);
 var _al_estimateTokens = (typeof estimateTokens !== 'undefined') ? estimateTokens : (_al_transcriptStore?.estimateTokens || function() { return 0; });
 var _al_HookPipeline = (typeof HookPipeline !== 'undefined') ? HookPipeline : (_al_hookPipeline?.HookPipeline || null);
@@ -192,9 +199,27 @@ var _META_WARN_THRESHOLD = 4;
 var _META_FORCE_STOP_THRESHOLD = 6;
 var _META_WINDOW_ITERATIONS = 12;
 
+// Phase 68 fast path (F1, WR-02): one key per control per page path. The page
+// path and the label are page data, and the key reaches the attempt-log
+// message, the logs and the terminal summary, so it holds only the role word
+// and an FNV-1a hash of path, role and label.
+function _metaJevKey(call) {
+  var a = call.args;
+  var role = String(a.expectedRole || '').toLowerCase();
+  if (!/^[a-z]{1,20}$/.test(role)) role = 'control';
+  var text = String(call.pagePath || '') + '\n' + String(a.expectedRole || '') + '\n' + String(a.expectedName || '');
+  var hash = 0x811c9dc5;
+  for (var i = 0; i < text.length; i++) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return 'jev:' + role + ':' + hash.toString(16).padStart(8, '0');
+}
+
 function _extractMetaTargetKey(call) {
   if (!call || !call.args) return null;
   var a = call.args;
+  if (a.jevHandle) return _metaJevKey(call);
   if (a.selector) return 'sel:' + String(a.selector).slice(0, 80);
   if (a.elementId) return 'id:' + String(a.elementId).slice(0, 40);
   if (a.element_id) return 'id:' + String(a.element_id).slice(0, 40);
@@ -1908,6 +1933,29 @@ async function runAgentIteration(sessionId, options) {
     if (_al_ScreenshotAttachments && typeof _al_ScreenshotAttachments.expireOrphans === 'function') {
       _al_ScreenshotAttachments.expireOrphans(sessionId, session.messages);
     }
+    // Phase 68 fast path (D-08): only a session that carries the fast-mode
+    // field asks for at most one code-built step. A decline, an error or a
+    // missing field leaves this iteration to the LLM; a stop while the
+    // decision is pending ends it (F21). Errors stay here (F13).
+    var _fastStep = null;
+    if (session.fastMode && typeof globalThis !== 'undefined' && globalThis.FsbFastPath && typeof globalThis.FsbFastPath.beforeTurn === 'function') {
+      try {
+        _fastStep = await globalThis.FsbFastPath.beforeTurn(session, { sessionId: sessionId, iteration: iterNum });
+      } catch (_fastErr) {
+        _fastStep = null;
+      }
+      if (session.status !== 'running') return;
+    }
+    if (_fastStep && _fastStep.toolCall) {
+      // The fast branch skips the LLM block below: no model call, no usage,
+      // no timing row, no assistant message (D-23).
+      var toolCalls = [_fastStep.toolCall];
+      var response = null;
+      var inputTokens = 0;
+      var outputTokens = 0;
+      var iterationCost = 0;
+      var _timingRow = null;
+    } else {
     var turnMessages = buildTurnMessages(session);
     var pendingScreenshotAttachments = _al_ScreenshotAttachments
       && typeof _al_ScreenshotAttachments.pending === 'function'
@@ -1934,6 +1982,8 @@ async function runAgentIteration(sessionId, options) {
     // DIAG: Log API call start/end to automationLogger so MCP get_logs can surface
     // agent loop lifecycle (console.log only goes to DevTools, invisible to MCP).
     var apiCallStartTime = Date.now();
+    var _timingModelRetried = false;
+    var _timingModelMs = null;
     if (typeof automationLogger !== 'undefined') {
       automationLogger.debug('Agent iteration API call starting', {
         sessionId: sessionId, iteration: iterNum,
@@ -1961,6 +2011,7 @@ async function runAgentIteration(sessionId, options) {
           ? _al_ScreenshotAttachments.classifyImageRejection(imageRequestError)
           : null;
         if (!imageFallbackCode) throw imageRequestError;
+        _timingModelRetried = true;
 
         // Retry exactly once, text-only, only for a likely image/shape/size
         // rejection. Authentication, rate limits, network, and server errors
@@ -1977,6 +2028,7 @@ async function runAgentIteration(sessionId, options) {
         );
         pendingScreenshotAttachments = [];
       }
+      _timingModelMs = Date.now() - apiCallStartTime;
       if (pendingScreenshotAttachments.length > 0
           && _al_ScreenshotAttachments
           && typeof _al_ScreenshotAttachments.markDelivered === 'function') {
@@ -2028,6 +2080,28 @@ async function runAgentIteration(sessionId, options) {
       session.totalCost = session.agentState.totalCost;
     }
     session.iterationCount = iterNum;
+
+    // h1a. Phase 66 (MEAS-01): one measurement row per iteration with model time,
+    // provider-first usage and labelled cost. Additive only: the legacy numbers
+    // above keep their meaning and nothing here changes what the loop decides.
+    // Appended before the end_turn check, so every path (terminal tools too)
+    // records its row.
+    var _timingRow = null;
+    if (_al_readProviderUsage && _al_estimateCostDetailed && _al_buildIterationTimingRow && _al_appendIterationTiming) {
+      try {
+        var _timingUsage = _al_readProviderUsage(response, providerKey);
+        _timingRow = _al_appendIterationTiming(session, _al_buildIterationTimingRow({
+          iteration: iterNum,
+          startedAt: apiCallStartTime,
+          modelMs: _timingModelMs,
+          modelRetried: _timingModelRetried,
+          usage: _timingUsage,
+          estimate: _al_estimateCostDetailed(model, _timingUsage, providerKey),
+          requestedModel: model,
+          provider: providerKey
+        }), 100);
+      } catch (_timingErr) { /* measurement is diagnostic-only */ }
+    }
 
     // h1b. Track usage in BackgroundAnalytics (control panel dashboard).
     //
@@ -2190,6 +2264,7 @@ async function runAgentIteration(sessionId, options) {
         })
       });
     }
+    }
 
     // Phase 233 Fix A: defensive iteration intent log. session.actionHistory
     // has known recording gaps (mutation tools sometimes don't reach the push
@@ -2291,6 +2366,10 @@ async function runAgentIteration(sessionId, options) {
           continue; // Skip to next tool
         }
       }
+
+      // Phase 66 (MEAS-01): tool time runs from here (the permission hook let the
+      // call through) to the success push into the action history below.
+      var _timingToolStartedAt = Date.now();
 
       // Phase 9 FINT-14 -- mark in-flight tool dispatch boundary. Adapter resume() maps
       // this marker to ResumePolicy 'ON_ERROR_SW_EVICTION_MID_TOOL_DISPATCH'. Marker set
@@ -2786,7 +2865,13 @@ async function runAgentIteration(sessionId, options) {
             },
             success: result.success,
             dispatcher_route: 'autopilot',
-            drivingModel: {
+            // Phase 68 (WR-06, D-23): a fast step was decided by Jev, not by
+            // the session's model, so its row is labelled separately.
+            drivingModel: (_fastStep && _fastStep.toolCall) ? {
+              provider: 'jev',
+              model_id: null,
+              decisionSource: 'jev'
+            } : {
               provider: _phase10ProviderKey,
               model_id: _phase10ModelId,
               reasoning_tokens: _phase10ReasoningTokens
@@ -2795,12 +2880,18 @@ async function runAgentIteration(sessionId, options) {
         } catch (_e) { /* swallow - recorder is fire-and-forget */ }
       }
 
+      // Phase 66 (MEAS-01): executed-tool time, measured up to this push. A wall
+      // clock that stepped back leaves it unmeasured (null), never negative.
+      var _timingToolMs = Date.now() - _timingToolStartedAt;
+      if (!(_timingToolMs >= 0)) _timingToolMs = null;
+
       // ADOPT-04: Use ActionHistory instance or fallback to raw array
       if (session._actionHistory) {
         session._actionHistory.push({
           tool: call.name, params: call.args,
           result: { success: result.success, hadEffect: result.hadEffect, error: result.error || null },
-          timestamp: Date.now(), iteration: iterNum
+          timestamp: Date.now(), iteration: iterNum,
+          durationMs: _timingToolMs
         });
         session.actionHistory = session._actionHistory.events; // backward compat sync
       } else {
@@ -2808,8 +2899,15 @@ async function runAgentIteration(sessionId, options) {
         session.actionHistory.push(_al_createActionEvent({
           tool: call.name, params: call.args,
           result: { success: result.success, hadEffect: result.hadEffect, error: result.error || null },
-          timestamp: Date.now(), iteration: iterNum
+          timestamp: Date.now(), iteration: iterNum,
+          durationMs: _timingToolMs
         }));
+      }
+
+      if (_al_addIterationToolTime && _timingRow) {
+        try {
+          _al_addIterationToolTime(session, _timingRow, _timingToolMs);
+        } catch (_timingErr) { /* measurement is diagnostic-only */ }
       }
 
       // Emit afterToolExecution hook
@@ -2829,6 +2927,14 @@ async function runAgentIteration(sessionId, options) {
     // m. Format tool results into messages and push to history
     // Verified Phase 183 AICOM-05: Continuation includes tool results (with DOM from snapshots), stuck recovery hints.
     // Tool results carry JSON.stringify(tr.result) via formatToolResult; stuck hints injected at step n below.
+    if (_fastStep && _fastStep.toolCall) {
+      // Phase 68 fast path (D-10): no tool message for a fast step; the LLM
+      // hears about it in one hand-off before its next turn.
+      _fastStep.afterDone = true;
+      try {
+        globalThis.FsbFastPath.afterStep(session, _fastStep.step, toolResults);
+      } catch (_fastAfterErr) { /* the module latches itself off */ }
+    } else {
     for (var ti = 0; ti < toolResults.length; ti++) {
       var tr = toolResults[ti];
       var resultMsg = _formatToolResult(
@@ -2838,6 +2944,12 @@ async function runAgentIteration(sessionId, options) {
         { name: tr.name }
       );
       session.messages.push(resultMsg);
+    }
+    if (session.fastMode && typeof globalThis !== 'undefined' && globalThis.FsbFastPath && typeof globalThis.FsbFastPath.observeTools === 'function') {
+      try {
+        globalThis.FsbFastPath.observeTools(session, toolCalls, toolResults);
+      } catch (_fastObsErr) { /* diagnostic only */ }
+    }
     }
 
     // m3. Phase 233: meta-cognitive attempt-counter. Operates directly on
@@ -3032,6 +3144,18 @@ async function runAgentIteration(sessionId, options) {
     session._nextIterationTimer = setTimeout(function() { runAgentIteration(sessionId, options); }, 100);
 
   } catch (error) {
+    // Phase 68 fast path (WR-03): a throw after a fast step was dispatched but
+    // before afterStep ran would lose the step, and the retried iteration could
+    // act again. afterStep with no result records it as possibly executed and
+    // latches fast mode off, so the retry hands the LLM a truthful summary.
+    if (_fastStep && _fastStep.toolCall && _fastStep.afterDone !== true && typeof globalThis !== 'undefined'
+        && globalThis.FsbFastPath && typeof globalThis.FsbFastPath.afterStep === 'function') {
+      _fastStep.afterDone = true;
+      try {
+        globalThis.FsbFastPath.afterStep(session, _fastStep.step, []);
+      } catch (_fastCatchErr) { /* the module latches itself off */ }
+    }
+
     // Error handling for API call failures
     var errMsg = error.message || String(error);
     var errStatus = error.status;

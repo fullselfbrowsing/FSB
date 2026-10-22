@@ -291,9 +291,9 @@ export class AgentsPageComponent implements OnInit, OnDestroy {
           applicationCategory: 'DeveloperApplication',
           operatingSystem: 'macOS, Linux, Windows (Node.js 18+)',
           url: `${HOST}/agents`,
-          description: $localize`:@@agents.schema.software.description:Canonical OpenClaw and Hermes onboarding path for FSB. Doctor flow, stdio config printer, consent-gated multi-host installer, and 68 MCP browser tools for the FSB MCP server.`,
+          description: $localize`:@@agents.schema.software.description:Canonical OpenClaw and Hermes onboarding path for FSB. Doctor flow, stdio config printer, consent-gated multi-host installer, and 73 MCP browser tools for the FSB MCP server.`,
           featureList: [
-            $localize`:@@agents.schema.software.feature.tools:68 MCP tools for browser action, observation, verification, and recovery`,
+            $localize`:@@agents.schema.software.feature.tools:73 MCP tools for browser action, observation, verification, and recovery`,
             $localize`:@@agents.schema.software.feature.manual:Manual mode by default; run_task autopilot only on explicit delegation`,
             $localize`:@@agents.schema.software.feature.vault:Vault tools fill credentials and payment methods without exposing raw secrets`,
             $localize`:@@agents.schema.software.feature.triggers:Trigger watcher tools for reactive page monitoring`,

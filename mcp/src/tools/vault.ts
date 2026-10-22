@@ -5,6 +5,7 @@ import type { TaskQueue } from '../queue.js';
 import { AgentScope } from '../agent-scope.js';
 import { sendAgentScopedBridgeMessage } from '../agent-bridge.js';
 import { mapFSBError } from '../errors.js';
+import { mcpToolDescription, mcpParamDescription } from './descriptions.js';
 
 // Must exceed the extension-side 120_000ms payment confirmation gate.
 const PAYMENT_CONFIRMATION_TIMEOUT_MS = 125_000;
@@ -33,7 +34,7 @@ export function registerVaultTools(
   // Password field is NEVER present in the response.
   server.tool(
     'list_credentials',
-    'List saved credentials. Returns domain and username pairs only -- passwords are never included in the response. Use fill_credential to autofill a login form.',
+    mcpToolDescription('list_credentials'),
     {},
     async () => {
       if (!bridge.isConnected) {
@@ -54,10 +55,10 @@ export function registerVaultTools(
   // resolver picks the right tab and the dispatch gate enforces ownership.
   server.tool(
     'fill_credential',
-    'Auto-fill login form on the active tab with a saved credential. The password is resolved inside the extension and injected directly into the page -- it never crosses the WebSocket bridge. The domain parameter is accepted for backward compatibility but the actual lookup domain is derived from the tab URL for security. Requires the credential vault to be unlocked. Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED. Pass tab_id only when this agent owns multiple tabs; auto-resolves otherwise.',
+    mcpToolDescription('fill_credential'),
     {
-      domain: z.string().optional().describe('Hint for which credential to fill. Ignored for security -- the actual domain is derived from the resolved tab URL. Kept for backward compatibility.'),
-      tab_id: z.coerce.number().int().positive().finite().optional().describe('Optional. Tab id this action targets. Omit when the calling agent owns exactly one tab; pass to disambiguate when the agent owns multiple.'),
+      domain: z.string().optional().describe(mcpParamDescription('fill_credential', 'domain')),
+      tab_id: z.coerce.number().int().positive().finite().optional().describe(mcpParamDescription('fill_credential', 'tab_id')),
     },
     async ({ domain, tab_id }) => {
       if (!bridge.isConnected) {
@@ -83,7 +84,7 @@ export function registerVaultTools(
   // Full card data is NEVER present in the response.
   server.tool(
     'list_payment_methods',
-    'List saved payment methods. Returns card brand, last 4 digits, and cardholder name only -- full card numbers and CVV are never included. Use use_payment_method to fill a checkout form.',
+    mcpToolDescription('list_payment_methods'),
     {},
     async () => {
       if (!bridge.isConnected) {
@@ -104,10 +105,10 @@ export function registerVaultTools(
   // + connectionId now thread through the bridge payload (mirrors fill_credential).
   server.tool(
     'use_payment_method',
-    'Fill checkout form on the active tab with a saved payment method. Shows a confirmation prompt with card brand, last 4 digits, and merchant domain before any fill occurs. The fill domain is derived from the resolved tab URL inside the extension, not from this request. Requires both credential vault and payment access to be unlocked. Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED. Pass tab_id only when this agent owns multiple tabs; auto-resolves otherwise.',
+    mcpToolDescription('use_payment_method'),
     {
-      payment_method_id: z.string().describe('ID of the payment method to use (from list_payment_methods)'),
-      tab_id: z.coerce.number().int().positive().finite().optional().describe('Optional. Tab id this action targets. Omit when the calling agent owns exactly one tab; pass to disambiguate when the agent owns multiple.'),
+      payment_method_id: z.string().describe(mcpParamDescription('use_payment_method', 'payment_method_id')),
+      tab_id: z.coerce.number().int().positive().finite().optional().describe(mcpParamDescription('use_payment_method', 'tab_id')),
     },
     async ({ payment_method_id, tab_id }) => {
       if (!bridge.isConnected) {

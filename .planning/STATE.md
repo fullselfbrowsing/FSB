@@ -1,20 +1,20 @@
 ---
 gsd_state_version: 1.0
-milestone: v0.9.91
-milestone_name: MCP Clients as Providers
-status: human_needed
-stopped_at: Phase 65 automated verification passed; human UAT65-01 through UAT65-03 pending
-last_updated: "2026-07-22T18:45:13.807Z"
-last_activity: 2026-07-22
+milestone: v1.0.0
+milestone_name: Jev Fast Mode
+status: executing
+stopped_at: "v1.0.0 code-complete; Validation Block V1-V6 pending (see .planning/v1.0.0-VALIDATION-BLOCK.md)"
+last_updated: "2026-10-19T05:45:24.000Z"
+last_activity: 2026-10-19 -- v1.0.0 Validation Block runbook and integration check written
 progress:
-  total_phases: 18
-  completed_phases: 9
-  total_plans: 61
-  completed_plans: 63
-  percent: 50
+  total_phases: 7
+  completed_phases: 0
+  total_plans: 72
+  completed_plans: 70
+  percent: 0
 ---
 
-*Note: the `total_phases`/`completed_phases` counts above are scoped to the active v0.9.91 milestone (Phases 57-65) only. Some GSD tooling (`roadmap.analyze`, `phase.complete`) reports a noisy multi-phase count including collapsed `## Completed Milestones` archive entries and `## Backlog` sections — treat this file's own numbers as authoritative for v0.9.91 progress.*
+*Note: the `total_phases`/`completed_phases` counts above are scoped to the active v1.0.0 milestone (Phases 66-71 plus inserted 66.1) only. Some GSD tooling (`roadmap.analyze`, `phase.complete`) reports a noisy multi-phase count including collapsed `## Completed Milestones` archive entries and `## Backlog` sections — treat this file's own numbers as authoritative for v1.0.0 progress.*
 
 # Project State
 
@@ -26,25 +26,36 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (v0.9.91 MCP Clients as Providers — Current Milestone section, Key context bullets)
-See: .planning/ROADMAP.md (v0.9.91 active, Phases 57-65; v1.2.0 / v1.1.0 / v1.0.0 / v0.9.99 / etc. archived and collapsed)
-See: .planning/REQUIREMENTS.md (51 v1 requirements across 10 categories: IDENT, PROV, CHAN, ADAPT, CLAUDE, UX, LIFE, DRIFT, NATIVE, MULTI — all mapped to Phases 57-65, 48/51 complete)
-See: .planning/research/SUMMARY.md (converged research summary; suggested phase structure; HIGH confidence)
-See: .planning/research/PITFALLS.md (16 pitfalls with phase assignments; security section verified against 2025-2026 CVE class incidents)
-See: .planning/research/ARCHITECTURE.md (file:line integration seams; brownfield mapping onto existing FSB architecture)
+See: .planning/PROJECT.md (updated 2026-09-28 after the v0.9.91 close)
+See: .planning/milestones/v0.9.91-ROADMAP.md, .planning/milestones/v0.9.91-REQUIREMENTS.md, .planning/milestones/v0.9.91-phases/ (archived MCP Clients as Providers milestone; 51/51 requirements complete)
 See: .planning/milestones/v1.2.0-ROADMAP.md, .planning/milestones/v1.2.0-REQUIREMENTS.md, .planning/v1.2.0-MILESTONE-AUDIT.md (archived Showcase i18n Completeness milestone)
 
-**Core value:** Reliable single-attempt execution — the AI decides correctly, the mechanics execute precisely. v0.9.91 does not touch the DOM/automation single-attempt property; it extends the surface so installed agent CLIs (Claude Code first, then OpenCode + Codex) become first-class side-panel providers that drive the same live browser through FSB's own MCP tools.
-**Current focus:** Milestone-end human UAT sweep; Phase 65 automated verification is complete
+**Core value:** Reliable single-attempt execution — the AI decides correctly, the mechanics execute precisely.
+**Current focus:** v1.0.0 milestone-end Validation Block (V1-V6), starting with the owner decisions in `.planning/v1.0.0-VALIDATION-BLOCK.md` section 1; every phase (66, 66.1, 67-71) is code-complete
 
 ## Current Position
 
-Phase: 65 (codex-adapter) — EXECUTING
-Plan: 8 of 8
-Status: human_needed
-Last activity: 2026-07-28 - Completed quick task 260728-k2v: animated toolbar action icon
+Milestone: v1.0.0 Jev Fast Mode — CODE-COMPLETE (Phases 66, 66.1, 67, 68, 69, 70, 71); Validation Block V1-V6 pending
+Phase: 71 (Comparative Gate and Release) — CODE-COMPLETE, the last phase; verification `human_needed` at 9c8e5d5b (4/4 roadmap criteria, 69/69 plan must-haves, 0 gaps; full chain exit 0, 348 commands, at 29093c4b and again at 9c8e5d5b)
+Plan: 70 of 72 plans complete; 66-10 and 66-11 run in Validation Block V1 from a worktree pinned at 8a058bdf, with Phase 71's gate numbers (30 rounds, 720 runs) superseding theirs
+Status: v1.0.0 code-complete; Validation Block V1-V6 pending. The runbook `.planning/v1.0.0-VALIDATION-BLOCK.md` orders every deferred item: section 1 lists 35 owner decisions due before V1 (M-71-00 is the hard gate; its D-15 false-fail finding means the frozen gate would almost surely disable Jev, so the recommendation is to amend it before V1), section 2 gives V1-V6 with commands and evidence, and section 3 traces all 25 requirements. The integration check `.planning/v1.0.0-INTEGRATION-CHECK.md` found no blockers (8/8 E2E flows wired; warnings W1-W8 carried into the runbook). No version, CHANGELOG or publish change; nothing pushed; `main` untouched; `scripts/bench/results` and `scripts/bench/gate/decisions` are still empty
+Last activity: 2026-10-19 -- v1.0.0 Validation Block runbook and integration check written
 
-## Roadmap At A Glance (v0.9.91, Phases 57-65)
+## Roadmap At A Glance (v1.0.0, Phases 66-71)
+
+| Phase | Name | Requirements | Status |
+|-------|------|--------------|--------|
+| 66 | Baseline and Session Timing | MEAS-01..03 | Code-complete (9/11; 66-10/66-11 in Validation Block V1) |
+| 66.1 | MCP Settings Tool (inserted) | SET-01..02 | Code-complete (8/8; human/live checks in Validation Block V5, V1 cross-check, V6 release) |
+| 67 | Hosted Jev Gateway, Policy, and Shadow Mode | JEV-01..07 | Code-complete (13/13; JEV-03/JEV-06 met; human/live checks in Validation Block V2, V3 calibration, V4 gate, V5 owner decisions, V6 release) |
+| 68 | Autopilot Fast Mode | AUTO-01..05 | Code-complete (12/12; AUTO-03 met; human/live checks in Validation Block V3 calibration and CR-01 decision, V4 gate, V5 UAT, V6 privacy page, Web Store, WR-04/IN-05 owner decisions and release) |
+| 69 | MCP Descriptions and Same-Call Checks | MCP-01, MCP-02, MCP-04 | Code-complete (8/8; human/live checks in Validation Block V4, V5, V1 cross-check, V6 release) |
+| 70 | Bounded MCP Fast Task | MCP-03 | Code-complete (8/8; human/live checks in Validation Block V2 fallbacks, V3 calibration, V4 gate and WR-01 owner decision, V5 hosts, real pages and PD-70-01, V6 release, D-17 amendment and consent review) |
+| 71 | Comparative Gate and Release | EVAL-01..02, REL-01..02 | Code-complete (12/12; human/live checks in Validation Block V1 gate sign-off (hard pre-V1) and 30-round baseline, V3 calibrated smoke, V4 gate campaigns, decision file and `count_tokens`, V6 release step A extension 1.0.0 and step B MCP 0.12.0) |
+
+Coverage: 25/25 v1.0.0 requirements mapped; 0/7 phases complete. See `.planning/REQUIREMENTS.md` and `.planning/ROADMAP.md`. FSB supplies the Jev credential server-side to every install without a user usage quota. The only fast-mode setting is the control-panel Advanced Settings switch, which the Phase 66.1 MCP settings tool can also read and write. With Jev disabled, FSB behaves as it did before this milestone.
+
+## Roadmap At A Glance (v0.9.91, Phases 57-65 — archived 2026-09-28)
 
 | Phase | Name | Requirements | Status |
 |-------|------|--------------|--------|
@@ -55,10 +66,10 @@ Last activity: 2026-07-28 - Completed quick task 260728-k2v: animated toolbar ac
 | 61 | Delegation UX & SW-Eviction Persistence | UX-01..06, LIFE-01..04 | Complete (2026-07-15; UAT deferred to milestone end) |
 | 62 | CI Drift-Smoke Gate & Doctor Extensions | DRIFT-01, DRIFT-02, DRIFT-03, DRIFT-04 | Complete (2026-07-16; UAT deferred to milestone end) |
 | 63 | Native-Messaging Host | NATIVE-01, NATIVE-02, NATIVE-03, NATIVE-04 | Complete (2026-07-20; UAT deferred to milestone end) |
-| 64 | OpenCode Adapter | MULTI-01, MULTI-02, MULTI-03 | In Progress (9/13) |
-| 65 | Codex Adapter | MULTI-04, MULTI-05, MULTI-06 | Not started |
+| 64 | OpenCode Adapter | MULTI-01, MULTI-02, MULTI-03 | Complete (2026-07-21) |
+| 65 | Codex Adapter | MULTI-04, MULTI-05, MULTI-06 | Complete (2026-07-22) |
 
-Coverage: 51/51 v0.9.91 requirements mapped and automated/source complete; milestone closure awaits the accumulated human UAT ledgers
+Coverage: 51/51 v0.9.91 requirements complete. The 48 deferred live UAT scenarios were closed on 2026-09-28 as waived by the user, not executed.
 
 ## Hard Invariants (v0.9.91)
 
@@ -77,9 +88,30 @@ Coverage: 51/51 v0.9.91 requirements mapped and automated/source complete; miles
 
 ## Accumulated Context
 
+### Roadmap Evolution
+
+- Phase 66.1 inserted after Phase 66: MCP Settings Tool: one MCP-only tool to view all control-panel settings and set one by key; secrets masked and never writable; approved 2026-09-29
+
 ### Decisions
 
-Full decision log for prior milestones (v0.9.99 Phase 26-34, v1.0.0, v1.1.0, v1.2.0) lives in PROJECT.md, ROADMAP.md's `## Completed Milestones` section, and the archived `.planning/milestones/*` files. Those decisions concern the T1 capability-catalog surface and the showcase-i18n surface; they have zero shared surface with v0.9.91's provider/delegation work and are not repeated here to keep this file a digest.
+Full decision log for prior milestones (v0.9.99 Phase 26-34, v0.13.0, v1.1.0, v1.2.0) lives in PROJECT.md, ROADMAP.md's `## Completed Milestones` section, and the archived `.planning/milestones/*` files. Those decisions concern the T1 capability-catalog surface and the showcase-i18n surface; they have zero shared surface with v0.9.91's provider/delegation work and are not repeated here to keep this file a digest.
+
+v1.0.0-specific decisions:
+
+- [Milestone 2026-10-15, owner direction]: **All human validations are deferred to one Validation Block at the end of the milestone.** Phases 66.1 and 67-71 are built and verified with automated checks only (unit, contract, fixture, fake-upstream and headless tests); no phase waits on a human checkpoint. Items that need the operator, live accounts, production, or spend are collected into the Validation Block instead:
+  - **V1, baseline:** 66-10 (H2/H3, smoke) and 66-11 (H4 campaign, H5 restore), run from a worktree pinned at `8a058bdf`, the last commit before any Phase 66.1+ product code. That keeps the baseline a measurement of FSB before this milestone, as Phase 66 requires.
+  - **V2, Jev gateway live:** set the server-side Jev credential and deploy the gateway (Fly). Pushing to `main` deploys the server, packages the extension, and publishes MCP to npm (`.github/workflows/deploy.yml`, `chrome-extension.yml`, `npm-publish.yml`), so nothing from this milestone reaches `main` before the Validation Block.
+  - **V3, shadow calibration (JEV-05):** run shadow mode on the labelled corpus against the pinned live model and set the live thresholds from that evidence. Until then, thresholds ship as explicit uncalibrated defaults, fast mode stays default-off, and anything that would turn it on for users is gated on V3 evidence.
+  - **V4, comparative gate (EVAL-01/02):** baseline vs. non-Jev control vs. fast mode on the same corpus, with the predeclared gate.
+  - **V5, human UAT:** every `human_needed` verification item and every UI check from Phases 66.1-71.
+  - **V6, release:** the version commits can be prepared in code, but publishing and merging to `main` wait for V4's gate and the owner's approval.
+- [Phase 66, 2026-10-15]: Phase 66 is code-complete (9/11). 66-10 and 66-11 are deferred to Validation Block V1, and later phases treat the pinned commit `8a058bdf` as "the Phase 66 baseline" (for example, Phase 69's tool-list token count is measured against the tool list at `8a058bdf`).
+- [Phase 66.1, 2026-10-15]: Phase 66.1 is code-complete (8/8 plans plus 10 review-fix commits; verification `human_needed`, 62/63, 0 failed). SET-01/SET-02 stay unticked until their live proof runs in V5. One owner decision is pending in V5: accept or revert the review fixes WR-02 (a switch to `custom` keeps a stored model name) and WR-04 (`providerKind=api` needs a ready provider), which depart from the letter of D-15. Open non-blocking follow-up IN-02: add a parity test for the settings literals hand-mirrored in `mcp-tool-dispatcher.js` before Phase 68 extends the schema.
+- [Phase 69, 2026-10-15]: Phase 69 is code-complete (8/8 plans plus 7 review-fix commits; verification `human_needed`, 12/12 automated must-haves, 0 failed). MCP-04 is ticked on automated evidence (a 192-call pre/post wire diff against `f978e989` with 0 diffs; the D-25 redaction of sensitive `inputs_changed`/`value` records is its one recorded exception). MCP-01/MCP-02 stay unticked until V4 (exact `count_tokens` ratio; the ceil(chars/4) estimate is a 55.2% cut on description text but 30.4% on whole-list bytes, so the PROJECT.md "more than half" target is unconfirmed) and V5 (description read-through, real-site verdicts, live SC4). The `expect` timing constants ship uncalibrated until V4. Pending in V5: owner decisions WR-04 (an already-true predicate reports `verified`, then "Do not repeat the action" on an unknown outcome) and WR-05 (keep or widen the D-25 sensitive-name list), and the CR-02 acknowledgement (the recorder now sanitizes http(s) URLs under `observed`/`expected`/`before`/`after`, a storage-only change). Non-blocking follow-ups: review IN-01, IN-02, IN-04 (see `69-HUMAN-UAT.md` Gaps).
+- [Phase 67, 2026-10-15]: Phase 67 is code-complete (13/13 plans plus 10 review-fix commits; verification `human_needed` at `9cd522c7`, 64/64 automated must-haves, 0 failed). JEV-03 and JEV-06 are ticked on automated evidence. JEV-01, JEV-02, JEV-04 and JEV-07 stay unticked until the V2 gateway deploy. JEV-05 stays unticked until V3 calibration on the V2 pin; until then the shipped profile is UNCALIBRATED and every decision stays below threshold. The extension `jev-*.js` modules are loaded inert, and Phases 68 and 70 are their consumers. Pending owner decisions: V5 WR-06 (a failed spend seed is retried, not failed closed) and IN-02 (client `invalid_request` vs gateway `payload_too_large` for an unshrinkable request); V2 IN-04/IN-05 (refusal and 404 accounting, CORS on `/api/jev`). For Phase 68: `FsbJevPolicy.accept()` is necessary, never sufficient, so every Jev-chosen action must still pass the existing consent, permission and breaker gates. The Phase 68 verifier should check that call site (JEV-06).
+- [Phase 68, 2026-10-17]: Phase 68 is code-complete (12/12 plans plus 12 review-fix commits; verification `human_needed` at `38312ca1`, 10/10 automated must-haves, 0 failed). AUTO-03 is ticked on automated evidence. AUTO-01 (live panel V5, deployed privacy page and Web Store V6), AUTO-02 (calibrated live V3/V5), AUTO-04 (whole-task comparison V4) and AUTO-05 (real summaries V5) stay unticked. The JEV-06 re-check is confirmed: a Jev-accepted step passes the same permission hook, breakers and meta-attempt counter, and no path special-cases `source:'jev'`. Fast mode is default-off, and with the switch off the autopilot path is byte-identical (golden committed before the loop edit). Pending owner decisions: V3 CR-01 (structural fast-eligibility allowlist) before freezing the instrument; V6 WR-04 (any fallback latches the session until a calibrated answer, narrowing CONTEXT D-16; update the D-16 record) and IN-05/M-68-12 (MCP can turn the data-sharing switch on). Non-blocking follow-up: review IN-03 (a session's last held capture is not counted as dropped). Phase 70 joins `run_task` through the one gate Phase 68 built.
+- [Phase 70, 2026-10-17]: Phase 70 is code-complete (8/8 plans plus 4 review-fix commits; verification `human_needed` at `9ec5093f`, 12/12 automated must-haves, 0 gaps). MCP-03 stays unticked until its live proof runs in V2-V6. `run_task` follows the one Advanced Settings switch under its own frozen `run_task` budget profile (12 / 16 / 20,000 ms / 3 / 3, revisited at V3), with no new MCP argument or tool and no `mcp/` diff. A pure classifier maps task state plus per-call run evidence to done, ambiguous, blocked or needs_confirmation and never reads a Jev answer; the result reaches callers as one additive `fast_mode` key only when the switch was on at start, and switch-off output is byte-identical to the pre-edit golden on all 5 settle paths. Recorded amendments awaiting owner confirmation: PD-70-01 (D-14 observation set narrowed to the 9 page-reading read-only tools plus a delivered hand-off snapshot; V5) and the D-17 amendment (the `fast_mode` key under MCP-04; V6). Pending owner decisions: V4 WR-01 (keep counting a failed read-only call with a null nested result as unresolved uncertainty, or loosen with a one-line `readOnly` guard) and V6 M-70-08 (MCP-enable consent remedy among D-07 options a-d; release blocker for MCP-started page-context transfers). Non-blocking follow-ups: review IN-02 (ignored registration boolean) and IN-04 (stopped-run `jev` counts possibly off by one; read that way at V4); see `70-HUMAN-UAT.md` Gaps.
+- [Phase 71, 2026-10-17]: Phase 71 is code-complete (12/12 plans plus 12 review-fix commits; verification `human_needed` at `9c8e5d5b`, 4/4 roadmap criteria and 69/69 automated must-haves, 0 gaps). EVAL-01, EVAL-02, REL-01 and REL-02 stay unticked until their live halves run: EVAL-01 at V1, V3 and V4; EVAL-02 at V4, with the M-71-00 sign-off at V1 and the verdicts applied at V6; REL-01 at V6; REL-02 at V4 (`count_tokens`) and V6. The release gate `scripts/bench/gate/release-gate-v1.0.0.json` is frozen (sha256 `9d97fb90…f8eb8e`, pinned in `tests/bench-gate.test.mjs`, committed in `b7bba953` before any campaign) at R = 30 rounds for every campaign, which is 1,800 paid runs plus 720 for the optional fallback. The evaluator, decision file, release claims and gate report are proven on synthetic campaigns. The version setter refuses 1.0.0 without the CHANGELOG entry, the 0.12.0 tools/list delta is reviewed (`settings` added, `expect` on 29 tools, nothing removed or newly required), and `check-release-diff` binds shipped code to the V4-measured SHA. Docs show 73 tools. Owner escalation, a hard pre-V1 decision at M-71-00: as frozen, D-15 with the `unknownExposure: 'acted'` reading fails Jev safety 83% (p = 0.5%) to 97% (p = 1%) of the time with no true difference, and the non-Jev "any excess" rule fails 39-49%. Without an amendment (new `gateVersion` and sha256 pin before V1), V4 would mechanically disable Jev for every install. M-71-00 also takes items 2-5 (D-27 count-free onboarding, M-70-08 remedy timing, the D-09 item-3 substitution, the D-24 `showcase/server/**` narrowing) and the review follow-ups WR-05 (`showcase/**` and `skills/**` code classed as docs), WR-03 (record the gate sha256 at M-71-01b as an amend-proof anchor) and the WR-01/WR-02/WR-06 rule confirmations. Operator check at V4: review IN-05, so confirm `fsbJevFastModeEnabled` reads false after the autopilot campaign. Hand-off drift: 71-VALIDATION.md does not yet carry the WR-03, WR-05 and IN-05 follow-ups (see `71-HUMAN-UAT.md` Gaps).
 
 v0.9.91-specific decisions so far:
 
@@ -248,24 +280,25 @@ v0.9.91-specific decisions so far:
 
 ### Pending Todos
 
-None. Phases 57-63 are automated/source complete; Phase 63 automated validation is closed (all 30 per-task rows green) and awaits phase verification plus the milestone-end human UAT sweep.
+None. v0.9.91 is archived; all nine phases are automated/source complete.
 
 ### Blockers/Concerns
 
 No active blocker.
 
-- **Milestone-end UAT gate:** Phase 58's 12 live Providers checks, Phase 59's 4 live pairing/lifecycle/accessibility checks, Phase 60's 7 authenticated CLI/OS/browser checks, Phase 61's 8 consolidated consent/theme/handoff/stream/worker/endurance/POSIX/restart scenarios, Phase 62's 3 doctor/stream/layout/accessibility checks, and Phase 63's eight genuine OS/Chrome/visual/accessibility scenarios remain pending. Per user instruction, all live evidence is accumulated and audited at milestone end; automated/source and independent review evidence is green through Phase 63 Plan 12 (automated validation closed), and no live pass is inferred.
+- **Milestone-end UAT gate (closed 2026-09-28):** The 48 accumulated live scenarios (Phase 58: 12, 59: 4, 60: 7, 61: 8, 62: 3, 63: 8, 64: 3, 65: 3) were closed at the user's direction as waived, not executed. The archived human-UAT ledgers keep their original pending entries as the record; no live pass is claimed.
 
 - **Phase 59 pairing decision resolved:** Use explicit `fsb-mcp-server pair`, a durable exact extension-Origin binding, a per-daemon 32-byte session credential, `pair --reset` for deliberate rebind, per-frame sessionId revalidation, and a secret-free `bridge.auth-status` acknowledgement. Silent TOFU is rejected.
 
 Phase 60 resolved the static inline-agent/profile and Windows shell-free resolution questions in source and deterministic tests. Their genuine installed-CLI corroboration remains in the deferred Phase 60 UAT ledger. Phase 64 Plan 07 resolved the remaining OpenCode server-shape item with cold-first execution plus an FSB-owned, authenticated `opencode serve` lease for later exact-identity attaches.
 
-- Milestone-end UAT gate: Phase 65 adds UAT65-01 through UAT65-03 (genuine auth matrix, live Codex/browser lifecycle, and accessibility/responsive rendering); all remain human_needed, pending, and evidence-empty.
+- Phase 65's UAT65-01 through UAT65-03 are included in the 2026-09-28 user waiver above.
 
 ### Quick Tasks Completed
 
 | # | Description | Date | Commit | Status | Directory |
 |---|-------------|------|--------|--------|-----------|
+| 260930-f7j | Make FSB content click activate its target once (no double activation; toggle-aware click verification) | 2026-09-30 | da7e484f | Verified | [260930-f7j-make-fsb-content-click-activate-its-targ](./quick/260930-f7j-make-fsb-content-click-activate-its-targ/) |
 | 260728-k2v | Replace the chrome.action connection badge with a state-driven animated toolbar icon | 2026-07-28 | 45aa40e1 |  | [260728-k2v-animated-toolbar-icon](./quick/260728-k2v-animated-toolbar-icon/) |
 | 260720-jb5 | Patch Sheets session redaction and multi-tab visual-session token finalization | 2026-07-20 | 2f8359b2 | Verified | [260720-jb5-patch-sheets-session-redaction-and-multi](./quick/260720-jb5-patch-sheets-session-redaction-and-multi/) |
 | 260715-hs1 | Replace Google Sheets OAuth with a zero-extra-auth signed-in tab session | 2026-07-15 | 9ab3d40d | Needs Review | [260715-hs1-replace-google-sheets-oauth-with-a-signe](./quick/260715-hs1-replace-google-sheets-oauth-with-a-signe/) |
@@ -395,26 +428,33 @@ Phase 60 resolved the static inline-agent/profile and Windows shell-free resolut
 
 ## Deferred Items
 
-Items acknowledged and carried forward from previous milestone closes (Chrome MV3/manual UAT evidence gaps, not fabricated passes; procedures archived under `.planning/milestones/*/` and `.planning/phases/*/`). None of this debt blocks v0.9.91.
+On 2026-09-28, at the v0.9.91 close, the user directed that every outstanding UAT gap be marked done and every open audit item be closed. UAT rows below are therefore closed as **waived by the user, not executed**; no live pass is claimed, and the original ledgers under `.planning/milestones/*/` keep their pending entries as the record.
 
 | Category | Item | Status | Deferred At |
 |----------|------|--------|-------------|
-| uat_gap | Phase 63 Plans 05-06 (real POSIX ownership/modes, Windows HKCU/WOW64/PE/bootstrap behavior, Chrome discovery, production CLI composition, installed launcher/native execution) | deferred to v0.9.91 milestone end; human_needed | Phase 63 Plan 06 |
-| uat_gap | Phase 62 / 62-HUMAN-UAT.md (installed doctor/genuine stream, compatibility layout, keyboard/accessibility/live refresh) | deferred to v0.9.91 milestone end; 3 scenarios | Phase 62 Plan 06 |
-| uat_gap | Phase 61 / 61-HUMAN-UAT.md (consent/theme/handoff, authenticated stream, worker eviction, 45-minute endurance, POSIX lifecycle, daemon restart classification) | deferred to v0.9.91 milestone end; 8 scenarios | Phase 61 Plan 08 |
-| uat_gap | Phase 60 / 60-HUMAN-UAT.md (authenticated isolation, genuine JSONL provenance, live MCP read, POSIX/Windows tree kill, crash recovery, browser ownership/vault/consent) | deferred to v0.9.91 milestone end; 7 scenarios | Phase 60 Plan 04 |
-| uat_gap | Phase 59 / 59-HUMAN-UAT.md (live pair, daemon restart invalidation, Chrome session clearing, accessibility/theme) | deferred to v0.9.91 milestone end; 4 scenarios | Phase 59 Plan 04 |
-| uat_gap | Phase 58 / 58-HUMAN-UAT.md + 58-VISUAL-QA.md (live Providers theme/responsive/keyboard/motion and extension-state checks) | deferred to v0.9.91 milestone end; 12 scenarios | Phase 58 Plan 03 |
-| uat_gap | v1.2.0 Phase 53 / 53-VISUAL-QA.md (VISUAL-01 live DE/CJK browser visual spot-check) | human_needed | v1.2.0 Phase 53 |
-| uat_gap | Phase 27 / 27-HUMAN-UAT.md (live FETCH-05 logged-in-shape UAT-27-01 + contrast + origin-pin) | human_needed; 3 scenarios | v0.9.99 Phase 27 |
-| uat_gap | Phase 29 / 29-HUMAN-UAT.md ([ASSUMED] internal-endpoint live capture) | human_needed | v0.9.99 Phase 29 |
-| uat_gap | Phase 30 / 30-HUMAN-UAT.md (UAT-30-01 live render/Grant/badge smoke) | human_needed | v0.9.99 Phase 30 |
-| uat_gap | Phase 31 / live discovery UAT | human_needed | v0.9.99 Phase 31 |
-| uat_gap | Phase 32 / 32-HUMAN-UAT.md (UAT-32-01 live self-healing) | human_needed; partial | v0.9.99 Phase 32 |
-| uat_gap | Phase 33 / 33-HUMAN-UAT.md (live media playback fidelity) | human_needed | v0.9.99 Phase 33 |
-| uat_gap | Phase 34 / 34-HUMAN-UAT.md (live upload fidelity) | partial: UAT-34-02 pass; UAT-34-01 MCP text-file smoke pass, binary/submit checks still human_needed; UAT-34-03/04 still human_needed | v0.9.99 Phase 34 |
-| uat_gap | Phases 01/16/20/25 (v0.10/v0.11/v0.12 live-browser) | human_needed/partial | prior closes |
+| uat_gap | Phase 65 / 65-HUMAN-UAT.md (genuine Codex auth matrix, live Codex/browser lifecycle, accessibility/responsive rendering) | closed 2026-09-28: waived by user, not executed; 3 scenarios | Phase 65 Plan 08 |
+| uat_gap | Phase 64 / 64-HUMAN-UAT.md (genuine OpenCode account/process/browser/accessibility scenarios) | closed 2026-09-28: waived by user, not executed; 3 scenarios | Phase 64 |
+| uat_gap | Phase 63 / 63-HUMAN-UAT.md + Plans 05-06 (real POSIX ownership/modes, Windows HKCU/WOW64/PE/bootstrap behavior, Chrome discovery, production CLI composition, installed launcher/native execution) | closed 2026-09-28: waived by user, not executed; 8 scenarios | Phase 63 Plan 06 |
+| uat_gap | Phase 62 / 62-HUMAN-UAT.md (installed doctor/genuine stream, compatibility layout, keyboard/accessibility/live refresh) | closed 2026-09-28: waived by user, not executed; 3 scenarios | Phase 62 Plan 06 |
+| uat_gap | Phase 61 / 61-HUMAN-UAT.md (consent/theme/handoff, authenticated stream, worker eviction, 45-minute endurance, POSIX lifecycle, daemon restart classification) | closed 2026-09-28: waived by user, not executed; 8 scenarios | Phase 61 Plan 08 |
+| uat_gap | Phase 60 / 60-HUMAN-UAT.md (authenticated isolation, genuine JSONL provenance, live MCP read, POSIX/Windows tree kill, crash recovery, browser ownership/vault/consent) | closed 2026-09-28: waived by user, not executed; 7 scenarios | Phase 60 Plan 04 |
+| uat_gap | Phase 59 / 59-HUMAN-UAT.md (live pair, daemon restart invalidation, Chrome session clearing, accessibility/theme) | closed 2026-09-28: waived by user, not executed; 4 scenarios | Phase 59 Plan 04 |
+| uat_gap | Phase 58 / 58-HUMAN-UAT.md + 58-VISUAL-QA.md (live Providers theme/responsive/keyboard/motion and extension-state checks) | closed 2026-09-28: waived by user, not executed; 12 scenarios | Phase 58 Plan 03 |
+| verification_gap | Phases 58-65 / *-VERIFICATION.md `human_needed` items (the human halves of the ledgers above) | closed 2026-09-28: waived by user; automated verification had passed | v0.9.91 phases |
+| uat_gap | v1.2.0 Phase 53 / 53-VISUAL-QA.md (VISUAL-01 live DE/CJK browser visual spot-check) | closed 2026-09-28: waived by user, not executed | v1.2.0 Phase 53 |
+| uat_gap | Phase 27 / 27-HUMAN-UAT.md (live FETCH-05 logged-in-shape UAT-27-01 + contrast + origin-pin) | closed 2026-09-28: waived by user, not executed; 3 scenarios | v0.9.99 Phase 27 |
+| uat_gap | Phase 29 / 29-HUMAN-UAT.md ([ASSUMED] internal-endpoint live capture) | closed 2026-09-28: waived by user, not executed | v0.9.99 Phase 29 |
+| uat_gap | Phase 30 / 30-HUMAN-UAT.md (UAT-30-01 live render/Grant/badge smoke) | closed 2026-09-28: waived by user, not executed | v0.9.99 Phase 30 |
+| uat_gap | Phase 31 / live discovery UAT | closed 2026-09-28: waived by user, not executed | v0.9.99 Phase 31 |
+| uat_gap | Phase 32 / 32-HUMAN-UAT.md (UAT-32-01 live self-healing) | closed 2026-09-28: waived by user, not executed (was partial) | v0.9.99 Phase 32 |
+| uat_gap | Phase 33 / 33-HUMAN-UAT.md (live media playback fidelity) | closed 2026-09-28: waived by user, not executed | v0.9.99 Phase 33 |
+| uat_gap | Phase 34 / 34-HUMAN-UAT.md (live upload fidelity) | closed 2026-09-28: UAT-34-02 and the UAT-34-01 MCP text-file smoke had passed; the remaining binary/submit checks and UAT-34-03/04 waived by user, not executed | v0.9.99 Phase 34 |
+| uat_gap | Phases 01/16/20/25 (v0.10/v0.11/v0.12 live-browser) | closed 2026-09-28: waived by user, not executed | prior closes |
+| quick_task | 116 entries flagged by `audit-open` in `.planning/quick/` | closed 2026-09-28 (acknowledged). 104 have summaries and were executed; the audit flags them only because it reads `SUMMARY.md` while GSD's quick workflow writes `<id>-SUMMARY.md` (or records `status: completed`). The other 12 were not completed: 9 plan-only (never executed), `260701-e69` (steam, blocked), `260701-2m4` (sentry, implemented but uncommitted) and `260701-e6d` (teams, implemented) | quick tasks 2026-06-17 through 2026-07-28 |
+| debug | fsb-trigger-arm-masked (MCP 0.10.0 trigger arm error masked as page navigation) | closed 2026-09-28 (acknowledged): diagnosis-only; root cause of the masking found, fix not applied | 2026-06-19 |
 | i18n_debt | WARNING-02 picker-cookie short-circuits bare-`/` Accept-Language redirect | closed in v1.2.0 Phase 56 (ROUTE-01/02) | v0.9.63, carried 6+ milestones |
+
+Phase 66 plan 66-01 (H1 history export) was closed on 2026-10-12, not executed. The 40 MCP sessions from 2026-09-16..21 were lost when the Web Store build was reinstalled on 2026-10-09, and no backup exists. No Phase 66 success criterion or MEAS requirement depends on them; see `66-01-SUMMARY.md`.
 
 Carry-forward publish/tag gates (pre-existing, user-gated): `npm publish fsb-mcp-server@0.9.0`; `npm publish fsb-mcp-server@0.10.0`; branch + tag pushes for v0.9.62 / v0.9.63 / v0.9.69 / v0.10.0 / v0.11.0 / v0.12.0 / v1.2.0; `clawhub publish "skills/FSB Skill"`; public package publication. None of this blocks v0.9.91.
 
@@ -422,13 +462,13 @@ v2 deferred (see REQUIREMENTS.md v0.9.91 v2 section): CHAT-FUTURE-01/02 (chat-mo
 
 ## Session Continuity
 
-Last session: 2026-07-22T18:44:34.205Z
-Stopped at: Phase 65 automated verification passed; human UAT65-01 through UAT65-03 pending
-Resume file: None
+Last session: 2026-10-19T05:45:24.000Z
+Stopped at: v1.0.0 code-complete; Validation Block V1-V6 pending (see .planning/v1.0.0-VALIDATION-BLOCK.md)
+Resume file: .planning/v1.0.0-VALIDATION-BLOCK.md
 
 ## Next Actions
 
-Execute 64-10-PLAN.md next. Generalize durable event/controller hydration and safe per-adapter drift diagnostics while preserving the canonical accepted-run provider context established in Plan 09.
+Owner: answer the section 1 decisions in `.planning/v1.0.0-VALIDATION-BLOCK.md` (items 1-10 are signed with M-71-00 after the 66-10 smoke), then run V1 from a worktree pinned at `8a058bdf`. Code-changing decisions (the gate amendment, the M-70-08 remedy, the D-25 widening) must land before the V4 release-candidate SHA. Nothing reaches `main` before V6.
 
 ## Performance Metrics
 
@@ -467,3 +507,15 @@ Execute 64-10-PLAN.md next. Generalize durable event/controller hydration and sa
 | Phase 65 P06 | 40 min | 2 tasks | 16 files |
 | Phase 65 P07 | 21m | 2 tasks | 8 files |
 | Phase 65 P08 | 55m | 2 tasks | 22 files |
+| Phase 66 P02 | 16 min | 3 tasks | 11 files |
+| Phase 66 P03 | 19 min | 3 tasks | 12 files |
+| Phase 66 P04 | 24 min | 3 tasks | 9 files |
+| Phase 66 P05 | 43 min | 3 tasks | 13 files |
+| Phase 66 P06 | 23 min | 3 tasks | 4 files |
+| Phase 66 P07 | 46 min | 3 tasks | 34 files |
+| Phase 66 P08 | 35 min | 3 tasks | 11 files |
+| Phase 66 P09 | 12 min | 2 tasks | 2 files |
+
+## Operator Next Steps
+
+- Read `.planning/v1.0.0-VALIDATION-BLOCK.md` section 1 and record the decisions, then start V1: pin worktree at `8a058bdf`, pinned Claude Code and Chrome for Testing, the 66-10 bench setup and smoke, the M-71-00 sign-off, then the 30-round `core-baseline-66` campaign.

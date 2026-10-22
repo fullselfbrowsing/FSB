@@ -1,0 +1,2115 @@
+{
+  "startedAt": "2026-10-15T09:49:06.388Z",
+  "finishedAt": "2026-10-15T09:53:05.382Z",
+  "head": "e1e6439c87193f1b0daa35f6e28d2f462b1af87c",
+  "nodeVersion": "v24.14.1",
+  "port7225Held": true,
+  "perTestTimeoutMs": 180000,
+  "files": [
+    "extension/config/config.js",
+    "extension/ws/mcp-tool-dispatcher.js",
+    "extension/ws/mcp-bridge-client.js",
+    "extension/utils/mcp-session-recorder.js",
+    "extension/ui/options.js",
+    "mcp/src/types.ts",
+    "mcp/src/errors.ts",
+    "mcp/src/runtime.ts"
+  ],
+  "results": [
+    {
+      "test": "tests/action-icon-behavior.test.js",
+      "command": "node tests/action-icon-behavior.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 167
+    },
+    {
+      "test": "tests/action-tool-agent-scoped.test.js",
+      "command": "node tests/action-tool-agent-scoped.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 65
+    },
+    {
+      "test": "tests/agent-bridge-routes.test.js",
+      "command": "node tests/agent-bridge-routes.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 60
+    },
+    {
+      "test": "tests/agent-cap-storage.test.js",
+      "command": "node tests/agent-cap-storage.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 71
+    },
+    {
+      "test": "tests/agent-cap-ui.test.js",
+      "command": "node tests/agent-cap-ui.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 58
+    },
+    {
+      "test": "tests/agent-grace.test.js",
+      "command": "node tests/agent-grace.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 956
+    },
+    {
+      "test": "tests/agent-id-threading.test.js",
+      "command": "node tests/agent-id-threading.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 113
+    },
+    {
+      "test": "tests/agent-loop-empty-contents.test.js",
+      "command": "node tests/agent-loop-empty-contents.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 63
+    },
+    {
+      "test": "tests/agent-loop-iterator-guard.test.js",
+      "command": "node tests/agent-loop-iterator-guard.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 56
+    },
+    {
+      "test": "tests/agent-manager-start-mode.test.js",
+      "command": "node tests/agent-manager-start-mode.test.js",
+      "exitCode": 1,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 56
+    },
+    {
+      "test": "tests/agent-pooling.test.js",
+      "command": "node tests/agent-pooling.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 104
+    },
+    {
+      "test": "tests/agent-protocol-drift-diagnostics.test.js",
+      "command": "node tests/agent-protocol-drift-diagnostics.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 68
+    },
+    {
+      "test": "tests/agent-provider-forbidden-flags.test.js",
+      "command": "node tests/agent-provider-forbidden-flags.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 1213
+    },
+    {
+      "test": "tests/agent-registry.test.js",
+      "command": "node tests/agent-registry.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 87
+    },
+    {
+      "test": "tests/agent-scope.test.js",
+      "command": "node tests/agent-scope.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 66
+    },
+    {
+      "test": "tests/agent-sunset-back-end.test.js",
+      "command": "node tests/agent-sunset-back-end.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 70
+    },
+    {
+      "test": "tests/agent-sunset-control-panel.test.js",
+      "command": "node tests/agent-sunset-control-panel.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 62
+    },
+    {
+      "test": "tests/ai-integration-analytics.test.js",
+      "command": "node tests/ai-integration-analytics.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 59
+    },
+    {
+      "test": "tests/audit-log-no-secret.test.js",
+      "command": "node tests/audit-log-no-secret.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 56
+    },
+    {
+      "test": "tests/audit-log.test.js",
+      "command": "node tests/audit-log.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 56
+    },
+    {
+      "test": "tests/automation-logger-mcp-retention.test.js",
+      "command": "node tests/automation-logger-mcp-retention.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 414
+    },
+    {
+      "test": "tests/autopilot-agent-scope.test.js",
+      "command": "node tests/autopilot-agent-scope.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 71
+    },
+    {
+      "test": "tests/back-tool-ownership.test.js",
+      "command": "node tests/back-tool-ownership.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 59
+    },
+    {
+      "test": "tests/bench-claude-stream.test.mjs",
+      "command": "node --test tests/bench-claude-stream.test.mjs",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 157
+    },
+    {
+      "test": "tests/bench-drivers.test.mjs",
+      "command": "node --test tests/bench-drivers.test.mjs",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 2337
+    },
+    {
+      "test": "tests/bench-fixture-server.test.mjs",
+      "command": "node --test tests/bench-fixture-server.test.mjs",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 634
+    },
+    {
+      "test": "tests/bench-identity.test.mjs",
+      "command": "node --test tests/bench-identity.test.mjs",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 194
+    },
+    {
+      "test": "tests/bench-report.test.mjs",
+      "command": "node --test tests/bench-report.test.mjs",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 2134
+    },
+    {
+      "test": "tests/bench-tasks.test.mjs",
+      "command": "node --test tests/bench-tasks.test.mjs",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 185
+    },
+    {
+      "test": "tests/breadth-batch-gate.test.js",
+      "command": "node tests/breadth-batch-gate.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 57
+    },
+    {
+      "test": "tests/breadth-search-return.test.js",
+      "command": "node tests/breadth-search-return.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 2397
+    },
+    {
+      "test": "tests/browser-editing-actions.test.mjs",
+      "command": "node --test tests/browser-editing-actions.test.mjs",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 91885
+    },
+    {
+      "test": "tests/cap-counter-live.test.js",
+      "command": "node tests/cap-counter-live.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 78
+    },
+    {
+      "test": "tests/capability-autopilot-parity.test.js",
+      "command": "node tests/capability-autopilot-parity.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 72
+    },
+    {
+      "test": "tests/capability-fetch.test.js",
+      "command": "node tests/capability-fetch.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 72
+    },
+    {
+      "test": "tests/capability-head-handlers.test.js",
+      "command": "node tests/capability-head-handlers.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 193
+    },
+    {
+      "test": "tests/capability-interpreter.test.js",
+      "command": "node tests/capability-interpreter.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 63
+    },
+    {
+      "test": "tests/capability-mcp-surface.test.js",
+      "command": "node tests/capability-mcp-surface.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 213
+    },
+    {
+      "test": "tests/capability-recipe-schema.test.js",
+      "command": "node tests/capability-recipe-schema.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 53
+    },
+    {
+      "test": "tests/capability-router.test.js",
+      "command": "node tests/capability-router.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 61
+    },
+    {
+      "test": "tests/capability-search-agent-scope.test.js",
+      "command": "node tests/capability-search-agent-scope.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 52
+    },
+    {
+      "test": "tests/capability-search-eval.test.js",
+      "command": "node tests/capability-search-eval.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 734
+    },
+    {
+      "test": "tests/carta-handler.test.js",
+      "command": "node tests/carta-handler.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 60
+    },
+    {
+      "test": "tests/catalog-inline-shape.test.js",
+      "command": "node tests/catalog-inline-shape.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 282
+    },
+    {
+      "test": "tests/change-report-builder.test.js",
+      "command": "node tests/change-report-builder.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 60
+    },
+    {
+      "test": "tests/change-report-cross-origin.test.js",
+      "command": "node tests/change-report-cross-origin.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 51
+    },
+    {
+      "test": "tests/change-report-dispatcher.test.js",
+      "command": "node tests/change-report-dispatcher.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 817
+    },
+    {
+      "test": "tests/change-report-read-tools-excluded.test.js",
+      "command": "node tests/change-report-read-tools-excluded.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 82
+    },
+    {
+      "test": "tests/change-report-settings-ui.test.js",
+      "command": "node tests/change-report-settings-ui.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 63
+    },
+    {
+      "test": "tests/change-report-toggle.test.js",
+      "command": "node tests/change-report-toggle.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 813
+    },
+    {
+      "test": "tests/classification-gate.test.js",
+      "command": "node tests/classification-gate.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 87
+    },
+    {
+      "test": "tests/click-single-dispatch.test.js",
+      "command": "node --test tests/click-single-dispatch.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 159
+    },
+    {
+      "test": "tests/config-lmstudio.test.js",
+      "command": "node tests/config-lmstudio.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 55
+    },
+    {
+      "test": "tests/consent-audit-settings-ui.test.js",
+      "command": "node tests/consent-audit-settings-ui.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 60
+    },
+    {
+      "test": "tests/consent-gate.test.js",
+      "command": "node tests/consent-gate.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 59
+    },
+    {
+      "test": "tests/consent-mutation-gate.test.js",
+      "command": "node tests/consent-mutation-gate.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 56
+    },
+    {
+      "test": "tests/consent-policy-store.test.js",
+      "command": "node tests/consent-policy-store.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 52
+    },
+    {
+      "test": "tests/content-click-single-activation.test.js",
+      "command": "node --test tests/content-click-single-activation.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 150
+    },
+    {
+      "test": "tests/control-panel-scroll-containment.test.js",
+      "command": "node tests/control-panel-scroll-containment.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 58
+    },
+    {
+      "test": "tests/cost-tracker-ordering.test.js",
+      "command": "node tests/cost-tracker-ordering.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 54
+    },
+    {
+      "test": "tests/coverage-report.test.js",
+      "command": "node tests/coverage-report.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 120
+    },
+    {
+      "test": "tests/dashboard-analytics-refresh.test.js",
+      "command": "node tests/dashboard-analytics-refresh.test.js",
+      "exitCode": 1,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 57
+    },
+    {
+      "test": "tests/dashboard-metrics-render.test.js",
+      "command": "node tests/dashboard-metrics-render.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 60
+    },
+    {
+      "test": "tests/dashboard-runtime-state.test.js",
+      "command": "node tests/dashboard-runtime-state.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 61
+    },
+    {
+      "test": "tests/dashboard-stream-readiness-ping.test.js",
+      "command": "node tests/dashboard-stream-readiness-ping.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 479
+    },
+    {
+      "test": "tests/dashboard-task-direct-start.test.js",
+      "command": "node tests/dashboard-task-direct-start.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 82
+    },
+    {
+      "test": "tests/delegation-consent.test.js",
+      "command": "node tests/delegation-consent.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 67
+    },
+    {
+      "test": "tests/delegation-controller.test.js",
+      "command": "node tests/delegation-controller.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 230
+    },
+    {
+      "test": "tests/delegation-phase-contract.test.js",
+      "command": "node tests/delegation-phase-contract.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 154
+    },
+    {
+      "test": "tests/delegation-routing.test.js",
+      "command": "node tests/delegation-routing.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 63
+    },
+    {
+      "test": "tests/delegation-sidepanel-tab-follow.test.js",
+      "command": "node tests/delegation-sidepanel-tab-follow.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 68
+    },
+    {
+      "test": "tests/delegation-sidepanel-ui.test.js",
+      "command": "node tests/delegation-sidepanel-ui.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 106
+    },
+    {
+      "test": "tests/delegation-streaming-performance.test.js",
+      "command": "node tests/delegation-streaming-performance.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 420
+    },
+    {
+      "test": "tests/diagnostics-ring-buffer.test.js",
+      "command": "node tests/diagnostics-ring-buffer.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 59
+    },
+    {
+      "test": "tests/discovery-seeds-load.test.js",
+      "command": "node tests/discovery-seeds-load.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 54
+    },
+    {
+      "test": "tests/extension-record-dispatch-serializes.test.js",
+      "command": "node tests/extension-record-dispatch-serializes.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 60
+    },
+    {
+      "test": "tests/foreground-audit.test.js",
+      "command": "node tests/foreground-audit.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 56
+    },
+    {
+      "test": "tests/fsb-telemetry-service.test.js",
+      "command": "node tests/fsb-telemetry-service.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 69
+    },
+    {
+      "test": "tests/full-corpus-scale.test.js",
+      "command": "node tests/full-corpus-scale.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 253
+    },
+    {
+      "test": "tests/generated-same-origin-read-recipes.test.js",
+      "command": "node tests/generated-same-origin-read-recipes.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 210
+    },
+    {
+      "test": "tests/glama-t1-ready.test.js",
+      "command": "node tests/glama-t1-ready.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 155
+    },
+    {
+      "test": "tests/google-sheets-content-actions.test.js",
+      "command": "node --test tests/google-sheets-content-actions.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 178
+    },
+    {
+      "test": "tests/google-sheets-session.test.js",
+      "command": "node --test tests/google-sheets-session.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 200
+    },
+    {
+      "test": "tests/google-sheets-wiring.test.js",
+      "command": "node --test tests/google-sheets-wiring.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 186
+    },
+    {
+      "test": "tests/gsheets-handler.test.js",
+      "command": "node --test tests/gsheets-handler.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 153
+    },
+    {
+      "test": "tests/head-handler-cap.test.js",
+      "command": "node tests/head-handler-cap.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 55
+    },
+    {
+      "test": "tests/head-handler-upgrade.test.js",
+      "command": "node tests/head-handler-upgrade.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 109
+    },
+    {
+      "test": "tests/hung-page-recovery.test.js",
+      "command": "node --test tests/hung-page-recovery.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 1721
+    },
+    {
+      "test": "tests/import-extraction.test.js",
+      "command": "node tests/import-extraction.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 123
+    },
+    {
+      "test": "tests/import-forbidden-prescan.test.js",
+      "command": "node tests/import-forbidden-prescan.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 311
+    },
+    {
+      "test": "tests/install-identity.test.js",
+      "command": "node tests/install-identity.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 61
+    },
+    {
+      "test": "tests/jira-t1-handler.test.js",
+      "command": "node tests/jira-t1-handler.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 144
+    },
+    {
+      "test": "tests/lattice-host-step-transition-smoke.test.js",
+      "command": "node tests/lattice-host-step-transition-smoke.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 165
+    },
+    {
+      "test": "tests/lattice-provider-bridge-smoke.test.js",
+      "command": "node tests/lattice-provider-bridge-smoke.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 100
+    },
+    {
+      "test": "tests/lattice-providers-smoke.test.js",
+      "command": "node tests/lattice-providers-smoke.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 95
+    },
+    {
+      "test": "tests/lattice-public-package.test.js",
+      "command": "node tests/lattice-public-package.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 194
+    },
+    {
+      "test": "tests/lattice-replay-background-contract.test.js",
+      "command": "node tests/lattice-replay-background-contract.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 64
+    },
+    {
+      "test": "tests/lattice-replay-playback.test.js",
+      "command": "node --test tests/lattice-replay-playback.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 214
+    },
+    {
+      "test": "tests/lattice-replay-reclaim.test.js",
+      "command": "node --test tests/lattice-replay-reclaim.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 171
+    },
+    {
+      "test": "tests/lattice-session-replay.test.js",
+      "command": "node tests/lattice-session-replay.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 86
+    },
+    {
+      "test": "tests/lattice-smoke.test.js",
+      "command": "node tests/lattice-smoke.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 74
+    },
+    {
+      "test": "tests/lattice-step-emitter-smoke.test.js",
+      "command": "node tests/lattice-step-emitter-smoke.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 60
+    },
+    {
+      "test": "tests/lattice-survivability-smoke.test.js",
+      "command": "node tests/lattice-survivability-smoke.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 81
+    },
+    {
+      "test": "tests/learned-search-add.test.js",
+      "command": "node tests/learned-search-add.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 61
+    },
+    {
+      "test": "tests/legacy-agent-synthesis.test.js",
+      "command": "node tests/legacy-agent-synthesis.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 60
+    },
+    {
+      "test": "tests/list-tabs-agent-scope.test.js",
+      "command": "node tests/list-tabs-agent-scope.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 59
+    },
+    {
+      "test": "tests/lmstudio-agent-request.test.js",
+      "command": "node tests/lmstudio-agent-request.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 62
+    },
+    {
+      "test": "tests/lmstudio-settings-persistence.test.js",
+      "command": "node tests/lmstudio-settings-persistence.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 54
+    },
+    {
+      "test": "tests/lmstudio-startup-preflight.test.js",
+      "command": "node tests/lmstudio-startup-preflight.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 58
+    },
+    {
+      "test": "tests/lyft-t1-handler.test.js",
+      "command": "node tests/lyft-t1-handler.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 144
+    },
+    {
+      "test": "tests/mcp-adapter-compatibility.test.js",
+      "command": "node tests/mcp-adapter-compatibility.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 173
+    },
+    {
+      "test": "tests/mcp-agent-orphan-recovery.test.js",
+      "command": "node tests/mcp-agent-orphan-recovery.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 387
+    },
+    {
+      "test": "tests/mcp-agent-provider-contract.test.js",
+      "command": "node tests/mcp-agent-provider-contract.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 1932
+    },
+    {
+      "test": "tests/mcp-agent-providers-storage.test.js",
+      "command": "node tests/mcp-agent-providers-storage.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 94
+    },
+    {
+      "test": "tests/mcp-agent-stream-fixture.test.js",
+      "command": "node tests/mcp-agent-stream-fixture.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 131
+    },
+    {
+      "test": "tests/mcp-bridge-background-dispatch.test.js",
+      "command": "node tests/mcp-bridge-background-dispatch.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 183
+    },
+    {
+      "test": "tests/mcp-bridge-client-lifecycle.test.js",
+      "command": "node tests/mcp-bridge-client-lifecycle.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 96
+    },
+    {
+      "test": "tests/mcp-bridge-events.test.js",
+      "command": "node tests/mcp-bridge-events.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 69
+    },
+    {
+      "test": "tests/mcp-bridge-topology.test.js",
+      "command": "node tests/mcp-bridge-topology.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 3162
+    },
+    {
+      "test": "tests/mcp-claude-code-adapter.test.js",
+      "command": "node tests/mcp-claude-code-adapter.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 102
+    },
+    {
+      "test": "tests/mcp-client-identity-integration.test.js",
+      "command": "node tests/mcp-client-identity-integration.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 161
+    },
+    {
+      "test": "tests/mcp-client-identity.test.js",
+      "command": "node tests/mcp-client-identity.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 154
+    },
+    {
+      "test": "tests/mcp-client-inventory.test.js",
+      "command": "node tests/mcp-client-inventory.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 65
+    },
+    {
+      "test": "tests/mcp-client-merged-view.test.js",
+      "command": "node tests/mcp-client-merged-view.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 65
+    },
+    {
+      "test": "tests/mcp-diagnostics-status.test.js",
+      "command": "node tests/mcp-diagnostics-status.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 178
+    },
+    {
+      "test": "tests/mcp-dispatcher-client-label.test.js",
+      "command": "node tests/mcp-dispatcher-client-label.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 60
+    },
+    {
+      "test": "tests/mcp-grok-build-adapter.test.js",
+      "command": "node tests/mcp-grok-build-adapter.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 100
+    },
+    {
+      "test": "tests/mcp-http-security.test.js",
+      "command": "node --test tests/mcp-http-security.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 302
+    },
+    {
+      "test": "tests/mcp-in-flight-session-lookup.test.js",
+      "command": "node tests/mcp-in-flight-session-lookup.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 243
+    },
+    {
+      "test": "tests/mcp-install-platforms.test.js",
+      "command": "node tests/mcp-install-platforms.test.js",
+      "exitCode": 1,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 20581
+    },
+    {
+      "test": "tests/mcp-lattice-journal.test.js",
+      "command": "node --test tests/mcp-lattice-journal.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 708
+    },
+    {
+      "test": "tests/mcp-lifecycle-smoke.test.js",
+      "command": "node tests/mcp-lifecycle-smoke.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 700
+    },
+    {
+      "test": "tests/mcp-metrics-recorder.test.js",
+      "command": "node tests/mcp-metrics-recorder.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 60
+    },
+    {
+      "test": "tests/mcp-native-host-daemon.test.js",
+      "command": "node tests/mcp-native-host-daemon.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 197
+    },
+    {
+      "test": "tests/mcp-native-host-install.test.js",
+      "command": "node tests/mcp-native-host-install.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 176
+    },
+    {
+      "test": "tests/mcp-native-host-packaging.test.js",
+      "command": "node tests/mcp-native-host-packaging.test.js --section workflow-and-pack",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 19383
+    },
+    {
+      "test": "tests/mcp-native-host-protocol.test.js",
+      "command": "node tests/mcp-native-host-protocol.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 79
+    },
+    {
+      "test": "tests/mcp-native-host-registry-helper.test.js",
+      "command": "node tests/mcp-native-host-registry-helper.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 109
+    },
+    {
+      "test": "tests/mcp-philosophy-parity-smoke.test.js",
+      "command": "node tests/mcp-philosophy-parity-smoke.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 73
+    },
+    {
+      "test": "tests/mcp-pricing.test.js",
+      "command": "node tests/mcp-pricing.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 66
+    },
+    {
+      "test": "tests/mcp-recovery-messaging.test.js",
+      "command": "node tests/mcp-recovery-messaging.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 57
+    },
+    {
+      "test": "tests/mcp-restricted-tab.test.js",
+      "command": "node tests/mcp-restricted-tab.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 59
+    },
+    {
+      "test": "tests/mcp-reverse-channel-contract.test.js",
+      "command": "node tests/mcp-reverse-channel-contract.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 90
+    },
+    {
+      "test": "tests/mcp-screenshot-route.test.js",
+      "command": "node --test tests/mcp-screenshot-route.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 137
+    },
+    {
+      "test": "tests/mcp-session-recorder-journal.test.js",
+      "command": "node tests/mcp-session-recorder-journal.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 78
+    },
+    {
+      "test": "tests/mcp-session-recorder.test.js",
+      "command": "node tests/mcp-session-recorder.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 76
+    },
+    {
+      "test": "tests/mcp-session-settings-ui.test.js",
+      "command": "node tests/mcp-session-settings-ui.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 56
+    },
+    {
+      "test": "tests/mcp-setup-guidance.test.js",
+      "command": "node tests/mcp-setup-guidance.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 218
+    },
+    {
+      "test": "tests/mcp-spawn-supervisor.test.js",
+      "command": "node tests/mcp-spawn-supervisor.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 172
+    },
+    {
+      "test": "tests/mcp-tool-routing-contract.test.js",
+      "command": "node tests/mcp-tool-routing-contract.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 56
+    },
+    {
+      "test": "tests/mcp-tool-smoke.test.js",
+      "command": "node tests/mcp-tool-smoke.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 143
+    },
+    {
+      "test": "tests/mcp-version-parity.test.js",
+      "command": "node tests/mcp-version-parity.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 462
+    },
+    {
+      "test": "tests/mcp-visual-session-contract.test.js",
+      "command": "node tests/mcp-visual-session-contract.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 80
+    },
+    {
+      "test": "tests/mcp-visual-tick-lifecycle.test.js",
+      "command": "node tests/mcp-visual-tick-lifecycle.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 70
+    },
+    {
+      "test": "tests/mcp-wire-verb-routing.test.js",
+      "command": "node --test tests/mcp-wire-verb-routing.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 155
+    },
+    {
+      "test": "tests/metrics-wireup.test.js",
+      "command": "node tests/metrics-wireup.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 55
+    },
+    {
+      "test": "tests/model-combobox-ui.test.js",
+      "command": "node tests/model-combobox-ui.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 60
+    },
+    {
+      "test": "tests/model-discovery-runtime.test.js",
+      "command": "node tests/model-discovery-runtime.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 61
+    },
+    {
+      "test": "tests/model-discovery-ui.test.js",
+      "command": "node tests/model-discovery-ui.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 128
+    },
+    {
+      "test": "tests/model-discovery.test.js",
+      "command": "node tests/model-discovery.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 83
+    },
+    {
+      "test": "tests/multi-agent-regression.test.js",
+      "command": "node tests/multi-agent-regression.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 72
+    },
+    {
+      "test": "tests/native-host-background-wake.test.js",
+      "command": "node tests/native-host-background-wake.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 69
+    },
+    {
+      "test": "tests/netflix-t1-ready.test.js",
+      "command": "node tests/netflix-t1-ready.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 163
+    },
+    {
+      "test": "tests/network-capture-debugger-lifecycle.test.js",
+      "command": "node --test tests/network-capture-debugger-lifecycle.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 148
+    },
+    {
+      "test": "tests/no-duplicate-stem.test.js",
+      "command": "node tests/no-duplicate-stem.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 128
+    },
+    {
+      "test": "tests/no-orphan-descriptor.test.js",
+      "command": "node --import tsx tests/no-orphan-descriptor.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 3561
+    },
+    {
+      "test": "tests/onboarding-agent-provider-clicks.test.js",
+      "command": "node tests/onboarding-agent-provider-clicks.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 66
+    },
+    {
+      "test": "tests/onboarding-first-run.test.js",
+      "command": "node tests/onboarding-first-run.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 63
+    },
+    {
+      "test": "tests/onboarding-lmstudio.test.js",
+      "command": "node tests/onboarding-lmstudio.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 59
+    },
+    {
+      "test": "tests/open-tab-background-default.test.js",
+      "command": "node tests/open-tab-background-default.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 58
+    },
+    {
+      "test": "tests/openai-agent-request.test.js",
+      "command": "node tests/openai-agent-request.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 65
+    },
+    {
+      "test": "tests/opentable-t1-handler.test.js",
+      "command": "node tests/opentable-t1-handler.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 58
+    },
+    {
+      "test": "tests/overlay-content-audit.test.js",
+      "command": "node tests/overlay-content-audit.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 1574
+    },
+    {
+      "test": "tests/overlay-stability-cadence.test.js",
+      "command": "node tests/overlay-stability-cadence.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 3186
+    },
+    {
+      "test": "tests/ownership-error-codes.test.js",
+      "command": "node tests/ownership-error-codes.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 79
+    },
+    {
+      "test": "tests/ownership-gate.test.js",
+      "command": "node tests/ownership-gate.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 67
+    },
+    {
+      "test": "tests/ownership-leakage-regression.test.js",
+      "command": "node tests/ownership-leakage-regression.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 70
+    },
+    {
+      "test": "tests/phantom-stream-capture-adapter.test.js",
+      "command": "node tests/phantom-stream-capture-adapter.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 60
+    },
+    {
+      "test": "tests/phantom-stream-content-bundle.test.js",
+      "command": "node tests/phantom-stream-content-bundle.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 62
+    },
+    {
+      "test": "tests/phantom-stream-dashboard-sidechannels.test.js",
+      "command": "node tests/phantom-stream-dashboard-sidechannels.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 62
+    },
+    {
+      "test": "tests/phantom-stream-dashboard-viewer-bundle.test.js",
+      "command": "node tests/phantom-stream-dashboard-viewer-bundle.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 409
+    },
+    {
+      "test": "tests/phantom-stream-differential-parity.test.js",
+      "command": "node tests/phantom-stream-differential-parity.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 94
+    },
+    {
+      "test": "tests/phantom-stream-exports.test.js",
+      "command": "node tests/phantom-stream-exports.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 87
+    },
+    {
+      "test": "tests/phantom-stream-media-wiring.test.js",
+      "command": "node tests/phantom-stream-media-wiring.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 60
+    },
+    {
+      "test": "tests/phantom-stream-protocol-envelope.test.js",
+      "command": "node tests/phantom-stream-protocol-envelope.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 59
+    },
+    {
+      "test": "tests/phantom-stream-public-package.test.js",
+      "command": "node tests/phantom-stream-public-package.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 58
+    },
+    {
+      "test": "tests/phantom-stream-security-masking.test.js",
+      "command": "node tests/phantom-stream-security-masking.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 60
+    },
+    {
+      "test": "tests/phase60-full-tests-harness.test.js",
+      "command": "node tests/phase60-full-tests-harness.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 17505
+    },
+    {
+      "test": "tests/phase64-full-tests-harness.test.js",
+      "command": "node tests/phase64-full-tests-harness.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 4724
+    },
+    {
+      "test": "tests/phase65-full-tests-harness.test.js",
+      "command": "node tests/phase65-full-tests-harness.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 5967
+    },
+    {
+      "test": "tests/provenance-scaffold.test.js",
+      "command": "node tests/provenance-scaffold.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 80
+    },
+    {
+      "test": "tests/provider-parity.test.js",
+      "command": "node tests/provider-parity.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 74
+    },
+    {
+      "test": "tests/providers-panel-logic.test.js",
+      "command": "node tests/providers-panel-logic.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 61
+    },
+    {
+      "test": "tests/providers-panel-ui.test.js",
+      "command": "node tests/providers-panel-ui.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 61
+    },
+    {
+      "test": "tests/qr-pairing.test.js",
+      "command": "node tests/qr-pairing.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 67
+    },
+    {
+      "test": "tests/read-tool-tab-resolution.test.js",
+      "command": "node tests/read-tool-tab-resolution.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 59
+    },
+    {
+      "test": "tests/recovery-tools-bootstrap.test.js",
+      "command": "node tests/recovery-tools-bootstrap.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 70
+    },
+    {
+      "test": "tests/relearn-coalescing.test.js",
+      "command": "node tests/relearn-coalescing.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 54
+    },
+    {
+      "test": "tests/remote-control-rebrand.test.js",
+      "command": "node tests/remote-control-rebrand.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 55
+    },
+    {
+      "test": "tests/replay-player-overlay.test.js",
+      "command": "node tests/replay-player-overlay.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 70
+    },
+    {
+      "test": "tests/rot-recurrence-classify.test.js",
+      "command": "node tests/rot-recurrence-classify.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 55
+    },
+    {
+      "test": "tests/run-task-cleanup-paths.test.js",
+      "command": "node tests/run-task-cleanup-paths.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 56
+    },
+    {
+      "test": "tests/run-task-heartbeat.test.js",
+      "command": "node tests/run-task-heartbeat.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 59
+    },
+    {
+      "test": "tests/run-task-resolve-discipline.test.js",
+      "command": "node tests/run-task-resolve-discipline.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 609
+    },
+    {
+      "test": "tests/runtime-contracts.test.js",
+      "command": "node tests/runtime-contracts.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 89
+    },
+    {
+      "test": "tests/screenshot-capture.test.js",
+      "command": "node --test tests/screenshot-capture.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 220
+    },
+    {
+      "test": "tests/secure-config-credential-vault.test.js",
+      "command": "node tests/secure-config-credential-vault.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 173
+    },
+    {
+      "test": "tests/sensitive-write-import-gate.test.js",
+      "command": "node tests/sensitive-write-import-gate.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 63
+    },
+    {
+      "test": "tests/server-github-poller.test.js",
+      "command": "node tests/server-github-poller.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 134
+    },
+    {
+      "test": "tests/server-legacy-html-redirects.test.js",
+      "command": "node tests/server-legacy-html-redirects.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 60
+    },
+    {
+      "test": "tests/server-telemetry-housekeeper.test.js",
+      "command": "node tests/server-telemetry-housekeeper.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 71
+    },
+    {
+      "test": "tests/server-trust-proxy.test.js",
+      "command": "node tests/server-trust-proxy.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 60
+    },
+    {
+      "test": "tests/service-denylist.test.js",
+      "command": "node tests/service-denylist.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 62
+    },
+    {
+      "test": "tests/settings-card-select-clipping.test.js",
+      "command": "node tests/settings-card-select-clipping.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 58
+    },
+    {
+      "test": "tests/showcase-angular-foundation.test.js",
+      "command": "node tests/showcase-angular-foundation.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 61
+    },
+    {
+      "test": "tests/showcase-build-smoke.test.js",
+      "command": "node tests/showcase-build-smoke.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 22933
+    },
+    {
+      "test": "tests/sidepanel-automation-runner.test.js",
+      "command": "node tests/sidepanel-automation-runner.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 58
+    },
+    {
+      "test": "tests/sidepanel-background-tab-completion.test.js",
+      "command": "node tests/sidepanel-background-tab-completion.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 57
+    },
+    {
+      "test": "tests/sidepanel-mcpvisualsession-listener.test.js",
+      "command": "node tests/sidepanel-mcpvisualsession-listener.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 54
+    },
+    {
+      "test": "tests/sidepanel-message-log-smoke.test.js",
+      "command": "node tests/sidepanel-message-log-smoke.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 65
+    },
+    {
+      "test": "tests/sidepanel-multi-document-fanout.test.js",
+      "command": "node tests/sidepanel-multi-document-fanout.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 57
+    },
+    {
+      "test": "tests/sidepanel-progress-tick-setter-routing.test.js",
+      "command": "node tests/sidepanel-progress-tick-setter-routing.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 57
+    },
+    {
+      "test": "tests/sidepanel-tab-aware-smoke.test.js",
+      "command": "node tests/sidepanel-tab-aware-smoke.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 64
+    },
+    {
+      "test": "tests/sidepanel-tab-scoping-fix-redo-smoke.test.js",
+      "command": "node tests/sidepanel-tab-scoping-fix-redo-smoke.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 64
+    },
+    {
+      "test": "tests/site-search.test.js",
+      "command": "node tests/site-search.test.js",
+      "exitCode": 1,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 56
+    },
+    {
+      "test": "tests/skill-fsb-spec.test.js",
+      "command": "node tests/skill-fsb-spec.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 63
+    },
+    {
+      "test": "tests/speech-to-text.test.js",
+      "command": "node tests/speech-to-text.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 68
+    },
+    {
+      "test": "tests/spreadsheet-record-redaction.test.js",
+      "command": "node --test tests/spreadsheet-record-redaction.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 164
+    },
+    {
+      "test": "tests/state-emitter.test.js",
+      "command": "node tests/state-emitter.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 55
+    },
+    {
+      "test": "tests/stats-chart-overhaul.test.js",
+      "command": "node tests/stats-chart-overhaul.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 57
+    },
+    {
+      "test": "tests/stats-view-state.test.js",
+      "command": "node tests/stats-view-state.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 190
+    },
+    {
+      "test": "tests/stream-candidate-resolution.test.js",
+      "command": "node tests/stream-candidate-resolution.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 59
+    },
+    {
+      "test": "tests/supabase-t1-ready.test.js",
+      "command": "node tests/supabase-t1-ready.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 153
+    },
+    {
+      "test": "tests/sync-tab-runtime.test.js",
+      "command": "node tests/sync-tab-runtime.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 58
+    },
+    {
+      "test": "tests/t1-port-contract-gate.test.js",
+      "command": "node tests/t1-port-contract-gate.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 374
+    },
+    {
+      "test": "tests/t1-port-contract.test.js",
+      "command": "node tests/t1-port-contract.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 60
+    },
+    {
+      "test": "tests/t1-readiness-report.test.js",
+      "command": "node tests/t1-readiness-report.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 172
+    },
+    {
+      "test": "tests/t1-terminal-states.test.js",
+      "command": "node tests/t1-terminal-states.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 159
+    },
+    {
+      "test": "tests/telemetry-collector.test.js",
+      "command": "node tests/telemetry-collector.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 89
+    },
+    {
+      "test": "tests/telemetry-payload-allowlist.test.js",
+      "command": "node tests/telemetry-payload-allowlist.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 56
+    },
+    {
+      "test": "tests/text-editing-contract.test.js",
+      "command": "node --test tests/text-editing-contract.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 268
+    },
+    {
+      "test": "tests/transcript-store.test.js",
+      "command": "node tests/transcript-store.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 63
+    },
+    {
+      "test": "tests/trigger-blocking-reporting.test.js",
+      "command": "node tests/trigger-blocking-reporting.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 107
+    },
+    {
+      "test": "tests/trigger-cap-settings-ui.test.js",
+      "command": "node tests/trigger-cap-settings-ui.test.js",
+      "exitCode": 1,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 59
+    },
+    {
+      "test": "tests/trigger-lifecycle.test.js",
+      "command": "node tests/trigger-lifecycle.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 75
+    },
+    {
+      "test": "tests/trigger-observe.test.js",
+      "command": "node tests/trigger-observe.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 66
+    },
+    {
+      "test": "tests/trigger-refresh-poll.test.js",
+      "command": "node tests/trigger-refresh-poll.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 93
+    },
+    {
+      "test": "tests/trigger-tool-dispatcher.test.js",
+      "command": "node tests/trigger-tool-dispatcher.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 173
+    },
+    {
+      "test": "tests/twitter-guide-safety.test.js",
+      "command": "node --test tests/twitter-guide-safety.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 178
+    },
+    {
+      "test": "tests/universal-provider-lmstudio.test.js",
+      "command": "node tests/universal-provider-lmstudio.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 58
+    },
+    {
+      "test": "tests/upload-file-chokepoint.test.js",
+      "command": "node tests/upload-file-chokepoint.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 68
+    },
+    {
+      "test": "tests/upload-file-route.test.js",
+      "command": "node tests/upload-file-route.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 61
+    },
+    {
+      "test": "tests/vault-list-state.test.js",
+      "command": "node --test tests/vault-list-state.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 152
+    },
+    {
+      "test": "tests/verify-origin-classification.test.js",
+      "command": "node tests/verify-origin-classification.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 140
+    },
+    {
+      "test": "tests/version-sync.test.js",
+      "command": "node tests/version-sync.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 1756
+    },
+    {
+      "test": "tests/visual-session-agent-scoped.test.js",
+      "command": "node tests/visual-session-agent-scoped.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 58
+    },
+    {
+      "test": "tests/visual-session-reentry.test.js",
+      "command": "node tests/visual-session-reentry.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 64
+    },
+    {
+      "test": "tests/visual-session-schema-lock.test.js",
+      "command": "node tests/visual-session-schema-lock.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 80
+    },
+    {
+      "test": "tests/voice-input-settings-ui.test.js",
+      "command": "node tests/voice-input-settings-ui.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 64
+    },
+    {
+      "test": "tests/ws-client-relay-reconnect.test.js",
+      "command": "node tests/ws-client-relay-reconnect.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 93
+    },
+    {
+      "test": "tests/youtube-t1-ready.test.js",
+      "command": "node tests/youtube-t1-ready.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 162
+    }
+  ],
+  "failures": [
+    "tests/agent-manager-start-mode.test.js",
+    "tests/dashboard-analytics-refresh.test.js",
+    "tests/mcp-install-platforms.test.js",
+    "tests/site-search.test.js",
+    "tests/trigger-cap-settings-ui.test.js"
+  ]
+}

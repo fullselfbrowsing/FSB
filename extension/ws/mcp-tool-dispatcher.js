@@ -152,13 +152,23 @@ const MCP_PHASE199_MESSAGE_ROUTES = {
   // boundary; Phase 238 is structural setup only.
   'agent:register': { routeFamily: 'agent', handler: handleAgentRegisterRoute },
   'agent:release':  { routeFamily: 'agent', handler: handleAgentReleaseRoute },
-  'agent:status':   { routeFamily: 'agent', handler: handleAgentStatusRoute }
+  'agent:status':   { routeFamily: 'agent', handler: handleAgentStatusRoute },
+  // Phase 66.1 (SET-01/SET-02, D-06): the settings tool's two INTERNAL-ONLY
+  // message routes. They are not TOOL_REGISTRY tools, so the frozen INV-01
+  // registry hash is unmoved. They are reachable only through the MCP bridge
+  // (MCPBridgeClient._routeMessage); chrome.runtime.onMessage handles neither,
+  // so pages and content scripts cannot reach them. Writes from delegated
+  // agent runs are refused inside handleSetSettingMessageRoute (D-20).
+  'mcp:get-settings': { routeFamily: 'settings', handler: handleGetSettingsMessageRoute },
+  'mcp:set-setting': { routeFamily: 'settings', handler: handleSetSettingMessageRoute }
 };
 
 // Non-enumerable, in-process-only recorder context. A Symbol prevents an MCP
 // caller from spoofing the resolved tab/origin metadata and keeps it out of
 // the bridge response JSON.
 const MCP_REPLAY_RECORD_CONTEXT = Symbol('fsb-mcp-replay-record-context');
+// Ingress stamp { receivedAt } from the bridge client (Phase 66, D-04): the same registry symbol under this file's own name.
+const MCP_DISPATCHER_CALL_TIMING = Symbol.for('fsb.mcp.call-timing');
 
 const MCP_VISUAL_SESSION_TASK_STATUS_TOOLS = new Set([
   'report_progress',
@@ -637,6 +647,36 @@ function canonicalizeVisualSessionTaskParams(tool, params, payload) {
   };
 }
 
+// Phase 66 (MEAS-01, D-04): per-call timing on the dispatcher's own recording
+// paths. The stamp is read only from the symbol property, so a caller-supplied
+// string key named timing is never trusted. Date.now() only.
+function readDispatcherCallStamp(payload) {
+  try {
+    if (!payload || typeof payload !== 'object') return null;
+    const stamp = payload[MCP_DISPATCHER_CALL_TIMING];
+    if (!stamp || typeof stamp !== 'object') return null;
+    const receivedAt = stamp.receivedAt;
+    if (!Number.isSafeInteger(receivedAt) || receivedAt < 0) return null;
+    return { receivedAt };
+  } catch (_error) {
+    return null;
+  }
+}
+
+// Completion is taken synchronously at the recorder call site. No stamp, or a
+// wall clock that stepped backwards, gives null: never an invented 0.
+function buildDispatcherCallTiming(stamp) {
+  try {
+    const receivedAt = stamp ? stamp.receivedAt : null;
+    if (!Number.isSafeInteger(receivedAt) || receivedAt < 0) return null;
+    const completedAt = Date.now();
+    if (!Number.isSafeInteger(completedAt) || completedAt < receivedAt) return null;
+    return { v: 1, receivedAt, completedAt, fsbMs: completedAt - receivedAt };
+  } catch (_error) {
+    return null;
+  }
+}
+
 async function dispatchMcpToolRoute({ tool, params = {}, client = null, tab = null, payload = {} }) {
   const route = MCP_PHASE199_TOOL_ROUTES[tool];
   if (!route) {
@@ -647,6 +687,9 @@ async function dispatchMcpToolRoute({ tool, params = {}, client = null, tab = nu
     return createMcpRouteError(tool, route.routeFamily, MCP_ROUTE_RECOVERY_HINT);
   }
 
+  // Canonicalization may hand back a spread copy of the payload, which drops
+  // the symbol stamp, so the timing stamp is read from the original first.
+  const callTimingStamp = readDispatcherCallStamp(payload);
   const canonicalized = canonicalizeVisualSessionTaskParams(tool, params, payload);
   if (canonicalized.error) return canonicalized.error;
   params = canonicalized.params;
@@ -720,7 +763,7 @@ async function dispatchMcpToolRoute({ tool, params = {}, client = null, tab = nu
         globalThis.fsbMcpSessionRecorder &&
         typeof globalThis.fsbMcpSessionRecorder.recordTaskOutcome === 'function'
       ) {
-        globalThis.fsbMcpSessionRecorder.recordTaskOutcome({ tool, params, payload, response });
+        globalThis.fsbMcpSessionRecorder.recordTaskOutcome({ tool, params, payload, response, timing: buildDispatcherCallTiming(callTimingStamp) });
       }
     } catch (_e) { /* never let task-memory recording break dispatch */ }
     // NOTE (260707-7id review fix): the session-recorder sibling hook that
@@ -830,7 +873,7 @@ async function dispatchMcpMessageRoute({ type, payload = {}, client = null, mcpM
           var sessionRecordEntry = {
             client: resolveMcpClientLabel(payload),
             tool: type,
-            requestPayload: payload,
+            requestPayload: sanitizeMcpMessageRequestForRecording(type, payload),
             // Screenshot pixels are transport-only. The session journal keeps
             // sanitized metadata and never receives base64.
             response: sanitizeMcpMessageResponseForRecording(type, response),
@@ -848,7 +891,8 @@ async function dispatchMcpMessageRoute({ type, payload = {}, client = null, mcpM
               : false,
             replayContext: payload && payload[MCP_REPLAY_RECORD_CONTEXT]
               ? Object.assign({}, payload[MCP_REPLAY_RECORD_CONTEXT], { routeFamily: route.routeFamily })
-              : Object.assign({}, readRouteInspection.recordContext || {}, { routeFamily: route.routeFamily })
+              : Object.assign({}, readRouteInspection.recordContext || {}, { routeFamily: route.routeFamily }),
+            timing: buildDispatcherCallTiming(readDispatcherCallStamp(payload))
           };
           var spreadsheetRedactor = globalThis.FsbSpreadsheetRecordRedaction;
           var spreadsheetInvoke = type === 'mcp:capabilities-invoke'
@@ -874,7 +918,80 @@ async function dispatchMcpMessageRoute({ type, payload = {}, client = null, mcpM
   }
 }
 
+// Phase 66.1 D-19: a settings call is recorded without the submitted value.
+// The key label uses the schema's key pattern as a literal, so recording never
+// depends on the FsbSettingsSchema global.
+const SETTINGS_RECORDING_KEY_PATTERN = /^[A-Za-z][A-Za-z0-9_]{0,63}$/;
+
+function _isSettingsRecordingType(type) {
+  return type === 'mcp:get-settings' || type === 'mcp:set-setting';
+}
+
+function _settingsRecordingKeyLabel(key) {
+  return typeof key === 'string' && SETTINGS_RECORDING_KEY_PATTERN.test(key) ? key : '[invalid]';
+}
+
+// Every other type keeps its payload reference. A settings request keeps key
+// (or '[invalid]'), agentId, the recording fields and any symbol-keyed context,
+// never value. A settings payload that is not a plain object records nothing.
+function sanitizeMcpMessageRequestForRecording(type, payload) {
+  if (!_isSettingsRecordingType(type) || payload === null || payload === undefined) return payload;
+  if (typeof payload !== 'object' || Array.isArray(payload)) return {};
+  const recorded = Object.assign({}, payload);
+  delete recorded.value;
+  if (Object.prototype.hasOwnProperty.call(recorded, 'key')) {
+    recorded.key = _settingsRecordingKeyLabel(recorded.key);
+  }
+  return recorded;
+}
+
+// Settings replies are recorded as summaries: read-all as its key count,
+// read-one as key and writable, an accepted write as key, value, previous and
+// changed (writable keys only, never a secret), a failure as code and key.
+// A copy of a write's coupled map ({ key: { value, previous } }) holding only
+// well-formed key labels; null when there is none. Shared by the reply, the
+// operator log line and the journal summary.
+function _settingsCoupledSummary(coupled) {
+  if (!coupled || typeof coupled !== 'object' || Array.isArray(coupled)) return null;
+  const out = {};
+  for (const key of Object.keys(coupled)) {
+    const entry = coupled[key];
+    if (!SETTINGS_RECORDING_KEY_PATTERN.test(key) || !entry || typeof entry !== 'object') continue;
+    out[key] = { value: entry.value, previous: entry.previous };
+  }
+  return Object.keys(out).length > 0 ? out : null;
+}
+
+function _summarizeSettingsResponseForRecording(type, response) {
+  if (response === null || response === undefined) return response;
+  if (typeof response !== 'object' || Array.isArray(response)) return { success: false };
+  if (response.success === false) {
+    const failure = { success: false };
+    const code = response.code || response.errorCode;
+    if (typeof code === 'string' && code !== '') failure.code = code;
+    if (response.key !== undefined) failure.key = _settingsRecordingKeyLabel(response.key);
+    return failure;
+  }
+  if (type === 'mcp:get-settings') {
+    if (response.settings && typeof response.settings === 'object') {
+      return { success: true, keyCount: Object.keys(response.settings).length };
+    }
+    return { success: true, key: _settingsRecordingKeyLabel(response.key), writable: response.writable === true };
+  }
+  const summary = {
+    success: true,
+    key: _settingsRecordingKeyLabel(response.key),
+    value: response.value,
+    previous: response.previous,
+    changed: Array.isArray(response.changed) ? response.changed.slice() : []
+  };
+  const coupled = _settingsCoupledSummary(response.coupled);
+  if (coupled) summary.coupled = coupled;
+  return summary;
+}
+
 function sanitizeMcpMessageResponseForRecording(type, response) {
+  if (_isSettingsRecordingType(type)) return _summarizeSettingsResponseForRecording(type, response);
   if (type !== 'mcp:capture-screenshot' || !response || typeof response !== 'object') {
     return response;
   }
@@ -1736,6 +1853,8 @@ async function handleBackRoute({ payload = {}, client = null }) {
     });
     if (recheck) return recheck;
   }
+  // Phase 69 D-17: same-call expect, resolved only after the ownership gates.
+  const expectCtx = _resolveExpectSpec(payload && payload.expect, 'back');
 
   // 3. Capture pre-back state.
   let preTab = null;
@@ -1777,7 +1896,7 @@ async function handleBackRoute({ payload = {}, client = null }) {
     prechecked = false;
   }
   if (!prechecked || historyDepth <= 1) {
-    return {
+    const noHistory = {
       success: true,
       status: 'no_history',
       resultingUrl: preUrl,
@@ -1785,7 +1904,14 @@ async function handleBackRoute({ payload = {}, client = null }) {
       tabId: targetTabId,
       tool: 'back'
     };
+    // Nothing navigated, so no commit is required.
+    return expectCtx ? _attachExpectResult(noHistory, expectCtx, targetTabId, null) : noHistory;
   }
+
+  // RESEARCH Pitfall 1: the settle below can end (2 s timeout, pageshow or
+  // onUpdated leg) before the history navigation commits, so with expect the
+  // commit watcher is subscribed before goBack and the checks wait for it.
+  const backCommit = expectCtx ? _watchMainFrameCommit(targetTabId, 'back') : null;
 
   // 5. Fire goBack. NEVER call the focus-stealing tabs update API here
   //    (D-08 background-tab posture; verification gate excludes the literal
@@ -1805,6 +1931,7 @@ async function handleBackRoute({ payload = {}, client = null }) {
   try {
     await chrome.tabs.goBack(targetTabId);
   } catch (error) {
+    if (backCommit) backCommit.dispose();
     return {
       success: false,
       errorCode: 'navigation_unavailable',
@@ -1822,6 +1949,7 @@ async function handleBackRoute({ payload = {}, client = null }) {
   try {
     postTab = await chrome.tabs.get(targetTabId);
   } catch (error) {
+    if (backCommit) backCommit.dispose();
     return {
       success: false,
       errorCode: 'tab_closed_during_back',
@@ -1862,6 +1990,11 @@ async function handleBackRoute({ payload = {}, client = null }) {
   };
   if (bindResult && bindResult.ownershipToken) {
     response.ownershipToken = bindResult.ownershipToken;
+  }
+  // Phase 69 D-17: evaluated after back's own settle and bindTab.
+  if (backCommit) {
+    try { await _attachExpectResult(response, expectCtx, targetTabId, backCommit); }
+    finally { backCommit.dispose(); }
   }
   return response;
 }
@@ -2184,7 +2317,12 @@ function sanitizeActionHistoryEntry(action) {
     result: {
       success: Boolean(result.success),
       ...(result.error ? { error: boundedString(result.error, 500) } : {})
-    }
+    },
+    // Phase 66 (D-05): only measured values; an unmeasured call has no key.
+    ...(Number.isFinite(action?.durationMs) && action.durationMs >= 0 ? { durationMs: action.durationMs } : {}),
+    ...(validProjectionTiming(action?.timing) ? { timing: validProjectionTiming(action.timing) } : {}),
+    // Phase 68 (D-23): a fast step's marker; its params never leave.
+    ...(action && action.decisionSource === 'jev' ? { decisionSource: 'jev' } : {})
   };
 }
 
@@ -2215,7 +2353,490 @@ function sanitizeSessionDetail(session) {
   if (Array.isArray(session.toolCallLog)) {
     sanitized.toolCallLog = session.toolCallLog.slice(-200);
   }
+  // Phase 66 (MEAS-01; D-05, D-10, D-12): stored measurement fields leave only
+  // through the explicit block below. The generic sanitizer drops every
+  // /token/i key and flattens deep objects, so it would mangle them.
+  delete sanitized.iterationTiming;
+  delete sanitized.measurementSummary;
+  // Phase 68 (AUTO-04, D-23): the same for the fast-mode block. It is added
+  // only when the session has one, so other sessions read exactly as before.
+  delete sanitized.jevMeasurement;
+  sanitized.measurement = session.mode === 'mcp-agent'
+    ? buildMcpMeasurementFromLegacy(session)
+    : buildAutopilotMeasurement(session);
+  if (session.jevMeasurement && typeof session.jevMeasurement === 'object' && !Array.isArray(session.jevMeasurement)) {
+    sanitized.jevMeasurement = projectJevMeasurement(session.jevMeasurement);
+  }
+  withLegacyCostBasis(sanitized, session);
   return sanitized;
+}
+
+// ---- Phase 66 (MEAS-01/MEAS-02; D-03, D-06..D-08, D-12) -----------------------
+//
+// Journal-backed MCP sessions for get_session_detail. Journal tool.call events
+// hold full request and result payloads, so they never leave as-is: each one
+// becomes a pseudo-action fed through sanitizeActionHistoryEntry, then gains
+// its sequence, route, logical tab and validated call timing. Paging is
+// internal and bounded; the tool gains no parameters (MCP-04).
+const JOURNAL_DETAIL_MAX_PAGES = 20;
+const JOURNAL_DETAIL_PAGE_LIMIT = 500;
+const JOURNAL_DETAIL_ROW_LIMIT = 100;
+
+// Only an inline descriptor contributes, and only when it holds a plain
+// object. Artifact and omitted descriptors contribute nothing.
+function projectJournalDescriptorObject(descriptor) {
+  if (!descriptor || typeof descriptor !== 'object' || descriptor.storage !== 'inline') return {};
+  const inline = descriptor.inline;
+  return inline && typeof inline === 'object' && !Array.isArray(inline) ? inline : {};
+}
+
+// The v1 call-timing contract: safe non-negative integer times, completedAt
+// at or after receivedAt, fsbMs recomputed. Returns a fresh object or null.
+function validProjectionTiming(value) {
+  try {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    if (value.v !== 1) return null;
+    const receivedAt = value.receivedAt;
+    const completedAt = value.completedAt;
+    if (!Number.isSafeInteger(receivedAt) || receivedAt < 0) return null;
+    if (!Number.isSafeInteger(completedAt) || completedAt < receivedAt) return null;
+    return { v: 1, receivedAt, completedAt, fsbMs: completedAt - receivedAt };
+  } catch (_error) {
+    return null;
+  }
+}
+
+function projectJournalToolCall(event) {
+  const metadata = event && event.metadata && typeof event.metadata === 'object' ? event.metadata : {};
+  const request = projectJournalDescriptorObject(metadata.request);
+  const requestParams = request.params && typeof request.params === 'object' && !Array.isArray(request.params)
+    ? request.params
+    : {};
+  const result = projectJournalDescriptorObject(metadata.result);
+  const row = sanitizeActionHistoryEntry({
+    tool: typeof metadata.tool === 'string' ? metadata.tool.slice(0, 100) : '',
+    timestamp: Date.parse(event && event.timestamp),
+    iteration: null,
+    params: requestParams,
+    // A result kept as an artifact (or omitted) has no inline object, so the
+    // journal's own success flag stands in for it.
+    result: {
+      success: typeof result.success === 'boolean' ? result.success : metadata.success !== false,
+      error: result.error
+    }
+  });
+  row.sequence = event && Number.isSafeInteger(event.sequence) ? event.sequence : null;
+  row.route = typeof metadata.route === 'string' ? metadata.route.slice(0, 40) : null;
+  row.logicalTab = typeof metadata.logicalTab === 'string' ? metadata.logicalTab.slice(0, 40) : null;
+  const timing = validProjectionTiming(metadata.timing);
+  if (timing) {
+    row.timing = timing;
+    row.durationMs = timing.fsbMs;
+  }
+  return row;
+}
+
+// Running per-call statistics, shared by the journal and legacy MCP paths so
+// both report the same measures. Caller gap = receivedAt(n) - completedAt(n-1)
+// and call interval = receivedAt(n) - receivedAt(n-1), both over consecutive
+// timed calls in sequence order. An untimed call breaks the chain; a negative
+// gap counts as overlapped and a negative interval is left out.
+function createMcpCallStats() {
+  return {
+    calls: 0,
+    callsWithTiming: 0,
+    fsbValues: [],
+    gapValues: [],
+    intervalValues: [],
+    overlapped: 0,
+    firstReceivedAt: null,
+    lastCompletedAt: null,
+    previousTiming: null,
+    pagesRead: 0,
+    truncated: false
+  };
+}
+
+function addMcpCallToStats(stats, timing) {
+  stats.calls += 1;
+  if (timing) {
+    stats.callsWithTiming += 1;
+    stats.fsbValues.push(timing.fsbMs);
+    if (stats.firstReceivedAt === null || timing.receivedAt < stats.firstReceivedAt) {
+      stats.firstReceivedAt = timing.receivedAt;
+    }
+    if (stats.lastCompletedAt === null || timing.completedAt > stats.lastCompletedAt) {
+      stats.lastCompletedAt = timing.completedAt;
+    }
+    const previous = stats.previousTiming;
+    if (previous) {
+      const gap = timing.receivedAt - previous.completedAt;
+      if (gap >= 0) stats.gapValues.push(gap);
+      else stats.overlapped += 1;
+      const interval = timing.receivedAt - previous.receivedAt;
+      if (interval >= 0) stats.intervalValues.push(interval);
+    }
+  }
+  stats.previousTiming = timing || null;
+}
+
+// Linear interpolation between order statistics, the same rule as the bench
+// report's quantile (scripts/bench/lib/stats.mjs).
+function measurementQuantile(sorted, q) {
+  if (!sorted.length) return null;
+  const h = (sorted.length - 1) * q;
+  const lo = Math.floor(h);
+  return sorted[lo] + (h - lo) * (sorted[Math.ceil(h)] - sorted[lo]);
+}
+
+// Total, median and p90 over the finite values; all null (count 0) when there
+// are none, so "no data" never reads as a measured zero.
+function summarizeMeasurementValues(values) {
+  const finite = (Array.isArray(values) ? values : [])
+    .filter((value) => typeof value === 'number' && Number.isFinite(value));
+  if (!finite.length) return { total: null, median: null, p90: null, count: 0 };
+  const sorted = finite.slice().sort((a, b) => a - b);
+  let total = 0;
+  for (const value of sorted) total += value;
+  return {
+    total,
+    median: measurementQuantile(sorted, 0.5),
+    p90: measurementQuantile(sorted, 0.9),
+    count: sorted.length
+  };
+}
+
+function readMcpEndReason(session) {
+  const details = session && session.outcomeDetails;
+  const reason = details && typeof details === 'object' ? details.reason : null;
+  return typeof reason === 'string' && reason ? reason.slice(0, 64) : null;
+}
+
+// The MCP measurement block (v1). It is attached after the generic sanitizer,
+// so it is never passed through the key filter. activeSpanMs spans the timed
+// calls only, never the session end minus its start, so an idle-timeout tail
+// is never counted (D-06). Queue wait and the host's own model time, tokens
+// and cost are not visible to FSB and are labelled, never 0 (D-03, D-12).
+function buildMcpMeasurementFromStats(stats, sessionMeta, source) {
+  const fsb = summarizeMeasurementValues(stats.fsbValues);
+  const gaps = summarizeMeasurementValues(stats.gapValues);
+  const intervals = summarizeMeasurementValues(stats.intervalValues);
+  const endReason = readMcpEndReason(sessionMeta);
+  const hasSpan = Number.isSafeInteger(stats.firstReceivedAt) && Number.isSafeInteger(stats.lastCompletedAt) &&
+    stats.lastCompletedAt >= stats.firstReceivedAt;
+  return {
+    v: 1,
+    kind: 'mcp',
+    source: source === 'journal' ? 'journal' : 'legacy',
+    calls: stats.calls,
+    callsWithTiming: stats.callsWithTiming,
+    fsbMs: { total: fsb.total, median: fsb.median, p90: fsb.p90 },
+    callerGapMs: {
+      total: gaps.total,
+      median: gaps.median,
+      p90: gaps.p90,
+      count: gaps.count,
+      overlapped: stats.overlapped,
+      label: 'upper bound on host thinking time'
+    },
+    callIntervalMs: { median: intervals.median, p90: intervals.p90, count: intervals.count },
+    activeSpanMs: hasSpan ? stats.lastCompletedAt - stats.firstReceivedAt : null,
+    endReason,
+    idleTimeout: endReason === 'idle_timeout',
+    idleTailExcluded: true,
+    queueWaitMs: null,
+    queueWaitStatus: 'not_measured',
+    host: {
+      modelMs: null,
+      inputTokens: null,
+      outputTokens: null,
+      costUsd: null,
+      status: 'unavailable',
+      reason: 'host does not report to FSB'
+    },
+    truncated: stats.truncated === true,
+    pagesRead: stats.pagesRead
+  };
+}
+
+// Pages journal.getSessionDetail 500 events at a time, for at most
+// JOURNAL_DETAIL_MAX_PAGES pages. Statistics cover every call read; only the
+// last JOURNAL_DETAIL_ROW_LIMIT calls are projected into rows. Reading stops
+// early, with truncated true, when the bound is hit or the cursor stalls.
+async function collectJournalToolCalls(journal, sessionId) {
+  const stats = createMcpCallStats();
+  const recent = [];
+  let session = null;
+  let afterSequence = -1;
+  let more = true;
+  while (more && stats.pagesRead < JOURNAL_DETAIL_MAX_PAGES) {
+    const detail = await journal.getSessionDetail({ sessionId, afterSequence, limit: JOURNAL_DETAIL_PAGE_LIMIT });
+    if (!detail || typeof detail !== 'object') break;
+    stats.pagesRead += 1;
+    if (!session && detail.session && typeof detail.session === 'object') session = detail.session;
+    const events = Array.isArray(detail.events) ? detail.events : [];
+    for (const event of events) {
+      if (!event || typeof event !== 'object' || event.kind !== 'tool.call') continue;
+      const metadata = event.metadata && typeof event.metadata === 'object' ? event.metadata : {};
+      addMcpCallToStats(stats, validProjectionTiming(metadata.timing));
+      recent.push(event);
+      if (recent.length > JOURNAL_DETAIL_ROW_LIMIT) recent.shift();
+    }
+    more = detail.hasMore === true;
+    if (more) {
+      const next = detail.nextSequence;
+      if (!Number.isSafeInteger(next) || next <= afterSequence) break;
+      afterSequence = next;
+    }
+  }
+  if (!session) throw new Error('Journal session detail missing');
+  stats.truncated = more;
+  delete stats.previousTiming;
+  return { session, rows: recent.map(projectJournalToolCall), stats };
+}
+
+function projectJournalSessionForMcp(collected) {
+  const sanitized = sanitizeSessionMetadata(collected.session) || {};
+  sanitized.logs = [];
+  sanitized.actionHistory = collected.rows;
+  sanitized.callsTotal = collected.stats.calls;
+  sanitized.actionHistoryTruncated = collected.stats.calls > collected.rows.length;
+  sanitized.measurement = buildMcpMeasurementFromStats(collected.stats, collected.session, 'journal');
+  return sanitized;
+}
+
+// Legacy (history-store) MCP sessions: the same statistics over the timing
+// stored on their actionHistory rows. No paging applies.
+function buildMcpMeasurementFromLegacy(session) {
+  const stats = createMcpCallStats();
+  const actions = Array.isArray(session && session.actionHistory) ? session.actionHistory : [];
+  for (const action of actions) {
+    addMcpCallToStats(stats, validProjectionTiming(action && action.timing));
+  }
+  delete stats.previousTiming;
+  return buildMcpMeasurementFromStats(stats, session, 'legacy');
+}
+
+function measurementNumberOrNull(value) {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null;
+}
+
+function measurementCountOrNull(value) {
+  return Number.isSafeInteger(value) && value >= 0 ? value : null;
+}
+
+function measurementPositiveOrNull(value) {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null;
+}
+
+function measurementSourceLabel(value, allowed) {
+  return allowed.indexOf(value) !== -1 ? value : 'unavailable';
+}
+
+function measurementModelName(value) {
+  return typeof value === 'string' && value ? value.slice(0, 128) : null;
+}
+
+// Basis of the legacy totalCost (BASIS LABELS, W1/I-B). The legacy total is
+// always a price-table sum, so it is never 'provider'. With a measurement
+// summary it is 'unavailable' when the measured cost is unavailable or any
+// stored row had no price row, because the legacy total then holds the
+// unknown-model display fallback. LM Studio rows are priced by a local $0
+// rule that the legacy total never applied, so a positive legacy total next
+// to them is that same fallback and is 'unavailable' too. Otherwise
+// 'estimate', even at 0. Without a summary (pre-Phase-66 sessions) it is
+// 'estimate' only for a positive total. automation-logger.js applies the same
+// rule at save time.
+function legacyCostBasisFor(session) {
+  const source = session && typeof session === 'object' ? session : {};
+  const summary = source.measurementSummary;
+  const positiveTotal = measurementPositiveOrNull(source.totalCost) !== null;
+  if (summary && typeof summary === 'object' && !Array.isArray(summary)) {
+    const rows = Array.isArray(source.iterationTiming) ? source.iterationTiming : [];
+    const isRow = (row) => !!row && typeof row === 'object';
+    const unpriced = rows.some((row) => isRow(row) && row.pricingKey === null);
+    const localFallback = positiveTotal && rows.some((row) => isRow(row) && row.pricingKey === 'lmstudio-local');
+    return (summary.costSource === 'unavailable' || unpriced || localFallback) ? 'unavailable' : 'estimate';
+  }
+  return positiveTotal ? 'estimate' : 'unavailable';
+}
+
+// The label stored at save time wins when it is valid (I-2): index entries
+// never carry the summary, so list_sessions could not recompute the rule, and
+// both routes must agree. Anything else is recomputed.
+function resolveLegacyCostBasis(session) {
+  const stored = session && typeof session === 'object' ? session.totalCostBasis : null;
+  if (stored === 'estimate' || stored === 'unavailable') return stored;
+  return legacyCostBasisFor(session);
+}
+
+// Legacy token totals sum provider-reported usage.
+function legacyUsageBasisFor(session) {
+  const source = session && typeof session === 'object' ? session : {};
+  return measurementPositiveOrNull(source.totalInputTokens) !== null ||
+    measurementPositiveOrNull(source.totalOutputTokens) !== null ? 'provider' : 'unavailable';
+}
+
+// Adds totalCostBasis beside an existing totalCost key; changes no value.
+function withLegacyCostBasis(target, source) {
+  if (target && typeof target === 'object' && Object.prototype.hasOwnProperty.call(target, 'totalCost')) {
+    target.totalCostBasis = resolveLegacyCostBasis(source);
+  }
+  return target;
+}
+
+function projectAutopilotIterationRow(row) {
+  const usage = row.usage && typeof row.usage === 'object' ? row.usage : {};
+  return {
+    iteration: measurementCountOrNull(row.iteration),
+    startedAt: measurementNumberOrNull(row.startedAt),
+    modelMs: measurementNumberOrNull(row.modelMs),
+    modelRetried: row.modelRetried === true,
+    toolMs: measurementNumberOrNull(row.toolMs),
+    toolCount: measurementCountOrNull(row.toolCount),
+    inputTokens: measurementNumberOrNull(usage.input),
+    outputTokens: measurementNumberOrNull(usage.output),
+    reasoningTokens: measurementNumberOrNull(usage.reasoning),
+    cachedInputTokens: measurementNumberOrNull(usage.cachedInput),
+    usageSource: measurementSourceLabel(row.usageSource, ['provider', 'unavailable']),
+    costUsd: measurementNumberOrNull(row.costUsd),
+    costSource: measurementSourceLabel(row.costSource, ['provider', 'estimate', 'unavailable']),
+    servedModel: measurementModelName(row.servedModel),
+    estimateDeltaPct: typeof row.estimateDeltaPct === 'number' && Number.isFinite(row.estimateDeltaPct)
+      ? row.estimateDeltaPct
+      : null
+  };
+}
+
+// Phase 68 (AUTO-04, D-23): the fast-mode measurement block, projected key by
+// key from the stored record. A string leaves only as a code word or a
+// bounded model id, so no label, URL or page text can; missing numbers are
+// null, never 0, and usage and cost keep their source labels. Jev cost stays
+// in this block, outside costUsd and the provider measurement, and is never
+// priced here. automation-logger.js cloneJevMeasurementForPersistence keeps
+// the same keys; tests/jev-fast-measurement.test.js holds both to the 68-04
+// producers.
+function jevMeasurementCode(value) {
+  return typeof value === 'string' && /^[a-z][a-z0-9_]{0,63}$/.test(value) ? value : null;
+}
+
+function jevMeasurementString(value, maxLength) {
+  return typeof value === 'string' && value.length > 0 && value.length <= maxLength ? value : null;
+}
+
+function projectJevAttempt(attempt) {
+  const usage = attempt.usage && typeof attempt.usage === 'object' ? attempt.usage : {};
+  const cost = attempt.cost && typeof attempt.cost === 'object' ? attempt.cost : {};
+  return {
+    iteration: measurementCountOrNull(attempt.iteration),
+    command: measurementCountOrNull(attempt.command),
+    decisionSource: attempt.decisionSource === 'jev' ? 'jev' : null,
+    jevCalled: attempt.jevCalled === true,
+    servedModel: jevMeasurementString(attempt.servedModel, 128),
+    instrumentVersion: jevMeasurementString(attempt.instrumentVersion, 64),
+    calibrationStatus: jevMeasurementCode(attempt.calibrationStatus),
+    latencyMs: measurementNumberOrNull(attempt.latencyMs),
+    usage: {
+      inputTokens: measurementCountOrNull(usage.inputTokens),
+      source: measurementSourceLabel(usage.source, ['provider', 'unavailable'])
+    },
+    cost: {
+      usd: measurementNumberOrNull(cost.usd),
+      source: measurementSourceLabel(cost.source, ['provider', 'estimate', 'unavailable'])
+    },
+    fallback: jevMeasurementCode(attempt.fallback),
+    outcome: jevMeasurementCode(attempt.outcome),
+    escalationReason: jevMeasurementCode(attempt.escalationReason),
+    op: jevMeasurementCode(attempt.op),
+    stepOutcome: jevMeasurementCode(attempt.stepOutcome)
+  };
+}
+
+function projectJevCommand(command) {
+  const usd = command.usd && typeof command.usd === 'object' ? command.usd : {};
+  const escalations = {};
+  if (command.escalations && typeof command.escalations === 'object' && !Array.isArray(command.escalations)) {
+    for (const reason of Object.keys(command.escalations).slice(0, 100)) {
+      const count = measurementCountOrNull(command.escalations[reason]);
+      if (jevMeasurementCode(reason) !== null && count !== null) escalations[reason] = count;
+    }
+  }
+  return {
+    command: measurementCountOrNull(command.command),
+    fastSteps: measurementCountOrNull(command.fastSteps),
+    jevCalls: measurementCountOrNull(command.jevCalls),
+    jevMs: measurementNumberOrNull(command.jevMs),
+    usd: { provider: measurementNumberOrNull(usd.provider), estimate: measurementNumberOrNull(usd.estimate) },
+    escalations
+  };
+}
+
+function projectJevMeasurement(block) {
+  const isRecord = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
+  const attempts = Array.isArray(block && block.attempts) ? block.attempts.filter(isRecord).slice(-100) : [];
+  const commands = Array.isArray(block && block.commands) ? block.commands.filter(isRecord).slice(-100) : [];
+  return {
+    v: 1,
+    attempts: attempts.map(projectJevAttempt),
+    commands: commands.map(projectJevCommand)
+  };
+}
+
+// The autopilot measurement block (v1), built from the flat stored fields
+// (D-05, D-10). Stored usage.input/output/reasoning/cachedInput become the
+// *Tokens names only here, after the key filter. Model and tool median and
+// p90 cover the stored per-iteration rows (the last 100). A session saved
+// before Phase 66 reports recorded: false with every measured value null.
+function buildAutopilotMeasurement(session) {
+  const source = session && typeof session === 'object' ? session : {};
+  const rawSummary = source.measurementSummary;
+  const summary = rawSummary && typeof rawSummary === 'object' && !Array.isArray(rawSummary) && rawSummary.v === 1
+    ? rawSummary
+    : null;
+  const rows = summary && Array.isArray(source.iterationTiming)
+    ? source.iterationTiming.filter((row) => !!row && typeof row === 'object' && !Array.isArray(row)).slice(-100)
+    : [];
+  const usage = summary && summary.usage && typeof summary.usage === 'object' ? summary.usage : {};
+  const model = summarizeMeasurementValues(rows.map((row) => measurementNumberOrNull(row.modelMs)));
+  const tool = summarizeMeasurementValues(rows.map((row) => measurementNumberOrNull(row.toolMs)));
+  return {
+    v: 1,
+    kind: 'autopilot',
+    recorded: !!summary,
+    iterations: summary ? measurementCountOrNull(summary.iterations) : null,
+    modelMs: {
+      total: summary ? measurementNumberOrNull(summary.modelMsTotal) : null,
+      median: model.median,
+      p90: model.p90
+    },
+    toolMs: {
+      total: summary ? measurementNumberOrNull(summary.toolMsTotal) : null,
+      median: tool.median,
+      p90: tool.p90,
+      calls: summary ? measurementCountOrNull(summary.toolCount) : null
+    },
+    inputTokens: measurementNumberOrNull(usage.input),
+    outputTokens: measurementNumberOrNull(usage.output),
+    reasoningTokens: measurementNumberOrNull(usage.reasoning),
+    cachedInputTokens: measurementNumberOrNull(usage.cachedInput),
+    usageSource: summary ? measurementSourceLabel(summary.usageSource, ['provider', 'mixed', 'unavailable']) : 'unavailable',
+    costUsd: summary ? measurementNumberOrNull(summary.costUsd) : null,
+    costSource: summary ? measurementSourceLabel(summary.costSource, ['provider', 'estimate', 'mixed', 'unavailable']) : 'unavailable',
+    costIterations: summary ? measurementCountOrNull(summary.costIterations) : null,
+    requestedModel: summary ? measurementModelName(summary.requestedModel) : null,
+    servedModels: summary && Array.isArray(summary.servedModels)
+      ? summary.servedModels.map(measurementModelName).filter(Boolean).slice(0, 10)
+      : [],
+    perIteration: rows.map(projectAutopilotIterationRow),
+    legacyTotals: {
+      costUsd: measurementPositiveOrNull(source.totalCost),
+      costBasis: resolveLegacyCostBasis(source),
+      inputTokens: measurementPositiveOrNull(source.totalInputTokens),
+      outputTokens: measurementPositiveOrNull(source.totalOutputTokens),
+      usageBasis: legacyUsageBasisFor(source),
+      label: 'legacy price-table total; not provider-reported'
+    }
+  };
 }
 
 function sanitizeMemoryEntry(memory) {
@@ -2979,7 +3600,10 @@ async function handleListSessionsMessageRoute({ payload }) {
   const sessions = await automationLogger.listSessions();
   return {
     success: true,
+    // Phase 66 (I-2): an entry's totalCost gains the same basis label that
+    // get_session_detail returns for that session.
     sessions: (Array.isArray(sessions) ? sessions : []).slice(0, limit).map(sanitizeSessionMetadata).filter(Boolean)
+      .map((entry) => withLegacyCostBasis(entry, entry))
   };
 }
 
@@ -3008,6 +3632,46 @@ async function handleGetSessionMessageRoute({ payload }) {
   if (!payload.sessionId) {
     return createMcpInvalidParamsError('get_session_detail', 'get_session_detail requires sessionId', { routeFamily: 'observability' });
   }
+
+  // Phase 66 (MEAS-02, D-07): journal-backed MCP sessions resolve first, then
+  // the history store, then in-flight sessions. The branch is skipped when
+  // the journal module is not loaded, and a failing lookup falls through.
+  const journal = (typeof globalThis !== 'undefined') ? globalThis.FsbMcpLatticeJournal : null;
+  if (journal && typeof journal.hasSession === 'function' && typeof journal.getSessionDetail === 'function') {
+    let isJournal = false;
+    try {
+      isJournal = (await journal.hasSession(payload.sessionId)) === true;
+    } catch (_error) {
+      isJournal = false;
+    }
+    if (isJournal) {
+      if (payload.format === 'text') {
+        if (typeof journal.exportHumanReadable !== 'function') {
+          return createMcpRouteError('get_session_detail', 'observability', MCP_ROUTE_RECOVERY_HINT, {
+            error: 'Human-readable session exporter unavailable'
+          });
+        }
+        try {
+          return { success: true, format: 'text', text: await journal.exportHumanReadable(payload.sessionId) };
+        } catch (_error) {
+          return createMcpRouteError('get_session_detail', 'observability', MCP_ROUTE_RECOVERY_HINT, {
+            error: 'Journal session detail unavailable'
+          });
+        }
+      }
+      try {
+        return {
+          success: true,
+          session: projectJournalSessionForMcp(await collectJournalToolCalls(journal, payload.sessionId))
+        };
+      } catch (_error) {
+        return createMcpRouteError('get_session_detail', 'observability', MCP_ROUTE_RECOVERY_HINT, {
+          error: 'Journal session detail unavailable'
+        });
+      }
+    }
+  }
+
   if (typeof automationLogger === 'undefined' || typeof automationLogger?.loadSession !== 'function') {
     return createMcpRouteError('get_session_detail', 'observability', MCP_ROUTE_RECOVERY_HINT, { error: 'Automation logger session loader unavailable' });
   }
@@ -3135,6 +3799,260 @@ async function handleGetLogsMessageRoute({ payload }) {
     logs: sanitizedLogs,
     count: sanitizedLogs.length
   };
+}
+
+// ---- Phase 66.1 settings routes (SET-01, SET-02) ---------------------------
+// mcp:get-settings reads every setting or one key; mcp:set-setting writes one
+// key (or the modelProvider+modelName pair) to chrome.storage.local. The
+// schema (globalThis.FsbSettingsSchema, extension/config/config.js) owns every
+// rule, mask and sentence. These routes read storage, gather the outside
+// facts the schema needs, write the planned patch and log the outcome. Both
+// handlers return typed SETTING_* failures and never throw. A submitted value
+// never goes into an error, a log line or a console call.
+
+// Serializes every settings write (read, plan, write) so concurrent writes
+// each report the right previous value and never interleave the provider
+// pair (Pitfall 9). Same shape as _withLabelStorageLock, on its own chain.
+var _settingsWriteChain = Promise.resolve();
+function _withSettingsWriteLock(fn) {
+  var next = _settingsWriteChain.then(fn, fn);
+  _settingsWriteChain = next.catch(function () { /* swallow so chain continues */ });
+  return next;
+}
+
+// The recovery hint every SETTING_* failure carries. mcp/src/errors.ts shows a
+// result's recoveryHint and keeps no per-code table of its own.
+const SETTING_RECOVERY_HINTS = Object.freeze({
+  SETTING_PROTECTED_KEY: 'Change this setting in the FSB Control Panel.',
+  SETTING_DELEGATED_WRITE_REFUSED: 'Change this setting in the FSB Control Panel.',
+  SETTING_PROVIDER_NOT_READY: 'Change this setting in the FSB Control Panel.',
+  SETTING_UNSUPPORTED: 'Update the FSB extension, or change the setting in the FSB Control Panel.',
+  default: 'Call settings with only a key to see its type and allowed values, or with no arguments to list every setting.'
+});
+
+// Same sentence as the schema's unknown-key failure.
+const SETTING_UNKNOWN_KEY_ERROR = 'Unknown setting key. Call settings with no arguments to list keys.';
+
+function _settingsFailure(code, error, extra) {
+  const recoveryHint = (code !== 'default' && Object.prototype.hasOwnProperty.call(SETTING_RECOVERY_HINTS, code))
+    ? SETTING_RECOVERY_HINTS[code]
+    : SETTING_RECOVERY_HINTS.default;
+  return Object.assign({ success: false, code, errorCode: code, error, recoveryHint }, extra || {});
+}
+
+// Looked up at call time, so a test fixture instance (D-17) or an older build
+// without the schema is honoured. A partial schema counts as missing.
+function _resolveSettingsSchema() {
+  const schema = typeof globalThis !== 'undefined' ? globalThis.FsbSettingsSchema : undefined;
+  if (!schema || typeof schema !== 'object') return null;
+  const required = ['keys', 'get', 'safeKeyLabel', 'effectiveDefault', 'projectAll', 'describe', 'planWrite',
+    'knownModelIds', 'discoveredIdsFromCache'];
+  for (const name of required) {
+    if (typeof schema[name] !== 'function') return null;
+  }
+  return schema;
+}
+
+async function _readSettingsStorage(keys) {
+  if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local
+      || typeof chrome.storage.local.get !== 'function') {
+    throw new Error('chrome.storage.local unavailable');
+  }
+  const result = await chrome.storage.local.get(keys);
+  return (result && typeof result === 'object') ? result : {};
+}
+
+async function _writeSettingsStorage(patch) {
+  if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local
+      || typeof chrome.storage.local.set !== 'function') {
+    throw new Error('chrome.storage.local unavailable');
+  }
+  await chrome.storage.local.set(patch);
+}
+
+// The provider the D-15 model rules compare against: the stored string, else
+// the schema's effective default (as the schema's own planWrite does).
+function _settingsCurrentProvider(schema, stored) {
+  if (stored && typeof stored.modelProvider === 'string') return stored.modelProvider;
+  const fallback = schema.effectiveDefault('modelProvider');
+  return typeof fallback === 'string' ? fallback : '';
+}
+
+// The outside facts planWrite and the read projection need (ctx). Every one
+// is optional and fails closed in the schema when it is missing.
+async function _buildSettingsContext(schema, stored, needDiscoveryFor) {
+  const ctx = {};
+  // D-12: getRecommendedAgentCap is async. Without the await the schema would
+  // see a Promise instead of a number and quietly fall back to 8.
+  const capModule = typeof globalThis !== 'undefined' ? globalThis.FsbAgentCapRecommendation : undefined;
+  if (capModule && typeof capModule.getRecommendedAgentCap === 'function') {
+    try {
+      ctx.agentCapRecommendation = await capModule.getRecommendedAgentCap();
+    } catch (_e) {
+      ctx.agentCapRecommendation = undefined;
+    }
+  }
+  const providers = typeof globalThis !== 'undefined' ? globalThis.FsbDelegationProviders : undefined;
+  if (providers && typeof providers.isShippedId === 'function') {
+    ctx.isShippedAgentId = function (id) { return providers.isShippedId(id) === true; };
+    if (typeof providers.ids === 'function') {
+      try {
+        const ids = providers.ids();
+        if (Array.isArray(ids)) {
+          ctx.shippedAgentIds = ids.filter(function (id) {
+            try { return providers.isShippedId(id) === true; } catch (_e) { return false; }
+          });
+        }
+      } catch (_e) { /* the shipped list stays unknown */ }
+    }
+  }
+  if (typeof needDiscoveryFor === 'string' && needDiscoveryFor !== '') {
+    // Pitfall 7: the persisted discovery cache, never the SW's in-memory copy,
+    // and never a network call.
+    const cached = await _readSettingsStorage('fsbDiscoveryCache');
+    ctx.discoveredModelIds = schema.discoveredIdsFromCache(cached.fsbDiscoveryCache, needDiscoveryFor, Date.now());
+  }
+  return ctx;
+}
+
+function _isHostedSettingsProvider(schema, provider) {
+  return Array.isArray(schema.HOSTED_PROVIDERS) && schema.HOSTED_PROVIDERS.indexOf(provider) !== -1;
+}
+
+// D-18 operator line in automationLogs, written whether or not session
+// recording is on. Fire-and-forget: it never gates or changes the response.
+function _logSettingsWrite(level, data) {
+  try {
+    if (typeof automationLogger === 'undefined' || !automationLogger) return;
+    const method = level === 'warn' ? 'warn' : 'info';
+    if (typeof automationLogger[method] !== 'function') return;
+    const message = method === 'warn' ? 'MCP settings write refused' : 'MCP settings write';
+    const logged = automationLogger[method](message, data);
+    if (logged && typeof logged.catch === 'function') logged.catch(function () {});
+  } catch (_e) { /* the operator log never gates the response */ }
+}
+
+async function handleGetSettingsMessageRoute({ payload } = {}) {
+  try {
+    const schema = _resolveSettingsSchema();
+    if (!schema) return _settingsFailure('SETTING_UNSUPPORTED', 'This FSB build has no settings schema.');
+    const request = (payload && typeof payload === 'object') ? payload : {};
+    const key = request.key;
+    if (key !== undefined && (typeof key !== 'string' || !schema.get(key))) {
+      return _settingsFailure('SETTING_UNKNOWN_KEY', SETTING_UNKNOWN_KEY_ERROR, { key: schema.safeKeyLabel(key) });
+    }
+    const stored = await _readSettingsStorage(schema.keys());
+    if (key === undefined) {
+      const ctx = await _buildSettingsContext(schema, stored, null);
+      return Object.assign({ success: true }, schema.projectAll(stored, ctx));
+    }
+    const provider = key === 'modelName' ? _settingsCurrentProvider(schema, stored) : '';
+    const hosted = provider !== '' && _isHostedSettingsProvider(schema, provider);
+    const ctx = await _buildSettingsContext(schema, stored, hosted ? provider : null);
+    const described = schema.describe(key, stored, ctx);
+    if (!described) {
+      return _settingsFailure('SETTING_UNKNOWN_KEY', SETTING_UNKNOWN_KEY_ERROR, { key: schema.safeKeyLabel(key) });
+    }
+    const reply = Object.assign({ success: true }, described);
+    if (key === 'modelName' && hosted) {
+      const cap = Number.isInteger(schema.MODEL_LIST_CAP) ? schema.MODEL_LIST_CAP : 25;
+      reply.values = schema.knownModelIds(provider, ctx.discoveredModelIds).slice(0, cap);
+    }
+    if (key === 'agentProviderId' && Array.isArray(ctx.shippedAgentIds)) {
+      reply.values = [''].concat(ctx.shippedAgentIds);
+    }
+    return reply;
+  } catch (_e) {
+    return _settingsFailure('SETTING_STORAGE_FAILED', 'Could not read FSB settings.');
+  }
+}
+
+async function handleSetSettingMessageRoute({ payload, client } = {}) {
+  const request = (payload && typeof payload === 'object' && !Array.isArray(payload)) ? payload : null;
+  let schema = null;
+  try { schema = _resolveSettingsSchema(); } catch (_e) { schema = null; }
+  let clientLabel = 'unknown';
+  try {
+    const resolved = resolveMcpClientLabel(request);
+    if (typeof resolved === 'string' && resolved !== '') clientLabel = resolved;
+  } catch (_e) { clientLabel = 'unknown'; }
+
+  // Refusals log the safe key label and the code only (D-18).
+  function refuse(code, error, extra) {
+    let keyLabel = '[invalid]';
+    try {
+      if (schema && request) keyLabel = schema.safeKeyLabel(request.key);
+    } catch (_e) { keyLabel = '[invalid]'; }
+    _logSettingsWrite('warn', { key: keyLabel, code, client: clientLabel, at: new Date().toISOString() });
+    return _settingsFailure(code, error, extra);
+  }
+
+  if (!request) return refuse('SETTING_REQUEST_INVALID', 'The settings request is malformed.');
+  if (!schema) return refuse('SETTING_UNSUPPORTED', 'This FSB build has no settings schema.');
+
+  // D-20: delegated agent runs can read settings but never write them. This
+  // runs before anything reads the value, and fails closed: a missing agentId,
+  // a missing client or detector, a throwing detector, or any answer other
+  // than exactly false (the registry is missing, malformed or maps this
+  // agent to a delegation) is a refusal.
+  let writeAllowed = false;
+  if (typeof request.agentId === 'string' && request.agentId.length > 0
+      && client && typeof client._isDelegationScopedInbound === 'function') {
+    try {
+      writeAllowed = client._isDelegationScopedInbound('mcp:set-setting', request) === false;
+    } catch (_e) {
+      writeAllowed = false;
+    }
+  }
+  if (!writeAllowed) {
+    return refuse('SETTING_DELEGATED_WRITE_REFUSED',
+      'Settings writes are not allowed from delegated agent runs or unidentified sessions.');
+  }
+
+  try {
+    return await _withSettingsWriteLock(async function () {
+      const key = request.key;
+      const stored = await _readSettingsStorage(schema.keys());
+      const provider = key === 'modelName' ? _settingsCurrentProvider(schema, stored) : '';
+      const ctx = await _buildSettingsContext(schema, stored,
+        provider !== '' && _isHostedSettingsProvider(schema, provider) ? provider : null);
+      const plan = schema.planWrite(key, request.value, stored, ctx);
+      if (!plan || plan.ok !== true) {
+        const code = plan && typeof plan.code === 'string' ? plan.code : 'SETTING_REQUEST_INVALID';
+        const extra = { key: plan && typeof plan.key === 'string' ? plan.key : schema.safeKeyLabel(key) };
+        if (plan && plan.range) extra.range = plan.range;
+        if (plan && Array.isArray(plan.values)) extra.values = plan.values;
+        return refuse(code, plan && typeof plan.error === 'string' ? plan.error : 'The setting could not be changed.', extra);
+      }
+      const patch = plan.patch && typeof plan.patch === 'object' ? plan.patch : {};
+      if (Object.keys(patch).length > 0) {
+        try {
+          await _writeSettingsStorage(patch);
+        } catch (_e) {
+          return refuse('SETTING_STORAGE_FAILED', 'Could not save the setting.', { key: plan.key });
+        }
+      }
+      const changed = Array.isArray(plan.changed) ? plan.changed.slice() : [];
+      // D-18: the other key a write also set (modelName on a provider change),
+      // with its new and previous value. Absent for one-key writes.
+      const coupled = _settingsCoupledSummary(plan.coupled);
+      const logged = {
+        key: plan.key,
+        previous: plan.previous,
+        value: plan.value,
+        changed: changed.slice(),
+        client: clientLabel,
+        at: new Date().toISOString()
+      };
+      if (coupled) logged.coupled = coupled;
+      _logSettingsWrite('info', logged);
+      const reply = { success: true, key: plan.key, value: plan.value, previous: plan.previous, changed };
+      if (coupled) reply.coupled = _settingsCoupledSummary(coupled);
+      return reply;
+    });
+  } catch (_e) {
+    return refuse('SETTING_STORAGE_FAILED', 'Could not change the setting.');
+  }
 }
 
 async function handleSearchMemoryMessageRoute({ payload }) {
@@ -3643,6 +4561,43 @@ let _changeReportSeq = 0;
 // it must be self-contained (no closures over SW scope).
 function _fsbHarvestStartInPage(targetSelector, token, deadline) {
   try {
+    // D-25: sensitive inputs never leave the page with their value. Same rules
+    // as isRedactedField in utils/action-verification.js: input type password
+    // or hidden; an autocomplete token current-password, new-password,
+    // one-time-code or cc-*; or a name, id or autocomplete matching
+    // EXPECT_SENSITIVE_NAME_SOURCE after the camelCase word split (short terms
+    // are letter-boundary aware, so 'footprint' stays non-sensitive). The
+    // marker is EXPECT_REDACTED. Both literals must stay identical to those
+    // constants (tests/change-report-redaction.test.js).
+    const REDACTED = '[redacted]';
+    const SENSITIVE_NAME_RE = new RegExp('(?<![a-z])(?:t?otp|pwd|cvv|cvc|cc[-_ ]?num(?:ber)?)(?![a-z])|pass(?:wd|[-_ ]?(?:word|code))|card[-_ ]?num(?:ber)?|security[-_ ]?code|one[-_ ]?time[-_ ]?(?:code|pass)', 'i');
+    function isSensitiveInput(el) {
+      if (!el || typeof el !== 'object') return false;
+      const read = function (name) {
+        try { return (typeof el.getAttribute === 'function') ? el.getAttribute(name) : null; } catch (_) { return null; }
+      };
+      const tag = (typeof el.tagName === 'string') ? el.tagName.toLowerCase() : '';
+      let type = (typeof el.type === 'string') ? el.type : read('type');
+      type = (typeof type === 'string') ? type.toLowerCase() : '';
+      if ((tag === '' || tag === 'input') && (type === 'password' || type === 'hidden')) return true;
+      let ac = read('autocomplete');
+      if (typeof ac !== 'string') ac = (typeof el.autocomplete === 'string') ? el.autocomplete : '';
+      const tokens = ac.toLowerCase().split(/\s+/);
+      for (let i = 0; i < tokens.length; i++) {
+        const t = tokens[i];
+        if (t === 'current-password' || t === 'new-password' || t === 'one-time-code' || t.indexOf('cc-') === 0) return true;
+      }
+      let name = read('name');
+      if (typeof name !== 'string') name = (typeof el.name === 'string') ? el.name : '';
+      let id = read('id');
+      if (typeof id !== 'string') id = (typeof el.id === 'string') ? el.id : '';
+      const names = [name, id, ac];
+      for (let i = 0; i < names.length; i++) {
+        const v = names[i];
+        if (v && SENSITIVE_NAME_RE.test(v.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2'))) return true;
+      }
+      return false;
+    }
     function getClassName(el) {
       if (!el) return '';
       const cn = el.className;
@@ -3661,20 +4616,34 @@ function _fsbHarvestStartInPage(targetSelector, token, deadline) {
       }
       return el.tagName.toLowerCase();
     }
-    function captureState() {
+    // side (optional, page-only): collects the raw values (side.raw) and the
+    // elements (side.els) of sensitive inputs; side.wasSensitive lists inputs
+    // that were sensitive at harvest start (a show-password toggle may have
+    // flipped them to type=text since).
+    function captureState(side) {
       const state = {
         url: window.location.href,
         title: document.title,
         elementCount: document.querySelectorAll('*').length,
         inputValues: {},
+        redactedInputKeys: [],
         activeElementSelector: null,
         timestamp: Date.now()
       };
+      const wasSensitive = (side && Array.isArray(side.wasSensitive)) ? side.wasSensitive : null;
       const inputs = document.querySelectorAll('input, textarea, [contenteditable="true"]');
       for (let i = 0; i < inputs.length && i < 20; i++) {
         const inp = inputs[i];
         const key = inp.id || inp.name || ('input_' + i);
-        state.inputValues[key] = inp.value || inp.textContent || '';
+        if (isSensitiveInput(inp) || (wasSensitive && wasSensitive.indexOf(inp) !== -1)) {
+          // Emptiness is not a secret: '' stays ''.
+          const raw = inp.value || inp.textContent || '';
+          state.inputValues[key] = raw ? REDACTED : '';
+          if (state.redactedInputKeys.indexOf(key) === -1) state.redactedInputKeys.push(key);
+          if (side) { side.raw[key] = raw; side.els.push(inp); }
+        } else {
+          state.inputValues[key] = inp.value || inp.textContent || '';
+        }
       }
       const ae = document.activeElement;
       if (ae && ae !== document.body) state.activeElementSelector = buildSel(ae);
@@ -3696,9 +4665,15 @@ function _fsbHarvestStartInPage(targetSelector, token, deadline) {
     // observer installed after that would never be stopped.
     if (Date.now() > deadline) return { ok: false, expired: true };
     const handles = window.__fsbChangeReportHandles || (window.__fsbChangeReportHandles = {});
-    const beforeState = captureState();
+    const sensitiveSide = { raw: {}, els: [] };
+    const beforeState = captureState(sensitiveSide);
     const root = resolveScope(targetSelector);
     const handle = { beforeState, mutations: [], mutationCount: 0, startedAt: Date.now() };
+    // D-25: the raw values of sensitive inputs stay on this page-side handle
+    // for the stop's change detection and are never returned; they are
+    // deleted with the handle at stop or at the two-minute expiry.
+    handle.sensitiveRaw = sensitiveSide.raw;
+    handle.sensitiveEls = sensitiveSide.els;
     // A stop that never arrives must not leave the observer running: retain
     // at most 5000 records and disconnect after two minutes.
     handle.expiry = setTimeout(() => {
@@ -3736,6 +4711,43 @@ function _fsbHarvestStartInPage(targetSelector, token, deadline) {
 // disconnects the observer, returns plain-data shape buildChangeReport accepts.
 function _fsbHarvestStopInPage(token) {
   try {
+    // D-25: sensitive inputs never leave the page with their value. Same rules
+    // as isRedactedField in utils/action-verification.js: input type password
+    // or hidden; an autocomplete token current-password, new-password,
+    // one-time-code or cc-*; or a name, id or autocomplete matching
+    // EXPECT_SENSITIVE_NAME_SOURCE after the camelCase word split (short terms
+    // are letter-boundary aware, so 'footprint' stays non-sensitive). The
+    // marker is EXPECT_REDACTED. Both literals must stay identical to those
+    // constants (tests/change-report-redaction.test.js).
+    const REDACTED = '[redacted]';
+    const SENSITIVE_NAME_RE = new RegExp('(?<![a-z])(?:t?otp|pwd|cvv|cvc|cc[-_ ]?num(?:ber)?)(?![a-z])|pass(?:wd|[-_ ]?(?:word|code))|card[-_ ]?num(?:ber)?|security[-_ ]?code|one[-_ ]?time[-_ ]?(?:code|pass)', 'i');
+    function isSensitiveInput(el) {
+      if (!el || typeof el !== 'object') return false;
+      const read = function (name) {
+        try { return (typeof el.getAttribute === 'function') ? el.getAttribute(name) : null; } catch (_) { return null; }
+      };
+      const tag = (typeof el.tagName === 'string') ? el.tagName.toLowerCase() : '';
+      let type = (typeof el.type === 'string') ? el.type : read('type');
+      type = (typeof type === 'string') ? type.toLowerCase() : '';
+      if ((tag === '' || tag === 'input') && (type === 'password' || type === 'hidden')) return true;
+      let ac = read('autocomplete');
+      if (typeof ac !== 'string') ac = (typeof el.autocomplete === 'string') ? el.autocomplete : '';
+      const tokens = ac.toLowerCase().split(/\s+/);
+      for (let i = 0; i < tokens.length; i++) {
+        const t = tokens[i];
+        if (t === 'current-password' || t === 'new-password' || t === 'one-time-code' || t.indexOf('cc-') === 0) return true;
+      }
+      let name = read('name');
+      if (typeof name !== 'string') name = (typeof el.name === 'string') ? el.name : '';
+      let id = read('id');
+      if (typeof id !== 'string') id = (typeof el.id === 'string') ? el.id : '';
+      const names = [name, id, ac];
+      for (let i = 0; i < names.length; i++) {
+        const v = names[i];
+        if (v && SENSITIVE_NAME_RE.test(v.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2'))) return true;
+      }
+      return false;
+    }
     function getClassName(el) {
       if (!el) return '';
       const cn = el.className;
@@ -3754,20 +4766,34 @@ function _fsbHarvestStopInPage(token) {
       }
       return el.tagName.toLowerCase();
     }
-    function captureState() {
+    // side (optional, page-only): collects the raw values (side.raw) and the
+    // elements (side.els) of sensitive inputs; side.wasSensitive lists inputs
+    // that were sensitive at harvest start (a show-password toggle may have
+    // flipped them to type=text since).
+    function captureState(side) {
       const state = {
         url: window.location.href,
         title: document.title,
         elementCount: document.querySelectorAll('*').length,
         inputValues: {},
+        redactedInputKeys: [],
         activeElementSelector: null,
         timestamp: Date.now()
       };
+      const wasSensitive = (side && Array.isArray(side.wasSensitive)) ? side.wasSensitive : null;
       const inputs = document.querySelectorAll('input, textarea, [contenteditable="true"]');
       for (let i = 0; i < inputs.length && i < 20; i++) {
         const inp = inputs[i];
         const key = inp.id || inp.name || ('input_' + i);
-        state.inputValues[key] = inp.value || inp.textContent || '';
+        if (isSensitiveInput(inp) || (wasSensitive && wasSensitive.indexOf(inp) !== -1)) {
+          // Emptiness is not a secret: '' stays ''.
+          const raw = inp.value || inp.textContent || '';
+          state.inputValues[key] = raw ? REDACTED : '';
+          if (state.redactedInputKeys.indexOf(key) === -1) state.redactedInputKeys.push(key);
+          if (side) { side.raw[key] = raw; side.els.push(inp); }
+        } else {
+          state.inputValues[key] = inp.value || inp.textContent || '';
+        }
       }
       const ae = document.activeElement;
       if (ae && ae !== document.body) state.activeElementSelector = buildSel(ae);
@@ -3817,13 +4843,18 @@ function _fsbHarvestStopInPage(token) {
     }
     const handles = window.__fsbChangeReportHandles || {};
     const handle = handles[token];
-    if (!handle) return { ok: true, mutations: [], afterState: captureState(), settle_ms: 0 };
+    if (!handle) {
+      const loneState = captureState(null);
+      loneState.redactedInputsChanged = [];
+      return { ok: true, mutations: [], afterState: loneState, settle_ms: 0 };
+    }
     delete handles[token];
     clearTimeout(handle.expiry);
     if (handle.observer && typeof handle.observer.disconnect === 'function') {
       try { handle.observer.disconnect(); } catch (_) { /* idempotent */ }
     }
     const settle_ms = Date.now() - (handle.startedAt || Date.now());
+    const sensitiveEls = Array.isArray(handle.sensitiveEls) ? handle.sensitiveEls : [];
     const serialized = [];
     for (let i = 0; i < handle.mutations.length; i++) {
       const rec = handle.mutations[i];
@@ -3831,16 +4862,40 @@ function _fsbHarvestStopInPage(token) {
       if (rec.addedNodes) for (let j = 0; j < rec.addedNodes.length; j++) added.push(serializeNode(rec.addedNodes[j]));
       const removed = [];
       if (rec.removedNodes) for (let j = 0; j < rec.removedNodes.length; j++) removed.push(serializeNode(rec.removedNodes[j]));
-      serialized.push({
+      const entry = {
         type: rec.type,
         attributeName: rec.attributeName || null,
         oldValue: rec.oldValue == null ? null : String(rec.oldValue),
         target: serializeNode(rec.target),
         addedNodes: added,
         removedNodes: removed
-      });
+      };
+      // D-25: a 'value' attribute record on a sensitive input (a React-synced
+      // password value attribute, a rotated hidden-input token) carries the
+      // secret in oldValue. Mask it here and flag the record for the builder;
+      // the flag never reaches change_report. Every other record keeps
+      // exactly today's six keys.
+      if (rec.type === 'attributes' && rec.attributeName === 'value'
+          && (isSensitiveInput(rec.target) || sensitiveEls.indexOf(rec.target) !== -1)) {
+        entry.oldValue = entry.oldValue === null ? null : (entry.oldValue === '' ? '' : REDACTED);
+        entry.valueRedacted = true;
+      }
+      serialized.push(entry);
     }
-    const afterState = captureState();
+    const afterSide = { raw: {}, els: [], wasSensitive: sensitiveEls };
+    const afterState = captureState(afterSide);
+    // D-25 change detection without values: compare the raw values on the
+    // page and report only the keys of sensitive inputs that changed,
+    // appeared or disappeared.
+    const beforeRaw = (handle.sensitiveRaw && typeof handle.sensitiveRaw === 'object') ? handle.sensitiveRaw : {};
+    const changedKeys = [];
+    for (const key in afterSide.raw) {
+      if (!Object.prototype.hasOwnProperty.call(beforeRaw, key) || beforeRaw[key] !== afterSide.raw[key]) changedKeys.push(key);
+    }
+    for (const key in beforeRaw) {
+      if (!Object.prototype.hasOwnProperty.call(afterSide.raw, key) && changedKeys.indexOf(key) === -1) changedKeys.push(key);
+    }
+    afterState.redactedInputsChanged = changedKeys;
     return { ok: true, mutations: serialized, afterState, settle_ms, mutation_count: handle.mutationCount };
   } catch (e) {
     return { ok: false, error: String(e && e.message || e) };
@@ -3939,6 +4994,242 @@ function _originOf(url) {
   try { return new URL(url).origin; } catch (_) { return null; }
 }
 
+// ---- Phase 69 same-call expect (D-17..D-20) ----------------------------------
+// Evaluated after execute() for the 29 expect tools, whatever the change-report
+// toggle or the tool's _emitChangeReport flag. Without expect nothing here runs.
+
+// D-18: the read-only probe runs in the ISOLATED world, so page scripts cannot
+// patch the DOM APIs it reads, and with injectImmediately, so a still-loading
+// document is probed instead of queued behind document_idle. Sibling of
+// _injectFn, whose MAIN-world calls are unchanged. Never throws.
+async function _injectProbe(tabId, func, args) {
+  if (typeof chrome === 'undefined' || !chrome.scripting || typeof chrome.scripting.executeScript !== 'function') {
+    return { ok: false, reason: 'no_scripting' };
+  }
+  let timer = null;
+  try {
+    const injection = chrome.scripting.executeScript({
+      target: { tabId },
+      world: 'ISOLATED',
+      injectImmediately: true,
+      func,
+      args: args || []
+    });
+    const timedOut = {};
+    const results = await Promise.race([
+      injection,
+      new Promise((resolve) => { timer = setTimeout(() => resolve(timedOut), _PAGE_INJECTION_TIMEOUT_MS); })
+    ]);
+    if (results === timedOut) return { ok: false, reason: 'timeout' };
+    const first = Array.isArray(results) ? results[0] : null;
+    if (!first) return { ok: false, reason: 'no_result' };
+    const documentId = (typeof first.documentId === 'string' && first.documentId) ? first.documentId : null;
+    return { ok: true, result: first.result, documentId };
+  } catch (err) {
+    return { ok: false, reason: (err && err.message) ? String(err.message) : String(err) };
+  } finally {
+    if (timer !== null) clearTimeout(timer);
+  }
+}
+
+// The evaluator lives in utils/action-verification.js (plan 69-03). In the
+// service worker its EXPECT_* constants are top-level const bindings of a
+// classic script: shared lexically, never properties of globalThis or self,
+// so only bare identifiers reach them (a globalThis.EXPECT_* read would
+// silently disable expect in the real extension). Node tests use require.
+function _resolveExpectEvaluator() {
+  try {
+    if (typeof normalizeExpectSpec === 'function' && typeof evaluateExpectation === 'function'
+        && typeof buildUncertainExpectResult === 'function' && typeof _fsbExpectProbeInPage === 'function'
+        && typeof EXPECT_TOOL_NAMES !== 'undefined' && typeof EXPECT_NAV_TOOL_NAMES !== 'undefined') {
+      return {
+        normalizeExpectSpec, evaluateExpectation, buildUncertainExpectResult, _fsbExpectProbeInPage,
+        EXPECT_TOOL_NAMES, EXPECT_NAV_TOOL_NAMES
+      };
+    }
+  } catch (_) { /* a binding left uninitialized by a failed script load */ }
+  if (typeof require !== 'undefined') {
+    try {
+      const av = require('../utils/action-verification.js');
+      if (av && typeof av.normalizeExpectSpec === 'function' && typeof av.evaluateExpectation === 'function'
+          && typeof av.buildUncertainExpectResult === 'function' && typeof av._fsbExpectProbeInPage === 'function'
+          && Array.isArray(av.EXPECT_TOOL_NAMES) && Array.isArray(av.EXPECT_NAV_TOOL_NAMES)) {
+        return {
+          normalizeExpectSpec: av.normalizeExpectSpec,
+          evaluateExpectation: av.evaluateExpectation,
+          buildUncertainExpectResult: av.buildUncertainExpectResult,
+          _fsbExpectProbeInPage: av._fsbExpectProbeInPage,
+          EXPECT_TOOL_NAMES: av.EXPECT_TOOL_NAMES,
+          EXPECT_NAV_TOOL_NAMES: av.EXPECT_NAV_TOOL_NAMES
+        };
+      }
+    } catch (_) { /* not available */ }
+  }
+  return null;
+}
+
+// null means today's path: no expect, an evaluator that is unavailable (the
+// MCP side then reports extension_unsupported) or a tool outside the 29.
+// The bridge passes wire verbs (type, keyPress, cdpClickAt, ...), so the
+// name is resolved before the membership check (RESEARCH Finding 9).
+function _resolveExpectSpec(rawExpect, toolNameOrVerb) {
+  if (rawExpect === undefined || rawExpect === null) return null;
+  const evaluator = _resolveExpectEvaluator();
+  if (!evaluator) return null;
+  let toolName = null;
+  try {
+    const def = (typeof _mcp_getToolByNameOrVerb === 'function') ? _mcp_getToolByNameOrVerb(toolNameOrVerb) : null;
+    toolName = (def && typeof def.name === 'string') ? def.name : null;
+  } catch (_) { toolName = null; }
+  if (!toolName && toolNameOrVerb === 'back') toolName = 'back';
+  if (!toolName || evaluator.EXPECT_TOOL_NAMES.indexOf(toolName) === -1) return null;
+  let normalized;
+  try { normalized = evaluator.normalizeExpectSpec(rawExpect); } catch (_) { normalized = { ok: false, reason: 'invalid_expect' }; }
+  return {
+    toolName,
+    isNav: evaluator.EXPECT_NAV_TOOL_NAMES.indexOf(toolName) !== -1,
+    normalized,
+    evaluator
+  };
+}
+
+// Main-frame commit watcher for navigation tools (RESEARCH Finding 2,
+// Pitfall 1). Subscribe it before the navigation starts: until a commit is
+// seen the evaluator judges nothing, and a probe of any other document than
+// the latest committed one is stale. A null tabId buffers commits per tab
+// until bindTab(id) picks one (navigate bootstrap). Same listen and remove
+// pattern as navigateTabAndWaitForCommit.
+//
+// Same-document events (fragment or history-state updates) need care: the
+// outgoing document keeps running until the new one commits, so its own
+// pushState / replaceState / hash updates during the network phase are not
+// the commit (69-REVIEW WR-01). A same-document event therefore counts only
+// while no cross-document navigation is pending (isCommitted(tab) sees no
+// tab.pendingUrl), and never for refresh, whose result is always a new
+// document. An onCommitted (new document) always counts.
+function _watchMainFrameCommit(tabId, toolName) {
+  const events = (typeof chrome !== 'undefined' && chrome.webNavigation) ? chrome.webNavigation : null;
+  if (!events || !events.onCommitted || typeof events.onCommitted.addListener !== 'function') {
+    return { required: false, isCommitted: () => true, documentId: () => null, bindTab() {}, dispose() {} };
+  }
+  const acceptSameDocument = toolName !== 'refresh';
+  let boundTab = Number.isFinite(tabId) ? tabId : null;
+  // Per-tab commit state; before bindTab every tab is buffered.
+  const seen = new Map();
+  const listeners = [];
+  const record = (details, newDocument) => {
+    if (!details || details.frameId !== 0 || !Number.isFinite(details.tabId)) return;
+    if (boundTab !== null && details.tabId !== boundTab) return;
+    if (!newDocument && !acceptSameDocument) return;
+    const doc = (typeof details.documentId === 'string' && details.documentId) ? details.documentId : null;
+    let entry = seen.get(details.tabId);
+    if (!entry) { entry = { newDocument: false, sameDocument: false, doc: null }; seen.set(details.tabId, entry); }
+    if (newDocument) {
+      entry.newDocument = true;
+      entry.doc = doc;
+    } else if (!entry.newDocument) {
+      // After a new-document commit, a same-document update happens in that
+      // same document, so only an earlier one may name the document.
+      entry.sameDocument = true;
+      if (doc) entry.doc = doc;
+    }
+  };
+  const current = () => (boundTab === null ? null : (seen.get(boundTab) || null));
+  const listen = (event, listener) => {
+    if (!event || typeof event.addListener !== 'function') return;
+    try { event.addListener(listener); listeners.push([event, listener]); } catch (_) { /* best-effort */ }
+  };
+  listen(events.onCommitted, (details) => record(details, true));
+  listen(events.onReferenceFragmentUpdated, (details) => record(details, false));
+  listen(events.onHistoryStateUpdated, (details) => record(details, false));
+  return {
+    required: true,
+    // tab: the evaluator's latest chrome.tabs.get result for the bound tab.
+    isCommitted: (tab) => {
+      const entry = current();
+      if (!entry) return false;
+      if (entry.newDocument) return true;
+      if (!entry.sameDocument) return false;
+      return !(tab && typeof tab.pendingUrl === 'string' && tab.pendingUrl.length > 0);
+    },
+    documentId: () => {
+      const entry = current();
+      return entry ? entry.doc : null;
+    },
+    bindTab(id) {
+      if (boundTab !== null || !Number.isFinite(id)) return;
+      boundTab = id;
+      for (const key of Array.from(seen.keys())) {
+        if (key !== id) seen.delete(key);
+      }
+    },
+    dispose() {
+      while (listeners.length > 0) {
+        const [event, listener] = listeners.pop();
+        try { event.removeListener(listener); } catch (_) { /* best-effort */ }
+      }
+      for (const key of Array.from(seen.keys())) {
+        if (key !== boundTab) seen.delete(key);
+      }
+    }
+  };
+}
+
+// D-19: expect_result rides only on success:true or mayHaveExecuted:true
+// results; definitive failures keep today's shape. success is never changed
+// and nothing here throws. Evaluation never re-dispatches the action.
+async function _attachExpectResult(response, expectCtx, tabId, commit) {
+  if (!expectCtx || !response || typeof response !== 'object') return response;
+  if (response.success !== true && response.mayHaveExecuted !== true) return response;
+  const evaluator = expectCtx.evaluator || _resolveExpectEvaluator();
+  if (!evaluator) return response;
+  const targetTabId = Number.isFinite(tabId) ? tabId : (Number.isFinite(response.tabId) ? response.tabId : null);
+  const normalized = expectCtx.normalized;
+  if (!normalized || normalized.ok !== true) {
+    try { response.expect_result = evaluator.buildUncertainExpectResult(null, 'invalid_expect'); } catch (_) { /* never throws */ }
+    return response;
+  }
+  const spec = normalized.spec;
+  try {
+    response.expect_result = await evaluator.evaluateExpectation({
+      tabId: targetTabId,
+      spec,
+      deps: {
+        tabsGet: async (id) => {
+          try {
+            if (typeof chrome === 'undefined' || !chrome.tabs || typeof chrome.tabs.get !== 'function') return null;
+            return (await chrome.tabs.get(id)) || null;
+          } catch (_) { return null; }
+        },
+        executeProbe: _injectProbe,
+        now: () => Date.now(),
+        sleep: (ms) => new Promise((resolve) => setTimeout(resolve, Math.max(0, ms)))
+      },
+      commit: commit || undefined,
+      pageUnresponsive: response.errorCode === 'PAGE_UNRESPONSIVE' || response.code === 'PAGE_UNRESPONSIVE'
+    });
+  } catch (_) {
+    try { response.expect_result = evaluator.buildUncertainExpectResult(spec, 'evaluator_failed'); } catch (__) { /* never throws */ }
+  }
+  return response;
+}
+
+// Gate-skip path with expect. Navigation tools subscribe the commit watcher
+// before execute(); a throw from execute() disposes it and propagates exactly
+// as the bare return execute() does.
+async function _executeWithExpect(expectCtx, execute, tabId) {
+  const watcher = expectCtx.isNav ? _watchMainFrameCommit(tabId, expectCtx.toolName) : null;
+  try {
+    const response = await execute();
+    if (watcher && !Number.isFinite(tabId) && response && Number.isFinite(response.tabId)) {
+      watcher.bindTab(response.tabId);
+    }
+    return await _attachExpectResult(response, expectCtx, tabId, watcher);
+  } finally {
+    if (watcher) watcher.dispose();
+  }
+}
+
 /**
  * Wrap an action tool dispatch with a change_report harvest.
  *
@@ -3963,10 +5254,13 @@ async function wrapWithChangeReport(ctx) {
   const flagOn = !!(toolDef && toolDef._emitChangeReport === true);
   // Gate 2: global toggle
   const globalOn = !!fsbChangeReportsEnabled;
+  // Phase 69 D-17: same-call expect; null (today's path) without one.
+  const expectCtx = _resolveExpectSpec(ctx && ctx.expect, toolName);
 
   if (!flagOn || !globalOn || !Number.isFinite(tabId) ||
       ['navigate', 'close_tab', 'refresh', 'go_back', 'go_forward', 'open_tab', 'switch_tab'].includes(toolName)) {
-    return execute();
+    if (!expectCtx) return execute();
+    return _executeWithExpect(expectCtx, execute, tabId);
   }
 
   // Begin harvest. If injection fails (cross-origin start, restricted page,
@@ -3989,7 +5283,7 @@ async function wrapWithChangeReport(ctx) {
     response = { success: false, error: err && err.message ? err.message : String(err) };
   }
 
-  if (!startedHarvest) return response;
+  if (!startedHarvest) return expectCtx ? await _attachExpectResult(response, expectCtx, tabId, null) : response;
 
   // Race waitStable vs 500ms safety net. partial:true on safety hit.
   let partial = false;
@@ -4015,7 +5309,7 @@ async function wrapWithChangeReport(ctx) {
     if (!builders) {
       // Builder unavailable; clean up the page-side handle and skip.
       if (!crossOrigin) await _injectFn(tabId, _fsbHarvestStopInPage, [harvestToken]);
-      return response;
+      return expectCtx ? await _attachExpectResult(response, expectCtx, tabId, null) : response;
     }
 
     let beforeState = (startResult && startResult.beforeState) || {};
@@ -4055,7 +5349,7 @@ async function wrapWithChangeReport(ctx) {
     } catch (_) { /* logging never throws */ }
   }
 
-  return response;
+  return expectCtx ? await _attachExpectResult(response, expectCtx, tabId, null) : response;
 }
 
 const _mcp_dispatcher_exports = {
@@ -4078,6 +5372,10 @@ const _mcp_dispatcher_exports = {
   wrapWithChangeReport,
   _getChangeReportsEnabled,
   _setChangeReportsEnabledForTest,
+  // Phase 69 same-call expect helpers (test-only accessors).
+  _injectProbe,
+  _resolveExpectSpec,
+  _watchMainFrameCommit,
   // Telemetry client-label extraction (regression guard against the
   // bridge-object-as-client leak that recorded every event as 'unknown').
   extractMcpClientLabel,
@@ -4091,7 +5389,17 @@ const _mcp_dispatcher_exports = {
   // client-label cache to chrome.storage.session so popup + sidepanel
   // surfaces (different contexts from the SW where _agentClientLabelCache
   // lives) can read it and render "owned by <ClientName>" in the chip.
-  FSB_AGENT_CLIENT_LABELS_KEY
+  FSB_AGENT_CLIENT_LABELS_KEY,
+  // Phase 66 call timing (test-only)
+  readDispatcherCallStamp,
+  buildDispatcherCallTiming,
+  // Phase 66.1 settings routes and their write lock (test access).
+  handleGetSettingsMessageRoute,
+  handleSetSettingMessageRoute,
+  _withSettingsWriteLock,
+  // Phase 66.1 D-19 recording sanitizers (test access).
+  sanitizeMcpMessageRequestForRecording,
+  sanitizeMcpMessageResponseForRecording
 };
 
 if (typeof globalThis !== 'undefined') {
