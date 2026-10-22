@@ -296,7 +296,7 @@ function checkSafetyBreakers(session) {
  * Called AFTER tool execution, BEFORE scheduling the next iteration.
  *
  * @param {Object} session - Session object with agentState and actionHistory
- * @param {Array<{callId: string, name: string, result: Object}>} toolResults - Results from this iteration
+ * @param {Array<{callId: string, name: string, args: Object, result: Object}>} toolResults - Results from this iteration
  * @returns {{ isStuck: boolean, hint: string|null }}
  */
 function detectStuck(session, toolResults) {
@@ -745,6 +745,7 @@ WORKFLOW -- follow these steps in order:
 CRITICAL RULES:
 - report_progress is NARRATION ONLY. It does NOT click, type, navigate, submit, or change the page in any way. To perform an action you MUST call the action tool itself (click, type_text, press_enter, select_option, navigate, etc.). If a turn contains only report_progress / read_page / get_page_snapshot / get_dom_snapshot, you have done NOTHING -- call a real action tool before narrating again.
 - If click or type_text fails with "obscured", "zero dimensions", or similar, use execute_js to run the action directly via JavaScript (e.g., execute_js({code: "document.querySelector('selector').click()"})).
+- A disabled control (disabled or aria-disabled) is not a DOM quirk: the page is blocking that action. Never use execute_js or set_attribute to click, enable, or submit it, and never report the blocked action as done. Satisfy the page's precondition first (fill the required fields, then wait for the control to enable) or call fail_task.
 - Do NOT stop after just navigating and scrolling. That is only the first step.
 - Do NOT end your turn with a text message. Always call complete_task, partial_task, or fail_task when done.
 - Do NOT turn auth walls into generic failure text when useful work was already completed. Preserve the handoff with partial_task.
@@ -2231,7 +2232,7 @@ async function runAgentIteration(sessionId, options) {
           error: 'Tool arguments were malformed or truncated (' + call.argsParseError + '). Re-issue the tool call with valid, complete JSON arguments.',
           navigationTriggered: false, result: null
         };
-        toolResults.push({ callId: call.id, name: call.name, result: result });
+        toolResults.push({ callId: call.id, name: call.name, args: call.args, result: result });
         // ADOPT-04: Use ActionHistory instance or fallback to raw array
         if (session._actionHistory) {
           session._actionHistory.push({
@@ -2271,7 +2272,7 @@ async function runAgentIteration(sessionId, options) {
             error: denialResult.denial.reason || 'Tool not permitted',
             navigationTriggered: false, result: null
           };
-          toolResults.push({ callId: call.id, name: call.name, result: result });
+          toolResults.push({ callId: call.id, name: call.name, args: call.args, result: result });
           // ADOPT-04: Use ActionHistory instance or fallback to raw array
           if (session._actionHistory) {
             session._actionHistory.push({
@@ -2754,7 +2755,7 @@ async function runAgentIteration(sessionId, options) {
         }
       }
 
-      toolResults.push({ callId: call.id, name: call.name, result: result });
+      toolResults.push({ callId: call.id, name: call.name, args: call.args, result: result });
 
       // Phase 10 FINT-17/FINT-18 -- record autopilot dispatch row with
       // driving-model attribution (CONTEXT D-04). Fires AFTER toolResults.push

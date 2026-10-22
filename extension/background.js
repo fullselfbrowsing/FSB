@@ -4565,6 +4565,15 @@ function createSessionHooks(sessionId) {
     pipeline.register(LIFECYCLE_EVENTS.BEFORE_ITERATION, safetyHook);
   }
 
+  // Stuck detection hook (#157): agent-loop only runs detectStuck inline when
+  // NO hook pipeline is passed. Every real session passes this pipeline, so
+  // without this registration detectStuck never ran and loops went to the
+  // iteration cap. detectStuck comes from agent-loop.js, loaded at startup.
+  if (typeof createStuckDetectionHook === 'function' && typeof detectStuck === 'function') {
+    const stuckHook = createStuckDetectionHook(detectStuck);
+    pipeline.register(LIFECYCLE_EVENTS.AFTER_ITERATION, stuckHook);
+  }
+
   // Progress hook: sends iteration progress to content script overlay
   if (typeof createToolProgressHook === 'function') {
     const progressHook = createToolProgressHook(function(tabId, statusData) {
@@ -20056,6 +20065,48 @@ async function executeUploadFileUnlocked(tabId, selector, filePath, options = {}
 }
 
 /**
+ * #156: page-side probe for cdpClickAt. Serialized via toString() and run with
+ * Runtime.evaluate, so it must stay self-contained (no closures).
+ * Walks from the hit-tested element up through ancestors (crossing shadow
+ * roots) and reports a disabled form control, aria-disabled="true", or inert.
+ * Only form controls are tested with :disabled. The browser already applies
+ * fieldset inheritance, including the first-<legend> exemption, to each
+ * control, so matching the <fieldset> itself would wrongly refuse an enabled
+ * control in its legend.
+ * @returns {{disabled: boolean, reason?: string, tag?: string, text?: string}}
+ */
+function fsbDisabledTargetProbe(x, y) {
+  var el = document.elementFromPoint(x, y);
+  while (el && el.shadowRoot && typeof el.shadowRoot.elementFromPoint === 'function') {
+    var inner = el.shadowRoot.elementFromPoint(x, y);
+    if (!inner || inner === el) break;
+    el = inner;
+  }
+  var controlTags = { BUTTON: true, INPUT: true, SELECT: true, TEXTAREA: true, OPTION: true, OPTGROUP: true };
+  var node = el;
+  while (node) {
+    if (node.nodeType === 1) {
+      var reason = null;
+      if (controlTags[node.tagName]) {
+        try { if (node.matches(':disabled')) reason = 'native_disabled'; } catch (_e) { /* :disabled unsupported */ }
+      }
+      if (!reason && node.getAttribute('aria-disabled') === 'true') reason = 'aria_disabled';
+      if (!reason && node.hasAttribute('inert')) reason = 'inert';
+      if (reason) {
+        return {
+          disabled: true,
+          reason: reason,
+          tag: node.tagName,
+          text: String(node.innerText || node.textContent || '').trim().slice(0, 60)
+        };
+      }
+    }
+    node = node.parentNode || node.host || null;
+  }
+  return { disabled: false };
+}
+
+/**
  * Direct CDP tool dispatcher for tool-executor.js CDP routing.
  *
  * Called from agent-loop.js via the cdpHandler wrapper:
@@ -20144,6 +20195,32 @@ async function executeCDPToolDirectUnlocked(request, tabId) {
         debuggerAttached = true;
 
         const modifiers = (altKey ? 1 : 0) | (ctrlKey ? 2 : 0) | (shiftKey ? 8 : 0);
+
+        // #156: trusted CDP clicks bypass the content-side readiness checks, so
+        // a click refused by `click` (aria-disabled / disabled) could still land
+        // via click_at. Probe the hit target first and refuse disabled controls.
+        // Probe failures fail open (canvas apps, cross-origin frames).
+        let disabledProbe = null;
+        try {
+          const probeEval = await chrome.debugger.sendCommand({ tabId }, 'Runtime.evaluate', {
+            expression: '(' + fsbDisabledTargetProbe.toString() + ')(' + JSON.stringify(x) + ',' + JSON.stringify(y) + ')',
+            returnByValue: true
+          });
+          disabledProbe = probeEval && probeEval.result ? probeEval.result.value : null;
+        } catch (_probeErr) { disabledProbe = null; }
+        if (disabledProbe && disabledProbe.disabled) {
+          automationLogger.logActionExecution(null, 'cdpClickAt', 'complete', { success: false, tabId, x, y, blocked: 'target_disabled', reason: disabledProbe.reason });
+          return {
+            success: false,
+            hadEffect: false,
+            blocked: true,
+            code: 'TARGET_DISABLED',
+            reason: disabledProbe.reason,
+            target: { tag: disabledProbe.tag || null, text: disabledProbe.text || null },
+            error: 'Click refused: the element at (' + x + ', ' + y + ') is disabled (' + disabledProbe.reason + '). ' +
+              'The page is blocking this action; do not report it as done. Satisfy the precondition first or call fail_task.'
+          };
+        }
 
         await chrome.debugger.sendCommand({ tabId }, 'Input.dispatchMouseEvent', {
           type: 'mousePressed', x, y, button: 'left', clickCount: 1, modifiers

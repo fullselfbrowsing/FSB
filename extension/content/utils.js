@@ -98,7 +98,9 @@
   function isFsbElement(el) {
     if (!el) return false;
     if (FSB_HOST_IDS.has(el.id)) return true;
-    if (el.hasAttribute?.('data-fsb-id')) return true;
+    // data-fsb-id is not a marker for FSB's own UI: get_dom_snapshot stamps it
+    // on the page elements it reports. Treating it as one hid every reported
+    // element from later page snapshots and read_page.
     // Walk up to check if any ancestor is an FSB host
     if (el.closest) {
       for (const id of FSB_HOST_IDS) {

@@ -2310,6 +2310,13 @@
    * @returns {Array<{region: string, text: string}>} Array of region-tagged lines
    */
   function walkDOMToMarkdown(root, interactiveSet, refMap, guideAnnotations) {
+    function containsOtherInteractive(node) {
+      for (const other of interactiveSet) {
+        if (other !== node && node.contains(other)) return true;
+      }
+      return false;
+    }
+
     const lines = [];
     let currentLine = '';
     let listDepth = 0;
@@ -2363,7 +2370,10 @@
         currentRegion = nodeRegion;
       }
 
-      // Interactive elements: emit ref inline, skip children (Pitfall 1)
+      // Interactive elements: emit ref inline, skip children (Pitfall 1),
+      // unless they hold other interactive elements. A <label> wrapping its
+      // <input> is the common case: skipping its children hid the input, so
+      // the field never got a ref and could not be typed into.
       if (interactiveSet.has(node)) {
         const refStr = formatInlineRef(node, refMap, guideAnnotations);
         if (refStr) {
@@ -2372,7 +2382,12 @@
           }
           currentLine += refStr;
         }
-        return; // Don't recurse into interactive element children
+        if (containsOtherInteractive(node)) {
+          for (const child of node.childNodes) {
+            visit(child);
+          }
+        }
+        return;
       }
 
       // Image handling

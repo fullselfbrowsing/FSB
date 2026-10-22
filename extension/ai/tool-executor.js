@@ -81,6 +81,267 @@ function autopilotTriggerHadEffect(toolName, response) {
 }
 
 // ---------------------------------------------------------------------------
+// Guarded page scripts (execute_js)
+// ---------------------------------------------------------------------------
+
+/**
+ * Run execute_js code in the page's MAIN world without letting it act through
+ * a control the page has disabled (#156). Chrome refuses trusted clicks on a
+ * disabled control, but a script can still dispatch a synthetic click at it,
+ * submit its form, or re-enable it and click. Each of those carries out an
+ * action the page is deliberately blocking.
+ *
+ * While the code runs, the script's own direct calls are checked. An
+ * activation aimed at a disabled control (click(), dispatchEvent() of
+ * click/dblclick/auxclick/submit, form.submit()/requestSubmit()) is dropped and
+ * reported, and so is an attempt to re-enable one (the disabled property, the
+ * disabled or aria-disabled attribute). Refusing the re-enable matters as much
+ * as refusing the click: a button the script enabled would stay enabled for
+ * the next tool call. Page listeners that run inside the script's calls are
+ * never checked, so a page that enables its own button in response to the
+ * script keeps working. Everything else the code does runs unchanged.
+ *
+ * Passed as chrome.scripting.executeScript({ func }), so it is serialized and
+ * must stay self-contained. Only synchronous work is covered: the guard comes
+ * off as soon as the code returns.
+ *
+ * @param {string} __fsbCode - Code to run
+ * @param {'eval'|'function'} __fsbMode - 'eval' returns the completion value
+ *   (autopilot shape); 'function' runs the code as a function body (MCP shape)
+ * @returns {Object} The caller's usual result shape, plus `blocked` when an
+ *   activation was dropped
+ */
+function fsbRunGuardedPageScript(__fsbCode, __fsbMode) {
+  var __fsbGuard = (function installDisabledControlGuard() {
+    var CONTROL_TAGS = { BUTTON: true, INPUT: true, SELECT: true, TEXTAREA: true, OPTION: true, OPTGROUP: true };
+    var ACTIVATION_EVENTS = { click: true, dblclick: true, auxclick: true };
+    var blocked = [];
+    var restorers = [];
+    var state = { active: true, depth: 0 };
+
+    function parentOf(node) {
+      var parent = node.parentNode;
+      return parent && parent.nodeType === 11 ? parent.host : parent;
+    }
+
+    function disabledReason(node) {
+      if (CONTROL_TAGS[node.tagName]) {
+        try { if (node.matches(':disabled')) return 'native_disabled'; } catch (_e) { /* :disabled unsupported */ }
+      }
+      if (node.getAttribute('aria-disabled') === 'true') return 'aria_disabled';
+      return null;
+    }
+
+    function blockedTarget(target) {
+      for (var node = target; node && node.nodeType === 1; node = parentOf(node)) {
+        var reason = disabledReason(node);
+        if (reason) return { node: node, reason: reason };
+      }
+      return null;
+    }
+
+    function defaultButton(form) {
+      var controls = form.elements || [];
+      for (var i = 0; i < controls.length; i++) {
+        var el = controls[i];
+        var type = String(el.type || '').toLowerCase();
+        if ((el.tagName === 'BUTTON' && type === 'submit') || (el.tagName === 'INPUT' && (type === 'submit' || type === 'image'))) {
+          return el;
+        }
+      }
+      return null;
+    }
+
+    function record(action, hit) {
+      blocked.push({
+        action: action,
+        reason: hit.reason,
+        tag: hit.node.tagName,
+        id: hit.node.id || null,
+        text: String(hit.node.innerText || hit.node.value || hit.node.textContent || '').trim().slice(0, 60)
+      });
+    }
+
+    function patchMethod(proto, name, makeWrapper) {
+      if (!proto || typeof proto[name] !== 'function') return;
+      var original = proto[name];
+      proto[name] = makeWrapper(original);
+      restorers.push(function() { proto[name] = original; });
+    }
+
+    // Runs page listeners triggered by the script without checking them.
+    function passThrough(original, self, args) {
+      state.depth++;
+      try { return original.apply(self, args); } finally { state.depth--; }
+    }
+
+    function checking() { return state.active && state.depth === 0; }
+
+    patchMethod(EventTarget.prototype, 'dispatchEvent', function(original) {
+      return function(event) {
+        if (checking() && event && this && this.nodeType === 1) {
+          var hit = null;
+          if (ACTIVATION_EVENTS[event.type]) hit = blockedTarget(this);
+          else if (event.type === 'submit' && this.tagName === 'FORM') {
+            var submitter = defaultButton(this);
+            hit = submitter ? blockedTarget(submitter) : null;
+          }
+          if (hit) { record('dispatchEvent:' + event.type, hit); return false; }
+        }
+        return passThrough(original, this, arguments);
+      };
+    });
+    patchMethod(HTMLElement.prototype, 'click', function(original) {
+      return function() {
+        if (checking()) {
+          var hit = blockedTarget(this);
+          if (hit) { record('click', hit); return undefined; }
+        }
+        return passThrough(original, this, arguments);
+      };
+    });
+    ['submit', 'requestSubmit'].forEach(function(name) {
+      patchMethod(HTMLFormElement.prototype, name, function(original) {
+        return function(submitter) {
+          if (checking()) {
+            var target = (name === 'requestSubmit' && submitter) ? submitter : defaultButton(this);
+            var hit = target ? blockedTarget(target) : null;
+            if (hit) { record(name, hit); return undefined; }
+          }
+          return passThrough(original, this, arguments);
+        };
+      });
+    });
+    ['focus', 'blur'].forEach(function(name) {
+      patchMethod(HTMLElement.prototype, name, function(original) {
+        return function() { return passThrough(original, this, arguments); };
+      });
+    });
+
+    // Refuses the script's own attempt to re-enable a disabled control.
+    // Returns true when the change must not be applied.
+    function refuseEnable(el, attrName, enabling) {
+      if (!checking() || !enabling || !el || el.nodeType !== 1) return false;
+      var disabledNow = attrName === 'disabled'
+        ? el.hasAttribute('disabled')
+        : el.getAttribute('aria-disabled') === 'true';
+      if (!disabledNow) return false;
+      record('enable', { node: el, reason: attrName === 'disabled' ? 'native_disabled' : 'aria_disabled' });
+      return true;
+    }
+    function isDisableAttr(name) {
+      var lower = String(name).toLowerCase();
+      return lower === 'disabled' || lower === 'aria-disabled' ? lower : null;
+    }
+    patchMethod(Element.prototype, 'removeAttribute', function(original) {
+      return function(name) {
+        var attr = isDisableAttr(name);
+        if (attr && refuseEnable(this, attr, true)) return undefined;
+        return original.apply(this, arguments);
+      };
+    });
+    patchMethod(Element.prototype, 'removeAttributeNode', function(original) {
+      return function(node) {
+        var attr = node && isDisableAttr(node.name);
+        if (attr && refuseEnable(this, attr, true)) return node;
+        return original.apply(this, arguments);
+      };
+    });
+    patchMethod(Element.prototype, 'setAttribute', function(original) {
+      return function(name, value) {
+        if (isDisableAttr(name) === 'aria-disabled' && refuseEnable(this, 'aria-disabled', String(value) !== 'true')) return undefined;
+        return original.apply(this, arguments);
+      };
+    });
+    patchMethod(Element.prototype, 'toggleAttribute', function(original) {
+      return function(name, force) {
+        var attr = isDisableAttr(name);
+        if (attr) {
+          var removing = force === undefined ? this.hasAttribute(attr) : !force;
+          if (refuseEnable(this, attr, removing)) return true;
+        }
+        return original.apply(this, arguments);
+      };
+    });
+    patchMethod(NamedNodeMap.prototype, 'removeNamedItem', function(original) {
+      return function(name) {
+        var attr = isDisableAttr(name);
+        var owner = attr && this.getNamedItem(name) && this.getNamedItem(name).ownerElement;
+        if (owner && refuseEnable(owner, attr, true)) return null;
+        return original.apply(this, arguments);
+      };
+    });
+    [HTMLButtonElement, HTMLInputElement, HTMLSelectElement, HTMLTextAreaElement, HTMLFieldSetElement, HTMLOptGroupElement, HTMLOptionElement].forEach(function(Ctor) {
+      var proto = Ctor && Ctor.prototype;
+      var desc = proto && Object.getOwnPropertyDescriptor(proto, 'disabled');
+      if (!desc || typeof desc.set !== 'function') return;
+      Object.defineProperty(proto, 'disabled', Object.assign({}, desc, {
+        set: function(value) {
+          if (refuseEnable(this, 'disabled', !value)) return;
+          desc.set.call(this, value);
+        }
+      }));
+      restorers.push(function() { Object.defineProperty(proto, 'disabled', desc); });
+    });
+    var ariaDesc = Object.getOwnPropertyDescriptor(Element.prototype, 'ariaDisabled');
+    if (ariaDesc && typeof ariaDesc.set === 'function') {
+      Object.defineProperty(Element.prototype, 'ariaDisabled', Object.assign({}, ariaDesc, {
+        set: function(value) {
+          if (refuseEnable(this, 'aria-disabled', String(value) !== 'true')) return;
+          ariaDesc.set.call(this, value);
+        }
+      }));
+      restorers.push(function() { Object.defineProperty(Element.prototype, 'ariaDisabled', ariaDesc); });
+    }
+
+    return {
+      blocked: blocked,
+      remove: function() {
+        state.active = false;
+        for (var i = restorers.length - 1; i >= 0; i--) {
+          try { restorers[i](); } catch (_e) { /* keep restoring the rest */ }
+        }
+      }
+    };
+  })();
+
+  var __fsbOutcome;
+  try {
+    if (__fsbMode === 'function') {
+      var __fsbValue = new Function(__fsbCode)();
+      if (__fsbValue === undefined) __fsbOutcome = { value: 'undefined' };
+      else if (__fsbValue === null) __fsbOutcome = { value: 'null' };
+      else if (typeof __fsbValue === 'object') {
+        try { __fsbOutcome = { value: JSON.stringify(__fsbValue) }; } catch (_e) { __fsbOutcome = { value: String(__fsbValue) }; }
+      } else __fsbOutcome = { value: String(__fsbValue) };
+    } else {
+      var __fsbResult = eval(__fsbCode);
+      __fsbOutcome = { success: true, result: __fsbResult !== undefined ? String(__fsbResult).substring(0, 5000) : null };
+    }
+  } catch (__fsbError) {
+    var __fsbMessage = (__fsbError && __fsbError.message) || String(__fsbError);
+    __fsbOutcome = __fsbMode === 'function' ? { error: __fsbMessage } : { success: false, error: __fsbMessage };
+  } finally {
+    __fsbGuard.remove();
+  }
+  if (__fsbGuard.blocked.length > 0) __fsbOutcome.blocked = __fsbGuard.blocked;
+  return __fsbOutcome;
+}
+
+/**
+ * Error text for execute_js activations the guard dropped.
+ * @param {Array<Object>} blocked - fsbRunGuardedPageScript().blocked
+ * @returns {string}
+ */
+function describeBlockedPageActivations(blocked) {
+  const first = blocked[0];
+  const label = first.tag.toLowerCase() + (first.id ? '#' + first.id : '') + (first.text ? ' "' + first.text + '"' : '');
+  return 'execute_js did not ' + first.action + ' ' + label + ': the page has it disabled. ' +
+    'The page is blocking this action, so do not report it as done. ' +
+    'Satisfy the page\'s precondition first (for example fill the required fields and wait for the control to enable) or call fail_task.';
+}
+
+// ---------------------------------------------------------------------------
 // Route handlers
 // ---------------------------------------------------------------------------
 
@@ -382,17 +643,16 @@ async function executeBackgroundTool(tool, params, tabId, dataHandler) {
         const results = await chrome.scripting.executeScript({
           target: { tabId },
           world: 'MAIN',
-          func: (jsCode) => {
-            try {
-              const result = eval(jsCode);
-              return { success: true, result: result !== undefined ? String(result).substring(0, 5000) : null };
-            } catch (e) {
-              return { success: false, error: e.message };
-            }
-          },
-          args: [code]
+          func: fsbRunGuardedPageScript,
+          args: [code, 'eval']
         });
         const execResult = results?.[0]?.result;
+        if (execResult && Array.isArray(execResult.blocked) && execResult.blocked.length > 0) {
+          return Object.assign(
+            makeResult({ success: false, error: describeBlockedPageActivations(execResult.blocked), result: execResult }),
+            { code: 'TARGET_DISABLED', blocked: true }
+          );
+        }
         if (execResult && execResult.success) {
           return makeResult({ success: true, hadEffect: true, result: execResult });
         }
@@ -894,5 +1154,5 @@ function isReadOnly(name) {
 
 // CommonJS for Chrome extension context and Node.js require()
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { executeTool, isReadOnly, executeCapabilityToolForAutopilot };
+  module.exports = { executeTool, isReadOnly, executeCapabilityToolForAutopilot, fsbRunGuardedPageScript, describeBlockedPageActivations };
 }
