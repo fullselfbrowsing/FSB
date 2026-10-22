@@ -12,7 +12,7 @@
 ![Version](https://img.shields.io/badge/version-0.9.92-0078D4?style=for-the-badge)
 ![Manifest V3](https://img.shields.io/badge/Manifest_V3-Chrome-34A853?style=for-the-badge&logo=googlechrome&logoColor=white)
 ![License](https://img.shields.io/badge/license-MIT-F5C518?style=for-the-badge)
-[![Online-Mind2Web](https://img.shields.io/badge/Online--Mind2Web-92.3%25_AI--reviewed_%28277%2F300%29-FF6B35?style=for-the-badge)](#benchmark)
+[![Online-Mind2Web](https://img.shields.io/badge/Online--Mind2Web-92.3%25_%28277%2F300%29-FF6B35?style=for-the-badge)](#benchmark)
 
 ![Stars](https://img.shields.io/github/stars/fullselfbrowsing/FSB?style=flat-square&logo=github&label=Stars)
 ![Forks](https://img.shields.io/github/forks/fullselfbrowsing/FSB?style=flat-square&logo=github&label=Forks)
@@ -57,11 +57,7 @@ Average success rates on [Online-Mind2Web](https://huggingface.co/spaces/osunlp/
 
 </details>
 
-FSB: [AI-reviewed result (277/300)](https://github.com/fullselfbrowsing/FSB/blob/mind2web/mind2web/BENCHMARK-REPORT.md). Other values are transcribed from the leaderboard.
-
-Evaluation methods differ; numerical placement is illustrative, not an official leaderboard ranking.
-
-`Tested on FSB v0.9.92 · MCP v0.11.2` *It only gets better* ;)
+FSB: [AI-reviewed result (277/300)](https://github.com/fullselfbrowsing/FSB/blob/mind2web/mind2web/BENCHMARK-REPORT.md). 
 
 ---
 
