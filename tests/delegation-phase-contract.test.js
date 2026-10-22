@@ -202,6 +202,7 @@ const REFINEMENT_ROOT_TEST_COMMANDS = Object.freeze([
   'node --test tests/bench-fast-mode-record.test.mjs',
   'node tests/release-version-rehearsal.test.js',
   'node tests/mcp-release-compat.test.js',
+  'node tests/benchmark-assets-parity.test.js',
 ]);
 
 const PHASE64_RETAINED_ROOT_COMMANDS = Object.freeze([
