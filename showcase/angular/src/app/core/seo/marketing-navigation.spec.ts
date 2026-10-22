@@ -8,6 +8,7 @@ import { HomePageComponent } from '../../pages/home/home-page.component';
 import { SupportPageComponent } from '../../pages/support/support-page.component';
 import { LOCALES, LOCALE_SUBPATHS } from '../i18n/locale-constants';
 import { HOST } from './locale-seo';
+import ONLINE_MIND2WEB from './online-mind2web.json';
 import TRAILER_VIDEO from './trailer-video.json';
 
 describe('marketing route metadata', () => {
@@ -69,6 +70,15 @@ describe('marketing route metadata', () => {
           expect(software['@id']).toBe(path === '/' ? `${HOST}/#software` : `${HOST}/agents#fsb-skill`);
           expect(software.url).toBe(path === '/' ? HOST : `${HOST}/agents`);
           expect(page.mainEntity['@id']).toBe(software['@id']);
+        }
+        const datasets = nodes.filter((node: { '@type': string }) => node['@type'] === 'Dataset');
+        expect(datasets.length).toBe(path === '/' ? 1 : 0);
+        if (path === '/') {
+          expect(datasets[0]['@id']).toBe(`${HOST}/#online-mind2web`);
+          expect(datasets[0].about['@id']).toBe(software['@id']);
+          expect(software.subjectOf['@id']).toBe(datasets[0]['@id']);
+          expect(datasets[0].isBasedOn).toBe(ONLINE_MIND2WEB.leaderboardUrl);
+          expect(datasets[0].description).toContain(`${ONLINE_MIND2WEB.fsb.passed}/${ONLINE_MIND2WEB.fsb.total}`);
         }
         if (path === '/agents') {
           const howTo = nodes.find((node: { '@type': string }) => node['@type'] === 'HowTo');

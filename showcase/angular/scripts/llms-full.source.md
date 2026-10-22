@@ -4,7 +4,7 @@ The About page embeds the public 33-second FSB trailer (uploaded September 6, 20
 
 ## 1. Project Description
 
-FSB (Full Self-Browsing) is an open-source Chrome extension that automates the browser through natural language. You describe a task in plain English; FSB plans the clicks, types, and navigation to complete it. The extension runs in your browser with your own API keys, encrypted local storage, and opt-out anonymous usage telemetry for aggregate public stats only. Multi-model AI (xAI Grok, OpenAI, Anthropic Claude, Google Gemini, OpenRouter, LM Studio, custom OpenAI-compatible endpoints), 56 canonical browser tools, a 69-tool MCP surface, 142+ site-specific guides, reactive trigger watchers, real file uploads, and a 128-app native capability catalog for verified first-party API execution. Current release: FSB v0.9.95 (Chrome extension) with fsb-mcp-server 0.11.5 (npm MCP package).
+FSB (Full Self-Browsing) is an open-source Chrome extension that automates the browser through natural language. You describe a task in plain English; FSB plans the clicks, types, and navigation to complete it. The extension runs in your browser with your own API keys, encrypted local storage, and opt-out anonymous usage telemetry for aggregate public stats only. Multi-model AI (xAI Grok, OpenAI, Anthropic Claude, Google Gemini, OpenRouter, LM Studio, custom OpenAI-compatible endpoints), 56 canonical browser tools, a 69-tool MCP surface, 142+ site-specific guides, reactive trigger watchers, real file uploads, and a 128-app native capability catalog for verified first-party API execution. Current release: FSB v0.9.95 (Chrome extension) with fsb-mcp-server 0.11.5 (npm MCP package). On Online-Mind2Web, FSB's AI-reviewed result (277/300) is 92.3%; see the benchmark under Comparison.
 
 License: [MIT License](https://github.com/fullselfbrowsing/FSB/blob/main/LICENSE).
 
@@ -165,6 +165,29 @@ FSB ships 142+ hand-curated site-specific guides (Notion, Google Sheets, Workday
 ## 5. Comparison
 
 These are factual capability summaries, not endorsements. FSB has overlap and differentiation with each project; the right tool depends on what you need.
+
+### Online-Mind2Web benchmark
+
+Average success rates on [Online-Mind2Web](https://huggingface.co/spaces/osunlp/Online_Mind2Web_Leaderboard), with FSB included.
+
+| # | Agent | Average success rate |
+| ---: | --- | ---: |
+| 01 | Hark | 97.7% |
+| 02 | Navigator (n1.5) | 97.3% |
+| 03 | ACT-2 | 92.7% |
+| 04 | FSB | 92.3% |
+| 05 | Navigator (n1-preview) | 78.7% |
+| 06 | Google Computer Use | 69.0% |
+| 07 | Operator | 61.3% |
+| 08 | ACT-1 (Aug 2025) | 57.3% |
+| 09 | Claude Computer Use | 56.3% |
+| 10 | ACT-1 (Jul 2025) | 45.7% |
+
+FSB: AI-reviewed result (277/300). Other values are transcribed from the leaderboard. Evaluation methods differ; numerical placement is illustrative, not an official leaderboard ranking. Tested on FSB v0.9.92 · MCP v0.11.2.
+
+- **What is FSB's Online-Mind2Web result?** AI-reviewed result (277/300), shown as 92.3% in the top 10 chart on https://full-selfbrowsing.com.
+- **Which versions were tested?** FSB v0.9.92 (Chrome extension) with MCP v0.11.2.
+- **Where is the report?** https://github.com/fullselfbrowsing/FSB/blob/mind2web/mind2web/BENCHMARK-REPORT.md
 
 ### Browser Use
 Browser Use is an open-source library and CLI for headless browser automation driven by LLMs. It runs in Node.js and Python contexts and targets server-side automation pipelines. Overlap with FSB: natural-language task execution against a browser, action-verification loops, multi-model support. Difference from FSB: Browser Use is a server-side library, not a Chrome extension; it operates a headless Chromium instance the user does not see, while FSB drives the user's actual browser session with the user's logged-in cookies. If you are building a backend automation pipeline, Browser Use fits that shape; if you are sitting at your own browser and want to delegate clicks and forms inside that session, FSB fits that shape.

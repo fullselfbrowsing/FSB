@@ -12,6 +12,7 @@
 ![Version](https://img.shields.io/badge/version-0.9.95-0078D4?style=for-the-badge)
 ![Manifest V3](https://img.shields.io/badge/Manifest_V3-Chrome-34A853?style=for-the-badge&logo=googlechrome&logoColor=white)
 ![License](https://img.shields.io/badge/license-MIT-F5C518?style=for-the-badge)
+[![Online-Mind2Web](https://img.shields.io/badge/Online--Mind2Web-92.3%25-FF6B35?style=for-the-badge)](#benchmark)
 
 ![Stars](https://img.shields.io/github/stars/fullselfbrowsing/FSB?style=flat-square&logo=github&label=Stars)
 ![Forks](https://img.shields.io/github/forks/fullselfbrowsing/FSB?style=flat-square&logo=github&label=Forks)
@@ -22,9 +23,41 @@
 
 *Pure structural intelligence. Zero vision. Zero guessing.*
 
-[What's New](#whats-new) · [Quick Start](#quick-start) · [MCP Server](#mcp-server) · [Architecture](#architecture) · [Providers](#ai-providers) · [Development](#development)
+[Benchmark](#benchmark) · [What's New](#whats-new) · [Quick Start](#quick-start) · [MCP Server](#mcp-server) · [Architecture](#architecture) · [Providers](#ai-providers) · [Development](#development)
 
 </div>
+
+---
+
+## Benchmark
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/online-mind2web-dark.svg" />
+  <source media="(prefers-color-scheme: light)" srcset="docs/assets/online-mind2web-light.svg" />
+  <img src="docs/assets/online-mind2web-light.svg" alt="Online-Mind2Web, top 10 agents by average success rate: Hark 97.7%, Navigator (n1.5) 97.3%, ACT-2 92.7%, FSB 92.3% (AI-reviewed result, 277/300), Navigator (n1-preview) 78.7%, Google Computer Use 69.0%, Operator 61.3%, ACT-1 (Aug 2025) 57.3%, Claude Computer Use 56.3%, ACT-1 (Jul 2025) 45.7%." />
+</picture>
+
+Average success rates on [Online-Mind2Web](https://huggingface.co/spaces/osunlp/Online_Mind2Web_Leaderboard), with FSB included.
+
+<details>
+<summary>Top 10 agents as a table</summary>
+
+| # | Agent | Average success rate |
+| ---: | --- | ---: |
+| 01 | Hark | 97.7% |
+| 02 | Navigator (n1.5) | 97.3% |
+| 03 | ACT-2 | 92.7% |
+| **04** | **FSB** | **92.3%** |
+| 05 | Navigator (n1-preview) | 78.7% |
+| 06 | Google Computer Use | 69.0% |
+| 07 | Operator | 61.3% |
+| 08 | ACT-1 (Aug 2025) | 57.3% |
+| 09 | Claude Computer Use | 56.3% |
+| 10 | ACT-1 (Jul 2025) | 45.7% |
+
+</details>
+
+FSB: [AI-reviewed result (277/300)](https://github.com/fullselfbrowsing/FSB/blob/mind2web/mind2web/BENCHMARK-REPORT.md). 
 
 ---
 

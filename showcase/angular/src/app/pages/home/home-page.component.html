@@ -19,63 +19,72 @@
   </a>
 </section>
 
-<!-- Features -->
+<!-- Features: Online-Mind2Web leaderboard -->
 <section class="features section" id="features">
   <div class="container">
     <div class="section-header reveal">
       <h2 i18n="@@home.features.title">Built for the Modern Web</h2>
+      <p i18n="@@home.features.benchmark.intro">Average success rates on <a href="https://huggingface.co/spaces/osunlp/Online_Mind2Web_Leaderboard" target="_blank" rel="noopener" [attr.translate]="'no'">Online-Mind2Web</a>, with <span [attr.translate]="'no'">FSB</span> included.</p>
       <p i18n="@@home.features.subtitle">Everything you need for intelligent browser automation, powered by leading AI models.</p>
     </div>
-    <div class="features-grid">
-      <div class="feature-card reveal delay-1">
-        <div class="feature-icon"><i class="fa-solid fa-bolt"></i></div>
-        <h3 i18n="@@home.features.card.directApi.title">Direct API Execution</h3>
-        <p i18n="@@home.features.card.directApi.desc">Beyond clicking. <span [attr.translate]="'no'">FSB</span> can call an app's own authenticated API through your logged-in session. Faster and more reliable than DOM automation, with DOM as the automatic fallback. Inspired by <a href="https://github.com/opentabs-dev/opentabs" target="_blank" rel="noopener" [attr.translate]="'no'">OpenTabs</a>.</p>
+    <div class="lb reveal">
+      <div class="lb-head">
+        <div class="lb-head-titles">
+          <a class="lb-source" href="https://huggingface.co/spaces/osunlp/Online_Mind2Web_Leaderboard" target="_blank" rel="noopener" [attr.translate]="'no'">{{ benchmarkName }} <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i></a>
+          <h3 class="lb-title" i18n="@@home.features.benchmark.title">Top 10 agents</h3>
+        </div>
+        <span class="lb-metric" i18n="@@home.features.benchmark.metric">Average success rate</span>
       </div>
-      <div class="feature-card reveal delay-3">
-        <div class="feature-icon"><i class="fa-solid fa-hand-pointer"></i></div>
-        <h3 i18n="@@home.features.card.actions.title">60 Browser Actions</h3>
-        <p i18n="@@home.features.card.actions.desc">Click, type, scroll, drag-and-drop, canvas drawing, <span [attr.translate]="'no'">CDP</span> mouse control, multi-tab management, and more. 53 DOM actions plus 7 through the <span [attr.translate]="'no'">Chrome DevTools Protocol</span>.</p>
+      <ol class="lb-rows">
+        @for (row of leaderboard; track row.rank) {
+          <li class="lb-row" [class.lb-row-fsb]="row.fsb" [style.--lb-score]="row.score + '%'">
+            <span class="lb-rank">{{ row.rank }}</span>
+            @if (row.fsb) {
+              <span class="lb-name">
+                <span class="fsb-mark fsb-highlight-wordmark lb-wordmark" role="img" i18n-aria-label="@@home.comparison.fsb.name" aria-label="FSB" [attr.translate]="'no'">
+                  <span class="fsb-row" aria-hidden="true">
+                    <span class="fsb-f"></span>
+                    <span class="fsb-s"></span>
+                    <svg class="fsb-b" viewBox="-3 -3 78 103" aria-hidden="true">
+                      <path d="M0 0 L40 0 C58 0 70 10 70 26 C70 38 62 46 50 49 C64 51 72 60 72 74 C72 90 60 100 40 100 L0 100 Z"></path>
+                    </svg>
+                  </span>
+                </span>
+              </span>
+            } @else {
+              <span class="lb-name" [attr.translate]="'no'">{{ row.name }}</span>
+            }
+            <span class="lb-track">
+              <span class="lb-bar">
+                @if (row.fsb) {
+                  <span class="lb-shine" aria-hidden="true"></span>
+                }
+              </span>
+              <span class="lb-value">
+                {{ row.value }}
+                @if (row.fsb) {
+                  <i class="fa-solid fa-caret-up lb-trend" role="img" i18n-aria-label="@@home.features.benchmark.trend" aria-label="Trending up" i18n-title="@@home.features.benchmark.trend" title="Trending up"></i>
+                }
+              </span>
+            </span>
+          </li>
+        }
+      </ol>
+      <div class="lb-axis" aria-hidden="true">
+        <span class="lb-scale">
+          @for (tick of leaderboardTicks; track tick.at) {
+            <span class="lb-tick" [style.left.%]="tick.at">{{ tick.label }}</span>
+          }
+        </span>
       </div>
-      <div class="feature-card reveal delay-4">
-        <div class="feature-icon"><i class="fa-solid fa-bell"></i></div>
-        <h3 i18n="@@home.features.card.reactiveTriggers.title">Reactive Triggers</h3>
-        <p i18n="@@home.features.card.reactiveTriggers.desc">Watch any element and get notified the instant a value changes, crosses a threshold, or matches a pattern.</p>
-      </div>
-      <div class="feature-card reveal delay-4">
-        <div class="feature-icon"><i class="fa-solid fa-sitemap"></i></div>
-        <h3 i18n="@@home.features.card.domAnalysis.title">Smart DOM Analysis</h3>
-        <p i18n="@@home.features.card.domAnalysis.desc">Incremental DOM diffing, multi-strategy selectors, and element identification for reliable automation.</p>
-      </div>
-      <div class="feature-card reveal delay-6">
-        <div class="feature-icon"><i class="fa-solid fa-gauge-high"></i></div>
-        <h3 i18n="@@home.features.card.autopilot.title">Autopilot</h3>
-        <p i18n="@@home.features.card.autopilot.desc">Rebuilt on the <a routerLink="/lattice" [attr.translate]="'no'">Lattice</a> SDK, long runs survive <span [attr.translate]="'no'">Chrome</span>'s <span [attr.translate]="'no'">MV3</span> shutdowns and finish. Up to 64 concurrent tabs, plus real file uploads from disk.</p>
-      </div>
-      <div class="feature-card reveal delay-5">
-        <div class="feature-icon"><i class="fa-solid fa-eye"></i></div>
-        <h3 i18n="@@home.features.card.visualFeedback.title">Visual Feedback</h3>
-        <p i18n="@@home.features.card.visualFeedback.desc">Glow borders, pulsing element highlights, and a floating progress overlay show exactly what <span [attr.translate]="'no'">FSB</span> is doing.</p>
-      </div>
-      <div class="feature-card reveal delay-6">
-        <div class="feature-icon"><i class="fa-solid fa-compass"></i></div>
-        <h3 i18n="@@home.features.card.siteIntel.title">Site Intelligence</h3>
-        <p i18n="@@home.features.card.siteIntel.desc">130+ built-in site guides across 17 categories, from commerce to coding.</p>
-      </div>
-      <div class="feature-card reveal delay-2">
-        <div class="feature-icon"><i class="fa-solid fa-plug"></i></div>
-        <h3 i18n="@@home.features.card.mcpIntegration.title"><span [attr.translate]="'no'">MCP</span> Integration</h3>
-        <p i18n="@@home.features.card.mcpIntegration.desc">Use <span [attr.translate]="'no'">FSB</span> as an <span [attr.translate]="'no'">MCP</span> server from <span [attr.translate]="'no'">Claude Code</span>, <span [attr.translate]="'no'">Codex</span>, <span [attr.translate]="'no'">Cursor</span>, <span [attr.translate]="'no'">OpenClaw</span>, or any <span [attr.translate]="'no'">MCP</span> client. 69 tools, with browser automation straight from your IDE.</p>
-      </div>
-      <div class="feature-card reveal delay-3">
-        <div class="feature-icon"><i class="fa-solid fa-tower-broadcast"></i></div>
-        <h3 i18n="@@home.features.card.remoteDashboard.title">Remote Dashboard</h3>
-        <p i18n="@@home.features.card.remoteDashboard.desc">Monitor and control <span [attr.translate]="'no'">FSB</span> from any device. QR-code pairing, a live DOM preview powered by <a routerLink="/phantom-stream" [attr.translate]="'no'">PhantomStream</a>, now with media mirroring, and real-time task execution.</p>
-      </div>
-      <div class="feature-card reveal delay-4">
-        <div class="feature-icon"><i class="fa-solid fa-database"></i></div>
-        <h3 i18n="@@home.features.card.memoryLearning.title">Memory &amp; Learning</h3>
-        <p i18n="@@home.features.card.memoryLearning.desc"><span [attr.translate]="'no'">FSB</span> remembers navigation patterns across sites. Semantic, episodic, and procedural memory for smarter automation over time.</p>
+      <div class="lb-notes">
+        <p i18n="@@home.features.benchmark.note.fsb"><span [attr.translate]="'no'">FSB</span>: <a href="https://github.com/fullselfbrowsing/FSB/tree/mind2web/mind2web" target="_blank" rel="noopener">AI-reviewed result (277/300)</a>. Other values are transcribed from the leaderboard.</p>
+        <p i18n="@@home.features.benchmark.note.method">Evaluation methods differ; numerical placement is illustrative, not an official leaderboard ranking.</p>
+        <p class="lb-tested">
+          <span i18n="@@home.features.benchmark.tested">Tested on <span [attr.translate]="'no'">FSB</span> v0.9.92 · <span [attr.translate]="'no'">MCP</span> v0.11.2</span>
+          <span class="lb-tagline" i18n="@@home.features.benchmark.tagline">It only gets better</span>
+          <span class="lb-wink" role="img" i18n-aria-label="@@home.features.benchmark.wink" aria-label="wink">;)</span>
+        </p>
       </div>
     </div>
   </div>

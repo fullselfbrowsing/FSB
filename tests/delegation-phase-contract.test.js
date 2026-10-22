@@ -159,6 +159,7 @@ const REFINEMENT_ROOT_TEST_COMMANDS = Object.freeze([
   'node tests/extension-ui-locale.test.js',
   'node scripts/verify-extension-i18n.mjs',
   'node scripts/verify-extension-copy.mjs',
+  'node tests/benchmark-assets-parity.test.js',
 ]);
 
 const PHASE64_RETAINED_ROOT_COMMANDS = Object.freeze([

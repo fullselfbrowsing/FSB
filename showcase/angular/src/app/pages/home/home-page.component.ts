@@ -19,6 +19,7 @@ import { CAPABILITY_ROW_1, CAPABILITY_ROW_2, type CapabilityApp } from '../../co
 import { APP_VERSION } from '../../core/seo/version';
 import { HOST, buildLocaleUrl, emitLocaleHead } from '../../core/seo/locale-seo';
 import { PageJsonLdService } from '../../core/seo/page-json-ld.service';
+import ONLINE_MIND2WEB from '../../core/seo/online-mind2web.json';
 import { ThemeService } from '../../core/theme.service';
 
 interface InstallClient {
@@ -36,8 +37,8 @@ interface FanClient extends InstallClient {
 }
 
 const ROUTE_PATH = '';
-const OG_IMAGE = `${HOST}/assets/fsb_logo_dark.png`;
-const OG_IMAGE_ALT = $localize`:@@home.og.imageAlt:FSB Full Self-Browsing logo`;
+const OG_IMAGE = `${HOST}/assets/og/online-mind2web.png`;
+const OG_IMAGE_ALT = $localize`:@@home.og.imageAlt:Online-Mind2Web top 10 agents chart. FSB: AI-reviewed result (277/300), 92.3%.`;
 const SITE_NAME = $localize`:@@site.name:FSB - Full Self-Browsing`;
 const YOUTUBE_CHANNEL = 'https://www.youtube.com/@parzival5707';
 const GITHUB_REPO = 'https://github.com/fullselfbrowsing/FSB';
@@ -103,6 +104,9 @@ export class HomePageComponent implements OnInit, AfterViewInit, OnDestroy {
   readonly engGlyphs = ENG_FLOW_GLYPHS;
   readonly engChips = ENG_CHIPS;
   readonly engCliMeta = ENG_CHIPS.cli.map((chip) => chip.name).join(' · ');
+  readonly benchmarkName = BENCHMARK_NAME;
+  readonly leaderboard = buildLeaderboardRows(this.localeId);
+  readonly leaderboardTicks = buildLeaderboardTicks(this.localeId);
   browserIconClass = 'fa-chrome';
   iconIndex = 0;
   token = '--claude-code';
@@ -146,8 +150,8 @@ export class HomePageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   ngOnInit(): void {
     const url = buildLocaleUrl(this.localeId, ROUTE_PATH);
-    const t = $localize`:@@home.meta.title:Full Self-Browsing | AI Browser Automation & MCP`;
-    const d = $localize`:@@home.meta.description:Automate Chrome with natural-language instructions or connect AI agents through MCP. FSB is open source and works in your real browser session.`;
+    const t = $localize`:@@home.meta.title:Full Self-Browsing | 92.3% on Online-Mind2Web | AI Browser Automation & MCP`;
+    const d = $localize`:@@home.meta.description:FSB on Online-Mind2Web: AI-reviewed result (277/300), 92.3%. Automate Chrome with natural-language instructions or connect AI agents through MCP. FSB is open source and works in your real browser session.`;
     this.applyMeta(t, d, url);
     this.injectSoftwareApplicationJsonLd();
     if (typeof navigator !== 'undefined' && typeof navigator.userAgent === 'string') {
@@ -284,11 +288,11 @@ export class HomePageComponent implements OnInit, AfterViewInit, OnDestroy {
     this.meta.updateTag({ property: 'og:url', content: url });
     this.meta.updateTag({ property: 'og:type', content: 'website' });
     this.meta.updateTag({ property: 'og:image', content: OG_IMAGE });
-    this.meta.updateTag({ property: 'og:image:width', content: '1000' });
-    this.meta.updateTag({ property: 'og:image:height', content: '1000' });
+    this.meta.updateTag({ property: 'og:image:width', content: '1200' });
+    this.meta.updateTag({ property: 'og:image:height', content: '630' });
     this.meta.updateTag({ property: 'og:image:alt', content: OG_IMAGE_ALT });
     this.meta.updateTag({ property: 'og:site_name', content: SITE_NAME });
-    this.meta.updateTag({ name: 'twitter:card', content: 'summary' });
+    this.meta.updateTag({ name: 'twitter:card', content: 'summary_large_image' });
     this.meta.updateTag({ name: 'twitter:title', content: t });
     this.meta.updateTag({ name: 'twitter:description', content: d });
     this.meta.updateTag({ name: 'twitter:image', content: OG_IMAGE });
@@ -310,7 +314,9 @@ export class HomePageComponent implements OnInit, AfterViewInit, OnDestroy {
       softwareVersion: APP_VERSION,
       downloadUrl: GITHUB_REPO,
       sameAs: [GITHUB_REPO, YOUTUBE_CHANNEL],
+      subjectOf: { '@id': `${HOST}/#online-mind2web` },
       featureList: [
+        $localize`:@@home.schema.feature.benchmark:Online-Mind2Web: AI-reviewed result (277/300), 92.3%`,
         $localize`:@@home.schema.feature.mcp:MCP server for Claude Code, Codex, Cursor, Antigravity, and OpenClaw`,
         $localize`:@@home.schema.feature.browser:Real browser automation through a local Chrome extension`,
         $localize`:@@home.schema.feature.triggers:Trigger watchers for reactive DOM monitoring`,
@@ -323,6 +329,28 @@ export class HomePageComponent implements OnInit, AfterViewInit, OnDestroy {
       license: `${GITHUB_REPO}/blob/main/LICENSE`,
       publisher: { '@id': `${HOST}/#org` },
       offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+    };
+    // The leaderboard chart in the features section, restated for crawlers. The visible FSB row
+    // is a wordmark with no text name, so this is where "FSB: 92.3%" is spelled out.
+    const benchmark = {
+      '@type': 'Dataset',
+      '@id': `${HOST}/#online-mind2web`,
+      name: $localize`:@@home.schema.benchmark.name:FSB on Online-Mind2Web: top 10 agents by average success rate`,
+      description: $localize`:@@home.schema.benchmark.description:Average success rates on Online-Mind2Web, with FSB included. FSB: AI-reviewed result (277/300), 92.3%. Other values are transcribed from the leaderboard. Evaluation methods differ; numerical placement is illustrative, not an official leaderboard ranking. Tested on FSB v0.9.92 · MCP v0.11.2.`,
+      url: `${url}#features`,
+      inLanguage: this.localeId,
+      isAccessibleForFree: true,
+      datePublished: ONLINE_MIND2WEB.fsb.published,
+      creator: { '@id': `${HOST}/#org` },
+      about: { '@id': software['@id'] },
+      isBasedOn: ONLINE_MIND2WEB.leaderboardUrl,
+      citation: ONLINE_MIND2WEB.reportUrl,
+      keywords: [ONLINE_MIND2WEB.name, 'web agent benchmark', 'browser automation'],
+      variableMeasured: {
+        '@type': 'PropertyValue',
+        name: $localize`:@@home.schema.benchmark.metric:Average success rate`,
+        unitText: 'percent',
+      },
     };
     this.pageJsonLd.set('software-application', {
       '@context': 'https://schema.org',
@@ -338,6 +366,7 @@ export class HomePageComponent implements OnInit, AfterViewInit, OnDestroy {
           publisher: { '@id': `${HOST}/#org` },
         },
         software,
+        benchmark,
       ],
     });
   }
@@ -464,8 +493,8 @@ export class HomePageComponent implements OnInit, AfterViewInit, OnDestroy {
 
 /* Declared in the module tail rather than beside the interfaces at the top of the
    file on purpose: messages.xlf pins a linenumber for every $localize call in this
-   module (the last one sits at line 312) and CI diffs `ng extract-i18n`
-   byte-for-byte, so nothing at or above that line may move. Same reason there is no
+   module (the last one is in injectSoftwareApplicationJsonLd) and CI diffs
+   `ng extract-i18n` byte-for-byte, so nothing at or above that line may move. Same reason there is no
    separate browser-icon.ts -- importing it would shift every one of those numbers.
 
    Narrower than Navigator so the detector stays a pure function over plain objects
@@ -562,3 +591,45 @@ const ENG_CHIPS: Readonly<Record<EngMode, readonly EngChip[]>> = {
     { name: 'LM Studio', icon: 'fa-solid fa-cube', tag: 'local' },
   ],
 };
+
+/* Online-Mind2Web top 10 by average success rate, read from core/seo/online-mind2web.json
+   so the README chart, the social card and the structured data draw the same numbers
+   (scripts/build-benchmark-assets.mjs). Agent names are interpolated for the same reason
+   as ENG_CHIPS. FSB's score is its own run, AI-reviewed at 277 of 300 tasks; every other
+   value is transcribed from the leaderboard's human-evaluation table. Percentages go
+   through Intl so separators and the % position follow the reader's locale. */
+const BENCHMARK_NAME = ONLINE_MIND2WEB.name;
+
+interface LeaderboardEntry {
+  readonly name: string;
+  readonly score: number;
+  readonly fsb?: boolean;
+}
+
+export interface LeaderboardRow extends LeaderboardEntry {
+  readonly rank: string;
+  readonly value: string;
+}
+
+export interface LeaderboardTick {
+  readonly at: number;
+  readonly label: string;
+}
+
+const LEADERBOARD: readonly LeaderboardEntry[] = ONLINE_MIND2WEB.leaderboard;
+
+const LEADERBOARD_TICKS: readonly number[] = [0, 20, 40, 60, 80];
+
+export function buildLeaderboardRows(localeId: string): LeaderboardRow[] {
+  const percent = new Intl.NumberFormat(localeId, { style: 'percent', minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  return LEADERBOARD.map((entry, index) => ({
+    ...entry,
+    rank: String(index + 1).padStart(2, '0'),
+    value: percent.format(entry.score / 100),
+  }));
+}
+
+export function buildLeaderboardTicks(localeId: string): LeaderboardTick[] {
+  const percent = new Intl.NumberFormat(localeId, { style: 'percent', maximumFractionDigits: 0 });
+  return LEADERBOARD_TICKS.map((at) => ({ at, label: percent.format(at / 100) }));
+}

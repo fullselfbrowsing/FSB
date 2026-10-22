@@ -1636,11 +1636,6 @@
         "reason": "natural German loanword or product name"
       },
       {
-        "id": "home.features.card.autopilot.title",
-        "sourceSha256": "0c62cfcf5c72673be0759f650d1bc0881071d1e9ad181b9a0e1ef4a925d8b5cb",
-        "reason": "natural German loanword or product name"
-      },
-      {
         "id": "phantomStream.schema.runtimePlatform",
         "sourceSha256": "048b6128f69e4de61fbfdf5386cb32f955d365823a9f03d37b3b1643f5248055",
         "reason": "natural German loanword or product name"
@@ -1691,18 +1686,6 @@
         "sourceSha256": "0a878454544f2e300b6936a35fea1c4872b4c218636aa53634414e2c23287b6f",
         "targetSha256": "39054c349f52971fb276e575ca697f36cd0c51bdceabc4e94be05f88135f7ce1",
         "reason": "natural German compound spelling with the invariant FSB brand name"
-      },
-      {
-        "id": "home.features.card.mcpIntegration.title",
-        "sourceSha256": "e6ee8349823e491ddeb344e43d96d29563e5ad4a8459da55ff83ee41b5d9ba47",
-        "targetSha256": "0dfc9b67b3dc2e84f90b14ce856f62c5165da0a71e3527ecd36116f365e37012",
-        "reason": "natural German compound spelling with the invariant MCP acronym"
-      },
-      {
-        "id": "home.features.card.remoteDashboard.title",
-        "sourceSha256": "8534dfa4bca7a53e11a55245e1b9366aa043f33e3d167ad99890e56b757d2589",
-        "targetSha256": "e3c770c330833a4e1b6e0f9f42cb97abcd3cad7d396739cc98450bf51efa4325",
-        "reason": "natural German compound spelling for a technical feature label"
       },
       {
         "id": "phantomStream.feature.playwright.title",
