@@ -1,4 +1,11 @@
-import { ENG_ORDER, type EngMode, detectBrowserIconClass, nextEngMode } from './home-page.component';
+import {
+  ENG_ORDER,
+  type EngMode,
+  buildLeaderboardRows,
+  buildLeaderboardTicks,
+  detectBrowserIconClass,
+  nextEngMode,
+} from './home-page.component';
 
 /* Verbatim real-world user agents. CHROME_DESKTOP is shared by Chrome, Brave and
    Arc: that collision is exactly why Brave needs the navigator.brave namespace and
@@ -257,5 +264,42 @@ describe('nextEngMode', () => {
     }
     expect(seen).toEqual([...ENG_ORDER]);
     expect(mode).toBe(ENG_ORDER[0]);
+  });
+});
+
+describe('buildLeaderboardRows', () => {
+  it('ranks ten agents with zero-padded positions and FSB fourth', () => {
+    const rows = buildLeaderboardRows('en-US');
+    expect(rows.length).toBe(10);
+    expect(rows.map((row) => row.rank)).toEqual(['01', '02', '03', '04', '05', '06', '07', '08', '09', '10']);
+    expect(rows.filter((row) => row.fsb).map((row) => row.rank)).toEqual(['04']);
+  });
+
+  it('keeps the list sorted by score so bar order matches rank', () => {
+    const scores = buildLeaderboardRows('en-US').map((row) => row.score);
+    expect(scores).toEqual([...scores].sort((a, b) => b - a));
+  });
+
+  /* 69.0 must not collapse to 69: every label shares one decimal so the column reads evenly. */
+  it('always shows one decimal place', () => {
+    const rows = buildLeaderboardRows('en-US');
+    expect(rows[0].value).toBe('97.7%');
+    expect(rows[5].value).toBe('69.0%');
+  });
+
+  it("follows the reader's locale for separators and the percent sign", () => {
+    expect(buildLeaderboardRows('de')[0].value).toBe('97,7\u00a0%');
+  });
+});
+
+describe('buildLeaderboardTicks', () => {
+  it('labels the gridlines at every 20 percent', () => {
+    expect(buildLeaderboardTicks('en-US')).toEqual([
+      { at: 0, label: '0%' },
+      { at: 20, label: '20%' },
+      { at: 40, label: '40%' },
+      { at: 60, label: '60%' },
+      { at: 80, label: '80%' },
+    ]);
   });
 });

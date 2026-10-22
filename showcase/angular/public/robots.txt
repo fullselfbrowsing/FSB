@@ -1,3 +1,6 @@
+# LLM-readable summary: https://full-selfbrowsing.com/llms.txt
+# Full LLM context: https://full-selfbrowsing.com/llms-full.txt
+
 User-agent: GPTBot
 Allow: /
 

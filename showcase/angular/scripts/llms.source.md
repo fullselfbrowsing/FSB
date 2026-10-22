@@ -10,6 +10,12 @@ The vault boundary is explicit: credentials and payment methods resolve inside t
 
 OpenClaw and Hermes users get a dedicated FSB skill at `skills/fsb/` in the FSB repo. The skill is the canonical OpenClaw onboarding path: it runs the doctor flow against `fsb-mcp-server`, prints the OpenClaw stdio config block for the user to paste, and offers consent-gated install for any other detected MCP hosts. Hermes users can print the canonical config block with `node skills/fsb/scripts/print-hermes-yaml.mjs`.
 
+## Benchmark: Online-Mind2Web
+
+FSB: AI-reviewed result (277/300), 92.3% on [Online-Mind2Web](https://huggingface.co/spaces/osunlp/Online_Mind2Web_Leaderboard). Tested on FSB v0.9.92 · MCP v0.11.2. Report: https://github.com/fullselfbrowsing/FSB/blob/mind2web/mind2web/BENCHMARK-REPORT.md
+
+Top 10 agents by average success rate: Hark 97.7%, Navigator (n1.5) 97.3%, ACT-2 92.7%, FSB 92.3%, Navigator (n1-preview) 78.7%, Google Computer Use 69.0%, Operator 61.3%, ACT-1 (Aug 2025) 57.3%, Claude Computer Use 56.3%, ACT-1 (Jul 2025) 45.7%. Other values are transcribed from the leaderboard. Evaluation methods differ; numerical placement is illustrative, not an official leaderboard ranking.
+
 ## How FSB compares
 
 Unlike cloud browser agents that run in a headless container without your cookies, FSB is local-first: it drives the user's real Chrome session, uses keys stored encrypted in Chrome local storage (BYO API key, never relayed through a vendor backend), and inherits any logged-in state, MFA, and saved extensions already on the machine.
