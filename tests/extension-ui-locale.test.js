@@ -525,6 +525,183 @@ function extractNamedFunction(source, name) {
   throw new Error('unbalanced function ' + name);
 }
 
+function extractRuntimeListener(source) {
+  const anchor = 'chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {';
+  const start = source.lastIndexOf(anchor, source.indexOf('switch (request.action)'));
+  assert(start !== -1, 'runtime switch listener exists');
+  return extractNamedFunction(source.slice(start).replace(anchor,
+    'function dispatchRuntimeMessage(request, sender, sendResponse) {'), 'dispatchRuntimeMessage');
+}
+
+function messageNode() {
+  return Object.assign(fakeNode({}, ''), {
+    children: [],
+    style: {},
+    classList: { add() {}, remove() {} },
+    appendChild(node) { this.children.push(node); },
+    remove() {}
+  });
+}
+
+// Failure bubbles retain the source template, while persistence receives the
+// rendered text exactly once through the existing completion path.
+{
+  const error = 'Network $& <failure> at shop.example\nprovider detail';
+  for (const [surface, payload, activeStatus] of [
+    ['popup', false, true], ['sidepanel', false, true],
+    ['sidepanel', true, true], ['sidepanel', true, false]
+  ]) {
+    const source = fs.readFileSync(path.join(root, `extension/ui/${surface}.js`), 'utf8');
+    for (const code of [...locale.PUBLIC_LOCALES.filter((code) => code !== 'en'), null]) {
+      const shipped = freshLocale().fsbUiLocale;
+      if (code) shipped.setOverride(code);
+      const persisted = [];
+      const brief = messageNode();
+      const anchor = Object.assign(messageNode(), {
+        querySelector: (selector) => selector === '.status-text' ? brief : null
+      });
+      const context = {
+        fsbUiLocale: code ? shipped : undefined,
+        document: { createElement: messageNode },
+        chatMessages: messageNode(),
+        currentStatusMessage: activeStatus ? anchor : null,
+        currentActionGroup: null,
+        currentSessionId: 'session-locale',
+        isRunning: true,
+        _activeTabIdSnapshot: 7,
+        _tabRunningMap: new Map(),
+        _resolveTabIdForSession: () => 7,
+        setErrorState() {}, setIdleState() {}, scrollToBottom() {}, addMessage() {},
+        persistSidepanelThreadState() {}, removeLoginPrompt() {},
+        isHistoryViewActive: false,
+        historySessionId: null,
+        lastRenderedTerminalSessionId: null,
+        _persistMessage: (...args) => persisted.push(args),
+        setTimeout: (fn) => fn()
+      };
+      context.globalThis = context;
+      vm.createContext(context);
+      for (const name of [surface === 'popup' ? 'uiLine' : 'spLine', 'completeStatusMessage', 'addCompletionMessage']) {
+        vm.runInContext(extractNamedFunction(source, name), context);
+      }
+      if (payload) {
+        for (const name of ['normalizeAutomationOutcome', 'renderAutomationCompletionPayload']) {
+          vm.runInContext(extractNamedFunction(source, name), context);
+        }
+        context.renderAutomationCompletionPayload({ sessionId: 'session-locale', outcome: 'failure', error });
+      } else {
+        vm.runInContext(extractRuntimeListener(source), context);
+        context.dispatchRuntimeMessage({ action: 'automationError', sessionId: 'session-locale', tabId: 7, error });
+      }
+      const label = `${surface} ${payload ? 'completion payload' : 'runtime error'} ${activeStatus ? 'with' : 'without'} status (${code || 'no locale helper'})`;
+      const bubble = context.chatMessages.children[0];
+      const expected = code
+        ? shippedCatalogs[code].copy_5044c249a6.replace('$ERROR$', () => error)
+        : 'Error: ' + error;
+      check(bubble && bubble.textContent === expected, `${label} renders the error prefix and preserves its details`);
+      check(persisted.length === (surface === 'sidepanel' ? 1 : 0)
+          && (!persisted.length || JSON.stringify(persisted[0]) === JSON.stringify(['assistant', expected, 'text'])),
+        `${label} persists rendered text once without placeholders`);
+      if (code) {
+        check(bubble.getAttribute('data-i18n-en') === 'Error: $ERROR$'
+            && JSON.parse(bubble.getAttribute('data-i18n-subs') || '{}').error === error,
+          `${label} retains the English template and raw error`);
+        const next = code === 'ja' ? 'de' : 'ja';
+        shipped.setOverride(next);
+        shipped.apply(fakeDoc([bubble, brief]));
+        check(bubble.textContent === shippedCatalogs[next].copy_5044c249a6.replace('$ERROR$', () => error)
+            && persisted.length === (surface === 'sidepanel' ? 1 : 0),
+          `${label} follows a language change without another persistence write`);
+        if (surface === 'popup') {
+          check(brief.textContent === shippedCatalogs[next].copy_5143a201f5,
+            'the popup keeps its translated brief error status');
+        }
+      }
+    }
+  }
+}
+
+// Popup progress keeps counts and the catalog key between progress events.
+{
+  const source = fs.readFileSync(path.join(root, 'extension/ui/popup.js'), 'utf8');
+  const shipped = freshLocale().fsbUiLocale;
+  const status = messageNode();
+  const progressLabel = messageNode();
+  const fill = messageNode();
+  let hidden = true;
+  const parts = {
+    '.status-text': status,
+    '.progress-label': progressLabel,
+    '.progress-fill': fill,
+    '.progress-container': { classList: { remove: () => { hidden = false; } } }
+  };
+  const context = {
+    fsbUiLocale: shipped,
+    currentStatusMessage: { querySelector: (selector) => parts[selector] }
+  };
+  context.globalThis = context;
+  vm.createContext(context);
+  for (const name of ['uiLine', 'updateStatusMessage']) vm.runInContext(extractNamedFunction(source, name), context);
+  for (const code of shipped.PUBLIC_LOCALES.filter((code) => code !== 'en')) {
+    for (const progress of [{ iteration: 0, maxIterations: 8 }, { iteration: 3, maxIterations: 8, progressPercent: 37 }, { iteration: 4 }]) {
+      shipped.setOverride(code);
+      context.updateStatusMessage('Clicked Submit', progress);
+      const expected = (language) => shippedCatalogs[language].entry_step
+        .replace('$CURRENT$', progress.iteration).replace('$TOTAL$', progress.maxIterations || 100);
+      const width = (progress.progressPercent || 0) + '%';
+      check(progressLabel.textContent === expected(code) && fill.style.width === width && !hidden,
+        `${code} popup progress translates step ${progress.iteration} and preserves its bar`);
+      const next = code === 'ja' ? 'de' : 'ja';
+      shipped.setOverride(next);
+      shipped.apply(fakeDoc([status, progressLabel]));
+      check(progressLabel.textContent === expected(next) && fill.style.width === width && status.textContent === 'Clicked Submit',
+        'popup progress follows a language change without another progress event');
+    }
+  }
+  context.fsbUiLocale = undefined;
+  context.updateStatusMessage('Working', { iteration: 2 });
+  check(progressLabel.textContent === 'Step 2 of 100', 'popup progress interpolates its English fallback without the locale helper');
+}
+
+// Missing provider labels use catalog copy, retained in English for switches.
+{
+  const source = fs.readFileSync(path.join(root, 'extension/ui/sidepanel.js'), 'utf8');
+  const shipped = freshLocale().fsbUiLocale;
+  const context = {
+    fsbUiLocale: shipped,
+    document: { createElement: messageNode },
+    _delegationUiState: {},
+    _clearDelegationNode: (node) => { node.children.length = 0; },
+    _delegationToneForSnapshot: () => 'danger',
+    _applyDelegationSnapshotTone() {},
+    _delegationStateLabel: () => 'Agent could not finish this task',
+    _appendDelegationTechnicalCode() {},
+    _delegationAction: () => messageNode(),
+    _syncDelegationStopControls() {}
+  };
+  context.globalThis = context;
+  vm.createContext(context);
+  for (const name of ['_delegationElement', '_renderDelegationRunHeader']) vm.runInContext(extractNamedFunction(source, name), context);
+  context._delegationSemanticHeading = (tag, cls, text, _tone, subs) => context._delegationElement(tag, cls, text, subs);
+  for (const code of shipped.PUBLIC_LOCALES.filter((code) => code !== 'en')) {
+    for (const provider of [undefined, null, {}, { label: '' }, { label: 'Grok Build' }]) {
+      shipped.setOverride(code);
+      const container = messageNode();
+      const snapshot = { delegationId: 'locale-run', state: 'failed', connection: 'connected', terminal: { code: 'provider_error' } };
+      if (provider !== undefined) snapshot.provider = provider;
+      context._renderDelegationRunHeader(container, snapshot);
+      const body = container.children.find((node) => node.className === 'delegation-state-body');
+      const expected = (language) => shippedCatalogs[language].copy_d3a5554e33
+        .replace('$NAME$', provider && provider.label || shippedCatalogs[language].copy_750a4ad2a8);
+      check(body.textContent === expected(code), `${code} delegated failure translates a missing provider and preserves a supplied name`);
+      const next = code === 'ja' ? 'de' : 'ja';
+      shipped.setOverride(next);
+      shipped.apply(fakeDoc([body]));
+      check(body.textContent === expected(next), 'delegated failure provider copy follows a language change');
+    }
+  }
+}
+
 // Keyed popup messages translate catalog reasons as well as the sentence.
 {
   const shipped = freshLocale().fsbUiLocale;
@@ -1357,6 +1534,48 @@ function extractNamedFunction(source, name) {
 }
 
 async function asyncChecks() {
+  // A rejected delegated start uses the same live provider fallback as a
+  // failure snapshot, without retaining an earlier language's translation.
+  {
+    const source = fs.readFileSync(path.join(root, 'extension/ui/sidepanel.js'), 'utf8');
+    const shipped = freshLocale().fsbUiLocale;
+    const container = messageNode();
+    const context = {
+      fsbUiLocale: shipped,
+      document: { createElement: messageNode },
+      _activeTabIdSnapshot: 7,
+      conversationId: 'locale-conversation',
+      _delegationValidConversationId: () => true,
+      _delegationReserveUnboundCleanup: () => 'cleanup-key',
+      _delegationReleaseCleanupReservation() {},
+      _renderDelegationPreparing() {}, updateSendButtonState() {}, _renderDelegationReadyState() {},
+      _sendDelegationCommand: async () => ({ ok: false, code: 'activation_failed' }),
+      _delegationValidLifecycleResponse: () => true,
+      _ensureDelegationMount: () => ({ state: container })
+    };
+    context.globalThis = context;
+    vm.createContext(context);
+    vm.runInContext(extractNamedFunction(source, '_delegationElement'), context);
+    vm.runInContext('async ' + extractNamedFunction(source, '_beginDelegationStart'), context);
+    context._renderDelegationInlineError = (mount, text, subs) => mount.appendChild(context._delegationElement('p', '', text, subs));
+    for (const code of shipped.PUBLIC_LOCALES.filter((code) => code !== 'en')) {
+      for (const providerLabel of [undefined, 'Grok Build']) {
+        shipped.setOverride(code);
+        container.children.length = 0;
+        context._delegationUiState = { pendingStart: false, task: 'Original task', providerLabel };
+        await context._beginDelegationStart('challenge-locale');
+        const body = container.children[0];
+        const expected = (language) => shippedCatalogs[language].copy_2b4b8c0560
+          .replace('$NAME$', providerLabel || shippedCatalogs[language].copy_750a4ad2a8);
+        check(body.textContent === expected(code), `${code} rejected start translates its provider fallback and preserves real labels`);
+        const next = code === 'ja' ? 'de' : 'ja';
+        shipped.setOverride(next);
+        shipped.apply(fakeDoc([body]));
+        check(body.textContent === expected(next), 'rejected-start provider copy follows a language change');
+      }
+    }
+  }
+
   // Run the popup's actual boot callback with catalogs held until ownership
   // has rendered, then cover the opposite startup order as well.
   const popupSource = fs.readFileSync(path.join(root, 'extension/ui/popup.js'), 'utf8');

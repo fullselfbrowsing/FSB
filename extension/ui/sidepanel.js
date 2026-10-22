@@ -2207,7 +2207,7 @@ function _renderDelegationRunHeader(container, snapshot) {
     && !offline
     && !unpaired
     && !unsupported;
-  var providerSubs = { name: snapshot.provider ? snapshot.provider.label : 'Agent' };
+  var providerSubs = { name: (snapshot.provider && snapshot.provider.label) || 'The agent' };
   var headingText = _delegationStateLabel(snapshot);
   var headingSubs = null;
   if (bindingCleanupPending) headingText = 'Agent cleanup needs attention';
@@ -2877,7 +2877,7 @@ async function _beginDelegationStart(challengeId) {
       _renderDelegationInlineError(
         failedMount.state,
         '$NAME$ could not start this task. Keep the message and try again.',
-        { name: _delegationUiState.providerLabel || 'Agent' }
+        { name: _delegationUiState.providerLabel || 'The agent' }
       );
     }
     updateSendButtonState();
@@ -5063,16 +5063,16 @@ function updateStatusMessage(text, progressData, subs) {
 
 
 // Complete status message: remove dots-only indicator, show only the result bubble
-function completeStatusMessage(text, type = 'ai') {
+function completeStatusMessage(text, type = 'ai', subs) {
   if (currentStatusMessage) {
     currentStatusMessage.remove();
     currentStatusMessage = null;
     currentActionGroup = null;
 
     if (type === 'partial') {
-      addCompletionMessage(text, 'ai', true);
+      addCompletionMessage(text, 'ai', true, subs);
     } else if (type !== 'system') {
-      addCompletionMessage(text, type);
+      addCompletionMessage(text, type, false, subs);
     } else {
       addMessage(text, 'system');
     }
@@ -5135,7 +5135,8 @@ function _renderCompletionDomOnly(text, type, isPartial) {
 }
 
 // Add a separate completion message bubble with markdown support
-function addCompletionMessage(text, type = 'ai', isPartial = false) {
+function addCompletionMessage(text, type = 'ai', isPartial = false, subs) {
+  let renderedText = text;
   const messageDiv = document.createElement('div');
   messageDiv.className = `message ai-completion new`;
 
@@ -5151,8 +5152,12 @@ function addCompletionMessage(text, type = 'ai', isPartial = false) {
 
   if (type === 'error') {
     messageDiv.className = `message error new`;
-    messageDiv.textContent = text;
-    if (globalThis.fsbUiLocale && typeof fsbUiLocale.markExact === 'function') fsbUiLocale.markExact(messageDiv, text);
+    if (globalThis.fsbUiLocale && typeof fsbUiLocale.markExact === 'function') {
+      renderedText = fsbUiLocale.markExact(messageDiv, text, subs);
+    } else {
+      renderedText = spLine(text, subs);
+      messageDiv.textContent = renderedText;
+    }
   } else {
     // Use markdown rendering if available, plain text fallback
     const contentDiv = document.createElement('div');
@@ -5178,7 +5183,7 @@ function addCompletionMessage(text, type = 'ai', isPartial = false) {
 
   // Phase 12 FINT-23 write-through (Plan 12-02): completion bubbles persist
   // as assistant text. isPartial flag NOT recorded per CONTEXT D-07 + D-26.
-  _persistMessage('assistant', text, 'text');
+  _persistMessage('assistant', renderedText, 'text');
 }
 
 // Show Chrome page error as plain text without bubble
@@ -5630,9 +5635,9 @@ function renderAutomationCompletionPayload(payload) {
     var errorMessage = payload.error || payload.outcomeDetails?.error || completionMessage || 'Automation error';
     setErrorState(_resolveTabIdForSession(payload.sessionId));
     if (currentStatusMessage) {
-      completeStatusMessage('Error: ' + errorMessage, 'error');
+      completeStatusMessage('Error: $ERROR$', 'error', { error: errorMessage });
     } else {
-      addCompletionMessage('Error: ' + errorMessage, 'error');
+      addCompletionMessage('Error: $ERROR$', 'error', false, { error: errorMessage });
     }
   } else if (currentStatusMessage) {
     completeStatusMessage(
@@ -6016,7 +6021,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
       var isErrorOriginatingActive = (typeof errorTabId === 'number' && errorTabId === _activeTabIdSnapshot);
       if (isErrorOriginatingActive) {
-        completeStatusMessage(`Error: ${request.error}`, 'error');
+        completeStatusMessage('Error: $ERROR$', 'error', { error: request.error });
 
         // Provide specific guidance for stuck scenarios
         if (request.error && request.error.includes('stuck')) {

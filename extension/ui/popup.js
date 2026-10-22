@@ -829,7 +829,13 @@ function updateStatusMessage(text, progressData) {
       if (container && fill && label) {
         container.classList.remove('hidden');
         fill.style.width = (progressData.progressPercent || 0) + '%';
-        label.textContent = `Step ${progressData.iteration}/${progressData.maxIterations || 100}`;
+        const template = 'Step $CURRENT$ of $TOTAL$';
+        const subs = { current: progressData.iteration, total: progressData.maxIterations || 100 };
+        if (globalThis.fsbUiLocale && typeof fsbUiLocale.fill === 'function') {
+          fsbUiLocale.fill(label, 'entry_step', template, subs);
+        } else {
+          label.textContent = template.replace('$CURRENT$', subs.current).replace('$TOTAL$', subs.total);
+        }
       }
     }
   }
@@ -837,7 +843,7 @@ function updateStatusMessage(text, progressData) {
 
 // Complete status message (remove loader, show brief label)
 // Full result is shown in a separate completion bubble below
-function completeStatusMessage(text, type = 'ai') {
+function completeStatusMessage(text, type = 'ai', subs) {
   if (currentStatusMessage) {
     // Remove loader dots
     const loaderDots = currentStatusMessage.querySelector('.typing-dots');
@@ -864,15 +870,15 @@ function completeStatusMessage(text, type = 'ai') {
 
     // Show full result in a separate bubble (skip for system messages like "Automation stopped")
     if (type === 'partial') {
-      addCompletionMessage(text, 'ai', true);
+      addCompletionMessage(text, 'ai', true, subs);
     } else if (type !== 'system') {
-      addCompletionMessage(text, type);
+      addCompletionMessage(text, type, false, subs);
     }
   }
 }
 
 // Add a separate completion message bubble with markdown support
-function addCompletionMessage(text, type = 'ai', isPartial = false) {
+function addCompletionMessage(text, type = 'ai', isPartial = false, subs) {
   const messageDiv = document.createElement('div');
   messageDiv.className = `message ai-completion new`;
 
@@ -888,7 +894,14 @@ function addCompletionMessage(text, type = 'ai', isPartial = false) {
 
   if (type === 'error') {
     messageDiv.className = `message error new`;
-    messageDiv.textContent = text;
+    if (globalThis.fsbUiLocale && typeof fsbUiLocale.markExact === 'function') {
+      fsbUiLocale.markExact(messageDiv, text, subs);
+    } else {
+      messageDiv.textContent = subs ? text.replace(/\$([A-Za-z0-9_]+)\$/g, (all, name) => {
+        const value = subs[name] != null ? subs[name] : subs[name.toLowerCase()];
+        return value == null ? all : String(value);
+      }) : text;
+    }
   } else {
     // Use markdown rendering if available, plain text fallback
     const contentDiv = document.createElement('div');
@@ -1096,7 +1109,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       if (!isRunning) return; // Already idle, ignore duplicate
       if (request.sessionId === currentSessionId) {
         setErrorState();
-        completeStatusMessage(`Error: ${request.error}`, 'error');
+        completeStatusMessage('Error: $ERROR$', 'error', { error: request.error });
         // Add retry button if task is available
         if (request.task) {
           const retryDiv = document.createElement('div');
