@@ -12,7 +12,7 @@
 ![Version](https://img.shields.io/badge/version-0.9.92-0078D4?style=for-the-badge)
 ![Manifest V3](https://img.shields.io/badge/Manifest_V3-Chrome-34A853?style=for-the-badge&logo=googlechrome&logoColor=white)
 ![License](https://img.shields.io/badge/license-MIT-F5C518?style=for-the-badge)
-[![Online-Mind2Web](https://img.shields.io/badge/Online--Mind2Web-92.3%25_%28277%2F300%29-FF6B35?style=for-the-badge)](#benchmark)
+[![Online-Mind2Web](https://img.shields.io/badge/Online--Mind2Web-92.3%-FF6B35?style=for-the-badge)](#benchmark)
 
 ![Stars](https://img.shields.io/github/stars/fullselfbrowsing/FSB?style=flat-square&logo=github&label=Stars)
 ![Forks](https://img.shields.io/github/forks/fullselfbrowsing/FSB?style=flat-square&logo=github&label=Forks)
