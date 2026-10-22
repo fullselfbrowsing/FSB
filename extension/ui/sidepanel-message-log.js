@@ -5,6 +5,7 @@
  * Storage key: 'fsbConversationMessages' (CONTEXT D-01 + D-02).
  * Envelope: { v: 1, byConv: { '<convId>': log, ... }, lru: ['<convId>', ...] }.
  * Log: { v: 1, messages: [{role, content, timestamp, kind}, ...], lastWriteAt, createdAt }.
+ * UI rows may carry uiMessage: { english, subs? }; content stays readable on its own.
  * Cap: 50 conversations; tail-eviction on 51st insert (D-04).
  * Debounce: 200ms per convId; clear-and-replace (D-03).
  *
@@ -117,6 +118,34 @@
     return true;
   }
 
+  // Copy only JSON-safe catalog sources. Bad optional metadata must never
+  // discard the message's readable fallback text.
+  function cloneUiMessage(value, depth) {
+    depth = depth || 0;
+    if (depth > 8 || !value || typeof value !== 'object' || Array.isArray(value)
+        || !Object.prototype.hasOwnProperty.call(value, 'english')
+        || typeof value.english !== 'string' || value.english.length === 0) return null;
+    var copy = { english: value.english };
+    if (Object.prototype.hasOwnProperty.call(value, 'subs') && value.subs !== undefined) {
+      if (!value.subs || typeof value.subs !== 'object' || Array.isArray(value.subs)) return null;
+      copy.subs = {};
+      var names = Object.keys(value.subs);
+      for (var i = 0; i < names.length; i++) {
+        var sub = value.subs[names[i]];
+        if (sub === undefined) continue;
+        if (sub !== null && typeof sub !== 'string' && typeof sub !== 'boolean'
+            && !(typeof sub === 'number' && Number.isFinite(sub))) {
+          sub = cloneUiMessage(sub, depth + 1);
+          if (!sub) return null;
+        }
+        Object.defineProperty(copy.subs, names[i], {
+          value: sub, enumerable: true, writable: true, configurable: true
+        });
+      }
+    }
+    return copy;
+  }
+
   /**
    * Append a message to the per-convId log. Lazy-creates the per-convId log on
    * first call. Updates lastWriteAt + LRU. Enforces cap. Mutates envelope in
@@ -153,6 +182,8 @@
     };
     if (typeof msg.sessionId === 'string') row.sessionId = msg.sessionId;
     if (msg.terminal === true) row.terminal = true;
+    var uiMessage = msg.role === 'assistant' && msg.kind !== 'tool' ? cloneUiMessage(msg.uiMessage) : null;
+    if (uiMessage) row.uiMessage = uiMessage;
     log.messages.push(row);
     log.lastWriteAt = now;
     _touchLru(envelope, key);
@@ -181,6 +212,8 @@
       var row = { role: m.role, content: m.content, timestamp: m.timestamp, kind: m.kind };
       if (typeof m.sessionId === 'string') row.sessionId = m.sessionId;
       if (m.terminal === true) row.terminal = true;
+      var uiMessage = m.role === 'assistant' && m.kind !== 'tool' ? cloneUiMessage(m.uiMessage) : null;
+      if (uiMessage) row.uiMessage = uiMessage;
       out.push(row);
     }
     return out;
@@ -321,6 +354,7 @@
     ENVELOPE_VERSION: ENVELOPE_VERSION,
     emptyEnvelope: emptyEnvelope,
     isValidEnvelope: isValidEnvelope,
+    cloneUiMessage: cloneUiMessage,
     appendMessage: appendMessage,
     getMessages: getMessages,
     dropConversationMessages: dropConversationMessages,

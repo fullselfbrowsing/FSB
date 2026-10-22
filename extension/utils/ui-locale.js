@@ -223,13 +223,20 @@
 
   // Live nodes keep their substitutions in English. A value that is catalog
   // copy itself ("Selected provider", a start-failure reason) is translated
-  // with the template, so a language change reaches the whole line.
+  // with the template, so a language change reaches the whole line. Nested
+  // sources keep their own template and substitutions for the same reason.
   function liveSubs(subs) {
     if (!subs || typeof subs !== 'object' || Array.isArray(subs)) return subs;
     var out = {};
     Object.keys(subs).forEach(function (name) {
       var value = subs[name];
-      out[name] = exactKey(value) ? line(value) : value;
+      if (value && typeof value === 'object' && !Array.isArray(value)
+          && Object.prototype.hasOwnProperty.call(value, 'english')
+          && typeof value.english === 'string') {
+        out[name] = line(value.english, value.subs);
+      } else {
+        out[name] = exactKey(value) ? line(value) : value;
+      }
     });
     return out;
   }
@@ -251,6 +258,10 @@
     'Ready': 'shell_ready',
     'Welcome to FSB. How can I help?': 'shell_welcome',
     'No active automation to stop.': 'shell_no_automation',
+    'Error communicating with background script: $ERROR$': 'shell_error_background',
+    'I encountered an error: $ERROR$': 'shell_error_encountered',
+    'Something went wrong: $ERROR$': 'shell_error_generic',
+    'Error stopping automation: $ERROR$': 'shell_error_stop',
     'Automation stopped. Let me know if you need help with anything else!': 'shell_stopped',
     'Partial result': 'shell_partial',
     'Would you like to try again? ': 'shell_try_again',

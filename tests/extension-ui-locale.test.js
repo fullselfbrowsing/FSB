@@ -539,8 +539,100 @@ function messageNode() {
     style: {},
     classList: { add() {}, remove() {} },
     appendChild(node) { this.children.push(node); },
+    addEventListener() {},
     remove() {}
   });
+}
+
+function sidepanelMessageContext(api) {
+  const source = fs.readFileSync(path.join(root, 'extension/ui/sidepanel.js'), 'utf8');
+  const log = require('../extension/ui/sidepanel-message-log.js');
+  const storage = {};
+  const metrics = { writes: 0 };
+  const chatMessages = messageNode();
+  Object.defineProperty(chatMessages, 'innerHTML', {
+    set() { this.children.length = 0; }
+  });
+  const context = {
+    fsbUiLocale: api,
+    FSBSidepanelMessageLog: log,
+    document: { createElement: messageNode },
+    chatMessages,
+    chrome: { storage: { local: {
+      async get() { return JSON.parse(JSON.stringify(storage)); },
+      async set(payload) { Object.assign(storage, JSON.parse(JSON.stringify(payload))); metrics.writes++; }
+    } } },
+    conversationId: 'visible-conversation',
+    activeConversationId: null,
+    currentSessionId: 'visible-session',
+    currentStatusMessage: null,
+    currentActionGroup: null,
+    isRunning: true,
+    _activeTabIdSnapshot: 7,
+    _lastUserTaskByConversation: new Map(),
+    _messageLogPendingBuffer: new Map(),
+    _messageLogDebouncer: { schedule() {} },
+    _delegatedRunPresentation: {},
+    _delegationUiState: {},
+    scrollToBottom() {}, setErrorState() {}, setIdleState() {},
+    setTimeout() {}
+  };
+  context.globalThis = context;
+  vm.createContext(context);
+  for (const name of ['spLine', 'addMessage', 'addCompletionMessage', 'completeStatusMessage',
+    '_persistMessage', '_persistMessageToConversation', '_flushMessageLog',
+    'renderPersistedMessage', 'hydrateChatFromConversationId', '_delegatedRunErrorMessage', '_delegatedRunApplyTerminal']) {
+    const prefix = ['_flushMessageLog', 'hydrateChatFromConversationId'].includes(name) ? 'async ' : '';
+    vm.runInContext(prefix + extractNamedFunction(source, name), context);
+  }
+  vm.runInContext(extractRuntimeListener(source), context);
+  return { context, log, storage, metrics };
+}
+
+// Optional sources round-trip independently of caller-owned objects, while
+// legacy rows and damaged metadata retain their readable content.
+{
+  const log = require('../extension/ui/sidepanel-message-log.js');
+  const envelope = log.emptyEnvelope();
+  const uiMessage = { english: 'Error: $ERROR$', subs: {
+    error: { english: '$NAME$ ran past the time limit for this task.', subs: { name: 'Grok Build' } }
+  } };
+  log.appendMessage(envelope, 'round-trip', {
+    role: 'assistant', kind: 'text', content: 'readable error', timestamp: 1,
+    sessionId: 'session', terminal: true, uiMessage
+  });
+  const expected = JSON.stringify(uiMessage);
+  uiMessage.subs.error.subs.name = 'changed';
+  const row = log.getMessages(envelope, 'round-trip')[0];
+  check(JSON.stringify(row.uiMessage) === expected && row.sessionId === 'session' && row.terminal === true,
+    'message-log storage retains nested sources and terminal fields without sharing substitutions');
+  row.uiMessage.subs.error.subs.name = 'changed on read';
+  check(JSON.stringify(log.getMessages(envelope, 'round-trip')[0].uiMessage) === expected,
+    'message-log reads return independent translation sources');
+
+  const cyclic = { english: 'Error: $ERROR$', subs: {} };
+  cyclic.subs.error = cyclic;
+  for (const invalid of [null, 'text', [], {}, { english: 7 }, { english: '' },
+    { english: 'Ready', subs: [] }, { english: 'Ready', subs: { count: Infinity } },
+    { english: 'Ready', subs: { reason: {} } }, cyclic]) {
+    const accepted = log.appendMessage(envelope, 'invalid', {
+      role: 'assistant', kind: 'text', content: 'keep this', timestamp: 2, uiMessage: invalid
+    });
+    const saved = log.getMessages(envelope, 'invalid').at(-1);
+    check(accepted && saved.content === 'keep this' && !Object.hasOwn(saved, 'uiMessage'),
+      'invalid optional source leaves its message intact');
+  }
+  for (const [role, kind] of [['user', 'text'], ['assistant', 'tool']]) {
+    log.appendMessage(envelope, 'plain-content', {
+      role, kind, content: 'Ready', timestamp: 3, uiMessage: { english: 'Ready' }
+    });
+  }
+  check(log.getMessages(envelope, 'plain-content').every((row) => !Object.hasOwn(row, 'uiMessage')),
+    'user and tool rows cannot acquire translation sources');
+  envelope.byConv['round-trip'].messages[0].uiMessage = { english: 'Ready', subs: [] };
+  check(log.getMessages(envelope, 'round-trip')[0].content === 'readable error'
+      && !Object.hasOwn(log.getMessages(envelope, 'round-trip')[0], 'uiMessage'),
+    'damaged stored sources fall back without discarding the row');
 }
 
 // Failure bubbles retain the source template, while persistence receives the
@@ -600,8 +692,12 @@ function messageNode() {
         : 'Error: ' + error;
       check(bubble && bubble.textContent === expected, `${label} renders the error prefix and preserves its details`);
       check(persisted.length === (surface === 'sidepanel' ? 1 : 0)
-          && (!persisted.length || JSON.stringify(persisted[0]) === JSON.stringify(['assistant', expected, 'text'])),
+          && (!persisted.length || JSON.stringify(persisted[0].slice(0, 3)) === JSON.stringify(['assistant', expected, 'text'])),
         `${label} persists rendered text once without placeholders`);
+      if (surface === 'sidepanel' && code) {
+        check(JSON.stringify(persisted[0][3]) === JSON.stringify({ english: 'Error: $ERROR$', subs: { error } }),
+          `${label} persists the translation source alongside readable text`);
+      }
       if (code) {
         check(bubble.getAttribute('data-i18n-en') === 'Error: $ERROR$'
             && JSON.parse(bubble.getAttribute('data-i18n-subs') || '{}').error === error,
@@ -1268,7 +1364,7 @@ function messageNode() {
   check(badge.textContent === ja.copy_62c33d7a6c,
     'a language change re-renders a Grok Build result instead of the idle hint');
 
-  check(panelSource.includes("spLine('Reconnaissance failed to start: $ERROR$', { error: error.message || 'Unknown error' })")
+  check(panelSource.includes("addMessage('Reconnaissance failed to start: $ERROR$', 'system', undefined, { error: error.message || 'Unknown error' })")
       && !panelSource.includes("'Reconnaissance failed: '"),
     'an explorer exception uses the failed-to-start template');
   check(!panelSource.includes("+ ' could not start this task."),
@@ -1534,6 +1630,168 @@ function messageNode() {
 }
 
 async function asyncChecks() {
+  for (const code of locale.PUBLIC_LOCALES.filter((code) => code !== 'en')) {
+    const api = freshLocale().fsbUiLocale;
+    api.setOverride(code);
+    const { context, log, storage, metrics } = sidepanelMessageContext(api);
+    context.dispatchRuntimeMessage({ action: 'sessionStateEvent', eventType: 'iteration_complete',
+      sessionId: 'background-session', conversationId: 'background-conversation', iteration: 7 });
+    await context._flushMessageLog('background-conversation');
+    const rows = log.getMessages(storage[log.STORAGE_KEY], 'background-conversation');
+    check(rows.length === 1 && rows[0].content === shippedCatalogs[code].copy_d6786d701f.replace('$NUMBER$', '7')
+        && rows[0].uiMessage.subs.number === 7
+        && log.getMessages(storage[log.STORAGE_KEY], 'visible-conversation').length === 0,
+      `${code} background progress saves translated fallback and its source in the originating conversation`);
+    const next = code === 'ja' ? 'de' : 'ja';
+    api.setOverride(next);
+    await context.hydrateChatFromConversationId('background-conversation');
+    const bubble = context.chatMessages.children[0];
+    check(bubble.textContent === shippedCatalogs[next].copy_d6786d701f.replace('$NUMBER$', '7')
+        && bubble.className === 'message action', `${code} progress replays in the current language`);
+    api.setOverride('en');
+    api.apply(fakeDoc([bubble]));
+    check(bubble.textContent === 'Step 7 complete' && metrics.writes === 1,
+      'replayed progress follows another language change without a history write');
+  }
+
+  for (const code of locale.PUBLIC_LOCALES.filter((code) => code !== 'en')) {
+    const api = freshLocale().fsbUiLocale;
+    api.setOverride(code);
+    const { context, log, storage, metrics } = sidepanelMessageContext(api);
+    const english = 'No active automation to stop.';
+    const template = 'Starting reconnaissance on $DOMAIN$...';
+    const domain = 'shop.$&<example>';
+    context.addMessage(english, 'system');
+    context.currentStatusMessage = messageNode();
+    context.completeStatusMessage(template, 'system', { domain });
+    context.addMessage(english, 'user');
+    context.addCompletionMessage(english, 'ai');
+    context.addMessage(english, 'action');
+    await context._flushMessageLog('visible-conversation');
+    const envelope = storage[log.STORAGE_KEY];
+    const rows = log.getMessages(envelope, 'visible-conversation');
+    check(rows[0].content === shippedCatalogs[code].shell_no_automation
+        && rows[0].uiMessage.english === english && rows[1].uiMessage.subs.domain === domain
+        && rows.slice(2).every((row) => row.content === english && !row.uiMessage),
+      `${code} system messages retain source while identical user, model and tool text stays plain`);
+    for (const [content, kind] of [[english, 'text'], ['Step 12 complete', 'progress'], ['Step 12 complete extra', 'progress']]) {
+      log.appendMessage(envelope, 'visible-conversation', { role: 'assistant', content, kind, timestamp: Date.now() + 100 });
+    }
+    log.appendMessage(envelope, 'visible-conversation', { role: 'assistant', content: 'stored fallback',
+      kind: 'text', timestamp: Date.now() + 100, uiMessage: { english: 'Unrecognized catalog source' } });
+    const next = code === 'ja' ? 'de' : 'ja';
+    api.setOverride(next);
+    await context.hydrateChatFromConversationId('visible-conversation');
+    const bubbles = context.chatMessages.children;
+    check(bubbles.length === 9 && bubbles[0].textContent === shippedCatalogs[next].shell_no_automation
+        && bubbles[1].textContent === api.line(template, { domain })
+        && bubbles.slice(2, 6).every((bubble) => bubble.textContent === english)
+        && bubbles[6].textContent === shippedCatalogs[next].copy_d6786d701f.replace('$NUMBER$', '12')
+        && bubbles[7].textContent === 'Step 12 complete extra' && bubbles[8].textContent === 'stored fallback',
+      `${code} replay translates sourced UI and exact legacy steps while preserving legacy assistant text`);
+    api.setOverride('en');
+    api.apply(fakeDoc(bubbles));
+    check(bubbles[0].textContent === english && bubbles[1].textContent === template.replace('$DOMAIN$', () => domain)
+        && bubbles[6].textContent === 'Step 12 complete' && metrics.writes === 1,
+      'replayed system messages and legacy progress follow another language change without rewriting history');
+  }
+
+  const failureCases = [
+    ['provider_error', '$NAME$ reported an error before completing this task. Raw provider output was not retained.'],
+    ['daemon_restart_lost_run', 'The previous agent process was stopped and was not reattached. Start a new task when the local service is ready.'],
+    ['resume_ownership_lost', 'FSB could not return this tab to $NAME$, so the run ended and the tab remains under your control.'],
+    ['hold_expired', 'FSB could not return this tab to $NAME$, so the run ended and the tab remains under your control.'],
+    ['wall_clock_timeout', '$NAME$ ran past the time limit for this task.'],
+    ['event_silence_timeout', '$NAME$ stopped sending updates, so FSB ended the run.'],
+    ['agent_unpaired', 'FSB’s local helper is not installed. Run: npx -y fsb-mcp-server@latest install --native-host'],
+    ['native_host_missing', 'FSB’s local helper is not installed. Run: npx -y fsb-mcp-server@latest install --native-host'],
+    ['agent_offline', '$NAME$ is not reachable. Start the local FSB service, then try this message again.'],
+    ['unsupported_provider', '$NAME$ cannot run browser tasks. Choose a supported agent provider in Settings.'],
+    ['unexpected_code', '$NAME$ stopped before the task was complete.']
+  ];
+  for (const code of [...locale.PUBLIC_LOCALES, null]) {
+    for (const provider of [undefined, { label: '' }, { label: 'Grok Build $& <provider>' }]) {
+      const api = freshLocale().fsbUiLocale;
+      api.setOverride(code || 'en');
+      const { context, log, storage, metrics } = sidepanelMessageContext(code ? api : undefined);
+      const expected = (language, english) => {
+        const cat = shippedCatalogs[language];
+        const name = provider && provider.label || cat[api.exact['The agent']];
+        const reason = cat[api.exact[english]].replace('$NAME$', () => name);
+        return cat.copy_5044c249a6.replace('$ERROR$', () => reason);
+      };
+      const next = code === 'ja' ? 'de' : 'ja';
+      for (const [terminalCode, english] of failureCases) {
+        api.setOverride(code || 'en');
+        context.currentStatusMessage = messageNode();
+        const snapshot = { delegationId: terminalCode, terminal: { code: terminalCode }, provider };
+        check(context._delegatedRunApplyTerminal(snapshot)
+            && !context._delegatedRunApplyTerminal(snapshot), 'delegated terminal delivery remains idempotent');
+        const bubble = context.chatMessages.children.at(-1);
+        check(bubble.textContent === expected(code || 'en', english),
+          `${code || 'no helper'} ${terminalCode} renders the complete failure and provider fallback`);
+        if (code) {
+          api.setOverride(next);
+          api.apply(fakeDoc([bubble]));
+          const subs = JSON.parse(bubble.getAttribute('data-i18n-subs'));
+          check(bubble.textContent === expected(next, english) && subs.error.english === english
+              && (!subs.error.subs || subs.error.subs.name === (provider && provider.label || 'The agent')),
+            `${terminalCode} keeps the nested source and retranslates the whole bubble`);
+        }
+      }
+      await context._flushMessageLog('visible-conversation');
+      const rows = log.getMessages(storage[log.STORAGE_KEY], 'visible-conversation');
+      check(rows.length === failureCases.length && rows.every((row, index) => row.content === expected(code || 'en', failureCases[index][1])
+          && (code ? row.uiMessage.subs.error.english === failureCases[index][1] : !row.uiMessage)),
+        'delegated failures persist readable fallbacks and untranslated nested sources exactly once');
+      api.setOverride(next);
+      await context.hydrateChatFromConversationId('visible-conversation');
+      check(context.chatMessages.children.every((bubble, index) => bubble.textContent === expected(code ? next : 'en', failureCases[index][1]))
+          && metrics.writes === 1, 'delegated failures replay in the current language without another write');
+    }
+  }
+
+  // The background, generic, and stop errors used to be keyed through text().
+  // As exact sources they still translate, follow a switch, and replay.
+  const keyedErrors = [
+    ['Error communicating with background script: $ERROR$', 'shell_error_background'],
+    ['I encountered an error: $ERROR$', 'shell_error_encountered'],
+    ['Something went wrong: $ERROR$', 'shell_error_generic'],
+    ['Error stopping automation: $ERROR$', 'shell_error_stop']
+  ];
+  for (const code of locale.PUBLIC_LOCALES.filter((code) => code !== 'en')) {
+    const api = freshLocale().fsbUiLocale;
+    api.setOverride(code);
+    const { context, log, storage, metrics } = sidepanelMessageContext(api);
+    const cases = keyedErrors.flatMap(([english, key]) => ['socket closed $& <raw>', 'Unknown error']
+      .map((reason) => ({ english, key, reason })));
+    const expected = (language, { key, reason }) => {
+      const cat = shippedCatalogs[language];
+      const shown = api.exact[reason] ? cat[api.exact[reason]] : reason;
+      return cat[key].replace('$ERROR$', () => shown);
+    };
+    for (const item of cases) context.addMessage(item.english, 'error', undefined, { error: item.reason });
+    const live = context.chatMessages.children.slice();
+    check(live.length === cases.length && live.every((bubble, index) => bubble.textContent === expected(code, cases[index])),
+      `${code} background, generic, and stop errors translate with raw and catalog reasons`);
+    const next = code === 'ja' ? 'de' : 'ja';
+    api.setOverride(next);
+    api.apply(fakeDoc(live));
+    check(live.every((bubble, index) => bubble.textContent === expected(next, cases[index])),
+      `${code} background, generic, and stop errors follow a language change`);
+    await context._flushMessageLog('visible-conversation');
+    const rows = log.getMessages(storage[log.STORAGE_KEY], 'visible-conversation');
+    check(rows.length === cases.length && rows.every((row, index) => row.kind === 'error'
+        && row.content === expected(code, cases[index])
+        && row.uiMessage.english === cases[index].english && row.uiMessage.subs.error === cases[index].reason),
+      `${code} background, generic, and stop errors persist a readable fallback and their English source`);
+    await context.hydrateChatFromConversationId('visible-conversation');
+    const replayed = context.chatMessages.children;
+    check(replayed.length === cases.length && metrics.writes === 1
+        && replayed.every((bubble, index) => bubble.className === 'message error' && bubble.textContent === expected(next, cases[index])),
+      `${code} background, generic, and stop errors replay in the current language without another write`);
+  }
+
   // A rejected delegated start uses the same live provider fallback as a
   // failure snapshot, without retaining an earlier language's translation.
   {

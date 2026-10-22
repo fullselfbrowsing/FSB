@@ -521,7 +521,7 @@ async function hydrateChatFromConversationId(convId) {
               && typeof _lastUserTaskByConversation.set === 'function') {
             _lastUserTaskByConversation.set(convId, m.content);
           }
-          renderPersistedMessage(m.content, m.role, m.kind);
+          renderPersistedMessage(m.content, m.role, m.kind, m.uiMessage);
         }
         activeConversationId = convId;
         return sorted.length;
@@ -3472,30 +3472,30 @@ function _renderAutomationRetryPrompt(taskText, onRetry) {
 }
 
 function _delegatedRunErrorMessage(snapshot) {
-  var label = (snapshot && snapshot.provider && snapshot.provider.label) || spLine('The agent');
+  var label = (snapshot && snapshot.provider && snapshot.provider.label) || 'The agent';
   var code = snapshot && snapshot.terminal ? snapshot.terminal.code : null;
   if (code === 'provider_error') {
-    return spLine('$NAME$ reported an error before completing this task. Raw provider output was not retained.', { name: label });
+    return { english: '$NAME$ reported an error before completing this task. Raw provider output was not retained.', subs: { name: label } };
   }
   if (code === 'daemon_restart_lost_run') {
-    return spLine('The previous agent process was stopped and was not reattached. Start a new task when the local service is ready.');
+    return { english: 'The previous agent process was stopped and was not reattached. Start a new task when the local service is ready.' };
   }
   if (code === 'resume_ownership_lost' || code === 'hold_expired') {
-    return spLine('FSB could not return this tab to $NAME$, so the run ended and the tab remains under your control.', { name: label });
+    return { english: 'FSB could not return this tab to $NAME$, so the run ended and the tab remains under your control.', subs: { name: label } };
   }
-  if (code === 'wall_clock_timeout') return spLine('$NAME$ ran past the time limit for this task.', { name: label });
-  if (code === 'event_silence_timeout') return spLine('$NAME$ stopped sending updates, so FSB ended the run.', { name: label });
+  if (code === 'wall_clock_timeout') return { english: '$NAME$ ran past the time limit for this task.', subs: { name: label } };
+  if (code === 'event_silence_timeout') return { english: '$NAME$ stopped sending updates, so FSB ended the run.', subs: { name: label } };
   // Setup failures carry their recovery in the text, because a plain retry cannot fix them.
   if (code === 'agent_unpaired' || code === 'native_host_missing') {
-    return spLine('FSB’s local helper is not installed. Run: npx -y fsb-mcp-server@latest install --native-host');
+    return { english: 'FSB’s local helper is not installed. Run: npx -y fsb-mcp-server@latest install --native-host' };
   }
   if (code === 'agent_offline') {
-    return spLine('$NAME$ is not reachable. Start the local FSB service, then try this message again.', { name: label });
+    return { english: '$NAME$ is not reachable. Start the local FSB service, then try this message again.', subs: { name: label } };
   }
   if (code === 'unsupported_provider') {
-    return spLine('$NAME$ cannot run browser tasks. Choose a supported agent provider in Settings.', { name: label });
+    return { english: '$NAME$ cannot run browser tasks. Choose a supported agent provider in Settings.', subs: { name: label } };
   }
-  return spLine('$NAME$ stopped before the task was complete.', { name: label });
+  return { english: '$NAME$ stopped before the task was complete.', subs: { name: label } };
 }
 
 function _delegatedRunEmitEntry(entry) {
@@ -3545,7 +3545,7 @@ function _delegatedRunApplyTerminal(snapshot) {
     return true;
   }
   setErrorState(_activeTabIdSnapshot);
-  completeStatusMessage(spLine('Error: $ERROR$', { error: _delegatedRunErrorMessage(snapshot) }), 'error');
+  completeStatusMessage('Error: $ERROR$', 'error', { error: _delegatedRunErrorMessage(snapshot) });
   if (typeof _renderAutomationRetryPrompt === 'function') {
     _renderAutomationRetryPrompt(_delegationUiState.task, async function() {
       await _prepareDelegationTask(true);
@@ -3669,9 +3669,7 @@ async function startReconFromSidepanel(url, originalTask) {
   pendingReconTask = originalTask;
   const domain = new URL(url).hostname;
 
-  addMessage((globalThis.fsbUiLocale && fsbUiLocale.line)
-    ? fsbUiLocale.line('Starting reconnaissance on $DOMAIN$...', { domain: domain })
-    : 'Starting reconnaissance on $DOMAIN$...'.replace('$DOMAIN$', domain), 'system');
+  addMessage('Starting reconnaissance on $DOMAIN$...', 'system', undefined, { domain: domain });
 
   try {
     const response = await chrome.runtime.sendMessage({
@@ -3683,13 +3681,11 @@ async function startReconFromSidepanel(url, originalTask) {
     });
 
     if (!response || !response.success) {
-      addMessage((globalThis.fsbUiLocale && fsbUiLocale.line)
-        ? fsbUiLocale.line('Reconnaissance failed to start: $ERROR$', { error: response?.error || 'Unknown error' })
-        : 'Reconnaissance failed to start: $ERROR$'.replace('$ERROR$', response?.error || 'Unknown error'), 'system');
+      addMessage('Reconnaissance failed to start: $ERROR$', 'system', undefined, { error: response?.error || 'Unknown error' });
       pendingReconTask = null;
     }
   } catch (error) {
-    addMessage(spLine('Reconnaissance failed to start: $ERROR$', { error: error.message || 'Unknown error' }), 'system');
+    addMessage('Reconnaissance failed to start: $ERROR$', 'system', undefined, { error: error.message || 'Unknown error' });
     pendingReconTask = null;
   }
 }
@@ -3734,9 +3730,7 @@ function handleReconComplete(data) {
     reconProgressMessages.delete(id);
   }
 
-  addMessage((globalThis.fsbUiLocale && fsbUiLocale.line)
-    ? fsbUiLocale.line('Reconnaissance complete! Site map saved for $DOMAIN$.', { domain: data?.domain || 'this site' })
-    : 'Reconnaissance complete! Site map saved for $DOMAIN$.'.replace('$DOMAIN$', data?.domain || 'this site'), 'system');
+  addMessage('Reconnaissance complete! Site map saved for $DOMAIN$.', 'system', undefined, { domain: data?.domain || 'this site' });
 
   // Offer retry with the original task
   if (pendingReconTask) {
@@ -4570,9 +4564,7 @@ async function _handleLegacySendMessage(message) {
       ownershipToken: legacy && legacy.ownershipToken
     }, (response) => {
       if (chrome.runtime.lastError) {
-        addMessage((globalThis.fsbUiLocale && fsbUiLocale.text)
-          ? fsbUiLocale.text('shell_error_background', 'Error communicating with background script: $ERROR$', { error: chrome.runtime.lastError.message })
-          : 'Error communicating with background script: $ERROR$'.replace('$ERROR$', chrome.runtime.lastError.message), 'error');
+        addMessage('Error communicating with background script: $ERROR$', 'error', undefined, { error: chrome.runtime.lastError.message });
         return;
       }
 
@@ -4589,18 +4581,14 @@ async function _handleLegacySendMessage(message) {
           // Show Chrome page error as plain text, not in a bubble
           showChromepageError(errorMsg);
         } else {
-          addMessage((globalThis.fsbUiLocale && fsbUiLocale.text)
-            ? fsbUiLocale.text('shell_error_encountered', 'I encountered an error: $ERROR$', { error: errorMsg })
-            : 'I encountered an error: $ERROR$'.replace('$ERROR$', errorMsg), 'error');
+          addMessage('I encountered an error: $ERROR$', 'error', undefined, { error: errorMsg });
         }
         setIdleState(_activeTabIdSnapshot);
       }
     });
     
   } catch (error) {
-    addMessage((globalThis.fsbUiLocale && fsbUiLocale.text)
-      ? fsbUiLocale.text('shell_error_generic', 'Something went wrong: $ERROR$', { error: error.message })
-      : 'Something went wrong: $ERROR$'.replace('$ERROR$', error.message), 'error');
+    addMessage('Something went wrong: $ERROR$', 'error', undefined, { error: error.message });
     setIdleState(_activeTabIdSnapshot);
   }
 }
@@ -4627,9 +4615,7 @@ function stopAutomation() {
     
     if (chrome.runtime.lastError) {
       console.error('Side panel: Chrome runtime error:', chrome.runtime.lastError);
-      addMessage((globalThis.fsbUiLocale && fsbUiLocale.text)
-          ? fsbUiLocale.text('shell_error_background', 'Error communicating with background script: $ERROR$', { error: chrome.runtime.lastError.message })
-          : 'Error communicating with background script: $ERROR$'.replace('$ERROR$', chrome.runtime.lastError.message), 'error');
+      addMessage('Error communicating with background script: $ERROR$', 'error', undefined, { error: chrome.runtime.lastError.message });
       stopRequested = false;
       return;
     }
@@ -4661,9 +4647,7 @@ function stopAutomation() {
         stopRequested = false;
         console.log('Side panel: Stop arrived after natural completion (alreadyEnded)');
       } else {
-        addMessage((globalThis.fsbUiLocale && fsbUiLocale.text)
-          ? fsbUiLocale.text('shell_error_stop', 'Error stopping automation: $ERROR$', { error: errorMsg })
-          : 'Error stopping automation: $ERROR$'.replace('$ERROR$', errorMsg), 'error');
+        addMessage('Error stopping automation: $ERROR$', 'error', undefined, { error: errorMsg });
         stopRequested = false;
         console.error('Side panel: Stop automation failed:', errorMsg);
       }
@@ -5064,7 +5048,7 @@ function completeStatusMessage(text, type = 'ai', subs) {
     } else if (type !== 'system') {
       addCompletionMessage(text, type, false, subs);
     } else {
-      addMessage(text, 'system');
+      addMessage(text, 'system', undefined, subs);
     }
   }
 }
@@ -5127,6 +5111,7 @@ function _renderCompletionDomOnly(text, type, isPartial) {
 // Add a separate completion message bubble with markdown support
 function addCompletionMessage(text, type = 'ai', isPartial = false, subs) {
   let renderedText = text;
+  let uiMessage;
   const messageDiv = document.createElement('div');
   messageDiv.className = `message ai-completion new`;
 
@@ -5144,6 +5129,10 @@ function addCompletionMessage(text, type = 'ai', isPartial = false, subs) {
     messageDiv.className = `message error new`;
     if (globalThis.fsbUiLocale && typeof fsbUiLocale.markExact === 'function') {
       renderedText = fsbUiLocale.markExact(messageDiv, text, subs);
+      if (messageDiv.getAttribute('data-i18n-live')) {
+        uiMessage = { english: text };
+        if (subs) uiMessage.subs = subs;
+      }
     } else {
       renderedText = spLine(text, subs);
       messageDiv.textContent = renderedText;
@@ -5173,7 +5162,8 @@ function addCompletionMessage(text, type = 'ai', isPartial = false, subs) {
 
   // Phase 12 FINT-23 write-through (Plan 12-02): completion bubbles persist
   // as assistant text. isPartial flag NOT recorded per CONTEXT D-07 + D-26.
-  _persistMessage('assistant', renderedText, 'text');
+  if (uiMessage) _persistMessage('assistant', renderedText, 'text', uiMessage);
+  else _persistMessage('assistant', renderedText, 'text');
 }
 
 // Show Chrome page error as plain text without bubble
@@ -5217,7 +5207,7 @@ function showChromepageError(text) {
  * Storage failures swallow silently -- DOM render must never block on
  * persistence per CONTEXT D-03.
  */
-function _persistMessage(role, content, kind) {
+function _persistMessage(role, content, kind, uiMessage) {
   if (typeof FSBSidepanelMessageLog === 'undefined') return;
   if (!conversationId || typeof conversationId !== 'string') return;
   if (typeof content !== 'string' || content.length === 0) return;
@@ -5234,12 +5224,16 @@ function _persistMessage(role, content, kind) {
     buffer = [];
     _messageLogPendingBuffer.set(convId, buffer);
   }
-  buffer.push({
+  var row = {
     role: resolvedRole,
     content: content,
     timestamp: Date.now(),
     kind: resolvedKind
-  });
+  };
+  var source = uiMessage && resolvedRole === 'assistant' && resolvedKind !== 'tool'
+    ? FSBSidepanelMessageLog.cloneUiMessage(uiMessage) : null;
+  if (source) row.uiMessage = source;
+  buffer.push(row);
 
   // Clear-and-replace 200ms debounce per CONTEXT D-03.
   _messageLogDebouncer.schedule(convId, function () {
@@ -5271,7 +5265,7 @@ function _persistMessage(role, content, kind) {
  * Storage failures swallow silently -- DOM render must never block on
  * persistence (mirrors _persistMessage contract).
  */
-function _persistMessageToConversation(role, content, kind, convId, sessionId, terminal) {
+function _persistMessageToConversation(role, content, kind, convId, sessionId, terminal, uiMessage) {
   if (typeof FSBSidepanelMessageLog === 'undefined') return;
   if (!convId || typeof convId !== 'string') return;
   if (typeof content !== 'string' || content.length === 0) return;
@@ -5297,6 +5291,9 @@ function _persistMessageToConversation(role, content, kind, convId, sessionId, t
   // the background already persisted; sidepanel is now idempotent backup).
   if (typeof sessionId === 'string' && sessionId.length > 0) row.sessionId = sessionId;
   if (terminal === true) row.terminal = true;
+  var source = uiMessage && resolvedRole === 'assistant' && resolvedKind !== 'tool'
+    ? FSBSidepanelMessageLog.cloneUiMessage(uiMessage) : null;
+  if (source) row.uiMessage = source;
   buffer.push(row);
 
   _messageLogDebouncer.schedule(convId, function () {
@@ -5384,7 +5381,7 @@ async function _flushMessageLog(convId) {
  *
  * No .new class. No animation setTimeout. Scrollback is not "new".
  */
-function renderPersistedMessage(content, role, kind) {
+function renderPersistedMessage(content, role, kind, uiMessage) {
   if (typeof content !== 'string' || content.length === 0) return;
   if (!chatMessages) return;
   var cssType = 'system';
@@ -5394,11 +5391,23 @@ function renderPersistedMessage(content, role, kind) {
   var messageDiv = document.createElement('div');
   messageDiv.className = 'message ' + cssType;
   messageDiv.textContent = content;
+  if (role === 'assistant' && kind !== 'tool') {
+    var source = uiMessage && typeof FSBSidepanelMessageLog !== 'undefined'
+      ? FSBSidepanelMessageLog.cloneUiMessage(uiMessage) : null;
+    var step = !uiMessage && kind === 'progress' ? /^Step (\d+) complete$/.exec(content) : null;
+    if (step) source = { english: 'Step $NUMBER$ complete', subs: { number: step[1] } };
+    if (source && globalThis.fsbUiLocale && typeof fsbUiLocale.markExact === 'function'
+        && Object.prototype.hasOwnProperty.call(fsbUiLocale.exact, source.english)) {
+      fsbUiLocale.markExact(messageDiv, source.english, source.subs);
+    }
+  }
   chatMessages.appendChild(messageDiv);
 }
 
 // Add message to chat with modern bubble styling
-function addMessage(text, type = 'system', kind) {
+function addMessage(text, type = 'system', kind, subs) {
+  let renderedText = text;
+  let uiMessage;
   const messageDiv = document.createElement('div');
   messageDiv.className = `message ${type} new`;
 
@@ -5420,9 +5429,17 @@ function addMessage(text, type = 'system', kind) {
   } else {
     messageDiv.textContent = text;
   }
-  if (type !== 'user' && type !== 'ai' && type !== 'action'
-      && globalThis.fsbUiLocale && typeof fsbUiLocale.markExact === 'function') {
-    fsbUiLocale.markExact(messageDiv, messageDiv.textContent);
+  if (type !== 'user' && type !== 'ai' && type !== 'action') {
+    if (globalThis.fsbUiLocale && typeof fsbUiLocale.markExact === 'function') {
+      renderedText = fsbUiLocale.markExact(messageDiv, text, subs);
+      if (messageDiv.getAttribute('data-i18n-live')) {
+        uiMessage = { english: text };
+        if (subs) uiMessage.subs = subs;
+      }
+    } else if (subs) {
+      renderedText = spLine(text, subs);
+      messageDiv.textContent = renderedText;
+    }
   }
 
   // Add dismiss button for error messages
@@ -5469,7 +5486,8 @@ function addMessage(text, type = 'system', kind) {
     else if (type === 'action') _kind = 'tool';
     else _kind = 'text';
   }
-  _persistMessage(_role, text, _kind);
+  if (uiMessage) _persistMessage(_role, renderedText, _kind, uiMessage);
+  else _persistMessage(_role, renderedText, _kind);
 }
 
 // Smooth scroll to bottom
@@ -6071,7 +6089,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           var iterConvId = (typeof request.conversationId === 'string' && request.conversationId.length > 0)
             ? request.conversationId
             : (request.sessionId === currentSessionId ? conversationId : null);
-          _persistMessageToConversation('assistant', 'Step ' + request.iteration + ' complete', 'progress', iterConvId);
+          var stepMessage = { english: 'Step $NUMBER$ complete', subs: { number: request.iteration } };
+          _persistMessageToConversation('assistant', spLine(stepMessage.english, stepMessage.subs),
+            'progress', iterConvId, undefined, undefined, stepMessage);
           // DOM render: only for the active session AND only when running.
           if (request.sessionId === currentSessionId && currentStatusMessage && isRunning) {
             updateStatusMessage('Step $NUMBER$ complete', {
@@ -6639,9 +6659,7 @@ function renderReplayDecisionPrompt(request) {
         }
       } catch (error) {
         Array.from(actions.querySelectorAll('button')).forEach((item) => { item.disabled = false; });
-        addMessage((globalThis.fsbUiLocale && fsbUiLocale.line)
-          ? fsbUiLocale.line('Could not apply replay decision: $ERROR$', { error: error.message })
-          : 'Could not apply replay decision: $ERROR$'.replace('$ERROR$', error.message), 'error');
+        addMessage('Could not apply replay decision: $ERROR$', 'error', undefined, { error: error.message });
       }
     });
     actions.appendChild(button);
@@ -6799,9 +6817,7 @@ function renderMcpReplayApproval(approval) {
     } catch (error) {
       setDisabled(false);
       completeStatusMessage('Replay error', 'error');
-      addMessage((globalThis.fsbUiLocale && fsbUiLocale.line)
-        ? fsbUiLocale.line('Failed to start requested replay: $ERROR$', { error: error.message })
-        : 'Failed to start requested replay: $ERROR$'.replace('$ERROR$', error.message), 'error');
+      addMessage('Failed to start requested replay: $ERROR$', 'error', undefined, { error: error.message });
     }
   });
   cancel.addEventListener('click', async () => {
@@ -6817,9 +6833,7 @@ function renderMcpReplayApproval(approval) {
       addMessage('Replay request cancelled. No target tabs were opened.', 'system');
     } catch (error) {
       setDisabled(false);
-      addMessage((globalThis.fsbUiLocale && fsbUiLocale.line)
-        ? fsbUiLocale.line('Could not cancel replay request: $ERROR$', { error: error.message })
-        : 'Could not cancel replay request: $ERROR$'.replace('$ERROR$', error.message), 'error');
+      addMessage('Could not cancel replay request: $ERROR$', 'error', undefined, { error: error.message });
     }
   });
 
@@ -6852,11 +6866,8 @@ async function startReplay(sessionId) {
     renderReplayPreview(preview);
 
     if (preview.truncated) {
-      addMessage((globalThis.fsbUiLocale && fsbUiLocale.line)
-        ? fsbUiLocale.line('This recording is inspect-only because only the latest $LATEST$ of $TOTAL$ recorded calls are available. Earlier browser state cannot be reconstructed safely.', { latest: preview.steps.length, total: preview.totalSourceSteps })
-        : 'This recording is inspect-only because only the latest $LATEST$ of $TOTAL$ recorded calls are available. Earlier browser state cannot be reconstructed safely.'.replace('$LATEST$', String(preview.steps.length)).replace('$TOTAL$', String(preview.totalSourceSteps)),
-        'system'
-      );
+      addMessage('This recording is inspect-only because only the latest $LATEST$ of $TOTAL$ recorded calls are available. Earlier browser state cannot be reconstructed safely.',
+        'system', undefined, { latest: preview.steps.length, total: preview.totalSourceSteps });
       return;
     }
 
@@ -6911,9 +6922,7 @@ async function startReplay(sessionId) {
     }
   } catch (error) {
     completeStatusMessage('Replay error', 'error');
-    addMessage((globalThis.fsbUiLocale && fsbUiLocale.line)
-      ? fsbUiLocale.line('Failed to start replay: $ERROR$', { error: error.message })
-      : 'Failed to start replay: $ERROR$'.replace('$ERROR$', error.message), 'error');
+    addMessage('Failed to start replay: $ERROR$', 'error', undefined, { error: error.message });
   }
 }
 
@@ -7040,9 +7049,7 @@ async function loadSessionView(sessionId) {
 
   } catch (error) {
     console.error('Failed to load session view:', error);
-    addMessage((globalThis.fsbUiLocale && fsbUiLocale.line)
-      ? fsbUiLocale.line('Failed to load session: $ERROR$', { error: error.message })
-      : 'Failed to load session: $ERROR$'.replace('$ERROR$', error.message), 'error');
+    addMessage('Failed to load session: $ERROR$', 'error', undefined, { error: error.message });
   }
 }
 
@@ -7092,6 +7099,10 @@ function spLine(english, subs) {
   if (!subs) return english;
   return english.replace(/\$([A-Za-z0-9_]+)\$/g, (all, name) => {
     const value = subs[name] != null ? subs[name] : subs[name.toLowerCase()];
+    if (value && typeof value === 'object' && !Array.isArray(value)
+        && Object.prototype.hasOwnProperty.call(value, 'english') && typeof value.english === 'string') {
+      return spLine(value.english, value.subs);
+    }
     return value == null ? all : String(value);
   });
 }
