@@ -16,6 +16,8 @@
  *   8. resolveTargetTab() never returns an extension page
  *   9. Lattice loopback round-trip + re-entrancy cap
  *  10. CDP_DOM_FALLBACKS covers every _route:'cdp' verb
+ *  11. source hygiene
+ *  12. Safari service worker: WebSocket guard + runtime.onSuspend stand-in
  *
  * Run: node tests/platform-adapter.test.js
  */
@@ -521,6 +523,81 @@ function safariLikeScope(overrides) {
   console.log('\n=== 11. source hygiene ===');
   passAssert(!/\bimportScripts\b/.test(SOURCE),
     'adapter source contains no importScripts token (background.js pins 334/330)');
+
+  console.log('\n=== 12. Safari service worker: WebSocket guard + runtime.onSuspend ===');
+  {
+    // Safari runs the background worker on its WebContent main thread, where
+    // `new WebSocket()` deadlocks the whole process. The guard must turn that
+    // into a synchronous SecurityError, which the MCP bridge classifies as
+    // 'security' and pins transport=native on.
+    function NativeWebSocket(url) { this.url = url; }
+    NativeWebSocket.CONNECTING = 0;
+    NativeWebSocket.OPEN = 1;
+    NativeWebSocket.CLOSING = 2;
+    NativeWebSocket.CLOSED = 3;
+    function workerScope(base) {
+      function ServiceWorkerGlobalScope() {}
+      const scope = Object.create(ServiceWorkerGlobalScope.prototype);
+      Object.assign(scope, base);
+      scope.ServiceWorkerGlobalScope = ServiceWorkerGlobalScope;
+      scope.WebSocket = NativeWebSocket;
+      return scope;
+    }
+    function constructError(Ctor) {
+      try { new Ctor('ws://localhost:7225'); return null; } catch (err) { return err; }
+    }
+
+    const sw = workerScope(safariLikeScope());
+    const swRes = loadAdapter(sw).install();
+    passAssert(swRes.installed.includes('WebSocket.workerGuard'), 'install() reports the worker WebSocket guard');
+    passAssert(sw.WebSocket !== NativeWebSocket, 'the worker WebSocket is replaced on Safari');
+    const err = constructError(sw.WebSocket);
+    passAssertEqual(err && err.name, 'SecurityError', 'new WebSocket() throws SecurityError synchronously');
+    passAssertEqual(sw.WebSocket.OPEN, 1, 'WebSocket.OPEN survives the guard');
+    passAssertEqual(sw.WebSocket.CONNECTING, 0, 'WebSocket.CONNECTING survives the guard');
+    passAssertEqual(sw.WebSocket.CLOSED, 3, 'WebSocket.CLOSED survives the guard');
+    passAssert(sw.WebSocket.prototype === NativeWebSocket.prototype, 'the native prototype is kept');
+
+    const guarded = sw.WebSocket;
+    const again = loadAdapter(sw).install({ force: true });
+    passAssert(sw.WebSocket === guarded && !again.installed.includes('WebSocket.workerGuard'),
+      'a forced second install() does not wrap the guard again');
+
+    const swDom = workerScope(safariLikeScope());
+    swDom.DOMException = DOMException;
+    loadAdapter(swDom).install();
+    const domErr = constructError(swDom.WebSocket);
+    passAssert(domErr instanceof DOMException && domErr.name === 'SecurityError',
+      'a DOMException SecurityError is thrown when the scope has DOMException');
+
+    const page = safariLikeScope();
+    page.WebSocket = NativeWebSocket;
+    loadAdapter(page).install({ loopback: false, trackTabs: false });
+    passAssert(page.WebSocket === NativeWebSocket, 'an extension page keeps the real WebSocket (not a worker)');
+
+    const chromeSw = workerScope(chromeLikeScope());
+    loadAdapter(chromeSw).install();
+    passAssert(chromeSw.WebSocket === NativeWebSocket, 'Chrome service worker WebSocket is untouched');
+
+    // background.js calls chrome.runtime.onSuspend.addListener at top level;
+    // Safari's worker has no onSuspend, so the unguarded call aborted it.
+    const susp = safariLikeScope();
+    const suspRes = loadAdapter(susp).install();
+    passAssert(suspRes.installed.includes('runtime.onSuspend'), 'install() reports the runtime.onSuspend stand-in');
+    let threw = false;
+    try { susp.chrome.runtime.onSuspend.addListener(() => {}); } catch (_e) { threw = true; }
+    passAssert(!threw, 'runtime.onSuspend.addListener no longer throws on Safari');
+
+    const own = { addListener() {}, removeListener() {}, hasListener() { return true; } };
+    const kept = safariLikeScope((s) => { s.chrome.runtime.onSuspend = own; });
+    const keptRes = loadAdapter(kept).install();
+    passAssert(kept.chrome.runtime.onSuspend === own && !keptRes.installed.includes('runtime.onSuspend'),
+      'a native runtime.onSuspend is left alone');
+
+    const chromeNoSusp = chromeLikeScope();
+    loadAdapter(chromeNoSusp).install();
+    passAssert(chromeNoSusp.chrome.runtime.onSuspend === undefined, 'Chrome runtime is not given an onSuspend stand-in');
+  }
 
   console.log('\n---');
   console.log('passed:', passed, 'failed:', failed);

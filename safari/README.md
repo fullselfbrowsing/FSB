@@ -61,12 +61,20 @@ Chrome. Only the pipe differs, and the extension picks it at runtime:
 | `ws` | `new WebSocket('ws://localhost:7225')` from the service worker | `safari-web-extension://` added to the origin allowlist |
 | `native` | the container app holds the socket; frames relayed over `runtime.connectNative` | the same allowlist entry: the app sends the extension's `Origin` |
 
-Safari's ability to open `ws://localhost` from an extension page is genuinely
-undetermined — Apple forum reports of CSP refusals run from Safari 14 through
-2025, but none tried an explicit MV3 `extension_pages` `connect-src` (which the
-build now emits). So the extension **probes**: direct first, pin to native
-after two failures, remember the decision in `chrome.storage.local` for 7 days.
-Worst case is ~7 s once per install.
+On Safari 26.5 the direct pipe is not an option at all, and not because of
+CSP. Safari runs the extension's service worker on its WebContent process's
+main thread, and a worker `new WebSocket()` hands its setup to the main thread
+and blocks on a semaphore until it finishes: the worker waits on itself and the
+whole process deadlocks. Every later fetch, extension resource load and
+extension page in that process hangs with it, and Safari abandons the
+background after about two minutes (`WKWebExtensionContextErrorDomain`
+Code=6). Seen on-device by sampling the stuck process.
+
+So `extension/utils/platform-adapter.js` makes `WebSocket` throw `SecurityError`
+inside the Safari worker. The extension still **probes** (direct first, pin to
+native after two failures, remembered in `chrome.storage.local` for 7 days),
+but it reads a construct-time `SecurityError` as final and pins native on the
+first attempt.
 
 Both transports present the extension's own `Origin`. `URLSessionWebSocketTask`
 sends none by default, so `MCPSocketSession` sets it from the `open` frame: the
@@ -165,13 +173,26 @@ as upside, not a dependency.
   CDP `Network` domain to replace it, and the build does not request
   `webRequest` at all. The consent gate, redactor and bounds port unchanged;
   only the transport is missing.
-- **`get_memory_stats`** — `chrome.system.memory` is Chrome-only. Returns
-  `capability_unavailable`.
+- **Device memory**: `chrome.system.memory` is Chrome-only, so the agent-cap
+  recommendation (`utils/agent-cap-recommendation.js`) falls back to its
+  default. `get_memory_stats` is unaffected: it reports FSB's memory store.
+- **`capture_screenshot`**: unavailable. Every capture path goes through CDP,
+  so it returns `SCREENSHOT_CAPTURE_FAILED`
+  (`capability_unavailable: chrome.debugger.attach`). Safari does implement
+  `tabs.captureVisibleTab`, which could back viewport captures; not wired yet.
+- **Dashboard relay** (`ws/ws-client.js`): unavailable. It needs a WebSocket in
+  the service worker, which deadlocks Safari (see "MCP on the same port"), so
+  with the worker guard it fails fast and retries on its backoff. Streaming
+  and remote control from the dashboard ride on it.
+- **`press_key` foreground guard**: the tool still requires the Safari window
+  to be focused (`requireForegroundNativeInput`), although on Safari it only
+  dispatches DOM events.
 - **Trusted input** — `press_key`, the drag family and `scroll_at` dispatch
   untrusted DOM events. They report `trusted:false, degraded:true` rather than
   claiming success, and will not work on sites gating on `event.isTrusted` or
   inside cross-origin iframes.
-- **Dashboard remote control** — clicks, typing and scrolling from the
+- **Dashboard remote control** — blocked by the relay gap above. Once the
+  relay has a Safari pipe: clicks, typing and scrolling from the
   dashboard run the same untrusted DOM fallbacks. A click moves focus the way
   a real one does. Backspace, Delete, Enter and Tab are performed when the page
   leaves the keydown alone; arrow keys are not, and nothing reaches into
@@ -253,3 +274,21 @@ of its results by design, and the app already lists the roots in its own UI.
 | V8 | Can the **extension** process resolve a security-scoped bookmark the **app** created, via the App Group? This is the documented pattern, but it is the one part of upload_file that cannot be unit-tested. | fall back to `NSOpenPanel` per upload (worse UX, still functional) |
 | V9 | After Safari evicts the background worker, does the dashboard relay come back within about a minute (reconnect alarm, then the arm on worker start)? | the 5-minute telemetry alarm also wakes the worker, and that start arms the relay |
 | V10 | Does `resolveTargetTab` return the last content tab, and does `tabs.query` report the workspace window's `safari-web-extension://` URL? | the adapter rules out the workspace's tab by its window id as well as its URL, and a tab with no URL is never streamed |
+
+### Results (Safari 26.5, macOS 26.6, ad-hoc signed Debug build)
+
+Driven through MCP against a local test page, with this branch's server as the
+hub on :7225.
+
+| # | Result |
+|---|---|
+| V1 | No. The direct WebSocket deadlocks the worker's process (see "MCP on the same port"); with the worker guard the bridge pins native on its first attempt. |
+| V2 | Yes. One `FSB Extension` process (same PID for 6+ hours) served every native port. When the worker recycled, the host saw its port torn down and the same process took the next one. |
+| V3 | Results of 0.5, 1.5 and 3 MB crossed the native transport intact in 350 to 430 ms, so chunking works past the ~1 MB single-message ceiling. The raw ceiling itself was not probed. |
+| V4 | Yes. The sandboxed host reached `localhost:7225`; loopback is exempt from the Local Network prompt. |
+| V5 | Yes. The hub registered the host's socket as the extension, not as an Origin-less relay. |
+| V6 | Yes. `canvas-interceptor.js` ran in the page's main world (`window.__canvasInterceptorInstalled === true`). |
+| V7 | Partly. On a worker recycle the host saw the port close and :7225 was re-dialled; the extension reconnected and re-armed (`lastWakeReason: delegation-authority-ready`). After a hub restart it reconnected in about 12 s. |
+| V8 | Not verified: needs "Grant Folder Access" in the app. Without a grant, `upload_file` returns the typed `no_granted_folders` refusal. |
+| V9 | Moot: the relay cannot run in the Safari worker (see Known gaps). |
+| V10 | Not verified: needs the workspace window. |

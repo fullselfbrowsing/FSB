@@ -20,6 +20,10 @@
  *   4. offscreen.hasDocument() resolves TRUE so ensureLatticeOffscreen() takes
  *      its existing `if (has) return;` early-exit and never calls
  *      createDocument. Zero edits to background.js for the offscreen path.
+ *   5. In the Safari service worker only, `WebSocket` throws SecurityError
+ *      (guardWorkerWebSocket below): a real one deadlocks the worker's process.
+ *   6. runtime.onSuspend gets a no-op stand-in when Safari lacks it, because
+ *      background.js registers on it at top level.
  *
  * This file is loaded two different ways:
  *   - service worker: PREPENDED verbatim to build/safari/background.js by
@@ -110,6 +114,51 @@
       removeListener: function () {},
       hasListener: function () { return false; }
     };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Service-worker WebSocket guard
+  //
+  // Safari runs an extension's background service worker on its WebContent
+  // process's MAIN thread (WorkerMainRunLoop). In a worker, `new WebSocket()`
+  // goes through WorkerThreadableWebSocketChannel, which hands setup to the
+  // main thread and blocks on a semaphore until it finishes. Here the worker
+  // IS the main thread, so it waits on itself and the process deadlocks. Every
+  // later fetch, extension resource load and extension page in that process
+  // hangs with it, and Safari abandons the background after about two minutes
+  // (WKWebExtensionContextErrorDomain Code=6). Seen on Safari 26.5 / macOS 26.6
+  // by sampling the stuck process.
+  //
+  // Throwing SecurityError synchronously makes each caller fail fast instead:
+  // the MCP bridge already reads a construct-time SecurityError as "pin
+  // transport=native", and ws/ws-client.js schedules its usual reconnect.
+  // Extension pages are not workers and keep the real WebSocket.
+  // ---------------------------------------------------------------------------
+
+  function isServiceWorker(g) {
+    return !!g && typeof g.ServiceWorkerGlobalScope === 'function' && g instanceof g.ServiceWorkerGlobalScope;
+  }
+
+  function guardWorkerWebSocket(g) {
+    var Native = g.WebSocket;
+    if (typeof Native !== 'function' || Native.__fsbSafariWorkerGuard) return false;
+    function WebSocket() {
+      var msg = 'WebSocket is unavailable in the Safari extension service worker';
+      if (typeof g.DOMException === 'function') throw new g.DOMException(msg, 'SecurityError');
+      var err = new Error(msg);
+      err.name = 'SecurityError';
+      throw err;
+    }
+    WebSocket.prototype = Native.prototype;
+    // readyState comparisons (`socket.readyState === WebSocket.OPEN`) still run
+    // against native-transport sockets, so the constants must survive.
+    WebSocket.CONNECTING = typeof Native.CONNECTING === 'number' ? Native.CONNECTING : 0;
+    WebSocket.OPEN = typeof Native.OPEN === 'number' ? Native.OPEN : 1;
+    WebSocket.CLOSING = typeof Native.CLOSING === 'number' ? Native.CLOSING : 2;
+    WebSocket.CLOSED = typeof Native.CLOSED === 'number' ? Native.CLOSED : 3;
+    WebSocket.__fsbSafariWorkerGuard = true;
+    g.WebSocket = WebSocket;
+    return true;
   }
 
   // ---------------------------------------------------------------------------
@@ -634,6 +683,17 @@
     if (FsbPlatform.id === 'chrome') return result;
     if (_installed && !opts.force) return result;
     if (!c) return result;
+
+    if (isServiceWorker(scope) && guardWorkerWebSocket(scope)) result.installed.push('WebSocket.workerGuard');
+
+    // Safari's service worker has no runtime.onSuspend, and background.js
+    // registers on it at top level. addListener on undefined throws a
+    // TypeError that aborts the worker's initial evaluation, which Safari
+    // reports as the background failing to load.
+    if (c.runtime && !c.runtime.onSuspend) {
+      c.runtime.onSuspend = noopEvent();
+      result.installed.push('runtime.onSuspend');
+    }
 
     if (!c.debugger) {
       c.debugger = {
