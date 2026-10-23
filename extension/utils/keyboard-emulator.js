@@ -215,6 +215,19 @@ class KeyboardEmulator {
    * @returns {Promise<boolean>} Success status
    */
   async attachDebugger(tabId) {
+    // Safari has no chrome.debugger at all. Without this early return, the
+    // 3-attempt retry loop below (150ms backoff each) would run for EVERY
+    // keystroke against a shim that always rejects -- a latency storm, not a
+    // graceful degradation. Callers already treat `false` as "no CDP", and
+    // content/actions.js falls through to its untrusted KeyboardEvent path.
+    //
+    // globalThis.FsbPlatform is undefined on Chrome and in every Node test
+    // harness, so the existing behaviour there is untouched.
+    if (globalThis.FsbPlatform && globalThis.FsbPlatform.caps &&
+        globalThis.FsbPlatform.caps.cdp === false) {
+      return false;
+    }
+
     // If already attached to THIS tab, reuse
     if (this.isAttachedTo(tabId)) {
       return true;

@@ -1142,7 +1142,7 @@ function isRestrictedMcpUrl(url) {
     'chrome://downloads/'
   ];
   if (restrictedPages.some(page => url.startsWith(page))) return true;
-  const restrictedProtocols = ['chrome://', 'chrome-extension://', 'moz-extension://', 'edge://', 'about:', 'file://'];
+  const restrictedProtocols = ['chrome://', 'chrome-extension://', 'moz-extension://', 'safari-web-extension://', 'edge://', 'about:', 'file://'];
   return restrictedProtocols.some(protocol => url.startsWith(protocol));
 }
 
@@ -1150,6 +1150,7 @@ function getPageTypeDescriptionForMcp(url) {
   if (!url) return 'Restricted page';
   if (url.startsWith('chrome://')) return 'Chrome internal page';
   if (url.startsWith('chrome-extension://')) return 'Chrome extension page';
+  if (url.startsWith('safari-web-extension://')) return 'Safari extension page';
   if (url.startsWith('edge://')) return 'Edge internal page';
   if (url.startsWith('about:')) return 'Browser internal page';
   if (url.startsWith('file://')) return 'Local file';

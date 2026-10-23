@@ -1,9 +1,16 @@
 #!/usr/bin/env node
-// Static validation gate for the Chrome extension.
+// Static validation gate for the browser extension.
 // Runs in CI before the Node test suite. Two checks:
 //   1. manifest.json sanity: MV3, required fields, every referenced asset exists.
 //   2. JS syntax: every .js file under known extension dirs is parsed via `node --check`.
 // Exits non-zero with a clear message on first failure.
+//
+// Flags:
+//   --root=<dir>       validate a different tree (default: extension/)
+//   --profile=safari   validate a Safari build output: skips the repo-global
+//                      package.json + catalog-snapshot checks (already covered
+//                      by the default run) and asserts the Safari-specific
+//                      NEGATIVE invariants instead.
 
 import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
@@ -13,8 +20,20 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..');
-const EXT_ROOT = join(ROOT, 'extension');
 const require = createRequire(import.meta.url);
+
+const argv = process.argv.slice(2);
+const argOf = (name) => {
+  const hit = argv.find((a) => a.startsWith(`--${name}=`));
+  return hit ? hit.slice(name.length + 3) : null;
+};
+const PROFILE = argOf('profile') || 'chrome';
+const EXT_ROOT = argOf('root') ? resolve(ROOT, argOf('root')) : join(ROOT, 'extension');
+const IS_SAFARI = PROFILE === 'safari';
+
+// Permissions that must NOT survive into a Safari build: Safari implements
+// none of them, and leaving them in the manifest is how a silent no-op ships.
+const SAFARI_BLOCKED_PERMISSIONS = ['sidePanel', 'debugger', 'offscreen', 'system.memory'];
 
 const errors = [];
 const fail = (msg) => errors.push(msg);
@@ -65,15 +84,16 @@ if (!existsSync(manifestPath)) {
   }
 }
 
-// ---------- 2. package.json semver ----------
+// ---------- 2. package.json semver (repo-global; default profile only) ----------
 const pkgPath = join(ROOT, 'package.json');
 try {
+  if (IS_SAFARI) throw { __skip: true };
   const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
   if (!/^\d+\.\d+\.\d+/.test(pkg.version || '')) {
     fail(`package.json version "${pkg.version}" is not semver-shaped`);
   }
 } catch (e) {
-  fail(`package.json read failed: ${e.message}`);
+  if (!e || !e.__skip) fail(`package.json read failed: ${e.message}`);
 }
 
 // ---------- 3. Generated capability catalog snapshot ----------
@@ -100,7 +120,10 @@ function readJsonDir(absDir) {
 }
 
 const catalogSnapshotPath = join(EXT_ROOT, 'catalog', 'recipe-index.generated.js');
-if (!existsSync(catalogSnapshotPath)) {
+if (IS_SAFARI) {
+  // Snapshot freshness is a property of the source tree, already asserted by
+  // the default run. Re-checking a copied build output adds no signal.
+} else if (!existsSync(catalogSnapshotPath)) {
   fail('capability catalog snapshot missing: extension/catalog/recipe-index.generated.js; run npm run package:extension');
 } else {
   try {
@@ -153,10 +176,40 @@ for (const file of jsFiles) {
   }
 }
 
+// ---------- 5. Safari profile: negative invariants ----------
+if (IS_SAFARI && existsSync(manifestPath)) {
+  try {
+    const m = JSON.parse(readFileSync(manifestPath, 'utf8'));
+    for (const perm of SAFARI_BLOCKED_PERMISSIONS) {
+      if ((m.permissions ?? []).includes(perm)) {
+        fail(`safari manifest still declares unsupported permission: ${perm}`);
+      }
+    }
+    if (m.side_panel) fail('safari manifest still declares a side_panel key (Safari has no sidePanel API)');
+    if (!(m.permissions ?? []).includes('nativeMessaging')) {
+      fail('safari manifest is missing the nativeMessaging permission');
+    }
+    if (m.action?.default_popup) {
+      fail('safari manifest declares action.default_popup; Safari only fires action.onClicked when no popup is set');
+    }
+    const csp = m.content_security_policy?.extension_pages;
+    if (!csp || !csp.includes('connect-src')) {
+      fail('safari manifest is missing content_security_policy.extension_pages connect-src');
+    }
+    const war = (m.web_accessible_resources ?? []).flatMap((w) => w.resources ?? []);
+    if (war.some((r) => r.startsWith('offscreen/'))) {
+      fail('safari manifest still exposes an offscreen/ web-accessible resource');
+    }
+  } catch (e) {
+    fail(`safari manifest invariant check failed: ${e.message}`);
+  }
+}
+
 // ---------- report ----------
 if (errors.length) {
-  console.error(`validate-extension: ${errors.length} failure(s)\n`);
+  console.error(`${IS_SAFARI ? 'validate-extension[safari]' : 'validate-extension'}: ${errors.length} failure(s)\n`);
   for (const e of errors) console.error(`  - ${e}`);
   process.exit(1);
 }
-console.log(`validate-extension: OK (manifest valid, ${checked} JS files parsed clean)`);
+const label = IS_SAFARI ? 'validate-extension[safari]' : 'validate-extension';
+console.log(`${label}: OK (manifest valid, ${checked} JS files parsed clean)`);
