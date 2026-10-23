@@ -252,6 +252,7 @@ const NOT_FOUND_COPY = {
   'en': { title: 'Page not found', home: 'Go to the home page' },
   'es': { title: 'Página no encontrada', home: 'Ir a la página de inicio' },
   'de': { title: 'Seite nicht gefunden', home: 'Zur Startseite' },
+  'ru': { title: 'Страница не найдена', home: 'На главную' },
   'ja': { title: 'ページが見つかりません', home: 'ホームページへ移動' },
   'ko': { title: '페이지를 찾을 수 없습니다', home: '홈페이지로 이동' },
   'zh-CN': { title: '未找到页面', home: '前往首页' },

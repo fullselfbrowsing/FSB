@@ -246,6 +246,13 @@ Operator is OpenAI's agentic browser product (2025). Overlap with FSB: end-user-
 - [FSB für KI-Agenten | Browserautomatisierung mit MCP](https://full-selfbrowsing.com/de/agents): Verbinden Sie Codex, Claude Code, Cursor, OpenClaw und Hermes über FSB mit Ihrer echten Chrome-Sitzung. Installieren Sie die MCP-Brücke und prüfen Sie sie mit doctor.
 - [FSB-Support | Installation und MCP-Einrichtung](https://full-selfbrowsing.com/de/support): Hier finden Sie FSB-Installationsschritte, Chrome-Anforderungen, Modellkosten, Antworten zum Datenschutz, die MCP-Einrichtung und Hilfe bei Problemen mit der Browserautomatisierung.
 
+### ru
+
+- [Full Self-Browsing | 92,3% в Online-Mind2Web | Автоматизация браузера на базе AI и MCP](https://full-selfbrowsing.com/ru): FSB в Online-Mind2Web: результат по оценке AI (277/300), 92,3%. Автоматизируйте Chrome с помощью инструкций на естественном языке или подключайте AI-агентов через MCP. FSB — проект с открытым исходным кодом, который работает в сессии вашего настоящего браузера.
+- [Об FSB | Демо автоматизации браузера на базе AI](https://full-selfbrowsing.com/ru/about): Посмотрите 33-секундное демо FSB, изучите встроенную память о 130 сайтах и откройте для себя 60 действий в браузере, доступных AI-агентам через MCP.
+- [FSB для AI-агентов | Автоматизация браузера через MCP](https://full-selfbrowsing.com/ru/agents): Подключите Codex, Claude Code, Cursor, OpenClaw и Hermes к своей настоящей сессии Chrome с помощью FSB. Установите мост MCP и проверьте его командой doctor.
+- [Поддержка FSB | Установка и настройка MCP](https://full-selfbrowsing.com/ru/support): Инструкции по установке FSB, требования к Chrome, стоимость моделей, ответы на вопросы о конфиденциальности, настройка MCP и решение проблем с автоматизацией браузера.
+
 ### ja
 
 - [Full Self-Browsing | Online-Mind2Web で 92.3% | AI ブラウザー自動化と MCP](https://full-selfbrowsing.com/ja): Online-Mind2Web での FSB: AI によるレビュー結果（277/300）、92.3%。自然言語の指示で Chrome を自動化するか、MCP で AI エージェントを接続できます。FSB はオープンソースで、実際のブラウザーセッションで動作します。

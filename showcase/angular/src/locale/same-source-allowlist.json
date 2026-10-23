@@ -1471,6 +1471,11 @@
       "reason": "extension UI sample shown in its own language"
     },
     {
+      "id": "releaseNotes.v0995.010.readyRu",
+      "sourceSha256": "ef05d57959cfde50d145153bdc66f9873ad699ce20c523cf040949ee5c404d4e",
+      "reason": "extension UI sample shown in its own language"
+    },
+    {
       "id": "releaseNotes.v0995.011.readyJa",
       "sourceSha256": "d888e7c7a8303af0f59b50de130b2e2b2913233456b35e146d05949af7d68885",
       "reason": "extension UI sample shown in its own language"

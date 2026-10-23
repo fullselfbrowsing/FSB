@@ -2,7 +2,7 @@
 // Phase 264 / SEO-01 / VERIFY-01 partial -- Post-build hreflang + canonical asserter.
 //
 // Walks the prerender output directory and asserts on every emitted index.html:
-//   1. Exactly 8 <link rel="alternate"> tags: 7 locales (en, es, de, ja, ko, zh-CN, zh-TW)
+//   1. Exactly 9 <link rel="alternate"> tags: 8 locales (en, es, de, ru, ja, ko, zh-CN, zh-TW)
 //      and 1 with hreflang="x-default" pointing at the en URL.
 //   2. Exactly 1 <link rel="canonical"> whose href matches the file's locale + route.
 //   3. <html lang="..."> matches the served locale (Angular i18n compiler sets this).
@@ -17,7 +17,7 @@ import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
 const HOST = 'https://full-selfbrowsing.com';
-const LOCALES = ['en', 'es', 'de', 'ja', 'ko', 'zh-CN', 'zh-TW'];
+const LOCALES = ['en', 'es', 'de', 'ru', 'ja', 'ko', 'zh-CN', 'zh-TW'];
 const SOURCE_LOCALE = 'en';
 const SERVER_ROUTES_PATH = join(process.cwd(), 'src', 'app', 'app.routes.server.ts');
 
