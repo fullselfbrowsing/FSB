@@ -22,6 +22,7 @@ const DEFAULT_LOCALES = [
   ['en', 'en'],
   ['es', 'es'],
   ['de', 'de'],
+  ['ru', 'ru'],
   ['ja', 'ja'],
   ['ko', 'ko'],
   ['zh-CN', 'zh_CN'],

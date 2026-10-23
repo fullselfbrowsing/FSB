@@ -20,13 +20,14 @@
     return;
   }
 
-  var PUBLIC_LOCALES = ['en', 'es', 'de', 'ja', 'ko', 'zh-CN', 'zh-TW'];
+  var PUBLIC_LOCALES = ['en', 'es', 'de', 'ru', 'ja', 'ko', 'zh-CN', 'zh-TW'];
   var SOURCE_LOCALE = 'en';
   var STORAGE_KEY = 'fsbUiLocale';
   var FOLDERS = {
     en: 'en',
     es: 'es',
     de: 'de',
+    ru: 'ru',
     ja: 'ja',
     ko: 'ko',
     'zh-CN': 'zh_CN',
@@ -498,6 +499,7 @@
     en: 'English',
     es: 'Español',
     de: 'Deutsch',
+    ru: 'Русский',
     ja: '日本語',
     ko: '한국어',
     'zh-CN': '简体中文',

@@ -97,6 +97,9 @@ for (const [input, expected, label] of [
   [{ accept: ['zh-Hans-HK'], timeZone: 'Asia/Hong_Kong' }, 'zh-CN', 'an explicit script beats the region and time zone'],
   [{ accept: ['es-MX'] }, 'es', 'es-MX resolves to es'],
   [{ accept: ['ko_KR'] }, 'ko', 'underscore tags resolve'],
+  [{ accept: ['ru-RU', 'en'] }, 'ru', 'ru-RU resolves to ru'],
+  [{ accept: ['uk', 'en'] }, 'en', 'Ukrainian is not mapped to Russian'],
+  [{ accept: ['be', 'kk'], ui: 'uk' }, 'en', 'Belarusian, Kazakh, and a Ukrainian UI are not mapped to Russian'],
   [{}, 'en', 'nothing known resolves to English']
 ]) {
   check(locale.resolveDefault(input) === expected, `resolveDefault: ${label}`);
@@ -173,8 +176,8 @@ for (const name of ['bad-missing', 'bad-empty', 'bad-placeholder', 'bad-undefine
   check(result.status === 1, `${name} fixture fails the gate`);
 }
 
-const autonyms = ['English', 'Español', 'Deutsch', '日本語', '한국어', '简体中文', '繁體中文'];
-check(JSON.stringify(locale.PUBLIC_LOCALES.map((code) => locale.NATIVE_LABELS[code])) === JSON.stringify(autonyms), 'language control uses the seven native autonyms');
+const autonyms = ['English', 'Español', 'Deutsch', 'Русский', '日本語', '한국어', '简体中文', '繁體中文'];
+check(JSON.stringify(locale.PUBLIC_LOCALES.map((code) => locale.NATIVE_LABELS[code])) === JSON.stringify(autonyms), 'language control uses the eight native autonyms');
 locale.setBrowserTag('en');
 locale.setPreferredLanguages(['ja-JP', 'en']);
 locale.saveOverride('de');
@@ -1969,9 +1972,9 @@ async function asyncChecks() {
     const picker = fakeSelect();
     shipped.mountSelect(picker);
     const automatic = picker.options[0];
-    check(picker.options.length === 8 && automatic.value === ''
+    check(picker.options.length === 9 && automatic.value === ''
         && automatic.attrs['data-i18n'] === 'lang_follow_browser' && automatic.textContent === 'Automatic',
-      'the picker lists Automatic, keyed for translation, before the seven languages');
+      'the picker lists Automatic, keyed for translation, before the eight languages');
     check(JSON.stringify(picker.options.slice(1).map((o) => o.textContent)) === JSON.stringify(autonyms),
       'the picker lists each language by its own name');
     check(shippedCatalogs.ja.lang_follow_browser === '自動' && shippedCatalogs.de.lang_follow_browser === 'Automatisch',
