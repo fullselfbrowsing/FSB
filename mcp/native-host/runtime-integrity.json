@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "packageName": "fsb-mcp-server",
-  "packageVersion": "0.11.2",
-  "lockSha256": "babe9349d46451732308aa53f9204093357e8f7768bcf4f1fd5c590a5a6d0667",
+  "packageVersion": "0.11.5",
+  "lockSha256": "2f78f5283a967e3c40474cacbd46701c55ebf6c46b50f0214e01554d3be1c65b",
   "directDependencies": [
     {
       "name": "@modelcontextprotocol/sdk",

@@ -145,31 +145,32 @@ const REC = require(REC_PATH);
 // ------------------------------------------------------------------
 (async function main() {
 
-  // --- Part 1: Allowlist accept (FINT-16; 4 PASS) -----------------
+  // --- Part 1: Allowlist accept (FINT-16; 5 PASS) -----------------
   console.log('\n--- Part 1: Allowlist accept (FINT-16) ---');
   var labels = VS.MCP_VISUAL_CLIENT_LABELS;
-  // Phase 10 added FSB Autopilot at index 13 (14th entry). Quick task
-  // 260608-6nm appended 12 more Tier-1 MCP clients (Cline ... Goose)
-  // after FSB Autopilot. The structural invariants this Part locks are:
-  // (a) the array is non-empty, (b) FSB Autopilot remains at index 13,
-  // (c) downstream Parts (allowlist accept, normalization) still hold.
-  // The exact array length is intentionally not pinned so future
-  // additive expansions do not silently regress this smoke test.
+  // The extension's own autopilot ticks the visual session as 'Autopilot'.
+  // The structural invariants this Part locks are: (a) the array is
+  // non-empty, (b) Autopilot is on it exactly once, (c) downstream Parts
+  // (allowlist accept, normalization) still hold. Neither the array length
+  // nor the position is pinned, so additions and removals elsewhere in the
+  // list do not regress this smoke test.
   ok(Array.isArray(labels) && labels.length >= 14,
-    'Part 1.1 -- MCP_VISUAL_CLIENT_LABELS has >= 14 entries post-Phase-10');
-  ok(labels[13] === 'FSB Autopilot',
-    'Part 1.2 -- index 13 entry is FSB Autopilot');
-  ok(VS.isAllowedMcpVisualClientLabel('FSB Autopilot') === true,
-    'Part 1.3 -- allowlist accepts canonical FSB Autopilot');
-  ok(VS.isAllowedMcpVisualClientLabel('fsb-autopilot') === true,
-    'Part 1.4 -- normalization accepts hyphen variant');
+    'Part 1.1 -- MCP_VISUAL_CLIENT_LABELS has >= 14 entries');
+  ok(labels.filter(function (l) { return l === 'Autopilot'; }).length === 1,
+    'Part 1.2 -- Autopilot appears exactly once');
+  ok(VS.isAllowedMcpVisualClientLabel('Autopilot') === true,
+    'Part 1.3 -- allowlist accepts canonical Autopilot');
+  ok(VS.isAllowedMcpVisualClientLabel('autopilot') === true,
+    'Part 1.4 -- normalization accepts lowercase variant');
+  ok(VS.isAllowedMcpVisualClientLabel('FSB Autopilot') === false,
+    'Part 1.5 -- the old FSB Autopilot label is gone');
 
   // --- Part 2: Lifecycle entry shape with driver field (5 PASS) ---
   console.log('\n--- Part 2: Lifecycle entry shape (FINT-16) ---');
   // Reset storage + alarms.
   chromeMock.storage.session._replace({});
   var result2 = await LC.recordVisualSessionTick(123, 'agent_test_p2', {
-    client: 'FSB Autopilot',
+    client: 'Autopilot',
     visualReason: 'autopilot-tool-dispatch:click',
     driver: 'autopilot'
   });
@@ -248,7 +249,7 @@ const REC = require(REC_PATH);
   var _origSendMsg5 = chromeMock.runtime.sendMessage;
   chromeMock.runtime.sendMessage = async function(msg) { _broadcasts5.push(msg); };
   await REC.recordDispatch({
-    client: 'FSB Autopilot',
+    client: 'Autopilot',
     tool: 'fsb_action',
     requestPayload: { action: 'click', selector: '#btn' },
     success: true,
@@ -262,8 +263,8 @@ const REC = require(REC_PATH);
   var snap5 = await _latestRow();
   ok(snap5.rows.length >= 1,
     'Part 5.1 -- fsbUsageData has at least 1 row');
-  ok(snap5.last.client === 'FSB Autopilot',
-    'Part 5.2 -- row.client === FSB Autopilot');
+  ok(snap5.last.client === 'Autopilot',
+    'Part 5.2 -- row.client === Autopilot');
   ok(snap5.last.dispatcher_route === 'autopilot',
     'Part 5.3 -- row.dispatcher_route === autopilot');
   ok(snap5.last.drivingModel && snap5.last.drivingModel.provider === 'xai',
@@ -278,7 +279,7 @@ const REC = require(REC_PATH);
   console.log('\n--- Part 6: dispatcher_route allowlist (FINT-17) ---');
   chromeMock.storage.local._replace({});
   await REC.recordDispatch({
-    client: 'FSB Autopilot', tool: 'fsb_action', requestPayload: {},
+    client: 'Autopilot', tool: 'fsb_action', requestPayload: {},
     success: true, dispatcher_route: 'autopilot',
     drivingModel: { provider: 'xai', model_id: 'grok-build-0.1' }
   });
@@ -288,7 +289,7 @@ const REC = require(REC_PATH);
 
   chromeMock.storage.local._replace({});
   await REC.recordDispatch({
-    client: 'FSB Autopilot', tool: 'fsb_action', requestPayload: {},
+    client: 'Autopilot', tool: 'fsb_action', requestPayload: {},
     success: true, dispatcher_route: 'garbage',
     drivingModel: { provider: 'xai', model_id: 'grok-build-0.1' }
   });
@@ -302,7 +303,7 @@ const REC = require(REC_PATH);
   // 7.1: xAI + value 42
   chromeMock.storage.local._replace({});
   await REC.recordDispatch({
-    client: 'FSB Autopilot', tool: 'fsb_action', requestPayload: {},
+    client: 'Autopilot', tool: 'fsb_action', requestPayload: {},
     success: true, dispatcher_route: 'autopilot',
     drivingModel: { provider: 'xai', model_id: 'grok-build-0.1', reasoning_tokens: 42 }
   });
@@ -313,7 +314,7 @@ const REC = require(REC_PATH);
   // 7.2: xAI + undefined (missing completion_tokens_details upstream)
   chromeMock.storage.local._replace({});
   await REC.recordDispatch({
-    client: 'FSB Autopilot', tool: 'fsb_action', requestPayload: {},
+    client: 'Autopilot', tool: 'fsb_action', requestPayload: {},
     success: true, dispatcher_route: 'autopilot',
     drivingModel: { provider: 'xai', model_id: 'grok-build-0.1', reasoning_tokens: undefined }
   });
@@ -324,7 +325,7 @@ const REC = require(REC_PATH);
   // 7.3: non-xAI (openai) -- agent-loop strips reasoning_tokens; recorder passes through
   chromeMock.storage.local._replace({});
   await REC.recordDispatch({
-    client: 'FSB Autopilot', tool: 'fsb_action', requestPayload: {},
+    client: 'Autopilot', tool: 'fsb_action', requestPayload: {},
     success: true, dispatcher_route: 'autopilot',
     drivingModel: { provider: 'openai', model_id: 'gpt-4', reasoning_tokens: undefined }
   });
@@ -336,7 +337,7 @@ const REC = require(REC_PATH);
   // 7.4: xAI + reasoning_tokens=0 -- preserved as 0 (not coerced to undefined)
   chromeMock.storage.local._replace({});
   await REC.recordDispatch({
-    client: 'FSB Autopilot', tool: 'fsb_action', requestPayload: {},
+    client: 'Autopilot', tool: 'fsb_action', requestPayload: {},
     success: true, dispatcher_route: 'autopilot',
     drivingModel: { provider: 'xai', model_id: 'grok-build-0.1', reasoning_tokens: 0 }
   });
@@ -427,7 +428,7 @@ const REC = require(REC_PATH);
 
   // 10.1: pre-switch state (providerKey === 'xai')
   await REC.recordDispatch({
-    client: 'FSB Autopilot', tool: 'fsb_action', requestPayload: { step: 1 },
+    client: 'Autopilot', tool: 'fsb_action', requestPayload: { step: 1 },
     success: true, dispatcher_route: 'autopilot',
     drivingModel: { provider: 'xai', model_id: 'grok-build-0.1', reasoning_tokens: 5 }
   });
@@ -437,7 +438,7 @@ const REC = require(REC_PATH);
 
   // 10.2: post-switch state (providerKey === 'openai')
   await REC.recordDispatch({
-    client: 'FSB Autopilot', tool: 'fsb_action', requestPayload: { step: 2 },
+    client: 'Autopilot', tool: 'fsb_action', requestPayload: { step: 2 },
     success: true, dispatcher_route: 'autopilot',
     drivingModel: { provider: 'openai', model_id: 'gpt-4', reasoning_tokens: undefined }
   });

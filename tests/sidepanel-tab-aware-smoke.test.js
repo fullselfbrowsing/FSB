@@ -162,9 +162,9 @@ function installDomStub(idMap) {
 
   // 1.2 trim semantics
   {
-    const fakeRead = async (k) => ({ [k]: { client: '  FSB Autopilot  ' } });
+    const fakeRead = async (k) => ({ [k]: { client: '  Autopilot  ' } });
     const result = await lcl1(42, fakeRead);
-    ok(result === 'FSB Autopilot', 'Part 1.2 -- trim semantics on entry.client');
+    ok(result === 'Autopilot', 'Part 1.2 -- trim semantics on entry.client');
   }
 
   // 1.3 missing entry
@@ -363,7 +363,7 @@ function installDomStub(idMap) {
      'Part 4.4 -- sidepanel.css carries .fsb-foreign-owned-disabled rule with opacity 0.45 + pointer-events none');
 
   // 4.5 sidepanel.html carries the aria-describedby description span
-  ok(/<span\s+id=\"fsb-lockout-aria-description\"\s+class=\"sr-only\">/.test(sidepanelHtmlSrc),
+  ok(/<span\s+id="fsb-lockout-aria-description"\s+class="sr-only"(?:\s+data-i18n="shell_lockout")?>/.test(sidepanelHtmlSrc),
      'Part 4.5 -- sidepanel.html carries fsb-lockout-aria-description sr-only span');
 
   // Phase 61 Plan 07: the delegation renderer is loaded exactly once before

@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "status": "finalized",
+  "finalized_at": "2026-10-22T05:49:57.071213+00:00",
+  "task_count": 300,
+  "manual_review_count": 72,
+  "pending_evaluation_jobs": 0,
+  "review_protocol": "conservative-saved-evidence-review-v1",
+  "canonical_report": "mind2web/FINAL-REPORT.md",
+  "sealed_benchmark_mutated": false,
+  "new_claude_judge_runs": 0,
+  "manual_sources_snapshotted": [
+    "manual-results.json",
+    "manual-manifest.json",
+    "manual-evidence-audit.json",
+    "manual-evidence-review.json",
+    "manual-resume-status.json",
+    "manual-reconnection.json",
+    "prior-preservation-audit.json",
+    "corrected-scores.json",
+    "corrected-per-task.json"
+  ],
+  "build_script": "mind2web/results/final-review-20261022/build_final.py"
+}

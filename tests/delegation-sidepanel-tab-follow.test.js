@@ -657,6 +657,10 @@ async function adopt(options) {
     vm.runInContext(extractNamedFunction(dispatcherSource, 'canonicalLabelFromClientInfo'), labelContext);
     check(vm.runInContext("canonicalLabelFromClientInfo({ name: 'claude-code', version: '1.0' })", labelContext) === 'Claude'
       && vm.runInContext("canonicalLabelFromClientInfo({ name: 'Codex CLI' })", labelContext) === 'Codex'
+      && vm.runInContext("canonicalLabelFromClientInfo({ name: 'Cline' })", labelContext) === 'Cline'
+      && vm.runInContext("canonicalLabelFromClientInfo({ name: '@cline/core' })", labelContext) === 'Cline'
+      && vm.runInContext("canonicalLabelFromClientInfo({ name: 'Antigravity' })", labelContext) === 'Antigravity'
+      && vm.runInContext("canonicalLabelFromClientInfo({ name: 'windsurf' })", labelContext) === null
       && vm.runInContext('canonicalLabelFromClientInfo(null)', labelContext) === null,
       'clientInfo names canonicalize to chip labels');
     const registerBody = extractFunctionBody(dispatcherSource, 'handleAgentRegisterRoute');

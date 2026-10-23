@@ -521,7 +521,7 @@ async function hydrateChatFromConversationId(convId) {
               && typeof _lastUserTaskByConversation.set === 'function') {
             _lastUserTaskByConversation.set(convId, m.content);
           }
-          renderPersistedMessage(m.content, m.role, m.kind);
+          renderPersistedMessage(m.content, m.role, m.kind, m.uiMessage);
         }
         activeConversationId = convId;
         return sorted.length;
@@ -631,7 +631,8 @@ let _activeTabSurfaceSyncGeneration = 0;
 function _renderHeaderStatus() {
   if (!statusText || !statusDot || !statusDot.classList) return;
   statusDot.classList.remove('running', 'error');
-  statusText.textContent = _headerBaseStatusLabel;
+  if (globalThis.fsbUiLocale && typeof fsbUiLocale.markExact === 'function') fsbUiLocale.markExact(statusText, _headerBaseStatusLabel);
+  else statusText.textContent = _headerBaseStatusLabel;
   if (_headerBaseStatusTone === 'running') statusDot.classList.add('running');
   if (_headerBaseStatusTone === 'error') statusDot.classList.add('error');
 }
@@ -1249,11 +1250,23 @@ function _clearDelegationNode(node) {
   while (node.firstChild) node.removeChild(node.firstChild);
 }
 
-function _delegationElement(tagName, className, textValue) {
+// Templated copy is passed as the English template plus subs, never as a filled
+// line, so the element keeps its key and follows a language change.
+function _delegationElement(tagName, className, textValue, subs) {
   var element = document.createElement(tagName);
   if (className) element.className = className;
   if (textValue !== undefined && textValue !== null) {
-    element.textContent = String(textValue);
+    var english = String(textValue);
+    if (globalThis.fsbUiLocale && typeof fsbUiLocale.markExact === 'function') {
+      fsbUiLocale.markExact(element, english, subs);
+    } else {
+      element.textContent = subs
+        ? english.replace(/\$([A-Z]+)\$/g, function(all, name) {
+          var value = subs[name.toLowerCase()];
+          return value == null ? all : String(value);
+        })
+        : english;
+    }
   }
   return element;
 }
@@ -1289,13 +1302,13 @@ function _delegationSemanticIcon(tone) {
   return icon;
 }
 
-function _delegationSemanticHeading(tagName, className, textValue, tone) {
+function _delegationSemanticHeading(tagName, className, textValue, tone, subs) {
   var heading = _delegationElement(
     tagName,
     className + ' delegation-semantic-heading'
   );
   heading.appendChild(_delegationSemanticIcon(tone));
-  heading.appendChild(_delegationElement('span', 'delegation-heading-copy', textValue));
+  heading.appendChild(_delegationElement('span', 'delegation-heading-copy', textValue, subs));
   return heading;
 }
 
@@ -1320,11 +1333,12 @@ function _applyDelegationSnapshotTone(container, snapshot, toneOverride) {
   container.setAttribute('data-delegation-tone', tone);
 }
 
-function _delegationAction(label, className, handler) {
+function _delegationAction(label, className, handler, subs) {
   var button = _delegationElement(
     'button',
     'delegation-action' + (className ? ' ' + className : ''),
-    label
+    label,
+    subs
   );
   button.type = 'button';
   if (typeof handler === 'function') button.addEventListener('click', handler);
@@ -1525,10 +1539,10 @@ async function _hydrateDelegationForSelectedConversation() {
   return true;
 }
 
-function _renderDelegationInlineError(container, textValue) {
+function _renderDelegationInlineError(container, textValue, subs) {
   if (!container || !textValue) return;
   var standalone = !container.firstChild;
-  var error = _delegationElement('p', 'delegation-inline-error', textValue);
+  var error = _delegationElement('p', 'delegation-inline-error', textValue, subs);
   if (standalone) error.id = 'delegationRunHeading';
   // The state card owns assertive semantics for lifecycle alerts. Avoid a
   // nested alert that would re-announce unchanged cleanup copy when the
@@ -1572,9 +1586,13 @@ function _renderDelegationConsent(options) {
     _delegationUiState.providerLabel
   );
   var providerLabel = provider ? provider.label : 'Agent';
+  var providerSubs = { name: providerLabel };
 
   var heading = _delegationElement(
-    'h2', 'delegation-state-heading', 'Let ' + providerLabel + ' control this browser?'
+    'h2',
+    'delegation-state-heading',
+    'Let $NAME$ control this browser?',
+    providerSubs
   );
   heading.id = 'delegationRunHeading';
   heading.tabIndex = -1;
@@ -1582,7 +1600,8 @@ function _renderDelegationConsent(options) {
   mount.state.appendChild(_delegationElement(
     'p',
     'delegation-state-body',
-    providerLabel + ' may drive FSB browser tools for this task.'
+    '$NAME$ may drive FSB browser tools for this task.',
+    providerSubs
   ));
   mount.state.appendChild(_delegationElement(
     'p',
@@ -1596,13 +1615,13 @@ function _renderDelegationConsent(options) {
   checkbox.checked = false;
   checkbox.disabled = _delegationUiState.pendingStart || _delegationUiState.pendingTrust;
   trust.appendChild(checkbox);
-  trust.appendChild(document.createTextNode('Trust ' + providerLabel + ' for future runs'));
+  trust.appendChild(_delegationElement('span', '', 'Trust $NAME$ for future runs', providerSubs));
   mount.state.appendChild(trust);
   mount.state.appendChild(_delegationElement(
     'p',
     'delegation-state-note',
-    'This turns off confirmation for future ' + providerLabel
-      + ' runs on this browser.'
+    'This turns off confirmation for future $NAME$ runs on this browser.',
+    providerSubs
   ));
 
   if (_delegationUiState.errorCode) {
@@ -1616,9 +1635,10 @@ function _renderDelegationConsent(options) {
 
   var actions = _delegationElement('div', 'delegation-state-actions');
   var allow = _delegationAction(
-    'Allow & start ' + providerLabel,
+    'Allow & start $NAME$',
     'delegation-action-primary',
-    function() { _allowDelegationFromConsent(checkbox); }
+    function() { _allowDelegationFromConsent(checkbox); },
+    providerSubs
   );
   allow.disabled = _delegationUiState.pendingStart || _delegationUiState.pendingTrust;
   var back = _delegationAction('Back to message', '', _backToDelegationMessage);
@@ -1643,7 +1663,10 @@ async function _copyDelegationDoctorCommand() {
         && typeof navigator.clipboard.writeText === 'function') {
       await navigator.clipboard.writeText(command);
       var mount = _ensureDelegationMount();
-      if (mount.announcer) mount.announcer.textContent = 'Doctor command copied';
+      if (mount.announcer) {
+        if (globalThis.fsbUiLocale && fsbUiLocale.markExact) fsbUiLocale.markExact(mount.announcer, 'Doctor command copied');
+        else mount.announcer.textContent = 'Doctor command copied';
+      }
     }
   } catch (_error) { /* clipboard failure leaves the visible literal available */ }
 }
@@ -1656,7 +1679,10 @@ async function _copyDelegationPairResetCommand() {
         && typeof navigator.clipboard.writeText === 'function') {
       await navigator.clipboard.writeText(command);
       var mount = _ensureDelegationMount();
-      if (mount.announcer) mount.announcer.textContent = 'Pairing reset command copied';
+      if (mount.announcer) {
+        if (globalThis.fsbUiLocale && fsbUiLocale.markExact) fsbUiLocale.markExact(mount.announcer, 'Pairing reset command copied');
+        else mount.announcer.textContent = 'Pairing reset command copied';
+      }
     }
   } catch (_error) { /* clipboard failure leaves the visible literal available */ }
 }
@@ -1681,7 +1707,10 @@ async function _copyDelegationNativeHostInstallCommand() {
         && typeof navigator.clipboard.writeText === 'function') {
       await navigator.clipboard.writeText(command);
       var mount = _ensureDelegationMount();
-      if (mount.announcer) mount.announcer.textContent = 'Native helper install command copied';
+      if (mount.announcer) {
+        if (globalThis.fsbUiLocale && fsbUiLocale.markExact) fsbUiLocale.markExact(mount.announcer, 'Native helper install command copied');
+        else mount.announcer.textContent = 'Native helper install command copied';
+      }
     }
   } catch (_error) { /* the visible recovery copy remains actionable */ }
 }
@@ -1807,9 +1836,13 @@ function _renderDelegationPreflightFailure(result) {
     _delegationOwnDataValue(result, 'providerId'),
     _delegationOwnDataValue(result, 'providerLabel')
   );
-  var providerLabel = provider ? provider.label : 'Selected provider';
+  // Subs stay English (the start reason too); markExact() translates the ones
+  // that are catalog copy along with their template.
+  var providerSubs = { name: provider ? provider.label : 'Selected provider' };
   var headingText = 'Agent offline';
+  var headingSubs = null;
   var bodyText = 'FSB cannot reach the local agent service. Run the doctor command, then try this message again.';
+  var bodySubs = null;
   var primaryLabel = 'Copy doctor command';
   var primaryAction = _copyDelegationDoctorCommand;
   var secondaryLabel = 'Open provider setup';
@@ -1837,37 +1870,43 @@ function _renderDelegationPreflightFailure(result) {
     secondaryLabel = null;
     secondaryAction = null;
   } else if (code === 'unsupported_provider') {
-    headingText = providerLabel + ' cannot run browser tasks';
+    headingText = '$NAME$ cannot run browser tasks';
+    headingSubs = providerSubs;
     bodyText = 'The selected provider does not support agents that control browser tabs. Choose a supported agent provider, then try this message again.';
     primaryLabel = 'Choose another provider';
     primaryAction = _openDelegationProviderSetup;
     secondaryLabel = null;
     secondaryAction = null;
   } else if (code === 'auth_unauthenticated') {
-    headingText = providerLabel + ' cannot start this task';
-    bodyText = 'Sign in to ' + providerLabel
-      + ' locally, then try this message again.';
+    headingText = '$NAME$ cannot start this task';
+    headingSubs = providerSubs;
+    bodyText = 'Sign in to $NAME$ locally, then try this message again.';
+    bodySubs = providerSubs;
     primaryLabel = 'Open provider setup';
     primaryAction = _openDelegationProviderSetup;
     secondaryLabel = 'Back to message';
     secondaryAction = _backToDelegationMessage;
   } else if (code === 'auth_unknown') {
-    headingText = providerLabel + ' cannot start this task';
-    bodyText = providerLabel
-      + ' sign-in status could not be verified. Use Test Connection in API Configuration, then try again.';
+    headingText = '$NAME$ cannot start this task';
+    headingSubs = providerSubs;
+    bodyText = '$NAME$ sign-in status could not be verified. Use Test Connection in API Configuration, then try again.';
+    bodySubs = providerSubs;
     primaryLabel = 'Open provider setup';
     primaryAction = _openDelegationProviderSetup;
     secondaryLabel = 'Back to message';
     secondaryAction = _backToDelegationMessage;
   } else if (code === 'start_rejected') {
     var startDetail = _delegationStartRejectionDetail(result);
-    headingText = providerLabel + ' cannot start this task';
-    bodyText = providerLabel
-      + (startDetail
-        ? ' could not start a delegated browser run because '
-          + startDetail.reason + ' (' + startDetail.code + ').'
-        : ' could not pass FSB\'s final delegated-browser start checks.')
-      + ' Test Connection may still succeed because it does not start a delegated run. Retry the message or review provider setup.';
+    headingText = '$NAME$ cannot start this task';
+    headingSubs = providerSubs;
+    bodyText = startDetail
+      ? '$NAME$ could not start a delegated browser run because $REASON$ ($CODE$). Test Connection may still succeed because it does not start a delegated run. Retry the message or review provider setup.'
+      : '$NAME$ could not pass FSB\'s final delegated-browser start checks. Test Connection may still succeed because it does not start a delegated run. Retry the message or review provider setup.';
+    bodySubs = {
+      name: providerSubs.name,
+      reason: startDetail ? startDetail.reason : '',
+      code: startDetail ? startDetail.code : ''
+    };
     primaryLabel = 'Open provider setup';
     primaryAction = _openDelegationProviderSetup;
     secondaryLabel = 'Back to message';
@@ -1901,14 +1940,14 @@ function _renderDelegationPreflightFailure(result) {
     || code === 'bridge_session_unavailable';
   var heading = offlinePresentation
     ? _delegationSemanticHeading(
-      'h2', 'delegation-state-heading delegation-semantic-heading', headingText, 'danger'
+      'h2', 'delegation-state-heading delegation-semantic-heading', headingText, 'danger', headingSubs
     )
-    : _delegationElement('h2', 'delegation-state-heading', headingText);
+    : _delegationElement('h2', 'delegation-state-heading', headingText, headingSubs);
   if (offlinePresentation) heading.setAttribute('data-delegation-tone', 'danger');
   heading.id = 'delegationRunHeading';
   heading.tabIndex = -1;
   mount.state.appendChild(heading);
-  mount.state.appendChild(_delegationElement('p', 'delegation-state-body', bodyText));
+  mount.state.appendChild(_delegationElement('p', 'delegation-state-body', bodyText, bodySubs));
   if (offlinePresentation || code === 'extension_origin_mismatch') {
     mount.state.appendChild(_delegationElement(
       'code',
@@ -1964,14 +2003,24 @@ function _delegationHeaderPresentation(snapshot) {
   return { label: 'Ready', tone: '' };
 }
 
-function _delegationStoppedHeading(snapshot) {
+// The heading as a catalog template and its count, so the card can keep the
+// key and follow a language change.
+function _delegationStoppedHeadingParts(snapshot) {
   var count = snapshot
     && snapshot.terminal
     && Number.isSafeInteger(snapshot.terminal.releasedTabCount)
     && snapshot.terminal.releasedTabCount >= 0
     ? snapshot.terminal.releasedTabCount
     : 0;
-  return 'Agent stopped, ' + count + ' ' + (count === 1 ? 'tab' : 'tabs') + ' released';
+  return {
+    template: count === 1 ? 'Agent stopped, $COUNT$ tab released' : 'Agent stopped, $COUNT$ tabs released',
+    subs: { count: count }
+  };
+}
+
+function _delegationStoppedHeading(snapshot) {
+  var parts = _delegationStoppedHeadingParts(snapshot);
+  return parts.template.replace('$COUNT$', String(parts.subs.count));
 }
 
 function _delegationSnapshotAlertKey(snapshot) {
@@ -2043,7 +2092,7 @@ function _restoreLegacyStopControl() {
   if (!stopBtn) return;
   stopBtn.removeAttribute('data-delegation-action');
   stopBtn.removeAttribute('aria-label');
-  stopBtn.setAttribute('title', 'Stop Automation');
+  stopBtn.setAttribute('title', (globalThis.fsbUiLocale && typeof fsbUiLocale.line === 'function') ? fsbUiLocale.line('Stop Automation') : 'Stop Automation');
   var ownerLocked = _chatLockedByOwnerChip === true;
   stopBtn.disabled = ownerLocked;
   if (ownerLocked) {
@@ -2066,6 +2115,7 @@ function _syncDelegationStopControls(snapshot) {
   }
   var stopping = _delegationStopControlPending(snapshot);
   var stopLabel = stopping ? 'Stopping Automation…' : 'Stop Automation';
+  if (globalThis.fsbUiLocale && typeof fsbUiLocale.line === 'function') stopLabel = fsbUiLocale.line(stopLabel);
   if (stopBtn) {
     stopBtn.classList.remove('hidden');
     stopBtn.classList.remove('fsb-foreign-owned-disabled');
@@ -2080,6 +2130,13 @@ function _syncDelegationStopControls(snapshot) {
   var mount = _ensureDelegationMount();
   if (mount.run) mount.run.setAttribute('aria-busy', stopping ? 'true' : 'false');
   return true;
+}
+
+// apply() only re-translates the idle Stop tooltip; it cannot reach the
+// accessible name or the pending label, so a language change re-runs the sync.
+function _relabelDelegationStop() {
+  if (!stopBtn || stopBtn.getAttribute('data-delegation-action') !== 'stop') return;
+  _syncDelegationStopControls(_delegationUiState.snapshot);
 }
 
 function _handleFixedStop(event) {
@@ -2150,23 +2207,29 @@ function _renderDelegationRunHeader(container, snapshot) {
     && !offline
     && !unpaired
     && !unsupported;
-  var providerLabel = snapshot.provider ? snapshot.provider.label : 'Agent';
+  var providerSubs = { name: (snapshot.provider && snapshot.provider.label) || 'The agent' };
   var headingText = _delegationStateLabel(snapshot);
+  var headingSubs = null;
   if (bindingCleanupPending) headingText = 'Agent cleanup needs attention';
   else if (restartLost) headingText = 'Agent run ended after daemon restart';
-  else if (stopped) headingText = _delegationStoppedHeading(snapshot);
+  else if (stopped) {
+    var stoppedHeading = _delegationStoppedHeadingParts(snapshot);
+    headingText = stoppedHeading.template;
+    headingSubs = stoppedHeading.subs;
+  }
   else if (offline) headingText = 'Agent offline';
   else if (disconnected) headingText = 'Agent connection lost';
   else if (unpaired) headingText = 'Automatic connection needs the native helper';
   else if (unsupported) {
-    headingText = (snapshot.provider ? snapshot.provider.label : 'Selected provider')
-      + ' cannot run browser tasks';
+    headingText = '$NAME$ cannot run browser tasks';
+    headingSubs = { name: snapshot.provider ? snapshot.provider.label : 'Selected provider' };
   } else if (resumeOwnershipFailure) headingText = 'Agent could not resume control';
   var heading = _delegationSemanticHeading(
     'h2',
     'delegation-state-heading',
     headingText,
-    presentationTone
+    presentationTone,
+    headingSubs
   );
   heading.id = 'delegationRunHeading';
   container.appendChild(heading);
@@ -2230,8 +2293,8 @@ function _renderDelegationRunHeader(container, snapshot) {
     container.appendChild(_delegationElement(
       'p',
       'delegation-state-body',
-      'FSB could not return this tab to ' + providerLabel
-        + ', so the run ended and the tab remains under your control. Start a new task when you are ready.'
+      'FSB could not return this tab to $NAME$, so the run ended and the tab remains under your control. Start a new task when you are ready.',
+      providerSubs
     ));
     var resumeFailureActions = _delegationElement('div', 'delegation-state-actions');
     resumeFailureActions.appendChild(_delegationAction(
@@ -2240,14 +2303,14 @@ function _renderDelegationRunHeader(container, snapshot) {
     container.appendChild(resumeFailureActions);
   } else if (genericRunFailure) {
     var providerReportedFailure = terminalCode === 'provider_error';
+    var failureTemplate = providerReportedFailure
+      ? '$NAME$ reported an error before completing this task. Raw provider output was not retained. Try the same message again.'
+      : '$NAME$ stopped before the task was complete. Try the same message again.';
     container.appendChild(_delegationElement(
       'p',
       'delegation-state-body',
-      providerReportedFailure
-        ? providerLabel
-          + ' reported an error before completing this task. Raw provider output was not retained. Try the same message again.'
-        : providerLabel
-          + ' stopped before the task was complete. Try the same message again.'
+      failureTemplate,
+      providerSubs
     ));
     _appendDelegationTechnicalCode(container, terminalCode || 'agent_failed');
     var retryActions = _delegationElement('div', 'delegation-state-actions');
@@ -2266,7 +2329,8 @@ function _renderDelegationRunHeader(container, snapshot) {
       || _delegationUiState.errorCode === 'hold_lease_failed') {
     _renderDelegationInlineError(
       container,
-      providerLabel + ' could not pause for human control.'
+      '$NAME$ could not pause for human control.',
+      providerSubs
     );
   } else if (_delegationUiState.errorCode === 'stop_failed'
       || _delegationUiState.errorCode === 'runtime_unavailable') {
@@ -2461,6 +2525,9 @@ function _delegationLifecycleAnnouncement(snapshot, previousSnapshot, hydrated) 
     textValue = 'Automation resumed';
   }
   if (!suffix) return '';
+  if (globalThis.fsbUiLocale && typeof fsbUiLocale.line === 'function') {
+    textValue = fsbUiLocale.line(textValue);
+  }
   return _delegationOneShotTransition(
     snapshot.delegationId + ':lifecycle:' + suffix,
     textValue,
@@ -2809,8 +2876,8 @@ async function _beginDelegationStart(challengeId) {
       var failedMount = _ensureDelegationMount();
       _renderDelegationInlineError(
         failedMount.state,
-        (_delegationUiState.providerLabel || 'Agent')
-          + ' could not start this task. Keep the message and try again.'
+        '$NAME$ could not start this task. Keep the message and try again.',
+        { name: _delegationUiState.providerLabel || 'The agent' }
       );
     }
     updateSendButtonState();
@@ -3300,9 +3367,11 @@ try {
   }
 } catch (_error) { /* reduced-motion changes are best-effort */ }
 
-function setAutomationRunnerText(text) {
+function setAutomationRunnerText(text, subs) {
   if (!automationRunnerLabel) return;
-  automationRunnerLabel.textContent = text || 'Automation running';
+  var label = text || 'Automation running';
+  if (globalThis.fsbUiLocale && typeof fsbUiLocale.markExact === 'function') fsbUiLocale.markExact(automationRunnerLabel, label, subs);
+  else automationRunnerLabel.textContent = subs ? spLine(label, subs) : label;
 }
 
 function showAutomationRunner(startedAt, text) {
@@ -3378,10 +3447,14 @@ function _renderAutomationRetryPrompt(taskText, onRetry) {
   if (!taskText) return null;
   const retryDiv = document.createElement('div');
   retryDiv.className = 'message system new';
-  retryDiv.textContent = 'Would you like to try again? ';
+  retryDiv.textContent = (globalThis.fsbUiLocale && fsbUiLocale.markExact)
+    ? fsbUiLocale.markExact(retryDiv, 'Would you like to try again? ')
+    : 'Would you like to try again? ';
   const retryBtn = document.createElement('button');
   retryBtn.className = 'retry-btn';
-  retryBtn.textContent = 'Retry';
+  retryBtn.textContent = (globalThis.fsbUiLocale && fsbUiLocale.markExact)
+    ? fsbUiLocale.markExact(retryBtn, 'Retry')
+    : 'Retry';
   retryBtn.addEventListener('click', async () => {
     // WR-03: without this gate the click silently drops the user's intent,
     // because handleSendMessage's runtime gate fail-closes without surfacing why.
@@ -3402,27 +3475,27 @@ function _delegatedRunErrorMessage(snapshot) {
   var label = (snapshot && snapshot.provider && snapshot.provider.label) || 'The agent';
   var code = snapshot && snapshot.terminal ? snapshot.terminal.code : null;
   if (code === 'provider_error') {
-    return label + ' reported an error before completing this task. Raw provider output was not retained.';
+    return { english: '$NAME$ reported an error before completing this task. Raw provider output was not retained.', subs: { name: label } };
   }
   if (code === 'daemon_restart_lost_run') {
-    return 'The previous agent process was stopped and was not reattached. Start a new task when the local service is ready.';
+    return { english: 'The previous agent process was stopped and was not reattached. Start a new task when the local service is ready.' };
   }
   if (code === 'resume_ownership_lost' || code === 'hold_expired') {
-    return 'FSB could not return this tab to ' + label + ', so the run ended and the tab remains under your control.';
+    return { english: 'FSB could not return this tab to $NAME$, so the run ended and the tab remains under your control.', subs: { name: label } };
   }
-  if (code === 'wall_clock_timeout') return label + ' ran past the time limit for this task.';
-  if (code === 'event_silence_timeout') return label + ' stopped sending updates, so FSB ended the run.';
+  if (code === 'wall_clock_timeout') return { english: '$NAME$ ran past the time limit for this task.', subs: { name: label } };
+  if (code === 'event_silence_timeout') return { english: '$NAME$ stopped sending updates, so FSB ended the run.', subs: { name: label } };
   // Setup failures carry their recovery in the text, because a plain retry cannot fix them.
   if (code === 'agent_unpaired' || code === 'native_host_missing') {
-    return 'FSB\u2019s local helper is not installed. Run: npx -y fsb-mcp-server@latest install --native-host';
+    return { english: 'FSB’s local helper is not installed. Run: npx -y fsb-mcp-server@latest install --native-host' };
   }
   if (code === 'agent_offline') {
-    return label + ' is not reachable. Start the local FSB service, then try this message again.';
+    return { english: '$NAME$ is not reachable. Start the local FSB service, then try this message again.', subs: { name: label } };
   }
   if (code === 'unsupported_provider') {
-    return label + ' cannot run browser tasks. Choose a supported agent provider in Settings.';
+    return { english: '$NAME$ cannot run browser tasks. Choose a supported agent provider in Settings.', subs: { name: label } };
   }
-  return label + ' stopped before the task was complete.';
+  return { english: '$NAME$ stopped before the task was complete.', subs: { name: label } };
 }
 
 function _delegatedRunEmitEntry(entry) {
@@ -3472,7 +3545,7 @@ function _delegatedRunApplyTerminal(snapshot) {
     return true;
   }
   setErrorState(_activeTabIdSnapshot);
-  completeStatusMessage('Error: ' + _delegatedRunErrorMessage(snapshot), 'error');
+  completeStatusMessage('Error: $ERROR$', 'error', { error: _delegatedRunErrorMessage(snapshot) });
   if (typeof _renderAutomationRetryPrompt === 'function') {
     _renderAutomationRetryPrompt(_delegationUiState.task, async function() {
       await _prepareDelegationTask(true);
@@ -3596,7 +3669,7 @@ async function startReconFromSidepanel(url, originalTask) {
   pendingReconTask = originalTask;
   const domain = new URL(url).hostname;
 
-  addMessage('Starting reconnaissance on ' + domain + '...', 'system');
+  addMessage('Starting reconnaissance on $DOMAIN$...', 'system', undefined, { domain: domain });
 
   try {
     const response = await chrome.runtime.sendMessage({
@@ -3608,11 +3681,11 @@ async function startReconFromSidepanel(url, originalTask) {
     });
 
     if (!response || !response.success) {
-      addMessage('Reconnaissance failed to start: ' + (response?.error || 'Unknown error'), 'system');
+      addMessage('Reconnaissance failed to start: $ERROR$', 'system', undefined, { error: response?.error || 'Unknown error' });
       pendingReconTask = null;
     }
   } catch (error) {
-    addMessage('Reconnaissance failed: ' + error.message, 'system');
+    addMessage('Reconnaissance failed to start: $ERROR$', 'system', undefined, { error: error.message || 'Unknown error' });
     pendingReconTask = null;
   }
 }
@@ -3657,16 +3730,20 @@ function handleReconComplete(data) {
     reconProgressMessages.delete(id);
   }
 
-  addMessage('Reconnaissance complete! Site map saved for ' + (data?.domain || 'this site') + '.', 'system');
+  addMessage('Reconnaissance complete! Site map saved for $DOMAIN$.', 'system', undefined, { domain: data?.domain || 'this site' });
 
   // Offer retry with the original task
   if (pendingReconTask) {
     const retryDiv = document.createElement('div');
     retryDiv.className = 'message system new';
-    retryDiv.textContent = 'Site map ready. Retry your task? ';
+    retryDiv.textContent = (globalThis.fsbUiLocale && fsbUiLocale.markExact)
+      ? fsbUiLocale.markExact(retryDiv, 'Site map ready. Retry your task? ')
+      : 'Site map ready. Retry your task? ';
     const retryBtn = document.createElement('button');
     retryBtn.className = 'retry-btn';
-    retryBtn.textContent = 'Retry with Site Map';
+    retryBtn.textContent = (globalThis.fsbUiLocale && fsbUiLocale.markExact)
+      ? fsbUiLocale.markExact(retryBtn, 'Retry with Site Map')
+      : 'Retry with Site Map';
     retryBtn.addEventListener('click', async () => {
       // Phase 11 FINT-20 WR-03 fix -- gate the retry on the foreign-owned
       // check. applyInputLockout dims chatInput/sendBtn/stopBtn/micBtn when
@@ -3883,7 +3960,10 @@ async function refreshActiveTabOwnership(tabId, surfaceGeneration) {
     // while the visible automation presentation stays provider-neutral.
     _chatLockedByOwnerChip = true;
     applyInputLockout(true);
-    chatInput.title = 'Disabled while automation is working on this tab';
+    chatInput.title = (globalThis.fsbUiLocale && fsbUiLocale.text)
+      ? fsbUiLocale.text('shell_locked_tab', 'Disabled while automation is working on this tab')
+      : 'Disabled while automation is working on this tab';
+    chatInput.setAttribute('data-i18n-attr', 'title:shell_locked_tab');
     updateSendButtonState();
     return {
       verified: true,
@@ -4455,16 +4535,6 @@ async function _handleLegacySendMessage(message) {
   // the helper; never blocks the send path.
   try { conversationId = await ensureTabConversationForActiveTab(false); } catch (_e) { /* swallow */ }
 
-  // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-  // Handle /agent slash commands
-  // if (message.startsWith('/agent')) {
-  //   chatInput.textContent = '';
-  //   updateSendButtonState();
-  //   addMessage(message, 'user');
-  //   handleAgentCommand(message);
-  //   return;
-  // }
-
   try {
     // Add user message to chat
     addMessage(message, 'user');
@@ -4494,7 +4564,7 @@ async function _handleLegacySendMessage(message) {
       ownershipToken: legacy && legacy.ownershipToken
     }, (response) => {
       if (chrome.runtime.lastError) {
-        addMessage(`Error communicating with background script: ${chrome.runtime.lastError.message}`, 'error');
+        addMessage('Error communicating with background script: $ERROR$', 'error', undefined, { error: chrome.runtime.lastError.message });
         return;
       }
 
@@ -4511,14 +4581,14 @@ async function _handleLegacySendMessage(message) {
           // Show Chrome page error as plain text, not in a bubble
           showChromepageError(errorMsg);
         } else {
-          addMessage(`I encountered an error: ${errorMsg}`, 'error');
+          addMessage('I encountered an error: $ERROR$', 'error', undefined, { error: errorMsg });
         }
         setIdleState(_activeTabIdSnapshot);
       }
     });
     
   } catch (error) {
-    addMessage(`Something went wrong: ${error.message}`, 'error');
+    addMessage('Something went wrong: $ERROR$', 'error', undefined, { error: error.message });
     setIdleState(_activeTabIdSnapshot);
   }
 }
@@ -4545,7 +4615,7 @@ function stopAutomation() {
     
     if (chrome.runtime.lastError) {
       console.error('Side panel: Chrome runtime error:', chrome.runtime.lastError);
-      addMessage(`Error communicating with background script: ${chrome.runtime.lastError.message}`, 'error');
+      addMessage('Error communicating with background script: $ERROR$', 'error', undefined, { error: chrome.runtime.lastError.message });
       stopRequested = false;
       return;
     }
@@ -4577,7 +4647,7 @@ function stopAutomation() {
         stopRequested = false;
         console.log('Side panel: Stop arrived after natural completion (alreadyEnded)');
       } else {
-        addMessage(`Error stopping automation: ${errorMsg}`, 'error');
+        addMessage('Error stopping automation: $ERROR$', 'error', undefined, { error: errorMsg });
         stopRequested = false;
         console.error('Side panel: Stop automation failed:', errorMsg);
       }
@@ -4843,7 +4913,7 @@ function ensureActionGroup() {
   group.className = 'action-summary-group';
   const header = document.createElement('div');
   header.className = 'action-summary-header';
-  header.innerHTML = '<span class="action-chevron">></span><span class="action-summary-count">0 actions completed</span>';
+  header.innerHTML = '<span class="action-chevron">></span><span class="action-summary-count">' + escapeHtml(actionCountLabel(0)) + '</span>';
   header.addEventListener('click', () => {
     const list = group.querySelector('.action-summary-list');
     const chevron = group.querySelector('.action-chevron');
@@ -4886,10 +4956,7 @@ function addActionMessage(text) {
   list.appendChild(entry);
 
   // Update count label
-  const countEl = group.querySelector('.action-summary-count');
-  if (countEl) {
-    countEl.textContent = `${list.children.length} action${list.children.length === 1 ? '' : 's'} completed`;
-  }
+  setActionCount(group.querySelector('.action-summary-count'), list.children.length);
 
   scrollToBottom();
 }
@@ -4912,6 +4979,7 @@ function addStatusMessage(text, type = 'ai') {
   const statusTextEl = document.createElement('span');
   statusTextEl.className = 'status-text';
   statusTextEl.textContent = text;
+  if (globalThis.fsbUiLocale && typeof fsbUiLocale.markExact === 'function') fsbUiLocale.markExact(statusTextEl, text);
   setAutomationRunnerText(text);
   
   // Progress container (hidden until progress data arrives)
@@ -4944,12 +5012,15 @@ function addStatusMessage(text, type = 'ai') {
 }
 
 // Update existing status message with optional progress data
-function updateStatusMessage(text, progressData) {
-  setAutomationRunnerText(text);
+function updateStatusMessage(text, progressData, subs) {
+  // The template and its subs go to markExact() unfilled, so both lines keep
+  // their key and follow a language change.
+  setAutomationRunnerText(text, subs);
   if (currentStatusMessage) {
     const statusText = currentStatusMessage.querySelector('.status-text');
     if (statusText) {
-      statusText.textContent = text;
+      if (globalThis.fsbUiLocale && typeof fsbUiLocale.markExact === 'function') fsbUiLocale.markExact(statusText, text, subs);
+      else statusText.textContent = subs ? spLine(text, subs) : text;
     }
     if (progressData && progressData.iteration != null) {
       const container = currentStatusMessage.querySelector('.progress-container');
@@ -4966,18 +5037,18 @@ function updateStatusMessage(text, progressData) {
 
 
 // Complete status message: remove dots-only indicator, show only the result bubble
-function completeStatusMessage(text, type = 'ai') {
+function completeStatusMessage(text, type = 'ai', subs) {
   if (currentStatusMessage) {
     currentStatusMessage.remove();
     currentStatusMessage = null;
     currentActionGroup = null;
 
     if (type === 'partial') {
-      addCompletionMessage(text, 'ai', true);
+      addCompletionMessage(text, 'ai', true, subs);
     } else if (type !== 'system') {
-      addCompletionMessage(text, type);
+      addCompletionMessage(text, type, false, subs);
     } else {
-      addMessage(text, 'system');
+      addMessage(text, 'system', undefined, subs);
     }
   }
 }
@@ -5004,13 +5075,16 @@ function _renderCompletionDomOnly(text, type, isPartial) {
     messageDiv.classList.add('partial-result');
     var label = document.createElement('div');
     label.className = 'partial-result-label';
-    label.textContent = 'Partial result';
+    label.textContent = (globalThis.fsbUiLocale && fsbUiLocale.markExact)
+      ? fsbUiLocale.markExact(label, 'Partial result')
+      : 'Partial result';
     messageDiv.appendChild(label);
   }
 
   if (type === 'error') {
     messageDiv.className = 'message error new';
     messageDiv.textContent = text;
+    if (globalThis.fsbUiLocale && typeof fsbUiLocale.markExact === 'function') fsbUiLocale.markExact(messageDiv, text);
   } else {
     var contentDiv = document.createElement('div');
     if (typeof FSBMarkdown !== 'undefined') {
@@ -5035,7 +5109,9 @@ function _renderCompletionDomOnly(text, type, isPartial) {
 }
 
 // Add a separate completion message bubble with markdown support
-function addCompletionMessage(text, type = 'ai', isPartial = false) {
+function addCompletionMessage(text, type = 'ai', isPartial = false, subs) {
+  let renderedText = text;
+  let uiMessage;
   const messageDiv = document.createElement('div');
   messageDiv.className = `message ai-completion new`;
 
@@ -5043,13 +5119,24 @@ function addCompletionMessage(text, type = 'ai', isPartial = false) {
     messageDiv.classList.add('partial-result');
     const label = document.createElement('div');
     label.className = 'partial-result-label';
-    label.textContent = 'Partial result';
+    label.textContent = (globalThis.fsbUiLocale && fsbUiLocale.markExact)
+      ? fsbUiLocale.markExact(label, 'Partial result')
+      : 'Partial result';
     messageDiv.appendChild(label);
   }
 
   if (type === 'error') {
     messageDiv.className = `message error new`;
-    messageDiv.textContent = text;
+    if (globalThis.fsbUiLocale && typeof fsbUiLocale.markExact === 'function') {
+      renderedText = fsbUiLocale.markExact(messageDiv, text, subs);
+      if (messageDiv.getAttribute('data-i18n-live')) {
+        uiMessage = { english: text };
+        if (subs) uiMessage.subs = subs;
+      }
+    } else {
+      renderedText = spLine(text, subs);
+      messageDiv.textContent = renderedText;
+    }
   } else {
     // Use markdown rendering if available, plain text fallback
     const contentDiv = document.createElement('div');
@@ -5075,7 +5162,8 @@ function addCompletionMessage(text, type = 'ai', isPartial = false) {
 
   // Phase 12 FINT-23 write-through (Plan 12-02): completion bubbles persist
   // as assistant text. isPartial flag NOT recorded per CONTEXT D-07 + D-26.
-  _persistMessage('assistant', text, 'text');
+  if (uiMessage) _persistMessage('assistant', renderedText, 'text', uiMessage);
+  else _persistMessage('assistant', renderedText, 'text');
 }
 
 // Show Chrome page error as plain text without bubble
@@ -5119,7 +5207,7 @@ function showChromepageError(text) {
  * Storage failures swallow silently -- DOM render must never block on
  * persistence per CONTEXT D-03.
  */
-function _persistMessage(role, content, kind) {
+function _persistMessage(role, content, kind, uiMessage) {
   if (typeof FSBSidepanelMessageLog === 'undefined') return;
   if (!conversationId || typeof conversationId !== 'string') return;
   if (typeof content !== 'string' || content.length === 0) return;
@@ -5136,12 +5224,16 @@ function _persistMessage(role, content, kind) {
     buffer = [];
     _messageLogPendingBuffer.set(convId, buffer);
   }
-  buffer.push({
+  var row = {
     role: resolvedRole,
     content: content,
     timestamp: Date.now(),
     kind: resolvedKind
-  });
+  };
+  var source = uiMessage && resolvedRole === 'assistant' && resolvedKind !== 'tool'
+    ? FSBSidepanelMessageLog.cloneUiMessage(uiMessage) : null;
+  if (source) row.uiMessage = source;
+  buffer.push(row);
 
   // Clear-and-replace 200ms debounce per CONTEXT D-03.
   _messageLogDebouncer.schedule(convId, function () {
@@ -5173,7 +5265,7 @@ function _persistMessage(role, content, kind) {
  * Storage failures swallow silently -- DOM render must never block on
  * persistence (mirrors _persistMessage contract).
  */
-function _persistMessageToConversation(role, content, kind, convId, sessionId, terminal) {
+function _persistMessageToConversation(role, content, kind, convId, sessionId, terminal, uiMessage) {
   if (typeof FSBSidepanelMessageLog === 'undefined') return;
   if (!convId || typeof convId !== 'string') return;
   if (typeof content !== 'string' || content.length === 0) return;
@@ -5199,6 +5291,9 @@ function _persistMessageToConversation(role, content, kind, convId, sessionId, t
   // the background already persisted; sidepanel is now idempotent backup).
   if (typeof sessionId === 'string' && sessionId.length > 0) row.sessionId = sessionId;
   if (terminal === true) row.terminal = true;
+  var source = uiMessage && resolvedRole === 'assistant' && resolvedKind !== 'tool'
+    ? FSBSidepanelMessageLog.cloneUiMessage(uiMessage) : null;
+  if (source) row.uiMessage = source;
   buffer.push(row);
 
   _messageLogDebouncer.schedule(convId, function () {
@@ -5286,7 +5381,7 @@ async function _flushMessageLog(convId) {
  *
  * No .new class. No animation setTimeout. Scrollback is not "new".
  */
-function renderPersistedMessage(content, role, kind) {
+function renderPersistedMessage(content, role, kind, uiMessage) {
   if (typeof content !== 'string' || content.length === 0) return;
   if (!chatMessages) return;
   var cssType = 'system';
@@ -5296,11 +5391,23 @@ function renderPersistedMessage(content, role, kind) {
   var messageDiv = document.createElement('div');
   messageDiv.className = 'message ' + cssType;
   messageDiv.textContent = content;
+  if (role === 'assistant' && kind !== 'tool') {
+    var source = uiMessage && typeof FSBSidepanelMessageLog !== 'undefined'
+      ? FSBSidepanelMessageLog.cloneUiMessage(uiMessage) : null;
+    var step = !uiMessage && kind === 'progress' ? /^Step (\d+) complete$/.exec(content) : null;
+    if (step) source = { english: 'Step $NUMBER$ complete', subs: { number: step[1] } };
+    if (source && globalThis.fsbUiLocale && typeof fsbUiLocale.markExact === 'function'
+        && Object.prototype.hasOwnProperty.call(fsbUiLocale.exact, source.english)) {
+      fsbUiLocale.markExact(messageDiv, source.english, source.subs);
+    }
+  }
   chatMessages.appendChild(messageDiv);
 }
 
 // Add message to chat with modern bubble styling
-function addMessage(text, type = 'system', kind) {
+function addMessage(text, type = 'system', kind, subs) {
+  let renderedText = text;
+  let uiMessage;
   const messageDiv = document.createElement('div');
   messageDiv.className = `message ${type} new`;
 
@@ -5321,6 +5428,18 @@ function addMessage(text, type = 'system', kind) {
     messageDiv.textContent = actionText;
   } else {
     messageDiv.textContent = text;
+  }
+  if (type !== 'user' && type !== 'ai' && type !== 'action') {
+    if (globalThis.fsbUiLocale && typeof fsbUiLocale.markExact === 'function') {
+      renderedText = fsbUiLocale.markExact(messageDiv, text, subs);
+      if (messageDiv.getAttribute('data-i18n-live')) {
+        uiMessage = { english: text };
+        if (subs) uiMessage.subs = subs;
+      }
+    } else if (subs) {
+      renderedText = spLine(text, subs);
+      messageDiv.textContent = renderedText;
+    }
   }
 
   // Add dismiss button for error messages
@@ -5367,7 +5486,8 @@ function addMessage(text, type = 'system', kind) {
     else if (type === 'action') _kind = 'tool';
     else _kind = 'text';
   }
-  _persistMessage(_role, text, _kind);
+  if (uiMessage) _persistMessage(_role, renderedText, _kind, uiMessage);
+  else _persistMessage(_role, renderedText, _kind);
 }
 
 // Smooth scroll to bottom
@@ -5523,9 +5643,9 @@ function renderAutomationCompletionPayload(payload) {
     var errorMessage = payload.error || payload.outcomeDetails?.error || completionMessage || 'Automation error';
     setErrorState(_resolveTabIdForSession(payload.sessionId));
     if (currentStatusMessage) {
-      completeStatusMessage('Error: ' + errorMessage, 'error');
+      completeStatusMessage('Error: $ERROR$', 'error', { error: errorMessage });
     } else {
-      addCompletionMessage('Error: ' + errorMessage, 'error');
+      addCompletionMessage('Error: $ERROR$', 'error', false, { error: errorMessage });
     }
   } else if (currentStatusMessage) {
     completeStatusMessage(
@@ -5563,13 +5683,17 @@ function renderAutomationCompletionPayload(payload) {
             reconDiv.className = 'message system new recon-suggestion';
             const textSpan = document.createElement('span');
             textSpan.className = 'recon-suggestion-text';
-            textSpan.textContent = 'This site does not have a map yet. Reconnaissance can help FSB learn the site structure for better performance.';
+            textSpan.textContent = (globalThis.fsbUiLocale && fsbUiLocale.markExact)
+              ? fsbUiLocale.markExact(textSpan, 'This site does not have a map yet. Reconnaissance can help FSB learn the site structure for better performance.')
+              : 'This site does not have a map yet. Reconnaissance can help FSB learn the site structure for better performance.';
             reconDiv.appendChild(textSpan);
 
             const reconBtn = document.createElement('button');
             reconBtn.className = 'recon-btn';
             reconBtn.id = 'reconFromSidepanel';
-            reconBtn.textContent = 'Run Reconnaissance';
+            reconBtn.textContent = (globalThis.fsbUiLocale && fsbUiLocale.markExact)
+              ? fsbUiLocale.markExact(reconBtn, 'Run Reconnaissance')
+              : 'Run Reconnaissance';
             reconBtn.addEventListener('click', () => {
               startReconFromSidepanel(currentUrl, payload.task || completionMessage);
             });
@@ -5818,13 +5942,17 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 reconDiv.className = 'message system new recon-suggestion';
                 const textSpan = document.createElement('span');
                 textSpan.className = 'recon-suggestion-text';
-                textSpan.textContent = 'This site does not have a map yet. Reconnaissance can help FSB learn the site structure for better performance.';
+                textSpan.textContent = (globalThis.fsbUiLocale && fsbUiLocale.markExact)
+              ? fsbUiLocale.markExact(textSpan, 'This site does not have a map yet. Reconnaissance can help FSB learn the site structure for better performance.')
+              : 'This site does not have a map yet. Reconnaissance can help FSB learn the site structure for better performance.';
                 reconDiv.appendChild(textSpan);
 
                 const reconBtn = document.createElement('button');
                 reconBtn.className = 'recon-btn';
                 reconBtn.id = 'reconFromSidepanel';
-                reconBtn.textContent = 'Run Reconnaissance';
+                reconBtn.textContent = (globalThis.fsbUiLocale && fsbUiLocale.markExact)
+              ? fsbUiLocale.markExact(reconBtn, 'Run Reconnaissance')
+              : 'Run Reconnaissance';
                 reconBtn.addEventListener('click', () => {
                   startReconFromSidepanel(currentUrl, request.task || completionMessage);
                 });
@@ -5861,7 +5989,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         // Snapshot previous status as completed action message
         const prevText = currentStatusMessage?.querySelector('.status-text')?.textContent;
         const skipTexts = ['Starting automation...', 'Connecting to page...', 'Connected. Analyzing page...', 'Analyzing page...'];
-        if (prevText && !skipTexts.includes(prevText)) {
+        // addStatusMessage() shows these through fsbUiLocale, so the DOM may hold a translation.
+        const isTransient = (english) => prevText === english
+          || (globalThis.fsbUiLocale && typeof fsbUiLocale.isLine === 'function' && fsbUiLocale.isLine(english, prevText));
+        if (prevText && !skipTexts.some(isTransient)) {
           addActionMessage(prevText);
         }
         updateStatusMessage(request.message, {
@@ -5898,7 +6029,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
       var isErrorOriginatingActive = (typeof errorTabId === 'number' && errorTabId === _activeTabIdSnapshot);
       if (isErrorOriginatingActive) {
-        completeStatusMessage(`Error: ${request.error}`, 'error');
+        completeStatusMessage('Error: $ERROR$', 'error', { error: request.error });
 
         // Provide specific guidance for stuck scenarios
         if (request.error && request.error.includes('stuck')) {
@@ -5958,14 +6089,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           var iterConvId = (typeof request.conversationId === 'string' && request.conversationId.length > 0)
             ? request.conversationId
             : (request.sessionId === currentSessionId ? conversationId : null);
-          _persistMessageToConversation('assistant', 'Step ' + request.iteration + ' complete', 'progress', iterConvId);
+          var stepMessage = { english: 'Step $NUMBER$ complete', subs: { number: request.iteration } };
+          _persistMessageToConversation('assistant', spLine(stepMessage.english, stepMessage.subs),
+            'progress', iterConvId, undefined, undefined, stepMessage);
           // DOM render: only for the active session AND only when running.
           if (request.sessionId === currentSessionId && currentStatusMessage && isRunning) {
-            updateStatusMessage('Step ' + request.iteration + ' complete', {
+            updateStatusMessage('Step $NUMBER$ complete', {
               iteration: request.iteration,
               maxIterations: 100,
               progressPercent: Math.min(100, Math.round((request.iteration / 100) * 100))
-            });
+            }, { number: request.iteration });
           }
           break;
         case 'session_ended':
@@ -6014,34 +6147,30 @@ function showLoginPrompt(domain, fields) {
   container.className = 'message login-prompt new';
   container.id = 'login-prompt';
 
-  const fieldLabel = (fields && fields.usernameType === 'email') ? 'Email' : 'Username / Email';
+  const fieldLabel = escapeAttr(spLine((fields && fields.usernameType === 'email') ? 'Email' : 'Username / Email'));
 
   // Escape domain for safe HTML insertion
-  const safeDomain = (domain || 'this site').replace(/[<>&"']/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c]));
+  const safeDomain = escapeAttr(domain || spLine('this site'));
   const authPrompt = null;
-  const promptDetail = (authPrompt && authPrompt.detail) || 'Submit credentials once to let FSB sign in and resume this same session.';
-  const handoffDetail = (authPrompt && authPrompt.handoff) || 'If you skip or the site still needs manual approval, FSB will preserve the completed work and finish with a manual handoff.';
   const allowSave = authPrompt?.allowSave !== false;
-  const saveDisabledReason = authPrompt?.saveDisabledReason || 'Saving is unavailable for this session.';
-  const safeSubtext = `${promptDetail} ${handoffDetail}`.trim().replace(/[<>&"']/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c]));
-  const safeSaveDisabledReason = saveDisabledReason.replace(/[<>&"']/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c]));
+  const safeSaveDisabledReason = escapeAttr(authPrompt?.saveDisabledReason || spLine('Saving is unavailable for this session.'));
 
   container.innerHTML = `
     <div class="login-prompt-header">
       <i class="fas fa-lock"></i>
-      <span>Login Required</span>
+      <span>${escapeHtml(spLine('Login Required'))}</span>
     </div>
     <div class="login-prompt-domain">${safeDomain}</div>
-    <div class="login-prompt-subtext">Enter your credentials to sign in. They will be encrypted and saved for future use.</div>
+    <div class="login-prompt-subtext">${escapeHtml(spLine('Enter your credentials to sign in. They will be encrypted and saved for future use.'))}</div>
     <div class="login-prompt-form">
       <div class="login-prompt-field">
         <label>${fieldLabel}</label>
         <input type="text" id="loginPromptUsername" placeholder="${fieldLabel}" autocomplete="username">
       </div>
       <div class="login-prompt-field">
-        <label>Password</label>
+        <label>${escapeHtml(spLine('Password'))}</label>
         <div class="login-prompt-password-wrapper">
-          <input type="password" id="loginPromptPassword" placeholder="Password" autocomplete="current-password">
+          <input type="password" id="loginPromptPassword" placeholder="${escapeAttr(spLine('Password'))}" autocomplete="current-password">
           <button type="button" class="login-prompt-eye" id="loginPromptTogglePw">
             <i class="fas fa-eye"></i>
           </button>
@@ -6049,12 +6178,12 @@ function showLoginPrompt(domain, fields) {
       </div>
       <label class="login-prompt-save-label">
         <input type="checkbox" id="loginPromptSave" ${allowSave ? 'checked' : ''} ${allowSave ? '' : 'disabled'}>
-        <span>Save for future use</span>
+        <span>${escapeHtml(spLine('Save for future use'))}</span>
       </label>
       ${allowSave ? '' : `<div class="login-prompt-subtext">${safeSaveDisabledReason}</div>`}
       <div class="login-prompt-actions">
-        <button class="login-prompt-btn primary" id="loginPromptSubmit">Sign In</button>
-        <button class="login-prompt-btn ghost" id="loginPromptSkip">Skip</button>
+        <button class="login-prompt-btn primary" id="loginPromptSubmit">${escapeHtml(spLine('Sign In'))}</button>
+        <button class="login-prompt-btn ghost" id="loginPromptSkip">${escapeHtml(spLine('Skip'))}</button>
       </div>
     </div>
   `;
@@ -6153,9 +6282,9 @@ function showPaymentPrompt(domain, paymentPrompt) {
   container.className = 'message payment-prompt new';
   container.id = 'payment-prompt';
 
-  const safeDomain = escapeHtml(domain || 'this checkout');
-  const headerText = 'Checkout Detected';
-  const detailText = escapeHtml(paymentPrompt?.detail || paymentPrompt?.blockedReason || 'Saved payment methods are not available for this checkout.');
+  const safeDomain = escapeHtml(domain || spLine('this checkout'));
+  const headerText = escapeHtml(spLine('Checkout Detected'));
+  const detailText = escapeHtml(paymentPrompt?.detail || paymentPrompt?.blockedReason || spLine('Saved payment methods are not available for this checkout.'));
   const stateLabelMap = {
     no_saved_methods: 'No saved cards',
     feature_disabled: 'Payments disabled',
@@ -6163,9 +6292,9 @@ function showPaymentPrompt(domain, paymentPrompt) {
     vault_locked: 'Vault locked',
     payment_locked: 'Payment access locked'
   };
-  const stateLabel = escapeHtml(stateLabelMap[state] || 'Saved payments unavailable');
+  const stateLabel = escapeHtml(spLine(stateLabelMap[state] || 'Saved payments unavailable'));
   const primaryAction = paymentPrompt?.primaryAction || '';
-  const primaryActionLabel = escapeHtml(paymentPrompt?.primaryActionLabel || 'Open Payments');
+  const primaryActionLabel = escapeHtml(paymentPrompt?.primaryActionLabel || spLine('Open Payments'));
 
   if (!available) {
     container.innerHTML = `
@@ -6178,7 +6307,7 @@ function showPaymentPrompt(domain, paymentPrompt) {
       <div class="login-prompt-subtext">${detailText}</div>
       <div class="login-prompt-actions">
         ${primaryAction ? `<button class="login-prompt-btn primary" id="paymentPromptPrimaryAction">${primaryActionLabel}</button>` : ''}
-        <button class="login-prompt-btn ghost" id="paymentPromptDismiss">Dismiss</button>
+        <button class="login-prompt-btn ghost" id="paymentPromptDismiss">${escapeHtml(spLine('Dismiss'))}</button>
       </div>
     `;
 
@@ -6215,10 +6344,13 @@ function showPaymentPrompt(domain, paymentPrompt) {
       diners: 'Diners',
       jcb: 'JCB'
     };
-    const brandLabel = brandLabelMap[method.cardBrand] || 'Unknown';
-    const title = escapeHtml(method.nickname || `${brandLabel} ending in ${method.last4 || '****'}`);
-    const subtitle = escapeHtml(`${method.maskedNumber || '****'}${method.expiryMonth && method.expiryYearLast2 ? ` | Exp ${method.expiryMonth}/${method.expiryYearLast2}` : ''}`);
-    const billing = escapeHtml(method.billingSummary || 'Billing profile stored');
+    const brandLabel = brandLabelMap[method.cardBrand] || spLine('Unknown');
+    const title = escapeHtml(method.nickname || spLine('$BRAND$ ending in $LAST$', { brand: brandLabel, last: method.last4 || '****' }));
+    const expiry = method.expiryMonth && method.expiryYearLast2
+      ? ' | ' + spLine('Exp $MONTH$/$YEAR$', { month: method.expiryMonth, year: method.expiryYearLast2 })
+      : '';
+    const subtitle = escapeHtml(`${method.maskedNumber || '****'}${expiry}`);
+    const billing = escapeHtml(method.billingSummary || spLine('Billing profile stored'));
     const brand = (method.cardBrand || 'unknown').replace(/[^a-z]/gi, '').toLowerCase() || 'unknown';
     return `
       <button class="payment-prompt-option ${index === 0 ? 'selected' : ''}" data-payment-id="${method.id}">
@@ -6241,8 +6373,8 @@ function showPaymentPrompt(domain, paymentPrompt) {
     <div class="login-prompt-subtext">${detailText}</div>
     <div class="payment-prompt-options">${methodOptions}</div>
     <div class="login-prompt-actions">
-      <button class="login-prompt-btn primary" id="paymentPromptFill">Fill Saved Card</button>
-      <button class="login-prompt-btn ghost" id="paymentPromptSkip">Skip</button>
+      <button class="login-prompt-btn primary" id="paymentPromptFill">${escapeHtml(spLine('Fill Saved Card'))}</button>
+      <button class="login-prompt-btn ghost" id="paymentPromptSkip">${escapeHtml(spLine('Skip'))}</button>
     </div>
   `;
 
@@ -6311,9 +6443,21 @@ function showPaymentFillConfirmation(data) {
   const last4El = document.getElementById('pfcLast4');
   const domainEl = document.getElementById('pfcDomain');
 
-  if (brandEl) brandEl.textContent = brandLabelMap[data.cardBrand] || data.cardBrand || 'Card';
+  // Brand names and the domain stay as sent; the words around them follow the
+  // UI language, including after a switch while the confirmation is open.
+  const brandName = brandLabelMap[data.cardBrand] || data.cardBrand;
+  const canMark = !!(globalThis.fsbUiLocale && typeof fsbUiLocale.markExact === 'function');
+  if (brandEl) {
+    if (canMark) fsbUiLocale.markExact(brandEl, brandName || 'Card');
+    else brandEl.textContent = brandName || 'Card';
+  }
   if (last4El) last4El.textContent = '****' + (data.last4 || '****');
-  if (domainEl) domainEl.textContent = 'on ' + (data.merchantDomain || 'this page');
+  if (domainEl) {
+    const domainTemplate = data.merchantDomain ? 'on $DOMAIN$' : 'on this page';
+    const domainSubs = data.merchantDomain ? { domain: data.merchantDomain } : undefined;
+    if (canMark) fsbUiLocale.markExact(domainEl, domainTemplate, domainSubs);
+    else domainEl.textContent = spLine(domainTemplate, domainSubs);
+  }
 
   overlay.classList.remove('hidden');
 
@@ -6425,7 +6569,7 @@ async function loadHistoryList() {
     if (sessions.length === 0) {
       historyList.innerHTML = '<div class="history-empty-state">' +
         '<i class="fa fa-inbox"></i>' +
-        '<p>No sessions yet. Run an automation to see your history here.</p>' +
+        '<p>' + escapeHtml(spLine('No sessions yet. Run an automation to see your history here.')) + '</p>' +
         '</div>';
       return;
     }
@@ -6436,27 +6580,27 @@ async function loadHistoryList() {
         : '';
       var idleClosed = session.status === 'expired' ||
         (session.status === 'stopped' && session.outcomeDetails?.reason === 'idle_timeout');
-      var statusLabel = idleClosed ? 'Idle-closed' : (session.status || 'unknown');
+      var statusLabel = idleClosed ? spLine('Idle-closed') : (session.status || 'unknown');
       var statusClass = idleClosed ? 'idle-closed' : (session.status || '');
       var hasReplayDetails = (session.actionCount > 0) || !!session.replayIntegrity;
       return '<div class="history-item" data-session-id="' + escapeHtml(session.id) + '">' +
         '<div class="history-item-info">' +
-          '<div class="history-item-task">' + escapeHtml(session.task || 'Unknown task') + '</div>' +
+          '<div class="history-item-task">' + escapeHtml(session.task || spLine('Unknown task')) + '</div>' +
           '<div class="history-item-meta">' +
             '<span>' + formatSessionDate(session.startTime) + '</span>' +
-            '<span>' + (session.actionCount || 0) + ' actions</span>' +
+            '<span>' + escapeHtml(spLine('$COUNT$ actions', { count: session.actionCount || 0 })) + '</span>' +
             costDisplay +
             (session.mode === 'mcp-agent'
               ? '<span class="history-source-badge mcp">MCP · ' + escapeHtml(session.mcpClient || 'Agent') + '</span>'
-              : '<span class="history-source-badge">Autopilot</span>') +
+              : '<span class="history-source-badge">' + escapeHtml(spLine('Autopilot')) + '</span>') +
             '<span class="history-status ' + escapeHtml(statusClass) + '">' + escapeHtml(statusLabel) + '</span>' +
           '</div>' +
         '</div>' +
         (hasReplayDetails ?
-          '<button class="history-replay-btn" data-session-id="' + escapeHtml(session.id) + '" title="Replay session">' +
+          '<button class="history-replay-btn" data-session-id="' + escapeHtml(session.id) + '" title="' + escapeAttr(spLine('Replay session')) + '">' +
             '<i class="fa fa-play"></i>' +
           '</button>' : '') +
-        '<button class="history-delete-btn" data-session-id="' + escapeHtml(session.id) + '" title="Delete session">' +
+        '<button class="history-delete-btn" data-session-id="' + escapeHtml(session.id) + '" title="' + escapeAttr(spLine('Delete session')) + '">' +
           '<i class="fa fa-trash"></i>' +
         '</button>' +
       '</div>';
@@ -6465,7 +6609,7 @@ async function loadHistoryList() {
     console.error('Failed to load history list:', error);
     historyList.innerHTML = '<div class="history-empty-state">' +
       '<i class="fa fa-exclamation-triangle"></i>' +
-      '<p>Failed to load sessions.</p>' +
+      '<p>' + escapeHtml(spLine('Failed to load sessions.')) + '</p>' +
       '</div>';
   }
 }
@@ -6515,7 +6659,7 @@ function renderReplayDecisionPrompt(request) {
         }
       } catch (error) {
         Array.from(actions.querySelectorAll('button')).forEach((item) => { item.disabled = false; });
-        addMessage('Could not apply replay decision: ' + error.message, 'error');
+        addMessage('Could not apply replay decision: $ERROR$', 'error', undefined, { error: error.message });
       }
     });
     actions.appendChild(button);
@@ -6540,7 +6684,9 @@ function renderReplayPreview(preview) {
 
   const heading = document.createElement('div');
   heading.className = 'replay-preview-heading';
-  heading.textContent = 'Verified replay preview';
+  heading.textContent = (globalThis.fsbUiLocale && fsbUiLocale.markExact)
+    ? fsbUiLocale.markExact(heading, 'Verified replay preview')
+    : 'Verified replay preview';
   card.appendChild(heading);
 
   const meta = document.createElement('div');
@@ -6556,7 +6702,11 @@ function renderReplayPreview(preview) {
   const origin = document.createElement('div');
   origin.className = 'replay-preview-origin';
   try { origin.textContent = 'Fresh tab: ' + new URL(preview.startUrl).origin; }
-  catch (_error) { origin.textContent = 'Fresh recorded-site tab'; }
+  catch (_error) {
+    origin.textContent = (globalThis.fsbUiLocale && fsbUiLocale.markExact)
+      ? fsbUiLocale.markExact(origin, 'Fresh recorded-site tab')
+      : 'Fresh recorded-site tab';
+  }
   card.appendChild(origin);
 
   const timeline = document.createElement('div');
@@ -6604,8 +6754,25 @@ function renderMcpReplayApproval(approval) {
   const tabCount = Math.max(1, approval.preview.tabs?.length || 0);
   const highImpact = (approval.preview.steps || [])
     .filter((step) => step.replay?.availability === 'approval-per-step').length;
-  copy.textContent = `An MCP client requested this replay in ${tabCount} fresh tab${tabCount === 1 ? '' : 's'}. ` +
-    `One approval covers only the exact verified manifest${highImpact ? `, including ${highImpact} high-impact step${highImpact === 1 ? '' : 's'}` : ''}.`;
+  var tabSentence = (globalThis.fsbUiLocale && fsbUiLocale.line)
+    ? fsbUiLocale.line(tabCount === 1
+      ? 'An MCP client requested this replay in $COUNT$ fresh tab.'
+      : 'An MCP client requested this replay in $COUNT$ fresh tabs.', { count: tabCount })
+    : (tabCount === 1
+      ? 'An MCP client requested this replay in $COUNT$ fresh tab.'
+      : 'An MCP client requested this replay in $COUNT$ fresh tabs.').replace('$COUNT$', String(tabCount));
+  var impactSentence = highImpact
+    ? ((globalThis.fsbUiLocale && fsbUiLocale.line)
+      ? fsbUiLocale.line(highImpact === 1
+        ? 'One approval covers only the exact verified manifest, including $COUNT$ high-impact step.'
+        : 'One approval covers only the exact verified manifest, including $COUNT$ high-impact steps.', { count: highImpact })
+      : (highImpact === 1
+        ? 'One approval covers only the exact verified manifest, including $COUNT$ high-impact step.'
+        : 'One approval covers only the exact verified manifest, including $COUNT$ high-impact steps.').replace('$COUNT$', String(highImpact)))
+    : ((globalThis.fsbUiLocale && fsbUiLocale.line)
+      ? fsbUiLocale.line('One approval covers only the exact verified manifest.')
+      : 'One approval covers only the exact verified manifest.');
+  copy.textContent = tabSentence + ' ' + impactSentence;
   card.appendChild(copy);
 
   const actions = document.createElement('div');
@@ -6614,10 +6781,13 @@ function renderMcpReplayApproval(approval) {
   approve.type = 'button';
   approve.className = 'replay-decision-btn retry';
   approve.textContent = 'Approve replay';
+  if (globalThis.fsbUiLocale && fsbUiLocale.markExact) fsbUiLocale.markExact(approve, 'Approve replay');
   const cancel = document.createElement('button');
   cancel.type = 'button';
   cancel.className = 'replay-decision-btn stop';
-  cancel.textContent = 'Cancel';
+  cancel.textContent = (globalThis.fsbUiLocale && fsbUiLocale.markExact)
+    ? fsbUiLocale.markExact(cancel, 'Cancel')
+    : 'Cancel';
   actions.appendChild(approve);
   actions.appendChild(cancel);
   card.appendChild(actions);
@@ -6647,7 +6817,7 @@ function renderMcpReplayApproval(approval) {
     } catch (error) {
       setDisabled(false);
       completeStatusMessage('Replay error', 'error');
-      addMessage('Failed to start requested replay: ' + error.message, 'error');
+      addMessage('Failed to start requested replay: $ERROR$', 'error', undefined, { error: error.message });
     }
   });
   cancel.addEventListener('click', async () => {
@@ -6663,7 +6833,7 @@ function renderMcpReplayApproval(approval) {
       addMessage('Replay request cancelled. No target tabs were opened.', 'system');
     } catch (error) {
       setDisabled(false);
-      addMessage('Could not cancel replay request: ' + error.message, 'error');
+      addMessage('Could not cancel replay request: $ERROR$', 'error', undefined, { error: error.message });
     }
   });
 
@@ -6696,11 +6866,8 @@ async function startReplay(sessionId) {
     renderReplayPreview(preview);
 
     if (preview.truncated) {
-      addMessage(
-        `This recording is inspect-only because only the latest ${preview.steps.length} of ` +
-          `${preview.totalSourceSteps} recorded calls are available. Earlier browser state cannot be reconstructed safely.`,
-        'system'
-      );
+      addMessage('This recording is inspect-only because only the latest $LATEST$ of $TOTAL$ recorded calls are available. Earlier browser state cannot be reconstructed safely.',
+        'system', undefined, { latest: preview.steps.length, total: preview.totalSourceSteps });
       return;
     }
 
@@ -6716,10 +6883,20 @@ async function startReplay(sessionId) {
     const approvals = [];
     if (onceSteps.length > 0) approvals.push(`${onceSteps.length} write step${onceSteps.length === 1 ? '' : 's'}`);
     if (perStep.length > 0) approvals.push(`${perStep.length} high-impact step${perStep.length === 1 ? '' : 's'}`);
-    const summary = `Replay this verified timeline in ${tabCount} fresh tab${tabCount === 1 ? '' : 's'}?` +
-      (approvals.length > 0
-        ? ` This one approval covers the exact signed manifest: ${approvals.join(' and ')}.`
-        : ' The timeline contains only read and navigation steps.');
+    const tabQuestion = (globalThis.fsbUiLocale && fsbUiLocale.line)
+      ? fsbUiLocale.line(tabCount === 1
+        ? 'Replay this verified timeline in $COUNT$ fresh tab?'
+        : 'Replay this verified timeline in $COUNT$ fresh tabs?', { count: tabCount })
+      : (tabCount === 1
+        ? 'Replay this verified timeline in $COUNT$ fresh tab?'
+        : 'Replay this verified timeline in $COUNT$ fresh tabs?').replace('$COUNT$', String(tabCount));
+    const summary = approvals.length > 0
+      ? tabQuestion + ' ' + ((globalThis.fsbUiLocale && fsbUiLocale.line)
+        ? fsbUiLocale.line('This one approval covers the exact signed manifest: $DETAIL$.', { detail: approvals.join(' and ') })
+        : 'This one approval covers the exact signed manifest: $DETAIL$.'.replace('$DETAIL$', approvals.join(' and ')))
+      : tabQuestion + ' ' + ((globalThis.fsbUiLocale && fsbUiLocale.line)
+        ? fsbUiLocale.line('The timeline contains only read and navigation steps.')
+        : 'The timeline contains only read and navigation steps.');
     if (!confirm(summary)) {
       addMessage('Replay cancelled. The original recording was not changed.', 'system');
       return;
@@ -6745,7 +6922,7 @@ async function startReplay(sessionId) {
     }
   } catch (error) {
     completeStatusMessage('Replay error', 'error');
-    addMessage('Failed to start replay: ' + error.message, 'error');
+    addMessage('Failed to start replay: $ERROR$', 'error', undefined, { error: error.message });
   }
 }
 
@@ -6872,7 +7049,7 @@ async function loadSessionView(sessionId) {
 
   } catch (error) {
     console.error('Failed to load session view:', error);
-    addMessage('Failed to load session: ' + error.message, 'error');
+    addMessage('Failed to load session: $ERROR$', 'error', undefined, { error: error.message });
   }
 }
 
@@ -6911,112 +7088,48 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
+// escapeHtml() leaves quotes alone, which breaks attribute values.
+function escapeAttr(str) {
+  return String(str == null ? '' : str).replace(/[<>&"']/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// Side panel copy from the exact maps (ui-locale.js and copy-exact.js).
+function spLine(english, subs) {
+  if (globalThis.fsbUiLocale && typeof fsbUiLocale.line === 'function') return fsbUiLocale.line(english, subs);
+  if (!subs) return english;
+  return english.replace(/\$([A-Za-z0-9_]+)\$/g, (all, name) => {
+    const value = subs[name] != null ? subs[name] : subs[name.toLowerCase()];
+    if (value && typeof value === 'object' && !Array.isArray(value)
+        && Object.prototype.hasOwnProperty.call(value, 'english') && typeof value.english === 'string') {
+      return spLine(value.english, value.subs);
+    }
+    return value == null ? all : String(value);
+  });
+}
+
+function actionCountTemplate(count) {
+  return count === 1 ? '$COUNT$ action completed' : '$COUNT$ actions completed';
+}
+
+function actionCountLabel(count) {
+  return spLine(actionCountTemplate(count), { count });
+}
+
+// The count keeps its catalog key, so a language change rewrites it before
+// the next action arrives.
+function setActionCount(el, count) {
+  if (!el) return;
+  if (globalThis.fsbUiLocale && typeof fsbUiLocale.markExact === 'function') fsbUiLocale.markExact(el, actionCountTemplate(count), { count });
+  else el.textContent = actionCountLabel(count);
+}
+
 
 console.log(`FSB v${chrome.runtime.getManifest().version} side panel script loaded`);
 
-// ==========================================
-// /agent Slash Command Handler
-// ==========================================
-
-// DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-// function handleAgentCommand(message) {
-//   const parts = message.split(/\s+/);
-//   const subCommand = parts[1] || '';
-// 
-//   if (subCommand === 'list') {
-//     showAgentList();
-//   } else if (subCommand === 'stop') {
-//     const agentName = parts.slice(2).join(' ');
-//     stopAgentByName(agentName);
-//   } else {
-//     startAgentWizard();
-//   }
-// }
-
-// DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-// async function showAgentList() {
-//   try {
-//     const response = await new Promise(resolve => {
-//       chrome.runtime.sendMessage({ action: 'listAgents' }, resolve);
-//     });
-// 
-//     const agents = response?.agents || [];
-//     if (agents.length === 0) {
-//       addMessage('No background agents configured. Use /agent to create one.', 'system');
-//       return;
-//     }
-// 
-//     let listText = 'Background Agents:\n';
-//     for (const agent of agents) {
-//       const status = agent.enabled ? '[ON]' : '[OFF]';
-//       const lastRun = agent.lastRunAt ? new Date(agent.lastRunAt).toLocaleString() : 'Never';
-//       listText += `\n${status} ${agent.name} - ${formatScheduleShort(agent.schedule)} - Last: ${lastRun}`;
-//     }
-//     addMessage(listText, 'system');
-//   } catch (error) {
-//     addMessage('Failed to load agents: ' + error.message, 'error');
-//   }
-// }
-
-// DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-// async function stopAgentByName(name) {
-//   if (!name) {
-//     addMessage('Usage: /agent stop <agent name>', 'system');
-//     return;
-//   }
-// 
-//   try {
-//     const response = await new Promise(resolve => {
-//       chrome.runtime.sendMessage({ action: 'listAgents' }, resolve);
-//     });
-// 
-//     const agents = response?.agents || [];
-//     const agent = agents.find(a => a.name.toLowerCase().includes(name.toLowerCase()));
-// 
-//     if (!agent) {
-//       addMessage('Agent not found: "' + name + '"', 'error');
-//       return;
-//     }
-// 
-//     if (!agent.enabled) {
-//       addMessage('Agent "' + agent.name + '" is already disabled.', 'system');
-//       return;
-//     }
-// 
-//     const toggleResp = await new Promise(resolve => {
-//       chrome.runtime.sendMessage({ action: 'toggleAgent', agentId: agent.agentId }, resolve);
-//     });
-// 
-//     if (toggleResp.success) {
-//       addMessage('Agent "' + agent.name + '" has been disabled.', 'system');
-//     } else {
-//       addMessage('Failed to stop agent: ' + (toggleResp.error || 'Unknown error'), 'error');
-//     }
-//   } catch (error) {
-//     addMessage('Error: ' + error.message, 'error');
-//   }
-// }
-
-// DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-// function startAgentWizard() {
-//   chrome.runtime.openOptionsPage();
-//   setTimeout(() => {
-//     chrome.runtime.sendMessage({ action: 'openAgentForm' });
-//   }, 500);
-//   addMessage('Opening agent settings... Use the form in the options page to create your agent.', 'system');
-// }
-
-// DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-// function formatScheduleShort(schedule) {
-//   if (!schedule) return 'Not set';
-//   switch (schedule.type) {
-//     case 'interval':
-//       return 'Every ' + (schedule.intervalMinutes || 1) + ' min';
-//     case 'daily':
-//       return 'Daily at ' + (schedule.dailyTime || '09:00');
-//     case 'once':
-//       return 'Run once';
-//     default:
-//       return schedule.type;
-//   }
-// }
+if (globalThis.fsbUiLocale && typeof fsbUiLocale.boot === 'function') {
+  if (typeof fsbUiLocale.onChange === 'function') fsbUiLocale.onChange(_relabelDelegationStop);
+  fsbUiLocale.boot().then(function () {
+    fsbUiLocale.apply(document);
+    if (typeof _renderHeaderStatus === 'function') _renderHeaderStatus();
+  });
+}

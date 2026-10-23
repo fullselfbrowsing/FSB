@@ -1026,7 +1026,10 @@ textarea.form-input {
   background: var(--primary-color);
 }
 
+/* Takes the rest of the header row, so a long description wraps beside the
+   icon instead of pushing the whole title below it. */
 .settings-card-title {
+  flex: 1 1 12rem;
   min-width: 0;
 }
 
@@ -5938,9 +5941,8 @@ textarea.form-input {
   color: var(--success, #22c55e);
 }
 
-/* DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-   Sync tab layout: key-generation row, action row, and the inline deprecation
-   notice for the retired remote-control sync feature. */
+/* Sync tab layout: key-generation row, action row, and the inline note about
+   retired background agents. */
 .sync-key-row {
   display: flex;
   gap: 8px;
@@ -6036,26 +6038,6 @@ textarea.form-input {
   display: block;
   font-size: 0.78rem;
   color: var(--text-muted);
-}
-
-.fsb-sunset-notice {
-  margin-top: 18px;
-}
-
-.fsb-sunset-notice-list {
-  list-style: disc;
-  padding-left: 22px;
-  margin: 8px 0 14px 0;
-}
-
-.fsb-sunset-notice-list li {
-  margin: 4px 0;
-  line-height: 1.5;
-  word-break: break-word;
-}
-
-.fsb-sunset-notice-dismiss {
-  align-self: flex-start;
 }
 
 /* ============================================================================

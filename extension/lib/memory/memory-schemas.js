@@ -70,10 +70,19 @@ function createSemanticMemory(text, metadata = {}, typeData = {}) {
 }
 
 /**
+ * Stored text for a site map memory. Kept in English regardless of the UI
+ * language because memory search and AI prompts read it.
+ */
+function siteMapMemoryText(domain, sitePattern, aiEnhanced = false) {
+  const text = `Site map for ${domain}: ${sitePattern.pageCount || 0} pages, ${sitePattern.formCount || 0} forms`;
+  return aiEnhanced ? text + ' (AI enhanced)' : text;
+}
+
+/**
  * Create a site map memory from domain and sitePattern data
  */
 function createSiteMapMemory(domain, sitePattern, metadata = {}) {
-  const text = `Site map for ${domain}: ${sitePattern.pageCount || 0} pages, ${sitePattern.formCount || 0} forms`;
+  const text = siteMapMemoryText(domain, sitePattern);
   return createSemanticMemory(text, {
     domain,
     tags: ['site_map'],
@@ -191,6 +200,7 @@ if (typeof self !== 'undefined') {
   self.createBaseMemory = createBaseMemory;
   self.createSemanticMemory = createSemanticMemory;
   self.createProceduralMemory = createProceduralMemory;
+  self.siteMapMemoryText = siteMapMemoryText;
   self.createSiteMapMemory = createSiteMapMemory;
   self.createTaskMemory = createTaskMemory;
   self.validateMemory = validateMemory;

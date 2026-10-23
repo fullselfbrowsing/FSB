@@ -25,7 +25,9 @@ const REDIRECTS = {
 const EXPECTED_BY_LOCALE = {
   es: ['/es', '/es/about', '/es/dashboard', '/es/privacy', '/es/support'],
   de: ['/de', '/de/about', '/de/dashboard', '/de/privacy', '/de/support'],
+  ru: ['/ru', '/ru/about', '/ru/dashboard', '/ru/privacy', '/ru/support'],
   ja: ['/ja', '/ja/about', '/ja/dashboard', '/ja/privacy', '/ja/support'],
+  ko: ['/ko', '/ko/about', '/ko/dashboard', '/ko/privacy', '/ko/support'],
   'zh-CN': ['/zh-CN', '/zh-CN/about', '/zh-CN/dashboard', '/zh-CN/privacy', '/zh-CN/support'],
   'zh-TW': ['/zh-TW', '/zh-TW/about', '/zh-TW/dashboard', '/zh-TW/privacy', '/zh-TW/support'],
 };

@@ -42,7 +42,7 @@ const CSS = read(path.join('extension', 'ui', 'options.css'));
 console.log('\n--- Sync nav: Beta badge on Sync (consolidation) ---');
 
 assert(
-  CP.includes('<span>Sync <span class="feature-badge beta">Beta</span></span>'),
+  CP.includes('<span><span data-i18n="panel_8d261a372f">Sync</span> <span class="feature-badge beta" data-i18n="panel_703390318b">Beta</span></span>'),
   '[SYNC-01] control_panel.html Sync nav-item carries the Beta badge inline'
 );
 assert(
@@ -104,10 +104,8 @@ assert(
   '[SYNC-04] deprecation footer names v0.9.45rc1 plus April 2026 inside #sync'
 );
 assert(
-  /id="fsbSunsetNotice"/.test(syncBody) &&
-  /id="fsbSunsetNoticeNames"/.test(syncBody) &&
-  /id="fsbSunsetNoticeDismiss"/.test(syncBody),
-  '[SYNC-04] sunset-notice scaffolding (fsbSunsetNotice / Names / Dismiss) lives inside #sync'
+  !/id="fsbSunsetNotice/.test(syncBody),
+  '[SYNC-04] the retired agent-names notice is gone from #sync (its data is cleared on update)'
 );
 
 console.log('\n--- Showcase mirror reflects Sync consolidation ---');

@@ -58,7 +58,7 @@ assert(bgSource.includes("alarm.name === 'fsb-domstream-watchdog'"), 'fsb-domstr
 assert(bgSource.includes("'fsb-domstream-watchdog', { periodInMinutes: 1 }"), 'chrome.alarms.create call present');
 assert(bgSource.includes('if (isMcpReconnectAlarm) {'), 'MCP_RECONNECT_ALARM early-return preserved');
 assert(bgSource.includes("armMcpBridge('alarm:' + MCP_RECONNECT_ALARM)"), 'MCP arm call preserved');
-assert(bgSource.includes('agentScheduler.getAgentIdFromAlarm(alarm.name)'), 'agent alarm branch preserved');
+assert(!bgSource.includes('agentScheduler'), 'retired background-agent alarm branch is gone');
 assert(bgSource.includes('_lastDomStreamStaleFlushCount'), 'SW-side staleFlushCount cache var present');
 console.log('  PASS: SW alarm branch invariants present');
 

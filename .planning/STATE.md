@@ -1,48 +1,46 @@
 ---
 gsd_state_version: 1.0
-milestone: v0.9.91
-milestone_name: MCP Clients as Providers
-status: human_needed
-stopped_at: Phase 65 automated verification passed; human UAT65-01 through UAT65-03 pending
-last_updated: "2026-07-22T18:45:13.807Z"
-last_activity: 2026-07-22
+milestone: v1.3.0
+milestone_name: Extension multilingual UI
+status: completed
+last_updated: "2026-10-13T20:22:29.068Z"
+last_activity: 2026-10-13
 progress:
-  total_phases: 18
-  completed_phases: 9
-  total_plans: 61
-  completed_plans: 63
-  percent: 50
+  total_phases: 6
+  completed_phases: 6
+  total_plans: 6
+  completed_plans: 6
+  percent: 100
 ---
 
-*Note: the `total_phases`/`completed_phases` counts above are scoped to the active v0.9.91 milestone (Phases 57-65) only. Some GSD tooling (`roadmap.analyze`, `phase.complete`) reports a noisy multi-phase count including collapsed `## Completed Milestones` archive entries and `## Backlog` sections — treat this file's own numbers as authoritative for v0.9.91 progress.*
+*Note: progress counts in the frontmatter are for v1.3.0 only. v0.9.91 is paused, not shipped. Its snapshot is `.planning/milestones/v0.9.91-STATE.md`.*
 
 # Project State
 
-> **Post-milestone supersession (2026-07-15):** This file preserves the
-> completed v1.2.0 state. The later showcase localization follow-up localized
-> the dashboard and removed its lint exclusion, so the dashboard hard invariant
-> below is historical rather than current. See
-> `showcase/angular/src/locale/I18N-BOUNDARIES.md` for current policy.
+> **v1.3.0 supersession (2026-10-11):** The active milestone is Extension multilingual UI. v0.9.91 MCP Clients as Providers is paused with human UAT still pending. Do not mark that UAT passed, and do not continue Phase 65 from this file. Archived copies: `.planning/milestones/v0.9.91-ROADMAP.md`, `.planning/milestones/v0.9.91-REQUIREMENTS.md`, `.planning/milestones/v0.9.91-phases/`.
 
 ## Project Reference
 
-See: .planning/PROJECT.md (v0.9.91 MCP Clients as Providers — Current Milestone section, Key context bullets)
-See: .planning/ROADMAP.md (v0.9.91 active, Phases 57-65; v1.2.0 / v1.1.0 / v1.0.0 / v0.9.99 / etc. archived and collapsed)
-See: .planning/REQUIREMENTS.md (51 v1 requirements across 10 categories: IDENT, PROV, CHAN, ADAPT, CLAUDE, UX, LIFE, DRIFT, NATIVE, MULTI — all mapped to Phases 57-65, 48/51 complete)
-See: .planning/research/SUMMARY.md (converged research summary; suggested phase structure; HIGH confidence)
-See: .planning/research/PITFALLS.md (16 pitfalls with phase assignments; security section verified against 2025-2026 CVE class incidents)
-See: .planning/research/ARCHITECTURE.md (file:line integration seams; brownfield mapping onto existing FSB architecture)
-See: .planning/milestones/v1.2.0-ROADMAP.md, .planning/milestones/v1.2.0-REQUIREMENTS.md, .planning/v1.2.0-MILESTONE-AUDIT.md (archived Showcase i18n Completeness milestone)
+See: .planning/PROJECT.md (v1.3.0 Extension multilingual UI)
+See: .planning/ROADMAP.md (v1.3.0, Phases 66-71)
+See: .planning/REQUIREMENTS.md (LOC, WIRE, SHELL, SET, ENTRY, QUAL, LANG, COPY)
+See: .planning/research/SUMMARY.md (extension i18n research, 2026-10-11)
+See: showcase/angular/src/app/core/i18n/locale-constants.ts (the seven locale codes)
+See: showcase/angular/src/locale/DO-NOT-TRANSLATE.md (protected literals)
 
-**Core value:** Reliable single-attempt execution — the AI decides correctly, the mechanics execute precisely. v0.9.91 does not touch the DOM/automation single-attempt property; it extends the surface so installed agent CLIs (Claude Code first, then OpenCode + Codex) become first-class side-panel providers that drive the same live browser through FSB's own MCP tools.
-**Current focus:** Milestone-end human UAT sweep; Phase 65 automated verification is complete
+**Core value:** Reliable single-attempt execution — the AI decides correctly, the mechanics execute precisely. v1.3.0 does not change automation or the MCP wire. It makes package-owned extension chrome render in the seven showcase locales.
+**Current focus:** Phases 66–71 passed. The product version is 0.9.93. v1.3.0 is the planning label only.
+
+## Historical context (v0.9.91 and earlier)
+
+The sections below this banner are accumulated decisions from earlier milestones, including the paused v0.9.91 work. They are not the current task. The v0.9.91 project-reference notes that used to live here are in the archived state snapshot.
 
 ## Current Position
 
-Phase: 65 (codex-adapter) — EXECUTING
-Plan: 8 of 8
-Status: human_needed
-Last activity: 2026-07-28 - Completed quick task 260728-k2v: animated toolbar action icon
+Phase: 71 — Language control (passed)
+Plan: 71-01
+Status: Milestone v1.3.0 is in PR #150. Six review findings are open, two of them blocking.
+Last activity: 2026-10-13, opened PR #150 for review
 
 ## Roadmap At A Glance (v0.9.91, Phases 57-65)
 

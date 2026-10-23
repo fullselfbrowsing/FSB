@@ -1,0 +1,73 @@
+{
+  "status": "finalized",
+  "published_at": "2026-10-22T06:32:59.048345+00:00",
+  "primary_result": true,
+  "publication_label": "FSB \u2014 final benchmark result (AI-reviewed)",
+  "successes": 277,
+  "expected": 300,
+  "success_rate": 0.9233333333333333,
+  "score_type": "reviewed_composite",
+  "autonomous_benchmark_score": false,
+  "review_type": "AI-reviewed",
+  "reviewer": "Codex AI assistant",
+  "human_reviewed": false,
+  "review_is_blind": false,
+  "task_coverage": {
+    "retained_claude_majority_verdicts": 228,
+    "tasks_reassessed_by_ai": 72,
+    "supported_reassessments": 49,
+    "qualified_without_credit": 6,
+    "unmet_without_credit": 17
+  },
+  "human_assistance": "User completed Target human verification; this was assistance during recovery, not human adjudication of benchmark verdicts.",
+  "selection": "Supersedes earlier headline score selection at user request; sealed historical evaluations are retained.",
+  "source_scores": "mind2web/results/final-review-20261022/SCORES.json",
+  "source_scores_sha256": "227dfdf19dfc0f2a6877c17e6f4b16cd5b15661fed25ccac2489241d9d739897",
+  "methodology": "mind2web/FINAL-REPORT.md",
+  "report": "mind2web/FINAL-REVIEWED-REPORT.md",
+  "by_difficulty": {
+    "easy": {
+      "expected": 80,
+      "retained": 69,
+      "manual_supported": 9,
+      "manual_qualified": 1,
+      "manual_not_met": 1,
+      "composite_supported": 78
+    },
+    "medium": {
+      "expected": 141,
+      "retained": 112,
+      "manual_supported": 21,
+      "manual_qualified": 1,
+      "manual_not_met": 7,
+      "composite_supported": 133
+    },
+    "hard": {
+      "expected": 79,
+      "retained": 47,
+      "manual_supported": 19,
+      "manual_qualified": 4,
+      "manual_not_met": 9,
+      "composite_supported": 66
+    }
+  },
+  "historical_automated_scores": {
+    "official": {
+      "original_mean": 0.79,
+      "recovery_adjusted_mean": 0.8333333333333334,
+      "original_majority": 238,
+      "recovery_adjusted_majority": 251,
+      "expected": 300,
+      "passes": 3
+    },
+    "strict": {
+      "original_mean": 0.7266666666666667,
+      "recovery_adjusted_mean": 0.77,
+      "original_majority": 218,
+      "recovery_adjusted_majority": 231,
+      "expected": 300,
+      "passes": 3
+    }
+  },
+  "pending_evaluations": 0
+}

@@ -1,0 +1,17 @@
+{
+  "sealed_at": "2026-10-22T06:44:49.382883+00:00",
+  "publication_label": "FSB benchmark — AI-reviewed",
+  "files": {
+    "mind2web/BENCHMARK-REPORT.md": "c33443b2d51d7a128b3fe5b6f7de3952e778f5a21cb4a1d51b228d733a08f42c",
+    "mind2web/BENCHMARK-RESULT.json": "d894279ffabf9257ebc326c561c453b955cca737cedd51ba6cf8947a887b0dcc",
+    "mind2web/results/benchmark-publication-20261022/METHODOLOGY.md": "5851a9cfc04b576ef28be338e4c660b926b79c85bbd11bddd72cc2f8e2829a3f",
+    "mind2web/results/benchmark-publication-20261022/REPORT.md": "8bd7873113f14952c7beef6a6ba6adff45bcdc5d7268fa194da4367381df15aa",
+    "mind2web/results/benchmark-publication-20261022/RESULT.json": "d894279ffabf9257ebc326c561c453b955cca737cedd51ba6cf8947a887b0dcc",
+    "mind2web/results/benchmark-publication-20261022/VALIDATION.json": "263fd4aab0c4f53fa8e740b7ebf0f18487e2d8f4d34a68ec954ce9f7ac7b7b1a",
+    "mind2web/results/benchmark-publication-20261022/charts/fsb-top-10.pdf": "e1929640f2d63f4e51dfa0f05149da06845803bd03009a957087263d931dce24",
+    "mind2web/results/benchmark-publication-20261022/charts/fsb-top-10.png": "85cf39172d6ce408e408d5735d5bcef5748dcbc977cf28e3f7a9908e9629fdce",
+    "mind2web/results/benchmark-publication-20261022/charts/fsb-top-10.svg": "6551d4437db34e725d8dfec438b114f80e85fe69f5ccf95aeaae45eacfd5c68d",
+    "mind2web/results/benchmark-publication-20261022/charts/top-10.csv": "12607d175655aadf727f0e505135ade88a17b53f999354dd6d37773a39080df5",
+    "mind2web/results/benchmark-publication-20261022/publication-manifest.json": "21d52ce6e690d75e59a51789bf8b1456336d7c4d0cf7869ca355e8103f08087b"
+  }
+}

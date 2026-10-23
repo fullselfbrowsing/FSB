@@ -9,12 +9,16 @@
     cursor: 'cursor',
     visualstudiocode: 'vscode',
     vscode: 'vscode',
-    windsurf: 'windsurf',
+    antigravity: 'antigravity',
+    googleantigravity: 'antigravity',
     codex: 'codex',
     openaicodex: 'codex',
     codexcli: 'codex',
     opencode: 'opencode',
     opencodecli: 'opencode',
+    cline: 'cline',
+    // Cline's SDK-based clients, such as the Cline CLI, identify as the SDK package.
+    '@cline/core': 'cline',
     openclaw: 'openclaw'
   });
 

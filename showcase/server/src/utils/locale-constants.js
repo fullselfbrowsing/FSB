@@ -5,12 +5,13 @@
 
 const SOURCE_LOCALE = 'en';
 
-const LOCALES = ['en', 'es', 'de', 'ja', 'ko', 'zh-CN', 'zh-TW'];
+const LOCALES = ['en', 'es', 'de', 'ru', 'ja', 'ko', 'zh-CN', 'zh-TW'];
 
 const LOCALE_NATIVE_LABELS = {
   'en':    'English',
   'es':    'Espanol',
   'de':    'Deutsch',
+  'ru':    '\u0420\u0443\u0441\u0441\u043a\u0438\u0439',
   'ja':    '\u65e5\u672c\u8a9e',
   'ko':    '\ud55c\uad6d\uc5b4',
   'zh-CN': '\u7b80\u4f53\u4e2d\u6587',
@@ -21,6 +22,7 @@ const LOCALE_SUBPATHS = {
   'en':    '',
   'es':    'es',
   'de':    'de',
+  'ru':    'ru',
   'ja':    'ja',
   'ko':    'ko',
   'zh-CN': 'zh-CN',

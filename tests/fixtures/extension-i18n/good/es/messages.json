@@ -1,0 +1,13 @@
+{
+  "locale_seed_greeting": {
+    "message": "FSB está listo"
+  },
+  "locale_seed_replay": {
+    "message": "Velocidad de repetición $SPEED$",
+    "placeholders": {
+      "speed": {
+        "content": "$1"
+      }
+    }
+  }
+}

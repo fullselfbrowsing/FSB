@@ -3269,10 +3269,10 @@ function runSourceContractCase() {
     assert(!compatibilityComposition.includes(forbidden),
       `compatibility refresh orchestration does not touch ${forbidden}`);
   }
-  const sunsetListAgents = backgroundSource.indexOf("//     case 'listAgents':");
-  assert(sunsetListAgents >= 0, 'sunset listAgents runtime case remains commented out');
-  assert(backgroundSource.indexOf("case 'getMcpClients'") < sunsetListAgents,
-    'new inventory action is independent from the later sunset listAgents block');
+  assert(!/case 'listAgents':/.test(backgroundSource),
+    'retired listAgents runtime case is gone, commented-out copy included');
+  assert(backgroundSource.indexOf("case 'getMcpClients'") >= 0,
+    'MCP client inventory action stays live');
 
   const bridgeSource = fs.readFileSync(path.join(__dirname, '..', 'extension', 'ws', 'mcp-bridge-client.js'), 'utf8');
   assert(bridgeSource.includes('globalThis.fsbDispatchInternalMessage'), 'mcp-bridge-client.js prefers globalThis.fsbDispatchInternalMessage');

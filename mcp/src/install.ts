@@ -1,4 +1,4 @@
-import { PLATFORMS, resolvePlatformTarget, getEntryForPlatform } from './platforms.js';
+import { PLATFORMS, resolvePlatformTarget, getEntryForPlatform, CLINE_TIMEOUT_SECONDS } from './platforms.js';
 import type { PlatformConfig, PlatformTarget } from './platforms.js';
 import { installToConfig, removeFromConfig, serializeByFormat } from './config-writer.js';
 import type { ConfigResult } from './config-writer.js';
@@ -339,14 +339,16 @@ export function getInstallNextStep(platformKey: string, variant: string | null =
       return 'Restart Cursor after editing ~/.cursor/mcp.json.';
     case 'vscode':
       return 'Open the MCP view in VS Code, trust/start the server if prompted, then reload VS Code if it does not start automatically.';
-    case 'windsurf':
-      return variant === 'plugin'
-        ? 'In Windsurf or the JetBrains/Cascade plugin, refresh the MCP integration or reload the client after editing ~/.codeium/mcp_config.json.'
-        : 'In Windsurf, refresh the MCP integration or reload the app after editing ~/.codeium/windsurf/mcp_config.json.';
+    case 'antigravity':
+      return variant === 'legacy'
+        ? 'In Antigravity, open Manage MCP Servers and press refresh after editing ~/.gemini/antigravity/mcp_config.json. If fsb does not appear, View raw config shows which file your release reads; current releases read ~/.gemini/config/mcp_config.json.'
+        : 'In Antigravity, open Manage MCP Servers and press refresh after editing ~/.gemini/config/mcp_config.json. View raw config there shows which file Antigravity reads.';
     case 'codex':
       return 'Restart Codex or reload the MCP server list after editing ~/.codex/config.toml.';
     case 'cline':
-      return 'Reload VS Code/Cline after editing the MCP settings file.';
+      return variant === 'legacy-vscode'
+        ? 'Reload VS Code/Cline after editing the MCP settings file. Current Cline releases read ~/.cline/data/settings/cline_mcp_settings.json instead; update Cline and rerun this install if fsb does not appear.'
+        : 'Cline reloads ~/.cline/data/settings/cline_mcp_settings.json on its own. If fsb does not appear, restart it under MCP Servers in Cline, or start a new Cline CLI session.';
     case 'zed':
       return 'Reload Zed after editing settings.json.';
     case 'gemini':
@@ -526,11 +528,11 @@ export function getSetupSections(httpEndpoint: string, cursorDeeplink: string): 
       ],
     },
     {
-      title: 'Windsurf',
+      title: 'Antigravity',
       lines: [
         'Supported config paths:',
-        '  ~/.codeium/windsurf/mcp_config.json',
-        '  ~/.codeium/mcp_config.json',
+        '  ~/.gemini/config/mcp_config.json',
+        '  ~/.gemini/antigravity/mcp_config.json (older releases)',
         'Use the standard stdio entry:',
         '  {',
         '    "mcpServers": {',
@@ -541,7 +543,27 @@ export function getSetupSections(httpEndpoint: string, cursorDeeplink: string): 
         '    }',
         '  }',
         'Next step:',
-        '  Press refresh in Windsurf or reload the client after editing the matching config file.',
+        '  Open Manage MCP Servers in Antigravity and press refresh after editing the matching config file.',
+      ],
+    },
+    {
+      title: 'Cline (VS Code, JetBrains, CLI)',
+      lines: [
+        'Config: ~/.cline/data/settings/cline_mcp_settings.json',
+        '  (CLINE_MCP_SETTINGS_PATH, CLINE_DATA_DIR, or CLINE_DIR move it, as in Cline)',
+        'Add:',
+        '  {',
+        '    "mcpServers": {',
+        '      "fsb": {',
+        '        "command": "npx",',
+        '        "args": ["-y", "fsb-mcp-server@latest"],',
+        '        "timeout": ' + CLINE_TIMEOUT_SECONDS,
+        '      }',
+        '    }',
+        '  }',
+        'timeout is in seconds. Cline\'s 60-second default cuts off long run_task calls.',
+        'Next step:',
+        '  ' + getInstallNextStep('cline'),
       ],
     },
     // New platforms
