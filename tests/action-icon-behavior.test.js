@@ -287,6 +287,9 @@ function makeWorker(opts) {
     }
   };
 
+  // The Safari build's adapter defines FsbPlatform before this module loads.
+  if (opts.platform) sandbox.FsbPlatform = opts.platform;
+
   const context = vm.createContext(sandbox);
   vm.runInContext(ICON_SRC, context, { filename: 'action-icon.js' });
 
@@ -1879,6 +1882,79 @@ const opsOf = (group, op) => (group || []).filter((o) => o.op === op);
     assertEq(w.timerCount(), 0, 'disabling live motion stops its scheduler immediately');
     assertEq((w.sessionStore[INTENT_KEY] || {}).claims['watch:3'], 'breathe',
       'disabling live motion does not mutate watch functionality');
+  }
+
+  // -------------------------------------------------------------------------
+  console.log('\nICON-SAFARI: a templateToolbarIcon platform gets black-plus-alpha frames');
+  // -------------------------------------------------------------------------
+
+  {
+    // Safari tints a grayscale toolbar icon as a template, keeping only alpha.
+    // The opaque tile showed as a solid square, so there every frame must be
+    // the lettering on a transparent background with every pixel grayscale.
+    const TEMPLATE_STYLE = /^rgba\(0, 0, 0, [\d.]+\)$/;
+    const styleOk = (style) => {
+      if (style && style.__linear) return true; // checked through its stops below
+      return TEMPLATE_STYLE.test(String(style));
+    };
+    const collect = (frameSets) => [].concat(...frameSets.map((set) => [].concat(...set[16], ...set[32])));
+
+    const w = makeWorker({ platform: { caps: { templateToolbarIcon: true } } });
+    await w.api.init({ hasLiveSession: () => false });
+    await flush();
+    const idle = { 16: w.groups(16), 32: w.groups(32) };
+    assert(w.fetches.some((u) => u.endsWith('assets/safari-toolbar-16.png'))
+      && w.fetches.some((u) => u.endsWith('assets/safari-toolbar-32.png')),
+      'template glyphs come from the safari-toolbar assets');
+    assert(!w.fetches.some((u) => /assets\/icon(16|128)\.png$/.test(u)), 'the opaque tiles are never loaded');
+
+    // Claims resolve by rank, so each form gets its own worker: a sweep noted
+    // while an orbit is live would never build.
+    const fresh = async () => {
+      const t = makeWorker({ platform: { caps: { templateToolbarIcon: true } } });
+      await t.api.init({ hasLiveSession: () => false });
+      await flush();
+      return t;
+    };
+    const orbit = await renderActivity(await fresh(), 'orbit', 1);
+    const sweep = await renderActivity(await fresh(), 'sweep', 1);
+    const ring = await renderCapability(await fresh(), 1);
+    const bw = await fresh();
+    bw.resetOps(16);
+    bw.resetOps(32);
+    bw.api.setWatching(true);
+    await flush();
+    const breathe = { 16: bw.groups(16), 32: bw.groups(32) };
+    assert(orbit[32].length > 0 && sweep[32].length > 0 && ring[32].length > 0 && breathe[32].length > 0,
+      'orbit, sweep, ring and breathe all render frames');
+
+    const ops = collect([idle, orbit, sweep, ring, breathe]);
+    assertEq(ops.filter((o) => o.op === 'fillRect').length, 0, 'no frame paints the black plate');
+    const styled = ops.filter((o) => o.op === 'stroke' || o.op === 'fill');
+    assert(styled.length > 0 && styled.every((o) => styleOk(o.strokeStyle || o.fillStyle)),
+      'every stroke and fill is black at some alpha');
+    const stops = [].concat(...ops.filter((o) => o.op === 'linear').map((o) => o.stops));
+    assert(stops.length > 0 && stops.every((s) => TEMPLATE_STYLE.test(String(s.color))),
+      'the sweep gradient is black at two alphas');
+    assert(ops.filter((o) => o.op === 'drawImage').every((d) => d.source === 'bitmap' && d.composite === 'source-over'),
+      'no scratch surface and no blend: the halo is a blurred copy of the lettering');
+
+    const mark = (frame) => opsOf(frame, 'drawImage').filter((d) => d.filter === 'none').pop() || {};
+    const halo = (frame) => opsOf(frame, 'drawImage').find((d) => /blur/.test(String(d.filter)));
+    const mid = breathe[32].length >> 1;
+    assertClose(mark(breathe[32][0]).alpha, BREATHE_MIN_ALPHA, 1e-6, 'the breathe still fades the lettering');
+    assertClose(mark(breathe[32][mid]).alpha, 1, 1e-6, 'and brings it back to full strength');
+    assert(!!halo(breathe[32][mid]), 'the breathe peak carries a blurred halo');
+
+    // Chrome, and every harness without an adapter, keeps the tile.
+    const chromeWorker = makeWorker();
+    await chromeWorker.api.init({ hasLiveSession: () => false });
+    await flush();
+    assert(chromeWorker.fetches.some((u) => u.endsWith('assets/icon16.png'))
+      && chromeWorker.fetches.some((u) => u.endsWith('assets/icon128.png')),
+      'without the capability the tile glyphs are used');
+    const chromeIdle = [].concat(...chromeWorker.groups(32));
+    assert(chromeIdle.filter((o) => o.op === 'drawImage').length > 0, 'and drawn as before');
   }
 
   // -------------------------------------------------------------------------

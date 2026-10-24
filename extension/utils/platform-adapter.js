@@ -196,7 +196,10 @@
       offscreen: isChrome,
       systemMemory: isChrome,
       networkBodies: isChrome,
-      nativeMessaging: !isChrome
+      nativeMessaging: !isChrome,
+      // Safari tints a grayscale toolbar icon as a template, so utils/action-icon.js
+      // draws its frames as black-plus-alpha there.
+      templateToolbarIcon: !isChrome
     };
   }
 
