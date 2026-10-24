@@ -19432,6 +19432,10 @@ async function recoverStalledTabNavigation(tabId, stillPending) {
 }
 
 async function requireForegroundNativeInput(tabId) {
+  // A platform without native input (Safari: no chrome.debugger) never sends
+  // any. The caller's CDP attach fails and it falls back to DOM events, which
+  // need no focus, so refusing here would only block that fallback.
+  if (globalThis.FsbPlatform?.caps?.trustedInput === false) return;
   const tab = await chrome.tabs.get(tabId);
   const window = await chrome.windows.get(tab.windowId);
   if (!tab.active || !window.focused || window.state === 'minimized') {
