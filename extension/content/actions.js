@@ -5212,9 +5212,29 @@ const tools = {
       return { success: false, error: 'sourceRef and targetRef are required (element references, e.g., "e5" and "e12")', action: 'dragdrop' };
     }
 
-    // Resolve element references through FSB's element map
-    const source = typeof sourceRef === 'string' ? FSB.getElementByRef?.(sourceRef) || document.querySelector(`[data-fsb-ref="${sourceRef}"]`) : sourceRef;
-    const target = typeof targetRef === 'string' ? FSB.getElementByRef?.(targetRef) || document.querySelector(`[data-fsb-ref="${targetRef}"]`) : targetRef;
+    // The tool takes an element ref ("e5") or a CSS selector ("#card-1"), and
+    // the MCP server passes either through as sourceRef/targetRef. Refs resolve
+    // through the ref map, selectors the way every other tool resolves them.
+    // Each lookup is guarded: an attribute selector built from a CSS selector
+    // with quotes in it (input[name="q"]) is itself invalid and would throw.
+    const resolveDragElement = (ref) => {
+      if (typeof ref !== 'string') return ref;
+      const lookups = [
+        () => (typeof FSB.resolveRef === 'function' ? FSB.resolveRef(ref) : null),
+        () => FSB.getElementByRef?.(ref),
+        () => document.querySelector(`[data-fsb-ref="${ref}"]`),
+        () => (typeof FSB.querySelectorWithShadow === 'function' ? FSB.querySelectorWithShadow(ref) : null)
+      ];
+      for (const lookup of lookups) {
+        try {
+          const element = lookup();
+          if (element) return element;
+        } catch (_lookupError) { /* not this kind of reference */ }
+      }
+      return null;
+    };
+    const source = resolveDragElement(sourceRef);
+    const target = resolveDragElement(targetRef);
 
     if (!source) {
       return { success: false, error: `Source element not found: ${sourceRef}`, action: 'dragdrop' };
