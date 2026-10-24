@@ -117,13 +117,41 @@ function withPlatform(platform, fn) {
     });
   });
 
-  console.log('\n=== 4b. capture_screenshot has no DOM fallback -> capability_unavailable ===');
+  console.log('\n=== 4b. capture_screenshot: no DOM fallback, but platform-handled -> cdpHandler ===');
+  // utils/screenshot-capture.js captures through tabs.captureVisibleTab when
+  // there is no chrome.debugger, so the verb still goes to the handler.
+  passAssert(safariPlatform.CDP_NO_DOM_FALLBACK.includes('cdpCaptureScreenshot'),
+    'cdpCaptureScreenshot still has no DOM equivalent');
+  passAssert(Array.isArray(safariPlatform.CDP_PLATFORM_HANDLED)
+    && safariPlatform.CDP_PLATFORM_HANDLED.includes('cdpCaptureScreenshot'),
+    'and is declared platform-handled');
   await withPlatform(safariPlatform, async () => {
     sent.length = 0;
-    const res = await executeTool('capture_screenshot', {}, 1, {});
-    passAssert(res.success === false, 'fails on Safari');
-    passAssert(/capability_unavailable/.test(res.error), 'error is typed capability_unavailable');
+    let calledWith = null;
+    const res = await executeTool('capture_screenshot', { mode: 'viewport' }, 4, {
+      cdpHandler: async (verb, params, tabId) => { calledWith = { verb, params, tabId }; return { success: true }; }
+    });
+    passAssertEqual(calledWith && calledWith.verb, 'cdpCaptureScreenshot', 'Safari sends capture_screenshot to the handler');
+    passAssertEqual(calledWith && calledWith.tabId, 4, 'with the tabId');
+    passAssert(res.success === true, 'and returns its result');
     passAssertEqual(sent.length, 0, 'no content dispatch');
+  });
+
+  console.log('\n=== 4c. a no-fallback verb that is NOT platform-handled still fails typed ===');
+  await withPlatform(safariPlatform, async () => {
+    const unhandled = Object.assign(Object.create(Object.getPrototypeOf(safariPlatform)), safariPlatform, {
+      CDP_PLATFORM_HANDLED: []
+    });
+    await withPlatform(unhandled, async () => {
+      sent.length = 0;
+      let cdpCalled = false;
+      const res = await executeTool('capture_screenshot', {}, 1, {
+        cdpHandler: async () => { cdpCalled = true; return { success: true }; }
+      });
+      passAssert(res.success === false && /capability_unavailable/.test(res.error), 'typed capability_unavailable');
+      passAssert(!cdpCalled, 'the handler is not called');
+      passAssertEqual(sent.length, 0, 'no content dispatch');
+    });
   });
 
   console.log('\n=== 5. the shared registry object is NOT mutated ===');

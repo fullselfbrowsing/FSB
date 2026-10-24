@@ -225,6 +225,12 @@
   // re-render is not the composited page image capture_screenshot promises.
   var CDP_NO_DOM_FALLBACK = ['cdpCaptureScreenshot'];
 
+  // Verbs with no DOM equivalent whose CDP handler has its own path for this
+  // platform, so ai/tool-executor.js sends them to the handler instead of
+  // failing them: utils/screenshot-capture.js captures through
+  // tabs.captureVisibleTab when chrome.debugger is missing.
+  var CDP_PLATFORM_HANDLED = ['cdpCaptureScreenshot'];
+
   // ---------------------------------------------------------------------------
   // Workspace surface (Safari has no sidePanel; we use a popup-type window)
   // ---------------------------------------------------------------------------
@@ -775,6 +781,7 @@
     caps: null,
     CDP_DOM_FALLBACKS: CDP_DOM_FALLBACKS,
     CDP_NO_DOM_FALLBACK: CDP_NO_DOM_FALLBACK,
+    CDP_PLATFORM_HANDLED: CDP_PLATFORM_HANDLED,
     install: install,
     unavailable: unavailable,
     openWorkspace: openWorkspace,

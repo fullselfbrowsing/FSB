@@ -201,10 +201,16 @@ async function executeCdpTool(tool, params, tabId, cdpHandler) {
     if (domVerb) {
       return executeContentTool(Object.assign({}, tool, { _contentVerb: domVerb }), params, tabId);
     }
-    return makeResult({
-      success: false,
-      error: `capability_unavailable: ${tool.name} requires chrome.debugger, which this browser does not provide`
-    });
+    // A verb whose handler carries its own non-CDP path (screenshots through
+    // tabs.captureVisibleTab) still goes to the handler below.
+    const handled = Array.isArray(platform.CDP_PLATFORM_HANDLED)
+      && platform.CDP_PLATFORM_HANDLED.indexOf(tool._cdpVerb) !== -1;
+    if (!handled) {
+      return makeResult({
+        success: false,
+        error: `capability_unavailable: ${tool.name} requires chrome.debugger, which this browser does not provide`
+      });
+    }
   }
 
   if (typeof cdpHandler !== 'function') {
