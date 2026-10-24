@@ -156,6 +156,7 @@ const REFINEMENT_ROOT_TEST_COMMANDS = Object.freeze([
   'node tests/server-client-ip-geo.test.js',
   'node tests/ws-client-relay-reconnect.test.js',
   'node --test tests/network-capture-debugger-lifecycle.test.js',
+  'node tests/execute-js-trusted-types.test.js',
 ]);
 
 const PHASE64_RETAINED_ROOT_COMMANDS = Object.freeze([

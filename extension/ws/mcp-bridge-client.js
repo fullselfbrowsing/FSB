@@ -2561,9 +2561,39 @@ class MCPBridgeClient {
         world: 'MAIN',
         func: (userCode) => {
           try {
-            // Use Function constructor to execute in page context
-            // This allows return values and multi-statement code
-            const fn = new Function(userCode);
+            // A page that enforces Trusted Types (require-trusted-types-for
+            // 'script', e.g. YouTube) refuses to turn a plain string into code.
+            // A policy that hands back the caller's own code passes that gate
+            // and adds nothing, since this function already runs in the page.
+            // It is created once per page because a trusted-types directive
+            // can forbid duplicate names; a page whose directive forbids new
+            // names keeps the plain string and gets the page's own refusal.
+            let source = userCode;
+            let policy = null;
+            const tt = globalThis.trustedTypes;
+            if (tt && typeof tt.createPolicy === 'function') {
+              const key = Symbol.for('fsb.executeJsPolicy');
+              try {
+                if (!globalThis[key]) {
+                  Object.defineProperty(globalThis, key, {
+                    value: tt.createPolicy('fsb-execute-js', { createScript: (s) => s }),
+                    configurable: true
+                  });
+                }
+                policy = globalThis[key];
+                source = policy.createScript(userCode);
+              } catch (_policyError) { /* the page's directive refused the policy */ }
+            }
+            // Function constructor: return values and multi-statement code.
+            let fn;
+            try {
+              fn = new Function(source);
+            } catch (compileError) {
+              // An engine that accepts TrustedScript in eval but not in the
+              // Function constructor compiles the same body through eval.
+              if (!policy || !(compileError instanceof EvalError)) throw compileError;
+              fn = (0, eval)(policy.createScript('(function () {\n' + userCode + '\n})'));
+            }
             const result = fn();
             // Serialize result for message passing
             if (result === undefined) return { value: 'undefined' };
@@ -2574,7 +2604,11 @@ class MCPBridgeClient {
             }
             return { value: String(result) };
           } catch (execError) {
-            return { error: execError.message || String(execError) };
+            const message = execError.message || String(execError);
+            if (/Trusted ?Type/i.test(message)) {
+              return { error: message + ' This page enforces Trusted Types and did not allow FSB to create a policy, so execute_js cannot run code here.' };
+            }
+            return { error: message };
           }
         },
         args: [code],
