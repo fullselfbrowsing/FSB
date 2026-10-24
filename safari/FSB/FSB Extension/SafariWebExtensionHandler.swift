@@ -6,7 +6,8 @@
 //
 //  Safari delivers each port.postMessage as its own beginRequest(with:)
 //  invocation, and the handler OBJECT is transient — so all durable state lives
-//  in BridgeCoordinator.shared, which outlives individual invocations.
+//  in the BridgeCoordinator for the message's channel (`ch`: "mcp", the
+//  default, or "relay"), which outlives individual invocations.
 //
 //  Two message types complete ASYNCHRONOUSLY and must park their context:
 //    open — the reply must wait until the socket actually reaches :7225,
@@ -59,24 +60,39 @@ class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
             context.completeRequest(returningItems: [response], completionHandler: nil)
         }
 
+        // Socket messages belong to one channel. A message with no `ch` comes
+        // from an extension that predates channels, and was always MCP.
+        let socketTypes: Set<String> = ["open", "frame", "chunk", "poll", "close"]
+        var bridge: BridgeCoordinator?
+        if socketTypes.contains(type) {
+            let channel = (msg["ch"] as? String) ?? "mcp"
+            bridge = BridgeCoordinator.forChannel(channel)
+            if bridge == nil {
+                os_log(.default, "FSB native host: unknown channel %{public}@", channel)
+                complete(["v": NativeFraming.protocolVersion, "t": "error",
+                          "phase": "dial", "message": "unknown_channel"])
+                return
+            }
+        }
+
         switch type {
         case "open":
             let url = (msg["url"] as? String) ?? "ws://localhost:7225"
             let origin = msg["origin"] as? String
-            BridgeCoordinator.shared.handleOpen(url: url, origin: origin) { reply in complete(reply) }
+            bridge?.handleOpen(url: url, origin: origin) { reply in complete(reply) }
 
         case "frame", "chunk":
-            BridgeCoordinator.shared.handleFrame(msg)
+            bridge?.handleFrame(msg)
             complete(["v": NativeFraming.protocolVersion, "t": "ack"])
 
         case "poll":
             let waitMs = (msg["waitMs"] as? Int) ?? 5000
-            BridgeCoordinator.shared.handlePoll(waitMs: waitMs) { reply in complete(reply) }
+            bridge?.handlePoll(waitMs: waitMs) { reply in complete(reply) }
 
         case "close":
             let code = (msg["code"] as? Int) ?? 1000
             let reason = (msg["reason"] as? String) ?? "intentional"
-            BridgeCoordinator.shared.handleClose(code: code, reason: reason)
+            bridge?.handleClose(code: code, reason: reason)
             complete(["v": NativeFraming.protocolVersion, "t": "ack"])
 
         // upload_file. App Sandbox forbids reading arbitrary absolute paths, so

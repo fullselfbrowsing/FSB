@@ -113,10 +113,16 @@
     return 'nid-' + Math.floor(Date.now()).toString(16) + '-' + (globalScope.__fsbNidSeq = (globalScope.__fsbNidSeq || 0) + 1);
   }
 
+  // The host keeps one socket per channel: 'mcp' for the MCP bridge on :7225,
+  // 'relay' for ws/ws-client.js's dashboard relay. Every message names its
+  // channel, so the two sockets never see each other's frames, polls or close.
+  const NATIVE_CHANNELS = ['mcp', 'relay'];
+
   class FsbNativeBridgeSocket {
     constructor(opts) {
       opts = opts || {};
       this.url = opts.url;
+      this.channel = NATIVE_CHANNELS.indexOf(opts.channel) !== -1 ? opts.channel : 'mcp';
       this._appId = opts.appId || NATIVE_APP_ID;
       this._openTimeoutMs = opts.openTimeoutMs || NATIVE_OPEN_TIMEOUT_MS;
       this._maxFrameBytes = opts.maxFrameBytes || NATIVE_MAX_FRAME_BYTES;
@@ -195,6 +201,7 @@
 
     _post(obj) {
       if (!this._port) return;
+      obj.ch = this.channel;
       try {
         this._port.postMessage(obj);
       } catch (err) {
@@ -250,6 +257,7 @@
         this._port.postMessage({
           v: NATIVE_PROTOCOL_VERSION,
           t: 'close',
+          ch: this.channel,
           seq: (this._seqOut += 1),
           code: code,
           reason: reason

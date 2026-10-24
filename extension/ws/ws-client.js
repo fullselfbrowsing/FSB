@@ -1476,6 +1476,21 @@ async function handleRemoteNavigate(payload) {
 }
 
 class FSBWebSocket {
+  // Safari's extension service worker deadlocks on new WebSocket(), so the
+  // platform adapter replaces it there with a constructor that throws (see
+  // utils/platform-adapter.js). On that platform the container app holds the
+  // relay socket instead and frames cross native messaging on the 'relay'
+  // channel, the same way the MCP bridge reaches :7225. Chrome never sees the
+  // guard and keeps the real WebSocket.
+  static createRelaySocket(url) {
+    const NativeSocket = globalThis.FsbNativeBridgeSocket;
+    if (globalThis.WebSocket && globalThis.WebSocket.__fsbSafariWorkerGuard === true
+        && typeof NativeSocket === 'function') {
+      return new NativeSocket({ url: url, channel: 'relay' });
+    }
+    return new WebSocket(url);
+  }
+
   constructor() {
     this.ws = null;
     this.wsUrl = null;
@@ -1563,7 +1578,7 @@ class FSBWebSocket {
 
     let socket;
     try {
-      socket = new WebSocket(wsUrl);
+      socket = FSBWebSocket.createRelaySocket(wsUrl);
     } catch (err) {
       console.warn('[FSB WS] Failed to create WebSocket:', err.message);
       this._scheduleReconnect();

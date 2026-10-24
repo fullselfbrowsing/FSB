@@ -2,7 +2,12 @@
 //  BridgeCoordinator.swift
 //  FSB — shared by the container app and the Safari web extension target.
 //
-//  Owns the single MCPSocketSession and relays frames to/from the extension.
+//  Owns one MCPSocketSession per channel and relays frames to/from the
+//  extension. "mcp" is the MCP bridge on ws://localhost:7225; "relay" is the
+//  dashboard relay ws/ws-client.js opens to the FSB server, which Safari's
+//  extension service worker cannot open itself. Each channel is a separate
+//  instance with its own socket, poll, linger and watchdog, so the two never
+//  see each other's frames. Everything below describes one channel.
 //
 //  SOCKET LIFETIME IS SLAVED TO PORT LIFETIME — and that is deliberate.
 //
@@ -28,7 +33,31 @@ import Foundation
 
 final class BridgeCoordinator {
 
-    static let shared = BridgeCoordinator()
+    /// The channels the extension may open. Anything else is refused, so a
+    /// malformed message cannot mint coordinators without bound.
+    static let channels: Set<String> = ["mcp", "relay"]
+
+    private static var registry: [String: BridgeCoordinator] = [:]
+    private static let registryLock = NSLock()
+
+    /// The coordinator for `channel`, created on first use and kept for the
+    /// life of the process: Safari's handler objects are transient, so durable
+    /// state has to live here. nil for an unknown channel.
+    static func forChannel(_ channel: String) -> BridgeCoordinator? {
+        guard channels.contains(channel) else { return nil }
+        registryLock.lock()
+        defer { registryLock.unlock() }
+        if let existing = registry[channel] { return existing }
+        let created = BridgeCoordinator(channel: channel)
+        registry[channel] = created
+        return created
+    }
+
+    /// The MCP channel. Messages from an extension that predates channels
+    /// carry no `ch` and land here.
+    static var shared: BridgeCoordinator { forChannel("mcp")! }
+
+    let channel: String
 
     /// Deliberately shorter than the extension's RECONNECT_GRACE_MS (10s).
     static let lingerSeconds: TimeInterval = 3
@@ -55,7 +84,7 @@ final class BridgeCoordinator {
     /// ~200ms sends `open` while the socket is still live and adopts it.
     static let portSilenceSeconds: TimeInterval = 5
 
-    private let queue = DispatchQueue(label: "com.fullselfbrowsing.fsb.bridge")
+    private let queue: DispatchQueue
     private var socket: MCPSocketSession?
     private var inbound: [String] = []
     private var reassembly: [String: NativeFraming.ChunkBuffer] = [:]
@@ -89,7 +118,10 @@ final class BridgeCoordinator {
     private var lastContactAt = Date()
     private var watchdog: DispatchSourceTimer?
 
-    private init() {}
+    private init(channel: String) {
+        self.channel = channel
+        self.queue = DispatchQueue(label: "com.fullselfbrowsing.fsb.bridge.\(channel)")
+    }
 
     // MARK: - open
 
