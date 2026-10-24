@@ -38,6 +38,9 @@
  *      (delegation-terminal immediate teardown) and leaves other agents'
  *      entries untouched; unknown agent is a counted no-op; invalid
  *      agentId rejects.
+ *   N. replayVisualSessionLifecycleForTab re-sends a live entry without
+ *      extending its window, clears an elapsed one, leaves is_final alone,
+ *      and background.js calls it on content-script ready and tab load.
  *
  * Run: node tests/mcp-visual-tick-lifecycle.test.js
  */
@@ -529,6 +532,73 @@ async function caseM() {
 // Driver
 // ------------------------------------------------------------------
 
+// ------------------------------------------------------------------
+// Case N -- replay on page load. open_tab / navigate record their tick
+// before the destination page has a content script, so the tick's own
+// broadcast is lost; background.js replays the entry when the tab finishes
+// loading and when the page's content script reports ready.
+// ------------------------------------------------------------------
+
+async function caseN() {
+  console.log('\n--- Case N: replayVisualSessionLifecycleForTab (overlay after open_tab / navigate) ---');
+  const { chromeMock, lc, capturedStatusBroadcasts } = setupHarness();
+
+  const none = await lc.replayVisualSessionLifecycleForTab(500);
+  check(none && none.ok === true && none.action === 'noop', 'N.1 no entry -> noop');
+  check(capturedStatusBroadcasts.length === 0, 'N.2 no entry -> nothing broadcast');
+
+  await lc.recordVisualSessionTick(501, 'agent_replay', { visualReason: 'Opening the page', client: 'Claude' });
+  const before = (await chromeMock.storage.session.get(['mcpVisualSession:501']))['mcpVisualSession:501'];
+  const createsBefore = chromeMock.alarms._createHistory().length;
+  capturedStatusBroadcasts.length = 0;
+
+  const live = await lc.replayVisualSessionLifecycleForTab(501);
+  const after = (await chromeMock.storage.session.get(['mcpVisualSession:501']))['mcpVisualSession:501'];
+  check(live && live.ok === true && live.action === 'replayed', 'N.3 live entry -> replayed');
+  check(capturedStatusBroadcasts.length === 1 && capturedStatusBroadcasts[0].tabId === 501, 'N.4 one running broadcast to the tab');
+  check(capturedStatusBroadcasts[0] && capturedStatusBroadcasts[0].statusData
+    && capturedStatusBroadcasts[0].statusData.clientLabel === 'Claude', 'N.5 broadcast carries the client label');
+  check(after && after.deadlineAt === before.deadlineAt && after.lastTickAt === before.lastTickAt,
+    'N.6 a replay does not extend the 60 s window');
+  check(chromeMock.alarms._createHistory().length === createsBefore, 'N.7 a replay arms no new alarm');
+
+  await chromeMock.storage.session.set({ 'mcpVisualSession:502': {
+    tabId: 502, agentId: 'agent_replay', client: 'Claude', visualReason: 'Old step',
+    startedAt: Date.now() - 120000, lastTickAt: Date.now() - 90000, deadlineAt: Date.now() - 30000, isFinal: false
+  } });
+  capturedStatusBroadcasts.length = 0;
+  const elapsed = await lc.replayVisualSessionLifecycleForTab(502);
+  const gone = (await chromeMock.storage.session.get(['mcpVisualSession:502']))['mcpVisualSession:502'];
+  check(elapsed && elapsed.action === 'cleared', 'N.8 elapsed entry -> cleared instead of replayed');
+  check(gone === undefined, 'N.9 elapsed entry removed from storage');
+  check(capturedStatusBroadcasts.length === 1 && capturedStatusBroadcasts[0].statusData.phase === 'ended',
+    'N.10 elapsed entry broadcasts the clear payload, not a running one');
+
+  await chromeMock.storage.session.set({ 'mcpVisualSession:503': {
+    tabId: 503, agentId: 'agent_replay', client: 'Claude', visualReason: 'Done',
+    startedAt: Date.now(), lastTickAt: Date.now(), deadlineAt: Date.now() + 60000, isFinal: true
+  } });
+  capturedStatusBroadcasts.length = 0;
+  const finished = await lc.replayVisualSessionLifecycleForTab(503);
+  check(finished && finished.action === 'noop' && capturedStatusBroadcasts.length === 0,
+    'N.11 an is_final entry is not brought back');
+
+  const invalid = await lc.replayVisualSessionLifecycleForTab(0);
+  check(invalid && invalid.ok === false && invalid.reason === 'invalid_tab_id', 'N.12 invalid tab id rejected');
+
+  // background.js wiring: both content-script ready signals and tab load.
+  const fs = require('fs');
+  const bg = fs.readFileSync(path.join(__dirname, '..', 'extension', 'background.js'), 'utf8');
+  const chained = bg.match(/\.then\(\(replayed\) => replayed \|\| replayMcpVisualLifecycleForTab\(tabId\)\)/g) || [];
+  check(chained.length === 2, 'N.13 port_ready and contentScriptReady fall through to the implicit replay');
+  const onUpdatedStart = bg.indexOf("fsbTriggerRearmLiveObserversForTab(tabId, 'tabs.onUpdated.complete')");
+  const onUpdatedEnd = onUpdatedStart >= 0 ? bg.indexOf('\n});\n', onUpdatedStart) : -1;
+  const onUpdatedBlock = onUpdatedEnd > onUpdatedStart ? bg.slice(onUpdatedStart, onUpdatedEnd) : '';
+  check(onUpdatedBlock.includes('replayMcpVisualLifecycleForTab(tabId)'), 'N.14 tabs.onUpdated complete replays the implicit session');
+  check(/function replayMcpVisualLifecycleForTab\(tabId\) \{\n  if \(hasExplicitMcpVisualSession\(tabId\)\) return Promise\.resolve\(null\);/.test(bg),
+    'N.15 an explicit start_visual_session session on the tab takes precedence');
+}
+
 (async () => {
   await caseA();
   await caseB();
@@ -543,6 +613,7 @@ async function caseM() {
   await caseK();
   await caseL();
   await caseM();
+  await caseN();
 
   console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===');
   process.exit(failed > 0 ? 1 : 0);

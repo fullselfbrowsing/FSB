@@ -1400,6 +1400,27 @@ async function replayMcpVisualSessionForTab(tabId, options = {}) {
   };
 }
 
+function hasExplicitMcpVisualSession(tabId) {
+  try {
+    return !!getMcpVisualSessionManager().getTokenForTab(tabId);
+  } catch (_error) {
+    return false;
+  }
+}
+
+// Implicit (visual_reason/client) sessions broadcast once, at tick time. A tick
+// recorded by open_tab or navigate lands before the destination page has a
+// content script, so without a replay the overlay stays dark until the next
+// action. An explicit start_visual_session session on the same tab wins.
+function replayMcpVisualLifecycleForTab(tabId) {
+  if (hasExplicitMcpVisualSession(tabId)) return Promise.resolve(null);
+  if (typeof MCPVisualSessionLifecycleUtils === 'undefined'
+      || typeof MCPVisualSessionLifecycleUtils.replayVisualSessionLifecycleForTab !== 'function') {
+    return Promise.resolve(null);
+  }
+  return MCPVisualSessionLifecycleUtils.replayVisualSessionLifecycleForTab(tabId);
+}
+
 async function restorePersistedMcpVisualSessions() {
   if (!mcpVisualSessionManager) return;
 
@@ -5331,12 +5352,14 @@ chrome.runtime.onConnect.addListener((port) => {
           method: 'port'
         });
         automationLogger.logComm(null, 'receive', 'port_ready', true, { tabId, url: msg.url });
-        replayMcpVisualSessionForTab(tabId, { now: Date.now(), source: 'port_ready' }).catch((error) => {
-          automationLogger.debug('MCP visual-session replay on port ready failed', {
-            tabId,
-            error: error?.message || String(error),
+        replayMcpVisualSessionForTab(tabId, { now: Date.now(), source: 'port_ready' })
+          .then((replayed) => replayed || replayMcpVisualLifecycleForTab(tabId))
+          .catch((error) => {
+            automationLogger.debug('MCP visual-session replay on port ready failed', {
+              tabId,
+              error: error?.message || String(error),
+            });
           });
-        });
       } else if (msg.type === 'heartbeat-ack') {
         const portInfo = contentScriptPorts.get(tabId);
         if (portInfo) portInfo.lastHeartbeat = Date.now();
@@ -5416,6 +5439,15 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
   fsbTriggerRearmLiveObserversForTab(tabId, 'tabs.onUpdated.complete')
     .catch((err) => {
       console.warn('[FSB TRG] live-observe tabs.onUpdated re-arm failed (non-blocking):', err && err.message);
+    });
+  // A page an agent opened or navigated: its tick was broadcast before this
+  // document existed. sendSessionStatus injects the content script if needed.
+  replayMcpVisualLifecycleForTab(tabId)
+    .catch((err) => {
+      automationLogger.debug('MCP visual lifecycle replay on tab complete failed', {
+        tabId,
+        error: err?.message || String(err),
+      });
     });
 });
 
@@ -12494,12 +12526,14 @@ const fsbHandleRuntimeMessage = (request, sender, sendResponse) => {
           });
           debugLog('[FSB Background] Tab marked as ready:', tabId);
           automationLogger.logInit('content_script', 'ready', { tabId, frameId, readyState: request.readyState, retry: request.retry || false });
-          replayMcpVisualSessionForTab(tabId, { now: Date.now(), source: 'contentScriptReady' }).catch((error) => {
-            automationLogger.debug('MCP visual-session replay on contentScriptReady failed', {
-              tabId,
-              error: error?.message || String(error),
+          replayMcpVisualSessionForTab(tabId, { now: Date.now(), source: 'contentScriptReady' })
+            .then((replayed) => replayed || replayMcpVisualLifecycleForTab(tabId))
+            .catch((error) => {
+              automationLogger.debug('MCP visual-session replay on contentScriptReady failed', {
+                tabId,
+                error: error?.message || String(error),
+              });
             });
-          });
         } else {
           debugLog('[FSB Background] Iframe ready ignored, frame:', frameId);
           automationLogger.debug('Iframe content script ready (ignored)', { tabId, frameId });
