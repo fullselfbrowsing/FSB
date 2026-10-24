@@ -7,7 +7,7 @@ payload is generated into `build/safari/` by `npm run build:safari`.
 ```
 npm run build:safari      # esbuild -> build/safari/ -> Version.xcconfig
 npm run validate:safari   # manifest + JS syntax + Safari negative invariants
-npm run test:safari       # 576 assertions across 11 suites
+npm run test:safari       # 716 assertions across 16 suites (one needs macOS + swiftc)
 ```
 
 ## Why there is no fork
@@ -45,10 +45,13 @@ safari/
       Resources/                   <- point this at ../../../build/safari
     Shared/                        member of BOTH targets
       NativeFraming.swift          wire codec + chunking
-      MCPSocketSession.swift       the real socket to ws://localhost:7225
-      BridgeCoordinator.swift      relay + linger/adoption
+      MCPSocketSession.swift       one real WebSocket (per channel)
+      BridgeCoordinator.swift      one per channel: relay + linger/adoption
       GrantedRoots.swift           security-scoped folder grants
       FileReadService.swift        sandbox-scoped chunked file reads
+  Tests/
+    BridgeChannels/main.swift      command-line harness over Shared/*.swift,
+                                   run by tests/safari-native-bridge-channels.test.js
 ```
 
 ## MCP on the same port
@@ -106,6 +109,35 @@ browser are planned as a separate change.
 in `BRIDGE_DISCONNECT_MESSAGES` — so the server's `sw_evicted` recovery would
 never arm. A 3 s linger (under the extension's 10 s staged-release grace) makes
 the common evict-and-revive case adopt the live socket instead of redialling.
+
+**The dashboard relay rides the same pipe, on its own channel.**
+`ws/ws-client.js` cannot open its socket to the FSB server either, for the same
+deadlock, so `createFSBRelaySocket` hands it an `FsbNativeBridgeSocket` on the
+`relay` channel wherever the worker `WebSocket` is guarded. Every native message
+names its channel (`ch`, `mcp` when absent), and the host keeps one
+`BridgeCoordinator` per channel: separate socket, poll, linger and watchdog, so
+the two never see each other's frames. The relay server authenticates by key and
+role only, so the app's socket needs no server change.
+`tests/safari-native-bridge-channels.test.js` builds the shipped `Shared/*.swift`
+into a command-line harness and drives both channels against two local
+WebSocket servers.
+
+## Toolbar icon
+
+Safari treats a grayscale toolbar icon as a template: it keeps only the alpha
+channel and tints it, gray or the accent color while the extension is active on
+the page. `icon*.png` are opaque grayscale tiles, so they showed as a solid
+square. The Safari manifest's `action.default_icon` points at
+`extension/assets/safari-toolbar-{16,32,48,64}.png` instead: the FSB lettering as
+black plus alpha on a transparent background, hand-drawn at 16 and 32 (the
+toolbar's 1x and 2x) by `scripts/generate-safari-toolbar-icons.py`. `icons` keeps
+the tile for Safari Settings.
+
+`utils/action-icon.js` animates the toolbar with `setIcon` frames. On a platform
+whose adapter sets `caps.templateToolbarIcon` it draws them the same way: no
+plate, every stroke and fill black at its usual alpha, so the orbit, sweep,
+capability ring and breathe still read once tinted. One coloured pixel would
+make Safari render that frame in colour instead.
 
 ## Remaining manual Xcode steps
 
@@ -176,27 +208,25 @@ as upside, not a dependency.
 - **Device memory**: `chrome.system.memory` is Chrome-only, so the agent-cap
   recommendation (`utils/agent-cap-recommendation.js`) falls back to its
   default. `get_memory_stats` is unaffected: it reports FSB's memory store.
-- **`capture_screenshot`**: unavailable. Every capture path goes through CDP,
-  so it returns `SCREENSHOT_CAPTURE_FAILED`
-  (`capability_unavailable: chrome.debugger.attach`). Safari does implement
-  `tabs.captureVisibleTab`, which could back viewport captures; not wired yet.
-- **Dashboard relay** (`ws/ws-client.js`): unavailable. It needs a WebSocket in
-  the service worker, which deadlocks Safari (see "MCP on the same port"), so
-  with the worker guard it fails fast and retries on its backoff. Streaming
-  and remote control from the dashboard ride on it.
-- **`press_key` foreground guard**: the tool still requires the Safari window
-  to be focused (`requireForegroundNativeInput`), although on Safari it only
-  dispatches DOM events.
+- **`capture_screenshot`**: the visible viewport only. Without CDP,
+  `utils/screenshot-capture.js` captures through `tabs.captureVisibleTab`:
+  `viewport` is that image, `region` and `element` are cropped out of it at
+  device pixels, and FSB's overlays are hidden for the capture as on Chrome.
+  `full_page`, device emulation and targets that are not on screen return
+  `INVALID_SCREENSHOT_ARGUMENTS` or `SCREENSHOT_REGION_OUT_OF_BOUNDS`, and a tab
+  that is not the active one returns a retryable `SCREENSHOT_CAPTURE_FAILED`
+  that says to `switch_tab` first.
 - **Trusted input** — `press_key`, the drag family and `scroll_at` dispatch
   untrusted DOM events. They report `trusted:false, degraded:true` rather than
   claiming success, and will not work on sites gating on `event.isTrusted` or
   inside cross-origin iframes.
-- **Dashboard remote control** — blocked by the relay gap above. Once the
-  relay has a Safari pipe: clicks, typing and scrolling from the
-  dashboard run the same untrusted DOM fallbacks. A click moves focus the way
-  a real one does. Backspace, Delete, Enter and Tab are performed when the page
-  leaves the keydown alone; arrow keys are not, and nothing reaches into
-  iframes. A miss on the page is logged and the session stays up.
+- **Dashboard remote control** — the relay now runs through the container app
+  (see "MCP on the same port"); not yet verified on device. Clicks, typing and
+  scrolling from the dashboard run the same untrusted DOM fallbacks. A click
+  moves focus the way a real one does. Backspace, Delete, Enter and Tab are
+  performed when the page leaves the keydown alone; arrow keys are not, and
+  nothing reaches into iframes. A miss on the page is logged and the session
+  stays up.
 - **Telemetry** — Safari installs send the same anonymous payload as Chrome and
   are counted, but nothing in it names the browser, so the two cannot be told
   apart.
@@ -290,5 +320,5 @@ hub on :7225.
 | V6 | Yes. `canvas-interceptor.js` ran in the page's main world (`window.__canvasInterceptorInstalled === true`). |
 | V7 | Partly. On a worker recycle the host saw the port close and :7225 was re-dialled; the extension reconnected and re-armed (`lastWakeReason: delegation-authority-ready`). After a hub restart it reconnected in about 12 s. |
 | V8 | Not verified: needs "Grant Folder Access" in the app. Without a grant, `upload_file` returns the typed `no_granted_folders` refusal. |
-| V9 | Moot: the relay cannot run in the Safari worker (see Known gaps). |
+| V9 | Not verified yet. The relay could not run in the Safari worker at all; it now runs through the app on the `relay` channel. The host side is covered by tests/safari-native-bridge-channels.test.js, the Safari side still needs a device run. |
 | V10 | Not verified: needs the workspace window. |
