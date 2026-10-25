@@ -451,6 +451,11 @@ code,
     flex-direction: column;
     gap: 12px;
   }
+
+  .footer-bottom .footer-version {
+    align-self: stretch;
+    text-align: center;
+  }
 }
 
 @media (max-width: 480px) {

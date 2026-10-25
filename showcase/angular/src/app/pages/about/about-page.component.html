@@ -5,52 +5,22 @@
     </div>
   </section>
 
-  <!-- Real Demo Videos -->
+  <!-- Trailer -->
   <section class="video-demo-section section">
     <div class="container">
       <div class="section-header reveal">
-        <h2 i18n="@@about.videos.title">Real Demos, Real Browser Work</h2>
-        <p i18n="@@about.videos.subtitle"><span [attr.translate]="'no'">FSB</span> still starts with a simple instruction, but these demos show the stronger loop: models and <span [attr.translate]="'no'">MCP</span> agents operating the browser, observing what happened, and pushing the task forward.</p>
+        <h2 i18n="@@about.videos.title">AI Browser Automation Demo</h2>
+        <p i18n="@@about.videos.subtitle"><span [attr.translate]="'no'">FSB</span> connects natural-language instructions and <span [attr.translate]="'no'">MCP</span> agents to your real browser. Watch the official trailer, then explore its built-in memory and browser actions below.</p>
       </div>
       <div class="video-demo-grid">
         <article class="video-demo-card reveal delay-1">
           <div class="video-frame">
-            <iframe src="https://www.youtube.com/embed/_iQ4_LSXcTU" i18n-title="@@about.videos.demo1.iframe.title" title="FSB: E-Commerce Autopilot by Grok 4.1" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+            <iframe width="960" height="540" src="https://www.youtube-nocookie.com/embed/osNHSquClo0" i18n-title="@@about.videos.trailer.iframe.title" title="FSB Demo: AI Browser Automation in Chrome" loading="eager" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
           </div>
           <div class="video-demo-copy">
-            <span class="video-demo-tag" i18n="@@about.videos.demo1.tag" [attr.translate]="'no'">Autopilot</span>
-            <h3 i18n="@@about.videos.demo1.title"><span [attr.translate]="'no'">FSB</span>: E-Commerce Autopilot by <span [attr.translate]="'no'">Grok 4.1</span></h3>
-            <p i18n="@@about.videos.demo1.desc"><span [attr.translate]="'no'">FSB</span> drives a shopping workflow from instruction to browser actions, showing the practical side of full self-browsing.</p>
-          </div>
-        </article>
-        <article class="video-demo-card reveal delay-2">
-          <div class="video-frame">
-            <iframe src="https://www.youtube-nocookie.com/embed/WbpOrFwgGME" i18n-title="@@about.videos.demo2.iframe.title" title="Flight Booking: Powered by Codex MCP" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
-          </div>
-          <div class="video-demo-copy">
-            <span class="video-demo-tag" i18n="@@about.videos.demo2.tag" [attr.translate]="'no'">MCP</span>
-            <h3 i18n="@@about.videos.demo2.title">Flight Booking: Powered by <span [attr.translate]="'no'">Codex MCP</span></h3>
-            <p i18n="@@about.videos.demo2.desc"><span [attr.translate]="'no'">Codex</span> uses <span [attr.translate]="'no'">FSB</span> through <span [attr.translate]="'no'">MCP</span> as the browser layer, turning coding-agent reasoning into real page interaction.</p>
-          </div>
-        </article>
-        <article class="video-demo-card reveal delay-3">
-          <div class="video-frame video-frame--ambient">
-            <iframe src="https://www.youtube-nocookie.com/embed/PNTGCWGopf8?autoplay=1&amp;mute=1&amp;controls=0&amp;loop=1&amp;playlist=PNTGCWGopf8&amp;playsinline=1&amp;disablekb=1&amp;fs=0&amp;rel=0&amp;modestbranding=1&amp;iv_load_policy=3" i18n-title="@@about.videos.demo3.iframe.title" title="OpenClaw Monitoring Doge Price" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" referrerpolicy="strict-origin-when-cross-origin"></iframe>
-          </div>
-          <div class="video-demo-copy">
-            <span class="video-demo-tag" i18n="@@about.videos.demo3.tag" [attr.translate]="'no'">OpenClaw</span>
-            <h3 i18n="@@about.videos.demo3.title" [attr.translate]="'no'">OpenClaw Monitoring Doge Price</h3>
-            <p i18n="@@about.videos.demo3.desc"><span [attr.translate]="'no'">OpenClaw</span> can provide the agent loop while <span [attr.translate]="'no'">FSB</span> supplies the live browser control surface for real-world monitoring tasks.</p>
-          </div>
-        </article>
-        <article class="video-demo-card reveal delay-4">
-          <div class="video-frame">
-            <iframe src="https://www.youtube-nocookie.com/embed/mD9oGB2JqVM" i18n-title="@@about.videos.demo4.iframe.title" title="An Aha Moment by Claude Opus 4.6" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
-          </div>
-          <div class="video-demo-copy">
-            <span class="video-demo-tag" i18n="@@about.videos.demo4.tag" [attr.translate]="'no'">Claude</span>
-            <h3 i18n="@@about.videos.demo4.title">An Aha Moment by <span [attr.translate]="'no'">Claude Opus 4.6</span></h3>
-            <p i18n="@@about.videos.demo4.desc"><span [attr.translate]="'no'">Claude</span> pairs reasoning with <span [attr.translate]="'no'">FSB</span>'s browser execution so the agent can learn from the page and keep iterating.</p>
+            <h3>{{ trailerName }}</h3>
+            <p>{{ trailerDescription }}</p>
+            <a [href]="trailerWatchUrl" target="_blank" rel="noopener" i18n="@@about.videos.trailer.watch">Watch on YouTube</a>
           </div>
         </article>
       </div>

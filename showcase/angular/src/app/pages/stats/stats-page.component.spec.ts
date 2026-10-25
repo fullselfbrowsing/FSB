@@ -468,7 +468,7 @@ describe('StatsPageComponent public status presentation', () => {
     expect(fixture.componentInstance.hasFsbAggregateSnapshot).toBeFalse();
     expect(text(fixture, '.stats-headline')).toContain('active right now');
     expect(text(fixture, '.stats-headline')).not.toContain('users (365d)');
-    expect(text(fixture, '.stats-headline')).not.toContain('agent-days since active v2');
+    expect(text(fixture, '.stats-headline')).not.toContain('Agent-days');
     expect(text(fixture, '.stats-headline')).not.toContain('tokens (24h)');
   });
 

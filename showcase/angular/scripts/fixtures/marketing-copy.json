@@ -1,0 +1,13 @@
+{
+  "home.hero.subtitle": {
+    "source": "AI-powered browser automation through natural language and connected AI agents. Built for the future of autonomous browsing.",
+    "targets": {
+      "es": "Automatización del navegador con IA mediante lenguaje natural y agentes de IA conectados. Diseñada para el futuro de la navegación autónoma.",
+      "de": "KI-gestützte Browserautomatisierung durch natürliche Sprache und verbundene KI-Agenten. Entwickelt für die Zukunft des autonomen Browsens.",
+      "ja": "自然言語と接続された AI エージェントによる、AI を活用したブラウザー自動化。自律型ブラウジングの未来に向けて。",
+      "ko": "자연어와 연결된 AI 에이전트로 구현하는 AI 기반 브라우저 자동화. 자율 브라우징의 미래를 위해 만들어졌습니다.",
+      "zh-CN": "通过自然语言和连接的 AI 智能体，实现 AI 驱动的浏览器自动化。为自主浏览的未来而打造。",
+      "zh-TW": "透過自然語言和連接的 AI 代理程式，實現 AI 驅動的瀏覽器自動化。為自主瀏覽的未來而打造。"
+    }
+  }
+}

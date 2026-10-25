@@ -1,8 +1,10 @@
 # FSB (Full Self-Browsing)
 
+The About page embeds the public 33-second FSB trailer (uploaded September 6, 2026), with a visible synopsis and YouTube link. FSB can run from natural-language instructions with a chosen model, through an agent CLI, or as an MCP browser connection for a calling agent. Chrome 116 or a compatible desktop Chromium browser is required; Firefox is not currently supported. The extension is free and MIT licensed; hosted model usage is billed by the chosen provider. MCP agents can work across tabs using agent identity and tab ownership. Setup, costs, privacy, and troubleshooting answers are at https://full-selfbrowsing.com/support.
+
 ## 1. Project Description
 
-FSB (Full Self-Browsing) is an open-source Chrome extension that automates the browser through natural language. You describe a task in plain English; FSB plans the clicks, types, and navigation to complete it. The extension runs in your browser with your own API keys, encrypted local storage, and opt-out anonymous usage telemetry for aggregate public stats only. Multi-model AI (xAI Grok, OpenAI, Anthropic Claude, Google Gemini, OpenRouter, LM Studio, custom OpenAI-compatible endpoints), 56 canonical browser tools, a 68-tool MCP surface, 142+ site-specific guides, reactive trigger watchers, real file uploads, and a 128-app native capability catalog for verified first-party API execution. Current release: FSB v0.9.92 (Chrome extension) with fsb-mcp-server 0.11.1 (npm MCP package).
+FSB (Full Self-Browsing) is an open-source Chrome extension that automates the browser through natural language. You describe a task in plain English; FSB plans the clicks, types, and navigation to complete it. The extension runs in your browser with your own API keys, encrypted local storage, and opt-out anonymous usage telemetry for aggregate public stats only. Multi-model AI (xAI Grok, OpenAI, Anthropic Claude, Google Gemini, OpenRouter, LM Studio, custom OpenAI-compatible endpoints), 56 canonical browser tools, a 68-tool MCP surface, 142+ site-specific guides, reactive trigger watchers, real file uploads, and a 128-app native capability catalog for verified first-party API execution. Current release: FSB v0.9.92 (Chrome extension) with fsb-mcp-server 0.11.2 (npm MCP package). On Online-Mind2Web, FSB's AI-reviewed result (277/300) is 92.3%; see the benchmark under Comparison.
 
 License: [MIT License](https://github.com/fullselfbrowsing/FSB/blob/main/LICENSE).
 
@@ -12,9 +14,12 @@ FSB exists because the gap between "I want the browser to do X" and "I can write
 
 A useful MCP framing: FSB is not only a "bot that browses." It is the browser surface agents can use when they need to act, observe, verify, and iterate across real web interfaces. Companion systems such as OpenClaw can provide autonomy, scheduling, identity, and personality while FSB performs the browser actions.
 
-The About page now uses real demo videos instead of synthetic CSS recreations. The demos show FSB e-commerce autopilot powered by Grok 4.1, flight booking powered by Codex MCP, OpenClaw monitoring Doge price, and an Aha moment powered by Claude Opus 4.6. The About page also embeds an interactive knowledge-graph viewer of FSB's site intelligence and guide coverage.
+The About page embeds the official FSB trailer, an interactive knowledge-graph viewer of FSB's site intelligence and guide coverage, and a categorized library of the browser actions FSB exposes to agents.
 
-Demo video URLs:
+Trailer (embedded on the About page):
+- FSB Trailer (YouTube title "FSB Demo: AI Browser Automation in Chrome | Full Self-Browsing v0.9.91"): https://www.youtube.com/watch?v=osNHSquClo0
+
+More demos on the YouTube channel:
 - FSB: E-Commerce Autopilot by Grok 4.1: https://www.youtube.com/watch?v=_iQ4_LSXcTU
 - Flight Booking: Powered by Codex MCP: https://www.youtube.com/watch?v=WbpOrFwgGME
 - OpenClaw Monitoring Doge Price: https://www.youtube.com/watch?v=PNTGCWGopf8
@@ -69,20 +74,20 @@ Credential and payment helpers are supervised autofill tools, not secret-export 
 The remote dashboard's DOM live preview is powered by PhantomStream (published on npm as `@full-self-browsing/phantom-stream`): one style-inlined snapshot, then MutationObserver diffs instead of pixels. As of PhantomStream 0.2.1, progressive `<video>` and `<audio>` elements can mirror alongside DOM snapshots through a media side channel. Input fields are masked in captured frames; adaptive HLS/DASH discovery is deferred because it would require a new `webRequest` permission.
 
 ### Supported AI providers
-- xAI: grok-4-1-fast (default, recommended), grok-4-1-fast-non-reasoning, grok-4, grok-code-fast-1, grok-3, grok-3-mini
-- OpenAI: GPT-4o (default), ChatGPT-4o Latest, GPT-4o Mini, GPT-4 Turbo
-- Anthropic: Claude Sonnet 4.6 (default), Claude Opus 4.6, Claude Opus 4.5, Claude Sonnet 4.5, Claude Haiku 4.5, and older Claude models
-- Google: Gemini 2.5 Flash (default), Gemini 2.5 Flash-Lite, Gemini 2.5 Pro, Gemini 2.0 Flash (free experimental)
-- OpenRouter: one key routes many models (GPT-4o, Claude, Gemini, Grok, Llama 4, DeepSeek R1 presets) with live discovery
-- LM Studio: local models with no API key; FSB reads the live list from the local server's /v1/models
+- xAI: Grok models
+- OpenAI: models available through the OpenAI API
+- Anthropic: Claude models
+- Google: Gemini models
+- OpenRouter: access to multiple providers through one key, with live model discovery
+- LM Studio: local models with no hosted-provider API key; FSB reads the live list from the local server's /v1/models
 - Custom: any OpenAI-compatible chat-completions endpoint
 
-Live model discovery queries provider model endpoints where available and falls back to the bundled lists above when a provider is offline or a key is missing.
+FSB uses live model discovery where available and bundled presets as a fallback. Check your selected provider's current model availability and pricing before choosing a model.
 
 ### Install posture
-- Chrome 88+ (Manifest V3); also runs on Chromium-based browsers (Edge, Brave)
+- Chrome 116+ (Manifest V3); compatible desktop Chromium-based browsers include Microsoft Edge, Brave, Opera, and Vivaldi. Firefox is not currently supported.
 - Single-user, single-machine: extension is local; no shared infrastructure
-- BYO API key: stored encrypted in Chrome local storage; never leaves the browser
+- BYO API key: stored encrypted in Chrome local storage and used to authenticate requests to the selected AI provider
 
 ## 3. Install Instructions
 
@@ -131,7 +136,7 @@ FSB exposes its tooling through a Model Context Protocol (MCP) server. External 
 The MCP surface is the best way to use FSB with coding agents and external autonomy layers. FSB handles precise single-attempt browser execution, visual feedback, observability, and verification. Long-running scheduling and personality/identity decisions belong in the calling agent layer, such as OpenClaw or Claude Routines.
 
 ### OpenClaw skill
-FSB ships a dedicated OpenClaw + Hermes skill at `skills/fsb/` in the repo root. The skill is the canonical OpenClaw onboarding path: it runs the doctor flow against `fsb-mcp-server`, prints the OpenClaw stdio config block for the user to paste into OpenClaw's MCP config, and offers consent-gated install for any other MCP hosts detected on the same machine. The bare `--openclaw` flag in the FSB MCP installer stays manual / unsupported because OpenClaw's MCP config schema is still unstable across builds; the skill prints, the user pastes, no auto-write. Frontmatter ships with `name: fsb`, `version: 0.9.92`, `requires.bins: [node, npx]`, and `requires.env: []` so vault credentials never leave the FSB Chrome extension. The full marketing rundown (skill features, MCP power story, 3-step install, grounded use cases, autopilot rules) lives at `https://full-selfbrowsing.com/agents`. Hermes users get the same skill: `node skills/fsb/scripts/print-hermes-yaml.mjs` prints the canonical `~/.hermes/config.yaml` `mcp_servers.fsb` block, and FSB v0.9.69 (PR #49) added `Hermes` to the v0.9.36 shared MCP client allowlist so action calls passing `client: "Hermes"` work without schema changes.
+FSB ships a dedicated OpenClaw + Hermes skill at `skills/fsb/` in the repo root. The skill is the canonical OpenClaw onboarding path: it runs the doctor flow against `fsb-mcp-server`, prints the OpenClaw stdio config block for the user to paste into OpenClaw's MCP config, and offers consent-gated install for any other MCP hosts detected on the same machine. The bare `--openclaw` flag in the FSB MCP installer stays manual / unsupported because OpenClaw's MCP config schema is still unstable across builds; the skill prints, the user pastes, no auto-write. Frontmatter ships with `name: fsb`, `version: 0.9.92`, `requires.bins: [node, npx]`, and `requires.env: []` so vault credentials never leave the FSB Chrome extension. The full marketing rundown (supported agents and hosts, MCP power story, skill features, one-line install command, grounded use cases, autopilot rules) lives at `https://full-selfbrowsing.com/agents`. Hermes users get the same skill: `node skills/fsb/scripts/print-hermes-yaml.mjs` prints the canonical `~/.hermes/config.yaml` `mcp_servers.fsb` block, and FSB v0.9.69 (PR #49) added `Hermes` to the v0.9.36 shared MCP client allowlist so action calls passing `client: "Hermes"` work without schema changes.
 
 ### ClawHub install path
 The /agents page exposes a one-click install on ClawHub at `https://clawhub.ai/lakshmanturlapati/full-selfbrowsing`. ClawHub is the recommended distribution surface for OpenClaw users who want the FSB skill registered without manually pasting stdio config. The skill source remains browsable at `https://github.com/fullselfbrowsing/FSB/tree/main/skills/fsb` for users who prefer reading before installing.
@@ -161,6 +166,29 @@ FSB ships 142+ hand-curated site-specific guides (Notion, Google Sheets, Workday
 
 These are factual capability summaries, not endorsements. FSB has overlap and differentiation with each project; the right tool depends on what you need.
 
+### Online-Mind2Web benchmark
+
+Average success rates on [Online-Mind2Web](https://huggingface.co/spaces/osunlp/Online_Mind2Web_Leaderboard), with FSB included.
+
+| # | Agent | Average success rate |
+| ---: | --- | ---: |
+| 01 | Hark | 97.7% |
+| 02 | Navigator (n1.5) | 97.3% |
+| 03 | ACT-2 | 92.7% |
+| 04 | FSB | 92.3% |
+| 05 | Navigator (n1-preview) | 78.7% |
+| 06 | Google Computer Use | 69.0% |
+| 07 | Operator | 61.3% |
+| 08 | ACT-1 (Aug 2025) | 57.3% |
+| 09 | Claude Computer Use | 56.3% |
+| 10 | ACT-1 (Jul 2025) | 45.7% |
+
+FSB: AI-reviewed result (277/300). Other values are transcribed from the leaderboard. Evaluation methods differ; numerical placement is illustrative, not an official leaderboard ranking. Tested on FSB v0.9.92 · MCP v0.11.2.
+
+- **What is FSB's Online-Mind2Web result?** AI-reviewed result (277/300), shown as 92.3% in the top 10 chart on https://full-selfbrowsing.com.
+- **Which versions were tested?** FSB v0.9.92 (Chrome extension) with MCP v0.11.2.
+- **Where is the report?** https://github.com/fullselfbrowsing/FSB/blob/mind2web/mind2web/BENCHMARK-REPORT.md
+
 ### Browser Use
 Browser Use is an open-source library and CLI for headless browser automation driven by LLMs. It runs in Node.js and Python contexts and targets server-side automation pipelines. Overlap with FSB: natural-language task execution against a browser, action-verification loops, multi-model support. Difference from FSB: Browser Use is a server-side library, not a Chrome extension; it operates a headless Chromium instance the user does not see, while FSB drives the user's actual browser session with the user's logged-in cookies. If you are building a backend automation pipeline, Browser Use fits that shape; if you are sitting at your own browser and want to delegate clicks and forms inside that session, FSB fits that shape.
 
@@ -187,6 +215,7 @@ Operator is OpenAI's agentic browser product (2025). Overlap with FSB: end-user-
 - Chrome Web Store: https://chromewebstore.google.com/detail/badgafnfchcihdfnjneklogedcdkmjfk
 - GitHub: https://github.com/fullselfbrowsing/FSB
 - YouTube channel: https://www.youtube.com/@parzival5707
+- Trailer: FSB Trailer: https://www.youtube.com/watch?v=osNHSquClo0
 - Demo: FSB: E-Commerce Autopilot by Grok 4.1: https://www.youtube.com/watch?v=_iQ4_LSXcTU
 - Demo: Flight Booking: Powered by Codex MCP: https://www.youtube.com/watch?v=WbpOrFwgGME
 - Demo: OpenClaw Monitoring Doge Price: https://www.youtube.com/watch?v=PNTGCWGopf8

@@ -1,29 +1,23 @@
 <!-- Hero -->
 <section class="agents-hero">
   <div class="container">
-    <div class="agents-hero-badge reveal">
-      <img
-        [src]="'assets/providers/' + markFile"
-        [alt]="markAlt"
-        class="agents-hero-mark"
-        [class.is-morphing]="morphing"
-        width="22"
-        height="22"
-        decoding="async">
-      <span><span [attr.translate]="'no'" class="agents-hero-morph">{{ currentToken }}</span>&nbsp;<ng-container i18n="@@agents.hero.badge">Ready</ng-container></span>
+    <div class="agents-hero-badge reveal" (mouseenter)="onTokenEnter()" (mouseleave)="onTokenLeave()">
+      <span class="agents-hero-mark" [class.is-morphing]="morphing" aria-hidden="true">
+        <span class="ag-glyph" [style.--ag-logo]="logoMask(markFile)"></span>
+      </span>
+      <span><span [attr.translate]="'no'" class="agents-hero-morph" aria-hidden="true">{{ currentToken }}</span><span class="sr-only" [attr.translate]="'no'">{{ markToken }}</span>&nbsp;<ng-container i18n="@@agents.hero.badge">Ready</ng-container></span>
+      <span class="agents-hero-dot" aria-hidden="true"></span>
     </div>
     <h1 class="reveal delay-1" i18n="@@agents.hero.title">
       Give your agent a real <span class="text-orange">browser</span>.
     </h1>
     <p class="reveal delay-2" i18n="@@agents.hero.subtitle">
-      <span [attr.translate]="'no'">FSB</span> ships a polished <span [attr.translate]="'no'">OpenClaw</span> skill plus a 68-tool <span [attr.translate]="'no'">MCP</span> surface that any agent runtime can drive. Click, type, orchestrate across tabs, fill vault credentials, read live page state, all from one prompt, in the user&#39;s actual <span [attr.translate]="'no'">Chrome</span>.
+      Always-on agents like <span [attr.translate]="'no'">Grok Bot</span>, <span [attr.translate]="'no'">Muse</span>, and <span [attr.translate]="'no'">Dots</span> ship with a cloud computer. <span [attr.translate]="'no'">FSB</span> hands them yours: the <span [attr.translate]="'no'">Chrome</span> you are already signed into, 68 <span [attr.translate]="'no'">MCP</span> tools, and a verified result after every action.
     </p>
     <div class="agents-hero-actions reveal delay-3">
-       
       <a href="https://clawhub.ai/lakshmanturlapati/full-selfbrowsing" target="_blank" rel="noopener" class="btn btn-primary" i18n="@@agents.hero.cta.install">
         Install on <span [attr.translate]="'no'">ClawHub</span>
       </a>
-       
       <a href="https://github.com/fullselfbrowsing/FSB" target="_blank" rel="noopener" class="btn btn-secondary" i18n="@@agents.hero.cta.github">
         <i class="fa-brands fa-github"></i> View on <span [attr.translate]="'no'">GitHub</span>
       </a>
@@ -31,29 +25,87 @@
   </div>
 </section>
 
-<!-- Meet the FSB Skill -->
-<section class="section agents-skill">
+<!-- Flow strip: agent -> FSB -> the user's Chrome -->
+<div class="ag-flow-wrap reveal delay-3">
+  <div class="ag-flow" role="group" aria-label="How an agent drives FSB" i18n-aria-label="@@agents.flow.aria" (mouseenter)="onTokenEnter()" (mouseleave)="onTokenLeave()">
+    <div class="ag-node">
+      <div class="ag-node-box">
+        <span class="agents-hero-mark" [class.is-morphing]="morphing" aria-hidden="true">
+          <span class="ag-glyph" [style.--ag-logo]="logoMask(markFile)"></span>
+        </span>
+      </div>
+      <span class="ag-node-label" i18n="@@agents.flow.agent.label"><span [attr.translate]="'no'" aria-hidden="true">{{ currentToken }}</span><span class="sr-only" [attr.translate]="'no'">{{ markToken }}</span> thinks</span>
+    </div>
+    <div class="ag-wire"></div>
+    <div class="ag-node ag-node-core">
+      <div class="ag-node-box">
+        <span class="fsb-mark fsb-highlight-wordmark" role="img" aria-label="FSB" i18n-aria-label="@@agents.flow.core.aria" [attr.translate]="'no'">
+          <span class="fsb-row" aria-hidden="true">
+            <span class="fsb-f"></span>
+            <span class="fsb-s"></span>
+            <svg class="fsb-b" viewBox="-3 -3 78 103" aria-hidden="true">
+              <path d="M0 0 L40 0 C58 0 70 10 70 26 C70 38 62 46 50 49 C64 51 72 60 72 74 C72 90 60 100 40 100 L0 100 Z"></path>
+            </svg>
+          </span>
+        </span>
+      </div>
+      <span class="ag-node-label" i18n="@@agents.flow.core.label">Reads · Acts · Verifies</span>
+    </div>
+    <div class="ag-wire"></div>
+    <div class="ag-node">
+      <div class="ag-node-box"><i class="fa-solid fa-globe" aria-hidden="true"></i></div>
+      <span class="ag-node-label" i18n="@@agents.flow.chrome.label">Your <span [attr.translate]="'no'">Chrome</span></span>
+    </div>
+  </div>
+</div>
+
+<!-- Works with the agents you already run -->
+<section class="section agents-with">
   <div class="container">
     <div class="section-header reveal">
-      <h2 i18n="@@agents.skill.title">Meet the <span [attr.translate]="'no'">FSB</span> Skill</h2>
-      <p i18n="@@agents.skill.subtitle">The canonical <span [attr.translate]="'no'">OpenClaw</span> onboarding path for <span [attr.translate]="'no'">FSB</span>. Loads cleanly into a fresh <span [attr.translate]="'no'">OpenClaw</span>, runs the full diagnostic flow, and installs the bridge for any other <span [attr.translate]="'no'">MCP</span> host on your machine.</p>
+      <h2 i18n="@@agents.with.title">Works with the agents <span class="text-orange">you already run</span></h2>
+      <p i18n="@@agents.with.subtitle">Connect <span [attr.translate]="'no'">Codex</span>, <span [attr.translate]="'no'">Claude Code</span>, <span [attr.translate]="'no'">Cursor</span>, <span [attr.translate]="'no'">OpenClaw</span>, <span [attr.translate]="'no'">Hermes</span>, or another <span [attr.translate]="'no'">MCP</span> host to <span [attr.translate]="'no'">FSB</span>. Install the <span [attr.translate]="'no'">Chrome</span> extension, connect the <span [attr.translate]="'no'">MCP</span> bridge, and run <code [attr.translate]="'no'">doctor</code> to verify access to your real browser session.</p>
     </div>
-    <div class="skill-feature-grid">
-      <article class="skill-feature-card reveal delay-1">
-        <div class="skill-feature-icon"><i class="ph ph-stethoscope"></i></div>
-        <h3 i18n="@@agents.skill.feature.doctor.title">Doctor first protocol</h3>
-        <p i18n="@@agents.skill.feature.doctor.desc">Runs <code [attr.translate]="'no'">npx -y fsb-mcp-server@latest doctor</code>, parses the failing layer (one of <code [attr.translate]="'no'">package</code>, <code [attr.translate]="'no'">bridge</code>, <code [attr.translate]="'no'">extension</code>, <code [attr.translate]="'no'">active-tab</code>, <code [attr.translate]="'no'">content-script</code>, <code [attr.translate]="'no'">config</code>), and prints the next step recommendation. Exit code surfaces failure to the host.</p>
-      </article>
-      <article class="skill-feature-card reveal delay-2">
-        <div class="skill-feature-icon"><i class="ph ph-clipboard-text"></i></div>
-        <h3 i18n="@@agents.skill.feature.stdio.title">Stdio config printer</h3>
-        <p i18n="@@agents.skill.feature.stdio.desc">Emits the canonical <span [attr.translate]="'no'">OpenClaw</span> stdio block to paste into your <span [attr.translate]="'no'">MCP</span> config. The block stays parity locked with <code [attr.translate]="'no'">mcp/src/install.ts</code> so the printer never drifts from the rest of the installer.</p>
-      </article>
-      <article class="skill-feature-card reveal delay-3">
-        <div class="skill-feature-icon"><i class="ph ph-list-checks"></i></div>
-        <h3 i18n="@@agents.skill.feature.consent.title">Consent gated host install</h3>
-        <p i18n="@@agents.skill.feature.consent.desc">Detects other <span [attr.translate]="'no'">MCP</span> hosts (<span [attr.translate]="'no'">Claude Desktop</span>, <span [attr.translate]="'no'">Cursor</span>, <span [attr.translate]="'no'">Codex</span>, etc.) and asks <code [attr.translate]="'no'">y/n</code> per host before installing. Never <code [attr.translate]="'no'">--all</code> without consent. Never auto writes the <span [attr.translate]="'no'">OpenClaw</span> config.</p>
-      </article>
+    <div class="ag-featured">
+      @for (agent of featuredAgents; track agent.id) {
+        <article class="ag-agent reveal" [class]="'delay-' + ($index + 1)">
+          <div class="ag-agent-head">
+            <span class="ag-agent-mark" aria-hidden="true">
+              <span class="ag-glyph" [style.--ag-logo]="logoMask(agent.logo)"></span>
+            </span>
+            <span class="ag-agent-maker" [attr.translate]="'no'">{{ agent.maker }}</span>
+          </div>
+          <h3 [attr.translate]="'no'">{{ agent.name }}</h3>
+          @switch (agent.id) {
+            @case ('grok') {
+              <p i18n="@@agents.with.agent.grok.desc">Persistent, named Bots on their own cloud computer. Give one <span [attr.translate]="'no'">FSB</span> and it works inside the <span [attr.translate]="'no'">Chrome</span> you are signed into instead of a blank sandbox.</p>
+            }
+            @case ('muse') {
+              <p i18n="@@agents.with.agent.muse.desc"><span [attr.translate]="'no'">Meta</span>&#39;s personal agent, and <span [attr.translate]="'no'">Muse Code</span> in the terminal. Point either at <span [attr.translate]="'no'">FSB</span> and the browsing happens on your machine, where your accounts already live.</p>
+            }
+            @case ('dots') {
+              <p i18n="@@agents.with.agent.dots.desc">Always-on agents that keep working after you close the tab. <span [attr.translate]="'no'">FSB</span> joins a dot&#39;s toolset like any other <span [attr.translate]="'no'">MCP</span> server, with every browser action verified.</p>
+            }
+          }
+          <div class="ag-agent-foot">
+            <i class="fa-solid fa-plug" aria-hidden="true"></i>
+            <span i18n="@@agents.with.agent.foot">via <span [attr.translate]="'no'">MCP</span> · 68 tools</span>
+          </div>
+        </article>
+      }
+    </div>
+    <div class="ag-more reveal delay-3">
+      <span class="ag-more-label" i18n="@@agents.with.more.label">Also at home in</span>
+      @for (chip of hostChips; track chip.name) {
+        <span class="ag-chip">
+          <span class="ag-glyph" [style.--ag-logo]="logoMask(chip.logo)" aria-hidden="true"></span>
+          <span [attr.translate]="'no'">{{ chip.name }}</span>
+        </span>
+      }
+      <span class="ag-chip ag-chip-muted">
+        <i class="fa-solid fa-plus" aria-hidden="true"></i>
+        <span i18n="@@agents.with.more.count">21 hosts · any <span [attr.translate]="'no'">MCP</span> client</span>
+      </span>
     </div>
   </div>
 </section>
@@ -65,35 +117,91 @@
       <h2 i18n="@@agents.power.title">Why <span [attr.translate]="'no'">FSB MCP</span> is <span class="text-orange">powerful</span></h2>
       <p i18n="@@agents.power.subtitle">Browser automation usually means a headless instance you cannot see. <span [attr.translate]="'no'">FSB</span> drives the user&#39;s actual <span [attr.translate]="'no'">Chrome</span> session, and the <span [attr.translate]="'no'">MCP</span> surface is built around four hard requirements: precision, observability, safety, and concurrency.</p>
     </div>
-    <div class="power-grid">
-      <article class="power-card reveal delay-1">
-        <div class="power-card-stat" i18n="@@agents.power.card.tools.stat">68</div>
+    <div class="power-grid reveal delay-1">
+      <article class="power-card">
+        <div class="power-card-stat" i18n="@@agents.power.card.tools.stat">68 tools</div>
         <div class="power-card-body">
-          <h3 i18n="@@agents.power.card.tools.title"><span [attr.translate]="'no'">MCP</span> tools, one surface</h3>
-          <p i18n="@@agents.power.card.tools.desc">Read, click, type, navigate, vault, observe. All typed. All agent-scoped. One surface, no glue code.</p>
+          <h3 i18n="@@agents.power.card.tools.title">One surface, no glue code</h3>
+          <p i18n="@@agents.power.card.tools.desc">Read, click, type, navigate, vault, observe. All typed. All agent-scoped.</p>
         </div>
       </article>
-      <article class="power-card reveal delay-2">
+      <article class="power-card">
         <div class="power-card-stat" i18n="@@agents.power.card.multiAgent.stat">N agents</div>
         <div class="power-card-body">
-          <h3 i18n="@@agents.power.card.multiAgent.title">Multi agent identity and tab ownership</h3>
-          <p i18n="@@agents.power.card.multiAgent.desc">Server-minted <code [attr.translate]="'no'">agent_id</code> per session. Tabs owned per agent. Cross-agent calls fail loud with <code [attr.translate]="'no'">TAB_NOT_OWNED</code>. Cap 1-64 (default 8), <code [attr.translate]="'no'">AGENT_CAP_REACHED</code> when full. No focus stealing.</p>
+          <h3 i18n="@@agents.power.card.multiAgent.title">Identity and tab ownership</h3>
+          <p i18n="@@agents.power.card.multiAgent.desc">Server-minted <code [attr.translate]="'no'">agent_id</code> per session. Tabs owned per agent; cross-agent calls fail loud with <code [attr.translate]="'no'">TAB_NOT_OWNED</code>. Cap 1-64, default 8. No focus stealing.</p>
         </div>
       </article>
-      <article class="power-card reveal delay-3">
+      <article class="power-card">
         <div class="power-card-stat" i18n="@@agents.power.card.vault.stat">0 leaks</div>
         <div class="power-card-body">
           <h3 i18n="@@agents.power.card.vault.title">Vault boundary, by design</h3>
-          <p i18n="@@agents.power.card.vault.desc">Passwords and cards resolve inside the extension&#39;s encrypted store via <code [attr.translate]="'no'">fill_credential</code> and <code [attr.translate]="'no'">use_payment_method</code>. Never in chat. Never in args. <code [attr.translate]="'no'">requires.env</code> is mandatory empty.</p>
+          <p i18n="@@agents.power.card.vault.desc">Passwords and cards resolve inside the extension&#39;s encrypted store via <code [attr.translate]="'no'">fill_credential</code> and <code [attr.translate]="'no'">use_payment_method</code>. Never in chat. Never in args.</p>
         </div>
       </article>
-      <article class="power-card reveal delay-4">
+      <article class="power-card">
         <div class="power-card-stat" i18n="@@agents.power.card.live.stat">Live</div>
         <div class="power-card-body">
           <h3 i18n="@@agents.power.card.live.title">Real <span [attr.translate]="'no'">Chrome</span>, real session</h3>
-          <p i18n="@@agents.power.card.live.desc">Your cookies. Your extensions. Your saved state. <code [attr.translate]="'no'">change_report</code> streams mutations on every action — no extra <code [attr.translate]="'no'">read_page</code> round-trip.</p>
+          <p i18n="@@agents.power.card.live.desc">Your cookies. Your extensions. Your saved state. <code [attr.translate]="'no'">change_report</code> streams mutations on every action, no extra <code [attr.translate]="'no'">read_page</code> round-trip.</p>
         </div>
       </article>
+    </div>
+  </div>
+</section>
+
+<!-- Meet the FSB Skill -->
+<section class="section agents-skill">
+  <div class="container">
+    <div class="section-header reveal">
+      <h2 i18n="@@agents.skill.title">Meet the <span [attr.translate]="'no'">FSB</span> Skill</h2>
+      <p i18n="@@agents.skill.subtitle">The canonical <span [attr.translate]="'no'">OpenClaw</span> and <span [attr.translate]="'no'">Hermes</span> onboarding path. Loads cleanly into a fresh runtime, runs the full diagnostic flow, and installs the bridge for any other <span [attr.translate]="'no'">MCP</span> host on your machine.</p>
+    </div>
+    <div class="skill-feature-grid">
+      <article class="skill-feature-card reveal delay-1">
+        <div class="skill-feature-icon" aria-hidden="true"><i class="ph ph-stethoscope"></i></div>
+        <h3 i18n="@@agents.skill.feature.doctor.title">Doctor first protocol</h3>
+        <p i18n="@@agents.skill.feature.doctor.desc">Runs <code [attr.translate]="'no'">npx -y fsb-mcp-server@latest doctor</code>, parses the failing layer (<code [attr.translate]="'no'">package</code>, <code [attr.translate]="'no'">bridge</code>, <code [attr.translate]="'no'">extension</code>, <code [attr.translate]="'no'">active-tab</code>, <code [attr.translate]="'no'">content-script</code>, <code [attr.translate]="'no'">config</code>), and prints the next step. Exit code surfaces failure to the host.</p>
+      </article>
+      <article class="skill-feature-card reveal delay-2">
+        <div class="skill-feature-icon" aria-hidden="true"><i class="ph ph-clipboard-text"></i></div>
+        <h3 i18n="@@agents.skill.feature.stdio.title">Stdio config printer</h3>
+        <p i18n="@@agents.skill.feature.stdio.desc">Emits the canonical <span [attr.translate]="'no'">OpenClaw</span> stdio block or the <span [attr.translate]="'no'">Hermes</span>&nbsp;<code [attr.translate]="'no'">config.yaml</code> entry to paste into your <span [attr.translate]="'no'">MCP</span> config. Parity locked with <code [attr.translate]="'no'">mcp/src/install.ts</code> so it never drifts from the installer.</p>
+      </article>
+      <article class="skill-feature-card reveal delay-3">
+        <div class="skill-feature-icon" aria-hidden="true"><i class="ph ph-list-checks"></i></div>
+        <h3 i18n="@@agents.skill.feature.consent.title">Consent gated host install</h3>
+        <p i18n="@@agents.skill.feature.consent.desc">Detects other <span [attr.translate]="'no'">MCP</span> hosts (<span [attr.translate]="'no'">Claude Desktop</span>, <span [attr.translate]="'no'">Cursor</span>, <span [attr.translate]="'no'">Codex</span>, etc.) and asks <code [attr.translate]="'no'">y/n</code> per host before installing. Never <code [attr.translate]="'no'">--all</code> without consent. Never auto writes the <span [attr.translate]="'no'">OpenClaw</span> config.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- One line to connect -->
+<section class="section agents-connect">
+  <div class="container">
+    <div class="ag-connect reveal">
+      <div>
+        <h2 i18n="@@agents.connect.title">One line to connect</h2>
+        <p i18n="@@agents.connect.body">Pick your host and the installer writes the smallest config entry it needs. Restart the client, open a normal webpage, and ask it to read the page. Run <code [attr.translate]="'no'">install --list</code> to see all 21 targets.</p>
+      </div>
+      <div>
+        <button class="ag-cmd" [class.copied]="copied" type="button" (click)="copyCommand()" aria-label="Copy install command" i18n-aria-label="@@agents.connect.copy.aria" [attr.aria-describedby]="'agents-connect-command'">
+          <span class="ag-cmd-prompt" aria-hidden="true">$</span>
+          <span class="ag-cmd-text" id="agents-connect-command" [attr.translate]="'no'">{{ baseCommand }} <span class="ag-cmd-flag">{{ selectedHost.flag }}</span></span>
+          <i class="ag-cmd-copy fa-regular" [class.fa-copy]="!copied" [class.fa-circle-check]="copied" aria-hidden="true"></i>
+        </button>
+        <span class="sr-only" role="status" aria-live="polite">
+          @if (copied) {
+            <ng-container i18n="@@agents.connect.copied">Copied</ng-container>
+          }
+        </span>
+        <div class="ag-hosts" role="group" aria-label="Choose a host" i18n-aria-label="@@agents.connect.hosts.aria">
+          @for (host of installHosts; track host.flag) {
+            <button class="ag-host" [class.on]="$index === hostIndex" type="button" [attr.aria-pressed]="$index === hostIndex" (click)="pickHost($index)" [attr.translate]="'no'">{{ host.name }}</button>
+          }
+        </div>
+      </div>
     </div>
   </div>
 </section>
@@ -109,43 +217,50 @@
     <div class="prompt-grid">
       <article class="prompt-card reveal delay-1">
         <header class="prompt-card-head">
-          <span class="prompt-card-icon"><i class="ph ph-tray"></i></span>
+          <span class="prompt-card-icon" aria-hidden="true"><i class="ph ph-tray"></i></span>
           <span class="prompt-card-label" i18n="@@agents.try.prompt.inbox.label">Inbox triage</span>
         </header>
-        <p class="prompt-card-body" i18n="@@agents.try.prompt.inbox.body">Open <span [attr.translate]="'no'">Gmail</span>, label everything from billing as <code [attr.translate]="'no'">finance</code>, draft replies to support threads using yesterday&#39;s tone, and flag anything urgent.</p>
+        <p class="prompt-card-body"><span class="prompt-caret" aria-hidden="true">&gt;</span><ng-container i18n="@@agents.try.prompt.inbox.body">Open <span [attr.translate]="'no'">Gmail</span>, label everything from billing as <code [attr.translate]="'no'">finance</code>, draft replies to support threads using yesterday&#39;s tone, and flag anything urgent.</ng-container></p>
       </article>
       <article class="prompt-card reveal delay-2">
         <header class="prompt-card-head">
-          <span class="prompt-card-icon"><i class="ph ph-headset"></i></span>
+          <span class="prompt-card-icon" aria-hidden="true"><i class="ph ph-headset"></i></span>
           <span class="prompt-card-label" i18n="@@agents.try.prompt.support.label">Support replies</span>
         </header>
-        <p class="prompt-card-body" i18n="@@agents.try.prompt.support.body">In <span [attr.translate]="'no'">Zendesk</span>, draft answers to open tickets about pricing, order status, and shipping using the help center as ground truth.</p>
+        <p class="prompt-card-body"><span class="prompt-caret" aria-hidden="true">&gt;</span><ng-container i18n="@@agents.try.prompt.support.body">In <span [attr.translate]="'no'">Zendesk</span>, draft answers to open tickets about pricing, order status, and shipping using the help center as ground truth.</ng-container></p>
       </article>
       <article class="prompt-card reveal delay-3">
         <header class="prompt-card-head">
-          <span class="prompt-card-icon"><i class="ph ph-chart-line-up"></i></span>
+          <span class="prompt-card-icon" aria-hidden="true"><i class="ph ph-chart-line-up"></i></span>
           <span class="prompt-card-label" i18n="@@agents.try.prompt.dashboards.label">Logged-in dashboards</span>
         </header>
-        <p class="prompt-card-body" i18n="@@agents.try.prompt.dashboards.body">Pull yesterday&#39;s revenue, signups, and refund count from the analytics dashboard and post a one paragraph summary.</p>
+        <p class="prompt-card-body"><span class="prompt-caret" aria-hidden="true">&gt;</span><ng-container i18n="@@agents.try.prompt.dashboards.body">Pull yesterday&#39;s revenue, signups, and refund count from the analytics dashboard and post a one paragraph summary.</ng-container></p>
       </article>
       <article class="prompt-card reveal delay-4">
         <header class="prompt-card-head">
-          <span class="prompt-card-icon"><i class="ph ph-target"></i></span>
+          <span class="prompt-card-icon" aria-hidden="true"><i class="ph ph-target"></i></span>
           <span class="prompt-card-label" i18n="@@agents.try.prompt.leads.label">Lead monitoring</span>
         </header>
-        <p class="prompt-card-body" i18n="@@agents.try.prompt.leads.body">Score new <span [attr.translate]="'no'">LinkedIn</span> connection requests against the ICP, draft outreach for the top three, and skip the rest.</p>
+        <p class="prompt-card-body"><span class="prompt-caret" aria-hidden="true">&gt;</span><ng-container i18n="@@agents.try.prompt.leads.body">Score new <span [attr.translate]="'no'">LinkedIn</span> connection requests against the ICP, draft outreach for the top three, and skip the rest.</ng-container></p>
       </article>
       <article class="prompt-card reveal delay-5">
         <header class="prompt-card-head">
-          <span class="prompt-card-icon"><i class="ph ph-storefront"></i></span>
+          <span class="prompt-card-icon" aria-hidden="true"><i class="ph ph-storefront"></i></span>
           <span class="prompt-card-label" i18n="@@agents.try.prompt.smb.label">Small-business ops</span>
         </header>
-        <p class="prompt-card-body" i18n="@@agents.try.prompt.smb.body">Categorize today&#39;s invoices in the POS as supplies vs. retail, extract shipping line items, and flag any vendor over last month&#39;s average.</p>
+        <p class="prompt-card-body"><span class="prompt-caret" aria-hidden="true">&gt;</span><ng-container i18n="@@agents.try.prompt.smb.body">Categorize today&#39;s invoices in the POS as supplies vs. retail, extract shipping line items, and flag any vendor over last month&#39;s average.</ng-container></p>
+      </article>
+      <article class="prompt-card reveal delay-6">
+        <header class="prompt-card-head">
+          <span class="prompt-card-icon" aria-hidden="true"><i class="ph ph-bell-ringing"></i></span>
+          <span class="prompt-card-label" i18n="@@agents.try.prompt.triggers.label">Trigger watchers</span>
+        </header>
+        <p class="prompt-card-body"><span class="prompt-caret" aria-hidden="true">&gt;</span><ng-container i18n="@@agents.try.prompt.triggers.body">Watch the price on this listing and tell me when it drops under $400. Keep the tab open, do not reload unless it stops updating.</ng-container></p>
       </article>
     </div>
 
     <p class="autopilot-rule reveal" i18n="@@agents.try.autopilotRule">
-      These run as manual-mode tool calls. Autopilot (<code [attr.translate]="'no'">run_task</code>) only fires when the user explicitly delegates the whole task -- <strong>&quot;use <span [attr.translate]="'no'">FSB</span> autopilot&quot;</strong>, <strong>&quot;delegate this&quot;</strong>, or names <code [attr.translate]="'no'">run_task</code> directly. Manual mode is the default for everything else.
+      These run as manual-mode tool calls. Autopilot (<code [attr.translate]="'no'">run_task</code>) only fires when the user explicitly delegates the whole task: <strong>&quot;use <span [attr.translate]="'no'">FSB</span> autopilot&quot;</strong>, <strong>&quot;delegate this&quot;</strong>, or names <code [attr.translate]="'no'">run_task</code> directly.
     </p>
   </div>
 </section>
@@ -154,15 +269,18 @@
 <section class="section agents-cta">
   <div class="container">
     <div class="agents-cta-band reveal">
+      <div class="agents-cta-logos" aria-hidden="true">
+        @for (logo of ctaLogos; track logo) {
+          <span class="ag-glyph" [style.--ag-logo]="logoMask(logo)"></span>
+        }
+      </div>
       <h2 i18n="@@agents.cta.title">Ship a real browser to your agent <span class="text-orange">today</span>.</h2>
-      <p i18n="@@agents.cta.body">Free, open source, BYO model keys. Works with <span [attr.translate]="'no'">OpenClaw</span>, <span [attr.translate]="'no'">Claude</span>, <span [attr.translate]="'no'">Codex</span>, <span [attr.translate]="'no'">Cursor</span>, <span [attr.translate]="'no'">Windsurf</span>, and any <span [attr.translate]="'no'">MCP</span> host that speaks the <span [attr.translate]="'no'">OpenAI</span> tool protocol.</p>
+      <p i18n="@@agents.cta.body">Free, open source, <span [attr.translate]="'no'">MIT</span> licensed. Works with <span [attr.translate]="'no'">Grok Bot</span>, <span [attr.translate]="'no'">Muse</span>, <span [attr.translate]="'no'">Dots</span>, <span [attr.translate]="'no'">OpenClaw</span>, <span [attr.translate]="'no'">Hermes</span>, <span [attr.translate]="'no'">Claude Code</span>, <span [attr.translate]="'no'">Codex</span>, <span [attr.translate]="'no'">Cursor</span>, and any <span [attr.translate]="'no'">MCP</span> host.</p>
       <div class="agents-cta-actions">
-         
         <a href="https://clawhub.ai/lakshmanturlapati/full-selfbrowsing" target="_blank" rel="noopener" class="btn btn-primary" i18n="@@agents.cta.install">
           Install on <span [attr.translate]="'no'">ClawHub</span>
         </a>
-         
-        <a href="https://github.com/fullselfbrowsing/FSB/tree/main/skills/FSB%20Skill" target="_blank" rel="noopener" class="btn btn-secondary" i18n="@@agents.cta.skillSource">
+        <a href="https://github.com/fullselfbrowsing/FSB/tree/main/skills/fsb" target="_blank" rel="noopener" class="btn btn-secondary" i18n="@@agents.cta.skillSource">
           Read the skill source
         </a>
         <a routerLink="/about" class="btn btn-ghost" i18n="@@agents.cta.demos">

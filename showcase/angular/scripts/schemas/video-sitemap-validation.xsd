@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+    xmlns:video="http://www.google.com/schemas/sitemap-video/1.1"
+    targetNamespace="http://www.sitemaps.org/schemas/sitemap/0.9"
+    elementFormDefault="qualified">
+  <xsd:import namespace="http://www.google.com/schemas/sitemap-video/1.1"
+      schemaLocation="sitemap-video-1.1.xsd"/>
+  <xsd:annotation>
+    <xsd:documentation>
+      Validate Google's video extension inside the complete sitemap so inherited
+      namespaces remain intact. Core sitemap fields and hreflang links are
+      checked separately by the existing crawler and hreflang checks.
+    </xsd:documentation>
+  </xsd:annotation>
+  <xsd:element name="urlset">
+    <xsd:complexType>
+      <xsd:sequence>
+        <xsd:element name="url" minOccurs="1" maxOccurs="unbounded">
+          <xsd:complexType>
+            <xsd:sequence>
+              <xsd:any namespace="http://www.sitemaps.org/schemas/sitemap/0.9 http://www.w3.org/1999/xhtml"
+                  processContents="skip" minOccurs="0" maxOccurs="unbounded"/>
+              <xsd:element ref="video:video" minOccurs="0" maxOccurs="unbounded"/>
+            </xsd:sequence>
+          </xsd:complexType>
+        </xsd:element>
+      </xsd:sequence>
+    </xsd:complexType>
+  </xsd:element>
+</xsd:schema>

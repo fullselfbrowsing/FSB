@@ -47,7 +47,7 @@
   <ng-content></ng-content>
 </main>
 
-@if (!shellless) {
+@if (!shellless && initialNavigationComplete) {
   <footer class="footer">
     <div class="container">
       <div class="footer-inner">
@@ -89,15 +89,14 @@
           </div>
           <div class="footer-column">
             <h4 i18n="@@shell.footer.col.community.title">Community</h4>
-            <a href="https://discord.gg/xRbj6JQpY" target="_blank" rel="noopener" i18n="@@shell.footer.community.discord" [attr.translate]="'no'">Discord</a>
             <a href="https://x.com/fsb0804" target="_blank" rel="noopener" class="footer-x-link" i18n="@@shell.footer.community.x" [attr.translate]="'no'">X</a>
+            <a href="https://discord.gg/xRbj6JQpY" target="_blank" rel="noopener" i18n="@@shell.footer.community.discord" [attr.translate]="'no'">Discord</a>
             <a routerLink="/sitemaps" i18n="@@shell.footer.community.sitemaps" [attr.translate]="'no'">Sitemaps</a>
           </div>
         </div>
       </div>
       <div class="footer-bottom">
-        <p i18n="@@shell.footer.bottom.credit">Made by <span [attr.translate]="'no'">Lakshman Turlapati</span></p>
-        <p i18n="@@shell.footer.bottom.version"><span class="version-tag" [attr.translate]="'no'">▽{{ appVersion }}</span></p>
+        <p class="footer-version" i18n="@@shell.footer.bottom.version"><span class="version-tag" [attr.translate]="'no'">▽{{ appVersion }}</span></p>
         <app-language-picker [mode]="'text'"></app-language-picker>
       </div>
     </div>

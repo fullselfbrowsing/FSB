@@ -1,5 +1,7 @@
 const assert = require('node:assert/strict');
 const http = require('node:http');
+const { readFileSync } = require('node:fs');
+const path = require('node:path');
 const test = require('node:test');
 
 function request(port, { path = '/health', host = `127.0.0.1:${port}`, origin, method = 'GET', hostname = '127.0.0.1' } = {}) {
@@ -48,7 +50,13 @@ test('local HTTP accepts only loopback Host and requests without Origin', async 
     });
     assert.equal(initialize.status, 200);
     assert.ok(initialize.headers.get('mcp-session-id'));
-    assert.equal((await initialize.json()).result.serverInfo.name, 'fsb');
+    const { serverInfo } = (await initialize.json()).result;
+    assert.equal(serverInfo.name, 'fsb');
+    assert.equal(serverInfo.version, JSON.parse(readFileSync(path.join(__dirname, '../mcp/package.json'), 'utf8')).version);
+    assert.deepEqual(serverInfo.icons, [{
+      src: `data:image/png;base64,${readFileSync(path.join(__dirname, '../extension/assets/fsb_logo_dark.png')).toString('base64')}`,
+      mimeType: 'image/png',
+    }]);
 
     for (const path of ['/health', '/mcp']) {
       assert.equal((await request(port, { path, host: `evil.example:${port}` })).status, 403);

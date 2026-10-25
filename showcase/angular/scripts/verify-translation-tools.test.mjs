@@ -172,6 +172,50 @@ test('quality gate rejects corrupted invariant product names outside protected m
   });
 });
 
+test('quality gate preserves both full brand spellings verbatim', () => {
+  for (const brand of ['FSB', 'Full Self-Browsing', 'Full Self Browsing']) {
+    const source = `Use ${brand} to automate your browser.`;
+    withFixture({
+      sourceUnits: [unit({ id: 'brand', source })],
+      targets: { de: [unit({ id: 'brand', source, target: `Verwenden Sie ${brand} zum Automatisieren Ihres Browsers.` })] },
+    }, (root) => {
+      const valid = run(QUALITY_SCRIPT, root);
+      assert.equal(valid.status, 0, valid.output);
+
+      const corruptedBrand = brand === 'FSB' ? 'ＦＳＢ' : brand.replace(/ /g, '-');
+      writeFileSync(join(root, 'src', 'locale', 'messages.de.xlf'), xliff([
+        unit({ id: 'brand', source, target: `Verwenden Sie ${corruptedBrand} zum Automatisieren Ihres Browsers.` }),
+      ], 'de'));
+      const corrupted = run(QUALITY_SCRIPT, root);
+      assert.equal(corrupted.status, 1, corrupted.output);
+      assert.ok(corrupted.output.includes(`target must preserve technical literal "${brand}"`), corrupted.output);
+    });
+  }
+});
+
+test('quality gate protects the brand through the highlighted Home heading', () => {
+  const brandStart = '<x id="START_TAG_SPAN_1" ctype="x-span_1" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>';
+  const highlightStart = '<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span class=&quot;highlight&quot;&gt;"/>';
+  const close = '<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>';
+  const source = `${brandStart}Full ${highlightStart}Self${close}-Browsing${close}`;
+  withFixture({
+    sourceUnits: [unit({ id: 'home.hero.title', source })],
+    targets: { es: [unit({ id: 'home.hero.title', source, target: source })] },
+    allowlist: { allLocales: [{ id: 'home.hero.title', sourceSha256: hashSource(source), reason: 'invariant full brand with highlighted Self' }], byLocale: {} },
+  }, (root) => {
+    const valid = run(QUALITY_SCRIPT, root);
+    assert.equal(valid.status, 0, valid.output);
+
+    writeFileSync(join(root, 'src', 'locale', 'messages.es.xlf'), xliff([
+      unit({ id: 'home.hero.title', source, target: `${brandStart}Navegación ${highlightStart}Autónoma${close} Total${close}` }),
+    ], 'es'));
+    const translatedBrand = run(QUALITY_SCRIPT, root);
+    assert.equal(translatedBrand.status, 1, translatedBrand.output);
+    assert.match(translatedBrand.output, /protected translate=no literal differs from source/);
+    assert.match(translatedBrand.output, /target must preserve technical literal "Full Self-Browsing"/);
+  });
+});
+
 test('quality gate rejects translated text inside a translate=no placeholder pair', () => {
   const start = '<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>';
   const close = '<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/>';

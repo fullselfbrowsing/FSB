@@ -9,179 +9,43 @@
     <div class="faq-section">
       <h2 class="reveal" i18n="@@support.faq.title">Frequently Asked Questions</h2>
       <div class="faq-list">
-        <div class="faq-item reveal">
-          <div class="faq-question" (click)="toggleFaq($event)">
-            <h3 i18n="@@support.faq.q.install.q">How do I install <span [attr.translate]="'no'">FSB</span>?</h3>
-            <i class="fa-solid fa-chevron-down faq-icon"></i>
-          </div>
-          <div class="faq-answer">
-            <div class="faq-answer-inner">
-               
-              <p i18n="@@support.faq.q.install.a">Install from the <a href="https://chromewebstore.google.com/detail/badgafnfchcihdfnjneklogedcdkmjfk" target="_blank" rel="noopener">Chrome Web Store</a>. One click and the <span [attr.translate]="'no'">FSB</span> icon appears in your toolbar. Prefer to run from source? Download the latest release from <a href="https://github.com/fullselfbrowsing/FSB/releases" target="_blank" rel="noopener" [attr.translate]="'no'">GitHub</a>, then load it unpacked: open <code [attr.translate]="'no'">chrome://extensions</code>, enable Developer Mode, click "Load unpacked," and select the <span [attr.translate]="'no'">FSB</span> folder.</p>
+        @for (faq of faqs; track faq.id) {
+          <div class="faq-item reveal" [class.active]="expandedFaqs.has(faq.id)">
+            <h3>
+              <button class="faq-question" type="button" (click)="toggleFaq(faq.id)"
+                [attr.aria-expanded]="expandedFaqs.has(faq.id)" [attr.aria-controls]="'faq-' + faq.id">
+                <span>{{ faq.q }}</span>
+                <i class="fa-solid fa-chevron-down faq-icon" aria-hidden="true"></i>
+              </button>
+            </h3>
+            <div class="faq-answer" [id]="'faq-' + faq.id" [attr.inert]="expandedFaqs.has(faq.id) ? null : ''">
+              <div class="faq-answer-inner">
+                <p>{{ faq.a }}</p>
+                <div class="faq-resources">
+                  @switch (faq.id) {
+                    @case ('install') {
+                      <a href="https://chromewebstore.google.com/detail/badgafnfchcihdfnjneklogedcdkmjfk" target="_blank" rel="noopener" [attr.translate]="'no'">{{ resourceNames.store }}</a>
+                      <a href="https://github.com/fullselfbrowsing/FSB/releases" target="_blank" rel="noopener" [attr.translate]="'no'">{{ resourceNames.github }}</a>
+                    }
+                    @case ('reportBug') {
+                      <a href="https://github.com/fullselfbrowsing/FSB/issues" target="_blank" rel="noopener" [attr.translate]="'no'">{{ resourceNames.issues }}</a>
+                    }
+                    @case ('mcp') {
+                      <a routerLink="/agents" i18n="@@support.faq.links.agents">Agents page</a>
+                    }
+                    @case ('openclawInstall') {
+                      <a href="https://clawhub.ai/lakshmanturlapati/full-selfbrowsing" target="_blank" rel="noopener" [attr.translate]="'no'">{{ resourceNames.clawhub }}</a>
+                      <a routerLink="/agents" i18n="@@support.faq.links.agents">Agents page</a>
+                    }
+                    @case ('remote') {
+                      <a routerLink="/dashboard" i18n="@@support.faq.links.dashboard">Remote Dashboard</a>
+                    }
+                  }
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-
-        <div class="faq-item reveal">
-          <div class="faq-question" (click)="toggleFaq($event)">
-            <h3 i18n="@@support.faq.q.provider.q">Which AI provider should I use?</h3>
-            <i class="fa-solid fa-chevron-down faq-icon"></i>
-          </div>
-          <div class="faq-answer">
-            <div class="faq-answer-inner">
-              <p i18n="@@support.faq.q.provider.a">We recommend <strong><span [attr.translate]="'no'">xAI Grok 4.1 Fast</span></strong> for the best balance of speed and accuracy. It has a 2M token context window and costs $0.20/$0.50 per million tokens. For a free hosted option, try <strong><span [attr.translate]="'no'">Gemini 2.0 Flash</span></strong> (experimental). For maximum quality, use <strong><span [attr.translate]="'no'">Claude Opus 4.6</span></strong> or <strong><span [attr.translate]="'no'">Grok 4.1</span></strong>. If you want broad model access, use <strong><span [attr.translate]="'no'">OpenRouter</span></strong>. If you want a privacy-friendly local setup with no API key, use <strong><span [attr.translate]="'no'">LM Studio</span></strong>.</p>
-            </div>
-          </div>
-        </div>
-
-        <div class="faq-item reveal">
-          <div class="faq-question" (click)="toggleFaq($event)">
-            <h3 i18n="@@support.faq.q.browsers.q">Which browsers are supported?</h3>
-            <i class="fa-solid fa-chevron-down faq-icon"></i>
-          </div>
-          <div class="faq-answer">
-            <div class="faq-answer-inner">
-              <p i18n="@@support.faq.q.browsers.a"><span [attr.translate]="'no'">FSB</span> supports <span [attr.translate]="'no'">Chrome</span> 88+ and all <span [attr.translate]="'no'">Chromium</span>-based browsers including <span [attr.translate]="'no'">Microsoft Edge</span>, <span [attr.translate]="'no'">Brave</span>, <span [attr.translate]="'no'">Opera</span>, and <span [attr.translate]="'no'">Vivaldi</span>. <span [attr.translate]="'no'">Firefox</span> support is planned for a future release.</p>
-            </div>
-          </div>
-        </div>
-
-        <div class="faq-item reveal">
-          <div class="faq-question" (click)="toggleFaq($event)">
-            <h3 i18n="@@support.faq.q.apiKeys.q">Are my API keys secure?</h3>
-            <i class="fa-solid fa-chevron-down faq-icon"></i>
-          </div>
-          <div class="faq-answer">
-            <div class="faq-answer-inner">
-              <p i18n="@@support.faq.q.apiKeys.a">Yes. API keys are encrypted using <span [attr.translate]="'no'">AES-GCM</span> before being stored in <span [attr.translate]="'no'">Chrome</span>'s local storage. They are only decrypted in-memory when making API calls. Keys are never logged, exported, or transmitted to any server other than your chosen AI provider.</p>
-            </div>
-          </div>
-        </div>
-
-        <div class="faq-item reveal">
-          <div class="faq-question" (click)="toggleFaq($event)">
-            <h3 i18n="@@support.faq.q.safety.q">Is <span [attr.translate]="'no'">FSB</span> safe to use?</h3>
-            <i class="fa-solid fa-chevron-down faq-icon"></i>
-          </div>
-          <div class="faq-answer">
-            <div class="faq-answer-inner">
-              <p i18n="@@support.faq.q.safety.a"><span [attr.translate]="'no'">FSB</span> includes action validation and safety checks. It only performs actions on the current tab and only when explicitly instructed. All code is open source and auditable. That said, use caution with tasks involving sensitive accounts or financial transactions -- always review what <span [attr.translate]="'no'">FSB</span> is doing.</p>
-            </div>
-          </div>
-        </div>
-
-        <div class="faq-item reveal">
-          <div class="faq-question" (click)="toggleFaq($event)">
-            <h3 i18n="@@support.faq.q.reportBug.q">How do I report a bug?</h3>
-            <i class="fa-solid fa-chevron-down faq-icon"></i>
-          </div>
-          <div class="faq-answer">
-            <div class="faq-answer-inner">
-               
-              <p i18n="@@support.faq.q.reportBug.a">Open an issue on the <a href="https://github.com/fullselfbrowsing/FSB/issues" target="_blank" rel="noopener" [attr.translate]="'no'">GitHub Issues</a> page. Include the website URL, your task description, and any error messages from the <span [attr.translate]="'no'">FSB</span> chat or browser console. Session logs from the Debug tab in Options can also help.</p>
-            </div>
-          </div>
-        </div>
-
-        <div class="faq-item reveal">
-          <div class="faq-question" (click)="toggleFaq($event)">
-            <h3 i18n="@@support.faq.q.mcp.q">What is <span [attr.translate]="'no'">MCP</span> and how do I use it?</h3>
-            <i class="fa-solid fa-chevron-down faq-icon"></i>
-          </div>
-          <div class="faq-answer">
-            <div class="faq-answer-inner">
-               
-              <p i18n="@@support.faq.q.mcp.a"><span [attr.translate]="'no'">MCP</span> (Model Context Protocol) lets you control <span [attr.translate]="'no'">FSB</span> from AI coding tools like <span [attr.translate]="'no'">Claude Code</span>, <span [attr.translate]="'no'">Codex</span>, <span [attr.translate]="'no'">Cursor</span>, <span [attr.translate]="'no'">Windsurf</span>, and <span [attr.translate]="'no'">OpenClaw</span>. The <span [attr.translate]="'no'">MCP</span> server runs as <code [attr.translate]="'no'">npx -y fsb-mcp-server@latest</code> and pairs with the running extension over a local WebSocket bridge. <span [attr.translate]="'no'">FSB</span> exposes 68 <span [attr.translate]="'no'">MCP</span> tools (click, type, navigate, read DOM, fill vault credentials, and more). For <span [attr.translate]="'no'">OpenClaw</span> users specifically, the fastest path is the one-click install on <span [attr.translate]="'no'">ClawHub</span> at <a href="https://clawhub.ai/lakshmanturlapati/full-selfbrowsing" target="_blank" rel="noopener" [attr.translate]="'no'">clawhub.ai/lakshmanturlapati/full-selfbrowsing</a>, or load the <span [attr.translate]="'no'">FSB</span> skill at <code [attr.translate]="'no'">skills/fsb/</code> which prints the stdio config block and runs the doctor diagnostic. The full rundown lives at the <a routerLink="/agents">Agents page</a>.</p>
-            </div>
-          </div>
-        </div>
-
-        <div class="faq-item reveal">
-          <div class="faq-question" (click)="toggleFaq($event)">
-            <h3 i18n="@@support.faq.q.testApps.q">How does <span [attr.translate]="'no'">FSB</span> help <span [attr.translate]="'no'">Claude Code</span> or <span [attr.translate]="'no'">Codex</span> test apps?</h3>
-            <i class="fa-solid fa-chevron-down faq-icon"></i>
-          </div>
-          <div class="faq-answer">
-            <div class="faq-answer-inner">
-              <p i18n="@@support.faq.q.testApps.a">Connect <span [attr.translate]="'no'">FSB</span> as an <span [attr.translate]="'no'">MCP</span> server, then let the coding agent open the local app, click through real flows, observe DOM state, capture console or task errors, and report failures back into the coding session. This closes the manual loop between code generation, browser testing, logging, and fixing.</p>
-            </div>
-          </div>
-        </div>
-
-        <div class="faq-item reveal">
-          <div class="faq-question" (click)="toggleFaq($event)">
-            <h3 i18n="@@support.faq.q.remote.q">Can I control <span [attr.translate]="'no'">FSB</span> remotely?</h3>
-            <i class="fa-solid fa-chevron-down faq-icon"></i>
-          </div>
-          <div class="faq-answer">
-            <div class="faq-answer-inner">
-               
-              <p i18n="@@support.faq.q.remote.a">Yes. The Remote Dashboard at <a href="https://full-selfbrowsing.com/dashboard" target="_blank" rel="noopener" [attr.translate]="'no'">full-selfbrowsing.com</a> lets you pair with your <span [attr.translate]="'no'">FSB</span> extension via QR code, then send tasks, view a live DOM preview of the browser, and monitor current execution state from any device with a web browser.</p>
-            </div>
-          </div>
-        </div>
-
-        <div class="faq-item reveal">
-          <div class="faq-question" (click)="toggleFaq($event)">
-            <h3 i18n="@@support.faq.q.learn.q">Does <span [attr.translate]="'no'">FSB</span> learn from my usage?</h3>
-            <i class="fa-solid fa-chevron-down faq-icon"></i>
-          </div>
-          <div class="faq-answer">
-            <div class="faq-answer-inner">
-              <p i18n="@@support.faq.q.learn.a"><span [attr.translate]="'no'">FSB</span> has a local memory system with three layers: semantic memory (site navigation patterns), episodic memory (past action sequences), and procedural memory (successful workflows). This data stays on your device and helps <span [attr.translate]="'no'">FSB</span> navigate familiar sites faster and avoid repeating mistakes. Memory auto-consolidates after enough sessions.</p>
-            </div>
-          </div>
-        </div>
-
-        <div class="faq-item reveal">
-          <div class="faq-question" (click)="toggleFaq($event)">
-            <h3 i18n="@@support.faq.q.ideSetup.q">How do I set up <span [attr.translate]="'no'">FSB</span>'s <span [attr.translate]="'no'">MCP</span> server with my IDE?</h3>
-            <i class="fa-solid fa-chevron-down faq-icon"></i>
-          </div>
-          <div class="faq-answer">
-            <div class="faq-answer-inner">
-              <p i18n="@@support.faq.q.ideSetup.a">Run <code [attr.translate]="'no'">npx -y fsb-mcp-server@latest install --list</code> to see which <span [attr.translate]="'no'">MCP</span> hosts the installer detects on your machine, then run the installer for one (for example <code [attr.translate]="'no'">npx -y fsb-mcp-server@latest install --claude-desktop</code>). <span [attr.translate]="'no'">Cursor</span>, <span [attr.translate]="'no'">Codex</span>, <span [attr.translate]="'no'">Windsurf</span>, and others have matching flags from <code [attr.translate]="'no'">--list</code>. For <span [attr.translate]="'no'">OpenClaw</span>, paste the canonical stdio block printed by the <span [attr.translate]="'no'">FSB</span> skill (loaded from <code [attr.translate]="'no'">skills/fsb/</code>) into your <span [attr.translate]="'no'">OpenClaw MCP</span> config -- the bare <code [attr.translate]="'no'">--openclaw</code> installer flag is intentionally manual because <span [attr.translate]="'no'">OpenClaw</span>'s <span [attr.translate]="'no'">MCP</span> config schema is still unstable across builds. Verify the install with <code [attr.translate]="'no'">npx -y fsb-mcp-server@latest doctor</code>; six green layers means you're ready.</p>
-            </div>
-          </div>
-        </div>
-
-        <div class="faq-item reveal">
-          <div class="faq-question" (click)="toggleFaq($event)">
-            <h3 i18n="@@support.faq.q.tools.q">What can I do with <span [attr.translate]="'no'">FSB</span> through <span [attr.translate]="'no'">MCP</span> tools?</h3>
-            <i class="fa-solid fa-chevron-down faq-icon"></i>
-          </div>
-          <div class="faq-answer">
-            <div class="faq-answer-inner">
-              <p i18n="@@support.faq.q.tools.a"><span [attr.translate]="'no'">FSB</span> exposes two modes through <span [attr.translate]="'no'">MCP</span>. <strong>Manual mode</strong> is the default and gives the calling agent 68 granular tools: navigate, click, type, scroll, read page state, take screenshots, upload real local files with <code [attr.translate]="'no'">upload_file</code>, arm trigger watchers with <code [attr.translate]="'no'">trigger</code> / <code [attr.translate]="'no'">get_trigger_status</code> / <code [attr.translate]="'no'">list_triggers</code>, and search or invoke guarded first-party <span [attr.translate]="'no'">API</span> capabilities with <code [attr.translate]="'no'">search_capabilities</code> and <code [attr.translate]="'no'">invoke_capability</code>. Vault and payment helpers fill inside the encrypted extension store, so raw secrets do not cross the <span [attr.translate]="'no'">MCP</span> bridge. <strong>Autopilot mode</strong> (<code [attr.translate]="'no'">run_task</code>) only fires when the user explicitly delegates the whole task. For everything else the calling agent stays in the loop on every action.</p>
-            </div>
-          </div>
-        </div>
-
-        <div class="faq-item reveal">
-          <div class="faq-question" (click)="toggleFaq($event)">
-            <h3 i18n="@@support.faq.q.openclawInstall.q">How do I install <span [attr.translate]="'no'">FSB</span> on <span [attr.translate]="'no'">OpenClaw</span>?</h3>
-            <i class="fa-solid fa-chevron-down faq-icon"></i>
-          </div>
-          <div class="faq-answer">
-            <div class="faq-answer-inner">
-               
-              <p i18n="@@support.faq.q.openclawInstall.a">Three options, fastest first. <strong>One-click on <span [attr.translate]="'no'">ClawHub</span></strong>: install from <a href="https://clawhub.ai/lakshmanturlapati/full-selfbrowsing" target="_blank" rel="noopener" [attr.translate]="'no'">clawhub.ai/lakshmanturlapati/full-selfbrowsing</a>. <strong><span [attr.translate]="'no'">FSB</span> skill</strong>: load the skill from <code [attr.translate]="'no'">skills/fsb/</code> in the <span [attr.translate]="'no'">FSB</span> repo. It prints the canonical <span [attr.translate]="'no'">OpenClaw</span> stdio block for you to paste into <span [attr.translate]="'no'">OpenClaw</span>'s <span [attr.translate]="'no'">MCP</span> config and offers consent-gated install for any other <span [attr.translate]="'no'">MCP</span> hosts on your machine. The full 3-step walkthrough (<span [attr.translate]="'no'">Chrome</span> extension, <span [attr.translate]="'no'">MCP</span> server config, doctor verification) lives at the <a routerLink="/agents">Agents page</a>.</p>
-            </div>
-          </div>
-        </div>
-
-        <div class="faq-item reveal">
-          <div class="faq-question" (click)="toggleFaq($event)">
-            <h3 i18n="@@support.faq.q.mcpHealth.q">How do I verify the <span [attr.translate]="'no'">FSB MCP</span> server is healthy?</h3>
-            <i class="fa-solid fa-chevron-down faq-icon"></i>
-          </div>
-          <div class="faq-answer">
-            <div class="faq-answer-inner">
-              <p i18n="@@support.faq.q.mcpHealth.a">Run <code [attr.translate]="'no'">npx -y fsb-mcp-server@latest doctor</code>. The doctor walks six layers -- <code [attr.translate]="'no'">package</code>, <code [attr.translate]="'no'">bridge</code>, <code [attr.translate]="'no'">extension</code>, <code [attr.translate]="'no'">active-tab</code>, <code [attr.translate]="'no'">content-script</code>, <code [attr.translate]="'no'">config</code> -- and exits non-zero on the first failure with a one-line next-step recommendation. The full recovery table for each layer lives in <code [attr.translate]="'no'">skills/fsb/USAGE.md</code>, and the same diagnostic runs automatically when the <span [attr.translate]="'no'">FSB</span> skill is loaded into <span [attr.translate]="'no'">OpenClaw</span>.</p>
-            </div>
-          </div>
-        </div>
-
+        }
       </div>
     </div>
 

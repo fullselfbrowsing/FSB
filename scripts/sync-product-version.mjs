@@ -303,13 +303,13 @@ function setMcpReadmeSurfaces(extensionVersion, mcpVersion) {
   changed.push(replaceExactly(
     'mcp/README.md',
     /^This .* build is release-prep ready\..*$/gmu,
-    `This ${mcpVersion} build is release-prep ready. The actual \`npm publish\` remains user-gated through the MCP-only tag workflow.`,
+    `This ${mcpVersion} build is release-prep ready. Merging a new MCP version into \`main\` automatically publishes the verified npm package to \`latest\` and creates its \`mcp-vX.Y.Z\` tag and GitHub release. Main pushes whose MCP version is already published skip publishing. Bump the MCP version with \`npm run version:set:mcp -- X.Y.Z\` before merging a new release.`,
     'MCP README release-prep version',
   ));
   changed.push(replaceExactly(
     'mcp/README.md',
-    /^- Preferred: .*tag workflow.*$/gmu,
-    `- Preferred: after merging to \`main\`, run the MCP-only tag workflow (\`git tag mcp-v${mcpVersion} && git push origin mcp-v${mcpVersion}\`). It publishes the verified npm artifact and creates the MCP GitHub release.`,
+    /^- Explicit tag alternative: .*$/gmu,
+    `- Explicit tag alternative: for an unpublished version already on \`main\`, run \`git tag mcp-v${mcpVersion} && git push origin mcp-v${mcpVersion}\`. Tag-triggered releases still require the tag to match the package version and reject an already-published version.`,
     'MCP README release tag guidance',
   ));
   return changed.some(Boolean);

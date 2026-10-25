@@ -12,6 +12,7 @@
     "downlevelIteration": true,
     "experimentalDecorators": true,
     "moduleResolution": "bundler",
+    "resolveJsonModule": true,
     "importHelpers": true,
     "target": "ES2022",
     "module": "ES2022",

@@ -62,9 +62,15 @@
   cursor: pointer;
   user-select: none;
   gap: 12px;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  font-family: inherit;
 }
 
-.faq-question h3 {
+.faq-question {
   font-size: 0.95rem;
   font-weight: 600;
 }
@@ -82,26 +88,45 @@
 }
 
 .faq-answer {
-  max-height: 0;
+  display: grid;
+  grid-template-rows: 0fr;
   overflow: hidden;
-  transition: max-height 0.35s ease;
+  transition: grid-template-rows 0.35s ease;
 }
 
 .faq-item.active .faq-answer {
-  max-height: 600px;
+  grid-template-rows: 1fr;
 }
 
 .faq-answer-inner {
-  padding: 0 20px 16px;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0 20px;
 }
 
 .faq-answer-inner p {
   font-size: 0.9rem;
   line-height: 1.7;
+  overflow-wrap: anywhere;
 }
 
 .faq-answer-inner a {
   color: var(--primary);
+}
+
+.faq-resources {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+  padding-bottom: 16px;
+  font-size: 0.85rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .faq-answer {
+    transition: none;
+  }
 }
 
 /* --- Troubleshooting Cards --- */
@@ -178,6 +203,18 @@
   font-size: 0.8rem;
 }
 
+/* --- Inline Code --- */
+/* No font-family here: the global code stack already applies, and a
+   scoped one would out-rank its :lang() CJK fallback. */
+.faq-answer-inner code,
+.trouble-card code {
+  font-size: 0.85em;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 2px 6px;
+}
+
 /* --- Contact Section --- */
 .contact-section {
   max-width: 600px;
@@ -223,12 +260,16 @@
     padding: 14px 16px;
   }
 
-  .faq-question h3 {
+  .faq-question {
     font-size: 0.9rem;
   }
 
   .faq-answer-inner {
-    padding: 0 16px 14px;
+    padding: 0 16px;
+  }
+
+  .faq-resources {
+    padding-bottom: 14px;
   }
 
   .trouble-card {

@@ -43,7 +43,7 @@
                 @if (hasFsbAgentDaysSinceActiveV2) {
                   <span class="headline-cell">
                     <strong>{{ formattedFsbAgentDays }}</strong>
-                    <span i18n="@@SHOWCASE_STATS_FSB_HEADLINE_AGENT_DAYS">agent-days since active v2</span>
+                    <span i18n="@@SHOWCASE_STATS_FSB_HEADLINE_AGENT_DAYS">Agent-days</span>
                   </span>
                 }
                 <span class="headline-cell">
@@ -101,7 +101,7 @@
             <p class="globe-annotation">
               <i class="ph ph-info" aria-hidden="true"></i>
               @if (hasPlottableRegions) {
-                <span i18n="@@SHOWCASE_STATS_FSB_GLOBE_ANNOTATION">Where installs were last seen over the past 365 days, by city, state, or country. Place data by <a href="https://db-ip.com" rel="noopener" [attr.translate]="'no'">DB-IP</a>.</span>
+                <span i18n="@@SHOWCASE_STATS_FSB_GLOBE_ANNOTATION">Where installs were last seen over the past 365 days. Place data by <a href="https://db-ip.com" rel="noopener" [attr.translate]="'no'">DB-IP</a>.</span>
               } @else {
                 <span i18n="@@SHOWCASE_STATS_FSB_GLOBE_EMPTY">Not enough anonymous activity yet to break down by region — check back soon.</span>
               }
@@ -151,8 +151,7 @@
   <footer class="footer stats-footer">
     <div class="container">
       <div class="footer-bottom">
-        <p i18n="@@stats.footer.credit">Made by <span [attr.translate]="'no'">Lakshman Turlapati</span></p>
-        <p i18n="@@stats.footer.version"><span class="version-tag" [attr.translate]="'no'">▽{{ appVersion }}</span></p>
+        <p class="footer-version" i18n="@@stats.footer.version"><span class="version-tag" [attr.translate]="'no'">▽{{ appVersion }}</span></p>
         <app-language-picker [mode]="'text'" />
       </div>
     </div>

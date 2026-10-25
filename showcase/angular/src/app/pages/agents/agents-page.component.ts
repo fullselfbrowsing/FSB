@@ -1,28 +1,25 @@
 import { isPlatformBrowser } from '@angular/common';
 import { Component, OnDestroy, OnInit, PLATFORM_ID, Renderer2, inject, DOCUMENT, LOCALE_ID } from '@angular/core';
 import { Meta, Title } from '@angular/platform-browser';
+import { RouterLink } from '@angular/router';
 
 import { HOST, buildLocaleUrl, emitLocaleHead } from '../../core/seo/locale-seo';
+import { PageJsonLdService } from '../../core/seo/page-json-ld.service';
 
 const ROUTE_PATH = '/agents';
 const OG_IMAGE = `${HOST}/assets/fsb_logo_dark.png`;
 const OG_IMAGE_ALT = $localize`:@@agents.og.imageAlt:FSB Full Self-Browsing logo`;
 const SITE_NAME = $localize`:@@site.name:FSB - Full Self-Browsing`;
-const AGENT_TOKENS = ['OpenClaw', 'Hermes'] as const;
-type AgentToken = typeof AGENT_TOKENS[number];
-
-const PROVIDER_MARKS: Record<AgentToken, { file: string; alt: string }> = {
-  OpenClaw: { file: 'openclaw.svg', alt: 'OpenClaw' },
-  Hermes: { file: 'hermes.png', alt: 'Hermes' },
-};
 
 @Component({
   selector: 'app-agents-page',
   standalone: true,
+  imports: [RouterLink],
   templateUrl: './agents-page.component.html',
   styleUrl: './agents-page.component.scss',
 })
 export class AgentsPageComponent implements OnInit, OnDestroy {
+  private readonly pageJsonLd = inject(PageJsonLdService);
   private readonly title = inject(Title);
   private readonly meta = inject(Meta);
   private readonly renderer = inject(Renderer2);
@@ -30,25 +27,37 @@ export class AgentsPageComponent implements OnInit, OnDestroy {
   private readonly localeId = inject(LOCALE_ID);
   private readonly platformId = inject(PLATFORM_ID);
 
+  readonly featuredAgents = FEATURED_AGENTS;
+  readonly hostChips = HOST_CHIPS;
+  readonly installHosts = INSTALL_HOSTS;
+  readonly ctaLogos = CTA_LOGOS;
+  readonly baseCommand = BASE_INSTALL_COMMAND;
+
   currentToken: string = AGENT_TOKENS[0];
   markToken: AgentToken = AGENT_TOKENS[0];
   morphing = false;
+  hostIndex = 0;
+  copied = false;
 
   private tokenIndex = 0;
   private cycleTimer: number | null = null;
   private rafId: number | null = null;
+  private copyTimer: number | null = null;
   private visibilityHandler: (() => void) | null = null;
   private prefersReducedMotion = false;
   // True while a scramble is in flight; prevents overlapping animations on
   // visibility/interval races.
   private isCycling = false;
+  // Held while the pointer is over the badge or the flow strip so the name can be
+  // read; both show the same token, so one flag holds them together.
+  private paused = false;
 
   get markFile(): string {
-    return PROVIDER_MARKS[this.markToken].file;
+    return AGENT_MARKS[this.markToken];
   }
 
-  get markAlt(): string {
-    return PROVIDER_MARKS[this.markToken].alt;
+  get selectedHost(): InstallHost {
+    return INSTALL_HOSTS[this.hostIndex];
   }
 
   ngOnInit(): void {
@@ -56,8 +65,8 @@ export class AgentsPageComponent implements OnInit, OnDestroy {
     // Marked via $localize so per-locale builds emit translated strings; embedded brand
     // tokens (FSB, OpenClaw, Claude, Codex, Cursor, MCP, Chrome) are preserved verbatim
     // by translators per showcase/angular/src/locale/DO-NOT-TRANSLATE.md.
-    const t = $localize`:@@agents.meta.title:FSB - Agents (OpenClaw Skill + MCP)`;
-    const d = $localize`:@@agents.meta.description:Drive your real Chrome from OpenClaw, Hermes, Claude, Codex, Cursor, and more. FSB gives agents a skill plus 68 MCP tools to act, observe, verify.`;
+    const t = $localize`:@@agents.meta.title:FSB for AI Agents | MCP Browser Automation`;
+    const d = $localize`:@@agents.meta.description:Connect Codex, Claude Code, Cursor, OpenClaw, and Hermes to your real Chrome session with FSB. Install the MCP bridge and verify it with doctor.`;
     this.applyMeta(t, d, url);
     this.injectAgentsPageJsonLd();
 
@@ -67,10 +76,37 @@ export class AgentsPageComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.pageJsonLd.remove('agents-page');
     if (!isPlatformBrowser(this.platformId)) {
       return;
     }
     this.stopTokenCycle();
+    this.clearCopyTimer();
+  }
+
+  logoMask(file: string): string {
+    return `url("/assets/providers/${file}")`;
+  }
+
+  onTokenEnter(): void {
+    this.paused = true;
+  }
+
+  onTokenLeave(): void {
+    this.paused = false;
+  }
+
+  pickHost(index: number): void {
+    this.hostIndex = index;
+    this.clearCopyTimer();
+    this.copied = false;
+  }
+
+  copyCommand(): void {
+    if (!isPlatformBrowser(this.platformId)) {
+      return;
+    }
+    this.copyText(`${BASE_INSTALL_COMMAND} ${this.selectedHost.flag}`);
   }
 
   private startTokenCycle(): void {
@@ -99,7 +135,7 @@ export class AgentsPageComponent implements OnInit, OnDestroy {
   }
 
   private scheduleNextCycle(): void {
-    if (this.cycleTimer !== null || this.doc.visibilityState === 'hidden') {
+    if (this.prefersReducedMotion || this.cycleTimer !== null || this.doc.visibilityState === 'hidden') {
       return;
     }
     this.cycleTimer = window.setInterval(() => this.advanceToken(), 3000);
@@ -126,16 +162,10 @@ export class AgentsPageComponent implements OnInit, OnDestroy {
   }
 
   private advanceToken(): void {
-    if (this.isCycling || !isPlatformBrowser(this.platformId)) {
+    if (this.isCycling || this.paused || !isPlatformBrowser(this.platformId)) {
       return;
     }
     const next = AGENT_TOKENS[(this.tokenIndex + 1) % AGENT_TOKENS.length];
-    if (this.prefersReducedMotion) {
-      this.currentToken = next;
-      this.markToken = next;
-      this.tokenIndex = (this.tokenIndex + 1) % AGENT_TOKENS.length;
-      return;
-    }
     this.scrambleTo(next);
   }
 
@@ -168,12 +198,54 @@ export class AgentsPageComponent implements OnInit, OnDestroy {
         return;
       }
 
+      // Spaces never scramble, so a two-word name keeps its word gap mid-morph.
       this.currentToken = Array.from(target, (char, index) =>
-        elapsed >= lockTimes[index] ? char : alphabet[Math.floor(Math.random() * alphabet.length)]
+        char === ' ' || elapsed >= lockTimes[index] ? char : alphabet[Math.floor(Math.random() * alphabet.length)]
       ).join('');
       this.rafId = window.requestAnimationFrame(tick);
     };
     this.rafId = window.requestAnimationFrame(tick);
+  }
+
+  private copyText(text: string): void {
+    if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+      void navigator.clipboard.writeText(text).catch(() => this.copyTextFallback(text));
+    } else {
+      this.copyTextFallback(text);
+    }
+    this.markCopied();
+  }
+
+  private copyTextFallback(text: string): void {
+    const textarea = this.renderer.createElement('textarea') as HTMLTextAreaElement;
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    textarea.style.pointerEvents = 'none';
+    this.renderer.appendChild(this.doc.body, textarea);
+    textarea.select();
+    try {
+      this.doc.execCommand('copy');
+    } catch {
+      // Copy feedback is still shown; failure is non-fatal for the page.
+    }
+    this.renderer.removeChild(this.doc.body, textarea);
+  }
+
+  private markCopied(): void {
+    this.clearCopyTimer();
+    this.copied = true;
+    this.copyTimer = window.setTimeout(() => {
+      this.copied = false;
+      this.copyTimer = null;
+    }, COPIED_FEEDBACK_MS);
+  }
+
+  private clearCopyTimer(): void {
+    if (this.copyTimer !== null) {
+      window.clearTimeout(this.copyTimer);
+      this.copyTimer = null;
+    }
   }
 
   private applyMeta(t: string, d: string, url: string): void {
@@ -197,12 +269,21 @@ export class AgentsPageComponent implements OnInit, OnDestroy {
   }
 
   private injectAgentsPageJsonLd(): void {
-    if (this.doc.head.querySelector('script[data-ld="agents-page"]')) {
-      return;
-    }
+    const url = buildLocaleUrl(this.localeId, ROUTE_PATH);
     const payload = {
       '@context': 'https://schema.org',
       '@graph': [
+        {
+          '@type': 'WebPage',
+          '@id': `${url}#webpage`,
+          url,
+          inLanguage: this.localeId,
+          name: this.title.getTitle(),
+          description: this.meta.getTag('name="description"')?.content,
+          mainEntity: { '@id': `${HOST}/agents#fsb-skill` },
+          hasPart: { '@id': `${url}#install-howto` },
+          publisher: { '@id': `${HOST}/#org` },
+        },
         {
           '@type': 'SoftwareApplication',
           '@id': `${HOST}/agents#fsb-skill`,
@@ -218,13 +299,16 @@ export class AgentsPageComponent implements OnInit, OnDestroy {
             $localize`:@@agents.schema.software.feature.triggers:Trigger watcher tools for reactive page monitoring`,
             $localize`:@@agents.schema.software.feature.capabilities:Native capability tools for guarded first-party API actions`,
           ],
+          license: 'https://github.com/fullselfbrowsing/FSB/blob/main/LICENSE',
           offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
           publisher: { '@id': `${HOST}/#org` },
-          isPartOf: { '@id': `${HOST}/#site` },
+          mainEntityOfPage: { '@id': `${url}#webpage` },
         },
         {
           '@type': 'HowTo',
-          '@id': `${HOST}/agents#install-howto`,
+          '@id': `${url}#install-howto`,
+          url: `${url}#install-howto`,
+          inLanguage: this.localeId,
           name: $localize`:@@agents.schema.howTo.name:Install FSB for an MCP agent`,
           description: $localize`:@@agents.schema.howTo.description:Install the FSB MCP bridge, verify it with doctor, then let an MCP host drive the user's real Chrome session.`,
           step: [
@@ -244,21 +328,93 @@ export class AgentsPageComponent implements OnInit, OnDestroy {
               text: $localize`:@@agents.schema.howTo.doctor.text:Run npx -y fsb-mcp-server@latest doctor and fix any failing package, bridge, extension, active-tab, content-script, or config layer.`,
             },
           ],
-          isPartOf: { '@id': `${HOST}/agents#fsb-skill` },
+          isPartOf: { '@id': `${url}#webpage` },
+          about: { '@id': `${HOST}/agents#fsb-skill` },
         },
       ],
     };
-    // Assigned after the literal instead of inside it: messages.xlf pins a linenumber
-    // for every $localize call above (the last sits at line 244) and CI diffs
-    // `ng extract-i18n` byte-for-byte, so nothing at or above that line may move.
-    Object.assign(payload['@graph'][0], { license: 'https://github.com/fullselfbrowsing/FSB/blob/main/LICENSE' });
-    const json = JSON.stringify(payload).replace(/</g, '\\u003c');
-    const script = this.renderer.createElement('script') as HTMLScriptElement;
-    this.renderer.setAttribute(script, 'type', 'application/ld+json');
-    this.renderer.setAttribute(script, 'data-ld', 'agents-page');
-    const text = this.renderer.createText(json);
-    this.renderer.appendChild(script, text);
-    this.renderer.appendChild(this.doc.head, script);
+    this.pageJsonLd.set('agents-page', payload);
   }
 
 }
+
+/* Page data lives in the module tail rather than beside ROUTE_PATH at the top on
+   purpose: messages.xlf pins a linenumber for every $localize call in this module
+   and CI diffs `ng extract-i18n` byte-for-byte, so growing one of these lists must
+   not move a pinned line. Every display string below is a brand, CLI host id or
+   command: the template interpolates it verbatim, so no locale ever translates it. */
+const AGENT_TOKENS = ['Grok Bot', 'Muse', 'Dots', 'OpenClaw', 'Hermes'] as const;
+type AgentToken = typeof AGENT_TOKENS[number];
+
+/* Every mark renders as a currentColor mask, so one glyph element serves all five
+   tokens and follows the theme without per-theme image swaps. */
+const AGENT_MARKS: Record<AgentToken, string> = {
+  'Grok Bot': 'grok-bot.png',
+  Muse: 'meta.svg',
+  Dots: 'openai.svg',
+  OpenClaw: 'openclaw.svg',
+  Hermes: 'hermes.png',
+};
+
+/* `id` selects the card's translated description in the template. */
+interface FeaturedAgent {
+  readonly id: 'grok' | 'muse' | 'dots';
+  readonly name: string;
+  readonly maker: string;
+  readonly logo: string;
+}
+
+const FEATURED_AGENTS: readonly FeaturedAgent[] = [
+  { id: 'grok', name: 'Grok Bot', maker: 'xAI', logo: 'grok-bot.png' },
+  { id: 'muse', name: 'Muse', maker: 'Meta', logo: 'meta.svg' },
+  { id: 'dots', name: 'Dots', maker: 'OpenAI', logo: 'openai.svg' },
+];
+
+interface HostChip {
+  readonly name: string;
+  readonly logo: string;
+}
+
+const HOST_CHIPS: readonly HostChip[] = [
+  { name: 'OpenClaw', logo: 'openclaw.svg' },
+  { name: 'Hermes', logo: 'hermes.png' },
+  { name: 'Claude Code', logo: 'claude.svg' },
+  { name: 'Codex', logo: 'openai.svg' },
+  { name: 'Grok Build', logo: 'xai.png' },
+  { name: 'Cursor', logo: 'cursor.svg' },
+  { name: 'Gemini CLI', logo: 'google.png' },
+  { name: 'VS Code', logo: 'vscode.svg' },
+  { name: 'Windsurf', logo: 'windsurf.svg' },
+  { name: 'OpenCode', logo: 'opencode.svg' },
+];
+
+const BASE_INSTALL_COMMAND = 'npx -y fsb-mcp-server@latest install';
+const COPIED_FEEDBACK_MS = 1600;
+
+/* A subset of the installer's platform flags; `install --list` prints all of them. */
+interface InstallHost {
+  readonly name: string;
+  readonly flag: string;
+}
+
+const INSTALL_HOSTS: readonly InstallHost[] = [
+  { name: 'claude-code', flag: '--claude-code' },
+  { name: 'claude-desktop', flag: '--claude-desktop' },
+  { name: 'codex', flag: '--codex' },
+  { name: 'cursor', flag: '--cursor' },
+  { name: 'gemini', flag: '--gemini' },
+  { name: 'vscode', flag: '--vscode' },
+  { name: 'windsurf', flag: '--windsurf' },
+  { name: 'opencode', flag: '--opencode' },
+  { name: 'all', flag: '--all' },
+];
+
+const CTA_LOGOS: readonly string[] = [
+  'grok-bot.png',
+  'meta.svg',
+  'openai.svg',
+  'openclaw.svg',
+  'hermes.png',
+  'claude.svg',
+  'cursor.svg',
+];

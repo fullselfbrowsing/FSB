@@ -74,7 +74,9 @@ const SHOWCASE_CSP = [
   // YouTube embeds on the /about page require frame-src; without this it falls
   // back to default-src 'self' and the demo videos render as a blocked iframe.
   "frame-src https://www.youtube.com https://www.youtube-nocookie.com",
-  "frame-ancestors 'none'",
+  // Portfolio preview embeds this site. DENY is not sent: X-Frame-Options DENY
+  // would still block these parents even when frame-ancestors allows them.
+  "frame-ancestors 'self' https://parzival.live https://parzival-live.fly.dev http://localhost:3000 http://127.0.0.1:3000",
   "base-uri 'self'",
   "form-action 'self'",
   "object-src 'none'",
@@ -83,7 +85,6 @@ const SHOWCASE_CSP = [
 app.use((req, res, next) => {
   res.setHeader('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
   res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
   res.setHeader('Permissions-Policy', 'camera=(self), microphone=(), geolocation=(), interest-cohort=()');

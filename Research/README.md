@@ -42,6 +42,11 @@ This folder contains comprehensive research on Claude for Chrome, Model Context 
    - Action execution strategies
    - Improvement opportunities for FSB
 
+7. **[Custom MCP Icons](../docs/mcp-custom-icons.md)**
+   - Icon support across all 21 FSB installer targets and additional client surfaces
+   - Protocol metadata, MCPB packaging, plugin logos, and client-specific settings
+   - Confirmed routes, unresolved client behavior, and implementation recommendations
+
 ## Quick Reference
 
 | Technology | Purpose | FSB Relevance |

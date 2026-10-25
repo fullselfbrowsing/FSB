@@ -2,6 +2,23 @@
 
 All notable changes to `fsb-mcp-server` are documented in this file. Each entry corresponds to a published npm release; FSB extension milestones map to MCP package versions in the entry header.
 
+<a id="v0.11.2"></a>
+
+## 0.11.2 (2026-10-14)
+
+Patch release adding the FSB dark logo to MCP server metadata.
+
+### Added
+
+- The unchanged dark logo is included in the npm package and advertised as a PNG data URI in server initialization metadata. Clients that support MCP server icons can display it after updating and restarting their MCP host.
+- MCP Registry metadata references the matching hosted PNG at its original 1000×1000 size.
+
+### Compatibility and update
+
+- Extension compatibility remains FSB 0.9.92 or newer. Server identity, capabilities, tool schemas, installer configuration, and dependency versions are unchanged.
+- Icon rendering depends on the MCP client; clients that ignore icon metadata keep their existing display.
+- Merging this release into `main` automatically publishes `fsb-mcp-server@0.11.2` and creates the `mcp-v0.11.2` GitHub release. Later main pushes skip publication when the MCP version is already on npm; explicit MCP release tags remain supported.
+
 <a id="v0.11.1"></a>
 
 ## 0.11.1 (2026-10-08)

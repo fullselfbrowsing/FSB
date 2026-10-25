@@ -145,6 +145,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
+      - name: Install XML schema validator
+        run: sudo apt-get update && sudo apt-get install -y libxml2-utils
       - name: Install showcase deps
         run: npm --prefix showcase/angular install --no-audit --no-fund
       - name: Verify locale registry parity (Angular vs Express)
@@ -155,6 +157,10 @@ jobs:
         run: npm --prefix showcase/angular run verify:translation-drift
       - name: Exercise translation-tool adversarial fixtures
         run: npm --prefix showcase/angular run test:translation-tools
+      - name: Exercise localized marketing SEO and crawler fixtures
+        run: npm --prefix showcase/angular run test:marketing-i18n-seo
+      - name: Exercise video sitemap schema regression fixtures
+        run: npm --prefix showcase/angular run test:video-sitemap
       - name: Reject English-copy and cross-locale-identical targets
         run: npm --prefix showcase/angular run verify:translation-quality
       - name: Run Angular component tests
@@ -168,6 +174,10 @@ jobs:
         run: npm --prefix showcase/angular run build
       - name: Verify hreflang + canonical + html lang on prerendered HTML (SEO-01)
         run: npm --prefix showcase/angular run verify:hreflang
+      - name: Verify video sitemap schema, metadata and localized FAQ parity
+        run: npm --prefix showcase/angular run verify:video-seo
+      - name: Verify localized marketing copy, branding and SEO on prerendered HTML
+        run: npm --prefix showcase/angular run verify:marketing-i18n-seo
       - name: Verify per-locale gzipped bundle budget (CI-05)
         run: node showcase/angular/scripts/verify-bundle-budgets.mjs
       # Crawler smoke (smoke:crawler) hits production by default; it lives in

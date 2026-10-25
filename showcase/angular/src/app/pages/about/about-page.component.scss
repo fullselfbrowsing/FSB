@@ -1,6 +1,6 @@
 /* =============================================
    FSB Showcase - About Page Styles
-   About page video demos, memory, and action library
+   About page trailer, memory, and action library
    ============================================= */
 
 /* --- Page Header --- */
@@ -20,7 +20,7 @@
   font-size: 1.1rem;
 }
 
-/* --- Video Demo Gallery --- */
+/* --- Trailer --- */
 .video-demo-section {
   padding-top: 48px;
   background: var(--bg-card);
@@ -61,60 +61,20 @@
   border: 0;
 }
 
-.video-frame--ambient {
-  position: relative;
-  overflow: hidden;
-}
-
-.video-frame--ambient iframe {
-  pointer-events: none;
-}
-
-.video-frame--ambient::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-}
-
-.video-frame--ambient::after {
-  content: "";
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  z-index: 2;
-  height: 56px;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.88), rgba(0, 0, 0, 0));
-  pointer-events: none;
-}
-
 .video-demo-copy {
-  padding: 22px 24px 24px;
-}
-
-.video-demo-tag {
-  display: inline-block;
-  margin-bottom: 10px;
-  padding: 3px 10px;
-  background: rgba(255, 107, 53, 0.1);
-  border: 1px solid rgba(255, 107, 53, 0.2);
-  border-radius: 999px;
-  color: var(--primary);
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
+  padding: 24px;
 }
 
 .video-demo-copy h3 {
-  font-size: 1.05rem;
-  margin-bottom: 8px;
+  margin-bottom: 12px;
 }
 
 .video-demo-copy p {
-  font-size: 0.9rem;
-  line-height: 1.6;
+  margin-bottom: 16px;
+}
+
+.video-demo-copy a {
+  color: var(--primary);
 }
 
 /* --- Memory --- */
@@ -546,17 +506,19 @@
 }
 
 /* --- Light mode overrides --- */
-[data-theme="light"] .action-tag {
+/* The theme attribute lives on <html>, outside this view; under emulated
+   encapsulation only :host-context can match it. */
+:host-context([data-theme="light"]) .action-tag {
   background: rgba(0, 0, 0, 0.04);
   border-color: rgba(0, 0, 0, 0.1);
   color: var(--text-secondary);
 }
 
-[data-theme="light"] .sitemap-link {
+:host-context([data-theme="light"]) .sitemap-link {
   background: rgba(0, 0, 0, 0.03);
 }
 
-[data-theme="light"] .sitemap-link:hover {
+:host-context([data-theme="light"]) .sitemap-link:hover {
   background: rgba(0, 0, 0, 0.05);
 }
 
@@ -603,10 +565,6 @@
 }
 
 @media (max-width: 480px) {
-  .video-demo-copy {
-    padding: 18px 18px 20px;
-  }
-
   .mem-stats {
     grid-template-columns: repeat(2, 1fr);
   }

@@ -362,7 +362,7 @@ function commitPunchcardLocal(commits) {
   check('stats FSB metrics: agent-days use only the active-v2 history',
     src.includes('agent_days_since_active_v2') &&
       !/formattedFsbAgentDays[\s\S]{0,300}(?:agent_days_lifetime|total_agents_lifetime)/.test(src) &&
-      html.includes('agent-days since active v2'),
+      html.includes('>Agent-days</span>'),
     'headline still renders a corrupt lifetime active-agent aggregate');
 
   check('stats tabs: fan selection restores focus to the disclosure button',

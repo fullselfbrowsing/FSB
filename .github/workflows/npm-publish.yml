@@ -2,11 +2,12 @@ name: npm-publish
 
 on:
   push:
+    branches: [main]
     tags:
       - 'mcp-v*'
 
 concurrency:
-  group: mcp-release-${{ github.ref }}
+  group: mcp-release
   cancel-in-progress: false
 
 jobs:
@@ -15,6 +16,8 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.package-version.outputs.version }}
+      tag: mcp-v${{ steps.package-version.outputs.version }}
+      publish: ${{ steps.release-plan.outputs.publish }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -33,17 +36,49 @@ jobs:
           node -e "require('fs').appendFileSync(process.env.GITHUB_OUTPUT, 'version=' + require('./mcp/package.json').version + String.fromCharCode(10))"
 
       - name: Bind tag to canonical MCP version
+        if: startsWith(github.ref, 'refs/tags/mcp-v')
         run: test "$GITHUB_REF_NAME" = "mcp-v${{ steps.package-version.outputs.version }}"
 
       - name: Require the tagged commit to be on main
+        if: startsWith(github.ref, 'refs/tags/mcp-v')
         run: |
           git fetch origin main --no-tags
           release_commit="$(git rev-list -n 1 "$GITHUB_REF_NAME")"
           git merge-base --is-ancestor "$release_commit" origin/main
 
+      - name: Decide whether the MCP version needs publishing
+        id: release-plan
+        run: |
+          npm view fsb-mcp-server versions --json > "$RUNNER_TEMP/fsb-published-versions.json"
+          node <<'NODE'
+          const fs = require('fs');
+          const version = require('./mcp/package.json').version;
+          const versions = JSON.parse(fs.readFileSync(`${process.env.RUNNER_TEMP}/fsb-published-versions.json`, 'utf8'));
+          if (!Array.isArray(versions) || versions.some(value => typeof value !== 'string')) {
+            throw new Error('npm returned an invalid published-version list');
+          }
+          const published = versions.includes(version);
+          if (published && process.env.GITHUB_REF.startsWith('refs/tags/')) {
+            throw new Error(`fsb-mcp-server@${version} is already published`);
+          }
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `publish=${!published}\n`);
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, published
+            ? `fsb-mcp-server@${version} is already published; skipping this main push.\n`
+            : `Publishing fsb-mcp-server@${version} from ${process.env.GITHUB_SHA}.\n`);
+          NODE
+
+      - name: Require an existing release tag to identify this commit
+        if: steps.release-plan.outputs.publish == 'true'
+        run: |
+          release_tag="mcp-v${{ steps.package-version.outputs.version }}"
+          if git show-ref --verify --quiet "refs/tags/$release_tag"; then
+            test "$(git rev-list -n 1 "$release_tag")" = "$GITHUB_SHA"
+          fi
+
   windows-bootstrap:
     name: build native-host Windows artifacts
     needs: version-contract
+    if: needs.version-contract.outputs.publish == 'true'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -116,6 +151,7 @@ jobs:
   publish-mcp:
     name: verify and publish MCP package
     needs: [version-contract, windows-bootstrap]
+    if: needs.version-contract.outputs.publish == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -226,6 +262,8 @@ jobs:
       - name: Create MCP GitHub release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ needs.version-contract.outputs.tag }}
+          target_commitish: ${{ github.sha }}
           name: fsb-mcp-server v${{ needs.version-contract.outputs.version }}
           body: |
             ## Install / Update

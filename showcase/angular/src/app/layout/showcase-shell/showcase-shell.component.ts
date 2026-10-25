@@ -25,6 +25,7 @@ export class ShowcaseShellComponent implements OnInit, OnDestroy {
   mobileMenuOpen = false;
   navScrolled = false;
   shellless = false;
+  initialNavigationComplete = this.router.navigated;
 
   toggleMobileMenu(): void {
     this.mobileMenuOpen = !this.mobileMenuOpen;
@@ -38,7 +39,10 @@ export class ShowcaseShellComponent implements OnInit, OnDestroy {
     this.updateShellMode();
     this.routeSub = this.router.events
       .pipe(filter((event): event is NavigationEnd => event instanceof NavigationEnd))
-      .subscribe(() => this.updateShellMode());
+      .subscribe(() => {
+        this.updateShellMode();
+        this.initialNavigationComplete = true;
+      });
   }
 
   ngOnDestroy(): void {

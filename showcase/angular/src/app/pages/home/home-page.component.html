@@ -2,8 +2,8 @@
 <section class="hero">
   <div class="hero-bg"></div>
   <div class="hero-content">
-    <h1 i18n="@@home.hero.title">Full <span class="highlight">Self</span>-Browsing</h1>
-    <p class="hero-subtitle" i18n="@@home.hero.subtitle">AI-powered browser automation through natural language. Tell it what to do, and watch it browse for you.</p>
+    <h1 i18n="@@home.hero.title"><span [attr.translate]="'no'">Full <span class="highlight">Self</span>-Browsing</span></h1>
+    <p class="hero-subtitle" i18n="@@home.hero.subtitle">AI-powered browser automation through natural language and connected AI agents. Built for the future of autonomous browsing.</p>
     <div class="hero-actions">
       <a [href]="storeUrl" target="_blank" rel="noopener" class="btn btn-primary" i18n="@@home.hero.cta.getStarted">
         <i [class]="'fa-brands ' + browserIconClass"></i> Get Started
@@ -19,63 +19,72 @@
   </a>
 </section>
 
-<!-- Features -->
+<!-- Features: Online-Mind2Web leaderboard -->
 <section class="features section" id="features">
   <div class="container">
     <div class="section-header reveal">
       <h2 i18n="@@home.features.title">Built for the Modern Web</h2>
+      <p i18n="@@home.features.benchmark.intro">Average success rates on <a href="https://huggingface.co/spaces/osunlp/Online_Mind2Web_Leaderboard" target="_blank" rel="noopener" [attr.translate]="'no'">Online-Mind2Web</a>, with <span [attr.translate]="'no'">FSB</span> included.</p>
       <p i18n="@@home.features.subtitle">Everything you need for intelligent browser automation, powered by leading AI models.</p>
     </div>
-    <div class="features-grid">
-      <div class="feature-card reveal delay-1">
-        <div class="feature-icon"><i class="fa-solid fa-bolt"></i></div>
-        <h3 i18n="@@home.features.card.directApi.title">Direct API Execution</h3>
-        <p i18n="@@home.features.card.directApi.desc">Beyond clicking. <span [attr.translate]="'no'">FSB</span> can call an app's own authenticated API through your logged-in session. Faster and more reliable than DOM automation, with DOM as the automatic fallback. Inspired by <a href="https://github.com/opentabs-dev/opentabs" target="_blank" rel="noopener" [attr.translate]="'no'">OpenTabs</a>.</p>
+    <div class="lb reveal">
+      <div class="lb-head">
+        <div class="lb-head-titles">
+          <a class="lb-source" href="https://huggingface.co/spaces/osunlp/Online_Mind2Web_Leaderboard" target="_blank" rel="noopener" [attr.translate]="'no'">{{ benchmarkName }} <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i></a>
+          <h3 class="lb-title" i18n="@@home.features.benchmark.title">Top 10 agents</h3>
+        </div>
+        <span class="lb-metric" i18n="@@home.features.benchmark.metric">Average success rate</span>
       </div>
-      <div class="feature-card reveal delay-3">
-        <div class="feature-icon"><i class="fa-solid fa-hand-pointer"></i></div>
-        <h3 i18n="@@home.features.card.actions.title">60 Browser Actions</h3>
-        <p i18n="@@home.features.card.actions.desc">Click, type, scroll, drag-and-drop, canvas drawing, <span [attr.translate]="'no'">CDP</span> mouse control, multi-tab management, and more. 53 DOM actions plus 7 through the <span [attr.translate]="'no'">Chrome DevTools Protocol</span>.</p>
+      <ol class="lb-rows">
+        @for (row of leaderboard; track row.rank) {
+          <li class="lb-row" [class.lb-row-fsb]="row.fsb" [style.--lb-score]="row.score + '%'">
+            <span class="lb-rank">{{ row.rank }}</span>
+            @if (row.fsb) {
+              <span class="lb-name">
+                <span class="fsb-mark fsb-highlight-wordmark lb-wordmark" role="img" i18n-aria-label="@@home.comparison.fsb.name" aria-label="FSB" [attr.translate]="'no'">
+                  <span class="fsb-row" aria-hidden="true">
+                    <span class="fsb-f"></span>
+                    <span class="fsb-s"></span>
+                    <svg class="fsb-b" viewBox="-3 -3 78 103" aria-hidden="true">
+                      <path d="M0 0 L40 0 C58 0 70 10 70 26 C70 38 62 46 50 49 C64 51 72 60 72 74 C72 90 60 100 40 100 L0 100 Z"></path>
+                    </svg>
+                  </span>
+                </span>
+              </span>
+            } @else {
+              <span class="lb-name" [attr.translate]="'no'">{{ row.name }}</span>
+            }
+            <span class="lb-track">
+              <span class="lb-bar">
+                @if (row.fsb) {
+                  <span class="lb-shine" aria-hidden="true"></span>
+                }
+              </span>
+              <span class="lb-value">
+                {{ row.value }}
+                @if (row.fsb) {
+                  <i class="fa-solid fa-caret-up lb-trend" role="img" i18n-aria-label="@@home.features.benchmark.trend" aria-label="Trending up" i18n-title="@@home.features.benchmark.trend" title="Trending up"></i>
+                }
+              </span>
+            </span>
+          </li>
+        }
+      </ol>
+      <div class="lb-axis" aria-hidden="true">
+        <span class="lb-scale">
+          @for (tick of leaderboardTicks; track tick.at) {
+            <span class="lb-tick" [style.left.%]="tick.at">{{ tick.label }}</span>
+          }
+        </span>
       </div>
-      <div class="feature-card reveal delay-4">
-        <div class="feature-icon"><i class="fa-solid fa-bell"></i></div>
-        <h3 i18n="@@home.features.card.reactiveTriggers.title">Reactive Triggers</h3>
-        <p i18n="@@home.features.card.reactiveTriggers.desc">Watch any element and get notified the instant a value changes, crosses a threshold, or matches a pattern.</p>
-      </div>
-      <div class="feature-card reveal delay-4">
-        <div class="feature-icon"><i class="fa-solid fa-sitemap"></i></div>
-        <h3 i18n="@@home.features.card.domAnalysis.title">Smart DOM Analysis</h3>
-        <p i18n="@@home.features.card.domAnalysis.desc">Incremental DOM diffing, multi-strategy selectors, and element identification for reliable automation.</p>
-      </div>
-      <div class="feature-card reveal delay-6">
-        <div class="feature-icon"><i class="fa-solid fa-gauge-high"></i></div>
-        <h3 i18n="@@home.features.card.autopilot.title">Autopilot</h3>
-        <p i18n="@@home.features.card.autopilot.desc">Rebuilt on the <a routerLink="/lattice" [attr.translate]="'no'">Lattice</a> SDK, long runs survive <span [attr.translate]="'no'">Chrome</span>'s <span [attr.translate]="'no'">MV3</span> shutdowns and finish. Up to 64 concurrent tabs, plus real file uploads from disk.</p>
-      </div>
-      <div class="feature-card reveal delay-5">
-        <div class="feature-icon"><i class="fa-solid fa-eye"></i></div>
-        <h3 i18n="@@home.features.card.visualFeedback.title">Visual Feedback</h3>
-        <p i18n="@@home.features.card.visualFeedback.desc">Glow borders, pulsing element highlights, and a floating progress overlay show exactly what <span [attr.translate]="'no'">FSB</span> is doing.</p>
-      </div>
-      <div class="feature-card reveal delay-6">
-        <div class="feature-icon"><i class="fa-solid fa-compass"></i></div>
-        <h3 i18n="@@home.features.card.siteIntel.title">Site Intelligence</h3>
-        <p i18n="@@home.features.card.siteIntel.desc">130+ built-in site guides across 17 categories, from commerce to coding.</p>
-      </div>
-      <div class="feature-card reveal delay-2">
-        <div class="feature-icon"><i class="fa-solid fa-plug"></i></div>
-        <h3 i18n="@@home.features.card.mcpIntegration.title"><span [attr.translate]="'no'">MCP</span> Integration</h3>
-        <p i18n="@@home.features.card.mcpIntegration.desc">Use <span [attr.translate]="'no'">FSB</span> as an <span [attr.translate]="'no'">MCP</span> server from <span [attr.translate]="'no'">Claude Code</span>, <span [attr.translate]="'no'">Codex</span>, <span [attr.translate]="'no'">Cursor</span>, <span [attr.translate]="'no'">OpenClaw</span>, or any <span [attr.translate]="'no'">MCP</span> client. 68 tools, with browser automation straight from your IDE.</p>
-      </div>
-      <div class="feature-card reveal delay-3">
-        <div class="feature-icon"><i class="fa-solid fa-tower-broadcast"></i></div>
-        <h3 i18n="@@home.features.card.remoteDashboard.title">Remote Dashboard</h3>
-        <p i18n="@@home.features.card.remoteDashboard.desc">Monitor and control <span [attr.translate]="'no'">FSB</span> from any device. QR-code pairing, a live DOM preview powered by <a routerLink="/phantom-stream" [attr.translate]="'no'">PhantomStream</a>, now with media mirroring, and real-time task execution.</p>
-      </div>
-      <div class="feature-card reveal delay-4">
-        <div class="feature-icon"><i class="fa-solid fa-database"></i></div>
-        <h3 i18n="@@home.features.card.memoryLearning.title">Memory &amp; Learning</h3>
-        <p i18n="@@home.features.card.memoryLearning.desc"><span [attr.translate]="'no'">FSB</span> remembers navigation patterns across sites. Semantic, episodic, and procedural memory for smarter automation over time.</p>
+      <div class="lb-notes">
+        <p i18n="@@home.features.benchmark.note.fsb"><span [attr.translate]="'no'">FSB</span>: <a href="https://github.com/fullselfbrowsing/FSB/tree/mind2web/mind2web" target="_blank" rel="noopener">AI-reviewed result (277/300)</a>. Other values are transcribed from the leaderboard.</p>
+        <p i18n="@@home.features.benchmark.note.method">Evaluation methods differ; numerical placement is illustrative, not an official leaderboard ranking.</p>
+        <p class="lb-tested">
+          <span i18n="@@home.features.benchmark.tested">Tested on <span [attr.translate]="'no'">FSB</span> v0.9.92 · <span [attr.translate]="'no'">MCP</span> v0.11.2</span>
+          <span class="lb-tagline" i18n="@@home.features.benchmark.tagline">It only gets better</span>
+          <span class="lb-wink" role="img" i18n-aria-label="@@home.features.benchmark.wink" aria-label="wink">;)</span>
+        </p>
       </div>
     </div>
   </div>
@@ -260,102 +269,202 @@
   </div>
 </section>
 
-<!-- How It Works -->
-<section class="how-it-works section" id="how-it-works">
-  <div class="container">
-    <div class="section-header reveal">
-      <h2 i18n="@@home.how.title">How It Works</h2>
-      <p i18n="@@home.how.subtitle">Three simple steps from instruction to completion.</p>
-    </div>
-    <div class="steps-row reveal">
-      <div class="step-item">
-        <div class="step-number" [attr.translate]="'no'">1</div>
-        <h3 i18n="@@home.how.step.1.title">Describe Your Task</h3>
-        <p i18n="@@home.how.step.1.desc">Type a natural language instruction into the <span [attr.translate]="'no'">FSB</span> chat panel. &quot;Book a flight from SF to NYC&quot; or &quot;Find the cheapest laptop on Amazon.&quot;</p>
-      </div>
-
-      <div class="step-arrow">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <line x1="5" y1="12" x2="19" y2="12"/>
-          <polyline points="12 5 19 12 12 19"/>
-        </svg>
-      </div>
-
-      <div class="step-item">
-        <div class="step-number" [attr.translate]="'no'">2</div>
-        <h3 i18n="@@home.how.step.2.title"><span [attr.translate]="'no'">FSB</span> Analyzes &amp; Acts</h3>
-        <p i18n="@@home.how.step.2.desc"><span [attr.translate]="'no'">FSB</span> reads the page, plans actions, and executes them. Clicking, typing, scrolling, and navigating as needed.</p>
-      </div>
-
-      <div class="step-arrow">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <line x1="5" y1="12" x2="19" y2="12"/>
-          <polyline points="12 5 19 12 12 19"/>
-        </svg>
-      </div>
-
-      <div class="step-item">
-        <div class="step-number" [attr.translate]="'no'">3</div>
-        <h3 i18n="@@home.how.step.3.title">Task Complete</h3>
-        <p i18n="@@home.how.step.3.desc"><span [attr.translate]="'no'">FSB</span> verifies the result, reports back in the chat, and gives you a summary. Review the outcome and iterate if needed.</p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- AI Providers -->
+<!-- Engine: MCP, Agent CLI, or your own key -->
 <section class="providers section" id="providers">
   <div class="container">
     <div class="section-header reveal">
-      <h2 i18n="@@home.providers.title">Choose Your AI Provider</h2>
-      <p i18n="@@home.providers.subtitle">Works with the leading AI platforms. Bring your own API key or connect <span [attr.translate]="'no'">LM Studio</span> locally.</p>
+      <h2 i18n="@@home.engine.title">Any agent. Any model. <span class="highlight">One browser engine.</span></h2>
+      <p i18n="@@home.engine.subtitle"><span [attr.translate]="'no'">FSB</span> is the browser layer, not another chatbot. Whatever does the thinking, <span [attr.translate]="'no'">FSB</span> reads the page structure, takes the action, and verifies the result. Connect it three ways.</p>
     </div>
-    <div class="providers-grid">
-      <div class="provider-card recommended reveal delay-1">
-        <span class="provider-badge" i18n="@@home.providers.badge.recommended">Recommended</span>
-        <div class="provider-icon">
-          <img src="/assets/providers/xai.png" alt="xAI" width="40" height="40" loading="lazy" decoding="async" i18n-alt="@@home.providers.xai.logo.alt">
-        </div>
-        <h3 i18n="@@home.providers.xai.name" [attr.translate]="'no'">xAI Grok</h3>
-        <p class="provider-models" i18n="@@home.providers.xai.models" [attr.translate]="'no'">Grok 4.1 Fast, Grok 4, Grok Code Fast 1</p>
+    <div class="eng reveal" [class.key-focus]="engKeyFocus" (mouseenter)="onEngEnter()" (mouseleave)="onEngLeave()" (focusin)="onEngFocusIn($event)" (focusout)="onEngFocusOut($event)" (keydown)="onEngKeyDown()">
+      <div class="eng-tabs" role="group" aria-label="Ways to run FSB" i18n-aria-label="@@home.engine.tabs.aria">
+        <button class="eng-tab" [class.on]="engMode === 'mcp'" type="button" (click)="pickEng('mcp')" [attr.aria-pressed]="engMode === 'mcp'">
+          <span class="eng-num">01</span>
+          <span class="eng-kind"><span [attr.translate]="'no'">{{ engMcpKind }}</span><span class="eng-rec" i18n="@@home.providers.badge.recommended">Recommended</span></span>
+          <span class="eng-tab-title" i18n="@@home.engine.mcp.title">Your agent drives <span [attr.translate]="'no'">FSB</span></span>
+          <span class="eng-tab-meta" i18n="@@home.engine.mcp.meta">68 tools · no API key</span>
+        </button>
+        <button class="eng-tab" [class.on]="engMode === 'cli'" type="button" (click)="pickEng('cli')" [attr.aria-pressed]="engMode === 'cli'">
+          <span class="eng-num">02</span>
+          <span class="eng-kind"><span i18n="@@home.engine.cli.kind">Agent <span [attr.translate]="'no'">CLI</span></span></span>
+          <span class="eng-tab-title" i18n="@@home.engine.cli.title">Run on the plan you already pay for</span>
+          <span class="eng-tab-meta" [attr.translate]="'no'">{{ engCliMeta }}</span>
+        </button>
+        <button class="eng-tab" [class.on]="engMode === 'byok'" type="button" (click)="pickEng('byok')" [attr.aria-pressed]="engMode === 'byok'">
+          <span class="eng-num">03</span>
+          <span class="eng-kind" i18n="@@home.engine.byok.kind">Your own key</span>
+          <span class="eng-tab-title" i18n="@@home.engine.byok.title">Standalone, with any model</span>
+          <span class="eng-tab-meta" i18n="@@home.engine.byok.meta">7 providers · local or hosted</span>
+        </button>
+        <div class="eng-tabs-foot" i18n="@@home.engine.tabs.foot">Set up one path now and add the others anytime from Settings. They share the same engine, site guides, and memory.</div>
       </div>
-      <div class="provider-card reveal delay-2">
-        <div class="provider-icon">
-          <img src="/assets/providers/openai.svg" alt="" width="40" height="40" loading="lazy" decoding="async">
+      <div class="eng-stage" [class.leaving]="engLeaving">
+        <div class="eng-panel" [class.is-active]="engMode === 'mcp'" [attr.aria-hidden]="engMode === 'mcp' ? null : 'true'" [attr.inert]="engMode === 'mcp' ? null : ''">
+          <div class="eng-flow">
+            <div class="eng-node">
+              <div class="eng-node-box eng-node-glyphs">
+                @for (glyph of engGlyphs.mcp; track glyph) {
+                  <span class="install-glyph" [style.--install-logo]="logoMask(glyph)" aria-hidden="true"></span>
+                }
+              </div>
+              <span class="eng-node-label" i18n="@@home.engine.flow.mcp.agent">Your agent thinks</span>
+            </div>
+            <div class="eng-wire"></div>
+            <div class="eng-node eng-node-core">
+              <div class="eng-node-box">
+                <span class="fsb-mark fsb-highlight-wordmark" role="img" i18n-aria-label="@@home.comparison.fsb.name" aria-label="FSB" [attr.translate]="'no'">
+                  <span class="fsb-row" aria-hidden="true">
+                    <span class="fsb-f"></span>
+                    <span class="fsb-s"></span>
+                    <svg class="fsb-b" viewBox="-3 -3 78 103" aria-hidden="true">
+                      <path d="M0 0 L40 0 C58 0 70 10 70 26 C70 38 62 46 50 49 C64 51 72 60 72 74 C72 90 60 100 40 100 L0 100 Z"></path>
+                    </svg>
+                  </span>
+                </span>
+              </div>
+              <span class="eng-node-label" i18n="@@home.engine.flow.core">Reads · Acts · Verifies</span>
+            </div>
+            <div class="eng-wire"></div>
+            <div class="eng-node">
+              <div class="eng-node-box"><i class="fa-solid fa-globe" aria-hidden="true"></i></div>
+              <span class="eng-node-label" i18n="@@home.engine.flow.browser">Your browser</span>
+            </div>
+          </div>
+          <h3 i18n="@@home.engine.mcp.title">Your agent drives <span [attr.translate]="'no'">FSB</span></h3>
+          <p class="eng-desc" i18n="@@home.engine.mcp.desc">Coding agents and <span [attr.translate]="'no'">MCP</span> clients call <span [attr.translate]="'no'">FSB</span>&#39;s tools directly. Your agent&#39;s own model does the reasoning, so there is no <span [attr.translate]="'no'">FSB</span> key to add and no second bill.</p>
+          <div class="eng-facts">
+            <span class="eng-fact"><i class="fa-solid fa-screwdriver-wrench" aria-hidden="true"></i><span i18n="@@home.engine.mcp.fact.tools">68 <span [attr.translate]="'no'">MCP</span> tools</span></span>
+            <span class="eng-fact"><i class="fa-solid fa-terminal" aria-hidden="true"></i><span i18n="@@home.engine.mcp.fact.install">One-command install</span></span>
+            <span class="eng-fact"><i class="fa-solid fa-key" aria-hidden="true"></i><span i18n="@@home.engine.mcp.fact.noKey">No API key</span></span>
+          </div>
+          <div class="eng-chips">
+            @for (chip of engChips.mcp; track chip.name) {
+              <span class="eng-chip">
+                @if (chip.logo) {
+                  <span class="install-glyph" [style.--install-logo]="logoMask(chip.logo)" aria-hidden="true"></span>
+                } @else {
+                  <i [class]="chip.icon" aria-hidden="true"></i>
+                }
+                <span [attr.translate]="'no'">{{ chip.name }}</span>
+              </span>
+            }
+            <span class="eng-chip eng-chip-muted"><i class="fa-solid fa-plus" aria-hidden="true"></i><span i18n="@@home.engine.mcp.chip.any">Any <span [attr.translate]="'no'">MCP</span> client</span></span>
+          </div>
         </div>
-        <h3 i18n="@@home.providers.openai.name" [attr.translate]="'no'">OpenAI</h3>
-        <p class="provider-models" i18n="@@home.providers.openai.models" [attr.translate]="'no'">GPT-4o, GPT-4o Mini, GPT-4 Turbo</p>
-      </div>
-      <div class="provider-card reveal delay-3">
-        <div class="provider-icon">
-          <img src="/assets/providers/anthropic.webp" alt="Anthropic" width="40" height="40" loading="lazy" decoding="async" i18n-alt="@@home.providers.anthropic.logo.alt">
+        <div class="eng-panel" [class.is-active]="engMode === 'cli'" [attr.aria-hidden]="engMode === 'cli' ? null : 'true'" [attr.inert]="engMode === 'cli' ? null : ''">
+          <div class="eng-flow">
+            <div class="eng-node">
+              <div class="eng-node-box eng-node-glyphs">
+                @for (glyph of engGlyphs.cli; track glyph) {
+                  <span class="install-glyph" [style.--install-logo]="logoMask(glyph)" aria-hidden="true"></span>
+                }
+              </div>
+              <span class="eng-node-label" i18n="@@home.engine.flow.cli.agent">Your plan thinks</span>
+            </div>
+            <div class="eng-wire"></div>
+            <div class="eng-node eng-node-core">
+              <div class="eng-node-box">
+                <span class="fsb-mark fsb-highlight-wordmark" role="img" i18n-aria-label="@@home.comparison.fsb.name" aria-label="FSB" [attr.translate]="'no'">
+                  <span class="fsb-row" aria-hidden="true">
+                    <span class="fsb-f"></span>
+                    <span class="fsb-s"></span>
+                    <svg class="fsb-b" viewBox="-3 -3 78 103" aria-hidden="true">
+                      <path d="M0 0 L40 0 C58 0 70 10 70 26 C70 38 62 46 50 49 C64 51 72 60 72 74 C72 90 60 100 40 100 L0 100 Z"></path>
+                    </svg>
+                  </span>
+                </span>
+              </div>
+              <span class="eng-node-label" i18n="@@home.engine.flow.core">Reads · Acts · Verifies</span>
+            </div>
+            <div class="eng-wire"></div>
+            <div class="eng-node">
+              <div class="eng-node-box"><i class="fa-solid fa-globe" aria-hidden="true"></i></div>
+              <span class="eng-node-label" i18n="@@home.engine.flow.browser">Your browser</span>
+            </div>
+          </div>
+          <h3 i18n="@@home.engine.cli.title">Run on the plan you already pay for</h3>
+          <p class="eng-desc" i18n="@@home.engine.cli.desc">Give a task in the side panel and <span [attr.translate]="'no'">FSB</span> hands the reasoning to <span [attr.translate]="'no'">Claude Code</span> or <span [attr.translate]="'no'">Grok Build</span>, signed in with your existing account. <span [attr.translate]="'no'">FSB</span> never handles that credential.</p>
+          <div class="eng-facts">
+            <span class="eng-fact"><i class="fa-solid fa-receipt" aria-hidden="true"></i><span i18n="@@home.engine.cli.fact.billing">Billed to your <span [attr.translate]="'no'">Claude</span> plan or <span [attr.translate]="'no'">SuperGrok</span></span></span>
+            <span class="eng-fact"><i class="fa-solid fa-user-shield" aria-hidden="true"></i><span i18n="@@home.engine.cli.fact.noCredential">No credential shared</span></span>
+          </div>
+          <div class="eng-chips">
+            @for (chip of engChips.cli; track chip.name) {
+              <span class="eng-chip">
+                @if (chip.logo) {
+                  <span class="install-glyph" [style.--install-logo]="logoMask(chip.logo)" aria-hidden="true"></span>
+                } @else {
+                  <i [class]="chip.icon" aria-hidden="true"></i>
+                }
+                <span [attr.translate]="'no'">{{ chip.name }}</span>
+              </span>
+            }
+          </div>
         </div>
-        <h3 i18n="@@home.providers.anthropic.name" [attr.translate]="'no'">Anthropic</h3>
-        <p class="provider-models" i18n="@@home.providers.anthropic.models" [attr.translate]="'no'">Claude Opus 4.6, Sonnet 4.6, Haiku 4.5</p>
-      </div>
-      <div class="provider-card reveal delay-4">
-        <div class="provider-icon">
-          <img src="/assets/providers/google.png" alt="Google Gemini" width="40" height="40" loading="lazy" decoding="async" i18n-alt="@@home.providers.gemini.logo.alt">
+        <div class="eng-panel" [class.is-active]="engMode === 'byok'" [attr.aria-hidden]="engMode === 'byok' ? null : 'true'" [attr.inert]="engMode === 'byok' ? null : ''">
+          <div class="eng-flow">
+            <div class="eng-node">
+              <div class="eng-node-box eng-node-glyphs">
+                @for (glyph of engGlyphs.byok; track glyph) {
+                  <span class="install-glyph" [style.--install-logo]="logoMask(glyph)" aria-hidden="true"></span>
+                }
+              </div>
+              <span class="eng-node-label" i18n="@@home.engine.flow.byok.agent">Your model thinks</span>
+            </div>
+            <div class="eng-wire"></div>
+            <div class="eng-node eng-node-core">
+              <div class="eng-node-box">
+                <span class="fsb-mark fsb-highlight-wordmark" role="img" i18n-aria-label="@@home.comparison.fsb.name" aria-label="FSB" [attr.translate]="'no'">
+                  <span class="fsb-row" aria-hidden="true">
+                    <span class="fsb-f"></span>
+                    <span class="fsb-s"></span>
+                    <svg class="fsb-b" viewBox="-3 -3 78 103" aria-hidden="true">
+                      <path d="M0 0 L40 0 C58 0 70 10 70 26 C70 38 62 46 50 49 C64 51 72 60 72 74 C72 90 60 100 40 100 L0 100 Z"></path>
+                    </svg>
+                  </span>
+                </span>
+              </div>
+              <span class="eng-node-label" i18n="@@home.engine.flow.core">Reads · Acts · Verifies</span>
+            </div>
+            <div class="eng-wire"></div>
+            <div class="eng-node">
+              <div class="eng-node-box"><i class="fa-solid fa-globe" aria-hidden="true"></i></div>
+              <span class="eng-node-label" i18n="@@home.engine.flow.browser">Your browser</span>
+            </div>
+          </div>
+          <h3 i18n="@@home.engine.byok.title">Standalone, with any model</h3>
+          <p class="eng-desc" i18n="@@home.engine.byok.desc">Chat with <span [attr.translate]="'no'">FSB</span> in the side panel using your own API key, or a local model with no key at all. Keys are encrypted and stay in your browser.</p>
+          <div class="eng-facts">
+            <span class="eng-fact"><i class="fa-solid fa-list" aria-hidden="true"></i><span i18n="@@home.engine.byok.fact.models">Live model lists</span></span>
+            <span class="eng-fact"><i class="fa-solid fa-lock" aria-hidden="true"></i><span i18n="@@home.engine.byok.fact.encrypted">Encrypted locally</span></span>
+          </div>
+          <div class="eng-chips">
+            @for (chip of engChips.byok; track chip.name) {
+              <span class="eng-chip">
+                @if (chip.logo) {
+                  <span class="install-glyph" [style.--install-logo]="logoMask(chip.logo)" aria-hidden="true"></span>
+                } @else {
+                  <i [class]="chip.icon" aria-hidden="true"></i>
+                }
+                <span [attr.translate]="'no'">{{ chip.name }}</span>
+                @switch (chip.tag) {
+                  @case ('default') {
+                    <small i18n="@@home.engine.byok.tag.default">Default</small>
+                  }
+                  @case ('freeTier') {
+                    <small i18n="@@home.engine.byok.tag.freeTier">Free tier</small>
+                  }
+                  @case ('local') {
+                    <small i18n="@@home.engine.byok.tag.local">Local</small>
+                  }
+                }
+              </span>
+            }
+            <span class="eng-chip eng-chip-muted"><i class="fa-solid fa-code" aria-hidden="true"></i><span i18n="@@home.engine.byok.chip.any">Any <span [attr.translate]="'no'">OpenAI</span>-compatible endpoint</span></span>
+          </div>
         </div>
-        <h3 i18n="@@home.providers.gemini.name" [attr.translate]="'no'">Google Gemini</h3>
-        <p class="provider-models" i18n="@@home.providers.gemini.models" [attr.translate]="'no'">2.5 Flash, 2.5 Pro, 2.0 Flash (FREE)</p>
-      </div>
-      <div class="provider-card reveal delay-5">
-        <div class="provider-icon">
-          <img src="/assets/providers/openrouter.svg" alt="OpenRouter" width="40" height="40" loading="lazy" decoding="async" i18n-alt="@@home.providers.openrouter.logo.alt">
-        </div>
-        <h3 i18n="@@home.providers.openrouter.name" [attr.translate]="'no'">OpenRouter</h3>
-        <p class="provider-models" i18n="@@home.providers.openrouter.models">200+ models through a single API key</p>
-      </div>
-      <div class="provider-card reveal delay-6">
-        <div class="provider-icon">
-          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-8 11H8v-2h4v2zm4-4H8V9h8v2z"/><path d="M7 2v2M17 2v2M7 20v2M17 20v2M2 7h2M2 17h2M20 7h2M20 17h2"/></svg>
-        </div>
-        <h3 i18n="@@home.providers.lmstudio.name" [attr.translate]="'no'">LM Studio</h3>
-        <p class="provider-models" i18n="@@home.providers.lmstudio.models">Local models, no API key, live discovery from <span [attr.translate]="'no'">/v1/models</span></p>
       </div>
     </div>
-    <p class="providers-note reveal" i18n="@@home.providers.note">Start from <strong>FREE</strong> with <span [attr.translate]="'no'">Gemini 2.0 Flash</span>, or run fully local with <strong><span [attr.translate]="'no'">LM Studio</span></strong> and no API key.</p>
   </div>
 </section>
 

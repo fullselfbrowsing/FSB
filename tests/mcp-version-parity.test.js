@@ -296,7 +296,7 @@ async function run() {
   assert(packageReadme.includes(`### Releasing ${canonicalVersion}`), 'MCP README release instructions match canonical package version');
   assert(packageReadme.includes(`git tag mcp-v${canonicalVersion} && git push origin mcp-v${canonicalVersion}`), 'MCP README uses the MCP-only release tag');
   assert(packageReadme.includes(`MCP ${canonicalVersion} requires extension ${extensionVersion} or newer`), 'MCP README documents independent compatibility requirements');
-  assert(publishWorkflow.includes("- 'mcp-v*'"), 'MCP release workflow is restricted to MCP tags');
+  assert(publishWorkflow.includes("- 'mcp-v*'"), 'MCP release workflow supports MCP tags');
   assert(publishWorkflow.includes('test "$GITHUB_REF_NAME" = "mcp-v${{ steps.package-version.outputs.version }}"'), 'MCP workflow binds the tag to mcp/package.json');
   assert(publishWorkflow.includes('git merge-base --is-ancestor "$release_commit" origin/main'), 'release workflow requires the tagged commit to be on main');
   assert(publishWorkflow.includes('--access public --tag latest'), 'MCP release workflow moves npm latest to the MCP version');

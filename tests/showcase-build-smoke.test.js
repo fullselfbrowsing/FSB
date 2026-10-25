@@ -7,8 +7,8 @@
  *      current page. All 5 non-en messages.{lang}.xlf files have a
  *      <target state="translated"> block for EVERY extracted ID (no missing
  *      translations means the build can pass with i18nMissingTranslation: error).
- *   2. AEO: generated llms files match their sources and carry an explicit
- *      MIT License line with the canonical repository license URL.
+ *   2. AEO: generated llms files retain their English sources, append localized
+ *      catalog summaries, and carry the canonical MIT License URL.
  *   3. BUILD: `npm --prefix showcase/angular run build --silent` exits 0
  *      and `npm --prefix showcase/angular run verify:hreflang` exits 0. The
  *      prerendered home, agents, and concierge pages expose the canonical MIT
@@ -238,6 +238,32 @@ const LLMS_FILE_PAIRS = [
   },
 ];
 
+function decodeCrawlerCopy(value) {
+  return value.replace(/&(amp|lt|gt|quot|apos|#\d+|#x[\da-f]+);/gi, (_, entity) => {
+    if (entity.toLowerCase().startsWith('#x')) return String.fromCodePoint(parseInt(entity.slice(2), 16));
+    if (entity.startsWith('#')) return String.fromCodePoint(parseInt(entity.slice(1), 10));
+    return { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" }[entity.toLowerCase()];
+  }).replace(/\s+/g, ' ').trim();
+}
+
+function catalogMarketingCopy(locale, page, field) {
+  const filename = locale === 'en' ? 'messages.xlf' : `messages.${locale}.xlf`;
+  const catalog = fs.readFileSync(path.join(ROOT, 'showcase/angular/src/locale', filename), 'utf8');
+  const id = `${page}.meta.${field}`;
+  const block = [...catalog.matchAll(/<trans-unit\b([^>]*)>([\s\S]*?)<\/trans-unit>/g)]
+    .find((match) => match[1].includes(`id="${id}"`))?.[2];
+  const tag = locale === 'en' ? 'source' : 'target';
+  const copy = block?.match(new RegExp(`<${tag}\\b[^>]*>([\\s\\S]*?)</${tag}>`))?.[1];
+  return copy === undefined ? undefined : decodeCrawlerCopy(copy);
+}
+
+const crawlerRegistry = fs.readFileSync(path.join(ROOT, 'showcase/angular/src/app/core/i18n/locale-constants.ts'), 'utf8');
+const crawlerLocales = crawlerRegistry.match(/LOCALES\s*=\s*\[([^\]]+)\]/)[1]
+  .split(',').map((value) => value.trim().replace(/^['"]|['"]$/g, '')).filter(Boolean);
+const crawlerSubpathBlock = crawlerRegistry.match(/LOCALE_SUBPATHS[^{]*\{([\s\S]*?)\}/)[1];
+const crawlerSubpaths = Object.fromEntries([...crawlerSubpathBlock.matchAll(/['"]([\w-]+)['"]\s*:\s*['"]([^'"]*)['"]/g)]
+  .map((match) => [match[1], match[2]]));
+
 for (const pair of LLMS_FILE_PAIRS) {
   const source = fs.readFileSync(path.join(ROOT, pair.source), 'utf8');
   const generated = fs.readFileSync(path.join(ROOT, pair.generated), 'utf8');
@@ -257,9 +283,39 @@ for (const pair of LLMS_FILE_PAIRS) {
   check(`${pair.generated}: contains MIT License and canonical URL`,
     generated.includes('MIT License') && generated.includes(LICENSE_URL),
     'explicit MIT license phrase or canonical URL missing');
-  check(`${pair.generated}: generated body matches ${pair.source}`,
-    generatedBody === source,
-    'generated content drifted from its source');
+  check(`${pair.generated}: retains ${pair.source} as its complete English guide`,
+    generatedBody.startsWith(`${source}\n`),
+    'generated English guide drifted from its source');
+  const localizedIndex = generatedBody.slice(source.length).trim();
+  check(`${pair.generated}: appends one localized marketing index`,
+    localizedIndex.startsWith('## Localized marketing pages\n')
+      && (localizedIndex.match(/^## Localized marketing pages$/gm) || []).length === 1,
+    'localized index missing or duplicated');
+  const sections = [...localizedIndex.matchAll(/^### ([\w-]+)\n\n((?:- .+\n?)+)/gm)];
+  check(`${pair.generated}: index has every locale in registry order`,
+    JSON.stringify(sections.map((section) => section[1])) === JSON.stringify(crawlerLocales),
+    `actual ${sections.map((section) => section[1]).join(', ')}`);
+  for (const section of sections) {
+    const locale = section[1];
+    const lines = section[2].trim().split('\n');
+    const pages = ['home', 'about', 'agents', 'support'];
+    check(`${pair.generated}: ${locale} index contains exactly four marketing pages`,
+      lines.length === pages.length, `actual ${lines.length}`);
+    for (const [index, page] of pages.entries()) {
+      const entry = lines[index]?.match(/^- \[((?:\\.|[^\]])+)\]\(([^)]+)\): (.+)$/);
+      const unescapeMarkdown = (value) => value?.replace(/\\([\\`*_[\]<>])/g, '$1');
+      const prefix = crawlerSubpaths[locale] ? `/${crawlerSubpaths[locale]}` : '';
+      const expectedUrl = `https://full-selfbrowsing.com${prefix}${page === 'home' ? '' : `/${page}`}`;
+      check(`${pair.generated}: ${locale}/${page} summary matches localized metadata and URL`,
+        Boolean(entry)
+          && unescapeMarkdown(entry[1]) === catalogMarketingCopy(locale, page, 'title')
+          && entry[2] === expectedUrl
+          && unescapeMarkdown(entry[3]) === catalogMarketingCopy(locale, page, 'description'),
+        `unexpected summary ${lines[index] || '(missing)'}`);
+    }
+  }
+  check(`${pair.generated}: has no stale Chrome 88+ requirement`,
+    !/Chrome\s+88\+/.test(generated), 'Chrome requirement must match the extension manifest');
 }
 
 // =============================================================================

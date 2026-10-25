@@ -15,6 +15,8 @@ const SOURCE_FILE = join(LOCALE_DIR, 'messages.xlf');
 const ALLOWLIST_FILE = join(LOCALE_DIR, 'same-source-allowlist.json');
 const INVARIANT_TECHNICAL_LITERALS = [
   'FSB',
+  'Full Self-Browsing',
+  'Full Self Browsing',
   'PhantomStream',
   'Lattice',
   'Concierge',
@@ -137,6 +139,12 @@ function visibleText(value) {
     .trim();
 }
 
+function inlineText(value) {
+  return decodeXmlEntities(value.replace(/<[^>]+>/g, ''))
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function comparisonKey(value) {
   return visibleText(value)
     .toLocaleLowerCase('en-US')
@@ -237,8 +245,8 @@ function hasUnbalancedParentheses(value) {
 }
 
 function missingInvariantTechnicalLiterals(source, target) {
-  const sourceText = visibleText(source);
-  const targetText = visibleText(target);
+  const sourceText = inlineText(source);
+  const targetText = inlineText(target);
   return INVARIANT_TECHNICAL_LITERALS.filter(
     (literal) => sourceText.includes(literal) && !targetText.includes(literal),
   );

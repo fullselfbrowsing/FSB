@@ -6,6 +6,7 @@
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { dirname, resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { buildLocalizedMarketingIndex } from './crawler-locale-summaries.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -18,6 +19,9 @@ const SCRIPTS_DIR = __dirname;
 const SERVER_ROUTES_PATH = join(ANGULAR_ROOT, 'src', 'app', 'app.routes.server.ts');
 
 const HOST = 'https://full-selfbrowsing.com';
+const TRAILER_VIDEO = JSON.parse(readFileSync(
+  join(ANGULAR_ROOT, 'src', 'app', 'core', 'seo', 'trailer-video.json'), 'utf8'
+));
 // PRE-03 locked, /dashboard excluded. changefreq/priority hint relative importance
 // to crawlers; lastmod is regenerated per build (see generateSitemap).
 const ROUTES = [
@@ -87,6 +91,8 @@ const LOCALE_CONSTANTS_PATH = join(ANGULAR_ROOT, 'src', 'app', 'core', 'i18n', '
 
 function readLocaleRegistry() {
   const source = readFileSync(LOCALE_CONSTANTS_PATH, 'utf8');
+  const sourceLocale = source.match(/SOURCE_LOCALE\s*=\s*['"]([^'"]+)['"]/)?.[1];
+  if (!sourceLocale) throw new Error('build-crawler-files: cannot read SOURCE_LOCALE from locale-constants.ts');
   const listMatch = source.match(/LOCALES\s*=\s*\[([^\]]+)\]/);
   if (!listMatch) throw new Error('build-crawler-files: cannot read LOCALES from locale-constants.ts');
   const locales = listMatch[1]
@@ -103,7 +109,7 @@ function readLocaleRegistry() {
   for (const locale of locales) {
     if (!(locale in subpaths)) throw new Error(`build-crawler-files: LOCALE_SUBPATHS missing ${locale}`);
   }
-  return { locales, subpaths };
+  return { locales, subpaths, sourceLocale };
 }
 
 function localeUrl(subpath, routePath) {
@@ -112,13 +118,37 @@ function localeUrl(subpath, routePath) {
   return `${HOST}${prefix}${routePath}`;
 }
 
+function escapeXml(value) {
+  return String(value).replace(/[&<>"']/g, (character) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;'
+  })[character]);
+}
+
+function localizedTrailerCopy(locale) {
+  if (locale === 'en') return TRAILER_VIDEO;
+  const catalog = readFileSync(join(ANGULAR_ROOT, 'src', 'locale', `messages.${locale}.xlf`), 'utf8');
+  const readTarget = (id) => {
+    const unit = catalog.match(new RegExp(`<trans-unit id="${id.replaceAll('.', '\\.')}"[^>]*>([\\s\\S]*?)</trans-unit>`));
+    const target = unit?.[1].match(/<target[^>]*>([\s\S]*?)<\/target>/)?.[1];
+    if (!target || target.includes('<x ')) throw new Error(`Missing plain-text video translation: ${locale}/${id}`);
+    return target.replace(/&(amp|lt|gt|quot|apos|#\d+|#x[\da-f]+);/gi, (_, entity) => {
+      if (entity.startsWith('#x')) return String.fromCodePoint(parseInt(entity.slice(2), 16));
+      if (entity.startsWith('#')) return String.fromCodePoint(parseInt(entity.slice(1), 10));
+      return { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" }[entity];
+    });
+  };
+  return {
+    name: readTarget('about.schema.trailer.name'),
+    description: readTarget('about.schema.trailer.description'),
+  };
+}
+
 function generateSitemap() {
   const lastmod = todayIsoDate();
-  const { locales, subpaths } = readLocaleRegistry();
-  const sourceLocale = locales[0];
+  const { locales, subpaths, sourceLocale } = readLocaleRegistry();
   const lines = [];
   lines.push('<?xml version="1.0" encoding="UTF-8"?>');
-  lines.push('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">');
+  lines.push('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml" xmlns:video="http://www.google.com/schemas/sitemap-video/1.1">');
   for (const route of ROUTES) {
     // Every locale variant is its own <url>, and each carries the full
     // alternate set -- Google requires the reciprocal links on each variant.
@@ -132,6 +162,17 @@ function generateSitemap() {
         lines.push(`    <xhtml:link rel="alternate" hreflang="${alternate}" href="${localeUrl(subpaths[alternate], route.path)}"/>`);
       }
       lines.push(`    <xhtml:link rel="alternate" hreflang="x-default" href="${localeUrl(subpaths[sourceLocale], route.path)}"/>`);
+      if (route.path === '/about') {
+        const copy = localizedTrailerCopy(locale);
+        lines.push('    <video:video>');
+        lines.push(`      <video:thumbnail_loc>${escapeXml(TRAILER_VIDEO.thumbnailUrl)}</video:thumbnail_loc>`);
+        lines.push(`      <video:title>${escapeXml(copy.name)}</video:title>`);
+        lines.push(`      <video:description>${escapeXml(copy.description)}</video:description>`);
+        lines.push(`      <video:player_loc>${escapeXml(TRAILER_VIDEO.embedUrl)}</video:player_loc>`);
+        lines.push(`      <video:duration>${TRAILER_VIDEO.durationSeconds}</video:duration>`);
+        lines.push(`      <video:publication_date>${TRAILER_VIDEO.uploadDate}</video:publication_date>`);
+        lines.push('    </video:video>');
+      }
       lines.push('  </url>');
     }
   }
@@ -142,14 +183,14 @@ function generateSitemap() {
   console.log(`[build-crawler-files] sitemap.xml written (${body.length} bytes, ${ROUTES.length * locales.length} urls, lastmod=${lastmod})`);
 }
 
-function copyCrawlerTextFile(sourceName, outputName, maxBytes) {
+function copyCrawlerTextFile(sourceName, outputName, maxBytes, localizedIndex) {
   const sourcePath = join(SCRIPTS_DIR, sourceName);
   if (!existsSync(sourcePath)) {
     throw new Error(`${sourceName} not found at ${sourcePath}`);
   }
   const source = readFileSync(sourcePath, 'utf8');
   const header = `<!-- generated ${todayIsoDate()} by build-crawler-files.mjs; edit ${sourceName} -->\n`;
-  const body = header + source;
+  const body = header + source + (source.endsWith('\n') ? '\n' : '\n\n') + localizedIndex;
   const bytes = Buffer.byteLength(body, 'utf8');
   if (bytes >= maxBytes) {
     throw new Error(`${outputName} exceeds ${maxBytes} bytes -- trim ${sourceName}`);
@@ -159,8 +200,15 @@ function copyCrawlerTextFile(sourceName, outputName, maxBytes) {
 }
 
 function copyLlmsFiles() {
-  copyCrawlerTextFile('llms.source.md', 'llms.txt', MAX_LLMS_BYTES);
-  copyCrawlerTextFile('llms-full.source.md', 'llms-full.txt', MAX_LLMS_FULL_BYTES);
+  const registry = readLocaleRegistry();
+  const localizedIndex = buildLocalizedMarketingIndex({
+    ...registry,
+    host: HOST,
+    catalogForLocale: locale => readFileSync(join(ANGULAR_ROOT, 'src', 'locale',
+      locale === registry.sourceLocale ? 'messages.xlf' : `messages.${locale}.xlf`), 'utf8'),
+  });
+  copyCrawlerTextFile('llms.source.md', 'llms.txt', MAX_LLMS_BYTES, localizedIndex);
+  copyCrawlerTextFile('llms-full.source.md', 'llms-full.txt', MAX_LLMS_FULL_BYTES, localizedIndex);
 }
 
 function writeVersion() {

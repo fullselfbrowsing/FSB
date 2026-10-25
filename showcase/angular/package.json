@@ -16,7 +16,11 @@
     "verify:hreflang": "node scripts/verify-hreflang.mjs",
     "verify:translation-drift": "node scripts/verify-translation-drift.mjs",
     "verify:translation-quality": "node scripts/verify-translation-quality.mjs",
-    "test:translation-tools": "node --test scripts/verify-translation-tools.test.mjs"
+    "test:translation-tools": "node --test scripts/verify-translation-tools.test.mjs",
+    "verify:video-seo": "node scripts/verify-video-seo.mjs",
+    "test:video-sitemap": "node --test scripts/validate-video-sitemap.test.mjs",
+    "verify:marketing-i18n-seo": "node scripts/verify-marketing-i18n-seo.mjs",
+    "test:marketing-i18n-seo": "node --test scripts/verify-marketing-i18n-seo.test.mjs scripts/crawler-locale-summaries.test.mjs"
   },
   "dependencies": {
     "@angular/animations": "^20.3.19",

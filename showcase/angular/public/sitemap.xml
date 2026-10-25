@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml" xmlns:video="http://www.google.com/schemas/sitemap-video/1.1">
   <url>
     <loc>https://full-selfbrowsing.com</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com"/>
@@ -16,7 +16,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/es</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com"/>
@@ -30,7 +30,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/de</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com"/>
@@ -44,7 +44,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/ja</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com"/>
@@ -58,7 +58,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/ko</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com"/>
@@ -72,7 +72,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/zh-CN</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com"/>
@@ -86,7 +86,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/zh-TW</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com"/>
@@ -100,7 +100,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/about</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/about"/>
@@ -111,10 +111,18 @@
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/about"/>
     <xhtml:link rel="alternate" hreflang="zh-TW" href="https://full-selfbrowsing.com/zh-TW/about"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://full-selfbrowsing.com/about"/>
+    <video:video>
+      <video:thumbnail_loc>https://i.ytimg.com/vi/osNHSquClo0/hqdefault.jpg</video:thumbnail_loc>
+      <video:title>FSB Demo: AI Browser Automation in Chrome</video:title>
+      <video:description>Watch the 33-second Full Self-Browsing trailer. FSB is an open-source Chrome extension for natural-language browser automation and a real browser connection for AI agents through MCP.</video:description>
+      <video:player_loc>https://www.youtube-nocookie.com/embed/osNHSquClo0</video:player_loc>
+      <video:duration>33</video:duration>
+      <video:publication_date>2026-09-06T18:41:54-07:00</video:publication_date>
+    </video:video>
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/es/about</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/about"/>
@@ -125,10 +133,18 @@
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/about"/>
     <xhtml:link rel="alternate" hreflang="zh-TW" href="https://full-selfbrowsing.com/zh-TW/about"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://full-selfbrowsing.com/about"/>
+    <video:video>
+      <video:thumbnail_loc>https://i.ytimg.com/vi/osNHSquClo0/hqdefault.jpg</video:thumbnail_loc>
+      <video:title>Demostración de FSB: automatización del navegador con IA en Chrome</video:title>
+      <video:description>Mira el tráiler de 33 segundos de Full Self-Browsing. FSB es una extensión de Chrome de código abierto para automatizar el navegador con lenguaje natural y conectar agentes de IA con un navegador real mediante MCP.</video:description>
+      <video:player_loc>https://www.youtube-nocookie.com/embed/osNHSquClo0</video:player_loc>
+      <video:duration>33</video:duration>
+      <video:publication_date>2026-09-06T18:41:54-07:00</video:publication_date>
+    </video:video>
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/de/about</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/about"/>
@@ -139,10 +155,18 @@
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/about"/>
     <xhtml:link rel="alternate" hreflang="zh-TW" href="https://full-selfbrowsing.com/zh-TW/about"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://full-selfbrowsing.com/about"/>
+    <video:video>
+      <video:thumbnail_loc>https://i.ytimg.com/vi/osNHSquClo0/hqdefault.jpg</video:thumbnail_loc>
+      <video:title>FSB-Demo: Browserautomatisierung mit KI in Chrome</video:title>
+      <video:description>Sehen Sie sich den 33 Sekunden langen Trailer zu Full Self-Browsing an. FSB ist eine quelloffene Chrome-Erweiterung für Browserautomatisierung mit natürlicher Sprache und die Verbindung von KI-Agenten mit einem echten Browser über MCP.</video:description>
+      <video:player_loc>https://www.youtube-nocookie.com/embed/osNHSquClo0</video:player_loc>
+      <video:duration>33</video:duration>
+      <video:publication_date>2026-09-06T18:41:54-07:00</video:publication_date>
+    </video:video>
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/ja/about</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/about"/>
@@ -153,10 +177,18 @@
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/about"/>
     <xhtml:link rel="alternate" hreflang="zh-TW" href="https://full-selfbrowsing.com/zh-TW/about"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://full-selfbrowsing.com/about"/>
+    <video:video>
+      <video:thumbnail_loc>https://i.ytimg.com/vi/osNHSquClo0/hqdefault.jpg</video:thumbnail_loc>
+      <video:title>FSB デモ：Chrome での AI ブラウザー自動化</video:title>
+      <video:description>Full Self-Browsing の 33 秒のトレーラーをご覧ください。FSB は、自然言語でブラウザーを自動化し、MCP を通じて AI エージェントを実際のブラウザーにつなぐ、オープンソースの Chrome 拡張機能です。</video:description>
+      <video:player_loc>https://www.youtube-nocookie.com/embed/osNHSquClo0</video:player_loc>
+      <video:duration>33</video:duration>
+      <video:publication_date>2026-09-06T18:41:54-07:00</video:publication_date>
+    </video:video>
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/ko/about</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/about"/>
@@ -167,10 +199,18 @@
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/about"/>
     <xhtml:link rel="alternate" hreflang="zh-TW" href="https://full-selfbrowsing.com/zh-TW/about"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://full-selfbrowsing.com/about"/>
+    <video:video>
+      <video:thumbnail_loc>https://i.ytimg.com/vi/osNHSquClo0/hqdefault.jpg</video:thumbnail_loc>
+      <video:title>FSB 데모: Chrome에서 AI 브라우저 자동화</video:title>
+      <video:description>Full Self-Browsing의 33초 예고편을 시청하세요. FSB는 자연어로 브라우저를 자동화하고 MCP를 통해 AI 에이전트를 실제 브라우저에 연결하는 오픈 소스 Chrome 확장 프로그램입니다.</video:description>
+      <video:player_loc>https://www.youtube-nocookie.com/embed/osNHSquClo0</video:player_loc>
+      <video:duration>33</video:duration>
+      <video:publication_date>2026-09-06T18:41:54-07:00</video:publication_date>
+    </video:video>
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/zh-CN/about</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/about"/>
@@ -181,10 +221,18 @@
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/about"/>
     <xhtml:link rel="alternate" hreflang="zh-TW" href="https://full-selfbrowsing.com/zh-TW/about"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://full-selfbrowsing.com/about"/>
+    <video:video>
+      <video:thumbnail_loc>https://i.ytimg.com/vi/osNHSquClo0/hqdefault.jpg</video:thumbnail_loc>
+      <video:title>FSB 演示：在 Chrome 中实现 AI 浏览器自动化</video:title>
+      <video:description>观看 Full Self-Browsing 的 33 秒预告片。FSB 是一款开源 Chrome 扩展，可通过自然语言自动操作浏览器，并通过 MCP 将 AI 智能体连接到真实浏览器。</video:description>
+      <video:player_loc>https://www.youtube-nocookie.com/embed/osNHSquClo0</video:player_loc>
+      <video:duration>33</video:duration>
+      <video:publication_date>2026-09-06T18:41:54-07:00</video:publication_date>
+    </video:video>
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/zh-TW/about</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/about"/>
@@ -195,10 +243,18 @@
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/about"/>
     <xhtml:link rel="alternate" hreflang="zh-TW" href="https://full-selfbrowsing.com/zh-TW/about"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://full-selfbrowsing.com/about"/>
+    <video:video>
+      <video:thumbnail_loc>https://i.ytimg.com/vi/osNHSquClo0/hqdefault.jpg</video:thumbnail_loc>
+      <video:title>FSB 示範：在 Chrome 中實現 AI 瀏覽器自動化</video:title>
+      <video:description>觀看 Full Self-Browsing 的 33 秒預告片。FSB 是一款開源 Chrome 擴充功能，可透過自然語言自動操作瀏覽器，並透過 MCP 將 AI 代理程式連接到真實瀏覽器。</video:description>
+      <video:player_loc>https://www.youtube-nocookie.com/embed/osNHSquClo0</video:player_loc>
+      <video:duration>33</video:duration>
+      <video:publication_date>2026-09-06T18:41:54-07:00</video:publication_date>
+    </video:video>
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/agents</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/agents"/>
@@ -212,7 +268,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/es/agents</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/agents"/>
@@ -226,7 +282,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/de/agents</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/agents"/>
@@ -240,7 +296,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/ja/agents</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/agents"/>
@@ -254,7 +310,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/ko/agents</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/agents"/>
@@ -268,7 +324,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/zh-CN/agents</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/agents"/>
@@ -282,7 +338,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/zh-TW/agents</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/agents"/>
@@ -296,7 +352,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/support</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/support"/>
@@ -310,7 +366,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/es/support</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/support"/>
@@ -324,7 +380,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/de/support</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/support"/>
@@ -338,7 +394,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/ja/support</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/support"/>
@@ -352,7 +408,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/ko/support</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/support"/>
@@ -366,7 +422,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/zh-CN/support</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/support"/>
@@ -380,7 +436,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/zh-TW/support</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/support"/>
@@ -394,7 +450,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/privacy</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.5</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/privacy"/>
@@ -408,7 +464,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/es/privacy</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.5</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/privacy"/>
@@ -422,7 +478,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/de/privacy</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.5</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/privacy"/>
@@ -436,7 +492,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/ja/privacy</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.5</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/privacy"/>
@@ -450,7 +506,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/ko/privacy</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.5</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/privacy"/>
@@ -464,7 +520,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/zh-CN/privacy</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.5</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/privacy"/>
@@ -478,7 +534,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/zh-TW/privacy</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.5</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/privacy"/>
@@ -492,7 +548,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/release-notes</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/release-notes"/>
@@ -506,7 +562,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/es/release-notes</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/release-notes"/>
@@ -520,7 +576,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/de/release-notes</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/release-notes"/>
@@ -534,7 +590,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/ja/release-notes</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/release-notes"/>
@@ -548,7 +604,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/ko/release-notes</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/release-notes"/>
@@ -562,7 +618,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/zh-CN/release-notes</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/release-notes"/>
@@ -576,7 +632,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/zh-TW/release-notes</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/release-notes"/>
@@ -590,7 +646,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/lattice</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/lattice"/>
@@ -604,7 +660,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/es/lattice</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/lattice"/>
@@ -618,7 +674,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/de/lattice</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/lattice"/>
@@ -632,7 +688,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/ja/lattice</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/lattice"/>
@@ -646,7 +702,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/ko/lattice</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/lattice"/>
@@ -660,7 +716,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/zh-CN/lattice</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/lattice"/>
@@ -674,7 +730,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/zh-TW/lattice</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/lattice"/>
@@ -688,7 +744,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/concierge</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/concierge"/>
@@ -702,7 +758,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/es/concierge</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/concierge"/>
@@ -716,7 +772,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/de/concierge</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/concierge"/>
@@ -730,7 +786,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/ja/concierge</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/concierge"/>
@@ -744,7 +800,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/ko/concierge</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/concierge"/>
@@ -758,7 +814,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/zh-CN/concierge</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/concierge"/>
@@ -772,7 +828,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/zh-TW/concierge</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/concierge"/>
@@ -786,7 +842,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/phantom-stream</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/phantom-stream"/>
@@ -800,7 +856,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/es/phantom-stream</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/phantom-stream"/>
@@ -814,7 +870,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/de/phantom-stream</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/phantom-stream"/>
@@ -828,7 +884,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/ja/phantom-stream</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/phantom-stream"/>
@@ -842,7 +898,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/ko/phantom-stream</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/phantom-stream"/>
@@ -856,7 +912,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/zh-CN/phantom-stream</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/phantom-stream"/>
@@ -870,7 +926,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/zh-TW/phantom-stream</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/phantom-stream"/>
@@ -884,7 +940,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/prometheus</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/prometheus"/>
@@ -898,7 +954,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/es/prometheus</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/prometheus"/>
@@ -912,7 +968,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/de/prometheus</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/prometheus"/>
@@ -926,7 +982,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/ja/prometheus</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/prometheus"/>
@@ -940,7 +996,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/ko/prometheus</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/prometheus"/>
@@ -954,7 +1010,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/zh-CN/prometheus</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/prometheus"/>
@@ -968,7 +1024,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/zh-TW/prometheus</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/prometheus"/>
@@ -982,7 +1038,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/sitemaps</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/sitemaps"/>
@@ -996,7 +1052,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/es/sitemaps</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/sitemaps"/>
@@ -1010,7 +1066,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/de/sitemaps</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/sitemaps"/>
@@ -1024,7 +1080,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/ja/sitemaps</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/sitemaps"/>
@@ -1038,7 +1094,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/ko/sitemaps</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/sitemaps"/>
@@ -1052,7 +1108,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/zh-CN/sitemaps</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/sitemaps"/>
@@ -1066,7 +1122,7 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/zh-TW/sitemaps</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/sitemaps"/>
