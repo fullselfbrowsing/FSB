@@ -513,7 +513,9 @@ function renderProviderKind() {
   }
   if (requiresProviderReselection && elements.retiredAgentProviderNoticeText) {
     const retiredLabel = getAgentProviderLabel(providerPanelState.retiredAgentProviderId);
-    elements.retiredAgentProviderNoticeText.textContent = `${retiredLabel} is no longer available for Autopilot. Select and save another provider before starting a new task.`;
+    fsbUiSet(elements.retiredAgentProviderNoticeText,
+      '$NAME$ is no longer available for Autopilot. Select and save another provider before starting a new task.',
+      { name: retiredLabel });
   }
   if (elements.fullApiTest) {
     elements.fullApiTest.hidden = requiresProviderReselection;
@@ -528,12 +530,14 @@ function renderProviderKind() {
   if (showAgentDetails) {
     const label = getAgentProviderLabel(providerPanelState.agentProviderId);
     if (elements.agentProviderDetailsHeading) {
-      elements.agentProviderDetailsHeading.textContent = `${label} connection`;
+      fsbUiSet(elements.agentProviderDetailsHeading, '$NAME$ connection', { name: label });
     }
     if (elements.agentProviderHelp) {
-      elements.agentProviderHelp.textContent = showGrokBuild
-        ? 'FSB uses a separate private Grok profile. Connect SuperGrok with browser OAuth; no API key or model selection is used.'
-        : `FSB uses ${label}'s existing local sign-in. Test Connection sends one small no-tools validation request.`;
+      if (showGrokBuild) {
+        fsbUiSet(elements.agentProviderHelp, 'FSB uses a separate private Grok profile. Connect SuperGrok with browser OAuth; no API key or model selection is used.');
+      } else {
+        fsbUiSet(elements.agentProviderHelp, 'FSB uses $NAME$\'s existing local sign-in. Test Connection sends one small no-tools validation request.', { name: label });
+      }
     }
   }
   if (showGrokBuild) {
@@ -2208,6 +2212,18 @@ function loadSettings() {
 
 let _capCounterDebounceHandle = null;
 
+// Writes "N of M active" as a keyed template so it renders in the UI language
+// and follows a language change; formatCounterText is the no-locale fallback.
+function renderCapCounter(counterEl, active, cap) {
+  if (globalThis.fsbUiLocale && typeof fsbUiLocale.markExact === 'function') {
+    fsbUiLocale.markExact(counterEl, '$ACTIVE$ of $CAP$ active', { active: String(active), cap: String(cap) });
+    return;
+  }
+  counterEl.textContent = (typeof formatCounterText === 'function')
+    ? formatCounterText(active, cap)
+    : (active + ' of ' + cap + ' active');
+}
+
 function scheduleRefreshActiveAgentCount() {
   // 100ms debounce — bulk registry writes during agent ramp-up
   // (8 agents x 1-3 tabs each = up to 24 storage events) collapse to a
@@ -2240,10 +2256,7 @@ function refreshActiveAgentCount() {
         : 0;
       let cap = parseInt(elements.fsbAgentCap && elements.fsbAgentCap.value, 10);
       if (!Number.isFinite(cap)) cap = 8;
-      const text = (typeof formatCounterText === 'function')
-        ? formatCounterText(active, cap)
-        : (active + ' of ' + cap + ' active');
-      counterEl.textContent = text;
+      renderCapCounter(counterEl, active, cap);
     });
   } catch (_e) {
     // Swallow — counter is purely informational and must never throw into
@@ -2281,10 +2294,7 @@ function refreshActiveTriggerCount() {
         : 0;
       let cap = parseInt(elements.fsbTriggerCap && elements.fsbTriggerCap.value, 10);
       if (!Number.isFinite(cap)) cap = 8;
-      const text = (typeof formatCounterText === 'function')
-        ? formatCounterText(active, cap)
-        : (active + ' of ' + cap + ' active');
-      counterEl.textContent = text;
+      renderCapCounter(counterEl, active, cap);
     });
   } catch (_e) {
     // Swallow — counter is purely informational and must never throw into

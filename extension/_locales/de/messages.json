@@ -4416,5 +4416,40 @@
   },
   "copy_c36ee348ff": {
     "message": "auf dieser Seite"
+  },
+  "panel_cce75d8bcd": {
+    "message": "$NAME$ ist für die Automatik nicht mehr verfügbar. Wähle und speichere einen anderen Anbieter, bevor du eine neue Aufgabe startest.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_0126b6243e": {
+    "message": "Verbindung mit $NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_7b94920f6d": {
+    "message": "FSB verwendet die vorhandene lokale Anmeldung von $NAME$. Verbindung testen sendet eine kleine Prüfanfrage ohne Werkzeuge.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_14deccb47b": {
+    "message": "$ACTIVE$ von $CAP$ aktiv",
+    "placeholders": {
+      "active": {
+        "content": "$1"
+      },
+      "cap": {
+        "content": "$2"
+      }
+    }
   }
 }

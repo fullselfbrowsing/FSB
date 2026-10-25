@@ -4416,5 +4416,40 @@
   },
   "copy_c36ee348ff": {
     "message": "このページで"
+  },
+  "panel_cce75d8bcd": {
+    "message": "$NAME$ はオートパイロットでは使えません。新しいタスクの前に、別のプロバイダーを選んで保存してください。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_0126b6243e": {
+    "message": "$NAME$ の接続",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_7b94920f6d": {
+    "message": "FSB は $NAME$ の既存のローカルサインインを使います。接続テストはツールなしの小さな検証要求を 1 件送ります。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_14deccb47b": {
+    "message": "$CAP$ 件中 $ACTIVE$ 件が実行中",
+    "placeholders": {
+      "active": {
+        "content": "$1"
+      },
+      "cap": {
+        "content": "$2"
+      }
+    }
   }
 }

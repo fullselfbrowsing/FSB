@@ -4416,5 +4416,40 @@
   },
   "copy_c36ee348ff": {
     "message": "在此页面上"
+  },
+  "panel_cce75d8bcd": {
+    "message": "$NAME$ 已不能用于自动驾驶。开始新任务前，请选择并保存其他提供方。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_0126b6243e": {
+    "message": "$NAME$ 连接",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_7b94920f6d": {
+    "message": "FSB 使用 $NAME$ 现有的本地登录。测试连接会发送一个不含工具的小型验证请求。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_14deccb47b": {
+    "message": "$CAP$ 个中有 $ACTIVE$ 个在运行",
+    "placeholders": {
+      "active": {
+        "content": "$1"
+      },
+      "cap": {
+        "content": "$2"
+      }
+    }
   }
 }

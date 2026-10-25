@@ -4416,5 +4416,40 @@
   },
   "copy_c36ee348ff": {
     "message": "在此頁面上"
+  },
+  "panel_cce75d8bcd": {
+    "message": "$NAME$ 已不能用於自動駕駛。開始新工作前，請選擇並儲存其他提供者。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_0126b6243e": {
+    "message": "$NAME$ 連線",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_7b94920f6d": {
+    "message": "FSB 使用 $NAME$ 現有的本機登入。測試連線會傳送一個不含工具的小型驗證要求。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_14deccb47b": {
+    "message": "$CAP$ 個中有 $ACTIVE$ 個在執行",
+    "placeholders": {
+      "active": {
+        "content": "$1"
+      },
+      "cap": {
+        "content": "$2"
+      }
+    }
   }
 }

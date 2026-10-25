@@ -4416,5 +4416,40 @@
   },
   "copy_c36ee348ff": {
     "message": "on this page"
+  },
+  "panel_cce75d8bcd": {
+    "message": "$NAME$ is no longer available for Autopilot. Select and save another provider before starting a new task.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_0126b6243e": {
+    "message": "$NAME$ connection",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_7b94920f6d": {
+    "message": "FSB uses $NAME$'s existing local sign-in. Test Connection sends one small no-tools validation request.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_14deccb47b": {
+    "message": "$ACTIVE$ of $CAP$ active",
+    "placeholders": {
+      "active": {
+        "content": "$1"
+      },
+      "cap": {
+        "content": "$2"
+      }
+    }
   }
 }

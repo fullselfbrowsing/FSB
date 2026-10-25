@@ -309,7 +309,11 @@ for (const [file, exactMap, texts] of [
     'Model Required', 'Models Required', 'API Key Required', 'Connection Failed', 'Connection Error', 'Test failed',
     'Provide an API key before saving this provider', 'Load an available model from this provider before saving',
     'Changes discarded', 'Logs cleared', 'Session deleted', 'Vault unlocked', 'Incorrect PIN', 'Credential saved',
-    'Credential updated', 'Credential deleted', 'Access granted', 'Request denied', 'Memory deleted', 'Memories exported'
+    'Credential updated', 'Credential deleted', 'Access granted', 'Request denied', 'Memory deleted', 'Memories exported',
+    '$NAME$ is no longer available for Autopilot. Select and save another provider before starting a new task.',
+    '$NAME$ connection', 'FSB uses $NAME$\'s existing local sign-in. Test Connection sends one small no-tools validation request.',
+    'FSB uses a separate private Grok profile. Connect SuperGrok with browser OAuth; no API key or model selection is used.',
+    '$ACTIVE$ of $CAP$ active'
   ]]
 ]) {
   const source = fs.readFileSync(path.join(root, file), 'utf8');
@@ -853,8 +857,11 @@ function sidepanelMessageContext(api) {
 }
 
 // Provider names survive every catalog, and no template token is left behind.
+// The control panel's templates are registered too, so they are covered here.
 {
-  const shipped = freshLocale().fsbUiLocale;
+  const leakSandbox = freshLocale();
+  vm.runInContext(fs.readFileSync(path.join(root, 'extension/utils/panel-exact.js'), 'utf8'), leakSandbox);
+  const shipped = leakSandbox.fsbUiLocale;
   const subs = { name: 'Grok Build', reason: 'x', code: 'activation_failed', error: 'Grok Build stopped', number: 3 };
   const templates = Object.keys(shipped.exact).filter((english) => english.includes('$NAME$'));
   const leaks = [];
@@ -1462,6 +1469,106 @@ function sidepanelMessageContext(api) {
     .flatMap((source) => source.match(/(?:fsbUiLine|uiLine)\([^\n]*\|\| 'unknown'[^\n]*/g) || []);
   check(lowercaseFallbacks.length === 0,
     `no translated sentence falls back to a lowercase English 'unknown'${lowercaseFallbacks.length ? ': ' + lowercaseFallbacks.join(' | ') : ''}`);
+}
+
+// The control panel's retired-provider notice, agent card title and help, and
+// both concurrency counters used to be written as filled English. As keyed
+// templates they render in the active language and follow a switch without
+// another render.
+{
+  const sandbox = freshLocale();
+  vm.runInContext(fs.readFileSync(path.join(root, 'extension/utils/panel-exact.js'), 'utf8'), sandbox);
+  const shipped = sandbox.fsbUiLocale;
+  const optionsSource = fs.readFileSync(path.join(root, 'extension/ui/options.js'), 'utf8');
+  const nodes = {
+    retiredAgentProviderNoticeText: fakeNode({ 'data-i18n': 'panel_822a9fabc1' }, 'This provider is no longer available for Autopilot. Select and save another provider before starting a new task.'),
+    agentProviderDetailsHeading: fakeNode({ 'data-i18n': 'panel_b6ff7ee96e' }, 'Agent CLI'),
+    agentProviderHelp: fakeNode({ 'data-i18n': 'panel_92f1115a37' }, "FSB uses this CLI's existing local sign-in. Test Connection sends one small no-tools validation request."),
+    fsbAgentCapCurrentActive: fakeNode({ 'data-i18n': 'panel_dd39c865d3' }, '0 of 8 active'),
+    fsbTriggerCapCurrentActive: fakeNode({ 'data-i18n': 'panel_dd39c865d3' }, '0 of 8 active')
+  };
+  const session = {
+    fsbAgentRegistry: { records: { a1: {}, a2: {}, a3: {}, 'legacy:tab-1': {} } },
+    fsbTriggerRegistry: { records: { t1: { status: 'armed' }, t2: { status: 'blocked' }, t3: { status: 'needs_attention' }, t4: { status: 'stopped' } } }
+  };
+  const ctx = {
+    fsbUiLocale: shipped,
+    providerPanelState: {},
+    elements: Object.assign({ fsbAgentCap: { value: '21' }, fsbTriggerCap: { value: '21' } }, nodes),
+    grokBuildAuthState: null,
+    grokBuildAuthRequest: null,
+    renderGrokBuildAuthState() {},
+    refreshGrokBuildAuthStatus() { return Promise.resolve(); },
+    chrome: { runtime: {}, storage: { session: { get: (key, callback) => callback({ [key]: session[key] }) } } }
+  };
+  ctx.globalThis = ctx;
+  vm.createContext(ctx);
+  vm.runInContext(fs.readFileSync(path.join(root, 'extension/ui/cap-counter-helpers.js'), 'utf8'), ctx);
+  for (const name of ['fsbUiLine', 'fsbUiSet', 'getAgentProviderLabel', 'renderProviderKind', 'renderCapCounter',
+    'refreshActiveAgentCount', 'refreshActiveTriggerCount']) {
+    vm.runInContext(extractNamedFunction(optionsSource, name), ctx);
+  }
+  const keys = { notice: 'panel_cce75d8bcd', heading: 'panel_0126b6243e', help: 'panel_7b94920f6d', counter: 'panel_14deccb47b' };
+  const fill = (message, subs) => message.replace(/\$([A-Z_]+)\$/g, (all, name) => (subs[name.toLowerCase()] != null ? String(subs[name.toLowerCase()]) : all));
+  const render = (state) => { ctx.providerPanelState = state; ctx.renderProviderKind(); };
+  const drawAll = () => {
+    render({ requiresProviderReselection: true, providerKind: 'api', retiredAgentProviderId: 'codex' });
+    render({ providerKind: 'agent', agentProviderId: 'claude-code' });
+    ctx.refreshActiveAgentCount();
+    ctx.refreshActiveTriggerCount();
+  };
+  const expected = (code) => {
+    const catalog = shippedCatalogs[code];
+    return {
+      notice: fill(catalog[keys.notice], { name: 'Codex' }),
+      heading: fill(catalog[keys.heading], { name: 'Claude Code' }),
+      help: fill(catalog[keys.help], { name: 'Claude Code' }),
+      counter: fill(catalog[keys.counter], { active: 3, cap: 21 })
+    };
+  };
+  const shown = () => ({
+    notice: nodes.retiredAgentProviderNoticeText.textContent,
+    heading: nodes.agentProviderDetailsHeading.textContent,
+    help: nodes.agentProviderHelp.textContent,
+    agentCounter: nodes.fsbAgentCapCurrentActive.textContent,
+    triggerCounter: nodes.fsbTriggerCapCurrentActive.textContent
+  });
+  const matches = (got, want) => got.notice === want.notice && got.heading === want.heading && got.help === want.help
+    && got.agentCounter === want.counter && got.triggerCounter === want.counter;
+
+  shipped.setOverride('en');
+  drawAll();
+  check(matches(shown(), {
+    notice: 'Codex is no longer available for Autopilot. Select and save another provider before starting a new task.',
+    heading: 'Claude Code connection',
+    help: "FSB uses Claude Code's existing local sign-in. Test Connection sends one small no-tools validation request.",
+    counter: '3 of 21 active'
+  }), 'the control panel notice, agent card and counters keep their English wording');
+
+  for (const code of shipped.PUBLIC_LOCALES.filter((c) => c !== 'en')) {
+    shipped.setOverride(code);
+    drawAll();
+    const got = shown();
+    check(matches(got, expected(code)) && got.agentCounter !== '3 of 21 active',
+      `${code} control panel notice, agent card and counters render in the active language`);
+    check(fill(shippedCatalogs[code][keys.counter], { active: 0, cap: 8 }) === shippedCatalogs[code].panel_dd39c865d3,
+      `${code} live counter reads like the static 0 of 8 hint`);
+    render({ providerKind: 'agent', agentProviderId: 'grok-build' });
+    check(nodes.agentProviderHelp.textContent === shippedCatalogs[code].copy_df3a34abef
+        && nodes.agentProviderDetailsHeading.textContent === fill(shippedCatalogs[code][keys.heading], { name: 'Grok Build' }),
+      `${code} Grok Build card renders its help and title in the active language`);
+  }
+
+  shipped.setOverride('de');
+  drawAll();
+  shipped.setOverride('ru');
+  shipped.apply(fakeDoc(Object.values(nodes)));
+  check(matches(shown(), expected('ru')), 'a language change re-renders the notice, agent card and counters without another render');
+  render({ providerKind: 'agent', agentProviderId: 'grok-build' });
+  shipped.setOverride('ja');
+  shipped.apply(fakeDoc(Object.values(nodes)));
+  check(nodes.agentProviderHelp.textContent === shippedCatalogs.ja.copy_df3a34abef,
+    'a language change re-renders the Grok Build help');
 }
 
 // The popup's collapsed action count keeps its key, and the owner header and

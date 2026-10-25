@@ -4416,5 +4416,40 @@
   },
   "copy_c36ee348ff": {
     "message": "이 페이지에서"
+  },
+  "panel_cce75d8bcd": {
+    "message": "$NAME$ 공급자는 오토파일럿에서 더 이상 사용할 수 없습니다. 새 작업을 시작하기 전에 다른 공급자를 선택하고 저장하세요.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_0126b6243e": {
+    "message": "$NAME$ 연결",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_7b94920f6d": {
+    "message": "FSB는 $NAME$의 기존 로컬 로그인을 사용합니다. 연결 테스트는 도구 없는 작은 확인 요청을 하나 보냅니다.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_14deccb47b": {
+    "message": "$CAP$개 중 $ACTIVE$개 실행 중",
+    "placeholders": {
+      "active": {
+        "content": "$1"
+      },
+      "cap": {
+        "content": "$2"
+      }
+    }
   }
 }

@@ -4416,5 +4416,40 @@
   },
   "copy_c36ee348ff": {
     "message": "en esta página"
+  },
+  "panel_cce75d8bcd": {
+    "message": "$NAME$ ya no está disponible para el piloto automático. Selecciona y guarda otro proveedor antes de empezar una tarea nueva.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_0126b6243e": {
+    "message": "Conexión con $NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_7b94920f6d": {
+    "message": "FSB usa el inicio de sesión local que ya tiene $NAME$. Probar conexión envía una solicitud pequeña de validación sin herramientas.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_14deccb47b": {
+    "message": "$ACTIVE$ de $CAP$ activos",
+    "placeholders": {
+      "active": {
+        "content": "$1"
+      },
+      "cap": {
+        "content": "$2"
+      }
+    }
   }
 }

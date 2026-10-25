@@ -11735,8 +11735,8 @@ https://full-selfbrowsing.com/api/telemetry/forget<x id="CLOSE_TAG_CODE" ctype="
         </context-group>
       </trans-unit>
       <trans-unit id="releaseNotes.v0995.015.keysPerLanguage" datatype="html">
-        <source>1,241 keys per language</source>
-        <target state="translated">1 言語あたり 1,241 キー</target>
+        <source>1,245 keys per language</source>
+        <target state="translated">1 言語あたり 1,245 キー</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/release-notes/release-notes-page.component.html</context>
           <context context-type="linenumber">231,234</context>
@@ -11767,8 +11767,8 @@ https://full-selfbrowsing.com/api/telemetry/forget<x id="CLOSE_TAG_CODE" ctype="
         </context-group>
       </trans-unit>
       <trans-unit id="releaseNotes.v0995.019.eachLanguageShipsA" datatype="html">
-        <source>Each language ships a catalog of 1,241 keys, and a message missing from a catalog falls back to English instead of showing a blank label.</source>
-        <target state="translated">各言語には 1,241 キーのカタログが用意されています。カタログにないメッセージは、空欄ではなく英語で表示されます。</target>
+        <source>Each language ships a catalog of 1,245 keys, and a message missing from a catalog falls back to English instead of showing a blank label.</source>
+        <target state="translated">各言語には 1,245 キーのカタログが用意されています。カタログにないメッセージは、空欄ではなく英語で表示されます。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/release-notes/release-notes-page.component.html</context>
           <context context-type="linenumber">240,241</context>
@@ -12023,8 +12023,8 @@ https://full-selfbrowsing.com/api/telemetry/forget<x id="CLOSE_TAG_CODE" ctype="
         </context-group>
       </trans-unit>
       <trans-unit id="releaseNotes.v0995.050.languagesKeys" datatype="html">
-        <source>8 languages × 1,241 keys</source>
-        <target state="translated">8 言語 × 1,241 キー</target>
+        <source>8 languages × 1,245 keys</source>
+        <target state="translated">8 言語 × 1,245 キー</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/release-notes/release-notes-page.component.html</context>
           <context context-type="linenumber">387,389</context>
