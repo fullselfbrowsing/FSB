@@ -49,6 +49,11 @@ export interface BoundedProcessProbeDescriptor {
   readonly stderrLimitBytes: number;
   readonly stdinBytes?: readonly number[];
   readonly stdinCloseAfterStdoutLinePrefixBytes?: readonly number[];
+  readonly stdinCloseAfterJsonRpcResponseId?: number;
+  readonly stdinJsonRpcFollowup?: Readonly<{
+    afterResponseId: number;
+    bytes: readonly number[];
+  }>;
   readonly signal?: AbortSignal;
 }
 
@@ -189,12 +194,14 @@ function validateDescriptor(value: unknown): BoundedProcessProbeDescriptor {
   const keys = Reflect.ownKeys(record) as string[];
   if (
     keys.length < requiredKeys.length
-    || keys.length > requiredKeys.length + 3
+    || keys.length > requiredKeys.length + 5
     || requiredKeys.some((key) => !keys.includes(key))
     || keys.some((key) => (
       !requiredKeys.includes(key)
       && key !== 'stdinBytes'
       && key !== 'stdinCloseAfterStdoutLinePrefixBytes'
+      && key !== 'stdinCloseAfterJsonRpcResponseId'
+      && key !== 'stdinJsonRpcFollowup'
       && key !== 'signal'
     ))
   ) invalidDescriptor();
@@ -206,7 +213,27 @@ function validateDescriptor(value: unknown): BoundedProcessProbeDescriptor {
   }
   const hasStdin = keys.includes('stdinBytes');
   const hasResponseDrivenClose = keys.includes('stdinCloseAfterStdoutLinePrefixBytes');
-  if (hasResponseDrivenClose && !hasStdin) invalidDescriptor();
+  const hasJsonRpcResponseClose = keys.includes('stdinCloseAfterJsonRpcResponseId');
+  if ((hasResponseDrivenClose || hasJsonRpcResponseClose) && !hasStdin) invalidDescriptor();
+  if (hasResponseDrivenClose && hasJsonRpcResponseClose) invalidDescriptor();
+  const stdinCloseAfterJsonRpcResponseId = hasJsonRpcResponseClose
+    ? boundedInteger(ownValue(record, 'stdinCloseAfterJsonRpcResponseId'), Number.MAX_SAFE_INTEGER)
+    : undefined;
+  let stdinJsonRpcFollowup: BoundedProcessProbeDescriptor['stdinJsonRpcFollowup'];
+  if (keys.includes('stdinJsonRpcFollowup')) {
+    if (!hasStdin || !hasJsonRpcResponseClose) invalidDescriptor();
+    const followup = ownDataRecord(ownValue(record, 'stdinJsonRpcFollowup'));
+    const followupKeys = Reflect.ownKeys(followup);
+    if (followupKeys.length !== 2 || !followupKeys.includes('afterResponseId')
+        || !followupKeys.includes('bytes')) invalidDescriptor();
+    const afterResponseId = boundedInteger(ownValue(followup, 'afterResponseId'), Number.MAX_SAFE_INTEGER);
+    if (afterResponseId === stdinCloseAfterJsonRpcResponseId) invalidDescriptor();
+    const bytes = cloneInputBytes(ownValue(followup, 'bytes'));
+    if (bytes.length + cloneInputBytes(ownValue(record, 'stdinBytes')).length > MAX_PROBE_STDIN_BYTES) {
+      invalidDescriptor();
+    }
+    stdinJsonRpcFollowup = Object.freeze({ afterResponseId, bytes });
+  }
   const stdinCloseAfterStdoutLinePrefixBytes = hasResponseDrivenClose
     ? cloneInputBytes(ownValue(record, 'stdinCloseAfterStdoutLinePrefixBytes'))
     : undefined;
@@ -233,6 +260,8 @@ function validateDescriptor(value: unknown): BoundedProcessProbeDescriptor {
     ...(stdinCloseAfterStdoutLinePrefixBytes
       ? { stdinCloseAfterStdoutLinePrefixBytes }
       : {}),
+    ...(stdinCloseAfterJsonRpcResponseId !== undefined ? { stdinCloseAfterJsonRpcResponseId } : {}),
+    ...(stdinJsonRpcFollowup ? { stdinJsonRpcFollowup } : {}),
     ...(keys.includes('signal') ? { signal: validateSignal(ownValue(record, 'signal')) } : {}),
   });
 }
@@ -295,6 +324,11 @@ export function runBoundedProcessProbe(
       .stdinCloseAfterStdoutLinePrefixBytes
       ? Buffer.from(descriptor.stdinCloseAfterStdoutLinePrefixBytes)
       : null;
+    let stdoutJsonRpcLine = Buffer.alloc(0);
+    let stdinFollowupBuffer: Buffer | null = descriptor.stdinJsonRpcFollowup
+      ? Buffer.from(descriptor.stdinJsonRpcFollowup.bytes)
+      : null;
+    let stdinFollowupSent = false;
     let stdoutCompletionIndex = 0;
     let stdoutCompletionLineMatches = true;
     let stdoutCompletionObserved = false;
@@ -318,6 +352,10 @@ export function runBoundedProcessProbe(
       stdinBuffer = null;
       stdoutCompletionPrefix?.fill(0);
       stdoutCompletionPrefix = null;
+      stdoutJsonRpcLine.fill(0);
+      stdoutJsonRpcLine = Buffer.alloc(0);
+      stdinFollowupBuffer?.fill(0);
+      stdinFollowupBuffer = null;
     };
 
     const fail = (code: ProcessProbeFailureCode): void => {
@@ -349,7 +387,7 @@ export function runBoundedProcessProbe(
     };
 
     const closeStdinAfterResponse = (): void => {
-      if (stdoutCompletionObserved || stdoutCompletionPrefix === null) return;
+      if (stdoutCompletionObserved) return;
       stdoutCompletionObserved = true;
       try {
         child.stdin.end();
@@ -359,8 +397,62 @@ export function runBoundedProcessProbe(
     };
 
     const observeStdoutCompletion = (value: Buffer): void => {
+      if (stdoutCompletionObserved) return;
+      if (descriptor.stdinCloseAfterJsonRpcResponseId !== undefined) {
+        const combined = Buffer.concat([stdoutJsonRpcLine, value]);
+        stdoutJsonRpcLine.fill(0);
+        stdoutJsonRpcLine = combined;
+        for (;;) {
+          const newline = stdoutJsonRpcLine.indexOf(0x0a);
+          if (newline < 0) return;
+          const line = Buffer.from(stdoutJsonRpcLine.subarray(0, newline));
+          const remainder = Buffer.from(stdoutJsonRpcLine.subarray(newline + 1));
+          stdoutJsonRpcLine.fill(0);
+          stdoutJsonRpcLine = remainder;
+          try {
+            const response = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(line)) as unknown;
+            if (response && typeof response === 'object' && !Array.isArray(response)) {
+              const record = response as Record<string, unknown>;
+              const isResponse = record.jsonrpc === '2.0'
+                && !Object.hasOwn(record, 'method');
+              if (isResponse && !stdinFollowupSent && descriptor.stdinJsonRpcFollowup
+                  && record.id === descriptor.stdinJsonRpcFollowup.afterResponseId) {
+                if (Object.hasOwn(record, 'error')) {
+                  closeStdinAfterResponse();
+                  return;
+                }
+                if (Object.hasOwn(record, 'result') && stdinFollowupBuffer) {
+                  stdinFollowupSent = true;
+                  try {
+                    child.stdin.write(stdinFollowupBuffer, () => {
+                      stdinFollowupBuffer?.fill(0);
+                      stdinFollowupBuffer = null;
+                    });
+                  } catch {
+                    fail('spawn_failed');
+                    return;
+                  }
+                }
+              }
+              if (
+                record.jsonrpc === '2.0'
+                && record.id === descriptor.stdinCloseAfterJsonRpcResponseId
+                && !Object.hasOwn(record, 'method')
+                && (Object.hasOwn(record, 'result') || Object.hasOwn(record, 'error'))
+              ) {
+                closeStdinAfterResponse();
+                return;
+              }
+            }
+          } catch {
+            // The contract parser classifies malformed output after the probe.
+          } finally {
+            line.fill(0);
+          }
+        }
+      }
       const prefix = stdoutCompletionPrefix;
-      if (prefix === null || stdoutCompletionObserved) return;
+      if (prefix === null) return;
       for (const byte of value) {
         if (byte === 0x0a) {
           if (stdoutCompletionLineMatches && stdoutCompletionIndex === prefix.length) {
@@ -495,7 +587,7 @@ export function runBoundedProcessProbe(
     timer.unref?.();
     try {
       if (stdinBuffer) {
-        if (stdoutCompletionPrefix) {
+        if (stdoutCompletionPrefix || descriptor.stdinCloseAfterJsonRpcResponseId !== undefined) {
           child.stdin.write(stdinBuffer, () => {
             stdinBuffer?.fill(0);
             stdinBuffer = null;

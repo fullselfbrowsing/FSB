@@ -44,6 +44,15 @@ const ROW_KEYS = Object.freeze([
 
 const ALL_REASONS = Object.freeze([
   'within_tested_range',
+  'capability_verified',
+  'capability_unverified',
+  'capability_missing',
+  'isolation_unavailable',
+  'sandbox_unavailable',
+  'agent_protocol_drift',
+  'binary_changed',
+  'adapter_unavailable',
+  'version_unsupported',
   'newer_than_tested_range',
   'evidence_stale',
   'binary_not_found',
@@ -99,7 +108,7 @@ function retainedDetection(version, binaryPath, overrides = {}) {
       realPath: binaryPath,
       argvPrefix: [],
     },
-    profileVersion: version,
+    profileVersion: version?.startsWith('1.') || binaryPath?.includes('grok') ? 'grok-acp-v1' : version,
     ...overrides,
   };
 }
@@ -192,6 +201,7 @@ async function main() {
     COMPATIBILITY_REASONS,
     COMPATIBILITY_STATUSES,
     classifyAdapterCompatibility,
+    classifyAdapterDetectionCompatibility,
     createSafeCompatibilitySnapshot,
     extractAdapterVersion,
     getAdapterCompatibilityContract,
@@ -250,11 +260,11 @@ async function main() {
       serverMode: false,
     },
     displayLabel: 'Grok Build',
-    profileVersion: '1.0.4',
+    profileVersion: 'grok-acp-v1',
     minimumVersion: '1.0.4',
-    testedThroughVersion: '1.0.4',
+    testedThroughVersion: '1.0.62',
     supportedMajor: 1,
-    fixtureManifest: 'tests/fixtures/agent-streams/grok-build-1.0.4/manifest.json',
+    fixtureManifest: 'tests/fixtures/agent-streams/grok-build-1.0.62/manifest.json',
     requiredInitFields: [
       'protocolVersion',
       'agentCapabilities.mcpCapabilities.http',
@@ -359,16 +369,32 @@ async function main() {
   );
   assertClassification(
     classifyAdapterCompatibility('grok-build', '1.0.4'),
-    'supported',
-    'within_tested_range',
+    'unsupported',
+    'capability_unverified',
     'grok-build',
   );
   assertClassification(
     classifyAdapterCompatibility('grok-build', '1.0.5'),
-    'degraded',
-    'newer_than_tested_range',
+    'unsupported',
+    'capability_unverified',
     'grok-build',
   );
+
+  for (const version of ['1.0.62', '1.1.0', '2.0.0', '25.4.1']) {
+    assertClassification(
+      classifyAdapterDetectionCompatibility('grok-build', retainedDetection(version, '/opt/grok')),
+      'supported', 'capability_verified', 'grok-build',
+    );
+    assertClassification(
+      classifyAdapterCompatibility('grok-build', version),
+      'unsupported', 'capability_unverified', 'grok-build',
+    );
+  }
+  for (const code of ['sandbox_unavailable', 'isolation_unavailable', 'capability_missing', 'agent_protocol_drift', 'binary_changed']) {
+    assertClassification(classifyAdapterDetectionCompatibility('grok-build', retainedDetection('2.0.0', '/opt/grok', {
+      installed: false, profileVersion: null, diagnostic: { code, message: 'SECRET_DO_NOT_PROJECT' },
+    })), 'unsupported', code, 'grok-build');
+  }
 
   const invalidMatrix = clone(ADAPTER_COMPATIBILITY_MATRIX);
   invalidMatrix.adapters[0].minimumVersion = '2.1.178';
@@ -380,7 +406,7 @@ async function main() {
   );
 
   const supported = classifyAdapterCompatibility('claude-code', '2.1.177');
-  const grokSupported = classifyAdapterCompatibility('grok-build', '1.0.4');
+  const grokSupported = classifyAdapterDetectionCompatibility('grok-build', retainedDetection('1.0.4', '/opt/grok'));
   const snapshot = createSafeCompatibilitySnapshot(
     1_784_222_000_000,
     [supported, grokSupported].map((candidate) => (
@@ -400,7 +426,7 @@ async function main() {
       adapterId: 'grok-build',
       displayLabel: 'Grok Build',
       status: 'supported',
-      reason: 'within_tested_range',
+      reason: 'capability_verified',
       authState: 'unknown',
     }],
   });
@@ -459,7 +485,7 @@ async function main() {
           model: daemonSentinels[5],
           config: daemonSentinels[6],
           nativeBody: daemonSentinels[7],
-          diagnostic: { code: 'agent_protocol_drift', message: daemonSentinels[8] },
+          diagnostic: { code: 'unrecognized', message: daemonSentinels[8] },
           topology: daemonSentinels[9],
           endpoint: daemonSentinels[10],
           port: daemonSentinels[11],
@@ -517,12 +543,12 @@ async function main() {
   assert.equal(JSON.stringify(invalidAuthProjection).includes('PRIVATE_AUTH_SENTINEL'), false);
 
   const daemonEvidenceCases = [
-    ['exact profile', retainedDetection('1.0.4', '/opt/grok'), 'supported', 'within_tested_range'],
+    ['exact profile', retainedDetection('1.0.4', '/opt/grok'), 'supported', 'capability_verified'],
     ['newer retained profile', retainedDetection('1.0.5', '/opt/grok', {
       installed: false,
       profileVersion: null,
       diagnostic: { code: 'version_unsupported', message: 'NEWER_MESSAGE_SENTINEL' },
-    }), 'degraded', 'newer_than_tested_range'],
+    }), 'unsupported', 'version_unsupported'],
     ['missing binary', retainedDetection(null, null, {
       installed: false,
       profileVersion: null,
@@ -538,7 +564,7 @@ async function main() {
       installed: false,
       profileVersion: null,
       diagnostic: { code: 'binary_changed', message: 'CHANGED_MESSAGE_SENTINEL' },
-    }), 'unsupported', 'binary_not_found'],
+    }), 'unsupported', 'binary_changed'],
   ];
   for (const [label, grokDetection, expectedStatus, expectedReason] of daemonEvidenceCases) {
     const projected = await requestServeCompatibility(
@@ -604,7 +630,7 @@ async function main() {
       adapterId: 'grok-build',
       displayLabel: 'Grok Build',
       status: 'unsupported',
-      reason: 'binary_not_found',
+      reason: label === 'throwing proxy' ? 'matrix_invalid' : 'binary_not_found',
       authState: 'unknown',
     }, `${label} detector evidence fails closed`);
   }

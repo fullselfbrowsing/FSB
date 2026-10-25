@@ -3270,6 +3270,20 @@ async function runGrokPreflightActivationTests(supervisorModule) {
   }
 
   {
+    const harness = makeGrokHarness({ attestationLines: [{ ok: false }] });
+    const result = await harness.supervisor.handleExtRequest({
+      id: 'ext-start-grok-isolation-refused', type: 'ext:request', method: 'delegate.start',
+      payload: { acceptedIdentity: GROK_IDENTITY, task: 'refuse changed isolation before task startup' },
+    }, () => {});
+    assert.equal(result.status, 'failed');
+    assert.equal(result.terminal.code, 'isolation_unavailable');
+    assert.equal(harness.spawnCalls.length, 1,
+      'failed policy evidence prevents all later preflights and task execution');
+    assert.equal(harness.loggedEvents.find((entry) => entry.event === 'run_settled').code,
+      'isolation_unavailable', 'startup retains the same refusal reason as status');
+  }
+
+  {
     // A preflight that keeps running still has to bind, and a mismatched identity
     // still fails closed.
     const harness = makeGrokHarness({
@@ -3300,7 +3314,7 @@ async function runGrokPreflightActivationTests(supervisorModule) {
       harness.loggedEvents
         .filter((entry) => entry.event === 'run_settled')
         .map((entry) => `${entry.status}:${entry.code}`),
-      ['failed:adapter_unavailable'],
+      ['failed:isolation_unavailable'],
       'the refusing gate is named in the log even though the card says start_rejected',
     );
   }

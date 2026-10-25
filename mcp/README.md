@@ -234,6 +234,20 @@ Extension IDs are browser-installation-specific. Omitted `--extension-id` uses t
 
 The browser selector controls the user-scoped native-messaging registration location. To switch browsers, uninstall the browser target reported by `doctor` first; cross-target install and uninstall requests refuse without changing either registration.
 
+### Grok Build as the extension's AI provider
+
+Choose **Settings → AI Provider → Harness Adapters → Grok Build**, then use **Connect SuperGrok** to sign in to FSB's private OAuth profile. This lets the extension delegate browser tasks to the local Grok CLI. Installing FSB into an MCP client is a separate setup direction.
+
+FSB verifies the `grok-acp-v1` integration contract rather than requiring one exact Grok release. The checks cover ACP v1, HTTP MCP support, session cleanup, isolated configuration, and the required strict sandbox. New CLI versions, including new majors, can work automatically when those checks pass. A **Verified** badge means the installed CLI passed runtime checks; it does not claim that every future upstream behavior has been fixture-tested.
+
+The private profile stays under `~/.fsb/agent-providers/grok/`. Upgrading the integration preserves its OAuth credentials and owned-session journal. Your normal Grok profile is separate. Connection/status checks do not send model prompts or initiate browser sign-in.
+
+If the CLI refuses its strict sandbox, FSB reports `sandbox_unavailable` rather than a version error. For example, a Docker socket symlink can prevent Grok from constructing its sandbox. Resolve the reported environment problem before retrying; FSB does not switch to a weaker sandbox automatically.
+
+The native helper stages its own package runtime. Updating an extension or source checkout does not update that installed copy. After a fixed package is published, rerun the native-host installation command above with the same browser and extension ID, then restart the local FSB service and retry the connection test. Before publication, `@latest` still installs the previously published runtime.
+
+Maintainers can build the MCP package and run `node scripts/check-grok-compatibility.mjs --binary /absolute/path/to/grok` from the repository root. It uses a disposable unauthenticated profile, prints a bounded JSON verdict, and makes no inference requests. The weekly/manual **Grok CLI compatibility** workflow runs the same check against the official stable CLI on macOS and Linux.
+
 ### Manual Setup
 
 Claude Code:

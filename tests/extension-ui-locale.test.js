@@ -1280,7 +1280,7 @@ function sidepanelMessageContext(api) {
   check(filled.length === 0, `delegation cards hand templates to markExact()${filled.length ? '; filled line() in: ' + filled.join(', ') : ''}`);
 
   const optionsSource = fs.readFileSync(path.join(root, 'extension/ui/options.js'), 'utf8');
-  check(optionsSource.includes("fsbUiSet(elements.grokBuildCompatibility, 'Installed and compatible: Grok Build 1.0.4.")
+  check(optionsSource.includes("fsbUiSet(elements.grokBuildCompatibility, 'Verified: Grok protocol, isolation, and cached OAuth checks passed without sending a prompt.')")
       && optionsSource.includes("fsbUiSet(elements.grokBuildCompatibility, 'Compatibility check failed: $ERROR$', { error: result.error })")
       && optionsSource.includes("fsbUiSet(elements.grokBuildCompatibility, 'Compatibility check failed: installation, version, isolation, ACP, or cached OAuth could not be verified.')"),
     'every Grok Build test result is written through markExact()');
@@ -1356,7 +1356,7 @@ function sidepanelMessageContext(api) {
   vm.createContext(optionsContext);
   for (const name of ['fsbUiLine', 'fsbUiSet', 'updateApiStatusCard']) vm.runInContext(extractNamedFunction(optionsSource, name), optionsContext);
   optionsContext.updateApiStatusCard('disconnected', 'No API Key', 'Configure your $NAME$ API key to get started', { name: 'OpenAI' });
-  const badge = fakeNode({ 'data-i18n': 'panel_fd05c3a95a' }, 'Requires the reviewed Grok Build 1.0.4 profile.');
+  const badge = fakeNode({ 'data-i18n': 'panel_fd05c3a95a' }, 'FSB verifies the required Grok protocol, isolation, and cached OAuth capabilities without sending a prompt.');
   optionsContext.fsbUiSet(badge, 'Compatibility check failed: installation, version, isolation, ACP, or cached OAuth could not be verified.');
   check(detail.textContent === de.copy_ec6c5d7132.replace('$NAME$', 'OpenAI') && badge.textContent === de.copy_62c33d7a6c,
     'the API-key detail and the Grok Build fallback render in the active language');

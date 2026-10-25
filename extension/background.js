@@ -223,8 +223,10 @@ function fsbReadMcpCompatibilityExpiryAt(providers, clients) {
     const status = fsbCompatibilityOwnDataValue(compatibility, 'status');
     const reason = fsbCompatibilityOwnDataValue(compatibility, 'reason');
     const checkedAt = fsbCompatibilityOwnDataValue(compatibility, 'checkedAt');
-    const runnable = (status === 'supported' && reason === 'within_tested_range')
-      || (status === 'degraded' && reason === 'newer_than_tested_range');
+    const runnable = providerId === 'grok-build'
+      ? status === 'supported' && reason === 'capability_verified'
+      : (status === 'supported' && reason === 'within_tested_range')
+        || (status === 'degraded' && reason === 'newer_than_tested_range');
     if (runnable
         && Number.isSafeInteger(checkedAt)
         && checkedAt >= 0
@@ -265,8 +267,10 @@ function fsbProjectStaleMcpClients(clients) {
       nextRow = fsbCopyCompatibilityDataRecord(row);
       nextRow.authState = 'unknown';
       delete nextRow.acceptedIdentity;
-      const runnable = (status === 'supported' && reason === 'within_tested_range')
-        || (status === 'degraded' && reason === 'newer_than_tested_range');
+      const runnable = providerId === 'grok-build'
+        ? status === 'supported' && reason === 'capability_verified'
+        : (status === 'supported' && reason === 'within_tested_range')
+          || (status === 'degraded' && reason === 'newer_than_tested_range');
       if (runnable
           && Number.isSafeInteger(checkedAt)
           && checkedAt >= 0) {
@@ -1476,6 +1480,10 @@ const FSB_DELEGATION_GENERATION_PREFIX = 'fsbDelegationGeneration:v1:';
 // outside this roster are dropped rather than shown.
 const FSB_DELEGATION_START_REJECTION_DETAILS = new Set([
   'adapter_unavailable',
+  'sandbox_unavailable',
+  'capability_missing',
+  'isolation_unavailable',
+  'binary_changed',
   'spawn_failed',
   'activation_failed',
   'agent_protocol_drift',
@@ -1963,6 +1971,12 @@ const FSB_AGENT_CONNECTION_FAILURE_CODES = Object.freeze({
   binary_not_found: true,
   unsupported_version: true,
   adapter_unavailable: true,
+  sandbox_unavailable: true,
+  capability_missing: true,
+  capability_unverified: true,
+  isolation_unavailable: true,
+  agent_protocol_drift: true,
+  binary_changed: true,
   auth_unauthenticated: true,
   connection_test_timeout: true,
   connection_test_cancelled: true,
@@ -2001,6 +2015,10 @@ const FSB_GROK_AUTH_BEGIN_REASONS = Object.freeze({
   login_failed: true,
   version_unsupported: true,
   sandbox_unavailable: true,
+  capability_missing: true,
+  isolation_unavailable: true,
+  agent_protocol_drift: true,
+  binary_changed: true,
   adapter_unavailable: true,
   provider_auth_locked: true,
   session_cleanup_blocked: true
@@ -2143,6 +2161,12 @@ function fsbAgentConnectionFailureMessage(code, providerId) {
   const label = provider && provider.label ? provider.label : 'The selected agent';
   if (code === 'binary_not_found') return `${label} is not installed or is not on PATH.`;
   if (code === 'unsupported_version') return `${label} must be updated to a supported version.`;
+  if (code === 'sandbox_unavailable') return `${label} could not start the required strict sandbox. Resolve the local sandbox environment problem and try again.`;
+  if (code === 'capability_missing') return `${label} is missing a capability required by FSB.`;
+  if (code === 'capability_unverified') return `${label} capabilities have not been verified. Refresh provider status and check that the native helper is up to date.`;
+  if (code === 'isolation_unavailable') return `${label} private configuration could not be verified.`;
+  if (code === 'agent_protocol_drift') return `${label} returned an incompatible protocol response.`;
+  if (code === 'binary_changed') return `${label} changed while it was being checked. Try again.`;
   if (code === 'adapter_unavailable') {
     return `${label} was found at a supported version, but its isolation or protocol profile could not be verified.`;
   }
@@ -2600,6 +2624,7 @@ function fsbDelegationTerminalCode(value) {
   if (value === 'runtime_cleanup_failed') return 'tree_unsettled';
   const allowed = new Set([
     'cancelled', 'route_lost', 'agent_protocol_drift', 'tree_unsettled',
+    'sandbox_unavailable', 'capability_missing', 'isolation_unavailable', 'binary_changed',
     'hold_expired', 'daemon_restart_lost_run', 'provider_error', 'agent_failed'
   ]);
   return typeof value === 'string' && allowed.has(value) ? value : 'agent_failed';

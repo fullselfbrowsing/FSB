@@ -698,7 +698,7 @@
     "message": "xAI · lokale Anbindung"
   },
   "panel_fd05c3a95a": {
-    "message": "Erfordert das geprüfte Profil Grok Build 1.0.4. Verbindung testen prüft Installation, Version, Isolation, ACP und zwischengespeichertes OAuth, ohne einen Prompt zu senden."
+    "message": "FSB prüft das erforderliche Grok-Protokoll, die Isolation und zwischengespeichertes OAuth, ohne einen Prompt zu senden."
   },
   "panel_ce4f452059": {
     "message": "Verwendet dein angemeldetes Grok-Konto. SuperGrok-Nutzung kommt aus dem gemeinsamen Wochenkontingent; zusätzliche Nutzung kann anfallen."
@@ -2606,7 +2606,7 @@
     "message": "Grok Build konnte eine vorherige Sitzung nicht bereinigen, daher ist die Anmeldung blockiert. Aktualisiere den Status, um die Bereinigung erneut zu versuchen."
   },
   "copy_28c4c69520": {
-    "message": "Die Grok CLI hat sich geweigert, in der strengen Sandbox zu starten, die FSB verlangt, daher ist die Anmeldung blockiert. Die CLI ist installiert und dein Konto ist in Ordnung."
+    "message": "Die Grok-CLI konnte die von FSB benötigte strikte Sandbox nicht starten. Behebe das lokale Problem mit der Sandbox-Umgebung und versuche es erneut."
   },
   "copy_0b9a54a7f8": {
     "message": "FSB konnte die Grok CLI nicht ausführen. Prüfe, ob sie installiert ist, und aktualisiere dann den Status."
@@ -2695,7 +2695,7 @@
     "message": "Verbindungstest fehlgeschlagen"
   },
   "copy_ad0770f1aa": {
-    "message": "Installiert und kompatibel: Grok Build 1.0.4. Isolation, ACP und zwischengespeicherte OAuth-Prüfungen sind ohne Prompt erfolgreich."
+    "message": "Verifiziert: Grok-Protokoll, Isolation und zwischengespeichertes OAuth wurden ohne Prompt geprüft."
   },
   "copy_aab517a207": {
     "message": "Kompatibilitätsprüfung fehlgeschlagen: $ERROR$",
@@ -4451,5 +4451,41 @@
         "content": "$2"
       }
     }
+  },
+  "copy_grok_verified": {
+    "message": "Verifiziert"
+  },
+  "copy_grok_verified_detail": {
+    "message": "FSB hat die erforderlichen Protokoll- und Isolationsfunktionen dieser CLI geprüft."
+  },
+  "copy_grok_unverified": {
+    "message": "Aktualisiere den Status, um diese CLI vor dem Start einer Aufgabe zu prüfen."
+  },
+  "copy_grok_capability_missing": {
+    "message": "Diese CLI bietet nicht die von FSB benötigten Funktionen."
+  },
+  "copy_grok_isolation_unavailable": {
+    "message": "FSB konnte die Isolation dieser CLI von externer Konfiguration und Werkzeugen nicht prüfen."
+  },
+  "copy_grok_sandbox_unavailable": {
+    "message": "Grok konnte die erforderliche strikte Sandbox nicht anwenden. Prüfe die lokale Docker-Socket-Konfiguration und aktualisiere den Status."
+  },
+  "copy_grok_protocol_drift": {
+    "message": "Diese CLI hat eine inkompatible Protokollantwort zurückgegeben."
+  },
+  "copy_grok_binary_changed": {
+    "message": "Die CLI wurde während der Prüfung geändert. Aktualisiere den Status, um die neue ausführbare Datei zu prüfen."
+  },
+  "copy_grok_task_sandbox": {
+    "message": "die erforderliche Sandbox konnte nicht starten"
+  },
+  "copy_grok_task_capability": {
+    "message": "der CLI fehlt eine erforderliche Funktion"
+  },
+  "copy_grok_task_isolation": {
+    "message": "die private Agentenkonfiguration konnte nicht geprüft werden"
+  },
+  "copy_grok_task_binary": {
+    "message": "die CLI wurde während der Prüfung geändert"
   }
 }

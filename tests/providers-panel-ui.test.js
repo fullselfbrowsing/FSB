@@ -453,6 +453,10 @@ function testGrokBuildSignInFailureCopy() {
   for (const reason of [
     'version_unsupported',
     'sandbox_unavailable',
+    'capability_missing',
+    'isolation_unavailable',
+    'agent_protocol_drift',
+    'binary_changed',
     'provider_auth_locked',
     'session_cleanup_blocked',
     'adapter_unavailable',
@@ -469,7 +473,8 @@ function testGrokBuildSignInFailureCopy() {
   assert.match(context.message('version_unsupported', ''), /version/i);
   assert.match(context.message('version_unsupported', ''), /account is fine/i);
   assert.match(context.message('sandbox_unavailable', ''), /sandbox/i);
-  assert.match(context.message('sandbox_unavailable', ''), /account is fine/i);
+  assert.match(context.message('sandbox_unavailable', ''), /local sandbox environment/i);
+  assert.doesNotMatch(context.message('sandbox_unavailable', ''), /account is fine/i);
 
   // Transport failures outrank the reason: a timeout is not a version problem.
   assert.match(

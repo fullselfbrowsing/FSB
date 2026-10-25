@@ -698,7 +698,7 @@
     "message": "xAI · arnés local"
   },
   "panel_fd05c3a95a": {
-    "message": "Requiere el perfil revisado Grok Build 1.0.4. Probar conexión verifica la instalación, la versión, el aislamiento, ACP y el OAuth en caché sin enviar un prompt."
+    "message": "FSB verifica el protocolo de Grok, el aislamiento y OAuth almacenado sin enviar un prompt."
   },
   "panel_ce4f452059": {
     "message": "Usa tu cuenta de Grok con sesión iniciada. El uso de SuperGrok sale de su cupo semanal compartido; puede haber uso adicional."
@@ -2606,7 +2606,7 @@
     "message": "Grok Build no pudo limpiar una sesión anterior, así que el inicio de sesión está bloqueado. Actualiza el estado para reintentar la limpieza."
   },
   "copy_28c4c69520": {
-    "message": "La CLI de Grok se negó a iniciarse en el aislamiento estricto que FSB exige, así que el inicio de sesión está bloqueado. La CLI está instalada y tu cuenta está bien."
+    "message": "La CLI de Grok no pudo iniciar el aislamiento estricto que FSB requiere. Resuelve el problema del entorno local de aislamiento e inténtalo de nuevo."
   },
   "copy_0b9a54a7f8": {
     "message": "FSB no pudo ejecutar la CLI de Grok. Comprueba que esté instalada y actualiza el estado."
@@ -2695,7 +2695,7 @@
     "message": "Falló la prueba de conexión"
   },
   "copy_ad0770f1aa": {
-    "message": "Instalado y compatible: Grok Build 1.0.4. Las comprobaciones de aislamiento, ACP y OAuth en caché se superaron sin enviar un prompt."
+    "message": "Verificado: el protocolo de Grok, el aislamiento y OAuth almacenado pasaron las comprobaciones sin enviar un prompt."
   },
   "copy_aab517a207": {
     "message": "Falló la comprobación de compatibilidad: $ERROR$",
@@ -4451,5 +4451,41 @@
         "content": "$2"
       }
     }
+  },
+  "copy_grok_verified": {
+    "message": "Verificado"
+  },
+  "copy_grok_verified_detail": {
+    "message": "FSB verificó las funciones de protocolo y aislamiento necesarias de esta CLI."
+  },
+  "copy_grok_unverified": {
+    "message": "Actualiza el estado para verificar esta CLI antes de iniciar una tarea."
+  },
+  "copy_grok_capability_missing": {
+    "message": "Esta CLI no ofrece las funciones que FSB necesita."
+  },
+  "copy_grok_isolation_unavailable": {
+    "message": "FSB no pudo verificar que esta CLI esté aislada de la configuración y las herramientas externas."
+  },
+  "copy_grok_sandbox_unavailable": {
+    "message": "Grok no pudo aplicar el aislamiento estricto requerido. Revisa la configuración local del socket de Docker y actualiza el estado."
+  },
+  "copy_grok_protocol_drift": {
+    "message": "Esta CLI devolvió una respuesta de protocolo incompatible."
+  },
+  "copy_grok_binary_changed": {
+    "message": "La CLI cambió durante la verificación. Actualiza el estado para verificar el ejecutable actualizado."
+  },
+  "copy_grok_task_sandbox": {
+    "message": "no se pudo iniciar el aislamiento requerido"
+  },
+  "copy_grok_task_capability": {
+    "message": "falta una función necesaria en la CLI"
+  },
+  "copy_grok_task_isolation": {
+    "message": "no se pudo verificar la configuración privada del agente"
+  },
+  "copy_grok_task_binary": {
+    "message": "la CLI cambió durante la comprobación"
   }
 }

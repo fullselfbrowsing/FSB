@@ -698,7 +698,7 @@
     "message": "xAI · 로컬 하네스"
   },
   "panel_fd05c3a95a": {
-    "message": "검토된 Grok Build 1.0.4 프로필이 필요합니다. 연결 테스트는 프롬프트를 보내지 않고 설치, 버전, 격리, ACP, 캐시된 OAuth를 확인합니다."
+    "message": "FSB는 프롬프트를 보내지 않고 필요한 Grok 프로토콜, 격리 및 저장된 OAuth를 확인합니다."
   },
   "panel_ce4f452059": {
     "message": "로그인한 Grok 계정을 사용합니다. SuperGrok 사용량은 공유 주간 허용량에서 차감되며, 추가 사용이 발생할 수 있습니다."
@@ -2606,7 +2606,7 @@
     "message": "Grok Build가 이전 세션을 정리하지 못해 로그인이 차단되었습니다. 상태를 새로고침해 정리를 다시 시도하세요."
   },
   "copy_28c4c69520": {
-    "message": "Grok CLI가 FSB가 요구하는 엄격한 샌드박스에서 시작을 거부해 로그인이 차단되었습니다. CLI는 설치되어 있고 계정은 문제없습니다."
+    "message": "Grok CLI가 FSB에 필요한 엄격한 샌드박스를 시작하지 못했습니다. 로컬 샌드박스 환경 문제를 해결한 후 다시 시도하세요."
   },
   "copy_0b9a54a7f8": {
     "message": "FSB가 Grok CLI를 실행하지 못했습니다. 설치되어 있는지 확인한 뒤 상태를 새로고침하세요."
@@ -2695,7 +2695,7 @@
     "message": "연결 테스트에 실패했습니다"
   },
   "copy_ad0770f1aa": {
-    "message": "설치되었고 호환됩니다: Grok Build 1.0.4. 격리, ACP, 캐시된 OAuth 검사가 프롬프트를 보내지 않고 통과했습니다."
+    "message": "확인됨: 프롬프트를 보내지 않고 Grok 프로토콜, 격리 및 저장된 OAuth 검사를 통과했습니다."
   },
   "copy_aab517a207": {
     "message": "호환성 검사 실패: $ERROR$",
@@ -4451,5 +4451,41 @@
         "content": "$2"
       }
     }
+  },
+  "copy_grok_verified": {
+    "message": "확인됨"
+  },
+  "copy_grok_verified_detail": {
+    "message": "FSB가 이 CLI에 필요한 프로토콜 및 격리 기능을 확인했습니다."
+  },
+  "copy_grok_unverified": {
+    "message": "작업을 시작하기 전에 상태를 새로 고쳐 이 CLI를 확인하세요."
+  },
+  "copy_grok_capability_missing": {
+    "message": "이 CLI는 FSB에 필요한 기능을 제공하지 않습니다."
+  },
+  "copy_grok_isolation_unavailable": {
+    "message": "FSB가 이 CLI의 외부 구성 및 도구 격리를 확인하지 못했습니다."
+  },
+  "copy_grok_sandbox_unavailable": {
+    "message": "Grok이 필요한 엄격한 샌드박스를 적용하지 못했습니다. 로컬 Docker 소켓 구성을 확인한 후 상태를 새로 고치세요."
+  },
+  "copy_grok_protocol_drift": {
+    "message": "이 CLI가 호환되지 않는 프로토콜 응답을 반환했습니다."
+  },
+  "copy_grok_binary_changed": {
+    "message": "확인 중 CLI가 변경되었습니다. 상태를 새로 고쳐 업데이트된 실행 파일을 확인하세요."
+  },
+  "copy_grok_task_sandbox": {
+    "message": "필요한 샌드박스를 시작하지 못했습니다"
+  },
+  "copy_grok_task_capability": {
+    "message": "CLI에 필요한 기능이 없습니다"
+  },
+  "copy_grok_task_isolation": {
+    "message": "에이전트의 비공개 구성을 확인하지 못했습니다"
+  },
+  "copy_grok_task_binary": {
+    "message": "확인 중 CLI가 변경되었습니다"
   }
 }

@@ -1289,7 +1289,7 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
       const controllerPath = require.resolve('../extension/utils/delegation-controller.js');
       const matrix = [
         ['claude-code', 'unknown', '2.1.177'],
-        ['grok-build', 'oauth', '1.0.4']
+        ['grok-build', 'oauth', 'grok-acp-v1']
       ];
       let canonicalShape = null;
       for (let index = 0; index < matrix.length; index += 1) {

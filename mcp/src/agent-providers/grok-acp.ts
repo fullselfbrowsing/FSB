@@ -13,8 +13,7 @@ import {
   buildGrokBuildAuthenticateRequest,
   grokBuildMcpServersFromNotification,
   grokBuildMcpServerStatusFromNotification,
-  hasOnlyGrokBuildKeys,
-  isEmptyGrokBuildRecord,
+  isBoundedGrokBuildRecord,
   isGrokBuildRecord,
   parseGrokBuildExtensionNotification,
   parseGrokBuildInitializeResult,
@@ -69,6 +68,7 @@ export interface GrokBuildAcpControllerOptions {
   readonly task: string;
   readonly cwd: string;
   readonly endpoint: string;
+  readonly expectedCliVersion?: string;
   readonly onEvent: (event: AgentEvent) => void;
   readonly recordSession: (sessionId: string) => Promise<void>;
   readonly deleteSession: (sessionId: string) => Promise<void>;
@@ -89,16 +89,11 @@ function drift(
 }
 
 const isRecord = isGrokBuildRecord;
-const hasOnlyKeys = hasOnlyGrokBuildKeys;
 
 function boundedText(value: unknown): value is string {
   return typeof value === 'string'
     && value.length > 0
     && Buffer.byteLength(value, 'utf8') <= MAX_TEXT_BYTES;
-}
-
-function exactEmptyRecord(value: unknown): boolean {
-  return isEmptyGrokBuildRecord(value);
 }
 
 class JsonLineChannel {
@@ -235,6 +230,16 @@ class DefaultGrokBuildAcpController implements GrokBuildAcpController {
         drift('invalid_shape', next.index);
       }
       if (Object.hasOwn(message, 'id')) {
+        if (typeof message.method === 'string') {
+          // FSB advertises neither filesystem nor terminal authority. An ACP
+          // server request can never widen that contract or obtain approval.
+          await this.write({
+            jsonrpc: GROK_BUILD_JSON_RPC_VERSION,
+            id: message.id,
+            error: { code: -32601, message: 'Client capability is not available' },
+          });
+          drift('configuration_surface', next.index, ['method']);
+        }
         if (typeof message.id !== 'number' || !Number.isSafeInteger(message.id)) {
           drift('invalid_shape', next.index, ['id']);
         }
@@ -242,7 +247,7 @@ class DefaultGrokBuildAcpController implements GrokBuildAcpController {
         this.responseIds.add(message.id);
         if (message.id !== id) drift('invalid_order', next.index, ['id']);
         if (Object.hasOwn(message, 'error')) drift('provider_error', next.index, ['error']);
-        if (!hasOnlyKeys(message, ['jsonrpc', 'id', 'result']) || !isRecord(message.result)) {
+        if (!Object.hasOwn(message, 'result') || !isRecord(message.result)) {
           drift('invalid_shape', next.index, ['result']);
         }
         return Object.freeze({ result: message.result, index: next.index });
@@ -319,6 +324,8 @@ class DefaultGrokBuildAcpController implements GrokBuildAcpController {
       kind === 'agent_thought_chunk'
       || kind === 'user_message_chunk'
       || kind === 'session_info_update'
+      || kind === 'config_option_update'
+      || kind === 'current_mode_update'
     ) return;
     if (kind === 'agent_message_chunk') {
       if (
@@ -493,7 +500,7 @@ class DefaultGrokBuildAcpController implements GrokBuildAcpController {
       return;
     }
     if (
-      !hasOnlyKeys(message, ['jsonrpc', 'method', 'params'])
+      !['jsonrpc', 'method', 'params'].every((key) => Object.hasOwn(message, key))
       || message.method !== 'session/update'
       || !isRecord(message.params)
     ) drift('unknown_event_type', index, ['method']);
@@ -505,7 +512,7 @@ class DefaultGrokBuildAcpController implements GrokBuildAcpController {
     try {
       await this.write(GROK_BUILD_INITIALIZE_REQUEST);
       const initialized = await this.response(1);
-      const negotiation = parseGrokBuildInitializeResult(initialized.result);
+      const negotiation = parseGrokBuildInitializeResult(initialized.result, this.options.expectedCliVersion);
       if (
         !negotiation
         || negotiation.authState !== 'oauth'
@@ -587,11 +594,8 @@ class DefaultGrokBuildAcpController implements GrokBuildAcpController {
         params: { sessionId: this.currentSessionId },
       });
       const closed = await this.response(5);
-      // 1.0.4 answers session/close with a close-outcome _meta rather than {}.
-      if (
-        !exactEmptyRecord(closed.result)
-        && !(hasOnlyKeys(closed.result, ['_meta']) && isRecord(closed.result._meta))
-      ) drift('invalid_shape', closed.index, ['result']);
+      // Session close carries only completion metadata, never new authority.
+      if (!isBoundedGrokBuildRecord(closed.result)) drift('invalid_shape', closed.index, ['result']);
       this.closed = true;
       await this.options.deleteSession(this.currentSessionId);
       completed = true;

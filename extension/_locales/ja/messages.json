@@ -698,7 +698,7 @@
     "message": "xAI · ローカルハーネス"
   },
   "panel_fd05c3a95a": {
-    "message": "確認済みの Grok Build 1.0.4 プロファイルが必要です。接続テストはプロンプトを送らずに、インストール、バージョン、分離、ACP、キャッシュ済み OAuth を確認します。"
+    "message": "FSB はプロンプトを送信せず、必要な Grok プロトコル、分離、保存済み OAuth を確認します。"
   },
   "panel_ce4f452059": {
     "message": "サインイン済みの Grok アカウントを使います。SuperGrok の使用は共有の週間枠から消費され、追加使用が発生する場合があります。"
@@ -2606,7 +2606,7 @@
     "message": "Grok Build は以前のセッションを片付けられなかったため、サインインがブロックされています。状態を更新して後処理を再試行してください。"
   },
   "copy_28c4c69520": {
-    "message": "Grok CLI が FSB の求める厳密なサンドボックスでは起動しなかったため、サインインはブロックされています。CLI はインストール済みで、アカウントに問題はありません。"
+    "message": "Grok CLI は FSB が必要とする厳密なサンドボックスを開始できませんでした。ローカルのサンドボックス環境の問題を解決して、もう一度お試しください。"
   },
   "copy_0b9a54a7f8": {
     "message": "FSB は Grok CLI を実行できませんでした。インストールを確認してから状態を更新してください。"
@@ -2695,7 +2695,7 @@
     "message": "接続テストに失敗しました"
   },
   "copy_ad0770f1aa": {
-    "message": "インストール済みで互換性あり: Grok Build 1.0.4。分離、ACP、キャッシュされた OAuth の確認はプロンプトを送らずに成功しました。"
+    "message": "確認済み: プロンプトを送信せず、Grok プロトコル、分離、保存済み OAuth の確認に成功しました。"
   },
   "copy_aab517a207": {
     "message": "互換性の確認に失敗しました: $ERROR$",
@@ -4451,5 +4451,41 @@
         "content": "$2"
       }
     }
+  },
+  "copy_grok_verified": {
+    "message": "確認済み"
+  },
+  "copy_grok_verified_detail": {
+    "message": "FSB は、この CLI に必要なプロトコルと分離機能を確認しました。"
+  },
+  "copy_grok_unverified": {
+    "message": "タスクを開始する前に、状態を更新してこの CLI を確認してください。"
+  },
+  "copy_grok_capability_missing": {
+    "message": "この CLI は FSB が必要とする機能を提供していません。"
+  },
+  "copy_grok_isolation_unavailable": {
+    "message": "FSB は、この CLI が外部の設定やツールから分離されていることを確認できませんでした。"
+  },
+  "copy_grok_sandbox_unavailable": {
+    "message": "Grok は必要な厳密なサンドボックスを適用できませんでした。ローカルの Docker ソケット設定を確認し、状態を更新してください。"
+  },
+  "copy_grok_protocol_drift": {
+    "message": "この CLI は互換性のないプロトコル応答を返しました。"
+  },
+  "copy_grok_binary_changed": {
+    "message": "確認中に CLI が変更されました。状態を更新して、新しい実行ファイルを確認してください。"
+  },
+  "copy_grok_task_sandbox": {
+    "message": "必要なサンドボックスを開始できませんでした"
+  },
+  "copy_grok_task_capability": {
+    "message": "CLI に必要な機能がありません"
+  },
+  "copy_grok_task_isolation": {
+    "message": "エージェントの専用設定を確認できませんでした"
+  },
+  "copy_grok_task_binary": {
+    "message": "確認中に CLI が変更されました"
   }
 }

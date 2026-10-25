@@ -2,6 +2,13 @@
 
 All notable changes to `fsb-mcp-server` are documented in this file. Each entry corresponds to a published npm release; FSB extension milestones map to MCP package versions in the entry header.
 
+## Unreleased
+
+- Replace Grok Build's exact upstream-version pin with the stable `grok-acp-v1` integration contract. Verify protocol capabilities, private configuration, strict sandbox startup, and executable identity before accepting a CLI, including future major versions.
+- Share semantic isolation checks between discovery and task preflight. Harmless metadata, description, and ordering additions no longer invalidate a compatible CLI; enabled external customizations and unexpected authority remain blocked.
+- Wait for ACP probe responses before closing stdin, tolerate bounded additive protocol metadata, and retain explicit OAuth sign-in behavior. Preserve private credentials and session journals when updating FSB-owned profile files.
+- Preserve concrete capability, isolation, sandbox, protocol, and binary-change refusals through doctor, connection tests, and schema-2 compatibility snapshots. Pair with the matching extension for the new **Verified** status and reason codes; rerun native-host installation after publication to replace the staged package runtime.
+
 <a id="v0.11.5"></a>
 
 ## 0.11.5 (2026-10-18)

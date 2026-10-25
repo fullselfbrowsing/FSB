@@ -918,6 +918,10 @@ function _delegationValidTrustResponse(value, providerId) {
 function _delegationStartRejectionDetail(value) {
   var reasons = {
     adapter_unavailable: 'the provider became unavailable',
+    sandbox_unavailable: 'the required sandbox could not start',
+    capability_missing: 'the CLI is missing a required capability',
+    isolation_unavailable: 'the private agent configuration could not be verified',
+    binary_changed: 'the CLI changed while it was being checked',
     spawn_failed: 'the agent process could not be started',
     activation_failed: 'the agent process could not be verified',
     agent_protocol_drift: 'the agent spoke an unexpected protocol',

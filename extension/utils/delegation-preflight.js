@@ -67,7 +67,7 @@
     return providerId || 'Selected provider';
   }
 
-  function canonicalCompatibilityState(value) {
+  function canonicalCompatibilityState(value, providerId) {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return 'unsupported';
     var expected = ['status', 'reason', 'checkedAt'];
     var record = {};
@@ -91,10 +91,10 @@
       return 'unsupported';
     }
     if (!Number.isSafeInteger(record.checkedAt) || record.checkedAt < 0) return 'unsupported';
-    var runnable = (record.status === 'supported'
-        && record.reason === 'within_tested_range')
-      || (record.status === 'degraded'
-        && record.reason === 'newer_than_tested_range');
+    var runnable = providerId === 'grok-build'
+      ? record.status === 'supported' && record.reason === 'capability_verified'
+      : (record.status === 'supported' && record.reason === 'within_tested_range')
+        || (record.status === 'degraded' && record.reason === 'newer_than_tested_range');
     if (runnable) return 'runnable';
     if (record.status === 'degraded' && record.reason === 'evidence_stale') return 'refresh';
     return 'unsupported';
@@ -146,7 +146,7 @@
     if (getOwnValue(bridgeState, 'pairingStatus') !== 'paired') {
       return failure('agent_unpaired', agentProviderId);
     }
-    var compatibilityState = canonicalCompatibilityState(getOwnValue(input, 'compatibility'));
+    var compatibilityState = canonicalCompatibilityState(getOwnValue(input, 'compatibility'), agentProviderId);
     if (compatibilityState === 'refresh') {
       return failure('provider_status_refresh', agentProviderId);
     }

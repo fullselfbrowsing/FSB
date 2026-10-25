@@ -241,7 +241,7 @@ async function run() {
   if (SELECTED_SECTION === 'delegated-agent-parity') {
     const identityMatrix = [
       ['claude-code', 'unknown', '2.1.177', 'subscription'],
-      ['grok-build', 'oauth', '1.0.4', 'subscription'],
+      ['grok-build', 'oauth', 'grok-acp-v1', 'subscription'],
     ];
     identityMatrix.forEach(([providerId, authState, profileVersion, billingKind]) => {
       const identity = delegationProviders.createAcceptedAgentIdentity(providerId, authState);
@@ -365,7 +365,11 @@ async function run() {
         status: 'connected', connected: true, pairingStatus: 'paired',
         delegationConnection: { state: 'connected' }
       },
-      compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 100 },
+      compatibility: {
+        status: 'supported',
+        reason: candidate === 'grok-build' ? 'capability_verified' : 'within_tested_range',
+        checkedAt: 100
+      },
       acceptedIdentity,
     });
     const isShippedAgent = SHIPPED_AGENT_IDS.includes(candidate);

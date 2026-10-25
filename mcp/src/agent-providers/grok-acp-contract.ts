@@ -1,5 +1,4 @@
 import type { AdapterAuthState } from './adapter.js';
-import { GROK_BUILD_PROFILE_VERSION } from './grok-runtime.js';
 
 export const GROK_BUILD_JSON_RPC_VERSION = '2.0' as const;
 export const GROK_BUILD_CACHED_AUTH_METHOD_ID = 'cached_token' as const;
@@ -21,7 +20,8 @@ export type GrokBuildExtensionNotificationKind =
   | 'lifecycle'
   | 'mcp_progress'
   | 'mcp_servers'
-  | 'mcp_server_status';
+  | 'mcp_server_status'
+  | 'informational';
 
 export interface GrokBuildExtensionNotification {
   readonly kind: GrokBuildExtensionNotificationKind;
@@ -88,65 +88,82 @@ function boundedDescription(value: unknown): value is string {
     && !/[\u0000-\u001f\u007f]/.test(value);
 }
 
-function validAuthMethod(
-  value: unknown,
-  id: typeof GROK_BUILD_CACHED_AUTH_METHOD_ID | typeof GROK_BUILD_BROWSER_AUTH_METHOD_ID,
-  name: string,
-): boolean {
+const CLI_VERSION_PATTERN = /^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)$/;
+const MAX_METADATA_NODES = 16_384;
+
+/** ACP metadata is extensible, but every accepted addition remains bounded JSON. */
+function boundedJson(value: unknown, depth = 0, budget = { nodes: 0 }): boolean {
+  budget.nodes += 1;
+  if (depth > 32 || budget.nodes > MAX_METADATA_NODES) return false;
+  if (value === null || typeof value === 'boolean') return true;
+  if (typeof value === 'number') return Number.isFinite(value);
+  if (typeof value === 'string') return value.length <= 256 * 1024;
+  if (Array.isArray(value)) {
+    return value.length <= MAX_METADATA_NODES
+      && value.every((entry) => boundedJson(entry, depth + 1, budget));
+  }
   return isGrokBuildRecord(value)
-    && hasOnlyGrokBuildKeys(value, ['id', 'name', 'description'])
-    && value.id === id
-    && value.name === name
-    && boundedDescription(value.description);
+    && Object.keys(value).length <= MAX_METADATA_NODES
+    && Object.values(value).every((entry) => boundedJson(entry, depth + 1, budget));
+}
+
+export function isBoundedGrokBuildRecord(value: unknown): value is GrokBuildJsonRecord {
+  return isGrokBuildRecord(value) && boundedJson(value);
+}
+
+function authMethodId(value: unknown): string | null {
+  return isGrokBuildRecord(value)
+    && boundedDescription(value.id)
+    && boundedJson(value)
+    ? value.id
+    : null;
 }
 
 export function parseGrokBuildInitializeResult(
   value: unknown,
+  expectedVersion?: string,
 ): GrokBuildAcpNegotiation | null {
-  if (!isGrokBuildRecord(value) || value.protocolVersion !== 1) return null;
+  if (!isGrokBuildRecord(value) || !boundedJson(value) || value.protocolVersion !== 1) return null;
   const capabilities = value.agentCapabilities;
   if (
     !isGrokBuildRecord(capabilities)
     || !isGrokBuildRecord(capabilities.mcpCapabilities)
     || capabilities.mcpCapabilities.http !== true
     || !isGrokBuildRecord(capabilities.sessionCapabilities)
-    || !isEmptyGrokBuildRecord(capabilities.sessionCapabilities.close)
+    || !isGrokBuildRecord(capabilities.sessionCapabilities.close)
   ) return null;
 
   const meta = value._meta;
   if (
     !isGrokBuildRecord(meta)
-    || meta.agentVersion !== GROK_BUILD_PROFILE_VERSION
+    || typeof meta.agentVersion !== 'string'
+    || !CLI_VERSION_PATTERN.test(meta.agentVersion)
+    || (expectedVersion !== undefined && meta.agentVersion !== expectedVersion)
     || !isEmptyArray(meta.mcpServers)
     || !Array.isArray(value.authMethods)
+    || value.authMethods.length === 0
+    || value.authMethods.length > 32
   ) return null;
 
-  const methods = value.authMethods;
-  const browserMethodValid = validAuthMethod(
-    methods.at(-1),
-    GROK_BUILD_BROWSER_AUTH_METHOD_ID,
-    'Grok',
-  );
-  if (!browserMethodValid) return null;
-
-  if (methods.length === 1 && meta.defaultAuthMethodId === null) {
-    return Object.freeze({
-      authState: 'unauthenticated',
-      authenticationMethodId: null,
-    });
-  }
+  const methodIds = value.authMethods.map(authMethodId);
+  if (methodIds.some((id) => id === null) || new Set(methodIds).size !== methodIds.length) return null;
+  // Other advertised methods carry no authority: FSB only selects cached OAuth.
   if (
-    methods.length === 2
-    && validAuthMethod(
-      methods[0],
-      GROK_BUILD_CACHED_AUTH_METHOD_ID,
-      GROK_BUILD_CACHED_AUTH_METHOD_ID,
-    )
-    && meta.defaultAuthMethodId === GROK_BUILD_CACHED_AUTH_METHOD_ID
+    meta.defaultAuthMethodId === GROK_BUILD_CACHED_AUTH_METHOD_ID
+    && methodIds.includes(GROK_BUILD_CACHED_AUTH_METHOD_ID)
   ) {
     return Object.freeze({
       authState: 'oauth',
       authenticationMethodId: GROK_BUILD_CACHED_AUTH_METHOD_ID,
+    });
+  }
+  if (
+    meta.defaultAuthMethodId === null
+    && (methodIds.includes(GROK_BUILD_BROWSER_AUTH_METHOD_ID) || methodIds.includes('oidc'))
+  ) {
+    return Object.freeze({
+      authState: 'unauthenticated',
+      authenticationMethodId: null,
     });
   }
   return null;
@@ -154,53 +171,37 @@ export function parseGrokBuildInitializeResult(
 
 export function parseGrokBuildInitializeResponse(
   value: unknown,
+  expectedVersion?: string,
 ): GrokBuildAcpNegotiation | null {
   if (
     !isGrokBuildRecord(value)
-    || !hasOnlyGrokBuildKeys(value, ['jsonrpc', 'id', 'result'])
+    || !['jsonrpc', 'id', 'result'].every((key) => Object.hasOwn(value, key))
+    || Object.hasOwn(value, 'method')
+    || Object.hasOwn(value, 'error')
+    || !boundedJson(value)
     || value.jsonrpc !== GROK_BUILD_JSON_RPC_VERSION
     || value.id !== 1
   ) return null;
-  return parseGrokBuildInitializeResult(value.result);
+  return parseGrokBuildInitializeResult(value.result, expectedVersion);
 }
 
 export function validateGrokBuildAuthenticationResult(value: unknown): boolean {
   if (
     !isGrokBuildRecord(value)
-    || !hasOnlyGrokBuildKeys(value, ['_meta'])
+    || !boundedJson(value)
     || !isGrokBuildRecord(value._meta)
   ) return false;
-  const meta = value._meta;
-  if (!hasOnlyGrokBuildKeys(meta, [
-    'email',
-    'auth_mode',
-    'team_id',
-    'team_name',
-    'is_zdr',
-    'team_role',
-    'coding_data_retention_opt_out',
-    'show_resolved_model',
-    'gate',
-    'subscription_tier',
-  ])) return false;
-  const nullableText = (item: unknown): boolean => (
-    item === null || (typeof item === 'string' && item.length <= 512)
-  );
-  return nullableText(meta.email)
-    && meta.auth_mode === 'Oidc'
-    && nullableText(meta.team_id)
-    && nullableText(meta.team_name)
-    && typeof meta.is_zdr === 'boolean'
-    && nullableText(meta.team_role)
-    && typeof meta.coding_data_retention_opt_out === 'boolean'
-    && (meta.show_resolved_model === null || typeof meta.show_resolved_model === 'boolean')
-    && (meta.gate === null || isGrokBuildRecord(meta.gate))
-    && nullableText(meta.subscription_tier);
+  // Account and subscription display metadata does not grant authority. Only
+  // the explicit OAuth mode establishes the credential kind FSB may accept.
+  return value._meta.auth_mode === 'Oidc';
 }
 
 export function validateGrokBuildAuthenticationResponse(value: unknown): boolean {
   return isGrokBuildRecord(value)
-    && hasOnlyGrokBuildKeys(value, ['jsonrpc', 'id', 'result'])
+    && ['jsonrpc', 'id', 'result'].every((key) => Object.hasOwn(value, key))
+    && !Object.hasOwn(value, 'method')
+    && !Object.hasOwn(value, 'error')
+    && boundedJson(value)
     && value.jsonrpc === GROK_BUILD_JSON_RPC_VERSION
     && value.id === 2
     && validateGrokBuildAuthenticationResult(value.result);
@@ -223,10 +224,12 @@ export function parseGrokBuildExtensionNotification(
 ): GrokBuildExtensionNotification | null {
   if (
     !isGrokBuildRecord(value)
-    || !hasOnlyGrokBuildKeys(value, ['jsonrpc', 'method', 'params'])
+    || !['jsonrpc', 'method', 'params'].every((key) => Object.hasOwn(value, key))
+    || Object.hasOwn(value, 'id')
     || value.jsonrpc !== GROK_BUILD_JSON_RPC_VERSION
     || typeof value.method !== 'string'
     || !isGrokBuildRecord(value.params)
+    || !boundedJson(value.params)
   ) return null;
   if (value.method === '_x.ai/mcp/servers_updated') {
     return Object.freeze({ kind: 'mcp_servers', params: value.params });
@@ -234,7 +237,14 @@ export function parseGrokBuildExtensionNotification(
   if (value.method === '_x.ai/mcp/server_status') {
     return Object.freeze({ kind: 'mcp_server_status', params: value.params });
   }
-  if (!Object.hasOwn(NON_AUTHORITY_NOTIFICATION_KINDS, value.method)) return null;
+  if (!Object.hasOwn(NON_AUTHORITY_NOTIFICATION_KINDS, value.method)) {
+    // These namespaces only report UI/catalog state. Unknown MCP, hook,
+    // permission and tool notifications remain incompatible rather than ignored.
+    if (/^_x\.ai\/(?:settings|announcements|models|sessions|queue)\/[a-z_]+$/.test(value.method)) {
+      return Object.freeze({ kind: 'informational', params: value.params });
+    }
+    return null;
+  }
   return Object.freeze({
     kind: NON_AUTHORITY_NOTIFICATION_KINDS[
       value.method as keyof typeof NON_AUTHORITY_NOTIFICATION_KINDS
@@ -248,7 +258,7 @@ export function grokBuildMcpServersFromNotification(
 ): readonly unknown[] | null {
   if (
     notification.kind !== 'mcp_servers'
-    || !hasOnlyGrokBuildKeys(notification.params, ['mcpServers'])
+    || !Object.hasOwn(notification.params, 'mcpServers')
     || !Array.isArray(notification.params.mcpServers)
   ) return null;
   return notification.params.mcpServers;
@@ -266,13 +276,7 @@ export function grokBuildMcpServerStatusFromNotification(
 ): Readonly<{ sessionId: unknown; name: unknown; source: unknown; status: unknown }> | null {
   if (notification.kind !== 'mcp_server_status') return null;
   const params = notification.params;
-  if (
-    !hasOnlyGrokBuildKeys(params, ['sessionId', 'name', 'source', 'status', 'reason', 'tools'])
-    && !hasOnlyGrokBuildKeys(
-      params,
-      ['sessionId', 'name', 'source', 'status', 'reason', 'detail', 'tools'],
-    )
-  ) return null;
+  if (!['sessionId', 'name', 'source', 'status'].every((key) => Object.hasOwn(params, key))) return null;
   return Object.freeze({
     sessionId: params.sessionId,
     name: params.name,
@@ -284,6 +288,7 @@ export function grokBuildMcpServerStatusFromNotification(
 export function parseGrokBuildProbeTranscript(
   messages: readonly unknown[],
   requireAuthentication: boolean,
+  expectedVersion?: string,
 ): GrokBuildAcpNegotiation | null {
   const expectedResponseIds = requireAuthentication ? [1, 2] : [1];
   let responseIndex = 0;
@@ -293,7 +298,7 @@ export function parseGrokBuildProbeTranscript(
       const expectedId = expectedResponseIds[responseIndex];
       if (expectedId === undefined || message.id !== expectedId) return null;
       if (expectedId === 1) {
-        negotiation = parseGrokBuildInitializeResponse(message);
+        negotiation = parseGrokBuildInitializeResponse(message, expectedVersion);
         if (!negotiation) return null;
       } else if (!validateGrokBuildAuthenticationResponse(message)) {
         return null;

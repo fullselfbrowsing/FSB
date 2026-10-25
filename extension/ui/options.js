@@ -645,7 +645,19 @@ function grokBuildSignInFailureMessage(reason, errorCode) {
     return 'Grok Build could not clean up a previous session, so sign-in is blocked. Refresh status to retry cleanup.';
   }
   if (reason === 'sandbox_unavailable') {
-    return 'The Grok CLI refused to start under the strict sandbox FSB requires, so sign-in is blocked. The CLI is installed and your account is fine.';
+    return 'The Grok CLI could not start the strict sandbox FSB requires. Resolve the local sandbox environment problem, then try again.';
+  }
+  if (reason === 'capability_missing') {
+    return 'This CLI does not provide the capabilities FSB requires.';
+  }
+  if (reason === 'isolation_unavailable') {
+    return 'FSB could not verify that this CLI is isolated from external configuration and tools.';
+  }
+  if (reason === 'agent_protocol_drift') {
+    return 'This CLI returned an incompatible protocol response.';
+  }
+  if (reason === 'binary_changed') {
+    return 'The CLI changed during verification. Refresh status to verify the updated executable.';
   }
   if (reason === 'adapter_unavailable') {
     return 'FSB could not run the Grok CLI. Check that it is installed, then refresh status.';
@@ -2775,7 +2787,7 @@ async function runFullApiTest() {
       // markExact() gives the result a live key, which takes over from the static
       // data-i18n key of the idle hint, so a later language change rewrites it.
       if (result.ok) {
-        fsbUiSet(elements.grokBuildCompatibility, 'Installed and compatible: Grok Build 1.0.4. Isolation, ACP, and cached OAuth checks passed without sending a prompt.');
+        fsbUiSet(elements.grokBuildCompatibility, 'Verified: Grok protocol, isolation, and cached OAuth checks passed without sending a prompt.');
       } else if (result.error) {
         fsbUiSet(elements.grokBuildCompatibility, 'Compatibility check failed: $ERROR$', { error: result.error });
       } else {

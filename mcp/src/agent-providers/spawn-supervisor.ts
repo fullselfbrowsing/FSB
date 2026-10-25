@@ -92,6 +92,7 @@ import {
   createGrokBuildAcpController,
   type GrokBuildAcpController,
 } from './grok-acp.js';
+import { verifyGrokBuildExecutableIdentity } from './grok-detect.js';
 import {
   createGrokBuildAuthCoordinator,
   type GrokBuildAuthCoordinator,
@@ -235,6 +236,10 @@ export interface DelegationStatus {
 
 export type DelegationFailureCode =
   | 'adapter_unavailable'
+  | 'sandbox_unavailable'
+  | 'capability_missing'
+  | 'isolation_unavailable'
+  | 'binary_changed'
   | 'agent_protocol_drift'
   | 'spawn_failed'
   | 'activation_failed'
@@ -437,6 +442,7 @@ interface DelegationRun {
   grokSessionRecorded: boolean;
   grokSessionCleaned: boolean;
   detectionBinary: AdapterDetection['binary'];
+  detectionVersion: string | null;
   settleMaskedCode: string | null;
   settleReason: string | null;
 }
@@ -1242,6 +1248,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       grokSessionRecorded: false,
       grokSessionCleaned: false,
       detectionBinary: null,
+      detectionVersion: null,
       settleMaskedCode: null,
       settleReason: null,
     };
@@ -1271,6 +1278,12 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
         run.grokTaskLease = await this.grokBuildAuthCoordinator.acquireTask();
       }
       const detection = await run.adapter.detect();
+      if (run.adapterId === GROK_BUILD_ADAPTER_ID && !detection.installed) {
+        const refusal = detection.diagnostic?.code;
+        if (refusal === 'sandbox_unavailable' || refusal === 'capability_missing'
+            || refusal === 'isolation_unavailable' || refusal === 'agent_protocol_drift'
+            || refusal === 'binary_changed') throw new Error(refusal);
+      }
       validateDetection(detection);
       const detectedIdentity = acceptedIdentityFromDetection(run.adapterId, detection);
       if (!acceptedAgentIdentitiesEqual(run.requestedIdentity, detectedIdentity)) {
@@ -1280,6 +1293,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       profileVersion = detection.profileVersion;
       run.profileVersion = profileVersion;
       run.detectionBinary = detection.binary;
+      run.detectionVersion = detection.version;
       if (run.adapterId === GROK_BUILD_ADAPTER_ID) {
         if (!this.grokBuildRuntime) throw new Error('adapter_unavailable');
         run.grokRun = await this.grokBuildRuntime.prepareRun(run.delegationId);
@@ -1321,13 +1335,18 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
         if (!directArgv) throw new Error('adapter_unavailable');
         argv = directArgv;
         if (run.adapterId === GROK_BUILD_ADAPTER_ID) {
-          await this.executePolicyAttestations(
-            run,
-            spec.attestations,
-            'process_json',
-            null,
-            spec.privateRuntimes,
-          );
+          try {
+            await this.executePolicyAttestations(
+              run,
+              spec.attestations,
+              'process_json',
+              null,
+              spec.privateRuntimes,
+            );
+          } catch (error) {
+            if (error instanceof PolicyAttestationFailure) throw new Error('isolation_unavailable');
+            throw error;
+          }
           if (!this.grokBuildRuntime) throw new Error('adapter_unavailable');
           await this.grokBuildRuntime.attestBase();
           const reattestedRun = await this.grokBuildRuntime.prepareRun(run.delegationId);
@@ -1337,6 +1356,9 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
             || reattestedRun.cwd !== run.grokRun.cwd
           ) throw new Error('adapter_unavailable');
           run.grokRun = reattestedRun;
+          if (!await verifyGrokBuildExecutableIdentity(detection.binary)) {
+            throw new Error('binary_changed');
+          }
         }
       } else {
         await this.executePolicyAttestations(
@@ -1428,6 +1450,10 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
         env: environment,
       });
       run.replayClosed = true;
+      if (run.adapterId === GROK_BUILD_ADAPTER_ID
+          && !await verifyGrokBuildExecutableIdentity(detection.binary)) {
+        throw new Error('binary_changed');
+      }
       const child = process.spawnSecretEnvBindings.length === 0
         ? this.spawnChild(process.command, argv, options)
         : this.spawnWithSecretBindings(process, argv, options);
@@ -2515,6 +2541,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       task: run.task,
       cwd: run.grokRun.cwd,
       endpoint: this.dependencies.endpoint,
+      expectedCliVersion: run.detectionVersion ?? undefined,
       onEvent: (event) => this.acceptGrokEvent(run, event),
       recordSession: async (sessionId) => {
         await this.grokBuildAuthCoordinator!.recordSession(run.delegationId, sessionId);
@@ -3668,6 +3695,8 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
     const code = errorCode(error) ?? (error instanceof Error ? error.message : '');
     if (code === 'agent_protocol_drift') return 'agent_protocol_drift';
     if (code === 'adapter_unavailable') return 'adapter_unavailable';
+    if (code === 'sandbox_unavailable' || code === 'capability_missing'
+        || code === 'isolation_unavailable' || code === 'binary_changed') return code;
     if (code === 'activation_failed') return 'activation_failed';
     if (code === 'stdin_failed') return 'stdin_failed';
     if (code === 'process_exit') return 'process_exit';

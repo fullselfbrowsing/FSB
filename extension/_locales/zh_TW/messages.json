@@ -698,7 +698,7 @@
     "message": "xAI · 本機工具"
   },
   "panel_fd05c3a95a": {
-    "message": "需要已審核的 Grok Build 1.0.4 設定。測試連線會核對安裝、版本、隔離、ACP 和快取的 OAuth，且不傳送提示。"
+    "message": "FSB 會驗證所需的 Grok 協定、隔離和已快取的 OAuth 功能，不會傳送提示詞。"
   },
   "panel_ce4f452059": {
     "message": "使用已登入的 Grok 帳戶。SuperGrok 用量來自共享的每週額度；可能產生額外用量。"
@@ -2606,7 +2606,7 @@
     "message": "Grok Build 無法清理先前的工作階段，因此登入被阻止。請重新整理狀態以重試清理。"
   },
   "copy_28c4c69520": {
-    "message": "Grok CLI 拒絕在 FSB 要求的嚴格沙箱中啟動，因此登入被阻止。CLI 已安裝，你的帳戶沒有問題。"
+    "message": "Grok CLI 無法啟動 FSB 所需的嚴格沙箱。請解決本機沙箱環境問題，然後重試。"
   },
   "copy_0b9a54a7f8": {
     "message": "FSB 無法執行 Grok CLI。請確認已安裝，然後重新整理狀態。"
@@ -2695,7 +2695,7 @@
     "message": "連線測試失敗"
   },
   "copy_ad0770f1aa": {
-    "message": "已安裝且相容：Grok Build 1.0.4。隔離、ACP 和快取的 OAuth 檢查已通過，且未傳送提示。"
+    "message": "已驗證：Grok 協定、隔離和已快取的 OAuth 檢查已通過，未傳送提示詞。"
   },
   "copy_aab517a207": {
     "message": "相容性檢查失敗：$ERROR$",
@@ -4451,5 +4451,41 @@
         "content": "$2"
       }
     }
+  },
+  "copy_grok_verified": {
+    "message": "已驗證"
+  },
+  "copy_grok_verified_detail": {
+    "message": "FSB 已驗證此 CLI 所需的協定和隔離功能。"
+  },
+  "copy_grok_unverified": {
+    "message": "開始工作前，請重新整理狀態以驗證此 CLI。"
+  },
+  "copy_grok_capability_missing": {
+    "message": "此 CLI 未提供 FSB 所需的功能。"
+  },
+  "copy_grok_isolation_unavailable": {
+    "message": "FSB 無法驗證此 CLI 是否與外部設定和工具隔離。"
+  },
+  "copy_grok_sandbox_unavailable": {
+    "message": "Grok 無法套用所需的嚴格沙箱。請檢查本機 Docker 通訊端設定，然後重新整理狀態。"
+  },
+  "copy_grok_protocol_drift": {
+    "message": "此 CLI 傳回了不相容的協定回應。"
+  },
+  "copy_grok_binary_changed": {
+    "message": "驗證期間 CLI 發生了變化。請重新整理狀態以驗證更新後的執行檔。"
+  },
+  "copy_grok_task_sandbox": {
+    "message": "無法啟動所需的沙箱"
+  },
+  "copy_grok_task_capability": {
+    "message": "CLI 缺少所需的功能"
+  },
+  "copy_grok_task_isolation": {
+    "message": "無法驗證代理的專用設定"
+  },
+  "copy_grok_task_binary": {
+    "message": "檢查期間 CLI 發生了變化"
   }
 }

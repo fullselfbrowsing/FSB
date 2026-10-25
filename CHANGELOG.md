@@ -6,6 +6,15 @@ The independently published `fsb-mcp-server` npm package keeps its own semver ch
 
 ## [Unreleased]
 
+### Fixed
+
+- Grok Build compatibility is verified through its ACP capabilities and isolated runtime instead of an exact CLI version pin. Compatible future releases can run without an FSB update; sandbox, isolation, and protocol refusals now retain their actual cause in provider status and connection tests.
+- Grok's provider badge reports **Verified** after runtime checks and drops stale version-only success evidence. Updating the integration preserves the private OAuth profile and owned-session journal.
+
+### Added
+
+- Sanitized Grok Build 1.0.62 inspection and initialization fixtures, future-version regression coverage, and a weekly/manual macOS/Linux compatibility check against the official stable CLI without credentials or inference.
+
 ## v0.9.95 — Multilingual Extension Interface and Official Cline Support — 2026-10-18
 
 The extension, showcase, skill, documentation, and store metadata align at `0.9.95`. The independently versioned `fsb-mcp-server` advances to `0.11.5` with the accompanying Cline installer fix and the removal of three dead tools; see [`mcp/CHANGELOG.md`](./mcp/CHANGELOG.md) for its package-specific release notes and compatibility requirements. The language work leaves MCP tool schemas and bridge messages unchanged.
