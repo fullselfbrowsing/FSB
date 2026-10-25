@@ -68,9 +68,10 @@ const SAFARI_MIN_VERSION = '18.0';
 
 const MCP_BRIDGE_URL = 'ws://localhost:7225';
 
-// extension/assets/safari-toolbar-<size>.png. 16 and 32 are the toolbar's 1x
-// and 2x; utils/action-icon.js draws its animated frames from the same two.
-export const SAFARI_TOOLBAR_ICON_SIZES = [16, 32, 48, 64];
+// extension/assets/safari-toolbar-<size>.png. 16/32 and 19/38 are the
+// toolbar's 1x and 2x, depending on the macOS version; utils/action-icon.js
+// draws its animated frames from the 16 and 32.
+export const SAFARI_TOOLBAR_ICON_SIZES = [16, 19, 32, 38, 48, 64];
 
 // Paths never copied into the Safari build, with the reason each is excluded.
 // tests/safari-source-parity.test.js asserts this list is exhaustive.
@@ -117,10 +118,11 @@ export function transformManifest(manifest) {
   // popup-type extension window, so the key itself must not survive.
   delete out.side_panel;
 
-  // Safari treats a grayscale toolbar icon as a template and tints its alpha.
-  // The opaque icon*.png tiles become a solid square, so the toolbar gets the
-  // lettering on a transparent background (scripts/generate-safari-toolbar-icons.py).
-  // `icons` keeps the tile: it is the extension's icon in Safari Settings.
+  // Safari tints any toolbar icon it detects as grayscale, and the black-and-
+  // white icon*.png tiles came out as a solid square. The toolbar gets the same
+  // tile with a faint warm tint on every pixel, so Safari shows it in its own
+  // colors (scripts/generate-safari-toolbar-icons.py). `icons` keeps the
+  // original tile: Safari Settings shows it untinted.
   out.action = {
     ...(out.action ?? {}),
     default_icon: Object.fromEntries(

@@ -22,6 +22,8 @@
  *      createDocument. Zero edits to background.js for the offscreen path.
  *   5. In the Safari service worker only, `WebSocket` throws SecurityError
  *      (guardWorkerWebSocket below): a real one deadlocks the worker's process.
+ *      caps.tintsGrayscaleToolbarIcon tells utils/action-icon.js to keep its
+ *      toolbar frames out of Safari's grayscale tint.
  *   6. runtime.onSuspend gets a no-op stand-in when Safari lacks it, because
  *      background.js registers on it at top level.
  *
@@ -197,9 +199,9 @@
       systemMemory: isChrome,
       networkBodies: isChrome,
       nativeMessaging: !isChrome,
-      // Safari tints a grayscale toolbar icon as a template, so utils/action-icon.js
-      // draws its frames as black-plus-alpha there.
-      templateToolbarIcon: !isChrome
+      // Safari tints any toolbar icon it detects as grayscale, so
+      // utils/action-icon.js draws its frames from tinted copies of the tile.
+      tintsGrayscaleToolbarIcon: !isChrome
     };
   }
 

@@ -130,24 +130,18 @@
   // its own asset or the mark renders thin. 128 into 32 is an exact 4:1 reduction.
   var GLYPH_PATHS = { 16: 'assets/icon16.png', 32: 'assets/icon128.png' };
 
-  // ---- Template toolbar (Safari) -------------------------------------------
-  // Safari treats a grayscale toolbar icon as a template: it keeps only the
-  // alpha channel and tints it, gray or the accent color while the extension
-  // is active on the page. The opaque tile above then shows as a solid square.
-  // A platform whose adapter asks for templateToolbarIcon gets every frame as
-  // black-plus-alpha on a transparent background instead: the lettering from
-  // the template assets, no plate, and each effect at its usual alpha. Black is
-  // what keeps every pixel grayscale; one coloured pixel would make Safari
-  // render that frame in colour instead. Undefined FsbPlatform (Chrome, every
+  // ---- Grayscale-tinting toolbars (Safari) ---------------------------------
+  // Safari tints any toolbar icon it detects as grayscale: it keeps only the
+  // alpha channel and paints it gray, or the accent color while the extension
+  // is active. The black-and-white tile above came out as a solid square. A
+  // platform whose adapter reports tintsGrayscaleToolbarIcon draws from the
+  // same tile with a faint warm tint on every pixel instead, so every frame,
+  // the resting one included, is shown in its own colors. The orbit, sweep,
+  // ring and glow are coloured already. Undefined FsbPlatform (Chrome, every
   // Node harness) leaves all of this off.
-  var TEMPLATE = !!(typeof globalThis !== 'undefined' && globalThis.FsbPlatform
-    && globalThis.FsbPlatform.caps && globalThis.FsbPlatform.caps.templateToolbarIcon === true);
-  var TEMPLATE_GLYPH_PATHS = { 16: 'assets/safari-toolbar-16.png', 32: 'assets/safari-toolbar-32.png' };
-  var TEMPLATE_RGB = '0, 0, 0';
-  // The tile's 10% white track is legible against black; as a tint over the
-  // toolbar it would vanish.
-  var TEMPLATE_TRACK_ALPHA = 0.3;
-  var TEMPLATE_SWEEP_FROM_ALPHA = 0.7;
+  var TINTED_TOOLBAR = !!(typeof globalThis !== 'undefined' && globalThis.FsbPlatform
+    && globalThis.FsbPlatform.caps && globalThis.FsbPlatform.caps.tintsGrayscaleToolbarIcon === true);
+  var TINTED_GLYPH_PATHS = { 16: 'assets/safari-toolbar-16.png', 32: 'assets/safari-toolbar-32.png' };
 
   // Normalized fade width expressed within the bead's own 0..1 span.
   var FADE_SPAN = FADE_FRACTION / BEAD_FRACTION;
@@ -353,14 +347,10 @@
     var drawn = size * GLYPH_SCALE;
     var offset = (size - drawn) / 2;
 
-    if (TEMPLATE) {
-      drawTemplateGlyph(ctx, size, bitmap, spec, offset, drawn);
-      return;
-    }
-
     if (spec.dimmed === true) {
       ctx.globalAlpha = DIM_ALPHA;
-      ctx.filter = DIM_FILTER;
+      // Graying the tinted tile would hand Safari a grayscale frame to tint.
+      ctx.filter = TINTED_TOOLBAR ? 'none' : DIM_FILTER;
       ctx.drawImage(bitmap, offset, offset, drawn, drawn);
       ctx.globalAlpha = 1;
       ctx.filter = 'none';
@@ -378,29 +368,6 @@
     ctx.fillStyle = PLATE_COLOR;
     ctx.fillRect(0, 0, size, size);
     if (wantsGlow) drawMarkGlow(ctx, size, bitmap, spec, offset, drawn);
-    ctx.globalAlpha = markAlpha;
-    ctx.drawImage(bitmap, offset, offset, drawn, drawn);
-    ctx.globalAlpha = 1;
-  }
-
-  // Template frames carry no plate, so the breathe is the lettering's own alpha
-  // and its halo is a blurred copy of the lettering under it. Dim is plain alpha:
-  // a grayscale filter has nothing to remove from black.
-  function drawTemplateGlyph(ctx, size, bitmap, spec, offset, drawn) {
-    if (spec.dimmed === true) {
-      ctx.globalAlpha = DIM_ALPHA;
-      ctx.drawImage(bitmap, offset, offset, drawn, drawn);
-      ctx.globalAlpha = 1;
-      return;
-    }
-    var markAlpha = typeof spec.glyphAlpha === 'number' ? spec.glyphAlpha : 1;
-    if (typeof spec.glowRatio === 'number' && spec.glowRatio > 0
-        && spec.glowAlpha > 0 && supportsDropShadow(ctx)) {
-      ctx.globalAlpha = spec.glowAlpha;
-      ctx.filter = 'blur(' + (spec.glowRatio * size).toFixed(2) + 'px)';
-      ctx.drawImage(bitmap, offset, offset, drawn, drawn);
-      ctx.filter = 'none';
-    }
     ctx.globalAlpha = markAlpha;
     ctx.drawImage(bitmap, offset, offset, drawn, drawn);
     ctx.globalAlpha = 1;
@@ -483,7 +450,7 @@
       // Everything but the last segment runs slightly long to cover it; the last
       // one still ends at exactly BEAD_FRACTION.
       var tEnd = i === BEAD_SEGMENTS - 1 ? t1 : t1 + SEAM_OVERLAP / BEAD_SEGMENTS;
-      ctx.strokeStyle = TEMPLATE ? alphaColor(TEMPLATE_RGB, alpha) : mixColor(head, tail, mid, alpha);
+      ctx.strokeStyle = mixColor(head, tail, mid, alpha);
       var d0 = start + t0 * BEAD_FRACTION * geometry.perimeter;
       var d1 = start + tEnd * BEAD_FRACTION * geometry.perimeter;
       ctx.beginPath();
@@ -522,7 +489,7 @@
     var y = Math.round(SWEEP_CENTER_Y_RATIO * size - trackH / 2);
     var radius = trackH <= 2 ? 0 : trackH / 2;
 
-    ctx.fillStyle = TEMPLATE ? alphaColor(TEMPLATE_RGB, TEMPLATE_TRACK_ALPHA) : SWEEP_TRACK_COLOR;
+    ctx.fillStyle = SWEEP_TRACK_COLOR;
     barPath(ctx, x, y, trackW, trackH, radius);
     ctx.fill();
 
@@ -535,8 +502,8 @@
     barPath(ctx, x, y, trackW, trackH, radius);
     ctx.clip();
     var grad = ctx.createLinearGradient(fillX, y, fillX + fillW, y);
-    grad.addColorStop(0, TEMPLATE ? alphaColor(TEMPLATE_RGB, TEMPLATE_SWEEP_FROM_ALPHA) : palette.from);
-    grad.addColorStop(1, TEMPLATE ? alphaColor(TEMPLATE_RGB, 1) : palette.to);
+    grad.addColorStop(0, palette.from);
+    grad.addColorStop(1, palette.to);
     ctx.fillStyle = grad;
     barPath(ctx, fillX, y, fillW, trackH, radius);
     ctx.fill();
@@ -567,7 +534,7 @@
 
     ctx.lineWidth = width;
     ctx.lineCap = 'butt';
-    ctx.strokeStyle = TEMPLATE ? alphaColor(TEMPLATE_RGB, ringAlpha) : mixColor(rgb, rgb, 0, ringAlpha);
+    ctx.strokeStyle = mixColor(rgb, rgb, 0, ringAlpha);
     ctx.beginPath();
     ctx.rect(half, half, size - width, size - width);
     ctx.stroke();
@@ -576,7 +543,7 @@
     var inset = half + CAP_PING_INSET_RATIO * size * pingTravel;
     var span = size - inset * 2;
     if (span <= 0) return;
-    ctx.strokeStyle = TEMPLATE ? alphaColor(TEMPLATE_RGB, pingAlpha) : mixColor(rgb, rgb, 0, pingAlpha);
+    ctx.strokeStyle = mixColor(rgb, rgb, 0, pingAlpha);
     ctx.beginPath();
     ctx.rect(inset, inset, span, span);
     ctx.stroke();
@@ -708,7 +675,7 @@
     try {
       for (var i = 0; i < SIZES.length; i++) {
         var size = SIZES[i];
-        var response = await fetch(chrome.runtime.getURL((TEMPLATE ? TEMPLATE_GLYPH_PATHS : GLYPH_PATHS)[size]));
+        var response = await fetch(chrome.runtime.getURL((TINTED_TOOLBAR ? TINTED_GLYPH_PATHS : GLYPH_PATHS)[size]));
         var blob = await response.blob();
         bitmaps[size] = await createImageBitmap(blob);
       }

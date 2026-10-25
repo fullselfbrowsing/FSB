@@ -1885,76 +1885,52 @@ const opsOf = (group, op) => (group || []).filter((o) => o.op === op);
   }
 
   // -------------------------------------------------------------------------
-  console.log('\nICON-SAFARI: a templateToolbarIcon platform gets black-plus-alpha frames');
+  console.log('\nICON-SAFARI: a tintsGrayscaleToolbarIcon platform keeps every frame in colour');
   // -------------------------------------------------------------------------
 
   {
-    // Safari tints a grayscale toolbar icon as a template, keeping only alpha.
-    // The opaque tile showed as a solid square, so there every frame must be
-    // the lettering on a transparent background with every pixel grayscale.
-    const TEMPLATE_STYLE = /^rgba\(0, 0, 0, [\d.]+\)$/;
-    const styleOk = (style) => {
-      if (style && style.__linear) return true; // checked through its stops below
-      return TEMPLATE_STYLE.test(String(style));
-    };
-    const collect = (frameSets) => [].concat(...frameSets.map((set) => [].concat(...set[16], ...set[32])));
-
-    const w = makeWorker({ platform: { caps: { templateToolbarIcon: true } } });
-    await w.api.init({ hasLiveSession: () => false });
-    await flush();
-    const idle = { 16: w.groups(16), 32: w.groups(32) };
-    assert(w.fetches.some((u) => u.endsWith('assets/safari-toolbar-16.png'))
-      && w.fetches.some((u) => u.endsWith('assets/safari-toolbar-32.png')),
-      'template glyphs come from the safari-toolbar assets');
-    assert(!w.fetches.some((u) => /assets\/icon(16|128)\.png$/.test(u)), 'the opaque tiles are never loaded');
-
-    // Claims resolve by rank, so each form gets its own worker: a sweep noted
-    // while an orbit is live would never build.
+    // Safari tints any toolbar icon it detects as grayscale. The black-and-white
+    // tile came out as a solid square, so on such a platform the glyphs come
+    // from tinted copies of the tile and dimming must not gray them again.
+    const SAFARI = { caps: { tintsGrayscaleToolbarIcon: true } };
     const fresh = async () => {
-      const t = makeWorker({ platform: { caps: { templateToolbarIcon: true } } });
+      const t = makeWorker({ platform: SAFARI });
       await t.api.init({ hasLiveSession: () => false });
       await flush();
       return t;
     };
-    const orbit = await renderActivity(await fresh(), 'orbit', 1);
-    const sweep = await renderActivity(await fresh(), 'sweep', 1);
+    const dimDraw = (worker) => [].concat(...worker.groups(32))
+      .find((o) => o.op === 'drawImage' && Math.abs(o.alpha - 0.5) < 1e-9);
+
+    const w = await fresh();
+    assert(w.fetches.some((u) => u.endsWith('assets/safari-toolbar-16.png'))
+      && w.fetches.some((u) => u.endsWith('assets/safari-toolbar-32.png')),
+      'glyphs come from the tinted safari-toolbar tiles');
+    assert(!w.fetches.some((u) => /assets\/icon(16|128)\.png$/.test(u)), 'the grayscale tiles are never loaded');
+    const safariDim = dimDraw(w);
+    assert(!!safariDim, 'the dimmed resting frame is rendered at init');
+    assertEq(safariDim && safariDim.filter, 'none', 'dimming keeps the tint instead of graying it');
+
+    // Everything else is the Chrome design: the plate, the coloured forms.
     const ring = await renderCapability(await fresh(), 1);
+    const ringStroke = opsOf(ring[32][0], 'stroke')[0];
+    assert(/139, 92, 246/.test((ringStroke && ringStroke.strokeStyle) || ''), 'the ring keeps the capability violet');
     const bw = await fresh();
-    bw.resetOps(16);
     bw.resetOps(32);
     bw.api.setWatching(true);
     await flush();
-    const breathe = { 16: bw.groups(16), 32: bw.groups(32) };
-    assert(orbit[32].length > 0 && sweep[32].length > 0 && ring[32].length > 0 && breathe[32].length > 0,
-      'orbit, sweep, ring and breathe all render frames');
+    const plate = opsOf(bw.groups(32)[0] || [], 'fillRect')[0];
+    assertEq(plate && plate.fillStyle, '#000000', 'the breathe still repaints the plate');
 
-    const ops = collect([idle, orbit, sweep, ring, breathe]);
-    assertEq(ops.filter((o) => o.op === 'fillRect').length, 0, 'no frame paints the black plate');
-    const styled = ops.filter((o) => o.op === 'stroke' || o.op === 'fill');
-    assert(styled.length > 0 && styled.every((o) => styleOk(o.strokeStyle || o.fillStyle)),
-      'every stroke and fill is black at some alpha');
-    const stops = [].concat(...ops.filter((o) => o.op === 'linear').map((o) => o.stops));
-    assert(stops.length > 0 && stops.every((s) => TEMPLATE_STYLE.test(String(s.color))),
-      'the sweep gradient is black at two alphas');
-    assert(ops.filter((o) => o.op === 'drawImage').every((d) => d.source === 'bitmap' && d.composite === 'source-over'),
-      'no scratch surface and no blend: the halo is a blurred copy of the lettering');
-
-    const mark = (frame) => opsOf(frame, 'drawImage').filter((d) => d.filter === 'none').pop() || {};
-    const halo = (frame) => opsOf(frame, 'drawImage').find((d) => /blur/.test(String(d.filter)));
-    const mid = breathe[32].length >> 1;
-    assertClose(mark(breathe[32][0]).alpha, BREATHE_MIN_ALPHA, 1e-6, 'the breathe still fades the lettering');
-    assertClose(mark(breathe[32][mid]).alpha, 1, 1e-6, 'and brings it back to full strength');
-    assert(!!halo(breathe[32][mid]), 'the breathe peak carries a blurred halo');
-
-    // Chrome, and every harness without an adapter, keeps the tile.
+    // Chrome, and every harness without an adapter, is unchanged.
     const chromeWorker = makeWorker();
     await chromeWorker.api.init({ hasLiveSession: () => false });
     await flush();
     assert(chromeWorker.fetches.some((u) => u.endsWith('assets/icon16.png'))
       && chromeWorker.fetches.some((u) => u.endsWith('assets/icon128.png')),
-      'without the capability the tile glyphs are used');
-    const chromeIdle = [].concat(...chromeWorker.groups(32));
-    assert(chromeIdle.filter((o) => o.op === 'drawImage').length > 0, 'and drawn as before');
+      'without the capability the original tiles are used');
+    const chromeDim = dimDraw(chromeWorker);
+    assertEq(chromeDim && chromeDim.filter, 'grayscale(0.8)', 'and dimming still grays the tile');
   }
 
   // -------------------------------------------------------------------------

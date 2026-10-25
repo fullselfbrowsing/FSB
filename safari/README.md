@@ -124,20 +124,22 @@ WebSocket servers.
 
 ## Toolbar icon
 
-Safari treats a grayscale toolbar icon as a template: it keeps only the alpha
-channel and tints it, gray or the accent color while the extension is active on
-the page. `icon*.png` are opaque grayscale tiles, so they showed as a solid
-square. The Safari manifest's `action.default_icon` points at
-`extension/assets/safari-toolbar-{16,32,48,64}.png` instead: the FSB lettering as
-black plus alpha on a transparent background, hand-drawn at 16 and 32 (the
-toolbar's 1x and 2x) by `scripts/generate-safari-toolbar-icons.py`. `icons` keeps
-the tile for Safari Settings.
+Safari tints any toolbar icon it detects as grayscale: it keeps only the alpha
+channel and paints it gray, or the accent color while the extension is active
+on the page. `icon*.png` are pure black and white, so the tile showed as a solid
+square (and a letters-only template came out as tinted lettering). An icon with
+some real color is shown as it is, so the Safari manifest's `action.default_icon`
+points at `extension/assets/safari-toolbar-{16,19,32,38,48,64}.png`: the same
+tile with a faint warm tint on every pixel (warm black plate, warm white
+lettering), made by `scripts/generate-safari-toolbar-icons.py`. 16/32 and 19/38
+are the toolbar's 1x and 2x, depending on the macOS version. `icons` keeps the
+original tile: Safari Settings shows it untinted.
 
 `utils/action-icon.js` animates the toolbar with `setIcon` frames. On a platform
-whose adapter sets `caps.templateToolbarIcon` it draws them the same way: no
-plate, every stroke and fill black at its usual alpha, so the orbit, sweep,
-capability ring and breathe still read once tinted. One coloured pixel would
-make Safari render that frame in colour instead.
+whose adapter sets `caps.tintsGrayscaleToolbarIcon` it draws them from the
+tinted 16 and 32, and dims without its grayscale filter, so every frame,
+resting and dimmed included, stays in color. The orbit, sweep, ring and glow
+are coloured already.
 
 ## Remaining manual Xcode steps
 
