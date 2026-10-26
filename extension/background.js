@@ -379,6 +379,25 @@ try { importScripts('utils/redactForLog.js'); } catch (e) { console.error('[FSB]
 try { importScripts('utils/agent-protocol-drift-diagnostics.js'); } catch (e) { console.error('[FSB] Failed to load agent-protocol-drift-diagnostics.js:', e.message); }
 try { importScripts('ws/ws-client.js'); } catch (e) { console.error('[FSB] Failed to load ws-client.js:', e.message); }
 
+// Bring the dashboard relay up on every service-worker start. onStartup and
+// onInstalled do not fire again after an idle eviction, and the relay's own
+// backoff timer dies with the old worker, so a worker woken by anything else
+// (including the relay's reconnect alarm) would otherwise stay disconnected.
+// connect() keeps a socket that is already open or opening, so overlapping
+// with those listeners is harmless. As in the storage listener, only an
+// explicit serverSyncEnabled:false opts out.
+function armDashboardRelay() {
+  if (typeof fsbWebSocket === 'undefined' || !fsbWebSocket || typeof fsbWebSocket.connect !== 'function') return;
+  try {
+    chrome.storage.local.get(['serverSyncEnabled']).then(({ serverSyncEnabled }) => {
+      if (serverSyncEnabled === false) return;
+      fsbWebSocket.connect();
+    }).catch(() => {});
+  } catch (_e) { /* storage unavailable in this context */ }
+}
+
+armDashboardRelay();
+
 // Phase 26 Plan 01 (v0.9.99 CAP-01/CAP-05): Native Capability Catalog Wall-1
 // data spine. The three vendored libraries load FIRST so their classic-script
 // globals (lowercase `jmespath`, `MiniSearch`, `CfworkerJsonSchema`) exist
@@ -1379,6 +1398,27 @@ async function replayMcpVisualSessionForTab(tabId, options = {}) {
     sessionToken,
     version: replayPlan.session?.version || session.version,
   };
+}
+
+function hasExplicitMcpVisualSession(tabId) {
+  try {
+    return !!getMcpVisualSessionManager().getTokenForTab(tabId);
+  } catch (_error) {
+    return false;
+  }
+}
+
+// Implicit (visual_reason/client) sessions broadcast once, at tick time. A tick
+// recorded by open_tab or navigate lands before the destination page has a
+// content script, so without a replay the overlay stays dark until the next
+// action. An explicit start_visual_session session on the same tab wins.
+function replayMcpVisualLifecycleForTab(tabId) {
+  if (hasExplicitMcpVisualSession(tabId)) return Promise.resolve(null);
+  if (typeof MCPVisualSessionLifecycleUtils === 'undefined'
+      || typeof MCPVisualSessionLifecycleUtils.replayVisualSessionLifecycleForTab !== 'function') {
+    return Promise.resolve(null);
+  }
+  return MCPVisualSessionLifecycleUtils.replayVisualSessionLifecycleForTab(tabId);
 }
 
 async function restorePersistedMcpVisualSessions() {
@@ -5312,12 +5352,14 @@ chrome.runtime.onConnect.addListener((port) => {
           method: 'port'
         });
         automationLogger.logComm(null, 'receive', 'port_ready', true, { tabId, url: msg.url });
-        replayMcpVisualSessionForTab(tabId, { now: Date.now(), source: 'port_ready' }).catch((error) => {
-          automationLogger.debug('MCP visual-session replay on port ready failed', {
-            tabId,
-            error: error?.message || String(error),
+        replayMcpVisualSessionForTab(tabId, { now: Date.now(), source: 'port_ready' })
+          .then((replayed) => replayed || replayMcpVisualLifecycleForTab(tabId))
+          .catch((error) => {
+            automationLogger.debug('MCP visual-session replay on port ready failed', {
+              tabId,
+              error: error?.message || String(error),
+            });
           });
-        });
       } else if (msg.type === 'heartbeat-ack') {
         const portInfo = contentScriptPorts.get(tabId);
         if (portInfo) portInfo.lastHeartbeat = Date.now();
@@ -5397,6 +5439,15 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
   fsbTriggerRearmLiveObserversForTab(tabId, 'tabs.onUpdated.complete')
     .catch((err) => {
       console.warn('[FSB TRG] live-observe tabs.onUpdated re-arm failed (non-blocking):', err && err.message);
+    });
+  // A page an agent opened or navigated: its tick was broadcast before this
+  // document existed. sendSessionStatus injects the content script if needed.
+  replayMcpVisualLifecycleForTab(tabId)
+    .catch((err) => {
+      automationLogger.debug('MCP visual lifecycle replay on tab complete failed', {
+        tabId,
+        error: err?.message || String(err),
+      });
     });
 });
 
@@ -5644,6 +5695,7 @@ function isRestrictedURL(url) {
     'chrome://',
     'chrome-extension://',
     'moz-extension://',
+    'safari-web-extension://',
     'edge://',
     'about:',
     'file://'
@@ -5678,6 +5730,7 @@ function isRestrictedURL(url) {
 function getPageTypeDescription(url) {
   if (url.startsWith('chrome://')) return 'Chrome internal page';
   if (url.startsWith('chrome-extension://')) return 'Chrome extension page';
+  if (url.startsWith('safari-web-extension://')) return 'Safari extension page';
   if (url.startsWith('edge://')) return 'Edge internal page';
   if (url.startsWith('about:')) return 'Browser internal page';
   if (url.startsWith('file://')) return 'Local file';
@@ -12473,12 +12526,14 @@ const fsbHandleRuntimeMessage = (request, sender, sendResponse) => {
           });
           debugLog('[FSB Background] Tab marked as ready:', tabId);
           automationLogger.logInit('content_script', 'ready', { tabId, frameId, readyState: request.readyState, retry: request.retry || false });
-          replayMcpVisualSessionForTab(tabId, { now: Date.now(), source: 'contentScriptReady' }).catch((error) => {
-            automationLogger.debug('MCP visual-session replay on contentScriptReady failed', {
-              tabId,
-              error: error?.message || String(error),
+          replayMcpVisualSessionForTab(tabId, { now: Date.now(), source: 'contentScriptReady' })
+            .then((replayed) => replayed || replayMcpVisualLifecycleForTab(tabId))
+            .catch((error) => {
+              automationLogger.debug('MCP visual-session replay on contentScriptReady failed', {
+                tabId,
+                error: error?.message || String(error),
+              });
             });
-          });
         } else {
           debugLog('[FSB Background] Iframe ready ignored, frame:', frameId);
           automationLogger.debug('Iframe content script ready (ignored)', { tabId, frameId });
@@ -19377,6 +19432,10 @@ async function recoverStalledTabNavigation(tabId, stillPending) {
 }
 
 async function requireForegroundNativeInput(tabId) {
+  // A platform without native input (Safari: no chrome.debugger) never sends
+  // any. The caller's CDP attach fails and it falls back to DOM events, which
+  // need no focus, so refusing here would only block that fallback.
+  if (globalThis.FsbPlatform?.caps?.trustedInput === false) return;
   const tab = await chrome.tabs.get(tabId);
   const window = await chrome.windows.get(tab.windowId);
   if (!tab.active || !window.focused || window.state === 'minimized') {
@@ -19989,6 +20048,79 @@ async function executeUploadFileUnlocked(tabId, selector, filePath, options = {}
   try {
     fileName = denylist.basenameOf(filePath);
     automationLogger.logActionExecution(null, 'cdpUploadFile', 'start', { tabId, selector, file: fileName });
+
+    // Safari has no CDP, so DOM.setFileInputFiles does not exist. The container
+    // app reads the bytes -- but ONLY inside a folder the user granted, because
+    // App Sandbox forbids reading arbitrary absolute paths -- and a content
+    // script sets them on the input via DataTransfer.
+    //
+    // This sits AFTER the denylist + audit gate above on purpose: a denied path
+    // must never reach the native host. The bookmark containment check in the
+    // app is a SECOND, independent constraint, not a replacement for the gate.
+    //
+    // globalThis.FsbPlatform is undefined on Chrome and in the chokepoint test
+    // harness, so Chrome always continues to the CDP path below.
+    if (globalThis.FsbPlatform && globalThis.FsbPlatform.caps && globalThis.FsbPlatform.caps.cdp === false) {
+      const reader = globalThis.FsbNativeFileReader;
+      if (!reader || typeof reader.readFile !== 'function') {
+        automationLogger.logActionExecution(null, 'cdpUploadFile', 'complete', { success: false, tabId, blocked: true, reason: 'native-reader-unavailable' });
+        await audit('blocked', 'native-reader-unavailable', null);
+        return { success: false, error: 'upload_file blocked: the native file reader is unavailable', reason: 'native-reader-unavailable' };
+      }
+
+      // The gate above only saw filePath. A symlink in a granted folder can
+      // name a secret under an innocent path, so the reader re-runs the same
+      // rules on the path the host actually opened.
+      const read = await reader.readFile(filePath, {
+        screenResolvedPath: (resolvedPath) => denylist.classify(resolvedPath, {
+          allowManagedScreenshot: options.allowManagedScreenshot === true
+        })
+      });
+      if (!read || read.ok !== true) {
+        const readReason = (read && read.reason) ? read.reason : 'native-read-failed';
+        automationLogger.logActionExecution(null, 'cdpUploadFile', 'complete', { success: false, tabId, blocked: true, reason: readReason });
+        await audit('blocked', readReason, null);
+        return {
+          success: false,
+          error: 'upload_file blocked: ' + ((read && read.message) ? read.message : 'the file could not be read'),
+          reason: readReason
+        };
+      }
+
+      // Inject + send once, deliberately NOT sendMessageWithRetry: a retry after
+      // a lost reply would set the file again and fire a second change event,
+      // which on auto-upload inputs is a double upload. frameId 0 because that
+      // is the only frame the content scripts are injected into.
+      if (typeof ensureContentScriptInjected === 'function') {
+        await ensureContentScriptInjected(tabId);
+      }
+      const applied = await chrome.tabs.sendMessage(tabId, {
+        action: 'executeAction',
+        tool: 'domSetFileInput',
+        params: { selector, name: read.name, mime: read.mime, dataB64: read.dataB64 }
+      }, { frameId: 0 });
+      if (!applied || applied.success === false) {
+        const appliedMsg = (applied && applied.error) ? applied.error : 'the page did not accept the file';
+        automationLogger.logActionExecution(null, 'cdpUploadFile', 'complete', { success: false, tabId, error: redactPathForUploadLog(appliedMsg) });
+        await audit('error', 'allow', null);
+        return { success: false, error: 'upload_file failed: ' + redactPathForUploadLog(appliedMsg) };
+      }
+
+      automationLogger.logActionExecution(null, 'cdpUploadFile', 'complete', { success: true, tabId, selector, file: fileName });
+      await audit('success', 'allow', null);
+      // trusted:false is not cosmetic -- a site gating on event.isTrusted will
+      // reject this even though input.files is genuinely populated.
+      return {
+        success: true,
+        method: 'dom_set_file_input',
+        selector,
+        file: fileName,
+        size: read.size,
+        trusted: false,
+        degraded: true,
+        hadEffect: true
+      };
+    }
 
     await attachFsbDebugger(tabId, 'upload_file');
     debuggerAttached = true;
@@ -21168,6 +21300,12 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 
   if (isMcpReconnectAlarm) {
     armMcpBridge('alarm:' + MCP_RECONNECT_ALARM);
+    return;
+  }
+
+  // Dashboard relay backstop (ws-client.js _armReconnectAlarm).
+  if (typeof FSB_RELAY_RECONNECT_ALARM !== 'undefined' && alarm.name === FSB_RELAY_RECONNECT_ALARM) {
+    armDashboardRelay();
     return;
   }
 

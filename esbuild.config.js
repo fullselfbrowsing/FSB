@@ -57,6 +57,79 @@ const SRC_ROOT = path.join(REPO_ROOT, 'extension');
 const SHOWCASE_ROOT = path.join(REPO_ROOT, 'showcase');
 const OUT_ROOT = path.join(REPO_ROOT, 'extension', 'dist');
 
+// UAT-1 fix (2026-05-31): Lattice's dist/index.js top-level imports node:fs/promises,
+// node:path, node:url, etc. for its artifact-storage submodule. Our offscreen import
+// surface (checkpoint/signer/survivability) does NOT exercise those code paths at
+// runtime, but ESM top-level imports cannot be tree-shaken merely by marking them
+// external -- esbuild preserves the import specifier verbatim, and Chrome MV3 CSP
+// (script-src 'self') rejects any surviving `node:*` import in the offscreen bundle.
+//
+// Fix: resolve every node:* specifier to a local stub module at build time via an
+// inline esbuild plugin. The stub exports no-op shims for the fs / path / url surface
+// Lattice's artifact-storage references. Dead code paths from artifact-storage stay
+// in the bundle but call into local no-ops; no CSP-blocked imports survive in output.
+const LATTICE_BUFFER_BANNER = [
+    '// Buffer polyfill for receipts/envelope.ts base64 encoding (UAT-08 fix; lattice-side',
+    '// uses Buffer.from(bytes).toString("base64") which Node provides but the offscreen',
+    '// browser context does not. INV-06 byte-freeze stays intact -- fix is build-side, not Lattice-side.',
+    'if (typeof globalThis.Buffer === "undefined") {',
+    '  globalThis.Buffer = {',
+    '    from: function (input, encoding) {',
+    '      if (typeof input === "string" && encoding === "base64") {',
+    '        var bin = atob(input);',
+    '        var bytes = new Uint8Array(bin.length);',
+    '        for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);',
+    '        return bytes;',
+    '      }',
+    '      if (input instanceof Uint8Array || (input && typeof input.length === "number" && typeof input !== "string")) {',
+    '        var bytes = input;',
+    '        return {',
+    '          toString: function (enc) {',
+    '            if (enc === "base64") {',
+    '              var s = "";',
+    '              for (var i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i] & 0xFF);',
+    '              return btoa(s);',
+    '            }',
+    '            throw new Error("Buffer polyfill: unsupported toString encoding: " + enc);',
+    '          }',
+    '        };',
+    '      }',
+    '      throw new Error("Buffer polyfill: unsupported Buffer.from() input");',
+    '    }',
+    '  };',
+    '}'
+  ].join("\n");
+
+/**
+ * Fresh plugin instance per build: esbuild mutates plugin state during a
+ * build, so the ESM and IIFE Lattice entries must not share one object.
+ */
+function stubNodeBuiltinsPlugin() {
+  return {
+    name: 'stub-node-builtins',
+    setup(build) {
+      build.onResolve({ filter: /^node:/ }, () => ({
+        path: 'node-stub',
+        namespace: 'node-stub-ns',
+      }));
+      build.onLoad({ filter: /.*/, namespace: 'node-stub-ns' }, () => ({
+        contents: [
+          'export default {};',
+          'export const join = (...p) => p.filter(Boolean).join("/");',
+          'export const fileURLToPath = (u) => String(u);',
+          'export const mkdir = async () => undefined;',
+          'export const readFile = async () => "";',
+          'export const readdir = async () => [];',
+          'export const rm = async () => undefined;',
+          'export const stat = async () => ({});',
+          'export const writeFile = async () => undefined;',
+        ].join('\n'),
+        loader: 'js',
+      }));
+    },
+  };
+}
+
 /**
  * Each entry is one bundle. The shape matches what esbuild.build accepts as
  * a single-build-call configuration so each entry runs as its own build (we
@@ -64,18 +137,6 @@ const OUT_ROOT = path.join(REPO_ROOT, 'extension', 'dist');
  * format / sourcemap settings differ per D-02 + D-04).
  */
 const ENTRIES = [
-  {
-    name: 'offscreen-stt',
-    entryPoints: [path.join(SRC_ROOT, 'offscreen', 'stt.js')],
-    outfile: path.join(OUT_ROOT, 'offscreen', 'stt.js'),
-    format: 'iife',
-    sourcemap: 'external',
-    platform: 'browser',
-    target: ['chrome120'],
-    bundle: true,
-    legalComments: 'none',
-    allowOverwrite: true,
-  },
   {
     name: 'offscreen-lattice-host',
     entryPoints: [path.join(SRC_ROOT, 'offscreen', 'lattice-host.js')],
@@ -87,75 +148,34 @@ const ENTRIES = [
     bundle: true,
     legalComments: 'none',
     allowOverwrite: true,
-    // UAT-1 fix (2026-05-31): Lattice's dist/index.js top-level imports node:fs/promises,
-    // node:path, node:url, etc. for its artifact-storage submodule. Our offscreen import
-    // surface (checkpoint/signer/survivability) does NOT exercise those code paths at
-    // runtime, but ESM top-level imports cannot be tree-shaken merely by marking them
-    // external -- esbuild preserves the import specifier verbatim, and Chrome MV3 CSP
-    // (script-src 'self') rejects any surviving `node:*` import in the offscreen bundle.
+    banner: { js: LATTICE_BUFFER_BANNER },
+    plugins: [stubNodeBuiltinsPlugin()],
+  },
+  {
+    // Safari port: the SAME Lattice host, bundled as IIFE instead of ESM.
     //
-    // Fix: resolve every node:* specifier to a local stub module at build time via an
-    // inline esbuild plugin. The stub exports no-op shims for the fs / path / url surface
-    // Lattice's artifact-storage references. Dead code paths from artifact-storage stay
-    // in the bundle but call into local no-ops; no CSP-blocked imports survive in output.
-    banner: {
-      js: [
-        '// Buffer polyfill for receipts/envelope.ts base64 encoding (UAT-08 fix; lattice-side',
-        '// uses Buffer.from(bytes).toString("base64") which Node provides but the offscreen',
-        '// browser context does not. INV-06 byte-freeze stays intact -- fix is build-side, not Lattice-side.',
-        'if (typeof globalThis.Buffer === "undefined") {',
-        '  globalThis.Buffer = {',
-        '    from: function (input, encoding) {',
-        '      if (typeof input === "string" && encoding === "base64") {',
-        '        var bin = atob(input);',
-        '        var bytes = new Uint8Array(bin.length);',
-        '        for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);',
-        '        return bytes;',
-        '      }',
-        '      if (input instanceof Uint8Array || (input && typeof input.length === "number" && typeof input !== "string")) {',
-        '        var bytes = input;',
-        '        return {',
-        '          toString: function (enc) {',
-        '            if (enc === "base64") {',
-        '              var s = "";',
-        '              for (var i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i] & 0xFF);',
-        '              return btoa(s);',
-        '            }',
-        '            throw new Error("Buffer polyfill: unsupported toString encoding: " + enc);',
-        '          }',
-        '        };',
-        '      }',
-        '      throw new Error("Buffer polyfill: unsupported Buffer.from() input");',
-        '    }',
-        '  };',
-        '}'
-      ].join("\n"),
-    },
-    plugins: [
-      {
-        name: 'stub-node-builtins',
-        setup(build) {
-          build.onResolve({ filter: /^node:/ }, () => ({
-            path: 'node-stub',
-            namespace: 'node-stub-ns',
-          }));
-          build.onLoad({ filter: /.*/, namespace: 'node-stub-ns' }, () => ({
-            contents: [
-              'export default {};',
-              'export const join = (...p) => p.filter(Boolean).join("/");',
-              'export const fileURLToPath = (u) => String(u);',
-              'export const mkdir = async () => undefined;',
-              'export const readFile = async () => "";',
-              'export const readdir = async () => [];',
-              'export const rm = async () => undefined;',
-              'export const stat = async () => ({});',
-              'export const writeFile = async () => undefined;',
-            ].join('\n'),
-            loader: 'js',
-          }));
-        },
-      },
-    ],
+    // MV3 forbids importScripts() inside a "type":"module" service worker, and
+    // background.js has 305 such call sites, so the SW can never be a module.
+    // Chrome sidesteps this with an offscreen document (which CAN use
+    // <script type="module">); Safari has no chrome.offscreen at all. The
+    // bundle was verified to need no DOM -- zero createObjectURL / Blob /
+    // window. / document.createElement / localStorage / Worker / indexedDB /
+    // XMLHttpRequest hits across 413 KB -- so IIFE loaded into the SW suffices.
+    //
+    // The ESM entry above STAYS: Chrome still ships it, and
+    // tests/lattice-provider-bridge-smoke.test.js reads the ESM source.
+    name: 'offscreen-lattice-host-iife',
+    entryPoints: [path.join(SRC_ROOT, 'offscreen', 'lattice-host.js')],
+    outfile: path.join(OUT_ROOT, 'offscreen', 'lattice-host.iife.js'),
+    format: 'iife',
+    sourcemap: false,
+    platform: 'browser',
+    target: ['safari18'],
+    bundle: true,
+    legalComments: 'none',
+    allowOverwrite: true,
+    banner: { js: LATTICE_BUFFER_BANNER },
+    plugins: [stubNodeBuiltinsPlugin()],
   },
   {
     name: 'content-canvas-interceptor',

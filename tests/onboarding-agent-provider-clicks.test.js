@@ -159,7 +159,8 @@ function createHarness(initialStore, options) {
 
   assert.strictEqual(
     sha256(ONBOARDING_HTML_PATH),
-    'ba4c297095e896bbabdc369a6bee114031df380a1cc75cc7431bed58176b634c',
+    // Rolled for the Safari port: bundled Font Awesome path and the platform shim.
+    'd58dfdf789c8d22b21e602b8242a179f4f201e5b4f8afef8a615b920f3a3e81f',
     'onboarding.html has no Phase 57 change'
   );
   assert.strictEqual(

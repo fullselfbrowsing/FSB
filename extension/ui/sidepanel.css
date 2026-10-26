@@ -68,7 +68,7 @@
 
 body {
   width: 100%;
-  height: 100vh;
+  height: 100dvh;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
   background: var(--bg-secondary);
   color: var(--text-primary);
@@ -79,9 +79,23 @@ body {
 .sidepanel-container {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  height: 100dvh;
   background: var(--bg-primary);
   position: relative;
+}
+
+/*
+ * Safari port: there is no sidePanel API, so the workspace opens as its own
+ * popup window (utils/platform-adapter.js openWorkspace). A window can be
+ * resized far wider than the ~350-500px rail this layout was designed for, so
+ * cap the content and centre it rather than stretching a chat column across a
+ * 27" display. Inert in a Chrome docked panel, which never reaches 900px.
+ */
+@media (min-width: 900px) {
+  .sidepanel-container {
+    max-width: 520px;
+    margin: 0 auto;
+  }
 }
 
 /* Header */
