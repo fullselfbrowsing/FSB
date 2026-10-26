@@ -141,7 +141,8 @@ function makeWorker(opts) {
         ops.push({
           op: 'drawImage', x, y, w, h, alpha: ctx.globalAlpha, filter: ctx.filter,
           composite: ctx.globalCompositeOperation,
-          source: bitmap && bitmap.__scratch ? 'scratch' : 'bitmap'
+          source: bitmap && bitmap.__scratch ? 'scratch' : 'bitmap',
+          url: bitmap && bitmap.__bitmap
         });
       },
       save() { ops.push({ op: 'save' }); },
@@ -368,7 +369,9 @@ function makeWorker(opts) {
       }
       return out;
     },
-    resetOps: (size) => { if (contexts[size]) contexts[size]._ops.length = 0; }
+    resetOps: (size) => { if (contexts[size]) contexts[size]._ops.length = 0; },
+    // The glow's scratch surface for one size, as one flat op log.
+    scratchOps: (size) => (scratchContexts[size] || { _ops: [] })._ops
   };
 }
 
@@ -1889,9 +1892,11 @@ const opsOf = (group, op) => (group || []).filter((o) => o.op === op);
   // -------------------------------------------------------------------------
 
   {
-    // Safari tints any toolbar icon it detects as grayscale. The black-and-white
-    // tile came out as a solid square, so on such a platform the glyphs come
-    // from tinted copies of the tile and dimming must not gray them again.
+    // Safari tints a toolbar icon unless at least 3% of its pixels carry colour
+    // (-[NSImage safari_isGrayscale]), so FSB's black-and-white tile came out as
+    // a solid square. On such a platform the tile is FSB orange with black
+    // lettering, the accents that would vanish into it are white, and the glow
+    // is still cut from the black-and-white artwork.
     const SAFARI = { caps: { tintsGrayscaleToolbarIcon: true } };
     const fresh = async () => {
       const t = makeWorker({ platform: SAFARI });
@@ -1901,26 +1906,54 @@ const opsOf = (group, op) => (group || []).filter((o) => o.op === op);
     };
     const dimDraw = (worker) => [].concat(...worker.groups(32))
       .find((o) => o.op === 'drawImage' && Math.abs(o.alpha - 0.5) < 1e-9);
+    const tileDraws = (frameSets) => [16, 32]
+      .flatMap((size) => [].concat(...frameSets[size]))
+      .filter((o) => o.op === 'drawImage' && o.source === 'bitmap');
 
     const w = await fresh();
     assert(w.fetches.some((u) => u.endsWith('assets/safari-toolbar-16.png'))
       && w.fetches.some((u) => u.endsWith('assets/safari-toolbar-32.png')),
-      'glyphs come from the tinted safari-toolbar tiles');
-    assert(!w.fetches.some((u) => /assets\/icon(16|128)\.png$/.test(u)), 'the grayscale tiles are never loaded');
+      'the tile comes from the orange safari-toolbar set');
+    assert(w.fetches.some((u) => u.endsWith('assets/icon16.png'))
+      && w.fetches.some((u) => u.endsWith('assets/icon128.png')),
+      'the black-and-white tiles are decoded for the glow mask');
+    const restDraws = tileDraws({ 16: w.groups(16), 32: w.groups(32) });
+    assert(restDraws.length > 0 && restDraws.every((o) => /assets\/safari-toolbar-(16|32)\.png$/.test(o.url)),
+      'the toolbar itself only ever shows the orange tile');
     const safariDim = dimDraw(w);
     assert(!!safariDim, 'the dimmed resting frame is rendered at init');
-    assertEq(safariDim && safariDim.filter, 'none', 'dimming keeps the tint instead of graying it');
+    assertEq(safariDim && safariDim.filter, 'none', 'dimming halves the tile without graying it');
 
-    // Everything else is the Chrome design: the plate, the coloured forms.
-    const ring = await renderCapability(await fresh(), 1);
-    const ringStroke = opsOf(ring[32][0], 'stroke')[0];
-    assert(/139, 92, 246/.test((ringStroke && ringStroke.strokeStyle) || ''), 'the ring keeps the capability violet');
+    // The watching breathe: the orange plate stays put, the glow is white and
+    // cut from the black-and-white tile on the scratch surface.
     const bw = await fresh();
     bw.resetOps(32);
     bw.api.setWatching(true);
     await flush();
     const plate = opsOf(bw.groups(32)[0] || [], 'fillRect')[0];
-    assertEq(plate && plate.fillStyle, '#000000', 'the breathe still repaints the plate');
+    assertEq(plate && plate.fillStyle, '#ff8c00', 'the breathe repaints the orange plate');
+    assert(tileDraws({ 16: bw.groups(16), 32: bw.groups(32) })
+      .every((o) => /assets\/safari-toolbar-(16|32)\.png$/.test(o.url)),
+      'the breathe draws the orange tile over it');
+    const maskDraws = opsOf(bw.scratchOps(32), 'drawImage');
+    assert(maskDraws.length > 0 && maskDraws.every((o) => /assets\/icon128\.png$/.test(o.url)),
+      'the glow is cut from the black-and-white tile');
+    const tint = bw.scratchOps(32).find((o) => o.op === 'fillRect' && o.composite === 'multiply');
+    assertEq(tint && tint.fillStyle, 'rgba(255, 255, 255, 1)', 'the glow is white');
+
+    // Orbit and sweep keep their shape and timing, drawn white.
+    const orbit = await renderActivity(await fresh(), 'orbit');
+    const beads = opsOf(orbit[32][0], 'stroke');
+    assert(beads.length > 0 && beads.every((s) => /^rgba\(255, 255, 255, /.test(s.strokeStyle)),
+      'the orbit bead is white');
+    const sweep = await renderActivity(await fresh(), 'sweep');
+    const sweepFills = opsOf(sweep[32][0], 'fill');
+    assertEq(sweepFills[0] && sweepFills[0].fillStyle, 'rgba(0, 0, 0, 0.15)', 'the sweep track is a faint dark band');
+    const sweepGrad = opsOf(sweep[32][0], 'linear')[0] || { stops: [] };
+    assertEq(sweepGrad.stops.map((s) => s.color).join(','), '#ffffff,#ffffff', 'the sweep fill is white');
+    const ring = await renderCapability(await fresh(), 1);
+    const ringStroke = opsOf(ring[32][0], 'stroke')[0];
+    assert(/139, 92, 246/.test((ringStroke && ringStroke.strokeStyle) || ''), 'the ring keeps the capability violet');
 
     // Chrome, and every harness without an adapter, is unchanged.
     const chromeWorker = makeWorker();
@@ -1929,8 +1962,19 @@ const opsOf = (group, op) => (group || []).filter((o) => o.op === op);
     assert(chromeWorker.fetches.some((u) => u.endsWith('assets/icon16.png'))
       && chromeWorker.fetches.some((u) => u.endsWith('assets/icon128.png')),
       'without the capability the original tiles are used');
+    assert(!chromeWorker.fetches.some((u) => /safari-toolbar/.test(u)), 'and the orange set is never loaded');
     const chromeDim = dimDraw(chromeWorker);
     assertEq(chromeDim && chromeDim.filter, 'grayscale(0.8)', 'and dimming still grays the tile');
+    chromeWorker.resetOps(32);
+    chromeWorker.api.setWatching(true);
+    await flush();
+    const chromePlate = opsOf(chromeWorker.groups(32)[0] || [], 'fillRect')[0];
+    assertEq(chromePlate && chromePlate.fillStyle, '#000000', 'the Chrome breathe keeps the black plate');
+    const chromeMasks = opsOf(chromeWorker.scratchOps(32), 'drawImage');
+    assert(chromeMasks.length > 0 && chromeMasks.every((o) => /assets\/icon128\.png$/.test(o.url)),
+      'and cuts its glow from the tile it draws');
+    const chromeTint = chromeWorker.scratchOps(32).find((o) => o.op === 'fillRect' && o.composite === 'multiply');
+    assertEq(chromeTint && chromeTint.fillStyle, 'rgba(255, 140, 0, 1)', 'in orange');
   }
 
   // -------------------------------------------------------------------------

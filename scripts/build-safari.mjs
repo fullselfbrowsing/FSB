@@ -120,7 +120,7 @@ export function transformManifest(manifest) {
 
   // Safari tints any toolbar icon it detects as grayscale, and the black-and-
   // white icon*.png tiles came out as a solid square. The toolbar gets the same
-  // tile with a faint warm tint on every pixel, so Safari shows it in its own
+  // artwork in FSB orange with black lettering, which Safari shows in its own
   // colors (scripts/generate-safari-toolbar-icons.py). `icons` keeps the
   // original tile: Safari Settings shows it untinted.
   out.action = {

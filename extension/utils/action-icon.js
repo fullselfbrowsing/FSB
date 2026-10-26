@@ -36,6 +36,24 @@
 (function () {
   'use strict';
 
+  // ---- Grayscale-tinting toolbars (Safari) ---------------------------------
+  // Safari keeps a toolbar icon in its own colors only when -[NSImage
+  // safari_isGrayscale] says it is not grayscale: at least 3% of its visible
+  // pixels need a premultiplied channel spread (max minus min of R, G, B) of
+  // 25/255 or more. Any other icon is tinted. Safari keeps only its alpha and
+  // paints it gray, or the accent color while the extension is active, so the
+  // black-and-white tile below came out as a solid square. A platform whose
+  // adapter reports tintsGrayscaleToolbarIcon draws the tile in FSB orange with
+  // black lettering instead. The plate alone then keeps every frame in color,
+  // dimmed ones included. Orange accents would vanish into that plate, so the
+  // orbit, sweep and glow are drawn white there. Undefined FsbPlatform (Chrome,
+  // every Node harness) leaves all of this off.
+  var TINTED_TOOLBAR = !!(typeof globalThis !== 'undefined' && globalThis.FsbPlatform
+    && globalThis.FsbPlatform.caps && globalThis.FsbPlatform.caps.tintsGrayscaleToolbarIcon === true);
+  var TINTED_GLYPH_PATHS = { 16: 'assets/safari-toolbar-16.png', 32: 'assets/safari-toolbar-32.png' };
+  var TINTED_PLATE = '#ff8c00';
+  var TINTED_ACCENT = '#ffffff';
+
   // ---- Locked geometry + cadence -----------------------------------------
   var FRAME_INTERVAL_MS = 66;        // ~15fps. chrome.alarms floors at 30s.
   var BEAD_FRACTION = 0.12;          // bead spans 12% of the square perimeter
@@ -64,18 +82,21 @@
   var SWEEP_FILL_FRACTION = 0.38;
   var SWEEP_FROM_PCT = -1.20;        // translateX(-120%), of the fill's own width
   var SWEEP_TO_PCT = 3.20;           // translateX(320%)
-  var SWEEP_TRACK_COLOR = 'rgba(255, 255, 255, 0.1)';
+  // A faint light band on the black plate. Safari's orange plate under a white
+  // fill needs the opposite, a faint dark band.
+  var SWEEP_TRACK_COLOR = TINTED_TOOLBAR ? 'rgba(0, 0, 0, 0.15)' : 'rgba(255, 255, 255, 0.1)';
 
   // ---- Breathe (watching) -------------------------------------------------
   // Canonical cadence: the .badge-dot fsb-trigger-badge-dot keyframe, 2.4s
   // ease-in-out. The dot also scales 1 -> 1.15; the icon does not, because
   // rescaling the mark at 16px aliases it. The glow colour is the dot's own
-  // static box-shadow colour.
-  var GLOW_RGB = '255, 140, 0';
+  // static box-shadow colour, except on Safari, where it would vanish into the
+  // orange plate.
+  var GLOW_RGB = TINTED_TOOLBAR ? '255, 255, 255' : '255, 140, 0';
   // The plate the lockup sits on. Repainting it is not the "opaque background"
   // the notes warn against -- the artwork already carries this exact tile; this
   // just keeps it solid while the mark above it fades.
-  var PLATE_COLOR = '#000000';
+  var PLATE_COLOR = TINTED_TOOLBAR ? TINTED_PLATE : '#000000';
   var BREATHE_MIN_ALPHA = 0.45;
   var BREATHE_GLOW_RATIO = 0.15625;  // 20/128 -> 2.5px at 16, 5px at 32
   var BREATHE_GLOW_ALPHA = 0.95;
@@ -130,19 +151,6 @@
   // its own asset or the mark renders thin. 128 into 32 is an exact 4:1 reduction.
   var GLYPH_PATHS = { 16: 'assets/icon16.png', 32: 'assets/icon128.png' };
 
-  // ---- Grayscale-tinting toolbars (Safari) ---------------------------------
-  // Safari tints any toolbar icon it detects as grayscale: it keeps only the
-  // alpha channel and paints it gray, or the accent color while the extension
-  // is active. The black-and-white tile above came out as a solid square. A
-  // platform whose adapter reports tintsGrayscaleToolbarIcon draws from the
-  // same tile with a faint warm tint on every pixel instead, so every frame,
-  // the resting one included, is shown in its own colors. The orbit, sweep,
-  // ring and glow are coloured already. Undefined FsbPlatform (Chrome, every
-  // Node harness) leaves all of this off.
-  var TINTED_TOOLBAR = !!(typeof globalThis !== 'undefined' && globalThis.FsbPlatform
-    && globalThis.FsbPlatform.caps && globalThis.FsbPlatform.caps.tintsGrayscaleToolbarIcon === true);
-  var TINTED_GLYPH_PATHS = { 16: 'assets/safari-toolbar-16.png', 32: 'assets/safari-toolbar-32.png' };
-
   // Normalized fade width expressed within the bead's own 0..1 span.
   var FADE_SPAN = FADE_FRACTION / BEAD_FRACTION;
 
@@ -162,6 +170,13 @@
     // A trigger watch. fsb-trigger-badge-dot cadence.
     breathe: { duration: 2400, form: 'breathe', from: '#ff8c00', to: '#ffa500', animated: true, bounded: BREATHE_HOLD_MS }
   };
+
+  // The table above stays the canonical source. On Safari's orange plate the
+  // orbit and sweep keep their timing and shape but are drawn white.
+  if (TINTED_TOOLBAR) {
+    STATES.sweep.from = STATES.sweep.to = TINTED_ACCENT;
+    STATES.orbit.from = STATES.orbit.to = TINTED_ACCENT;
+  }
 
   // Highest claim wins. A watch outranks everything on every tab: it is the one
   // state the user armed deliberately and is waiting on.
@@ -310,19 +325,21 @@
     return ctx;
   }
 
-  // An orange halo around the MARK, not around the tile.
+  // A halo around the MARK, not around the tile.
   //
-  // 'multiply' on the scratch turns the white mark orange and leaves the black
-  // plate black (x * 0 = 0). Compositing that back with 'lighter' then adds only
-  // where the scratch is non-black, so the halo hugs the lettering and the plate
-  // contributes nothing. A filter on the tile itself would halo the SQUARE.
-  function drawMarkGlow(ctx, size, bitmap, spec, offset, drawn) {
+  // 'multiply' on the scratch turns the white mark the glow colour and leaves
+  // the black plate black (x * 0 = 0). Compositing that back with 'lighter' then
+  // adds only where the scratch is non-black, so the halo hugs the lettering and
+  // the plate contributes nothing. A filter on the tile itself would halo the
+  // SQUARE. The mask is always the black-and-white artwork: the tile itself,
+  // except on Safari, whose orange tile carries black lettering.
+  function drawMarkGlow(ctx, size, mask, spec, offset, drawn) {
     var scratch = scratchFor(size);
     scratch.globalCompositeOperation = 'source-over';
     scratch.globalAlpha = 1;
     scratch.filter = 'none';
     scratch.clearRect(0, 0, size, size);
-    scratch.drawImage(bitmap, offset, offset, drawn, drawn);
+    scratch.drawImage(mask, offset, offset, drawn, drawn);
     scratch.globalCompositeOperation = 'multiply';
     scratch.fillStyle = alphaColor(GLOW_RGB, 1);
     scratch.fillRect(0, 0, size, size);
@@ -340,16 +357,18 @@
   // The design's breathe animates the LOCKUP inside a static black plate -- the
   // plate itself never moves. Fading the artwork instead fades the whole icon,
   // because the artwork IS the plate. So the plate is painted solid first and the
-  // mark composited over it: black-on-black is a no-op, so only the lettering
-  // varies. Dim is deliberately different -- a dropped relay recedes the whole
-  // icon, and it outranks the glow because grayscale would fight an orange halo.
-  function drawGlyph(ctx, size, bitmap, spec) {
+  // mark composited over it: plate-on-plate (black, or Safari's orange) is a
+  // no-op, so only the lettering varies. Dim is deliberately different -- a
+  // dropped relay recedes the whole icon, and it outranks the glow because
+  // grayscale would fight an orange halo.
+  function drawGlyph(ctx, size, bitmap, spec, mask) {
     var drawn = size * GLYPH_SCALE;
     var offset = (size - drawn) / 2;
 
     if (spec.dimmed === true) {
       ctx.globalAlpha = DIM_ALPHA;
-      // Graying the tinted tile would hand Safari a grayscale frame to tint.
+      // Grayed and then halved, the orange plate would sit right at Safari's
+      // 25/255 threshold. Halving it alone leaves a spread of 128.
       ctx.filter = TINTED_TOOLBAR ? 'none' : DIM_FILTER;
       ctx.drawImage(bitmap, offset, offset, drawn, drawn);
       ctx.globalAlpha = 1;
@@ -367,7 +386,7 @@
 
     ctx.fillStyle = PLATE_COLOR;
     ctx.fillRect(0, 0, size, size);
-    if (wantsGlow) drawMarkGlow(ctx, size, bitmap, spec, offset, drawn);
+    if (wantsGlow) drawMarkGlow(ctx, size, mask || bitmap, spec, offset, drawn);
     ctx.globalAlpha = markAlpha;
     ctx.drawImage(bitmap, offset, offset, drawn, drawn);
     ctx.globalAlpha = 1;
@@ -562,7 +581,7 @@
       var ctx = contextFor(size);
       var progress = spec.progress || 0;
       ctx.clearRect(0, 0, size, size);
-      drawGlyph(ctx, size, bitmaps[size], spec);
+      drawGlyph(ctx, size, bitmaps[size], spec, bitmaps.masks && bitmaps.masks[size]);
       if (spec.form === 'orbit') strokeSquareOrbit(ctx, size, spec.palette, progress);
       else if (spec.form === 'sweep') drawSweep(ctx, size, spec.palette, progress);
       else if (spec.form === 'ring') drawCapabilityRing(ctx, size, progress);
@@ -661,23 +680,34 @@
   }
 
   function closeGlyphs(bitmaps) {
-    for (var i = 0; i < SIZES.length; i++) {
-      var bitmap = bitmaps[SIZES[i]];
-      if (bitmap) bitmap.close();
+    var sets = bitmaps.masks && bitmaps.masks !== bitmaps ? [bitmaps, bitmaps.masks] : [bitmaps];
+    for (var s = 0; s < sets.length; s++) {
+      for (var i = 0; i < SIZES.length; i++) {
+        var bitmap = sets[s][SIZES[i]];
+        if (bitmap) bitmap.close();
+      }
     }
+  }
+
+  async function decodeGlyph(path) {
+    var response = await fetch(chrome.runtime.getURL(path));
+    var blob = await response.blob();
+    return createImageBitmap(blob);
   }
 
   // One bitmap per output size. createImageBitmap rejects SVG sources in a
   // worker, so PNG is the only viable base image here. A partial failure closes
-  // whatever already decoded rather than stranding it.
+  // whatever already decoded rather than stranding it. `masks` is what the glow
+  // is cut from: the same bitmaps, except on Safari, which also decodes the
+  // black-and-white tile for it.
   async function loadGlyphs() {
     var bitmaps = {};
+    bitmaps.masks = TINTED_TOOLBAR ? {} : bitmaps;
     try {
       for (var i = 0; i < SIZES.length; i++) {
         var size = SIZES[i];
-        var response = await fetch(chrome.runtime.getURL((TINTED_TOOLBAR ? TINTED_GLYPH_PATHS : GLYPH_PATHS)[size]));
-        var blob = await response.blob();
-        bitmaps[size] = await createImageBitmap(blob);
+        bitmaps[size] = await decodeGlyph((TINTED_TOOLBAR ? TINTED_GLYPH_PATHS : GLYPH_PATHS)[size]);
+        if (TINTED_TOOLBAR) bitmaps.masks[size] = await decodeGlyph(GLYPH_PATHS[size]);
       }
     } catch (e) {
       closeGlyphs(bitmaps);

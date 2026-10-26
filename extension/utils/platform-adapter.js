@@ -200,7 +200,7 @@
       networkBodies: isChrome,
       nativeMessaging: !isChrome,
       // Safari tints any toolbar icon it detects as grayscale, so
-      // utils/action-icon.js draws its frames from tinted copies of the tile.
+      // utils/action-icon.js draws its frames from the orange copy of the tile.
       tintsGrayscaleToolbarIcon: !isChrome
     };
   }
