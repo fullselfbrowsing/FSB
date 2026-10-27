@@ -11735,8 +11735,8 @@ https://full-selfbrowsing.com/api/telemetry/forget<x id="CLOSE_TAG_CODE" ctype="
         </context-group>
       </trans-unit>
       <trans-unit id="releaseNotes.v0995.015.keysPerLanguage" datatype="html">
-        <source>1,245 keys per language</source>
-        <target state="translated">1.245 Schlüssel pro Sprache</target>
+        <source>1,285 keys per language</source>
+        <target state="translated">1.285 Schlüssel pro Sprache</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/release-notes/release-notes-page.component.html</context>
           <context context-type="linenumber">231,234</context>
@@ -11767,8 +11767,8 @@ https://full-selfbrowsing.com/api/telemetry/forget<x id="CLOSE_TAG_CODE" ctype="
         </context-group>
       </trans-unit>
       <trans-unit id="releaseNotes.v0995.019.eachLanguageShipsA" datatype="html">
-        <source>Each language ships a catalog of 1,245 keys, and a message missing from a catalog falls back to English instead of showing a blank label.</source>
-        <target state="translated">Jede Sprache bringt einen Katalog mit 1.245 Schlüsseln mit. Fehlt ein Text in einem Katalog, erscheint er auf Englisch statt als leere Beschriftung.</target>
+        <source>Each language ships a catalog of 1,285 keys, and a message missing from a catalog falls back to English instead of showing a blank label.</source>
+        <target state="translated">Jede Sprache bringt einen Katalog mit 1.285 Schlüsseln mit. Fehlt ein Text in einem Katalog, erscheint er auf Englisch statt als leere Beschriftung.</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/release-notes/release-notes-page.component.html</context>
           <context context-type="linenumber">240,241</context>
@@ -12023,8 +12023,8 @@ https://full-selfbrowsing.com/api/telemetry/forget<x id="CLOSE_TAG_CODE" ctype="
         </context-group>
       </trans-unit>
       <trans-unit id="releaseNotes.v0995.050.languagesKeys" datatype="html">
-        <source>8 languages × 1,245 keys</source>
-        <target state="translated">8 Sprachen × 1.245 Schlüssel</target>
+        <source>8 languages × 1,285 keys</source>
+        <target state="translated">8 Sprachen × 1.285 Schlüssel</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/release-notes/release-notes-page.component.html</context>
           <context context-type="linenumber">387,389</context>

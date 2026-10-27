@@ -4487,5 +4487,184 @@
   },
   "copy_grok_task_binary": {
     "message": "확인 중 CLI가 변경되었습니다"
+  },
+  "panel_0303e18246": {
+    "message": "연결되지 않음"
+  },
+  "panel_5ee01ca9e6": {
+    "message": "로그인 실패"
+  },
+  "panel_2de1d14a0b": {
+    "message": "로그인 취소됨"
+  },
+  "panel_6f5bbfed56": {
+    "message": "$NAME$ CLI가 설치되어 있지 않거나 PATH에 없습니다.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_86dc0fd216": {
+    "message": "$NAME$ CLI를 지원되는 버전으로 업데이트해야 합니다.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_36ba29572c": {
+    "message": "지원되는 버전의 $NAME$ CLI를 찾았지만 격리 또는 프로토콜 프로필을 확인하지 못했습니다.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_d3ed6a15f2": {
+    "message": "$NAME$에서 필요한 엄격한 샌드박스를 시작하지 못했습니다. 로컬 샌드박스 환경 문제를 해결한 후 다시 시도하세요.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_766cce4889": {
+    "message": "$NAME$에서 FSB에 필요한 기능을 제공하지 않습니다.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_7ae4eb6279": {
+    "message": "$NAME$의 기능이 아직 확인되지 않았습니다. 공급자 상태를 새로고침하고 네이티브 도우미가 최신 버전인지 확인하세요.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_b3e0c7aece": {
+    "message": "$NAME$의 비공개 구성을 확인하지 못했습니다.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_fbbe98fc39": {
+    "message": "$NAME$에서 호환되지 않는 프로토콜 응답을 반환했습니다.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_d126638cde": {
+    "message": "확인 중 $NAME$ CLI가 변경되었습니다. 다시 시도하세요.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_53f086de2f": {
+    "message": "로컬에서 $NAME$에 로그인한 뒤 다시 시도하세요.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_a43f3c4388": {
+    "message": "비공개 FSB Grok Build 프로필에 SuperGrok을 연결한 뒤 다시 시도하세요."
+  },
+  "panel_5ed48f0f17": {
+    "message": "$NAME$에서 60초 안에 응답하지 않았습니다.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_c3fa2db456": {
+    "message": "$NAME$ 연결 테스트가 취소되었습니다.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_621f130e52": {
+    "message": "$NAME$에서 올바르지 않은 응답을 반환했습니다.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_cfaf21eb87": {
+    "message": "$NAME$에서 확인 중에 도구를 사용하려고 했습니다.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_e6821e184d": {
+    "message": "$NAME$에서 확인 요청을 완료하지 못했습니다.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_2864938790": {
+    "message": "$NAME$ 확인 후 정리가 안전하게 마무리되지 않았습니다.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_481e3360a0": {
+    "message": "다음 명령으로 FSB 네이티브 도우미를 설치한 뒤 다시 시도하세요: $COMMAND$",
+    "placeholders": {
+      "command": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_614bccf590": {
+    "message": "FSB 네이티브 도우미가 다른 확장 프로그램과 페어링되어 있습니다. 다음 명령으로 페어링을 재설정하세요: $COMMAND$. 그런 다음 다시 시도하면 FSB가 이 확장 프로그램을 자동으로 페어링합니다.",
+    "placeholders": {
+      "command": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_c79e5bdc3e": {
+    "message": "로컬 FSB 서비스가 사용할 수 있는 세션을 제공하지 않았습니다. 서비스를 다시 시작한 뒤 다시 시도하세요."
+  },
+  "panel_bdb665fec7": {
+    "message": "로컬 FSB 에이전트 서비스에 연결할 수 없습니다. 다시 시도하세요."
+  },
+  "panel_d4e7a8bb52": {
+    "message": "이 브라우저와 확장 프로그램용 FSB 네이티브 도우미를 설치한 뒤 다시 시도하세요."
+  },
+  "panel_262861193c": {
+    "message": "지원되는 에이전트 공급자를 선택하세요."
+  },
+  "panel_00896ee08f": {
+    "message": "자격 증명 편집"
+  },
+  "panel_1bffbc03dc": {
+    "message": "대기 $COUNT$건",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   }
 }

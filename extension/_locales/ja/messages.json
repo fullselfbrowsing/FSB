@@ -4487,5 +4487,184 @@
   },
   "copy_grok_task_binary": {
     "message": "確認中に CLI が変更されました"
+  },
+  "panel_0303e18246": {
+    "message": "未接続"
+  },
+  "panel_5ee01ca9e6": {
+    "message": "サインインに失敗しました"
+  },
+  "panel_2de1d14a0b": {
+    "message": "サインインがキャンセルされました"
+  },
+  "panel_6f5bbfed56": {
+    "message": "$NAME$ がインストールされていないか、PATH 上にありません。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_86dc0fd216": {
+    "message": "$NAME$ を対応バージョンに更新する必要があります。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_36ba29572c": {
+    "message": "対応バージョンの $NAME$ が見つかりましたが、分離またはプロトコルのプロファイルを確認できませんでした。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_d3ed6a15f2": {
+    "message": "$NAME$ は必要な厳密なサンドボックスを開始できませんでした。ローカルのサンドボックス環境の問題を解決して、もう一度お試しください。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_766cce4889": {
+    "message": "$NAME$ には FSB が必要とする機能がありません。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_7ae4eb6279": {
+    "message": "$NAME$ の機能はまだ確認されていません。プロバイダーの状態を更新し、ネイティブヘルパーが最新であることを確認してください。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_b3e0c7aece": {
+    "message": "$NAME$ の専用設定を確認できませんでした。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_fbbe98fc39": {
+    "message": "$NAME$ は互換性のないプロトコル応答を返しました。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_d126638cde": {
+    "message": "確認中に $NAME$ が変更されました。もう一度お試しください。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_53f086de2f": {
+    "message": "ローカルで $NAME$ にサインインしてから、もう一度お試しください。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_a43f3c4388": {
+    "message": "非公開の FSB Grok Build プロフィールに SuperGrok を接続してから、もう一度お試しください。"
+  },
+  "panel_5ed48f0f17": {
+    "message": "$NAME$ は 60 秒以内に応答しませんでした。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_c3fa2db456": {
+    "message": "$NAME$ の接続テストがキャンセルされました。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_621f130e52": {
+    "message": "$NAME$ は無効な応答を返しました。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_cfaf21eb87": {
+    "message": "$NAME$ は検証中にツールを使おうとしました。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_e6821e184d": {
+    "message": "$NAME$ は検証要求を完了できませんでした。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_2864938790": {
+    "message": "$NAME$ の検証の後処理が安全に完了しませんでした。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_481e3360a0": {
+    "message": "次のコマンドで FSB のネイティブヘルパーをインストールしてから、もう一度お試しください: $COMMAND$",
+    "placeholders": {
+      "command": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_614bccf590": {
+    "message": "FSB のネイティブヘルパーは別の拡張機能とペアリングされています。$COMMAND$ でペアリングをリセットしてから、もう一度お試しください。FSB がこの拡張機能を自動的にペアリングします。",
+    "placeholders": {
+      "command": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_c79e5bdc3e": {
+    "message": "ローカルの FSB サービスは使用可能なセッションを公開しませんでした。サービスを再起動してから、もう一度お試しください。"
+  },
+  "panel_bdb665fec7": {
+    "message": "ローカルの FSB エージェントサービスに接続できませんでした。もう一度お試しください。"
+  },
+  "panel_d4e7a8bb52": {
+    "message": "このブラウザと拡張機能用に FSB のネイティブヘルパーをインストールしてから、もう一度お試しください。"
+  },
+  "panel_262861193c": {
+    "message": "対応するエージェントプロバイダーを選んでください。"
+  },
+  "panel_00896ee08f": {
+    "message": "資格情報を編集"
+  },
+  "panel_1bffbc03dc": {
+    "message": "保留 $COUNT$ 件",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   }
 }

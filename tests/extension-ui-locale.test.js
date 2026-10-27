@@ -313,7 +313,27 @@ for (const [file, exactMap, texts] of [
     '$NAME$ is no longer available for Autopilot. Select and save another provider before starting a new task.',
     '$NAME$ connection', 'FSB uses $NAME$\'s existing local sign-in. Test Connection sends one small no-tools validation request.',
     'FSB uses a separate private Grok profile. Connect SuperGrok with browser OAuth; no API key or model selection is used.',
-    '$ACTIVE$ of $CAP$ active'
+    '$ACTIVE$ of $CAP$ active',
+    'Not connected', 'Sign-in failed', 'Sign-in cancelled', 'Connected with browser OAuth',
+    'Sign-in status unavailable', 'Opening Grok sign-in...', 'Waiting for browser sign-in...', 'Edit Credential',
+    'Add Credential', 'Edit Payment Method', 'Add Payment Method', 'No models match search', 'No models available',
+    '$COUNT$ pending', '$NAME$ is not installed or is not on PATH.', '$NAME$ must be updated to a supported version.',
+    '$NAME$ was found at a supported version, but its isolation or protocol profile could not be verified.',
+    '$NAME$ could not start the required strict sandbox. Resolve the local sandbox environment problem and try again.',
+    '$NAME$ is missing a capability required by FSB.',
+    '$NAME$ capabilities have not been verified. Refresh provider status and check that the native helper is up to date.',
+    '$NAME$ private configuration could not be verified.', '$NAME$ returned an incompatible protocol response.',
+    '$NAME$ changed while it was being checked. Try again.', 'Sign in to $NAME$ locally, then try again.',
+    'Connect SuperGrok to the private FSB Grok Build profile, then try again.',
+    '$NAME$ did not respond within 60 seconds.', '$NAME$ connection test was cancelled.',
+    '$NAME$ returned an invalid response.', '$NAME$ attempted to use tools during validation.',
+    '$NAME$ could not complete the validation request.', '$NAME$ validation cleanup did not settle safely.',
+    'Install the FSB native helper, then try again: $COMMAND$',
+    'The FSB native helper is paired with a different extension. Reset pairing with: $COMMAND$. Then try again so FSB can pair this extension automatically.',
+    'The local FSB service did not publish a usable session. Restart it and try again.',
+    'The local FSB agent service could not be reached. Try again.',
+    'Install the FSB native helper for this browser and extension, then try again.',
+    'Select a supported agent provider.', 'Connection test failed'
   ]]
 ]) {
   const source = fs.readFileSync(path.join(root, file), 'utf8');
@@ -1281,7 +1301,7 @@ function sidepanelMessageContext(api) {
 
   const optionsSource = fs.readFileSync(path.join(root, 'extension/ui/options.js'), 'utf8');
   check(optionsSource.includes("fsbUiSet(elements.grokBuildCompatibility, 'Verified: Grok protocol, isolation, and cached OAuth checks passed without sending a prompt.')")
-      && optionsSource.includes("fsbUiSet(elements.grokBuildCompatibility, 'Compatibility check failed: $ERROR$', { error: result.error })")
+      && optionsSource.includes("fsbUiSet(elements.grokBuildCompatibility, 'Compatibility check failed: $ERROR$', { error: result.errorSource || result.error })")
       && optionsSource.includes("fsbUiSet(elements.grokBuildCompatibility, 'Compatibility check failed: installation, version, isolation, ACP, or cached OAuth could not be verified.')"),
     'every Grok Build test result is written through markExact()');
 }
@@ -1569,6 +1589,127 @@ function sidepanelMessageContext(api) {
   shipped.apply(fakeDoc(Object.values(nodes)));
   check(nodes.agentProviderHelp.textContent === shippedCatalogs.ja.copy_df3a34abef,
     'a language change re-renders the Grok Build help');
+}
+
+// Every sentence the background can return for a failed agent connection test
+// matches a control-panel template, fills back to exactly that sentence, and
+// renders from the catalog in every language. A new background sentence with
+// no template fails here instead of reaching users in English.
+{
+  const sandbox = freshLocale();
+  vm.runInContext(fs.readFileSync(path.join(root, 'extension/utils/panel-exact.js'), 'utf8'), sandbox);
+  const shipped = sandbox.fsbUiLocale;
+  const optionsSource = fs.readFileSync(path.join(root, 'extension/ui/options.js'), 'utf8');
+  const backgroundSource = fs.readFileSync(path.join(root, 'extension/background.js'), 'utf8');
+  const codesSource = backgroundSource.match(/const FSB_AGENT_CONNECTION_FAILURE_CODES = Object\.freeze\(\{[\s\S]*?\}\);/)[0];
+  const providerLabels = { 'claude-code': 'Claude Code', 'grok-build': 'Grok Build' };
+  const bg = {
+    FSB_GROK_BUILD_PROVIDER_ID: 'grok-build',
+    command: 'npx -y fsb-mcp-server@latest install --native-host --browser chrome --extension-id abcdefghijklmnopabcdefghijklmnop',
+    FsbDelegationProviders: { get: (id) => ({ id, label: providerLabels[id] }) }
+  };
+  bg.fsbCurrentNativeHostInstallCommand = () => bg.command;
+  bg.globalThis = bg;
+  vm.createContext(bg);
+  vm.runInContext([codesSource, extractNamedFunction(backgroundSource, 'fsbAgentBridgeFailureMessage'),
+    extractNamedFunction(backgroundSource, 'fsbAgentConnectionFailureMessage')].join('\n'), bg);
+  const sentences = new Set();
+  for (const code of Object.keys(vm.runInContext('FSB_AGENT_CONNECTION_FAILURE_CODES', bg))) {
+    for (const id of Object.keys(providerLabels)) sentences.add(bg.fsbAgentConnectionFailureMessage(code, id));
+  }
+  // No failure code reaches the bridge copy, so its codes are listed here.
+  for (const code of ['native_host_missing', 'extension_origin_mismatch', 'bridge_session_unavailable', 'bridge_not_ready', 'unrecognized_code']) {
+    sentences.add(bg.fsbAgentBridgeFailureMessage(code));
+  }
+  bg.command = null;
+  sentences.add(bg.fsbAgentBridgeFailureMessage('native_host_missing'));
+  check(backgroundSource.includes("message: 'Select a supported agent provider.'"), 'the background still sends the invalid-request sentence');
+  sentences.add('Select a supported agent provider.');
+  sentences.add('Connection test failed');
+
+  const ctx = { fsbUiLocale: shipped };
+  ctx.globalThis = ctx;
+  vm.createContext(ctx);
+  for (const name of ['fsbUiLine', 'fsbUiSet', 'agentConnectionFailureTemplates', 'agentConnectionFailureSource', 'renderGrokBuildAuthState', 'updatePendingCount']) {
+    vm.runInContext(extractNamedFunction(optionsSource, name), ctx);
+  }
+  const fillEnglish = (english, subs) => english.replace(/\$([A-Z_]+)\$/g, (all, name) => (subs && subs[name.toLowerCase()] != null ? subs[name.toLowerCase()] : all));
+  const unmatched = [];
+  const unmapped = [];
+  const untranslated = [];
+  for (const sentence of sentences) {
+    const source = ctx.agentConnectionFailureSource(sentence);
+    if (!source || fillEnglish(source.english, source.subs) !== sentence) { unmatched.push(sentence); continue; }
+    if (!Object.prototype.hasOwnProperty.call(controlPanelMap, source.english)) { unmapped.push(source.english); continue; }
+    for (const code of shipped.PUBLIC_LOCALES.filter((c) => c !== 'en')) {
+      shipped.setOverride(code);
+      const shown = shipped.line(source.english, source.subs);
+      const keepsValues = Object.values(source.subs || {}).every((value) => shown.includes(value));
+      if (shown === sentence || !keepsValues || /\$[A-Z_]+\$/.test(shown)) untranslated.push(`${code}: ${shown}`);
+    }
+  }
+  check(sentences.size >= 30 && unmatched.length === 0,
+    `every failed connection-test sentence (${sentences.size}) matches a template${unmatched.length ? ': ' + unmatched.join(' | ') : ''}`);
+  check(unmapped.length === 0, `connection-test templates resolve on the control panel${unmapped.length ? ': ' + unmapped.join(' | ') : ''}`);
+  check(untranslated.length === 0,
+    `failed connection tests render translated and keep the provider name or command${untranslated.length ? ': ' + untranslated.slice(0, 3).join(' | ') : ''}`);
+  check(ctx.agentConnectionFailureSource('connection test timeout') === null && ctx.agentConnectionFailureSource('') === null,
+    'an unknown failure sentence is left as sent');
+
+  // The Grok badge keeps a nested $ERROR$ source live across a switch.
+  const failure = ctx.agentConnectionFailureSource(bg.fsbAgentConnectionFailureMessage('sandbox_unavailable', 'grok-build'));
+  const badgeText = (code) => {
+    shipped.setOverride(code);
+    return shipped.line('Compatibility check failed: $ERROR$', { error: shipped.line(failure.english, failure.subs) });
+  };
+  const expectedRu = badgeText('ru');
+  const expectedDe = badgeText('de');
+  const badge = fakeNode({ 'data-i18n': 'panel_fd05c3a95a' }, '');
+  ctx.fsbUiSet(badge, 'Compatibility check failed: $ERROR$', { error: failure });
+  check(badge.textContent === expectedDe && expectedDe.includes('Grok Build') && !expectedDe.includes('strict sandbox'),
+    'the Grok badge renders a failed test in the active language');
+  shipped.setOverride('ru');
+  shipped.apply(fakeDoc([badge]));
+  check(badge.textContent === expectedRu && expectedRu !== expectedDe, 'a language change re-renders the failed-test badge');
+
+  // The Grok sign-in pill and the pending-request pill render from the catalog
+  // and follow a switch; the live pending pill reads like the static 0 hint.
+  const pill = fakeNode({}, '');
+  const pending = Object.assign(fakeNode({ 'data-i18n': 'panel_0334c4fb39' }, '0 pending'), { style: {} });
+  ctx.elements = {
+    grokBuildAuthStatus: pill,
+    pendingRequestCount: pending,
+    pendingRequestList: { querySelectorAll: () => [{}, {}, {}] }
+  };
+  const keyFor = (english) => controlPanelMap[english];
+  const pillCases = [
+    [['unauthenticated'], 'Not connected'],
+    [['oauth'], 'Connected with browser OAuth'],
+    [['unknown', 'failed'], 'Sign-in failed'],
+    [['unknown', 'cancelled'], 'Sign-in cancelled'],
+    [['unknown', 'waiting'], 'Waiting for browser sign-in...']
+  ];
+  for (const code of shipped.PUBLIC_LOCALES.filter((c) => c !== 'en')) {
+    shipped.setOverride(code);
+    const catalog = shippedCatalogs[code];
+    const wrong = pillCases.filter(([args, english]) => {
+      ctx.renderGrokBuildAuthState(...args);
+      return pill.textContent !== catalog[keyFor(english)] || pill.textContent === english;
+    }).map(([, english]) => english);
+    ctx.updatePendingCount();
+    const pendingKey = keyFor('$COUNT$ pending');
+    check(wrong.length === 0 && pending.textContent === catalog[pendingKey].replace('$COUNT$', '3'),
+      `${code} Grok sign-in pill and pending count render in the active language${wrong.length ? ': ' + wrong.join(', ') : ''}`);
+    check(catalog[pendingKey].replace('$COUNT$', '0') === catalog.panel_0334c4fb39, `${code} live pending count reads like the static 0 hint`);
+  }
+  shipped.setOverride('de');
+  ctx.renderGrokBuildAuthState('unauthenticated');
+  ctx.updatePendingCount();
+  shipped.setOverride('ja');
+  shipped.apply(fakeDoc([pill, pending]));
+  check(pill.textContent === shippedCatalogs.ja[keyFor('Not connected')]
+      && pending.textContent === shippedCatalogs.ja[keyFor('$COUNT$ pending')].replace('$COUNT$', '3'),
+    'a language change re-renders the Grok sign-in pill and the pending count');
 }
 
 // The popup's collapsed action count keeps its key, and the owner header and

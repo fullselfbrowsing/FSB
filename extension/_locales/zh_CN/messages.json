@@ -4487,5 +4487,184 @@
   },
   "copy_grok_task_binary": {
     "message": "检查期间 CLI 发生了变化"
+  },
+  "panel_0303e18246": {
+    "message": "未连接"
+  },
+  "panel_5ee01ca9e6": {
+    "message": "登录失败"
+  },
+  "panel_2de1d14a0b": {
+    "message": "登录已取消"
+  },
+  "panel_6f5bbfed56": {
+    "message": "$NAME$ 未安装或不在 PATH 中。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_86dc0fd216": {
+    "message": "必须将 $NAME$ 更新到受支持的版本。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_36ba29572c": {
+    "message": "已找到受支持版本的 $NAME$，但无法验证其隔离或协议配置。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_d3ed6a15f2": {
+    "message": "$NAME$ 无法启动所需的严格沙盒。请解决本地沙盒环境问题，然后重试。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_766cce4889": {
+    "message": "$NAME$ 缺少 FSB 所需的功能。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_7ae4eb6279": {
+    "message": "尚未验证 $NAME$ 的功能。请刷新提供方状态，并检查本机助手是否为最新版本。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_b3e0c7aece": {
+    "message": "无法验证 $NAME$ 的私有配置。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_fbbe98fc39": {
+    "message": "$NAME$ 返回了不兼容的协议响应。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_d126638cde": {
+    "message": "检查期间 $NAME$ 发生了变化。请重试。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_53f086de2f": {
+    "message": "请在本地登录 $NAME$，然后重试。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_a43f3c4388": {
+    "message": "请将 SuperGrok 连接到私有 FSB Grok Build 配置文件，然后重试。"
+  },
+  "panel_5ed48f0f17": {
+    "message": "$NAME$ 未在 60 秒内响应。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_c3fa2db456": {
+    "message": "$NAME$ 连接测试已取消。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_621f130e52": {
+    "message": "$NAME$ 返回了无效的响应。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_cfaf21eb87": {
+    "message": "$NAME$ 在验证期间尝试使用工具。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_e6821e184d": {
+    "message": "$NAME$ 无法完成验证请求。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_2864938790": {
+    "message": "$NAME$ 的验证清理未能安全完成。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_481e3360a0": {
+    "message": "请安装 FSB 本机助手，然后重试：$COMMAND$",
+    "placeholders": {
+      "command": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_614bccf590": {
+    "message": "FSB 本机助手已与另一个扩展配对。请运行以下命令重置配对：$COMMAND$。然后重试，以便 FSB 自动配对此扩展。",
+    "placeholders": {
+      "command": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_c79e5bdc3e": {
+    "message": "本地 FSB 服务未发布可用的会话。请重新启动该服务，然后重试。"
+  },
+  "panel_bdb665fec7": {
+    "message": "无法连接本地 FSB 代理服务。请重试。"
+  },
+  "panel_d4e7a8bb52": {
+    "message": "请为此浏览器和扩展安装 FSB 本机助手，然后重试。"
+  },
+  "panel_262861193c": {
+    "message": "请选择支持的代理提供方。"
+  },
+  "panel_00896ee08f": {
+    "message": "编辑凭据"
+  },
+  "panel_1bffbc03dc": {
+    "message": "$COUNT$ 个待处理",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   }
 }

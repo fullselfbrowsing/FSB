@@ -181,7 +181,8 @@ assert.doesNotMatch(selection, /providerPanelState\.modelProvider = id[\s\S]*?ki
 
 const connectionTest = extractFunction(js, 'runFullApiTest');
 // runFullApiTest renders its copy through these; with no fsbUiLocale they return English.
-const uiCopyHelpers = ['fsbUiLine', 'fsbUiEscape', 'fsbUiHtml'].map((name) => extractFunction(js, name)).join('\n');
+const uiCopyHelpers = ['fsbUiLine', 'fsbUiEscape', 'fsbUiHtml', 'fsbUiSet', 'agentConnectionFailureTemplates', 'agentConnectionFailureSource']
+  .map((name) => extractFunction(js, name)).join('\n');
 assert.match(
   connectionTest,
   /action:\s*'testAgentProviderConnection',\s*providerId:\s*providerId/
@@ -209,8 +210,10 @@ function testGrokBuildAuthRendering() {
     grokBuildLoginLink: makeElement()
   };
   const context = { elements, URL, grokBuildAuthState: 'unauthenticated' };
+  // The pill label goes through fsbUiSet(); with no fsbUiLocale it writes English.
+  const pillHelpers = ['fsbUiLine', 'fsbUiSet'].map((name) => extractFunction(js, name)).join('\n');
   vm.runInNewContext(
-    `${safeLoginUrl}\n${render}\n${applyProgress}\n`
+    `${pillHelpers}\n${safeLoginUrl}\n${render}\n${applyProgress}\n`
       + 'this.renderGrokBuildAuthState = renderGrokBuildAuthState;\n'
       + 'this.applyGrokBuildAuthProgress = applyGrokBuildAuthProgress;',
     context,
@@ -218,6 +221,7 @@ function testGrokBuildAuthRendering() {
   );
 
   context.renderGrokBuildAuthState('unauthenticated');
+  assert.equal(elements.grokBuildAuthStatus.textContent, 'Not connected');
   assert.equal(elements.connectGrokBuildBtn.hidden, false);
   assert.equal(elements.disconnectGrokBuildBtn.hidden, true);
   assert.equal(elements.grokBuildLoginLink.hidden, true);
@@ -397,10 +401,13 @@ async function testAgentConnectionRendering() {
   });
   assert.match(backendFailure.html, /<strong>Status:<\/strong>\s*Failed/);
   assert.match(backendFailure.html, /Sign in to OpenCode locally, then try again\./);
-  assert.deepEqual(backendFailure.statusUpdates, [[
+  // The status card gets the template and its values, so it renders from the
+  // catalog; subs come from the vm realm, hence the JSON round-trip.
+  assert.deepEqual(JSON.parse(JSON.stringify(backendFailure.statusUpdates)), [[
     'disconnected',
     'Connection Failed',
-    'Sign in to OpenCode locally, then try again.'
+    'Sign in to $NAME$ locally, then try again.',
+    { name: 'OpenCode' }
   ]]);
 
   const codeFailure = await renderAgentConnectionResponse({

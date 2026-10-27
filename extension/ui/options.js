@@ -6,6 +6,7 @@ function fsbUiLine(english, subs) {
   if (!subs) return english;
   return english.replace(/\$([A-Za-z0-9_]+)\$/g, function (all, name) {
     var value = subs[name] != null ? subs[name] : subs[name.toLowerCase()];
+    if (value && typeof value === 'object' && typeof value.english === 'string') return fsbUiLine(value.english, value.subs);
     return value == null ? all : String(value);
   });
 }
@@ -592,7 +593,7 @@ function renderGrokBuildAuthState(state, progressState) {
     ? progressState === 'authenticated'
     : safeState === 'oauth';
   if (elements.grokBuildAuthStatus) {
-    elements.grokBuildAuthStatus.textContent = progressLabel || labels[safeState];
+    fsbUiSet(elements.grokBuildAuthStatus, progressLabel || labels[safeState]);
     if (elements.grokBuildAuthStatus.dataset) {
       elements.grokBuildAuthStatus.dataset.state = connected ? 'on' : 'off';
     }
@@ -761,7 +762,7 @@ async function beginGrokBuildAuth() {
 
 async function disconnectGrokBuildAuth() {
   if (grokBuildAuthRequest) return grokBuildAuthRequest;
-  if (!window.confirm('Disconnect the private FSB Grok Build profile? Your normal Grok login is unchanged.')) {
+  if (!window.confirm(fsbUiLine('Disconnect the private FSB Grok Build profile? Your normal Grok login is unchanged.'))) {
     return grokBuildAuthState;
   }
   const request = (async () => {
@@ -2735,6 +2736,67 @@ function updateApiStatusCard(status, title, detail, detailSubs) {
   }
 }
 
+// The background's failed connection-test sentences as English templates:
+// $NAME$ is the provider label and $COMMAND$ a CLI command. Matching the
+// filled sentence back to its template lets the result render from the
+// catalog in the UI language.
+function agentConnectionFailureTemplates() {
+  return [
+    '$NAME$ is not installed or is not on PATH.',
+    '$NAME$ must be updated to a supported version.',
+    '$NAME$ was found at a supported version, but its isolation or protocol profile could not be verified.',
+    '$NAME$ could not start the required strict sandbox. Resolve the local sandbox environment problem and try again.',
+    '$NAME$ is missing a capability required by FSB.',
+    '$NAME$ capabilities have not been verified. Refresh provider status and check that the native helper is up to date.',
+    '$NAME$ private configuration could not be verified.',
+    '$NAME$ returned an incompatible protocol response.',
+    '$NAME$ changed while it was being checked. Try again.',
+    'Sign in to $NAME$ locally, then try again.',
+    'Connect SuperGrok to the private FSB Grok Build profile, then try again.',
+    '$NAME$ did not respond within 60 seconds.',
+    '$NAME$ connection test was cancelled.',
+    '$NAME$ returned an invalid response.',
+    '$NAME$ attempted to use tools during validation.',
+    '$NAME$ could not complete the validation request.',
+    '$NAME$ validation cleanup did not settle safely.',
+    'Install the FSB native helper, then try again: $COMMAND$',
+    'The FSB native helper is paired with a different extension. Reset pairing with: $COMMAND$. Then try again so FSB can pair this extension automatically.',
+    'The local FSB service did not publish a usable session. Restart it and try again.',
+    'The local FSB agent service could not be reached. Try again.',
+    'Install the FSB native helper for this browser and extension, then try again.',
+    'Select a supported agent provider.',
+    'Connection test failed'
+  ];
+}
+
+// Returns { english, subs } for a sentence that fills one of the templates
+// above, or null when none matches; the sentence is then shown as sent.
+function agentConnectionFailureSource(message) {
+  if (typeof message !== 'string' || !message) return null;
+  const templates = agentConnectionFailureTemplates();
+  for (let i = 0; i < templates.length; i++) {
+    const english = templates[i];
+    const parts = english.split(/\$([A-Z_]+)\$/);
+    const names = [];
+    let pattern = '^';
+    for (let p = 0; p < parts.length; p++) {
+      if (p % 2 === 1) {
+        names.push(parts[p].toLowerCase());
+        pattern += '(.+?)';
+      } else {
+        pattern += parts[p].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      }
+    }
+    const match = new RegExp(pattern + '$').exec(message);
+    if (!match) continue;
+    if (!names.length) return { english };
+    const subs = {};
+    names.forEach((name, n) => { subs[name] = match[n + 1]; });
+    return { english, subs };
+  }
+  return null;
+}
+
 async function runFullApiTest() {
   if (!elements.fullApiTest
       || !elements.testResults
@@ -2779,6 +2841,7 @@ async function runFullApiTest() {
                   ? response.errorCode.replace(/_/g, ' ')
                   : 'Connection test failed')
           };
+      if (!result.ok) result.errorSource = agentConnectionFailureSource(result.error);
     } else {
       result = await checkApiConnection();
     }
@@ -2789,7 +2852,7 @@ async function runFullApiTest() {
       if (result.ok) {
         fsbUiSet(elements.grokBuildCompatibility, 'Verified: Grok protocol, isolation, and cached OAuth checks passed without sending a prompt.');
       } else if (result.error) {
-        fsbUiSet(elements.grokBuildCompatibility, 'Compatibility check failed: $ERROR$', { error: result.error });
+        fsbUiSet(elements.grokBuildCompatibility, 'Compatibility check failed: $ERROR$', { error: result.errorSource || result.error });
       } else {
         fsbUiSet(elements.grokBuildCompatibility, 'Compatibility check failed: installation, version, isolation, ACP, or cached OAuth could not be verified.');
       }
@@ -2805,12 +2868,16 @@ async function runFullApiTest() {
       </div>
       ${result.model ? `<div class="test-result-item"><strong>${fsbUiHtml('Model:')}</strong> ${escapeHtml(result.model)}</div>` : ''}
       ${Number.isFinite(result.responseTime) ? `<div class="test-result-item"><strong>${fsbUiHtml('Response Time:')}</strong> ${fsbUiHtml('$MS$ ms', { ms: result.responseTime })}</div>` : ''}
-      ${result.error ? `<div class="test-result-item error"><strong>${fsbUiHtml('Error:')}</strong> ${escapeHtml(result.error)}</div>` : ''}
+      ${result.error ? `<div class="test-result-item error"><strong>${fsbUiHtml('Error:')}</strong> ${result.errorSource ? fsbUiHtml(result.errorSource.english, result.errorSource.subs) : escapeHtml(result.error)}</div>` : ''}
     `;
 
     elements.testResults.classList.add('show');
     if (result.ok) {
       if (elements.apiStatusCard) elements.apiStatusCard.style.display = 'none';
+    } else if (result.errorSource && result.errorSource.subs) {
+      updateApiStatusCard('disconnected', 'Connection Failed', result.errorSource.english, result.errorSource.subs);
+    } else if (result.errorSource) {
+      updateApiStatusCard('disconnected', 'Connection Failed', result.errorSource.english);
     } else {
       updateApiStatusCard('disconnected', 'Connection Failed', result.error || 'Test failed');
     }
@@ -3225,7 +3292,7 @@ function exportAuditLog() {
 // Clear the audit ring after a destructive confirm (mirror clearLogs but guarded).
 function clearAuditLog() {
   const confirmed = (typeof window !== 'undefined' && typeof window.confirm === 'function')
-    ? window.confirm('Clear audit log: This permanently deletes all local audit entries. Export first if you want a copy. Continue?')
+    ? window.confirm(fsbUiLine('Clear audit log: This permanently deletes all local audit entries. Export first if you want a copy. Continue?'))
     : true;
   if (!confirmed) return;
   const auditStore = (typeof globalThis !== 'undefined') ? globalThis.FsbAuditLog : null;
@@ -3391,7 +3458,7 @@ function updatePendingCount() {
   const count = list.querySelectorAll('.pending-request-row').length;
   if (elements.pendingRequestCount) {
     if (count > 0) {
-      elements.pendingRequestCount.textContent = count + ' pending';
+      fsbUiSet(elements.pendingRequestCount, '$COUNT$ pending', { count });
       elements.pendingRequestCount.style.display = '';
     } else {
       elements.pendingRequestCount.style.display = 'none';
@@ -3513,7 +3580,7 @@ async function viewStorageData() {
 }
 
 async function clearAnalyticsData() {
-  if (confirm('Are you sure you want to clear all analytics data? This cannot be undone.')) {
+  if (confirm(fsbUiLine('Are you sure you want to clear all analytics data? This cannot be undone.'))) {
     try {
       await chrome.storage.local.remove(['fsbUsageData', 'fsbCurrentModel']);
       if (analytics) {
@@ -4132,7 +4199,7 @@ async function downloadSessionLogs(sessionId, storageBackend) {
  * @param {string} sessionId - The session ID to delete
  */
 async function deleteSession(sessionId) {
-  if (!confirm('Are you sure you want to delete this session? This cannot be undone.')) {
+  if (!confirm(fsbUiLine('Are you sure you want to delete this session? This cannot be undone.'))) {
     return;
   }
 
@@ -4164,7 +4231,7 @@ async function deleteSession(sessionId) {
  * Clear all saved sessions
  */
 async function clearAllSessions() {
-  if (!confirm('Are you sure you want to delete ALL session history? This cannot be undone.')) {
+  if (!confirm(fsbUiLine('Are you sure you want to delete ALL session history? This cannot be undone.'))) {
     return;
   }
 
@@ -5296,7 +5363,7 @@ async function showCredentialModal(mode, domain) {
   const passwordInput = document.getElementById('credModalPassword');
   const notesInput = document.getElementById('credModalNotes');
 
-  if (titleEl) titleEl.textContent = mode === 'edit' ? 'Edit Credential' : 'Add Credential';
+  if (titleEl) fsbUiSet(titleEl, mode === 'edit' ? 'Edit Credential' : 'Add Credential');
 
   // Clear fields
   if (domainInput) domainInput.value = '';
@@ -5882,7 +5949,7 @@ async function showPaymentMethodModal(mode, id) {
   const brandEl = document.getElementById('paymentMethodCardBrand');
   const cardNumInput = document.getElementById('paymentMethodCardNumber');
 
-  if (title) title.textContent = mode === 'edit' ? 'Edit Payment Method' : 'Add Payment Method';
+  if (title) fsbUiSet(title, mode === 'edit' ? 'Edit Payment Method' : 'Add Payment Method');
 
   // Clear all form fields
   const fieldIds = [
@@ -6034,7 +6101,7 @@ async function savePaymentMethodFromModal() {
       hidePaymentMethodModal();
       loadPaymentMethods();
     } else {
-      showToast('Failed: ' + (response?.error || 'Unknown error'), 'error');
+      showToast(fsbUiLine('Error saving payment method: $ERROR$', { error: response?.error || 'Unknown error' }), 'error');
     }
   } catch (error) {
     showToast(fsbUiLine('Error saving payment method: $ERROR$', { error: error.message }), 'error');
@@ -6043,7 +6110,7 @@ async function savePaymentMethodFromModal() {
 
 // Delete payment method with confirmation
 async function deletePaymentMethodConfirm(id) {
-  if (!confirm('Delete this payment method? This cannot be undone.')) return;
+  if (!confirm(fsbUiLine('Delete this payment method? This cannot be undone.'))) return;
 
   try {
     const response = await chrome.runtime.sendMessage({ action: 'deletePaymentMethod', id });
@@ -6501,7 +6568,7 @@ async function downloadResearch(researchId) {
 }
 
 async function deleteResearch(researchId) {
-  if (!confirm('Are you sure you want to delete this research result?')) {
+  if (!confirm(fsbUiLine('Are you sure you want to delete this research result?'))) {
     return;
   }
 
@@ -6586,7 +6653,7 @@ async function saveResearchToMemory(researchId) {
 }
 
 async function clearAllResearchResults() {
-  if (!confirm('Are you sure you want to delete ALL research results? This cannot be undone.')) {
+  if (!confirm(fsbUiLine('Are you sure you want to delete ALL research results? This cannot be undone.'))) {
     return;
   }
 
@@ -7178,7 +7245,7 @@ function renderMemoryList(memories) {
     btn.addEventListener('click', async (e) => {
       e.stopPropagation();
       const id = btn.dataset.id;
-      if (confirm('Delete this memory?')) {
+      if (confirm(fsbUiLine('Delete this memory?'))) {
         await memoryManager.delete(id);
         loadMemoryDashboard();
         showToast('Memory deleted', 'info');
@@ -7868,7 +7935,7 @@ async function exportMemories() {
 async function clearAllMemories() {
   if (typeof memoryManager === 'undefined') return;
 
-  if (!confirm('Delete ALL memories? This cannot be undone.')) return;
+  if (!confirm(fsbUiLine('Delete ALL memories? This cannot be undone.'))) return;
 
   try {
     await memoryManager.deleteAll();
@@ -8241,7 +8308,7 @@ function initializeSyncSection() {
     if (!list.length) {
       const opt = doc.createElement('option');
       opt.value = '';
-      opt.textContent = hasSearch ? 'No models match search' : 'No models available';
+      fsbUiSet(opt, hasSearch ? 'No models match search' : 'No models available');
       opt.disabled = true;
       sel.appendChild(opt);
       sel.value = '';

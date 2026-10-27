@@ -4487,5 +4487,184 @@
   },
   "copy_grok_task_binary": {
     "message": "檢查期間 CLI 發生了變化"
+  },
+  "panel_0303e18246": {
+    "message": "未連線"
+  },
+  "panel_5ee01ca9e6": {
+    "message": "登入失敗"
+  },
+  "panel_2de1d14a0b": {
+    "message": "登入已取消"
+  },
+  "panel_6f5bbfed56": {
+    "message": "$NAME$ 未安裝，或不在 PATH 中。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_86dc0fd216": {
+    "message": "$NAME$ 必須更新至受支援的版本。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_36ba29572c": {
+    "message": "已找到受支援版本的 $NAME$，但無法驗證其隔離或協定設定檔。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_d3ed6a15f2": {
+    "message": "$NAME$ 無法啟動所需的嚴格沙箱。請解決本機沙箱環境問題，然後重試。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_766cce4889": {
+    "message": "$NAME$ 缺少 FSB 所需的功能。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_7ae4eb6279": {
+    "message": "尚未驗證 $NAME$ 的功能。請重新整理提供者狀態，並確認原生小幫手為最新版本。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_b3e0c7aece": {
+    "message": "無法驗證 $NAME$ 的專用設定。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_fbbe98fc39": {
+    "message": "$NAME$ 傳回了不相容的協定回應。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_d126638cde": {
+    "message": "檢查期間 $NAME$ 發生了變化。請重試。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_53f086de2f": {
+    "message": "請在本機登入 $NAME$，然後重試。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_a43f3c4388": {
+    "message": "請將 SuperGrok 連接到私人的 FSB Grok Build 設定檔，然後重試。"
+  },
+  "panel_5ed48f0f17": {
+    "message": "$NAME$ 未在 60 秒內回應。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_c3fa2db456": {
+    "message": "$NAME$ 連線測試已取消。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_621f130e52": {
+    "message": "$NAME$ 傳回了無效的回應。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_cfaf21eb87": {
+    "message": "$NAME$ 在驗證期間嘗試使用工具。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_e6821e184d": {
+    "message": "$NAME$ 無法完成驗證要求。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_2864938790": {
+    "message": "$NAME$ 的驗證清理未能安全完成。",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_481e3360a0": {
+    "message": "請安裝 FSB 原生小幫手，然後重試：$COMMAND$",
+    "placeholders": {
+      "command": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_614bccf590": {
+    "message": "FSB 原生小幫手已與另一個擴充功能配對。請使用以下命令重設配對：$COMMAND$。完成後請重試，讓 FSB 自動配對此擴充功能。",
+    "placeholders": {
+      "command": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_c79e5bdc3e": {
+    "message": "本機 FSB 服務未發布可用的工作階段。請重新啟動該服務，然後重試。"
+  },
+  "panel_bdb665fec7": {
+    "message": "無法連線到本機 FSB 代理服務。請重試。"
+  },
+  "panel_d4e7a8bb52": {
+    "message": "請為此瀏覽器和擴充功能安裝 FSB 原生小幫手，然後重試。"
+  },
+  "panel_262861193c": {
+    "message": "請選擇支援的代理提供者。"
+  },
+  "panel_00896ee08f": {
+    "message": "編輯憑證"
+  },
+  "panel_1bffbc03dc": {
+    "message": "$COUNT$ 個待處理",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   }
 }

@@ -4487,5 +4487,184 @@
   },
   "copy_grok_task_binary": {
     "message": "die CLI wurde während der Prüfung geändert"
+  },
+  "panel_0303e18246": {
+    "message": "Nicht verbunden"
+  },
+  "panel_5ee01ca9e6": {
+    "message": "Anmeldung fehlgeschlagen"
+  },
+  "panel_2de1d14a0b": {
+    "message": "Anmeldung abgebrochen"
+  },
+  "panel_6f5bbfed56": {
+    "message": "$NAME$ ist nicht installiert oder nicht im PATH.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_86dc0fd216": {
+    "message": "$NAME$ muss auf eine unterstützte Version aktualisiert werden.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_36ba29572c": {
+    "message": "$NAME$ wurde in einer unterstützten Version gefunden, aber das Isolations- oder Protokollprofil konnte nicht überprüft werden.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_d3ed6a15f2": {
+    "message": "$NAME$ konnte die erforderliche strikte Sandbox nicht starten. Behebe das lokale Problem mit der Sandbox-Umgebung und versuche es erneut.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_766cce4889": {
+    "message": "$NAME$ fehlt eine von FSB benötigte Funktion.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_7ae4eb6279": {
+    "message": "Die Funktionen von $NAME$ wurden noch nicht überprüft. Aktualisiere den Anbieterstatus und prüfe, ob der native Helfer auf dem neuesten Stand ist.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_b3e0c7aece": {
+    "message": "Die private Konfiguration von $NAME$ konnte nicht überprüft werden.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_fbbe98fc39": {
+    "message": "$NAME$ hat eine inkompatible Protokollantwort zurückgegeben.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_d126638cde": {
+    "message": "$NAME$ wurde während der Prüfung geändert. Versuche es erneut.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_53f086de2f": {
+    "message": "Melde dich lokal bei $NAME$ an und versuche es erneut.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_a43f3c4388": {
+    "message": "Verbinde SuperGrok mit dem privaten Grok Build-Profil von FSB und versuche es erneut."
+  },
+  "panel_5ed48f0f17": {
+    "message": "$NAME$ hat nicht innerhalb von 60 Sekunden geantwortet.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_c3fa2db456": {
+    "message": "Der Verbindungstest für $NAME$ wurde abgebrochen.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_621f130e52": {
+    "message": "$NAME$ hat eine ungültige Antwort zurückgegeben.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_cfaf21eb87": {
+    "message": "$NAME$ hat während der Prüfung versucht, Werkzeuge zu verwenden.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_e6821e184d": {
+    "message": "$NAME$ konnte die Prüfanfrage nicht abschließen.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_2864938790": {
+    "message": "Die Bereinigung nach der Prüfung von $NAME$ wurde nicht sicher abgeschlossen.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_481e3360a0": {
+    "message": "Installiere den nativen FSB-Helfer und versuche es erneut: $COMMAND$",
+    "placeholders": {
+      "command": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_614bccf590": {
+    "message": "Der native FSB-Helfer ist mit einer anderen Erweiterung gekoppelt. Setze die Kopplung mit diesem Befehl zurück: $COMMAND$. Versuche es dann erneut, damit FSB diese Erweiterung automatisch koppeln kann.",
+    "placeholders": {
+      "command": {
+        "content": "$1"
+      }
+    }
+  },
+  "panel_c79e5bdc3e": {
+    "message": "Der lokale FSB-Dienst hat keine nutzbare Sitzung bereitgestellt. Starte ihn neu und versuche es erneut."
+  },
+  "panel_bdb665fec7": {
+    "message": "Der lokale FSB-Agent-Dienst konnte nicht erreicht werden. Versuche es erneut."
+  },
+  "panel_d4e7a8bb52": {
+    "message": "Installiere den nativen FSB-Helfer für diesen Browser und diese Erweiterung. Versuche es dann erneut."
+  },
+  "panel_262861193c": {
+    "message": "Wähle einen unterstützten Agent-Anbieter."
+  },
+  "panel_00896ee08f": {
+    "message": "Zugangsdaten bearbeiten"
+  },
+  "panel_1bffbc03dc": {
+    "message": "$COUNT$ ausstehend",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
   }
 }
