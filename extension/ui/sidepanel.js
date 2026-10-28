@@ -1589,7 +1589,7 @@ function _renderDelegationConsent(options) {
     _delegationUiState.providerId,
     _delegationUiState.providerLabel
   );
-  var providerLabel = provider ? provider.label : 'Agent';
+  var providerLabel = provider ? provider.label : 'The agent';
   var providerSubs = { name: providerLabel };
 
   var heading = _delegationElement(
@@ -7058,7 +7058,7 @@ async function loadSessionView(sessionId) {
 }
 
 async function clearAllHistorySessions() {
-  if (!confirm('Delete all session history? This cannot be undone.')) return;
+  if (!confirm(spLine('Delete all session history? This cannot be undone.'))) return;
   try {
     const response = await chrome.runtime.sendMessage({ action: 'clearSessionHistory' });
     if (!response?.success) throw new Error(response?.error || 'Failed to clear session history');
@@ -7135,5 +7135,8 @@ if (globalThis.fsbUiLocale && typeof fsbUiLocale.boot === 'function') {
   fsbUiLocale.boot().then(function () {
     fsbUiLocale.apply(document);
     if (typeof _renderHeaderStatus === 'function') _renderHeaderStatus();
+    // A delegated run hydrated before the catalogs loaded left an English
+    // accessible name on Stop; boot() does not notify onChange listeners.
+    _relabelDelegationStop();
   });
 }

@@ -537,6 +537,21 @@ function freshLocale(globals) {
   return sandbox;
 }
 
+// The brace-balanced statement that starts at index (e.g. a top-level if block).
+function extractNamedBlock(source, start) {
+  if (start < 0) throw new Error('missing block');
+  const bodyStart = source.indexOf('{', start);
+  let depth = 0;
+  for (let index = bodyStart; index < source.length; index++) {
+    if (source[index] === '{') depth += 1;
+    if (source[index] === '}') {
+      depth -= 1;
+      if (depth === 0) return source.slice(start, index + 1);
+    }
+  }
+  throw new Error('unbalanced block');
+}
+
 function extractNamedFunction(source, name) {
   const start = source.indexOf('function ' + name + '(');
   if (start === -1) throw new Error('missing function ' + name);
@@ -1132,6 +1147,9 @@ function sidepanelMessageContext(api) {
     'the relabel leaves the legacy Stop button to apply()');
   check(panelSource.includes("fsbUiLocale.onChange(_relabelDelegationStop)"),
     'the side panel relabels the Stop button on a language change');
+  const consent = extractNamedFunction(panelSource, '_renderDelegationConsent');
+  check(consent.includes("provider ? provider.label : 'The agent'") && !consent.includes(": 'Agent'"),
+    'the consent dialog falls back to the cataloged "The agent" for a missing provider');
 }
 
 // Side panel status lines: plain lines are keyed, templates are filled, and
@@ -1881,6 +1899,49 @@ function sidepanelMessageContext(api) {
 }
 
 async function asyncChecks() {
+  // The side panel can open onto a running delegation before boot() has loaded
+  // the catalogs, so Stop gets the English fallback. boot() does not notify
+  // onChange listeners, so its own callback must relabel the button.
+  {
+    const panelSource = fs.readFileSync(path.join(root, 'extension/ui/sidepanel.js'), 'utf8');
+    const bootStart = panelSource.indexOf("if (globalThis.fsbUiLocale && typeof fsbUiLocale.boot === 'function') {");
+    const bootBlock = extractNamedBlock(panelSource, bootStart);
+    for (const pendingState of [true, false]) {
+      const shipped = freshLocale().fsbUiLocale;
+      shipped.setOverride('en');
+      const stopBtn = fakeNode({ 'data-i18n-attr': 'title:shell_stop', title: 'Stop Automation' }, '');
+      const classes = new Set(['hidden']);
+      stopBtn.classList = { add: (name) => classes.add(name), remove: (name) => classes.delete(name), contains: (name) => classes.has(name) };
+      const context = {
+        fsbUiLocale: shipped,
+        stopBtn,
+        isRunning: false,
+        _chatLockedByOwnerChip: false,
+        _delegationUsesFixedStop: () => true,
+        _delegationStopControlPending: () => pendingState,
+        _ensureDelegationMount: () => ({}),
+        _delegationUiState: { snapshot: {} },
+        document: fakeDoc([stopBtn]),
+        _renderHeaderStatus() {}
+      };
+      context.globalThis = context;
+      vm.createContext(context);
+      for (const name of ['_restoreLegacyStopControl', '_syncDelegationStopControls', '_relabelDelegationStop']) {
+        vm.runInContext(extractNamedFunction(panelSource, name), context);
+      }
+      context._syncDelegationStopControls({});
+      const english = pendingState ? 'Stopping Automation…' : 'Stop Automation';
+      const hydrated = stopBtn.getAttribute('aria-label') === english && stopBtn.getAttribute('title') === english;
+      shipped.boot = () => { shipped.setOverride('ru'); return Promise.resolve(); };
+      vm.runInContext(bootBlock, context);
+      await new Promise((resolve) => setImmediate(resolve));
+      const want = pendingState ? shippedCatalogs.ru.copy_26de247a57 : shippedCatalogs.ru.shell_stop;
+      check(hydrated && want !== english
+          && stopBtn.getAttribute('aria-label') === want && stopBtn.getAttribute('title') === want,
+        `boot relabels a ${pendingState ? 'stopping' : 'running'} delegated Stop hydrated before the catalogs loaded`);
+    }
+  }
+
   for (const code of locale.PUBLIC_LOCALES.filter((code) => code !== 'en')) {
     const api = freshLocale().fsbUiLocale;
     api.setOverride(code);
