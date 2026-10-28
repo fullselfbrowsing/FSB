@@ -18,7 +18,7 @@ import { StdioClient } from './mcp-client.mjs';
 import { atomicJson, acquireRunLock, failureClass, refreshRunState } from './run-state.mjs';
 import { writeReport } from './report.mjs';
 import { waitForResource, modelReady } from './readiness.mjs';
-import { runJudgeJobs } from './judge-jobs.mjs';
+import { runJudgeJobs, JUDGE_PROTOCOL } from './judge-jobs.mjs';
 import { hashTree } from './fingerprint.mjs';
 
 export function options(argv) {
@@ -129,7 +129,7 @@ export async function runBench(o, dependencies = {}) {
     const config = { format_version: 2, synthetic: dry, scripted: dry && !o['real-agent'], driver: o.driver, browser: o.browser,
       model: o.model, effort: o.effort, max_turns: Number(o['max-turns']), max_actions: Number(o['max-actions']), timeout_seconds: Number(o['timeout-seconds']),
       budget_usd: o.driver === 'claude' ? Number(o['budget-usd']) : null, seed: o.seed, task_selection: o.tasks, count: Number(o.count),
-      judge_passes: Number(o['judge-passes']), server_command: serverCommand, fsb_commit: commit.stdout.trim(), harness_sha256: sha256(harnessSource),
+      judge_passes: Number(o['judge-passes']), judge_protocol: JUDGE_PROTOCOL, server_command: serverCommand, fsb_commit: commit.stdout.trim(), harness_sha256: sha256(harnessSource),
       judge_sha256: sha256(judgeSource),
       provenance_sha256: provenance ? sha256(provenance) : null,
       fsb_runtime_sha256: !dry && serverCommand[1]?.endsWith('/build/index.js') && existsSync(serverCommand[1]) ? await hashTree(path.dirname(serverCommand[1])) : null,

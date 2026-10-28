@@ -8,7 +8,7 @@ import { preflight } from '../preflight.mjs';
 import { localHfToken, DATASET_REV } from '../dataset.mjs';
 import { atomicJson, acquireRunLock, failureClass } from '../run-state.mjs';
 import { encodeSolidPng } from '../png.mjs';
-import { runJudgeJobs } from '../judge-jobs.mjs';
+import { runJudgeJobs, JUDGE_PROTOCOL } from '../judge-jobs.mjs';
 import { MODEL, EFFORT, JUDGE_ENGINE, CLAUDE_CLI } from '../model-family.mjs';
 
 function tasks(count = 2) {
@@ -36,6 +36,24 @@ async function completedAttempt({ task, rawDir }, outcome = 'complete') {
     action_count: 0, duration_ms: 5, usage: { input_tokens: 10, output_tokens: 2 }, cleanup_ok: true };
   await atomicJson(path.join(rawDir, 'final.json'), final);
   return final;
+}
+
+// Stands in for the Python judge: checks the pinned arguments and writes the
+// summary a successful job leaves behind.
+function fakeJudgeRun(runDir, observed, expected = 1) {
+  return async (_command, args) => {
+    const engine = args[args.indexOf('--engine') + 1], variant = args[args.indexOf('--variant') + 1], pass = args[args.indexOf('--pass_number') + 1];
+    observed.push(`${engine}-${variant}-${pass}`);
+    assert.equal(engine, JUDGE_ENGINE); assert.equal(args[args.indexOf('--cli') + 1], CLAUDE_CLI);
+    assert.equal(args[args.indexOf('--model') + 1], MODEL); assert.equal(args[args.indexOf('--effort') + 1], EFFORT);
+    assert.equal(args[args.indexOf('--num_workers') + 1], '10');
+    assert.equal(args[args.indexOf('--engine-concurrency') + 1], '10');
+    assert.equal(args[args.indexOf('--judge-protocol') + 1], JUDGE_PROTOCOL);
+    const summary = { expected, successes: 0, errors: 0, pending_judgments: 0, infrastructure_errors: 0,
+      judge_protocol: JUDGE_PROTOCOL, workers: 10, engine_concurrency: 10, global_cli_limit: 10 };
+    await atomicJson(path.join(runDir, 'judge', `${engine}-${variant}-pass${pass}`, 'summary.json'), summary);
+    return { code: 0, stdout: JSON.stringify(summary), stderr: '' };
+  };
 }
 
 test('Codex and existing-browser options are explicit and validated', () => {
@@ -173,18 +191,7 @@ test('six Claude jobs are sequential, capped at ten CLIs, and revalidate cached 
   const manifest = { task_ids: tasks(1).map(t => t.task_id), outcomes: [], source: {}, expected: 1, model: 'fixture', judge_protocol: 'scorefield-v2' };
   await atomicJson(path.join(runDir, 'task-ids.json'), manifest.task_ids);
   const observed = [];
-  const run = async (_command, args) => {
-    const engine = args[args.indexOf('--engine') + 1], variant = args[args.indexOf('--variant') + 1], pass = args[args.indexOf('--pass_number') + 1];
-    observed.push(`${engine}-${variant}-${pass}`);
-    assert.equal(engine, JUDGE_ENGINE); assert.equal(args[args.indexOf('--cli') + 1], CLAUDE_CLI);
-    assert.equal(args[args.indexOf('--model') + 1], MODEL); assert.equal(args[args.indexOf('--effort') + 1], EFFORT);
-    assert.equal(args[args.indexOf('--num_workers') + 1], '10');
-    assert.equal(args[args.indexOf('--engine-concurrency') + 1], '10');
-    const summary = { expected: 1, successes: 0, errors: 0, pending_judgments: 0, infrastructure_errors: 0,
-      judge_protocol: 'scorefield-v2', workers: 10, engine_concurrency: 10, global_cli_limit: 10 };
-    await atomicJson(path.join(runDir, 'judge', `${engine}-${variant}-pass${pass}`, 'summary.json'), summary);
-    return { code: 0, stdout: JSON.stringify(summary), stderr: '' };
-  };
+  const run = fakeJudgeRun(runDir, observed);
   const first = await runJudgeJobs({ runDir, manifest, passes: 3, run });
   assert.equal(first.jobs.length, 6); assert.equal(first.complete, true);
   assert.equal(first.jobs.filter(j => j.status === 'complete').length, 6);
@@ -192,4 +199,19 @@ test('six Claude jobs are sequential, capped at ten CLIs, and revalidate cached 
   assert.equal(observed.length, 6);
   await runJudgeJobs({ runDir, manifest, passes: 3, run });
   assert.equal(observed.length, 12);
+});
+
+test('a collected non-dry run judges under the pinned protocol', async t => {
+  const { o, deps, runDir } = await fixture(t, 1);
+  o.judge = true;
+  const observed = [];
+  deps.runJudgeJobs = args => runJudgeJobs({ ...args, run: fakeJudgeRun(runDir, observed) });
+  const { manifest } = await runBench(o, deps);
+  assert.equal(manifest.judge_protocol, JUDGE_PROTOCOL);
+  assert.equal(manifest.collection_complete, true);
+  assert.equal(manifest.state, 'complete');
+  assert.equal(observed.length, 6);
+  const jobs = JSON.parse(await readFile(path.join(runDir, 'judge-jobs.json'), 'utf8'));
+  assert.equal(jobs.judge_protocol, JUDGE_PROTOCOL);
+  assert.equal(jobs.jobs.filter(job => job.status === 'complete').length, 6);
 });
