@@ -223,8 +223,10 @@ function fsbReadMcpCompatibilityExpiryAt(providers, clients) {
     const status = fsbCompatibilityOwnDataValue(compatibility, 'status');
     const reason = fsbCompatibilityOwnDataValue(compatibility, 'reason');
     const checkedAt = fsbCompatibilityOwnDataValue(compatibility, 'checkedAt');
-    const runnable = (status === 'supported' && reason === 'within_tested_range')
-      || (status === 'degraded' && reason === 'newer_than_tested_range');
+    const runnable = providerId === 'grok-build'
+      ? status === 'supported' && reason === 'capability_verified'
+      : (status === 'supported' && reason === 'within_tested_range')
+        || (status === 'degraded' && reason === 'newer_than_tested_range');
     if (runnable
         && Number.isSafeInteger(checkedAt)
         && checkedAt >= 0
@@ -265,8 +267,10 @@ function fsbProjectStaleMcpClients(clients) {
       nextRow = fsbCopyCompatibilityDataRecord(row);
       nextRow.authState = 'unknown';
       delete nextRow.acceptedIdentity;
-      const runnable = (status === 'supported' && reason === 'within_tested_range')
-        || (status === 'degraded' && reason === 'newer_than_tested_range');
+      const runnable = providerId === 'grok-build'
+        ? status === 'supported' && reason === 'capability_verified'
+        : (status === 'supported' && reason === 'within_tested_range')
+          || (status === 'degraded' && reason === 'newer_than_tested_range');
       if (runnable
           && Number.isSafeInteger(checkedAt)
           && checkedAt >= 0) {
@@ -792,13 +796,6 @@ importScripts('site-guides/gaming/humble-bundle.js');
 importScripts('site-guides/productivity/google-sheets.js');
 importScripts('site-guides/productivity/google-docs.js');
 
-// DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-// Background agent modules (commented out; modules retired in v0.9.45rc1)
-// importScripts('agents/agent-manager.js');
-// importScripts('agents/agent-scheduler.js');
-// importScripts('agents/agent-executor.js');
-// importScripts('agents/server-sync.js');
-
 // Agent loop engine modules (Phase 181: re-enable modular agent loop per D-01, D-02)
 importScripts('ai/engine-config.js');
 importScripts('ai/cost-tracker.js');
@@ -849,6 +846,7 @@ const CONTENT_SCRIPT_FILES = [
   'content/dom-state.js',
   'content/selectors.js',
   'content/badge-combine.js',
+  'utils/ui-locale.js',
   'content/visual-feedback.js',
   'content/phantom-stream-capture.js',
   'content/dom-stream.js',
@@ -1482,6 +1480,10 @@ const FSB_DELEGATION_GENERATION_PREFIX = 'fsbDelegationGeneration:v1:';
 // outside this roster are dropped rather than shown.
 const FSB_DELEGATION_START_REJECTION_DETAILS = new Set([
   'adapter_unavailable',
+  'sandbox_unavailable',
+  'capability_missing',
+  'isolation_unavailable',
+  'binary_changed',
   'spawn_failed',
   'activation_failed',
   'agent_protocol_drift',
@@ -1969,6 +1971,12 @@ const FSB_AGENT_CONNECTION_FAILURE_CODES = Object.freeze({
   binary_not_found: true,
   unsupported_version: true,
   adapter_unavailable: true,
+  sandbox_unavailable: true,
+  capability_missing: true,
+  capability_unverified: true,
+  isolation_unavailable: true,
+  agent_protocol_drift: true,
+  binary_changed: true,
   auth_unauthenticated: true,
   connection_test_timeout: true,
   connection_test_cancelled: true,
@@ -2007,6 +2015,10 @@ const FSB_GROK_AUTH_BEGIN_REASONS = Object.freeze({
   login_failed: true,
   version_unsupported: true,
   sandbox_unavailable: true,
+  capability_missing: true,
+  isolation_unavailable: true,
+  agent_protocol_drift: true,
+  binary_changed: true,
   adapter_unavailable: true,
   provider_auth_locked: true,
   session_cleanup_blocked: true
@@ -2149,6 +2161,12 @@ function fsbAgentConnectionFailureMessage(code, providerId) {
   const label = provider && provider.label ? provider.label : 'The selected agent';
   if (code === 'binary_not_found') return `${label} is not installed or is not on PATH.`;
   if (code === 'unsupported_version') return `${label} must be updated to a supported version.`;
+  if (code === 'sandbox_unavailable') return `${label} could not start the required strict sandbox. Resolve the local sandbox environment problem and try again.`;
+  if (code === 'capability_missing') return `${label} is missing a capability required by FSB.`;
+  if (code === 'capability_unverified') return `${label} capabilities have not been verified. Refresh provider status and check that the native helper is up to date.`;
+  if (code === 'isolation_unavailable') return `${label} private configuration could not be verified.`;
+  if (code === 'agent_protocol_drift') return `${label} returned an incompatible protocol response.`;
+  if (code === 'binary_changed') return `${label} changed while it was being checked. Try again.`;
   if (code === 'adapter_unavailable') {
     return `${label} was found at a supported version, but its isolation or protocol profile could not be verified.`;
   }
@@ -2606,6 +2624,7 @@ function fsbDelegationTerminalCode(value) {
   if (value === 'runtime_cleanup_failed') return 'tree_unsettled';
   const allowed = new Set([
     'cancelled', 'route_lost', 'agent_protocol_drift', 'tree_unsettled',
+    'sandbox_unavailable', 'capability_missing', 'isolation_unavailable', 'binary_changed',
     'hold_expired', 'daemon_restart_lost_run', 'provider_error', 'agent_failed'
   ]);
   return typeof value === 'string' && allowed.has(value) ? value : 'agent_failed';
@@ -13028,176 +13047,6 @@ const fsbHandleRuntimeMessage = (request, sender, sendResponse) => {
       })();
       return true;
 
-    // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-//     // --- Background Agent Management ---
-//     case 'createAgent':
-//       (async () => {
-//         try {
-//           const agent = await agentManager.createAgent(request.params);
-//           if (agent.enabled) {
-//             await agentScheduler.scheduleAgent(agent);
-//           }
-//           sendResponse({ success: true, agent });
-//         } catch (error) {
-//           sendResponse({ success: false, error: error.message });
-//         }
-//       })();
-//       return true;
-//
-//     case 'updateAgent':
-//       (async () => {
-//         try {
-//           const agent = await agentManager.updateAgent(request.agentId, request.updates);
-//           // Reschedule if schedule or enabled state changed
-//           if (agent.enabled) {
-//             await agentScheduler.scheduleAgent(agent);
-//           } else {
-//             await agentScheduler.clearAlarm(agent.agentId);
-//           }
-//           sendResponse({ success: true, agent });
-//         } catch (error) {
-//           sendResponse({ success: false, error: error.message });
-//         }
-//       })();
-//       return true;
-//
-//     case 'deleteAgent':
-//       (async () => {
-//         try {
-//           await agentScheduler.clearAlarm(request.agentId);
-//           await agentExecutor.forceStop(request.agentId);
-//           const deleted = await agentManager.deleteAgent(request.agentId);
-//           sendResponse({ success: deleted });
-//         } catch (error) {
-//           sendResponse({ success: false, error: error.message });
-//         }
-//       })();
-//       return true;
-//
-//     case 'listAgents':
-//       (async () => {
-//         try {
-//           const agents = await agentManager.listAgents();
-//           sendResponse({ success: true, agents });
-//         } catch (error) {
-//           sendResponse({ success: false, error: error.message });
-//         }
-//       })();
-//       return true;
-//
-//     case 'toggleAgent':
-//       (async () => {
-//         try {
-//           const agent = await agentManager.toggleAgent(request.agentId);
-//           if (agent.enabled) {
-//             await agentScheduler.scheduleAgent(agent);
-//           } else {
-//             await agentScheduler.clearAlarm(agent.agentId);
-//           }
-//           sendResponse({ success: true, agent });
-//         } catch (error) {
-//           sendResponse({ success: false, error: error.message });
-//         }
-//       })();
-//       return true;
-//
-//     case 'runAgentNow':
-//       (async () => {
-//         try {
-//           const agent = await agentManager.getAgent(request.agentId);
-//           if (!agent) {
-//             sendResponse({ success: false, error: 'Agent not found' });
-//             return;
-//           }
-//           // Execute immediately in background
-//           sendResponse({ success: true, message: 'Agent execution started' });
-//           const result = await agentExecutor.execute(agent);
-//           await agentManager.recordRun(agent.agentId, result);
-//           chrome.runtime.sendMessage({
-//             action: 'agentRunComplete',
-//             agentId: agent.agentId,
-//             result: { success: result.success, duration: result.duration, error: result.error }
-//           }).catch((err) => {
-//             console.warn('[FSB] agentRunComplete sendMessage delivery failed', { agentId: agent.agentId, error: err && err.message });
-//           });
-//         } catch (error) {
-//           sendResponse({ success: false, error: error.message });
-//         }
-//       })();
-//       return true;
-//
-//     case 'getAgentStats':
-//       (async () => {
-//         try {
-//           const stats = await agentManager.getStats();
-//           sendResponse({ success: true, stats });
-//         } catch (error) {
-//           sendResponse({ success: false, error: error.message });
-//         }
-//       })();
-//       return true;
-//
-//     case 'getAgentRunHistory':
-//       (async () => {
-//         try {
-//           const history = await agentManager.getRunHistory(request.agentId, request.limit || 10);
-//           sendResponse({ success: true, history });
-//         } catch (error) {
-//           sendResponse({ success: false, error: error.message });
-//         }
-//       })();
-//       return true;
-//
-//     case 'clearAgentScript':
-//       (async () => {
-//         try {
-//           await agentManager.clearRecordedScript(request.agentId);
-//           sendResponse({ success: true });
-//         } catch (error) {
-//           sendResponse({ success: false, error: error.message });
-//         }
-//       })();
-//       return true;
-//
-//     case 'getAgentReplayInfo':
-//       (async () => {
-//         try {
-//           const agent = await agentManager.getAgent(request.agentId);
-//           if (!agent) {
-//             sendResponse({ success: false, error: 'Agent not found' });
-//             return;
-//           }
-//           sendResponse({
-//             success: true,
-//             replayEnabled: agent.replayEnabled !== false,
-//             hasScript: !!(agent.recordedScript && agent.recordedScript.steps && agent.recordedScript.steps.length > 0),
-//             scriptSteps: agent.recordedScript?.totalSteps || 0,
-//             recordedAt: agent.recordedScript?.recordedAt || null,
-//             replayStats: agent.replayStats || { totalReplays: 0, totalAISaves: 0, estimatedCostSaved: 0 }
-//           });
-//         } catch (error) {
-//           sendResponse({ success: false, error: error.message });
-//         }
-//       })();
-//       return true;
-//
-//     case 'toggleAgentReplay':
-//       (async () => {
-//         try {
-//           const agent = await agentManager.getAgent(request.agentId);
-//           if (!agent) {
-//             sendResponse({ success: false, error: 'Agent not found' });
-//             return;
-//           }
-//           const newValue = !(agent.replayEnabled !== false);
-//           await agentManager.updateAgent(request.agentId, { replayEnabled: newValue });
-//           sendResponse({ success: true, replayEnabled: newValue });
-//         } catch (error) {
-//           sendResponse({ success: false, error: error.message });
-//         }
-//       })();
-//       return true;
-
     case 'prepareSessionReplay':
       handlePrepareSessionReplay(request, sender, sendResponse);
       return true;
@@ -14272,165 +14121,6 @@ async function handleStartAutomation(request, sender, sendResponse) {
       isChromePage: error.isChromePage || false
     });
   }
-}
-
-
-/**
- * Execute an automation task programmatically (used by background agents).
- * Creates a session, runs the automation loop, and returns a Promise with the result.
- * @param {number} tabId - Target tab ID (must already exist and be loaded)
- * @param {string} task - Task description for the AI
- * @param {Object} [options] - Execution options
- * @param {number} [options.maxIterations=15] - Max automation iterations
- * @param {boolean} [options.isBackgroundAgent=false] - If true, skip UI status messages
- * @param {string} [options.agentId] - Agent ID for tracking
- * @returns {Promise<Object>} { success, sessionId, result, error, duration, tokensUsed, costUsd, iterations }
- */
-async function executeAutomationTask(tabId, task, options = {}) {
-  const { maxIterations = 15, isBackgroundAgent = false, agentId = null } = options;
-
-  return new Promise(async (resolve) => {
-    try {
-      const sessionId = `session_${Date.now()}`;
-      const sessionData = {
-        task,
-        tabId: tabId,
-        originalTabId: tabId,
-        status: 'running',
-        startTime: Date.now(),
-        maxIterations: maxIterations,
-        actionHistory: [],
-        stateHistory: [],
-        failedAttempts: {},
-        failedActionDetails: {},
-        lastDOMHash: null,
-        stuckCounter: 0,
-        consecutiveNoProgressCount: 0,
-        iterationCount: 0,
-        urlHistory: [],
-        lastUrl: null,
-        actionSequences: [],
-        sequenceRepeatCount: {},
-        isBackgroundAgent: isBackgroundAgent,
-        agentId: agentId,
-        animatedActionHighlights: false, // No highlights for background agents
-        _completionCallback: resolve, // Store callback for when automation finishes
-        // PERF: Cache DOM settings (use defaults for background agents)
-        domSettings: {
-          domOptimization: true,
-          maxDOMElements: 2000,
-          prioritizeViewport: true
-        },
-        // Cost tracking fields
-        totalCost: 0,
-        totalInputTokens: 0,
-        totalOutputTokens: 0
-      };
-
-      activeSessions.set(sessionId, sessionData);
-      persistSession(sessionId, sessionData);
-
-      automationLogger.logSessionStart(sessionId, task, tabId);
-      initializeSessionMetrics(sessionId);
-
-      startKeepAlive();
-
-      // Reset DOM state
-      try {
-        await chrome.tabs.sendMessage(tabId, { action: 'resetDOMState', sessionId });
-      } catch (e) {
-        // Content script may not be ready yet, proceed anyway
-      }
-
-      // Intercept completion messages for this session
-      const originalCleanup = cleanupSession;
-
-      // Patch: listen for automationComplete for this session to capture result
-      const completionListener = (message) => {
-        if (message.action === 'automationComplete' && message.sessionId === sessionId) {
-          chrome.runtime.onMessage.removeListener(completionListener);
-          const session = activeSessions.get(sessionId) || sessionData;
-          const duration = Date.now() - sessionData.startTime;
-          const metrics = performanceMetrics.sessionStats.get(sessionId);
-          resolve({
-            success: !message.partial && !message.error,
-            sessionId,
-            result: message.result || null,
-            error: message.error || (message.partial ? 'Task completed partially: ' + (message.reason || 'unknown') : null),
-            duration,
-            tokensUsed: metrics?.totalActions || 0,
-            costUsd: 0,
-            iterations: session.iterationCount || 0,
-            actionHistory: session.actionHistory || []
-          });
-        }
-
-        if (message.action === 'automationError' && message.sessionId === sessionId) {
-          chrome.runtime.onMessage.removeListener(completionListener);
-          const duration = Date.now() - sessionData.startTime;
-          resolve({
-            success: false,
-            sessionId,
-            result: null,
-            error: message.error || 'Automation error',
-            duration,
-            tokensUsed: 0,
-            costUsd: 0,
-            iterations: sessionData.iterationCount || 0
-          });
-        }
-      };
-      chrome.runtime.onMessage.addListener(completionListener);
-
-      // Safety timeout - resolve after maxIterations * 30s max
-      const safetyTimeout = setTimeout(() => {
-        chrome.runtime.onMessage.removeListener(completionListener);
-        const duration = Date.now() - sessionData.startTime;
-        resolve({
-          success: false,
-          sessionId,
-          result: null,
-          error: 'Execution safety timeout reached',
-          duration,
-          tokensUsed: 0,
-          costUsd: 0,
-          iterations: sessionData.iterationCount || 0
-        });
-      }, Math.min(maxIterations * 30000, 4 * 60 * 1000));
-
-      // Store timeout for cleanup
-      sessionData._safetyTimeout = safetyTimeout;
-
-      // Start the modular agent loop (Phase 181, D-01/D-02)
-      const agentTaskHooks = createSessionHooks(sessionId);
-      runAgentLoop(sessionId, {
-        activeSessions,
-        persistSession,
-        sendSessionStatus,
-        broadcastDashboardProgress: typeof broadcastDashboardProgress === 'function' ? broadcastDashboardProgress : function() {},
-        endSessionOverlays,
-        cleanupSession,
-        startKeepAlive,
-        executeCDPToolDirect: executeCDPToolDirect,
-        handleDataTool: null,
-        resolveAuthWall: typeof resolveAuthWall === 'function' ? resolveAuthWall : null,
-        hooks: agentTaskHooks,
-        emitter: null
-      });
-
-    } catch (error) {
-      resolve({
-        success: false,
-        sessionId: null,
-        result: null,
-        error: error.message,
-        duration: 0,
-        tokensUsed: 0,
-        costUsd: 0,
-        iterations: 0
-      });
-    }
-  });
 }
 
 
@@ -21205,72 +20895,6 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     }
     return;
   }
-
-  // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-//   const agentId = agentScheduler.getAgentIdFromAlarm(alarm.name);
-//   if (!agentId) return; // Not an FSB agent alarm
-//
-//   console.log('[FSB] Agent alarm fired:', alarm.name);
-//
-//   try {
-//     const agent = await agentManager.getAgent(agentId);
-//     if (!agent) {
-//       console.warn('[FSB] Agent not found for alarm, clearing:', agentId);
-//       await agentScheduler.clearAlarm(agentId);
-//       return;
-//     }
-//
-//     if (!agent.enabled) {
-//       console.log('[FSB] Agent disabled, skipping:', agentId);
-//       return;
-//     }
-//
-//     // Guard against double-runs
-//     if (!agentScheduler.isValidAlarmFire(agent)) {
-//       console.log('[FSB] Agent alarm fired too soon, skipping:', agentId);
-//       return;
-//     }
-//
-//     // Execute the agent
-//     const result = await agentExecutor.execute(agent);
-//
-//     // Record the run
-//     const updatedAgent = await agentManager.recordRun(agentId, result);
-//
-//     // Reschedule daily agents for their next occurrence
-//     if (agent.schedule.type === 'daily') {
-//       await agentScheduler.rescheduleDaily(updatedAgent);
-//     }
-//
-//     // Disable once-type agents after execution
-//     if (agent.schedule.type === 'once') {
-//       await agentManager.updateAgent(agentId, { enabled: false });
-//       await agentScheduler.clearAlarm(agentId);
-//     }
-//
-//     // Notify any open UI about the run completion
-//     chrome.runtime.sendMessage({
-//       action: 'agentRunComplete',
-//       agentId: agentId,
-//       result: {
-//         success: result.success,
-//         duration: result.duration,
-//         error: result.error
-//       }
-//     }).catch((err) => {
-//       console.warn('[FSB] agentRunComplete sendMessage delivery failed', { agentId, error: err && err.message });
-//     });
-//
-//     // Sync to server if enabled
-//     if (updatedAgent.syncEnabled && typeof serverSync !== 'undefined') {
-//       serverSync.syncRun(updatedAgent, result).catch(err => {
-//         console.warn('[FSB] Server sync failed:', err.message);
-//       });
-//     }
-//
-//   } catch (error) {
-//     console.error('[FSB] Agent alarm handler error:', error.message);
-//   }
 });
 
 // Phase 6 Plan 06-02 (FINT-07): SW-side startup wiring for the offscreen
@@ -21301,8 +20925,26 @@ async function ensureLatticeOffscreen() {
 }
 globalThis.ensureLatticeOffscreen = ensureLatticeOffscreen;
 
+// Background agents were removed in v0.9.45rc1. Every extension update
+// deletes what they left behind: saved definitions, the server sync queue,
+// the retired control-panel notice flag, and any scheduled fsb_agent_* alarms.
+const RETIRED_AGENT_STORAGE_KEYS = ['bgAgents', 'fsb_sync_queue', 'fsb_sunset_notice_dismissed'];
+const RETIRED_AGENT_ALARM_PREFIX = 'fsb_agent_';
+
+async function clearRetiredBackgroundAgentData() {
+  try {
+    await chrome.storage.local.remove(RETIRED_AGENT_STORAGE_KEYS);
+    const alarms = await chrome.alarms.getAll();
+    await Promise.all(alarms
+      .filter((alarm) => alarm.name.startsWith(RETIRED_AGENT_ALARM_PREFIX))
+      .map((alarm) => chrome.alarms.clear(alarm.name)));
+  } catch (error) {
+    console.warn('[FSB BG] Retired background agent cleanup failed:', error && error.message);
+  }
+}
+
 // Set up side panel behavior
-chrome.runtime.onInstalled.addListener(async () => {
+chrome.runtime.onInstalled.addListener(async (details) => {
   automationLogger.logInit('extension', 'installed', { version: chrome.runtime.getManifest().version });
 
   // Initialize analytics
@@ -21370,9 +21012,9 @@ chrome.runtime.onInstalled.addListener(async () => {
     automationLogger.debug('Side panel API not available', { chromeVersion: 'below 114' });
   }
 
-  // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-  // Reschedule all background agents (retired in v0.9.45rc1)
-  // agentScheduler.rescheduleAllAgents();
+  if (details && details.reason === 'update') {
+    await clearRetiredBackgroundAgentData();
+  }
 
   // Connect to local MCP bridge (auto-reconnects if server not running yet)
   armMcpBridge('runtime.onInstalled');
@@ -21410,9 +21052,6 @@ chrome.runtime.onStartup.addListener(async () => {
   await loadDebugMode();
   // Restore sessions from storage so stop button works after service worker restart
   await restoreSessionsFromStorage();
-  // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-  // Reschedule all background agents (retired in v0.9.45rc1)
-  // agentScheduler.rescheduleAllAgents();
 
   // Connect to local MCP bridge (auto-reconnects if server not running yet)
   armMcpBridge('runtime.onStartup');

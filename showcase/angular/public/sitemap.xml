@@ -2,12 +2,13 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml" xmlns:video="http://www.google.com/schemas/sitemap-video/1.1">
   <url>
     <loc>https://full-selfbrowsing.com</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN"/>
@@ -16,12 +17,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/es</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN"/>
@@ -30,12 +32,28 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/de</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko"/>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN"/>
+    <xhtml:link rel="alternate" hreflang="zh-TW" href="https://full-selfbrowsing.com/zh-TW"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://full-selfbrowsing.com"/>
+  </url>
+  <url>
+    <loc>https://full-selfbrowsing.com/ru</loc>
+    <lastmod>2026-10-16</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN"/>
@@ -44,12 +62,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/ja</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN"/>
@@ -58,12 +77,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/ko</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN"/>
@@ -72,12 +92,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/zh-CN</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN"/>
@@ -86,12 +107,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/zh-TW</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN"/>
@@ -100,12 +122,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/about</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/about"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/about"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/about"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/about"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/about"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/about"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/about"/>
@@ -122,12 +145,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/es/about</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/about"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/about"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/about"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/about"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/about"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/about"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/about"/>
@@ -144,12 +168,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/de/about</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/about"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/about"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/about"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/about"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/about"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/about"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/about"/>
@@ -165,13 +190,37 @@
     </video:video>
   </url>
   <url>
-    <loc>https://full-selfbrowsing.com/ja/about</loc>
-    <lastmod>2026-10-14</lastmod>
+    <loc>https://full-selfbrowsing.com/ru/about</loc>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/about"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/about"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/about"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/about"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/about"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/about"/>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/about"/>
+    <xhtml:link rel="alternate" hreflang="zh-TW" href="https://full-selfbrowsing.com/zh-TW/about"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://full-selfbrowsing.com/about"/>
+    <video:video>
+      <video:thumbnail_loc>https://i.ytimg.com/vi/osNHSquClo0/hqdefault.jpg</video:thumbnail_loc>
+      <video:title>Демо FSB: автоматизация браузера на базе AI в Chrome</video:title>
+      <video:description>Посмотрите 33-секундный трейлер Full Self-Browsing. FSB — расширение для Chrome с открытым исходным кодом: автоматизация браузера на естественном языке и подключение AI-агентов к настоящему браузеру через MCP.</video:description>
+      <video:player_loc>https://www.youtube-nocookie.com/embed/osNHSquClo0</video:player_loc>
+      <video:duration>33</video:duration>
+      <video:publication_date>2026-09-06T18:41:54-07:00</video:publication_date>
+    </video:video>
+  </url>
+  <url>
+    <loc>https://full-selfbrowsing.com/ja/about</loc>
+    <lastmod>2026-10-16</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/about"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/about"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/about"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/about"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/about"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/about"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/about"/>
@@ -188,12 +237,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/ko/about</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/about"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/about"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/about"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/about"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/about"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/about"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/about"/>
@@ -210,12 +260,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/zh-CN/about</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/about"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/about"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/about"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/about"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/about"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/about"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/about"/>
@@ -232,12 +283,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/zh-TW/about</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/about"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/about"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/about"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/about"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/about"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/about"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/about"/>
@@ -254,12 +306,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/agents</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/agents"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/agents"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/agents"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/agents"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/agents"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/agents"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/agents"/>
@@ -268,12 +321,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/es/agents</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/agents"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/agents"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/agents"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/agents"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/agents"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/agents"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/agents"/>
@@ -282,12 +336,28 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/de/agents</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/agents"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/agents"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/agents"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/agents"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/agents"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/agents"/>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/agents"/>
+    <xhtml:link rel="alternate" hreflang="zh-TW" href="https://full-selfbrowsing.com/zh-TW/agents"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://full-selfbrowsing.com/agents"/>
+  </url>
+  <url>
+    <loc>https://full-selfbrowsing.com/ru/agents</loc>
+    <lastmod>2026-10-16</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/agents"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/agents"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/agents"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/agents"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/agents"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/agents"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/agents"/>
@@ -296,12 +366,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/ja/agents</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/agents"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/agents"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/agents"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/agents"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/agents"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/agents"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/agents"/>
@@ -310,12 +381,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/ko/agents</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/agents"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/agents"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/agents"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/agents"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/agents"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/agents"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/agents"/>
@@ -324,12 +396,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/zh-CN/agents</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/agents"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/agents"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/agents"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/agents"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/agents"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/agents"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/agents"/>
@@ -338,12 +411,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/zh-TW/agents</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/agents"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/agents"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/agents"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/agents"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/agents"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/agents"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/agents"/>
@@ -352,12 +426,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/support</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/support"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/support"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/support"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/support"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/support"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/support"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/support"/>
@@ -366,12 +441,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/es/support</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/support"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/support"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/support"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/support"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/support"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/support"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/support"/>
@@ -380,12 +456,28 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/de/support</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/support"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/support"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/support"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/support"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/support"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/support"/>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/support"/>
+    <xhtml:link rel="alternate" hreflang="zh-TW" href="https://full-selfbrowsing.com/zh-TW/support"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://full-selfbrowsing.com/support"/>
+  </url>
+  <url>
+    <loc>https://full-selfbrowsing.com/ru/support</loc>
+    <lastmod>2026-10-16</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/support"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/support"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/support"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/support"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/support"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/support"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/support"/>
@@ -394,12 +486,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/ja/support</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/support"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/support"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/support"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/support"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/support"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/support"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/support"/>
@@ -408,12 +501,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/ko/support</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/support"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/support"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/support"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/support"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/support"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/support"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/support"/>
@@ -422,12 +516,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/zh-CN/support</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/support"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/support"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/support"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/support"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/support"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/support"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/support"/>
@@ -436,12 +531,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/zh-TW/support</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/support"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/support"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/support"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/support"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/support"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/support"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/support"/>
@@ -450,12 +546,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/privacy</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.5</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/privacy"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/privacy"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/privacy"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/privacy"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/privacy"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/privacy"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/privacy"/>
@@ -464,12 +561,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/es/privacy</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.5</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/privacy"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/privacy"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/privacy"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/privacy"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/privacy"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/privacy"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/privacy"/>
@@ -478,12 +576,28 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/de/privacy</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.5</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/privacy"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/privacy"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/privacy"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/privacy"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/privacy"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/privacy"/>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/privacy"/>
+    <xhtml:link rel="alternate" hreflang="zh-TW" href="https://full-selfbrowsing.com/zh-TW/privacy"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://full-selfbrowsing.com/privacy"/>
+  </url>
+  <url>
+    <loc>https://full-selfbrowsing.com/ru/privacy</loc>
+    <lastmod>2026-10-16</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.5</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/privacy"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/privacy"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/privacy"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/privacy"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/privacy"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/privacy"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/privacy"/>
@@ -492,12 +606,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/ja/privacy</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.5</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/privacy"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/privacy"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/privacy"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/privacy"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/privacy"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/privacy"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/privacy"/>
@@ -506,12 +621,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/ko/privacy</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.5</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/privacy"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/privacy"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/privacy"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/privacy"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/privacy"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/privacy"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/privacy"/>
@@ -520,12 +636,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/zh-CN/privacy</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.5</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/privacy"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/privacy"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/privacy"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/privacy"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/privacy"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/privacy"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/privacy"/>
@@ -534,12 +651,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/zh-TW/privacy</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.5</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/privacy"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/privacy"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/privacy"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/privacy"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/privacy"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/privacy"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/privacy"/>
@@ -548,12 +666,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/release-notes</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/release-notes"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/release-notes"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/release-notes"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/release-notes"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/release-notes"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/release-notes"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/release-notes"/>
@@ -562,12 +681,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/es/release-notes</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/release-notes"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/release-notes"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/release-notes"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/release-notes"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/release-notes"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/release-notes"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/release-notes"/>
@@ -576,12 +696,28 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/de/release-notes</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/release-notes"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/release-notes"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/release-notes"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/release-notes"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/release-notes"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/release-notes"/>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/release-notes"/>
+    <xhtml:link rel="alternate" hreflang="zh-TW" href="https://full-selfbrowsing.com/zh-TW/release-notes"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://full-selfbrowsing.com/release-notes"/>
+  </url>
+  <url>
+    <loc>https://full-selfbrowsing.com/ru/release-notes</loc>
+    <lastmod>2026-10-16</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/release-notes"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/release-notes"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/release-notes"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/release-notes"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/release-notes"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/release-notes"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/release-notes"/>
@@ -590,12 +726,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/ja/release-notes</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/release-notes"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/release-notes"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/release-notes"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/release-notes"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/release-notes"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/release-notes"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/release-notes"/>
@@ -604,12 +741,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/ko/release-notes</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/release-notes"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/release-notes"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/release-notes"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/release-notes"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/release-notes"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/release-notes"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/release-notes"/>
@@ -618,12 +756,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/zh-CN/release-notes</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/release-notes"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/release-notes"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/release-notes"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/release-notes"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/release-notes"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/release-notes"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/release-notes"/>
@@ -632,12 +771,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/zh-TW/release-notes</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/release-notes"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/release-notes"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/release-notes"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/release-notes"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/release-notes"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/release-notes"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/release-notes"/>
@@ -646,12 +786,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/lattice</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/lattice"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/lattice"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/lattice"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/lattice"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/lattice"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/lattice"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/lattice"/>
@@ -660,12 +801,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/es/lattice</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/lattice"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/lattice"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/lattice"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/lattice"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/lattice"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/lattice"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/lattice"/>
@@ -674,12 +816,28 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/de/lattice</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/lattice"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/lattice"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/lattice"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/lattice"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/lattice"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/lattice"/>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/lattice"/>
+    <xhtml:link rel="alternate" hreflang="zh-TW" href="https://full-selfbrowsing.com/zh-TW/lattice"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://full-selfbrowsing.com/lattice"/>
+  </url>
+  <url>
+    <loc>https://full-selfbrowsing.com/ru/lattice</loc>
+    <lastmod>2026-10-16</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/lattice"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/lattice"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/lattice"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/lattice"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/lattice"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/lattice"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/lattice"/>
@@ -688,12 +846,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/ja/lattice</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/lattice"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/lattice"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/lattice"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/lattice"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/lattice"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/lattice"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/lattice"/>
@@ -702,12 +861,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/ko/lattice</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/lattice"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/lattice"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/lattice"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/lattice"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/lattice"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/lattice"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/lattice"/>
@@ -716,12 +876,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/zh-CN/lattice</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/lattice"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/lattice"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/lattice"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/lattice"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/lattice"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/lattice"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/lattice"/>
@@ -730,12 +891,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/zh-TW/lattice</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/lattice"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/lattice"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/lattice"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/lattice"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/lattice"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/lattice"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/lattice"/>
@@ -744,12 +906,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/concierge</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/concierge"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/concierge"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/concierge"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/concierge"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/concierge"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/concierge"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/concierge"/>
@@ -758,12 +921,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/es/concierge</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/concierge"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/concierge"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/concierge"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/concierge"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/concierge"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/concierge"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/concierge"/>
@@ -772,12 +936,28 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/de/concierge</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/concierge"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/concierge"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/concierge"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/concierge"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/concierge"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/concierge"/>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/concierge"/>
+    <xhtml:link rel="alternate" hreflang="zh-TW" href="https://full-selfbrowsing.com/zh-TW/concierge"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://full-selfbrowsing.com/concierge"/>
+  </url>
+  <url>
+    <loc>https://full-selfbrowsing.com/ru/concierge</loc>
+    <lastmod>2026-10-16</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/concierge"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/concierge"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/concierge"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/concierge"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/concierge"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/concierge"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/concierge"/>
@@ -786,12 +966,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/ja/concierge</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/concierge"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/concierge"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/concierge"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/concierge"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/concierge"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/concierge"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/concierge"/>
@@ -800,12 +981,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/ko/concierge</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/concierge"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/concierge"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/concierge"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/concierge"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/concierge"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/concierge"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/concierge"/>
@@ -814,12 +996,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/zh-CN/concierge</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/concierge"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/concierge"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/concierge"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/concierge"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/concierge"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/concierge"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/concierge"/>
@@ -828,12 +1011,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/zh-TW/concierge</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/concierge"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/concierge"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/concierge"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/concierge"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/concierge"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/concierge"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/concierge"/>
@@ -842,12 +1026,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/phantom-stream</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/phantom-stream"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/phantom-stream"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/phantom-stream"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/phantom-stream"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/phantom-stream"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/phantom-stream"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/phantom-stream"/>
@@ -856,12 +1041,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/es/phantom-stream</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/phantom-stream"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/phantom-stream"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/phantom-stream"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/phantom-stream"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/phantom-stream"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/phantom-stream"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/phantom-stream"/>
@@ -870,12 +1056,28 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/de/phantom-stream</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/phantom-stream"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/phantom-stream"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/phantom-stream"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/phantom-stream"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/phantom-stream"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/phantom-stream"/>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/phantom-stream"/>
+    <xhtml:link rel="alternate" hreflang="zh-TW" href="https://full-selfbrowsing.com/zh-TW/phantom-stream"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://full-selfbrowsing.com/phantom-stream"/>
+  </url>
+  <url>
+    <loc>https://full-selfbrowsing.com/ru/phantom-stream</loc>
+    <lastmod>2026-10-16</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/phantom-stream"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/phantom-stream"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/phantom-stream"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/phantom-stream"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/phantom-stream"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/phantom-stream"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/phantom-stream"/>
@@ -884,12 +1086,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/ja/phantom-stream</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/phantom-stream"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/phantom-stream"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/phantom-stream"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/phantom-stream"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/phantom-stream"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/phantom-stream"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/phantom-stream"/>
@@ -898,12 +1101,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/ko/phantom-stream</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/phantom-stream"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/phantom-stream"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/phantom-stream"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/phantom-stream"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/phantom-stream"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/phantom-stream"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/phantom-stream"/>
@@ -912,12 +1116,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/zh-CN/phantom-stream</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/phantom-stream"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/phantom-stream"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/phantom-stream"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/phantom-stream"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/phantom-stream"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/phantom-stream"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/phantom-stream"/>
@@ -926,12 +1131,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/zh-TW/phantom-stream</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/phantom-stream"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/phantom-stream"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/phantom-stream"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/phantom-stream"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/phantom-stream"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/phantom-stream"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/phantom-stream"/>
@@ -940,12 +1146,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/prometheus</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/prometheus"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/prometheus"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/prometheus"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/prometheus"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/prometheus"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/prometheus"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/prometheus"/>
@@ -954,12 +1161,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/es/prometheus</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/prometheus"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/prometheus"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/prometheus"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/prometheus"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/prometheus"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/prometheus"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/prometheus"/>
@@ -968,12 +1176,28 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/de/prometheus</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/prometheus"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/prometheus"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/prometheus"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/prometheus"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/prometheus"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/prometheus"/>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/prometheus"/>
+    <xhtml:link rel="alternate" hreflang="zh-TW" href="https://full-selfbrowsing.com/zh-TW/prometheus"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://full-selfbrowsing.com/prometheus"/>
+  </url>
+  <url>
+    <loc>https://full-selfbrowsing.com/ru/prometheus</loc>
+    <lastmod>2026-10-16</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/prometheus"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/prometheus"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/prometheus"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/prometheus"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/prometheus"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/prometheus"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/prometheus"/>
@@ -982,12 +1206,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/ja/prometheus</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/prometheus"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/prometheus"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/prometheus"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/prometheus"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/prometheus"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/prometheus"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/prometheus"/>
@@ -996,12 +1221,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/ko/prometheus</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/prometheus"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/prometheus"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/prometheus"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/prometheus"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/prometheus"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/prometheus"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/prometheus"/>
@@ -1010,12 +1236,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/zh-CN/prometheus</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/prometheus"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/prometheus"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/prometheus"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/prometheus"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/prometheus"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/prometheus"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/prometheus"/>
@@ -1024,12 +1251,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/zh-TW/prometheus</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/prometheus"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/prometheus"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/prometheus"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/prometheus"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/prometheus"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/prometheus"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/prometheus"/>
@@ -1038,12 +1266,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/sitemaps</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/sitemaps"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/sitemaps"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/sitemaps"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/sitemaps"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/sitemaps"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/sitemaps"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/sitemaps"/>
@@ -1052,12 +1281,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/es/sitemaps</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/sitemaps"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/sitemaps"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/sitemaps"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/sitemaps"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/sitemaps"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/sitemaps"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/sitemaps"/>
@@ -1066,12 +1296,28 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/de/sitemaps</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/sitemaps"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/sitemaps"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/sitemaps"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/sitemaps"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/sitemaps"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/sitemaps"/>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/sitemaps"/>
+    <xhtml:link rel="alternate" hreflang="zh-TW" href="https://full-selfbrowsing.com/zh-TW/sitemaps"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://full-selfbrowsing.com/sitemaps"/>
+  </url>
+  <url>
+    <loc>https://full-selfbrowsing.com/ru/sitemaps</loc>
+    <lastmod>2026-10-16</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/sitemaps"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/sitemaps"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/sitemaps"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/sitemaps"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/sitemaps"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/sitemaps"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/sitemaps"/>
@@ -1080,12 +1326,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/ja/sitemaps</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/sitemaps"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/sitemaps"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/sitemaps"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/sitemaps"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/sitemaps"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/sitemaps"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/sitemaps"/>
@@ -1094,12 +1341,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/ko/sitemaps</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/sitemaps"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/sitemaps"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/sitemaps"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/sitemaps"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/sitemaps"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/sitemaps"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/sitemaps"/>
@@ -1108,12 +1356,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/zh-CN/sitemaps</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/sitemaps"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/sitemaps"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/sitemaps"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/sitemaps"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/sitemaps"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/sitemaps"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/sitemaps"/>
@@ -1122,12 +1371,13 @@
   </url>
   <url>
     <loc>https://full-selfbrowsing.com/zh-TW/sitemaps</loc>
-    <lastmod>2026-10-14</lastmod>
+    <lastmod>2026-10-16</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://full-selfbrowsing.com/sitemaps"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://full-selfbrowsing.com/es/sitemaps"/>
     <xhtml:link rel="alternate" hreflang="de" href="https://full-selfbrowsing.com/de/sitemaps"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://full-selfbrowsing.com/ru/sitemaps"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://full-selfbrowsing.com/ja/sitemaps"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://full-selfbrowsing.com/ko/sitemaps"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://full-selfbrowsing.com/zh-CN/sitemaps"/>

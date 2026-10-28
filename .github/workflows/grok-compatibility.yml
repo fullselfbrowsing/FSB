@@ -1,0 +1,58 @@
+name: Grok CLI compatibility
+
+on:
+  schedule:
+    - cron: '27 10 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: grok-compatibility-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  stable-cli:
+    name: stable CLI (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install MCP build dependencies
+        run: npm --prefix mcp ci --no-audit --no-fund
+      - name: Build the checked-out integration
+        run: npm --prefix mcp run build
+      - name: Prepare Linux sandbox dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bubblewrap
+      - name: Install official stable Grok in a disposable directory
+        shell: bash
+        env:
+          GROK_CHANNEL: stable
+        run: |
+          export GROK_BIN_DIR="$RUNNER_TEMP/fsb-grok-bin"
+          mkdir -p "$GROK_BIN_DIR"
+          curl --fail --silent --show-error --location --proto '=https' https://x.ai/cli/install.sh --output "$RUNNER_TEMP/install-grok.sh"
+          bash "$RUNNER_TEMP/install-grok.sh"
+      - name: Probe capabilities without credentials or inference
+        shell: bash
+        run: |
+          set -o pipefail
+          node scripts/check-grok-compatibility.mjs --binary "$RUNNER_TEMP/fsb-grok-bin/grok" | tee "$RUNNER_TEMP/grok-compatibility.json"
+      - name: Upload bounded compatibility result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: grok-compatibility-${{ matrix.os }}
+          path: ${{ runner.temp }}/grok-compatibility.json
+          if-no-files-found: ignore

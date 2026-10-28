@@ -1,5 +1,62 @@
 // FSB Modern Dashboard Control Panel Script
 
+function fsbUiLine(english, subs) {
+  if (globalThis.fsbUiLocale && typeof fsbUiLocale.line === 'function') return fsbUiLocale.line(english, subs);
+  if (!english || typeof english !== 'string') return english;
+  if (!subs) return english;
+  return english.replace(/\$([A-Za-z0-9_]+)\$/g, function (all, name) {
+    var value = subs[name] != null ? subs[name] : subs[name.toLowerCase()];
+    if (value && typeof value === 'object' && typeof value.english === 'string') return fsbUiLine(value.english, value.subs);
+    return value == null ? all : String(value);
+  });
+}
+
+function fsbUiSet(node, english, subs) {
+  if (!node) return;
+  if (globalThis.fsbUiLocale && typeof fsbUiLocale.markExact === 'function') fsbUiLocale.markExact(node, english, subs);
+  else node.textContent = subs ? fsbUiLine(english, subs) : english;
+}
+
+// Escapes quotes as well as markup, so the result is safe in text and attributes.
+// The quotes are written as \u0022 and \u0027 so tests that lift this function
+// out by scanning for quotes stay aligned.
+function fsbUiEscape(value) {
+  return String(value == null ? '' : value).replace(/[&<>\u0022\u0027]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+// The catalog key for an English template, when the page registers one.
+function fsbUiExactKey(english) {
+  const exact = globalThis.fsbUiLocale && fsbUiLocale.exact;
+  return exact && typeof english === 'string' && Object.prototype.hasOwnProperty.call(exact, english) ? exact[english] : null;
+}
+
+// Substitutions as stored on a live node. JSON turns NaN and Infinity into
+// null, so non-finite numbers are kept as their string form.
+function fsbUiSubsJson(subs) {
+  return JSON.stringify(subs, (name, value) => (typeof value === 'number' && !Number.isFinite(value) ? String(value) : value));
+}
+
+// Control panel copy for HTML templates, in text positions only (never inside
+// an attribute or a node that fsbUiSet() writes later). Catalog copy is
+// wrapped in a live node, the same one fill() writes, so a language change
+// rewrites it in place.
+function fsbUiHtml(english, subs) {
+  const shown = fsbUiEscape(fsbUiLine(english, subs));
+  const key = fsbUiExactKey(english);
+  if (!key) return shown;
+  let attrs = ' data-i18n-live="' + fsbUiEscape(key) + '" data-i18n-en="' + fsbUiEscape(english) + '"';
+  if (subs && typeof subs === 'object') attrs += ' data-i18n-subs="' + fsbUiEscape(fsbUiSubsJson(subs)) + '"';
+  return '<span' + attrs + ' data-i18n-shown="' + shown + '">' + shown + '</span>';
+}
+
+// A tooltip for an HTML template. The data-i18n-attr key lets apply() rewrite
+// it after a language change.
+function fsbUiTitle(english) {
+  const title = 'title="' + fsbUiEscape(fsbUiLine(english)) + '"';
+  const key = fsbUiExactKey(english);
+  return key ? title + ' data-i18n-attr="title:' + fsbUiEscape(key) + '"' : title;
+}
+
 // Default settings
 const defaultSettings = {
   providerKind: 'api',
@@ -93,15 +150,15 @@ async function resolveRecommendedAgentCap() {
 
 function updateAgentCapResetLabel() {
   if (!elements.fsbAgentCapReset) return;
-  const text = 'Reset to recommended (' + fsbRecommendedAgentCap + ')';
+  const english = 'Reset to recommended ($COUNT$)';
+  const subs = { count: fsbRecommendedAgentCap };
   // The button carries a leading <i> icon -- write into the inner label span
   // so re-renders don't wipe it out via a bare .textContent = on the button.
-  const label = elements.fsbAgentCapReset.querySelector('.form-secondary-btn__label');
-  if (label) {
-    label.textContent = text;
-  } else {
-    elements.fsbAgentCapReset.textContent = text;
-  }
+  const label = elements.fsbAgentCapReset.querySelector('.form-secondary-btn__label') || elements.fsbAgentCapReset;
+  const locale = globalThis.fsbUiLocale;
+  const key = locale && locale.exact && locale.exact[english];
+  if (key && typeof locale.fill === 'function') locale.fill(label, key, english, subs);
+  else label.textContent = fsbUiLine(english, subs);
 }
 
 function setAgentCapControlValue(value) {
@@ -229,6 +286,11 @@ function initializeDashboard() {
   // reflects the persisted setting when the widget reads its initial state.
   initFsbSelects();
 
+  // The widget copies option text once, so re-copy it whenever the locale
+  // translates the hidden native options (after boot and on every change).
+  if (globalThis.fsbUiLocale && typeof fsbUiLocale.onChange === 'function') fsbUiLocale.onChange(refreshFsbSelectOptions);
+  refreshFsbSelectOptions();
+
   // Initialize sections
   initializeSections();
 
@@ -248,6 +310,11 @@ function initializeDashboard() {
     analytics.initPromise.then(() => {
       console.log('Options page: Analytics initialized, setting up dashboard...');
       analytics.initializeChart();
+      // The chart draws its labels on a canvas, so a language change has to
+      // re-label it directly.
+      if (globalThis.fsbUiLocale && typeof fsbUiLocale.onChange === 'function') {
+        fsbUiLocale.onChange(() => analytics.updateChartLocale());
+      }
       analytics.updateDashboard();
       loadDashboardCostBreakdown();
     }).catch(error => {
@@ -466,7 +533,9 @@ function renderProviderKind() {
   }
   if (requiresProviderReselection && elements.retiredAgentProviderNoticeText) {
     const retiredLabel = getAgentProviderLabel(providerPanelState.retiredAgentProviderId);
-    elements.retiredAgentProviderNoticeText.textContent = `${retiredLabel} is no longer available for Autopilot. Select and save another provider before starting a new task.`;
+    fsbUiSet(elements.retiredAgentProviderNoticeText,
+      '$NAME$ is no longer available for Autopilot. Select and save another provider before starting a new task.',
+      { name: retiredLabel });
   }
   if (elements.fullApiTest) {
     elements.fullApiTest.hidden = requiresProviderReselection;
@@ -481,12 +550,14 @@ function renderProviderKind() {
   if (showAgentDetails) {
     const label = getAgentProviderLabel(providerPanelState.agentProviderId);
     if (elements.agentProviderDetailsHeading) {
-      elements.agentProviderDetailsHeading.textContent = `${label} connection`;
+      fsbUiSet(elements.agentProviderDetailsHeading, '$NAME$ connection', { name: label });
     }
     if (elements.agentProviderHelp) {
-      elements.agentProviderHelp.textContent = showGrokBuild
-        ? 'FSB uses a separate private Grok profile. Connect SuperGrok with browser OAuth; no API key or model selection is used.'
-        : `FSB uses ${label}'s existing local sign-in. Test Connection sends one small no-tools validation request.`;
+      if (showGrokBuild) {
+        fsbUiSet(elements.agentProviderHelp, 'FSB uses a separate private Grok profile. Connect SuperGrok with browser OAuth; no API key or model selection is used.');
+      } else {
+        fsbUiSet(elements.agentProviderHelp, 'FSB uses $NAME$\'s existing local sign-in. Test Connection sends one small no-tools validation request.', { name: label });
+      }
     }
   }
   if (showGrokBuild) {
@@ -541,7 +612,7 @@ function renderGrokBuildAuthState(state, progressState) {
     ? progressState === 'authenticated'
     : safeState === 'oauth';
   if (elements.grokBuildAuthStatus) {
-    elements.grokBuildAuthStatus.textContent = progressLabel || labels[safeState];
+    fsbUiSet(elements.grokBuildAuthStatus, progressLabel || labels[safeState]);
     if (elements.grokBuildAuthStatus.dataset) {
       elements.grokBuildAuthStatus.dataset.state = connected ? 'on' : 'off';
     }
@@ -594,7 +665,19 @@ function grokBuildSignInFailureMessage(reason, errorCode) {
     return 'Grok Build could not clean up a previous session, so sign-in is blocked. Refresh status to retry cleanup.';
   }
   if (reason === 'sandbox_unavailable') {
-    return 'The Grok CLI refused to start under the strict sandbox FSB requires, so sign-in is blocked. The CLI is installed and your account is fine.';
+    return 'The Grok CLI could not start the strict sandbox FSB requires. Resolve the local sandbox environment problem, then try again.';
+  }
+  if (reason === 'capability_missing') {
+    return 'This CLI does not provide the capabilities FSB requires.';
+  }
+  if (reason === 'isolation_unavailable') {
+    return 'FSB could not verify that this CLI is isolated from external configuration and tools.';
+  }
+  if (reason === 'agent_protocol_drift') {
+    return 'This CLI returned an incompatible protocol response.';
+  }
+  if (reason === 'binary_changed') {
+    return 'The CLI changed during verification. Refresh status to verify the updated executable.';
   }
   if (reason === 'adapter_unavailable') {
     return 'FSB could not run the Grok CLI. Check that it is installed, then refresh status.';
@@ -698,7 +781,7 @@ async function beginGrokBuildAuth() {
 
 async function disconnectGrokBuildAuth() {
   if (grokBuildAuthRequest) return grokBuildAuthRequest;
-  if (!window.confirm('Disconnect the private FSB Grok Build profile? Your normal Grok login is unchanged.')) {
+  if (!window.confirm(fsbUiLine('Disconnect the private FSB Grok Build profile? Your normal Grok login is unchanged.'))) {
     return grokBuildAuthState;
   }
   const request = (async () => {
@@ -1488,6 +1571,13 @@ function initSidebarProximity() {
     if (!sp || sp.querySelector('.nav-label')) return;
     const lab = document.createElement('span');
     lab.className = 'nav-label';
+    // apply() skips keyed nodes that hold child markup, so the locale key
+    // moves with the text onto the new leaf.
+    const key = sp.getAttribute('data-i18n');
+    if (key) {
+      lab.setAttribute('data-i18n', key);
+      sp.removeAttribute('data-i18n');
+    }
     while (sp.firstChild) { lab.appendChild(sp.firstChild); }
     sp.appendChild(lab);
   });
@@ -1575,6 +1665,52 @@ function syncFsbSelectLabels() {
   });
 }
 
+// True when the custom menu lists the native options' values in order.
+function fsbSelectMenuMatches(sel, menu) {
+  if (menu.children.length !== sel.options.length) return false;
+  return Array.prototype.every.call(sel.options, (o, i) => menu.children[i].getAttribute('data-value') === o.value);
+}
+
+// Re-copies each native option's text into its custom menu item, matched by
+// value, then re-syncs the button label. The locale translates only the hidden
+// native <option>s, so the widget needs this after boot and on language change.
+// A select whose options were added after initFsbSelects() (the language
+// picker fills its own once the locale has booted) gets its menu rebuilt.
+function refreshFsbSelectOptions() {
+  document.querySelectorAll('.form-select[data-enh="1"], .chart-select[data-enh="1"]').forEach((sel) => {
+    const menu = sel.parentNode && sel.parentNode.querySelector('.fsb-select__menu');
+    if (!menu) return;
+    if (!fsbSelectMenuMatches(sel, menu) && typeof sel._fsbRebuildMenu === 'function') {
+      sel._fsbRebuildMenu();
+    } else {
+      const labels = {};
+      Array.prototype.forEach.call(sel.options, (o) => { labels[o.value] = o.textContent; });
+      Array.prototype.forEach.call(menu.children, (li) => {
+        const value = li.getAttribute('data-value');
+        if (Object.prototype.hasOwnProperty.call(labels, value)) li.textContent = labels[value];
+      });
+    }
+    if (typeof sel._fsbSyncLabel === 'function') sel._fsbSyncLabel();
+  });
+  // Locale callbacks registered after this one can still set a select's value
+  // (the language picker follows a change made on another page), so the
+  // labels are synced again once every callback has run.
+  Promise.resolve().then(syncFsbSelectLabels);
+}
+
+// One custom menu item for a native <option>.
+function buildFsbSelectItem(o, pick) {
+  const li = document.createElement('li');
+  li.className = 'fsb-select__opt';
+  li.setAttribute('role', 'option');
+  li.textContent = o.textContent;
+  li.setAttribute('data-value', o.value);
+  if (o.disabled) li.classList.add('is-disabled');
+  if (o.selected) li.classList.add('is-selected');
+  li.addEventListener('click', () => { if (o.disabled) return; pick(o.value); });
+  return li;
+}
+
 function setFsbSelectCardOpen(wrap, open) {
   const card = typeof wrap.closest === 'function' ? wrap.closest('.settings-card') : null;
   if (card) card.classList.toggle('settings-card--select-open', open);
@@ -1639,18 +1775,19 @@ function initFsbSelects() {
       sel.dispatchEvent(new Event('change', { bubbles: true }));
     }
 
-    Array.prototype.slice.call(sel.options).forEach((o) => {
-      const li = document.createElement('li');
-      li.className = 'fsb-select__opt';
-      li.setAttribute('role', 'option');
-      li.textContent = o.textContent;
-      li.setAttribute('data-value', o.value);
-      if (o.disabled) li.classList.add('is-disabled');
-      if (o.selected) { li.classList.add('is-selected'); lbl.textContent = o.textContent; }
-      li.addEventListener('click', () => { if (o.disabled) return; pick(o.value); });
-      menu.appendChild(li);
-    });
-    if (!lbl.textContent && sel.options[0]) lbl.textContent = sel.options[0].textContent;
+    function fillMenu() {
+      menu.textContent = '';
+      lbl.textContent = '';
+      Array.prototype.slice.call(sel.options).forEach((o) => {
+        menu.appendChild(buildFsbSelectItem(o, pick));
+        if (o.selected) lbl.textContent = o.textContent;
+      });
+      if (!lbl.textContent && sel.options[0]) lbl.textContent = sel.options[0].textContent;
+    }
+    // Stashed like sync() so refreshFsbSelectOptions() can rebuild the menu
+    // when options are added after this runs.
+    sel._fsbRebuildMenu = fillMenu;
+    fillMenu();
 
     sel.parentNode.insertBefore(wrap, sel);
     wrap.appendChild(btn);
@@ -2107,6 +2244,18 @@ function loadSettings() {
 
 let _capCounterDebounceHandle = null;
 
+// Writes "N of M active" as a keyed template so it renders in the UI language
+// and follows a language change; formatCounterText is the no-locale fallback.
+function renderCapCounter(counterEl, active, cap) {
+  if (globalThis.fsbUiLocale && typeof fsbUiLocale.markExact === 'function') {
+    fsbUiLocale.markExact(counterEl, '$ACTIVE$ of $CAP$ active', { active: String(active), cap: String(cap) });
+    return;
+  }
+  counterEl.textContent = (typeof formatCounterText === 'function')
+    ? formatCounterText(active, cap)
+    : (active + ' of ' + cap + ' active');
+}
+
 function scheduleRefreshActiveAgentCount() {
   // 100ms debounce — bulk registry writes during agent ramp-up
   // (8 agents x 1-3 tabs each = up to 24 storage events) collapse to a
@@ -2139,10 +2288,7 @@ function refreshActiveAgentCount() {
         : 0;
       let cap = parseInt(elements.fsbAgentCap && elements.fsbAgentCap.value, 10);
       if (!Number.isFinite(cap)) cap = 8;
-      const text = (typeof formatCounterText === 'function')
-        ? formatCounterText(active, cap)
-        : (active + ' of ' + cap + ' active');
-      counterEl.textContent = text;
+      renderCapCounter(counterEl, active, cap);
     });
   } catch (_e) {
     // Swallow — counter is purely informational and must never throw into
@@ -2180,10 +2326,7 @@ function refreshActiveTriggerCount() {
         : 0;
       let cap = parseInt(elements.fsbTriggerCap && elements.fsbTriggerCap.value, 10);
       if (!Number.isFinite(cap)) cap = 8;
-      const text = (typeof formatCounterText === 'function')
-        ? formatCounterText(active, cap)
-        : (active + ' of ' + cap + ' active');
-      counterEl.textContent = text;
+      renderCapCounter(counterEl, active, cap);
     });
   } catch (_e) {
     // Swallow — counter is purely informational and must never throw into
@@ -2294,7 +2437,7 @@ function validateHostedApiSettingsSelection(providerSettings, selectedModelName)
   updateApiStatusCard(
     'disconnected',
     missingKey ? 'API Key Required' : 'Models Required',
-    message + '.'
+    message
   );
   return false;
 }
@@ -2491,7 +2634,7 @@ async function checkApiConnection() {
     const apiKey = (PROVIDER_KEY_GETTERS[provider] || function () { return ''; })();
     if (!apiKey && provider !== 'lmstudio') {
       updateConnectionStatus('disconnected', 'No API key configured');
-      updateApiStatusCard('disconnected', 'No API Key', 'Configure your ' + (PROVIDER_NAMES[provider] || provider) + ' API key to get started');
+      updateApiStatusCard('disconnected', 'No API Key', 'Configure your $NAME$ API key to get started', { name: PROVIDER_NAMES[provider] || provider });
       return {
         ok: false,
         provider: provider,
@@ -2584,7 +2727,9 @@ function updateConnectionStatus(status, text) {
   }
 }
 
-function updateApiStatusCard(status, title, detail) {
+// detail may be a catalog template with detailSubs; it is passed unfilled so
+// the card keeps its key and follows a language change.
+function updateApiStatusCard(status, title, detail, detailSubs) {
   if (elements.apiStatusCard) {
     elements.apiStatusCard.style.display = 'block';
     elements.apiStatusCard.className = `api-status-card ${status}`;
@@ -2599,9 +2744,76 @@ function updateApiStatusCard(status, title, detail) {
                      'fas fa-exclamation-triangle';
     }
 
-    if (titleElement) titleElement.textContent = title;
-    if (detailElement) detailElement.textContent = detail;
+    if (titleElement) {
+      if (globalThis.fsbUiLocale && typeof fsbUiLocale.markExact === 'function') fsbUiLocale.markExact(titleElement, title);
+      else titleElement.textContent = title;
+    }
+    if (detailElement) {
+      if (globalThis.fsbUiLocale && typeof fsbUiLocale.markExact === 'function') fsbUiLocale.markExact(detailElement, detail, detailSubs);
+      else detailElement.textContent = detailSubs ? fsbUiLine(detail, detailSubs) : detail;
+    }
   }
+}
+
+// The background's failed connection-test sentences as English templates:
+// $NAME$ is the provider label and $COMMAND$ a CLI command. Matching the
+// filled sentence back to its template lets the result render from the
+// catalog in the UI language.
+function agentConnectionFailureTemplates() {
+  return [
+    '$NAME$ is not installed or is not on PATH.',
+    '$NAME$ must be updated to a supported version.',
+    '$NAME$ was found at a supported version, but its isolation or protocol profile could not be verified.',
+    '$NAME$ could not start the required strict sandbox. Resolve the local sandbox environment problem and try again.',
+    '$NAME$ is missing a capability required by FSB.',
+    '$NAME$ capabilities have not been verified. Refresh provider status and check that the native helper is up to date.',
+    '$NAME$ private configuration could not be verified.',
+    '$NAME$ returned an incompatible protocol response.',
+    '$NAME$ changed while it was being checked. Try again.',
+    'Sign in to $NAME$ locally, then try again.',
+    'Connect SuperGrok to the private FSB Grok Build profile, then try again.',
+    '$NAME$ did not respond within 60 seconds.',
+    '$NAME$ connection test was cancelled.',
+    '$NAME$ returned an invalid response.',
+    '$NAME$ attempted to use tools during validation.',
+    '$NAME$ could not complete the validation request.',
+    '$NAME$ validation cleanup did not settle safely.',
+    'Install the FSB native helper, then try again: $COMMAND$',
+    'The FSB native helper is paired with a different extension. Reset pairing with: $COMMAND$. Then try again so FSB can pair this extension automatically.',
+    'The local FSB service did not publish a usable session. Restart it and try again.',
+    'The local FSB agent service could not be reached. Try again.',
+    'Install the FSB native helper for this browser and extension, then try again.',
+    'Select a supported agent provider.',
+    'Connection test failed'
+  ];
+}
+
+// Returns { english, subs } for a sentence that fills one of the templates
+// above, or null when none matches; the sentence is then shown as sent.
+function agentConnectionFailureSource(message) {
+  if (typeof message !== 'string' || !message) return null;
+  const templates = agentConnectionFailureTemplates();
+  for (let i = 0; i < templates.length; i++) {
+    const english = templates[i];
+    const parts = english.split(/\$([A-Z_]+)\$/);
+    const names = [];
+    let pattern = '^';
+    for (let p = 0; p < parts.length; p++) {
+      if (p % 2 === 1) {
+        names.push(parts[p].toLowerCase());
+        pattern += '(.+?)';
+      } else {
+        pattern += parts[p].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      }
+    }
+    const match = new RegExp(pattern + '$').exec(message);
+    if (!match) continue;
+    if (!names.length) return { english };
+    const subs = {};
+    names.forEach((name, n) => { subs[name] = match[n + 1]; });
+    return { english, subs };
+  }
+  return null;
 }
 
 async function runFullApiTest() {
@@ -2610,7 +2822,8 @@ async function runFullApiTest() {
       || providerPanelState.requiresProviderReselection === true) return;
 
   elements.fullApiTest.disabled = true;
-  elements.fullApiTest.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Testing...';
+  elements.fullApiTest.innerHTML = '<i class="fas fa-spinner fa-spin"></i> <span data-i18n="panel_6c02a28421">'
+    + escapeHtml((globalThis.fsbUiLocale && fsbUiLocale.line) ? fsbUiLocale.line('Testing...') : 'Testing...') + '</span>';
   elements.testResults.classList.remove('show');
 
   try {
@@ -2647,32 +2860,43 @@ async function runFullApiTest() {
                   ? response.errorCode.replace(/_/g, ' ')
                   : 'Connection test failed')
           };
+      if (!result.ok) result.errorSource = agentConnectionFailureSource(result.error);
     } else {
       result = await checkApiConnection();
     }
 
     if (isAgent && providerId === 'grok-build' && elements.grokBuildCompatibility) {
-      elements.grokBuildCompatibility.textContent = result.ok
-        ? 'Installed and compatible: Grok Build 1.0.4. Isolation, ACP, and cached OAuth checks passed without sending a prompt.'
-        : `Compatibility check failed: ${result.error || 'installation, version, isolation, ACP, or cached OAuth could not be verified.'}`;
+      // markExact() gives the result a live key, which takes over from the static
+      // data-i18n key of the idle hint, so a later language change rewrites it.
+      if (result.ok) {
+        fsbUiSet(elements.grokBuildCompatibility, 'Verified: Grok protocol, isolation, and cached OAuth checks passed without sending a prompt.');
+      } else if (result.error) {
+        fsbUiSet(elements.grokBuildCompatibility, 'Compatibility check failed: $ERROR$', { error: result.errorSource || result.error });
+      } else {
+        fsbUiSet(elements.grokBuildCompatibility, 'Compatibility check failed: installation, version, isolation, ACP, or cached OAuth could not be verified.');
+      }
     }
 
     elements.testResults.innerHTML = `
-      <h4>Connection Test</h4>
+      <h4>${fsbUiHtml('Connection Test')}</h4>
       <div class="test-result-item">
-        <strong>Provider:</strong> ${escapeHtml(providerName)}
+        <strong>${fsbUiHtml('Provider:')}</strong> ${escapeHtml(providerName)}
       </div>
       <div class="test-result-item">
-        <strong>Status:</strong> ${result.ok ? 'Success' : 'Failed'}
+        <strong>${fsbUiHtml('Status:')}</strong> ${fsbUiHtml(result.ok ? 'Success' : 'Failed')}
       </div>
-      ${result.model ? `<div class="test-result-item"><strong>Model:</strong> ${escapeHtml(result.model)}</div>` : ''}
-      ${Number.isFinite(result.responseTime) ? `<div class="test-result-item"><strong>Response Time:</strong> ${escapeHtml(String(result.responseTime))}ms</div>` : ''}
-      ${result.error ? `<div class="test-result-item error"><strong>Error:</strong> ${escapeHtml(result.error)}</div>` : ''}
+      ${result.model ? `<div class="test-result-item"><strong>${fsbUiHtml('Model:')}</strong> ${escapeHtml(result.model)}</div>` : ''}
+      ${Number.isFinite(result.responseTime) ? `<div class="test-result-item"><strong>${fsbUiHtml('Response Time:')}</strong> ${fsbUiHtml('$MS$ ms', { ms: result.responseTime })}</div>` : ''}
+      ${result.error ? `<div class="test-result-item error"><strong>${fsbUiHtml('Error:')}</strong> ${result.errorSource ? fsbUiHtml(result.errorSource.english, result.errorSource.subs) : escapeHtml(result.error)}</div>` : ''}
     `;
 
     elements.testResults.classList.add('show');
     if (result.ok) {
       if (elements.apiStatusCard) elements.apiStatusCard.style.display = 'none';
+    } else if (result.errorSource && result.errorSource.subs) {
+      updateApiStatusCard('disconnected', 'Connection Failed', result.errorSource.english, result.errorSource.subs);
+    } else if (result.errorSource) {
+      updateApiStatusCard('disconnected', 'Connection Failed', result.errorSource.english);
     } else {
       updateApiStatusCard('disconnected', 'Connection Failed', result.error || 'Test failed');
     }
@@ -2680,9 +2904,9 @@ async function runFullApiTest() {
 
   } catch (error) {
     elements.testResults.innerHTML = `
-      <h4>Connection Test</h4>
+      <h4>${fsbUiHtml('Connection Test')}</h4>
       <div class="test-result-item error">
-        <strong>Error:</strong> ${escapeHtml(error.message)}
+        <strong>${fsbUiHtml('Error:')}</strong> ${escapeHtml(error.message)}
       </div>
     `;
     elements.testResults.classList.add('show');
@@ -2690,7 +2914,8 @@ async function runFullApiTest() {
     updateApiStatusCard('disconnected', 'Connection Error', error.message);
   } finally {
     elements.fullApiTest.disabled = false;
-    elements.fullApiTest.innerHTML = '<i class="fas fa-plug"></i> Test Connection';
+    elements.fullApiTest.innerHTML = '<i class="fas fa-plug"></i> <span data-i18n="panel_c02977b07e">'
+      + escapeHtml((globalThis.fsbUiLocale && fsbUiLocale.line) ? fsbUiLocale.line('Test Connection') : 'Test Connection') + '</span>';
   }
 }
 
@@ -2932,6 +3157,8 @@ function renderConsentOriginList(envelope, auditOrigins) {
     const mutating = !!policy.mutating;
 
     const frag = tmpl.content.cloneNode(true);
+    // apply(document) does not reach <template> content, so translate the clone.
+    if (globalThis.fsbUiLocale && typeof fsbUiLocale.apply === 'function') fsbUiLocale.apply(frag);
     const row = frag.querySelector('.consent-origin-row');
     if (!row) return;
     row.dataset.origin = origin;
@@ -2940,7 +3167,7 @@ function renderConsentOriginList(envelope, auditOrigins) {
     if (nameEl) nameEl.textContent = origin;
 
     const radiogroup = row.querySelector('.consent-mode-toggle');
-    if (radiogroup) radiogroup.setAttribute('aria-label', 'Consent mode for ' + origin);
+    if (radiogroup) radiogroup.setAttribute('aria-label', fsbUiLine('Consent mode for $ORIGIN$', { origin: origin }));
 
     // classify() is the gate's source of truth. denied => Blocked + all controls
     // disabled; sensitive => amber badge only for capability invokes.
@@ -2978,14 +3205,14 @@ function renderConsentOriginList(envelope, auditOrigins) {
       if (blockBadge) blockBadge.style.display = '';
       if (hint) {
         hint.style.display = '';
-        hint.textContent = 'Automation prohibited for this origin. '
+        hint.textContent = fsbUiLine('Automation prohibited for this origin. ')
           + (classified.reason || '');
       }
     } else if (classified.sensitive) {
       if (sensBadge) sensBadge.style.display = '';
       if (hint) {
         hint.style.display = '';
-        hint.textContent = 'Sensitive origin. Capability invocations can run under Auto; network-capture discovery still requires confirmation.';
+        fsbUiSet(hint, "Sensitive origin. Capability invocations can run under Auto; network-capture discovery still requires confirmation.");
       }
     }
 
@@ -3084,7 +3311,7 @@ function exportAuditLog() {
 // Clear the audit ring after a destructive confirm (mirror clearLogs but guarded).
 function clearAuditLog() {
   const confirmed = (typeof window !== 'undefined' && typeof window.confirm === 'function')
-    ? window.confirm('Clear audit log: This permanently deletes all local audit entries. Export first if you want a copy. Continue?')
+    ? window.confirm(fsbUiLine('Clear audit log: This permanently deletes all local audit entries. Export first if you want a copy. Continue?'))
     : true;
   if (!confirmed) return;
   const auditStore = (typeof globalThis !== 'undefined') ? globalThis.FsbAuditLog : null;
@@ -3157,6 +3384,7 @@ function renderPendingRequests(envelope, entries) {
   Object.keys(pendingByOrigin).sort().forEach((origin) => {
     const pending = pendingByOrigin[origin];
     const frag = tmpl.content.cloneNode(true);
+    if (globalThis.fsbUiLocale && typeof fsbUiLocale.apply === 'function') fsbUiLocale.apply(frag);
     const row = frag.querySelector('.pending-request-row');
     if (!row) return;
     row.dataset.origin = origin;
@@ -3249,7 +3477,7 @@ function updatePendingCount() {
   const count = list.querySelectorAll('.pending-request-row').length;
   if (elements.pendingRequestCount) {
     if (count > 0) {
-      elements.pendingRequestCount.textContent = count + ' pending';
+      fsbUiSet(elements.pendingRequestCount, '$COUNT$ pending', { count });
       elements.pendingRequestCount.style.display = '';
     } else {
       elements.pendingRequestCount.style.display = 'none';
@@ -3275,7 +3503,8 @@ function showToast(message, type = 'info') {
   elements.statusToast.innerHTML = '';
   const textSpan = document.createElement('span');
   textSpan.className = 'toast-text';
-  textSpan.textContent = message;
+  if (globalThis.fsbUiLocale && typeof fsbUiLocale.markExact === 'function') fsbUiLocale.markExact(textSpan, message);
+  else textSpan.textContent = message;
   const dismissBtn = document.createElement('button');
   dismissBtn.className = 'toast-dismiss';
   dismissBtn.textContent = 'X';
@@ -3370,7 +3599,7 @@ async function viewStorageData() {
 }
 
 async function clearAnalyticsData() {
-  if (confirm('Are you sure you want to clear all analytics data? This cannot be undone.')) {
+  if (confirm(fsbUiLine('Are you sure you want to clear all analytics data? This cannot be undone.'))) {
     try {
       await chrome.storage.local.remove(['fsbUsageData', 'fsbCurrentModel']);
       if (analytics) {
@@ -3604,7 +3833,7 @@ async function loadSessionList() {
       sessionList.innerHTML = `
         <div class="session-empty-state">
           <i class="fas fa-inbox"></i>
-          <p>No sessions recorded yet. Run an automation task to see session logs here.</p>
+          <p>${fsbUiHtml('No sessions recorded yet. Run an automation task to see session logs here.')}</p>
         </div>
       `;
       return;
@@ -3614,27 +3843,27 @@ async function loadSessionList() {
     sessionList.innerHTML = sessions.map(session => `
       <div class="session-item" data-session-id="${session.id}" data-storage-backend="${session.storageBackend === 'journal-v2' ? 'journal-v2' : 'legacy-v1'}">
         <div class="session-item-info">
-          <div class="session-item-task">${escapeHtml(session.task || 'Unknown task')}</div>
+          <div class="session-item-task">${session.task ? escapeHtml(session.task) : fsbUiHtml('Unknown task')}</div>
           <div class="session-item-meta">
             <span><i class="fas fa-clock"></i> ${formatSessionDate(session.startTime)}</span>
-            <span><i class="fas fa-play-circle"></i> ${session.actionCount || 0} actions</span>
+            <span><i class="fas fa-play-circle"></i> ${fsbUiHtml('$COUNT$ actions', { count: session.actionCount || 0 })}</span>
             <span><i class="fas fa-hourglass-half"></i> ${formatSessionDuration(session.startTime, session.endTime)}</span>
             ${session.mode === 'mcp-agent'
               ? `<span class="session-source-badge mcp">MCP · ${escapeHtml(session.mcpClient || 'Agent')}</span>`
-              : `<span class="session-source-badge">Autopilot</span>`}
+              : `<span class="session-source-badge">${fsbUiHtml('Autopilot')}</span>`}
           </div>
         </div>
         <div class="session-item-status">
           <span class="session-status-badge ${session.status}">${session.status}</span>
         </div>
         <div class="session-item-actions">
-          <button class="session-action-btn view" data-action="view" title="View logs">
+          <button class="session-action-btn view" data-action="view" ${fsbUiTitle('View logs')}>
             <i class="fas fa-eye"></i>
           </button>
-          <button class="session-action-btn download" data-action="download" title="Download logs">
+          <button class="session-action-btn download" data-action="download" ${fsbUiTitle('Download logs')}>
             <i class="fas fa-download"></i>
           </button>
-          <button class="session-action-btn delete" data-action="delete" title="Delete session">
+          <button class="session-action-btn delete" data-action="delete" ${fsbUiTitle('Delete session')}>
             <i class="fas fa-trash"></i>
           </button>
         </div>
@@ -3648,7 +3877,7 @@ async function loadSessionList() {
     sessionList.innerHTML = `
       <div class="session-empty-state">
         <i class="fas fa-exclamation-triangle"></i>
-        <p>Failed to load sessions: ${error.message}</p>
+        <p>${fsbUiHtml('Failed to load sessions: $ERROR$', { error: error.message })}</p>
       </div>
     `;
   }
@@ -3756,74 +3985,72 @@ function createInlineDetailHTML(session) {
     <div class="session-detail-panel" data-session-id="${session.id}">
       <div class="session-detail-header">
         <div class="session-detail-title">
-          <h4 id="sessionDetailTitle">${escapeHtml(session.task || 'Unknown Task')}</h4>
+          <h4 id="sessionDetailTitle">${session.task ? escapeHtml(session.task) : fsbUiHtml('Unknown task')}</h4>
           <span class="session-detail-status session-status-badge ${session.status}" id="sessionDetailStatus">${session.status}</span>
         </div>
         <div class="session-detail-actions">
-          <button class="control-btn" id="exportSessionText" title="Export as human-readable text">
+          <button class="control-btn" id="exportSessionText" ${fsbUiTitle('Export as human-readable text')}>
             <i class="fas fa-file-alt"></i>
-            Export Text
+            ${fsbUiHtml('Export Text')}
           </button>
-          <button class="control-btn" id="downloadSessionLogs" title="Download JSON logs">
+          <button class="control-btn" id="downloadSessionLogs" ${fsbUiTitle('Download JSON logs')}>
             <i class="fas fa-download"></i>
-            Download JSON
+            ${fsbUiHtml('Download JSON')}
           </button>
           <button class="control-btn" id="closeSessionDetail">
             <i class="fas fa-times"></i>
-            Close
+            ${fsbUiHtml('Close')}
           </button>
         </div>
       </div>
       <div class="session-detail-meta" id="sessionDetailMeta">
         <div class="session-meta-item">
-          <span class="session-meta-label">Session ID</span>
+          <span class="session-meta-label">${fsbUiHtml('Session ID')}</span>
           <span class="session-meta-value">${session.id}</span>
         </div>
         <div class="session-meta-item">
-          <span class="session-meta-label">Started</span>
+          <span class="session-meta-label">${fsbUiHtml('Started')}</span>
           <span class="session-meta-value">${new Date(session.startTime).toLocaleString()}</span>
         </div>
         <div class="session-meta-item">
-          <span class="session-meta-label">Ended</span>
+          <span class="session-meta-label">${fsbUiHtml('Ended')}</span>
           <span class="session-meta-value">${new Date(session.endTime).toLocaleString()}</span>
         </div>
         <div class="session-meta-item">
-          <span class="session-meta-label">Duration</span>
+          <span class="session-meta-label">${fsbUiHtml('Duration')}</span>
           <span class="session-meta-value">${formatSessionDuration(session.startTime, session.endTime)}</span>
         </div>
         <div class="session-meta-item">
-          <span class="session-meta-label">Actions</span>
+          <span class="session-meta-label">${fsbUiHtml('Actions')}</span>
           <span class="session-meta-value">${session.actionCount || 0}</span>
         </div>
         <div class="session-meta-item">
-          <span class="session-meta-label">Iterations</span>
+          <span class="session-meta-label">${fsbUiHtml('Iterations')}</span>
           <span class="session-meta-value">${session.iterationCount || 'N/A'}</span>
         </div>
       </div>
       <div class="session-replay-container" id="sessionReplayContainer">
         <div class="replay-controls">
           <button class="replay-btn" id="prevStep" disabled>
-            <i class="fas fa-chevron-left"></i> Prev
+            <i class="fas fa-chevron-left"></i> ${fsbUiHtml('Prev')}
           </button>
-          <span class="replay-step-indicator">
-            Step <span id="currentStepNum">0</span> of <span id="totalSteps">0</span>
-          </span>
+          <span class="replay-step-indicator" id="replayStepIndicator">${fsbUiEscape(fsbUiLine('Step $CURRENT$ of $TOTAL$', { current: '0', total: '0' }))}</span>
           <button class="replay-btn" id="nextStep" disabled>
-            Next <i class="fas fa-chevron-right"></i>
+            ${fsbUiHtml('Next')} <i class="fas fa-chevron-right"></i>
           </button>
         </div>
         <div class="replay-step-content" id="replayStepContent">
-          <div class="step-placeholder">Loading replay data...</div>
+          <div class="step-placeholder">${fsbUiHtml('Loading replay data...')}</div>
         </div>
         <div class="replay-summary" id="replaySummary" style="display: none;"></div>
       </div>
       <div class="session-logs-section">
         <button class="logs-toggle-btn" id="toggleRawLogs">
-          <i class="fas fa-chevron-down"></i> Show Raw Logs
+          <i class="fas fa-chevron-down"></i> ${fsbUiHtml('Show Raw Logs')}
         </button>
         <div class="session-logs-container" id="rawLogsContainer" style="display: none;">
-          <pre class="session-logs-content" id="sessionLogsContent">Loading...</pre>
-          ${session._journalHasMore ? '<button class="control-btn" id="loadMoreSessionEvents">Load next 500 events</button>' : ''}
+          <pre class="session-logs-content" id="sessionLogsContent">${fsbUiHtml('Loading...')}</pre>
+          ${session._journalHasMore ? `<button class="control-btn" id="loadMoreSessionEvents">${fsbUiEscape(fsbUiLine('Load next 500 events'))}</button>` : ''}
         </div>
       </div>
     </div>
@@ -3836,6 +4063,7 @@ function createInlineDetailHTML(session) {
  * @param {Object} session - The session data object
  */
 function attachInlinePanelListeners(wrapper, session) {
+  setReplayStepIndicator(0, 0, wrapper.querySelector('#replayStepIndicator'));
   const exportTextBtn = wrapper.querySelector('#exportSessionText');
   const downloadBtn = wrapper.querySelector('#downloadSessionLogs');
   const closeBtn = wrapper.querySelector('#closeSessionDetail');
@@ -3883,18 +4111,20 @@ function attachInlinePanelListeners(wrapper, session) {
         const isVisible = rawLogsContainer.style.display !== 'none';
         rawLogsContainer.style.display = isVisible ? 'none' : 'block';
         toggleRawLogsBtn.innerHTML = isVisible
-          ? '<i class="fas fa-chevron-down"></i> Show Raw Logs'
-          : '<i class="fas fa-chevron-up"></i> Hide Raw Logs';
+          ? '<i class="fas fa-chevron-down"></i> ' + fsbUiHtml('Show Raw Logs')
+          : '<i class="fas fa-chevron-up"></i> ' + fsbUiHtml('Hide Raw Logs');
         toggleRawLogsBtn.classList.toggle('expanded', !isVisible);
       }
     });
   }
 
   if (loadMoreEventsBtn) {
+    // The button is the live node, so later labels replace this one in place.
+    fsbUiSet(loadMoreEventsBtn, "Load next 500 events");
     loadMoreEventsBtn.addEventListener('click', async () => {
       if (!session._journalHasMore || !Number.isFinite(session._journalNextSequence)) return;
       loadMoreEventsBtn.disabled = true;
-      loadMoreEventsBtn.textContent = 'Loading...';
+      fsbUiSet(loadMoreEventsBtn, "Loading...");
       try {
         const page = await loadSessionDetail(session.id, session._journalNextSequence);
         if (!page) throw new Error('Session events could not be loaded');
@@ -3908,14 +4138,14 @@ function attachInlinePanelListeners(wrapper, session) {
         if (logsEl) logsEl.textContent = formatSessionLogsForDisplay(session);
         if (session._journalHasMore) {
           loadMoreEventsBtn.disabled = false;
-          loadMoreEventsBtn.textContent = 'Load next 500 events';
+          fsbUiSet(loadMoreEventsBtn, "Load next 500 events");
         } else {
           loadMoreEventsBtn.remove();
         }
       } catch (error) {
         loadMoreEventsBtn.disabled = false;
-        loadMoreEventsBtn.textContent = 'Retry loading events';
-        showToast('Failed to load more session events: ' + error.message, 'error');
+        fsbUiSet(loadMoreEventsBtn, "Retry loading events");
+        showToast(fsbUiLine('Failed to load more session events: $ERROR$', { error: error.message }), 'error');
       }
     });
   }
@@ -3989,7 +4219,7 @@ async function downloadSessionLogs(sessionId, storageBackend) {
  * @param {string} sessionId - The session ID to delete
  */
 async function deleteSession(sessionId) {
-  if (!confirm('Are you sure you want to delete this session? This cannot be undone.')) {
+  if (!confirm(fsbUiLine('Are you sure you want to delete this session? This cannot be undone.'))) {
     return;
   }
 
@@ -4021,7 +4251,7 @@ async function deleteSession(sessionId) {
  * Clear all saved sessions
  */
 async function clearAllSessions() {
-  if (!confirm('Are you sure you want to delete ALL session history? This cannot be undone.')) {
+  if (!confirm(fsbUiLine('Are you sure you want to delete ALL session history? This cannot be undone.'))) {
     return;
   }
 
@@ -4648,12 +4878,11 @@ async function renderSessionReplay(sessionId) {
   });
 
   if (!response?.replay || !response.replay.steps || response.replay.steps.length === 0) {
-    document.getElementById('replayStepContent').innerHTML = '<div class="step-placeholder">No replay data available for this session</div>';
+    document.getElementById('replayStepContent').innerHTML = '<div class="step-placeholder">' + fsbUiHtml('No replay data available for this session') + '</div>';
     document.getElementById('replaySummary').style.display = 'none';
     document.getElementById('prevStep').disabled = true;
     document.getElementById('nextStep').disabled = true;
-    document.getElementById('currentStepNum').textContent = '0';
-    document.getElementById('totalSteps').textContent = '0';
+    setReplayStepIndicator(0, 0);
     return;
   }
 
@@ -4661,7 +4890,6 @@ async function renderSessionReplay(sessionId) {
   currentStepIndex = 0;
 
   // Update controls
-  document.getElementById('totalSteps').textContent = currentReplayData.steps.length;
   document.getElementById('prevStep').disabled = true;
   document.getElementById('nextStep').disabled = currentReplayData.steps.length <= 1;
 
@@ -4670,6 +4898,13 @@ async function renderSessionReplay(sessionId) {
 
   // Show summary
   renderReplaySummary();
+}
+
+// The replay counter is one live node, so a language change rewrites the whole
+// "Step N of M" line, in the word order of that language.
+function setReplayStepIndicator(current, total, indicator) {
+  const el = indicator || document.getElementById('replayStepIndicator');
+  if (el) fsbUiSet(el, 'Step $CURRENT$ of $TOTAL$', { current: String(current), total: String(total) });
 }
 
 /**
@@ -4683,7 +4918,7 @@ function renderStep(index) {
   if (!step) return;
 
   currentStepIndex = index;
-  document.getElementById('currentStepNum').textContent = index + 1;
+  setReplayStepIndicator(index + 1, currentReplayData.steps.length);
   document.getElementById('prevStep').disabled = index === 0;
   document.getElementById('nextStep').disabled = index === currentReplayData.steps.length - 1;
 
@@ -4696,10 +4931,10 @@ function renderStep(index) {
       <strong>${escapeHtml(step.action.tool)}</strong>
     </div>
     <div class="step-section">
-      <h5>Targeting</h5>
-      <div class="step-detail">Selector: <code>${escapeHtml(step.targeting.selectorUsed || step.targeting.selectorTried || 'N/A')}</code></div>
-      <div class="step-detail">Element Found: ${step.targeting.elementFound ? 'Yes' : 'No'}</div>
-      ${step.targeting.coordinatesUsed ? `<div class="step-detail">Coordinates: (${step.targeting.coordinatesUsed.x}, ${step.targeting.coordinatesUsed.y})</div>` : ''}
+      <h5>${fsbUiHtml('Targeting')}</h5>
+      <div class="step-detail">${fsbUiHtml('Selector:')} <code>${escapeHtml(step.targeting.selectorUsed || step.targeting.selectorTried || 'N/A')}</code></div>
+      <div class="step-detail">${fsbUiHtml(step.targeting.elementFound ? 'Element Found: Yes' : 'Element Found: No')}</div>
+      ${step.targeting.coordinatesUsed ? `<div class="step-detail">${fsbUiHtml('Coordinates: ($X$, $Y$)', { x: step.targeting.coordinatesUsed.x, y: step.targeting.coordinatesUsed.y })}</div>` : ''}
     </div>
   `;
 
@@ -4708,9 +4943,9 @@ function renderStep(index) {
     const tagDisplay = `&lt;${el.tagName || 'unknown'}${el.id ? ' id="' + escapeHtml(el.id) + '"' : ''}${el.className ? ' class="' + escapeHtml(el.className.split(' ')[0]) + '"' : ''}&gt;`;
     html += `
       <div class="step-section">
-        <h5>Element</h5>
+        <h5>${fsbUiHtml('Element')}</h5>
         <div class="step-detail">${tagDisplay}</div>
-        ${el.text ? `<div class="step-detail">Text: "${escapeHtml(el.text.substring(0, 50))}${el.text.length > 50 ? '...' : ''}"</div>` : ''}
+        ${el.text ? `<div class="step-detail">${fsbUiHtml('Text: "$TEXT$"', { text: el.text.substring(0, 50) + (el.text.length > 50 ? '...' : '') })}</div>` : ''}
       </div>
     `;
   }
@@ -4720,7 +4955,7 @@ function renderStep(index) {
     const paramsStr = JSON.stringify(step.action.params, null, 2);
     html += `
       <div class="step-section">
-        <h5>Parameters</h5>
+        <h5>${fsbUiHtml('Parameters')}</h5>
         <div class="step-detail" style="white-space: pre-wrap; font-size: 0.8rem;">${escapeHtml(paramsStr.substring(0, 300))}${paramsStr.length > 300 ? '...' : ''}</div>
       </div>
     `;
@@ -4729,16 +4964,16 @@ function renderStep(index) {
   if (!step.result.success && step.result.diagnostic) {
     html += `
       <div class="step-section">
-        <h5>Diagnostic</h5>
-        <div class="step-detail" style="color: var(--error-color);">${escapeHtml(step.result.diagnostic.message || 'Unknown error')}</div>
+        <h5>${fsbUiHtml('Diagnostic')}</h5>
+        <div class="step-detail" style="color: var(--error-color);">${step.result.diagnostic.message ? escapeHtml(step.result.diagnostic.message) : fsbUiHtml('Unknown error')}</div>
         ${step.result.diagnostic.details ? `<div class="step-detail">${escapeHtml(step.result.diagnostic.details)}</div>` : ''}
-        ${step.result.diagnostic.suggestions && step.result.diagnostic.suggestions.length > 0 ? `<div class="step-detail">Suggestions:<br>${step.result.diagnostic.suggestions.map(s => '  - ' + escapeHtml(s)).join('<br>')}</div>` : ''}
+        ${step.result.diagnostic.suggestions && step.result.diagnostic.suggestions.length > 0 ? `<div class="step-detail">${fsbUiHtml('Suggestions:')}<br>${step.result.diagnostic.suggestions.map(s => '  - ' + escapeHtml(s)).join('<br>')}</div>` : ''}
       </div>
     `;
   } else if (!step.result.success && step.result.error) {
     html += `
       <div class="step-section">
-        <h5>Error</h5>
+        <h5>${fsbUiHtml('Error')}</h5>
         <div class="step-detail" style="color: var(--error-color);">${escapeHtml(step.result.error)}</div>
       </div>
     `;
@@ -4758,11 +4993,11 @@ function renderReplaySummary() {
 
   const summary = currentReplayData.summary;
   const retainedRange = summary.truncated
-    ? ` | latest ${summary.totalSteps} of ${summary.totalSourceSteps}`
+    ? ' | ' + fsbUiHtml('latest $COUNT$ of $TOTAL$', { count: summary.totalSteps, total: summary.totalSourceSteps })
     : '';
   let summaryHtml = `
-    <strong>Summary:</strong> ${summary.successfulSteps}/${summary.totalSteps} steps successful
-    ${summary.failedSteps > 0 ? ` | <span style="color: var(--error-color);">${summary.failedSteps} failed</span>` : ''}
+    <strong>${fsbUiHtml('Summary:')}</strong> ${fsbUiHtml('$DONE$/$TOTAL$ steps successful', { done: summary.successfulSteps, total: summary.totalSteps })}
+    ${summary.failedSteps > 0 ? ` | <span style="color: var(--error-color);">${fsbUiHtml('$COUNT$ failed', { count: summary.failedSteps })}</span>` : ''}
     ${retainedRange}
   `;
 
@@ -4840,7 +5075,7 @@ async function loadCredentialVaultStatus() {
   try {
     const response = await chrome.runtime.sendMessage({ action: 'getCredentialVaultStatus' });
     if (!response) {
-      if (statusText) statusText.textContent = 'Unable to reach vault service';
+      if (statusText) fsbUiSet(statusText, "Unable to reach vault service");
       return;
     }
 
@@ -4851,7 +5086,7 @@ async function loadCredentialVaultStatus() {
     if (lockBtn) lockBtn.style.display = 'none';
 
     if (!response.configured) {
-      if (statusText) statusText.textContent = 'No vault configured. Create one to protect saved credentials.';
+      if (statusText) fsbUiSet(statusText, "No vault configured. Create one to protect saved credentials.");
       if (setupPanel) setupPanel.style.display = 'block';
       if (manager) manager.style.display = 'none';
       // Initialize setup PIN inputs
@@ -4862,7 +5097,7 @@ async function loadCredentialVaultStatus() {
         _vaultPinConfirm = createPinInput(confirmContainer, _vaultSetupDigits);
       }
     } else if (!response.unlocked) {
-      if (statusText) statusText.textContent = 'Vault is locked.';
+      if (statusText) fsbUiSet(statusText, "Vault is locked.");
       if (unlockPanel) unlockPanel.style.display = 'block';
       if (manager) manager.style.display = 'none';
       // Initialize unlock PIN input
@@ -4875,7 +5110,7 @@ async function loadCredentialVaultStatus() {
         });
       }
     } else {
-      if (statusText) statusText.textContent = 'Vault unlocked for this session.';
+      if (statusText) fsbUiSet(statusText, "Vault unlocked for this session.");
       if (unlockedPanel) unlockedPanel.style.display = 'block';
       if (lockBtn) lockBtn.style.display = 'inline-flex';
       if (manager) {
@@ -4885,7 +5120,7 @@ async function loadCredentialVaultStatus() {
     }
   } catch (error) {
     console.error('Failed to check vault status:', error);
-    if (statusText) statusText.textContent = 'Error checking vault status.';
+    if (statusText) fsbUiSet(statusText, "Error checking vault status.");
   }
 }
 
@@ -4893,7 +5128,7 @@ async function submitVaultUnlock(pin) {
   if (_unlockSubmitting) return;
   _unlockSubmitting = true;
   const unlockBtn = document.getElementById('unlockCredentialVaultBtn');
-  if (unlockBtn) { unlockBtn.disabled = true; unlockBtn.textContent = 'Unlocking...'; }
+  if (unlockBtn) { unlockBtn.disabled = true; fsbUiSet(unlockBtn, "Unlocking..."); }
   try {
     const response = await chrome.runtime.sendMessage({ action: 'unlockCredentialVault', passphrase: pin });
     if (response?.success) {
@@ -4905,11 +5140,11 @@ async function submitVaultUnlock(pin) {
       if (_vaultPinUnlock) _vaultPinUnlock.clear();
     }
   } catch (error) {
-    showToast('Error unlocking vault: ' + error.message, 'error');
+    showToast(fsbUiLine('Error unlocking vault: $ERROR$', { error: error.message }), 'error');
     if (_vaultPinUnlock) _vaultPinUnlock.clear();
   } finally {
     _unlockSubmitting = false;
-    if (unlockBtn) { unlockBtn.disabled = false; unlockBtn.textContent = 'Unlock Vault'; }
+    if (unlockBtn) { unlockBtn.disabled = false; fsbUiSet(unlockBtn, "Unlock Vault"); }
   }
 }
 
@@ -4944,7 +5179,7 @@ function initCredentialVaultListeners() {
         return;
       }
       setupBtn.disabled = true;
-      setupBtn.textContent = 'Creating...';
+      fsbUiSet(setupBtn, "Creating...");
       try {
         const response = await chrome.runtime.sendMessage({ action: 'createCredentialVault', passphrase: pin });
         if (response?.success) {
@@ -4957,10 +5192,10 @@ function initCredentialVaultListeners() {
           showToast(response?.error || 'Failed to create vault', 'error');
         }
       } catch (error) {
-        showToast('Error creating vault: ' + error.message, 'error');
+        showToast(fsbUiLine('Error creating vault: $ERROR$', { error: error.message }), 'error');
       } finally {
         setupBtn.disabled = false;
-        setupBtn.textContent = 'Set Up Vault';
+        fsbUiSet(setupBtn, "Set Up Vault");
       }
     });
   }
@@ -4987,7 +5222,7 @@ function initCredentialVaultListeners() {
           loadPaymentVaultStatus();
         }
       } catch (error) {
-        showToast('Error locking vault: ' + error.message, 'error');
+        showToast(fsbUiLine('Error locking vault: $ERROR$', { error: error.message }), 'error');
       }
     });
   }
@@ -5004,7 +5239,7 @@ async function loadPaymentVaultStatus() {
   try {
     const response = await chrome.runtime.sendMessage({ action: 'getPaymentVaultStatus' });
     if (!response) {
-      if (statusText) statusText.textContent = 'Unable to reach vault service';
+      if (statusText) fsbUiSet(statusText, "Unable to reach vault service");
       return;
     }
 
@@ -5017,21 +5252,21 @@ async function loadPaymentVaultStatus() {
 
     if (!response.configured || !response.unlocked) {
       // Credential vault not configured or locked -- payment methods blocked
-      if (statusText) statusText.textContent = 'Unlock the credential vault first.';
+      if (statusText) fsbUiSet(statusText, "Unlock the credential vault first.");
       if (blockedPanel) blockedPanel.style.display = 'block';
     } else if (!response.paymentUnlocked) {
       // Credential vault unlocked but payment access locked
-      if (statusText) statusText.textContent = 'Payment methods are locked.';
+      if (statusText) fsbUiSet(statusText, "Payment methods are locked.");
       if (unlockPanel) unlockPanel.style.display = 'block';
     } else {
       // Payment methods fully unlocked
-      if (statusText) statusText.textContent = 'Payment methods unlocked for this session.';
+      if (statusText) fsbUiSet(statusText, "Payment methods unlocked for this session.");
       if (unlockedPanel) unlockedPanel.style.display = 'block';
       if (lockBtn) lockBtn.style.display = 'inline-flex';
     }
   } catch (error) {
     console.error('Failed to check payment vault status:', error);
-    if (statusText) statusText.textContent = 'Error checking payment status.';
+    if (statusText) fsbUiSet(statusText, "Error checking payment status.");
   }
 }
 
@@ -5107,19 +5342,19 @@ function renderCredentialCard(cred) {
       </div>
       <div class="credential-card-info">
         <div class="credential-card-domain">${escapeHtml(cred.domain)}</div>
-        <div class="credential-card-username">${escapeHtml(cred.username || 'No username')}</div>
+        <div class="credential-card-username">${cred.username ? escapeHtml(cred.username) : fsbUiHtml('No username')}</div>
       </div>
       <div class="credential-card-password" data-domain="${escapeHtml(cred.domain)}">
         <span class="password-dots">--------</span>
       </div>
       <div class="credential-card-actions">
-        <button class="credential-action-btn" data-cred-action="toggle-password" data-cred-domain="${escapeHtml(cred.domain)}" title="Show password">
+        <button class="credential-action-btn" data-cred-action="toggle-password" data-cred-domain="${escapeHtml(cred.domain)}" ${fsbUiTitle('Show password')}>
           <i class="fas fa-eye"></i>
         </button>
-        <button class="credential-action-btn" data-cred-action="edit" data-cred-domain="${escapeHtml(cred.domain)}" title="Edit">
+        <button class="credential-action-btn" data-cred-action="edit" data-cred-domain="${escapeHtml(cred.domain)}" ${fsbUiTitle('Edit')}>
           <i class="fas fa-edit"></i>
         </button>
-        <button class="credential-action-btn delete" data-cred-action="delete" data-cred-domain="${escapeHtml(cred.domain)}" title="Delete">
+        <button class="credential-action-btn delete" data-cred-action="delete" data-cred-domain="${escapeHtml(cred.domain)}" ${fsbUiTitle('Delete')}>
           <i class="fas fa-trash"></i>
         </button>
       </div>
@@ -5153,7 +5388,7 @@ async function showCredentialModal(mode, domain) {
   const passwordInput = document.getElementById('credModalPassword');
   const notesInput = document.getElementById('credModalNotes');
 
-  if (titleEl) titleEl.textContent = mode === 'edit' ? 'Edit Credential' : 'Add Credential';
+  if (titleEl) fsbUiSet(titleEl, mode === 'edit' ? 'Edit Credential' : 'Add Credential');
 
   // Clear fields
   if (domainInput) domainInput.value = '';
@@ -5229,16 +5464,16 @@ async function saveCredentialFromModal() {
       hideCredentialModal();
       loadCredentials();
     } else {
-      showToast('Failed to save: ' + (response?.error || 'Unknown error'), 'error');
+      showToast(fsbUiLine('Failed to save: $ERROR$', { error: response?.error || 'Unknown error' }), 'error');
     }
   } catch (error) {
-    showToast('Error saving credential: ' + error.message, 'error');
+    showToast(fsbUiLine('Error saving credential: $ERROR$', { error: error.message }), 'error');
   }
 }
 
 // Delete credential with confirmation
 async function deleteCredentialConfirm(domain) {
-  if (!confirm(`Delete saved credential for "${domain}"? This cannot be undone.`)) {
+  if (!confirm(fsbUiLine('Delete saved credential for "$DOMAIN$"? This cannot be undone.', { domain: domain }))) {
     return;
   }
 
@@ -5252,10 +5487,10 @@ async function deleteCredentialConfirm(domain) {
       showToast('Credential deleted', 'success');
       loadCredentials();
     } else {
-      showToast('Failed to delete: ' + (response?.error || 'Unknown error'), 'error');
+      showToast(fsbUiLine('Failed to delete: $ERROR$', { error: response?.error || 'Unknown error' }), 'error');
     }
   } catch (error) {
-    showToast('Error deleting credential: ' + error.message, 'error');
+    showToast(fsbUiLine('Error deleting credential: $ERROR$', { error: error.message }), 'error');
   }
 }
 
@@ -5433,11 +5668,11 @@ async function loadPaymentVaultStatus() {
 
     if (!response.configured) {
       // Vault not configured -- direct user to Passwords section
-      if (statusText) statusText.textContent = 'Configure a vault PIN in Passwords first.';
+      if (statusText) fsbUiSet(statusText, "Configure a vault PIN in Passwords first.");
       if (blockedPanel) blockedPanel.style.display = 'block';
     } else if (!response.paymentUnlocked) {
       // Vault configured but payment methods locked -- show PIN unlock
-      if (statusText) statusText.textContent = 'Payment methods are locked.';
+      if (statusText) fsbUiSet(statusText, "Payment methods are locked.");
       if (unlockPanel) unlockPanel.style.display = 'block';
 
       // Fetch pinLength and create PIN input
@@ -5452,7 +5687,7 @@ async function loadPaymentVaultStatus() {
       }
     } else {
       // Fully unlocked
-      if (statusText) statusText.textContent = 'Payment methods are unlocked.';
+      if (statusText) fsbUiSet(statusText, "Payment methods are unlocked.");
       if (unlockedPanel) unlockedPanel.style.display = 'block';
       if (lockBtn) lockBtn.style.display = 'inline-flex';
       if (paymentManager) paymentManager.style.display = 'block';
@@ -5472,7 +5707,7 @@ async function submitPaymentUnlock(pin) {
   const originalText = unlockBtn ? unlockBtn.textContent : '';
   if (unlockBtn) {
     unlockBtn.disabled = true;
-    unlockBtn.textContent = 'Unlocking...';
+    fsbUiSet(unlockBtn, "Unlocking...");
   }
 
   try {
@@ -5490,7 +5725,7 @@ async function submitPaymentUnlock(pin) {
       if (_paymentPinUnlock) _paymentPinUnlock.clear();
     }
   } catch (error) {
-    showToast('Error unlocking payment methods: ' + error.message, 'error');
+    showToast(fsbUiLine('Error unlocking payment methods: $ERROR$', { error: error.message }), 'error');
     if (_paymentPinUnlock) _paymentPinUnlock.clear();
   } finally {
     _paymentUnlockSubmitting = false;
@@ -5517,7 +5752,7 @@ function initializePaymentManager() {
           showToast('Failed to lock payment methods', 'error');
         }
       } catch (error) {
-        showToast('Error locking payment methods: ' + error.message, 'error');
+        showToast(fsbUiLine('Error locking payment methods: $ERROR$', { error: error.message }), 'error');
       }
     });
   }
@@ -5645,25 +5880,24 @@ function renderPaymentCard(pm) {
     amex: 'Amex',
     discover: 'Discover',
     diners: 'Diners',
-    jcb: 'JCB',
-    unknown: 'Card'
+    jcb: 'JCB'
   };
-  const brandLabel = brandLabels[pm.cardBrand] || brandLabels.unknown;
+  const brandLabel = brandLabels[pm.cardBrand];
 
   return `
     <div class="credential-card payment-card" data-payment-id="${escapeHtml(pm.id)}">
       <div class="credential-card-icon">
-        <span class="payment-card-brand ${escapeHtml(pm.cardBrand)}">${escapeHtml(brandLabel)}</span>
+        <span class="payment-card-brand ${escapeHtml(pm.cardBrand)}">${brandLabel ? escapeHtml(brandLabel) : fsbUiHtml('Card')}</span>
       </div>
       <div class="credential-card-info">
-        <div class="credential-card-domain">${escapeHtml(pm.nickname || pm.cardholderName || 'Card')}</div>
-        <div class="credential-card-username">${escapeHtml(pm.maskedNumber)} -- Exp ${escapeHtml(String(pm.expiryMonth))}/${escapeHtml(String(pm.expiryYearLast2))}</div>
+        <div class="credential-card-domain">${(pm.nickname || pm.cardholderName) ? escapeHtml(pm.nickname || pm.cardholderName) : fsbUiHtml('Card')}</div>
+        <div class="credential-card-username">${escapeHtml(pm.maskedNumber)} -- ${fsbUiHtml('Exp $MONTH$/$YEAR$', { month: pm.expiryMonth, year: pm.expiryYearLast2 })}</div>
       </div>
       <div class="credential-card-actions">
-        <button class="credential-action-btn" data-payment-action="edit" data-payment-id="${escapeHtml(pm.id)}" title="Edit">
+        <button class="credential-action-btn" data-payment-action="edit" data-payment-id="${escapeHtml(pm.id)}" ${fsbUiTitle('Edit')}>
           <i class="fas fa-edit"></i>
         </button>
-        <button class="credential-action-btn delete" data-payment-action="delete" data-payment-id="${escapeHtml(pm.id)}" title="Delete">
+        <button class="credential-action-btn delete" data-payment-action="delete" data-payment-id="${escapeHtml(pm.id)}" ${fsbUiTitle('Delete')}>
           <i class="fas fa-trash"></i>
         </button>
       </div>
@@ -5739,7 +5973,7 @@ async function showPaymentMethodModal(mode, id) {
   const brandEl = document.getElementById('paymentMethodCardBrand');
   const cardNumInput = document.getElementById('paymentMethodCardNumber');
 
-  if (title) title.textContent = mode === 'edit' ? 'Edit Payment Method' : 'Add Payment Method';
+  if (title) fsbUiSet(title, mode === 'edit' ? 'Edit Payment Method' : 'Add Payment Method');
 
   // Clear all form fields
   const fieldIds = [
@@ -5759,7 +5993,7 @@ async function showPaymentMethodModal(mode, id) {
 
   // Reset brand badge
   if (brandEl) {
-    brandEl.textContent = 'Unknown';
+    fsbUiSet(brandEl, "Unknown");
     brandEl.className = 'payment-card-brand unknown';
   }
 
@@ -5891,16 +6125,16 @@ async function savePaymentMethodFromModal() {
       hidePaymentMethodModal();
       loadPaymentMethods();
     } else {
-      showToast('Failed: ' + (response?.error || 'Unknown error'), 'error');
+      showToast(fsbUiLine('Error saving payment method: $ERROR$', { error: response?.error || 'Unknown error' }), 'error');
     }
   } catch (error) {
-    showToast('Error saving payment method: ' + error.message, 'error');
+    showToast(fsbUiLine('Error saving payment method: $ERROR$', { error: error.message }), 'error');
   }
 }
 
 // Delete payment method with confirmation
 async function deletePaymentMethodConfirm(id) {
-  if (!confirm('Delete this payment method? This cannot be undone.')) return;
+  if (!confirm(fsbUiLine('Delete this payment method? This cannot be undone.'))) return;
 
   try {
     const response = await chrome.runtime.sendMessage({ action: 'deletePaymentMethod', id });
@@ -5908,10 +6142,10 @@ async function deletePaymentMethodConfirm(id) {
       showToast('Payment method deleted', 'success');
       loadPaymentMethods();
     } else {
-      showToast('Failed to delete: ' + (response?.error || 'Unknown error'), 'error');
+      showToast(fsbUiLine('Failed to delete: $ERROR$', { error: response?.error || 'Unknown error' }), 'error');
     }
   } catch (error) {
-    showToast('Error deleting payment method: ' + error.message, 'error');
+    showToast(fsbUiLine('Error deleting payment method: $ERROR$', { error: error.message }), 'error');
   }
 }
 
@@ -6020,7 +6254,7 @@ async function startExplorer() {
     });
 
     if (!response || !response.success) {
-      showToast('Failed to start explorer: ' + (response?.error || 'Unknown error'), 'error');
+      showToast(fsbUiLine('Failed to start explorer: $ERROR$', { error: response?.error || 'Unknown error' }), 'error');
     } else {
       addLog('info', 'Site Explorer started for ' + testUrl);
       // Clear input for next URL, show Stop All
@@ -6028,7 +6262,7 @@ async function startExplorer() {
       updateStopAllVisibility();
     }
   } catch (error) {
-    showToast('Failed to start explorer: ' + error.message, 'error');
+    showToast(fsbUiLine('Failed to start explorer: $ERROR$', { error: error.message }), 'error');
   }
 }
 
@@ -6069,18 +6303,22 @@ function createCrawlerCard(crawlerId, domain, maxPages) {
     <div class="crawler-header">
       <span class="crawler-domain">${escapeHtml(domain)}</span>
       <button class="crawler-stop-btn" data-crawler-id="${crawlerId}">
-        <i class="fas fa-stop"></i> Stop
+        <i class="fas fa-stop"></i> <span class="crawler-stop-label"></span>
       </button>
     </div>
     <div class="crawler-progress-info">
-      <span class="crawler-progress-text">Starting crawl...</span>
-      <span class="crawler-progress-count">0 / ${maxPages} pages</span>
+      <span class="crawler-progress-text"></span>
+      <span class="crawler-progress-count"></span>
     </div>
     <div class="crawler-progress-bar">
       <div class="crawler-progress-fill" style="width: 0%;"></div>
     </div>
     <div class="crawler-current-url"></div>
   `;
+  // Keyed writes, so a language change redraws the card before the next event.
+  fsbUiSet(card.querySelector('.crawler-stop-label'), 'Stop');
+  fsbUiSet(card.querySelector('.crawler-progress-text'), 'Starting crawl...');
+  fsbUiSet(card.querySelector('.crawler-progress-count'), '$COLLECTED$ / $MAX$ pages', { collected: 0, max: maxPages });
 
   // Wire up stop button
   card.querySelector('.crawler-stop-btn').addEventListener('click', () => {
@@ -6110,10 +6348,8 @@ function updateExplorerProgress(data) {
       const percent = data.maxPages > 0 ? Math.round((data.pagesCollected / data.maxPages) * 100) : 0;
       const fill = card.querySelector('.crawler-progress-fill');
       if (fill) fill.style.width = percent + '%';
-      const text = card.querySelector('.crawler-progress-text');
-      if (text) text.textContent = 'Crawling ' + (data.domain || '');
-      const count = card.querySelector('.crawler-progress-count');
-      if (count) count.textContent = data.pagesCollected + ' / ' + data.maxPages + ' pages';
+      fsbUiSet(card.querySelector('.crawler-progress-text'), 'Crawling $DOMAIN$', { domain: data.domain || '' });
+      fsbUiSet(card.querySelector('.crawler-progress-count'), '$COLLECTED$ / $MAX$ pages', { collected: data.pagesCollected, max: data.maxPages });
       const urlEl = card.querySelector('.crawler-current-url');
       if (urlEl) urlEl.textContent = data.currentUrl || '';
     }
@@ -6127,10 +6363,10 @@ function updateExplorerProgress(data) {
     }
 
     if (data.status === 'completed') {
-      showToast('Crawl completed: ' + data.pagesCollected + ' pages from ' + (data.domain || ''), 'success');
+      showToast(fsbUiLine('Crawl completed: $COUNT$ pages from $DOMAIN$', { count: data.pagesCollected, domain: data.domain || '' }), 'success');
       addLog('info', 'Site Explorer completed: ' + data.pagesCollected + ' pages from ' + data.domain);
     } else if (data.status === 'error') {
-      showToast('Crawl failed for ' + (data.domain || 'unknown'), 'error');
+      showToast(fsbUiLine('Crawl failed for $DOMAIN$', { domain: data.domain || 'Unknown' }), 'error');
     }
 
     // Refresh research list
@@ -6157,7 +6393,7 @@ async function loadResearchList(page) {
       elements.researchList.innerHTML = `
         <div class="session-empty-state">
           <i class="fas fa-flask"></i>
-          <p>No research results yet. Use Site Explorer above to crawl a website.</p>
+          <p>${fsbUiHtml('No research results yet. Use Reconnaissance above to crawl a website.')}</p>
         </div>
       `;
       renderResearchPagination(0, researchPageSize, 0);
@@ -6177,10 +6413,10 @@ async function loadResearchList(page) {
     elements.researchList.innerHTML = pageItems.map(item => `
       <div class="session-item" data-research-id="${item.id}">
         <div class="session-item-info">
-          <div class="session-item-task">${escapeHtml(item.domain || 'Unknown')}</div>
+          <div class="session-item-task">${item.domain ? escapeHtml(item.domain) : fsbUiHtml('Unknown')}</div>
           <div class="session-item-meta">
             <span><i class="fas fa-clock"></i> ${formatSessionDate(item.startTime)}</span>
-            <span><i class="fas fa-file-alt"></i> ${item.pageCount || 0} pages</span>
+            <span><i class="fas fa-file-alt"></i> ${fsbUiHtml('$COUNT$ pages', { count: item.pageCount || 0 })}</span>
             <span><i class="fas fa-hourglass-half"></i> ${formatSessionDuration(item.startTime, item.endTime)}</span>
           </div>
         </div>
@@ -6188,16 +6424,16 @@ async function loadResearchList(page) {
           <span class="session-status-badge ${item.status}">${item.status}</span>
         </div>
         <div class="session-item-actions">
-          <button class="session-action-btn view" data-action="view" title="View details">
+          <button class="session-action-btn view" data-action="view" ${fsbUiTitle('View details')}>
             <i class="fas fa-eye"></i>
           </button>
-          <button class="session-action-btn download" data-action="download" title="Download JSON">
+          <button class="session-action-btn download" data-action="download" ${fsbUiTitle('Download JSON')}>
             <i class="fas fa-download"></i>
           </button>
-          <button class="session-action-btn save-memory" data-action="saveMemory" title="Save as site map memory">
+          <button class="session-action-btn save-memory" data-action="saveMemory" ${fsbUiTitle('Save as site map memory')}>
             <i class="fas fa-brain"></i>
           </button>
-          <button class="session-action-btn delete" data-action="delete" title="Delete">
+          <button class="session-action-btn delete" data-action="delete" ${fsbUiTitle('Delete')}>
             <i class="fas fa-trash"></i>
           </button>
         </div>
@@ -6211,7 +6447,7 @@ async function loadResearchList(page) {
     elements.researchList.innerHTML = `
       <div class="session-empty-state">
         <i class="fas fa-exclamation-triangle"></i>
-        <p>Failed to load research results: ${error.message}</p>
+        <p>${fsbUiHtml('Failed to load research results: $ERROR$', { error: error.message })}</p>
       </div>
     `;
     renderResearchPagination(0, researchPageSize, 0);
@@ -6234,7 +6470,7 @@ function renderResearchPagination(total, pageSize, currentPage) {
   let html = '';
 
   // Prev button
-  html += `<button ${currentPage === 0 ? 'disabled' : ''} onclick="loadResearchList(${currentPage - 1})">Prev</button>`;
+  html += `<button ${currentPage === 0 ? 'disabled' : ''} onclick="loadResearchList(${currentPage - 1})">${fsbUiHtml('Prev')}</button>`;
 
   // Page number buttons
   for (let i = 0; i < totalPages; i++) {
@@ -6242,10 +6478,10 @@ function renderResearchPagination(total, pageSize, currentPage) {
   }
 
   // Next button
-  html += `<button ${currentPage >= totalPages - 1 ? 'disabled' : ''} onclick="loadResearchList(${currentPage + 1})">Next</button>`;
+  html += `<button ${currentPage >= totalPages - 1 ? 'disabled' : ''} onclick="loadResearchList(${currentPage + 1})">${fsbUiHtml('Next')}</button>`;
 
   // Info text
-  html += `<span class="pagination-info">${start}-${end} of ${total}</span>`;
+  html += `<span class="pagination-info">${fsbUiHtml('$START$-$END$ of $TOTAL$', { start, end, total })}</span>`;
 
   container.innerHTML = html;
 }
@@ -6283,31 +6519,31 @@ async function viewResearch(researchId) {
         <div class="research-detail-grid">
           <div class="research-stat">
             <div class="research-stat-value">${summary.totalPages || 0}</div>
-            <div class="research-stat-label">Pages</div>
+            <div class="research-stat-label">${fsbUiHtml('Pages')}</div>
           </div>
           <div class="research-stat">
             <div class="research-stat-value">${summary.totalElements || 0}</div>
-            <div class="research-stat-label">Elements</div>
+            <div class="research-stat-label">${fsbUiHtml('Elements')}</div>
           </div>
           <div class="research-stat">
             <div class="research-stat-value">${summary.totalForms || 0}</div>
-            <div class="research-stat-label">Forms</div>
+            <div class="research-stat-label">${fsbUiHtml('Forms')}</div>
           </div>
           <div class="research-stat">
             <div class="research-stat-value">${summary.totalLinks || 0}</div>
-            <div class="research-stat-label">Links</div>
+            <div class="research-stat-label">${fsbUiHtml('Links')}</div>
           </div>
         </div>
         <div style="font-size: 0.75rem; color: var(--text-muted);">
-          <strong>Start URL:</strong> ${escapeHtml(data.startUrl || '')}<br>
-          <strong>Duration:</strong> ${formatSessionDuration(data.startTime, data.endTime)}<br>
-          <strong>Depth:</strong> ${data.settings?.maxDepth || '?'} | <strong>Status:</strong> ${data.status}
+          <strong>${fsbUiHtml('Start URL:')}</strong> ${escapeHtml(data.startUrl || '')}<br>
+          <strong>${fsbUiHtml('Duration:')}</strong> ${formatSessionDuration(data.startTime, data.endTime)}<br>
+          <strong>${fsbUiHtml('Depth:')}</strong> ${data.settings?.maxDepth || '?'} | <strong>${fsbUiHtml('Status:')}</strong> ${data.status}
         </div>
         ${data.pages && data.pages.length > 0 ? `
           <details style="margin-top: 0.5rem;">
-            <summary style="cursor: pointer; font-size: 0.8125rem; color: var(--text-secondary);">Pages crawled (${data.pages.length})</summary>
+            <summary style="cursor: pointer; font-size: 0.8125rem; color: var(--text-secondary);">${fsbUiHtml('Pages crawled ($COUNT$)', { count: data.pages.length })}</summary>
             <ul style="margin: 0.25rem 0 0; padding-left: 1.25rem; font-size: 0.75rem; font-family: monospace; color: var(--text-muted); max-height: 200px; overflow-y: auto;">
-              ${data.pages.map(p => `<li>${escapeHtml(p.url)} (${p.interactiveElements?.length || 0} elements)</li>`).join('')}
+              ${data.pages.map(p => `<li>${escapeHtml(p.url)} (${fsbUiHtml('$COUNT$ elements', { count: p.interactiveElements?.length || 0 })})</li>`).join('')}
             </ul>
           </details>
         ` : ''}
@@ -6356,7 +6592,7 @@ async function downloadResearch(researchId) {
 }
 
 async function deleteResearch(researchId) {
-  if (!confirm('Are you sure you want to delete this research result?')) {
+  if (!confirm(fsbUiLine('Are you sure you want to delete this research result?'))) {
     return;
   }
 
@@ -6416,32 +6652,32 @@ async function saveResearchToMemory(researchId) {
         if (refined && refined.refined === true) {
           memory.typeData.sitePattern = refined;
           memory.metadata.confidence = 0.95;
-          memory.text = `Site map for ${domain}: ${refined.pageCount || 0} pages, ${refined.formCount || 0} forms (AI enhanced)`;
+          memory.text = siteMapMemoryText(domain, refined, true);
           memory.updatedAt = Date.now();
           await memoryStorage.update(memory.id, memory);
-          showToast('Site map saved and refined for ' + domain, 'success');
+          showToast(fsbUiLine('Site map saved and refined for $DOMAIN$', { domain: domain }), 'success');
           addLog('info', 'Saved and AI-refined site map for ' + domain);
         } else {
-          showToast('Site map saved for ' + domain + ' (refinement returned no data)', 'info');
+          showToast(fsbUiLine('Site map saved for $DOMAIN$ (refinement returned no data)', { domain: domain }), 'info');
           addLog('info', 'Saved site map for ' + domain + ' (refinement returned no data)');
         }
       } catch (err) {
         console.warn('AI refinement failed, keeping Tier 1 result:', err.message);
-        showToast('Site map saved (AI refinement failed: ' + err.message + ')', 'info');
+        showToast(fsbUiLine('Site map saved (AI refinement failed: $ERROR$)', { error: err.message }), 'info');
         addLog('info', 'Saved site map for ' + domain + ' (refinement failed: ' + err.message + ')');
       }
     } else {
-      showToast('Site map saved to memory for ' + domain, 'success');
+      showToast(fsbUiLine('Site map saved to memory for $DOMAIN$', { domain: domain }), 'success');
       addLog('info', 'Saved site map memory for ' + domain);
     }
   } catch (error) {
     console.error('Failed to save research to memory:', error);
-    showToast('Failed to save to memory: ' + error.message, 'error');
+    showToast(fsbUiLine('Failed to save to memory: $ERROR$', { error: error.message }), 'error');
   }
 }
 
 async function clearAllResearchResults() {
-  if (!confirm('Are you sure you want to delete ALL research results? This cannot be undone.')) {
+  if (!confirm(fsbUiLine('Are you sure you want to delete ALL research results? This cannot be undone.'))) {
     return;
   }
 
@@ -6456,72 +6692,9 @@ async function clearAllResearchResults() {
   }
 }
 
-// ==========================================
-// Background Agent Management
-// ==========================================
-
-// Phase 212: Background Agents sunset -- replaces interactive agent UI with deprecation card + one-time names list.
-// The function below is LIVE (not commented). The agent UI controllers below initializeAgentSection() are commented per-line.
-function initializeBackgroundAgentsDeprecation() {
-  const dismissBtn = document.getElementById('fsbSunsetNoticeDismiss');
-  const noticeEl = document.getElementById('fsbSunsetNotice');
-  const namesList = document.getElementById('fsbSunsetNoticeNames');
-
-  if (!dismissBtn || !noticeEl || !namesList) {
-    // Scaffolding not present (older HTML cached?); silently skip.
-    return;
-  }
-
-  // Wire the "Got it" button once; subsequent clicks are no-ops because the aside is hidden.
-  dismissBtn.addEventListener('click', function () {
-    try {
-      chrome.storage.local.set({ fsb_sunset_notice_dismissed: true });
-    } catch (e) {
-      // chrome.storage may be unavailable in test environments; degrade gracefully.
-    }
-    noticeEl.hidden = true;
-  });
-
-  // Read bgAgents + dismiss flag in parallel; render only if (bgAgents non-empty AND not dismissed).
-  try {
-    chrome.storage.local.get(['bgAgents', 'fsb_sunset_notice_dismissed'], function (stored) {
-      const dismissed = stored && stored.fsb_sunset_notice_dismissed === true;
-      // Phase 212-04 (gap-closure / WR-01): bgAgents was historically written as an object map
-      // keyed by agentId (agents/agent-manager.js:86-91 -- the only writer that ever ran).
-      // Array.isArray({}) returns false, which suppressed the notice on the only profiles
-      // that matter. Accept both shapes defensively: array as-is, object map -> Object.values,
-      // anything else -> empty array.
-      const raw = stored && stored.bgAgents;
-      const agents = Array.isArray(raw)
-        ? raw
-        : (raw && typeof raw === 'object' ? Object.values(raw) : []);
-      if (dismissed) return;        // D-09: never re-render after dismiss
-      if (agents.length === 0) return; // D-10: skip entirely if no agents ever existed
-
-      // Defensive textContent rendering (T-01 mitigation -- agent names came from user input).
-      // NEVER use innerHTML for these strings. PurifyDOM is loaded but textContent is sufficient for plain text.
-      while (namesList.firstChild) {
-        namesList.removeChild(namesList.firstChild);
-      }
-      for (let i = 0; i < agents.length; i++) {
-        const a = agents[i] || {};
-        const name = (typeof a.name === 'string' && a.name.length > 0) ? a.name : '(unnamed agent)';
-        const li = document.createElement('li');
-        li.textContent = name;            // textContent ONLY; never innerHTML
-        namesList.appendChild(li);
-      }
-      noticeEl.hidden = false;
-    });
-  } catch (e) {
-    // chrome.storage unavailable; deprecation card alone is sufficient.
-  }
-}
-
 function initializeSyncDeprecationAndButtons() {
-  // Sync consolidation: the deprecation card + sunset notice + Server Sync buttons all
-  // live in the Sync section now. Keep wiring idempotent so re-init from /clear is safe.
-
-  initializeBackgroundAgentsDeprecation();
+  // Sync consolidation: the deprecation card and Server Sync buttons both live in
+  // the Sync section. Keep wiring idempotent so re-init from /clear is safe.
 
   // Server sync buttons
   const btnGenerate = document.getElementById('btnGenerateHashKey');
@@ -6542,448 +6715,6 @@ function initializeSyncDeprecationAndButtons() {
   loadServerSettings();
 }
 
-// DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-// function showAgentForm(editAgent) {
-//   const form = document.getElementById('agentFormCard');
-//   const title = document.getElementById('agentFormTitle');
-//   if (!form) return;
-// 
-//   if (editAgent && typeof editAgent === 'object' && editAgent.agentId) {
-//     // Edit mode
-//     title.textContent = 'Edit Agent';
-//     document.getElementById('agentFormId').value = editAgent.agentId;
-//     document.getElementById('agentName').value = editAgent.name || '';
-//     document.getElementById('agentTask').value = editAgent.task || '';
-//     document.getElementById('agentTargetUrl').value = editAgent.targetUrl || '';
-//     document.getElementById('agentScheduleType').value = editAgent.schedule?.type || 'interval';
-//     document.getElementById('agentInterval').value = editAgent.schedule?.intervalMinutes || 30;
-//     document.getElementById('agentDailyTime').value = editAgent.schedule?.dailyTime || '09:00';
-//     document.getElementById('agentMaxIterations').value = editAgent.maxIterations || 15;
-// 
-//     // Set replay toggle
-//     const replayToggle = document.getElementById('agentReplayEnabled');
-//     if (replayToggle) replayToggle.checked = editAgent.replayEnabled !== false;
-// 
-//     // Set days of week checkboxes
-//     const daysContainer = document.getElementById('agentDaysOfWeek');
-//     if (daysContainer) {
-//       const checkboxes = daysContainer.querySelectorAll('input[type="checkbox"]');
-//       checkboxes.forEach(cb => {
-//         cb.checked = (editAgent.schedule?.daysOfWeek || []).includes(parseInt(cb.value));
-//       });
-//     }
-// 
-//     // Trigger schedule type change to show/hide fields
-//     document.getElementById('agentScheduleType').dispatchEvent(new Event('change'));
-//   } else {
-//     // Create mode
-//     title.textContent = 'Create New Agent';
-//     document.getElementById('agentFormId').value = '';
-//     document.getElementById('agentName').value = '';
-//     document.getElementById('agentTask').value = '';
-//     document.getElementById('agentTargetUrl').value = '';
-//     document.getElementById('agentScheduleType').value = 'interval';
-//     document.getElementById('agentInterval').value = 30;
-//     document.getElementById('agentDailyTime').value = '09:00';
-//     document.getElementById('agentMaxIterations').value = 15;
-//     const replayToggleCreate = document.getElementById('agentReplayEnabled');
-//     if (replayToggleCreate) replayToggleCreate.checked = true;
-//     document.getElementById('agentScheduleType').dispatchEvent(new Event('change'));
-//   }
-// 
-//   form.style.display = '';
-// }
-
-// DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-// function hideAgentForm() {
-//   const form = document.getElementById('agentFormCard');
-//   if (form) form.style.display = 'none';
-// }
-
-// DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-// async function saveAgent() {
-//   const agentId = document.getElementById('agentFormId').value;
-//   const name = document.getElementById('agentName').value.trim();
-//   const task = document.getElementById('agentTask').value.trim();
-//   const targetUrl = document.getElementById('agentTargetUrl').value.trim();
-//   const scheduleType = document.getElementById('agentScheduleType').value;
-//   const intervalMinutes = parseInt(document.getElementById('agentInterval').value) || 30;
-//   const dailyTime = document.getElementById('agentDailyTime').value;
-//   const maxIterations = parseInt(document.getElementById('agentMaxIterations').value) || 15;
-// 
-//   if (!name || !task || !targetUrl) {
-//     showToast('Please fill in all required fields', 'error');
-//     return;
-//   }
-// 
-//   // Build schedule
-//   const schedule = { type: scheduleType };
-//   if (scheduleType === 'interval') {
-//     schedule.intervalMinutes = Math.max(1, intervalMinutes);
-//   } else if (scheduleType === 'daily') {
-//     schedule.dailyTime = dailyTime;
-//     const daysContainer = document.getElementById('agentDaysOfWeek');
-//     if (daysContainer) {
-//       const checked = Array.from(daysContainer.querySelectorAll('input:checked')).map(cb => parseInt(cb.value));
-//       if (checked.length > 0) {
-//         schedule.daysOfWeek = checked;
-//       }
-//     }
-//   }
-// 
-//   const replayEnabled = document.getElementById('agentReplayEnabled')?.checked !== false;
-// 
-//   const action = agentId ? 'updateAgent' : 'createAgent';
-//   const payload = agentId
-//     ? { action, agentId, updates: { name, task, targetUrl, schedule, maxIterations, replayEnabled } }
-//     : { action, params: { name, task, targetUrl, schedule, maxIterations, replayEnabled } };
-// 
-//   try {
-//     const response = await new Promise((resolve) => {
-//       chrome.runtime.sendMessage(payload, resolve);
-//     });
-// 
-//     if (response.success) {
-//       showToast(agentId ? 'Agent updated' : 'Agent created', 'success');
-//       hideAgentForm();
-//       loadAgentList();
-//       loadAgentStats();
-//     } else {
-//       showToast('Error: ' + (response.error || 'Unknown error'), 'error');
-//     }
-//   } catch (error) {
-//     showToast('Error: ' + error.message, 'error');
-//   }
-// }
-
-// DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-// async function loadAgentList() {
-//   try {
-//     const response = await new Promise((resolve) => {
-//       chrome.runtime.sendMessage({ action: 'listAgents' }, resolve);
-//     });
-// 
-//     const list = document.getElementById('agentList');
-//     const emptyState = document.getElementById('agentEmptyState');
-//     if (!list) return;
-// 
-//     // Remove existing agent cards (keep empty state)
-//     list.querySelectorAll('.agent-card').forEach(card => card.remove());
-// 
-//     const agents = response?.agents || [];
-// 
-//     if (agents.length === 0) {
-//       if (emptyState) emptyState.style.display = '';
-//       return;
-//     }
-// 
-//     if (emptyState) emptyState.style.display = 'none';
-// 
-//     for (const agent of agents) {
-//       const card = createAgentCard(agent);
-//       list.appendChild(card);
-//     }
-//   } catch (error) {
-//     console.error('Failed to load agents:', error);
-//   }
-// }
-
-// DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-// function createAgentCard(agent) {
-//   const card = document.createElement('div');
-//   card.className = 'agent-card';
-//   card.dataset.agentId = agent.agentId;
-// 
-//   const statusClass = agent.enabled ? 'active' : 'disabled';
-//   const statusText = agent.enabled ? 'Active' : 'Disabled';
-//   const lastRun = agent.lastRunAt ? formatTimeAgo(agent.lastRunAt) : 'Never';
-//   const scheduleText = formatSchedule(agent.schedule);
-// 
-//   // Replay info
-//   const hasScript = agent.recordedScript && agent.recordedScript.steps && agent.recordedScript.steps.length > 0;
-//   const replayEnabled = agent.replayEnabled !== false;
-//   const replayBadgeClass = hasScript ? 'active' : 'inactive';
-//   const replayBadgeText = hasScript
-//     ? 'Replay Ready - ' + agent.recordedScript.totalSteps + ' steps'
-//     : 'No Script';
-//   const replayStats = agent.replayStats || { totalReplays: 0, estimatedCostSaved: 0 };
-//   const costSavedText = replayStats.estimatedCostSaved > 0
-//     ? '$' + replayStats.estimatedCostSaved.toFixed(4)
-//     : '$0';
-// 
-//   card.innerHTML = `
-//     <div class="agent-card-header">
-//       <div class="agent-card-info">
-//         <h4 class="agent-card-name">${escapeHtml(agent.name)}</h4>
-//         <span class="agent-status-badge ${statusClass}">${statusText}</span>
-//       </div>
-//       <label class="toggle-switch small">
-//         <input type="checkbox" class="agent-toggle" data-agent-id="${agent.agentId}" ${agent.enabled ? 'checked' : ''}>
-//         <span class="toggle-slider"></span>
-//       </label>
-//     </div>
-//     <div class="agent-card-body">
-//       <div class="agent-card-detail">
-//         <span class="agent-detail-label">Task:</span>
-//         <span class="agent-detail-value">${escapeHtml(agent.task.substring(0, 100))}${agent.task.length > 100 ? '...' : ''}</span>
-//       </div>
-//       <div class="agent-card-detail">
-//         <span class="agent-detail-label">URL:</span>
-//         <span class="agent-detail-value">${escapeHtml(agent.targetUrl)}</span>
-//       </div>
-//       <div class="agent-card-detail">
-//         <span class="agent-detail-label">Schedule:</span>
-//         <span class="agent-detail-value">${scheduleText}</span>
-//       </div>
-//       <div class="agent-card-replay">
-//         <span class="replay-badge ${replayBadgeClass}">${replayBadgeText}</span>
-//         ${replayStats.totalReplays > 0 ? `<span class="replay-count">${replayStats.totalReplays} replays</span>` : ''}
-//         ${replayStats.estimatedCostSaved > 0 ? `<span class="cost-saved">${costSavedText} saved</span>` : ''}
-//         ${hasScript ? `<button class="control-btn tiny agent-rerecord-btn" data-agent-id="${agent.agentId}" title="Clear script and re-record on next run">Re-record</button>` : ''}
-//       </div>
-//       <div class="agent-card-meta">
-//         <span>Last run: ${lastRun}</span>
-//         <span>Runs: ${agent.runCount}</span>
-//         ${agent.lastRunStatus ? `<span class="run-status-${agent.lastRunStatus}">${agent.lastRunStatus}</span>` : ''}
-//       </div>
-//     </div>
-//     <div class="agent-card-actions">
-//       <button class="control-btn small agent-run-btn" data-agent-id="${agent.agentId}">
-//         <i class="fas fa-play"></i> Run Now
-//       </button>
-//       <button class="control-btn small agent-edit-btn" data-agent-id="${agent.agentId}">
-//         <i class="fas fa-edit"></i> Edit
-//       </button>
-//       <button class="control-btn small danger agent-delete-btn" data-agent-id="${agent.agentId}">
-//         <i class="fas fa-trash"></i> Delete
-//       </button>
-//       <button class="control-btn small agent-history-btn" data-agent-id="${agent.agentId}">
-//         <i class="fas fa-history"></i> History
-//       </button>
-//     </div>
-//     <div class="agent-run-history" id="history-${agent.agentId}" style="display: none;"></div>
-//   `;
-// 
-//   // Toggle handler
-//   const toggle = card.querySelector('.agent-toggle');
-//   if (toggle) {
-//     toggle.addEventListener('change', () => toggleAgent(agent.agentId));
-//   }
-// 
-//   // Run now
-//   const runBtn = card.querySelector('.agent-run-btn');
-//   if (runBtn) {
-//     runBtn.addEventListener('click', () => runAgentNow(agent.agentId));
-//   }
-// 
-//   // Edit
-//   const editBtn = card.querySelector('.agent-edit-btn');
-//   if (editBtn) {
-//     editBtn.addEventListener('click', async () => {
-//       const response = await new Promise(resolve => {
-//         chrome.runtime.sendMessage({ action: 'listAgents' }, resolve);
-//       });
-//       const fresh = (response?.agents || []).find(a => a.agentId === agent.agentId);
-//       if (fresh) showAgentForm(fresh);
-//     });
-//   }
-// 
-//   // Delete
-//   const deleteBtn = card.querySelector('.agent-delete-btn');
-//   if (deleteBtn) {
-//     deleteBtn.addEventListener('click', () => deleteAgent(agent.agentId, agent.name));
-//   }
-// 
-//   // History toggle
-//   const historyBtn = card.querySelector('.agent-history-btn');
-//   if (historyBtn) {
-//     historyBtn.addEventListener('click', () => toggleAgentHistory(agent.agentId));
-//   }
-// 
-//   // Re-record button (clear script)
-//   const rerecordBtn = card.querySelector('.agent-rerecord-btn');
-//   if (rerecordBtn) {
-//     rerecordBtn.addEventListener('click', async (e) => {
-//       e.stopPropagation();
-//       if (!confirm('Clear the recorded script for "' + agent.name + '"? The next run will use AI to re-record.')) return;
-//       try {
-//         const response = await new Promise(resolve => {
-//           chrome.runtime.sendMessage({ action: 'clearAgentScript', agentId: agent.agentId }, resolve);
-//         });
-//         if (response.success) {
-//           showToast('Script cleared - next run will use AI', 'success');
-//           loadAgentList();
-//         } else {
-//           showToast('Error: ' + (response.error || 'Failed to clear script'), 'error');
-//         }
-//       } catch (error) {
-//         showToast('Error: ' + error.message, 'error');
-//       }
-//     });
-//   }
-// 
-//   return card;
-// }
-
-// DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-// async function toggleAgent(agentId) {
-//   try {
-//     const response = await new Promise(resolve => {
-//       chrome.runtime.sendMessage({ action: 'toggleAgent', agentId }, resolve);
-//     });
-//     if (response.success) {
-//       loadAgentList();
-//       loadAgentStats();
-//     } else {
-//       showToast('Error: ' + (response.error || 'Failed to toggle agent'), 'error');
-//     }
-//   } catch (error) {
-//     showToast('Error: ' + error.message, 'error');
-//   }
-// }
-
-// DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-// async function runAgentNow(agentId) {
-//   showToast('Starting agent run...', 'info');
-//   try {
-//     const response = await new Promise(resolve => {
-//       chrome.runtime.sendMessage({ action: 'runAgentNow', agentId }, resolve);
-//     });
-//     if (response.success) {
-//       showToast('Agent execution started', 'success');
-//     } else {
-//       showToast('Error: ' + (response.error || 'Failed to start agent'), 'error');
-//     }
-//   } catch (error) {
-//     showToast('Error: ' + error.message, 'error');
-//   }
-// }
-
-// DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-// async function deleteAgent(agentId, name) {
-//   if (!confirm('Delete agent "' + name + '"? This cannot be undone.')) return;
-// 
-//   try {
-//     const response = await new Promise(resolve => {
-//       chrome.runtime.sendMessage({ action: 'deleteAgent', agentId }, resolve);
-//     });
-//     if (response.success) {
-//       showToast('Agent deleted', 'success');
-//       loadAgentList();
-//       loadAgentStats();
-//     } else {
-//       showToast('Error: ' + (response.error || 'Failed to delete agent'), 'error');
-//     }
-//   } catch (error) {
-//     showToast('Error: ' + error.message, 'error');
-//   }
-// }
-
-// DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-// async function toggleAgentHistory(agentId) {
-//   const container = document.getElementById('history-' + agentId);
-//   if (!container) return;
-// 
-//   if (container.style.display !== 'none') {
-//     container.style.display = 'none';
-//     return;
-//   }
-// 
-//   try {
-//     const response = await new Promise(resolve => {
-//       chrome.runtime.sendMessage({ action: 'getAgentRunHistory', agentId, limit: 10 }, resolve);
-//     });
-// 
-//     const history = response?.history || [];
-//     if (history.length === 0) {
-//       container.innerHTML = '<div class="history-empty">No run history yet.</div>';
-//     } else {
-//       container.innerHTML = history.map(run => {
-//         const mode = run.executionMode || 'ai_initial';
-//         let modeBadge = '';
-//         if (mode === 'replay') {
-//           modeBadge = '<span class="mode-badge replay">Replay</span>';
-//         } else if (mode === 'ai_fallback') {
-//           modeBadge = '<span class="mode-badge fallback">AI Fallback</span>';
-//         } else {
-//           modeBadge = '<span class="mode-badge ai">AI</span>';
-//         }
-//         const costSavedInfo = run.costSaved > 0
-//           ? '<span class="cost-saved">$' + run.costSaved.toFixed(4) + ' saved</span>'
-//           : '';
-//         return `
-//           <div class="history-entry ${run.success ? 'success' : 'failed'}">
-//             <div class="history-entry-header">
-//               <span class="history-status">${run.success ? 'Success' : 'Failed'}</span>
-//               ${modeBadge}
-//               <span class="history-time">${new Date(run.timestamp).toLocaleString()}</span>
-//               <span class="history-duration">${formatDuration(run.duration)}</span>
-//               ${costSavedInfo}
-//             </div>
-//             <div class="history-entry-body">
-//               ${run.result ? '<p>' + escapeHtml(run.result.substring(0, 200)) + '</p>' : ''}
-//               ${run.error ? '<p class="history-error">' + escapeHtml(run.error.substring(0, 200)) + '</p>' : ''}
-//               <span class="history-iterations">${run.iterations || 0} iterations</span>
-//               ${run.replayFailedAtStep != null ? '<span class="history-replay-fail">Replay failed at step ' + run.replayFailedAtStep + '</span>' : ''}
-//             </div>
-//           </div>
-//         `;
-//       }).join('');
-//     }
-// 
-//     container.style.display = '';
-//   } catch (error) {
-//     container.innerHTML = '<div class="history-empty">Failed to load history.</div>';
-//     container.style.display = '';
-//   }
-// }
-
-// DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-// async function loadAgentStats() {
-//   try {
-//     const response = await new Promise(resolve => {
-//       chrome.runtime.sendMessage({ action: 'getAgentStats' }, resolve);
-//     });
-// 
-//     const stats = response?.stats;
-//     if (!stats) return;
-// 
-//     const el = (id) => document.getElementById(id);
-//     if (el('statTotalAgents')) el('statTotalAgents').textContent = stats.totalAgents;
-//     if (el('statEnabledAgents')) el('statEnabledAgents').textContent = stats.enabledAgents;
-//     if (el('statRunsToday')) el('statRunsToday').textContent = stats.runsToday;
-//     if (el('statSuccessRate')) el('statSuccessRate').textContent = stats.totalRuns > 0 ? stats.successRate + '%' : '--';
-//     if (el('statTotalCost')) el('statTotalCost').textContent = '$' + stats.totalCost.toFixed(4);
-//     if (el('statReplayRuns')) el('statReplayRuns').textContent = stats.totalReplayRuns || 0;
-//     if (el('statCostSaved')) el('statCostSaved').textContent = '$' + (stats.totalCostSaved || 0).toFixed(4);
-//   } catch (error) {
-//     console.error('Failed to load agent stats:', error);
-//   }
-// }
-
-// DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-// function formatSchedule(schedule) {
-//   if (!schedule) return 'Not set';
-//   switch (schedule.type) {
-//     case 'interval':
-//       const mins = schedule.intervalMinutes || 1;
-//       if (mins >= 60) return 'Every ' + (mins / 60) + ' hour' + (mins >= 120 ? 's' : '');
-//       return 'Every ' + mins + ' minute' + (mins > 1 ? 's' : '');
-//     case 'daily':
-//       const days = schedule.daysOfWeek;
-//       const time = schedule.dailyTime || '09:00';
-//       if (days && days.length > 0 && days.length < 7) {
-//         const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-//         return 'Daily at ' + time + ' (' + days.map(d => dayNames[d]).join(', ') + ')';
-//       }
-//       return 'Daily at ' + time;
-//     case 'once':
-//       return 'Run once';
-//     default:
-//       return schedule.type;
-//   }
-// }
-
 function formatTimeAgo(timestamp) {
   const diff = Date.now() - timestamp;
   if (diff < 60000) return 'Just now';
@@ -6991,21 +6722,6 @@ function formatTimeAgo(timestamp) {
   if (diff < 86400000) return Math.floor(diff / 3600000) + 'h ago';
   return Math.floor(diff / 86400000) + 'd ago';
 }
-
-// DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-// function formatDuration(ms) {
-//   if (!ms) return '--';
-//   if (ms < 1000) return ms + 'ms';
-//   if (ms < 60000) return (ms / 1000).toFixed(1) + 's';
-//   return Math.floor(ms / 60000) + 'm ' + Math.floor((ms % 60000) / 1000) + 's';
-// }
-
-// DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-// function escapeHtml(text) {
-//   const div = document.createElement('div');
-//   div.textContent = text;
-//   return div.innerHTML;
-// }
 
 // Server sync functions
 const FSB_DEFAULT_SERVER_URL = 'https://full-selfbrowsing.com';
@@ -7047,7 +6763,7 @@ async function generateHashKey() {
       showToast('Failed to generate hash key', 'error');
     }
   } catch (error) {
-    showToast('Cannot connect to server: ' + error.message, 'error');
+    showToast(fsbUiLine('Cannot connect to server: $ERROR$', { error: error.message }), 'error');
   }
 }
 
@@ -7089,7 +6805,7 @@ async function testServerConnection() {
     return;
   }
 
-  if (statusEl) statusEl.textContent = 'Testing...';
+  if (statusEl) fsbUiSet(statusEl, "Testing...");
 
   try {
     const resp = await fetch(serverUrl + '/api/auth/validate', {
@@ -7097,16 +6813,16 @@ async function testServerConnection() {
     });
     const data = await resp.json();
     if (data.valid) {
-      if (statusEl) statusEl.textContent = 'Connected';
+      if (statusEl) fsbUiSet(statusEl, "Connected");
       if (statusEl) statusEl.className = 'connection-status connected';
       showToast('Server connection successful', 'success');
     } else {
-      if (statusEl) statusEl.textContent = 'Invalid key';
+      if (statusEl) fsbUiSet(statusEl, "Invalid key");
       if (statusEl) statusEl.className = 'connection-status error';
       showToast('Hash key is invalid', 'error');
     }
   } catch (error) {
-    if (statusEl) statusEl.textContent = 'Failed';
+    if (statusEl) fsbUiSet(statusEl, "Failed");
     if (statusEl) statusEl.className = 'connection-status error';
     showToast('Cannot connect to server', 'error');
   }
@@ -7192,13 +6908,13 @@ function renderExpiredState() {
   // D-02: replace countdown text with Expired indicator
   countdownEl.classList.remove('pairing-countdown-urgent');
   countdownEl.classList.add('pairing-qr-expired');
-  countdownEl.textContent = 'Expired';
+  fsbUiSet(countdownEl, "Expired");
   // D-02: replace QR slot with Generate new code button
   qrCodeEl.innerHTML = '';
   const regenBtn = document.createElement('button');
   regenBtn.type = 'button';
   regenBtn.className = 'control-btn accent';
-  regenBtn.textContent = 'Generate new code';
+  fsbUiSet(regenBtn, "Generate new code");
   regenBtn.addEventListener('click', regeneratePairingToken);
   qrCodeEl.appendChild(regenBtn);
   // Overlay stays open (D-02): do NOT touch overlay.style.display here.
@@ -7227,9 +6943,9 @@ async function regeneratePairingToken() {
   } catch (error) {
     if (messageEl) {
       messageEl.classList.add('pairing-qr-expired');
-      messageEl.textContent = 'Could not generate pairing code. Try again.';
+      fsbUiSet(messageEl, "Could not generate pairing code. Try again.");
     }
-    showToast('Could not generate pairing code: ' + error.message, 'error');
+    showToast(fsbUiLine('Could not generate pairing code: $ERROR$', { error: error.message }), 'error');
   } finally {
     pairingFetchInFlight = false;
   }
@@ -7258,7 +6974,7 @@ async function showPairingQR() {
       try {
         hashKey = await ensureHashKey(serverUrl);
       } catch (error) {
-        showToast('Could not register hash key: ' + error.message, 'error');
+        showToast(fsbUiLine('Could not register hash key: $ERROR$', { error: error.message }), 'error');
         return; // abort BEFORE opening overlay
       }
     }
@@ -7272,7 +6988,7 @@ async function showPairingQR() {
     overlay.style.display = 'flex';
     startPairingCountdown(data.expiresAt);
   } catch (error) {
-    showToast('Could not generate pairing code: ' + error.message, 'error');
+    showToast(fsbUiLine('Could not generate pairing code: $ERROR$', { error: error.message }), 'error');
   } finally {
     pairingFetchInFlight = false;
   }
@@ -7508,7 +7224,7 @@ function renderMemoryList(memories) {
     }[memory.type] || 'fa-circle';
 
     const typeLabel = memory.type.charAt(0).toUpperCase() + memory.type.slice(1);
-    const domain = memory.metadata?.domain || 'Unknown';
+    const domain = memory.metadata?.domain;
     const age = formatTimeAgo(memory.createdAt);
     const accesses = memory.accessCount || 0;
     const confidence = Math.round((memory.metadata?.confidence || 0) * 100);
@@ -7517,14 +7233,14 @@ function renderMemoryList(memories) {
     const isSiteMap = memory.typeData?.category === 'site_map';
     const isRefined = memory.typeData?.sitePattern?.refined === true;
     const badgeHtml = isSiteMap
-      ? `<span class="memory-badge ${isRefined ? 'refined' : 'basic'}">${isRefined ? 'Refined' : 'Basic'}</span>`
+      ? `<span class="memory-badge ${isRefined ? 'refined' : 'basic'}">${fsbUiHtml(isRefined ? 'Refined' : 'Basic')}</span>`
       : '';
     const refineBtn = isSiteMap && !isRefined
-      ? `<button class="refine-btn-prominent" data-id="${memory.id}" data-recon-id="${memory.typeData?.sitePattern?.reconId || ''}" title="Refine sitemap"><i class="fas fa-magic"></i> Refine</button>`
+      ? `<button class="refine-btn-prominent" data-id="${memory.id}" data-recon-id="${memory.typeData?.sitePattern?.reconId || ''}" ${fsbUiTitle('Refine sitemap')}><i class="fas fa-magic"></i> ${fsbUiHtml('Refine')}</button>`
       : '';
 
     const graphAttr = isSiteMap ? ' data-has-graph="true"' : '';
-    const chevronHtml = '<i class="fas fa-chevron-right detail-toggle-icon" title="Toggle details"></i>';
+    const chevronHtml = '<i class="fas fa-chevron-right detail-toggle-icon" ' + fsbUiTitle('Toggle details') + '></i>';
 
     return `
       <div class="session-item memory-item" data-memory-id="${memory.id}" data-expandable="true"${graphAttr} style="cursor: pointer;">
@@ -7535,12 +7251,12 @@ function renderMemoryList(memories) {
               ${escapeHtml(memory.text)} ${badgeHtml}
             </div>
             <div class="memory-item-meta">
-              ${typeLabel} | ${escapeHtml(domain)} | ${age} | ${accesses} accesses | ${confidence}% conf${tags ? ' | ' + escapeHtml(tags) : ''}
+              ${typeLabel} | ${domain ? escapeHtml(domain) : fsbUiHtml('Unknown')} | ${age} | ${fsbUiHtml('$COUNT$ accesses', { count: accesses })} | ${fsbUiHtml('$PERCENT$% conf', { percent: confidence })}${tags ? ' | ' + escapeHtml(tags) : ''}
             </div>
           </div>
           ${refineBtn}
           ${chevronHtml}
-          <button class="control-btn small memory-delete-btn" data-id="${memory.id}" title="Delete memory">
+          <button class="control-btn small memory-delete-btn" data-id="${memory.id}" ${fsbUiTitle('Delete memory')}>
             <i class="fas fa-trash"></i>
           </button>
         </div>
@@ -7553,7 +7269,7 @@ function renderMemoryList(memories) {
     btn.addEventListener('click', async (e) => {
       e.stopPropagation();
       const id = btn.dataset.id;
-      if (confirm('Delete this memory?')) {
+      if (confirm(fsbUiLine('Delete this memory?'))) {
         await memoryManager.delete(id);
         loadMemoryDashboard();
         showToast('Memory deleted', 'info');
@@ -7696,15 +7412,15 @@ function renderEpisodicDetail(memory) {
 
   const stepsHtml = (td.stepsCompleted && td.stepsCompleted.length > 0)
     ? `<ul class="detail-list">${td.stepsCompleted.map(s => `<li>${escapeHtml(String(s))}</li>`).join('')}</ul>`
-    : '<span class="detail-muted">None recorded</span>';
+    : '<span class="detail-muted">' + fsbUiHtml('None recorded') + '</span>';
 
   const failuresHtml = (td.failures && td.failures.length > 0)
     ? `<ul class="detail-list">${td.failures.map(f => `<li>${escapeHtml(String(f))}</li>`).join('')}</ul>`
-    : '<span class="detail-muted">None</span>';
+    : '<span class="detail-muted">' + fsbUiHtml('None') + '</span>';
 
   const finalUrlHtml = td.finalUrl
     ? `<div class="detail-section">
-        <div class="detail-label">Final URL</div>
+        <div class="detail-label">${fsbUiHtml('Final URL')}</div>
         <div class="detail-value"><a href="${escapeHtml(td.finalUrl)}" target="_blank" rel="noopener">${escapeHtml(td.finalUrl)}</a></div>
       </div>`
     : '';
@@ -7712,28 +7428,28 @@ function renderEpisodicDetail(memory) {
   return `
     <div class="detail-grid">
       <div class="detail-section">
-        <div class="detail-label">Task</div>
+        <div class="detail-label">${fsbUiHtml('Task')}</div>
         <div class="detail-value">${escapeHtml(td.task || 'N/A')}</div>
       </div>
       <div class="detail-section">
-        <div class="detail-label">Outcome</div>
+        <div class="detail-label">${fsbUiHtml('Outcome')}</div>
         <div class="detail-value"><span class="${outcomeClass}">${outcomeLabel}</span></div>
       </div>
       <div class="detail-section">
-        <div class="detail-label">Duration</div>
+        <div class="detail-label">${fsbUiHtml('Duration')}</div>
         <div class="detail-value">${durationStr}</div>
       </div>
       <div class="detail-section">
-        <div class="detail-label">Iterations</div>
+        <div class="detail-label">${fsbUiHtml('Iterations')}</div>
         <div class="detail-value">${td.iterationCount || 0}</div>
       </div>
     </div>
     <div class="detail-section">
-      <div class="detail-label">Steps Completed</div>
+      <div class="detail-label">${fsbUiHtml('Steps Completed')}</div>
       ${stepsHtml}
     </div>
     <div class="detail-section">
-      <div class="detail-label">Failures</div>
+      <div class="detail-label">${fsbUiHtml('Failures')}</div>
       ${failuresHtml}
     </div>
     ${finalUrlHtml}
@@ -7750,7 +7466,9 @@ function renderSemanticDetail(memory) {
     cross_site_pattern: 'Cross-Site Pattern',
     user_preference: 'User Preference'
   };
-  const categoryLabel = categoryLabels[td.category] || (td.category || 'General');
+  const categoryLabel = categoryLabels[td.category]
+    ? fsbUiHtml(categoryLabels[td.category])
+    : (td.category ? escapeHtml(td.category) : fsbUiHtml('General'));
 
   let categoryContent = '';
 
@@ -7762,7 +7480,7 @@ function renderSemanticDetail(memory) {
     const navCount = Object.keys(sp.navigation || {}).length;
     const selectorCount = Object.keys(sp.keySelectors || {}).length;
     const linkCount = (sp.pageLinks || []).length;
-    const crawledAt = sp.crawledAt ? new Date(sp.crawledAt).toLocaleString() : 'Unknown';
+    const crawledAt = sp.crawledAt ? new Date(sp.crawledAt).toLocaleString() : '';
 
     // Build pages list (top 15)
     const pageEntries = Object.entries(sp.pages || {}).slice(0, 15);
@@ -7770,60 +7488,60 @@ function renderSemanticDetail(memory) {
       ? `<ul class="detail-list">${pageEntries.map(([path, info]) => {
           const title = info.title ? ` -- ${escapeHtml(info.title)}` : '';
           return `<li><span class="detail-code">${escapeHtml(path)}</span>${title}</li>`;
-        }).join('')}</ul>${Object.keys(sp.pages || {}).length > 15 ? `<div class="detail-muted">...and ${Object.keys(sp.pages).length - 15} more</div>` : ''}`
-      : '<span class="detail-muted">None</span>';
+        }).join('')}</ul>${Object.keys(sp.pages || {}).length > 15 ? `<div class="detail-muted">${fsbUiHtml('...and $COUNT$ more', { count: Object.keys(sp.pages).length - 15 })}</div>` : ''}`
+      : '<span class="detail-muted">' + fsbUiHtml('None') + '</span>';
 
     // Build forms list
     const formEntries = Object.entries(sp.forms || {});
     const formsHtml = formEntries.length > 0
       ? `<ul class="detail-list">${formEntries.map(([path, formList]) => {
           const count = Array.isArray(formList) ? formList.length : 1;
-          return `<li><span class="detail-code">${escapeHtml(path)}</span> (${count} form${count !== 1 ? 's' : ''})</li>`;
+          return `<li><span class="detail-code">${escapeHtml(path)}</span> ${fsbUiHtml(count === 1 ? '($COUNT$ form)' : '($COUNT$ forms)', { count })}</li>`;
         }).join('')}</ul>`
-      : '<span class="detail-muted">None</span>';
+      : '<span class="detail-muted">' + fsbUiHtml('None') + '</span>';
 
     // Build navigation summary
     const navEntries = Object.entries(sp.navigation || {});
     const navHtml = navEntries.length > 0
       ? `<ul class="detail-list">${navEntries.slice(0, 10).map(([path, navItems]) => {
           const count = Array.isArray(navItems) ? navItems.length : 0;
-          return `<li><span class="detail-code">${escapeHtml(path)}</span> (${count} nav item${count !== 1 ? 's' : ''})</li>`;
+          return `<li><span class="detail-code">${escapeHtml(path)}</span> ${fsbUiHtml(count === 1 ? '($COUNT$ nav item)' : '($COUNT$ nav items)', { count })}</li>`;
         }).join('')}</ul>`
-      : '<span class="detail-muted">None</span>';
+      : '<span class="detail-muted">' + fsbUiHtml('None') + '</span>';
 
     categoryContent = `
       <div class="detail-grid" style="grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 12px;">
         <div class="detail-section">
-          <div class="detail-label">Pages</div>
+          <div class="detail-label">${fsbUiHtml('Pages')}</div>
           <div class="detail-value" style="font-size: 1.2em; font-weight: 700;">${pageCount}</div>
         </div>
         <div class="detail-section">
-          <div class="detail-label">Forms</div>
+          <div class="detail-label">${fsbUiHtml('Forms')}</div>
           <div class="detail-value" style="font-size: 1.2em; font-weight: 700;">${formCount}</div>
         </div>
         <div class="detail-section">
-          <div class="detail-label">Nav Sections</div>
+          <div class="detail-label">${fsbUiHtml('Nav Sections')}</div>
           <div class="detail-value" style="font-size: 1.2em; font-weight: 700;">${navCount}</div>
         </div>
         <div class="detail-section">
-          <div class="detail-label">Links</div>
+          <div class="detail-label">${fsbUiHtml('Links')}</div>
           <div class="detail-value" style="font-size: 1.2em; font-weight: 700;">${linkCount}</div>
         </div>
       </div>
       <div class="detail-section">
-        <div class="detail-label">Crawled</div>
-        <div class="detail-value">${crawledAt}${sp.refined ? ' (refined)' : ''}</div>
+        <div class="detail-label">${fsbUiHtml('Crawled')}</div>
+        <div class="detail-value">${crawledAt ? escapeHtml(crawledAt) : fsbUiHtml('Unknown')}${sp.refined ? ' ' + fsbUiHtml('(refined)') : ''}</div>
       </div>
       <div class="detail-section">
-        <div class="detail-label">Pages Discovered</div>
+        <div class="detail-label">${fsbUiHtml('Pages Discovered')}</div>
         ${pagesHtml}
       </div>
       <div class="detail-section">
-        <div class="detail-label">Forms Found</div>
+        <div class="detail-label">${fsbUiHtml('Forms Found')}</div>
         ${formsHtml}
       </div>
       <div class="detail-section">
-        <div class="detail-label">Navigation</div>
+        <div class="detail-label">${fsbUiHtml('Navigation')}</div>
         ${navHtml}
       </div>
     `;
@@ -7834,7 +7552,7 @@ function renderSemanticDetail(memory) {
       .join('');
     categoryContent = `
       <div class="detail-section">
-        <div class="detail-label">Selector Info</div>
+        <div class="detail-label">${fsbUiHtml('Selector Info')}</div>
         <table class="detail-table">
           <tbody>${rows}</tbody>
         </table>
@@ -7844,14 +7562,14 @@ function renderSemanticDetail(memory) {
     const sp = td.sitePattern;
     categoryContent = `
       <div class="detail-section">
-        <div class="detail-label">Site Pattern</div>
+        <div class="detail-label">${fsbUiHtml('Site Pattern')}</div>
         <div class="detail-grid">
           <div class="detail-section">
-            <div class="detail-label">Pages</div>
+            <div class="detail-label">${fsbUiHtml('Pages')}</div>
             <div class="detail-value">${sp.pageCount || 0}</div>
           </div>
           <div class="detail-section">
-            <div class="detail-label">Forms</div>
+            <div class="detail-label">${fsbUiHtml('Forms')}</div>
             <div class="detail-value">${sp.formCount || 0}</div>
           </div>
         </div>
@@ -7861,24 +7579,24 @@ function renderSemanticDetail(memory) {
     const sp = td.sitePattern;
     const domainsHtml = (sp.domains && sp.domains.length > 0)
       ? `<ul class="detail-list">${sp.domains.map(d => `<li>${escapeHtml(d)}</li>`).join('')}</ul>`
-      : '<span class="detail-muted">None</span>';
+      : '<span class="detail-muted">' + fsbUiHtml('None') + '</span>';
     const formTypesHtml = (sp.commonFormTypes && sp.commonFormTypes.length > 0)
       ? `<ul class="detail-list">${sp.commonFormTypes.map(f => `<li>${escapeHtml(String(f))}</li>`).join('')}</ul>`
-      : '<span class="detail-muted">None</span>';
+      : '<span class="detail-muted">' + fsbUiHtml('None') + '</span>';
     const sharedPatternsHtml = (sp.sharedSelectorPatterns && sp.sharedSelectorPatterns.length > 0)
       ? `<ul class="detail-list">${sp.sharedSelectorPatterns.map(p => `<li class="detail-code">${escapeHtml(String(p))}</li>`).join('')}</ul>`
-      : '<span class="detail-muted">None</span>';
+      : '<span class="detail-muted">' + fsbUiHtml('None') + '</span>';
     categoryContent = `
       <div class="detail-section">
-        <div class="detail-label">Domains Analyzed</div>
+        <div class="detail-label">${fsbUiHtml('Domains Analyzed')}</div>
         ${domainsHtml}
       </div>
       <div class="detail-section">
-        <div class="detail-label">Common Form Types</div>
+        <div class="detail-label">${fsbUiHtml('Common Form Types')}</div>
         ${formTypesHtml}
       </div>
       <div class="detail-section">
-        <div class="detail-label">Shared Selector Patterns</div>
+        <div class="detail-label">${fsbUiHtml('Shared Selector Patterns')}</div>
         ${sharedPatternsHtml}
       </div>
     `;
@@ -7893,7 +7611,7 @@ function renderSemanticDetail(memory) {
 
   const validatedHtml = td.validatedAt
     ? `<div class="detail-section">
-        <div class="detail-label">Validated At</div>
+        <div class="detail-label">${fsbUiHtml('Validated At')}</div>
         <div class="detail-value">${new Date(td.validatedAt).toLocaleString()}</div>
       </div>`
     : '';
@@ -7901,7 +7619,7 @@ function renderSemanticDetail(memory) {
   return `
     <div class="detail-grid">
       <div class="detail-section">
-        <div class="detail-label">Category</div>
+        <div class="detail-label">${fsbUiHtml('Category')}</div>
         <div class="detail-value">${categoryLabel}</div>
       </div>
     </div>
@@ -7915,11 +7633,11 @@ function renderProceduralDetail(memory) {
 
   const stepsHtml = (td.steps && td.steps.length > 0)
     ? `<ol class="detail-list detail-list-ordered">${td.steps.map(s => `<li>${escapeHtml(String(s))}</li>`).join('')}</ol>`
-    : '<span class="detail-muted">No steps recorded</span>';
+    : '<span class="detail-muted">' + fsbUiHtml('No steps recorded') + '</span>';
 
   const selectorsHtml = (td.selectors && td.selectors.length > 0)
     ? `<ul class="detail-list">${td.selectors.map(s => `<li><code class="detail-code">${escapeHtml(String(s))}</code></li>`).join('')}</ul>`
-    : '<span class="detail-muted">None</span>';
+    : '<span class="detail-muted">' + fsbUiHtml('None') + '</span>';
 
   // Success rate color
   const rate = (td.successRate ?? 1) * 100;
@@ -7927,7 +7645,7 @@ function renderProceduralDetail(memory) {
 
   const targetUrlHtml = td.targetUrl
     ? `<div class="detail-section">
-        <div class="detail-label">Target URL</div>
+        <div class="detail-label">${fsbUiHtml('Target URL')}</div>
         <div class="detail-value"><a href="${escapeHtml(td.targetUrl)}" target="_blank" rel="noopener">${escapeHtml(td.targetUrl)}</a></div>
       </div>`
     : '';
@@ -7935,20 +7653,20 @@ function renderProceduralDetail(memory) {
   return `
     <div class="detail-grid">
       <div class="detail-section">
-        <div class="detail-label">Success Rate</div>
+        <div class="detail-label">${fsbUiHtml('Success Rate')}</div>
         <div class="detail-value"><span class="${rateClass}">${Math.round(rate)}%</span></div>
       </div>
       <div class="detail-section">
-        <div class="detail-label">Total Runs</div>
+        <div class="detail-label">${fsbUiHtml('Total Runs')}</div>
         <div class="detail-value">${td.totalRuns || 0}</div>
       </div>
     </div>
     <div class="detail-section">
-      <div class="detail-label">Steps</div>
+      <div class="detail-label">${fsbUiHtml('Steps')}</div>
       ${stepsHtml}
     </div>
     <div class="detail-section">
-      <div class="detail-label">Selectors Used</div>
+      <div class="detail-label">${fsbUiHtml('Selectors Used')}</div>
       ${selectorsHtml}
     </div>
     ${targetUrlHtml}
@@ -7963,7 +7681,7 @@ function renderAIAnalysisSection(aiAnalysis) {
 
   const renderValue = (val) => {
     if (Array.isArray(val)) {
-      if (val.length === 0) return '<span class="detail-muted">None</span>';
+      if (val.length === 0) return '<span class="detail-muted">' + fsbUiHtml('None') + '</span>';
       return `<ul class="detail-list">${val.map(v => `<li>${escapeHtml(String(v))}</li>`).join('')}</ul>`;
     }
     if (typeof val === 'object' && val !== null) {
@@ -7987,7 +7705,7 @@ function renderAIAnalysisSection(aiAnalysis) {
 
   return `
     <div class="ai-analysis-section">
-      <div class="ai-analysis-header"><i class="fas fa-brain"></i> Analysis</div>
+      <div class="ai-analysis-header"><i class="fas fa-brain"></i> ${fsbUiHtml('Analysis')}</div>
       ${sections}
     </div>
   `;
@@ -8063,11 +7781,11 @@ async function expandMemoryGraph(memoryItem, memoryId) {
   const hasDiscovered = graphData.nodes.some(n => n.discovered);
 
   let legendItems = '';
-  if (hasPages) legendItems += '<span class="site-graph-legend-item"><span class="site-graph-legend-dot" style="background: #4285f4; opacity: 0.7;"></span> Page</span>';
-  if (hasDiscovered) legendItems += '<span class="site-graph-legend-item"><span class="site-graph-legend-dot" style="background: transparent; border: 1.5px dashed #4285f4; opacity: 0.5;"></span> Discovered</span>';
-  if (hasForms) legendItems += '<span class="site-graph-legend-item"><span class="site-graph-legend-dot" style="background: #d97706; opacity: 0.7;"></span> Form</span>';
-  if (hasElements) legendItems += '<span class="site-graph-legend-item"><span class="site-graph-legend-dot" style="background: var(--text-muted, #737373); opacity: 0.5; border: 1px dashed var(--text-muted, #737373); background: transparent;"></span> Element</span>';
-  if (hasWorkflowLinks) legendItems += '<span class="site-graph-legend-item"><span class="site-graph-legend-dot" style="background: transparent; border: 1.5px dashed var(--success-color, #059669);"></span> Workflow</span>';
+  if (hasPages) legendItems += '<span class="site-graph-legend-item"><span class="site-graph-legend-dot" style="background: #4285f4; opacity: 0.7;"></span> ' + fsbUiHtml('Page') + '</span>';
+  if (hasDiscovered) legendItems += '<span class="site-graph-legend-item"><span class="site-graph-legend-dot" style="background: transparent; border: 1.5px dashed #4285f4; opacity: 0.5;"></span> ' + fsbUiHtml('Discovered') + '</span>';
+  if (hasForms) legendItems += '<span class="site-graph-legend-item"><span class="site-graph-legend-dot" style="background: #d97706; opacity: 0.7;"></span> ' + fsbUiHtml('Form') + '</span>';
+  if (hasElements) legendItems += '<span class="site-graph-legend-item"><span class="site-graph-legend-dot" style="background: var(--text-muted, #737373); opacity: 0.5; border: 1px dashed var(--text-muted, #737373); background: transparent;"></span> ' + fsbUiHtml('Element') + '</span>';
+  if (hasWorkflowLinks) legendItems += '<span class="site-graph-legend-item"><span class="site-graph-legend-dot" style="background: transparent; border: 1.5px dashed var(--success-color, #059669);"></span> ' + fsbUiHtml('Workflow') + '</span>';
 
   if (legendItems) {
     const legend = document.createElement('div');
@@ -8083,8 +7801,8 @@ async function expandMemoryGraph(memoryItem, memoryId) {
   const toggle = document.createElement('div');
   toggle.className = 'site-graph-detail-toggle';
   toggle.innerHTML =
-    '<button class="detail-btn' + (savedLevel === 'simple' ? ' active' : '') + '" data-level="simple">Simple</button>' +
-    '<button class="detail-btn' + (savedLevel === 'full' ? ' active' : '') + '" data-level="full">Full</button>';
+    '<button class="detail-btn' + (savedLevel === 'simple' ? ' active' : '') + '" data-level="simple">' + fsbUiHtml('Simple') + '</button>' +
+    '<button class="detail-btn' + (savedLevel === 'full' ? ' active' : '') + '" data-level="full">' + fsbUiHtml('Full') + '</button>';
   toolbar.appendChild(toggle);
   wrapper.appendChild(toolbar);
 
@@ -8179,7 +7897,7 @@ async function refineMemoryWithAI(memoryId, reconId) {
     showToast('Site map refined successfully', 'success');
     loadMemoryDashboard();
   } catch (err) {
-    showToast('AI refinement failed: ' + err.message, 'error');
+    showToast(fsbUiLine('AI refinement failed: $ERROR$', { error: err.message }), 'error');
   }
 }
 
@@ -8241,14 +7959,14 @@ async function exportMemories() {
 async function clearAllMemories() {
   if (typeof memoryManager === 'undefined') return;
 
-  if (!confirm('Delete ALL memories? This cannot be undone.')) return;
+  if (!confirm(fsbUiLine('Delete ALL memories? This cannot be undone.'))) return;
 
   try {
     await memoryManager.deleteAll();
     loadMemoryDashboard();
     showToast('All memories cleared', 'info');
   } catch (error) {
-    showToast('Failed to clear memories: ' + error.message, 'error');
+    showToast(fsbUiLine('Failed to clear memories: $ERROR$', { error: error.message }), 'error');
   }
 }
 
@@ -8614,7 +8332,7 @@ function initializeSyncSection() {
     if (!list.length) {
       const opt = doc.createElement('option');
       opt.value = '';
-      opt.textContent = hasSearch ? 'No models match search' : 'No models available';
+      fsbUiSet(opt, hasSearch ? 'No models match search' : 'No models available');
       opt.disabled = true;
       sel.appendChild(opt);
       sel.value = '';
@@ -8625,7 +8343,7 @@ function initializeSyncSection() {
     if (options.requireExplicit === true) {
       const prompt = doc.createElement('option');
       prompt.value = '';
-      prompt.textContent = 'Choose a loaded model...';
+      fsbUiSet(prompt, "Choose a loaded model...");
       prompt.disabled = true;
       sel.appendChild(prompt);
     }
@@ -8711,7 +8429,7 @@ function initializeSyncSection() {
       sel.value = '';
     }
     const description = doc.getElementById('modelDescription');
-    if (description) description.textContent = 'Select the AI model to use';
+    if (description) fsbUiSet(description, "Select the AI model to use");
     _setControlState({
       modelDisabled: true,
       refreshDisabled: options.refreshDisabled !== false,
@@ -9100,7 +8818,7 @@ function initializeSyncSection() {
       const empty = doc.createElement('li');
       empty.className = 'model-combobox__status';
       empty.setAttribute('role', 'presentation');
-      empty.textContent = 'No models match';
+      fsbUiSet(empty, "No models match");
       _listbox.appendChild(empty);
     }
 

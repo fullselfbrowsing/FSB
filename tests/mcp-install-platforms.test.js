@@ -28,6 +28,7 @@ const cliPath = path.join(repoRoot, 'mcp', 'build', 'index.js');
 const PRODUCT_VERSION = require('../extension/manifest.json').version;
 const EXTENSION_ID = 'badgafnfchcihdfnjneklogedcdkmjfk';
 const DEVELOPMENT_EXTENSION_ID = 'abcdefghijklmnopabcdefghijklmnop';
+const CLINE_ENV_KEYS = ['CLINE_DIR', 'CLINE_DATA_DIR', 'CLINE_MCP_SETTINGS_PATH'];
 
 function runCli(args, fixture, options = {}) {
   const env = {
@@ -38,6 +39,9 @@ function runCli(args, fixture, options = {}) {
     ...(options.env ?? {}),
   };
   if (!Object.hasOwn(options.env ?? {}, 'npm_execpath')) delete env.npm_execpath;
+  for (const key of CLINE_ENV_KEYS) {
+    if (!Object.hasOwn(options.env ?? {}, key)) delete env[key];
+  }
   return spawnSync(process.execPath, [cliPath, ...args], {
     cwd: repoRoot,
     encoding: 'utf8',
@@ -73,6 +77,23 @@ function writeText(filePath, content) {
 
 function readText(filePath) {
   return fs.readFileSync(filePath, 'utf8');
+}
+
+function readJson(filePath) {
+  return JSON.parse(readText(filePath));
+}
+
+function clineSettingsPath(fixture) {
+  return path.join(fixture.home, '.cline', 'data', 'settings', 'cline_mcp_settings.json');
+}
+
+function clineLegacySettingsPath(fixture) {
+  const storage = ['User', 'globalStorage', 'saoudrizwan.claude-dev', 'settings', 'cline_mcp_settings.json'];
+  if (process.platform === 'darwin') {
+    return path.join(fixture.home, 'Library', 'Application Support', 'Code', ...storage);
+  }
+  if (process.platform === 'win32') return path.join(fixture.appData, 'Code', ...storage);
+  return path.join(fixture.home, '.config', 'Code', ...storage);
 }
 
 function assertIncludes(text, needle, msg) {
@@ -143,7 +164,7 @@ function run() {
       'Claude Desktop',
       'Cursor',
       'VS Code',
-      'Windsurf',
+      'Antigravity',
       'Cline',
       'Zed',
       'Codex CLI',
@@ -166,9 +187,15 @@ function run() {
     assertIncludes(output, 'name: fsb', 'dry-run shows the Continue YAML array entry');
     assertIncludes(
       output,
-      '.codeium/windsurf/mcp_config.json',
-      'dry-run shows the Windsurf app config path',
+      path.join('.gemini', 'config', 'mcp_config.json'),
+      'dry-run shows the Antigravity config path',
     );
+    assertIncludes(
+      output,
+      path.join('.cline', 'data', 'settings', 'cline_mcp_settings.json'),
+      'dry-run shows the shared Cline settings path',
+    );
+    assertIncludes(output, '"timeout": 1800', 'dry-run shows the Cline request timeout');
     assertNotIncludes(output, 'Native messaging host', 'install --all excludes the native messaging host');
     assertNotIncludes(output, 'native-host', 'install --all output does not widen to the native target');
   });
@@ -237,11 +264,43 @@ function run() {
     assertIncludes(config, '- fsb-mcp-server@latest', 'continue install writes the latest-channel fsb command args');
   });
 
-  console.log('\n--- windsurf app config path ---');
-  withTempHome('mcp-install-windsurf-app', (fixture) => {
-    const windsurfPath = path.join(fixture.home, '.codeium', 'windsurf', 'mcp_config.json');
+  console.log('\n--- continue reinstall ignores property order but respects argument order ---');
+  withTempHome('mcp-install-continue-reordered', (fixture) => {
+    const configPath = path.join(fixture.home, '.continue', 'config.yaml');
+    const original = [
+      '# Keep this formatting on a no-op reinstall',
+      'theme: dark',
+      'mcpServers:',
+      '  - args: ["-y", "fsb-mcp-server@latest"]',
+      '    command: npx',
+      '    name: fsb',
+      '',
+    ].join('\n');
+    writeText(configPath, original);
+    const unchanged = runCli(['install', '--continue'], fixture);
+    assertEqual(unchanged.status, 0, 'continue reinstall with reordered properties exits cleanly');
+    assertIncludes(`${unchanged.stdout}${unchanged.stderr}`, 'Continue already configured',
+      'named-array property order does not trigger an update');
+    assertEqual(readText(configPath), original, 'continue no-op preserves the complete YAML file');
+    assertEqual(readText(configPath + '.bak'), original, 'continue no-op still backs up the original file');
+
+    const reversedArgs = original.replace('["-y", "fsb-mcp-server@latest"]', '["fsb-mcp-server@latest", "-y"]');
+    writeText(configPath, reversedArgs);
+    const changed = runCli(['install', '--continue'], fixture);
+    assertEqual(changed.status, 0, 'continue reinstall with changed arguments exits cleanly');
+    assertIncludes(`${changed.stdout}${changed.stderr}`, 'Updated Continue',
+      'named-array argument order remains significant');
+    assertEqual(readText(configPath + '.bak'), reversedArgs, 'continue update backs up the changed argument order');
+    const restored = runCli(['install', '--continue'], fixture);
+    assertIncludes(`${restored.stdout}${restored.stderr}`, 'Continue already configured',
+      'continue update restores the expected argument order');
+  });
+
+  console.log('\n--- antigravity config path ---');
+  withTempHome('mcp-install-antigravity', (fixture) => {
+    const configPath = path.join(fixture.home, '.gemini', 'config', 'mcp_config.json');
     writeText(
-      windsurfPath,
+      configPath,
       JSON.stringify({
         mcpServers: {
           existing: {
@@ -251,51 +310,219 @@ function run() {
         },
       }, null, 2),
     );
+    // An older release's file must not outrank the current config directory.
+    writeText(path.join(fixture.home, '.gemini', 'antigravity', 'mcp_config.json'), '');
 
-    const result = runCli(['install', '--windsurf'], fixture);
+    const result = runCli(['install', '--antigravity'], fixture);
     const output = `${result.stdout}${result.stderr}`;
-    const config = readText(windsurfPath);
+    const config = readJson(configPath);
 
-    assertEqual(result.status, 0, 'windsurf app-path install exits cleanly');
-    assertIncludes(output, 'Installed to Windsurf', 'windsurf app-path install reports success');
-    assertIncludes(config, '"existing"', 'windsurf app-path install preserves existing entries');
-    assertIncludes(config, '"fsb"', 'windsurf app-path install writes the fsb entry');
+    assertEqual(result.status, 0, 'antigravity install exits cleanly');
+    assertIncludes(output, 'Installed to Antigravity', 'antigravity install reports success');
+    assert(Object.hasOwn(config.mcpServers, 'existing'), 'antigravity install preserves existing entries');
+    assertEqual(
+      JSON.stringify(config.mcpServers.fsb),
+      JSON.stringify({ command: 'npx', args: ['-y', 'fsb-mcp-server@latest'] }),
+      'antigravity install writes the standard stdio entry',
+    );
+    assertEqual(
+      readText(path.join(fixture.home, '.gemini', 'antigravity', 'mcp_config.json')),
+      '',
+      'antigravity install leaves the older release file alone when ~/.gemini/config exists',
+    );
   });
 
-  console.log('\n--- windsurf plugin config variant ---');
-  withTempHome('mcp-install-windsurf-plugin', (fixture) => {
-    const pluginPath = path.join(fixture.home, '.codeium', 'mcp_config.json');
-    writeText(
-      pluginPath,
-      JSON.stringify({
-        mcpServers: {
-          existing: {
-            command: 'uvx',
-            args: ['plugin-server'],
-          },
-        },
-      }, null, 2),
+  console.log('\n--- antigravity older release with an empty config file ---');
+  withTempHome('mcp-install-antigravity-legacy', (fixture) => {
+    // Antigravity creates its config file empty until a server is added.
+    const legacyPath = path.join(fixture.home, '.gemini', 'antigravity', 'mcp_config.json');
+    writeText(legacyPath, '');
+
+    const result = runCli(['install', '--antigravity'], fixture);
+    const output = `${result.stdout}${result.stderr}`;
+
+    assertEqual(result.status, 0, 'antigravity install into an empty file exits cleanly');
+    assertIncludes(
+      output,
+      path.join('.gemini', 'antigravity', 'mcp_config.json'),
+      'antigravity install targets the older release file when ~/.gemini/config does not exist',
+    );
+    assertEqual(
+      JSON.stringify(readJson(legacyPath)),
+      JSON.stringify({ mcpServers: { fsb: { command: 'npx', args: ['-y', 'fsb-mcp-server@latest'] } } }),
+      'antigravity install turns an empty config file into an mcpServers map with the fsb entry',
     );
 
+    const rerun = runCli(['install', '--antigravity'], fixture);
+    assertIncludes(
+      `${rerun.stdout}${rerun.stderr}`,
+      'Antigravity (older release) already configured',
+      'antigravity reinstall is a no-op',
+    );
+
+    const uninstallResult = runCli(['uninstall', '--antigravity'], fixture);
+    assertEqual(uninstallResult.status, 0, 'antigravity uninstall exits cleanly');
+    assertIncludes(
+      `${uninstallResult.stdout}${uninstallResult.stderr}`,
+      'Removed from Antigravity',
+      'antigravity uninstall reports a successful removal',
+    );
+    assert(!Object.hasOwn(readJson(legacyPath).mcpServers, 'fsb'), 'antigravity uninstall removes the fsb entry');
+  });
+
+  console.log('\n--- windsurf flag is gone ---');
+  withTempHome('mcp-install-windsurf-retired', (fixture) => {
     const result = runCli(['install', '--windsurf'], fixture);
     const output = `${result.stdout}${result.stderr}`;
-    const config = readText(pluginPath);
+    assertNotIncludes(output, 'Installed to', 'install --windsurf writes nothing');
+    assert(!fs.existsSync(path.join(fixture.home, '.codeium')), 'install --windsurf creates no Windsurf config');
+  });
 
-    assertEqual(result.status, 0, 'windsurf plugin-path install exits cleanly');
-    assertIncludes(
-      output,
-      '.codeium/mcp_config.json',
-      'windsurf plugin-path install targets the JetBrains/Cascade config when it is the only detected variant',
+  console.log('\n--- cline shared settings install + uninstall ---');
+  withTempHome('mcp-install-cline-shared', (fixture) => {
+    const settingsPath = clineSettingsPath(fixture);
+    const existingServer = {
+      transport: { type: 'stdio', command: 'uvx', args: ['existing-server'] },
+      autoApprove: ['search'],
+    };
+    writeText(settingsPath, JSON.stringify({ mcpServers: { existing: existingServer } }, null, 2));
+
+    const result = runCli(['install', '--cline'], fixture);
+    const output = `${result.stdout}${result.stderr}`;
+    const config = readJson(settingsPath);
+
+    assertEqual(result.status, 0, 'cline install exits cleanly');
+    assertIncludes(output, 'Installed to Cline: ', 'cline install reports the shared settings target');
+    assertEqual(
+      JSON.stringify(config.mcpServers.fsb),
+      JSON.stringify({ command: 'npx', args: ['-y', 'fsb-mcp-server@latest'], timeout: 1800 }),
+      'cline install writes the stdio entry with a 30-minute request timeout',
     );
-    assertNotIncludes(
-      output,
-      'Directory does not exist',
-      'windsurf plugin-path install does not fail because the app-specific directory is missing',
+    assertEqual(
+      JSON.stringify(config.mcpServers.existing),
+      JSON.stringify(existingServer),
+      'cline install preserves other servers byte-for-byte',
     );
+
+    const uninstallResult = runCli(['uninstall', '--cline'], fixture);
+    const uninstalled = readJson(settingsPath);
+    assertEqual(uninstallResult.status, 0, 'cline uninstall exits cleanly');
     assertIncludes(
-      config,
-      '"fsb"',
-      'windsurf plugin-path install updates the JetBrains/Cascade config when that is the only Windsurf config surface',
+      `${uninstallResult.stdout}${uninstallResult.stderr}`,
+      'Removed from Cline',
+      'cline uninstall reports a successful removal',
+    );
+    assert(!Object.hasOwn(uninstalled.mcpServers, 'fsb'), 'cline uninstall removes the fsb entry');
+    assert(Object.hasOwn(uninstalled.mcpServers, 'existing'), 'cline uninstall keeps other servers');
+  });
+
+  console.log('\n--- cline reinstall keeps client-owned settings ---');
+  withTempHome('mcp-install-cline-preserve', (fixture) => {
+    const settingsPath = clineSettingsPath(fixture);
+    const userEntry = {
+      command: 'npx',
+      args: ['-y', 'fsb-mcp-server@latest'],
+      timeout: 3600,
+      autoApprove: ['navigate', 'read_page'],
+      disabled: false,
+    };
+    for (const [label, keys] of [
+      ['transport first', ['command', 'args', 'timeout', 'autoApprove', 'disabled']],
+      ['client settings first', ['autoApprove', 'disabled', 'timeout', 'command', 'args']],
+      ['interleaved settings', ['disabled', 'command', 'autoApprove', 'args', 'timeout']],
+    ]) {
+      const reordered = Object.fromEntries(keys.map((key) => [key, userEntry[key]]));
+      const original = JSON.stringify({ mcpServers: { fsb: reordered } }, null, 4) + '\n';
+      writeText(settingsPath, original);
+      const unchanged = runCli(['install', '--cline'], fixture);
+      assertEqual(unchanged.status, 0, `cline reinstall exits cleanly with ${label}`);
+      assertIncludes(`${unchanged.stdout}${unchanged.stderr}`, 'Cline already configured',
+        `cline reinstall skips an unchanged entry with ${label}`);
+      assertEqual(readText(settingsPath), original,
+        `cline reinstall preserves file bytes and client settings with ${label}`);
+      assertEqual(readText(settingsPath + '.bak'), original,
+        `cline reinstall preserves the backup behavior with ${label}`);
+    }
+
+    writeText(settingsPath, JSON.stringify({ mcpServers: { fsb: { ...userEntry, command: 'node' } } }));
+    const changedCommand = runCli(['install', '--cline'], fixture);
+    assertEqual(changedCommand.status, 0, 'cline reinstall with a stale command exits cleanly');
+    assertIncludes(`${changedCommand.stdout}${changedCommand.stderr}`, 'Updated Cline',
+      'a changed command still triggers an update');
+    assertEqual(JSON.stringify(readJson(settingsPath).mcpServers.fsb), JSON.stringify(userEntry),
+      'updating the command keeps the client timeout, auto-approve list, and disabled toggle');
+
+    writeText(settingsPath, JSON.stringify({
+      mcpServers: {
+        fsb: {
+          transport: { type: 'stdio', command: 'node', args: ['/old/fsb/build/index.js'] },
+          disabled: true,
+          autoApprove: ['click'],
+        },
+      },
+    }, null, 2));
+    const nested = runCli(['install', '--cline'], fixture);
+    assertIncludes(
+      `${nested.stdout}${nested.stderr}`,
+      'Updated Cline',
+      'a stale nested-transport entry is updated',
+    );
+    assertEqual(
+      JSON.stringify(readJson(settingsPath).mcpServers.fsb),
+      JSON.stringify({
+        command: 'npx',
+        args: ['-y', 'fsb-mcp-server@latest'],
+        timeout: 1800,
+        disabled: true,
+        autoApprove: ['click'],
+      }),
+      'updating a nested entry replaces its transport and keeps Cline-owned settings',
+    );
+  });
+
+  console.log('\n--- cline legacy VS Code settings fallback ---');
+  withTempHome('mcp-install-cline-legacy', (fixture) => {
+    const legacyPath = clineLegacySettingsPath(fixture);
+    writeText(legacyPath, JSON.stringify({ mcpServers: {} }, null, 2));
+
+    const legacyResult = runCli(['install', '--cline'], fixture);
+    assertEqual(legacyResult.status, 0, 'legacy cline install exits cleanly');
+    assertIncludes(
+      `${legacyResult.stdout}${legacyResult.stderr}`,
+      'Installed to Cline (legacy VS Code settings)',
+      'cline falls back to the legacy VS Code settings when no shared settings exist',
+    );
+    assert(Object.hasOwn(readJson(legacyPath).mcpServers, 'fsb'), 'legacy fallback writes the fsb entry');
+
+    fs.mkdirSync(path.dirname(clineSettingsPath(fixture)), { recursive: true });
+    const sharedPreview = runCli(['install', '--cline', '--dry-run'], fixture);
+    assertIncludes(
+      `${sharedPreview.stdout}${sharedPreview.stderr}`,
+      clineSettingsPath(fixture),
+      'a shared settings directory outranks a leftover legacy settings file',
+    );
+  });
+
+  console.log('\n--- cline settings path environment overrides ---');
+  withTempHome('mcp-install-cline-env', (fixture) => {
+    const explicitPath = path.join(fixture.root, 'explicit', 'cline_mcp_settings.json');
+    const clineDir = path.join(fixture.root, 'cline-home');
+    fs.mkdirSync(path.dirname(explicitPath), { recursive: true });
+    fs.mkdirSync(path.join(clineDir, 'data', 'settings'), { recursive: true });
+
+    const explicitResult = runCli(['install', '--cline'], fixture, {
+      env: { CLINE_MCP_SETTINGS_PATH: explicitPath, CLINE_DIR: clineDir },
+    });
+    assertEqual(explicitResult.status, 0, 'cline install honors CLINE_MCP_SETTINGS_PATH');
+    assert(fs.existsSync(explicitPath), 'CLINE_MCP_SETTINGS_PATH outranks CLINE_DIR');
+
+    const dirPreview = runCli(['install', '--cline', '--dry-run'], fixture, {
+      env: { CLINE_DIR: clineDir },
+    });
+    assertIncludes(
+      `${dirPreview.stdout}${dirPreview.stderr}`,
+      path.join(clineDir, 'data', 'settings', 'cline_mcp_settings.json'),
+      'cline install honors CLINE_DIR',
     );
   });
 

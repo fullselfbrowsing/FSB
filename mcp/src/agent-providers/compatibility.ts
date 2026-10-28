@@ -9,6 +9,15 @@ export type CompatibilityStatus = 'supported' | 'degraded' | 'unsupported';
 
 export type CompatibilityReason =
   | 'within_tested_range'
+  | 'capability_verified'
+  | 'capability_unverified'
+  | 'capability_missing'
+  | 'isolation_unavailable'
+  | 'sandbox_unavailable'
+  | 'agent_protocol_drift'
+  | 'binary_changed'
+  | 'adapter_unavailable'
+  | 'version_unsupported'
   | 'newer_than_tested_range'
   | 'evidence_stale'
   | 'binary_not_found'
@@ -68,6 +77,15 @@ export const COMPATIBILITY_STATUSES = Object.freeze([
 
 export const COMPATIBILITY_REASONS = Object.freeze([
   'within_tested_range',
+  'capability_verified',
+  'capability_unverified',
+  'capability_missing',
+  'isolation_unavailable',
+  'sandbox_unavailable',
+  'agent_protocol_drift',
+  'binary_changed',
+  'adapter_unavailable',
+  'version_unsupported',
   'newer_than_tested_range',
   'evidence_stale',
   'binary_not_found',
@@ -260,7 +278,8 @@ function parseStringArray(
 function parseFixtureReference(value: unknown, adapterId: string, profileVersion: string): string | null {
   if (!boundedString(value, MAX_FIXTURE_REFERENCE_LENGTH)) return null;
   if (value.startsWith('/') || value.includes('\\') || value.split('/').includes('..')) return null;
-  const expected = `tests/fixtures/agent-streams/${adapterId}-${profileVersion}/manifest.json`;
+  const captureVersion = adapterId === GROK_BUILD_ADAPTER_ID ? '1.0.62' : profileVersion;
+  const expected = `tests/fixtures/agent-streams/${adapterId}-${captureVersion}/manifest.json`;
   return value === expected ? value : null;
 }
 
@@ -294,21 +313,27 @@ function parseContract(value: unknown): AdapterCompatibilityContract | null {
   const capabilities = parseCapabilities(record.capabilities, record.adapterId);
   if (!capabilities) return null;
 
+  const isGrok = record.adapterId === GROK_BUILD_ADAPTER_ID;
   const profileVersion = parseVersion(record.profileVersion);
+  const profileId = isGrok
+    ? (record.profileVersion === 'grok-acp-v1' ? record.profileVersion : undefined)
+    : profileVersion?.raw;
   const minimumVersion = parseVersion(record.minimumVersion);
   const testedThroughVersion = parseVersion(record.testedThroughVersion);
-  if (!profileVersion || !minimumVersion || !testedThroughVersion) return null;
+  if (!profileId || !minimumVersion || !testedThroughVersion) return null;
   if (
     !Number.isSafeInteger(record.supportedMajor)
     || typeof record.supportedMajor !== 'number'
     || record.supportedMajor < 0
     || record.supportedMajor > 999_999_999
-    || profileVersion.major !== record.supportedMajor
+    || (!isGrok && profileVersion?.major !== record.supportedMajor)
     || minimumVersion.major !== record.supportedMajor
     || testedThroughVersion.major !== record.supportedMajor
     || compareVersions(minimumVersion, testedThroughVersion) > 0
-    || compareVersions(profileVersion, minimumVersion) < 0
-    || compareVersions(profileVersion, testedThroughVersion) > 0
+    || (!isGrok && profileVersion !== null && (
+      compareVersions(profileVersion, minimumVersion) < 0
+      || compareVersions(profileVersion, testedThroughVersion) > 0
+    ))
   ) {
     return null;
   }
@@ -316,7 +341,7 @@ function parseContract(value: unknown): AdapterCompatibilityContract | null {
   const fixtureManifest = parseFixtureReference(
     record.fixtureManifest,
     record.adapterId,
-    profileVersion.raw,
+    profileId,
   );
   if (!fixtureManifest) return null;
 
@@ -344,7 +369,7 @@ function parseContract(value: unknown): AdapterCompatibilityContract | null {
     adapterId: record.adapterId,
     capabilities,
     displayLabel: record.displayLabel,
-    profileVersion: profileVersion.raw,
+    profileVersion: profileId,
     minimumVersion: minimumVersion.raw,
     testedThroughVersion: testedThroughVersion.raw,
     supportedMajor: record.supportedMajor,
@@ -418,11 +443,11 @@ const RAW_ADAPTER_COMPATIBILITY_MATRIX = {
       serverMode: false,
     },
     displayLabel: 'Grok Build',
-    profileVersion: '1.0.4',
+    profileVersion: 'grok-acp-v1',
     minimumVersion: '1.0.4',
-    testedThroughVersion: '1.0.4',
+    testedThroughVersion: '1.0.62',
     supportedMajor: 1,
-    fixtureManifest: 'tests/fixtures/agent-streams/grok-build-1.0.4/manifest.json',
+    fixtureManifest: 'tests/fixtures/agent-streams/grok-build-1.0.62/manifest.json',
     requiredInitFields: [
       'protocolVersion',
       'agentCapabilities.mcpCapabilities.http',
@@ -543,6 +568,9 @@ export function classifyAdapterCompatibility(
   if (!version) {
     return classification(contract.adapterId, contract.displayLabel, 'unsupported', 'version_malformed');
   }
+  if (adapterId === GROK_BUILD_ADAPTER_ID) {
+    return classification(contract.adapterId, contract.displayLabel, 'unsupported', 'capability_unverified');
+  }
   if (version.major !== contract.supportedMajor) {
     return classification(contract.adapterId, contract.displayLabel, 'unsupported', 'wrong_major');
   }
@@ -571,8 +599,67 @@ export function classifyAdapterCompatibility(
   );
 }
 
+/** Project only bounded detector facts; raw diagnostics never cross the bridge. */
+export function classifyAdapterDetectionCompatibility(
+  adapterId: string,
+  detection: unknown,
+): AdapterCompatibilityClassification {
+  const contract = getAdapterCompatibilityContract(adapterId);
+  if (!contract) return classifyAdapterCompatibility(adapterId, null);
+  const value = (object: unknown, key: string): unknown => {
+    if (!object || typeof object !== 'object' || Array.isArray(object)
+      || Object.getPrototypeOf(object) !== Object.prototype) return undefined;
+    const descriptor = Object.getOwnPropertyDescriptor(object, key);
+    return descriptor?.enumerable && Object.hasOwn(descriptor, 'value') ? descriptor.value : undefined;
+  };
+  try {
+    const binary = value(detection, 'binary');
+    const command = value(binary, 'command');
+    const realPath = value(binary, 'realPath');
+    const prefix = value(binary, 'argvPrefix');
+    const prefixValues = denseDataArray(prefix, 8);
+    const binaryFound = ownDataRecord(binary, ['command', 'realPath', 'argvPrefix']) !== null
+      && typeof command === 'string' && command.length > 0 && command.length <= 4096
+      && typeof realPath === 'string' && realPath.length > 0 && realPath.length <= 4096
+      && prefixValues !== null
+      && prefixValues.every((item) => typeof item === 'string' && item.length <= 4096);
+    const rawVersion = value(detection, 'version');
+    const diagnostic = value(value(detection, 'diagnostic'), 'code');
+    const version = rawVersion === null && diagnostic === 'version_unparseable'
+      ? 'malformed' : rawVersion;
+    const base = classifyAdapterCompatibility(adapterId, {
+      binaryFound,
+      version: version === null || typeof version === 'string' ? version : null,
+    });
+    const refusals: Readonly<Record<string, CompatibilityReason>> = {
+      binary_missing: 'binary_not_found', binary_changed: 'binary_changed', binary_unsafe: 'adapter_unavailable',
+      version_unsupported: 'version_unsupported', version_unparseable: 'version_malformed',
+      capability_missing: 'capability_missing', isolation_unavailable: 'isolation_unavailable',
+      sandbox_unavailable: 'sandbox_unavailable', agent_protocol_drift: 'agent_protocol_drift',
+      adapter_unavailable: 'adapter_unavailable', tree_unsettled: 'adapter_unavailable',
+    };
+    if (typeof diagnostic === 'string' && Object.hasOwn(refusals, diagnostic)) {
+      return classification(contract.adapterId, contract.displayLabel, 'unsupported', refusals[diagnostic]);
+    }
+    if (!binaryFound || (base.status === 'unsupported' && base.reason !== 'capability_unverified')) return base;
+    if (value(detection, 'installed') !== true) {
+      return classification(contract.adapterId, contract.displayLabel, 'unsupported', 'adapter_unavailable');
+    }
+    if (adapterId === GROK_BUILD_ADAPTER_ID) {
+      return classification(contract.adapterId, contract.displayLabel,
+        value(detection, 'profileVersion') === contract.profileVersion && parseVersion(rawVersion) !== null
+          ? 'supported' : 'unsupported',
+        value(detection, 'profileVersion') === contract.profileVersion && parseVersion(rawVersion) !== null
+          ? 'capability_verified' : 'capability_unverified');
+    }
+    return base;
+  } catch {
+    return classification(contract.adapterId, contract.displayLabel, 'unsupported', 'matrix_invalid');
+  }
+}
+
 function validStatusReason(status: unknown, reason: unknown): boolean {
-  if (status === 'supported') return reason === 'within_tested_range';
+  if (status === 'supported') return reason === 'within_tested_range' || reason === 'capability_verified';
   if (status === 'degraded') {
     return reason === 'newer_than_tested_range' || reason === 'evidence_stale';
   }
@@ -583,7 +670,15 @@ function validStatusReason(status: unknown, reason: unknown): boolean {
     || reason === 'below_minimum'
     || reason === 'wrong_major'
     || reason === 'adapter_unshipped'
-    || reason === 'matrix_invalid';
+    || reason === 'matrix_invalid'
+    || reason === 'capability_unverified'
+    || reason === 'capability_missing'
+    || reason === 'isolation_unavailable'
+    || reason === 'sandbox_unavailable'
+    || reason === 'agent_protocol_drift'
+    || reason === 'binary_changed'
+    || reason === 'adapter_unavailable'
+    || reason === 'version_unsupported';
 }
 
 function validProviderAuthState(adapterId: unknown, authState: unknown): boolean {

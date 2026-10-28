@@ -11,6 +11,32 @@ function vsCodeGlobalStorage(publisherId, settingsFile) {
         linux: join(home, '.config', 'Code', 'User', 'globalStorage', publisherId, 'settings', settingsFile),
     };
 }
+const CLINE_MCP_SETTINGS_FILE = 'cline_mcp_settings.json';
+/**
+ * Cline's VS Code extension, JetBrains plugin, and CLI all read one MCP
+ * settings file under ~/.cline. Resolve it with the same environment
+ * overrides Cline honors, in the same precedence order.
+ */
+function clineMcpSettingsPaths() {
+    const explicitPath = process.env.CLINE_MCP_SETTINGS_PATH?.trim();
+    const dataDir = process.env.CLINE_DATA_DIR?.trim()
+        || join(process.env.CLINE_DIR?.trim() || join(home, '.cline'), 'data');
+    const settingsPath = explicitPath || join(dataDir, 'settings', CLINE_MCP_SETTINGS_FILE);
+    return { darwin: settingsPath, win32: settingsPath, linux: settingsPath };
+}
+/**
+ * Older Cline builds kept MCP settings in VS Code's extension storage. Current
+ * builds import that file once on upgrade and then ignore it, so it is only a
+ * fallback for machines that have no shared Cline settings directory.
+ */
+const CLINE_LEGACY_VSCODE_PATHS = vsCodeGlobalStorage('saoudrizwan.claude-dev', CLINE_MCP_SETTINGS_FILE);
+/**
+ * Cline gives every MCP request one fixed timeout, 60 seconds unless the
+ * server entry sets `timeout`, and does not extend it on progress
+ * notifications. `run_task` can block for up to 600 seconds, so the entry
+ * asks for 1800: the smallest preset in Cline's timeout picker above that.
+ */
+export const CLINE_TIMEOUT_SECONDS = 1800;
 /**
  * Platform registry mapping all MCP-capable platforms to their
  * config file metadata. Each entry contains:
@@ -73,15 +99,15 @@ export const PLATFORMS = {
         installMode: 'file',
         mergeStrategy: 'object-map',
     },
-    'windsurf': {
-        displayName: 'Windsurf',
-        flag: 'windsurf',
+    'antigravity': {
+        displayName: 'Antigravity',
+        flag: 'antigravity',
         format: 'json',
         serverMapKey: 'mcpServers',
         configPath: {
-            darwin: join(home, '.codeium', 'windsurf', 'mcp_config.json'),
-            win32: join(home, '.codeium', 'windsurf', 'mcp_config.json'),
-            linux: join(home, '.codeium', 'windsurf', 'mcp_config.json'),
+            darwin: join(home, '.gemini', 'config', 'mcp_config.json'),
+            win32: join(home, '.gemini', 'config', 'mcp_config.json'),
+            linux: join(home, '.gemini', 'config', 'mcp_config.json'),
         },
         installMode: 'file',
         mergeStrategy: 'object-map',
@@ -91,9 +117,12 @@ export const PLATFORMS = {
         flag: 'cline',
         format: 'json',
         serverMapKey: 'mcpServers',
-        configPath: vsCodeGlobalStorage('saoudrizwan.claude-dev', 'cline_mcp_settings.json'),
+        configPath: clineMcpSettingsPaths(),
         installMode: 'file',
         mergeStrategy: 'object-map',
+        // Cline's MCP panel writes these onto the entry: the server toggle,
+        // per-tool auto-approval, and the timeout picker.
+        preservedEntryKeys: ['timeout', 'disabled', 'autoApprove'],
     },
     'zed': {
         displayName: 'Zed',
@@ -286,6 +315,7 @@ export function getServerEntry() {
  * Most platforms use the standard { command, args } shape. Some need
  * different field names or structures:
  *   - vscode: adds type: "stdio"
+ *   - cline: adds a request timeout in seconds (see CLINE_TIMEOUT_SECONDS)
  *   - goose: uses { name, type, cmd, args } for its extensions array
  *   - opencode: uses { type: "local", command: [...] } with command as array
  */
@@ -294,6 +324,8 @@ export function getEntryForPlatform(platformKey) {
     switch (platformKey) {
         case 'vscode':
             return { type: 'stdio', ...base };
+        case 'cline':
+            return { ...base, timeout: CLINE_TIMEOUT_SECONDS };
         case 'goose':
             return { name: FSB_SERVER_NAME, type: 'stdio', cmd: base.command, args: base.args };
         case 'opencode':
@@ -319,18 +351,38 @@ function getPlatformTargetCandidates(platformKey, platform) {
     const configPath = getPlatformConfigPath(platform);
     if (!configPath)
         return [];
-    if (platformKey === 'windsurf') {
-        const windsurfRoot = join(home, '.codeium');
+    if (platformKey === 'antigravity') {
         return [
             {
                 configPath,
                 targetLabel: platform.displayName,
-                variant: 'app',
+                variant: null,
             },
             {
-                configPath: join(windsurfRoot, 'mcp_config.json'),
-                targetLabel: platform.displayName + ' (JetBrains/Cascade plugin)',
-                variant: 'plugin',
+                configPath: join(home, '.gemini', 'antigravity', 'mcp_config.json'),
+                targetLabel: platform.displayName + ' (older release)',
+                variant: 'legacy',
+                // Older releases read ~/.gemini/antigravity/mcp_config.json. Use it only
+                // when ~/.gemini/config does not exist, so an upgraded install is not
+                // pinned to a file the app no longer reads.
+                fallback: true,
+            },
+        ];
+    }
+    if (platformKey === 'cline') {
+        return [
+            {
+                configPath,
+                targetLabel: platform.displayName,
+                variant: null,
+            },
+            {
+                configPath: CLINE_LEGACY_VSCODE_PATHS[process.platform],
+                targetLabel: platform.displayName + ' (legacy VS Code settings)',
+                variant: 'legacy-vscode',
+                // Upgraded installs keep this file after importing it, so it must not
+                // outrank a shared settings directory that exists without a file yet.
+                fallback: true,
             },
         ];
     }
@@ -342,12 +394,17 @@ function getPlatformTargetCandidates(platformKey, platform) {
         },
     ];
 }
+function findDetectedCandidate(candidates) {
+    return candidates.find((candidate) => existsSync(candidate.configPath))
+        ?? candidates.find((candidate) => existsSync(dirname(candidate.configPath)));
+}
 /**
  * Resolve the best config target for a platform on the current OS.
  * Prefers an existing config file first, then an existing parent directory,
+ * consulting fallback candidates only when no other candidate is detected,
  * and finally falls back to the default documented path for dry-run/help output.
  *
- * @param platformKey - Platform key (e.g., 'cursor', 'windsurf')
+ * @param platformKey - Platform key (e.g., 'cursor', 'antigravity')
  * @returns Structured target metadata for installer flows
  */
 export function resolvePlatformTarget(platformKey) {
@@ -366,38 +423,16 @@ export function resolvePlatformTarget(platformKey) {
             detected: false,
         };
     }
-    for (const candidate of candidates) {
-        if (existsSync(candidate.configPath)) {
-            return {
-                platformKey,
-                platform,
-                configPath: candidate.configPath,
-                targetLabel: candidate.targetLabel,
-                variant: candidate.variant,
-                detected: true,
-            };
-        }
-    }
-    for (const candidate of candidates) {
-        if (existsSync(dirname(candidate.configPath))) {
-            return {
-                platformKey,
-                platform,
-                configPath: candidate.configPath,
-                targetLabel: candidate.targetLabel,
-                variant: candidate.variant,
-                detected: true,
-            };
-        }
-    }
-    const fallback = candidates[0];
+    const detected = findDetectedCandidate(candidates.filter((candidate) => !candidate.fallback))
+        ?? findDetectedCandidate(candidates.filter((candidate) => candidate.fallback));
+    const target = detected ?? candidates[0];
     return {
         platformKey,
         platform,
-        configPath: fallback.configPath,
-        targetLabel: fallback.targetLabel,
-        variant: fallback.variant,
-        detected: false,
+        configPath: target.configPath,
+        targetLabel: target.targetLabel,
+        variant: target.variant,
+        detected: detected !== undefined,
     };
 }
 /**

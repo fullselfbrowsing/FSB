@@ -36,13 +36,35 @@
     below_minimum: true,
     wrong_major: true,
     adapter_unshipped: true,
-    matrix_invalid: true
+    matrix_invalid: true,
+    capability_unverified: true,
+    capability_missing: true,
+    isolation_unavailable: true,
+    sandbox_unavailable: true,
+    agent_protocol_drift: true,
+    binary_changed: true,
+    adapter_unavailable: true,
+    version_unsupported: true
   });
   var COMPATIBILITY_SUPPORTED_MODEL = Object.freeze({
     label: 'Supported',
     icon: 'fa-circle-check',
     className: 'compatibility-badge--supported',
     detail: "This CLI is within FSB's fixture-tested compatibility range."
+  });
+  var COMPATIBILITY_VERIFIED_MODEL = Object.freeze({
+    label: 'Verified',
+    icon: 'fa-circle-check',
+    className: 'compatibility-badge--supported',
+    detail: 'FSB verified the required protocol and isolation capabilities of this CLI.'
+  });
+  var COMPATIBILITY_REFUSAL_DETAILS = Object.freeze({
+    capability_unverified: 'Refresh status to verify this CLI before starting a task.',
+    capability_missing: 'This CLI does not provide the capabilities FSB requires.',
+    isolation_unavailable: 'FSB could not verify that this CLI is isolated from external configuration and tools.',
+    sandbox_unavailable: 'Grok could not apply the required strict sandbox. Check the local Docker socket configuration, then refresh status.',
+    agent_protocol_drift: 'This CLI returned an incompatible protocol response.',
+    binary_changed: 'The CLI changed during verification. Refresh status to verify the updated executable.'
   });
   var COMPATIBILITY_DEGRADED_NEWER_MODEL = Object.freeze({
     label: 'Degraded',
@@ -341,6 +363,12 @@
         && hasCheckedAt) {
       return createCompatibilityDisplayModel(COMPATIBILITY_DEGRADED_STALE_MODEL, checkedText);
     }
+    if (providerId === 'grok-build' && status === 'supported'
+        && reason === 'capability_verified' && hasCheckedAt) {
+      return createCompatibilityDisplayModel(COMPATIBILITY_VERIFIED_MODEL, checkedText);
+    }
+    if (providerId === 'grok-build' && (status === 'supported' || status === 'degraded')
+        && reason !== 'evidence_stale') return fallback;
     if (status === 'supported' && reason === 'within_tested_range' && hasCheckedAt) {
       return createCompatibilityDisplayModel(COMPATIBILITY_SUPPORTED_MODEL, checkedText);
     }
@@ -350,10 +378,11 @@
     if (status === 'unsupported'
         && typeof reason === 'string'
         && hasOwn(COMPATIBILITY_UNSUPPORTED_REASONS, reason)) {
-      return createCompatibilityDisplayModel(
-        COMPATIBILITY_UNSUPPORTED_MODEL,
-        hasCheckedAt ? checkedText : null
+      var refusal = createCompatibilityDisplayModel(
+        COMPATIBILITY_UNSUPPORTED_MODEL, hasCheckedAt ? checkedText : null
       );
+      if (hasOwn(COMPATIBILITY_REFUSAL_DETAILS, reason)) refusal.detail = COMPATIBILITY_REFUSAL_DETAILS[reason];
+      return refusal;
     }
     return fallback;
   }

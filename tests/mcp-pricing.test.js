@@ -550,29 +550,32 @@ const pricingData = JSON.parse(fs.readFileSync(DATA_PATH, 'utf-8'));
       // (12 Tier-1 MCP-supporting AI clients appended). The 12 new entries
       // (Cline, Continue, Zed, VS Code, Copilot, JetBrains, Xcode, Eclipse,
       // Cody, Roo Code, Kiro, Goose) are owner-chip / overlay labels for
-      // widely used MCP clients; FSB does not ship default-model mappings
-      // for them (default model selection varies by per-client config and
-      // is not authored at this layer). The pricing parity contract is
-      // therefore scoped to: (a) every default-model entry must be on
-      // the allowlist (extra-in-pricing remains zero -- prevents drift in
-      // the other direction), (b) the 13 ORIGINALLY paired core labels
-      // must still have default-model entries (preserves the v0.9.36
-      // pricing pairing for the historical client set), and (c) the
-      // OpenClaw crab grapheme survives byte-exact on both sides.
+      // widely used MCP clients; apart from Cline, which later became an
+      // officially supported install target with a conservative fallback,
+      // FSB does not ship default-model mappings for them (default model
+      // selection varies by per-client config and is not authored at this
+      // layer). The pricing parity contract is therefore scoped to: (a)
+      // every default-model entry must be on the allowlist (extra-in-pricing
+      // remains zero -- prevents drift in the other direction), (b) the 13
+      // ORIGINALLY paired core labels plus Cline must still have
+      // default-model entries (preserves the v0.9.36 pricing pairing for the
+      // historical client set), and (c) the OpenClaw crab grapheme survives
+      // byte-exact on both sides.
       passAssert(labels.length >= 13, 'visual-session allowlist has >= 13 labels (parsed ' + labels.length + ' via ' + labelSource + ')');
 
       const allowlistSet = new Set(labels);
       const pricingSet = new Set(Object.keys(pricingData.client_default_model));
 
-      // Lock the 13 ORIGINAL core labels (the historical v0.9.36 set
-      // through Hermes) to still have default-model entries. The 12
-      // quick-task additions are intentionally excluded from this lock
-      // because default-model mapping for them is out of scope for the
-      // allowlist expansion.
+      // Lock the original core labels (the v0.9.36 set through Hermes,
+      // less Windsurf, which Antigravity replaced) to still have
+      // default-model entries, plus Cline, the one later addition promoted
+      // to the public telemetry set. The other later additions stay
+      // excluded from this lock because default-model mapping for them is
+      // out of scope for the allowlist expansion.
       const CORE_PRICING_PAIRED_LABELS = [
-        'Claude', 'Codex', 'ChatGPT', 'Perplexity', 'Windsurf',
+        'Claude', 'Codex', 'ChatGPT', 'Perplexity',
         'Cursor', 'Antigravity', 'OpenCode', 'OpenClaw', 'OpenClaw \u{1F980}',
-        'Grok', 'Gemini', 'Hermes',
+        'Grok', 'Gemini', 'Hermes', 'Cline',
       ];
       const missingCorePricing = CORE_PRICING_PAIRED_LABELS.filter(function (l) { return !pricingSet.has(l); });
       passAssertEqual(missingCorePricing.length, 0,

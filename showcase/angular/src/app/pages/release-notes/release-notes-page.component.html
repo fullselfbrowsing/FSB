@@ -8,6 +8,17 @@
         <span class="rn-hero-sep" aria-hidden="true">|</span>
         <span class="rn-hero-ver" [attr.translate]="'no'">&#9661;{{ versionLabel() }}</span>
       </h1>
+@if (version() === '0.9.95') {
+
+      <p style="margin: 0 0 32px; font-size: 1.0625rem; line-height: 1.7; color: var(--dim); max-width: 62ch; text-wrap: pretty;" i18n="@@releaseNotes.v0995.001.twoChangesInThis">Two changes in this release. FSB's own interface now reads in eight languages, and Cline joins the officially supported MCP clients. The interface picks a language from Chrome's language list, can be changed in Advanced Settings without restarting Chrome, and leaves your prompts, model output, and page content exactly as written.</p>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px; font-family: 'Space Mono', monospace; font-size: 11px; color: var(--dim);">
+        <span [attr.translate]="'no'" style="border: 1px solid var(--line); border-radius: 999px; padding: 6px 13px; white-space: nowrap;" i18n="@@releaseNotes.v0995.002.extension">extension 0.9.95</span>
+        <span [attr.translate]="'no'" style="border: 1px solid var(--line); border-radius: 999px; padding: 6px 13px; white-space: nowrap;" i18n="@@releaseNotes.v0995.003.mcp">mcp 0.11.5</span>
+        <span [attr.translate]="'no'" style="border: 1px solid var(--line); border-radius: 999px; padding: 6px 13px; white-space: nowrap;" i18n="@@releaseNotes.v0995.004.chrome">chrome 116+</span>
+        <span [attr.translate]="'no'" style="border: 1px solid var(--line); border-radius: 999px; padding: 6px 13px; white-space: nowrap;" i18n="@@releaseNotes.v0995.005.node">node 24</span>
+        <span [attr.translate]="'no'" style="border: 1px solid var(--line); border-radius: 999px; padding: 6px 13px; white-space: nowrap;" i18n="@@releaseNotes.v0995.006.mit">MIT</span>
+      </div>
+      }
 @if (version() === '0.9.92') {
 
       <p style="margin: 0 0 32px; font-size: 1.0625rem; line-height: 1.7; color: var(--dim); max-width: 62ch; text-wrap: pretty;" i18n="@@releaseNotes.v0992.001.sevenChangesInThis">Seven changes in this release. Connections recover on their own, every action runs at most once, typing reaches code editors and web components, and a hung page stops receiving input once its deadline passes.</p>
@@ -180,6 +191,271 @@
     </aside>
 
     <div class="rn-content" [class.is-swapping]="swapping()">
+@if (version() === '0.9.95') {
+  <section class="rn-sec rn-sec-split" style="margin: 0; padding: 72px 0 0; display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 56px; align-items: center;">
+    <div class="rn-sec-viz" style="display: flex; align-items: center; justify-content: center;">
+      <div style="width: 280px; display: flex; flex-direction: column; gap: 16px;">
+        <div style="border: 1px solid var(--line); border-radius: 10px; background: var(--panel2); overflow: hidden;">
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border-bottom: 1px solid var(--line);">
+            <span [attr.translate]="'no'" style="display: inline-block; line-height: 1; color: var(--ink); font-size: 18px;"><span style="display: inline-flex; align-items: baseline; letter-spacing: -0.02em; font-family: 'Poppins', system-ui, sans-serif; line-height: 1;"><span class="rn-fsb-f"></span><span class="rn-fsb-s"></span><svg viewBox="-3 -3 78 103" aria-hidden="true" style="height: 0.715em; width: auto; fill: currentColor; display: inline-block; vertical-align: baseline; margin-left: 0.02em;"><path d="M0 0 L40 0 C58 0 70 10 70 26 C70 38 62 46 50 49 C64 51 72 60 72 74 C72 90 60 100 40 100 L0 100 Z"></path></svg></span></span>
+            <div aria-hidden="true" style="flex: 0 0 auto; display: flex; gap: 6px;">
+              <span style="width: 22px; height: 22px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; border: 1px solid var(--line); border-radius: 6px;"><svg viewBox="0 0 16 16" style="width: 12px; height: 12px; fill: none; stroke: var(--dim2); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;"><path d="M8 2.5a5.5 5.5 0 1 1 0 11a5.5 5.5 0 1 1 0-11M8 5v3l2 1.5"></path></svg></span>
+              <span style="width: 22px; height: 22px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; border: 1px solid var(--line); border-radius: 6px;"><svg viewBox="0 0 16 16" style="width: 12px; height: 12px; fill: none; stroke: var(--dim2); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;"><path d="M8 3v10M3 8h10"></path></svg></span>
+              <span style="width: 22px; height: 22px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; border: 1px solid var(--line); border-radius: 6px;"><svg viewBox="0 0 16 16" style="width: 12px; height: 12px; fill: none; stroke: var(--dim2); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;"><path d="M8 5.5a2.5 2.5 0 1 1 0 5a2.5 2.5 0 1 1 0-5M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4"></path></svg></span>
+            </div>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 12px; padding: 12px 12px 14px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span class="rn-a119" style="flex: 0 0 auto; width: 7px; height: 7px; border-radius: 999px; background: var(--ac);"></span>
+              <div style="position: relative; flex: 1 1 auto; height: 18px; font-size: 11px;">
+                <span [attr.translate]="'no'" lang="en" class="rn-a118 rn-cycle rn-cycle-first" style="position: absolute; left: 0; right: 0; top: 0; line-height: 18px; white-space: nowrap; color: var(--dim); opacity: 0; animation-delay: 0s" i18n="@@releaseNotes.v0995.008.ready">Ready</span>
+                <span [attr.translate]="'no'" lang="es" class="rn-a118 rn-cycle" style="position: absolute; left: 0; right: 0; top: 0; line-height: 18px; white-space: nowrap; color: var(--dim); opacity: 0; animation-delay: 2s" i18n="@@releaseNotes.v0995.009.listo">Listo</span>
+                <span [attr.translate]="'no'" lang="de" class="rn-a118 rn-cycle" style="position: absolute; left: 0; right: 0; top: 0; line-height: 18px; white-space: nowrap; color: var(--dim); opacity: 0; animation-delay: 4s" i18n="@@releaseNotes.v0995.010.bereit">Bereit</span>
+                <span [attr.translate]="'no'" lang="ru" class="rn-a118 rn-cycle" style="position: absolute; left: 0; right: 0; top: 0; line-height: 18px; white-space: nowrap; color: var(--dim); opacity: 0; animation-delay: 6s" i18n="@@releaseNotes.v0995.010.readyRu">Готово</span>
+                <span [attr.translate]="'no'" lang="ja" class="rn-a118 rn-cycle" style="position: absolute; left: 0; right: 0; top: 0; line-height: 18px; white-space: nowrap; color: var(--dim); opacity: 0; animation-delay: 8s" i18n="@@releaseNotes.v0995.011.readyJa">準備完了</span>
+                <span [attr.translate]="'no'" lang="ko" class="rn-a118 rn-cycle" style="position: absolute; left: 0; right: 0; top: 0; line-height: 18px; white-space: nowrap; color: var(--dim); opacity: 0; animation-delay: 10s" i18n="@@releaseNotes.v0995.012.readyKo">준비됨</span>
+                <span [attr.translate]="'no'" lang="zh-CN" class="rn-a118 rn-cycle" style="position: absolute; left: 0; right: 0; top: 0; line-height: 18px; white-space: nowrap; color: var(--dim); opacity: 0; animation-delay: 12s" i18n="@@releaseNotes.v0995.013.readyZhCn">就绪</span>
+                <span [attr.translate]="'no'" lang="zh-TW" class="rn-a118 rn-cycle" style="position: absolute; left: 0; right: 0; top: 0; line-height: 18px; white-space: nowrap; color: var(--dim); opacity: 0; animation-delay: 14s" i18n="@@releaseNotes.v0995.014.readyZhTw">就緒</span>
+              </div>
+            </div>
+            <div style="align-self: flex-end; width: 62%; display: flex; flex-direction: column; gap: 6px; padding: 9px 11px; border: 1px solid rgba(255,107,53,.35); border-radius: 10px 10px 3px 10px; background: rgba(255,107,53,.1);">
+              <span style="height: 5px; border-radius: 3px; background: var(--ac); opacity: .6;"></span>
+              <span style="width: 58%; height: 5px; border-radius: 3px; background: var(--ac); opacity: .6;"></span>
+            </div>
+            <div style="width: 84%; display: flex; flex-direction: column; gap: 7px; padding-top: 2px;">
+              <span style="height: 5px; border-radius: 3px; background: var(--line2);"></span>
+              <span style="width: 72%; height: 5px; border-radius: 3px; background: var(--line2);"></span>
+            </div>
+          </div>
+        </div>
+        <div [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: 9.5px; color: var(--dim2); text-align: center;" i18n="@@releaseNotes.v0995.015.keysPerLanguage">1,285 keys per language</div>
+      </div>
+    </div>
+    <div class="rn-sec-copy">
+      <div class="rn-sec-num" [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: 11px; letter-spacing: .22em; color: var(--ac); margin-bottom: 14px;">01</div>
+      <h2 style="margin: 0 0 18px; font-size: clamp(1.5rem, 3vw, 2rem); font-weight: 700; letter-spacing: -.02em; line-height: 1.15;" i18n="@@releaseNotes.v0995.016.theExtensionSpeaksEight">The extension speaks eight languages</h2>
+      <ul style="margin: 0; padding-left: 18px; color: var(--dim); font-size: 1rem; line-height: 1.65;">
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0995.017.theSidePanelPopup">The side panel, popup, control panel, onboarding, unlock, and microphone-permission pages render in English, Spanish, German, Russian, Japanese, Korean, Simplified Chinese, and Traditional Chinese.</li>
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0995.018.fsbInPageOverlay">FSB's in-page overlay controls are translated too, including Stop, Done, the status pill, and the replay-speed caption.</li>
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0995.019.eachLanguageShipsA">Each language ships a catalog of 1,285 keys, and a message missing from a catalog falls back to English instead of showing a blank label.</li>
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0995.020.withoutASavedChoice">Without a saved choice, FSB goes down Chrome's language list in Settings › Languages and uses the first language it supports. English counts, so an English-first list keeps FSB in English, and when nothing in the list is supported, FSB falls back to Chrome's UI language, then English.</li>
+        <li style="margin-bottom: 0;" i18n="@@releaseNotes.v0995.020.regionalVariantsMapTo">Regional variants map to the nearest catalog, so Taiwan, Hong Kong, and Macau Chinese open in Traditional Chinese. A plain Chinese entry follows the computer's time zone: Taipei, Hong Kong, and Macau get Traditional Chinese, and everywhere else gets Simplified Chinese.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="rn-sec rn-sec-split" style="margin: 0; padding: 72px 0 0; display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 56px; align-items: center;">
+    <div class="rn-sec-viz" style="order: 2; display: flex; align-items: center; justify-content: center;">
+      <div style="width: 300px; max-width: 100%; display: flex; flex-direction: column; align-items: center; gap: 18px; font-family: 'Space Mono', monospace;">
+        <div style="width: 100%; display: flex; align-items: center;">
+          <span [attr.translate]="'no'" style="flex: 0 0 auto; border: 1px solid var(--ac); border-radius: 8px; padding: 8px 10px; background: rgba(255,107,53,.08); font-size: 10px; color: var(--ink); white-space: nowrap;" i18n="@@releaseNotes.v0995.021.fsbUiLocaleKo">fsbUiLocale = ko</span>
+          <div style="position: relative; flex: 1 1 auto; min-width: 26px; height: 132px;">
+            <div style="position: absolute; left: 0; right: 8px; top: 65.5px; height: 1px; background: var(--line2);"></div>
+            <div style="position: absolute; right: 8px; top: 19px; bottom: 19px; width: 1px; background: var(--line2);"></div>
+            <div style="position: absolute; right: 0; top: 19px; width: 8px; height: 1px; background: var(--line2);"></div>
+            <div style="position: absolute; right: 0; top: 65.5px; width: 8px; height: 1px; background: var(--line2);"></div>
+            <div style="position: absolute; right: 0; bottom: 19px; width: 8px; height: 1px; background: var(--line2);"></div>
+            <div style="position: absolute; left: 0; right: 8px; top: 63px; height: 6px;">
+              <span class="rn-a120" style="position: absolute; left: 100%; top: 0; width: 6px; height: 6px; margin-left: -3px; border-radius: 999px; background: var(--ac); box-shadow: 0 0 8px rgba(255,107,53,.6); opacity: 0;"></span>
+            </div>
+          </div>
+          <div style="flex: 0 0 auto; min-width: 136px; display: flex; flex-direction: column; gap: 9px;">
+            <div style="height: 38px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; gap: 6px; padding: 0 9px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel2);">
+              <span [attr.translate]="'no'" style="font-size: 8.5px; line-height: 1.1; color: var(--dim2); white-space: nowrap;" i18n="@@releaseNotes.v0995.022.sidePanel">side panel</span>
+              <div style="position: relative; height: 5px;">
+                <div class="rn-a121" style="position: absolute; inset: 0; display: flex; gap: 4px; opacity: 0;"><span style="width: 62%; border-radius: 3px; background: var(--line2);"></span><span style="width: 28%; border-radius: 3px; background: var(--line2);"></span></div>
+                <div class="rn-a122" style="position: absolute; inset: 0; display: flex; gap: 4px;"><span style="width: 34%; border-radius: 3px; background: var(--ac);"></span><span style="width: 18%; border-radius: 3px; background: var(--ac); opacity: .55;"></span></div>
+              </div>
+            </div>
+            <div style="height: 38px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; gap: 6px; padding: 0 9px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel2);">
+              <span [attr.translate]="'no'" style="font-size: 8.5px; line-height: 1.1; color: var(--dim2); white-space: nowrap;" i18n="@@releaseNotes.v0995.023.controlPanel">control panel</span>
+              <div style="position: relative; height: 5px;">
+                <div class="rn-a121" style="position: absolute; inset: 0; display: flex; gap: 4px; opacity: 0;"><span style="width: 48%; border-radius: 3px; background: var(--line2);"></span><span style="width: 40%; border-radius: 3px; background: var(--line2);"></span></div>
+                <div class="rn-a122" style="position: absolute; inset: 0; display: flex; gap: 4px;"><span style="width: 26%; border-radius: 3px; background: var(--ac);"></span><span style="width: 22%; border-radius: 3px; background: var(--ac); opacity: .55;"></span></div>
+              </div>
+            </div>
+            <div style="height: 38px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; gap: 6px; padding: 0 9px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel2);">
+              <span [attr.translate]="'no'" style="font-size: 8.5px; line-height: 1.1; color: var(--dim2); white-space: nowrap;" i18n="@@releaseNotes.v0995.024.pageOverlay">page overlay</span>
+              <div style="position: relative; height: 5px;">
+                <div class="rn-a121" style="position: absolute; inset: 0; display: flex; gap: 4px; opacity: 0;"><span style="width: 56%; border-radius: 3px; background: var(--line2);"></span><span style="width: 32%; border-radius: 3px; background: var(--line2);"></span></div>
+                <div class="rn-a122" style="position: absolute; inset: 0; display: flex; gap: 4px;"><span style="width: 30%; border-radius: 3px; background: var(--ac);"></span><span style="width: 16%; border-radius: 3px; background: var(--ac); opacity: .55;"></span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <span [attr.translate]="'no'" class="rn-a122" style="border: 1px solid var(--ac); border-radius: 999px; padding: 4px 10px; font-size: 10px; white-space: nowrap; color: var(--ac);" i18n="@@releaseNotes.v0995.025.noRestart">no restart</span>
+      </div>
+    </div>
+    <div class="rn-sec-copy" style="order: 1;">
+      <div class="rn-sec-num" [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: 11px; letter-spacing: .22em; color: var(--ac); margin-bottom: 14px;">02</div>
+      <h2 style="margin: 0 0 18px; font-size: clamp(1.5rem, 3vw, 2rem); font-weight: 700; letter-spacing: -.02em; line-height: 1.15;" i18n="@@releaseNotes.v0995.026.switchLanguagesWithoutRestarting">Switch languages without restarting Chrome</h2>
+      <ul style="margin: 0; padding-left: 18px; color: var(--dim); font-size: 1rem; line-height: 1.65;">
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0995.027.aLanguagePickerSits">A language picker sits in the control panel under Advanced Settings › Appearance, next to Theme.</li>
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0995.028.yourChoiceIsSaved">Your choice is saved in <span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">chrome.storage.local</span> under <span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">fsbUiLocale</span>, and open FSB pages and in-page overlays re-render as soon as it changes.</li>
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0995.029.choosingAutomaticClears">Choosing Automatic clears the saved choice, so FSB follows Chrome's language list again.</li>
+        <li style="margin-bottom: 0;" i18n="@@releaseNotes.v0995.030.languagesAreListedBy">Languages are listed by their own names, so the list reads the same in every language.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="rn-sec rn-sec-split" style="margin: 0; padding: 72px 0 0; display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 56px; align-items: center;">
+    <div class="rn-sec-viz" style="display: flex; align-items: center; justify-content: center;">
+      <div style="width: 270px; display: flex; flex-direction: column; gap: 10px; font-family: 'Space Mono', monospace;">
+        <span [attr.translate]="'no'" style="font-size: 9.5px; color: var(--dim2);" i18n="@@releaseNotes.v0995.031.chromeExtensions">chrome://extensions</span>
+        <div style="display: flex; gap: 12px; padding: 14px 14px 12px; border: 1px solid var(--line2); border-radius: 10px; background: var(--panel2);">
+          <span [attr.translate]="'no'" style="flex: 0 0 auto; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; border-radius: 8px; background: #000000; box-shadow: inset 0 0 0 1px var(--line2); color: #ffffff; font-size: 11px; line-height: 1;"><span style="display: inline-flex; align-items: baseline; letter-spacing: -0.02em; font-family: 'Poppins', system-ui, sans-serif; line-height: 1;"><span class="rn-fsb-f"></span><span class="rn-fsb-s"></span><svg viewBox="-3 -3 78 103" aria-hidden="true" style="height: 0.715em; width: auto; fill: currentColor; display: inline-block; vertical-align: baseline; margin-left: 0.02em;"><path d="M0 0 L40 0 C58 0 70 10 70 26 C70 38 62 46 50 49 C64 51 72 60 72 74 C72 90 60 100 40 100 L0 100 Z"></path></svg></span></span>
+          <div style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 8px;">
+            <div style="position: relative; height: 18px; font-family: 'Poppins', system-ui, sans-serif; font-size: 14px; font-weight: 700; line-height: 18px;">
+              <div class="rn-a124" style="position: absolute; left: 0; top: 0; color: var(--dim); white-space: nowrap; opacity: 0;">
+                <span [attr.translate]="'no'" i18n="@@releaseNotes.v0995.032.fsbV">FSB v0.9.92</span>
+                <span class="rn-a123" style="position: absolute; left: -2px; right: -2px; top: 10px; height: 1.5px; background: var(--ac); transform-origin: left center;"></span>
+              </div>
+              <span [attr.translate]="'no'" class="rn-a125" style="position: absolute; left: 0; top: 0; color: var(--ink); white-space: nowrap;" i18n="@@releaseNotes.v0995.033.fsb">FSB</span>
+            </div>
+            <span style="height: 5px; border-radius: 3px; background: var(--line2);"></span>
+            <span style="width: 64%; height: 5px; border-radius: 3px; background: var(--line2);"></span>
+            <span style="position: relative; align-self: flex-end; width: 22px; height: 12px; margin-top: 2px; border-radius: 999px; background: var(--ac);"><span style="position: absolute; right: 2px; top: 2px; width: 8px; height: 8px; border-radius: 999px; background: var(--bg);"></span></span>
+          </div>
+        </div>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 8px; margin-top: 6px; font-size: 9.5px;">
+          <span [attr.translate]="'no'" style="border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; color: var(--dim); white-space: nowrap;" i18n="@@releaseNotes.v0995.034.msgExtName">__MSG_ext_name__</span>
+          <span [attr.translate]="'no'" class="rn-a125" style="border: 1px solid var(--ac); border-radius: 999px; padding: 4px 10px; color: var(--ac); white-space: nowrap;" i18n="@@releaseNotes.v0995.035.followsTheBrowserLanguage">follows the browser language</span>
+        </div>
+      </div>
+    </div>
+    <div class="rn-sec-copy">
+      <div class="rn-sec-num" [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: 11px; letter-spacing: .22em; color: var(--ac); margin-bottom: 14px;">03</div>
+      <h2 style="margin: 0 0 18px; font-size: clamp(1.5rem, 3vw, 2rem); font-weight: 700; letter-spacing: -.02em; line-height: 1.15;" i18n="@@releaseNotes.v0995.036.chromesExtensionList">Chrome's extension list follows the browser</h2>
+      <ul style="margin: 0; padding-left: 18px; color: var(--dim); font-size: 1rem; line-height: 1.65;">
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0995.037.theManifestNameAnd">The manifest name and description now come from the catalogs through <span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">__MSG_ext_name__</span> and <span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">__MSG_ext_description__</span>.</li>
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0995.038.chromeResolvesThemIn">Chrome resolves them in the browser's UI language, so the picker inside FSB does not change them, and the control panel says so beside the picker.</li>
+        <li style="margin-bottom: 0;" i18n="@@releaseNotes.v0995.039.theNameOnChrome">The name on <span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">chrome://extensions</span> is now FSB, without a version suffix.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="rn-sec rn-sec-split" style="margin: 0; padding: 72px 0 0; display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 56px; align-items: center;">
+    <div class="rn-sec-viz" style="order: 2; display: flex; align-items: center; justify-content: center;">
+      <div style="width: 270px; display: flex; flex-direction: column; gap: 16px;">
+        <div style="position: relative; height: 158px; border: 1px solid var(--line2); border-radius: 10px; background: var(--panel2); overflow: hidden;">
+          <div class="rn-a127" style="position: absolute; left: 12px; right: 12px; top: 12px; height: 78px; box-sizing: border-box; display: flex; flex-direction: column; gap: 9px; padding: 12px; border: 1px dashed var(--dim2); border-radius: 7px;">
+            <span style="width: 46%; height: 7px; border-radius: 3px; background: var(--dim2);"></span>
+            <span style="height: 5px; border-radius: 3px; background: var(--line2);"></span>
+            <span style="width: 82%; height: 5px; border-radius: 3px; background: var(--line2);"></span>
+            <span style="width: 58%; height: 5px; border-radius: 3px; background: var(--line2);"></span>
+          </div>
+          <div style="position: absolute; left: 12px; right: 12px; bottom: 12px; height: 44px; box-sizing: border-box; display: flex; align-items: center; gap: 7px; padding: 0 7px 0 13px; border: 1px solid var(--line2); border-radius: 999px; background: var(--bg); box-shadow: 0 8px 20px rgba(0,0,0,.22); font-size: 10px; line-height: 1.2;">
+            <span style="flex: 0 0 auto; width: 7px; height: 7px; border-radius: 999px; background: var(--ac);"></span>
+            <span class="rn-a127" style="flex: 1 1 auto; min-width: 20px; height: 6px; border-radius: 3px; background: var(--dim);"></span>
+            <span [attr.translate]="'no'" class="rn-a126" style="flex: 0 0 auto; border: 1px solid var(--line2); border-radius: 999px; padding: 4px 9px; color: var(--ink); white-space: nowrap;" i18n="@@releaseNotes.v0995.040.stop">Stop</span>
+            <span [attr.translate]="'no'" class="rn-a126" style="flex: 0 0 auto; border: 1px solid var(--ac); border-radius: 999px; padding: 4px 9px; background: rgba(255,107,53,.1); color: var(--ac); white-space: nowrap;" i18n="@@releaseNotes.v0995.041.done">Done</span>
+          </div>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 18px; font-family: 'Space Mono', monospace; font-size: 9.5px; color: var(--dim);">
+          <span class="rn-a126" style="display: inline-flex; align-items: center; gap: 7px;"><span style="width: 9px; height: 9px; border-radius: 2px; background: var(--ac);"></span><span [attr.translate]="'no'" i18n="@@releaseNotes.v0995.042.translated">translated</span></span>
+          <span class="rn-a127" style="display: inline-flex; align-items: center; gap: 7px;"><span style="width: 9px; height: 9px; box-sizing: border-box; border: 1px dashed var(--dim2); border-radius: 2px;"></span><span [attr.translate]="'no'" i18n="@@releaseNotes.v0995.043.asWritten">as written</span></span>
+        </div>
+      </div>
+    </div>
+    <div class="rn-sec-copy" style="order: 1;">
+      <div class="rn-sec-num" [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: 11px; letter-spacing: .22em; color: var(--ac); margin-bottom: 14px;">04</div>
+      <h2 style="margin: 0 0 18px; font-size: clamp(1.5rem, 3vw, 2rem); font-weight: 700; letter-spacing: -.02em; line-height: 1.15;" i18n="@@releaseNotes.v0995.044.onlyFsbsOwnWords">Only FSB's own words change</h2>
+      <ul style="margin: 0; padding-left: 18px; color: var(--dim); font-size: 1rem; line-height: 1.65;">
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0995.045.yourPromptsModelOutput">Your prompts, model output, task titles, and page content appear exactly as written.</li>
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0995.046.secretsLogsAndProvider">Secrets, logs, and provider names are left as they are.</li>
+        <li style="margin-bottom: 0;" i18n="@@releaseNotes.v0995.047.mcpToolSchemasAnd">MCP tool schemas and bridge messages are byte-for-byte unchanged, so <span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">fsb-mcp-server</span> 0.11.5 works with this release as is.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="rn-sec rn-sec-split" style="margin: 0; padding: 72px 0 0; display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 56px; align-items: center;">
+    <div class="rn-sec-viz" style="display: flex; align-items: center; justify-content: center;">
+      <div style="width: 280px; display: flex; flex-direction: column; gap: 16px;">
+        <div style="border: 1px solid var(--line); border-radius: 8px; background: var(--panel2); overflow: hidden;">
+          <div style="display: flex; align-items: center; gap: 5px; padding: 8px 11px; border-bottom: 1px solid var(--line);">
+            <span style="width: 6px; height: 6px; border-radius: 999px; background: var(--line2);"></span>
+            <span style="width: 6px; height: 6px; border-radius: 999px; background: var(--line2);"></span>
+            <span style="width: 6px; height: 6px; border-radius: 999px; background: var(--line2);"></span>
+            <span [attr.translate]="'no'" style="margin-left: auto; font-family: 'Space Mono', monospace; font-size: 9px; color: var(--dim2);" i18n="@@releaseNotes.v0995.048.npmTest">npm test</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 12px; padding: 13px 11px 15px; font-family: 'Space Mono', monospace; font-size: 9.5px;">
+            <div class="rn-a91 rn-enter" style="display: flex; flex-direction: column; gap: 4px; opacity: 0; animation-delay: 0s">
+              <div style="display: flex; align-items: center; gap: 10px; white-space: nowrap;">
+                <span [attr.translate]="'no'" style="color: var(--ink);" i18n="@@releaseNotes.v0995.049.verifyExtensionI18n">verify-extension-i18n</span>
+                <span [attr.translate]="'no'" class="rn-a113 rn-enter" style="margin-left: auto; color: var(--ac); opacity: 0; animation-delay: 0s">✓</span>
+              </div>
+              <span [attr.translate]="'no'" style="color: var(--dim2); white-space: nowrap;" i18n="@@releaseNotes.v0995.050.languagesKeys">8 languages × 1,285 keys</span>
+            </div>
+            <div class="rn-a92 rn-enter" style="display: flex; flex-direction: column; gap: 4px; opacity: 0; animation-delay: .25s">
+              <div style="display: flex; align-items: center; gap: 10px; white-space: nowrap;">
+                <span [attr.translate]="'no'" style="color: var(--ink);" i18n="@@releaseNotes.v0995.051.verifyExtensionCopy">verify-extension-copy</span>
+                <span [attr.translate]="'no'" class="rn-a114 rn-enter" style="margin-left: auto; color: var(--ac); opacity: 0; animation-delay: .4s">✓</span>
+              </div>
+              <span [attr.translate]="'no'" style="color: var(--dim2); white-space: nowrap;" i18n="@@releaseNotes.v0995.052.uiFiles">13 UI files</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="rn-sec-copy">
+      <div class="rn-sec-num" [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: 11px; letter-spacing: .22em; color: var(--ac); margin-bottom: 14px;">05</div>
+      <h2 style="margin: 0 0 18px; font-size: clamp(1.5rem, 3vw, 2rem); font-weight: 700; letter-spacing: -.02em; line-height: 1.15;" i18n="@@releaseNotes.v0995.053.catalogGapsFailCi">Catalog gaps fail CI</h2>
+      <ul style="margin: 0; padding-left: 18px; color: var(--dim); font-size: 1rem; line-height: 1.65;">
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0995.054.verifyExtensionI18nFails"><span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">verify-extension-i18n</span> fails on a missing key, an empty message, mismatched placeholders between languages, unreviewed copied English, or a dropped protected term such as FSB.</li>
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0995.055.verifyExtensionCopyFails"><span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">verify-extension-copy</span> fails when an extension page keeps package-owned English outside the catalogs.</li>
+        <li style="margin-bottom: 0;" i18n="@@releaseNotes.v0995.056.bothChecksRunAt">Both checks run at the start of <span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">npm test</span>, so a new key has to land in all eight catalogs in the same change.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="rn-sec rn-sec-split" style="margin: 0; padding: 72px 0 0; display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 56px; align-items: center;">
+    <div class="rn-sec-viz" style="order: 2; display: flex; align-items: center; justify-content: center;">
+      <div style="width: 300px; max-width: 100%; display: flex; flex-direction: column; gap: 16px;">
+        <div style="border: 1px solid var(--line); border-radius: 8px; background: var(--panel2); overflow: hidden;">
+          <div style="display: flex; align-items: center; gap: 5px; padding: 8px 11px; border-bottom: 1px solid var(--line);">
+            <span style="width: 6px; height: 6px; border-radius: 999px; background: var(--line2);"></span>
+            <span style="width: 6px; height: 6px; border-radius: 999px; background: var(--line2);"></span>
+            <span style="width: 6px; height: 6px; border-radius: 999px; background: var(--line2);"></span>
+            <img src="/assets/providers/cline.svg" alt="" aria-hidden="true" data-mono-mark="" width="13" height="13" decoding="async" style="margin-left: auto; width: 13px; height: 13px; object-fit: contain; opacity: .85;">
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 12px; padding: 13px 11px 15px; font-family: 'Space Mono', monospace; font-size: 9.5px;">
+            <div class="rn-a91 rn-enter" style="display: flex; flex-direction: column; gap: 4px; opacity: 0; animation-delay: 0s">
+              <div style="display: flex; align-items: center; gap: 10px; white-space: nowrap;">
+                <span [attr.translate]="'no'" style="color: var(--ink);" i18n="@@releaseNotes.v0995.058.installCline">install --cline</span>
+                <span [attr.translate]="'no'" class="rn-a113 rn-enter" style="margin-left: auto; color: var(--ac); opacity: 0; animation-delay: 0s">✓</span>
+              </div>
+              <span [attr.translate]="'no'" style="color: var(--dim2); overflow-wrap: anywhere;" i18n="@@releaseNotes.v0995.059.clineSettingsPath">~/.cline/data/settings/cline_mcp_settings.json</span>
+            </div>
+            <div class="rn-a92 rn-enter" style="display: flex; flex-direction: column; gap: 4px; opacity: 0; animation-delay: .25s">
+              <div style="display: flex; align-items: center; gap: 10px; white-space: nowrap;">
+                <span [attr.translate]="'no'" style="color: var(--ink);" i18n="@@releaseNotes.v0995.060.timeout1800">timeout: 1800</span>
+                <span [attr.translate]="'no'" class="rn-a114 rn-enter" style="margin-left: auto; color: var(--ac); opacity: 0; animation-delay: .4s">✓</span>
+              </div>
+              <span style="color: var(--dim2);" i18n="@@releaseNotes.v0995.061.secondsUpFrom60">seconds, up from 60</span>
+            </div>
+          </div>
+        </div>
+        <div style="font-family: 'Space Mono', monospace; font-size: 9.5px; color: var(--dim2); text-align: center; text-wrap: pretty;" i18n="@@releaseNotes.v0995.062.oneSettingsFileFor">one settings file for VS Code, JetBrains, and the CLI</div>
+      </div>
+    </div>
+    <div class="rn-sec-copy" style="order: 1;">
+      <div class="rn-sec-num" [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: 11px; letter-spacing: .22em; color: var(--ac); margin-bottom: 14px;">06</div>
+      <h2 style="margin: 0 0 18px; font-size: clamp(1.5rem, 3vw, 2rem); font-weight: 700; letter-spacing: -.02em; line-height: 1.15;" i18n="@@releaseNotes.v0995.063.clineIsAnOfficially">Cline is an officially supported client</h2>
+      <ul style="margin: 0; padding-left: 18px; color: var(--dim); font-size: 1rem; line-height: 1.65;">
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0995.064.installClineNowWrites"><span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">install --cline</span> now writes <code [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em; overflow-wrap: anywhere;">~/.cline/data/settings/cline_mcp_settings.json</code>, the settings file Cline shares across its VS Code extension, JetBrains plugin, and CLI. The installer used to write the old VS Code storage file, which current Cline imports once and then ignores, so FSB never appeared.</li>
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0995.065.clineAppliesOneFixed">Cline applies one fixed timeout to every MCP request, 60 seconds unless configured. FSB's entry now sets <span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">timeout: 1800</span>, so <span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">run_task</span> gets 1,800 seconds instead of 60.</li>
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0995.066.reinstallingKeepsThe">Reinstalling keeps the <span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">timeout</span>, <span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">disabled</span>, and <span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">autoApprove</span> settings Cline stores on the entry. Cline sessions are labeled Cline on the owner chip, in the client inventory, and in anonymous usage stats.</li>
+        <li style="margin-bottom: 0;" i18n="@@releaseNotes.v0995.067.onboardingAndThisSites">Onboarding and this site's install picker list Cline, and the installer fix ships in <span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">fsb-mcp-server</span> 0.11.5. If you set up Cline before this release, rerun <code [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em; overflow-wrap: anywhere;">npx -y fsb-mcp-server&#64;latest install --cline</code>.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="rn-sec" style="margin: 0; padding: 72px 0 0;">
+    <p style="margin: 0; padding-top: 26px; border-top: 1px solid var(--line); font-family: 'Space Mono', monospace; font-size: 11.5px; line-height: 1.8; color: var(--dim2); max-width: 76ch; text-wrap: pretty;" i18n="@@releaseNotes.v0995.057.extensionAndShowcaseVersion">This release pairs extension and showcase version 0.9.95 with MCP package 0.11.5. The language switch was verified in Chrome on the side panel, popup, control panel, onboarding, unlock, and microphone-permission pages.</p>
+  </section>
+
+    }
+
 @if (version() === '0.9.92') {
   <section class="rn-sec rn-sec-split" style="margin: 0; padding: 72px 0 0; display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 56px; align-items: center;">
     <div class="rn-sec-viz" style="display: flex; align-items: center; justify-content: center;">

@@ -18,9 +18,9 @@
  *        - v0.9.70: floor=2 (dev-phase visibility tradeoff)
  *        - v0.9.70+ (this change): floor=1, effectively DISABLING the floor.
  *      Rationale: MCP_CLIENT_ALLOWLIST in routes/telemetry.js is a FIXED
- *      PUBLIC 13-label set (Claude, Codex, ChatGPT, Perplexity, Windsurf,
+ *      PUBLIC 17-label set (Claude, Codex, ChatGPT, Perplexity, Windsurf,
  *      Cursor, Antigravity, OpenCode, OpenClaw, OpenClaw 🦀, Grok, Gemini,
- *      Hermes + 'unknown'). The label set carries no identifying information
+ *      Hermes, Cline, Muse, Grok Bot, Dots + 'unknown'). The label set carries no identifying information
  *      beyond the per-label install count, and that count is already exposed
  *      via total_users. Bucketing single-install labels into "Other" only
  *      hides legitimate diversity at single-digit install totals (the live

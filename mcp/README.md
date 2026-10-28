@@ -17,7 +17,7 @@
 
 *Manual browser tools, capabilities, trigger watchers, visual sessions, autopilot, vault, and observability for the FSB Chrome Extension.*
 
-[Quick Start](#quick-start) · [Trigger Watchers](#trigger-watchers) · [Tools](#tools-69-total) · [Diagnostics](#diagnostics) · [Architecture](#architecture)
+[Quick Start](#quick-start) · [Trigger Watchers](#trigger-watchers) · [Tools](#tools) · [Diagnostics](#diagnostics) · [Architecture](#architecture)
 
 </div>
 
@@ -25,7 +25,7 @@
 
 ## What It Is
 
-`fsb-mcp-server` connects MCP clients such as Claude Desktop, Claude Code, Codex, Cursor, VS Code, Windsurf, Zed, Cline, Gemini CLI, Continue, and others to the FSB Chrome extension.
+`fsb-mcp-server` connects MCP clients such as Claude Desktop, Claude Code, Codex, Cursor, VS Code, Antigravity, Zed, Cline, Gemini CLI, Continue, and others to the FSB Chrome extension.
 
 The server supports two operating styles:
 
@@ -38,11 +38,19 @@ Use this package when you want your AI client to drive the browser directly whil
 
 > **PhantomStream (engineering milestone 0.12.0):** the dashboard live-preview and remote-control relay are now powered by the published `@full-self-browsing/phantom-stream` package on the extension and showcase side. This is an internal capture/renderer/transport change — the MCP tool schemas, routes, and bridge contracts in this server are unchanged.
 
+### What's New In v0.11.5
+
+- `install --cline` writes `~/.cline/data/settings/cline_mcp_settings.json`, the settings file Cline's VS Code extension, JetBrains plugin, and CLI share. Earlier versions wrote a VS Code extension-storage file that current Cline ignores after its one-time import, so rerun the install if FSB never appeared in Cline.
+- Cline entries set `timeout: 1800` (seconds) so long `run_task` calls are not cut off by Cline's fixed 60-second request timeout.
+- Reinstalling keeps the `timeout`, `disabled`, and `autoApprove` settings Cline stores on the `fsb` entry.
+- `start_visual_session`, `end_visual_session`, and `back` are no longer registered, so the server lists 69 tools. Use `go_back` in place of `back`.
+- **Compatibility:** `fsb-mcp-server` 0.11.5 requires FSB extension 0.9.95 or newer for `mcp:task-status`. Upgrade the extension and restart the MCP host together.
+
 ### What's New In v0.11.2
 
 - The FSB dark logo ships with the MCP package and is advertised as an embedded PNG server icon. Update the package and restart the MCP host to make it available to clients that render MCP icons.
 - The MCP Registry uses the matching hosted dark logo. Rendering remains client-controlled.
-- **Compatibility:** `fsb-mcp-server` 0.11.2 requires FSB extension 0.9.92 or newer for `mcp:task-status`. Upgrade the extension and restart the MCP host together.
+- **0.11.2 compatibility:** `fsb-mcp-server` 0.11.2 requires FSB extension 0.9.92 or newer for `mcp:task-status`. Upgrade the extension and restart the MCP host together.
 
 ### What's New In v0.11.1
 
@@ -105,7 +113,7 @@ This is the FSB v0.9.60 milestone release. The headline change is the new multi-
 - Secure vault tools that avoid sending raw secrets over the bridge.
 - One-command installer coverage for 21 platforms.
 
-Background-agent MCP tools were retired with the extension's background-agent sunset. The agent registrar now only exposes `back` for ownership-gated history navigation.
+Background-agent MCP tools were retired with the extension's background-agent sunset. The last tool left in that module, `back`, duplicated `go_back` and has been removed.
 
 ---
 
@@ -121,8 +129,8 @@ Common file or CLI targets:
 | `--claude-code` | Claude Code |
 | `--cursor` | Cursor |
 | `--vscode` | VS Code |
-| `--windsurf` | Windsurf |
-| `--cline` | Cline |
+| `--antigravity` | Antigravity |
+| `--cline` | Cline (VS Code, JetBrains, CLI) |
 | `--zed` | Zed |
 | `--codex` | Codex CLI / Codex IDE |
 | `--gemini` | Gemini CLI |
@@ -152,7 +160,7 @@ command: npx
 args: -y fsb-mcp-server@latest
 ```
 
-For file-based targets, existing config files are parsed, updated, and serialized back in the platform's expected format: JSON, JSONC, TOML, or YAML. For Claude Code, the installer delegates to the `claude mcp add --scope user` CLI command. For instruction-only targets, it prints steps instead of guessing at a private config path.
+For file-based targets, existing config files are parsed, updated, and serialized back in the platform's expected format: JSON, JSONC, TOML, or YAML. Cline entries also set `timeout: 1800`, and reinstalling keeps the `timeout`, `disabled`, and `autoApprove` settings Cline stores on the entry. For Claude Code, the installer delegates to the `claude mcp add --scope user` CLI command. For instruction-only targets, it prints steps instead of guessing at a private config path.
 
 Use `--dry-run` before `--all` when you want to see planned writes without changing files.
 
@@ -187,8 +195,9 @@ npx -y fsb-mcp-server@latest install --claude-desktop
 npx -y fsb-mcp-server@latest install --claude-code
 npx -y fsb-mcp-server@latest install --cursor
 npx -y fsb-mcp-server@latest install --vscode
-npx -y fsb-mcp-server@latest install --windsurf
+npx -y fsb-mcp-server@latest install --antigravity
 npx -y fsb-mcp-server@latest install --codex
+npx -y fsb-mcp-server@latest install --cline
 npx -y fsb-mcp-server@latest install --all
 ```
 
@@ -224,6 +233,20 @@ npx -y fsb-mcp-server@latest uninstall --native-host --browser edge
 Extension IDs are browser-installation-specific. Omitted `--extension-id` uses the published Chrome Web Store ID, `badgafnfchcihdfnjneklogedcdkmjfk`. For Edge, Brave, Chromium, or an unpacked build, copy the 32-character lowercase ID shown on that browser's extensions page and pass it with `--extension-id`.
 
 The browser selector controls the user-scoped native-messaging registration location. To switch browsers, uninstall the browser target reported by `doctor` first; cross-target install and uninstall requests refuse without changing either registration.
+
+### Grok Build as the extension's AI provider
+
+Choose **Settings → AI Provider → Harness Adapters → Grok Build**, then use **Connect SuperGrok** to sign in to FSB's private OAuth profile. This lets the extension delegate browser tasks to the local Grok CLI. Installing FSB into an MCP client is a separate setup direction.
+
+FSB verifies the `grok-acp-v1` integration contract rather than requiring one exact Grok release. The checks cover ACP v1, HTTP MCP support, session cleanup, isolated configuration, and the required strict sandbox. New CLI versions, including new majors, can work automatically when those checks pass. A **Verified** badge means the installed CLI passed runtime checks; it does not claim that every future upstream behavior has been fixture-tested.
+
+The private profile stays under `~/.fsb/agent-providers/grok/`. Upgrading the integration preserves its OAuth credentials and owned-session journal. Your normal Grok profile is separate. Connection/status checks do not send model prompts or initiate browser sign-in.
+
+If the CLI refuses its strict sandbox, FSB reports `sandbox_unavailable` rather than a version error. For example, a Docker socket symlink can prevent Grok from constructing its sandbox. Resolve the reported environment problem before retrying; FSB does not switch to a weaker sandbox automatically.
+
+The native helper stages its own package runtime. Updating an extension or source checkout does not update that installed copy. After a fixed package is published, rerun the native-host installation command above with the same browser and extension ID, then restart the local FSB service and retry the connection test. Before publication, `@latest` still installs the previously published runtime.
+
+Maintainers can build the MCP package and run `node scripts/check-grok-compatibility.mjs --binary /absolute/path/to/grok` from the repository root. It uses a disposable unauthenticated profile, prints a bounded JSON verdict, and makes no inference requests. The weekly/manual **Grok CLI compatibility** workflow runs the same check against the official stable CLI on macOS and Linux.
 
 ### Manual Setup
 
@@ -268,7 +291,21 @@ VS Code uses the `servers` root key and requires `type: "stdio"`:
 }
 ```
 
-After editing config files, restart or reload the host client if tools do not appear. Claude Code is usually active immediately after `claude mcp add`; Cursor, Claude Desktop, VS Code, and Windsurf often need a restart, refresh, or trust/start action in their MCP UI.
+Cline (`~/.cline/data/settings/cline_mcp_settings.json`) is shared by the Cline VS Code extension, JetBrains plugin, and CLI. The installer honors `CLINE_MCP_SETTINGS_PATH`, `CLINE_DATA_DIR`, and `CLINE_DIR` the way Cline does, and falls back to the VS Code extension-storage file used by older Cline builds only when no shared settings directory exists. `timeout` is in seconds: Cline applies one fixed timeout per request, 60 seconds by default, which would cut off a long `run_task`.
+
+```json
+{
+  "mcpServers": {
+    "fsb": {
+      "command": "npx",
+      "args": ["-y", "fsb-mcp-server@latest"],
+      "timeout": 1800
+    }
+  }
+}
+```
+
+After editing config files, restart or reload the host client if tools do not appear. Claude Code is usually active immediately after `claude mcp add`; Cursor, Claude Desktop, VS Code, and Antigravity often need a restart, refresh, or trust/start action in their MCP UI.
 
 ### Local Streamable HTTP
 
@@ -353,11 +390,11 @@ Move to a normal `http` or `https` page before calling DOM tools such as `read_p
 
 ## Visual Session Lifecycle
 
-> **v0.9.0 breaking change** -- The explicit `start_visual_session` and `end_visual_session` tools were REMOVED in v0.9.0. Action tools now require `visual_reason` + `client` fields; the visual session is created implicitly on the first action call, refreshed on a sliding 60-second window, and cleared by `is_final: true` (immediate) or 60 seconds of silence (auto-clear). Calling the removed tools returns the typed `TOOL_REMOVED` error. See [CHANGELOG.md](./CHANGELOG.md#v0.9.0) for the migration recipe with concrete before/after code.
+> **v0.9.0 breaking change** -- The explicit `start_visual_session` and `end_visual_session` tools were REMOVED in v0.9.0. Action tools now require `visual_reason` + `client` fields; the visual session is created implicitly on the first action call, refreshed on a sliding 60-second window, and cleared by `is_final: true` (immediate) or 60 seconds of silence (auto-clear). The two names are no longer registered at all, so they do not appear in `tools/list`. See [CHANGELOG.md](./CHANGELOG.md#v0.9.0) for the migration recipe with concrete before/after code.
 
 Use the implicit visual session when your MCP client controls the browser and you still want FSB's visible trusted overlay. The session is per-tab and per-agent; the v0.9.60 ownership gate (`TAB_NOT_OWNED`) fires before any session state is touched.
 
-1. Call any action tool (`click`, `type_text`, `navigate`, ...) with the required field bundle: `visual_reason` (short human-readable string for the overlay) and `client` (allowlisted badge label such as `Codex`, `Claude`, `ChatGPT`, `Gemini`, `Cursor`, `Windsurf`, `OpenCode`, `OpenClaw`, `Grok`, `Perplexity`, or `Antigravity`).
+1. Call any action tool (`click`, `type_text`, `navigate`, ...) with the required field bundle: `visual_reason` (short human-readable string for the overlay) and `client` (allowlisted badge label such as `Codex`, `Claude`, `ChatGPT`, `Gemini`, `Cursor`, `Antigravity`, `OpenCode`, `OpenClaw`, `Grok`, `Perplexity`, `Cline`, `Muse`, `Grok Bot`, or `Dots`).
 2. Drive the page with subsequent action tools. Each call re-arms the 60-second sliding window so the overlay stays alive as long as actions keep arriving.
 3. On the LAST action of the task, set `is_final: true`. The overlay clears immediately after the action's `change_report` resolves -- no 60-second wait.
 
@@ -371,7 +408,7 @@ type_text(selector="#email", text="user@example.com", visual_reason="Complete ch
 
 If the task ends without an explicit `is_final: true` signal, the overlay auto-clears after 60 seconds of no further carrying action calls. Read-only tools (`read_page`, `get_dom_snapshot`, `get_text`, ...) do NOT carry the field bundle and do NOT re-arm the sliding window -- reads stay silent by design.
 
-Calling the removed `start_visual_session` or `end_visual_session` tools by name returns the typed `TOOL_REMOVED` error whose body names the new contract and points at this CHANGELOG entry. See `mcp/CHANGELOG.md` v0.9.0 for the full migration recipe and the typed-error catalogue (`VISUAL_FIELDS_REQUIRED`, `BADGE_NOT_ALLOWED`, `TOOL_REMOVED`).
+A client that still calls `start_visual_session` or `end_visual_session` gets its MCP host's unknown-tool error. See `mcp/CHANGELOG.md` v0.9.0 for the full migration recipe and the typed-error catalogue (`VISUAL_FIELDS_REQUIRED`, `BADGE_NOT_ALLOWED`).
 
 Use `run_task` only when the user explicitly wants FSB autopilot to decide and execute the steps -- autopilot manages its own overlay lifecycle internally and is NOT affected by the v0.9.0 implicit-contract change.
 
@@ -465,15 +502,9 @@ There is no idle timeout. An idle agent keeps its tab indefinitely until one of 
 - If the bridge cannot recover after eviction, the server resolves `run_task` with a structured `partial_outcome` whose `disposition` is `'sw_evicted'`. The hint string is the literal `lifecycle event missing -- audit cleanup paths`.
 - The agent registry mirrors to `chrome.storage.session` write-through; on SW wake, `hydrate()` reconciles persisted records against `chrome.tabs.query()` and reaps ghost records before servicing any request.
 
-### `back` tool
+### Going back in history
 
-The new ownership-gated `back` tool is the typed replacement for `execute_js("history.back()")`. It returns:
-
-```text
-{ status, resultingUrl, historyDepth }
-```
-
-where `status` is one of `ok`, `no_history`, `cross_origin`, `bf_cache`, `fragment_only`. Settle verification uses `pageshow` with a 2s timeout; cross-origin transitions reuse the v0.9.11 BF-cache resilience path to re-inject the content script. The tool is background-tab compatible and does not steal focus.
+Use `go_back` and `go_forward`. Both are ownership-gated, run on background tabs without stealing focus, and return the resulting URL. The separate `back` tool, which duplicated `go_back`, has been removed.
 
 ### Background-tab execution
 
@@ -481,23 +512,17 @@ Most tools execute on background tabs without stealing focus. Tools that genuine
 
 ---
 
-## Tools (69 Total)
+## Tools
 
-### Visual Sessions (2)
+`fsb-mcp-server` registers 69 tools.
 
-| Tool | Purpose |
-|------|---------|
-| `start_visual_session` | Removed in v0.9.0 -- see Visual Session Lifecycle section. Calling returns `TOOL_REMOVED`. |
-| `end_visual_session` | Removed in v0.9.0 -- see Visual Session Lifecycle section. Calling returns `TOOL_REMOVED`. |
-
-### Autopilot And Agent Navigation (4)
+### Autopilot (3)
 
 | Tool | Purpose |
 |------|---------|
 | `run_task` | Let FSB's AI perform a natural language browser task end to end. |
 | `stop_task` | Cancel the active automation task. |
 | `get_task_status` | Check task progress, phase, and ETA. |
-| `back` | Single-step browser-history back, ownership-gated. Returns `{ status, resultingUrl, historyDepth }`. |
 
 ### Trigger Watchers (4)
 
@@ -540,6 +565,14 @@ Notes:
 | `get_site_guide` | Retrieve site-specific automation guidance. |
 | `list_tabs` | List open tabs. |
 | `read_sheet` | Read spreadsheet ranges. |
+
+### Task Outcome (3)
+
+| Tool | Purpose |
+|------|---------|
+| `complete_task` | Report that the task is fully done, with a summary. |
+| `partial_task` | Report useful work that an external blocker stopped short of the final step. |
+| `fail_task` | Report that the task cannot be completed, and why. |
 
 ### Developer / UAT (1)
 
@@ -585,7 +618,7 @@ Vault responses expose metadata only. Passwords, full card numbers, and CVV valu
 
 ### Tool Count Contract
 
-The public count is intentionally based on registered MCP handlers, not every internal helper in the extension. The extension's canonical registry also contains task-lifecycle signals and internal context tools used by the browser runtime. The MCP README documents the tool surface an MCP client can call.
+The public count is intentionally based on registered MCP handlers, not every internal helper in the extension. The extension's canonical registry also contains task-lifecycle signals and internal context tools used by the browser runtime. The MCP README documents the tool surface an MCP client can call. `tests/mcp-version-parity.test.js` counts the tools the built server registers and fails when any published count disagrees.
 
 ---
 
@@ -664,9 +697,9 @@ The build command copies `extension/ai/tool-definitions.js` into `mcp/ai/tool-de
 
 ### Versioning
 
-The MCP package has its own version (`0.11.2`) because it is published independently from the extension release (`0.9.92`). Use `npm run version:set:mcp -- X.Y.Z` for MCP releases and `npm run version:set:extension -- X.Y.Z` for extension releases; `npm run version:check` verifies both domains without requiring them to match.
+The MCP package has its own version (`0.11.5`) because it is published independently from the extension release (`0.9.95`). Use `npm run version:set:mcp -- X.Y.Z` for MCP releases and `npm run version:set:extension -- X.Y.Z` for extension releases; `npm run version:check` verifies both domains without requiring them to match.
 
-Compatibility for this release: MCP 0.11.2 requires extension 0.9.92 or newer for the `mcp:task-status` route used by `complete_task`, `partial_task`, and `fail_task`. Existing `0.10.0` tool routes remain additive and unchanged.
+Compatibility for this release: MCP 0.11.5 requires extension 0.9.95 or newer for the `mcp:task-status` route used by `complete_task`, `partial_task`, and `fail_task`. Existing `0.10.0` tool routes remain additive and unchanged.
 
 Contract-sensitive changes should be covered by tests before publishing:
 
@@ -676,18 +709,18 @@ Contract-sensitive changes should be covered by tests before publishing:
 - restricted-tab recovery messages
 - visual-session token lifecycle
 - vault redaction boundaries
-- multi-agent contract: `agent_id` capture, ownership gate, configurable cap, ownership tokens, `back` tool
+- multi-agent contract: `agent_id` capture, ownership gate, configurable cap, ownership tokens
 - trigger contract: `trigger`, `stop_trigger`, `get_trigger_status`, `list_triggers`, blocking/detached reporting, and local browser-open limits
 - terminal task-outcome contract: `mcp:task-status`, agent/ownership context, serialized lifecycle ordering, and `fail_task` acknowledgement semantics
 
-### Releasing 0.11.2
+### Releasing 0.11.5
 
-This 0.11.2 build is release-prep ready. Merging a new MCP version into `main` automatically publishes the verified npm package to `latest` and creates its `mcp-vX.Y.Z` tag and GitHub release. Main pushes whose MCP version is already published skip publishing. Bump the MCP version with `npm run version:set:mcp -- X.Y.Z` before merging a new release.
+This 0.11.5 build is release-prep ready. Merging a new MCP version into `main` automatically publishes the verified npm package to `latest` and creates its `mcp-vX.Y.Z` tag and GitHub release. Main pushes whose MCP version is already published skip publishing. Bump the MCP version with `npm run version:set:mcp -- X.Y.Z` before merging a new release.
 
 To publish:
 
 - Preferred: merge the versioned release into `main`; the npm workflow builds the Windows native-host artifacts, verifies the packed payload, publishes to npm, and creates the release automatically.
-- Explicit tag alternative: for an unpublished version already on `main`, run `git tag mcp-v0.11.2 && git push origin mcp-v0.11.2`. Tag-triggered releases still require the tag to match the package version and reject an already-published version.
+- Explicit tag alternative: for an unpublished version already on `main`, run `git tag mcp-v0.11.5 && git push origin mcp-v0.11.5`. Tag-triggered releases still require the tag to match the package version and reject an already-published version.
 - Manual MCP fallback: from the release commit, run `cd mcp && npm publish --tag latest` only after confirming `npm whoami`, `npm --prefix mcp run build`, and the MCP smoke/parity/schema gates all pass.
 
 Use the release workflow for normal releases so the native-host packaging and integrity checks run before publication.

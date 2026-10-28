@@ -11,6 +11,146 @@
   const FSB = window.FSB;
   const logger = FSB.logger;
 
+  function ov(key, english, subs) {
+    var locale = globalThis.fsbUiLocale;
+    if (locale && typeof locale.text === 'function') return locale.text(key, english, subs);
+    if (!subs || typeof english !== 'string') return english;
+    return english.replace(/\$([A-Za-z0-9_]+)\$/g, function (all, name) {
+      var value = subs[name] != null ? subs[name] : subs[name.toLowerCase()];
+      return value == null ? all : String(value);
+    });
+  }
+
+  // Labels the service worker builds in English (utils/overlay-state.js and the
+  // agent loop fallbacks). Only exact matches are translated; task titles, model
+  // summaries and AI status text are shown as sent.
+  var OVERLAY_LABELS = {
+    'Analyzing': 'entry_phase_analyzing', 'Planning': 'entry_planning', 'Acting': 'entry_phase_acting',
+    'Recovering': 'entry_phase_recovering', 'Writing': 'entry_phase_writing',
+    'Switching Tabs': 'entry_phase_switching', 'Calling API': 'entry_phase_calling',
+    'Watching a trigger': 'entry_phase_watching', 'Complete': 'entry_phase_complete',
+    'Error': 'shell_error_status', 'Done': 'entry_done_pill', 'Partial': 'entry_phase_partial',
+    'Working': 'shell_working', 'Waiting': 'entry_phase_waiting', 'Searching': 'entry_phase_searching',
+    'Formatting': 'entry_phase_formatting', 'Formatted': 'entry_phase_formatted',
+    'Task completed': 'copy_71fea45d26', 'Task partially completed': 'copy_0d3875c352',
+    'Task ended with an error': 'entry_detail_error', 'Task stopped': 'entry_detail_stopped',
+    'Reviewing page state': 'entry_detail_reviewing', 'Planning next step': 'entry_detail_planning',
+    'Planning next browser step': 'entry_detail_planning_browser',
+    'Performing browser action': 'entry_detail_acting',
+    'Recovering from interruption': 'entry_detail_recovering', 'Updating page': 'entry_detail_updating',
+    'Switching to another tab': 'entry_detail_switching', 'Watching DOM for change': 'entry_detail_watching',
+    'Ready to begin': 'entry_detail_ready', 'Calling model': 'entry_detail_calling_model',
+    'Dispatching tool': 'entry_detail_dispatching', 'Scheduling next step': 'entry_detail_scheduling'
+  };
+  // Active phases arrive as "Acting…"; translate the label and keep the ellipsis.
+  function overlayLabel(english) {
+    if (typeof english !== 'string' || !english) return english;
+    var ellipsis = english.slice(-1) === '…';
+    var base = ellipsis ? english.slice(0, -1) : english;
+    if (!Object.prototype.hasOwnProperty.call(OVERLAY_LABELS, base)) return english;
+    return ov(OVERLAY_LABELS[base], base) + (ellipsis ? '…' : '');
+  }
+
+  // The English each label was written from, so a language change can redraw
+  // the pill, detail and log lines without waiting for the next progress write.
+  var labelSources = new WeakMap();
+  function writeLabel(el, english) {
+    if (!el) return;
+    var shown = overlayLabel(english);
+    el.textContent = shown;
+    labelSources.set(el, { english: english, shown: shown });
+  }
+  // False when the label was not written by writeLabel() or was replaced since.
+  function rewriteLabel(el) {
+    var source = el ? labelSources.get(el) : null;
+    if (!source || el.textContent !== source.shown) return false;
+    writeLabel(el, source.english);
+    return true;
+  }
+
+  // Counters and lines drawn from a catalog template keep the template and its
+  // subs, so a language change can redraw them before the next update. attr
+  // names an attribute; text is written when it is omitted.
+  var keyedSources = new WeakMap();
+  function writeKeyed(el, key, english, subs, attr) {
+    if (!el) return;
+    var shown = ov(key, english, subs);
+    if (attr) el.setAttribute(attr, shown);
+    else el.textContent = shown;
+    var sources = keyedSources.get(el) || {};
+    sources[attr || ''] = { key: key, english: english, subs: subs, shown: shown };
+    keyedSources.set(el, sources);
+  }
+  // Leaves any value that other code has replaced since it was written.
+  function rewriteKeyed(el) {
+    var sources = el ? keyedSources.get(el) : null;
+    if (!sources) return;
+    Object.keys(sources).forEach(function (attr) {
+      var source = sources[attr];
+      var current = attr ? el.getAttribute(attr) : el.textContent;
+      if (current === source.shown) writeKeyed(el, source.key, source.english, source.subs, attr);
+    });
+  }
+  function writeActions(el, count) {
+    writeKeyed(el, 'entry_actions', 'Actions: $COUNT$', { count: count });
+  }
+
+  var chromeRoots = [];
+  function ownedText(current, key, english) {
+    if (current === english) return true;
+    var locale = globalThis.fsbUiLocale;
+    return !!(locale && typeof locale.isMessage === 'function' && locale.isMessage(key, current));
+  }
+  function refreshOwnedChrome(root) {
+    if (!root || typeof root.querySelector !== 'function') return;
+    var locale = globalThis.fsbUiLocale;
+    if (locale && typeof locale.current === 'function' && typeof root.setAttribute === 'function') root.setAttribute('lang', locale.current());
+    var title = root.querySelector('.fsb-title');
+    if (title && ownedText(title.textContent, 'entry_automating', 'FSB Automating')) title.textContent = ov('entry_automating', 'FSB Automating');
+    var crawlTitle = root.querySelector('.fsb-crawl-title');
+    if (crawlTitle && ownedText(crawlTitle.textContent, 'entry_crawl_title', 'FSB Crawling')) crawlTitle.textContent = ov('entry_crawl_title', 'FSB Crawling');
+    var stop = root.querySelector('.fsb-stop');
+    if (stop && ownedText(stop.getAttribute('aria-label'), 'entry_stop', 'Stop')) stop.setAttribute('aria-label', ov('entry_stop', 'Stop'));
+    var step = root.querySelector('.fsb-step-number');
+    if (step && !rewriteLabel(step) && ownedText(step.textContent, 'entry_planning', 'Planning')) step.textContent = ov('entry_planning', 'Planning');
+    var detail = root.querySelector('.fsb-step-text');
+    if (detail && !rewriteLabel(detail) && ownedText(detail.textContent, 'entry_initializing', 'Initializing...')) detail.textContent = ov('entry_initializing', 'Initializing...');
+    if (typeof root.querySelectorAll === 'function') Array.prototype.forEach.call(root.querySelectorAll('.fsb-log-line'), rewriteLabel);
+    ['.fsb-eta', '.fsb-crawl-domain', '.fsb-crawl-pages', '.fsb-replay-speed', '.badge-watching', '.badge-fired'].forEach(function (selector) {
+      rewriteKeyed(root.querySelector(selector));
+    });
+    if (root.getAttribute && ownedText(root.getAttribute('aria-label'), 'entry_replay_controls', 'Replay controls')) {
+      root.setAttribute('aria-label', ov('entry_replay_controls', 'Replay controls'));
+    }
+    var pause = root.querySelector('.fsb-replay-toggle');
+    if (pause && ownedText(pause.getAttribute('aria-label'), 'entry_pause_replay', 'Pause replay')) pause.setAttribute('aria-label', ov('entry_pause_replay', 'Pause replay'));
+    else if (pause && ownedText(pause.getAttribute('aria-label'), 'entry_play_replay', 'Play replay')) pause.setAttribute('aria-label', ov('entry_play_replay', 'Play replay'));
+    var scrubber = root.querySelector('.fsb-replay-scrubber');
+    if (scrubber && ownedText(scrubber.getAttribute('aria-label'), 'entry_replay_position', 'Replay position, forward seek only')) {
+      scrubber.setAttribute('aria-label', ov('entry_replay_position', 'Replay position, forward seek only'));
+      scrubber.setAttribute('title', ov('entry_seek_forward', 'Seek forward through the replay'));
+    }
+  }
+  function watchChrome(root) {
+    // Overlays are rebuilt after destroy(), so drop roots that left the page.
+    chromeRoots = chromeRoots.filter(function (r) { return r.isConnected; });
+    chromeRoots.push(root);
+    refreshOwnedChrome(root);
+  }
+  if (globalThis.fsbUiLocale && typeof fsbUiLocale.boot === 'function') {
+    if (typeof fsbUiLocale.onChange === 'function') {
+      fsbUiLocale.onChange(function () {
+        chromeRoots.forEach(function (root) {
+          refreshOwnedChrome(root);
+          if (typeof fsbUiLocale.apply === 'function') fsbUiLocale.apply(root);
+        });
+      });
+    }
+    fsbUiLocale.boot().then(function () {
+      chromeRoots.forEach(refreshOwnedChrome);
+    });
+  }
+
   // ============================================================================
   // VISUAL FEEDBACK - Highlight Manager and Progress Overlay
   // ============================================================================
@@ -306,8 +446,8 @@
       var stepNumberEl = this.container.querySelector('.fsb-step-number');
       if (taskEl) taskEl.textContent = p.title;
       if (summaryEl) summaryEl.textContent = p.subtitle;
-      if (stepTextEl) stepTextEl.textContent = p.detail;
-      if (stepNumberEl) stepNumberEl.textContent = p.stepNumberLabel;
+      writeLabel(stepTextEl, p.detail);
+      writeLabel(stepNumberEl, p.stepNumberLabel);
       // Scrollback log: push the outgoing detail text (about to be replaced)
       // into the rolling buffer, deduped against consecutive repeats, capped
       // at 3 entries (current + 2 "previous" lines rendered in update()).
@@ -757,9 +897,9 @@
       this.container.innerHTML = `
       <div class="fsb-header">
         <img class="fsb-logo" src="" alt="FSB">
-        <span class="fsb-title">FSB Automating</span>
+        <span class="fsb-title">${ov('entry_automating', 'FSB Automating')}</span>
         <span class="fsb-client-badge"></span>
-        <button type="button" class="fsb-stop hidden" aria-label="Stop">&#9632;</button>
+        <button type="button" class="fsb-stop hidden" aria-label="${ov('entry_stop', 'Stop')}">&#9632;</button>
       </div>
       <div class="fsb-task">-</div>
       <div class="fsb-summary"></div>
@@ -773,8 +913,8 @@
         <span class="fsb-note-text"></span>
       </div>
       <div class="fsb-step">
-        <span class="fsb-step-number">Planning</span>
-        <span class="fsb-step-text">Initializing...</span>
+        <span class="fsb-step-number">${ov('entry_planning', 'Planning')}</span>
+        <span class="fsb-step-text">${ov('entry_initializing', 'Initializing...')}</span>
       </div>
       <div class="fsb-log">
         <div class="fsb-log-line"></div>
@@ -810,6 +950,7 @@
       }
 
       this.shadow.appendChild(this.container);
+      watchChrome(this.container);
 
       // Promote to top layer via Popover API for guaranteed rendering above all page content.
       // This bypasses stacking context issues on complex sites like Google Docs.
@@ -965,8 +1106,8 @@
       var logLines = this.container.querySelectorAll('.fsb-log-line');
       if (logLines && logLines.length) {
         var prevLines = this._logBuffer.slice(0, -1).slice(-2).reverse();
-        if (logLines[0]) logLines[0].textContent = prevLines[0] || '';
-        if (logLines[1]) logLines[1].textContent = prevLines[1] || '';
+        writeLabel(logLines[0], prevLines[0] || '');
+        writeLabel(logLines[1], prevLines[1] || '');
       }
 
       // Phase 229-02 (OVERLAY-05): suppress generic 'thinking-class' phase
@@ -999,7 +1140,7 @@
       var etaEl = this.container.querySelector('.fsb-eta');
       if (etaEl && actionCount !== this._lastActionCount) {
         if (actionCount !== null && actionCount !== undefined) {
-          etaEl.textContent = 'Actions: ' + actionCount;
+          writeActions(etaEl, actionCount);
         } else {
           etaEl.textContent = '';
         }
@@ -1062,7 +1203,7 @@
           // Green glow on overlay
           this.container.style.boxShadow = '0 8px 32px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(52, 211, 153, 0.3)';
           // Done pill
-          this.container.querySelector('.fsb-step-number').textContent = 'Done';
+          writeLabel(this.container.querySelector('.fsb-step-number'), 'Done');
         }
         // Failure: bar stays orange, pill keeps existing text (D-10) -- no action needed
 
@@ -1218,8 +1359,8 @@
       var button = this.container.querySelector('.fsb-replay-speed');
       if (!button) return;
       button.textContent = label;
-      button.setAttribute('aria-label', 'Replay speed ' + label + '. Activate to change to ' + nextLabel);
-      button.setAttribute('title', 'Replay speed: ' + label + ' (click to change)');
+      writeKeyed(button, 'entry_replay_speed', 'Replay speed $SPEED$. Activate to change to $NEXT$', { speed: label, next: nextLabel }, 'aria-label');
+      writeKeyed(button, 'entry_replay_speed_title', 'Replay speed: $SPEED$ (click to change)', { speed: label }, 'title');
     }
 
     _isTerminal(replay, lifecycle) {
@@ -1644,18 +1785,18 @@
       this.container = document.createElement('div');
       this.container.className = 'fsb-replay-shell';
       this.container.setAttribute('role', 'group');
-      this.container.setAttribute('aria-label', 'Replay controls');
+      this.container.setAttribute('aria-label', ov('entry_replay_controls', 'Replay controls'));
       this.container.innerHTML = `
       <div class="fsb-replay-controls">
-        <button type="button" class="fsb-replay-toggle" aria-label="Pause replay">&#10074;&#10074;</button>
+        <button type="button" class="fsb-replay-toggle" aria-label="${ov('entry_pause_replay', 'Pause replay')}">&#10074;&#10074;</button>
         <span class="fsb-replay-time">0:00 / 0:00</span>
         <div class="fsb-replay-timeline">
           <div class="fsb-replay-progress-track" aria-hidden="true">
             <div class="fsb-replay-progress-fill"></div>
           </div>
-          <input class="fsb-replay-scrubber" type="range" min="0" max="1" value="0" step="100" aria-label="Replay position, forward seek only" title="Seek forward through the replay">
+          <input class="fsb-replay-scrubber" type="range" min="0" max="1" value="0" step="100" aria-label="${ov('entry_replay_position', 'Replay position, forward seek only')}" title="${ov('entry_seek_forward', 'Seek forward through the replay')}">
         </div>
-        <button type="button" class="fsb-replay-speed" aria-label="Replay speed 2\u00D7. Activate to change to 4\u00D7" title="Replay speed: 2\u00D7 (click to change)">2\u00D7</button>
+        <button type="button" class="fsb-replay-speed" aria-label="${ov('entry_replay_speed', 'Replay speed $SPEED$. Activate to change to $NEXT$', { speed: '2\u00D7', next: '4\u00D7' })}" title="${ov('entry_replay_speed_title', 'Replay speed: $SPEED$ (click to change)', { speed: '2\u00D7' })}">2\u00D7</button>
       </div>
       <div class="fsb-replay-minimal-track" aria-hidden="true">
         <div class="fsb-replay-minimal-fill"></div>
@@ -1776,6 +1917,7 @@
       });
 
       this.shadow.appendChild(this.container);
+      watchChrome(this.container);
       document.addEventListener('pointermove', this._handleDocumentPointerMove, { passive: true });
       document.addEventListener('pointerdown', this._handleDocumentPointerDown, { passive: true });
       this._listenersAttached = true;
@@ -1812,7 +1954,7 @@
       var toggle = this.container.querySelector('.fsb-replay-toggle');
       var showPlay = replay.status === 'paused' || awaitingDecision;
       toggle.textContent = showPlay ? '\u25B6' : '\u2161';
-      toggle.setAttribute('aria-label', showPlay ? 'Play replay' : 'Pause replay');
+      toggle.setAttribute('aria-label', showPlay ? ov('entry_play_replay', 'Play replay') : ov('entry_pause_replay', 'Pause replay'));
       toggle.disabled = terminal || awaitingDecision;
 
       var scrubber = this.container.querySelector('.fsb-replay-scrubber');
@@ -2311,13 +2453,14 @@
       this.root.className = 'badge-root';
       this.root.innerHTML = `
         <span class="badge-dot"></span>
-        <span class="badge-text"><span class="badge-watching">0 watching</span><span class="badge-sep badge-fired-sep"> · </span><span class="badge-fired zero">0 fired</span></span>
+        <span class="badge-text"><span class="badge-watching">${ov('entry_watching', '$COUNT$ watching', { count: 0 })}</span><span class="badge-sep badge-fired-sep"> · </span><span class="badge-fired zero">${ov('entry_fired', '$COUNT$ fired', { count: 0 })}</span></span>
       `;
       this.shadow.appendChild(this.root);
 
       this.watchingEl = this.root.querySelector('.badge-watching');
       this.firedEl = this.root.querySelector('.badge-fired');
       this.firedSepEl = this.root.querySelector('.badge-fired-sep');
+      watchChrome(this.root);
 
       this._inTopLayer = promoteToTopLayer(this.host);
       if (!this._inTopLayer) {
@@ -2345,11 +2488,9 @@
         this.root.classList.add('visible');
       }
 
-      if (this.watchingEl) {
-        this.watchingEl.textContent = watching + (watching === 1 ? ' watching' : ' watching');
-      }
+      writeKeyed(this.watchingEl, 'entry_watching', '$COUNT$ watching', { count: watching });
       if (this.firedEl) {
-        this.firedEl.textContent = fired + ' fired';
+        writeKeyed(this.firedEl, 'entry_fired', '$COUNT$ fired', { count: fired });
         this.firedEl.classList.toggle('zero', fired === 0);
       }
       if (this.firedSepEl) {
@@ -3142,7 +3283,7 @@
       shadow.appendChild(style);
       const container = document.createElement('div');
       container.className = 'panel';
-      container.innerHTML = '<div class="section">Click an element to inspect</div>';
+      container.innerHTML = '<div class="section">' + ov('entry_inspect', 'Click an element to inspect') + '</div>';
       shadow.appendChild(container);
       this._panelInTopLayer = promoteToTopLayer(this.inspectionPanel);
       if (!this._panelInTopLayer) {
@@ -3156,7 +3297,7 @@
       this.activeIndicator.id = 'fsb-inspector-indicator';
       // z-index kept as fallback; top-layer via Popover API is the primary mechanism
       this.activeIndicator.style.cssText = 'all:initial!important;position:fixed!important;inset:auto!important;top:10px!important;left:50%!important;transform:translateX(-50%)!important;z-index:2147483647!important;background:#FF8C00!important;color:#fff!important;padding:6px 16px!important;border-radius:20px!important;font-family:system-ui,-apple-system,sans-serif!important;font-size:12px!important;font-weight:600!important;box-shadow:0 2px 10px rgba(0,0,0,0.3)!important;pointer-events:none!important;margin:0!important;border:none!important;';
-      this.activeIndicator.textContent = 'FSB Inspector Mode (Ctrl+Shift+E to exit)';
+      this.activeIndicator.textContent = ov('entry_inspector', 'FSB Inspector Mode (Ctrl+Shift+E to exit)');
       this._indicatorInTopLayer = promoteToTopLayer(this.activeIndicator);
       if (!this._indicatorInTopLayer) {
         document.documentElement.appendChild(this.activeIndicator);
@@ -3252,12 +3393,18 @@
       attrsHtml += '</div>';
       const checks = inspection.interactability;
       const checkIcon = (pass) => pass ? '<span class="check-pass">OK</span>' : '<span class="check-fail">FAIL</span>';
-      const interactHtml = '<div class="check-list"><div class="check-item">' + checkIcon(checks.isVisible) + ' Visible</div><div class="check-item">' + checkIcon(checks.isEnabled) + ' Enabled</div><div class="check-item">' + checkIcon(checks.isInViewport) + ' In Viewport</div><div class="check-item">' + checkIcon(checks.receivesPointerEvents) + ' Pointer Events</div></div>';
+      const checkRow = (pass, label) => '<div class="check-item">' + checkIcon(pass) + ' ' + label + '</div>';
+      const interactHtml = '<div class="check-list">'
+        + checkRow(checks.isVisible, ov('entry_check_visible', 'Visible'))
+        + checkRow(checks.isEnabled, ov('entry_check_enabled', 'Enabled'))
+        + checkRow(checks.isInViewport, ov('entry_check_viewport', 'In Viewport'))
+        + checkRow(checks.receivesPointerEvents, ov('entry_check_pointer', 'Pointer Events'))
+        + '</div>';
       const pos = inspection.boundingRect;
       const positionHtml = '<span class="position-info">x: ' + pos.x + ', y: ' + pos.y + ', w: ' + pos.width + ', h: ' + pos.height + '</span>';
       let textHtml = '';
-      if (inspection.text) textHtml = '<div class="section"><div class="section-title">Text Content</div><div class="text-preview">' + this.escapeHtml(inspection.text) + '</div></div>';
-      container.innerHTML = '<div class="header"><div>' + headerContent + '</div><button class="close-btn" id="fsb-close-panel">x</button></div><div class="section"><div class="section-title">Selectors FSB Would Try</div>' + selectorsHtml + '</div>' + (hasAttrs ? '<div class="section"><div class="section-title">Attributes</div>' + attrsHtml + '</div>' : '') + '<div class="section"><div class="section-title">Interactability</div>' + interactHtml + '</div><div class="section"><div class="section-title">Position</div>' + positionHtml + '</div>' + textHtml;
+      if (inspection.text) textHtml = '<div class="section"><div class="section-title">' + ov('entry_text_content', 'Text Content') + '</div><div class="text-preview">' + this.escapeHtml(inspection.text) + '</div></div>';
+      container.innerHTML = '<div class="header"><div>' + headerContent + '</div><button class="close-btn" id="fsb-close-panel">x</button></div><div class="section"><div class="section-title">' + ov('entry_selectors', 'Selectors FSB Would Try') + '</div>' + selectorsHtml + '</div>' + (hasAttrs ? '<div class="section"><div class="section-title">' + ov('entry_attributes', 'Attributes') + '</div>' + attrsHtml + '</div>' : '') + '<div class="section"><div class="section-title">' + ov('entry_interact', 'Interactability') + '</div>' + interactHtml + '</div><div class="section"><div class="section-title">' + ov('entry_position', 'Position') + '</div>' + positionHtml + '</div>' + textHtml;
       const closeBtn = shadow.querySelector('#fsb-close-panel');
       if (closeBtn) closeBtn.addEventListener('click', () => { this.inspectionPanel.style.setProperty('visibility', 'hidden', 'important'); });
       this.inspectionPanel.style.setProperty('visibility', 'visible', 'important');
@@ -3425,11 +3572,11 @@
       this.container.innerHTML = `
       <div class="fsb-crawl-header">
         <img class="fsb-crawl-logo" src="" alt="FSB">
-        <span class="fsb-crawl-title">FSB Crawling</span>
+        <span class="fsb-crawl-title">${ov('entry_crawl_title', 'FSB Crawling')}</span>
       </div>
       <div class="fsb-crawl-domain">--</div>
       <div class="fsb-crawl-count">
-        <span class="fsb-crawl-pages">0 / 0 pages</span>
+        <span class="fsb-crawl-pages">${ov('entry_pages', '$COLLECTED$ / $MAX$ pages', { collected: 0, max: 0 })}</span>
         <span class="fsb-crawl-percent">0%</span>
       </div>
       <div class="fsb-crawl-progress-bar">
@@ -3443,6 +3590,7 @@
       logoImg.src = chrome.runtime.getURL('assets/icon48.png');
 
       this.shadow.appendChild(this.container);
+      watchChrome(this.container);
 
       this._inTopLayer = promoteToTopLayer(this.host);
       if (!this._inTopLayer) {
@@ -3463,10 +3611,10 @@
       if (!this.container) return;
 
       if (data.domain !== undefined) {
-        this.container.querySelector('.fsb-crawl-domain').textContent = 'Crawling ' + data.domain;
+        writeKeyed(this.container.querySelector('.fsb-crawl-domain'), 'entry_crawling', 'Crawling $DOMAIN$', { domain: data.domain });
       }
       if (data.pagesCollected !== undefined && data.maxPages !== undefined) {
-        this.container.querySelector('.fsb-crawl-pages').textContent = data.pagesCollected + ' / ' + data.maxPages + ' pages';
+        writeKeyed(this.container.querySelector('.fsb-crawl-pages'), 'entry_pages', '$COLLECTED$ / $MAX$ pages', { collected: data.pagesCollected, max: data.maxPages });
       }
       if (data.percent !== undefined) {
         const clamped = Math.min(100, Math.max(0, data.percent));

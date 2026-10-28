@@ -128,7 +128,7 @@ check(loadMoreStart !== -1,
   'journal detail view wires the load-more control');
 check(loadMoreEvents.includes("if (!page) throw new Error('Session events could not be loaded')"),
   'a null journal detail page enters the retry error path');
-check(loadMoreEvents.includes("loadMoreEventsBtn.textContent = 'Retry loading events'"),
+check(loadMoreEvents.includes('fsbUiSet(loadMoreEventsBtn, "Retry loading events")'),
   'the pagination error path restores a retry label');
 check(loadMoreEvents.indexOf("if (!page) throw new Error('Session events could not be loaded')") <
       loadMoreEvents.indexOf('session._journalEvents.push'),

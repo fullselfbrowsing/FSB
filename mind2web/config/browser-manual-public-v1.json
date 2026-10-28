@@ -1,0 +1,154 @@
+{
+  "version": 1,
+  "id": "browser-manual-public-v1",
+  "actions": {
+    "check_box": {
+      "verb": "CHECK_BOX"
+    },
+    "clear_input": {
+      "verb": "CLEAR"
+    },
+    "click": {
+      "verb": "CLICK"
+    },
+    "click_and_hold": {
+      "verb": "HOLD"
+    },
+    "click_at": {
+      "verb": "CLICK_AT"
+    },
+    "close_tab": {
+      "verb": "CLOSE_TAB"
+    },
+    "double_click": {
+      "verb": "DOUBLE_CLICK"
+    },
+    "double_click_at": {
+      "verb": "DOUBLE_CLICK_AT"
+    },
+    "drag": {
+      "verb": "DRAG"
+    },
+    "drag_drop": {
+      "verb": "DRAG_DROP"
+    },
+    "drag_variable_speed": {
+      "verb": "DRAG_VARIABLE_SPEED"
+    },
+    "execute_js": {
+      "verb": "EXECUTE_JS"
+    },
+    "fill_sheet": {
+      "verb": "FILL_SHEET"
+    },
+    "focus": {
+      "verb": "FOCUS"
+    },
+    "go_back": {
+      "verb": "GO_BACK"
+    },
+    "go_forward": {
+      "verb": "GO_FORWARD"
+    },
+    "hover": {
+      "verb": "HOVER"
+    },
+    "insert_text": {
+      "verb": "INSERT_TEXT"
+    },
+    "navigate": {
+      "verb": "NAVIGATE"
+    },
+    "open_tab": {
+      "verb": "OPEN_TAB"
+    },
+    "press_enter": {
+      "verb": "PRESS_KEY"
+    },
+    "press_key": {
+      "verb": "PRESS_KEY"
+    },
+    "refresh": {
+      "verb": "REFRESH"
+    },
+    "right_click": {
+      "verb": "RIGHT_CLICK"
+    },
+    "scroll": {
+      "verb": "SCROLL"
+    },
+    "scroll_at": {
+      "verb": "SCROLL_AT"
+    },
+    "scroll_to_bottom": {
+      "verb": "SCROLL"
+    },
+    "scroll_to_element": {
+      "verb": "SCROLL"
+    },
+    "scroll_to_top": {
+      "verb": "SCROLL"
+    },
+    "search": {
+      "verb": "SEARCH"
+    },
+    "select_option": {
+      "verb": "SELECT"
+    },
+    "select_text_range": {
+      "verb": "SELECT_TEXT_RANGE"
+    },
+    "set_attribute": {
+      "verb": "SET_ATTRIBUTE"
+    },
+    "switch_tab": {
+      "verb": "SWITCH_TAB"
+    },
+    "type_text": {
+      "verb": "TYPE"
+    },
+    "read_sheet": {
+      "verb": "READ_SHEET"
+    },
+    "read_page": {
+      "verb": "READ_PAGE"
+    }
+  },
+  "reads": [
+    "get_attribute",
+    "get_dom_snapshot",
+    "get_page_snapshot",
+    "get_site_guide",
+    "get_text",
+    "list_tabs",
+    "capture_screenshot"
+  ],
+  "bootstrap": {
+    "open_tab": true,
+    "capture_screenshot": true
+  },
+  "exclusions": [
+    "upload_file",
+    "drop_file",
+    "search_memory",
+    "vault",
+    "capability",
+    "autopilot",
+    "trigger",
+    "lifecycle",
+    "global resources"
+  ],
+  "javascript_policy": "Synchronous rendered DOM/UI work only; no direct network/API calls, credentials, fabricated uploads or deferred actions. This is a usage policy, not a sandbox.",
+  "public_release": true,
+  "potential_ui_reads": [
+    "read_page"
+  ],
+  "public_behavior": {
+    "search_google_fallback": "Public default is preserved; search may use the browser Google fallback",
+    "read_page": "Public read_page can dismiss consent UI; every attempt consumes the UI budget and runs under the foreground lease",
+    "missing_tools": [
+      "wait_for_element",
+      "wait_for_stable"
+    ]
+  }
+}

@@ -173,6 +173,8 @@ async function testPrivateRuntime(runtimeModule) {
     assert.equal(paths.authPath, path.join(root, 'grok-home', 'auth.json'));
     assert.equal(paths.agentProfilePath, path.join(root, 'grok-home', 'fsb-agent.md'));
     assert.equal((await fs.stat(paths.configPath)).mode & 0o777, 0o600);
+    assert(runtimeModule.buildGrokBuildConfig(paths.grokHome).includes(
+      '[auth]\npreferred_method = "oidc"'), 'status probes cannot fall through to browser login');
     assert.equal((await fs.stat(paths.agentProfilePath)).mode & 0o777, 0o600);
     assert.equal(
       await fs.readFile(paths.configPath, 'utf8'),
@@ -214,6 +216,15 @@ async function testPrivateRuntime(runtimeModule) {
     await fs.writeFile(paths.authPath, '{"private":"credential-sentinel"}\n', { mode: 0o644 });
     assert.equal(await runtime.secureAuthFile(), true);
     assert.equal((await fs.stat(paths.authPath)).mode & 0o777, 0o600);
+    const authBeforeMigration = await fs.readFile(paths.authPath);
+    await fs.writeFile(paths.sessionJournalPath, '{"version":1,"sessions":[]}\n', { mode: 0o600 });
+    const sessionsBeforeMigration = await fs.readFile(paths.sessionJournalPath);
+    await fs.writeFile(paths.configPath, '[cli]\nmaximum_version = "1.0.4"\n', { mode: 0o600 });
+    await Promise.all([runtime.ensureBase(), runtime.ensureBase()]);
+    assert.deepEqual(await fs.readFile(paths.authPath), authBeforeMigration);
+    assert.deepEqual(await fs.readFile(paths.sessionJournalPath), sessionsBeforeMigration);
+    assert.equal((await fs.readFile(paths.configPath, 'utf8')).includes('maximum_version'), false,
+      'migration removes upstream version limits without rewriting credentials or sessions');
 
     const normalAuthCanary = path.join(root, 'normal-grok-auth-canary.json');
     await fs.rm(paths.authPath);
@@ -338,6 +349,7 @@ async function testDetector(detectorModule) {
     )),
   ];
   const detector = detectorModule.createGrokBuildDetector({
+    inspectBinaryIdentity: async () => 'fixture_identity',
     platform: 'linux',
     pathValue: '/fixture/bin',
     sourceEnv: { PATH: '/fixture/bin', XAI_API_KEY: 'SECRET_SENTINEL' },
@@ -361,7 +373,7 @@ async function testDetector(detectorModule) {
   assert.equal(detected.installed, true);
   assert.equal(detected.version, '1.0.4');
   assert.equal(detected.authState, 'oauth');
-  assert.equal(detected.profileVersion, '1.0.4');
+  assert.equal(detected.profileVersion, 'grok-acp-v1');
   assert.equal(outputs.length, 0);
   assert.deepEqual(descriptors.map((value) => value.argv.slice(-3)), [
     ['--version'],
@@ -374,13 +386,19 @@ async function testDetector(detectorModule) {
   for (const descriptor of descriptors) {
     assert.equal(JSON.stringify(descriptor.environment).includes('SECRET_SENTINEL'), false);
   }
-  const authProbeRequests = Buffer.from(descriptors.at(-1).stdinBytes)
-    .toString('utf8').trim().split('\n').map(JSON.parse);
+  const authProbeRequests = [
+    ...Buffer.from(descriptors.at(-1).stdinBytes).toString('utf8').trim().split('\n').map(JSON.parse),
+    JSON.parse(Buffer.from(descriptors.at(-1).stdinJsonRpcFollowup.bytes).toString('utf8')),
+  ];
+  assert.equal(descriptors.at(-1).stdinJsonRpcFollowup.afterResponseId, 1,
+    'cached OAuth authentication waits for successful initialization');
   assert.deepEqual(authProbeRequests.map((request) => request.method), [
     'initialize',
     'authenticate',
   ]);
   assert.equal(authProbeRequests[1].params.methodId, 'cached_token');
+  assert.equal(descriptors[4].stdinCloseAfterJsonRpcResponseId, 1);
+  assert.equal(descriptors[5].stdinCloseAfterJsonRpcResponseId, 2);
   assert.equal(JSON.stringify(detected).includes('private@example.test'), false,
     'ACP account metadata never enters detection evidence');
 
@@ -392,6 +410,7 @@ async function testDetector(detectorModule) {
     probeResult(`${JSON.stringify(initializeResponse(null))}\r\n`),
   ];
   const windowsDetector = detectorModule.createGrokBuildDetector({
+    inspectBinaryIdentity: async () => 'fixture_identity',
     platform: 'win32',
     runtime,
     mintProbeId: () => 'probe_0000000000000005',
@@ -411,6 +430,7 @@ async function testDetector(detectorModule) {
   assert.equal(windowsOutputs.length, 0, 'Windows grok.exe uses the same bounded probe profile');
 
   const missing = detectorModule.createGrokBuildDetector({
+    inspectBinaryIdentity: async () => 'fixture_identity',
     runtime,
     resolveBinary: async () => null,
   });
@@ -427,6 +447,7 @@ async function testDetector(detectorModule) {
   });
 
   const unsafe = detectorModule.createGrokBuildDetector({
+    inspectBinaryIdentity: async () => 'fixture_identity',
     platform: 'linux',
     runtime,
     resolveBinary: async () => ({ sourcePath: 'grok', realPath: '/fixture/grok' }),
@@ -434,6 +455,7 @@ async function testDetector(detectorModule) {
   assert.equal((await unsafe.detect()).diagnostic.code, 'binary_unsafe');
 
   const malformedVersion = detectorModule.createGrokBuildDetector({
+    inspectBinaryIdentity: async () => 'fixture_identity',
     platform: 'linux',
     runtime,
     mintProbeId: () => 'probe_0000000000000006',
@@ -450,6 +472,7 @@ async function testDetector(detectorModule) {
 
   let sourceIdentityChecks = 0;
   const changed = detectorModule.createGrokBuildDetector({
+    inspectBinaryIdentity: async () => 'fixture_identity',
     platform: 'linux',
     runtime,
     mintProbeId: () => 'probe_0000000000000007',
@@ -479,6 +502,7 @@ async function testDetector(detectorModule) {
     })}\n`),
   ];
   const malformedAcp = detectorModule.createGrokBuildDetector({
+    inspectBinaryIdentity: async () => 'fixture_identity',
     platform: 'linux',
     runtime,
     mintProbeId: () => 'probe_0000000000000002',
@@ -493,7 +517,7 @@ async function testDetector(detectorModule) {
   });
   const malformedAcpDetection = await malformedAcp.detect();
   assert.equal(malformedAcpDetection.installed, false);
-  assert.equal(malformedAcpDetection.diagnostic.code, 'adapter_unavailable');
+  assert.equal(malformedAcpDetection.diagnostic.code, 'agent_protocol_drift');
   assert.equal(malformedAcpOutputs.length, 0,
     'malformed ACP initialization fails closed after the fixed probe sequence');
 
@@ -508,6 +532,7 @@ async function testDetector(detectorModule) {
     })}\n`),
   ];
   const refreshFailure = detectorModule.createGrokBuildDetector({
+    inspectBinaryIdentity: async () => 'fixture_identity',
     platform: 'linux',
     runtime,
     mintProbeId: () => 'probe_0000000000000008',
@@ -534,6 +559,7 @@ async function testDetector(detectorModule) {
     probeResult(''),
   ];
   const staleCache = detectorModule.createGrokBuildDetector({
+    inspectBinaryIdentity: async () => 'fixture_identity',
     platform: 'linux',
     runtime,
     mintProbeId: () => 'probe_0000000000000009',
@@ -547,10 +573,10 @@ async function testDetector(detectorModule) {
     probe: async () => staleCacheOutputs.shift(),
   });
   const staleCacheDetection = await staleCache.detect();
-  assert.equal(staleCacheDetection.installed, true);
-  assert.equal(staleCacheDetection.authState, 'unauthenticated');
+  assert.equal(staleCacheDetection.installed, false);
+  assert.equal(staleCacheDetection.diagnostic.code, 'agent_protocol_drift');
   assert.equal(staleCacheOutputs.length, 0,
-    'a secured stale OAuth cache with the pinned empty transcript can recover through login');
+    'a credential file cannot substitute for missing ACP capability evidence');
 
   const unexplainedEmptyOutputs = [
     probeResult('grok 1.0.4\n'),
@@ -560,6 +586,7 @@ async function testDetector(detectorModule) {
     probeResult(''),
   ];
   const unexplainedEmpty = detectorModule.createGrokBuildDetector({
+    inspectBinaryIdentity: async () => 'fixture_identity',
     platform: 'linux',
     runtime: { ...runtime, async secureAuthFile() { return false; } },
     mintProbeId: () => 'probe_0000000000000010',
@@ -574,11 +601,12 @@ async function testDetector(detectorModule) {
   });
   const unexplainedEmptyDetection = await unexplainedEmpty.detect();
   assert.equal(unexplainedEmptyDetection.installed, false);
-  assert.equal(unexplainedEmptyDetection.diagnostic.code, 'adapter_unavailable');
+  assert.equal(unexplainedEmptyDetection.diagnostic.code, 'agent_protocol_drift');
   assert.equal(unexplainedEmptyOutputs.length, 0,
     'an empty ACP transcript without a secured OAuth cache still fails closed');
 
   const unsupported = detectorModule.createGrokBuildDetector({
+    inspectBinaryIdentity: async () => 'fixture_identity',
     platform: 'linux',
     runtime,
     mintProbeId: () => 'probe_0000000000000003',
@@ -594,7 +622,7 @@ async function testDetector(detectorModule) {
   const unsupportedDetection = await unsupported.detect();
   assert.equal(unsupportedDetection.installed, false);
   assert.equal(unsupportedDetection.version, '1.0.5');
-  assert.equal(unsupportedDetection.diagnostic.code, 'version_unsupported');
+  assert.equal(unsupportedDetection.diagnostic.code, 'isolation_unavailable');
 
   const duplicateCellDocument = inspectDocument(run.cwd, configPath);
   duplicateCellDocument.externalCompat.cells[12] = {
@@ -605,6 +633,7 @@ async function testDetector(detectorModule) {
     probeResult(JSON.stringify(duplicateCellDocument)),
   ];
   const duplicateCells = detectorModule.createGrokBuildDetector({
+    inspectBinaryIdentity: async () => 'fixture_identity',
     platform: 'linux',
     runtime,
     mintProbeId: () => 'probe_0000000000000004',
@@ -619,9 +648,110 @@ async function testDetector(detectorModule) {
   });
   const duplicateCellDetection = await duplicateCells.detect();
   assert.equal(duplicateCellDetection.installed, false);
-  assert.equal(duplicateCellDetection.diagnostic.code, 'adapter_unavailable');
+  assert.equal(duplicateCellDetection.diagnostic.code, 'isolation_unavailable');
   assert.equal(duplicateCellOutputs.length, 0,
     'duplicated compatibility cells fail the exact authority-set check');
+
+  for (const version of ['1.0.62', '1.4.0', '2.0.0', '12.3.4']) {
+    const document = version === '1.0.62'
+      ? JSON.parse(await fs.readFile(path.join(repoRoot, 'tests', 'fixtures', 'agent-streams',
+        'grok-build-1.0.62', 'inspect.json'), 'utf8'))
+      : inspectDocument(run.cwd, configPath);
+    document.cwd = run.cwd;
+    document.permissions.sources = [`${configPath} (config)`];
+    document.configSources.layers = [{ role: 'user', path: configPath }];
+    document.grokVersion = version;
+    document.agents.reverse();
+    document.agents.forEach((agent) => { agent.description = 'New upstream wording'; });
+    document.agents.push({ name: 'new-builtin', source: { type: 'builtin' } });
+    document.externalCompat.cells.reverse();
+    document.externalCompat.cells.push({ vendor: 'future', surface: 'hooks', enabled: false, source: 'config' });
+    document.permissions.mcpLockdownSources = [];
+    document.permissions.mcpManagedServersOnly = 'off';
+    document.permissions.futurePermission = false;
+    document.permissions.futureAllowlist = [];
+    const init = initializeResponse(null);
+    init.result._meta.agentVersion = version;
+    init.result.agentCapabilities.promptCapabilities = { image: true };
+    const futureOutputs = [
+      probeResult(`grok ${version} (build) [stable]\n`),
+      probeResult(JSON.stringify(document), 'warning: a harmless CLI advisory'),
+      probeResult('[]'), probeResult('[]'), probeResult(transcript(init)),
+    ];
+    const future = detectorModule.createGrokBuildDetector({
+      platform: 'linux', runtime,
+      inspectBinaryIdentity: async () => 'fixture_identity',
+      mintProbeId: () => 'probe_future_00000000000001',
+      resolveBinary: async () => ({ sourcePath: '/fixture/grok', realPath: '/fixture/grok' }),
+      resolveRealPath: async (value) => value,
+      probe: async () => futureOutputs.shift(),
+    });
+    const result = await future.detect();
+    assert.equal(result.installed, true, `${version} is accepted by capabilities`);
+    assert.equal(result.version, version);
+    assert.equal(result.profileVersion, 'grok-acp-v1');
+    assert.equal(futureOutputs.length, 0);
+  }
+
+  for (const change of [
+    (document) => { document.externalCompat.cells.push({ vendor: 'future', surface: 'hooks', enabled: true, source: 'config' }); },
+    (document) => { document.hooks.push({ event: 'pre_tool_use' }); },
+    (document) => { document.agents.push({ name: 'foreign', source: { type: 'file' } }); },
+    (document) => { document.permissions.managedSettingsActive = true; },
+    (document) => { document.permissions.futurePermission = true; },
+    (document) => { document.permissions.futureAllowlist = ['foreign-tool']; },
+    (document) => { document.externalCompat.cells.pop(); },
+  ]) {
+    const document = inspectDocument(run.cwd, configPath); change(document);
+    const refusalOutputs = [probeResult('grok 1.0.4\n'), probeResult(JSON.stringify(document))];
+    const refusal = detectorModule.createGrokBuildDetector({
+      platform: 'linux', runtime, inspectBinaryIdentity: async () => 'fixture_identity',
+      mintProbeId: () => 'probe_refusal_0000000000001',
+      resolveBinary: async () => ({ sourcePath: '/fixture/grok', realPath: '/fixture/grok' }),
+      resolveRealPath: async (value) => value,
+      probe: async () => refusalOutputs.shift(),
+    });
+    assert.equal((await refusal.detect()).diagnostic.code, 'isolation_unavailable');
+    assert.equal(refusalOutputs.length, 0);
+  }
+
+  for (const [failure, response] of [
+    ['capability_missing', () => {
+      const init = initializeResponse(null); delete init.result.agentCapabilities.mcpCapabilities.http;
+      return probeResult(transcript(init));
+    }],
+    ['sandbox_unavailable', () => probeResult('',
+      "error: could not apply the 'strict' sandbox profile; refusing unsafe startup",
+      { code: 1, signal: null })],
+  ]) {
+    const outputs = [probeResult('grok 1.0.4\n'),
+      probeResult(JSON.stringify(inspectDocument(run.cwd, configPath))),
+      probeResult('[]'), probeResult('[]'), response()];
+    const refused = detectorModule.createGrokBuildDetector({
+      platform: 'linux', runtime, inspectBinaryIdentity: async () => 'fixture_identity',
+      mintProbeId: () => 'probe_capability_0000000001',
+      resolveBinary: async () => ({ sourcePath: '/fixture/grok', realPath: '/fixture/grok' }),
+      resolveRealPath: async (value) => value, probe: async () => outputs.shift(),
+    });
+    assert.equal((await refused.detect()).diagnostic.code, failure);
+    assert.equal(outputs.length, 0);
+  }
+
+  const changedFileOutputs = [
+    probeResult('grok 1.0.4\n'),
+    probeResult(JSON.stringify(inspectDocument(run.cwd, configPath))),
+    probeResult('[]'), probeResult('[]'), probeResult(transcript(initializeResponse(null))),
+  ];
+  let fileIdentity = 'original';
+  const changedFile = detectorModule.createGrokBuildDetector({
+    platform: 'linux', runtime, inspectBinaryIdentity: async () => fileIdentity,
+    mintProbeId: () => 'probe_identity_000000000001',
+    resolveBinary: async () => ({ sourcePath: '/fixture/grok', realPath: '/fixture/grok' }),
+    resolveRealPath: async (value) => value,
+    probe: async () => { const result = changedFileOutputs.shift(); if (!changedFileOutputs.length) fileIdentity = 'replaced'; return result; },
+  });
+  assert.equal((await changedFile.detect()).diagnostic.code, 'binary_changed',
+    'an in-place executable update invalidates capability evidence');
 }
 
 async function testAdapterSpawn(adapterModule) {
@@ -667,7 +797,7 @@ async function testAdapterSpawn(adapterModule) {
       version: '1.0.4',
       authState: 'oauth',
       binary,
-      profileVersion: '1.0.4',
+      profileVersion: 'grok-acp-v1',
     }),
     async kill() {},
   });
@@ -700,6 +830,15 @@ async function testAdapterSpawn(adapterModule) {
     'stdio',
   ]);
   assert.equal(spec.attestations.length, 3);
+  const policy = await import(buildUrl('policy-attestation.js'));
+  const document = inspectDocument(`${root}/runs/delegation_spawn_test/cwd`, runtime.paths.configPath);
+  document.agents.reverse();
+  document.agents.forEach((agent) => { agent.description = 'upstream wording changed'; });
+  document.externalCompat.cells.reverse();
+  assert.equal(policy.verifyPolicyAttestation(document, spec.attestations[0].assertions).pass, true,
+    'discovery and pre-spawn attestation share semantic isolation checks');
+  document.plugins.push({ name: 'foreign-plugin' });
+  assert.equal(policy.verifyPolicyAttestation(document, spec.attestations[0].assertions).pass, false);
   assert.equal(JSON.stringify(spec).includes(task), false,
     'task text stays out of the Grok spawn specification');
 }
@@ -1061,7 +1200,7 @@ async function testAuthCoordinator(authModule) {
       version: '1.0.4',
       authState: states.shift() || 'oauth',
       binary,
-      profileVersion: '1.0.4',
+      profileVersion: 'grok-acp-v1',
     }),
     spawn: (command, argv, options) => {
       spawnDescriptor = { command, argv, options };
@@ -1190,7 +1329,7 @@ async function testAuthCoordinator(authModule) {
       version: '1.0.4',
       authState: 'unauthenticated',
       binary,
-      profileVersion: '1.0.4',
+      profileVersion: 'grok-acp-v1',
     }),
     spawn: () => {
       const child = fakeAuthChild(() => {});
@@ -1223,7 +1362,7 @@ async function testAuthCoordinator(authModule) {
       version: '1.0.4',
       authState: 'unauthenticated',
       binary,
-      profileVersion: '1.0.4',
+      profileVersion: 'grok-acp-v1',
     }),
     spawn: () => fakeAuthChild((child) => {
       child.stdout.write(Buffer.alloc((64 * 1024) + 1, 0x78));
@@ -1251,7 +1390,7 @@ async function testAuthCoordinator(authModule) {
       version: '1.0.4',
       authState: logoutStates.shift() || 'unauthenticated',
       binary,
-      profileVersion: '1.0.4',
+      profileVersion: 'grok-acp-v1',
     }),
     probe: async (descriptor) => {
       logoutProbes.push(descriptor);
@@ -1286,7 +1425,7 @@ async function testAuthCoordinator(authModule) {
       version: '1.0.4',
       authState: 'oauth',
       binary,
-      profileVersion: '1.0.4',
+      profileVersion: 'grok-acp-v1',
     }),
     probe: async (descriptor) => {
       recovered.push(['delete', ...descriptor.argv]);

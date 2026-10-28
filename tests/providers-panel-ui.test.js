@@ -180,6 +180,10 @@ assert.match(selection, /providerPanelState\.agentProviderId = id/);
 assert.doesNotMatch(selection, /providerPanelState\.modelProvider = id[\s\S]*?kind === 'agent'/);
 
 const connectionTest = extractFunction(js, 'runFullApiTest');
+// runFullApiTest renders its copy through these; with no fsbUiLocale they return English.
+const uiCopyHelpers = ['fsbUiLine', 'fsbUiEscape', 'fsbUiExactKey', 'fsbUiSubsJson', 'fsbUiHtml', 'fsbUiSet',
+  'agentConnectionFailureTemplates', 'agentConnectionFailureSource']
+  .map((name) => extractFunction(js, name)).join('\n');
 assert.match(
   connectionTest,
   /action:\s*'testAgentProviderConnection',\s*providerId:\s*providerId/
@@ -207,8 +211,10 @@ function testGrokBuildAuthRendering() {
     grokBuildLoginLink: makeElement()
   };
   const context = { elements, URL, grokBuildAuthState: 'unauthenticated' };
+  // The pill label goes through fsbUiSet(); with no fsbUiLocale it writes English.
+  const pillHelpers = ['fsbUiLine', 'fsbUiSet'].map((name) => extractFunction(js, name)).join('\n');
   vm.runInNewContext(
-    `${safeLoginUrl}\n${render}\n${applyProgress}\n`
+    `${pillHelpers}\n${safeLoginUrl}\n${render}\n${applyProgress}\n`
       + 'this.renderGrokBuildAuthState = renderGrokBuildAuthState;\n'
       + 'this.applyGrokBuildAuthProgress = applyGrokBuildAuthProgress;',
     context,
@@ -216,6 +222,7 @@ function testGrokBuildAuthRendering() {
   );
 
   context.renderGrokBuildAuthState('unauthenticated');
+  assert.equal(elements.grokBuildAuthStatus.textContent, 'Not connected');
   assert.equal(elements.connectGrokBuildBtn.hidden, false);
   assert.equal(elements.disconnectGrokBuildBtn.hidden, true);
   assert.equal(elements.grokBuildLoginLink.hidden, true);
@@ -361,7 +368,7 @@ async function renderAgentConnectionResponse(response) {
   };
   context.globalThis = context;
   vm.runInNewContext(
-    `${connectionTest}\nthis.runFullApiTest = runFullApiTest;`,
+    `${uiCopyHelpers}\n${connectionTest}\nthis.runFullApiTest = runFullApiTest;`,
     context,
     { filename: 'options.js#runFullApiTest' }
   );
@@ -395,10 +402,13 @@ async function testAgentConnectionRendering() {
   });
   assert.match(backendFailure.html, /<strong>Status:<\/strong>\s*Failed/);
   assert.match(backendFailure.html, /Sign in to OpenCode locally, then try again\./);
-  assert.deepEqual(backendFailure.statusUpdates, [[
+  // The status card gets the template and its values, so it renders from the
+  // catalog; subs come from the vm realm, hence the JSON round-trip.
+  assert.deepEqual(JSON.parse(JSON.stringify(backendFailure.statusUpdates)), [[
     'disconnected',
     'Connection Failed',
-    'Sign in to OpenCode locally, then try again.'
+    'Sign in to $NAME$ locally, then try again.',
+    { name: 'OpenCode' }
   ]]);
 
   const codeFailure = await renderAgentConnectionResponse({
@@ -451,6 +461,10 @@ function testGrokBuildSignInFailureCopy() {
   for (const reason of [
     'version_unsupported',
     'sandbox_unavailable',
+    'capability_missing',
+    'isolation_unavailable',
+    'agent_protocol_drift',
+    'binary_changed',
     'provider_auth_locked',
     'session_cleanup_blocked',
     'adapter_unavailable',
@@ -467,7 +481,8 @@ function testGrokBuildSignInFailureCopy() {
   assert.match(context.message('version_unsupported', ''), /version/i);
   assert.match(context.message('version_unsupported', ''), /account is fine/i);
   assert.match(context.message('sandbox_unavailable', ''), /sandbox/i);
-  assert.match(context.message('sandbox_unavailable', ''), /account is fine/i);
+  assert.match(context.message('sandbox_unavailable', ''), /local sandbox environment/i);
+  assert.doesNotMatch(context.message('sandbox_unavailable', ''), /account is fine/i);
 
   // Transport failures outrank the reason: a timeout is not a version problem.
   assert.match(

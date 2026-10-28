@@ -143,7 +143,7 @@
   }
 
   function validCompatibilityStatusReason(status, reason) {
-    if (status === 'supported') return reason === 'within_tested_range';
+    if (status === 'supported') return reason === 'within_tested_range' || reason === 'capability_verified';
     if (status === 'degraded') {
       return reason === 'newer_than_tested_range' || reason === 'evidence_stale';
     }
@@ -154,7 +154,15 @@
       || reason === 'below_minimum'
       || reason === 'wrong_major'
       || reason === 'adapter_unshipped'
-      || reason === 'matrix_invalid';
+      || reason === 'matrix_invalid'
+      || reason === 'capability_unverified'
+      || reason === 'capability_missing'
+      || reason === 'isolation_unavailable'
+      || reason === 'sandbox_unavailable'
+      || reason === 'agent_protocol_drift'
+      || reason === 'binary_changed'
+      || reason === 'adapter_unavailable'
+      || reason === 'version_unsupported';
   }
 
   function parseCompatibilityRow(value) {
@@ -215,6 +223,11 @@
       if (!row
           || row.adapterId !== expectedId
           || row.displayLabel !== FSB_SHIPPED_COMPATIBILITY_LABELS[expectedId]) return null;
+      if (expectedId === 'grok-build' && row.status !== 'unsupported'
+          && row.reason !== 'capability_verified') {
+        row = { adapterId: row.adapterId, displayLabel: row.displayLabel,
+          status: 'unsupported', reason: 'capability_unverified', authState: 'unknown' };
+      }
       adapters.push(row);
     }
     return {
@@ -535,7 +548,8 @@
         'unsupported', 'matrix_invalid', checkedAt, 'unknown', null
       );
     }
-    var runnable = (row.status === 'supported' && row.reason === 'within_tested_range')
+    var runnable = (row.status === 'supported'
+      && (row.reason === 'within_tested_range' || row.reason === 'capability_verified'))
       || (row.status === 'degraded' && row.reason === 'newer_than_tested_range');
     if (runnable && now - snapshot.checkedAt >= FSB_AGENT_COMPATIBILITY_MAX_AGE_MS) {
       return adapterEvidenceProjection(

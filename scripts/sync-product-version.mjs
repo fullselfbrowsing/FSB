@@ -370,7 +370,8 @@ function setExtensionVersion(version) {
 
   const manifest = readJson('extension/manifest.json');
   manifest.version = version;
-  manifest.name = `FSB v${version}`;
+  manifest.name = '__MSG_ext_name__';
+  manifest.description = '__MSG_ext_description__';
   changed.push(writeJson('extension/manifest.json', manifest));
 
   const rootPackage = readJson('package.json');
@@ -489,7 +490,8 @@ function collectParityErrors() {
     equal(lock.packages?.['']?.version, expected, `${label} lock root version`);
   };
 
-  equal(manifest.name, `FSB v${extensionVersion}`, 'extension manifest name');
+  equal(manifest.name, '__MSG_ext_name__', 'extension manifest name');
+  equal(manifest.description, '__MSG_ext_description__', 'extension manifest description');
   for (const [packagePath, lockPath, label] of [
     ['package.json', 'package-lock.json', 'root package'],
     ['showcase/angular/package.json', 'showcase/angular/package-lock.json', 'Angular showcase'],

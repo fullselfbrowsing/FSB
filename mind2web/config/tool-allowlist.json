@@ -1,0 +1,329 @@
+{
+  "version": 1,
+  "actions": {
+    "navigate": {
+      "verb": "NAVIGATE"
+    },
+    "click": {
+      "verb": "CLICK"
+    },
+    "check_box": {
+      "verb": "CLICK"
+    },
+    "type_text": {
+      "verb": "TYPE"
+    },
+    "press_enter": {
+      "verb": "PRESS_KEY"
+    },
+    "select_option": {
+      "verb": "SELECT"
+    },
+    "hover": {
+      "verb": "HOVER"
+    },
+    "scroll": {
+      "verb": "SCROLL"
+    },
+    "scroll_to_element": {
+      "verb": "SCROLL"
+    },
+    "scroll_to_top": {
+      "verb": "SCROLL"
+    },
+    "scroll_to_bottom": {
+      "verb": "SCROLL"
+    },
+    "go_back": {
+      "verb": "GO_BACK"
+    },
+    "go_forward": {
+      "verb": "GO_FORWARD"
+    },
+    "refresh": {
+      "verb": "REFRESH"
+    }
+  },
+  "reads": [
+    "read_page",
+    "get_text",
+    "get_page_snapshot"
+  ],
+  "bootstrap": {
+    "open_tab": true,
+    "capture_screenshot": true
+  },
+  "params": {
+    "navigate": {
+      "properties": [
+        "url",
+        "tab_id",
+        "visual_reason",
+        "client",
+        "is_final"
+      ],
+      "required": [
+        "url",
+        "visual_reason",
+        "client"
+      ],
+      "definition": "extension/ai/tool-definitions.js:128"
+    },
+    "click": {
+      "properties": [
+        "selector",
+        "text",
+        "tab_id",
+        "visual_reason",
+        "client",
+        "is_final"
+      ],
+      "required": [
+        "visual_reason",
+        "client"
+      ],
+      "definition": "extension/ai/tool-definitions.js:224"
+    },
+    "check_box": {
+      "properties": [
+        "selector",
+        "tab_id",
+        "visual_reason",
+        "client",
+        "is_final"
+      ],
+      "required": [
+        "selector",
+        "visual_reason",
+        "client"
+      ],
+      "definition": "extension/ai/tool-definitions.js:326"
+    },
+    "type_text": {
+      "properties": [
+        "selector",
+        "text",
+        "clear_first",
+        "tab_id",
+        "visual_reason",
+        "client",
+        "is_final"
+      ],
+      "required": [
+        "selector",
+        "text",
+        "visual_reason",
+        "client"
+      ],
+      "definition": "extension/ai/tool-definitions.js:244"
+    },
+    "press_enter": {
+      "properties": [
+        "selector",
+        "tab_id",
+        "visual_reason",
+        "client",
+        "is_final"
+      ],
+      "required": [
+        "visual_reason",
+        "client"
+      ],
+      "definition": "extension/ai/tool-definitions.js:265"
+    },
+    "select_option": {
+      "properties": [
+        "selector",
+        "value",
+        "tab_id",
+        "visual_reason",
+        "client",
+        "is_final"
+      ],
+      "required": [
+        "selector",
+        "value",
+        "visual_reason",
+        "client"
+      ],
+      "definition": "extension/ai/tool-definitions.js:306"
+    },
+    "hover": {
+      "properties": [
+        "selector",
+        "tab_id",
+        "visual_reason",
+        "client",
+        "is_final"
+      ],
+      "required": [
+        "selector",
+        "visual_reason",
+        "client"
+      ],
+      "definition": "extension/ai/tool-definitions.js:345"
+    },
+    "scroll": {
+      "properties": [
+        "direction",
+        "amount",
+        "tab_id",
+        "visual_reason",
+        "client",
+        "is_final"
+      ],
+      "required": [
+        "direction",
+        "visual_reason",
+        "client"
+      ],
+      "definition": "extension/ai/tool-definitions.js:510"
+    },
+    "scroll_to_element": {
+      "properties": [
+        "selector",
+        "tab_id",
+        "visual_reason",
+        "client",
+        "is_final"
+      ],
+      "required": [
+        "selector",
+        "visual_reason",
+        "client"
+      ],
+      "definition": "extension/ai/tool-definitions.js:566"
+    },
+    "scroll_to_top": {
+      "properties": [
+        "tab_id",
+        "visual_reason",
+        "client",
+        "is_final"
+      ],
+      "required": [
+        "visual_reason",
+        "client"
+      ],
+      "definition": "extension/ai/tool-definitions.js:530"
+    },
+    "scroll_to_bottom": {
+      "properties": [
+        "tab_id",
+        "visual_reason",
+        "client",
+        "is_final"
+      ],
+      "required": [
+        "visual_reason",
+        "client"
+      ],
+      "definition": "extension/ai/tool-definitions.js:548"
+    },
+    "go_back": {
+      "properties": [
+        "tab_id",
+        "visual_reason",
+        "client",
+        "is_final"
+      ],
+      "required": [
+        "visual_reason",
+        "client"
+      ],
+      "definition": "extension/ai/tool-definitions.js:166"
+    },
+    "go_forward": {
+      "properties": [
+        "tab_id",
+        "visual_reason",
+        "client",
+        "is_final"
+      ],
+      "required": [
+        "visual_reason",
+        "client"
+      ],
+      "definition": "extension/ai/tool-definitions.js:184"
+    },
+    "refresh": {
+      "properties": [
+        "tab_id",
+        "visual_reason",
+        "client",
+        "is_final"
+      ],
+      "required": [
+        "visual_reason",
+        "client"
+      ],
+      "definition": "extension/ai/tool-definitions.js:202"
+    },
+    "read_page": {
+      "properties": [
+        "full",
+        "tab_id"
+      ],
+      "required": [],
+      "definition": "extension/ai/tool-definitions.js:956"
+    },
+    "get_text": {
+      "properties": [
+        "selector",
+        "tab_id"
+      ],
+      "required": [
+        "selector"
+      ],
+      "definition": "extension/ai/tool-definitions.js:978"
+    },
+    "get_page_snapshot": {
+      "properties": [
+        "tab_id"
+      ],
+      "required": [],
+      "definition": "extension/ai/tool-definitions.js:1086"
+    },
+    "open_tab": {
+      "properties": [
+        "url",
+        "active",
+        "visual_reason",
+        "client",
+        "is_final"
+      ],
+      "required": [
+        "url",
+        "visual_reason",
+        "client"
+      ],
+      "definition": "extension/ai/tool-definitions.js:630"
+    },
+    "capture_screenshot": {
+      "properties": [
+        "mode",
+        "coordinate_space",
+        "x",
+        "y",
+        "width",
+        "height",
+        "selector",
+        "device_mode",
+        "viewport_width",
+        "viewport_height",
+        "device_scale_factor",
+        "orientation",
+        "wait_ms",
+        "include_fsb_overlays",
+        "tab_id"
+      ],
+      "required": [],
+      "definition": "extension/ai/tool-definitions.js:920"
+    }
+  },
+  "notes": {
+    "injected_args": "The proxy sends client:\"Codex\" or client:\"Claude\" for the selected driver on action tools (FSB rejects other labels, e.g. \"Claude Code\", with BADGE_NOT_ALLOWED) and fills visual_reason when the agent omits it. client is removed from the schemas the agent sees.",
+    "url_source": "After each action the proxy reads metadata.source_url from its own capture_screenshot (tab.url read right after Page.captureScreenshot, extension/utils/screenshot-capture.js:603), so the URL matches the saved frame. Fallbacks: change_report.url.after, then url/currentUrl in the action result JSON.",
+    "excluded": "press_key and coordinate/drag tools need OS window focus; execute_js, search (Google fallback), tab tools, capture_screenshot, site-guide, memory, capability, vault, agent, trigger, session and run_task tools are hidden and denied."
+  }
+}

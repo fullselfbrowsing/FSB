@@ -227,7 +227,7 @@ function hasMeaningfulContent(value) {
 function translatorArtifact(source, target) {
   const targetText = visibleText(target);
   const artifact = targetText.match(
-    /[（(]\s*(?:法语|法文|韩语|韩文|中文(?:\s*[（(]中国大陆)?|英语|英文|日语|日文|德语|德文|西班牙语|西语|spanish|german|japanese|(?:simplified |traditional )?chinese|english|french|korean|[EQ]\s*[)）])/iu,
+    /[（(]\s*(?:法语|法文|韩语|韩文|中文(?:\s*[（(]中国大陆)?|英语|英文|日语|日文|德语|德文|西班牙语|西语|spanish|german|japanese|(?:simplified |traditional )?chinese|english|french|korean|russian|русск[а-яё]*|англ[а-яё.]*|[EQ]\s*[)）])/iu,
   )?.[0];
   if (!artifact) return undefined;
   return visibleText(source).includes(artifact) ? undefined : artifact;

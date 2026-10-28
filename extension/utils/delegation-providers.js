@@ -32,7 +32,7 @@
       id: 'grok-build',
       label: 'Grok Build',
       billingKind: 'subscription',
-      profileVersion: '1.0.4',
+      profileVersion: 'grok-acp-v1',
       authToBilling: { oauth: 'subscription' }
     }
   ]);

@@ -6,7 +6,6 @@
     'Codex',
     'ChatGPT',
     'Perplexity',
-    'Windsurf',
     'Cursor',
     'Antigravity',
     'OpenCode',
@@ -15,9 +14,10 @@
     'Grok',
     'Gemini',
     'Hermes',
-    // Phase 10 FINT-16 -- autopilot driver discriminator (D-02)
-    'FSB Autopilot',
-    // Quick task 260608-6nm -- Tier-1 MCP clients (modelcontextprotocol.io clients + awesome-mcp-clients + Nimbalyst 2026)
+    // The extension's own autopilot. The MCP server leaves this label out so
+    // an outside client cannot claim it.
+    'Autopilot',
+    // Other MCP clients
     'Cline',
     'Continue',
     'Zed',
@@ -29,7 +29,11 @@
     'Cody',
     'Roo Code',
     'Kiro',
-    'Goose'
+    'Goose',
+    // Always-on agents
+    'Muse',
+    'Grok Bot',
+    'Dots'
   ];
 
   var CLIENT_LABEL_MAP = Object.create(null);

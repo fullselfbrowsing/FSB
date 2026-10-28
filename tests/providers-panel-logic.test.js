@@ -177,4 +177,17 @@ for (const agentProviderId of [...agentIds, ...retiredAgentIds]) {
   );
 }
 
+for (const reason of ['capability_missing', 'isolation_unavailable', 'sandbox_unavailable', 'agent_protocol_drift', 'binary_changed']) {
+  const model = providers.getCompatibilityDisplayModel('grok-build', {
+    compatibility: { status: 'unsupported', reason, checkedAt: 10_000 }
+  }, String);
+  assert.equal(model.label, 'Unsupported', `${reason} cannot appear runnable`);
+  assert.notEqual(model.detail, '', `${reason} provides recovery detail`);
+}
+const verifiedGrok = providers.getCompatibilityDisplayModel('grok-build', {
+  compatibility: { status: 'supported', reason: 'capability_verified', checkedAt: 10_000 }
+}, String);
+assert.equal(verifiedGrok.label, 'Verified');
+assert.doesNotMatch(verifiedGrok.detail, /fixture-tested/);
+
 console.log('providers-panel-logic.test.js: PASS');
