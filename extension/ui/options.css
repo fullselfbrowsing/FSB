@@ -2253,7 +2253,7 @@ textarea.form-input {
   color: var(--text-muted);
 }
 
-.session-item-meta span {
+.session-item-meta > span {
   display: flex;
   align-items: center;
   gap: var(--space-xs);

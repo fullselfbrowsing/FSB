@@ -24,18 +24,37 @@ function fsbUiEscape(value) {
   return String(value == null ? '' : value).replace(/[&<>\u0022\u0027]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
-// Control panel copy for HTML templates.
-function fsbUiHtml(english, subs) {
-  return fsbUiEscape(fsbUiLine(english, subs));
+// The catalog key for an English template, when the page registers one.
+function fsbUiExactKey(english) {
+  const exact = globalThis.fsbUiLocale && fsbUiLocale.exact;
+  return exact && typeof english === 'string' && Object.prototype.hasOwnProperty.call(exact, english) ? exact[english] : null;
 }
 
-// Copy whose placeholders hold markup: escapes the translated message, then
-// puts each prebuilt HTML part in place of its $NAME$ token.
-function fsbUiMarkup(english, parts) {
-  return fsbUiEscape(fsbUiLine(english)).replace(/\$([A-Za-z0-9_]+)\$/g, (all, name) => {
-    const value = parts[name] != null ? parts[name] : parts[name.toLowerCase()];
-    return value == null ? all : String(value);
-  });
+// Substitutions as stored on a live node. JSON turns NaN and Infinity into
+// null, so non-finite numbers are kept as their string form.
+function fsbUiSubsJson(subs) {
+  return JSON.stringify(subs, (name, value) => (typeof value === 'number' && !Number.isFinite(value) ? String(value) : value));
+}
+
+// Control panel copy for HTML templates, in text positions only (never inside
+// an attribute or a node that fsbUiSet() writes later). Catalog copy is
+// wrapped in a live node, the same one fill() writes, so a language change
+// rewrites it in place.
+function fsbUiHtml(english, subs) {
+  const shown = fsbUiEscape(fsbUiLine(english, subs));
+  const key = fsbUiExactKey(english);
+  if (!key) return shown;
+  let attrs = ' data-i18n-live="' + fsbUiEscape(key) + '" data-i18n-en="' + fsbUiEscape(english) + '"';
+  if (subs && typeof subs === 'object') attrs += ' data-i18n-subs="' + fsbUiEscape(fsbUiSubsJson(subs)) + '"';
+  return '<span' + attrs + ' data-i18n-shown="' + shown + '">' + shown + '</span>';
+}
+
+// A tooltip for an HTML template. The data-i18n-attr key lets apply() rewrite
+// it after a language change.
+function fsbUiTitle(english) {
+  const title = 'title="' + fsbUiEscape(fsbUiLine(english)) + '"';
+  const key = fsbUiExactKey(english);
+  return key ? title + ' data-i18n-attr="title:' + fsbUiEscape(key) + '"' : title;
 }
 
 // Default settings
@@ -3824,7 +3843,7 @@ async function loadSessionList() {
     sessionList.innerHTML = sessions.map(session => `
       <div class="session-item" data-session-id="${session.id}" data-storage-backend="${session.storageBackend === 'journal-v2' ? 'journal-v2' : 'legacy-v1'}">
         <div class="session-item-info">
-          <div class="session-item-task">${escapeHtml(session.task || fsbUiLine('Unknown task'))}</div>
+          <div class="session-item-task">${session.task ? escapeHtml(session.task) : fsbUiHtml('Unknown task')}</div>
           <div class="session-item-meta">
             <span><i class="fas fa-clock"></i> ${formatSessionDate(session.startTime)}</span>
             <span><i class="fas fa-play-circle"></i> ${fsbUiHtml('$COUNT$ actions', { count: session.actionCount || 0 })}</span>
@@ -3838,13 +3857,13 @@ async function loadSessionList() {
           <span class="session-status-badge ${session.status}">${session.status}</span>
         </div>
         <div class="session-item-actions">
-          <button class="session-action-btn view" data-action="view" title="${fsbUiHtml('View logs')}">
+          <button class="session-action-btn view" data-action="view" ${fsbUiTitle('View logs')}>
             <i class="fas fa-eye"></i>
           </button>
-          <button class="session-action-btn download" data-action="download" title="${fsbUiHtml('Download logs')}">
+          <button class="session-action-btn download" data-action="download" ${fsbUiTitle('Download logs')}>
             <i class="fas fa-download"></i>
           </button>
-          <button class="session-action-btn delete" data-action="delete" title="${fsbUiHtml('Delete session')}">
+          <button class="session-action-btn delete" data-action="delete" ${fsbUiTitle('Delete session')}>
             <i class="fas fa-trash"></i>
           </button>
         </div>
@@ -3966,15 +3985,15 @@ function createInlineDetailHTML(session) {
     <div class="session-detail-panel" data-session-id="${session.id}">
       <div class="session-detail-header">
         <div class="session-detail-title">
-          <h4 id="sessionDetailTitle">${escapeHtml(session.task || fsbUiLine('Unknown task'))}</h4>
+          <h4 id="sessionDetailTitle">${session.task ? escapeHtml(session.task) : fsbUiHtml('Unknown task')}</h4>
           <span class="session-detail-status session-status-badge ${session.status}" id="sessionDetailStatus">${session.status}</span>
         </div>
         <div class="session-detail-actions">
-          <button class="control-btn" id="exportSessionText" title="${fsbUiHtml('Export as human-readable text')}">
+          <button class="control-btn" id="exportSessionText" ${fsbUiTitle('Export as human-readable text')}>
             <i class="fas fa-file-alt"></i>
             ${fsbUiHtml('Export Text')}
           </button>
-          <button class="control-btn" id="downloadSessionLogs" title="${fsbUiHtml('Download JSON logs')}">
+          <button class="control-btn" id="downloadSessionLogs" ${fsbUiTitle('Download JSON logs')}>
             <i class="fas fa-download"></i>
             ${fsbUiHtml('Download JSON')}
           </button>
@@ -4015,9 +4034,7 @@ function createInlineDetailHTML(session) {
           <button class="replay-btn" id="prevStep" disabled>
             <i class="fas fa-chevron-left"></i> ${fsbUiHtml('Prev')}
           </button>
-          <span class="replay-step-indicator">
-            ${fsbUiMarkup('Step $CURRENT$ of $TOTAL$', { current: '<span id="currentStepNum">0</span>', total: '<span id="totalSteps">0</span>' })}
-          </span>
+          <span class="replay-step-indicator" id="replayStepIndicator">${fsbUiEscape(fsbUiLine('Step $CURRENT$ of $TOTAL$', { current: '0', total: '0' }))}</span>
           <button class="replay-btn" id="nextStep" disabled>
             ${fsbUiHtml('Next')} <i class="fas fa-chevron-right"></i>
           </button>
@@ -4033,7 +4050,7 @@ function createInlineDetailHTML(session) {
         </button>
         <div class="session-logs-container" id="rawLogsContainer" style="display: none;">
           <pre class="session-logs-content" id="sessionLogsContent">${fsbUiHtml('Loading...')}</pre>
-          ${session._journalHasMore ? `<button class="control-btn" id="loadMoreSessionEvents">${fsbUiHtml('Load next 500 events')}</button>` : ''}
+          ${session._journalHasMore ? `<button class="control-btn" id="loadMoreSessionEvents">${fsbUiEscape(fsbUiLine('Load next 500 events'))}</button>` : ''}
         </div>
       </div>
     </div>
@@ -4046,6 +4063,7 @@ function createInlineDetailHTML(session) {
  * @param {Object} session - The session data object
  */
 function attachInlinePanelListeners(wrapper, session) {
+  setReplayStepIndicator(0, 0, wrapper.querySelector('#replayStepIndicator'));
   const exportTextBtn = wrapper.querySelector('#exportSessionText');
   const downloadBtn = wrapper.querySelector('#downloadSessionLogs');
   const closeBtn = wrapper.querySelector('#closeSessionDetail');
@@ -4101,6 +4119,8 @@ function attachInlinePanelListeners(wrapper, session) {
   }
 
   if (loadMoreEventsBtn) {
+    // The button is the live node, so later labels replace this one in place.
+    fsbUiSet(loadMoreEventsBtn, "Load next 500 events");
     loadMoreEventsBtn.addEventListener('click', async () => {
       if (!session._journalHasMore || !Number.isFinite(session._journalNextSequence)) return;
       loadMoreEventsBtn.disabled = true;
@@ -4862,8 +4882,7 @@ async function renderSessionReplay(sessionId) {
     document.getElementById('replaySummary').style.display = 'none';
     document.getElementById('prevStep').disabled = true;
     document.getElementById('nextStep').disabled = true;
-    document.getElementById('currentStepNum').textContent = '0';
-    document.getElementById('totalSteps').textContent = '0';
+    setReplayStepIndicator(0, 0);
     return;
   }
 
@@ -4871,7 +4890,6 @@ async function renderSessionReplay(sessionId) {
   currentStepIndex = 0;
 
   // Update controls
-  document.getElementById('totalSteps').textContent = currentReplayData.steps.length;
   document.getElementById('prevStep').disabled = true;
   document.getElementById('nextStep').disabled = currentReplayData.steps.length <= 1;
 
@@ -4880,6 +4898,13 @@ async function renderSessionReplay(sessionId) {
 
   // Show summary
   renderReplaySummary();
+}
+
+// The replay counter is one live node, so a language change rewrites the whole
+// "Step N of M" line, in the word order of that language.
+function setReplayStepIndicator(current, total, indicator) {
+  const el = indicator || document.getElementById('replayStepIndicator');
+  if (el) fsbUiSet(el, 'Step $CURRENT$ of $TOTAL$', { current: String(current), total: String(total) });
 }
 
 /**
@@ -4893,7 +4918,7 @@ function renderStep(index) {
   if (!step) return;
 
   currentStepIndex = index;
-  document.getElementById('currentStepNum').textContent = index + 1;
+  setReplayStepIndicator(index + 1, currentReplayData.steps.length);
   document.getElementById('prevStep').disabled = index === 0;
   document.getElementById('nextStep').disabled = index === currentReplayData.steps.length - 1;
 
@@ -4940,7 +4965,7 @@ function renderStep(index) {
     html += `
       <div class="step-section">
         <h5>${fsbUiHtml('Diagnostic')}</h5>
-        <div class="step-detail" style="color: var(--error-color);">${escapeHtml(step.result.diagnostic.message || fsbUiLine('Unknown error'))}</div>
+        <div class="step-detail" style="color: var(--error-color);">${step.result.diagnostic.message ? escapeHtml(step.result.diagnostic.message) : fsbUiHtml('Unknown error')}</div>
         ${step.result.diagnostic.details ? `<div class="step-detail">${escapeHtml(step.result.diagnostic.details)}</div>` : ''}
         ${step.result.diagnostic.suggestions && step.result.diagnostic.suggestions.length > 0 ? `<div class="step-detail">${fsbUiHtml('Suggestions:')}<br>${step.result.diagnostic.suggestions.map(s => '  - ' + escapeHtml(s)).join('<br>')}</div>` : ''}
       </div>
@@ -5317,19 +5342,19 @@ function renderCredentialCard(cred) {
       </div>
       <div class="credential-card-info">
         <div class="credential-card-domain">${escapeHtml(cred.domain)}</div>
-        <div class="credential-card-username">${escapeHtml(cred.username || fsbUiLine('No username'))}</div>
+        <div class="credential-card-username">${cred.username ? escapeHtml(cred.username) : fsbUiHtml('No username')}</div>
       </div>
       <div class="credential-card-password" data-domain="${escapeHtml(cred.domain)}">
         <span class="password-dots">--------</span>
       </div>
       <div class="credential-card-actions">
-        <button class="credential-action-btn" data-cred-action="toggle-password" data-cred-domain="${escapeHtml(cred.domain)}" title="${fsbUiHtml('Show password')}">
+        <button class="credential-action-btn" data-cred-action="toggle-password" data-cred-domain="${escapeHtml(cred.domain)}" ${fsbUiTitle('Show password')}>
           <i class="fas fa-eye"></i>
         </button>
-        <button class="credential-action-btn" data-cred-action="edit" data-cred-domain="${escapeHtml(cred.domain)}" title="${fsbUiHtml('Edit')}">
+        <button class="credential-action-btn" data-cred-action="edit" data-cred-domain="${escapeHtml(cred.domain)}" ${fsbUiTitle('Edit')}>
           <i class="fas fa-edit"></i>
         </button>
-        <button class="credential-action-btn delete" data-cred-action="delete" data-cred-domain="${escapeHtml(cred.domain)}" title="${fsbUiHtml('Delete')}">
+        <button class="credential-action-btn delete" data-cred-action="delete" data-cred-domain="${escapeHtml(cred.domain)}" ${fsbUiTitle('Delete')}>
           <i class="fas fa-trash"></i>
         </button>
       </div>
@@ -5855,25 +5880,24 @@ function renderPaymentCard(pm) {
     amex: 'Amex',
     discover: 'Discover',
     diners: 'Diners',
-    jcb: 'JCB',
-    unknown: fsbUiLine('Card')
+    jcb: 'JCB'
   };
-  const brandLabel = brandLabels[pm.cardBrand] || brandLabels.unknown;
+  const brandLabel = brandLabels[pm.cardBrand];
 
   return `
     <div class="credential-card payment-card" data-payment-id="${escapeHtml(pm.id)}">
       <div class="credential-card-icon">
-        <span class="payment-card-brand ${escapeHtml(pm.cardBrand)}">${escapeHtml(brandLabel)}</span>
+        <span class="payment-card-brand ${escapeHtml(pm.cardBrand)}">${brandLabel ? escapeHtml(brandLabel) : fsbUiHtml('Card')}</span>
       </div>
       <div class="credential-card-info">
-        <div class="credential-card-domain">${escapeHtml(pm.nickname || pm.cardholderName || fsbUiLine('Card'))}</div>
+        <div class="credential-card-domain">${(pm.nickname || pm.cardholderName) ? escapeHtml(pm.nickname || pm.cardholderName) : fsbUiHtml('Card')}</div>
         <div class="credential-card-username">${escapeHtml(pm.maskedNumber)} -- ${fsbUiHtml('Exp $MONTH$/$YEAR$', { month: pm.expiryMonth, year: pm.expiryYearLast2 })}</div>
       </div>
       <div class="credential-card-actions">
-        <button class="credential-action-btn" data-payment-action="edit" data-payment-id="${escapeHtml(pm.id)}" title="${fsbUiHtml('Edit')}">
+        <button class="credential-action-btn" data-payment-action="edit" data-payment-id="${escapeHtml(pm.id)}" ${fsbUiTitle('Edit')}>
           <i class="fas fa-edit"></i>
         </button>
-        <button class="credential-action-btn delete" data-payment-action="delete" data-payment-id="${escapeHtml(pm.id)}" title="${fsbUiHtml('Delete')}">
+        <button class="credential-action-btn delete" data-payment-action="delete" data-payment-id="${escapeHtml(pm.id)}" ${fsbUiTitle('Delete')}>
           <i class="fas fa-trash"></i>
         </button>
       </div>
@@ -6389,7 +6413,7 @@ async function loadResearchList(page) {
     elements.researchList.innerHTML = pageItems.map(item => `
       <div class="session-item" data-research-id="${item.id}">
         <div class="session-item-info">
-          <div class="session-item-task">${escapeHtml(item.domain || fsbUiLine('Unknown'))}</div>
+          <div class="session-item-task">${item.domain ? escapeHtml(item.domain) : fsbUiHtml('Unknown')}</div>
           <div class="session-item-meta">
             <span><i class="fas fa-clock"></i> ${formatSessionDate(item.startTime)}</span>
             <span><i class="fas fa-file-alt"></i> ${fsbUiHtml('$COUNT$ pages', { count: item.pageCount || 0 })}</span>
@@ -6400,16 +6424,16 @@ async function loadResearchList(page) {
           <span class="session-status-badge ${item.status}">${item.status}</span>
         </div>
         <div class="session-item-actions">
-          <button class="session-action-btn view" data-action="view" title="${fsbUiHtml('View details')}">
+          <button class="session-action-btn view" data-action="view" ${fsbUiTitle('View details')}>
             <i class="fas fa-eye"></i>
           </button>
-          <button class="session-action-btn download" data-action="download" title="${fsbUiHtml('Download JSON')}">
+          <button class="session-action-btn download" data-action="download" ${fsbUiTitle('Download JSON')}>
             <i class="fas fa-download"></i>
           </button>
-          <button class="session-action-btn save-memory" data-action="saveMemory" title="${fsbUiHtml('Save as site map memory')}">
+          <button class="session-action-btn save-memory" data-action="saveMemory" ${fsbUiTitle('Save as site map memory')}>
             <i class="fas fa-brain"></i>
           </button>
-          <button class="session-action-btn delete" data-action="delete" title="${fsbUiHtml('Delete')}">
+          <button class="session-action-btn delete" data-action="delete" ${fsbUiTitle('Delete')}>
             <i class="fas fa-trash"></i>
           </button>
         </div>
@@ -7200,7 +7224,7 @@ function renderMemoryList(memories) {
     }[memory.type] || 'fa-circle';
 
     const typeLabel = memory.type.charAt(0).toUpperCase() + memory.type.slice(1);
-    const domain = memory.metadata?.domain || fsbUiLine('Unknown');
+    const domain = memory.metadata?.domain;
     const age = formatTimeAgo(memory.createdAt);
     const accesses = memory.accessCount || 0;
     const confidence = Math.round((memory.metadata?.confidence || 0) * 100);
@@ -7212,11 +7236,11 @@ function renderMemoryList(memories) {
       ? `<span class="memory-badge ${isRefined ? 'refined' : 'basic'}">${fsbUiHtml(isRefined ? 'Refined' : 'Basic')}</span>`
       : '';
     const refineBtn = isSiteMap && !isRefined
-      ? `<button class="refine-btn-prominent" data-id="${memory.id}" data-recon-id="${memory.typeData?.sitePattern?.reconId || ''}" title="${fsbUiHtml('Refine sitemap')}"><i class="fas fa-magic"></i> ${fsbUiHtml('Refine')}</button>`
+      ? `<button class="refine-btn-prominent" data-id="${memory.id}" data-recon-id="${memory.typeData?.sitePattern?.reconId || ''}" ${fsbUiTitle('Refine sitemap')}><i class="fas fa-magic"></i> ${fsbUiHtml('Refine')}</button>`
       : '';
 
     const graphAttr = isSiteMap ? ' data-has-graph="true"' : '';
-    const chevronHtml = '<i class="fas fa-chevron-right detail-toggle-icon" title="' + fsbUiHtml('Toggle details') + '"></i>';
+    const chevronHtml = '<i class="fas fa-chevron-right detail-toggle-icon" ' + fsbUiTitle('Toggle details') + '></i>';
 
     return `
       <div class="session-item memory-item" data-memory-id="${memory.id}" data-expandable="true"${graphAttr} style="cursor: pointer;">
@@ -7227,12 +7251,12 @@ function renderMemoryList(memories) {
               ${escapeHtml(memory.text)} ${badgeHtml}
             </div>
             <div class="memory-item-meta">
-              ${typeLabel} | ${escapeHtml(domain)} | ${age} | ${fsbUiHtml('$COUNT$ accesses', { count: accesses })} | ${fsbUiHtml('$PERCENT$% conf', { percent: confidence })}${tags ? ' | ' + escapeHtml(tags) : ''}
+              ${typeLabel} | ${domain ? escapeHtml(domain) : fsbUiHtml('Unknown')} | ${age} | ${fsbUiHtml('$COUNT$ accesses', { count: accesses })} | ${fsbUiHtml('$PERCENT$% conf', { percent: confidence })}${tags ? ' | ' + escapeHtml(tags) : ''}
             </div>
           </div>
           ${refineBtn}
           ${chevronHtml}
-          <button class="control-btn small memory-delete-btn" data-id="${memory.id}" title="${fsbUiHtml('Delete memory')}">
+          <button class="control-btn small memory-delete-btn" data-id="${memory.id}" ${fsbUiTitle('Delete memory')}>
             <i class="fas fa-trash"></i>
           </button>
         </div>
@@ -7444,7 +7468,7 @@ function renderSemanticDetail(memory) {
   };
   const categoryLabel = categoryLabels[td.category]
     ? fsbUiHtml(categoryLabels[td.category])
-    : escapeHtml(td.category || fsbUiLine('General'));
+    : (td.category ? escapeHtml(td.category) : fsbUiHtml('General'));
 
   let categoryContent = '';
 
@@ -7456,7 +7480,7 @@ function renderSemanticDetail(memory) {
     const navCount = Object.keys(sp.navigation || {}).length;
     const selectorCount = Object.keys(sp.keySelectors || {}).length;
     const linkCount = (sp.pageLinks || []).length;
-    const crawledAt = sp.crawledAt ? new Date(sp.crawledAt).toLocaleString() : fsbUiLine('Unknown');
+    const crawledAt = sp.crawledAt ? new Date(sp.crawledAt).toLocaleString() : '';
 
     // Build pages list (top 15)
     const pageEntries = Object.entries(sp.pages || {}).slice(0, 15);
@@ -7506,7 +7530,7 @@ function renderSemanticDetail(memory) {
       </div>
       <div class="detail-section">
         <div class="detail-label">${fsbUiHtml('Crawled')}</div>
-        <div class="detail-value">${escapeHtml(crawledAt)}${sp.refined ? ' ' + fsbUiHtml('(refined)') : ''}</div>
+        <div class="detail-value">${crawledAt ? escapeHtml(crawledAt) : fsbUiHtml('Unknown')}${sp.refined ? ' ' + fsbUiHtml('(refined)') : ''}</div>
       </div>
       <div class="detail-section">
         <div class="detail-label">${fsbUiHtml('Pages Discovered')}</div>

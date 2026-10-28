@@ -181,7 +181,8 @@ assert.doesNotMatch(selection, /providerPanelState\.modelProvider = id[\s\S]*?ki
 
 const connectionTest = extractFunction(js, 'runFullApiTest');
 // runFullApiTest renders its copy through these; with no fsbUiLocale they return English.
-const uiCopyHelpers = ['fsbUiLine', 'fsbUiEscape', 'fsbUiHtml', 'fsbUiSet', 'agentConnectionFailureTemplates', 'agentConnectionFailureSource']
+const uiCopyHelpers = ['fsbUiLine', 'fsbUiEscape', 'fsbUiExactKey', 'fsbUiSubsJson', 'fsbUiHtml', 'fsbUiSet',
+  'agentConnectionFailureTemplates', 'agentConnectionFailureSource']
   .map((name) => extractFunction(js, name)).join('\n');
 assert.match(
   connectionTest,

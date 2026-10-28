@@ -265,7 +265,7 @@ function pageExactMap(files) {
 }
 const literal = "'((?:[^'\\\\]|\\\\.)*)'";
 for (const [file, maps, helpers] of [
-  ['extension/ui/options.js', ['extension/utils/panel-exact.js', 'extension/utils/copy-exact.js'], 'fsbUiLine|fsbUiHtml|fsbUiMarkup'],
+  ['extension/ui/options.js', ['extension/utils/panel-exact.js', 'extension/utils/copy-exact.js'], 'fsbUiLine|fsbUiHtml|fsbUiTitle'],
   ['extension/ui/sidepanel.js', ['extension/utils/copy-exact.js'], 'spLine|fsbUiLocale\\.line']
 ]) {
   const exactMap = pageExactMap(['extension/utils/ui-locale.js', ...maps]);
@@ -313,7 +313,7 @@ for (const [file, exactMap, texts] of [
     '$NAME$ is no longer available for Autopilot. Select and save another provider before starting a new task.',
     '$NAME$ connection', 'FSB uses $NAME$\'s existing local sign-in. Test Connection sends one small no-tools validation request.',
     'FSB uses a separate private Grok profile. Connect SuperGrok with browser OAuth; no API key or model selection is used.',
-    '$ACTIVE$ of $CAP$ active',
+    '$ACTIVE$ of $CAP$ active', 'Step $CURRENT$ of $TOTAL$', 'Load next 500 events',
     'Not connected', 'Sign-in failed', 'Sign-in cancelled', 'Connected with browser OAuth',
     'Sign-in status unavailable', 'Opening Grok sign-in...', 'Waiting for browser sign-in...', 'Edit Credential',
     'Add Credential', 'Edit Payment Method', 'Add Payment Method', 'No models match search', 'No models available',
@@ -1728,6 +1728,92 @@ function sidepanelMessageContext(api) {
   check(pill.textContent === shippedCatalogs.ja[keyFor('Not connected')]
       && pending.textContent === shippedCatalogs.ja[keyFor('$COUNT$ pending')].replace('$COUNT$', '3'),
     'a language change re-renders the Grok sign-in pill and the pending count');
+}
+
+// Control-panel sections are built as HTML strings. fsbUiHtml() wraps catalog
+// copy in the live node fill() writes, and fsbUiTitle() keys tooltips, so a
+// language change rewrites generated labels in place instead of leaving the
+// language they were rendered in.
+{
+  const sandbox = freshLocale();
+  vm.runInContext(fs.readFileSync(path.join(root, 'extension/utils/panel-exact.js'), 'utf8'), sandbox);
+  const shipped = sandbox.fsbUiLocale;
+  const optionsSource = fs.readFileSync(path.join(root, 'extension/ui/options.js'), 'utf8');
+  const helpers = ['fsbUiLine', 'fsbUiSet', 'fsbUiEscape', 'fsbUiExactKey', 'fsbUiSubsJson', 'fsbUiHtml', 'fsbUiTitle', 'setReplayStepIndicator'];
+  const makeContext = (withLocale) => {
+    const ctx = withLocale ? { fsbUiLocale: shipped } : {};
+    ctx.globalThis = ctx;
+    vm.createContext(ctx);
+    for (const name of helpers) vm.runInContext(extractNamedFunction(optionsSource, name), ctx);
+    return ctx;
+  };
+  const ctx = makeContext(true);
+  const decode = (value) => value.replace(/&(amp|lt|gt|quot|#39);/g, (all, name) => ({ amp: '&', lt: '<', gt: '>', quot: '"', '#39': "'" }[name]));
+  const attrsOf = (markup) => Object.fromEntries([...markup.matchAll(/([\w-]+)="([^"]*)"/g)].map((m) => [m[1], decode(m[2])]));
+  // Builds the node the browser would parse from fsbUiHtml() output.
+  const parseSpan = (markup) => {
+    const match = markup.match(/^<span ([^>]*)>([\s\S]*)<\/span>$/);
+    return match ? fakeNode(attrsOf(match[1]), decode(match[2])) : null;
+  };
+  const key = (english) => controlPanelMap[english];
+
+  shipped.setOverride('es');
+  const exportLabel = parseSpan(ctx.fsbUiHtml('Export Text'));
+  const actions = parseSpan(ctx.fsbUiHtml('$COUNT$ actions', { count: 3 }));
+  const nested = parseSpan(ctx.fsbUiHtml('Compatibility check failed: $ERROR$',
+    { error: { english: 'Sign in to $NAME$ locally, then try again.', subs: { name: 'OpenCode' } } }));
+  const hostileValue = '<img src=x onerror=alert(1)> "q" \'a\' & {}';
+  const hostileMarkup = ctx.fsbUiHtml('$COUNT$ actions', { count: hostileValue });
+  const hostile = parseSpan(hostileMarkup);
+  const notANumber = parseSpan(ctx.fsbUiHtml('$COUNT$ actions', { count: NaN }));
+  const tooltip = fakeNode(attrsOf(ctx.fsbUiTitle('Delete memory')), '');
+  check(exportLabel && exportLabel.textContent === shippedCatalogs.es[key('Export Text')]
+      && actions.textContent === shippedCatalogs.es[key('$COUNT$ actions')].replace('$COUNT$', '3')
+      && tooltip.getAttribute('title') === shippedCatalogs.es[key('Delete memory')]
+      && tooltip.getAttribute('data-i18n-attr') === 'title:' + key('Delete memory'),
+    'generated control-panel copy renders in the active language with its key attached');
+  check(!hostileMarkup.includes('<img') && hostile.textContent.includes(hostileValue),
+    'a raw substitution stays text in generated markup');
+
+  shipped.setOverride('de');
+  shipped.apply(fakeDoc([exportLabel, actions, nested, hostile, notANumber, tooltip]));
+  check(exportLabel.textContent === shippedCatalogs.de[key('Export Text')] && exportLabel.textContent === 'Text exportieren'
+      && actions.textContent === shippedCatalogs.de[key('$COUNT$ actions')].replace('$COUNT$', '3')
+      && tooltip.getAttribute('title') === shippedCatalogs.de[key('Delete memory')],
+    'a language change rewrites generated labels and tooltips (Exportar texto becomes Text exportieren)');
+  check(nested.textContent.includes('OpenCode') && nested.textContent === shipped.line('Compatibility check failed: $ERROR$',
+    { error: shipped.line('Sign in to $NAME$ locally, then try again.', { name: 'OpenCode' }) }),
+    'a nested failure source in generated markup follows a language change');
+  check(hostile.textContent.includes(hostileValue) && notANumber.textContent.includes('NaN') && !notANumber.textContent.includes('$'),
+    'raw and non-finite substitutions survive a language change');
+
+  const unmapped = ctx.fsbUiHtml('Totally uncataloged words <here>');
+  check(unmapped === 'Totally uncataloged words &lt;here&gt;', 'uncataloged copy stays plain escaped text');
+  const plain = makeContext(false);
+  check(plain.fsbUiHtml('Export Text') === 'Export Text' && plain.fsbUiTitle('Delete') === 'title="Delete"',
+    'without a locale the helpers keep their plain output');
+
+  shipped.setOverride('ko');
+  const indicator = fakeNode({}, '');
+  ctx.setReplayStepIndicator(2, 5, indicator);
+  check(indicator.textContent === shippedCatalogs.ko[key('Step $CURRENT$ of $TOTAL$')].replace('$CURRENT$', '2').replace('$TOTAL$', '5'),
+    'the replay step counter renders in the active language and word order');
+  shipped.setOverride('de');
+  shipped.apply(fakeDoc([indicator]));
+  check(indicator.textContent === shippedCatalogs.de[key('Step $CURRENT$ of $TOTAL$')].replace('$CURRENT$', '2').replace('$TOTAL$', '5'),
+    'a language change rewrites the replay step counter');
+
+  const loadMoreLine = optionsSource.split('\n').find((line) => line.includes('id="loadMoreSessionEvents"')) || '';
+  check(!/title="\$\{fsbUiHtml\(/.test(optionsSource) && !optionsSource.includes('title="\' + fsbUiHtml(')
+      && !/(aria-label|placeholder|alt|value)="\$\{fsbUiHtml/.test(optionsSource)
+      && !optionsSource.includes('escapeHtml(fsbUiHtml') && !optionsSource.includes('fsbUiMarkup(')
+      && loadMoreLine && !loadMoreLine.includes('fsbUiHtml('),
+    'fsbUiHtml() is only used in text positions, never in attributes or nodes fsbUiSet() writes later');
+  // A catalog fallback filled into a variable and escaped later is plain text
+  // that a language change cannot reach; render it with fsbUiHtml() instead.
+  const filledFallbacks = optionsSource.match(/\|\| *fsbUiLine\([^)]*\)/g) || [];
+  check(filledFallbacks.length === 0,
+    `generated copy has no filled catalog fallbacks${filledFallbacks.length ? ': ' + filledFallbacks.join(' | ') : ''}`);
 }
 
 // The popup's collapsed action count keeps its key, and the owner header and
