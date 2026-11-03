@@ -19098,14 +19098,18 @@ function crashStalledRenderer(tabId) {
     const listener = (source, method) => {
       if (source && source.tabId === tabId && method === 'Inspector.targetCrashed') done(true);
     };
-    const done = crashed => {
+    let settled = false;
+    const done = (crashed, error) => {
       clearTimeout(timer);
       if (onEvent && typeof onEvent.removeListener === 'function') onEvent.removeListener(listener);
+      if (!settled) globalThis.automationLogger?.debug('Navigation renderer crash result', { tabId, crashed, error });
+      settled = true;
       resolve(crashed);
     };
     if (onEvent && typeof onEvent.addListener === 'function') onEvent.addListener(listener);
-    timer = setTimeout(() => done(false), 1000);
-    Promise.resolve(chrome.debugger.sendCommand({ tabId }, 'Page.crash')).catch(() => done(false));
+    timer = setTimeout(() => done(false, 'No crash reported'), 1000);
+    Promise.resolve(chrome.debugger.sendCommand({ tabId }, 'Page.crash'))
+      .catch(error => done(false, (error && error.message) || String(error)));
   });
 }
 
