@@ -553,8 +553,12 @@ test('Chrome recovery stays bounded when attaching to an already-hung renderer',
 test('MV3 public navigation recovers owned tabs before and after keyboard input', { skip: !chrome }, async () => {
   const fixture = await openFixture('nested-text-editor.html');
   const server = createServer((request, response) => {
+    // A parser-blocking script that never arrives keeps /blocked loading.
+    if (request.url === '/never') return response.writeHead(200, { 'content-type': 'text/javascript' });
+    if (request.url === '/no-content') return response.writeHead(204).end();
     response.writeHead(200, { 'content-type': 'text/html' });
-    response.end(request.url === '/loop'
+    response.end(request.url === '/blocked' ? '<p>loading</p><script src="/never"></script>'
+      : request.url === '/loop'
       ? '<script>const end=Date.now()+30000;while(Date.now()<end){}</script>'
       : request.url === '/destination' ? '<p id="destination">recovered</p>' : '<input id="field">');
   });
@@ -652,6 +656,22 @@ test('MV3 public navigation recovers owned tabs before and after keyboard input'
     assert.equal(nav.success, true, JSON.stringify(nav));
     assert.equal(nav.recovered, true);
     await evaluate(workerSocket, `chrome.tabs.remove(${immediate.tabId})`);
+    // Leaving a page that is still loading aborts that page's own load; the
+    // navigation itself succeeds. A navigation that loads no document still
+    // fails at once.
+    const loading = await open(origin + '/field');
+    assert.equal(loading.success, true, JSON.stringify(loading));
+    const blocked = await route('navigate', { tabId: loading.tabId, ownershipToken: loading.ownershipToken,
+      url: origin + '/blocked' });
+    assert.equal(blocked.success, true, JSON.stringify(blocked));
+    const left = await route('navigate', { tabId: loading.tabId, ownershipToken: blocked.ownershipToken,
+      url: origin + '/destination' });
+    assert.equal(left.success, true, JSON.stringify(left));
+    assert.equal(left.recovered, undefined, 'an idle page that is still parsing is not recovered');
+    const empty = await route('navigate', { tabId: loading.tabId, ownershipToken: left.ownershipToken,
+      url: origin + '/no-content' });
+    assert.equal(empty.errorCode, 'navigation_failed', JSON.stringify(empty));
+    await evaluate(workerSocket, `chrome.tabs.remove(${loading.tabId})`);
     const released = await open(origin + '/field');
     await evaluate(workerSocket, `fsbAgentRegistryInstance.releaseAgent(${JSON.stringify(agentId)})`);
     await evaluate(workerSocket, 'FsbDebuggerSessions.releaseUnowned()');

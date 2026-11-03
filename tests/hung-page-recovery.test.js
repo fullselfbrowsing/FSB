@@ -532,7 +532,7 @@ test('MCP execution timeout advice preserves the pending write without suggestin
   assert.doesNotMatch(text, /navigate|close_tab/);
 });
 
-function navigationHarness({ commit, recover, pendingUpdate = false } = {}) {
+function navigationHarness({ commit, recover, pendingUpdate = false, frame, beforeCommit } = {}) {
   const event = () => {
     const listeners = new Set();
     return { addListener: fn => listeners.add(fn), removeListener: fn => listeners.delete(fn),
@@ -545,12 +545,15 @@ function navigationHarness({ commit, recover, pendingUpdate = false } = {}) {
   const start = dispatcher.indexOf('async function navigateTabAndWaitForCommit(');
   const end = dispatcher.indexOf('\nasync function handleNavigateRoute', start);
   const navigate = vm.runInNewContext(`${dispatcher.slice(start, end)}\nnavigateTabAndWaitForCommit`, {
-    chrome: { webNavigation: events,
+    chrome: { webNavigation: frame === undefined ? events
+      : { ...events, getFrame: async () => { if (frame instanceof Error) throw frame; return frame; } },
       tabs: { onRemoved: removed,
         get: async () => ({ id: 9, url: 'https://old.test/', pendingUrl: 'https://new.test/' }),
-        update: async () => { updateCalls++; if (commit) setTimeout(() => events[commit.event || 'onCommitted'].emit({
-          tabId: 9, frameId: 0, url: commit.url, error: commit.error
-        }), 2); return pendingUpdate ? new Promise(() => {}) : { id: 9, url: 'https://old.test/' }; } } },
+        update: async () => { updateCalls++;
+          if (beforeCommit) setTimeout(() => events[beforeCommit.event].emit({ tabId: 9, frameId: 0, ...beforeCommit.details }), 1);
+          if (commit) setTimeout(() => events[commit.event || 'onCommitted'].emit({
+            tabId: 9, frameId: 0, url: commit.url, error: commit.error, documentId: commit.documentId
+          }), 2); return pendingUpdate ? new Promise(() => {}) : { id: 9, url: 'https://old.test/' }; } } },
     recoverStalledTabNavigation: async (...args) => { recoveryCalls++; return recover?.(events, ...args) || false; },
     setTimeout: (fn, ms) => setTimeout(fn, ms === 10000 ? 45 : ms === 3000 ? 10 : ms), clearTimeout
   });
@@ -649,6 +652,51 @@ test('a navigation error after the navigation is requested still fails it', asyn
   assert.equal(result.error, 'net::ERR_NAME_NOT_RESOLVED');
   assert.equal(result.mayHaveExecuted, false);
   assert.ok(Object.values(h.events).every(e => e.listeners.size === 0));
+});
+
+const outgoingAbort = { event: 'onErrorOccurred',
+  details: { url: 'https://old.test/', error: 'net::ERR_ABORTED', documentId: 'OUTGOING' } };
+
+test('leaving a page that is still loading ignores the aborted load of that page', async () => {
+  const h = navigationHarness({ frame: { documentId: 'OUTGOING', url: 'https://old.test/' }, beforeCommit: outgoingAbort,
+    commit: { url: 'https://new.test/' } });
+  const result = await h.navigate(9, 'https://new.test/');
+  assert.equal(result.success, true);
+  assert.equal(result.tab.url, 'https://new.test/');
+  assert.ok(Object.values(h.events).every(e => e.listeners.size === 0));
+});
+
+for (const [name, documentId, error] of [
+  ['that commits an error page', 'ERROR-PAGE', 'net::ERR_CONNECTION_REFUSED'],
+  ['that loads no document', '00000000000000000000000000000000', 'net::ERR_ABORTED']
+]) {
+  test(`a navigation ${name} still fails at once`, async () => {
+    const h = navigationHarness({ frame: { documentId: 'OUTGOING', url: 'https://old.test/' },
+      commit: { event: 'onErrorOccurred', url: 'https://new.test/', error, documentId } });
+    const result = await h.navigate(9, 'https://new.test/');
+    assert.equal(result.success, false);
+    assert.equal(result.errorCode, 'navigation_failed');
+    assert.equal(result.error, error);
+    assert.equal(result.mayHaveExecuted, false);
+  });
+}
+
+test('a failed navigation to the current URL still fails at once', async () => {
+  // Only the document, not the URL, tells this failure from the outgoing page's own abort.
+  const h = navigationHarness({ frame: { documentId: 'OUTGOING', url: 'https://old.test/' },
+    commit: { event: 'onErrorOccurred', url: 'https://old.test/', error: 'net::ERR_CONNECTION_REFUSED', documentId: 'ERROR-PAGE' } });
+  const result = await h.navigate(9, 'https://old.test/');
+  assert.equal(result.success, false);
+  assert.equal(result.errorCode, 'navigation_failed');
+  assert.equal(result.error, 'net::ERR_CONNECTION_REFUSED');
+});
+
+test('without the outgoing document, an aborted load still fails the navigation', async () => {
+  const h = navigationHarness({ frame: new Error('No frame'), beforeCommit: outgoingAbort,
+    commit: { url: 'https://new.test/' } });
+  const result = await h.navigate(9, 'https://new.test/');
+  assert.equal(result.success, false);
+  assert.equal(result.error, 'net::ERR_ABORTED');
 });
 
 test('navigate allows a renderer crash only before the navigation is requested', async () => {
