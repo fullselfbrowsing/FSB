@@ -1285,6 +1285,9 @@ async function navigateTabAndWaitForCommit(tabId, url) {
   listen(events.onReferenceFragmentUpdated, committed);
   listen(events.onHistoryStateUpdated, committed);
   listen(events.onErrorOccurred, details => {
+    // Recovering a hung renderer can abort the outgoing page's own load before
+    // this navigation is requested; that error is not this navigation's.
+    if (!navigationRequested) return;
     if (details.tabId === tabId && details.frameId === 0) finish({
       success: false, errorCode: 'navigation_failed', error: details.error,
       outcome: 'failed', mayHaveExecuted: false
@@ -1301,7 +1304,7 @@ async function navigateTabAndWaitForCommit(tabId, url) {
   try {
     const recoverRenderer = async () => {
       if (typeof recoverStalledTabNavigation !== 'function') return false;
-      try { return await recoverStalledTabNavigation(tabId, () => !settled); }
+      try { return await recoverStalledTabNavigation(tabId, () => !settled, { allowCrash: !navigationRequested }); }
       catch (error) {
         globalThis.automationLogger?.debug('Navigation renderer recovery failed', { tabId, error: error.message || String(error) });
         return false;

@@ -19027,10 +19027,11 @@ async function prepareCdpTextTarget(tabId, selector, position) {
   return result?.result || { success: false, error: 'Unable to inspect editable field' };
 }
 
-async function recoverStalledTabNavigation(tabId, stillPending) {
+async function recoverStalledTabNavigation(tabId, stillPending, { allowCrash = true } = {}) {
   // A slow network can delay a commit too; terminate only a renderer that cannot answer.
+  // The probe skips the document_idle wait so a page that is still parsing can answer.
   let probeTimer;
-  const probe = chrome.scripting.executeScript({ target: { tabId }, func: () => true });
+  const probe = chrome.scripting.executeScript({ target: { tabId }, func: () => true, injectImmediately: true });
   const responsive = await Promise.race([
     probe.then(() => true, () => true),
     new Promise(resolve => { probeTimer = setTimeout(() => resolve(false), 500); })
@@ -19053,10 +19054,30 @@ async function recoverStalledTabNavigation(tabId, stillPending) {
     globalThis.automationLogger?.debug('Navigation renderer recovery attached', { tabId, reused: !!reuseOwnedSession });
     if (!stillPending()) return false;
     let commandTimer;
-    await Promise.race([
-      chrome.debugger.sendCommand({ tabId }, 'Runtime.terminateExecution'),
-      new Promise((_, reject) => { commandTimer = setTimeout(() => reject(new Error('Navigation recovery timed out')), 2000); })
-    ]).finally(() => clearTimeout(commandTimer));
+    try {
+      await Promise.race([
+        chrome.debugger.sendCommand({ tabId }, 'Runtime.terminateExecution'),
+        new Promise((_, reject) => { commandTimer = setTimeout(() => reject(new Error('Navigation recovery timed out')), 2000); })
+      ]).finally(() => clearTimeout(commandTimer));
+    } catch (error) {
+      // Chrome 156 refuses Runtime.terminateExecution from extension debugger
+      // clients. Crashing the hung renderer before the navigation is requested
+      // lets it commit in a fresh one, and the tab keeps its id. Once the
+      // navigation is pending the crash no longer frees the tab, so callers
+      // allow it only before then.
+      if (!allowCrash || !/not allowed for untrusted clients/i.test((error && error.message) || String(error))) throw error;
+      if (!stillPending()) return false;
+      // A crash also takes down any tab sharing the renderer process, so a
+      // long task gets one more second to finish first.
+      let graceTimer;
+      const answered = await Promise.race([
+        probe.then(() => true, () => true),
+        new Promise(resolve => { graceTimer = setTimeout(() => resolve(false), 1000); })
+      ]).finally(() => clearTimeout(graceTimer));
+      if (answered || !stillPending()) return false;
+      globalThis.automationLogger?.debug('Navigation renderer crash requested', { tabId });
+      return await crashStalledRenderer(tabId);
+    }
     return true;
   } finally {
     if (attached) {
@@ -19064,6 +19085,28 @@ async function recoverStalledTabNavigation(tabId, stillPending) {
     }
     lease?.release();
   }
+}
+
+// Page.crash never answers. The debugger stays attached and reports
+// Inspector.targetCrashed instead. Resolves true on that event, or false if
+// Chrome refuses the crash or the short bound passes first. The navigation
+// goes ahead either way.
+function crashStalledRenderer(tabId) {
+  return new Promise(resolve => {
+    const onEvent = chrome.debugger.onEvent;
+    let timer;
+    const listener = (source, method) => {
+      if (source && source.tabId === tabId && method === 'Inspector.targetCrashed') done(true);
+    };
+    const done = crashed => {
+      clearTimeout(timer);
+      if (onEvent && typeof onEvent.removeListener === 'function') onEvent.removeListener(listener);
+      resolve(crashed);
+    };
+    if (onEvent && typeof onEvent.addListener === 'function') onEvent.addListener(listener);
+    timer = setTimeout(() => done(false), 1000);
+    Promise.resolve(chrome.debugger.sendCommand({ tabId }, 'Page.crash')).catch(() => done(false));
+  });
 }
 
 async function requireForegroundNativeInput(tabId) {
