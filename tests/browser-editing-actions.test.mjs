@@ -45,6 +45,9 @@ async function openFixture(name) {
   const fixture = new URL(`./fixtures/${name}`, import.meta.url).href;
   const child = spawn(chrome, [
     '--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check',
+    // A crashed renderer must exit at once. On CI runners the crash reporter
+    // can hold it mid-dump indefinitely, so Chrome never reports the crash.
+    '--disable-breakpad', '--disable-crash-reporter',
     '--remote-debugging-port=0', '--enable-unsafe-extension-debugging', `--user-data-dir=${profile}`, fixture
   ], { stdio: ['ignore', 'ignore', 'pipe'] });
   let launchError, launchStderr = '';
