@@ -47,7 +47,8 @@ async function openFixture(name) {
     '--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check',
     // A crashed renderer must exit at once. On CI runners the crash reporter
     // can hold it mid-dump indefinitely, so Chrome never reports the crash.
-    '--disable-breakpad', '--disable-crash-reporter',
+    // Only this switch stops the Linux crashpad handler from starting.
+    '--disable-crashpad-for-testing',
     '--remote-debugging-port=0', '--enable-unsafe-extension-debugging', `--user-data-dir=${profile}`, fixture
   ], { stdio: ['ignore', 'ignore', 'pipe'] });
   let launchError, launchStderr = '';
