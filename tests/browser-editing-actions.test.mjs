@@ -578,7 +578,8 @@ test('MV3 public navigation recovers owned tabs before and after keyboard input'
     const workerSource = `
       importScripts('utils/cdp-lease.js', 'utils/debugger-sessions.js', 'utils/agent-registry.js', 'utils/keyboard-emulator.js', 'utils/screenshot-capture.js', 'ws/mcp-tool-dispatcher.js');
       globalThis.__uatLogs = [];
-      globalThis.automationLogger = { debug: (name, data) => __uatLogs.push({name, ...data}), logActionExecution() {}, error() {}, info() {}, warn() {} };
+      const __uatStarted = Date.now();
+      globalThis.automationLogger = { debug: (name, data) => __uatLogs.push({name, ...data, ms: Date.now() - __uatStarted}), logActionExecution() {}, error() {}, info() {}, warn() {} };
       let keyboardEmulator = null;
       ${section('function isCdpDebuggerContention(', '\nasync function runLegacyCdpMessageWithLease(')}
       ${section('async function recoverStalledTabNavigation(', '\nasync function dispatchCdpTextInsertion(')}
@@ -605,6 +606,8 @@ test('MV3 public navigation recovers owned tabs before and after keyboard input'
     assert.ok(worker, 'test extension service worker started');
     workerSocket = new WebSocketClient(worker.webSocketDebuggerUrl);
     await new Promise(resolve => workerSocket.addEventListener('open', resolve, { once: true }));
+    // The worker target can be listed before its script has run.
+    for (let i = 0; i < 50 && !(await evaluate(workerSocket, 'typeof __uatReady !== "undefined"')); i++) await sleep(100);
     await evaluate(workerSocket, '__uatReady');
     const agent = await evaluate(workerSocket, 'fsbAgentRegistryInstance.registerAgent()');
     const agentId = agent.agentId;
@@ -639,7 +642,7 @@ test('MV3 public navigation recovers owned tabs before and after keyboard input'
       const started = Date.now();
       const navigated = await route('navigate', { tabId, ownershipToken: opened.ownershipToken,
         url: origin + '/destination' });
-      assert.equal(navigated.success, true, JSON.stringify(navigated));
+      assert.equal(navigated.success, true, JSON.stringify({ navigated, logs: await evaluate(workerSocket, '__uatLogs') }));
       assert.equal(navigated.recovered, true, JSON.stringify(await evaluate(workerSocket, '__uatLogs')));
       assert.ok(Date.now() - started < 5000, 'navigation interrupts rather than waiting for the loop');
       const destination = await evaluate(workerSocket, `chrome.scripting.executeScript({target:{tabId:${tabId}},func:()=>document.getElementById('destination')?.textContent})`);
@@ -653,7 +656,7 @@ test('MV3 public navigation recovers owned tabs before and after keyboard input'
     await sleep(200);
     const nav = await route('navigate', { tabId: immediate.tabId, ownershipToken: immediate.ownershipToken,
       url: origin + '/destination' });
-    assert.equal(nav.success, true, JSON.stringify(nav));
+    assert.equal(nav.success, true, JSON.stringify({ nav, logs: await evaluate(workerSocket, '__uatLogs') }));
     assert.equal(nav.recovered, true);
     await evaluate(workerSocket, `chrome.tabs.remove(${immediate.tabId})`);
     // Leaving a page that is still loading aborts that page's own load; the
