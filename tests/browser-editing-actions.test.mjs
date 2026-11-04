@@ -45,10 +45,6 @@ async function openFixture(name) {
   const fixture = new URL(`./fixtures/${name}`, import.meta.url).href;
   const child = spawn(chrome, [
     '--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check',
-    // A crashed renderer must exit at once. On CI runners the crash reporter
-    // can hold it mid-dump indefinitely, so Chrome never reports the crash.
-    // Only this switch stops the Linux crashpad handler from starting.
-    '--disable-crashpad-for-testing',
     '--remote-debugging-port=0', '--enable-unsafe-extension-debugging', `--user-data-dir=${profile}`, fixture
   ], { stdio: ['ignore', 'ignore', 'pipe'] });
   let launchError, launchStderr = '';
@@ -555,6 +551,8 @@ test('Chrome recovery stays bounded when attaching to an already-hung renderer',
 // A disposable MV3 extension uses the real debugger API and the production
 // dispatcher/registry/session code. No inspector session is opened on the
 // controlled page by the test runner, so it cannot accidentally warm that page.
+// Recovery crashes a renderer, so on Linux this needs a kernel.core_pattern that
+// does not pipe to a handler such as systemd-coredump (see the CI workflows).
 test('MV3 public navigation recovers owned tabs before and after keyboard input', { skip: !chrome }, async () => {
   const fixture = await openFixture('nested-text-editor.html');
   const server = createServer((request, response) => {
