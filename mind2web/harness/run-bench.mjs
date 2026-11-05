@@ -60,6 +60,16 @@ export async function runScriptedTask(task, rawDir, serverCommand, env = process
   } finally { await client.close(); }
 }
 
+// Reports each part as it starts, so a later failure still closes the earlier ones.
+export async function startIsolatedRig({ checks, serverCommand, runDir, createHub, onStarted }) {
+  const auth = JSON.parse(await readFile(path.join(homedir(), '.fsb/bridge-auth.json'), 'utf8'));
+  if (!auth.allowedExtensionOrigin || !auth.sessionSecret) throw new Error('Live rig needs an existing FSB bridge pairing');
+  const hub = createHub(serverCommand); onStarted({ hub }); await hub.initialize();
+  const browser = await launchChrome({ chromePath: checks.chromePath, extensionDir: path.join(REPO_ROOT, 'extension'), userDataDir: path.join(runDir, 'chrome-profile') });
+  onStarted({ browser });
+  await seedExtensionStorage(browser.cdp, `fsb-auth.${auth.sessionSecret}`, auth.allowedExtensionOrigin); await dismissDialogs(browser.cdp);
+}
+
 export async function runBench(o, dependencies = {}) {
   const dry = o['dry-run'];
   const signal = dependencies.signal;
@@ -68,6 +78,8 @@ export async function runBench(o, dependencies = {}) {
   const run = dependencies.runCommand ?? runCommand;
   const drivers = { claude: runClaudeTask, codex: runCodexTask, ...dependencies.drivers };
   const createHub = dependencies.createHub ?? (command => new StdioClient(command));
+  const startRig = dependencies.startIsolatedRig ?? startIsolatedRig;
+  const focus = dependencies.checkFocus ?? checkFocus;
   const runDir = path.join(dependencies.resultsDir ?? RESULTS_DIR, o['run-id']);
   await mkdir(runDir, { recursive: true });
   const releaseLock = await acquireRunLock(runDir);
@@ -91,7 +103,13 @@ export async function runBench(o, dependencies = {}) {
   }
   async function health(sourcePath) {
     const checks = await inspect({ full: o.tasks === 'all', chromePath: o.chrome, datasetPath: sourcePath,
-      browserMode: o.browser, driver: o.driver, serverCommand: manifest.server_command, checkDataset: false });
+      browserMode: o.browser, bridgeRunning: !!hub, driver: o.driver, serverCommand: manifest.server_command, checkDataset: false });
+    // A retry would fail the focus gate at once, so it waits for that too.
+    if (o.browser === 'isolated' && hub) {
+      const front = await focus();
+      checks.checks.push({ name: 'chrome_focus', ok: front.ok, detail: front.ok ? 'Chrome for Testing is frontmost' : `Chrome for Testing must be frontmost; found ${front.frontmost ?? front.error}` });
+      checks.ok &&= front.ok;
+    }
     await atomicJson(path.join(runDir, 'preflight.json'), checks);
     return checks;
   }
@@ -176,11 +194,7 @@ export async function runBench(o, dependencies = {}) {
         if (checks.ok) {
           manifest.preflight = checks;
           if (o.browser === 'isolated') {
-            const auth = JSON.parse(await readFile(path.join(homedir(), '.fsb/bridge-auth.json'), 'utf8'));
-            if (!auth.allowedExtensionOrigin || !auth.sessionSecret) throw new Error('Live rig needs an existing FSB bridge pairing');
-            hub = createHub(serverCommand); await hub.initialize();
-            browser = await launchChrome({ chromePath: checks.chromePath, extensionDir: path.join(REPO_ROOT, 'extension'), userDataDir: path.join(runDir, 'chrome-profile') });
-            await seedExtensionStorage(browser.cdp, `fsb-auth.${auth.sessionSecret}`, auth.allowedExtensionOrigin); await dismissDialogs(browser.cdp);
+            await startRig({ checks, serverCommand, runDir, createHub, onStarted: started => { hub = started.hub ?? hub; browser = started.browser ?? browser; } });
             manifest.chrome_version = browser.version;
           }
           break;
@@ -208,7 +222,7 @@ export async function runBench(o, dependencies = {}) {
           attempt = { task_id: task.task_id, index: attempts.length + 1, raw_dir: rawDir, state: 'running', started_at: new Date().toISOString() };
           manifest.attempts.push(attempt); manifest.state = 'running'; manifest.current_task_id = task.task_id;
           await checkpoint();
-          if (!dry && o.browser === 'isolated' && !(await checkFocus()).ok) final = { outcome: 'rig_failure', error: 'Chrome for Testing must be frontmost' };
+          if (!dry && o.browser === 'isolated' && !(await focus()).ok) final = { outcome: 'rig_failure', error: 'Chrome for Testing must be frontmost' };
           else final = dry && !o['real-agent'] ? await runScriptedTask(task, rawDir, serverCommand, env) : await drivers[o.driver]({ task, rawDir, serverCommand,
             model: o.model, effort: o.effort, maxTurns: Number(o['max-turns']), maxActions: Number(o['max-actions']), timeoutMs: Number(o['timeout-seconds']) * 1000, budgetUsd: Number(o['budget-usd']), env, signal });
         }

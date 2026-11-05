@@ -24,11 +24,11 @@ export async function bridgeStatus(command, run = runCommand) {
 }
 
 export async function preflight({ full = false, minGb = full ? 15 : 2, chromePath, datasetPath, run = runCommand, filesystem = statfs, token,
-  browserMode = 'isolated', driver = 'claude', serverCommand, checkDataset = true, checkJudges = false } = {}) {
+  browserMode = 'isolated', bridgeRunning = false, driver = 'claude', serverCommand, checkDataset = true, checkJudges = false } = {}) {
   const nativeEntry = path.join(homedir(), '.fsb/native-host/runtime/package/build/index.js');
   serverCommand ??= browserMode === 'existing' && existsSync(nativeEntry) ? [process.execPath, nativeEntry, 'stdio'] : ['npx', '-y', 'fsb-mcp-server@0.11.2', 'stdio'];
   const checks = [];
-  if (browserMode === 'existing') checks.push({ name: 'extension', ...await bridgeStatus(serverCommand, run) });
+  if (browserMode === 'existing' || bridgeRunning) checks.push({ name: 'extension', ...await bridgeStatus(serverCommand, run) });
   else {
     const listeners = await run('lsof', ['-nP', '-iTCP:7225', '-iTCP:7226', '-sTCP:LISTEN']);
     checks.push({ name: 'bridge_ports', ok: listeners.code === 1 && !listeners.stdout.trim(), detail: listeners.stdout.trim() || listeners.stderr.trim() || 'Ports 7225 and 7226 are free' });

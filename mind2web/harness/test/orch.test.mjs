@@ -50,6 +50,17 @@ test('preflight reports occupied ports without connecting or killing anything', 
     run: async cmd => ({ code: 0, stdout: cmd === 'lsof' ? 'node 48247 user TCP 127.0.0.1:7225 (LISTEN)' : 'version', stderr: '' }) });
   assert.equal(report.ok, false); assert.equal(report.checks.find(c => c.name === 'bridge_ports').ok, false);
 });
+test('a bridge this run already holds is checked through status, not its ports', async () => {
+  for (const [stdout, ok] of [['Ext: yes', true], ['Ext: no', false]]) {
+    const commands = [];
+    const report = await preflight({ bridgeRunning: true, serverCommand: ['npx', '-y', 'fsb-mcp-server', 'stdio'], datasetPath: '/fixture', chromePath: process.execPath,
+      filesystem: async () => ({ bavail: 100, bsize: 1e9 }),
+      run: async (cmd, args = []) => { commands.push(cmd); return { code: 0, stdout: args.at(-1) === 'status' ? stdout : 'version', stderr: '' }; } });
+    assert.equal(commands.includes('lsof'), false);
+    assert.equal(report.checks.some(c => c.name === 'bridge_ports'), false);
+    assert.equal(report.checks.find(c => c.name === 'extension').ok, ok);
+  }
+});
 test('CLI validates run IDs and limits', () => {
   assert.equal(options(['--dry-run', '--run-id', 'test-1'])['dry-run'], true);
   assert.throws(() => options(['--run-id', '../escape']));

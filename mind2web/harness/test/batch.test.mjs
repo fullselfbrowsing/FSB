@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { options, runBench } from '../run-bench.mjs';
+import { options, runBench, startIsolatedRig } from '../run-bench.mjs';
 import { preflight } from '../preflight.mjs';
 import { localHfToken, DATASET_REV } from '../dataset.mjs';
 import { atomicJson, acquireRunLock, failureClass } from '../run-state.mjs';
@@ -150,6 +150,63 @@ test('quota recovery waits for availability and preserves both attempts before o
   assert.equal(manifest.collection_complete, true); assert.equal(manifest.attempts.length, 2); assert.equal(probes, 2);
   assert.equal(manifest.attempts[0].failure_class, 'quota'); assert.equal(manifest.outcomes[0].selected_attempt, 2);
   assert.equal(JSON.parse(await readFile(path.join(runDir, 'summary.json'))).input_tokens, 17);
+});
+test('isolated recovery checks the bridge it is already running', async t => {
+  const { o, deps, observed } = await fixture(t, 1); o.browser = 'isolated'; o['wait-for-resources'] = true;
+  const controller = new AbortController(); deps.signal = controller.signal;
+  let rigStarted = false, inspections = 0;
+  const running = [];
+  deps.checkFocus = async () => ({ ok: true });
+  deps.startIsolatedRig = async ({ onStarted }) => {
+    rigStarted = true;
+    onStarted({ hub: { close: async () => {} }, browser: { version: 'fake', cdp: { send: async () => ({ targetInfos: [] }) }, close: async () => {} } });
+  };
+  // The real check refuses ports while this run's own hub holds them.
+  deps.preflight = async ({ bridgeRunning }) => {
+    if (++inspections > 5) controller.abort();
+    running.push(bridgeRunning);
+    return { ok: !rigStarted || bridgeRunning === true, checks: [{ name: 'bridge_ports', ok: false, detail: 'Held by this run' }] };
+  };
+  deps.drivers.codex = async args => {
+    observed.calls.push(args.task.task_id);
+    return observed.calls.length === 1 ? { outcome: 'rig_failure', error: 'Extension disconnected' } : completedAttempt(args);
+  };
+  const { manifest } = await runBench(o, deps);
+  assert.equal(observed.calls.length, 2, 'the failed task is retried once the running rig passes');
+  assert.equal(manifest.collection_complete, true);
+  assert.deepEqual(running, [false, true], 'startup still requires free ports');
+});
+test('isolated recovery keeps its one retry until Chrome is frontmost again', async t => {
+  const { o, deps, observed } = await fixture(t, 1); o.browser = 'isolated'; o['wait-for-resources'] = true;
+  const answers = [false, false, false, true, true];
+  deps.checkFocus = async () => ({ ok: answers.shift() ?? true, frontmost: 'Finder' });
+  deps.startIsolatedRig = async ({ onStarted }) => {
+    onStarted({ hub: { close: async () => {} }, browser: { version: 'fake', cdp: { send: async () => ({ targetInfos: [] }) }, close: async () => {} } });
+  };
+  deps.preflight = async () => ({ ok: true, checks: [] });
+  const { manifest } = await runBench(o, deps);
+  assert.equal(manifest.collection_complete, true);
+  assert.equal(manifest.attempts.length, 2, 'the retry waits for focus instead of failing the same gate');
+  assert.equal(observed.calls.length, 1);
+  assert.equal(answers.length, 0);
+});
+test('a hub that fails to start is still handed back to be closed', async t => {
+  const home = await mkdtemp(path.join(tmpdir(), 'om2w-rig-test-'));
+  const savedHome = process.env.HOME; process.env.HOME = home;
+  t.after(async () => { process.env.HOME = savedHome; await rm(home, { recursive: true, force: true }); });
+  await mkdir(path.join(home, '.fsb'));
+  await writeFile(path.join(home, '.fsb/bridge-auth.json'), JSON.stringify({ allowedExtensionOrigin: 'chrome-extension://fixture', sessionSecret: 'fixture' }));
+  const hub = { initialize: async () => { throw new Error('Hub did not start'); } }, started = [];
+  await assert.rejects(startIsolatedRig({ checks: {}, serverCommand: ['fixture'], runDir: home, createHub: () => hub, onStarted: part => started.push(part) }), /Hub did not start/);
+  assert.deepEqual(started, [{ hub }]);
+});
+test('a failed isolated start still closes the parts that came up', async t => {
+  const { o, deps } = await fixture(t, 1); o.browser = 'isolated';
+  let closed = 0;
+  deps.preflight = async () => ({ ok: true, checks: [] });
+  deps.startIsolatedRig = async ({ onStarted }) => { onStarted({ hub: { close: async () => { closed++; } } }); throw new Error('Chrome did not start'); };
+  await assert.rejects(runBench(o, deps), /Chrome did not start/);
+  assert.equal(closed, 1);
 });
 test('resuming a quota pause does not spend the infrastructure retry until a readiness probe passes', async t => {
   const { o, deps, observed } = await fixture(t, 1);
