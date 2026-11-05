@@ -291,7 +291,7 @@ VS Code uses the `servers` root key and requires `type: "stdio"`:
 }
 ```
 
-Cline (`~/.cline/data/settings/cline_mcp_settings.json`) is shared by the Cline VS Code extension, JetBrains plugin, and CLI. The installer honors `CLINE_MCP_SETTINGS_PATH`, `CLINE_DATA_DIR`, and `CLINE_DIR` the way Cline does, and falls back to the VS Code extension-storage file used by older Cline builds only when no shared settings directory exists. `timeout` is in seconds: Cline applies one fixed timeout per request, 60 seconds by default, which would cut off a long `run_task`.
+Cline (`~/.cline/data/settings/cline_mcp_settings.json`) is shared by the Cline VS Code extension, JetBrains plugin, and CLI. The installer honors `CLINE_MCP_SETTINGS_PATH`, `CLINE_DATA_DIR`, and `CLINE_DIR` the way Cline does, and falls back to the VS Code extension-storage file used by older Cline builds only when no override is set and no shared settings directory exists. `timeout` is in seconds: Cline applies one fixed timeout per request, 60 seconds by default, which would cut off a long `run_task`.
 
 ```json
 {

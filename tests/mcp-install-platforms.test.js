@@ -526,6 +526,53 @@ function run() {
     );
   });
 
+  console.log('\n--- cline path overrides never fall back to the legacy settings ---');
+  withTempHome('mcp-install-cline-env-missing', (fixture) => {
+    const legacyPath = clineLegacySettingsPath(fixture);
+    const legacyText = JSON.stringify({ mcpServers: { fsb: { command: 'legacy-fsb' } } }, null, 2);
+    writeText(legacyPath, legacyText);
+    const missingRoot = path.join(fixture.root, 'missing');
+    const settingsFile = 'cline_mcp_settings.json';
+    const explicitPath = path.join(missingRoot, 'explicit', settingsFile);
+    const dataDir = path.join(missingRoot, 'data');
+    const clineDir = path.join(missingRoot, 'cline-home');
+
+    for (const [name, value, settingsPath] of [
+      ['CLINE_MCP_SETTINGS_PATH', explicitPath, explicitPath],
+      ['CLINE_DATA_DIR', dataDir, path.join(dataDir, 'settings', settingsFile)],
+      ['CLINE_DIR', clineDir, path.join(clineDir, 'data', 'settings', settingsFile)],
+    ]) {
+      const installed = runCli(['install', '--cline'], fixture, { env: { [name]: value } });
+      const installOutput = `${installed.stdout}${installed.stderr}`;
+      assertIncludes(
+        installOutput,
+        `Directory does not exist: ${path.dirname(settingsPath)}`,
+        `${name} reports its missing directory`,
+      );
+      assertNotIncludes(installOutput, 'legacy VS Code settings', `${name} is not replaced by the legacy settings`);
+      assertEqual(fs.readFileSync(legacyPath, 'utf8'), legacyText, `${name} leaves the legacy settings untouched`);
+      assert(!fs.existsSync(missingRoot), `${name} does not create the missing directory`);
+
+      const preview = runCli(['install', '--cline', '--dry-run'], fixture, { env: { [name]: value } });
+      const previewOutput = `${preview.stdout}${preview.stderr}`;
+      assertIncludes(previewOutput, settingsPath, `${name} previews the requested settings file`);
+      assertNotIncludes(previewOutput, legacyPath, `${name} does not preview the legacy settings`);
+    }
+
+    runCli(['install', '--all'], fixture, { env: { CLINE_DIR: clineDir } });
+    assertEqual(fs.readFileSync(legacyPath, 'utf8'), legacyText, 'install --all leaves the legacy settings untouched');
+
+    runCli(['uninstall', '--cline'], fixture, { env: { CLINE_DIR: clineDir } });
+    assertEqual(fs.readFileSync(legacyPath, 'utf8'), legacyText, 'uninstall keeps the fsb entry in the legacy settings');
+
+    const blank = runCli(['install', '--cline', '--dry-run'], fixture, { env: { CLINE_DIR: '   ' } });
+    assertIncludes(
+      `${blank.stdout}${blank.stderr}`,
+      legacyPath,
+      'a blank override still falls back to the legacy settings',
+    );
+  });
+
   console.log('\n--- native target isolation ---');
   withTempHome('mcp-native-target-isolation', (fixture) => {
     const helpResult = runCli(['--help'], fixture);

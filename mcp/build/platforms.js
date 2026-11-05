@@ -24,10 +24,13 @@ function clineMcpSettingsPaths() {
     const settingsPath = explicitPath || join(dataDir, 'settings', CLINE_MCP_SETTINGS_FILE);
     return { darwin: settingsPath, win32: settingsPath, linux: settingsPath };
 }
+function hasClinePathOverride() {
+    return ['CLINE_MCP_SETTINGS_PATH', 'CLINE_DATA_DIR', 'CLINE_DIR'].some((name) => process.env[name]?.trim());
+}
 /**
  * Older Cline builds kept MCP settings in VS Code's extension storage. Current
  * builds import that file once on upgrade and then ignore it, so it is only a
- * fallback for machines that have no shared Cline settings directory.
+ * fallback for machines with no path override and no shared settings directory.
  */
 const CLINE_LEGACY_VSCODE_PATHS = vsCodeGlobalStorage('saoudrizwan.claude-dev', CLINE_MCP_SETTINGS_FILE);
 /**
@@ -370,12 +373,16 @@ function getPlatformTargetCandidates(platformKey, platform) {
         ];
     }
     if (platformKey === 'cline') {
+        const shared = {
+            configPath,
+            targetLabel: platform.displayName,
+            variant: null,
+        };
+        // An override names the only file Cline reads, even before its directory exists.
+        if (hasClinePathOverride())
+            return [shared];
         return [
-            {
-                configPath,
-                targetLabel: platform.displayName,
-                variant: null,
-            },
+            shared,
             {
                 configPath: CLINE_LEGACY_VSCODE_PATHS[process.platform],
                 targetLabel: platform.displayName + ' (legacy VS Code settings)',

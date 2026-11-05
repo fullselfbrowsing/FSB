@@ -8,6 +8,7 @@ All notable changes to `fsb-mcp-server` are documented in this file. Each entry 
 - Share semantic isolation checks between discovery and task preflight. Harmless metadata, description, and ordering additions no longer invalidate a compatible CLI; enabled external customizations and unexpected authority remain blocked.
 - Wait for ACP probe responses before closing stdin, tolerate bounded additive protocol metadata, and retain explicit OAuth sign-in behavior. Preserve private credentials and session journals when updating FSB-owned profile files.
 - Preserve concrete capability, isolation, sandbox, protocol, and binary-change refusals through doctor, connection tests, and schema-2 compatibility snapshots. Pair with the matching extension for the new **Verified** status and reason codes; rerun native-host installation after publication to replace the staged package runtime.
+- `install --cline` no longer edits the legacy VS Code settings file when `CLINE_MCP_SETTINGS_PATH`, `CLINE_DATA_DIR`, or `CLINE_DIR` points to a directory that does not exist yet. It reports the missing directory instead.
 
 <a id="v0.11.5"></a>
 
