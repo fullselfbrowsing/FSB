@@ -37,3 +37,23 @@ test('driver records wall-clock expiry even without a CLI result', async t => {
   const final = await runClaudeTask({ task, rawDir: path.join(root, 'raw'), command, serverCommand: ['unused'], timeoutMs: 100 });
   assert.equal(final.outcome, 'timeout'); assert.equal(final.final_answer, null);
 });
+const lateAnswer = `setTimeout(() => {
+  console.log(JSON.stringify({ type: 'result', subtype: 'success', num_turns: 1, result: 'late answer' }));
+  process.exit(0);
+}, 1500); setInterval(() => {}, 1000);`;
+test('cancelling a run stops the CLI before it can finish the task', async t => {
+  const { root, command } = await cliFixture(t, lateAnswer);
+  const rawDir = path.join(root, 'raw'), controller = new AbortController(), started = Date.now();
+  setTimeout(() => controller.abort(), 100);
+  const final = await runClaudeTask({ task, rawDir, command, serverCommand: ['unused'], signal: controller.signal });
+  assert.ok(Date.now() - started < 1200, 'the CLI is stopped, not waited for');
+  assert.notEqual(final.outcome, 'complete'); assert.equal(final.final_answer, null);
+  assert.doesNotMatch(await readFile(path.join(rawDir, 'stream.jsonl'), 'utf8').catch(() => ''), /late answer/);
+});
+test('a run that is already cancelled never completes the task', async t => {
+  const { root, command } = await cliFixture(t, lateAnswer);
+  const started = Date.now();
+  const final = await runClaudeTask({ task, rawDir: path.join(root, 'raw'), command, serverCommand: ['unused'], signal: AbortSignal.abort() });
+  assert.ok(Date.now() - started < 1200, 'the CLI is stopped, not waited for');
+  assert.notEqual(final.outcome, 'complete'); assert.equal(final.final_answer, null);
+});

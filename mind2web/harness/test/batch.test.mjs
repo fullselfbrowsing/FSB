@@ -91,6 +91,17 @@ test('full benchmark rejects any dataset other than 300 tasks before browser act
   const { o, deps, observed } = await fixture(t); o.tasks = 'all';
   await assert.rejects(runBench(o, deps), /exactly 300/); assert.equal(observed.calls.length, 0);
 });
+test('a run hands its cancellation signal to the driver', async t => {
+  const { o, deps } = await fixture(t, 1);
+  const controller = new AbortController(); deps.signal = controller.signal;
+  let received;
+  deps.drivers.codex = async args => {
+    received = args.signal; controller.abort();
+    return { outcome: 'rig_failure', error: 'Test interruption after the driver started' };
+  };
+  await runBench(o, deps);
+  assert.equal(received, controller.signal);
+});
 test('all-task selection freezes exactly 300 IDs in dataset order before the first attempt', async t => {
   const { o, deps, observed, runDir } = await fixture(t, 300); o.tasks = 'all';
   const controller = new AbortController(); deps.signal = controller.signal;

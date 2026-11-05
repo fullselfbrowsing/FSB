@@ -5,7 +5,7 @@ import path from 'node:path';
 import { BENCH_ROOT, HARNESS_DIR, runCommand } from './proc.mjs';
 import { deriveOutcome } from './outcomes.mjs';
 
-export async function runClaudeTask({ task, rawDir, serverCommand, model = 'claude-opus-5-5', effort = 'medium', maxTurns = 60, timeoutMs = 600_000, budgetUsd = 5, env = process.env, command = 'claude' }) {
+export async function runClaudeTask({ task, rawDir, serverCommand, model = 'claude-opus-5-5', effort = 'medium', maxTurns = 60, timeoutMs = 600_000, budgetUsd = 5, env = process.env, command = 'claude', signal }) {
   await mkdir(rawDir, { recursive: true });
   rawDir = path.resolve(rawDir);
   const work = await mkdtemp(path.join(tmpdir(), 'om2w-agent-'));
@@ -34,7 +34,7 @@ export async function runClaudeTask({ task, rawDir, serverCommand, model = 'clau
     delete cleanEnv.CLAUDE_CODE_ENTRYPOINT;
     delete cleanEnv.HF_TOKEN;
     delete cleanEnv.HUGGING_FACE_HUB_TOKEN;
-    const execution = await runCommand(command, args, { cwd: work, env: cleanEnv, input: `Starting website: ${task.website}\nTask: ${task.confirmed_task}\n`, timeoutMs, capture: false,
+    const execution = await runCommand(command, args, { cwd: work, env: cleanEnv, input: `Starting website: ${task.website}\nTask: ${task.confirmed_task}\n`, timeoutMs, capture: false, signal,
       onStdout: chunk => {
         appendFileSync(path.join(rawDir, 'stream.jsonl'), chunk);
         pending += chunk;
