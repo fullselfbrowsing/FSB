@@ -169,8 +169,8 @@
     return typeof english === 'string' && Object.prototype.hasOwnProperty.call(EXACT, english) ? EXACT[english] : null;
   }
 
-  // A substitution that is catalog copy itself ("this site", "Unknown error")
-  // is translated too; raw values such as domains and provider names are not.
+  // Substitutions are shown as given: they can hold recorded page text, which
+  // must never change. Only an explicit { english, subs } source is translated.
   function line(english, subs) {
     var key = exactKey(english);
     if (key) return text(key, english, subs);
@@ -222,10 +222,10 @@
     node.removeAttribute('data-i18n-shown');
   }
 
-  // Live nodes keep their substitutions in English. A value that is catalog
-  // copy itself ("Selected provider", a start-failure reason) is translated
-  // with the template, so a language change reaches the whole line. Nested
-  // sources keep their own template and substitutions for the same reason.
+  // Live nodes keep their substitutions in English. FSB's own copy passed as a
+  // substitution ("Selected provider", a start-failure reason) is marked as an
+  // { english, subs } source and translated with the template, so a language
+  // change reaches the whole line. Any other value is left alone.
   function liveSubs(subs) {
     if (!subs || typeof subs !== 'object' || Array.isArray(subs)) return subs;
     var out = {};
@@ -236,7 +236,7 @@
           && typeof value.english === 'string') {
         out[name] = line(value.english, value.subs);
       } else {
-        out[name] = exactKey(value) ? line(value) : value;
+        out[name] = value;
       }
     });
     return out;

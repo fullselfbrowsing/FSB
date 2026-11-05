@@ -822,7 +822,7 @@ function sidepanelMessageContext(api) {
   for (const name of ['_delegationElement', '_renderDelegationRunHeader']) vm.runInContext(extractNamedFunction(source, name), context);
   context._delegationSemanticHeading = (tag, cls, text, _tone, subs) => context._delegationElement(tag, cls, text, subs);
   for (const code of shipped.PUBLIC_LOCALES.filter((code) => code !== 'en')) {
-    for (const provider of [undefined, null, {}, { label: '' }, { label: 'Grok Build' }]) {
+    for (const provider of [undefined, null, {}, { label: '' }, { label: 'Grok Build' }, { label: 'Ready' }]) {
       shipped.setOverride(code);
       const container = messageNode();
       const snapshot = { delegationId: 'locale-run', state: 'failed', connection: 'connected', terminal: { code: 'provider_error' } };
@@ -863,14 +863,17 @@ function sidepanelMessageContext(api) {
   for (const code of shipped.PUBLIC_LOCALES.filter((code) => code !== 'en')) {
     shipped.setOverride(code);
     for (const error of ['Already completed', 'Session not found', 'Unknown error']) {
-      const subs = Object.freeze({ error });
+      const subs = Object.freeze({ error: Object.freeze({ english: error }) });
       const reason = shippedCatalogs[code][shipped.exact[error]];
       const expected = shippedCatalogs[code].shell_error_stop.replace('$ERROR$', () => reason);
       check(shipped.text('shell_error_stop', 'Error stopping automation: $ERROR$', subs) === expected,
         `${code} text() translates the catalog reason ${error}`);
       check(shipped.text('missing_stop_key', 'Error stopping automation: $ERROR$', subs)
-          === 'Error stopping automation: ' + reason && subs.error === error,
+          === 'Error stopping automation: ' + reason && subs.error.english === error,
         `${code} text() translates substitutions in an English fallback without changing the input`);
+      check(shipped.text('shell_error_stop', 'Error stopping automation: $ERROR$', { error })
+          === shippedCatalogs[code].shell_error_stop.replace('$ERROR$', () => error),
+        `${code} text() shows a plain substitution as given, even if it matches ${error}`);
       response = { success: false, error };
       context.stopAutomation();
       check(messages.at(-1).text === expected && messages.at(-1).type === 'error' && !context.stopRequested,
@@ -1148,7 +1151,7 @@ function sidepanelMessageContext(api) {
   check(panelSource.includes("fsbUiLocale.onChange(_relabelDelegationStop)"),
     'the side panel relabels the Stop button on a language change');
   const consent = extractNamedFunction(panelSource, '_renderDelegationConsent');
-  check(consent.includes("provider ? provider.label : 'The agent'") && !consent.includes(": 'Agent'"),
+  check(consent.includes("provider ? provider.label : { english: 'The agent' }") && !consent.includes(": 'Agent'"),
     'the consent dialog falls back to the cataloged "The agent" for a missing provider');
 }
 
@@ -1288,8 +1291,8 @@ function sidepanelMessageContext(api) {
 }
 
 // Delegation cards pass a template and its subs, never a filled line(), so a
-// language change re-renders the sentence and any substitution that is
-// catalog copy itself. A passing Grok Build test writes its translated line.
+// language change re-renders the sentence and any substitution marked as a
+// catalog source. A passing Grok Build test writes its translated line.
 {
   const panelSource = fs.readFileSync(path.join(root, 'extension/ui/sidepanel.js'), 'utf8');
   const shipped = freshLocale().fsbUiLocale;
@@ -1300,8 +1303,8 @@ function sidepanelMessageContext(api) {
   vm.runInContext(extractNamedFunction(panelSource, '_delegationElement'), context);
   const reason = 'the agent process could not be verified';
   const startTemplate = '$NAME$ could not start a delegated browser run because $REASON$ ($CODE$). Test Connection may still succeed because it does not start a delegated run. Retry the message or review provider setup.';
-  const heading = context._delegationElement('h2', '', '$NAME$ cannot run browser tasks', { name: 'Selected provider' });
-  const body = context._delegationElement('p', '', startTemplate, { name: 'Grok Build', reason, code: 'activation_failed' });
+  const heading = context._delegationElement('h2', '', '$NAME$ cannot run browser tasks', { name: { english: 'Selected provider' } });
+  const body = context._delegationElement('p', '', startTemplate, { name: 'Grok Build', reason: { english: reason }, code: 'activation_failed' });
   const expectHeading = () => shipped.line('$NAME$ cannot run browser tasks', { name: shipped.line('Selected provider') });
   const expectBody = () => shipped.line(startTemplate, { name: 'Grok Build', reason: shipped.line(reason), code: 'activation_failed' });
   check(heading.textContent === expectHeading() && body.textContent === expectBody(),
@@ -1324,18 +1327,18 @@ function sidepanelMessageContext(api) {
     'every Grok Build test result is written through markExact()');
 }
 
-// A substitution that is catalog copy follows the language, raw values do
-// not, and the side panel and control panel lines that used to be filled or
+// A substitution marked as a catalog source follows the language, raw values
+// do not, and the side panel and control panel lines that used to be filled or
 // concatenated keep their key across a switch.
 {
   const shipped = freshLocale().fsbUiLocale;
   const de = shippedCatalogs.de;
   const ja = shippedCatalogs.ja;
   shipped.setOverride('de');
-  check(shipped.line('Reconnaissance complete! Site map saved for $DOMAIN$.', { domain: 'this site' })
+  check(shipped.line('Reconnaissance complete! Site map saved for $DOMAIN$.', { domain: { english: 'this site' } })
       === de.copy_ca79bcd4d7.replace('$DOMAIN$', de.copy_fb625242db),
-    'line() translates a substitution that is catalog copy');
-  check(shipped.line('Reconnaissance failed to start: $ERROR$', { error: 'Unknown error' })
+    'line() translates a substitution marked as a catalog source');
+  check(shipped.line('Reconnaissance failed to start: $ERROR$', { error: { english: 'Unknown error' } })
       === de.copy_7654da628e.replace('$ERROR$', de.panel_27c2ccd962),
     'the side panel map resolves the Unknown error fallback');
   check(shipped.line('Starting reconnaissance on $DOMAIN$...', { domain: 'shop.example' }).includes('shop.example')
@@ -1412,7 +1415,7 @@ function sidepanelMessageContext(api) {
   check(badge.textContent === ja.copy_62c33d7a6c,
     'a language change re-renders a Grok Build result instead of the idle hint');
 
-  check(panelSource.includes("addMessage('Reconnaissance failed to start: $ERROR$', 'system', undefined, { error: error.message || 'Unknown error' })")
+  check(panelSource.includes("addMessage('Reconnaissance failed to start: $ERROR$', 'system', undefined, { error: error.message || { english: 'Unknown error' } })")
       && !panelSource.includes("'Reconnaissance failed: '"),
     'an explorer exception uses the failed-to-start template');
   check(!panelSource.includes("+ ' could not start this task."),
@@ -1787,6 +1790,98 @@ function sidepanelMessageContext(api) {
   check(hostile.textContent.includes(hostileValue) && notANumber.textContent.includes('NaN') && !notANumber.textContent.includes('$'),
     'raw and non-finite substitutions survive a language change');
 
+  // A substitution is shown as given even when it matches a catalog sentence:
+  // it can be recorded page text. Only an explicit source is FSB's own copy.
+  const textTemplate = 'Text: "$TEXT$"';
+  for (const word of ['Ready', 'Password', 'Cancel']) {
+    const expected = (code) => shippedCatalogs[code][key(textTemplate)].replace('$TEXT$', () => word);
+    shipped.setOverride('es');
+    const recorded = parseSpan(ctx.fsbUiHtml(textTemplate, { text: word }));
+    const written = fakeNode({}, '');
+    shipped.markExact(written, textTemplate, { text: word });
+    check(shipped.exact[word] && expected('es') !== textTemplate.replace('$TEXT$', word)
+        && shipped.line(textTemplate, { text: word }) === expected('es')
+        && shipped.text(key(textTemplate), textTemplate, { text: word }) === expected('es')
+        && recorded.textContent === expected('es') && written.textContent === expected('es'),
+      `recorded text "${word}" keeps its captured words while its label translates`);
+    shipped.setOverride('de');
+    shipped.apply(fakeDoc([recorded, written]));
+    check(recorded.textContent === expected('de') && written.textContent === expected('de'),
+      `recorded text "${word}" keeps its captured words after a language change`);
+  }
+
+  // The real replay step, as the control panel renders it.
+  const replayContext = makeContext(true);
+  vm.runInContext(extractNamedFunction(optionsSource, 'renderStep'), replayContext);
+  const replayNodes = {};
+  replayContext.escapeHtml = (value) => ctx.fsbUiEscape(value);
+  replayContext.document = { getElementById: (id) => (replayNodes[id] = replayNodes[id] || fakeNode({}, '')) };
+  replayContext.currentReplayData = { steps: [{ action: { tool: 'click', params: {} }, result: { success: true },
+    targeting: { selectorUsed: '#go', elementFound: true, elementDetails: { tagName: 'button', text: 'Ready' } } }] };
+  shipped.setOverride('es');
+  replayContext.renderStep(0);
+  const recordedMarkup = replayNodes.replayStepContent.innerHTML.match(/<span [^>]*data-i18n-en="Text: [^>]*>[^<]*<\/span>/);
+  const recordedRow = recordedMarkup && parseSpan(recordedMarkup[0]);
+  const expectedRow = (code) => shippedCatalogs[code][key(textTemplate)].replace('$TEXT$', () => 'Ready');
+  check(recordedRow && recordedRow.textContent === expectedRow('es')
+      && JSON.parse(recordedRow.getAttribute('data-i18n-subs')).text === 'Ready',
+    'renderStep shows recorded element text as captured');
+  shipped.setOverride('de');
+  shipped.apply(fakeDoc([recordedRow]));
+  check(recordedRow.textContent === expectedRow('de'), 'a replay step keeps recorded text as captured after a language change');
+
+  shipped.setOverride('es');
+  const typedDomain = ctx.fsbUiLine('Delete saved credential for "$DOMAIN$"? This cannot be undone.', { domain: 'Email' });
+  check(typedDomain.includes('Email') && !typedDomain.includes(shippedCatalogs.es[shipped.exact.Email]),
+    'a domain the user typed stays as typed even when it matches catalog copy');
+  check(shipped.line('Reconnaissance complete! Site map saved for $DOMAIN$.', { domain: { english: 'this site' } })
+      .includes(shippedCatalogs.es[shipped.exact['this site']]),
+    'an explicit source translates with its template');
+  check(shipped.line('Compatibility check failed: $ERROR$', { error: { english: 'socket closed $& <raw>' } })
+      .includes('socket closed $& <raw>'),
+    'an explicit source with no catalog entry is shown as sent');
+  check(shipped.line('Compatibility check failed: $ERROR$', { error: { english: 'Sign in to $NAME$ locally, then try again.',
+    subs: { name: { english: 'The agent' } } } }).includes(shippedCatalogs.es[shipped.exact['The agent']]),
+  'a source inside a source translates too');
+  check(!extractNamedFunction(fs.readFileSync(path.join(root, 'extension/utils/ui-locale.js'), 'utf8'), 'liveSubs').includes('exactKey'),
+    'liveSubs does not look up plain substitutions');
+
+  // FSB's own copy reaches a substitution only as an explicit source. These
+  // error paths are not all reachable here, so their marks are pinned in source.
+  const uiSource = Object.fromEntries(['options', 'sidepanel', 'popup'].map((name) =>
+    [name, fs.readFileSync(path.join(root, `extension/ui/${name}.js`), 'utf8')]));
+  const occurrences = (source, text) => source.split(text).length - 1;
+  for (const [file, text, count] of [
+    ['options', "'Failed to save: $ERROR$', { error: response?.error || { english: 'Unknown error' } }", 1],
+    ['options', "'Failed to delete: $ERROR$', { error: response?.error || { english: 'Unknown error' } }", 2],
+    ['options', "'Error saving payment method: $ERROR$', { error: response?.error || { english: 'Unknown error' } }", 1],
+    ['options', "'Failed to start explorer: $ERROR$', { error: response?.error || { english: 'Unknown error' } }", 1],
+    ['options', "'Failed to load more session events: $ERROR$', { error: { english: error.message } }", 1],
+    ['options', "'Could not generate pairing code: $ERROR$', { error: { english: error.message } }", 2],
+    ['options', "'Could not register hash key: $ERROR$', { error: { english: error.message } }", 1],
+    ['sidepanel', "var providerSubs = { name: provider ? provider.label : { english: 'Selected provider' } };", 1],
+    ['sidepanel', "headingSubs = { name: snapshot.provider ? snapshot.provider.label : { english: 'Selected provider' } };", 1],
+    ['sidepanel', "reason: startDetail ? { english: startDetail.reason } : '',", 1],
+    ['sidepanel', "{ domain: data?.domain || { english: 'this site' } }", 1],
+    ['sidepanel', "'Reconnaissance failed to start: $ERROR$', 'system', undefined, { error: response?.error || { english: 'Unknown error' } }", 1],
+    ['sidepanel', "'I encountered an error: $ERROR$', 'error', undefined, { error: response?.error || { english: 'Unknown error' } }", 1],
+    ['sidepanel', "'Error stopping automation: $ERROR$', 'error', undefined, { error: { english: errorMsg } }", 1],
+    ['sidepanel', "'Could not apply replay decision: $ERROR$', 'error', undefined, { error: { english: error.message } }", 1],
+    ['sidepanel', "'Failed to start requested replay: $ERROR$', 'error', undefined, { error: { english: error.message } }", 1],
+    ['sidepanel', "'Could not cancel replay request: $ERROR$', 'error', undefined, { error: { english: error.message } }", 1],
+    ['sidepanel', "'Failed to start replay: $ERROR$', 'error', undefined, { error: { english: error.message } }", 1],
+    ['popup', "'Error stopping automation: $ERROR$', { error: { english: errorMsg } }", 1]
+  ]) {
+    check(occurrences(uiSource[file], text) === count, `${file} marks its own copy as a source: ${text}`);
+  }
+  check(occurrences(uiSource.sidepanel, "'Error: $ERROR$', 'error', { error: errorMessage }") === 1
+      && occurrences(uiSource.sidepanel, "'Error: $ERROR$', 'error', false, { error: errorMessage }") === 1,
+  'a failure message that can be model text stays raw');
+  for (const [file, source] of Object.entries(uiSource)) {
+    check(!/(?:\|\||\? [^:\n]+ :) '(?:Unknown error|Unknown|this site|The agent|Selected provider)' \}/.test(source),
+      `${file} passes no literal fallback as a plain substitution`);
+  }
+
   const unmapped = ctx.fsbUiHtml('Totally uncataloged words <here>');
   check(unmapped === 'Totally uncataloged words &lt;here&gt;', 'uncataloged copy stays plain escaped text');
   const plain = makeContext(false);
@@ -2108,7 +2203,7 @@ async function asyncChecks() {
     ['unexpected_code', '$NAME$ stopped before the task was complete.']
   ];
   for (const code of [...locale.PUBLIC_LOCALES, null]) {
-    for (const provider of [undefined, { label: '' }, { label: 'Grok Build $& <provider>' }]) {
+    for (const provider of [undefined, { label: '' }, { label: 'Grok Build $& <provider>' }, { label: 'Ready' }]) {
       const api = freshLocale().fsbUiLocale;
       api.setOverride(code || 'en');
       const { context, log, storage, metrics } = sidepanelMessageContext(code ? api : undefined);
@@ -2133,7 +2228,8 @@ async function asyncChecks() {
           api.apply(fakeDoc([bubble]));
           const subs = JSON.parse(bubble.getAttribute('data-i18n-subs'));
           check(bubble.textContent === expected(next, english) && subs.error.english === english
-              && (!subs.error.subs || subs.error.subs.name === (provider && provider.label || 'The agent')),
+              && (!subs.error.subs || JSON.stringify(subs.error.subs.name)
+                === JSON.stringify(provider && provider.label || { english: 'The agent' })),
             `${terminalCode} keeps the nested source and retranslates the whole bubble`);
         }
       }
@@ -2168,7 +2264,8 @@ async function asyncChecks() {
       const shown = api.exact[reason] ? cat[api.exact[reason]] : reason;
       return cat[key].replace('$ERROR$', () => shown);
     };
-    for (const item of cases) context.addMessage(item.english, 'error', undefined, { error: item.reason });
+    const source = (reason) => (api.exact[reason] ? { english: reason } : reason);
+    for (const item of cases) context.addMessage(item.english, 'error', undefined, { error: source(item.reason) });
     const live = context.chatMessages.children.slice();
     check(live.length === cases.length && live.every((bubble, index) => bubble.textContent === expected(code, cases[index])),
       `${code} background, generic, and stop errors translate with raw and catalog reasons`);
@@ -2181,7 +2278,8 @@ async function asyncChecks() {
     const rows = log.getMessages(storage[log.STORAGE_KEY], 'visible-conversation');
     check(rows.length === cases.length && rows.every((row, index) => row.kind === 'error'
         && row.content === expected(code, cases[index])
-        && row.uiMessage.english === cases[index].english && row.uiMessage.subs.error === cases[index].reason),
+        && row.uiMessage.english === cases[index].english
+        && JSON.stringify(row.uiMessage.subs.error) === JSON.stringify(source(cases[index].reason))),
       `${code} background, generic, and stop errors persist a readable fallback and their English source`);
     await context.hydrateChatFromConversationId('visible-conversation');
     const replayed = context.chatMessages.children;

@@ -4145,7 +4145,7 @@ function attachInlinePanelListeners(wrapper, session) {
       } catch (error) {
         loadMoreEventsBtn.disabled = false;
         fsbUiSet(loadMoreEventsBtn, "Retry loading events");
-        showToast(fsbUiLine('Failed to load more session events: $ERROR$', { error: error.message }), 'error');
+        showToast(fsbUiLine('Failed to load more session events: $ERROR$', { error: { english: error.message } }), 'error');
       }
     });
   }
@@ -5464,7 +5464,7 @@ async function saveCredentialFromModal() {
       hideCredentialModal();
       loadCredentials();
     } else {
-      showToast(fsbUiLine('Failed to save: $ERROR$', { error: response?.error || 'Unknown error' }), 'error');
+      showToast(fsbUiLine('Failed to save: $ERROR$', { error: response?.error || { english: 'Unknown error' } }), 'error');
     }
   } catch (error) {
     showToast(fsbUiLine('Error saving credential: $ERROR$', { error: error.message }), 'error');
@@ -5487,7 +5487,7 @@ async function deleteCredentialConfirm(domain) {
       showToast('Credential deleted', 'success');
       loadCredentials();
     } else {
-      showToast(fsbUiLine('Failed to delete: $ERROR$', { error: response?.error || 'Unknown error' }), 'error');
+      showToast(fsbUiLine('Failed to delete: $ERROR$', { error: response?.error || { english: 'Unknown error' } }), 'error');
     }
   } catch (error) {
     showToast(fsbUiLine('Error deleting credential: $ERROR$', { error: error.message }), 'error');
@@ -6125,7 +6125,7 @@ async function savePaymentMethodFromModal() {
       hidePaymentMethodModal();
       loadPaymentMethods();
     } else {
-      showToast(fsbUiLine('Error saving payment method: $ERROR$', { error: response?.error || 'Unknown error' }), 'error');
+      showToast(fsbUiLine('Error saving payment method: $ERROR$', { error: response?.error || { english: 'Unknown error' } }), 'error');
     }
   } catch (error) {
     showToast(fsbUiLine('Error saving payment method: $ERROR$', { error: error.message }), 'error');
@@ -6142,7 +6142,7 @@ async function deletePaymentMethodConfirm(id) {
       showToast('Payment method deleted', 'success');
       loadPaymentMethods();
     } else {
-      showToast(fsbUiLine('Failed to delete: $ERROR$', { error: response?.error || 'Unknown error' }), 'error');
+      showToast(fsbUiLine('Failed to delete: $ERROR$', { error: response?.error || { english: 'Unknown error' } }), 'error');
     }
   } catch (error) {
     showToast(fsbUiLine('Error deleting payment method: $ERROR$', { error: error.message }), 'error');
@@ -6254,7 +6254,7 @@ async function startExplorer() {
     });
 
     if (!response || !response.success) {
-      showToast(fsbUiLine('Failed to start explorer: $ERROR$', { error: response?.error || 'Unknown error' }), 'error');
+      showToast(fsbUiLine('Failed to start explorer: $ERROR$', { error: response?.error || { english: 'Unknown error' } }), 'error');
     } else {
       addLog('info', 'Site Explorer started for ' + testUrl);
       // Clear input for next URL, show Stop All
@@ -6366,7 +6366,7 @@ function updateExplorerProgress(data) {
       showToast(fsbUiLine('Crawl completed: $COUNT$ pages from $DOMAIN$', { count: data.pagesCollected, domain: data.domain || '' }), 'success');
       addLog('info', 'Site Explorer completed: ' + data.pagesCollected + ' pages from ' + data.domain);
     } else if (data.status === 'error') {
-      showToast(fsbUiLine('Crawl failed for $DOMAIN$', { domain: data.domain || 'Unknown' }), 'error');
+      showToast(fsbUiLine('Crawl failed for $DOMAIN$', { domain: data.domain || { english: 'Unknown' } }), 'error');
     }
 
     // Refresh research list
@@ -6945,7 +6945,7 @@ async function regeneratePairingToken() {
       messageEl.classList.add('pairing-qr-expired');
       fsbUiSet(messageEl, "Could not generate pairing code. Try again.");
     }
-    showToast(fsbUiLine('Could not generate pairing code: $ERROR$', { error: error.message }), 'error');
+    showToast(fsbUiLine('Could not generate pairing code: $ERROR$', { error: { english: error.message } }), 'error');
   } finally {
     pairingFetchInFlight = false;
   }
@@ -6974,7 +6974,7 @@ async function showPairingQR() {
       try {
         hashKey = await ensureHashKey(serverUrl);
       } catch (error) {
-        showToast(fsbUiLine('Could not register hash key: $ERROR$', { error: error.message }), 'error');
+        showToast(fsbUiLine('Could not register hash key: $ERROR$', { error: { english: error.message } }), 'error');
         return; // abort BEFORE opening overlay
       }
     }
@@ -6988,7 +6988,7 @@ async function showPairingQR() {
     overlay.style.display = 'flex';
     startPairingCountdown(data.expiresAt);
   } catch (error) {
-    showToast(fsbUiLine('Could not generate pairing code: $ERROR$', { error: error.message }), 'error');
+    showToast(fsbUiLine('Could not generate pairing code: $ERROR$', { error: { english: error.message } }), 'error');
   } finally {
     pairingFetchInFlight = false;
   }

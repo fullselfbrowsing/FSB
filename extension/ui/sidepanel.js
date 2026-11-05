@@ -1267,6 +1267,7 @@ function _delegationElement(tagName, className, textValue, subs) {
       element.textContent = subs
         ? english.replace(/\$([A-Z]+)\$/g, function(all, name) {
           var value = subs[name.toLowerCase()];
+          if (value && typeof value === 'object') value = value.english;
           return value == null ? all : String(value);
         })
         : english;
@@ -1589,8 +1590,7 @@ function _renderDelegationConsent(options) {
     _delegationUiState.providerId,
     _delegationUiState.providerLabel
   );
-  var providerLabel = provider ? provider.label : 'The agent';
-  var providerSubs = { name: providerLabel };
+  var providerSubs = { name: provider ? provider.label : { english: 'The agent' } };
 
   var heading = _delegationElement(
     'h2',
@@ -1840,9 +1840,9 @@ function _renderDelegationPreflightFailure(result) {
     _delegationOwnDataValue(result, 'providerId'),
     _delegationOwnDataValue(result, 'providerLabel')
   );
-  // Subs stay English (the start reason too); markExact() translates the ones
-  // that are catalog copy along with their template.
-  var providerSubs = { name: provider ? provider.label : 'Selected provider' };
+  // Subs stay English. The fallback name and the start reason are explicit
+  // sources, so markExact() translates them along with their template.
+  var providerSubs = { name: provider ? provider.label : { english: 'Selected provider' } };
   var headingText = 'Agent offline';
   var headingSubs = null;
   var bodyText = 'FSB cannot reach the local agent service. Run the doctor command, then try this message again.';
@@ -1908,7 +1908,7 @@ function _renderDelegationPreflightFailure(result) {
       : '$NAME$ could not pass FSB\'s final delegated-browser start checks. Test Connection may still succeed because it does not start a delegated run. Retry the message or review provider setup.';
     bodySubs = {
       name: providerSubs.name,
-      reason: startDetail ? startDetail.reason : '',
+      reason: startDetail ? { english: startDetail.reason } : '',
       code: startDetail ? startDetail.code : ''
     };
     primaryLabel = 'Open provider setup';
@@ -2211,7 +2211,7 @@ function _renderDelegationRunHeader(container, snapshot) {
     && !offline
     && !unpaired
     && !unsupported;
-  var providerSubs = { name: (snapshot.provider && snapshot.provider.label) || 'The agent' };
+  var providerSubs = { name: (snapshot.provider && snapshot.provider.label) || { english: 'The agent' } };
   var headingText = _delegationStateLabel(snapshot);
   var headingSubs = null;
   if (bindingCleanupPending) headingText = 'Agent cleanup needs attention';
@@ -2226,7 +2226,7 @@ function _renderDelegationRunHeader(container, snapshot) {
   else if (unpaired) headingText = 'Automatic connection needs the native helper';
   else if (unsupported) {
     headingText = '$NAME$ cannot run browser tasks';
-    headingSubs = { name: snapshot.provider ? snapshot.provider.label : 'Selected provider' };
+    headingSubs = { name: snapshot.provider ? snapshot.provider.label : { english: 'Selected provider' } };
   } else if (resumeOwnershipFailure) headingText = 'Agent could not resume control';
   var heading = _delegationSemanticHeading(
     'h2',
@@ -2881,7 +2881,7 @@ async function _beginDelegationStart(challengeId) {
       _renderDelegationInlineError(
         failedMount.state,
         '$NAME$ could not start this task. Keep the message and try again.',
-        { name: _delegationUiState.providerLabel || 'The agent' }
+        { name: _delegationUiState.providerLabel || { english: 'The agent' } }
       );
     }
     updateSendButtonState();
@@ -3476,7 +3476,7 @@ function _renderAutomationRetryPrompt(taskText, onRetry) {
 }
 
 function _delegatedRunErrorMessage(snapshot) {
-  var label = (snapshot && snapshot.provider && snapshot.provider.label) || 'The agent';
+  var label = (snapshot && snapshot.provider && snapshot.provider.label) || { english: 'The agent' };
   var code = snapshot && snapshot.terminal ? snapshot.terminal.code : null;
   if (code === 'provider_error') {
     return { english: '$NAME$ reported an error before completing this task. Raw provider output was not retained.', subs: { name: label } };
@@ -3685,11 +3685,11 @@ async function startReconFromSidepanel(url, originalTask) {
     });
 
     if (!response || !response.success) {
-      addMessage('Reconnaissance failed to start: $ERROR$', 'system', undefined, { error: response?.error || 'Unknown error' });
+      addMessage('Reconnaissance failed to start: $ERROR$', 'system', undefined, { error: response?.error || { english: 'Unknown error' } });
       pendingReconTask = null;
     }
   } catch (error) {
-    addMessage('Reconnaissance failed to start: $ERROR$', 'system', undefined, { error: error.message || 'Unknown error' });
+    addMessage('Reconnaissance failed to start: $ERROR$', 'system', undefined, { error: error.message || { english: 'Unknown error' } });
     pendingReconTask = null;
   }
 }
@@ -3734,7 +3734,7 @@ function handleReconComplete(data) {
     reconProgressMessages.delete(id);
   }
 
-  addMessage('Reconnaissance complete! Site map saved for $DOMAIN$.', 'system', undefined, { domain: data?.domain || 'this site' });
+  addMessage('Reconnaissance complete! Site map saved for $DOMAIN$.', 'system', undefined, { domain: data?.domain || { english: 'this site' } });
 
   // Offer retry with the original task
   if (pendingReconTask) {
@@ -4585,7 +4585,7 @@ async function _handleLegacySendMessage(message) {
           // Show Chrome page error as plain text, not in a bubble
           showChromepageError(errorMsg);
         } else {
-          addMessage('I encountered an error: $ERROR$', 'error', undefined, { error: errorMsg });
+          addMessage('I encountered an error: $ERROR$', 'error', undefined, { error: response?.error || { english: 'Unknown error' } });
         }
         setIdleState(_activeTabIdSnapshot);
       }
@@ -4634,7 +4634,7 @@ function stopAutomation() {
       stopRequested = false;
       console.log('Side panel: Automation stopped successfully');
     } else {
-      const errorMsg = response ? response.error : 'Unknown error';
+      const errorMsg = (response && response.error) || 'Unknown error';
       if (response && response.alreadyEnded) {
         // QT-uof-4 (C-FIX) -- the session completed cleanly between UI
         // state and stop-click. Treat as a friendly outcome: complete
@@ -4651,7 +4651,7 @@ function stopAutomation() {
         stopRequested = false;
         console.log('Side panel: Stop arrived after natural completion (alreadyEnded)');
       } else {
-        addMessage('Error stopping automation: $ERROR$', 'error', undefined, { error: errorMsg });
+        addMessage('Error stopping automation: $ERROR$', 'error', undefined, { error: { english: errorMsg } });
         stopRequested = false;
         console.error('Side panel: Stop automation failed:', errorMsg);
       }
@@ -6663,7 +6663,7 @@ function renderReplayDecisionPrompt(request) {
         }
       } catch (error) {
         Array.from(actions.querySelectorAll('button')).forEach((item) => { item.disabled = false; });
-        addMessage('Could not apply replay decision: $ERROR$', 'error', undefined, { error: error.message });
+        addMessage('Could not apply replay decision: $ERROR$', 'error', undefined, { error: { english: error.message } });
       }
     });
     actions.appendChild(button);
@@ -6821,7 +6821,7 @@ function renderMcpReplayApproval(approval) {
     } catch (error) {
       setDisabled(false);
       completeStatusMessage('Replay error', 'error');
-      addMessage('Failed to start requested replay: $ERROR$', 'error', undefined, { error: error.message });
+      addMessage('Failed to start requested replay: $ERROR$', 'error', undefined, { error: { english: error.message } });
     }
   });
   cancel.addEventListener('click', async () => {
@@ -6837,7 +6837,7 @@ function renderMcpReplayApproval(approval) {
       addMessage('Replay request cancelled. No target tabs were opened.', 'system');
     } catch (error) {
       setDisabled(false);
-      addMessage('Could not cancel replay request: $ERROR$', 'error', undefined, { error: error.message });
+      addMessage('Could not cancel replay request: $ERROR$', 'error', undefined, { error: { english: error.message } });
     }
   });
 
@@ -6926,7 +6926,7 @@ async function startReplay(sessionId) {
     }
   } catch (error) {
     completeStatusMessage('Replay error', 'error');
-    addMessage('Failed to start replay: $ERROR$', 'error', undefined, { error: error.message });
+    addMessage('Failed to start replay: $ERROR$', 'error', undefined, { error: { english: error.message } });
   }
 }
 

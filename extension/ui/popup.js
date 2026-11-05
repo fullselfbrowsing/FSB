@@ -563,8 +563,8 @@ function stopAutomation() {
       stopRequested = false;
       console.log('Automation stopped successfully');
     } else {
-      const errorMsg = response ? response.error : 'Unknown error';
-      addMessage(uiLine('shell_error_stop', 'Error stopping automation: $ERROR$', { error: errorMsg }), 'error');
+      const errorMsg = (response && response.error) || 'Unknown error';
+      addMessage(uiLine('shell_error_stop', 'Error stopping automation: $ERROR$', { error: { english: errorMsg } }), 'error');
       console.error('Stop automation failed:', errorMsg);
       stopRequested = false;
     }
