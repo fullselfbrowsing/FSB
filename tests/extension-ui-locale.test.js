@@ -715,7 +715,7 @@ function sidepanelMessageContext(api) {
       };
       context.globalThis = context;
       vm.createContext(context);
-      for (const name of [surface === 'popup' ? 'uiLine' : 'spLine', 'completeStatusMessage', 'addCompletionMessage']) {
+      for (const name of [...(surface === 'popup' ? [] : ['spLine']), 'completeStatusMessage', 'addCompletionMessage']) {
         vm.runInContext(extractNamedFunction(source, name), context);
       }
       if (payload) {
@@ -779,7 +779,7 @@ function sidepanelMessageContext(api) {
   };
   context.globalThis = context;
   vm.createContext(context);
-  for (const name of ['uiLine', 'updateStatusMessage']) vm.runInContext(extractNamedFunction(source, name), context);
+  vm.runInContext(extractNamedFunction(source, 'updateStatusMessage'), context);
   for (const code of shipped.PUBLIC_LOCALES.filter((code) => code !== 'en')) {
     for (const progress of [{ iteration: 0, maxIterations: 8 }, { iteration: 3, maxIterations: 8, progressPercent: 37 }, { iteration: 4 }]) {
       shipped.setOverride(code);
@@ -840,6 +840,61 @@ function sidepanelMessageContext(api) {
   }
 }
 
+// Popup messages are written from their template, so a language change can
+// refill them, and every template is registered on the page that shows it.
+{
+  const shipped = freshLocale().fsbUiLocale;
+  const popupSource = fs.readFileSync(path.join(root, 'extension/ui/popup.js'), 'utf8');
+  const chatMessages = messageNode();
+  const context = { fsbUiLocale: shipped, chatMessages, document: { createElement: () => messageNode() },
+    scrollToBottom() {}, setTimeout: () => 0 };
+  context.globalThis = context;
+  vm.createContext(context);
+  vm.runInContext(extractNamedFunction(popupSource, 'addMessage'), context);
+  const unknown = (code) => shippedCatalogs[code][shipped.exact.Unknown];
+  const cases = [
+    ['I encountered an error: $ERROR$', 'error', { error: 'offline' }, 'shell_error_encountered'],
+    ['Something went wrong: $ERROR$', 'error', { error: 'offline' }, 'shell_error_generic'],
+    ['Error communicating with background script: $ERROR$', 'error', { error: 'offline' }, 'shell_error_background'],
+    ['Error stopping automation: $ERROR$', 'error', { error: 'offline' }, 'shell_error_stop'],
+    ['Testing $NAME$ API connection...', 'system', { name: 'xAI' }, 'shell_testing_api'],
+    ['$NAME$ API connection is working.', 'system', { name: 'xAI' }, 'shell_api_ok'],
+    ['Connected to model: $MODEL$', 'ai', { model: 'grok-4' }, 'shell_api_model'],
+    ['$NAME$ API connection failed. Please check your settings.', 'error', { name: 'xAI' }, 'shell_api_failed'],
+    ['Status: $STATUS$ - $DETAIL$', 'error', { status: 500, detail: 'Server Error' }, 'shell_api_status'],
+    ['Details: $ERROR$', 'error', { error: 'offline' }, 'shell_api_details'],
+    ['Error details: $ERROR$', 'error', { error: 'offline' }, 'shell_error_details']
+  ];
+  const filled = (code, key, subs) => Object.entries(subs).reduce((text, [name, value]) =>
+    text.replace('$' + name.toUpperCase() + '$', () => value), shippedCatalogs[code][key]);
+  for (const code of shipped.PUBLIC_LOCALES.filter((code) => code !== 'en')) {
+    const next = code === 'de' ? 'ja' : 'de';
+    for (const [template, type, subs, key] of cases) {
+      shipped.setOverride(code);
+      context.addMessage(template, type, subs);
+      const bubble = chatMessages.children.at(-1);
+      check(shipped.exact[template] === key && bubble.textContent === filled(code, key, subs),
+        `${code} popup writes "${template}" from its template`);
+      shipped.setOverride(next);
+      shipped.apply(fakeDoc([bubble]));
+      check(bubble.textContent === filled(next, key, subs), `${code} popup "${template}" follows a language change`);
+    }
+    shipped.setOverride(code);
+    context.addMessage('Connected to model: $MODEL$', 'ai', { model: { english: 'Unknown' } });
+    check(chatMessages.children.at(-1).textContent === filled(code, 'shell_api_model', { model: unknown(code) }),
+      `${code} popup translates the unknown-model fallback`);
+    for (const type of ['ai', 'user']) {
+      context.addMessage('Ready', type);
+      check(chatMessages.children.at(-1).textContent === 'Ready', `${code} popup leaves ${type} text as sent`);
+    }
+    context.addMessage('Ready', 'system');
+    check(chatMessages.children.at(-1).textContent === shippedCatalogs[code].shell_ready,
+      `${code} popup still translates a whole catalog sentence in a system message`);
+    chatMessages.children.length = 0;
+  }
+  check(!popupSource.includes('uiLine'), 'popup messages never fill a template before writing it');
+}
+
 // Keyed popup messages translate catalog reasons as well as the sentence.
 {
   const shipped = freshLocale().fsbUiLocale;
@@ -853,13 +908,11 @@ function sidepanelMessageContext(api) {
     currentSessionId: 'session-1',
     isRunning: true,
     stopRequested: false,
-    addMessage: (text, type) => messages.push({ text, type })
+    addMessage: (text, type, subs) => messages.push({ text: shipped.line(text, subs), type })
   };
   context.globalThis = context;
   vm.createContext(context);
-  for (const name of ['uiLine', 'stopAutomation']) {
-    vm.runInContext(extractNamedFunction(popupSource, name), context);
-  }
+  vm.runInContext(extractNamedFunction(popupSource, 'stopAutomation'), context);
   for (const code of shipped.PUBLIC_LOCALES.filter((code) => code !== 'en')) {
     shipped.setOverride(code);
     for (const error of ['Already completed', 'Session not found', 'Unknown error']) {
@@ -1507,7 +1560,7 @@ function sidepanelMessageContext(api) {
 
   const popupSource = fs.readFileSync(path.join(root, 'extension/ui/popup.js'), 'utf8');
   const lowercaseFallbacks = [optionsSource, popupSource]
-    .flatMap((source) => source.match(/(?:fsbUiLine|uiLine)\([^\n]*\|\| 'unknown'[^\n]*/g) || []);
+    .flatMap((source) => source.match(/(?:fsbUiLine|addMessage)\([^\n]*\|\| 'unknown'[^\n]*/g) || []);
   check(lowercaseFallbacks.length === 0,
     `no translated sentence falls back to a lowercase English 'unknown'${lowercaseFallbacks.length ? ': ' + lowercaseFallbacks.join(' | ') : ''}`);
 }
@@ -1870,7 +1923,11 @@ function sidepanelMessageContext(api) {
     ['sidepanel', "'Failed to start requested replay: $ERROR$', 'error', undefined, { error: { english: error.message } }", 1],
     ['sidepanel', "'Could not cancel replay request: $ERROR$', 'error', undefined, { error: { english: error.message } }", 1],
     ['sidepanel', "'Failed to start replay: $ERROR$', 'error', undefined, { error: { english: error.message } }", 1],
-    ['popup', "'Error stopping automation: $ERROR$', { error: { english: errorMsg } }", 1]
+    ['popup', "'Error stopping automation: $ERROR$', 'error', { error: { english: errorMsg } }", 1],
+    ['popup', "{ model: response.result.model || { english: 'Unknown' } }", 1],
+    ['popup', "addMessage('I encountered an error: $ERROR$', 'error', { error: response.error });", 1],
+    ['popup', "addMessage('Something went wrong: $ERROR$', 'error', { error: error.message });", 1],
+    ['popup', "addMessage('Error communicating with background script: $ERROR$', 'error', { error: chrome.runtime.lastError.message });", 1]
   ]) {
     check(occurrences(uiSource[file], text) === count, `${file} marks its own copy as a source: ${text}`);
   }
@@ -2080,6 +2137,36 @@ function sidepanelMessageContext(api) {
 }
 
 async function asyncChecks() {
+  // The real Test API flow writes each message with its live key.
+  {
+    const api = freshLocale().fsbUiLocale;
+    api.setOverride('es');
+    const popupSource = fs.readFileSync(path.join(root, 'extension/ui/popup.js'), 'utf8');
+    const chatMessages = messageNode();
+    let response;
+    const context = { fsbUiLocale: api, chatMessages, document: { createElement: () => messageNode() },
+      scrollToBottom() {}, setTimeout: () => 0, testBtn: { querySelector: () => null },
+      chrome: { storage: { local: { get: async () => ({ modelProvider: 'xai' }) } },
+        runtime: { sendMessage: (_message, callback) => callback(response) } } };
+    context.globalThis = context;
+    vm.createContext(context);
+    vm.runInContext(extractNamedFunction(popupSource, 'addMessage'), context);
+    vm.runInContext('async ' + extractNamedFunction(popupSource, 'testAPI'), context);
+    const liveKeys = async (reply) => {
+      chatMessages.children.length = 0;
+      response = reply;
+      await context.testAPI();
+      return chatMessages.children.map((bubble) => bubble.getAttribute('data-i18n-live')).join(' ');
+    };
+    check(await liveKeys({ success: true, result: { data: {}, model: 'grok-4' } }) === 'shell_testing_api shell_api_ok shell_api_model',
+      'a passing popup API test writes every line with its live key');
+    check(await liveKeys({ success: false, result: { status: 500, statusText: 'Server Error', error: 'offline' } })
+        === 'shell_testing_api shell_api_failed shell_api_status shell_api_details',
+      'a failed popup API test with a result writes every line with its live key');
+    check(await liveKeys({ success: false, error: 'offline' }) === 'shell_testing_api shell_api_failed shell_error_details',
+      'a failed popup API test with an error writes every line with its live key');
+  }
+
   // The side panel can open onto a running delegation before boot() has loaded
   // the catalogs, so Stop gets the English fallback. boot() does not notify
   // onChange listeners, so its own callback must relabel the button.

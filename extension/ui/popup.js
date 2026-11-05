@@ -72,11 +72,6 @@ const chatMessages = document.getElementById('chatMessages');
 const statusDot = document.querySelector('.status-dot');
 const statusText = document.querySelector('.status-text');
 
-function uiLine(key, english, subs) {
-  if (globalThis.fsbUiLocale && typeof fsbUiLocale.text === 'function') return fsbUiLocale.text(key, english, subs);
-  return english;
-}
-
 let _headerBaseStatusLabel = 'Ready';
 let _headerBaseStatusTone = '';
 let _headerOwnerLabel = null;
@@ -512,14 +507,14 @@ async function handleSendMessage() {
           // Show Chrome page error as plain text, not in a bubble
           showChromepageError(response.error);
         } else {
-          addMessage(uiLine('shell_error_encountered', 'I encountered an error: $ERROR$', { error: response.error }), 'error');
+          addMessage('I encountered an error: $ERROR$', 'error', { error: response.error });
         }
         setIdleState();
       }
     });
     
   } catch (error) {
-    addMessage(uiLine('shell_error_generic', 'Something went wrong: $ERROR$', { error: error.message }), 'error');
+    addMessage('Something went wrong: $ERROR$', 'error', { error: error.message });
     setIdleState();
   }
 }
@@ -547,7 +542,7 @@ function stopAutomation() {
     
     if (chrome.runtime.lastError) {
       console.error('Chrome runtime error:', chrome.runtime.lastError);
-      addMessage(uiLine('shell_error_background', 'Error communicating with background script: $ERROR$', { error: chrome.runtime.lastError.message }), 'error');
+      addMessage('Error communicating with background script: $ERROR$', 'error', { error: chrome.runtime.lastError.message });
       stopRequested = false;
       return;
     }
@@ -564,7 +559,7 @@ function stopAutomation() {
       console.log('Automation stopped successfully');
     } else {
       const errorMsg = (response && response.error) || 'Unknown error';
-      addMessage(uiLine('shell_error_stop', 'Error stopping automation: $ERROR$', { error: { english: errorMsg } }), 'error');
+      addMessage('Error stopping automation: $ERROR$', 'error', { error: { english: errorMsg } });
       console.error('Stop automation failed:', errorMsg);
       stopRequested = false;
     }
@@ -587,7 +582,7 @@ async function testAPI() {
   };
   const displayName = providerNames[provider] || provider;
 
-  addMessage(uiLine('shell_testing_api', 'Testing $NAME$ API connection...', { name: displayName }), 'system');
+  addMessage('Testing $NAME$ API connection...', 'system', { name: displayName });
 
   const testIcon = testBtn.querySelector('i');
   if (testIcon) {
@@ -602,19 +597,19 @@ async function testAPI() {
     }
 
     if (response.success) {
-      addMessage(uiLine('shell_api_ok', '$NAME$ API connection is working.', { name: displayName }), 'system');
+      addMessage('$NAME$ API connection is working.', 'system', { name: displayName });
       if (response.result && response.result.data) {
-        addMessage(uiLine('shell_api_model', 'Connected to model: $MODEL$', { model: response.result.model || uiLine('copy_b764cdc0ea', 'Unknown') }), 'ai');
+        addMessage('Connected to model: $MODEL$', 'ai', { model: response.result.model || { english: 'Unknown' } });
       }
     } else {
-      addMessage(uiLine('shell_api_failed', '$NAME$ API connection failed. Please check your settings.', { name: displayName }), 'error');
+      addMessage('$NAME$ API connection failed. Please check your settings.', 'error', { name: displayName });
       if (response.result) {
-        addMessage(uiLine('shell_api_status', 'Status: $STATUS$ - $DETAIL$', { status: response.result.status, detail: response.result.statusText }), 'error');
+        addMessage('Status: $STATUS$ - $DETAIL$', 'error', { status: response.result.status, detail: response.result.statusText });
         if (response.result.error) {
-          addMessage(uiLine('shell_api_details', 'Details: $ERROR$', { error: response.result.error }), 'error');
+          addMessage('Details: $ERROR$', 'error', { error: response.result.error });
         }
       } else if (response.error) {
-        addMessage(uiLine('shell_error_details', 'Error details: $ERROR$', { error: response.error }), 'error');
+        addMessage('Error details: $ERROR$', 'error', { error: response.error });
       }
     }
   });
@@ -941,7 +936,7 @@ function showChromepageError(text) {
 }
 
 // Add message to chat with modern bubble styling
-function addMessage(text, type = 'system') {
+function addMessage(text, type = 'system', subs) {
   const messageDiv = document.createElement('div');
   messageDiv.className = `message ${type} new`;
 
@@ -963,9 +958,11 @@ function addMessage(text, type = 'system') {
   } else {
     messageDiv.textContent = text;
   }
-  if (type !== 'user' && type !== 'ai' && type !== 'action'
+  // A message with subs is an FSB template, whatever its type. The bubble keeps
+  // the template so a language change can refill it.
+  if ((subs || (type !== 'user' && type !== 'ai' && type !== 'action'))
       && globalThis.fsbUiLocale && typeof fsbUiLocale.markExact === 'function') {
-    fsbUiLocale.markExact(messageDiv, messageDiv.textContent);
+    fsbUiLocale.markExact(messageDiv, messageDiv.textContent, subs);
   }
 
   // Add dismiss button for error messages
