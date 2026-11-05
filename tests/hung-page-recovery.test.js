@@ -269,7 +269,8 @@ test('a change-report start that times out queues the stop for its own token', a
     assert.equal(calls[0].func.name, '_fsbHarvestStartInPage');
     assert.equal(calls[1].func.name, '_fsbHarvestStopInPage');
     assert.equal(calls[1].args[0], calls[0].args[1]);
-    assert.ok(calls[0].args[2] <= Date.now());
+    // The give-up timer can fire a moment before the wall-clock deadline set beside it.
+    assert.ok(calls[0].args[2] <= Date.now() + 50);
   } finally {
     global.chrome = priorChrome;
   }
