@@ -15,6 +15,7 @@ export function resultData(result) {
 export function resultOK(result) {
   return !!result && !result.isError && !resultData(result).some(d => d.success === false || d.error);
 }
+export const ACTION_LIMIT_MESSAGE = 'Benchmark action limit reached';
 function toolError(message) { return { isError: true, content: [{ type: 'text', text: message }] }; }
 
 export class RecordingProxy {
@@ -143,7 +144,7 @@ export class RecordingProxy {
       this.meta.action_limit_reached = true;
       await this.saveMeta();
       this.onLimit?.();
-      return toolError('Benchmark action limit reached');
+      return toolError(ACTION_LIMIT_MESSAGE);
     }
     const args = { ...(params.arguments ?? {}), tab_id: this.tabId };
     if (action) { args.client = this.clientLabel; args.visual_reason ||= DEFAULT_REASON; }
@@ -203,6 +204,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   }
   try {
     const allowlist = JSON.parse(await readFile(process.env.OM2W_ALLOWLIST ?? DEFAULT_ALLOWLIST_PATH, 'utf8'));
-    await serveProxy({ command: process.argv.slice(split + 1), rawDir: process.env.OM2W_RAW_DIR, startUrl: process.env.OM2W_START_URL, allowlist });
+    const maxActions = process.env.OM2W_MAX_ACTIONS ? Number(process.env.OM2W_MAX_ACTIONS) : undefined;
+    await serveProxy({ command: process.argv.slice(split + 1), rawDir: process.env.OM2W_RAW_DIR, startUrl: process.env.OM2W_START_URL, allowlist, maxActions });
   } catch (err) { console.error(err.message); process.exitCode = 1; }
 }
