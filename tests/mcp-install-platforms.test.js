@@ -559,10 +559,22 @@ function run() {
       assertNotIncludes(previewOutput, legacyPath, `${name} does not preview the legacy settings`);
     }
 
-    runCli(['install', '--all'], fixture, { env: { CLINE_DIR: clineDir } });
+    // An empty PATH keeps --all away from the real claude command.
+    const allResult = runCli(['install', '--all'], fixture, { env: { CLINE_DIR: clineDir, PATH: '' } });
+    assertIncludes(
+      `${allResult.stdout}${allResult.stderr}`,
+      'Skipped Cline (config path not detected)',
+      'install --all skips Cline while its override directory is missing',
+    );
     assertEqual(fs.readFileSync(legacyPath, 'utf8'), legacyText, 'install --all leaves the legacy settings untouched');
 
-    runCli(['uninstall', '--cline'], fixture, { env: { CLINE_DIR: clineDir } });
+    const uninstalled = runCli(['uninstall', '--cline'], fixture, { env: { CLINE_DIR: clineDir } });
+    assertEqual(uninstalled.status, 0, 'uninstall with a missing override directory exits cleanly');
+    assertIncludes(
+      `${uninstalled.stdout}${uninstalled.stderr}`,
+      `Cline config file not found: ${path.join(clineDir, 'data', 'settings', settingsFile)}`,
+      'uninstall looks only at the requested settings file',
+    );
     assertEqual(fs.readFileSync(legacyPath, 'utf8'), legacyText, 'uninstall keeps the fsb entry in the legacy settings');
 
     const blank = runCli(['install', '--cline', '--dry-run'], fixture, { env: { CLINE_DIR: '   ' } });
