@@ -10,20 +10,23 @@
 <script src="../../extension/content/actions.js"></script>
 <script>
 // Each case starts from a clean stage. `seen` counts what reached the document.
-const tracked=['dragstart','dragover','dragleave','drop','dragend','pointerdown','pointerup','mousedown','mouseup'];
-for(const type of tracked)document.addEventListener(type,()=>{window.seen[type]=(window.seen[type]||0)+1;},true);
+const tracked=['dragstart','dragenter','dragover','dragleave','drop','dragend','pointerdown','pointerup','mousedown','mouseup'];
+for(const type of tracked)document.addEventListener(type,event=>{
+  window.seen[type]=(window.seen[type]||0)+1;
+  if(type.startsWith('drag')||type==='drop')window.dragLog.push(`${event.target.id}:${type}`);
+},true);
 const cleanups=[];
 window.on=(node,type,fn)=>{node.addEventListener(type,fn);cleanups.push(()=>node.removeEventListener(type,fn));};
 window.every=(ms,fn)=>{const timer=setInterval(fn,ms);cleanups.push(()=>clearInterval(timer));};
 window.stage=html=>{
   for(const clean of cleanups.splice(0))clean();
-  window.seen={};window.drops=0;
+  window.seen={};window.dragLog=[];window.drops=0;window.payload=null;
   delete document.body.dataset.dropped;delete document.body.dataset.overlay;
   document.getElementById('stage').innerHTML=html;
 };
 // Short pauses: these cases check which method ran, not how long a drag takes.
 window.drag=(sourceRef,targetRef)=>FSB.tools.dragdrop({sourceRef,targetRef,steps:2,holdMs:1,stepDelayMs:1});
-window.result=value=>({...value,drops:window.drops,seen:window.seen,dropped:document.body.dataset.dropped??null});
+window.result=value=>({...value,drops:window.drops,seen:window.seen,dragLog:window.dragLog,payload:window.payload,dropped:document.body.dataset.dropped??null});
 class DragHost extends HTMLElement{constructor(){super();this.attachShadow({mode:'open'}).innerHTML='<section><div id="wrap"><div id="drag" draggable="true">Drag</div></div></section><div id="drop">Drop</div>';}}
 customElements.define('drag-host',DragHost);
 class FlatList extends HTMLElement{constructor(){super();this.attachShadow({mode:'open'}).innerHTML='<div id="one" style="position:absolute;left:0;top:0">One</div><div id="two" style="position:absolute;left:0;top:0">Two</div><div id="three">Three</div>';}}

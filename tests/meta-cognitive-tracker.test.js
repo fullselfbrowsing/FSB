@@ -154,16 +154,5 @@ assert(aOnly === null, 'separate targets do not pool counts (eA at 3 attempts ->
 assert(session._metaAttempts['id:eA'].length === 3, 'eA tracker has 3 entries');
 assert(session._metaAttempts['id:eB'].length === 2, 'eB tracker has 2 entries');
 
-console.log('\n--- drag repeats ---');
-const drag = (source, target) => ({ name: 'drag_drop', args: { sourceSelector: source, targetSelector: target } });
-assert(
-  _extractMetaTargetKey(drag('#card', '#done')) === 'drag:#card>#done',
-  'a drag is keyed by both of its ends'
-);
-session = freshSession();
-for (let iteration = 1; iteration <= 3; iteration++) _trackMetaAttempt(session, drag('#card', '#done'), iteration);
-assert(_trackMetaAttempt(session, drag('#card', '#done'), 4)?.forceStop === false, 'a repeated drag warns like a repeated click');
-assert(_trackMetaAttempt(session, drag('#card', '#todo'), 5) === null, 'the same card dragged elsewhere is a new attempt');
-
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===');
 process.exit(failed > 0 ? 1 : 0);

@@ -5266,28 +5266,35 @@ const tools = {
         targetParentChildCount: targetParent ? targetParent.children.length : 0,
         targetChildCount: target.children.length,
         sourceInDOM: tracked.isConnected,
-        // Measured from the target, so a page that reflows or scrolls is not a move
-        offsetX: sourceBox.left - targetBox.left,
-        offsetY: sourceBox.top - targetBox.top
+        // Between centres, so a page that reflows or scrolls does not change them
+        gapX: sourceBox.left + sourceBox.width / 2 - targetBox.left - targetBox.width / 2,
+        gapY: sourceBox.top + sourceBox.height / 2 - targetBox.top - targetBox.height / 2
       };
     }
 
-    function detectChange(before, after) {
+    function sourceMoved(before, after) {
       // Source moved to another parent, even if no count changed
       if (before.sourceParent !== after.sourceParent) return true;
+      // Source index within parent changed
+      if (before.sourceIndex !== after.sourceIndex) return true;
+      // Source removed from DOM entirely (some drag libs re-render)
+      return before.sourceInDOM && !after.sourceInDOM;
+    }
+
+    function detectChange(before, after) {
+      if (sourceMoved(before, after)) return true;
       // Source moved out of its original parent
       if (before.sourceParentChildCount !== after.sourceParentChildCount) return true;
       // Target parent gained a child
       if (before.targetParentChildCount !== after.targetParentChildCount) return true;
       // Target itself gained a child
       if (before.targetChildCount !== after.targetChildCount) return true;
-      // Source index within parent changed
-      if (before.sourceIndex !== after.sourceIndex) return true;
-      // Source removed from DOM entirely (some drag libs re-render)
-      if (before.sourceInDOM && !after.sourceInDOM) return true;
-      // Source moved on screen without moving in the DOM, as a free drag does
-      if (Math.abs(before.offsetX - after.offsetX) > 2 || Math.abs(before.offsetY - after.offsetY) > 2) return true;
-      return false;
+      // Source reached the target without moving in the DOM, as a free drag does. On
+      // an axis it must cross the target or close half the gap, which animations and
+      // hover effects do not. A slider or grip may only ever close one axis.
+      const approached = (gapBefore, gapAfter) => Math.abs(gapBefore) > 8 &&
+        (Math.sign(gapBefore) !== Math.sign(gapAfter) || Math.abs(gapAfter) <= Math.abs(gapBefore) / 2);
+      return approached(before.gapX, after.gapX) || approached(before.gapY, after.gapY);
     }
 
     const sourceRect = source.getBoundingClientRect();
@@ -5306,6 +5313,10 @@ const tools = {
       action: 'dragdrop',
       error: 'The page accepted the drop but showed no change. The element may have moved, so inspect the page before retrying.'
     });
+    const html5Moved = () => {
+      logger.log('info', 'dragdrop succeeded with HTML5 DragEvent', { sessionId: FSB.sessionId, method: 'html5_drag' });
+      return { success: true, method: 'html5_drag', action: 'dragdrop', hadEffect: true };
+    };
     let dropDelivered = false;
 
     // -----------------------------------------------------------------------
@@ -5318,11 +5329,22 @@ const tools = {
         const dragEvent = (type, x, y) => new DragEvent(type, {
           bubbles: true, cancelable: true, composed: true, dataTransfer: dt, clientX: x, clientY: y
         });
+        // A browser fills this in for links and images, and pages read it on drop.
+        // An image inside a link carries the link's URL.
+        if (dragRoot.matches('a[href], img')) {
+          const link = dragRoot.closest('a[href]');
+          const url = link?.href || dragRoot.currentSrc || dragRoot.src;
+          dt.setData('text/uri-list', url);
+          if (link === dragRoot) dt.setData('text/plain', url);
+          dt.setData('text/html', dragRoot.outerHTML);
+        }
 
         // A cancelled dragstart ends the drag before it begins
         if (dragRoot.dispatchEvent(dragEvent('dragstart', startX, startY))) {
           await delay(50);
           target.dispatchEvent(dragEvent('dragenter', endX, endY));
+          // Pages often decide on dragover from state dragenter set a tick earlier
+          await delay(50);
           const dropAllowed = !target.dispatchEvent(dragEvent('dragover', endX, endY));
           await delay(50);
 
@@ -5350,10 +5372,7 @@ const tools = {
             await delay(100);
 
             const after = snapshotState();
-            if (detectChange(before, after)) {
-              logger.log('info', 'dragdrop succeeded with HTML5 DragEvent', { sessionId: FSB.sessionId, method: 'html5_drag' });
-              return { success: true, method: 'html5_drag', action: 'dragdrop', hadEffect: true };
-            }
+            if (detectChange(before, after)) return html5Moved();
             if (explicitDrag && pageChanged) {
               logger.log('info', 'dragdrop delivered: page reacted without moving the element', { sessionId: FSB.sessionId, method: 'html5_drag' });
               return {
@@ -5369,9 +5388,13 @@ const tools = {
               return unconfirmedDrop();
             }
           } else {
-            // A browser sends no drop to a target that refused it
+            // A browser sends no drop to a target that refused it, but a page can
+            // still commit the move, for example in dragend. Only the source counts
+            // here, because a refusal message changes the page around it too.
             target.dispatchEvent(dragEvent('dragleave', endX, endY));
             dragRoot.dispatchEvent(dragEvent('dragend', endX, endY));
+            await delay(100);
+            if (sourceMoved(before, snapshotState())) return html5Moved();
           }
         }
       } catch (e) {

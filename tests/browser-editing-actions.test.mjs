@@ -491,7 +491,7 @@ async function dragFixture(ws) {
 
 const flagPage = `<div id="drag" draggable="true" ondragstart="event.dataTransfer.setData('text/plain','safe')">Drag me</div>
   <div id="drop" ondragover="event.preventDefault()"
-    ondrop="event.preventDefault();window.drops++;document.body.dataset.dropped='true'">Drop target</div>`;
+    ondrop="event.preventDefault();window.drops++;window.payload=event.dataTransfer.getData('text/plain');document.body.dataset.dropped='true'">Drop target</div>`;
 
 async function dragCases(ws, body) {
   await dragFixture(ws);
@@ -524,6 +524,9 @@ test('drag_drop finds its elements by selector, ref and either parameter name, a
           ' ondrop="window.drops++;queueMicrotask(()=>{document.body.dataset.dropped=\\'true\\'})">Drop</div>');
         out.microtask = result(await drag('#drag', '#drop'));
       `);
+      for (const name of ['css', 'quoted', 'refs', 'schemaNames']) {
+        assert.equal(results[name].payload, 'safe', `${name} keeps one DataTransfer from dragstart to drop`);
+      }
       for (const [name, value] of Object.entries(results)) {
         assert.equal(value.success, true, `${name}: ${value.error}`);
         assert.equal(value.method, 'html5_drag', name);
@@ -575,6 +578,56 @@ test('drag_drop plays the drag the way a browser does',
         on(document, 'dragover', allow);
         on(document, 'drop', () => { window.drops++; document.body.dataset.dropped = 'true'; });
         out.composed = result(await drag('drag-host >>> #drag', 'drag-host >>> #drop'));
+
+        // Pages decide on dragover from what dragenter set, often a tick later.
+        const flagBoard = '<div id="drag" draggable="true">Drag</div><div id="drop">Drop</div>';
+        stage(flagBoard);
+        let accepts = false;
+        on($('#drop'), 'dragenter', () => queueMicrotask(() => { accepts = true; }));
+        on($('#drop'), 'dragover', event => { if (accepts) event.preventDefault(); });
+        on($('#drop'), 'drop', () => { window.drops++; });
+        out.acceptsLater = result(await drag('#drag', '#drop'));
+
+        // Reordering live on dragover is common. One dragover must move a row once.
+        const rows = 'ABCDE'.split('').map(id => '<li id="' + id + '" draggable="true">' + id + '</li>').join('');
+        const liveList = () => {
+          stage('<ul id="list">' + rows + '</ul>');
+          let dragged = null;
+          on($('#list'), 'dragstart', event => { dragged = event.target; });
+          on($('#list'), 'dragover', event => {
+            event.preventDefault();
+            const over = event.target;
+            if (over === dragged || over.parentElement !== $('#list')) return;
+            const items = [...$('#list').children];
+            if (items.indexOf(over) < items.indexOf(dragged)) over.before(dragged); else over.after(dragged);
+          });
+        };
+        const order = () => [...$('#list').children].map(item => item.id).join('');
+        liveList();
+        out.liveReorder = { ...result(await drag('#A', '#C')), order: order() };
+        liveList();
+        out.liveNeighbour = { ...result(await drag('#A', '#B')), order: order() };
+
+        // A refused drag can still end in a move the page made itself.
+        stage('<div id="a"><div id="card" draggable="true">Card</div></div><div id="b"></div>');
+        on(document, 'dragend', () => $('#b').append($('#card')));
+        out.commitInDragend = { ...result(await drag('#card', '#b')), cardIn: $('#card').parentElement.id };
+
+        const pixel = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
+        const payloadOf = async (html, source) => {
+          stage(html + '<ul id="drop"></ul>');
+          on($('#drop'), 'dragover', allow);
+          on($('#drop'), 'drop', event => {
+            window.payload = ['text/uri-list', 'text/plain', 'text/html'].map(type => event.dataTransfer.getData(type));
+            $('#drop').append(document.createElement('li'));
+          });
+          return result(await drag(source, '#drop'));
+        };
+        out.linkData = await payloadOf('<a id="link" href="https://example.com/doc">Doc</a>', '#link');
+        out.explicitLinkData = await payloadOf('<a id="link" draggable="true" href="https://example.com/doc">Doc</a>', '#link');
+        out.imageData = await payloadOf('<img id="pic" alt="x" src="' + pixel + '">', '#pic');
+        out.linkedImageData = await payloadOf('<a href="https://example.com/product"><img id="pic" alt="x" src="' + pixel + '"></a>', '#pic');
+        out.plainDivData = await payloadOf('<div id="box" draggable="true">Box</div>', '#box');
       `);
 
       assert.equal(results.innerElement.success, true, results.innerElement.error);
@@ -582,13 +635,15 @@ test('drag_drop plays the drag the way a browser does',
       assert.equal(results.innerElement.started, 'card', 'a drag starts from the draggable element');
       assert.equal(results.innerElement.cardIn, 'drop');
       assert.equal(results.innerElement.gripIn, 'card');
+      assert.deepEqual(results.innerElement.dragLog,
+        ['card:dragstart', 'drop:dragenter', 'drop:dragover', 'drop:drop', 'card:dragend']);
 
       assert.equal(results.coordinates.success, true, results.coordinates.error);
       assert.deepEqual(results.coordinates.places, { start: true, over: true, drop: true });
 
       assert.equal(results.refusedDrop.seen.drop, undefined, 'a refused target gets no drop');
-      assert.equal(results.refusedDrop.seen.dragleave, 1);
-      assert.equal(results.refusedDrop.seen.dragend, 1);
+      assert.deepEqual(results.refusedDrop.dragLog,
+        ['card:dragstart', 'locked:dragenter', 'locked:dragover', 'locked:dragleave', 'card:dragend']);
       assert.equal(results.refusedDrop.cardIn, 'todo');
       assert.equal(results.refusedDrop.drops, 0);
       assert.equal(results.refusedDrop.success, false);
@@ -605,6 +660,28 @@ test('drag_drop plays the drag the way a browser does',
       assert.equal(results.composed.success, true, results.composed.error);
       assert.equal(results.composed.dropped, 'true', 'listeners outside the shadow root see the drop');
       assert.equal(results.composed.drops, 1);
+
+      assert.equal(results.acceptsLater.drops, 1, 'dragover comes a tick after dragenter');
+      assert.equal(results.liveReorder.order, 'BCADE', 'matches a trusted drag');
+      assert.equal(results.liveReorder.success, true, results.liveReorder.error);
+      assert.equal(results.liveNeighbour.order, 'BACDE', 'matches a trusted drag');
+      assert.equal(results.liveNeighbour.success, true, results.liveNeighbour.error);
+      assert.equal(results.commitInDragend.success, true, results.commitInDragend.error);
+      assert.equal(results.commitInDragend.method, 'html5_drag');
+      assert.equal(results.commitInDragend.cardIn, 'b');
+      assert.equal(results.commitInDragend.seen.pointerdown, undefined, 'a move the page made needs no fallback');
+      for (const name of ['linkData', 'explicitLinkData']) {
+        assert.equal(results[name].success, true, results[name].error);
+        assert.equal(results[name].payload[0], 'https://example.com/doc', name);
+        assert.equal(results[name].payload[1], 'https://example.com/doc', name);
+        assert.match(results[name].payload[2], /<a id="link"/, name);
+      }
+      assert.match(results.imageData.payload[0], /^data:image\/gif/);
+      assert.equal(results.imageData.payload[1], '', 'Chrome leaves text/plain empty for an image');
+      assert.match(results.imageData.payload[2], /<img id="pic"/);
+      assert.equal(results.linkedImageData.payload[0], 'https://example.com/product', 'an image in a link carries the link');
+      assert.equal(results.linkedImageData.payload[1], '');
+      assert.deepEqual(results.plainDivData.payload, ['', '', ''], 'nothing is invented for other elements');
     } finally { await close(); }
   });
 
@@ -698,6 +775,27 @@ test('drag_drop reaches the pointer method when HTML5 cannot apply, and stops on
         on(document, 'pointermove', event => { if (held) $('#card').style.left = event.clientX + 'px'; });
         on(document, 'pointerup', () => { held = false; });
         out.freeDrag = result(await drag('#card', '#b'));
+
+        stage('<div id="card" style="position:absolute;left:100px;top:0">Card</div><div id="b" style="position:absolute;left:100px;top:300px">Target</div>');
+        held = false;
+        on($('#card'), 'pointerdown', () => { held = true; });
+        on(document, 'pointermove', event => { if (held) $('#card').style.top = event.clientY + 'px'; });
+        on(document, 'pointerup', () => { held = false; });
+        out.freeDragDown = result(await drag('#card', '#b'));
+
+        // The grip's sideways gap to the row never closes, but the rows do reorder.
+        const gripList = move => {
+          stage('<ul id="list" style="width:300px;padding:0">' + ['A', 'B', 'C', 'D'].map(id =>
+            '<li id="' + id + '" style="height:40px;list-style:none"><span id="g' + id + '" style="display:inline-block;width:24px">=</span> ' + id + '</li>').join('') + '</ul>');
+          let gripped = false;
+          on($('#gA'), 'pointerdown', () => { gripped = true; });
+          on(document, 'pointerup', () => { if (gripped) move(); gripped = false; });
+        };
+        gripList(() => $('#C').after($('#A')));
+        out.gripReorder = result(await drag('#gA', '#C'));
+        // Swapping neighbours crosses the target without shrinking the gap at all.
+        gripList(() => $('#B').after($('#A')));
+        out.gripSwap = result(await drag('#gA', '#B'));
       `);
       const shadowPress = await dragCases(ws, `
         stage('<flat-list></flat-list><div id="b">Target</div>');
@@ -801,6 +899,48 @@ test('drag_drop fails plainly when nothing was delivered, and rejects what it ca
         stage('<div id="spacer"></div><div id="card">Card</div><div id="b">Target</div>');
         on(document, 'pointerup', () => { $('#spacer').style.height = '300px'; });
         out.reflow = result(await drag('#card', '#b'));
+        stage('<div style="display:flex"><div id="spacer" style="width:0"></div><div id="card">Card</div><div style="width:40px"></div><div id="b">Target</div></div>');
+        on(document, 'pointerup', () => { $('#spacer').style.width = '300px'; });
+        out.reflowSideways = result(await drag('#card', '#b'));
+
+        // Motion that is not a move: none of these may read as a completed drag.
+        const motion = '<style>@keyframes pulse{50%{transform:scale(1.3)}}@keyframes bob{50%{transform:translateY(12px)}}' +
+          '.pulse{animation:pulse .5s infinite}.bob{animation:bob .4s infinite}' +
+          '.lift{transition:transform 300ms ease}.dragging{transform:scale(1.05) rotate(3deg)}' +
+          '.home{transition:transform 250ms ease}</style>';
+        stage(motion + '<div id="card" style="width:80px">Card</div><div id="b" class="pulse" style="width:80px;margin-top:200px">Target</div>');
+        out.pulsingTarget = result(await drag('#card', '#b'));
+        stage(motion + '<div id="card" class="bob" style="width:80px">Card</div><div id="b" style="width:80px;margin-top:200px">Target</div>');
+        out.bobbingCard = result(await drag('#card', '#b'));
+        stage(motion + '<div id="card" class="lift" draggable="true" style="width:200px">Card</div><div id="b" style="margin-top:200px">Target</div>');
+        on($('#card'), 'dragstart', () => $('#card').classList.add('dragging'));
+        on($('#card'), 'dragend', () => $('#card').classList.remove('dragging'));
+        out.liftUnwinding = result(await drag('#card', '#b'));
+        stage(motion + '<div id="card" class="home" style="width:80px">Card</div><div id="b" style="width:80px;margin-top:300px">Target</div>');
+        let pressed = false;
+        on($('#card'), 'pointerdown', () => { pressed = true; });
+        on(document, 'pointermove', event => { if (pressed) $('#card').style.transform = 'translateY(' + event.clientY + 'px)'; });
+        on(document, 'pointerup', () => { pressed = false; $('#card').style.transform = ''; });
+        out.snapBack = result(await drag('#card', '#b'));
+        stage('<div id="a"><div id="card" draggable="true">Card</div></div><div id="b">Target</div>');
+        on($('#card'), 'dragstart', () => $('#a').append(document.createElement('hr')));
+        on($('#card'), 'dragend', () => setTimeout(() => $('#a hr').remove(), 0));
+        out.placeholder = result(await drag('#card', '#b'));
+        stage('<div id="card" style="position:absolute;left:0;top:0">Card</div><div id="b" style="position:absolute;left:0;top:1px">Target</div>');
+        on(document, 'pointerup', () => { $('#card').style.top = '1px'; });
+        out.touching = result(await drag('#card', '#b'));
+
+        // A refusal the page shows is not a move, however close to the card it lands.
+        const locked = '<div id="todo"><div id="card" draggable="true">Card</div></div><ul id="locked"></ul>';
+        stage(locked);
+        on($('#locked'), 'dragenter', () => $('#locked').append(document.createElement('li')));
+        out.refusalOnEnter = result(await drag('#card', '#locked'));
+        stage(locked);
+        on(document, 'dragend', () => $('#todo').append(document.createElement('p')));
+        out.refusalOnEnd = result(await drag('#card', '#locked'));
+        stage('<div id="card" draggable="true" style="width:80px">Card</div><div id="b" style="position:fixed;bottom:0;left:0;width:80px;height:30px">Zone</div>');
+        on($('#b'), 'dragenter', () => { $('#b').style.height = '500px'; });
+        out.growingZone = result(await drag('#card', '#b'));
         stage(page);
         out.missingSource = await drag('#missing', '#drop');
         out.missingTarget = await drag('#drag', '#missing');
@@ -820,8 +960,12 @@ test('drag_drop fails plainly when nothing was delivered, and rejects what it ca
       assert.equal(results.nothing.mayHaveExecuted, undefined);
       assert.equal(results.nothing.seen.pointerdown, 1);
       assert.equal(results.nothing.seen.mousedown, 1);
-      assert.equal(results.reflow.success, false, 'a page that shifts everything has not moved the card');
-      assert.equal(results.reflow.error, 'All drag methods failed - use keyboard move alternative');
+      for (const name of ['reflow', 'reflowSideways', 'pulsingTarget', 'bobbingCard', 'liftUnwinding', 'snapBack', 'placeholder', 'touching',
+        'refusalOnEnter', 'refusalOnEnd', 'growingZone']) {
+        assert.equal(results[name].success, false, `${name} did not move the card`);
+        assert.equal(results[name].error, 'All drag methods failed - use keyboard move alternative', name);
+        assert.equal(results[name].seen.mousedown, 1, `${name} still tries the mouse method`);
+      }
       assert.equal(results.missingSource.error, 'Source element not found: #missing');
       assert.equal(results.missingTarget.error, 'Target element not found: #missing');
       assert.equal(results.invalidSource.error, 'Source element not found: div[');
