@@ -291,9 +291,9 @@ export class AgentsPageComponent implements OnInit, OnDestroy {
           applicationCategory: 'DeveloperApplication',
           operatingSystem: 'macOS, Linux, Windows (Node.js 18+)',
           url: `${HOST}/agents`,
-          description: $localize`:@@agents.schema.software.description:Canonical OpenClaw and Hermes onboarding path for FSB. Doctor flow, stdio config printer, consent-gated multi-host installer, and 68 MCP browser tools for the FSB MCP server.`,
+          description: $localize`:@@agents.schema.software.description:Canonical OpenClaw and Hermes onboarding path for FSB. Doctor flow, stdio config printer, consent-gated multi-host installer, and 69 MCP browser tools for the FSB MCP server.`,
           featureList: [
-            $localize`:@@agents.schema.software.feature.tools:68 MCP tools for browser action, observation, verification, and recovery`,
+            $localize`:@@agents.schema.software.feature.tools:69 MCP tools for browser action, observation, verification, and recovery`,
             $localize`:@@agents.schema.software.feature.manual:Manual mode by default; run_task autopilot only on explicit delegation`,
             $localize`:@@agents.schema.software.feature.vault:Vault tools fill credentials and payment methods without exposing raw secrets`,
             $localize`:@@agents.schema.software.feature.triggers:Trigger watcher tools for reactive page monitoring`,
@@ -384,8 +384,9 @@ const HOST_CHIPS: readonly HostChip[] = [
   { name: 'Cursor', logo: 'cursor.svg' },
   { name: 'Gemini CLI', logo: 'google.png' },
   { name: 'VS Code', logo: 'vscode.svg' },
-  { name: 'Windsurf', logo: 'windsurf.svg' },
+  { name: 'Antigravity', logo: 'antigravity.svg' },
   { name: 'OpenCode', logo: 'opencode.svg' },
+  { name: 'Cline', logo: 'cline.svg' },
 ];
 
 const BASE_INSTALL_COMMAND = 'npx -y fsb-mcp-server@latest install';
@@ -404,8 +405,9 @@ const INSTALL_HOSTS: readonly InstallHost[] = [
   { name: 'cursor', flag: '--cursor' },
   { name: 'gemini', flag: '--gemini' },
   { name: 'vscode', flag: '--vscode' },
-  { name: 'windsurf', flag: '--windsurf' },
+  { name: 'antigravity', flag: '--antigravity' },
   { name: 'opencode', flag: '--opencode' },
+  { name: 'cline', flag: '--cline' },
   { name: 'all', flag: '--all' },
 ];
 

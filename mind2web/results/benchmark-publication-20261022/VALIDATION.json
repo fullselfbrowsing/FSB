@@ -1,0 +1,30 @@
+{
+  "verified_at": "2026-10-22T06:44:49.382883+00:00",
+  "ok": true,
+  "score_unchanged": true,
+  "task_outcomes_unchanged": true,
+  "review_attribution": "AI-reviewed",
+  "chart": {
+    "entries": 10,
+    "fsb_label": "FSB",
+    "position": 4,
+    "formats": [
+      "png",
+      "svg",
+      "pdf"
+    ],
+    "visually_inspected_png": true,
+    "headline_terms_removed": true
+  },
+  "historical_evaluation_seal": {
+    "path": "mind2web/results/final-review-20261022/FINAL-SEAL.json",
+    "verified": true,
+    "source_files": 2160,
+    "earlier_benchmark_files": 43
+  },
+  "historical_publication_seal": {
+    "path": "mind2web/results/final-reviewed-20261022/FINAL-SEAL.json",
+    "files_verified": 5
+  },
+  "report_links_verified": true
+}

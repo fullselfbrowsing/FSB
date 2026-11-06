@@ -1,0 +1,8 @@
+{
+  "locale_seed_greeting": {
+    "message": "Está listo"
+  },
+  "locale_seed_replay": {
+    "message": "Velocidad de repetición $SPEED$"
+  }
+}

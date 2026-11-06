@@ -349,6 +349,15 @@ img[src*="xai"] { filter: invert(1); }
 @keyframes rnLbReject{0%{transform:translateX(-70px);opacity:0}6%{opacity:1}24%{transform:none}28%{transform:translateX(-4px)}32%{transform:translateX(3px)}36%{transform:translateX(-2px)}40%,88%{transform:none;opacity:1}100%{transform:none;opacity:0}}
 @keyframes rnLbStrike{0%,40%{transform:scaleX(0)}48%,100%{transform:scaleX(1)}}
 @keyframes rnLbDeny{0%,42%{opacity:0}48%,88%{opacity:1}100%{opacity:0}}
+@keyframes rnLoc8{0%{opacity:0}1.3%,11.2%{opacity:1}12.4%,100%{opacity:0}}
+@keyframes rnLocPing{0%{box-shadow:0 0 0 0 rgba(255,107,53,.45)}45%,100%{box-shadow:0 0 0 7px rgba(255,107,53,0)}}
+@keyframes rnLsSend{0%,6%{left:0;opacity:0}10%{opacity:1}34%{left:100%;opacity:1}38%,100%{left:100%;opacity:0}}
+@keyframes rnLsOld{0%,36%{opacity:1}44%,94%{opacity:0}100%{opacity:1}}
+@keyframes rnLsNew{0%,38%{opacity:0}46%,92%{opacity:1}100%{opacity:0}}
+@keyframes rnExOld{0%,4%{opacity:0}10%,52%{opacity:1}60%,100%{opacity:0}}
+@keyframes rnExNew{0%,58%{opacity:0;transform:translateY(4px)}66%,94%{opacity:1;transform:none}100%{opacity:0;transform:none}}
+@keyframes rnBdA{0%,4%{opacity:.3}10%,44%{opacity:1}50%,100%{opacity:.3}}
+@keyframes rnBdB{0%,50%{opacity:.3}56%,94%{opacity:1}100%{opacity:.3}}
   img[data-mono-mark] { filter: brightness(0) invert(1); }
   img[data-invert-art] { filter: invert(1); }
   :host-context([data-theme="light"]) img[data-mono-mark] { filter: brightness(0); }
@@ -678,6 +687,16 @@ img[src*="xai"] { filter: invert(1); }
 .rn-a115 { animation: rnLbReject 6s ease-out infinite; animation-delay: .8s; }
 .rn-a116 { animation: rnLbStrike 6s ease-out infinite; animation-delay: .8s; }
 .rn-a117 { animation: rnLbDeny 6s linear infinite; animation-delay: .8s; }
+.rn-a118 { animation: rnLoc8 16s linear infinite; }
+.rn-a119 { animation: rnLocPing 2s ease-out infinite; }
+.rn-a120 { animation: rnLsSend 4s linear infinite; }
+.rn-a121 { animation: rnLsOld 4s ease-in-out infinite; }
+.rn-a122 { animation: rnLsNew 4s ease-in-out infinite; }
+.rn-a123 { animation: rnLbStrike 6s ease-out infinite; }
+.rn-a124 { animation: rnExOld 6s ease-in-out infinite; }
+.rn-a125 { animation: rnExNew 6s ease-out infinite; }
+.rn-a126 { animation: rnBdA 8s ease-in-out infinite; }
+.rn-a127 { animation: rnBdB 8s ease-in-out infinite; }
 
 /* =============================================
    Responsive

@@ -1,6 +1,6 @@
 # FSB Skill -- Usage
 
-> **v0.9.0 breaking change** -- The explicit `start_visual_session` / `end_visual_session` tools were REMOVED in fsb-mcp-server v0.9.0 (FSB milestone v0.9.62). Action tools now require `visual_reason` + `client` fields in every call (validated against the v0.9.36 badge allowlist). The visual session is created implicitly on the first action call, refreshed on a sliding 60-second window, and cleared by `is_final: true` (immediate) or 60 seconds of silence (auto-clear). Calling the removed tools returns the typed `TOOL_REMOVED` error. See [`mcp/CHANGELOG.md`](../../mcp/CHANGELOG.md#v0.9.0) and [`mcp/README.md`](../../mcp/README.md#visual-session-lifecycle) for the migration recipe with concrete before/after code.
+> **v0.9.0 breaking change** -- The explicit `start_visual_session` / `end_visual_session` tools were REMOVED in fsb-mcp-server v0.9.0 (FSB milestone v0.9.62). Action tools now require `visual_reason` + `client` fields in every call (validated against the v0.9.36 badge allowlist). The visual session is created implicitly on the first action call, refreshed on a sliding 60-second window, and cleared by `is_final: true` (immediate) or 60 seconds of silence (auto-clear). The removed names are no longer registered at all. See [`mcp/CHANGELOG.md`](../../mcp/CHANGELOG.md#v0.9.0) and [`mcp/README.md`](../../mcp/README.md#visual-session-lifecycle) for the migration recipe with concrete before/after code.
 
 FSB drives the user's real Chrome via the FSB extension and a local MCP bridge so OpenClaw can run live web tasks (clicks, typing, multi-tab flows, auth-gated reads).
 
@@ -94,7 +94,7 @@ FSB shows a trusted client badge and an orange element targeting overlay on the 
 Three rules govern the bundle:
 
 - **`visual_reason`** -- short human-readable string shown in the overlay (for example, `"Completing checkout"`). Required on every action tool call.
-- **`client`** -- allowlisted badge label. Required on every action tool call. The shared v0.9.36 allowlist accepts: `Claude`, `Codex`, `ChatGPT`, `Perplexity`, `Windsurf`, `Cursor`, `Antigravity`, `OpenCode`, `OpenClaw`, `Grok`, `Gemini`. Freeform strings reject with `BADGE_NOT_ALLOWED`. The skill ships as part of OpenClaw, so the canonical `client` value for this surface is `OpenClaw`.
+- **`client`** -- allowlisted badge label. Required on every action tool call. The shared allowlist accepts: `Claude`, `Codex`, `ChatGPT`, `Perplexity`, `Cursor`, `Antigravity`, `OpenCode`, `OpenClaw`, `Grok`, `Gemini`, `Hermes`, `Cline`, `Continue`, `Zed`, `VS Code`, `Copilot`, `JetBrains`, `Xcode`, `Eclipse`, `Cody`, `Roo Code`, `Kiro`, `Goose`, `Muse`, `Grok Bot`, `Dots`. Freeform strings reject with `BADGE_NOT_ALLOWED`. The skill ships as part of OpenClaw, so the canonical `client` value for this surface is `OpenClaw`.
 - **`is_final`** -- optional boolean. Set `true` on the LAST action of a task to clear the overlay immediately after that action's `change_report` resolves. Default `false`.
 
 Read-only tools (`read_page`, `get_dom_snapshot`, `get_text`, `get_attribute`, `read_sheet`, `get_page_snapshot`, `list_tabs`, `get_site_guide`, `search_memory`, `report_progress`, `complete_task`, `partial_task`, `fail_task`, `wait_for_element`, `wait_for_stable`) do NOT carry the bundle and do NOT re-arm the sliding window. Reads stay silent by design. The newer `stop_trigger`, `get_trigger_status`, and `list_triggers` tools are also read-only and bundle-exempt, but are a separate family from this pinned 15-tool list -- see the Addendum in `.planning/v0.9.62-CONTRACT.md`.
@@ -121,7 +121,6 @@ Three typed errors guard the contract; match on the name, not the human-readable
 
 - **`VISUAL_FIELDS_REQUIRED`** -- raised when an action call is missing `visual_reason` or `client`. Schema-layer reject; no DOM mutation occurs.
 - **`BADGE_NOT_ALLOWED`** -- raised when `client` is not on the v0.9.36 allowlist. Use one of the labels above.
-- **`TOOL_REMOVED`** -- raised when a caller invokes `start_visual_session` or `end_visual_session` by name. The body names the new contract; do not retry with the removed tool names.
 
 ### Autopilot exception
 

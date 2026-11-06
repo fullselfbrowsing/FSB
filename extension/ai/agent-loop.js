@@ -2330,7 +2330,7 @@ async function runAgentIteration(sessionId, options) {
             session.tabId,
             session.agentId,
             {
-              client: 'FSB Autopilot',
+              client: 'Autopilot',
               visualReason: 'autopilot-tool-dispatch:' + call.name,
               driver: 'autopilot',
               isFinal: false
@@ -2779,7 +2779,7 @@ async function runAgentIteration(sessionId, options) {
             _phase10ReasoningTokens = response.usage.completion_tokens_details.reasoning_tokens;
           }
           globalThis.fsbMcpMetricsRecorder.recordDispatch({
-            client: 'FSB Autopilot',
+            client: 'Autopilot',
             tool: call.name,
             requestMetadata: {
               textLength: call.args && typeof call.args.text === 'string' ? call.args.text.length : 0

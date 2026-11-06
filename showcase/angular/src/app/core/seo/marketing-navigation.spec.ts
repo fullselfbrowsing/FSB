@@ -42,7 +42,7 @@ describe('marketing route metadata', () => {
         expect(schemas[0].getAttribute('data-ld')).withContext(path).toBe(key);
         expect(document.head.contains(organization)).toBeTrue();
         expect(document.head.querySelectorAll('link[rel="canonical"]').length).toBe(1);
-        expect(document.head.querySelectorAll('link[hreflang]').length).toBe(8);
+        expect(document.head.querySelectorAll('link[hreflang]').length).toBe(LOCALES.length + 1);
         const route = path === '/' ? '' : path;
         const prefix = LOCALE_SUBPATHS[locale];
         const url = `${HOST}${prefix ? `/${prefix}` : ''}${route}`;

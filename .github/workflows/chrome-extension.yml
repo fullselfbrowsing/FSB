@@ -52,6 +52,11 @@ jobs:
       - name: Validate extension
         run: npm run validate:extension
 
+      - name: Let crashed Chrome renderers exit at once
+        # The hung-page navigation test crashes a renderer. Ubuntu pipes core dumps
+        # to systemd-coredump, which keeps the process alive for over ten seconds.
+        run: sudo sysctl -w kernel.core_pattern=core
+
       - name: Run extension and bridge tests
         run: npm test
 

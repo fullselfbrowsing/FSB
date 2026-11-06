@@ -18,6 +18,7 @@ const compatibilityBuildPath = path.join(buildRoot, 'compatibility.js');
 const registryBuildPath = path.join(buildRoot, 'registry.js');
 const fixturesRoot = path.join(repoRoot, 'tests', 'fixtures', 'agent-streams');
 const ciPath = path.join(repoRoot, '.github', 'workflows', 'ci.yml');
+const archivedGrokManifest = 'tests/fixtures/agent-streams/grok-build-1.0.4/manifest.json';
 
 const MANIFEST_KEYS = Object.freeze([
   'expectedSequence',
@@ -217,12 +218,14 @@ function assertProductionRoster(registryIds, rows, registry) {
     'JSONL parser-contract roster excludes the supervisor-owned Grok ACP transport',
   );
   const matrixFixtures = rows.map((row) => row.fixtureManifest).sort();
-  const registeredFixtures = rows.map((row) => row.fixtureManifest).sort();
+  const registeredFixtures = Object.values(FIXTURE_CONTRACTS)
+    .map((contract) => `tests/fixtures/agent-streams/${contract.directory}/manifest.json`)
+    .concat('tests/fixtures/agent-streams/grok-build-1.0.62/manifest.json').sort();
   assert.deepEqual(matrixFixtures, registeredFixtures, 'registered matrix fixtures agree');
   assert.deepEqual(
     listCommittedManifests(),
-    registeredFixtures,
-    'committed manifest roster agrees with production exposure',
+    [...new Set([...registeredFixtures, archivedGrokManifest])].sort(),
+    'committed manifest roster agrees with production exposure and the explicit archived Grok regression',
   );
   const productionAdapterIds = registryIds.filter((adapterId) => {
     const adapter = registry.require(adapterId);
@@ -358,12 +361,23 @@ async function main() {
   const committedManifests = listCommittedManifests();
   const expectedManifests = contractIds.map(
     (adapterId) => `tests/fixtures/agent-streams/${FIXTURE_CONTRACTS[adapterId].directory}/manifest.json`,
-  ).concat('tests/fixtures/agent-streams/grok-build-1.0.4/manifest.json').sort();
+  ).concat(archivedGrokManifest, matrixRows.find((row) => row.adapterId === 'grok-build').fixtureManifest).sort();
   assert.deepEqual(
     committedManifests,
     expectedManifests,
     'fixture roster covers both active delegated providers',
   );
+
+  const archivedGrok = JSON.parse(fs.readFileSync(path.join(repoRoot, archivedGrokManifest), 'utf8'));
+  assert.equal(archivedGrok.profileVersion, '1.0.4');
+  assert.equal(archivedGrok.recordedProvenanceStatus, 'full_turn_captured');
+  const currentGrok = JSON.parse(fs.readFileSync(path.join(repoRoot,
+    matrixRows.find((row) => row.adapterId === 'grok-build').fixtureManifest), 'utf8'));
+  assert.equal(currentGrok.profileVersion, 'grok-acp-v1');
+  assert.equal(currentGrok.recordedProvenanceStatus, 'initialization_only');
+  assert.deepEqual(currentGrok.expectedSequence, ['init']);
+  assert.ok(currentGrok.limitations.some((limitation) => limitation.includes('No authentication')),
+    'initialization capture is never promoted to authenticated full-task evidence');
 
   for (const adapterId of contractIds) {
     const contract = FIXTURE_CONTRACTS[adapterId];

@@ -463,7 +463,7 @@ function makeLifecycleFakes(overrides = {}) {
                   realPath: '/private/compatibility-path-canary/grok',
                   argvPrefix: [],
                 },
-                profileVersion: '1.0.4',
+                profileVersion: 'grok-acp-v1',
               };
             },
           };
@@ -543,7 +543,7 @@ async function runServeDelegationLifecycle(lifecycleModule) {
   assertEqual(success.state.compatibilityDetectCalls, 2, 'compatibility invokes each registered production detector once');
   assertEqual(
     JSON.stringify(compatibility),
-    '{"schemaVersion":2,"checkedAt":123456789,"adapters":[{"adapterId":"claude-code","displayLabel":"Claude Code","status":"supported","reason":"within_tested_range","authState":"unknown"},{"adapterId":"grok-build","displayLabel":"Grok Build","status":"supported","reason":"within_tested_range","authState":"oauth"}]}',
+    '{"schemaVersion":2,"checkedAt":123456789,"adapters":[{"adapterId":"claude-code","displayLabel":"Claude Code","status":"supported","reason":"within_tested_range","authState":"unknown"},{"adapterId":"grok-build","displayLabel":"Grok Build","status":"supported","reason":"capability_verified","authState":"oauth"}]}',
     'compatibility returns only the exact bounded browser-safe projection',
   );
   for (const forbidden of [

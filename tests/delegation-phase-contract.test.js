@@ -6,24 +6,24 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
-const PHASE_DIR = '.planning/phases/61-delegation-ux-sw-eviction-persistence';
+const PHASE_DIR = '.planning/milestones/v0.9.91-phases/61-delegation-ux-sw-eviction-persistence';
 const UAT_PATH = `${PHASE_DIR}/61-HUMAN-UAT.md`;
 const VALIDATION_PATH = `${PHASE_DIR}/61-VALIDATION.md`;
 const PRE_PHASE61_ROOT_TEST_HASH = '1f02d3f54f3136054ccb26f10dbff97e1c30ed7118cae72e0f0dfc758577f683';
-const PHASE62_DIR = '.planning/phases/62-ci-drift-smoke-gate-doctor-extensions';
+const PHASE62_DIR = '.planning/milestones/v0.9.91-phases/62-ci-drift-smoke-gate-doctor-extensions';
 const PHASE62_VALIDATION_PATH = `${PHASE62_DIR}/62-VALIDATION.md`;
 const PHASE62_UAT_PATH = `${PHASE62_DIR}/62-HUMAN-UAT.md`;
 const PRE_PHASE62_ROOT_TEST_HASH = '8069c2f916171cd373a073d52c5874aa29bad9a0710c7104efde6ce21ee9e282';
-const PHASE63_DIR = '.planning/phases/63-native-messaging-host';
+const PHASE63_DIR = '.planning/milestones/v0.9.91-phases/63-native-messaging-host';
 const PHASE63_UAT_PATH = `${PHASE63_DIR}/63-HUMAN-UAT.md`;
 const PHASE63_VALIDATION_PATH = `${PHASE63_DIR}/63-VALIDATION.md`;
 const PHASE63_CONTEXT_PATH = `${PHASE63_DIR}/63-CONTEXT.md`;
 const PHASE63_RESEARCH_PATH = `${PHASE63_DIR}/63-RESEARCH.md`;
 const PHASE63_UI_SPEC_PATH = `${PHASE63_DIR}/63-UI-SPEC.md`;
-const PHASE64_DIR = '.planning/phases/64-opencode-adapter';
+const PHASE64_DIR = '.planning/milestones/v0.9.91-phases/64-opencode-adapter';
 const PHASE64_UAT_PATH = `${PHASE64_DIR}/64-HUMAN-UAT.md`;
 const PHASE64_VALIDATION_PATH = `${PHASE64_DIR}/64-VALIDATION.md`;
-const PHASE65_DIR = '.planning/phases/65-codex-adapter';
+const PHASE65_DIR = '.planning/milestones/v0.9.91-phases/65-codex-adapter';
 const PHASE65_PLAN05_PATH = `${PHASE65_DIR}/65-05-PLAN.md`;
 const PHASE65_UAT_PATH = `${PHASE65_DIR}/65-HUMAN-UAT.md`;
 const PHASE65_VALIDATION_PATH = `${PHASE65_DIR}/65-VALIDATION.md`;
@@ -156,6 +156,9 @@ const REFINEMENT_ROOT_TEST_COMMANDS = Object.freeze([
   'node tests/server-client-ip-geo.test.js',
   'node tests/ws-client-relay-reconnect.test.js',
   'node --test tests/network-capture-debugger-lifecycle.test.js',
+  'node tests/extension-ui-locale.test.js',
+  'node scripts/verify-extension-i18n.mjs',
+  'node scripts/verify-extension-copy.mjs',
   'node tests/benchmark-assets-parity.test.js',
 ]);
 
@@ -1202,8 +1205,8 @@ function runPhase63FinalContract() {
   const context63 = read(PHASE63_CONTEXT_PATH);
   const research63 = read(PHASE63_RESEARCH_PATH);
   const uiSpec63 = read(PHASE63_UI_SPEC_PATH);
-  const roadmap63 = read('.planning/ROADMAP.md');
-  const requirements63 = read('.planning/REQUIREMENTS.md');
+  const roadmap63 = read('.planning/milestones/v0.9.91-ROADMAP.md');
+  const requirements63 = read('.planning/milestones/v0.9.91-REQUIREMENTS.md');
   const { planNames, records: planRecords } = phase63PlanRecords();
   const validationRows = phase63ValidationRows(validation63);
 
@@ -2233,8 +2236,8 @@ const context = read(`${PHASE_DIR}/61-CONTEXT.md`);
 const research = read(`${PHASE_DIR}/61-RESEARCH.md`);
 const patterns = read(`${PHASE_DIR}/61-PATTERNS.md`);
 const uiSpec = read(`${PHASE_DIR}/61-UI-SPEC.md`);
-const roadmap = read('.planning/ROADMAP.md');
-const requirements = read('.planning/REQUIREMENTS.md');
+const roadmap = read('.planning/milestones/v0.9.91-ROADMAP.md');
+const requirements = read('.planning/milestones/v0.9.91-REQUIREMENTS.md');
 const packageJson = JSON.parse(read('package.json'));
 
 console.log('\n--- honest milestone-end UAT prerequisite ---');
@@ -2472,9 +2475,9 @@ const decisionEvidence = Object.freeze({
   'D-22': [['extension/ui/sidepanel.js', /Copy doctor command/]],
   'D-23': [['mcp/src/agent-providers/runtime-files.ts', /recoveryRequired/]],
   'D-24': [['tests/delegation-controller.test.js', /without replay|no replay/i]],
-  'D-25': [['.planning/phases/61-delegation-ux-sw-eviction-persistence/61-HUMAN-UAT.md', /service-worker eviction/]],
+  'D-25': [['.planning/milestones/v0.9.91-phases/61-delegation-ux-sw-eviction-persistence/61-HUMAN-UAT.md', /service-worker eviction/]],
   'D-26': [['tests/mcp-version-parity.test.js', /Phase 61 Chrome 116 and Phase 63 native permission boundary/]],
-  'D-27': [['.planning/phases/61-delegation-ux-sw-eviction-persistence/61-VALIDATION.md', /After every task commit/]],
+  'D-27': [['.planning/milestones/v0.9.91-phases/61-delegation-ux-sw-eviction-persistence/61-VALIDATION.md', /After every task commit/]],
   'D-28': [[UAT_PATH, /Every case above remains `human_needed` and pending/]],
 });
 for (const id of decisionIds) checkEvidence(id, decisionEvidence[id]);
@@ -2556,7 +2559,8 @@ const terminalCodes = [
   'event_silence_timeout', 'delegation_persistence_failed', 'delegation_quota_exceeded',
   'delegation_ledger_corrupt', 'route_lost', 'agent_offline', 'agent_unpaired',
   'unsupported_provider', 'hold_expired', 'resume_ownership_lost',
-  'daemon_restart_lost_run', 'agent_protocol_drift', 'provider_error', 'tree_unsettled', 'agent_failed',
+  'daemon_restart_lost_run', 'agent_protocol_drift', 'sandbox_unavailable',
+  'capability_missing', 'isolation_unavailable', 'binary_changed', 'provider_error', 'tree_unsettled', 'agent_failed',
   'unknown_failure',
 ];
 equal(extractFrozenTrueKeys(auditedEventStoreSource, 'VALID_TERMINAL_CODES'), terminalCodes,
@@ -2969,10 +2973,13 @@ equal(Array.from(compatibilityStatusesBlock.matchAll(/'([^']+)'/g), (match) => m
   ['supported', 'degraded', 'unsupported'],
   'canonical compatibility statuses are the exact closed three-value set');
 equal(Array.from(compatibilityReasonsBlock.matchAll(/'([^']+)'/g), (match) => match[1]), [
-  'within_tested_range', 'newer_than_tested_range', 'evidence_stale',
+  'within_tested_range', 'capability_verified', 'capability_unverified',
+  'capability_missing', 'isolation_unavailable', 'sandbox_unavailable', 'agent_protocol_drift',
+  'binary_changed', 'adapter_unavailable', 'version_unsupported',
+  'newer_than_tested_range', 'evidence_stale',
   'binary_not_found', 'version_missing', 'version_malformed', 'below_minimum',
   'wrong_major', 'adapter_unshipped', 'matrix_invalid',
-], 'canonical compatibility reasons are the exact closed ten-value set');
+], 'canonical compatibility reasons retain the exact closed version and capability verdict set');
 
 const rawCompatibilityMatrix = between(
   compatibilitySource,
@@ -3002,10 +3009,10 @@ check(!rawCompatibilityMatrix.includes("adapterId: 'codex'")
   'the canonical matrix contains no retired provider row or fixture');
 for (const exactGrokMatrixToken of [
   "displayLabel: 'Grok Build'",
-  "profileVersion: '1.0.4'",
+  "profileVersion: 'grok-acp-v1'",
   "minimumVersion: '1.0.4'",
-  "testedThroughVersion: '1.0.4'",
-  "fixtureManifest: 'tests/fixtures/agent-streams/grok-build-1.0.4/manifest.json'",
+  "testedThroughVersion: '1.0.62'",
+  "fixtureManifest: 'tests/fixtures/agent-streams/grok-build-1.0.62/manifest.json'",
   "'agentCapabilities.mcpCapabilities.http'",
   "'agentCapabilities.sessionCapabilities.close'",
   "requiredResultFields: ['stopReason']",
@@ -3321,8 +3328,8 @@ for (const doctorToken of [
   'registryIds = denseStringArray(idsMethod.call(registry))',
   'const adapter = requireMethod.call(registry, contract.adapterId)',
   'detection = await detectMethod.call(adapter)',
-  'classifyAdapterCompatibility',
-  'authState: normalized.authState',
+  'classifyAdapterDetectionCompatibility(contract.adapterId, detection)',
+  "authState: compatibility.status === 'unsupported' ? 'unknown' : normalized.authState",
 ]) {
   check(doctorCollectorSource.includes(doctorToken),
     `doctor collection remains local and canonical: ${doctorToken}`);

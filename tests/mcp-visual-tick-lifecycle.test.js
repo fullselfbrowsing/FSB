@@ -346,7 +346,7 @@ async function caseG() {
   console.log('\n--- Case G: tab-removed cleanup (no broadcast; tab is gone) ---');
   const { chromeMock, lc, capturedStatusBroadcasts } = setupHarness();
 
-  await lc.recordVisualSessionTick(55, 'agent_c', { visualReason: 'r', client: 'Windsurf' });
+  await lc.recordVisualSessionTick(55, 'agent_c', { visualReason: 'r', client: 'Antigravity' });
   capturedStatusBroadcasts.length = 0;
 
   await lc.handleVisualSessionLifecycleTabRemoved(55);

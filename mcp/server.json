@@ -3,7 +3,7 @@
   "name": "io.github.fullselfbrowsing/fsb-mcp-server",
   "title": "FSB MCP Server",
   "description": "Control the FSB browser extension from any MCP client using a local stdio or Streamable HTTP companion runtime.",
-  "version": "0.11.2",
+  "version": "0.11.5",
   "icons": [
     {
       "src": "https://www.full-selfbrowsing.com/assets/fsb_logo_dark.png",
@@ -17,7 +17,7 @@
     {
       "registryType": "npm",
       "identifier": "fsb-mcp-server",
-      "version": "0.11.2",
+      "version": "0.11.5",
       "transport": {
         "type": "stdio"
       }

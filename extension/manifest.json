@@ -1,9 +1,10 @@
 {
   "manifest_version": 3,
-  "name": "FSB v0.9.92",
-  "version": "0.9.92",
+  "default_locale": "en",
+  "name": "__MSG_ext_name__",
+  "version": "0.9.95",
   "minimum_chrome_version": "116",
-  "description": "FSB - Universal AI-powered browser automation assistant with multi-model support",
+  "description": "__MSG_ext_description__",
   "homepage_url": "https://full-selfbrowsing.com",
   "permissions": [
     "activeTab",
@@ -47,6 +48,7 @@
     {
       "resources": [
         "assets/icon48.png",
+        "_locales/*/messages.json",
         "site-maps/*.json",
         "test-data/**/*",
         "utils/redactForLog.js",

@@ -1431,6 +1431,126 @@
       "reason": "code identifier or wire token"
     },
     {
+      "id": "releaseNotes.v0995.002.extension",
+      "sourceSha256": "05ef5b5eacdf3da9ed2e30b4107131895c363096d1b3895ba2b2df178892daf3",
+      "reason": "version chip"
+    },
+    {
+      "id": "releaseNotes.v0995.003.mcp",
+      "sourceSha256": "730b6ef654233fef5dd0031dc2fd46ac018b18a317e8d997d1628a7b9914b082",
+      "reason": "version chip"
+    },
+    {
+      "id": "releaseNotes.v0995.004.chrome",
+      "sourceSha256": "93e225f07a15e9af97ef69b4569eff842d57e9d55a14436de8ec377f8df2bc18",
+      "reason": "version chip"
+    },
+    {
+      "id": "releaseNotes.v0995.005.node",
+      "sourceSha256": "f987ef9780d1b33004fa3678b582a395a29802eb2923a1b1dd05b924cc2f2483",
+      "reason": "version chip"
+    },
+    {
+      "id": "releaseNotes.v0995.006.mit",
+      "sourceSha256": "e5dcffe836b6ec8a58e492419b550e65fb8cbdc308503979e5dacb33ac7ea3b7",
+      "reason": "license identifier"
+    },
+    {
+      "id": "releaseNotes.v0995.008.ready",
+      "sourceSha256": "5fa7aac5375c5815787fba3f49559f9b45b14023147ce0652803387974144e5f",
+      "reason": "extension UI sample shown in its own language"
+    },
+    {
+      "id": "releaseNotes.v0995.009.listo",
+      "sourceSha256": "b5fa51d564a9d8809f67c15dd6aef17cb1ebffbaa416b42978e079134adf568e",
+      "reason": "extension UI sample shown in its own language"
+    },
+    {
+      "id": "releaseNotes.v0995.010.bereit",
+      "sourceSha256": "8d4d4830b4da5aa02a77a69d2ff4f8afed762bf70dfd8173687548d936f64442",
+      "reason": "extension UI sample shown in its own language"
+    },
+    {
+      "id": "releaseNotes.v0995.010.readyRu",
+      "sourceSha256": "ef05d57959cfde50d145153bdc66f9873ad699ce20c523cf040949ee5c404d4e",
+      "reason": "extension UI sample shown in its own language"
+    },
+    {
+      "id": "releaseNotes.v0995.011.readyJa",
+      "sourceSha256": "d888e7c7a8303af0f59b50de130b2e2b2913233456b35e146d05949af7d68885",
+      "reason": "extension UI sample shown in its own language"
+    },
+    {
+      "id": "releaseNotes.v0995.012.readyKo",
+      "sourceSha256": "f296cb19f0a261ebacd5851775bc2ed5ef5739753e8a69cac74b51c5050f83d4",
+      "reason": "extension UI sample shown in its own language"
+    },
+    {
+      "id": "releaseNotes.v0995.013.readyZhCn",
+      "sourceSha256": "b073db9c0bd6f2edb13632e70fd7709039504a4eafca09b18aaa576c97b89a37",
+      "reason": "extension UI sample shown in its own language"
+    },
+    {
+      "id": "releaseNotes.v0995.014.readyZhTw",
+      "sourceSha256": "68ddad7fd948d5df9f4d9e2a024681b619be7eb171d80553f06e0ec19207e956",
+      "reason": "extension UI sample shown in its own language"
+    },
+    {
+      "id": "releaseNotes.v0995.021.fsbUiLocaleKo",
+      "sourceSha256": "789492121de1cd540676b91c6b28ee2ab8a8f3be72f32a3e62c5391c8d40d729",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0995.031.chromeExtensions",
+      "sourceSha256": "c0ae15d785f5343cd50ab12f25ee9c3c614590f73dc68d2c3e237efa3f073c2e",
+      "reason": "literal path, selector, or sample address"
+    },
+    {
+      "id": "releaseNotes.v0995.032.fsbV",
+      "sourceSha256": "c184a12c4a1fa6afea958b837dfc579af83b485d79a3c3cbfd3e86d82c7de0f3",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "releaseNotes.v0995.033.fsb",
+      "sourceSha256": "83139e1a42a4c7033286d67f1c732d7067ea620fd6dbf5c5fb0df845d8b33e4a",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "releaseNotes.v0995.034.msgExtName",
+      "sourceSha256": "c41e86862fbb77ce7056c56f0808ba758517dfedd9ad30328b5f7f24d7a754fb",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0995.048.npmTest",
+      "sourceSha256": "328e123c63857fd8473bd4bd3581e655b08b7440d7f5d2c31cc375607582f539",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "releaseNotes.v0995.049.verifyExtensionI18n",
+      "sourceSha256": "18fc609a1c0a182b5965f2b64d9185516c896b1a7aedd69a171ef5c3c8dcde5f",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0995.051.verifyExtensionCopy",
+      "sourceSha256": "8a844f9dc886f4f46c2626ea12b1615c4f87bf14165c100417bee882c67063c9",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0995.058.installCline",
+      "sourceSha256": "30d620a18598ea64264b66f2ae2c0a230ea5f9fa494c7a970c452e038c309820",
+      "reason": "literal install command"
+    },
+    {
+      "id": "releaseNotes.v0995.059.clineSettingsPath",
+      "sourceSha256": "ec8e566e290fd0b482326477e2a92067ad911d270f6397f668918ecc6b61d8eb",
+      "reason": "literal path, selector, or sample address"
+    },
+    {
+      "id": "releaseNotes.v0995.060.timeout1800",
+      "sourceSha256": "c83b2f2c576a8df0343d510c43ea57139bdb3598c145d4a7394d01c9a87c892e",
+      "reason": "code identifier or wire token"
+    },
+    {
       "id": "releaseNotes.v0990.030.latticeSdk",
       "sourceSha256": "e4290fe5d92b7da4ba206c1b7337cc33f798d5170122dcdc9c652117d83ea4b5",
       "reason": "brand, package, or CLI name"
@@ -1598,14 +1718,14 @@
       },
       {
         "id": "agents.power.card.tools.stat",
-        "sourceSha256": "d73e58b89a81bb6abad87def2805d561e35d529433feff62f3ec91042031bac7",
-        "targetSha256": "d6169d5f466b1d50034c7847c5251fd380eeeaf6b49eaa1a5c21b67d372508f6",
+        "sourceSha256": "f2e9494e99a028839cb7d4a71a4ae6d305bcc46ce2acfbf573d4feaa49221c63",
+        "targetSha256": "d0d8ce69e94c85b63a100eca4ad1ef470e61c02e37f86b8a9cea58cab780fd5f",
         "reason": "Tools is the standard German technical loanword, capitalized as a noun; the MCP compound uses a German hyphen."
       },
       {
         "id": "home.engine.mcp.fact.tools",
-        "sourceSha256": "be82197e9662c8e2c9788aea0a27c4dc9e51db4ae7e456eefb39ab88c021de34",
-        "targetSha256": "04d914741631f87377073bf5fa253d9b4a9d90379573b16c970f16d2afaa886f",
+        "sourceSha256": "485c669be39838cb5f5e9593d6393b2eeb78676f283835af645bb7f1625946e6",
+        "targetSha256": "dedc78f12f58994c4f436de0107e23cc658ee138e559e5b14b9ab9c1f1a0027e",
         "reason": "Tools is the standard German technical loanword, capitalized as a noun; the MCP compound uses a German hyphen."
       }
     ]

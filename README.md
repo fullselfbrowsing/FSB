@@ -1,4 +1,4 @@
-# FSB v0.9.92 Full Self Browsing
+# FSB v0.9.95 Full Self Browsing
 
 <div align="center">
 
@@ -9,7 +9,7 @@
 </picture>
 
 ![FSB](https://img.shields.io/badge/FSB-Full_Self_Browsing-000000?style=for-the-badge)
-![Version](https://img.shields.io/badge/version-0.9.92-0078D4?style=for-the-badge)
+![Version](https://img.shields.io/badge/version-0.9.95-0078D4?style=for-the-badge)
 ![Manifest V3](https://img.shields.io/badge/Manifest_V3-Chrome-34A853?style=for-the-badge&logo=googlechrome&logoColor=white)
 ![License](https://img.shields.io/badge/license-MIT-F5C518?style=for-the-badge)
 [![Online-Mind2Web](https://img.shields.io/badge/Online--Mind2Web-92.3%25-FF6B35?style=for-the-badge)](#benchmark)
@@ -65,7 +65,7 @@ FSB: [AI-reviewed result (277/300)](https://github.com/fullselfbrowsing/FSB/blob
 
 FSB (Full Self Browsing) is an open source Chrome extension for AI powered browser automation. Describe a task in plain English; FSB reads the live DOM, builds a plan, executes browser actions, verifies results, and reports progress through the popup, side panel, or MCP.
 
-> FSB v0.9.92 is functional and production ready for supervised automation. Browser automation can still behave unpredictably on complex or sensitive sites, so monitor actions and test on non critical pages first.
+> FSB v0.9.95 is functional and production ready for supervised automation. Browser automation can still behave unpredictably on complex or sensitive sites, so monitor actions and test on non critical pages first.
 
 ### Why DOM First
 
@@ -88,8 +88,9 @@ Project Mariner, Claude Computer Use, and OpenAI Operator rely heavily on visual
 | Claude Desktop | `npx -y fsb-mcp-server@latest install --claude-desktop` |
 | Cursor | `npx -y fsb-mcp-server@latest install --cursor` |
 | VS Code | `npx -y fsb-mcp-server@latest install --vscode` |
-| Windsurf | `npx -y fsb-mcp-server@latest install --windsurf` |
+| Antigravity | `npx -y fsb-mcp-server@latest install --antigravity` |
 | Codex | `npx -y fsb-mcp-server@latest install --codex` |
+| Cline | `npx -y fsb-mcp-server@latest install --cline` |
 | All at once | `npx -y fsb-mcp-server@latest install --all` |
 
 Preview before writing: append `--dry-run`. Sanity check with `npx -y fsb-mcp-server@latest doctor`. Restart the client so the new MCP server appears.
@@ -118,9 +119,9 @@ Want to run FSB standalone from the extension popup/side panel? Open settings, p
 - Uploads real local files to file inputs through the supervised `upload_file` tool with sensitive-path safeguards.
 - Maintains long term memory for past sites, workflows, selectors, and task outcomes.
 - Includes secure credential and payment vault flows for supervised autofill.
-- Exposes a local MCP server so Claude Code, Codex, Cursor, VS Code, Windsurf, and other MCP clients can drive the browser.
+- Exposes a local MCP server so Claude Code, Codex, Cursor, VS Code, Antigravity, Cline, and other MCP clients can drive the browser.
 
-Background agents are retired. Existing `chrome.storage.local['bgAgents']` data is preserved for users who had old agents, but scheduled or recurring automation is no longer an active FSB feature.
+Background agents were removed in v0.9.45rc1. When the extension updates, it deletes the saved agent definitions and alarms they left behind. For scheduled or recurring work, use [OpenClaw](https://github.com/openclaw/openclaw) or [Claude Routines](https://www.anthropic.com/claude/routines).
 
 ### Common Use Cases
 
@@ -310,7 +311,7 @@ The extension reads bundled scripts directly from `extension/`. The MCP package 
 
 ## MCP Server
 
-FSB ships [`fsb-mcp-server`](https://www.npmjs.com/package/fsb-mcp-server), a local MCP server that lets external AI clients control the same browser extension. It exposes 69 registered tools across visual sessions, trigger watchers, manual browser control, Developer/UAT capture, capability search/invoke, read-only page inspection, autopilot, vault, and observability.
+FSB ships [`fsb-mcp-server`](https://www.npmjs.com/package/fsb-mcp-server), a local MCP server that lets external AI clients control the same browser extension. It exposes 69 registered tools across autopilot, trigger watchers, manual browser control, read-only page inspection, task outcome reporting, Developer/UAT capture, capability search/invoke, observability, and vault.
 
 The extension connects to the MCP bridge on:
 
@@ -333,8 +334,9 @@ npx -y fsb-mcp-server@latest install --claude-desktop
 npx -y fsb-mcp-server@latest install --claude-code
 npx -y fsb-mcp-server@latest install --cursor
 npx -y fsb-mcp-server@latest install --vscode
-npx -y fsb-mcp-server@latest install --windsurf
+npx -y fsb-mcp-server@latest install --antigravity
 npx -y fsb-mcp-server@latest install --codex
+npx -y fsb-mcp-server@latest install --cline
 npx -y fsb-mcp-server@latest install --all
 ```
 
@@ -370,6 +372,20 @@ VS Code (`mcp.json`):
       "type": "stdio",
       "command": "npx",
       "args": ["-y", "fsb-mcp-server@latest"]
+    }
+  }
+}
+```
+
+Cline (`~/.cline/data/settings/cline_mcp_settings.json`, shared by the VS Code extension, JetBrains plugin, and CLI). `timeout` is in seconds; Cline's 60-second default would cut off long `run_task` calls:
+
+```json
+{
+  "mcpServers": {
+    "fsb": {
+      "command": "npx",
+      "args": ["-y", "fsb-mcp-server@latest"],
+      "timeout": 1800
     }
   }
 }
@@ -459,11 +475,11 @@ The MCP server exposes a curated public surface around that registry plus direct
 
 | Surface | Count | Examples |
 |---------|-------|----------|
-| Visual sessions | 2 | `start_visual_session`, `end_visual_session` |
-| Autopilot and agent navigation | 4 | `run_task`, `stop_task`, `get_task_status`, `back` |
+| Autopilot | 3 | `run_task`, `stop_task`, `get_task_status` |
 | Trigger watchers | 4 | `trigger`, `stop_trigger`, `get_trigger_status`, `list_triggers` |
 | Manual control | 37 | `execute_js`, `navigate`, `click`, `type_text`, `drag`, `upload_file` |
 | Read-only inspection | 8 | `read_page`, `get_dom_snapshot`, `get_site_guide`, `read_sheet` |
+| Task outcome | 3 | `complete_task`, `partial_task`, `fail_task` |
 | Developer / UAT | 1 | `capture_screenshot` |
 | Capabilities | 2 | `search_capabilities`, `invoke_capability` |
 | Observability and replay | 7 | `list_sessions`, `get_session_replay`, `replay_session` |

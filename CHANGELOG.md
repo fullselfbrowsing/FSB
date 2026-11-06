@@ -1,10 +1,53 @@
 # Changelog
 
-All notable changes to the FSB product (Chrome extension + showcase dashboard) are documented in this file. Entries are organized by FSB milestone. The extension version is `0.9.92`; milestone versions such as `v0.11.0` and `v0.12.0` are the meaningful release units.
+All notable changes to the FSB product (Chrome extension + showcase dashboard) are documented in this file. Entries are organized by FSB milestone. The extension version is `0.9.95`; milestone versions such as `v0.11.0` and `v0.12.0` are the meaningful release units.
 
 The independently published `fsb-mcp-server` npm package keeps its own semver changelog in [`mcp/CHANGELOG.md`](./mcp/CHANGELOG.md).
 
 ## [Unreleased]
+
+### Fixed
+
+- Grok Build compatibility is verified through its ACP capabilities and isolated runtime instead of an exact CLI version pin. Compatible future releases can run without an FSB update; sandbox, isolation, and protocol refusals now retain their actual cause in provider status and connection tests.
+- Grok's provider badge reports **Verified** after runtime checks and drops stale version-only success evidence. Updating the integration preserves the private OAuth profile and owned-session journal.
+
+### Added
+
+- Sanitized Grok Build 1.0.62 inspection and initialization fixtures, future-version regression coverage, and a weekly/manual macOS/Linux compatibility check against the official stable CLI without credentials or inference.
+
+## v0.9.95 — Multilingual Extension Interface and Official Cline Support — 2026-10-18
+
+The extension, showcase, skill, documentation, and store metadata align at `0.9.95`. The independently versioned `fsb-mcp-server` advances to `0.11.5` with the accompanying Cline installer fix and the removal of three dead tools; see [`mcp/CHANGELOG.md`](./mcp/CHANGELOG.md) for its package-specific release notes and compatibility requirements. The language work leaves MCP tool schemas and bridge messages unchanged.
+
+### Added
+
+- **The extension interface reads in eight languages.** The side panel, popup, control panel, onboarding, unlock, and microphone-permission pages render in English, Spanish, German, Russian, Japanese, Korean, Simplified Chinese, and Traditional Chinese, and so do the in-page overlay's own controls, status pill, and replay-speed caption. Each language ships a catalog of 1,285 keys in `extension/_locales/`; a message missing from a catalog falls back to English instead of leaving a blank label.
+- **The interface language follows Chrome's language list.** Without a saved choice, FSB goes down Chrome's preferred languages (Settings › Languages) in order and uses the first one it supports. English counts, so English-first users stay in English. Regional variants map to the nearest catalog: `es-MX` opens in Spanish, `ru-RU` in Russian, `zh-TW`, `zh-HK`, and `zh-MO` in Traditional Chinese, and `zh-CN` and `zh-SG` in Simplified Chinese. A plain `zh` entry follows the computer's time zone, opening in Traditional Chinese in Taipei, Hong Kong, and Macau and in Simplified Chinese everywhere else. Ukrainian, Belarusian, and Kazakh are not mapped to Russian. When nothing in the list is supported, FSB uses Chrome's UI language, then English.
+- **A language picker in Advanced Settings switches without restarting Chrome.** The control panel's Advanced Settings › Appearance group carries a Language card next to Theme that lists every language by its own name. The choice is saved in `chrome.storage.local` under `fsbUiLocale`, and open FSB pages and in-page overlays re-render as soon as it changes. Choosing Automatic clears the saved choice, so FSB follows Chrome's language list again.
+- **The extension's name and description follow the browser language.** The manifest declares `default_locale` and reads its name and description through `__MSG_ext_name__` and `__MSG_ext_description__`. Chrome resolves them in the browser's UI language, so the picker inside FSB does not change them, and the control panel says so beside the picker. The name on `chrome://extensions` is now `FSB`, without a version suffix.
+- **Catalog gaps fail CI.** `scripts/verify-extension-i18n.mjs` fails on a missing key, an empty message, mismatched placeholders between languages, unreviewed copied English, or a dropped protected term such as FSB; `scripts/verify-extension-copy.mjs` fails when one of the 13 in-scope UI files keeps package-owned English outside the catalogs. Both run at the start of `npm test`, so a new key has to land in all eight catalogs in the same change.
+- **The showcase adds Russian.** Every page is served in Russian under `/ru/`, the header language picker lists Русский, the sitemap and `hreflang` sets carry the Russian variant of each marketing route, and an `Accept-Language` of `ru` (any region) or a saved `fsb-locale=ru` cookie opens the Russian site.
+- **Release notes for 0.9.95 on the showcase.** The release-notes page documents this release in all eight site languages.
+- **Cline is an officially supported MCP client.** The onboarding and showcase install pickers offer `install --cline` with the Cline logo, and the READMEs document Cline's shared settings file. A Cline session is labeled Cline on the owner chip and in the client inventory whether it connects from the VS Code extension or the SDK-based Cline CLI, and anonymous usage stats count it as Cline instead of `unknown`, with the same conservative cost fallback as other bring-your-own-model clients. The companion installer fix ships in `fsb-mcp-server` 0.11.5.
+- **Antigravity replaces Windsurf as an install target.** Onboarding and the showcase install pickers offer `install --antigravity` with the Antigravity logo in Windsurf's place, and an Antigravity session is labeled Antigravity on the owner chip and in the client inventory.
+- **Muse, Grok Bot, and Dots are allowed client labels.** Always-on agents can send `client: "Muse"`, `"Grok Bot"`, or `"Dots"` on action tools, and anonymous usage stats count them under those names instead of `unknown`. The MCP server accepts them from 0.11.5.
+
+### Changed
+
+- The Grok Bot plugin launches `fsb-mcp-server@0.11.5` and sends `client: "Grok Bot"`; it previously pinned 0.11.0 and sent `client: "Grok"`.
+- The extension's own autopilot uses the client label `Autopilot` instead of `FSB Autopilot`, so its page overlay badge reads "Autopilot".
+- Windsurf is no longer an install target or an allowed `client` label, and its default-model cost row is gone. The telemetry server still accepts Windsurf from extensions older than 0.9.95.
+- Every published MCP tool count now says 69 and is checked against the built server, so the README, onboarding, showcase and `llms` figures can no longer disagree.
+
+### Removed
+
+- **What background agents left behind.** Background agents were retired in v0.9.45rc1, but their saved definitions stayed in `chrome.storage.local['bgAgents']` and several thousand lines of commented-out agent code stayed in the extension and both dashboards. When the extension updates, it now deletes `bgAgents`, the `fsb_sync_queue` sync queue and any scheduled `fsb_agent_*` alarms. The control-panel list of old agent names, the commented-out code, and the unused `executeAutomationTask` entry point are gone.
+- **Agent sync endpoints on the server.** `/api/agents` and the agent-only `/api/stats` route are removed from `showcase/server`, and the agents, stats and SSE routers from `server-py`. The `agents` and `agent_runs` tables are kept, so previously synced rows are untouched.
+- **Three MCP tools.** `start_visual_session`, `end_visual_session` and `back` are no longer registered, leaving 69 tools; see [`mcp/CHANGELOG.md`](./mcp/CHANGELOG.md).
+
+### Unchanged
+
+- Only FSB's own words are translated. Prompts, model output, task titles, page content, secrets, logs, and provider names appear exactly as written.
 
 ## v0.9.92 — Bridge Reliability and Editing Fixes — 2026-10-07
 
