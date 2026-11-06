@@ -481,6 +481,358 @@ test('native email and number inputs append at the end and replace with one inse
     } finally { await close(); }
   });
 
+async function dragFixture(ws) {
+  for (let attempt = 0; attempt < 100; attempt++) {
+    if (await evaluate(ws, 'window.dragFixtureReady === true')) return;
+    await new Promise(resolve => setTimeout(resolve, 50));
+  }
+  throw new Error('The drag fixture did not load');
+}
+
+const flagPage = `<div id="drag" draggable="true" ondragstart="event.dataTransfer.setData('text/plain','safe')">Drag me</div>
+  <div id="drop" ondragover="event.preventDefault()"
+    ondrop="event.preventDefault();window.drops++;document.body.dataset.dropped='true'">Drop target</div>`;
+
+async function dragCases(ws, body) {
+  await dragFixture(ws);
+  return evaluate(ws, `(async () => {
+    const out = {}, later = fn => setTimeout(fn, 20), allow = event => event.preventDefault();
+    const $ = selector => document.querySelector(selector);
+    ${body}
+    return out;
+  })()`);
+}
+
+test('drag_drop finds its elements by selector, ref and either parameter name, and drops once',
+  { skip: !chrome }, async () => {
+    const { ws, close } = await openFixture('drag-drop.html');
+    try {
+      const results = await dragCases(ws, `
+        const page = ${JSON.stringify(flagPage)};
+        stage(page); out.css = result(await drag('#drag', '#drop'));
+        stage(page); out.quoted = result(await drag('div[draggable="true"]', '#drop'));
+        stage(page);
+        const source = FSB.refMap.register($('#drag'), '#drag', 'generic', 'Drag me');
+        const target = FSB.refMap.register($('#drop'), '#drop', 'generic', 'Drop target');
+        out.refs = result(await drag(source, target));
+        stage(page);
+        out.schemaNames = result(await FSB.tools.dragdrop({ sourceSelector: '#drag', targetSelector: '#drop', steps: 2, holdMs: 1, stepDelayMs: 1 }));
+        stage('<div draggable="true"><span id="grip">Grip</span></div><div id="drop" ondragover="event.preventDefault()"' +
+          ' ondrop="window.drops++;document.body.dataset.dropped=\\'true\\'">Drop</div>');
+        out.handle = result(await drag('#grip', '#drop'));
+        stage('<div id="drag" draggable="true">Drag</div><div id="drop" ondragover="event.preventDefault()"' +
+          ' ondrop="window.drops++;queueMicrotask(()=>{document.body.dataset.dropped=\\'true\\'})">Drop</div>');
+        out.microtask = result(await drag('#drag', '#drop'));
+      `);
+      for (const [name, value] of Object.entries(results)) {
+        assert.equal(value.success, true, `${name}: ${value.error}`);
+        assert.equal(value.method, 'html5_drag', name);
+        assert.equal(value.hadEffect, true, name);
+        assert.equal(value.dropped, 'true', name);
+        assert.equal(value.drops, 1, name);
+        assert.match(value.warning, /did not move/, `${name} reports only what it saw`);
+        assert.equal(value.seen.pointerdown, undefined, `${name} must not run the pointer method after a drop`);
+        assert.equal(value.seen.mousedown, undefined, `${name} must not run the mouse method after a drop`);
+      }
+    } finally { await close(); }
+  });
+
+test('drag_drop plays the drag the way a browser does',
+  { skip: !chrome }, async () => {
+    const { ws, close } = await openFixture('drag-drop.html');
+    try {
+      const results = await dragCases(ws, `
+        // The usual pattern: remember event.target at dragstart and move it on drop.
+        stage('<div id="col"><div id="card" draggable="true"><span id="grip">Grip</span> Title</div></div><div id="drop"></div>');
+        let dragged = null;
+        on(document, 'dragstart', event => { dragged = event.target; });
+        on($('#drop'), 'dragover', allow);
+        on($('#drop'), 'drop', () => $('#drop').append(dragged));
+        out.innerElement = { ...result(await drag('#grip', '#drop')), started: dragged.id, cardIn: $('#card').parentElement.id, gripIn: $('#grip').parentElement.id };
+
+        stage('<div id="drag" draggable="true" style="width:50px;height:50px">Drag</div>' +
+          '<div id="drop" style="width:100px;height:100px;margin-top:30px"></div>');
+        const box = { source: $('#drag').getBoundingClientRect(), target: $('#drop').getBoundingClientRect() };
+        const inside = (event, rect) => event.clientX > rect.left && event.clientX < rect.right && event.clientY > rect.top && event.clientY < rect.bottom;
+        const places = {};
+        on($('#drag'), 'dragstart', event => { places.start = inside(event, box.source); });
+        on($('#drop'), 'dragover', event => { places.over = inside(event, box.target); if (places.over) event.preventDefault(); });
+        on($('#drop'), 'drop', event => { places.drop = inside(event, box.target); $('#drop').append(document.createElement('i')); });
+        out.coordinates = { ...result(await drag('#drag', '#drop')), places };
+
+        // A column at its limit refuses the drag, though its drop handler would still act.
+        stage('<div id="todo"><div id="card" draggable="true">Card</div></div><div id="locked"></div>');
+        on($('#locked'), 'drop', () => { window.drops++; $('#locked').append($('#card')); });
+        out.refusedDrop = { ...result(await drag('#card', '#locked')), cardIn: $('#card').parentElement.id };
+
+        stage('<div id="todo"><div id="card" draggable="true">Card</div></div><div id="done"></div>');
+        on($('#card'), 'dragstart', allow);
+        on($('#done'), 'dragover', allow);
+        on($('#done'), 'drop', () => { window.drops++; $('#done').append($('#card')); });
+        out.refusedDrag = { ...result(await drag('#card', '#done')), cardIn: $('#card').parentElement.id };
+
+        stage('<drag-host></drag-host>');
+        on(document, 'dragover', allow);
+        on(document, 'drop', () => { window.drops++; document.body.dataset.dropped = 'true'; });
+        out.composed = result(await drag('drag-host >>> #drag', 'drag-host >>> #drop'));
+      `);
+
+      assert.equal(results.innerElement.success, true, results.innerElement.error);
+      assert.equal(results.innerElement.warning, undefined, 'the card really moved');
+      assert.equal(results.innerElement.started, 'card', 'a drag starts from the draggable element');
+      assert.equal(results.innerElement.cardIn, 'drop');
+      assert.equal(results.innerElement.gripIn, 'card');
+
+      assert.equal(results.coordinates.success, true, results.coordinates.error);
+      assert.deepEqual(results.coordinates.places, { start: true, over: true, drop: true });
+
+      assert.equal(results.refusedDrop.seen.drop, undefined, 'a refused target gets no drop');
+      assert.equal(results.refusedDrop.seen.dragleave, 1);
+      assert.equal(results.refusedDrop.seen.dragend, 1);
+      assert.equal(results.refusedDrop.cardIn, 'todo');
+      assert.equal(results.refusedDrop.drops, 0);
+      assert.equal(results.refusedDrop.success, false);
+      assert.equal(results.refusedDrop.mayHaveExecuted, undefined, 'nothing was delivered, so a retry is safe');
+      assert.equal(results.refusedDrop.seen.pointerdown, 1, 'the pointer method still gets its turn');
+
+      assert.equal(results.refusedDrag.seen.dragover, undefined, 'a cancelled dragstart ends the drag');
+      assert.equal(results.refusedDrag.seen.drop, undefined);
+      assert.equal(results.refusedDrag.seen.dragend, undefined);
+      assert.equal(results.refusedDrag.cardIn, 'todo');
+      assert.equal(results.refusedDrag.success, false);
+      assert.equal(results.refusedDrag.seen.pointerdown, 1);
+
+      assert.equal(results.composed.success, true, results.composed.error);
+      assert.equal(results.composed.dropped, 'true', 'listeners outside the shadow root see the drop');
+      assert.equal(results.composed.drops, 1);
+    } finally { await close(); }
+  });
+
+test('drag_drop sees every kind of move, including inside shadow roots',
+  { skip: !chrome }, async () => {
+    const { ws, close } = await openFixture('drag-drop.html');
+    try {
+      // Absolute positioning keeps the card's place on screen, so each case can only
+      // be seen through the DOM check it is named after.
+      const results = await dragCases(ws, `
+        const board = '<div id="a"><div id="card" draggable="true" style="position:absolute;left:0;top:0">Card</div>' +
+          '<i id="peer"></i></div><section id="b"><ul id="items"><li></li></ul></section>';
+        const dropThen = change => { stage(board); on($('#b'), 'dragover', allow); on($('#b'), 'drop', () => later(change)); };
+
+        dropThen(() => $('#items').prepend($('#card')));
+        out.parent = { ...result(await drag('#card', '#b')), cardIn: $('#card').parentElement.id };
+        dropThen(() => $('#a').prepend($('#peer')));
+        out.index = result(await drag('#card', '#b'));
+        dropThen(() => $('#a').append(document.createElement('i')));
+        out.sourceSiblings = result(await drag('#card', '#b'));
+        dropThen(() => $('#b').after(document.createElement('i')));
+        out.targetSiblings = result(await drag('#card', '#b'));
+        dropThen(() => $('#b').append(document.createElement('i')));
+        out.targetChild = result(await drag('#card', '#b'));
+
+        stage('<div id="a"><div id="card" draggable="true" style="position:absolute;left:0;top:0"><span id="grip">Grip</span></div>' +
+          '<i></i></div><section id="b"><ul id="items"><li></li></ul></section>');
+        on($('#b'), 'dragover', allow);
+        on($('#b'), 'drop', () => later(() => $('#items').prepend($('#card'))));
+        out.ancestorMoved = { ...result(await drag('#grip', '#b')), cardIn: $('#card').parentElement.id };
+
+        stage('<drag-host></drag-host>');
+        const host = $('drag-host').shadowRoot;
+        host.querySelector('#drag').style.cssText = 'position:absolute;left:0;top:0';
+        on(host.querySelector('#drop'), 'dragover', allow);
+        on(host.querySelector('#drop'), 'drop', () => later(() => host.querySelector('#wrap').remove()));
+        out.removed = result(await drag('drag-host >>> #drag', 'drag-host >>> #drop'));
+
+        stage('<flat-list></flat-list>');
+        const list = $('flat-list').shadowRoot;
+        list.querySelector('#one').draggable = true;
+        on(list.querySelector('#three'), 'dragover', allow);
+        on(list.querySelector('#three'), 'drop', () => later(() => list.append(list.querySelector('#one'))));
+        out.shadowTopLevel = result(await drag('flat-list >>> #one', 'flat-list >>> #three'));
+
+        stage('<div id="a"><div id="card" draggable="true" style="position:absolute;left:0;top:0">Card</div></div><flat-list></flat-list>');
+        const targetList = $('flat-list').shadowRoot;
+        on(targetList.querySelector('#three'), 'dragover', allow);
+        on(targetList.querySelector('#three'), 'drop', () => later(() => targetList.append(document.createElement('i'))));
+        out.shadowTargetSiblings = result(await drag('#card', 'flat-list >>> #three'));
+      `);
+      assert.equal(results.parent.cardIn, 'items');
+      assert.equal(results.ancestorMoved.cardIn, 'items');
+      for (const [name, value] of Object.entries(results)) {
+        assert.equal(value.success, true, `${name}: ${value.error}`);
+        assert.equal(value.method, 'html5_drag', name);
+        assert.equal(value.warning, undefined, name);
+        assert.equal(value.seen.pointerdown, undefined, name);
+      }
+    } finally { await close(); }
+  });
+
+test('drag_drop reaches the pointer method when HTML5 cannot apply, and stops once it worked',
+  { skip: !chrome }, async () => {
+    const { ws, close } = await openFixture('drag-drop.html');
+    try {
+      const results = await dragCases(ws, `
+        const pointerBoard = () => {
+          const primary = {};
+          on($('#card'), 'pointerdown', event => { primary.down = event.isPrimary; });
+          on(document, 'pointermove', event => { primary.move = event.isPrimary; });
+          // dnd-kit ignores a press that is not the primary pointer.
+          on(document, 'pointerup', event => { primary.up = event.isPrimary; if (primary.down && primary.move && primary.up) $('#b').append($('#card')); });
+        };
+        const div = '<div id="a"><span>Kept</span><div id="card">Card</div></div><div id="b"></div>';
+        const link = '<div id="a"><span>Kept</span><a id="card" href="#x">Card</a></div><div id="b"></div>';
+        stage(div); pointerBoard();
+        out.plainDiv = result(await drag('#card', '#b'));
+        stage(link); pointerBoard();
+        on(document, 'dragover', allow); on(document, 'drop', allow);
+        out.guardedLink = result(await drag('#card', '#b'));
+        stage(link); pointerBoard();
+        document.body.dataset.overlay = 'shown';
+        on(document, 'dragover', allow);
+        on(document, 'drop', event => { event.preventDefault(); document.body.dataset.overlay = 'hidden'; });
+        out.overlayLink = result(await drag('#card', '#b'));
+
+        stage('<div id="card" style="position:absolute;left:0;top:200px">Card</div><div id="b" style="position:absolute;left:300px;top:200px">Target</div>');
+        let held = false;
+        on($('#card'), 'pointerdown', () => { held = true; });
+        on(document, 'pointermove', event => { if (held) $('#card').style.left = event.clientX + 'px'; });
+        on(document, 'pointerup', () => { held = false; });
+        out.freeDrag = result(await drag('#card', '#b'));
+      `);
+      const shadowPress = await dragCases(ws, `
+        stage('<flat-list></flat-list><div id="b">Target</div>');
+        out.value = result(await drag('flat-list >>> #three', '#b'));
+      `);
+      assert.equal(shadowPress.value.seen.pointerdown, 1, 'a press inside a shadow root reaches the document');
+      assert.equal(shadowPress.value.seen.mousedown, 1);
+      assert.equal(results.plainDiv.seen.dragstart, undefined, 'a browser starts no HTML5 drag from a plain div');
+      assert.equal(results.guardedLink.seen.drop, 1, 'a link can drag natively, so the drop is delivered first');
+      for (const [name, value] of Object.entries(results)) {
+        assert.equal(value.success, true, `${name}: ${value.error}`);
+        assert.equal(value.method, 'pointer_events', name);
+        assert.equal(value.seen.pointerdown, 1, name);
+        assert.equal(value.seen.mousedown, undefined, `${name} must not run the mouse method after it worked`);
+      }
+    } finally { await close(); }
+  });
+
+test('drag_drop never claims a move it did not see, and never invites a repeat of a delivered drop',
+  { skip: !chrome }, async () => {
+    const { ws, close } = await openFixture('drag-drop.html');
+    try {
+      const results = await dragCases(ws, `
+        const source = '<div id="a"><div id="drag" draggable="true">Drag</div></div>';
+        const reacted = {}, unknown = {};
+        stage(source + '<div id="drop" ondragover="event.preventDefault()"><p id="toast"></p></div>');
+        on($('#drop'), 'drop', () => { $('#toast').textContent = 'Column is full'; });
+        reacted.refusalMessage = result(await drag('#drag', '#drop'));
+        stage(source + '<div id="drop" ondragover="event.preventDefault()"></div><ul id="log"></ul>');
+        on($('#drop'), 'drop', () => $('#log').append(document.createElement('li')));
+        reacted.elsewhere = result(await drag('#drag', '#drop'));
+        stage(source + '<div id="drop" ondragover="event.preventDefault()"></div><p id="status">Waiting</p>');
+        on($('#drop'), 'drop', () => { $('#status').firstChild.data = 'Dropped'; });
+        reacted.textOnly = result(await drag('#drag', '#drop'));
+        stage(source + '<div id="drop" ondragover="event.preventDefault()"></div>');
+        on($('#drop'), 'drop', () => $('#drop').append($('#drag')));
+        on(document, 'dragend', () => $('#a').append($('#drag')));
+        reacted.undone = result(await drag('#drag', '#drop'));
+        stage('<div id="a"><div id="drag" draggable="true">Drag</div></div><flat-list></flat-list>');
+        const list = $('flat-list').shadowRoot;
+        on(list.querySelector('#three'), 'dragover', allow);
+        on(list.querySelector('#three'), 'drop', () => { list.querySelector('#three').dataset.dropped = 'true'; });
+        reacted.targetShadow = result(await drag('#drag', 'flat-list >>> #three'));
+        stage('<flat-list></flat-list><div id="drop" ondragover="event.preventDefault()"></div>');
+        const own = $('flat-list').shadowRoot;
+        own.querySelector('#one').draggable = true;
+        on($('#drop'), 'drop', () => { own.querySelector('#three').dataset.dropped = 'true'; });
+        reacted.sourceShadow = result(await drag('flat-list >>> #one', '#drop'));
+
+        stage(source + '<div id="drop" ondragover="event.preventDefault()" ondrop="event.preventDefault();window.drops++">Drop</div>');
+        unknown.memoryOnly = result(await drag('#drag', '#drop'));
+        stage(source + '<div id="drop" ondragover="event.preventDefault()">Drop</div>');
+        unknown.noDropHandler = result(await drag('#drag', '#drop'));
+        stage(source + '<div id="drop" class="over" ondragover="event.preventDefault()"' +
+          ' ondrop="event.preventDefault();window.drops++;this.classList.remove(\\'over\\')">Drop</div>');
+        unknown.classOnly = result(await drag('#drag', '#drop'));
+        stage(source + '<div id="drop" ondragover="event.preventDefault()"' +
+          ' ondrop="event.preventDefault();window.drops++;this.style.outline=\\'none\\'">Drop</div>');
+        unknown.styleOnly = result(await drag('#drag', '#drop'));
+        stage('<flat-list draggable="true"></flat-list><div id="drop" ondragover="event.preventDefault()">Drop</div>');
+        unknown.draggableHost = result(await drag('flat-list >>> #three', '#drop'));
+        stage(source + '<div id="drop" ondragover="event.preventDefault()" ondrop="event.preventDefault()">Drop</div><p id="ticker"></p>');
+        let tick = 0;
+        every(1, () => { $('#ticker').textContent = String(++tick); });
+        unknown.textNoise = result(await drag('#drag', '#drop'));
+        out.ticks = tick;
+
+        stage('<a id="drag" href="#x">Link</a><div id="drop" ondragover="event.preventDefault()" ondrop="event.preventDefault();window.drops++">Drop</div>');
+        out.link = result(await drag('#drag', '#drop'));
+        out.reacted = reacted; out.unknown = unknown;
+      `);
+      for (const [name, value] of Object.entries(results.reacted)) {
+        assert.equal(value.success, true, `${name}: ${value.error}`);
+        assert.match(value.warning, /did not move/, name);
+        assert.equal(value.seen.pointerdown, undefined, name);
+      }
+      for (const [name, value] of Object.entries(results.unknown)) {
+        assert.equal(value.success, false, name);
+        assert.equal(value.outcome, 'unknown', name);
+        assert.equal(value.mayHaveExecuted, true, name);
+        assert.equal(value.method, 'html5_drag', name);
+        assert.match(value.error, /inspect the page before retrying/, name);
+        assert.equal(value.seen.pointerdown, undefined, `${name} must not run another method`);
+        assert.equal(value.seen.mousedown, undefined, `${name} must not run another method`);
+      }
+      assert.ok(results.ticks > 5, 'the page kept changing during the drag');
+      assert.equal(results.link.outcome, 'unknown', 'a delivered drop stays unconfirmed after the fallbacks fail');
+      assert.equal(results.link.mayHaveExecuted, true);
+      assert.equal(results.link.seen.pointerdown, 1, 'a link still tries the pointer method');
+      assert.equal(results.link.drops, 1);
+    } finally { await close(); }
+  });
+
+test('drag_drop fails plainly when nothing was delivered, and rejects what it cannot use',
+  { skip: !chrome }, async () => {
+    const { ws, close } = await openFixture('drag-drop.html');
+    try {
+      const results = await dragCases(ws, `
+        const page = '<div id="drag" draggable="true">Drag</div><p id="note">Text</p><div id="drop">Drop</div>';
+        stage(page); out.nothing = result(await drag('#drag', '#drop'));
+        stage('<div id="spacer"></div><div id="card">Card</div><div id="b">Target</div>');
+        on(document, 'pointerup', () => { $('#spacer').style.height = '300px'; });
+        out.reflow = result(await drag('#card', '#b'));
+        stage(page);
+        out.missingSource = await drag('#missing', '#drop');
+        out.missingTarget = await drag('#drag', '#missing');
+        out.invalidSource = await drag('div[', '#drop');
+        out.unknownRef = await drag('e999', '#drop');
+        out.textNode = await drag('//p[@id="note"]/text()', '#drop');
+        out.number = await FSB.tools.dragdrop({ sourceRef: 5, targetRef: '#drop' });
+        out.noArguments = await FSB.tools.dragdrop({});
+        const stale = FSB.refMap.register($('#drag'), '#drop', 'generic', 'Gone');
+        $('#drag').remove();
+        out.staleRef = await drag(stale, '#drop');
+      `);
+      assert.equal(results.nothing.success, false);
+      assert.equal(results.nothing.error, 'All drag methods failed - use keyboard move alternative');
+      assert.equal(results.nothing.hadEffect, false);
+      assert.equal(results.nothing.outcome, undefined);
+      assert.equal(results.nothing.mayHaveExecuted, undefined);
+      assert.equal(results.nothing.seen.pointerdown, 1);
+      assert.equal(results.nothing.seen.mousedown, 1);
+      assert.equal(results.reflow.success, false, 'a page that shifts everything has not moved the card');
+      assert.equal(results.reflow.error, 'All drag methods failed - use keyboard move alternative');
+      assert.equal(results.missingSource.error, 'Source element not found: #missing');
+      assert.equal(results.missingTarget.error, 'Target element not found: #missing');
+      assert.equal(results.invalidSource.error, 'Source element not found: div[');
+      assert.equal(results.unknownRef.error, 'Source element not found: e999');
+      assert.equal(results.textNode.error, 'Source element not found: //p[@id="note"]/text()');
+      assert.equal(results.number.error, 'Source element not found: 5');
+      assert.match(results.staleRef.error, /^Source element not found: e\d+$/, 'a stale ref never falls back to its selector');
+      assert.match(results.noArguments.error, /sourceSelector and targetSelector are required/);
+    } finally { await close(); }
+  });
+
 test('Chrome can recover a hung renderer over an established debugger session', { skip: !chrome }, async () => {
   const { ws, close } = await openFixture('nested-text-editor.html');
   try {

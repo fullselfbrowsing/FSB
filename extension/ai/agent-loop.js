@@ -196,6 +196,7 @@ function _extractMetaTargetKey(call) {
   if (!call || !call.args) return null;
   var a = call.args;
   if (a.selector) return 'sel:' + String(a.selector).slice(0, 80);
+  if (a.sourceSelector) return 'drag:' + String(a.sourceSelector).slice(0, 60) + '>' + String(a.targetSelector).slice(0, 60);
   if (a.elementId) return 'id:' + String(a.elementId).slice(0, 40);
   if (a.element_id) return 'id:' + String(a.element_id).slice(0, 40);
   if (call.name === 'execute_js' && a.code) {

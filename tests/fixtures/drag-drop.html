@@ -1,0 +1,32 @@
+<!doctype html><html><body>
+<main id="stage"></main>
+<script>window.__FSB_COOKIE_DISMISSED__=true;</script>
+<script src="../../extension/content/init.js"></script>
+<script src="../../extension/content/utils.js"></script>
+<script src="../../extension/content/dom-state.js"></script>
+<script src="../../extension/content/selectors.js"></script>
+<script src="../../extension/content/accessibility.js"></script>
+<script>Object.assign(FSB,{isCanvasBasedEditor:()=>false,generateMessagingSelectors:()=>[]});Object.assign(FSB.logger,{logActionRecord(){},logActionExecution(){}});</script>
+<script src="../../extension/content/actions.js"></script>
+<script>
+// Each case starts from a clean stage. `seen` counts what reached the document.
+const tracked=['dragstart','dragover','dragleave','drop','dragend','pointerdown','pointerup','mousedown','mouseup'];
+for(const type of tracked)document.addEventListener(type,()=>{window.seen[type]=(window.seen[type]||0)+1;},true);
+const cleanups=[];
+window.on=(node,type,fn)=>{node.addEventListener(type,fn);cleanups.push(()=>node.removeEventListener(type,fn));};
+window.every=(ms,fn)=>{const timer=setInterval(fn,ms);cleanups.push(()=>clearInterval(timer));};
+window.stage=html=>{
+  for(const clean of cleanups.splice(0))clean();
+  window.seen={};window.drops=0;
+  delete document.body.dataset.dropped;delete document.body.dataset.overlay;
+  document.getElementById('stage').innerHTML=html;
+};
+// Short pauses: these cases check which method ran, not how long a drag takes.
+window.drag=(sourceRef,targetRef)=>FSB.tools.dragdrop({sourceRef,targetRef,steps:2,holdMs:1,stepDelayMs:1});
+window.result=value=>({...value,drops:window.drops,seen:window.seen,dropped:document.body.dataset.dropped??null});
+class DragHost extends HTMLElement{constructor(){super();this.attachShadow({mode:'open'}).innerHTML='<section><div id="wrap"><div id="drag" draggable="true">Drag</div></div></section><div id="drop">Drop</div>';}}
+customElements.define('drag-host',DragHost);
+class FlatList extends HTMLElement{constructor(){super();this.attachShadow({mode:'open'}).innerHTML='<div id="one" style="position:absolute;left:0;top:0">One</div><div id="two" style="position:absolute;left:0;top:0">Two</div><div id="three">Three</div>';}}
+customElements.define('flat-list',FlatList);
+window.dragFixtureReady=true;
+</script></body></html>
