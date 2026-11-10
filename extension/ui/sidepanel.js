@@ -6151,30 +6151,32 @@ function showLoginPrompt(domain, fields) {
   container.className = 'message login-prompt new';
   container.id = 'login-prompt';
 
-  const fieldLabel = escapeAttr(spLine((fields && fields.usernameType === 'email') ? 'Email' : 'Username / Email'));
+  const fieldLabel = (fields && fields.usernameType === 'email') ? 'Email' : 'Username / Email';
 
   // Escape domain for safe HTML insertion
-  const safeDomain = escapeAttr(domain || spLine('this site'));
+  const safeDomain = domain ? escapeAttr(domain) : spHtml('this site');
   const authPrompt = null;
   const allowSave = authPrompt?.allowSave !== false;
-  const safeSaveDisabledReason = escapeAttr(authPrompt?.saveDisabledReason || spLine('Saving is unavailable for this session.'));
+  const safeSaveDisabledReason = authPrompt?.saveDisabledReason
+    ? escapeAttr(authPrompt.saveDisabledReason)
+    : spHtml('Saving is unavailable for this session.');
 
   container.innerHTML = `
     <div class="login-prompt-header">
       <i class="fas fa-lock"></i>
-      <span>${escapeHtml(spLine('Login Required'))}</span>
+      <span>${spHtml('Login Required')}</span>
     </div>
     <div class="login-prompt-domain">${safeDomain}</div>
-    <div class="login-prompt-subtext">${escapeHtml(spLine('Enter your credentials to sign in. They will be encrypted and saved for future use.'))}</div>
+    <div class="login-prompt-subtext">${spHtml('Enter your credentials to sign in. They will be encrypted and saved for future use.')}</div>
     <div class="login-prompt-form">
       <div class="login-prompt-field">
-        <label>${fieldLabel}</label>
-        <input type="text" id="loginPromptUsername" placeholder="${fieldLabel}" autocomplete="username">
+        <label>${spHtml(fieldLabel)}</label>
+        <input type="text" id="loginPromptUsername" ${spAttr(fieldLabel, 'placeholder')} autocomplete="username">
       </div>
       <div class="login-prompt-field">
-        <label>${escapeHtml(spLine('Password'))}</label>
+        <label>${spHtml('Password')}</label>
         <div class="login-prompt-password-wrapper">
-          <input type="password" id="loginPromptPassword" placeholder="${escapeAttr(spLine('Password'))}" autocomplete="current-password">
+          <input type="password" id="loginPromptPassword" ${spAttr('Password', 'placeholder')} autocomplete="current-password">
           <button type="button" class="login-prompt-eye" id="loginPromptTogglePw">
             <i class="fas fa-eye"></i>
           </button>
@@ -6182,12 +6184,12 @@ function showLoginPrompt(domain, fields) {
       </div>
       <label class="login-prompt-save-label">
         <input type="checkbox" id="loginPromptSave" ${allowSave ? 'checked' : ''} ${allowSave ? '' : 'disabled'}>
-        <span>${escapeHtml(spLine('Save for future use'))}</span>
+        <span>${spHtml('Save for future use')}</span>
       </label>
       ${allowSave ? '' : `<div class="login-prompt-subtext">${safeSaveDisabledReason}</div>`}
       <div class="login-prompt-actions">
-        <button class="login-prompt-btn primary" id="loginPromptSubmit">${escapeHtml(spLine('Sign In'))}</button>
-        <button class="login-prompt-btn ghost" id="loginPromptSkip">${escapeHtml(spLine('Skip'))}</button>
+        <button class="login-prompt-btn primary" id="loginPromptSubmit">${spHtml('Sign In')}</button>
+        <button class="login-prompt-btn ghost" id="loginPromptSkip">${spHtml('Skip')}</button>
       </div>
     </div>
   `;
@@ -6286,9 +6288,10 @@ function showPaymentPrompt(domain, paymentPrompt) {
   container.className = 'message payment-prompt new';
   container.id = 'payment-prompt';
 
-  const safeDomain = escapeHtml(domain || spLine('this checkout'));
-  const headerText = escapeHtml(spLine('Checkout Detected'));
-  const detailText = escapeHtml(paymentPrompt?.detail || paymentPrompt?.blockedReason || spLine('Saved payment methods are not available for this checkout.'));
+  const safeDomain = domain ? escapeHtml(domain) : spHtml('this checkout');
+  const headerText = spHtml('Checkout Detected');
+  const sentDetail = paymentPrompt?.detail || paymentPrompt?.blockedReason;
+  const detailText = sentDetail ? escapeHtml(sentDetail) : spHtml('Saved payment methods are not available for this checkout.');
   const stateLabelMap = {
     no_saved_methods: 'No saved cards',
     feature_disabled: 'Payments disabled',
@@ -6296,9 +6299,9 @@ function showPaymentPrompt(domain, paymentPrompt) {
     vault_locked: 'Vault locked',
     payment_locked: 'Payment access locked'
   };
-  const stateLabel = escapeHtml(spLine(stateLabelMap[state] || 'Saved payments unavailable'));
+  const stateLabel = spHtml(stateLabelMap[state] || 'Saved payments unavailable');
   const primaryAction = paymentPrompt?.primaryAction || '';
-  const primaryActionLabel = escapeHtml(paymentPrompt?.primaryActionLabel || spLine('Open Payments'));
+  const primaryActionLabel = paymentPrompt?.primaryActionLabel ? escapeHtml(paymentPrompt.primaryActionLabel) : spHtml('Open Payments');
 
   if (!available) {
     container.innerHTML = `
@@ -6311,7 +6314,7 @@ function showPaymentPrompt(domain, paymentPrompt) {
       <div class="login-prompt-subtext">${detailText}</div>
       <div class="login-prompt-actions">
         ${primaryAction ? `<button class="login-prompt-btn primary" id="paymentPromptPrimaryAction">${primaryActionLabel}</button>` : ''}
-        <button class="login-prompt-btn ghost" id="paymentPromptDismiss">${escapeHtml(spLine('Dismiss'))}</button>
+        <button class="login-prompt-btn ghost" id="paymentPromptDismiss">${spHtml('Dismiss')}</button>
       </div>
     `;
 
@@ -6348,18 +6351,21 @@ function showPaymentPrompt(domain, paymentPrompt) {
       diners: 'Diners',
       jcb: 'JCB'
     };
-    const brandLabel = brandLabelMap[method.cardBrand] || spLine('Unknown');
-    const title = escapeHtml(method.nickname || spLine('$BRAND$ ending in $LAST$', { brand: brandLabel, last: method.last4 || '****' }));
+    const knownBrand = brandLabelMap[method.cardBrand];
+    const brandLabel = knownBrand ? escapeHtml(knownBrand) : spHtml('Unknown');
+    const title = method.nickname
+      ? escapeHtml(method.nickname)
+      : spHtml('$BRAND$ ending in $LAST$', { brand: knownBrand || { english: 'Unknown' }, last: method.last4 || '****' });
     const expiry = method.expiryMonth && method.expiryYearLast2
-      ? ' | ' + spLine('Exp $MONTH$/$YEAR$', { month: method.expiryMonth, year: method.expiryYearLast2 })
+      ? ' | ' + spHtml('Exp $MONTH$/$YEAR$', { month: method.expiryMonth, year: method.expiryYearLast2 })
       : '';
-    const subtitle = escapeHtml(`${method.maskedNumber || '****'}${expiry}`);
-    const billing = escapeHtml(method.billingSummary || spLine('Billing profile stored'));
+    const subtitle = escapeHtml(method.maskedNumber || '****') + expiry;
+    const billing = method.billingSummary ? escapeHtml(method.billingSummary) : spHtml('Billing profile stored');
     const brand = (method.cardBrand || 'unknown').replace(/[^a-z]/gi, '').toLowerCase() || 'unknown';
     return `
       <button class="payment-prompt-option ${index === 0 ? 'selected' : ''}" data-payment-id="${method.id}">
         <div class="payment-prompt-option-top">
-          <span class="payment-card-brand ${brand}">${escapeHtml(brandLabel)}</span>
+          <span class="payment-card-brand ${brand}">${brandLabel}</span>
           <span class="payment-prompt-option-title">${title}</span>
         </div>
         <div class="payment-prompt-option-subtitle">${subtitle}</div>
@@ -6377,8 +6383,8 @@ function showPaymentPrompt(domain, paymentPrompt) {
     <div class="login-prompt-subtext">${detailText}</div>
     <div class="payment-prompt-options">${methodOptions}</div>
     <div class="login-prompt-actions">
-      <button class="login-prompt-btn primary" id="paymentPromptFill">${escapeHtml(spLine('Fill Saved Card'))}</button>
-      <button class="login-prompt-btn ghost" id="paymentPromptSkip">${escapeHtml(spLine('Skip'))}</button>
+      <button class="login-prompt-btn primary" id="paymentPromptFill">${spHtml('Fill Saved Card')}</button>
+      <button class="login-prompt-btn ghost" id="paymentPromptSkip">${spHtml('Skip')}</button>
     </div>
   `;
 
@@ -6573,7 +6579,7 @@ async function loadHistoryList() {
     if (sessions.length === 0) {
       historyList.innerHTML = '<div class="history-empty-state">' +
         '<i class="fa fa-inbox"></i>' +
-        '<p>' + escapeHtml(spLine('No sessions yet. Run an automation to see your history here.')) + '</p>' +
+        '<p>' + spHtml('No sessions yet. Run an automation to see your history here.') + '</p>' +
         '</div>';
       return;
     }
@@ -6584,27 +6590,27 @@ async function loadHistoryList() {
         : '';
       var idleClosed = session.status === 'expired' ||
         (session.status === 'stopped' && session.outcomeDetails?.reason === 'idle_timeout');
-      var statusLabel = idleClosed ? spLine('Idle-closed') : (session.status || 'unknown');
+      var statusLabel = idleClosed ? spHtml('Idle-closed') : escapeHtml(session.status || 'unknown');
       var statusClass = idleClosed ? 'idle-closed' : (session.status || '');
       var hasReplayDetails = (session.actionCount > 0) || !!session.replayIntegrity;
       return '<div class="history-item" data-session-id="' + escapeHtml(session.id) + '">' +
         '<div class="history-item-info">' +
-          '<div class="history-item-task">' + escapeHtml(session.task || spLine('Unknown task')) + '</div>' +
+          '<div class="history-item-task">' + (session.task ? escapeHtml(session.task) : spHtml('Unknown task')) + '</div>' +
           '<div class="history-item-meta">' +
             '<span>' + formatSessionDate(session.startTime) + '</span>' +
-            '<span>' + escapeHtml(spLine('$COUNT$ actions', { count: session.actionCount || 0 })) + '</span>' +
+            '<span>' + spHtml('$COUNT$ actions', { count: session.actionCount || 0 }) + '</span>' +
             costDisplay +
             (session.mode === 'mcp-agent'
               ? '<span class="history-source-badge mcp">MCP · ' + escapeHtml(session.mcpClient || 'Agent') + '</span>'
-              : '<span class="history-source-badge">' + escapeHtml(spLine('Autopilot')) + '</span>') +
-            '<span class="history-status ' + escapeHtml(statusClass) + '">' + escapeHtml(statusLabel) + '</span>' +
+              : '<span class="history-source-badge">' + spHtml('Autopilot') + '</span>') +
+            '<span class="history-status ' + escapeHtml(statusClass) + '">' + statusLabel + '</span>' +
           '</div>' +
         '</div>' +
         (hasReplayDetails ?
-          '<button class="history-replay-btn" data-session-id="' + escapeHtml(session.id) + '" title="' + escapeAttr(spLine('Replay session')) + '">' +
+          '<button class="history-replay-btn" data-session-id="' + escapeHtml(session.id) + '" ' + spAttr('Replay session', 'title') + '>' +
             '<i class="fa fa-play"></i>' +
           '</button>' : '') +
-        '<button class="history-delete-btn" data-session-id="' + escapeHtml(session.id) + '" title="' + escapeAttr(spLine('Delete session')) + '">' +
+        '<button class="history-delete-btn" data-session-id="' + escapeHtml(session.id) + '" ' + spAttr('Delete session', 'title') + '>' +
           '<i class="fa fa-trash"></i>' +
         '</button>' +
       '</div>';
@@ -6613,7 +6619,7 @@ async function loadHistoryList() {
     console.error('Failed to load history list:', error);
     historyList.innerHTML = '<div class="history-empty-state">' +
       '<i class="fa fa-exclamation-triangle"></i>' +
-      '<p>' + escapeHtml(spLine('Failed to load sessions.')) + '</p>' +
+      '<p>' + spHtml('Failed to load sessions.') + '</p>' +
       '</div>';
   }
 }
@@ -7095,6 +7101,38 @@ function escapeHtml(str) {
 // escapeHtml() leaves quotes alone, which breaks attribute values.
 function escapeAttr(str) {
   return String(str == null ? '' : str).replace(/[<>&"']/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// The catalog key for an English template, when the side panel registers one.
+function spExactKey(english) {
+  const exact = globalThis.fsbUiLocale && fsbUiLocale.exact;
+  return exact && typeof english === 'string' && Object.prototype.hasOwnProperty.call(exact, english) ? exact[english] : null;
+}
+
+// Substitutions as stored on a live node. JSON turns NaN and Infinity into
+// null, so non-finite numbers are kept as their string form.
+function spSubsJson(subs) {
+  return JSON.stringify(subs, (name, value) => (typeof value === 'number' && !Number.isFinite(value) ? String(value) : value));
+}
+
+// Copy for HTML templates, in text positions only. Catalog copy goes in a live
+// node, the same one fill() writes, so a language change rewrites it in place.
+// Pass the template and its subs unfilled; escaped text has no key to follow.
+function spHtml(english, subs) {
+  const shown = escapeAttr(spLine(english, subs));
+  const key = spExactKey(english);
+  if (!key) return shown;
+  let attrs = ' data-i18n-live="' + escapeAttr(key) + '" data-i18n-en="' + escapeAttr(english) + '"';
+  if (subs && typeof subs === 'object') attrs += ' data-i18n-subs="' + escapeAttr(spSubsJson(subs)) + '"';
+  return '<span' + attrs + ' data-i18n-shown="' + shown + '">' + shown + '</span>';
+}
+
+// An attribute for an HTML template, such as a tooltip or placeholder. The
+// data-i18n-attr key lets apply() rewrite it after a language change.
+function spAttr(english, name) {
+  const attr = name + '="' + escapeAttr(spLine(english)) + '"';
+  const key = spExactKey(english);
+  return key ? attr + ' data-i18n-attr="' + name + ':' + escapeAttr(key) + '"' : attr;
 }
 
 // Side panel copy from the exact maps (ui-locale.js and copy-exact.js).

@@ -266,7 +266,7 @@ function pageExactMap(files) {
 const literal = "'((?:[^'\\\\]|\\\\.)*)'";
 for (const [file, maps, helpers] of [
   ['extension/ui/options.js', ['extension/utils/panel-exact.js', 'extension/utils/copy-exact.js'], 'fsbUiLine|fsbUiHtml|fsbUiTitle'],
-  ['extension/ui/sidepanel.js', ['extension/utils/copy-exact.js'], 'spLine|fsbUiLocale\\.line']
+  ['extension/ui/sidepanel.js', ['extension/utils/copy-exact.js'], 'spLine|spHtml|spAttr|fsbUiLocale\\.line']
 ]) {
   const exactMap = pageExactMap(['extension/utils/ui-locale.js', ...maps]);
   const source = fs.readFileSync(path.join(root, file), 'utf8');
@@ -2691,6 +2691,182 @@ async function asyncChecks() {
   hostPage.fsbUiLocale.setOverride('ja');
   hostPage.fsbUiLocale.refresh();
   check(hostPage.document.documentElement.getAttribute('lang') === 'fr', 'content scripts leave the host page <html lang> alone');
+
+  // The login prompt, payment prompt and history rows are built as HTML strings.
+  // spHtml() and spAttr() keep a key on each piece of FSB copy, so a language
+  // change rewrites what is on screen instead of leaving the old language.
+  {
+    const sandbox = freshLocale();
+    vm.runInContext(fs.readFileSync(path.join(root, 'extension/utils/copy-exact.js'), 'utf8'), sandbox);
+    const shipped = sandbox.fsbUiLocale;
+    const panelSource = fs.readFileSync(path.join(root, 'extension/ui/sidepanel.js'), 'utf8');
+    const decode = (value) => value.replace(/&(amp|lt|gt|quot|#39);/g, (all, name) => ({ amp: '&', lt: '<', gt: '>', quot: '"', '#39': "'" }[name]));
+    const attrsOf = (markup) => Object.fromEntries([...markup.matchAll(/([\w-]+)="([^"]*)"/g)].map((m) => [m[1], decode(m[2])]));
+    const makeElement = () => {
+      const element = { innerHTML: '', className: '', id: '', dataset: {}, classList: { add() {}, remove() {} },
+        querySelector: () => null, querySelectorAll: () => [], remove() {}, addEventListener() {} };
+      Object.defineProperty(element, 'textContent', { set(value) { element.innerHTML = String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); } });
+      return element;
+    };
+    const historyNode = makeElement();
+    let appended = null;
+    let storedSessions = { fsbSessionIndex: [] };
+    const makeContext = (withLocale) => {
+      const ctx = {
+        console, JSON, Object, Array, String, Number, Math,
+        setTimeout() {}, currentStatusMessage: null, completeStatusMessage() {}, scrollToBottom() {}, removePaymentPrompt() {},
+        formatSessionDate: () => 'now', chatMessages: { appendChild(node) { appended = node; } },
+        document: { createElement: makeElement, getElementById: (id) => (id === 'historyList' ? historyNode : null) },
+        chrome: { storage: { local: { get: async () => storedSessions } } }
+      };
+      if (withLocale) ctx.fsbUiLocale = shipped;
+      ctx.globalThis = ctx;
+      vm.createContext(ctx);
+      for (const name of ['escapeHtml', 'escapeAttr', 'spLine', 'showLoginPrompt', 'showPaymentPrompt']) vm.runInContext(extractNamedFunction(panelSource, name), ctx);
+      for (const name of ['spExactKey', 'spSubsJson', 'spHtml', 'spAttr']) {
+        if (panelSource.includes('function ' + name + '(')) vm.runInContext(extractNamedFunction(panelSource, name), ctx);
+      }
+      vm.runInContext('async ' + extractNamedFunction(panelSource, 'loadHistoryList'), ctx);
+      return ctx;
+    };
+    const ctx = makeContext(true);
+    const key = (english) => sidePanelMap[english];
+    const catalogText = (code, english, subs = {}) => {
+      let text = shippedCatalogs[code][key(english)];
+      for (const [name, value] of Object.entries(subs)) text = text.replace('$' + name.toUpperCase() + '$', value);
+      return text;
+    };
+    const parse = (html) => ({
+      html,
+      live: [...html.matchAll(/<span ([^>]*data-i18n-live[^>]*)>([^<]*)<\/span>/g)].map((m) => fakeNode(attrsOf(m[1]), decode(m[2]))),
+      attrs: [...html.matchAll(/<(?:input|button)\b([^>]*data-i18n-attr[^>]*)>/g)].map((m) => fakeNode(attrsOf(m[1]), ''))
+    });
+    const liveFor = (page, english) => page.live.find((node) => node.getAttribute('data-i18n-en') === english);
+    const switchTo = (code, page) => {
+      shipped.setOverride(code);
+      shipped.apply(fakeDoc([...page.live, ...page.attrs]));
+    };
+    const shows = (page, code, english, subs) => {
+      const node = liveFor(page, english);
+      return !!node && node.textContent === catalogText(code, english, subs);
+    };
+    const attrShows = (page, code, name, english) => page.attrs.some((node) =>
+      node.getAttribute('data-i18n-attr') === name + ':' + key(english) && node.getAttribute(name) === catalogText(code, english));
+
+    shipped.setOverride('es');
+    ctx.showLoginPrompt('Ready', { usernameType: 'email' });
+    const login = parse(appended.innerHTML);
+    const loginCopy = ['Login Required', 'Enter your credentials to sign in. They will be encrypted and saved for future use.',
+      'Email', 'Password', 'Save for future use', 'Sign In', 'Skip'];
+    check(loginCopy.every((english) => shows(login, 'es', english)), 'the login prompt renders each label and button in the active language');
+    check(attrShows(login, 'es', 'placeholder', 'Email') && attrShows(login, 'es', 'placeholder', 'Password'),
+      'the login prompt renders its placeholders in the active language');
+    switchTo('de', login);
+    check(loginCopy.every((english) => shows(login, 'de', english)), 'a language change rewrites an open login prompt');
+    check(attrShows(login, 'de', 'placeholder', 'Email') && attrShows(login, 'de', 'placeholder', 'Password'),
+      'a language change rewrites the login placeholders');
+    check(login.html.includes('<div class="login-prompt-domain">Ready</div>'), 'a site name stays as sent, even when it matches FSB copy');
+
+    shipped.setOverride('es');
+    ctx.showLoginPrompt('', {});
+    const anonymous = parse(appended.innerHTML);
+    switchTo('de', anonymous);
+    check(shows(anonymous, 'de', 'this site') && shows(anonymous, 'de', 'Username / Email')
+        && attrShows(anonymous, 'de', 'placeholder', 'Username / Email'),
+      'the login prompt defaults follow a language change too');
+
+    const unavailableStates = { no_saved_methods: 'No saved cards', feature_disabled: 'Payments disabled', vault_not_configured: 'Vault setup required',
+      vault_locked: 'Vault locked', payment_locked: 'Payment access locked', other: 'Saved payments unavailable' };
+    for (const [state, english] of Object.entries(unavailableStates)) {
+      shipped.setOverride('es');
+      ctx.showPaymentPrompt('', { available: false, state, primaryAction: 'open_payments_section' });
+      const page = parse(appended.innerHTML);
+      switchTo('de', page);
+      check(['Checkout Detected', 'this checkout', english, 'Saved payment methods are not available for this checkout.', 'Open Payments', 'Dismiss']
+        .every((copy) => shows(page, 'de', copy)), `an open payment prompt in state ${state} follows a language change`);
+    }
+
+    shipped.setOverride('es');
+    ctx.showPaymentPrompt('Ready', { available: false, state: 'vault_locked', detail: 'Ready', primaryAction: 'open_payments_section', primaryActionLabel: 'Skip' });
+    const sentByCaller = appended.innerHTML;
+    check(sentByCaller.includes('<div class="login-prompt-domain">Ready</div>') && sentByCaller.includes('login-prompt-subtext">Ready</div>')
+        && sentByCaller.includes('id="paymentPromptPrimaryAction">Skip</button>'),
+      'a site name, detail and action label sent with the prompt stay as sent, even when they match FSB copy');
+    ctx.showPaymentPrompt('', { available: false, state: 'vault_locked', blockedReason: 'Ready <b>' });
+    check(appended.innerHTML.includes('login-prompt-subtext">Ready &lt;b&gt;</div>'), 'a blocked reason is shown as sent and escaped');
+
+    shipped.setOverride('es');
+    ctx.showPaymentPrompt('shop.example', { available: true, methods: [
+      { id: 'a', cardBrand: 'mystery', last4: '<img src=x>', expiryMonth: '07', expiryYearLast2: '29' },
+      { id: 'b', cardBrand: 'visa', nickname: 'Ready', maskedNumber: '<b>1111', billingSummary: 'Skip' }
+    ] });
+    const cards = parse(appended.innerHTML);
+    const brandLine = liveFor(cards, '$BRAND$ ending in $LAST$');
+    switchTo('de', cards);
+    check(shows(cards, 'de', 'Fill Saved Card') && shows(cards, 'de', 'Skip') && shows(cards, 'de', 'Billing profile stored')
+        && shows(cards, 'de', 'Exp $MONTH$/$YEAR$', { month: '07', year: '29' }) && shows(cards, 'de', 'Checkout Detected'),
+      'an open card list follows a language change');
+    check(!!brandLine && brandLine.textContent === catalogText('de', '$BRAND$ ending in $LAST$', { brand: catalogText('de', 'Unknown'), last: '<img src=x>' })
+        && cards.live.some((node) => node.getAttribute('data-i18n-en') === 'Unknown'),
+      'an unknown card brand follows a language change, in its badge and inside the title');
+    check(!cards.html.includes('<img src=x>') && !cards.html.includes('<b>1111') && cards.html.includes('&lt;b&gt;1111'),
+      'a card value cannot inject markup through a live node or the masked number');
+    check(cards.html.includes('payment-prompt-option-title">Ready</span>') && cards.html.includes('payment-prompt-option-billing">Skip</div>')
+        && cards.html.includes('payment-card-brand visa">Visa</span>'),
+      'a nickname, billing summary and brand name stay as saved');
+
+    shipped.setOverride('es');
+    storedSessions = { fsbSessionIndex: [] };
+    await ctx.loadHistoryList();
+    const emptyHistory = parse(historyNode.innerHTML);
+    switchTo('de', emptyHistory);
+    check(shows(emptyHistory, 'de', 'No sessions yet. Run an automation to see your history here.'), 'the empty history message follows a language change');
+
+    shipped.setOverride('es');
+    const failing = ctx.chrome.storage.local.get;
+    ctx.chrome.storage.local.get = async () => { throw new Error('offline'); };
+    const quiet = console.error;
+    console.error = () => {};
+    await ctx.loadHistoryList();
+    console.error = quiet;
+    ctx.chrome.storage.local.get = failing;
+    const failedHistory = parse(historyNode.innerHTML);
+    switchTo('de', failedHistory);
+    check(shows(failedHistory, 'de', 'Failed to load sessions.'), 'the history error message follows a language change');
+
+    shipped.setOverride('es');
+    storedSessions = { fsbSessionIndex: [
+      { id: 's1', status: 'expired', actionCount: 3, totalCost: 0 },
+      { id: 's2', status: 'Ready', task: 'Skip', actionCount: 0, totalCost: 0, mode: 'mcp-agent', mcpClient: 'Codex' }
+    ] };
+    await ctx.loadHistoryList();
+    const history = parse(historyNode.innerHTML);
+    switchTo('de', history);
+    check(shows(history, 'de', 'Idle-closed') && shows(history, 'de', 'Unknown task') && shows(history, 'de', 'Autopilot')
+        && shows(history, 'de', '$COUNT$ actions', { count: '3' }), 'an open history list follows a language change');
+    check(attrShows(history, 'de', 'title', 'Replay session') && attrShows(history, 'de', 'title', 'Delete session'),
+      'history button tooltips follow a language change');
+    check(history.html.includes('history-item-task">Skip</div>') && history.html.includes('history-status Ready">Ready</span>'),
+      'a recorded task and status stay as recorded, even when they match FSB copy');
+
+    const plain = makeContext(false);
+    check(plain.spHtml && plain.spHtml('Skip') === 'Skip' && plain.spAttr('Delete session', 'title') === 'title="Delete session"',
+      'prompt copy still renders plainly when the locale module is missing');
+    shipped.setOverride('es');
+    check(ctx.spHtml && ctx.spHtml('Totally uncataloged <words>') === 'Totally uncataloged &lt;words&gt;'
+        && ctx.spAttr('Totally "uncataloged"', 'title') === 'title="Totally &quot;uncataloged&quot;"',
+      'copy with no catalog entry is escaped and left without a binding');
+    check(ctx.spHtml && ctx.spHtml('constructor') === 'constructor', 'a template named like an object property is not treated as a catalog key');
+
+    // The two helpers are the one place copy is meant to be filled and escaped.
+    const templates = ['spHtml', 'spAttr'].reduce((text, name) => text.replace(extractNamedFunction(panelSource, name), ''), panelSource);
+    const leftovers = templates.match(/escape(?:Html|Attr)\(spLine\(/g) || [];
+    check(leftovers.length === 0, `no side panel template fills copy before escaping it${leftovers.length ? ': ' + leftovers.length + ' left' : ''}`);
+    const fallbacks = panelSource.match(/\|\| *spLine\([^)]*\)/g) || [];
+    check(fallbacks.length === 0, `generated side panel copy has no filled fallbacks${fallbacks.length ? ': ' + fallbacks.join(' | ') : ''}`);
+    check(!/(title|aria-label|placeholder|alt|value)="\$\{spHtml/.test(panelSource) && !panelSource.includes('title="\' + spHtml('),
+      'spHtml() is only used in text positions, never in attributes');
+  }
 }
 
 asyncChecks().then(() => {
