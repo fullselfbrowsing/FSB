@@ -2573,9 +2573,41 @@ function testRuntimeRefusesInvalidCleanupCertificates() {
   assert.deepEqual(Object.keys(ZERO_RESOURCES), RESOURCE_CATEGORIES, 'certificate category order remains canonical');
 }
 
+// FSB's own content scripts share this isolated world and answer their
+// requests asynchronously. Chrome keeps the first sendResponse, so the
+// Skopeo listener must stay silent for any action outside skopeo:*.
+function testRuntimeLeavesForeignMessagesUnanswered() {
+  const harness = createRuntimeHarness();
+  const api = harness.evaluate();
+  assert.ok(api, 'runtime evaluation installs its sentinel');
+  const entry = harness.runtimeListeners.entries.find(item => item.type === 'message');
+  assert.ok(entry, 'runtime installs its message listener');
+  const sender = { id: harness.sandbox.chrome.runtime.id };
+  for (const message of [
+    { action: 'executeAction', tool: 'click', params: {} },
+    { action: 'getDOM' },
+    { action: 'readPage' },
+    { action: 'getJevMenu' },
+    { action: 'fsb:element-cache-config-changed', elementCacheSize: 200 },
+    { action: 'skopeo' },
+    { tool: 'click' },
+    null
+  ]) {
+    let replies = 0;
+    const result = entry.listener(message === null ? null : harness.toContent(message), sender, () => { replies += 1; });
+    const label = message && message.action ? message.action : JSON.stringify(message);
+    assert.equal(replies, 0, `${label}: Skopeo does not answer a message it does not own`);
+    assert.equal(result, false, `${label}: Skopeo keeps no response channel open`);
+  }
+  let probeReplies = 0;
+  entry.listener(harness.toContent({ action: 'skopeo:probe', generation: 1 }), sender, () => { probeReplies += 1; });
+  assert.equal(probeReplies, 1, 'skopeo:probe is still answered');
+}
+
 async function testRuntimeIntegration() {
   testRealProjectionConfigureLifecycle();
   testRuntimePrepareCommitAndProbe();
+  testRuntimeLeavesForeignMessagesUnanswered();
   await testRuntimeCancelsUnrenderableConsequence();
   await testTrustedAndSyntheticEscapeBoundary();
   testRuntimeContextAndAnchorAuthority();

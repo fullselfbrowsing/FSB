@@ -2756,6 +2756,10 @@
 
     function onRuntimeMessage(message, sender, sendResponse) {
       if (!sender || sender.id !== chrome.runtime.id) return false;
+      // FSB's own content scripts share this isolated world and answer their
+      // requests later. Chrome keeps the first sendResponse, so anything
+      // outside skopeo:* is left to them.
+      if (!message || typeof message.action !== 'string' || message.action.indexOf('skopeo:') !== 0) return false;
       let response = false;
       if (message && message.action === 'skopeo:configure') response = configure(message);
       else if (message && message.action === 'skopeo:prepare') response = prepare(message);
