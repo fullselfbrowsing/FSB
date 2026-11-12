@@ -242,7 +242,7 @@ function dispatchMessage(request) {
     // Persistence + render stubs.
     '_persistMessageToConversation', '_renderCompletionDomOnly',
     'completeStatusMessage', 'addMessage', 'addCompletionMessage', 'addActionMessage',
-    'updateStatusMessage', 'showLoginPrompt', 'showPaymentFillConfirmation',
+    'updateStatusMessage', 'showLoginPrompt', 'showPaymentFillConfirmation', 'spLine',
     'loadHistoryList', 'showChatView', 'startReconFromSidepanel',
     // Misc flags referenced by the handler.
     'isHistoryViewActive', 'historySessionId', 'lastRenderedTerminalSessionId',
@@ -260,6 +260,7 @@ function dispatchMessage(request) {
     _persistMessageToConversation, _renderCompletionDomOnly,
     completeStatusMessage, addMessage, addCompletionMessage, addActionMessage,
     updateStatusMessage, showLoginPrompt, showPaymentFillConfirmation,
+    function (english, subs) { return english.replace('$NUMBER$', () => String(subs.number)); },
     loadHistoryList, showChatView, startReconFromSidepanel,
     /* isHistoryViewActive */ false, /* historySessionId */ null, /* lastRenderedTerminalSessionId */ null,
     /* showSidepanelProgressEnabled */ true

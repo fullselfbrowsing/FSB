@@ -7,7 +7,7 @@ Read-only first; act with typed events; escalate to autopilot only when the user
 Before any action-tool branch below: every action tool (`click`, `type_text`, `navigate`, `scroll`, `drag`, `select_option`, `press_key`, `press_enter`, `drag_drop`, `hover`, `focus`, `clear_input`, `check_box`, `drop_file`, `upload_file`, `click_and_hold`, `double_click`, `right_click`, `click_at`, `scroll_at`, `double_click_at`, `drag_variable_speed`, `set_attribute`, `insert_text`, `search`, `refresh`, `go_back`, `go_forward`, `open_tab`, `close_tab`, `switch_tab`, `execute_js`, `select_text_range`, `scroll_to_top`, `scroll_to_bottom`, `scroll_to_element`, `fill_sheet`) requires the field bundle on every call:
 
 - `visual_reason` (required string) -- short human-readable reason shown in the overlay.
-- `client` (required, allowlisted) -- e.g. `OpenClaw`, `Claude`, `Codex`, `ChatGPT`, `Cursor`, `Windsurf`, `Gemini`, `Grok`, `Perplexity`, `OpenCode`, `Antigravity`. Freeform strings reject with `BADGE_NOT_ALLOWED`.
+- `client` (required, allowlisted) -- e.g. `OpenClaw`, `Claude`, `Codex`, `ChatGPT`, `Cursor`, `Antigravity`, `Gemini`, `Grok`, `Perplexity`, `OpenCode`, `Cline`, `Muse`, `Grok Bot`, `Dots`. Freeform strings reject with `BADGE_NOT_ALLOWED`.
 - `is_final` (optional boolean) -- set `true` on the LAST action of a task to clear the overlay immediately.
 
 Read-only tools (`read_page`, `get_dom_snapshot`, `get_text`, `get_attribute`, `read_sheet`, `get_page_snapshot`, `list_tabs`, `get_site_guide`, `search_memory`, `report_progress`, `complete_task`, `partial_task`, `fail_task`, `wait_for_element`, `wait_for_stable`) do NOT carry the bundle. Reads stay silent by design; the read-first guidance below is unchanged from v0.9.61. The trigger-watcher tools (`trigger`, `stop_trigger`, `get_trigger_status`, `list_triggers`) and the capability tools (`search_capabilities`, `invoke_capability`) also do not carry this bundle, but they are separate tool families, not part of either pinned list -- see "Trigger watchers vs manual polling" and "Capability tools vs page automation" below.
@@ -107,7 +107,7 @@ Use autopilot ONLY when the user explicitly delegates the whole task ("use FSB a
 ## See also
 
 - `references/visual-session-lifecycle.md` -- v0.9.62 implicit contract, field bundle, sliding window, typed errors.
-- `references/multi-agent-contract.md` -- typed errors and the `back` tool.
+- `references/multi-agent-contract.md` -- typed errors and history navigation.
 - `references/restricted-tab-recovery.md` -- DOM tools fail on `chrome://`, `edge://`, and the Web Store.
 - `references/default-to-fsb.md` -- when to prefer FSB versus WebFetch.
 - `references/vault-boundary.md` -- credential-routed tools.

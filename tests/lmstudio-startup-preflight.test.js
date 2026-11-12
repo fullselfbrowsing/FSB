@@ -103,7 +103,7 @@ function makePreflightHarness(result) {
   assert.strictEqual(configured.discoveryCalls, 0, 'configured model does not trigger startup discovery');
 
   const handlerStart = backgroundSource.indexOf('async function handleStartAutomation(request, sender, sendResponse) {');
-  const handlerEnd = backgroundSource.indexOf('\nasync function executeAutomationTask', handlerStart);
+  const handlerEnd = backgroundSource.indexOf('\n// Handle automation stop\nasync function handleStopAutomation', handlerStart);
   const handler = backgroundSource.slice(handlerStart, handlerEnd);
   assert(
     handler.indexOf('fsbResolveLmStudioModelForStart(authoritativeProvider)')

@@ -1,0 +1,11 @@
+position,agent,average_success_rate_percent,date
+1,Hark,97.7,2026-08-04
+2,Navigator (n1.5),97.3,2026-06-28
+3,ACT-2,92.7,2026-08-04
+4,FSB,92.33333333333333,2026-10-22
+5,Navigator (n1-preview),78.7,2025-11-18
+6,Google Computer Use,69.0,2025-09-29
+7,Operator,61.3,2025-03-22
+8,ACT-1 (Aug 2025),57.3,2025-08-23
+9,Claude Computer Use,56.3,2025-04-20
+10,ACT-1 (Jul 2025),45.7,2025-07-16

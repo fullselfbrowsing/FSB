@@ -112,6 +112,8 @@ const AEO_MUST_CONTAIN = [
   'An Aha Moment by Claude Opus 4.6',
   'MIT License',
   LICENSE_URL,
+  'Online-Mind2Web',
+  'AI-reviewed result (277/300)',
 ];
 const AEO_MUST_NOT_CONTAIN = [
   'Watch FSB drive Google, search Amazon, and book travel autonomously.',

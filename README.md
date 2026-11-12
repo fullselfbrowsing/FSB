@@ -1,4 +1,4 @@
-# FSB v0.9.92 Full Self Browsing
+# FSB v0.9.95 Full Self Browsing
 
 <div align="center">
 
@@ -9,9 +9,10 @@
 </picture>
 
 ![FSB](https://img.shields.io/badge/FSB-Full_Self_Browsing-000000?style=for-the-badge)
-![Version](https://img.shields.io/badge/version-0.9.92-0078D4?style=for-the-badge)
+![Version](https://img.shields.io/badge/version-0.9.95-0078D4?style=for-the-badge)
 ![Manifest V3](https://img.shields.io/badge/Manifest_V3-Chrome-34A853?style=for-the-badge&logo=googlechrome&logoColor=white)
 ![License](https://img.shields.io/badge/license-MIT-F5C518?style=for-the-badge)
+[![Online-Mind2Web](https://img.shields.io/badge/Online--Mind2Web-92.3%25-FF6B35?style=for-the-badge)](#benchmark)
 
 ![Stars](https://img.shields.io/github/stars/fullselfbrowsing/FSB?style=flat-square&logo=github&label=Stars)
 ![Forks](https://img.shields.io/github/forks/fullselfbrowsing/FSB?style=flat-square&logo=github&label=Forks)
@@ -22,9 +23,41 @@
 
 *Pure structural intelligence. Zero vision. Zero guessing.*
 
-[What's New](#whats-new) · [Quick Start](#quick-start) · [MCP Server](#mcp-server) · [Architecture](#architecture) · [Providers](#ai-providers) · [Development](#development)
+[Benchmark](#benchmark) · [What's New](#whats-new) · [Quick Start](#quick-start) · [MCP Server](#mcp-server) · [Architecture](#architecture) · [Providers](#ai-providers) · [Development](#development)
 
 </div>
+
+---
+
+## Benchmark
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/online-mind2web-dark.svg" />
+  <source media="(prefers-color-scheme: light)" srcset="docs/assets/online-mind2web-light.svg" />
+  <img src="docs/assets/online-mind2web-light.svg" alt="Online-Mind2Web, top 10 agents by average success rate: Hark 97.7%, Navigator (n1.5) 97.3%, ACT-2 92.7%, FSB 92.3% (AI-reviewed result, 277/300), Navigator (n1-preview) 78.7%, Google Computer Use 69.0%, Operator 61.3%, ACT-1 (Aug 2025) 57.3%, Claude Computer Use 56.3%, ACT-1 (Jul 2025) 45.7%." />
+</picture>
+
+Average success rates on [Online-Mind2Web](https://huggingface.co/spaces/osunlp/Online_Mind2Web_Leaderboard), with FSB included.
+
+<details>
+<summary>Top 10 agents as a table</summary>
+
+| # | Agent | Average success rate |
+| ---: | --- | ---: |
+| 01 | Hark | 97.7% |
+| 02 | Navigator (n1.5) | 97.3% |
+| 03 | ACT-2 | 92.7% |
+| **04** | **FSB** | **92.3%** |
+| 05 | Navigator (n1-preview) | 78.7% |
+| 06 | Google Computer Use | 69.0% |
+| 07 | Operator | 61.3% |
+| 08 | ACT-1 (Aug 2025) | 57.3% |
+| 09 | Claude Computer Use | 56.3% |
+| 10 | ACT-1 (Jul 2025) | 45.7% |
+
+</details>
+
+FSB: [AI-reviewed result (277/300)](https://github.com/fullselfbrowsing/FSB/blob/mind2web/mind2web/BENCHMARK-REPORT.md). 
 
 ---
 
@@ -32,7 +65,7 @@
 
 FSB (Full Self Browsing) is an open source Chrome extension for AI powered browser automation. Describe a task in plain English; FSB reads the live DOM, builds a plan, executes browser actions, verifies results, and reports progress through the popup, side panel, or MCP.
 
-> FSB v0.9.92 is functional and production ready for supervised automation. Browser automation can still behave unpredictably on complex or sensitive sites, so monitor actions and test on non critical pages first.
+> FSB v0.9.95 is functional and production ready for supervised automation. Browser automation can still behave unpredictably on complex or sensitive sites, so monitor actions and test on non critical pages first.
 
 ### Why DOM First
 
@@ -55,8 +88,9 @@ Project Mariner, Claude Computer Use, and OpenAI Operator rely heavily on visual
 | Claude Desktop | `npx -y fsb-mcp-server@latest install --claude-desktop` |
 | Cursor | `npx -y fsb-mcp-server@latest install --cursor` |
 | VS Code | `npx -y fsb-mcp-server@latest install --vscode` |
-| Windsurf | `npx -y fsb-mcp-server@latest install --windsurf` |
+| Antigravity | `npx -y fsb-mcp-server@latest install --antigravity` |
 | Codex | `npx -y fsb-mcp-server@latest install --codex` |
+| Cline | `npx -y fsb-mcp-server@latest install --cline` |
 | All at once | `npx -y fsb-mcp-server@latest install --all` |
 
 Preview before writing: append `--dry-run`. Sanity check with `npx -y fsb-mcp-server@latest doctor`. Restart the client so the new MCP server appears.
@@ -85,9 +119,9 @@ Want to run FSB standalone from the extension popup/side panel? Open settings, p
 - Uploads real local files to file inputs through the supervised `upload_file` tool with sensitive-path safeguards.
 - Maintains long term memory for past sites, workflows, selectors, and task outcomes.
 - Includes secure credential and payment vault flows for supervised autofill.
-- Exposes a local MCP server so Claude Code, Codex, Cursor, VS Code, Windsurf, and other MCP clients can drive the browser.
+- Exposes a local MCP server so Claude Code, Codex, Cursor, VS Code, Antigravity, Cline, and other MCP clients can drive the browser.
 
-Background agents are retired. Existing `chrome.storage.local['bgAgents']` data is preserved for users who had old agents, but scheduled or recurring automation is no longer an active FSB feature.
+Background agents were removed in v0.9.45rc1. When the extension updates, it deletes the saved agent definitions and alarms they left behind. For scheduled or recurring work, use [OpenClaw](https://github.com/openclaw/openclaw) or [Claude Routines](https://www.anthropic.com/claude/routines).
 
 ### Common Use Cases
 
@@ -277,7 +311,7 @@ The extension reads bundled scripts directly from `extension/`. The MCP package 
 
 ## MCP Server
 
-FSB ships [`fsb-mcp-server`](https://www.npmjs.com/package/fsb-mcp-server), a local MCP server that lets external AI clients control the same browser extension. It exposes 69 registered tools across visual sessions, trigger watchers, manual browser control, Developer/UAT capture, capability search/invoke, read-only page inspection, autopilot, vault, and observability.
+FSB ships [`fsb-mcp-server`](https://www.npmjs.com/package/fsb-mcp-server), a local MCP server that lets external AI clients control the same browser extension. It exposes 69 registered tools across autopilot, trigger watchers, manual browser control, read-only page inspection, task outcome reporting, Developer/UAT capture, capability search/invoke, observability, and vault.
 
 The extension connects to the MCP bridge on:
 
@@ -300,8 +334,9 @@ npx -y fsb-mcp-server@latest install --claude-desktop
 npx -y fsb-mcp-server@latest install --claude-code
 npx -y fsb-mcp-server@latest install --cursor
 npx -y fsb-mcp-server@latest install --vscode
-npx -y fsb-mcp-server@latest install --windsurf
+npx -y fsb-mcp-server@latest install --antigravity
 npx -y fsb-mcp-server@latest install --codex
+npx -y fsb-mcp-server@latest install --cline
 npx -y fsb-mcp-server@latest install --all
 ```
 
@@ -337,6 +372,20 @@ VS Code (`mcp.json`):
       "type": "stdio",
       "command": "npx",
       "args": ["-y", "fsb-mcp-server@latest"]
+    }
+  }
+}
+```
+
+Cline (`~/.cline/data/settings/cline_mcp_settings.json`, shared by the VS Code extension, JetBrains plugin, and CLI). `timeout` is in seconds; Cline's 60-second default would cut off long `run_task` calls:
+
+```json
+{
+  "mcpServers": {
+    "fsb": {
+      "command": "npx",
+      "args": ["-y", "fsb-mcp-server@latest"],
+      "timeout": 1800
     }
   }
 }
@@ -426,11 +475,11 @@ The MCP server exposes a curated public surface around that registry plus direct
 
 | Surface | Count | Examples |
 |---------|-------|----------|
-| Visual sessions | 2 | `start_visual_session`, `end_visual_session` |
-| Autopilot and agent navigation | 4 | `run_task`, `stop_task`, `get_task_status`, `back` |
+| Autopilot | 3 | `run_task`, `stop_task`, `get_task_status` |
 | Trigger watchers | 4 | `trigger`, `stop_trigger`, `get_trigger_status`, `list_triggers` |
 | Manual control | 37 | `execute_js`, `navigate`, `click`, `type_text`, `drag`, `upload_file` |
 | Read-only inspection | 8 | `read_page`, `get_dom_snapshot`, `get_site_guide`, `read_sheet` |
+| Task outcome | 3 | `complete_task`, `partial_task`, `fail_task` |
 | Developer / UAT | 1 | `capture_screenshot` |
 | Capabilities | 2 | `search_capabilities`, `invoke_capability` |
 | Observability and replay | 7 | `list_sessions`, `get_session_replay`, `replay_session` |
@@ -628,6 +677,7 @@ The root README should describe what a new user needs to understand before insta
 ## Acknowledgements
 
 - **OpenTabs** inspired FSB's Native Capability Catalog (first-party API execution: turning authenticated browser sessions into reusable, signed, audited API capabilities). Thanks for the direction on this approach.
+- **Graphify Labs / Graphify** informed the local graph design through a conceptual-only review of [Graphify](https://github.com/Graphify-Labs/graphify) at commit `abff1b1ca4052fcf9d955c5f6a034088723f4536`. The reviewed project is MIT licensed, with upstream copyright `Copyright 2026 Safi Shamsi`. Reviewed files: `LICENSE`, `docs/how-it-works.md`, `ARCHITECTURE.md`, `graphify/ids.py`, `graphify/validate.py`, and `graphify/cache.py`. Conceptual influences: bounded extraction, validate-before-build, evidence-bearing records/relations, fingerprints, and traversal. Integration status: no copied code; no runtime dependency. Copied-code inventory: empty (`[]`).
 
 ## License
 

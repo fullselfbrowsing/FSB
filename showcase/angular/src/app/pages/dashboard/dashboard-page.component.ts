@@ -413,14 +413,6 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
   private lzLibraryPromise: Promise<void> | null = null;
   private qrStartAttempt = 0;
   private qrStartPending = false;
-  // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-  // private agents: any[] = [];
-  // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-  // private stats: any = {};
-  // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-  // private selectedAgentId: string | null = null;
-  // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-  // private pollTimer: any = null;
   private ws: WebSocket | null = null;
   private wsReconnectDelay = 0;
   private readonly wsMaxReconnectDelay = 30000;
@@ -435,26 +427,6 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
   private taskElapsedTimer: any = null;
   private lastProgressAction = '';
   private taskTimeoutTimer: any = null;
-
-  // ---- Agent management state ----
-  // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-  // private detailAgentId: string | null = null;
-  // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-  // private detailRunsOffset = 0;
-  // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-  // private readonly detailRunsLimit = 10;
-  // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-  // private modalMode: 'create' | 'edit' | null = null;
-  // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-  // private modalAgentId: string | null = null;
-  // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-  // private deleteAgentId: string | null = null;
-  // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-  // private deleteAgentName = '';
-  // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-  // private saveAgentScheduleType = 'interval';
-  // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-  // private agentRunningId: string | null = null;
 
   // ---- DOM preview state ----
   private previewState: PreviewState = 'hidden';
@@ -522,14 +494,8 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
   private keyInput!: HTMLInputElement | null;
   private connectBtn!: HTMLElement | null;
   private disconnectBtn!: HTMLElement | null;
-  // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-  // private agentCountEl!: HTMLElement | null;
   private sseStatusEl!: HTMLElement | null;
   private wakeBtn!: HTMLElement | null;
-  // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-  // private agentGrid!: HTMLElement | null;
-  // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-  // private emptyState!: HTMLElement | null;
   private tabScan!: HTMLElement | null;
   private tabPaste!: HTMLElement | null;
   private tabScanContent!: HTMLElement | null;
@@ -611,60 +577,6 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
   private actionFeed!: HTMLElement | null;
   private readonly ACTION_FEED_MAX = 15;
 
-  // Agent management DOM refs
-  // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-  // private newAgentBtn!: HTMLElement | null;
-  // private agentContainer!: HTMLElement | null;
-  // private detailPanel!: HTMLElement | null;
-  // private detailClose!: HTMLElement | null;
-  // private detailRunNow!: HTMLElement | null;
-  // private detailEdit!: HTMLElement | null;
-  // private detailDelete!: HTMLElement | null;
-  // private detailName!: HTMLElement | null;
-  // private detailTask!: HTMLElement | null;
-  // private detailUrl!: HTMLElement | null;
-  // private detailSchedule!: HTMLElement | null;
-  // private detailReplayRuns!: HTMLElement | null;
-  // private detailAiFallback!: HTMLElement | null;
-  // private detailTokensSaved!: HTMLElement | null;
-  // private detailCostSaved!: HTMLElement | null;
-  // private detailRunProgress!: HTMLElement | null;
-  // private detailRunBar!: HTMLElement | null;
-  // private detailRunAction!: HTMLElement | null;
-  // private detailRunsList!: HTMLElement | null;
-  // private detailRunsPagination!: HTMLElement | null;
-  // private detailScriptToggle!: HTMLElement | null;
-  // private detailScriptContent!: HTMLElement | null;
-  // private detailScriptList!: HTMLElement | null;
-  // private detailScriptChevron!: HTMLElement | null;
-//
-  // Modal DOM refs
-  // private modalOverlay!: HTMLElement | null;
-  // private modalTitle!: HTMLElement | null;
-  // private modalClose!: HTMLElement | null;
-  // private modalName!: HTMLInputElement | null;
-  // private modalTask!: HTMLTextAreaElement | null;
-  // private modalUrl!: HTMLInputElement | null;
-  // private modalScheduleType!: HTMLElement | null;
-  // private modalScheduleConfig!: HTMLElement | null;
-  // private modalDiscard!: HTMLElement | null;
-  // private modalSave!: HTMLElement | null;
-//
-  // Delete dialog DOM refs
-  // private deleteOverlay!: HTMLElement | null;
-  // private deleteTitle!: HTMLElement | null;
-  // private deleteCancel!: HTMLElement | null;
-  // private deleteConfirm!: HTMLElement | null;
-//
-  // Save-as-Agent DOM refs
-  // private saveAgentSection!: HTMLElement | null;
-  // private saveAgentTrigger!: HTMLElement | null;
-  // private saveAgentFields!: HTMLElement | null;
-  // private saveAgentNameEl!: HTMLInputElement | null;
-  // private saveAgentUrlEl!: HTMLInputElement | null;
-  // private saveAgentBtn!: HTMLElement | null;
-  // private saveAgentScheduleConfig!: HTMLElement | null;
-//
   // Cleanup tracking
   private destroyed = false;
   private readonly boundHandlers: Array<{ el: EventTarget; event: string; handler: EventListener; options?: any }> = [];
@@ -688,8 +600,6 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
     this.disconnectWS();
 
     // Stop polling
-    // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-    // this.stopPolling();
 
     // Stop QR scanner
     this.stopQRScanner();
@@ -732,14 +642,8 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
     this.keyInput = this.el('dash-key-input') as HTMLInputElement | null;
     this.connectBtn = this.el('dash-connect-btn');
     this.disconnectBtn = this.el('dash-disconnect-btn');
-    // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-    // this.agentCountEl = this.el('dash-agent-count');
     this.sseStatusEl = this.el('dash-sse-status');
     this.wakeBtn = this.el('dash-wake-btn');
-    // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-    // this.agentGrid = this.el('dash-agent-grid');
-    // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-    // this.emptyState = this.el('dash-empty');
     this.tabScan = this.el('dash-tab-scan');
     this.tabPaste = this.el('dash-tab-paste');
     this.tabScanContent = this.el('tab-scan');
@@ -815,55 +719,6 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
     this.previewRestrictedUrl = this.el('dash-preview-restricted-url');
     this.actionFeed = this.el('dash-action-feed');
 
-    // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-    // this.newAgentBtn = this.el('dash-new-agent-btn');
-    // this.agentContainer = this.el('dash-agent-container');
-    // this.detailPanel = this.el('dash-agent-detail');
-    // this.detailClose = this.el('dash-detail-close');
-    // this.detailRunNow = this.el('dash-detail-run-now');
-    // this.detailEdit = this.el('dash-detail-edit');
-    // this.detailDelete = this.el('dash-detail-delete');
-    // this.detailName = this.el('dash-detail-name');
-    // this.detailTask = this.el('dash-detail-task');
-    // this.detailUrl = this.el('dash-detail-url');
-    // this.detailSchedule = this.el('dash-detail-schedule');
-    // this.detailReplayRuns = this.el('dash-detail-replay-runs');
-    // this.detailAiFallback = this.el('dash-detail-ai-fallback');
-    // this.detailTokensSaved = this.el('dash-detail-tokens-saved');
-    // this.detailCostSaved = this.el('dash-detail-cost-saved');
-    // this.detailRunProgress = this.el('dash-detail-run-progress');
-    // this.detailRunBar = this.el('dash-detail-run-bar');
-    // this.detailRunAction = this.el('dash-detail-run-action');
-    // this.detailRunsList = this.el('dash-detail-runs');
-    // this.detailRunsPagination = this.el('dash-detail-runs-pagination');
-    // this.detailScriptToggle = this.el('dash-detail-script-toggle');
-    // this.detailScriptContent = this.el('dash-detail-script-content');
-    // this.detailScriptList = this.el('dash-detail-script-list');
-    // this.detailScriptChevron = this.el('dash-detail-script-chevron');
-//
-    // this.modalOverlay = this.el('dash-agent-modal-overlay');
-    // this.modalTitle = this.el('dash-modal-title');
-    // this.modalClose = this.el('dash-modal-close');
-    // this.modalName = this.el('dash-modal-name') as HTMLInputElement | null;
-    // this.modalTask = this.el('dash-modal-task') as HTMLTextAreaElement | null;
-    // this.modalUrl = this.el('dash-modal-url') as HTMLInputElement | null;
-    // this.modalScheduleType = this.el('dash-modal-schedule-type');
-    // this.modalScheduleConfig = this.el('dash-modal-schedule-config');
-    // this.modalDiscard = this.el('dash-modal-discard');
-    // this.modalSave = this.el('dash-modal-save');
-//
-    // this.deleteOverlay = this.el('dash-delete-overlay');
-    // this.deleteTitle = this.el('dash-delete-title');
-    // this.deleteCancel = this.el('dash-delete-cancel');
-    // this.deleteConfirm = this.el('dash-delete-confirm');
-//
-    // this.saveAgentSection = this.el('dash-task-save-agent');
-    // this.saveAgentTrigger = this.el('dash-save-agent-trigger');
-    // this.saveAgentFields = this.el('dash-save-agent-fields');
-    // this.saveAgentNameEl = this.el('dash-save-agent-name') as HTMLInputElement | null;
-    // this.saveAgentUrlEl = this.el('dash-save-agent-url') as HTMLInputElement | null;
-    // this.saveAgentBtn = this.el('dash-save-agent-btn');
-    // this.saveAgentScheduleConfig = this.el('dash-save-agent-schedule-config');
   }
 
   // ==================== EVENT LISTENERS ====================
@@ -919,99 +774,6 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
       this.handleRemoteControlToggleClick();
     });
 
-    // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-    // Detail panel listeners
-    // this.listen(this.detailClose, 'click', () => this.closeDetailPanel());
-    // this.listen(this.detailRunNow, 'click', () => {
-      // if (this.detailAgentId) this.runAgentNow(this.detailAgentId);
-    // });
-    // this.listen(this.detailEdit, 'click', () => {
-      // if (this.detailAgentId) this.openAgentModal('edit', this.detailAgentId);
-    // });
-    // this.listen(this.detailDelete, 'click', () => {
-      // if (this.detailAgentId) {
-        // const agent = this.agents.find(a => a.agent_id === this.detailAgentId);
-        // this.openDeleteDialog(this.detailAgentId, agent ? agent.name : this.detailAgentId);
-      // }
-    // });
-//
-    // Recorded script toggle
-    // this.listen(this.detailScriptToggle, 'click', () => {
-      // if (!this.detailScriptToggle) return;
-      // const isExpanded = this.detailScriptToggle.classList.contains('expanded');
-      // this.detailScriptToggle.classList.toggle('expanded');
-      // if (this.detailScriptContent) this.detailScriptContent.style.display = isExpanded ? 'none' : 'block';
-    // });
-
-    // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-    // New Agent button
-    // this.listen(this.newAgentBtn, 'click', () => this.openAgentModal('create'));
-
-    // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-    // Modal listeners
-    // this.listen(this.modalClose, 'click', () => this.closeAgentModal());
-    // this.listen(this.modalDiscard, 'click', () => this.closeAgentModal());
-    // this.listen(this.modalSave, 'click', () => this.saveAgentFromModal());
-    // this.listen(this.modalOverlay, 'click', (e: Event) => {
-      // if (e.target === this.modalOverlay) this.closeAgentModal();
-    // });
-//
-    // Escape key closes modal/delete dialog/maximized
-    // this.listen(document, 'keydown', (e: Event) => {
-      // const key = (e as KeyboardEvent).key;
-      // if (key === 'Escape') {
-        // if (this.modalOverlay && this.modalOverlay.style.display !== 'none') {
-          // this.closeAgentModal();
-        // } else if (this.deleteOverlay && this.deleteOverlay.style.display !== 'none') {
-          // this.closeDeleteDialog();
-        // } else if (this.previewLayoutMode === 'maximized') {
-          // this.setPreviewLayout('inline');
-        // }
-      // }
-    // });
-//
-    // Schedule type pill handlers (modal)
-    // this.listen(this.modalScheduleType, 'click', (e: Event) => {
-      // const pill = (e.target as HTMLElement).closest('.dash-schedule-pill');
-      // if (!pill) return;
-      // this.modalScheduleType?.querySelectorAll('.dash-schedule-pill').forEach(p => p.classList.remove('active'));
-      // pill.classList.add('active');
-      // this.renderScheduleConfig(this.modalScheduleConfig, pill.getAttribute('data-type') || 'interval', '{}');
-    // });
-//
-    // Delete dialog listeners
-    // this.listen(this.deleteCancel, 'click', () => this.closeDeleteDialog());
-    // this.listen(this.deleteConfirm, 'click', () => this.confirmDeleteAgent());
-    // this.listen(this.deleteOverlay, 'click', (e: Event) => {
-      // if (e.target === this.deleteOverlay) this.closeDeleteDialog();
-    // });
-//
-    // Save-as-Agent listeners
-    // this.listen(this.saveAgentTrigger, 'click', () => {
-      // if (!this.saveAgentTrigger) return;
-      // const isExpanded = this.saveAgentTrigger.classList.contains('expanded');
-      // this.saveAgentTrigger.classList.toggle('expanded');
-      // if (this.saveAgentFields) {
-        // if (isExpanded) {
-          // this.saveAgentFields.classList.remove('dash-save-expanded');
-          // this.saveAgentFields.style.display = 'none';
-        // } else {
-          // this.saveAgentFields.style.display = 'flex';
-          // this.saveAgentFields.classList.add('dash-save-expanded');
-        // }
-      // }
-    // });
-//
-    // this.listen(this.saveAgentSection, 'click', (e: Event) => {
-      // const pill = (e.target as HTMLElement).closest('.dash-schedule-pill');
-      // if (!pill) return;
-      // this.saveAgentSection?.querySelectorAll('.dash-schedule-pill').forEach(p => p.classList.remove('active'));
-      // pill.classList.add('active');
-      // this.renderScheduleConfig(this.saveAgentScheduleConfig, pill.getAttribute('data-type') || 'interval', '{}');
-    // });
-//
-    // this.listen(this.saveAgentBtn, 'click', () => this.submitSaveAsAgent());
-//
     // Wake Extension button
     this.listen(this.wakeBtn, 'click', () => {
       if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
@@ -1984,8 +1746,6 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
         if (this.taskInput) { this.taskInput.value = ''; this.taskInput.disabled = false; }
         if (this.taskSubmitBtn) (this.taskSubmitBtn as HTMLButtonElement).disabled = false;
         if (this.taskBarFill) { this.taskBarFill.style.width = '0%'; this.taskBarFill.className = 'dash-task-bar-fill'; }
-        // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-        // this.hideSaveAsAgent();
         if (this.previewContainer) this.previewContainer.classList.remove('dash-preview-automating');
         this.renderTaskRecoveryStatus('', '');
         break;
@@ -2012,8 +1772,6 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
           }
         }, this.TASK_TIMEOUT_MS);
         this.disableAllTaskInputs(true);
-        // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-        // this.hideSaveAsAgent();
         if (this.previewContainer) this.previewContainer.classList.add('dash-preview-automating');
         this.renderTaskRecoveryStatus(this.activeTaskRunId || '', this.taskRecoverySource);
         break;
@@ -2034,8 +1792,6 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
         }
         this.disableAllTaskInputs(false);
         if (this.taskInputNext) this.taskInputNext.value = '';
-        // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-        // this.showSaveAsAgent();
         if (this.previewContainer) this.previewContainer.classList.remove('dash-preview-automating');
         this.renderTaskRecoveryStatus('', '');
         break;
@@ -2287,11 +2043,7 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
         localStorage.setItem(this.STORAGE_KEY, key);
         this.clearSessionStorage();
         this.showDashboard();
-        // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-        // this.loadData();
         this.connectWS();
-        // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-        // this.startPolling();
       } else {
         this.showLoginError(this.dashboardCopy.invalidHashKey);
       }
@@ -2308,21 +2060,13 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
     this.validateKey(key).then(result => {
       if (result.valid) {
         this.showDashboard();
-        // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-        // this.loadData();
         this.connectWS();
-        // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-        // this.startPolling();
       } else {
         localStorage.removeItem(this.STORAGE_KEY);
         this.hashKey = '';
       }
     }).catch(() => {
       this.showDashboard();
-      // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-      // this.loadData();
-      // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-      // this.startPolling();
     });
   }
 
@@ -2336,11 +2080,6 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
     this.hashKey = '';
     localStorage.removeItem(this.STORAGE_KEY);
     this.clearSessionStorage();
-    // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-    // this.agents = [];
-    // this.stats = {};
-    // this.selectedAgentId = null;
-    // this.stopPolling();
     this.disconnectWS();
     this.stopQRScanner();
     this.showLogin();
@@ -2360,11 +2099,7 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
         this.hashKey = result.hashKey;
         localStorage.setItem(this.STORAGE_KEY, this.hashKey);
         this.showDashboard();
-        // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-        // this.loadData();
         this.connectWS();
-        // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-        // this.startPolling();
       } else {
         this.clearSessionStorage();
         if (result.reason === 'expired') {
@@ -2376,11 +2111,7 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
     }).catch(() => {
       if (this.hashKey) {
         this.showDashboard();
-        // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-        // this.loadData();
         this.connectWS();
-        // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-        // this.startPolling();
       }
     });
   }
@@ -2617,11 +2348,7 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
         paired = true;
         this.storeSession(result.hashKey, result.sessionToken, result.expiresAt);
         this.showDashboard();
-        // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-        // this.loadData();
         this.connectWS();
-        // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-        // this.startPolling();
       }).catch((err: Error & { localizedMessage?: string }) => {
         if (paired) return;
         this.failScan(err?.localizedMessage || this.dashboardCopy.qrExchangeFailed);
@@ -2657,562 +2384,7 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
     this.showScanError(message);
     void this.startQRScanner();
   }
-//
-  // ==================== DATA LOADING ====================
-//
-  // private loadData(): void {
-    // this.fetchStats();
-    // this.fetchAgents();
-  // }
-//
-  // private fetchStats(): void {
-    // this.apiFetch('/api/stats', { headers: { 'X-FSB-Hash-Key': this.hashKey } })
-      // .then(data => { this.stats = data; this.renderStats(); })
-      // .catch(() => {});
-  // }
-//
-  // private fetchAgents(): void {
-    // this.apiFetch('/api/agents', { headers: { 'X-FSB-Hash-Key': this.hashKey } })
-      // .then(data => { this.agents = data.agents || []; this.renderAgents(); })
-      // .catch(() => {});
-  // }
-//
-  // private fetchRuns(agentId: string, limit: number, offset: number): Promise<any> {
-    // const url = '/api/agents/' + encodeURIComponent(agentId) + '/runs?limit=' + limit + '&offset=' + offset;
-    // return this.apiFetch(url, { headers: { 'X-FSB-Hash-Key': this.hashKey } });
-  // }
-//
-  // ==================== RENDERING ====================
-//
-  // private renderStats(): void {
-    // this.setTextById('stat-agents', String(this.stats.totalAgents || 0));
-    // this.setTextById('stat-enabled', String(this.stats.enabledAgents || 0));
-    // this.setTextById('stat-runs-today', String(this.stats.runsToday || 0));
-    // this.setTextById('stat-success-rate', (this.stats.successRate || 0) + '%');
-    // this.setTextById('stat-total-cost', '$' + (this.stats.totalCost || 0).toFixed(2));
-    // this.setTextById('stat-cost-saved', '$' + (this.stats.totalCostSaved || 0).toFixed(2));
-    // const countText = (this.stats.totalAgents || 0) + ' agent' + ((this.stats.totalAgents || 0) !== 1 ? 's' : '');
-    // if (this.agentCountEl) this.agentCountEl.textContent = countText + (this.extensionOnline ? '' : ' - extension offline');
-  // }
-//
-  // private renderAgents(): void {
-    // if (!this.agentGrid) return;
-    // this.agentGrid.innerHTML = '';
-//
-    // if (this.agents.length === 0) {
-      // if (this.emptyState) this.emptyState.style.display = 'block';
-      // this.agentGrid.style.display = 'none';
-      // return;
-    // }
-//
-    // if (this.emptyState) this.emptyState.style.display = 'none';
-    // this.agentGrid.style.display = '';
-//
-    // this.agents.forEach(agent => {
-      // const card = document.createElement('div');
-      // const isEnabled = agent.enabled === true || agent.enabled === 1;
-      // const isSelected = this.detailAgentId === agent.agent_id;
-      // card.className = 'dash-agent-card' + (isSelected ? ' selected' : '') + (!isEnabled ? ' dash-agent-disabled' : '');
-      // card.setAttribute('data-agent-id', agent.agent_id);
-      // card.setAttribute('role', 'button');
-      // card.setAttribute('aria-expanded', isSelected ? 'true' : 'false');
-//
-      // const scheduleLabel = this.formatScheduleLabel(agent.schedule_type, agent.schedule_config);
-      // const successCount = agent.successful_runs || 0;
-      // const totalRuns = agent.total_runs || 0;
-      // const successRateText = totalRuns > 0 ? successCount + '/' + totalRuns : '0/0';
-      // const successPercent = totalRuns > 0 ? (successCount / totalRuns) * 100 : 100;
-      // const rateColor = successPercent > 80 ? '#22c55e' : successPercent >= 50 ? '#eab308' : '#ef4444';
-      // const costSaved = agent.cost_saved || 0;
-      // const costText = '$' + costSaved.toFixed(2);
-      // const lastRunText = agent.last_run_at ? this.formatTimeAgo(agent.last_run_at) : 'Never';
-      // const runningIcon = this.agentRunningId === agent.agent_id ? ' <span class="dash-spinner dash-agent-running-icon"></span>' : '';
-//
-      // card.innerHTML =
-        // '<div class="dash-agent-card-header">' +
-          // '<div class="dash-agent-name">' +
-            // '<span class="dash-status-dot ' + (isEnabled ? 'dash-status-enabled' : 'dash-status-disabled') + '"></span>' +
-            // this.escapeHtml(agent.name) + runningIcon +
-          // '</div>' +
-          // '<button class="dash-toggle" role="switch" aria-checked="' + isEnabled + '" aria-label="Enable ' + this.escapeAttr(agent.name) + '" data-agent-id="' + this.escapeAttr(agent.agent_id) + '"></button>' +
-        // '</div>' +
-        // '<div class="dash-agent-task">' + this.escapeHtml(agent.task) + '</div>' +
-        // '<div class="dash-agent-url">' + this.escapeHtml(agent.target_url || '') + '</div>' +
-        // '<div class="dash-agent-meta">' +
-          // '<span class="dash-agent-schedule">' + this.escapeHtml(scheduleLabel) + '</span>' +
-          // '<span class="dash-agent-last-run">' + this.escapeHtml(lastRunText) + '</span>' +
-        // '</div>' +
-        // '<div class="dash-agent-card-stats">' +
-          // '<span class="dash-agent-success-rate" style="color: ' + rateColor + '">' + successRateText + '</span>' +
-          // '<span class="dash-agent-cost-saved">' + costText + '</span>' +
-        // '</div>';
-//
-      // card.addEventListener('click', (e: Event) => {
-        // if ((e.target as HTMLElement).closest('.dash-toggle')) return;
-        // this.openDetailPanel(agent.agent_id);
-      // });
-//
-      // const toggle = card.querySelector('.dash-toggle');
-      // if (toggle) {
-        // toggle.addEventListener('click', (e: Event) => {
-          // e.stopPropagation();
-          // this.toggleAgent(agent.agent_id, !isEnabled);
-        // });
-      // }
-//
-      // this.agentGrid!.appendChild(card);
-    // });
-  // }
-//
-  // ==================== TOGGLE AGENT ====================
-  // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-//
-  // private toggleAgent(agentId: string, enabled: boolean): void {
-    // this.agents = this.agents.map(a => {
-      // if (a.agent_id === agentId) a.enabled = enabled ? 1 : 0;
-      // return a;
-    // });
-    // this.renderAgents();
-//
-    // this.apiFetch('/api/agents/' + encodeURIComponent(agentId), {
-      // method: 'PATCH',
-      // headers: { 'Content-Type': 'application/json', 'X-FSB-Hash-Key': this.hashKey },
-      // body: JSON.stringify({ enabled }),
-    // }).catch(() => {
-      // this.agents = this.agents.map(a => {
-        // if (a.agent_id === agentId) a.enabled = enabled ? 0 : 1;
-        // return a;
-      // });
-      // this.renderAgents();
-    // });
-  // }
-//
-  // ==================== DETAIL PANEL ====================
-//
-  // private openDetailPanel(agentId: string): void {
-    // const agent = this.agents.find(a => a.agent_id === agentId);
-    // if (!agent) return;
-//
-    // this.detailAgentId = agentId;
-    // this.selectedAgentId = agentId;
-    // this.detailRunsOffset = 0;
-//
-    // const cards = this.agentGrid?.querySelectorAll('.dash-agent-card');
-    // cards?.forEach(c => {
-      // const isThis = c.getAttribute('data-agent-id') === agentId;
-      // c.classList.toggle('selected', isThis);
-      // c.setAttribute('aria-expanded', isThis ? 'true' : 'false');
-    // });
-//
-    // if (this.detailName) this.detailName.textContent = agent.name;
-    // if (this.detailTask) this.detailTask.textContent = agent.task;
-    // if (this.detailUrl) this.detailUrl.textContent = agent.target_url || '';
-    // if (this.detailSchedule) this.detailSchedule.textContent = this.formatScheduleLabel(agent.schedule_type, agent.schedule_config);
-//
-    // if (this.detailPanel) this.detailPanel.style.display = 'block';
-    // if (this.agentContainer) this.agentContainer.classList.add('dash-detail-open');
-//
-    // this.loadAgentStats(agentId);
-    // this.loadDetailRuns(agentId, 0);
-    // this.loadRecordedScript(agent);
-//
-    // if (this.detailRunProgress) this.detailRunProgress.style.display = 'none';
-  // }
-//
-  // private closeDetailPanel(): void {
-    // this.detailAgentId = null;
-    // this.selectedAgentId = null;
-    // if (this.detailPanel) this.detailPanel.style.display = 'none';
-    // if (this.agentContainer) this.agentContainer.classList.remove('dash-detail-open');
-    // this.agentGrid?.querySelectorAll('.dash-agent-card').forEach(c => {
-      // c.classList.remove('selected');
-      // c.setAttribute('aria-expanded', 'false');
-    // });
-  // }
-//
-  // private loadAgentStats(agentId: string): void {
-    // this.apiFetch('/api/agents/' + encodeURIComponent(agentId) + '/stats', {
-      // headers: { 'X-FSB-Hash-Key': this.hashKey },
-    // }).then(data => {
-      // if (this.detailReplayRuns) this.detailReplayRuns.textContent = String(data.replayRuns || 0);
-      // if (this.detailAiFallback) this.detailAiFallback.textContent = String(data.aiFallbackRuns || 0);
-      // if (this.detailTokensSaved) this.detailTokensSaved.textContent = this.formatNumber(data.tokensSaved || 0);
-      // if (this.detailCostSaved) this.detailCostSaved.textContent = '$' + (data.costSaved || 0).toFixed(2);
-    // }).catch(() => {});
-  // }
-//
-  // private loadDetailRuns(agentId: string, offset: number): void {
-    // if (!this.detailRunsList) return;
-    // this.detailRunsList.innerHTML = '<div class="text-center"><span class="dash-spinner"></span></div>';
-    // this.fetchRuns(agentId, this.detailRunsLimit, offset).then(data => {
-      // this.renderDetailRuns(data.runs || [], data.total || 0, data.limit || this.detailRunsLimit, data.offset || 0);
-    // }).catch(() => {
-      // if (this.detailRunsList) this.detailRunsList.innerHTML = '<p class="text-muted text-center">Failed to load runs.</p>';
-    // });
-  // }
-//
-  // private renderDetailRuns(runs: any[], total: number, limit: number, offset: number): void {
-    // if (!this.detailRunsList) return;
-    // this.detailRunsList.innerHTML = '';
-//
-    // if (runs.length === 0) {
-      // this.detailRunsList.innerHTML = '<p class="text-muted text-center">No runs yet. Tap Run Now to test this agent.</p>';
-      // if (this.detailRunsPagination) this.detailRunsPagination.innerHTML = '';
-      // return;
-    // }
-//
-    // runs.forEach(run => {
-      // const entry = document.createElement('div');
-      // entry.className = 'dash-run-entry';
-      // const time = this.formatTime(run.completed_at);
-      // const statusClass = run.status === 'success' ? 'dash-run-status-success' :
-                          // run.status === 'failed' ? 'dash-run-status-failed' : 'dash-run-status-unknown';
-      // const statusSr = run.status === 'success' ? 'Status: success' : run.status === 'failed' ? 'Status: failed' : 'Status: unknown';
-      // const modeBadge = this.renderModeBadge(run.execution_mode);
-      // const resultText = run.error || run.result || '-';
-      // const duration = run.duration_ms ? this.formatDuration(run.duration_ms) : '-';
-      // const costStr = run.cost_saved && run.cost_saved > 0 ? '-$' + run.cost_saved.toFixed(4) :
-                      // run.cost_usd ? '$' + run.cost_usd.toFixed(4) : '-';
-      // entry.innerHTML =
-        // '<div class="dash-run-time">' + time + '</div>' +
-        // '<div><span class="dash-run-status ' + statusClass + '"><span class="sr-only">' + statusSr + '</span>' + this.escapeHtml(run.status) + '</span></div>' +
-        // '<div>' + modeBadge + '</div>' +
-        // '<div class="dash-run-result" title="' + this.escapeAttr(resultText) + '">' + this.escapeHtml(resultText) + '</div>' +
-        // '<div class="dash-run-duration">' + duration + '</div>' +
-        // '<div class="dash-run-cost">' + costStr + '</div>';
-      // this.detailRunsList!.appendChild(entry);
-    // });
-//
-    // if (this.detailRunsPagination) {
-      // this.detailRunsPagination.innerHTML = '';
-      // if (total > limit) {
-        // const prevBtn = document.createElement('button');
-        // prevBtn.textContent = 'Previous';
-        // prevBtn.disabled = offset === 0;
-        // prevBtn.addEventListener('click', () => this.loadDetailRuns(this.detailAgentId!, Math.max(0, offset - limit)));
-        // const nextBtn = document.createElement('button');
-        // nextBtn.textContent = 'Next';
-        // nextBtn.disabled = (offset + limit) >= total;
-        // nextBtn.addEventListener('click', () => this.loadDetailRuns(this.detailAgentId!, offset + limit));
-        // const info = document.createElement('span');
-        // info.className = 'text-muted text-sm';
-        // info.style.padding = '6px 8px';
-        // info.textContent = (offset + 1) + '-' + Math.min(offset + limit, total) + ' of ' + total;
-        // this.detailRunsPagination.appendChild(prevBtn);
-        // this.detailRunsPagination.appendChild(info);
-        // this.detailRunsPagination.appendChild(nextBtn);
-      // }
-    // }
-  // }
-//
-  // private loadRecordedScript(agent: any): void {
-    // if (!this.detailScriptList) return;
-    // this.detailScriptList.innerHTML = '';
-    // if (this.detailScriptContent) this.detailScriptContent.style.display = 'none';
-    // if (this.detailScriptToggle) this.detailScriptToggle.classList.remove('expanded');
-//
-    // const script = agent.recorded_script || agent.recordedScript;
-    // if (!script || !Array.isArray(script) || script.length === 0) {
-      // this.detailScriptList.innerHTML = '<li>No recorded script available</li>';
-      // return;
-    // }
-    // script.forEach((step: any) => {
-      // const li = document.createElement('li');
-      // li.textContent = typeof step === 'string' ? step : (step.action || step.description || JSON.stringify(step));
-      // this.detailScriptList!.appendChild(li);
-    // });
-  // }
-//
-  // ==================== RUN NOW ====================
-//
-  // private runAgentNow(agentId: string): void {
-    // if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
-    // if (!this.extensionOnline) return;
-//
-    // this.agentRunningId = agentId;
-    // this.renderAgents();
-//
-    // if (this.detailRunProgress) this.detailRunProgress.style.display = 'block';
-    // if (this.detailRunBar) { this.detailRunBar.style.width = '0%'; this.detailRunBar.className = 'dash-task-bar-fill'; }
-    // if (this.detailRunAction) this.detailRunAction.textContent = 'Starting...';
-    // if (this.detailRunNow) { (this.detailRunNow as HTMLButtonElement).disabled = true; this.detailRunNow.innerHTML = '<span class="dash-spinner"></span> Running'; }
-//
-    // this.ws.send(JSON.stringify({
-      // type: 'dash:agent-run-now',
-      // payload: { agentId },
-      // ts: Date.now(),
-    // }));
-  // }
-//
-  // ==================== AGENT MODAL ====================
-//
-  // private openAgentModal(mode: 'create' | 'edit', agentId?: string): void {
-    // this.modalMode = mode;
-    // this.modalAgentId = agentId || null;
-    // if (this.modalTitle) this.modalTitle.textContent = mode === 'edit' ? 'Edit Agent' : 'New Agent';
-    // if (this.modalSave) { this.modalSave.textContent = 'Save Agent'; (this.modalSave as HTMLButtonElement).disabled = false; }
-//
-    // if (mode === 'edit' && agentId) {
-      // const agent = this.agents.find(a => a.agent_id === agentId);
-      // if (agent) {
-        // if (this.modalName) this.modalName.value = agent.name || '';
-        // if (this.modalTask) this.modalTask.value = agent.task || '';
-        // if (this.modalUrl) this.modalUrl.value = agent.target_url || '';
-        // this.setModalScheduleType(agent.schedule_type || 'interval', agent.schedule_config);
-      // }
-    // } else {
-      // if (this.modalName) this.modalName.value = '';
-      // if (this.modalTask) this.modalTask.value = '';
-      // if (this.modalUrl) this.modalUrl.value = '';
-      // this.setModalScheduleType('interval', '{}');
-    // }
-//
-    // if (this.modalOverlay) this.modalOverlay.style.display = 'flex';
-    // if (this.modalName) this.modalName.focus();
-  // }
-//
-  // private closeAgentModal(): void {
-    // if (this.modalOverlay) this.modalOverlay.style.display = 'none';
-    // this.modalMode = null;
-    // this.modalAgentId = null;
-    // this.clearModalErrors();
-  // }
-//
-  // private clearModalErrors(): void {
-    // const container = this.modalOverlay || this.host.nativeElement;
-    // container.querySelectorAll('.dash-field-error').forEach((e: Element) => e.remove());
-    // container.querySelectorAll('.dash-input-error').forEach((e: Element) => e.classList.remove('dash-input-error'));
-  // }
-//
-  // private saveAgentFromModal(): void {
-    // this.clearModalErrors();
-    // const name = this.modalName?.value.trim() || '';
-    // const task = this.modalTask?.value.trim() || '';
-    // const url = this.modalUrl?.value.trim() || '';
-//
-    // let valid = true;
-    // if (!name) { this.showFieldError(this.modalName, 'Name is required'); valid = false; }
-    // if (!task) { this.showFieldError(this.modalTask, 'Task description is required'); valid = false; }
-    // if (!url) { this.showFieldError(this.modalUrl, 'Target URL is required'); valid = false; }
-    // if (!valid) return;
-//
-    // const scheduleType = this.getActiveScheduleType(this.modalScheduleType);
-    // const scheduleConfig = this.getScheduleConfig(this.modalScheduleConfig, scheduleType);
-//
-    // if (this.modalSave) { (this.modalSave as HTMLButtonElement).disabled = true; this.modalSave.innerHTML = '<span class="dash-spinner"></span> Saving...'; }
-//
-    // const agentId = this.modalMode === 'edit' ? this.modalAgentId! :
-      // 'agent_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 8);
-//
-    // this.apiFetch('/api/agents', {
-      // method: 'POST',
-      // headers: { 'Content-Type': 'application/json', 'X-FSB-Hash-Key': this.hashKey },
-      // body: JSON.stringify({
-        // agentId, name, task, targetUrl: url,
-        // scheduleType, scheduleConfig: JSON.stringify(scheduleConfig), enabled: true,
-      // }),
-    // }).then(() => {
-      // this.closeAgentModal();
-      // this.loadData();
-      // setTimeout(() => {
-        // const newCard = this.agentGrid?.querySelector('[data-agent-id="' + agentId + '"]');
-        // if (newCard) {
-          // newCard.classList.add('dash-agent-card-highlight');
-          // setTimeout(() => newCard.classList.remove('dash-agent-card-highlight'), 1100);
-        // }
-      // }, 200);
-    // }).catch(err => {
-      // if (this.modalSave) { (this.modalSave as HTMLButtonElement).disabled = false; this.modalSave.textContent = 'Save Agent'; }
-      // const msg = err?.error || 'Couldn\'t create agent. Check your connection and try again.';
-      // this.showFieldError(this.modalUrl, msg);
-    // });
-  // }
-//
-  // private showFieldError(inputEl: HTMLElement | null, msg: string): void {
-    // if (!inputEl) return;
-    // inputEl.classList.add('dash-input-error');
-    // const errEl = document.createElement('div');
-    // errEl.className = 'dash-field-error';
-    // errEl.textContent = msg;
-    // inputEl.parentNode?.appendChild(errEl);
-  // }
-//
-  // ==================== SCHEDULE CONFIGURATION ====================
-//
-  // private setModalScheduleType(type: string, configStr: any): void {
-    // const pills = (this.modalScheduleType || this.host.nativeElement).querySelectorAll('.dash-schedule-pill');
-    // pills.forEach((p: Element) => p.classList.toggle('active', p.getAttribute('data-type') === type));
-    // this.renderScheduleConfig(this.modalScheduleConfig, type, configStr);
-  // }
-//
-  // private renderScheduleConfig(container: HTMLElement | null, type: string, configStr: any): void {
-    // if (!container) return;
-    // let config: any = {};
-    // try { config = typeof configStr === 'string' ? JSON.parse(configStr) : (configStr || {}); } catch (_) {}
-//
-    // if (type === 'interval') {
-      // const mins = config.intervalMinutes || 60;
-      // container.innerHTML =
-        // '<div class="dash-schedule-interval-row">' +
-          // '<span class="dash-schedule-interval-label">Every</span>' +
-          // '<input type="number" class="dash-input dash-schedule-interval-input" value="' + mins + '" min="5" step="5">' +
-          // '<span class="dash-schedule-interval-label">minutes</span>' +
-        // '</div>';
-      // const input = container.querySelector('input');
-      // if (input) {
-        // input.addEventListener('blur', () => {
-          // if (parseInt(input.value) < 5) {
-            // input.value = '5';
-            // let msgEl = container.querySelector('.dash-schedule-snap-msg');
-            // if (!msgEl) {
-              // msgEl = document.createElement('div');
-              // msgEl.className = 'dash-schedule-snap-msg';
-              // msgEl.textContent = 'Minimum 5 minutes';
-              // container.appendChild(msgEl);
-              // setTimeout(() => { (msgEl as HTMLElement).style.opacity = '0'; }, 100);
-              // setTimeout(() => { if (msgEl?.parentNode) msgEl.remove(); }, 2100);
-            // }
-          // }
-        // });
-      // }
-    // } else if (type === 'daily') {
-      // const time = config.dailyTime || '08:00';
-      // const days = config.daysOfWeek || [0, 1, 2, 3, 4, 5, 6];
-      // const dayLabels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-      // const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-      // const pillsHtml = dayLabels.map((label, i) => {
-        // const checked = days.indexOf(i) >= 0;
-        // return '<button class="dash-day-pill" role="checkbox" aria-checked="' + checked + '" aria-label="' + dayNames[i] + '" data-day="' + i + '">' + label + '</button>';
-      // }).join('');
-      // container.innerHTML =
-        // '<input type="time" class="dash-input" value="' + time + '" style="width: 120px;">' +
-        // '<div class="dash-day-pills">' + pillsHtml + '</div>';
-      // container.querySelectorAll('.dash-day-pill').forEach(pill => {
-        // pill.addEventListener('click', () => {
-          // const isChecked = pill.getAttribute('aria-checked') === 'true';
-          // pill.setAttribute('aria-checked', String(!isChecked));
-        // });
-      // });
-    // } else if (type === 'once') {
-      // const dt = config.dateTime || '';
-      // container.innerHTML = '<input type="datetime-local" class="dash-input" value="' + dt + '">';
-    // }
-  // }
-//
-  // private getActiveScheduleType(container: HTMLElement | null): string {
-    // if (!container) return 'interval';
-    // const active = container.querySelector('.dash-schedule-pill.active');
-    // return active ? (active.getAttribute('data-type') || 'interval') : 'interval';
-  // }
-//
-  // private getScheduleConfig(container: HTMLElement | null, type: string): any {
-    // if (!container) return {};
-    // if (type === 'interval') {
-      // const input = container.querySelector('input[type="number"]') as HTMLInputElement | null;
-      // return { intervalMinutes: Math.max(5, parseInt(input?.value || '60') || 60) };
-    // }
-    // if (type === 'daily') {
-      // const timeInput = container.querySelector('input[type="time"]') as HTMLInputElement | null;
-      // const daysChecked: number[] = [];
-      // container.querySelectorAll('.dash-day-pill[aria-checked="true"]').forEach(p => {
-        // daysChecked.push(parseInt(p.getAttribute('data-day') || '0'));
-      // });
-      // return { dailyTime: timeInput?.value || '08:00', daysOfWeek: daysChecked };
-    // }
-    // if (type === 'once') {
-      // const dtInput = container.querySelector('input[type="datetime-local"]') as HTMLInputElement | null;
-      // return { dateTime: dtInput?.value || '' };
-    // }
-    // return {};
-  // }
-//
-  // ==================== DELETE AGENT ====================
-//
-  // private openDeleteDialog(agentId: string, agentName: string): void {
-    // this.deleteAgentId = agentId;
-    // this.deleteAgentName = agentName;
-    // if (this.deleteTitle) this.deleteTitle.textContent = 'Delete ' + agentName + '?';
-    // if (this.deleteOverlay) this.deleteOverlay.style.display = 'flex';
-    // if (this.deleteCancel) this.deleteCancel.focus();
-  // }
-//
-  // private closeDeleteDialog(): void {
-    // if (this.deleteOverlay) this.deleteOverlay.style.display = 'none';
-    // this.deleteAgentId = null;
-    // this.deleteAgentName = '';
-  // }
-//
-  // private confirmDeleteAgent(): void {
-    // if (!this.deleteAgentId) return;
-    // this.apiFetch('/api/agents/' + encodeURIComponent(this.deleteAgentId), {
-      // method: 'DELETE',
-      // headers: { 'X-FSB-Hash-Key': this.hashKey },
-    // }).then(() => {
-      // this.closeDeleteDialog();
-      // this.closeDetailPanel();
-      // this.loadData();
-    // }).catch(() => {
-      // this.closeDeleteDialog();
-    // });
-  // }
-//
-  // ==================== SAVE AS AGENT ====================
-//
-  // private showSaveAsAgent(): void {
-    // if (this.saveAgentSection) this.saveAgentSection.style.display = 'block';
-    // if (this.saveAgentNameEl && this.taskText) {
-      // this.saveAgentNameEl.value = this.taskText.length > 50 ? this.taskText.substring(0, 50) + '...' : this.taskText;
-    // }
-    // if (this.saveAgentUrlEl) {
-      // const urlMatch = this.taskText.match(/https?:\/\/[^\s]+/);
-      // if (urlMatch) this.saveAgentUrlEl.value = urlMatch[0];
-    // }
-    // this.renderScheduleConfig(this.saveAgentScheduleConfig, 'interval', '{"intervalMinutes": 60}');
-  // }
-//
-  // private hideSaveAsAgent(): void {
-    // if (this.saveAgentSection) this.saveAgentSection.style.display = 'none';
-    // if (this.saveAgentFields) { this.saveAgentFields.style.display = 'none'; this.saveAgentFields.classList.remove('dash-save-expanded'); }
-    // if (this.saveAgentTrigger) this.saveAgentTrigger.classList.remove('expanded');
-  // }
-//
-  // private submitSaveAsAgent(): void {
-    // const name = this.saveAgentNameEl?.value.trim() || '';
-    // const url = this.saveAgentUrlEl?.value.trim() || '';
-    // if (!name || !url) return;
-//
-    // let scheduleType = 'interval';
-    // this.saveAgentSection?.querySelectorAll('.dash-schedule-pill').forEach(p => {
-      // if (p.classList.contains('active')) scheduleType = p.getAttribute('data-type') || 'interval';
-    // });
-    // const scheduleConfig = this.getScheduleConfig(this.saveAgentScheduleConfig, scheduleType);
-//
-    // if (this.saveAgentBtn) { (this.saveAgentBtn as HTMLButtonElement).disabled = true; this.saveAgentBtn.innerHTML = '<span class="dash-spinner"></span> Saving...'; }
-//
-    // const agentId = 'agent_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 8);
-//
-    // this.apiFetch('/api/agents', {
-      // method: 'POST',
-      // headers: { 'Content-Type': 'application/json', 'X-FSB-Hash-Key': this.hashKey },
-      // body: JSON.stringify({
-        // agentId, name, task: this.taskText, targetUrl: url,
-        // scheduleType, scheduleConfig: JSON.stringify(scheduleConfig), enabled: true,
-      // }),
-    // }).then(() => {
-      // this.hideSaveAsAgent();
-      // this.loadData();
-      // if (this.saveAgentBtn) { (this.saveAgentBtn as HTMLButtonElement).disabled = false; this.saveAgentBtn.textContent = 'Save Agent'; }
-    // }).catch(() => {
-      // if (this.saveAgentBtn) { (this.saveAgentBtn as HTMLButtonElement).disabled = false; this.saveAgentBtn.textContent = 'Save Agent'; }
-    // });
-  // }
-//
-  // private renderModeBadge(mode: string): string {
-    // if (mode === 'replay') return '<span class="dash-mode-badge dash-mode-replay">Replay</span>';
-    // if (mode === 'ai_fallback') return '<span class="dash-mode-badge dash-mode-fallback">AI Fallback</span>';
-    // return '<span class="dash-mode-badge dash-mode-ai">AI</span>';
-  // }
-//
+
   // ==================== DOM PREVIEW ====================
 
   private setPreviewLoadingText(text: string): void {
@@ -4177,11 +3349,6 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
         this.setTaskRecoveryPending(true, 'extension-online');
       }
       this.updateTaskOfflineState();
-      // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-      // if (this.agentCountEl) {
-        // const countText = (this.stats.totalAgents || 0) + ' agent' + ((this.stats.totalAgents || 0) !== 1 ? 's' : '');
-        // this.agentCountEl.textContent = countText + (this.extensionOnline ? '' : ' - extension offline');
-      // }
       if (!wasExtensionOnline && this.extensionOnline) this.scheduleStreamRecovery('extension-online');
       if (!this.extensionOnline) this.pageReady = false;
       return;
@@ -4191,8 +3358,6 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
       const snapshot = msg.payload || {};
       const snapshotIntentActive = snapshot.streamIntentActive !== false;
       this.extensionOnline = true;
-      // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-      // this.loadData();
       this.recordTransportEvent('snapshot-recovered', { type: 'ext:snapshot' });
       this.recordSnapshotRecovery({ type: 'ext:snapshot', status: snapshot.streamStatus || '' });
       if (snapshot.remoteControl) this.renderRemoteControlState(snapshot.remoteControl);
@@ -4226,38 +3391,6 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
       this.renderTaskRecoveryStatus(snapshot.taskRunId || '', snapshot.taskSource || snapshot.snapshotSource || '');
       return;
     }
-
-    // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-    // if (msg.type === 'ext:agent-run-progress') {
-      // const rp = msg.payload || {};
-      // if (rp.agentId === this.agentRunningId) {
-        // if (this.detailRunBar) this.detailRunBar.style.width = (rp.progress || 0) + '%';
-        // if (this.detailRunAction) this.detailRunAction.textContent = rp.action || 'Working...';
-      // }
-      // return;
-    // }
-
-    // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-    // if (msg.type === 'ext:agent-run-complete') {
-      // const rc = msg.payload || {};
-      // this.agentRunningId = null;
-      // this.renderAgents();
-      // if (rc.agentId === this.detailAgentId) {
-        // if (this.detailRunNow) { (this.detailRunNow as HTMLButtonElement).disabled = false; this.detailRunNow.textContent = 'Run Now'; }
-        // if (this.detailRunProgress) {
-          // if (this.detailRunBar) {
-            // this.detailRunBar.style.width = '100%';
-            // this.detailRunBar.className = 'dash-task-bar-fill ' + (rc.success ? 'dash-task-bar-success' : 'dash-task-bar-failed');
-          // }
-          // if (this.detailRunAction) this.detailRunAction.textContent = rc.success ? 'Complete' : (rc.error || 'Failed');
-          // setTimeout(() => { if (this.detailRunProgress) this.detailRunProgress.style.display = 'none'; }, 3000);
-        // }
-        // this.loadAgentStats(this.detailAgentId!);
-        // this.loadDetailRuns(this.detailAgentId!, 0);
-      // }
-      // this.loadData();
-      // return;
-    // }
 
     if (msg.type === 'ext:dom-snapshot') { this.handleDOMSnapshot(msg.payload); return; }
     if (msg.type === 'ext:dom-mutations') { this.handleDOMMutations(msg.payload); return; }
@@ -4306,26 +3439,7 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
       return;
     }
 
-    // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-    // if (msg.type === 'agent_updated' || msg.type === 'agent_deleted' || msg.type === 'run_completed') {
-      // this.loadData();
-      // if (msg.agentId && msg.agentId === this.detailAgentId) {
-        // this.loadAgentStats(this.detailAgentId!);
-        // this.loadDetailRuns(this.detailAgentId!, 0);
-      // }
-    // }
   }
-//
-  // ==================== POLLING FALLBACK ====================
-//
-  // private startPolling(): void {
-    // this.stopPolling();
-    // this.pollTimer = setInterval(() => { if (!this.destroyed) this.loadData(); }, this.POLL_INTERVAL);
-  // }
-//
-  // private stopPolling(): void {
-    // if (this.pollTimer) { clearInterval(this.pollTimer); this.pollTimer = null; }
-  // }
 
   // ==================== API HELPERS ====================
 
@@ -4595,38 +3709,6 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
     if (ms < 60000) return (ms / 1000).toFixed(1) + 's';
     return Math.floor(ms / 60000) + 'm ' + Math.round((ms % 60000) / 1000) + 's';
   }
-
-  // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-  // private formatTimeAgo(isoStr: string): string {
-    // if (!isoStr) return 'Never';
-    // try {
-      // const diff = Date.now() - new Date(isoStr).getTime();
-      // if (diff < 60000) return 'Just now';
-      // if (diff < 3600000) return Math.floor(diff / 60000) + 'm ago';
-      // if (diff < 86400000) return Math.floor(diff / 3600000) + 'h ago';
-      // return Math.floor(diff / 86400000) + 'd ago';
-    // } catch (_) { return isoStr; }
-  // }
-//
-  // private formatNumber(n: number): string {
-    // if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
-    // if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
-    // return String(n);
-  // }
-//
-  // private formatScheduleLabel(scheduleType: string, scheduleConfig: any): string {
-    // let config: any = {};
-    // try { config = typeof scheduleConfig === 'string' ? JSON.parse(scheduleConfig) : (scheduleConfig || {}); } catch (_) {}
-    // if (scheduleType === 'interval') {
-      // const mins = config.intervalMinutes || 60;
-      // if (mins >= 1440) return 'Every ' + Math.round(mins / 1440) + 'd';
-      // if (mins >= 60) return 'Every ' + Math.round(mins / 60) + 'h';
-      // return 'Every ' + mins + 'min';
-    // }
-    // if (scheduleType === 'daily') return 'Daily ' + (config.dailyTime || '08:00');
-    // if (scheduleType === 'once') return 'Once';
-    // return scheduleType || 'manual';
-  // }
 
   private escapeHtml(str: string): string {
     if (!str) return '';

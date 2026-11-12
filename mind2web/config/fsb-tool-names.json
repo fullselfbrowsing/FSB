@@ -1,0 +1,1188 @@
+{
+  "version": 1,
+  "source_commit": "f5255da173454e6a7f4199abbc613828dce648b9",
+  "count": 72,
+  "tools": [
+    {
+      "name": "back",
+      "registered_by": "agents",
+      "source": "mcp/src/tools/agents.ts:32",
+      "definition": null,
+      "read_only": null,
+      "params": null,
+      "required": null
+    },
+    {
+      "name": "capture_screenshot",
+      "registered_by": "registerScreenshotTools",
+      "source": "mcp/src/tools/screenshots.ts:60",
+      "definition": "extension/ai/tool-definitions.js:920",
+      "read_only": true,
+      "params": [
+        "mode",
+        "coordinate_space",
+        "x",
+        "y",
+        "width",
+        "height",
+        "selector",
+        "device_mode",
+        "viewport_width",
+        "viewport_height",
+        "device_scale_factor",
+        "orientation",
+        "wait_ms",
+        "include_fsb_overlays",
+        "tab_id"
+      ],
+      "required": []
+    },
+    {
+      "name": "check_box",
+      "registered_by": "registerManualTools",
+      "source": "mcp/src/tools/manual.ts:262",
+      "definition": "extension/ai/tool-definitions.js:326",
+      "read_only": false,
+      "params": [
+        "selector",
+        "tab_id",
+        "visual_reason",
+        "client",
+        "is_final"
+      ],
+      "required": [
+        "selector",
+        "visual_reason",
+        "client"
+      ]
+    },
+    {
+      "name": "clear_input",
+      "registered_by": "registerManualTools",
+      "source": "mcp/src/tools/manual.ts:262",
+      "definition": "extension/ai/tool-definitions.js:487",
+      "read_only": false,
+      "params": [
+        "selector",
+        "tab_id",
+        "visual_reason",
+        "client",
+        "is_final"
+      ],
+      "required": [
+        "selector",
+        "visual_reason",
+        "client"
+      ]
+    },
+    {
+      "name": "click",
+      "registered_by": "registerManualTools",
+      "source": "mcp/src/tools/manual.ts:262",
+      "definition": "extension/ai/tool-definitions.js:224",
+      "read_only": false,
+      "params": [
+        "selector",
+        "text",
+        "tab_id",
+        "visual_reason",
+        "client",
+        "is_final"
+      ],
+      "required": [
+        "visual_reason",
+        "client"
+      ]
+    },
+    {
+      "name": "click_and_hold",
+      "registered_by": "registerManualTools",
+      "source": "mcp/src/tools/manual.ts:262",
+      "definition": "extension/ai/tool-definitions.js:777",
+      "read_only": false,
+      "params": [
+        "x",
+        "y",
+        "holdMs",
+        "tab_id",
+        "visual_reason",
+        "client",
+        "is_final"
+      ],
+      "required": [
+        "x",
+        "y",
+        "visual_reason",
+        "client"
+      ]
+    },
+    {
+      "name": "click_at",
+      "registered_by": "registerManualTools",
+      "source": "mcp/src/tools/manual.ts:262",
+      "definition": "extension/ai/tool-definitions.js:754",
+      "read_only": false,
+      "params": [
+        "x",
+        "y",
+        "shift",
+        "ctrl",
+        "alt",
+        "tab_id",
+        "visual_reason",
+        "client",
+        "is_final"
+      ],
+      "required": [
+        "x",
+        "y",
+        "visual_reason",
+        "client"
+      ]
+    },
+    {
+      "name": "close_tab",
+      "registered_by": "registerManualTools",
+      "source": "mcp/src/tools/manual.ts:262",
+      "definition": "extension/ai/tool-definitions.js:677",
+      "read_only": false,
+      "params": [
+        "tab_id",
+        "allow_active",
+        "visual_reason",
+        "client",
+        "is_final"
+      ],
+      "required": [
+        "visual_reason",
+        "client"
+      ]
+    },
+    {
+      "name": "complete_task",
+      "registered_by": "registerReadOnlyTools",
+      "source": "mcp/src/tools/read-only.ts:126",
+      "definition": "extension/ai/tool-definitions.js:1178",
+      "read_only": true,
+      "params": [
+        "summary",
+        "tab_id",
+        "session_token"
+      ],
+      "required": [
+        "summary"
+      ]
+    },
+    {
+      "name": "double_click",
+      "registered_by": "registerManualTools",
+      "source": "mcp/src/tools/manual.ts:262",
+      "definition": "extension/ai/tool-definitions.js:383",
+      "read_only": false,
+      "params": [
+        "selector",
+        "tab_id",
+        "visual_reason",
+        "client",
+        "is_final"
+      ],
+      "required": [
+        "selector",
+        "visual_reason",
+        "client"
+      ]
+    },
+    {
+      "name": "double_click_at",
+      "registered_by": "registerManualTools",
+      "source": "mcp/src/tools/manual.ts:262",
+      "definition": "extension/ai/tool-definitions.js:893",
+      "read_only": false,
+      "params": [
+        "x",
+        "y",
+        "shift",
+        "ctrl",
+        "alt",
+        "tab_id",
+        "visual_reason",
+        "client",
+        "is_final"
+      ],
+      "required": [
+        "x",
+        "y",
+        "visual_reason",
+        "client"
+      ]
+    },
+    {
+      "name": "drag",
+      "registered_by": "registerManualTools",
+      "source": "mcp/src/tools/manual.ts:262",
+      "definition": "extension/ai/tool-definitions.js:798",
+      "read_only": false,
+      "params": [
+        "startX",
+        "startY",
+        "endX",
+        "endY",
+        "steps",
+        "stepDelayMs",
+        "shift",
+        "ctrl",
+        "alt",
+        "tab_id",
+        "visual_reason",
+        "client",
+        "is_final"
+      ],
+      "required": [
+        "startX",
+        "startY",
+        "endX",
+        "endY",
+        "visual_reason",
+        "client"
+      ]
+    },
+    {
+      "name": "drag_drop",
+      "registered_by": "registerManualTools",
+      "source": "mcp/src/tools/manual.ts:262",
+      "definition": "extension/ai/tool-definitions.js:423",
+      "read_only": false,
+      "params": [
+        "sourceSelector",
+        "targetSelector",
+        "steps",
+        "holdMs",
+        "stepDelayMs",
+        "tab_id",
+        "visual_reason",
+        "client",
+        "is_final"
+      ],
+      "required": [
+        "sourceSelector",
+        "targetSelector",
+        "visual_reason",
+        "client"
+      ]
+    },
+    {
+      "name": "drag_variable_speed",
+      "registered_by": "registerManualTools",
+      "source": "mcp/src/tools/manual.ts:262",
+      "definition": "extension/ai/tool-definitions.js:825",
+      "read_only": false,
+      "params": [
+        "startX",
+        "startY",
+        "endX",
+        "endY",
+        "steps",
+        "minDelayMs",
+        "maxDelayMs",
+        "tab_id",
+        "visual_reason",
+        "client",
+        "is_final"
+      ],
+      "required": [
+        "startX",
+        "startY",
+        "endX",
+        "endY",
+        "visual_reason",
+        "client"
+      ]
+    },
+    {
+      "name": "drop_file",
+      "registered_by": "registerManualTools",
+      "source": "mcp/src/tools/manual.ts:262",
+      "definition": "extension/ai/tool-definitions.js:446",
+      "read_only": false,
+      "params": [
+        "selector",
+        "fileName",
+        "fileContent",
+        "mimeType",
+        "tab_id",
+        "visual_reason",
+        "client",
+        "is_final"
+      ],
+      "required": [
+        "selector",
+        "visual_reason",
+        "client"
+      ]
+    },
+    {
+      "name": "end_visual_session",
+      "registered_by": "visual-session",
+      "source": "mcp/src/tools/visual-session.ts:70",
+      "definition": null,
+      "read_only": null,
+      "params": null,
+      "required": null
+    },
+    {
+      "name": "execute_js",
+      "registered_by": "registerManualTools",
+      "source": "mcp/src/tools/manual.ts:262",
+      "definition": "extension/ai/tool-definitions.js:102",
+      "read_only": false,
+      "params": [
+        "code",
+        "tab_id",
+        "visual_reason",
+        "client",
+        "is_final"
+      ],
+      "required": [
+        "code",
+        "visual_reason",
+        "client"
+      ]
+    },
+    {
+      "name": "fail_task",
+      "registered_by": "registerReadOnlyTools",
+      "source": "mcp/src/tools/read-only.ts:126",
+      "definition": "extension/ai/tool-definitions.js:1231",
+      "read_only": true,
+      "params": [
+        "reason",
+        "tab_id",
+        "session_token"
+      ],
+      "required": [
+        "reason"
+      ]
+    },
+    {
+      "name": "fill_credential",
+      "registered_by": "vault",
+      "source": "mcp/src/tools/vault.ts:55",
+      "definition": null,
+      "read_only": null,
+      "params": null,
+      "required": null
+    },
+    {
+      "name": "fill_sheet",
+      "registered_by": "registerManualTools",
+      "source": "mcp/src/tools/manual.ts:262",
+      "definition": "extension/ai/tool-definitions.js:707",
+      "read_only": false,
+      "params": [
+        "startCell",
+        "csvData",
+        "sheetName",
+        "tab_id",
+        "visual_reason",
+        "client",
+        "is_final"
+      ],
+      "required": [
+        "startCell",
+        "csvData",
+        "visual_reason",
+        "client"
+      ]
+    },
+    {
+      "name": "focus",
+      "registered_by": "registerManualTools",
+      "source": "mcp/src/tools/manual.ts:262",
+      "definition": "extension/ai/tool-definitions.js:468",
+      "read_only": false,
+      "params": [
+        "selector",
+        "tab_id",
+        "visual_reason",
+        "client",
+        "is_final"
+      ],
+      "required": [
+        "selector",
+        "visual_reason",
+        "client"
+      ]
+    },
+    {
+      "name": "get_attribute",
+      "registered_by": "registerReadOnlyTools",
+      "source": "mcp/src/tools/read-only.ts:126",
+      "definition": "extension/ai/tool-definitions.js:1000",
+      "read_only": true,
+      "params": [
+        "selector",
+        "attribute",
+        "tab_id"
+      ],
+      "required": [
+        "selector",
+        "attribute"
+      ]
+    },
+    {
+      "name": "get_dom_snapshot",
+      "registered_by": "registerReadOnlyTools",
+      "source": "mcp/src/tools/read-only.ts:126",
+      "definition": "extension/ai/tool-definitions.js:1044",
+      "read_only": true,
+      "params": [
+        "maxElements",
+        "tab_id"
+      ],
+      "required": []
+    },
+    {
+      "name": "get_logs",
+      "registered_by": "observability",
+      "source": "mcp/src/tools/observability.ts:100",
+      "definition": null,
+      "read_only": null,
+      "params": null,
+      "required": null
+    },
+    {
+      "name": "get_memory_stats",
+      "registered_by": "observability",
+      "source": "mcp/src/tools/observability.ts:150",
+      "definition": null,
+      "read_only": null,
+      "params": null,
+      "required": null
+    },
+    {
+      "name": "get_page_snapshot",
+      "registered_by": "registerReadOnlyTools",
+      "source": "mcp/src/tools/read-only.ts:126",
+      "definition": "extension/ai/tool-definitions.js:1086",
+      "read_only": true,
+      "params": [
+        "tab_id"
+      ],
+      "required": []
+    },
+    {
+      "name": "get_session_detail",
+      "registered_by": "observability",
+      "source": "mcp/src/tools/observability.ts:43",
+      "definition": null,
+      "read_only": null,
+      "params": null,
+      "required": null
+    },
+    {
+      "name": "get_session_replay",
+      "registered_by": "observability",
+      "source": "mcp/src/tools/observability.ts:64",
+      "definition": null,
+      "read_only": null,
+      "params": null,
+      "required": null
+    },
+    {
+      "name": "get_site_guide",
+      "registered_by": "registerReadOnlyTools",
+      "source": "mcp/src/tools/read-only.ts:126",
+      "definition": "extension/ai/tool-definitions.js:1107",
+      "read_only": true,
+      "params": [
+        "domain"
+      ],
+      "required": [
+        "domain"
+      ]
+    },
+    {
+      "name": "get_task_status",
+      "registered_by": "autopilot",
+      "source": "mcp/src/tools/autopilot.ts:236",
+      "definition": null,
+      "read_only": null,
+      "params": null,
+      "required": null
+    },
+    {
+      "name": "get_text",
+      "registered_by": "registerReadOnlyTools",
+      "source": "mcp/src/tools/read-only.ts:126",
+      "definition": "extension/ai/tool-definitions.js:978",
+      "read_only": true,
+      "params": [
+        "selector",
+        "tab_id"
+      ],
+      "required": [
+        "selector"
+      ]
+    },
+    {
+      "name": "get_trigger_status",
+      "registered_by": "registerTriggerTools",
+      "source": "mcp/src/tools/triggers.ts:222",
+      "definition": "extension/ai/tool-definitions.js:1367",
+      "read_only": true,
+      "params": [
+        "trigger_id",
+        "tab_id"
+      ],
+      "required": [
+        "trigger_id"
+      ]
+    },
+    {
+      "name": "go_back",
+      "registered_by": "registerManualTools",
+      "source": "mcp/src/tools/manual.ts:262",
+      "definition": "extension/ai/tool-definitions.js:166",
+      "read_only": false,
+      "params": [
+        "tab_id",
+        "visual_reason",
+        "client",
+        "is_final"
+      ],
+      "required": [
+        "visual_reason",
+        "client"
+      ]
+    },
+    {
+      "name": "go_forward",
+      "registered_by": "registerManualTools",
+      "source": "mcp/src/tools/manual.ts:262",
+      "definition": "extension/ai/tool-definitions.js:184",
+      "read_only": false,
+      "params": [
+        "tab_id",
+        "visual_reason",
+        "client",
+        "is_final"
+      ],
+      "required": [
+        "visual_reason",
+        "client"
+      ]
+    },
+    {
+      "name": "hover",
+      "registered_by": "registerManualTools",
+      "source": "mcp/src/tools/manual.ts:262",
+      "definition": "extension/ai/tool-definitions.js:345",
+      "read_only": false,
+      "params": [
+        "selector",
+        "tab_id",
+        "visual_reason",
+        "client",
+        "is_final"
+      ],
+      "required": [
+        "selector",
+        "visual_reason",
+        "client"
+      ]
+    },
+    {
+      "name": "insert_text",
+      "registered_by": "registerManualTools",
+      "source": "mcp/src/tools/manual.ts:262",
+      "definition": "extension/ai/tool-definitions.js:872",
+      "read_only": false,
+      "params": [
+        "text",
+        "position",
+        "selector",
+        "tab_id",
+        "visual_reason",
+        "client",
+        "is_final"
+      ],
+      "required": [
+        "text",
+        "visual_reason",
+        "client"
+      ]
+    },
+    {
+      "name": "invoke_capability",
+      "registered_by": "capabilities",
+      "source": "mcp/src/tools/capabilities.ts:78",
+      "definition": null,
+      "read_only": null,
+      "params": null,
+      "required": null
+    },
+    {
+      "name": "list_credentials",
+      "registered_by": "vault",
+      "source": "mcp/src/tools/vault.ts:34",
+      "definition": null,
+      "read_only": null,
+      "params": null,
+      "required": null
+    },
+    {
+      "name": "list_payment_methods",
+      "registered_by": "vault",
+      "source": "mcp/src/tools/vault.ts:84",
+      "definition": null,
+      "read_only": null,
+      "params": null,
+      "required": null
+    },
+    {
+      "name": "list_sessions",
+      "registered_by": "observability",
+      "source": "mcp/src/tools/observability.ts:25",
+      "definition": null,
+      "read_only": null,
+      "params": null,
+      "required": null
+    },
+    {
+      "name": "list_tabs",
+      "registered_by": "registerReadOnlyTools",
+      "source": "mcp/src/tools/read-only.ts:126",
+      "definition": "extension/ai/tool-definitions.js:1066",
+      "read_only": true,
+      "params": [],
+      "required": []
+    },
+    {
+      "name": "list_triggers",
+      "registered_by": "registerTriggerTools",
+      "source": "mcp/src/tools/triggers.ts:222",
+      "definition": "extension/ai/tool-definitions.js:1392",
+      "read_only": true,
+      "params": [
+        "status",
+        "include_terminal",
+        "tab_id"
+      ],
+      "required": []
+    },
+    {
+      "name": "navigate",
+      "registered_by": "registerManualTools",
+      "source": "mcp/src/tools/manual.ts:262",
+      "definition": "extension/ai/tool-definitions.js:128",
+      "read_only": false,
+      "params": [
+        "url",
+        "tab_id",
+        "visual_reason",
+        "client",
+        "is_final"
+      ],
+      "required": [
+        "url",
+        "visual_reason",
+        "client"
+      ]
+    },
+    {
+      "name": "open_tab",
+      "registered_by": "registerManualTools",
+      "source": "mcp/src/tools/manual.ts:262",
+      "definition": "extension/ai/tool-definitions.js:630",
+      "read_only": false,
+      "params": [
+        "url",
+        "active",
+        "visual_reason",
+        "client",
+        "is_final"
+      ],
+      "required": [
+        "url",
+        "visual_reason",
+        "client"
+      ]
+    },
+    {
+      "name": "partial_task",
+      "registered_by": "registerReadOnlyTools",
+      "source": "mcp/src/tools/read-only.ts:126",
+      "definition": "extension/ai/tool-definitions.js:1201",
+      "read_only": true,
+      "params": [
+        "summary",
+        "blocker",
+        "next_step",
+        "tab_id",
+        "reason",
+        "session_token"
+      ],
+      "required": [
+        "summary",
+        "blocker"
+      ]
+    },
+    {
+      "name": "press_enter",
+      "registered_by": "registerManualTools",
+      "source": "mcp/src/tools/manual.ts:262",
+      "definition": "extension/ai/tool-definitions.js:265",
+      "read_only": false,
+      "params": [
+        "selector",
+        "tab_id",
+        "visual_reason",
+        "client",
+        "is_final"
+      ],
+      "required": [
+        "visual_reason",
+        "client"
+      ]
+    },
+    {
+      "name": "press_key",
+      "registered_by": "registerManualTools",
+      "source": "mcp/src/tools/manual.ts:262",
+      "definition": "extension/ai/tool-definitions.js:284",
+      "read_only": false,
+      "params": [
+        "key",
+        "ctrl",
+        "shift",
+        "alt",
+        "tab_id",
+        "visual_reason",
+        "client",
+        "is_final"
+      ],
+      "required": [
+        "key",
+        "visual_reason",
+        "client"
+      ]
+    },
+    {
+      "name": "read_page",
+      "registered_by": "registerReadOnlyTools",
+      "source": "mcp/src/tools/read-only.ts:126",
+      "definition": "extension/ai/tool-definitions.js:956",
+      "read_only": true,
+      "params": [
+        "full",
+        "tab_id"
+      ],
+      "required": []
+    },
+    {
+      "name": "read_sheet",
+      "registered_by": "registerReadOnlyTools",
+      "source": "mcp/src/tools/read-only.ts:126",
+      "definition": "extension/ai/tool-definitions.js:728",
+      "read_only": true,
+      "params": [
+        "range",
+        "tab_id"
+      ],
+      "required": [
+        "range"
+      ]
+    },
+    {
+      "name": "refresh",
+      "registered_by": "registerManualTools",
+      "source": "mcp/src/tools/manual.ts:262",
+      "definition": "extension/ai/tool-definitions.js:202",
+      "read_only": false,
+      "params": [
+        "tab_id",
+        "visual_reason",
+        "client",
+        "is_final"
+      ],
+      "required": [
+        "visual_reason",
+        "client"
+      ]
+    },
+    {
+      "name": "replay_session",
+      "registered_by": "observability",
+      "source": "mcp/src/tools/observability.ts:82",
+      "definition": null,
+      "read_only": null,
+      "params": null,
+      "required": null
+    },
+    {
+      "name": "right_click",
+      "registered_by": "registerManualTools",
+      "source": "mcp/src/tools/manual.ts:262",
+      "definition": "extension/ai/tool-definitions.js:364",
+      "read_only": false,
+      "params": [
+        "selector",
+        "tab_id",
+        "visual_reason",
+        "client",
+        "is_final"
+      ],
+      "required": [
+        "selector",
+        "visual_reason",
+        "client"
+      ]
+    },
+    {
+      "name": "run_task",
+      "registered_by": "autopilot",
+      "source": "mcp/src/tools/autopilot.ts:32",
+      "definition": null,
+      "read_only": null,
+      "params": null,
+      "required": null
+    },
+    {
+      "name": "scroll",
+      "registered_by": "registerManualTools",
+      "source": "mcp/src/tools/manual.ts:262",
+      "definition": "extension/ai/tool-definitions.js:510",
+      "read_only": false,
+      "params": [
+        "direction",
+        "amount",
+        "tab_id",
+        "visual_reason",
+        "client",
+        "is_final"
+      ],
+      "required": [
+        "direction",
+        "visual_reason",
+        "client"
+      ]
+    },
+    {
+      "name": "scroll_at",
+      "registered_by": "registerManualTools",
+      "source": "mcp/src/tools/manual.ts:262",
+      "definition": "extension/ai/tool-definitions.js:850",
+      "read_only": false,
+      "params": [
+        "x",
+        "y",
+        "deltaY",
+        "deltaX",
+        "tab_id",
+        "visual_reason",
+        "client",
+        "is_final"
+      ],
+      "required": [
+        "x",
+        "y",
+        "visual_reason",
+        "client"
+      ]
+    },
+    {
+      "name": "scroll_to_bottom",
+      "registered_by": "registerManualTools",
+      "source": "mcp/src/tools/manual.ts:262",
+      "definition": "extension/ai/tool-definitions.js:548",
+      "read_only": false,
+      "params": [
+        "tab_id",
+        "visual_reason",
+        "client",
+        "is_final"
+      ],
+      "required": [
+        "visual_reason",
+        "client"
+      ]
+    },
+    {
+      "name": "scroll_to_element",
+      "registered_by": "registerManualTools",
+      "source": "mcp/src/tools/manual.ts:262",
+      "definition": "extension/ai/tool-definitions.js:566",
+      "read_only": false,
+      "params": [
+        "selector",
+        "tab_id",
+        "visual_reason",
+        "client",
+        "is_final"
+      ],
+      "required": [
+        "selector",
+        "visual_reason",
+        "client"
+      ]
+    },
+    {
+      "name": "scroll_to_top",
+      "registered_by": "registerManualTools",
+      "source": "mcp/src/tools/manual.ts:262",
+      "definition": "extension/ai/tool-definitions.js:530",
+      "read_only": false,
+      "params": [
+        "tab_id",
+        "visual_reason",
+        "client",
+        "is_final"
+      ],
+      "required": [
+        "visual_reason",
+        "client"
+      ]
+    },
+    {
+      "name": "search",
+      "registered_by": "registerManualTools",
+      "source": "mcp/src/tools/manual.ts:262",
+      "definition": "extension/ai/tool-definitions.js:147",
+      "read_only": false,
+      "params": [
+        "query",
+        "tab_id",
+        "visual_reason",
+        "client",
+        "is_final"
+      ],
+      "required": [
+        "query",
+        "visual_reason",
+        "client"
+      ]
+    },
+    {
+      "name": "search_capabilities",
+      "registered_by": "capabilities",
+      "source": "mcp/src/tools/capabilities.ts:41",
+      "definition": null,
+      "read_only": null,
+      "params": null,
+      "required": null
+    },
+    {
+      "name": "search_memory",
+      "registered_by": "observability",
+      "source": "mcp/src/tools/observability.ts:121",
+      "definition": null,
+      "read_only": null,
+      "params": null,
+      "required": null
+    },
+    {
+      "name": "select_option",
+      "registered_by": "registerManualTools",
+      "source": "mcp/src/tools/manual.ts:262",
+      "definition": "extension/ai/tool-definitions.js:306",
+      "read_only": false,
+      "params": [
+        "selector",
+        "value",
+        "tab_id",
+        "visual_reason",
+        "client",
+        "is_final"
+      ],
+      "required": [
+        "selector",
+        "value",
+        "visual_reason",
+        "client"
+      ]
+    },
+    {
+      "name": "select_text_range",
+      "registered_by": "registerManualTools",
+      "source": "mcp/src/tools/manual.ts:262",
+      "definition": "extension/ai/tool-definitions.js:402",
+      "read_only": false,
+      "params": [
+        "selector",
+        "startOffset",
+        "endOffset",
+        "tab_id",
+        "visual_reason",
+        "client",
+        "is_final"
+      ],
+      "required": [
+        "selector",
+        "startOffset",
+        "endOffset",
+        "visual_reason",
+        "client"
+      ]
+    },
+    {
+      "name": "set_attribute",
+      "registered_by": "registerManualTools",
+      "source": "mcp/src/tools/manual.ts:262",
+      "definition": "extension/ai/tool-definitions.js:1023",
+      "read_only": false,
+      "params": [
+        "selector",
+        "attribute",
+        "value",
+        "tab_id",
+        "visual_reason",
+        "client",
+        "is_final"
+      ],
+      "required": [
+        "selector",
+        "attribute",
+        "value",
+        "visual_reason",
+        "client"
+      ]
+    },
+    {
+      "name": "start_visual_session",
+      "registered_by": "visual-session",
+      "source": "mcp/src/tools/visual-session.ts:46",
+      "definition": null,
+      "read_only": null,
+      "params": null,
+      "required": null
+    },
+    {
+      "name": "stop_task",
+      "registered_by": "autopilot",
+      "source": "mcp/src/tools/autopilot.ts:216",
+      "definition": null,
+      "read_only": null,
+      "params": null,
+      "required": null
+    },
+    {
+      "name": "stop_trigger",
+      "registered_by": "registerTriggerTools",
+      "source": "mcp/src/tools/triggers.ts:222",
+      "definition": "extension/ai/tool-definitions.js:1342",
+      "read_only": true,
+      "params": [
+        "trigger_id",
+        "tab_id"
+      ],
+      "required": [
+        "trigger_id"
+      ]
+    },
+    {
+      "name": "switch_tab",
+      "registered_by": "registerManualTools",
+      "source": "mcp/src/tools/manual.ts:262",
+      "definition": "extension/ai/tool-definitions.js:653",
+      "read_only": false,
+      "params": [
+        "tabId",
+        "active",
+        "visual_reason",
+        "client",
+        "is_final"
+      ],
+      "required": [
+        "tabId",
+        "visual_reason",
+        "client"
+      ]
+    },
+    {
+      "name": "trigger",
+      "registered_by": "registerTriggerTools",
+      "source": "mcp/src/tools/triggers.ts:222",
+      "definition": "extension/ai/tool-definitions.js:1258",
+      "read_only": false,
+      "params": [
+        "selector",
+        "condition",
+        "trigger_id",
+        "detached",
+        "timeout_ms",
+        "safety_ceiling_ms",
+        "rearm_on_fire",
+        "watch",
+        "tab_id",
+        "target_tab_id",
+        "extract",
+        "attribute",
+        "attrName",
+        "poll_interval_ms",
+        "locale",
+        "decimal_separator"
+      ],
+      "required": [
+        "selector",
+        "condition"
+      ]
+    },
+    {
+      "name": "type_text",
+      "registered_by": "registerManualTools",
+      "source": "mcp/src/tools/manual.ts:262",
+      "definition": "extension/ai/tool-definitions.js:244",
+      "read_only": false,
+      "params": [
+        "selector",
+        "text",
+        "clear_first",
+        "tab_id",
+        "visual_reason",
+        "client",
+        "is_final"
+      ],
+      "required": [
+        "selector",
+        "text",
+        "visual_reason",
+        "client"
+      ]
+    },
+    {
+      "name": "upload_file",
+      "registered_by": "registerManualTools",
+      "source": "mcp/src/tools/manual.ts:262",
+      "definition": "extension/ai/tool-definitions.js:1426",
+      "read_only": false,
+      "params": [
+        "selector",
+        "file_path",
+        "tab_id",
+        "visual_reason",
+        "client",
+        "is_final"
+      ],
+      "required": [
+        "selector",
+        "file_path",
+        "visual_reason",
+        "client"
+      ]
+    },
+    {
+      "name": "use_payment_method",
+      "registered_by": "vault",
+      "source": "mcp/src/tools/vault.ts:105",
+      "definition": null,
+      "read_only": null,
+      "params": null,
+      "required": null
+    }
+  ],
+  "registry_entries_not_registered": [
+    "wait_for_element",
+    "wait_for_stable",
+    "report_progress"
+  ]
+}

@@ -4,11 +4,11 @@ The About page embeds the public 33-second FSB trailer (uploaded September 6, 20
 
 ## 1. Project Description
 
-FSB (Full Self-Browsing) is an open-source Chrome extension that automates the browser through natural language. You describe a task in plain English; FSB plans the clicks, types, and navigation to complete it. The extension runs in your browser with your own API keys, encrypted local storage, and opt-out anonymous usage telemetry for aggregate public stats only. Multi-model AI (xAI Grok, OpenAI, Anthropic Claude, Google Gemini, OpenRouter, LM Studio, custom OpenAI-compatible endpoints), 56 canonical browser tools, a 68-tool MCP surface, 142+ site-specific guides, reactive trigger watchers, real file uploads, and a 128-app native capability catalog for verified first-party API execution. Current release: FSB v0.9.92 (Chrome extension) with fsb-mcp-server 0.11.2 (npm MCP package).
+FSB (Full Self-Browsing) is an open-source Chrome extension that automates the browser through natural language. You describe a task in plain English; FSB plans the clicks, types, and navigation to complete it. The extension runs in your browser with your own API keys, encrypted local storage, and opt-out anonymous usage telemetry for aggregate public stats only. Multi-model AI (xAI Grok, OpenAI, Anthropic Claude, Google Gemini, OpenRouter, LM Studio, custom OpenAI-compatible endpoints), 56 canonical browser tools, a 69-tool MCP surface, 142+ site-specific guides, reactive trigger watchers, real file uploads, and a 128-app native capability catalog for verified first-party API execution. Current release: FSB v0.9.95 (Chrome extension) with fsb-mcp-server 0.11.5 (npm MCP package). On Online-Mind2Web, FSB's AI-reviewed result (277/300) is 92.3%; see the benchmark under Comparison.
 
 License: [MIT License](https://github.com/fullselfbrowsing/FSB/blob/main/LICENSE).
 
-FSB also works especially well as an MCP browser layer for AI agents. Claude Code, Codex, Cursor, VS Code, Windsurf, OpenClaw, Hermes, and other MCP clients can use FSB to operate a real Chrome browser, inspect page state, verify outcomes, and feed observations back into their own coding or autonomy loop.
+FSB also works especially well as an MCP browser layer for AI agents. Claude Code, Codex, Cursor, VS Code, Antigravity, OpenClaw, Hermes, and other MCP clients can use FSB to operate a real Chrome browser, inspect page state, verify outcomes, and feed observations back into their own coding or autonomy loop.
 
 FSB exists because the gap between "I want the browser to do X" and "I can write a deterministic script to do X" is wide and getting wider. Modern web apps are dynamic, login-gated, and visually rich; brittle selectors and recorded macros break the moment a page reflows. FSB closes that gap by letting an LLM read the live DOM, plan an action sequence against the user's actual logged-in browser session, execute each step with verification, and recover when something shifts. The user keeps full visibility through an orange-glow overlay on every targeted element and can pause, intervene, or hand off at any point.
 
@@ -40,7 +40,7 @@ The bring-your-own-key model is deliberate. The user picks the model -- frontier
 - Operator loop: every workflow can act on the page, observe what changed, verify the outcome, report errors, and recover when the web app shifts.
 - Reactive monitoring: arm a trigger watcher on one page element and get notified on value changes, thresholds, deltas, or regex matches instead of polling manually.
 
-### MCP tool surface (68 tools)
+### MCP tool surface (69 tools)
 - Navigation and tabs: navigate, search, refresh, go_back, go_forward, back, open_tab, close_tab, switch_tab, list_tabs
 - Clicking and pointer: click, double_click, right_click, hover, click_at, double_click_at, click_and_hold, drag, drag_drop, drag_variable_speed
 - Text and keyboard: type_text, insert_text, clear_input, press_key, press_enter, select_text_range, focus
@@ -109,7 +109,7 @@ No FSB API key is needed on this path -- the MCP client's model does the reasoni
 - Claude Desktop: `npx -y fsb-mcp-server@latest install --claude-desktop`
 - Cursor: `npx -y fsb-mcp-server@latest install --cursor`
 - VS Code: `npx -y fsb-mcp-server@latest install --vscode`
-- Windsurf: `npx -y fsb-mcp-server@latest install --windsurf`
+- Antigravity: `npx -y fsb-mcp-server@latest install --antigravity`
 - Codex: `npx -y fsb-mcp-server@latest install --codex`
 - All detected hosts: `npx -y fsb-mcp-server@latest install --all`
 
@@ -131,12 +131,12 @@ When FSB acts on an element, the page briefly outlines that element in orange. T
 After every action, FSB checks the DOM for expected post-conditions (URL change, element disappearance, text appearance). If verification fails, FSB does not silently continue -- it surfaces the failure and lets the planner choose between retry, alternate selector, or stop. This is the second load-bearing reliability mechanism: even when a click "succeeded" mechanically, FSB only counts the action as complete when the page state reflects the intended outcome.
 
 ### MCP server surface
-FSB exposes its tooling through a Model Context Protocol (MCP) server. External AI clients (Claude Desktop, Claude Code, Codex, Cursor, Windsurf, OpenClaw, and custom MCP clients) can drive FSB by speaking MCP, which lets agents orchestrate browser tasks without writing extension code. The MCP server is published to npm as `fsb-mcp-server` and runs as `npx -y fsb-mcp-server@latest`; it pairs with the running extension over a local WebSocket bridge.
+FSB exposes its tooling through a Model Context Protocol (MCP) server. External AI clients (Claude Desktop, Claude Code, Codex, Cursor, Antigravity, OpenClaw, and custom MCP clients) can drive FSB by speaking MCP, which lets agents orchestrate browser tasks without writing extension code. The MCP server is published to npm as `fsb-mcp-server` and runs as `npx -y fsb-mcp-server@latest`; it pairs with the running extension over a local WebSocket bridge.
 
 The MCP surface is the best way to use FSB with coding agents and external autonomy layers. FSB handles precise single-attempt browser execution, visual feedback, observability, and verification. Long-running scheduling and personality/identity decisions belong in the calling agent layer, such as OpenClaw or Claude Routines.
 
 ### OpenClaw skill
-FSB ships a dedicated OpenClaw + Hermes skill at `skills/fsb/` in the repo root. The skill is the canonical OpenClaw onboarding path: it runs the doctor flow against `fsb-mcp-server`, prints the OpenClaw stdio config block for the user to paste into OpenClaw's MCP config, and offers consent-gated install for any other MCP hosts detected on the same machine. The bare `--openclaw` flag in the FSB MCP installer stays manual / unsupported because OpenClaw's MCP config schema is still unstable across builds; the skill prints, the user pastes, no auto-write. Frontmatter ships with `name: fsb`, `version: 0.9.92`, `requires.bins: [node, npx]`, and `requires.env: []` so vault credentials never leave the FSB Chrome extension. The full marketing rundown (supported agents and hosts, MCP power story, skill features, one-line install command, grounded use cases, autopilot rules) lives at `https://full-selfbrowsing.com/agents`. Hermes users get the same skill: `node skills/fsb/scripts/print-hermes-yaml.mjs` prints the canonical `~/.hermes/config.yaml` `mcp_servers.fsb` block, and FSB v0.9.69 (PR #49) added `Hermes` to the v0.9.36 shared MCP client allowlist so action calls passing `client: "Hermes"` work without schema changes.
+FSB ships a dedicated OpenClaw + Hermes skill at `skills/fsb/` in the repo root. The skill is the canonical OpenClaw onboarding path: it runs the doctor flow against `fsb-mcp-server`, prints the OpenClaw stdio config block for the user to paste into OpenClaw's MCP config, and offers consent-gated install for any other MCP hosts detected on the same machine. The bare `--openclaw` flag in the FSB MCP installer stays manual / unsupported because OpenClaw's MCP config schema is still unstable across builds; the skill prints, the user pastes, no auto-write. Frontmatter ships with `name: fsb`, `version: 0.9.95`, `requires.bins: [node, npx]`, and `requires.env: []` so vault credentials never leave the FSB Chrome extension. The full marketing rundown (supported agents and hosts, MCP power story, skill features, one-line install command, grounded use cases, autopilot rules) lives at `https://full-selfbrowsing.com/agents`. Hermes users get the same skill: `node skills/fsb/scripts/print-hermes-yaml.mjs` prints the canonical `~/.hermes/config.yaml` `mcp_servers.fsb` block, and FSB v0.9.69 (PR #49) added `Hermes` to the v0.9.36 shared MCP client allowlist so action calls passing `client: "Hermes"` work without schema changes.
 
 ### ClawHub install path
 The /agents page exposes a one-click install on ClawHub at `https://clawhub.ai/lakshmanturlapati/full-selfbrowsing`. ClawHub is the recommended distribution surface for OpenClaw users who want the FSB skill registered without manually pasting stdio config. The skill source remains browsable at `https://github.com/fullselfbrowsing/FSB/tree/main/skills/fsb` for users who prefer reading before installing.
@@ -165,6 +165,29 @@ FSB ships 142+ hand-curated site-specific guides (Notion, Google Sheets, Workday
 ## 5. Comparison
 
 These are factual capability summaries, not endorsements. FSB has overlap and differentiation with each project; the right tool depends on what you need.
+
+### Online-Mind2Web benchmark
+
+Average success rates on [Online-Mind2Web](https://huggingface.co/spaces/osunlp/Online_Mind2Web_Leaderboard), with FSB included.
+
+| # | Agent | Average success rate |
+| ---: | --- | ---: |
+| 01 | Hark | 97.7% |
+| 02 | Navigator (n1.5) | 97.3% |
+| 03 | ACT-2 | 92.7% |
+| 04 | FSB | 92.3% |
+| 05 | Navigator (n1-preview) | 78.7% |
+| 06 | Google Computer Use | 69.0% |
+| 07 | Operator | 61.3% |
+| 08 | ACT-1 (Aug 2025) | 57.3% |
+| 09 | Claude Computer Use | 56.3% |
+| 10 | ACT-1 (Jul 2025) | 45.7% |
+
+FSB: AI-reviewed result (277/300). Other values are transcribed from the leaderboard. Evaluation methods differ; numerical placement is illustrative, not an official leaderboard ranking. Tested on FSB v0.9.92 · MCP v0.11.2.
+
+- **What is FSB's Online-Mind2Web result?** AI-reviewed result (277/300), shown as 92.3% in the top 10 chart on https://full-selfbrowsing.com.
+- **Which versions were tested?** FSB v0.9.92 (Chrome extension) with MCP v0.11.2.
+- **Where is the report?** https://github.com/fullselfbrowsing/FSB/blob/mind2web/mind2web/BENCHMARK-REPORT.md
 
 ### Browser Use
 Browser Use is an open-source library and CLI for headless browser automation driven by LLMs. It runs in Node.js and Python contexts and targets server-side automation pipelines. Overlap with FSB: natural-language task execution against a browser, action-verification loops, multi-model support. Difference from FSB: Browser Use is a server-side library, not a Chrome extension; it operates a headless Chromium instance the user does not see, while FSB drives the user's actual browser session with the user's logged-in cookies. If you are building a backend automation pipeline, Browser Use fits that shape; if you are sitting at your own browser and want to delegate clicks and forms inside that session, FSB fits that shape.

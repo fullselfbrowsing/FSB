@@ -1,0 +1,25 @@
+{
+  "name": "Online-Mind2Web",
+  "leaderboardUrl": "https://huggingface.co/spaces/osunlp/Online_Mind2Web_Leaderboard",
+  "reportUrl": "https://github.com/fullselfbrowsing/FSB/blob/mind2web/mind2web/BENCHMARK-REPORT.md",
+  "resultsUrl": "https://github.com/fullselfbrowsing/FSB/tree/mind2web/mind2web",
+  "fsb": {
+    "passed": 277,
+    "total": 300,
+    "extensionVersion": "0.9.92",
+    "mcpVersion": "0.11.2",
+    "published": "2026-10-22"
+  },
+  "leaderboard": [
+    { "name": "Hark", "score": 97.7 },
+    { "name": "Navigator (n1.5)", "score": 97.3 },
+    { "name": "ACT-2", "score": 92.7 },
+    { "name": "FSB", "score": 92.3, "fsb": true },
+    { "name": "Navigator (n1-preview)", "score": 78.7 },
+    { "name": "Google Computer Use", "score": 69.0 },
+    { "name": "Operator", "score": 61.3 },
+    { "name": "ACT-1 (Aug 2025)", "score": 57.3 },
+    { "name": "Claude Computer Use", "score": 56.3 },
+    { "name": "ACT-1 (Jul 2025)", "score": 45.7 }
+  ]
+}

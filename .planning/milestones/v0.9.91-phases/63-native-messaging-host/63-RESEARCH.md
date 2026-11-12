@@ -1,7 +1,7 @@
 # Phase 63: Native-Messaging Host — Research
 
-**Researched:** 2026-07-16 [VERIFIED: local environment date and Phase 63 context metadata]  
-**Overall confidence:** HIGH for repository architecture and Chrome protocol; MEDIUM for release packaging until a Windows launcher artifact is designed and exercised. [VERIFIED: repository inspection] [CITED: https://developer.chrome.com/docs/extensions/develop/concepts/native-messaging] [CITED: https://chromium.googlesource.com/chromium/src/+/57c3662e332095c8e7d98255d86e29d3a86c530c/chrome/browser/extensions/api/messaging/native_process_launcher_win.cc]  
+**Researched:** 2026-07-16 [VERIFIED: local environment date and Phase 63 context metadata]
+**Overall confidence:** HIGH for repository architecture and Chrome protocol; MEDIUM for release packaging until a Windows launcher artifact is designed and exercised. [VERIFIED: repository inspection] [CITED: https://developer.chrome.com/docs/extensions/develop/concepts/native-messaging] [CITED: https://chromium.googlesource.com/chromium/src/+/57c3662e332095c8e7d98255d86e29d3a86c530c/chrome/browser/extensions/api/messaging/native_process_launcher_win.cc]
 **Scope:** Planning research and deterministic validation design only; genuine OS, Chrome, native-host, and accessibility UAT is deferred. [VERIFIED: `.planning/phases/63-native-messaging-host/63-CONTEXT.md`]
 
 <user_constraints>

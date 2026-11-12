@@ -1,205 +1,148 @@
-// utils/diagnostics-ring-buffer.js -- FSB Phase 211-03 diagnostic ring buffer.
-// FIFO 100 entries persisted to chrome.storage.local.fsb_diagnostics_ring.
-// Entry shape (D-09):
-//   { ts, level, prefix, category, message, redactedContext: { origin?, lengths?, statusCode?, kind? } }
-//
-// Phase 211 ships back-end only (D-08). Phase 213 wires the Sync tab "Export
-// diagnostics" button to chrome.runtime.sendMessage({ action: 'exportDiagnostics' })
-// which background.js handles by calling getDiagnosticEntries({ clear?: true }).
-
+// utils/diagnostics-ring-buffer.js -- storage-free diagnostic client/ring.
+// Durable writes are delegated to the background-owned trusted feature store.
 (function() {
   'use strict';
 
   var STORAGE_KEY = 'fsb_diagnostics_ring';
   var MAX_ENTRIES = 100;
-  var MAX_CONTEXT_DEPTH = 4;
-  var MAX_OBJECT_KEYS = 20;
-  var MAX_ARRAY_ITEMS = 100;
+  var DIAGNOSTIC_APPEND = 'fsb:diagnostic-append';
+  var DIAGNOSTIC_GET = 'fsb:diagnostic-get';
   var FSB_BRIDGE_SECRET_PATTERN = /fsb-auth\.[A-Za-z0-9_-]{43}(?![A-Za-z0-9_-])/g;
   var FSB_BRIDGE_SECRET_REPLACEMENT = '[REDACTED_FSB_BRIDGE_SECRET]';
-
-  // In-memory shadow for synchronous appends; reconciled with chrome.storage on every write.
   var _inMemoryRing = [];
 
-  function _redactBridgeSecretString(value) {
-    if (typeof value !== 'string') return value;
+  function _redactBridgeSecrets(value) {
+    var text = String(value === undefined || value === null ? '' : value);
     try {
-      var shared = (typeof globalThis !== 'undefined')
-        ? globalThis.redactBridgeSecretsInString : null;
+      var shared = typeof globalThis !== 'undefined'
+        ? globalThis.redactBridgeSecretsInString
+        : null;
       if (typeof shared === 'function') {
-        var sharedResult = shared(value);
+        var sharedResult = shared(text);
         if (typeof sharedResult === 'string') return sharedResult;
       }
-    } catch (e) { /* use the private fallback */ }
-    return value.replace(FSB_BRIDGE_SECRET_PATTERN, FSB_BRIDGE_SECRET_REPLACEMENT);
+    } catch (_error) {
+      // Fall through to the private fail-closed scrubber.
+    }
+    return text.replace(FSB_BRIDGE_SECRET_PATTERN, FSB_BRIDGE_SECRET_REPLACEMENT);
   }
 
-  function _shapeSafeValue(value) {
-    if (Array.isArray(value)) return { kind: 'array', length: value.length };
-    if (value && typeof value === 'object') {
-      try {
-        return { kind: 'object', keys: Math.min(Object.keys(value).length, MAX_OBJECT_KEYS) };
-      } catch (e) {
-        return { kind: 'object', keys: 0 };
-      }
-    }
-    if (value === null || value === undefined) return { kind: 'empty' };
-    return { kind: typeof value };
+  function _redactText(value, maxChars) {
+    return _redactBridgeSecrets(value)
+      .replace(/\bBearer\s+[A-Za-z0-9._~+\/-]+/gi, '[redacted]')
+      .replace(/\b(?:sk|pk)_(?:live|test)_[A-Za-z0-9_-]+/gi, '[redacted]')
+      .replace(/\b(?:api[_ -]?key|access[_ -]?token|authorization)\s*[:=]\s*[^\s,;]+/gi, '[redacted]')
+      .slice(0, maxChars);
   }
 
-  function _sanitizeDiagnosticValue(value, depth) {
-    if (typeof value === 'string') return _redactBridgeSecretString(value);
-    if (typeof value === 'number' || typeof value === 'boolean' || value === null) return value;
-    if (value === undefined) return { kind: 'empty' };
-    if (typeof value !== 'object') return _shapeSafeValue(value);
-
-    if (value instanceof Error) {
-      return {
-        kind: 'error',
-        name: _redactBridgeSecretString(String(value.name || 'Error')),
-        message: _redactBridgeSecretString(String(value.message || ''))
-      };
-    }
-
-    if (depth >= MAX_CONTEXT_DEPTH) return _shapeSafeValue(value);
-
-    if (Array.isArray(value)) {
-      return value.slice(0, MAX_ARRAY_ITEMS).map(function(item) {
-        return _sanitizeDiagnosticValue(item, depth + 1);
+  function _safeContext(value) {
+    var input = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+    var safe = {};
+    if (typeof input.origin === 'string') safe.origin = _redactText(input.origin, 256);
+    if (Number.isFinite(Number(input.statusCode))) safe.statusCode = Number(input.statusCode);
+    if (typeof input.kind === 'string') safe.kind = _redactText(input.kind, 64);
+    if (input.lengths && typeof input.lengths === 'object' && !Array.isArray(input.lengths)) {
+      safe.lengths = {};
+      Object.keys(input.lengths).slice(0, 8).forEach(function(key) {
+        if (/^[A-Za-z][A-Za-z0-9_-]{0,31}$/.test(key) && Number.isFinite(Number(input.lengths[key]))) {
+          safe.lengths[key] = Number(input.lengths[key]);
+        }
       });
     }
-
-    var result = {};
-    var keys;
-    try {
-      keys = Object.keys(value).slice(0, MAX_OBJECT_KEYS);
-    } catch (e) {
-      return { kind: 'object', keys: 0 };
-    }
-    for (var i = 0; i < keys.length; i++) {
-      var rawKey = keys[i];
-      var safeKey = _redactBridgeSecretString(rawKey);
-      try {
-        result[safeKey] = _sanitizeDiagnosticValue(value[rawKey], depth + 1);
-      } catch (e) {
-        result[safeKey] = { kind: 'unavailable' };
-      }
-    }
-    return result;
+    return safe;
   }
 
-  function _makeSafeEntry(entry) {
-    var whitelisted = {
-      ts: typeof entry.ts === 'number' ? entry.ts : Date.now(),
-      level: String(entry.level || 'warn'),
-      prefix: String(entry.prefix || ''),
-      category: String(entry.category || ''),
-      message: String(entry.message || ''),
-      redactedContext: (entry.redactedContext && typeof entry.redactedContext === 'object')
-        ? entry.redactedContext : {}
-    };
+  function _safeEntry(entry) {
+    if (!entry || typeof entry !== 'object') return null;
     return {
-      ts: whitelisted.ts,
-      level: _redactBridgeSecretString(whitelisted.level),
-      prefix: _redactBridgeSecretString(whitelisted.prefix),
-      category: _redactBridgeSecretString(whitelisted.category),
-      message: _redactBridgeSecretString(whitelisted.message),
-      redactedContext: _sanitizeDiagnosticValue(whitelisted.redactedContext, 0)
+      ts: typeof entry.ts === 'number' ? entry.ts : Date.now(),
+      level: _redactText(entry.level || 'warn', 16),
+      prefix: _redactText(entry.prefix || '', 48),
+      category: _redactText(entry.category || '', 64),
+      message: _redactText(entry.message || '', 512),
+      redactedContext: _safeContext(entry.redactedContext)
     };
   }
 
-  function _hasChromeStorage() {
-    return typeof chrome !== 'undefined'
-      && chrome.storage
-      && chrome.storage.local
-      && typeof chrome.storage.local.get === 'function'
-      && typeof chrome.storage.local.set === 'function';
+  function _trustedStore() {
+    var store = typeof globalThis !== 'undefined' ? globalThis.fsbTrustedLocalFeatureStore : null;
+    return store && typeof store === 'object' ? store : null;
+  }
+
+  function _sendFixed(message) {
+    if (typeof chrome === 'undefined' || !chrome.runtime || typeof chrome.runtime.sendMessage !== 'function') {
+      return Promise.resolve(null);
+    }
+    return new Promise(function(resolve) {
+      try {
+        chrome.runtime.sendMessage(message, function(response) {
+          if (chrome.runtime.lastError) {
+            resolve(null);
+            return;
+          }
+          resolve(response || null);
+        });
+      } catch (_error) {
+        resolve(null);
+      }
+    });
   }
 
   function appendDiagnosticEntry(entry) {
-    if (!entry || typeof entry !== 'object') return Promise.resolve();
-    // Defensive copy with explicit field whitelist to prevent accidental disclosure.
-    var safe = _makeSafeEntry(entry);
+    var safe = _safeEntry(entry);
+    if (!safe) return Promise.resolve();
     _inMemoryRing.push(safe);
     if (_inMemoryRing.length > MAX_ENTRIES) {
-      _inMemoryRing.splice(0, _inMemoryRing.length - MAX_ENTRIES); // FIFO trim
+      _inMemoryRing.splice(0, _inMemoryRing.length - MAX_ENTRIES);
     }
-    if (!_hasChromeStorage()) {
-      return Promise.resolve();
+
+    var store = _trustedStore();
+    if (store && typeof store.appendDiagnosticEntry === 'function') {
+      return Promise.resolve(store.appendDiagnosticEntry(safe)).then(function() {}, function() {});
     }
-    return new Promise(function(resolve) {
-      try {
-        chrome.storage.local.get([STORAGE_KEY], function(stored) {
-          var ring = (stored && Array.isArray(stored[STORAGE_KEY])) ? stored[STORAGE_KEY] : [];
-          ring = ring.filter(function(item) {
-            return item && typeof item === 'object';
-          }).map(_makeSafeEntry);
-          ring.push(safe);
-          if (ring.length > MAX_ENTRIES) {
-            ring = ring.slice(ring.length - MAX_ENTRIES);
-          }
-          var update = {};
-          update[STORAGE_KEY] = ring;
-          chrome.storage.local.set(update, function() {
-            // chrome.runtime.lastError is best-effort; no throw, no log spam.
-            resolve();
-          });
-        });
-      } catch (e) {
-        resolve();
-      }
-    });
+    return _sendFixed({ action: DIAGNOSTIC_APPEND, entry: safe }).then(function() {});
   }
 
-  function getDiagnosticEntries(opts) {
-    var shouldClear = !!(opts && opts.clear === true);
-    if (!_hasChromeStorage()) {
-      var snap = _inMemoryRing.slice();
-      if (shouldClear) {
-        _inMemoryRing = [];
-        return Promise.resolve({ entries: snap, clearedAt: Date.now() });
-      }
-      return Promise.resolve({ entries: snap });
-    }
-    return new Promise(function(resolve) {
+  async function getDiagnosticEntries(options) {
+    var clear = !!(options && options.clear === true);
+    var store = _trustedStore();
+    if (store && typeof store.getDiagnosticEntries === 'function') {
       try {
-        chrome.storage.local.get([STORAGE_KEY], function(stored) {
-          var ring = (stored && Array.isArray(stored[STORAGE_KEY])) ? stored[STORAGE_KEY] : [];
-          ring = ring.filter(function(item) {
-            return item && typeof item === 'object';
-          }).map(_makeSafeEntry);
-          if (!shouldClear) {
-            resolve({ entries: ring });
-            return;
-          }
-          var update = {};
-          update[STORAGE_KEY] = [];
-          chrome.storage.local.set(update, function() {
-            _inMemoryRing = [];
-            resolve({ entries: ring, clearedAt: Date.now() });
-          });
-        });
-      } catch (e) {
-        resolve({ entries: _inMemoryRing.slice() });
+        return await store.getDiagnosticEntries({ clear: clear });
+      } catch (_error) {
+        // The in-memory ring below is the bounded fail-quiet fallback.
       }
-    });
+    } else {
+      var remote = await _sendFixed({ action: DIAGNOSTIC_GET, clear: clear });
+      if (remote && remote.ok === true && Array.isArray(remote.entries)) {
+        return {
+          entries: remote.entries,
+          ...(clear && Number.isFinite(remote.clearedAt) ? { clearedAt: remote.clearedAt } : {})
+        };
+      }
+    }
+
+    var snapshot = _inMemoryRing.slice();
+    if (clear) {
+      _inMemoryRing = [];
+      return { entries: snapshot, clearedAt: Date.now() };
+    }
+    return { entries: snapshot };
   }
 
-  // Test hook: reset the in-memory ring (used by tests/diagnostics-ring-buffer.test.js).
   function _resetRing() {
     _inMemoryRing = [];
   }
 
-  if (typeof globalThis !== 'undefined') {
-    globalThis.fsbDiagnostics = {
-      append: appendDiagnosticEntry,
-      get: getDiagnosticEntries,
-      _reset: _resetRing,
-      STORAGE_KEY: STORAGE_KEY,
-      MAX_ENTRIES: MAX_ENTRIES
-    };
-  }
+  var api = {
+    append: appendDiagnosticEntry,
+    get: getDiagnosticEntries,
+    _reset: _resetRing,
+    STORAGE_KEY: STORAGE_KEY,
+    MAX_ENTRIES: MAX_ENTRIES
+  };
 
+  if (typeof globalThis !== 'undefined') globalThis.fsbDiagnostics = api;
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
       appendDiagnosticEntry: appendDiagnosticEntry,

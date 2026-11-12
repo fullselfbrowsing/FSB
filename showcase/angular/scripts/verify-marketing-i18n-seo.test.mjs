@@ -21,6 +21,8 @@ function fixture(page = 'home') {
     ['site.name', 'FSB - Full Self-Browsing'],
     ['home.hero.subtitle', translated],
     ['home.schema.description', 'Automatización local del navegador con FSB.'],
+    ['home.schema.benchmark.name', 'FSB en Online-Mind2Web: los 10 mejores agentes por tasa de éxito promedio'],
+    ['home.schema.benchmark.description', 'Tasas de éxito promedio en Online-Mind2Web, con FSB incluido. FSB: resultado revisado por IA (277/300), 92,3 %.'],
     ['support.schema.faq.install.q', '¿Cómo instalo FSB?'],
     ['support.schema.faq.install.a', 'Instala FSB desde Chrome Web Store.'],
   ]);
@@ -35,7 +37,10 @@ function fixture(page = 'home') {
   ];
   let body;
   if (page === 'home') {
-    graph.push({ '@type': 'SoftwareApplication', '@id': `${HOST}/#software`, url: HOST, name: 'FSB', description: catalog.get('home.schema.description') });
+    graph.push(
+      { '@type': 'SoftwareApplication', '@id': `${HOST}/#software`, url: HOST, name: 'FSB', description: catalog.get('home.schema.description'), subjectOf: { '@id': `${HOST}/#online-mind2web` } },
+      { '@type': 'Dataset', '@id': `${HOST}/#online-mind2web`, name: catalog.get('home.schema.benchmark.name'), description: catalog.get('home.schema.benchmark.description'), about: { '@id': `${HOST}/#software` } },
+    );
     body = `<h1 translate="no">Full <span class="highlight">Self</span>-Browsing</h1><p class="hero-subtitle">${translated}</p>`;
   } else {
     context.mainEntity = [{ '@type': 'Question', name: catalog.get('support.schema.faq.install.q'), acceptedAnswer: { '@type': 'Answer', text: catalog.get('support.schema.faq.install.a') } }];
@@ -116,4 +121,16 @@ test('validates both FAQ question and answer parity against visible text and cat
   const value = fixture('support');
   value.options.catalog.set('support.schema.faq.install.a', 'Texto actualizado que aún no se muestra.');
   assert.throws(() => verify(value), /catalog FAQ answer/);
+});
+
+test('rejects a home benchmark dataset that drifts from the catalog or loses its software link', () => {
+  const drifted = fixture();
+  drifted.graph.find(node => node['@type'] === 'Dataset').description = 'FSB: 99%.';
+  assert.throws(() => verify(drifted), /benchmark description/);
+  const orphaned = fixture();
+  delete orphaned.graph.find(node => node['@type'] === 'SoftwareApplication').subjectOf;
+  assert.throws(() => verify(orphaned), /software links its benchmark/);
+  const missing = fixture();
+  missing.graph.splice(missing.graph.findIndex(node => node['@type'] === 'Dataset'), 1);
+  assert.throws(() => verify(missing), /benchmark dataset: expected exactly one/);
 });

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Enable microphone for FSB</title>
+  <title data-i18n="entry_mic_title">Enable microphone for FSB</title>
   <style>
     :root {
       color-scheme: light dark;
@@ -150,31 +150,35 @@
   <main>
     <div class="brand">
       <img src="../assets/icon128.png" alt="">
-      <span>FSB voice input</span>
+      <span data-i18n="entry_mic_brand">FSB voice input</span>
     </div>
 
-    <h1>Enable your microphone</h1>
-    <p class="intro">
+    <h1 data-i18n="entry_mic_h">Enable your microphone</h1>
+    <p class="intro" data-i18n="entry_mic_intro">
       Chrome requires the first microphone approval in a regular extension tab.
       After that, voice input works from the FSB side panel on every website.
     </p>
 
     <div class="instruction">
-      In Chrome’s prompt, choose <strong>Allow while visiting</strong> for a persistent FSB grant.
+      <span data-i18n="entry_mic_instruction_lead">In Chrome’s prompt, choose</span>
+      <strong data-i18n="entry_mic_instruction_action">Allow while visiting</strong>
+      <span data-i18n="entry_mic_instruction_tail">for a persistent FSB grant.</span>
     </div>
 
-    <p id="status" role="status" aria-live="polite">Waiting for Chrome’s microphone prompt…</p>
+    <p id="status" role="status" aria-live="polite" data-i18n="entry_mic_waiting">Waiting for Chrome’s microphone prompt…</p>
 
     <div class="actions">
-      <button id="allowMicBtn" type="button">Allow microphone</button>
-      <button id="openSettingsBtn" class="hidden" type="button">Open microphone settings</button>
+      <button id="allowMicBtn" type="button" data-i18n="entry_mic_allow">Allow microphone</button>
+      <button id="openSettingsBtn" class="hidden" type="button" data-i18n="entry_mic_settings">Open microphone settings</button>
     </div>
 
-    <p class="footnote">
+    <p class="footnote" data-i18n="entry_mic_footnote">
       This permission belongs to the FSB extension—not to the website in your active tab.
     </p>
   </main>
 
+  <script src="../utils/ui-locale.js"></script>
   <script src="microphone-permission.js"></script>
+  <script src="ui-locale-page.js"></script>
 </body>
 </html>

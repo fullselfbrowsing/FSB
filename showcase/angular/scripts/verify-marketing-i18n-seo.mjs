@@ -133,6 +133,12 @@ export function verifyPage({ html, locale, page, catalog, reviewedCopy, locales,
     assert.equal(software.url, HOST, `${label}: shared software URL`);
     assert.equal(software.name, 'FSB', `${label}: literal software brand`);
     assert.equal(software.description, expected('home.schema.description'), `${label}: software description`);
+    const dataset = one(graph.filter(node => node['@type'] === 'Dataset'), `${label}: benchmark dataset`);
+    assert.equal(dataset['@id'], `${HOST}/#online-mind2web`, `${label}: stable benchmark identity`);
+    assert.equal(dataset.name, expected('home.schema.benchmark.name'), `${label}: benchmark name`);
+    assert.equal(dataset.description, expected('home.schema.benchmark.description'), `${label}: benchmark description`);
+    assert.equal(dataset.about?.['@id'], software['@id'], `${label}: benchmark is about the software`);
+    assert.equal(software.subjectOf?.['@id'], dataset['@id'], `${label}: software links its benchmark`);
   } else if (page === 'agents') {
     const software = one(graph.filter(node => node['@type'] === 'SoftwareApplication'), `${label}: skill`);
     assert.equal(software['@id'], `${HOST}/agents#fsb-skill`, `${label}: stable skill identity`);

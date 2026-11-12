@@ -411,63 +411,284 @@
   color: var(--primary);
 }
 
-/* --- Features Grid --- */
+/* --- Features: Online-Mind2Web leaderboard --- */
+/* The dot grid covers the whole section and the chart card sits on it as a solid
+   panel, so the bars read against plain background rather than the pattern. */
 .features {
+  background-color: var(--bg-body);
+  background-image: radial-gradient(circle, color-mix(in srgb, var(--text-muted) 22%, transparent) 1px, transparent 1.2px);
+  background-size: 18px 18px;
+}
+
+.features .section-header a {
+  color: var(--primary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.lb {
+  --lb-cols: 28px minmax(84px, 190px) minmax(0, 1fr);
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 28px clamp(16px, 3vw, 36px) 24px;
   background: var(--bg-body);
-}
-
-.features-grid {
-  column-count: 4;
-  column-gap: 24px;
-}
-
-.feature-card {
-  background: var(--bg-card);
   border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  padding: 32px 28px;
-  transition: all var(--transition-base);
-  break-inside: avoid;
-  margin-bottom: 24px;
-  display: grid;
-  grid-template-columns: auto 1fr;
-  column-gap: 14px;
-  align-items: center;
-  /* Hover lift uses top, not transform: transforming a multicol child makes
-     Chromium re-composite the fragmented box and the card blinks out. */
-  position: relative;
-  top: 0;
+  border-radius: var(--radius-lg);
 }
 
-.feature-card:hover {
-  border-color: var(--border-hover);
-  top: -4px;
-  box-shadow: var(--shadow-md);
-}
-
-.feature-icon {
-  width: 34px;
-  height: 34px;
+.lb-head {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.lb-head-titles {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.lb-source {
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  background: rgba(255, 107, 53, 0.1);
-  border-radius: var(--radius-sm);
-  margin-bottom: 0;
-  font-size: 0.95rem;
+  gap: 6px;
+  font-family: 'SF Mono', 'Monaco', 'Roboto Mono', monospace;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+
+.lb-source:hover {
   color: var(--primary);
 }
 
-.feature-card h3 {
-  font-size: 1.125rem;
-  margin-bottom: 0;
+.lb-source i {
+  font-size: 0.65rem;
 }
 
-.feature-card p {
-  font-size: 0.9rem;
+.lb-title {
+  font-size: 1.35rem;
   line-height: 1.6;
-  grid-column: 1 / -1;
-  margin-top: 12px;
+  margin: 0;
+}
+
+.lb-metric {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.lb-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.lb-row,
+.lb-axis {
+  display: grid;
+  grid-template-columns: var(--lb-cols);
+  gap: 14px;
+}
+
+.lb-row {
+  align-items: center;
+  padding: 7px 10px;
+  border-radius: 8px;
+}
+
+.lb-row-fsb {
+  background: rgba(255, 107, 53, 0.07);
+}
+
+.lb-rank {
+  font-family: 'SF Mono', 'Monaco', 'Roboto Mono', monospace;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.lb-name {
+  text-align: right;
+  font-size: 0.9rem;
+  font-weight: 500;
+  line-height: 1.25;
+  color: var(--text-primary);
+  text-wrap: balance;
+}
+
+/* Doubled class: .fsb-highlight-wordmark is declared further down and would win a tie. */
+.fsb-highlight-wordmark.lb-wordmark {
+  font-size: 1.25rem;
+}
+
+/* Gridlines every 20%; the right margin leaves room for the value label past a full bar. */
+.lb-track {
+  position: relative;
+  height: 26px;
+  margin-right: 64px;
+  background-image: linear-gradient(to right, var(--border-color) 1px, transparent 1px);
+  background-size: 20% 100%;
+}
+
+.lb-bar {
+  position: absolute;
+  left: 0;
+  top: 4px;
+  bottom: 4px;
+  width: var(--lb-score);
+  border-radius: 0 4px 4px 0;
+  background: rgba(148, 163, 184, 0.38);
+}
+
+.lb-value {
+  position: absolute;
+  top: 50%;
+  left: calc(var(--lb-score) + 8px);
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'SF Mono', 'Monaco', 'Roboto Mono', monospace;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.lb-row-fsb .lb-rank,
+.lb-row-fsb .lb-value {
+  color: #e04e12;
+}
+
+.lb-row-fsb .lb-value {
+  font-weight: 700;
+}
+
+.lb-row-fsb .lb-bar {
+  overflow: hidden;
+  background: linear-gradient(135deg, #e04e12, #f26a1b);
+  box-shadow: 0 0 18px var(--primary-glow);
+  animation: lbGlow 3.2s ease-in-out infinite;
+}
+
+/* Rests off the bar's left edge, so reduced motion shows a plain bar. */
+.lb-shine {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 35%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+  transform: translateX(-120%);
+  animation: lbShimmer 3.2s ease-in-out infinite;
+}
+
+.lb-trend {
+  font-size: 0.95rem;
+  animation: lbRise 1.8s ease-in-out infinite;
+}
+
+.lb-axis {
+  padding: 6px 10px 0;
+}
+
+.lb-scale {
+  grid-column: 3;
+  position: relative;
+  height: 18px;
+  margin-right: 64px;
+  font-family: 'SF Mono', 'Monaco', 'Roboto Mono', monospace;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.lb-tick {
+  position: absolute;
+  transform: translateX(-50%);
+}
+
+.lb-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-color);
+}
+
+.lb-notes p {
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.lb-notes a {
+  color: var(--primary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.lb-notes .lb-tested {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin-top: 6px;
+  font-family: 'SF Mono', 'Monaco', 'Roboto Mono', monospace;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.lb-tagline {
+  font-style: italic;
+}
+
+.lb-wink {
+  color: var(--primary);
+  font-weight: 700;
+}
+
+@keyframes lbGlow {
+  0%,
+  100% {
+    box-shadow: 0 0 14px var(--primary-glow);
+  }
+
+  50% {
+    box-shadow: 0 0 26px var(--primary-glow);
+  }
+}
+
+@keyframes lbShimmer {
+  0% {
+    transform: translateX(-120%);
+  }
+
+  55%,
+  100% {
+    transform: translateX(320%);
+  }
+}
+
+@keyframes lbRise {
+  0%,
+  100% {
+    transform: translateY(1px);
+    opacity: 0.75;
+  }
+
+  50% {
+    transform: translateY(-3px);
+    opacity: 1;
+  }
 }
 
 /* --- Competitor Comparison --- */
@@ -1244,7 +1465,10 @@
   .cue-text,
   .cue-line,
   .install-mark.is-morphing .install-glyph,
-  .cap-track {
+  .cap-track,
+  .lb-row-fsb .lb-bar,
+  .lb-shine,
+  .lb-trend {
     animation: none;
   }
 
@@ -1266,10 +1490,6 @@
 
 /* --- Responsive --- */
 @media (max-width: 1024px) {
-  .features-grid {
-    column-count: 3;
-  }
-
   .eng {
     grid-template-columns: 1fr;
   }
@@ -1325,10 +1545,6 @@
     display: none;
   }
 
-  .features-grid {
-    column-count: 2;
-  }
-
   .competitors-row {
     grid-template-columns: repeat(2, 1fr);
     gap: 12px;
@@ -1347,10 +1563,6 @@
     flex-direction: column;
     text-align: center;
     align-items: center;
-  }
-
-  .feature-card {
-    padding: 24px 20px;
   }
 
   /* Four glyphs in one row outgrow the flow's side column below ~700px. */
@@ -1395,13 +1607,34 @@
   .eng-flow {
     grid-template-columns: minmax(0, 1fr) 28px minmax(0, 1fr) 28px minmax(0, 1fr);
   }
+
+  /* Side by side, the name column keeps up to 190px and the bar column ends up
+     narrower than its 64px label gutter, so every bar collapses to nothing.
+     Stacking each bar under its name gives it the full card width. */
+  .lb {
+    --lb-cols: 22px minmax(0, 1fr);
+  }
+
+  .lb-row,
+  .lb-axis {
+    column-gap: 10px;
+  }
+
+  .lb-row {
+    row-gap: 2px;
+  }
+
+  .lb-name {
+    text-align: left;
+  }
+
+  .lb-track,
+  .lb-scale {
+    grid-column: 2;
+  }
 }
 
 @media (max-width: 480px) {
-  .features-grid {
-    column-count: 1;
-  }
-
   .competitors-row {
     grid-template-columns: 1fr;
   }

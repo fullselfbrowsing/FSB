@@ -24,11 +24,12 @@
  *     3.4 setIdleState(tabA) clears tabA's entry without touching active-tab state
  *     3.5 getCurrentTabRunningState() returns the active tab's snapshot
  *
- *   Part 4 (QT-93i-02 chrome.tabs.onActivated re-sync + completion routing)
- *     4.1 chrome.tabs.onActivated handler re-resolves _activeTabIdSnapshot
- *     4.2 Switching from working tab A to idle tab B leaves tab A's running entry intact
- *     4.3 automationComplete with request.tabId=X calls setIdleState(X) (per-tab routing)
- *     4.4 session_ended with request.tabId=X resolves the entry before flipping idle
+ *   Part 4 (QT-93i-02 unified active-tab synchronization + completion routing)
+ *     4.1 chrome.tabs.onActivated delegates its exact identity to syncActiveTabSurface
+ *     4.2 A changed tab is committed before its single Skopeo activation
+ *     4.3 Every asynchronous surface phase is fenced by the sync generation
+ *     4.4 The synchronized tab restores its per-tab running state
+ *     4.5 automationComplete/session_ended route idle state by originating tab
  *
  *   Part 5 (API automation presentation survives delegation hydration)
  *     5.1 API running -> null delegation hydration keeps Working + runner + Stop
@@ -405,42 +406,60 @@ function runPart3() {
 }
 
 // =====================================================================
-// PART 4 -- chrome.tabs.onActivated re-sync + completion routing
+// PART 4 -- unified active-tab synchronization + completion routing
 // =====================================================================
 
 function runPart4() {
-  console.log('\nPart 4 -- chrome.tabs.onActivated re-sync + completion routing:');
+  console.log('\nPart 4 -- unified active-tab synchronization + completion routing:');
 
   // 4.1 -- activation passes Chrome's exact tab/window identity into the
   // unified synchronizer, which commits the incoming tab snapshot.
   var exactActivation = /chrome\.tabs\.onActivated\.addListener[\s\S]*?syncActiveTabSurface\(activeInfo\.tabId, activeInfo\.windowId\)/.test(spSrc);
-  var syncCommitsTab = /async function syncActiveTabSurface[\s\S]*?_activeTabIdSnapshot\s*=\s*incomingTabId/.test(spSrc);
-  ok(exactActivation && syncCommitsTab,
+  var syncBody = extractAfterAnchor(spSrc, 'async function syncActiveTabSurface(tabId, windowId) {');
+  ok(exactActivation && syncBody !== null,
      'Part 4.1 -- activation sends exact tab identity to the unified synchronizer');
 
-  // 4.2 -- the same handler dispatches setRunningState OR setIdleState
-  // based on the activated tab's per-tab entry.
-  var dispatchesSetRunning = /if \(snap\.isRunning\) setRunningState\(incomingTabId/.test(spSrc);
-  var dispatchesSetIdle = /else setIdleState\(incomingTabId\)/.test(spSrc);
-  ok(dispatchesSetRunning && dispatchesSetIdle,
-     'Part 4.2 -- handler dispatches setRunningState/setIdleState based on per-tab entry on activation');
+  if (syncBody) {
+    var commitIndex = syncBody.indexOf('_activeTabIdSnapshot = incomingTabId');
+    var activationIndex = syncBody.indexOf('FSBSkopeoSidepanelController.activateTab(incomingTabId)');
+    var ownerRefreshIndex = syncBody.indexOf('await refreshActiveTabOwnership(incomingTabId, syncGeneration)');
+    var activationSites = (syncBody.match(/FSBSkopeoSidepanelController\.activateTab\(incomingTabId\)/g) || []).length;
+    var activationIsChangeGated = /if \(tabChanged\) \{[\s\S]*?FSBSkopeoSidepanelController[\s\S]*?\.activateTab\(incomingTabId\)/.test(syncBody);
+    ok(commitIndex !== -1 && activationIndex > commitIndex && ownerRefreshIndex > activationIndex
+       && activationSites === 1 && activationIsChangeGated,
+       'Part 4.2 -- each changed tab is committed before its one Skopeo activation');
 
-  // 4.3 -- automationComplete routes setIdleState by originating tabId.
+    var generationFences = (syncBody.match(/syncGeneration !== _activeTabSurfaceSyncGeneration/g) || []).length;
+    var fencesOwnerRefresh = /await refreshActiveTabOwnership\([^;]+;\s*if \(syncGeneration !== _activeTabSurfaceSyncGeneration\) return false;/.test(syncBody);
+    var fencesConversationSwap = /await swapToTabConversation\([^;]+;\s*if \(syncGeneration !== _activeTabSurfaceSyncGeneration\) return false;/.test(syncBody);
+    var fencesHydration = /await _hydrateDelegationForSelectedConversation\(\);[^\n]*\n\s*if \(syncGeneration !== _activeTabSurfaceSyncGeneration\) return false;/.test(syncBody);
+    ok(generationFences >= 6 && fencesOwnerRefresh && fencesConversationSwap && fencesHydration,
+       'Part 4.3 -- ownership, conversation, status, and hydration phases are generation fenced');
+  }
+
+  // 4.4 -- the synchronizer dispatches setRunningState OR setIdleState
+  // based on the committed tab's per-tab entry.
+  var dispatchesSetRunning = /if \(snap\.isRunning\) setRunningState\(incomingTabId/.test(syncBody || '');
+  var dispatchesSetIdle = /else setIdleState\(incomingTabId\)/.test(syncBody || '');
+  ok(dispatchesSetRunning && dispatchesSetIdle,
+     'Part 4.4 -- synchronizer restores running or idle state for the committed tab');
+
+  // 4.5 -- automationComplete routes setIdleState by originating tabId.
   var caseBody = extractAfterAnchor(spSrc, "case 'automationComplete': {");
   ok(caseBody !== null,
-     'Part 4.3a -- case automationComplete body extractable');
+     'Part 4.5a -- case automationComplete body extractable');
   if (caseBody) {
     var derivesOriginating = /var originatingTabId = \(typeof request\.tabId === 'number'\)/.test(caseBody);
     var routesIdle = /setIdleState\(originatingTabId\)/.test(caseBody);
     ok(derivesOriginating && routesIdle,
-       'Part 4.3b -- automationComplete derives originatingTabId from request.tabId + calls setIdleState(originatingTabId)');
+       'Part 4.5b -- automationComplete derives originatingTabId from request.tabId + calls setIdleState(originatingTabId)');
   }
 
-  // 4.4 -- session_ended branch routes by session_endedTabId.
+  // 4.6 -- session_ended branch routes by session_endedTabId.
   var hasSessionEndedRouted = /var sessionEndedTabId = \(typeof request\.tabId === 'number'\)/.test(spSrc)
     && /setIdleState\(sessionEndedTabId\)/.test(spSrc);
   ok(hasSessionEndedRouted,
-     'Part 4.4 -- session_ended branch derives sessionEndedTabId from request.tabId + calls setIdleState(sessionEndedTabId)');
+     'Part 4.6 -- session_ended branch derives sessionEndedTabId from request.tabId + calls setIdleState(sessionEndedTabId)');
 
   runPart5();
 }

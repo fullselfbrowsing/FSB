@@ -80,4 +80,3 @@ Five warning-level correctness and accessibility gaps remain. The most visible a
 _Reviewed: 2026-07-12T22:01:41Z_
 _Reviewer: the agent (gsd-code-reviewer)_
 _Depth: standard_
-

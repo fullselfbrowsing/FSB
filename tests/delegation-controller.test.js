@@ -1574,6 +1574,7 @@ async function runCodexAcceptedIdentity() {
         'agent_unpaired', 'unsupported_provider', 'hold_expired',
         'resume_ownership_lost', 'daemon_restart_lost_run',
         'agent_protocol_drift', 'tree_unsettled', 'agent_failed',
+        'sandbox_unavailable', 'capability_missing', 'isolation_unavailable', 'binary_changed',
         'unknown_failure',
       ];
       const cases = codes.map((code) => ({ code, input: code })).concat([{

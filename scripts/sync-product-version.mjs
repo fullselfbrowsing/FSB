@@ -48,6 +48,7 @@ const currentSurfaceTargets = Object.freeze([
   'mcp/src/install.ts',
   'mcp/src/platforms.ts',
   'showcase/about.html',
+  'showcase/dashboard.html',
   'showcase/angular/scripts/llms.source.md',
   'showcase/angular/scripts/llms-full.source.md',
   'showcase/angular/public/llms.txt',
@@ -359,6 +360,12 @@ function setExtensionPublicSurfaces(version) {
     `FSB v${version}`,
     'legacy showcase current version',
   ));
+  changed.push(replaceExactly(
+    'showcase/dashboard.html',
+    /FSB v\d+\.\d+\.\d+/gu,
+    `FSB v${version}`,
+    'legacy dashboard current version',
+  ));
   changed.push(setLlmsExtensionSurfaces(version));
   return changed.some(Boolean);
 }
@@ -370,7 +377,8 @@ function setExtensionVersion(version) {
 
   const manifest = readJson('extension/manifest.json');
   manifest.version = version;
-  manifest.name = `FSB v${version}`;
+  manifest.name = '__MSG_ext_name__';
+  manifest.description = '__MSG_ext_description__';
   changed.push(writeJson('extension/manifest.json', manifest));
 
   const rootPackage = readJson('package.json');
@@ -489,7 +497,8 @@ function collectParityErrors() {
     equal(lock.packages?.['']?.version, expected, `${label} lock root version`);
   };
 
-  equal(manifest.name, `FSB v${extensionVersion}`, 'extension manifest name');
+  equal(manifest.name, '__MSG_ext_name__', 'extension manifest name');
+  equal(manifest.description, '__MSG_ext_description__', 'extension manifest description');
   for (const [packagePath, lockPath, label] of [
     ['package.json', 'package-lock.json', 'root package'],
     ['showcase/angular/package.json', 'showcase/angular/package-lock.json', 'Angular showcase'],

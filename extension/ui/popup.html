@@ -13,22 +13,22 @@
     <header class="chat-header">
       <div class="header-info">
         <div class="brand-row">
-          <h1>FSB</h1>
-          <span class="surface-subtitle">Fast task launch</span>
+          <h1 data-i18n="ext_name">FSB</h1>
+          <span class="surface-subtitle" data-i18n="shell_fast_task">Fast task launch</span>
         </div>
         <div class="status-indicator">
           <i class="fa fa-circle status-dot"></i>
-          <span class="status-text">Ready</span>
+          <span class="status-text" data-i18n="shell_ready">Ready</span>
         </div>
       </div>
       <div class="header-actions">
-        <button id="pinBtn" class="icon-btn" title="Pin Window">
+        <button id="pinBtn" class="icon-btn" data-i18n-attr="title:shell_pin_window" title="Pin Window">
           <i class="fa fa-thumbtack"></i>
         </button>
-        <button id="testBtn" class="icon-btn" title="Test API Connection">
+        <button id="testBtn" class="icon-btn" data-i18n-attr="title:shell_test_api" title="Test API Connection">
           <i class="fa fa-wrench"></i>
         </button>
-        <button id="settingsBtn" class="icon-btn" title="Settings">
+        <button id="settingsBtn" class="icon-btn" data-i18n-attr="title:shell_settings" title="Settings">
           <i class="fa fa-cog"></i>
         </button>
       </div>
@@ -48,17 +48,18 @@
             class="chat-input" 
             contenteditable="true" 
             data-placeholder="Ask me to automate something..."
+            data-i18n-attr="data-placeholder:shell_ask"
             role="textbox"
             aria-multiline="true"
           ></div>
           <div class="input-actions">
-            <button id="stopBtn" class="stop-btn hidden" title="Stop Automation">
+            <button id="stopBtn" class="stop-btn hidden" data-i18n-attr="title:shell_stop" title="Stop Automation">
               <i class="fa fa-stop"></i>
             </button>
-            <button id="micBtn" class="mic-btn" title="Voice input">
+            <button id="micBtn" class="mic-btn" data-i18n-attr="title:shell_voice" title="Voice input">
               <i class="fa fa-microphone"></i>
             </button>
-            <button id="sendBtn" class="send-btn" title="Send Message">
+            <button id="sendBtn" class="send-btn" data-i18n-attr="title:shell_send" title="Send Message">
               <i class="fa fa-arrow-up"></i>
             </button>
           </div>
@@ -68,7 +69,7 @@
     
     <!-- Extension Footer -->
     <div class="author-footer">
-      <span class="footer-meta">Pin when you need a persistent window</span>
+        <span class="footer-meta" data-i18n="shell_pin_hint">Pin when you need a persistent window</span>
     </div>
   </div>
   
@@ -81,6 +82,8 @@
   <script src="../utils/agent-registry.js"></script>
   <script src="owner-chip.js"></script>
   <script src="speech-to-text.js"></script>
+  <script src="../utils/ui-locale.js"></script>
+  <script src="../utils/copy-exact.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

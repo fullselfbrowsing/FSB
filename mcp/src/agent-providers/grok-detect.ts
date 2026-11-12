@@ -9,7 +9,7 @@ import {
   type AdapterDiagnosticCode,
   type RetainedBinary,
 } from './adapter.js';
-import { classifyAdapterCompatibility } from './compatibility.js';
+import { validateGrokBuildIsolation } from './grok-isolation.js';
 import {
   GROK_BUILD_PROFILE_VERSION,
   createGrokBuildPrivateRuntime,
@@ -56,21 +56,6 @@ const MAX_PATH_BYTES = 4_096;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const VERSION_PATTERN = /(?:^|[^0-9A-Za-z.-])((?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*))(?=$|[^0-9A-Za-z.-])/g;
 const EMPTY_ARRAY_JSON = '[]';
-const EXPECTED_COMPATIBILITY_CELLS = Object.freeze([
-  'cursor:skills',
-  'cursor:rules',
-  'cursor:agents',
-  'cursor:mcps',
-  'cursor:hooks',
-  'cursor:sessions',
-  'claude:skills',
-  'claude:rules',
-  'claude:agents',
-  'claude:mcps',
-  'claude:hooks',
-  'claude:sessions',
-  'codex:sessions',
-] as const);
 
 export interface GrokBuildBinaryCandidate {
   readonly sourcePath: string;
@@ -90,6 +75,36 @@ export interface GrokBuildDetectDependencies {
   readonly probe: GrokBuildProbeDependency;
   readonly runtime: GrokBuildPrivateRuntime;
   readonly mintProbeId: () => string;
+  readonly inspectBinaryIdentity: (path: string) => Promise<string>;
+}
+
+interface RetainedGrokIdentity {
+  readonly sourcePath: string;
+  readonly fingerprint: string;
+  readonly resolve: GrokBuildDetectDependencies['resolveRealPath'];
+  readonly inspect: GrokBuildDetectDependencies['inspectBinaryIdentity'];
+}
+
+const retainedIdentities = new WeakMap<RetainedBinary, RetainedGrokIdentity>();
+
+async function inspectBinaryIdentity(pathname: string): Promise<string> {
+  const metadata = await stat(pathname, { bigint: true });
+  if (!metadata.isFile()) throw new Error('binary_changed');
+  return [metadata.dev, metadata.ino, metadata.size, metadata.mtimeNs, metadata.ctimeNs].join(':');
+}
+
+/** Recheck the retained path and file identity immediately before process creation. */
+export async function verifyGrokBuildExecutableIdentity(binary: RetainedBinary): Promise<boolean> {
+  const retained = retainedIdentities.get(binary);
+  // Injected adapters can supply their own retained-binary verification.
+  if (!retained) return true;
+  try {
+    return await retained.resolve(retained.sourcePath) === binary.realPath
+      && await retained.resolve(binary.command) === binary.realPath
+      && await retained.inspect(binary.command) === retained.fingerprint;
+  } catch {
+    return false;
+  }
 }
 
 function pathApi(platform: NodeJS.Platform): typeof win32 {
@@ -128,6 +143,7 @@ function defaultDependencies(): GrokBuildDetectDependencies {
     platform,
     pathValue,
     sourceEnv: process.env,
+    inspectBinaryIdentity,
     resolveBinary: () => resolveFromPath(platform, pathValue),
     resolveRealPath: realpath,
     probe: runBoundedProcessProbe,
@@ -188,19 +204,29 @@ async function retainExecutable(
   if (dependencies.platform === 'win32' && !candidate.sourcePath.toLowerCase().endsWith('.exe')) {
     return null;
   }
-  return Object.freeze({
+  const binary = Object.freeze({
     command: candidate.realPath,
     realPath: candidate.realPath,
     argvPrefix: Object.freeze([]),
   });
+  retainedIdentities.set(binary, {
+    sourcePath: candidate.sourcePath,
+    fingerprint: await dependencies.inspectBinaryIdentity(candidate.realPath),
+    resolve: dependencies.resolveRealPath,
+    inspect: dependencies.inspectBinaryIdentity,
+  });
+  return binary;
 }
 
 function decodeVersion(result: BoundedProcessProbeResult): string | null {
   try {
     if (result.exit.code !== 0 || result.exit.signal !== null) return null;
     const decoder = new TextDecoder('utf-8', { fatal: true });
-    const combined = `${decoder.decode(result.stdout)}\n${decoder.decode(result.stderr)}`;
-    const matches = [...combined.matchAll(VERSION_PATTERN)];
+    const stdout = decoder.decode(result.stdout).trim();
+    const stderr = decoder.decode(result.stderr).trim();
+    // Prefer the CLI's own version line; advisory text can mention other releases.
+    const versionLine = stdout.split(/\r?\n/).find((line) => /^grok\s+\d+\.\d+\.\d+(?:\s|$)/i.test(line));
+    const matches = [...(versionLine ?? (stdout || stderr)).matchAll(VERSION_PATTERN)];
     return matches.length === 1 ? matches[0]?.[1] ?? null : null;
   } catch {
     return null;
@@ -211,7 +237,7 @@ function decodeVersion(result: BoundedProcessProbeResult): string | null {
 
 function parseJsonLines(result: BoundedProcessProbeResult): readonly unknown[] | null {
   try {
-    if (result.exit.code !== 0 || result.exit.signal !== null || result.stderr.length !== 0) {
+    if (result.exit.code !== 0 || result.exit.signal !== null) {
       return null;
     }
     const decoded = new TextDecoder('utf-8', { fatal: true }).decode(result.stdout);
@@ -226,7 +252,7 @@ function parseJsonLines(result: BoundedProcessProbeResult): readonly unknown[] |
 
 function parseJsonDocument(result: BoundedProcessProbeResult): unknown | null {
   try {
-    if (result.exit.code !== 0 || result.exit.signal !== null || result.stderr.length !== 0) {
+    if (result.exit.code !== 0 || result.exit.signal !== null) {
       return null;
     }
     const decoded = new TextDecoder('utf-8', { fatal: true }).decode(result.stdout);
@@ -245,119 +271,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
     && Object.getPrototypeOf(value) === Object.prototype;
 }
 
-function exactKeys(value: Record<string, unknown>, keys: readonly string[]): boolean {
-  const actual = Object.keys(value).sort();
-  const expected = [...keys].sort();
-  return actual.length === expected.length
-    && actual.every((key, index) => key === expected[index]);
-}
-
 function emptyArray(value: unknown): boolean {
   return Array.isArray(value) && JSON.stringify(value) === EMPTY_ARRAY_JSON;
-}
-
-async function validateInspectDocument(
-  value: unknown,
-  dependencies: GrokBuildDetectDependencies,
-  runtime: GrokBuildPrivateRuntime,
-  run: GrokBuildRunPaths,
-): Promise<boolean> {
-  if (!isRecord(value) || value.grokVersion !== GROK_BUILD_PROFILE_VERSION) return false;
-  if (
-    typeof value.cwd !== 'string'
-    || value.projectRoot !== null
-    || value.projectTrusted !== true
-  ) {
-    return false;
-  }
-  try {
-    if (
-      await dependencies.resolveRealPath(value.cwd)
-      !== await dependencies.resolveRealPath(run.cwd)
-    ) return false;
-  } catch {
-    return false;
-  }
-  for (const key of [
-    'projectInstructions',
-    'hooks',
-    'skills',
-    'plugins',
-    'marketplaces',
-    'mcpServers',
-    'lspServers',
-  ]) {
-    if (!emptyArray(value[key])) return false;
-  }
-  if (!isRecord(value.permissions)) return false;
-  const permissionSources = value.permissions.sources;
-  if (
-    !Array.isArray(permissionSources)
-    || permissionSources.length !== 1
-    || typeof permissionSources[0] !== 'string'
-    || !permissionSources[0].endsWith(' (config)')
-  ) return false;
-  const permissionPath = permissionSources[0].slice(0, -' (config)'.length);
-  try {
-    if (
-      await dependencies.resolveRealPath(permissionPath)
-      !== await dependencies.resolveRealPath(runtime.paths.configPath)
-    ) return false;
-  } catch {
-    return false;
-  }
-  if (
-    value.permissions.loaded !== 1
-    || value.permissions.managedSettingsExists !== false
-    || value.permissions.managedSettingsActive !== false
-  ) return false;
-  if (!emptyArray(value.permissions.skipped)) return false;
-  if (!emptyArray(value.permissions.mcpServerAllowlist)) return false;
-  if (!emptyArray(value.permissions.marketplaceAllowlist)) return false;
-  if (!Array.isArray(value.agents) || value.agents.length !== 3) return false;
-  const agentNames = value.agents.map((agent) => isRecord(agent) ? agent.name : null);
-  if (JSON.stringify(agentNames) !== JSON.stringify(['general-purpose', 'explore', 'plan'])) {
-    return false;
-  }
-  if (!value.agents.every((agent) => (
-    isRecord(agent)
-    && isRecord(agent.source)
-    && agent.source.type === 'builtin'
-  ))) return false;
-  if (
-    !isRecord(value.configSources)
-    || !Array.isArray(value.configSources.layers)
-    || value.configSources.layers.length !== 1
-    || !isRecord(value.configSources.layers[0])
-    || value.configSources.layers[0].role !== 'user'
-    || typeof value.configSources.layers[0].path !== 'string'
-  ) return false;
-  try {
-    if (
-      await dependencies.resolveRealPath(value.configSources.layers[0].path)
-      !== await dependencies.resolveRealPath(runtime.paths.configPath)
-    ) return false;
-  } catch {
-    return false;
-  }
-  if (!isRecord(value.externalCompat) || value.externalCompat.remoteSettingsLoaded !== false) {
-    return false;
-  }
-  const cells = value.externalCompat.cells;
-  if (!Array.isArray(cells) || cells.length !== 13) return false;
-  const actualCells: string[] = [];
-  for (const cell of cells) {
-    if (
-      !isRecord(cell)
-      || !exactKeys(cell, ['vendor', 'surface', 'enabled', 'source'])
-      || typeof cell.vendor !== 'string'
-      || typeof cell.surface !== 'string'
-      || cell.enabled !== false
-      || cell.source !== 'env'
-    ) return false;
-    actualCells.push(`${cell.vendor}:${cell.surface}`);
-  }
-  return JSON.stringify(actualCells) === JSON.stringify(EXPECTED_COMPATIBILITY_CELLS);
 }
 
 function jsonLine(value: unknown): string {
@@ -371,6 +286,8 @@ function descriptor(
   argv: readonly string[],
   limit: number,
   stdin?: string,
+  responseId?: number,
+  followup?: Readonly<{ afterResponseId: number; text: string }>,
 ): BoundedProcessProbeDescriptor {
   const fixedEnv = dependencies.runtime.authEnvironment();
   return {
@@ -382,6 +299,13 @@ function descriptor(
     stdoutLimitBytes: limit,
     stderrLimitBytes: limit,
     ...(stdin ? { stdinBytes: Object.freeze(Array.from(Buffer.from(stdin, 'utf8'))) } : {}),
+    ...(responseId === undefined ? {} : { stdinCloseAfterJsonRpcResponseId: responseId }),
+    ...(followup ? {
+      stdinJsonRpcFollowup: Object.freeze({
+        afterResponseId: followup.afterResponseId,
+        bytes: Object.freeze(Array.from(Buffer.from(followup.text, 'utf8'))),
+      }),
+    } : {}),
   };
 }
 
@@ -389,6 +313,7 @@ async function verifyIsolation(
   dependencies: GrokBuildDetectDependencies,
   binary: RetainedBinary,
   run: GrokBuildRunPaths,
+  version: string,
 ): Promise<boolean> {
   const inspect = parseJsonDocument(await dependencies.probe(descriptor(
     dependencies,
@@ -397,7 +322,9 @@ async function verifyIsolation(
     ['inspect', '--json'],
     JSON_OUTPUT_LIMIT_BYTES,
   )));
-  if (!await validateInspectDocument(inspect, dependencies, dependencies.runtime, run)) {
+  if (!validateGrokBuildIsolation(inspect, {
+    expectedCliVersion: version, cwd: run.cwd, configPath: dependencies.runtime.paths.configPath,
+  })) {
     return false;
   }
   for (const argv of [['mcp', 'list', '--json'], ['plugin', 'list', '--json']] as const) {
@@ -435,10 +362,12 @@ async function probeAcpAuthState(
   dependencies: GrokBuildDetectDependencies,
   binary: RetainedBinary,
   run: GrokBuildRunPaths,
+  version: string,
 ): Promise<Readonly<{
   initialized: boolean;
   authState: AdapterAuthState;
   sandboxRefused?: boolean;
+  capabilityMissing?: boolean;
 }>> {
   const argv = [
     ...GROK_BUILD_TASK_ARGV,
@@ -453,6 +382,7 @@ async function probeAcpAuthState(
     argv,
     JSON_OUTPUT_LIMIT_BYTES,
     jsonLine(GROK_BUILD_INITIALIZE_REQUEST),
+    1,
   ));
   // Read stderr before parseJsonLines zeroizes both channels.
   const sandboxRefused = refusedSandbox(initializeProbe);
@@ -460,16 +390,18 @@ async function probeAcpAuthState(
   if (!initialized) {
     return Object.freeze({ initialized: false, authState: 'unknown', sandboxRefused });
   }
-  const negotiation = parseGrokBuildProbeTranscript(initialized, false);
-  if (!negotiation) {
-    // Grok Build 1.0.4 exits cleanly without an ACP initialize response when
-    // its private OIDC cache is present but can no longer be refreshed. Treat
-    // only that exact, credential-backed empty transcript as logged out so the
-    // browser OAuth recovery path remains available. Any malformed or partial
-    // ACP transcript still fails closed as protocol drift.
-    if (initialized.length === 0 && await dependencies.runtime.secureAuthFile()) {
-      return Object.freeze({ initialized: true, authState: 'unauthenticated' });
+  const init = initialized.find((message) => isRecord(message) && message.id === 1);
+  const result = isRecord(init) && isRecord(init.result) ? init.result : null;
+  if (result?.protocolVersion === 1) {
+    const caps = result.agentCapabilities;
+    if (!isRecord(caps) || !isRecord(caps.mcpCapabilities)
+        || caps.mcpCapabilities.http !== true || !isRecord(caps.sessionCapabilities)
+        || !isRecord(caps.sessionCapabilities.close)) {
+      return Object.freeze({ initialized: false, authState: 'unknown', capabilityMissing: true });
     }
+  }
+  const negotiation = parseGrokBuildProbeTranscript(initialized, false, version);
+  if (!negotiation) {
     return Object.freeze({ initialized: false, authState: 'unknown' });
   }
   if (negotiation.authState !== 'oauth') {
@@ -482,13 +414,13 @@ async function probeAcpAuthState(
     run,
     argv,
     JSON_OUTPUT_LIMIT_BYTES,
-    `${jsonLine(GROK_BUILD_INITIALIZE_REQUEST)}${jsonLine(
-      buildGrokBuildAuthenticateRequest(),
-    )}`,
+    jsonLine(GROK_BUILD_INITIALIZE_REQUEST),
+    2,
+    { afterResponseId: 1, text: jsonLine(buildGrokBuildAuthenticateRequest()) },
   )));
   return Object.freeze({
     initialized: true,
-    authState: authenticated && parseGrokBuildProbeTranscript(authenticated, true)
+    authState: authenticated && parseGrokBuildProbeTranscript(authenticated, true, version)
       ? 'oauth'
       : 'unknown',
   });
@@ -515,6 +447,7 @@ export function createGrokBuildDetector(
 
       let run: GrokBuildRunPaths | null = null;
       let probeId: string | null = null;
+      let version: string | null = null;
       try {
         await dependencies.runtime.ensureBase();
         probeId = dependencies.mintProbeId();
@@ -524,7 +457,7 @@ export function createGrokBuildDetector(
           });
         }
         run = await dependencies.runtime.prepareRun(probeId);
-        const version = decodeVersion(await dependencies.probe(descriptor(
+        version = decodeVersion(await dependencies.probe(descriptor(
           dependencies,
           binary,
           run,
@@ -539,22 +472,15 @@ export function createGrokBuildDetector(
         if (
           !await identityMatches(dependencies, candidate.sourcePath, candidate.realPath)
           || !await identityMatches(dependencies, binary.command, binary.realPath)
+          || !await verifyGrokBuildExecutableIdentity(binary)
         ) return unavailable('binary_changed', 'Grok Build executable identity changed during detection');
-        const compatibility = classifyAdapterCompatibility(GROK_BUILD_ADAPTER_ID, version);
-        if (compatibility.status !== 'supported' || version !== GROK_BUILD_PROFILE_VERSION) {
-          return unavailable(
-            'version_unsupported',
-            'Grok Build version is outside the verified compatibility profile',
-            { binary, version },
-          );
-        }
-        if (!await verifyIsolation(dependencies, binary, run)) {
-          return unavailable('adapter_unavailable', 'Grok Build isolation could not be attested', {
+        if (!await verifyIsolation(dependencies, binary, run, version)) {
+          return unavailable('isolation_unavailable', 'Grok Build isolation could not be attested', {
             binary,
             version,
           });
         }
-        const acp = await probeAcpAuthState(dependencies, binary, run);
+        const acp = await probeAcpAuthState(dependencies, binary, run, version);
         if (!acp.initialized) {
           return acp.sandboxRefused === true
             ? unavailable(
@@ -562,7 +488,7 @@ export function createGrokBuildDetector(
               'Grok Build refused to start under the required strict sandbox',
               { binary, version },
             )
-            : unavailable('adapter_unavailable', 'Grok Build ACP could not be verified', {
+            : unavailable(acp.capabilityMissing ? 'capability_missing' : 'agent_protocol_drift', 'Grok Build ACP could not be verified', {
               binary,
               version,
             });
@@ -577,6 +503,7 @@ export function createGrokBuildDetector(
         if (
           !await identityMatches(dependencies, candidate.sourcePath, candidate.realPath)
           || !await identityMatches(dependencies, binary.command, binary.realPath)
+          || !await verifyGrokBuildExecutableIdentity(binary)
         ) return unavailable('binary_changed', 'Grok Build executable identity changed during detection');
         return Object.freeze({
           installed: true,
@@ -586,7 +513,7 @@ export function createGrokBuildDetector(
           profileVersion: GROK_BUILD_PROFILE_VERSION,
         });
       } catch {
-        return unavailable('adapter_unavailable', 'Grok Build compatibility probe failed', { binary });
+        return unavailable('adapter_unavailable', 'Grok Build compatibility probe failed', { binary, version });
       } finally {
         if (run && probeId) await dependencies.runtime.removeRun(probeId)
           .catch(() => undefined);

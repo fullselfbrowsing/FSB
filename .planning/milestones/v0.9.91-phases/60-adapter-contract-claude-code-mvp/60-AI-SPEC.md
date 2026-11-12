@@ -39,51 +39,51 @@ user work completed when it did not.
 
 ### What Domain Experts Evaluate Against
 
-**Dimension: Delegation authority containment**  
+**Dimension: Delegation authority containment**
 **Good (domain expert would accept):** Only the explicitly started `serve` daemon can accept
 an authenticated Phase 59 reverse request; the request cannot choose command, flags, cwd,
 environment, config, or identity. The task is stdin-only, provider keys are scrubbed, inherited
 MCP/tool surfaces are excluded, and Claude receives only the shipped FSB policy plus FSB MCP
-tools.  
+tools.
 **Bad (domain expert would flag):** Any shell/string command, caller-supplied argv or config,
-PATH re-resolution after detection, inherited user/project tools, or auto-approval surface.  
-**Stakes:** Critical  
+PATH re-resolution after detection, inherited user/project tools, or auto-approval surface.
+**Stakes:** Critical
 **Source:** ADAPT-02/03, CLAUDE-01/02; Phase 60 D-05..12 and D-18..23; Phase 59 trust boundary;
 [Claude Code permissions](https://code.claude.com/docs/en/permissions).
 
-**Dimension: Cancellation really revokes control**  
+**Dimension: Cancellation really revokes control**
 **Good (domain expert would accept):** Cancel settles exactly once only after the child and
 matching descendants are gone; startup handles only journaled, strongly verified survivors
 before advertising spawn capability; ambiguity fails closed without killing an unrelated
-user-owned Claude process.  
+user-owned Claude process.
 **Bad (domain expert would flag):** Parent-only kill, unverified process-name scanning, silent
 orphan adoption, cleanup before exit confirmation, or a cancel response while descendants can
-still reach the browser.  
-**Stakes:** Critical  
+still reach the browser.
+**Stakes:** Critical
 **Source:** ADAPT-04/05; Phase 60 D-13..17;
 [Node.js child processes](https://nodejs.org/docs/latest-v22.x/api/child_process.html) and
 [Microsoft `taskkill`](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/taskkill).
 
-**Dimension: Browser ownership and vault boundaries survive delegation**  
+**Dimension: Browser ownership and vault boundaries survive delegation**
 **Good (domain expert would accept):** FSB mints the MCP agent identity; the delegated agent
 acts only on its owned tabs, uses typed ownership recovery, and routes passwords, CVV, and saved
 payment data only through vault-reference tools. Irreversible submissions remain human-confirmed
-policy, even though the Phase 61 consent UI is not yet present.  
+policy, even though the Phase 61 consent UI is not yet present.
 **Bad (domain expert would flag):** Caller-supplied `agent_id`, cross-agent tab access, needless
 foregrounding/closing, credentials in prompts/tool args/logs, or automatic purchase, account,
-permission, deletion, or public-post submission.  
-**Stakes:** Critical  
+permission, deletion, or public-post submission.
+**Stakes:** Critical
 **Source:** `skills/fsb/SKILL.md`, `multi-agent-contract.md`, and `vault-boundary.md`.
 
-**Dimension: Outcomes and protocol state are truthful**  
+**Dimension: Outcomes and protocol state are truthful**
 **Good (domain expert would accept):** Spawn uses the exact fingerprinted binary/profile;
 provider JSON ends at the adapter; bounded parsing drains stdout and stderr; every accepted event
 normalizes to `{ type, sessionId, payload }`; malformed or unknown protocol input terminates as
-`agent_protocol_drift` without replay or fabricated success; existing MCP bytes remain frozen.  
+`agent_protocol_drift` without replay or fabricated success; existing MCP bytes remain frozen.
 **Bad (domain expert would flag):** Silent event drops, raw Claude JSON above the adapter,
 unbounded buffering/deadlock, weaker retry flags, automatic task replay, or a terminal success
-without a validated result.  
-**Stakes:** High  
+without a validated result.
+**Stakes:** High
 **Source:** CLAUDE-03/04; Phase 60 D-24..28; Phase 59 final review and verification; PITFALLS 7/9.
 
 ### Known Failure Modes in This Domain

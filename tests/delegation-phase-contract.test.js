@@ -158,6 +158,40 @@ const REFINEMENT_ROOT_TEST_COMMANDS = Object.freeze([
   'node --test tests/network-capture-debugger-lifecycle.test.js',
   'node --test tests/content-click-single-activation.test.js',
   'node --test tests/bench-export-history.test.mjs tests/bench-stats.test.mjs tests/bench-outcome.test.mjs tests/bench-identity.test.mjs tests/bench-tasks.test.mjs tests/bench-fixture-server.test.mjs tests/bench-claude-stream.test.mjs tests/bench-corpus.test.mjs tests/bench-report.test.mjs tests/bench-drivers.test.mjs',
+  'node tests/extension-ui-locale.test.js',
+  'node scripts/verify-extension-i18n.mjs',
+  'node scripts/verify-extension-copy.mjs',
+  'node tests/benchmark-assets-parity.test.js',
+]);
+
+const SKOPEO_ROOT_TEST_COMMANDS = Object.freeze([
+  'node tests/skopeo-corpus-schema.test.js',
+  'node tests/skopeo-corpus-store.test.js',
+  'node tests/skopeo-drive-corpus-transport.test.js',
+  'node tests/skopeo-drive-authority.test.js',
+  'node tests/skopeo-drive-reconciler.test.js',
+  'node tests/skopeo-corpus-runtime.test.js',
+  'npm run test:skopeo-graph-evals',
+  'npm run test:skopeo-truth-evals',
+  'npm run test:skopeo-hud-evals',
+  'npm run test:skopeo-ask-evals',
+  'npm run test:skopeo-release-evals',
+  'node tests/skopeo-profile-schema.test.js',
+  'node tests/skopeo-profile-coverage.test.js',
+  'node tests/skopeo-capability-projection.test.js',
+  'node tests/skopeo-app-context-resolver.test.js',
+  'node tests/skopeo-adaptive-composer.test.js',
+  'node tests/skopeo-genre-adapters.test.js',
+  'node tests/skopeo-consequence-gate.test.js',
+  'node tests/skopeo-catalog-runtime.test.js',
+  'node tests/skopeo-context-router.test.js',
+  'node tests/skopeo-anchor-registry.test.js',
+  'node tests/skopeo-session-lifecycle.test.js',
+  'node tests/skopeo-shell-contract.test.js',
+  'node tests/skopeo-sidepanel-command.test.js',
+  'node tests/skopeo-accessibility.test.js',
+  'node tests/skopeo-gap-closure.test.js',
+  'node tests/skopeo-browser-contract.test.js',
 ]);
 
 const PHASE64_RETAINED_ROOT_COMMANDS = Object.freeze([
@@ -2377,6 +2411,12 @@ check(planSources[7].includes('  - "61-07"'), 'Plan 08 evidence gate follows the
 console.log('\n--- serial root-chain inclusion and prior-gate preservation ---');
 
 const rootCommands = packageJson.scripts.test.split(' && ');
+check(SKOPEO_ROOT_TEST_COMMANDS.length === 27,
+  'the merge declares exactly 27 Skopeo-only root test steps');
+for (const command of SKOPEO_ROOT_TEST_COMMANDS) {
+  check(rootCommands.filter((candidate) => candidate === command).length === 1,
+    `${command} appears exactly once in the merged serial root chain`);
+}
 for (const command of REFINEMENT_ROOT_TEST_COMMANDS) {
   check(rootCommands.filter((candidate) => candidate === command).length === 1,
     `${command} appears exactly once in the refinements root chain`);
@@ -2392,6 +2432,7 @@ const prePhase61Commands = rootCommands.filter((command) => (
   && !PHASE64_NEW_ROOT_COMMANDS.includes(command)
   && !PHASE65_NEW_ROOT_COMMANDS.includes(command)
   && !REFINEMENT_ROOT_TEST_COMMANDS.includes(command)
+  && !SKOPEO_ROOT_TEST_COMMANDS.includes(command)
 ));
 check(digest(prePhase61Commands.join(' && ')) === PRE_PHASE61_ROOT_TEST_HASH,
   'removing the six new Phase 61 gates reproduces the exact prior serial chain');
@@ -2557,7 +2598,8 @@ const terminalCodes = [
   'event_silence_timeout', 'delegation_persistence_failed', 'delegation_quota_exceeded',
   'delegation_ledger_corrupt', 'route_lost', 'agent_offline', 'agent_unpaired',
   'unsupported_provider', 'hold_expired', 'resume_ownership_lost',
-  'daemon_restart_lost_run', 'agent_protocol_drift', 'provider_error', 'tree_unsettled', 'agent_failed',
+  'daemon_restart_lost_run', 'agent_protocol_drift', 'sandbox_unavailable',
+  'capability_missing', 'isolation_unavailable', 'binary_changed', 'provider_error', 'tree_unsettled', 'agent_failed',
   'unknown_failure',
 ];
 equal(extractFrozenTrueKeys(auditedEventStoreSource, 'VALID_TERMINAL_CODES'), terminalCodes,
@@ -2970,10 +3012,13 @@ equal(Array.from(compatibilityStatusesBlock.matchAll(/'([^']+)'/g), (match) => m
   ['supported', 'degraded', 'unsupported'],
   'canonical compatibility statuses are the exact closed three-value set');
 equal(Array.from(compatibilityReasonsBlock.matchAll(/'([^']+)'/g), (match) => match[1]), [
-  'within_tested_range', 'newer_than_tested_range', 'evidence_stale',
+  'within_tested_range', 'capability_verified', 'capability_unverified',
+  'capability_missing', 'isolation_unavailable', 'sandbox_unavailable', 'agent_protocol_drift',
+  'binary_changed', 'adapter_unavailable', 'version_unsupported',
+  'newer_than_tested_range', 'evidence_stale',
   'binary_not_found', 'version_missing', 'version_malformed', 'below_minimum',
   'wrong_major', 'adapter_unshipped', 'matrix_invalid',
-], 'canonical compatibility reasons are the exact closed ten-value set');
+], 'canonical compatibility reasons retain the exact closed version and capability verdict set');
 
 const rawCompatibilityMatrix = between(
   compatibilitySource,
@@ -3003,10 +3048,10 @@ check(!rawCompatibilityMatrix.includes("adapterId: 'codex'")
   'the canonical matrix contains no retired provider row or fixture');
 for (const exactGrokMatrixToken of [
   "displayLabel: 'Grok Build'",
-  "profileVersion: '1.0.4'",
+  "profileVersion: 'grok-acp-v1'",
   "minimumVersion: '1.0.4'",
-  "testedThroughVersion: '1.0.4'",
-  "fixtureManifest: 'tests/fixtures/agent-streams/grok-build-1.0.4/manifest.json'",
+  "testedThroughVersion: '1.0.62'",
+  "fixtureManifest: 'tests/fixtures/agent-streams/grok-build-1.0.62/manifest.json'",
   "'agentCapabilities.mcpCapabilities.http'",
   "'agentCapabilities.sessionCapabilities.close'",
   "requiredResultFields: ['stopReason']",
@@ -3135,6 +3180,7 @@ const prePhase62Commands = rootCommands.filter((command) => (
   && !PHASE64_NEW_ROOT_COMMANDS.includes(command)
   && !PHASE65_NEW_ROOT_COMMANDS.includes(command)
   && !REFINEMENT_ROOT_TEST_COMMANDS.includes(command)
+  && !SKOPEO_ROOT_TEST_COMMANDS.includes(command)
 ));
 check(digest(prePhase62Commands.join(' && ')) === PRE_PHASE62_ROOT_TEST_HASH,
   'removing the three Phase 62 gates reproduces the exact prior serial chain');
@@ -3322,8 +3368,8 @@ for (const doctorToken of [
   'registryIds = denseStringArray(idsMethod.call(registry))',
   'const adapter = requireMethod.call(registry, contract.adapterId)',
   'detection = await detectMethod.call(adapter)',
-  'classifyAdapterCompatibility',
-  'authState: normalized.authState',
+  'classifyAdapterDetectionCompatibility(contract.adapterId, detection)',
+  "authState: compatibility.status === 'unsupported' ? 'unknown' : normalized.authState",
 ]) {
   check(doctorCollectorSource.includes(doctorToken),
     `doctor collection remains local and canonical: ${doctorToken}`);

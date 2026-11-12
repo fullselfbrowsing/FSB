@@ -8,7 +8,6 @@ import {
   type SpawnContext,
   type SpawnSpec,
 } from './adapter.js';
-import { classifyAdapterCompatibility } from './compatibility.js';
 import { GROK_BUILD_TASK_ARGV } from './grok-detect.js';
 import {
   GROK_BUILD_PROFILE_VERSION,
@@ -19,9 +18,6 @@ const MAX_TASK_BYTES = 64 * 1024;
 const ATTESTATION_TIMEOUT_MS = 5_000;
 const ATTESTATION_LIMIT_BYTES = 1024 * 1024;
 const EMPTY_ARRAY_SHA256 = createHash('sha256').update('[]', 'utf8').digest('hex');
-const VERSION_SHA256 = createHash('sha256')
-  .update(GROK_BUILD_PROFILE_VERSION, 'utf8')
-  .digest('hex');
 
 function processSpec(
   command: string,
@@ -74,11 +70,9 @@ export function buildGrokBuildSpawnSpec(
     context.adapterId !== GROK_BUILD_ADAPTER_ID
     || context.detection.installed !== true
     || context.detection.binary === null
-    || context.detection.version !== GROK_BUILD_PROFILE_VERSION
+    || !context.detection.version
     || context.detection.profileVersion !== GROK_BUILD_PROFILE_VERSION
     || context.detection.authState !== 'oauth'
-    || classifyAdapterCompatibility(GROK_BUILD_ADAPTER_ID, context.detection.version).status
-      !== 'supported'
     || typeof task.text !== 'string'
     || task.text.length === 0
     || Buffer.byteLength(task.text, 'utf8') > MAX_TASK_BYTES
@@ -140,98 +134,11 @@ export function buildGrokBuildSpawnSpec(
     attestations: Object.freeze([
       processAttestation(inspectProcess, Object.freeze([
         Object.freeze({
-          kind: 'string_sha256' as const,
-          path: Object.freeze(['grokVersion']),
-          sha256: VERSION_SHA256,
-        }),
-        Object.freeze({
-          kind: 'string_sha256' as const,
-          path: Object.freeze(['cwd']),
-          sha256: createHash('sha256').update(context.cwd, 'utf8').digest('hex'),
-        }),
-        Object.freeze({ kind: 'exact_scalar' as const, path: Object.freeze(['projectRoot']), value: null }),
-        Object.freeze({ kind: 'exact_scalar' as const, path: Object.freeze(['projectTrusted']), value: true }),
-        emptyArrayAssertion(['projectInstructions']),
-        emptyArrayAssertion(['hooks']),
-        emptyArrayAssertion(['skills']),
-        emptyArrayAssertion(['plugins']),
-        emptyArrayAssertion(['marketplaces']),
-        emptyArrayAssertion(['mcpServers']),
-        emptyArrayAssertion(['lspServers']),
-        emptyArrayAssertion(['permissions', 'skipped']),
-        emptyArrayAssertion(['permissions', 'mcpServerAllowlist']),
-        emptyArrayAssertion(['permissions', 'marketplaceAllowlist']),
-        Object.freeze({
-          kind: 'document_sha256' as const,
-          path: Object.freeze(['permissions', 'sources']),
-          sha256: createHash('sha256')
-            .update(JSON.stringify([`${runtime.paths.configPath} (config)`]), 'utf8')
-            .digest('hex'),
-        }),
-        Object.freeze({ kind: 'exact_scalar' as const, path: Object.freeze(['permissions', 'loaded']), value: 1 }),
-        Object.freeze({
-          kind: 'exact_scalar' as const,
-          path: Object.freeze(['permissions', 'managedSettingsExists']),
-          value: false,
-        }),
-        Object.freeze({
-          kind: 'exact_scalar' as const,
-          path: Object.freeze(['permissions', 'managedSettingsActive']),
-          value: false,
-        }),
-        Object.freeze({
-          kind: 'document_sha256' as const,
-          path: Object.freeze(['agents']),
-          sha256: createHash('sha256').update(JSON.stringify([
-            {
-              name: 'general-purpose',
-              description: 'General purpose agent for multi-step tasks.',
-              source: { type: 'builtin' },
-            },
-            {
-              name: 'explore',
-              description: 'Fast, read-only agent specialized for codebase exploration.',
-              source: { type: 'builtin' },
-            },
-            {
-              name: 'plan',
-              description: 'Software architect for planning implementation strategies.',
-              source: { type: 'builtin' },
-            },
-          ]), 'utf8').digest('hex'),
-        }),
-        Object.freeze({
-          kind: 'document_sha256' as const,
-          path: Object.freeze(['configSources', 'layers']),
-          sha256: createHash('sha256').update(JSON.stringify([{
-            role: 'user',
-            path: runtime.paths.configPath,
-          }]), 'utf8').digest('hex'),
-        }),
-        Object.freeze({
-          kind: 'exact_scalar' as const,
-          path: Object.freeze(['externalCompat', 'remoteSettingsLoaded']),
-          value: false,
-        }),
-        Object.freeze({
-          kind: 'document_sha256' as const,
-          path: Object.freeze(['externalCompat', 'cells']),
-          sha256: createHash('sha256').update(JSON.stringify([
-            ['cursor', 'skills'],
-            ['cursor', 'rules'],
-            ['cursor', 'agents'],
-            ['cursor', 'mcps'],
-            ['cursor', 'hooks'],
-            ['cursor', 'sessions'],
-            ['claude', 'skills'],
-            ['claude', 'rules'],
-            ['claude', 'agents'],
-            ['claude', 'mcps'],
-            ['claude', 'hooks'],
-            ['claude', 'sessions'],
-            ['codex', 'sessions'],
-          ].map(([vendor, surface]) => ({ vendor, surface, enabled: false, source: 'env' }))), 'utf8')
-            .digest('hex'),
+          kind: 'grok_isolation' as const,
+          path: Object.freeze([]),
+          expectedCliVersion: context.detection.version,
+          cwd: context.cwd,
+          configPath: runtime.paths.configPath,
         }),
       ])),
       processAttestation(mcpListProcess, Object.freeze([emptyArrayAssertion([])])),

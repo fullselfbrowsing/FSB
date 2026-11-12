@@ -19,14 +19,13 @@ const DELEGATION_ID_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
 const SESSION_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const SESSION_JOURNAL_FILENAME = 'sessions.json';
 
-export const GROK_BUILD_PROFILE_VERSION = '1.0.4' as const;
+export const GROK_BUILD_PROFILE_VERSION = 'grok-acp-v1' as const;
 
 const GROK_BUILD_CONFIG_TEMPLATE = `[cli]
 auto_update = false
-minimum_version = "1.0.4"
-maximum_version = "1.0.4"
-required_minimum_version = "1.0.4"
-required_maximum_version = "1.0.4"
+
+[auth]
+preferred_method = "oidc"
 
 [features]
 telemetry = false
@@ -282,21 +281,23 @@ class DefaultGrokBuildPrivateRuntime implements GrokBuildPrivateRuntime {
   }
 
   async ensureBase(): Promise<GrokBuildRuntimePaths> {
-    await ensureOwnedDirectory(this.paths.root, this.platform);
-    await ensureOwnedDirectory(this.paths.home, this.platform);
-    await ensureOwnedDirectory(this.paths.grokHome, this.platform);
-    await ensureOwnedDirectory(this.paths.runsRoot, this.platform);
-    await writeOwnedFile(
-      this.paths.configPath,
-      buildGrokBuildConfig(this.paths.grokHome),
-      this.platform,
-    );
-    await writeOwnedFile(
-      this.paths.agentProfilePath,
-      GROK_BUILD_AGENT_PROFILE,
-      this.platform,
-    );
-    return this.paths;
+    return this.serialize(async () => {
+      await ensureOwnedDirectory(this.paths.root, this.platform);
+      await ensureOwnedDirectory(this.paths.home, this.platform);
+      await ensureOwnedDirectory(this.paths.grokHome, this.platform);
+      await ensureOwnedDirectory(this.paths.runsRoot, this.platform);
+      await writeOwnedFile(
+        this.paths.configPath,
+        buildGrokBuildConfig(this.paths.grokHome),
+        this.platform,
+      );
+      await writeOwnedFile(
+        this.paths.agentProfilePath,
+        GROK_BUILD_AGENT_PROFILE,
+        this.platform,
+      );
+      return this.paths;
+    });
   }
 
   async attestBase(): Promise<void> {

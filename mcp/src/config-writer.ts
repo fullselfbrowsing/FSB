@@ -1,6 +1,7 @@
 import { readFile, writeFile, copyFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { dirname } from 'node:path';
+import { isDeepStrictEqual } from 'node:util';
 import stripJsonComments from 'strip-json-comments';
 import { parse as parseToml, stringify as stringifyToml } from 'smol-toml';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
@@ -21,6 +22,8 @@ export interface ConfigResult {
  * @returns Parsed data
  */
 function parseByFormat(raw: string, format: ConfigFormat): Record<string, unknown> {
+  // Some clients create their config file empty (Antigravity's mcp_config.json).
+  if (raw.trim() === '') return {};
   switch (format) {
     case 'json':
       return JSON.parse(raw) as Record<string, unknown>;
@@ -95,6 +98,53 @@ function mergeServerEntry(
 }
 
 /**
+ * Find the current server entry, if any, under the platform's root key.
+ * @param data - Current config data
+ * @param serverMapKey - Root key
+ * @param serverName - Server name
+ * @param mergeStrategy - How entries are stored: 'object-map' or 'named-array'
+ * @returns The existing entry, or undefined when there is none
+ */
+function findExistingEntry(
+  data: Record<string, unknown>,
+  serverMapKey: string,
+  serverName: string,
+  mergeStrategy: MergeStrategy,
+): unknown {
+  const container = data[serverMapKey];
+  if (mergeStrategy === 'named-array') {
+    return Array.isArray(container)
+      ? container.find((item: Record<string, unknown>) => item?.name === serverName)
+      : undefined;
+  }
+  if (!container || typeof container !== 'object' || Array.isArray(container)) return undefined;
+  return (container as Record<string, unknown>)[serverName];
+}
+
+/**
+ * Copy the platform's preserved keys from the existing entry onto the new one
+ * so a reinstall keeps settings the user chose in the client.
+ * @param entry - Server entry FSB would write
+ * @param existing - Entry currently in the config, if any
+ * @param keys - Keys the client owns on the entry
+ * @returns The entry to write
+ */
+function carryOverPreservedKeys(
+  entry: Record<string, unknown>,
+  existing: unknown,
+  keys: readonly string[] | undefined,
+): Record<string, unknown> {
+  if (!keys?.length || !existing || typeof existing !== 'object' || Array.isArray(existing)) {
+    return entry;
+  }
+  const merged: Record<string, unknown> = { ...entry };
+  for (const [key, value] of Object.entries(existing)) {
+    if (keys.includes(key) && value !== undefined) merged[key] = value;
+  }
+  return merged;
+}
+
+/**
  * Check if FSB is already configured identically (idempotency check).
  * @param data - Current config data
  * @param serverMapKey - Root key
@@ -117,11 +167,11 @@ function checkIdempotent(
       (item: Record<string, unknown>) => item.name === serverName,
     );
     if (!found) return false;
-    return JSON.stringify({ name: serverName, ...entry }) === JSON.stringify(found);
+    return isDeepStrictEqual({ name: serverName, ...entry }, found);
   } else {
     const map = data[serverMapKey] as Record<string, unknown> | undefined;
     if (!map?.[serverName]) return false;
-    return JSON.stringify(map[serverName]) === JSON.stringify(entry);
+    return isDeepStrictEqual(map[serverName], entry);
   }
 }
 
@@ -177,7 +227,7 @@ export async function installToConfig(
     }
 
     // 2. Build the server entry (use caller-provided entry or fall back to default)
-    const serverEntry: Record<string, unknown> = entry || { ...getServerEntry() };
+    const baseEntry: Record<string, unknown> = entry || { ...getServerEntry() };
     const strategy: MergeStrategy = platform.mergeStrategy;
 
     // 3. Read existing file or start fresh, backup before any mutation
@@ -189,6 +239,13 @@ export async function installToConfig(
       const raw: string = await readFile(configPath, 'utf-8');
       data = parseByFormat(raw, platform.format);
     }
+
+    // Keep client-owned settings from an existing entry (e.g. Cline's auto-approve list)
+    const serverEntry: Record<string, unknown> = carryOverPreservedKeys(
+      baseEntry,
+      findExistingEntry(data, platform.serverMapKey!, serverName, strategy),
+      platform.preservedEntryKeys,
+    );
 
     // 4. Check idempotency (INST-04) -- skip if already identical
     if (checkIdempotent(data, platform.serverMapKey!, serverName, serverEntry, strategy)) {

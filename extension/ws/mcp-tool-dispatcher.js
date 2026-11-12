@@ -488,7 +488,8 @@ function canonicalLabelFromClientInfo(clientInfo) {
   if (name.includes('codex')) return 'Codex';
   if (name.includes('opencode')) return 'OpenCode';
   if (name.includes('cursor')) return 'Cursor';
-  if (name.includes('windsurf')) return 'Windsurf';
+  if (name.includes('antigravity')) return 'Antigravity';
+  if (name.includes('cline')) return 'Cline';
   return null;
 }
 
@@ -1313,6 +1314,14 @@ async function navigateTabAndWaitForCommit(tabId, url) {
     event.addListener(listener);
     listeners.push([event, listener]);
   };
+  // This navigation also aborts the outgoing page's unfinished load, and
+  // webNavigation reports that under the outgoing document. A failure of this
+  // navigation carries the error page's document, or none.
+  let outgoingDocumentId;
+  if (typeof events.getFrame === 'function') {
+    Promise.resolve(events.getFrame({ tabId, frameId: 0 }))
+      .then(frame => { outgoingDocumentId = frame && frame.documentId; }, () => {});
+  }
   const committed = details => {
     if (details.tabId === tabId && details.frameId === 0) finish({ success: true, url: details.url });
   };
@@ -1320,6 +1329,10 @@ async function navigateTabAndWaitForCommit(tabId, url) {
   listen(events.onReferenceFragmentUpdated, committed);
   listen(events.onHistoryStateUpdated, committed);
   listen(events.onErrorOccurred, details => {
+    // Recovering a hung renderer can abort the outgoing page's own load before
+    // this navigation is requested; that error is not this navigation's.
+    if (!navigationRequested) return;
+    if (outgoingDocumentId && details.documentId === outgoingDocumentId) return;
     if (details.tabId === tabId && details.frameId === 0) finish({
       success: false, errorCode: 'navigation_failed', error: details.error,
       outcome: 'failed', mayHaveExecuted: false
@@ -1336,7 +1349,7 @@ async function navigateTabAndWaitForCommit(tabId, url) {
   try {
     const recoverRenderer = async () => {
       if (typeof recoverStalledTabNavigation !== 'function') return false;
-      try { return await recoverStalledTabNavigation(tabId, () => !settled); }
+      try { return await recoverStalledTabNavigation(tabId, () => !settled, { allowCrash: !navigationRequested }); }
       catch (error) {
         globalThis.automationLogger?.debug('Navigation renderer recovery failed', { tabId, error: error.message || String(error) });
         return false;
