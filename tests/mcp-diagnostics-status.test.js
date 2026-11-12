@@ -227,7 +227,7 @@ function makeGrokDetection(overrides = {}) {
       realPath: '/opt/grok',
       argvPrefix: [],
     },
-    profileVersion: '1.0.4',
+    profileVersion: 'grok-acp-v1',
     ...overrides,
   };
 }
@@ -808,9 +808,9 @@ async function run() {
       binaryPath: '/opt/grok',
       detectedVersion: '1.0.4',
       compatibilityStatus: 'supported',
-      compatibilityReason: 'within_tested_range',
+      compatibilityReason: 'capability_verified',
       authState: 'oauth',
-      profileVersion: '1.0.4',
+      profileVersion: 'grok-acp-v1',
     },
     'Grok Build doctor row publishes the exact reviewed profile and safe OAuth state',
   );
@@ -851,33 +851,40 @@ async function run() {
       binaryPath: '/opt/grok',
       detectedVersion: '1.0.4',
       compatibilityStatus: 'supported',
-      compatibilityReason: 'within_tested_range',
+      compatibilityReason: 'capability_verified',
       authState: 'oauth',
     }],
-    ['degraded OAuth', makeGrokDetection({
+    ['newer verified OAuth', makeGrokDetection({
       version: '1.0.5',
-      profileVersion: '1.0.4',
+      profileVersion: 'grok-acp-v1',
     }), {
       binaryPath: '/opt/grok',
       detectedVersion: '1.0.5',
-      compatibilityStatus: 'degraded',
-      compatibilityReason: 'newer_than_tested_range',
+      compatibilityStatus: 'supported',
+      compatibilityReason: 'capability_verified',
       authState: 'oauth',
     }],
     ['unauthenticated', makeGrokDetection({ authState: 'unauthenticated' }), {
       binaryPath: '/opt/grok',
       detectedVersion: '1.0.4',
       compatibilityStatus: 'supported',
-      compatibilityReason: 'within_tested_range',
+      compatibilityReason: 'capability_verified',
       authState: 'unauthenticated',
     }],
     ['unknown native state', makeGrokDetection({ authState: 'authenticated' }), {
       binaryPath: '/opt/grok',
       detectedVersion: '1.0.4',
       compatibilityStatus: 'supported',
-      compatibilityReason: 'within_tested_range',
+      compatibilityReason: 'capability_verified',
       authState: 'unknown',
     }],
+    ...['sandbox_unavailable', 'isolation_unavailable', 'capability_missing', 'agent_protocol_drift', 'binary_changed'].map((code) => [
+      code, makeGrokDetection({ installed: false, profileVersion: null,
+        diagnostic: { code, message: 'PRIVATE_FAILURE_DETAIL' } }), {
+        binaryPath: '/opt/grok', detectedVersion: '1.0.4', compatibilityStatus: 'unsupported',
+        compatibilityReason: code, authState: 'unknown',
+      },
+    ]),
   ]) {
     const snapshot = await diagnostics.collectBridgeDiagnostics(
       { waitForExtensionMs: 0 },
@@ -895,7 +902,7 @@ async function run() {
       adapterId: 'grok-build',
       displayLabel: 'Grok Build',
       ...expected,
-      profileVersion: '1.0.4',
+      profileVersion: 'grok-acp-v1',
     }, `${label} maps to the canonical safe Grok Build doctor row`);
   }
 

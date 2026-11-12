@@ -192,12 +192,16 @@ async function main() {
     ['cursor', 'cursor'],
     ['visualstudiocode', 'vscode'],
     ['vscode', 'vscode'],
-    ['windsurf', 'windsurf'],
+    ['antigravity', 'antigravity'],
+    ['googleantigravity', 'antigravity'],
     ['codex', 'codex'],
     ['openaicodex', 'codex'],
     ['codexcli', 'codex'],
     ['opencode', 'opencode'],
     ['opencodecli', 'opencode'],
+    ['cline', 'cline'],
+    ['  Cline  ', 'cline'],
+    ['@cline/core', 'cline'],
     ['openclaw', 'openclaw']
   ]);
   for (const [name, expected] of aliasesExpected) {

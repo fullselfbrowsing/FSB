@@ -8,8 +8,15 @@
   const settingsButton = document.getElementById('openSettingsBtn');
   const statusElement = document.getElementById('status');
 
-  function setStatus(message, state = '') {
-    statusElement.textContent = message;
+  // fill() records the key, so the locale boot (which can finish after this
+  // page writes its first status) re-translates the text in place.
+  function writeMicText(node, key, english) {
+    if (globalThis.fsbUiLocale && typeof fsbUiLocale.fill === 'function') fsbUiLocale.fill(node, key, english);
+    else node.textContent = english;
+  }
+
+  function setStatus(key, english, state = '') {
+    writeMicText(statusElement, key, english);
     statusElement.className = state;
   }
 
@@ -47,36 +54,37 @@
     window.close();
   }
 
-  function errorMessage(error, permissionState) {
+  // Returns [catalog key, English text] for a failed microphone request.
+  function errorCopy(error, permissionState) {
     if (permissionState === 'denied') {
-      return 'Microphone access is blocked for FSB. Open Chrome microphone settings, remove the blocked FSB entry, then try again.';
+      return ['entry_mic_blocked', 'Microphone access is blocked for FSB. Open Chrome microphone settings, remove the blocked FSB entry, then try again.'];
     }
     switch (error?.name) {
       case 'NotFoundError':
       case 'DevicesNotFoundError':
-        return 'No microphone was found. Connect or enable an input device, then try again.';
+        return ['entry_mic_none', 'No microphone was found. Connect or enable an input device, then try again.'];
       case 'NotReadableError':
       case 'TrackStartError':
-        return 'The microphone is busy or unavailable. Close other recording apps, then try again.';
+        return ['entry_mic_busy', 'The microphone is busy or unavailable. Close other recording apps, then try again.'];
       case 'NotAllowedError':
       case 'PermissionDeniedError':
       case 'SecurityError':
-        return 'Chrome could not access the microphone. On macOS, enable Google Chrome in System Settings → Privacy & Security → Microphone, then try again.';
+        return ['entry_mic_macos', 'Chrome could not access the microphone. On macOS, enable Google Chrome in System Settings → Privacy & Security → Microphone, then try again.'];
       default:
-        return 'FSB could not access the microphone. Check Chrome and macOS microphone settings, then try again.';
+        return ['entry_mic_generic', 'FSB could not access the microphone. Check Chrome and macOS microphone settings, then try again.'];
     }
   }
 
   async function requestMicrophone() {
     if (!navigator.mediaDevices?.getUserMedia) {
-      setStatus('This Chrome build does not provide microphone access to extensions.', 'error');
+      setStatus('entry_mic_no_api', 'This Chrome build does not provide microphone access to extensions.', 'error');
       allowButton.disabled = true;
       return;
     }
 
     allowButton.disabled = true;
     settingsButton.classList.add('hidden');
-    setStatus('Waiting for Chrome’s microphone prompt…');
+    setStatus('entry_mic_waiting', 'Waiting for Chrome’s microphone prompt…');
 
     let stream = null;
     try {
@@ -88,17 +96,18 @@
       } catch (_e) {
         // The permission remains granted if the side panel closed meanwhile.
       }
-      setStatus('Microphone enabled. Returning to FSB…', 'success');
+      setStatus('entry_mic_enabled', 'Microphone enabled. Returning to FSB…', 'success');
       setTimeout(() => {
         void closePermissionTab();
       }, 700);
     } catch (error) {
       stopStream(stream);
       const permissionState = await getPermissionState();
-      setStatus(errorMessage(error, permissionState), 'error');
+      const [errorKey, errorEnglish] = errorCopy(error, permissionState);
+      setStatus(errorKey, errorEnglish, 'error');
       settingsButton.classList.toggle('hidden', permissionState !== 'denied');
       allowButton.disabled = false;
-      allowButton.textContent = 'Try again';
+      writeMicText(allowButton, 'entry_mic_try', 'Try again');
       console.warn('[STT permission]', error?.name || 'Error', error?.message || '');
     }
   }
@@ -107,7 +116,7 @@
     try {
       await chrome.tabs.create({ url: 'chrome://settings/content/microphone', active: true });
     } catch (_e) {
-      setStatus('Open chrome://settings/content/microphone in the address bar, then remove the blocked FSB entry.', 'error');
+      setStatus('entry_mic_manual', 'Open chrome://settings/content/microphone in the address bar, then remove the blocked FSB entry.', 'error');
     }
   }
 
@@ -120,8 +129,7 @@
 
   globalThis.FSBMicrophonePermission = {
     requestMicrophone,
-    getPermissionState,
-    errorMessage
+    getPermissionState
   };
 
   void requestMicrophone();

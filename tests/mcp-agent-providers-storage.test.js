@@ -60,7 +60,7 @@ function grokCompatibilityRow(overrides = {}) {
     adapterId: 'grok-build',
     displayLabel: 'Grok Build',
     status: 'supported',
-    reason: 'within_tested_range',
+    reason: 'capability_verified',
     authState: 'oauth',
     ...overrides
   };
@@ -285,7 +285,7 @@ async function main() {
     assert.deepEqual(canonical.createAcceptedAgentIdentity('grok-build', 'oauth'), {
       providerId: 'grok-build',
       label: 'Grok Build',
-      profileVersion: '1.0.4',
+      profileVersion: 'grok-acp-v1',
       authState: 'oauth',
       billingKind: 'subscription'
     });
@@ -836,7 +836,7 @@ async function main() {
     }, 'snapshot-only Claude compatibility remains visible without unrelated evidence maps');
     assert.deepEqual(merged['grok-build'].compatibility, {
       status: 'supported',
-      reason: 'within_tested_range',
+      reason: 'capability_verified',
       checkedAt
     }, 'snapshot-only Grok Build compatibility ships from its validated daemon row');
     for (const providerId of ['claude-code', 'grok-build']) {
@@ -845,10 +845,12 @@ async function main() {
         merged[providerId],
         (value) => `absolute:${value}`
       ), {
-        label: 'Supported',
+        label: providerId === 'grok-build' ? 'Verified' : 'Supported',
         icon: 'fa-circle-check',
         className: 'compatibility-badge--supported',
-        detail: "This CLI is within FSB's fixture-tested compatibility range.",
+        detail: providerId === 'grok-build'
+          ? 'FSB verified the required protocol and isolation capabilities of this CLI.'
+          : "This CLI is within FSB's fixture-tested compatibility range.",
         checkedText: `Checked absolute:${checkedAt}`
       }, `${providerId} safe storage projection reaches the shared Supported view model`);
     }
@@ -862,7 +864,7 @@ async function main() {
     assert.deepEqual(merged['grok-build'].acceptedIdentity, {
       providerId: 'grok-build',
       label: 'Grok Build',
-      profileVersion: '1.0.4',
+      profileVersion: 'grok-acp-v1',
       authState: 'oauth',
       billingKind: 'subscription'
     });
@@ -1313,6 +1315,29 @@ async function main() {
       /MCP client inventory storage unavailable/,
       'missing provider helper rejects with a bounded error'
     );
+  }
+
+  {
+    const checkedAt = 15_000_000;
+    installChrome({ local: { fsbAgentProviders: {
+      clicked: {}, connected: {}, installed: {},
+      compatibility: compatibilitySnapshot(checkedAt, [compatibilityRow(),
+        grokCompatibilityRow({ reason: 'within_tested_range' })])
+    } } });
+    const providers = freshProviders();
+    const merged = await providers.getMergedClients([], () => checkedAt);
+    assert.deepEqual(merged['grok-build'].compatibility, {
+      status: 'unsupported', reason: 'capability_unverified', checkedAt
+    }, 'old version-only success evidence requires fresh capability verification');
+    assert.equal(Object.hasOwn(merged['grok-build'], 'acceptedIdentity'), false,
+      'legacy version evidence cannot mint a new contract identity');
+    for (const reason of ['sandbox_unavailable', 'isolation_unavailable', 'capability_missing', 'agent_protocol_drift', 'binary_changed']) {
+      await providers.replaceCompatibility(compatibilitySnapshot(checkedAt, [compatibilityRow(),
+        grokCompatibilityRow({ status: 'unsupported', reason, authState: 'unknown' })]));
+      const refused = await providers.getMergedClients([], () => checkedAt);
+      assert.equal(refused['grok-build'].compatibility.reason, reason);
+      assert.equal(Object.hasOwn(refused['grok-build'], 'acceptedIdentity'), false);
+    }
   }
 
   delete globalThis.FsbMcpAgentProviders;

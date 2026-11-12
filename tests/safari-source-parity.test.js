@@ -153,10 +153,11 @@ function extensionResourcePaths(pbx) {
       'epilogue loads the Lattice host inside captureLoopback() so only its listeners join the fan-out');
 
     console.log('\n=== 6. Chrome pins are unaffected by the transform ===');
-    passAssertEqual((srcBg.match(/importScripts/g) || []).length, 334,
-      'extension/background.js still has exactly 334 script-import mentions');
-    passAssertEqual((srcBg.match(/importScripts\(/g) || []).length, 330,
-      'extension/background.js still has exactly 330 script-import call sites');
+    // Mirrors tests/lattice-provider-bridge-smoke.test.js, the canonical pin.
+    passAssertEqual((srcBg.match(/importScripts/g) || []).length, 330,
+      'extension/background.js still has exactly 330 script-import mentions');
+    passAssertEqual((srcBg.match(/importScripts\(/g) || []).length, 326,
+      'extension/background.js still has exactly 326 script-import call sites');
 
     console.log('\n=== 7. adapter + native transport are INLINED, not script-imported ===');
     const adapter = fs.readFileSync(path.join(EXT, 'utils', 'platform-adapter.js'), 'utf8');

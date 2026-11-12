@@ -16,9 +16,10 @@ const ALL_CLIENT_IDS = [
   'claude-desktop',
   'cursor',
   'vscode',
-  'windsurf',
+  'antigravity',
   'codex',
-  'opencode'
+  'opencode',
+  'cline'
 ];
 
 function sha256(filePath) {
@@ -138,7 +139,7 @@ function createHarness(initialStore, options) {
   const allIdsMatch = ONBOARDING_SOURCE.match(/const ALL_INSTALL_CLIENT_IDS = \[([\s\S]*?)\];/);
   assert(allIdsMatch, 'all-client expansion constant exists');
   const sourceAllIds = Array.from(allIdsMatch[1].matchAll(/'([^']+)'/g), (match) => match[1]);
-  assert.deepStrictEqual(sourceAllIds, ALL_CLIENT_IDS, 'all expands to the exact seven flag-backed ids');
+  assert.deepStrictEqual(sourceAllIds, ALL_CLIENT_IDS, 'all expands to the exact eight flag-backed ids');
   assert(!sourceAllIds.includes('openclaw'), 'all expansion excludes openclaw');
 
   const copyCommandSource = extractFunction(ONBOARDING_SOURCE, 'copyCommand');
@@ -153,15 +154,16 @@ function createHarness(initialStore, options) {
   assert(copyCommandSource.indexOf('writeClipboard(text);') < copyCommandSource.indexOf('persistCopyClick(clientId, source)'),
     'clipboard write remains ahead of persistence');
   assert(copyCommandSource.includes('}, 1600);'), 'copied state still uses the 1600 ms timer');
-  assert(copyCommandSource.includes("showToast('Install command copied');"), 'copy toast text remains exact');
+  assert(copyCommandSource.includes("showToast(ob('entry_toast_copied', 'Install command copied'))"), 'copy toast text remains exact');
   assert(showToastSource.includes('}, 2600);'), 'toast still uses the 2600 ms timer');
   assert(!/\brender(?:Toast)?\s*\(/.test(persistSource), 'persistence does not render or toast');
 
   assert.strictEqual(
     sha256(ONBOARDING_HTML_PATH),
-    // Rolled for the Safari port: bundled Font Awesome path and the platform shim.
-    'd58dfdf789c8d22b21e602b8242a179f4f201e5b4f8afef8a615b920f3a3e81f',
-    'onboarding.html has no Phase 57 change'
+    // Rolled for the Safari port (bundled Font Awesome path and the platform shim)
+    // and the locale script and onboarding tag key.
+    'a080df4b14ee0850a552356455e2765c5d06e6e7930882d04a90c191e3cb7181',
+    'onboarding.html hash rolled for the Safari shim and the locale script'
   );
   assert.strictEqual(
     sha256(ONBOARDING_CSS_PATH),
@@ -230,7 +232,7 @@ function createHarness(initialStore, options) {
     await harness.api.flushCopyWrites();
     const envelope = plain(harness.store.fsbAgentProviders);
     assert.deepStrictEqual(Object.keys(envelope.clicked).sort(), ALL_CLIENT_IDS.slice().sort(),
-      'all writes exactly seven clicked entries');
+      'all writes exactly eight clicked entries');
     ALL_CLIENT_IDS.forEach((id) => {
       assert.deepStrictEqual(envelope.clicked[id], {
         count: 1,
@@ -253,9 +255,9 @@ function createHarness(initialStore, options) {
     harness.api.setRender(() => { renderCount++; });
     harness.api.state.iconIndex = 4;
 
-    const result = harness.api.copyCommand('install windsurf', 'current');
+    const result = harness.api.copyCommand('install antigravity', 'current');
     assert.strictEqual(result, undefined, 'visual copy path remains synchronous');
-    assert.deepStrictEqual(clipboardWrites, ['install windsurf'], 'clipboard action runs once immediately');
+    assert.deepStrictEqual(clipboardWrites, ['install antigravity'], 'clipboard action runs once immediately');
     assert.strictEqual(renderCount, 1, 'copy action renders once immediately');
     assert.strictEqual(harness.api.state.copied, 'current', 'base copied state remains current');
     assert.strictEqual(harness.api.state.toast, 'Install command copied', 'one existing toast is shown');
@@ -264,7 +266,7 @@ function createHarness(initialStore, options) {
 
     await harness.api.flushCopyWrites();
     const clicked = plain(harness.store.fsbAgentProviders.clicked);
-    assert.deepStrictEqual(clicked.windsurf, {
+    assert.deepStrictEqual(clicked.antigravity, {
       count: 1,
       firstClickedAt: 1000,
       lastClickedAt: 1000,

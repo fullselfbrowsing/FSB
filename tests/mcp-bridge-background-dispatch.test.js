@@ -70,7 +70,7 @@ const ACCEPTED_IDENTITIES = Object.freeze({
   'grok-build': Object.freeze({
     providerId: 'grok-build',
     label: 'Grok Build',
-    profileVersion: '1.0.4',
+    profileVersion: 'grok-acp-v1',
     authState: 'oauth',
     billingKind: 'subscription'
   })
@@ -777,7 +777,7 @@ function buildDelegationCommandHarness(options = {}) {
       acceptedIdentity: acceptedIdentity('claude-code')
     },
     'grok-build': {
-      compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 100 },
+      compatibility: { status: 'supported', reason: 'capability_verified', checkedAt: 100 },
       authState: 'oauth',
       acceptedIdentity: acceptedIdentity('grok-build')
     }
@@ -917,7 +917,7 @@ function buildDelegationProviderRoutingHarness(options = {}) {
       acceptedIdentity: acceptedIdentity('claude-code')
     },
     'grok-build': {
-      compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 100 },
+      compatibility: { status: 'supported', reason: 'capability_verified', checkedAt: 100 },
       authState: 'oauth',
       acceptedIdentity: acceptedIdentity('grok-build')
     }
@@ -1422,10 +1422,10 @@ async function runDriftSettlementCases() {
   {
     const harness = buildDriftSettlementHarness();
     const grokBuildId = 'delegation_drift_grok_build';
-    harness.activate(grokBuildId, '1.0.4', 'grok-build');
+    harness.activate(grokBuildId, 'grok-acp-v1', 'grok-build');
     await harness.settle(grokBuildId, driftFinal({
       adapterId: 'grok-build',
-      profileVersion: '1.0.4',
+      profileVersion: 'grok-acp-v1',
       reason: 'invalid_order',
       expected: 'known_event_shape',
       eventIndex: 4097,
@@ -1433,7 +1433,7 @@ async function runDriftSettlementCases() {
     }), null);
     assertDeepEqual(harness.reporterCalls[0], {
       adapterId: 'grok-build',
-      profileVersion: '1.0.4',
+      profileVersion: 'grok-acp-v1',
       reason: 'invalid_order',
       expected: 'known_event_shape',
       eventIndex: 4097,
@@ -1447,7 +1447,7 @@ async function runDriftSettlementCases() {
     for (const [delegationId, detail] of [
       ['delegation_drift_provider_mismatch', {
         adapterId: 'claude-code',
-        profileVersion: '1.0.4',
+        profileVersion: 'grok-acp-v1',
         reason: 'invalid_json',
         expected: 'bounded_jsonl',
         eventIndex: 1,
@@ -1462,7 +1462,7 @@ async function runDriftSettlementCases() {
         issuePaths: []
       }]
     ]) {
-      harness.activate(delegationId, '1.0.4', 'grok-build');
+      harness.activate(delegationId, 'grok-acp-v1', 'grok-build');
       await harness.settle(delegationId, driftFinal(detail), null);
     }
     assertEqual(harness.reporterCalls.length, 1,
@@ -1656,7 +1656,7 @@ async function runCompatibilityRefreshCases() {
         },
         'grok-build': {
           id: 'grok-build',
-          compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 1 }
+          compatibility: { status: 'supported', reason: 'capability_verified', checkedAt: 1 }
         }
       }
     });
@@ -2551,7 +2551,7 @@ async function runDelegationAuthorityCases() {
       compatibilityClients: clients,
       async refreshCompatibility() {
         clients[providerId] = {
-          compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 200 },
+          compatibility: { status: 'supported', reason: providerId === 'grok-build' ? 'capability_verified' : 'within_tested_range', checkedAt: 200 },
           authState: ACCEPTED_IDENTITIES[providerId].authState,
           acceptedIdentity: acceptedIdentity(providerId)
         };
@@ -2669,7 +2669,7 @@ async function runDelegationAuthorityCases() {
       compatibilityClients: clients,
       async refreshCompatibility() {
         clients['grok-build'] = {
-          compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 200 },
+          compatibility: { status: 'supported', reason: 'capability_verified', checkedAt: 200 },
           acceptedIdentity: acceptedIdentity('grok-build')
         };
         return { refreshOutcome: 'refreshed' };
@@ -2945,7 +2945,7 @@ async function runDelegationProviderRoutingCases() {
   {
     const clients = {
       'grok-build': {
-        compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 100 },
+        compatibility: { status: 'supported', reason: 'capability_verified', checkedAt: 100 },
         authState: 'unauthenticated'
       }
     };
@@ -2954,7 +2954,7 @@ async function runDelegationProviderRoutingCases() {
       compatibilityClients: clients,
       async refreshCompatibility() {
         clients['grok-build'] = {
-          compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 200 },
+          compatibility: { status: 'supported', reason: 'capability_verified', checkedAt: 200 },
           authState: 'oauth',
           acceptedIdentity: acceptedIdentity('grok-build')
         };
@@ -3114,7 +3114,7 @@ async function runDelegationProviderRoutingCases() {
         acceptedIdentity: ACCEPTED_IDENTITIES['grok-build'],
         providerId: 'grok-build',
         label: 'Grok Build',
-        profileVersion: '1.0.4',
+        profileVersion: 'grok-acp-v1',
         authState: 'oauth',
         billingKind: 'subscription'
       }, 'accepted Grok Build context never inherits Claude identity or billing');
@@ -3269,10 +3269,10 @@ function runSourceContractCase() {
     assert(!compatibilityComposition.includes(forbidden),
       `compatibility refresh orchestration does not touch ${forbidden}`);
   }
-  const sunsetListAgents = backgroundSource.indexOf("//     case 'listAgents':");
-  assert(sunsetListAgents >= 0, 'sunset listAgents runtime case remains commented out');
-  assert(backgroundSource.indexOf("case 'getMcpClients'") < sunsetListAgents,
-    'new inventory action is independent from the later sunset listAgents block');
+  assert(!/case 'listAgents':/.test(backgroundSource),
+    'retired listAgents runtime case is gone, commented-out copy included');
+  assert(backgroundSource.indexOf("case 'getMcpClients'") >= 0,
+    'MCP client inventory action stays live');
 
   const bridgeSource = fs.readFileSync(path.join(__dirname, '..', 'extension', 'ws', 'mcp-bridge-client.js'), 'utf8');
   assert(bridgeSource.includes('globalThis.fsbDispatchInternalMessage'), 'mcp-bridge-client.js prefers globalThis.fsbDispatchInternalMessage');

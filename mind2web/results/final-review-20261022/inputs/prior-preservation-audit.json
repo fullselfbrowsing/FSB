@@ -1,0 +1,265 @@
+{
+  "verified_at": "2026-10-22T05:32:25.850485+00:00",
+  "ok": true,
+  "files_verified": 43,
+  "files": [
+    {
+      "path": "bench/online-mind2web/results/rerun-public-claude-20261020/manifest.json",
+      "expected": "c04277dbd71e894639c22bc0f6761b298ce6d3a8a0039ac6f864ca06f01c19e3",
+      "actual": "c04277dbd71e894639c22bc0f6761b298ce6d3a8a0039ac6f864ca06f01c19e3",
+      "matches": true
+    },
+    {
+      "path": "bench/online-mind2web/results/rerun-public-claude-20261020/REPORT.md",
+      "expected": "e1a1dbc484ef2f19f6d60a2489f6c07602dfb16d384d2a8d8c92704c03ab9267",
+      "actual": "e1a1dbc484ef2f19f6d60a2489f6c07602dfb16d384d2a8d8c92704c03ab9267",
+      "matches": true
+    },
+    {
+      "path": "bench/online-mind2web/results/rerun-public-claude-20261020/CORRECTED-SCORES.json",
+      "expected": "c6b0ad25bb80632d678c15a5ce3193960042b4818b156f3611c43e9490fd249d",
+      "actual": "c6b0ad25bb80632d678c15a5ce3193960042b4818b156f3611c43e9490fd249d",
+      "matches": true
+    },
+    {
+      "path": "bench/online-mind2web/results/rerun-public-claude-20261020/per-task-corrected.json",
+      "expected": "c8e66a3a4ba6dbf22aecbca08f39d77985694e43b533515f0e88a8d3db581783",
+      "actual": "c8e66a3a4ba6dbf22aecbca08f39d77985694e43b533515f0e88a8d3db581783",
+      "matches": true
+    },
+    {
+      "path": "bench/online-mind2web/results/rerun-public-claude-20261020/per-task-corrected.csv",
+      "expected": "7886e8a82709ae0df6e8f0dd66f27df6965e7b1cfab8ba158a7cf5666b858559",
+      "actual": "7886e8a82709ae0df6e8f0dd66f27df6965e7b1cfab8ba158a7cf5666b858559",
+      "matches": true
+    },
+    {
+      "path": "bench/online-mind2web/results/rerun-public-claude-20261020/collection-audit.json",
+      "expected": "666e57eae3f5ac9bc8efa507aec183515404f5fc3628cda4bf6b3275d864a52a",
+      "actual": "666e57eae3f5ac9bc8efa507aec183515404f5fc3628cda4bf6b3275d864a52a",
+      "matches": true
+    },
+    {
+      "path": "bench/online-mind2web/results/rerun-public-claude-20261020/FINAL-AUDIT.json",
+      "expected": "739d0b0091c6692853537c8b542e83c2dfa6aebd4d39417fe4d3252f774625fa",
+      "actual": "739d0b0091c6692853537c8b542e83c2dfa6aebd4d39417fe4d3252f774625fa",
+      "matches": true
+    },
+    {
+      "path": "bench/online-mind2web/results/rerun-public-claude-20261020/judge/claude-official-pass1/results.jsonl",
+      "expected": "3d2be878102995f75e801f4d036ebb4b3a366122be1d3ebf5a9aaa2f68e6aabd",
+      "actual": "3d2be878102995f75e801f4d036ebb4b3a366122be1d3ebf5a9aaa2f68e6aabd",
+      "matches": true
+    },
+    {
+      "path": "bench/online-mind2web/results/rerun-public-claude-20261020/judge/claude-official-pass2/results.jsonl",
+      "expected": "f387ffff85c40623c0ad74666bdb1c65534cbe53c208e22f930b78a9788be445",
+      "actual": "f387ffff85c40623c0ad74666bdb1c65534cbe53c208e22f930b78a9788be445",
+      "matches": true
+    },
+    {
+      "path": "bench/online-mind2web/results/rerun-public-claude-20261020/judge/claude-official-pass3/results.jsonl",
+      "expected": "590f41d7b67db595301cc7720a34b2149cd9a21a816e844010f1d1276fd26c60",
+      "actual": "590f41d7b67db595301cc7720a34b2149cd9a21a816e844010f1d1276fd26c60",
+      "matches": true
+    },
+    {
+      "path": "bench/online-mind2web/results/rerun-public-claude-20261020/judge/claude-strict-pass1/results.jsonl",
+      "expected": "52c734886999c28916d19bb87a1427ae12805b14786a500601d51da966360996",
+      "actual": "52c734886999c28916d19bb87a1427ae12805b14786a500601d51da966360996",
+      "matches": true
+    },
+    {
+      "path": "bench/online-mind2web/results/rerun-public-claude-20261020/judge/claude-strict-pass2/results.jsonl",
+      "expected": "25fc038cefeb2c506213ed2c538b30b5a629f5e224e3a438a3d753a6706623ee",
+      "actual": "25fc038cefeb2c506213ed2c538b30b5a629f5e224e3a438a3d753a6706623ee",
+      "matches": true
+    },
+    {
+      "path": "bench/online-mind2web/results/rerun-public-claude-20261020/judge/claude-strict-pass3/results.jsonl",
+      "expected": "2bff865935511a17adea2d53a6ef98761017e329d62459914ff5090f7ce79344",
+      "actual": "2bff865935511a17adea2d53a6ef98761017e329d62459914ff5090f7ce79344",
+      "matches": true
+    },
+    {
+      "path": "bench/online-mind2web/results/rerun-public-claude-20261020/judge/claude-official-pass1/summary.json",
+      "expected": "8ed0e6e452d91ee32b35417e704c03decd59c790192fd0aec21917adf39eef65",
+      "actual": "8ed0e6e452d91ee32b35417e704c03decd59c790192fd0aec21917adf39eef65",
+      "matches": true
+    },
+    {
+      "path": "bench/online-mind2web/results/rerun-public-claude-20261020/judge/claude-official-pass2/summary.json",
+      "expected": "7c34e138fda2fb684807fdbdad3407847e4be57644cd8fc2cfffc09830dc39ad",
+      "actual": "7c34e138fda2fb684807fdbdad3407847e4be57644cd8fc2cfffc09830dc39ad",
+      "matches": true
+    },
+    {
+      "path": "bench/online-mind2web/results/rerun-public-claude-20261020/judge/claude-official-pass3/summary.json",
+      "expected": "045056a3c9c50c1c40110059d9dba55f6b3c6e449f9ed69be1db3f4927b73845",
+      "actual": "045056a3c9c50c1c40110059d9dba55f6b3c6e449f9ed69be1db3f4927b73845",
+      "matches": true
+    },
+    {
+      "path": "bench/online-mind2web/results/rerun-public-claude-20261020/judge/claude-strict-pass1/summary.json",
+      "expected": "b3495d01e702b7bfa26bd633e1fa57012907c99ebd5a5b623ec73d6afc225d63",
+      "actual": "b3495d01e702b7bfa26bd633e1fa57012907c99ebd5a5b623ec73d6afc225d63",
+      "matches": true
+    },
+    {
+      "path": "bench/online-mind2web/results/rerun-public-claude-20261020/judge/claude-strict-pass2/summary.json",
+      "expected": "e5782abd1b39a73288169a30b6310debe7113b855b788c139032da89835a0ec6",
+      "actual": "e5782abd1b39a73288169a30b6310debe7113b855b788c139032da89835a0ec6",
+      "matches": true
+    },
+    {
+      "path": "bench/online-mind2web/results/rerun-public-claude-20261020/judge/claude-strict-pass3/summary.json",
+      "expected": "aa1672550712096343f590afd2dd0a93e2d6649247ec160103e34ea185849550",
+      "actual": "aa1672550712096343f590afd2dd0a93e2d6649247ec160103e34ea185849550",
+      "matches": true
+    },
+    {
+      "path": "bench/online-mind2web/results/full-public-claude-20261019g/summary.json",
+      "expected": "8d4addd00b39d0f084b06a4a69c70611e678e2010a0457b65639f60349dfd6fe",
+      "actual": "8d4addd00b39d0f084b06a4a69c70611e678e2010a0457b65639f60349dfd6fe",
+      "matches": true
+    },
+    {
+      "path": "bench/online-mind2web/results/full-public-claude-20261019g/per-task.json",
+      "expected": "0a2d41765b10c0f79a700e2cf75c09a85c3b4d2ad0affd3ead9a0ca0e538358f",
+      "actual": "0a2d41765b10c0f79a700e2cf75c09a85c3b4d2ad0affd3ead9a0ca0e538358f",
+      "matches": true
+    },
+    {
+      "path": "bench/online-mind2web/results/full-public-claude-20261019g/per-task.csv",
+      "expected": "7240e1eeffabb926d1ad31c1b7a40ea17dbbd7c532cfa0da1fab388b68feca9d",
+      "actual": "7240e1eeffabb926d1ad31c1b7a40ea17dbbd7c532cfa0da1fab388b68feca9d",
+      "matches": true
+    },
+    {
+      "path": "bench/online-mind2web/results/full-public-claude-20261019g/judge-disagreements.json",
+      "expected": "1fb7ec602a48b1e376a92c30e857ecffc8a7f87e96b4701b30aee83b6e2f60e6",
+      "actual": "1fb7ec602a48b1e376a92c30e857ecffc8a7f87e96b4701b30aee83b6e2f60e6",
+      "matches": true
+    },
+    {
+      "path": "bench/online-mind2web/results/full-public-claude-20261019g/REPORT.md",
+      "expected": "ce6d139def339f5f30216e0dbb54e2134b06a05c4308b3d9a510b0455f3d5537",
+      "actual": "ce6d139def339f5f30216e0dbb54e2134b06a05c4308b3d9a510b0455f3d5537",
+      "matches": true
+    },
+    {
+      "path": "/Users/lakshman/conductor/workspaces/fsb/jerusalem/bench/online-mind2web/results/full-public-claude-20261019g/judge/claude-official-pass1/results.jsonl",
+      "expected": "2a8112ad36be8403283992324ad2bc07f2d6a205c23eadc438681ce5409d6cb0",
+      "actual": "2a8112ad36be8403283992324ad2bc07f2d6a205c23eadc438681ce5409d6cb0",
+      "matches": true
+    },
+    {
+      "path": "/Users/lakshman/conductor/workspaces/fsb/jerusalem/bench/online-mind2web/results/full-public-claude-20261019g/judge/claude-official-pass1/usage.jsonl",
+      "expected": "1656b0befbff8ccd4473e550989d0afc3fc032b1a33c6e3a0cf0d271fe6f4398",
+      "actual": "1656b0befbff8ccd4473e550989d0afc3fc032b1a33c6e3a0cf0d271fe6f4398",
+      "matches": true
+    },
+    {
+      "path": "/Users/lakshman/conductor/workspaces/fsb/jerusalem/bench/online-mind2web/results/full-public-claude-20261019g/judge/claude-official-pass1/config.json",
+      "expected": "52480dbc57cea47e3a13d41d3371ce8af85ed5310d9c9a34adac6248171836c4",
+      "actual": "52480dbc57cea47e3a13d41d3371ce8af85ed5310d9c9a34adac6248171836c4",
+      "matches": true
+    },
+    {
+      "path": "/Users/lakshman/conductor/workspaces/fsb/jerusalem/bench/online-mind2web/results/full-public-claude-20261019g/judge/claude-official-pass2/results.jsonl",
+      "expected": "17e7ea1febedabc6846fdbd795264c43a93ca33f6abaf2b04a371767aa983eec",
+      "actual": "17e7ea1febedabc6846fdbd795264c43a93ca33f6abaf2b04a371767aa983eec",
+      "matches": true
+    },
+    {
+      "path": "/Users/lakshman/conductor/workspaces/fsb/jerusalem/bench/online-mind2web/results/full-public-claude-20261019g/judge/claude-official-pass2/usage.jsonl",
+      "expected": "e4658eed185b4258ba079e71d19c846c6fd8c1bb79b9cb9f0f7cb97c93917331",
+      "actual": "e4658eed185b4258ba079e71d19c846c6fd8c1bb79b9cb9f0f7cb97c93917331",
+      "matches": true
+    },
+    {
+      "path": "/Users/lakshman/conductor/workspaces/fsb/jerusalem/bench/online-mind2web/results/full-public-claude-20261019g/judge/claude-official-pass2/config.json",
+      "expected": "3a2b58624d42daf8f2261e511d3ddaf7f2ad62f98edb5abcc6b9e1fdb5bf121d",
+      "actual": "3a2b58624d42daf8f2261e511d3ddaf7f2ad62f98edb5abcc6b9e1fdb5bf121d",
+      "matches": true
+    },
+    {
+      "path": "/Users/lakshman/conductor/workspaces/fsb/jerusalem/bench/online-mind2web/results/full-public-claude-20261019g/judge/claude-official-pass3/results.jsonl",
+      "expected": "3dbdaa4cc4c6ad6e2d8bed072596e82d4375022fa3c9ad37e2a7eb7d246a661b",
+      "actual": "3dbdaa4cc4c6ad6e2d8bed072596e82d4375022fa3c9ad37e2a7eb7d246a661b",
+      "matches": true
+    },
+    {
+      "path": "/Users/lakshman/conductor/workspaces/fsb/jerusalem/bench/online-mind2web/results/full-public-claude-20261019g/judge/claude-official-pass3/usage.jsonl",
+      "expected": "36c3a21e438694d259595bc269356e6f4a1434ff2100ae4170ee8e3ca4fb270c",
+      "actual": "36c3a21e438694d259595bc269356e6f4a1434ff2100ae4170ee8e3ca4fb270c",
+      "matches": true
+    },
+    {
+      "path": "/Users/lakshman/conductor/workspaces/fsb/jerusalem/bench/online-mind2web/results/full-public-claude-20261019g/judge/claude-official-pass3/config.json",
+      "expected": "ce247941a19a0ed81319175d15e8cbcfbf43fe0df5d7d0c261be282253e6ce81",
+      "actual": "ce247941a19a0ed81319175d15e8cbcfbf43fe0df5d7d0c261be282253e6ce81",
+      "matches": true
+    },
+    {
+      "path": "/Users/lakshman/conductor/workspaces/fsb/jerusalem/bench/online-mind2web/results/full-public-claude-20261019g/judge/claude-strict-pass1/results.jsonl",
+      "expected": "4fed90cb32a15b13cdaf2c54b3332daf3c06a9b447920634ea125ad396f0c7e8",
+      "actual": "4fed90cb32a15b13cdaf2c54b3332daf3c06a9b447920634ea125ad396f0c7e8",
+      "matches": true
+    },
+    {
+      "path": "/Users/lakshman/conductor/workspaces/fsb/jerusalem/bench/online-mind2web/results/full-public-claude-20261019g/judge/claude-strict-pass1/usage.jsonl",
+      "expected": "78bf81cbcf86720fc61562ea28a5fb935839d41cde8498be7a9780655f184612",
+      "actual": "78bf81cbcf86720fc61562ea28a5fb935839d41cde8498be7a9780655f184612",
+      "matches": true
+    },
+    {
+      "path": "/Users/lakshman/conductor/workspaces/fsb/jerusalem/bench/online-mind2web/results/full-public-claude-20261019g/judge/claude-strict-pass1/config.json",
+      "expected": "4cef96f801b0bc48e04c2f1b3aa26e7157c3421c983eb5a982755a958310df92",
+      "actual": "4cef96f801b0bc48e04c2f1b3aa26e7157c3421c983eb5a982755a958310df92",
+      "matches": true
+    },
+    {
+      "path": "/Users/lakshman/conductor/workspaces/fsb/jerusalem/bench/online-mind2web/results/full-public-claude-20261019g/judge/claude-strict-pass2/results.jsonl",
+      "expected": "2d984ab22f9f94e41fd037aa33c2c6a604f6f76326d869bb522d4777db138639",
+      "actual": "2d984ab22f9f94e41fd037aa33c2c6a604f6f76326d869bb522d4777db138639",
+      "matches": true
+    },
+    {
+      "path": "/Users/lakshman/conductor/workspaces/fsb/jerusalem/bench/online-mind2web/results/full-public-claude-20261019g/judge/claude-strict-pass2/usage.jsonl",
+      "expected": "8a4842732a6c40bec94e74fe94c3db00ef2a86d8e48f38c593a47f6a56e0d9ef",
+      "actual": "8a4842732a6c40bec94e74fe94c3db00ef2a86d8e48f38c593a47f6a56e0d9ef",
+      "matches": true
+    },
+    {
+      "path": "/Users/lakshman/conductor/workspaces/fsb/jerusalem/bench/online-mind2web/results/full-public-claude-20261019g/judge/claude-strict-pass2/config.json",
+      "expected": "06b52c6e82860cbc04036346110c6f9177ac6e3c8a89c25c579e1e89e80400c4",
+      "actual": "06b52c6e82860cbc04036346110c6f9177ac6e3c8a89c25c579e1e89e80400c4",
+      "matches": true
+    },
+    {
+      "path": "/Users/lakshman/conductor/workspaces/fsb/jerusalem/bench/online-mind2web/results/full-public-claude-20261019g/judge/claude-strict-pass3/results.jsonl",
+      "expected": "b3e111d4ff803f25323fbdd1df48d5be7b19c992b2d30bd2b81d590322c3357c",
+      "actual": "b3e111d4ff803f25323fbdd1df48d5be7b19c992b2d30bd2b81d590322c3357c",
+      "matches": true
+    },
+    {
+      "path": "/Users/lakshman/conductor/workspaces/fsb/jerusalem/bench/online-mind2web/results/full-public-claude-20261019g/judge/claude-strict-pass3/usage.jsonl",
+      "expected": "1e85432723417a7fcaaca1d6200eb7b720345068829016a0ceb569306232f6f9",
+      "actual": "1e85432723417a7fcaaca1d6200eb7b720345068829016a0ceb569306232f6f9",
+      "matches": true
+    },
+    {
+      "path": "/Users/lakshman/conductor/workspaces/fsb/jerusalem/bench/online-mind2web/results/full-public-claude-20261019g/judge/claude-strict-pass3/config.json",
+      "expected": "cecaf81d07c40e42c05d1392cb5c3ca98ded0a412bac521fc4e7d05580a19edb",
+      "actual": "cecaf81d07c40e42c05d1392cb5c3ca98ded0a412bac521fc4e7d05580a19edb",
+      "matches": true
+    },
+    {
+      "path": "/Users/lakshman/conductor/workspaces/fsb/jerusalem/bench/online-mind2web/results/rerun-public-claude-20261020/FAILURE-ANALYSIS.json",
+      "expected": "27c4d625bc8d70757c03f34236c3c6911baa596e74f1c73511e299654e363c02",
+      "actual": "27c4d625bc8d70757c03f34236c3c6911baa596e74f1c73511e299654e363c02",
+      "matches": true
+    }
+  ]
+}

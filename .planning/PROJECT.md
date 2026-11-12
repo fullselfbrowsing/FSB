@@ -10,7 +10,9 @@ FSB is an AI-powered browser automation Chrome extension that executes tasks thr
 
 ## Current State
 
-**Active milestone progress:** Phases 57-64 are complete (48/51 requirements). Phase 64 verified 4/4 roadmap success criteria, 66/66 plan truths, 36/36 key links, MULTI-01..03, and all ten registered HIGH/CRITICAL threats; its guarded 25-command matrix and repository test process are green after a clean code-review fix loop. Three genuine OpenCode account/process/browser/accessibility scenarios join the prior 42 in the user-directed milestone-end UAT sweep. Phase 65 (Codex Adapter) is the final implementation phase in v0.9.91; backlog Phase 999.1 remains outside this milestone.
+**Active milestone:** v1.3.0 Extension multilingual UI — planning. The Chrome extension has no `chrome.i18n` catalog. This milestone makes every package-owned user-facing string render in the same seven locales the showcase already ships.
+
+**Paused, not shipped:** v0.9.91 MCP Clients as Providers. Automated work through Phase 65 is complete and human UAT remains pending. Its roadmap, requirements, state snapshot, research, and phase directories are archived under `.planning/milestones/v0.9.91-*`. Backlog phase 999.1 stays in `.planning/phases/`.
 
 **Last completed:** v1.2.0 Showcase i18n Completeness — Phases 52-56 shipped 2026-07-09. Full-page translation audit, 5-id resync + stats-274 retirement + hero/CTA transcreation, stats lint gate flip, permanent `verify-translation-drift` CI gate, and WARNING-02 locale-cookie redirect fix. VISUAL-01 browser UAT remains human_needed (`53-VISUAL-QA.md`).
 
@@ -25,7 +27,29 @@ FSB is an AI-powered browser automation Chrome extension that executes tasks thr
 - v1.0.0 Full App Catalog (OpenTabs Parity) -- archived 2026-06-29; T1 expansion debt carried into v1.1.0
 
 
-## Current Milestone: v0.9.91 MCP Clients as Providers
+## Current Milestone: v1.3.0 Extension multilingual UI
+
+**Goal:** Internationalize the Chrome extension so every package-owned user-facing string can render in the same seven locales the showcase already ships.
+
+**Target features:**
+- MV3 `chrome.i18n` catalogs for `en`, `es`, `de`, `ja`, `ko`, `zh-CN`, and `zh-TW`, with Chrome folders `zh_CN` and `zh_TW` mapped in one module.
+- A runtime resolver so an explicit `chrome.storage.local` choice overrides the browser UI language. Missing keys fall back to English. The website `fsb-locale` cookie is not read.
+- Localized manifest name and description, side panel, popup, options and control panel, onboarding, unlock, microphone permission, and package-owned overlay chrome.
+- A CI gate that fails on a missing key, an empty message, a changed placeholder, or copied English prose that is not on a hash-bound allowlist.
+- A language control that shows the seven native autonyms and persists the choice.
+
+**Key context:**
+- English is the source locale. Native labels are English, Español, Deutsch, 日本語, 한국어, 简体中文, 繁體中文. The list is `showcase/angular/src/app/core/i18n/locale-constants.ts`, mirrored in `showcase/server/src/utils/locale-constants.js`. Korean stays. v1.2.0 docs that say six locales are historical.
+- `chrome.i18n.getMessage` and `__MSG_key__` follow the browser UI language and cannot switch at runtime. Extension pages are classic scripts, and the service worker loads helpers with `importScripts`, so the resolver is a classic script on `globalThis`.
+- Manifest name and description follow the browser locale. The in-extension override covers extension pages and overlay chrome.
+- Brand and product names, commands, and code identifiers follow `showcase/angular/src/locale/DO-NOT-TRANSLATE.md`.
+- MCP tool names, JSON-RPC methods, error codes, storage keys, and message types stay byte-stable.
+- Phases continue from 66. v0.9.91 human UAT is unchanged and is not marked passed.
+- No string translation happens in the planning turn.
+
+## Paused Milestone: v0.9.91 MCP Clients as Providers
+
+**Status:** Paused 2026-10-11. Automated work through Phase 65 is complete. Human UAT is still pending. This milestone is not shipped.
 
 **Goal:** Make installed agent CLIs (Claude Code first) first-class side-panel providers -- FSB captures which MCP clients the user installs/connects, presents them as key-less providers in a renamed Providers panel, and delegates side-panel tasks to a spawned agent CLI that drives the browser back through FSB's own MCP tools.
 
@@ -38,7 +62,7 @@ FSB is an AI-powered browser automation Chrome extension that executes tasks thr
 - **Drift gate + compatibility doctor (Phase 62 complete)** -- one daemon-owned compatibility matrix feeds offline production-parser CI, doctor text/JSON, authenticated durable browser projection, protocol-drift diagnostics, and non-mutating Providers compatibility states. Three genuine installed/rendered/accessibility checks remain pending.
 - **Native wake path (Phase 63 complete)** -- the optional native-messaging host wakes or attaches only to `serve` through exact one-shot framing, exact-owned cross-platform registration, read-only diagnostics, and a background-authoritative wake UI with doctor fallback; it never spawns agent CLIs, and the Phase 59 channel-gate files are byte-identical to the phase base. Eight genuine install/Chrome/accessibility checks remain pending.
 - **OpenCode adapter (Phase 64 complete)** -- the unchanged five-method `AgentProviderAdapter` now drives both cold `opencode run` tasks and verified attaches to an FSB-owned `opencode serve`; exact 1.14.25 private policy, schema-derived JSONL fixture, first-commit drift coverage, transient server authentication, role-aware crash recovery, provider-neutral browser persistence, and honest unknown billing are all verified. Three genuine live scenarios remain pending.
-- **Codex adapter (Phase 65 next)** -- complete the stable adapter roster with hermetic `codex exec --json`, source-pinned fixture/drift coverage, and honest ChatGPT OAuth versus API-key versus unauthenticated disclosure. Gemini remains explicitly deferred until a live help capture and fixture pin exist. Task-mode only for v0.9.91.
+- **Codex adapter (Phase 65 automated work complete)** -- hermetic `codex exec --json`, source-pinned fixture/drift coverage, and honest ChatGPT OAuth versus API-key versus unauthenticated disclosure. Human UAT65-01 through UAT65-03 remain pending. Gemini remains explicitly deferred. Task-mode only for v0.9.91.
 
 **Key context:**
 - The spawn channel is security-critical (RCE-adjacent): extension-origin gating + shared secret + explicit consent tiers required. Bridge already rejects untrusted browser origins (`tests/mcp-bridge-topology.test.js`).
@@ -736,4 +760,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-07-21 -- Phase 64 OpenCode Adapter deterministically complete; 45 live scenarios remain deferred to the milestone-end sweep. Next: Phase 65 Codex Adapter.*
+*Last updated: 2026-10-11 -- v1.3.0 Extension multilingual UI started. v0.9.91 archived as paused with human UAT still pending, not shipped.*

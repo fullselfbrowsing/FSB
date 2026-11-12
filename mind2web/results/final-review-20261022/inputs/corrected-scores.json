@@ -1,0 +1,298 @@
+{
+  "completed_at": "2026-10-21T20:32:34.023Z",
+  "model": "claude-opus-5-5",
+  "judge_protocol": "scorefield-v2",
+  "expected": 300,
+  "rerun_tasks": 44,
+  "execution_concurrency": 1,
+  "jobs": {
+    "claude-official-pass1": {
+      "original": 237,
+      "corrected": 250,
+      "expected": 300,
+      "original_rate": 0.79,
+      "corrected_rate": 0.8333333333333334,
+      "rerun_successes": 13
+    },
+    "claude-official-pass2": {
+      "original": 235,
+      "corrected": 248,
+      "expected": 300,
+      "original_rate": 0.7833333333333333,
+      "corrected_rate": 0.8266666666666667,
+      "rerun_successes": 13
+    },
+    "claude-official-pass3": {
+      "original": 239,
+      "corrected": 252,
+      "expected": 300,
+      "original_rate": 0.7966666666666666,
+      "corrected_rate": 0.84,
+      "rerun_successes": 13
+    },
+    "claude-strict-pass1": {
+      "original": 222,
+      "corrected": 235,
+      "expected": 300,
+      "original_rate": 0.74,
+      "corrected_rate": 0.7833333333333333,
+      "rerun_successes": 13
+    },
+    "claude-strict-pass2": {
+      "original": 217,
+      "corrected": 230,
+      "expected": 300,
+      "original_rate": 0.7233333333333334,
+      "corrected_rate": 0.7666666666666667,
+      "rerun_successes": 13
+    },
+    "claude-strict-pass3": {
+      "original": 215,
+      "corrected": 228,
+      "expected": 300,
+      "original_rate": 0.7166666666666667,
+      "corrected_rate": 0.76,
+      "rerun_successes": 13
+    }
+  },
+  "by_level": {
+    "claude-official-pass1": {
+      "medium": {
+        "expected": 141,
+        "original": 118,
+        "corrected": 123
+      },
+      "easy": {
+        "expected": 80,
+        "original": 71,
+        "corrected": 73
+      },
+      "hard": {
+        "expected": 79,
+        "original": 48,
+        "corrected": 54
+      }
+    },
+    "claude-official-pass2": {
+      "medium": {
+        "expected": 141,
+        "original": 115,
+        "corrected": 120
+      },
+      "easy": {
+        "expected": 80,
+        "original": 71,
+        "corrected": 73
+      },
+      "hard": {
+        "expected": 79,
+        "original": 49,
+        "corrected": 55
+      }
+    },
+    "claude-official-pass3": {
+      "medium": {
+        "expected": 141,
+        "original": 117,
+        "corrected": 122
+      },
+      "easy": {
+        "expected": 80,
+        "original": 72,
+        "corrected": 74
+      },
+      "hard": {
+        "expected": 79,
+        "original": 50,
+        "corrected": 56
+      }
+    },
+    "claude-strict-pass1": {
+      "medium": {
+        "expected": 141,
+        "original": 108,
+        "corrected": 113
+      },
+      "easy": {
+        "expected": 80,
+        "original": 70,
+        "corrected": 72
+      },
+      "hard": {
+        "expected": 79,
+        "original": 44,
+        "corrected": 50
+      }
+    },
+    "claude-strict-pass2": {
+      "medium": {
+        "expected": 141,
+        "original": 107,
+        "corrected": 112
+      },
+      "easy": {
+        "expected": 80,
+        "original": 67,
+        "corrected": 69
+      },
+      "hard": {
+        "expected": 79,
+        "original": 43,
+        "corrected": 49
+      }
+    },
+    "claude-strict-pass3": {
+      "medium": {
+        "expected": 141,
+        "original": 107,
+        "corrected": 112
+      },
+      "easy": {
+        "expected": 80,
+        "original": 67,
+        "corrected": 69
+      },
+      "hard": {
+        "expected": 79,
+        "original": 41,
+        "corrected": 47
+      }
+    }
+  },
+  "source": {
+    "path": "/Users/lakshman/conductor/workspaces/fsb/jerusalem/bench/online-mind2web/cache/dataset/eacad896a84dc5b65e29b0b06e4699ab0544d701.json",
+    "sha256": "7dedf381531d423dc0fc48d21dc1d425655dd75f38b10211a880fa09102f257f",
+    "revision": "eacad896a84dc5b65e29b0b06e4699ab0544d701"
+  },
+  "original_run": "/Users/lakshman/conductor/workspaces/fsb/jerusalem/bench/online-mind2web/results/full-public-claude-20261019g",
+  "rerun_run": "/Users/lakshman/conductor/workspaces/fsb/jerusalem/bench/online-mind2web/results/rerun-public-claude-20261020",
+  "original_seal_verified": true,
+  "collection": {
+    "terminal": 44,
+    "exported": 16,
+    "outcomes": {
+      "complete": 16,
+      "capture_failure": 27,
+      "rig_failure": 1
+    },
+    "excluded_attempts": [
+      {
+        "task_id": "b3f8bd9198d9d157e0848109563c4b23",
+        "index": 1
+      },
+      {
+        "task_id": "b3f8bd9198d9d157e0848109563c4b23",
+        "index": 2
+      },
+      {
+        "task_id": "b3f8bd9198d9d157e0848109563c4b23",
+        "index": 4
+      },
+      {
+        "task_id": "85b284c18d7e78c9b5a9e074e7aa3b98_051526",
+        "index": 1
+      },
+      {
+        "task_id": "dd44c665cec1e9c929a4c5f074e7844a_110325",
+        "index": 1
+      }
+    ],
+    "operator_recovered_zeros": [
+      {
+        "task_id": "bb5d90e6f2fbc0ae146f7c1998c2b4a1",
+        "index": 1,
+        "receipt": "/Users/lakshman/conductor/workspaces/fsb/jerusalem/bench/online-mind2web/results/rerun-public-claude-20261020/operator-native-health-recovery-20261021.json"
+      }
+    ]
+  },
+  "official": {
+    "original_mean": 0.79,
+    "corrected_mean": 0.8333333333333334,
+    "majority": {
+      "original": 238,
+      "corrected": 251,
+      "expected": 300
+    },
+    "by_level": {
+      "medium": {
+        "expected": 141,
+        "original_majority": 119,
+        "corrected_majority": 124,
+        "original_mean": 0.8274231678486998,
+        "corrected_mean": 0.8628841607565012
+      },
+      "easy": {
+        "expected": 80,
+        "original_majority": 71,
+        "corrected_majority": 73,
+        "original_mean": 0.8916666666666666,
+        "corrected_mean": 0.9166666666666666
+      },
+      "hard": {
+        "expected": 79,
+        "original_majority": 48,
+        "corrected_majority": 54,
+        "original_mean": 0.620253164556962,
+        "corrected_mean": 0.6962025316455697
+      }
+    }
+  },
+  "strict": {
+    "original_mean": 0.7266666666666667,
+    "corrected_mean": 0.77,
+    "majority": {
+      "original": 218,
+      "corrected": 231,
+      "expected": 300
+    },
+    "by_level": {
+      "medium": {
+        "expected": 141,
+        "original_majority": 108,
+        "corrected_majority": 113,
+        "original_mean": 0.7612293144208038,
+        "corrected_mean": 0.7966903073286051
+      },
+      "easy": {
+        "expected": 80,
+        "original_majority": 68,
+        "corrected_majority": 70,
+        "original_mean": 0.85,
+        "corrected_mean": 0.875
+      },
+      "hard": {
+        "expected": 79,
+        "original_majority": 42,
+        "corrected_majority": 48,
+        "original_mean": 0.5400843881856541,
+        "corrected_mean": 0.6160337552742616
+      }
+    }
+  },
+  "recovery_by_initial_symptom": {
+    "race": {
+      "selected": 13,
+      "exported": 8,
+      "remaining_unexported": 5,
+      "remaining_capture_failures": 5,
+      "official_majority_successes": 7,
+      "strict_majority_successes": 7
+    },
+    "ambiguous": {
+      "selected": 28,
+      "exported": 7,
+      "remaining_unexported": 21,
+      "remaining_capture_failures": 21,
+      "official_majority_successes": 5,
+      "strict_majority_successes": 5
+    },
+    "network": {
+      "selected": 3,
+      "exported": 1,
+      "remaining_unexported": 2,
+      "remaining_capture_failures": 1,
+      "official_majority_successes": 1,
+      "strict_majority_successes": 1
+    }
+  }
+}

@@ -26,7 +26,7 @@
 		2AB6AD8730383AD4003322C0 /* config in Resources */ = {isa = PBXBuildFile; fileRef = 2AB6AD7330383AD4003322C0 /* config */; };
 		2AB6AD8830383AD4003322C0 /* catalog in Resources */ = {isa = PBXBuildFile; fileRef = 2AB6AD7430383AD4003322C0 /* catalog */; };
 		2AB6AD8930383AD4003322C0 /* canvas-interceptor.js in Resources */ = {isa = PBXBuildFile; fileRef = 2AB6AD7530383AD4003322C0 /* canvas-interceptor.js */; };
-		2AB6AD8A30383AD4003322C0 /* agents in Resources */ = {isa = PBXBuildFile; fileRef = 2AB6AD7630383AD4003322C0 /* agents */; };
+		2AB6AD8A30383AD4003322C0 /* _locales in Resources */ = {isa = PBXBuildFile; fileRef = 2AB6AD7630383AD4003322C0 /* _locales */; };
 		2AB6AD8B30383AD4003322C0 /* content in Resources */ = {isa = PBXBuildFile; fileRef = 2AB6AD7730383AD4003322C0 /* content */; };
 		2AB6AD8C30383AD4003322C0 /* utils in Resources */ = {isa = PBXBuildFile; fileRef = 2AB6AD7830383AD4003322C0 /* utils */; };
 		2AB6AD8D30383AD4003322C0 /* shared in Resources */ = {isa = PBXBuildFile; fileRef = 2AB6AD7930383AD4003322C0 /* shared */; };
@@ -96,7 +96,7 @@
 		2AB6AD7330383AD4003322C0 /* config */ = {isa = PBXFileReference; lastKnownFileType = folder; name = config; path = Resources/config; sourceTree = "<group>"; };
 		2AB6AD7430383AD4003322C0 /* catalog */ = {isa = PBXFileReference; lastKnownFileType = folder; name = catalog; path = Resources/catalog; sourceTree = "<group>"; };
 		2AB6AD7530383AD4003322C0 /* canvas-interceptor.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; name = "canvas-interceptor.js"; path = "Resources/canvas-interceptor.js"; sourceTree = "<group>"; };
-		2AB6AD7630383AD4003322C0 /* agents */ = {isa = PBXFileReference; lastKnownFileType = folder; name = agents; path = Resources/agents; sourceTree = "<group>"; };
+		2AB6AD7630383AD4003322C0 /* _locales */ = {isa = PBXFileReference; lastKnownFileType = folder; name = _locales; path = Resources/_locales; sourceTree = "<group>"; };
 		2AB6AD7730383AD4003322C0 /* content */ = {isa = PBXFileReference; lastKnownFileType = folder; name = content; path = Resources/content; sourceTree = "<group>"; };
 		2AB6AD7830383AD4003322C0 /* utils */ = {isa = PBXFileReference; lastKnownFileType = folder; name = utils; path = Resources/utils; sourceTree = "<group>"; };
 		2AB6AD7930383AD4003322C0 /* shared */ = {isa = PBXFileReference; lastKnownFileType = folder; name = shared; path = Resources/shared; sourceTree = "<group>"; };
@@ -211,7 +211,7 @@
 				2AB6AD7330383AD4003322C0 /* config */,
 				2AB6AD7430383AD4003322C0 /* catalog */,
 				2AB6AD7530383AD4003322C0 /* canvas-interceptor.js */,
-				2AB6AD7630383AD4003322C0 /* agents */,
+				2AB6AD7630383AD4003322C0 /* _locales */,
 				2AB6AD7730383AD4003322C0 /* content */,
 				2AB6AD7830383AD4003322C0 /* utils */,
 				2AB6AD7930383AD4003322C0 /* shared */,
@@ -329,7 +329,7 @@
 				2AB6AD9430383AD4003322C0 /* ws in Resources */,
 				2AB6AD9230383AD4003322C0 /* lib in Resources */,
 				2AB6AD8D30383AD4003322C0 /* shared in Resources */,
-				2AB6AD8A30383AD4003322C0 /* agents in Resources */,
+				2AB6AD8A30383AD4003322C0 /* _locales in Resources */,
 				2AB6AD8930383AD4003322C0 /* canvas-interceptor.js in Resources */,
 				2AB6AD8630383AD4003322C0 /* dist in Resources */,
 				2AB6AD8F30383AD4003322C0 /* site-maps in Resources */,

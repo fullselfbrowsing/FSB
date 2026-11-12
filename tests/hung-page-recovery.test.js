@@ -269,7 +269,8 @@ test('a change-report start that times out queues the stop for its own token', a
     assert.equal(calls[0].func.name, '_fsbHarvestStartInPage');
     assert.equal(calls[1].func.name, '_fsbHarvestStopInPage');
     assert.equal(calls[1].args[0], calls[0].args[1]);
-    assert.ok(calls[0].args[2] <= Date.now());
+    // The give-up timer can fire a moment before the wall-clock deadline set beside it.
+    assert.ok(calls[0].args[2] <= Date.now() + 50);
   } finally {
     global.chrome = priorChrome;
   }
@@ -532,7 +533,7 @@ test('MCP execution timeout advice preserves the pending write without suggestin
   assert.doesNotMatch(text, /navigate|close_tab/);
 });
 
-function navigationHarness({ commit, recover, pendingUpdate = false } = {}) {
+function navigationHarness({ commit, recover, pendingUpdate = false, frame, beforeCommit } = {}) {
   const event = () => {
     const listeners = new Set();
     return { addListener: fn => listeners.add(fn), removeListener: fn => listeners.delete(fn),
@@ -545,12 +546,15 @@ function navigationHarness({ commit, recover, pendingUpdate = false } = {}) {
   const start = dispatcher.indexOf('async function navigateTabAndWaitForCommit(');
   const end = dispatcher.indexOf('\nasync function handleNavigateRoute', start);
   const navigate = vm.runInNewContext(`${dispatcher.slice(start, end)}\nnavigateTabAndWaitForCommit`, {
-    chrome: { webNavigation: events,
+    chrome: { webNavigation: frame === undefined ? events
+      : { ...events, getFrame: async () => { if (frame instanceof Error) throw frame; return frame; } },
       tabs: { onRemoved: removed,
         get: async () => ({ id: 9, url: 'https://old.test/', pendingUrl: 'https://new.test/' }),
-        update: async () => { updateCalls++; if (commit) setTimeout(() => events[commit.event || 'onCommitted'].emit({
-          tabId: 9, frameId: 0, url: commit.url, error: commit.error
-        }), 2); return pendingUpdate ? new Promise(() => {}) : { id: 9, url: 'https://old.test/' }; } } },
+        update: async () => { updateCalls++;
+          if (beforeCommit) setTimeout(() => events[beforeCommit.event].emit({ tabId: 9, frameId: 0, ...beforeCommit.details }), 1);
+          if (commit) setTimeout(() => events[commit.event || 'onCommitted'].emit({
+            tabId: 9, frameId: 0, url: commit.url, error: commit.error, documentId: commit.documentId
+          }), 2); return pendingUpdate ? new Promise(() => {}) : { id: 9, url: 'https://old.test/' }; } } },
     recoverStalledTabNavigation: async (...args) => { recoveryCalls++; return recover?.(events, ...args) || false; },
     setTimeout: (fn, ms) => setTimeout(fn, ms === 10000 ? 45 : ms === 3000 ? 10 : ms), clearTimeout
   });
@@ -629,6 +633,209 @@ for (const event of ['onReferenceFragmentUpdated', 'onHistoryStateUpdated']) {
     assert.equal((await h.navigate(9, 'https://new.test/#fragment')).tab.url, 'https://new.test/#fragment');
   });
 }
+
+test('an aborted load of the outgoing page during renderer recovery does not fail the navigation', async () => {
+  const h = navigationHarness({ commit: { url: 'https://new.test/' }, recover(events) {
+    events.onErrorOccurred.emit({ tabId: 9, frameId: 0, url: 'https://old.test/loop', error: 'net::ERR_ABORTED' });
+    return true;
+  } });
+  const result = await h.navigate(9, 'https://new.test/');
+  assert.equal(result.success, true);
+  assert.equal(result.recovered, true);
+  assert.equal(h.updateCalls(), 1);
+});
+
+test('a navigation error after the navigation is requested still fails it', async () => {
+  const h = navigationHarness({ commit: { event: 'onErrorOccurred', url: 'https://new.test/', error: 'net::ERR_NAME_NOT_RESOLVED' } });
+  const result = await h.navigate(9, 'https://new.test/');
+  assert.equal(result.success, false);
+  assert.equal(result.errorCode, 'navigation_failed');
+  assert.equal(result.error, 'net::ERR_NAME_NOT_RESOLVED');
+  assert.equal(result.mayHaveExecuted, false);
+  assert.ok(Object.values(h.events).every(e => e.listeners.size === 0));
+});
+
+const outgoingAbort = { event: 'onErrorOccurred',
+  details: { url: 'https://old.test/', error: 'net::ERR_ABORTED', documentId: 'OUTGOING' } };
+
+test('leaving a page that is still loading ignores the aborted load of that page', async () => {
+  const h = navigationHarness({ frame: { documentId: 'OUTGOING', url: 'https://old.test/' }, beforeCommit: outgoingAbort,
+    commit: { url: 'https://new.test/' } });
+  const result = await h.navigate(9, 'https://new.test/');
+  assert.equal(result.success, true);
+  assert.equal(result.tab.url, 'https://new.test/');
+  assert.ok(Object.values(h.events).every(e => e.listeners.size === 0));
+});
+
+for (const [name, documentId, error] of [
+  ['that commits an error page', 'ERROR-PAGE', 'net::ERR_CONNECTION_REFUSED'],
+  ['that loads no document', '00000000000000000000000000000000', 'net::ERR_ABORTED']
+]) {
+  test(`a navigation ${name} still fails at once`, async () => {
+    const h = navigationHarness({ frame: { documentId: 'OUTGOING', url: 'https://old.test/' },
+      commit: { event: 'onErrorOccurred', url: 'https://new.test/', error, documentId } });
+    const result = await h.navigate(9, 'https://new.test/');
+    assert.equal(result.success, false);
+    assert.equal(result.errorCode, 'navigation_failed');
+    assert.equal(result.error, error);
+    assert.equal(result.mayHaveExecuted, false);
+  });
+}
+
+test('a failed navigation to the current URL still fails at once', async () => {
+  // Only the document, not the URL, tells this failure from the outgoing page's own abort.
+  const h = navigationHarness({ frame: { documentId: 'OUTGOING', url: 'https://old.test/' },
+    commit: { event: 'onErrorOccurred', url: 'https://old.test/', error: 'net::ERR_CONNECTION_REFUSED', documentId: 'ERROR-PAGE' } });
+  const result = await h.navigate(9, 'https://old.test/');
+  assert.equal(result.success, false);
+  assert.equal(result.errorCode, 'navigation_failed');
+  assert.equal(result.error, 'net::ERR_CONNECTION_REFUSED');
+});
+
+test('without the outgoing document, an aborted load still fails the navigation', async () => {
+  const h = navigationHarness({ frame: new Error('No frame'), beforeCommit: outgoingAbort,
+    commit: { url: 'https://new.test/' } });
+  const result = await h.navigate(9, 'https://new.test/');
+  assert.equal(result.success, false);
+  assert.equal(result.error, 'net::ERR_ABORTED');
+});
+
+test('navigate allows a renderer crash only before the navigation is requested', async () => {
+  const allowCrash = [];
+  const h = navigationHarness({ pendingUpdate: true, recover(_events, _tabId, _stillPending, options) {
+    allowCrash.push(options && options.allowCrash);
+    return false;
+  } });
+  await h.navigate(9, 'https://new.test/');
+  assert.deepEqual(allowCrash, [true, false]);
+});
+
+const untrustedTerminate = () => new Error('{"code":-32000,"message":"Runtime.terminateExecution is not allowed for untrusted clients"}');
+
+function stalledRendererHarness({ terminate, crash = 'event', crashBound = 5000, stillPending = () => true,
+  executeScript = () => new Promise(() => {}), onGrace = () => {} }) {
+  const sent = [];
+  const probes = [];
+  const eventListeners = new Set();
+  let released = 0;
+  let crashEmitted = false;
+  let graces = 0;
+  const start = background.indexOf('async function recoverStalledTabNavigation(');
+  const end = background.indexOf('\nasync function requireForegroundNativeInput', start);
+  const recover = vm.runInNewContext(`${background.slice(start, end)}\nrecoverStalledTabNavigation`, {
+    chrome: {
+      // By default the responsiveness probe never answers, as on a hung renderer.
+      scripting: { executeScript: details => { probes.push(details); return executeScript(); } },
+      debugger: {
+        sendCommand: async (target, method) => {
+          sent.push(method);
+          if (method === 'Runtime.terminateExecution') return terminate();
+          if (crash === 'reject') throw new Error('Page has pending navigations, not killing');
+          // Chrome never answers Page.crash. The session stays attached and
+          // reports the crash as an event, after events for other tabs and methods.
+          const emit = (tabId, name) => [...eventListeners].forEach(fn => fn({ tabId }, name, {}));
+          if (crash === 'event') {
+            setTimeout(() => { emit(8, 'Inspector.targetCrashed'); emit(target.tabId, 'Runtime.executionContextsCleared'); }, 2);
+            setTimeout(() => { crashEmitted = true; emit(target.tabId, 'Inspector.targetCrashed'); }, 30);
+          }
+          return new Promise(() => {});
+        },
+        onEvent: { addListener: fn => eventListeners.add(fn), removeListener: fn => eventListeners.delete(fn) }
+      }
+    },
+    FsbCdpLease: { acquire: async () => ({ release() { released++; } }) },
+    keyboardEmulator: { isAttachedTo: () => true },
+    attachFsbDebugger: async () => { throw new Error('Must reuse the established FSB debugger session'); },
+    // The 1000 ms timer armed while the crash listener is registered is the
+    // crash bound; the earlier one is the grace for a long task.
+    setTimeout: (fn, ms) => {
+      if (ms === 1000 && !eventListeners.size) { graces++; onGrace(); }
+      return setTimeout(fn, ms === 500 ? 5 : ms === 1000 ? (eventListeners.size ? crashBound : 5) : ms);
+    },
+    clearTimeout
+  });
+  return { run: options => recover(7, stillPending, options), sent, probes, eventListeners,
+    released: () => released, crashEmitted: () => crashEmitted, graces: () => graces };
+}
+
+test('renderer recovery crashes the hung renderer when Chrome refuses to terminate its script', async () => {
+  const h = stalledRendererHarness({ terminate: () => Promise.reject(untrustedTerminate()) });
+  const startedAt = Date.now();
+  assert.equal(await h.run(), true);
+  assert.ok(Date.now() - startedAt < 1000, 'the crash event ends the wait, not its bound');
+  assert.equal(h.crashEmitted(), true, 'only this tab\'s crash event ends the wait');
+  assert.deepEqual(h.sent, ['Runtime.terminateExecution', 'Page.crash']);
+  assert.equal(h.probes[0].injectImmediately, true);
+  assert.equal(h.eventListeners.size, 0);
+  assert.equal(h.released(), 1);
+});
+
+test('a renderer crash that is never reported stays bounded and is not reported as recovered', async () => {
+  const h = stalledRendererHarness({ terminate: () => Promise.reject(untrustedTerminate()), crash: 'silent', crashBound: 20 });
+  const startedAt = Date.now();
+  assert.equal(await h.run(), false);
+  assert.ok(Date.now() - startedAt < 1000);
+  assert.deepEqual(h.sent, ['Runtime.terminateExecution', 'Page.crash']);
+  assert.equal(h.eventListeners.size, 0);
+});
+
+test('a refused renderer crash is not reported as recovered and does not wait out its bound', async () => {
+  const h = stalledRendererHarness({ terminate: () => Promise.reject(untrustedTerminate()), crash: 'reject' });
+  const startedAt = Date.now();
+  assert.equal(await h.run(), false);
+  assert.ok(Date.now() - startedAt < 1000);
+  assert.deepEqual(h.sent, ['Runtime.terminateExecution', 'Page.crash']);
+  assert.equal(h.eventListeners.size, 0);
+  assert.equal(h.released(), 1);
+});
+
+test('a renderer that answers during the grace period is not crashed', async () => {
+  let answerProbe;
+  const h = stalledRendererHarness({ executeScript: () => new Promise(resolve => { answerProbe = resolve; }),
+    terminate: () => { answerProbe([{ result: true }]); return Promise.reject(untrustedTerminate()); } });
+  assert.equal(await h.run(), false);
+  assert.deepEqual(h.sent, ['Runtime.terminateExecution']);
+});
+
+test('a renderer whose probe fails during the grace period is not crashed', async () => {
+  let failProbe;
+  const h = stalledRendererHarness({ executeScript: () => new Promise((_, reject) => { failProbe = reject; }),
+    terminate: () => { failProbe(new Error('Frame with ID 0 was removed.')); return Promise.reject(untrustedTerminate()); } });
+  assert.equal(await h.run(), false);
+  assert.deepEqual(h.sent, ['Runtime.terminateExecution']);
+});
+
+test('a navigation that settles during the grace period is not crashed', async () => {
+  let pending = true;
+  const h = stalledRendererHarness({ stillPending: () => pending, onGrace: () => { pending = false; },
+    terminate: () => Promise.reject(untrustedTerminate()) });
+  assert.equal(await h.run(), false);
+  assert.deepEqual(h.sent, ['Runtime.terminateExecution']);
+  assert.equal(h.graces(), 1);
+});
+
+test('renderer recovery does not crash when the caller disallows it', async () => {
+  const h = stalledRendererHarness({ terminate: () => Promise.reject(untrustedTerminate()) });
+  await assert.rejects(h.run({ allowCrash: false }), /not allowed for untrusted clients/);
+  assert.deepEqual(h.sent, ['Runtime.terminateExecution']);
+  assert.equal(h.released(), 1);
+});
+
+test('other termination failures still fail recovery without crashing the renderer', async () => {
+  const h = stalledRendererHarness({ terminate: () => Promise.reject(new Error('Some other failure')) });
+  await assert.rejects(h.run(), /Some other failure/);
+  assert.deepEqual(h.sent, ['Runtime.terminateExecution']);
+  assert.equal(h.released(), 1);
+});
+
+test('a navigation that settles while termination is refused is not crashed', async () => {
+  let pending = true;
+  const h = stalledRendererHarness({ stillPending: () => pending,
+    terminate: () => { pending = false; return Promise.reject(untrustedTerminate()); } });
+  assert.equal(await h.run(), false);
+  assert.deepEqual(h.sent, ['Runtime.terminateExecution']);
+  assert.equal(h.graces(), 0, 'a settled navigation does not wait out the grace period');
+});
 
 function debuggerSessionContext(overrides = {}) {
   const owners = new Map([[11, 'agent-a'], [12, 'agent-b']]);

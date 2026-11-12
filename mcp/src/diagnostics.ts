@@ -10,6 +10,7 @@ import type {
 import {
   ADAPTER_COMPATIBILITY_MATRIX,
   classifyAdapterCompatibility,
+  classifyAdapterDetectionCompatibility,
   type AdapterCompatibilityMatrix,
   type CompatibilityReason,
   type CompatibilityStatus,
@@ -628,10 +629,7 @@ async function collectAdapterDoctorRows(
       continue;
     }
 
-    const compatibility = classifyAdapterCompatibility(contract.adapterId, {
-      binaryFound: normalized.binaryPath !== null,
-      version: normalized.evidenceVersion,
-    });
+    const compatibility = classifyAdapterDetectionCompatibility(contract.adapterId, detection);
     rows.push(Object.freeze({
       adapterId: contract.adapterId,
       displayLabel: contract.displayLabel,
@@ -642,7 +640,7 @@ async function collectAdapterDoctorRows(
         : normalized.version,
       compatibilityStatus: compatibility.status,
       compatibilityReason: compatibility.reason,
-      authState: normalized.authState,
+      authState: compatibility.status === 'unsupported' ? 'unknown' : normalized.authState,
       profileVersion: contract.profileVersion,
     }));
   }

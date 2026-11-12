@@ -1,38 +1,31 @@
 /**
- * Phase 212-01 regression tests
+ * Background-agents retirement: back-end checks.
  *
- * Verifies the preservation invariants of the background-agents sunset:
- *   - AGENTS-02: every agent code path carries the canonical deprecation annotation;
- *                MCP registerAgentTools shell preserved with zero registered tools.
- *   - AGENTS-05: chrome.storage.local['bgAgents'] is NOT proactively cleaned by Phase 212.
- *   - AGENTS-06: chrome.alarms.onAlarm listener preserves the MCP_RECONNECT_ALARM early-return
- *                BYTE-FOR-BYTE, and the Phase 211-02 dom-stream watchdog branch is untouched.
+ * Background agents were removed in v0.9.45rc1. These checks keep the
+ * leftovers from coming back and prove the update-time cleanup works:
+ *   - The agent modules, the MCP agent-tools module and every commented-out
+ *     agent code path are gone.
+ *   - On extension update, background.js deletes the saved agent data
+ *     (bgAgents, fsb_sync_queue, the old notice flag) and clears every
+ *     fsb_agent_* alarm, leaving other storage keys and alarms alone.
+ *   - The alarm listener still returns early for the MCP reconnect alarm
+ *     and keeps the dom-stream watchdog branch live.
  *
- * Plain Node + assert. No jsdom, no chrome stubs. Static-analysis on source files.
+ * Plain Node + assert. Static checks plus one sandboxed run of the cleanup.
  */
 
 'use strict';
 
 const fs = require('fs');
 const path = require('path');
+const vm = require('vm');
 const assert = require('assert');
 
 const ROOT = path.resolve(__dirname, '..');
-const ANNOTATION = '// DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md';
+const RETIRED_ANNOTATION = 'DEPRECATED v0.9.45rc1';
 
 function read(rel) {
   return fs.readFileSync(path.join(ROOT, rel), 'utf8');
-}
-
-function countSubstring(haystack, needle) {
-  if (!needle) return 0;
-  let count = 0;
-  let idx = 0;
-  while ((idx = haystack.indexOf(needle, idx)) !== -1) {
-    count += 1;
-    idx += needle.length;
-  }
-  return count;
 }
 
 let failures = 0;
@@ -43,123 +36,152 @@ function fail(label, detail) {
   if (detail) console.log('       ' + detail);
 }
 
-// ---- Section 1: AGENTS-02 canonical annotation present in every modified back-end file ----
+// ---- Section 1: the retired modules are deleted ----
 
-const annotationFiles = [
+for (const rel of [
   'extension/agents/agent-manager.js',
   'extension/agents/agent-scheduler.js',
   'extension/agents/agent-executor.js',
   'extension/agents/server-sync.js',
   'mcp/src/tools/agents.ts',
-  'extension/background.js',
-  'extension/ws/ws-client.js',
-];
-
-for (const f of annotationFiles) {
-  const src = read(f);
-  const n = countSubstring(src, ANNOTATION);
-  if (n >= 1) pass('AGENTS-02 annotation present in ' + f + ' (count=' + n + ')');
-  else fail('AGENTS-02 annotation MISSING in ' + f);
+]) {
+  if (!fs.existsSync(path.join(ROOT, rel))) pass(rel + ' is deleted');
+  else fail(rel + ' still exists');
 }
-
-// ---- Section 2: AGENTS-02 only `back` tool is LIVE in mcp/src/tools/agents.ts ----
-// Phase 242 (v0.9.60) added the `back` browser-history tool to this file. It is NOT a
-// background-agent tool; the AGENTS-02 invariant is "no background-agent tool registrations",
-// not "no tool registrations at all". Allow exactly one live registration AND assert it's `back`.
-
-{
-  const src = read('mcp/src/tools/agents.ts');
-  const lines = src.split('\n');
-  const liveServerTool = lines.filter(line => /^[\s]*server\.tool\(/.test(line));
-  const allowedSingle = liveServerTool.length === 1;
-  // Confirm the single live registration is for `back` by scanning the next ~3 lines after the call.
-  let isBackTool = false;
-  if (allowedSingle) {
-    const idx = lines.findIndex(line => /^[\s]*server\.tool\(/.test(line));
-    const window = lines.slice(idx, idx + 4).join('\n');
-    isBackTool = /['"]back['"]/.test(window);
-  }
-  if (allowedSingle && isBackTool) pass('AGENTS-02 only `back` tool live in agents.ts (Phase 242 carve-out)');
-  else fail('AGENTS-02 found ' + liveServerTool.length + ' LIVE server.tool() calls in agents.ts (only `back` permitted)', JSON.stringify(liveServerTool.slice(0, 3)));
-}
-
-// ---- Section 3: AGENTS-02 registerAgentTools function shell preserved in runtime.ts (D-16) ----
 
 {
   const src = read('mcp/src/runtime.ts');
-  const hasImport = /^\s*import\s*\{\s*registerAgentTools\s*\}\s*from\s*['"]\.\/tools\/agents\.js['"]/m.test(src);
-  // Phase 238 added agentScope as a 4th argument; signature is now (server, bridge, queue, agentScope).
-  const hasCall = /^\s*registerAgentTools\(server,\s*bridge,\s*queue(?:,\s*agentScope)?\)\s*;/m.test(src);
-  if (hasImport && hasCall) pass('AGENTS-02 registerAgentTools import + call preserved in runtime.ts');
-  else fail('AGENTS-02 registerAgentTools shell broken (import=' + hasImport + ', call=' + hasCall + ')');
+  if (!/registerAgentTools|tools\/agents\.js/.test(src)) pass('runtime.ts no longer imports or calls registerAgentTools');
+  else fail('runtime.ts still references the agent tools module');
 }
 
-// ---- Section 4: AGENTS-06 MCP_RECONNECT_ALARM early-return preserved BYTE-FOR-BYTE ----
+// ---- Section 2: no commented-out agent code is left behind ----
 
-{
-  const src = read('extension/background.js');
-  // The exact byte-for-byte substring (matches lines 12579-12582 indentation in current file)
-  const expected = '  if (isMcpReconnectAlarm) {\n    armMcpBridge(\'alarm:\' + MCP_RECONNECT_ALARM);\n    return;\n  }';
-  if (src.indexOf(expected) !== -1) pass('AGENTS-06 MCP_RECONNECT_ALARM early-return byte-for-byte preserved');
-  else fail('AGENTS-06 MCP_RECONNECT_ALARM early-return path mutated or missing', 'Expected substring not found');
-}
-
-// ---- Section 5: AGENTS-06 Phase 211-02 dom-stream watchdog branch preserved on a LIVE line ----
-
-{
-  const src = read('extension/background.js');
-  const lines = src.split('\n');
-  const hits = lines.filter(line => /if\s*\(alarm\.name\s*===\s*'fsb-domstream-watchdog'\)/.test(line));
-  const liveHits = hits.filter(line => !/^\s*\/\//.test(line));
-  if (liveHits.length === 1) pass('AGENTS-06 Phase 211-02 dom-stream watchdog branch is LIVE (and unique)');
-  else fail('AGENTS-06 expected exactly 1 LIVE dom-stream watchdog hit, found ' + liveHits.length);
-}
-
-// ---- Section 6: AGENTS-05 no chrome.storage cleanup of bgAgents in modified files ----
-
-const cleanupTargets = [
+const sourceFiles = [
   'extension/background.js',
-  'extension/agents/agent-manager.js',
-  'extension/agents/agent-scheduler.js',
-  'extension/agents/agent-executor.js',
-  'extension/agents/server-sync.js',
   'extension/ws/ws-client.js',
+  'extension/ws/mcp-bridge-client.js',
+  'extension/ui/popup.js',
+  'extension/ui/sidepanel.js',
+  'extension/ui/options.js',
+  'extension/ui/options.css',
+  'extension/ui/control_panel.html',
 ];
 
-{
-  let violations = [];
-  for (const f of cleanupTargets) {
-    const src = read(f);
-    const lines = src.split('\n');
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      if (/^\s*\/\//.test(line)) continue; // skip commented lines
+for (const rel of sourceFiles) {
+  const src = read(rel);
+  if (!src.includes(RETIRED_ANNOTATION)) pass('no retired-agent annotation left in ' + rel);
+  else fail('retired-agent annotation still present in ' + rel);
+}
 
-      if (/chrome\.storage\.local\.remove\([^)]*bgAgents/.test(line)) {
-        violations.push(f + ':' + (i + 1) + ' chrome.storage.local.remove(bgAgents)');
-      }
-      if (/chrome\.storage\.local\.set\(\s*\{[^}]*bgAgents\s*:/.test(line)) {
-        violations.push(f + ':' + (i + 1) + ' chrome.storage.local.set({ bgAgents: ... })');
-      }
-      if (/chrome\.alarms\.clear\([^)]*['"]fsb_agent_/.test(line)) {
-        violations.push(f + ':' + (i + 1) + ' chrome.alarms.clear with fsb_agent_ prefix');
-      }
-    }
+{
+  const src = read('extension/background.js');
+  const leftovers = ['agentScheduler', 'agentManager', 'agentExecutor', 'serverSync.', 'executeAutomationTask']
+    .filter((token) => src.includes(token));
+  if (leftovers.length === 0) pass('background.js has no background-agent code paths');
+  else fail('background.js still mentions retired agent code', leftovers.join(', '));
+}
+
+{
+  const html = read('extension/ui/control_panel.html');
+  const js = read('extension/ui/options.js');
+  const gone = !html.includes('fsbSunsetNotice') && !js.includes('fsbSunsetNotice') && !js.includes('bgAgents');
+  if (gone) pass('control panel no longer renders the old agent-names notice');
+  else fail('control panel still carries the agent-names notice or reads bgAgents');
+}
+
+// ---- Section 3: the update-time cleanup ----
+
+const bgSource = read('extension/background.js');
+
+{
+  const start = bgSource.indexOf('const RETIRED_AGENT_STORAGE_KEYS');
+  const end = bgSource.indexOf('chrome.runtime.onInstalled.addListener(', start);
+  if (start === -1 || end === -1) {
+    fail('background.js defines the retired-agent cleanup before the onInstalled listener');
+  } else {
+    pass('background.js defines the retired-agent cleanup before the onInstalled listener');
+    const cleanupSource = bgSource.slice(start, end);
+    const removedKeys = [];
+    const clearedAlarms = [];
+    const sandbox = {
+      console,
+      chrome: {
+        storage: {
+          local: {
+            remove: async (keys) => { removedKeys.push(...[].concat(keys)); },
+          },
+        },
+        alarms: {
+          getAll: async () => [
+            { name: 'fsb_agent_daily-digest' },
+            { name: 'fsb_agent_price-watch' },
+            { name: 'fsb-mcp-bridge-reconnect' },
+            { name: 'fsb-telemetry-beat' },
+            { name: 'fsbTrigger:abc' },
+          ],
+          clear: async (name) => { clearedAlarms.push(name); return true; },
+        },
+      },
+    };
+    vm.createContext(sandbox);
+    vm.runInContext(cleanupSource + '\nthis.__cleanup = clearRetiredBackgroundAgentData;', sandbox);
+
+    sandbox.__cleanup().then(() => {
+      assert.deepStrictEqual(removedKeys.slice().sort(),
+        ['bgAgents', 'fsb_sunset_notice_dismissed', 'fsb_sync_queue']);
+      pass('cleanup removes bgAgents, fsb_sync_queue and the old notice flag');
+      assert.deepStrictEqual(clearedAlarms.slice().sort(),
+        ['fsb_agent_daily-digest', 'fsb_agent_price-watch']);
+      pass('cleanup clears only fsb_agent_* alarms');
+    }).catch((error) => {
+      fail('cleanup run', error && error.message);
+    }).finally(finish);
   }
-  if (violations.length === 0) pass('AGENTS-05 no LIVE bgAgents cleanup or fsb_agent_ alarm clear in modified files');
-  else fail('AGENTS-05 found ' + violations.length + ' violation(s)', violations.slice(0, 5).join('; '));
+}
+
+{
+  const listenerStart = bgSource.indexOf('chrome.runtime.onInstalled.addListener(async (details) => {');
+  const listenerEnd = bgSource.indexOf('\n});', listenerStart);
+  const listener = listenerStart === -1 ? '' : bgSource.slice(listenerStart, listenerEnd);
+  if (/if \(details && details\.reason === 'update'\) \{\s*await clearRetiredBackgroundAgentData\(\);/.test(listener)) {
+    pass('onInstalled runs the cleanup on extension update only');
+  } else {
+    fail('onInstalled does not gate the cleanup on reason === "update"');
+  }
+}
+
+// ---- Section 4: MCP_RECONNECT_ALARM early-return preserved byte-for-byte ----
+
+{
+  const expected = '  if (isMcpReconnectAlarm) {\n    armMcpBridge(\'alarm:\' + MCP_RECONNECT_ALARM);\n    return;\n  }';
+  if (bgSource.indexOf(expected) !== -1) pass('MCP_RECONNECT_ALARM early-return byte-for-byte preserved');
+  else fail('MCP_RECONNECT_ALARM early-return path mutated or missing', 'Expected substring not found');
+}
+
+// ---- Section 5: dom-stream watchdog branch preserved on a live line ----
+
+{
+  const lines = bgSource.split('\n');
+  const hits = lines.filter(line => /if\s*\(alarm\.name\s*===\s*'fsb-domstream-watchdog'\)/.test(line));
+  const liveHits = hits.filter(line => !/^\s*\/\//.test(line));
+  if (liveHits.length === 1) pass('dom-stream watchdog branch is live (and unique)');
+  else fail('expected exactly 1 live dom-stream watchdog hit, found ' + liveHits.length);
 }
 
 // ---- Result ----
 
-assert.strictEqual(typeof failures, 'number');
-
-if (failures === 0) {
+let finished = false;
+function finish() {
+  if (finished) return;
+  finished = true;
   console.log('');
-  console.log('All Phase 212-01 regression checks PASSED');
-  process.exit(0);
-} else {
-  console.log('');
+  if (failures === 0) {
+    console.log('All background-agent retirement checks PASSED');
+    process.exit(0);
+  }
   console.log(failures + ' check(s) FAILED');
   process.exit(1);
 }
+
+if (bgSource.indexOf('const RETIRED_AGENT_STORAGE_KEYS') === -1) finish();

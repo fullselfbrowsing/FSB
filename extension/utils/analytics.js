@@ -19,6 +19,26 @@ function normalizeUsageSource(source) {
   return 'automation';
 }
 
+// Chart copy follows the control panel language when the locale helper is
+// loaded. The service worker loads this file too and has no helper, so the
+// English text is used there.
+function analyticsLine(english, subs) {
+  const locale = globalThis.fsbUiLocale;
+  if (locale && typeof locale.line === 'function') return locale.line(english, subs);
+  if (!subs) return english;
+  return english.replace(/\$([A-Za-z0-9_]+)\$/g, (all, name) => {
+    const value = subs[name] != null ? subs[name] : subs[name.toLowerCase()];
+    return value == null ? all : String(value);
+  });
+}
+
+// The active UI language for date labels, or undefined (the browser default)
+// without the locale helper.
+function analyticsLocale() {
+  const locale = globalThis.fsbUiLocale;
+  return locale && typeof locale.current === 'function' ? locale.current() : undefined;
+}
+
 class FSBAnalytics {
   constructor() {
     // Model pricing per 1M tokens (USD) - Updated January 2025
@@ -514,7 +534,7 @@ class FSBAnalytics {
         interval = 24 * 60 * 60 * 1000; // 1 day intervals
         for (let i = 7; i >= 0; i--) {
           const time = new Date(now - (i * interval));
-          labels.push(time.toLocaleDateString(undefined, { weekday: 'short' }));
+          labels.push(time.toLocaleDateString(analyticsLocale(), { weekday: 'short' }));
         }
         break;
       case '30d':
@@ -547,7 +567,7 @@ class FSBAnalytics {
       labels,
       datasets: [
         {
-          label: 'Input Tokens',
+          label: analyticsLine('Input Tokens'),
           data: inputData,
           borderColor: '#ff6b35',
           backgroundColor: 'rgba(255, 107, 53, 0.1)',
@@ -555,7 +575,7 @@ class FSBAnalytics {
           fill: true
         },
         {
-          label: 'Output Tokens',
+          label: analyticsLine('Output Tokens'),
           data: outputData,
           borderColor: '#404040',
           backgroundColor: 'rgba(64, 64, 64, 0.1)',
@@ -594,7 +614,8 @@ class FSBAnalytics {
     
     console.log('Analytics: Canvas element found, creating chart...');
 
-    const chartData = this.getChartData('24h');
+    this.chartTimeRange = '24h';
+    const chartData = this.getChartData(this.chartTimeRange);
     console.log('Analytics: Chart data prepared:', chartData);
 
     const colors = this.getChartThemeColors();
@@ -619,7 +640,7 @@ class FSBAnalytics {
             intersect: false,
             callbacks: {
               label: function(context) {
-                return context.dataset.label + ': ' + context.parsed.y.toLocaleString() + ' tokens';
+                return context.dataset.label + ': ' + analyticsLine('$COUNT$ tokens', { count: context.parsed.y.toLocaleString() });
               }
             }
           }
@@ -629,7 +650,7 @@ class FSBAnalytics {
             display: true,
             title: {
               display: true,
-              text: 'Time'
+              text: analyticsLine('Time')
             },
             grid: { color: colors.grid },
             ticks: { color: colors.tick }
@@ -638,7 +659,7 @@ class FSBAnalytics {
             display: true,
             title: {
               display: true,
-              text: 'Tokens'
+              text: analyticsLine('Tokens')
             },
             beginAtZero: true,
             grid: { color: colors.grid },
@@ -680,6 +701,20 @@ class FSBAnalytics {
     this.chart.update();
   }
 
+  // Re-labels the chart for the current UI language in place, like
+  // updateChartTheme(). The canvas text is out of reach of the page's
+  // data-i18n pass, so the control panel calls this on a language change.
+  // Dataset labels and weekday ticks come from getChartData(), so the data is
+  // rebuilt for the range on screen.
+  updateChartLocale() {
+    if (!this.chart) return;
+    const scales = this.chart.options.scales;
+    if (scales.x && scales.x.title) scales.x.title.text = analyticsLine('Time');
+    if (scales.y && scales.y.title) scales.y.title.text = analyticsLine('Tokens');
+    this.chart.data = this.getChartData(this.chartTimeRange || '24h');
+    this.chart.update();
+  }
+
   // Update chart with new time range
   updateChart(timeRange) {
     console.log(`Analytics: Updating chart with time range: ${timeRange}`);
@@ -689,6 +724,7 @@ class FSBAnalytics {
       return;
     }
 
+    this.chartTimeRange = timeRange;
     const chartData = this.getChartData(timeRange);
     console.log('Analytics: Updated chart data:', chartData);
     

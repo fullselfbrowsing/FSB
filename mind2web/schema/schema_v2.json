@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mind2web.example/online-mind2web-submission.schema.json",
+  "title": "Online Mind2Web Submission Result",
+  "description": "Schema for Online-Mind2Web trajectory submissions. A submission represents one agent attempt at one benchmark task and bundles the natural-language goal, ordered action history, and references to per-step screenshots stored under ./trajectory/. Each step is a self-contained record so action, thought, screenshot, and url cannot desync.",
+  "$comment": "The 'thought' field must be present in each step and may be null. Screenshot filenames must sort lexicographically into the same order as their 'step' index, and every referenced screenshot file must exist under ./trajectory/.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "task", "task_id", "action_history", "reference_length"],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "online-mind2web-v2",
+      "title": "Schema Version",
+      "description": "Pinned identifier for the schema this submission conforms to. Must be exactly 'online-mind2web-v2'. Bump this string when the schema changes in a backward-incompatible way so downstream consumers can route to the right validator."
+    },
+    "task": {
+      "type": "string",
+      "minLength": 1,
+      "title": "Task",
+      "description": "Natural-language task instruction for the trajectory, copied verbatim from the benchmark task definition.",
+      "examples": ["Add a $100 Best Buy gift card for a birthday to my cart."]
+    },
+    "task_id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_\\-]+$",
+      "title": "Task ID",
+      "description": "Unique task identifier, copied EXACTLY as it appears in the upstream Online-Mind2Web dataset. Do NOT add a 'tasks/' prefix, a trailing slash, or any other wrapping — the value must be the raw ID only (typically a hex hash). Submissions that prefix the ID will fail validation.",
+      "examples": [
+        "d392e154c1c6ffbb26e2331c3afafc67",
+        "1b867afecf072cb877ebfa4069263746"
+      ]
+    },
+    "agent_final_answer": {
+      "type": ["string", "null"],
+      "title": "Agent Final Answer",
+      "description": "The free-text answer the agent returned at task completion (the payload after 'TASK_COMPLETE -> ANSWER:' in the final action). Null if the agent did not produce a final answer."
+    },
+    "reference_length": {
+      "type": "integer",
+      "minimum": 1,
+      "title": "Reference Length",
+      "description": "Number of steps in the *human reference* trajectory for this task_id. This is a property of the benchmark task, not of the submitted attempt; it is used as a denominator for efficiency metrics. Do not substitute the submitted step count.",
+      "examples": [12]
+    },
+    "action_history": {
+      "type": "array",
+      "title": "Action History",
+      "description": "Ordered list of factual actions the agent took during the attempt. Each item is a self-contained step record so action, thought, url, and screenshot stay locked together. Element index must equal the step's 'step' field.",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/ActionStep" }
+    }
+  },
+  "$defs": {
+    "ActionStep": {
+      "type": "object",
+      "title": "Action Step",
+      "description": "A single step in the trajectory. All required fields belong to the same moment in time and must be supplied together — this is the contract that prevents the v1 desync problem.",
+      "additionalProperties": false,
+      "required": ["step", "screenshot", "action", "thought"],
+      "properties": {
+        "step": {
+          "type": "integer",
+          "minimum": 0,
+          "title": "Step",
+          "description": "Zero-based step index. Must equal the item's position in action_history, be strictly increasing, and have no gaps."
+        },
+        "screenshot": {
+          "type": "string",
+          "title": "Screenshot Filename",
+          "description": "Filename (no path) of the screenshot for this step, stored in ./trajectory/. The file must exist. Filenames must sort lexicographically into step order. Two accepted naming conventions: zero-padded 4-digit ('0000.png'), or the exporter's '<step>_full_screenshot_<unix_ms>.png'.",
+          "pattern": "^(\\d{4}|\\d+_full_screenshot_\\d+)\\.(png|jpg|jpeg|webp)$"
+        },
+        "url": {
+          "type": ["string", "null"],
+          "format": "uri",
+          "title": "Page URL",
+          "description": "URL of the page at the moment the action was taken. Optional but STRONGLY RECOMMENDED on every step — it's the single canonical place to record page state and lets reviewers and graders re-derive context without parsing the action string. For NAVIGATE steps, set this to the *destination* URL; do not also embed it in 'action'."
+        },
+        "action": {
+          "type": "string",
+          "minLength": 1,
+          "title": "Action",
+          "description": "Factual action taken at this step. Two grammars are accepted; choose ONE per submission and stay consistent. See README.md §4 for the full action dictionary."
+        },
+        "action_status": {
+          "type": ["string", "null"],
+          "enum": ["SUCCESS", "FAILED", null],
+          "title": "Action Status",
+          "description": "Optional structured mirror of the '| SUCCESS' / '| FAILED' suffix in the action string. When present, must agree with the suffix."
+        },
+        "thought": {
+          "type": ["string", "null"],
+          "title": "Thought",
+          "description": "Reasoning for the step. This field MUST be present and may be null when no reasoning text is available — never omit it. Keeping the thought inside the step record is what prevents the v1 problem of thought arrays drifting out of sync with actions."
+        }
+      }
+    }
+  }
+}

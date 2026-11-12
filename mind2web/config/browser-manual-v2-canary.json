@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "seed": "fsb-full-external-codex-canary-v2-20261018",
+  "selection_basis": "Pinned dataset metadata only; no old outcomes. Ten distinct domains, difficulty quotas3easy/5medium/2hard and capability quotas2forms/3filters/3extraction-comparison/2interactive. Rank SHA256(seed|capability|level|task_id) with frozen capability priority and uniqueness constraints.",
+  "task_ids": ["6db4a0e346976f2729ba9afcd3208941", "a7a73c8fa75441fc76df9746c327bdd6", "e24662008c3be5d56f986f232fcec447_070826", "123e8c2fc453f55fadd1d0b9aaf94df4", "a13e4231a3d6a7000c622c56448d97ba", "3f312ae3efc3c3e90ababe050dd4e7ae", "2218042362d8fae73756eb309848c2b2", "b3a7da968de13bbdcaed12ffe4993df6", "a48e2f1ee8d87eaeea56fe5e730427e6", "1223b07536a87e0170ff87cbbebd1d3c"],
+  "task_ids_sha256": "ab4853f1a909a9ad389a90270ca8b52fd42077e9935828bfa55ff6e7934a8e29",
+  "live_policy": "No outcome-based substitutions. Serial A five, concurrent all ten, serial B five, with A/B split ranked by SHA256(seed|order|task_id). Shared signed-in Chrome cookies; no claim of identical clean browser state or causal noninferiority."
+}

@@ -33,8 +33,6 @@ const requiredSmokeTools = [
   'get_site_guide',
   'click',
   'close_tab',
-  'start_visual_session',
-  'end_visual_session',
   'run_task',
   'stop_task',
   'complete_task',
@@ -47,8 +45,11 @@ const requiredSmokeTools = [
   'get_logs',
   'get_session_replay',
   'replay_session',
-  'back',
 ];
+
+// Removed from the MCP surface: the two visual-session stubs that only
+// returned an error, and `back`, which duplicated go_back.
+const retiredTools = ['start_visual_session', 'end_visual_session', 'back'];
 
 // Session journals (ac377038) stamp every agent-scoped bridge payload with
 // correlation fields in buildAgentPayload() -- mcp/src/agent-bridge.ts. Two of
@@ -125,26 +126,22 @@ async function run() {
   const readOnlyModule = await loadBuildModule(pathJoin('tools', 'read-only.js'));
   const screenshotsModule = await loadBuildModule(pathJoin('tools', 'screenshots.js'));
   const manualModule = await loadBuildModule(pathJoin('tools', 'manual.js'));
-  const visualSessionModule = await loadBuildModule(pathJoin('tools', 'visual-session.js'));
   const autopilotModule = await loadBuildModule(pathJoin('tools', 'autopilot.js'));
   const triggersModule = await loadBuildModule(pathJoin('tools', 'triggers.js'));
   const observabilityModule = await loadBuildModule(pathJoin('tools', 'observability.js'));
-  // Phase 242 plan 02: agents.ts now exposes the 'back' tool (Plan 01 D-01).
-  // Loading the module here lets the smoke test register the back handler
-  // alongside the other surfaces; without this, 'back' stays in
-  // requiredSmokeTools but its handler never lands in harness.handlers.
-  const agentsModule = await loadBuildModule(pathJoin('tools', 'agents.js'));
 
   console.log('\n--- packaged runtime surface ---');
   assert(typeof runtimeModule.createRuntime === 'function', 'build/runtime.js exports createRuntime');
   assert(typeof readOnlyModule.registerReadOnlyTools === 'function', 'build/tools/read-only.js exports registerReadOnlyTools');
   assert(typeof screenshotsModule.registerScreenshotTools === 'function', 'build/tools/screenshots.js exports registerScreenshotTools');
   assert(typeof manualModule.registerManualTools === 'function', 'build/tools/manual.js exports registerManualTools');
-  assert(typeof visualSessionModule.registerVisualSessionTools === 'function', 'build/tools/visual-session.js exports registerVisualSessionTools');
   assert(typeof autopilotModule.registerAutopilotTools === 'function', 'build/tools/autopilot.js exports registerAutopilotTools');
   assert(typeof triggersModule.registerTriggerTools === 'function', 'build/tools/triggers.js exports registerTriggerTools');
   assert(typeof observabilityModule.registerObservabilityTools === 'function', 'build/tools/observability.js exports registerObservabilityTools');
-  assert(typeof agentsModule.registerAgentTools === 'function', 'build/tools/agents.js exports registerAgentTools');
+  const runtimeTools = Object.keys(runtimeModule.createRuntime().server._registeredTools || {});
+  for (const toolName of retiredTools) {
+    assert(!runtimeTools.includes(toolName), `createRuntime does not register the retired ${toolName} tool`);
+  }
 
   const harness = createToolHarness({
     bridgeResponses: {
@@ -163,17 +160,6 @@ async function run() {
         status: 'approval_required',
         requestId: 'smoke-replay-approval'
       },
-      'mcp:start-visual-session': ({ payload }) => ({
-        success: true,
-        sessionToken: 'visual_token_123',
-        clientLabel: payload.clientLabel,
-        tabId: 7,
-      }),
-      'mcp:end-visual-session': ({ payload }) => ({
-        success: true,
-        sessionToken: payload.sessionToken,
-        cleared: true,
-      }),
       'mcp:start-automation': { success: true, sessionId: 'smoke-session', status: 'started' },
       'mcp:stop-automation': { success: true, stopped: true },
       'mcp:task-status': ({ payload }) => {
@@ -207,13 +193,9 @@ async function run() {
   readOnlyModule.registerReadOnlyTools(harness.server, harness.bridge, harness.queue, agentScope);
   screenshotsModule.registerScreenshotTools(harness.server, harness.bridge, harness.queue, agentScope);
   manualModule.registerManualTools(harness.server, harness.bridge, harness.queue, agentScope);
-  visualSessionModule.registerVisualSessionTools(harness.server, harness.bridge, harness.queue, agentScope);
   triggersModule.registerTriggerTools(harness.server, harness.bridge, harness.queue, agentScope);
   autopilotModule.registerAutopilotTools(harness.server, harness.bridge, harness.queue, agentScope);
   observabilityModule.registerObservabilityTools(harness.server, harness.bridge, harness.queue, agentScope);
-  // Phase 242 D-01: registerAgentTools registers the 'back' MCP tool. Loaded
-  // last so the smoke test's registered-handlers assertion (line 118) sees it.
-  agentsModule.registerAgentTools(harness.server, harness.bridge, harness.queue, agentScope);
 
   console.log('\n--- registered smoke tools ---');
   for (const toolName of requiredSmokeTools) {
@@ -298,30 +280,6 @@ async function run() {
       },
     },
     'click routes through mcp:execute-action with click payload + v0.9.62 visualSession sidecar',
-  );
-
-  // v0.9.62 (fsb-mcp-server 0.9.0): start_visual_session + end_visual_session
-  // are TOOL_REMOVED stubs. Handlers stay registered (for the migration recipe
-  // surface) but they short-circuit BEFORE the task queue and BEFORE the bridge
-  // connectivity check -- no bridge dispatch happens. See
-  // mcp/src/tools/visual-session.ts and .planning/v0.9.62-CONTRACT.md.
-  const startVisualSessionCall = await invokeTool(harness, 'start_visual_session', {
-    client: ' codex ',
-    task: 'Smoke test the visual lifecycle',
-    detail: 'Preparing overlay',
-  });
-  assert(
-    startVisualSessionCall === null,
-    'start_visual_session is a TOOL_REMOVED stub and does not dispatch a bridge message',
-  );
-
-  const endVisualSessionCall = await invokeTool(harness, 'end_visual_session', {
-    session_token: 'visual_token_123',
-    reason: 'ended',
-  });
-  assert(
-    endVisualSessionCall === null,
-    'end_visual_session is a TOOL_REMOVED stub and does not dispatch a bridge message',
   );
 
   const runTaskCall = await invokeTool(harness, 'run_task', { task: 'Smoke test the browser bridge' }, harness.createExtra({ progressToken: 'smoke-progress' }));
@@ -440,16 +398,6 @@ async function run() {
     replaySessionCall && replaySessionCall.message,
     { type: 'mcp:replay-session', payload: { sessionId: 'smoke-session' } },
     'replay_session requests side-panel consent without target-page input',
-  );
-
-  // Phase 242 plan 02: 'back' routes through mcp:go-back. Bridge response
-  // surfaces the canonical 5-status envelope; agentScope captures the
-  // (optional) ownershipToken via captureOwnershipToken on success.
-  const backCall = await invokeTool(harness, 'back');
-  assertDeepEqual(
-    backCall && backCall.message,
-    { type: 'mcp:go-back', payload: { agentId: 'agent_test_smoke', ownershipToken: 'token_test_smoke' } },
-    'back routes through mcp:go-back with agentId + ownershipToken (Phase 242 D-01)',
   );
 
   console.log('\n--- explicit tab_id uses tab-specific ownership token ---');
@@ -588,13 +536,6 @@ async function run() {
     'read_page with tab_id uses ownershipTokenFor(tab_id)',
   );
 
-  const explicitBackCall = await invokeTool(harness, 'back', { tab_id: 77 });
-  assertDeepEqual(
-    explicitBackCall && explicitBackCall.message,
-    { type: 'mcp:go-back', payload: { agentId: 'agent_test_smoke', ownershipToken: 'token_tab_77', tabId: 77 } },
-    'back with tab_id uses ownershipTokenFor(tab_id)',
-  );
-
   const explicitCloseTabCall = await invokeTool(harness, 'close_tab', {
     tab_id: 77,
     visual_reason: 'smoke test',
@@ -620,12 +561,9 @@ async function run() {
   assert(registerCalls.length === 1, 'agent:register must fire exactly once across all tool invocations; saw ' + registerCalls.length);
 
   console.log('\n--- queue coverage ---');
-  // v0.9.62 (fsb-mcp-server 0.9.0): start_visual_session + end_visual_session
-  // are TOOL_REMOVED stubs that short-circuit BEFORE queue.enqueue (see
-  // mcp/src/tools/visual-session.ts). They are excluded from queue coverage
-  // alongside stop_task (which stays direct so cancellation does not wait
-  // behind queued work).
-  const DIRECT_TOOLS = new Set(['stop_task', 'start_visual_session', 'end_visual_session', 'trigger', 'stop_trigger', 'get_trigger_status', 'list_triggers']);
+  // stop_task stays direct so cancellation does not wait behind queued work;
+  // the trigger tools dispatch directly from their registrar.
+  const DIRECT_TOOLS = new Set(['stop_task', 'trigger', 'stop_trigger', 'get_trigger_status', 'list_triggers']);
   for (const toolName of requiredSmokeTools.filter((name) => !DIRECT_TOOLS.has(name))) {
     assert(harness.queueCalls.includes(toolName), `${toolName} passes through the shared queue surface`);
   }
@@ -634,8 +572,6 @@ async function run() {
   assert(!harness.queueCalls.includes('stop_trigger'), 'stop_trigger dispatches directly so cancellation does not wait behind queued work');
   assert(!harness.queueCalls.includes('get_trigger_status'), 'get_trigger_status dispatches directly so status does not wait behind queued work');
   assert(!harness.queueCalls.includes('list_triggers'), 'list_triggers dispatches directly so listing does not wait behind queued work');
-  assert(!harness.queueCalls.includes('start_visual_session'), 'start_visual_session is a TOOL_REMOVED stub and does not enqueue');
-  assert(!harness.queueCalls.includes('end_visual_session'), 'end_visual_session is a TOOL_REMOVED stub and does not enqueue');
 
   console.log(`\n=== Results: ${passed} passed, ${failed} failed ===`);
   process.exit(failed > 0 ? 1 : 0);

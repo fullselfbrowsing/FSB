@@ -768,8 +768,10 @@ assert.equal((htmlSource.match(/id="delegationControlBar"/g) || []).length, 0,
 assert.equal(sha256(htmlSource
   .replace(delegationProviderScript, '')
   .replace(nativeHostInstallScript, '')),
-  // Rolled for the Safari port: bundled Font Awesome and the platform shim.
-  '2870979deee6c925445c690f9bb5eaae9a745fdb652ae12f4372c140c2cf223c',
+  // Rolled for the Safari port (bundled Font Awesome and the platform shim) and
+  // the UI locale work (ui-locale.js and copy-exact.js scripts and data-i18n keys
+  // on static copy). No delegation control was added.
+  '7d66c360348766749f119a7302de31fe93155650f5843c445834918fe5db0c7e',
   'the side-panel HTML includes only the intended helpers and tab-scoped ownership treatment');
 const replayCssStart = cssSource.indexOf('.history-status.idle-closed {');
 const replayCssEnd = cssSource.indexOf('/* Phase 11 FINT-20', replayCssStart);
@@ -988,8 +990,8 @@ console.log('\n--- Phase 61 consent and human-control contract ---');
 assert(!panelSource.includes('Delegate a browser task')
     && !panelSource.includes('Choose an agent provider, describe the outcome, and FSB will run it in a background tab.'),
   'the idle delegation promotion is absent from the side panel');
-assert(panelSource.includes("+ ' cannot run browser tasks'"),
-  'unsupported-provider heading retains the exact dynamic provider-label suffix');
+assert(panelSource.includes("'$NAME$ cannot run browser tasks'"),
+  'unsupported-provider heading keeps the provider label in a $NAME$ template');
 
 const delegationUiSource = panelSource.slice(
   panelSource.indexOf('var _delegationUiState = {'),
@@ -1096,16 +1098,17 @@ assert(/e\.key === 'Escape'[\s\S]{0,120}_backToDelegationMessage\(\)/.test(panel
       _ensureDelegationMount: () => ({ run, state: stateCard, feed }),
       _clearDelegationNode(node) { while (node.firstChild) node.removeChild(node.firstChild); },
       _restoreLegacyStopControl() {},
-      _delegationElement(tag, className, textValue) {
+      // Templated consent copy arrives as the template plus { name }.
+      _delegationElement(tag, className, textValue, subs) {
         const node = new TestNode(tag);
         node.className = className || '';
-        if (textValue !== undefined) node.textContent = textValue;
+        if (textValue !== undefined) node.textContent = subs ? textValue.replace('$NAME$', subs.name) : textValue;
         return node;
       },
-      _delegationAction(label, className, handler) {
+      _delegationAction(label, className, handler, subs) {
         const button = new TestNode('button');
         button.className = 'delegation-action' + (className ? ' ' + className : '');
-        button.textContent = label;
+        button.textContent = subs ? label.replace('$NAME$', subs.name) : label;
         button.addEventListener('click', handler);
         return button;
       },
@@ -1181,8 +1184,7 @@ assert(panelSource.includes('announcedTransitions: Object.create(null)')
     && panelSource.includes("snapshot.delegationId + ':lifecycle:' + suffix")
     && panelSource.includes('announcementParts.join(\'. \')'),
   'lifecycle/control one-shots use a separate dedupe map and the one existing announcer');
-assert(panelSource.includes("return 'Agent stopped, ' + count + ' '")
-    && panelSource.includes("count === 1 ? 'tab' : 'tabs'"),
+assert(panelSource.includes("count === 1 ? 'Agent stopped, $COUNT$ tab released' : 'Agent stopped, $COUNT$ tabs released'"),
   'stopped copy uses only the canonical release count with singular grammar');
 assert(panelSource.includes('var stopping = _delegationStopControlPending(snapshot)')
     && panelSource.includes("snapshot.state === 'stopping'")
@@ -1289,7 +1291,7 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
       const controllerPath = require.resolve('../extension/utils/delegation-controller.js');
       const matrix = [
         ['claude-code', 'unknown', '2.1.177'],
-        ['grok-build', 'oauth', '1.0.4']
+        ['grok-build', 'oauth', 'grok-acp-v1']
       ];
       let canonicalShape = null;
       for (let index = 0; index < matrix.length; index += 1) {
@@ -3428,6 +3430,7 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
 
     const headingContext = {};
     vm.createContext(headingContext);
+    vm.runInContext(extractNamedFunction(panelSource, '_delegationStoppedHeadingParts'), headingContext);
     vm.runInContext(extractNamedFunction(panelSource, '_delegationStoppedHeading'), headingContext);
     assert.equal(headingContext._delegationStoppedHeading(stopped), 'Agent stopped, 1 tab released');
     assert.equal(headingContext._delegationStoppedHeading({
@@ -3462,6 +3465,7 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
       '_applyDelegationSnapshotTone',
       '_delegationAction',
       '_renderDelegationInlineError',
+      '_delegationStoppedHeadingParts',
       '_delegationStoppedHeading',
       '_delegationStateLabel',
       '_delegationIsActiveSnapshot',

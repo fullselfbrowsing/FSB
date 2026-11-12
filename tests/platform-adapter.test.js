@@ -522,7 +522,7 @@ function safariLikeScope(overrides) {
 
   console.log('\n=== 11. source hygiene ===');
   passAssert(!/\bimportScripts\b/.test(SOURCE),
-    'adapter source contains no importScripts token (background.js pins 334/330)');
+    'adapter source contains no importScripts token (background.js pins 330/326)');
 
   console.log('\n=== 12. Safari service worker: WebSocket guard + runtime.onSuspend ===');
   {
