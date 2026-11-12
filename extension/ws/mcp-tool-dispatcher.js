@@ -2231,7 +2231,8 @@ function sanitizeActionHistoryEntry(action) {
     ...(params.selector ? { selector: boundedString(params.selector, 250) } : {}),
     ...(params.url ? { domain: getDomainFromUrl(params.url) } : {}),
     result: {
-      success: Boolean(result.success),
+      // Stored rows keep a top-level success flag and no result object.
+      success: typeof result.success === 'boolean' ? result.success : action?.success === true,
       ...(result.error ? { error: boundedString(result.error, 500) } : {})
     },
     // Phase 66 (D-05): only measured values; an unmeasured call has no key.
