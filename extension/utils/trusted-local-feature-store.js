@@ -34,6 +34,7 @@
     SESSION_COUNT_PER_MODE: 50,
     SESSION_LOG_ENTRIES: 500,
     SESSION_ACTION_ENTRIES: 100,
+    SESSION_ITERATION_TIMING_ENTRIES: 100,
     SESSION_COMMAND_ENTRIES: 25,
     SESSION_RESPONSE_BYTES: 262144,
     DOM_SNAPSHOT_SESSIONS: 20,
@@ -214,18 +215,75 @@
     };
   }
 
+  // An MCP call timing survives only in its v1 shape (safe non-negative
+  // integers, completedAt >= receivedAt); fsbMs is recomputed, never trusted.
+  function safeCallTiming(value) {
+    if (!value || typeof value !== 'object' || value.v !== 1) return null;
+    if (!Number.isSafeInteger(value.receivedAt) || value.receivedAt < 0) return null;
+    if (!Number.isSafeInteger(value.completedAt) || value.completedAt < value.receivedAt) return null;
+    return {
+      v: 1,
+      receivedAt: value.receivedAt,
+      completedAt: value.completedAt,
+      fsbMs: value.completedAt - value.receivedAt
+    };
+  }
+
   function safeActionHistory(value, now) {
     if (!Array.isArray(value)) return [];
     return value.slice(-LIMITS.SESSION_ACTION_ENTRIES).map(function(action) {
       if (!action || typeof action !== 'object') return null;
-      return {
+      var row = {
         tool: redactText(action.tool || '', 64),
         timestamp: safeTimestamp(action.timestamp, now),
         success: action.result && typeof action.result.success === 'boolean'
           ? action.result.success : action.success === true,
-        logicalTab: redactText(action.logicalTab || 'primary', 128)
+        logicalTab: redactText(action.logicalTab || 'primary', 128),
+        // Unmeasured calls keep an explicit null, never 0.
+        durationMs: Number.isFinite(action.durationMs) && action.durationMs >= 0 ? action.durationMs : null
       };
+      var timing = safeCallTiming(action.timing);
+      if (timing) row.timing = timing;
+      return row;
     }).filter(Boolean);
+  }
+
+  function isPlainRecord(value) {
+    return !!value && typeof value === 'object' && !Array.isArray(value);
+  }
+
+  // Measurement rows and summaries are numbers, short labels and small
+  // nested records. Copy them the way JSON would, but bounded: finite
+  // numbers only, redacted strings, capped arrays and plain keys.
+  function safeMeasurementValue(value, depth) {
+    if (value === null || typeof value === 'boolean') return value;
+    if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+    if (typeof value === 'string') return redactText(value, 256);
+    if (depth >= 5 || typeof value !== 'object') return undefined;
+    if (Array.isArray(value)) {
+      return value.slice(0, 100).map(function(item) {
+        var copy = safeMeasurementValue(item, depth + 1);
+        return copy === undefined ? null : copy;
+      });
+    }
+    var out = {};
+    Object.keys(value).slice(0, 64).forEach(function(key) {
+      if (!/^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(key)) return;
+      var copy = safeMeasurementValue(value[key], depth + 1);
+      if (copy !== undefined) out[key] = copy;
+    });
+    return out;
+  }
+
+  function safeIterationTiming(rows) {
+    if (!Array.isArray(rows)) return undefined;
+    return rows.filter(isPlainRecord)
+      .slice(-LIMITS.SESSION_ITERATION_TIMING_ENTRIES)
+      .map(function(row) { return safeMeasurementValue(row, 0); });
+  }
+
+  function safeMeasurementSummary(summary) {
+    return isPlainRecord(summary) ? safeMeasurementValue(summary, 0) : undefined;
   }
 
   function safeReplayValue(value, depth) {
@@ -404,6 +462,16 @@
       actionHistory: safeActionHistory(session.actionHistory, now),
       replay: safeReplayRecord(session.replay, now)
     };
+    // Autopilot measurement (iteration timing, the summary and the legacy
+    // cost label) is kept only when the session carries it, so a record
+    // without measurement gains no key.
+    var iterationTiming = safeIterationTiming(session.iterationTiming);
+    if (iterationTiming !== undefined) safe.iterationTiming = iterationTiming;
+    var measurementSummary = safeMeasurementSummary(session.measurementSummary);
+    if (measurementSummary !== undefined) safe.measurementSummary = measurementSummary;
+    if (session.totalCostBasis === 'estimate' || session.totalCostBasis === 'unavailable') {
+      safe.totalCostBasis = session.totalCostBasis;
+    }
     while (safe.logs.length && byteLength(safe) > LIMITS.SESSION_RESPONSE_BYTES) safe.logs.shift();
     if (byteLength(safe) > LIMITS.SESSION_RESPONSE_BYTES) return null;
     return safe;
@@ -424,6 +492,7 @@
       tabIds: session.tabIds,
       tabCount: session.tabCount,
       totalCost: session.totalCost,
+      totalCostBasis: session.totalCostBasis,
       outcome: session.outcome,
       outcomeDetails: session.outcomeDetails,
       result: session.result,
