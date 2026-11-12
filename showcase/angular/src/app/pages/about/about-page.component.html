@@ -1,237 +1,286 @@
-  <section class="about-hero">
-    <div class="container">
-      <h1 i18n="@@about.hero.title">See <span [attr.translate]="'no'">FSB</span> in <span class="text-orange">Action</span></h1>
-      <p i18n="@@about.hero.subtitle"><span [attr.translate]="'no'">FSB</span> still starts with natural-language browser automation. Through <span [attr.translate]="'no'">MCP</span>, it also gives <span [attr.translate]="'no'">Codex</span>, <span [attr.translate]="'no'">Claude</span>, <span [attr.translate]="'no'">OpenClaw</span>, and other agents a real browser surface for acting, observing, and iterating.</p>
+<!-- Depth page: each section is a plane along the z axis (layout/depth). -->
+<div class="fsb-depth-root" appDepthStage (depthActive)="onDepthActive($event)">
+<div class="fsb-depth" data-depth-stage tabindex="0" role="region" i18n-aria-label="@@about.depth.aria" aria-label="About FSB. Scroll, swipe or use the arrow keys to move between sections.">
+
+  <!-- Hero -->
+  <div class="fsb-depth-layer" style="z-index: 60">
+    <div class="fsb-depth-fit">
+      <section class="about-hero">
+        <div class="container">
+          <h1 data-di="0" i18n="@@about.hero.title">See <span [attr.translate]="'no'">FSB</span> in <span class="text-orange">Action</span></h1>
+        </div>
+      </section>
     </div>
-  </section>
+  </div>
 
   <!-- Trailer -->
-  <section class="video-demo-section section">
-    <div class="container">
-      <div class="section-header reveal">
-        <h2 i18n="@@about.videos.title">AI Browser Automation Demo</h2>
-        <p i18n="@@about.videos.subtitle"><span [attr.translate]="'no'">FSB</span> connects natural-language instructions and <span [attr.translate]="'no'">MCP</span> agents to your real browser. Watch the official trailer, then explore its built-in memory and browser actions below.</p>
-      </div>
-      <div class="video-demo-grid">
-        <article class="video-demo-card reveal delay-1">
-          <div class="video-frame">
-            <iframe width="960" height="540" src="https://www.youtube-nocookie.com/embed/osNHSquClo0" i18n-title="@@about.videos.trailer.iframe.title" title="FSB Demo: AI Browser Automation in Chrome" loading="eager" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+  <div class="fsb-depth-layer" style="z-index: 59">
+    <div class="fsb-depth-fit">
+      <section class="video-demo-section section">
+        <div class="container">
+          <div class="video-demo-grid">
+            <article class="video-demo-card reveal delay-1" data-di="0">
+              <div class="video-frame">
+                <div class="video-shield" aria-hidden="true"></div>
+                <iframe width="960" height="540" src="https://www.youtube-nocookie.com/embed/osNHSquClo0" i18n-title="@@about.videos.trailer.iframe.title" title="FSB Demo: AI Browser Automation in Chrome" loading="eager" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+              </div>
+              <div class="video-demo-copy">
+                <h3>{{ trailerName }}</h3>
+                <p>{{ trailerDescription }}</p>
+                <a [href]="trailerWatchUrl" target="_blank" rel="noopener" i18n="@@about.videos.trailer.watch">Watch on YouTube</a>
+              </div>
+            </article>
           </div>
-          <div class="video-demo-copy">
-            <h3>{{ trailerName }}</h3>
-            <p>{{ trailerDescription }}</p>
-            <a [href]="trailerWatchUrl" target="_blank" rel="noopener" i18n="@@about.videos.trailer.watch">Watch on YouTube</a>
-          </div>
-        </article>
-      </div>
+        </div>
+      </section>
     </div>
-  </section>
+  </div>
 
   <!-- Memory -->
-  <section class="memory-section section" [attr.data-theme]="graphTheme">
-    <div class="container">
-      <div class="section-header reveal">
-        <h2 i18n="@@about.memory.title">Memory</h2>
-        <p i18n="@@about.memory.subtitle"><span [attr.translate]="'no'">FSB</span> ships with built-in memory for the web's most-used sites. It already knows their selectors, workflows, and gotchas. Start with the categories, then switch to <strong>Expanded</strong> to branch out to every site <span [attr.translate]="'no'">FSB</span> already understands.</p>
-      </div>
-      <div class="mem-stats reveal">
-        @for (stat of memoryStats; track stat.label) {
-          <div class="mem-stat">
-            <span class="mem-stat-value" [attr.translate]="'no'">{{ formatStatValue(stat.value) }}</span>
-            <span class="mem-stat-label">{{ stat.label }}</span>
+  <div class="fsb-depth-layer" style="z-index: 58">
+    <div class="fsb-depth-fit">
+      <section class="memory-section section" [attr.data-theme]="graphTheme">
+        <div class="container">
+          <div class="section-header reveal" data-di="0">
+            <h2 i18n="@@about.memory.title">Memory</h2>
+            <p i18n="@@about.memory.subtitle"><span [attr.translate]="'no'">FSB</span> ships with built-in memory for the web's most-used sites. It already knows their selectors, workflows, and gotchas. Start with the categories, then switch to <strong>Expanded</strong> to branch out to every site <span [attr.translate]="'no'">FSB</span> already understands.</p>
           </div>
-        }
-      </div>
-      <article class="sitemap-card reveal">
-        <header class="sitemap-head">
-          <div class="sitemap-head-icon" aria-hidden="true"><i class="fa-solid fa-brain"></i></div>
-          <div class="sitemap-head-main">
-            <div class="sitemap-title-row">
-              <h3 i18n="@@about.memory.card.title">Consolidated Memory</h3>
-              <span class="sitemap-badge" i18n="@@about.memory.card.badge"><i class="fa-solid fa-cube"></i> Built-in</span>
-            </div>
-            <div class="sitemap-meta" i18n="@@about.memory.card.meta">
-              <span>130 sites</span><span>·</span><span>19 categories</span><span>·</span><span>1,440 selectors mapped</span>
-            </div>
-          </div>
-          <a class="sitemap-link" routerLink="/sitemaps">
-            <span class="sitemap-link-main">
-              <span class="sitemap-link-title" i18n="@@about.memory.sitemaps.title">Site Maps</span>
-              <span class="sitemap-link-sub" i18n="@@about.memory.sitemaps.sub">Community</span>
-            </span>
-            <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>
-          </a>
-        </header>
-        <div class="kg-toolbar">
-          <div class="kg-search">
-            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
-            <input type="search" placeholder="Highlight a site or category..." i18n-placeholder="@@about.memory.search.placeholder" (input)="onGraphSearch($event)">
-          </div>
-          <div class="kg-toggle" role="group" aria-label="Graph detail level" i18n-aria-label="@@about.memory.toggle.aria">
-            <button class="kg-toggle-btn" [class.active]="graphDetail === 'simple'" type="button" (click)="setGraphDetail('simple')" i18n="@@about.memory.toggle.overview">Overview</button>
-            <button class="kg-toggle-btn" [class.active]="graphDetail === 'full'" type="button" (click)="setGraphDetail('full')" i18n="@@about.memory.toggle.expanded">Expanded</button>
-          </div>
-        </div>
-        <div class="sitemap-graph-wrap">
-          <div class="sitemap-graph" #graphHost></div>
-          <div class="sitemap-graph-overlay">
-            <span class="sitemap-hint" i18n="@@about.memory.graph.hint"><i class="fa-solid fa-arrows-rotate"></i> Drag to rotate · scroll to zoom · hover a node</span>
-          </div>
-        </div>
-        <footer class="sitemap-foot sitemap-cats">
-          <div class="sitemap-block-label" i18n="@@about.memory.categories.label">Knowledge by category</div>
-          <div class="cat-legend">
-            @for (category of categories; track category.name) {
-              <span class="cat-legend-item">
-                <span class="cat-dot" [style.background]="category.color" aria-hidden="true"></span>
-                <span>{{ category.name }}</span>
-                <span class="cat-count" [attr.translate]="'no'">{{ category.count }}</span>
-              </span>
+          <div class="mem-stats reveal">
+            @for (stat of memoryStats; track stat.label) {
+              <div class="mem-stat" [attr.data-di]="(30 + $index * 7) / 100">
+                <span class="mem-stat-value" [attr.translate]="'no'">{{ formatStatValue(stat.value) }}</span>
+                <span class="mem-stat-label">{{ stat.label }}</span>
+              </div>
             }
           </div>
-        </footer>
-      </article>
+        </div>
+      </section>
     </div>
-  </section>
+  </div>
+
+  <!-- Memory: the site graph -->
+  <div class="fsb-depth-layer" style="z-index: 57">
+    <div class="fsb-depth-fit">
+      <section class="memory-section section" [attr.data-theme]="graphTheme">
+        <div class="container">
+          <article class="sitemap-card reveal" data-di="0">
+            <header class="sitemap-head">
+              <div class="sitemap-head-icon" aria-hidden="true"><i class="fa-solid fa-brain"></i></div>
+              <div class="sitemap-head-main">
+                <div class="sitemap-title-row">
+                  <h3 i18n="@@about.memory.card.title">Consolidated Memory</h3>
+                  <span class="sitemap-badge" i18n="@@about.memory.card.badge"><i class="fa-solid fa-cube"></i> Built-in</span>
+                </div>
+                <div class="sitemap-meta" i18n="@@about.memory.card.meta">
+                  <span>130 sites</span><span>·</span><span>19 categories</span><span>·</span><span>1,440 selectors mapped</span>
+                </div>
+              </div>
+              <a class="sitemap-link" routerLink="/sitemaps">
+                <span class="sitemap-link-main">
+                  <span class="sitemap-link-title" i18n="@@about.memory.sitemaps.title">Site Maps</span>
+                  <span class="sitemap-link-sub" i18n="@@about.memory.sitemaps.sub">Community</span>
+                </span>
+                <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>
+              </a>
+            </header>
+            <div class="kg-toolbar">
+              <div class="kg-search">
+                <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                <input type="search" placeholder="Highlight a site or category..." i18n-placeholder="@@about.memory.search.placeholder" (input)="onGraphSearch($event)">
+              </div>
+              <div class="kg-toggle" role="group" aria-label="Graph detail level" i18n-aria-label="@@about.memory.toggle.aria">
+                <button class="kg-toggle-btn" [class.active]="graphDetail === 'simple'" type="button" (click)="setGraphDetail('simple')" i18n="@@about.memory.toggle.overview">Overview</button>
+                <button class="kg-toggle-btn" [class.active]="graphDetail === 'full'" type="button" (click)="setGraphDetail('full')" i18n="@@about.memory.toggle.expanded">Expanded</button>
+              </div>
+            </div>
+            <div class="sitemap-graph-wrap">
+              <div class="sitemap-graph" #graphHost data-depth-own></div>
+              <div class="sitemap-graph-overlay">
+                <span class="sitemap-hint" i18n="@@about.memory.graph.hint"><i class="fa-solid fa-arrows-rotate"></i> Drag to rotate · pinch or ⌘/Ctrl + scroll to zoom · hover a node</span>
+              </div>
+            </div>
+            <footer class="sitemap-foot sitemap-cats">
+              <div class="sitemap-block-label" i18n="@@about.memory.categories.label">Knowledge by category</div>
+              <div class="cat-legend">
+                @for (category of categories; track category.name) {
+                  <span class="cat-legend-item">
+                    <span class="cat-dot" [style.background]="category.color" aria-hidden="true"></span>
+                    <span>{{ category.name }}</span>
+                    <span class="cat-count" [attr.translate]="'no'">{{ category.count }}</span>
+                  </span>
+                }
+              </div>
+            </footer>
+          </article>
+        </div>
+      </section>
+    </div>
+  </div>
 
   <!-- Action Library -->
-  <section class="action-library section">
-    <div class="container">
-      <div class="section-header reveal">
-        <h2 i18n="@@about.actions.title">Action Library</h2>
-        <p i18n="@@about.actions.subtitle">60 browser actions organized by category, all executable through natural language, and surfaced to agents as part of the 69-tool <span [attr.translate]="'no'">MCP</span> catalog.</p>
-      </div>
-      <div class="action-categories">
-        <div class="action-category reveal delay-1">
-          <h4 i18n="@@about.actions.cat.nav.title"><i class="fa-solid fa-compass"></i> Navigation</h4>
-          <div class="action-list" [attr.translate]="'no'">
-            <span class="action-tag" i18n="@@about.actions.tag.navigate" [attr.translate]="'no'">navigate</span>
-            <span class="action-tag" i18n="@@about.actions.tag.searchGoogle" [attr.translate]="'no'">searchGoogle</span>
-            <span class="action-tag" i18n="@@about.actions.tag.refresh" [attr.translate]="'no'">refresh</span>
-            <span class="action-tag" i18n="@@about.actions.tag.goBack" [attr.translate]="'no'">goBack</span>
-            <span class="action-tag" i18n="@@about.actions.tag.goForward" [attr.translate]="'no'">goForward</span>
-            <span class="action-tag" i18n="@@about.actions.tag.spaNavigation" [attr.translate]="'no'">spaNavigation</span>
+  <div class="fsb-depth-layer" style="z-index: 56">
+    <div class="fsb-depth-fit">
+      <section class="action-library section">
+        <div class="container">
+          <div class="section-header reveal" data-di="0">
+            <h2 i18n="@@about.actions.title">Action Library</h2>
+            <p i18n="@@about.actions.subtitle">60 browser actions organized by category, all executable through natural language, and surfaced to agents as part of the 69-tool <span [attr.translate]="'no'">MCP</span> catalog.</p>
+          </div>
+          <div class="action-categories">
+            <div class="action-category reveal delay-1" data-di="0.3">
+              <h4 i18n="@@about.actions.cat.nav.title"><i class="fa-solid fa-compass"></i> Navigation</h4>
+              <div class="action-list" [attr.translate]="'no'">
+                <span class="action-tag" i18n="@@about.actions.tag.navigate" [attr.translate]="'no'">navigate</span>
+                <span class="action-tag" i18n="@@about.actions.tag.searchGoogle" [attr.translate]="'no'">searchGoogle</span>
+                <span class="action-tag" i18n="@@about.actions.tag.refresh" [attr.translate]="'no'">refresh</span>
+                <span class="action-tag" i18n="@@about.actions.tag.goBack" [attr.translate]="'no'">goBack</span>
+                <span class="action-tag" i18n="@@about.actions.tag.goForward" [attr.translate]="'no'">goForward</span>
+                <span class="action-tag" i18n="@@about.actions.tag.spaNavigation" [attr.translate]="'no'">spaNavigation</span>
+              </div>
+            </div>
+            <div class="action-category reveal delay-2" data-di="0.36">
+              <h4 i18n="@@about.actions.cat.clicking.title"><i class="fa-solid fa-hand-pointer"></i> Clicking</h4>
+              <div class="action-list" [attr.translate]="'no'">
+                <span class="action-tag" i18n="@@about.actions.tag.click" [attr.translate]="'no'">click</span>
+                <span class="action-tag" i18n="@@about.actions.tag.rightClick" [attr.translate]="'no'">rightClick</span>
+                <span class="action-tag" i18n="@@about.actions.tag.doubleClick" [attr.translate]="'no'">doubleClick</span>
+                <span class="action-tag" i18n="@@about.actions.tag.hover" [attr.translate]="'no'">hover</span>
+                <span class="action-tag" i18n="@@about.actions.tag.focus" [attr.translate]="'no'">focus</span>
+                <span class="action-tag" i18n="@@about.actions.tag.blur" [attr.translate]="'no'">blur</span>
+              </div>
+            </div>
+            <div class="action-category reveal delay-3" data-di="0.42">
+              <h4 i18n="@@about.actions.cat.textInput.title"><i class="fa-solid fa-keyboard"></i> Text Input</h4>
+              <div class="action-list" [attr.translate]="'no'">
+                <span class="action-tag" i18n="@@about.actions.tag.type" [attr.translate]="'no'">type</span>
+                <span class="action-tag" i18n="@@about.actions.tag.clearInput" [attr.translate]="'no'">clearInput</span>
+                <span class="action-tag" i18n="@@about.actions.tag.selectText" [attr.translate]="'no'">selectText</span>
+                <span class="action-tag" i18n="@@about.actions.tag.pressEnter" [attr.translate]="'no'">pressEnter</span>
+                <span class="action-tag" i18n="@@about.actions.tag.keyPress" [attr.translate]="'no'">keyPress</span>
+                <span class="action-tag" i18n="@@about.actions.tag.typeInto" [attr.translate]="'no'">typeInto</span>
+                <span class="action-tag" i18n="@@about.actions.tag.clearAndType" [attr.translate]="'no'">clearAndType</span>
+                <span class="action-tag" i18n="@@about.actions.tag.pasteText" [attr.translate]="'no'">pasteText</span>
+              </div>
+            </div>
+            <div class="action-category reveal delay-4" data-di="0.48">
+              <h4 i18n="@@about.actions.cat.forms.title"><i class="fa-solid fa-list-check"></i> Forms</h4>
+              <div class="action-list" [attr.translate]="'no'">
+                <span class="action-tag" i18n="@@about.actions.tag.selectOption" [attr.translate]="'no'">selectOption</span>
+                <span class="action-tag" i18n="@@about.actions.tag.toggleCheckbox" [attr.translate]="'no'">toggleCheckbox</span>
+              </div>
+            </div>
+            <div class="action-category reveal delay-5" data-di="0.54">
+              <h4 i18n="@@about.actions.cat.info.title"><i class="fa-solid fa-circle-info"></i> Information</h4>
+              <div class="action-list" [attr.translate]="'no'">
+                <span class="action-tag" i18n="@@about.actions.tag.getText" [attr.translate]="'no'">getText</span>
+                <span class="action-tag" i18n="@@about.actions.tag.getAttribute" [attr.translate]="'no'">getAttribute</span>
+                <span class="action-tag" i18n="@@about.actions.tag.setAttribute" [attr.translate]="'no'">setAttribute</span>
+                <span class="action-tag" i18n="@@about.actions.tag.readPage" [attr.translate]="'no'">readPage</span>
+                <span class="action-tag" i18n="@@about.actions.tag.getPageSnapshot" [attr.translate]="'no'">get_page_snapshot</span>
+              </div>
+            </div>
+            <div class="action-category reveal delay-6" data-di="0.6">
+              <h4 i18n="@@about.actions.cat.scrolling.title"><i class="fa-solid fa-arrows-up-down"></i> Scrolling</h4>
+              <div class="action-list" [attr.translate]="'no'">
+                <span class="action-tag" i18n="@@about.actions.tag.scroll" [attr.translate]="'no'">scroll</span>
+                <span class="action-tag" i18n="@@about.actions.tag.scrollToElement" [attr.translate]="'no'">scrollToElement</span>
+                <span class="action-tag" i18n="@@about.actions.tag.scrollToTop" [attr.translate]="'no'">scrollToTop</span>
+                <span class="action-tag" i18n="@@about.actions.tag.scrollToBottom" [attr.translate]="'no'">scrollToBottom</span>
+              </div>
+            </div>
+            <div class="action-category reveal delay-1" data-di="0.66">
+              <h4 i18n="@@about.actions.cat.multiTab.title"><i class="fa-solid fa-window-restore"></i> Multi-Tab</h4>
+              <div class="action-list" [attr.translate]="'no'">
+                <span class="action-tag" i18n="@@about.actions.tag.openTab" [attr.translate]="'no'">openTab</span>
+                <span class="action-tag" i18n="@@about.actions.tag.closeTab" [attr.translate]="'no'">closeTab</span>
+                <span class="action-tag" i18n="@@about.actions.tag.switchTab" [attr.translate]="'no'">switchTab</span>
+                <span class="action-tag" i18n="@@about.actions.tag.listTabs" [attr.translate]="'no'">listTabs</span>
+                <span class="action-tag" i18n="@@about.actions.tag.duplicateTab" [attr.translate]="'no'">duplicateTab</span>
+                <span class="action-tag" i18n="@@about.actions.tag.moveTab" [attr.translate]="'no'">moveTab</span>
+              </div>
+            </div>
           </div>
         </div>
-        <div class="action-category reveal delay-2">
-          <h4 i18n="@@about.actions.cat.clicking.title"><i class="fa-solid fa-hand-pointer"></i> Clicking</h4>
-          <div class="action-list" [attr.translate]="'no'">
-            <span class="action-tag" i18n="@@about.actions.tag.click" [attr.translate]="'no'">click</span>
-            <span class="action-tag" i18n="@@about.actions.tag.rightClick" [attr.translate]="'no'">rightClick</span>
-            <span class="action-tag" i18n="@@about.actions.tag.doubleClick" [attr.translate]="'no'">doubleClick</span>
-            <span class="action-tag" i18n="@@about.actions.tag.hover" [attr.translate]="'no'">hover</span>
-            <span class="action-tag" i18n="@@about.actions.tag.focus" [attr.translate]="'no'">focus</span>
-            <span class="action-tag" i18n="@@about.actions.tag.blur" [attr.translate]="'no'">blur</span>
-          </div>
-        </div>
-        <div class="action-category reveal delay-3">
-          <h4 i18n="@@about.actions.cat.textInput.title"><i class="fa-solid fa-keyboard"></i> Text Input</h4>
-          <div class="action-list" [attr.translate]="'no'">
-            <span class="action-tag" i18n="@@about.actions.tag.type" [attr.translate]="'no'">type</span>
-            <span class="action-tag" i18n="@@about.actions.tag.clearInput" [attr.translate]="'no'">clearInput</span>
-            <span class="action-tag" i18n="@@about.actions.tag.selectText" [attr.translate]="'no'">selectText</span>
-            <span class="action-tag" i18n="@@about.actions.tag.pressEnter" [attr.translate]="'no'">pressEnter</span>
-            <span class="action-tag" i18n="@@about.actions.tag.keyPress" [attr.translate]="'no'">keyPress</span>
-            <span class="action-tag" i18n="@@about.actions.tag.typeInto" [attr.translate]="'no'">typeInto</span>
-            <span class="action-tag" i18n="@@about.actions.tag.clearAndType" [attr.translate]="'no'">clearAndType</span>
-            <span class="action-tag" i18n="@@about.actions.tag.pasteText" [attr.translate]="'no'">pasteText</span>
-          </div>
-        </div>
-        <div class="action-category reveal delay-4">
-          <h4 i18n="@@about.actions.cat.forms.title"><i class="fa-solid fa-list-check"></i> Forms</h4>
-          <div class="action-list" [attr.translate]="'no'">
-            <span class="action-tag" i18n="@@about.actions.tag.selectOption" [attr.translate]="'no'">selectOption</span>
-            <span class="action-tag" i18n="@@about.actions.tag.toggleCheckbox" [attr.translate]="'no'">toggleCheckbox</span>
-          </div>
-        </div>
-        <div class="action-category reveal delay-5">
-          <h4 i18n="@@about.actions.cat.info.title"><i class="fa-solid fa-circle-info"></i> Information</h4>
-          <div class="action-list" [attr.translate]="'no'">
-            <span class="action-tag" i18n="@@about.actions.tag.getText" [attr.translate]="'no'">getText</span>
-            <span class="action-tag" i18n="@@about.actions.tag.getAttribute" [attr.translate]="'no'">getAttribute</span>
-            <span class="action-tag" i18n="@@about.actions.tag.setAttribute" [attr.translate]="'no'">setAttribute</span>
-            <span class="action-tag" i18n="@@about.actions.tag.readPage" [attr.translate]="'no'">readPage</span>
-            <span class="action-tag" i18n="@@about.actions.tag.getPageSnapshot" [attr.translate]="'no'">get_page_snapshot</span>
-          </div>
-        </div>
-        <div class="action-category reveal delay-6">
-          <h4 i18n="@@about.actions.cat.scrolling.title"><i class="fa-solid fa-arrows-up-down"></i> Scrolling</h4>
-          <div class="action-list" [attr.translate]="'no'">
-            <span class="action-tag" i18n="@@about.actions.tag.scroll" [attr.translate]="'no'">scroll</span>
-            <span class="action-tag" i18n="@@about.actions.tag.scrollToElement" [attr.translate]="'no'">scrollToElement</span>
-            <span class="action-tag" i18n="@@about.actions.tag.scrollToTop" [attr.translate]="'no'">scrollToTop</span>
-            <span class="action-tag" i18n="@@about.actions.tag.scrollToBottom" [attr.translate]="'no'">scrollToBottom</span>
-          </div>
-        </div>
-        <div class="action-category reveal delay-1">
-          <h4 i18n="@@about.actions.cat.multiTab.title"><i class="fa-solid fa-window-restore"></i> Multi-Tab</h4>
-          <div class="action-list" [attr.translate]="'no'">
-            <span class="action-tag" i18n="@@about.actions.tag.openTab" [attr.translate]="'no'">openTab</span>
-            <span class="action-tag" i18n="@@about.actions.tag.closeTab" [attr.translate]="'no'">closeTab</span>
-            <span class="action-tag" i18n="@@about.actions.tag.switchTab" [attr.translate]="'no'">switchTab</span>
-            <span class="action-tag" i18n="@@about.actions.tag.listTabs" [attr.translate]="'no'">listTabs</span>
-            <span class="action-tag" i18n="@@about.actions.tag.duplicateTab" [attr.translate]="'no'">duplicateTab</span>
-            <span class="action-tag" i18n="@@about.actions.tag.moveTab" [attr.translate]="'no'">moveTab</span>
-          </div>
-        </div>
-        <div class="action-category reveal delay-2">
-          <h4 i18n="@@about.actions.cat.waiting.title"><i class="fa-solid fa-clock"></i> Waiting</h4>
-          <div class="action-list" [attr.translate]="'no'">
-            <span class="action-tag" i18n="@@about.actions.tag.waitForElement" [attr.translate]="'no'">waitForElement</span>
-            <span class="action-tag" i18n="@@about.actions.tag.waitForDOMStable" [attr.translate]="'no'">waitForDOMStable</span>
-            <span class="action-tag" i18n="@@about.actions.tag.detectLoadingState" [attr.translate]="'no'">detectLoadingState</span>
-            <span class="action-tag" i18n="@@about.actions.tag.sleep" [attr.translate]="'no'">sleep</span>
-          </div>
-        </div>
-        <div class="action-category reveal delay-3">
-          <h4 i18n="@@about.actions.cat.powertool.title"><i class="fa-solid fa-code"></i> Powertool</h4>
-          <div class="action-list" [attr.translate]="'no'">
-            <span class="action-tag" i18n="@@about.actions.tag.execute_js" [attr.translate]="'no'">execute_js</span>
-          </div>
-        </div>
-        <div class="action-category reveal delay-1">
-          <h4 i18n="@@about.actions.cat.canvas.title"><i class="fa-solid fa-pen-nib"></i> Canvas &amp; Drawing</h4>
-          <div class="action-list" [attr.translate]="'no'">
-            <span class="action-tag" i18n="@@about.actions.tag.insertText" [attr.translate]="'no'">insertText</span>
-            <span class="action-tag" i18n="@@about.actions.tag.dblClickAt" [attr.translate]="'no'">dblClickAt</span>
-            <span class="action-tag" i18n="@@about.actions.tag.drawShape" [attr.translate]="'no'">drawShape</span>
-            <span class="action-tag" i18n="@@about.actions.tag.monacoEditorInsert" [attr.translate]="'no'">monacoEditorInsert</span>
-          </div>
-        </div>
-        <div class="action-category reveal delay-2">
-          <h4 i18n="@@about.actions.cat.cdp.title"><i class="fa-solid fa-crosshairs"></i> CDP Tools</h4>
-          <div class="action-list" [attr.translate]="'no'">
-            <span class="action-tag" i18n="@@about.actions.tag.cdpMouseClick" [attr.translate]="'no'">cdpMouseClick</span>
-            <span class="action-tag" i18n="@@about.actions.tag.cdpMouseDrag" [attr.translate]="'no'">cdpMouseDrag</span>
-            <span class="action-tag" i18n="@@about.actions.tag.cdpMouseWheel" [attr.translate]="'no'">cdpMouseWheel</span>
-            <span class="action-tag" i18n="@@about.actions.tag.cdpClickAndHold" [attr.translate]="'no'">cdpClickAndHold</span>
-            <span class="action-tag" i18n="@@about.actions.tag.dragDrop" [attr.translate]="'no'">dragDrop</span>
-            <span class="action-tag" i18n="@@about.actions.tag.dropFile" [attr.translate]="'no'">dropFile</span>
-            <span class="action-tag" i18n="@@about.actions.tag.selectTextRange" [attr.translate]="'no'">selectTextRange</span>
-          </div>
-        </div>
-        <div class="action-category reveal delay-3">
-          <h4 i18n="@@about.actions.cat.capabilities.title"><i class="fa-solid fa-bolt"></i> Capabilities</h4>
-          <div class="action-list" [attr.translate]="'no'">
-            <span class="action-tag" i18n="@@about.actions.tag.searchCapabilities" [attr.translate]="'no'">search_capabilities</span>
-            <span class="action-tag" i18n="@@about.actions.tag.invokeCapability" [attr.translate]="'no'">invoke_capability</span>
-          </div>
-        </div>
-        <div class="action-category reveal delay-4">
-          <h4 i18n="@@about.actions.cat.monitoring.title"><i class="fa-solid fa-bell"></i> Monitoring</h4>
-          <div class="action-list" [attr.translate]="'no'">
-            <span class="action-tag" i18n="@@about.actions.tag.trigger" [attr.translate]="'no'">trigger</span>
-            <span class="action-tag" i18n="@@about.actions.tag.stopTrigger" [attr.translate]="'no'">stop_trigger</span>
-            <span class="action-tag" i18n="@@about.actions.tag.getTriggerStatus" [attr.translate]="'no'">get_trigger_status</span>
-            <span class="action-tag" i18n="@@about.actions.tag.listTriggers" [attr.translate]="'no'">list_triggers</span>
-          </div>
-        </div>
-        <div class="action-category reveal delay-5">
-          <h4 i18n="@@about.actions.cat.files.title"><i class="fa-solid fa-file-arrow-up"></i> Files</h4>
-          <div class="action-list" [attr.translate]="'no'">
-            <span class="action-tag" i18n="@@about.actions.tag.uploadFile" [attr.translate]="'no'">upload_file</span>
-          </div>
-        </div>
-      </div>
+      </section>
     </div>
-  </section>
+  </div>
+
+  <!-- Action Library, continued -->
+  <div class="fsb-depth-layer" style="z-index: 55">
+    <div class="fsb-depth-fit">
+      <section class="action-library section">
+        <div class="container">
+          <div class="action-categories">
+            <div class="action-category reveal delay-2" data-di="0">
+              <h4 i18n="@@about.actions.cat.waiting.title"><i class="fa-solid fa-clock"></i> Waiting</h4>
+              <div class="action-list" [attr.translate]="'no'">
+                <span class="action-tag" i18n="@@about.actions.tag.waitForElement" [attr.translate]="'no'">waitForElement</span>
+                <span class="action-tag" i18n="@@about.actions.tag.waitForDOMStable" [attr.translate]="'no'">waitForDOMStable</span>
+                <span class="action-tag" i18n="@@about.actions.tag.detectLoadingState" [attr.translate]="'no'">detectLoadingState</span>
+                <span class="action-tag" i18n="@@about.actions.tag.sleep" [attr.translate]="'no'">sleep</span>
+              </div>
+            </div>
+            <div class="action-category reveal delay-3" data-di="0.06">
+              <h4 i18n="@@about.actions.cat.powertool.title"><i class="fa-solid fa-code"></i> Powertool</h4>
+              <div class="action-list" [attr.translate]="'no'">
+                <span class="action-tag" i18n="@@about.actions.tag.execute_js" [attr.translate]="'no'">execute_js</span>
+              </div>
+            </div>
+            <div class="action-category reveal delay-1" data-di="0.12">
+              <h4 i18n="@@about.actions.cat.canvas.title"><i class="fa-solid fa-pen-nib"></i> Canvas &amp; Drawing</h4>
+              <div class="action-list" [attr.translate]="'no'">
+                <span class="action-tag" i18n="@@about.actions.tag.insertText" [attr.translate]="'no'">insertText</span>
+                <span class="action-tag" i18n="@@about.actions.tag.dblClickAt" [attr.translate]="'no'">dblClickAt</span>
+                <span class="action-tag" i18n="@@about.actions.tag.drawShape" [attr.translate]="'no'">drawShape</span>
+                <span class="action-tag" i18n="@@about.actions.tag.monacoEditorInsert" [attr.translate]="'no'">monacoEditorInsert</span>
+              </div>
+            </div>
+            <div class="action-category reveal delay-2" data-di="0.18">
+              <h4 i18n="@@about.actions.cat.cdp.title"><i class="fa-solid fa-crosshairs"></i> CDP Tools</h4>
+              <div class="action-list" [attr.translate]="'no'">
+                <span class="action-tag" i18n="@@about.actions.tag.cdpMouseClick" [attr.translate]="'no'">cdpMouseClick</span>
+                <span class="action-tag" i18n="@@about.actions.tag.cdpMouseDrag" [attr.translate]="'no'">cdpMouseDrag</span>
+                <span class="action-tag" i18n="@@about.actions.tag.cdpMouseWheel" [attr.translate]="'no'">cdpMouseWheel</span>
+                <span class="action-tag" i18n="@@about.actions.tag.cdpClickAndHold" [attr.translate]="'no'">cdpClickAndHold</span>
+                <span class="action-tag" i18n="@@about.actions.tag.dragDrop" [attr.translate]="'no'">dragDrop</span>
+                <span class="action-tag" i18n="@@about.actions.tag.dropFile" [attr.translate]="'no'">dropFile</span>
+                <span class="action-tag" i18n="@@about.actions.tag.selectTextRange" [attr.translate]="'no'">selectTextRange</span>
+              </div>
+            </div>
+            <div class="action-category reveal delay-3" data-di="0.24">
+              <h4 i18n="@@about.actions.cat.capabilities.title"><i class="fa-solid fa-bolt"></i> Capabilities</h4>
+              <div class="action-list" [attr.translate]="'no'">
+                <span class="action-tag" i18n="@@about.actions.tag.searchCapabilities" [attr.translate]="'no'">search_capabilities</span>
+                <span class="action-tag" i18n="@@about.actions.tag.invokeCapability" [attr.translate]="'no'">invoke_capability</span>
+              </div>
+            </div>
+            <div class="action-category reveal delay-4" data-di="0.3">
+              <h4 i18n="@@about.actions.cat.monitoring.title"><i class="fa-solid fa-bell"></i> Monitoring</h4>
+              <div class="action-list" [attr.translate]="'no'">
+                <span class="action-tag" i18n="@@about.actions.tag.trigger" [attr.translate]="'no'">trigger</span>
+                <span class="action-tag" i18n="@@about.actions.tag.stopTrigger" [attr.translate]="'no'">stop_trigger</span>
+                <span class="action-tag" i18n="@@about.actions.tag.getTriggerStatus" [attr.translate]="'no'">get_trigger_status</span>
+                <span class="action-tag" i18n="@@about.actions.tag.listTriggers" [attr.translate]="'no'">list_triggers</span>
+              </div>
+            </div>
+            <div class="action-category reveal delay-5" data-di="0.36">
+              <h4 i18n="@@about.actions.cat.files.title"><i class="fa-solid fa-file-arrow-up"></i> Files</h4>
+              <div class="action-list" [attr.translate]="'no'">
+                <span class="action-tag" i18n="@@about.actions.tag.uploadFile" [attr.translate]="'no'">upload_file</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- Site index -->
+  <div class="fsb-depth-layer" data-full style="z-index: 54">
+    <div class="fsb-depth-fit">
+      <app-depth-end></app-depth-end>
+    </div>
+  </div>
+</div>
+<app-depth-rail [items]="rail" [label]="railLabel"></app-depth-rail>
+</div>

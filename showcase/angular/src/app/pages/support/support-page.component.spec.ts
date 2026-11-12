@@ -6,8 +6,19 @@ import { SupportPageComponent } from './support-page.component';
 describe('Support FAQ layout', () => {
   let fixture: ComponentFixture<SupportPageComponent>;
   let host: HTMLElement;
+  let flatten: HTMLStyleElement;
 
   beforeEach(async () => {
+    // These cases measure the accordion against the host's width. The page's depth
+    // planes are fixed to the window and scaled to fit, which would decouple both,
+    // so lay the planes out in normal flow here.
+    flatten = document.createElement('style');
+    flatten.textContent = `
+      .fsb-depth, .fsb-depth-layer { position: static !important; visibility: visible !important; }
+      .fsb-depth-fit { transform: none !important; }
+    `;
+    document.head.appendChild(flatten);
+
     await TestBed.configureTestingModule({
       imports: [SupportPageComponent],
       providers: [provideRouter([])],
@@ -25,7 +36,10 @@ describe('Support FAQ layout', () => {
     });
   });
 
-  afterEach(() => fixture.destroy());
+  afterEach(() => {
+    fixture.destroy();
+    flatten.remove();
+  });
 
   function answer(id: string): HTMLElement {
     return host.querySelector<HTMLElement>(`#faq-${id}`)!;

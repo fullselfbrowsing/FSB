@@ -1,0 +1,112 @@
+/* Plane index on the right edge. Labels appear on hover or keyboard focus; the
+   current plane's tick grows and turns orange (the engine sets .is-active). */
+.fsb-depth-rail {
+  align-items: flex-end;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  position: fixed;
+  right: 28px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 30;
+}
+
+.fsb-depth-go {
+  align-items: center;
+  appearance: none;
+  background: none;
+  border: 0;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  font-family: 'SF Mono', Monaco, Inconsolata, 'Roboto Mono', monospace;
+  font-size: 11px;
+  font-weight: 500;
+  gap: 12px;
+  justify-content: flex-end;
+  letter-spacing: .14em;
+  margin: 0;
+  min-height: 40px;
+  padding: 0 0 0 12px;
+  text-transform: uppercase;
+}
+
+.fsb-depth-rail[data-dense] .fsb-depth-go {
+  min-height: 26px;
+}
+
+.fsb-depth-rail[data-dense='xl'] .fsb-depth-go {
+  min-height: 22px;
+}
+
+/* Long section titles (the privacy policy's) stop at an ellipsis. */
+.fsb-depth-lbl {
+  max-width: 26ch;
+  opacity: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transform: translateX(6px);
+  transition: opacity .25s ease, transform .25s ease;
+  white-space: nowrap;
+}
+
+.fsb-depth-tick {
+  background: var(--text-muted);
+  border-radius: 2px;
+  display: block;
+  flex: none;
+  height: 2px;
+  opacity: .55;
+  transition: width .3s ease, background-color .3s ease, opacity .3s ease;
+  width: 14px;
+}
+
+.fsb-depth-go:hover .fsb-depth-lbl,
+.fsb-depth-go:focus-visible .fsb-depth-lbl {
+  opacity: 1;
+  transform: none;
+}
+
+.fsb-depth-go:hover .fsb-depth-tick {
+  opacity: 1;
+  width: 22px;
+}
+
+.fsb-depth-go.is-active {
+  color: var(--text-primary);
+}
+
+.fsb-depth-go.is-active .fsb-depth-tick {
+  background: var(--primary);
+  opacity: 1;
+  width: 32px;
+}
+
+.fsb-depth-go:focus-visible {
+  border-radius: 4px;
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+@media (max-width: 768px) {
+  .fsb-depth-rail {
+    right: 6px;
+  }
+
+  .fsb-depth-lbl {
+    display: none;
+  }
+
+  .fsb-depth-tick {
+    width: 10px;
+  }
+
+  .fsb-depth-go:hover .fsb-depth-tick {
+    width: 14px;
+  }
+
+  .fsb-depth-go.is-active .fsb-depth-tick {
+    width: 18px;
+  }
+}

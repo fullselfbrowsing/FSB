@@ -1,13 +1,13 @@
 import { Routes } from '@angular/router';
 
 export const routes: Routes = [
-  { path: '', loadComponent: () => import('./pages/home/home-page.component').then(m => m.HomePageComponent) },
-  { path: 'about', loadComponent: () => import('./pages/about/about-page.component').then(m => m.AboutPageComponent) },
+  { path: '', loadComponent: () => import('./pages/home/home-page.component').then(m => m.HomePageComponent), data: { depth: 'home' } },
+  { path: 'about', loadComponent: () => import('./pages/about/about-page.component').then(m => m.AboutPageComponent), data: { depth: 'about' } },
   { path: 'dashboard', loadComponent: () => import('./pages/dashboard/dashboard-page.component').then(m => m.DashboardPageComponent) },
-  { path: 'agents', loadComponent: () => import('./pages/agents/agents-page.component').then(m => m.AgentsPageComponent) },
+  { path: 'agents', loadComponent: () => import('./pages/agents/agents-page.component').then(m => m.AgentsPageComponent), data: { depth: 'agents' } },
   { path: 'release-notes', loadComponent: () => import('./pages/release-notes/release-notes-page.component').then(m => m.ReleaseNotesPageComponent) },
-  { path: 'privacy', loadComponent: () => import('./pages/privacy/privacy-page.component').then(m => m.PrivacyPageComponent) },
-  { path: 'support', loadComponent: () => import('./pages/support/support-page.component').then(m => m.SupportPageComponent) },
+  { path: 'privacy', loadComponent: () => import('./pages/privacy/privacy-page.component').then(m => m.PrivacyPageComponent), data: { depth: 'privacy' } },
+  { path: 'support', loadComponent: () => import('./pages/support/support-page.component').then(m => m.SupportPageComponent), data: { depth: 'support' } },
   { path: 'stats', loadComponent: () => import('./pages/stats/stats-page.component').then(m => m.StatsPageComponent), data: { shellless: true } },
   { path: 'lattice', loadComponent: () => import('./pages/lattice/lattice-page.component').then(m => m.LatticePageComponent), data: { shellless: true } },
   { path: 'concierge', loadComponent: () => import('./pages/concierge/concierge-page.component').then(m => m.ConciergePageComponent), data: { shellless: true } },

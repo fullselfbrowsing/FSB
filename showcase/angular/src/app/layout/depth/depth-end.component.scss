@@ -1,0 +1,256 @@
+/* Site index: the closing plane of every depth page. --px/--py come from the
+   pointer (component class); each float moves by its own --d so the groups and
+   the mark drift at different depths. */
+:host {
+  display: block;
+  height: 100%;
+}
+
+.fsb-end {
+  --px: 0;
+  --py: 0;
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+}
+
+.fsb-end-float {
+  transform: translate3d(calc(var(--px) * var(--d) * 1px), calc(var(--py) * var(--d) * 1px), 0);
+  transition: transform 1s cubic-bezier(.16, 1, .3, 1), opacity .35s ease, filter .35s ease;
+}
+
+/* The wordmark, as large as the window allows, sinking into the bottom edge. */
+.fsb-end-mark {
+  bottom: -.2em;
+  display: flex;
+  font-size: clamp(180px, min(40vw, 60vh), 600px);
+  justify-content: center;
+  left: 0;
+  line-height: 1;
+  -webkit-mask-image: linear-gradient(to bottom, #000 35%, transparent 92%);
+  mask-image: linear-gradient(to bottom, #000 35%, transparent 92%);
+  pointer-events: none;
+  position: absolute;
+  right: 0;
+}
+
+.fsb-end-mark::before {
+  background: radial-gradient(closest-side, rgba(255, 107, 53, .14), transparent);
+  content: '';
+  height: 90%;
+  left: 50%;
+  pointer-events: none;
+  position: absolute;
+  top: 10%;
+  transform: translateX(-50%);
+  width: min(1100px, 90vw);
+}
+
+.fsb-mark {
+  color: color-mix(in srgb, var(--text-primary) 9%, transparent);
+  display: inline-block;
+  font-size: 1em;
+  line-height: 1;
+}
+
+.fsb-row {
+  align-items: baseline;
+  display: inline-flex;
+  font-family: 'Poppins', system-ui, sans-serif;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.fsb-f {
+  font-weight: 100;
+}
+
+.fsb-f::before {
+  content: 'F';
+}
+
+.fsb-s {
+  font-weight: 900;
+}
+
+.fsb-s::before {
+  content: 'S';
+}
+
+.fsb-b {
+  display: inline-block;
+  fill: currentColor;
+  height: 0.74em;
+  margin-left: 0.01em;
+  vertical-align: baseline;
+  width: auto;
+}
+
+.fsb-end-groups {
+  display: grid;
+  gap: 40px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-top: calc(-1 * min(150px, 17vh));
+  position: relative;
+  transform: rotateX(calc(var(--py) * -3deg)) rotateY(calc(var(--px) * 4deg));
+  transition: transform 1s cubic-bezier(.16, 1, .3, 1);
+  width: min(1040px, calc(100% - 96px));
+  z-index: 1;
+}
+
+.fsb-end-group {
+  display: flex;
+  justify-content: center;
+  text-align: center;
+}
+
+.fsb-end-label {
+  color: var(--text-muted);
+  font-size: .64rem;
+  font-weight: 600;
+  letter-spacing: .22em;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.fsb-end-line {
+  background: var(--primary);
+  border-radius: 2px;
+  display: block;
+  height: 1.5px;
+  margin: 12px auto 16px;
+  transition: width .4s cubic-bezier(.16, 1, .3, 1);
+  width: 24px;
+}
+
+.fsb-end-list {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.fsb-end-list a {
+  align-items: center;
+  color: var(--text-secondary);
+  display: inline-flex;
+  font-size: .95rem;
+  font-weight: 300;
+  gap: 7px;
+  min-height: 36px;
+  position: relative;
+  text-decoration: none;
+  transform-origin: 50% 50%;
+  transition: color .2s ease, transform .25s cubic-bezier(.16, 1, .3, 1);
+}
+
+.fsb-end-list a:hover,
+.fsb-end-list a:focus-visible {
+  color: var(--text-primary);
+  transform: scale(1.05);
+}
+
+.fsb-end-list a:active {
+  transform: scale(.98);
+}
+
+.fsb-end-list a:focus-visible {
+  border-radius: 6px;
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.fsb-end-list a.is-current {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.fsb-end-list a .fa-x-twitter {
+  font-size: 1rem;
+}
+
+.fsb-end-ext {
+  color: var(--text-muted);
+  font-size: .6rem;
+  opacity: 0;
+  position: absolute;
+  right: -16px;
+  transform: translate(-3px, 3px);
+  transition: opacity .2s ease, transform .25s ease;
+}
+
+.fsb-end-list a:hover .fsb-end-ext,
+.fsb-end-list a:focus-visible .fsb-end-ext {
+  opacity: 1;
+  transform: none;
+}
+
+.fsb-end-group:hover .fsb-end-line,
+.fsb-end-group:focus-within .fsb-end-line {
+  width: 52px;
+}
+
+.fsb-end-groups:has(.fsb-end-group:hover) .fsb-end-group:not(:hover) .fsb-end-float {
+  filter: blur(1.5px);
+  opacity: .32;
+}
+
+.fsb-end-meta {
+  align-items: center;
+  bottom: 36px;
+  color: var(--text-muted);
+  display: flex;
+  font-size: .8rem;
+  justify-content: space-between;
+  left: 0;
+  padding: 0 max(48px, calc((100% - 1152px) / 2));
+  position: absolute;
+  right: 0;
+}
+
+.footer-version {
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.version-tag {
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+  letter-spacing: 0.4em;
+}
+
+@media (max-width: 900px) {
+  .fsb-end-groups {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-top: -80px;
+    row-gap: 24px;
+  }
+}
+
+@media (max-width: 600px) {
+  .fsb-end-groups {
+    gap: 20px 12px;
+    width: calc(100% - 48px);
+  }
+
+  .fsb-end-meta {
+    bottom: 76px;
+    gap: 28px;
+    justify-content: center;
+    padding: 0 24px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fsb-end-float,
+  .fsb-end-groups {
+    transform: none;
+    transition: none;
+  }
+}

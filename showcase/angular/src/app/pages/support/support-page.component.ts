@@ -2,6 +2,9 @@ import { Component, OnDestroy, OnInit, Renderer2, inject, DOCUMENT, LOCALE_ID } 
 import { Title, Meta } from '@angular/platform-browser';
 import { RouterLink } from '@angular/router';
 
+import { DepthEndComponent } from '../../layout/depth/depth-end.component';
+import { DepthRailComponent, type DepthRailItem } from '../../layout/depth/depth-rail.component';
+import { DepthStageDirective } from '../../layout/depth/depth-stage.directive';
 import { HOST, buildLocaleUrl, emitLocaleHead } from '../../core/seo/locale-seo';
 import { PageJsonLdService } from '../../core/seo/page-json-ld.service';
 
@@ -77,7 +80,7 @@ const SUPPORT_FAQ = {
 @Component({
   selector: 'app-support-page',
   standalone: true,
-  imports: [RouterLink],
+  imports: [RouterLink, DepthStageDirective, DepthRailComponent, DepthEndComponent],
   templateUrl: './support-page.component.html',
   styleUrl: './support-page.component.scss',
 })
@@ -151,4 +154,22 @@ export class SupportPageComponent implements OnInit, OnDestroy {
     if (this.expandedFaqs.has(id)) this.expandedFaqs.delete(id);
     else this.expandedFaqs.add(id);
   }
+
+  /* Depth page wiring: the questions are split across two planes, so each one
+     fits a desktop window at full size. */
+  readonly faqsLead = this.faqs.slice(0, FAQ_FIRST_PLANE);
+  readonly faqsMore = this.faqs.slice(FAQ_FIRST_PLANE);
+  readonly rail: readonly DepthRailItem[] = SUPPORT_RAIL_LABELS.map((label, layer) => ({ label, layer }));
+  readonly railLabel = SUPPORT_RAIL_ARIA;
 }
+
+/* Depth page: the planes of this page in order. */
+const FAQ_FIRST_PLANE = 8;
+const SUPPORT_RAIL_ARIA = $localize`:@@support.depth.rail.aria:FSB support sections`;
+const SUPPORT_RAIL_LABELS: readonly string[] = [
+  $localize`:@@support.depth.rail.support:Support`,
+  $localize`:@@support.depth.rail.moreQuestions:More questions`,
+  $localize`:@@support.depth.rail.troubleshooting:Troubleshooting`,
+  $localize`:@@support.depth.rail.contact:Contact`,
+  $localize`:@@depth.rail.index:Index`,
+];

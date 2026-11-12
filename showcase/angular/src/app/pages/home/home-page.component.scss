@@ -80,69 +80,6 @@
   flex-wrap: wrap;
 }
 
-@keyframes cuePull {
-  0%, 26%, 84%, 100% { transform: translateY(0); }
-  46%, 64% { transform: translateY(-6px); }
-}
-
-@keyframes cueText {
-  0%, 26%, 84%, 100% {
-    opacity: 0;
-    transform: translateY(3px);
-  }
-
-  46%, 64% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes cuePulse {
-  0%, 26%, 84%, 100% { color: var(--text-muted); }
-  46%, 64% { color: rgba(255, 107, 53, 0.85); }
-}
-
-.scroll-cue {
-  position: absolute;
-  left: 50%;
-  bottom: 30px;
-  transform: translateX(-50%);
-  z-index: 2;
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 9px;
-  color: var(--text-muted);
-  text-decoration: none;
-  cursor: pointer;
-  transition: opacity 0.3s ease;
-  will-change: opacity;
-  animation: cuePulse 3s ease-in-out infinite;
-}
-
-.cue-text {
-  font-size: 0.64rem;
-  font-weight: 600;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  text-align: center;
-  opacity: 0;
-  animation: cueText 3s ease-in-out infinite;
-}
-
-.cue-line {
-  width: 100%;
-  height: 1.5px;
-  background: currentColor;
-  border-radius: 2px;
-  transform-origin: center top;
-  animation: cuePull 3s ease-in-out infinite;
-}
-
-.scroll-cue:hover {
-  color: var(--primary);
-}
-
 /* --- Install Widget --- */
 .install-widget {
   width: 100%;
@@ -308,13 +245,6 @@
   transform: translateY(8px) scale(0.94);
 }
 
-.install-fan-down {
-  top: calc(100% + 14px);
-  flex-direction: column;
-  transform-origin: top right;
-  transform: translateY(-8px) scale(0.94);
-}
-
 .install-fan.open::after {
   content: '';
   position: absolute;
@@ -325,10 +255,6 @@
 
 .install-fan-up.open::after {
   bottom: -16px;
-}
-
-.install-fan-down.open::after {
-  top: -16px;
 }
 
 .install-fan.open {
@@ -717,11 +643,6 @@
   text-align: center;
   transition: all var(--transition-base);
   opacity: 0.7;
-}
-
-.competitor-card:hover {
-  opacity: 1;
-  border-color: var(--border-hover);
 }
 
 .competitor-logo {
@@ -1461,9 +1382,6 @@
 
 @media (prefers-reduced-motion: reduce) {
   .hero-bg,
-  .scroll-cue,
-  .cue-text,
-  .cue-line,
   .install-mark.is-morphing .install-glyph,
   .cap-track,
   .lb-row-fsb .lb-bar,
@@ -1477,10 +1395,6 @@
   .eng-panel.is-active .eng-wire,
   .eng-tab.on::after {
     animation: none;
-  }
-
-  .cue-text {
-    opacity: 1;
   }
 
   .cap-marquee-row {
@@ -1539,10 +1453,6 @@
     width: 100%;
     max-width: 280px;
     text-align: center;
-  }
-
-  .scroll-cue {
-    display: none;
   }
 
   .competitors-row {
@@ -1726,11 +1636,6 @@
     padding: 14px 24px;
   }
 
-  .scroll-cue {
-    display: flex;
-    bottom: calc(20px + env(safe-area-inset-bottom));
-  }
-
   .features {
     scroll-margin-top: var(--nav-height);
   }
@@ -1751,5 +1656,69 @@
 
   .install-fan-item:hover {
     transform: none;
+  }
+}
+
+/* =============================================
+   Depth page (layout/depth): each section is a plane.
+   ============================================= */
+
+/* The leaderboard is the tallest plane; tighter spacing keeps it at full size
+   on a desktop-height window instead of scaling it down. */
+.fsb-depth-layer section.features .section-header {
+  margin-bottom: 24px;
+}
+
+.fsb-depth-layer section.features .section-header h2 {
+  margin-bottom: 10px;
+}
+
+.fsb-depth-layer section.features .section-header p {
+  margin-bottom: 2px;
+  margin-top: 0;
+  max-width: 780px;
+}
+
+.fsb-depth-layer section.features .lb {
+  padding-bottom: 18px;
+  padding-top: 22px;
+}
+
+.fsb-depth-layer section.features .lb-head {
+  margin-bottom: 12px;
+}
+
+.fsb-depth-layer section.features .lb-rows {
+  gap: 2px;
+}
+
+.fsb-depth-layer section.features .lb-row {
+  padding-bottom: 5px;
+  padding-top: 5px;
+}
+
+.fsb-depth-layer section.features .lb-track {
+  height: 24px;
+}
+
+.fsb-depth-layer section.features .lb-notes {
+  margin-top: 14px;
+  padding-top: 12px;
+}
+
+/* Dot grid behind the leaderboard plane (shown by the engine while it is in view). */
+.fsb-ambient-dots {
+  background-image: radial-gradient(circle, color-mix(in srgb, var(--text-muted) 22%, transparent) 1px, transparent 1.2px);
+  background-size: 18px 18px;
+}
+
+/* A fan entry keeps its place in the arc while it leans toward the pointer. */
+.install-fan-item[data-tilt] {
+  transform: translateX(var(--dx, 0)) rotate(var(--rot, 0deg)) perspective(600px) translateZ(calc(var(--tilt-z, 0) * 1px)) rotateX(calc(var(--tilt-x, 0) * 1deg)) rotateY(calc(var(--tilt-y, 0) * 1deg)) scale(calc(1 + var(--tilt-z, 0) * .004)) !important;
+}
+
+@media (max-width: 768px) {
+  .install-fan-item[data-tilt] {
+    transform: perspective(600px) translateZ(calc(var(--tilt-z, 0) * 1px)) rotateX(calc(var(--tilt-x, 0) * 1deg)) rotateY(calc(var(--tilt-y, 0) * 1deg)) !important;
   }
 }

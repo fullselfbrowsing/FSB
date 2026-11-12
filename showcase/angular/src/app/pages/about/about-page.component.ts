@@ -15,6 +15,9 @@ import {
 import { Title, Meta } from '@angular/platform-browser';
 import { RouterLink } from '@angular/router';
 
+import { DepthEndComponent } from '../../layout/depth/depth-end.component';
+import { DepthRailComponent, type DepthRailItem } from '../../layout/depth/depth-rail.component';
+import { DepthStageDirective } from '../../layout/depth/depth-stage.directive';
 import { HOST, buildLocaleUrl, emitLocaleHead } from '../../core/seo/locale-seo';
 import { PageJsonLdService } from '../../core/seo/page-json-ld.service';
 import TRAILER_VIDEO from '../../core/seo/trailer-video.json';
@@ -116,6 +119,8 @@ interface KnowledgeGraphApi {
   destroy(container: HTMLElement): void;
   setDetailLevel(level: GraphDetail): void;
   highlight(query: string): void;
+  pause?(): void;
+  resume?(): void;
 }
 
 interface FsbKnowledgeWindow extends Window {
@@ -133,7 +138,7 @@ let knowledgeGraphLoadPromise: Promise<void> | null = null;
 @Component({
   selector: 'app-about-page',
   standalone: true,
-  imports: [RouterLink],
+  imports: [RouterLink, DepthStageDirective, DepthRailComponent, DepthEndComponent],
   templateUrl: './about-page.component.html',
   styleUrl: './about-page.component.scss',
 })
@@ -149,6 +154,7 @@ export class AboutPageComponent implements OnInit, AfterViewInit, OnDestroy {
   private readonly themeService = inject(ThemeService);
   private readonly cdr = inject(ChangeDetectorRef);
   private readonly zone = inject(NgZone);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
   categories: KnowledgeCategory[] = [];
   graphDetail: GraphDetail = 'simple';
@@ -193,11 +199,13 @@ export class AboutPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   ngAfterViewInit(): void {
     void this.initMemoryGraph();
+    this.armVideoShield();
   }
 
   ngOnDestroy(): void {
     this.pageJsonLd.remove('about-trailer-video');
     this.destroyMemoryGraph();
+    this.disarmVideoShield?.();
   }
 
   setGraphDetail(detail: GraphDetail): void {
@@ -289,6 +297,8 @@ export class AboutPageComponent implements OnInit, AfterViewInit, OnDestroy {
       if (!currentHost) return;
       this.zone.runOutsideAngular(() => {
         win.KnowledgeGraph?.render(currentHost, { detailLevel: this.graphDetail });
+        this.graphRunning = true;
+        this.syncGraphMotion();
       });
     } catch (error) {
       console.warn('Knowledge graph render failed:', error);
@@ -329,4 +339,80 @@ export class AboutPageComponent implements OnInit, AfterViewInit, OnDestroy {
     if (typeof window === 'undefined') return undefined;
     return (window as FsbKnowledgeWindow).KnowledgeGraph;
   }
+
+  /* Depth page wiring. The memory graph is drawn once the page mounts but only
+     animates while its plane is the one in view. */
+  readonly rail: readonly DepthRailItem[] = ABOUT_RAIL_LABELS.map((label, layer) => ({ label, layer }));
+  readonly railLabel = ABOUT_RAIL_ARIA;
+  private activePlane = 0;
+  private graphRunning = false;
+  private disarmVideoShield?: () => void;
+
+  onDepthActive(index: number): void {
+    this.activePlane = index;
+    this.syncGraphMotion();
+  }
+
+  private syncGraphMotion(): void {
+    const graph = this.getKnowledgeGraph();
+    if (!graph || !this.graphHost) return;
+    const want = this.activePlane === GRAPH_PLANE;
+    if (want === this.graphRunning) return;
+    this.graphRunning = want;
+    this.zone.runOutsideAngular(() => (want ? graph.resume?.() : graph.pause?.()));
+  }
+
+  /* A cross-origin player swallows wheel and touch gestures, so scrolling over the
+     trailer would never reach the depth engine. A transparent shield sits on the
+     player and lets clicks through only once the pointer has settled on it (or
+     after a first tap), and comes back when the pointer leaves. */
+  private armVideoShield(): void {
+    const frame = this.host.nativeElement.querySelector<HTMLElement>('.video-frame');
+    const shield = frame?.querySelector<HTMLElement>('.video-shield');
+    const win = this.doc.defaultView;
+    if (!frame || !shield || !win) return;
+    let dwell = 0;
+    const lower = (): void => {
+      win.clearTimeout(dwell);
+      shield.classList.add('is-lowered');
+    };
+    const raise = (): void => {
+      win.clearTimeout(dwell);
+      shield.classList.remove('is-lowered');
+    };
+    const settle = (e: PointerEvent): void => {
+      if (e.pointerType === 'touch') return;
+      win.clearTimeout(dwell);
+      dwell = win.setTimeout(lower, SHIELD_DWELL_MS);
+    };
+    const hold = (): void => win.clearTimeout(dwell);
+    this.zone.runOutsideAngular(() => {
+      shield.addEventListener('pointermove', settle, { passive: true });
+      shield.addEventListener('wheel', hold, { passive: true });
+      shield.addEventListener('click', lower);
+      frame.addEventListener('mouseleave', raise);
+    });
+    this.disarmVideoShield = () => {
+      win.clearTimeout(dwell);
+      shield.removeEventListener('pointermove', settle);
+      shield.removeEventListener('wheel', hold);
+      shield.removeEventListener('click', lower);
+      frame.removeEventListener('mouseleave', raise);
+    };
+  }
 }
+
+/* Depth page: the planes of this page in order. The memory graph sits on the
+   fourth; the trailer shield waits this long for the pointer to settle. */
+const GRAPH_PLANE = 3;
+const SHIELD_DWELL_MS = 450;
+const ABOUT_RAIL_ARIA = $localize`:@@about.depth.rail.aria:About FSB sections`;
+const ABOUT_RAIL_LABELS: readonly string[] = [
+  $localize`:@@depth.rail.intro:Intro`,
+  $localize`:@@about.depth.rail.demo:Demo`,
+  $localize`:@@about.depth.rail.memory:Memory`,
+  $localize`:@@about.depth.rail.siteGraph:Site graph`,
+  $localize`:@@about.depth.rail.actionLibrary:Action library`,
+  $localize`:@@about.depth.rail.moreActions:More actions`,
+  $localize`:@@depth.rail.index:Index`,
+];

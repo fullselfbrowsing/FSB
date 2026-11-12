@@ -52,6 +52,19 @@
   aspect-ratio: 16 / 9;
   width: 100%;
   background: #000;
+  position: relative;
+}
+
+/* Keeps scroll and swipe gestures on the page while the pointer only passes over
+   the player; the component lowers it once the pointer settles (or on a tap). */
+.video-shield {
+  inset: 0;
+  position: absolute;
+  z-index: 1;
+}
+
+.video-shield.is-lowered {
+  pointer-events: none;
 }
 
 .video-frame iframe {
