@@ -6,7 +6,7 @@ FSB v1.0.0
 
 ## Summary
 
-FSB - Universal AI-powered browser automation assistant with multi-model support
+FSB is a universal AI-powered browser automation assistant.
 
 ## Description
 

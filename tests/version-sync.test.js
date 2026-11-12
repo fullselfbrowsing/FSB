@@ -201,7 +201,8 @@ function main() {
       'extension setter changed MCP-owned files',
     );
     assert.equal(readJson(fixtureRoot, 'extension/manifest.json').version, nextExtensionVersion);
-    assert.equal(readJson(fixtureRoot, 'extension/manifest.json').name, `FSB v${nextExtensionVersion}`);
+    assert.equal(readJson(fixtureRoot, 'extension/manifest.json').name, '__MSG_ext_name__');
+    assert.equal(readJson(fixtureRoot, 'extension/manifest.json').description, '__MSG_ext_description__');
     assert.ok(
       fs.readFileSync(path.join(fixtureRoot, 'showcase/dashboard.html'), 'utf8').includes(`FSB v${nextExtensionVersion}`),
       'legacy dashboard version follows the extension release',

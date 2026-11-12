@@ -1,7 +1,7 @@
 # Do Not Translate -- showcase/angular i18n
 
 This list is the authoritative source of terms that MUST NOT be translated when
-preparing the per-locale XLIFF targets (messages.es.xlf, .de.xlf,
+preparing the per-locale XLIFF targets (messages.es.xlf, .de.xlf, .ru.xlf,
 .ja.xlf, .ko.xlf, .zh-CN.xlf, .zh-TW.xlf). When any of these appear inside a translatable
 string, they are wrapped in `<span translate="no">...</span>` in the source HTML
 so the XLIFF extractor preserves them as `<x>` placeholders the translator must
@@ -34,6 +34,7 @@ whole element only when all of its content is genuinely invariant.
 
 - AI
 - Anthropic
+- Antigravity
 - Brave
 - CDP
 - Chrome
@@ -130,7 +131,6 @@ whole element only when all of its content is genuinely invariant.
 - WeakMap
 - WebRTC
 - WebSocket
-- Windsurf
 - X
 - XSS
 - xAI

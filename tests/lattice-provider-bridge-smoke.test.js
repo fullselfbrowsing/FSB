@@ -632,9 +632,10 @@ async function loadOffscreenHandlerSource(chromeMock) {
   // discovery add two more classic-SW loads -> 332. The delegation tab seed
   // (side-panel active tab handed to the delegated agent) adds one -> 333.
   // The retained debugger session manager adds one shared load -> 334.
-  // Merging the Skopeo runtime families adds 37 more mentions -> 371.
+  // Deleting the four commented-out background-agent loads drops it to 330.
+  // The Skopeo runtime families add 37 more mentions -> 367.
   const importScriptsCount = (bgSource.match(/importScripts/g) || []).length;
-  passAssertEqual(importScriptsCount, 371, 'background.js importScripts count includes the Skopeo runtime families and the retained debugger session manager');
+  passAssertEqual(importScriptsCount, 367, 'background.js importScripts count includes the Skopeo runtime families and the retained debugger session manager');
   // Companion call-site-only count (regex requires open paren): Phase 5 baseline
   // was 150 actual importScripts() calls; Phase 6 adds 1 -> 151; Phase 8 adds 1 -> 152;
   // Phase 14 adds 2 (trigger-store + trigger-lifecycle) -> 154; Phase 15 adds 2
@@ -681,9 +682,10 @@ async function loadOffscreenHandlerSource(chromeMock) {
   // capture adds three call sites -> 326. Agent tab-spawn provenance and
   // shared model discovery add two more call sites -> 328. The delegation tab
   // seed is call site 329. The debugger session manager is call site 330.
-  // The Skopeo runtime families add 35 more call sites -> 365.
+  // Deleting the four commented-out background-agent loads drops it to 326.
+  // The Skopeo runtime families add 35 more call sites -> 361.
   const importScriptsCallSites = (bgSource.match(/importScripts\(/g) || []).length;
-  passAssertEqual(importScriptsCallSites, 365, 'background.js importScripts() call sites include the Skopeo runtime families and the retained debugger session manager');
+  passAssertEqual(importScriptsCallSites, 361, 'background.js importScripts() call sites include the Skopeo runtime families and the retained debugger session manager');
   passAssertEqual((bgSource.match(/importScripts\(['"]utils\/debugger-sessions\.js['"]\)/g) || []).length, 1,
     'debugger session manager is loaded exactly once');
   const lineLease = bgLines.findIndex(line => /importScripts\(['"]utils\/cdp-lease\.js['"]\)/.test(line));

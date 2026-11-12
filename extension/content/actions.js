@@ -5189,19 +5189,33 @@ const tools = {
 
   // =========================================================================
   // DRAG-AND-DROP: dragdrop — mechanical drag simulation with 3 fallback methods
-  // Tries HTML5 DragEvent, PointerEvent sequence, MouseEvent sequence in order.
+  // Tries an HTML5 drag, a PointerEvent sequence, then a MouseEvent sequence.
+  // The HTML5 drag follows what a browser does: it starts from the nearest draggable
+  // element, and a page that refuses the drag or the drop never receives a drop.
   // Returns { success, method } on success or { success: false, error } on failure.
+  // A delivered drop with no visible result returns outcome: 'unknown'.
   // =========================================================================
   dragdrop: async (params) => {
-    const { sourceRef, targetRef, steps: userSteps, holdMs: userHoldMs, stepDelayMs: userStepDelayMs } = params;
+    // MCP sends sourceRef/targetRef. Autopilot sends the names in the tool schema.
+    const sourceRef = params.sourceRef ?? params.sourceSelector;
+    const targetRef = params.targetRef ?? params.targetSelector;
+    const { steps: userSteps, holdMs: userHoldMs, stepDelayMs: userStepDelayMs } = params;
 
     if (!sourceRef || !targetRef) {
-      return { success: false, error: 'sourceRef and targetRef are required (element references, e.g., "e5" and "e12")', action: 'dragdrop' };
+      return { success: false, error: 'sourceSelector and targetSelector are required (CSS selectors or element references, e.g., "#card" or "e5")', action: 'dragdrop' };
     }
 
-    // Resolve element references through FSB's element map
-    const source = typeof sourceRef === 'string' ? FSB.getElementByRef?.(sourceRef) || document.querySelector(`[data-fsb-ref="${sourceRef}"]`) : sourceRef;
-    const target = typeof targetRef === 'string' ? FSB.getElementByRef?.(targetRef) || document.querySelector(`[data-fsb-ref="${targetRef}"]`) : targetRef;
+    // Each end is a snapshot ref, a selector, or an element from an internal caller.
+    // A stale ref is refused, because its selector may now match a different element.
+    const resolveEnd = (value) => {
+      if (typeof value === 'string' && FSB.refMap.resolve(value)?.stale) return null;
+      const element = typeof value === 'string'
+        ? FSB.resolveRef(value) || FSB.querySelectorWithShadow(value)
+        : value;
+      return element?.nodeType === Node.ELEMENT_NODE ? element : null;
+    };
+    const source = resolveEnd(sourceRef);
+    const target = resolveEnd(targetRef);
 
     if (!source) {
       return { success: false, error: `Source element not found: ${sourceRef}`, action: 'dragdrop' };
@@ -5215,30 +5229,59 @@ const tools = {
     const stepDelayMs = userStepDelayMs || 20;
     const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
+    // A drag picks up the nearest draggable element, which may be an ancestor of the
+    // one named, even across a shadow boundary. Without one, a browser starts no drag.
+    let dragRoot = source;
+    while (dragRoot && !dragRoot.draggable) {
+      dragRoot = dragRoot.parentElement || dragRoot.getRootNode().host;
+    }
+    const tracked = dragRoot || source;
+    // Links and images drag by default, but libraries usually drive those with pointer
+    // events. Only an explicit draggable marks a page built around HTML5 drag.
+    const explicitDrag = dragRoot?.getAttribute('draggable') === 'true';
+
     // Snapshot DOM state for change detection
     function snapshotState() {
-      const sourceParent = source.parentElement;
-      const targetParent = target.parentElement;
+      const sourceParent = tracked.parentNode;
+      const targetParent = target.parentNode;
+      const sourceBox = tracked.getBoundingClientRect();
+      const targetBox = target.getBoundingClientRect();
       return {
-        sourceIndex: sourceParent ? Array.from(sourceParent.children).indexOf(source) : -1,
+        sourceParent,
+        sourceIndex: sourceParent ? Array.from(sourceParent.children).indexOf(tracked) : -1,
         sourceParentChildCount: sourceParent ? sourceParent.children.length : 0,
         targetParentChildCount: targetParent ? targetParent.children.length : 0,
-        sourceInDOM: document.contains(source),
-        sourceParentId: sourceParent ? (sourceParent.id || sourceParent.dataset?.testid || '') : '',
-        targetParentId: targetParent ? (targetParent.id || targetParent.dataset?.testid || '') : ''
+        targetChildCount: target.children.length,
+        sourceInDOM: tracked.isConnected,
+        // Between centres, so a page that reflows or scrolls does not change them
+        gapX: sourceBox.left + sourceBox.width / 2 - targetBox.left - targetBox.width / 2,
+        gapY: sourceBox.top + sourceBox.height / 2 - targetBox.top - targetBox.height / 2
       };
     }
 
+    function sourceMoved(before, after) {
+      // Source moved to another parent, even if no count changed
+      if (before.sourceParent !== after.sourceParent) return true;
+      // Source index within parent changed
+      if (before.sourceIndex !== after.sourceIndex) return true;
+      // Source removed from DOM entirely (some drag libs re-render)
+      return before.sourceInDOM && !after.sourceInDOM;
+    }
+
     function detectChange(before, after) {
+      if (sourceMoved(before, after)) return true;
       // Source moved out of its original parent
       if (before.sourceParentChildCount !== after.sourceParentChildCount) return true;
       // Target parent gained a child
       if (before.targetParentChildCount !== after.targetParentChildCount) return true;
-      // Source index within parent changed
-      if (before.sourceIndex !== after.sourceIndex) return true;
-      // Source removed from DOM entirely (some drag libs re-render)
-      if (before.sourceInDOM && !after.sourceInDOM) return true;
-      return false;
+      // Target itself gained a child
+      if (before.targetChildCount !== after.targetChildCount) return true;
+      // Source reached the target without moving in the DOM, as a free drag does. On
+      // an axis it must cross the target or close half the gap, which animations and
+      // hover effects do not. A slider or grip may only ever close one axis.
+      const approached = (gapBefore, gapAfter) => Math.abs(gapBefore) > 8 &&
+        (Math.sign(gapBefore) !== Math.sign(gapAfter) || Math.abs(gapAfter) <= Math.abs(gapBefore) / 2);
+      return approached(before.gapX, after.gapX) || approached(before.gapY, after.gapY);
     }
 
     const sourceRect = source.getBoundingClientRect();
@@ -5248,29 +5291,102 @@ const tools = {
     const endX = targetRect.left + targetRect.width / 2;
     const endY = targetRect.top + targetRect.height / 2;
 
+    // Repeating a drop the page may already have applied could apply it twice
+    const unconfirmedDrop = () => ({
+      success: false,
+      outcome: 'unknown',
+      mayHaveExecuted: true,
+      method: 'html5_drag',
+      action: 'dragdrop',
+      error: 'The page accepted the drop but showed no change. The element may have moved, so inspect the page before retrying.'
+    });
+    const html5Moved = () => {
+      logger.log('info', 'dragdrop succeeded with HTML5 DragEvent', { sessionId: FSB.sessionId, method: 'html5_drag' });
+      return { success: true, method: 'html5_drag', action: 'dragdrop', hadEffect: true };
+    };
+    let dropDelivered = false;
+
     // -----------------------------------------------------------------------
     // Method 1: HTML5 DragEvent sequence
     // -----------------------------------------------------------------------
-    try {
-      const before = snapshotState();
-      const dt = new DataTransfer();
+    if (dragRoot) {
+      try {
+        const before = snapshotState();
+        const dt = new DataTransfer();
+        const dragEvent = (type, x, y) => new DragEvent(type, {
+          bubbles: true, cancelable: true, composed: true, dataTransfer: dt, clientX: x, clientY: y
+        });
+        // A browser fills this in for links and images, and pages read it on drop.
+        // An image inside a link carries the link's URL.
+        if (dragRoot.matches('a[href], img')) {
+          const link = dragRoot.closest('a[href]');
+          const url = link?.href || dragRoot.currentSrc || dragRoot.src;
+          dt.setData('text/uri-list', url);
+          if (link === dragRoot) dt.setData('text/plain', url);
+          dt.setData('text/html', dragRoot.outerHTML);
+        }
 
-      source.dispatchEvent(new DragEvent('dragstart', { bubbles: true, cancelable: true, dataTransfer: dt }));
-      await delay(50);
-      target.dispatchEvent(new DragEvent('dragenter', { bubbles: true, cancelable: true, dataTransfer: dt }));
-      target.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: dt }));
-      await delay(50);
-      target.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt }));
-      source.dispatchEvent(new DragEvent('dragend', { bubbles: true, cancelable: true, dataTransfer: dt }));
-      await delay(100);
+        // A cancelled dragstart ends the drag before it begins
+        if (dragRoot.dispatchEvent(dragEvent('dragstart', startX, startY))) {
+          await delay(50);
+          target.dispatchEvent(dragEvent('dragenter', endX, endY));
+          // Pages often decide on dragover from state dragenter set a tick earlier
+          await delay(50);
+          const dropAllowed = !target.dispatchEvent(dragEvent('dragover', endX, endY));
+          await delay(50);
 
-      const after = snapshotState();
-      if (detectChange(before, after)) {
-        logger.log('info', 'dragdrop succeeded with HTML5 DragEvent', { sessionId: FSB.sessionId, method: 'html5_drag' });
-        return { success: true, method: 'html5_drag', action: 'dragdrop', hadEffect: true };
+          if (dropAllowed) {
+            // Handlers run inside dispatchEvent, so changes read this early came from
+            // the drop rather than the page's own timers. Class and style changes are
+            // usually hover cleanup, so they prove nothing.
+            let pageChanged = false;
+            const noteChanges = (records) => {
+              pageChanged ||= records.some(record => record.type !== 'attributes' ||
+                !['class', 'style'].includes(record.attributeName));
+            };
+            const watcher = new MutationObserver(noteChanges);
+            for (const root of new Set([document, source.getRootNode(), target.getRootNode()])) {
+              watcher.observe(root, { subtree: true, childList: true, attributes: true, characterData: true });
+            }
+            target.dispatchEvent(dragEvent('drop', endX, endY));
+            dropDelivered = true;
+            // React 18 commits a state update made in the handler in a microtask
+            await Promise.resolve();
+            noteChanges(watcher.takeRecords());
+            watcher.disconnect();
+
+            dragRoot.dispatchEvent(dragEvent('dragend', endX, endY));
+            await delay(100);
+
+            const after = snapshotState();
+            if (detectChange(before, after)) return html5Moved();
+            if (explicitDrag && pageChanged) {
+              logger.log('info', 'dragdrop delivered: page reacted without moving the element', { sessionId: FSB.sessionId, method: 'html5_drag' });
+              return {
+                success: true,
+                method: 'html5_drag',
+                action: 'dragdrop',
+                hadEffect: true,
+                warning: 'The page reacted to the drop, but the element did not move. Check that the page shows the result you expected.'
+              };
+            }
+            if (explicitDrag) {
+              logger.log('warn', 'dragdrop outcome unknown: drop delivered with no visible change', { sessionId: FSB.sessionId, method: 'html5_drag' });
+              return unconfirmedDrop();
+            }
+          } else {
+            // A browser sends no drop to a target that refused it, but a page can
+            // still commit the move, for example in dragend. Only the source counts
+            // here, because a refusal message changes the page around it too.
+            target.dispatchEvent(dragEvent('dragleave', endX, endY));
+            dragRoot.dispatchEvent(dragEvent('dragend', endX, endY));
+            await delay(100);
+            if (sourceMoved(before, snapshotState())) return html5Moved();
+          }
+        }
+      } catch (e) {
+        // Method 1 failed, continue to Method 2
       }
-    } catch (e) {
-      // Method 1 failed, continue to Method 2
     }
 
     // -----------------------------------------------------------------------
@@ -5280,7 +5396,7 @@ const tools = {
       const before = snapshotState();
 
       source.dispatchEvent(new PointerEvent('pointerdown', {
-        bubbles: true, cancelable: true, clientX: startX, clientY: startY, pointerId: 1,
+        bubbles: true, cancelable: true, composed: true, clientX: startX, clientY: startY, pointerId: 1, isPrimary: true,
         button: 0, buttons: 1, pointerType: 'mouse'
       }));
       await delay(holdMs);
@@ -5290,14 +5406,14 @@ const tools = {
         const x = startX + (endX - startX) * t;
         const y = startY + (endY - startY) * t;
         document.dispatchEvent(new PointerEvent('pointermove', {
-          bubbles: true, cancelable: true, clientX: x, clientY: y, pointerId: 1,
+          bubbles: true, cancelable: true, composed: true, clientX: x, clientY: y, pointerId: 1, isPrimary: true,
           button: 0, buttons: 1, pointerType: 'mouse'
         }));
         await delay(stepDelayMs);
       }
 
       document.dispatchEvent(new PointerEvent('pointerup', {
-        bubbles: true, cancelable: true, clientX: endX, clientY: endY, pointerId: 1,
+        bubbles: true, cancelable: true, composed: true, clientX: endX, clientY: endY, pointerId: 1, isPrimary: true,
         button: 0, buttons: 0, pointerType: 'mouse'
       }));
       await delay(200);
@@ -5318,7 +5434,7 @@ const tools = {
       const before = snapshotState();
 
       source.dispatchEvent(new MouseEvent('mousedown', {
-        bubbles: true, cancelable: true, clientX: startX, clientY: startY,
+        bubbles: true, cancelable: true, composed: true, clientX: startX, clientY: startY,
         button: 0, buttons: 1, view: window
       }));
       await delay(holdMs);
@@ -5328,14 +5444,14 @@ const tools = {
         const x = startX + (endX - startX) * t;
         const y = startY + (endY - startY) * t;
         document.dispatchEvent(new MouseEvent('mousemove', {
-          bubbles: true, cancelable: true, clientX: x, clientY: y,
+          bubbles: true, cancelable: true, composed: true, clientX: x, clientY: y,
           button: 0, buttons: 1, view: window
         }));
         await delay(stepDelayMs);
       }
 
       document.dispatchEvent(new MouseEvent('mouseup', {
-        bubbles: true, cancelable: true, clientX: endX, clientY: endY,
+        bubbles: true, cancelable: true, composed: true, clientX: endX, clientY: endY,
         button: 0, buttons: 0, view: window
       }));
       await delay(200);
@@ -5351,6 +5467,7 @@ const tools = {
 
     // All methods exhausted
     logger.log('warn', 'dragdrop: all three methods failed', { sessionId: FSB.sessionId, sourceRef, targetRef });
+    if (dropDelivered) return unconfirmedDrop();
     return { success: false, error: 'All drag methods failed - use keyboard move alternative', action: 'dragdrop', hadEffect: false };
   }
 };

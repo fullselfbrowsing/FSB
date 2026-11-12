@@ -3109,12 +3109,10 @@ class MCPBridgeClient {
   }
 
   async _handleAgentAction(action, payload) {
-    // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-    // background.js's agent switch cases are commented out and
-    // mcp/src/tools/agents.ts registers no agent tools, so only a
-    // version-skewed MCP server can still send mcp:*-agent messages.
-    // Short-circuit with an explicit envelope instead of dispatching into
-    // the background switch's default branch.
+    // Background agents were removed in v0.9.45rc1, so only an MCP server
+    // from before then still sends mcp:*-agent messages. Answer with an
+    // explicit error instead of dispatching into the background switch's
+    // default branch.
     return {
       success: false,
       errorCode: 'agent_management_deprecated',

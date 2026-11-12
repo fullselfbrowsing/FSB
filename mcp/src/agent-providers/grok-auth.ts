@@ -3,7 +3,7 @@ import {
   type ChildProcessWithoutNullStreams,
 } from 'node:child_process';
 import type { RetainedBinary } from './adapter.js';
-import { createGrokBuildDetector } from './grok-detect.js';
+import { createGrokBuildDetector, verifyGrokBuildExecutableIdentity } from './grok-detect.js';
 import {
   createGrokBuildPrivateRuntime,
   GROK_BUILD_PROFILE_VERSION,
@@ -50,6 +50,10 @@ export type GrokBuildAuthBeginReason =
   | 'login_failed'
   | 'version_unsupported'
   | 'sandbox_unavailable'
+  | 'capability_missing'
+  | 'isolation_unavailable'
+  | 'agent_protocol_drift'
+  | 'binary_changed'
   | 'adapter_unavailable'
   | 'provider_auth_locked'
   | 'session_cleanup_blocked';
@@ -131,6 +135,10 @@ export interface GrokBuildAuthCoordinatorDependencies {
 const BEGIN_FAILURE_REASONS: ReadonlySet<string> = new Set([
   'version_unsupported',
   'sandbox_unavailable',
+  'capability_missing',
+  'isolation_unavailable',
+  'agent_protocol_drift',
+  'binary_changed',
   'adapter_unavailable',
   'provider_auth_locked',
   'session_cleanup_blocked',
@@ -229,28 +237,55 @@ class DefaultGrokBuildAuthCoordinator implements GrokBuildAuthCoordinator {
   private supportedBinary(detection: Awaited<ReturnType<typeof this.detect>>): RetainedBinary {
     if (
       detection.installed !== true
-      || detection.version !== GROK_BUILD_PROFILE_VERSION
+      || !detection.version
       || detection.profileVersion !== GROK_BUILD_PROFILE_VERSION
       || !detection.binary
     ) {
-      // The detector already classified why it refused. Carry that through so
-      // begin() can tell a stale version pin apart from a missing binary --
-      // otherwise both surface to the panel as a bare "Sign-in failed".
       const code = detection.diagnostic?.code;
       throw new Error(
-        code === 'version_unsupported' || code === 'version_unparseable'
-          ? 'version_unsupported'
-          : (code === 'sandbox_unavailable' ? 'sandbox_unavailable' : 'adapter_unavailable'),
+        code === 'version_unparseable' ? 'version_unsupported'
+          : (code && BEGIN_FAILURE_REASONS.has(code) ? code : 'adapter_unavailable'),
       );
     }
     return detection.binary;
   }
 
-  private operationDescriptor(
+  /** Local maintenance is independent of inference protocol/sandbox readiness. */
+  private async maintenanceBinary(
+    detection: Awaited<ReturnType<typeof this.detect>>,
+    operation: 'logout' | 'session_cleanup' | 'login',
+  ): Promise<RetainedBinary> {
+    if (detection.installed) return this.supportedBinary(detection);
+    if (
+      !detection.binary
+      || !detection.version
+      || !['sandbox_unavailable', 'capability_missing', 'isolation_unavailable', 'agent_protocol_drift']
+        .includes(detection.diagnostic?.code ?? '')
+    ) throw new Error('adapter_unavailable');
+    const binary = detection.binary;
+    const argv = operation === 'session_cleanup'
+      ? ['sessions', 'delete', '--help']
+      : [operation, '--help'];
+    const probe = await this.probe(await this.operationDescriptor(binary, this.runtime.paths.home, argv));
+    try {
+      const text = new TextDecoder('utf-8', { fatal: true }).decode(probe.stdout);
+      const command = operation === 'session_cleanup' ? /\bgrok\s+sessions\s+delete\b/
+        : (operation === 'login' ? /\bgrok\s+login\b/ : /\bgrok\s+logout\b/);
+      if (probe.exit.code !== 0 || probe.exit.signal !== null || !command.test(text)) {
+        throw new Error('adapter_unavailable');
+      }
+      return binary;
+    } finally {
+      probe.zeroize();
+    }
+  }
+
+  private async operationDescriptor(
     binary: RetainedBinary,
     cwd: string,
     argv: readonly string[],
-  ): BoundedProcessProbeDescriptor {
+  ): Promise<BoundedProcessProbeDescriptor> {
+    if (!await verifyGrokBuildExecutableIdentity(binary)) throw new Error('binary_changed');
     return {
       command: binary.command,
       argv: Object.freeze([...binary.argvPrefix, ...argv]),
@@ -270,7 +305,7 @@ class DefaultGrokBuildAuthCoordinator implements GrokBuildAuthCoordinator {
     cwd: string,
     sessionId: string,
   ): Promise<void> {
-    const result = await this.probe(this.operationDescriptor(
+    const result = await this.probe(await this.operationDescriptor(
       binary,
       cwd,
       ['sessions', 'delete', sessionId],
@@ -296,7 +331,7 @@ class DefaultGrokBuildAuthCoordinator implements GrokBuildAuthCoordinator {
       const detection = await this.detection();
       let binary: RetainedBinary;
       try {
-        binary = this.supportedBinary(detection);
+        binary = await this.maintenanceBinary(detection, 'session_cleanup');
       } catch {
         throw new Error('grok_session_cleanup_failed');
       }
@@ -350,7 +385,13 @@ class DefaultGrokBuildAuthCoordinator implements GrokBuildAuthCoordinator {
       }
       await this.runtime.ensureBase();
       const detection = await this.detection();
-      const binary = this.supportedBinary(detection);
+      // Explicit Connect may repair an expired cache on a CLI that exits before
+      // initialization. This never grants inference compatibility to that CLI.
+      const binary = !detection.installed
+          && detection.diagnostic?.code === 'agent_protocol_drift'
+          && await this.runtime.secureAuthFile()
+        ? await this.maintenanceBinary(detection, 'login')
+        : this.supportedBinary(detection);
       if (detection.authState === 'oauth') {
         emit(Object.freeze({ state: 'authenticated' }));
         return Object.freeze({ state: 'oauth', reason: 'none' });
@@ -360,6 +401,7 @@ class DefaultGrokBuildAuthCoordinator implements GrokBuildAuthCoordinator {
         this.environment,
         this.runtime.authEnvironment(),
       );
+      if (!await verifyGrokBuildExecutableIdentity(binary)) throw new Error('binary_changed');
       child = this.spawn(
         binary.command,
         [...binary.argvPrefix, 'login', '--oauth'],
@@ -483,7 +525,8 @@ class DefaultGrokBuildAuthCoordinator implements GrokBuildAuthCoordinator {
         emit(Object.freeze({ state: 'failed' }));
         return Object.freeze({
           state: safeState(verified.authState),
-          reason: 'login_failed',
+          reason: verified.diagnostic?.code && BEGIN_FAILURE_REASONS.has(verified.diagnostic.code)
+            ? verified.diagnostic.code as GrokBuildAuthBeginReason : 'login_failed',
         });
       }
       emit(Object.freeze({ state: 'authenticated' }));
@@ -517,8 +560,8 @@ class DefaultGrokBuildAuthCoordinator implements GrokBuildAuthCoordinator {
       }
       await this.runtime.ensureBase();
       const detection = await this.detection();
-      const binary = this.supportedBinary(detection);
-      const result = await this.probe(this.operationDescriptor(
+      const binary = await this.maintenanceBinary(detection, 'logout');
+      const result = await this.probe(await this.operationDescriptor(
         binary,
         this.runtime.paths.home,
         ['logout'],
@@ -531,7 +574,7 @@ class DefaultGrokBuildAuthCoordinator implements GrokBuildAuthCoordinator {
         result.zeroize();
       }
       const verified = await this.detection();
-      if (verified.authState !== 'unauthenticated') {
+      if (verified.authState !== 'unauthenticated' && await this.runtime.secureAuthFile()) {
         throw new Error('provider_auth_failed');
       }
       return Object.freeze({ state: 'unauthenticated' });
