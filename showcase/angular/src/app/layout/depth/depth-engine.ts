@@ -64,6 +64,11 @@ const MIN_SCALE_WIDE = 0.6;
 const MIN_SCALE_NARROW = 0.86;
 const NARROW_MAX_WIDTH = 600;
 
+/* After a swipe snaps to a plane, wheel events that still arrive this soon belong
+   to that swipe's momentum and are eaten. The snap itself comes 160ms after the
+   last event, so together this matches the 400ms pause that starts a new swipe. */
+const SWALLOW_MS = 240;
+
 export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions = {}): DepthEngine {
   const doc = root.ownerDocument;
   const win = (doc.defaultView || window) as Window & typeof globalThis;
@@ -100,6 +105,7 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
   let lastAbs = 0;
   let steady = 0;
   let swallow = false;
+  let swallowEnd = 0;
   let lastEvt = 0;
   const ambients: Ambient[] = Array.from(stage.querySelectorAll<HTMLElement>('[data-depth-ambient]')).map((el) => {
     const r = (el.getAttribute('data-depth-ambient') || '0,0').split(',');
@@ -566,6 +572,7 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
   function settle(): void {
     gesturing = false;
     swallow = true;
+    swallowEnd = win.performance.now() + SWALLOW_MS;
     const delta = target - anchor;
     go(Math.abs(delta) < 0.1 ? anchor : anchor + (delta > 0 ? 1 : -1));
   }
@@ -620,10 +627,19 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
       steady = 0;
       swallow = false;
     }
-    // The rest of the swipe that just changed planes is eaten, so it cannot scroll or skip the next one.
+    // The rest of the swipe that just changed planes is eaten, so it cannot scroll or
+    // skip the next one. Only its stragglers, though: they arrive right after the snap
+    // and keep decaying. Anything later, or growing again, is new input, so a wheel
+    // rolled on or a fresh swipe is never held for more than a moment.
     if (swallow && !gesturing) {
-      e.preventDefault();
-      return;
+      if (cont && now < swallowEnd && ad <= prev + 1) {
+        e.preventDefault();
+        return;
+      }
+      swallow = false;
+      scrolled = false;
+      edgeT = 0;
+      steady = 0;
     }
     if (!gesturing && isScroll(L)) {
       if (canScroll(L, dy)) {

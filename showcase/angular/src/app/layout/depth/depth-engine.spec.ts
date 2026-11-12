@@ -135,6 +135,60 @@ describe('createDepthEngine', () => {
     });
   });
 
+  describe('wheel', () => {
+    // A wheel notch or trackpad step, dispatched on the stage and bubbling to the document.
+    function wheel(deltaY: number): void {
+      root.querySelector('[data-depth-stage]')!.dispatchEvent(new WheelEvent('wheel', { deltaY, cancelable: true, bubbles: true }));
+    }
+    const pause = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+    const activeIndex = (): number => layers().findIndex((l) => !l.hasAttribute('inert'));
+    async function burst(deltas: readonly number[]): Promise<void> {
+      for (const d of deltas) {
+        wheel(d);
+        await pause(16);
+      }
+    }
+
+    it('keeps moving while a mouse wheel is rolled on', async () => {
+      build([120, 120, 120]);
+      for (let i = 0; i < 10 && activeIndex() < 2; i++) {
+        wheel(120);
+        await pause(250);
+      }
+      await settle(2);
+    });
+
+    it('scrolls a plane that scrolls inside itself while the wheel rolls on', async () => {
+      build([120, window.innerHeight * 8, 120]);
+      for (let i = 0; i < 8; i++) {
+        wheel(120);
+        await pause(250);
+      }
+      expect(activeIndex()).toBe(1);
+      expect(layers()[1].scrollTop).toBeGreaterThan(0);
+    });
+
+    // A trackpad swipe begun right after the snap ramps up gently, never in one jump.
+    it('takes a fresh swipe that starts right after a plane snaps into place', async () => {
+      build([120, 120, 120]);
+      wheel(120);
+      await pause(200);
+      await burst([10, 14, 19, 25, 32, 40, 50, 62]);
+      await settle(2);
+    });
+
+    it('still eats the momentum of the swipe that changed planes', async () => {
+      build([120, 120, 120]);
+      wheel(120);
+      await pause(200);
+      await burst([100, 80, 60, 40, 20]);
+      await settle(1);
+      await pause(500);
+      expect(activeIndex()).toBe(1);
+      expect(seen).not.toContain(2);
+    });
+  });
+
   it('cleans up after itself', () => {
     build([120, 120]);
     engine!.destroy();
