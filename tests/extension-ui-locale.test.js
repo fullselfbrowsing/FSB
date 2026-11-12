@@ -302,7 +302,13 @@ for (const [file, exactMap, texts] of [
     'the provider became unavailable', 'the agent process could not be started', 'the agent process could not be verified',
     'the agent spoke an unexpected protocol', 'the connection to the local agent service was lost',
     'the local agent service shut down', 'an earlier agent process did not shut down',
-    'an earlier agent run was not cleaned up', 'the start was cancelled'
+    'an earlier agent run was not cleaned up', 'the start was cancelled',
+    'Off for this tab', 'Turn on Skopeo', 'Turn off Skopeo', 'Open Chrome shortcut settings',
+    'Shortcut not assigned · Set in Chrome shortcuts', 'Shortcut: $SHORTCUT$ · Change shortcut',
+    'Esc Esc: turn off Skopeo in this tab', 'Skopeo can’t open safely on this layout.',
+    'Zoom out or resize the page, then try again.', 'Starting on this tab…', 'On · Ambient',
+    'Skopeo can’t run on this page.', 'Open a standard web page, then try again.', 'Skopeo didn’t start.',
+    'Nothing was added to the page. Try again.', 'Try again'
   ]],
   ['extension/ui/popup.js', sidePanelMap, ['Error occurred', 'Task completed', 'Task partially completed']],
   ['extension/ui/options.js', controlPanelMap, [
@@ -337,7 +343,10 @@ for (const [file, exactMap, texts] of [
   ]]
 ]) {
   const source = fs.readFileSync(path.join(root, file), 'utf8');
-  const missing = texts.filter((text) => !source.includes("'" + text.replace(/'/g, "\\'") + "'"));
+  // A literal may spell punctuation as a \u escape, as the Skopeo row does.
+  const escaped = (text) => text.replace(/’/g, '\\u2019').replace(/…/g, '\\u2026').replace(/·/g, '\\u00b7');
+  const missing = texts.filter((text) => ![text, escaped(text)]
+    .some((form) => source.includes("'" + form.replace(/'/g, "\\'") + "'")));
   const unresolved = texts.filter((text) => !Object.prototype.hasOwnProperty.call(exactMap, text));
   check(missing.length === 0 && unresolved.length === 0,
     `${file} status and delegation copy resolves on its page${missing.length ? '; not in source: ' + missing.join(' | ') : ''}${unresolved.length ? '; unresolved: ' + unresolved.join(' | ') : ''}`);

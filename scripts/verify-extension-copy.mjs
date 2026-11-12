@@ -81,7 +81,8 @@ function decodeJs(body) {
     .replace(/\\`/g, '`')
     .replace(/\\u2019/g, '’')
     .replace(/\\u00d7/gi, '×')
-    .replace(/\\u2026/g, '…');
+    .replace(/\\u2026/g, '…')
+    .replace(/\\u00b7/gi, '·');
 }
 
 const MARKUP = /<\/?[A-Za-z]/;

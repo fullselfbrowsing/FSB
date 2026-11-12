@@ -49,10 +49,13 @@ var _activeTabIdSnapshot = null;
   var COMMAND = 'toggle-skopeo-current-tab';
   var SHORTCUTS_URL = 'chrome://extensions/shortcuts';
   var UNASSIGNED_SHORTCUT = 'Shortcut not assigned \u00b7 Set in Chrome shortcuts';
+  var ASSIGNED_SHORTCUT = 'Shortcut: $SHORTCUT$ \u00b7 Change shortcut';
+  var OPEN_SHORTCUTS_LABEL = 'Open Chrome shortcut settings';
   var ACTIVE_KILL_HINT = 'Esc Esc: turn off Skopeo in this tab';
   var _nodes = null;
   var _initialized = false;
   var _shortcutHint = UNASSIGNED_SHORTCUT;
+  var _shortcutHintSource = { english: UNASSIGNED_SHORTCUT, subs: null };
   var _activationSerial = 0;
   var _currentActivation = null;
   var _requestSerial = 0;
@@ -199,10 +202,60 @@ var _activeTabIdSnapshot = null;
     return _nodes;
   }
 
-  function setSkopeoText(node, value) {
+  // The side panel loads fsbUiLocale and copy-exact.js before this file, so
+  // the row follows the FSB language. Without them (the controller's vm
+  // tests) the English text is written as before.
+  function skopeoLocale() {
+    var locale = global.fsbUiLocale;
+    return locale && typeof locale.markExact === 'function' && typeof locale.line === 'function'
+      ? locale : null;
+  }
+
+  function fillSkopeoCopy(english, subs) {
+    if (!subs) return english;
+    return english.replace(/\$([A-Z][A-Z0-9_]*)\$/g, function (match, name) {
+      return Object.prototype.hasOwnProperty.call(subs, name) ? String(subs[name]) : match;
+    });
+  }
+
+  function setSkopeoText(node, value, subs) {
     if (!node) return;
-    var next = typeof value === 'string' ? value : '';
+    var english = typeof value === 'string' ? value : '';
+    var locale = english ? skopeoLocale() : null;
+    if (locale) {
+      if (node.textContent !== locale.line(english, subs)) locale.markExact(node, english, subs);
+      return;
+    }
+    var next = fillSkopeoCopy(english, subs);
     if (node.textContent !== next) node.textContent = next;
+  }
+
+  // aria-label copy keeps a data-i18n-attr key so a language change can
+  // rewrite it in place.
+  function setSkopeoLabel(node, english) {
+    if (!node) return;
+    var locale = skopeoLocale();
+    if (!locale) {
+      setSkopeoAttribute(node, 'aria-label', english);
+      return;
+    }
+    setSkopeoAttribute(node, 'aria-label', locale.line(english));
+    var exact = locale.exact;
+    var key = exact && Object.prototype.hasOwnProperty.call(exact, english) ? exact[english] : null;
+    if (key) setSkopeoAttribute(node, 'data-i18n-attr', 'aria-label:' + key);
+    else node.removeAttribute('data-i18n-attr');
+  }
+
+  function renderSkopeoHint(node) {
+    setSkopeoText(node, _shortcutHintSource.english, _shortcutHintSource.subs);
+  }
+
+  function rememberShortcutHint(normalized) {
+    _shortcutHintSource = normalized
+      ? { english: ASSIGNED_SHORTCUT, subs: { SHORTCUT: normalized } }
+      : { english: UNASSIGNED_SHORTCUT, subs: null };
+    _shortcutHint = fillSkopeoCopy(_shortcutHintSource.english, _shortcutHintSource.subs);
+    return _shortcutHint;
   }
 
   function setSkopeoAttribute(node, name, value) {
@@ -316,14 +369,11 @@ var _activeTabIdSnapshot = null;
     setSkopeoText(nodes.status, view.status);
     setSkopeoOptionalCopy(nodes.body, view.body);
     setSkopeoOptionalCopy(nodes.action, view.action);
-    setSkopeoText(nodes.hint, view.state === 'active' ? ACTIVE_KILL_HINT : _shortcutHint);
+    if (view.state === 'active') setSkopeoText(nodes.hint, ACTIVE_KILL_HINT);
+    else renderSkopeoHint(nodes.hint);
     nodes.hint.disabled = view.state === 'active';
     nodes.hint.tabIndex = view.state === 'active' ? -1 : 0;
-    setSkopeoAttribute(
-      nodes.hint,
-      'aria-label',
-      view.state === 'active' ? ACTIVE_KILL_HINT : 'Open Chrome shortcut settings'
-    );
+    setSkopeoLabel(nodes.hint, view.state === 'active' ? ACTIVE_KILL_HINT : OPEN_SHORTCUTS_LABEL);
     if (view.state === 'active') {
       setSkopeoAttribute(nodes.hint, 'aria-disabled', 'true');
     } else {
@@ -345,7 +395,7 @@ var _activeTabIdSnapshot = null;
     setSkopeoText(nodes.status, '');
     setSkopeoOptionalCopy(nodes.body, '');
     setSkopeoOptionalCopy(nodes.action, '');
-    setSkopeoText(nodes.hint, _shortcutHint);
+    renderSkopeoHint(nodes.hint);
     return true;
   }
 
@@ -433,19 +483,17 @@ var _activeTabIdSnapshot = null;
         : null;
       var normalized = normalizeSkopeoShortcut(command && command.shortcut);
       if (!requestIsCurrent(requestCapture)) return false;
-      _shortcutHint = normalized
-        ? 'Shortcut: ' + normalized + ' \u00b7 Change shortcut'
-        : UNASSIGNED_SHORTCUT;
+      rememberShortcutHint(normalized);
       var nodes = getSkopeoNodes();
       if (!nodes || !requestIsCurrent(requestCapture)) return false;
-      if (nodes.row.dataset.state !== 'active') setSkopeoText(nodes.hint, _shortcutHint);
+      if (nodes.row.dataset.state !== 'active') renderSkopeoHint(nodes.hint);
       return _shortcutHint;
     } catch (_error) {
       if (!requestIsCurrent(requestCapture)) return false;
-      _shortcutHint = UNASSIGNED_SHORTCUT;
+      rememberShortcutHint(null);
       var nodes = getSkopeoNodes();
       if (!nodes || !requestIsCurrent(requestCapture)) return false;
-      if (nodes.row.dataset.state !== 'active') setSkopeoText(nodes.hint, _shortcutHint);
+      if (nodes.row.dataset.state !== 'active') renderSkopeoHint(nodes.hint);
       return _shortcutHint;
     }
   }

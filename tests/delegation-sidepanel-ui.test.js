@@ -770,8 +770,9 @@ assert.equal(sha256(htmlSource
   .replace(nativeHostInstallScript, '')),
   // Rolled for the UI locale work: ui-locale.js and copy-exact.js scripts and
   // data-i18n keys on static copy. Rolled again for the Skopeo control row,
-  // which sits outside the delegation surface. No delegation control was added.
-  '249120c9e9b36a9caa4e4af506b0a0e42b116c3a9208de7f3008f21478f6b7a2',
+  // which sits outside the delegation surface, and again for that row's
+  // data-i18n keys. No delegation control was added.
+  'cdf4c12ccc040387ce31e4fca1d8cdcceb3b607ddf09cdd2f0cabc590b539cb8',
   'the side-panel HTML includes only the intended helpers and tab-scoped ownership treatment');
 const replayCssStart = cssSource.indexOf('.history-status.idle-closed {');
 const replayCssEnd = cssSource.indexOf('/* Phase 11 FINT-20', replayCssStart);

@@ -4666,5 +4666,58 @@
         "content": "$1"
       }
     }
+  },
+  "copy_1ca28d1918": {
+    "message": "此标签页已关闭"
+  },
+  "copy_dc069f34dd": {
+    "message": "开启 Skopeo"
+  },
+  "copy_bd47072fe5": {
+    "message": "关闭 Skopeo"
+  },
+  "copy_14893d4a92": {
+    "message": "打开 Chrome 快捷键设置"
+  },
+  "copy_f262cf94ab": {
+    "message": "未设置快捷键 · 在 Chrome 快捷键中设置"
+  },
+  "copy_b7fb9f7ede": {
+    "message": "此标签页的 Skopeo"
+  },
+  "copy_94b2c61b4b": {
+    "message": "Esc Esc：在此标签页关闭 Skopeo"
+  },
+  "copy_3432134e77": {
+    "message": "在此布局下无法安全打开 Skopeo。"
+  },
+  "copy_48ba5c84b7": {
+    "message": "缩小页面或调整页面大小，然后重试。"
+  },
+  "copy_99536455cd": {
+    "message": "正在此标签页启动…"
+  },
+  "copy_e656694252": {
+    "message": "已开启 · 环境模式"
+  },
+  "copy_f0bbe1ab9e": {
+    "message": "Skopeo 无法在此页面运行。"
+  },
+  "copy_caf87bac3d": {
+    "message": "打开一个普通网页，然后重试。"
+  },
+  "copy_6e4dce91aa": {
+    "message": "Skopeo 未能启动。"
+  },
+  "copy_f4d25b46e3": {
+    "message": "页面上未添加任何内容。请重试。"
+  },
+  "copy_595462a32d": {
+    "message": "快捷键：$SHORTCUT$ · 更改快捷键",
+    "placeholders": {
+      "shortcut": {
+        "content": "$1"
+      }
+    }
   }
 }

@@ -4666,5 +4666,58 @@
         "content": "$1"
       }
     }
+  },
+  "copy_1ca28d1918": {
+    "message": "此分頁已關閉"
+  },
+  "copy_dc069f34dd": {
+    "message": "開啟 Skopeo"
+  },
+  "copy_bd47072fe5": {
+    "message": "關閉 Skopeo"
+  },
+  "copy_14893d4a92": {
+    "message": "開啟 Chrome 快速鍵設定"
+  },
+  "copy_f262cf94ab": {
+    "message": "未設定快速鍵 · 在 Chrome 快速鍵中設定"
+  },
+  "copy_b7fb9f7ede": {
+    "message": "此分頁的 Skopeo"
+  },
+  "copy_94b2c61b4b": {
+    "message": "Esc Esc：在此分頁關閉 Skopeo"
+  },
+  "copy_3432134e77": {
+    "message": "在此版面配置下無法安全開啟 Skopeo。"
+  },
+  "copy_48ba5c84b7": {
+    "message": "縮小頁面或調整頁面大小，然後再試一次。"
+  },
+  "copy_99536455cd": {
+    "message": "正在此分頁啟動…"
+  },
+  "copy_e656694252": {
+    "message": "已開啟 · 環境模式"
+  },
+  "copy_f0bbe1ab9e": {
+    "message": "Skopeo 無法在此頁面執行。"
+  },
+  "copy_caf87bac3d": {
+    "message": "開啟一般網頁，然後再試一次。"
+  },
+  "copy_6e4dce91aa": {
+    "message": "Skopeo 未能啟動。"
+  },
+  "copy_f4d25b46e3": {
+    "message": "頁面上未新增任何內容。請再試一次。"
+  },
+  "copy_595462a32d": {
+    "message": "快速鍵：$SHORTCUT$ · 變更快速鍵",
+    "placeholders": {
+      "shortcut": {
+        "content": "$1"
+      }
+    }
   }
 }

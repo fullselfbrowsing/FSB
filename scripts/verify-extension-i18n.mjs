@@ -31,7 +31,8 @@ const DEFAULT_LOCALES = [
 const PROTECTED = [
   'FSB', 'Full Self-Browsing', 'Chrome', 'Chrome Web Store',
   // Provider and product names stay in English in every locale.
-  'Grok Build', 'LM Studio', 'Claude Code', 'Claude Routines', 'OpenClaw', 'OpenRouter', 'OpenAI', 'Google AI Studio'
+  'Grok Build', 'LM Studio', 'Claude Code', 'Claude Routines', 'OpenClaw', 'OpenRouter', 'OpenAI', 'Google AI Studio',
+  'Skopeo'
 ];
 
 function arg(name, fallback) {

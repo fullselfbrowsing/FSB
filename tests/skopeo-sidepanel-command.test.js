@@ -509,7 +509,7 @@ function instrumentSidepanelControllerAuthority(controllerSource) {
   ].join('\n  '));
 }
 
-function bootSidepanelController(sidepanelSource, domHarness, chromeHarness, activeTabId = 11) {
+function bootSidepanelController(sidepanelSource, domHarness, chromeHarness, activeTabId = 11, extraGlobals = {}) {
   const controllerSource = instrumentSidepanelControllerAuthority(
     extractSidepanelControllerSource(sidepanelSource)
   );
@@ -528,7 +528,8 @@ function bootSidepanelController(sidepanelSource, domHarness, chromeHarness, act
     Set,
     Error,
     TypeError,
-    _activeTabIdSnapshot: activeTabId
+    _activeTabIdSnapshot: activeTabId,
+    ...extraGlobals
   };
   sandbox.globalThis = sandbox;
   vm.runInContext(controllerSource, vm.createContext(sandbox), { filename: 'sidepanel-skopeo-controller.js' });
@@ -1365,6 +1366,64 @@ function assertSidepanelRowStaticContracts(htmlSource, cssSource) {
   assert.ok(sizes.every((size) => [11, 12, 14, 16].includes(size)), 'row uses only approved font sizes');
   const weights = Array.from(css.matchAll(/font-weight:\s*(\d+)/g), (match) => Number(match[1]));
   assert.ok(weights.length > 0 && weights.every((weight) => weight === 400 || weight === 700), 'row uses only approved font weights');
+}
+
+// The side panel loads fsbUiLocale and copy-exact.js before this controller.
+// With them present every row string goes through the locale (markExact for
+// text, line plus a data-i18n-attr key for aria-label), so the row follows
+// the FSB language instead of staying English. The stub answers from the
+// real German catalog through the real exact map.
+async function assertSidepanelRowFollowsFsbLanguage(sidepanelSource) {
+  const german = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'extension/_locales/de/messages.json'), 'utf8'));
+  const exact = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'extension/utils/copy-exact.js'), 'utf8')
+    .match(/var extra = (\{.*\});/)[1]);
+  const fill = (text, subs) => text.replace(/\$([A-Z][A-Z0-9_]*)\$/g, (match, name) =>
+    (subs && Object.prototype.hasOwnProperty.call(subs, name) ? String(subs[name]) : match));
+  const line = (english, subs) => {
+    const key = Object.prototype.hasOwnProperty.call(exact, english) ? exact[english] : null;
+    return fill(key && german[key] ? german[key].message : english, subs);
+  };
+  const marked = [];
+  const fsbUiLocale = {
+    exact,
+    line,
+    markExact(node, english, subs) {
+      marked.push(english);
+      node.textContent = line(english, subs);
+      return node.textContent;
+    }
+  };
+  const dom = createSidepanelDomHarness();
+  const chromeHarness = createSidepanelChromeHarness();
+  const { controller } = bootSidepanelController(sidepanelSource, dom, chromeHarness, 11, { fsbUiLocale });
+
+  controller.renderSkopeoState(11, { success: true, tabId: 11, status: 'off' });
+  assert.equal(dom.status.textContent, 'F\u00fcr diesen Tab aus', 'Off status follows the FSB language');
+  assert.equal(dom.action.textContent, 'Skopeo einschalten', 'Off action follows the FSB language');
+  assert.equal(dom.hint.textContent, 'Keine Tastenkombination zugewiesen \u00b7 In den Chrome-Tastenkombinationen festlegen');
+  assert.equal(dom.hint.getAttribute('aria-label'), 'Chrome-Tastenkombinationen \u00f6ffnen');
+  assert.equal(dom.hint.getAttribute('data-i18n-attr'), 'aria-label:copy_14893d4a92',
+    'the hint label keeps its key for an in-place language change');
+
+  controller.renderSkopeoState(11, { success: true, tabId: 11, status: 'active', attention: 'ambient' });
+  assert.equal(dom.status.textContent, 'An \u00b7 Dezent');
+  assert.equal(dom.action.textContent, 'Skopeo ausschalten');
+  assert.equal(dom.hint.textContent, 'Esc Esc: Skopeo in diesem Tab ausschalten');
+  assert.equal(dom.hint.getAttribute('data-i18n-attr'), 'aria-label:copy_94b2c61b4b');
+
+  controller.renderSkopeoState(11, { success: true, tabId: 11, status: 'off' });
+  chromeHarness.setCommandRows([{ name: COMMAND, shortcut: 'Alt+Space' }]);
+  assert.equal(await controller.refreshSkopeoShortcut(11), 'Shortcut: \u2325 Space \u00b7 Change shortcut',
+    'the controller still reports the English hint');
+  assert.equal(dom.hint.textContent, 'Tastenkombination: \u2325 Space \u00b7 \u00c4ndern',
+    'the shortcut hint is one translated template with the key text kept as given');
+
+  controller.renderSkopeoState(11, { success: true, tabId: 11, status: 'error', code: 'SKOPEO_UNSAFE_LAYOUT' });
+  assert.equal(dom.status.textContent, 'Skopeo kann sich bei diesem Layout nicht sicher \u00f6ffnen.');
+  assert.equal(dom.action.textContent, 'Erneut versuchen', 'Try again reuses the existing catalog key');
+
+  assert.ok(marked.length > 0 && marked.every((english) => Object.prototype.hasOwnProperty.call(exact, english)),
+    'every row string written through the locale resolves in the exact map');
 }
 
 async function assertSidepanelStateController(sidepanelSource) {
@@ -4552,6 +4611,7 @@ async function runProductionContract() {
   assertStaticContracts(backgroundSource, manifest, wsClientSource);
   assertSidepanelRowStaticContracts(sidepanelHtmlSource, sidepanelCssSource);
   await assertSidepanelStateController(sidepanelSource);
+  await assertSidepanelRowFollowsFsbLanguage(sidepanelSource);
   await assertSidepanelRaceIntegration(sidepanelSource);
   await assertStatusNotificationResponseContract(backgroundSource, sidepanelSource);
   await assertGenerationZeroBaselineRecovery(backgroundSource, sidepanelSource);
