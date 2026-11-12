@@ -768,9 +768,10 @@ assert.equal((htmlSource.match(/id="delegationControlBar"/g) || []).length, 0,
 assert.equal(sha256(htmlSource
   .replace(delegationProviderScript, '')
   .replace(nativeHostInstallScript, '')),
-  // Rolled for the UI locale work: ui-locale.js and copy-exact.js scripts and
-  // data-i18n keys on static copy. No delegation control was added.
-  'cdd94600df72e6bfceb97c5ba55066ce5905bd958e8ddda8d1d142c9adc17369',
+  // Rolled for the Safari port (bundled Font Awesome and the platform shim) and
+  // the UI locale work (ui-locale.js and copy-exact.js scripts and data-i18n keys
+  // on static copy). No delegation control was added.
+  '7d66c360348766749f119a7302de31fe93155650f5843c445834918fe5db0c7e',
   'the side-panel HTML includes only the intended helpers and tab-scoped ownership treatment');
 const replayCssStart = cssSource.indexOf('.history-status.idle-closed {');
 const replayCssEnd = cssSource.indexOf('/* Phase 11 FINT-20', replayCssStart);
@@ -779,9 +780,10 @@ assert(replayCssStart !== -1 && replayCssEnd > replayCssStart,
 const delegationCssSource = cssSource.slice(0, replayCssStart) + cssSource.slice(replayCssEnd);
 // Rolled when the prefers-reduced-motion block gained .pixel-letter coverage:
 // the block already silenced the delegation spinner and status dot, but the
-// automation loader kept animating for users who asked it not to.
+// automation loader kept animating for users who asked it not to. Rolled
+// again for the Safari port's dvh heights and wide-window content cap.
 assert.equal(sha256(delegationCssSource),
-  'db8ee02f3ed61b84b9ced7af1e9c043460b4f8fa24ba222d79e235badb058ef7',
+  'ec8117b3381f6ab50c26aaa915e1f3fc8b8b9f75a67680a1d497f13d22c7c197',
   'the intentional delegated and ownership-status CSS deltas remain exact outside replay UI');
 
 {

@@ -160,8 +160,10 @@ function createHarness(initialStore, options) {
 
   assert.strictEqual(
     sha256(ONBOARDING_HTML_PATH),
-    '27e535ef3e829e205223b8a7dfeda5aeb6bd29b7e99b895079cc71cd9b10c9d0',
-    'onboarding.html hash rolled for the locale script and onboarding tag key'
+    // Rolled for the Safari port (bundled Font Awesome path and the platform shim)
+    // and the locale script and onboarding tag key.
+    'a080df4b14ee0850a552356455e2765c5d06e6e7930882d04a90c191e3cb7181',
+    'onboarding.html hash rolled for the Safari shim and the locale script'
   );
   assert.strictEqual(
     sha256(ONBOARDING_CSS_PATH),

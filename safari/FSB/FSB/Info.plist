@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>FSB connects to the FSB MCP server running on your Mac (localhost port 7225) so coding agents can drive your browser.</string>
+	<key>SFSafariWebExtensionConverterVersion</key>
+	<string>26.6</string>
+</dict>
+</plist>

@@ -10,7 +10,11 @@
   const getClassName = FSB.getClassName;
 
   async function executeContentAction(tool, params) {
-    const longTimeoutTools = ['solveCaptcha', 'fillsheet', 'readsheet', 'sheetsSession'];
+    // pointerClickAndHoldAt is the Safari DOM fallback for click_and_hold: it
+    // sleeps for the caller's holdMs in-page, where the CDP original holds in
+    // the service worker with no cap, so the default 10s would fail any hold
+    // at or above that.
+    const longTimeoutTools = ['solveCaptcha', 'fillsheet', 'readsheet', 'sheetsSession', 'pointerClickAndHoldAt'];
     const actionTimeout = longTimeoutTools.includes(tool) ? 120000 : 10000;
     let actionTimer;
     const timeout = new Promise((_, reject) => {

@@ -681,6 +681,55 @@
     return Object.assign({ ok: true }, counters);
   }
 
+  /**
+   * Re-send the running overlay to a tab whose page has just (re)loaded.
+   *
+   * recordVisualSessionTick broadcasts once, at tick time. A tick recorded by
+   * open_tab or navigate lands before the destination page has a content
+   * script, so that broadcast has nowhere to go and the overlay stays dark
+   * until the next action. background.js calls this when the tab finishes
+   * loading and when the page's content script reports ready.
+   *
+   * Behaviour:
+   *   - No entry: no-op.
+   *   - Elapsed or malformed deadline: clearVisualSession(tabId, { reason: 'timeout' }).
+   *   - isFinal entry: no-op. Its clear already ran or is about to; replaying
+   *     it would bring a finished overlay back.
+   *   - Otherwise broadcasts the running status. Storage and the death alarm are
+   *     left alone, so a page load never extends the 60 s window.
+   *
+   * @param {number} tabId
+   * @param {object} options { now?: number }
+   * @returns {Promise<object>} { ok: true, action: 'noop'|'cleared'|'replayed', entry? };
+   *                            { ok: false, reason: 'invalid_tab_id' }.
+   */
+  async function replayVisualSessionLifecycleForTab(tabId, options) {
+    var storageKey = storageKeyForTab(tabId);
+    if (!storageKey) {
+      return { ok: false, reason: 'invalid_tab_id' };
+    }
+
+    var entry = await readStorageEntry(storageKey);
+    if (!entry) {
+      return { ok: true, action: 'noop' };
+    }
+
+    var opts = options || {};
+    var now = Number.isFinite(opts.now) ? Number(opts.now) : Date.now();
+    var deadlineAt = Number(entry.deadlineAt);
+    if (!Number.isFinite(deadlineAt) || now >= deadlineAt) {
+      await clearVisualSession(tabId, { reason: 'timeout' });
+      return { ok: true, action: 'cleared', entry: entry };
+    }
+
+    if (entry.isFinal === true) {
+      return { ok: true, action: 'noop', entry: entry };
+    }
+
+    var sent = await broadcastRunningStatus(entry);
+    return { ok: true, action: sent ? 'replayed' : 'noop', entry: entry };
+  }
+
   // --- Module exports (mirrors v0.9.36 utils export pattern at mcp-visual-session.js:553-575) ---
 
   var exportsObj = {
@@ -692,7 +741,8 @@
     clearVisualSessionsForAgent: clearVisualSessionsForAgent,
     handleVisualSessionLifecycleTabRemoved: handleVisualSessionLifecycleTabRemoved,
     handleVisualSessionLifecycleAlarm: handleVisualSessionLifecycleAlarm,
-    restoreVisualSessionLifecyclesFromStorage: restoreVisualSessionLifecyclesFromStorage
+    restoreVisualSessionLifecyclesFromStorage: restoreVisualSessionLifecyclesFromStorage,
+    replayVisualSessionLifecycleForTab: replayVisualSessionLifecycleForTab
   };
 
   global.MCPVisualSessionLifecycleUtils = exportsObj;
