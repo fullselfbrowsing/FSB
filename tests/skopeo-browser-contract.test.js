@@ -17,6 +17,9 @@ const path = require('node:path');
 const url = require('node:url');
 
 const ROOT = path.resolve(__dirname, '..');
+// CI runs Node 20, which has no global WebSocket; the MCP package's ws
+// client offers the same addEventListener interface.
+const WebSocket = globalThis.WebSocket || require(path.join(ROOT, 'mcp', 'node_modules', 'ws'));
 const SHELL_PATH = path.join(ROOT, 'extension', 'content', 'skopeo-shell.js');
 const RUNTIME_PATH = path.join(ROOT, 'extension', 'content', 'skopeo-runtime.js');
 const COMPOSER_PATH = path.join(ROOT, 'extension', 'content', 'skopeo-adaptive-composer.js');

@@ -1807,8 +1807,10 @@ async function run() {
     assert.equal(source.includes(forbidden), false,
       `truth store has no forbidden runtime dependency: ${forbidden}`);
   }
-  assert.ok(Date.now() - started < 30000,
-    'focused truth-store contract completes under 30 seconds');
+  // GitHub's Ubuntu runners on Node 20 take 31-41 s for this contract, so the
+  // bound only catches a runaway loop, not ordinary runner speed.
+  assert.ok(Date.now() - started < 120000,
+    'focused truth-store contract completes under 120 seconds');
   console.log('skopeo truth store contract: PASS');
 }
 
