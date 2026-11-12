@@ -42,7 +42,7 @@ const defaultConfig = {
   // Speech-to-Text provider ('browser' | 'whisper'); read by ui/speech-to-text.js
   sttProvider: 'browser',
 
-  // Background Agents Server
+  // Remote Dashboard sync server
   serverUrl: 'https://fsb-server.fly.dev',
   serverHashKey: '',
   serverSyncEnabled: false

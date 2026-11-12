@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FSB - Control Panel</title>
+  <title data-i18n="copy_7ec33c22aa">FSB - Control Panel</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css" integrity="sha512-Kc323vGBEqzTmouAECnVceyQqyqdsSiqLQISBL29aUW4U/M7pSPA/gEUZQqv1cwx4OnYxTxve5UMg5GT6L4JJg==" crossorigin="anonymous" referrerpolicy="no-referrer">
   <link rel="stylesheet" href="../shared/fsb-ui-core.css">
   <link rel="stylesheet" href="options.css">
@@ -42,39 +42,39 @@
           <ul class="nav-list">
             <li class="nav-item active" data-section="dashboard">
               <i class="fas fa-tachometer-alt"></i>
-              <span>Dashboard</span>
+              <span data-i18n="panel_67b6964686">Dashboard</span>
             </li>
             <li class="nav-item" data-section="api-config">
               <i class="fas fa-key"></i>
-              <span>API Configuration</span>
+              <span data-i18n="panel_8ad747d05c">API Configuration</span>
             </li>
             <li class="nav-item" data-section="sync">
               <i class="fas fa-sync-alt"></i>
-              <span>Sync <span class="feature-badge beta">Beta</span></span>
+              <span><span data-i18n="panel_8d261a372f">Sync</span> <span class="feature-badge beta" data-i18n="panel_703390318b">Beta</span></span>
             </li>
             <li class="nav-item" data-section="passwords">
               <i class="fas fa-lock"></i>
-              <span>Passwords <span class="feature-badge beta">Beta</span></span>
+              <span><span data-i18n="panel_be146b37a0">Passwords</span> <span class="feature-badge beta" data-i18n="panel_703390318b">Beta</span></span>
             </li>
             <li class="nav-item" data-section="payments">
               <i class="fas fa-credit-card"></i>
-              <span>Payments <span class="feature-badge beta">Beta</span></span>
+              <span><span data-i18n="panel_632e1c5839">Payments</span> <span class="feature-badge beta" data-i18n="panel_703390318b">Beta</span></span>
             </li>
             <li class="nav-item" data-section="advanced">
               <i class="fas fa-sliders-h"></i>
-              <span>Advanced Settings</span>
+              <span data-i18n="panel_22d4f6088b">Advanced Settings</span>
             </li>
             <li class="nav-item" data-section="memory">
               <i class="fas fa-brain"></i>
-              <span>Memory</span>
+              <span data-i18n="panel_c3963aedaa">Memory</span>
             </li>
             <li class="nav-item" data-section="logs">
               <i class="fas fa-terminal"></i>
-              <span>Logs & Debugging</span>
+              <span data-i18n="panel_480d3c119a">Logs & Debugging</span>
             </li>
             <li class="nav-item" data-section="help">
               <i class="fas fa-question-circle"></i>
-              <span>Help & Documentation</span>
+              <span data-i18n="panel_2ccff1d108">Help & Documentation</span>
             </li>
           </ul>
         </nav>
@@ -85,8 +85,8 @@
         <!-- Dashboard Section -->
         <section class="content-section active" id="dashboard">
           <div class="section-header">
-            <h2>Dashboard</h2>
-            <p>Monitor your AI usage, costs, and automation performance</p>
+            <h2 data-i18n="panel_67b6964686">Dashboard</h2>
+            <p data-i18n="panel_db17c74beb">Monitor your AI usage, costs, and automation performance</p>
           </div>
 
           <!-- Analytics Hero Section -->
@@ -94,29 +94,29 @@
             <div class="hero-metrics">
               <div class="hero-metric">
                 <div class="metric-value" id="totalTokensToday">0</div>
-                <div class="metric-label">Total Tokens</div>
+                <div class="metric-label" data-i18n="panel_cd41bf0d3e">Total Tokens</div>
               </div>
               <div class="hero-metric">
                 <div class="metric-value" id="totalCostToday">$0.00</div>
-                <div class="metric-label">Total Cost</div>
+                <div class="metric-label" data-i18n="panel_dfa5cc738d">Total Cost</div>
               </div>
               <div class="hero-metric">
                 <div class="metric-value" id="totalRequests">0</div>
-                <div class="metric-label">Requests</div>
+                <div class="metric-label" data-i18n="panel_ada27592c9">Requests</div>
               </div>
               <div class="hero-metric">
                 <div class="metric-value" id="successRate">100%</div>
-                <div class="metric-label">Success Rate</div>
+                <div class="metric-label" data-i18n="panel_5068c6c343">Success Rate</div>
               </div>
             </div>
             <!-- Cost Breakdown -->
             <div class="cost-breakdown" id="dashboardCostBreakdown">
               <div class="cost-item">
-                <span class="cost-label">Automation</span>
+                <span class="cost-label" data-i18n="panel_d909750b1b">Automation</span>
                 <span class="cost-value" id="costAutomation">$0.00</span>
               </div>
               <div class="cost-item">
-                <span class="cost-label">Memory</span>
+                <span class="cost-label" data-i18n="panel_c3963aedaa">Memory</span>
                 <span class="cost-value" id="costMemory">$0.00</span>
               </div>
             </div>
@@ -125,12 +125,12 @@
           <!-- Usage Chart Section -->
           <div class="chart-section">
             <div class="chart-header">
-              <h3>Token Usage Over Time</h3>
+              <h3 data-i18n="panel_cddf50281d">Token Usage Over Time</h3>
               <div class="chart-controls">
                 <select id="chartTimeRange" class="chart-select">
-                  <option value="24h">Last 24 Hours</option>
-                  <option value="7d">Last 7 Days</option>
-                  <option value="30d">Last 30 Days</option>
+                  <option value="24h" data-i18n="panel_615c5daff4">Last 24 Hours</option>
+                  <option value="7d" data-i18n="panel_b84372e5cb">Last 7 Days</option>
+                  <option value="30d" data-i18n="panel_e9ddf63b38">Last 30 Days</option>
                 </select>
               </div>
             </div>
@@ -143,163 +143,163 @@
         <!-- API Configuration Section -->
         <section class="content-section" id="api-config">
           <div class="section-header">
-            <h2>API Configuration</h2>
-            <p>Configure your AI model provider and API settings</p>
+            <h2 data-i18n="panel_8ad747d05c">API Configuration</h2>
+            <p data-i18n="panel_5e4bc34faf">Configure your AI model provider and API settings</p>
           </div>
 
           <div class="form-card">
             <div class="form-section">
-              <h3>AI Model Configuration</h3>
+              <h3 data-i18n="panel_9b3cf4a154">AI Model Configuration</h3>
 
               <!-- Model Provider Selection -->
               <div class="form-group">
-                <label for="modelProvider">AI Provider <span id="providerIcon" style="display: inline-block; vertical-align: middle; margin-left: 6px;"></span></label>
+                <label for="modelProvider"><span data-i18n="panel_84e1ec2c5b">AI Provider</span> <span id="providerIcon" style="display: inline-block; vertical-align: middle; margin-left: 6px;"></span></label>
                 <select id="modelProvider" class="form-select">
-                  <option value="" disabled>Choose another provider</option>
+                  <option value="" disabled data-i18n="panel_994f468aae">Choose another provider</option>
                   <option value="xai">xAI (Grok)</option>
                   <option value="gemini">Google Gemini</option>
                   <option value="openai">OpenAI</option>
                   <option value="anthropic">Anthropic (Claude)</option>
                   <option value="openrouter">OpenRouter</option>
                   <option value="lmstudio">LM Studio</option>
-                  <option value="custom">Custom (OpenAI Compatible)</option>
+                  <option value="custom" data-i18n="panel_e65d5614f4">Custom (OpenAI Compatible)</option>
                   <optgroup label="Harness Adapters">
                     <option value="claude-code">Claude Code</option>
                     <option value="grok-build">Grok Build</option>
                   </optgroup>
                 </select>
-                <div class="form-help">API providers use local keys. Agent CLIs use their existing local sign-in.</div>
+                <div class="form-help" data-i18n="panel_e69daa3849">API providers use local keys. Agent CLIs use their existing local sign-in.</div>
                 <div id="retiredAgentProviderNotice" class="provider-retirement-notice" role="alert" hidden>
-                  <strong>Choose another AI provider</strong>
-                  <span id="retiredAgentProviderNoticeText">This provider is no longer available for Autopilot. Select and save another provider before starting a new task.</span>
+                  <strong data-i18n="panel_daa5fed227">Choose another AI provider</strong>
+                  <span id="retiredAgentProviderNoticeText" data-i18n="panel_822a9fabc1">This provider is no longer available for Autopilot. Select and save another provider before starting a new task.</span>
                 </div>
               </div>
 
               <div id="apiProviderDetails">
               <!-- Model Selection -->
               <div class="form-group">
-                <label for="modelSearch">Model</label>
+                <label for="modelSearch" data-i18n="panel_5e2c614c23">Model</label>
                 <div class="model-combobox" id="modelCombobox">
                   <div class="model-combobox__control">
                     <div class="model-combobox__field">
-                      <input type="text" id="modelSearch" class="form-input model-combobox__input" value="Provide API key to list models" placeholder="Search models" autocomplete="off" spellcheck="false" role="combobox" aria-expanded="false" aria-controls="modelListbox" aria-autocomplete="list" aria-haspopup="listbox" aria-label="Search and select model" disabled>
-                      <button type="button" id="modelComboboxToggle" class="model-combobox__chevron" tabindex="-1" aria-label="Toggle model list" disabled>
+                      <input type="text" id="modelSearch" class="form-input model-combobox__input" value="Provide API key to list models" placeholder="Search models" autocomplete="off" spellcheck="false" role="combobox" aria-expanded="false" aria-controls="modelListbox" aria-autocomplete="list" aria-haspopup="listbox" aria-label="Search and select model" disabled data-i18n-attr="aria-label:copy_e21ca6d204">
+                      <button type="button" id="modelComboboxToggle" class="model-combobox__chevron" tabindex="-1" aria-label="Toggle model list" disabled data-i18n-attr="aria-label:copy_d6699494ff">
                         <i class="fas fa-chevron-down" aria-hidden="true"></i>
                       </button>
                     </div>
-                    <button id="refreshModelsBtn" type="button" class="fsb-refresh-icon" title="Refresh model list" aria-label="Refresh model list" disabled>
+                    <button id="refreshModelsBtn" type="button" class="fsb-refresh-icon" title="Refresh model list" aria-label="Refresh model list" disabled data-i18n-attr="title:copy_9606bfc49e,aria-label:copy_9606bfc49e">
                       <i class="fas fa-sync-alt" aria-hidden="true"></i>
                     </button>
                   </div>
                   <ul class="model-combobox__listbox" id="modelListbox" role="listbox" aria-label="Models" tabindex="-1" hidden></ul>
                   <select id="modelName" class="model-combobox__native" tabindex="-1" aria-hidden="true" disabled>
-                    <option value="" disabled selected>Provide API key to list models</option>
+                    <option value="" disabled selected data-i18n="panel_dfa17046ae">Provide API key to list models</option>
                   </select>
                 </div>
                 <div id="modelDiscoveryStatus" class="discovery-status" hidden></div>
-                <div class="form-help" id="modelDescription">Select the AI model to use</div>
+                <div class="form-help" id="modelDescription" data-i18n="panel_00889a77ec">Select the AI model to use</div>
               </div>
               
               <!-- Reasoning Effort removed: no current models need it -->
               
               <!-- xAI API Key -->
               <div class="form-group" id="xaiApiKeyGroup">
-                <label for="apiKey">xAI API Key</label>
+                <label for="apiKey" data-i18n="panel_bc3286fa36">xAI API Key</label>
                 <div class="input-with-button">
-                  <input type="password" id="apiKey" placeholder="Enter your xAI API key" class="form-input">
+                  <input type="password" id="apiKey" placeholder="Enter your xAI API key" class="form-input" data-i18n-attr="placeholder:copy_881bf7079c">
                   <button type="button" class="input-btn" id="toggleApiKey" title="Toggle visibility">
                     <i class="fas fa-eye"></i>
                   </button>
                 </div>
                 <div class="form-help">
-                  Get your API key from <a href="https://x.ai/api" target="_blank">x.ai/api</a>. Your key is stored locally in your browser.
+                  <span data-i18n="panel_a3fb46f4c6">Get your API key from</span> <a href="https://x.ai/api" target="_blank">x.ai/api</a><span data-i18n="panel_8e9faa30de">. Your key is stored locally in your browser.</span>
                 </div>
               </div>
               
               <!-- Gemini API Key -->
               <div class="form-group" id="geminiApiKeyGroup" style="display: none;">
-                <label for="geminiApiKey">Gemini API Key</label>
+                <label for="geminiApiKey" data-i18n="panel_53bca734db">Gemini API Key</label>
                 <div class="input-with-button">
-                  <input type="password" id="geminiApiKey" placeholder="Enter your Gemini API key" class="form-input">
+                  <input type="password" id="geminiApiKey" placeholder="Enter your Gemini API key" class="form-input" data-i18n-attr="placeholder:copy_1e9720ad1e">
                   <button type="button" class="input-btn" id="toggleGeminiApiKey" title="Toggle visibility">
                     <i class="fas fa-eye"></i>
                   </button>
                 </div>
                 <div class="form-help">
-                  Get your API key from <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio</a>. Your key is stored locally in your browser.
+                  <span data-i18n="panel_a3fb46f4c6">Get your API key from</span> <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio</a><span data-i18n="panel_8e9faa30de">. Your key is stored locally in your browser.</span>
                 </div>
               </div>
               
               <!-- OpenAI API Key -->
               <div class="form-group" id="openaiApiKeyGroup" style="display: none;">
-                <label for="openaiApiKey">OpenAI API Key</label>
+                <label for="openaiApiKey" data-i18n="panel_8418bdbdcd">OpenAI API Key</label>
                 <div class="input-with-button">
-                  <input type="password" id="openaiApiKey" placeholder="Enter your OpenAI API key" class="form-input">
+                  <input type="password" id="openaiApiKey" placeholder="Enter your OpenAI API key" class="form-input" data-i18n-attr="placeholder:copy_699e26dc48">
                   <button type="button" class="input-btn" id="toggleOpenaiApiKey" title="Toggle visibility">
                     <i class="fas fa-eye"></i>
                   </button>
                 </div>
                 <div class="form-help">
-                  Get your API key from <a href="https://platform.openai.com/api-keys" target="_blank">OpenAI Platform</a>. Your key is stored locally in your browser.
+                  <span data-i18n="panel_a3fb46f4c6">Get your API key from</span> <a href="https://platform.openai.com/api-keys" target="_blank" data-i18n="panel_e07165f5ce">OpenAI Platform</a><span data-i18n="panel_8e9faa30de">. Your key is stored locally in your browser.</span>
                 </div>
               </div>
               
               <!-- Anthropic API Key -->
               <div class="form-group" id="anthropicApiKeyGroup" style="display: none;">
-                <label for="anthropicApiKey">Anthropic API Key</label>
+                <label for="anthropicApiKey" data-i18n="panel_959bc25166">Anthropic API Key</label>
                 <div class="input-with-button">
-                  <input type="password" id="anthropicApiKey" placeholder="Enter your Anthropic API key" class="form-input">
+                  <input type="password" id="anthropicApiKey" placeholder="Enter your Anthropic API key" class="form-input" data-i18n-attr="placeholder:copy_e73283ba69">
                   <button type="button" class="input-btn" id="toggleAnthropicApiKey" title="Toggle visibility">
                     <i class="fas fa-eye"></i>
                   </button>
                 </div>
                 <div class="form-help">
-                  Get your API key from <a href="https://console.anthropic.com/account/keys" target="_blank">Anthropic Console</a>. Your key is stored locally in your browser.
+                  <span data-i18n="panel_a3fb46f4c6">Get your API key from</span> <a href="https://console.anthropic.com/account/keys" target="_blank" data-i18n="panel_c481af39b2">Anthropic Console</a><span data-i18n="panel_8e9faa30de">. Your key is stored locally in your browser.</span>
                 </div>
               </div>
               
               <!-- OpenRouter API Key -->
               <div class="form-group" id="openrouterApiKeyGroup" style="display: none;">
-                <label for="openrouterApiKey">OpenRouter API Key</label>
+                <label for="openrouterApiKey" data-i18n="panel_36e0497429">OpenRouter API Key</label>
                 <div class="input-with-button">
-                  <input type="password" id="openrouterApiKey" placeholder="Enter your OpenRouter API key" class="form-input">
+                  <input type="password" id="openrouterApiKey" placeholder="Enter your OpenRouter API key" class="form-input" data-i18n-attr="placeholder:copy_c545294348">
                   <button type="button" class="input-btn" id="toggleOpenrouterApiKey" title="Toggle visibility">
                     <i class="fas fa-eye"></i>
                   </button>
                 </div>
                 <div class="form-help">
-                  Get your API key from <a href="https://openrouter.ai/keys" target="_blank">OpenRouter</a>. Access 200+ models with a single key.
+                  <span data-i18n="panel_a3fb46f4c6">Get your API key from</span> <a href="https://openrouter.ai/keys" target="_blank">OpenRouter</a><span data-i18n="panel_84de34181d">. Access 200+ models with a single key.</span>
                 </div>
               </div>
 
               <!-- LM Studio Server Configuration -->
               <div class="form-group" id="lmstudioServerGroup" style="display: none;">
-                <label for="lmstudioBaseUrl">LM Studio Server URL</label>
+                <label for="lmstudioBaseUrl" data-i18n="panel_018833a024">LM Studio Server URL</label>
                 <input type="text" id="lmstudioBaseUrl" placeholder="http://localhost:1234" class="form-input">
                 <div class="form-help">
-                  Uses LM Studio's local OpenAI-compatible server. No API key required. Models are discovered live from <code>/v1/models</code>.
+                  <span data-i18n="panel_3efaf1b1c1">Uses LM Studio's local OpenAI-compatible server. No API key required. Models are discovered live from</span> <code>/v1/models</code>.
                 </div>
               </div>
 
               <!-- Custom API Configuration -->
               <div class="form-group" id="customApiGroup" style="display: none;">
-                <label for="customEndpoint">Custom API Endpoint</label>
+                <label for="customEndpoint" data-i18n="panel_83419f15b8">Custom API Endpoint</label>
                 <input type="text" id="customEndpoint" placeholder="https://api.example.com/v1/chat/completions" class="form-input">
-                <div class="form-help">Enter the full URL for your OpenAI-compatible API endpoint</div>
+                <div class="form-help" data-i18n="panel_cfb67fffe3">Enter the full URL for your OpenAI-compatible API endpoint</div>
                 
-                <label for="customApiKey" style="margin-top: 15px;">Custom API Key</label>
+                <label for="customApiKey" style="margin-top: 15px;" data-i18n="panel_acb781f972">Custom API Key</label>
                 <div class="input-with-button">
-                  <input type="password" id="customApiKey" placeholder="Enter your custom API key" class="form-input">
+                  <input type="password" id="customApiKey" placeholder="Enter your custom API key" class="form-input" data-i18n-attr="placeholder:copy_8001f1687a">
                   <button type="button" class="input-btn" id="toggleCustomApiKey" title="Toggle visibility">
                     <i class="fas fa-eye"></i>
                   </button>
                 </div>
-                <div class="form-help">Your key is stored locally in your browser.</div>
+                <div class="form-help" data-i18n="panel_5e2e7207a6">Your key is stored locally in your browser.</div>
               </div>
 
               <!-- Speech-to-Text -->
               <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border-color);">
-                <h3 style="margin-bottom: 12px;">Speech-to-Text</h3>
+                <h3 style="margin-bottom: 12px;" data-i18n="panel_abfe6d40e5">Speech-to-Text</h3>
                 <div class="toggle-grid single">
                   <label class="modern-toggle">
                     <input type="checkbox" id="sttProvider" value="whisper">
@@ -307,8 +307,8 @@
                       <span class="toggle-thumb"></span>
                     </span>
                     <div class="toggle-content">
-                      <span class="toggle-label">Use OpenAI Whisper</span>
-                      <span class="toggle-desc" id="sttStatusDesc">Requires an OpenAI API key. When disabled, uses browser's built-in speech recognition.</span>
+                      <span class="toggle-label" data-i18n="panel_5303c4374c">Use OpenAI Whisper</span>
+                      <span class="toggle-desc" id="sttStatusDesc" data-i18n="panel_14e36783b5">Requires an OpenAI API key. When disabled, uses browser's built-in speech recognition.</span>
                     </div>
                   </label>
                 </div>
@@ -316,8 +316,8 @@
 
               <!-- CAPTCHA Solver -->
               <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border-color);">
-                <h3 style="margin-bottom: 12px;">CAPTCHA Solver</h3>
-                <p class="captcha-reassurance"><i class="fas fa-circle-check" aria-hidden="true"></i>Users haven't reported a single instance of FSB being detected as a bot and interrupting their workflow. That said, not every day is sunshine. This is here for when one isn't.</p>
+                <h3 style="margin-bottom: 12px;" data-i18n="panel_e1461bf33a">CAPTCHA Solver</h3>
+                <p class="captcha-reassurance"><i class="fas fa-circle-check" aria-hidden="true"></i><span data-i18n="panel_1a3a4b99db">Users haven't reported a single instance of FSB being detected as a bot and interrupting their workflow. That said, not every day is sunshine. This is here for when one isn't.</span></p>
                 <div class="toggle-grid single">
                   <label class="modern-toggle">
                     <input type="checkbox" id="captchaSolverEnabled">
@@ -325,23 +325,23 @@
                       <span class="toggle-thumb"></span>
                     </span>
                     <div class="toggle-content">
-                      <span class="toggle-label">Enable CAPTCHA Solving</span>
-                      <span class="toggle-desc">Use 2Captcha service to solve reCAPTCHA v2, hCaptcha, and Cloudflare Turnstile challenges</span>
+                      <span class="toggle-label" data-i18n="panel_2909841c62">Enable CAPTCHA Solving</span>
+                      <span class="toggle-desc" data-i18n="panel_1955b2ec44">Use 2Captcha service to solve reCAPTCHA v2, hCaptcha, and Cloudflare Turnstile challenges</span>
                     </div>
                   </label>
                 </div>
 
                 <div id="captchaSolverConfig" style="display: none; margin-top: var(--space-lg);">
                   <div class="form-group">
-                    <label for="captchaApiKey">2Captcha API Key</label>
+                    <label for="captchaApiKey" data-i18n="panel_5ac544cb2f">2Captcha API Key</label>
                     <div class="input-with-button">
-                      <input type="password" id="captchaApiKey" placeholder="Enter your 2Captcha API key" class="form-input">
+                      <input type="password" id="captchaApiKey" placeholder="Enter your 2Captcha API key" class="form-input" data-i18n-attr="placeholder:copy_ec8571e74c">
                       <button type="button" class="input-btn" id="toggleCaptchaApiKey" title="Toggle visibility">
                         <i class="fas fa-eye"></i>
                       </button>
                     </div>
                     <div class="form-help">
-                      Sign up at <a href="https://2captcha.com?from=fsb" target="_blank">2captcha.com</a>, add balance, then copy your API key from the dashboard. Solves reCAPTCHA v2, hCaptcha, and Turnstile.
+                      <span data-i18n="panel_a003f76423">Sign up at</span> <a href="https://2captcha.com?from=fsb" target="_blank">2captcha.com</a><span data-i18n="panel_1a187ac034">, add balance, then copy your API key from the dashboard. Solves reCAPTCHA v2, hCaptcha, and Turnstile.</span>
                     </div>
                   </div>
                 </div>
@@ -350,29 +350,29 @@
               </div>
 
               <div id="agentProviderDetails" hidden>
-                <h3 id="agentProviderDetailsHeading" class="agent-conn-title">Agent CLI</h3>
-                <p id="agentProviderHelp" class="agent-conn-sub">FSB uses this CLI's existing local sign-in. Test Connection sends one small no-tools validation request.</p>
+                <h3 id="agentProviderDetailsHeading" class="agent-conn-title" data-i18n="panel_b6ff7ee96e">Agent CLI</h3>
+                <p id="agentProviderHelp" class="agent-conn-sub" data-i18n="panel_92f1115a37">FSB uses this CLI's existing local sign-in. Test Connection sends one small no-tools validation request.</p>
 
                 <div id="grokBuildConnectionCard" class="agent-conn" hidden>
                   <div class="agent-conn-top">
                     <span class="agent-conn-mark"><img src="../assets/onboarding/providers/xai.png" alt="" data-invert="1"></span>
                     <span class="agent-conn-name">
                       <h4>Grok Build</h4>
-                      <span class="agent-conn-meta">xAI &middot; local harness</span>
+                      <span class="agent-conn-meta" data-i18n="panel_cfaa352b86">xAI &middot; local harness</span>
                     </span>
-                    <span class="agent-conn-status" id="grokBuildAuthStatus" data-state="off">Checking sign-in...</span>
+                    <span class="agent-conn-status" id="grokBuildAuthStatus" data-state="off" data-i18n="panel_a1272b91cf">Checking sign-in...</span>
                   </div>
                   <dl class="agent-conn-rows">
-                    <div class="agent-conn-row"><dt>Profile</dt><dd id="grokBuildCompatibility">Requires the reviewed Grok Build 1.0.4 profile. Test Connection verifies installation, version, isolation, ACP, and cached OAuth without sending a prompt.</dd></div>
-                    <div class="agent-conn-row"><dt>Billing</dt><dd>Uses your signed-in Grok account. SuperGrok usage draws from its shared weekly allowance; extra usage may apply.</dd></div>
-                    <div class="agent-conn-row"><dt>Data</dt><dd>Browser task text and FSB MCP results are sent to Grok for inference. FSB disables secondary telemetry and trace uploads for this private profile.</dd></div>
+                    <div class="agent-conn-row"><dt data-i18n="panel_d696a35bdd">Profile</dt><dd id="grokBuildCompatibility" data-i18n="panel_fd05c3a95a">FSB verifies the required Grok protocol, isolation, and cached OAuth capabilities without sending a prompt.</dd></div>
+                    <div class="agent-conn-row"><dt data-i18n="panel_3ac8bbca9a">Billing</dt><dd data-i18n="panel_ce4f452059">Uses your signed-in Grok account. SuperGrok usage draws from its shared weekly allowance; extra usage may apply.</dd></div>
+                    <div class="agent-conn-row"><dt data-i18n="panel_cec3a9b89b">Data</dt><dd data-i18n="panel_ba5c14963d">Browser task text and FSB MCP results are sent to Grok for inference. FSB disables secondary telemetry and trace uploads for this private profile.</dd></div>
                   </dl>
                   <div class="agent-conn-actions">
-                    <button type="button" class="control-btn primary" id="connectGrokBuildBtn">Connect SuperGrok</button>
-                    <button type="button" class="control-btn danger" id="disconnectGrokBuildBtn" hidden>Disconnect</button>
-                    <a class="control-btn" id="grokBuildLoginLink" href="#" target="_blank" rel="noopener noreferrer" hidden>Continue sign-in</a>
-                    <a class="agent-conn-link" href="https://docs.x.ai/grok/faq" target="_blank" rel="noopener noreferrer">Review SuperGrok usage <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i></a>
-                    <a class="agent-conn-link" href="https://docs.x.ai/build/overview" target="_blank" rel="noopener noreferrer">Installation guide <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i></a>
+                    <button type="button" class="control-btn primary" id="connectGrokBuildBtn" data-i18n="panel_ccf75fb483">Connect SuperGrok</button>
+                    <button type="button" class="control-btn danger" id="disconnectGrokBuildBtn" hidden data-i18n="panel_acfc5be785">Disconnect</button>
+                    <a class="control-btn" id="grokBuildLoginLink" href="#" target="_blank" rel="noopener noreferrer" hidden data-i18n="panel_1771a5d0f6">Continue sign-in</a>
+                    <a class="agent-conn-link" href="https://docs.x.ai/grok/faq" target="_blank" rel="noopener noreferrer"><span data-i18n="panel_888a2f4fc6">Review SuperGrok usage</span> <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i></a>
+                    <a class="agent-conn-link" href="https://docs.x.ai/build/overview" target="_blank" rel="noopener noreferrer"><span data-i18n="panel_d334745b85">Installation guide</span> <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i></a>
                   </div>
                 </div>
 
@@ -381,17 +381,17 @@
                     <span class="agent-conn-mark"><span class="agent-conn-claude" role="img" aria-label="Claude"></span></span>
                     <span class="agent-conn-name">
                       <h4>Claude Code</h4>
-                      <span class="agent-conn-meta">Anthropic &middot; local harness</span>
+                      <span class="agent-conn-meta" data-i18n="panel_baf4338a6f">Anthropic &middot; local harness</span>
                     </span>
-                    <span class="agent-conn-status" id="claudeCodeAuthStatus" data-state="off">Not reported</span>
+                    <span class="agent-conn-status" id="claudeCodeAuthStatus" data-state="off" data-i18n="panel_adadface01">Not reported</span>
                   </div>
                   <dl class="agent-conn-rows">
-                    <div class="agent-conn-row"><dt>Sign-in</dt><dd>Uses the account signed into Claude Code. FSB does not need your Anthropic credential.</dd></div>
-                    <div class="agent-conn-row"><dt>Billing</dt><dd>Usage and charges follow that account's Claude plan or API configuration.</dd></div>
-                    <div class="agent-conn-row"><dt>Auth state</dt><dd>Claude Code does not report an auth state that FSB can safely read.</dd></div>
+                    <div class="agent-conn-row"><dt data-i18n="panel_5bbbe53187">Sign-in</dt><dd data-i18n="panel_7b14b6ca11">Uses the account signed into Claude Code. FSB does not need your Anthropic credential.</dd></div>
+                    <div class="agent-conn-row"><dt data-i18n="panel_3ac8bbca9a">Billing</dt><dd data-i18n="panel_8cceeb4d83">Usage and charges follow that account's Claude plan or API configuration.</dd></div>
+                    <div class="agent-conn-row"><dt data-i18n="panel_774bf7db76">Auth state</dt><dd data-i18n="panel_d9daa99f67">Claude Code does not report an auth state that FSB can safely read.</dd></div>
                   </dl>
                   <div class="agent-conn-actions">
-                    <a class="agent-conn-link" href="https://claude.com/pricing" target="_blank" rel="noopener noreferrer">Review Claude plans and billing <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i></a>
+                    <a class="agent-conn-link" href="https://claude.com/pricing" target="_blank" rel="noopener noreferrer"><span data-i18n="panel_00604d2592">Review Claude plans and billing</span> <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i></a>
                   </div>
                 </div>
               </div>
@@ -403,8 +403,8 @@
                     <i class="fas fa-spinner fa-spin"></i>
                   </div>
                   <div class="status-info">
-                    <div class="status-title">Checking...</div>
-                    <div class="status-detail">Verifying API connection</div>
+                    <div class="status-title" data-i18n="panel_2e5f79bb94">Checking...</div>
+                    <div class="status-detail" data-i18n="panel_02600e6189">Verifying API connection</div>
                   </div>
                 </div>
               </div>
@@ -412,7 +412,7 @@
               <div class="api-test-section">
                 <button class="test-btn" id="fullApiTest">
                   <i class="fas fa-plug"></i>
-                  Test Connection
+                  <span data-i18n="panel_c02977b07e">Test Connection</span>
                 </button>
                 <div class="test-results" id="testResults"></div>
               </div>
@@ -423,32 +423,45 @@
         <!-- Advanced Settings Section -->
         <section class="content-section" id="advanced">
           <div class="section-header">
-            <h2>Advanced Settings</h2>
-            <p>Fine-tune automation behavior and performance</p>
+            <h2 data-i18n="panel_22d4f6088b">Advanced Settings</h2>
+            <p data-i18n="panel_b9f2d95fd0">Fine-tune automation behavior and performance</p>
           </div>
 
           <!-- Settings Grid -->
           <div class="advanced-settings-grid">
 
-            <div class="adv-sub"><i class="fas fa-palette"></i><span>Appearance</span><span class="adv-sub-rule"></span></div>
+            <div class="adv-sub"><i class="fas fa-palette"></i><span data-i18n="panel_3907fa7f80">Appearance</span><span class="adv-sub-rule"></span></div>
             <div class="settings-card">
               <div class="settings-card-header">
                 <div class="settings-card-icon"><i class="fas fa-palette"></i></div>
                 <div class="settings-card-title">
-                  <h3>Theme</h3>
-                  <p>Appearance of the control panel</p>
+                  <h3 data-i18n="panel_efb52e7172">Theme</h3>
+                  <p data-i18n="panel_d987fa1b93">Appearance of the control panel</p>
                 </div>
               </div>
               <div class="settings-card-content">
-                <div class="site-graph-detail-toggle theme-mode-toggle" id="themeModeToggle" role="radiogroup" aria-label="Theme">
-                  <button type="button" class="detail-btn active" data-theme-mode="system" role="radio" aria-checked="true">System</button>
-                  <button type="button" class="detail-btn" data-theme-mode="dark" role="radio" aria-checked="false">Dark</button>
-                  <button type="button" class="detail-btn" data-theme-mode="light" role="radio" aria-checked="false">Light</button>
+                <div class="site-graph-detail-toggle theme-mode-toggle" id="themeModeToggle" role="radiogroup" aria-label="Theme" data-i18n-attr="aria-label:panel_efb52e7172">
+                  <button type="button" class="detail-btn active" data-theme-mode="system" role="radio" aria-checked="true" data-i18n="panel_6725e7bbcd">System</button>
+                  <button type="button" class="detail-btn" data-theme-mode="dark" role="radio" aria-checked="false" data-i18n="panel_60acc53f13">Dark</button>
+                  <button type="button" class="detail-btn" data-theme-mode="light" role="radio" aria-checked="false" data-i18n="panel_dbcd5e7bb7">Light</button>
                 </div>
-                <div class="setting-hint">System follows your operating system appearance. Default: System.</div>
+                <div class="setting-hint" data-i18n="panel_1b0daa3cbf">System follows your operating system appearance. Default: System.</div>
               </div>
             </div>
-            <div class="adv-sub"><i class="fas fa-gauge-high"></i><span>Execution &amp; Limits</span><span class="adv-sub-rule"></span></div>
+            <div class="settings-card">
+              <div class="settings-card-header">
+                <div class="settings-card-icon"><i class="fas fa-language"></i></div>
+                <div class="settings-card-title">
+                  <h3 data-i18n="lang_choose">Language</h3>
+                  <p data-i18n="lang_auto_hint">FSB follows your Chrome language list. Pick a language here to override it.</p>
+                </div>
+              </div>
+              <div class="settings-card-content">
+                <select id="fsbUiLocaleSelect" class="form-select" translate="no" aria-describedby="fsbLocaleNote"></select>
+                <div class="setting-hint" id="fsbLocaleNote" data-i18n="lang_extensions_page">The name on chrome://extensions follows the browser language.</div>
+              </div>
+            </div>
+            <div class="adv-sub"><i class="fas fa-gauge-high"></i><span data-i18n="panel_0c2634ded4">Execution &amp; Limits</span><span class="adv-sub-rule"></span></div>
             <!-- Automation Limits Card -->
             <div class="settings-card">
               <div class="settings-card-header">
@@ -456,22 +469,22 @@
                   <i class="fas fa-repeat"></i>
                 </div>
                 <div class="settings-card-title">
-                  <h3>Automation Limits</h3>
-                  <p>Control task execution boundaries</p>
+                  <h3 data-i18n="panel_a429108292">Automation Limits</h3>
+                  <p data-i18n="panel_a6db09cd31">Control task execution boundaries</p>
                 </div>
               </div>
               <div class="settings-card-content">
                 <div class="setting-item">
                   <div class="setting-label">
-                    <span>Max Iterations</span>
+                    <span data-i18n="panel_7f9bd64777">Max Iterations</span>
                     <div class="fsb-stepper" data-min="50" data-max="500" data-step="10">
-                      <button type="button" class="fsb-stepper__btn fsb-stepper__btn--dec" aria-label="Decrease max iterations"><i class="fas fa-minus"></i></button>
+                      <button type="button" class="fsb-stepper__btn fsb-stepper__btn--dec" aria-label="Decrease max iterations" data-i18n-attr="aria-label:copy_9a679edbd3"><i class="fas fa-minus"></i></button>
                       <input type="text" inputmode="numeric" class="fsb-stepper__input" id="maxIterationsSlider" value="100">
-                      <button type="button" class="fsb-stepper__btn fsb-stepper__btn--inc" aria-label="Increase max iterations"><i class="fas fa-plus"></i></button>
+                      <button type="button" class="fsb-stepper__btn fsb-stepper__btn--inc" aria-label="Increase max iterations" data-i18n-attr="aria-label:copy_7ff25a6879"><i class="fas fa-plus"></i></button>
                     </div>
                   </div>
                   <input type="hidden" id="maxIterations" value="100">
-                  <div class="setting-hint">Prevents runaway automation loops</div>
+                  <div class="setting-hint" data-i18n="panel_efb8da8405">Prevents runaway automation loops</div>
                 </div>
               </div>
             </div>
@@ -483,42 +496,42 @@
                   <i class="fas fa-sitemap"></i>
                 </div>
                 <div class="settings-card-title">
-                  <h3>DOM Analysis</h3>
-                  <p>Optimize page element processing</p>
+                  <h3 data-i18n="panel_217a08135e">DOM Analysis</h3>
+                  <p data-i18n="panel_f57d34cd62">Optimize page element processing</p>
                 </div>
               </div>
               <div class="settings-card-content">
                 <div class="setting-item">
                   <div class="setting-label">
-                    <span>Element Limit</span>
+                    <span data-i18n="panel_f239d1c5e2">Element Limit</span>
                     <div class="fsb-stepper" data-min="500" data-max="5000" data-step="500">
-                      <button type="button" class="fsb-stepper__btn fsb-stepper__btn--dec" aria-label="Decrease element limit"><i class="fas fa-minus"></i></button>
+                      <button type="button" class="fsb-stepper__btn fsb-stepper__btn--dec" aria-label="Decrease element limit" data-i18n-attr="aria-label:copy_1da98f8734"><i class="fas fa-minus"></i></button>
                       <input type="text" inputmode="numeric" class="fsb-stepper__input" id="maxDOMElementsSlider" value="2000">
-                      <button type="button" class="fsb-stepper__btn fsb-stepper__btn--inc" aria-label="Increase element limit"><i class="fas fa-plus"></i></button>
+                      <button type="button" class="fsb-stepper__btn fsb-stepper__btn--inc" aria-label="Increase element limit" data-i18n-attr="aria-label:copy_396f15bbfe"><i class="fas fa-plus"></i></button>
                     </div>
                   </div>
                   <input type="hidden" id="maxDOMElements" value="2000">
-                  <div class="setting-hint">Balance between coverage and speed</div>
+                  <div class="setting-hint" data-i18n="panel_a0981cec31">Balance between coverage and speed</div>
                 </div>
                 <div class="setting-item">
                   <div class="setting-label">
-                    <span>Element Cache Size</span>
+                    <span data-i18n="panel_44551744d4">Element Cache Size</span>
                     <span class="setting-value-display" id="elementCacheSizeDisplay">200</span>
                   </div>
                   <select id="elementCacheSizePreset" class="form-select">
-                    <option value="50">50 (Minimal - simple pages)</option>
-                    <option value="100">100 (Light - standard pages)</option>
-                    <option value="200" selected>200 (Standard - recommended)</option>
-                    <option value="500">500 (Heavy - complex SPAs)</option>
-                    <option value="custom">Custom...</option>
+                    <option value="50" data-i18n="panel_bc63ff6878">50 (Minimal - simple pages)</option>
+                    <option value="100" data-i18n="panel_6e13b13acc">100 (Light - standard pages)</option>
+                    <option value="200" selected data-i18n="panel_f5e5f028c7">200 (Standard - recommended)</option>
+                    <option value="500" data-i18n="panel_51a4656787">500 (Heavy - complex SPAs)</option>
+                    <option value="custom" data-i18n="panel_b497c0b77d">Custom...</option>
                   </select>
                   <div class="fsb-stepper" id="elementCacheSizeCustomWrap" data-min="10" data-max="1000" data-step="10" style="display: none; margin-top: 8px;">
-                    <button type="button" class="fsb-stepper__btn fsb-stepper__btn--dec" aria-label="Decrease element cache size"><i class="fas fa-minus"></i></button>
+                    <button type="button" class="fsb-stepper__btn fsb-stepper__btn--dec" aria-label="Decrease element cache size" data-i18n-attr="aria-label:copy_8418bb6be8"><i class="fas fa-minus"></i></button>
                     <input type="text" inputmode="numeric" class="fsb-stepper__input" id="elementCacheSizeCustom" value="200">
-                    <button type="button" class="fsb-stepper__btn fsb-stepper__btn--inc" aria-label="Increase element cache size"><i class="fas fa-plus"></i></button>
+                    <button type="button" class="fsb-stepper__btn fsb-stepper__btn--inc" aria-label="Increase element cache size" data-i18n-attr="aria-label:copy_4d09f69eb1"><i class="fas fa-plus"></i></button>
                   </div>
                   <input type="hidden" id="elementCacheSize" value="200">
-                  <div class="setting-hint">Cached element lookups for faster repeated queries. Higher = faster on complex pages, more memory.</div>
+                  <div class="setting-hint" data-i18n="panel_3bba622285">Cached element lookups for faster repeated queries. Higher = faster on complex pages, more memory.</div>
                 </div>
               </div>
             </div>
@@ -530,36 +543,36 @@
                   <i class="fas fa-users"></i>
                 </div>
                 <div class="settings-card-title">
-                  <h3>Agent Concurrency</h3>
-                  <p>Maximum simultaneous agents</p>
+                  <h3 data-i18n="panel_964b6d2feb">Agent Concurrency</h3>
+                  <p data-i18n="panel_93bdf716dc">Maximum simultaneous agents</p>
                 </div>
               </div>
               <div class="settings-card-content">
                 <div class="setting-item">
                   <div class="setting-label">
-                    <span>Concurrency Cap</span>
+                    <span data-i18n="panel_05f46c29ed">Concurrency Cap</span>
                     <span class="setting-value-display" id="fsbAgentCapDisplay">8</span>
                     <div class="fsb-stepper" data-min="1" data-max="64" data-step="1">
-                      <button type="button" class="fsb-stepper__btn fsb-stepper__btn--dec" aria-label="Decrease agent concurrency cap"><i class="fas fa-minus"></i></button>
+                      <button type="button" class="fsb-stepper__btn fsb-stepper__btn--dec" aria-label="Decrease agent concurrency cap" data-i18n-attr="aria-label:copy_8afc6eb606"><i class="fas fa-minus"></i></button>
                       <input type="text" inputmode="numeric" class="fsb-stepper__input" id="fsbAgentCap" value="8">
-                      <button type="button" class="fsb-stepper__btn fsb-stepper__btn--inc" aria-label="Increase agent concurrency cap"><i class="fas fa-plus"></i></button>
+                      <button type="button" class="fsb-stepper__btn fsb-stepper__btn--inc" aria-label="Increase agent concurrency cap" data-i18n-attr="aria-label:copy_484366fe68"><i class="fas fa-plus"></i></button>
                     </div>
                   </div>
                   <button type="button" class="form-secondary-btn" id="fsbAgentCapReset" style="margin-top: 8px;">
-                    <i class="fas fa-rotate-left"></i> <span class="form-secondary-btn__label">Reset to recommended (8)</span>
+                    <i class="fas fa-rotate-left"></i> <span class="form-secondary-btn__label" data-i18n="panel_599bc7e4ae">Reset to recommended (8)</span>
                   </button>
-                  <div class="setting-hint">
+                  <div class="setting-hint" data-i18n="panel_f00611c47f">
                     Automatically recommended for your system. Range 1 to 64. Lower = predictable resource use; higher = more parallel agents. Lowering this value while active agents are running does not evict them; new claims past the new cap are rejected (grandfather behavior).
                   </div>
                   <!-- Phase 243 Plan 04 / UI-03: inline validation message for out-of-range input (D-06). -->
                   <div class="setting-hint" id="fsbAgentCapValidation"
-                       style="color: #ff6b6b; display: none; margin-top: 4px;">
+                       style="color: #ff6b6b; display: none; margin-top: 4px;" data-i18n="panel_26f41aac5c">
                     Must be between 1 and 64
                   </div>
                   <!-- Phase 243 Plan 04 / UI-03: live current-active counter (D-06). -->
                   <!-- Updated via chrome.storage.onChanged on session/fsbAgentRegistry + local/fsbAgentCap. -->
                   <!-- Excludes legacy:* synthesized agents (Pitfall 1 per 243-RESEARCH.md). -->
-                  <div class="setting-hint" id="fsbAgentCapCurrentActive" style="margin-top: 4px;">
+                  <div class="setting-hint" id="fsbAgentCapCurrentActive" style="margin-top: 4px;" data-i18n="panel_dd39c865d3">
                     0 of 8 active
                   </div>
                 </div>
@@ -573,38 +586,38 @@
                   <i class="fas fa-bolt"></i>
                 </div>
                 <div class="settings-card-title">
-                  <h3>Trigger Concurrency</h3>
-                  <p>Maximum simultaneous trigger watches</p>
+                  <h3 data-i18n="panel_8b2e97f4e5">Trigger Concurrency</h3>
+                  <p data-i18n="panel_1844d05c26">Maximum simultaneous trigger watches</p>
                 </div>
               </div>
               <div class="settings-card-content">
                 <div class="setting-item">
                   <div class="setting-label">
-                    <span>Concurrency Cap</span>
+                    <span data-i18n="panel_05f46c29ed">Concurrency Cap</span>
                     <div class="fsb-stepper" data-min="1" data-max="64" data-step="1">
-                      <button type="button" class="fsb-stepper__btn fsb-stepper__btn--dec" aria-label="Decrease trigger concurrency cap"><i class="fas fa-minus"></i></button>
+                      <button type="button" class="fsb-stepper__btn fsb-stepper__btn--dec" aria-label="Decrease trigger concurrency cap" data-i18n-attr="aria-label:copy_cffeed4c47"><i class="fas fa-minus"></i></button>
                       <input type="text" inputmode="numeric" class="fsb-stepper__input" id="fsbTriggerCap" value="8">
-                      <button type="button" class="fsb-stepper__btn fsb-stepper__btn--inc" aria-label="Increase trigger concurrency cap"><i class="fas fa-plus"></i></button>
+                      <button type="button" class="fsb-stepper__btn fsb-stepper__btn--inc" aria-label="Increase trigger concurrency cap" data-i18n-attr="aria-label:copy_3816b69dee"><i class="fas fa-plus"></i></button>
                     </div>
                   </div>
                   <button type="button" class="form-secondary-btn" id="fsbTriggerCapReset" style="margin-top: 8px;">
-                    <i class="fas fa-rotate-left"></i> Reset to default (8)
+                    <i class="fas fa-rotate-left"></i> <span data-i18n="panel_5aa4aff46c">Reset to default (8)</span>
                   </button>
-                  <div class="setting-hint">
+                  <div class="setting-hint" data-i18n="panel_bfd6b0808c">
                     Default 8. Range 1 to 64. Lower = predictable resource use; higher = more parallel watches. Lowering this value while triggers are active does not stop existing watches; new triggers past the new cap are rejected.
                   </div>
                   <div class="setting-hint" id="fsbTriggerCapValidation"
-                       style="color: #ff6b6b; display: none; margin-top: 4px;">
+                       style="color: #ff6b6b; display: none; margin-top: 4px;" data-i18n="panel_26f41aac5c">
                     Must be between 1 and 64
                   </div>
-                  <div class="setting-hint" id="fsbTriggerCapCurrentActive" style="margin-top: 4px;">
+                  <div class="setting-hint" id="fsbTriggerCapCurrentActive" style="margin-top: 4px;" data-i18n="panel_dd39c865d3">
                     0 of 8 active
                   </div>
                 </div>
               </div>
             </div>
 
-            <div class="adv-sub"><i class="fas fa-wand-magic-sparkles"></i><span>Automation Behavior</span><span class="adv-sub-rule"></span></div>
+            <div class="adv-sub"><i class="fas fa-wand-magic-sparkles"></i><span data-i18n="panel_4f6e909317">Automation Behavior</span><span class="adv-sub-rule"></span></div>
             <!-- Phase 245 D-07: Action Change Reports global toggle (default ON) -->
             <div class="settings-card">
               <div class="settings-card-header">
@@ -612,8 +625,8 @@
                   <i class="fas fa-clipboard-list"></i>
                 </div>
                 <div class="settings-card-title">
-                  <h3>Action Change Reports</h3>
-                  <p>Inline diff returned with each action</p>
+                  <h3 data-i18n="panel_87fb620509">Action Change Reports</h3>
+                  <p data-i18n="panel_8807532414">Inline diff returned with each action</p>
                 </div>
               </div>
               <div class="settings-card-content">
@@ -624,8 +637,8 @@
                       <span class="toggle-thumb"></span>
                     </span>
                     <div class="toggle-content">
-                      <span class="toggle-label">Return action change reports (recommended)</span>
-                      <span class="toggle-desc">Returns a compact diff describing what each action changed, so the AI doesn't need to re-read the page. Default on.</span>
+                      <span class="toggle-label" data-i18n="panel_5d2f08be69">Return action change reports (recommended)</span>
+                      <span class="toggle-desc" data-i18n="panel_552aa7152b">Returns a compact diff describing what each action changed, so the AI doesn't need to re-read the page. Default on.</span>
                     </div>
                   </label>
                 </div>
@@ -638,8 +651,8 @@
                   <i class="fas fa-clock-rotate-left"></i>
                 </div>
                 <div class="settings-card-title">
-                  <h3>MCP Session Replay</h3>
-                  <p>Local, exact-fidelity history for MCP agent actions</p>
+                  <h3 data-i18n="panel_814f4c658e">MCP Session Replay</h3>
+                  <p data-i18n="panel_d93120e9c3">Local, exact-fidelity history for MCP agent actions</p>
                 </div>
               </div>
               <div class="settings-card-content">
@@ -650,21 +663,21 @@
                       <span class="toggle-thumb"></span>
                     </span>
                     <div class="toggle-content">
-                      <span class="toggle-label">Record MCP sessions for replay</span>
-                      <span class="toggle-desc">Stores replay data locally while redacting secret-bearing fields and sensitive inputs. Ordinary typed text and action results remain available for replay. MCP clients can save a local task memory by providing a secret-free completion, partial, or failure summary; no separate AI-provider call is made. Turning this off stops future MCP recording and saves any open recording. Existing MCP replay history stores up to the 50 most recent sessions, and no session is kept longer than the configured retention period. Autopilot history is unaffected.</span>
+                      <span class="toggle-label" data-i18n="panel_e3d0d26ac8">Record MCP sessions for replay</span>
+                      <span class="toggle-desc" data-i18n="panel_53e5555e9a">Stores replay data locally while redacting secret-bearing fields and sensitive inputs. Ordinary typed text and action results remain available for replay. MCP clients can save a local task memory by providing a secret-free completion, partial, or failure summary; no separate AI-provider call is made. Turning this off stops future MCP recording and saves any open recording. Existing MCP replay history stores up to the 50 most recent sessions, and no session is kept longer than the configured retention period. Autopilot history is unaffected.</span>
                     </div>
                   </label>
                 </div>
                 <div class="setting-item">
                   <div class="setting-label">
-                    <span>MCP replay retention (days)</span>
+                    <span data-i18n="panel_8c338dcb22">MCP replay retention (days)</span>
                     <div class="fsb-stepper" data-min="1" data-max="365" data-step="1">
-                      <button type="button" class="fsb-stepper__btn fsb-stepper__btn--dec" aria-label="Decrease MCP replay retention"><i class="fas fa-minus"></i></button>
-                      <input type="text" inputmode="numeric" class="fsb-stepper__input" id="fsbMcpSessionRetentionDays" value="30" aria-label="MCP replay retention days">
-                      <button type="button" class="fsb-stepper__btn fsb-stepper__btn--inc" aria-label="Increase MCP replay retention"><i class="fas fa-plus"></i></button>
+                      <button type="button" class="fsb-stepper__btn fsb-stepper__btn--dec" aria-label="Decrease MCP replay retention" data-i18n-attr="aria-label:copy_2a1df07657"><i class="fas fa-minus"></i></button>
+                      <input type="text" inputmode="numeric" class="fsb-stepper__input" id="fsbMcpSessionRetentionDays" value="30" aria-label="MCP replay retention days" data-i18n-attr="aria-label:copy_a346fdf291">
+                      <button type="button" class="fsb-stepper__btn fsb-stepper__btn--inc" aria-label="Increase MCP replay retention" data-i18n-attr="aria-label:copy_71c20adba6"><i class="fas fa-plus"></i></button>
                     </div>
                   </div>
-                  <div class="setting-hint">Default 30. Range 1 to 365 days. This automatically deletes expired MCP replay sessions only; Autopilot history is never pruned by this setting.</div>
+                  <div class="setting-hint" data-i18n="panel_bb0522a484">Default 30. Range 1 to 365 days. This automatically deletes expired MCP replay sessions only; Autopilot history is never pruned by this setting.</div>
                 </div>
               </div>
             </div>
@@ -676,8 +689,8 @@
                   <i class="fas fa-bolt"></i>
                 </div>
                 <div class="settings-card-title">
-                  <h3>Performance Optimizations</h3>
-                  <p>Enable smart features to improve speed and accuracy</p>
+                  <h3 data-i18n="panel_a3a33e657a">Performance Optimizations</h3>
+                  <p data-i18n="panel_318ba4fefb">Enable smart features to improve speed and accuracy</p>
                 </div>
               </div>
               <div class="settings-card-content">
@@ -688,8 +701,8 @@
                       <span class="toggle-thumb"></span>
                     </span>
                     <div class="toggle-content">
-                      <span class="toggle-label">Delta Diffing</span>
-                      <span class="toggle-desc">Send only DOM changes after first scan (70-90% context reduction)</span>
+                      <span class="toggle-label" data-i18n="panel_718ec50194">Delta Diffing</span>
+                      <span class="toggle-desc" data-i18n="panel_4df3ccd4f7">Send only DOM changes after first scan (70-90% context reduction)</span>
                     </div>
                   </label>
 
@@ -699,8 +712,8 @@
                       <span class="toggle-thumb"></span>
                     </span>
                     <div class="toggle-content">
-                      <span class="toggle-label">Viewport Priority</span>
-                      <span class="toggle-desc">Focus on visible elements for faster, more relevant results</span>
+                      <span class="toggle-label" data-i18n="panel_386c10cfbb">Viewport Priority</span>
+                      <span class="toggle-desc" data-i18n="panel_55b7c33a00">Focus on visible elements for faster, more relevant results</span>
                     </div>
                   </label>
 
@@ -710,8 +723,8 @@
                       <span class="toggle-thumb"></span>
                     </span>
                     <div class="toggle-content">
-                      <span class="toggle-label">AI Site Map Refinement</span>
-                      <span class="toggle-desc">Automatically refine site maps with AI for navigation strategies and workflow detection</span>
+                      <span class="toggle-label" data-i18n="panel_56cb122532">AI Site Map Refinement</span>
+                      <span class="toggle-desc" data-i18n="panel_bbabb56b4f">Automatically refine site maps with AI for navigation strategies and workflow detection</span>
                     </div>
                   </label>
 
@@ -726,8 +739,8 @@
                   <i class="fas fa-eye"></i>
                 </div>
                 <div class="settings-card-title">
-                  <h3>Visual Feedback</h3>
-                  <p>Control visual indicators during automation</p>
+                  <h3 data-i18n="panel_6a63ec792f">Visual Feedback</h3>
+                  <p data-i18n="panel_d9db4fd5a6">Control visual indicators during automation</p>
                 </div>
               </div>
               <div class="settings-card-content">
@@ -738,8 +751,8 @@
                       <span class="toggle-thumb"></span>
                     </span>
                     <div class="toggle-content">
-                      <span class="toggle-label">Animated Action Highlights</span>
-                      <span class="toggle-desc">Show a pulsing glow around elements while actions are being performed</span>
+                      <span class="toggle-label" data-i18n="panel_882726c86c">Animated Action Highlights</span>
+                      <span class="toggle-desc" data-i18n="panel_525c3926bb">Show a pulsing glow around elements while actions are being performed</span>
                     </div>
                   </label>
                   <label class="modern-toggle">
@@ -748,23 +761,23 @@
                       <span class="toggle-thumb"></span>
                     </span>
                     <div class="toggle-content">
-                      <span class="toggle-label">Sidepanel Step Progress</span>
-                      <span class="toggle-desc">Show action steps in the side panel during automation</span>
+                      <span class="toggle-label" data-i18n="panel_b8c545e36f">Sidepanel Step Progress</span>
+                      <span class="toggle-desc" data-i18n="panel_cd7487b136">Show action steps in the side panel during automation</span>
                     </div>
                   </label>
                 </div>
               </div>
             </div>
 
-            <div class="adv-sub"><i class="fas fa-user-shield"></i><span>Privacy &amp; Developer</span><span class="adv-sub-rule"></span></div>
+            <div class="adv-sub"><i class="fas fa-user-shield"></i><span data-i18n="panel_915c0ef81c">Privacy &amp; Developer</span><span class="adv-sub-rule"></span></div>
             <div class="settings-card full-width" id="voiceInputSettings">
               <div class="settings-card-header">
                 <div class="settings-card-icon">
                   <i class="fas fa-microphone"></i>
                 </div>
                 <div class="settings-card-title">
-                  <h3>Voice Input</h3>
-                  <p>Control microphone input in the FSB side panel</p>
+                  <h3 data-i18n="panel_02d7d5cfae">Voice Input</h3>
+                  <p data-i18n="panel_936f490e8e">Control microphone input in the FSB side panel</p>
                 </div>
               </div>
               <div class="settings-card-content">
@@ -775,29 +788,29 @@
                       <span class="toggle-thumb"></span>
                     </span>
                     <div class="toggle-content">
-                      <span class="toggle-label">Enable microphone voice input</span>
-                      <span class="toggle-desc">Show the microphone in the side panel and allow browser speech recognition or OpenAI Whisper. Default on.</span>
+                      <span class="toggle-label" data-i18n="panel_92f7b96921">Enable microphone voice input</span>
+                      <span class="toggle-desc" data-i18n="panel_77f6039567">Show the microphone in the side panel and allow browser speech recognition or OpenAI Whisper. Default on.</span>
                     </div>
                   </label>
                 </div>
                 <div class="voice-permission-panel">
                   <div class="voice-permission-copy">
                     <span class="voice-permission-status" id="voiceInputPermissionStatus"
-                          data-state="checking" role="status" aria-live="polite">Checking microphone permission…</span>
-                    <span class="setting-hint" id="voiceInputPermissionDetail">Chrome manages the extension-wide microphone grant.</span>
+                          data-state="checking" role="status" aria-live="polite" data-i18n="panel_e007c1f5fd">Checking microphone permission…</span>
+                    <span class="setting-hint" id="voiceInputPermissionDetail" data-i18n="panel_7df7702416">Chrome manages the extension-wide microphone grant.</span>
                   </div>
                   <div class="voice-permission-actions">
                     <button type="button" class="form-secondary-btn" id="voiceInputPermissionAction" hidden>
                       <i class="fas fa-microphone"></i>
-                      <span>Enable microphone</span>
+                      <span data-i18n="panel_5e09a0b0eb">Enable microphone</span>
                     </button>
                     <button type="button" class="form-secondary-btn" id="voiceInputChromeSettings" hidden>
                       <i class="fas fa-gear"></i>
-                      <span>Open Chrome settings</span>
+                      <span data-i18n="panel_2c0acdeddf">Open Chrome settings</span>
                     </button>
                   </div>
                 </div>
-                <div class="setting-hint voice-permission-note">
+                <div class="setting-hint voice-permission-note" data-i18n="panel_509f0b9d50">
                   Turning voice input off stops FSB from using your microphone, but does not revoke Chrome's saved permission.
                 </div>
               </div>
@@ -810,8 +823,8 @@
                   <i class="fas fa-code"></i>
                 </div>
                 <div class="settings-card-title">
-                  <h3>Developer Options</h3>
-                  <p>Tools for debugging and troubleshooting</p>
+                  <h3 data-i18n="panel_d7de9cfa12">Developer Options</h3>
+                  <p data-i18n="panel_fef2fc10ae">Tools for debugging and troubleshooting</p>
                 </div>
               </div>
               <div class="settings-card-content">
@@ -822,8 +835,8 @@
                       <span class="toggle-thumb"></span>
                     </span>
                     <div class="toggle-content">
-                      <span class="toggle-label">Debug Mode</span>
-                      <span class="toggle-desc">Enable verbose console logging for troubleshooting automation issues</span>
+                      <span class="toggle-label" data-i18n="panel_5f75368293">Debug Mode</span>
+                      <span class="toggle-desc" data-i18n="panel_64b2d259ae">Enable verbose console logging for troubleshooting automation issues</span>
                     </div>
                   </label>
                 </div>
@@ -839,26 +852,26 @@
                   <i class="fas fa-shield-alt"></i>
                 </div>
                 <div class="settings-card-title">
-                  <h3>Privacy &amp; Telemetry</h3>
-                  <p>Anonymous usage data</p>
+                  <h3 data-i18n="panel_38d35a351e">Privacy &amp; Telemetry</h3>
+                  <p data-i18n="panel_21bf1bebea">Anonymous usage data</p>
                 </div>
               </div>
               <div class="settings-card-content">
                 <div class="setting-item">
                   <label class="modern-toggle">
                     <input type="checkbox" id="fsbTelemetryOptOut" checked
-                           aria-label="Anonymous usage data is being sent. Click to stop.">
+                           aria-label="Anonymous usage data is being sent. Click to stop." data-i18n-attr="aria-label:copy_f38984cf15">
                     <span class="toggle-track">
                       <span class="toggle-thumb"></span>
                     </span>
                     <div class="toggle-content">
-                      <span class="toggle-label">Send anonymous usage data</span>
-                      <span class="toggle-desc">Tokens used, MCP client name, active agent count. No URLs, prompts, or DOM.</span>
+                      <span class="toggle-label" data-i18n="panel_451d787c00">Send anonymous usage data</span>
+                      <span class="toggle-desc" data-i18n="panel_57f9a109d4">Tokens used, MCP client name, active agent count. No URLs, prompts, or DOM.</span>
                     </div>
                   </label>
                   <a class="setting-hint" href="https://full-selfbrowsing.com/privacy#telemetry-disclosure"
                      target="_blank" rel="noopener noreferrer"
-                     style="display:block; margin-top:8px;">Read full policy &rarr;</a>
+                     style="display:block; margin-top:8px;" data-i18n="panel_9ec9376910">Read full policy &rarr;</a>
                 </div>
               </div>
             </div>
@@ -870,12 +883,12 @@
         <section class="content-section" id="sync">
           <div class="section-header sync-section-header">
             <div class="section-header-text">
-              <h2>Sync</h2>
-              <p>Pair this extension with the FSB dashboard for remote control and result storage</p>
+              <h2 data-i18n="panel_8d261a372f">Sync</h2>
+              <p data-i18n="panel_76e917ee87">Pair this extension with the FSB dashboard for remote control and result storage</p>
             </div>
             <span class="sync-status-pill" id="syncStatusPill" role="status" aria-live="polite" aria-atomic="true" data-state="disconnected">
               <span class="dot"></span>
-              <span class="label">Disconnected</span>
+              <span class="label" data-i18n="panel_04dfac3671">Disconnected</span>
             </span>
           </div>
 
@@ -886,41 +899,41 @@
                 <i class="fas fa-server"></i>
               </div>
               <div class="settings-card-title">
-                <h3>Server Sync</h3>
-                <p>Connect to FSB server for result storage and dashboard access</p>
+                <h3 data-i18n="panel_acf2db1614">Server Sync</h3>
+                <p data-i18n="panel_c11de3bb2e">Connect to FSB server for result storage and dashboard access</p>
               </div>
             </div>
             <div class="settings-card-content">
               <input type="hidden" id="serverUrl">
               <div class="form-group">
-                <label for="serverHashKey">Hash Key</label>
+                <label for="serverHashKey" data-i18n="panel_609bbbdf07">Hash Key</label>
                 <div class="sync-key-row">
-                  <input type="text" id="serverHashKey" class="form-input sync-key-input" placeholder="Your server hash key" readonly>
-                  <button class="control-btn" id="btnGenerateHashKey"><i class="fas fa-rotate"></i> Generate</button>
-                  <button class="control-btn sync-copy-btn" id="btnCopyHashKey" title="Copy hash key" aria-label="Copy hash key"><i class="fas fa-copy"></i></button>
+                  <input type="text" id="serverHashKey" class="form-input sync-key-input" placeholder="Your server hash key" readonly data-i18n-attr="placeholder:copy_81649d0543">
+                  <button class="control-btn" id="btnGenerateHashKey"><i class="fas fa-rotate"></i> <span data-i18n="panel_49e49bb440">Generate</span></button>
+                  <button class="control-btn sync-copy-btn" id="btnCopyHashKey" title="Copy hash key" aria-label="Copy hash key" data-i18n-attr="title:copy_e4cdf160f5,aria-label:copy_e4cdf160f5"><i class="fas fa-copy"></i></button>
                 </div>
-                <div class="form-help">Generate a key, then pair the dashboard to link this browser to the FSB server.</div>
+                <div class="form-help" data-i18n="panel_097b5fa7f6">Generate a key, then pair the dashboard to link this browser to the FSB server.</div>
               </div>
               <div class="sync-action-row">
                 <button class="control-btn accent" id="btnPairDashboard">
                   <i class="fas fa-qrcode"></i>
-                  Pair Dashboard
+                  <span data-i18n="panel_534803768c">Pair Dashboard</span>
                 </button>
                 <button class="control-btn" id="btnTestConnection">
                   <i class="fas fa-plug"></i>
-                  Test Connection
+                  <span data-i18n="panel_c02977b07e">Test Connection</span>
                 </button>
                 <span class="connection-status" id="syncConnectionStatus"></span>
               </div>
               <div id="pairingQROverlay" class="pairing-qr-overlay" style="display: none;">
                 <div class="pairing-qr-popup">
                   <div class="pairing-qr-popup-header">
-                    <span>Scan to Pair</span>
+                    <span data-i18n="panel_9a177de63c">Scan to Pair</span>
                     <button class="pairing-qr-close" id="btnCancelPairing">&times;</button>
                   </div>
                   <div id="pairingQRCode" class="pairing-qr-code"></div>
                   <div class="pairing-qr-countdown">
-                    <span id="pairingCountdown">60s</span> remaining
+                    <span id="pairingCountdown">60s</span> <span data-i18n="panel_43e3ece73f">remaining</span>
                   </div>
                   <div id="pairingQRMessage" class="pairing-qr-message"></div>
                 </div>
@@ -930,48 +943,31 @@
 
           <!-- Background agents: inline informational note (was a card) -->
           <div class="sync-deprecation">
-            <div class="sync-deprecation-head"><i class="fas fa-flag-checkered"></i> Background agents have left the building</div>
-            <p class="sync-deprecation-body">FSB stays focused on precise single-attempt browser execution. Scheduled and recurring task work is better served by tools built for it: <strong>OpenClaw</strong> for an open-source agent loop, and <strong>Claude Routines</strong> for managed long-running automations. Pick whichever fits the way you work.</p>
+            <div class="sync-deprecation-head"><i class="fas fa-flag-checkered"></i> <span data-i18n="panel_75d0625c55">Background agents have left the building</span></div>
+            <p class="sync-deprecation-body"><span data-i18n="panel_d17d0cfd98">FSB stays focused on precise single-attempt browser execution. Scheduled and recurring task work is better served by tools built for it:</span> <strong>OpenClaw</strong> <span data-i18n="panel_5a694f4532">for an open-source agent loop, and</span> <strong>Claude Routines</strong> <span data-i18n="panel_6e34781c2f">for managed long-running automations. Pick whichever fits the way you work.</span></p>
             <div class="sync-deprecation-links">
-              <a href="https://github.com/openclaw/openclaw" target="_blank" rel="noopener noreferrer">Try OpenClaw <i class="fas fa-arrow-up-right-from-square"></i></a>
-              <a href="https://www.anthropic.com/claude/routines" target="_blank" rel="noopener noreferrer">Try Claude Routines <i class="fas fa-arrow-up-right-from-square"></i></a>
+              <a href="https://github.com/openclaw/openclaw" target="_blank" rel="noopener noreferrer"><span data-i18n="panel_e76c360683">Try OpenClaw</span> <i class="fas fa-arrow-up-right-from-square"></i></a>
+              <a href="https://www.anthropic.com/claude/routines" target="_blank" rel="noopener noreferrer"><span data-i18n="panel_1a58d9154d">Try Claude Routines</span> <i class="fas fa-arrow-up-right-from-square"></i></a>
             </div>
-            <small class="sync-deprecation-foot">Retired in v0.9.45rc1 · April 2026</small>
+            <small class="sync-deprecation-foot" data-i18n="panel_582ba53e9e">Retired in v0.9.45rc1 · April 2026</small>
           </div>
-
-          <!-- SUNSET NOTICE (one-time names list per AGENTS-03 / D-07..D-12) -->
-          <!-- ui/options.js toggles `hidden` based on bgAgents non-empty AND fsb_sunset_notice_dismissed != true -->
-          <aside id="fsbSunsetNotice" class="settings-card full-width fsb-sunset-notice" hidden>
-            <div class="settings-card-header">
-              <div class="settings-card-title">
-                <h3>Your previous agents</h3>
-                <p>Names of agents that lived on this profile, kept here so nothing feels lost. Definitions remain in chrome.storage.local['bgAgents'] (untouched).</p>
-              </div>
-            </div>
-            <div class="settings-card-content">
-              <ul id="fsbSunsetNoticeNames" class="fsb-sunset-notice-list" aria-label="Previously created background agents"></ul>
-              <button type="button" id="fsbSunsetNoticeDismiss" class="control-btn fsb-sunset-notice-dismiss">
-                Got it
-              </button>
-            </div>
-          </aside>
         </section>
 
         <!-- Memory Section -->
         <section class="content-section" id="memory">
           <div class="section-header" style="display: flex; justify-content: space-between; align-items: flex-start;">
             <div>
-              <h2>Memory</h2>
-              <p>Long-term memory learned from past automation sessions</p>
+              <h2 data-i18n="panel_c3963aedaa">Memory</h2>
+              <p data-i18n="panel_9f83a0b7bf">Long-term memory learned from past automation sessions</p>
             </div>
             <div class="auto-analyze-toggle">
-              <label class="modern-toggle compact" title="When enabled, new memories are automatically analyzed by AI for deeper insights">
+              <label class="modern-toggle compact" title="When enabled, new memories are automatically analyzed by AI for deeper insights" data-i18n-attr="title:copy_8c16fe2070">
                 <input type="checkbox" id="autoAnalyzeToggle" checked>
                 <span class="toggle-track">
                   <span class="toggle-thumb"></span>
                 </span>
                 <div class="toggle-content">
-                  <span class="toggle-label">Auto-Analyze</span>
+                  <span class="toggle-label" data-i18n="panel_76a6bcf157">Auto-Analyze</span>
                 </div>
               </label>
             </div>
@@ -981,39 +977,39 @@
           <div class="agent-stats-bar" id="memoryStatsBar">
             <div class="agent-stat">
               <span class="agent-stat-value" id="memStatTotal">0</span>
-              <span class="agent-stat-label">Total</span>
+              <span class="agent-stat-label" data-i18n="panel_c9b3c38247">Total</span>
             </div>
             <div class="agent-stat">
               <span class="agent-stat-value" id="memStatEpisodic">0</span>
-              <span class="agent-stat-label">Episodic</span>
+              <span class="agent-stat-label" data-i18n="panel_50d0c5511b">Episodic</span>
             </div>
             <div class="agent-stat">
               <span class="agent-stat-value" id="memStatSemantic">0</span>
-              <span class="agent-stat-label">Semantic</span>
+              <span class="agent-stat-label" data-i18n="panel_9c11c99c77">Semantic</span>
             </div>
             <div class="agent-stat">
               <span class="agent-stat-value" id="memStatProcedural">0</span>
-              <span class="agent-stat-label">Procedural</span>
+              <span class="agent-stat-label" data-i18n="panel_2e3e91ffbd">Procedural</span>
             </div>
             <div class="agent-stat">
               <span class="agent-stat-value" id="memStatStorage">0 KB</span>
-              <span class="agent-stat-label">Storage</span>
+              <span class="agent-stat-label" data-i18n="panel_a69c4dece1">Storage</span>
             </div>
             <div class="agent-stat">
               <span class="agent-stat-value" id="memStatUtilization">0%</span>
-              <span class="agent-stat-label">Capacity</span>
+              <span class="agent-stat-label" data-i18n="panel_ae65d09655">Capacity</span>
             </div>
             <div class="agent-stat">
               <span class="agent-stat-value" id="memCostTotal">$0.00</span>
-              <span class="agent-stat-label">Cost (30d)</span>
+              <span class="agent-stat-label" data-i18n="panel_ee6cfab445">Cost (30d)</span>
             </div>
             <div class="agent-stat">
               <span class="agent-stat-value" id="memCostRequests">0</span>
-              <span class="agent-stat-label">Requests</span>
+              <span class="agent-stat-label" data-i18n="panel_ada27592c9">Requests</span>
             </div>
             <div class="agent-stat">
               <span class="agent-stat-value" id="memCostTokens">0</span>
-              <span class="agent-stat-label">Tokens</span>
+              <span class="agent-stat-label" data-i18n="panel_a039dfb962">Tokens</span>
             </div>
           </div>
 
@@ -1024,17 +1020,17 @@
               <input type="search" id="memorySearchInput" placeholder="Search memories..." class="form-input">
             </div>
             <select id="memoryTypeFilter" class="form-select small">
-              <option value="">All Types</option>
-              <option value="episodic">Episodic</option>
-              <option value="semantic">Semantic</option>
-              <option value="procedural">Procedural</option>
-              <option value="task">Task</option>
+              <option value="" data-i18n="panel_bc01325482">All Types</option>
+              <option value="episodic" data-i18n="panel_50d0c5511b">Episodic</option>
+              <option value="semantic" data-i18n="panel_9c11c99c77">Semantic</option>
+              <option value="procedural" data-i18n="panel_2e3e91ffbd">Procedural</option>
+              <option value="task" data-i18n="panel_4bc74b2135">Task</option>
             </select>
-            <button class="control-btn" id="btnExportMemories" title="Export memories as JSON">
-              <i class="fas fa-download"></i> Export
+            <button class="control-btn" id="btnExportMemories" title="Export memories as JSON" data-i18n-attr="title:copy_0a221bc876">
+              <i class="fas fa-download"></i> <span data-i18n="panel_3664895579">Export</span>
             </button>
-            <button class="control-btn" id="btnImportMemories" title="Import memories from JSON">
-              <i class="fas fa-upload"></i> Import
+            <button class="control-btn" id="btnImportMemories" title="Import memories from JSON" data-i18n-attr="title:copy_70e6248096">
+              <i class="fas fa-upload"></i> <span data-i18n="panel_2cff9baabf">Import</span>
             </button>
             <div class="memory-overflow-menu">
               <button class="control-btn" id="btnMemoryOverflow" title="More actions">
@@ -1042,10 +1038,10 @@
               </button>
               <div class="overflow-dropdown" id="memoryOverflowDropdown">
                 <button class="overflow-item" id="btnConsolidateMemories">
-                  <i class="fas fa-compress-arrows-alt"></i> Consolidate
+                  <i class="fas fa-compress-arrows-alt"></i> <span data-i18n="panel_2f36130ebc">Consolidate</span>
                 </button>
                 <button class="overflow-item danger" id="btnClearMemories">
-                  <i class="fas fa-trash"></i> Clear All
+                  <i class="fas fa-trash"></i> <span data-i18n="panel_ddceb7adfd">Clear All</span>
                 </button>
               </div>
             </div>
@@ -1057,7 +1053,7 @@
             <div class="session-list" id="memoryList">
               <div class="session-empty-state" id="memoryEmptyState">
                 <i class="fas fa-brain"></i>
-                <p>No memories stored yet. Memories are automatically extracted from completed automation sessions.</p>
+                <p data-i18n="panel_96452046b5">No memories stored yet. Memories are automatically extracted from completed automation sessions.</p>
               </div>
             </div>
           </div>
@@ -1065,8 +1061,8 @@
           <!-- Reconnaissance -->
           <div class="explorer-section" style="margin-top: 2rem;">
             <div class="section-header">
-              <h3>Reconnaissance</h3>
-              <p>Crawl a website to map its interactive structure, navigation, and selectors</p>
+              <h3 data-i18n="panel_ba7fab765c">Reconnaissance</h3>
+              <p data-i18n="panel_cf0e1ec867">Crawl a website to map its interactive structure, navigation, and selectors</p>
             </div>
 
             <div class="explorer-card">
@@ -1077,17 +1073,17 @@
                 </div>
                 <button class="control-btn explorer-go-btn" id="explorerGoBtn">
                   <i class="fas fa-search"></i>
-                  Go
+                  <span data-i18n="panel_6cc8519b91">Go</span>
                 </button>
                 <button class="control-btn explorer-stop-all-btn" id="explorerStopAllBtn" style="display: none;">
                   <i class="fas fa-stop"></i>
-                  Stop All
+                  <span data-i18n="panel_d3f7409ad7">Stop All</span>
                 </button>
               </div>
 
               <div class="explorer-options-row">
                 <label class="explorer-option">
-                  <span>Max Depth</span>
+                  <span data-i18n="panel_ad2f160b7b">Max Depth</span>
                   <select id="explorerMaxDepth" class="form-select small">
                     <option value="1">1</option>
                     <option value="2">2</option>
@@ -1097,7 +1093,7 @@
                   </select>
                 </label>
                 <label class="explorer-option">
-                  <span>Max Pages</span>
+                  <span data-i18n="panel_53e4d8efcc">Max Pages</span>
                   <select id="explorerMaxPages" class="form-select small">
                     <option value="5">5</option>
                     <option value="10">10</option>
@@ -1116,18 +1112,18 @@
           <!-- Research Results -->
           <div class="research-section" style="margin-top: 2rem;">
             <div class="section-header">
-              <h3>Research Results</h3>
-              <p>View and download site reconnaissance data, or save as site map memories</p>
+              <h3 data-i18n="panel_8ccc2c0e78">Research Results</h3>
+              <p data-i18n="panel_452d842e33">View and download site reconnaissance data, or save as site map memories</p>
             </div>
 
             <div class="session-controls">
               <button class="control-btn" id="refreshResearch">
                 <i class="fas fa-sync-alt"></i>
-                Refresh
+                <span data-i18n="panel_0e91610117">Refresh</span>
               </button>
               <button class="control-btn" id="clearAllResearch">
                 <i class="fas fa-trash"></i>
-                Clear All
+                <span data-i18n="panel_ddceb7adfd">Clear All</span>
               </button>
             </div>
 
@@ -1135,7 +1131,7 @@
               <div class="session-list" id="researchList">
                 <div class="session-empty-state">
                   <i class="fas fa-flask"></i>
-                  <p>No research results yet. Use Reconnaissance above to crawl a website.</p>
+                  <p data-i18n="panel_df63a2da5f">No research results yet. Use Reconnaissance above to crawl a website.</p>
                 </div>
               </div>
               <div class="research-pagination" id="researchPagination"></div>
@@ -1147,12 +1143,12 @@
             <div class="site-guides-header" style="display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
               <h3>
                 <i class="fas fa-brain"></i>
-                Consolidated Memory
+                <span data-i18n="panel_30c19209ac">Consolidated Memory</span>
               </h3>
               <a class="sitemap-link" href="https://full-selfbrowsing.com/sitemaps" target="_blank" rel="noopener noreferrer">
                 <span class="sitemap-link-main">
-                  <span class="sitemap-link-title">Site Maps</span>
-                  <span class="sitemap-link-sub">Community</span>
+                  <span class="sitemap-link-title" data-i18n="panel_ba41142e62">Site Maps</span>
+                  <span class="sitemap-link-sub" data-i18n="panel_bb501d7877">Community</span>
                 </span>
                 <i class="fas fa-arrow-up-right-from-square"></i>
               </a>
@@ -1164,8 +1160,8 @@
                 <input type="search" id="knowledgeGraphSearch" placeholder="Highlight nodes..." class="form-input">
               </div>
               <div class="site-graph-detail-toggle" id="knowledgeDetailToggle">
-                <button class="detail-btn active" data-level="simple">Overview</button>
-                <button class="detail-btn" data-level="full">Expanded</button>
+                <button class="detail-btn active" data-level="simple" data-i18n="panel_d4b1ea5708">Overview</button>
+                <button class="detail-btn" data-level="full" data-i18n="panel_e72d5d8d0b">Expanded</button>
               </div>
             </div>
 
@@ -1174,23 +1170,23 @@
             </div>
 
             <div class="knowledge-graph-legend" id="knowledgeGraphLegend">
-              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #4285f4;"></span> E-Commerce &amp; Shopping</span>
-              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #34a853;"></span> Social Media</span>
-              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #ea4335;"></span> Finance &amp; Trading</span>
-              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #fbbc04;"></span> Travel &amp; Booking</span>
-              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #8b5cf6;"></span> Email Platforms</span>
-              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #06b6d4;"></span> Coding Platforms</span>
-              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #ec4899;"></span> Career &amp; Job Search</span>
-              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #f97316;"></span> Gaming Platforms</span>
-              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #14b8a6;"></span> Productivity Tools</span>
-              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #a855f7;"></span> Design &amp; Whiteboard</span>
-              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #0891b2;"></span> Games</span>
-              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #d946ef;"></span> Media</span>
-              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #4285f4;"></span> Music</span>
-              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #34a853;"></span> News</span>
-              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #ea4335;"></span> Reference</span>
-              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #fbbc04;"></span> Sports</span>
-              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #8b5cf6;"></span> Utilities</span>
+              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #4285f4;"></span> <span data-i18n="panel_73cde2ba51">E-Commerce &amp; Shopping</span></span>
+              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #34a853;"></span> <span data-i18n="panel_8dfdbc2ef4">Social Media</span></span>
+              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #ea4335;"></span> <span data-i18n="panel_6c335e2a76">Finance &amp; Trading</span></span>
+              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #fbbc04;"></span> <span data-i18n="panel_822c302ddc">Travel &amp; Booking</span></span>
+              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #8b5cf6;"></span> <span data-i18n="panel_7b1b7b315b">Email Platforms</span></span>
+              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #06b6d4;"></span> <span data-i18n="panel_cbb811ada2">Coding Platforms</span></span>
+              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #ec4899;"></span> <span data-i18n="panel_c47f423a0a">Career &amp; Job Search</span></span>
+              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #f97316;"></span> <span data-i18n="panel_08cf7301b0">Gaming Platforms</span></span>
+              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #14b8a6;"></span> <span data-i18n="panel_2d995d5860">Productivity Tools</span></span>
+              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #a855f7;"></span> <span data-i18n="panel_95bfe584eb">Design &amp; Whiteboard</span></span>
+              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #0891b2;"></span> <span data-i18n="panel_d9dae78103">Games</span></span>
+              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #d946ef;"></span> <span data-i18n="panel_d357175cfe">Media</span></span>
+              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #4285f4;"></span> <span data-i18n="panel_6eb00b4b26">Music</span></span>
+              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #34a853;"></span> <span data-i18n="panel_69752f2313">News</span></span>
+              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #ea4335;"></span> <span data-i18n="panel_71bf90935f">Reference</span></span>
+              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #fbbc04;"></span> <span data-i18n="panel_9b1f5daf0a">Sports</span></span>
+              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #8b5cf6;"></span> <span data-i18n="panel_0a035c2b85">Utilities</span></span>
             </div>
           </div>
 
@@ -1199,8 +1195,8 @@
         <!-- Logs Section -->
         <section class="content-section" id="logs">
           <div class="section-header">
-            <h2>Logs & Debugging</h2>
-            <p>Monitor automation activity and troubleshoot issues</p>
+            <h2 data-i18n="panel_480d3c119a">Logs & Debugging</h2>
+            <p data-i18n="panel_4b7ef9d8cd">Monitor automation activity and troubleshoot issues</p>
           </div>
           
           <div class="logs-card">
@@ -1208,17 +1204,17 @@
               <div class="logs-controls">
                 <button class="control-btn" id="clearLogs">
                   <i class="fas fa-trash"></i>
-                  Clear Logs
+                  <span data-i18n="panel_65e5078378">Clear Logs</span>
                 </button>
                 <button class="control-btn" id="exportLogs">
                   <i class="fas fa-download"></i>
-                  Export Logs
+                  <span data-i18n="panel_5ddbf16ab1">Export Logs</span>
                 </button>
                 <select id="logLevel" class="form-select small">
-                  <option value="all">All Logs</option>
-                  <option value="error">Errors Only</option>
-                  <option value="warn">Warnings & Errors</option>
-                  <option value="info">Info & Above</option>
+                  <option value="all" data-i18n="panel_03f1acb9e6">All Logs</option>
+                  <option value="error" data-i18n="panel_ee585cc4bd">Errors Only</option>
+                  <option value="warn" data-i18n="panel_0b3ff2c6ee">Warnings & Errors</option>
+                  <option value="info" data-i18n="panel_2d9e112fc2">Info & Above</option>
                 </select>
               </div>
             </div>
@@ -1227,7 +1223,7 @@
                 <div class="log-entry info">
                   <span class="log-time">00:00:00</span>
                   <span class="log-level">INFO</span>
-                  <span class="log-message">FSB Control Panel loaded successfully</span>
+                  <span class="log-message" data-i18n="panel_122df75095">FSB Control Panel loaded successfully</span>
                 </div>
               </div>
             </div>
@@ -1236,18 +1232,18 @@
           <!-- Session History Section -->
           <div class="session-history-section" style="margin-top: 2rem;">
             <div class="section-header">
-              <h3>Session History</h3>
-              <p>View and export logs from past automation sessions</p>
+              <h3 data-i18n="panel_edeead3f19">Session History</h3>
+              <p data-i18n="panel_fba294fa8b">View and export logs from past automation sessions</p>
             </div>
 
             <div class="session-controls">
               <button class="control-btn" id="refreshSessions">
                 <i class="fas fa-sync-alt"></i>
-                Refresh
+                <span data-i18n="panel_0e91610117">Refresh</span>
               </button>
               <button class="control-btn" id="clearAllSessions">
                 <i class="fas fa-trash"></i>
-                Clear All Sessions
+                <span data-i18n="panel_7a28e26099">Clear All Sessions</span>
               </button>
             </div>
 
@@ -1256,7 +1252,7 @@
                 <!-- Session items will be rendered here -->
                 <div class="session-empty-state">
                   <i class="fas fa-inbox"></i>
-                  <p>No sessions recorded yet. Run an automation task to see session logs here.</p>
+                  <p data-i18n="panel_600cf8138b">No sessions recorded yet. Run an automation task to see session logs here.</p>
                 </div>
               </div>
             </div>
@@ -1267,31 +1263,31 @@
           <!-- Analytics Debug Tools -->
           <div class="debug-section" style="margin-top: 2rem;">
             <div class="section-header">
-              <h3>Analytics Debug Tools</h3>
-              <p>Test and verify analytics data collection</p>
+              <h3 data-i18n="panel_e38737d4e5">Analytics Debug Tools</h3>
+              <p data-i18n="panel_c0b1dd0e52">Test and verify analytics data collection</p>
             </div>
             
             <div class="debug-controls">
               <button class="debug-btn" id="testTrackingBtn">
                 <i class="fas fa-vial"></i>
-                Test Token Tracking
+                <span data-i18n="panel_bc93dddbb3">Test Token Tracking</span>
               </button>
               <button class="debug-btn" id="viewStorageBtn">
                 <i class="fas fa-database"></i>
-                View Storage Data
+                <span data-i18n="panel_4267998cbe">View Storage Data</span>
               </button>
               <button class="debug-btn" id="clearDataBtn">
                 <i class="fas fa-trash"></i>
-                Clear Analytics Data
+                <span data-i18n="panel_056a9215e5">Clear Analytics Data</span>
               </button>
               <button class="debug-btn" id="exportDataBtn">
                 <i class="fas fa-download"></i>
-                Export Data
+                <span data-i18n="panel_2ed2274015">Export Data</span>
               </button>
             </div>
             
             <div class="debug-output" id="debugOutput" style="display: none;">
-              <h4>Debug Output:</h4>
+              <h4 data-i18n="panel_a239457076">Debug Output:</h4>
               <pre id="debugContent"></pre>
             </div>
           </div>
@@ -1304,11 +1300,11 @@
                in the .adv-sub row below to match the sub-group visual pattern).
                Kept explicit so consent-audit-settings-ui.test.js and assistive-
                tech both see a semantic H2. -->
-          <h2 class="visually-hidden">Consent &amp; Audit</h2>
+          <h2 class="visually-hidden" data-i18n="panel_38b6a17864">Consent &amp; Audit</h2>
           <div class="advanced-settings-grid">
             <div class="adv-sub-group">
-              <div class="adv-sub"><i class="fas fa-clipboard-check"></i><span>Consent &amp; Audit</span><span class="adv-sub-rule"></span></div>
-              <p class="adv-sub-desc">The default below applies to every site you have not configured; the per-origin list lets you opt individual sites out.</p>
+              <div class="adv-sub"><i class="fas fa-clipboard-check"></i><span data-i18n="panel_38b6a17864">Consent &amp; Audit</span><span class="adv-sub-rule"></span></div>
+              <p class="adv-sub-desc" data-i18n="panel_94ef5e0fd6">The default below applies to every site you have not configured; the per-origin list lets you opt individual sites out.</p>
             </div>
 
           <!-- Default for New Sites Card (global consent default; opt-out posture) -->
@@ -1318,17 +1314,17 @@
                 <i class="fas fa-shield-halved"></i>
               </div>
               <div class="settings-card-title">
-                <h3>Default for New Sites</h3>
-                <p>How FSB treats a site you have not configured. Auto lets FSB call any non-blocked site's authenticated API (reads and writes). Off requires you to enable each site first. Ask queues a request for your approval.</p>
+                <h3 data-i18n="panel_6e133ee86d">Default for New Sites</h3>
+                <p data-i18n="panel_8e0f9288e2">How FSB treats a site you have not configured. Auto lets FSB call any non-blocked site's authenticated API (reads and writes). Off requires you to enable each site first. Ask queues a request for your approval.</p>
               </div>
             </div>
             <div class="settings-card-content">
-              <div class="site-graph-detail-toggle consent-default-toggle" role="radiogroup" aria-label="Default consent mode for new sites" id="consentDefaultModeToggle">
-                <button type="button" class="detail-btn" data-default-mode="off" role="radio" aria-checked="false">Off</button>
-                <button type="button" class="detail-btn" data-default-mode="ask" role="radio" aria-checked="false">Ask</button>
-                <button type="button" class="detail-btn" data-default-mode="auto" role="radio" aria-checked="true">Auto</button>
+              <div class="site-graph-detail-toggle consent-default-toggle" role="radiogroup" aria-label="Default consent mode for new sites" id="consentDefaultModeToggle" data-i18n-attr="aria-label:copy_1152ae520b">
+                <button type="button" class="detail-btn" data-default-mode="off" role="radio" aria-checked="false" data-i18n="panel_ca7981b46e">Off</button>
+                <button type="button" class="detail-btn" data-default-mode="ask" role="radio" aria-checked="false" data-i18n="panel_b8c209cdea">Ask</button>
+                <button type="button" class="detail-btn" data-default-mode="auto" role="radio" aria-checked="true" data-i18n="panel_0286249762">Auto</button>
               </div>
-              <div class="setting-hint">Financial and government services are always blocked regardless of this setting. Shipped as Auto; set to Off to restore strict opt-in.</div>
+              <div class="setting-hint" data-i18n="panel_9693a6dbf3">Financial and government services are always blocked regardless of this setting. Shipped as Auto; set to Off to restore strict opt-in.</div>
             </div>
           </div>
 
@@ -1339,8 +1335,8 @@
                 <i class="fas fa-user-shield"></i>
               </div>
               <div class="settings-card-title">
-                <h3>Per-Origin Consent</h3>
-                <p>Every site follows the default above unless you override it here. Set a site to Off to stop FSB acting on it.</p>
+                <h3 data-i18n="panel_01914d2038">Per-Origin Consent</h3>
+                <p data-i18n="panel_96db3ff001">Every site follows the default above unless you override it here. Set a site to Off to stop FSB acting on it.</p>
               </div>
             </div>
             <div class="settings-card-content">
@@ -1348,7 +1344,7 @@
                 <div class="session-list" id="consentOriginList">
                   <div class="session-empty-state" id="consentOriginEmptyState">
                     <i class="fas fa-globe"></i>
-                    <p>No sites yet. Every site FSB acts on appears here so you can set it to Off (opt out). New sites follow the default above.</p>
+                    <p data-i18n="panel_48cfb671aa">No sites yet. Every site FSB acts on appears here so you can set it to Off (opt out). New sites follow the default above.</p>
                   </div>
                 </div>
               </div>
@@ -1366,16 +1362,16 @@
                   <div class="setting-label">
                     <span class="consent-origin-name"></span>
                     <span class="feature-badge consent-sensitive-badge" style="display:none; background: var(--warning-color);">
-                      <i class="fas fa-triangle-exclamation"></i> Sensitive
+                      <i class="fas fa-triangle-exclamation"></i> <span data-i18n="panel_2c64c030d4">Sensitive</span>
                     </span>
                     <span class="feature-badge consent-blocked-badge" style="display:none; background: var(--error-color);">
-                      <i class="fas fa-ban"></i> Blocked
+                      <i class="fas fa-ban"></i> <span data-i18n="panel_18f2a0947f">Blocked</span>
                     </span>
                   </div>
-                  <div class="site-graph-detail-toggle consent-mode-toggle" role="radiogroup" aria-label="Consent mode for origin">
-                    <button type="button" class="detail-btn" data-mode="off" role="radio" aria-checked="true">Off</button>
-                    <button type="button" class="detail-btn" data-mode="ask" role="radio" aria-checked="false">Ask</button>
-                    <button type="button" class="detail-btn" data-mode="auto" role="radio" aria-checked="false">Auto</button>
+                  <div class="site-graph-detail-toggle consent-mode-toggle" role="radiogroup" aria-label="Consent mode for origin" data-i18n-attr="aria-label:copy_f5af3ff4e6">
+                    <button type="button" class="detail-btn" data-mode="off" role="radio" aria-checked="true" data-i18n="panel_ca7981b46e">Off</button>
+                    <button type="button" class="detail-btn" data-mode="ask" role="radio" aria-checked="false" data-i18n="panel_b8c209cdea">Ask</button>
+                    <button type="button" class="detail-btn" data-mode="auto" role="radio" aria-checked="false" data-i18n="panel_0286249762">Auto</button>
                   </div>
                   <label class="modern-toggle consent-mutating-toggle" style="display:none;">
                     <input type="checkbox" class="consent-mutating-input" disabled>
@@ -1383,8 +1379,8 @@
                       <span class="toggle-thumb"></span>
                     </span>
                     <div class="toggle-content">
-                      <span class="toggle-label">Allow mutating (write) calls</span>
-                      <span class="toggle-desc">Compatibility metadata for POST/PUT/PATCH/DELETE. Under Auto, FSB can perform reads and writes on non-blocked origins.</span>
+                      <span class="toggle-label" data-i18n="panel_5f351832fd">Allow mutating (write) calls</span>
+                      <span class="toggle-desc" data-i18n="panel_45a8c38cdf">Compatibility metadata for POST/PUT/PATCH/DELETE. Under Auto, FSB can perform reads and writes on non-blocked origins.</span>
                     </div>
                   </label>
                   <div class="setting-hint consent-origin-hint" style="display:none;"></div>
@@ -1400,17 +1396,17 @@
                 <i class="fas fa-bell"></i>
               </div>
               <div class="settings-card-title">
-                <h3>Pending Requests</h3>
-                <p>Requests waiting on your decision. Granting one lets the caller retry; FSB never acts without your approval.</p>
+                <h3 data-i18n="panel_87b1794408">Pending Requests</h3>
+                <p data-i18n="panel_811f8544eb">Requests waiting on your decision. Granting one lets the caller retry; FSB never acts without your approval.</p>
               </div>
-              <span class="sync-status-pill" id="pendingRequestCount" data-state="remote-active" style="display: none;">0 pending</span>
+              <span class="sync-status-pill" id="pendingRequestCount" data-state="remote-active" style="display: none;" data-i18n="panel_0334c4fb39">0 pending</span>
             </div>
             <div class="settings-card-content">
               <div class="session-list-container" id="pendingRequestListContainer">
                 <div class="session-list" id="pendingRequestList">
                   <div class="session-empty-state" id="pendingRequestEmptyState">
                     <i class="fas fa-inbox"></i>
-                    <p>No pending requests. When a tool needs consent it appears here. You can also grant access ahead of time from the list above.</p>
+                    <p data-i18n="panel_b04eb08367">No pending requests. When a tool needs consent it appears here. You can also grant access ahead of time from the list above.</p>
                   </div>
                 </div>
               </div>
@@ -1425,16 +1421,16 @@
                   <div class="setting-label">
                     <span class="pending-request-origin"></span>
                     <span class="pending-request-meta"></span>
-                    <span class="feature-badge pending-write-badge" style="display:none; background: var(--warning-color);">write</span>
+                    <span class="feature-badge pending-write-badge" style="display:none; background: var(--warning-color);" data-i18n="panel_10fd874b68">write</span>
                   </div>
                   <div class="session-controls">
                     <button type="button" class="control-btn pending-grant-btn">
                       <i class="fas fa-check"></i>
-                      Grant
+                      <span data-i18n="panel_78b7d0379d">Grant</span>
                     </button>
                     <button type="button" class="control-btn danger pending-deny-btn">
                       <i class="fas fa-xmark"></i>
-                      Deny
+                      <span data-i18n="panel_05a2d7332e">Deny</span>
                     </button>
                   </div>
                 </div>
@@ -1449,32 +1445,32 @@
                 <i class="fas fa-clipboard-check"></i>
               </div>
               <div class="settings-card-title">
-                <h3>Audit Log</h3>
-                <p>A redacted, append-only record of capability calls. No arguments, tokens, cookies, or response bodies are ever stored.</p>
+                <h3 data-i18n="panel_47751f88ed">Audit Log</h3>
+                <p data-i18n="panel_1fdd802663">A redacted, append-only record of capability calls. No arguments, tokens, cookies, or response bodies are ever stored.</p>
               </div>
             </div>
             <div class="settings-card-content">
               <div class="session-controls">
                 <button class="control-btn primary" id="auditExportBtn">
                   <i class="fas fa-download"></i>
-                  Export Log
+                  <span data-i18n="panel_818cb91030">Export Log</span>
                 </button>
                 <button class="control-btn danger" id="auditClearBtn">
                   <i class="fas fa-trash"></i>
-                  Clear Log
+                  <span data-i18n="panel_533e26bdcc">Clear Log</span>
                 </button>
               </div>
               <div class="logs-content">
                 <table class="logs-display" id="auditLogTable" aria-label="Audit log">
                   <thead>
                     <tr class="log-entry">
-                      <th scope="col">Time</th>
-                      <th scope="col">Origin</th>
-                      <th scope="col">Capability</th>
-                      <th scope="col">Method</th>
-                      <th scope="col">Side Effect</th>
-                      <th scope="col">Consent</th>
-                      <th scope="col">Outcome</th>
+                      <th scope="col" data-i18n="panel_33b93476cf">Time</th>
+                      <th scope="col" data-i18n="panel_d3e1c5f8a6">Origin</th>
+                      <th scope="col" data-i18n="panel_5faf58a69d">Capability</th>
+                      <th scope="col" data-i18n="panel_52a0f9b65b">Method</th>
+                      <th scope="col" data-i18n="panel_bce87826df">Side Effect</th>
+                      <th scope="col" data-i18n="panel_d37e0cd00f">Consent</th>
+                      <th scope="col" data-i18n="panel_4e80abb5b1">Outcome</th>
                     </tr>
                   </thead>
                   <tbody id="auditLogBody">
@@ -1482,7 +1478,7 @@
                       <td colspan="7">
                         <div class="session-empty-state">
                           <i class="fas fa-clipboard-list"></i>
-                          <p>No audit entries yet. Capability calls are recorded here once you allow an origin. Entries are redacted and stored locally only.</p>
+                          <p data-i18n="panel_787513f4fd">No audit entries yet. Capability calls are recorded here once you allow an origin. Entries are redacted and stored locally only.</p>
                         </div>
                       </td>
                     </tr>
@@ -1499,20 +1495,20 @@
                 <i class="fas fa-scale-balanced"></i>
               </div>
               <div class="settings-card-title">
-                <h3>Legal &amp; Service Policy</h3>
-                <p>FSB's automation posture, audit retention, and the consent model are documented in LEGAL.md. Some origins are blocked from automation by the service denylist.</p>
+                <h3 data-i18n="panel_5934628d0f">Legal &amp; Service Policy</h3>
+                <p data-i18n="panel_323d6ff1f1">FSB's automation posture, audit retention, and the consent model are documented in LEGAL.md. Some origins are blocked from automation by the service denylist.</p>
               </div>
             </div>
             <div class="settings-card-content">
               <a class="setting-hint" href="https://full-selfbrowsing.com/legal"
                  target="_blank" rel="noopener noreferrer"
-                 style="display:block; margin-top:8px;">Read the legal posture &rarr;</a>
+                 style="display:block; margin-top:8px;" data-i18n="panel_fea0aab06e">Read the legal posture &rarr;</a>
               <a class="setting-hint" href="../config/service-denylist.json"
                  target="_blank" rel="noopener noreferrer"
-                 style="display:block; margin-top:8px;">View blocked services &rarr;</a>
+                 style="display:block; margin-top:8px;" data-i18n="panel_4fc14539b2">View blocked services &rarr;</a>
               <a class="setting-hint" href="https://full-selfbrowsing.com/privacy.html"
                  target="_blank" rel="noopener noreferrer"
-                 style="display:block; margin-top:8px;">Privacy policy &rarr;</a>
+                 style="display:block; margin-top:8px;" data-i18n="panel_efc0b9cac2">Privacy policy &rarr;</a>
             </div>
           </div>
           </div>
@@ -1522,8 +1518,8 @@
         <!-- Passwords Section (Beta) -->
         <section class="content-section" id="passwords">
           <div class="section-header">
-            <h2>Passwords <span class="feature-badge beta">Beta</span></h2>
-            <p>Manage saved credentials and the shared credential vault for assisted sign-in</p>
+            <h2><span data-i18n="panel_be146b37a0">Passwords</span> <span class="feature-badge beta" data-i18n="panel_703390318b">Beta</span></h2>
+            <p data-i18n="panel_e31b2a3d3f">Manage saved credentials and the shared credential vault for assisted sign-in</p>
           </div>
 
           <div class="toggle-grid single" style="margin-bottom: 1.5rem;">
@@ -1533,8 +1529,8 @@
                 <span class="toggle-thumb"></span>
               </span>
               <div class="toggle-content">
-                <span class="toggle-label">Enable Auto-Login</span>
-                <span class="toggle-desc">When enabled, FSB will detect login pages and offer to sign in automatically using saved credentials</span>
+                <span class="toggle-label" data-i18n="panel_bfe73827c5">Enable Auto-Login</span>
+                <span class="toggle-desc" data-i18n="panel_93f508370d">When enabled, FSB will detect login pages and offer to sign in automatically using saved credentials</span>
               </div>
             </label>
           </div>
@@ -1542,40 +1538,40 @@
           <div id="credentialVaultPanel" class="credential-vault-panel">
             <div class="credential-vault-header">
               <div>
-                <h3>Credential Vault</h3>
-                <p id="credentialVaultStatusText">Checking vault status...</p>
+                <h3 data-i18n="panel_bbf6a83734">Credential Vault</h3>
+                <p id="credentialVaultStatusText" data-i18n="panel_07dd5f0064">Checking vault status...</p>
               </div>
-              <button id="lockCredentialVaultBtn" class="save-btn secondary" style="display: none;">Lock Vault</button>
+              <button id="lockCredentialVaultBtn" class="save-btn secondary" style="display: none;" data-i18n="panel_50b231118c">Lock Vault</button>
             </div>
 
             <div id="credentialVaultSetup" class="credential-vault-state" style="display: none;">
-              <p class="pin-label">Choose PIN length</p>
+              <p class="pin-label" data-i18n="panel_ac22d297f8">Choose PIN length</p>
               <div class="pin-length-toggle">
-                <button class="pin-length-btn" data-pin-length="4">4 digits</button>
-                <button class="pin-length-btn active" data-pin-length="6">6 digits</button>
+                <button class="pin-length-btn" data-pin-length="4" data-i18n="panel_3e785bbc44">4 digits</button>
+                <button class="pin-length-btn active" data-pin-length="6" data-i18n="panel_7856e511a2">6 digits</button>
               </div>
-              <p class="pin-label">Enter PIN</p>
+              <p class="pin-label" data-i18n="panel_f246c76813">Enter PIN</p>
               <div id="credentialVaultPinSetup"></div>
-              <p class="pin-label">Confirm PIN</p>
+              <p class="pin-label" data-i18n="panel_4fa10c7baa">Confirm PIN</p>
               <div id="credentialVaultPinConfirm"></div>
-              <p class="credential-vault-helper">Choose a PIN to protect saved credentials. Existing legacy credentials will be migrated automatically.</p>
-              <button id="setupCredentialVaultBtn" class="save-btn primary">Set Up Vault</button>
+              <p class="credential-vault-helper" data-i18n="panel_10f7c25d31">Choose a PIN to protect saved credentials. Existing legacy credentials will be migrated automatically.</p>
+              <button id="setupCredentialVaultBtn" class="save-btn primary" data-i18n="panel_73134c8143">Set Up Vault</button>
             </div>
 
             <div id="credentialVaultUnlock" class="credential-vault-state" style="display: none;">
-              <p class="pin-label">Enter your PIN to unlock</p>
+              <p class="pin-label" data-i18n="panel_872ac152d2">Enter your PIN to unlock</p>
               <div id="credentialVaultPinUnlock"></div>
-              <p id="credentialVaultUnlockHint" class="credential-vault-helper">Unlock to view, edit, autofill, or save passwords.</p>
-              <button id="unlockCredentialVaultBtn" class="save-btn primary">Unlock Vault</button>
+              <p id="credentialVaultUnlockHint" class="credential-vault-helper" data-i18n="panel_50c3db852a">Unlock to view, edit, autofill, or save passwords.</p>
+              <button id="unlockCredentialVaultBtn" class="save-btn primary" data-i18n="panel_b41986e3f5">Unlock Vault</button>
             </div>
 
             <div id="credentialVaultUnlocked" class="credential-vault-state" style="display: none;">
-              <p class="credential-vault-helper">Vault unlocked for this browser session. Saved credentials are available below.</p>
+              <p class="credential-vault-helper" data-i18n="panel_b6680d54b2">Vault unlocked for this browser session. Saved credentials are available below.</p>
             </div>
           </div>
 
           <div id="credentialsManager" style="display: none;">
-            <div id="credentialManagerDisabledNote" class="credential-vault-helper" style="display: none;">
+            <div id="credentialManagerDisabledNote" class="credential-vault-helper" style="display: none;" data-i18n="panel_8d5ab0fe44">
               Auto-Login is currently disabled. You can still manage saved credentials here, but FSB will not use or save them automatically until you enable it.
             </div>
 
@@ -1586,7 +1582,7 @@
               </div>
               <button id="addCredentialBtn" class="test-btn">
                 <i class="fas fa-plus"></i>
-                Add New
+                <span data-i18n="panel_c1dc92c680">Add New</span>
               </button>
             </div>
 
@@ -1596,7 +1592,7 @@
 
             <div id="credentialsEmpty" class="credentials-empty-state">
               <i class="fas fa-lock"></i>
-              <p>No saved credentials yet. Credentials will be saved automatically when you sign in during automation, or you can add them manually.</p>
+              <p data-i18n="panel_c533cc0b87">No saved credentials yet. Credentials will be saved automatically when you sign in during automation, or you can add them manually.</p>
             </div>
           </div>
 
@@ -1604,23 +1600,23 @@
             <div class="credential-modal-backdrop"></div>
             <div class="credential-modal-content">
               <div class="credential-modal-header">
-                <h3 id="credentialModalTitle">Add Credential</h3>
+                <h3 id="credentialModalTitle" data-i18n="panel_35d74dfd8d">Add Credential</h3>
                 <button class="credential-modal-close" id="credentialModalClose">
                   <i class="fas fa-times"></i>
                 </button>
               </div>
               <div class="credential-modal-body">
                 <div class="form-group">
-                  <label for="credModalDomain">Website / Domain</label>
+                  <label for="credModalDomain" data-i18n="panel_85a85dc9a2">Website / Domain</label>
                   <input type="text" id="credModalDomain" placeholder="example.com" class="form-input">
-                  <div class="form-help">Enter the website domain (e.g., github.com, mail.google.com)</div>
+                  <div class="form-help" data-i18n="panel_0153e2da59">Enter the website domain (e.g., github.com, mail.google.com)</div>
                 </div>
                 <div class="form-group">
-                  <label for="credModalUsername">Username / Email</label>
+                  <label for="credModalUsername" data-i18n="panel_657144f3f7">Username / Email</label>
                   <input type="text" id="credModalUsername" placeholder="user@example.com" class="form-input">
                 </div>
                 <div class="form-group">
-                  <label for="credModalPassword">Password</label>
+                  <label for="credModalPassword" data-i18n="panel_e7cf3ef4f1">Password</label>
                   <div class="input-with-button">
                     <input type="password" id="credModalPassword" placeholder="Enter password" class="form-input">
                     <button type="button" class="input-btn" id="toggleCredModalPassword" title="Toggle visibility">
@@ -1629,20 +1625,20 @@
                   </div>
                 </div>
                 <div class="form-group">
-                  <label for="credModalNotes">Notes (optional)</label>
+                  <label for="credModalNotes" data-i18n="panel_6239b93e96">Notes (optional)</label>
                   <input type="text" id="credModalNotes" placeholder="Optional notes" class="form-input">
                 </div>
                 <div class="form-group">
                   <label class="credential-checkbox">
                     <input type="checkbox" id="credModalAllowSubdomains">
-                    <span>Allow this credential on subdomains</span>
+                    <span data-i18n="panel_9caa27b9d0">Allow this credential on subdomains</span>
                   </label>
-                  <div class="form-help">Example: a credential saved for <code>example.com</code> can also be used on <code>login.example.com</code>.</div>
+                  <div class="form-help"><span data-i18n="panel_8816182605">Example: a credential saved for</span> <code>example.com</code> <span data-i18n="panel_eb1c90412b">can also be used on</span> <code>login.example.com</code>.</div>
                 </div>
               </div>
               <div class="credential-modal-footer">
-                <button class="save-btn secondary" id="credentialModalCancel">Cancel</button>
-                <button class="save-btn primary" id="credentialModalSave">Save</button>
+                <button class="save-btn secondary" id="credentialModalCancel" data-i18n="panel_19766ed6cc">Cancel</button>
+                <button class="save-btn primary" id="credentialModalSave" data-i18n="panel_1509f561f2">Save</button>
               </div>
             </div>
           </div>
@@ -1651,8 +1647,8 @@
         <!-- Payments Section (Beta) -->
         <section class="content-section" id="payments">
           <div class="section-header">
-            <h2>Payments <span class="feature-badge beta">Beta</span></h2>
-            <p>Manage saved cards for assisted checkout. Payment methods share the credential vault configured in Passwords.</p>
+            <h2><span data-i18n="panel_632e1c5839">Payments</span> <span class="feature-badge beta" data-i18n="panel_703390318b">Beta</span></h2>
+            <p data-i18n="panel_83c6ad5aef">Manage saved cards for assisted checkout. Payment methods share the credential vault configured in Passwords.</p>
           </div>
 
           <div class="toggle-grid single" style="margin-bottom: 1.5rem;">
@@ -1662,8 +1658,8 @@
                 <span class="toggle-thumb"></span>
               </span>
               <div class="toggle-content">
-                <span class="toggle-label">Enable Saved Payment Methods</span>
-                <span class="toggle-desc">When enabled, FSB can prompt to fill a saved card on checkout pages. It never submits the final payment automatically.</span>
+                <span class="toggle-label" data-i18n="panel_195ab9772f">Enable Saved Payment Methods</span>
+                <span class="toggle-desc" data-i18n="panel_ff7378d58d">When enabled, FSB can prompt to fill a saved card on checkout pages. It never submits the final payment automatically.</span>
               </div>
             </label>
           </div>
@@ -1671,44 +1667,44 @@
           <div id="paymentAccessPanel" class="credential-vault-panel">
             <div class="credential-vault-header">
               <div>
-                <h3>Saved Payment Methods</h3>
-                <p id="paymentMethodsStatusText">Checking payment method status...</p>
+                <h3 data-i18n="panel_b45d64e4a3">Saved Payment Methods</h3>
+                <p id="paymentMethodsStatusText" data-i18n="panel_a92743920d">Checking payment method status...</p>
               </div>
-              <button id="lockPaymentMethodsBtn" class="save-btn secondary" style="display: none;">Lock Payment Methods</button>
+              <button id="lockPaymentMethodsBtn" class="save-btn secondary" style="display: none;" data-i18n="panel_bbc3d7eb41">Lock Payment Methods</button>
             </div>
 
             <div id="paymentMethodsBlocked" class="credential-vault-state" style="display: none;">
-              <p id="paymentMethodsBlockedText" class="credential-vault-helper">Unlock the credential vault before managing saved payment methods.</p>
-              <button id="openPasswordsForPaymentsBtn" class="save-btn secondary" style="display: none;">Open Passwords</button>
+              <p id="paymentMethodsBlockedText" class="credential-vault-helper" data-i18n="panel_7d1624ea92">Unlock the credential vault before managing saved payment methods.</p>
+              <button id="openPasswordsForPaymentsBtn" class="save-btn secondary" style="display: none;" data-i18n="panel_24e06db48e">Open Passwords</button>
             </div>
 
             <div id="paymentMethodsUnlock" class="credential-vault-state" style="display: none;">
               <div class="form-group">
-                <label>Enter your vault PIN to unlock payment methods</label>
+                <label data-i18n="panel_ad5f8e8263">Enter your vault PIN to unlock payment methods</label>
                 <div id="paymentMethodsPinUnlock"></div>
               </div>
-              <p class="credential-vault-helper">Saved cards use the same encrypted vault but require a separate unlock before checkout fills in this browser session.</p>
-              <button id="unlockPaymentMethodsBtn" class="save-btn primary">Unlock Saved Payment Methods</button>
+              <p class="credential-vault-helper" data-i18n="panel_2035e1f48d">Saved cards use the same encrypted vault but require a separate unlock before checkout fills in this browser session.</p>
+              <button id="unlockPaymentMethodsBtn" class="save-btn primary" data-i18n="panel_186f818f5f">Unlock Saved Payment Methods</button>
             </div>
 
             <div id="paymentMethodsUnlocked" class="credential-vault-state" style="display: none;">
-              <p class="credential-vault-helper">Saved payment methods are unlocked for this browser session. FSB can prompt to fill a saved card on detected checkout pages, but it will never submit the final payment automatically.</p>
+              <p class="credential-vault-helper" data-i18n="panel_0ec4dc2534">Saved payment methods are unlocked for this browser session. FSB can prompt to fill a saved card on detected checkout pages, but it will never submit the final payment automatically.</p>
             </div>
           </div>
 
           <div id="paymentMethodsManager" style="display: none;">
-            <div id="paymentManagerDisabledNote" class="credential-vault-helper" style="display: none;">
+            <div id="paymentManagerDisabledNote" class="credential-vault-helper" style="display: none;" data-i18n="panel_5d38d8a7cf">
               Saved Payment Methods is currently disabled. You can still manage stored cards here, but FSB will not offer them during checkout until you enable the feature.
             </div>
 
             <div class="credentials-toolbar">
               <div class="credentials-search-wrapper">
                 <i class="fas fa-search"></i>
-                <input type="search" id="paymentMethodSearch" placeholder="Search cards, brands, or billing details..." class="form-input">
+                <input type="search" id="paymentMethodSearch" placeholder="Search cards, brands, or billing details..." class="form-input" data-i18n-attr="placeholder:copy_8371bee1a3">
               </div>
               <button id="addPaymentMethodBtn" class="test-btn">
                 <i class="fas fa-credit-card"></i>
-                Add Card
+                <span data-i18n="panel_82f87079c6">Add Card</span>
               </button>
             </div>
 
@@ -1718,7 +1714,7 @@
 
             <div id="paymentMethodsEmpty" class="credentials-empty-state">
               <i class="fas fa-credit-card"></i>
-              <p>No saved payment methods yet. Add a card here so FSB can offer it on checkout pages after you unlock payment access.</p>
+              <p data-i18n="panel_2fd67f06e0">No saved payment methods yet. Add a card here so FSB can offer it on checkout pages after you unlock payment access.</p>
             </div>
           </div>
 
@@ -1726,31 +1722,31 @@
             <div class="credential-modal-backdrop"></div>
             <div class="credential-modal-content payment-method-modal-content">
               <div class="credential-modal-header">
-                <h3 id="paymentMethodModalTitle">Add Payment Method</h3>
+                <h3 id="paymentMethodModalTitle" data-i18n="panel_b610b1ecca">Add Payment Method</h3>
                 <button class="credential-modal-close" id="paymentMethodModalClose">
                   <i class="fas fa-times"></i>
                 </button>
               </div>
               <div class="credential-modal-body">
                 <div class="form-group">
-                  <label for="paymentMethodNickname">Nickname (optional)</label>
+                  <label for="paymentMethodNickname" data-i18n="panel_7cbcb92acd">Nickname (optional)</label>
                   <input type="text" id="paymentMethodNickname" placeholder="Personal Visa" class="form-input">
-                  <div class="form-help">Shown in the card picker and saved-cards list.</div>
+                  <div class="form-help" data-i18n="panel_85dfa9ba97">Shown in the card picker and saved-cards list.</div>
                 </div>
                 <div class="form-group">
-                  <label for="paymentMethodCardholderName">Cardholder Name</label>
-                  <input type="text" id="paymentMethodCardholderName" placeholder="Name on card" class="form-input" autocomplete="cc-name">
+                  <label for="paymentMethodCardholderName" data-i18n="panel_d6bc26851d">Cardholder Name</label>
+                  <input type="text" id="paymentMethodCardholderName" placeholder="Name on card" class="form-input" autocomplete="cc-name" data-i18n-attr="placeholder:copy_18bf091ea7">
                 </div>
                 <div class="form-group">
-                  <label for="paymentMethodCardNumber">Card Number <span id="paymentMethodCardBrand" class="payment-card-brand unknown">Unknown</span></label>
+                  <label for="paymentMethodCardNumber"><span data-i18n="panel_4566e068a2">Card Number</span> <span id="paymentMethodCardBrand" class="payment-card-brand unknown" data-i18n="panel_b764cdc0ea">Unknown</span></label>
                   <input type="text" id="paymentMethodCardNumber" placeholder="1234 5678 9012 3456" class="form-input" inputmode="numeric" autocomplete="cc-number">
-                  <div id="paymentMethodCardNumberHint" class="form-help">Card brand is detected automatically as you type.</div>
+                  <div id="paymentMethodCardNumberHint" class="form-help" data-i18n="panel_25ec19a82f">Card brand is detected automatically as you type.</div>
                 </div>
                 <div class="payment-expiry-grid">
                   <div class="form-group">
-                    <label for="paymentMethodExpiryMonth">Expiry Month</label>
+                    <label for="paymentMethodExpiryMonth" data-i18n="panel_43533009b2">Expiry Month</label>
                     <select id="paymentMethodExpiryMonth" class="form-select">
-                      <option value="">Month</option>
+                      <option value="" data-i18n="panel_310ca503ef">Month</option>
                       <option value="01">01</option>
                       <option value="02">02</option>
                       <option value="03">03</option>
@@ -1766,7 +1762,7 @@
                     </select>
                   </div>
                   <div class="form-group">
-                    <label for="paymentMethodExpiryYear">Expiry Year</label>
+                    <label for="paymentMethodExpiryYear" data-i18n="panel_ca7aaef8c5">Expiry Year</label>
                     <input type="text" id="paymentMethodExpiryYear" placeholder="2029" class="form-input" inputmode="numeric" autocomplete="cc-exp-year">
                   </div>
                   <div class="form-group">
@@ -1780,42 +1776,42 @@
                   </div>
                 </div>
                 <div class="form-group">
-                  <label for="paymentMethodBillingName">Billing Name</label>
-                  <input type="text" id="paymentMethodBillingName" placeholder="Billing profile name" class="form-input">
+                  <label for="paymentMethodBillingName" data-i18n="panel_8a944d3d0e">Billing Name</label>
+                  <input type="text" id="paymentMethodBillingName" placeholder="Billing profile name" class="form-input" data-i18n-attr="placeholder:copy_eb59dcee20">
                 </div>
                 <div class="form-group">
-                  <label for="paymentMethodAddressLine1">Billing Address Line 1</label>
+                  <label for="paymentMethodAddressLine1" data-i18n="panel_1b77352e0b">Billing Address Line 1</label>
                   <input type="text" id="paymentMethodAddressLine1" placeholder="123 Main St" class="form-input" autocomplete="billing address-line1">
                 </div>
                 <div class="form-group">
-                  <label for="paymentMethodAddressLine2">Billing Address Line 2 (optional)</label>
-                  <input type="text" id="paymentMethodAddressLine2" placeholder="Apt, suite, unit" class="form-input" autocomplete="billing address-line2">
+                  <label for="paymentMethodAddressLine2" data-i18n="panel_ff2bc02380">Billing Address Line 2 (optional)</label>
+                  <input type="text" id="paymentMethodAddressLine2" placeholder="Apt, suite, unit" class="form-input" autocomplete="billing address-line2" data-i18n-attr="placeholder:copy_e151fee074">
                 </div>
                 <div class="payment-billing-grid">
                   <div class="form-group">
-                    <label for="paymentMethodCity">City</label>
+                    <label for="paymentMethodCity" data-i18n="panel_fc33f73246">City</label>
                     <input type="text" id="paymentMethodCity" placeholder="Chicago" class="form-input" autocomplete="billing address-level2">
                   </div>
                   <div class="form-group">
-                    <label for="paymentMethodStateRegion">State / Region</label>
+                    <label for="paymentMethodStateRegion" data-i18n="panel_9630a4b030">State / Region</label>
                     <input type="text" id="paymentMethodStateRegion" placeholder="Illinois" class="form-input" autocomplete="billing address-level1">
                   </div>
                 </div>
                 <div class="payment-billing-grid">
                   <div class="form-group">
-                    <label for="paymentMethodPostalCode">Postal Code</label>
+                    <label for="paymentMethodPostalCode" data-i18n="panel_8198b202a8">Postal Code</label>
                     <input type="text" id="paymentMethodPostalCode" placeholder="60601" class="form-input" autocomplete="billing postal-code">
                   </div>
                   <div class="form-group">
-                    <label for="paymentMethodCountry">Country</label>
+                    <label for="paymentMethodCountry" data-i18n="panel_701d021d08">Country</label>
                     <input type="text" id="paymentMethodCountry" placeholder="United States" class="form-input" autocomplete="billing country">
                   </div>
                 </div>
-                <div class="form-help payment-method-security-note">CVV and billing profile data are stored encrypted inside your local vault. Review local device security before using this feature.</div>
+                <div class="form-help payment-method-security-note" data-i18n="panel_928895f662">CVV and billing profile data are stored encrypted inside your local vault. Review local device security before using this feature.</div>
               </div>
               <div class="credential-modal-footer">
-                <button class="save-btn secondary" id="paymentMethodModalCancel">Cancel</button>
-                <button class="save-btn primary" id="paymentMethodModalSave">Save Card</button>
+                <button class="save-btn secondary" id="paymentMethodModalCancel" data-i18n="panel_19766ed6cc">Cancel</button>
+                <button class="save-btn primary" id="paymentMethodModalSave" data-i18n="panel_39d561254a">Save Card</button>
               </div>
             </div>
           </div>
@@ -1824,8 +1820,8 @@
         <!-- Help Section -->
         <section class="content-section" id="help">
           <div class="section-header">
-            <h2>Help & Documentation</h2>
-            <p>Get help and learn more about FSB features</p>
+            <h2 data-i18n="panel_2ccff1d108">Help & Documentation</h2>
+            <p data-i18n="panel_e4d896bcce">Get help and learn more about FSB features</p>
           </div>
           
           <div class="help-grid">
@@ -1833,98 +1829,98 @@
               <div class="help-icon">
                 <i class="fas fa-rocket"></i>
               </div>
-              <h3>Getting Started</h3>
-              <p>Learn the basics of browser automation with FSB</p>
-              <a href="https://full-selfbrowsing.com" target="_blank" rel="noopener" class="help-link">Visit Website</a>
+              <h3 data-i18n="panel_d00eca1bae">Getting Started</h3>
+              <p data-i18n="panel_c772928cb0">Learn the basics of browser automation with FSB</p>
+              <a href="https://full-selfbrowsing.com" target="_blank" rel="noopener" class="help-link" data-i18n="panel_584aa47f13">Visit Website</a>
             </div>
 
             <div class="help-card">
               <div class="help-icon">
                 <i class="fas fa-route"></i>
               </div>
-              <h3>Guided Setup</h3>
-              <p>Re-run the onboarding walkthrough to change your provider or MCP setup</p>
-              <a href="onboarding.html" target="_blank" class="help-link">Restart Setup</a>
+              <h3 data-i18n="panel_b50c780ec8">Guided Setup</h3>
+              <p data-i18n="panel_32623395c6">Re-run the onboarding walkthrough to change your provider or MCP setup</p>
+              <a href="onboarding.html" target="_blank" class="help-link" data-i18n="panel_01c470e51f">Restart Setup</a>
             </div>
 
             <div class="help-card">
               <div class="help-icon">
                 <i class="fas fa-book"></i>
               </div>
-              <h3>Documentation</h3>
-              <p>Complete documentation and setup guides for FSB</p>
-              <a href="https://github.com/fullselfbrowsing/FSB" target="_blank" class="help-link">View Repository</a>
+              <h3 data-i18n="panel_c205924de0">Documentation</h3>
+              <p data-i18n="panel_db4cec18bf">Complete documentation and setup guides for FSB</p>
+              <a href="https://github.com/fullselfbrowsing/FSB" target="_blank" class="help-link" data-i18n="panel_ed16cec106">View Repository</a>
             </div>
 
             <div class="help-card">
               <div class="help-icon">
                 <i class="fas fa-life-ring"></i>
               </div>
-              <h3>Support & FAQ</h3>
-              <p>Browse FAQs and fix common connection issues</p>
-              <a href="https://full-selfbrowsing.com/support" target="_blank" rel="noopener" class="help-link">Open Support</a>
+              <h3 data-i18n="panel_4c4a152a2b">Support & FAQ</h3>
+              <p data-i18n="panel_63dfe63d28">Browse FAQs and fix common connection issues</p>
+              <a href="https://full-selfbrowsing.com/support" target="_blank" rel="noopener" class="help-link" data-i18n="panel_7302582a6f">Open Support</a>
             </div>
 
             <div class="help-card">
               <div class="help-icon">
                 <i class="fas fa-plug"></i>
               </div>
-              <h3>MCP Setup</h3>
-              <p>Connect MCP clients like Claude Code and Cursor, then verify with the doctor command</p>
-              <a href="https://full-selfbrowsing.com/agents" target="_blank" rel="noopener" class="help-link">View MCP Guide</a>
+              <h3 data-i18n="panel_d4a48a753a">MCP Setup</h3>
+              <p data-i18n="panel_d2286811e6">Connect MCP clients like Claude Code and Cursor, then verify with the doctor command</p>
+              <a href="https://full-selfbrowsing.com/agents" target="_blank" rel="noopener" class="help-link" data-i18n="panel_2df575344e">View MCP Guide</a>
             </div>
 
             <div class="help-card">
               <div class="help-icon">
                 <i class="fas fa-shield-alt"></i>
               </div>
-              <h3>Privacy Policy</h3>
-              <p>Read how FSB handles data, storage, and optional server sync</p>
-              <a href="https://full-selfbrowsing.com/privacy.html" target="_blank" rel="noopener" class="help-link">View Privacy Policy</a>
+              <h3 data-i18n="panel_506ff39462">Privacy Policy</h3>
+              <p data-i18n="panel_f3cb441c27">Read how FSB handles data, storage, and optional server sync</p>
+              <a href="https://full-selfbrowsing.com/privacy.html" target="_blank" rel="noopener" class="help-link" data-i18n="panel_377733b622">View Privacy Policy</a>
             </div>
 
             <div class="help-card">
               <div class="help-icon">
                 <i class="fas fa-bug"></i>
               </div>
-              <h3>Issues</h3>
-              <p>Report bugs, request features, and track development progress</p>
-              <a href="https://github.com/fullselfbrowsing/FSB/issues" target="_blank" class="help-link">View Issues</a>
+              <h3 data-i18n="panel_666067dd37">Issues</h3>
+              <p data-i18n="panel_476481e410">Report bugs, request features, and track development progress</p>
+              <a href="https://github.com/fullselfbrowsing/FSB/issues" target="_blank" class="help-link" data-i18n="panel_cf82dd02e8">View Issues</a>
             </div>
 
             <div class="help-card">
               <div class="help-icon">
                 <i class="fa-brands fa-github"></i>
               </div>
-              <h3>Source Code</h3>
-              <p>View the source code and contribute to FSB development</p>
-              <a href="https://github.com/fullselfbrowsing/FSB" target="_blank" class="help-link">View GitHub</a>
+              <h3 data-i18n="panel_bc47da663d">Source Code</h3>
+              <p data-i18n="panel_89b47ad370">View the source code and contribute to FSB development</p>
+              <a href="https://github.com/fullselfbrowsing/FSB" target="_blank" class="help-link" data-i18n="panel_6209d4d395">View GitHub</a>
             </div>
 
             <div class="help-card">
               <div class="help-icon">
                 <i class="fas fa-clock-rotate-left"></i>
               </div>
-              <h3>Release Notes</h3>
-              <p>See what's new and changed in each FSB release</p>
-              <a href="https://github.com/LakshmanTurlapati/FSB/releases" target="_blank" rel="noopener" class="help-link">View Releases</a>
+              <h3 data-i18n="panel_bd4702c187">Release Notes</h3>
+              <p data-i18n="panel_f775bb5cbf">See what's new and changed in each FSB release</p>
+              <a href="https://github.com/LakshmanTurlapati/FSB/releases" target="_blank" rel="noopener" class="help-link" data-i18n="panel_1705ccc5a5">View Releases</a>
             </div>
 
             <div class="help-card">
               <div class="help-icon">
                 <i class="fas fa-gavel"></i>
               </div>
-              <h3>License</h3>
-              <p>FSB is open source under the MIT license</p>
-              <a href="https://github.com/LakshmanTurlapati/FSB/blob/main/LICENSE" target="_blank" rel="noopener" class="help-link">View License</a>
+              <h3 data-i18n="panel_c011d6097b">License</h3>
+              <p data-i18n="panel_8abc0aef4e">FSB is open source under the MIT license</p>
+              <a href="https://github.com/LakshmanTurlapati/FSB/blob/main/LICENSE" target="_blank" rel="noopener" class="help-link" data-i18n="panel_b392d33f2e">View License</a>
             </div>
 
             <div class="help-card">
               <div class="help-icon">
                 <i class="fas fa-users"></i>
               </div>
-              <h3>Community</h3>
-              <p>Join other FSB users and follow along for updates</p>
+              <h3 data-i18n="panel_bb501d7877">Community</h3>
+              <p data-i18n="panel_e235f8135c">Join other FSB users and follow along for updates</p>
               <div class="help-links-row">
                 <a href="https://discord.gg/fullselfbrowsing" target="_blank" rel="noopener" class="help-link"><i class="fa-brands fa-discord"></i> Discord</a>
                 <a href="https://x.com/fullselfbrowsing" target="_blank" rel="noopener" class="help-link" aria-label="X"><i class="fa-brands fa-x-twitter"></i></a>
@@ -1950,10 +1946,10 @@
     <!-- Save Bar -->
     <div class="save-bar" id="saveBar" style="display: none;">
       <div class="save-content">
-        <span class="save-message">You have unsaved changes</span>
+        <span class="save-message" data-i18n="panel_a4b17bc7db">You have unsaved changes</span>
         <div class="save-actions">
-          <button class="save-btn secondary" id="discardBtn">Discard</button>
-          <button class="save-btn primary" id="saveBtn">Save Changes</button>
+          <button class="save-btn secondary" id="discardBtn" data-i18n="panel_eb1a70e392">Discard</button>
+          <button class="save-btn primary" id="saveBtn" data-i18n="panel_35322b5bb5">Save Changes</button>
         </div>
       </div>
     </div>
@@ -1962,6 +1958,9 @@
     <div id="statusToast" class="status-toast"></div>
   </div>
 
+  <script src="../utils/ui-locale.js"></script>
+  <script src="../utils/panel-exact.js"></script>
+  <script src="../utils/copy-exact.js"></script>
   <script src="../config/config.js"></script>
   <script src="../utils/automation-logger.js"></script>
   <script src="../ai/universal-provider.js"></script>
@@ -2068,6 +2067,7 @@
   <script src="voice-input-settings.js"></script>
   <script src="../utils/mcp-session-export-port.js"></script>
   <script src="options.js"></script>
+  <script src="ui-locale-page.js"></script>
   <!--
     Phase 269 / CONS-01, CONS-02: kill-switch wiring.
     Extracted to an external file so it runs under MV3's default CSP

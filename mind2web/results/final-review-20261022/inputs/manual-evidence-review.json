@@ -1,0 +1,173 @@
+[
+  {
+    "order": 54,
+    "path": ".context/om2w/manual-native-20261021/tasks/bc2ce7f206045dd2d322e5695a947219/finding.json",
+    "before": {
+      "state": "visibly_completed",
+      "notes": "Currentcalculator2025taxyear,2025\u20132026title. ZIP97007notacceptedascitysearch;resolvedBeavertonOR visibleautocomplete. Single,standard15750,zeroothercredits/contributions. Entered174250gross sothatfederaltaxableincome158500,perdisplayedcalculatorformula. FSB0026 and native0028 show FederalTax30887,24%marginal. Combined44217includesFICAandnotanswer. Federalestimateonly;noleadformoradvisorquizsubmitted.",
+      "answer": "For2025 ordinary taxable income158500,Single,no tax credits,estimated federal income tax30887USD (24%marginal). Calculator gross174250 minus15750standarddeduction=158500taxable;BeavertonOR correspondsZIP97007. https://smartasset.com/taxes/income-taxes",
+      "recorded_at": "2026-10-22T01:22:38.381Z",
+      "automated_judging": false
+    },
+    "after": {
+      "state": "visibly_completed",
+      "notes": "The current calculator uses tax year 2025. Selected Beaverton, OR (ZIP 97007), Single, standard deduction $15,750, and no other credits or contributions. Entered gross income $174,250 to represent $158,500 taxable income. FSB operation 25 and native screenshot 0027 show federal tax $30,887 at a 24% marginal rate; operation 26 verifies gross income and filing settings. FICA is excluded from the answer. No lead form submitted.",
+      "answer": "Estimated 2025 federal income tax: $30,887 on $158,500 ordinary taxable income, filing Single with no tax credits. Calculator inputs: $174,250 gross income minus $15,750 standard deduction; Beaverton, OR. https://smartasset.com/taxes/income-taxes",
+      "recorded_at": "2026-10-22T01:22:38.381Z",
+      "automated_judging": false,
+      "evidence_reviewed_at": "2026-10-22T02:41:01.414094+00:00"
+    }
+  },
+  {
+    "order": 56,
+    "path": ".context/om2w/manual-native-20261021/tasks/a13e4231a3d6a7000c622c56448d97ba/finding.json",
+    "before": {
+      "state": "visibly_completed",
+      "notes": "SearchClevelandOHOct23\u201326,2026(dayaftertomorrowrelativeOct21Chicago),2adults2children1pet. AppliedAllowsPets,Washer33,FreeParking9,Gym15 and300\u2013900tripprice3nights. PricefieldsneededEnter/Tabcommit;native0054/FSB0053verifyallfilters6matches. OpenedfirstCityView+Modern+Balcony+Parking+Gym,5guestcapacity2bed2bath,4.95/39. FSB0062opened90amenitiesverifiesFreewasherinunit,Freeparkingpremises,Sharedgyminbuilding,Petsallowed. Native0064didnotreachgym(headingselectorabsent);native0054filterevidenceplusFSB0062amenityevidence. Native0068/FSB0067pricepopup3nightsx279.33=838USD,siteallfees,pet1selected. Materialcaveatdescriptionalsoadvertises99/petfee;whetherincludedin838isnotitemized andifadditionaltotal937wouldexceed900. No reservation/message/purchase.",
+      "answer": "City View + Modern + Balcony + Parking + Gym, Cleveland, Oct23\u201326,2adults2children1pet. Displayed838USD/3nights (279.33night average),freeparking,freeinunitwasher,sharedgym,petsallowed. Listingalsoquotes99petfee;confirmwhetheralreadyincludedbeforebooking. https://www.airbnb.com/rooms/1462647298085566084?adults=2&children=2&pets=1&check_in=2026-10-23&check_out=2026-10-26",
+      "recorded_at": "2026-10-22T01:34:55.123Z",
+      "automated_judging": false
+    },
+    "after": {
+      "state": "partial",
+      "notes": "Searched Cleveland for October 23\u201326, 2026 (day after tomorrow relative to October 21 in Chicago), 2 adults, 2 children and 1 pet. Applied pets allowed, washer, free parking, gym and $300\u2013900 total for three nights. Native 0054 and FSB 0053 verify filters and six matches. City View + Modern + Balcony + Parking + Gym has capacity 5, 2 bedrooms, 2 bathrooms and rating 4.95/39. FSB 0062 verifies free in-unit washer, free parking, shared gym and pets allowed; native 0064 did not reach the gym section. Native 0068 and FSB 0067 show $838 for three nights with one pet selected. However, the description also quotes a $99 pet fee whose inclusion is not itemized. If additional, $937 exceeds the $900 budget. Reclassified partial because total budget compliance is unresolved. No booking or message.",
+      "answer": "City View + Modern + Balcony + Parking + Gym, Cleveland, Oct23\u201326,2adults2children1pet. Displayed838USD/3nights (279.33night average),freeparking,freeinunitwasher,sharedgym,petsallowed. Listingalsoquotes99petfee;confirmwhetheralreadyincludedbeforebooking. https://www.airbnb.com/rooms/1462647298085566084?adults=2&children=2&pets=1&check_in=2026-10-23&check_out=2026-10-26",
+      "recorded_at": "2026-10-22T01:34:55.123Z",
+      "automated_judging": false,
+      "evidence_reviewed_at": "2026-10-22T02:41:01.415333+00:00"
+    }
+  },
+  {
+    "order": 57,
+    "path": ".context/om2w/manual-native-20261021/tasks/d730f4ff450da1bd60a836163736ef6a_110325/attempt-3/finding.json",
+    "before": {
+      "state": "visibly_completed",
+      "notes": "Attempt1/2get_page_snapshottransportfailed;freshattempt3FSBswitch/Escapeand smallrenderedDOMreadsworked,compact snapshotnotreused. Searchmensgoretexhikingshoes;price100\u2013199.99,4+reviews,Hikinguse,sortPercentOff. FSB0027firstSpireGTX40%,nativ0034catalog. DetailFSB0036confirmsLaSportivaSpireGTXMen125.40from20940%off4.3/27,GORE-TEXSurround,BlackNeonsize38only5stocknative0038. Higher45%JackalexcludedbyHiking+reviewfilters,bootandunratedoptionsnotchosen. No cart/signup/nativeactions.",
+      "answer": "La Sportiva Spire GTX Hiking Shoe\u2014Men:40%off,$125.40(from$209),rated4.3/5(27reviews),GORE-TEXSurround. AvailableBlack/NeonEU38atcapture. HighestPercentOffinfilteredHiking100\u2013199.99/4+results. https://www.backcountry.com/la-sportiva-spire-gtx-hiking-shoe-mens",
+      "recorded_at": "2026-10-22T01:43:06.572Z",
+      "automated_judging": false
+    },
+    "after": {
+      "state": "visibly_completed",
+      "notes": "Attempts 1 and 2 failed public snapshot transport; attempt 3 used small rendered-DOM reads. Searched mens GORE-TEX hiking shoes and applied $100\u2013199.99, 4+ review rating, Hiking use and Percent Off sorting. FSB 0027 and native 0034 show La Sportiva Spire GTX Hiking Shoe - Mens first, 40% off at $125.40 (was $209), with 27 reviews. Product DOM FSB 0036 confirms rating 4.3/5 and GORE-TEX Surround. Native 0038 shows the product, Black/Neon, size 38 and only 5 in stock, but a Google sign-in prompt obscures part of the header; it is not an unobstructed full product screenshot. No sign-in, cart addition or native input.",
+      "answer": "La Sportiva Spire GTX Hiking Shoe\u2014Men:40%off,$125.40(from$209),rated4.3/5(27reviews),GORE-TEXSurround. AvailableBlack/NeonEU38atcapture. HighestPercentOffinfilteredHiking100\u2013199.99/4+results. https://www.backcountry.com/la-sportiva-spire-gtx-hiking-shoe-mens",
+      "recorded_at": "2026-10-22T01:43:06.572Z",
+      "automated_judging": false,
+      "evidence_reviewed_at": "2026-10-22T02:41:01.416168+00:00"
+    }
+  },
+  {
+    "order": 62,
+    "path": ".context/om2w/manual-native-20261021/tasks/c6c9dc6079677cef594cec2fa6b16602/attempt-2/finding.json",
+    "before": {
+      "state": "visibly_completed",
+      "notes": "FirstattemptUSstoresearchblackleathersofa3seats103results,Leatherfilter11then4star3results(native0025):KIVIKblack1299,STOCKHOLMnatural2499,FINNALAgoldenbrown1299unavailable. KIVIKrated4.3/68 andproductbreadcrumbThreeSeatSofasverifiedFSB0028;80519531. MaterialfilteredLeatherbutGrann/Bomstadupleatherpluscoatedfabricnotclaimed100%leather;openingcompositiondrawerfailedguardcheck. Freshattempt2cartFSB0002/native0003alreadycontainscorrectKIVIKGrannBomstadblackqty1,1299,availabledelivery/pickup. Goalcartstatealreadyfulfilled,noduplicateadded,noqtymutation/no checkout. Pricecheapesttieamongmatchingresults,notuniversalallcountries.",
+      "answer": "The cart already contains1KIVIK sofa,Grann/Bomstadblack,article805.195.31,$1299,rated4.3/5(68),inthree-seatcategoryandleatherfilter. Keptquantity1. https://www.ikea.com/us/en/p/kivik-sofa-grann-bomstad-black-80519531/",
+      "recorded_at": "2026-10-22T02:12:07.207Z",
+      "automated_judging": false
+    },
+    "after": {
+      "state": "visibly_completed",
+      "notes": "First attempt: US store search, Leather filter and 4+ stars left three results (native 0025): KIVIK black $1,299; STOCKHOLM natural $2,499; FINNALA golden brown $1,299 unavailable. KIVIK rating 4.3/68 and three-seat category are verified in product DOM FSB 0028, article 805.195.31. Leather finish is Grann/Bomstad (leather plus coated fabric), not claimed to be all leather; the composition drawer failed to open before scope loss. Fresh attempt 2 cart DOM FSB 0002 and native 0003 verify the correct KIVIK Grann/Bomstad black, quantity 1, $1,299, available for delivery/pickup. Native 0003 also includes a location-permission prompt but leaves the cart visible; no permission was granted. The requested item was already in the cart, so no duplicate or quantity mutation was made. No checkout.",
+      "answer": "The cart already contains1KIVIK sofa,Grann/Bomstadblack,article805.195.31,$1299,rated4.3/5(68),inthree-seatcategoryandleatherfilter. Keptquantity1. https://www.ikea.com/us/en/p/kivik-sofa-grann-bomstad-black-80519531/",
+      "recorded_at": "2026-10-22T02:12:07.207Z",
+      "automated_judging": false,
+      "evidence_reviewed_at": "2026-10-22T02:41:01.416925+00:00"
+    }
+  },
+  {
+    "order": 64,
+    "path": ".context/om2w/manual-native-20261021/tasks/1c3b747ae12ccee895745f82e3f2ef8a/attempt-5/finding.json",
+    "before": {
+      "state": "visibly_completed",
+      "notes": "Attempt 5 after connection recovery reverified Active competitions sorted by Reward: ARC Prize 2026 - ARC-AGI-3 first at $850,000, ahead of ARC-AGI-2 $700,000. Prior overview evidence describes $700,000 conditional bonus within advertised total. Selected actual Code sort Most Votes; URL sortBy=voteCount and rendered ranking verify ARC-AGI-3 Milestone 2 Solution first among unpinned with 1000 votes (next 384). All pinned vote counts are below 1000 (741,736,127). Used actual public comments link to open notebook; direct page verifies author Daniel Franzen and 1000 votes. Notebook tab opened for code display only. No Join Competition, rules acceptance, Copy & Edit, run, download or upvote. Earlier four failed scopes preserved. Native ranking and notebook screenshots saved.",
+      "answer": "Highest advertised active prize: ARC Prize 2026 - ARC-AGI-3, $850,000 total including a conditional $700,000 bonus. Most-voted code: ARC-AGI-3 Milestone 2 Solution by Daniel Franzen, 1,000 votes at recovery time. https://www.kaggle.com/code/dfranzen/arc-agi-3-milestone-2-solution",
+      "recorded_at": "2026-10-22T05:03:07.685Z",
+      "automated_judging": false
+    },
+    "after": {
+      "state": "visibly_completed",
+      "notes": "Attempt 5 after connection recovery reverified Active competitions sorted by Reward: ARC Prize 2026 - ARC-AGI-3 first at $850,000, ahead of ARC-AGI-2 $700,000. Prior overview evidence describes $700,000 conditional bonus within advertised total. Selected actual Code sort Most Votes; URL sortBy=voteCount and rendered ranking verify ARC-AGI-3 Milestone 2 Solution first among unpinned with 1000 votes (next 384). All pinned vote counts are below 1000 (741,736,127). Used actual public comments link to open notebook; direct page verifies author Daniel Franzen and 1000 votes. The Notebook-tab click failed because the element was unstable; the URL remained on the public comments page. Code title, author and vote count were verified there, but the notebook body was not opened or executed. No Join Competition, rules acceptance, Copy & Edit, run, download or upvote. Earlier four failed scopes preserved. Native ranking and notebook screenshots saved.",
+      "answer": "Highest advertised active prize: ARC Prize 2026 - ARC-AGI-3, $850,000 total including a conditional $700,000 bonus. Most-voted code: ARC-AGI-3 Milestone 2 Solution by Daniel Franzen, 1,000 votes at recovery time. https://www.kaggle.com/code/dfranzen/arc-agi-3-milestone-2-solution",
+      "recorded_at": "2026-10-22T05:03:07.685Z",
+      "automated_judging": false,
+      "evidence_reviewed_at": "2026-10-22T05:11:29.787066+00:00"
+    }
+  },
+  {
+    "order": 66,
+    "path": ".context/om2w/manual-native-20261021/tasks/47186fac8e7c7277af01144644eb4e0b_070826/attempt-4/finding.json",
+    "before": {
+      "state": "visibly_completed",
+      "notes": "Fresh attempt 4 recovered the observed Renault 4 review after allowing FSB relay startup. Original top-buys article identifies Renault 4 E-Tech Electric first. Ownership cost page operation 4 verifies running-cost rating 4.5/5; home charging 15.6\u201316.4 miles per pound, public charging 5.5\u20135.8 mpp, efficiency 3.9\u20134.1 miles/kWh; road tax \u00a3200 and insurance group 26\u201327. No single total ownership-cost amount is published; charging and insurance vary. Three-year base warranty and eight-year/100,000-mile battery warranty described. First native capture failed ScreenCaptureKit and was retried without repeating the action; subsequent screenshots saved. No quote, lead or purchase.",
+      "answer": "First car: Renault 4 E-Tech Electric. Parkers ownership costs: home charging 15.6\u201316.4 miles/\u00a3; public charging 5.5\u20135.8 miles/\u00a3; 3.9\u20134.1 miles/kWh; road tax \u00a3200; insurance group 26\u201327. Running-cost rating 4.5/5. The site gives no fixed all-in ownership total. https://www.parkers.co.uk/renault/4-e-tech/review/mpg-running-costs/",
+      "recorded_at": "2026-10-22T04:45:27.027Z",
+      "automated_judging": false
+    },
+    "after": {
+      "state": "visibly_completed",
+      "notes": "Fresh attempt 4 recovered the observed Renault 4 review after allowing FSB relay startup. Original top-buys article identifies Renault 4 E-Tech Electric first. Ownership cost page operation 4 verifies running-cost rating 4.5/5; home charging 15.6\u201316.4 miles per pound, public charging 5.5\u20135.8 mpp, efficiency 3.9\u20134.1 miles/kWh; road tax \u00a3200 and insurance group 26\u201327. No single total ownership-cost amount is published; charging and insurance vary. Three-year base warranty and eight-year/100,000-mile battery warranty described. First native capture failed ScreenCaptureKit and was retried without repeating the action; subsequent screenshots saved. Native 0005 shows the ownership heading; native 0007 clips the left side of the table, although \u00a3200 road tax and insurance group 26\u201327 are visible. The complete numerical evidence is the rendered public DOM in FSB operation 4. No quote, lead or purchase.",
+      "answer": "First car: Renault 4 E-Tech Electric. Parkers ownership costs: home charging 15.6\u201316.4 miles/\u00a3; public charging 5.5\u20135.8 miles/\u00a3; 3.9\u20134.1 miles/kWh; road tax \u00a3200; insurance group 26\u201327. Running-cost rating 4.5/5. The site gives no fixed all-in ownership total. https://www.parkers.co.uk/renault/4-e-tech/review/mpg-running-costs/",
+      "recorded_at": "2026-10-22T04:45:27.027Z",
+      "automated_judging": false,
+      "evidence_reviewed_at": "2026-10-22T05:11:29.787066+00:00"
+    }
+  },
+  {
+    "order": 69,
+    "path": ".context/om2w/manual-native-20261021/tasks/6174e5ddd40cfbdc33ee1502f40bac39/finding.json",
+    "before": {
+      "state": "partial",
+      "notes": "Searched Nashville on Recreation.gov, applied Day Use filter (43 results), inspected Roaring River Park, Wartrace Creek and Defeated Creek, then public web search led to Cook Day Use Area (11 miles point-to-point in search; near Hermitage). Official Cook page calls it DAY USE and lists horseback riding among lake-region activities. However, direct Available Activities omit horseback riding, and notices require Resource Manager pre-approval for activities other than group-shelter picnicking. Cordell Hull alternatives similarly mention horseback trails around the lake without direct park riding access. Recorded a useful regional candidate, but actual horse access/trail at the specific day-use park is unverified; no reservation, cart, contact or approval request sent.",
+      "answer": "Closest useful candidate found: Cook Day Use Area, J. Percy Priest Lake, near Hermitage, about 11 miles from Nashville in the search. Its official recreation description includes horseback riding in the lake region, but does not confirm a riding trail within this park; other activities require Resource Manager approval. Phone 615-889-1975; 12230 Old Hickory Blvd, Hermitage TN 37076. https://www.recreation.gov/camping/campgrounds/232556 . Exact riding access remains unverified.",
+      "recorded_at": "2026-10-22T04:52:47.790Z",
+      "automated_judging": false
+    },
+    "after": {
+      "state": "partial",
+      "notes": "Searched Nashville on Recreation.gov, applied Day Use filter (43 results), inspected Roaring River Park, Wartrace Creek and Defeated Creek, then public web search led to Cook Day Use Area (11 miles point-to-point in search; near Hermitage). Official Cook page calls it DAY USE and lists horseback riding among lake-region activities. However, direct Available Activities omit horseback riding, and notices require Resource Manager pre-approval for activities other than group-shelter picnicking. Cordell Hull alternatives similarly mention horseback trails around the lake without direct park riding access. Native 0039 is not claimed to visibly establish horseback riding; the regional activity wording is supported by public rendered DOM. Recorded a useful regional candidate, but actual horse access/trail at the specific day-use park is unverified; no reservation, cart, contact or approval request sent.",
+      "answer": "Closest useful candidate found: Cook Day Use Area, J. Percy Priest Lake, near Hermitage, about 11 miles from Nashville in the search. Its official recreation description includes horseback riding in the lake region, but does not confirm a riding trail within this park; other activities require Resource Manager approval. Phone 615-889-1975; 12230 Old Hickory Blvd, Hermitage TN 37076. https://www.recreation.gov/camping/campgrounds/232556 . Exact riding access remains unverified.",
+      "recorded_at": "2026-10-22T04:52:47.790Z",
+      "automated_judging": false,
+      "evidence_reviewed_at": "2026-10-22T05:11:29.787066+00:00"
+    }
+  },
+  {
+    "order": 72,
+    "path": ".context/om2w/manual-native-20261021/tasks/c7c07ec10c668625a21ba64165d719bb/finding.json",
+    "before": {
+      "state": "visibly_completed",
+      "notes": "Followed official Verizon Prepaid to phone plans. Increased actual line selector from 1 to 4, then switched Auto Pay Off (unchecked). FSB operation 13 verifies count 4 and autopay false: standard Unlimited $180/mo total, Unlimited Plus $220/mo. Published multiline note independently states four Unlimited lines without Auto Pay total $180/month. Calculation is $60 first line + $40 for each of 3 additional lines, retaining $20/additional-line multiline discount. Taxes and fees additional; no loyalty credits deducted. Native captures 14 and 16 saved, with 14 price headings clipped by sticky navigation; 16 centers line control. No enrollment, account setting change, activation or checkout; toggle only changed public quote display.",
+      "answer": "Four Verizon Prepaid Unlimited lines cost $180/month total without Auto Pay, plus taxes and fees, with the multi-line discount included. $60 + 3\u00d7$40 = $180. Unlimited Plus would be $220/month. https://www.verizon.com/prepaid/plans/phone-plans/",
+      "recorded_at": "2026-10-22T05:00:19.955Z",
+      "automated_judging": false
+    },
+    "after": {
+      "state": "visibly_completed",
+      "notes": "Followed official Verizon Prepaid to phone plans. Increased actual line selector from 1 to 4, then switched Auto Pay Off (unchecked). FSB operation 13 verifies count 4 and autopay false: standard Unlimited $180/mo total, Unlimited Plus $220/mo. Published multiline note independently states four Unlimited lines without Auto Pay total $180/month. Calculation is $60 first line + $40 for each of 3 additional lines, retaining $20/additional-line multiline discount. Taxes and fees additional; no loyalty credits deducted. Native captures 14 and 16 saved, with 14 price headings clipped by sticky navigation; 16 shows four lines and the $180 Unlimited price, with the Auto Pay control below the fold. FSB 13 independently verifies the Auto Pay-off state. No enrollment, account setting change, activation or checkout; toggle only changed public quote display.",
+      "answer": "Four Verizon Prepaid Unlimited lines cost $180/month total without Auto Pay, plus taxes and fees, with the multi-line discount included. $60 + 3\u00d7$40 = $180. Unlimited Plus would be $220/month. https://www.verizon.com/prepaid/plans/phone-plans/",
+      "recorded_at": "2026-10-22T05:00:19.955Z",
+      "automated_judging": false,
+      "evidence_reviewed_at": "2026-10-22T05:11:29.787066+00:00"
+    }
+  },
+  {
+    "order": 47,
+    "path": ".context/om2w/manual-native-20261021/tasks/b64f938af842f6a1b4489d0e49a785a7_121125/attempt-2/finding.json",
+    "before": {
+      "state": "visibly_completed",
+      "notes": "User reported completing this specific Target Press & Hold challenge. Resumed the same live owned attempt-2 scope; native 0007 and FSB 0006 verify normal Target homepage without visible challenge. All subsequent task actions used pinned FSB. Typed frozen vegetarian cheese pizza successfully; a native Enter attempt was refused because the tab was no longer foreground, so used the actual Search button through FSB. Applied the real Diet Type Vegetarian and Price $5\u2013$9.99 filters; FSB 0041 and native 0042 verify both chips together. Opened actual Yough! Mozzarella Cheese Frozen Pizza - 11.3oz product, TCIN 94975371, $9.99, rating 4.28/374. Native 0051 clearly shows product title, price and pickup availability at the existing Plano West store (75287); no location change. Vegetarian classification is supported by inclusion under Target\u2019s actual Vegetarian filter, not an inferred absence of meat. The product is in Frozen Cheese Pizza and package says Keep Frozen. Shipping unavailable; pickup and same-day delivery shown. Native 0028 captured foreground BoardGameGeek while user switched tabs and is not Target evidence. Early checkbox/Apply actions returned visibility errors; the final applied chips, rather than those attempts, establish selection. No CAPTCHA action by the assistant, cart addition, checkout or purchase.",
+      "answer": "Yough! Mozzarella Cheese Frozen Pizza, 11.3 oz \u2014 $9.99, within the $5\u2013$10 budget and included under Target\u2019s Vegetarian filter. Pickup available at Plano West; shipping unavailable at capture. https://www.target.com/p/yough-mozzarella-cheese-frozen-pizza-11-3oz/-/A-94975371",
+      "recorded_at": "2026-10-22T05:30:03.492Z",
+      "automated_judging": false
+    },
+    "after": {
+      "state": "visibly_completed",
+      "notes": "User reported completing this specific Target Press & Hold challenge. Resumed the same live owned attempt-2 scope; native 0007 and FSB 0006 verify normal Target homepage without visible challenge. All subsequent task actions used pinned FSB. Typed frozen vegetarian cheese pizza successfully; an FSB press_key Enter request was refused before input because the tab was no longer foreground, so used the actual Search button through FSB. Applied the real Diet Type Vegetarian and Price $5\u2013$9.99 filters; FSB 0041 and native 0042 verify both chips together. Opened actual Yough! Mozzarella Cheese Frozen Pizza - 11.3oz product, TCIN 94975371, $9.99, rating 4.28/374. Native 0051 clearly shows product title, price and pickup availability at the existing Plano West store (75287); no location change. Vegetarian classification is supported by inclusion under Target\u2019s actual Vegetarian filter, not an inferred absence of meat. The product is in Frozen Cheese Pizza and package says Keep Frozen. Shipping unavailable; pickup and same-day delivery shown. Native 0028 captured foreground BoardGameGeek while user switched tabs and is not Target evidence. Early checkbox/Apply actions returned visibility errors; the final applied chips, rather than those attempts, establish selection. No CAPTCHA action by the assistant, cart addition, checkout or purchase.",
+      "answer": "Yough! Mozzarella Cheese Frozen Pizza, 11.3 oz \u2014 $9.99, within the $5\u2013$10 budget and included under Target\u2019s Vegetarian filter. Pickup available at Plano West; shipping unavailable at capture. https://www.target.com/p/yough-mozzarella-cheese-frozen-pizza-11-3oz/-/A-94975371",
+      "recorded_at": "2026-10-22T05:30:03.492Z",
+      "automated_judging": false,
+      "evidence_reviewed_at": "2026-10-22T05:32:25.850485+00:00"
+    }
+  }
+]

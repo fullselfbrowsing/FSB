@@ -1,0 +1,14 @@
+{
+  "status": "finalized",
+  "published_at": "2026-10-22T06:32:59.048345+00:00",
+  "primary_report": "mind2web/FINAL-REVIEWED-REPORT.md",
+  "primary_result": "mind2web/FINAL-RESULT.json",
+  "score": {
+    "successes": 277,
+    "expected": 300,
+    "rate": 0.9233333333333333
+  },
+  "review_type": "AI-reviewed",
+  "human_reviewed": false,
+  "historical_seals_unchanged": true
+}

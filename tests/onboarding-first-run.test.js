@@ -126,7 +126,7 @@ async function loadInitConfigHarness() {
     const clientIds = context.FSB_ONBOARDING_INSTALL_CLIENTS.map((client) => client.id).sort();
     assert.strictEqual(
       JSON.stringify(clientIds),
-      JSON.stringify(['all', 'claude-code', 'claude-desktop', 'codex', 'cursor', 'openclaw', 'opencode', 'vscode', 'windsurf'].sort()),
+      JSON.stringify(['all', 'antigravity', 'claude-code', 'claude-desktop', 'cline', 'codex', 'cursor', 'openclaw', 'opencode', 'vscode'].sort()),
       'MCP install client list includes all planned targets'
     );
   }

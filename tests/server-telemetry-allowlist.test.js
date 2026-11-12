@@ -129,7 +129,7 @@ function post(events) {
   let parsed5 = null; try { parsed5 = JSON.parse(r5.body); } catch {}
   check('error === invalid_event_id for bad uuid', parsed5 && parsed5.error === 'invalid_event_id', `body=${r5.body}`);
 
-  // Sanity: bad mcp_client (not in 13+unknown allowlist).
+  // Sanity: bad mcp_client (not in the allowlist).
   const ev6 = baseEvent();
   ev6.mcp_client = 'Other';
   const r6 = await post([ev6]);
@@ -141,11 +141,26 @@ function post(events) {
   const r7 = await post([ev7]);
   check('bad event_type -> 400 invalid_event_type', r7.statusCode === 400, `got ${r7.statusCode}, body=${r7.body}`);
 
-  // mcp_client 'unknown' is allowed (14th value in the allowlist).
+  // mcp_client 'unknown' is allowed (15th value in the allowlist).
   const ev8 = baseEvent();
   ev8.mcp_client = 'unknown';
   const r8 = await post([ev8]);
-  check('mcp_client === "unknown" -> 200 (14th allowed value)', r8.statusCode === 200, `got ${r8.statusCode}, body=${r8.body}`);
+  check('mcp_client === "unknown" -> 200 (15th allowed value)', r8.statusCode === 200, `got ${r8.statusCode}, body=${r8.body}`);
+
+  // Cline joined the public label set after the v0.9.36 allowlist.
+  const evCline = baseEvent();
+  evCline.mcp_client = 'Cline';
+  const rCline = await post([evCline]);
+  check('mcp_client === "Cline" -> 200', rCline.statusCode === 200, `got ${rCline.statusCode}, body=${rCline.body}`);
+
+  // The always-on agents are accepted, and Windsurf stays accepted for
+  // extensions from before 0.9.95 that still send it.
+  for (const label of ['Muse', 'Grok Bot', 'Dots', 'Windsurf']) {
+    const ev = baseEvent();
+    ev.mcp_client = label;
+    const r = await post([ev]);
+    check(`mcp_client === "${label}" -> 200`, r.statusCode === 200, `got ${r.statusCode}, body=${r.body}`);
+  }
 
   // The emoji-bearing allowlist label is accepted.
   const ev9 = baseEvent();

@@ -30,7 +30,7 @@ function detection(providerId, overrides = {}) {
       realPath: `/fixture/bin/${providerId}`,
       argvPrefix: Object.freeze([]),
     }),
-    profileVersion: version,
+    profileVersion: providerId === 'grok-build' ? 'grok-acp-v1' : version,
     ...overrides,
   });
 }
@@ -217,6 +217,17 @@ function staticAdapter(detected, output) {
 }
 
 async function testFailureMatrix(connection, processProbe) {
+  for (const code of ['sandbox_unavailable', 'isolation_unavailable', 'capability_missing', 'agent_protocol_drift', 'binary_changed']) {
+    const refused = staticAdapter(detection('grok-build', {
+      installed: false, profileVersion: null,
+      diagnostic: { code, message: 'PRIVATE_FAILURE_DETAIL' },
+    }), []);
+    const result = await connection.testAgentProviderConnection({
+      providerId: 'grok-build', registry: registryFor('grok-build', refused, []),
+    });
+    assert.deepEqual(result, { ok: false, providerId: 'grok-build', code },
+      `${code} reaches the connection test without a generic adapter error`);
+  }
   {
     let spawnCalls = 0;
     const adapter = Object.freeze({

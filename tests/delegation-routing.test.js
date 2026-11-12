@@ -48,7 +48,7 @@ const OPENCODE_ACCEPTED_IDENTITY = Object.freeze({
 const GROK_BUILD_ACCEPTED_IDENTITY = Object.freeze({
   providerId: 'grok-build',
   label: 'Grok Build',
-  profileVersion: '1.0.4',
+  profileVersion: 'grok-acp-v1',
   authState: 'oauth',
   billingKind: 'subscription'
 });
@@ -596,6 +596,7 @@ async function main() {
   assert.deepEqual(clone(preflight.check({
     ...readyInput,
     agentProviderId: 'grok-build',
+    compatibility: { status: 'supported', reason: 'capability_verified', checkedAt: 100 },
     acceptedIdentity: clone(GROK_BUILD_ACCEPTED_IDENTITY)
   })), {
     ok: true,
@@ -604,6 +605,13 @@ async function main() {
     providerLabel: 'Grok Build',
     acceptedIdentity: GROK_BUILD_ACCEPTED_IDENTITY
   }, 'Grok Build enters delegated mode only with canonical compatibility evidence');
+
+  for (const compatibility of [supportedCompatibility(), degradedCompatibility()]) {
+    const refused = clone(preflight.check({ ...readyInput, agentProviderId: 'grok-build',
+      compatibility, acceptedIdentity: clone(GROK_BUILD_ACCEPTED_IDENTITY) }));
+    assert.equal(refused.ok, false, 'Grok version-range evidence cannot authorize capability-based execution');
+    assert.equal(refused.code, 'unsupported_provider');
+  }
 
   for (const compatibility of [
     undefined,

@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "source": "Official bundled catalog from codex-cli0.160.1 debug models --bundled",
+  "bundled_catalog_sha256": "262dc36e0e7beb290aef8196bd59f42acf51647b8f7b68dafa533ae7742019e6",
+  "model": "gpt-6.1-sol",
+  "original_selected_model_sha256": "c431dcf452fd42fe88ca2d4b6adfa151d00cc76e25859a4638c7c309cec7ae23",
+  "policy_catalog_sha256": "ef0d32fdba5a0ce359dafa3cea0c83405d0a23418463f0a4f0fa55ccb3424887",
+  "changed_fields": {
+    "apply_patch_tool_type": {
+      "from": "freeform",
+      "to": null
+    },
+    "experimental_supported_tools": {
+      "from": [
+        "send_user_message_async",
+        "clock"
+      ],
+      "to": []
+    }
+  },
+  "policy": "Same model and reasoning metadata; remove non-browser tool creation metadata. Code mode tool routing remains unchanged."
+}

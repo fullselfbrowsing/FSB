@@ -86,9 +86,9 @@ const KNOWLEDGE_SITE_LABELS: Readonly<Record<string, string>> = {
 const KNOWLEDGE_GRAPH_COPY = {
   unknown: $localize`:@@about.memory.graph.unknown:Unknown`,
   // Graph nodes routinely carry a count of 1, so a single form rendered
-  // "1 selectors" in en/de/es. Of the supported locales only those three
-  // inflect, and all three are two-form, so a singular/plural pair is
-  // sufficient -- ja/ko/zh simply translate both forms identically.
+  // "1 selectors" in en/de/es. A singular/plural pair covers those two-form
+  // locales; ja/ko/zh translate both forms identically, and ru (one/few/many)
+  // uses a count-neutral "noun: N" wording in both forms.
   siteCount: (count: number) => count === 1
     ? $localize`:@@about.memory.graph.siteCountOne:${count}:count: site`
     : $localize`:@@about.memory.graph.siteCount:${count}:count: sites`,

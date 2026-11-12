@@ -2,7 +2,7 @@
 
 As of fsb-mcp-server v0.9.0 (FSB milestone v0.9.62) the visual session is IMPLICIT. There is no `start_visual_session` / `end_visual_session` pairing. Every action tool call carries a field bundle, and the lifecycle is driven by those fields alone. This file documents the bundle, the sliding 60-second window, the read-tool vs action-tool split, and the bootstrap path.
 
-If you arrived here from v0.8.0 / v0.9.36 docs that documented an explicit start/end pairing, that pairing was removed in v0.9.0. Calling the removed tools returns the typed `TOOL_REMOVED` error -- the body names the new contract and points at the migration recipe in `mcp/CHANGELOG.md` v0.9.0.
+If you arrived here from v0.8.0 / v0.9.36 docs that documented an explicit start/end pairing, that pairing was removed in v0.9.0. The removed names are no longer registered, so calling them fails with the MCP host's unknown-tool error. The migration recipe is in `mcp/CHANGELOG.md` v0.9.0.
 
 ## The field bundle
 
@@ -14,7 +14,7 @@ Every MCP action tool accepts and requires the following fields on every call:
 | `client`        | string  | required | Allowlisted client label. Validated against the v0.9.36 shared badge allowlist (see below).          |
 | `is_final`      | boolean | optional | When `true`, the overlay clears immediately after the tool's `change_report` resolves. Default `false`. |
 
-Allowlisted `client` values (v0.9.36 shared allowlist): `Claude`, `Codex`, `ChatGPT`, `Perplexity`, `Windsurf`, `Cursor`, `Antigravity`, `OpenCode`, `OpenClaw`, `Grok`, `Gemini`. The skill ships as part of OpenClaw, so the canonical `client` value for this surface is `OpenClaw`. Freeform strings reject with `BADGE_NOT_ALLOWED`.
+Allowlisted `client` values (shared allowlist): `Claude`, `Codex`, `ChatGPT`, `Perplexity`, `Cursor`, `Antigravity`, `OpenCode`, `OpenClaw`, `Grok`, `Gemini`, `Hermes`, `Cline`, `Continue`, `Zed`, `VS Code`, `Copilot`, `JetBrains`, `Xcode`, `Eclipse`, `Cody`, `Roo Code`, `Kiro`, `Goose`, `Muse`, `Grok Bot`, `Dots`. The skill ships as part of OpenClaw, so the canonical `client` value for this surface is `OpenClaw`. Freeform strings reject with `BADGE_NOT_ALLOWED`.
 
 The canonical 36-tool action list lives in `.planning/v0.9.62-CONTRACT.md` (Action Tools section). The 15-tool read-only list lives in the same file (Read-Only Tools section). Do not re-derive either list from memory.
 
@@ -85,9 +85,8 @@ Three typed errors guard the contract. Match on the name, not the human-readable
 |---------------------------|---------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------|
 | `VISUAL_FIELDS_REQUIRED`  | Action call missing `visual_reason` or `client`.                          | Add the missing field(s) and retry. Schema-layer reject; no DOM mutation occurs.                      |
 | `BADGE_NOT_ALLOWED`       | `client` value not on the v0.9.36 allowlist.                              | Use one of the allowlisted labels listed above (`OpenClaw` for this skill) and retry.                  |
-| `TOOL_REMOVED`            | Caller invoked `start_visual_session` or `end_visual_session` by name.    | Stop calling the removed tools. Migrate to the field bundle on action calls. See migration recipe.    |
 
-The three error names are pinned by `.planning/v0.9.62-CONTRACT.md` and stay verbatim across surfaces.
+The two error names are pinned by `.planning/v0.9.62-CONTRACT.md` and stay verbatim across surfaces.
 
 ## Autopilot exception
 
