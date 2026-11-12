@@ -916,7 +916,7 @@
 
     async function getElementCacheConfig() {
       var stored = await get([KEY.ELEMENT_CACHE_SIZE]);
-      return { elementCacheSize: safeNumber(stored[KEY.ELEMENT_CACHE_SIZE], 100, 10, 1000) };
+      return { elementCacheSize: safeNumber(stored[KEY.ELEMENT_CACHE_SIZE], 200, 10, 1000) };
     }
 
     async function getCaptchaSettings() {
@@ -933,7 +933,7 @@
           typeof chromeApi.storage.onChanged.addListener !== 'function') return function() {};
       var onChanged = function(changes, areaName) {
         if (areaName !== 'local' || !changes || !changes[KEY.ELEMENT_CACHE_SIZE]) return;
-        listener(safeNumber(changes[KEY.ELEMENT_CACHE_SIZE].newValue, 100, 10, 1000));
+        listener(safeNumber(changes[KEY.ELEMENT_CACHE_SIZE].newValue, 200, 10, 1000));
       };
       chromeApi.storage.onChanged.addListener(onChanged);
       return function() {

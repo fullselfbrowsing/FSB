@@ -2108,6 +2108,10 @@ async function run() {
 
     check((await store.getElementCacheConfig()).elementCacheSize === 321,
       'element-cache configuration is parsed and clamped by the trusted store');
+    const unsetCacheStore = api.create({ chrome: createFakeStorage({}).chrome, now: () => 1700000000000 });
+    await unsetCacheStore.ready();
+    check((await unsetCacheStore.getElementCacheConfig()).elementCacheSize === 200,
+      'an unset element-cache size falls back to the 200 default that Config and init-config use');
     const captcha = await store.getCaptchaSettings();
     check(captcha.enabled === true && captcha.apiKey === 'super-secret-captcha-key',
       'CAPTCHA key remains obtainable only through the background-owned store');
