@@ -278,7 +278,7 @@ function seedMessageLogEnvelope(convId, msgSeq) {
 function _loadSidepanelHydrate() {
   const src = fs.readFileSync(path.join(__dirname, '..', 'extension/ui/sidepanel.js'), 'utf8');
   const hydrateMatch = src.match(/async function hydrateChatFromConversationId\(convId\) \{[\s\S]*?\n\}/);
-  const renderMatch = src.match(/function renderPersistedMessage\(content, role, kind\) \{[\s\S]*?\n\}/);
+  const renderMatch = src.match(/function renderPersistedMessage\(content, role, kind, uiMessage\) \{[\s\S]*?\n\}/);
   if (!hydrateMatch) throw new Error('hydrateChatFromConversationId not found in sidepanel.js');
   if (!renderMatch) throw new Error('renderPersistedMessage not found in sidepanel.js');
   const hydrateSrc = hydrateMatch[0];
@@ -564,7 +564,7 @@ function _loadSidepanelHydrate() {
     const iterMatch = spSrc.match(/case 'iteration_complete':[\s\S]*?break;/);
     ok(iterMatch !== null, 'Part 5.8: case iteration_complete found');
     const iterBody = iterMatch ? iterMatch[0] : '';
-    ok(/_persistMessageToConversation\('assistant', 'Step ' \+ request\.iteration \+ ' complete', 'progress', iterConvId\)/.test(iterBody),
+    ok(/_persistMessageToConversation\('assistant',[\s\S]*?'progress', iterConvId,/.test(iterBody),
        'Part 5.9: iteration_complete persists progress via _persistMessageToConversation (QT-7bi-02 conv-routed)');
     ok(/updateStatusMessage/.test(iterBody),
        'Part 5.10: iteration_complete existing updateStatusMessage call preserved');

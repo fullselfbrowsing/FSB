@@ -1,0 +1,134 @@
+{
+  "status": "finalized",
+  "finalized_at": "2026-10-22T05:49:57.071213+00:00",
+  "expected": 300,
+  "dataset": {
+    "path": "/Users/lakshman/conductor/workspaces/fsb/jerusalem/mind2web/cache/dataset/eacad896a84dc5b65e29b0b06e4699ab0544d701.json",
+    "sha256": "7dedf381531d423dc0fc48d21dc1d425655dd75f38b10211a880fa09102f257f",
+    "revision": "eacad896a84dc5b65e29b0b06e4699ab0544d701"
+  },
+  "new_claude_judge_runs": 0,
+  "pending_evaluations": 0,
+  "automated": {
+    "official": {
+      "original_mean": 0.79,
+      "recovery_adjusted_mean": 0.8333333333333334,
+      "original_majority": 238,
+      "recovery_adjusted_majority": 251,
+      "expected": 300,
+      "passes": 3
+    },
+    "strict": {
+      "original_mean": 0.7266666666666667,
+      "recovery_adjusted_mean": 0.77,
+      "original_majority": 218,
+      "recovery_adjusted_majority": 231,
+      "expected": 300,
+      "passes": 3
+    }
+  },
+  "jobs": {
+    "claude-official-pass1": {
+      "variant": "official",
+      "original_successes": 237,
+      "recovery_adjusted_successes": 250,
+      "expected": 300
+    },
+    "claude-official-pass2": {
+      "variant": "official",
+      "original_successes": 235,
+      "recovery_adjusted_successes": 248,
+      "expected": 300
+    },
+    "claude-official-pass3": {
+      "variant": "official",
+      "original_successes": 239,
+      "recovery_adjusted_successes": 252,
+      "expected": 300
+    },
+    "claude-strict-pass1": {
+      "variant": "strict",
+      "original_successes": 222,
+      "recovery_adjusted_successes": 235,
+      "expected": 300
+    },
+    "claude-strict-pass2": {
+      "variant": "strict",
+      "original_successes": 217,
+      "recovery_adjusted_successes": 230,
+      "expected": 300
+    },
+    "claude-strict-pass3": {
+      "variant": "strict",
+      "original_successes": 215,
+      "recovery_adjusted_successes": 228,
+      "expected": 300
+    }
+  },
+  "manual_review": {
+    "protocol": "conservative-saved-evidence-review-v1",
+    "reviewer": "Codex assistant directly",
+    "blind": false,
+    "automated_webjudge": false,
+    "goals_and_findings_reviewed": 72,
+    "historical_operator_completed_count": 55,
+    "counts": {
+      "supported": 49,
+      "not_met": 17,
+      "qualified": 6
+    },
+    "supported_rate_within_selected_failures": 0.6805555555555556,
+    "native_observations_integrity_verified": 850,
+    "all_native_images_independently_reexamined": false,
+    "focused_images_reexamined": 8,
+    "prior_28_missing_trajectory_outcomes": {
+      "supported": 15,
+      "not_met": 10,
+      "qualified": 3
+    }
+  },
+  "reviewed_composite": {
+    "supported_total": 277,
+    "expected": 300,
+    "rate": 0.9233333333333333,
+    "retained_both_claude_majorities": 228,
+    "new_supported_manual_reviews": 49,
+    "uncredited_qualified": 6,
+    "uncredited_not_met": 17,
+    "autonomous_benchmark_score": false,
+    "by_level": {
+      "easy": {
+        "expected": 80,
+        "retained": 69,
+        "manual_supported": 9,
+        "manual_qualified": 1,
+        "manual_not_met": 1,
+        "composite_supported": 78
+      },
+      "medium": {
+        "expected": 141,
+        "retained": 112,
+        "manual_supported": 21,
+        "manual_qualified": 1,
+        "manual_not_met": 7,
+        "composite_supported": 133
+      },
+      "hard": {
+        "expected": 79,
+        "retained": 47,
+        "manual_supported": 19,
+        "manual_qualified": 4,
+        "manual_not_met": 9,
+        "composite_supported": 66
+      }
+    }
+  },
+  "limitations": [
+    "The 228 carried-forward tasks were not independently re-reviewed.",
+    "This is one non-blind Codex review, not six new Claude passes or upstream WebJudge equivalence.",
+    "Manual recovery used native macOS observation, public rendered DOM, multiple fresh retries and user-completed Target verification.",
+    "Manual recovery does not retain the automated per-task time/action budget; products, dates and shared cart state changed.",
+    "An already-correct IKEA cart is credited as an end state, not a new actor-caused addition.",
+    "Qualified and unsuccessful tasks remain zeros; pending Ryanair terms authorization does not leave the evaluation pending."
+  ]
+}

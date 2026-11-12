@@ -38,10 +38,18 @@ export const MCP_EXTENSION_COMPAT = Object.freeze({
     bulletReason: 'for `mcp:task-status`',
     pairReason: 'for the `mcp:task-status` route used by `complete_task`, `partial_task`, and `fail_task`. Existing `0.10.0` tool routes remain additive and unchanged.',
   }),
+  // 0.11.5 accepts the Muse, Grok Bot and Dots client labels and checks Grok
+  // Build by capability, which the extension matches from 0.9.95.
+  '0.11.5': entry({
+    minimum: '0.9.95',
+    feature: null,
+    bulletReason: 'for `mcp:task-status`',
+    pairReason: 'for the `mcp:task-status` route used by `complete_task`, `partial_task`, and `fail_task`. Existing `0.10.0` tool routes remain additive and unchanged.',
+  }),
   // 66.1-03: older extensions answer SETTING_UNSUPPORTED; 69-06: they report
   // expect_result uncertain with extension_unsupported.
   '0.12.0': entry({
-    minimum: '0.9.92',
+    minimum: '0.9.95',
     feature: { version: '1.0.0', names: ['settings', 'expect'] },
     bulletReason: 'for existing tools; `settings` and the optional `expect` need FSB extension 1.0.0 or newer',
     pairReason: 'for existing tools. `settings` and the optional `expect` need extension 1.0.0 or newer; older extensions answer `SETTING_UNSUPPORTED` and report `expect_result` as `uncertain` with `extension_unsupported`. Existing tool routes remain additive and unchanged.',

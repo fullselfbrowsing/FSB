@@ -26,8 +26,13 @@ export const EXPECT_TOOL_NAMES_VERBATIM = Object.freeze([
   'select_option', 'check_box', 'set_attribute',
   'drag_drop', 'drag', 'drag_variable_speed', 'drop_file', 'upload_file',
   'select_text_range', 'scroll_to_top', 'scroll_to_bottom', 'scroll_to_element',
-  'navigate', 'go_back', 'go_forward', 'refresh', 'back',
+  'navigate', 'go_back', 'go_forward', 'refresh',
 ]);
+
+// In the 8a058bdf baseline but no longer registered: fsb-mcp-server 0.11.5
+// removed the two TOOL_REMOVED visual-session stubs and `back`, which
+// duplicated go_back.
+export const RETIRED_TOOL_NAMES = Object.freeze(['back', 'end_visual_session', 'start_visual_session']);
 
 const MCP_SRC = path.join(REPO_ROOT, 'mcp', 'src');
 const MCP_BUILD = path.join(REPO_ROOT, 'mcp', 'build');

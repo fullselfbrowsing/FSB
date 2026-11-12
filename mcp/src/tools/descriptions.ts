@@ -28,7 +28,7 @@ type TextTable = Readonly<Record<string, string>>;
 export const MCP_COMMON_PARAM_DESCRIPTIONS: TextTable = Object.freeze({
   tab_id: "Optional target tab; omit if this agent owns one tab. Another agent's tab is rejected (TAB_NOT_OWNED).",
   visual_reason: 'Short reason shown in the overlay.',
-  client: 'Client label such as Claude, Codex, Cursor, ChatGPT, Gemini, VS Code, Copilot or Windsurf; case, spaces, _ and - are ignored.',
+  client: 'Client label such as Claude, Codex, Cursor, ChatGPT, Gemini, VS Code, Copilot or Antigravity; case, spaces, _ and - are ignored.',
   is_final: 'True clears the overlay after this call.',
 });
 
@@ -114,9 +114,6 @@ export const MCP_TOOL_DESCRIPTIONS: TextTable = Object.freeze({
   search_capabilities: 'Search the FSB capability catalog by intent; use it before DOM tools for first-party actions on the current site. Returns up to topN hits ranked toward the tab origin, each with slug, service, side-effect class (read, mutate or destructive), readiness and a params schema. Only t1-ready hits run as direct API calls.',
   invoke_capability: "Invoke a capability by slug from a search_capabilities hit, with params matching its schema. Ready capabilities call the service's real web API in your signed-in session, and mutating ones perform real side effects, so check the side-effect class first. On RECIPE_DOM_FALLBACK_PENDING, RECIPE_LEARN_PENDING or RECIPE_EXPIRED, continue the task with DOM tools.",
 
-  // --- back (agents.ts); the mcp:go-back route returns no change_report, so
-  // only the inspect-before-retrying guidance is kept from that sentence ---
-  back: "Go back one step in browser history on the agent's tab (single step, no count). It does not steal focus, so it works on background tabs. Returns status ok, no_history, cross_origin, bf_cache or fragment_only, with resultingUrl and historyDepth; if the outcome is unknown, inspect the page before retrying.",
 
   // --- observability tools (observability.ts) ---
   list_sessions: 'List past FSB automation sessions with task, status, duration, action count and cost. Pass a session ID to get_session_detail to inspect it.',
@@ -132,9 +129,6 @@ export const MCP_TOOL_DESCRIPTIONS: TextTable = Object.freeze({
   stop_task: "Stop (cancel) the running autopilot task to regain manual control, for example when run_task is slow or off track. Only the calling agent's task is cancelled.",
   get_task_status: "Get the status of the running autopilot task: whether it is running, percent complete, current phase and ETA. Poll it when progress notifications do not arrive; it reports the calling agent's task only.",
 
-  // --- removed visual-session tools (visual-session.ts) ---
-  start_visual_session: 'Start a visual session: REMOVED in v0.9.0, returns TOOL_REMOVED. Visual sessions are now implicit: pass visual_reason and client on any action tool, and is_final true to clear the overlay.',
-  end_visual_session: 'End a visual session: REMOVED in v0.9.0, returns TOOL_REMOVED. The session now clears after 60 seconds without calls, or at once when an action tool is called with is_final true.',
 
   // --- settings (settings.ts, Phase 66.1; its contract test pins this text) ---
   settings: 'Read or change FSB settings. No args returns all; key returns one with its allowed values; key and value sets it. API keys and endpoints are read-only.',
@@ -332,15 +326,6 @@ export const MCP_PARAM_DESCRIPTIONS: Readonly<Record<string, TextTable>> = Objec
     task: 'Task to perform, in natural language.',
   }),
 
-  // --- removed visual-session tools (inline; client and tab_id use the common text) ---
-  start_visual_session: Object.freeze({
-    task: 'Short task title for the overlay.',
-    detail: 'Optional first detail line for the overlay.',
-  }),
-  end_visual_session: Object.freeze({
-    session_token: 'Token from start_visual_session.',
-    reason: 'Optional end reason.',
-  }),
 
   // --- settings (inline; Phase 66.1 text, pinned by its contract test) ---
   settings: Object.freeze({

@@ -5,17 +5,15 @@
  *
  * Context: Claude Code's current MCP tool-call transport stringifies JSON
  * numbers, so the FSB MCP server's Zod gate rejects every numeric tool call
- * (switch_tab tabId, click_at x/y, agents back tab_id, vault tab_id,
- * visual-session tab_id, observability limit/count/topN, ...). The bug lives
+ * (switch_tab tabId, click_at x/y, vault tab_id, observability
+ * limit/count/topN, ...). The bug lives
  * in two places:
  *
  *   1. The JSON Schema -> Zod translator at mcp/src/tools/schema-bridge.ts:95
  *      (covers ~35 numeric fields across the TOOL_REGISTRY).
- *   2. Seven hand-rolled Zod sites that bypass the translator:
- *        - mcp/src/tools/agents.ts:35           (back tab_id)
+ *   2. Five hand-rolled Zod sites that bypass the translator:
  *        - mcp/src/tools/vault.ts:60            (fill_credential tab_id)
  *        - mcp/src/tools/vault.ts:110           (use_payment_method tab_id)
- *        - mcp/src/tools/visual-session.ts:50   (start_visual_session tab_id)
  *        - mcp/src/tools/observability.ts:27    (list_sessions limit)
  *        - mcp/src/tools/observability.ts:68    (get_logs count)
  *        - mcp/src/tools/observability.ts:91    (search_memory topN)
@@ -176,8 +174,8 @@ async function main() {
   // guard (A11) is what enforces the actual source matches this shape.
 
   function postFixTabIdPositive() {
-    // Shape used at agents.ts:35, vault.ts:60, vault.ts:110,
-    // visual-session.ts:50: tab ids MUST be positive integers.
+    // Shape used at vault.ts:60 and vault.ts:110: tab ids MUST be positive
+    // integers.
     return z.coerce.number().int().positive().finite().optional();
   }
   function postFixCountNonnegative() {
@@ -188,14 +186,6 @@ async function main() {
   function postFixTopNPositive() {
     // Shape used at observability.ts:91 (topN): top-N must be >= 1.
     return z.coerce.number().int().positive().finite().optional();
-  }
-
-  // A10.1: agents.ts:35 back tool tab_id
-  {
-    const s = postFixTabIdPositive();
-    const r = s.safeParse('999');
-    check('A10.1: agents.ts:35 back.tab_id accepts string "999"',
-      r.success && r.data === 999 && typeof r.data === 'number', JSON.stringify(r));
   }
 
   // A10.2: vault.ts:60 fill_credential tab_id
@@ -211,14 +201,6 @@ async function main() {
     const s = postFixTabIdPositive();
     const r = s.safeParse('999');
     check('A10.3: vault.ts:110 use_payment_method.tab_id accepts string "999"',
-      r.success && r.data === 999, JSON.stringify(r));
-  }
-
-  // A10.4: visual-session.ts:50 start_visual_session tab_id
-  {
-    const s = postFixTabIdPositive();
-    const r = s.safeParse('999');
-    check('A10.4: visual-session.ts:50 start_visual_session.tab_id accepts string "999"',
       r.success && r.data === 999, JSON.stringify(r));
   }
 
@@ -249,8 +231,7 @@ async function main() {
   // -------- A11: source-grep regression guard --------
   // Scan every .ts file under mcp/src/tools/ for a literal `z.number(`.
   // ALLOW: `z.coerce.number(` (the post-fix shape).
-  // ALLOW: lines whose trimmed start is `//` (commented-out code, e.g.
-  //   the deprecated agent block in agents.ts kept as historical refs).
+  // ALLOW: lines whose trimmed start is `//` (commented-out code).
   // ALLOW: a line that contains the marker `internal-only` (escape valve
   //   per research; today there should be ZERO exemptions of this kind).
   // FAIL: any other line containing `z.number(` is a regression.

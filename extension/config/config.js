@@ -54,7 +54,7 @@ class Config {
       captchaSolverEnabled: false,
       captchaApiKey: '',
 
-      // Background Agents Server
+      // Remote Dashboard sync server
       serverUrl: 'https://fsb-server.fly.dev',
       serverHashKey: '',
       serverSyncEnabled: false

@@ -1,13 +1,17 @@
 {
   "schemaVersion": 1,
-  "note": "Reviewed tools/list and MCPMessageType delta of fsb-mcp-server 0.12.0 against the 8a058bdf pin (D-23). Any other change fails tests/mcp-release-compat.test.js.",
+  "note": "Reviewed tools/list and MCPMessageType delta of fsb-mcp-server 0.12.0 against the 8a058bdf pin (D-23); removedTools were retired in 0.11.5. Any other change fails the compat test.",
   "release": "0.12.0",
   "baselineFixture": "tests/fixtures/mcp-tools-list-8a058bdf.json",
   "baselineFixtureSha256": "b0e67bb7974cf1cf0d649113162b438559585aa02ba28666f17df5d14a8274b8",
   "addedTools": [
     "settings"
   ],
-  "removedTools": [],
+  "removedTools": [
+    "back",
+    "end_visual_session",
+    "start_visual_session"
+  ],
   "addedOptionalProperties": {
     "expect": [
       "execute_js",
@@ -37,8 +41,7 @@
       "navigate",
       "go_back",
       "go_forward",
-      "refresh",
-      "back"
+      "refresh"
     ]
   },
   "newRequiredArguments": [],

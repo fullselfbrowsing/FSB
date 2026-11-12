@@ -166,23 +166,30 @@ const CLAMP_INPUTS = Object.freeze([undefined, null, 'abc', NaN, -5, 0, 1234.9, 
   const descriptions = await import(pathToFileURL(DESCRIPTIONS_BUILD_PATH).href);
 
   // -------------------------------------------------------------------------
-  console.log('\n--- D-12: the 29-tool list (MCP build, extension, test helper) ---');
+  console.log('\n--- D-12: the 28-tool MCP list (MCP build, test helper) and the extension list ---');
   {
     const mcpNames = Array.from(manual.EXPECT_TOOL_NAMES || []);
     const extNames = Array.from(av.EXPECT_TOOL_NAMES || []);
     const helperNames = Array.from(helper.EXPECT_TOOL_NAMES_VERBATIM || []);
-    check(sameJson(mcpNames, extNames), 'MCP EXPECT_TOOL_NAMES equals the extension EXPECT_TOOL_NAMES (same order)',
-      sides(mcpNames, extNames));
-    check(sameJson(helperNames, extNames), 'the helper EXPECT_TOOL_NAMES_VERBATIM equals the extension list (same order)',
-      `helper:         ${JSON.stringify(helperNames)}\nextension side: ${JSON.stringify(extNames)}`);
-    check(extNames.length === 29 && new Set(extNames).size === 29, 'the list holds 29 distinct names',
-      `length ${extNames.length}, distinct ${new Set(extNames).size}`);
+    // The extension still serves the mcp:go-back route for servers older than
+    // 0.11.5, so its list keeps `back` last; the MCP server no longer
+    // registers back, so its list is the extension list without it.
+    const extMcpNames = extNames.filter((name) => name !== 'back');
+    check(sameJson(mcpNames, extMcpNames), 'MCP EXPECT_TOOL_NAMES equals the extension EXPECT_TOOL_NAMES minus back (same order)',
+      sides(mcpNames, extMcpNames));
+    check(extNames[extNames.length - 1] === 'back' && extNames.length === extMcpNames.length + 1,
+      'the extension list keeps back once, last, for the mcp:go-back route', JSON.stringify(extNames));
+    check(sameJson(helperNames, mcpNames), 'the helper EXPECT_TOOL_NAMES_VERBATIM equals the MCP list (same order)',
+      `helper:   ${JSON.stringify(helperNames)}\nMCP side: ${JSON.stringify(mcpNames)}`);
+    check(mcpNames.length === 28 && new Set(mcpNames).size === 28, 'the MCP list holds 28 distinct names',
+      `length ${mcpNames.length}, distinct ${new Set(mcpNames).size}`);
     const mcpSet = manual.EXPECT_TOOL_SET;
     check(mcpSet instanceof Set && mcpSet.size === mcpNames.length && mcpNames.every((name) => mcpSet.has(name)),
       'MCP EXPECT_TOOL_SET holds exactly EXPECT_TOOL_NAMES');
     const nav = Array.from(av.EXPECT_NAV_TOOL_NAMES || []);
     check(nav.length === 5 && nav.every((name) => extNames.includes(name)),
-      'the extension navigation subset is inside the 29', JSON.stringify(nav));
+      'the extension navigation subset is inside the extension list', JSON.stringify(nav));
+    check(!mcpNames.includes('back'), 'back, retired from the MCP surface in 0.11.5, is not an MCP expect tool');
   }
 
   // -------------------------------------------------------------------------
@@ -267,16 +274,10 @@ const CLAMP_INPUTS = Object.freeze([undefined, null, 'abc', NaN, -5, 0, 1234.9, 
   }
 
   // -------------------------------------------------------------------------
-  console.log('\n--- D-20: back headroom vs the 750 ms probe race; expect description size ---');
+  console.log('\n--- D-20: expect description size ---');
   {
-    const dispatcherSrc = readSource(DISPATCHER_PATH);
-    const matches = [...dispatcherSrc.matchAll(/const _PAGE_INJECTION_TIMEOUT_MS = (\d+);/g)];
-    check(matches.length === 1, 'the dispatcher declares _PAGE_INJECTION_TIMEOUT_MS exactly once',
-      `found ${matches.length}`);
-    const probeRace = matches.length === 1 ? Number(matches[0][1]) : NaN;
-    check(Number.isFinite(probeRace) && manual.EXPECT_BRIDGE_HEADROOM_MS > probeRace,
-      `EXPECT_BRIDGE_HEADROOM_MS (${manual.EXPECT_BRIDGE_HEADROOM_MS}) exceeds the probe race (${probeRace} ms)`,
-      sides(manual.EXPECT_BRIDGE_HEADROOM_MS, probeRace));
+    check(manual.EXPECT_BRIDGE_HEADROOM_MS === undefined,
+      'EXPECT_BRIDGE_HEADROOM_MS is gone with back, the only tool that used it');
     const description = descriptions.MCP_EXPECT_DESCRIPTION;
     check(typeof description === 'string' && description.length > 0 && description.length <= 160,
       `MCP_EXPECT_DESCRIPTION is at most 160 characters (${description && description.length})`);

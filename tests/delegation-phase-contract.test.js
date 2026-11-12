@@ -202,6 +202,9 @@ const REFINEMENT_ROOT_TEST_COMMANDS = Object.freeze([
   'node --test tests/bench-fast-mode-record.test.mjs',
   'node tests/release-version-rehearsal.test.js',
   'node tests/mcp-release-compat.test.js',
+  'node tests/extension-ui-locale.test.js',
+  'node scripts/verify-extension-i18n.mjs',
+  'node scripts/verify-extension-copy.mjs',
   'node tests/benchmark-assets-parity.test.js',
 ]);
 
@@ -2602,7 +2605,8 @@ const terminalCodes = [
   'event_silence_timeout', 'delegation_persistence_failed', 'delegation_quota_exceeded',
   'delegation_ledger_corrupt', 'route_lost', 'agent_offline', 'agent_unpaired',
   'unsupported_provider', 'hold_expired', 'resume_ownership_lost',
-  'daemon_restart_lost_run', 'agent_protocol_drift', 'provider_error', 'tree_unsettled', 'agent_failed',
+  'daemon_restart_lost_run', 'agent_protocol_drift', 'sandbox_unavailable',
+  'capability_missing', 'isolation_unavailable', 'binary_changed', 'provider_error', 'tree_unsettled', 'agent_failed',
   'unknown_failure',
 ];
 equal(extractFrozenTrueKeys(auditedEventStoreSource, 'VALID_TERMINAL_CODES'), terminalCodes,
@@ -3015,10 +3019,13 @@ equal(Array.from(compatibilityStatusesBlock.matchAll(/'([^']+)'/g), (match) => m
   ['supported', 'degraded', 'unsupported'],
   'canonical compatibility statuses are the exact closed three-value set');
 equal(Array.from(compatibilityReasonsBlock.matchAll(/'([^']+)'/g), (match) => match[1]), [
-  'within_tested_range', 'newer_than_tested_range', 'evidence_stale',
+  'within_tested_range', 'capability_verified', 'capability_unverified',
+  'capability_missing', 'isolation_unavailable', 'sandbox_unavailable', 'agent_protocol_drift',
+  'binary_changed', 'adapter_unavailable', 'version_unsupported',
+  'newer_than_tested_range', 'evidence_stale',
   'binary_not_found', 'version_missing', 'version_malformed', 'below_minimum',
   'wrong_major', 'adapter_unshipped', 'matrix_invalid',
-], 'canonical compatibility reasons are the exact closed ten-value set');
+], 'canonical compatibility reasons retain the exact closed version and capability verdict set');
 
 const rawCompatibilityMatrix = between(
   compatibilitySource,
@@ -3048,10 +3055,10 @@ check(!rawCompatibilityMatrix.includes("adapterId: 'codex'")
   'the canonical matrix contains no retired provider row or fixture');
 for (const exactGrokMatrixToken of [
   "displayLabel: 'Grok Build'",
-  "profileVersion: '1.0.4'",
+  "profileVersion: 'grok-acp-v1'",
   "minimumVersion: '1.0.4'",
-  "testedThroughVersion: '1.0.4'",
-  "fixtureManifest: 'tests/fixtures/agent-streams/grok-build-1.0.4/manifest.json'",
+  "testedThroughVersion: '1.0.62'",
+  "fixtureManifest: 'tests/fixtures/agent-streams/grok-build-1.0.62/manifest.json'",
   "'agentCapabilities.mcpCapabilities.http'",
   "'agentCapabilities.sessionCapabilities.close'",
   "requiredResultFields: ['stopReason']",
@@ -3367,8 +3374,8 @@ for (const doctorToken of [
   'registryIds = denseStringArray(idsMethod.call(registry))',
   'const adapter = requireMethod.call(registry, contract.adapterId)',
   'detection = await detectMethod.call(adapter)',
-  'classifyAdapterCompatibility',
-  'authState: normalized.authState',
+  'classifyAdapterDetectionCompatibility(contract.adapterId, detection)',
+  "authState: compatibility.status === 'unsupported' ? 'unknown' : normalized.authState",
 ]) {
   check(doctorCollectorSource.includes(doctorToken),
     `doctor collection remains local and canonical: ${doctorToken}`);

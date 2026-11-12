@@ -12,9 +12,8 @@ import { pushMcpClientInventory } from '../client-inventory.js';
 import { TaskQueue } from '../queue.js';
 import {
   ADAPTER_COMPATIBILITY_MATRIX,
-  classifyAdapterCompatibility,
+  classifyAdapterDetectionCompatibility,
   createSafeCompatibilitySnapshot,
-  type AdapterCompatibilityEvidence,
   type SafeCompatibilitySnapshot,
 } from './compatibility.js';
 import {
@@ -154,6 +153,10 @@ const GROK_AUTH_BEGIN_REASONS: readonly string[] = Object.freeze([
   'login_failed',
   'version_unsupported',
   'sandbox_unavailable',
+  'capability_missing',
+  'isolation_unavailable',
+  'agent_protocol_drift',
+  'binary_changed',
   'adapter_unavailable',
   'provider_auth_locked',
   'session_cleanup_blocked',
@@ -274,75 +277,6 @@ function denseAdapterIds(value: unknown): readonly string[] | null {
   return Object.freeze(ids);
 }
 
-function denseRetainedPrefix(value: unknown): boolean {
-  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) return false;
-  if (!Number.isSafeInteger(value.length) || value.length > 8) return false;
-  if (Reflect.ownKeys(value).length !== value.length + 1) return false;
-  for (let index = 0; index < value.length; index += 1) {
-    const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
-    if (
-      !descriptor
-      || !descriptor.enumerable
-      || !('value' in descriptor)
-      || typeof descriptor.value !== 'string'
-      || descriptor.value.length > 4_096
-    ) return false;
-  }
-  return true;
-}
-
-function isRetainedBinary(value: unknown): boolean {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
-  if (Object.getPrototypeOf(value) !== Object.prototype) return false;
-  const keys = Reflect.ownKeys(value);
-  if (
-    keys.some((key) => typeof key !== 'string')
-    || JSON.stringify([...keys].sort()) !== JSON.stringify(['argvPrefix', 'command', 'realPath'])
-  ) {
-    return false;
-  }
-  const command = ownDataValue(value, 'command');
-  const realPath = ownDataValue(value, 'realPath');
-  const argvPrefix = ownDataValue(value, 'argvPrefix');
-  return typeof command === 'string'
-    && command.length > 0
-    && command.length <= 4_096
-    && typeof realPath === 'string'
-    && realPath.length > 0
-    && realPath.length <= 4_096
-    && denseRetainedPrefix(argvPrefix);
-}
-
-function safeDiagnosticCode(detection: object): string | null {
-  const value = ownDataValue(detection, 'diagnostic');
-  if (value === undefined) return null;
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
-  if (Object.getPrototypeOf(value) !== Object.prototype) return null;
-  const code = ownDataValue(value, 'code');
-  return typeof code === 'string' ? code : null;
-}
-
-function compatibilityEvidence(detection: unknown): AdapterCompatibilityEvidence {
-  if (!detection || typeof detection !== 'object' || Array.isArray(detection)) {
-    return Object.freeze({ binaryFound: false, version: null });
-  }
-  if (Object.getPrototypeOf(detection) !== Object.prototype) {
-    return Object.freeze({ binaryFound: false, version: null });
-  }
-  const binary = ownDataValue(detection, 'binary');
-  const rawVersion = ownDataValue(detection, 'version');
-  if (!(rawVersion === null || typeof rawVersion === 'string')) {
-    return Object.freeze({ binaryFound: false, version: null });
-  }
-  const version = rawVersion === null && safeDiagnosticCode(detection) === 'version_unparseable'
-    ? 'malformed'
-    : rawVersion;
-  return Object.freeze({
-    binaryFound: isRetainedBinary(binary),
-    version,
-  });
-}
-
 function safeAuthState(detection: unknown): AdapterAuthState {
   if (!detection || typeof detection !== 'object' || Array.isArray(detection)) return 'unknown';
   if (Object.getPrototypeOf(detection) !== Object.prototype) return 'unknown';
@@ -398,18 +332,13 @@ async function collectCompatibilitySnapshot(
     } catch {
       // Detection failure is a closed unsupported fact, never response detail.
     }
-    let evidence: AdapterCompatibilityEvidence = Object.freeze({
-      binaryFound: false,
-      version: null,
-    });
     let authState: AdapterAuthState = 'unknown';
     try {
-      evidence = compatibilityEvidence(detection);
       authState = safeAuthState(detection);
     } catch {
-      // Hostile detector objects fail closed before the safe projection.
+      // Hostile detector objects cannot supply authentication evidence.
     }
-    const classified = classifyAdapterCompatibility(contract.adapterId, evidence);
+    const classified = classifyAdapterDetectionCompatibility(contract.adapterId, detection);
     rows.push(Object.freeze({
       ...classified,
       authState: classified.status === 'unsupported' ? 'unknown' : authState,

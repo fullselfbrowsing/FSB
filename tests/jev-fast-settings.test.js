@@ -484,9 +484,10 @@ function loadOptionsDefaultSettings() {
     'the MCP Session Replay card follows the closing comment directly');
 
   ok(/<i class="fas fa-bolt"><\/i>/.test(cardBlock), 'the card icon is fas fa-bolt');
-  ok(/<h3>Jev fast mode \(experimental\)<\/h3>/.test(cardBlock), 'the card title is "Jev fast mode (experimental)"');
-  ok(/<p>Faster simple clicks during autopilot<\/p>/.test(cardBlock), 'the card subtitle is "Faster simple clicks during autopilot"');
-  ok(/<span class="toggle-label">Use Jev for simple steps<\/span>/.test(cardBlock), 'the toggle label is "Use Jev for simple steps"');
+  // Each line carries the data-i18n key of its English text (extension UI locales).
+  ok(/<h3 data-i18n="panel_[0-9a-f]{10}">Jev fast mode \(experimental\)<\/h3>/.test(cardBlock), 'the card title is "Jev fast mode (experimental)"');
+  ok(/<p data-i18n="panel_[0-9a-f]{10}">Faster simple clicks during autopilot<\/p>/.test(cardBlock), 'the card subtitle is "Faster simple clicks during autopilot"');
+  ok(/<span class="toggle-label" data-i18n="panel_[0-9a-f]{10}">Use Jev for simple steps<\/span>/.test(cardBlock), 'the toggle label is "Use Jev for simple steps"');
 
   const cardText = facts.textOf(cardBlock);
   const lowerCardText = cardText.toLowerCase();
@@ -499,7 +500,7 @@ function loadOptionsDefaultSettings() {
   ok(cardText.includes("Sent to FSB's server"), 'the sent list is headed "Sent to FSB\'s server"');
   const firedForbidden = facts.FORBIDDEN_PATTERNS.filter((re) => re.test(cardText)).map(String);
   ok(firedForbidden.length === 0, 'the card text matches no FORBIDDEN_PATTERNS entry (' + (firedForbidden.join(', ') || 'none') + ')');
-  ok(/^Off by default\./.test(facts.textOf((cardBlock.match(/<span class="toggle-desc">[\s\S]*?<\/span>/) || [''])[0])),
+  ok(/^Off by default\./.test(facts.textOf((cardBlock.match(/<span class="toggle-desc"[^>]*>[\s\S]*?<\/span>/) || [''])[0])),
     'the toggle description opens with "Off by default."');
 
   const toggleLabel = (cardBlock.match(/<label class="modern-toggle">[\s\S]*?<\/label>/) || [''])[0];

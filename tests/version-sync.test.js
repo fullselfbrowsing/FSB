@@ -124,7 +124,10 @@ function assertCompatDeclarations(compat) {
   assert.equal(compatFor('0.11.2').minimum, '0.9.92');
   assert.equal(compatFor('0.11.2').feature, null);
   assert.equal(compatFor('0.11.3'), MCP_EXTENSION_COMPAT['0.11.2'], '0.11.3 inherits the 0.11.2 entry');
-  assert.equal(compatFor('0.12.0').minimum, '0.9.92');
+  assert.equal(compatFor('0.11.5').minimum, '0.9.95');
+  assert.equal(compatFor('0.11.5').feature, null);
+  assert.equal(compatFor('0.11.6'), MCP_EXTENSION_COMPAT['0.11.5'], '0.11.6 inherits the 0.11.5 entry');
+  assert.equal(compatFor('0.12.0').minimum, '0.9.95');
   assert.deepEqual(compatFor('0.12.0').feature, { version: '1.0.0', names: ['settings', 'expect'] });
   assert.equal(compatFor('0.12.4'), MCP_EXTENSION_COMPAT['0.12.0'], '0.12.4 inherits the 0.12.0 entry');
   // IN-07: inheritance runs forward only; an earlier patch never takes a later patch's reasons.
@@ -145,14 +148,23 @@ function assertCompatDeclarations(compat) {
     compatPairLine('0.11.2'),
     'Compatibility for this release: MCP 0.11.2 requires extension 0.9.92 or newer for the `mcp:task-status` route used by `complete_task`, `partial_task`, and `fail_task`. Existing `0.10.0` tool routes remain additive and unchanged.',
   );
-  // 0.12.0: existing tools keep 0.9.92; settings and expect need 1.0.0 (66.1-03, 69-06).
+  // 0.11.5, the current release, reproduced byte for byte.
+  assert.equal(
+    compatBullet('0.11.5'),
+    '- **Compatibility:** `fsb-mcp-server` 0.11.5 requires FSB extension 0.9.95 or newer for `mcp:task-status`. Upgrade the extension and restart the MCP host together.',
+  );
+  assert.equal(
+    compatPairLine('0.11.5'),
+    'Compatibility for this release: MCP 0.11.5 requires extension 0.9.95 or newer for the `mcp:task-status` route used by `complete_task`, `partial_task`, and `fail_task`. Existing `0.10.0` tool routes remain additive and unchanged.',
+  );
+  // 0.12.0: existing tools keep 0.11.5's 0.9.95; settings and expect need 1.0.0 (66.1-03, 69-06).
   assert.equal(
     compatBullet('0.12.0'),
-    '- **Compatibility:** `fsb-mcp-server` 0.12.0 requires FSB extension 0.9.92 or newer for existing tools; `settings` and the optional `expect` need FSB extension 1.0.0 or newer. Upgrade the extension and restart the MCP host together.',
+    '- **Compatibility:** `fsb-mcp-server` 0.12.0 requires FSB extension 0.9.95 or newer for existing tools; `settings` and the optional `expect` need FSB extension 1.0.0 or newer. Upgrade the extension and restart the MCP host together.',
   );
   assert.equal(
     compatPairLine('0.12.0'),
-    'Compatibility for this release: MCP 0.12.0 requires extension 0.9.92 or newer for existing tools. `settings` and the optional `expect` need extension 1.0.0 or newer; older extensions answer `SETTING_UNSUPPORTED` and report `expect_result` as `uncertain` with `extension_unsupported`. Existing tool routes remain additive and unchanged.',
+    'Compatibility for this release: MCP 0.12.0 requires extension 0.9.95 or newer for existing tools. `settings` and the optional `expect` need extension 1.0.0 or newer; older extensions answer `SETTING_UNSUPPORTED` and report `expect_result` as `uncertain` with `extension_unsupported`. Existing tool routes remain additive and unchanged.',
   );
 }
 
@@ -252,7 +264,8 @@ async function main() {
       'extension setter changed MCP-owned files',
     );
     assert.equal(readJson(fixtureRoot, 'extension/manifest.json').version, nextExtensionVersion);
-    assert.equal(readJson(fixtureRoot, 'extension/manifest.json').name, `FSB v${nextExtensionVersion}`);
+    assert.equal(readJson(fixtureRoot, 'extension/manifest.json').name, '__MSG_ext_name__');
+    assert.equal(readJson(fixtureRoot, 'extension/manifest.json').description, '__MSG_ext_description__');
     for (const [packagePath, lockPath] of [
       ['package.json', 'package-lock.json'],
       ['showcase/angular/package.json', 'showcase/angular/package-lock.json'],

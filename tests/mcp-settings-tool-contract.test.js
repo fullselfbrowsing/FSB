@@ -244,7 +244,8 @@ async function loadMcp() {
     sha256Hex: identityModule.sha256Hex,
     readBaselineFixture: phase69Module.readBaselineFixture,
     projectShape: phase69Module.projectShape,
-    EXPECT_TOOL_NAMES_VERBATIM: phase69Module.EXPECT_TOOL_NAMES_VERBATIM
+    EXPECT_TOOL_NAMES_VERBATIM: phase69Module.EXPECT_TOOL_NAMES_VERBATIM,
+    RETIRED_TOOL_NAMES: phase69Module.RETIRED_TOOL_NAMES
   };
 }
 
@@ -405,8 +406,9 @@ async function partContract() {
       checkDeep(mcp.toolsListDigest(fixture.tools), BASELINE_8A058BDF_TOOLS_DIGEST,
         'the frozen 8a058bdf fixture carries BASELINE_8A058BDF_TOOLS_DIGEST');
       const baselineTools = tools.filter((candidate) => candidate.name !== 'settings');
-      checkDeep(baselineTools.map((tool) => tool.name).sort(), fixture.tools.map((tool) => tool.name).sort(),
-        'the current tool names minus settings equal the 8a058bdf names');
+      checkDeep(baselineTools.map((tool) => tool.name).sort(),
+        fixture.tools.map((tool) => tool.name).filter((name) => !mcp.RETIRED_TOOL_NAMES.includes(name)).sort(),
+        'the current tool names minus settings equal the 8a058bdf names minus the tools 0.11.5 retired');
       const expectNames = new Set(mcp.EXPECT_TOOL_NAMES_VERBATIM);
       const fixtureByName = new Map(fixture.tools.map((tool) => [tool.name, tool]));
       const drifted = [];
@@ -419,7 +421,7 @@ async function partContract() {
         if (mcp.canonicalJson(projection) !== mcp.canonicalJson(mcp.projectShape(fixtureTool))) drifted.push(tool.name);
       }
       checkDeep(drifted, [],
-        'the 72 tools that existed at 8a058bdf keep their description-free shape (expect allowed on the 29 D-12 tools)');
+        'the 69 tools kept from 8a058bdf keep their description-free shape (expect allowed on the 28 D-12 tools)');
       if (drifted.length > 0) {
         out('  DIAG: a drifted shape means a pre-existing tool changed a type, required list, default, enum or other');
         out('  DIAG: non-description key; diff against tests/fixtures/mcp-tools-list-8a058bdf.json and fix the owning file.');

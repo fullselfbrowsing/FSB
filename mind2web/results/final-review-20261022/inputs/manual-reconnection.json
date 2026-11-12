@@ -1,0 +1,11 @@
+{
+  "at": "2026-10-22T04:44:21.850469+00:00",
+  "native_setup_only": [
+    "Opened FSB side panel and control panel to inspect connection controls",
+    "Restarted the existing enabled Web Store FSB 0.9.92 through its existing on/off toggle"
+  ],
+  "no_task_actions_via_native_ui": true,
+  "same_install_instance_verified": "57a09c34-8ecf-4599-aa02-be200f2e2dd9",
+  "public_readiness_observation": "A fresh raw client first list_tabs returns attachment diagnostic; second and third reads after 1-second startup delay return success with zero owned tabs.",
+  "manual_helper_change": "Wait 1000 ms after initialize and before prepareGuard; no action retry or pinned runtime change."
+}

@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { validateGrokBuildIsolation } from './grok-isolation.js';
 import {
   freezePolicyAttestationAssertions,
   type PolicyAttestationAssertion,
@@ -183,6 +184,9 @@ function assertionPasses(document: JsonValue, assertion: PolicyAttestationAssert
   if (assertion.kind === 'absent') return !selected.found;
   if (!selected.found) return false;
   const value = selected.value;
+  if (assertion.kind === 'grok_isolation') {
+    return validateGrokBuildIsolation(value, assertion);
+  }
   if (assertion.kind === 'exact_keys') {
     return !!value
       && typeof value === 'object'

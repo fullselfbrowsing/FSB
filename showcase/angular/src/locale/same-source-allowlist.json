@@ -1431,6 +1431,281 @@
       "reason": "code identifier or wire token"
     },
     {
+      "id": "releaseNotes.v0995.002.extension",
+      "sourceSha256": "05ef5b5eacdf3da9ed2e30b4107131895c363096d1b3895ba2b2df178892daf3",
+      "reason": "version chip"
+    },
+    {
+      "id": "releaseNotes.v0995.003.mcp",
+      "sourceSha256": "730b6ef654233fef5dd0031dc2fd46ac018b18a317e8d997d1628a7b9914b082",
+      "reason": "version chip"
+    },
+    {
+      "id": "releaseNotes.v0995.004.chrome",
+      "sourceSha256": "93e225f07a15e9af97ef69b4569eff842d57e9d55a14436de8ec377f8df2bc18",
+      "reason": "version chip"
+    },
+    {
+      "id": "releaseNotes.v0995.005.node",
+      "sourceSha256": "f987ef9780d1b33004fa3678b582a395a29802eb2923a1b1dd05b924cc2f2483",
+      "reason": "version chip"
+    },
+    {
+      "id": "releaseNotes.v0995.006.mit",
+      "sourceSha256": "e5dcffe836b6ec8a58e492419b550e65fb8cbdc308503979e5dacb33ac7ea3b7",
+      "reason": "license identifier"
+    },
+    {
+      "id": "releaseNotes.v0995.008.ready",
+      "sourceSha256": "5fa7aac5375c5815787fba3f49559f9b45b14023147ce0652803387974144e5f",
+      "reason": "extension UI sample shown in its own language"
+    },
+    {
+      "id": "releaseNotes.v0995.009.listo",
+      "sourceSha256": "b5fa51d564a9d8809f67c15dd6aef17cb1ebffbaa416b42978e079134adf568e",
+      "reason": "extension UI sample shown in its own language"
+    },
+    {
+      "id": "releaseNotes.v0995.010.bereit",
+      "sourceSha256": "8d4d4830b4da5aa02a77a69d2ff4f8afed762bf70dfd8173687548d936f64442",
+      "reason": "extension UI sample shown in its own language"
+    },
+    {
+      "id": "releaseNotes.v0995.010.readyRu",
+      "sourceSha256": "ef05d57959cfde50d145153bdc66f9873ad699ce20c523cf040949ee5c404d4e",
+      "reason": "extension UI sample shown in its own language"
+    },
+    {
+      "id": "releaseNotes.v0995.011.readyJa",
+      "sourceSha256": "d888e7c7a8303af0f59b50de130b2e2b2913233456b35e146d05949af7d68885",
+      "reason": "extension UI sample shown in its own language"
+    },
+    {
+      "id": "releaseNotes.v0995.012.readyKo",
+      "sourceSha256": "f296cb19f0a261ebacd5851775bc2ed5ef5739753e8a69cac74b51c5050f83d4",
+      "reason": "extension UI sample shown in its own language"
+    },
+    {
+      "id": "releaseNotes.v0995.013.readyZhCn",
+      "sourceSha256": "b073db9c0bd6f2edb13632e70fd7709039504a4eafca09b18aaa576c97b89a37",
+      "reason": "extension UI sample shown in its own language"
+    },
+    {
+      "id": "releaseNotes.v0995.014.readyZhTw",
+      "sourceSha256": "68ddad7fd948d5df9f4d9e2a024681b619be7eb171d80553f06e0ec19207e956",
+      "reason": "extension UI sample shown in its own language"
+    },
+    {
+      "id": "releaseNotes.v0995.021.fsbUiLocaleKo",
+      "sourceSha256": "789492121de1cd540676b91c6b28ee2ab8a8f3be72f32a3e62c5391c8d40d729",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0995.031.chromeExtensions",
+      "sourceSha256": "c0ae15d785f5343cd50ab12f25ee9c3c614590f73dc68d2c3e237efa3f073c2e",
+      "reason": "literal path, selector, or sample address"
+    },
+    {
+      "id": "releaseNotes.v0995.032.fsbV",
+      "sourceSha256": "c184a12c4a1fa6afea958b837dfc579af83b485d79a3c3cbfd3e86d82c7de0f3",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "releaseNotes.v0995.033.fsb",
+      "sourceSha256": "83139e1a42a4c7033286d67f1c732d7067ea620fd6dbf5c5fb0df845d8b33e4a",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "releaseNotes.v0995.034.msgExtName",
+      "sourceSha256": "c41e86862fbb77ce7056c56f0808ba758517dfedd9ad30328b5f7f24d7a754fb",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0995.048.npmTest",
+      "sourceSha256": "328e123c63857fd8473bd4bd3581e655b08b7440d7f5d2c31cc375607582f539",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "releaseNotes.v0995.049.verifyExtensionI18n",
+      "sourceSha256": "18fc609a1c0a182b5965f2b64d9185516c896b1a7aedd69a171ef5c3c8dcde5f",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0995.051.verifyExtensionCopy",
+      "sourceSha256": "8a844f9dc886f4f46c2626ea12b1615c4f87bf14165c100417bee882c67063c9",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0995.058.installCline",
+      "sourceSha256": "30d620a18598ea64264b66f2ae2c0a230ea5f9fa494c7a970c452e038c309820",
+      "reason": "literal install command"
+    },
+    {
+      "id": "releaseNotes.v0995.059.clineSettingsPath",
+      "sourceSha256": "ec8e566e290fd0b482326477e2a92067ad911d270f6397f668918ecc6b61d8eb",
+      "reason": "literal path, selector, or sample address"
+    },
+    {
+      "id": "releaseNotes.v0995.060.timeout1800",
+      "sourceSha256": "c83b2f2c576a8df0343d510c43ea57139bdb3598c145d4a7394d01c9a87c892e",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0995.068.acceptLanguageRu",
+      "sourceSha256": "132daaf8bc3a5e9a8486b2deb6d244e499cbea256d2f187d835d3e63327c8361",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0995.069.siteHost",
+      "sourceSha256": "7fd68abf645323cb0934dc23cb06b58dfd799bc3bf059122ba180c6c0131ee9c",
+      "reason": "literal path, selector, or sample address"
+    },
+    {
+      "id": "releaseNotes.v0995.070.ruPath",
+      "sourceSha256": "3ea38acb79c398f61bbbb756fb8e4da0ea9b37d89987b1db0c19f96ecd372d14",
+      "reason": "literal path, selector, or sample address"
+    },
+    {
+      "id": "releaseNotes.v0995.071.pickerEnglish",
+      "sourceSha256": "ba118bf7fc9c1aedc1edb28a0aa86e0b43b681f222af6616e13c43be87815b06",
+      "reason": "language name shown in its own language"
+    },
+    {
+      "id": "releaseNotes.v0995.072.pickerRussian",
+      "sourceSha256": "6da140fdd4be01893bd14afe43ad5d1cc2a4eec98fc37e67e91e0c63fd703094",
+      "reason": "language name shown in its own language"
+    },
+    {
+      "id": "releaseNotes.v0995.081.windsurf",
+      "sourceSha256": "da30d04dca8e2ba17952d7f50a72ea5cfe7926dbd9c68ee9ae41bce921f9f0f0",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "releaseNotes.v0995.082.antigravity",
+      "sourceSha256": "4da276f5f11d050f83c5b576ab967b88eb7bf200f21cdf4830a482529af183d4",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "releaseNotes.v0995.083.installAntigravity",
+      "sourceSha256": "a03beb654368b92a4866751fee38e8bc9cbe750ad08d40e55b27d6f6ffc18867",
+      "reason": "literal install command"
+    },
+    {
+      "id": "releaseNotes.v0995.084.antigravityConfigPath",
+      "sourceSha256": "aaffdada691deef26d222bbee606f746fc56820d9e3440d338495e3b43c2a783",
+      "reason": "literal path, selector, or sample address"
+    },
+    {
+      "id": "releaseNotes.v0995.085.clientMuse",
+      "sourceSha256": "779f8f01d25b7e87cd1d3482a07fc0b20c7a87f8089fe6376997150d3b238467",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0995.086.clientGrokBot",
+      "sourceSha256": "c23c62e91ba84aa07950d6a9d20cfe409ebb7586e379a04241050737e48317cc",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0995.087.clientDots",
+      "sourceSha256": "41dd658e9a24f71ec8cf8963fe95177edfcd2f5b13f21bdb24c8235c3bf004e6",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0995.088.clientAutopilot",
+      "sourceSha256": "13fbfbd731785c58a2945eda6eac286a5dc09f570a7c6910ca97b4299487b901",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0995.096.toolsList",
+      "sourceSha256": "b7721731a8ca0e978c0e041a6fd0ccf17edd247eab04b9ff4d9bf302cb9467a2",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0995.097.startVisualSession",
+      "sourceSha256": "c2e4dcd127f42ef5522c4460a64a8087c8c8bfc4cbc1ab216c8d3b83274255e1",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0995.098.endVisualSession",
+      "sourceSha256": "e11d70ae91ef5e347a6391e76335815cdf0fdc4aaa36c51f7ccedb88ee1cc183",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0995.099.back",
+      "sourceSha256": "3c482346f375027677fa8a0d6830a32714d4f13f9e94c2d9e215e0ac205ad4e5",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0995.100.goBack",
+      "sourceSha256": "cb8699ccf6bd5b8ef9383449b20095f9992096d39a63cf21ad64f557e88c9c99",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0995.108.grokAcpV1",
+      "sourceSha256": "4785eedd76d6f112a75af74cd24d4b8d49bbf43bdbe8b24bf4310728ebc35774",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0995.120.dragstart",
+      "sourceSha256": "589c813fcd6e0b55b9745b7117e0ff2bf38582d0eca74e2189a75ae24b7f3544",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0995.121.dragenter",
+      "sourceSha256": "f25092b5ddefd94df4f2b303bd098b03470e897ddcc387acafbb34548e57e167",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0995.122.dragover",
+      "sourceSha256": "35eb6c28cd64db27a9f2a235bd76abdca0e7e68cbddb646ac91f2ce1af2180c8",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0995.123.drop",
+      "sourceSha256": "d90ee9ccf6bea1d2942a7b21319338198dec2a746f8a0d0771621f00da2e0864",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0995.130.terminateExecution",
+      "sourceSha256": "a7917404ea113e44dcf8684fb195ab011acd79de4890e1cb76ad66aa2090fdb5",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0995.132.pageCrash",
+      "sourceSha256": "e3d1f3150d2033d86140de6487e3cd58ab181cb7af09c57d4591c059a2dd34c1",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0995.142.chromeStorageLocal",
+      "sourceSha256": "fabb232a7e734d7290de8c09309c900659c9a29637bd6ad16e8fd122523de5a8",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0995.143.bgAgents",
+      "sourceSha256": "bf4a719d25c4ca406199fd9ca364634dac2635c5b4950d07f6a6fa64f74d0e23",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0995.144.fsbSyncQueue",
+      "sourceSha256": "c7e9bf681ff561a4dedf594fdc79885f6a6c38adf6a5de8c10580a3d19ccb9b8",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0995.145.fsbAgentAlarms",
+      "sourceSha256": "342be854468dff7202b544fa58d37f95fd85fbaa30c87ef38c47916cb1e18dcd",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0995.146.fsbUiLocale",
+      "sourceSha256": "ba45a1000d939b43ca29cd06bb0abf56516aba74fefd5b7319055c428747ae80",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0995.149.apiAgents",
+      "sourceSha256": "f13e665a794118fb1c3d6acc3df5f7cff050cd6a28d184113e87a34d1b479759",
+      "reason": "literal path, selector, or sample address"
+    },
+    {
       "id": "releaseNotes.v0990.030.latticeSdk",
       "sourceSha256": "e4290fe5d92b7da4ba206c1b7337cc33f798d5170122dcdc9c652117d83ea4b5",
       "reason": "brand, package, or CLI name"
@@ -1598,15 +1873,21 @@
       },
       {
         "id": "agents.power.card.tools.stat",
-        "sourceSha256": "840f9d69ab7743bf47c296b634e8f7875f915436dffa80f73fd44791cd815b3e",
-        "targetSha256": "0a936b3ab6a86e4c45eb61d887f8ff666f3c9b9c13b18a70f1cb9337cbe2bac6",
+        "sourceSha256": "52c28cd61a1a54ddd6f6f65a9635ad0d0e9427ff5a5de54819578afc48bc6550",
+        "targetSha256": "23649e2b1aae1eb067b01d1c4d18fa2b42d81784623b676894687401292f902a",
         "reason": "Tools is the standard German technical loanword, capitalized as a noun; the MCP compound uses a German hyphen."
       },
       {
         "id": "home.engine.mcp.fact.tools",
-        "sourceSha256": "8be49af2bfa643a2ff19a6ae39df807f99481e0aa687cea14f0035ecd747cbe3",
-        "targetSha256": "5409df185994143906c0de0723d88f8f16ccf58aab0137b3b5a63a69a1c63cb2",
+        "sourceSha256": "37319308e6c107586593d10df290928f377e604a514441aa272744847e121bd6",
+        "targetSha256": "af2da84669a587b676d6a8dd8fe25c8c078e8fab86356775a098ebb54725f2e3",
         "reason": "Tools is the standard German technical loanword, capitalized as a noun; the MCP compound uses a German hyphen."
+      },
+      {
+        "id": "releaseNotes.v0995.148.server",
+        "sourceSha256": "b3eacd33433b31b5252351032c9b3e7a2e7aa7738d5decdf0dd6c62680853c06",
+        "targetSha256": "aef7de28d52977f1b5cd0fecfdc151717610adf41e0aa33b4d9f7522a43337ef",
+        "reason": "natural German loanword or product name"
       }
     ]
   }

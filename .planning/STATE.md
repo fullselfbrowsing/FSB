@@ -4,8 +4,8 @@ milestone: v1.0.0
 milestone_name: Jev Fast Mode
 status: executing
 stopped_at: "v1.0.0 code-complete; Validation Block V1-V6 pending (see .planning/v1.0.0-VALIDATION-BLOCK.md)"
-last_updated: "2026-10-28T19:40:00.000Z"
-last_activity: 2026-10-28 -- section 1 #13 decided (OpenRouter typesafe/jev-1.14); Jev secrets staged on fsb-server
+last_updated: "2026-11-12T18:00:00.000Z"
+last_activity: 2026-11-12 -- merged main (v1.3.0 multilingual UI, MCP 0.11.5) into Jev; MCP tool count 70
 progress:
   total_phases: 7
   completed_phases: 0
@@ -91,6 +91,7 @@ Coverage: 51/51 v0.9.91 requirements complete. The 48 deferred live UAT scenario
 
 ### Roadmap Evolution
 
+- 2026-11-12: merged `main` (v1.3.0 Extension multilingual UI, extension 0.9.95, MCP 0.11.5). v1.3.0 used Phases 66-71 too, so its phase directories moved to `.planning/milestones/v1.3.0-phases/` and this milestone keeps `.planning/phases/66-71`. MCP 0.11.5 retired `back`, `start_visual_session` and `end_visual_session`, so with `settings` the server registers 70 tools and `expect` covers 28 tools; the 0.12.0 release delta records the three removals. The fast-mode card, the privacy page and the onboarding copy are now translated in all eight locales, including Russian.
 - Phase 66.1 inserted after Phase 66: MCP Settings Tool: one MCP-only tool to view all control-panel settings and set one by key; secrets masked and never writable; approved 2026-09-29
 
 ### Decisions

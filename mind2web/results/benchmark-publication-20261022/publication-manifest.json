@@ -1,0 +1,18 @@
+{
+  "status": "finalized",
+  "published_at": "2026-10-22T06:44:49.382883+00:00",
+  "publication_label": "FSB benchmark — AI-reviewed",
+  "primary_report": "mind2web/BENCHMARK-REPORT.md",
+  "primary_result": "mind2web/BENCHMARK-RESULT.json",
+  "review_type": "AI-reviewed",
+  "human_reviewed": false,
+  "successes": 277,
+  "expected": 300,
+  "success_rate": 0.9233333333333333,
+  "chart_entries": 10,
+  "chart_fsb_position": 4,
+  "chart_generator": ".context/benchmark-chart/generate.py",
+  "chart_generator_sha256": "5c248bd11376948b21fc86bc61394dc1101c4a7dc1d596045a4fdd3f11efc946",
+  "methodology": "METHODOLOGY.md",
+  "historical_seals_unchanged": true
+}

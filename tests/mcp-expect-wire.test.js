@@ -130,15 +130,9 @@ const GOLDEN_CALLS = Object.freeze([
   },
 ]);
 
-const GOLDEN_BACK_CALLS = Object.freeze([
-  { label: 'back', args: {}, type: 'mcp:go-back', timeout: 5000, payload: { agentId: 'agent-test' } },
-  { label: 'back tab_id 12', args: { tab_id: 12 }, type: 'mcp:go-back', timeout: 5000, payload: { tabId: 12, agentId: 'agent-test' } },
-]);
-
 // Canned bridge answers (G3). Deterministic per message so the response text
 // can be compared byte for byte.
 function defaultCanned(message) {
-  if (message.type === 'mcp:go-back') return { success: true, tool: 'back', navigated: true, tabId: 12 };
   return { success: true, tool: message.payload && message.payload.tool, wire: 'canned' };
 }
 
@@ -153,7 +147,6 @@ const EXPECT_FIELDS = Object.freeze([
   'url_includes', 'title_includes', 'text_visible', 'text_gone', 'selector', 'state', 'value', 'dialog_open', 'timeout_ms',
 ]);
 const EXPECT_SCHEMA_BYTE_CAP = 600;
-const BACK_BASE_TIMEOUT_MS = 5000;
 const ACTION_TIMEOUT_MS = 30000;
 
 // clampExpectTimeoutMs table (D-20; same rows 69-07's parity test runs on
@@ -366,22 +359,12 @@ function unsupportedResult(checks, timeoutMs) {
     }
 
     // -----------------------------------------------------------------------
-    console.log('\n--- G2: back without expect matches the pre-change goldens ---');
-    for (const golden of GOLDEN_BACK_CALLS) {
-      const outcome = await call('back', golden.args);
-      check(outcome.error === null && outcome.dispatches.length === 1 && outcome.calls.length === 1,
-        `${golden.label}: exactly one bridge send`);
-      const sent = outcome.dispatches[0];
-      if (!sent) continue;
-      check(sent.message.type === golden.type, `${golden.label}: sends ${golden.type}`);
-      const actual = wireJson(sent);
-      const expected = JSON.stringify(golden.payload);
-      check(actual === expected, `${golden.label}: payload bytes equal the golden`
-        + (actual === expected ? '' : `\n      golden: ${expected}\n      actual: ${actual}`));
-      check(sent.options && sent.options.timeout === 5000,
-        `${golden.label}: options.timeout is 5000 (got ${sent.options && sent.options.timeout})`);
-      check(responseText(outcome) === JSON.stringify(outcome.canned[0], null, 2) && outcome.result.isError === undefined,
-        `${golden.label}: G3 response text is the canned result's JSON.stringify(result, null, 2)`);
+    console.log('\n--- back is retired (0.11.5): refused before any bridge send ---');
+    for (const args of [{}, { tab_id: 12 }, { expect: { url_includes: '/a' } }]) {
+      const outcome = await call('back', args);
+      check(outcome.dispatches.length === 0 && outcome.calls.length === 0 && outcome.queued === 0
+        && (outcome.error !== null || (outcome.result && outcome.result.isError === true)),
+        `back ${JSON.stringify(args)}: refused with zero bridge sends and zero queue entries`);
     }
 
     const goldenByName = new Map(GOLDEN_CALLS.map((golden) => [golden.name, golden]));
@@ -392,12 +375,12 @@ function unsupportedResult(checks, timeoutMs) {
       && JSON.stringify(manual.EXPECT_TOOL_NAMES) === JSON.stringify(h.EXPECT_TOOL_NAMES_VERBATIM)
       && Object.isFrozen(manual.EXPECT_TOOL_NAMES),
       'EXPECT_TOOL_NAMES is the frozen D-12 list in D-12 order');
-    check(manual.EXPECT_TOOL_SET instanceof Set && manual.EXPECT_TOOL_SET.size === 29
+    check(manual.EXPECT_TOOL_SET instanceof Set && manual.EXPECT_TOOL_SET.size === 28
       && h.EXPECT_TOOL_NAMES_VERBATIM.every((name) => manual.EXPECT_TOOL_SET.has(name)),
-      'EXPECT_TOOL_SET holds the same 29 names');
+      'EXPECT_TOOL_SET holds the same 28 names');
     check(manual.EXPECT_DEFAULT_TIMEOUT_MS === 2000 && manual.EXPECT_MAX_TIMEOUT_MS === 5000
-      && manual.EXPECT_STRING_MAX === 2000 && manual.EXPECT_BRIDGE_HEADROOM_MS === 1500,
-      'EXPECT_DEFAULT_TIMEOUT_MS 2000, EXPECT_MAX_TIMEOUT_MS 5000, EXPECT_STRING_MAX 2000, EXPECT_BRIDGE_HEADROOM_MS 1500');
+      && manual.EXPECT_STRING_MAX === 2000 && manual.EXPECT_BRIDGE_HEADROOM_MS === undefined,
+      'EXPECT_DEFAULT_TIMEOUT_MS 2000, EXPECT_MAX_TIMEOUT_MS 5000, EXPECT_STRING_MAX 2000; no back-only bridge headroom');
     if (typeof manual.clampExpectTimeoutMs === 'function') {
       const wrong = CLAMP_TABLE.filter(([input, output]) => manual.clampExpectTimeoutMs(input) !== output)
         .map(([input, output]) => `${String(input)} -> ${manual.clampExpectTimeoutMs(input)} (want ${output})`);
@@ -424,13 +407,13 @@ function unsupportedResult(checks, timeoutMs) {
       'buildUnsupportedExpectResult and withUnsupportedExpectFill are exported');
 
     // -----------------------------------------------------------------------
-    console.log('\n--- published schema: expect on exactly the 29 D-12 tools ---');
+    console.log('\n--- published schema: expect on exactly the 28 D-12 tools ---');
     const listed = (await session.client.listTools()).tools;
     const withExpect = listed.filter((tool) => hasOwn(tool.inputSchema && tool.inputSchema.properties, 'expect'));
     const withExpectNames = withExpect.map((tool) => tool.name).sort();
     const wantNames = [...h.EXPECT_TOOL_NAMES_VERBATIM].sort();
     check(JSON.stringify(withExpectNames) === JSON.stringify(wantNames),
-      `expect is published on exactly the 29 D-12 tools (got ${withExpect.length}`
+      `expect is published on exactly the 28 D-12 tools (got ${withExpect.length}`
         + `${withExpectNames.length !== 29 ? `: ${withExpectNames.join(', ')}` : ''})`);
     const inRequired = withExpect.filter((tool) => (tool.inputSchema.required || []).includes('expect')).map((tool) => tool.name);
     check(inRequired.length === 0, `expect is never in required${inRequired.length ? ` (${inRequired.join(', ')})` : ''}`);
@@ -467,7 +450,7 @@ function unsupportedResult(checks, timeoutMs) {
         'click with expect: null returns the canned bytes (no fill)');
     }
 
-    console.log('\n--- expect on tools outside the 29 is stripped by the SDK ---');
+    console.log('\n--- expect on tools outside the 28 is stripped by the SDK ---');
     for (const name of ['hover', 'fill_sheet']) {
       const golden = goldenByName.get(name);
       const outcome = await call(name, { ...golden.args, expect: { text_visible: 'Saved' } });
@@ -551,45 +534,6 @@ function unsupportedResult(checks, timeoutMs) {
           `click expect ${label}: rejected (-32602 or isError) with zero bridge sends and zero queue entries`
             + (outcome.dispatches.length ? ` (sent ${outcome.dispatches.length})` : ''));
       }
-      for (const [label, value] of [['{}', {}], ['unknown key', { bogus: 1 }], ['unparseable string', '{not json']]) {
-        const outcome = await call('back', { expect: value });
-        const rejected = isValidationRejection(outcome);
-        check(rejected && outcome.dispatches.length === 0 && outcome.calls.length === 0 && outcome.queued === 0,
-          `back expect ${label}: rejected with zero bridge sends and zero queue entries`);
-      }
-    }
-
-    // -----------------------------------------------------------------------
-    console.log('\n--- back: expect sidecar and the conditional timeout (RESEARCH Finding 1) ---');
-    for (const [label, spec, timeout] of [
-      ['timeout_ms 5000', { url_includes: '/a', timeout_ms: 5000 }, 11500],
-      ['timeout_ms 99999', { url_includes: '/a', timeout_ms: 99999 }, 11500],
-      ['no timeout_ms', { url_includes: '/a' }, 8500],
-      ['timeout_ms -5', { url_includes: '/a', timeout_ms: -5 }, 6500],
-      ['timeout_ms "3000"', { url_includes: '/a', timeout_ms: '3000' }, 9500],
-      ['timeout_ms null (omitted: the 2000 ms default)', { url_includes: '/a', timeout_ms: null }, 8500],
-    ]) {
-      const outcome = await call('back', { expect: spec });
-      const sent = outcome.dispatches[0];
-      check(outcome.error === null && outcome.dispatches.length === 1 && sent && sent.message.type === 'mcp:go-back',
-        `back expect ${label}: one mcp:go-back send`);
-      check(sent && sent.options.timeout === timeout, `back expect ${label}: options.timeout ${timeout} (got ${sent && sent.options.timeout})`);
-      check(sent && hasOwn(sent.message.payload, 'expect') && wireJsonWithoutExpect(sent) === JSON.stringify(GOLDEN_BACK_CALLS[0].payload),
-        `back expect ${label}: payload.expect set; the rest is the G2 bytes`);
-    }
-    {
-      const outcome = await call('back', { tab_id: 12, expect: { url_includes: '/a' } });
-      const sent = outcome.dispatches[0];
-      check(sent && sent.message.payload.tabId === 12 && sameValue(sent.message.payload.expect, { url_includes: '/a' })
-        && wireJsonWithoutExpect(sent) === JSON.stringify(GOLDEN_BACK_CALLS[1].payload),
-        'back tab_id 12 with expect: tabId threading unchanged, expect top-level');
-      check(sent && sent.options.timeout === BACK_BASE_TIMEOUT_MS + 2000 + 1500, 'back tab_id 12 with expect: options.timeout 8500');
-    }
-    {
-      const outcome = await call('back', { expect: null });
-      const sent = outcome.dispatches[0];
-      check(sent && wireJson(sent) === JSON.stringify(GOLDEN_BACK_CALLS[0].payload) && sent.options.timeout === BACK_BASE_TIMEOUT_MS,
-        'back with expect: null sends the G2 bytes with timeout 5000');
     }
 
     // -----------------------------------------------------------------------
@@ -617,14 +561,6 @@ function unsupportedResult(checks, timeoutMs) {
       check(typeof text === 'string' && !text.includes('hunter2'), 'the value check never echoes the expected value');
       check(text === JSON.stringify({ success: true, tool: 'click', expect_result: body && body.expect_result }, null, 2),
         'the filled response is the canned result plus expect_result, nothing else');
-    }
-    {
-      cannedFor = () => ({ success: true, tool: 'back', navigated: true });
-      const outcome = await call('back', { expect: { url_includes: '/a', selector: '#x' } });
-      cannedFor = defaultCanned;
-      const body = parseResponseJson(responseText(outcome));
-      check(body && sameValue(body.expect_result, unsupportedResult([['url_includes', '/a'], ['state', 'visible']], 2000)),
-        'back success without expect_result is filled (default timeout 2000; selector alone means state visible)');
     }
     {
       const existing = { status: 'verified', checks: [{ kind: 'text_visible', expected: 'Saved', observed: 'Saved', status: 'met' }], waited_ms: 40, timeout_ms: 2000 };

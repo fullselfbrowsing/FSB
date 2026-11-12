@@ -11,7 +11,7 @@ import {
   type ProcessSpec,
   type SpawnContext,
 } from './adapter.js';
-import { classifyAdapterCompatibility } from './compatibility.js';
+import { classifyAdapterDetectionCompatibility } from './compatibility.js';
 import type { AgentProviderRegistry } from './registry.js';
 import {
   ProcessProbeError,
@@ -35,6 +35,12 @@ export type AgentConnectionTestFailureCode =
   | 'binary_not_found'
   | 'unsupported_version'
   | 'adapter_unavailable'
+  | 'capability_missing'
+  | 'capability_unverified'
+  | 'isolation_unavailable'
+  | 'sandbox_unavailable'
+  | 'agent_protocol_drift'
+  | 'binary_changed'
   | 'auth_unauthenticated'
   | 'connection_test_timeout'
   | 'connection_test_cancelled'
@@ -140,17 +146,7 @@ export async function testAgentProviderConnection(input: Readonly<{
   try {
     const adapter = registry.require(providerId);
     const detection = await adapter.detect();
-    const compatibility = classifyAdapterCompatibility(providerId, {
-      binaryFound: detection.binary !== null,
-      // Mirrors compatibilityEvidence() in serve-delegation.ts. A retained
-      // binary whose version never parsed is a version failure, not an
-      // isolation one, but so is every version-less detection when read
-      // through the classifier alone -- only the diagnostic separates the two.
-      version: detection.version === null
-          && detection.diagnostic?.code === 'version_unparseable'
-        ? 'malformed'
-        : detection.version,
-    });
+    const compatibility = classifyAdapterDetectionCompatibility(providerId, detection);
     if (!detection.binary) {
       return failure(providerId, 'binary_not_found');
     }
@@ -163,10 +159,17 @@ export async function testAgentProviderConnection(input: Readonly<{
       return failure(providerId, 'unsupported_version');
     }
     if (!detection.installed) {
+      const code = detection.diagnostic?.code;
+      if (code === 'capability_missing' || code === 'isolation_unavailable'
+        || code === 'sandbox_unavailable' || code === 'agent_protocol_drift'
+        || code === 'binary_changed') return failure(providerId, code);
       return failure(providerId, 'adapter_unavailable');
     }
     if (detection.authState === 'unauthenticated') {
       return failure(providerId, 'auth_unauthenticated');
+    }
+    if (providerId === GROK_BUILD_ADAPTER_ID && compatibility.reason !== 'capability_verified') {
+      return failure(providerId, 'capability_unverified');
     }
     if (signal?.aborted) return failure(providerId, 'connection_test_cancelled');
     if (providerId === GROK_BUILD_ADAPTER_ID) {

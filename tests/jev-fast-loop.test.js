@@ -1700,7 +1700,7 @@ async function metricsRowCase() {
     const fastRows = rows.filter((row) => row.tool === 'click');
     check(run.steps[1].fast === 1 && fastRows.length === 1 && llmRows.length >= 1,
       'usage metrics: one dispatch row for the fast click and one for the LLM turn\'s tool');
-    check(fastRows.length === 1 && fastRows[0].client === 'FSB Autopilot' && fastRows[0].dispatcher_route === 'autopilot'
+    check(fastRows.length === 1 && fastRows[0].client === 'Autopilot' && fastRows[0].dispatcher_route === 'autopilot'
       && util.isDeepStrictEqual(fastRows[0].drivingModel, { provider: 'jev', model_id: null, decisionSource: 'jev' }),
     'usage metrics: the fast click row carries drivingModel {provider:"jev", model_id:null, decisionSource:"jev"}');
     check(llmRows.length >= 1 && llmRows.every((row) => row.drivingModel && row.drivingModel.provider === providerKey

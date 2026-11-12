@@ -1312,8 +1312,8 @@ async function runEvidenceSections() {
     const helper = sliceFunction(bgSource, 'fsbRegisterFastRunEvidence');
     check(bgSource.replace(helper, '').indexOf('_fastRun') === -1,
       'no _fastRun persistence: outside the registration helper background.js names no _fastRun field');
-    check(!/importscripts/i.test(helper) && !/importscripts/i.test(REGISTER_LINE) && countOf(bgSource, 'importScripts') === 338,
-      'background.js gains no importScripts token (338, the lattice pin)');
+    check(!/importscripts/i.test(helper) && !/importscripts/i.test(REGISTER_LINE) && countOf(bgSource, 'importScripts') === 334,
+      'background.js gains no importScripts token (334, the lattice pin)');
     check(!/\bawait\b/.test(helper) && !/^async /.test(helper), 'the registration helper is synchronous');
     check(/typeof globalThis !== 'undefined'/.test(helper) && countOf(helper, 'pipeline.register(LIFECYCLE_EVENTS.') === 3,
       'the helper reads FsbFastPath through a typeof-guarded globalThis and makes three pipeline.register(LIFECYCLE_EVENTS.X, ...) calls');

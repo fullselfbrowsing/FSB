@@ -26,9 +26,8 @@ const TRIGGER_MANUAL_EXCLUSIONS = new Set(['trigger']); function isManualTool(t:
 // ---------------------------------------------------------------------------
 // Phase 69 D-11..D-16: the optional same-call `expect` check.
 //
-// MCP-only: added as an extra zod key at registration for the 29 D-12 tools
-// (28 registry action tools here, plus `back` in ./agents.ts), never in the
-// registry inputSchema. Values mirror extension/utils/action-verification.js
+// MCP-only: added as an extra zod key at registration for the 28 D-12
+// registry action tools, never in the registry inputSchema. Values mirror extension/utils/action-verification.js
 // (plan 69-03); plan 69-07's parity test compares the two sides.
 // ---------------------------------------------------------------------------
 
@@ -39,7 +38,7 @@ export const EXPECT_TOOL_NAMES: readonly string[] = Object.freeze([
   'select_option', 'check_box', 'set_attribute',
   'drag_drop', 'drag', 'drag_variable_speed', 'drop_file', 'upload_file',
   'select_text_range', 'scroll_to_top', 'scroll_to_bottom', 'scroll_to_element',
-  'navigate', 'go_back', 'go_forward', 'refresh', 'back',
+  'navigate', 'go_back', 'go_forward', 'refresh',
 ]);
 export const EXPECT_TOOL_SET: ReadonlySet<string> = new Set(EXPECT_TOOL_NAMES);
 
@@ -47,9 +46,6 @@ export const EXPECT_TOOL_SET: ReadonlySet<string> = new Set(EXPECT_TOOL_NAMES);
 export const EXPECT_DEFAULT_TIMEOUT_MS = 2_000;
 export const EXPECT_MAX_TIMEOUT_MS = 5_000;
 export const EXPECT_STRING_MAX = 2_000;
-// Bridge headroom added to `back`'s timeout when expect is sent. Uncalibrated
-// (V4); it must exceed the extension's 750 ms probe race.
-export const EXPECT_BRIDGE_HEADROOM_MS = 1_500;
 
 // D-19 result vocabulary used by the version-skew fill.
 const EXPECT_OBSERVED_MAX = 120;

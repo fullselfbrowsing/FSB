@@ -341,6 +341,7 @@ async function run() {
     ['extension onboarding', readText('extension/ui/onboarding.js')],
     ['showcase home page', readText('showcase/angular/src/app/pages/home/home-page.component.html')],
     ['showcase about page', readText('showcase/angular/src/app/pages/about/about-page.component.html')],
+    ['showcase about metadata', readText('showcase/angular/src/app/pages/about/about-page.component.ts')],
     ['showcase agents page', readText('showcase/angular/src/app/pages/agents/agents-page.component.html')],
     ['showcase agents metadata', readText('showcase/angular/src/app/pages/agents/agents-page.component.ts')],
     ['showcase support page', readText('showcase/angular/src/app/pages/support/support-page.component.html')],
@@ -349,7 +350,7 @@ async function run() {
     ['LLM full source', llmsFullSource],
     ['generated LLM summary', llmsPublic],
     ['generated LLM full text', llmsFullPublic],
-    ...['messages.xlf', 'messages.de.xlf', 'messages.es.xlf', 'messages.ja.xlf', 'messages.ko.xlf', 'messages.zh-CN.xlf', 'messages.zh-TW.xlf']
+    ...['messages.xlf', 'messages.de.xlf', 'messages.es.xlf', 'messages.ru.xlf', 'messages.ja.xlf', 'messages.ko.xlf', 'messages.zh-CN.xlf', 'messages.zh-TW.xlf']
       .map((file) => [`showcase locale ${file}`, readText(`showcase/angular/src/locale/${file}`)]),
   ];
 
@@ -388,17 +389,14 @@ async function run() {
   ]) {
     assert(content.includes(`fsb-mcp-server ${canonicalVersion}`), `${name} advertises the canonical MCP release`);
   }
-  for (const [name, content] of liveToolCountSources) {
-    // Phase 71 (71-11): 68 and 69 are stale too, including the '68 available'
-    // summary form and the '68 <span>MCP</span> tools' / '68 <x .../>MCP'
-    // placeholder form in the templates and the xlf catalogs.
-    assert(!/\b6[689](?:-tool| MCP| granular| registered| tools| Tools| available)|\b6[689] <(?:span|x)\b[^>]*>MCP|\(6[689] tools\)|Tools \(6[689] Total\)/u.test(content),
-      `${name} contains no stale 66/68/69-tool surface claim`);
-  }
+  console.log('\n--- published tool counts match the built server ---');
   // Phase 71 D-27: the documented count follows the Tool Count Contract marker
   // in mcp/README.md against the built tools/list length, never a literal.
   const { listCurrentTools } = await import(pathToFileURL(path.join(repoRoot, 'tests/helpers/mcp-in-process.mjs')).href);
   const builtToolNames = (await listCurrentTools()).map((tool) => tool.name);
+  for (const retired of ['start_visual_session', 'end_visual_session', 'back']) {
+    assert(!builtToolNames.includes(retired), `retired ${retired} tool stays off the MCP surface`);
+  }
   const releaseDelta = JSON.parse(readText('tests/fixtures/mcp-release-delta-0.12.0.json'));
   const toolCount = checkToolCountDocs({
     rootReadme,
@@ -409,6 +407,66 @@ async function run() {
   });
   assert(toolCount.ok,
     `README tool counts follow the Tool Count Contract against the built tools/list (state: ${toolCount.state}, expected: ${toolCount.expected}, built: ${builtToolNames.length}, errors: ${toolCount.errors.join('; ') || 'none'})`);
+  // Every other published count states the count the contract expects: the
+  // built length, or that length minus the unpublished release's added tools.
+  const expectedToolCount = typeof toolCount.expected === 'number' ? toolCount.expected : builtToolNames.length;
+
+  // Counts that were published or planned before and are now wrong: 66 and 68
+  // never matched the server, 69 is the 0.11.5 surface and 72/73 the counts
+  // before 0.11.5 removed three tools. The count the contract expects is
+  // never banned. Release notes in the catalogs are history and stay out.
+  const staleCounts = [66, 68, 69, 72, 73].filter((count) => count !== expectedToolCount).join('|');
+  const staleClaim = new RegExp(`\\b(?:${staleCounts})(?:-tool| MCP| granular| registered| tools| Tools| available)|\\b(?:${staleCounts}) <(?:span|x)\\b[^>]*>MCP|\\((?:${staleCounts}) tools\\)|Tools \\((?:${staleCounts}) Total\\)`, 'u');
+  const withoutReleaseNotes = (text) => text.replace(/<trans-unit id="releaseNotes\.[^"]*"[\s\S]*?<\/trans-unit>/gu, '');
+  for (const [name, content] of liveToolCountSources) {
+    assert(!staleClaim.test(name.startsWith('showcase locale ') ? withoutReleaseNotes(content) : content),
+      `${name} contains no stale ${staleCounts.replace(/\|/gu, '/')}-tool surface claim`);
+  }
+
+  // A count claim is "N-tool", "N [registered|granular] [MCP [browser]] tools",
+  // or a "Tools ... N available" row. Markup is stripped first, so
+  // "68 <span>MCP</span> tools" reads as "68 MCP tools". "53 browser tools" and
+  // "4 trigger tools" count the extension's own registry, not MCP, and stay out.
+  const TOOL_COUNT_CLAIM = /(?<![\w.])(\d+)(?:-tool\b|\s+(?:(?:registered|granular)\s+)?(?:MCP\s+(?:browser\s+)?)?tools\b)|\btools?\b[^\d\n]{0,12}?(?<![\w.])(\d+)\s+available\b/giu;
+  const withoutMarkup = (text) => text
+    .replace(/<x\b[^>]*\/>/gu, '')
+    .replace(/<[^>]+>/gu, ' ')
+    .replace(/\s+/gu, ' ');
+  const claimedCounts = (text) => Array.from(withoutMarkup(text).matchAll(TOOL_COUNT_CLAIM),
+    (match) => Number(match[1] ?? match[2]));
+  const statesToolCount = new RegExp(`(?<![\\d.])${expectedToolCount}(?![\\d.])`, 'u');
+  // The READMEs follow the Tool Count Contract above. Onboarding names no
+  // tool count (71-10), so a withheld MCP release cannot force an extension
+  // edit. The other two are scanned for stale claims only.
+  const contractSources = new Set(['root README', 'MCP README']);
+  const sourcesWithoutClaims = new Set(['extension onboarding', 'showcase about metadata', 'showcase support page']);
+  for (const [name, content] of liveToolCountSources) {
+    if (contractSources.has(name)) continue;
+    if (!name.startsWith('showcase locale ')) {
+      const counts = claimedCounts(content);
+      assert(counts.length > 0 || sourcesWithoutClaims.has(name),
+        `${name} still states a tool count the check can read`);
+      assert(counts.every((count) => count === expectedToolCount),
+        `${name} states the ${expectedToolCount}-tool registered surface (claims found: ${counts.join(', ') || 'none'})`);
+      continue;
+    }
+    // Catalogs: every unit whose English source states a count must state the
+    // live count, and so must its translation. Release notes are history.
+    for (const unit of content.matchAll(/<trans-unit id="([^"]+)"[\s\S]*?<\/trans-unit>/gu)) {
+      if (unit[1].startsWith('releaseNotes.')) continue;
+      const source = (unit[0].match(/<source>([\s\S]*?)<\/source>/u) || [])[1] || '';
+      const counts = claimedCounts(source);
+      if (counts.length === 0) continue;
+      assert(counts.every((count) => count === expectedToolCount),
+        `${name} ${unit[1]} source states ${expectedToolCount} tools (got ${counts.join(', ')})`);
+      const target = (unit[0].match(/<target[^>]*>([\s\S]*?)<\/target>/u) || [])[1];
+      if (target !== undefined) {
+        assert(statesToolCount.test(withoutMarkup(target)), `${name} ${unit[1]} translation states ${expectedToolCount} tools`);
+      }
+    }
+  }
+  assert(claimedCounts(readText('extension/ui/onboarding.js')).length === 0,
+    'extension onboarding names no MCP tool count (71-10)');
   assert(promptSource.includes('FSB Tool Reference (49 tools)') &&
     promptSource.includes('## Developer / UAT (1 tool)') &&
     promptSource.includes('## Observability (7 tools)') &&

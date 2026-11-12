@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "fixture": "initialize.json",
+  "profileVersion": "grok-acp-v1",
+  "cliVersion": "1.0.62",
+  "provenance": "local-unauthenticated-non-inference-initialization-and-inspection",
+  "sanitized": true,
+  "liveCapturePending": false,
+  "recordedProvenanceStatus": "initialization_only",
+  "sanitization": {
+    "syntheticIdentifiers": true,
+    "containsRealPrompt": false,
+    "containsBrowserContent": false,
+    "containsCredentials": false,
+    "containsFilesystemPaths": true,
+    "filesystemPathsAreSynthetic": true
+  },
+  "expectedSequence": [
+    "init"
+  ],
+  "sourceDocs": [
+    "https://docs.x.ai/build/cli/headless-scripting"
+  ],
+  "limitations": [
+    "No authentication, model prompt, browser tool, or full task turn was executed.",
+    "The strict sandbox refuses this Mac Docker socket symlink. Initialization shape was captured in a disposable unauthenticated profile with sandbox off; this capture does not attest production sandbox support."
+  ]
+}

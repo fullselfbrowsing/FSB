@@ -313,35 +313,18 @@ test('7. a content-verb tool (type_text) and a CDP-verb tool (click_at) carry ex
   assert.deepEqual(body.expect_result.checks, [{ kind: 'state', expected: 'visible', observed: 'visible', status: 'met' }]);
 });
 
-test('8. back with expect: mcp:go-back carries expect and the timeout makes room for the check', async () => {
-  const expect = { text_visible: 'Home', timeout_ms: 1000 };
-  const turn = await act('back', { tab_id: 7, expect }, baseScenario({
-    actionResult: { success: true, status: 'navigated', tabId: 7 },
-    tab: { ...DEFAULT_TAB, url: 'https://app.example.test/home', title: 'Home' },
-    commit: { required: true, isCommitted: () => true, documentId: () => 'doc-current' },
-    probe: cannedProbe({ text_visible: { holds: true, observed: 'present' } }),
-  }));
-  assertOneCall(turn, 'back');
-  const dispatch = turn.dispatches[0];
-  assert.equal(dispatch.message.type, 'mcp:go-back');
-  assert.deepEqual(dispatch.message.payload.expect, expect);
-  assert.equal(dispatch.message.payload.tabId, 7);
-  assert.equal(dispatch.options.timeout, 5000 + av.clampExpectTimeoutMs(expect.timeout_ms) + 1500,
-    'back timeout = 5,000 + clamp(timeout_ms) + 1,500');
-  assert.equal(dispatch.options.timeout, 7500);
-  assert.equal(manual.EXPECT_BRIDGE_HEADROOM_MS, 1500);
-  const body = parseBody(turn);
-  assert.equal(body.expect_result.status, 'verified');
-  assert.equal(body.expect_result.timeout_ms, 1000);
-});
-
-test('8b. back without expect keeps the 5,000 ms timeout and an expect-free payload', async () => {
-  const canned = { success: true, status: 'navigated', tabId: 7 };
-  const turn = await act('back', { tab_id: 7 }, baseScenario({ actionResult: canned }));
-  assertOneCall(turn, 'back without expect');
-  assert.equal(turn.dispatches[0].options.timeout, 5000);
-  assert.equal(Object.prototype.hasOwnProperty.call(turn.dispatches[0].message.payload, 'expect'), false);
-  assert.equal(turn.text, JSON.stringify(canned, null, 2));
+test('8. back is retired (0.11.5): a call is refused and nothing reaches the bridge', async () => {
+  let refused = false;
+  try {
+    const turn = await act('back', { tab_id: 7, expect: { text_visible: 'Home' } }, baseScenario());
+    refused = Boolean(turn.result && turn.result.isError);
+  } catch (_) {
+    refused = true;
+  }
+  assert.ok(refused, 'calling the retired back tool is refused');
+  assert.equal(bridge.calls.filter((entry) => DISPATCH_TYPES.has(entry.message.type)).length, 0,
+    'no mcp:go-back or action send reaches the bridge');
+  assert.equal(manual.EXPECT_BRIDGE_HEADROOM_MS, undefined, 'the back-only bridge headroom is gone');
 });
 
 test('9. a malformed expect is rejected before dispatch: no bridge send, no side effect', async () => {

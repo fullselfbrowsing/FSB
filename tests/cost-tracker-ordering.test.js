@@ -130,7 +130,7 @@ const deniedSlice = sliceBetween(agentLoopSource, 'if (denialResult && denialRes
 assert(malformedSlice !== null && !malformedSlice.includes('durationMs'), 'Phase 66: malformed-argument calls carry no durationMs');
 assert(deniedSlice !== null && !deniedSlice.includes('durationMs'), 'Phase 66: permission-denied calls carry no durationMs');
 
-const successPushSlice = sliceBetween(agentLoopSource, "client: 'FSB Autopilot',\n            tool: call.name,", '// Emit afterToolExecution hook');
+const successPushSlice = sliceBetween(agentLoopSource, "client: 'Autopilot',\n            tool: call.name,", '// Emit afterToolExecution hook');
 assert(successPushSlice !== null && countOccurrences(successPushSlice, 'durationMs: _timingToolMs') === 2,
   'Phase 66: the durationMs literals sit in the success push after the autopilot metrics block');
 assert(successPushSlice !== null && countOccurrences(successPushSlice, '_al_addIterationToolTime(session, _timingRow, _timingToolMs)') === 1 &&

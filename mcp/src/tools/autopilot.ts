@@ -20,7 +20,7 @@ import { mcpToolDescription, mcpParamDescription } from './descriptions.js';
  * tool the loop dispatches still emits change_report when the global toggle
  * is on). Read run_task's completion summary or call get_task_status for
  * autopilot-level state; the action-tool change_report contract documented
- * on the manual tools (manual.ts) and on `back` (agents.ts) is the right
+ * on the manual tools (manual.ts) is the right
  * place to consume per-action consequences.
  */
 export function registerAutopilotTools(

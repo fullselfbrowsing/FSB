@@ -11,15 +11,16 @@
  * tests/mcp-description-budget.test.js); everything else is frozen.
  *
  * Exactly two differences are tolerated:
- *   - an optional `expect` property on the 29 D-12 tools
+ *   - an optional `expect` property on the 28 D-12 tools
  *     (EXPECT_TOOL_NAMES_VERBATIM), never in `required`, with one
  *     byte-identical, closed, flat schema of at most EXPECT_SCHEMA_BYTE_CAP
  *     canonical bytes and no sub-property descriptions;
  *   - the Phase 66.1 `settings` tool, identified by name (never by a total
- *     tool count, D-02).
+ *     tool count, D-02);
+ *   - the three baseline tools 0.11.5 retired (RETIRED_TOOL_NAMES).
  *
  * EXPECT_REQUIRED is true since plan 69-06 published `expect`: every one of
- * the 29 tools must carry it.
+ * the 28 tools must carry it.
  *
  * Run: npm --prefix mcp run build && node tests/mcp-tools-list-shape-freeze.test.js
  */
@@ -71,8 +72,8 @@ function hasOwn(object, key) {
   const expectNames = new Set(h.EXPECT_TOOL_NAMES_VERBATIM);
 
   console.log('\n--- the D-12 expect list ---');
-  check(h.EXPECT_TOOL_NAMES_VERBATIM.length === 29 && expectNames.size === 29,
-    'EXPECT_TOOL_NAMES_VERBATIM holds 29 unique names');
+  check(h.EXPECT_TOOL_NAMES_VERBATIM.length === 28 && expectNames.size === 28,
+    'EXPECT_TOOL_NAMES_VERBATIM holds 28 unique names');
   const baselineNames = new Set(baselineTools.map((tool) => tool.name));
   const unknownExpectNames = h.EXPECT_TOOL_NAMES_VERBATIM.filter((name) => !baselineNames.has(name));
   check(unknownExpectNames.length === 0,
@@ -87,9 +88,13 @@ function hasOwn(object, key) {
   const currentNames = current.map((tool) => tool.name).filter((name) => name !== h.SETTINGS_TOOL_NAME);
   const missing = [...baselineNames].filter((name) => !currentNames.includes(name));
   const extra = currentNames.filter((name) => !baselineNames.has(name));
-  check(missing.length === 0 && extra.length === 0,
-    'current tool names minus settings equal the 8a058bdf baseline names'
-      + (missing.length ? `; missing: ${missing.join(', ')}` : '')
+  const unexpectedMissing = missing.filter((name) => !h.RETIRED_TOOL_NAMES.includes(name));
+  check(JSON.stringify([...missing].sort()) === JSON.stringify([...h.RETIRED_TOOL_NAMES].sort()),
+    'the 8a058bdf names missing from the current build are exactly the 0.11.5 retirements'
+      + ` (missing: ${missing.join(', ') || 'none'})`);
+  check(unexpectedMissing.length === 0 && extra.length === 0,
+    'current tool names minus settings equal the 8a058bdf baseline names minus the retired tools'
+      + (unexpectedMissing.length ? `; missing: ${unexpectedMissing.join(', ')}` : '')
       + (extra.length ? `; unexpected: ${extra.join(', ')}` : ''));
   check(new Set(currentNames).size === currentNames.length, 'current tool names are unique');
 
@@ -110,7 +115,7 @@ function hasOwn(object, key) {
         publishedExpect.push({ name, schema: properties.expect });
         delete projection.inputSchema.properties.expect;
       } else {
-        check(false, `${name}: \`expect\` is published on a tool outside the 29 D-12 tools`);
+        check(false, `${name}: \`expect\` is published on a tool outside the 28 D-12 tools`);
       }
     } else if (EXPECT_REQUIRED && expectNames.has(name)) {
       check(false, `${name}: \`expect\` is missing (EXPECT_REQUIRED)`);
@@ -134,10 +139,10 @@ function hasOwn(object, key) {
   if (publishedExpect.length === 0) {
     console.log(`  no tool publishes \`expect\` yet (EXPECT_REQUIRED=${EXPECT_REQUIRED})`);
   } else {
-    console.log(`  \`expect\` published on ${publishedExpect.length} of 29 tools`);
+    console.log(`  \`expect\` published on ${publishedExpect.length} of 28 tools`);
   }
   if (EXPECT_REQUIRED) {
-    check(publishedExpect.length === 29, `every D-12 tool publishes \`expect\` (got ${publishedExpect.length})`);
+    check(publishedExpect.length === 28, `every D-12 tool publishes \`expect\` (got ${publishedExpect.length})`);
   }
   if (publishedExpect.length > 0) {
     const reference = h.canonicalJson(publishedExpect[0].schema);

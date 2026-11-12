@@ -17,11 +17,7 @@
   var sessionToken = localStorage.getItem(SESSION_KEY) || '';
   var sessionExpiresAt = localStorage.getItem(SESSION_EXPIRES_KEY) || '';
   var qrScanner = null;
-  // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-  // var agents = [];
   var stats = {};
-  // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-  // var selectedAgentId = null;
   var runsOffset = 0;
   var runsLimit = 20;
   var pollTimer = null;
@@ -38,18 +34,6 @@
   var taskStartTime = 0;
   var taskElapsedTimer = null;
   var lastProgressAction = '';
-
-  // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-  // Agent management state
-  // var detailAgentId = null;         // Currently open detail panel agent
-  // var detailRunsOffset = 0;
-  // var detailRunsLimit = 10;
-  // var modalMode = null;             // 'create' | 'edit'
-  // var modalAgentId = null;          // agentId when editing
-  // var deleteAgentId = null;         // agentId pending deletion
-  // var deleteAgentName = '';         // name for delete dialog
-  // var saveAgentScheduleType = 'interval'; // schedule type for inline save / modal
-  // var agentRunningId = null;        // agentId currently running via Run Now
 
   // DOM preview state
   var previewState = 'hidden'; // 'hidden' | 'loading' | 'streaming' | 'disconnected' | 'frozen-disconnect' | 'frozen-complete' | 'error'
@@ -809,13 +793,8 @@
   var keyInput = document.getElementById('dash-key-input');
   var connectBtn = document.getElementById('dash-connect-btn');
   var disconnectBtn = document.getElementById('dash-disconnect-btn');
-  // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-  // var agentCountEl = document.getElementById('dash-agent-count');
   var sseStatusEl = document.getElementById('dash-sse-status');
   var wakeBtn = document.getElementById('dash-wake-btn');
-  // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-  // var agentGrid = document.getElementById('dash-agent-grid');
-  // var emptyState = document.getElementById('dash-empty');
   var tabScan = document.getElementById('dash-tab-scan');
   var tabPaste = document.getElementById('dash-tab-paste');
   var tabScanContent = document.getElementById('tab-scan');
@@ -894,60 +873,6 @@
   var previewRestrictedTitle = document.getElementById('dash-preview-restricted-title');
   var previewRestrictedUrl = document.getElementById('dash-preview-restricted-url');
   var lastKnownStreamUrl = '';
-
-  // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-  // Agent management DOM refs
-  // var newAgentBtn = document.getElementById('dash-new-agent-btn');
-  // var agentContainer = document.getElementById('dash-agent-container');
-  // var detailPanel = document.getElementById('dash-agent-detail');
-  // var detailClose = document.getElementById('dash-detail-close');
-  // var detailRunNow = document.getElementById('dash-detail-run-now');
-  // var detailEdit = document.getElementById('dash-detail-edit');
-  // var detailDelete = document.getElementById('dash-detail-delete');
-  // var detailName = document.getElementById('dash-detail-name');
-  // var detailTask = document.getElementById('dash-detail-task');
-  // var detailUrl = document.getElementById('dash-detail-url');
-  // var detailSchedule = document.getElementById('dash-detail-schedule');
-  // var detailReplayRuns = document.getElementById('dash-detail-replay-runs');
-  // var detailAiFallback = document.getElementById('dash-detail-ai-fallback');
-  // var detailTokensSaved = document.getElementById('dash-detail-tokens-saved');
-  // var detailCostSaved = document.getElementById('dash-detail-cost-saved');
-  // var detailRunProgress = document.getElementById('dash-detail-run-progress');
-  // var detailRunBar = document.getElementById('dash-detail-run-bar');
-  // var detailRunAction = document.getElementById('dash-detail-run-action');
-  // var detailRunsList = document.getElementById('dash-detail-runs');
-  // var detailRunsPagination = document.getElementById('dash-detail-runs-pagination');
-  // var detailScriptToggle = document.getElementById('dash-detail-script-toggle');
-  // var detailScriptContent = document.getElementById('dash-detail-script-content');
-  // var detailScriptList = document.getElementById('dash-detail-script-list');
-  // var detailScriptChevron = document.getElementById('dash-detail-script-chevron');
-//
-  // Modal DOM refs
-  // var modalOverlay = document.getElementById('dash-agent-modal-overlay');
-  // var modalTitle = document.getElementById('dash-modal-title');
-  // var modalClose = document.getElementById('dash-modal-close');
-  // var modalName = document.getElementById('dash-modal-name');
-  // var modalTask = document.getElementById('dash-modal-task');
-  // var modalUrl = document.getElementById('dash-modal-url');
-  // var modalScheduleType = document.getElementById('dash-modal-schedule-type');
-  // var modalScheduleConfig = document.getElementById('dash-modal-schedule-config');
-  // var modalDiscard = document.getElementById('dash-modal-discard');
-  // var modalSave = document.getElementById('dash-modal-save');
-//
-  // Delete dialog DOM refs
-  // var deleteOverlay = document.getElementById('dash-delete-overlay');
-  // var deleteTitle = document.getElementById('dash-delete-title');
-  // var deleteCancel = document.getElementById('dash-delete-cancel');
-  // var deleteConfirm = document.getElementById('dash-delete-confirm');
-//
-  // Save-as-Agent DOM refs
-  // var saveAgentSection = document.getElementById('dash-task-save-agent');
-  // var saveAgentTrigger = document.getElementById('dash-save-agent-trigger');
-  // var saveAgentFields = document.getElementById('dash-save-agent-fields');
-  // var saveAgentName = document.getElementById('dash-save-agent-name');
-  // var saveAgentUrl = document.getElementById('dash-save-agent-url');
-  // var saveAgentBtn = document.getElementById('dash-save-agent-btn');
-  // var saveAgentScheduleConfig = document.getElementById('dash-save-agent-schedule-config');
 
   // --- Init ---
   if (sessionToken && sessionExpiresAt) {
@@ -1031,100 +956,6 @@
     });
   }
 
-  // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-  // Detail panel listeners
-  // if (detailClose) detailClose.addEventListener('click', closeDetailPanel);
-  // if (detailRunNow) detailRunNow.addEventListener('click', function () {
-    // if (detailAgentId) runAgentNow(detailAgentId);
-  // });
-  // if (detailEdit) detailEdit.addEventListener('click', function () {
-    // if (detailAgentId) openAgentModal('edit', detailAgentId);
-  // });
-  // if (detailDelete) detailDelete.addEventListener('click', function () {
-    // if (detailAgentId) {
-      // var agent = agents.find(function (a) { return a.agent_id === detailAgentId; });
-      // openDeleteDialog(detailAgentId, agent ? agent.name : detailAgentId);
-    // }
-  // });
-//
-  // Recorded script toggle
-  // if (detailScriptToggle) {
-    // detailScriptToggle.addEventListener('click', function () {
-      // var isExpanded = detailScriptToggle.classList.contains('expanded');
-      // detailScriptToggle.classList.toggle('expanded');
-      // if (detailScriptContent) detailScriptContent.style.display = isExpanded ? 'none' : 'block';
-    // });
-  // }
-
-  // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-  // New Agent button
-  // if (newAgentBtn) newAgentBtn.addEventListener('click', function () { openAgentModal('create'); });
-//
-  // Modal listeners
-  // if (modalClose) modalClose.addEventListener('click', closeAgentModal);
-  // if (modalDiscard) modalDiscard.addEventListener('click', closeAgentModal);
-  // if (modalSave) modalSave.addEventListener('click', saveAgentFromModal);
-  // if (modalOverlay) {
-    // modalOverlay.addEventListener('click', function (e) {
-      // if (e.target === modalOverlay) closeAgentModal();
-    // });
-  // }
-  // Escape key closes modal
-  // document.addEventListener('keydown', function (e) {
-    // if (e.key === 'Escape') {
-      // if (modalOverlay && modalOverlay.style.display !== 'none') closeAgentModal();
-      // else if (deleteOverlay && deleteOverlay.style.display !== 'none') closeDeleteDialog();
-    // }
-  // });
-//
-  // Schedule type pill handlers (modal)
-  // if (modalScheduleType) {
-    // modalScheduleType.addEventListener('click', function (e) {
-      // var pill = e.target.closest('.dash-schedule-pill');
-      // if (!pill) return;
-      // modalScheduleType.querySelectorAll('.dash-schedule-pill').forEach(function (p) { p.classList.remove('active'); });
-      // pill.classList.add('active');
-      // renderScheduleConfig(modalScheduleConfig, pill.getAttribute('data-type'), '{}');
-    // });
-  // }
-//
-  // Delete dialog listeners
-  // if (deleteCancel) deleteCancel.addEventListener('click', closeDeleteDialog);
-  // if (deleteConfirm) deleteConfirm.addEventListener('click', confirmDelete);
-  // if (deleteOverlay) {
-    // deleteOverlay.addEventListener('click', function (e) {
-      // if (e.target === deleteOverlay) closeDeleteDialog();
-    // });
-  // }
-//
-  // Save-as-Agent listeners
-  // if (saveAgentTrigger) {
-    // saveAgentTrigger.addEventListener('click', function () {
-      // var isExpanded = saveAgentTrigger.classList.contains('expanded');
-      // saveAgentTrigger.classList.toggle('expanded');
-      // if (saveAgentFields) {
-        // if (isExpanded) {
-          // saveAgentFields.classList.remove('dash-save-expanded');
-          // saveAgentFields.style.display = 'none';
-        // } else {
-          // saveAgentFields.style.display = 'flex';
-          // saveAgentFields.classList.add('dash-save-expanded');
-        // }
-      // }
-    // });
-  // }
-  // Schedule pills for save-as-agent section
-  // if (saveAgentSection) {
-    // saveAgentSection.addEventListener('click', function (e) {
-      // var pill = e.target.closest('.dash-schedule-pill');
-      // if (!pill) return;
-      // saveAgentSection.querySelectorAll('.dash-schedule-pill').forEach(function (p) { p.classList.remove('active'); });
-      // pill.classList.add('active');
-      // renderScheduleConfig(saveAgentScheduleConfig, pill.getAttribute('data-type'), '{}');
-    // });
-  // }
-  // if (saveAgentBtn) saveAgentBtn.addEventListener('click', submitSaveAsAgent);
-
   // --- Task Control ---
 
   function submitTask(text) {
@@ -1197,8 +1028,6 @@
         // Reset progress bar
         if (taskBarFill) { taskBarFill.style.width = '0%'; taskBarFill.className = 'dash-task-bar-fill'; }
         if (actionFeed) actionFeed.innerHTML = '';
-        // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-        // hideSaveAsAgent();
         if (previewContainer) previewContainer.classList.remove('dash-preview-automating');
         renderTaskRecoveryStatus('', '');
         break;
@@ -1229,8 +1058,6 @@
         }, TASK_TIMEOUT_MS);
         // Disable all task inputs during run
         disableAllTaskInputs(true);
-        // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-        // hideSaveAsAgent();
         if (previewContainer) previewContainer.classList.add('dash-preview-automating');
         renderTaskRecoveryStatus(activeTaskRunId || '', taskRecoverySource);
         break;
@@ -1252,9 +1079,6 @@
         // Show next-task input
         disableAllTaskInputs(false);
         if (taskInputNext) { taskInputNext.value = ''; }
-        // Show save-as-agent option
-        // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-        // showSaveAsAgent();
         if (previewContainer) previewContainer.classList.remove('dash-preview-automating');
         renderTaskRecoveryStatus('', '');
         break;
@@ -1648,11 +1472,7 @@
         // For paste-key users, clear any stale session
         clearSession();
         showDashboard();
-        // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-        // loadData();
         connectWS();
-        // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-        // startPolling();
       } else {
         showError(result.error || 'Invalid hash key. Check your key and try again.');
       }
@@ -1667,11 +1487,7 @@
     validateKey(key).then(function (result) {
       if (result.valid) {
         showDashboard();
-        // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-        // loadData();
         connectWS();
-        // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-        // startPolling();
       } else {
         // Stored key is invalid, clear it
         localStorage.removeItem(STORAGE_KEY);
@@ -1680,10 +1496,6 @@
     }).catch(function () {
       // Server unreachable -- show dashboard anyway with cached key
       showDashboard();
-      // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-      // loadData();
-      // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-      // startPolling();
     });
   }
 
@@ -1699,11 +1511,6 @@
     hashKey = '';
     localStorage.removeItem(STORAGE_KEY);
     clearSession();
-    // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-    // agents = [];
-    // stats = {};
-    // selectedAgentId = null;
-    // stopPolling();
     disconnectWS();
     stopQRScanner();
     showLogin();
@@ -1773,11 +1580,7 @@
         hashKey = result.hashKey;
         localStorage.setItem(STORAGE_KEY, hashKey);
         showDashboard();
-        // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-        // loadData();
         connectWS();
-        // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-        // startPolling();
       } else {
         clearSession();
         if (result.reason === 'expired') {
@@ -1790,11 +1593,7 @@
       // Server unreachable - try with stored hashKey
       if (hashKey) {
         showDashboard();
-        // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-        // loadData();
         connectWS();
-        // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-        // startPolling();
       }
     });
   }
@@ -1944,11 +1743,7 @@
         // Store session and connect
         storeSession(result.hashKey, result.sessionToken, result.expiresAt);
         showDashboard();
-        // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-        // loadData();
         connectWS();
-        // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-        // startPolling();
       }).catch(function (err) {
         showScanError(err.message || 'Scan failed -- paste your key instead');
         // Restore scan tab content
@@ -1975,687 +1770,8 @@
     }
   }
 
-  // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-  // --- Data Loading ---
-//
-  // function loadData() {
-    // fetchStats();
-    // fetchAgents();
-  // }
-//
-  // function fetchStats() {
-    // apiFetch('/api/stats', { headers: { 'X-FSB-Hash-Key': hashKey } })
-      // .then(function (data) {
-        // stats = data;
-        // renderStats();
-      // })
-      // .catch(function () {});
-  // }
-//
-  // function fetchAgents() {
-    // apiFetch('/api/agents', { headers: { 'X-FSB-Hash-Key': hashKey } })
-      // .then(function (data) {
-        // agents = data.agents || [];
-        // renderAgents();
-      // })
-      // .catch(function () {});
-  // }
-//
-  // function fetchRuns(agentId, limit, offset) {
-    // var url = '/api/agents/' + encodeURIComponent(agentId) + '/runs?limit=' + limit + '&offset=' + offset;
-    // return apiFetch(url, { headers: { 'X-FSB-Hash-Key': hashKey } });
-  // }
-//
-  // --- Rendering ---
-//
-  // function renderStats() {
-    // setTextById('stat-agents', stats.totalAgents || 0);
-    // setTextById('stat-enabled', stats.enabledAgents || 0);
-    // setTextById('stat-runs-today', stats.runsToday || 0);
-    // setTextById('stat-success-rate', (stats.successRate || 0) + '%');
-    // setTextById('stat-total-cost', '$' + (stats.totalCost || 0).toFixed(2));
-    // setTextById('stat-cost-saved', '$' + (stats.totalCostSaved || 0).toFixed(2));
-    // var countText = (stats.totalAgents || 0) + ' agent' + ((stats.totalAgents || 0) !== 1 ? 's' : '');
-    // agentCountEl.textContent = countText + (extensionOnline ? '' : ' - extension offline');
-  // }
-
-  // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-  // function renderAgents() {
-    // agentGrid.innerHTML = '';
-//
-    // if (agents.length === 0) {
-      // emptyState.style.display = 'block';
-      // agentGrid.style.display = 'none';
-      // return;
-    // }
-//
-    // emptyState.style.display = 'none';
-    // agentGrid.style.display = '';
-//
-    // agents.forEach(function (agent) {
-      // var card = document.createElement('div');
-      // var isEnabled = agent.enabled === true || agent.enabled === 1;
-      // var isSelected = detailAgentId === agent.agent_id;
-      // card.className = 'dash-agent-card' + (isSelected ? ' selected' : '') + (!isEnabled ? ' dash-agent-disabled' : '');
-      // card.setAttribute('data-agent-id', agent.agent_id);
-      // card.setAttribute('role', 'button');
-      // card.setAttribute('aria-expanded', isSelected ? 'true' : 'false');
-//
-      // Parse schedule for display
-      // var scheduleLabel = formatScheduleLabel(agent.schedule_type, agent.schedule_config);
-//
-      // Calculate success rate from recent data
-      // var successCount = agent.successful_runs || 0;
-      // var totalRuns = agent.total_runs || 0;
-      // var successRateText = totalRuns > 0 ? successCount + '/' + totalRuns : '0/0';
-      // var successPercent = totalRuns > 0 ? (successCount / totalRuns) * 100 : 100;
-      // var rateColor = successPercent > 80 ? '#22c55e' : successPercent >= 50 ? '#eab308' : '#ef4444';
-//
-      // Cost saved
-      // var costSaved = agent.cost_saved || 0;
-      // var costText = '$' + costSaved.toFixed(2);
-//
-      // Last run time
-      // var lastRunText = agent.last_run_at ? formatTimeAgo(agent.last_run_at) : 'Never';
-//
-      // Running indicator
-      // var runningIcon = agentRunningId === agent.agent_id ? ' <span class="dash-spinner dash-agent-running-icon"></span>' : '';
-//
-      // card.innerHTML =
-        // '<div class="dash-agent-card-header">' +
-          // '<div class="dash-agent-name">' +
-            // '<span class="dash-status-dot ' + (isEnabled ? 'dash-status-enabled' : 'dash-status-disabled') + '"></span>' +
-            // escapeHtml(agent.name) + runningIcon +
-          // '</div>' +
-          // '<button class="dash-toggle" role="switch" aria-checked="' + isEnabled + '" aria-label="Enable ' + escapeAttr(agent.name) + '" data-agent-id="' + escapeAttr(agent.agent_id) + '"></button>' +
-        // '</div>' +
-        // '<div class="dash-agent-task">' + escapeHtml(agent.task) + '</div>' +
-        // '<div class="dash-agent-url">' + escapeHtml(agent.target_url || '') + '</div>' +
-        // '<div class="dash-agent-meta">' +
-          // '<span class="dash-agent-schedule">' + escapeHtml(scheduleLabel) + '</span>' +
-          // '<span class="dash-agent-last-run">' + escapeHtml(lastRunText) + '</span>' +
-        // '</div>' +
-        // '<div class="dash-agent-card-stats">' +
-          // '<span class="dash-agent-success-rate" style="color: ' + rateColor + '">' + successRateText + '</span>' +
-          // '<span class="dash-agent-cost-saved">' + costText + '</span>' +
-        // '</div>';
-//
-      // Card click opens detail panel (but not on toggle click)
-      // card.addEventListener('click', function (e) {
-        // if (e.target.closest('.dash-toggle')) return; // toggle has own handler
-        // openDetailPanel(agent.agent_id);
-      // });
-//
-      // Toggle click handler
-      // var toggle = card.querySelector('.dash-toggle');
-      // if (toggle) {
-        // toggle.addEventListener('click', function (e) {
-          // e.stopPropagation();
-          // toggleAgent(agent.agent_id, !isEnabled);
-        // });
-      // }
-//
-      // agentGrid.appendChild(card);
-    // });
-  // }
-
   // --- Helper Functions ---
 
-  // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-  // function formatScheduleLabel(scheduleType, scheduleConfig) {
-    // var config = {};
-    // try { config = typeof scheduleConfig === 'string' ? JSON.parse(scheduleConfig) : (scheduleConfig || {}); } catch (_) {}
-//
-    // if (scheduleType === 'interval') {
-      // var mins = config.intervalMinutes || 60;
-      // if (mins >= 1440) return 'Every ' + Math.round(mins / 1440) + 'd';
-      // if (mins >= 60) return 'Every ' + Math.round(mins / 60) + 'h';
-      // return 'Every ' + mins + 'min';
-    // }
-    // if (scheduleType === 'daily') {
-      // return 'Daily ' + (config.dailyTime || '08:00');
-    // }
-    // if (scheduleType === 'once') {
-      // return 'Once';
-    // }
-    // return scheduleType || 'manual';
-  // }
-
-  // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-  // function formatTimeAgo(isoStr) {
-    // if (!isoStr) return 'Never';
-    // try {
-      // var diff = Date.now() - new Date(isoStr).getTime();
-      // if (diff < 60000) return 'Just now';
-      // if (diff < 3600000) return Math.floor(diff / 60000) + 'm ago';
-      // if (diff < 86400000) return Math.floor(diff / 3600000) + 'h ago';
-      // return Math.floor(diff / 86400000) + 'd ago';
-    // } catch (_) { return isoStr; }
-  // }
-
-  // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-  // function formatNumber(n) {
-    // if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
-    // if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
-    // return String(n);
-  // }
-
-  // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-  // --- Toggle Agent ---
-//
-  // function toggleAgent(agentId, enabled) {
-    // Optimistic UI update
-    // agents = agents.map(function (a) {
-      // if (a.agent_id === agentId) { a.enabled = enabled ? 1 : 0; }
-      // return a;
-    // });
-    // renderAgents();
-//
-    // API call
-    // apiFetch('/api/agents/' + encodeURIComponent(agentId), {
-      // method: 'PATCH',
-      // headers: { 'Content-Type': 'application/json', 'X-FSB-Hash-Key': hashKey },
-      // body: JSON.stringify({ enabled: enabled })
-    // }).catch(function () {
-      // Revert on failure
-      // agents = agents.map(function (a) {
-        // if (a.agent_id === agentId) { a.enabled = enabled ? 0 : 1; }
-        // return a;
-      // });
-      // renderAgents();
-    // });
-  // }
-
-  // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-  // --- Detail Panel ---
-//
-  // function openDetailPanel(agentId) {
-    // var agent = agents.find(function (a) { return a.agent_id === agentId; });
-    // if (!agent) return;
-//
-    // detailAgentId = agentId;
-    // selectedAgentId = agentId; // Keep selected for card styling
-    // detailRunsOffset = 0;
-//
-    // Update card selection
-    // var cards = agentGrid.querySelectorAll('.dash-agent-card');
-    // cards.forEach(function (c) {
-      // var isThis = c.getAttribute('data-agent-id') === agentId;
-      // c.classList.toggle('selected', isThis);
-      // c.setAttribute('aria-expanded', isThis ? 'true' : 'false');
-    // });
-//
-    // Fill detail panel
-    // if (detailName) detailName.textContent = agent.name;
-    // if (detailTask) detailTask.textContent = agent.task;
-    // if (detailUrl) detailUrl.textContent = agent.target_url || '';
-    // if (detailSchedule) detailSchedule.textContent = formatScheduleLabel(agent.schedule_type, agent.schedule_config);
-//
-    // Show panel
-    // if (detailPanel) detailPanel.style.display = 'block';
-    // if (agentContainer) agentContainer.classList.add('dash-detail-open');
-//
-    // Load cost savings
-    // loadAgentStats(agentId);
-//
-    // Load run history
-    // loadDetailRuns(agentId, 0);
-//
-    // Load recorded script
-    // loadRecordedScript(agent);
-//
-    // Reset run progress
-    // if (detailRunProgress) detailRunProgress.style.display = 'none';
-  // }
-//
-  // function closeDetailPanel() {
-    // detailAgentId = null;
-    // selectedAgentId = null;
-    // if (detailPanel) detailPanel.style.display = 'none';
-    // if (agentContainer) agentContainer.classList.remove('dash-detail-open');
-    // var cards = agentGrid.querySelectorAll('.dash-agent-card');
-    // cards.forEach(function (c) {
-      // c.classList.remove('selected');
-      // c.setAttribute('aria-expanded', 'false');
-    // });
-  // }
-//
-  // function loadAgentStats(agentId) {
-    // apiFetch('/api/agents/' + encodeURIComponent(agentId) + '/stats', {
-      // headers: { 'X-FSB-Hash-Key': hashKey }
-    // }).then(function (data) {
-      // if (detailReplayRuns) detailReplayRuns.textContent = data.replayRuns || 0;
-      // if (detailAiFallback) detailAiFallback.textContent = data.aiFallbackRuns || 0;
-      // if (detailTokensSaved) detailTokensSaved.textContent = formatNumber(data.tokensSaved || 0);
-      // if (detailCostSaved) detailCostSaved.textContent = '$' + (data.costSaved || 0).toFixed(2);
-    // }).catch(function () {});
-  // }
-//
-  // function loadDetailRuns(agentId, offset) {
-    // if (!detailRunsList) return;
-    // detailRunsList.innerHTML = '<div class="text-center"><span class="dash-spinner"></span></div>';
-//
-    // fetchRuns(agentId, detailRunsLimit, offset).then(function (data) {
-      // renderDetailRuns(data.runs || [], data.total || 0, data.limit || detailRunsLimit, data.offset || 0);
-    // }).catch(function () {
-      // detailRunsList.innerHTML = '<p class="text-muted text-center">Failed to load runs.</p>';
-    // });
-  // }
-//
-  // function renderDetailRuns(runs, total, limit, offset) {
-    // if (!detailRunsList) return;
-    // detailRunsList.innerHTML = '';
-//
-    // if (runs.length === 0) {
-      // detailRunsList.innerHTML = '<p class="text-muted text-center">No runs yet. Tap Run Now to test this agent.</p>';
-      // if (detailRunsPagination) detailRunsPagination.innerHTML = '';
-      // return;
-    // }
-//
-    // runs.forEach(function (run) {
-      // var entry = document.createElement('div');
-      // entry.className = 'dash-run-entry';
-//
-      // var time = formatTime(run.completed_at);
-      // var statusClass = run.status === 'success' ? 'dash-run-status-success' :
-                        // run.status === 'failed' ? 'dash-run-status-failed' :
-                        // 'dash-run-status-unknown';
-      // var statusSr = run.status === 'success' ? 'Status: success' : run.status === 'failed' ? 'Status: failed' : 'Status: unknown';
-//
-      // var modeBadge = renderModeBadge(run.execution_mode);
-      // var resultText = run.error || run.result || '-';
-      // var duration = run.duration_ms ? formatDuration(run.duration_ms) : '-';
-      // var costStr = run.cost_saved && run.cost_saved > 0 ? '-$' + run.cost_saved.toFixed(4) :
-                    // run.cost_usd ? '$' + run.cost_usd.toFixed(4) : '-';
-//
-      // entry.innerHTML =
-        // '<div class="dash-run-time">' + time + '</div>' +
-        // '<div><span class="dash-run-status ' + statusClass + '"><span class="sr-only">' + statusSr + '</span>' + escapeHtml(run.status) + '</span></div>' +
-        // '<div>' + modeBadge + '</div>' +
-        // '<div class="dash-run-result" title="' + escapeAttr(resultText) + '">' + escapeHtml(resultText) + '</div>' +
-        // '<div class="dash-run-duration">' + duration + '</div>' +
-        // '<div class="dash-run-cost">' + costStr + '</div>';
-//
-      // detailRunsList.appendChild(entry);
-    // });
-//
-    // Pagination (reuse existing pattern)
-    // if (detailRunsPagination) {
-      // detailRunsPagination.innerHTML = '';
-      // if (total > limit) {
-        // var prevBtn = document.createElement('button');
-        // prevBtn.textContent = 'Previous';
-        // prevBtn.disabled = offset === 0;
-        // prevBtn.addEventListener('click', function () { loadDetailRuns(detailAgentId, Math.max(0, offset - limit)); });
-//
-        // var nextBtn = document.createElement('button');
-        // nextBtn.textContent = 'Next';
-        // nextBtn.disabled = (offset + limit) >= total;
-        // nextBtn.addEventListener('click', function () { loadDetailRuns(detailAgentId, offset + limit); });
-//
-        // var info = document.createElement('span');
-        // info.className = 'text-muted text-sm';
-        // info.style.padding = '6px 8px';
-        // info.textContent = (offset + 1) + '-' + Math.min(offset + limit, total) + ' of ' + total;
-//
-        // detailRunsPagination.appendChild(prevBtn);
-        // detailRunsPagination.appendChild(info);
-        // detailRunsPagination.appendChild(nextBtn);
-      // }
-    // }
-  // }
-//
-  // function loadRecordedScript(agent) {
-    // if (!detailScriptList) return;
-    // detailScriptList.innerHTML = '';
-    // Collapse script section by default
-    // if (detailScriptContent) detailScriptContent.style.display = 'none';
-    // if (detailScriptToggle) detailScriptToggle.classList.remove('expanded');
-//
-    // Agent may have recordedScript from extension sync
-    // var script = agent.recorded_script || agent.recordedScript;
-    // if (!script || !Array.isArray(script) || script.length === 0) {
-      // detailScriptList.innerHTML = '<li>No recorded script available</li>';
-      // return;
-    // }
-//
-    // script.forEach(function (step) {
-      // var li = document.createElement('li');
-      // li.textContent = typeof step === 'string' ? step : (step.action || step.description || JSON.stringify(step));
-      // detailScriptList.appendChild(li);
-    // });
-  // }
-
-  // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-  // --- Run Now ---
-//
-  // function runAgentNow(agentId) {
-    // if (!ws || ws.readyState !== WebSocket.OPEN) return;
-    // if (!extensionOnline) return;
-//
-    // agentRunningId = agentId;
-    // renderAgents(); // Show spinner on card
-//
-    // Show progress bar in detail panel
-    // if (detailRunProgress) detailRunProgress.style.display = 'block';
-    // if (detailRunBar) { detailRunBar.style.width = '0%'; detailRunBar.className = 'dash-task-bar-fill'; }
-    // if (detailRunAction) detailRunAction.textContent = 'Starting...';
-    // if (detailRunNow) { detailRunNow.disabled = true; detailRunNow.innerHTML = '<span class="dash-spinner"></span> Running'; }
-//
-    // ws.send(JSON.stringify({
-      // type: 'dash:agent-run-now',
-      // payload: { agentId: agentId },
-      // ts: Date.now()
-    // }));
-  // }
-
-  // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-  // --- Agent Modal ---
-//
-  // function openAgentModal(mode, agentId) {
-    // modalMode = mode;
-    // modalAgentId = agentId || null;
-//
-    // if (modalTitle) modalTitle.textContent = mode === 'edit' ? 'Edit Agent' : 'New Agent';
-    // if (modalSave) { modalSave.textContent = 'Save Agent'; modalSave.disabled = false; }
-//
-    // Clear or pre-fill fields
-    // if (mode === 'edit' && agentId) {
-      // var agent = agents.find(function (a) { return a.agent_id === agentId; });
-      // if (agent) {
-        // if (modalName) modalName.value = agent.name || '';
-        // if (modalTask) modalTask.value = agent.task || '';
-        // if (modalUrl) modalUrl.value = agent.target_url || '';
-        // setModalScheduleType(agent.schedule_type || 'interval', agent.schedule_config);
-      // }
-    // } else {
-      // if (modalName) modalName.value = '';
-      // if (modalTask) modalTask.value = '';
-      // if (modalUrl) modalUrl.value = '';
-      // setModalScheduleType('interval', '{}');
-    // }
-//
-    // Show modal
-    // if (modalOverlay) modalOverlay.style.display = 'flex';
-    // if (modalName) modalName.focus();
-  // }
-//
-  // function closeAgentModal() {
-    // if (modalOverlay) modalOverlay.style.display = 'none';
-    // modalMode = null;
-    // modalAgentId = null;
-    // clearModalErrors();
-  // }
-//
-  // function clearModalErrors() {
-    // var errors = (modalOverlay || document).querySelectorAll('.dash-field-error');
-    // errors.forEach(function (e) { e.remove(); });
-    // var errorInputs = (modalOverlay || document).querySelectorAll('.dash-input-error');
-    // errorInputs.forEach(function (e) { e.classList.remove('dash-input-error'); });
-  // }
-//
-  // function saveAgentFromModal() {
-    // clearModalErrors();
-//
-    // var name = modalName ? modalName.value.trim() : '';
-    // var task = modalTask ? modalTask.value.trim() : '';
-    // var url = modalUrl ? modalUrl.value.trim() : '';
-//
-    // Validate
-    // var valid = true;
-    // if (!name) { showFieldError(modalName, 'Name is required'); valid = false; }
-    // if (!task) { showFieldError(modalTask, 'Task description is required'); valid = false; }
-    // if (!url) { showFieldError(modalUrl, 'Target URL is required'); valid = false; }
-    // if (!valid) return;
-//
-    // Gather schedule
-    // var scheduleType = getActiveScheduleType(modalScheduleType);
-    // var scheduleConfig = getScheduleConfig(modalScheduleConfig, scheduleType);
-//
-    // Disable save button
-    // if (modalSave) { modalSave.disabled = true; modalSave.innerHTML = '<span class="dash-spinner"></span> Saving...'; }
-//
-    // var agentId = modalMode === 'edit' ? modalAgentId : 'agent_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 8);
-//
-    // apiFetch('/api/agents', {
-      // method: 'POST',
-      // headers: { 'Content-Type': 'application/json', 'X-FSB-Hash-Key': hashKey },
-      // body: JSON.stringify({
-        // agentId: agentId,
-        // name: name,
-        // task: task,
-        // targetUrl: url,
-        // scheduleType: scheduleType,
-        // scheduleConfig: JSON.stringify(scheduleConfig),
-        // enabled: true
-      // })
-    // }).then(function () {
-      // closeAgentModal();
-      // loadData();
-      // if (window.showToast) showToast('Agent ' + (modalMode === 'edit' ? 'updated' : 'created'));
-      // Highlight new card briefly
-      // setTimeout(function () {
-        // var newCard = agentGrid.querySelector('[data-agent-id="' + agentId + '"]');
-        // if (newCard) {
-          // newCard.classList.add('dash-agent-card-highlight');
-          // setTimeout(function () { newCard.classList.remove('dash-agent-card-highlight'); }, 1100);
-        // }
-      // }, 200);
-    // }).catch(function (err) {
-      // if (modalSave) { modalSave.disabled = false; modalSave.textContent = 'Save Agent'; }
-      // var msg = (err && err.error) || 'Couldn\'t create agent. Check your connection and try again.';
-      // showFieldError(modalUrl, msg);
-    // });
-  // }
-//
-  // function showFieldError(inputEl, msg) {
-    // if (!inputEl) return;
-    // inputEl.classList.add('dash-input-error');
-    // var errEl = document.createElement('div');
-    // errEl.className = 'dash-field-error';
-    // errEl.textContent = msg;
-    // inputEl.parentNode.appendChild(errEl);
-  // }
-
-  // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-  // --- Schedule Configuration ---
-//
-  // function setModalScheduleType(type, configStr) {
-    // var pills = (modalScheduleType || document).querySelectorAll('.dash-schedule-pill');
-    // pills.forEach(function (p) { p.classList.toggle('active', p.getAttribute('data-type') === type); });
-    // renderScheduleConfig(modalScheduleConfig, type, configStr);
-  // }
-//
-  // function renderScheduleConfig(container, type, configStr) {
-    // if (!container) return;
-    // var config = {};
-    // try { config = typeof configStr === 'string' ? JSON.parse(configStr) : (configStr || {}); } catch (_) {}
-//
-    // if (type === 'interval') {
-      // var mins = config.intervalMinutes || 60;
-      // container.innerHTML =
-        // '<div class="dash-schedule-interval-row">' +
-          // '<span class="dash-schedule-interval-label">Every</span>' +
-          // '<input type="number" class="dash-input dash-schedule-interval-input" value="' + mins + '" min="5" step="5">' +
-          // '<span class="dash-schedule-interval-label">minutes</span>' +
-        // '</div>';
-      // Snap to minimum
-      // var input = container.querySelector('input');
-      // if (input) {
-        // input.addEventListener('blur', function () {
-          // if (parseInt(input.value) < 5) {
-            // input.value = 5;
-            // var msgEl = container.querySelector('.dash-schedule-snap-msg');
-            // if (!msgEl) {
-              // msgEl = document.createElement('div');
-              // msgEl.className = 'dash-schedule-snap-msg';
-              // msgEl.textContent = 'Minimum 5 minutes';
-              // container.appendChild(msgEl);
-              // setTimeout(function () { msgEl.style.opacity = '0'; }, 100);
-              // setTimeout(function () { if (msgEl.parentNode) msgEl.remove(); }, 2100);
-            // }
-          // }
-        // });
-      // }
-    // } else if (type === 'daily') {
-      // var time = config.dailyTime || '08:00';
-      // var days = config.daysOfWeek || [0, 1, 2, 3, 4, 5, 6];
-      // var dayLabels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-      // var dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-//
-      // var pillsHtml = dayLabels.map(function (label, i) {
-        // var checked = days.indexOf(i) >= 0;
-        // return '<button class="dash-day-pill" role="checkbox" aria-checked="' + checked + '" aria-label="' + dayNames[i] + '" data-day="' + i + '">' + label + '</button>';
-      // }).join('');
-//
-      // container.innerHTML =
-        // '<input type="time" class="dash-input" value="' + time + '" style="width: 120px;">' +
-        // '<div class="dash-day-pills">' + pillsHtml + '</div>';
-//
-      // Day pill toggle handlers
-      // container.querySelectorAll('.dash-day-pill').forEach(function (pill) {
-        // pill.addEventListener('click', function () {
-          // var isChecked = pill.getAttribute('aria-checked') === 'true';
-          // pill.setAttribute('aria-checked', !isChecked);
-        // });
-      // });
-    // } else if (type === 'once') {
-      // var dt = config.dateTime || '';
-      // container.innerHTML = '<input type="datetime-local" class="dash-input" value="' + dt + '">';
-    // }
-  // }
-//
-  // function getActiveScheduleType(container) {
-    // if (!container) return 'interval';
-    // var active = container.querySelector('.dash-schedule-pill.active');
-    // return active ? active.getAttribute('data-type') : 'interval';
-  // }
-//
-  // function getScheduleConfig(container, type) {
-    // if (!container) return {};
-    // if (type === 'interval') {
-      // var input = container.querySelector('input[type="number"]');
-      // return { intervalMinutes: Math.max(5, parseInt(input ? input.value : '60') || 60) };
-    // }
-    // if (type === 'daily') {
-      // var timeInput = container.querySelector('input[type="time"]');
-      // var daysChecked = [];
-      // container.querySelectorAll('.dash-day-pill[aria-checked="true"]').forEach(function (p) {
-        // daysChecked.push(parseInt(p.getAttribute('data-day')));
-      // });
-      // return { dailyTime: timeInput ? timeInput.value : '08:00', daysOfWeek: daysChecked };
-    // }
-    // if (type === 'once') {
-      // var dtInput = container.querySelector('input[type="datetime-local"]');
-      // return { dateTime: dtInput ? dtInput.value : '' };
-    // }
-    // return {};
-  // }
-
-  // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-  // --- Delete Agent ---
-//
-  // function openDeleteDialog(agentId, agentName) {
-    // deleteAgentId = agentId;
-    // deleteAgentName = agentName;
-    // if (deleteTitle) deleteTitle.textContent = 'Delete ' + agentName + '?';
-    // if (deleteOverlay) deleteOverlay.style.display = 'flex';
-    // if (deleteCancel) deleteCancel.focus();
-  // }
-//
-  // function closeDeleteDialog() {
-    // if (deleteOverlay) deleteOverlay.style.display = 'none';
-    // deleteAgentId = null;
-    // deleteAgentName = '';
-  // }
-//
-  // function confirmDelete() {
-    // if (!deleteAgentId) return;
-    // apiFetch('/api/agents/' + encodeURIComponent(deleteAgentId), {
-      // method: 'DELETE',
-      // headers: { 'X-FSB-Hash-Key': hashKey }
-    // }).then(function () {
-      // closeDeleteDialog();
-      // closeDetailPanel();
-      // loadData();
-      // if (window.showToast) showToast('Agent deleted');
-    // }).catch(function () {
-      // closeDeleteDialog();
-    // });
-  // }
-
-  // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-  // --- Post-Task Save as Agent ---
-//
-  // function showSaveAsAgent() {
-    // if (saveAgentSection) saveAgentSection.style.display = 'block';
-    // Pre-fill from completed task context
-    // if (saveAgentName && taskText) {
-      // Use first ~50 chars of task as agent name
-      // saveAgentName.value = taskText.length > 50 ? taskText.substring(0, 50) + '...' : taskText;
-    // }
-    // if (saveAgentUrl) {
-      // URL can be populated from task text if it contains a URL
-      // var urlMatch = taskText.match(/https?:\/\/[^\s]+/);
-      // if (urlMatch) saveAgentUrl.value = urlMatch[0];
-    // }
-    // Render default schedule config
-    // renderScheduleConfig(saveAgentScheduleConfig, 'interval', '{"intervalMinutes": 60}');
-  // }
-//
-  // function hideSaveAsAgent() {
-    // if (saveAgentSection) saveAgentSection.style.display = 'none';
-    // if (saveAgentFields) { saveAgentFields.style.display = 'none'; saveAgentFields.classList.remove('dash-save-expanded'); }
-    // if (saveAgentTrigger) saveAgentTrigger.classList.remove('expanded');
-  // }
-//
-  // function submitSaveAsAgent() {
-    // var name = saveAgentName ? saveAgentName.value.trim() : '';
-    // var url = saveAgentUrl ? saveAgentUrl.value.trim() : '';
-    // if (!name || !url) return;
-//
-    // var scheduleType = 'interval';
-    // var saveSchedulePills = saveAgentSection ? saveAgentSection.querySelectorAll('.dash-schedule-pill') : [];
-    // saveSchedulePills.forEach(function (p) { if (p.classList.contains('active')) scheduleType = p.getAttribute('data-type'); });
-    // var scheduleConfig = getScheduleConfig(saveAgentScheduleConfig, scheduleType);
-//
-    // if (saveAgentBtn) { saveAgentBtn.disabled = true; saveAgentBtn.innerHTML = '<span class="dash-spinner"></span> Saving...'; }
-//
-    // var agentId = 'agent_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 8);
-//
-    // apiFetch('/api/agents', {
-      // method: 'POST',
-      // headers: { 'Content-Type': 'application/json', 'X-FSB-Hash-Key': hashKey },
-      // body: JSON.stringify({
-        // agentId: agentId,
-        // name: name,
-        // task: taskText,
-        // targetUrl: url,
-        // scheduleType: scheduleType,
-        // scheduleConfig: JSON.stringify(scheduleConfig),
-        // enabled: true
-      // })
-    // }).then(function () {
-      // hideSaveAsAgent();
-      // loadData();
-      // if (saveAgentBtn) { saveAgentBtn.disabled = false; saveAgentBtn.textContent = 'Save Agent'; }
-      // if (window.showToast) showToast('Agent created');
-    // }).catch(function () {
-      // if (saveAgentBtn) { saveAgentBtn.disabled = false; saveAgentBtn.textContent = 'Save Agent'; }
-    // });
-  // }
-
-  // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-  // function renderModeBadge(mode) {
-    // if (mode === 'replay') {
-      // return '<span class="dash-mode-badge dash-mode-replay">Replay</span>';
-    // }
-    // if (mode === 'ai_fallback') {
-      // return '<span class="dash-mode-badge dash-mode-fallback">AI Fallback</span>';
-    // }
-    // return '<span class="dash-mode-badge dash-mode-ai">AI</span>';
-  // }
-//
   // --- DOM Preview ---
 
   function setPreviewLoadingText(text) {
@@ -4030,14 +3146,6 @@
         setTaskRecoveryPending(true, 'extension-online');
       }
       updateTaskOfflineState();
-      // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-      // Update agent count area to show extension status
-      // if (agentCountEl) {
-        // var countText = (stats.totalAgents || 0) + ' agent' +
-          // ((stats.totalAgents || 0) !== 1 ? 's' : '');
-        // agentCountEl.textContent = countText +
-          // (extensionOnline ? '' : ' - extension offline');
-      // }
       if (!wasExtensionOnline && extensionOnline) {
         scheduleStreamRecovery('extension-online');
       }
@@ -4051,8 +3159,6 @@
       var snapshot = msg.payload || {};
       var snapshotIntentActive = snapshot.streamIntentActive !== false;
       extensionOnline = true;
-      // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-      // loadData(); // Refresh dashboard data on extension reconnect
       recordDashboardTransportEvent('snapshot-recovered', {
         type: 'ext:snapshot',
         status: snapshot.streamStatus || '',
@@ -4107,47 +3213,6 @@
       renderTaskRecoveryStatus(snapshot.taskRunId || '', snapshot.taskSource || snapshot.snapshotSource || '');
       return;
     }
-
-    // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-    // Agent run progress from extension
-    // if (msg.type === 'ext:agent-run-progress') {
-      // var rp = msg.payload || {};
-      // if (rp.agentId === agentRunningId) {
-        // if (detailRunBar) detailRunBar.style.width = (rp.progress || 0) + '%';
-        // if (detailRunAction) detailRunAction.textContent = rp.action || 'Working...';
-      // }
-      // return;
-    // }
-//
-    // Agent run complete from extension
-    // if (msg.type === 'ext:agent-run-complete') {
-      // var rc = msg.payload || {};
-      // agentRunningId = null;
-      // renderAgents(); // Remove spinner
-//
-      // Update detail panel if showing this agent
-      // if (rc.agentId === detailAgentId) {
-        // if (detailRunNow) { detailRunNow.disabled = false; detailRunNow.textContent = 'Run Now'; }
-        // if (detailRunProgress) {
-          // if (detailRunBar) {
-            // detailRunBar.style.width = '100%';
-            // detailRunBar.className = 'dash-task-bar-fill ' + (rc.success ? 'dash-task-bar-success' : 'dash-task-bar-failed');
-          // }
-          // if (detailRunAction) detailRunAction.textContent = rc.success ? 'Complete' : (rc.error || 'Failed');
-          // Auto-hide progress bar after 3 seconds
-          // setTimeout(function () {
-            // if (detailRunProgress) detailRunProgress.style.display = 'none';
-          // }, 3000);
-        // }
-        // Reload detail panel data
-        // loadAgentStats(detailAgentId);
-        // loadDetailRuns(detailAgentId, 0);
-      // }
-//
-      // Refresh grid data
-      // loadData();
-      // return;
-    // }
 
     if (msg.type === 'ext:dom-snapshot') {
       handleDOMSnapshot(msg.payload);
@@ -4246,33 +3311,9 @@
       return;
     }
 
-    // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-    // Agent/run events from REST API broadcasts
-    // if (msg.type === 'agent_updated' || msg.type === 'agent_deleted' || msg.type === 'run_completed') {
-      // loadData();
-      // if (msg.agentId && msg.agentId === detailAgentId) {
-        // loadAgentStats(detailAgentId);
-        // loadDetailRuns(detailAgentId, 0);
-      // }
-    // }
   }
 
   // --- Polling Fallback ---
-  // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
-//
-  // function startPolling() {
-    // stopPolling();
-    // pollTimer = setInterval(function () {
-      // loadData();
-    // }, POLL_INTERVAL);
-  // }
-//
-  // function stopPolling() {
-    // if (pollTimer) {
-      // clearInterval(pollTimer);
-      // pollTimer = null;
-    // }
-  // }
 
   // --- API Helpers ---
 

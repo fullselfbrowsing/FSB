@@ -1263,7 +1263,7 @@ const EXCLUDED_FROM_SCHEMA = {
   speedMode: 'legacy: Config.defaults marks it deprecated in favour of modelName; no control-panel writer',
   enableSavedPayments: 'no reader or writer: the control_panel.html checkbox is never read or saved by any script',
   serverSyncEnabled: 'no control-panel writer (only Config.defaults and init-config.js carry it)',
-  fsb_sunset_notice_dismissed: 'UI dismissal flag the panel writes when the sunset notice is closed, not a setting',
+  fsb_sunset_notice_dismissed: 'retired background-agent notice flag; background.js deletes it on update, not a setting',
 };
 
 function inventoryDiff(panelKeys, schemaKeys) {
@@ -1296,8 +1296,8 @@ runSection('D-09 inventory parity: schema keys equal every control-panel writer'
     check(schema.get(key) === null, `${key} is not a schema key (${reason})`);
     check(!inventory.includes(key), `${key} is not in the panel settings inventory`);
   }
-  check(OPTIONS_SOURCE.includes('chrome.storage.local.set({ fsb_sunset_notice_dismissed: true })'),
-    'options.js still writes fsb_sunset_notice_dismissed as a UI flag');
+  check(!OPTIONS_SOURCE.includes('fsb_sunset_notice_dismissed'),
+    'options.js no longer writes the retired fsb_sunset_notice_dismissed flag');
 
   // The four writers outside saveSettings still exist.
   check(OPTIONS_SOURCE.includes('chrome.storage.local.set({ autoAnalyzeMemories'), 'options.js still writes autoAnalyzeMemories');

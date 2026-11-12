@@ -103,7 +103,7 @@ const FORBIDDEN_DESCRIPTION_SUBSTRINGS = ['Multi-agent:', 'mcp/src/', 'MCP_VISUA
 const COMMON_PARAM_NAMES = ['tab_id', 'client', 'visual_reason', 'is_final'];
 
 // The labels the common client text names; each must be on the allowlist.
-const CLIENT_LABELS_NAMED = ['Claude', 'Codex', 'Cursor', 'ChatGPT', 'Gemini', 'VS Code', 'Copilot', 'Windsurf'];
+const CLIENT_LABELS_NAMED = ['Claude', 'Codex', 'Cursor', 'ChatGPT', 'Gemini', 'VS Code', 'Copilot', 'Antigravity'];
 
 // Search terms first (D-09): the first sentence of each manual-site
 // description (text up to the first ". ") must contain a token of the tool
@@ -139,7 +139,6 @@ const MUST_KEEP = [
   { id: 'list_payment_methods never returns card numbers or CVV', where: 'tool:list_payment_methods', patterns: [/card numbers/i, /CVV/, /never returned/i] },
   { id: 'invoke_capability performs real side effects', where: 'tool:invoke_capability', patterns: [/real side effects/i, /side-effect class/i] },
   { id: 'replay_session: FSB opens the pages itself', where: 'tool:replay_session', patterns: [/never ask the user to open target pages manually/, /approv/i] },
-  { id: 'back keeps single-step semantics, its statuses and no focus steal', where: 'tool:back', patterns: [/single step/i, /\bok\b/, /no_history/, /cross_origin/, /bf_cache/, /fragment_only/, /does not steal focus/i, /inspect the page before retrying/i] },
   { id: 'run_task keeps its call contract', where: 'tool:run_task', patterns: [/autopilot/i, /manual tools/i, /completion summary/i, /get_task_status/, /stop_task/] },
   { id: 'complete_task never reports secrets', where: 'tool:complete_task', patterns: [/never include passwords/i] },
   { id: 'partial_task never reports secrets and names the handoff', where: 'tool:partial_task', patterns: [/never include passwords/i, /fail_task/, /next step/i] },
@@ -619,11 +618,9 @@ async function importBuildTool(file) {
     'the change-report sentence never says "then retry."');
   check(d.MCP_EXPECT_DESCRIPTION.length <= 160,
     `MCP_EXPECT_DESCRIPTION is at most 160 characters (got ${d.MCP_EXPECT_DESCRIPTION.length})`);
-  // 69-REVIEW WR-06: the mcp:go-back route never attaches change_report, so
-  // back must not promise one.
-  const backText = mustKeepText('tool:back', liveByName, d);
-  check(typeof backText === 'string' && !/change_report/.test(backText),
-    'back does not promise change_report (the mcp:go-back route never returns one)');
+  // 0.11.5 retired back (it duplicated go_back), so it has no MCP text left.
+  check(!Object.prototype.hasOwnProperty.call(d.MCP_TOOL_DESCRIPTIONS, 'back') && !liveByName.has('back'),
+    'back, retired in 0.11.5, has no MCP description and is not registered');
 
   console.log(`\n=== Results: ${passed} passed, ${failed} failed ===`);
   process.exit(failed > 0 ? 1 : 0);

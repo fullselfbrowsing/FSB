@@ -9,9 +9,10 @@
  * tests/fixtures/mcp-release-delta-0.12.0.json. The difference must equal the
  * reviewed manifest exactly:
  *   - added tools: exactly `addedTools` (the 66.1 `settings` tool);
- *   - removed tools: exactly `removedTools` (none);
+ *   - removed tools: exactly `removedTools` (`back`, `start_visual_session`
+ *     and `end_visual_session`, which 0.11.5 stopped registering);
  *   - added properties: exactly `addedOptionalProperties` (the 69 `expect`
- *     property on the 29 D-12 tools), never in any required list;
+ *     property on the 28 D-12 tools), never in any required list;
  *   - new required arguments on kept tools: exactly `newRequiredArguments`
  *     (none); every kept tool keeps its required list and every baseline
  *     property with its description-free shape;
@@ -202,14 +203,15 @@ function reviewedAdditionsByTool(manifest) {
     check(isStringList(manifest[listKey]), `${listKey} is a list of strings`);
   }
   check(sameList(manifest.addedTools, [h.SETTINGS_TOOL_NAME]), 'addedTools is exactly [settings]');
-  check(sameList(manifest.removedTools, []), 'removedTools is empty');
+  check(sameList(manifest.removedTools, ['back', 'end_visual_session', 'start_visual_session']),
+    'removedTools is exactly the three tools 0.11.5 retired (back, end_visual_session, start_visual_session)');
   check(sameList(manifest.newRequiredArguments, []), 'newRequiredArguments is empty');
   const addedOptional = manifest.addedOptionalProperties;
   check(Boolean(addedOptional) && typeof addedOptional === 'object' && !Array.isArray(addedOptional)
     && sameList(Object.keys(addedOptional), ['expect']),
   'addedOptionalProperties holds exactly one property, expect');
   check(Boolean(addedOptional) && sameList(addedOptional.expect, [...h.EXPECT_TOOL_NAMES_VERBATIM]),
-    'addedOptionalProperties.expect equals the 29 EXPECT_TOOL_NAMES_VERBATIM names in D-12 order');
+    'addedOptionalProperties.expect equals the 28 EXPECT_TOOL_NAMES_VERBATIM names in D-12 order');
 
   console.log('\n--- tool names ---');
   const delta = computeToolDelta(h, baselineTools, currentTools);

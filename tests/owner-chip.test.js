@@ -397,7 +397,7 @@ async function runOwnershipRefreshContract(source, surfaceName, mySurface, richL
     applyInputLockout(value) { lockoutCalls.push(value); }
   };
   vm.createContext(context);
-  for (const name of ['_renderHeaderStatus', '_setHeaderStatus', '_setHeaderOwner', 'refreshOwnerChip']) {
+  for (const name of ['_renderHeaderStatus', '_setHeaderStatus', '_setHeaderOwner', '_ownerLockTitle', 'refreshOwnerChip']) {
     const definition = extractNamedFunction(source, name);
     ok(!!definition, surfaceName + ': ' + name + ' is extractable for refresh behavior');
     if (definition) vm.runInContext(definition, context);
@@ -407,6 +407,10 @@ async function runOwnershipRefreshContract(source, surfaceName, mySurface, richL
   ok(context.statusText.textContent === 'Owned by Claude'
       && classes.has('owned') && context._chatLockedByOwnerChip === true,
     surfaceName + ': canonical client ownership replaces Ready and locks the composer');
+  // refreshOwnerChip() swallows its own errors, so a missing helper would only
+  // show up as a composer without its owner tooltip.
+  ok(chatInput.title === 'Disabled while tab is owned by Claude',
+    surfaceName + ': the locked composer names the owning client in its tooltip');
   if (richLockout) {
     ok(lockoutCalls[lockoutCalls.length - 1] === true,
       surfaceName + ': ownership status preserves the rich input lockout path');

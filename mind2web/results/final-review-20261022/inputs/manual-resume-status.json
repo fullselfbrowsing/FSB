@@ -1,0 +1,21 @@
+{
+  "at": "2026-10-22T05:32:25.850485+00:00",
+  "status": "manual_pass_finished_with_unresolved_tasks",
+  "tasks_visited": 72,
+  "counts": {
+    "visibly_completed": 55,
+    "partial": 15,
+    "blocked_site": 2
+  },
+  "manual_daemon_stopped": true,
+  "manual_daemon_pid": 94558,
+  "current_task": null,
+  "autonomous_task_loop": false,
+  "paused_scopes": [],
+  "pending_terms_order": 70,
+  "our_keepawake_pid": 93738,
+  "our_keepawake_stopped": true,
+  "shared_bridge_and_other_keepawake_processes_untouched": true,
+  "next_action": "Ryanair Website Terms confirmation remains pending. On a later authorized continuation, start the local helper and use a fresh retry scope. No CAPTCHA-paused tasks remain. All benchmark task actions continue through pinned FSB.",
+  "report": "REPORT.md"
+}

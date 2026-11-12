@@ -1,0 +1,11 @@
+{
+  "name": "fsb-online-mind2web-bench",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test harness/test/*.test.mjs",
+    "dry-run": "node harness/run-bench.mjs --dry-run",
+    "preflight": "node harness/preflight.mjs"
+  },
+  "engines": { "node": ">=24" }
+}

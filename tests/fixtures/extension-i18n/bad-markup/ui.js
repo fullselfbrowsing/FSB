@@ -1,0 +1,10 @@
+const empty = '<p>Markup sentence is not wired.</p>';
+const button = `<button class="primary">Sign Up Now</button>`;
+const close = `<button aria-label="Close this panel">${icon}</button>`;
+const tidy = value.replace(/[<>&"']/g, (c) => map[c]).replace(/^https?:\/\//, '');
+const after = 'This sentence follows a regex literal.';
+const wired = `<span>${escapeHtml(t('fine_key', 'Fine label'))}</span>`;
+const keyed = '<span data-i18n="probe_key">Keyed label text</span>';
+const untranslated = '<span translate="no">Brand Name Here</span>';
+const brand = '<a href="https://github.com">GitHub</a>';
+console.log('<b>Logged markup text</b>');

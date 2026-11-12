@@ -1,3 +1,4 @@
+import { isAbsolute } from 'node:path';
 import {
   validateEffectiveAuthorityAttestation,
   validatePreSpawnIdentityProbe,
@@ -19,6 +20,8 @@ export type AdapterDiagnosticCode =
   | 'binary_unsafe'
   | 'version_unparseable'
   | 'version_unsupported'
+  | 'isolation_unavailable'
+  | 'capability_missing'
   // The CLI started but refused to apply the strict sandbox FSB requires, so it
   // is installed and the right version yet still unusable. Distinct from
   // adapter_unavailable so the panel can say so instead of "check it is installed".
@@ -231,6 +234,13 @@ export type SpawnTopology =
 export type AttestationProductRef = 'fsb_mcp_tool_prefix';
 
 export type PolicyAttestationAssertion =
+  | Readonly<{
+      kind: 'grok_isolation';
+      path: readonly string[];
+      expectedCliVersion: string;
+      cwd: string;
+      configPath: string;
+    }>
   | Readonly<{
       kind: 'exact_keys';
       path: readonly string[];
@@ -650,6 +660,18 @@ function cloneRuntimeRefs(value: unknown): OwnedServerRuntimeRefs {
 function cloneAssertion(value: unknown): PolicyAttestationAssertion {
   const base = ownDataRecord(value, 'policy attestation assertion');
   const kind = ownValue(base, 'kind');
+  if (kind === 'grok_isolation') {
+    const record = exactRecord(
+      value, ['kind', 'path', 'expectedCliVersion', 'cwd', 'configPath'],
+      'grok_isolation assertion',
+    );
+    const expectedCliVersion = boundedString(ownValue(record, 'expectedCliVersion'), 'Grok CLI version');
+    const cwd = boundedString(ownValue(record, 'cwd'), 'Grok working directory');
+    const configPath = boundedString(ownValue(record, 'configPath'), 'Grok configuration path');
+    if (!/^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/.test(expectedCliVersion)
+        || !isAbsolute(cwd) || !isAbsolute(configPath)) invalidContract('grok_isolation expectation');
+    return Object.freeze({ kind, path: clonePath(ownValue(record, 'path')), expectedCliVersion, cwd, configPath });
+  }
   if (kind === 'exact_keys') {
     const record = exactRecord(value, ['kind', 'path', 'keys'], 'exact_keys assertion');
     const keys = cloneStringArray(ownValue(record, 'keys'), 'exact_keys values', 128);
