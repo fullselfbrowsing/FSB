@@ -10,7 +10,7 @@
       </h1>
 @if (version() === '0.9.95') {
 
-      <p style="margin: 0 0 32px; font-size: 1.0625rem; line-height: 1.7; color: var(--dim); max-width: 62ch; text-wrap: pretty;" i18n="@@releaseNotes.v0995.001.twoChangesInThis">Two changes in this release. FSB's own interface now reads in eight languages, and Cline joins the officially supported MCP clients. The interface picks a language from Chrome's language list, can be changed in Advanced Settings without restarting Chrome, and leaves your prompts, model output, and page content exactly as written.</p>
+      <p style="margin: 0 0 32px; font-size: 1.0625rem; line-height: 1.7; color: var(--dim); max-width: 62ch; text-wrap: pretty;" i18n="@@releaseNotes.v0995.001.twoChangesInThis">Thirteen changes in this release. FSB's own interface reads in eight languages and this site adds Russian. Cline and Antigravity join the supported MCP clients, the server lists exactly the 69 tools it advertises, Grok Build is checked by capability instead of version, drag_drop follows a real drag, and hung pages recover on Chrome 156.</p>
       <div style="display: flex; flex-wrap: wrap; gap: 8px; font-family: 'Space Mono', monospace; font-size: 11px; color: var(--dim);">
         <span [attr.translate]="'no'" style="border: 1px solid var(--line); border-radius: 999px; padding: 6px 13px; white-space: nowrap;" i18n="@@releaseNotes.v0995.002.extension">extension 0.9.95</span>
         <span [attr.translate]="'no'" style="border: 1px solid var(--line); border-radius: 999px; padding: 6px 13px; white-space: nowrap;" i18n="@@releaseNotes.v0995.003.mcp">mcp 0.11.5</span>
@@ -363,7 +363,7 @@
       <ul style="margin: 0; padding-left: 18px; color: var(--dim); font-size: 1rem; line-height: 1.65;">
         <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0995.045.yourPromptsModelOutput">Your prompts, model output, task titles, and page content appear exactly as written.</li>
         <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0995.046.secretsLogsAndProvider">Secrets, logs, and provider names are left as they are.</li>
-        <li style="margin-bottom: 0;" i18n="@@releaseNotes.v0995.047.mcpToolSchemasAnd">MCP tool schemas and bridge messages are byte-for-byte unchanged, so <span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">fsb-mcp-server</span> 0.11.5 works with this release as is.</li>
+        <li style="margin-bottom: 0;" i18n="@@releaseNotes.v0995.047.mcpToolSchemasAnd">The language work leaves MCP tool schemas and bridge messages unchanged, so an MCP client sees the same tools whichever language the interface uses.</li>
       </ul>
     </div>
   </section>
@@ -410,6 +410,60 @@
 
   <section class="rn-sec rn-sec-split" style="margin: 0; padding: 72px 0 0; display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 56px; align-items: center;">
     <div class="rn-sec-viz" style="order: 2; display: flex; align-items: center; justify-content: center;">
+      <div style="width: 280px; max-width: 100%; display: flex; flex-direction: column; align-items: center; font-family: 'Space Mono', monospace;">
+        <span [attr.translate]="'no'" style="border: 1px solid var(--ac); border-radius: 8px; padding: 8px 10px; background: rgba(255,107,53,.08); font-size: 10px; color: var(--ink); white-space: nowrap;" i18n="@@releaseNotes.v0995.068.acceptLanguageRu">Accept-Language: ru-RU</span>
+        <div style="position: relative; width: 6px; height: 34px;">
+          <div style="position: absolute; left: 2.5px; top: 0; bottom: 0; width: 1px; background: var(--line2);"></div>
+          <span class="rn-a128" style="position: absolute; left: 0; top: 100%; width: 6px; height: 6px; margin-top: -3px; border-radius: 999px; background: var(--ac); box-shadow: 0 0 8px rgba(255,107,53,.6); opacity: 0;"></span>
+        </div>
+        <div style="width: 100%; border: 1px solid var(--line); border-radius: 10px; background: var(--panel2); overflow: hidden;">
+          <div style="display: flex; align-items: center; gap: 5px; padding: 8px 11px; border-bottom: 1px solid var(--line);">
+            <span style="flex: 0 0 auto; width: 6px; height: 6px; border-radius: 999px; background: var(--line2);"></span>
+            <span style="flex: 0 0 auto; width: 6px; height: 6px; border-radius: 999px; background: var(--line2);"></span>
+            <span style="flex: 0 0 auto; width: 6px; height: 6px; border-radius: 999px; background: var(--line2);"></span>
+            <div style="margin-left: 6px; flex: 1 1 auto; min-width: 0; display: flex; align-items: center; height: 20px; padding: 0 9px; border: 1px solid var(--line); border-radius: 999px; font-size: 9px; color: var(--dim); white-space: nowrap; overflow: hidden;">
+              <span [attr.translate]="'no'" i18n="@@releaseNotes.v0995.069.siteHost">full-selfbrowsing.com</span><span [attr.translate]="'no'" class="rn-a122" style="color: var(--ac);" i18n="@@releaseNotes.v0995.070.ruPath">/ru/</span>
+            </div>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 12px; padding: 12px 12px 15px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+              <span style="width: 34px; height: 7px; border-radius: 3px; background: var(--dim2);"></span>
+              <div style="position: relative; width: 84px; height: 20px; font-size: 9.5px;">
+                <span [attr.translate]="'no'" lang="en" class="rn-a121" style="position: absolute; right: 0; top: 0; box-sizing: border-box; height: 20px; display: inline-flex; align-items: center; border: 1px solid var(--line2); border-radius: 999px; padding: 0 9px; color: var(--dim); white-space: nowrap; opacity: 0;" i18n="@@releaseNotes.v0995.071.pickerEnglish">English</span>
+                <span [attr.translate]="'no'" lang="ru" class="rn-a122" style="position: absolute; right: 0; top: 0; box-sizing: border-box; height: 20px; display: inline-flex; align-items: center; border: 1px solid var(--ac); border-radius: 999px; padding: 0 9px; color: var(--ac); white-space: nowrap;" i18n="@@releaseNotes.v0995.072.pickerRussian">Русский</span>
+              </div>
+            </div>
+            <div style="position: relative; height: 9px;">
+              <div class="rn-a121" style="position: absolute; inset: 0; display: flex; gap: 5px; opacity: 0;"><span style="width: 54%; border-radius: 4px; background: var(--line2);"></span><span style="width: 30%; border-radius: 4px; background: var(--line2);"></span></div>
+              <div class="rn-a122" style="position: absolute; inset: 0; display: flex; gap: 5px;"><span style="width: 38%; border-radius: 4px; background: var(--ac);"></span><span style="width: 44%; border-radius: 4px; background: var(--ac); opacity: .55;"></span></div>
+            </div>
+            <div style="position: relative; height: 5px;">
+              <div class="rn-a121" style="position: absolute; inset: 0; display: flex; gap: 4px; opacity: 0;"><span style="width: 66%; border-radius: 3px; background: var(--line2);"></span><span style="width: 24%; border-radius: 3px; background: var(--line2);"></span></div>
+              <div class="rn-a122" style="position: absolute; inset: 0; display: flex; gap: 4px;"><span style="width: 28%; border-radius: 3px; background: var(--line2);"></span><span style="width: 52%; border-radius: 3px; background: var(--line2);"></span></div>
+            </div>
+            <div style="position: relative; height: 5px;">
+              <div class="rn-a121" style="position: absolute; inset: 0; display: flex; gap: 4px; opacity: 0;"><span style="width: 42%; border-radius: 3px; background: var(--line2);"></span><span style="width: 36%; border-radius: 3px; background: var(--line2);"></span></div>
+              <div class="rn-a122" style="position: absolute; inset: 0; display: flex; gap: 4px;"><span style="width: 60%; border-radius: 3px; background: var(--line2);"></span><span style="width: 14%; border-radius: 3px; background: var(--line2);"></span></div>
+            </div>
+          </div>
+        </div>
+        <div [attr.translate]="'no'" style="margin-top: 14px; font-size: 9.5px; color: var(--dim2); text-align: center;" i18n="@@releaseNotes.v0995.073.siteLanguages">8 site languages</div>
+      </div>
+    </div>
+    <div class="rn-sec-copy" style="order: 1;">
+      <div class="rn-sec-num" [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: 11px; letter-spacing: .22em; color: var(--ac); margin-bottom: 14px;">06</div>
+      <h2 style="margin: 0 0 18px; font-size: clamp(1.5rem, 3vw, 2rem); font-weight: 700; letter-spacing: -.02em; line-height: 1.15;" i18n="@@releaseNotes.v0995.074.thisSiteReadsIn">This site reads in Russian too</h2>
+      <ul style="margin: 0; padding-left: 18px; color: var(--dim); font-size: 1rem; line-height: 1.65;">
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0995.075.everyPageOfThis">Every page of this site is served in Russian under <span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">/ru/</span>, and the header's language picker lists Русский.</li>
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0995.076.aBrowserThatSends">A browser that sends an <span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">Accept-Language</span> of <span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">ru</span>, in any region, opens the Russian site, and so does a saved <span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">fsb-locale=ru</span> cookie. A request without the header is never redirected.</li>
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0995.077.theSitemapAndHreflang">The sitemap and <span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">hreflang</span> sets carry the Russian variant of each marketing route.</li>
+        <li style="margin-bottom: 0;" i18n="@@releaseNotes.v0995.078.theSiteAndThe">The site and the extension now offer the same eight languages.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="rn-sec rn-sec-split" style="margin: 0; padding: 72px 0 0; display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 56px; align-items: center;">
+    <div class="rn-sec-viz" style="display: flex; align-items: center; justify-content: center;">
       <div style="width: 300px; max-width: 100%; display: flex; flex-direction: column; gap: 16px;">
         <div style="border: 1px solid var(--line); border-radius: 8px; background: var(--panel2); overflow: hidden;">
           <div style="display: flex; align-items: center; gap: 5px; padding: 8px 11px; border-bottom: 1px solid var(--line);">
@@ -438,20 +492,286 @@
         <div style="font-family: 'Space Mono', monospace; font-size: 9.5px; color: var(--dim2); text-align: center; text-wrap: pretty;" i18n="@@releaseNotes.v0995.062.oneSettingsFileFor">one settings file for VS Code, JetBrains, and the CLI</div>
       </div>
     </div>
-    <div class="rn-sec-copy" style="order: 1;">
-      <div class="rn-sec-num" [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: 11px; letter-spacing: .22em; color: var(--ac); margin-bottom: 14px;">06</div>
+    <div class="rn-sec-copy">
+      <div class="rn-sec-num" [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: 11px; letter-spacing: .22em; color: var(--ac); margin-bottom: 14px;">07</div>
       <h2 style="margin: 0 0 18px; font-size: clamp(1.5rem, 3vw, 2rem); font-weight: 700; letter-spacing: -.02em; line-height: 1.15;" i18n="@@releaseNotes.v0995.063.clineIsAnOfficially">Cline is an officially supported client</h2>
       <ul style="margin: 0; padding-left: 18px; color: var(--dim); font-size: 1rem; line-height: 1.65;">
         <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0995.064.installClineNowWrites"><span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">install --cline</span> now writes <code [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em; overflow-wrap: anywhere;">~/.cline/data/settings/cline_mcp_settings.json</code>, the settings file Cline shares across its VS Code extension, JetBrains plugin, and CLI. The installer used to write the old VS Code storage file, which current Cline imports once and then ignores, so FSB never appeared.</li>
         <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0995.065.clineAppliesOneFixed">Cline applies one fixed timeout to every MCP request, 60 seconds unless configured. FSB's entry now sets <span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">timeout: 1800</span>, so <span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">run_task</span> gets 1,800 seconds instead of 60.</li>
         <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0995.066.reinstallingKeepsThe">Reinstalling keeps the <span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">timeout</span>, <span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">disabled</span>, and <span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">autoApprove</span> settings Cline stores on the entry. Cline sessions are labeled Cline on the owner chip, in the client inventory, and in anonymous usage stats.</li>
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0995.079.aClinePathOverride">When <span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">CLINE_MCP_SETTINGS_PATH</span>, <span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">CLINE_DATA_DIR</span>, or <span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">CLINE_DIR</span> points at a directory that does not exist yet, the installer reports the missing directory instead of editing the old settings file, which a Cline configured that way never reads.</li>
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0995.080.reinstallingNoLongerRewrites">Reinstalling no longer rewrites a Cline or Continue config whose only difference is the order of its keys.</li>
         <li style="margin-bottom: 0;" i18n="@@releaseNotes.v0995.067.onboardingAndThisSites">Onboarding and this site's install picker list Cline, and the installer fix ships in <span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">fsb-mcp-server</span> 0.11.5. If you set up Cline before this release, rerun <code [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em; overflow-wrap: anywhere;">npx -y fsb-mcp-server&#64;latest install --cline</code>.</li>
       </ul>
     </div>
   </section>
 
+  <section class="rn-sec rn-sec-split" style="margin: 0; padding: 72px 0 0; display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 56px; align-items: center;">
+    <div class="rn-sec-viz" style="order: 2; display: flex; align-items: center; justify-content: center;">
+      <div style="width: 280px; max-width: 100%; display: flex; flex-direction: column; gap: 16px; font-family: 'Space Mono', monospace;">
+        <div style="border: 1px solid var(--line); border-radius: 8px; background: var(--panel2); overflow: hidden;">
+          <div style="display: flex; align-items: center; gap: 5px; padding: 8px 11px; border-bottom: 1px solid var(--line);">
+            <span style="width: 6px; height: 6px; border-radius: 999px; background: var(--line2);"></span>
+            <span style="width: 6px; height: 6px; border-radius: 999px; background: var(--line2);"></span>
+            <span style="width: 6px; height: 6px; border-radius: 999px; background: var(--line2);"></span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 12px; padding: 13px 12px 15px;">
+            <div style="position: relative; height: 22px;">
+              <div class="rn-a124" style="position: absolute; left: 0; top: 0; height: 22px; display: flex; align-items: center; gap: 8px; color: var(--dim); opacity: 0;">
+                <span style="flex: 0 0 auto; width: 14px; height: 14px; box-sizing: border-box; border: 1px solid var(--line2); border-radius: 4px;"></span>
+                <span style="position: relative; font-family: 'Poppins', system-ui, sans-serif; font-size: 13px; font-weight: 600; line-height: 22px; white-space: nowrap;">
+                  <span [attr.translate]="'no'" i18n="@@releaseNotes.v0995.081.windsurf">Windsurf</span>
+                  <span class="rn-a123" style="position: absolute; left: -2px; right: -2px; top: 50%; height: 1.5px; margin-top: -.75px; background: var(--ac); transform-origin: left center;"></span>
+                </span>
+              </div>
+              <div class="rn-a125" style="position: absolute; left: 0; top: 0; height: 22px; display: flex; align-items: center; gap: 8px; color: var(--ink);">
+                <img src="/assets/providers/antigravity.svg" alt="" aria-hidden="true" data-mono-mark="" width="14" height="14" decoding="async" style="flex: 0 0 auto; width: 14px; height: 14px; object-fit: contain;">
+                <span [attr.translate]="'no'" style="font-family: 'Poppins', system-ui, sans-serif; font-size: 13px; font-weight: 600; line-height: 22px; white-space: nowrap;" i18n="@@releaseNotes.v0995.082.antigravity">Antigravity</span>
+              </div>
+            </div>
+            <div class="rn-a125" style="display: flex; flex-direction: column; gap: 4px; font-size: 9.5px;">
+              <div style="display: flex; align-items: center; gap: 10px; white-space: nowrap;">
+                <span [attr.translate]="'no'" style="color: var(--ink);" i18n="@@releaseNotes.v0995.083.installAntigravity">install --antigravity</span>
+                <span [attr.translate]="'no'" style="margin-left: auto; color: var(--ac);">✓</span>
+              </div>
+              <span [attr.translate]="'no'" style="color: var(--dim2); overflow-wrap: anywhere;" i18n="@@releaseNotes.v0995.084.antigravityConfigPath">~/.gemini/config/mcp_config.json</span>
+            </div>
+          </div>
+        </div>
+        <div style="position: relative; height: 24px; font-size: 10px;">
+          <div style="position: absolute; inset: 0; display: flex; justify-content: center;"><span [attr.translate]="'no'" class="rn-a34 rn-cycle rn-cycle-first" style="box-sizing: border-box; height: 24px; display: inline-flex; align-items: center; border: 1px solid var(--line2); border-radius: 999px; padding: 0 11px; color: var(--ink); white-space: nowrap; opacity: 0;" i18n="@@releaseNotes.v0995.085.clientMuse">client: "Muse"</span></div>
+          <div style="position: absolute; inset: 0; display: flex; justify-content: center;"><span [attr.translate]="'no'" class="rn-a35 rn-cycle" style="box-sizing: border-box; height: 24px; display: inline-flex; align-items: center; border: 1px solid var(--line2); border-radius: 999px; padding: 0 11px; color: var(--ink); white-space: nowrap; opacity: 0;" i18n="@@releaseNotes.v0995.086.clientGrokBot">client: "Grok Bot"</span></div>
+          <div style="position: absolute; inset: 0; display: flex; justify-content: center;"><span [attr.translate]="'no'" class="rn-a36 rn-cycle" style="box-sizing: border-box; height: 24px; display: inline-flex; align-items: center; border: 1px solid var(--line2); border-radius: 999px; padding: 0 11px; color: var(--ink); white-space: nowrap; opacity: 0;" i18n="@@releaseNotes.v0995.087.clientDots">client: "Dots"</span></div>
+          <div style="position: absolute; inset: 0; display: flex; justify-content: center;"><span [attr.translate]="'no'" class="rn-a37 rn-cycle" style="box-sizing: border-box; height: 24px; display: inline-flex; align-items: center; border: 1px solid var(--line2); border-radius: 999px; padding: 0 11px; color: var(--ink); white-space: nowrap; opacity: 0;" i18n="@@releaseNotes.v0995.088.clientAutopilot">client: "Autopilot"</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="rn-sec-copy" style="order: 1;">
+      <div class="rn-sec-num" [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: 11px; letter-spacing: .22em; color: var(--ac); margin-bottom: 14px;">08</div>
+      <h2 style="margin: 0 0 18px; font-size: clamp(1.5rem, 3vw, 2rem); font-weight: 700; letter-spacing: -.02em; line-height: 1.15;" i18n="@@releaseNotes.v0995.089.antigravityReplacesWindsurf">Antigravity replaces Windsurf</h2>
+      <ul style="margin: 0; padding-left: 18px; color: var(--dim); font-size: 1rem; line-height: 1.65;">
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0995.090.installAntigravityWrites"><span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">install --antigravity</span> writes <code [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em; overflow-wrap: anywhere;">~/.gemini/config/mcp_config.json</code>, the global file current Antigravity releases read, and falls back to <code [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em; overflow-wrap: anywhere;">~/.gemini/antigravity/mcp_config.json</code> on older releases. Onboarding and this site's install picker offer it with the Antigravity logo in Windsurf's place.</li>
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0995.091.antigravityCreatesThatFile">Antigravity creates that file empty, and the installer used to fail to parse it. An empty or whitespace-only config file now counts as an empty config.</li>
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0995.092.anAntigravitySessionIs">An Antigravity session is labeled Antigravity on the owner chip and in the client inventory.</li>
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0995.093.windsurfIsNoLonger">Windsurf is no longer an install target or an accepted client label. An <span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">fsb</span> entry already in a Windsurf config keeps working until it is removed by hand.</li>
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0995.094.actionToolsAcceptMuse">Action tools accept Muse, Grok Bot, and Dots as client labels, and anonymous usage stats count them under those names instead of as unknown. The Grok Bot plugin now launches <span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">fsb-mcp-server</span> 0.11.5 and sends Grok Bot instead of Grok.</li>
+        <li style="margin-bottom: 0;" i18n="@@releaseNotes.v0995.095.fsbsOwnAutopilotLabels">FSB's own autopilot labels itself Autopilot instead of FSB Autopilot, so its page overlay badge reads Autopilot.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="rn-sec rn-sec-split" style="margin: 0; padding: 72px 0 0; display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 56px; align-items: center;">
+    <div class="rn-sec-viz" style="display: flex; align-items: center; justify-content: center;">
+      <div style="width: 280px; max-width: 100%; display: flex; flex-direction: column; gap: 14px; font-family: 'Space Mono', monospace;">
+        <div style="border: 1px solid var(--line); border-radius: 8px; background: var(--panel2); overflow: hidden;">
+          <div style="display: flex; align-items: center; gap: 5px; padding: 8px 11px; border-bottom: 1px solid var(--line);">
+            <span style="width: 6px; height: 6px; border-radius: 999px; background: var(--line2);"></span>
+            <span style="width: 6px; height: 6px; border-radius: 999px; background: var(--line2);"></span>
+            <span style="width: 6px; height: 6px; border-radius: 999px; background: var(--line2);"></span>
+            <span [attr.translate]="'no'" style="margin-left: auto; font-size: 9px; color: var(--dim2);" i18n="@@releaseNotes.v0995.096.toolsList">tools/list</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 10px; padding: 13px 11px 14px; font-size: 9.5px;">
+            <div class="rn-a95" style="display: flex; color: var(--dim); opacity: .4;">
+              <span style="position: relative; white-space: nowrap;"><span [attr.translate]="'no'" i18n="@@releaseNotes.v0995.097.startVisualSession">start_visual_session</span><span class="rn-a129" style="position: absolute; left: -2px; right: -2px; top: 50%; height: 1.5px; margin-top: -.75px; background: var(--ac); transform-origin: left center;"></span></span>
+            </div>
+            <div class="rn-a95" style="display: flex; color: var(--dim); opacity: .4;">
+              <span style="position: relative; white-space: nowrap;"><span [attr.translate]="'no'" i18n="@@releaseNotes.v0995.098.endVisualSession">end_visual_session</span><span class="rn-a130" style="position: absolute; left: -2px; right: -2px; top: 50%; height: 1.5px; margin-top: -.75px; background: var(--ac); transform-origin: left center;"></span></span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px; white-space: nowrap;">
+              <span class="rn-a95" style="position: relative; color: var(--dim); opacity: .4;"><span [attr.translate]="'no'" i18n="@@releaseNotes.v0995.099.back">back</span><span class="rn-a131" style="position: absolute; left: -2px; right: -2px; top: 50%; height: 1.5px; margin-top: -.75px; background: var(--ac); transform-origin: left center;"></span></span>
+              <span [attr.translate]="'no'" style="color: var(--dim2);">→</span>
+              <span [attr.translate]="'no'" style="color: var(--ink);" i18n="@@releaseNotes.v0995.100.goBack">go_back</span>
+            </div>
+            <div style="height: 1px; background: var(--line);"></div>
+            <div class="rn-a125" style="display: flex; align-items: baseline; justify-content: space-between; gap: 10px;">
+              <span [attr.translate]="'no'" style="color: var(--dim2);" i18n="@@releaseNotes.v0995.101.registered">registered</span>
+              <span [attr.translate]="'no'" style="font-family: 'Poppins', system-ui, sans-serif; font-size: 22px; font-weight: 700; line-height: 1; color: var(--ac);">69</span>
+            </div>
+          </div>
+        </div>
+        <div class="rn-a125" style="display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 9.5px; color: var(--dim2); text-align: center;">
+          <span [attr.translate]="'no'" i18n="@@releaseNotes.v0995.102.countSurfaces">README · onboarding · site · llms</span>
+          <span [attr.translate]="'no'" style="color: var(--ac);">✓</span>
+        </div>
+      </div>
+    </div>
+    <div class="rn-sec-copy">
+      <div class="rn-sec-num" [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: 11px; letter-spacing: .22em; color: var(--ac); margin-bottom: 14px;">09</div>
+      <h2 style="margin: 0 0 18px; font-size: clamp(1.5rem, 3vw, 2rem); font-weight: 700; letter-spacing: -.02em; line-height: 1.15;" i18n="@@releaseNotes.v0995.103.exactly69ToolsAnd">Exactly 69 tools, and every count agrees</h2>
+      <ul style="margin: 0; padding-left: 18px; color: var(--dim); font-size: 1rem; line-height: 1.65;">
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0995.104.startVisualSessionAnd"><span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">start_visual_session</span> and <span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">end_visual_session</span> have only returned an error since 0.9.0, and <span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">back</span> duplicated <span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">go_back</span>. None of the three is registered anymore, so the server lists 69 tools.</li>
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0995.105.aClientThatStill">A client that still calls one of them gets its MCP host's unknown-tool error. Use <span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">go_back</span> for history navigation.</li>
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0995.106.theSchemasOfThe">The schemas of the 69 remaining tools are unchanged.</li>
+        <li style="margin-bottom: 0;" i18n="@@releaseNotes.v0995.107.theToolCountIn">The tool count in both READMEs, extension onboarding, this site and its translations, and the <span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">llms</span> files is now checked against what the built server registers, so a count that drifts fails CI.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="rn-sec rn-sec-split" style="margin: 0; padding: 72px 0 0; display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 56px; align-items: center;">
+    <div class="rn-sec-viz" style="order: 2; display: flex; align-items: center; justify-content: center;">
+      <div style="width: 270px; max-width: 100%; display: flex; flex-direction: column; align-items: center; gap: 14px; font-family: 'Space Mono', monospace;">
+        <div style="position: relative; width: 100%; height: 26px; font-size: 10px;">
+          <div class="rn-a124" style="position: absolute; inset: 0; display: flex; justify-content: center; opacity: 0;">
+            <span [attr.translate]="'no'" style="position: relative; box-sizing: border-box; height: 26px; display: inline-flex; align-items: center; border: 1px solid var(--line2); border-radius: 999px; padding: 0 12px; color: var(--dim); white-space: nowrap;">= 1.0.4<span class="rn-a123" style="position: absolute; left: 8px; right: 8px; top: 50%; height: 1.5px; margin-top: -.75px; background: var(--ac); transform-origin: left center;"></span></span>
+          </div>
+          <div style="position: absolute; inset: 0; display: flex; justify-content: center;">
+            <span [attr.translate]="'no'" class="rn-a125" style="box-sizing: border-box; height: 26px; display: inline-flex; align-items: center; border: 1px solid var(--ac); border-radius: 999px; padding: 0 12px; color: var(--ac); white-space: nowrap;" i18n="@@releaseNotes.v0995.108.grokAcpV1">grok-acp-v1</span>
+          </div>
+        </div>
+        <div style="width: 100%; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; padding: 12px 12px 13px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel2); font-size: 9.5px;">
+          <div class="rn-a91 rn-enter" style="display: flex; align-items: center; gap: 10px; white-space: nowrap; opacity: 0;">
+            <span [attr.translate]="'no'" style="color: var(--ink);" i18n="@@releaseNotes.v0995.109.protocol">protocol</span>
+            <span [attr.translate]="'no'" class="rn-a113 rn-enter" style="margin-left: auto; color: var(--ac); opacity: 0;">✓</span>
+          </div>
+          <div class="rn-a92 rn-enter" style="display: flex; align-items: center; gap: 10px; white-space: nowrap; opacity: 0;">
+            <span [attr.translate]="'no'" style="color: var(--ink);" i18n="@@releaseNotes.v0995.110.privateConfig">private config</span>
+            <span [attr.translate]="'no'" class="rn-a114 rn-enter" style="margin-left: auto; color: var(--ac); opacity: 0;">✓</span>
+          </div>
+          <div class="rn-a93 rn-enter" style="display: flex; align-items: center; gap: 10px; white-space: nowrap; opacity: 0;">
+            <span [attr.translate]="'no'" style="color: var(--ink);" i18n="@@releaseNotes.v0995.111.strictSandbox">strict sandbox</span>
+            <span [attr.translate]="'no'" class="rn-a132 rn-enter" style="margin-left: auto; color: var(--ac); opacity: 0;">✓</span>
+          </div>
+          <div class="rn-a94 rn-enter" style="display: flex; align-items: center; gap: 10px; white-space: nowrap; opacity: 0;">
+            <span [attr.translate]="'no'" style="color: var(--ink);" i18n="@@releaseNotes.v0995.112.cachedSignIn">cached sign-in</span>
+            <span [attr.translate]="'no'" class="rn-a133 rn-enter" style="margin-left: auto; color: var(--ac); opacity: 0;">✓</span>
+          </div>
+        </div>
+        <span [attr.translate]="'no'" class="rn-a109 rn-enter" style="border: 1px solid var(--ac); border-radius: 999px; padding: 4px 12px; background: rgba(255,107,53,.08); font-size: 10px; color: var(--ac); white-space: nowrap; opacity: 0;" i18n="@@releaseNotes.v0995.113.verified">Verified</span>
+      </div>
+    </div>
+    <div class="rn-sec-copy" style="order: 1;">
+      <div class="rn-sec-num" [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: 11px; letter-spacing: .22em; color: var(--ac); margin-bottom: 14px;">10</div>
+      <h2 style="margin: 0 0 18px; font-size: clamp(1.5rem, 3vw, 2rem); font-weight: 700; letter-spacing: -.02em; line-height: 1.15;" i18n="@@releaseNotes.v0995.114.grokBuildIsChecked">Grok Build is checked by capability, not version</h2>
+      <ul style="margin: 0; padding-left: 18px; color: var(--dim); font-size: 1rem; line-height: 1.65;">
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0995.115.earlierReleasesAcceptedOnly">Earlier releases accepted only exact Grok Build versions, so a Grok update could stop delegated runs until FSB shipped a new pin. FSB now checks the CLI against the <span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">grok-acp-v1</span> contract: protocol capabilities, private configuration, strict sandbox startup, and executable identity. Compatible future releases, new major versions included, run without an FSB update.</li>
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0995.116.theProviderBadgeReads">The provider badge reads Verified only after those checks pass, and they run without sending a prompt. Success recorded from a version check alone no longer counts.</li>
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0995.117.whenACheckFails">When a check fails, provider status and connection tests name the cause: a missing capability, a private configuration FSB cannot verify, a sandbox that could not start, an incompatible protocol response, or a CLI that changed while it was being checked.</li>
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0995.118.harmlessAdditionsToThe">Harmless additions to the CLI's metadata no longer fail it, while enabled external customizations and unexpected authority stay blocked. Updating the integration keeps your private Grok sign-in and session journal.</li>
+        <li style="margin-bottom: 0;" i18n="@@releaseNotes.v0995.119.aWeeklyCiJob">A weekly CI job checks the official stable CLI on macOS and Linux, without credentials or inference.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="rn-sec rn-sec-split" style="margin: 0; padding: 72px 0 0; display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 56px; align-items: center;">
+    <div class="rn-sec-viz" style="display: flex; align-items: center; justify-content: center;">
+      <div style="width: 280px; max-width: 100%; display: flex; flex-direction: column; align-items: center; gap: 16px; font-family: 'Space Mono', monospace;">
+        <div style="position: relative; width: 280px; height: 128px;">
+          <div style="position: absolute; left: 0; top: 0; width: 120px; height: 128px; box-sizing: border-box; display: flex; flex-direction: column; gap: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel2);">
+            <span style="width: 40%; height: 5px; border-radius: 3px; background: var(--dim2);"></span>
+            <span style="height: 26px; box-sizing: border-box; border: 1px dashed var(--line2); border-radius: 6px;"></span>
+            <span style="height: 26px; box-sizing: border-box; border: 1px solid var(--line2); border-radius: 6px; background: var(--bg);"></span>
+          </div>
+          <div class="rn-a134" style="position: absolute; left: 160px; top: 0; width: 120px; height: 128px; box-sizing: border-box; display: flex; flex-direction: column; gap: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel2);">
+            <span style="width: 52%; height: 5px; border-radius: 3px; background: var(--dim2);"></span>
+            <span style="height: 26px; box-sizing: border-box; border: 1px solid var(--line2); border-radius: 6px; background: var(--bg);"></span>
+          </div>
+          <div class="rn-a135" style="position: absolute; left: 170px; top: 57px; width: 100px; height: 26px; box-sizing: border-box; display: flex; align-items: center; gap: 7px; padding: 0 9px; border: 1px solid var(--ac); border-radius: 6px; background: var(--panel2); box-shadow: 0 6px 16px rgba(0,0,0,.25);">
+            <span style="flex: 0 0 auto; width: 6px; height: 6px; border-radius: 999px; background: var(--ac);"></span>
+            <span style="flex: 1 1 auto; height: 5px; border-radius: 3px; background: var(--line2);"></span>
+          </div>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; font-size: 9px;">
+          <span [attr.translate]="'no'" class="rn-a136" style="border: 1px solid var(--line); border-radius: 999px; padding: 3px 7px; color: var(--dim2); white-space: nowrap;" i18n="@@releaseNotes.v0995.120.dragstart">dragstart</span>
+          <span [attr.translate]="'no'" class="rn-a137" style="border: 1px solid var(--line); border-radius: 999px; padding: 3px 7px; color: var(--dim2); white-space: nowrap;" i18n="@@releaseNotes.v0995.121.dragenter">dragenter</span>
+          <span [attr.translate]="'no'" class="rn-a138" style="border: 1px solid var(--line); border-radius: 999px; padding: 3px 7px; color: var(--dim2); white-space: nowrap;" i18n="@@releaseNotes.v0995.122.dragover">dragover</span>
+          <span [attr.translate]="'no'" class="rn-a139" style="border: 1px solid var(--ac); border-radius: 999px; padding: 3px 7px; color: var(--ac); white-space: nowrap;" i18n="@@releaseNotes.v0995.123.drop">drop</span>
+        </div>
+        <span [attr.translate]="'no'" class="rn-a125" style="display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--ac); border-radius: 999px; padding: 4px 11px; background: rgba(255,107,53,.08); font-size: 10px; color: var(--ac); white-space: nowrap;"><span i18n="@@releaseNotes.v0995.124.moved">moved</span><span>✓</span></span>
+      </div>
+    </div>
+    <div class="rn-sec-copy">
+      <div class="rn-sec-num" [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: 11px; letter-spacing: .22em; color: var(--ac); margin-bottom: 14px;">11</div>
+      <h2 style="margin: 0 0 18px; font-size: clamp(1.5rem, 3vw, 2rem); font-weight: 700; letter-spacing: -.02em; line-height: 1.15;" i18n="@@releaseNotes.v0995.125.dragDropFollowsA">drag_drop follows a real drag</h2>
+      <ul style="margin: 0; padding-left: 18px; color: var(--dim); font-size: 1rem; line-height: 1.65;">
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0995.126.dragDropCouldNot"><span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">drag_drop</span> could not find its elements before: it called a lookup that does not exist, so CSS selectors and snapshot refs both failed. Elements now resolve through the same ref and shadow-DOM-aware selector lookup as other actions, and both <span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">sourceRef</span>/<span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">targetRef</span> and <span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">sourceSelector</span>/<span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">targetSelector</span> work. A stale ref is refused rather than guessed.</li>
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0995.127.theHtml5PathPlays">The HTML5 path plays the events a browser sends, in order. A drop only follows a dragover the page cancelled, and a refused drag gets dragleave and dragend instead. Events carry coordinates and cross shadow boundaries, links and images carry the data a browser would, and pointer events set <span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">isPrimary</span>, which dnd-kit needs.</li>
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0995.128.aSourceNoBrowser">A source no browser would drag goes straight to the pointer method, and once a drop works, the pointer and mouse methods no longer run after it.</li>
+        <li style="margin-bottom: 0;" i18n="@@releaseNotes.v0995.129.resultsSayWhatHappened">Results say what happened. A move counts only when the element crosses the target or closes half the gap. A page that reacted without moving the element returns a warning, and a delivered drop with no visible result returns <span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">outcome: 'unknown'</span> with <span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">mayHaveExecuted</span>, so callers check the page instead of dropping twice.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="rn-sec rn-sec-split" style="margin: 0; padding: 72px 0 0; display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 56px; align-items: center;">
+    <div class="rn-sec-viz" style="order: 2; display: flex; align-items: center; justify-content: center;">
+      <div style="width: 290px; max-width: 100%; display: flex; flex-direction: column; align-items: center; gap: 14px; font-family: 'Space Mono', monospace;">
+        <div style="display: flex; align-items: center; gap: 7px; font-size: 9.5px; color: var(--dim2);">
+          <span [attr.translate]="'no'" i18n="@@releaseNotes.v0995.130.terminateExecution">terminateExecution</span>
+          <span [attr.translate]="'no'" style="font-size: 12px; line-height: 1; color: var(--ac);">×</span>
+        </div>
+        <div style="position: relative; width: 290px; height: 76px;">
+          <div class="rn-a95" style="position: absolute; left: 0; top: 0; width: 92px; height: 76px; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px; border: 1px solid var(--line2); border-radius: 8px; background: var(--panel2); opacity: .4;">
+            <span style="width: 13px; height: 13px; box-sizing: border-box; border-radius: 999px; border: 1.5px solid var(--line2); border-top-color: var(--dim2);"></span>
+            <span [attr.translate]="'no'" style="padding: 0 6px; font-size: 8.5px; line-height: 1.35; text-align: center; color: var(--dim2);" i18n="@@releaseNotes.v0995.131.pageNotResponding">page not responding</span>
+          </div>
+          <div style="position: absolute; left: 92px; right: 92px; top: 49.5px; height: 1px; background: var(--line2);"></div>
+          <div style="position: absolute; left: 92px; right: 92px; top: 47px; height: 6px;">
+            <span class="rn-a140" style="position: absolute; left: 100%; top: 0; width: 6px; height: 6px; margin-left: -3px; border-radius: 999px; background: var(--ac); box-shadow: 0 0 8px rgba(255,107,53,.6); opacity: 0;"></span>
+          </div>
+          <span [attr.translate]="'no'" class="rn-a101" style="position: absolute; left: 50%; top: 14px; transform: translateX(-50%); border: 1px solid var(--ac); border-radius: 6px; padding: 3px 7px; font-size: 9px; color: var(--ac); white-space: nowrap;" i18n="@@releaseNotes.v0995.132.pageCrash">Page.crash</span>
+          <div class="rn-a125" style="position: absolute; right: 0; top: 0; width: 92px; height: 76px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; gap: 7px; padding: 0 10px; border: 1px solid var(--ac); border-radius: 8px; background: var(--panel2);">
+            <span style="width: 70%; height: 5px; border-radius: 3px; background: var(--dim2);"></span>
+            <span style="height: 4px; border-radius: 2px; background: var(--line2);"></span>
+            <span style="width: 56%; height: 4px; border-radius: 2px; background: var(--line2);"></span>
+            <span [attr.translate]="'no'" style="font-size: 8.5px; line-height: 1.35; color: var(--dim);" i18n="@@releaseNotes.v0995.133.freshRenderer">fresh renderer</span>
+          </div>
+        </div>
+        <span [attr.translate]="'no'" class="rn-a109 rn-enter" style="border: 1px solid var(--ac); border-radius: 999px; padding: 4px 10px; font-size: 9.5px; color: var(--ac); white-space: nowrap; opacity: 0;" i18n="@@releaseNotes.v0995.134.sameTabId">same tab id</span>
+      </div>
+    </div>
+    <div class="rn-sec-copy" style="order: 1;">
+      <div class="rn-sec-num" [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: 11px; letter-spacing: .22em; color: var(--ac); margin-bottom: 14px;">12</div>
+      <h2 style="margin: 0 0 18px; font-size: clamp(1.5rem, 3vw, 2rem); font-weight: 700; letter-spacing: -.02em; line-height: 1.15;" i18n="@@releaseNotes.v0995.135.hungPagesRecoverOn">Hung pages recover on Chrome 156</h2>
+      <ul style="margin: 0; padding-left: 18px; color: var(--dim); font-size: 1rem; line-height: 1.65;">
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0995.136.chromeRefusesRuntime">Chrome 156 refuses <span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">Runtime.terminateExecution</span> to extensions, so the 0.9.92 recovery could no longer stop a runaway script, and <span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">navigate</span> ran into its <span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">PAGE_UNRESPONSIVE</span> deadline instead.</li>
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0995.137.whenTerminationIsRefused">When termination is refused, FSB crashes the hung renderer with <span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">Page.crash</span> before it requests the navigation. The destination commits in a fresh renderer, and the tab keeps its id.</li>
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0995.138.aCrashAlsoTakes">A crash also takes down any tab that shares the renderer process, so a page in a long task gets one more second before it is crashed, and an idle page that is still parsing is no longer mistaken for a hung one.</li>
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0995.139.leavingAPageThat">Leaving a page that had not finished loading no longer reports <span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">navigation_failed</span> with <span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">net::ERR_ABORTED</span> when the destination loaded. A real failure still fails at once.</li>
+        <li style="margin-bottom: 0;" i18n="@@releaseNotes.v0995.140.onceANavigationIs">Once a navigation is already pending on a hung tab, Chrome 156 leaves an extension no way to free it, so that case still ends at the deadline.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="rn-sec rn-sec-split" style="margin: 0; padding: 72px 0 0; display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 56px; align-items: center;">
+    <div class="rn-sec-viz" style="display: flex; align-items: center; justify-content: center;">
+      <div style="width: 270px; max-width: 100%; display: flex; flex-direction: column; gap: 12px; font-family: 'Space Mono', monospace;">
+        <span [attr.translate]="'no'" style="align-self: center; border: 1px solid var(--ac); border-radius: 999px; padding: 4px 10px; font-size: 9.5px; color: var(--ac); white-space: nowrap;" i18n="@@releaseNotes.v0995.141.onUpdate">on update</span>
+        <div style="border: 1px solid var(--line); border-radius: 8px; background: var(--panel2); overflow: hidden;">
+          <div [attr.translate]="'no'" style="padding: 8px 11px; border-bottom: 1px solid var(--line); font-size: 9px; color: var(--dim2);" i18n="@@releaseNotes.v0995.142.chromeStorageLocal">chrome.storage.local</div>
+          <div style="display: flex; flex-direction: column; gap: 10px; padding: 12px 11px 14px; font-size: 9.5px;">
+            <div class="rn-a95" style="display: flex; color: var(--dim); opacity: .4;">
+              <span style="position: relative; white-space: nowrap;"><span [attr.translate]="'no'" i18n="@@releaseNotes.v0995.143.bgAgents">bgAgents</span><span class="rn-a129" style="position: absolute; left: -2px; right: -2px; top: 50%; height: 1.5px; margin-top: -.75px; background: var(--ac); transform-origin: left center;"></span></span>
+            </div>
+            <div class="rn-a95" style="display: flex; color: var(--dim); opacity: .4;">
+              <span style="position: relative; white-space: nowrap;"><span [attr.translate]="'no'" i18n="@@releaseNotes.v0995.144.fsbSyncQueue">fsb_sync_queue</span><span class="rn-a130" style="position: absolute; left: -2px; right: -2px; top: 50%; height: 1.5px; margin-top: -.75px; background: var(--ac); transform-origin: left center;"></span></span>
+            </div>
+            <div class="rn-a95" style="display: flex; color: var(--dim); opacity: .4;">
+              <span style="position: relative; white-space: nowrap;"><span [attr.translate]="'no'" i18n="@@releaseNotes.v0995.145.fsbAgentAlarms">fsb_agent_*</span><span class="rn-a131" style="position: absolute; left: -2px; right: -2px; top: 50%; height: 1.5px; margin-top: -.75px; background: var(--ac); transform-origin: left center;"></span></span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px; white-space: nowrap;">
+              <span [attr.translate]="'no'" style="color: var(--ink);" i18n="@@releaseNotes.v0995.146.fsbUiLocale">fsbUiLocale</span>
+              <span [attr.translate]="'no'" style="margin-left: auto; color: var(--dim2);" i18n="@@releaseNotes.v0995.147.kept">kept</span>
+            </div>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px; padding: 9px 11px; border: 1px solid var(--line); border-radius: 8px; font-size: 9.5px; white-space: nowrap;">
+          <span [attr.translate]="'no'" style="color: var(--dim2);" i18n="@@releaseNotes.v0995.148.server">server</span>
+          <span class="rn-a95" style="position: relative; margin-left: auto; color: var(--dim); opacity: .4;"><span [attr.translate]="'no'" i18n="@@releaseNotes.v0995.149.apiAgents">/api/agents</span><span class="rn-a131" style="position: absolute; left: -2px; right: -2px; top: 50%; height: 1.5px; margin-top: -.75px; background: var(--ac); transform-origin: left center;"></span></span>
+        </div>
+      </div>
+    </div>
+    <div class="rn-sec-copy">
+      <div class="rn-sec-num" [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: 11px; letter-spacing: .22em; color: var(--ac); margin-bottom: 14px;">13</div>
+      <h2 style="margin: 0 0 18px; font-size: clamp(1.5rem, 3vw, 2rem); font-weight: 700; letter-spacing: -.02em; line-height: 1.15;" i18n="@@releaseNotes.v0995.150.whatBackgroundAgentsLeft">What background agents left behind is gone</h2>
+      <ul style="margin: 0; padding-left: 18px; color: var(--dim); font-size: 1rem; line-height: 1.65;">
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0995.151.backgroundAgentsWereRetired">Background agents were retired in v0.9.45rc1, but their saved definitions stayed in <span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">chrome.storage.local</span>. When the extension updates, it now deletes <span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">bgAgents</span>, the <span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">fsb_sync_queue</span> sync queue, the flag for the retired control-panel notice, and any scheduled <span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">fsb_agent_*</span> alarms. Other saved settings are left alone.</li>
+        <li style="margin-bottom: 10px;" i18n="@@releaseNotes.v0995.152.theControlPanelsList">The control panel's list of old agent names, several thousand lines of commented-out agent code in the extension and both dashboards, and the unused <span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">executeAutomationTask</span> entry point are gone.</li>
+        <li style="margin-bottom: 0;" i18n="@@releaseNotes.v0995.153.theServerDropsApi">The server drops <span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">/api/agents</span> and the agent-only <span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">/api/stats</span> route, and the Python server drops its agents, stats, and SSE routers. The <span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">agents</span> and <span [attr.translate]="'no'" style="font-family: 'Space Mono', monospace; font-size: .9em;">agent_runs</span> tables are kept, so previously synced rows are untouched.</li>
+      </ul>
+    </div>
+  </section>
+
   <section class="rn-sec" style="margin: 0; padding: 72px 0 0;">
-    <p style="margin: 0; padding-top: 26px; border-top: 1px solid var(--line); font-family: 'Space Mono', monospace; font-size: 11.5px; line-height: 1.8; color: var(--dim2); max-width: 76ch; text-wrap: pretty;" i18n="@@releaseNotes.v0995.057.extensionAndShowcaseVersion">This release pairs extension and showcase version 0.9.95 with MCP package 0.11.5. The language switch was verified in Chrome on the side panel, popup, control panel, onboarding, unlock, and microphone-permission pages.</p>
+    <p style="margin: 0; padding-top: 26px; border-top: 1px solid var(--line); font-family: 'Space Mono', monospace; font-size: 11.5px; line-height: 1.8; color: var(--dim2); max-width: 76ch; text-wrap: pretty;" i18n="@@releaseNotes.v0995.057.extensionAndShowcaseVersion">This release pairs extension and showcase version 0.9.95 with MCP package 0.11.5. After updating, rerun the Cline install if you set Cline up earlier, rerun the native-host install so Grok Build gets the new checks, and restart your MCP client. The language switch was verified in Chrome on the side panel, popup, control panel, onboarding, unlock, and microphone-permission pages, and drag_drop and hung-page recovery are tested against real Chrome.</p>
   </section>
 
     }

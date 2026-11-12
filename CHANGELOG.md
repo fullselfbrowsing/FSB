@@ -6,18 +6,9 @@ The independently published `fsb-mcp-server` npm package keeps its own semver ch
 
 ## [Unreleased]
 
-### Fixed
-
-- Grok Build compatibility is verified through its ACP capabilities and isolated runtime instead of an exact CLI version pin. Compatible future releases can run without an FSB update; sandbox, isolation, and protocol refusals now retain their actual cause in provider status and connection tests.
-- Grok's provider badge reports **Verified** after runtime checks and drops stale version-only success evidence. Updating the integration preserves the private OAuth profile and owned-session journal.
-
-### Added
-
-- Sanitized Grok Build 1.0.62 inspection and initialization fixtures, future-version regression coverage, and a weekly/manual macOS/Linux compatibility check against the official stable CLI without credentials or inference.
-
 ## v0.9.95 — Multilingual Extension Interface and Official Cline Support — 2026-10-18
 
-The extension, showcase, skill, documentation, and store metadata align at `0.9.95`. The independently versioned `fsb-mcp-server` advances to `0.11.5` with the accompanying Cline installer fix and the removal of three dead tools; see [`mcp/CHANGELOG.md`](./mcp/CHANGELOG.md) for its package-specific release notes and compatibility requirements. The language work leaves MCP tool schemas and bridge messages unchanged.
+The extension, showcase, skill, documentation, and store metadata align at `0.9.95`. The independently versioned `fsb-mcp-server` advances to `0.11.5` with the accompanying Cline and Antigravity installer fixes, Grok Build capability checks, and the removal of three dead tools; see [`mcp/CHANGELOG.md`](./mcp/CHANGELOG.md) for its package-specific release notes and compatibility requirements. The language work leaves MCP tool schemas and bridge messages unchanged.
 
 ### Added
 
@@ -31,6 +22,7 @@ The extension, showcase, skill, documentation, and store metadata align at `0.9.
 - **Cline is an officially supported MCP client.** The onboarding and showcase install pickers offer `install --cline` with the Cline logo, and the READMEs document Cline's shared settings file. A Cline session is labeled Cline on the owner chip and in the client inventory whether it connects from the VS Code extension or the SDK-based Cline CLI, and anonymous usage stats count it as Cline instead of `unknown`, with the same conservative cost fallback as other bring-your-own-model clients. The companion installer fix ships in `fsb-mcp-server` 0.11.5.
 - **Antigravity replaces Windsurf as an install target.** Onboarding and the showcase install pickers offer `install --antigravity` with the Antigravity logo in Windsurf's place, and an Antigravity session is labeled Antigravity on the owner chip and in the client inventory.
 - **Muse, Grok Bot, and Dots are allowed client labels.** Always-on agents can send `client: "Muse"`, `"Grok Bot"`, or `"Dots"` on action tools, and anonymous usage stats count them under those names instead of `unknown`. The MCP server accepts them from 0.11.5.
+- Sanitized Grok Build 1.0.62 inspection and initialization fixtures, future-version regression coverage, and a weekly/manual macOS/Linux compatibility check against the official stable CLI without credentials or inference.
 
 ### Changed
 
@@ -38,6 +30,14 @@ The extension, showcase, skill, documentation, and store metadata align at `0.9.
 - The extension's own autopilot uses the client label `Autopilot` instead of `FSB Autopilot`, so its page overlay badge reads "Autopilot".
 - Windsurf is no longer an install target or an allowed `client` label, and its default-model cost row is gone. The telemetry server still accepts Windsurf from extensions older than 0.9.95.
 - Every published MCP tool count now says 69 and is checked against the built server, so the README, onboarding, showcase and `llms` figures can no longer disagree.
+
+### Fixed
+
+- **drag_drop finds its elements and follows a real drag.** It called a lookup that does not exist and read only `sourceRef`/`targetRef`, so CSS selectors, snapshot refs, and Autopilot's `sourceSelector`/`targetSelector` all failed. Elements now resolve through `FSB.resolveRef` and the shadow-aware selector lookup, either parameter name works, and a stale ref is refused. The HTML5 method follows what Chrome does: a drop comes only after a dragover the page cancelled, a refused drag gets dragleave and dragend, events carry coordinates and cross shadow boundaries, links and images carry the data a browser sends, and pointer events set `isPrimary` for dnd-kit. A move counts only when the source crosses the target or closes half the gap; a page that reacted without moving the element returns success with a warning, and a delivered drop with no visible result returns `outcome: 'unknown'` with `mayHaveExecuted`. The pointer and mouse methods no longer run after a drop that worked.
+- **Hung pages recover on Chrome 156.** Chrome 156 refuses `Runtime.terminateExecution` to extensions, so `navigate` could no longer stop a runaway script and ran into its `PAGE_UNRESPONSIVE` deadline. When termination is refused, recovery now crashes the hung renderer with `Page.crash` before requesting the navigation; the destination commits in a fresh renderer and the tab keeps its id. A long task gets one more second first, because a crash also takes down any tab sharing the renderer, and the responsiveness probe no longer mistakes an idle page that is still parsing for a hung one. Once a navigation is pending, nothing an extension can do frees the tab on Chrome 156, so that case still ends at the deadline. Recovery logs whether Chrome refused the crash request.
+- **Leaving a page that is still loading no longer fails the navigation.** The outgoing page's own aborted load was reported as `navigation_failed` / `net::ERR_ABORTED` with `mayHaveExecuted: false` even though the destination had loaded. Errors reported under the outgoing document are now ignored; a real failure still fails at once.
+- Grok Build compatibility is verified through its ACP capabilities and isolated runtime instead of an exact CLI version pin. Compatible future releases can run without an FSB update; sandbox, isolation, and protocol refusals now retain their actual cause in provider status and connection tests.
+- Grok's provider badge reports **Verified** after runtime checks and drops stale version-only success evidence. Updating the integration preserves the private OAuth profile and owned-session journal.
 
 ### Removed
 

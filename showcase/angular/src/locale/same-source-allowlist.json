@@ -1551,6 +1551,161 @@
       "reason": "code identifier or wire token"
     },
     {
+      "id": "releaseNotes.v0995.068.acceptLanguageRu",
+      "sourceSha256": "132daaf8bc3a5e9a8486b2deb6d244e499cbea256d2f187d835d3e63327c8361",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0995.069.siteHost",
+      "sourceSha256": "7fd68abf645323cb0934dc23cb06b58dfd799bc3bf059122ba180c6c0131ee9c",
+      "reason": "literal path, selector, or sample address"
+    },
+    {
+      "id": "releaseNotes.v0995.070.ruPath",
+      "sourceSha256": "3ea38acb79c398f61bbbb756fb8e4da0ea9b37d89987b1db0c19f96ecd372d14",
+      "reason": "literal path, selector, or sample address"
+    },
+    {
+      "id": "releaseNotes.v0995.071.pickerEnglish",
+      "sourceSha256": "ba118bf7fc9c1aedc1edb28a0aa86e0b43b681f222af6616e13c43be87815b06",
+      "reason": "language name shown in its own language"
+    },
+    {
+      "id": "releaseNotes.v0995.072.pickerRussian",
+      "sourceSha256": "6da140fdd4be01893bd14afe43ad5d1cc2a4eec98fc37e67e91e0c63fd703094",
+      "reason": "language name shown in its own language"
+    },
+    {
+      "id": "releaseNotes.v0995.081.windsurf",
+      "sourceSha256": "da30d04dca8e2ba17952d7f50a72ea5cfe7926dbd9c68ee9ae41bce921f9f0f0",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "releaseNotes.v0995.082.antigravity",
+      "sourceSha256": "4da276f5f11d050f83c5b576ab967b88eb7bf200f21cdf4830a482529af183d4",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "releaseNotes.v0995.083.installAntigravity",
+      "sourceSha256": "a03beb654368b92a4866751fee38e8bc9cbe750ad08d40e55b27d6f6ffc18867",
+      "reason": "literal install command"
+    },
+    {
+      "id": "releaseNotes.v0995.084.antigravityConfigPath",
+      "sourceSha256": "aaffdada691deef26d222bbee606f746fc56820d9e3440d338495e3b43c2a783",
+      "reason": "literal path, selector, or sample address"
+    },
+    {
+      "id": "releaseNotes.v0995.085.clientMuse",
+      "sourceSha256": "779f8f01d25b7e87cd1d3482a07fc0b20c7a87f8089fe6376997150d3b238467",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0995.086.clientGrokBot",
+      "sourceSha256": "c23c62e91ba84aa07950d6a9d20cfe409ebb7586e379a04241050737e48317cc",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0995.087.clientDots",
+      "sourceSha256": "41dd658e9a24f71ec8cf8963fe95177edfcd2f5b13f21bdb24c8235c3bf004e6",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0995.088.clientAutopilot",
+      "sourceSha256": "13fbfbd731785c58a2945eda6eac286a5dc09f570a7c6910ca97b4299487b901",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0995.096.toolsList",
+      "sourceSha256": "b7721731a8ca0e978c0e041a6fd0ccf17edd247eab04b9ff4d9bf302cb9467a2",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0995.097.startVisualSession",
+      "sourceSha256": "c2e4dcd127f42ef5522c4460a64a8087c8c8bfc4cbc1ab216c8d3b83274255e1",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0995.098.endVisualSession",
+      "sourceSha256": "e11d70ae91ef5e347a6391e76335815cdf0fdc4aaa36c51f7ccedb88ee1cc183",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0995.099.back",
+      "sourceSha256": "3c482346f375027677fa8a0d6830a32714d4f13f9e94c2d9e215e0ac205ad4e5",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0995.100.goBack",
+      "sourceSha256": "cb8699ccf6bd5b8ef9383449b20095f9992096d39a63cf21ad64f557e88c9c99",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0995.108.grokAcpV1",
+      "sourceSha256": "4785eedd76d6f112a75af74cd24d4b8d49bbf43bdbe8b24bf4310728ebc35774",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0995.120.dragstart",
+      "sourceSha256": "589c813fcd6e0b55b9745b7117e0ff2bf38582d0eca74e2189a75ae24b7f3544",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0995.121.dragenter",
+      "sourceSha256": "f25092b5ddefd94df4f2b303bd098b03470e897ddcc387acafbb34548e57e167",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0995.122.dragover",
+      "sourceSha256": "35eb6c28cd64db27a9f2a235bd76abdca0e7e68cbddb646ac91f2ce1af2180c8",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0995.123.drop",
+      "sourceSha256": "d90ee9ccf6bea1d2942a7b21319338198dec2a746f8a0d0771621f00da2e0864",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0995.130.terminateExecution",
+      "sourceSha256": "a7917404ea113e44dcf8684fb195ab011acd79de4890e1cb76ad66aa2090fdb5",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0995.132.pageCrash",
+      "sourceSha256": "e3d1f3150d2033d86140de6487e3cd58ab181cb7af09c57d4591c059a2dd34c1",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0995.142.chromeStorageLocal",
+      "sourceSha256": "fabb232a7e734d7290de8c09309c900659c9a29637bd6ad16e8fd122523de5a8",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0995.143.bgAgents",
+      "sourceSha256": "bf4a719d25c4ca406199fd9ca364634dac2635c5b4950d07f6a6fa64f74d0e23",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0995.144.fsbSyncQueue",
+      "sourceSha256": "c7e9bf681ff561a4dedf594fdc79885f6a6c38adf6a5de8c10580a3d19ccb9b8",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0995.145.fsbAgentAlarms",
+      "sourceSha256": "342be854468dff7202b544fa58d37f95fd85fbaa30c87ef38c47916cb1e18dcd",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0995.146.fsbUiLocale",
+      "sourceSha256": "ba45a1000d939b43ca29cd06bb0abf56516aba74fefd5b7319055c428747ae80",
+      "reason": "code identifier or wire token"
+    },
+    {
+      "id": "releaseNotes.v0995.149.apiAgents",
+      "sourceSha256": "f13e665a794118fb1c3d6acc3df5f7cff050cd6a28d184113e87a34d1b479759",
+      "reason": "literal path, selector, or sample address"
+    },
+    {
       "id": "releaseNotes.v0990.030.latticeSdk",
       "sourceSha256": "e4290fe5d92b7da4ba206c1b7337cc33f798d5170122dcdc9c652117d83ea4b5",
       "reason": "brand, package, or CLI name"
@@ -1727,6 +1882,12 @@
         "sourceSha256": "485c669be39838cb5f5e9593d6393b2eeb78676f283835af645bb7f1625946e6",
         "targetSha256": "dedc78f12f58994c4f436de0107e23cc658ee138e559e5b14b9ab9c1f1a0027e",
         "reason": "Tools is the standard German technical loanword, capitalized as a noun; the MCP compound uses a German hyphen."
+      },
+      {
+        "id": "releaseNotes.v0995.148.server",
+        "sourceSha256": "b3eacd33433b31b5252351032c9b3e7a2e7aa7738d5decdf0dd6c62680853c06",
+        "targetSha256": "aef7de28d52977f1b5cd0fecfdc151717610adf41e0aa33b4d9f7522a43337ef",
+        "reason": "natural German loanword or product name"
       }
     ]
   }

@@ -44,6 +44,10 @@ Use this package when you want your AI client to drive the browser directly whil
 - Cline entries set `timeout: 1800` (seconds) so long `run_task` calls are not cut off by Cline's fixed 60-second request timeout.
 - Reinstalling keeps the `timeout`, `disabled`, and `autoApprove` settings Cline stores on the `fsb` entry.
 - `start_visual_session`, `end_visual_session`, and `back` are no longer registered, so the server lists 69 tools. Use `go_back` in place of `back`.
+- When `CLINE_MCP_SETTINGS_PATH`, `CLINE_DATA_DIR`, or `CLINE_DIR` points at a directory that does not exist yet, `install --cline` reports it instead of editing the legacy settings file. Reinstalling no longer rewrites a Cline or Continue config whose keys only changed order.
+- `install --antigravity` replaces `install --windsurf` and writes `~/.gemini/config/mcp_config.json`, falling back to `~/.gemini/antigravity/mcp_config.json` on older Antigravity releases. An empty config file is treated as an empty config.
+- Action tools accept `Muse`, `Grok Bot`, and `Dots` as `client` labels and no longer accept `Windsurf`.
+- Grok Build is verified against the `grok-acp-v1` integration contract instead of one exact version (see [Grok Build as the extension's AI provider](#grok-build-as-the-extensions-ai-provider)). Rerun the native-host installation after updating so the staged runtime gets the new checks.
 - **Compatibility:** `fsb-mcp-server` 0.11.5 requires FSB extension 0.9.95 or newer for `mcp:task-status`. Upgrade the extension and restart the MCP host together.
 
 ### What's New In v0.11.2
