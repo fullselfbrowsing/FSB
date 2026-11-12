@@ -2345,11 +2345,19 @@ async function runLoadedExtensionStorageContract(resolution, tempRoot) {
     const preparedManifest = JSON.parse(
       fs.readFileSync(path.join(prepared.extensionRoot, 'manifest.json'), 'utf8')
     );
+    // Chrome reports the localized name, so resolve __MSG_key__ the way it does
+    // for the manifest's default locale.
+    const manifestMessage = /^__MSG_(\w+)__$/u.exec(preparedManifest.name);
+    const expectedName = manifestMessage
+      ? JSON.parse(fs.readFileSync(path.join(
+        prepared.extensionRoot, '_locales', preparedManifest.default_locale, 'messages.json'
+      ), 'utf8'))[manifestMessage[1]].message
+      : preparedManifest.name;
     assert.equal(inventory.extensions.length, 1,
       'real Chrome reports exactly one loaded unpacked extension');
     assert.deepEqual(inventory.extensions[0], {
       id: prepared.extensionId,
-      name: preparedManifest.name,
+      name: expectedName,
       version: preparedManifest.version,
       path: fs.realpathSync(prepared.extensionRoot),
       enabled: true
