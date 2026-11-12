@@ -2593,10 +2593,25 @@ async function asyncChecks() {
   locale.setBrowserTag(null);
   const bootRequests = [];
   const fetchBeforeBoot = globalThis.fetch;
+  // A content script never touches storage.local: the background limits it to
+  // trusted contexts. The saved choice arrives through the language bridge.
+  const bridgeRequests = [];
   globalThis.chrome = {
-    i18n: { getUILanguage: () => 'ja', getMessage: (key) => (jaOverlay[key] ? jaOverlay[key].message : '') },
-    storage: { local: { get: (_key, cb) => cb({ fsbUiLocale: 'en' }) }, onChanged: { addListener() {} } },
-    runtime: { getURL: (file) => file }
+    i18n: {
+      getUILanguage: () => 'ja',
+      getAcceptLanguages: () => Promise.resolve(['ja']),
+      getMessage: (key) => (jaOverlay[key] ? jaOverlay[key].message : '')
+    },
+    storage: {
+      local: { get: () => { throw new Error('content boot read storage.local'); } },
+      onChanged: { addListener: () => { throw new Error('content boot watched storage'); } }
+    },
+    runtime: {
+      id: 'fsb-test',
+      getURL: (file) => file,
+      sendMessage: (message, callback) => { bridgeRequests.push(message); callback({ ok: true, locale: 'en' }); },
+      onMessage: { addListener() {} }
+    }
   };
   globalThis.fetch = (url) => {
     bootRequests.push(url);
@@ -2614,9 +2629,114 @@ async function asyncChecks() {
     'content-script boot loads the browser catalog next to the override');
   check(locale.isMessage('probe_overlay', drawnBeforeBoot), 'boot recognises browser-language text drawn before it finished');
   check(locale.t('probe_overlay') === 'FSB Automating', 'the stored override applies after boot');
+  check(bridgeRequests.length === 1 && JSON.stringify(bridgeRequests[0]) === '{"action":"fsb:ui-language-config-get"}',
+    'content-script boot asks the background for the saved language with one fixed message');
   locale.setOverride(null);
   locale.setBrowserTag(null);
   locale.setPreferredLanguages(null);
+
+  // The language bridge for content scripts: every bad answer falls back to
+  // the automatic language, a late answer still applies, and only an exact
+  // change broadcast from this extension switches the language.
+  function bridgeSandbox(answer, extra) {
+    const listeners = [];
+    const requests = [];
+    const sandbox = freshLocale(Object.assign({
+      chrome: {
+        i18n: { getUILanguage: () => 'ja', getMessage: () => '', getAcceptLanguages: () => Promise.resolve(['ja']) },
+        runtime: {
+          id: 'fsb-test',
+          getURL: (file) => file,
+          sendMessage: (message, callback) => { requests.push(message); answer(callback, sandbox); },
+          onMessage: { addListener: (fn) => { listeners.push(fn); } }
+        }
+      },
+      fetch: () => Promise.resolve({ json: () => ({}) })
+    }, extra || {}));
+    return { sandbox, api: sandbox.fsbUiLocale, listeners, requests };
+  }
+  for (const [label, answer] of [
+    ['a lastError answer', (cb, sb) => { sb.chrome.runtime.lastError = { message: 'Receiving end does not exist.' }; cb(undefined); delete sb.chrome.runtime.lastError; }],
+    ['a closed trusted store', (cb) => cb({ ok: false, code: 'TRUSTED_STORAGE_CLOSED' })],
+    ['an unknown language code', (cb) => cb({ ok: true, locale: 'xx' })],
+    ['no saved choice', (cb) => cb({ ok: true, locale: null })]
+  ]) {
+    const bridge = bridgeSandbox(answer);
+    await bridge.api.boot();
+    check(bridge.api.current() === 'ja', `${label} falls back to the automatic language`);
+  }
+  let lateCallback = null;
+  const late = bridgeSandbox((cb) => { lateCallback = cb; }, { setTimeout: (fn) => { fn(); return 1; }, clearTimeout() {} });
+  let lateRefreshes = 0;
+  late.api.onChange(() => { lateRefreshes += 1; });
+  await late.api.boot();
+  check(late.api.current() === 'ja' && typeof lateCallback === 'function', 'boot does not wait past the bridge timeout');
+  lateCallback({ ok: true, locale: 'de' });
+  await new Promise((resolve) => setImmediate(resolve));
+  check(late.api.current() === 'de' && lateRefreshes === 1, 'a late bridge answer still applies and refreshes once');
+
+  const live = bridgeSandbox((cb) => cb({ ok: true, locale: null }));
+  let liveRefreshes = 0;
+  const unsubscribe = live.api.onChange(() => { liveRefreshes += 1; });
+  await live.api.bootOnce();
+  await live.api.bootOnce();
+  check(live.requests.length === 1, 'bootOnce asks the background once');
+  check(live.listeners.length === 1, 'boot registers one change listener');
+  const own = { id: 'fsb-test' };
+  const deliver = (message, sender) => {
+    let replied = false;
+    const kept = live.listeners[0](message, sender, () => { replied = true; });
+    return { replied, kept };
+  };
+  let outcome = deliver({ action: 'fsb:ui-language-changed', locale: 'de', extra: true }, own);
+  outcome = deliver({ action: 'fsb:ui-language-changed', locale: 'de' }, { id: 'another-extension' });
+  outcome = deliver({ action: 'fsb:ui-language-changed', locale: 'xx' }, own);
+  await new Promise((resolve) => setImmediate(resolve));
+  check(live.api.current() === 'ja' && liveRefreshes === 0, 'extra keys, a foreign sender and an unknown code are ignored');
+  outcome = deliver({ action: 'fsb:ui-language-changed', locale: 'de' }, own);
+  await new Promise((resolve) => setImmediate(resolve));
+  check(live.api.current() === 'de' && liveRefreshes === 1, 'a change broadcast from this extension switches the language');
+  check(outcome.replied === false && outcome.kept === false, 'the change listener never answers or holds the channel');
+  unsubscribe();
+  deliver({ action: 'fsb:ui-language-changed', locale: null }, own);
+  await new Promise((resolve) => setImmediate(resolve));
+  check(live.api.current() === 'ja' && liveRefreshes === 1, 'onChange returns a working unsubscribe');
+
+  // The overlay's own boot block on a content-world instance: before the
+  // bridge it never heard about a language change, now a broadcast redraws
+  // every overlay root it watches.
+  const overlayBridge = bridgeSandbox((cb) => cb({ ok: true, locale: null }));
+  const feedbackSource = fs.readFileSync(path.join(root, 'extension/content/visual-feedback.js'), 'utf8');
+  const overlayBoot = extractNamedBlock(feedbackSource,
+    feedbackSource.indexOf("if (globalThis.fsbUiLocale && typeof fsbUiLocale.boot === 'function')"));
+  const redrawn = [];
+  overlayBridge.sandbox.chromeRoots = [{ id: 'overlay-root' }];
+  overlayBridge.sandbox.refreshOwnedChrome = (overlayRoot) => { redrawn.push(overlayRoot.id); };
+  vm.runInContext(overlayBoot, overlayBridge.sandbox);
+  await new Promise((resolve) => setImmediate(resolve));
+  check(overlayBridge.requests.length === 1 && redrawn.length === 1, 'the overlay boots through the language bridge');
+  redrawn.length = 0;
+  overlayBridge.listeners[0]({ action: 'fsb:ui-language-changed', locale: 'ru' }, { id: 'fsb-test' }, () => {});
+  await new Promise((resolve) => setImmediate(resolve));
+  check(overlayBridge.api.current() === 'ru' && redrawn.join() === 'overlay-root',
+    'a language change in the control panel redraws the in-page overlay');
+
+  // The service worker is a trusted context without a document: it reads the
+  // saved choice from storage but loads only the catalogs it can show.
+  const workerRequests = [];
+  const worker = freshLocale({
+    location: { protocol: 'chrome-extension:' },
+    chrome: {
+      i18n: { getUILanguage: () => 'ja', getMessage: () => '', getAcceptLanguages: () => Promise.resolve(['ja']) },
+      storage: { local: { get: (_key, cb) => cb({ fsbUiLocale: 'ko' }) }, onChanged: { addListener() {} } },
+      runtime: { getURL: (file) => file, sendMessage: () => { throw new Error('the worker used the bridge'); } }
+    },
+    fetch: (url) => { workerRequests.push(url); return Promise.resolve({ json: () => ({}) }); }
+  });
+  await worker.fsbUiLocale.boot();
+  check(worker.fsbUiLocale.current() === 'ko', 'the service worker reads the saved language from storage');
+  check(workerRequests.length === 3 && ['ko', 'ja', 'en'].every((code) => workerRequests.indexOf(`_locales/${code}/messages.json`) !== -1),
+    'the service worker loads only the active, browser and English catalogs');
 
   // boot() reads Chrome's preferred-languages list before it loads catalogs.
   // getAcceptLanguages() returns a promise in MV3 and takes a callback in

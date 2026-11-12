@@ -2009,6 +2009,8 @@ async function run() {
     check(trustedRouter.includes('vocabulary.AUTOMATION_SESSION_UPDATE_OUTCOME') &&
           trustedRouter.includes('vocabulary.AUTOMATION_SESSION_PRUNE_MCP'),
     'background routes fixed outcome-update and MCP-prune actions to the trusted store');
+    check(trustedRouter.includes('vocabulary.UI_LANGUAGE_GET'),
+      'background routes the content-script language request to the trusted store');
   }
 
   if (api) {
@@ -2137,6 +2139,25 @@ async function run() {
     check(validConfig && validConfig.ok === true && validConfig.elementCacheSize === 321,
       'valid content sender receives only bounded element-cache configuration');
 
+    // Content scripts read the saved FSB language through the same bridge.
+    for (const sender of forgedSenders) {
+      const response = await invokeMessage(messageHandler, { action: api.MESSAGE.UI_LANGUAGE_GET }, sender);
+      check(response && response.ok === false && response.code === 'UNAUTHORIZED_SENDER',
+        'the language bridge rejects forged or tabless senders');
+    }
+    fake.values.fsbUiLocale = 'ja';
+    const language = await invokeMessage(messageHandler, { action: api.MESSAGE.UI_LANGUAGE_GET }, validSender);
+    check(language && language.ok === true && language.locale === 'ja' && Object.keys(language).join() === 'ok,locale',
+      'a content sender receives only the saved FSB language');
+    fake.values.fsbUiLocale = 'xx';
+    const unknownLanguage = await invokeMessage(messageHandler, { action: api.MESSAGE.UI_LANGUAGE_GET }, validSender);
+    check(unknownLanguage && unknownLanguage.ok === true && unknownLanguage.locale === null,
+      'an unknown saved language reads as no choice');
+    delete fake.values.fsbUiLocale;
+    const changedEcho = await invokeMessage(messageHandler, { action: api.MESSAGE.UI_LANGUAGE_CHANGED, locale: 'de' }, validSender);
+    check(changedEcho && changedEcho.ok === false && changedEcho.code === 'UNKNOWN_ACTION',
+      'the language change broadcast is background-to-tab only');
+
     const NOW = 1700000000000;
     const DAY = 24 * 60 * 60 * 1000;
     fake.values.fsbSessionLogs = {
@@ -2199,6 +2220,7 @@ async function run() {
     const hostileMessages = [
       { action: api.MESSAGE.ELEMENT_CACHE_GET, tabId: 99 },
       { action: api.MESSAGE.ELEMENT_CACHE_GET, pageUrl: 'https://forged.test/' },
+      { action: api.MESSAGE.UI_LANGUAGE_GET, locale: 'de' },
       { action: api.MESSAGE.DIAGNOSTIC_APPEND, key: 'skopeo:corpus', value: 'leak' },
       {
         action: api.MESSAGE.AUTOMATION_SESSION_UPDATE_OUTCOME,

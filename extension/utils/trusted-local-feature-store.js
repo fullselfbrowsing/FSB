@@ -19,8 +19,12 @@
     MCP_RETENTION_DAYS: 'fsbMcpSessionRetentionDays',
     ELEMENT_CACHE_SIZE: 'elementCacheSize',
     CAPTCHA_ENABLED: 'captchaSolverEnabled',
-    CAPTCHA_API_KEY: 'captchaApiKey'
+    CAPTCHA_API_KEY: 'captchaApiKey',
+    UI_LANGUAGE: 'fsbUiLocale'
   });
+
+  // The public codes of extension/utils/ui-locale.js.
+  var UI_LANGUAGES = Object.freeze(['en', 'es', 'de', 'ru', 'ja', 'ko', 'zh-CN', 'zh-TW']);
 
   var LIMITS = Object.freeze({
     DIAGNOSTIC_ENTRIES: 100,
@@ -57,13 +61,15 @@
     AUTOMATION_SESSION_PRUNE_MCP: 'fsb:automation-session-prune-mcp',
     AUTOMATION_DOM_SNAPSHOT_LOAD: 'fsb:automation-dom-snapshot-load',
     ELEMENT_CACHE_GET: 'fsb:element-cache-config-get',
-    ELEMENT_CACHE_CHANGED: 'fsb:element-cache-config-changed'
+    ELEMENT_CACHE_CHANGED: 'fsb:element-cache-config-changed',
+    UI_LANGUAGE_GET: 'fsb:ui-language-config-get',
+    UI_LANGUAGE_CHANGED: 'fsb:ui-language-changed'
   });
 
   var MESSAGE_ACTIONS = new Set(Object.keys(MESSAGE).map(function(key) {
     return MESSAGE[key];
   }).filter(function(action) {
-    return action !== MESSAGE.ELEMENT_CACHE_CHANGED;
+    return action !== MESSAGE.ELEMENT_CACHE_CHANGED && action !== MESSAGE.UI_LANGUAGE_CHANGED;
   }));
 
   var FSB_BRIDGE_SECRET_PATTERN = /fsb-auth\.[A-Za-z0-9_-]{43}(?![A-Za-z0-9_-])/g;
@@ -919,6 +925,14 @@
       return { elementCacheSize: safeNumber(stored[KEY.ELEMENT_CACHE_SIZE], 200, 10, 1000) };
     }
 
+    // Content scripts cannot read storage.local, so they get the saved FSB
+    // language from here. Anything but a public code reads as no choice.
+    async function getUiLanguageConfig() {
+      var stored = await get([KEY.UI_LANGUAGE]);
+      var value = stored[KEY.UI_LANGUAGE];
+      return { locale: typeof value === 'string' && UI_LANGUAGES.indexOf(value) !== -1 ? value : null };
+    }
+
     async function getCaptchaSettings() {
       var stored = await get([KEY.CAPTCHA_ENABLED, KEY.CAPTCHA_API_KEY]);
       return {
@@ -1067,6 +1081,13 @@
             }
             work = getElementCacheConfig().then(function(result) { return Object.assign({ ok: true }, result); });
             break;
+          case MESSAGE.UI_LANGUAGE_GET:
+            if (!hasExactOwnKeys(message, ['action'])) {
+              sendResponse({ ok: false, code: 'INVALID_MESSAGE' });
+              return false;
+            }
+            work = getUiLanguageConfig().then(function(result) { return Object.assign({ ok: true }, result); });
+            break;
           default:
             sendResponse({ ok: false, code: 'UNKNOWN_ACTION' });
             return false;
@@ -1095,6 +1116,7 @@
       clearAutomationSessions: clearAutomationSessions,
       loadAutomationDOMSnapshots: loadAutomationDOMSnapshots,
       getElementCacheConfig: getElementCacheConfig,
+      getUiLanguageConfig: getUiLanguageConfig,
       getCaptchaSettings: getCaptchaSettings,
       subscribeElementCacheConfig: subscribeElementCacheConfig,
       createMessageHandler: createMessageHandler

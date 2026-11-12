@@ -79,7 +79,8 @@ function fsbHandlesTrustedFeatureAction(action) {
     action === vocabulary.AUTOMATION_SESSION_UPDATE_OUTCOME ||
     action === vocabulary.AUTOMATION_SESSION_PRUNE_MCP ||
     action === vocabulary.AUTOMATION_DOM_SNAPSHOT_LOAD ||
-    action === vocabulary.ELEMENT_CACHE_GET;
+    action === vocabulary.ELEMENT_CACHE_GET ||
+    action === vocabulary.UI_LANGUAGE_GET;
 }
 
 function fsbDispatchTrustedFeatureMessage(request, sender, sendResponse) {
@@ -115,6 +116,38 @@ Promise.resolve(fsbTrustedLocalBootPromise).then(function(store) {
     });
   });
 });
+
+// Content scripts cannot read storage.local after the trusted boot, so every
+// tab is told when the saved FSB language changes. The listener is
+// registered at top level, so a change made while the worker sleeps still
+// wakes it.
+function fsbBroadcastUiLanguage() {
+  Promise.resolve(fsbTrustedLocalBootPromise).then(function(store) {
+    return store && typeof store.getUiLanguageConfig === 'function' ? store.getUiLanguageConfig() : null;
+  }).then(function(config) {
+    var vocabulary = globalThis.FsbTrustedLocalFeatureStore && globalThis.FsbTrustedLocalFeatureStore.MESSAGE;
+    if (!config || !vocabulary || !vocabulary.UI_LANGUAGE_CHANGED) return;
+    if (!chrome.tabs || typeof chrome.tabs.query !== 'function' || typeof chrome.tabs.sendMessage !== 'function') return;
+    chrome.tabs.query({}, function(tabs) {
+      (Array.isArray(tabs) ? tabs : []).forEach(function(tab) {
+        if (!tab || !Number.isInteger(tab.id) || tab.id <= 0) return;
+        chrome.tabs.sendMessage(tab.id, {
+          action: vocabulary.UI_LANGUAGE_CHANGED,
+          locale: config.locale
+        }, function() {
+          void chrome.runtime.lastError;
+        });
+      });
+    });
+  }, function() {});
+}
+
+if (chrome.storage && chrome.storage.onChanged && typeof chrome.storage.onChanged.addListener === 'function') {
+  chrome.storage.onChanged.addListener(function(changes, areaName) {
+    if (areaName !== 'local' || !changes || !Object.prototype.hasOwnProperty.call(changes, 'fsbUiLocale')) return;
+    fsbBroadcastUiLanguage();
+  });
+}
 
 // Import configuration and AI integration modules
 // Phase 269 / v0.9.69: install-identity.js MUST load FIRST so that any
