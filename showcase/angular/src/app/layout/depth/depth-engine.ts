@@ -107,6 +107,13 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
   let swallow = false;
   let swallowEnd = 0;
   let lastEvt = 0;
+  // Shape of the current swipe's deltas: how far it peaked, whether it has ebbed
+  // (its momentum tail), and the run of rising or falling steps since.
+  let peak = 0;
+  let ebbed = false;
+  let rising = 0;
+  let riseFrom = 0;
+  let falling = 0;
   const ambients: Ambient[] = Array.from(stage.querySelectorAll<HTMLElement>('[data-depth-ambient]')).map((el) => {
     const r = (el.getAttribute('data-depth-ambient') || '0,0').split(',');
     return { el, a: parseFloat(r[0]), b: parseFloat(r[1]), o: -1 };
@@ -569,10 +576,12 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
     target = anchor;
     kick();
   }
-  function settle(): void {
+  // Ends a gesture on a plane. After a pause the stragglers that follow are eaten;
+  // when a fresh swipe is what ended it, that swipe is new input and goes through.
+  function settle(eat = true): void {
     gesturing = false;
-    swallow = true;
-    swallowEnd = win.performance.now() + SWALLOW_MS;
+    swallow = eat;
+    if (eat) swallowEnd = win.performance.now() + SWALLOW_MS;
     const delta = target - anchor;
     go(Math.abs(delta) < 0.1 ? anchor : anchor + (delta > 0 ? 1 : -1));
   }
@@ -611,22 +620,44 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
     if (Math.abs(e.deltaX) > Math.abs(dy)) return;
     win.clearTimeout(idle);
     idle = win.setTimeout(onIdle, 160);
-    const L = layers[Math.round(target)];
     const ad = Math.abs(dy);
     const prev = lastAbs;
     const now = win.performance.now();
     const gap = now - lastEvt;
     lastAbs = ad;
     lastEvt = now;
-    // One physical swipe is a push plus its momentum tail. A tail only decays; a new
-    // push makes the deltas jump up again (or follows a pause).
-    const cont = gap < 400 && !(ad > prev * 1.5 + 4);
-    if (!cont) {
+    // One physical swipe is a push plus its momentum tail: the deltas climb, then
+    // only ebb. A new push follows a pause, makes them jump, or (a fresh swipe landing
+    // on a tail that is still running) makes them climb again after they have ebbed.
+    if (ad < prev) {
+      falling++;
+      rising = 0;
+    } else if (ad > prev) {
+      if (!rising) riseFrom = prev;
+      rising++;
+      falling = 0;
+    }
+    if (falling >= 3 || ad <= peak * 0.4) ebbed = true;
+    const fresh = gap >= 400 || ad > prev * 1.5 + 4 || (ebbed && rising >= 2 && ad - riseFrom >= 2);
+    const cont = !fresh;
+    if (fresh) {
+      // Only a swipe that follows an ebbed one closes an open gesture: a push that
+      // jumps while it is still building is the same swipe.
+      const closes = gesturing && ebbed;
+      peak = ad;
+      ebbed = false;
+      falling = 0;
+      rising = 0;
       scrolled = false;
       edgeT = 0;
       steady = 0;
       swallow = false;
-    }
+      // The last swipe's momentum can keep its gesture open, and a gesture never goes
+      // past one plane. A fresh swipe closes it where the camera got to, then carries
+      // on from there (to the next plane, or scrolling inside this one).
+      if (closes) settle(false);
+    } else peak = Math.max(peak, ad);
+    const L = layers[Math.round(target)];
     // The rest of the swipe that just changed planes is eaten, so it cannot scroll or
     // skip the next one. Only its stragglers, though: they arrive right after the snap
     // and keep decaying. Anything later, or growing again, is new input, so a wheel

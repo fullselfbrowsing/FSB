@@ -156,7 +156,8 @@ describe('createDepthEngine', () => {
         await pause(250);
       }
       await settle(2);
-    });
+      expect(activeIndex()).toBe(2);
+    }, 10000);
 
     it('scrolls a plane that scrolls inside itself while the wheel rolls on', async () => {
       build([120, window.innerHeight * 8, 120]);
@@ -166,7 +167,7 @@ describe('createDepthEngine', () => {
       }
       expect(activeIndex()).toBe(1);
       expect(layers()[1].scrollTop).toBeGreaterThan(0);
-    });
+    }, 10000);
 
     // A trackpad swipe begun right after the snap ramps up gently, never in one jump.
     it('takes a fresh swipe that starts right after a plane snaps into place', async () => {
@@ -175,7 +176,33 @@ describe('createDepthEngine', () => {
       await pause(200);
       await burst([10, 14, 19, 25, 32, 40, 50, 62]);
       await settle(2);
-    });
+      expect(activeIndex()).toBe(2);
+    }, 10000);
+
+    // Trackpad swipes: a push that climbs, then a momentum tail that ebbs.
+    const swipe = (peak: number, until = 1): number[] => {
+      const steps = [2, 4, 8, 14, 20, peak];
+      for (let d = peak * 0.93; d >= until; d *= 0.93) steps.push(Math.round(d));
+      return steps;
+    };
+
+    it('takes a swipe that lands on the last one\'s momentum before it has died out', async () => {
+      build([120, 120, 120]);
+      await burst(swipe(28, 3));
+      await burst(swipe(28));
+      await settle(2);
+      expect(activeIndex()).toBe(2);
+    }, 10000);
+
+    // The push jumps from 20 to 45 on the way up, which must not split it in two.
+    it('moves one plane for one swipe, however long its momentum runs', async () => {
+      build([120, 120, 120]);
+      await burst(swipe(45, 0.5).map((d) => Math.max(1, d)));
+      await settle(1);
+      await pause(400);
+      expect(activeIndex()).toBe(1);
+      expect(seen).not.toContain(2);
+    }, 10000);
 
     it('still eats the momentum of the swipe that changed planes', async () => {
       build([120, 120, 120]);
@@ -186,7 +213,7 @@ describe('createDepthEngine', () => {
       await pause(500);
       expect(activeIndex()).toBe(1);
       expect(seen).not.toContain(2);
-    });
+    }, 10000);
   });
 
   it('cleans up after itself', () => {
