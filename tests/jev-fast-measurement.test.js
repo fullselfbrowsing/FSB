@@ -60,6 +60,7 @@ const ROOT = path.join(__dirname, '..');
 const LOGGER_PATH = path.join(ROOT, 'extension', 'utils', 'automation-logger.js');
 const LOGGER_SOURCE = fs.readFileSync(LOGGER_PATH, 'utf8');
 const LOGGER_GOLDEN = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'jev-fast-logger-off-session.json'), 'utf8'));
+const TRUSTED_STORE = require(path.join(ROOT, 'extension', 'utils', 'trusted-local-feature-store.js'));
 const DISPATCHER_PATH = path.join(ROOT, 'extension', 'ws', 'mcp-tool-dispatcher.js');
 const DISPATCHER_SOURCE = fs.readFileSync(DISPATCHER_PATH, 'utf8');
 const DETAIL_GOLDEN = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'jev-fast-session-detail-off.json'), 'utf8'));
@@ -162,9 +163,20 @@ function fixedDate(clock) {
   return FixedDate;
 }
 
-function loadLogger(storage, clock) {
+// Session saves go through the background-only trusted store, as in the
+// extension: the logger's VM gets runtime messaging only, and the store holds
+// the storage area.
+// options.rawLoad hands each stored record back as written, without the
+// store's field list, for the dispatcher cases below.
+function loadLogger(storage, clock, options = {}) {
+  const chrome = { runtime: { id: 'test-extension' }, storage: { local: storage } };
+  const trusted = TRUSTED_STORE.create({ chrome, now: () => clock.t });
+  const store = options.rawLoad ? Object.assign({}, trusted, {
+    loadAutomationSession: async (sessionId) => ({ session: clone(storage.store.fsbSessionLogs[sessionId] || null) })
+  }) : trusted;
   const sandbox = {
-    chrome: { runtime: { id: 'test-extension' }, storage: { local: storage } },
+    chrome: { runtime: chrome.runtime },
+    fsbTrustedLocalFeatureStore: store,
     console: { log() {}, warn() {}, error() {}, info() {}, debug() {} },
     setTimeout() { return 1; },
     clearTimeout() {},
@@ -389,14 +401,30 @@ function containsMark(value) {
 // Logger cases (Task 1)
 // ---------------------------------------------------------------------------
 
+// The goldens were captured before session saves moved into the trusted
+// store, and they stay byte-identical. The store keeps a fixed set of fields
+// (no action params or result objects, its own key order, domSnapshotCount),
+// so the logger's output is compared with each golden record as that store
+// keeps it. A key the logger adds for an off session (a jevMeasurement block,
+// a decisionSource marker) survives the store and still fails the comparison.
+const STORED_GOLDEN = {};
+async function storeGolden(state, at) {
+  const storage = makeStorage({ fsbSessionLogs: {}, fsbSessionIndex: [] });
+  const store = TRUSTED_STORE.create({ chrome: { runtime: { id: 'test-extension' }, storage: { local: storage } }, now: () => at });
+  await store.saveAutomationSession(state.record.id, clone(state.record), []);
+  return storedState(storage, state.record.id);
+}
+
 async function loggerGoldenCases() {
-  section('logger: a fast-mode-off session is stored byte-identically to the pre-edit golden');
+  STORED_GOLDEN.newMode = await storeGolden(LOGGER_GOLDEN.newMode, LOGGER_GOLDEN.input.firstSave.at);
+  STORED_GOLDEN.updateMode = await storeGolden(LOGGER_GOLDEN.updateMode, LOGGER_GOLDEN.input.secondSave.at);
+  section('logger: a fast-mode-off session is stored exactly as the pre-edit golden, as the trusted store keeps it');
   const run = await replayGolden();
   check(run.savedNew === true && run.savedUpdate === true, 'both golden saves succeed');
-  check(JSON.stringify(run.newMode, null, 2) === JSON.stringify(LOGGER_GOLDEN.newMode, null, 2),
-    'new mode: the stored record and index entry equal the golden byte for byte' + (sameJson(run.newMode, LOGGER_GOLDEN.newMode) ? '' : ' (' + firstDifference(run.newMode, LOGGER_GOLDEN.newMode) + ')'));
-  check(JSON.stringify(run.updateMode, null, 2) === JSON.stringify(LOGGER_GOLDEN.updateMode, null, 2),
-    'update mode: the stored record and index entry equal the golden byte for byte' + (sameJson(run.updateMode, LOGGER_GOLDEN.updateMode) ? '' : ' (' + firstDifference(run.updateMode, LOGGER_GOLDEN.updateMode) + ')'));
+  check(JSON.stringify(run.newMode, null, 2) === JSON.stringify(STORED_GOLDEN.newMode, null, 2),
+    'new mode: the stored record and index entry equal the golden byte for byte' + (sameJson(run.newMode, STORED_GOLDEN.newMode) ? '' : ' (' + firstDifference(run.newMode, STORED_GOLDEN.newMode) + ')'));
+  check(JSON.stringify(run.updateMode, null, 2) === JSON.stringify(STORED_GOLDEN.updateMode, null, 2),
+    'update mode: the stored record and index entry equal the golden byte for byte' + (sameJson(run.updateMode, STORED_GOLDEN.updateMode) ? '' : ' (' + firstDifference(run.updateMode, STORED_GOLDEN.updateMode) + ')'));
   check(!hasOwn(run.updateMode.record, 'jevMeasurement') && !hasOwn(run.newMode.record, 'jevMeasurement'),
     'an off session stores no jevMeasurement key');
 
@@ -407,11 +435,11 @@ async function loggerGoldenCases() {
     agentState: Object.assign({}, data.agentState, { jevFast: { command: 1, steps: 0, calls: 0, jevMs: 0, latched: null } }),
     jevMeasurement: undefined
   }));
-  check(sameJson(quiet.newMode, LOGGER_GOLDEN.newMode) && sameJson(quiet.updateMode, LOGGER_GOLDEN.updateMode),
+  check(sameJson(quiet.newMode, STORED_GOLDEN.newMode) && sameJson(quiet.updateMode, STORED_GOLDEN.updateMode),
     'fastMode, _fastPath and agentState.jevFast never reach the stored record or index');
   for (const value of [null, [], 'block', 42, true]) {
     const odd = await replayGolden((data) => Object.assign(data, { jevMeasurement: clone(value) }));
-    check(sameJson(odd.newMode, LOGGER_GOLDEN.newMode) && sameJson(odd.updateMode, LOGGER_GOLDEN.updateMode),
+    check(sameJson(odd.newMode, STORED_GOLDEN.newMode) && sameJson(odd.updateMode, STORED_GOLDEN.updateMode),
       'a jevMeasurement of ' + JSON.stringify(value) + ' is not an object and is not persisted');
   }
 }
@@ -427,15 +455,15 @@ async function loggerPersistCases() {
     'every persisted attempt holds exactly the producer keys, in producer order');
   check(persisted.commands.length === 2 && persisted.commands.every((c) => Object.keys(c).join(',') === COMMAND_KEYS.join(',')),
     'every persisted command holds exactly the producer keys, in producer order');
-  check(sameJson(withoutKey(run.newMode.record, 'jevMeasurement'), LOGGER_GOLDEN.newMode.record),
+  check(sameJson(withoutKey(run.newMode.record, 'jevMeasurement'), STORED_GOLDEN.newMode.record),
     'apart from the block the new-mode record is the golden record (cost, tokens, timing and summary unchanged)');
-  check(sameJson(run.newMode.index, LOGGER_GOLDEN.newMode.index), 'the index entry carries no measurement');
+  check(sameJson(run.newMode.index, STORED_GOLDEN.newMode.index), 'the index entry carries no measurement');
   check(deepEqual(run.updateMode.record.jevMeasurement, block),
     'update mode keeps the stored block when the new session has none');
-  check(sameJson(withoutKey(run.updateMode.record, 'jevMeasurement'), LOGGER_GOLDEN.updateMode.record),
+  check(sameJson(withoutKey(run.updateMode.record, 'jevMeasurement'), STORED_GOLDEN.updateMode.record),
     'apart from the block the update-mode record is the golden record');
-  check(run.updateMode.record.totalCost === LOGGER_GOLDEN.updateMode.record.totalCost &&
-    run.updateMode.record.totalCostBasis === LOGGER_GOLDEN.updateMode.record.totalCostBasis,
+  check(run.updateMode.record.totalCost === STORED_GOLDEN.updateMode.record.totalCost &&
+    run.updateMode.record.totalCostBasis === STORED_GOLDEN.updateMode.record.totalCostBasis,
     'Jev cost is never folded into totalCost or its basis (D-23)');
 
   const replaced = sampleBlock();
@@ -484,7 +512,7 @@ async function loggerMarkerCases() {
     return data;
   };
   const run = await replayGolden(mark);
-  for (const [label, state, golden] of [['new', run.newMode, LOGGER_GOLDEN.newMode], ['update', run.updateMode, LOGGER_GOLDEN.updateMode]]) {
+  for (const [label, state, golden] of [['new', run.newMode, STORED_GOLDEN.newMode], ['update', run.updateMode, STORED_GOLDEN.updateMode]]) {
     const history = state.record.actionHistory;
     const expected = clone(golden.record.actionHistory);
     expected[1].decisionSource = 'jev';
@@ -553,12 +581,15 @@ function loadDispatcher(automationLogger, activeSessionEntries) {
 }
 
 /** A real logger over storage holding these records. */
+// The dispatcher cases test the dispatcher's own projection, so a record
+// reaches it exactly as stored, without another pass through the trusted
+// store (the logger cases cover what the store keeps).
 function storeWith(records) {
   const fsbSessionLogs = {};
   for (const record of records) fsbSessionLogs[record.id] = clone(record);
   const clock = { t: 1790726420000 };
   const storage = makeStorage({ fsbSessionLogs, fsbSessionIndex: [] });
-  return { storage, clock, logger: loadLogger(storage, clock) };
+  return { storage, clock, logger: loadLogger(storage, clock, { rawLoad: true }) };
 }
 
 function detailOf(dispatcher, sessionId) {
@@ -623,9 +654,12 @@ async function dispatcherGoldenCases() {
   check(!hasOwn(outputs.stored.session, 'jevMeasurement') && !hasOwn(outputs.inFlight.session, 'jevMeasurement'),
     'an off session has no jevMeasurement key');
 
+  // End to end, the save passes through the trusted store, so the read-back
+  // equals what the dispatcher shows for the golden record as the store keeps it.
   const chain = await replayGolden();
   const chained = await detailOf(loadDispatcher(chain.logger, []), chain.sid);
-  check(sameBytes(chained, goldenOutput('stored')), 'the golden input saved by the current logger reads back as the golden output');
+  const storedGoldenDetail = await detailFor([STORED_GOLDEN.updateMode.record], chain.sid);
+  check(sameBytes(chained, storedGoldenDetail), 'the golden input saved by the current logger reads back as the golden record the store keeps' + diffNote(chained, storedGoldenDetail));
 
   const quietLive = Object.assign(clone(GOLDEN_LIVE), {
     fastMode: { enabled: true, stored: true, source: null },
@@ -1067,9 +1101,11 @@ async function parityRoundTrip() {
   check(!FAST_STATE_NAMES.test(JSON.stringify(storedRecord)) && !FAST_STATE_NAMES.test(JSON.stringify(out)),
     'fastMode, _fastPath and agentState.jevFast are never stored or projected');
   const storedFast = (storedRecord.actionHistory || []).filter((a) => a.decisionSource === 'jev');
-  check(storedFast.length === 1 && storedFast[0].params && storedFast[0].params.jevHandle === 'j1' &&
+  // The trusted store keeps no action params, so the fast step is found by its
+  // marker alone and its jevHandle never reaches storage.
+  check(storedFast.length === 1 && !hasOwn(storedFast[0], 'params') &&
     (storedRecord.actionHistory || []).length === 5,
-    'the stored history keeps every action and marks only the fast step');
+    'the stored history keeps every action, marks only the fast step and stores no action params');
   const projectedHistory = (out.session && out.session.actionHistory) || [];
   check(projectedHistory.length === 5 && projectedHistory.filter((a) => a.decisionSource === 'jev').length === 1 &&
     projectedHistory[1].decisionSource === 'jev', 'get_session_detail marks only the fast step');

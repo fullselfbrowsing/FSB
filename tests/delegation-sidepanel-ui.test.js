@@ -769,8 +769,10 @@ assert.equal(sha256(htmlSource
   .replace(delegationProviderScript, '')
   .replace(nativeHostInstallScript, '')),
   // Rolled for the UI locale work: ui-locale.js and copy-exact.js scripts and
-  // data-i18n keys on static copy. No delegation control was added.
-  'cdd94600df72e6bfceb97c5ba55066ce5905bd958e8ddda8d1d142c9adc17369',
+  // data-i18n keys on static copy. Rolled again for the Skopeo control row,
+  // which sits outside the delegation surface, and again for that row's
+  // data-i18n keys. No delegation control was added.
+  'cdf4c12ccc040387ce31e4fca1d8cdcceb3b607ddf09cdd2f0cabc590b539cb8',
   'the side-panel HTML includes only the intended helpers and tab-scoped ownership treatment');
 const replayCssStart = cssSource.indexOf('.history-status.idle-closed {');
 const replayCssEnd = cssSource.indexOf('/* Phase 11 FINT-20', replayCssStart);
@@ -781,7 +783,7 @@ const delegationCssSource = cssSource.slice(0, replayCssStart) + cssSource.slice
 // the block already silenced the delegation spinner and status dot, but the
 // automation loader kept animating for users who asked it not to.
 assert.equal(sha256(delegationCssSource),
-  'db8ee02f3ed61b84b9ced7af1e9c043460b4f8fa24ba222d79e235badb058ef7',
+  '252a6ef96c275815f0ef60e6eb4feb4eb8143eb6cc48dc03096eb19557fe31b0',
   'the intentional delegated and ownership-status CSS deltas remain exact outside replay UI');
 
 {

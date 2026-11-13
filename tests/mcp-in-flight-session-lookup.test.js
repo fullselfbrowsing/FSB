@@ -982,6 +982,26 @@ async function runAutopilotUnrecordedCase() {
     legacy.usageBasis === 'unavailable', 'W1: totalCost 0 without a summary is unavailable for both bases');
 }
 
+// The trusted session store keeps a stored action's outcome as a top-level
+// success flag and drops the result object, so the projection must read it.
+async function runStoredActionSuccessCase() {
+  console.log('\n--- stored actions keep their success flag ---');
+
+  const response = await getHistorySession(autopilotSession('session_stored_success', {
+    actionHistory: [
+      { tool: 'click', timestamp: 1, success: true, logicalTab: 'primary', durationMs: null },
+      { tool: 'type', timestamp: 2, success: false, logicalTab: 'primary', durationMs: null },
+      { tool: 'scroll', timestamp: 3, result: { success: true } },
+      { tool: 'hover', timestamp: 4, result: { success: false }, success: true }
+    ]
+  }));
+  const rows = (response && response.session && response.session.actionHistory) || [];
+  assert(rows.length === 4 && rows[0].result.success === true, 'a stored success: true reads as a successful action');
+  assert(rows.length === 4 && rows[1].result.success === false, 'a stored success: false reads as a failed action');
+  assert(rows.length === 4 && rows[2].result.success === true, 'a legacy result.success still decides the outcome');
+  assert(rows.length === 4 && rows[3].result.success === false, 'result.success wins over a top-level flag');
+}
+
 async function runActionDurationAllowlistCase() {
   console.log('\n--- action allowlist: measured durationMs and valid timing only ---');
 
@@ -1260,6 +1280,7 @@ async function run() {
   await runJournalCallIntervalCase();
   await runAutopilotMeasurementCase();
   await runAutopilotUnrecordedCase();
+  await runStoredActionSuccessCase();
   await runActionDurationAllowlistCase();
   await runLegacyMcpMeasurementCase();
   await runLegacyCostBasisCases();

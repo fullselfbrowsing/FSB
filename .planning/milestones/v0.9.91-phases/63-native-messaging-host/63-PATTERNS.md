@@ -1,7 +1,7 @@
 # Phase 63: Native-Messaging Host — Pattern Map
 
-**Mapped:** 2026-07-16  
-**Inputs:** `63-CONTEXT.md`, `63-RESEARCH.md`, `63-UI-SPEC.md`, and current repository source/tests  
+**Mapped:** 2026-07-16
+**Inputs:** `63-CONTEXT.md`, `63-RESEARCH.md`, `63-UI-SPEC.md`, and current repository source/tests
 **Evidence boundary:** repository inspection only; all genuine OS/browser/native/accessibility UAT remains pending `human_needed` for the milestone-end sweep
 
 ## Planning Verdict

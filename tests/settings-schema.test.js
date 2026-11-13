@@ -144,6 +144,9 @@ const CONFIG_DEFAULTS_SNAPSHOT = {
   serverUrl: 'https://fsb-server.fly.dev',
   serverHashKey: '',
   serverSyncEnabled: false,
+  // Skopeo's truth evaluation stays closed until it is configured.
+  skopeoTruthTimezoneBinding: null,
+  skopeoTruthCalendars: [],
 };
 
 console.log('\n--- exports ---');

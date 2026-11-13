@@ -206,6 +206,37 @@ const REFINEMENT_ROOT_TEST_COMMANDS = Object.freeze([
   'node scripts/verify-extension-i18n.mjs',
   'node scripts/verify-extension-copy.mjs',
   'node tests/benchmark-assets-parity.test.js',
+  'node tests/skopeo-hud-locale-coverage.test.js',
+]);
+
+const SKOPEO_ROOT_TEST_COMMANDS = Object.freeze([
+  'node tests/skopeo-corpus-schema.test.js',
+  'node tests/skopeo-corpus-store.test.js',
+  'node tests/skopeo-drive-corpus-transport.test.js',
+  'node tests/skopeo-drive-authority.test.js',
+  'node tests/skopeo-drive-reconciler.test.js',
+  'node tests/skopeo-corpus-runtime.test.js',
+  'npm run test:skopeo-graph-evals',
+  'npm run test:skopeo-truth-evals',
+  'npm run test:skopeo-hud-evals',
+  'npm run test:skopeo-ask-evals',
+  'npm run test:skopeo-release-evals',
+  'node tests/skopeo-profile-schema.test.js',
+  'node tests/skopeo-profile-coverage.test.js',
+  'node tests/skopeo-capability-projection.test.js',
+  'node tests/skopeo-app-context-resolver.test.js',
+  'node tests/skopeo-adaptive-composer.test.js',
+  'node tests/skopeo-genre-adapters.test.js',
+  'node tests/skopeo-consequence-gate.test.js',
+  'node tests/skopeo-catalog-runtime.test.js',
+  'node tests/skopeo-context-router.test.js',
+  'node tests/skopeo-anchor-registry.test.js',
+  'node tests/skopeo-session-lifecycle.test.js',
+  'node tests/skopeo-shell-contract.test.js',
+  'node tests/skopeo-sidepanel-command.test.js',
+  'node tests/skopeo-accessibility.test.js',
+  'node tests/skopeo-gap-closure.test.js',
+  'node tests/skopeo-browser-contract.test.js',
 ]);
 
 const PHASE64_RETAINED_ROOT_COMMANDS = Object.freeze([
@@ -2425,6 +2456,12 @@ check(planSources[7].includes('  - "61-07"'), 'Plan 08 evidence gate follows the
 console.log('\n--- serial root-chain inclusion and prior-gate preservation ---');
 
 const rootCommands = packageJson.scripts.test.split(' && ');
+check(SKOPEO_ROOT_TEST_COMMANDS.length === 27,
+  'the merge declares exactly 27 Skopeo-only root test steps');
+for (const command of SKOPEO_ROOT_TEST_COMMANDS) {
+  check(rootCommands.filter((candidate) => candidate === command).length === 1,
+    `${command} appears exactly once in the merged serial root chain`);
+}
 for (const command of REFINEMENT_ROOT_TEST_COMMANDS) {
   check(rootCommands.filter((candidate) => candidate === command).length === 1,
     `${command} appears exactly once in the refinements root chain`);
@@ -2440,6 +2477,7 @@ const prePhase61Commands = rootCommands.filter((command) => (
   && !PHASE64_NEW_ROOT_COMMANDS.includes(command)
   && !PHASE65_NEW_ROOT_COMMANDS.includes(command)
   && !REFINEMENT_ROOT_TEST_COMMANDS.includes(command)
+  && !SKOPEO_ROOT_TEST_COMMANDS.includes(command)
 ));
 check(digest(prePhase61Commands.join(' && ')) === PRE_PHASE61_ROOT_TEST_HASH,
   'removing the six new Phase 61 gates reproduces the exact prior serial chain');
@@ -3187,6 +3225,7 @@ const prePhase62Commands = rootCommands.filter((command) => (
   && !PHASE64_NEW_ROOT_COMMANDS.includes(command)
   && !PHASE65_NEW_ROOT_COMMANDS.includes(command)
   && !REFINEMENT_ROOT_TEST_COMMANDS.includes(command)
+  && !SKOPEO_ROOT_TEST_COMMANDS.includes(command)
 ));
 check(digest(prePhase62Commands.join(' && ')) === PRE_PHASE62_ROOT_TEST_HASH,
   'removing the three Phase 62 gates reproduces the exact prior serial chain');

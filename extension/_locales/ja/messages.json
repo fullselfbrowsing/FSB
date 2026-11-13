@@ -4696,5 +4696,1834 @@
   },
   "panel_01003693b8": {
     "message": "このパネルの外でプロバイダーが変更されました。モデルを更新すると、ほかのモデルも一覧に表示されます。"
+  },
+  "copy_1ca28d1918": {
+    "message": "このタブではオフ"
+  },
+  "copy_dc069f34dd": {
+    "message": "Skopeo をオンにする"
+  },
+  "copy_bd47072fe5": {
+    "message": "Skopeo をオフにする"
+  },
+  "copy_14893d4a92": {
+    "message": "Chrome のショートカット設定を開く"
+  },
+  "copy_f262cf94ab": {
+    "message": "ショートカット未設定 · Chrome のショートカットで設定"
+  },
+  "copy_b7fb9f7ede": {
+    "message": "このタブの Skopeo"
+  },
+  "copy_94b2c61b4b": {
+    "message": "Esc Esc: このタブで Skopeo をオフにする"
+  },
+  "copy_3432134e77": {
+    "message": "このレイアウトでは Skopeo を安全に開けません。"
+  },
+  "copy_48ba5c84b7": {
+    "message": "ページを縮小するかサイズを変更してから、もう一度試してください。"
+  },
+  "copy_99536455cd": {
+    "message": "このタブで起動しています…"
+  },
+  "copy_e656694252": {
+    "message": "オン · アンビエント"
+  },
+  "copy_f0bbe1ab9e": {
+    "message": "このページでは Skopeo を実行できません。"
+  },
+  "copy_caf87bac3d": {
+    "message": "通常のウェブページを開いてから、もう一度試してください。"
+  },
+  "copy_6e4dce91aa": {
+    "message": "Skopeo を起動できませんでした。"
+  },
+  "copy_f4d25b46e3": {
+    "message": "ページには何も追加されていません。もう一度試してください。"
+  },
+  "copy_595462a32d": {
+    "message": "ショートカット: $SHORTCUT$ · ショートカットを変更",
+    "placeholders": {
+      "shortcut": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_51ac158080": {
+    "message": "Skopeo · $NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_c5386756c1": {
+    "message": "Skopeo"
+  },
+  "copy_97cd52dc76": {
+    "message": "$NOUN$ · 準備完了 $COUNT$ 件",
+    "placeholders": {
+      "noun": {
+        "content": "$1"
+      },
+      "count": {
+        "content": "$2"
+      }
+    }
+  },
+  "copy_d79610c6ef": {
+    "message": "$NAME$ の操作を開く",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_92b4c3d0cb": {
+    "message": "Skopeo の操作を開く"
+  },
+  "copy_ed1caa4112": {
+    "message": "$NAME$ の Skopeo",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_7841c1bf54": {
+    "message": "Skopeo の操作"
+  },
+  "copy_6148cdb943": {
+    "message": "Skopeo アンビエントの状態"
+  },
+  "copy_1e24c5b560": {
+    "message": "Skopeo アンカー表示の状態"
+  },
+  "copy_38db0927c2": {
+    "message": "文書: $LABEL$",
+    "placeholders": {
+      "label": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_d3db487846": {
+    "message": "文書「$LABEL$」の操作を開く",
+    "placeholders": {
+      "label": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_e1917bc332": {
+    "message": "Skopeo はこの文書を検証できなくなりました。エンティティの操作は削除されました。"
+  },
+  "copy_37d184a6fc": {
+    "message": "文書に対する検証済みの操作と機能の準備状況です。"
+  },
+  "copy_7122183da5": {
+    "message": "メッセージ: $LABEL$",
+    "placeholders": {
+      "label": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_a60a734727": {
+    "message": "メッセージ「$LABEL$」の操作を開く",
+    "placeholders": {
+      "label": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_38acf9866a": {
+    "message": "Skopeo はこのメッセージを検証できなくなりました。エンティティの操作は削除されました。"
+  },
+  "copy_5910ceb0ae": {
+    "message": "メッセージに対する検証済みの操作と機能の準備状況です。"
+  },
+  "copy_bd4f74926f": {
+    "message": "レコード: $LABEL$",
+    "placeholders": {
+      "label": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_05c0855046": {
+    "message": "レコード「$LABEL$」の操作を開く",
+    "placeholders": {
+      "label": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_5833f2802f": {
+    "message": "Skopeo はこのレコードを検証できなくなりました。エンティティの操作は削除されました。"
+  },
+  "copy_23ef7f752f": {
+    "message": "レコードに対する検証済みの操作と機能の準備状況です。"
+  },
+  "copy_662322c323": {
+    "message": "項目: $LABEL$",
+    "placeholders": {
+      "label": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_28c4642f77": {
+    "message": "項目「$LABEL$」の操作を開く",
+    "placeholders": {
+      "label": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_7f5e2bd8af": {
+    "message": "Skopeo はこの項目を検証できなくなりました。エンティティの操作は削除されました。"
+  },
+  "copy_f7ff338d0d": {
+    "message": "項目に対する検証済みの操作と機能の準備状況です。"
+  },
+  "copy_ae9331cbba": {
+    "message": "対象: $LABEL$",
+    "placeholders": {
+      "label": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_eef8a2312a": {
+    "message": "対象「$LABEL$」の操作を開く",
+    "placeholders": {
+      "label": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_683131c44a": {
+    "message": "Skopeo はこの対象を検証できなくなりました。エンティティの操作は削除されました。"
+  },
+  "copy_a5ad15c91c": {
+    "message": "対象に対する検証済みの操作と機能の準備状況です。"
+  },
+  "copy_65f47ec845": {
+    "message": "$NAME$ · $NOUN$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      },
+      "noun": {
+        "content": "$2"
+      }
+    }
+  },
+  "copy_e481db9b9c": {
+    "message": "$NAME$ の操作",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_8e368ff718": {
+    "message": "$TITLE$ を開きました。",
+    "placeholders": {
+      "title": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_2c02b0518c": {
+    "message": "$NAME$ の概要に戻る",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_2c011b72ce": {
+    "message": "Skopeo の概要に戻る"
+  },
+  "copy_6fe1f3a9b3": {
+    "message": "この$NOUN$に対する検証済みの操作と機能の準備状況です。",
+    "placeholders": {
+      "noun": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_be040e47fb": {
+    "message": "ここには検証済みの操作がありません"
+  },
+  "copy_76af34b916": {
+    "message": "Skopeo は、この$NOUN$で準備完了の機能を見つけられませんでした。タスクの視点を変えるか、別の対応画面を開いてください。",
+    "placeholders": {
+      "noun": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_8e5ff104da": {
+    "message": "このタブで Skopeo をオフにする"
+  },
+  "copy_89f808c350": {
+    "message": "$LABEL$ がオンです。",
+    "placeholders": {
+      "label": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_9199b6b795": {
+    "message": "$LABEL$ の概要です。",
+    "placeholders": {
+      "label": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_a172cedcae": {
+    "message": "アプリ"
+  },
+  "copy_0d04bfeb7d": {
+    "message": "アプリ"
+  },
+  "copy_84393add8c": {
+    "message": "記事"
+  },
+  "copy_29d9492251": {
+    "message": "記事"
+  },
+  "copy_66cd9688a2": {
+    "message": "ダッシュボード"
+  },
+  "copy_67b6964686": {
+    "message": "ダッシュボード"
+  },
+  "copy_43cc23fa52": {
+    "message": "文書"
+  },
+  "copy_d6bd8c0aee": {
+    "message": "文書"
+  },
+  "copy_7062520c5a": {
+    "message": "ドライブ"
+  },
+  "copy_6312b4b9ba": {
+    "message": "ドライブ"
+  },
+  "copy_c8bc2586cd": {
+    "message": "フィード"
+  },
+  "copy_396c3cb18f": {
+    "message": "フィード"
+  },
+  "copy_872491a30d": {
+    "message": "レジストリ"
+  },
+  "copy_05c2e32770": {
+    "message": "レジストリ"
+  },
+  "copy_e2885f2bbe": {
+    "message": "リポジトリ"
+  },
+  "copy_13d6ff07b8": {
+    "message": "リポジトリ"
+  },
+  "copy_824d80d719": {
+    "message": "ストア"
+  },
+  "copy_ee7da936b5": {
+    "message": "ストア"
+  },
+  "copy_21a3230e03": {
+    "message": "ワークスペース"
+  },
+  "copy_87bb59ba2f": {
+    "message": "ワークスペース"
+  },
+  "copy_2bcb43cbc8": {
+    "message": "画面"
+  },
+  "copy_dcc839a401": {
+    "message": "画面"
+  },
+  "copy_346c78df50": {
+    "message": "$GROUP$ · データを変更",
+    "placeholders": {
+      "group": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_ad0a2a84e2": {
+    "message": "$GROUP$ · 破壊的",
+    "placeholders": {
+      "group": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_9460f16ac9": {
+    "message": "機能"
+  },
+  "copy_f97e9da0e3": {
+    "message": "その他"
+  },
+  "copy_64002843f9": {
+    "message": "パラメーター $COUNT$ 個",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_9a5ac573ff": {
+    "message": "パラメーター $COUNT$ 個",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_8aacf86da7": {
+    "message": "利用できない操作（$COUNT$）",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_6b10cd5f05": {
+    "message": "安全のため利用不可"
+  },
+  "copy_b5d74ac3b7": {
+    "message": "実行経路は未検証です。"
+  },
+  "copy_dec64a50f3": {
+    "message": "ポリシーによりブロック"
+  },
+  "copy_f0ea600280": {
+    "message": "続行する前に、該当するポリシーを確認してください。"
+  },
+  "copy_081db50d93": {
+    "message": "接続が必要"
+  },
+  "copy_c93390b118": {
+    "message": "続行する前に、信頼できる接続設定を使用してください。"
+  },
+  "copy_3dddf7d417": {
+    "message": "検証が必要"
+  },
+  "copy_64bfb348a7": {
+    "message": "この機能には、現時点でのライブ検証が必要です。"
+  },
+  "copy_e1faf34f65": {
+    "message": "学習待ち"
+  },
+  "copy_252fc572d1": {
+    "message": "学習が終わるまで、利用できる操作はありません。"
+  },
+  "copy_9d2bde300d": {
+    "message": "機能の検出待ち"
+  },
+  "copy_8191a51a82": {
+    "message": "検証済みの操作はまだありません。"
+  },
+  "copy_a11dfc13db": {
+    "message": "この画面で利用できる検証済みの操作はありません。"
+  },
+  "copy_89a21132ff": {
+    "message": "この画面には非対応"
+  },
+  "copy_9c9877e9f7": {
+    "message": "続けるには、別の対応画面を開いてください。"
+  },
+  "copy_2a78025de6": {
+    "message": "選択してください"
+  },
+  "copy_27320771d7": {
+    "message": "強調表示された入力欄を確認してください。"
+  },
+  "copy_09dda3ef8c": {
+    "message": "Skopeo はこの画面を検証できません。ページは変更されていません。別の画面を開くか、Skopeo をオフにしてください。"
+  },
+  "copy_abd21a1c4f": {
+    "message": "Skopeo はまだこのアプリに対応していません。ページには何も追加されていません。Skopeo をオフにするか、対応アプリを開いてください。"
+  },
+  "copy_388daeb09e": {
+    "message": "$ACTION$ を実行しています。",
+    "placeholders": {
+      "action": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_346cc980b6": {
+    "message": "選択した操作を実行しています。"
+  },
+  "copy_7eeab708af": {
+    "message": "$ACTION$ を完了できませんでした。$RECOVERY$",
+    "placeholders": {
+      "action": {
+        "content": "$1"
+      },
+      "recovery": {
+        "content": "$2"
+      }
+    }
+  },
+  "copy_4cf3540cdd": {
+    "message": "操作を完了できませんでした。対象を確認して、操作をもう一度試してください。"
+  },
+  "copy_70fb1ff02e": {
+    "message": "対象を確認して、操作をもう一度試してください。"
+  },
+  "copy_30199459dd": {
+    "message": "Skopeo は確認画面を完全には表示できませんでした。操作を確認して、もう一度試してください。"
+  },
+  "copy_dace1bf51c": {
+    "message": "Skopeo の結果"
+  },
+  "copy_3a2052a3f1": {
+    "message": "Skopeo の結果を更新しました。"
+  },
+  "copy_c947bd1159": {
+    "message": "$N$ 行目",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_db1d829fd5": {
+    "message": "$HEADING$ · $N$ 行目",
+    "placeholders": {
+      "heading": {
+        "content": "$1"
+      },
+      "n": {
+        "content": "$2"
+      }
+    }
+  },
+  "copy_f412b71c54": {
+    "message": "結果の詳細"
+  },
+  "copy_219c4a6c86": {
+    "message": "結果"
+  },
+  "copy_6e7d50e84f": {
+    "message": "結果"
+  },
+  "copy_9e893cb1f0": {
+    "message": "項目 $N$",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_1f53883d72": {
+    "message": "結果: $VALUE$",
+    "placeholders": {
+      "value": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_e079d88e1c": {
+    "message": "読み取り完了"
+  },
+  "copy_c4a0771419": {
+    "message": "選択した読み取りは機能ルーター経由で完了しました。"
+  },
+  "copy_380627bf06": {
+    "message": "結果を確認して、現在の画面で作業を続けてください。"
+  },
+  "copy_a8f574eaad": {
+    "message": "操作完了"
+  },
+  "copy_0bc10c8338": {
+    "message": "確認済みの操作は機能ルーター経由で完了しました。"
+  },
+  "copy_4cbca64e28": {
+    "message": "サービスを確認して、現在の画面で続けてください。"
+  },
+  "copy_6f22e207e2": {
+    "message": "操作を完了できませんでした"
+  },
+  "copy_d8696cef16": {
+    "message": "対象を確認して、もう一度試してください。"
+  },
+  "copy_04f3f2c2bc": {
+    "message": "データを変更"
+  },
+  "copy_627d4cfc84": {
+    "message": "破壊的な操作"
+  },
+  "copy_1603452a27": {
+    "message": "$EFFECT$ 対象: $TARGET$。$PARAMETERS$",
+    "placeholders": {
+      "effect": {
+        "content": "$1"
+      },
+      "target": {
+        "content": "$2"
+      },
+      "parameters": {
+        "content": "$3"
+      }
+    }
+  },
+  "copy_48cce26163": {
+    "message": "この操作により、サービスのデータが削除される可能性があります。$EFFECT$ 対象: $TARGET$。$PARAMETERS$",
+    "placeholders": {
+      "effect": {
+        "content": "$1"
+      },
+      "target": {
+        "content": "$2"
+      },
+      "parameters": {
+        "content": "$3"
+      }
+    }
+  },
+  "copy_761d63c328": {
+    "message": "Skopeo は、現在のページのコントロールを覆わずにこの表示を開くことができません。"
+  },
+  "copy_34411a1bde": {
+    "message": "確認を続ける"
+  },
+  "copy_5852e3c811": {
+    "message": "$COUNT$/$LIMIT$ 文字",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "limit": {
+        "content": "$2"
+      }
+    }
+  },
+  "copy_6dd398e40c": {
+    "message": "文書群"
+  },
+  "copy_5e3c42fc06": {
+    "message": "このフォルダーを登録"
+  },
+  "copy_fc8a8bfccc": {
+    "message": "現在のソース"
+  },
+  "copy_0faade3653": {
+    "message": "アクセスを確認中"
+  },
+  "copy_89e45653b9": {
+    "message": "読み取り不可"
+  },
+  "copy_ca3dd73c4e": {
+    "message": "ダウンロード不可"
+  },
+  "copy_3f0806bded": {
+    "message": "アクセス不可"
+  },
+  "copy_6be36ca49e": {
+    "message": "欠落"
+  },
+  "copy_734fdb8823": {
+    "message": "ソース $N$",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_b91616306b": {
+    "message": "ソース $COUNT$ 件",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_9d4ea755e6": {
+    "message": "ソース $COUNT$ 件",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_9ebd6068a1": {
+    "message": "文書群を利用できません"
+  },
+  "copy_561bb09259": {
+    "message": "文書群の状態を更新しました。"
+  },
+  "copy_eeb62522ec": {
+    "message": "フォルダーを登録できます。"
+  },
+  "copy_d19456062f": {
+    "message": "$LABEL$。$STATE$。",
+    "placeholders": {
+      "label": {
+        "content": "$1"
+      },
+      "state": {
+        "content": "$2"
+      }
+    }
+  },
+  "copy_bb2a0e8cad": {
+    "message": "文書群のソースを更新しました。"
+  },
+  "copy_a751237081": {
+    "message": "文書群を利用できません。"
+  },
+  "copy_c618c2b786": {
+    "message": "Skopeo のベンダー契約書"
+  },
+  "copy_853ad14c65": {
+    "message": "Skopeo の契約書の閲覧"
+  },
+  "copy_a487b8ad8b": {
+    "message": "Skopeo の契約表示を利用できません"
+  },
+  "copy_9d27e8796b": {
+    "message": "ベンダー契約書"
+  },
+  "copy_48f97d03e0": {
+    "message": "契約書の閲覧"
+  },
+  "copy_0b06b49f1a": {
+    "message": "契約表示"
+  },
+  "copy_0d28280a79": {
+    "message": "契約表示を隠す"
+  },
+  "copy_3c0accb3e9": {
+    "message": "契約表示を利用できません"
+  },
+  "copy_ce4dbde36a": {
+    "message": "Skopeo はこの契約表示を検証できません。フォルダーまたは文書を開き直して、もう一度 Skopeo を起動してください。"
+  },
+  "copy_f6732d18b1": {
+    "message": "$NAME$ · ベンダー $COUNT$ 社",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      },
+      "count": {
+        "content": "$2"
+      }
+    }
+  },
+  "copy_9bec46d59b": {
+    "message": "完全な登録済み文書群"
+  },
+  "copy_af23b76c2e": {
+    "message": "不完全な文書群"
+  },
+  "copy_d96da80724": {
+    "message": "次の重要な日付"
+  },
+  "copy_6fa6d0c2bd": {
+    "message": "通知期限"
+  },
+  "copy_f4a9133d79": {
+    "message": "更新"
+  },
+  "copy_91c986e5ad": {
+    "message": "解約"
+  },
+  "copy_f38d6e0e9b": {
+    "message": "満了"
+  },
+  "copy_a00fb0c507": {
+    "message": "承認済み"
+  },
+  "copy_00a659675a": {
+    "message": "抽出"
+  },
+  "copy_d461cbb490": {
+    "message": "推定"
+  },
+  "copy_70a8b6912f": {
+    "message": "あいまい"
+  },
+  "copy_f0742e3a82": {
+    "message": "レビューが必要"
+  },
+  "copy_892ca8bb15": {
+    "message": "対応しない場合"
+  },
+  "copy_767308da17": {
+    "message": "裏付けのある重要な日付はありません。"
+  },
+  "copy_9639831c95": {
+    "message": "重要な日付は未評価です。"
+  },
+  "copy_4b5b3476e0": {
+    "message": "ほかの重要な日付 $COUNT$ 件はベンダーの行にあります",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_2de9b48279": {
+    "message": "この日までに通知が必要です"
+  },
+  "copy_00f1e7c62d": {
+    "message": "この日に契約が終了します"
+  },
+  "copy_04a24f4597": {
+    "message": "この日に契約が満了します"
+  },
+  "copy_f87a7337d0": {
+    "message": "更新はこの日から起算されます"
+  },
+  "copy_239f16b58e": {
+    "message": "緊急の不備"
+  },
+  "copy_e1daefa9d7": {
+    "message": "$GAP$ · $VENDOR$",
+    "placeholders": {
+      "gap": {
+        "content": "$1"
+      },
+      "vendor": {
+        "content": "$2"
+      }
+    }
+  },
+  "copy_8db2a1ad53": {
+    "message": "最終契約書がありません"
+  },
+  "copy_1d1f550a8a": {
+    "message": "スキャンを読み取れません"
+  },
+  "copy_dc0277bbda": {
+    "message": "インデックス未完了"
+  },
+  "copy_add389e072": {
+    "message": "担当者が未割り当て"
+  },
+  "copy_694eda3eba": {
+    "message": "契約書のバージョンの矛盾（レビューが必要）"
+  },
+  "copy_cf17785b9b": {
+    "message": "ポリシー文書がありません"
+  },
+  "copy_331551b0de": {
+    "message": "保留中"
+  },
+  "copy_58b1510f8a": {
+    "message": "アクセスできません"
+  },
+  "copy_cdfabec4de": {
+    "message": "根拠があいまい"
+  },
+  "copy_d5b2db5b94": {
+    "message": "未評価"
+  },
+  "copy_380952987e": {
+    "message": "裏付けのある緊急の不備はありません。"
+  },
+  "copy_d43eeaccd0": {
+    "message": "緊急の不備は未評価です。"
+  },
+  "copy_37ddcf82b9": {
+    "message": "ほかの不備 $COUNT$ 件はベンダーの行にあります",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_720b6017f2": {
+    "message": "ベンダー"
+  },
+  "copy_b57eb5cffd": {
+    "message": "表示できるベンダー契約書はありません"
+  },
+  "copy_0c1db5efb0": {
+    "message": "Skopeo は、完全な登録済み文書群の中に、アクセス可能なベンダーフォルダーを見つけられませんでした。Google ドライブのフォルダーを確認するか、Skopeo をオフにしてください。"
+  },
+  "copy_4b1b8aa360": {
+    "message": "担当者"
+  },
+  "copy_f4e6015090": {
+    "message": "文書とインデックス"
+  },
+  "copy_9daa4f1529": {
+    "message": "適用状況"
+  },
+  "copy_fb53ddd05f": {
+    "message": "次の重要な日付"
+  },
+  "copy_8f7d4c25ad": {
+    "message": "メモの根拠"
+  },
+  "copy_fda05f21cb": {
+    "message": "ポリシー文書"
+  },
+  "copy_7f0025363a": {
+    "message": "メモの要件"
+  },
+  "copy_43a90b173d": {
+    "message": "ローカルアラート"
+  },
+  "copy_80f927e49a": {
+    "message": "アクセス権のあるソース $COUNT$ 件",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_edfdc5fc72": {
+    "message": "アクセス権のあるソース $COUNT$ 件",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_9f6ab44459": {
+    "message": "インデックス完了"
+  },
+  "copy_1e635fb302": {
+    "message": "準備完了 $COUNT$ 件",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_1bffbc03dc": {
+    "message": "保留 $COUNT$ 件",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_ba46c2d2b2": {
+    "message": "読み取り不可 $COUNT$ 件",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_92d99bc455": {
+    "message": "ダウンロード不可 $COUNT$ 件",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_aede7976b7": {
+    "message": "アクセス不可 $COUNT$ 件",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_a0e309d5e2": {
+    "message": "欠落 $COUNT$ 件",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_7ebca289d1": {
+    "message": "$LIST$ · $ITEM$",
+    "placeholders": {
+      "list": {
+        "content": "$1"
+      },
+      "item": {
+        "content": "$2"
+      }
+    }
+  },
+  "copy_bbc5faa910": {
+    "message": "適用中"
+  },
+  "copy_b9e98c6b36": {
+    "message": "一部適用"
+  },
+  "copy_81461172ff": {
+    "message": "裏付けのある重要な日付なし"
+  },
+  "copy_8785e7b1f0": {
+    "message": "裏付けのある影響なし"
+  },
+  "copy_e975267293": {
+    "message": "影響は未評価"
+  },
+  "copy_52324a6550": {
+    "message": "メモあり"
+  },
+  "copy_10e9a22a27": {
+    "message": "メモの根拠は未評価"
+  },
+  "copy_b719f9891f": {
+    "message": "ポリシー文書あり"
+  },
+  "copy_2905954326": {
+    "message": "ポリシー文書は未評価"
+  },
+  "copy_c96ff71da9": {
+    "message": "ほかの不備 $COUNT$ 件",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_7313a3db7a": {
+    "message": "裏付けのある緊急の不備なし"
+  },
+  "copy_5ed6c2b8f4": {
+    "message": "緊急の不備は未評価"
+  },
+  "copy_1fb5255bd6": {
+    "message": "ローカルアラートを予約済み"
+  },
+  "copy_68c774959c": {
+    "message": "ローカルアラートの試行を記録済み"
+  },
+  "copy_cfee65fcfa": {
+    "message": "ローカルアラートを配信済み"
+  },
+  "copy_a732ecf95c": {
+    "message": "ローカルアラートが失敗しました"
+  },
+  "copy_f8aa9ca925": {
+    "message": "ローカルアラートの見逃し"
+  },
+  "copy_3da13a4566": {
+    "message": "ローカル配信不可"
+  },
+  "copy_bc039efcea": {
+    "message": "$DATE$ 予定 · 適用される通知期限の 90 日前です。",
+    "placeholders": {
+      "date": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_6c45107d7e": {
+    "message": "$DATE$ にこの Chrome ユーザーに配信しました。",
+    "placeholders": {
+      "date": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_a5a5954133": {
+    "message": "サービスワーカーが停止する前に、Chrome は完了を確認できませんでした。Skopeo は配信済みとして扱いません。"
+  },
+  "copy_e5123bbec6": {
+    "message": "Chrome は現在のローカル通知を確認できませんでした。アクセスが回復したら、Skopeo を開き直してください。"
+  },
+  "copy_08dfb16531": {
+    "message": "現在の配信を確認する前に、90 日前のアラート日が過ぎました。"
+  },
+  "copy_3594f6a99a": {
+    "message": "現在の契約担当者は、この Chrome ユーザーに紐付けられていません。"
+  },
+  "copy_426c5c39d1": {
+    "message": "紐付けられた担当者が、現在の契約担当者と異なります。"
+  },
+  "copy_0757a1ed95": {
+    "message": "ローカル配信先として、現在の受信者を検証できません。"
+  },
+  "copy_72efa77290": {
+    "message": "アクセス可能な適用される根拠からは、現在の契約担当者を 1 人に特定する裏付けがありません。"
+  },
+  "copy_3c04799807": {
+    "message": "アクセス可能な適用される根拠では、現在の契約担当者があいまいです。"
+  },
+  "copy_d28c832069": {
+    "message": "アラート日"
+  },
+  "copy_6fcb38ddc8": {
+    "message": "期限"
+  },
+  "copy_df4a3ef90f": {
+    "message": "現在の担当者をこの Chrome ユーザーに紐付ける"
+  },
+  "copy_41fb2f2f69": {
+    "message": "現在の担当者の紐付けを解除"
+  },
+  "copy_410a93d088": {
+    "message": "契約の根拠に質問"
+  },
+  "copy_6ef090bae5": {
+    "message": "根拠の範囲を明示的に選んでください。Skopeo は現在アクセス可能な根拠のみを確認します。"
+  },
+  "copy_ed555ae32f": {
+    "message": "この契約書について質問"
+  },
+  "copy_ef67dbed6e": {
+    "message": "登録済みの文書群に質問"
+  },
+  "copy_9c28366482": {
+    "message": "$VENDOR$ について質問",
+    "placeholders": {
+      "vendor": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_9cb58dd04b": {
+    "message": "$PAGE$/$TOTAL$ ページ",
+    "placeholders": {
+      "page": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "copy_8c49dc2280": {
+    "message": "ベンダー一覧 $PAGE$/$TOTAL$ ページ。",
+    "placeholders": {
+      "page": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "copy_819b368f09": {
+    "message": "ベンダー一覧の前のページ"
+  },
+  "copy_7afd6ca5d6": {
+    "message": "前のベンダー"
+  },
+  "copy_249f48388f": {
+    "message": "ベンダー一覧の次のページ"
+  },
+  "copy_3e4263ad2a": {
+    "message": "次のベンダー"
+  },
+  "copy_8fe13a8507": {
+    "message": "一部のソースは未評価"
+  },
+  "copy_29bd90dd10": {
+    "message": "アクセス可能なベンダー $TOTAL$ 社のうち $SHOWN$ 社を表示しています。ほかのベンダー $COUNT$ 社は、この限定された表示の範囲外です。",
+    "placeholders": {
+      "shown": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      },
+      "count": {
+        "content": "$3"
+      }
+    }
+  },
+  "copy_47b8dab761": {
+    "message": "ベンダー契約書を更新しました。"
+  },
+  "copy_25e990a080": {
+    "message": "以下の事項にはこの文書が適用されます。"
+  },
+  "copy_4bf4450c6a": {
+    "message": "この文書が適用されるのは、引用された条項のみです。その他の条件には、以下に示す出典が適用されます。"
+  },
+  "copy_7be303f8f3": {
+    "message": "履歴"
+  },
+  "copy_86a7aa3106": {
+    "message": "この文書は関連する履歴です。以下の事項には適用されません。"
+  },
+  "copy_e5830d2654": {
+    "message": "差し替え済み"
+  },
+  "copy_04f3f333be": {
+    "message": "この文書は差し替えられています。以下の事項には適用されません。"
+  },
+  "copy_f6ea9c8cf8": {
+    "message": "Skopeo は何が適用されるかを特定できません。対応する前に、引用された矛盾を確認してください。"
+  },
+  "copy_19637ce40b": {
+    "message": "現在の完全な根拠からは、適用状況を特定できません。"
+  },
+  "copy_2a0ea5cea9": {
+    "message": "Skopeo は、現在の Google ドライブのアクセス権では、この文書を確認できません。"
+  },
+  "copy_c67fcddfcf": {
+    "message": "現在のソースを利用可能"
+  },
+  "copy_90e99384e3": {
+    "message": "適用される条項を開く"
+  },
+  "copy_78c54579ff": {
+    "message": "適用される文書を開く"
+  },
+  "copy_e787f10d71": {
+    "message": "適用される出典がありません"
+  },
+  "copy_07b152f270": {
+    "message": "適用される出典を開いています…"
+  },
+  "copy_b8b6305aa3": {
+    "message": "適用される出典を開きました。"
+  },
+  "copy_845c0dee6c": {
+    "message": "Skopeo は適用される出典を開けませんでした。この契約表示を開き直して、もう一度試してください。"
+  },
+  "copy_c2f2c46ce9": {
+    "message": "適用される事項"
+  },
+  "copy_928ee4fee9": {
+    "message": "関連する履歴"
+  },
+  "copy_a8450448b2": {
+    "message": "矛盾と不備"
+  },
+  "copy_428c40b0a0": {
+    "message": "ポリシーと配信の状態"
+  },
+  "copy_d4a073c24b": {
+    "message": "追加の根拠"
+  },
+  "copy_08251562b3": {
+    "message": "署名"
+  },
+  "copy_a4f3df623c": {
+    "message": "発効"
+  },
+  "copy_a2472ca8fa": {
+    "message": "通知期間"
+  },
+  "copy_26b6ab1b68": {
+    "message": "送付方法"
+  },
+  "copy_3aa3ea3746": {
+    "message": "書面通知の送付先"
+  },
+  "copy_4746739305": {
+    "message": "$EVIDENCE$ · $TRUST$ · $CITATION$",
+    "placeholders": {
+      "evidence": {
+        "content": "$1"
+      },
+      "trust": {
+        "content": "$2"
+      },
+      "citation": {
+        "content": "$3"
+      }
+    }
+  },
+  "copy_174e6a66d6": {
+    "message": "適用される根拠"
+  },
+  "copy_96c8213ce4": {
+    "message": "$LABEL$ の出典を開く",
+    "placeholders": {
+      "label": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_350e3eb9aa": {
+    "message": "裏付けのある矛盾や不備はありません。"
+  },
+  "copy_ce07bd3019": {
+    "message": "引用された事項はありません"
+  },
+  "copy_4c8f8d63a8": {
+    "message": "Skopeo は、現在アクセス可能な根拠から裏付けられる正確な事項を見つけられませんでした。"
+  },
+  "copy_e5b6ce8c47": {
+    "message": "引用された事項 $COUNT$ 件は非表示",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_6f73f3c05c": {
+    "message": "矛盾または不備 $COUNT$ 件は非表示",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_8b3ce69d91": {
+    "message": "契約書の閲覧を更新しました。$LABEL$。",
+    "placeholders": {
+      "label": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_373a38146f": {
+    "message": "契約の根拠に質問"
+  },
+  "copy_451196f076": {
+    "message": "質問のナビゲーション"
+  },
+  "copy_716556189d": {
+    "message": "契約表示に戻る"
+  },
+  "copy_2d2ef8280e": {
+    "message": "根拠の範囲 · $SCOPE$",
+    "placeholders": {
+      "scope": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_c4b7928d1b": {
+    "message": "根拠の範囲"
+  },
+  "copy_f4929c83c2": {
+    "message": "現在の契約書"
+  },
+  "copy_d65b345614": {
+    "message": "登録済みでアクセス可能な文書群"
+  },
+  "copy_289aff12b0": {
+    "message": "質問"
+  },
+  "copy_850c91b6bd": {
+    "message": "適用される条件、正確な日付、矛盾、アクセス可能な履歴について質問してください。"
+  },
+  "copy_6d45e7f000": {
+    "message": "アクセス可能な根拠を確認しています…"
+  },
+  "copy_53ede022fd": {
+    "message": "Skopeo はこの質問を安全に評価できません。契約の事項や日付を使って言い換えてください。"
+  },
+  "copy_9992e43fcb": {
+    "message": "Skopeo は、設定されたプロバイダーでこの質問を評価できませんでした。プロバイダーの設定を確認して、もう一度質問してください。"
+  },
+  "copy_218bde53e7": {
+    "message": "この根拠の範囲は変更されました。契約表示を開き直して、もう一度質問してください。"
+  },
+  "copy_d35aa3ea65": {
+    "message": "契約について質問する"
+  },
+  "copy_b0f43d6203": {
+    "message": "質問をクリア"
+  },
+  "copy_d715f5cd89": {
+    "message": "現在の質問をキャンセル"
+  },
+  "copy_ff5c17e52b": {
+    "message": "Skopeo は、この範囲で現在アクセス可能な根拠のみを使用します。"
+  },
+  "copy_2db9cfd1c7": {
+    "message": "契約の根拠に質問。$SCOPE$。",
+    "placeholders": {
+      "scope": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_665590354e": {
+    "message": "回答済み"
+  },
+  "copy_449ff38775": {
+    "message": "以下の結論は、この範囲で現在アクセス可能な完全な根拠に裏付けられています。"
+  },
+  "copy_db6255fd34": {
+    "message": "現在の根拠には、判断を許可する前に人によるレビューが必要な矛盾またはポリシーの保護措置があります。"
+  },
+  "copy_6ab4717580": {
+    "message": "回答を保留"
+  },
+  "copy_e74b9bf7a7": {
+    "message": "Skopeo は、現在アクセス可能な完全な根拠からは重要な結論を裏付けられません。"
+  },
+  "copy_33aa2130b0": {
+    "message": "$LABEL$。契約の根拠を更新しました。",
+    "placeholders": {
+      "label": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_bd6017c1aa": {
+    "message": "質問 · $QUESTION$",
+    "placeholders": {
+      "question": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_89db2ad881": {
+    "message": "結論"
+  },
+  "copy_fafed72ab5": {
+    "message": "現在の適用される完全な根拠が、この結論を裏付けています。"
+  },
+  "copy_749b942924": {
+    "message": "現在の適用される根拠には、人によるレビューが必要な矛盾があります。"
+  },
+  "copy_4dfd89f828": {
+    "message": "現在の根拠は、重要な結論を完全には裏付けていません。"
+  },
+  "copy_2495da3ec8": {
+    "message": "裏付けのある結論はありません"
+  },
+  "copy_55cc130c39": {
+    "message": "Skopeo は、重要な結論を裏付ける現在の完全な根拠を見つけられませんでした。表示された不備を確認するか、契約について範囲を絞って質問してください。"
+  },
+  "copy_5bcee20c7a": {
+    "message": "署名日"
+  },
+  "copy_9c12937c06": {
+    "message": "発効日"
+  },
+  "copy_b34ddc5d7c": {
+    "message": "満了日"
+  },
+  "copy_f6cdeb9113": {
+    "message": "解約日"
+  },
+  "copy_78bf8ee749": {
+    "message": "更新"
+  },
+  "copy_c424f94514": {
+    "message": "通知期間"
+  },
+  "copy_b67bd6b77f": {
+    "message": "通知期限"
+  },
+  "copy_a50030924e": {
+    "message": "送付方法"
+  },
+  "copy_493606f2a1": {
+    "message": "書面の送付先"
+  },
+  "copy_e1a4354fd9": {
+    "message": "現在の契約の根拠"
+  },
+  "copy_bf4952a792": {
+    "message": "このセクションに裏付けのある根拠はありません。"
+  },
+  "copy_342901859f": {
+    "message": "根拠の矛盾"
+  },
+  "copy_580010c551": {
+    "message": "不完全な根拠"
+  },
+  "copy_82e5fb7fbb": {
+    "message": "ソースにアクセスできません"
+  },
+  "copy_320ae7276d": {
+    "message": "ソースを読み取れません"
+  },
+  "copy_d719525cde": {
+    "message": "適用状況のレビューが必要"
+  },
+  "copy_1851042981": {
+    "message": "Document 10 がありません"
+  },
+  "copy_8a94e8c308": {
+    "message": "Document 10 にアクセスできません"
+  },
+  "copy_bbf5aa0612": {
+    "message": "必須のメモがありません"
+  },
+  "copy_2200d8c0cd": {
+    "message": "必須のメモにアクセスできません"
+  },
+  "copy_cfbab54dd8": {
+    "message": "現在の適用される根拠には、レビューが必要な矛盾があります。"
+  },
+  "copy_f3ffdbbbdd": {
+    "message": "この回答では、関連する現在のソースの 1 つ以上を保証できませんでした。"
+  },
+  "copy_d204d0a0e2": {
+    "message": "ポリシーの保護措置"
+  },
+  "copy_bbfdaf0dfa": {
+    "message": "判断の許可 · $CLEARANCE$",
+    "placeholders": {
+      "clearance": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_18f2a0947f": {
+    "message": "ブロック中"
+  },
+  "copy_15f3a2898a": {
+    "message": "許可済み"
+  },
+  "copy_5737ca7c03": {
+    "message": "この判断について Document 10 をレビュー済み"
+  },
+  "copy_4bf9aea2e1": {
+    "message": "判断はブロック中 · Document 10 をレビュー"
+  },
+  "copy_bb49232d11": {
+    "message": "判断はブロック中 · Document 10 がありません"
+  },
+  "copy_54b56263f1": {
+    "message": "判断はブロック中 · 現在のアカウントでは Document 10 にアクセスできません"
+  },
+  "copy_0b044d549b": {
+    "message": "判断はブロック中 · レビュー後に Document 10 が変更されました"
+  },
+  "copy_2b418c141b": {
+    "message": "人が作成したメモあり"
+  },
+  "copy_ec3dd67075": {
+    "message": "判断はブロック中 · 人が作成した必須のメモがありません"
+  },
+  "copy_924cac44d9": {
+    "message": "判断はブロック中 · 必須のメモにアクセスできません"
+  },
+  "copy_9107e16cf8": {
+    "message": "判断はブロック中 · メモの状態にレビューが必要です"
+  },
+  "copy_f0299b9161": {
+    "message": "この判断を許可する前に、Document 10 をレビューしてください。"
+  },
+  "copy_e1e68c289d": {
+    "message": "Document 10 がありません。"
+  },
+  "copy_e9a100da6d": {
+    "message": "現在のアカウントでは Document 10 にアクセスできません。"
+  },
+  "copy_4ef56c1ba0": {
+    "message": "レビュー後に Document 10 が変更されました。"
+  },
+  "copy_c79cc0e7a8": {
+    "message": "適用される根拠にレビューが必要です。"
+  },
+  "copy_877e8f8374": {
+    "message": "人が作成した必須のメモがありません。"
+  },
+  "copy_1e212440ab": {
+    "message": "必須のメモにアクセスできません。"
+  },
+  "copy_b0ba2710e5": {
+    "message": "メモの状態にレビューが必要です。"
+  },
+  "copy_e0f5fabed4": {
+    "message": "Document 10 をレビュー"
+  },
+  "copy_ddce5a88d4": {
+    "message": "Document 10 をレビューしました"
+  },
+  "copy_a0b30ea071": {
+    "message": "Document 10 を設定"
+  },
+  "copy_648cf08a6d": {
+    "message": "Document 10 を置き換える"
+  },
+  "copy_007433b24a": {
+    "message": "Document 10 をクリア"
+  },
+  "copy_4a255a4afd": {
+    "message": "「複雑」に分類"
+  },
+  "copy_f866504af3": {
+    "message": "「複雑」の分類を解除"
+  },
+  "copy_1e1104138b": {
+    "message": "人が作成したメモを開く"
+  },
+  "copy_883525a630": {
+    "message": "確認を準備しています…"
+  },
+  "copy_fabbe01ac4": {
+    "message": "操作を適用しています…"
+  },
+  "copy_55d47976b7": {
+    "message": "確認画面を開きました。"
+  },
+  "copy_d466be6feb": {
+    "message": "操作が完了しました。"
+  },
+  "copy_aa908e0a92": {
+    "message": "操作を利用できません。この回答を開き直して、もう一度試してください。"
+  },
+  "copy_caf85b0888": {
+    "message": "出典"
+  },
+  "copy_6c0c15abfc": {
+    "message": "引用された出典はありません。"
+  },
+  "copy_f437de190a": {
+    "message": "ほかの出典 $COUNT$ 件は非表示",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_8347952c53": {
+    "message": "契約について別の質問をする"
+  },
+  "copy_a139e3e525": {
+    "message": "ローカルアラートの受信者"
+  },
+  "copy_cd435f6875": {
+    "message": "契約書の分類"
+  },
+  "copy_1ba1ee1d27": {
+    "message": "ポリシーの設定"
+  },
+  "copy_c1d4a51216": {
+    "message": "現在の担当者を紐付ける"
+  },
+  "copy_792e712952": {
+    "message": "今後の該当する判断には、この文書の現在アクセス可能なバージョンのレビューが必要になります。"
+  },
+  "copy_966afd851e": {
+    "message": "該当する判断を許可するには、人が作成した最新のメモが必要になります。"
+  },
+  "copy_a39972b7d5": {
+    "message": "Document 10 のローカル識別情報を置き換え、現在のレビュー済みの記録を無効にします。"
+  },
+  "copy_9b7d82da0d": {
+    "message": "Document 10 のローカル識別情報を削除し、再設定するまで該当する判断をブロックします。"
+  },
+  "copy_9536622512": {
+    "message": "ソースを変更せずに、今後の判断に対する Skopeo のメモの保護措置を解除します。"
+  },
+  "copy_5540569522": {
+    "message": "この現在の契約担当者を、この Chrome アカウントと文書群でのローカルアラートの受信者として保存します。"
+  },
+  "copy_d49da07bc7": {
+    "message": "この現在の契約担当者について、ローカル受信者の紐付けを解除し、保留中のアラートを無効にします。"
+  },
+  "copy_7f3e42f9c6": {
+    "message": "「定型」の分類を維持"
+  },
+  "copy_49701b0dfa": {
+    "message": "「複雑」の分類を維持"
+  },
+  "copy_94fc74c22b": {
+    "message": "アラートを紐付けないままにする"
+  },
+  "copy_6f8dddf459": {
+    "message": "現在の担当者の紐付けを維持"
+  },
+  "copy_cbc11a411b": {
+    "message": "現在のポリシー文書を維持"
+  },
+  "copy_8a249b0b08": {
+    "message": "確認が必要です。$TITLE$。",
+    "placeholders": {
+      "title": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_cc5eaee07c": {
+    "message": "Skopeo · アンビエント"
+  },
+  "copy_df9f5938af": {
+    "message": "Esc Esc"
+  },
+  "copy_d6add7db3e": {
+    "message": "Skopeo アンビエント HUD"
+  },
+  "copy_f47ece6bf5": {
+    "message": "Skopeo アンビエントレール"
+  },
+  "copy_781cea8a6d": {
+    "message": "Skopeo アンカー HUD"
+  },
+  "copy_e013589331": {
+    "message": "Skopeo がオンになりました。アンビエント表示です。"
+  },
+  "copy_03b0a09c0f": {
+    "message": "Skopeo · 文書群のコンテキスト"
+  },
+  "copy_40a9b8a75b": {
+    "message": "Skopeo は文書群のコンテキストを検証しました。"
+  },
+  "copy_e274a8944a": {
+    "message": "Skopeo · ベンダーフォルダー"
+  },
+  "copy_22ca85d703": {
+    "message": "Skopeo はベンダーフォルダーのコンテキストを検証しました。"
+  },
+  "copy_2e200318d9": {
+    "message": "Skopeo · 契約書の閲覧"
+  },
+  "copy_2f8c3b7964": {
+    "message": "Skopeo は契約書の閲覧コンテキストを検証しました。"
+  },
+  "copy_a4aa80217f": {
+    "message": "Skopeo · フォーカス中の質問"
+  },
+  "copy_b644ad183f": {
+    "message": "Skopeo はフォーカス中の質問のコンテキストを検証しました。"
+  },
+  "copy_3daa6a515e": {
+    "message": "Skopeo はこのコンテキストを検証できません。"
+  },
+  "copy_7d003c5a9e": {
+    "message": "Skopeo はこのコンテキストを検証できません。ページは変更されていません。"
+  },
+  "copy_7dbaa51dc2": {
+    "message": "Skopeo はこのコンテキストに対応していません。"
+  },
+  "copy_d5fe7ab570": {
+    "message": "Skopeo はこのコンテキストに対応していません。ページは変更されていません。"
+  },
+  "copy_cf9831dc02": {
+    "message": "Skopeo はこの対象を検証できません。"
+  },
+  "copy_a7564df078": {
+    "message": "対象を検証できなかったため、Skopeo は注釈を削除しました。"
+  },
+  "copy_7c55c9ea2e": {
+    "message": "検証済みの対象は要求されていません"
+  },
+  "copy_19ec755ada": {
+    "message": "検証済みの対象が要求されなかったため、Skopeo はアンビエント表示のままです。"
+  },
+  "copy_f4fa9aa1d9": {
+    "message": "アンカーマークのデモを開く"
+  },
+  "copy_25b1bf5c97": {
+    "message": "アンカーのデモ"
+  },
+  "copy_d5ae944038": {
+    "message": "エンティティチップのデモを開く"
+  },
+  "copy_d7156d68f0": {
+    "message": "エンティティの例 · 注記 1 件"
+  },
+  "copy_cb5b3ae9db": {
+    "message": "異常シグナルのデモ"
+  },
+  "copy_4392ef2767": {
+    "message": "異常のデモ · 通常と異なる変更"
+  },
+  "copy_f3c8d57e58": {
+    "message": "アンビエント表示の Skopeo に戻る"
+  },
+  "copy_614fc81be0": {
+    "message": "Skopeo フォーカス表示のデモ"
+  },
+  "copy_0700b1b64b": {
+    "message": "フォーカス表示の Skopeo デモ"
+  },
+  "copy_0405ec6300": {
+    "message": "この管理されたプレビューでは、一時的な半透明表示を示します。ページの読み取りや変更は行いません。"
+  },
+  "copy_e68212e067": {
+    "message": "アンカー表示に戻る"
+  },
+  "copy_07a92fc61f": {
+    "message": "影響のプレビューを開く"
+  },
+  "copy_cd663f9f29": {
+    "message": "フォーカス表示がオンです。Esc キーを押すとページが元に戻ります。"
+  },
+  "copy_afa09efd8b": {
+    "message": "デモ専用"
+  },
+  "copy_121b453f67": {
+    "message": "影響のプレビュー"
+  },
+  "copy_cc1fc9cd9c": {
+    "message": "続行するとこのプレビューが閉じます。Skopeo はページを操作しません。"
+  },
+  "copy_c88b8415e0": {
+    "message": "フォーカス表示のデモに戻る"
+  },
+  "copy_7d005db682": {
+    "message": "デモを続ける"
+  },
+  "copy_7a0af3438a": {
+    "message": "フォーカス表示に戻る"
+  },
+  "copy_a4405d29ad": {
+    "message": "$VENDOR$ · 通知期限",
+    "placeholders": {
+      "vendor": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_a9e29d03a6": {
+    "message": "担当者: $OWNER$ · 適用される根拠: $EVIDENCE$",
+    "placeholders": {
+      "owner": {
+        "content": "$1"
+      },
+      "evidence": {
+        "content": "$2"
+      }
+    }
+  },
+  "copy_d35bef08b9": {
+    "message": "$DOCUMENT$ · 通知の根拠",
+    "placeholders": {
+      "document": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_390bf05359": {
+    "message": "適用される根拠を開く"
+  },
+  "copy_fa810a30c8": {
+    "message": "Skopeo の管理されたテスト環境の準備ができました。"
+  },
+  "copy_7baa989602": {
+    "message": "対応アプリ"
+  },
+  "copy_3661b847f9": {
+    "message": "署名日の引用"
+  },
+  "copy_db14bdd363": {
+    "message": "発効日の引用"
+  },
+  "copy_7a371c5ac5": {
+    "message": "満了日の引用"
+  },
+  "copy_7901f368b6": {
+    "message": "解約日の引用"
+  },
+  "copy_446a535bc2": {
+    "message": "更新の引用"
+  },
+  "copy_f103738e41": {
+    "message": "通知期間の引用"
+  },
+  "copy_9267e4d016": {
+    "message": "通知期限の引用"
+  },
+  "copy_6aa5461ae7": {
+    "message": "送付方法の引用"
+  },
+  "copy_3900bd4834": {
+    "message": "書面の送付先の引用"
+  },
+  "copy_2d03873447": {
+    "message": "自動更新の記載なし"
   }
 }

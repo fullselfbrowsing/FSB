@@ -4696,5 +4696,1834 @@
   },
   "panel_01003693b8": {
     "message": "El proveedor cambió fuera de este panel. Actualiza los modelos para ver más."
+  },
+  "copy_1ca28d1918": {
+    "message": "Desactivado en esta pestaña"
+  },
+  "copy_dc069f34dd": {
+    "message": "Activar Skopeo"
+  },
+  "copy_bd47072fe5": {
+    "message": "Desactivar Skopeo"
+  },
+  "copy_14893d4a92": {
+    "message": "Abrir los atajos de teclado de Chrome"
+  },
+  "copy_f262cf94ab": {
+    "message": "Sin atajo asignado · Configúralo en los atajos de Chrome"
+  },
+  "copy_b7fb9f7ede": {
+    "message": "Skopeo en esta pestaña"
+  },
+  "copy_94b2c61b4b": {
+    "message": "Esc Esc: desactiva Skopeo en esta pestaña"
+  },
+  "copy_3432134e77": {
+    "message": "Skopeo no puede abrirse de forma segura con este diseño."
+  },
+  "copy_48ba5c84b7": {
+    "message": "Reduce el zoom o cambia el tamaño de la página e inténtalo de nuevo."
+  },
+  "copy_99536455cd": {
+    "message": "Iniciando en esta pestaña…"
+  },
+  "copy_e656694252": {
+    "message": "Activado · Discreto"
+  },
+  "copy_f0bbe1ab9e": {
+    "message": "Skopeo no puede ejecutarse en esta página."
+  },
+  "copy_caf87bac3d": {
+    "message": "Abre una página web normal e inténtalo de nuevo."
+  },
+  "copy_6e4dce91aa": {
+    "message": "Skopeo no se inició."
+  },
+  "copy_f4d25b46e3": {
+    "message": "No se añadió nada a la página. Inténtalo de nuevo."
+  },
+  "copy_595462a32d": {
+    "message": "Atajo: $SHORTCUT$ · Cambiar atajo",
+    "placeholders": {
+      "shortcut": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_51ac158080": {
+    "message": "Skopeo · $NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_c5386756c1": {
+    "message": "Skopeo"
+  },
+  "copy_97cd52dc76": {
+    "message": "$NOUN$ · Listas: $COUNT$",
+    "placeholders": {
+      "noun": {
+        "content": "$1"
+      },
+      "count": {
+        "content": "$2"
+      }
+    }
+  },
+  "copy_d79610c6ef": {
+    "message": "Abrir acciones de $NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_92b4c3d0cb": {
+    "message": "Abrir acciones de Skopeo"
+  },
+  "copy_ed1caa4112": {
+    "message": "Skopeo para $NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_7841c1bf54": {
+    "message": "Acciones de Skopeo"
+  },
+  "copy_6148cdb943": {
+    "message": "Estado de Skopeo (modo Discreto)"
+  },
+  "copy_1e24c5b560": {
+    "message": "Estado de Skopeo (anclado)"
+  },
+  "copy_38db0927c2": {
+    "message": "Documento: $LABEL$",
+    "placeholders": {
+      "label": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_d3db487846": {
+    "message": "Abrir acciones del documento $LABEL$",
+    "placeholders": {
+      "label": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_e1917bc332": {
+    "message": "Skopeo ya no puede verificar este documento. Se quitaron las acciones de la entidad."
+  },
+  "copy_37d184a6fc": {
+    "message": "Acciones verificadas del documento y disponibilidad de las capacidades."
+  },
+  "copy_7122183da5": {
+    "message": "Mensaje: $LABEL$",
+    "placeholders": {
+      "label": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_a60a734727": {
+    "message": "Abrir acciones del mensaje $LABEL$",
+    "placeholders": {
+      "label": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_38acf9866a": {
+    "message": "Skopeo ya no puede verificar este mensaje. Se quitaron las acciones de la entidad."
+  },
+  "copy_5910ceb0ae": {
+    "message": "Acciones verificadas del mensaje y disponibilidad de las capacidades."
+  },
+  "copy_bd4f74926f": {
+    "message": "Registro: $LABEL$",
+    "placeholders": {
+      "label": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_05c0855046": {
+    "message": "Abrir acciones del registro $LABEL$",
+    "placeholders": {
+      "label": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_5833f2802f": {
+    "message": "Skopeo ya no puede verificar este registro. Se quitaron las acciones de la entidad."
+  },
+  "copy_23ef7f752f": {
+    "message": "Acciones verificadas del registro y disponibilidad de las capacidades."
+  },
+  "copy_662322c323": {
+    "message": "Elemento: $LABEL$",
+    "placeholders": {
+      "label": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_28c4642f77": {
+    "message": "Abrir acciones del elemento $LABEL$",
+    "placeholders": {
+      "label": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_7f5e2bd8af": {
+    "message": "Skopeo ya no puede verificar este elemento. Se quitaron las acciones de la entidad."
+  },
+  "copy_f7ff338d0d": {
+    "message": "Acciones verificadas del elemento y disponibilidad de las capacidades."
+  },
+  "copy_ae9331cbba": {
+    "message": "Objetivo: $LABEL$",
+    "placeholders": {
+      "label": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_eef8a2312a": {
+    "message": "Abrir acciones del objetivo $LABEL$",
+    "placeholders": {
+      "label": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_683131c44a": {
+    "message": "Skopeo ya no puede verificar este objetivo. Se quitaron las acciones de la entidad."
+  },
+  "copy_a5ad15c91c": {
+    "message": "Acciones verificadas del objetivo y disponibilidad de las capacidades."
+  },
+  "copy_65f47ec845": {
+    "message": "$NAME$ · $NOUN$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      },
+      "noun": {
+        "content": "$2"
+      }
+    }
+  },
+  "copy_e481db9b9c": {
+    "message": "Acciones de $NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_8e368ff718": {
+    "message": "Abierto: $TITLE$.",
+    "placeholders": {
+      "title": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_2c02b0518c": {
+    "message": "Volver al resumen de $NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_2c011b72ce": {
+    "message": "Volver al resumen de Skopeo"
+  },
+  "copy_6fe1f3a9b3": {
+    "message": "Acciones verificadas y disponibilidad de las capacidades en esta página ($NOUN$).",
+    "placeholders": {
+      "noun": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_be040e47fb": {
+    "message": "No hay acciones verificadas aquí"
+  },
+  "copy_76af34b916": {
+    "message": "Skopeo no encontró capacidades listas en esta página ($NOUN$). Cambia el enfoque de la tarea o abre otra vista compatible.",
+    "placeholders": {
+      "noun": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_8e5ff104da": {
+    "message": "Desactivar Skopeo en esta pestaña"
+  },
+  "copy_89f808c350": {
+    "message": "Activado: $LABEL$.",
+    "placeholders": {
+      "label": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_9199b6b795": {
+    "message": "Resumen de $LABEL$.",
+    "placeholders": {
+      "label": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_a172cedcae": {
+    "message": "app"
+  },
+  "copy_0d04bfeb7d": {
+    "message": "App"
+  },
+  "copy_84393add8c": {
+    "message": "artículo"
+  },
+  "copy_29d9492251": {
+    "message": "Artículo"
+  },
+  "copy_66cd9688a2": {
+    "message": "panel"
+  },
+  "copy_67b6964686": {
+    "message": "Panel"
+  },
+  "copy_43cc23fa52": {
+    "message": "documento"
+  },
+  "copy_d6bd8c0aee": {
+    "message": "Documento"
+  },
+  "copy_7062520c5a": {
+    "message": "unidad"
+  },
+  "copy_6312b4b9ba": {
+    "message": "Unidad"
+  },
+  "copy_c8bc2586cd": {
+    "message": "feed"
+  },
+  "copy_396c3cb18f": {
+    "message": "Feed"
+  },
+  "copy_872491a30d": {
+    "message": "registro"
+  },
+  "copy_05c2e32770": {
+    "message": "Registro"
+  },
+  "copy_e2885f2bbe": {
+    "message": "repositorio"
+  },
+  "copy_13d6ff07b8": {
+    "message": "Repositorio"
+  },
+  "copy_824d80d719": {
+    "message": "tienda"
+  },
+  "copy_ee7da936b5": {
+    "message": "Tienda"
+  },
+  "copy_21a3230e03": {
+    "message": "espacio de trabajo"
+  },
+  "copy_87bb59ba2f": {
+    "message": "Espacio de trabajo"
+  },
+  "copy_2bcb43cbc8": {
+    "message": "vista"
+  },
+  "copy_dcc839a401": {
+    "message": "Vista"
+  },
+  "copy_346c78df50": {
+    "message": "$GROUP$ · Modifica datos",
+    "placeholders": {
+      "group": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_ad0a2a84e2": {
+    "message": "$GROUP$ · Destructivas",
+    "placeholders": {
+      "group": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_9460f16ac9": {
+    "message": "Capacidades"
+  },
+  "copy_f97e9da0e3": {
+    "message": "Otras"
+  },
+  "copy_64002843f9": {
+    "message": "$COUNT$ parámetro",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_9a5ac573ff": {
+    "message": "$COUNT$ parámetros",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_8aacf86da7": {
+    "message": "Acciones no disponibles ($COUNT$)",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_6b10cd5f05": {
+    "message": "No disponible por seguridad"
+  },
+  "copy_b5d74ac3b7": {
+    "message": "La ruta de ejecución no está verificada."
+  },
+  "copy_dec64a50f3": {
+    "message": "Bloqueada por la política"
+  },
+  "copy_f0ea600280": {
+    "message": "Revisa la política aplicable antes de continuar."
+  },
+  "copy_081db50d93": {
+    "message": "Se requiere conexión"
+  },
+  "copy_c93390b118": {
+    "message": "Usa la configuración de conexión de confianza antes de continuar."
+  },
+  "copy_3dddf7d417": {
+    "message": "Requiere verificación"
+  },
+  "copy_64bfb348a7": {
+    "message": "Esta capacidad requiere una verificación en vivo actualizada."
+  },
+  "copy_e1faf34f65": {
+    "message": "Aprendizaje pendiente"
+  },
+  "copy_252fc572d1": {
+    "message": "No hay acciones disponibles mientras el aprendizaje esté pendiente."
+  },
+  "copy_9d2bde300d": {
+    "message": "Detección de capacidades pendiente"
+  },
+  "copy_8191a51a82": {
+    "message": "Aún no hay ninguna acción verificada disponible."
+  },
+  "copy_a11dfc13db": {
+    "message": "No hay ninguna acción verificada disponible en esta vista."
+  },
+  "copy_89a21132ff": {
+    "message": "No compatible con esta vista"
+  },
+  "copy_9c9877e9f7": {
+    "message": "Abre otra vista compatible para continuar."
+  },
+  "copy_2a78025de6": {
+    "message": "Seleccionar"
+  },
+  "copy_27320771d7": {
+    "message": "Revisa el campo resaltado."
+  },
+  "copy_09dda3ef8c": {
+    "message": "Skopeo no puede verificar esta vista. La página no se modificó. Abre otra vista o desactiva Skopeo."
+  },
+  "copy_abd21a1c4f": {
+    "message": "Skopeo aún no es compatible con esta app. No se añadió nada a la página. Desactiva Skopeo o abre una app compatible."
+  },
+  "copy_388daeb09e": {
+    "message": "$ACTION$ en curso.",
+    "placeholders": {
+      "action": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_346cc980b6": {
+    "message": "La acción seleccionada está en curso."
+  },
+  "copy_7eeab708af": {
+    "message": "$ACTION$ no terminó. $RECOVERY$",
+    "placeholders": {
+      "action": {
+        "content": "$1"
+      },
+      "recovery": {
+        "content": "$2"
+      }
+    }
+  },
+  "copy_4cf3540cdd": {
+    "message": "La acción no terminó. Revisa el objetivo y vuelve a intentar la acción."
+  },
+  "copy_70fb1ff02e": {
+    "message": "Revisa el objetivo y vuelve a intentar la acción."
+  },
+  "copy_30199459dd": {
+    "message": "Skopeo no pudo mostrar una confirmación completa. Revisa la acción e inténtalo de nuevo."
+  },
+  "copy_dace1bf51c": {
+    "message": "Resultado de Skopeo"
+  },
+  "copy_3a2052a3f1": {
+    "message": "Resultado de Skopeo actualizado."
+  },
+  "copy_c947bd1159": {
+    "message": "Fila $N$",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_db1d829fd5": {
+    "message": "$HEADING$ · Fila $N$",
+    "placeholders": {
+      "heading": {
+        "content": "$1"
+      },
+      "n": {
+        "content": "$2"
+      }
+    }
+  },
+  "copy_f412b71c54": {
+    "message": "Detalles del resultado"
+  },
+  "copy_219c4a6c86": {
+    "message": "Resultados"
+  },
+  "copy_6e7d50e84f": {
+    "message": "Resultado"
+  },
+  "copy_9e893cb1f0": {
+    "message": "Elemento $N$",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_1f53883d72": {
+    "message": "Resultado: $VALUE$",
+    "placeholders": {
+      "value": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_e079d88e1c": {
+    "message": "Lectura completada"
+  },
+  "copy_c4a0771419": {
+    "message": "La lectura seleccionada se completó mediante el enrutador de capacidades."
+  },
+  "copy_380627bf06": {
+    "message": "Revisa el resultado y sigue trabajando en la vista actual."
+  },
+  "copy_a8f574eaad": {
+    "message": "Acción completada"
+  },
+  "copy_0bc10c8338": {
+    "message": "La acción confirmada se completó mediante el enrutador de capacidades."
+  },
+  "copy_4cbca64e28": {
+    "message": "Revisa el servicio y continúa en la vista actual."
+  },
+  "copy_6f22e207e2": {
+    "message": "Acción no completada"
+  },
+  "copy_d8696cef16": {
+    "message": "Revisa el objetivo e inténtalo de nuevo."
+  },
+  "copy_04f3f2c2bc": {
+    "message": "Modifica datos"
+  },
+  "copy_627d4cfc84": {
+    "message": "Acción destructiva"
+  },
+  "copy_1603452a27": {
+    "message": "$EFFECT$ Objetivo: $TARGET$. $PARAMETERS$",
+    "placeholders": {
+      "effect": {
+        "content": "$1"
+      },
+      "target": {
+        "content": "$2"
+      },
+      "parameters": {
+        "content": "$3"
+      }
+    }
+  },
+  "copy_48cce26163": {
+    "message": "Esta acción puede eliminar datos del servicio. $EFFECT$ Objetivo: $TARGET$. $PARAMETERS$",
+    "placeholders": {
+      "effect": {
+        "content": "$1"
+      },
+      "target": {
+        "content": "$2"
+      },
+      "parameters": {
+        "content": "$3"
+      }
+    }
+  },
+  "copy_761d63c328": {
+    "message": "Skopeo no puede abrir esta vista sin cubrir el control actual de la página."
+  },
+  "copy_34411a1bde": {
+    "message": "Seguir revisando"
+  },
+  "copy_5852e3c811": {
+    "message": "$COUNT$ de $LIMIT$ caracteres",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "limit": {
+        "content": "$2"
+      }
+    }
+  },
+  "copy_6dd398e40c": {
+    "message": "Corpus"
+  },
+  "copy_5e3c42fc06": {
+    "message": "Registrar esta carpeta"
+  },
+  "copy_fc8a8bfccc": {
+    "message": "Fuente actual"
+  },
+  "copy_0faade3653": {
+    "message": "Comprobando el acceso"
+  },
+  "copy_89e45653b9": {
+    "message": "Ilegible"
+  },
+  "copy_ca3dd73c4e": {
+    "message": "Descarga bloqueada"
+  },
+  "copy_3f0806bded": {
+    "message": "Inaccesible"
+  },
+  "copy_6be36ca49e": {
+    "message": "Falta"
+  },
+  "copy_734fdb8823": {
+    "message": "Fuente $N$",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_b91616306b": {
+    "message": "$COUNT$ fuente",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_9d4ea755e6": {
+    "message": "$COUNT$ fuentes",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_9ebd6068a1": {
+    "message": "Corpus no disponible"
+  },
+  "copy_561bb09259": {
+    "message": "Estado del corpus actualizado."
+  },
+  "copy_eeb62522ec": {
+    "message": "Registro de carpeta disponible."
+  },
+  "copy_d19456062f": {
+    "message": "$LABEL$. $STATE$.",
+    "placeholders": {
+      "label": {
+        "content": "$1"
+      },
+      "state": {
+        "content": "$2"
+      }
+    }
+  },
+  "copy_bb2a0e8cad": {
+    "message": "Fuentes del corpus actualizadas."
+  },
+  "copy_a751237081": {
+    "message": "Corpus no disponible."
+  },
+  "copy_c618c2b786": {
+    "message": "Contratos de proveedores en Skopeo"
+  },
+  "copy_853ad14c65": {
+    "message": "Lectura del contrato en Skopeo"
+  },
+  "copy_a487b8ad8b": {
+    "message": "Vista de contratos de Skopeo no disponible"
+  },
+  "copy_9d27e8796b": {
+    "message": "Contratos de proveedores"
+  },
+  "copy_48f97d03e0": {
+    "message": "Lectura del contrato"
+  },
+  "copy_0b06b49f1a": {
+    "message": "Vista de contratos"
+  },
+  "copy_0d28280a79": {
+    "message": "Ocultar la vista de contratos"
+  },
+  "copy_3c0accb3e9": {
+    "message": "Vista de contratos no disponible"
+  },
+  "copy_ce4dbde36a": {
+    "message": "Skopeo no puede verificar esta vista de contratos. Vuelve a abrir la carpeta o el documento e inicia Skopeo de nuevo."
+  },
+  "copy_f6732d18b1": {
+    "message": "$NAME$ · Proveedores: $COUNT$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      },
+      "count": {
+        "content": "$2"
+      }
+    }
+  },
+  "copy_9bec46d59b": {
+    "message": "Corpus registrado completo"
+  },
+  "copy_af23b76c2e": {
+    "message": "Corpus incompleto"
+  },
+  "copy_d96da80724": {
+    "message": "Próximas fechas clave"
+  },
+  "copy_6fa6d0c2bd": {
+    "message": "Límite de preaviso"
+  },
+  "copy_f4a9133d79": {
+    "message": "Renovación"
+  },
+  "copy_91c986e5ad": {
+    "message": "Terminación"
+  },
+  "copy_f38d6e0e9b": {
+    "message": "Vencimiento"
+  },
+  "copy_a00fb0c507": {
+    "message": "Aceptado"
+  },
+  "copy_00a659675a": {
+    "message": "Extraído"
+  },
+  "copy_d461cbb490": {
+    "message": "Inferido"
+  },
+  "copy_70a8b6912f": {
+    "message": "Ambiguo"
+  },
+  "copy_f0742e3a82": {
+    "message": "Requiere revisión"
+  },
+  "copy_892ca8bb15": {
+    "message": "Si no se actúa"
+  },
+  "copy_767308da17": {
+    "message": "No se acreditaron fechas clave."
+  },
+  "copy_9639831c95": {
+    "message": "Fechas clave sin evaluar."
+  },
+  "copy_4b5b3476e0": {
+    "message": "Otras fechas clave en las filas de proveedores: $COUNT$",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_2de9b48279": {
+    "message": "El preaviso debe darse a más tardar en esta fecha"
+  },
+  "copy_00f1e7c62d": {
+    "message": "El contrato termina en esta fecha"
+  },
+  "copy_04a24f4597": {
+    "message": "El contrato vence en esta fecha"
+  },
+  "copy_f87a7337d0": {
+    "message": "La renovación se calcula a partir de esta fecha"
+  },
+  "copy_239f16b58e": {
+    "message": "Lagunas urgentes"
+  },
+  "copy_e1daefa9d7": {
+    "message": "$GAP$ · $VENDOR$",
+    "placeholders": {
+      "gap": {
+        "content": "$1"
+      },
+      "vendor": {
+        "content": "$2"
+      }
+    }
+  },
+  "copy_8db2a1ad53": {
+    "message": "Falta el contrato final"
+  },
+  "copy_1d1f550a8a": {
+    "message": "Escaneo ilegible"
+  },
+  "copy_dc0277bbda": {
+    "message": "Índice incompleto"
+  },
+  "copy_add389e072": {
+    "message": "Sin responsable asignado"
+  },
+  "copy_694eda3eba": {
+    "message": "Conflicto de versiones del contrato: requiere revisión"
+  },
+  "copy_cf17785b9b": {
+    "message": "Falta el documento de política"
+  },
+  "copy_331551b0de": {
+    "message": "Pendiente"
+  },
+  "copy_58b1510f8a": {
+    "message": "Acceso no disponible"
+  },
+  "copy_cdfabec4de": {
+    "message": "Evidencia ambigua"
+  },
+  "copy_d5b2db5b94": {
+    "message": "Sin evaluar"
+  },
+  "copy_380952987e": {
+    "message": "No se acreditaron lagunas urgentes."
+  },
+  "copy_d43eeaccd0": {
+    "message": "Lagunas urgentes sin evaluar."
+  },
+  "copy_37ddcf82b9": {
+    "message": "Otras lagunas en las filas de proveedores: $COUNT$",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_720b6017f2": {
+    "message": "Proveedores"
+  },
+  "copy_b57eb5cffd": {
+    "message": "No hay contratos de proveedores"
+  },
+  "copy_0c1db5efb0": {
+    "message": "Skopeo no encontró carpetas de proveedores accesibles en el corpus registrado completo. Revisa la carpeta de Drive o desactiva Skopeo."
+  },
+  "copy_4b1b8aa360": {
+    "message": "Responsable"
+  },
+  "copy_f4e6015090": {
+    "message": "Documentos e índice"
+  },
+  "copy_9daa4f1529": {
+    "message": "Estado de vigencia"
+  },
+  "copy_fb53ddd05f": {
+    "message": "Próxima fecha clave"
+  },
+  "copy_8f7d4c25ad": {
+    "message": "Evidencia del memorando"
+  },
+  "copy_fda05f21cb": {
+    "message": "Documento de política"
+  },
+  "copy_7f0025363a": {
+    "message": "Requisito de memorando"
+  },
+  "copy_43a90b173d": {
+    "message": "Alerta local"
+  },
+  "copy_80f927e49a": {
+    "message": "$COUNT$ fuente autorizada",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_edfdc5fc72": {
+    "message": "$COUNT$ fuentes autorizadas",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_9f6ab44459": {
+    "message": "Índice completo"
+  },
+  "copy_1e635fb302": {
+    "message": "Listos: $COUNT$",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_1bffbc03dc": {
+    "message": "Pendientes: $COUNT$",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_ba46c2d2b2": {
+    "message": "Ilegibles: $COUNT$",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_92d99bc455": {
+    "message": "Descargas bloqueadas: $COUNT$",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_aede7976b7": {
+    "message": "Inaccesibles: $COUNT$",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_a0e309d5e2": {
+    "message": "Faltan: $COUNT$",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_7ebca289d1": {
+    "message": "$LIST$ · $ITEM$",
+    "placeholders": {
+      "list": {
+        "content": "$1"
+      },
+      "item": {
+        "content": "$2"
+      }
+    }
+  },
+  "copy_bbc5faa910": {
+    "message": "Vigente"
+  },
+  "copy_b9e98c6b36": {
+    "message": "Parcialmente vigente"
+  },
+  "copy_81461172ff": {
+    "message": "Sin fecha clave acreditada"
+  },
+  "copy_8785e7b1f0": {
+    "message": "Sin consecuencia acreditada"
+  },
+  "copy_e975267293": {
+    "message": "Consecuencia sin evaluar"
+  },
+  "copy_52324a6550": {
+    "message": "Memorando archivado"
+  },
+  "copy_10e9a22a27": {
+    "message": "Evidencia del memorando sin evaluar"
+  },
+  "copy_b719f9891f": {
+    "message": "Documento de política archivado"
+  },
+  "copy_2905954326": {
+    "message": "Documento de política sin evaluar"
+  },
+  "copy_c96ff71da9": {
+    "message": "Otras lagunas: $COUNT$",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_7313a3db7a": {
+    "message": "Sin lagunas urgentes acreditadas"
+  },
+  "copy_5ed6c2b8f4": {
+    "message": "Lagunas urgentes sin evaluar"
+  },
+  "copy_1fb5255bd6": {
+    "message": "Alerta local programada"
+  },
+  "copy_68c774959c": {
+    "message": "Intento de alerta local registrado"
+  },
+  "copy_cfee65fcfa": {
+    "message": "Alerta local entregada"
+  },
+  "copy_a732ecf95c": {
+    "message": "Alerta local fallida"
+  },
+  "copy_f8aa9ca925": {
+    "message": "Alerta local perdida"
+  },
+  "copy_3da13a4566": {
+    "message": "No se puede entregar localmente"
+  },
+  "copy_bc039efcea": {
+    "message": "Para el $DATE$ · 90 días antes del límite de preaviso vigente.",
+    "placeholders": {
+      "date": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_6c45107d7e": {
+    "message": "Entregada a este usuario de Chrome el $DATE$.",
+    "placeholders": {
+      "date": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_a5a5954133": {
+    "message": "Chrome no confirmó la finalización antes de que se detuviera el proceso en segundo plano. Skopeo no dará por hecha la entrega."
+  },
+  "copy_e5123bbec6": {
+    "message": "Chrome no pudo confirmar la notificación local actual. Vuelve a abrir Skopeo cuando se restablezca el acceso."
+  },
+  "copy_08dfb16531": {
+    "message": "La fecha de alerta de 90 días pasó antes de que se pudiera confirmar una entrega actual."
+  },
+  "copy_3594f6a99a": {
+    "message": "El responsable actual del contrato no está vinculado a este usuario de Chrome."
+  },
+  "copy_426c5c39d1": {
+    "message": "El responsable vinculado no es el responsable actual del contrato."
+  },
+  "copy_0757a1ed95": {
+    "message": "No se puede verificar el destinatario actual para la entrega local."
+  },
+  "copy_72efa77290": {
+    "message": "La evidencia vigente accesible no acredita un único responsable actual del contrato."
+  },
+  "copy_3c04799807": {
+    "message": "La evidencia vigente accesible no deja claro quién es el responsable actual del contrato."
+  },
+  "copy_d28c832069": {
+    "message": "Fecha de alerta"
+  },
+  "copy_6fcb38ddc8": {
+    "message": "Fecha límite"
+  },
+  "copy_df4a3ef90f": {
+    "message": "Vincular al responsable actual con este usuario de Chrome"
+  },
+  "copy_41fb2f2f69": {
+    "message": "Desvincular al responsable actual"
+  },
+  "copy_410a93d088": {
+    "message": "Consultar la evidencia del contrato"
+  },
+  "copy_6ef090bae5": {
+    "message": "Elige explícitamente el alcance de la evidencia. Skopeo solo comprobará la evidencia accesible actualmente."
+  },
+  "copy_ed555ae32f": {
+    "message": "Preguntar sobre este contrato"
+  },
+  "copy_ef67dbed6e": {
+    "message": "Consultar el corpus registrado"
+  },
+  "copy_9c28366482": {
+    "message": "Preguntar sobre $VENDOR$",
+    "placeholders": {
+      "vendor": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_9cb58dd04b": {
+    "message": "Página $PAGE$ de $TOTAL$",
+    "placeholders": {
+      "page": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "copy_8c49dc2280": {
+    "message": "Página de proveedores $PAGE$ de $TOTAL$.",
+    "placeholders": {
+      "page": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "copy_819b368f09": {
+    "message": "Página anterior de proveedores"
+  },
+  "copy_7afd6ca5d6": {
+    "message": "Proveedores anteriores"
+  },
+  "copy_249f48388f": {
+    "message": "Página siguiente de proveedores"
+  },
+  "copy_3e4263ad2a": {
+    "message": "Proveedores siguientes"
+  },
+  "copy_8fe13a8507": {
+    "message": "Hay fuentes sin evaluar"
+  },
+  "copy_29bd90dd10": {
+    "message": "Mostrando $SHOWN$ de $TOTAL$ proveedores accesibles. Proveedores adicionales fuera de esta vista limitada: $COUNT$.",
+    "placeholders": {
+      "shown": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      },
+      "count": {
+        "content": "$3"
+      }
+    }
+  },
+  "copy_47b8dab761": {
+    "message": "Contratos de proveedores actualizados."
+  },
+  "copy_25e990a080": {
+    "message": "Este documento rige los datos que se muestran abajo."
+  },
+  "copy_4bf4450c6a": {
+    "message": "Este documento solo rige las cláusulas citadas. Las demás condiciones proceden de las fuentes vigentes indicadas abajo."
+  },
+  "copy_7be303f8f3": {
+    "message": "Histórico"
+  },
+  "copy_86a7aa3106": {
+    "message": "Este documento es historial relevante. No rige los datos que se muestran abajo."
+  },
+  "copy_e5830d2654": {
+    "message": "Sustituido"
+  },
+  "copy_04f3f333be": {
+    "message": "Este documento ha sido sustituido. No rige los datos que se muestran abajo."
+  },
+  "copy_f6ea9c8cf8": {
+    "message": "Skopeo no puede determinar qué rige. Revisa el conflicto citado antes de actuar."
+  },
+  "copy_19637ce40b": {
+    "message": "El estado de vigencia no está disponible con la evidencia completa actual."
+  },
+  "copy_2a0ea5cea9": {
+    "message": "Skopeo no puede confirmar este documento con el acceso actual a Drive."
+  },
+  "copy_c67fcddfcf": {
+    "message": "Fuente actual disponible"
+  },
+  "copy_90e99384e3": {
+    "message": "Abrir la cláusula vigente"
+  },
+  "copy_78c54579ff": {
+    "message": "Abrir el documento vigente"
+  },
+  "copy_e787f10d71": {
+    "message": "Fuente vigente no disponible"
+  },
+  "copy_07b152f270": {
+    "message": "Abriendo la fuente vigente…"
+  },
+  "copy_b8b6305aa3": {
+    "message": "Fuente vigente abierta."
+  },
+  "copy_845c0dee6c": {
+    "message": "Skopeo no pudo abrir la fuente vigente. Vuelve a abrir esta vista de contratos e inténtalo de nuevo."
+  },
+  "copy_c2f2c46ce9": {
+    "message": "Datos vigentes"
+  },
+  "copy_928ee4fee9": {
+    "message": "Historial relevante"
+  },
+  "copy_a8450448b2": {
+    "message": "Conflictos y lagunas"
+  },
+  "copy_428c40b0a0": {
+    "message": "Política y estado de entrega"
+  },
+  "copy_d4a073c24b": {
+    "message": "Evidencia adicional"
+  },
+  "copy_08251562b3": {
+    "message": "Firma"
+  },
+  "copy_a4f3df623c": {
+    "message": "Entrada en vigor"
+  },
+  "copy_a2472ca8fa": {
+    "message": "Plazo de preaviso"
+  },
+  "copy_26b6ab1b68": {
+    "message": "Forma de entrega"
+  },
+  "copy_3aa3ea3746": {
+    "message": "Dirección de notificación"
+  },
+  "copy_4746739305": {
+    "message": "$EVIDENCE$ · $TRUST$ · $CITATION$",
+    "placeholders": {
+      "evidence": {
+        "content": "$1"
+      },
+      "trust": {
+        "content": "$2"
+      },
+      "citation": {
+        "content": "$3"
+      }
+    }
+  },
+  "copy_174e6a66d6": {
+    "message": "Evidencia vigente"
+  },
+  "copy_96c8213ce4": {
+    "message": "Abrir la fuente de $LABEL$",
+    "placeholders": {
+      "label": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_350e3eb9aa": {
+    "message": "No se acreditaron conflictos ni lagunas."
+  },
+  "copy_ce07bd3019": {
+    "message": "No hay datos citados disponibles"
+  },
+  "copy_4c8f8d63a8": {
+    "message": "Skopeo no encontró datos exactos que pueda respaldar con la evidencia accesible actual."
+  },
+  "copy_e5b6ce8c47": {
+    "message": "Datos citados no mostrados: $COUNT$",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_6f73f3c05c": {
+    "message": "Conflictos o lagunas no mostrados: $COUNT$",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_8b3ce69d91": {
+    "message": "Lectura del contrato actualizada. $LABEL$.",
+    "placeholders": {
+      "label": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_373a38146f": {
+    "message": "CONSULTAR LA EVIDENCIA DEL CONTRATO"
+  },
+  "copy_451196f076": {
+    "message": "Navegación de la consulta"
+  },
+  "copy_716556189d": {
+    "message": "Volver a la vista de contratos"
+  },
+  "copy_2d2ef8280e": {
+    "message": "Alcance de la evidencia · $SCOPE$",
+    "placeholders": {
+      "scope": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_c4b7928d1b": {
+    "message": "Alcance de la evidencia"
+  },
+  "copy_f4929c83c2": {
+    "message": "Contrato actual"
+  },
+  "copy_d65b345614": {
+    "message": "Corpus registrado accesible"
+  },
+  "copy_289aff12b0": {
+    "message": "Pregunta"
+  },
+  "copy_850c91b6bd": {
+    "message": "Haz preguntas sobre condiciones vigentes, fechas exactas, conflictos o historial accesible."
+  },
+  "copy_6d45e7f000": {
+    "message": "Comprobando la evidencia accesible…"
+  },
+  "copy_53ede022fd": {
+    "message": "Skopeo no puede evaluar esta pregunta de forma segura. Reformúlala con datos o fechas del contrato."
+  },
+  "copy_9992e43fcb": {
+    "message": "Skopeo no pudo evaluar esta pregunta con el proveedor de AI configurado. Revisa la configuración del proveedor de AI y vuelve a preguntar."
+  },
+  "copy_218bde53e7": {
+    "message": "Este alcance de la evidencia cambió. Vuelve a abrir la vista de contratos y pregunta de nuevo."
+  },
+  "copy_d35aa3ea65": {
+    "message": "Preguntar sobre el contrato"
+  },
+  "copy_b0f43d6203": {
+    "message": "Borrar la pregunta"
+  },
+  "copy_d715f5cd89": {
+    "message": "Cancelar la pregunta actual"
+  },
+  "copy_ff5c17e52b": {
+    "message": "Skopeo solo usa la evidencia accesible actualmente para este alcance."
+  },
+  "copy_2db9cfd1c7": {
+    "message": "Consultar la evidencia del contrato. $SCOPE$.",
+    "placeholders": {
+      "scope": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_665590354e": {
+    "message": "Respondida"
+  },
+  "copy_449ff38775": {
+    "message": "La conclusión de abajo está respaldada por toda la evidencia accesible actual de este alcance."
+  },
+  "copy_db6255fd34": {
+    "message": "La evidencia actual contiene un conflicto o una salvaguarda de la política que requiere revisión humana antes de poder autorizar una decisión."
+  },
+  "copy_6ab4717580": {
+    "message": "Sin conclusión"
+  },
+  "copy_e74b9bf7a7": {
+    "message": "Skopeo no puede respaldar una conclusión de fondo con toda la evidencia accesible actual."
+  },
+  "copy_33aa2130b0": {
+    "message": "$LABEL$. Evidencia del contrato actualizada.",
+    "placeholders": {
+      "label": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_bd6017c1aa": {
+    "message": "Pregunta · $QUESTION$",
+    "placeholders": {
+      "question": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_89db2ad881": {
+    "message": "Conclusión"
+  },
+  "copy_fafed72ab5": {
+    "message": "Toda la evidencia vigente actual respalda esta conclusión."
+  },
+  "copy_749b942924": {
+    "message": "La evidencia vigente actual contiene un conflicto que requiere revisión humana."
+  },
+  "copy_4dfd89f828": {
+    "message": "La evidencia actual no respalda por completo una conclusión de fondo."
+  },
+  "copy_2495da3ec8": {
+    "message": "Sin conclusión respaldada"
+  },
+  "copy_55cc130c39": {
+    "message": "Skopeo no encontró evidencia actual completa que respalde una conclusión de fondo. Revisa las lagunas indicadas o haz una pregunta más concreta sobre el contrato."
+  },
+  "copy_5bcee20c7a": {
+    "message": "fecha de firma"
+  },
+  "copy_9c12937c06": {
+    "message": "fecha de entrada en vigor"
+  },
+  "copy_b34ddc5d7c": {
+    "message": "fecha de vencimiento"
+  },
+  "copy_f6cdeb9113": {
+    "message": "fecha de terminación"
+  },
+  "copy_78bf8ee749": {
+    "message": "renovación"
+  },
+  "copy_c424f94514": {
+    "message": "plazo de preaviso"
+  },
+  "copy_b67bd6b77f": {
+    "message": "límite de preaviso"
+  },
+  "copy_a50030924e": {
+    "message": "forma de entrega"
+  },
+  "copy_493606f2a1": {
+    "message": "dirección de notificación"
+  },
+  "copy_e1a4354fd9": {
+    "message": "Evidencia actual del contrato"
+  },
+  "copy_bf4952a792": {
+    "message": "No hay evidencia respaldada en esta sección."
+  },
+  "copy_342901859f": {
+    "message": "Conflicto de evidencia"
+  },
+  "copy_580010c551": {
+    "message": "Evidencia incompleta"
+  },
+  "copy_82e5fb7fbb": {
+    "message": "Fuente inaccesible"
+  },
+  "copy_320ae7276d": {
+    "message": "Fuente ilegible"
+  },
+  "copy_d719525cde": {
+    "message": "Estado de vigencia: requiere revisión"
+  },
+  "copy_1851042981": {
+    "message": "Falta Document 10"
+  },
+  "copy_8a94e8c308": {
+    "message": "Document 10 inaccesible"
+  },
+  "copy_bbf5aa0612": {
+    "message": "Falta el memorando obligatorio"
+  },
+  "copy_2200d8c0cd": {
+    "message": "Memorando obligatorio inaccesible"
+  },
+  "copy_cfbab54dd8": {
+    "message": "La evidencia vigente actual contiene un conflicto que requiere revisión."
+  },
+  "copy_f3ffdbbbdd": {
+    "message": "Una o más fuentes actuales relevantes no se pudieron certificar para esta respuesta."
+  },
+  "copy_d204d0a0e2": {
+    "message": "Salvaguardas de la política"
+  },
+  "copy_bbfdaf0dfa": {
+    "message": "Autorización de la decisión · $CLEARANCE$",
+    "placeholders": {
+      "clearance": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_18f2a0947f": {
+    "message": "Bloqueada"
+  },
+  "copy_15f3a2898a": {
+    "message": "Autorizada"
+  },
+  "copy_5737ca7c03": {
+    "message": "Document 10 revisado para esta decisión"
+  },
+  "copy_4bf9aea2e1": {
+    "message": "Decisión bloqueada · Revisar Document 10"
+  },
+  "copy_bb49232d11": {
+    "message": "Decisión bloqueada · Falta Document 10"
+  },
+  "copy_54b56263f1": {
+    "message": "Decisión bloqueada · Document 10 no es accesible con la cuenta actual"
+  },
+  "copy_0b044d549b": {
+    "message": "Decisión bloqueada · Document 10 cambió desde la revisión"
+  },
+  "copy_2b418c141b": {
+    "message": "Memorando redactado por una persona archivado"
+  },
+  "copy_ec3dd67075": {
+    "message": "Decisión bloqueada · Falta el memorando obligatorio redactado por una persona"
+  },
+  "copy_924cac44d9": {
+    "message": "Decisión bloqueada · El memorando obligatorio no es accesible"
+  },
+  "copy_9107e16cf8": {
+    "message": "Decisión bloqueada · El estado del memorando requiere revisión"
+  },
+  "copy_f0299b9161": {
+    "message": "Revisa Document 10 antes de autorizar esta decisión."
+  },
+  "copy_e1e68c289d": {
+    "message": "Falta Document 10."
+  },
+  "copy_e9a100da6d": {
+    "message": "Document 10 no es accesible con la cuenta actual."
+  },
+  "copy_4ef56c1ba0": {
+    "message": "Document 10 cambió desde la revisión."
+  },
+  "copy_c79cc0e7a8": {
+    "message": "La evidencia vigente requiere revisión."
+  },
+  "copy_877e8f8374": {
+    "message": "Falta el memorando obligatorio redactado por una persona."
+  },
+  "copy_1e212440ab": {
+    "message": "El memorando obligatorio no es accesible."
+  },
+  "copy_b0ba2710e5": {
+    "message": "El estado del memorando requiere revisión."
+  },
+  "copy_e0f5fabed4": {
+    "message": "Revisar Document 10"
+  },
+  "copy_ddce5a88d4": {
+    "message": "Revisé Document 10"
+  },
+  "copy_a0b30ea071": {
+    "message": "Configurar Document 10"
+  },
+  "copy_648cf08a6d": {
+    "message": "Reemplazar Document 10"
+  },
+  "copy_007433b24a": {
+    "message": "Quitar Document 10"
+  },
+  "copy_4a255a4afd": {
+    "message": "Clasificar como complejo"
+  },
+  "copy_f866504af3": {
+    "message": "Quitar la clasificación de complejo"
+  },
+  "copy_1e1104138b": {
+    "message": "Abrir el memorando redactado por una persona"
+  },
+  "copy_883525a630": {
+    "message": "Preparando la confirmación…"
+  },
+  "copy_fabbe01ac4": {
+    "message": "Aplicando la acción…"
+  },
+  "copy_55d47976b7": {
+    "message": "Confirmación abierta."
+  },
+  "copy_d466be6feb": {
+    "message": "Acción completada."
+  },
+  "copy_aa908e0a92": {
+    "message": "Acción no disponible. Vuelve a abrir esta respuesta e inténtalo de nuevo."
+  },
+  "copy_caf85b0888": {
+    "message": "Fuentes"
+  },
+  "copy_6c0c15abfc": {
+    "message": "No hay fuentes citadas disponibles."
+  },
+  "copy_f437de190a": {
+    "message": "Fuentes adicionales no mostradas: $COUNT$",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_8347952c53": {
+    "message": "Hacer otra pregunta sobre el contrato"
+  },
+  "copy_a139e3e525": {
+    "message": "DESTINATARIO DE ALERTAS LOCALES"
+  },
+  "copy_cd435f6875": {
+    "message": "CLASIFICACIÓN DEL CONTRATO"
+  },
+  "copy_1ba1ee1d27": {
+    "message": "CONFIGURACIÓN DE LA POLÍTICA"
+  },
+  "copy_c1d4a51216": {
+    "message": "Vincular al responsable actual"
+  },
+  "copy_792e712952": {
+    "message": "Las futuras decisiones aplicables requerirán revisar la versión accesible actual de este documento."
+  },
+  "copy_966afd851e": {
+    "message": "Se requerirá un memorando actual redactado por una persona antes de poder autorizar las decisiones aplicables."
+  },
+  "copy_a39972b7d5": {
+    "message": "Reemplaza la identificación local de Document 10 e invalida la constancia de revisión actual."
+  },
+  "copy_9b7d82da0d": {
+    "message": "Quita la identificación local de Document 10 y bloquea las decisiones aplicables hasta que se vuelva a configurar."
+  },
+  "copy_9536622512": {
+    "message": "Quita la salvaguarda del memorando de Skopeo para futuras decisiones sin cambiar ninguna fuente."
+  },
+  "copy_5540569522": {
+    "message": "Guarda a este mismo responsable actual del contrato como destinatario de las alertas locales en esta cuenta de Chrome y en este corpus."
+  },
+  "copy_d49da07bc7": {
+    "message": "Quita la vinculación del destinatario local y deja sin efecto las alertas pendientes de este mismo responsable actual del contrato."
+  },
+  "copy_7f3e42f9c6": {
+    "message": "Mantener como rutinario"
+  },
+  "copy_49701b0dfa": {
+    "message": "Mantener como complejo"
+  },
+  "copy_94fc74c22b": {
+    "message": "Dejar las alertas sin vincular"
+  },
+  "copy_6f8dddf459": {
+    "message": "Mantener la vinculación actual"
+  },
+  "copy_cbc11a411b": {
+    "message": "Mantener el documento de política actual"
+  },
+  "copy_8a249b0b08": {
+    "message": "Se requiere confirmación. $TITLE$.",
+    "placeholders": {
+      "title": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_cc5eaee07c": {
+    "message": "Skopeo · Discreto"
+  },
+  "copy_df9f5938af": {
+    "message": "Esc Esc"
+  },
+  "copy_d6add7db3e": {
+    "message": "HUD de Skopeo (modo Discreto)"
+  },
+  "copy_f47ece6bf5": {
+    "message": "Franja de Skopeo (modo Discreto)"
+  },
+  "copy_781cea8a6d": {
+    "message": "HUD de Skopeo (anclado)"
+  },
+  "copy_e013589331": {
+    "message": "Skopeo activado. Vista en modo Discreto."
+  },
+  "copy_03b0a09c0f": {
+    "message": "Skopeo · Contexto del corpus"
+  },
+  "copy_40a9b8a75b": {
+    "message": "Skopeo verificó el contexto del corpus."
+  },
+  "copy_e274a8944a": {
+    "message": "Skopeo · Carpeta del proveedor"
+  },
+  "copy_22ca85d703": {
+    "message": "Skopeo verificó el contexto de la carpeta del proveedor."
+  },
+  "copy_2e200318d9": {
+    "message": "Skopeo · Lectura del contrato"
+  },
+  "copy_2f8c3b7964": {
+    "message": "Skopeo verificó el contexto de lectura del contrato."
+  },
+  "copy_a4aa80217f": {
+    "message": "Skopeo · Consulta enfocada"
+  },
+  "copy_b644ad183f": {
+    "message": "Skopeo verificó el contexto de la consulta enfocada."
+  },
+  "copy_3daa6a515e": {
+    "message": "Skopeo no puede verificar este contexto."
+  },
+  "copy_7d003c5a9e": {
+    "message": "Skopeo no puede verificar este contexto. La página no se modificó."
+  },
+  "copy_7dbaa51dc2": {
+    "message": "Skopeo no es compatible con este contexto."
+  },
+  "copy_d5fe7ab570": {
+    "message": "Skopeo no es compatible con este contexto. La página no se modificó."
+  },
+  "copy_cf9831dc02": {
+    "message": "Skopeo no puede verificar este objetivo."
+  },
+  "copy_a7564df078": {
+    "message": "Skopeo quitó la anotación porque no pudo verificar el objetivo."
+  },
+  "copy_7c55c9ea2e": {
+    "message": "No se solicitó ningún objetivo verificado"
+  },
+  "copy_19ec755ada": {
+    "message": "Skopeo sigue en modo Discreto porque no se solicitó ningún objetivo verificado."
+  },
+  "copy_f4fa9aa1d9": {
+    "message": "Abrir la demo de la marca de anclaje"
+  },
+  "copy_25b1bf5c97": {
+    "message": "Demo de anclaje"
+  },
+  "copy_d5ae944038": {
+    "message": "Abrir la demo del chip de entidad"
+  },
+  "copy_d7156d68f0": {
+    "message": "Entidad de ejemplo · 1 nota"
+  },
+  "copy_cb5b3ae9db": {
+    "message": "Demo de señal de anomalía"
+  },
+  "copy_4392ef2767": {
+    "message": "Demo de anomalía · cambio inusual"
+  },
+  "copy_f3c8d57e58": {
+    "message": "Volver a Skopeo en modo Discreto"
+  },
+  "copy_614fc81be0": {
+    "message": "Demo de la vista enfocada de Skopeo"
+  },
+  "copy_0700b1b64b": {
+    "message": "Demo de Skopeo en vista enfocada"
+  },
+  "copy_0405ec6300": {
+    "message": "Esta vista previa controlada muestra una atenuación temporal. No lee ni modifica la página."
+  },
+  "copy_e68212e067": {
+    "message": "Volver a la vista anclada"
+  },
+  "copy_07a92fc61f": {
+    "message": "Abrir la vista previa de consecuencias"
+  },
+  "copy_cd663f9f29": {
+    "message": "Vista enfocada activada. Pulsa Esc para restaurar la página."
+  },
+  "copy_afa09efd8b": {
+    "message": "Solo demo"
+  },
+  "copy_121b453f67": {
+    "message": "Vista previa de consecuencias"
+  },
+  "copy_cc1fc9cd9c": {
+    "message": "Si continúas, se cerrará esta vista previa. Skopeo no actuará en la página."
+  },
+  "copy_c88b8415e0": {
+    "message": "Volver a la demo enfocada"
+  },
+  "copy_7d005db682": {
+    "message": "Continuar la demo"
+  },
+  "copy_7a0af3438a": {
+    "message": "Volver a la vista enfocada"
+  },
+  "copy_a4405d29ad": {
+    "message": "$VENDOR$ · límite de preaviso",
+    "placeholders": {
+      "vendor": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_a9e29d03a6": {
+    "message": "Responsable: $OWNER$ · Evidencia vigente: $EVIDENCE$",
+    "placeholders": {
+      "owner": {
+        "content": "$1"
+      },
+      "evidence": {
+        "content": "$2"
+      }
+    }
+  },
+  "copy_d35bef08b9": {
+    "message": "$DOCUMENT$ · Evidencia del preaviso",
+    "placeholders": {
+      "document": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_390bf05359": {
+    "message": "Abrir la evidencia vigente"
+  },
+  "copy_fa810a30c8": {
+    "message": "Entorno de prueba controlado de Skopeo listo."
+  },
+  "copy_7baa989602": {
+    "message": "App compatible"
+  },
+  "copy_3661b847f9": {
+    "message": "cita de la fecha de firma"
+  },
+  "copy_db14bdd363": {
+    "message": "cita de la fecha de entrada en vigor"
+  },
+  "copy_7a371c5ac5": {
+    "message": "cita de la fecha de vencimiento"
+  },
+  "copy_7901f368b6": {
+    "message": "cita de la fecha de terminación"
+  },
+  "copy_446a535bc2": {
+    "message": "cita de la renovación"
+  },
+  "copy_f103738e41": {
+    "message": "cita del plazo de preaviso"
+  },
+  "copy_9267e4d016": {
+    "message": "cita del límite de preaviso"
+  },
+  "copy_6aa5461ae7": {
+    "message": "cita de la forma de entrega"
+  },
+  "copy_3900bd4834": {
+    "message": "cita de la dirección de notificación"
+  },
+  "copy_2d03873447": {
+    "message": "Sin renovación automática indicada"
   }
 }
