@@ -4617,7 +4617,9 @@
           this.document, 'p', 'skopeo-answer-meta', {}, answerTrustExplanation(answer.trust)
         ));
         region.appendChild(conclusion);
-      } else {
+      } else if (answer.empty) {
+        // An abstained answer that still cites evidence has no empty block:
+        // its banner explains the abstention and the evidence follows.
         const empty = createElement(this.document, 'div', 'skopeo-answer-empty');
         empty.appendChild(createElement(this.document, 'h3', '', {}, copy(answer.empty.heading)));
         empty.appendChild(createElement(this.document, 'p', '', {}, copy(answer.empty.body)));
