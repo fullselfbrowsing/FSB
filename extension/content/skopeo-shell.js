@@ -1130,6 +1130,291 @@
     return model.attention === ATTENTION.INTERSTITIAL ? model.consequence !== null : model.consequence === null;
   }
 
+  // Adaptive HUD copy. The composer builds its sentences in English from a
+  // few structured parts (the app name, the page noun, the entity noun and
+  // label, counts). These helpers rebuild each sentence as a copy() source
+  // from the same parts. A rebuilt source is used only while its English is
+  // exactly the model's string; otherwise the model's string is written as
+  // given, so a composer change can never show a wrong translation.
+  function rebuilt(shown, source) {
+    return source && englishOf(source) === shown ? source : shown;
+  }
+
+  function titleCaseNoun(value) {
+    return value.charAt(0).toUpperCase() + value.slice(1);
+  }
+
+  // One full template per composer entity noun, so no translation has to
+  // agree with a noun spliced into it.
+  const ENTITY_NOUN_COPY = Object.freeze({
+    document: Object.freeze({
+      chip: 'Document: $LABEL$',
+      accessibleName: 'Open actions for document $LABEL$',
+      withdrawn: 'Skopeo can’t verify this document anymore. Entity actions were removed.',
+      description: 'Verified document actions and capability readiness.'
+    }),
+    message: Object.freeze({
+      chip: 'Message: $LABEL$',
+      accessibleName: 'Open actions for message $LABEL$',
+      withdrawn: 'Skopeo can’t verify this message anymore. Entity actions were removed.',
+      description: 'Verified message actions and capability readiness.'
+    }),
+    record: Object.freeze({
+      chip: 'Record: $LABEL$',
+      accessibleName: 'Open actions for record $LABEL$',
+      withdrawn: 'Skopeo can’t verify this record anymore. Entity actions were removed.',
+      description: 'Verified record actions and capability readiness.'
+    }),
+    item: Object.freeze({
+      chip: 'Item: $LABEL$',
+      accessibleName: 'Open actions for item $LABEL$',
+      withdrawn: 'Skopeo can’t verify this item anymore. Entity actions were removed.',
+      description: 'Verified item actions and capability readiness.'
+    }),
+    target: Object.freeze({
+      chip: 'Target: $LABEL$',
+      accessibleName: 'Open actions for target $LABEL$',
+      withdrawn: 'Skopeo can’t verify this target anymore. Entity actions were removed.',
+      description: 'Verified target actions and capability readiness.'
+    })
+  });
+  const ADAPTIVE_RAIL_COPY = Object.freeze({
+    ambient: 'Skopeo ambient status',
+    anchored: 'Skopeo anchored status'
+  });
+  // Group labels that Skopeo itself supplies when a catalog group has none:
+  // the composer's fallback and the capability projector's two groups.
+  const ADAPTIVE_FALLBACK_GROUPS = new Set(['Actions', 'Capabilities', 'Other']);
+  const ADAPTIVE_RECOVERY_COPY = Object.freeze([
+    'Review the target and try the action again.',
+    'Skopeo could not display a complete confirmation. Review the action and try again.'
+  ]);
+  // Typed-result atoms carry router data, apart from the fixed strings the
+  // service worker, the runtime and the renderer registry put in them.
+  const RESULT_HEADING_COPY = new Set([
+    'Result details', 'Results', 'Read complete', 'Action complete', 'Action not completed'
+  ]);
+  const RESULT_NOTICE_COPY = new Set([
+    'The selected read completed through the capability router.',
+    'The confirmed action completed through the capability router.',
+    'The action didn’t finish. Review the target and try the action again.',
+    'Review the result and keep working in the current view.',
+    'Review the service and continue in the current view.',
+    'Review the target and try again.'
+  ]);
+
+  function adaptiveEntityCopy(entity) {
+    if (!entity) return null;
+    const forms = Object.prototype.hasOwnProperty.call(ENTITY_NOUN_COPY, entity.noun)
+      ? ENTITY_NOUN_COPY[entity.noun]
+      : null;
+    if (!forms) {
+      return {
+        chip: entity.chipLabel,
+        accessibleName: entity.chipAccessibleName,
+        withdrawn: entity.withdrawnText,
+        description: null
+      };
+    }
+    return {
+      chip: rebuilt(entity.chipLabel, copy(forms.chip, { LABEL: entity.label })),
+      accessibleName: rebuilt(entity.chipAccessibleName, copy(forms.accessibleName, { LABEL: entity.label })),
+      withdrawn: rebuilt(entity.withdrawnText, copy(forms.withdrawn)),
+      description: copy(forms.description)
+    };
+  }
+
+  // "<action> didn’t finish. <recovery>" from the composer and the renderer
+  // registry; the action is a catalog label or slug and stays data.
+  function unfinishedActionCopy(message) {
+    const fixed = 'The action didn’t finish. Review the target and try the action again.';
+    if (message === fixed) return copy(fixed);
+    for (const recovery of ADAPTIVE_RECOVERY_COPY) {
+      const tail = ' didn’t finish. ' + recovery;
+      if (message.length > tail.length && message.endsWith(tail)) {
+        return rebuilt(message, copy('$ACTION$ didn’t finish. $RECOVERY$', {
+          ACTION: message.slice(0, message.length - tail.length),
+          RECOVERY: copy(recovery)
+        }));
+      }
+    }
+    return message;
+  }
+
+  // The composer's result message, decided by the result status.
+  function adaptiveResultMessage(model, entity) {
+    const message = model.rendererRequest.copy.resultMessage;
+    if (typeof message !== 'string') return message;
+    const status = model.rendererRequest.resultStatus;
+    if (status === 'uncertain') {
+      return rebuilt(message, copy(
+        'Skopeo can’t verify this view. The page was left unchanged. Open another view or turn off Skopeo.'
+      ));
+    }
+    if (status === 'unsupported') {
+      return rebuilt(message, copy(
+        'Skopeo doesn’t support this app yet. Nothing was added to the page. Turn off Skopeo or open a supported app.'
+      ));
+    }
+    if (status === 'target-withdrawn') {
+      return rebuilt(message, entity ? entity.withdrawn
+        : copy('Skopeo can’t verify this target anymore. Entity actions were removed.'));
+    }
+    if (status === 'pending') {
+      const fixed = 'The selected action is pending.';
+      if (message === fixed) return copy(fixed);
+      const tail = ' is pending.';
+      return message.length > tail.length && message.endsWith(tail)
+        ? rebuilt(message, copy('$ACTION$ is pending.', { ACTION: message.slice(0, message.length - tail.length) }))
+        : message;
+    }
+    return status === 'error' ? unfinishedActionCopy(message) : message;
+  }
+
+  const ADAPTIVE_COPY_CACHE = new WeakMap();
+
+  // The copy sources for one validated adaptive model.
+  function adaptiveCopy(model) {
+    const cached = ADAPTIVE_COPY_CACHE.get(model);
+    if (cached) return cached;
+    const lens = model.lens;
+    const pageCopy = model.rendererRequest.copy;
+    // The composer labels the lens just 'Skopeo' only when the app has no
+    // display name; appDisplayName then falls back to 'Skopeo' too.
+    const named = lens.label !== 'Skopeo';
+    const name = named ? lens.appDisplayName : copy('Skopeo');
+    const page = copy(lens.pageNoun);
+    const readyCount = model.readyGroups.reduce(function (total, group) { return total + group.rows.length; }, 0);
+    const entity = adaptiveEntityCopy(model.entity);
+    const lensLabel = rebuilt(lens.label, named ? copy('Skopeo · $NAME$', { NAME: name }) : copy('Skopeo'));
+    const focusedTitle = rebuilt(pageCopy.focusedTitle, entity ? entity.chip
+      : named ? copy('$NAME$ actions', { NAME: name }) : copy('Skopeo actions'));
+    const sources = Object.freeze({
+      entity: entity,
+      lensLabel: lensLabel,
+      metadata: rebuilt(lens.metadata, copy('$NOUN$ · $COUNT$ ready', {
+        NOUN: copy(titleCaseNoun(lens.pageNoun)),
+        COUNT: String(readyCount)
+      })),
+      actionLabel: rebuilt(lens.actionLabel, named
+        ? copy('Open $NAME$ actions', { NAME: name }) : copy('Open Skopeo actions')),
+      regionLabel: rebuilt(lens.regionLabel, named
+        ? copy('Skopeo for $NAME$', { NAME: name }) : copy('Skopeo actions')),
+      eyebrow: rebuilt(lens.appDisplayName + ' · ' + lens.pageNoun, copy('$NAME$ · $NOUN$', {
+        NAME: name,
+        NOUN: page
+      })),
+      focusedTitle: focusedTitle,
+      contextDescription: rebuilt(pageCopy.contextDescription, entity ? entity.description
+        : copy('Verified actions and capability readiness for this $NOUN$.', { NOUN: page })),
+      emptyHeading: rebuilt(pageCopy.emptyHeading, copy('No verified actions here')),
+      emptyBody: rebuilt(pageCopy.emptyBody, copy(
+        'Skopeo found no ready capabilities for this $NOUN$. Change the task lens or open another supported view.',
+        { NOUN: page }
+      )),
+      resultMessage: adaptiveResultMessage(model, entity),
+      backLabel: rebuilt(pageCopy.backLabel, named
+        ? copy('Back to $NAME$ overview', { NAME: name }) : copy('Back to Skopeo overview')),
+      turnOffLabel: rebuilt(pageCopy.turnOffLabel, copy(COPY.universalKill)),
+      initialAnnouncement: rebuilt(lens.label + ' on.', copy('$LABEL$ on.', { LABEL: lensLabel })),
+      overviewAnnouncement: rebuilt(lens.label + ' overview.', copy('$LABEL$ overview.', { LABEL: lensLabel })),
+      openAnnouncement: rebuilt(pageCopy.focusedTitle + ' open.', copy('$TITLE$ open.', { TITLE: focusedTitle }))
+    });
+    ADAPTIVE_COPY_CACHE.set(model, sources);
+    return sources;
+  }
+
+  // The composer appends a fixed side-effect suffix to the catalog group
+  // label; the label itself is data unless it is one of Skopeo's fallbacks.
+  function adaptiveGroupHeading(group) {
+    const label = group.label;
+    const template = group.sideEffectClass === 'write' ? '$GROUP$ · Changes data'
+      : group.sideEffectClass === 'destructive' ? '$GROUP$ · Destructive' : null;
+    let base = label;
+    if (template) {
+      const suffix = template.slice('$GROUP$'.length);
+      if (label.length <= suffix.length || !label.endsWith(suffix)) return label;
+      base = label.slice(0, label.length - suffix.length);
+    }
+    const baseSource = ADAPTIVE_FALLBACK_GROUPS.has(base) ? copy(base) : base;
+    return template ? rebuilt(label, copy(template, { GROUP: baseSource })) : baseSource;
+  }
+
+  function adaptiveParameterSummary(summary) {
+    const match = /^(\d+) parameters?$/.exec(summary);
+    if (!match) return summary;
+    return rebuilt(summary, copy(match[1] === '1' ? '$COUNT$ parameter' : '$COUNT$ parameters', {
+      COUNT: match[1]
+    }));
+  }
+
+  // Effect, target and parameter text come from the catalog's consequence
+  // contract and stay data; only the sentence frame is Skopeo's.
+  function adaptiveConsequenceBody(consequence) {
+    const body = consequence.body;
+    const destructive = consequence.sideEffectClass === 'destructive';
+    const template = destructive
+      ? 'This action may remove service data. $EFFECT$ Target: $TARGET$. $PARAMETERS$'
+      : '$EFFECT$ Target: $TARGET$. $PARAMETERS$';
+    const warning = template.slice(0, template.indexOf('$EFFECT$'));
+    if (!body.startsWith(warning)) return body;
+    const rest = body.slice(warning.length);
+    const marker = ' Target: ';
+    const at = rest.indexOf(marker);
+    if (at <= 0) return body;
+    const after = rest.slice(at + marker.length);
+    const end = after.indexOf('. ');
+    if (end <= 0 || end + 2 >= after.length) return body;
+    return rebuilt(body, copy(template, {
+      EFFECT: rest.slice(0, at),
+      TARGET: after.slice(0, end),
+      PARAMETERS: after.slice(end + 2)
+    }));
+  }
+
+  function resultHeading(value) {
+    if (RESULT_HEADING_COPY.has(value)) return copy(value);
+    // The renderer registry splits a table on a narrow viewport.
+    const row = / · Row (\d+)$/.exec(value);
+    if (row && RESULT_HEADING_COPY.has(value.slice(0, row.index))) {
+      return rebuilt(value, copy('$HEADING$ · Row $N$', { HEADING: copy(value.slice(0, row.index)), N: row[1] }));
+    }
+    return value;
+  }
+
+  function resultNoticeText(value) {
+    return RESULT_NOTICE_COPY.has(value) ? copy(value) : value;
+  }
+
+  // Fact labels the service worker writes for a single value ('Result') or a
+  // list of plain values ('Item 1', 'Item 2', ...); other labels are data.
+  function resultFactItems(atom) {
+    const items = atom.items;
+    if (atom.heading !== 'Result details') return items;
+    if (items.length === 1 && items[0].label === 'Result') {
+      return [{ label: copy('Result'), value: items[0].value }];
+    }
+    const listed = items.length > 0 && items.every(function (item, index) {
+      return item.label === 'Item ' + String(index + 1);
+    });
+    return listed ? items.map(function (item, index) {
+      return { label: copy('Item $N$', { N: String(index + 1) }), value: item.value };
+    }) : items;
+  }
+
+  // A single value in a list-shaped result shows as "Result: <value>".
+  function resultListText(atom, item) {
+    const prefix = 'Result: ';
+    if (atom.heading !== 'Results' || atom.items.length !== 1 || item.metadata !== null ||
+        item.text.length <= prefix.length || !item.text.startsWith(prefix)) return item.text;
+    return rebuilt(item.text, copy('Result: $VALUE$', { VALUE: item.text.slice(prefix.length) }));
+  }
+
+  function resultNoticeMessage(atom) {
+    if (atom.tone === 'error' && atom.heading === 'Action not completed') return unfinishedActionCopy(atom.message);
+    return resultNoticeText(atom.message);
+  }
+
   function normalizeRect(rect) {
     if (!rect) return null;
     const left = Number(rect.left);
@@ -2355,24 +2640,25 @@
 
     _adaptiveLens(model, placement, attention) {
       const shell = this;
+      const sources = adaptiveCopy(model);
       const region = createElement(this.document, 'div', 'skopeo-ambient skopeo-adaptive-lens-region', {
         role: 'region',
-        'aria-label': model.lens.regionLabel,
-        'aria-description': model.lens.metadata,
+        'aria-label': sources.regionLabel,
+        'aria-description': sources.metadata,
         'data-adaptive-attention': attention
       });
       const lens = createElement(this.document, 'div', 'skopeo-lens', {
         'data-placement-corner': placement.corner,
         'data-placement-mode': placement.mode
       });
-      const open = this._button('skopeo-lens-open', model.lens.actionLabel, '', function () {
+      const open = this._button('skopeo-lens-open', sources.actionLabel, '', function () {
         shell._adaptiveAction('open-actions', model);
       });
       open.appendChild(createElement(this.document, 'span', 'skopeo-active-glyph', { 'aria-hidden': 'true' }));
-      open.appendChild(createElement(this.document, 'span', 'skopeo-lens-label', {}, model.lens.label));
+      open.appendChild(createElement(this.document, 'span', 'skopeo-lens-label', {}, sources.lensLabel));
       lens.appendChild(open);
-      lens.appendChild(createElement(this.document, 'span', 'skopeo-lens-meta', {}, model.lens.metadata));
-      const close = this._button('skopeo-close', 'Turn off Skopeo', '×', function () {
+      lens.appendChild(createElement(this.document, 'span', 'skopeo-lens-meta', {}, sources.metadata));
+      const close = this._button('skopeo-close', copy(COPY.turnOff), '×', function () {
         shell.onRequestClose({
           generation: model.authority.generation,
           reason: 'close',
@@ -2391,8 +2677,8 @@
           'aria-hidden': 'true'
         });
         entityRow.appendChild(anchor);
-        const chip = this._button('skopeo-chip skopeo-entity-label', model.entity.chipAccessibleName,
-          model.entity.chipLabel, function () {
+        const chip = this._button('skopeo-chip skopeo-entity-label', sources.entity.accessibleName,
+          sources.entity.chip, function () {
             shell._adaptiveAction('open-actions', model);
           });
         chip.setAttribute('data-skopeo-primitive', 'chip');
@@ -2407,7 +2693,11 @@
       }
 
       const rail = this._rail(placement);
-      rail.setAttribute('aria-label', 'Skopeo ' + attention + ' status');
+      setAttributes(rail, {
+        'aria-label': Object.prototype.hasOwnProperty.call(ADAPTIVE_RAIL_COPY, attention)
+          ? copy(ADAPTIVE_RAIL_COPY[attention])
+          : 'Skopeo ' + attention + ' status'
+      });
       region.appendChild(rail);
       return region;
     }
@@ -2415,6 +2705,7 @@
     _adaptivePrimitiveRow(model) {
       if (!model.entity) return null;
       const shell = this;
+      const sources = adaptiveCopy(model);
       const row = createElement(this.document, 'div', 'skopeo-fixture-row skopeo-adaptive-focused-primitives');
       if (model.primitives.includes('anchor')) {
         row.appendChild(createElement(this.document, 'span', 'skopeo-adaptive-anchor', {
@@ -2423,8 +2714,8 @@
         }));
       }
       if (model.primitives.includes('chip')) {
-        const chip = this._button('skopeo-chip skopeo-entity-label', model.entity.chipAccessibleName,
-          model.entity.chipLabel, function () {
+        const chip = this._button('skopeo-chip skopeo-entity-label', sources.entity.accessibleName,
+          sources.entity.chip, function () {
             shell._adaptiveAction('open-actions', model);
           });
         chip.setAttribute('data-skopeo-primitive', 'chip');
@@ -2451,7 +2742,7 @@
       });
       section.appendChild(createElement(this.document, 'h3', 'skopeo-group-heading', {
         id: headingId
-      }, group.label));
+      }, adaptiveGroupHeading(group)));
       group.rows.forEach(function (row) {
         const classes = 'skopeo-capability-row' + (row.primary ? ' skopeo-ready-primary' : '');
         const button = shell._button(classes, row.label, '', function () {
@@ -2464,9 +2755,10 @@
         button.setAttribute('data-skopeo-capability', row.slug);
         button.setAttribute('data-side-effect-class', row.sideEffectClass);
         button.appendChild(createElement(shell.document, 'span', 'skopeo-row-label', {}, row.label));
-        button.appendChild(createElement(shell.document, 'span', 'skopeo-row-status', {}, row.status));
+        button.appendChild(createElement(shell.document, 'span', 'skopeo-row-status', {}, copy(row.status)));
         if (row.paramSummary) {
-          button.appendChild(createElement(shell.document, 'span', 'skopeo-row-detail', {}, row.paramSummary));
+          button.appendChild(createElement(shell.document, 'span', 'skopeo-row-detail', {},
+            adaptiveParameterSummary(row.paramSummary)));
         }
         section.appendChild(button);
       });
@@ -2528,7 +2820,7 @@
             value: '',
             disabled: 'disabled',
             selected: 'selected'
-          }, 'Select');
+          }, copy('Select'));
           control.appendChild(empty);
           field.choices.forEach(function (choice) {
             control.appendChild(createElement(shell.document, 'option', '', {
@@ -2573,12 +2865,12 @@
         form.appendChild(createElement(this.document, 'p', 'skopeo-argument-error', {
           id: formId + '-error',
           role: 'status'
-        }, collection.errorMessage));
+        }, copy(collection.errorMessage)));
       }
 
       const actions = createElement(this.document, 'div', 'skopeo-actions');
-      const cancel = this._button('skopeo-argument-cancel', collection.cancelLabel,
-        collection.cancelLabel, function () {
+      const cancel = this._button('skopeo-argument-cancel', copy(collection.cancelLabel),
+        copy(collection.cancelLabel), function () {
           if (submitted) return;
           shell._adaptiveAction('cancel-arguments', model, {
             groupId: collection.groupId,
@@ -2640,15 +2932,17 @@
     _adaptiveUnavailable(model) {
       if (!model.unavailableSummary.count) return null;
       const details = createElement(this.document, 'details', 'skopeo-unavailable');
+      const count = String(model.unavailableSummary.count);
       details.appendChild(createElement(this.document, 'summary', 'skopeo-section-heading', {},
-        model.unavailableSummary.heading + ' (' + model.unavailableSummary.count + ')'));
+        rebuilt(model.unavailableSummary.heading + ' (' + count + ')',
+          copy('Unavailable actions ($COUNT$)', { COUNT: count }))));
       model.unavailableSummary.rows.forEach((row) => {
         const status = createElement(this.document, 'div', 'skopeo-status-row', {
           'data-readiness-disposition': row.disposition
         });
         status.appendChild(createElement(this.document, 'span', 'skopeo-row-label', {}, row.label));
-        status.appendChild(createElement(this.document, 'span', 'skopeo-row-status', {}, row.status));
-        status.appendChild(createElement(this.document, 'span', 'skopeo-row-detail', {}, row.detail));
+        status.appendChild(createElement(this.document, 'span', 'skopeo-row-status', {}, copy(row.status)));
+        status.appendChild(createElement(this.document, 'span', 'skopeo-row-detail', {}, copy(row.detail)));
         details.appendChild(status);
       });
       return details;
@@ -2670,17 +2964,20 @@
 
     _adaptiveTableFacts(atom) {
       const wrapper = createElement(this.document, 'section', 'skopeo-atom');
-      wrapper.appendChild(createElement(this.document, 'h3', 'skopeo-atom-heading', {}, atom.heading));
+      wrapper.appendChild(createElement(this.document, 'h3', 'skopeo-atom-heading', {}, resultHeading(atom.heading)));
       atom.rows.forEach((row, rowIndex) => {
         const items = atom.columns.map(function (column, columnIndex) {
           return { label: column, value: row[columnIndex] };
         });
-        const facts = this._adaptiveFactList('Row ' + String(rowIndex + 1), items, 'skopeo-table-fact-list');
+        const facts = this._adaptiveFactList(copy('Row $N$', { N: String(rowIndex + 1) }), items,
+          'skopeo-table-fact-list');
         wrapper.appendChild(facts);
       });
       return wrapper;
     }
 
+    // Atom text is router data; resultHeading, resultFactItems and the
+    // notice helpers pick out the fixed copy that typed results carry.
     _adaptiveAtom(atom, model) {
       if (atom.type === 'section-heading') {
         return createElement(this.document, 'h3', 'skopeo-section-heading skopeo-atom', {}, atom.text);
@@ -2692,14 +2989,14 @@
         if (atom.detail) row.appendChild(createElement(this.document, 'span', 'skopeo-row-detail', {}, atom.detail));
         return row;
       }
-      if (atom.type === 'fact-list') return this._adaptiveFactList(atom.heading, atom.items);
+      if (atom.type === 'fact-list') return this._adaptiveFactList(resultHeading(atom.heading), resultFactItems(atom));
       if (atom.type === 'item-list') {
         const section = createElement(this.document, 'section', 'skopeo-atom');
-        section.appendChild(createElement(this.document, 'h3', 'skopeo-atom-heading', {}, atom.heading));
+        section.appendChild(createElement(this.document, 'h3', 'skopeo-atom-heading', {}, resultHeading(atom.heading)));
         const list = createElement(this.document, 'ul', 'skopeo-item-list');
         atom.items.forEach((item) => {
           const row = createElement(this.document, 'li', 'skopeo-atom-row');
-          row.appendChild(createElement(this.document, 'span', 'skopeo-atom-value', {}, item.text));
+          row.appendChild(createElement(this.document, 'span', 'skopeo-atom-value', {}, resultListText(atom, item)));
           if (item.metadata) row.appendChild(createElement(this.document, 'span', 'skopeo-atom-meta', {}, item.metadata));
           list.appendChild(row);
         });
@@ -2711,7 +3008,7 @@
           return this._adaptiveTableFacts(atom);
         }
         const section = createElement(this.document, 'section', 'skopeo-atom');
-        section.appendChild(createElement(this.document, 'h3', 'skopeo-atom-heading', {}, atom.heading));
+        section.appendChild(createElement(this.document, 'h3', 'skopeo-atom-heading', {}, resultHeading(atom.heading)));
         const table = createElement(this.document, 'table', 'skopeo-compact-table');
         const head = createElement(this.document, 'thead');
         const headRow = createElement(this.document, 'tr');
@@ -2732,7 +3029,7 @@
       }
       if (atom.type === 'timeline') {
         const section = createElement(this.document, 'section', 'skopeo-atom');
-        section.appendChild(createElement(this.document, 'h3', 'skopeo-atom-heading', {}, atom.heading));
+        section.appendChild(createElement(this.document, 'h3', 'skopeo-atom-heading', {}, resultHeading(atom.heading)));
         const list = createElement(this.document, 'ol', 'skopeo-timeline');
         atom.events.forEach((event) => {
           const row = createElement(this.document, 'li', 'skopeo-atom-row');
@@ -2745,7 +3042,7 @@
       }
       if (atom.type === 'diff') {
         const section = createElement(this.document, 'section', 'skopeo-atom skopeo-diff');
-        section.appendChild(createElement(this.document, 'h3', 'skopeo-atom-heading', {}, atom.heading));
+        section.appendChild(createElement(this.document, 'h3', 'skopeo-atom-heading', {}, resultHeading(atom.heading)));
         [[atom.beforeLabel, atom.before], [atom.afterLabel, atom.after]].forEach((entry) => {
           const row = createElement(this.document, 'div', 'skopeo-atom-row');
           row.appendChild(createElement(this.document, 'span', 'skopeo-row-label', {}, entry[0]));
@@ -2756,9 +3053,9 @@
       }
       const notice = createElement(this.document, 'section', 'skopeo-atom skopeo-notice' +
         (atom.tone === 'error' ? ' skopeo-notice-error' : ''));
-      notice.appendChild(createElement(this.document, 'h3', 'skopeo-atom-heading', {}, atom.heading));
-      notice.appendChild(createElement(this.document, 'p', 'skopeo-atom-value', {}, atom.message));
-      notice.appendChild(createElement(this.document, 'p', 'skopeo-atom-meta', {}, atom.nextStep));
+      notice.appendChild(createElement(this.document, 'h3', 'skopeo-atom-heading', {}, resultHeading(atom.heading)));
+      notice.appendChild(createElement(this.document, 'p', 'skopeo-atom-value', {}, resultNoticeMessage(atom)));
+      notice.appendChild(createElement(this.document, 'p', 'skopeo-atom-meta', {}, resultNoticeText(atom.nextStep)));
       return notice;
     }
 
@@ -2767,9 +3064,12 @@
       if (!message && !renderedAtoms.length) return null;
       const region = createElement(this.document, 'section', 'skopeo-result-region', {
         role: 'region',
-        'aria-label': 'Skopeo result'
+        'aria-label': copy('Skopeo result')
       });
-      if (message) region.appendChild(createElement(this.document, 'p', 'skopeo-result-message', {}, message));
+      if (message) {
+        region.appendChild(createElement(this.document, 'p', 'skopeo-result-message', {},
+          adaptiveCopy(model).resultMessage));
+      }
       renderedAtoms.forEach((atom) => region.appendChild(this._adaptiveAtom(atom, model)));
       return region;
     }
@@ -2779,24 +3079,24 @@
       const nodes = [];
       const primitives = this._adaptivePrimitiveRow(model);
       if (primitives) nodes.push(primitives);
+      const sources = adaptiveCopy(model);
       const titleId = 'skopeo-adaptive-title-' + model.authority.generation + '-' + model.authority.contextEpoch;
       const card = createElement(this.document, 'section', 'skopeo-focused-card skopeo-adaptive-card', {
         role: 'region',
         'aria-labelledby': titleId,
-        'aria-label': model.rendererRequest.copy.focusedTitle
+        'aria-label': sources.focusedTitle
       });
       const tools = createElement(this.document, 'div', 'skopeo-focused-tools');
-      tools.appendChild(this._button('skopeo-back', model.rendererRequest.copy.backLabel,
-        model.rendererRequest.copy.backLabel, function () { shell.back(); }));
+      tools.appendChild(this._button('skopeo-back', sources.backLabel,
+        sources.backLabel, function () { shell.back(); }));
       card.appendChild(tools);
-      card.appendChild(createElement(this.document, 'div', 'skopeo-eyebrow', {},
-        model.lens.appDisplayName + ' · ' + model.lens.pageNoun));
+      card.appendChild(createElement(this.document, 'div', 'skopeo-eyebrow', {}, sources.eyebrow));
       card.appendChild(createElement(this.document, 'h2', 'skopeo-focused-title', {
         id: titleId,
         tabindex: '-1'
-      }, model.rendererRequest.copy.focusedTitle));
+      }, sources.focusedTitle));
       card.appendChild(createElement(this.document, 'p', 'skopeo-focused-body', {},
-        model.rendererRequest.copy.contextDescription));
+        sources.contextDescription));
 
       model.readyGroups.forEach(function (group, groupIndex) {
         card.appendChild(shell._adaptiveReadyGroup(model, group, groupIndex));
@@ -2807,17 +3107,17 @@
       if (unavailable) card.appendChild(unavailable);
       if (!model.readyGroups.length && !model.unavailableSummary.count) {
         card.appendChild(createElement(this.document, 'h3', 'skopeo-empty-heading', {},
-          model.rendererRequest.copy.emptyHeading));
+          sources.emptyHeading));
         card.appendChild(createElement(this.document, 'p', 'skopeo-empty-body', {},
-          model.rendererRequest.copy.emptyBody));
+          sources.emptyBody));
       }
       const result = this._adaptiveResult(model, renderedAtoms);
       if (result) card.appendChild(result);
 
       const actions = createElement(this.document, 'div', 'skopeo-actions' +
         (Number(this.window.innerWidth) < model.rendererRequest.narrowBreakpoint ? ' skopeo-actions-stacked' : ''));
-      actions.appendChild(this._button('skopeo-turn-off', model.rendererRequest.copy.turnOffLabel,
-        model.rendererRequest.copy.turnOffLabel, function () {
+      actions.appendChild(this._button('skopeo-turn-off', sources.turnOffLabel,
+        sources.turnOffLabel, function () {
           shell._adaptiveTurnOff(model, ATTENTION.FOCUSED);
         }));
       card.appendChild(actions);
@@ -2840,18 +3140,22 @@
         'aria-labelledby': titleId,
         'aria-describedby': bodyId
       });
+      // The title ('<action>?') and the confirm label are the catalog action
+      // label and stay data.
       gate.appendChild(createElement(this.document, 'div', 'skopeo-eyebrow skopeo-gate-eyebrow', {},
-        consequence.eyebrow));
+        rebuilt(consequence.eyebrow, copy(consequence.sideEffectClass === 'destructive'
+          ? 'Destructive action' : 'Changes data'))));
       gate.appendChild(createElement(this.document, 'h2', 'skopeo-gate-title', {
         id: titleId
       }, consequence.title));
       gate.appendChild(createElement(this.document, 'p', 'skopeo-gate-body', {
         id: bodyId
-      }, consequence.body));
+      }, adaptiveConsequenceBody(consequence)));
       const actions = createElement(this.document, 'div', 'skopeo-actions' +
         (Number(this.window.innerWidth) < model.rendererRequest.narrowBreakpoint ? ' skopeo-actions-stacked' : ''));
       let submitted = false;
-      const safe = this._button('skopeo-gate-return', consequence.safeLabel, consequence.safeLabel, function () {
+      const safeLabel = rebuilt(consequence.safeLabel, copy('Keep reviewing'));
+      const safe = this._button('skopeo-gate-return', safeLabel, safeLabel, function () {
         shell._requestAdaptiveConsequenceCancel(model);
       });
       const confirm = this._button('skopeo-gate-continue' +
@@ -2867,10 +3171,10 @@
           sideEffectClass: consequence.sideEffectClass
         });
       });
-      const turnOff = this._button('skopeo-turn-off', model.rendererRequest.copy.turnOffLabel,
-        model.rendererRequest.copy.turnOffLabel, function () {
-          shell._adaptiveTurnOff(model, ATTENTION.INTERSTITIAL);
-        });
+      const turnOffLabel = adaptiveCopy(model).turnOffLabel;
+      const turnOff = this._button('skopeo-turn-off', turnOffLabel, turnOffLabel, function () {
+        shell._adaptiveTurnOff(model, ATTENTION.INTERSTITIAL);
+      });
       actions.appendChild(safe);
       actions.appendChild(confirm);
       actions.appendChild(turnOff);
@@ -3785,7 +4089,10 @@
       });
       const updateCount = function () {
         const length = Array.from(question.value).length;
-        text(count, String(length) + ' of ' + String(composer.questionLimit) + ' characters');
+        text(count, copy('$COUNT$ of $LIMIT$ characters', {
+          COUNT: String(length),
+          LIMIT: String(composer.questionLimit)
+        }));
         count.hidden = length < 1800;
         if (primary) {
           const disabled = composer.readOnly ||
@@ -4420,7 +4727,7 @@
       }
       this._rememberAdaptiveCommit(scope, candidate);
       this._applyPlacement(this._currentPlacement);
-      this._announce(model.lens.label + ' on.', true);
+      this._announce(adaptiveCopy(model).initialAnnouncement, true);
       return true;
     }
 
@@ -4475,10 +4782,10 @@
             !isFocusable(this.window, origin)) {
           this._safeFocus(title);
         }
-        const message = model.rendererRequest.copy.resultMessage;
-        if (message) this._announce(message, true);
-        else if (renderedAtoms.length) this._announce('Skopeo result updated.', true);
-        else if (!sameLevel) this._announce(model.rendererRequest.copy.focusedTitle + ' open.', true);
+        const sources = adaptiveCopy(model);
+        if (model.rendererRequest.copy.resultMessage) this._announce(sources.resultMessage, true);
+        else if (renderedAtoms.length) this._announce(copy('Skopeo result updated.'), true);
+        else if (!sameLevel) this._announce(sources.openAnnouncement, true);
       } else {
         this._safeFocus(this._surface.querySelector('.skopeo-gate-return'));
       }
@@ -4513,7 +4820,7 @@
       this._adaptiveModel = scope.adaptiveModel;
       this._adaptiveRenderedAtoms = scope.renderedAtoms;
       this._applyPlacement(this._currentPlacement);
-      this._announce(this._adaptiveModel.lens.label + ' overview.', true);
+      this._announce(adaptiveCopy(this._adaptiveModel).overviewAnnouncement, true);
       return true;
     }
 
