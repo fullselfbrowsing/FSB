@@ -1599,6 +1599,64 @@
     return rebuilt(label, copy('Ask about $VENDOR$', { VENDOR: entry.label }));
   }
 
+  // Ask and answer copy. The composer fills the ask and answer models from
+  // its own tables, apart from the typed question, the provider's conclusion,
+  // evidence values, citation and document labels, and a vendor scope's
+  // Drive folder name, which are data. The service worker names an
+  // agreement or corpus scope itself; a vendor scope that has no readable
+  // folder name falls back to 'Vendor folder', which cannot be told apart
+  // from a folder with that name and so stays data.
+  const ASK_SCOPE_COPY = Object.freeze({
+    agreement: 'Current agreement',
+    corpus: 'Enrolled accessible corpus'
+  });
+
+  function askScopeLabel(kind, label) {
+    return Object.prototype.hasOwnProperty.call(ASK_SCOPE_COPY, kind)
+      ? rebuilt(label, copy(ASK_SCOPE_COPY[kind]))
+      : label;
+  }
+
+  // The service worker names a piece of answer evidence by its assertion
+  // type with the hyphens removed, or as 'Current contract evidence'; any
+  // other claim is shown as given.
+  const ANSWER_CLAIM_COPY = new Set([
+    'signed date', 'effective date', 'expiration date', 'termination date', 'renewal',
+    'notice window', 'notice deadline', 'delivery method', 'written address',
+    'Current contract evidence'
+  ]);
+
+  function answerClaimLabel(claim) {
+    return ANSWER_CLAIM_COPY.has(claim) ? copy(claim) : claim;
+  }
+
+  // The ask engine explains each trust state with one fixed sentence.
+  const ANSWER_TRUST_EXPLANATION_COPY = Object.freeze({
+    accepted: 'The complete current governing evidence supports this conclusion.',
+    'review-required': 'Current governing evidence contains a conflict requiring human review.',
+    ambiguous: 'The current evidence does not completely support a material conclusion.'
+  });
+
+  function answerTrustExplanation(trust) {
+    return Object.prototype.hasOwnProperty.call(ANSWER_TRUST_EXPLANATION_COPY, trust.state)
+      ? rebuilt(trust.explanation, copy(ANSWER_TRUST_EXPLANATION_COPY[trust.state]))
+      : trust.explanation;
+  }
+
+  // The conflict and gap details the service worker and the ask engine
+  // write themselves, by the label the composer gives their type.
+  const ANSWER_DETAIL_TEXT_COPY = Object.freeze({
+    'Evidence conflict': 'Current governing evidence contains a conflict requiring review.',
+    'Source inaccessible': 'One or more relevant current sources could not be certified for this answer.',
+    'Incomplete evidence': 'The current evidence does not completely support a material conclusion.'
+  });
+
+  function answerDetailText(row) {
+    return Object.prototype.hasOwnProperty.call(ANSWER_DETAIL_TEXT_COPY, row.label)
+      ? rebuilt(row.detail, copy(ANSWER_DETAIL_TEXT_COPY[row.label]))
+      : row.detail;
+  }
+
   function normalizeRect(rect) {
     if (!rect) return null;
     const left = Number(rect.left);
@@ -4274,11 +4332,11 @@
         'data-contract-section': 'heading'
       });
       header.appendChild(createElement(
-        this.document, 'p', 'skopeo-ask-eyebrow', {}, model.composer.eyebrow
+        this.document, 'p', 'skopeo-ask-eyebrow', {}, copy(model.composer.eyebrow)
       ));
       header.appendChild(createElement(this.document, 'h2', 'skopeo-contract-heading', {
         id: 'skopeo-contract-heading'
-      }, model.title));
+      }, copy(model.title)));
       return header;
     }
 
@@ -4286,10 +4344,11 @@
       const shell = this;
       const composer = model.composer;
       const back = createElement(this.document, 'nav', '', {
-        'data-contract-section': 'back', 'aria-label': 'Ask navigation'
+        'data-contract-section': 'back', 'aria-label': copy('Ask navigation')
       });
+      const backLabel = copy(composer.backAction.label);
       back.appendChild(this._button(
-        'skopeo-contract-hide', composer.backAction.label, composer.backAction.label,
+        'skopeo-contract-hide', backLabel, backLabel,
         function () {
           shell._contractLocalAction(scope, model, onAction, { kind: composer.backAction.kind });
         }
@@ -4299,7 +4358,9 @@
       region.appendChild(createElement(
         this.document, 'p', 'skopeo-ask-scope', {
           'data-contract-section': 'scope'
-        }, 'Evidence scope · ' + model.scope.summary
+        }, copy('Evidence scope · $SCOPE$', {
+          SCOPE: askScopeLabel(model.scope.kind, model.scope.summary)
+        })
       ));
 
       const questionSection = this._contractSection('question');
@@ -4307,7 +4368,7 @@
       const helperId = 'skopeo-contract-question-helper';
       const countId = 'skopeo-contract-question-count';
       questionSection.appendChild(createElement(
-        this.document, 'label', 'skopeo-ask-label', { for: fieldId }, composer.fieldLabel
+        this.document, 'label', 'skopeo-ask-label', { for: fieldId }, copy(composer.fieldLabel)
       ));
       const question = createElement(this.document, 'textarea', 'skopeo-ask-question', {
         id: fieldId,
@@ -4320,7 +4381,7 @@
       question.style.minHeight = '88px';
       this._pointerSurface(question);
       const helper = createElement(
-        this.document, 'p', 'skopeo-ask-helper', { id: helperId }, composer.helper
+        this.document, 'p', 'skopeo-ask-helper', { id: helperId }, copy(composer.helper)
       );
       const count = createElement(this.document, 'p', 'skopeo-ask-count', {
         id: countId,
@@ -4350,7 +4411,7 @@
       const choices = createElement(this.document, 'fieldset', 'skopeo-ask-scope-choices', {
         'data-contract-section': 'scope-choices'
       });
-      choices.appendChild(createElement(this.document, 'legend', '', {}, 'Evidence scope'));
+      choices.appendChild(createElement(this.document, 'legend', '', {}, copy('Evidence scope')));
       const choice = createElement(this.document, 'label', 'skopeo-ask-scope-choice');
       const radio = createElement(this.document, 'input', '', {
         type: 'radio', name: 'skopeo-contract-scope', value: model.scope.scopeToken,
@@ -4359,7 +4420,9 @@
       radio.checked = true;
       this._pointerSurface(radio);
       choice.appendChild(radio);
-      choice.appendChild(createElement(this.document, 'span', '', {}, model.scope.label));
+      choice.appendChild(createElement(
+        this.document, 'span', '', {}, askScopeLabel(model.scope.kind, model.scope.label)
+      ));
       choices.appendChild(choice);
       region.appendChild(choices);
 
@@ -4377,14 +4440,14 @@
         });
       };
       if (composer.primaryAction) {
-        primary = this._button(
-          'skopeo-ask-primary', composer.primaryAction.label, composer.primaryAction.label, dispatch
-        );
+        const primaryLabel = copy(composer.primaryAction.label);
+        primary = this._button('skopeo-ask-primary', primaryLabel, primaryLabel, dispatch);
         actions.appendChild(primary);
       }
       if (composer.clearAction) {
+        const clearLabel = copy(composer.clearAction.label);
         clear = this._button(
-          'skopeo-ask-clear', composer.clearAction.label, composer.clearAction.label,
+          'skopeo-ask-clear', clearLabel, clearLabel,
           function () {
             shell._contractLocalAction(scope, model, onAction, { kind: composer.clearAction.kind });
           }
@@ -4392,8 +4455,9 @@
         actions.appendChild(clear);
       }
       if (composer.cancelAction) {
+        const cancelLabel = copy(composer.cancelAction.label);
         actions.appendChild(this._button(
-          'skopeo-ask-cancel', composer.cancelAction.label, composer.cancelAction.label,
+          'skopeo-ask-cancel', cancelLabel, cancelLabel,
           function () {
             shell._contractLocalAction(scope, model, onAction, { kind: composer.cancelAction.kind });
           }
@@ -4403,17 +4467,17 @@
       region.appendChild(createElement(
         this.document, 'p', 'skopeo-ask-privacy', {
           'data-contract-section': 'privacy'
-        }, composer.privacy
+        }, copy(composer.privacy)
       ));
       if (composer.status) {
         region.appendChild(createElement(this.document, 'p', 'skopeo-ask-status', {
           role: 'status', 'aria-live': 'polite'
-        }, composer.status));
+        }, copy(composer.status)));
       }
       if (composer.error) {
         region.appendChild(createElement(this.document, 'p', 'skopeo-ask-error', {
           role: 'alert'
-        }, composer.error.message));
+        }, copy(composer.error.message)));
       }
 
       let composing = false;
@@ -4444,13 +4508,20 @@
 
     _contractAnswerEvidence(scope, model, row, onAction) {
       const item = createElement(this.document, 'li', 'skopeo-answer-evidence', { role: 'listitem' });
-      item.appendChild(createElement(this.document, 'strong', '', {}, row.claim));
+      const claim = answerClaimLabel(row.claim);
+      item.appendChild(createElement(this.document, 'strong', '', {}, claim));
       item.appendChild(createElement(this.document, 'div', '', {}, row.value));
       item.appendChild(createElement(
         this.document, 'p', 'skopeo-answer-meta', {},
-        row.evidenceLabel + ' · ' + row.trustLabel + ' · ' + row.citationLabel
+        copy('$EVIDENCE$ · $TRUST$ · $CITATION$', {
+          EVIDENCE: copy(row.evidenceLabel),
+          TRUST: copy(row.trustLabel),
+          CITATION: row.citationLabel
+        })
       ));
-      item.appendChild(this._contractCitationControl(scope, model, row.action, onAction));
+      item.appendChild(this._contractCitationControl(scope, model, row.action, onAction, rebuilt(
+        row.action.label, copy('Open source for $LABEL$', { LABEL: claim })
+      )));
       return item;
     }
 
@@ -4462,13 +4533,15 @@
       });
       let pending = false;
       let button = null;
+      const actionLabel = copy(action.label);
+      const unavailable = copy('Action unavailable. Reopen this answer and try again.');
       button = this._button(
-        'skopeo-answer-policy-action', action.label, action.label, function () {
+        'skopeo-answer-policy-action', actionLabel, actionLabel, function () {
           if (pending) return;
           pending = true;
           button.disabled = true;
           button.setAttribute('aria-disabled', 'true');
-          text(status, action.requiresConfirmation ? 'Preparing confirmation…' : 'Applying action…');
+          text(status, copy(action.requiresConfirmation ? 'Preparing confirmation…' : 'Applying action…'));
           const result = shell._contractLocalAction(scope, model, onAction, {
             kind: 'answer-action', actionId: action.actionId
           });
@@ -4476,18 +4549,18 @@
             if (scope.disposed || shell._corpusScope !== scope || shell._contractModel !== model) return;
             pending = false;
             if (handled === true) {
-              text(status, action.requiresConfirmation ? 'Confirmation opened.' : 'Action completed.');
+              text(status, copy(action.requiresConfirmation ? 'Confirmation opened.' : 'Action completed.'));
               return;
             }
             button.disabled = false;
             button.removeAttribute('aria-disabled');
-            text(status, 'Action unavailable. Reopen this answer and try again.');
+            text(status, unavailable);
           }, function () {
             if (scope.disposed || shell._corpusScope !== scope || shell._contractModel !== model) return;
             pending = false;
             button.disabled = false;
             button.removeAttribute('aria-disabled');
-            text(status, 'Action unavailable. Reopen this answer and try again.');
+            text(status, unavailable);
           });
         }
       );
@@ -4504,37 +4577,38 @@
         'data-outcome': answer.banner.outcome
       });
       banner.appendChild(createElement(
-        this.document, 'p', 'skopeo-ask-eyebrow', {}, 'ASK CONTRACT EVIDENCE'
+        this.document, 'p', 'skopeo-ask-eyebrow', {}, copy('ASK CONTRACT EVIDENCE')
       ));
       banner.appendChild(createElement(this.document, 'h2', 'skopeo-contract-heading', {
         id: 'skopeo-contract-heading'
-      }, answer.banner.label));
+      }, copy(answer.banner.label)));
       banner.appendChild(createElement(
-        this.document, 'p', 'skopeo-contract-explanation', {}, answer.banner.explanation
+        this.document, 'p', 'skopeo-contract-explanation', {}, copy(answer.banner.explanation)
       ));
       region.appendChild(banner);
       region.appendChild(createElement(
-        this.document, 'p', 'skopeo-answer-question', {}, 'Question · ' + answer.question
+        this.document, 'p', 'skopeo-answer-question', {},
+        copy('Question · $QUESTION$', { QUESTION: answer.question })
       ));
 
       if (answer.conclusion) {
-        const conclusion = this._contractSection('conclusion', answer.conclusion.heading);
+        const conclusion = this._contractSection('conclusion', copy(answer.conclusion.heading));
         conclusion.appendChild(createElement(
           this.document, 'p', 'skopeo-answer-conclusion', {}, answer.conclusion.text
         ));
         conclusion.appendChild(createElement(
           this.document, 'p', 'skopeo-answer-trust', {
             'data-trust-state': answer.trust.state
-          }, answer.trust.label
+          }, copy(answer.trust.label)
         ));
         conclusion.appendChild(createElement(
-          this.document, 'p', 'skopeo-answer-meta', {}, answer.trust.explanation
+          this.document, 'p', 'skopeo-answer-meta', {}, answerTrustExplanation(answer.trust)
         ));
         region.appendChild(conclusion);
       } else {
         const empty = createElement(this.document, 'div', 'skopeo-answer-empty');
-        empty.appendChild(createElement(this.document, 'h3', '', {}, answer.empty.heading));
-        empty.appendChild(createElement(this.document, 'p', '', {}, answer.empty.body));
+        empty.appendChild(createElement(this.document, 'h3', '', {}, copy(answer.empty.heading)));
+        empty.appendChild(createElement(this.document, 'p', '', {}, copy(answer.empty.body)));
         region.appendChild(empty);
       }
 
@@ -4543,29 +4617,30 @@
         const list = createElement(shell.document, 'ul', 'skopeo-answer-list', { role: 'list' });
         for (const row of rows) list.appendChild(shell._contractAnswerEvidence(scope, model, row, onAction));
         if (rows.length === 0) list.appendChild(createElement(
-          shell.document, 'li', 'skopeo-answer-detail', { role: 'listitem' }, 'No supported evidence in this section.'
+          shell.document, 'li', 'skopeo-answer-detail', { role: 'listitem' },
+          copy('No supported evidence in this section.')
         ));
         section.appendChild(list);
         region.appendChild(section);
       };
-      evidenceSection('governing-evidence', 'Governing evidence', answer.governingEvidence);
+      evidenceSection('governing-evidence', copy('Governing evidence'), answer.governingEvidence);
       if (answer.relevantHistory.length) {
-        evidenceSection('relevant-history', 'Relevant history', answer.relevantHistory);
+        evidenceSection('relevant-history', copy('Relevant history'), answer.relevantHistory);
       }
 
-      const detailSection = this._contractSection('conflicts-and-gaps', 'Conflicts and gaps');
+      const detailSection = this._contractSection('conflicts-and-gaps', copy('Conflicts and gaps'));
       const details = createElement(this.document, 'ul', 'skopeo-answer-list', { role: 'list' });
       if (answer.conflictsAndGaps.length) {
         for (const row of answer.conflictsAndGaps) {
           const item = createElement(this.document, 'li', 'skopeo-answer-detail', { role: 'listitem' });
-          item.appendChild(createElement(this.document, 'strong', '', {}, row.label));
-          item.appendChild(createElement(this.document, 'div', '', {}, row.detail));
+          item.appendChild(createElement(this.document, 'strong', '', {}, copy(row.label)));
+          item.appendChild(createElement(this.document, 'div', '', {}, answerDetailText(row)));
           details.appendChild(item);
         }
       } else {
         details.appendChild(createElement(
           this.document, 'li', 'skopeo-answer-detail', { role: 'listitem' },
-          'No conflicts or gaps proven.'
+          copy('No conflicts or gaps proven.')
         ));
       }
       detailSection.appendChild(details);
@@ -4573,21 +4648,21 @@
 
       const policy = answer.policySafeguards;
       if (policy) {
-        const policySection = this._contractSection('policy-safeguards', 'Policy safeguards');
+        const policySection = this._contractSection('policy-safeguards', copy('Policy safeguards'));
         const card = createElement(this.document, 'div', 'skopeo-answer-policy');
         card.appendChild(createElement(
           this.document, 'p', 'skopeo-answer-policy-status', {
             'data-clearance': policy.clearance.state
-          }, 'Decision clearance · ' + policy.clearance.label
+          }, copy('Decision clearance · $CLEARANCE$', { CLEARANCE: copy(policy.clearance.label) })
         ));
-        card.appendChild(createElement(this.document, 'p', '', {}, policy.document10.label));
+        card.appendChild(createElement(this.document, 'p', '', {}, copy(policy.document10.label)));
         if (Object.prototype.hasOwnProperty.call(policy, 'memo')) {
-          card.appendChild(createElement(this.document, 'p', '', {}, policy.memo.label));
+          card.appendChild(createElement(this.document, 'p', '', {}, copy(policy.memo.label)));
         }
         if (policy.reasons.length) {
           const reasons = createElement(this.document, 'ul', 'skopeo-answer-policy-list', { role: 'list' });
           for (const reason of policy.reasons) {
-            reasons.appendChild(createElement(this.document, 'li', '', { role: 'listitem' }, reason));
+            reasons.appendChild(createElement(this.document, 'li', '', { role: 'listitem' }, copy(reason)));
           }
           card.appendChild(reasons);
         }
@@ -4598,35 +4673,41 @@
         region.appendChild(policySection);
       }
 
-      const sourcesSection = this._contractSection('sources', 'Sources');
+      const sourcesSection = this._contractSection('sources', copy('Sources'));
       const sources = createElement(this.document, 'ul', 'skopeo-answer-list', { role: 'list' });
       for (const source of answer.sources) {
         const item = createElement(this.document, 'li', 'skopeo-answer-source', { role: 'listitem' });
         item.appendChild(createElement(this.document, 'strong', '', {}, source.label));
-        item.appendChild(createElement(this.document, 'p', 'skopeo-answer-meta', {}, source.evidenceLabel));
-        item.appendChild(this._contractCitationControl(scope, model, source.action, onAction));
+        item.appendChild(createElement(
+          this.document, 'p', 'skopeo-answer-meta', {}, copy(source.evidenceLabel)
+        ));
+        item.appendChild(this._contractCitationControl(scope, model, source.action, onAction, rebuilt(
+          source.action.label, copy('Open source for $LABEL$', { LABEL: source.label })
+        )));
         sources.appendChild(item);
       }
       if (answer.sources.length === 0) sources.appendChild(createElement(
-        this.document, 'li', 'skopeo-answer-source', { role: 'listitem' }, 'No cited sources available.'
+        this.document, 'li', 'skopeo-answer-source', { role: 'listitem' }, copy('No cited sources available.')
       ));
       sourcesSection.appendChild(sources);
       if (answer.sourceOverflowText) sourcesSection.appendChild(createElement(
-        this.document, 'p', 'skopeo-contract-overflow', {}, answer.sourceOverflowText
+        this.document, 'p', 'skopeo-contract-overflow', {},
+        overflowCopy(answer.sourceOverflowText, '+$COUNT$ additional sources not shown', answer.sourceOverflow)
       ));
       region.appendChild(sourcesSection);
 
       const resultActions = createElement(this.document, 'div', 'skopeo-answer-result-actions', {
         'data-contract-section': 'result-actions'
       });
+      const askAnotherLabel = copy(answer.resultActions.askAnother.label);
+      const backLabel = copy(answer.resultActions.back.label);
       resultActions.appendChild(this._button(
-        'skopeo-ask-another', answer.resultActions.askAnother.label,
-        answer.resultActions.askAnother.label, function () {
+        'skopeo-ask-another', askAnotherLabel, askAnotherLabel, function () {
           shell._contractLocalAction(scope, model, onAction, { kind: answer.resultActions.askAnother.kind });
         }
       ));
       resultActions.appendChild(this._button(
-        'skopeo-ask-back', answer.resultActions.back.label, answer.resultActions.back.label,
+        'skopeo-ask-back', backLabel, backLabel,
         function () {
           shell._contractLocalAction(scope, model, onAction, { kind: answer.resultActions.back.kind });
         }
@@ -4717,13 +4798,17 @@
       }
       if (scope.initialFocus) this._safeFocus(scope.initialFocus);
       if (model.mode === 'answer') {
-        this._announce(model.answer.banner.label + '. Contract evidence updated.', true);
+        this._announce(copy('$LABEL$. Contract evidence updated.', {
+          LABEL: copy(model.answer.banner.label)
+        }), true);
       } else if (model.composer.state === 'checking') {
-        this._announce(model.composer.status, true);
+        this._announce(copy(model.composer.status), true);
       } else if (model.composer.state === 'error') {
-        this._announce(model.composer.error.message, true);
+        this._announce(copy(model.composer.error.message), true);
       } else {
-        this._announce('Ask contract evidence. ' + model.scope.label + '.', true);
+        this._announce(copy('Ask contract evidence. $SCOPE$.', {
+          SCOPE: askScopeLabel(model.scope.kind, model.scope.label)
+        }), true);
       }
       return true;
     }
@@ -4770,24 +4855,29 @@
             'aria-describedby': 'skopeo-contract-confirmation-body',
             'data-contract-mode': 'confirmation'
           });
-        region.appendChild(createElement(this.document, 'p', 'skopeo-ask-eyebrow', {}, model.eyebrow));
+        // The runtime writes the eyebrow, body and safe label from its own
+        // literals or the service worker's fixed consequence detail; the
+        // title and the confirm label are one of the checked titles.
+        region.appendChild(createElement(this.document, 'p', 'skopeo-ask-eyebrow', {}, copy(model.eyebrow)));
         region.appendChild(createElement(this.document, 'h2', 'skopeo-contract-heading', {
           id: 'skopeo-contract-heading'
-        }, model.title));
+        }, copy(model.title)));
         region.appendChild(createElement(this.document, 'p', 'skopeo-confirmation-body', {
           id: 'skopeo-contract-confirmation-body'
-        }, model.body));
+        }, copy(model.body)));
         const actions = createElement(this.document, 'div', 'skopeo-confirmation-actions');
         let consumed = false;
+        const safeLabel = copy(model.safeAction.label);
+        const confirmLabel = copy(model.confirmAction.label);
         const safe = this._button(
-          'skopeo-confirmation-safe', model.safeAction.label, model.safeAction.label, function () {
+          'skopeo-confirmation-safe', safeLabel, safeLabel, function () {
             if (consumed) return;
             consumed = true;
             shell._contractLocalAction(scope, authorityModel, onAction, { kind: model.safeAction.kind });
           }
         );
         const confirm = this._button(
-          'skopeo-confirmation-confirm', model.confirmAction.label, model.confirmAction.label,
+          'skopeo-confirmation-confirm', confirmLabel, confirmLabel,
           function () {
             if (consumed) return;
             consumed = true;
@@ -4876,7 +4966,7 @@
       this._corpusScope = scope;
       this._contractOnAction = onAction;
       if (scope.initialFocus) this._safeFocus(scope.initialFocus);
-      this._announce('Confirmation required. ' + model.title + '.', true);
+      this._announce(copy('Confirmation required. $TITLE$.', { TITLE: copy(model.title) }), true);
       return true;
     }
 
