@@ -2401,7 +2401,21 @@ async function runChromeContract() {
   };
   try {
     fs.writeFileSync(fixturePath, fixtureHtml(scriptUrls), 'utf8');
+    // Headless --dump-dom sometimes snapshots the page before the fixture
+    // script has finished (no result yet, with or without data-progress), even
+    // when the same build passes seconds earlier. Only a dump without a result
+    // is retried, each time with a fresh profile; a fixture error or a wrong
+    // result still fails at once, and a real hang fails every attempt.
     function runAt(width, height, label) {
+      const attempts = 3;
+      for (let attempt = 1; ; attempt += 1) {
+        const stdout = dumpAt(width, height, label + (attempt === 1 ? '' : '-retry' + attempt));
+        const noResult = !/id="skopeo-contract-result"[^>]*data-(?:json|error)="/.test(stdout);
+        if (noResult && attempt < attempts) continue;
+        return parseResult(stdout);
+      }
+    }
+    function dumpAt(width, height, label) {
       const run = childProcess.spawnSync(resolution.executable, [
         '--headless=new',
         '--run-all-compositor-stages-before-draw',
@@ -2433,7 +2447,7 @@ async function runChromeContract() {
       const expectedDumpTimeout = !!(run.error && run.error.code === 'ETIMEDOUT' && run.stdout);
       assert.ok(!run.error || expectedDumpTimeout, 'local Chrome process launches successfully: ' + String(run.error || ''));
       if (!expectedDumpTimeout) assert.equal(run.status, 0, 'local Chrome exits successfully\n' + String(run.stderr || ''));
-      return parseResult(run.stdout);
+      return String(run.stdout || '');
     }
     const storageBoundary = await runLoadedExtensionStorageContract(resolution, tempRoot);
     const result = runAt(1024, 768, 'normal');
