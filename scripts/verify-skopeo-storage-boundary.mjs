@@ -896,7 +896,8 @@ export function verifyStorageBoundary(options = {}) {
 
   const contentFiles = parseLiteralArray(backgroundSource, 'CONTENT_SCRIPT_FILES', errors);
   const skopeoFiles = parseLiteralArray(backgroundSource, 'SKOPEO_INJECTION_FILES', errors);
-  const roots = new Set([...manifestContentFiles, ...contentFiles, ...skopeoFiles]);
+  const skopeoLocaleFiles = parseLiteralArray(backgroundSource, 'SKOPEO_LOCALE_FILES', errors);
+  const roots = new Set([...manifestContentFiles, ...contentFiles, ...skopeoFiles, ...skopeoLocaleFiles]);
   const closure = new Set();
   const pending = [...roots];
   while (pending.length) {

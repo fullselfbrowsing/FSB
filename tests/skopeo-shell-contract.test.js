@@ -2036,6 +2036,105 @@ function testArgumentCollectorSourceContract() {
     'schema default/example text never becomes a placeholder');
 }
 
+// A real ui-locale instance with probe keys, as skopeo-hud-exact.js and the
+// catalogs supply them in the extension.
+function loadProbeLocale() {
+  const vm = require('vm');
+  const sandbox = { module: undefined };
+  sandbox.globalThis = sandbox;
+  vm.createContext(sandbox);
+  vm.runInContext(fs.readFileSync(path.resolve(__dirname, '..', 'extension', 'utils', 'ui-locale.js'), 'utf8'), sandbox);
+  const locale = sandbox.fsbUiLocale;
+  const english = {
+    probe_ambient: 'Skopeo · Ambient',
+    probe_turn_off: 'Turn off Skopeo',
+    probe_ambient_announcement: 'Skopeo on. Ambient view.',
+    probe_anchor_label: 'Open anchor mark demo',
+    probe_back_ambient: 'Back to ambient Skopeo',
+    probe_focused_title: 'Focused Skopeo demo'
+  };
+  const german = {
+    probe_ambient: 'Skopeo · Dezent',
+    probe_turn_off: 'Skopeo ausschalten',
+    probe_ambient_announcement: 'Skopeo an. Dezente Ansicht.',
+    probe_anchor_label: 'Anker-Demo öffnen',
+    probe_back_ambient: 'Zurück zu dezentem Skopeo',
+    probe_focused_title: 'Fokussierte Skopeo-Demo'
+  };
+  locale.setCatalog('en', english);
+  locale.setCatalog('de', german);
+  const exact = {};
+  for (const [key, value] of Object.entries(english)) exact[value] = key;
+  locale.registerExact(exact);
+  return { locale, english, german };
+}
+
+// FSB's own HUD copy follows the FSB language. It is written translated into
+// the closed root, and a language change rewrites the same nodes in place:
+// no render, no new announcement. Without fsbUiLocale (every test above)
+// the shell writes English as before.
+function testShellFollowsFsbLanguage(api) {
+  const plain = createHarness(api);
+  plain.shell.mountAmbient(plain.shell.prepareAmbient());
+  const plainResources = exactResourceSnapshot(plain.shell);
+  assertZeroSnapshot(plain.shell.destroy('plain-language-baseline'), 'plain baseline destroys to zero');
+
+  const { locale, german } = loadProbeLocale();
+  locale.setOverride('de');
+  globalThis.fsbUiLocale = locale;
+  try {
+    const harness = createHarness(api);
+    assert.strictEqual(harness.shell.mountAmbient(harness.shell.prepareAmbient()), true);
+    const shadow = harness.shadow();
+    const label = shadow.querySelector('.skopeo-lens-label');
+    const close = shadow.querySelector('.skopeo-close');
+    const live = shadow.querySelector('[aria-live="polite"]');
+    const envelope = shadow.querySelector('.skopeo-envelope');
+    assert.strictEqual(label.textContent, german.probe_ambient, 'the lens label follows the FSB language');
+    assert.strictEqual(close.getAttribute('aria-label'), german.probe_turn_off, 'the close label follows the FSB language');
+    assert.strictEqual(close.textContent, '×', 'the close glyph is not copy');
+    assert.strictEqual(live.textContent, german.probe_ambient_announcement, 'the first announcement is translated');
+    assert.strictEqual(envelope.getAttribute('lang'), 'de', 'the envelope inside the closed root carries the language');
+    assert.strictEqual(harness.host().getAttribute('lang'), null, 'the page-visible host gets no lang');
+    const resources = exactResourceSnapshot(harness.shell);
+    assert.strictEqual(resources.listeners, plainResources.listeners + 1, 'the language subscription is one ledgered listener');
+
+    locale.setOverride('en');
+    locale.refresh();
+    assert.strictEqual(shadow.querySelector('.skopeo-lens-label'), label, 'a language change keeps the node');
+    assert.strictEqual(label.textContent, 'Skopeo · Ambient', 'a language change rewrites the label in place');
+    assert.strictEqual(close.getAttribute('aria-label'), 'Turn off Skopeo', 'a language change rewrites the close label');
+    assert.strictEqual(live.textContent, german.probe_ambient_announcement, 'a language change never announces again');
+    assert.strictEqual(envelope.getAttribute('lang'), 'en');
+
+    label.textContent = 'changed since';
+    locale.setOverride('de');
+    locale.refresh();
+    assert.strictEqual(label.textContent, 'changed since', 'text replaced since it was written is left alone');
+    assertZeroSnapshot(harness.shell.destroy('language'), 'a shell that followed the language destroys to zero');
+    locale.setOverride('en');
+    locale.refresh();
+
+    // A suspended scope comes back in the language chosen while it was away.
+    locale.setOverride('de');
+    const { harness: fixture } = mountFixtureWithOrigin(api);
+    assert.strictEqual(fixture.shell.render('anchored', {}), true);
+    const anchor = fixture.shadow().querySelector('[data-skopeo-primitive="anchor"]');
+    assert.strictEqual(anchor.getAttribute('aria-label'), german.probe_anchor_label);
+    assert.strictEqual(fixture.shell.render('focused', {}), true);
+    assert.strictEqual(fixture.shadow().querySelector('.skopeo-focused-title').textContent, german.probe_focused_title);
+    locale.setOverride('en');
+    locale.refresh();
+    assert.strictEqual(fixture.shadow().querySelector('.skopeo-focused-title').textContent, 'Focused Skopeo demo');
+    assert.strictEqual(fixture.shell.back(), true, 'Back restores the suspended anchored scope');
+    assert.strictEqual(anchor.getAttribute('aria-label'), 'Open anchor mark demo',
+      'the restored anchored scope shows the language chosen while it was suspended');
+    assertZeroSnapshot(fixture.shell.destroy('language-restore'), 'restored fixture destroys to zero');
+  } finally {
+    delete globalThis.fsbUiLocale;
+  }
+}
+
 function runProductionContract(api) {
   testExports(api);
   testPhase53MethodSurface(api);
@@ -2053,6 +2152,7 @@ function runProductionContract(api) {
   testRichGeometryRevalidation(api);
   testGeometryInvalidationListenerContract(api);
   testSuspendedPlacementRestoration(api);
+  testShellFollowsFsbLanguage(api);
   testPhase53ClosedContextProjection(api);
   testPhase53SemanticMarkGeometry(api);
   testPhase53AnchorAuthorityWithdrawalAndPlateau(api);

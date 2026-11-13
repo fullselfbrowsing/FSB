@@ -777,15 +777,137 @@
     return sortedActual.every(function (key, index) { return key === sortedExpected[index]; });
   }
 
+  // FSB's own HUD copy follows the FSB language; everything else is data.
+  // Copy reaches the shell in English: composer models and runtime and
+  // service-worker messages stay English because their validators compare
+  // exact strings. A sink translates a copy() source when it writes it. A
+  // plain string (a catalog label, a Drive or document name, an extracted
+  // value, a model answer, a typed question) is written as given.
+  const COPY_SOURCE = Symbol('skopeoCopy');
+  const COPY_WRITES = new WeakMap();
+  const COPY_TOKEN = /\$([A-Z][A-Z0-9_]*)\$/g;
+
+  function copy(english, subs) {
+    const source = { english: String(english), subs: subs || null };
+    source[COPY_SOURCE] = true;
+    return Object.freeze(source);
+  }
+
+  function isCopy(value) {
+    return !!value && typeof value === 'object' && value[COPY_SOURCE] === true;
+  }
+
+  function hudLocale() {
+    const locale = globalThis.fsbUiLocale;
+    return locale && typeof locale.line === 'function' && typeof locale.current === 'function'
+      ? locale
+      : null;
+  }
+
+  // The English a copy() source stands for, nested sources filled in: the
+  // exact string the shell wrote before it translated anything.
+  function englishOf(value) {
+    if (!isCopy(value)) return value == null ? '' : String(value);
+    if (!value.subs) return value.english;
+    const subs = value.subs;
+    return value.english.replace(COPY_TOKEN, function (match, name) {
+      return Object.prototype.hasOwnProperty.call(subs, name) ? englishOf(subs[name]) : match;
+    });
+  }
+
+  // ui-locale translates a nested { english, subs } substitution and shows
+  // every other value as given.
+  function lineSubs(subs) {
+    if (!subs) return undefined;
+    const out = {};
+    for (const name of Object.keys(subs)) {
+      const value = subs[name];
+      out[name] = isCopy(value)
+        ? { english: value.english, subs: lineSubs(value.subs) }
+        : (value == null ? '' : String(value));
+    }
+    return out;
+  }
+
+  function localized(value) {
+    if (!isCopy(value)) return value == null ? '' : String(value);
+    const locale = hudLocale();
+    if (!locale) return englishOf(value);
+    try {
+      const shown = locale.line(value.english, lineSubs(value.subs));
+      return typeof shown === 'string' ? shown : englishOf(value);
+    } catch (_error) {
+      return englishOf(value);
+    }
+  }
+
+  function recordCopy(node, slot, value, shown) {
+    let record = COPY_WRITES.get(node);
+    if (!isCopy(value)) {
+      if (record) delete record[slot];
+      return;
+    }
+    if (!record) {
+      record = Object.create(null);
+      COPY_WRITES.set(node, record);
+    }
+    record[slot] = { source: value, shown: shown };
+  }
+
+  // Rewrites the copy this shell wrote under root in the active language. A
+  // node or attribute is rewritten only while it still shows what was
+  // written, so anything that changed since is left alone.
+  function relocalizeTree(root) {
+    const stack = root ? [root] : [];
+    while (stack.length) {
+      const node = stack.pop();
+      const record = COPY_WRITES.get(node);
+      if (record) {
+        for (const slot of Object.keys(record)) {
+          const entry = record[slot];
+          const attribute = slot === 'text' ? null : slot.slice(1);
+          const current = attribute ? node.getAttribute(attribute) : node.textContent;
+          if (current !== entry.shown) {
+            delete record[slot];
+            continue;
+          }
+          const next = localized(entry.source);
+          if (next !== entry.shown) {
+            if (attribute) node.setAttribute(attribute, next);
+            else node.textContent = next;
+          }
+          entry.shown = next;
+        }
+      }
+      const children = node.childNodes;
+      if (children) {
+        for (let index = children.length - 1; index >= 0; index -= 1) stack.push(children[index]);
+      }
+    }
+  }
+
   function text(node, value) {
-    node.textContent = value == null ? '' : String(value);
+    const shown = localized(value);
+    node.textContent = shown;
+    recordCopy(node, 'text', value, shown);
+    return node;
+  }
+
+  // Live-region text is translated when it is announced but never rewritten
+  // later, so a language change does not announce it again.
+  function announcementText(node, value) {
+    node.textContent = localized(value);
+    recordCopy(node, 'text', undefined);
     return node;
   }
 
   function setAttributes(node, attributes) {
     for (const key of Object.keys(attributes || {})) {
       const value = attributes[key];
-      if (value !== undefined && value !== null) node.setAttribute(key, String(value));
+      if (value === undefined || value === null) continue;
+      const shown = localized(value);
+      node.setAttribute(key, shown);
+      recordCopy(node, '@' + key, value, shown);
     }
     return node;
   }
@@ -1171,6 +1293,7 @@
       this._shadow = null;
       this._style = null;
       this._envelope = null;
+      this._languageHandle = null;
       this._surface = null;
       this._liveRegion = null;
       this._attention = null;
@@ -1378,7 +1501,8 @@
       const live = createElement(this.document, 'div', 'skopeo-live', {
         'aria-live': 'polite',
         'aria-atomic': 'true'
-      }, COPY.ambientAnnouncement);
+      });
+      announcementText(live, copy(COPY.ambientAnnouncement));
 
       envelope.appendChild(surface);
       envelope.appendChild(live);
@@ -1426,7 +1550,42 @@
       this._applyPlacement(placement);
       this._installGeometryInvalidationListeners();
       this._installKeyboardListener();
+      this._watchLanguage();
       return true;
+    }
+
+    // Follows the FSB language: a change rewrites this shell's copy in place,
+    // with no render, so focus, scroll, typed text and announcements stay.
+    _watchLanguage() {
+      const locale = hudLocale();
+      if (!locale || this._languageHandle || this._disposed) return;
+      const shell = this;
+      if (typeof locale.onChange === 'function') {
+        const release = locale.onChange(function () { shell._relocalize(); });
+        if (typeof release === 'function') {
+          this._languageHandle = this._acquire('listeners', release, 'FSB language change');
+        }
+      }
+      this._syncLanguage();
+      if (typeof locale.bootOnce === 'function') {
+        Promise.resolve().then(function () { return locale.bootOnce(); })
+          .then(function () { shell._relocalize(); }, function () {});
+      }
+    }
+
+    _syncLanguage() {
+      const locale = hudLocale();
+      if (!locale || !this._envelope) return;
+      const code = locale.current();
+      if (typeof code === 'string' && code && this._envelope.getAttribute('lang') !== code) {
+        this._envelope.setAttribute('lang', code);
+      }
+    }
+
+    _relocalize() {
+      if (this._disposed || !this._shadow) return;
+      relocalizeTree(this._shadow);
+      this._syncLanguage();
     }
 
     _installGeometryInvalidationListeners() {
@@ -1618,6 +1777,7 @@
       }
       this._clearSurface();
       for (const node of scope.nodes) this._surface.appendChild(node);
+      if (hudLocale()) for (const node of scope.nodes) relocalizeTree(node);
       this._activeSurfaceScope = scope;
       this._attention = scope.attention;
       this._host.setAttribute('data-attention', scope.attention);
@@ -2002,7 +2162,7 @@
 
     _rejectStagedAttention(staged) {
       if (staged && staged.scope) this._disposeSurfaceScope(staged.scope);
-      this._announce(COPY.unsafeView, true);
+      this._announce(copy(COPY.unsafeView), true);
       return false;
     }
 
@@ -2017,10 +2177,10 @@
       });
       lens.style.pointerEvents = 'none';
       const glyph = createElement(this.document, 'span', 'skopeo-active-glyph', { 'aria-hidden': 'true' });
-      const label = createElement(this.document, 'span', 'skopeo-lens-label', {}, COPY.ambient);
+      const label = createElement(this.document, 'span', 'skopeo-lens-label', {}, copy(COPY.ambient));
       const metadata = createElement(this.document, 'span', 'skopeo-lens-meta', {}, 'Esc Esc');
       const shell = this;
-      const close = this._button('skopeo-close', COPY.turnOff, '×', function () {
+      const close = this._button('skopeo-close', copy(COPY.turnOff), '×', function () {
         shell.onRequestClose({
           generation: shell.generation,
           reason: 'close',
@@ -2042,11 +2202,11 @@
     _renderAnchored() {
       const shell = this;
       const row = createElement(this.document, 'div', 'skopeo-fixture-row');
-      const anchor = this._button('skopeo-anchor', 'Open anchor mark demo', COPY.anchor, function () {
+      const anchor = this._button('skopeo-anchor', copy('Open anchor mark demo'), copy(COPY.anchor), function () {
         shell.render(ATTENTION.FOCUSED, {});
       });
       anchor.setAttribute('data-skopeo-primitive', 'anchor');
-      const chip = this._button('skopeo-chip skopeo-entity-label', 'Open entity chip demo', COPY.entity, function () {
+      const chip = this._button('skopeo-chip skopeo-entity-label', copy('Open entity chip demo'), copy(COPY.entity), function () {
         shell.render(ATTENTION.FOCUSED, {});
       });
       chip.setAttribute('data-skopeo-primitive', 'chip');
@@ -2060,14 +2220,14 @@
         role: 'group',
         'aria-label': 'Anomaly signal demo'
       });
-      anomaly.appendChild(createElement(this.document, 'span', 'skopeo-anomaly-label', {}, COPY.anomaly));
+      anomaly.appendChild(createElement(this.document, 'span', 'skopeo-anomaly-label', {}, copy(COPY.anomaly)));
       row.appendChild(anchor);
       row.appendChild(chip);
       row.appendChild(rail);
       row.appendChild(halo);
       row.appendChild(anomaly);
       const backRow = createElement(this.document, 'div', 'skopeo-back-row');
-      backRow.appendChild(this._button('skopeo-back', COPY.backAmbient, COPY.backAmbient, function () {
+      backRow.appendChild(this._button('skopeo-back', copy(COPY.backAmbient), copy(COPY.backAmbient), function () {
         shell.back();
       }));
       return [row, backRow];
@@ -2076,9 +2236,9 @@
     _renderFocused() {
       const shell = this;
       const row = createElement(this.document, 'div', 'skopeo-fixture-row');
-      const anchor = this._button('skopeo-anchor', 'Open anchor mark demo', COPY.anchor);
+      const anchor = this._button('skopeo-anchor', copy('Open anchor mark demo'), copy(COPY.anchor));
       anchor.setAttribute('data-skopeo-primitive', 'anchor');
-      const chip = this._button('skopeo-chip', 'Open entity chip demo', COPY.entity);
+      const chip = this._button('skopeo-chip', copy('Open entity chip demo'), copy(COPY.entity));
       chip.setAttribute('data-skopeo-primitive', 'chip');
       const ghost = createElement(this.document, 'div', 'skopeo-ghost', {
         'data-skopeo-primitive': 'ghost',
@@ -2093,16 +2253,16 @@
         role: 'region',
         'aria-label': 'Skopeo focused demo'
       });
-      const title = createElement(this.document, 'h2', 'skopeo-focused-title', { tabindex: '-1' }, COPY.focusedTitle);
-      const body = createElement(this.document, 'p', 'skopeo-focused-body', {}, COPY.focusedBody);
+      const title = createElement(this.document, 'h2', 'skopeo-focused-title', { tabindex: '-1' }, copy(COPY.focusedTitle));
+      const body = createElement(this.document, 'p', 'skopeo-focused-body', {}, copy(COPY.focusedBody));
       const actions = createElement(this.document, 'div', 'skopeo-actions');
-      actions.appendChild(this._button('skopeo-back', COPY.backAnchored, COPY.backAnchored, function () {
+      actions.appendChild(this._button('skopeo-back', copy(COPY.backAnchored), copy(COPY.backAnchored), function () {
         shell.back();
       }));
-      actions.appendChild(this._button('skopeo-fixture-action', COPY.fixtureAction, COPY.fixtureAction, function () {
+      actions.appendChild(this._button('skopeo-fixture-action', copy(COPY.fixtureAction), copy(COPY.fixtureAction), function () {
         shell.render(ATTENTION.INTERSTITIAL, {});
       }));
-      actions.appendChild(this._button('skopeo-turn-off', COPY.universalKill, COPY.universalKill, function () {
+      actions.appendChild(this._button('skopeo-turn-off', copy(COPY.universalKill), copy(COPY.universalKill), function () {
         shell.onRequestKill({
           generation: shell.generation,
           reason: 'control',
@@ -2124,21 +2284,21 @@
         'aria-labelledby': 'skopeo-gate-title',
         'aria-describedby': 'skopeo-gate-description'
       });
-      gate.appendChild(createElement(this.document, 'div', 'skopeo-eyebrow skopeo-gate-eyebrow', {}, COPY.demoOnly));
+      gate.appendChild(createElement(this.document, 'div', 'skopeo-eyebrow skopeo-gate-eyebrow', {}, copy(COPY.demoOnly)));
       gate.appendChild(createElement(this.document, 'h2', 'skopeo-gate-title', {
         id: 'skopeo-gate-title'
-      }, COPY.gateTitle));
+      }, copy(COPY.gateTitle)));
       gate.appendChild(createElement(this.document, 'p', 'skopeo-gate-body', {
         id: 'skopeo-gate-description'
-      }, COPY.gateBody));
+      }, copy(COPY.gateBody)));
       const actions = createElement(this.document, 'div', 'skopeo-actions');
-      actions.appendChild(this._button('skopeo-gate-return', COPY.gateReturn, COPY.gateReturn, function () {
+      actions.appendChild(this._button('skopeo-gate-return', copy(COPY.gateReturn), copy(COPY.gateReturn), function () {
         shell.back();
       }));
-      actions.appendChild(this._button('skopeo-gate-continue', COPY.gateContinue, COPY.gateContinue, function () {
+      actions.appendChild(this._button('skopeo-gate-continue', copy(COPY.gateContinue), copy(COPY.gateContinue), function () {
         shell.back();
       }));
-      actions.appendChild(this._button('skopeo-back', COPY.backFocused, COPY.backFocused, function () {
+      actions.appendChild(this._button('skopeo-back', copy(COPY.backFocused), copy(COPY.backFocused), function () {
         shell.back();
       }));
       gate.appendChild(actions);
@@ -4367,10 +4527,10 @@
 
     _announce(message, terminal) {
       if (!this._liveRegion || this._disposed) return;
-      const value = message == null ? '' : String(message);
+      const value = isCopy(message) ? message : (message == null ? '' : String(message));
       if (terminal) {
         this._cancelAnnouncement();
-        text(this._liveRegion, value);
+        announcementText(this._liveRegion, value);
         return;
       }
       this._pendingAnnouncement = value;
@@ -4385,7 +4545,7 @@
         if (timerHandle) shell._release(timerHandle, false);
         if (pendingHandle) shell._release(pendingHandle, false);
         if (shell._disposed || !shell._liveRegion) return;
-        text(shell._liveRegion, shell._pendingAnnouncement);
+        announcementText(shell._liveRegion, shell._pendingAnnouncement);
         shell._pendingAnnouncement = null;
       }, LIVE_CADENCE_MS);
       this._announcementTimerId = timerId;
@@ -4440,13 +4600,13 @@
       return true;
     }
 
-    _setAmbientProjection(copy, announcementKey) {
+    _setAmbientProjection(projectionCopy, announcementKey) {
       const label = this._projectionLabel();
       const region = this._projectionRegion();
       if (!label || !region) return false;
-      text(label, copy.visible);
-      region.setAttribute('aria-label', 'Skopeo ambient HUD');
-      this._announceProjection(announcementKey, copy.announcement);
+      text(label, copy(projectionCopy.visible));
+      setAttributes(region, { 'aria-label': copy('Skopeo ambient HUD') });
+      this._announceProjection(announcementKey, copy(projectionCopy.announcement));
       return true;
     }
 
@@ -4740,7 +4900,7 @@
       }
 
       if (result && level === ATTENTION.FOCUSED) {
-        this._announce(COPY.focusedAnnouncement, true);
+        this._announce(copy(COPY.focusedAnnouncement), true);
         if (!this._safeFocus(this._surface.querySelector('.skopeo-focused-title'))) {
           this._safeFocus(this._focusedFallback);
         }
@@ -4863,6 +5023,7 @@
       this._shadow = null;
       this._style = null;
       this._envelope = null;
+      this._languageHandle = null;
       this._surface = null;
       this._liveRegion = null;
       this._currentPlacement = null;

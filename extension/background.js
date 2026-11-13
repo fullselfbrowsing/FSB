@@ -1986,6 +1986,14 @@ const SKOPEO_INJECTION_FILES = Object.freeze([
   'content/skopeo-runtime.js'
 ]);
 
+// The FSB language resolver and the HUD copy map load in front of the Skopeo
+// bundle, in the same world. ui-locale.js keeps an instance that FSB's own
+// content scripts already booted there.
+const SKOPEO_LOCALE_FILES = Object.freeze([
+  'utils/ui-locale.js',
+  'utils/skopeo-hud-exact.js'
+]);
+
 (function initializeFSBSkopeoController(global) {
   'use strict';
 
@@ -7413,7 +7421,7 @@ const SKOPEO_INJECTION_FILES = Object.freeze([
 
       await chrome.scripting.executeScript({
         target: { tabId: tabId, frameIds: [0] },
-        files: SKOPEO_INJECTION_FILES
+        files: SKOPEO_LOCALE_FILES.concat(SKOPEO_INJECTION_FILES)
       });
 
       current = await readRecord(tabId);

@@ -42,6 +42,11 @@ const ADAPTIVE_INJECTION_FILES = Object.freeze([
   'content/skopeo-shell.js',
   'content/skopeo-runtime.js'
 ]);
+// ui-locale.js and the HUD copy map are injected in front of the bundle.
+const LOCALE_INJECTION_FILES = Object.freeze([
+  'utils/ui-locale.js',
+  'utils/skopeo-hud-exact.js'
+]);
 
 function activeResources() {
   return { ...ZERO_RESOURCES, roots: 1, listeners: 2, popoverTopLayer: 1 };
@@ -1285,8 +1290,18 @@ function assertStaticContracts(backgroundSource, manifest, wsClientSource) {
   const fallbackBundle = parseFallbackBundle(wsClientSource);
   const dedicatedBundle = parseStringArray(backgroundSource, 'SKOPEO_INJECTION_FILES');
   assert.deepEqual(dedicatedBundle, ADAPTIVE_INJECTION_FILES);
+  const localeBundle = parseStringArray(backgroundSource, 'SKOPEO_LOCALE_FILES');
+  assert.deepEqual(localeBundle, LOCALE_INJECTION_FILES, 'the HUD locale files load in a fixed order');
+  assert.equal(localeBundle.some((file) => dedicatedBundle.includes(file)), false,
+    'the locale files stay out of the dedicated Skopeo bundle');
   const manifestContentScripts = (manifest.content_scripts || []).flatMap((entry) => entry.js || []);
   const webAccessibleResources = (manifest.web_accessible_resources || []).flatMap((entry) => entry.resources || []);
+  // ui-locale.js is FSB's shared resolver and also loads with the content
+  // scripts; the HUD copy map loads only with Skopeo.
+  for (const [where, list] of [['CONTENT_SCRIPT_FILES', contentBundle], ['fallback injection list', fallbackBundle],
+    ['manifest content scripts', manifestContentScripts], ['web-accessible resources', webAccessibleResources]]) {
+    assert.equal(list.includes('utils/skopeo-hud-exact.js'), false, 'the HUD copy map is absent from ' + where);
+  }
   for (const file of dedicatedBundle) {
     assert.equal(dedicatedBundle.filter((entry) => entry === file).length, 1, file + ' occurs once in dedicated injection list');
     assert.equal(contentBundle.includes(file), false, file + ' is absent from CONTENT_SCRIPT_FILES');
@@ -3794,12 +3809,12 @@ async function assertPrimaryInvocationContract(backgroundSource) {
   assert.equal(harness.executeCalls.length, 1);
   assert.deepEqual(harness.executeCalls[0], {
     target: { tabId: 11, frameIds: [0] },
-    files: ADAPTIVE_INJECTION_FILES
+    files: [...LOCALE_INJECTION_FILES, ...ADAPTIVE_INJECTION_FILES]
   });
   let tabA = storageRecord(harness, 11);
   assert.equal(tabA.status, 'starting');
   assert.deepEqual(resourceSnapshot(harness, 11), ZERO_RESOURCES, 'prepare remains root/listener/top-layer free');
-  const injectionOperation = 'execute:11:' + ADAPTIVE_INJECTION_FILES.join(',');
+  const injectionOperation = 'execute:11:' + [...LOCALE_INJECTION_FILES, ...ADAPTIVE_INJECTION_FILES].join(',');
   assert.ok(harness.operations.indexOf('storage.set:11:starting:none') < harness.operations.indexOf(injectionOperation));
   assert.ok(harness.operations.indexOf('broadcast:skopeo:status-changed:starting') < harness.operations.indexOf(injectionOperation));
 
