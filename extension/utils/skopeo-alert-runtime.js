@@ -4,6 +4,33 @@
   var VERSION = 'skopeo-alert-runtime/1';
   var ALARM_PREFIX = 'skopeoAlert:';
   var NOTIFICATION_PREFIX = 'skopeoAlertNotification:';
+  var DEPENDENCY_KEYS = Object.freeze([
+    'alertSchema', 'store', 'alarms', 'notifications', 'now', 'IntlDateTimeFormat',
+    'iconUrl', 'revalidate', 'openEvidence'
+  ]);
+  // localize(key, english, subs) is optional. Without it, or when it gives no
+  // usable string, the notification is sent in English.
+  var LOCALIZED_DEPENDENCY_KEYS = Object.freeze(DEPENDENCY_KEYS.concat(['localize']));
+
+  // FSB's own notification copy, keyed like the extension catalogs: 'copy_'
+  // plus the first ten hex digits of the sha256 of the English template.
+  // Vendor, owner, document and consequence text come from the user's Drive
+  // and are substituted unchanged.
+  var NOTICE_TITLE = Object.freeze({
+    key: 'copy_a4405d29ad', english: '$VENDOR$ · notice deadline'
+  });
+  var NOTICE_CONTEXT = Object.freeze({
+    key: 'copy_a9e29d03a6', english: 'Owner: $OWNER$ · Governing evidence: $EVIDENCE$'
+  });
+  var NOTICE_EVIDENCE = Object.freeze({
+    key: 'copy_d35bef08b9', english: '$DOCUMENT$ · Notice evidence'
+  });
+  var OPEN_EVIDENCE = Object.freeze({
+    key: 'copy_390bf05359', english: 'Open governing evidence'
+  });
+  // The background labels the governing citation as the document name plus
+  // this suffix. Only the suffix is FSB copy.
+  var NOTICE_EVIDENCE_SUFFIX = ' · Notice evidence';
 
   function own(value, key) {
     return Object.prototype.hasOwnProperty.call(value, key);
@@ -31,6 +58,13 @@
       output[keys[index]] = descriptor.value;
     }
     return output;
+  }
+
+  function substitute(english, subs) {
+    if (!subs) return english;
+    return english.replace(/\$([A-Z]+)\$/g, function(all, name) {
+      return own(subs, name) && typeof subs[name] === 'string' ? subs[name] : all;
+    });
   }
 
   function validAlertKey(value) {
@@ -95,11 +129,10 @@
   }
 
   function create(dependencies) {
-    var fields = exact(dependencies, [
-      'alertSchema', 'store', 'alarms', 'notifications', 'now', 'IntlDateTimeFormat',
-      'iconUrl', 'revalidate', 'openEvidence'
-    ]);
-    if (!fields || !fields.alertSchema || !fields.store ||
+    var fields = exact(dependencies, LOCALIZED_DEPENDENCY_KEYS) ||
+      exact(dependencies, DEPENDENCY_KEYS);
+    if (!fields || (own(fields, 'localize') && typeof fields.localize !== 'function') ||
+        !fields.alertSchema || !fields.store ||
         typeof fields.store.schedule !== 'function' ||
         typeof fields.store.transition !== 'function' ||
         typeof fields.store.list !== 'function' || typeof fields.store.listAll !== 'function' ||
@@ -278,15 +311,32 @@
       return { status: data.status, candidate: candidate };
     }
 
+    function line(entry, subs) {
+      var value = null;
+      if (typeof fields.localize === 'function') {
+        try { value = fields.localize(entry.key, entry.english, subs); }
+        catch (_error) { value = null; }
+      }
+      return typeof value === 'string' && value.length > 0 ? value : substitute(entry.english, subs);
+    }
+
+    function evidenceLabel(label) {
+      var cut = label.length - NOTICE_EVIDENCE_SUFFIX.length;
+      if (cut <= 0 || label.slice(cut) !== NOTICE_EVIDENCE_SUFFIX) return label;
+      return line(NOTICE_EVIDENCE, { DOCUMENT: label.slice(0, cut) });
+    }
+
     function notificationOptions(candidate) {
       return {
         type: 'basic',
         iconUrl: fields.iconUrl,
-        title: candidate.vendorLabel + ' · notice deadline',
+        title: line(NOTICE_TITLE, { VENDOR: candidate.vendorLabel }),
         message: candidate.deadline.deadlineCivilDate + ' · ' + candidate.deadline.consequence,
-        contextMessage: 'Owner: ' + candidate.owner.label +
-          ' · Governing evidence: ' + candidate.evidence.label,
-        buttons: [{ title: 'Open governing evidence' }],
+        contextMessage: line(NOTICE_CONTEXT, {
+          OWNER: candidate.owner.label,
+          EVIDENCE: evidenceLabel(candidate.evidence.label)
+        }),
+        buttons: [{ title: line(OPEN_EVIDENCE, null) }],
         priority: 1
       };
     }

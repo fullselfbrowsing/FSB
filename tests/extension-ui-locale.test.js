@@ -137,11 +137,17 @@ const source = fs.readFileSync(path.join(root, 'extension/utils/ui-locale.js'), 
 check(!source.includes('fsb-locale'), 'resolver does not mention the website cookie name');
 check(!source.includes('document.cookie'), 'resolver does not read document.cookie');
 
-// Nothing in the service worker translates, so it does not load the module.
-// Content scripts do, right before the overlay that uses it.
+// The service worker loads the module once, ahead of the Skopeo alert runtime
+// whose notifications it translates. Content scripts load it right before the
+// overlay that uses it.
 const background = fs.readFileSync(path.join(root, 'extension/background.js'), 'utf8');
 const wsClient = fs.readFileSync(path.join(root, 'extension/ws/ws-client.js'), 'utf8');
-check(!background.includes("importScripts('utils/ui-locale.js')"), 'the service worker does not load ui-locale.js');
+{
+  const localeLoad = "importScripts('utils/ui-locale.js')";
+  const alertRuntimeLoad = "importScripts('utils/skopeo-alert-runtime.js')";
+  check(background.split(localeLoad).length === 2 && background.indexOf(alertRuntimeLoad) > background.indexOf(localeLoad),
+    "the service worker loads ui-locale.js once, before 'utils/skopeo-alert-runtime.js'");
+}
 const contentScriptOrder = /'utils\/ui-locale\.js',\s*'content\/visual-feedback\.js'/;
 check(contentScriptOrder.test(background) && contentScriptOrder.test(wsClient),
   'both content-script lists inject ui-locale.js right before visual-feedback.js');
@@ -2066,8 +2072,8 @@ function sidepanelMessageContext(api) {
 }
 
 // The dashboard chart draws its legend, axis titles and tooltip on a canvas,
-// so analytics.js translates them itself. The service worker loads the same
-// file without the locale helper and keeps English.
+// so analytics.js translates them itself. Without the locale helper it keeps
+// English.
 {
   const analyticsSource = fs.readFileSync(path.join(root, 'extension/utils/analytics.js'), 'utf8');
   function chartSandbox(withLocale) {
@@ -2112,7 +2118,7 @@ function sidepanelMessageContext(api) {
   const en = chartText(english.analytics, english.sandbox);
   check(JSON.stringify(en.legend) === JSON.stringify(['Input Tokens', 'Output Tokens']) && en.x === 'Time' && en.y === 'Tokens'
       && en.tooltip === `Input Tokens: ${en.formatted} tokens`,
-    'without the locale helper (service worker) the chart stays in English');
+    'without the locale helper the chart stays in English');
   english.analytics.updateChartLocale();
   check(english.analytics.chart.data.datasets[0].label === 'Input Tokens', 'updateChartLocale is safe without the locale helper');
 

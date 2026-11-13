@@ -61,6 +61,27 @@ fsbTrustedLocalBootPromise = initializeFsbTrustedLocalBoundary();
 /* FSB_TRUSTED_LOCAL_BOUNDARY_END */
 
 try { importScripts('utils/trusted-local-feature-store.js'); } catch (_error) { console.error('[FSB] Trusted local feature store failed to load'); }
+try { importScripts('utils/ui-locale.js'); } catch (_error) { console.error('[FSB] UI locale helper failed to load'); }
+
+// Skopeo alert notifications are written in the saved FSB language. Before
+// boot finishes, ui-locale answers through chrome.i18n in the browser
+// language, so the alarm path waits for boot first. The wait is bounded: a
+// boot that never settles must not hold back a deadline notification.
+const FSB_SKOPEO_UI_LOCALE_WAIT_MS = 3000;
+function fsbSkopeoUiLocaleReady() {
+  return new Promise(function(resolve) {
+    var locale = globalThis.fsbUiLocale;
+    var timer = typeof setTimeout === 'function'
+      ? setTimeout(resolve, FSB_SKOPEO_UI_LOCALE_WAIT_MS)
+      : null;
+    new Promise(function(boot) {
+      boot(locale && typeof locale.bootOnce === 'function' ? locale.bootOnce() : null);
+    }).catch(function() {}).then(function() {
+      if (timer !== null) clearTimeout(timer);
+      resolve();
+    });
+  });
+}
 
 var fsbTrustedFeatureMessageHandler = null;
 
@@ -1343,7 +1364,11 @@ function initializeFsbSkopeoCorpusBoundary() {
       IntlDateTimeFormat: Intl.DateTimeFormat,
       iconUrl: chrome.runtime.getURL('assets/icon128.png'),
       revalidate: fsbRevalidateCurrentSkopeoAlertCandidate,
-      openEvidence: fsbOpenCurrentSkopeoAlertEvidence
+      openEvidence: fsbOpenCurrentSkopeoAlertEvidence,
+      localize: function(key, english, subs) {
+        var locale = globalThis.fsbUiLocale;
+        return locale && typeof locale.text === 'function' ? locale.text(key, english, subs) : null;
+      }
     });
     if (!alertStore || !alertEngine || !alertRuntime || !Object.isFrozen(alertStore) ||
         !Object.isFrozen(alertEngine) || !Object.isFrozen(alertRuntime)) {
@@ -28169,6 +28194,7 @@ try {
 chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (fsbSkopeoAlertRuntimeFacade && alarm && typeof alarm.name === 'string' &&
       alarm.name.startsWith(globalThis.FsbSkopeoAlertRuntime.ALARM_PREFIX)) {
+    await fsbSkopeoUiLocaleReady();
     try { await fsbSkopeoAlertRuntimeFacade.handleAlarm(alarm); }
     catch (_error) {}
     return;
