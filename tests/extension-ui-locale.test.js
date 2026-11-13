@@ -197,6 +197,38 @@ const copyMismatches = Object.entries(locale.exact).filter(([english, key]) => {
   return String(key).startsWith('copy_') && (!englishCatalog[key] || englishCatalog[key].message !== english);
 });
 check(copyMismatches.length === 0, 'copy exact map matches the English catalog');
+
+// The Skopeo HUD loads ui-locale.js and skopeo-hud-exact.js only. Every HUD
+// entry must resolve to its English message, and none may remap English that
+// ui-locale's built-in map or copy-exact.js already owns.
+const readExtra = (file) => JSON.parse(fs.readFileSync(path.join(root, file), 'utf8').match(/var extra = (\{.*\});/)[1]);
+const hudExact = readExtra('extension/utils/skopeo-hud-exact.js');
+const copyExactMap = readExtra('extension/utils/copy-exact.js');
+const hudMismatches = Object.entries(hudExact).filter(([english, key]) => !englishCatalog[key] || englishCatalog[key].message !== english);
+check(Object.keys(hudExact).length > 400 && hudMismatches.length === 0,
+  `the Skopeo HUD exact map matches the English catalog${hudMismatches.length ? ': ' + hudMismatches.slice(0, 3).map(([e]) => e).join(' | ') : ''}`);
+const hudShadows = Object.entries(hudExact).filter(([english, key]) => {
+  const owned = Object.prototype.hasOwnProperty.call(copyExactMap, english) ? copyExactMap[english]
+    : (Object.prototype.hasOwnProperty.call(locale.exact, english) && String(locale.exact[english]).startsWith('shell_') ? locale.exact[english] : null);
+  return owned !== null && owned !== key;
+});
+check(hudShadows.length === 0, 'the Skopeo HUD map never remaps English owned by another exact map');
+const sameSource = JSON.parse(fs.readFileSync(path.join(root, 'extension/_locales/same-source-allowlist.json'), 'utf8'));
+const hudKeys = new Set(Object.values(hudExact));
+for (const folder of ['en', 'es', 'de', 'ru', 'ja', 'ko', 'zh_CN', 'zh_TW']) {
+  const raw = fs.readFileSync(path.join(root, 'extension/_locales', folder, 'messages.json'), 'utf8');
+  check(raw === JSON.stringify(JSON.parse(raw), null, 2) + '\n', `${folder} catalog round-trips byte for byte, so it holds no duplicate key`);
+}
+// English left inside a ru or CJK translation passes the catalog gate unless
+// the whole message is copied; every HUD message must use its own script.
+for (const [folder, script] of Object.entries({
+  ru: /[\u0400-\u04ff]/, ja: /[\u3040-\u30ff\u4e00-\u9fff]/, ko: /[\uac00-\ud7af]/, zh_CN: /[\u4e00-\u9fff]/, zh_TW: /[\u4e00-\u9fff]/
+})) {
+  const catalog = JSON.parse(fs.readFileSync(path.join(root, 'extension/_locales', folder, 'messages.json'), 'utf8'));
+  const latinOnly = [...hudKeys].filter((key) => catalog[key] && !sameSource[key] &&
+    !script.test(catalog[key].message.replace(/\$[A-Z0-9_]+\$/g, '')));
+  check(latinOnly.length === 0, `${folder} Skopeo HUD messages are written in their own script${latinOnly.length ? ': ' + latinOnly.slice(0, 5).join(', ') : ''}`);
+}
 const panelExact = JSON.parse(fs.readFileSync(path.join(root, 'extension/utils/panel-exact.js'), 'utf8').match(/var extra = (\{.*\});/)[1]);
 const panelMismatches = Object.entries(panelExact).filter(([english, key]) => !englishCatalog[key] || englishCatalog[key].message !== english);
 check(panelMismatches.length === 0, 'panel exact map matches the English catalog');
@@ -241,6 +273,8 @@ check(String(badSentence.stderr).includes('ui.js:3: uncataloged chrome: This tem
   'fixture reports a sentence inside a template expression on its own line');
 check(String(badSentence.stderr).includes('$NAME$ sentence is not cataloged here.'), 'fixture reports a sentence that opens with a placeholder');
 check(!String(badSentence.stderr).includes('User typed a secret sentence here.'), 'log sentences stay off the coverage gate');
+check(!String(badSentence.stderr).includes('This thrown sentence is a diagnostic only.'), 'thrown error messages stay off the coverage gate');
+check(!String(badSentence.stderr).includes('This ledger detail sentence stays internal'), 'resource-ledger detail labels stay off the coverage gate');
 const badUnwired = spawnSync(process.execPath, ['scripts/verify-extension-copy.mjs', '--file', 'tests/fixtures/extension-i18n/bad-unwired/page.html'], { cwd: root, encoding: 'utf8' });
 check(badUnwired.status === 1, 'cataloged but unwired HTML text fails');
 check(String(badUnwired.stderr).includes('page.html:1: unwired chrome'), 'fixture reports the unwired button label');
