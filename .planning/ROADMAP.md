@@ -10,6 +10,7 @@
 
 - 🚧 **v1.0.0 Jev Fast Mode** — Phases 66-71, planned 2026-09-28. Establish a whole-task speed and quality baseline, add FSB-hosted Jev with the credential held on the server, expose one opt-in switch in Advanced Settings, add an MCP tool to view and change settings, use bounded autopilot and MCP fast paths, shorten existing MCP tool descriptions, and release the extension as 1.0.0 only with honest comparative evidence.
 - ✅ **v1.3.0 Extension multilingual UI** — built on `main` (PR #150), shipped in extension 0.9.95 on 2026-10-18 and merged into Jev on 2026-11-12. Package-owned extension chrome renders in eight locales (Russian added on `main`). Its Phases 66-71 are `main`'s numbering, so they are archived apart from this milestone's: `.planning/milestones/v1.3.0-ROADMAP.md` and `.planning/milestones/v1.3.0-phases/`.
+- ✅ **v1.2.0 Skopeo** — built on branch `Skopeo` (PR #149); automated complete 2026-08-27, not approved on live accounts (63/63 requirements, 9/9 phases, 62/62 plans, 12 observations still human_needed); merged into Jev on 2026-11-12 through the bench pin `1edb6476`. Its Phases 52-59 and 53.1 use Skopeo's own numbering and are archived as `.planning/milestones/v1.2.0-SKOPEO-ROADMAP.md` and `.planning/milestones/v1.2.0-SKOPEO-phases/`. (The label v1.2.0 also names the archived Showcase i18n Completeness milestone; the -SKOPEO suffix keeps the paths apart.)
 - ✅ **v0.9.91 MCP Clients as Providers** — Phases 57-65, shipped 2026-09-28. Installed agent CLIs (Claude Code, OpenCode, Codex) became key-less side-panel providers that drive the live browser through FSB's own MCP tools. Archive: `.planning/milestones/v0.9.91-ROADMAP.md`.
 - ✅ **v1.2.0 Showcase i18n Completeness** — Phases 52-56, shipped 2026-07-09. Archive: `.planning/milestones/v1.2.0-ROADMAP.md`. Closes the translation gap that reopened after v0.9.63 shipped: a full-page audit establishes the true drift/missing scope, resync + stats-page translation + transcreation review close it, a CI drift-detection gate lands on the clean baseline, and the long-deferred WARNING-02 locale-cookie redirect bug is fixed.
 - ✅ **v1.1.0 T1 App Execution Expansion** — Phases 44-51, shipped 2026-06-30; refreshed 2026-07-01 after post-closeout T1 ports. Expanded proven T1/guarded coverage from 26 baseline descriptors to 1,267 executable T1-ready descriptors plus 556 guarded fail-closed rows, and closed the remaining catalog tail with explicit terminal-state accounting. Archive: `.planning/milestones/v1.1.0-ROADMAP.md`.
@@ -27,7 +28,7 @@
 
 **Provider decision:** FSB supplies Jev to every installation without user sign-in or usage quotas for now. The upstream credential stays on `showcase/server/` (or its server-side secret store); the extension never receives it. A bounded HTTPS gateway carries redacted decision state and monitors aggregate usage and cost. The only fast-mode setting is the control-panel Advanced Settings switch, default off. MCP `run_task` follows it, and the MCP settings tool (Phase 66.1) reads and writes that same value. The server round trip is included in all speed measurements.
 
-**Validation Block (owner direction 2026-10-15):** every human, live-account, production, or spend validation in this milestone is deferred to one block at the end (V1 baseline at the pinned pre-milestone commit `8a058bdf`, V2 Jev gateway deploy, V3 shadow calibration, V4 comparative gate, V5 human UAT, V6 release). Phases are built and verified with automated checks only. See `.planning/STATE.md` → Decisions.
+**Validation Block (owner direction 2026-10-15):** every human, live-account, production, or spend validation in this milestone is deferred to one block at the end (V1 baseline at the pinned pre-milestone commit `8a058bdf` (amended 2026-11-12: V1 runs at `1edb6476` = 8a058bdf + origin/Skopeo, gate 1.0.1), V2 Jev gateway deploy, V3 shadow calibration, V4 comparative gate, V5 human UAT, V6 release). Phases are built and verified with automated checks only. See `.planning/STATE.md` → Decisions.
 
 **Release evidence:** Compare whole-task completion, wall time per completed task, and cost on the same task set. The project brief's 1.5-2x autopilot and 1.3-1.6x MCP speedups are targets to measure, not results already achieved. A path that fails its predeclared gate remains experimental or disabled.
 
@@ -69,11 +70,11 @@ Plans:
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 66-10-PLAN.md — Bench profile setup (H2/H3), CDP pairing, preflight, all-task smoke and live smoke, live operator timing check (wave 5, human) (deferred to Validation Block V1; run at `8a058bdf`)
+- [ ] 66-10-PLAN.md — Bench profile setup (H2/H3), CDP pairing, preflight, all-task smoke and live smoke, live operator timing check (wave 5, human) (deferred to Validation Block V1; run at `8a058bdf`) (amended 2026-11-12: V1 runs at `1edb6476` = 8a058bdf + origin/Skopeo, gate 1.0.1)
 
 **Wave 6** *(blocked on Wave 5 completion)*
 
-- [ ] 66-11-PLAN.md — Approved baseline campaign (H4), committed sanitized results, restore (H5) (wave 6, human) (deferred to Validation Block V1; run at `8a058bdf`)
+- [ ] 66-11-PLAN.md — Approved baseline campaign (H4), committed sanitized results, restore (H5) (wave 6, human) (deferred to Validation Block V1; run at `8a058bdf`) (amended 2026-11-12: V1 runs at `1edb6476` = 8a058bdf + origin/Skopeo, gate 1.0.1)
 
 ### Phase 66.1: MCP Settings Tool (INSERTED)
 

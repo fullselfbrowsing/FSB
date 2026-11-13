@@ -21,6 +21,7 @@ FSB is an AI-powered browser automation Chrome extension that executes tasks thr
 
 **Recent shipping cadence:**
 - v1.3.0 Extension multilingual UI -- built on `main` and shipped in extension 0.9.95 (2026-10-18); archived under `.planning/milestones/v1.3.0-*` when `main` was merged into Jev on 2026-11-12
+- v1.2.0 Skopeo -- built on branch `Skopeo` (PR #149), automated complete 2026-08-27 (63/63 requirements, 9/9 phases, 62/62 plans; 12 observations still human_needed, not approved on live accounts); merged into Jev on 2026-11-12 through the bench pin `1edb6476` with versions kept at extension 0.9.95 / MCP 0.11.5; archived under `.planning/milestones/v1.2.0-SKOPEO-*` (Phases 52-59 and 53.1 in Skopeo's own numbering)
 - v0.9.91 MCP Clients as Providers -- archived 2026-09-28; all deferred human UAT waived by the user
 - v1.2.0 Showcase i18n Completeness -- archived 2026-07-09
 - v1.1.0 T1 App Execution Expansion -- archived 2026-06-30; remaining tail rows carry explicit proof requirements before direct execution

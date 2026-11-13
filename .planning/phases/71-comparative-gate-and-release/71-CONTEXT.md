@@ -6,7 +6,7 @@
 <domain>
 ## Phase Boundary
 
-This phase builds everything the milestone's release decision needs and proves it offline. It covers EVAL-01, EVAL-02, REL-01 and REL-02. The live comparison runs in Validation Block V4, using the V1 baseline at pin `8a058bdf`, the V2 gateway and the V3 calibration. The version bumps, the CHANGELOG entries, the merge to `main` and the publishes all run in V6. Phase 71 changes no product behavior.
+This phase builds everything the milestone's release decision needs and proves it offline. It covers EVAL-01, EVAL-02, REL-01 and REL-02. The live comparison runs in Validation Block V4, using the V1 baseline at pin `8a058bdf` (amended 2026-11-12: pin `1edb6476`, gate 1.0.1; see the D-03 amendment), the V2 gateway and the V3 calibration. The version bumps, the CHANGELOG entries, the merge to `main` and the publishes all run in V6. Phase 71 changes no product behavior.
 
 Planning status of the upstream phases:
 - **Phase 66.1** has executed in the main tree (commits up to `f978e989`).
@@ -86,6 +86,7 @@ Out of scope:
   - **The live set** is reported as context and never enters a gate criterion (66 D-15).
   - **The baseline** is the V1 campaign `core-baseline-66`, recorded at `8a058bdf` as schema-1 rows under `scripts/bench/results/core-baseline-66/`.
   - **Getting the baseline onto Jev.** V1 commits its results on a branch in the pin worktree (66-11). That results-only commit is cherry-picked onto Jev before V4 evaluation (M-71-02).
+  - *Amended 2026-11-12 (owner decision at the origin/Skopeo merge; gate 1.0.1).* The baseline pin moves from `8a058bdf` to `1edb6476afaba2a7860c85b4a555e926b968895e` (tag `bench-pin-gate-1.0.1`): `8a058bdf` merged with origin/Skopeo `c2d396e7`, plus the shared fixes Jev also carries (the trusted store keeps the Phase 66 measurement fields; skopeo-runtime answers only `skopeo:*` messages; Node 20 test fixes; `elementCacheSize` 200; the stored `get_session_detail` success flag; side-panel and HUD localization in 8 languages; the content-world language bridge), with versions kept at 0.9.95/0.11.5. `core-baseline-66` and `core-rebaseline-71-pin` run in a worktree at `1edb6476`. Both builds now carry Skopeo's service-worker load, its trusted-store save path and main through `fdfa1234`, so candidate minus pin is Phases 66.1-71. `1edb6476` has no Phase 66.1+ product code, and its `scripts/bench` equals 8a058bdf's (same runner, corpus and schema-1 rows), so the baseline is still FSB before this milestone. The pin was merged into Jev (`9c838c7df`), so it is an ancestor of the release candidate.
 - **D-04 (Auto-Resolved): V4 is two campaigns at one release-candidate SHA, and the run condition is a new schedule dimension.**
   - **The campaigns:**
     - `core-gate-71-autopilot`: the autopilot driver, conditions `off` and `on` interleaved run by run inside the seeded ABBA schedule, 20 rounds, seed 71 (480 runs);
@@ -119,6 +120,7 @@ Out of scope:
     A mismatch makes that verdict "inconclusive", never "pass". `agentPolicySha256` and `mcp.toolsList.sha256` are reported. Their difference is part of the treatment.
   - **Pinning Claude Code.** Both blocks run one fixed Claude Code release from a bench-only directory placed first on PATH (M-71-01). The bench resolves `claude` from PATH and passes only allowlisted env names (`scripts/bench/lib/claude-arm.mjs:60-97`). Adding `DISABLE_AUTOUPDATER` to the child env would change `envKeyNamesSha256` between V1 and V4, so pinning is done by PATH, never by env.
   - **The fallback when the sentinel or identity check fails.** It is predeclared in the gate: a block-swapped re-baseline in V4. It runs the Claude driver alternately in blocks with the pin build and the candidate build loaded unpacked, under campaign id `core-rebaseline-71`. Running it is an owner decision at V4. Phase 71 builds no build-swap tooling.
+  - *Amended 2026-11-12 (gate 1.0.1).* The fallback's pin build is the `1edb6476` worktree build. No identity-match field changes. The reported `mcp.toolsList` at the pin moves from 72 tools (`8321cc72…8c4a05`) to 69 (`aeb905dc…3402`, measured from a live `tools/list` at `1edb6476`), because main's 0.11.5 retirements are in `1edb6476`; the non-Jev tool-list difference is now exactly `settings`, the Phase 69 descriptions and `expect`. `8321cc72…8c4a05` stays the MCP-compat fixture digest; that baseline does not move.
 - **D-07 (Auto-Resolved): Phase 71 fixes F5 in the bench, not in the product.**
   - **The change.** `fixture-server.mjs` `newRunToken()` (`:415-416`) gets a token shape that the real 67-01 scrubber does not redact inside the rendered instruction. One candidate is 24 lowercase letters, which is about 112 bits and still matches `TOKEN_PATTERN` (`:50`).
   - **The proof.** A registered test loads the real `FsbJevState`. It renders every core instruction with a generated start URL, at the default port shape and with several tokens, and asserts that `buildRequest` never returns `sensitive_goal`.
@@ -176,7 +178,7 @@ Out of scope:
 
 - **D-11 (Auto-Resolved): The gate is one committed JSON file that is frozen before V1.**
   - **The files:**
-    - the gate: `scripts/bench/gate/release-gate-v1.0.0.json`, beside the 67-02 `scripts/bench/shadow/targets.json` precedent;
+    - the gate: `scripts/bench/gate/release-gate-v1.0.0.json`, beside the 67-02 `scripts/bench/shadow/targets.json` precedent (superseded 2026-11-12 by `release-gate-v1.0.1.json`; see the D-11 amendment);
     - its exact-key validator: `scripts/bench/gate/lib/gate.mjs`;
     - the pure evaluator: `scripts/bench/gate/lib/evaluate.mjs`;
     - the CLI: `scripts/bench/gate/evaluate-gate.mjs`.
@@ -205,6 +207,7 @@ Out of scope:
       - `safety.unknownExposure: 'acted'` (see the D-15 amendment);
       - the predeclared `core-rebaseline-71` fallback (D-06);
       - `power.safetyTable` (71-04).
+  - *Amended 2026-11-12 (owner decision at the origin/Skopeo merge).* The gate is `scripts/bench/gate/release-gate-v1.0.1.json` (`gateVersion` 1.0.1, GATE_SHA256 `e0b36ea7f92d6f639a129aa04443b2eb7fd601a07b251cbf5b14f8dbfbc5a4a5`, committed alone in `910442f8c`, author date 2026-11-12T23:26:07-06:00, before any V1 campaign). It differs from `release-gate-v1.0.0.json` only in `gateVersion`, `fallback.design` (`1edb6476` instead of `8a058bdf`) and one appended note naming `1edb6476afaba2a7860c85b4a555e926b968895e`. Every number, campaign id, seed, round count, power and safety table is unchanged. The pin is the code constant `PIN_SHA` (`scripts/bench/gate/lib/evaluate.mjs`), and `tests/bench-gate.test.mjs` binds it to the hashed gate bytes. `release-gate-v1.0.0.json` (`9d97fb90…f8eb8e`, `b7bba953`) stays committed as history and no longer loads (`fixed:gateVersion`, `fixed:fallback.design`).
 - **D-12 (Auto-Resolved): The speed criteria.**
   - **The statistic.** The existing `geoMeanMedianRatio` (fast or candidate over control or baseline), with the hierarchical bootstrap at 10,000 iterations and the seed fixed in the gate (`stats.mjs:34-51`).
   - **The Jev fast path claims superiority.** It passes speed only when all three hold:
@@ -255,6 +258,7 @@ Out of scope:
       - amend them: re-plan, then author a new `gateVersion` file with its sha256 pin before V1.
 
       The phase goal, deciding which fast paths merit release, depends on this decision.
+  - *Amended 2026-11-12 (gate 1.0.1).* Version 1.0.1 is taken by the re-pin. A D-15 amendment is therefore authored as `release-gate-v1.0.2.json` (`gateVersion` 1.0.2), keeps `PIN_SHA` `1edb6476afaba2a7860c85b4a555e926b968895e` and `fallback.design`, and is committed before the V1 campaign's `createdAt`.
 - **D-16: The "exercised" precondition.** A Jev path is judged only if all of these hold in `core-gate-71-autopilot`:
   - every acted attempt reports `calibrationStatus: 'calibrated'`;
   - there is exactly one (`servedModel`, `instrumentVersion`) pair across the campaign;
@@ -553,7 +557,7 @@ Out of scope:
   - Every validation is deferred to V1-V6 (2026-10-15).
   - With Jev disabled, FSB behaves exactly as before.
 - **The three columns, in one sentence each.**
-  - Baseline: FSB at `8a058bdf`, before this milestone.
+  - Baseline: FSB at `8a058bdf`, before this milestone (amended 2026-11-12: `1edb6476afaba2a7860c85b4a555e926b968895e`, which is `8a058bdf` + origin/Skopeo `c2d396e7`; still before this milestone).
   - Control: the release candidate with the switch off.
   - Fast: the same build with the switch on, interleaved run by run with control.
 - **Why the safety rule has two parts.** The LLM path can double-submit on its own. Charging every such event to fast mode would fail it for the LLM's behaviour. Ignoring them would hide a fast-mode duplicate. So any event in a run where Jev acted is decisive (rule a), and other events are judged against control (rule b).
@@ -573,7 +577,7 @@ Out of scope:
     2. `git -C <pin-worktree> show --stat <results-sha>` must list only `scripts/bench/results/*-baseline-66/**`.
     3. On Jev: `git cherry-pick <results-sha>`.
     4. Then `node scripts/bench/report.mjs scripts/bench/results/core-baseline-66` must exit 0 under the v2 validator.
-  - **M-71-03 (V1, cross-check).** `scripts/bench/results/core-baseline-66/identity.json` records `hosts.claude.version` equal to M-71-01's version, and `git.sha` equal to `8a058bdf…`.
+  - **M-71-03 (V1, cross-check).** `scripts/bench/results/core-baseline-66/identity.json` records `hosts.claude.version` equal to M-71-01's version, and `git.sha` equal to `8a058bdf…`. *Amended 2026-11-12:* `git.sha` equals `1edb6476afaba2a7860c85b4a555e926b968895e`.
   - **M-71-04 (V3).**
     1. After the calibrated profile is committed and deployed, run a one-round smoke: `node scripts/bench/run-bench.mjs --smoke --pair-via-cdp --arms autopilot --conditions on …`.
     2. Read the raw records' `jevMeasurement`. It must show `calibrationStatus: 'calibrated'` and at least one fast step on at least one fixture, with 0 `sensitive_goal` fallbacks.
@@ -610,6 +614,7 @@ Out of scope:
        node scripts/bench/gate/evaluate-gate.mjs --gate scripts/bench/gate/release-gate-v1.0.0.json --baseline scripts/bench/results/core-baseline-66 --campaign scripts/bench/results/core-gate-71-autopilot --campaign scripts/bench/results/core-gate-71-claude --verify-suites --out scripts/bench/gate/decisions/core-gate-71.json
        ```
 
+       *Amended 2026-11-12 (gate 1.0.1):* every `--gate` path above (M-71-06, M-71-07 and this step) is `scripts/bench/gate/release-gate-v1.0.1.json`.
     3. Commit only the results and the decision file.
     4. If the sentinel trips, the owner decides whether to run the fallback `core-rebaseline-71`.
   - **M-71-09 (V4).** Run `ANTHROPIC_API_KEY=… node scripts/mcp/count-tool-tokens.mjs --model <V1 Claude model> [--model …]`. Record the baseline and new tool-list tokens and the ratio beside the 69 budget estimate, and say whether "more than half" is met.

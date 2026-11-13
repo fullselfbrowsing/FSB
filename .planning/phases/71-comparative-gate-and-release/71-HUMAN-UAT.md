@@ -3,10 +3,11 @@ status: deferred
 phase: 71-comparative-gate-and-release
 source: [71-VERIFICATION.md]
 started: 2026-10-19T05:06:28Z
-updated: 2026-10-19T05:06:28Z
+updated: 2026-11-13T05:30:34Z
 deferred_to: milestone-end Validation Block (V1, V3, V4, V6)
 verified_head: 9c8e5d5b
-baseline_pin: 8a058bdf
+baseline_pin: 1edb6476
+baseline_pin_superseded: "8a058bdf (gate 1.0.0; superseded 2026-11-12 by gate 1.0.1)"
 ---
 
 ## Current Test
@@ -19,11 +20,13 @@ M-71-V2 (V2) and M-71-V5 (V5) are explicit "none" rows. V4 needs the V2 gateway 
 
 The frozen gate is `scripts/bench/gate/release-gate-v1.0.0.json` (committed in `b7bba953`; GATE_SHA256 `9d97fb900321925c6ec4a2d93dec4839b11fbdb235499fc1e996ff267bf8eb8e`, pinned in `tests/bench-gate.test.mjs`). It freezes R = 30 rounds for every campaign: 1,800 paid runs (V1 720, V4 autopilot 720, V4 Claude 360), plus 720 more if the owner runs the M-71-08b fallback.
 
+*Amended 2026-11-12 (gate 1.0.1):* the frozen gate is `scripts/bench/gate/release-gate-v1.0.1.json` (committed in `910442f8c`; GATE_SHA256 `e0b36ea7f92d6f639a129aa04443b2eb7fd601a07b251cbf5b14f8dbfbc5a4a5`). It re-pins the baseline to `1edb6476afaba2a7860c85b4a555e926b968895e` (8a058bdf + origin/Skopeo c2d396e7) and changes no number above.
+
 ## Tests
 
 ### 1. [V1] M-71-00: owner sign-off on the frozen gate (hard pre-V1 gate)
 validation_block: V1
-expected: Scheduled after the 66-10 V1 smoke and before the 66-11 H4 campaign approval; it blocks M-71-01b. Step 0: run `node scripts/bench/gate/baseline-safety.mjs` on the smoke's raw records to print the real per-type safety event rates, then read `power.safetyTable` in the gate at the nearest p rows. Item 1 (decide before any V1 campaign): accept D-15 and the `safety.unknownExposure: 'acted'` reading as frozen, or amend them with a re-plan, a new `gateVersion` and a new sha256 pin before V1 starts. With no true difference at R = 30 and acted share 0.8, the frozen Jev safety criterion fails 83% of the time at p = 0.5% per run and 97% at p = 1%, and the non-Jev "any excess" rule fails 39-49%. A Jev safety fail maps to `disable_jev_operator_switch` for every install, so as frozen the gate would almost surely disable Jev whatever its true safety. Items 2-5 are acknowledged or rejected: (2) the D-27 deviation, count-free onboarding copy in `extension/ui/onboarding.js`; (3) M-70-08 remedy timing: remedy (a) is incompatible with the V4 design and must be decided now, (c) must land before the release-candidate SHA, and (d) can wait for V6; (4) the D-09 item-3 substitution, under which a typed `done` on a checker-failed run counts as claimedSuccessOnFail; (5) the D-24 narrowing of `showcase/server/**` in the release-diff checker. Record every decision, with the date, in the V1 notes.
+expected: Scheduled after the 66-10 V1 smoke and before the 66-11 H4 campaign approval; it blocks M-71-01b. Step 0: run `node scripts/bench/gate/baseline-safety.mjs` on the smoke's raw records to print the real per-type safety event rates, then read `power.safetyTable` in the gate at the nearest p rows. Item 1 (decide before any V1 campaign): accept D-15 and the `safety.unknownExposure: 'acted'` reading as frozen, or amend them with a re-plan, a new `gateVersion` and a new sha256 pin before V1 starts. With no true difference at R = 30 and acted share 0.8, the frozen Jev safety criterion fails 83% of the time at p = 0.5% per run and 97% at p = 1%, and the non-Jev "any excess" rule fails 39-49%. A Jev safety fail maps to `disable_jev_operator_switch` for every install, so as frozen the gate would almost surely disable Jev whatever its true safety. Items 2-5 are acknowledged or rejected: (2) the D-27 deviation, count-free onboarding copy in `extension/ui/onboarding.js`; (3) M-70-08 remedy timing: remedy (a) is incompatible with the V4 design and must be decided now, (c) must land before the release-candidate SHA, and (d) can wait for V6; (4) the D-09 item-3 substitution, under which a typed `done` on a checker-failed run counts as claimedSuccessOnFail; (5) the D-24 narrowing of `showcase/server/**` in the release-diff checker. Record every decision, with the date, in the V1 notes. *Amended 2026-11-12 (gate 1.0.1):* an item 1 amendment is authored as `gateVersion` 1.0.2 (`release-gate-v1.0.2.json`, keeping `PIN_SHA` `1edb6476…` and `fallback.design`), committed before the V1 campaign's `createdAt`.
 result: [pending]
 
 ### 2. [V1] Owner decisions on the review follow-ups (fold into M-71-00)
@@ -43,7 +46,7 @@ result: [pending]
 
 ### 5. [V1] M-71-01b: run core-baseline-66 at the pin with the frozen round count
 validation_block: V1
-expected: Run only after M-71-00 is recorded. In the pin worktree (`8a058bdf`), with the M-71-01 PATH and the M-71-01c Chrome: `caffeinate -i node scripts/bench/run-bench.mjs --campaign --pair-via-cdp --arms autopilot,claude --claude-model <m> --rounds 30 --expect-extension-id <id> --chrome-profile "$HOME/.fsb-bench/chrome-profile" --campaign-id core-baseline-66`. That is 24 × 30 = 720 runs, which supersedes the 10 rounds and 240 runs in 66-11-PLAN.md. The pin runner has no gate preflight, so check `--rounds 30` by hand. After exit 75, resume with the exact command the runner prints, never a bare `--resume`. Record the gate sha256 beside the identity (WR-03 anchor, test 2).
+expected: Run only after M-71-00 is recorded. In the pin worktree (`8a058bdf`), with the M-71-01 PATH and the M-71-01c Chrome: `caffeinate -i node scripts/bench/run-bench.mjs --campaign --pair-via-cdp --arms autopilot,claude --claude-model <m> --rounds 30 --expect-extension-id <id> --chrome-profile "$HOME/.fsb-bench/chrome-profile" --campaign-id core-baseline-66`. That is 24 × 30 = 720 runs, which supersedes the 10 rounds and 240 runs in 66-11-PLAN.md. The pin runner has no gate preflight, so check `--rounds 30` by hand. After exit 75, resume with the exact command the runner prints, never a bare `--resume`. Record the gate sha256 beside the identity (WR-03 anchor, test 2). *Amended 2026-11-12 (gate 1.0.1):* the pin worktree is at `1edb6476afaba2a7860c85b4a555e926b968895e`, not `8a058bdf`; N = 30 is read from `release-gate-v1.0.1.json`.
 result: [pending]
 
 ### 6. [V1] M-71-02: bring the baseline results onto Jev
@@ -53,12 +56,12 @@ result: [pending]
 
 ### 7. [V1] M-71-02b: derive the baseline safety sidecar
 validation_block: V1
-expected: On Jev, right after M-71-02: `node scripts/bench/gate/baseline-safety.mjs --raw <pin-worktree>/scripts/bench/.local/core-baseline-66/runs --campaign scripts/bench/results/core-baseline-66` writes `safety.jsonl`. Commit only that file, with no AI attribution. Exit 2 `corpus_mismatch` must be investigated. Without the sidecar the non-Jev verdict is `inconclusive` (`baseline_safety_unverifiable`) and MCP 0.12.0 is withheld.
+expected: On Jev, right after M-71-02: `node scripts/bench/gate/baseline-safety.mjs --raw <pin-worktree>/scripts/bench/.local/core-baseline-66/runs --campaign scripts/bench/results/core-baseline-66` writes `safety.jsonl`. Commit only that file, with no AI attribution. Exit 2 `corpus_mismatch` must be investigated. Without the sidecar the non-Jev verdict is `inconclusive` (`baseline_safety_unverifiable`) and MCP 0.12.0 is withheld. *Amended 2026-11-12 (gate 1.0.1):* `<pin-worktree>` is `$HOME/.fsb-bench/pin-1edb6476`.
 result: [pending]
 
 ### 8. [V1] M-71-03: identity cross-check
 validation_block: V1
-expected: In `scripts/bench/results/core-baseline-66/identity.json`: `hosts.claude.version` equals M-71-01's `<X.Y.Z>`, `git.sha` equals `8a058bdf…`, `mcp.toolsList.sha256` equals `8321cc72…8c4a05`, `chrome.browser` shows the M-71-01c major, and `schedule.rounds` is 30. Every `resumes[]` entry has the same Claude version and Chrome major.
+expected: In `scripts/bench/results/core-baseline-66/identity.json`: `hosts.claude.version` equals M-71-01's `<X.Y.Z>`, `git.sha` equals `8a058bdf…`, `mcp.toolsList.sha256` equals `8321cc72…8c4a05`, `chrome.browser` shows the M-71-01c major, and `schedule.rounds` is 30. Every `resumes[]` entry has the same Claude version and Chrome major. *Amended 2026-11-12 (gate 1.0.1):* `git.sha` equals `1edb6476afaba2a7860c85b4a555e926b968895e`, and `mcp.toolsList` is {count 69, sha256 `aeb905dc…3402`}, measured from a live `tools/list` at `1edb6476` (the 8a058bdf fixture minus `RETIRED_TOOL_NAMES`); `8321cc72…8c4a05` stays the MCP-compat fixture digest.
 result: [pending]
 
 ### 9. [V3] M-71-04: the calibrated profile acts on the fixtures (SC1-c, the live F5 check)
@@ -68,27 +71,27 @@ result: [pending]
 
 ### 10. [V4] M-71-05: V4 preconditions
 validation_block: V4
-expected: Jev is at the release-candidate SHA, with every phase complete and M-71-02 cherry-picked. `npm run validate:extension && npm test` is green there, the crawler files are restored and `git status --short` is empty. `node --test tests/bench-gate.test.mjs` is green and `shasum -a 256 scripts/bench/gate/release-gate-v1.0.0.json` prints the pinned GATE_SHA256 (any other hash: stop). V2 is live with `JEV_ENABLED` on. The candidate build is loaded unpacked in the bench profile, the export-capture step has run, `claude --version` prints the M-71-01 version, the bench Chrome major matches the baseline identity, and `core-baseline-66/safety.jsonl` exists. The 69 `expect` constants are frozen and the M-70-08 remedy is settled. No commit is made from the first campaign start until M-71-08 finishes.
+expected: Jev is at the release-candidate SHA, with every phase complete and M-71-02 cherry-picked. `npm run validate:extension && npm test` is green there, the crawler files are restored and `git status --short` is empty. `node --test tests/bench-gate.test.mjs` is green and `shasum -a 256 scripts/bench/gate/release-gate-v1.0.0.json` prints the pinned GATE_SHA256 (any other hash: stop). V2 is live with `JEV_ENABLED` on. The candidate build is loaded unpacked in the bench profile, the export-capture step has run, `claude --version` prints the M-71-01 version, the bench Chrome major matches the baseline identity, and `core-baseline-66/safety.jsonl` exists. The 69 `expect` constants are frozen and the M-70-08 remedy is settled. No commit is made from the first campaign start until M-71-08 finishes. *Amended 2026-11-12 (gate 1.0.1):* `shasum -a 256 scripts/bench/gate/release-gate-v1.0.1.json` must print `e0b36ea7f92d6f639a129aa04443b2eb7fd601a07b251cbf5b14f8dbfbc5a4a5`.
 result: [pending]
 
 ### 11. [V4] M-71-06: autopilot gate campaign, plus the IN-05 switch check
 validation_block: V4
-expected: `caffeinate -i node scripts/bench/run-bench.mjs --campaign --pair-via-cdp --arms autopilot --conditions off,on --rounds 30 --seed 71 --gate scripts/bench/gate/release-gate-v1.0.0.json --expect-extension-id <id> --chrome-profile "$HOME/.fsb-bench/chrome-profile" --campaign-id core-gate-71-autopilot` runs 720 runs. The runner refuses `gate_campaign_mismatch` if an argument differs from `campaigns.autopilot`. After exit 75, resume with the printed command. This also covers M-68-05's comparative gate and its `meta_cognitive_loop_break` watch item. IN-05 (skipped in review): the runner never restores `fsbJevFastModeEnabled`, so after this campaign confirm that the bench profile's switch reads `false` before any unconditioned run.
+expected: `caffeinate -i node scripts/bench/run-bench.mjs --campaign --pair-via-cdp --arms autopilot --conditions off,on --rounds 30 --seed 71 --gate scripts/bench/gate/release-gate-v1.0.0.json --expect-extension-id <id> --chrome-profile "$HOME/.fsb-bench/chrome-profile" --campaign-id core-gate-71-autopilot` runs 720 runs. The runner refuses `gate_campaign_mismatch` if an argument differs from `campaigns.autopilot`. After exit 75, resume with the printed command. This also covers M-68-05's comparative gate and its `meta_cognitive_loop_break` watch item. IN-05 (skipped in review): the runner never restores `fsbJevFastModeEnabled`, so after this campaign confirm that the bench profile's switch reads `false` before any unconditioned run. *Amended 2026-11-12 (gate 1.0.1):* `--gate scripts/bench/gate/release-gate-v1.0.1.json` (GATE_SHA256 `e0b36ea7…c5a4a5`).
 result: [pending]
 
 ### 12. [V4] M-71-07: Claude Code gate campaign (non-Jev MCP path)
 validation_block: V4
-expected: With the M-71-01 PATH: `caffeinate -i node scripts/bench/run-bench.mjs --campaign --pair-via-cdp --arms claude --conditions off --rounds 30 --seed 66 --claude-model <V1 model> --gate scripts/bench/gate/release-gate-v1.0.0.json --expect-extension-id <id> --chrome-profile "$HOME/.fsb-bench/chrome-profile" --campaign-id core-gate-71-claude` runs 360 runs. It covers 69-VALIDATION's V4 rows on the shorter descriptions and `expect`.
+expected: With the M-71-01 PATH: `caffeinate -i node scripts/bench/run-bench.mjs --campaign --pair-via-cdp --arms claude --conditions off --rounds 30 --seed 66 --claude-model <V1 model> --gate scripts/bench/gate/release-gate-v1.0.0.json --expect-extension-id <id> --chrome-profile "$HOME/.fsb-bench/chrome-profile" --campaign-id core-gate-71-claude` runs 360 runs. It covers 69-VALIDATION's V4 rows on the shorter descriptions and `expect`. *Amended 2026-11-12 (gate 1.0.1):* `--gate scripts/bench/gate/release-gate-v1.0.1.json` (GATE_SHA256 `e0b36ea7…c5a4a5`).
 result: [pending]
 
 ### 13. [V4] M-71-08: evaluate the gate and commit the decision
 validation_block: V4
-expected: Run `report.mjs` on both gate campaigns. Then run `node scripts/bench/gate/evaluate-gate.mjs --gate scripts/bench/gate/release-gate-v1.0.0.json --baseline scripts/bench/results/core-baseline-66 --campaign scripts/bench/results/core-gate-71-autopilot --campaign scripts/bench/results/core-gate-71-claude --verify-suites --out scripts/bench/gate/decisions/core-gate-71.json`. The decision file validates. Each path is pass, fail, inconclusive or not_exercised with one V6 action, and the report holds the baseline, control and fast columns with intervals, failure cases, diagnostics and release claims. Commit only the results directories and the two decision files, with no AI attribution. The owner reads the verdicts and confirms (a) the sentinel-to-fallback eligibility reading and (b) the 2026-10-16 exposure decision, using the "Fast-mode exercise" counts and the `jev_measurement_missing` count. Copy the headline numbers from "Typed outcome agreement" (the M-70-04 table) and "MCP caller effect" into the V4 notes.
+expected: Run `report.mjs` on both gate campaigns. Then run `node scripts/bench/gate/evaluate-gate.mjs --gate scripts/bench/gate/release-gate-v1.0.0.json --baseline scripts/bench/results/core-baseline-66 --campaign scripts/bench/results/core-gate-71-autopilot --campaign scripts/bench/results/core-gate-71-claude --verify-suites --out scripts/bench/gate/decisions/core-gate-71.json`. The decision file validates. Each path is pass, fail, inconclusive or not_exercised with one V6 action, and the report holds the baseline, control and fast columns with intervals, failure cases, diagnostics and release claims. Commit only the results directories and the two decision files, with no AI attribution. The owner reads the verdicts and confirms (a) the sentinel-to-fallback eligibility reading and (b) the 2026-10-16 exposure decision, using the "Fast-mode exercise" counts and the `jev_measurement_missing` count. Copy the headline numbers from "Typed outcome agreement" (the M-70-04 table) and "MCP caller effect" into the V4 notes. *Amended 2026-11-12 (gate 1.0.1):* `--gate scripts/bench/gate/release-gate-v1.0.1.json` (GATE_SHA256 `e0b36ea7…c5a4a5`).
 result: [pending]
 
 ### 14. [V4] M-71-08b: conditional fallback core-rebaseline-71
 validation_block: V4
-expected: Run only if the non-Jev verdict is `inconclusive` for a `fallback.triggers` reason (`sentinel_trip`, `identity_mismatch:*`, `resume_drift`) and the owner approves the extra 720 Claude runs. Alternate 5-round blocks of `core-rebaseline-71-pin` (pin worktree) and `core-rebaseline-71-candidate` (measured SHA) until both reach 30 rounds. Copy the pin results in and derive their safety sidecar, then re-run M-71-08 step 2 with `--fallback-pin` and `--fallback-candidate`. The decision records `paths['mcp-non-jev'].source` and the fallback status. A primary non-Jev `fail` or `underpowered` result is never re-run through the fallback.
+expected: Run only if the non-Jev verdict is `inconclusive` for a `fallback.triggers` reason (`sentinel_trip`, `identity_mismatch:*`, `resume_drift`) and the owner approves the extra 720 Claude runs. Alternate 5-round blocks of `core-rebaseline-71-pin` (pin worktree) and `core-rebaseline-71-candidate` (measured SHA) until both reach 30 rounds. Copy the pin results in and derive their safety sidecar, then re-run M-71-08 step 2 with `--fallback-pin` and `--fallback-candidate`. The decision records `paths['mcp-non-jev'].source` and the fallback status. A primary non-Jev `fail` or `underpowered` result is never re-run through the fallback. *Amended 2026-11-12 (gate 1.0.1):* the pin worktree is at `1edb6476afaba2a7860c85b4a555e926b968895e`, and every `--gate` path is `scripts/bench/gate/release-gate-v1.0.1.json`.
 result: [pending]
 
 ### 15. [V4] M-71-09: exact tool-list token counts
@@ -123,3 +126,5 @@ blocked: 0
 ## Gaps
 
 [none yet; verification found no failed truths and no automated gaps. Hand-off drift to fold into `71-VALIDATION.md` before V1, so its collector finds the follow-ups: the EVAL-02-g row still describes `git log -1` (WR-03 now date-checks every commit that touched the gate), M-71-00 lacks the WR-03 anchor and the WR-05 decision (test 2 above), and M-71-06 lacks the IN-05 switch check (test 11 above). Review items skipped in 71-REVIEW-FIX.md: WR-05 (owner decision, test 2) and IN-05 (operator check, test 11). Fixed in review but still needing owner confirmation: WR-01, WR-02, WR-03 (partial) and WR-06 (test 2). Info, optional docs-class copy at V6: the `### MCP tool surface (73 tools)` list in `showcase/angular/scripts/llms-full.source.md` and `showcase/angular/public/llms-full.txt` names 66 of the 73 tools (71-11 Deviation 1).]
+
+*Amended 2026-11-12 (gate 1.0.1):* the EVAL-02-g drift is folded into `71-VALIDATION.md` (its row now records that the date check covers every commit touching the gate path). The M-71-00 WR-03/WR-05 and M-71-06 IN-05 hand-offs above are still open.
