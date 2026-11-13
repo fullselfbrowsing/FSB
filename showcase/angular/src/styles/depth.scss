@@ -163,6 +163,51 @@ body:has(.fsb-navcue :focus-visible) .fsb-depth {
   }
 }
 
+/* Phones: every swipe moves the camera, so each plane has to fit one screen. The
+   engine lays a tall plane out wider and scales it down; these rules take out the
+   slack that a page with room to scroll could afford. */
+@media (max-width: 600px) {
+  .fsb-depth-layer section.section .section-header {
+    margin-bottom: 20px;
+  }
+
+  .fsb-depth-layer section.section .section-header h2 {
+    margin-bottom: 10px;
+  }
+
+  .fsb-depth-layer section.section .section-header p {
+    font-size: .86rem;
+    line-height: 1.5;
+  }
+
+  .fsb-depth-layer:not([data-full]) .fsb-depth-fit > * + section,
+  .fsb-depth-layer:not([data-full]) .fsb-depth-fit > * + div {
+    margin-top: 24px;
+  }
+
+  /* A row of cards swiped sideways: one card at a time, with the edge of the next
+     one showing. The engine leaves sideways swipes to the row, and moves the row
+     as one piece. */
+  .fsb-depth .fsb-depth-layer [data-depth-swipe] {
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+  }
+
+  .fsb-depth .fsb-depth-layer [data-depth-swipe]::-webkit-scrollbar {
+    display: none;
+  }
+
+  .fsb-depth .fsb-depth-layer [data-depth-swipe] > * {
+    flex: 0 0 86%;
+    min-width: 0;
+    scroll-snap-align: center;
+  }
+}
+
 /* On paper the planes become one ordinary column, as they do without JavaScript
    (the noscript rules in index.html), and the engine's inline motion styles are
    undone so the planes you are not on print too. The rail, the cue and the
@@ -197,6 +242,7 @@ body:has(.fsb-navcue :focus-visible) .fsb-depth {
 
   .fsb-depth-fit {
     transform: none !important;
+    width: 100% !important;
   }
 
   .fsb-depth [data-di] {

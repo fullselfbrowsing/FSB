@@ -634,3 +634,126 @@
     padding: 16px;
   }
 }
+
+/* Phones: a plane has one screen and no scrolling of its own, so the graph card
+   and the action lists are set more tightly. The graph plane is data-depth-rigid:
+   the canvas takes its size once and would not follow a plane laid out wider. */
+@media (max-width: 600px) {
+  .sitemap-head {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 6px 12px;
+    padding: 12px 14px;
+  }
+
+  .sitemap-head-icon {
+    display: none;
+  }
+
+  .sitemap-head-main {
+    grid-column: 1;
+  }
+
+  .sitemap-title-row {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .sitemap-title-row h3 {
+    font-size: 1rem;
+  }
+
+  .sitemap-meta {
+    gap: 4px 8px;
+    margin-top: 4px;
+    font-size: 0.7rem;
+  }
+
+  .sitemap-link {
+    grid-column: 2;
+    align-self: center;
+  }
+
+  /* Search and the view switch share one row. */
+  .kg-toolbar {
+    flex-wrap: nowrap;
+    gap: 8px;
+    padding: 8px 14px;
+  }
+
+  .kg-search {
+    min-width: 0;
+  }
+
+  .kg-toggle-btn {
+    padding: 6px 10px;
+    font-size: 0.74rem;
+  }
+
+  .sitemap-graph {
+    height: 250px;
+  }
+
+  /* Laid over a graph this short the hint would hide a fifth of it, so it sits
+     underneath as a plain line. */
+  .sitemap-graph-overlay {
+    position: static;
+    padding: 6px 14px 0;
+  }
+
+  .sitemap-hint {
+    padding: 0;
+    background: none;
+    border: 0;
+    font-size: 0.66rem;
+  }
+
+  .sitemap-foot {
+    padding: 10px 14px 12px;
+  }
+
+  .sitemap-foot.sitemap-cats {
+    gap: 8px;
+  }
+
+  /* The categories sit on one line that scrolls sideways. */
+  .cat-legend {
+    flex-wrap: nowrap;
+    gap: 14px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .cat-legend::-webkit-scrollbar {
+    display: none;
+  }
+
+  .cat-legend-item {
+    flex: none;
+  }
+
+  .action-categories {
+    column-count: 2;
+    column-gap: 10px;
+  }
+
+  .action-category {
+    margin-bottom: 10px;
+    padding: 10px;
+  }
+
+  .action-category h4 {
+    gap: 6px;
+    margin-bottom: 6px;
+    font-size: 0.8rem;
+  }
+
+  .action-list {
+    gap: 4px;
+  }
+
+  .action-tag {
+    padding: 2px 6px;
+    font-size: 0.62rem;
+  }
+}

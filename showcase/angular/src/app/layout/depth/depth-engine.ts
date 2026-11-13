@@ -1,7 +1,9 @@
 /* Depth engine: a page's sections sit on planes along the z axis, and scrolling
    moves the camera through them. The plane in focus flies past and blurs out while
-   the next one comes forward out of the blur. A plane taller than the window
-   scrolls inside itself before the camera moves on.
+   the next one comes forward out of the blur. A plane taller than the window is
+   scaled down to fit it. On a wide window, one that would become too small to
+   read scrolls inside itself instead, before the camera moves on; on a phone
+   every plane is fitted, so a swipe always moves the camera.
 
    Everything here is style writes on nodes the template already rendered; no DOM is
    created. The engine runs outside Angular's zone and reports the plane in focus
@@ -18,6 +20,9 @@
      [data-depth-ambient="a,b"]  a backdrop shown while planes a..b are in view
      [data-depth-anchor]         section starts inside a scrolling plane
      [data-depth-own]            gestures that start here belong to the element
+     [data-depth-swipe]          on a phone, a row of cards swiped sideways; it
+                                 travels as one piece
+     [data-depth-rigid]          a plane that keeps its own width when it is fitted
      .fsb-depth-rail [data-depth-go="i"][data-depth-sec="j"]  the plane index */
 
 export interface DepthEngine {
@@ -38,6 +43,10 @@ interface DepthLayer extends HTMLElement {
   _st?: number | null;
   _anch?: HTMLElement[];
   _auto?: boolean;
+  /** How much wider than the window the plane is laid out (0: not widened). */
+  _w?: number;
+  /** The window and height the width was last worked out for. */
+  _key?: string;
 }
 
 interface DepthItem {
@@ -57,12 +66,22 @@ interface Ambient {
 }
 
 /* Planes are scaled down to fit the window, which is the approved desktop look.
-   Below these factors the text would stop being readable, so the plane scrolls
-   inside itself instead: phones need the higher bar because their type is already
-   small. */
+   On a wide window, text below MIN_SCALE_WIDE would stop being readable, so the
+   plane scrolls inside itself instead.
+
+   A phone has no room for two kinds of scrolling: every swipe there moves the
+   camera. So a narrow plane is always fitted, and is laid out wider than the
+   window first, because scaling shrinks width as well as height and a phone only
+   runs out of height. The wider layout wraps less text, so the plane needs to
+   shrink less. MIN_SCALE_NARROW only catches windows too short to show anything. */
 const MIN_SCALE_WIDE = 0.6;
-const MIN_SCALE_NARROW = 0.86;
+const MIN_SCALE_NARROW = 0.45;
 const NARROW_MAX_WIDTH = 600;
+/* A plane this close to full size is left at its own width. */
+const WIDEN_BELOW = 0.97;
+const FIT_EASE = 'transform .35s cubic-bezier(.16,1,.3,1)';
+/* The length of the tick a phone gives when a swipe lands on another plane. */
+const TICK_MS = 15;
 
 /* After a swipe snaps to a plane, wheel events that still arrive this soon belong
    to that swipe's momentum and are eaten. The snap itself comes 160ms after the
@@ -97,6 +116,11 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
   let raf = 0;
   let lastT = 0;
   let laidOut = false;
+  let eased = false;
+  let wasNarrow: boolean | null = null;
+  let sized = '';
+  let widenT = 0;
+  let lastTouch = -1e9;
   let gesturing = false;
   let scrolled = false;
   let idle = 0;
@@ -246,6 +270,9 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
     });
   }
   const kOf = (el: Element): number => parseFloat(el.getAttribute('data-di') || '') || 0;
+  // A box that scrolls clips what is inside it, so cards flying toward the camera
+  // would be cut off at its edges: the box travels as one piece instead.
+  const scrolls = (el: Element): boolean => /^(auto|scroll)$/.test(css(el).overflowX);
   function normalize(L: DepthLayer): void {
     if (isScroll(L) && !L._auto) return;
     const fit = L.firstElementChild as HTMLElement | null;
@@ -255,7 +282,7 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
       let top: HTMLElement | null = null;
       let a = el.parentElement;
       while (a && a !== fit && a !== L) {
-        if (painted(a)) top = a;
+        if (painted(a) || scrolls(a)) top = a;
         a = a.parentElement;
       }
       if (!top) continue;
@@ -370,21 +397,99 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
     return parseFloat(css(stage!).getPropertyValue('--nav-height')) || 64;
   }
 
+  function setWide(L: DepthLayer, fit: HTMLElement, factor: number): void {
+    const wide = factor > 1.001;
+    L._w = wide ? factor : 0;
+    const width = wide ? (factor * 100).toFixed(2) + '%' : '';
+    if (fit.style.width !== width) {
+      fit.style.width = width;
+      fit.style.flexShrink = wide ? '0' : '';
+    }
+  }
+  // Finds the width at which a narrow plane needs to shrink least: the largest
+  // scale s for which the plane, laid out 1 / s times as wide as the window, is no
+  // taller than the room once scaled.
+  function solve(L: DepthLayer, fit: HTMLElement, room: number, W: number): void {
+    const at = (factor: number): number => {
+      setWide(L, fit, factor);
+      return fit.offsetHeight;
+    };
+    const h1 = at(1);
+    const plain = h1 > 0 ? Math.min(1, room / h1) : 1;
+    let factor = 1;
+    if (plain < WIDEN_BELOW) {
+      let lo = plain;
+      let hi = 1;
+      for (let k = 0; k < 6; k++) {
+        const mid = (lo + hi) / 2;
+        if (at(1 / mid) * mid <= room + 0.5) lo = mid;
+        else hi = mid;
+      }
+      // A picture or video that keeps its proportions grows taller as its plane
+      // widens, and gains nothing: such a plane stays at its own width.
+      const h = at(1 / lo);
+      if (h > 0 && Math.min(lo, room / h) > plain + 0.005) factor = 1 / lo;
+    }
+    L._key = W + '|' + room + '|' + at(factor);
+  }
+  // Sets how wide each plane is laid out. Changing a plane's size inside the resize
+  // observer that watches it would loop, so this only ever runs from a timer or at
+  // the start, and layout() asks for it.
+  function widen(): void {
+    const H = stage!.clientHeight;
+    const W = stage!.clientWidth;
+    const narrow = W <= NARROW_MAX_WIDTH;
+    const room = H - navHeight() - 84 - 24;
+    sized = W + 'x' + H;
+    const moved: HTMLElement[] = [];
+    for (const L of layers) {
+      const fit = L.firstElementChild as HTMLElement;
+      const before = fit.style.width;
+      if (narrow && !L.hasAttribute('data-full') && !isScroll(L) && !L.hasAttribute('data-depth-rigid')) solve(L, fit, room, W);
+      else setWide(L, fit, 1);
+      if (fit.style.width !== before) moved.push(fit);
+    }
+    // A plane that changed width takes its new scale at once: easing only the scale
+    // would show the two out of step.
+    for (const fit of moved) fit.style.transition = 'none';
+    layout();
+    if (moved.length) {
+      stage!.getBoundingClientRect();
+      for (const fit of moved) fit.style.transition = eased ? FIT_EASE : '';
+    }
+  }
+  function askWiden(delay: number): void {
+    win.clearTimeout(widenT);
+    widenT = win.setTimeout(() => {
+      if (alive) widen();
+    }, delay);
+  }
+
   function layout(): void {
     const H = stage!.clientHeight;
     const W = stage!.clientWidth;
-    const minScale = W <= NARROW_MAX_WIDTH ? MIN_SCALE_NARROW : MIN_SCALE_WIDE;
+    const narrow = W <= NARROW_MAX_WIDTH;
+    const minScale = narrow ? MIN_SCALE_NARROW : MIN_SCALE_WIDE;
     // The same room a fitted plane gets from its CSS padding (nav above, nav cue
     // below), so a plane that switched to scrolling can switch back.
     const room = H - navHeight() - 84 - 24;
-    let changed = false;
+    // Which boxes scroll sideways depends on the width, so the travelling elements
+    // are worked out again when a window crosses between narrow and wide.
+    let changed = wasNarrow !== null && wasNarrow !== narrow;
+    wasNarrow = narrow;
+    let stale = false;
     for (const L of layers) {
       const fit = L.firstElementChild as HTMLElement;
       let s = 1;
       if (!L.hasAttribute('data-full') && (!isScroll(L) || L._auto)) {
         const h = fit.offsetHeight;
-        s = h > 0 ? Math.min(1, room / h) : 1;
-        const auto = s < minScale;
+        const widens = narrow && !L._auto && !L.hasAttribute('data-depth-rigid');
+        const settled = widens ? L._key === W + '|' + room + '|' + h : !L._w;
+        if (!settled) stale = true;
+        // A widened plane is exactly as wide as the window once scaled by 1 / _w.
+        s = h > 0 ? Math.min(1, room / h, 1 / (L._w || 1)) : 1;
+        // A plane whose width is still to be worked out may yet fit: it is asked first.
+        const auto = s < minScale && (settled || !!L._auto);
         if (auto !== !!L._auto) {
           L._auto = auto;
           if (auto) L.setAttribute('data-scroll', '');
@@ -393,14 +498,18 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
             L.scrollTop = 0;
             L._st = null;
           }
+          if (L._w) stale = true;
           changed = true;
         }
         if (auto) s = 1;
-      }
+      } else if (L._w) stale = true;
       const tf = s < 0.999 ? 'scale(' + s.toFixed(4) + ')' : '';
       if (fit.style.transform !== tf) fit.style.transform = tf;
       L._s = s;
     }
+    // A turned or resized window is refitted at once; a plane whose content is
+    // still changing height (an answer opening) waits until it has stopped.
+    if (stale) askWiden(sized === W + 'x' + H ? 120 : 0);
     if (changed) collect();
     const sr = stage!.getBoundingClientRect();
     const cx = sr.left + W / 2;
@@ -423,7 +532,8 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
     if (!laidOut) {
       laidOut = true;
       timers.push(win.setTimeout(() => {
-        for (const L of layers) (L.firstElementChild as HTMLElement).style.transition = 'transform .35s cubic-bezier(.16,1,.3,1)';
+        eased = true;
+        for (const L of layers) (L.firstElementChild as HTMLElement).style.transition = FIT_EASE;
       }, 600));
     }
   }
@@ -566,9 +676,23 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
     lastT = win.performance.now();
     raf = win.requestAnimationFrame(frame);
   }
+  // A phone ticks when a swipe or tap lands on another plane. Browsers that cannot
+  // vibrate have no such function; Chrome ignores the call, and warns in the console,
+  // until the page has been tapped once.
+  function tick(): void {
+    if (win.performance.now() - lastTouch > 1000) return;
+    const nav = win.navigator as Navigator & { userActivation?: { hasBeenActive?: boolean } };
+    if (typeof nav.vibrate !== 'function' || nav.userActivation?.hasBeenActive === false) return;
+    try {
+      nav.vibrate(TICK_MS);
+    } catch {
+      // The tick is a nicety.
+    }
+  }
   function go(i: number): void {
     const from = anchor;
     anchor = clamp(Math.round(i), 0, N - 1);
+    if (anchor !== from) tick();
     // Arriving at a scrolling plane from above starts at its top, from below at its end.
     const L = layers[anchor];
     if (isScroll(L) && anchor !== from) {
@@ -749,6 +873,7 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
     e.preventDefault();
   }
   function onTouchStart(e: TouchEvent): void {
+    lastTouch = win.performance.now();
     // A touch already being followed means another finger landed: finish that
     // swipe on a plane before letting it go, or the camera stays between two.
     if (touch?.mode === 'depth') settle();
@@ -780,6 +905,7 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
     kick();
   }
   function onTouchEnd(): void {
+    lastTouch = win.performance.now();
     if (!touch) return;
     const m = touch.mode;
     touch = null;
@@ -866,7 +992,7 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
   if (doc.readyState !== 'complete') win.addEventListener('load', rescan);
   timers.push(win.setTimeout(rescan, 400), win.setTimeout(rescan, 1500), win.setTimeout(rescan, 4000));
   doc.fonts?.ready.then(rescan).catch(() => undefined);
-  layout();
+  widen();
   refreshRail();
   sync();
   revealHash();
@@ -891,6 +1017,7 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
       alive = false;
       timers.forEach((t) => win.clearTimeout(t));
       win.clearTimeout(rescanT);
+      win.clearTimeout(widenT);
       win.clearTimeout(idle);
       win.cancelAnimationFrame(raf);
       mo?.disconnect();

@@ -76,7 +76,7 @@
             <h2 i18n="@@agents.with.title">Works with the agents <span class="text-orange">you already run</span></h2>
             <p i18n="@@agents.with.subtitle">Connect <span [attr.translate]="'no'">Codex</span>, <span [attr.translate]="'no'">Claude Code</span>, <span [attr.translate]="'no'">Cursor</span>, <span [attr.translate]="'no'">OpenClaw</span>, <span [attr.translate]="'no'">Hermes</span>, or another <span [attr.translate]="'no'">MCP</span> host to <span [attr.translate]="'no'">FSB</span>. Install the <span [attr.translate]="'no'">Chrome</span> extension, connect the <span [attr.translate]="'no'">MCP</span> bridge, and run <code [attr.translate]="'no'">doctor</code> to verify access to your real browser session.</p>
           </div>
-          <div class="ag-featured">
+          <div class="ag-featured" data-depth-swipe>
             @for (agent of featuredAgents; track agent.id) {
               <article class="ag-agent reveal" [class]="'delay-' + ($index + 1)" [attr.data-di]="(30 + $index * 10) / 100">
                 <div class="ag-agent-head">
@@ -175,7 +175,7 @@
             <h2 i18n="@@agents.skill.title">Meet the <span [attr.translate]="'no'">FSB</span> Skill</h2>
             <p i18n="@@agents.skill.subtitle">The canonical <span [attr.translate]="'no'">OpenClaw</span> and <span [attr.translate]="'no'">Hermes</span> onboarding path. Loads cleanly into a fresh runtime, runs the full diagnostic flow, and installs the bridge for any other <span [attr.translate]="'no'">MCP</span> host on your machine.</p>
           </div>
-          <div class="skill-feature-grid">
+          <div class="skill-feature-grid" data-depth-swipe>
             <article class="skill-feature-card reveal delay-1" data-di="0.3">
               <div class="skill-feature-icon" aria-hidden="true"><i class="ph ph-stethoscope"></i></div>
               <h3 i18n="@@agents.skill.feature.doctor.title">Doctor first protocol</h3>
@@ -236,7 +236,7 @@
             <p i18n="@@agents.try.subtitle">The recurring browser work. The boring, repetitive stuff that vision-based agents struggle with on logged-in sites. <span [attr.translate]="'no'">FSB</span> runs in the user&#39;s real <span [attr.translate]="'no'">Chrome</span>, so cookies, sessions, MFA state, and saved logins are already there.</p>
           </div>
 
-          <div class="prompt-grid">
+          <div class="prompt-grid" data-depth-swipe>
             <article class="prompt-card reveal delay-1" data-di="0.3">
               <header class="prompt-card-head">
                 <span class="prompt-card-icon" aria-hidden="true"><i class="ph ph-tray"></i></span>

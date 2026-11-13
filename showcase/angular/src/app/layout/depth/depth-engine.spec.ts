@@ -7,20 +7,35 @@ describe('createDepthEngine', () => {
   let engine: DepthEngine | undefined;
   let seen: number[];
 
-  function plane(label: string, height: number): string {
-    return `<div class="fsb-depth-layer" data-label="${label}"><div class="fsb-depth-fit">` +
-      `<section><h2 data-di="0" style="height:${height}px;margin:0">${label}</h2></section></div></div>`;
+  // A plane is a box of a fixed height, or any markup of its own.
+  type PlaneSpec = number | { html: string; attrs?: string };
+
+  function plane(label: string, spec: PlaneSpec): string {
+    const inner = typeof spec === 'number'
+      ? `<section><h2 data-di="0" style="height:${spec}px;margin:0">${label}</h2></section>`
+      : spec.html;
+    const attrs = typeof spec === 'number' ? '' : spec.attrs || '';
+    return `<div class="fsb-depth-layer" data-label="${label}" ${attrs}><div class="fsb-depth-fit">${inner}</div></div>`;
   }
 
-  function build(heights: number[]): void {
+  // `width` narrows the stage to a phone's, whatever the test window's size.
+  function build(planes: PlaneSpec[], width?: number): void {
     root = document.createElement('div');
+    const narrow = width ? ` style="right:auto;width:${width}px"` : '';
     root.innerHTML =
-      `<div class="fsb-depth" data-depth-stage tabindex="0">${heights.map((h, i) => plane('P' + i, h)).join('')}</div>` +
-      `<nav class="fsb-depth-rail">${heights.map((_, i) => `<button class="fsb-depth-go" data-depth-go="${i}"></button>`).join('')}</nav>`;
+      `<div class="fsb-depth" data-depth-stage tabindex="0"${narrow}>${planes.map((h, i) => plane('P' + i, h)).join('')}</div>` +
+      `<nav class="fsb-depth-rail">${planes.map((_, i) => `<button class="fsb-depth-go" data-depth-go="${i}"></button>`).join('')}</nav>`;
     document.body.appendChild(root);
     seen = [];
     engine = createDepthEngine(root, { onActive: (i) => seen.push(i) });
   }
+
+  // The height a fitted plane has to itself: the window less the nav and the nav cue.
+  // The stage fills the window, so this holds before a stage is built too.
+  const room = (): number =>
+    window.innerHeight - (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--nav-height')) || 64) - 108;
+  const fitOf = (index: number): HTMLElement => layers()[index].firstElementChild as HTMLElement;
+  const scaleOf = (index: number): number => parseFloat((fitOf(index).style.transform.match(/scale\(([^)]+)\)/) || ['', '1'])[1]);
 
   const layers = (): HTMLElement[] => Array.from(root.querySelectorAll<HTMLElement>('.fsb-depth-layer'));
   const rail = (): HTMLElement[] => Array.from(root.querySelectorAll<HTMLElement>('.fsb-depth-go'));
@@ -84,6 +99,67 @@ describe('createDepthEngine', () => {
     expect((fitted.firstElementChild as HTMLElement).style.transform).toMatch(/^scale\(0\.\d+\)$/);
   });
 
+  describe('on a narrow window', () => {
+    const PHONE = 400;
+    // Running text that would be `times` the room tall at the phone's width: how
+    // tall it is depends on how wide it is laid out.
+    function prose(times: number): string {
+      const words = Math.round((times * PHONE * room()) / (5 * 9.6 * 24));
+      return `<p data-di="0" style="font:16px/24px monospace;margin:0">${'word '.repeat(words)}</p>`;
+    }
+
+    it('fits a plane that a wide window would scroll', () => {
+      const tall = Math.round((window.innerHeight - 172) / 0.5);
+      build([120, tall, 120], PHONE);
+      expect(layers()[1].hasAttribute('data-scroll')).toBeFalse();
+      expect(scaleOf(1)).toBeLessThan(0.6);
+      expect(scaleOf(1)).toBeGreaterThan(0.45);
+    });
+
+    it('lays a plane out wider than the window so it shrinks less', () => {
+      // Shrunk at the window's own width this would be about 0.42 of its size.
+      build([120, { html: prose(2.4) }, 120], PHONE);
+      const fit = fitOf(1);
+      const scale = scaleOf(1);
+      expect(layers()[1].hasAttribute('data-scroll')).toBeFalse();
+      expect(parseFloat(fit.style.width)).toBeGreaterThan(110);
+      expect(scale).toBeGreaterThan(0.5);
+      expect(fit.offsetWidth * scale).toBeCloseTo(PHONE, -1);
+      expect(fit.offsetHeight * scale).toBeLessThanOrEqual(room() + 1);
+    });
+
+    it('leaves a box of a fixed height at its own width', () => {
+      build([120, Math.round(room() / 0.7), 120], PHONE);
+      expect(fitOf(1).style.width).toBe('');
+      expect(scaleOf(1)).toBeCloseTo(0.7, 1);
+    });
+
+    it('keeps a rigid plane at its own width', () => {
+      build([120, { html: prose(1.5), attrs: 'data-depth-rigid' }, 120], PHONE);
+      expect(fitOf(1).style.width).toBe('');
+      expect(scaleOf(1)).toBeLessThan(0.75);
+    });
+  });
+
+  describe('a row that scrolls sideways', () => {
+    const card = (di: string): string => `<div data-di="${di}" style="background:#333;flex:0 0 80%;height:60px">card</div>`;
+    const row = (style: string): string => `<div class="row" style="display:flex;${style}">${card('0.2')}${card('0.4')}</div>`;
+
+    it('travels as one piece, so its cards are not cut off as they fly', () => {
+      build([120, { html: row('overflow-x:auto') }, 120]);
+      const el = root.querySelector<HTMLElement>('.row')!;
+      expect(el.getAttribute('data-di')).toBe('0.2');
+      expect(el.querySelectorAll('[data-di]').length).toBe(0);
+    });
+
+    it('is left alone when it does not scroll', () => {
+      build([120, { html: row('') }, 120]);
+      const el = root.querySelector<HTMLElement>('.row')!;
+      expect(el.hasAttribute('data-di')).toBeFalse();
+      expect(el.querySelectorAll('[data-di]').length).toBe(2);
+    });
+  });
+
   describe('touch', () => {
     const canTouch = typeof Touch === 'function' && typeof TouchEvent === 'function';
 
@@ -132,6 +208,57 @@ describe('createDepthEngine', () => {
       touch('touchstart', [[300, 590 - nearDrag()], [380, 500]]);
       touch('touchend', []);
       await settle(1);
+    });
+
+    describe('haptics', () => {
+      let vibrate: jasmine.Spy;
+      const tapped = (yes: boolean): void => {
+        spyOnProperty(Navigator.prototype, 'userActivation', 'get').and.returnValue({ hasBeenActive: yes, isActive: yes } as UserActivation);
+      };
+      function swipe(distance: number): void {
+        touch('touchstart', [[300, 600]]);
+        touch('touchmove', [[300, 590]]);
+        touch('touchmove', [[300, 590 - distance]]);
+        touch('touchend', []);
+      }
+
+      beforeEach(() => {
+        if (typeof navigator.vibrate !== 'function') pending('This browser cannot vibrate');
+        vibrate = spyOn(Navigator.prototype, 'vibrate').and.returnValue(true);
+      });
+
+      it('ticks once when a swipe lands on another plane', async () => {
+        tapped(true);
+        build([120, 120, 120]);
+        swipe(nearDrag());
+        expect(vibrate).toHaveBeenCalledTimes(1);
+        await settle(1);
+        expect(vibrate).toHaveBeenCalledTimes(1);
+      });
+
+      it('stays quiet when a swipe settles back where it started', () => {
+        tapped(true);
+        build([120, 120, 120]);
+        swipe(3);
+        expect(seen).toEqual([0]);
+        expect(vibrate).not.toHaveBeenCalled();
+      });
+
+      it('stays quiet until the page has been tapped', async () => {
+        tapped(false);
+        build([120, 120, 120]);
+        swipe(nearDrag());
+        await settle(1);
+        expect(vibrate).not.toHaveBeenCalled();
+      });
+
+      it('stays quiet for a wheel or a key', async () => {
+        tapped(true);
+        build([120, 120, 120]);
+        engine!.go(1);
+        await settle(1);
+        expect(vibrate).not.toHaveBeenCalled();
+      });
     });
   });
 
