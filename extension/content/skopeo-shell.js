@@ -804,9 +804,54 @@
       : null;
   }
 
+  // A civil date (YYYY-MM-DD) the shell shows, on its own or inside copy.
+  // With no FSB language, or English, it is written exactly as the service
+  // worker wrote it (english); in any other language it is formatted for that
+  // language, so month names never need catalog keys.
+  const CIVIL_DATE_SOURCE = Symbol('skopeoCivilDate');
+  const CIVIL_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+  function civilDate(iso, english) {
+    const source = { iso: String(iso), english: String(english) };
+    source[CIVIL_DATE_SOURCE] = true;
+    return Object.freeze(source);
+  }
+
+  function isCivilDate(value) {
+    return !!value && typeof value === 'object' && value[CIVIL_DATE_SOURCE] === true;
+  }
+
+  function formatCivilDate(iso, code, month) {
+    const parts = CIVIL_DATE.exec(iso);
+    if (!parts) return null;
+    try {
+      const shown = new Intl.DateTimeFormat(code, {
+        year: 'numeric', month: month || 'long', day: 'numeric', timeZone: 'UTC'
+      }).format(Date.UTC(Number(parts[1]), Number(parts[2]) - 1, Number(parts[3])));
+      return typeof shown === 'string' && shown ? shown : null;
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  function shownCivilDate(value) {
+    const locale = hudLocale();
+    let code = null;
+    try { code = locale ? locale.current() : null; } catch (_error) { code = null; }
+    if (typeof code !== 'string' || !code || code === 'en') return value.english;
+    return formatCivilDate(value.iso, code) || value.english;
+  }
+
+  // The English an alert-engine date reads as ("March 1, 2027"), used only to
+  // confirm that a sentence or label names its own civil date.
+  function englishCivilDate(iso, month) {
+    return formatCivilDate(iso, 'en-US', month);
+  }
+
   // The English a copy() source stands for, nested sources filled in: the
   // exact string the shell wrote before it translated anything.
   function englishOf(value) {
+    if (isCivilDate(value)) return value.english;
     if (!isCopy(value)) return value == null ? '' : String(value);
     if (!value.subs) return value.english;
     const subs = value.subs;
@@ -824,12 +869,13 @@
       const value = subs[name];
       out[name] = isCopy(value)
         ? { english: value.english, subs: lineSubs(value.subs) }
-        : (value == null ? '' : String(value));
+        : isCivilDate(value) ? shownCivilDate(value) : (value == null ? '' : String(value));
     }
     return out;
   }
 
   function localized(value) {
+    if (isCivilDate(value)) return shownCivilDate(value);
     if (!isCopy(value)) return value == null ? '' : String(value);
     const locale = hudLocale();
     if (!locale) return englishOf(value);
@@ -843,7 +889,7 @@
 
   function recordCopy(node, slot, value, shown) {
     let record = COPY_WRITES.get(node);
-    if (!isCopy(value)) {
+    if (!isCopy(value) && !isCivilDate(value)) {
       if (record) delete record[slot];
       return;
     }
@@ -1413,6 +1459,144 @@
   function resultNoticeMessage(atom) {
     if (atom.tone === 'error' && atom.heading === 'Action not completed') return unfinishedActionCopy(atom.message);
     return resultNoticeText(atom.message);
+  }
+
+  // Corpus and contract-view copy. The composer fills these models from its
+  // own state tables, so most fields are FSB copy. The data in them is Drive
+  // folder and document names, citation labels, extracted fact values, owner
+  // names and accepted consequence text. A field that can hold either is
+  // decided by its state or type enum, and a sentence the composer assembles
+  // is rebuilt from the model's counts and enums, then used only while its
+  // English is exactly the model's string.
+
+  // While the current source is pending, inaccessible or missing the service
+  // worker sends no Drive name for it; in every other state the label may be
+  // that name.
+  const CORPUS_UNNAMED_SOURCE_STATES = new Set(['pending', 'inaccessible', 'missing']);
+
+  function corpusSourceLabel(source) {
+    return CORPUS_UNNAMED_SOURCE_STATES.has(source.state)
+      ? rebuilt(source.label, copy('Current source'))
+      : source.label;
+  }
+
+  // A corpus row without a Drive name is numbered by its position.
+  function corpusRowLabel(row, index) {
+    return rebuilt(row.label, copy('Source $N$', { N: String(index + 1) }));
+  }
+
+  function corpusAggregateLabel(model) {
+    const count = model.rows.length;
+    return rebuilt(model.aggregate.label, copy(count === 1 ? '$COUNT$ source' : '$COUNT$ sources', {
+      COUNT: String(count)
+    }));
+  }
+
+  function joinedCopy(parts) {
+    return parts.reduce(function (list, item) {
+      return list === null ? item : copy('$LIST$ · $ITEM$', { LIST: list, ITEM: item });
+    }, null);
+  }
+
+  const DOCUMENT_COUNT_COPY = Object.freeze([
+    Object.freeze(['ready', '$COUNT$ ready']),
+    Object.freeze(['pending', '$COUNT$ pending']),
+    Object.freeze(['unreadable', '$COUNT$ unreadable']),
+    Object.freeze(['downloadBlocked', '$COUNT$ download blocked']),
+    Object.freeze(['inaccessible', '$COUNT$ inaccessible']),
+    Object.freeze(['missing', '$COUNT$ missing'])
+  ]);
+
+  // "N authorized sources · <index state> · N ready · ...", from the counts.
+  function contractDocumentsValue(slot) {
+    const parts = [
+      copy(slot.total === 1 ? '$COUNT$ authorized source' : '$COUNT$ authorized sources', {
+        COUNT: String(slot.total)
+      }),
+      copy(slot.indexLabel)
+    ];
+    for (const entry of DOCUMENT_COUNT_COPY) {
+      if (slot[entry[0]] > 0) parts.push(copy(entry[1], { COUNT: String(slot[entry[0]]) }));
+    }
+    return rebuilt(slot.value, joinedCopy(parts));
+  }
+
+  // An assigned owner's value is the owner's name.
+  function contractOwnerValue(slot) {
+    return slot.state === 'assigned' ? slot.value : copy(slot.value);
+  }
+
+  // An accepted consequence is document text, except the sentence the
+  // service worker writes itself for a material date of each type.
+  const MATERIAL_DATE_CONSEQUENCE_COPY = Object.freeze({
+    'notice-deadline': 'Notice must be given by this date',
+    termination: 'Agreement terminates on this date',
+    expiration: 'Agreement expires on this date',
+    renewal: 'Renewal is measured from this date'
+  });
+
+  function contractConsequenceValue(state, value, dateType) {
+    if (state !== 'accepted') return copy(value);
+    const fixed = typeof dateType === 'string' &&
+      Object.prototype.hasOwnProperty.call(MATERIAL_DATE_CONSEQUENCE_COPY, dateType)
+      ? MATERIAL_DATE_CONSEQUENCE_COPY[dateType]
+      : null;
+    return fixed ? rebuilt(value, copy(fixed)) : value;
+  }
+
+  // A material date's label is its civil date, written as ISO by the service
+  // worker or in English words by a fixture; any other label is kept as is.
+  function contractDateLabel(dateLabel, iso) {
+    if (!CIVIL_DATE.test(iso)) return dateLabel;
+    const names = dateLabel === iso || dateLabel === englishCivilDate(iso) ||
+      dateLabel === englishCivilDate(iso, 'short');
+    return names ? civilDate(iso, dateLabel) : dateLabel;
+  }
+
+  // The scheduled and delivered alert details name the alert date in English
+  // words; they are rebuilt around that civil date. Every other detail is a
+  // fixed service-worker sentence.
+  const ALERT_DETAIL_COPY = Object.freeze({
+    scheduled: 'For $DATE$ · 90 days before the governing notice deadline.',
+    delivered: 'Delivered to this Chrome user on $DATE$.'
+  });
+
+  function contractAlertDetail(slot) {
+    const detail = slot.detail;
+    if (!Object.prototype.hasOwnProperty.call(ALERT_DETAIL_COPY, slot.state)) return copy(detail);
+    const template = ALERT_DETAIL_COPY[slot.state];
+    const at = template.indexOf('$DATE$');
+    const head = template.slice(0, at);
+    const tail = template.slice(at + '$DATE$'.length);
+    if (!slot.alertCivilDate || detail.length <= head.length + tail.length ||
+        !detail.startsWith(head) || !detail.endsWith(tail)) return detail;
+    const english = detail.slice(head.length, detail.length - tail.length);
+    if (english !== englishCivilDate(slot.alertCivilDate)) return detail;
+    return rebuilt(detail, copy(template, { DATE: civilDate(slot.alertCivilDate, english) }));
+  }
+
+  // A "+N ..." overflow line, rebuilt from the count the model carries with it.
+  function overflowCopy(line, template, count) {
+    return line ? rebuilt(line, copy(template, { COUNT: String(count) })) : line;
+  }
+
+  function folderOverflowText(overflow) {
+    return rebuilt(overflow.text, copy(
+      'Showing $SHOWN$ of $TOTAL$ accessible vendors. $COUNT$ additional vendors are outside this bounded view.',
+      {
+        SHOWN: String(overflow.projectedVendorCount),
+        TOTAL: String(overflow.vendorCount),
+        COUNT: String(overflow.vendorOverflow)
+      }
+    ));
+  }
+
+  // The ask entry for a vendor names the vendor's Drive folder (data).
+  function contractAskEntryLabel(entry) {
+    const label = entry.action.label;
+    if (entry.kind === 'agreement') return rebuilt(label, copy('Ask about this agreement'));
+    if (entry.kind === 'corpus') return rebuilt(label, copy('Ask enrolled corpus'));
+    return rebuilt(label, copy('Ask about $VENDOR$', { VENDOR: entry.label }));
   }
 
   function normalizeRect(rect) {
@@ -3282,49 +3466,50 @@
         });
         region.appendChild(createElement(this.document, 'h2', 'skopeo-corpus-heading', {
           id: 'skopeo-corpus-heading'
-        }, 'Corpus'));
+        }, copy('Corpus')));
         if (model.mode === 'enrollment') {
           let button = null;
           button = this._button(
             'skopeo-corpus-enroll',
-            CORPUS_ENROLL_COPY,
-            CORPUS_ENROLL_COPY,
+            copy(CORPUS_ENROLL_COPY),
+            copy(CORPUS_ENROLL_COPY),
             function () { shell._emitCorpusAction(model, button); }
           );
           region.appendChild(button);
         } else if (model.mode === 'current-source') {
           const source = createElement(this.document, 'div', 'skopeo-corpus-source');
           source.appendChild(createElement(
-            this.document, 'span', 'skopeo-corpus-source-label', {}, model.source.label
+            this.document, 'span', 'skopeo-corpus-source-label', {}, corpusSourceLabel(model.source)
           ));
           source.appendChild(createElement(this.document, 'p', 'skopeo-corpus-source-state', {
             role: 'status',
             'aria-live': 'polite'
-          }, model.source.stateLabel));
+          }, copy(model.source.stateLabel)));
           region.appendChild(source);
         } else if (model.mode === 'active-corpus') {
           const list = createElement(this.document, 'ul', 'skopeo-corpus-list', { role: 'list' });
-          for (const row of model.rows) {
+          for (let index = 0; index < model.rows.length; index += 1) {
+            const row = model.rows[index];
             const item = createElement(this.document, 'li', 'skopeo-corpus-row', { role: 'listitem' });
             item.appendChild(createElement(
-              this.document, 'span', 'skopeo-corpus-row-label', {}, row.label
+              this.document, 'span', 'skopeo-corpus-row-label', {}, corpusRowLabel(row, index)
             ));
             item.appendChild(createElement(
-              this.document, 'span', 'skopeo-corpus-row-state', {}, row.stateLabel
+              this.document, 'span', 'skopeo-corpus-row-state', {}, copy(row.stateLabel)
             ));
             list.appendChild(item);
           }
           region.appendChild(list);
           if (model.aggregate) {
             region.appendChild(createElement(
-              this.document, 'p', 'skopeo-corpus-aggregate', {}, model.aggregate.label
+              this.document, 'p', 'skopeo-corpus-aggregate', {}, corpusAggregateLabel(model)
             ));
           }
         } else {
           region.appendChild(createElement(this.document, 'p', 'skopeo-corpus-closed', {
             role: 'status',
             'aria-live': 'polite'
-          }, model.copy));
+          }, copy(model.copy)));
         }
         scope.node = region;
         scope.nodes = [region];
@@ -3368,12 +3553,15 @@
         this.withdrawCorpus();
         return false;
       }
-      let announcement = 'Corpus status updated.';
-      if (model.mode === 'enrollment') announcement = 'Folder enrollment available.';
+      let announcement = copy('Corpus status updated.');
+      if (model.mode === 'enrollment') announcement = copy('Folder enrollment available.');
       else if (model.mode === 'current-source') {
-        announcement = model.source.label + '. ' + model.source.stateLabel + '.';
-      } else if (model.mode === 'active-corpus') announcement = 'Corpus sources updated.';
-      else announcement = 'Corpus unavailable.';
+        announcement = copy('$LABEL$. $STATE$.', {
+          LABEL: corpusSourceLabel(model.source),
+          STATE: copy(model.source.stateLabel)
+        });
+      } else if (model.mode === 'active-corpus') announcement = copy('Corpus sources updated.');
+      else announcement = copy('Corpus unavailable.');
       this._announce(announcement, true);
       return true;
     }
@@ -3486,11 +3674,11 @@
       const titleRow = createElement(this.document, 'div', 'skopeo-contract-title-row');
       const heading = createElement(this.document, 'h2', 'skopeo-contract-heading', {
         id: 'skopeo-contract-heading',
-        'aria-label': model.mode === 'folder' ? 'Skopeo vendor agreements' :
-          model.mode === 'reading' ? 'Skopeo agreement reading' : 'Skopeo contract view unavailable'
-      }, model.title);
+        'aria-label': copy(model.mode === 'folder' ? 'Skopeo vendor agreements' :
+          model.mode === 'reading' ? 'Skopeo agreement reading' : 'Skopeo contract view unavailable')
+      }, copy(model.title));
       const hide = this._button(
-        'skopeo-contract-hide', 'Hide contract view', 'Hide contract view',
+        'skopeo-contract-hide', copy('Hide contract view'), copy('Hide contract view'),
         function () { shell._contractHide(scope); }
       );
       titleRow.appendChild(heading);
@@ -3499,22 +3687,27 @@
       return header;
     }
 
-    _contractAppendTextSlot(list, slot) {
-      list.appendChild(createElement(this.document, 'dt', '', {}, slot.label));
-      list.appendChild(createElement(this.document, 'dd', '', {}, slot.value));
+    // Slot labels are FSB copy; the caller decides whether the value is.
+    _contractAppendTextSlot(list, slot, value) {
+      list.appendChild(createElement(this.document, 'dt', '', {}, copy(slot.label)));
+      list.appendChild(createElement(this.document, 'dd', '', {}, value));
     }
 
     _contractAppendDateSlot(list, slot) {
-      list.appendChild(createElement(this.document, 'dt', '', {}, slot.label));
+      list.appendChild(createElement(this.document, 'dt', '', {}, copy(slot.label)));
       const value = createElement(this.document, 'dd');
       if (slot.state === 'accepted') {
-        value.appendChild(createElement(this.document, 'span', 'skopeo-contract-date-type', {}, slot.typeLabel));
+        value.appendChild(createElement(
+          this.document, 'span', 'skopeo-contract-date-type', {}, copy(slot.typeLabel)
+        ));
         value.appendChild(createElement(this.document, 'time', 'skopeo-contract-date', {
           datetime: slot.civilDate
-        }, slot.dateLabel));
-        value.appendChild(createElement(this.document, 'span', 'skopeo-contract-metadata', {}, slot.trustLabel));
+        }, contractDateLabel(slot.dateLabel, slot.civilDate)));
+        value.appendChild(createElement(
+          this.document, 'span', 'skopeo-contract-metadata', {}, copy(slot.trustLabel)
+        ));
       } else {
-        text(value, slot.value);
+        text(value, copy(slot.value));
       }
       list.appendChild(value);
     }
@@ -3522,30 +3715,30 @@
     _contractAppendAlertSlot(list, slot, scope, model, onAction) {
       if (!slot) return;
       const shell = this;
-      list.appendChild(createElement(this.document, 'dt', '', {}, slot.label));
+      list.appendChild(createElement(this.document, 'dt', '', {}, copy(slot.label)));
       const value = createElement(this.document, 'dd', 'skopeo-contract-alert-status', {
         'data-alert-state': slot.state
       });
-      value.appendChild(createElement(this.document, 'strong', '', {}, slot.value));
-      value.appendChild(createElement(this.document, 'p', 'skopeo-contract-metadata', {}, slot.detail));
-      if (slot.alertCivilDate) {
-        const alertDate = createElement(this.document, 'p', 'skopeo-contract-metadata', {}, 'Alert date ');
-        alertDate.appendChild(createElement(this.document, 'time', '', {
-          datetime: slot.alertCivilDate
-        }, slot.alertCivilDate));
-        value.appendChild(alertDate);
-      }
-      if (slot.deadlineCivilDate) {
-        const deadline = createElement(this.document, 'p', 'skopeo-contract-metadata', {}, 'Deadline ');
-        deadline.appendChild(createElement(this.document, 'time', '', {
-          datetime: slot.deadlineCivilDate
-        }, slot.deadlineCivilDate));
-        value.appendChild(deadline);
-      }
+      value.appendChild(createElement(this.document, 'strong', '', {}, copy(slot.value)));
+      value.appendChild(createElement(
+        this.document, 'p', 'skopeo-contract-metadata', {}, contractAlertDetail(slot)
+      ));
+      // The label sits in its own element so a language change can rewrite it
+      // without touching the ISO date beside it.
+      const datedLine = function (label, iso) {
+        const line = createElement(shell.document, 'p', 'skopeo-contract-metadata');
+        line.appendChild(createElement(shell.document, 'span', '', {}, copy(label)));
+        line.appendChild(shell.document.createTextNode(' '));
+        line.appendChild(createElement(shell.document, 'time', '', { datetime: iso }, iso));
+        return line;
+      };
+      if (slot.alertCivilDate) value.appendChild(datedLine('Alert date', slot.alertCivilDate));
+      if (slot.deadlineCivilDate) value.appendChild(datedLine('Deadline', slot.deadlineCivilDate));
       if (slot.action) {
         let consumed = false;
+        const actionLabel = copy(slot.action.label);
         const button = this._button(
-          'skopeo-contract-alert-action', slot.action.label, slot.action.label, function () {
+          'skopeo-contract-alert-action', actionLabel, actionLabel, function () {
             if (consumed || scope.disposed || shell._corpusScope !== scope ||
                 shell._contractModel !== model || !model.actionIds.includes(slot.action.actionId) ||
                 !sameContractAuthority(contractAuthoritySnapshot(model), shell._contractAuthority)) return;
@@ -3568,30 +3761,33 @@
         this.document, 'h4', 'skopeo-contract-vendor-heading', {}, vendor.label
       ));
       const slots = createElement(this.document, 'dl', 'skopeo-contract-slots');
-      this._contractAppendTextSlot(slots, vendor.owner);
-      this._contractAppendTextSlot(slots, vendor.documents);
-      this._contractAppendTextSlot(slots, vendor.governing);
+      this._contractAppendTextSlot(slots, vendor.owner, contractOwnerValue(vendor.owner));
+      this._contractAppendTextSlot(slots, vendor.documents, contractDocumentsValue(vendor.documents));
+      this._contractAppendTextSlot(slots, vendor.governing, copy(vendor.governing.value));
       this._contractAppendDateSlot(slots, vendor.nextMaterialDate);
-      this._contractAppendTextSlot(slots, vendor.consequence);
-      this._contractAppendTextSlot(slots, vendor.memoEvidence);
-      this._contractAppendTextSlot(slots, vendor.policyDocument);
-      this._contractAppendTextSlot(slots, vendor.memoRequirement);
+      this._contractAppendTextSlot(slots, vendor.consequence, contractConsequenceValue(
+        vendor.consequence.state, vendor.consequence.value, vendor.nextMaterialDate.type
+      ));
+      this._contractAppendTextSlot(slots, vendor.memoEvidence, copy(vendor.memoEvidence.value));
+      this._contractAppendTextSlot(slots, vendor.policyDocument, copy(vendor.policyDocument.value));
+      this._contractAppendTextSlot(slots, vendor.memoRequirement, copy(vendor.memoRequirement.value));
       this._contractAppendAlertSlot(slots, vendor.notificationDelivery, scope, model, onAction);
-      slots.appendChild(createElement(this.document, 'dt', '', {}, 'Urgent gaps'));
+      slots.appendChild(createElement(this.document, 'dt', '', {}, copy('Urgent gaps')));
       const gapValue = createElement(this.document, 'dd');
       if (vendor.gaps.length) {
         const gaps = createElement(this.document, 'ul', 'skopeo-contract-gaps', { role: 'list' });
         for (const gap of vendor.gaps) {
-          gaps.appendChild(createElement(this.document, 'li', '', { role: 'listitem' }, gap.label));
+          gaps.appendChild(createElement(this.document, 'li', '', { role: 'listitem' }, copy(gap.label)));
         }
         if (vendor.gapOverflowText) {
           gaps.appendChild(createElement(
-            this.document, 'li', 'skopeo-contract-overflow', { role: 'listitem' }, vendor.gapOverflowText
+            this.document, 'li', 'skopeo-contract-overflow', { role: 'listitem' },
+            overflowCopy(vendor.gapOverflowText, '+$COUNT$ more gaps', vendor.gapOverflow)
           ));
         }
         gapValue.appendChild(gaps);
       } else {
-        text(gapValue, vendor.gapEmptyText);
+        text(gapValue, copy(vendor.gapEmptyText));
       }
       slots.appendChild(gapValue);
       item.appendChild(slots);
@@ -3601,14 +3797,15 @@
     _contractAskEntries(scope, model, region, onAction) {
       if (!Array.isArray(model.askEntries) || model.askEntries.length === 0) return;
       const shell = this;
-      const section = this._contractSection('ask-contract-evidence', 'Ask contract evidence');
+      const section = this._contractSection('ask-contract-evidence', copy('Ask contract evidence'));
       section.appendChild(createElement(
         this.document, 'p', 'skopeo-contract-metadata', {},
-        'Choose an explicit evidence scope. Skopeo will check only currently accessible evidence.'
+        copy('Choose an explicit evidence scope. Skopeo will check only currently accessible evidence.')
       ));
       for (const entry of model.askEntries) {
+        const entryLabel = contractAskEntryLabel(entry);
         section.appendChild(this._button(
-          'skopeo-contract-ask-entry', entry.action.label, entry.action.label,
+          'skopeo-contract-ask-entry', entryLabel, entryLabel,
           function () {
             if (scope.disposed || shell._corpusScope !== scope || shell._contractModel !== model ||
                 !sameContractAuthority(
@@ -3627,76 +3824,97 @@
       const header = this._contractHeader(scope, model, 'header');
       header.appendChild(createElement(
         this.document, 'p', 'skopeo-contract-metadata', {},
-        folder.completeness.label + ' · ' + String(folder.completeness.vendorCount) + ' vendors'
+        copy('$NAME$ · $COUNT$ vendors', {
+          NAME: copy(folder.completeness.label),
+          COUNT: String(folder.completeness.vendorCount)
+        })
       ));
       region.appendChild(header);
 
-      const dates = this._contractSection('next-material-dates', 'Next material dates');
+      const vendorsByToken = new Map(folder.vendors.map(function (vendor) {
+        return [vendor.vendorToken, vendor];
+      }));
+      // A date row repeats its vendor's consequence; that slot's state says
+      // whether the text is document data.
+      const rowConsequence = function (row) {
+        const vendor = vendorsByToken.get(row.vendorToken);
+        return vendor && vendor.consequence.value === row.consequence
+          ? contractConsequenceValue(vendor.consequence.state, row.consequence, row.type)
+          : row.consequence;
+      };
+      const dates = this._contractSection('next-material-dates', copy('Next material dates'));
       const dateList = createElement(this.document, 'ol', 'skopeo-contract-list', { role: 'list' });
       if (folder.nextMaterialDates.length) {
         for (const row of folder.nextMaterialDates) {
           const item = createElement(this.document, 'li', 'skopeo-contract-summary-row', { role: 'listitem' });
-          item.appendChild(createElement(this.document, 'span', 'skopeo-contract-date-type', {}, row.typeLabel));
+          item.appendChild(createElement(
+            this.document, 'span', 'skopeo-contract-date-type', {}, copy(row.typeLabel)
+          ));
           item.appendChild(createElement(this.document, 'time', 'skopeo-contract-date', {
             datetime: row.civilDate
-          }, row.dateLabel));
+          }, contractDateLabel(row.dateLabel, row.civilDate)));
           item.appendChild(createElement(this.document, 'div', '', {}, row.vendorLabel));
           const consequence = createElement(this.document, 'p', 'skopeo-contract-consequence');
           consequence.appendChild(createElement(
-            this.document, 'span', 'skopeo-contract-slot-label', {}, row.consequenceLabel
+            this.document, 'span', 'skopeo-contract-slot-label', {}, copy(row.consequenceLabel)
           ));
-          consequence.appendChild(createElement(this.document, 'span', '', {}, row.consequence));
+          consequence.appendChild(createElement(this.document, 'span', '', {}, rowConsequence(row)));
           item.appendChild(consequence);
           item.appendChild(createElement(
-            this.document, 'span', 'skopeo-contract-metadata', {}, row.trustLabel
+            this.document, 'span', 'skopeo-contract-metadata', {}, copy(row.trustLabel)
           ));
           dateList.appendChild(item);
         }
       } else {
         dateList.appendChild(createElement(
           this.document, 'li', 'skopeo-contract-summary-row', { role: 'listitem' },
-          folder.completeness.manifestState === 'complete' ? 'No material dates proven.' : 'Material dates not evaluated.'
+          copy(folder.completeness.manifestState === 'complete'
+            ? 'No material dates proven.' : 'Material dates not evaluated.')
         ));
       }
       if (folder.nextMaterialDateOverflowText) {
         dateList.appendChild(createElement(
           this.document, 'li', 'skopeo-contract-overflow', { role: 'listitem' },
-          folder.nextMaterialDateOverflowText
+          overflowCopy(folder.nextMaterialDateOverflowText,
+            '+$COUNT$ more material dates appear in vendor rows', folder.nextMaterialDateOverflow)
         ));
       }
       dates.appendChild(dateList);
       region.appendChild(dates);
 
-      const urgent = this._contractSection('urgent-gaps', 'Urgent gaps');
+      const urgent = this._contractSection('urgent-gaps', copy('Urgent gaps'));
       const urgentList = createElement(this.document, 'ul', 'skopeo-contract-list', { role: 'list' });
       if (folder.urgentGaps.length) {
         for (const row of folder.urgentGaps) {
           urgentList.appendChild(createElement(
             this.document, 'li', 'skopeo-contract-summary-row', { role: 'listitem' },
-            row.label + ' · ' + row.vendorLabel
+            copy('$GAP$ · $VENDOR$', { GAP: copy(row.label), VENDOR: row.vendorLabel })
           ));
         }
       } else {
         urgentList.appendChild(createElement(
           this.document, 'li', 'skopeo-contract-summary-row', { role: 'listitem' },
-          folder.completeness.manifestState === 'complete' ? 'No urgent gaps proven.' : 'Urgent gaps not evaluated.'
+          copy(folder.completeness.manifestState === 'complete'
+            ? 'No urgent gaps proven.' : 'Urgent gaps not evaluated.')
         ));
       }
       if (folder.urgentGapOverflowText) {
         urgentList.appendChild(createElement(
-          this.document, 'li', 'skopeo-contract-overflow', { role: 'listitem' }, folder.urgentGapOverflowText
+          this.document, 'li', 'skopeo-contract-overflow', { role: 'listitem' },
+          overflowCopy(folder.urgentGapOverflowText,
+            '+$COUNT$ more gaps appear in vendor rows', folder.urgentGapOverflow)
         ));
       }
       urgent.appendChild(urgentList);
       region.appendChild(urgent);
 
-      const vendors = this._contractSection('vendors', 'Vendors');
+      const vendors = this._contractSection('vendors', copy('Vendors'));
       const vendorList = createElement(this.document, 'ul', 'skopeo-contract-vendors', { role: 'list' });
       vendors.appendChild(vendorList);
       if (folder.empty.state === 'complete-empty') {
         const empty = createElement(this.document, 'div', 'skopeo-contract-empty');
-        empty.appendChild(createElement(this.document, 'h3', '', {}, folder.empty.heading));
-        empty.appendChild(createElement(this.document, 'p', '', {}, folder.empty.body));
+        empty.appendChild(createElement(this.document, 'h3', '', {}, copy(folder.empty.heading)));
+        empty.appendChild(createElement(this.document, 'p', '', {}, copy(folder.empty.body)));
         vendors.appendChild(empty);
       }
       region.appendChild(vendors);
@@ -3713,7 +3931,10 @@
         for (const vendor of folder.vendors.slice(start, start + CONTRACT_PAGE_SIZE)) {
           vendorList.appendChild(shell._contractVendorItem(scope, model, vendor, onAction));
         }
-        text(pageState, 'Page ' + String(currentPage) + ' of ' + String(folder.paging.pageCount));
+        text(pageState, copy('Page $PAGE$ of $TOTAL$', {
+          PAGE: String(currentPage),
+          TOTAL: String(folder.paging.pageCount)
+        }));
         pager.replaceChildren();
         if (currentPage > 1) pager.appendChild(previous);
         pager.appendChild(pageState);
@@ -3723,20 +3944,21 @@
           if (!sameDirection || !sameDirection.isConnected || !shell._safeFocus(sameDirection)) {
             shell._safeFocus(region);
           }
-          shell._announce(
-            'Vendor page ' + String(currentPage) + ' of ' + String(folder.paging.pageCount) + '.', true
-          );
+          shell._announce(copy('Vendor page $PAGE$ of $TOTAL$.', {
+            PAGE: String(currentPage),
+            TOTAL: String(folder.paging.pageCount)
+          }), true);
         }
       };
       previous = this._button(
-        'skopeo-contract-pager-previous', 'Previous vendor page', 'Previous vendors', function () {
+        'skopeo-contract-pager-previous', copy('Previous vendor page'), copy('Previous vendors'), function () {
           if (scope.disposed || currentPage <= 1) return;
           currentPage -= 1;
           renderPage('previous');
         }
       );
       next = this._button(
-        'skopeo-contract-pager-next', 'Next vendor page', 'Next vendors', function () {
+        'skopeo-contract-pager-next', copy('Next vendor page'), copy('Next vendors'), function () {
           if (scope.disposed || currentPage >= folder.paging.pageCount) return;
           currentPage += 1;
           renderPage('next');
@@ -3745,17 +3967,20 @@
       renderPage(null);
       if (folder.paging.pageCount > 1) region.appendChild(pager);
       if (folder.overflow.text) {
-        const overflow = this._contractSection('overflow', 'Some sources aren’t evaluated');
+        const overflow = this._contractSection('overflow', copy('Some sources aren’t evaluated'));
         overflow.appendChild(createElement(
-          this.document, 'p', 'skopeo-contract-overflow', {}, folder.overflow.text
+          this.document, 'p', 'skopeo-contract-overflow', {}, folderOverflowText(folder.overflow)
         ));
         region.appendChild(overflow);
       }
       this._contractAskEntries(scope, model, region, onAction);
     }
 
-    _contractCitationControl(scope, model, action, onAction) {
+    // label is the button's text, a copy() source where the caller knows the
+    // action label is FSB copy; it defaults to action.label as given.
+    _contractCitationControl(scope, model, action, onAction, label) {
       const shell = this;
+      const buttonLabel = label === undefined ? action.label : label;
       const wrapper = createElement(this.document, 'div', 'skopeo-contract-action');
       const sequence = scope.actionSequence++;
       const statusId = 'skopeo-contract-action-status-' + String(sequence);
@@ -3774,7 +3999,7 @@
         button.setAttribute('disabled', '');
         button.setAttribute('aria-disabled', 'true');
         button.setAttribute('aria-busy', 'true');
-        text(status, 'Opening governing source…');
+        text(status, copy('Opening governing source…'));
         const epoch = scope.actionEpoch;
         let actionResult;
         try {
@@ -3788,23 +4013,23 @@
           pending = false;
           button.removeAttribute('aria-busy');
           if (opened === true) {
-            text(status, 'Governing source opened.');
+            text(status, copy('Governing source opened.'));
             return;
           }
-          text(status, CONTRACT_ACTION_ERROR);
-          shell._announce(CONTRACT_ACTION_ERROR, true);
+          text(status, copy(CONTRACT_ACTION_ERROR));
+          shell._announce(copy(CONTRACT_ACTION_ERROR), true);
         }, function () {
           if (scope.disposed || scope.actionEpoch !== epoch || shell._corpusScope !== scope ||
               shell._contractModel !== model) return;
           pending = false;
           button.removeAttribute('aria-busy');
-          text(status, CONTRACT_ACTION_ERROR);
-          shell._announce(CONTRACT_ACTION_ERROR, true);
+          text(status, copy(CONTRACT_ACTION_ERROR));
+          shell._announce(copy(CONTRACT_ACTION_ERROR), true);
         });
       };
       button = this._button(
         'skopeo-contract-citation' + (action.placement === 'primary' ? ' skopeo-contract-citation-primary' : ''),
-        action.label, action.label, activate
+        buttonLabel, buttonLabel, activate
       );
       button.setAttribute('aria-describedby', statusId);
       wrapper.appendChild(button);
@@ -3814,13 +4039,21 @@
 
     _contractFactItem(scope, model, fact, onAction) {
       const item = createElement(this.document, 'li', 'skopeo-contract-fact', { role: 'listitem' });
-      item.appendChild(createElement(this.document, 'strong', '', {}, fact.typeLabel));
+      item.appendChild(createElement(this.document, 'strong', '', {}, copy(fact.typeLabel)));
       item.appendChild(createElement(this.document, 'div', '', {}, fact.value));
       item.appendChild(createElement(
         this.document, 'p', 'skopeo-contract-fact-meta', {},
-        fact.evidenceLabel + ' · ' + fact.trustLabel + ' · ' + fact.citationLabel
+        copy('$EVIDENCE$ · $TRUST$ · $CITATION$', {
+          EVIDENCE: copy(fact.evidenceLabel),
+          TRUST: copy(fact.trustLabel),
+          CITATION: fact.citationLabel
+        })
       ));
-      if (fact.action) item.appendChild(this._contractCitationControl(scope, model, fact.action, onAction));
+      if (fact.action) {
+        item.appendChild(this._contractCitationControl(scope, model, fact.action, onAction, rebuilt(
+          fact.action.label, copy('Open source for $LABEL$', { LABEL: copy(fact.typeLabel) })
+        )));
+      }
       return item;
     }
 
@@ -3834,22 +4067,24 @@
       ].includes(reading.banner.state)));
       banner.style.position = 'sticky';
       banner.appendChild(createElement(
-        this.document, 'p', 'skopeo-contract-state-label', {}, reading.banner.label
+        this.document, 'p', 'skopeo-contract-state-label', {}, copy(reading.banner.label)
       ));
       banner.appendChild(createElement(
         this.document, 'h3', 'skopeo-contract-document-title', {}, reading.banner.title
       ));
       banner.appendChild(createElement(
-        this.document, 'p', 'skopeo-contract-explanation', {}, reading.banner.explanation
+        this.document, 'p', 'skopeo-contract-explanation', {}, copy(reading.banner.explanation)
       ));
       banner.appendChild(createElement(
-        this.document, 'p', 'skopeo-contract-metadata', {}, reading.banner.sourceLabel
+        this.document, 'p', 'skopeo-contract-metadata', {}, copy(reading.banner.sourceLabel)
       ));
       if (reading.banner.action) {
-        banner.appendChild(this._contractCitationControl(scope, model, reading.banner.action, onAction));
+        banner.appendChild(this._contractCitationControl(
+          scope, model, reading.banner.action, onAction, copy(reading.banner.action.label)
+        ));
       } else {
         banner.appendChild(createElement(
-          this.document, 'p', 'skopeo-contract-action-status', {}, reading.banner.actionStatus
+          this.document, 'p', 'skopeo-contract-action-status', {}, copy(reading.banner.actionStatus)
         ));
       }
       region.appendChild(banner);
@@ -3862,50 +4097,52 @@
         region.appendChild(section);
       };
       const shell = this;
-      factSection('governing-facts', 'Governing facts', reading.governingFacts);
+      factSection('governing-facts', copy('Governing facts'), reading.governingFacts);
       if (reading.relevantHistory.length) {
-        factSection('relevant-history', 'Relevant history', reading.relevantHistory);
+        factSection('relevant-history', copy('Relevant history'), reading.relevantHistory);
       }
-      const gapSection = this._contractSection('conflicts-and-gaps', 'Conflicts and gaps');
+      const gapSection = this._contractSection('conflicts-and-gaps', copy('Conflicts and gaps'));
       const gapList = createElement(this.document, 'ul', 'skopeo-contract-list', { role: 'list' });
       if (reading.gaps.length) {
         for (const gap of reading.gaps) {
           gapList.appendChild(createElement(
-            this.document, 'li', 'skopeo-contract-gap', { role: 'listitem' }, gap.label
+            this.document, 'li', 'skopeo-contract-gap', { role: 'listitem' }, copy(gap.label)
           ));
         }
       } else {
         gapList.appendChild(createElement(
-          this.document, 'li', 'skopeo-contract-gap', { role: 'listitem' }, 'No conflicts or gaps proven.'
+          this.document, 'li', 'skopeo-contract-gap', { role: 'listitem' }, copy('No conflicts or gaps proven.')
         ));
       }
       gapSection.appendChild(gapList);
       region.appendChild(gapSection);
 
-      const policy = this._contractSection('policy-and-delivery-status', 'Policy and delivery status');
+      const policy = this._contractSection('policy-and-delivery-status', copy('Policy and delivery status'));
       const slots = createElement(this.document, 'dl', 'skopeo-contract-slots');
       for (const slot of reading.policyAndDelivery) {
         if (slot.key === 'notification-delivery') {
           this._contractAppendAlertSlot(slots, slot, scope, model, onAction);
         } else {
-          this._contractAppendTextSlot(slots, slot);
+          this._contractAppendTextSlot(slots, slot, copy(slot.value));
         }
       }
       policy.appendChild(slots);
       region.appendChild(policy);
       if (reading.empty.state === 'complete-empty') {
         const empty = createElement(this.document, 'div', 'skopeo-contract-empty');
-        empty.appendChild(createElement(this.document, 'h3', '', {}, reading.empty.heading));
-        empty.appendChild(createElement(this.document, 'p', '', {}, reading.empty.body));
+        empty.appendChild(createElement(this.document, 'h3', '', {}, copy(reading.empty.heading)));
+        empty.appendChild(createElement(this.document, 'p', '', {}, copy(reading.empty.body)));
         region.appendChild(empty);
       }
       if (reading.factOverflowText || reading.gapOverflowText) {
-        const overflow = this._contractSection('overflow', 'Additional evidence');
+        const overflow = this._contractSection('overflow', copy('Additional evidence'));
         if (reading.factOverflowText) overflow.appendChild(createElement(
-          this.document, 'p', 'skopeo-contract-overflow', {}, reading.factOverflowText
+          this.document, 'p', 'skopeo-contract-overflow', {},
+          overflowCopy(reading.factOverflowText, '+$COUNT$ cited facts not shown', reading.factOverflow)
         ));
         if (reading.gapOverflowText) overflow.appendChild(createElement(
-          this.document, 'p', 'skopeo-contract-overflow', {}, reading.gapOverflowText
+          this.document, 'p', 'skopeo-contract-overflow', {},
+          overflowCopy(reading.gapOverflowText, '+$COUNT$ conflicts or gaps not shown', reading.gapOverflow)
         ));
         region.appendChild(overflow);
       }
@@ -3932,8 +4169,8 @@
         else {
           const header = this._contractHeader(scope, model, 'blocker');
           const blocker = createElement(this.document, 'div', 'skopeo-contract-blocker', { role: 'status' });
-          blocker.appendChild(createElement(this.document, 'h3', '', {}, model.blocker.heading));
-          blocker.appendChild(createElement(this.document, 'p', '', {}, model.blocker.body));
+          blocker.appendChild(createElement(this.document, 'h3', '', {}, copy(model.blocker.heading)));
+          blocker.appendChild(createElement(this.document, 'p', '', {}, copy(model.blocker.body)));
           header.appendChild(blocker);
           region.appendChild(header);
         }
@@ -4006,11 +4243,13 @@
         this.withdrawCorpus();
         return false;
       }
-      if (model.mode === 'folder') this._announce('Vendor agreements updated.', true);
+      if (model.mode === 'folder') this._announce(copy('Vendor agreements updated.'), true);
       else if (model.mode === 'reading') {
-        this._announce('Agreement reading updated. ' + model.reading.banner.label + '.', true);
+        this._announce(copy('Agreement reading updated. $LABEL$.', {
+          LABEL: copy(model.reading.banner.label)
+        }), true);
       } else {
-        this._announce(CONTRACT_CLOSED_COPY, true);
+        this._announce(copy(CONTRACT_CLOSED_COPY), true);
       }
       return true;
     }
