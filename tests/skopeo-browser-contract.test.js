@@ -2416,7 +2416,10 @@ async function runChromeContract() {
         '--allow-file-access-from-files',
         '--force-device-scale-factor=1',
         '--window-size=' + width + ',' + height,
-        '--virtual-time-budget=5000',
+        // Headless virtual time also advances with compositor frames, so on a
+        // busy CI runner a 5 s budget can end mid-flow; the dump then lacks the
+        // result node. The budget and the process cap leave headroom.
+        '--virtual-time-budget=15000',
         '--user-data-dir=' + path.join(tempRoot, 'profile-' + label),
         '--dump-dom',
         url.pathToFileURL(fixturePath).href
@@ -2424,7 +2427,7 @@ async function runChromeContract() {
         cwd: path.resolve(__dirname, '..'),
         encoding: 'utf8',
         maxBuffer: 10 * 1024 * 1024,
-        timeout: 10000,
+        timeout: 30000,
         killSignal: 'SIGKILL'
       });
       const expectedDumpTimeout = !!(run.error && run.error.code === 'ETIMEDOUT' && run.stdout);
