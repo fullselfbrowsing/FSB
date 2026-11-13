@@ -157,6 +157,14 @@ function fixtureHtml(scriptUrls) {
 <body>
   <pre id="skopeo-contract-result"></pre>
   <script>
+    // A production script that fails to load is recorded on the result node,
+    // so an empty dump can be told apart from a stalled fixture.
+    document.addEventListener('error', function (event) {
+      var target = event && event.target;
+      if (!target || !target.src) return;
+      var node = document.getElementById('skopeo-contract-result');
+      if (node) node.setAttribute('data-load-error', encodeURIComponent(String(target.src).split('/').pop()));
+    }, true);
     window.__skopeoRuntimeListeners = [];
     window.chrome = {
       runtime: {
@@ -186,6 +194,7 @@ function fixtureHtml(scriptUrls) {
   (async function () {
     'use strict';
     var resultNode = document.getElementById('skopeo-contract-result');
+    resultNode.setAttribute('data-progress', 'boot');
     var keys = ${JSON.stringify(RESOURCE_KEYS)};
 
     function snapshot(shell) {
@@ -597,7 +606,12 @@ function fixtureHtml(scriptUrls) {
       };
     }
 
+    // Counts frame waits on the result node, so a dump taken while Chrome has
+    // stopped producing frames says which wait never returned.
+    var frameWaits = 0;
     function nextAnimationFrame(windowRef) {
+      frameWaits += 1;
+      resultNode.setAttribute('data-frame-wait', String(frameWaits));
       return new Promise(function (resolve) { windowRef.requestAnimationFrame(resolve); });
     }
 
@@ -2043,8 +2057,13 @@ function parseResult(serializedDom) {
   if (errorMatch) assert.fail('Chrome fixture failed: ' + decodeURIComponent(errorMatch[1]));
   const match = serializedDom.match(/id="skopeo-contract-result"[^>]*data-json="([^"]+)"/);
   const progressMatch = serializedDom.match(/id="skopeo-contract-result"[^>]*data-progress="([^"]+)"/);
+  const loadErrorMatch = serializedDom.match(/id="skopeo-contract-result"[^>]*data-load-error="([^"]+)"/);
+  const frameWaitMatch = serializedDom.match(/id="skopeo-contract-result"[^>]*data-frame-wait="([^"]+)"/);
   assert.ok(match, 'Chrome dump contains the escaped Skopeo result node (last progress: ' +
-    (progressMatch ? progressMatch[1] : 'unavailable') + ')');
+    (progressMatch ? progressMatch[1] : 'unavailable') +
+    (loadErrorMatch ? '; failed to load ' + decodeURIComponent(loadErrorMatch[1]) : '') +
+    (frameWaitMatch ? '; frame waits started: ' + frameWaitMatch[1] : '') +
+    '; dump bytes: ' + serializedDom.length + ')');
   return JSON.parse(decodeURIComponent(match[1]));
 }
 
@@ -2409,10 +2428,15 @@ async function runChromeContract() {
     function runAt(width, height, label) {
       const attempts = 3;
       for (let attempt = 1; ; attempt += 1) {
-        const stdout = dumpAt(width, height, label + (attempt === 1 ? '' : '-retry' + attempt));
-        const noResult = !/id="skopeo-contract-result"[^>]*data-(?:json|error)="/.test(stdout);
+        const run = dumpAt(width, height, label + (attempt === 1 ? '' : '-retry' + attempt));
+        const noResult = !/id="skopeo-contract-result"[^>]*data-(?:json|error)="/.test(run.stdout);
         if (noResult && attempt < attempts) continue;
-        return parseResult(stdout);
+        try {
+          return parseResult(run.stdout);
+        } catch (error) {
+          if (noResult) error.message += '\nChrome stderr (last 1500 characters, attempt ' + attempt + '):\n' + run.stderr.slice(-1500);
+          throw error;
+        }
       }
     }
     function dumpAt(width, height, label) {
@@ -2447,7 +2471,7 @@ async function runChromeContract() {
       const expectedDumpTimeout = !!(run.error && run.error.code === 'ETIMEDOUT' && run.stdout);
       assert.ok(!run.error || expectedDumpTimeout, 'local Chrome process launches successfully: ' + String(run.error || ''));
       if (!expectedDumpTimeout) assert.equal(run.status, 0, 'local Chrome exits successfully\n' + String(run.stderr || ''));
-      return String(run.stdout || '');
+      return { stdout: String(run.stdout || ''), stderr: String(run.stderr || '') };
     }
     const storageBoundary = await runLoadedExtensionStorageContract(resolution, tempRoot);
     const result = runAt(1024, 768, 'normal');
