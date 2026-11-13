@@ -4719,5 +4719,1781 @@
         "content": "$1"
       }
     }
+  },
+  "copy_51ac158080": {
+    "message": "Skopeo · $NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_c5386756c1": {
+    "message": "Skopeo"
+  },
+  "copy_97cd52dc76": {
+    "message": "$NOUN$ · $COUNT$ 個就緒",
+    "placeholders": {
+      "noun": {
+        "content": "$1"
+      },
+      "count": {
+        "content": "$2"
+      }
+    }
+  },
+  "copy_d79610c6ef": {
+    "message": "開啟 $NAME$ 操作",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_92b4c3d0cb": {
+    "message": "開啟 Skopeo 操作"
+  },
+  "copy_ed1caa4112": {
+    "message": "$NAME$ 的 Skopeo",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_7841c1bf54": {
+    "message": "Skopeo 操作"
+  },
+  "copy_6148cdb943": {
+    "message": "Skopeo 環境模式狀態"
+  },
+  "copy_1e24c5b560": {
+    "message": "Skopeo 錨定狀態"
+  },
+  "copy_38db0927c2": {
+    "message": "文件：$LABEL$",
+    "placeholders": {
+      "label": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_d3db487846": {
+    "message": "開啟文件 $LABEL$ 的操作",
+    "placeholders": {
+      "label": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_e1917bc332": {
+    "message": "Skopeo 已無法驗證此文件。已移除實體操作。"
+  },
+  "copy_37d184a6fc": {
+    "message": "已驗證的文件操作和能力就緒狀態。"
+  },
+  "copy_7122183da5": {
+    "message": "訊息：$LABEL$",
+    "placeholders": {
+      "label": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_a60a734727": {
+    "message": "開啟訊息 $LABEL$ 的操作",
+    "placeholders": {
+      "label": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_38acf9866a": {
+    "message": "Skopeo 已無法驗證此訊息。已移除實體操作。"
+  },
+  "copy_5910ceb0ae": {
+    "message": "已驗證的訊息操作和能力就緒狀態。"
+  },
+  "copy_bd4f74926f": {
+    "message": "記錄：$LABEL$",
+    "placeholders": {
+      "label": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_05c0855046": {
+    "message": "開啟記錄 $LABEL$ 的操作",
+    "placeholders": {
+      "label": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_5833f2802f": {
+    "message": "Skopeo 已無法驗證此記錄。已移除實體操作。"
+  },
+  "copy_23ef7f752f": {
+    "message": "已驗證的記錄操作和能力就緒狀態。"
+  },
+  "copy_662322c323": {
+    "message": "項目：$LABEL$",
+    "placeholders": {
+      "label": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_28c4642f77": {
+    "message": "開啟項目 $LABEL$ 的操作",
+    "placeholders": {
+      "label": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_7f5e2bd8af": {
+    "message": "Skopeo 已無法驗證此項目。已移除實體操作。"
+  },
+  "copy_f7ff338d0d": {
+    "message": "已驗證的項目操作和能力就緒狀態。"
+  },
+  "copy_ae9331cbba": {
+    "message": "目標：$LABEL$",
+    "placeholders": {
+      "label": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_eef8a2312a": {
+    "message": "開啟目標 $LABEL$ 的操作",
+    "placeholders": {
+      "label": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_683131c44a": {
+    "message": "Skopeo 已無法驗證此目標。已移除實體操作。"
+  },
+  "copy_a5ad15c91c": {
+    "message": "已驗證的目標操作和能力就緒狀態。"
+  },
+  "copy_65f47ec845": {
+    "message": "$NAME$ · $NOUN$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      },
+      "noun": {
+        "content": "$2"
+      }
+    }
+  },
+  "copy_e481db9b9c": {
+    "message": "$NAME$ 操作",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_8e368ff718": {
+    "message": "$TITLE$ 已開啟。",
+    "placeholders": {
+      "title": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_2c02b0518c": {
+    "message": "返回 $NAME$ 概覽",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_2c011b72ce": {
+    "message": "返回 Skopeo 概覽"
+  },
+  "copy_6fe1f3a9b3": {
+    "message": "此$NOUN$的已驗證操作和能力就緒狀態。",
+    "placeholders": {
+      "noun": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_be040e47fb": {
+    "message": "這裡沒有已驗證的操作"
+  },
+  "copy_76af34b916": {
+    "message": "Skopeo 在此$NOUN$找不到就緒的能力。請變更任務視角，或開啟其他支援的畫面。",
+    "placeholders": {
+      "noun": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_8e5ff104da": {
+    "message": "在此分頁關閉 Skopeo"
+  },
+  "copy_89f808c350": {
+    "message": "$LABEL$ 已開啟。",
+    "placeholders": {
+      "label": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_9199b6b795": {
+    "message": "$LABEL$ 概覽。",
+    "placeholders": {
+      "label": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_a172cedcae": {
+    "message": "應用程式"
+  },
+  "copy_0d04bfeb7d": {
+    "message": "應用程式"
+  },
+  "copy_84393add8c": {
+    "message": "文章"
+  },
+  "copy_29d9492251": {
+    "message": "文章"
+  },
+  "copy_66cd9688a2": {
+    "message": "儀表板"
+  },
+  "copy_67b6964686": {
+    "message": "儀表板"
+  },
+  "copy_43cc23fa52": {
+    "message": "文件"
+  },
+  "copy_d6bd8c0aee": {
+    "message": "文件"
+  },
+  "copy_7062520c5a": {
+    "message": "雲端硬碟"
+  },
+  "copy_6312b4b9ba": {
+    "message": "雲端硬碟"
+  },
+  "copy_c8bc2586cd": {
+    "message": "動態"
+  },
+  "copy_396c3cb18f": {
+    "message": "動態"
+  },
+  "copy_872491a30d": {
+    "message": "登錄庫"
+  },
+  "copy_05c2e32770": {
+    "message": "登錄庫"
+  },
+  "copy_e2885f2bbe": {
+    "message": "儲存庫"
+  },
+  "copy_13d6ff07b8": {
+    "message": "儲存庫"
+  },
+  "copy_824d80d719": {
+    "message": "商店"
+  },
+  "copy_ee7da936b5": {
+    "message": "商店"
+  },
+  "copy_21a3230e03": {
+    "message": "工作區"
+  },
+  "copy_87bb59ba2f": {
+    "message": "工作區"
+  },
+  "copy_2bcb43cbc8": {
+    "message": "畫面"
+  },
+  "copy_dcc839a401": {
+    "message": "畫面"
+  },
+  "copy_346c78df50": {
+    "message": "$GROUP$ · 會變更資料",
+    "placeholders": {
+      "group": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_ad0a2a84e2": {
+    "message": "$GROUP$ · 破壞性",
+    "placeholders": {
+      "group": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_9460f16ac9": {
+    "message": "能力"
+  },
+  "copy_f97e9da0e3": {
+    "message": "其他"
+  },
+  "copy_64002843f9": {
+    "message": "$COUNT$ 個參數",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_9a5ac573ff": {
+    "message": "$COUNT$ 個參數",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_8aacf86da7": {
+    "message": "無法使用的操作（$COUNT$）",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_6b10cd5f05": {
+    "message": "無法安全使用"
+  },
+  "copy_b5d74ac3b7": {
+    "message": "執行路徑未經驗證。"
+  },
+  "copy_dec64a50f3": {
+    "message": "已遭政策封鎖"
+  },
+  "copy_f0ea600280": {
+    "message": "繼續之前，請檢查適用的政策。"
+  },
+  "copy_081db50d93": {
+    "message": "需要連線"
+  },
+  "copy_c93390b118": {
+    "message": "繼續之前，請使用受信任的連線設定。"
+  },
+  "copy_3dddf7d417": {
+    "message": "需要驗證"
+  },
+  "copy_64bfb348a7": {
+    "message": "此能力需要目前的即時驗證。"
+  },
+  "copy_e1faf34f65": {
+    "message": "正在學習"
+  },
+  "copy_252fc572d1": {
+    "message": "學習完成前沒有可用的操作。"
+  },
+  "copy_9d2bde300d": {
+    "message": "能力探索待完成"
+  },
+  "copy_8191a51a82": {
+    "message": "目前還沒有可用的已驗證操作。"
+  },
+  "copy_a11dfc13db": {
+    "message": "此畫面中沒有可用的已驗證操作。"
+  },
+  "copy_89a21132ff": {
+    "message": "此畫面不支援"
+  },
+  "copy_9c9877e9f7": {
+    "message": "請開啟其他支援的畫面以繼續。"
+  },
+  "copy_2a78025de6": {
+    "message": "請選擇"
+  },
+  "copy_27320771d7": {
+    "message": "請檢查醒目提示的欄位。"
+  },
+  "copy_09dda3ef8c": {
+    "message": "Skopeo 無法驗證此畫面。頁面未做任何變更。請開啟其他畫面或關閉 Skopeo。"
+  },
+  "copy_abd21a1c4f": {
+    "message": "Skopeo 尚不支援此應用程式。頁面上未新增任何內容。請關閉 Skopeo 或開啟支援的應用程式。"
+  },
+  "copy_388daeb09e": {
+    "message": "正在執行 $ACTION$。",
+    "placeholders": {
+      "action": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_346cc980b6": {
+    "message": "正在執行所選的操作。"
+  },
+  "copy_7eeab708af": {
+    "message": "$ACTION$ 未完成。$RECOVERY$",
+    "placeholders": {
+      "action": {
+        "content": "$1"
+      },
+      "recovery": {
+        "content": "$2"
+      }
+    }
+  },
+  "copy_4cf3540cdd": {
+    "message": "操作未完成。請檢查目標，然後重新執行此操作。"
+  },
+  "copy_70fb1ff02e": {
+    "message": "請檢查目標，然後重新執行此操作。"
+  },
+  "copy_30199459dd": {
+    "message": "Skopeo 無法顯示完整的確認內容。請檢查此操作，然後再試一次。"
+  },
+  "copy_dace1bf51c": {
+    "message": "Skopeo 結果"
+  },
+  "copy_3a2052a3f1": {
+    "message": "Skopeo 結果已更新。"
+  },
+  "copy_c947bd1159": {
+    "message": "第 $N$ 列",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_db1d829fd5": {
+    "message": "$HEADING$ · 第 $N$ 列",
+    "placeholders": {
+      "heading": {
+        "content": "$1"
+      },
+      "n": {
+        "content": "$2"
+      }
+    }
+  },
+  "copy_f412b71c54": {
+    "message": "結果詳細資料"
+  },
+  "copy_219c4a6c86": {
+    "message": "結果"
+  },
+  "copy_6e7d50e84f": {
+    "message": "結果"
+  },
+  "copy_9e893cb1f0": {
+    "message": "第 $N$ 項",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_1f53883d72": {
+    "message": "結果：$VALUE$",
+    "placeholders": {
+      "value": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_e079d88e1c": {
+    "message": "讀取完成"
+  },
+  "copy_c4a0771419": {
+    "message": "已透過能力路由器完成所選的讀取。"
+  },
+  "copy_380627bf06": {
+    "message": "請檢查結果，然後繼續在目前的畫面中工作。"
+  },
+  "copy_a8f574eaad": {
+    "message": "操作完成"
+  },
+  "copy_0bc10c8338": {
+    "message": "已透過能力路由器完成已確認的操作。"
+  },
+  "copy_4cbca64e28": {
+    "message": "請檢查服務，然後在目前的畫面中繼續。"
+  },
+  "copy_6f22e207e2": {
+    "message": "操作未完成"
+  },
+  "copy_d8696cef16": {
+    "message": "請檢查目標，然後再試一次。"
+  },
+  "copy_04f3f2c2bc": {
+    "message": "會變更資料"
+  },
+  "copy_627d4cfc84": {
+    "message": "破壞性操作"
+  },
+  "copy_1603452a27": {
+    "message": "$EFFECT$ 目標：$TARGET$。$PARAMETERS$",
+    "placeholders": {
+      "effect": {
+        "content": "$1"
+      },
+      "target": {
+        "content": "$2"
+      },
+      "parameters": {
+        "content": "$3"
+      }
+    }
+  },
+  "copy_48cce26163": {
+    "message": "此操作可能會移除服務資料。$EFFECT$ 目標：$TARGET$。$PARAMETERS$",
+    "placeholders": {
+      "effect": {
+        "content": "$1"
+      },
+      "target": {
+        "content": "$2"
+      },
+      "parameters": {
+        "content": "$3"
+      }
+    }
+  },
+  "copy_761d63c328": {
+    "message": "Skopeo 無法在不遮住目前頁面控制項的情況下開啟此檢視。"
+  },
+  "copy_34411a1bde": {
+    "message": "繼續檢查"
+  },
+  "copy_5852e3c811": {
+    "message": "$COUNT$/$LIMIT$ 個字元",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "limit": {
+        "content": "$2"
+      }
+    }
+  },
+  "copy_6dd398e40c": {
+    "message": "文件庫"
+  },
+  "copy_5e3c42fc06": {
+    "message": "納入此資料夾"
+  },
+  "copy_fc8a8bfccc": {
+    "message": "目前來源"
+  },
+  "copy_0faade3653": {
+    "message": "正在檢查存取權"
+  },
+  "copy_89e45653b9": {
+    "message": "無法讀取"
+  },
+  "copy_ca3dd73c4e": {
+    "message": "下載已遭封鎖"
+  },
+  "copy_3f0806bded": {
+    "message": "無法存取"
+  },
+  "copy_6be36ca49e": {
+    "message": "缺少"
+  },
+  "copy_734fdb8823": {
+    "message": "來源 $N$",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_b91616306b": {
+    "message": "$COUNT$ 個來源",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_9d4ea755e6": {
+    "message": "$COUNT$ 個來源",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_9ebd6068a1": {
+    "message": "文件庫無法使用"
+  },
+  "copy_561bb09259": {
+    "message": "文件庫狀態已更新。"
+  },
+  "copy_eeb62522ec": {
+    "message": "可以納入資料夾。"
+  },
+  "copy_d19456062f": {
+    "message": "$LABEL$。$STATE$。",
+    "placeholders": {
+      "label": {
+        "content": "$1"
+      },
+      "state": {
+        "content": "$2"
+      }
+    }
+  },
+  "copy_bb2a0e8cad": {
+    "message": "文件庫來源已更新。"
+  },
+  "copy_a751237081": {
+    "message": "文件庫無法使用。"
+  },
+  "copy_c618c2b786": {
+    "message": "Skopeo 供應商合約"
+  },
+  "copy_853ad14c65": {
+    "message": "Skopeo 合約閱讀"
+  },
+  "copy_a487b8ad8b": {
+    "message": "Skopeo 合約檢視無法使用"
+  },
+  "copy_9d27e8796b": {
+    "message": "供應商合約"
+  },
+  "copy_48f97d03e0": {
+    "message": "合約閱讀"
+  },
+  "copy_0b06b49f1a": {
+    "message": "合約檢視"
+  },
+  "copy_0d28280a79": {
+    "message": "隱藏合約檢視"
+  },
+  "copy_3c0accb3e9": {
+    "message": "合約檢視無法使用"
+  },
+  "copy_ce4dbde36a": {
+    "message": "Skopeo 無法驗證此合約檢視。請重新開啟資料夾或文件，然後再次啟動 Skopeo。"
+  },
+  "copy_f6732d18b1": {
+    "message": "$NAME$ · $COUNT$ 家供應商",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      },
+      "count": {
+        "content": "$2"
+      }
+    }
+  },
+  "copy_9bec46d59b": {
+    "message": "已納入的完整文件庫"
+  },
+  "copy_af23b76c2e": {
+    "message": "文件庫不完整"
+  },
+  "copy_d96da80724": {
+    "message": "接下來的關鍵日期"
+  },
+  "copy_6fa6d0c2bd": {
+    "message": "通知截止日"
+  },
+  "copy_f4a9133d79": {
+    "message": "續約"
+  },
+  "copy_91c986e5ad": {
+    "message": "終止"
+  },
+  "copy_f38d6e0e9b": {
+    "message": "到期"
+  },
+  "copy_a00fb0c507": {
+    "message": "已接受"
+  },
+  "copy_00a659675a": {
+    "message": "已擷取"
+  },
+  "copy_d461cbb490": {
+    "message": "推斷"
+  },
+  "copy_70a8b6912f": {
+    "message": "有歧義"
+  },
+  "copy_f0742e3a82": {
+    "message": "需要審查"
+  },
+  "copy_892ca8bb15": {
+    "message": "若未採取行動"
+  },
+  "copy_767308da17": {
+    "message": "沒有已證實的關鍵日期。"
+  },
+  "copy_9639831c95": {
+    "message": "未評估關鍵日期。"
+  },
+  "copy_4b5b3476e0": {
+    "message": "供應商列中還有 $COUNT$ 個關鍵日期",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_2de9b48279": {
+    "message": "必須在此日期前發出通知"
+  },
+  "copy_00f1e7c62d": {
+    "message": "合約於此日期終止"
+  },
+  "copy_04a24f4597": {
+    "message": "合約於此日期到期"
+  },
+  "copy_f87a7337d0": {
+    "message": "續約自此日期起算"
+  },
+  "copy_239f16b58e": {
+    "message": "緊急缺口"
+  },
+  "copy_e1daefa9d7": {
+    "message": "$GAP$ · $VENDOR$",
+    "placeholders": {
+      "gap": {
+        "content": "$1"
+      },
+      "vendor": {
+        "content": "$2"
+      }
+    }
+  },
+  "copy_8db2a1ad53": {
+    "message": "缺少最終合約"
+  },
+  "copy_1d1f550a8a": {
+    "message": "掃描檔無法讀取"
+  },
+  "copy_dc0277bbda": {
+    "message": "索引不完整"
+  },
+  "copy_add389e072": {
+    "message": "未指定負責人"
+  },
+  "copy_694eda3eba": {
+    "message": "合約版本衝突，需要審查"
+  },
+  "copy_cf17785b9b": {
+    "message": "缺少政策文件"
+  },
+  "copy_331551b0de": {
+    "message": "待處理"
+  },
+  "copy_58b1510f8a": {
+    "message": "無法取得存取權"
+  },
+  "copy_cdfabec4de": {
+    "message": "依據有歧義"
+  },
+  "copy_d5b2db5b94": {
+    "message": "未評估"
+  },
+  "copy_380952987e": {
+    "message": "沒有已證實的緊急缺口。"
+  },
+  "copy_d43eeaccd0": {
+    "message": "未評估緊急缺口。"
+  },
+  "copy_37ddcf82b9": {
+    "message": "供應商列中還有 $COUNT$ 個缺口",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_720b6017f2": {
+    "message": "供應商"
+  },
+  "copy_b57eb5cffd": {
+    "message": "沒有可顯示的供應商合約"
+  },
+  "copy_0c1db5efb0": {
+    "message": "Skopeo 在已納入的完整文件庫中找不到可存取的供應商資料夾。請檢查 Google 雲端硬碟資料夾，或關閉 Skopeo。"
+  },
+  "copy_4b1b8aa360": {
+    "message": "負責人"
+  },
+  "copy_f4e6015090": {
+    "message": "文件與索引"
+  },
+  "copy_9daa4f1529": {
+    "message": "適用狀態"
+  },
+  "copy_fb53ddd05f": {
+    "message": "下一個關鍵日期"
+  },
+  "copy_8f7d4c25ad": {
+    "message": "備忘錄依據"
+  },
+  "copy_fda05f21cb": {
+    "message": "政策文件"
+  },
+  "copy_7f0025363a": {
+    "message": "備忘錄要求"
+  },
+  "copy_43a90b173d": {
+    "message": "本機提醒"
+  },
+  "copy_80f927e49a": {
+    "message": "$COUNT$ 個已授權來源",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_edfdc5fc72": {
+    "message": "$COUNT$ 個已授權來源",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_9f6ab44459": {
+    "message": "索引完整"
+  },
+  "copy_1e635fb302": {
+    "message": "$COUNT$ 個就緒",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_1bffbc03dc": {
+    "message": "$COUNT$ 個待處理",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_ba46c2d2b2": {
+    "message": "$COUNT$ 個無法讀取",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_92d99bc455": {
+    "message": "$COUNT$ 個下載遭封鎖",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_aede7976b7": {
+    "message": "$COUNT$ 個無法存取",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_a0e309d5e2": {
+    "message": "缺少 $COUNT$ 個",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_7ebca289d1": {
+    "message": "$LIST$ · $ITEM$",
+    "placeholders": {
+      "list": {
+        "content": "$1"
+      },
+      "item": {
+        "content": "$2"
+      }
+    }
+  },
+  "copy_bbc5faa910": {
+    "message": "適用"
+  },
+  "copy_b9e98c6b36": {
+    "message": "部分適用"
+  },
+  "copy_81461172ff": {
+    "message": "沒有已證實的關鍵日期"
+  },
+  "copy_8785e7b1f0": {
+    "message": "沒有已證實的後果"
+  },
+  "copy_e975267293": {
+    "message": "未評估後果"
+  },
+  "copy_52324a6550": {
+    "message": "備忘錄已存檔"
+  },
+  "copy_10e9a22a27": {
+    "message": "未評估備忘錄依據"
+  },
+  "copy_b719f9891f": {
+    "message": "政策文件已存檔"
+  },
+  "copy_2905954326": {
+    "message": "未評估政策文件"
+  },
+  "copy_c96ff71da9": {
+    "message": "還有 $COUNT$ 個缺口",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_7313a3db7a": {
+    "message": "沒有已證實的緊急缺口"
+  },
+  "copy_5ed6c2b8f4": {
+    "message": "未評估緊急缺口"
+  },
+  "copy_1fb5255bd6": {
+    "message": "本機提醒已排定"
+  },
+  "copy_68c774959c": {
+    "message": "已記錄本機提醒嘗試"
+  },
+  "copy_cfee65fcfa": {
+    "message": "本機提醒已送達"
+  },
+  "copy_a732ecf95c": {
+    "message": "本機提醒失敗"
+  },
+  "copy_f8aa9ca925": {
+    "message": "本機提醒已錯過"
+  },
+  "copy_3da13a4566": {
+    "message": "無法在本機送達"
+  },
+  "copy_bc039efcea": {
+    "message": "定於 $DATE$ · 適用通知截止日前 90 天。",
+    "placeholders": {
+      "date": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_6c45107d7e": {
+    "message": "已於 $DATE$ 送達此 Chrome 使用者。",
+    "placeholders": {
+      "date": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_a5a5954133": {
+    "message": "背景程序停止前，Chrome 未確認已完成。Skopeo 不會宣稱已送達。"
+  },
+  "copy_e5123bbec6": {
+    "message": "Chrome 無法確認目前的本機通知。恢復存取權後，請重新開啟 Skopeo。"
+  },
+  "copy_08dfb16531": {
+    "message": "在確認目前的送達之前，提前 90 天的提醒日期已過。"
+  },
+  "copy_3594f6a99a": {
+    "message": "目前的合約負責人未對應到此 Chrome 使用者。"
+  },
+  "copy_426c5c39d1": {
+    "message": "已對應的負責人與目前的合約負責人不同。"
+  },
+  "copy_0757a1ed95": {
+    "message": "無法為本機送達驗證目前的接收者。"
+  },
+  "copy_72efa77290": {
+    "message": "無法從可存取的適用依據證實單一的目前合約負責人。"
+  },
+  "copy_3c04799807": {
+    "message": "在可存取的適用依據中，目前的合約負責人有歧義。"
+  },
+  "copy_d28c832069": {
+    "message": "提醒日期"
+  },
+  "copy_6fcb38ddc8": {
+    "message": "截止日"
+  },
+  "copy_df4a3ef90f": {
+    "message": "將目前負責人對應到此 Chrome 使用者"
+  },
+  "copy_41fb2f2f69": {
+    "message": "移除目前的負責人對應"
+  },
+  "copy_410a93d088": {
+    "message": "向合約依據提問"
+  },
+  "copy_6ef090bae5": {
+    "message": "請選擇明確的依據範圍。Skopeo 只會檢查目前可存取的依據。"
+  },
+  "copy_ed555ae32f": {
+    "message": "就此合約提問"
+  },
+  "copy_ef67dbed6e": {
+    "message": "向已納入的文件庫提問"
+  },
+  "copy_9c28366482": {
+    "message": "就 $VENDOR$ 提問",
+    "placeholders": {
+      "vendor": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_9cb58dd04b": {
+    "message": "第 $PAGE$ 頁，共 $TOTAL$ 頁",
+    "placeholders": {
+      "page": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "copy_8c49dc2280": {
+    "message": "供應商第 $PAGE$ 頁，共 $TOTAL$ 頁。",
+    "placeholders": {
+      "page": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "copy_819b368f09": {
+    "message": "上一頁供應商"
+  },
+  "copy_7afd6ca5d6": {
+    "message": "上一批供應商"
+  },
+  "copy_249f48388f": {
+    "message": "下一頁供應商"
+  },
+  "copy_3e4263ad2a": {
+    "message": "下一批供應商"
+  },
+  "copy_8fe13a8507": {
+    "message": "部分來源未評估"
+  },
+  "copy_29bd90dd10": {
+    "message": "顯示 $TOTAL$ 家可存取供應商中的 $SHOWN$ 家。另有 $COUNT$ 家供應商不在此有限的檢視範圍內。",
+    "placeholders": {
+      "shown": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      },
+      "count": {
+        "content": "$3"
+      }
+    }
+  },
+  "copy_47b8dab761": {
+    "message": "供應商合約已更新。"
+  },
+  "copy_25e990a080": {
+    "message": "以下事項適用本文件。"
+  },
+  "copy_4bf4450c6a": {
+    "message": "只有引用的條款適用本文件。其他條款以下列適用來源為準。"
+  },
+  "copy_7be303f8f3": {
+    "message": "歷史"
+  },
+  "copy_86a7aa3106": {
+    "message": "本文件屬於相關歷史。以下事項不適用本文件。"
+  },
+  "copy_e5830d2654": {
+    "message": "已被取代"
+  },
+  "copy_04f3f333be": {
+    "message": "本文件已被取代。以下事項不適用本文件。"
+  },
+  "copy_f6ea9c8cf8": {
+    "message": "Skopeo 無法判斷何者適用。採取行動前，請檢查引用的衝突。"
+  },
+  "copy_19637ce40b": {
+    "message": "無法從目前的完整依據取得適用狀態。"
+  },
+  "copy_2a0ea5cea9": {
+    "message": "在目前的 Google 雲端硬碟存取權下，Skopeo 無法確認此文件。"
+  },
+  "copy_c67fcddfcf": {
+    "message": "目前來源可用"
+  },
+  "copy_90e99384e3": {
+    "message": "開啟適用條款"
+  },
+  "copy_78c54579ff": {
+    "message": "開啟適用文件"
+  },
+  "copy_e787f10d71": {
+    "message": "沒有可用的適用來源"
+  },
+  "copy_07b152f270": {
+    "message": "正在開啟適用來源…"
+  },
+  "copy_b8b6305aa3": {
+    "message": "已開啟適用來源。"
+  },
+  "copy_845c0dee6c": {
+    "message": "Skopeo 無法開啟適用來源。請重新開啟此合約檢視，然後再試一次。"
+  },
+  "copy_c2f2c46ce9": {
+    "message": "適用事項"
+  },
+  "copy_928ee4fee9": {
+    "message": "相關歷史"
+  },
+  "copy_a8450448b2": {
+    "message": "衝突與缺口"
+  },
+  "copy_428c40b0a0": {
+    "message": "政策與送達狀態"
+  },
+  "copy_d4a073c24b": {
+    "message": "其他依據"
+  },
+  "copy_08251562b3": {
+    "message": "簽署"
+  },
+  "copy_a4f3df623c": {
+    "message": "生效"
+  },
+  "copy_a2472ca8fa": {
+    "message": "通知期間"
+  },
+  "copy_26b6ab1b68": {
+    "message": "送達方式"
+  },
+  "copy_3aa3ea3746": {
+    "message": "書面通知地址"
+  },
+  "copy_4746739305": {
+    "message": "$EVIDENCE$ · $TRUST$ · $CITATION$",
+    "placeholders": {
+      "evidence": {
+        "content": "$1"
+      },
+      "trust": {
+        "content": "$2"
+      },
+      "citation": {
+        "content": "$3"
+      }
+    }
+  },
+  "copy_174e6a66d6": {
+    "message": "適用依據"
+  },
+  "copy_96c8213ce4": {
+    "message": "開啟「$LABEL$」的來源",
+    "placeholders": {
+      "label": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_350e3eb9aa": {
+    "message": "沒有已證實的衝突或缺口。"
+  },
+  "copy_ce07bd3019": {
+    "message": "沒有可用的引用事項"
+  },
+  "copy_4c8f8d63a8": {
+    "message": "Skopeo 在目前可存取的依據中，找不到可支持的確切事項。"
+  },
+  "copy_e5b6ce8c47": {
+    "message": "另有 $COUNT$ 個引用事項未顯示",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_6f73f3c05c": {
+    "message": "另有 $COUNT$ 個衝突或缺口未顯示",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_8b3ce69d91": {
+    "message": "合約閱讀已更新。$LABEL$。",
+    "placeholders": {
+      "label": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_373a38146f": {
+    "message": "向合約依據提問"
+  },
+  "copy_451196f076": {
+    "message": "提問導覽"
+  },
+  "copy_716556189d": {
+    "message": "返回合約檢視"
+  },
+  "copy_2d2ef8280e": {
+    "message": "依據範圍 · $SCOPE$",
+    "placeholders": {
+      "scope": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_c4b7928d1b": {
+    "message": "依據範圍"
+  },
+  "copy_f4929c83c2": {
+    "message": "目前的合約"
+  },
+  "copy_d65b345614": {
+    "message": "已納入的可存取文件庫"
+  },
+  "copy_289aff12b0": {
+    "message": "問題"
+  },
+  "copy_850c91b6bd": {
+    "message": "請就適用條款、確切日期、衝突或可存取的歷史提問。"
+  },
+  "copy_6d45e7f000": {
+    "message": "正在檢查可存取的依據…"
+  },
+  "copy_53ede022fd": {
+    "message": "Skopeo 無法安全地評估此問題。請使用合約事項或日期重新措辭。"
+  },
+  "copy_9992e43fcb": {
+    "message": "Skopeo 無法使用已設定的提供者評估此問題。請檢查提供者設定，然後再次提問。"
+  },
+  "copy_218bde53e7": {
+    "message": "此依據範圍已變更。請重新開啟合約檢視，然後再次提問。"
+  },
+  "copy_d35aa3ea65": {
+    "message": "提出合約問題"
+  },
+  "copy_b0f43d6203": {
+    "message": "清除問題"
+  },
+  "copy_d715f5cd89": {
+    "message": "取消目前的問題"
+  },
+  "copy_ff5c17e52b": {
+    "message": "Skopeo 只會使用此範圍內目前可存取的依據。"
+  },
+  "copy_2db9cfd1c7": {
+    "message": "向合約依據提問。$SCOPE$。",
+    "placeholders": {
+      "scope": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_665590354e": {
+    "message": "已回答"
+  },
+  "copy_449ff38775": {
+    "message": "此範圍內目前可存取的完整依據支持以下結論。"
+  },
+  "copy_db6255fd34": {
+    "message": "目前的依據包含衝突或政策保障措施，須經人工審查後才能核准決策。"
+  },
+  "copy_6ab4717580": {
+    "message": "未下結論"
+  },
+  "copy_e74b9bf7a7": {
+    "message": "Skopeo 無法根據目前可存取的完整依據支持關鍵結論。"
+  },
+  "copy_33aa2130b0": {
+    "message": "$LABEL$。合約依據已更新。",
+    "placeholders": {
+      "label": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_bd6017c1aa": {
+    "message": "問題 · $QUESTION$",
+    "placeholders": {
+      "question": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_89db2ad881": {
+    "message": "結論"
+  },
+  "copy_fafed72ab5": {
+    "message": "目前完整的適用依據支持此結論。"
+  },
+  "copy_749b942924": {
+    "message": "目前的適用依據包含需要人工審查的衝突。"
+  },
+  "copy_4dfd89f828": {
+    "message": "目前的依據無法完全支持關鍵結論。"
+  },
+  "copy_2495da3ec8": {
+    "message": "沒有可支持的結論"
+  },
+  "copy_55cc130c39": {
+    "message": "Skopeo 找不到目前可支持關鍵結論的完整依據。請檢查列出的缺口，或提出範圍更小的合約問題。"
+  },
+  "copy_5bcee20c7a": {
+    "message": "簽署日期"
+  },
+  "copy_9c12937c06": {
+    "message": "生效日期"
+  },
+  "copy_b34ddc5d7c": {
+    "message": "到期日期"
+  },
+  "copy_f6cdeb9113": {
+    "message": "終止日期"
+  },
+  "copy_78bf8ee749": {
+    "message": "續約"
+  },
+  "copy_c424f94514": {
+    "message": "通知期間"
+  },
+  "copy_b67bd6b77f": {
+    "message": "通知截止日"
+  },
+  "copy_a50030924e": {
+    "message": "送達方式"
+  },
+  "copy_493606f2a1": {
+    "message": "書面地址"
+  },
+  "copy_e1a4354fd9": {
+    "message": "目前的合約依據"
+  },
+  "copy_bf4952a792": {
+    "message": "此區段沒有可支持的依據。"
+  },
+  "copy_342901859f": {
+    "message": "依據衝突"
+  },
+  "copy_580010c551": {
+    "message": "依據不完整"
+  },
+  "copy_82e5fb7fbb": {
+    "message": "來源無法存取"
+  },
+  "copy_320ae7276d": {
+    "message": "來源無法讀取"
+  },
+  "copy_d719525cde": {
+    "message": "適用狀態需要審查"
+  },
+  "copy_1851042981": {
+    "message": "缺少 Document 10"
+  },
+  "copy_8a94e8c308": {
+    "message": "Document 10 無法存取"
+  },
+  "copy_bbf5aa0612": {
+    "message": "缺少必要的備忘錄"
+  },
+  "copy_2200d8c0cd": {
+    "message": "必要的備忘錄無法存取"
+  },
+  "copy_cfbab54dd8": {
+    "message": "目前的適用依據包含需要審查的衝突。"
+  },
+  "copy_f3ffdbbbdd": {
+    "message": "有一或多個目前的相關來源無法為此回答完成認證。"
+  },
+  "copy_d204d0a0e2": {
+    "message": "政策保障措施"
+  },
+  "copy_bbfdaf0dfa": {
+    "message": "決策核准 · $CLEARANCE$",
+    "placeholders": {
+      "clearance": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_18f2a0947f": {
+    "message": "受阻"
+  },
+  "copy_15f3a2898a": {
+    "message": "已核准"
+  },
+  "copy_5737ca7c03": {
+    "message": "已為此決策審查 Document 10"
+  },
+  "copy_4bf9aea2e1": {
+    "message": "決策受阻 · 審查 Document 10"
+  },
+  "copy_bb49232d11": {
+    "message": "決策受阻 · 缺少 Document 10"
+  },
+  "copy_54b56263f1": {
+    "message": "決策受阻 · 目前的帳戶無法存取 Document 10"
+  },
+  "copy_0b044d549b": {
+    "message": "決策受阻 · Document 10 在審查後已變更"
+  },
+  "copy_2b418c141b": {
+    "message": "人工撰寫的備忘錄已存檔"
+  },
+  "copy_ec3dd67075": {
+    "message": "決策受阻 · 缺少必要的人工撰寫備忘錄"
+  },
+  "copy_924cac44d9": {
+    "message": "決策受阻 · 無法存取必要的備忘錄"
+  },
+  "copy_9107e16cf8": {
+    "message": "決策受阻 · 備忘錄狀態需要審查"
+  },
+  "copy_f0299b9161": {
+    "message": "核准此決策之前，請先審查 Document 10。"
+  },
+  "copy_e1e68c289d": {
+    "message": "缺少 Document 10。"
+  },
+  "copy_e9a100da6d": {
+    "message": "目前的帳戶無法存取 Document 10。"
+  },
+  "copy_4ef56c1ba0": {
+    "message": "Document 10 在審查後已變更。"
+  },
+  "copy_c79cc0e7a8": {
+    "message": "適用依據需要審查。"
+  },
+  "copy_877e8f8374": {
+    "message": "缺少必要的人工撰寫備忘錄。"
+  },
+  "copy_1e212440ab": {
+    "message": "無法存取必要的備忘錄。"
+  },
+  "copy_b0ba2710e5": {
+    "message": "備忘錄狀態需要審查。"
+  },
+  "copy_e0f5fabed4": {
+    "message": "審查 Document 10"
+  },
+  "copy_ddce5a88d4": {
+    "message": "我已審查 Document 10"
+  },
+  "copy_a0b30ea071": {
+    "message": "設定 Document 10"
+  },
+  "copy_648cf08a6d": {
+    "message": "取代 Document 10"
+  },
+  "copy_007433b24a": {
+    "message": "清除 Document 10"
+  },
+  "copy_4a255a4afd": {
+    "message": "歸類為複雜"
+  },
+  "copy_f866504af3": {
+    "message": "取消複雜分類"
+  },
+  "copy_1e1104138b": {
+    "message": "開啟人工撰寫的備忘錄"
+  },
+  "copy_883525a630": {
+    "message": "正在準備確認…"
+  },
+  "copy_fabbe01ac4": {
+    "message": "正在套用操作…"
+  },
+  "copy_55d47976b7": {
+    "message": "已開啟確認對話方塊。"
+  },
+  "copy_d466be6feb": {
+    "message": "操作已完成。"
+  },
+  "copy_aa908e0a92": {
+    "message": "操作無法使用。請重新開啟此回答，然後再試一次。"
+  },
+  "copy_caf85b0888": {
+    "message": "來源"
+  },
+  "copy_6c0c15abfc": {
+    "message": "沒有可用的引用來源。"
+  },
+  "copy_f437de190a": {
+    "message": "另有 $COUNT$ 個來源未顯示",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_8347952c53": {
+    "message": "提出其他合約問題"
+  },
+  "copy_a139e3e525": {
+    "message": "本機提醒接收者"
+  },
+  "copy_cd435f6875": {
+    "message": "合約分類"
+  },
+  "copy_1ba1ee1d27": {
+    "message": "政策設定"
+  },
+  "copy_c1d4a51216": {
+    "message": "建立目前的負責人對應"
+  },
+  "copy_792e712952": {
+    "message": "日後適用的決策將需要審查此文件目前可存取的版本。"
+  },
+  "copy_966afd851e": {
+    "message": "核准適用的決策之前，將需要一份目前的人工撰寫備忘錄。"
+  },
+  "copy_a39972b7d5": {
+    "message": "取代本機 Document 10 識別資訊，並使目前的審查確認失效。"
+  },
+  "copy_9b7d82da0d": {
+    "message": "移除本機 Document 10 識別資訊，適用的決策將受阻，直到重新設定為止。"
+  },
+  "copy_9536622512": {
+    "message": "移除日後決策的 Skopeo 備忘錄保障措施，不會變更任何來源。"
+  },
+  "copy_5540569522": {
+    "message": "將此確切的目前合約負責人儲存為此 Chrome 帳戶與文件庫的本機提醒接收者。"
+  },
+  "copy_d49da07bc7": {
+    "message": "移除本機接收者對應，並取代此確切的目前合約負責人待傳送的提醒。"
+  },
+  "copy_7f3e42f9c6": {
+    "message": "保留例行分類"
+  },
+  "copy_49701b0dfa": {
+    "message": "保留複雜分類"
+  },
+  "copy_94fc74c22b": {
+    "message": "維持提醒未對應"
+  },
+  "copy_6f8dddf459": {
+    "message": "保留目前的負責人對應"
+  },
+  "copy_cbc11a411b": {
+    "message": "保留目前的政策文件"
+  },
+  "copy_8a249b0b08": {
+    "message": "需要確認。$TITLE$。",
+    "placeholders": {
+      "title": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_cc5eaee07c": {
+    "message": "Skopeo · 環境模式"
+  },
+  "copy_df9f5938af": {
+    "message": "Esc Esc"
+  },
+  "copy_d6add7db3e": {
+    "message": "Skopeo 環境模式 HUD"
+  },
+  "copy_f47ece6bf5": {
+    "message": "Skopeo 環境模式邊條"
+  },
+  "copy_781cea8a6d": {
+    "message": "Skopeo 錨定 HUD"
+  },
+  "copy_e013589331": {
+    "message": "Skopeo 已開啟。環境模式檢視。"
+  },
+  "copy_03b0a09c0f": {
+    "message": "Skopeo · 文件庫情境"
+  },
+  "copy_40a9b8a75b": {
+    "message": "Skopeo 已驗證文件庫情境。"
+  },
+  "copy_e274a8944a": {
+    "message": "Skopeo · 供應商資料夾"
+  },
+  "copy_22ca85d703": {
+    "message": "Skopeo 已驗證供應商資料夾情境。"
+  },
+  "copy_2e200318d9": {
+    "message": "Skopeo · 合約閱讀"
+  },
+  "copy_2f8c3b7964": {
+    "message": "Skopeo 已驗證合約閱讀情境。"
+  },
+  "copy_a4aa80217f": {
+    "message": "Skopeo · 聚焦提問"
+  },
+  "copy_b644ad183f": {
+    "message": "Skopeo 已驗證聚焦提問情境。"
+  },
+  "copy_3daa6a515e": {
+    "message": "Skopeo 無法驗證此情境。"
+  },
+  "copy_7d003c5a9e": {
+    "message": "Skopeo 無法驗證此情境。頁面未做任何變更。"
+  },
+  "copy_7dbaa51dc2": {
+    "message": "Skopeo 不支援此情境。"
+  },
+  "copy_d5fe7ab570": {
+    "message": "Skopeo 不支援此情境。頁面未做任何變更。"
+  },
+  "copy_cf9831dc02": {
+    "message": "Skopeo 無法驗證此目標。"
+  },
+  "copy_a7564df078": {
+    "message": "Skopeo 無法驗證目標，已移除標註。"
+  },
+  "copy_7c55c9ea2e": {
+    "message": "未要求已驗證的目標"
+  },
+  "copy_19ec755ada": {
+    "message": "Skopeo 維持環境模式，因為未要求已驗證的目標。"
+  },
+  "copy_f4fa9aa1d9": {
+    "message": "開啟錨點標記示範"
+  },
+  "copy_25b1bf5c97": {
+    "message": "錨點示範"
+  },
+  "copy_d5ae944038": {
+    "message": "開啟實體標籤示範"
+  },
+  "copy_d7156d68f0": {
+    "message": "範例實體 · 1 則附註"
+  },
+  "copy_cb5b3ae9db": {
+    "message": "異常訊號示範"
+  },
+  "copy_4392ef2767": {
+    "message": "異常示範 · 不尋常的變更"
+  },
+  "copy_f3c8d57e58": {
+    "message": "返回 Skopeo 環境模式"
+  },
+  "copy_614fc81be0": {
+    "message": "Skopeo 聚焦示範"
+  },
+  "copy_0700b1b64b": {
+    "message": "Skopeo 聚焦示範"
+  },
+  "copy_0405ec6300": {
+    "message": "此受控預覽示範暫時淡化效果，不會讀取或變更頁面。"
+  },
+  "copy_e68212e067": {
+    "message": "返回錨定檢視"
+  },
+  "copy_07a92fc61f": {
+    "message": "開啟後果預覽"
+  },
+  "copy_cd663f9f29": {
+    "message": "聚焦檢視已開啟。按 Esc 鍵即可還原頁面。"
+  },
+  "copy_afa09efd8b": {
+    "message": "僅限示範"
+  },
+  "copy_121b453f67": {
+    "message": "後果預覽"
+  },
+  "copy_cc1fc9cd9c": {
+    "message": "繼續會關閉此預覽。Skopeo 不會對頁面執行任何操作。"
+  },
+  "copy_c88b8415e0": {
+    "message": "返回聚焦示範"
+  },
+  "copy_7d005db682": {
+    "message": "繼續示範"
+  },
+  "copy_7a0af3438a": {
+    "message": "返回聚焦檢視"
+  },
+  "copy_a4405d29ad": {
+    "message": "$VENDOR$ · 通知截止日",
+    "placeholders": {
+      "vendor": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_a9e29d03a6": {
+    "message": "負責人：$OWNER$ · 適用依據：$EVIDENCE$",
+    "placeholders": {
+      "owner": {
+        "content": "$1"
+      },
+      "evidence": {
+        "content": "$2"
+      }
+    }
+  },
+  "copy_d35bef08b9": {
+    "message": "$DOCUMENT$ · 通知依據",
+    "placeholders": {
+      "document": {
+        "content": "$1"
+      }
+    }
+  },
+  "copy_390bf05359": {
+    "message": "開啟適用依據"
+  },
+  "copy_fa810a30c8": {
+    "message": "Skopeo 受控測試環境已就緒。"
+  },
+  "copy_7baa989602": {
+    "message": "支援的應用程式"
+  },
+  "copy_3661b847f9": {
+    "message": "簽署日期引文"
+  },
+  "copy_db14bdd363": {
+    "message": "生效日期引文"
+  },
+  "copy_7a371c5ac5": {
+    "message": "到期日期引文"
+  },
+  "copy_7901f368b6": {
+    "message": "終止日期引文"
+  },
+  "copy_446a535bc2": {
+    "message": "續約引文"
+  },
+  "copy_f103738e41": {
+    "message": "通知期間引文"
+  },
+  "copy_9267e4d016": {
+    "message": "通知截止日引文"
+  },
+  "copy_6aa5461ae7": {
+    "message": "送達方式引文"
+  },
+  "copy_3900bd4834": {
+    "message": "書面地址引文"
+  },
+  "copy_2d03873447": {
+    "message": "未載明自動續約"
   }
 }

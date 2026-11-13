@@ -24,7 +24,7 @@
 // Report mode prints the findings and exits 0. Strict mode (STRICT below, or
 // SKOPEO_HUD_LOCALE_STRICT=1) exits 1 on any finding.
 
-const STRICT = false;
+const STRICT = true;
 const STRICT_MODE = STRICT || process.env.SKOPEO_HUD_LOCALE_STRICT === '1';
 
 const fs = require('fs');
