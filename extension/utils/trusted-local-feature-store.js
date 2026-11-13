@@ -297,10 +297,10 @@
   // Fast-mode measurement: the same allowlist as the logger's
   // cloneJevMeasurementForPersistence (automation-logger.js), so a block the
   // logger wrote passes through unchanged and nothing outside it survives.
-  var JEV_CODE_WORD = /^[a-z][a-z0-9_]{0,63}$/;
+  var FAST_MODE_CODE_WORD = /^[a-z][a-z0-9_]{0,63}$/;
   function jevNumber(value) { return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null; }
   function jevCount(value) { return Number.isSafeInteger(value) && value >= 0 ? value : null; }
-  function jevCode(value) { return typeof value === 'string' && JEV_CODE_WORD.test(value) ? value : null; }
+  function jevCode(value) { return typeof value === 'string' && FAST_MODE_CODE_WORD.test(value) ? value : null; }
   function jevString(value, max) { return typeof value === 'string' && value.length > 0 && value.length <= max ? value : null; }
   function jevSource(value, allowed) { return allowed.indexOf(value) !== -1 ? value : 'unavailable'; }
 
@@ -338,7 +338,7 @@
     if (isPlainRecord(command.escalations)) {
       Object.keys(command.escalations).slice(0, 100).forEach(function(reason) {
         var count = jevCount(command.escalations[reason]);
-        if (JEV_CODE_WORD.test(reason) && count !== null) escalations[reason] = count;
+        if (FAST_MODE_CODE_WORD.test(reason) && count !== null) escalations[reason] = count;
       });
     }
     return {
