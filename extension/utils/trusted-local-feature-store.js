@@ -250,6 +250,8 @@
       };
       var timing = safeCallTiming(action.timing);
       if (timing) row.timing = timing;
+      // Fast-mode steps carry decisionSource 'jev'; no other value is kept.
+      if (action.decisionSource === 'jev') row.decisionSource = 'jev';
       return row;
     }).filter(Boolean);
   }
@@ -290,6 +292,70 @@
 
   function safeMeasurementSummary(summary) {
     return isPlainRecord(summary) ? safeMeasurementValue(summary, 0) : undefined;
+  }
+
+  // Fast-mode measurement: the same allowlist as the logger's
+  // cloneJevMeasurementForPersistence (automation-logger.js), so a block the
+  // logger wrote passes through unchanged and nothing outside it survives.
+  var JEV_CODE_WORD = /^[a-z][a-z0-9_]{0,63}$/;
+  function jevNumber(value) { return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null; }
+  function jevCount(value) { return Number.isSafeInteger(value) && value >= 0 ? value : null; }
+  function jevCode(value) { return typeof value === 'string' && JEV_CODE_WORD.test(value) ? value : null; }
+  function jevString(value, max) { return typeof value === 'string' && value.length > 0 && value.length <= max ? value : null; }
+  function jevSource(value, allowed) { return allowed.indexOf(value) !== -1 ? value : 'unavailable'; }
+
+  function safeJevAttempt(attempt) {
+    var usage = isPlainRecord(attempt.usage) ? attempt.usage : {};
+    var cost = isPlainRecord(attempt.cost) ? attempt.cost : {};
+    return {
+      iteration: jevCount(attempt.iteration),
+      command: jevCount(attempt.command),
+      decisionSource: attempt.decisionSource === 'jev' ? 'jev' : null,
+      jevCalled: attempt.jevCalled === true,
+      servedModel: jevString(attempt.servedModel, 128),
+      instrumentVersion: jevString(attempt.instrumentVersion, 64),
+      calibrationStatus: jevCode(attempt.calibrationStatus),
+      latencyMs: jevNumber(attempt.latencyMs),
+      usage: {
+        inputTokens: jevCount(usage.inputTokens),
+        source: jevSource(usage.source, ['provider', 'unavailable'])
+      },
+      cost: {
+        usd: jevNumber(cost.usd),
+        source: jevSource(cost.source, ['provider', 'estimate', 'unavailable'])
+      },
+      fallback: jevCode(attempt.fallback),
+      outcome: jevCode(attempt.outcome),
+      escalationReason: jevCode(attempt.escalationReason),
+      op: jevCode(attempt.op),
+      stepOutcome: jevCode(attempt.stepOutcome)
+    };
+  }
+
+  function safeJevCommand(command) {
+    var usd = isPlainRecord(command.usd) ? command.usd : {};
+    var escalations = {};
+    if (isPlainRecord(command.escalations)) {
+      Object.keys(command.escalations).slice(0, 100).forEach(function(reason) {
+        var count = jevCount(command.escalations[reason]);
+        if (JEV_CODE_WORD.test(reason) && count !== null) escalations[reason] = count;
+      });
+    }
+    return {
+      command: jevCount(command.command),
+      fastSteps: jevCount(command.fastSteps),
+      jevCalls: jevCount(command.jevCalls),
+      jevMs: jevNumber(command.jevMs),
+      usd: { provider: jevNumber(usd.provider), estimate: jevNumber(usd.estimate) },
+      escalations: escalations
+    };
+  }
+
+  function safeJevMeasurement(block) {
+    if (!isPlainRecord(block)) return undefined;
+    var attempts = Array.isArray(block.attempts) ? block.attempts.filter(isPlainRecord).slice(-100) : [];
+    var commands = Array.isArray(block.commands) ? block.commands.filter(isPlainRecord).slice(-100) : [];
+    return { v: 1, attempts: attempts.map(safeJevAttempt), commands: commands.map(safeJevCommand) };
   }
 
   function safeReplayValue(value, depth) {
@@ -475,10 +541,18 @@
     if (iterationTiming !== undefined) safe.iterationTiming = iterationTiming;
     var measurementSummary = safeMeasurementSummary(session.measurementSummary);
     if (measurementSummary !== undefined) safe.measurementSummary = measurementSummary;
+    var jevMeasurement = safeJevMeasurement(session.jevMeasurement);
+    if (jevMeasurement !== undefined) safe.jevMeasurement = jevMeasurement;
     if (session.totalCostBasis === 'estimate' || session.totalCostBasis === 'unavailable') {
       safe.totalCostBasis = session.totalCostBasis;
     }
     while (safe.logs.length && byteLength(safe) > LIMITS.SESSION_RESPONSE_BYTES) safe.logs.shift();
+    // Measurement goes next, oldest first, so a long fast-mode session still
+    // saves instead of being refused as oversized.
+    while (safe.jevMeasurement && safe.jevMeasurement.attempts.length &&
+        byteLength(safe) > LIMITS.SESSION_RESPONSE_BYTES) safe.jevMeasurement.attempts.shift();
+    while (safe.iterationTiming && safe.iterationTiming.length &&
+        byteLength(safe) > LIMITS.SESSION_RESPONSE_BYTES) safe.iterationTiming.shift();
     if (byteLength(safe) > LIMITS.SESSION_RESPONSE_BYTES) return null;
     return safe;
   }

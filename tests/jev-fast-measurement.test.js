@@ -1214,11 +1214,66 @@ async function loopTimingCase() {
     'the loop session projects one marked fast step and no fast params, fast-mode state or labels');
 }
 
+// The trusted store caps each saved record at LIMITS.SESSION_RESPONSE_BYTES.
+// Logs go first, then fast-mode attempts, then iteration rows, oldest first,
+// so a long fast-mode session is still saved rather than refused.
+async function storeBudgetCases() {
+  section('trusted store: a full fast-mode session saves within the record budget');
+  const storage = makeStorage({ fsbSessionLogs: {}, fsbSessionIndex: [] });
+  const store = TRUSTED_STORE.create({
+    chrome: { runtime: { id: 'test-extension' }, storage: { local: storage } },
+    now: () => 1790726420000
+  });
+  const many = { v: 1, attempts: [], commands: [] };
+  const rows = [];
+  for (let i = 1; i <= 100; i += 1) {
+    many.attempts.push(sampleAttempt(i));
+    many.commands.push(sampleCommand(i));
+    rows.push({ v: 1, iteration: i, modelMs: 1200, toolMs: 300, usage: { input: 1000, output: 200 }, servedModel: 'grok-4.3' });
+  }
+  const logs = [];
+  for (let i = 0; i < 500; i += 1) {
+    logs.push({ timestamp: 1790726000000 + i, level: 'info', message: 'step ' + i + ' ' + 'x'.repeat(400), sessionId: 'budget-full' });
+  }
+  const full = await store.saveAutomationSession('budget-full', {
+    id: 'budget-full', task: 'budget', status: 'completed', mode: 'autopilot',
+    logs, actionHistory: [], iterationTiming: rows, jevMeasurement: many, totalCost: 0.01
+  }, []);
+  const fullRecord = storage.store.fsbSessionLogs['budget-full'];
+  check(full && full.ok === true && fullRecord && fullRecord.jevMeasurement.attempts.length === 100 &&
+    fullRecord.iterationTiming.length === 100 && fullRecord.logs.length < 500,
+  'logs are trimmed first, so all 100 timing rows and 100 fast-mode attempts are kept');
+  check(Buffer.byteLength(JSON.stringify(fullRecord)) <= TRUSTED_STORE.LIMITS.SESSION_RESPONSE_BYTES,
+    'the stored record fits the store budget');
+
+  section('trusted store: oversized measurement sheds its oldest rows instead of refusing the save');
+  const wide = [];
+  for (let i = 1; i <= 100; i += 1) {
+    const row = { v: 1, iteration: i };
+    for (let k = 0; k < 40; k += 1) row['f' + k] = 'y'.repeat(200);
+    wide.push(row);
+  }
+  const big = await store.saveAutomationSession('budget-wide', {
+    id: 'budget-wide', task: 'budget', status: 'completed', mode: 'autopilot',
+    logs: [], actionHistory: [], iterationTiming: wide, jevMeasurement: many
+  }, []);
+  const bigRecord = storage.store.fsbSessionLogs['budget-wide'];
+  check(big && big.ok === true && !!bigRecord, 'the oversized session is still saved');
+  check(bigRecord && bigRecord.jevMeasurement.attempts.length === 0 && bigRecord.jevMeasurement.commands.length === 100,
+    'fast-mode attempts are shed before iteration rows; the per-command totals stay');
+  check(bigRecord && bigRecord.iterationTiming.length > 0 && bigRecord.iterationTiming.length < 100 &&
+    bigRecord.iterationTiming[bigRecord.iterationTiming.length - 1].iteration === 100,
+  'iteration rows are shed oldest first and the newest row is kept');
+  check(bigRecord && Buffer.byteLength(JSON.stringify(bigRecord)) <= TRUSTED_STORE.LIMITS.SESSION_RESPONSE_BYTES,
+    'the shed record fits the store budget');
+}
+
 async function main() {
   await loggerGoldenCases();
   await loggerPersistCases();
   await loggerMarkerCases();
   loggerStaticCases();
+  await storeBudgetCases();
   await dispatcherGoldenCases();
   await dispatcherProjectionCases();
   await dispatcherMarkerCases();
