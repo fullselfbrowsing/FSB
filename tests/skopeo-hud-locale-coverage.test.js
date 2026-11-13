@@ -76,7 +76,23 @@ const DATA_ALLOWLIST = Object.freeze([
   { text: 'Issues', surface: 'adaptive', reason: 'a fixture app display name that is also an English catalog message' },
   { text: 'Media', surface: 'adaptive', reason: 'a fixture app display name that is also an English catalog message' },
   { text: 'Current agreement', where: 'h3.skopeo-contract-document-title',
-    reason: 'the hud-evals and hud-runtime reading fixtures name their document Current agreement' }
+    reason: 'the hud-evals and hud-runtime reading fixtures name their document Current agreement' },
+  { text: 'Ready', surface: 'adaptive: ', where: 'span.skopeo-row-status',
+    reason: 'the status of a router status-row or capability-row atom in the renderedAtoms fixture; ' +
+      'router atoms are data, and Ready is also FSB copy' },
+  { text: 'Owner', surface: 'adaptive results', where: 'span.skopeo-atom-meta',
+    reason: 'item metadata is the service worker\u2019s join of humanized router record keys and values ("Owner: Procurement")' },
+  { text: 'Not available', surface: 'adaptive results', where: 'dd.skopeo-atom-value',
+    reason: 'the service worker writes Not available for a null router value into the value slot, which also ' +
+      'carries router strings, and nothing in the atom says which it is' },
+  { text: 'Current source', surface: 'corpus', where: 'span.skopeo-corpus-source-label',
+    reason: 'a current source in a named state (ready, unreadable...) with no safe Drive name falls back to ' +
+      'Current source, and the model does not say whether the label is that fallback or a Drive file name' },
+  { text: 'Current source', surface: 'corpus', where: 'div.skopeo-live',
+    reason: 'the same corpus source label inside the corpus announcement' },
+  { text: 'Current agreement ' + DOT + ' Acme', surface: 'ask',
+    reason: 'the ask fixtures label their agreement scope Current agreement \u00B7 Acme; the service worker only ' +
+      'ever sends Current agreement, which the shell translates, and any other scope label is written as given' }
 ]);
 
 // Render paths the harness does not drive, with the reason.
@@ -2171,6 +2187,9 @@ function selfCheck() {
     surface.slots.set('synthetic-data', {
       where: 'synthetic', step: 'self-check', value: globalThis.fsbUiLocale.line('Wikipedia')
     });
+    // Plain copy is probed with a synthetic slot: the lens key hint as it
+    // would read had the shell skipped the locale.
+    surface.slots.set('synthetic-plain', { where: 'synthetic', step: 'self-check', value: 'Esc Esc' });
     endSurface();
     const analysis = analyzeSurface(surface);
     const slots = Array.from(surface.slots.values());
@@ -2179,7 +2198,7 @@ function selfCheck() {
     if (analysis.uncovered.some(function (entry) { return entry.value === (label && label.value); })) {
       failures.push('a bracketed label is covered');
     }
-    if (!analysis.uncovered.some(function (entry) { return entry.fragment === 'Esc Esc'; })) {
+    if (!analysis.uncovered.some(function (entry) { return entry.where === 'synthetic' && entry.fragment === 'Esc Esc'; })) {
       failures.push('plain copy is reported as uncovered');
     }
     const template = surface.slots.get('synthetic-template');

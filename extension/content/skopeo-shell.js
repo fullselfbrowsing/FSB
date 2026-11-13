@@ -932,6 +932,19 @@
     }
   }
 
+  // The control under root whose aria-label this shell wrote from the given
+  // copy and still shows, in whatever language that is.
+  function copyLabelled(root, english) {
+    const nodes = root && typeof root.querySelectorAll === 'function' ? root.querySelectorAll('[aria-label]') : [];
+    for (const node of Array.from(nodes)) {
+      const record = COPY_WRITES.get(node);
+      const entry = record && record['@aria-label'];
+      if (entry && isCopy(entry.source) && englishOf(entry.source) === english &&
+          node.getAttribute('aria-label') === entry.shown) return node;
+    }
+    return null;
+  }
+
   function text(node, value) {
     const shown = localized(value);
     node.textContent = shown;
@@ -1224,6 +1237,7 @@
       description: 'Verified target actions and capability readiness.'
     })
   });
+  // The adaptive lens, and so its rail, renders only in Ambient and Anchored.
   const ADAPTIVE_RAIL_COPY = Object.freeze({
     ambient: 'Skopeo ambient status',
     anchored: 'Skopeo anchored status'
@@ -2371,7 +2385,7 @@
       const rail = createElement(this.document, 'div', 'skopeo-rail', {
         'data-skopeo-primitive': 'rail',
         role: 'group',
-        'aria-label': 'Skopeo ambient rail'
+        'aria-label': copy('Skopeo ambient rail')
       });
       rail.style.pointerEvents = 'none';
       if (placement && placement.corner.endsWith('left')) {
@@ -2696,7 +2710,7 @@
     _renderAmbient(placement) {
       const ambient = createElement(this.document, 'div', 'skopeo-ambient', {
         role: 'region',
-        'aria-label': 'Skopeo ambient HUD'
+        'aria-label': copy('Skopeo ambient HUD')
       });
       const lens = createElement(this.document, 'div', 'skopeo-lens', {
         'data-placement-corner': placement.corner,
@@ -2705,7 +2719,7 @@
       lens.style.pointerEvents = 'none';
       const glyph = createElement(this.document, 'span', 'skopeo-active-glyph', { 'aria-hidden': 'true' });
       const label = createElement(this.document, 'span', 'skopeo-lens-label', {}, copy(COPY.ambient));
-      const metadata = createElement(this.document, 'span', 'skopeo-lens-meta', {}, 'Esc Esc');
+      const metadata = createElement(this.document, 'span', 'skopeo-lens-meta', {}, copy('Esc Esc'));
       const shell = this;
       const close = this._button('skopeo-close', copy(COPY.turnOff), '×', function () {
         shell.onRequestClose({
@@ -2745,7 +2759,7 @@
       halo.style.pointerEvents = 'none';
       const anomaly = createElement(this.document, 'div', 'skopeo-anomaly-payload', {
         role: 'group',
-        'aria-label': 'Anomaly signal demo'
+        'aria-label': copy('Anomaly signal demo')
       });
       anomaly.appendChild(createElement(this.document, 'span', 'skopeo-anomaly-label', {}, copy(COPY.anomaly)));
       row.appendChild(anchor);
@@ -2778,7 +2792,7 @@
 
       const card = createElement(this.document, 'section', 'skopeo-focused-card', {
         role: 'region',
-        'aria-label': 'Skopeo focused demo'
+        'aria-label': copy('Skopeo focused demo')
       });
       const title = createElement(this.document, 'h2', 'skopeo-focused-title', { tabindex: '-1' }, copy(COPY.focusedTitle));
       const body = createElement(this.document, 'p', 'skopeo-focused-body', {}, copy(COPY.focusedBody));
@@ -2935,11 +2949,9 @@
       }
 
       const rail = this._rail(placement);
-      setAttributes(rail, {
-        'aria-label': Object.prototype.hasOwnProperty.call(ADAPTIVE_RAIL_COPY, attention)
-          ? copy(ADAPTIVE_RAIL_COPY[attention])
-          : 'Skopeo ' + attention + ' status'
-      });
+      if (Object.prototype.hasOwnProperty.call(ADAPTIVE_RAIL_COPY, attention)) {
+        setAttributes(rail, { 'aria-label': copy(ADAPTIVE_RAIL_COPY[attention]) });
+      }
       region.appendChild(rail);
       return region;
     }
@@ -5430,8 +5442,8 @@
       const region = this._projectionRegion();
       const label = this._projectionLabel();
       const contextCopy = PROJECTION_COPY.recognized[this._projectionState.contextKind];
-      if (label && contextCopy) text(label, contextCopy.visible);
-      if (region) region.setAttribute('aria-label', 'Skopeo anchored HUD');
+      if (label && contextCopy) text(label, copy(contextCopy.visible));
+      if (region) setAttributes(region, { 'aria-label': copy('Skopeo anchored HUD') });
       if (this._pendingAnnouncement !== null &&
           typeof this._projectionAnnouncementKey === 'string' &&
           this._projectionAnnouncementKey.startsWith('binding:')) {
@@ -5541,8 +5553,8 @@
           this._safeFocus(this._focusedFallback);
         }
       } else if (result && level === ATTENTION.INTERSTITIAL) {
-        if (!this._safeFocus(this._surface.querySelector('[aria-label="Return to focused demo"]'))) {
-          this._safeFocus(this._surface.querySelector('[aria-label="Back to focused view"]'));
+        if (!this._safeFocus(copyLabelled(this._surface, COPY.gateReturn))) {
+          this._safeFocus(copyLabelled(this._surface, COPY.backFocused));
         }
       }
 
@@ -5563,7 +5575,7 @@
         const restored = scope ? this._restoreSurfaceScope(scope) : false;
         this._consequenceExitPending = false;
         if (!this._safeFocus(origin)) {
-          this._safeFocus(this._surface.querySelector('[aria-label="Back to anchored view"]'));
+          this._safeFocus(copyLabelled(this._surface, COPY.backAnchored));
         }
         return restored;
       }
