@@ -111,6 +111,8 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
   // (its momentum tail), and the run of rising or falling steps since.
   let peak = 0;
   let ebbed = false;
+  // A fresh swipe has landed on the momentum of the one that opened this gesture.
+  let carry = false;
   let rising = 0;
   let riseFrom = 0;
   let falling = 0;
@@ -580,6 +582,7 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
   // when a fresh swipe is what ended it, that swipe is new input and goes through.
   function settle(eat = true): void {
     gesturing = false;
+    carry = false;
     swallow = eat;
     if (eat) swallowEnd = win.performance.now() + SWALLOW_MS;
     const delta = target - anchor;
@@ -604,7 +607,13 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
     park();
   }
   function revealHash(): void {
-    const id = decodeURIComponent((win.location.hash || '').slice(1));
+    const raw = (win.location.hash || '').slice(1);
+    let id = raw;
+    try {
+      id = decodeURIComponent(raw);
+    } catch {
+      // Not valid percent-encoding (a link ending in "#100%"): no element has that id.
+    }
     if (!id) return;
     const el = doc.getElementById(id);
     if (el && stage!.contains(el)) reveal(el);
@@ -629,6 +638,8 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
     // One physical swipe is a push plus its momentum tail: the deltas climb, then
     // only ebb. A new push follows a pause, makes them jump, or (a fresh swipe landing
     // on a tail that is still running) makes them climb again after they have ebbed.
+    // A slow drag whose speed wavers climbs again after ebbing too, so that shape
+    // alone never moves a plane: see where the gesture rolls over below.
     if (ad < prev) {
       falling++;
       rising = 0;
@@ -641,9 +652,9 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
     const fresh = gap >= 400 || ad > prev * 1.5 + 4 || (ebbed && rising >= 2 && ad - riseFrom >= 2);
     const cont = !fresh;
     if (fresh) {
-      // Only a swipe that follows an ebbed one closes an open gesture: a push that
-      // jumps while it is still building is the same swipe.
-      const closes = gesturing && ebbed;
+      // Only a swipe that follows an ebbed one counts as landing on an open gesture:
+      // a push that jumps while it is still building is the same swipe.
+      if (gesturing && ebbed) carry = true;
       peak = ad;
       ebbed = false;
       falling = 0;
@@ -652,11 +663,13 @@ export function createDepthEngine(root: HTMLElement, options: DepthEngineOptions
       edgeT = 0;
       steady = 0;
       swallow = false;
-      // The last swipe's momentum can keep its gesture open, and a gesture never goes
-      // past one plane. A fresh swipe closes it where the camera got to, then carries
-      // on from there (to the next plane, or scrolling inside this one).
-      if (closes) settle(false);
     } else peak = Math.max(peak, ad);
+    // The last swipe's momentum can keep its gesture open, and a gesture never goes
+    // past one plane. Once a fresh swipe has landed on it, the gesture rolls over when
+    // the camera reaches that plane, and the swipe carries on from there (to the next
+    // plane, or scrolling inside this one). Momentum alone stays where it stopped, and
+    // a drag moves one plane for each plane of travel however its speed wavers.
+    if (carry && gesturing && Math.abs(target - anchor) >= 0.999) settle(false);
     const L = layers[Math.round(target)];
     // The rest of the swipe that just changed planes is eaten, so it cannot scroll or
     // skip the next one. Only its stragglers, though: they arrive right after the snap

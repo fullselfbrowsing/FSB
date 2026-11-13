@@ -214,6 +214,49 @@ describe('createDepthEngine', () => {
       expect(activeIndex()).toBe(1);
       expect(seen).not.toContain(2);
     }, 10000);
+
+    // A slow drag with the fingers down throughout: its speed rises and falls as it
+    // goes, and it covers this many planes of travel.
+    const waver = (planes: number): number[] => {
+      const travel = root.querySelector<HTMLElement>('[data-depth-stage]')!.clientHeight * 0.75 * planes;
+      const steps: number[] = [];
+      for (let i = 0, sum = 0; sum < travel; i++) {
+        const d = Math.round(8 + 4 * Math.sin((2 * Math.PI * i) / 10));
+        steps.push(d);
+        sum += d;
+      }
+      return steps;
+    };
+
+    it('keeps a slow drag that wavers to one plane', async () => {
+      build([120, 120, 120, 120, 120]);
+      await burst(waver(1));
+      await settle(1);
+      await pause(400);
+      expect(activeIndex()).toBe(1);
+      expect(seen).not.toContain(2);
+    }, 10000);
+
+    it('carries a slow wavering drag on, one plane per plane of travel', async () => {
+      build([120, 120, 120, 120, 120]);
+      await burst(waver(2));
+      await settle(2);
+      await pause(400);
+      expect(activeIndex()).toBe(2);
+      expect(seen).not.toContain(3);
+    }, 10000);
+  });
+
+  it('starts even when the fragment is not valid percent-encoding', () => {
+    const url = location.href;
+    history.replaceState(null, '', '#100%');
+    try {
+      build([120, 120, 120]);
+      expect(root.querySelector('[data-depth-stage]')!.hasAttribute('data-depth-live')).toBeTrue();
+      expect(seen).toEqual([0]);
+    } finally {
+      history.replaceState(null, '', url);
+    }
   });
 
   it('cleans up after itself', () => {
