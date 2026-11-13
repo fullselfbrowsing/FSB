@@ -1228,7 +1228,7 @@ const V2_IDENTITY = Object.freeze({
   ...REPORT_IDENTITY,
   campaignId: 'cmp-v2',
   schedule: { runs: 48, rounds: 4, arms: ['autopilot'], seed: 71, cooldownMs: 3000, conditions: ['off', 'on'] },
-  gate: { path: 'scripts/bench/gate/release-gate-v1.0.0.json', sha256: 'e'.repeat(64) },
+  gate: { path: 'scripts/bench/gate/release-gate-v1.0.1.json', sha256: 'e'.repeat(64) },
   hosts: {},
 });
 
@@ -1361,7 +1361,7 @@ test('71-03 report: the method notes keep every Phase 66 sentence and disclose c
     /interleaved run by run/, /written through the MCP settings tool before t0 and read back over CDP/, /condition_not_applied/,
     /intention to treat/, /whether or not Jev acted/,
     /completed runs only/, /read together with completion/,
-    /24-letter lowercase run tokens/, /8a058bdf baseline used base64url tokens/, /token alphabet and length only/, /22 base64url characters at the pin/,
+    /24-letter lowercase run tokens/, /pin baseline used base64url tokens/, /token alphabet and length only/, /22 base64url characters at the pin/,
     /FSB-borne/, /user-borne/, /side by side and never summed/,
   ]) {
     assert.match(notes, pattern);

@@ -7,7 +7,7 @@
  * spawn (CI uses a shallow clone, 67-VALIDATION:27).
  *
  * V4 (M-71-08) runs it once on the real campaigns:
- *   node scripts/bench/gate/evaluate-gate.mjs --gate scripts/bench/gate/release-gate-v1.0.0.json
+ *   node scripts/bench/gate/evaluate-gate.mjs --gate scripts/bench/gate/release-gate-v1.0.1.json
  *     --baseline scripts/bench/results/core-baseline-66
  *     --campaign scripts/bench/results/core-gate-71-autopilot --campaign scripts/bench/results/core-gate-71-claude
  *     --verify-suites --out scripts/bench/gate/decisions/core-gate-71.json
@@ -75,7 +75,7 @@ export const USAGE = [
   'usage: node scripts/bench/gate/evaluate-gate.mjs --gate <file> --baseline <dir> --campaign <dir> --campaign <dir>',
   '         --out <file.json> [--verify-suites] [--fallback-pin <dir> --fallback-candidate <dir>]',
   '',
-  '  --gate <file>               the predeclared gate (scripts/bench/gate/release-gate-v1.0.0.json)',
+  '  --gate <file>               the predeclared gate (scripts/bench/gate/release-gate-v1.0.1.json)',
   '  --baseline <dir>            the V1 baseline campaign (scripts/bench/results/core-baseline-66); its safety.jsonl is read when present',
   '  --campaign <dir>            exactly twice: the core-gate-71-autopilot and core-gate-71-claude campaigns, matched by campaign id',
   '  --out <file.json>           the decision file; the gate report goes beside it as <name>.report.md; never inside a campaign directory',

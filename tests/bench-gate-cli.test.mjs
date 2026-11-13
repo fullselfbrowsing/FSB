@@ -27,7 +27,7 @@ import { computeSafety, isClaimedSuccess } from '../scripts/bench/lib/runs.mjs';
 import { corpusLock, loadTasks } from '../scripts/bench/lib/tasks.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const GATE_REL = 'scripts/bench/gate/release-gate-v1.0.0.json';
+const GATE_REL = 'scripts/bench/gate/release-gate-v1.0.1.json';
 const GATE_PATH = path.join(ROOT, GATE_REL);
 const { gate: GATE, sha256: GATE_SHA256 } = loadGate(GATE_PATH);
 const CORE_TASKS = loadTasks({ set: 'core' });
@@ -426,7 +426,7 @@ test('evaluate-gate writes the decision and the report beside it, prints one lin
   const lines = io.out().split('\n').filter((line) => / -> /.test(line));
   assert.deepEqual(lines, PATHS.map((name) => `${name}: ${decision.paths[name].verdict} -> ${decision.paths[name].v6Action}`));
   const report = fs.readFileSync(dirs.report, 'utf8');
-  assert.match(report, /^# Release gate report: gate 1\.0\.0/);
+  assert.match(report, /^# Release gate report: gate 1\.0\.1/);
   assert.match(report, /\n## Diagnostics \(per decision, not whole-task speed\)\n/);
   for (const text of [io.text(), report]) assert.equal(text.includes('://'), false);
 

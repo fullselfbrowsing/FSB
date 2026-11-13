@@ -82,7 +82,7 @@ export const METHOD_NOTES = Object.freeze([
   'Conditions are interleaved run by run in the seeded ABBA schedule. The fast-mode switch is written through the MCP settings tool before t0 and read back over CDP, and the capture arm must read off; a run whose switch is not confirmed is the infra error condition_not_applied and is never counted.',
   'The fast condition means "switch on", whether or not Jev acted in a given run (intention to treat). Runs where Jev acted appear only as descriptive exposure counts.',
   'Wall time per completed task covers completed runs only, so it is read together with completion: a condition that turns slow successes into fast failures can look faster.',
-  'Runs after Phase 71 use 24-letter lowercase run tokens, while the 8a058bdf baseline used base64url tokens, so the start URL in each instruction differs in its token alphabet and length only (22 base64url characters at the pin, 24 lowercase letters now).',
+  'Runs after Phase 71 use 24-letter lowercase run tokens, while the pin baseline used base64url tokens, so the start URL in each instruction differs in its token alphabet and length only (22 base64url characters at the pin, 24 lowercase letters now).',
   'Jev cost is FSB-borne and LLM cost is user-borne; the two are shown side by side and never summed.',
 ]);
 

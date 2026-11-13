@@ -68,7 +68,7 @@ export const CLAIM_TEMPLATES = Object.freeze({
   'jev-no-speedup': 'No whole-task speedup from fast mode was demonstrated on the 12-task core set.',
   'jev-disabled': 'Fast mode is disabled for every install for this release.',
   'mcp-non-jev-time': "With the release-candidate MCP server, Claude Code's whole-task wall time per completed task on the 12-task core set "
-    + 'was {ratio} of the time at the 8a058bdf baseline (95% CI {ratioLow} to {ratioHigh}), within the predeclared non-inferiority '
+    + 'was {ratio} of the time at the 1edb6476 baseline (95% CI {ratioLow} to {ratioHigh}), within the predeclared non-inferiority '
     + 'bound of {bound}; completion changed by {completionDiff} points (95% CI {completionDiffLow} to {completionDiffHigh}).',
   'mcp-non-jev-faster': 'The upper end of that interval, {ratioHigh}, is below 100%, so whole-task time with the release-candidate MCP '
     + 'server was faster than the baseline.',

@@ -9,7 +9,7 @@
  * evaluateGate turns committed rows and campaign identities into one verdict
  * per fast path: 'pass', 'fail', 'inconclusive' or 'not_exercised', each with
  * every criterion's numbers. Every threshold is read from the gate object
- * (scripts/bench/gate/release-gate-v1.0.0.json), never written here.
+ * (scripts/bench/gate/release-gate-v1.0.1.json), never written here.
  *
  * - Speed reads only the runner's wallMs of completed runs (D-10): the
  *   geometric mean of per-task median ratios with the hierarchical bootstrap
@@ -56,8 +56,10 @@ import { corpusDigest } from './gate.mjs';
 
 // The V1 baseline and the fallback pin campaign run at this commit (D-03),
 // compared in full: a prefix would accept any commit that shares it (IN-02).
-export const PIN_SHA_PREFIX = '8a058bdf';
-export const PIN_SHA = '8a058bdf0d17c1e3e79ec3104cc1996326b4c402';
+// Gate 1.0.1: 8a058bdf merged with origin/Skopeo c2d396e7 (tag
+// bench-pin-gate-1.0.1), so Skopeo is in both the baseline and the candidate.
+export const PIN_SHA_PREFIX = '1edb6476';
+export const PIN_SHA = '1edb6476afaba2a7860c85b4a555e926b968895e';
 // Two-sided z at gate.bootstrap.sensitivityLevel 0.975: the Bonferroni
 // two-family line (D-14). Never decisive.
 export const SENSITIVITY_Z = 2.241402727604947;

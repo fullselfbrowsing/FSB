@@ -33,6 +33,7 @@ import {
   validateGate,
 } from '../scripts/bench/gate/lib/gate.mjs';
 import { canonicalJson, sha256Hex } from '../scripts/bench/lib/identity.mjs';
+import { PIN_SHA, PIN_SHA_PREFIX } from '../scripts/bench/gate/lib/evaluate.mjs';
 
 const ERROR_CODE = /^(extra_key|missing_key|type|fixed|range|duplicate|inconsistent|string_too_long|url_in_string):[A-Za-z0-9_.[\]-]*$/;
 
@@ -41,7 +42,7 @@ const ERROR_CODE = /^(extra_key|missing_key|type|fixed|range|duplicate|inconsist
 function validFixture() {
   return {
     schemaVersion: 1,
-    gateVersion: '1.0.0',
+    gateVersion: '1.0.1',
     notes: ['Fixture gate for the validator tests; not the frozen release gate.'],
     corpusLockSha256: 'a'.repeat(64),
     campaigns: {
@@ -105,7 +106,7 @@ function validFixture() {
       replaces: 'mcp-non-jev',
       criteria: 'mcp-non-jev',
       sentinel: 'not_applicable',
-      design: 'pin runner and build (8a058bdf worktree) and candidate runner and build run in alternating blocks of blockRounds rounds in one window',
+      design: 'pin runner and build (1edb6476 worktree) and candidate runner and build run in alternating blocks of blockRounds rounds in one window',
       decision: 'owner at V4',
       tooling: 'none; manual V4 procedure',
     },
@@ -259,7 +260,7 @@ const MUTATIONS = [
   ['a target used as a pass condition', (g) => { g.targets.use = 'pass when met'; }, ['fixed:targets.use']],
   ['exercise.noOffActivity false', (g) => { g.exercise.noOffActivity = false; }, ['fixed:exercise.noOffActivity']],
   ['schemaVersion 2', (g) => { g.schemaVersion = 2; }, ['fixed:schemaVersion']],
-  ['gateVersion 1.0.1', (g) => { g.gateVersion = '1.0.1'; }, ['fixed:gateVersion']],
+  ['gateVersion 1.0.0 (superseded)', (g) => { g.gateVersion = '1.0.0'; }, ['fixed:gateVersion']],
 ];
 
 test('validateGate rejects every mutation with a path-named error and never echoes a value', () => {
@@ -435,13 +436,17 @@ test('gateCampaignFor returns the role, arms, seed, conditions and minRounds for
 
 // --- The frozen release gate (Task 2) ------------------------------------------------------------
 
-// The sha256 of the committed bytes of scripts/bench/gate/release-gate-v1.0.0.json.
+// The sha256 of the committed bytes of scripts/bench/gate/release-gate-v1.0.1.json.
 // Changing the gate file means a new gateVersion and changing this pin in the
 // same commit, and never after V1 has started (D-11).
-const GATE_SHA256 = '9d97fb900321925c6ec4a2d93dec4839b11fbdb235499fc1e996ff267bf8eb8e';
+const GATE_SHA256 = 'e0b36ea7f92d6f639a129aa04443b2eb7fd601a07b251cbf5b14f8dbfbc5a4a5';
+// Gate 1.0.0, superseded by 1.0.1 only to move the baseline pin. Its bytes
+// stay committed as history and must never change.
+const SUPERSEDED_GATE_SHA256 = '9d97fb900321925c6ec4a2d93dec4839b11fbdb235499fc1e996ff267bf8eb8e';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const GATE_FILE = path.join(ROOT, 'scripts', 'bench', 'gate', 'release-gate-v1.0.0.json');
+const GATE_FILE = path.join(ROOT, 'scripts', 'bench', 'gate', 'release-gate-v1.0.1.json');
+const SUPERSEDED_GATE_FILE = path.join(ROOT, 'scripts', 'bench', 'gate', 'release-gate-v1.0.0.json');
 const CORE_LOCK_FILE = path.join(ROOT, 'scripts', 'bench', 'tasks', 'core.lock.json');
 
 function committedGate() {
@@ -456,8 +461,39 @@ test('the committed gate validates, and the sha256 of its raw bytes is the pinne
   const loaded = loadGate(GATE_FILE);
   assert.equal(loaded.sha256, GATE_SHA256);
   assert.deepEqual(loaded.gate, gate);
-  assert.equal(gate.gateVersion, '1.0.0');
+  assert.equal(gate.gateVersion, '1.0.1');
   assert.equal(path.relative(ROOT, GATE_FILE).split(path.sep)[0], 'scripts', 'the gate lives outside .planning');
+});
+
+test('the superseded v1.0.0 gate is byte-frozen and refused', () => {
+  const bytes = fs.readFileSync(SUPERSEDED_GATE_FILE);
+  assert.equal(sha256Hex(bytes), SUPERSEDED_GATE_SHA256, 'the v1.0.0 bytes never change');
+  const result = validateGate(JSON.parse(bytes.toString('utf8')));
+  assert.deepEqual(result, { ok: false, errors: ['fixed:gateVersion', 'fixed:fallback.design'] });
+  assert.throws(() => loadGate(SUPERSEDED_GATE_FILE), (error) =>
+    Array.isArray(error.codes) && error.codes.join() === 'fixed:gateVersion,fixed:fallback.design');
+});
+
+test('v1.0.1 differs from v1.0.0 only in gateVersion, fallback.design and one appended note', () => {
+  const previous = JSON.parse(fs.readFileSync(SUPERSEDED_GATE_FILE, 'utf8'));
+  const { gate } = committedGate();
+  assert.equal(gate.notes.length, previous.notes.length + 1);
+  assert.deepEqual(gate.notes.slice(0, previous.notes.length), previous.notes);
+  const overlaid = JSON.parse(JSON.stringify(previous));
+  overlaid.gateVersion = gate.gateVersion;
+  overlaid.fallback.design = gate.fallback.design;
+  overlaid.notes.push(gate.notes[gate.notes.length - 1]);
+  assert.deepEqual(gate, overlaid, 'every number, campaign, table and criterion is unchanged');
+});
+
+test('the baseline pin is bound to the hashed gate bytes', () => {
+  const { gate } = committedGate();
+  assert.match(PIN_SHA, /^[0-9a-f]{40}$/);
+  assert.equal(PIN_SHA_PREFIX.length, 8);
+  assert.ok(PIN_SHA.startsWith(PIN_SHA_PREFIX));
+  assert.notEqual(PIN_SHA, '8a058bdf0d17c1e3e79ec3104cc1996326b4c402', 'the pre-Skopeo pin is retired');
+  assert.ok(gate.fallback.design.includes(`(${PIN_SHA_PREFIX} worktree)`), 'the fallback design names the pin');
+  assert.ok(gate.notes.some((note) => note.includes(PIN_SHA)), 'a gate note carries the full pin, so moving it changes the hashed bytes');
 });
 
 test('the committed gate has deterministic bytes: pretty JSON, two-space indent, a trailing newline', () => {

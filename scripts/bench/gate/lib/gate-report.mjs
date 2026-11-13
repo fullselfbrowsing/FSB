@@ -62,7 +62,7 @@ export const GATE_METHOD_NOTES = Object.freeze([
   'Wall time per completed task covers completed runs only, so it is read together with completion: a condition that turns slow successes into fast failures can look faster.',
   'Completion differences use the Newcombe hybrid score interval on pooled counted runs; infra errors are outside every denominator.',
   'Both Jev verdicts come from run_task in core-gate-71-autopilot (shared loop mechanics); the side-panel start path was not driven separately.',
-  'Runs after Phase 71 use 24-letter lowercase run tokens, while the 8a058bdf baseline used base64url tokens, so the start URL in each instruction differs from the baseline in its token alphabet and length only (22 base64url characters at the pin, 24 lowercase letters now).',
+  'Runs after Phase 71 use 24-letter lowercase run tokens, while the pin baseline used base64url tokens, so the start URL in each instruction differs from the baseline in its token alphabet and length only (22 base64url characters at the pin, 24 lowercase letters now).',
   'LLM cost is user-borne and Jev cost is FSB-borne; they are reported side by side and never summed.',
   'A path passes only when every criterion passes (intersection-union); the Bonferroni sensitivity line, the per-category targets and every descriptive section are never decisive.',
   'Release claims are rendered only from typed whole-task numbers: wallMs ratios, completion differences and counts, and cost.',

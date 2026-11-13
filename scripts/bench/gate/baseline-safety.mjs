@@ -20,7 +20,7 @@
  *   --out <file>        default <campaign>/safety.jsonl
  *   --tasks-root <dir>  the task definitions (default scripts/bench/tasks;
  *                       fixtures are read from its sibling "fixtures")
- *   --gate <file>       default scripts/bench/gate/release-gate-v1.0.0.json,
+ *   --gate <file>       default scripts/bench/gate/release-gate-v1.0.1.json,
  *                       read only for its claim words
  *
  * It refuses (corpus_mismatch) unless the campaign's corpus digest equals the
@@ -49,7 +49,7 @@ import { SIDECAR_FILE, serializeSidecar, sidecarLine, validateSidecarLine } from
 
 const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url));
 export const REPO_ROOT = path.resolve(MODULE_DIR, '..', '..', '..');
-export const DEFAULT_GATE = 'scripts/bench/gate/release-gate-v1.0.0.json';
+export const DEFAULT_GATE = 'scripts/bench/gate/release-gate-v1.0.1.json';
 export const EXIT = Object.freeze({ OK: 0, ERROR: 1, REFUSED: 2 });
 export const RATE_KINDS = Object.freeze(['requestOvercount', 'unexpectedMutations', 'unverifiable', 'claimedSuccessOnFail', 'anyEvent']);
 

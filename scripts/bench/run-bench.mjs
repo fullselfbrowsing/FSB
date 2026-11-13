@@ -47,7 +47,7 @@
  * never the settings tool's answer, decides. A mismatch or an unverifiable
  * read is the pausing infra code condition_not_applied, and that arm never
  * runs. The preflight refuses --conditions on a build whose settings tool
- * does not report the key as a boolean (the 8a058bdf pin has no settings
+ * does not report the key as a boolean (the pin has no settings
  * tool), with an armed capture, or when CDP cannot verify. --gate <file>
  * loads the predeclared gate through its exact-key validator (gate_invalid
  * lists only error codes), records the gate file's path and the sha256 of its
@@ -1288,7 +1288,7 @@ async function runPreflight({ deps, options, mode, client, transport, sdkVersion
  * The --conditions preflight (Phase 71, D-04), run after the Phase 66
  * preflight passes. It refuses unless CDP can verify (a DevTools port and an
  * extension id), the settings tool reports fsbJevFastModeEnabled as a
- * boolean (the 8a058bdf pin has no settings tool, so a conditioned campaign
+ * boolean (the pin has no settings tool, so a conditioned campaign
  * can never run against it), and the capture arm reads strictly false.
  * Nothing is written. Returns { ok, refusals, cdpPort, extensionId }.
  */

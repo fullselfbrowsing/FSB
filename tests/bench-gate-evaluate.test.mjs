@@ -68,7 +68,7 @@ import {
 import { SYNTHETIC_CANDIDATE_SHA, SYNTHETIC_PIN_SHA, defaultIdentity, makeCampaign } from '../scripts/bench/gate/lib/synthetic.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const GATE_FILE = 'scripts/bench/gate/release-gate-v1.0.0.json';
+const GATE_FILE = 'scripts/bench/gate/release-gate-v1.0.1.json';
 const EVALUATE_FILE = path.join(ROOT, 'scripts/bench/gate/lib/evaluate.mjs');
 const { gate: REAL_GATE, sha256: GATE_SHA256 } = loadGate(path.join(ROOT, GATE_FILE));
 const GATE = Object.freeze({ ...REAL_GATE, corpusLockSha256: corpusDigest(defaultIdentity().tasks) });
@@ -574,6 +574,8 @@ test('refusals: a tampered or mismatched input is refused with no verdicts', () 
     ['baseline_not_pin', { baseline: baselineCampaign({ identity: { git: { sha: `abc${SYNTHETIC_PIN_SHA.slice(3)}` } } }) }],
     // IN-02: a commit that only shares the 8-character pin prefix is not the pin.
     ['baseline_not_pin', { baseline: baselineCampaign({ identity: { git: { sha: `${SYNTHETIC_PIN_SHA.slice(0, 8)}${'0'.repeat(32)}` } } }) }],
+    // Gate 1.0.1 retired the pre-Skopeo pin; a baseline measured there is refused.
+    ['baseline_not_pin', { baseline: baselineCampaign({ identity: { git: { sha: '8a058bdf0d17c1e3e79ec3104cc1996326b4c402' } } }) }],
     ['campaign_schedule_mismatch', { autopilot: autopilotCampaign({ identity: { schedule: { seed: 72 } } }) }],
     ['candidate_row_schema', { autopilot: withRows(AUTOPILOT, (runs) => { runs[5].schemaVersion = 1; }) }],
     ['baseline_row_schema', { baseline: withRows(BASELINE, (runs) => { runs[0].schemaVersion = 2; }) }],
@@ -908,6 +910,7 @@ test('fallback: a sentinel trip plus a passing core-rebaseline-71 replaces the n
 test('fallback: refusals stay inside the fallback result and leave the primary verdict in place', () => {
   const cases = [
     ['fallback_pin_not_pin', fallbackCampaigns({ pin: { identity: { git: { sha: `abc${SYNTHETIC_PIN_SHA.slice(3)}` } } } })],
+    ['fallback_pin_not_pin', fallbackCampaigns({ pin: { identity: { git: { sha: '8a058bdf0d17c1e3e79ec3104cc1996326b4c402' } } } })],
     ['fallback_candidate_not_measured', fallbackCampaigns({ candidate: { identity: { git: { sha: 'b'.repeat(40) } } } })],
     ['fallback_candidate_not_measured', fallbackCampaigns({ candidate: { identity: { gate: { path: GATE_FILE, sha256: 'f'.repeat(64) } } } })],
     ['fallback_campaign_mismatch', fallbackCampaigns({ pin: { campaignId: 'core-rebaseline-71-pinned' } })],

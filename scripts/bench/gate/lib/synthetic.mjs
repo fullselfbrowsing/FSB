@@ -68,6 +68,7 @@ import { createHash } from 'node:crypto';
 
 import { ARMS, CONDITIONS, INFRA_CODES, buildSchedule, toCommittedRow, validateCommittedRow } from '../../lib/runs.mjs';
 import { mulberry32 } from '../../lib/stats.mjs';
+import { PIN_SHA } from './evaluate.mjs';
 
 export const CORE_TASK_IDS_SYNTHETIC = Object.freeze(
   Array.from({ length: 12 }, (_, i) => `core-syn-${String(i + 1).padStart(2, '0')}`),
@@ -79,7 +80,7 @@ export const SYNTHETIC_TASK_BASE_MS = Object.freeze([
   30000, 36000, 42000, 48000, 54000, 60000, 33000, 39000, 45000, 51000, 57000, 63000,
 ]);
 
-export const SYNTHETIC_PIN_SHA = '8a058bdf0d17c1e3e79ec3104cc1996326b4c402';
+export const SYNTHETIC_PIN_SHA = PIN_SHA;
 export const SYNTHETIC_CANDIDATE_SHA = '7171717171717171717171717171717171717171';
 export const SYNTHETIC_DEFAULT_CREATED_AT = '2026-11-02T00:00:00.000Z';
 export const SYNTHETIC_DEFAULT_MODELS = Object.freeze([

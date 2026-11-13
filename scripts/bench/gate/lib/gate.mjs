@@ -2,9 +2,11 @@
  * The predeclared gate for the v1.0.0 release (Phase 71, EVAL-02; CONTEXT
  * D-04..D-17 and the D-11 amendment of 2026-10-16).
  *
- * The gate file, scripts/bench/gate/release-gate-v1.0.0.json, is frozen
+ * The gate file, scripts/bench/gate/release-gate-v1.0.1.json, is frozen
  * before V1. Any change needs a new gateVersion, a new file and a new pinned
  * hash in tests/bench-gate.test.mjs, and never happens after V1 has started.
+ * Version 1.0.1 superseded 1.0.0 (still committed, now refused) only to move
+ * the baseline pin to a build that includes Skopeo.
  *
  * validateGate checks exact keys at every level, the numbers the release may
  * never move (the completion margin 0.10, the 0.90 practical-effect bound,
@@ -41,7 +43,7 @@ const CLAIM_WORD = /^[a-z][a-z_]{0,39}$/;
 const VERIFY_SUITE = /^node (--test )?tests\/[A-Za-z0-9._/-]+( tests\/[A-Za-z0-9._/-]+)*$/;
 
 export const GATE_SCHEMA_VERSION = 1;
-export const GATE_VERSION = '1.0.0';
+export const GATE_VERSION = '1.0.1';
 
 export const GATE_KEYS = Object.freeze([
   'schemaVersion', 'gateVersion', 'notes', 'corpusLockSha256', 'campaigns', 'identityMatch', 'paths', 'sentinel', 'criteria',
@@ -151,7 +153,7 @@ const FIXED_FALLBACK = Object.freeze({
   replaces: 'mcp-non-jev',
   criteria: 'mcp-non-jev',
   sentinel: 'not_applicable',
-  design: 'pin runner and build (8a058bdf worktree) and candidate runner and build run in alternating blocks of blockRounds rounds in one window',
+  design: 'pin runner and build (1edb6476 worktree) and candidate runner and build run in alternating blocks of blockRounds rounds in one window',
   decision: 'owner at V4',
   tooling: 'none; manual V4 procedure',
 });

@@ -25,6 +25,7 @@ import {
   validateCommittedRow,
 } from '../scripts/bench/lib/runs.mjs';
 import { median, mulberry32 } from '../scripts/bench/lib/stats.mjs';
+import { PIN_SHA } from '../scripts/bench/gate/lib/evaluate.mjs';
 
 const counted = (row) => row.infraError === null;
 const onRows = (runs) => runs.filter((row) => row.arm === 'autopilot' && row.condition === 'on');
@@ -45,7 +46,7 @@ test('exports: 12 synthetic core task ids, 12 base times, the pin and candidate 
   for (const id of CORE_TASK_IDS_SYNTHETIC) assert.match(id, /^(?:core|live)-[a-z0-9]+(?:-[a-z0-9]+)*$/);
   assert.equal(SYNTHETIC_TASK_BASE_MS.length, 12);
   assert.ok(SYNTHETIC_TASK_BASE_MS.every((ms) => Number.isInteger(ms) && ms > 0));
-  assert.ok(SYNTHETIC_PIN_SHA.startsWith('8a058bdf'));
+  assert.equal(SYNTHETIC_PIN_SHA, PIN_SHA, 'synthetic campaigns run at the gate pin');
   assert.match(SYNTHETIC_PIN_SHA, /^[0-9a-f]{40}$/);
   assert.match(SYNTHETIC_CANDIDATE_SHA, /^[0-9a-f]{40}$/);
   assert.notEqual(SYNTHETIC_CANDIDATE_SHA, SYNTHETIC_PIN_SHA);
@@ -65,7 +66,7 @@ test('a schema-1 baseline: v1 rows with ids and orders from buildSchedule, all v
   });
   assertAllValid(runs);
   assert.equal(identity.campaignId, 'core-baseline-66');
-  assert.ok(identity.git.sha.startsWith('8a058bdf'));
+  assert.equal(identity.git.sha, PIN_SHA);
   assert.deepEqual(identity.schedule, { runs: 72, rounds: 3, arms: ['autopilot', 'claude'], seed: 66, cooldownMs: 3000 });
   assert.equal(identity.gate, undefined, 'the pin runner records no gate');
   assert.ok(identity.hosts.claude, 'a campaign with the claude arm records hosts.claude');
@@ -391,13 +392,13 @@ test('identity: the shared fields, optional gate and resumes, and overrides that
 
   const merged = defaultIdentity({
     hosts: { claude: { version: '9.9.9 (Claude Code)' } },
-    gate: { path: 'scripts/bench/gate/release-gate-v1.0.0.json', sha256: 'e'.repeat(64) },
+    gate: { path: 'scripts/bench/gate/release-gate-v1.0.1.json', sha256: 'e'.repeat(64) },
     resumes: [{ at: '2026-11-03T00:00:00.000Z', claudeVersion: '9.9.9 (Claude Code)', chromeBrowser: 'Chrome/147.0.1.0', launchFlags: null }],
     chrome: undefined,
   });
   assert.equal(merged.hosts.claude.version, '9.9.9 (Claude Code)');
   assert.equal(merged.hosts.claude.model, identity.hosts.claude.model, 'nested fields not named stay');
-  assert.deepEqual(merged.gate, { path: 'scripts/bench/gate/release-gate-v1.0.0.json', sha256: 'e'.repeat(64) });
+  assert.deepEqual(merged.gate, { path: 'scripts/bench/gate/release-gate-v1.0.1.json', sha256: 'e'.repeat(64) });
   assert.equal(merged.resumes.length, 1);
   assert.equal('chrome' in merged, false, 'an undefined override removes the key');
   assert.deepEqual(defaultIdentity(), identity, 'defaultIdentity never mutates a shared default');

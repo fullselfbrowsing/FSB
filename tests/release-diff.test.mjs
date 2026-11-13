@@ -143,6 +143,7 @@ test('classifyPath: forbidden paths', () => {
     'mcp/src/tools/manual.ts',
     'scripts/bench/gate/lib/evaluate.mjs',
     'scripts/bench/gate/release-gate-v1.0.0.json',
+    'scripts/bench/gate/release-gate-v1.0.1.json',
     'mcp/build/index.js',
     'showcase/server/src/jev/contract.js',
     'showcase/server/server.js',

@@ -73,7 +73,7 @@ const V1_FIXTURE = JSON.parse(fs.readFileSync(
   path.join(ROOT, 'tests', 'fixtures', 'bench', 'schedule-v1-core-baseline-66.json'), 'utf8'));
 const CORE_LOCK = JSON.parse(fs.readFileSync(path.join(ROOT, 'scripts', 'bench', 'tasks', 'core.lock.json'), 'utf8'));
 const CORE_IDS = Object.freeze(CORE_LOCK.tasks.map((task) => task.id));
-const GATE_FILE = path.join(ROOT, 'scripts', 'bench', 'gate', 'release-gate-v1.0.0.json');
+const GATE_FILE = path.join(ROOT, 'scripts', 'bench', 'gate', 'release-gate-v1.0.1.json');
 
 // The committed gate re-serialized with another indent: valid, with different
 // bytes and so a different sha256 (indent 2 gives the committed bytes).
