@@ -258,14 +258,17 @@ async function testPolicyDocumentResolver(backgroundSource) {
   const resolver = createResolver({
     async runCorpusOperation(kind, exactTuple, selection, callback) {
       operations.push({ kind, exactTuple, selection });
-      const aggregate = await callback(
+      assert.equal(kind, 'query');
+      const value = await callback(
         Object.freeze([Object.freeze({
           sourceFileId: selection.sourceFileIds[0], sourceState: 'ready'
         })]),
         Object.freeze({ complete: true }),
         Object.freeze({ aborted: false })
       );
-      return Object.freeze({ decision: 'admitted', aggregate: aggregate.aggregate });
+      // Same shape as FsbSkopeoDriveAuthority: a non-display operation returns
+      // the callback's value as-is.
+      return Object.freeze({ decision: 'admitted', value });
     },
     async bindSource(args, sourceFileId) {
       assert.equal(args.certificateBySource.get(sourceFileId).sourceState, 'ready');
@@ -1690,12 +1693,16 @@ async function testAskControllerRuntime(backgroundSource) {
         return Object.freeze({ decision: 'admitted', value });
       }
       assert.ok(kind === 'display' || kind === 'query');
-      const aggregate = await callback(
+      const returned = await callback(
         Object.freeze([{ sourceFileId: 'raw-source-file-A' }]),
         Object.freeze({ complete: true }),
         Object.freeze({ aborted: false })
       );
-      return Object.freeze({ decision: 'admitted', aggregate: aggregate.aggregate });
+      // Same shapes as FsbSkopeoDriveAuthority: display surfaces rows and
+      // aggregate, every other operation returns the callback's value as-is.
+      return kind === 'display'
+        ? Object.freeze({ decision: 'admitted', rows: returned.rows, aggregate: returned.aggregate })
+        : Object.freeze({ decision: 'admitted', value: returned });
     }
   });
 

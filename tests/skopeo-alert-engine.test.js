@@ -86,6 +86,25 @@ const input = {
     'alert date is exactly 90 civil days before the governing notice deadline');
   assert.match(eligible.candidate.alertKey, /^sa1:[0-9a-f]{64}$/);
 
+  // The evaluation context carries today's date, so the truth generation and
+  // context digest change every civil day. The alert they describe does not.
+  const nextDay = await engine.derive({
+    ...input,
+    truthGenerationId: `stp1:${'7'.repeat(64)}`,
+    evaluationContextDigest: `sha256:${'8'.repeat(64)}`
+  });
+  assert.equal(nextDay.disposition, 'eligible');
+  assert.equal(nextDay.candidate.alertKey, eligible.candidate.alertKey,
+    'the same alert keeps its key when only the evaluation day changes');
+  assert.equal(nextDay.candidate.truthGenerationId, `stp1:${'7'.repeat(64)}`,
+    'the candidate still records the current truth generation');
+  const revisedEvidence = await engine.derive({
+    ...input,
+    evidence: { ...input.evidence, sourceRevision: 'revision-after-edit' }
+  });
+  assert.notEqual(revisedEvidence.candidate && revisedEvidence.candidate.alertKey, eligible.candidate.alertKey,
+    'a change to the alert evidence still yields a new key');
+
   const absent = await engine.derive({ ...input, mapping: null });
   assert.equal(absent.disposition, 'not-locally-deliverable');
   assert.equal(absent.publicStatus.state, 'not-locally-deliverable');

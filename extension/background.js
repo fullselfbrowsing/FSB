@@ -2946,7 +2946,8 @@ const SKOPEO_LOCALE_FILES = Object.freeze([
                 !sameBinding(state.binding, afterAsk) ||
                 projectionStates.get(initial.controllerKey) !== state ||
                 state.askEpoch !== askEpoch) throw new Error('stale-hud-ask-result');
-            return { rows: [], aggregate: result };
+            // 'query' returns this as `value`; admittedAggregate reads it there.
+            return result;
           }
         );
       } catch (_error) {
@@ -3997,6 +3998,14 @@ const SKOPEO_LOCALE_FILES = Object.freeze([
     }
   }
 
+  // getVisibleManifest only returns a manifest whose checkpoint validated as
+  // inventory-complete; this keeps that fact explicit where an empty source
+  // list has to mean "complete and empty".
+  function hudManifestInventoryComplete(manifest) {
+    return !!manifest && !!manifest.checkpoint &&
+      manifest.checkpoint.kind === 'inventory-complete';
+  }
+
   async function visibleHudManifest() {
     const boundary = await awaitCorpusBoundary();
     const claim = boundary && boundary.currentClaim;
@@ -4006,9 +4015,7 @@ const SKOPEO_LOCALE_FILES = Object.freeze([
       : null;
     return manifest && Array.isArray(manifest.sources) &&
       manifest.sources.length <= MAX_CORPUS_OPERATION_SOURCES &&
-      (manifest.sources.length > 0 ||
-        (manifest.state === 'complete' && manifest.totalSources === 0 &&
-          manifest.sourceOverflow === 0))
+      (manifest.sources.length > 0 || hudManifestInventoryComplete(manifest))
       ? { boundary: boundary, claim: claim, manifest: manifest }
       : null;
   }
@@ -4231,9 +4238,11 @@ const SKOPEO_LOCALE_FILES = Object.freeze([
       hudDeadlineBoundToContext(result, evaluationContext));
   }
 
+  // Same alert means same key. The key covers every identity field; the
+  // candidate also carries per-day evaluation fields that must not count.
   function hudAlertSameCandidate(left, right) {
-    try { return JSON.stringify(left) === JSON.stringify(right); }
-    catch (_error) { return false; }
+    return !!left && !!right && typeof left.alertKey === 'string' &&
+      left.alertKey.length > 0 && left.alertKey === right.alertKey;
   }
 
   function hudAlertCertificateFingerprint(certificate) {
@@ -4522,8 +4531,13 @@ const SKOPEO_LOCALE_FILES = Object.freeze([
         'display', binding.exactTuple,
         { sourceFileIds: binding.sourceFileIds.slice() },
         async function(certificates, proof, operationSignal) {
-          return hudCurrentAlertDerivations(
-            binding, certificates, proof, operationSignal);
+          // A 'display' callback must return exactly { rows, aggregate }; the
+          // authority closes anything else.
+          return {
+            rows: [],
+            aggregate: await hudCurrentAlertDerivations(
+              binding, certificates, proof, operationSignal)
+          };
         }
       );
     } catch (_error) {
@@ -5001,18 +5015,24 @@ const SKOPEO_LOCALE_FILES = Object.freeze([
     });
     if (sources.map(function(source) { return source.sourceFileId; }).join('\u0000') !==
         args.binding.sourceFileIds.join('\u0000')) return null;
+    // A published manifest is an inventory-complete checkpoint, so an empty
+    // source list here means the enrolled folder really has no sources. The
+    // manifest carries no digests, so derive them the way the truth path does.
     if (args.binding.mode === 'folder' && sources.length === 0 &&
-        visible.manifest.state === 'complete' &&
-        visible.manifest.totalSources === 0 &&
-        visible.manifest.sourceOverflow === 0) {
-      const digest = visible.manifest.authorizedSetDigest;
-      const civilDate = args.evaluationContext &&
-        (args.evaluationContext.asOfCivilDate || args.evaluationContext.civilDate);
-      const rawDigest = args.evaluationContext && args.evaluationContext.digest;
-      const contextDigest = typeof rawDigest === 'string'
-        ? (rawDigest.indexOf('sha256:') === 0 ? rawDigest : 'sha256:' + rawDigest)
-        : null;
-      if (!digest || !civilDate || !contextDigest) return null;
+        hudManifestInventoryComplete(visible.manifest)) {
+      const digest = args.binding.sourceSetDigest;
+      const civilDate = args.evaluationContext && args.evaluationContext.asOfCivilDate;
+      let contextDigest = null;
+      try {
+        const truthSchema = global.FsbSkopeoTruthSchema;
+        const parsedContext = truthSchema.parseEvaluationContext(args.evaluationContext);
+        contextDigest = parsedContext ? await truthSchema.sha256Hex(parsedContext) : null;
+      } catch (_error) {
+        contextDigest = null;
+      }
+      if (typeof digest !== 'string' || !/^sha256:[0-9a-f]{64}$/.test(digest) ||
+          !civilDate || typeof contextDigest !== 'string' ||
+          !/^sha256:[0-9a-f]{64}$/.test(contextDigest)) return null;
       const projection = global.FsbSkopeoHudProjector.createProjection({
         mode: 'folder',
         focus: { sourceBinding: null, documentLabel: null },
@@ -5534,10 +5554,9 @@ const SKOPEO_LOCALE_FILES = Object.freeze([
             args.binding.exactTuple,
             { sourceFileIds: [configuredFileKey] },
             async function(certificates, proof, operationSignal) {
-              return {
-                rows: [],
-                aggregate: await bind(certificates, proof, operationSignal)
-              };
+              // A 'query' operation hands this return back as `value` as-is;
+              // only 'display' callbacks use the { rows, aggregate } shape.
+              return await bind(certificates, proof, operationSignal);
             }
           );
         } catch (_error) {
@@ -5967,7 +5986,7 @@ const SKOPEO_LOCALE_FILES = Object.freeze([
             })
             : null;
           if (!result) throw new Error('skopeo-policy-refresh-closed');
-          return { rows: [], aggregate: result };
+          return result;
         }
       );
     } catch (_error) {
@@ -6011,14 +6030,11 @@ const SKOPEO_LOCALE_FILES = Object.freeze([
               currentSourceDigest !== policyInput.authority.sourceSetDigest) {
             throw new Error('skopeo-policy-effect-stale');
           }
-          return {
-            rows: [],
-            aggregate: Object.freeze({
-              partitionClaim: claim,
-              agreementKey: agreementKey,
-              targetFileKey: agreementKey
-            })
-          };
+          return Object.freeze({
+            partitionClaim: claim,
+            agreementKey: agreementKey,
+            targetFileKey: agreementKey
+          });
         }
       );
     } catch (_error) {

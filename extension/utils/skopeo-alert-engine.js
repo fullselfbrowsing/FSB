@@ -259,9 +259,11 @@
         input.evidence.contentFingerprint,
         input.sourceSetDigest,
         input.revisionDigest,
-        input.accessDigest,
-        input.truthGenerationId,
-        input.evaluationContextDigest
+        input.accessDigest
+        // truthGenerationId and evaluationContextDigest stay on the candidate
+        // but out of the key: both change every civil day (the evaluation
+        // context carries today's date), and a key that changes daily
+        // supersedes the alert before its alarm can fire.
       ];
       var hash;
       try { hash = await fields.digest(material); } catch (_error) { hash = null; }

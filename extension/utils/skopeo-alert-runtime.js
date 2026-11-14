@@ -296,8 +296,11 @@
       return reconcilePromise;
     }
 
+    // Same alert means same key. The candidate also carries per-day evaluation
+    // fields (truth generation, evaluation context) that are not identity.
     function sameCandidate(left, right) {
-      try { return JSON.stringify(left) === JSON.stringify(right); } catch (_error) { return false; }
+      return !!left && !!right && typeof left.alertKey === 'string' &&
+        left.alertKey.length > 0 && left.alertKey === right.alertKey;
     }
 
     async function currentCandidate(entry) {
