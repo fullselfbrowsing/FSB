@@ -22,6 +22,7 @@
      [data-depth-own]            gestures that start here belong to the element
      [data-depth-swipe]          on a phone, a row of cards swiped sideways; it
                                  travels as one piece
+     [data-depth-line]           on a phone, a line of chips swiped sideways
      [data-depth-rigid]          a plane that keeps its own width when it is fitted
      .fsb-depth-rail [data-depth-go="i"][data-depth-sec="j"]  the plane index */
 

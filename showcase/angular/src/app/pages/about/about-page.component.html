@@ -101,7 +101,7 @@
             </div>
             <footer class="sitemap-foot sitemap-cats">
               <div class="sitemap-block-label" i18n="@@about.memory.categories.label">Knowledge by category</div>
-              <div class="cat-legend">
+              <div class="cat-legend" data-depth-line>
                 @for (category of categories; track category.name) {
                   <span class="cat-legend-item">
                     <span class="cat-dot" [style.background]="category.color" aria-hidden="true"></span>

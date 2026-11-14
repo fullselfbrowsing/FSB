@@ -961,28 +961,15 @@
     line-height: 1.55;
   }
 
-  /* The other hosts sit on one line that scrolls sideways, label first. */
+  /* The other hosts sit on one line swiped sideways, label first. */
   .ag-more {
-    flex-wrap: nowrap;
-    justify-content: flex-start;
     margin-top: 16px;
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-
-  .ag-more::-webkit-scrollbar {
-    display: none;
   }
 
   .ag-more-label {
-    flex: none;
     width: auto;
     margin: 0 4px 0 0;
     white-space: nowrap;
-  }
-
-  .ag-chip {
-    flex: none;
   }
 
   /* Two by two, sharing the dividers as the wider layouts do. */
@@ -1036,18 +1023,12 @@
     font-size: 0.86rem;
   }
 
+  /* The host chips are a line swiped sideways inside the card, so the line runs
+     to the card's own edges. */
   .ag-hosts {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-
-  .ag-hosts::-webkit-scrollbar {
-    display: none;
-  }
-
-  .ag-host {
-    flex: none;
+    --swipe-gutter: 16px;
+    --swipe-end: 16px;
+    --swipe-gap: 6px;
   }
 
   .prompt-card {

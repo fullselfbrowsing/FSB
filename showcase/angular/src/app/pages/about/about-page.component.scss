@@ -716,20 +716,12 @@
     gap: 8px;
   }
 
-  /* The categories sit on one line that scrolls sideways. */
+  /* The categories are a line swiped sideways inside the card, so the line runs
+     to the card's own edges. */
   .cat-legend {
-    flex-wrap: nowrap;
-    gap: 14px;
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-
-  .cat-legend::-webkit-scrollbar {
-    display: none;
-  }
-
-  .cat-legend-item {
-    flex: none;
+    --swipe-gutter: 14px;
+    --swipe-end: 14px;
+    --swipe-gap: 14px;
   }
 
   .action-categories {

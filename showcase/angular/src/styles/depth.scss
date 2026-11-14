@@ -185,26 +185,57 @@ body:has(.fsb-navcue :focus-visible) .fsb-depth {
     margin-top: 24px;
   }
 
-  /* A row of cards swiped sideways: one card at a time, with the edge of the next
-     one showing. The engine leaves sideways swipes to the row, and moves the row
-     as one piece. */
-  .fsb-depth .fsb-depth-layer [data-depth-swipe] {
+  /* A row swiped sideways (data-depth-swipe): one card at a time, with the edge of
+     the next showing.
+     The row runs past the page's side padding to both edges of the screen and
+     fades out there, so the next card is seen to carry on off the screen instead
+     of being cut short inside it. A card at rest lines up with the text above it
+     and stops short of the rail on the right, and the next one has faded out
+     before it reaches the rail's marks. The engine leaves sideways swipes to the
+     row, and moves the row as one piece.
+
+     --swipe-gutter  how far the row reaches past its column at each end (the
+                     page's side padding)
+     --swipe-end     the room kept at the far end (the side padding and the rail)
+     --swipe-gap     the space between its cards
+     A row inside a card sets the first two to that card's own padding. */
+  .fsb-depth .fsb-depth-layer [data-depth-swipe],
+  .fsb-depth .fsb-depth-layer [data-depth-line] {
     display: flex;
-    gap: 12px;
+    flex-wrap: nowrap;
+    gap: var(--swipe-gap, 12px);
+    justify-content: flex-start;
+    margin-inline: calc(var(--swipe-gutter, 16px) * -1);
+    padding-inline: var(--swipe-gutter, 16px) var(--swipe-end, 32px);
+    scroll-padding-inline: var(--swipe-gutter, 16px) var(--swipe-end, 32px);
     overflow-x: auto;
     overscroll-behavior-x: contain;
     scroll-snap-type: x mandatory;
     scrollbar-width: none;
+    -webkit-mask-image: linear-gradient(to right, transparent, #000 var(--swipe-gutter, 16px), #000 calc(100% - var(--swipe-end, 32px)), transparent calc(100% - var(--swipe-end, 32px) + 14px));
+    mask-image: linear-gradient(to right, transparent, #000 var(--swipe-gutter, 16px), #000 calc(100% - var(--swipe-end, 32px)), transparent calc(100% - var(--swipe-end, 32px) + 14px));
   }
 
-  .fsb-depth .fsb-depth-layer [data-depth-swipe]::-webkit-scrollbar {
+  .fsb-depth .fsb-depth-layer [data-depth-swipe]::-webkit-scrollbar,
+  .fsb-depth .fsb-depth-layer [data-depth-line]::-webkit-scrollbar {
     display: none;
   }
 
   .fsb-depth .fsb-depth-layer [data-depth-swipe] > * {
     flex: 0 0 86%;
     min-width: 0;
-    scroll-snap-align: center;
+    scroll-snap-align: start;
+  }
+
+  /* A line of chips swiped the same way (data-depth-line): each chip keeps its own
+     width, and the line moves freely instead of stopping card by card. */
+  .fsb-depth .fsb-depth-layer [data-depth-line] {
+    gap: var(--swipe-gap, 8px);
+    scroll-snap-type: none;
+  }
+
+  .fsb-depth .fsb-depth-layer [data-depth-line] > * {
+    flex: none;
   }
 }
 
