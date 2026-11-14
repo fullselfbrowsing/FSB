@@ -3,10 +3,12 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
 
 import { APP_VERSION } from '../../core/seo/version';
 import { LanguagePickerComponent } from '../language-picker/language-picker.component';
+import { DepthSway, createDepthSway } from './depth-sway';
 
 /* The last plane of every depth page: the site index that replaces the footer.
    The groups float a little toward the pointer (--px/--py, read by the
-   .fsb-end-float rules); the copy reuses the footer's trans-units. */
+   .fsb-end-float rules), or with the tilt of a phone that gives it unasked
+   (depth-sway.ts); the copy reuses the footer's trans-units. */
 @Component({
   selector: 'app-depth-end',
   standalone: true,
@@ -38,13 +40,16 @@ export class DepthEndComponent implements OnDestroy {
         el.style.setProperty('--px', '0');
         el.style.setProperty('--py', '0');
       };
+      let sway: DepthSway | undefined;
       this.zone.runOutsideAngular(() => {
         el.addEventListener('mousemove', move, { passive: true });
         el.addEventListener('mouseleave', leave, { passive: true });
+        sway = createDepthSway(el);
       });
       this.detach = () => {
         el.removeEventListener('mousemove', move);
         el.removeEventListener('mouseleave', leave);
+        sway?.destroy();
       };
     });
   }
