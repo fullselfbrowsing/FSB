@@ -1397,8 +1397,25 @@
     animation: none;
   }
 
-  .cap-marquee-row {
-    overflow-x: auto;
+  /* Without the loop, the rest of each row would be out of sight. The apps of both
+     rows wrap into one block instead, without the second copy of each row that
+     exists only to make the loop seamless. */
+  .cap-marquee {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+
+  .cap-marquee-row,
+  .cap-track {
+    display: contents;
+  }
+
+  .cap-logo[aria-hidden='true'] {
+    display: none;
   }
 }
 
@@ -1410,7 +1427,6 @@
 
   .eng-tabs {
     flex-direction: row;
-    overflow-x: auto;
     border-right: none;
     border-bottom: 1px solid var(--border-color);
   }
@@ -1425,6 +1441,15 @@
 
   .competitors-row {
     grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Three tabs of 220px stop fitting side by side below about 730px. From there
+   down they share the row equally, so the strip never has to be scrolled. */
+@media (max-width: 760px) {
+  .eng-tab {
+    flex: 1 1 0;
+    min-width: 0;
   }
 }
 

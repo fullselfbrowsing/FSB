@@ -716,12 +716,19 @@
     gap: 8px;
   }
 
-  /* The categories are a line swiped sideways inside the card, so the line runs
-     to the card's own edges. */
+  /* All the categories show, wrapped in small type. */
   .cat-legend {
-    --swipe-gutter: 14px;
-    --swipe-end: 14px;
-    --swipe-gap: 14px;
+    gap: 4px 12px;
+  }
+
+  .cat-legend-item {
+    gap: 5px;
+    font-size: 0.68rem;
+  }
+
+  .cat-dot {
+    width: 8px;
+    height: 8px;
   }
 
   .action-categories {

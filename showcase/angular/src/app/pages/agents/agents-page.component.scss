@@ -928,9 +928,10 @@
   }
 }
 
-/* Phones: a plane has one screen and no scrolling of its own. Card groups become
-   rows swiped sideways (data-depth-swipe, styles/depth.scss) and everything else
-   is set more tightly. */
+/* Phones: a plane has one screen and nothing in it scrolls, up, down or sideways,
+   so everything in a section has to be on that screen at once. Cards become short
+   rows or two columns, chip lists wrap, and the rest is set more tightly; the
+   engine then scales the plane to fit. */
 @media (max-width: 600px) {
   .agents-hero h1 {
     margin-bottom: 12px;
@@ -951,25 +952,70 @@
     padding-bottom: 0;
   }
 
+  /* Each agent is a short row: its mark on the left, name and maker on one line,
+     the description under the name. The footer says the same on all three cards,
+     so it is left out here. */
+  .ag-featured {
+    gap: 8px;
+  }
+
   .ag-agent {
-    gap: 10px;
-    padding: 18px 18px 16px;
+    display: grid;
+    grid-template-columns: 40px minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 4px 12px;
+    padding: 12px 14px;
+  }
+
+  .ag-agent-head {
+    display: contents;
+  }
+
+  .ag-agent-mark {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    width: 40px;
+    height: 40px;
+  }
+
+  .ag-agent h3 {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: center;
+    font-size: 1.05rem;
+  }
+
+  .ag-agent-maker {
+    grid-column: 3;
+    grid-row: 1;
+    align-self: center;
   }
 
   .ag-agent p {
-    font-size: 0.88rem;
-    line-height: 1.55;
+    grid-column: 2 / -1;
+    grid-row: 2;
+    font-size: 0.82rem;
+    line-height: 1.5;
   }
 
-  /* The other hosts sit on one line swiped sideways, label first. */
+  .ag-agent-foot {
+    display: none;
+  }
+
+  /* The other hosts wrap under their label. */
   .ag-more {
-    margin-top: 16px;
+    gap: 6px;
+    margin-top: 12px;
   }
 
   .ag-more-label {
-    width: auto;
-    margin: 0 4px 0 0;
-    white-space: nowrap;
+    margin-bottom: 2px;
+  }
+
+  .ag-chip {
+    gap: 6px;
+    padding: 4px 9px;
+    font-size: 0.74rem;
   }
 
   /* Two by two, sharing the dividers as the wider layouts do. */
@@ -1001,48 +1047,105 @@
     overflow-wrap: anywhere;
   }
 
+  /* Each skill feature is a short row: icon and title on one line, the text
+     across underneath. This plane also holds the connect card, so it is the
+     fullest one and its spacing is the tightest. */
+  .fsb-depth-layer section.agents-skill .section-header {
+    margin-bottom: 14px;
+  }
+
+  .fsb-depth-layer .fsb-depth-fit > section.agents-connect {
+    margin-top: 14px;
+  }
+
+  .skill-feature-grid {
+    gap: 8px;
+  }
+
   .skill-feature-card {
-    padding: 18px;
+    display: grid;
+    grid-template-columns: 30px minmax(0, 1fr);
+    gap: 5px 10px;
+    padding: 10px 14px;
   }
 
   .skill-feature-icon {
-    margin-bottom: 10px;
+    width: 30px;
+    height: 30px;
+    margin-bottom: 0;
+    font-size: 1rem;
+  }
+
+  .skill-feature-card h3 {
+    align-self: center;
+    margin-bottom: 0;
+    font-size: 0.98rem;
   }
 
   .skill-feature-card p {
-    font-size: 0.86rem;
-    line-height: 1.55;
+    grid-column: 1 / -1;
+    font-size: 0.8rem;
+    line-height: 1.5;
   }
 
   .ag-connect {
-    gap: 14px;
-    padding: 18px 16px;
+    gap: 8px;
+    padding: 12px 14px;
+  }
+
+  .ag-connect h2 {
+    margin-bottom: 6px;
+    font-size: 1.15rem;
   }
 
   .ag-connect p {
-    font-size: 0.86rem;
+    font-size: 0.82rem;
+    line-height: 1.5;
   }
 
-  /* The host chips are a line swiped sideways inside the card, so the line runs
-     to the card's own edges. */
+  .ag-cmd {
+    padding: 10px 12px;
+  }
+
   .ag-hosts {
-    --swipe-gutter: 16px;
-    --swipe-end: 16px;
-    --swipe-gap: 6px;
+    gap: 5px;
+    margin-top: 8px;
+  }
+
+  /* The six prompts sit two by two. */
+  .prompt-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
   }
 
   .prompt-card {
-    padding: 16px;
+    padding: 10px 12px;
+  }
+
+  .prompt-card-head {
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+
+  .prompt-card-icon {
+    width: 24px;
+    height: 24px;
+    font-size: 0.85rem;
+  }
+
+  .prompt-card-label {
+    font-size: 0.62rem;
+    letter-spacing: 0.04em;
   }
 
   .prompt-card-body {
-    font-size: 0.88rem;
-    line-height: 1.55;
+    font-size: 0.78rem;
+    line-height: 1.45;
   }
 
   .autopilot-rule {
-    margin-top: 16px;
+    margin-top: 12px;
     padding: 10px 14px;
-    font-size: 0.8rem;
+    font-size: 0.78rem;
   }
 }
